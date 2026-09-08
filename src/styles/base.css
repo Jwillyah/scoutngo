@@ -1,0 +1,64 @@
+/* Reset and element defaults. Colors come from tokens.css only. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/* The map is full bleed. Nothing scrolls at the document level; the bottom
+   sheet does its own scrolling. */
+body {
+  margin: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+p,
+figure {
+  margin: 0;
+}
+
+input,
+textarea,
+select,
+button {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: var(--focus-ring) solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/*
+ * The monospace variant. Numeric readouts only: coordinates, bearings, degrees,
+ * focal lengths, clock times. Never labels, never prose. Always full opacity on
+ * a solid surface, so it survives direct sunlight.
+ */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  opacity: 1;
+}

@@ -7,19 +7,21 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@turf/turf": "^7.4.0",
+    "maplibre-gl": "^6.8.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "suncalc": "^2.0.2"
+    "suncalc": "2.0.2"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
-    "@types/suncalc": "^1.9.2",
     "@vitejs/plugin-react": "^6.1.0",
     "oxlint": "^1.79.0",
     "typescript": "~6.0.2",

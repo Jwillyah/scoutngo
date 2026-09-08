@@ -1,0 +1,133 @@
+/*
+ * ScoutNGo design tokens.
+ *
+ * THE MAP IS THE HERO. Satellite imagery runs full bleed, edge to edge. Every
+ * other surface is minimal near-black chrome floating over it.
+ *
+ * THREE SEPARATE PALETTES. Do not mix them.
+ *
+ * 1. CHROME. Near-black surfaces, off-white type, one accent.
+ *    ACCENT is electric lime. Primary action and active states ONLY. It is not
+ *    a decorative color and it never fills a panel.
+ *    HAZARD is magenta. Airspace and warnings ONLY.
+ *
+ * 2. DATA OVERLAY. The lighting classes and the sun. These sit on the map, are
+ *    computed by src/core/, and are hard edged with no rounding.
+ *
+ * 3. CHART. Buff land and pale water, held for a vector chart fallback when
+ *    imagery is unusable. Not used by any component today.
+ *
+ * READABILITY RULES, non negotiable, this is used outdoors in sun:
+ * - Numeric readouts are monospace at full opacity on a SOLID surface. Never
+ *   frosted glass, never a low opacity fill behind a number.
+ * - Rounding is allowed on floating panels only, at --radius-panel. The map and
+ *   every data overlay stay hard edged at --radius-flat.
+ * - No gradients. No shadows for depth, only a hairline to separate surfaces.
+ *
+ * Every component reads from this file. No component hardcodes a color.
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* ------------------------------------------------------ chrome palette */
+  --black: #0a0b09; /* deepest, the sheet grab area and scrims */
+  --surface-1: #121412; /* floating panels, the bottom sheet */
+  --surface-2: #1c1f1c; /* inputs and rows inside a panel */
+  --surface-3: #2a2e29; /* hairlines and dividers */
+  --white: #f4f6f1; /* primary type */
+  --grey-1: #b6bcb2; /* secondary type */
+  --grey-2: #7f867c; /* faint type, placeholders */
+
+  --accent: #d6f84c; /* electric lime. primary action, active state. nothing else */
+  --accent-ink: #101208; /* type on top of the accent */
+
+  --hazard: #bd0069; /* magenta. hazard only */
+  --hazard-tint: #2a0518;
+
+  /* -------------------------------------------------- data overlay palette */
+  /* Lighting classes, computed by src/core/lighting.ts. Deliberately not lime
+     and not magenta, so a cone can never be mistaken for a control or a warning. */
+  --light-front: #3ddc84; /* front-lit, sun behind the camera */
+  --light-side: #4db8ff; /* side-lit */
+  --light-back: #ff6b3d; /* backlit, shooting into the sun */
+  --sun: #ffd54a; /* the sun direction line */
+  --mark: #ffffff; /* subject reticle and venue pin */
+  --mark-edge: #0a0b09; /* the dark edging that keeps a mark legible on imagery */
+
+  /* --------------------------------------------- chart fallback, unused yet */
+  --map-land: #e5d6b2;
+  --map-water: #cbdfe9;
+
+  /* ------------------------------------------------------------- semantic */
+  --color-bg: var(--black);
+  --color-panel: var(--surface-1);
+  --color-panel-2: var(--surface-2);
+  --color-field: var(--surface-2);
+  --color-text: var(--white);
+  --color-text-muted: var(--grey-1);
+  --color-text-faint: var(--grey-2);
+  --color-line: var(--surface-3);
+  --color-line-strong: var(--grey-2);
+
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-hazard: var(--hazard);
+  --color-hazard-bg: var(--hazard-tint);
+  --color-focus: var(--accent);
+
+  /* ----------------------------------------------------------------- type */
+  /* One family. The monospace variant is for numeric readouts only, applied
+     through .num, and never for labels or prose. */
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  /* Tightened scale, heavier headers. */
+  --text-xs: 0.6875rem; /* 11 */
+  --text-sm: 0.75rem; /* 12 */
+  --text-md: 0.875rem; /* 14 */
+  --text-base: 1rem; /* 16, form controls. Below this iOS zooms on focus. */
+  --text-lg: 1.0625rem; /* 17 */
+  --text-xl: 1.25rem; /* 20 */
+
+  --leading-tight: 1.1;
+  --leading-normal: 1.4;
+
+  --weight-normal: 400;
+  --weight-medium: 600;
+  --weight-heavy: 800;
+
+  --tracking-label: 0.08em;
+  --tracking-tight: -0.01em;
+
+  /* -------------------------------------------------------------- spacing */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+
+  /* ------------------------------------------------------------- linework */
+  --line-hair: 1px;
+  --line-rule: 2px;
+
+  --radius-panel: 12px; /* floating chrome only */
+  --radius-flat: 0; /* the map and every data overlay */
+
+  /* -------------------------------------------------------------- control */
+  --control-height: 44px;
+  --control-pad-x: var(--space-3);
+  --focus-ring: var(--line-rule);
+  --box-size: 1.125rem;
+
+  /* --------------------------------------------------------------- layout */
+  --page-pad: var(--space-4);
+  --page-max: 34rem;
+  --sheet-peek: 108px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}

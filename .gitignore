@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local secrets. Bring your own key.
+.env
+.env.*
+!.env.example
