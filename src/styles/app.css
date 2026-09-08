@@ -60,7 +60,7 @@
    visible, which is a licence requirement, not a nicety. */
 .maplibregl-ctrl-bottom-left,
 .maplibregl-ctrl-bottom-right {
-  bottom: calc(var(--sheet-peek) + var(--safe-bottom));
+  bottom: calc(var(--nav-height) + var(--scrub-height) + var(--sheet-peek) + var(--safe-bottom));
 }
 
 /* maplibre themes the compact attribution with a two class selector, so match
@@ -98,21 +98,17 @@
   position: absolute;
   top: var(--space-3);
   left: var(--space-3);
+  right: var(--space-3);
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
   gap: var(--space-2);
-  pointer-events: none;
 }
 
-.hud__mark {
-  background: var(--color-panel);
-  border-radius: var(--radius-panel);
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-heavy);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
+.hud__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 /* Solid behind the numbers. Never glass, never faded. */
@@ -131,16 +127,6 @@
   letter-spacing: var(--tracking-label);
   text-transform: uppercase;
   color: var(--color-text-muted);
-}
-
-/* ----------------------------------------------------------- tap modes */
-
-.modes {
-  position: absolute;
-  top: var(--space-3);
-  right: 60px;
-  display: flex;
-  gap: var(--space-2);
 }
 
 .mode {
@@ -162,6 +148,193 @@
   background: var(--color-accent);
   color: var(--color-accent-ink);
   border-color: var(--color-accent);
+}
+
+/* ------------------------------------------------------------- search */
+
+.search {
+  position: relative;
+}
+
+.search__input {
+  width: 100%;
+  height: 44px;
+  padding: 0 var(--space-3);
+  background: var(--color-panel);
+  color: var(--color-text);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-panel);
+  font-size: var(--text-base);
+}
+
+.search__input::placeholder {
+  color: var(--color-text-faint);
+}
+
+.search__busy {
+  position: absolute;
+  right: var(--space-3);
+  top: 12px;
+  color: var(--color-text-muted);
+}
+
+.search__results {
+  list-style: none;
+  margin: var(--space-1) 0 0;
+  padding: var(--space-1);
+  background: var(--color-panel);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-panel);
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.search__hit {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-2);
+  background: transparent;
+  border: 0;
+  color: var(--color-text);
+  text-align: left;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.search__hit:hover {
+  background: var(--color-panel-2);
+}
+
+/* OSM requires visible attribution wherever their data is shown. */
+.search__credit {
+  padding: var(--space-2);
+  border-top: var(--line-hair) solid var(--color-line);
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+}
+
+/* --------------------------------------------------------- map controls */
+
+.mapctl {
+  position: absolute;
+  right: var(--space-3);
+  /* Clears the sheet, the nav bar, AND maplibre's own attribution row, which
+     runs nearly the full width when expanded and would sit on the fit button. */
+  bottom: calc(
+    var(--nav-height) + var(--scrub-height) + var(--sheet-peek) + 56px + var(--space-3) +
+      var(--safe-bottom)
+  );
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.mapctl__stack {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-panel);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-panel);
+  overflow: hidden;
+}
+
+.mapctl__stack .mapctl__btn {
+  border: 0;
+  border-radius: 0;
+}
+
+.mapctl__stack .mapctl__btn + .mapctl__btn {
+  border-top: var(--line-hair) solid var(--color-line);
+}
+
+/* Thumb sized, not mouse sized. */
+.mapctl__btn {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-panel);
+  color: var(--color-text);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-panel);
+  font-size: var(--text-xl);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.mapctl__btn:disabled {
+  color: var(--color-text-faint);
+  cursor: not-allowed;
+}
+
+.mapctl__btn--on {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  border-color: var(--color-accent);
+}
+
+.mapctl__tilt {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heavy);
+}
+
+.mapctl__fit {
+  font-size: var(--text-lg);
+}
+
+/* Dims the map behind a full screen readout. */
+.scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--black);
+  opacity: 0.6;
+}
+
+/* ------------------------------------------------------------- nav bar */
+
+.nav {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(var(--nav-height) + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background: var(--black);
+  border-top: var(--line-hair) solid var(--color-line);
+}
+
+.nav__item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  background: transparent;
+  border: 0;
+  border-top: var(--line-rule) solid transparent;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.nav__item--on {
+  color: var(--color-accent);
+  border-top-color: var(--color-accent);
+}
+
+.nav__count {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  border-radius: var(--radius-panel);
+  padding: 1px 5px;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-heavy);
 }
 
 /* ------------------------------------------------------- map marks */
@@ -219,60 +392,175 @@
 
 /* --------------------------------------------------------- shooter figure */
 
-.shooter-host {
-  cursor: pointer;
+/*
+ * DRAG FIX. maplibre-gl.css sets touch-action only on the map canvas, never on
+ * markers, so these inherited `auto`. On a real touch device the browser is then
+ * free to claim a touchmove that starts on the marker as a pan gesture and fire
+ * touchcancel, and maplibre's drag never begins. Synthetic touch events skip
+ * that arbitration, which is why it looked fine in a headless browser and did
+ * not work on a phone. `none` hands the gesture to maplibre.
+ */
+.shooter-host,
+.shooter {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Say it is draggable. The button's own pointer cursor was hiding maplibre's. */
+.shooter-host,
+.shooter-host .shooter {
+  cursor: grab;
+}
+
+.shooter-host:active,
+.shooter-host:active .shooter {
+  cursor: grabbing;
 }
 
 .shooter {
   display: grid;
   justify-items: center;
-  gap: 2px;
+  gap: 3px;
   padding: 0;
   background: transparent;
   border: 0;
-  cursor: pointer;
 }
 
-.shooter__svg {
-  width: 34px;
-  height: 37px;
-  display: block;
+/* A geometric mark. The cone shows direction, so the disc does not have to. */
+.shooter__disc {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  border: var(--line-rule) solid var(--mark-edge);
 }
 
-.shooter__edge {
+.shooter__number {
+  font-size: var(--text-md);
+  font-weight: var(--weight-heavy);
+  line-height: 1;
+  color: var(--color-accent-ink);
+}
+
+/* Small silhouette, only to say what the disc is. */
+.shooter__cam {
+  position: absolute;
+  bottom: -7px;
+  width: 16px;
+  height: 10px;
   fill: var(--mark-edge);
 }
 
-.shooter__body {
+.shooter__cam-lens {
   fill: var(--color-accent);
 }
 
-.shooter__lens {
-  fill: var(--mark-edge);
+.shooter--selected .shooter__disc {
+  width: 38px;
+  height: 38px;
+  background: var(--white);
+  border-color: var(--color-accent);
+  border-width: var(--line-heavy, 3px);
+  outline: var(--line-rule) solid var(--mark-edge);
 }
 
-/* Readouts on the map: solid plate, full opacity, monospace. */
-.shooter__badge,
+.shooter--selected .shooter__number {
+  color: var(--black);
+  font-size: var(--text-lg);
+}
+
+.shooter--selected .shooter__cam-lens {
+  fill: var(--white);
+}
+
+/* Magenta is the hazard color, and standing in a river is a hazard. */
+.shooter--warned .shooter__disc {
+  background: var(--color-hazard);
+  border-color: var(--white);
+}
+
+.shooter--warned .shooter__number {
+  color: var(--white);
+}
+
+.shooter--warned .shooter__cam-lens {
+  fill: var(--color-hazard);
+}
+
+.shooter__warn {
+  background: var(--color-hazard);
+  color: var(--white);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  padding: 2px 5px;
+  white-space: nowrap;
+}
+
+/* Readout on the map: solid plate, full opacity, monospace. */
 .shooter__focal {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: var(--mark-edge);
+  color: var(--color-text);
   font-size: var(--text-xs);
   font-weight: var(--weight-heavy);
   line-height: 1;
   padding: 3px 5px;
 }
 
-.shooter__badge {
+.shooter__moved {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
   background: var(--color-accent);
-  color: var(--color-accent-ink);
 }
 
-.shooter__focal {
+/* ------------------------------------------------------- sun ray labels */
+
+.ray-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 3px 5px;
   background: var(--mark-edge);
-  color: var(--color-text);
+  border-left: var(--line-heavy, 3px) solid var(--sun);
+  pointer-events: none;
+  white-space: nowrap;
 }
 
-.shooter--selected .shooter__badge {
-  outline: var(--line-rule) solid var(--mark);
+.ray-label--shadow {
+  border-left-color: var(--sun-shadow);
+}
+
+.ray-label--sunrise {
+  border-left-color: var(--sun-rise);
+}
+
+.ray-label--sunset {
+  border-left-color: var(--sun-set);
+}
+
+.ray-label__text {
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.ray-label__deg {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heavy);
+  color: var(--color-text);
 }
 
 /* ---------------------------------------------------------------- card */
@@ -281,7 +569,10 @@
   position: absolute;
   left: var(--space-3);
   right: var(--space-3);
-  bottom: calc(var(--sheet-peek) + var(--space-3) + var(--safe-bottom));
+  bottom: calc(
+    var(--nav-height) + var(--scrub-height) + var(--sheet-peek) + var(--space-3) +
+      var(--safe-bottom)
+  );
   max-width: var(--page-max);
   margin: 0 auto;
   background: var(--color-panel);
@@ -398,7 +689,7 @@
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 0;
+  bottom: calc(var(--nav-height) + var(--scrub-height));
   display: flex;
   flex-direction: column;
   background: var(--color-panel);
@@ -995,4 +1286,256 @@
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+/* --------------------------------------------------------------- shot list */
+
+.shots {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--page-pad) var(--space-5);
+}
+
+.shot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 100%;
+  padding: var(--space-3) 0;
+  background: transparent;
+  border: 0;
+  border-bottom: var(--line-hair) solid var(--color-line);
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.shot--on {
+  border-left: var(--line-rule) solid var(--color-accent);
+  padding-left: var(--space-2);
+}
+
+.shot__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.shot__number {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  font-weight: var(--weight-heavy);
+  font-size: var(--text-sm);
+  padding: 2px 6px;
+}
+
+/* Computed by src/core/lighting.ts. Same three colors as the cones. */
+.shot__light {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  padding: 2px 6px;
+  color: var(--accent-ink);
+}
+
+.shot__light--backlit {
+  background: var(--light-back);
+}
+
+.shot__light--side-lit {
+  background: var(--light-side);
+}
+
+.shot__light--front-lit {
+  background: var(--light-front);
+}
+
+.shot__moved,
+.card__moved {
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  border: var(--line-hair) solid var(--color-line-strong);
+  padding: 1px 4px;
+}
+
+.card__moved {
+  display: block;
+  margin-top: var(--space-1);
+  background: var(--color-panel);
+  color: var(--color-text-muted);
+}
+
+.shot__shot {
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-normal);
+}
+
+.shot__gear,
+.shot__stats {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.shot__risk {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  border-left: var(--line-rule) solid var(--color-hazard);
+  padding-left: var(--space-2);
+}
+
+/* A dragged position is marked so a hand placed one is never mistaken for
+   a generated one. */
+.shooter__moved {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-left: 3px;
+  vertical-align: middle;
+  background: var(--color-accent-ink);
+}
+
+/* ------------------------------------------------------- raw response */
+
+.raw {
+  margin: var(--space-3) var(--page-pad) 0;
+  border: var(--line-hair) solid var(--color-hazard);
+  border-radius: var(--radius-panel);
+  overflow: hidden;
+}
+
+.raw__head {
+  background: var(--color-hazard);
+  color: var(--white);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.raw__reason,
+.raw__hint {
+  padding: var(--space-2) var(--space-3) 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.raw__body {
+  margin: var(--space-2) var(--space-3) var(--space-3);
+  padding: var(--space-2);
+  max-height: 40vh;
+  overflow: auto;
+  background: var(--color-panel-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.notice--hazard {
+  border-left-color: var(--color-hazard);
+}
+
+.empty {
+  padding: var(--space-5) var(--page-pad);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* --------------------------------------------------------- time scrubber */
+
+.scrub {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--nav-height);
+  z-index: 2;
+  padding: var(--space-2) var(--page-pad);
+  background: var(--black);
+  border-top: var(--line-hair) solid var(--color-line);
+}
+
+.scrub__readout {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.scrub__time {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-heavy);
+}
+
+.scrub__stat {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  font-size: var(--text-md);
+}
+
+.scrub__stat-label {
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.scrub__range {
+  width: 100%;
+  margin: var(--space-1) 0 0;
+  accent-color: var(--color-accent);
+  height: 28px;
+}
+
+.scrub__ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+}
+
+/* ----------------------------------------------------------- warnings */
+
+.shot__warn {
+  background: var(--color-hazard);
+  color: var(--white);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  padding: 2px 6px;
+}
+
+.card__warn {
+  background: var(--color-hazard-bg);
+  border-left: var(--line-rule) solid var(--color-hazard);
+  color: var(--white);
+  padding: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+/* --------------------------------------------------------- ground view */
+
+.ground {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ground__img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: var(--line-hair) solid var(--color-line);
+}
+
+.ground__note {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
 }

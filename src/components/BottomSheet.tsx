@@ -29,6 +29,8 @@ interface BottomSheetProps {
   children: ReactNode
   /** Reports the live height so the map can keep its content above the sheet. */
   onHeightChange?: (height: number) => void
+  /** Space taken by the fixed nav bar underneath, excluded from every stop. */
+  reservedBottom?: number
 }
 
 /**
@@ -42,10 +44,12 @@ export function BottomSheet({
   peek,
   children,
   onHeightChange,
+  reservedBottom = 0,
 }: BottomSheetProps) {
-  const [viewport, setViewport] = useState(() =>
+  const [rawViewport, setViewport] = useState(() =>
     typeof window === 'undefined' ? 800 : window.innerHeight,
   )
+  const viewport = Math.max(PEEK_PX * 2, rawViewport - reservedBottom)
   const [dragHeight, setDragHeight] = useState<number | null>(null)
   const drag = useRef<{ startY: number; startHeight: number } | null>(null)
 

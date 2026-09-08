@@ -44,8 +44,8 @@ export const EMPTY_VENUE: VenueDraft = {
  */
 export const CALIBRATION_VENUE: VenueDraft = {
   name: 'Brew River Dock Bar, Salisbury MD',
-  latitude: '38.3648',
-  longitude: '-75.6069',
+  latitude: '38.364236',
+  longitude: '-75.605912',
   date: '2026-09-12',
   startTime: '11:00',
   endTime: '15:00',

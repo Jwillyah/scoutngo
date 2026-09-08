@@ -18,28 +18,24 @@ describe('render smoke', () => {
   it('renders the map shell with the map as the hero', () => {
     expect(html).toContain('class="shell"')
     expect(html).toContain('class="map__canvas"')
-    expect(html).toContain('ScoutNGo')
   })
 
-  it('offers both map tap modes, neither of them on by default', () => {
-    expect(html).toContain('Set venue')
-    expect(html).toContain('Set subject')
+  it('carries the four tab shell with plan as the default', () => {
+    expect(html).toContain('Shot list')
+    expect(html).toContain('nav__item nav__item--on')
+    expect(html).toContain('Venue and window')
+  })
+
+  it('offers search and both map tap modes, none of them on by default', () => {
+    expect(html).toContain('Search for a venue')
     expect(html).not.toContain('mode mode--on')
   })
 
   it('starts as a peek sheet: one summary line and the generate button', () => {
     expect(html).toContain('sheet sheet--peek')
     expect(html).toContain('Brew River Dock Bar · 11:00 to 15:00')
-    expect(html).toContain('btn btn--primary')
-    // The form is mounted but folded away behind the peek.
+    expect(html).toContain('Generate')
     expect(html).toContain('<div class="sheet__body" hidden=""')
-  })
-
-  it('carries all four setup sections, with the screenshot demoted to a fallback', () => {
-    expect(html).toContain('Venue and window')
-    expect(html).toContain('Kit and style')
-    expect(html).toContain('Sun through the window')
-    expect(html).toContain('Screenshot fallback')
   })
 
   it('shows no validation errors before anything has been touched', () => {
@@ -47,9 +43,8 @@ describe('render smoke', () => {
     expect(html).not.toContain('aria-invalid="true"')
   })
 
-  it('reads the kit off the core, forced crop included', () => {
-    expect(html).toContain('Sony 200-600')
-    expect(html).toContain('10-18mm APS-C')
+  it('has no positions until generate has run', () => {
+    expect(html).not.toContain('class="shooter')
   })
 })
 

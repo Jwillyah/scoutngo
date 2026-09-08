@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getSunPosition, normalizeBearing, toCompassAzimuth } from './sun.ts'
+import { getSunArc, getSunPosition, normalizeBearing, toCompassAzimuth } from './sun.ts'
 
 describe('toCompassAzimuth', () => {
   it('maps suncalc 0 (due south) to 180 compass', () => {
@@ -55,5 +55,43 @@ describe('getSunPosition', () => {
   it('derives shadowBearing as the reciprocal of the azimuth', () => {
     const { azimuth, shadowBearing } = getSunPosition(new Date('2026-09-12T13:00:00-04:00'), 38.3648, -75.6069)
     expect(shadowBearing).toBeCloseTo(normalizeBearing(azimuth + 180), 10)
+  })
+})
+
+describe('getSunArc', () => {
+  const LAT = 38.364236
+  const LON = -75.605912
+  const DAY = new Date('2026-09-12T13:00:00-04:00')
+
+  it('puts sunrise in the east and sunset in the west', () => {
+    const arc = getSunArc(DAY, LAT, LON)
+    expect(arc.sunrise).not.toBeNull()
+    expect(arc.sunset).not.toBeNull()
+    // Mid September, close to the equinox, so both sit near due east and west.
+    expect(arc.sunrise!.azimuth).toBeGreaterThan(60)
+    expect(arc.sunrise!.azimuth).toBeLessThan(110)
+    expect(arc.sunset!.azimuth).toBeGreaterThan(250)
+    expect(arc.sunset!.azimuth).toBeLessThan(300)
+  })
+
+  it('agrees with getSunPosition at those exact times', () => {
+    // The arc must not be a second source of solar truth.
+    const arc = getSunArc(DAY, LAT, LON)
+    expect(arc.sunrise!.azimuth).toBeCloseTo(
+      getSunPosition(arc.sunrise!.at, LAT, LON).azimuth,
+      10,
+    )
+  })
+
+  it('reports sunrise before sunset', () => {
+    const arc = getSunArc(DAY, LAT, LON)
+    expect(arc.sunrise!.at.getTime()).toBeLessThan(arc.sunset!.at.getTime())
+  })
+
+  it('returns nulls during polar night instead of throwing', () => {
+    // Longyearbyen in December: the sun does not rise.
+    const arc = getSunArc(new Date('2026-12-21T12:00:00Z'), 78.22, 15.65)
+    expect(arc.sunrise).toBeNull()
+    expect(arc.sunset).toBeNull()
   })
 })

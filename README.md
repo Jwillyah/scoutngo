@@ -46,17 +46,44 @@ So:
 - Bring your own Anthropic API key. It goes in `.env`, which is gitignored, and
   is read only by a serverless function so it never reaches the browser bundle.
 
-Two things do leave your device, and you should know exactly what they are.
+Three things leave your device, and you should know exactly what they are.
 
 **Map tiles.** The satellite map fetches imagery from Esri at
 `server.arcgisonline.com`. Requesting a tile tells that server which tile you
 are looking at, so your venue coordinates are visible to Esri, at roughly the
 zoom level you are viewing. That is unavoidable for any map that streams
-imagery. Nothing else is attached to those requests: no account, no identifier,
-no form content. If a venue location is sensitive, do not point the map at it.
+imagery. Nothing else is attached: no account, no identifier, no form content.
 
-**Plan generation.** Only when you press generate, and only then. That request
-goes to Anthropic, not to us.
+**Venue search.** Typing in the search box sends that text to Nominatim at
+`nominatim.openstreetmap.org`, run by the OpenStreetMap Foundation. They see the
+query and, as with any web request, your IP and the referring page. Only what you
+type in that box is sent. If you would rather not search, drop the pin by hand or
+type coordinates; nothing is sent then.
+
+**Site geometry.** Pressing Generate also asks Overpass, at
+`overpass-api.de`, for the water, buildings, piers, roads, and parking inside the
+current map view. That sends the bounding box you are looking at, nothing else.
+Results are cached per view so repeated generates do not re-query, and if
+Overpass is slow or down the app carries on without it.
+
+**Plan generation.** Only when you press Generate, and only then. That request
+carries a JPEG of the current map view plus your text context and the site
+geometry, and it goes to Anthropic through the serverless function so your key
+stays out of the browser. The function logs nothing at all, stores nothing, and
+writes to no database: `netlify/functions/generate.ts` says so at the top and
+explains why.
+
+**Ground view, opt in and off by default.** A position card has a Ground view
+button. Pressing it sends that one position's coordinates to Google's Street
+View API, through a serverless function so the key stays server side. Nothing is
+sent until you press it, and nothing at all is sent if `GOOGLE_MAPS_API_KEY` is
+unset, which is the default: the card simply says ground view is off. That
+function logs nothing either.
+
+Ground view shows real Street View imagery or it says plainly that there is
+none. It never generates or illustrates a view. A plausible fake sightline is
+worse than no sightline for a tool whose whole value is being right about a place
+you have not seen.
 
 Everything else stays put. There is no "us." There is no server holding your
 data because there is no server holding anything.
@@ -65,6 +92,9 @@ data because there is no server holding anything.
 
 - Vite, React, TypeScript
 - `maplibre-gl` for the map, over Esri World Imagery satellite tiles
+- Nominatim, from OpenStreetMap, for venue search
+- Overpass, from OpenStreetMap, for real water, building, road and pier shapes
+- Google Street View Static API for the optional ground view
 - `suncalc` for solar position
 - `@turf/turf` for bearings, distances, and destination points
 - Vitest for the core tests
@@ -78,11 +108,25 @@ Requires Node 20 or newer.
 ```sh
 npm install
 cp .env.example .env   # then paste in your own Anthropic key
+                       # GOOGLE_MAPS_API_KEY is optional, for ground view
 npm run dev
 ```
 
-The dev server prints a local URL. The map, the venue form, the kit profile, and
-the sun readout all work without a key. Only plan generation needs one.
+`npm run dev` prints a local URL and runs everything except Generate: the map,
+search, the venue form, the kit profile, the sun readout, dragging positions.
+
+Generate goes through a serverless function, and Vite does not run those. For
+that you need the Netlify dev server, which runs the site and the function
+together:
+
+```sh
+npx netlify dev
+```
+
+That serves the app on <http://localhost:8888>. The function is at
+<http://localhost:8888/.netlify/functions/generate>. It reads `ANTHROPIC_API_KEY`
+from your `.env`. If you press Generate under `npm run dev` instead, the app
+tells you to switch rather than failing silently.
 
 ```sh
 npm run build     # typecheck and production build
@@ -104,11 +148,23 @@ where the correct answer is already known.
 
 ## Status
 
-Early. The computation core, the live satellite map, and the setup form exist.
-Camera positions are hardcoded stubs around the calibration venue so the shooter
-figures, the field of view cones, and the lighting colors can be seen on real
-imagery. Their geometry is real: bearings, cone angles, and lighting classes are
-all computed by `src/core/`. Plan generation is not wired up yet.
+Working end to end. Press Generate and the app pulls real land and water shapes
+from Overpass, sends those plus the current map view and your context to the
+model, and gets back camera positions as normalized image coordinates. The app
+converts those to real coordinates, then computes the bearing, the field of view
+cone, and the lighting for each one itself.
+
+Every position is then checked against the same OSM geometry. One that lands in
+a river or on a road centreline is flagged in magenta on the map and in the shot
+list. It is never moved for you: you can see the problem and drag it somewhere
+you judge to be standable.
+
+A time scrubber runs the whole window. Dragging it recomputes the sun and
+re-lights every position live, so a four hour window flipping from backlit to
+front-lit is something you watch happen.
+
+Not built, and deliberately: depth of field, exposure, and hyperfocal tools; 3D
+building meshes; accounts; any server side storage.
 
 ## License
 

@@ -51,7 +51,10 @@
   --light-front: #3ddc84; /* front-lit, sun behind the camera */
   --light-side: #4db8ff; /* side-lit */
   --light-back: #ff6b3d; /* backlit, shooting into the sun */
-  --sun: #ffd54a; /* the sun direction line */
+  --sun: #ffd54a; /* current sun bearing */
+  --sun-shadow: #9aa7ff; /* current shadow bearing */
+  --sun-rise: #ffa04a; /* sunrise bearing */
+  --sun-set: #ff5fa8; /* sunset bearing. NOT the magenta hazard token. */
   --mark: #ffffff; /* subject reticle and venue pin */
   --mark-edge: #0a0b09; /* the dark edging that keeps a mark legible on imagery */
 
@@ -128,6 +131,9 @@
   /* --------------------------------------------------------------- layout */
   --page-pad: var(--space-4);
   --page-max: 34rem;
+  --scrub-height: 62px;
   --sheet-peek: 108px;
+  /* Keep --nav-height in step with NAV_HEIGHT in NavBar.tsx. */
+  --nav-height: 56px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }

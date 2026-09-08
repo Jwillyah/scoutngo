@@ -1,62 +1,78 @@
 import type { Classification } from '../core/lighting.ts'
+import type { SiteWarning } from '../core/siting.ts'
 
 interface ShooterFigureProps {
   number: number
   focalLength: number
   classification: Classification
+  /** Ground problems from OSM. Magenta, because that is the hazard color. */
+  warnings: SiteWarning[]
+  moved: boolean
   selected: boolean
   onSelect: () => void
 }
 
+const WARNING_LABEL: Record<SiteWarning, string> = {
+  'in-water': 'in water',
+  'in-roadway': 'in roadway',
+}
+
 /**
- * A shooter standing at a camera position: a person holding a camera to their
- * eye, drawn inline so it can be tinted from tokens. Accent colored, with a dark
- * edge so it holds up over bright sand and dark water alike.
+ * A geometric mark, not a drawing of a person. A filled disc carries the
+ * number; the field of view cone on the map does the work of showing which way
+ * the camera is pointing, so the mark itself does not need to.
  *
- * The badge number and the focal length are readouts, so they sit on a solid
- * surface at full opacity. Nothing here is translucent.
+ * The focal length sits on a solid plate underneath at full opacity, because it
+ * is a numeric readout and has to survive direct sunlight.
  */
 export function ShooterFigure({
   number,
   focalLength,
   classification,
+  warnings,
+  moved,
   selected,
   onSelect,
 }: ShooterFigureProps) {
+  const warning = warnings[0]
+
   return (
     <button
       type="button"
-      className={`shooter${selected ? ' shooter--selected' : ''}`}
+      className={[
+        'shooter',
+        selected ? 'shooter--selected' : '',
+        warning !== undefined ? 'shooter--warned' : '',
+      ]
+        .filter((c) => c !== '')
+        .join(' ')}
       onClick={onSelect}
-      aria-label={`Position ${number}, ${focalLength} millimetres, ${classification}`}
+      aria-label={[
+        `Position ${number}`,
+        `${focalLength} millimetres`,
+        classification,
+        moved ? 'moved by hand' : '',
+        warning === undefined ? '' : WARNING_LABEL[warning],
+      ]
+        .filter((part) => part !== '')
+        .join(', ')}
     >
-      <span className="shooter__badge num" aria-hidden="true">
-        {number}
+      <span className="shooter__disc">
+        <span className="shooter__number num">{number}</span>
+        {/* A camera silhouette, small, only to say what the disc represents. */}
+        <svg className="shooter__cam" viewBox="0 0 16 10" aria-hidden="true">
+          <path d="M1 3h3l1.2-1.6h5.6L12 3h3v6H1z" />
+          <circle className="shooter__cam-lens" cx="8" cy="6" r="2.1" />
+        </svg>
       </span>
 
-      <svg className="shooter__svg" viewBox="0 0 26 28" aria-hidden="true">
-        {/* Dark backing shape, drawn first, so the figure never dissolves into
-            the imagery underneath it. */}
-        <g className="shooter__edge">
-          <circle cx="9" cy="6" r="4.6" />
-          <path d="M2.6 27.5 V16.5 Q2.6 11.4 9 11.4 Q15.4 11.4 15.4 16.5 V27.5 Z" />
-          <rect x="10.6" y="8.6" width="12.8" height="9.8" />
-        </g>
+      {warning === undefined ? null : (
+        <span className="shooter__warn">{WARNING_LABEL[warning]}</span>
+      )}
 
-        <g className="shooter__body">
-          <circle cx="9" cy="6" r="3.4" />
-          <path d="M3.8 27.5 V16.6 Q3.8 12.6 9 12.6 Q14.2 12.6 14.2 16.6 V27.5 Z" />
-          {/* Camera held up at the eye. */}
-          <rect x="11.8" y="9.8" width="10.4" height="7.4" />
-          <rect x="13.4" y="8.2" width="3.4" height="1.8" />
-        </g>
-
-        {/* Lens bore, punched out dark so the camera reads as a camera. */}
-        <circle className="shooter__lens" cx="17" cy="13.5" r="2.5" />
-      </svg>
-
-      <span className="shooter__focal num" aria-hidden="true">
+      <span className="shooter__focal num">
         {focalLength}
+        {moved ? <span className="shooter__moved" aria-hidden="true" /> : null}
       </span>
     </button>
   )

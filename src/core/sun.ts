@@ -1,4 +1,4 @@
-import { getPosition } from 'suncalc'
+import { getPosition, getTimes } from 'suncalc'
 
 const RAD_TO_DEG = 180 / Math.PI
 
@@ -45,4 +45,33 @@ export function getSunPosition(date: Date, lat: number, lon: number): SunPositio
     altitude,
     shadowBearing: normalizeBearing(compass + 180),
   }
+}
+
+export interface SunEvent {
+  at: Date
+  /** Compass bearing of the sun at that moment. */
+  azimuth: number
+}
+
+export interface SunArc {
+  /** Null at latitudes and dates where the sun does not rise or set. */
+  sunrise: SunEvent | null
+  sunset: SunEvent | null
+}
+
+/**
+ * Sunrise and sunset, and the compass bearing of the sun at each.
+ *
+ * Still no solar math here. suncalc supplies the times, and getSunPosition above
+ * supplies the bearing at those times. This exists so the map overlay has one
+ * source for all four of its lines.
+ */
+export function getSunArc(date: Date, lat: number, lon: number): SunArc {
+  const times = getTimes(date, lat, lon)
+  const event = (at: Date | null): SunEvent | null =>
+    at === null || Number.isNaN(at.getTime())
+      ? null
+      : { at, azimuth: getSunPosition(at, lat, lon).azimuth }
+
+  return { sunrise: event(times.sunrise), sunset: event(times.sunset) }
 }

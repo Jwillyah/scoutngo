@@ -9,8 +9,9 @@ import { getSunPosition } from './sun.ts'
  * Riverside Drive. The known right answer is that the south bank is the strong
  * position, because shooting from the north bank means shooting into the sun.
  */
-const LAT = 38.3648
-const LON = -75.6069
+// The actual dock bar. The earlier values were about 100m off.
+const LAT = 38.364236
+const LON = -75.605912
 // 13:00 America/New_York on Sat 12 Sept 2026. EDT is UTC-4, written as an
 // explicit offset so the test does not depend on the machine's timezone.
 const AT_1300 = new Date('2026-09-12T13:00:00-04:00')
