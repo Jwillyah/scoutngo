@@ -7,7 +7,7 @@ export default defineConfig({
   /*
    * Bind to every interface so a phone on the same wifi can reach the dev
    * server. Without this Vite listens on localhost only and prints
-   * "Network: use --host to expose", and netlify dev has nothing to proxy to
+   * "Network: use --host to expose", and `vercel dev` has nothing to proxy to
    * from another device.
    */
   server: { host: true },
@@ -16,10 +16,11 @@ export default defineConfig({
   worker: { format: 'es' },
   test: {
     /*
-     * `netlify dev` bundles every function into .netlify/functions-serve. Those
-     * are compiled copies, and vitest would otherwise collect and run them as a
-     * second, broken set of the same tests.
+     * .vercel holds the project link and, after `vercel build`, a compiled copy of
+     * every function under .vercel/output. Those are build artefacts, and vitest
+     * would otherwise collect and run them as a second, broken set of the same
+     * tests.
      */
-    exclude: [...configDefaults.exclude, '.netlify/**'],
+    exclude: [...configDefaults.exclude, '.vercel/**'],
   },
 })

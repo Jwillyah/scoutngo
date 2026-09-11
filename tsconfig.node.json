@@ -25,5 +25,5 @@
    * same declarations the app project has; without it, tz-lookup is untyped here
    * and only here, which `tsc -p tsconfig.app.json` will not show you.
    */
-  "include": ["vite.config.ts", "netlify/functions", "tests", "src/types"]
+  "include": ["vite.config.ts", "api", "tests", "src/types"]
 }

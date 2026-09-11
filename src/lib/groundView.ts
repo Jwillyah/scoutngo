@@ -9,7 +9,7 @@
  *
  * Opt in, per position. Nothing is requested until the shooter asks for it.
  */
-export const GROUND_VIEW_ENDPOINT = '/.netlify/functions/streetview'
+export const GROUND_VIEW_ENDPOINT = '/api/streetview'
 
 export type GroundView =
   | { status: 'idle' }
@@ -50,7 +50,7 @@ export async function fetchGroundView(
       status: 'error',
       message:
         response.status === 404 || text.startsWith('<')
-          ? 'Ground view needs `netlify dev`, not `npm run dev`.'
+          ? 'Ground view needs `vercel dev`, which serves the functions alongside the app.'
           : `Unexpected response (HTTP ${response.status}).`,
     }
   }

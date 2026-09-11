@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import handler from '../netlify/functions/streetview.ts'
+import * as streetview from '../api/streetview.ts'
 
 const original = process.env.GOOGLE_MAPS_API_KEY
 
@@ -13,9 +13,18 @@ afterEach(() => {
 })
 
 const get = (query: string) =>
-  handler(new Request(`https://example.test/.netlify/functions/streetview?${query}`))
+  streetview.GET(new Request(`https://example.test/api/streetview?${query}`))
 
 describe('streetview function', () => {
+  /* Same reasoning as generate: the export surface is the part that is ours. */
+  it('exposes GET and nothing else', () => {
+    expect(typeof streetview.GET).toBe('function')
+    for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+      expect(streetview).not.toHaveProperty(method)
+    }
+    expect(streetview).not.toHaveProperty('default')
+  })
+
   it('reports a missing key as a state, not a failure', async () => {
     const response = await get('lat=38.36&lon=-75.60&heading=180&fov=30')
     expect(response.status).toBe(200)

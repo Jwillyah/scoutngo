@@ -12,7 +12,7 @@ describe('groundViewUrl', () => {
   })
 
   it('goes through the function, so the key never reaches the browser', () => {
-    expect(url.startsWith('/.netlify/functions/streetview?')).toBe(true)
+    expect(url.startsWith('/api/streetview?')).toBe(true)
     expect(url).not.toContain('googleapis')
     expect(url).not.toContain('key=')
   })

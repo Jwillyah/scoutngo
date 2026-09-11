@@ -103,7 +103,7 @@ export interface GenerateResponse {
   usage?: { input: number; output: number }
 }
 
-export const GENERATE_ENDPOINT = '/.netlify/functions/generate'
+export const GENERATE_ENDPOINT = '/api/generate'
 
 export async function requestPlan(body: GenerateRequestBody): Promise<GenerateResponse> {
   let response: Response
@@ -117,8 +117,8 @@ export async function requestPlan(body: GenerateRequestBody): Promise<GenerateRe
     return { status: 'error', message: 'Could not reach the generate function.' }
   }
 
-  // Under `npm run dev` the function does not exist and Vite answers with the
-  // app's own HTML, so a non JSON body is a real and likely case.
+  // Under a bare `vite` dev server the function does not exist and Vite answers
+  // with the app's own HTML, so a non JSON body is a real and likely case.
   const text = await response.text()
   try {
     return JSON.parse(text) as GenerateResponse
@@ -127,7 +127,7 @@ export async function requestPlan(body: GenerateRequestBody): Promise<GenerateRe
       status: 'error',
       message:
         response.status === 404 || text.startsWith('<')
-          ? 'The generate function is not running. Use `netlify dev` instead of `npm run dev`.'
+          ? 'The generate function is not running. Use `vercel dev`, which serves the app and the functions together.'
           : `Unexpected response from the function (HTTP ${response.status}).`,
     }
   }

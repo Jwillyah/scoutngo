@@ -111,8 +111,9 @@ Overpass is slow or down the app carries on without it.
 carries a JPEG of the current map view plus your text context and the site
 geometry, and it goes to Anthropic through the serverless function so your key
 stays out of the browser. The function logs nothing at all, stores nothing, and
-writes to no database: `netlify/functions/generate.ts` says so at the top and
-explains why.
+writes to no database: `api/generate.ts` says so at the top and explains why.
+Vercel retains function logs in its dashboard, which is precisely why nothing is
+ever written to them.
 
 **Ground view, opt in and off by default.** A position card has a Ground view
 button. Pressing it sends that one position's coordinates to Google's Street
@@ -141,9 +142,9 @@ data because there is no server holding anything.
 - turf for bearings, distances, and destination points, as the seven scoped
   packages actually used rather than the `@turf/turf` barrel
 - Vitest for the core tests
-- Anthropic API through a Netlify serverless function, so the key is not in the
-  browser. The model is `claude-sonnet-5`, named once at the top of
-  `netlify/functions/generate.ts` alongside the token cap and the effort level
+- Anthropic API through a Vercel Function, so the key is not in the browser. The
+  model is `claude-sonnet-5`, named once at the top of `api/generate.ts` alongside
+  the token cap and the effort level
 
 ## Run it
 
@@ -156,21 +157,48 @@ cp .env.example .env   # then paste in your own Anthropic key
 npm run dev
 ```
 
-`npm run dev` prints a local URL and runs everything except Generate: the map,
-search, the venue form, the kit profile, the sun readout, dragging positions.
+`npm run dev` is the fast loop. It prints a local URL and a LAN one, and runs
+everything except Generate and Ground view: the map, search, the venue form, the
+kit profile, the sun readout, the time scrubber, dragging positions. Vite does not
+run serverless functions, so those two buttons tell you to switch rather than
+failing silently.
 
-Generate goes through a serverless function, and Vite does not run those. For
-that you need the Netlify dev server, which runs the site and the function
-together:
+**To run the app and the functions together, use `vercel dev`.** That is the one
+command.
 
 ```sh
-npx netlify dev
+npm i -g vercel        # once
+vercel dev             # app + functions, http://localhost:3000
 ```
 
-That serves the app on <http://localhost:8888>. The function is at
-<http://localhost:8888/.netlify/functions/generate>. It reads `ANTHROPIC_API_KEY`
-from your `.env`. If you press Generate under `npm run dev` instead, the app
-tells you to switch rather than failing silently.
+`vercel dev` runs Vite as its dev command and serves `api/generate.ts` and
+`api/streetview.ts` alongside it at `/api/generate` and `/api/streetview`, which
+are the same paths production uses. No proxy config, no second port.
+
+**It is already on your LAN.** `vercel dev` binds `0.0.0.0:3000` by default, and
+Vite's `server.host: true` in `vite.config.ts` does the same for the underlying
+dev server, so Vite prints the network address on startup:
+
+```
+➜  Local:   http://localhost:3000/
+➜  Network: http://192.168.0.96:3000/  en0
+```
+
+Open that Network URL on the phone. Both the app and `/api/*` answer on it. Use
+`--listen` only if you want a different port or a narrower bind:
+
+```sh
+vercel dev --listen 8080              # different port, still all interfaces
+vercel dev --listen 127.0.0.1:3000    # localhost only, no phone access
+```
+
+The first `vercel dev` links the directory to a Vercel project and pulls that
+project's environment variables. To skip linking and read variables from your
+local `.env` instead, add `--local`:
+
+```sh
+vercel dev --local
+```
 
 ```sh
 npm run build     # typecheck and production build
@@ -194,27 +222,43 @@ already known.
 ## Deploy your own
 
 ScoutNGo is bring your own API key. There is no hosted instance, no account, and no
-key of ours to use; you deploy a copy and it talks to Anthropic with your key, from
-your own serverless function.
+key of ours to use; you fork it, deploy your own copy, and it talks to Anthropic with
+your key from your own serverless function.
 
-### What Netlify needs
+Hosted on **Vercel**. The two functions live in `api/` and deploy automatically as
+Vercel Functions; the Vite app builds to `dist` and is served as static files.
 
-Two environment variables, set in the Netlify UI under **Site configuration →
-Environment variables**. Never in `netlify.toml`, which is committed and therefore
-public.
+### What Vercel needs
+
+Two environment variables, set in the Vercel dashboard under **Project → Settings →
+Environment Variables**, for the Production, Preview, and Development environments you
+care about. Never in `vercel.json`, which is committed and therefore public.
 
 | Variable | Required | What it is |
 | --- | --- | --- |
-| `ANTHROPIC_API_KEY` | Yes | Your Anthropic key, from <https://console.anthropic.com>. Read only by `netlify/functions/generate.ts`, so it never reaches the browser bundle. Without it, Generate returns a plain message naming the missing variable. |
-| `GOOGLE_MAPS_API_KEY` | No | Enables the optional ground view on a position card, via `netlify/functions/streetview.ts`. Leave it unset and the card says ground view is off; nothing else changes. |
+| `ANTHROPIC_API_KEY` | Yes | Your Anthropic key, from <https://console.anthropic.com>. Read only by `api/generate.ts`, so it never reaches the browser bundle. Without it, Generate returns a plain message naming the missing variable. |
+| `GOOGLE_MAPS_API_KEY` | No | Enables the optional ground view on a position card, via `api/streetview.ts`. Leave it unset and the card says ground view is off; nothing else changes. |
 
-`NODE_VERSION` is pinned to 20 in `netlify.toml`, so there is nothing to set for it.
+Neither is prefixed `VITE_`, and that is deliberate: Vite only exposes `VITE_`
+variables to the browser bundle, so a plain name cannot leak into client code even
+by accident.
 
-`.env` is for local development only. It is gitignored, has never been committed,
-and is not read by Netlify's build; the deployed site reads the variables above from
-Netlify's own store.
+The Node version comes from `engines.node` in `package.json` (`>=20`), which Vercel
+reads, so there is nothing to set for it.
 
-### Create the repository and deploy
+`vercel.json` contains one key, `framework: "vite"`. Deployment would auto-detect
+Vite without it, but `vercel dev` would not: with no framework configured the CLI has
+no dev command, falls through to a build path that shells out to yarn, and fails on a
+machine that only has npm. Nothing else needs configuring — the Vite preset already
+gives `npm run build` into `dist`, the default function timeout is 300s against a
+generate call that measures under 10, and there is no client side router to need a
+rewrite rule.
+
+`.env` is for local development only. It is gitignored, has never been committed, and
+is not read by Vercel's build; the deployed site reads the variables above from
+Vercel's own store.
+
+### Fork it and deploy
 
 These are the commands, start to finish. **Run them yourself** — read each one first,
 and check `git status` before the first push so you know exactly what is going up.
@@ -232,18 +276,21 @@ git commit -m "ScoutNGo"
 #    with `gh auth login`. Change the name if you want a different one.
 gh repo create scoutngo --public --source=. --remote=origin --push
 
-# 4. Link the directory to a new Netlify site and deploy it.
-#    Requires the netlify CLI: npm i -g netlify-cli && netlify login
-netlify init          # choose "Create & configure a new site"; it reads
-                      # netlify.toml, so accept the build command and publish dir
+# 4. Link this directory to a Vercel project. Requires the Vercel CLI:
+#    npm i -g vercel && vercel login
+vercel link           # choose your scope, then "Create a new project"
+                      # it reads vercel.json and detects Vite, so accept
+                      # the build command (npm run build) and output dir (dist)
 
-# 5. Set your key on the site. Do this BEFORE the first production deploy,
-#    or the first Generate will fail with the missing-key message.
-netlify env:set ANTHROPIC_API_KEY "sk-ant-your-key-here"
-netlify env:set GOOGLE_MAPS_API_KEY "your-google-key"   # optional, skip for no ground view
+# 5. Set your keys. Do this BEFORE the first production deploy, or the first
+#    Generate will fail with the missing-key message. Each command prompts for
+#    the value, so the key is never typed into your shell history.
+vercel env add ANTHROPIC_API_KEY production
+vercel env add ANTHROPIC_API_KEY preview
+vercel env add GOOGLE_MAPS_API_KEY production   # optional, skip for no ground view
 
 # 6. Deploy to production.
-netlify deploy --build --prod
+vercel deploy --prod
 ```
 
 Step 3 makes the repository **public**. The code is MIT and contains no secrets, but
@@ -252,9 +299,11 @@ that is the step that cannot be undone quietly, so run it knowing that.
 After step 6 the CLI prints the live URL. Open it on a phone and use the browser's
 Add to Home Screen to get the standalone app.
 
-Connecting the GitHub repo to Netlify through their web UI instead of `netlify init`
-gets you deploys on every push; either way the environment variables in step 5 still
-have to be set, in the UI or with `netlify env:set`.
+Connecting the GitHub repo to Vercel through their dashboard instead of `vercel link`
+gets you a deploy on every push, with preview deployments per branch; either way the
+environment variables in step 5 still have to be set, in the dashboard or with
+`vercel env add`. If you set them after a deploy has already run, redeploy — Vercel
+bakes the environment into each build.
 
 ## Status
 

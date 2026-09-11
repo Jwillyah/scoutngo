@@ -28,5 +28,5 @@ dist-ssr
 .env.*
 !.env.example
 
-# Local Netlify folder
-.netlify
+# Local Vercel folder: project link, pulled env, and build output.
+.vercel

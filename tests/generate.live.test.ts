@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { deflateSync } from 'node:zlib'
-import handler from '../netlify/functions/generate.ts'
+import { POST } from '../api/generate.ts'
 import { MAX_POSITIONS, parsePlanResponse } from '../src/lib/parsePlan.ts'
 import { DEFAULT_KIT } from '../src/core/kit.ts'
 import { defaultSelection } from '../src/lib/kitSelection.ts'
@@ -18,7 +18,7 @@ import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
  * app can read, inside the caps it promises. That cannot be answered offline.
  *
  * Run it after any change to MODEL, MAX_TOKENS, EFFORT, or SYSTEM_PROMPT in
- * netlify/functions/generate.ts. One call, a few cents.
+ * api/generate.ts. One call, a few cents.
  */
 
 const live = process.env.RUN_LIVE_API === '1' && process.env.ANTHROPIC_API_KEY
@@ -102,8 +102,8 @@ describe.skipIf(!live)('generate against the real model', () => {
 
   it('returns a plan the app can parse, inside every cap', async () => {
     const started = Date.now()
-    const response = await handler(
-      new Request('https://example.test/.netlify/functions/generate', {
+    const response = await POST(
+      new Request('https://example.test/api/generate', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),

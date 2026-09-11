@@ -11,11 +11,12 @@ import Anthropic from '@anthropic-ai/sdk'
  * The reason is the whole privacy stance in README.md: a venue location plus a
  * date and a time window is a statement about where a specific person will be
  * standing at a specific hour. There is no product reason to keep that, so it is
- * never written down. Function logs are readable in the Netlify dashboard and
- * are retained, so a single console.log of the request body would quietly
- * undo it.
+ * never written down. Function logs are readable in the Vercel dashboard, and are
+ * retained and searchable there, so a single console.log of the request body would
+ * quietly undo it. This rule is a property of the data, not of the host: it survives
+ * any move, and it survived this one.
  *
- * If you are debugging this, reproduce locally with `netlify dev` rather than
+ * If you are debugging this, reproduce locally with `vercel dev` rather than
  * adding a log line here. If you add one anyway, it must not include any field
  * from the request or the response.
  * ===========================================================================
@@ -194,18 +195,22 @@ ${renderSite(body.site)}
 Return the JSON object now, and nothing else.`
 }
 
-export default async (request: Request): Promise<Response> => {
-  if (request.method !== 'POST') {
-    return Response.json({ status: 'error', message: 'POST only.' }, { status: 405 })
-  }
-
+/*
+ * A Vercel Web Handler: one named export per HTTP method, taking a standard
+ * Request and returning a standard Response.
+ *
+ * POST is the only export on purpose. Vercel routes by method and answers anything
+ * else with 405 before this module is reached, so there is no method check here to
+ * go stale. Verified against `vercel dev`: GET /api/generate returns 405.
+ */
+export async function POST(request: Request): Promise<Response> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
     return Response.json(
       {
         status: 'error',
         message:
-          'ANTHROPIC_API_KEY is not set. Copy .env.example to .env, add your own key, and run netlify dev.',
+          'ANTHROPIC_API_KEY is not set. Copy .env.example to .env, add your own key, and run `vercel dev`.',
       },
       { status: 500 },
     )

@@ -4,7 +4,8 @@
  *
  * It receives a coordinate the shooter is considering standing on. That is the
  * same category of information as the venue itself, so it is never written to a
- * log, a database, or a file. Debug with `netlify dev`, not with a log line.
+ * log, a database, or a file. Vercel retains function logs in its dashboard, which
+ * is exactly why none are written. Debug with `vercel dev`, not with a log line.
  * ===========================================================================
  */
 
@@ -18,7 +19,12 @@ const num = (value: string | null): number | null => {
   return Number.isFinite(parsed) ? parsed : null
 }
 
-export default async (request: Request): Promise<Response> => {
+/*
+ * A Vercel Web Handler. GET is the only export: this reads its input from the
+ * query string, and Vercel answers any other method with 405 before this module
+ * is reached.
+ */
+export async function GET(request: Request): Promise<Response> {
   const url = new URL(request.url)
   const lat = num(url.searchParams.get('lat'))
   const lon = num(url.searchParams.get('lon'))
