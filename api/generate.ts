@@ -85,13 +85,23 @@ The application checks every position you return against this same geometry and 
 - platform: "ground" or "air". Use "air" ONLY if a drone is listed in the kit below. An air position is a hover point, so it may sit over water or a road.
 - altitudeFeet: for "air", height above ground in feet, no more than 400, which is the FAA ceiling. For "ground", 0.
 
-HOW FAR TO STAND BACK. Each optic below carries a MAX STANDOFF in metres, computed by the application for that optic. Do not exceed it. A position beyond it frames so much ground that the subject is a speck, and it is flagged as an error in the app. Closer is usually better: pick the shortest standoff that still gets the shot and still clears the obstacles. Do not park every position on the far bank because the far bank is easy to reach.
+HOW FAR TO STAND BACK. Each optic below carries a MAX STANDOFF in metres, computed by the application for that optic. Do not exceed it. A position beyond it frames so much ground that the subject is a speck, and it is flagged as an error in the app. Closer is usually better: pick the shortest standoff that still gets the shot and still clears the obstacles.
 
-WHERE THE LIGHT WANTS YOU. The sun's compass bearing is given below for three moments in the window. A camera whose view direction is roughly 135 to 180 degrees away from the sun's bearing has the sun behind it and the subject lit from the front. PREFER those vantages, all else being equal.
+VARY THE RANGE. Do not park every position at its maximum standoff. A plan that is six versions of "as far back as this lens allows" has no near work in it. Include at least one position in the closer half of its optic's range. The application measures this and reports a plan that is entirely parked at the back.
 
-DO NOT ONLY DO THAT. A strong angle in side light beats a dull angle in flat front light every time. Side light across a subject gives shape and texture that front light flattens. Shooting into the sun is a real choice for rim light, spray, and silhouette against water. If a position is the best view of the event, propose it and say why in angleRationale, whatever the light is doing. Light is one input among the background, the foreground, the access, and the geometry of the event itself. Spread the set: a plan where every position sits on the same side of the subject is a worse plan than one that covers it.
+COVERAGE IS A HARD REQUIREMENT, and it is measured. The application computes the compass bearing FROM the subject TO each position you return, and checks how they are distributed. Two rules:
 
-Vary the positions. Do not cluster them all on one side. Respect the shooter's stated style and the optics they actually brought.
+1. THREE SECTORS. Divide the compass around the subject into four quadrants: NE is 0 to 90, SE is 90 to 180, SW is 180 to 270, NW is 270 to 360. Your positions must fall in AT LEAST THREE different quadrants. A plan landing in fewer is reported to the user as a cluster, with the count shown.
+
+2. ONE ON THE FAR SIDE. At least one position must sit on the opposite side of the subject from where the majority sit, more than 90 degrees away from them. If five positions are south of the subject, one must be north of it.
+
+These are requirements about GEOMETRY, not about light, and they win when the two conflict. Work out where the subject is, then deliberately walk around it and choose the best vantage available in each quadrant.
+
+WHERE THE LIGHT WANTS YOU. The sun's compass bearing is given below for three moments in the window. A camera whose view direction is roughly 135 to 180 degrees away from the sun's bearing has the sun behind it and the subject lit from the front. Prefer those vantages WHEN CHOOSING BETWEEN TWO POSITIONS IN THE SAME QUADRANT. Never use light as a reason to leave a quadrant empty.
+
+The far side position will usually be shooting into the sun. Propose it anyway. Backlight is a real choice: rim light on spray, a boat wake lit from behind, a crowd in silhouette against water. The application computes and labels the lighting itself, honestly, so a backlit position is offered as what it is rather than hidden. A plan with one strong backlit angle is better than six safe front-lit ones from the same bank.
+
+Respect the shooter's stated style and the optics they actually brought.
 
 Stay inside the limits. A response cut off mid JSON is worthless.`
 
@@ -107,6 +117,8 @@ interface GenerateContext {
   optics?: unknown
   drones?: unknown
   sun?: unknown
+  subjectPoint?: unknown
+  imageNorthBearing?: unknown
   bounds?: unknown
   image?: unknown
   mediaType?: unknown
@@ -201,6 +213,30 @@ function renderSun(list: unknown): string {
   return `SUN THROUGH THE WINDOW, computed by the application. These are facts, not estimates.\n${rows}\nBearing is a compass direction: 0 is north, 90 east, 180 south, 270 west. Altitude below 0 means the sun is down.`
 }
 
+/**
+ * Which way the image is oriented, and where the subject is in it.
+ *
+ * THE MISSING LINK. Sun bearings are compass degrees; the model is looking at a
+ * picture. Without being told which way north points in that picture it cannot
+ * connect the two, and has to guess where "away from the sun" is on the image.
+ * The subject point is the centre the coverage quadrants are measured around.
+ */
+function renderFraming(body: GenerateContext): string {
+  const north = typeof body.imageNorthBearing === 'number' ? body.imageNorthBearing : 0
+  const orientation =
+    Math.abs(((north + 180) % 360) - 180) < 1
+      ? 'NORTH IS STRAIGHT UP in this image. East is right, south is down, west is left.'
+      : `This image is ROTATED: compass bearing ${north.toFixed(0)} degrees points toward the top of the image. Work out the other directions from that before placing anything.`
+
+  const point = body.subjectPoint as { x?: unknown; y?: unknown } | undefined
+  const subject =
+    typeof point?.x === 'number' && typeof point?.y === 'number'
+      ? `THE SUBJECT IS AT x=${point.x.toFixed(3)}, y=${point.y.toFixed(3)} in the image. Every coverage quadrant is measured outward from that exact point, so place your positions around it, not around the centre of the frame.`
+      : 'The subject is at the centre of the venue. Place your positions around it.'
+
+  return `IMAGE ORIENTATION. ${orientation}\n${subject}`
+}
+
 /** Renders the context the app sent into the user turn. */
 function renderContext(body: GenerateContext): string {
   const bounds = body.bounds as Record<string, unknown> | undefined
@@ -219,6 +255,8 @@ ${asText(body.style, 1500)}
 DATE AND WINDOW: ${asText(body.date, 20)}, ${asText(body.startTime, 10)} to ${asText(body.endTime, 10)} in VENUE LOCAL TIME${
     asText(body.timeZoneLabel, 40) === '' ? '' : ` (${asText(body.timeZoneLabel, 40)})`
   }
+
+${renderFraming(body)}
 
 ${renderSun(body.sun)}
 

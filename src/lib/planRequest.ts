@@ -1,6 +1,6 @@
 import { computeFOV, SENSORS, standoffBand } from '../core/fov.ts'
 import { DEFAULT_KIT, resolveSensor, selectedDroneCameras } from '../core/kit.ts'
-import { getSunPosition } from '../core/sun.ts'
+import { getSunPosition, normalizeBearing } from '../core/sun.ts'
 import { formatClock } from '../core/timezone.ts'
 import type { KitSelection } from './kitSelection.ts'
 import type { DroneCameraSpec, LensSpec } from './parsePlan.ts'
@@ -170,6 +170,19 @@ export interface GenerateRequestBody {
   optics: OpticSpec[]
   /** Sun azimuth and altitude across the window, computed before the call. */
   sun: SunFact[]
+  /**
+   * Where the subject sits in the attached image, 0 to 1. The model is asked to
+   * spread positions AROUND this point, so it has to know where it is.
+   */
+  subjectPoint?: { x: number; y: number }
+  /**
+   * Compass bearing that points toward the TOP of the image, normally 0.
+   *
+   * Without this the sun bearings are unusable: the model is told the sun is at
+   * 134 degrees and has no way to know which direction that is on the picture in
+   * front of it. This is the number that connects the two.
+   */
+  imageNorthBearing: number
   bounds: MapBounds
   image: string
   mediaType: string
@@ -196,6 +209,8 @@ export function buildGenerateBody(
   timeZoneLabel = '',
   /** Sun across the window. Empty only when the window has not resolved. */
   sun: SunFact[] = [],
+  /** Where the subject is in the image, and which way the image is oriented. */
+  framing: { subjectPoint?: { x: number; y: number }; imageNorthBearing?: number } = {},
 ): GenerateRequestBody {
   return {
     venueName: venue.name,
@@ -209,6 +224,13 @@ export function buildGenerateBody(
     drones: selectedDroneNames(kit),
     optics: selectedOptics(kit),
     sun,
+    ...(framing.subjectPoint === undefined ? {} : { subjectPoint: framing.subjectPoint }),
+    /*
+     * The map camera's bearing is how far the view is rotated clockwise from
+     * north, so north sits that many degrees anticlockwise from the top of the
+     * image. Negating turns it into "the compass bearing of image up".
+     */
+    imageNorthBearing: normalizeBearing(-(framing.imageNorthBearing ?? 0)),
     bounds: capture.bounds,
     image: stripDataUrl(capture.dataUrl),
     mediaType: capture.mediaType,

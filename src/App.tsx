@@ -26,7 +26,7 @@ import {
 } from './lib/kitSelection.ts'
 import { fetchSiteGeometry, trimSummary } from './lib/overpass.ts'
 import { parsePlanResponse } from './lib/parsePlan.ts'
-import { planPositions, type CameraPosition } from './lib/plan.ts'
+import { assessPlan, planPositions, type CameraPosition } from './lib/plan.ts'
 import {
   buildGenerateBody,
   droneAvailable,
@@ -158,6 +158,13 @@ function App() {
         : planPositions(positions, aim, sun.azimuth, land, kit.bodyIds),
     [positions, aim, sun, land, kit.bodyIds],
   )
+
+  /*
+   * Coverage is computed from the PLANNED positions, so it is live. Drag the one
+   * position that was on the far bank back across the river and the cluster
+   * warning comes back, which is the honest behaviour.
+   */
+  const planCoverage = useMemo(() => assessPlan(plan), [plan])
 
   const selected = plan.find((p) => p.position.id === selectedId) ?? null
 
@@ -332,6 +339,18 @@ function App() {
          * recomputes every call from the coordinates returned.
          */
         venueWindow === null ? [] : sunFacts(venueWindow),
+        /*
+         * Where the subject is in the captured image, and which way that image is
+         * oriented. Without these the model is told the sun sits at 134 degrees
+         * while looking at a picture with no compass on it, and has to guess.
+         */
+        {
+          subjectPoint:
+            aim === null
+              ? undefined
+              : mapHandle.current?.projectToCapture(capture, [aim])[0],
+          imageNorthBearing: capture.camera.bearing,
+        },
       ),
     )
     if (response.status !== 'ok' || typeof response.raw !== 'string') {
@@ -538,6 +557,7 @@ function App() {
             onVenueToggle={() => setVenueOpen((open) => !open)}
             revealAllErrors={submitAttempted}
             generation={generation}
+            planCoverage={plan.length === 0 ? null : planCoverage}
             siteNote={siteNote}
             staleBrief={staleBrief}
             drift={drift}
@@ -547,7 +567,12 @@ function App() {
         ) : null}
 
         {tab === 'shots' ? (
-          <ShotList plan={visiblePlan} selectedId={selectedId} onPick={flyToPosition} />
+          <ShotList
+            plan={visiblePlan}
+            planCoverage={plan.length === 0 ? null : planCoverage}
+            selectedId={selectedId}
+            onPick={flyToPosition}
+          />
         ) : null}
 
         {tab === 'sun' ? (

@@ -4,7 +4,7 @@ import { destinationPoint, distanceMeters } from '../core/geo.ts'
 import { bearingBetween, type LatLon } from '../core/geo.ts'
 import { getSunPosition } from '../core/sun.ts'
 import type { Landcover, Ring } from '../core/siting.ts'
-import { planPosition, planPositions, type CameraPosition } from './plan.ts'
+import { assessPlan, planPosition, planPositions, type CameraPosition } from './plan.ts'
 
 /** Brew River, the calibration venue, at the actual dock bar. */
 const VENUE: LatLon = { lat: 38.364236, lon: -75.605912 }
@@ -277,5 +277,77 @@ describe('no body is assigned to a position', () => {
     const planned = planPosition(at(38.3648, -75.6059), SUBJECT, sunAzimuth)
     expect(planned.optic.name).toBe('Sony 200-600')
     expect(planned).not.toHaveProperty('body')
+  })
+})
+
+
+/*
+ * Coverage across the whole plan. A clustered set is REPORTED, never rejected:
+ * a venue with one accessible bank genuinely has one, and the shooter knows that.
+ */
+describe('assessPlan', () => {
+  const around = (bearing: number, metres = 250) => {
+    const at_ = destinationPoint(SUBJECT, bearing, metres)
+    return at(at_.lat, at_.lon)
+  }
+
+  it('calls six positions on one bank a cluster', () => {
+    const plan = planPositions(
+      [168, 175, 181, 186, 193, 199].map((b) => around(b)),
+      SUBJECT,
+      sunAzimuth,
+    )
+    const { coverage } = assessPlan(plan)
+    expect(coverage.clustered).toBe(true)
+    expect(coverage.hasOppositeSide).toBe(false)
+  })
+
+  it('accepts a plan that works round the subject', () => {
+    const plan = planPositions([20, 110, 200, 290].map((b) => around(b)), SUBJECT, sunAzimuth)
+    const { coverage } = assessPlan(plan)
+    expect(coverage.clustered).toBe(false)
+    expect(coverage.sectorCount).toBe(4)
+    expect(coverage.hasOppositeSide).toBe(true)
+  })
+
+  /*
+   * The real bug from a live run: a position placed on the venue pin, which is
+   * also the default subject. Its bearing is arbitrary, and counting it could
+   * satisfy the three sector rule with a direction that does not exist.
+   */
+  it('does not let a position sitting on the subject fake a sector', () => {
+    const onSubject = at(SUBJECT.lat, SUBJECT.lon)
+    const plan = planPositions([onSubject, around(180), around(190)], SUBJECT, sunAzimuth)
+    const { coverage } = assessPlan(plan)
+    expect(coverage.withoutBearing).toBe(1)
+    expect(coverage.bearings).toHaveLength(2)
+    expect(coverage.clustered).toBe(true)
+  })
+
+  it('flags a plan parked entirely at the back', () => {
+    // 30mm has a short ceiling, so 60m out is already near the back for it.
+    const wide = [170, 180, 190].map((b) => ({
+      ...around(b, 60),
+      lensId: 'sigma-30',
+      focalLength: 30,
+    }))
+    const { rangeVariety } = assessPlan(planPositions(wide, SUBJECT, sunAzimuth))
+    expect(rangeVariety.allNearMaxStandoff).toBe(true)
+  })
+
+  it('passes a plan with near work in it', () => {
+    const mixed = [
+      { ...around(20, 40), lensId: 'sigma-28-75', focalLength: 28 },
+      around(200, 300),
+      around(110, 150),
+    ]
+    const { rangeVariety } = assessPlan(planPositions(mixed, SUBJECT, sunAzimuth))
+    expect(rangeVariety.allNearMaxStandoff).toBe(false)
+  })
+
+  it('says nothing about an empty plan', () => {
+    const { coverage } = assessPlan([])
+    expect(coverage.sectorCount).toBe(0)
+    expect(coverage.withoutBearing).toBe(0)
   })
 })

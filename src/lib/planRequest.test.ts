@@ -159,6 +159,58 @@ describe('buildGenerateBody', () => {
   })
 })
 
+/*
+ * THE MISSING LINK BEHIND THE CLUSTERING. The model is told the sun sits at 134
+ * degrees and is looking at a picture with no compass on it. Without being told
+ * which way north points in that image it cannot connect the two, and has to
+ * guess where "away from the sun" is.
+ *
+ * The map camera's `bearing` is how far the VIEW is rotated clockwise from north,
+ * so north sits that many degrees ANTICLOCKWISE from the top of the image. The
+ * number sent is the compass bearing of image-up, which is the negation. Getting
+ * this backwards would be worse than sending nothing: it would point the model
+ * confidently the wrong way.
+ */
+describe('image orientation', () => {
+  const withBearing = (mapBearing: number) =>
+    buildGenerateBody(
+      CALIBRATION_VENUE,
+      defaultSelection(DEFAULT_KIT),
+      capture,
+      undefined,
+      '',
+      [],
+      { imageNorthBearing: mapBearing, subjectPoint: { x: 0.5, y: 0.5 } },
+    )
+
+  it('reports north as straight up for an unrotated map', () => {
+    expect(withBearing(0).imageNorthBearing).toBe(0)
+  })
+
+  it('negates the camera bearing, so image-up is a compass bearing', () => {
+    // Rotate the view 90 clockwise and the top of the image now faces west, 270.
+    expect(withBearing(90).imageNorthBearing).toBe(270)
+    expect(withBearing(270).imageNorthBearing).toBe(90)
+    expect(withBearing(180).imageNorthBearing).toBe(180)
+  })
+
+  it('normalises rather than emitting a negative bearing', () => {
+    expect(withBearing(45).imageNorthBearing).toBe(315)
+    expect(withBearing(-45).imageNorthBearing).toBe(45)
+  })
+
+  it('carries the subject point so the quadrants have a centre', () => {
+    expect(withBearing(0).subjectPoint).toEqual({ x: 0.5, y: 0.5 })
+  })
+
+  it('defaults to north up when the map never reported a bearing', () => {
+    // No framing argument at all: the common case of an unrotated map.
+    const plain = buildGenerateBody(CALIBRATION_VENUE, defaultSelection(DEFAULT_KIT), capture)
+    expect(plain.imageNorthBearing).toBe(0)
+    expect(plain.subjectPoint).toBeUndefined()
+  })
+})
+
 describe('generate stages', () => {
   it('names the four real steps, in the order the code takes them', () => {
     expect(GENERATE_STAGES.map((stage) => stage.key)).toEqual([

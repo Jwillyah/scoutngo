@@ -83,6 +83,15 @@ export interface MapHandle {
    * camera as it was at capture time rather than wherever the map is now.
    */
   unprojectFromCapture(capture: MapCapture, points: { x: number; y: number }[]): LatLon[]
+  /**
+   * The other direction: real positions into normalized image coordinates for a
+   * capture. Used to tell the model where the subject sits in the image it is
+   * looking at, which it otherwise has to guess.
+   */
+  projectToCapture(
+    capture: MapCapture,
+    points: LatLon[],
+  ): { x: number; y: number }[]
   flyTo(at: LatLon, zoom?: number): void
   fitAll(points: LatLon[]): void
   setPitch(pitch: number): void
@@ -558,6 +567,26 @@ export function MapView({
         const out = points.map((p) => {
           const ll = instance.unproject([p.x * capture.width, p.y * capture.height])
           return { lat: ll.lat, lon: ll.lng }
+        })
+        instance.jumpTo(restore)
+        return out
+      },
+
+      projectToCapture(capture, points) {
+        const instance = map.current
+        if (instance === null) return []
+        const now = instance.getCenter()
+        const restore: CameraState = {
+          center: [now.lng, now.lat],
+          zoom: instance.getZoom(),
+          bearing: instance.getBearing(),
+          pitch: instance.getPitch(),
+        }
+        // Same snap-there-and-back as unprojectFromCapture, for the same reason.
+        instance.jumpTo(capture.camera)
+        const out = points.map((point) => {
+          const p = instance.project([point.lon, point.lat])
+          return { x: p.x / capture.width, y: p.y / capture.height }
         })
         instance.jumpTo(restore)
         return out

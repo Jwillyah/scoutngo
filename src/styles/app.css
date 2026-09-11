@@ -150,8 +150,13 @@
   color: var(--color-text-muted);
 }
 
+/*
+ * 44px minimum, because this is used one handed on a phone, outdoors, in sun,
+ * often with the other hand on a camera. 44 is the smallest reliable thumb
+ * target and the tokens file already sets --control-height to it.
+ */
 .mode {
-  min-height: 36px;
+  min-height: var(--control-height);
   padding: 0 var(--space-3);
   background: var(--color-panel);
   color: var(--color-text);
@@ -824,6 +829,60 @@
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+}
+
+/* --------------------------------------------------------------- coverage */
+
+/*
+ * The coverage readout. A computed statement about the whole plan, so it is a
+ * panel rather than a warning strip: the headline numbers are always shown, and
+ * the problems appear underneath only when there are any.
+ *
+ * The accent rule means "this is a computed fact about your plan". It switches to
+ * hazard magenta when something is actually wrong, matching the in-water and
+ * frame-width flags, because it is the same kind of statement: here is a problem,
+ * you decide what to do about it.
+ */
+.coverage {
+  margin: var(--space-3) var(--page-pad) 0;
+  padding: var(--space-3);
+  background: var(--color-panel-2);
+  border-left: var(--line-rule) solid var(--color-accent);
+  border-radius: var(--radius-panel);
+  display: grid;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.coverage--thin {
+  border-left-color: var(--color-hazard);
+}
+
+.coverage__head {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.coverage__label {
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.coverage__sectors {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.coverage__warn {
+  margin: 0;
+  padding-left: var(--space-3);
+  border-left: var(--line-rule) solid var(--color-hazard);
+  color: var(--color-text);
 }
 
 /* ------------------------------------------------------- generate progress */
@@ -1631,11 +1690,26 @@
   color: var(--color-text-muted);
 }
 
+/*
+ * The HIT AREA is 44px tall; the drawn track stays slim.
+ *
+ * A range input's height is its touch target, and the browser draws the track
+ * and thumb centred inside whatever height it is given. At 28px this was the
+ * hardest control in the app to grab while moving, and it is the one control
+ * that gets dragged rather than tapped. Raising the height costs nothing
+ * visually: the bar looks identical, there is simply more of it to hit.
+ *
+ * The negative margin keeps the dock from growing by the 16px this adds, so the
+ * map does not lose height to a change that is only about the thumb.
+ */
 .scrub__range {
   width: 100%;
-  margin: var(--space-1) 0 0;
+  margin: calc(var(--space-1) - 8px) 0 -8px;
   accent-color: var(--color-accent);
-  height: 28px;
+  height: var(--control-height);
+  /* No vertical padding: on a range input that shrinks the track, not the box. */
+  padding: 0;
+  touch-action: pan-y;
 }
 
 .scrub__ends {
@@ -1693,7 +1767,7 @@
 }
 
 .mode--icon {
-  width: 40px;
+  width: var(--control-height);
   padding: 0;
   font-size: var(--text-lg);
   line-height: 1;

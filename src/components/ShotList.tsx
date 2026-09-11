@@ -1,9 +1,12 @@
 import type { FramingWarning } from '../core/fov.ts'
 import type { SiteWarning } from '../core/siting.ts'
-import type { PlannedPosition } from '../lib/plan.ts'
+import type { PlanCoverage, PlannedPosition } from '../lib/plan.ts'
+import { CoverageNotice } from './CoverageNotice.tsx'
 
 interface ShotListProps {
   plan: PlannedPosition[]
+  /** Coverage across the WHOLE plan, not just the filtered rows below. */
+  planCoverage: PlanCoverage | null
   selectedId: string | null
   onPick: (id: string) => void
 }
@@ -26,7 +29,7 @@ const FRAMING_LABEL: Record<FramingWarning, string> = {
  * src/core/lighting.ts from the position's own coordinates, not carried over
  * from anything the model said.
  */
-export function ShotList({ plan, selectedId, onPick }: ShotListProps) {
+export function ShotList({ plan, planCoverage, selectedId, onPick }: ShotListProps) {
   if (plan.length === 0) {
     return (
       <p className="empty">
@@ -37,7 +40,10 @@ export function ShotList({ plan, selectedId, onPick }: ShotListProps) {
   }
 
   return (
-    <ol className="shots">
+    <>
+      <CoverageNotice planCoverage={planCoverage} />
+
+      <ol className="shots">
       {plan.map((planned) => {
         const { position, fov, lighting, warnings, framingWarnings, subjectRangeMeters } =
           planned
@@ -88,7 +94,8 @@ export function ShotList({ plan, selectedId, onPick }: ShotListProps) {
             </button>
           </li>
         )
-      })}
-    </ol>
+        })}
+      </ol>
+    </>
   )
 }

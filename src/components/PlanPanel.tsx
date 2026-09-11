@@ -4,7 +4,9 @@ import {
   type GenerateStage,
   type GenerationState,
 } from '../lib/planRequest.ts'
+import type { PlanCoverage } from '../lib/plan.ts'
 import type { VenueDraft, VenueErrors } from '../lib/venue.ts'
+import { CoverageNotice } from './CoverageNotice.tsx'
 import { VenueForm } from './VenueForm.tsx'
 
 interface PlanPanelProps {
@@ -15,6 +17,8 @@ interface PlanPanelProps {
   onVenueToggle: () => void
   revealAllErrors: boolean
   generation: GenerationState
+  /** How well the plan covers the subject. Null until there are positions. */
+  planCoverage: PlanCoverage | null
   /** Set when Overpass could not be reached, so siting was not checked. */
   siteNote: string | null
   /** The venue has moved far from where the brief text was written. */
@@ -76,6 +80,7 @@ export function PlanPanel({
   onVenueToggle,
   revealAllErrors,
   generation,
+  planCoverage,
   siteNote,
   staleBrief,
   drift,
@@ -124,6 +129,8 @@ export function PlanPanel({
             : ''}
         </p>
       ) : null}
+
+      <CoverageNotice planCoverage={planCoverage} />
 
       {siteNote === null ? null : <p className="notice">{siteNote}</p>}
 

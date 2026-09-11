@@ -24,6 +24,13 @@ import {
   type DroneCamera,
   type Lens,
 } from '../core/kit.ts'
+import {
+  assessCoverage,
+  assessRangeVariety,
+  MIN_BEARING_RANGE_METERS,
+  type Coverage,
+  type RangeVariety,
+} from '../core/coverage.ts'
 import { classifyLighting, type LightingResult } from '../core/lighting.ts'
 import { checkSite, EMPTY_LANDCOVER, type Landcover, type SiteWarning } from '../core/siting.ts'
 import type { Platform } from './parsePlan.ts'
@@ -193,4 +200,41 @@ export function planPositions(
   return positions.map((position) =>
     planPosition(position, subject, sunAzimuth, land, bodyIds),
   )
+}
+
+
+export interface PlanCoverage {
+  coverage: Coverage
+  rangeVariety: RangeVariety
+}
+
+/**
+ * How well the plan as a whole covers the subject.
+ *
+ * Computed from the PLANNED positions, so it is live: drag a position across the
+ * river and this updates with it. That matters, because the answer to a clustered
+ * plan is often the shooter moving one position rather than generating again, and
+ * the readout has to reward that rather than stay stale on what the model said.
+ */
+export function assessPlan(plan: PlannedPosition[]): PlanCoverage {
+  /*
+   * A position sitting on the subject has no direction from it, so it cannot
+   * count toward covering a sector. Splitting rather than filtering, so the count
+   * of what was left out can be reported instead of quietly vanishing.
+   */
+  const directional = plan.filter((p) => p.subjectRangeMeters >= MIN_BEARING_RANGE_METERS)
+  const onSubject = plan.length - directional.length
+
+  return {
+    coverage: assessCoverage(
+      directional.map((p) => p.positionBearing),
+      onSubject,
+    ),
+    rangeVariety: assessRangeVariety(
+      directional.map((p) => ({
+        rangeMeters: p.subjectRangeMeters,
+        maxStandoffMeters: p.standoff.maxMeters,
+      })),
+    ),
+  }
 }
