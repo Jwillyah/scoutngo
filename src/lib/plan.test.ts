@@ -20,6 +20,8 @@ const at = (lat: number, lon: number, over: Partial<CameraPosition> = {}): Camer
   focalLength: 400,
   shot: 'Boats hitting the pilings.',
   risk: 'Crowd on the rail.',
+  platform: 'ground',
+  altitudeFeet: 0,
   moved: false,
   ...over,
 })
@@ -129,6 +131,7 @@ describe('siting warnings', () => {
         halfWidthMeters: 6,
       },
     ],
+    structures: [],
   }
 
   it('reports nothing when there is no OSM data, exactly as before', () => {

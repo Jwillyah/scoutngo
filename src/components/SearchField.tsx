@@ -6,25 +6,34 @@ interface SearchFieldProps {
   onPick: (at: LatLon, label: string) => void
 }
 
+/** Nominatim returns one long display_name. The head is the name, the tail the address. */
+function splitLabel(label: string): { name: string; address: string } {
+  const comma = label.indexOf(',')
+  if (comma === -1) return { name: label, address: '' }
+  return { name: label.slice(0, comma), address: label.slice(comma + 1).trim() }
+}
+
 export function SearchField({ onPick }: SearchFieldProps) {
   const [query, setQuery] = useState('')
   const [hits, setHits] = useState<SearchHit[]>([])
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
+  /** Bumped by submit to force a lookup without waiting out the debounce. */
+  const [submitTick, setSubmitTick] = useState(0)
   const lastRequestAt = useRef(0)
+  const input = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const trimmed = query.trim()
-    // Clearing is handled by the change handler that caused it, not here.
     if (trimmed.length < 3) return
 
     /*
-     * Nominatim's usage policy caps this at one request per second. The wait is
-     * a full second from the last keystroke, and never less than a second after
-     * the previous request actually went out.
+     * Nominatim's usage policy caps this at one request per second. A full
+     * second after the last keystroke, and never less than a second after the
+     * previous request actually went out.
      */
     const sinceLast = Date.now() - lastRequestAt.current
-    const wait = Math.max(MIN_INTERVAL_MS, MIN_INTERVAL_MS - sinceLast)
+    const wait = submitTick > 0 ? 0 : Math.max(MIN_INTERVAL_MS, MIN_INTERVAL_MS - sinceLast)
 
     const controller = new AbortController()
     const timer = window.setTimeout(() => {
@@ -36,7 +45,7 @@ export function SearchField({ onPick }: SearchFieldProps) {
           setOpen(true)
         })
         .catch(() => {
-          // Aborted or offline. The field just shows nothing.
+          // Aborted or offline. The dropdown just stays as it was.
         })
         .finally(() => setBusy(false))
     }, wait)
@@ -45,45 +54,82 @@ export function SearchField({ onPick }: SearchFieldProps) {
       window.clearTimeout(timer)
       controller.abort()
     }
-  }, [query])
+  }, [query, submitTick])
+
+  const clear = () => {
+    setQuery('')
+    setHits([])
+    setOpen(false)
+    input.current?.focus()
+  }
 
   return (
     <div className="search">
-      <input
-        className="search__input"
-        type="search"
-        value={query}
-        placeholder="Search for a venue"
-        aria-label="Search for a venue"
-        onChange={(event) => {
-          const next = event.target.value
-          setQuery(next)
-          if (next.trim().length < 3) {
-            setHits([])
-            setOpen(false)
-          }
+      <form
+        className="search__bar"
+        role="search"
+        onSubmit={(event) => {
+          event.preventDefault()
+          // Honour the keyboard's search key without waiting for the debounce.
+          if (query.trim().length >= 3) setSubmitTick((tick) => tick + 1)
+          input.current?.blur()
         }}
-        onFocus={() => setOpen(hits.length > 0)}
-      />
-      {busy ? <span className="search__busy">…</span> : null}
+      >
+        <input
+          ref={input}
+          className="search__input"
+          type="search"
+          enterKeyHint="search"
+          autoComplete="off"
+          value={query}
+          placeholder="Search for a venue"
+          aria-label="Search for a venue"
+          onChange={(event) => {
+            const next = event.target.value
+            setQuery(next)
+            if (next.trim().length < 3) {
+              setHits([])
+              setOpen(false)
+            }
+          }}
+          onFocus={() => setOpen(hits.length > 0)}
+        />
+
+        {busy ? (
+          <span className="search__busy" aria-hidden="true">
+            …
+          </span>
+        ) : null}
+
+        {query === '' ? null : (
+          <button type="button" className="search__clear" onClick={clear} aria-label="Clear search">
+            ✕
+          </button>
+        )}
+      </form>
 
       {open && hits.length > 0 ? (
         <ul className="search__results">
-          {hits.map((hit) => (
-            <li key={hit.id}>
-              <button
-                type="button"
-                className="search__hit"
-                onClick={() => {
-                  onPick({ lat: hit.lat, lon: hit.lon }, hit.label)
-                  setOpen(false)
-                  setQuery('')
-                }}
-              >
-                {hit.label}
-              </button>
-            </li>
-          ))}
+          {hits.map((hit) => {
+            const { name, address } = splitLabel(hit.label)
+            return (
+              <li key={hit.id}>
+                <button
+                  type="button"
+                  className="search__hit"
+                  onClick={() => {
+                    onPick({ lat: hit.lat, lon: hit.lon }, hit.label)
+                    setOpen(false)
+                    setQuery('')
+                    setHits([])
+                  }}
+                >
+                  <span className="search__name">{name}</span>
+                  {address === '' ? null : <span className="search__addr">{address}</span>}
+                </button>
+              </li>
+            )
+          })}
           <li className="search__credit">{OSM_ATTRIBUTION}</li>
         </ul>
       ) : null}

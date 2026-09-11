@@ -50,6 +50,8 @@ const SUN_RAY_METERS = 900
 const LABEL_SPAN_FRACTION = 0.28
 const LABEL_MIN_METERS = 50
 const LABEL_MAX_METERS = 700
+/** How long a press has to be held before it drops a pin. */
+const LONG_PRESS_MS = 550
 const CONE_SOURCE = 'fov-cones'
 const SUN_SOURCE = 'sun-axis'
 const RAY_SOURCE = 'sun-rays'
@@ -100,11 +102,18 @@ interface MapViewProps {
   subject: LatLon | null
   onSubjectChange: (next: LatLon) => void
   mode: TapMode
+  /** Every position, drawn as a marker. */
   plan: PlannedPosition[]
+  /** The subset whose cones are drawn. Filtering lives in App. */
+  conePlan: PlannedPosition[]
   onPositionMove: (id: string, next: LatLon) => void
+  /** Long press drops the venue if it is unset, otherwise the subject. */
+  onLongPress: (at: LatLon) => void
   sunAzimuth: number | null
   /** PhotoPills style rays from the venue pin. All four bearings from core. */
   sunOverlay: SunOverlay | null
+  showSun: boolean
+  showArc: boolean
   selectedId: string | null
   onSelect: (id: string | null) => void
   onPitchChange: (pitch: number) => void
@@ -125,6 +134,7 @@ function coneCollection(plan: PlannedPosition[]): GeoJSON.FeatureCollection {
         id: p.position.id,
         lighting: p.lighting.classification,
         hFOV: p.fov.hFOV,
+        platform: p.position.platform,
       },
       geometry: { type: 'Polygon', coordinates: p.cone },
     })),
@@ -159,17 +169,20 @@ function sunCollection(
 function rayCollection(
   venue: LatLon | null,
   overlay: SunOverlay | null,
+  showSun: boolean,
+  showArc: boolean,
 ): GeoJSON.FeatureCollection {
-  if (venue === null || overlay === null) return emptyCollection()
+  if (venue === null || overlay === null || !showSun) return emptyCollection()
 
   const rays: { kind: string; bearing: number }[] = [
     { kind: 'sun', bearing: overlay.azimuth },
     { kind: 'shadow', bearing: overlay.shadowBearing },
   ]
-  if (overlay.arc.sunrise !== null) {
+  // Sunrise and sunset matter less inside a midday window, so they are opt in.
+  if (showArc && overlay.arc.sunrise !== null) {
     rays.push({ kind: 'sunrise', bearing: overlay.arc.sunrise.azimuth })
   }
-  if (overlay.arc.sunset !== null) {
+  if (showArc && overlay.arc.sunset !== null) {
     rays.push({ kind: 'sunset', bearing: overlay.arc.sunset.azimuth })
   }
 
@@ -203,9 +216,13 @@ export function MapView({
   onSubjectChange,
   mode,
   plan,
+  conePlan,
   onPositionMove,
+  onLongPress,
   sunAzimuth,
   sunOverlay,
+  showSun,
+  showArc,
   selectedId,
   onSelect,
   onPitchChange,
@@ -231,6 +248,7 @@ export function MapView({
     onSelect,
     onPositionMove,
     onPitchChange,
+    onLongPress,
   })
   useEffect(() => {
     latest.current = {
@@ -240,8 +258,17 @@ export function MapView({
       onSelect,
       onPositionMove,
       onPitchChange,
+      onLongPress,
     }
-  }, [mode, onVenueChange, onSubjectChange, onSelect, onPositionMove, onPitchChange])
+  }, [
+    mode,
+    onVenueChange,
+    onSubjectChange,
+    onSelect,
+    onPositionMove,
+    onPitchChange,
+    onLongPress,
+  ])
 
   const selfMoved = useRef(false)
   const insetRef = useRef(bottomInset)
@@ -295,6 +322,15 @@ export function MapView({
 
     instance.on('click', (event) => {
       const l = latest.current
+      /*
+       * Markers are appended into maplibre's own canvas container, so a click on
+       * a shooter bubbles up and arrives here as a map click too. Without this
+       * guard, tapping a figure selected it and then this handler immediately
+       * deselected it, and the card never appeared.
+       */
+      const target = event.originalEvent.target as HTMLElement | null
+      if (target?.closest('.shooter-host, .pin, .reticle-mark, .ray-label') != null) return
+
       const next = { lat: event.lngLat.lat, lon: event.lngLat.lng }
       if (l.mode === 'venue') {
         selfMoved.current = true
@@ -305,6 +341,32 @@ export function MapView({
         l.onSelect(null)
       }
     })
+
+    /*
+     * Long press drops a pin. Cancelled by any pan, zoom, or release, so a drag
+     * of the map never turns into a dropped pin by accident.
+     */
+    let pressTimer: number | null = null
+    const cancelPress = () => {
+      if (pressTimer !== null) {
+        window.clearTimeout(pressTimer)
+        pressTimer = null
+      }
+    }
+    const beginPress = (event: { lngLat: maplibregl.LngLat }) => {
+      cancelPress()
+      const at = { lat: event.lngLat.lat, lon: event.lngLat.lng }
+      pressTimer = window.setTimeout(() => {
+        pressTimer = null
+        latest.current.onLongPress(at)
+      }, LONG_PRESS_MS)
+    }
+
+    instance.on('touchstart', beginPress)
+    instance.on('mousedown', beginPress)
+    for (const event of ['touchend', 'touchcancel', 'touchmove', 'mouseup', 'movestart', 'zoomstart', 'dragstart'] as const) {
+      instance.on(event, cancelPress)
+    }
 
     instance.on('pitchend', () => latest.current.onPitchChange(instance.getPitch()))
     instance.on('moveend', () => setViewTick((tick) => tick + 1))
@@ -346,7 +408,21 @@ export function MapView({
         id: 'cone-line',
         type: 'line',
         source: CONE_SOURCE,
+        filter: ['!=', ['get', 'platform'], 'air'],
         paint: { 'line-color': lighting, 'line-width': 1.5, 'line-opacity': 0.95 },
+      })
+      // A drone is not standing on the ground, so its cone is drawn dashed.
+      instance.addLayer({
+        id: 'cone-line-air',
+        type: 'line',
+        source: CONE_SOURCE,
+        filter: ['==', ['get', 'platform'], 'air'],
+        paint: {
+          'line-color': lighting,
+          'line-width': 1.5,
+          'line-dasharray': [3, 2],
+          'line-opacity': 0.95,
+        },
       })
       instance.addLayer({
         id: 'sun-line',
@@ -362,21 +438,22 @@ export function MapView({
 
       // Thick enough to read over satellite imagery, with a dark casing so they
       // survive both bright sand and dark water.
+      // Thin and quiet. These are orientation, not the subject of the map.
       instance.addLayer({
         id: 'ray-casing',
         type: 'line',
         source: RAY_SOURCE,
         paint: {
           'line-color': readToken('--mark-edge'),
-          'line-width': 7,
-          'line-opacity': 0.55,
+          'line-width': 4,
+          'line-opacity': 0.28,
         },
       })
       instance.addLayer({
         id: 'ray-line',
         type: 'line',
         source: RAY_SOURCE,
-        paint: { 'line-color': rayColor, 'line-width': 3.5 },
+        paint: { 'line-color': rayColor, 'line-width': 2, 'line-opacity': 0.35 },
       })
 
       setReady(true)
@@ -384,6 +461,7 @@ export function MapView({
 
     map.current = instance
     return () => {
+      cancelPress()
       instance.remove()
       map.current = null
       /*
@@ -552,8 +630,8 @@ export function MapView({
   useEffect(() => {
     if (map.current === null || !ready) return
     const cones = map.current.getSource(CONE_SOURCE) as maplibregl.GeoJSONSource | undefined
-    cones?.setData(coneCollection(plan))
-  }, [plan, ready])
+    cones?.setData(coneCollection(conePlan))
+  }, [conePlan, ready])
 
   useEffect(() => {
     if (map.current === null || !ready) return
@@ -564,8 +642,8 @@ export function MapView({
   useEffect(() => {
     if (map.current === null || !ready) return
     const rays = map.current.getSource(RAY_SOURCE) as maplibregl.GeoJSONSource | undefined
-    rays?.setData(rayCollection(venue, sunOverlay))
-  }, [venue, sunOverlay, ready])
+    rays?.setData(rayCollection(venue, sunOverlay, showSun, showArc))
+  }, [venue, sunOverlay, showSun, showArc, ready])
 
   /* Degree labels at the end of each ray, in the monospace variant. */
   useEffect(() => {
@@ -573,16 +651,16 @@ export function MapView({
     if (instance === null) return
     for (const marker of rayLabels.current) marker.remove()
     rayLabels.current = []
-    if (venue === null || sunOverlay === null) return
+    if (venue === null || sunOverlay === null || !showSun) return
 
     const labels: { kind: string; bearing: number; text: string }[] = [
       { kind: 'sun', bearing: sunOverlay.azimuth, text: 'Sun' },
       { kind: 'shadow', bearing: sunOverlay.shadowBearing, text: 'Shadow' },
     ]
-    if (sunOverlay.arc.sunrise !== null) {
+    if (showArc && sunOverlay.arc.sunrise !== null) {
       labels.push({ kind: 'sunrise', bearing: sunOverlay.arc.sunrise.azimuth, text: 'Rise' })
     }
-    if (sunOverlay.arc.sunset !== null) {
+    if (showArc && sunOverlay.arc.sunset !== null) {
       labels.push({ kind: 'sunset', bearing: sunOverlay.arc.sunset.azimuth, text: 'Set' })
     }
 
@@ -618,7 +696,7 @@ export function MapView({
         .addTo(instance)
       rayLabels.current.push(marker)
     }
-  }, [venue, sunOverlay, viewTick])
+  }, [venue, sunOverlay, showSun, showArc, viewTick])
 
   /* ----------------------------------------------- shooter figure markers */
   useEffect(() => {
@@ -689,6 +767,8 @@ export function MapView({
             focalLength={planned.position.focalLength}
             classification={planned.lighting.classification}
             warnings={planned.warnings}
+            platform={planned.position.platform}
+            altitudeFeet={planned.position.altitudeFeet}
             moved={planned.position.moved}
             selected={selectedId === planned.position.id}
             onSelect={() => {

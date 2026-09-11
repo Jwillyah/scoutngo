@@ -56,11 +56,20 @@
   filter: invert(1);
 }
 
-/* Lift the bottom controls clear of the peek sheet so attribution stays
-   visible, which is a licence requirement, not a nicety. */
+/*
+ * LAYERING. maplibre gives its control containers z-index 2, which put the scale
+ * bar and the attribution icon on top of the bottom sheet. They belong above the
+ * map and below every surface of ours, and they have to ride up with the sheet
+ * as it grows rather than sitting at a fixed height.
+ *
+ * --sheet-live-height is set from App on .shell and tracks the sheet while it is
+ * being dragged.
+ */
 .maplibregl-ctrl-bottom-left,
 .maplibregl-ctrl-bottom-right {
-  bottom: calc(var(--nav-height) + var(--scrub-height) + var(--sheet-peek) + var(--safe-bottom));
+  z-index: 1;
+  bottom: calc(var(--dock-height, 0px) + var(--sheet-live-height, 0px));
+  transition: bottom 180ms ease-out;
 }
 
 /* maplibre themes the compact attribution with a two class selector, so match
@@ -96,6 +105,7 @@
 
 .hud {
   position: absolute;
+  z-index: 4;
   top: var(--space-3);
   left: var(--space-3);
   right: var(--space-3);
@@ -218,12 +228,11 @@
 
 .mapctl {
   position: absolute;
+  z-index: 3;
   right: var(--space-3);
-  /* Clears the sheet, the nav bar, AND maplibre's own attribution row, which
-     runs nearly the full width when expanded and would sit on the fit button. */
+  /* Clears the dock, the sheet, and maplibre's own attribution row. */
   bottom: calc(
-    var(--nav-height) + var(--scrub-height) + var(--sheet-peek) + 56px + var(--space-3) +
-      var(--safe-bottom)
+    var(--dock-height, 0px) + var(--sheet-live-height, 0px) + 56px + var(--space-3)
   );
   display: flex;
   flex-direction: column;
@@ -295,14 +304,14 @@
 /* ------------------------------------------------------------- nav bar */
 
 .nav {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  flex: 0 0 auto;
   height: calc(var(--nav-height) + var(--safe-bottom));
   padding-bottom: var(--safe-bottom);
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* One column per tab, whatever the count. A fixed repeat(4) wrapped the fifth
+     tab onto a second row when Spots was added. */
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   background: var(--black);
   border-top: var(--line-hair) solid var(--color-line);
 }
@@ -311,14 +320,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-1);
+  gap: 3px;
+  padding: 0 2px;
+  line-height: 1.1;
+  text-align: center;
   background: transparent;
   border: 0;
   border-top: var(--line-rule) solid transparent;
   color: var(--color-text-muted);
-  font-size: var(--text-xs);
+  font-size: 10px;
   font-weight: var(--weight-medium);
-  letter-spacing: var(--tracking-label);
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   cursor: pointer;
 }
@@ -530,8 +542,9 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1px;
-  padding: 3px 5px;
+  gap: 0;
+  padding: 2px 4px;
+  opacity: 0.82;
   background: var(--mark-edge);
   border-left: var(--line-heavy, 3px) solid var(--sun);
   pointer-events: none;
@@ -551,14 +564,14 @@
 }
 
 .ray-label__text {
-  font-size: var(--text-xs);
+  font-size: 9px;
   letter-spacing: var(--tracking-label);
   text-transform: uppercase;
   color: var(--color-text-muted);
 }
 
 .ray-label__deg {
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   font-weight: var(--weight-heavy);
   color: var(--color-text);
 }
@@ -567,12 +580,10 @@
 
 .card {
   position: absolute;
+  z-index: 4;
   left: var(--space-3);
   right: var(--space-3);
-  bottom: calc(
-    var(--nav-height) + var(--scrub-height) + var(--sheet-peek) + var(--space-3) +
-      var(--safe-bottom)
-  );
+  bottom: calc(var(--dock-height, 0px) + var(--sheet-live-height, 0px) + var(--space-3));
   max-width: var(--page-max);
   margin: 0 auto;
   background: var(--color-panel);
@@ -689,7 +700,9 @@
   position: absolute;
   left: 0;
   right: 0;
-  bottom: calc(var(--nav-height) + var(--scrub-height));
+  /* Sits directly on top of the measured dock, whatever the dock happens to be. */
+  bottom: var(--dock-height, 0px);
+  z-index: 4;
   display: flex;
   flex-direction: column;
   background: var(--color-panel);
@@ -780,6 +793,73 @@
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+}
+
+/* ------------------------------------------------------- generate progress */
+
+/*
+ * The staged readout during a generate. Hard edged and monospace-free: it is a
+ * checklist of steps, not a numeric readout, and it must never suggest smooth
+ * progress inside a step, because there is none to report. No animation on the
+ * active mark for the same reason; a pulsing dot reads as measured motion.
+ */
+.stages {
+  margin: var(--space-3) var(--page-pad) 0;
+  padding: var(--space-3);
+  list-style: none;
+  background: var(--color-panel-2);
+  border-left: var(--line-rule) solid var(--color-accent);
+  border-radius: var(--radius-panel);
+  display: grid;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.stages__step {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.stages__mark {
+  width: 8px;
+  height: 8px;
+  border: var(--line-hair) solid var(--color-line-strong);
+}
+
+.stages__step--done .stages__mark {
+  background: var(--color-text-muted);
+  border-color: var(--color-text-muted);
+}
+
+.stages__step--now .stages__mark {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.stages__step--now .stages__label {
+  font-weight: var(--weight-medium);
+  color: var(--color-text);
+}
+
+.stages__step--done .stages__label {
+  color: var(--color-text-muted);
+}
+
+.stages__step--next .stages__label {
+  color: var(--color-text-faint);
+}
+
+.stages__state {
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.stages__step--now .stages__state {
+  color: var(--color-accent);
 }
 
 .notice {
@@ -1450,11 +1530,6 @@
 /* --------------------------------------------------------- time scrubber */
 
 .scrub {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: var(--nav-height);
-  z-index: 2;
   padding: var(--space-2) var(--page-pad);
   background: var(--black);
   border-top: var(--line-hair) solid var(--color-line);
@@ -1469,6 +1544,19 @@
 .scrub__time {
   font-size: var(--text-lg);
   font-weight: var(--weight-heavy);
+}
+
+/*
+ * The zone sits tight against the time, not spaced like a stat, because it is part
+ * of reading the time rather than a separate number. The negative margin pulls it
+ * inside the flex gap the readout sets for real columns.
+ */
+.scrub__zone {
+  margin-left: calc(var(--space-3) * -1 + var(--space-1));
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
 }
 
 .scrub__stat {
@@ -1538,4 +1626,283 @@
 .ground__note {
   font-size: var(--text-xs);
   color: var(--color-text-muted);
+}
+
+/* ------------------------------------------------------------- overflow */
+
+.overflow {
+  position: relative;
+}
+
+.mode--icon {
+  width: 40px;
+  padding: 0;
+  font-size: var(--text-lg);
+  line-height: 1;
+}
+
+.overflow__menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--space-2));
+  min-width: 15rem;
+  padding: var(--space-1);
+  background: var(--color-panel);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-panel);
+}
+
+.overflow__item {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  background: transparent;
+  border: 0;
+  color: var(--color-text);
+  text-align: left;
+  font-size: var(--text-md);
+  cursor: pointer;
+}
+
+.overflow__item--on {
+  color: var(--color-accent);
+  font-weight: var(--weight-heavy);
+}
+
+.overflow__hint {
+  padding: var(--space-2) var(--space-3);
+  border-top: var(--line-hair) solid var(--color-line);
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+}
+
+/* ---------------------------------------------------------- cone filter */
+
+.cones {
+  flex: 0 0 auto;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--page-pad);
+  background: var(--black);
+  border-top: var(--line-hair) solid var(--color-line);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.cones::-webkit-scrollbar {
+  display: none;
+}
+
+.chip {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 0 var(--space-3);
+  background: var(--color-panel-2);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-panel);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-wide);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.chip--on {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-ink);
+  font-weight: var(--weight-heavy);
+}
+
+/* --------------------------------------------------------- stale brief */
+
+.stale {
+  margin: var(--space-3) var(--page-pad) 0;
+  padding: var(--space-3);
+  background: var(--color-hazard-bg);
+  border-left: var(--line-heavy, 3px) solid var(--color-hazard);
+  border-radius: var(--radius-panel);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.stale__head {
+  font-size: var(--text-md);
+  font-weight: var(--weight-heavy);
+  color: var(--white);
+}
+
+.stale__body {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* ---------------------------------------------------------- drone bits */
+
+.shooter--air .shooter__disc {
+  background: var(--sun-shadow);
+  border-radius: 20%;
+}
+
+.shooter--air .shooter__number {
+  color: var(--black);
+}
+
+.shooter--air .shooter__cam {
+  width: 20px;
+}
+
+.shooter__alt {
+  color: var(--sun-shadow);
+  font-weight: var(--weight-heavy);
+}
+
+.shot__air {
+  background: var(--sun-shadow);
+  color: var(--black);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-heavy);
+  padding: 2px 6px;
+}
+
+.card__air {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.card__air-tag {
+  background: var(--sun-shadow);
+  color: var(--black);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  padding: 2px 6px;
+}
+
+.card__air-note {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* ------------------------------------------------------------- search */
+
+.search__bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search__clear {
+  position: absolute;
+  right: var(--space-1);
+  width: 40px;
+  height: 40px;
+  background: transparent;
+  border: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-md);
+  cursor: pointer;
+}
+
+.search__name {
+  display: block;
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  color: var(--color-text);
+}
+
+.search__addr {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* -------------------------------------------------------------- spots */
+
+.spots {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 0 var(--page-pad) var(--space-5);
+}
+
+.spot-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.spot {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  border-bottom: var(--line-hair) solid var(--color-line);
+}
+
+.spot__open {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 52px;
+  padding: var(--space-2) 0;
+  background: transparent;
+  border: 0;
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.spot__name {
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+}
+
+.spot__meta {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.spot__del {
+  width: 44px;
+  height: 44px;
+  background: transparent;
+  border: 0;
+  color: var(--color-text-faint);
+  cursor: pointer;
+}
+
+.mapctl__sun {
+  font-size: var(--text-lg);
+}
+
+
+/* ---------------------------------------------------------------- dock */
+
+/*
+ * The bottom stack: cone filter, time scrubber, nav bar. Laid out in normal
+ * flow so each bar is whatever height its content needs, and measured once in
+ * App so everything above it can be positioned against the real number instead
+ * of a per-bar token that has to be kept in sync by hand.
+ */
+.dock {
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--black);
 }

@@ -13,11 +13,18 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
-    "@turf/turf": "^7.4.0",
+    "@turf/bearing": "^7.4.0",
+    "@turf/boolean-point-in-polygon": "^7.4.0",
+    "@turf/destination": "^7.4.0",
+    "@turf/distance": "^7.4.0",
+    "@turf/helpers": "^7.4.0",
+    "@turf/line-intersect": "^7.4.0",
+    "@turf/point-to-line-distance": "^7.4.0",
     "maplibre-gl": "^6.8.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "suncalc": "2.0.2"
+    "suncalc": "2.0.2",
+    "tz-lookup": "^6.1.25"
   },
   "devDependencies": {
     "@netlify/functions": "^6.0.0",

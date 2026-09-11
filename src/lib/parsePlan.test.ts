@@ -145,6 +145,8 @@ describe('parsePlanResponse', () => {
       'focalLength',
       'shot',
       'risk',
+      'platform',
+      'altitudeFeet',
     ])
   })
 
@@ -161,5 +163,48 @@ describe('parsePlanResponse', () => {
 
   it('refuses when the kit has no lenses selected', () => {
     expect(parsePlanResponse(wrap([position()]), []).ok).toBe(false)
+  })
+})
+
+describe('drone positions', () => {
+  it('refuses an air position when no drone is in the kit', () => {
+    const result = parsePlanResponse(
+      wrap([position({ platform: 'air', altitudeFeet: 200 })]),
+      LENSES,
+      false,
+    )
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.positions[0].platform).toBe('ground')
+    expect(result.positions[0].altitudeFeet).toBe(0)
+  })
+
+  it('accepts one when a drone is in the kit', () => {
+    const result = parsePlanResponse(
+      wrap([position({ platform: 'air', altitudeFeet: 220 })]),
+      LENSES,
+      true,
+    )
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.positions[0].platform).toBe('air')
+    expect(result.positions[0].altitudeFeet).toBe(220)
+  })
+
+  it('clamps altitude to the FAA 400ft ceiling', () => {
+    const high = parsePlanResponse(
+      wrap([position({ platform: 'air', altitudeFeet: 2500 })]),
+      LENSES,
+      true,
+    )
+    expect(high.ok && high.positions[0].altitudeFeet).toBe(400)
+  })
+
+  it('falls back to a sane altitude when the model omits it', () => {
+    const result = parsePlanResponse(wrap([position({ platform: 'air' })]), LENSES, true)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.positions[0].altitudeFeet).toBeGreaterThan(0)
+    expect(result.positions[0].altitudeFeet).toBeLessThanOrEqual(400)
   })
 })

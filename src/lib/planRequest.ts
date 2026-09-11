@@ -27,6 +27,17 @@ export function selectedBodyNames(kit: KitSelection): string[] {
   return DEFAULT_KIT.bodies.filter((b) => kit.bodyIds.includes(b.id)).map((b) => b.name)
 }
 
+export function selectedDroneNames(kit: KitSelection): string[] {
+  return DEFAULT_KIT.drones
+    .filter((d) => kit.droneIds.includes(d.id))
+    .map((d) => `${d.name}, ${d.weightGrams}g`)
+}
+
+/** Air positions are only offered when a drone is actually coming. */
+export function droneAvailable(kit: KitSelection): boolean {
+  return kit.droneIds.length > 0
+}
+
 export interface GenerateRequestBody {
   venueName: string
   event: string
@@ -34,8 +45,11 @@ export interface GenerateRequestBody {
   date: string
   startTime: string
   endTime: string
+  /** How the window's zone is written, "EDT, UTC-4". Empty if it did not resolve. */
+  timeZoneLabel: string
   style: string
   bodies: string[]
+  drones: string[]
   lenses: LensSpec[]
   bounds: MapBounds
   image: string
@@ -55,6 +69,12 @@ export function buildGenerateBody(
   kit: KitSelection,
   capture: { dataUrl: string; bounds: MapBounds; mediaType: string },
   site?: SiteSummary,
+  /*
+   * The venue's zone, so "11:00 to 15:00" in the prompt is not the same ambiguity
+   * the app just stopped having. Nothing is computed from it: the sun is worked out
+   * in src/core/ from real instants, and this is context only.
+   */
+  timeZoneLabel = '',
 ): GenerateRequestBody {
   return {
     venueName: venue.name,
@@ -63,8 +83,10 @@ export function buildGenerateBody(
     date: venue.date,
     startTime: venue.startTime,
     endTime: venue.endTime,
+    timeZoneLabel,
     style: kit.styleNotes,
     bodies: selectedBodyNames(kit),
+    drones: selectedDroneNames(kit),
     lenses: selectedLenses(kit),
     bounds: capture.bounds,
     image: stripDataUrl(capture.dataUrl),
@@ -111,10 +133,43 @@ export async function requestPlan(body: GenerateRequestBody): Promise<GenerateRe
   }
 }
 
+/*
+ * The stages of a generate, in the order they happen.
+ *
+ * These are the REAL steps in App.onGenerate, not a decorative sequence and not a
+ * timer. Each one is set immediately before the work it names begins, so the stage
+ * shown is always the thing the app is actually blocked on. Two of them take real
+ * time, `terrain` waiting on Overpass and `positions` waiting on the model; `capture`
+ * and `lighting` are arithmetic and go by in a frame. They are still listed, because
+ * a list that only shows the slow steps is a list that cannot be checked against
+ * what the code does.
+ *
+ * If a step is added to onGenerate, add it here. If one is removed, remove it here.
+ * Nothing advances on its own.
+ */
+export const GENERATE_STAGES = [
+  { key: 'capture', label: 'Capturing the view' },
+  { key: 'terrain', label: 'Reading the terrain' },
+  { key: 'positions', label: 'Asking for positions' },
+  { key: 'lighting', label: 'Computing lighting' },
+] as const
+
+export type GenerateStage = (typeof GENERATE_STAGES)[number]['key']
+
+/** Where a stage sits in the sequence. -1 for a key that is not one. */
+export function stageIndex(stage: GenerateStage): number {
+  return GENERATE_STAGES.findIndex((entry) => entry.key === stage)
+}
+
+export function stageLabel(stage: GenerateStage): string {
+  return GENERATE_STAGES.find((entry) => entry.key === stage)?.label ?? ''
+}
+
 /** What the Plan panel shows about the last generate attempt. */
 export type GenerationState =
   | { status: 'idle' }
-  | { status: 'working' }
+  /** Mid flight, on the named step. Nothing here is inferred from elapsed time. */
+  | { status: 'working'; stage: GenerateStage }
   | { status: 'error'; message: string }
   /** Parsing failed. The raw response is shown rather than a dead end. */
   | { status: 'raw'; reason: string; raw: string }

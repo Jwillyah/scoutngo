@@ -1,6 +1,8 @@
 const PITCH_STOPS = [0, 45, 60]
 
 interface MapControlsProps {
+  showSun: boolean
+  onShowSun: (next: boolean) => void
   pitch: number
   onPitch: (next: number) => void
   onZoom: (delta: number) => void
@@ -9,7 +11,15 @@ interface MapControlsProps {
 }
 
 /** Thumb sized map controls. Tilt steps through 0, 45 and 60 degrees. */
-export function MapControls({ pitch, onPitch, onZoom, onFitAll, canFitAll }: MapControlsProps) {
+export function MapControls({
+  showSun,
+  onShowSun,
+  pitch,
+  onPitch,
+  onZoom,
+  onFitAll,
+  canFitAll,
+}: MapControlsProps) {
   const activeStop = PITCH_STOPS.reduce((best, stop) =>
     Math.abs(stop - pitch) < Math.abs(best - pitch) ? stop : best,
   )
@@ -21,6 +31,19 @@ export function MapControls({ pitch, onPitch, onZoom, onFitAll, canFitAll }: Map
 
   return (
     <div className="mapctl">
+      {/* Sun overlay on by default, one tap to get it out of the way. */}
+      <button
+        type="button"
+        className={`mapctl__btn${showSun ? ' mapctl__btn--on' : ''}`}
+        aria-pressed={showSun}
+        onClick={() => onShowSun(!showSun)}
+        aria-label={showSun ? 'Hide the sun overlay' : 'Show the sun overlay'}
+      >
+        <span className="mapctl__sun" aria-hidden="true">
+          ☀
+        </span>
+      </button>
+
       <button
         type="button"
         className={`mapctl__btn${activeStop === 0 ? '' : ' mapctl__btn--on'}`}

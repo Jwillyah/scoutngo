@@ -12,6 +12,7 @@ const deg = (n: number) => `${n.toFixed(1)}°`
 const WARNING_LABEL: Record<SiteWarning, string> = {
   'in-water': 'in water',
   'in-roadway': 'in roadway',
+  'over-structure': 'over people',
 }
 
 /**
@@ -47,6 +48,9 @@ export function ShotList({ plan, selectedId, onPick }: ShotListProps) {
                 >
                   {lighting.classification}
                 </span>
+                {position.platform === 'air' ? (
+                  <span className="shot__air num">{position.altitudeFeet}ft</span>
+                ) : null}
                 {position.moved ? <span className="shot__moved">moved</span> : null}
                 {warnings.map((warning) => (
                   <span className="shot__warn" key={warning}>

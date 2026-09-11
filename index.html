@@ -2,9 +2,36 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>ScoutNGo</title>
+    <meta
+      name="description"
+      content="Camera positions, lenses and lighting for a venue you have never visited."
+    />
+
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>scoutngo</title>
+
+    <!--
+      Add to Home Screen. manifest.json gives Android a standalone app; the
+      apple-touch-icon and the two apple-mobile-web-app tags are what iOS reads
+      instead, since Safari still ignores most of the manifest.
+
+      DELIBERATELY NO SERVICE WORKER. Installing one is what makes a page
+      "offline capable", and the only thing worth caching here is satellite
+      imagery, which is hundreds of megabytes for a single venue at usable zoom
+      and would sit in the user's storage indefinitely. Offline is not a goal
+      yet. When it becomes one it should cache a chosen venue on request, not
+      every tile that happens to scroll past.
+    -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#0a0b09" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <!-- black-translucent puts the map under the status bar, which the safe-area
+         insets in tokens.css already account for. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="ScoutNGo" />
   </head>
   <body>
     <div id="root"></div>

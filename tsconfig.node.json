@@ -19,5 +19,11 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["vite.config.ts", "netlify/functions", "tests"]
+  /*
+   * src/types carries the ambient declarations for untyped dependencies. Tests in
+   * tests/ import from src/, so this project compiles src files too and needs the
+   * same declarations the app project has; without it, tz-lookup is untyped here
+   * and only here, which `tsc -p tsconfig.app.json` will not show you.
+   */
+  "include": ["vite.config.ts", "netlify/functions", "tests", "src/types"]
 }

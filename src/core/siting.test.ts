@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { checkSite, isInRoadway, isInWater, type Landcover, type Ring } from './siting.ts'
+import {
+  checkSite,
+  isInRoadway,
+  isInWater,
+  pathCrossesStructure,
+  type Landcover,
+  type Ring,
+} from './siting.ts'
 
 /** A square of water around the Wicomico, in [lon, lat]. */
 const RIVER: Ring[] = [
@@ -21,7 +28,7 @@ const ROAD = {
   halfWidthMeters: 6,
 }
 
-const LAND: Landcover = { water: [RIVER], roads: [ROAD] }
+const LAND: Landcover = { water: [RIVER], roads: [ROAD], structures: [] }
 
 describe('isInWater', () => {
   it('catches a position dropped in the river', () => {
@@ -84,5 +91,74 @@ describe('checkSite', () => {
     const result = checkSite({ lat: 38.3638, lon: -75.6055 }, LAND)
     expect(Array.isArray(result)).toBe(true)
     expect(result.every((w) => typeof w === 'string')).toBe(true)
+  })
+})
+
+describe('pathCrossesStructure, the drone check', () => {
+  /** A building sitting between the launch point and the subject. */
+  const BUILDING: Ring[] = [
+    [
+      [-75.6058, 38.3648],
+      [-75.6052, 38.3648],
+      [-75.6052, 38.3652],
+      [-75.6058, 38.3652],
+      [-75.6058, 38.3648],
+    ],
+  ]
+
+  it('flags a flight path that crosses a building', () => {
+    expect(
+      pathCrossesStructure(
+        { lat: 38.3660, lon: -75.6055 },
+        { lat: 38.3640, lon: -75.6055 },
+        [BUILDING],
+      ),
+    ).toBe(true)
+  })
+
+  it('clears a path that goes around it', () => {
+    expect(
+      pathCrossesStructure(
+        { lat: 38.3660, lon: -75.6030 },
+        { lat: 38.3640, lon: -75.6030 },
+        [BUILDING],
+      ),
+    ).toBe(false)
+  })
+
+  it('flags a path that starts inside the footprint', () => {
+    expect(
+      pathCrossesStructure(
+        { lat: 38.3650, lon: -75.6055 },
+        { lat: 38.3600, lon: -75.6055 },
+        [BUILDING],
+      ),
+    ).toBe(true)
+  })
+
+  it('is false when there is no structure data', () => {
+    expect(
+      pathCrossesStructure({ lat: 38.366, lon: -75.6055 }, { lat: 38.364, lon: -75.6055 }, []),
+    ).toBe(false)
+  })
+
+  it('judges an air position on its path, not on the ground beneath it', () => {
+    const land: Landcover = { water: [RIVER], roads: [ROAD], structures: [BUILDING] }
+    const overWater = { lat: 38.3638, lon: -75.6055 }
+    // Same spot: a person standing there is in the river, a drone is not.
+    expect(checkSite(overWater, land)).toEqual(['in-water'])
+    expect(
+      checkSite(overWater, land, { platform: 'air', subject: { lat: 38.3639, lon: -75.6056 } }),
+    ).toEqual([])
+  })
+
+  it('flags an air position whose path crosses a building', () => {
+    const land: Landcover = { water: [], roads: [], structures: [BUILDING] }
+    expect(
+      checkSite({ lat: 38.366, lon: -75.6055 }, land, {
+        platform: 'air',
+        subject: { lat: 38.364, lon: -75.6055 },
+      }),
+    ).toEqual(['over-structure'])
   })
 })

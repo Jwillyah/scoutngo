@@ -131,7 +131,6 @@
   /* --------------------------------------------------------------- layout */
   --page-pad: var(--space-4);
   --page-max: 34rem;
-  --scrub-height: 62px;
   --sheet-peek: 108px;
   /* Keep --nav-height in step with NAV_HEIGHT in NavBar.tsx. */
   --nav-height: 56px;

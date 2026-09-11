@@ -17,6 +17,8 @@ export interface LensSpec {
   max: number
 }
 
+export type Platform = 'ground' | 'air'
+
 export interface RawPosition {
   x: number
   y: number
@@ -24,6 +26,9 @@ export interface RawPosition {
   focalLength: number
   shot: string
   risk: string
+  platform: Platform
+  /** Feet above ground for an air position. Zero for a ground one. */
+  altitudeFeet: number
 }
 
 export type ParseResult =
@@ -31,6 +36,8 @@ export type ParseResult =
   | { ok: false; reason: string; raw: string }
 
 export const MAX_POSITIONS = 6
+/** FAA ceiling for uncrewed aircraft, feet above ground level. */
+export const FAA_CEILING_FEET = 400
 export const SHOT_WORD_CAP = 25
 export const RISK_WORD_CAP = 15
 
@@ -56,7 +63,11 @@ export function extractJsonObject(raw: string): string | null {
   return withoutFences.slice(start, end + 1)
 }
 
-export function parsePlanResponse(raw: string, lenses: LensSpec[]): ParseResult {
+export function parsePlanResponse(
+  raw: string,
+  lenses: LensSpec[],
+  droneAvailable = false,
+): ParseResult {
   if (lenses.length === 0) {
     return { ok: false, reason: 'No lenses are selected in the kit.', raw }
   }
@@ -117,6 +128,27 @@ export function parsePlanResponse(raw: string, lenses: LensSpec[]): ParseResult 
         ? Math.round(clamp(item.focalLength, lens.min, lens.max))
         : lens.min
 
+    // A drone position is only possible if a drone is actually in the kit.
+    const platform: Platform =
+      droneAvailable && item.platform === 'air' ? 'air' : 'ground'
+
+    /*
+     * Clamped to the FAA ceiling. The model does not get to propose an illegal
+     * altitude, and the card states the rule regardless of what came back.
+     */
+    const altitudeFeet =
+      platform === 'air'
+        ? Math.round(
+            clamp(
+              typeof item.altitudeFeet === 'number' && Number.isFinite(item.altitudeFeet)
+                ? item.altitudeFeet
+                : 150,
+              0,
+              FAA_CEILING_FEET,
+            ),
+          )
+        : 0
+
     kept.push({
       x: clamp(item.x, 0, 1),
       y: clamp(item.y, 0, 1),
@@ -124,6 +156,8 @@ export function parsePlanResponse(raw: string, lenses: LensSpec[]): ParseResult 
       focalLength: focal,
       shot: capWords(typeof item.shot === 'string' ? item.shot : '', SHOT_WORD_CAP),
       risk: capWords(typeof item.risk === 'string' ? item.risk : '', RISK_WORD_CAP),
+      platform,
+      altitudeFeet,
     })
   }
 

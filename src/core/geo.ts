@@ -6,11 +6,18 @@
  * which way that camera points or how wide the lens sees. Those come from here
  * and from fov.ts, and they override anything a model claims.
  *
- * Unlike the rest of core this file does depend on @turf/turf, which is the
- * geodesy library named in docs/brief.md. Nothing here is hand rolled.
+ * Unlike the rest of core this file does depend on turf, which is the geodesy
+ * library named in docs/brief.md. Nothing here is hand rolled.
+ *
+ * The scoped packages are imported one by one rather than through the @turf/turf
+ * barrel. The barrel re-exports every turf module, so importing `bearing` from it
+ * pulled the whole library into the bundle; these four are what this file uses.
  */
 
-import { bearing as turfBearing, destination, distance, point } from '@turf/turf'
+import turfBearing from '@turf/bearing'
+import destination from '@turf/destination'
+import distance from '@turf/distance'
+import { point } from '@turf/helpers'
 import { normalizeBearing } from './sun.ts'
 
 export interface LatLon {

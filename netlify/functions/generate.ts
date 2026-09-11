@@ -21,8 +21,33 @@ import Anthropic from '@anthropic-ai/sdk'
  * ===========================================================================
  */
 
-const MODEL = 'claude-sonnet-4-6'
-const MAX_TOKENS = 4000
+const MODEL = 'claude-sonnet-5'
+
+/*
+ * Raised from 4000 when moving off claude-sonnet-4-6. On Sonnet 5 thinking is on
+ * by default and thinking tokens are drawn from the SAME max_tokens budget as the
+ * visible answer, so the old 4000 was no longer 4000 for the JSON. The plan itself
+ * is small, about 700 tokens for six positions, so this is headroom rather than a
+ * licence to ramble: the caps that matter are the per-field ones in the prompt and
+ * in src/lib/parsePlan.ts, and they are unchanged.
+ *
+ * Still a single non-streaming request. 8000 is far below the point where the SDK
+ * wants streaming to dodge an HTTP timeout.
+ */
+const MAX_TOKENS = 8000
+
+/*
+ * Adaptive thinking, stated rather than left implicit, because Sonnet 5 runs it
+ * whether or not it is asked for and the budget arithmetic above depends on it.
+ *
+ * Effort is held at 'low' deliberately. The judgement asked for here is bounded:
+ * pick four to six places to stand in one image. Every expensive part, the
+ * bearings, the cones, the lighting and the siting checks, is arithmetic done in
+ * src/core/ after the response comes back, so paying for deeper reasoning buys
+ * very little and costs seconds on a button the user is already waiting on. Raise
+ * this if placements start looking lazy; it is one word.
+ */
+const EFFORT = 'low' as const
 
 /*
  * Lighting and geometry are settled by src/core/. The model is told this
@@ -39,7 +64,7 @@ WHAT YOU MUST NOT DECIDE: anything geometric or photometric. Do not state or imp
 
 OUTPUT FORMAT. Return a single JSON object and nothing else. No prose before or after. No markdown code fences. No explanation.
 
-{"positions":[{"x":0.0,"y":0.0,"lensId":"","focalLength":0,"shot":"","risk":""}]}
+{"positions":[{"x":0.0,"y":0.0,"lensId":"","focalLength":0,"shot":"","risk":"","platform":"ground","altitudeFeet":0}]}
 
 FIELD RULES, all mandatory:
 - x, y: numbers from 0 to 1, the position in the image. x is left to right, y is top to bottom.
@@ -53,6 +78,8 @@ The application checks every position you return against this same geometry and 
 - focalLength: millimetres, within that lens's range as listed.
 - shot: what to capture from here. AT MOST 25 WORDS. Hard limit.
 - risk: what could go wrong here, such as access, crowds, obstruction, or distance. AT MOST 15 WORDS. Hard limit.
+- platform: "ground" or "air". Use "air" ONLY if a drone is listed in the kit below. An air position is a hover point, so it may sit over water or a road.
+- altitudeFeet: for "air", height above ground in feet, no more than 400, which is the FAA ceiling. For "ground", 0.
 
 Vary the positions. Do not cluster them all on one side. Respect the shooter's stated style and the lenses they actually brought.
 
@@ -65,9 +92,11 @@ interface GenerateContext {
   date?: unknown
   startTime?: unknown
   endTime?: unknown
+  timeZoneLabel?: unknown
   style?: unknown
   lenses?: unknown
   bodies?: unknown
+  drones?: unknown
   bounds?: unknown
   image?: unknown
   mediaType?: unknown
@@ -146,9 +175,13 @@ ${asText(body.outcome, 2000)}
 HOW THEY SHOOT:
 ${asText(body.style, 1500)}
 
-DATE AND WINDOW: ${asText(body.date, 20)}, ${asText(body.startTime, 10)} to ${asText(body.endTime, 10)} local
+DATE AND WINDOW: ${asText(body.date, 20)}, ${asText(body.startTime, 10)} to ${asText(body.endTime, 10)} in VENUE LOCAL TIME${
+    asText(body.timeZoneLabel, 40) === '' ? '' : ` (${asText(body.timeZoneLabel, 40)})`
+  }
 
 BODIES IN PLAY: ${bodies}
+
+AIRCRAFT IN PLAY: ${Array.isArray(body.drones) && body.drones.length > 0 ? body.drones.map((d) => asText(d, 80)).join(', ') : 'none, so every position must be "ground"'}
 
 LENSES IN PLAY, use one of these ids:
 ${lenses}
@@ -200,6 +233,8 @@ export default async (request: Request): Promise<Response> => {
     const response = await client.messages.create({
       model: MODEL,
       max_tokens: MAX_TOKENS,
+      thinking: { type: 'adaptive' },
+      output_config: { effort: EFFORT },
       system: SYSTEM_PROMPT,
       messages: [
         {
@@ -212,8 +247,14 @@ export default async (request: Request): Promise<Response> => {
       ],
     })
 
-    // Raw text, handed back untouched. The app parses it and, if that fails,
-    // shows the user exactly this instead of a dead end error.
+    /*
+     * Raw text, handed back untouched. The app parses it and, if that fails,
+     * shows the user exactly this instead of a dead end error.
+     *
+     * The type filter is load bearing now that thinking is on: the response also
+     * carries thinking blocks, and they must not reach the JSON parser. Their text
+     * is empty by default in any case, since display is 'omitted' unless asked for.
+     */
     const raw = response.content
       .filter((block) => block.type === 'text')
       .map((block) => block.text)

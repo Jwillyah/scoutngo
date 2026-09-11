@@ -1,13 +1,11 @@
-/** Must match --nav-height in tokens.css. The sheet sizes itself against it. */
-export const NAV_HEIGHT = 56
-
-export type Tab = 'plan' | 'shots' | 'sun' | 'kit'
+export type Tab = 'plan' | 'shots' | 'sun' | 'kit' | 'spots'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'plan', label: 'Plan' },
-  { id: 'shots', label: 'Shot list' },
+  { id: 'shots', label: 'Shots' },
   { id: 'sun', label: 'Sun' },
   { id: 'kit', label: 'Kit' },
+  { id: 'spots', label: 'Spots' },
 ]
 
 interface NavBarProps {

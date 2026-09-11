@@ -1,5 +1,6 @@
 import { altitudeNote, type AltitudeNote } from '../core/lighting.ts'
 import { getSunPosition, type SunPosition } from '../core/sun.ts'
+import { formatClock } from '../core/timezone.ts'
 import type { VenueWindow } from '../lib/venue.ts'
 import { Section } from './Section.tsx'
 
@@ -23,9 +24,6 @@ const SHORT_NOTE: Record<AltitudeNote, string> = {
   'flat overhead light': 'flat',
   workable: 'workable',
 }
-
-const clock = (date: Date) =>
-  date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
 
 const degrees = (n: number) => `${n.toFixed(1)}°`
 
@@ -76,7 +74,7 @@ export function SunReadout({ venueWindow, open, onToggle }: SunReadoutProps) {
     <Section
       index="03"
       title="Sun through the window"
-      summary={`mid-window azimuth ${degrees(samples[1].sun.azimuth)}`}
+      summary={`mid-window azimuth ${degrees(samples[1].sun.azimuth)} · ${venueWindow.timeZoneLabel}`}
       open={open}
       onToggle={onToggle}
     >
@@ -99,7 +97,9 @@ export function SunReadout({ venueWindow, open, onToggle }: SunReadoutProps) {
           <div className="readout__cell">Time</div>
           {samples.map((s) => (
             <div className="readout__cell" key={s.key}>
-              <span className="readout__value num">{clock(s.at)}</span>
+              <span className="readout__value num">
+                {formatClock(s.at, venueWindow.timeZone)}
+              </span>
             </div>
           ))}
 
@@ -147,10 +147,29 @@ export function SunReadout({ venueWindow, open, onToggle }: SunReadoutProps) {
           {notes.map((note) => (
             <p key={note}>{note}</p>
           ))}
+          {/*
+            * The timezone is stated rather than assumed. Times are resolved
+            * through the venue's own zone, so this is a fact about the numbers
+            * above, not a warning to check something by hand.
+            */}
           <p>
-            Times read in this device's timezone, <span className="num">{venueWindow.timeZone}</span>.
-            Check that this is the venue's timezone too.
+            Times are venue local:{' '}
+            <span className="num">{venueWindow.timeZoneLabel}</span> at{' '}
+            <span className="num">{venueWindow.timeZone}</span>.
           </p>
+          {venueWindow.travelling ? (
+            <p>
+              This device is set to{' '}
+              <span className="num">{venueWindow.deviceTimeZone}</span>, so the clock
+              on your screen is not the clock these times are in.
+            </p>
+          ) : null}
+          {venueWindow.timeZoneFallback ? (
+            <p>
+              No timezone could be resolved for these coordinates, so this device's
+              zone is standing in. Move the pin onto land to fix it.
+            </p>
+          ) : null}
         </div>
       </div>
     </Section>

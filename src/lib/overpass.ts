@@ -108,10 +108,13 @@ export function simplify(ring: Position[], maxPoints: number): Position[] {
 
 export function parseOverpass(payload: unknown): SiteGeometry {
   const elements = (payload as { elements?: unknown })?.elements
-  if (!Array.isArray(elements)) return { land: { water: [], roads: [] }, summary: EMPTY_SUMMARY }
+  if (!Array.isArray(elements)) {
+    return { land: { water: [], roads: [], structures: [] }, summary: EMPTY_SUMMARY }
+  }
 
   const water: Ring[][] = []
   const roads: RoadLine[] = []
+  const structures: Ring[][] = []
   const summary: SiteSummary = { water: [], buildings: [], piers: [], roads: [], parking: [] }
 
   for (const raw of elements as OverpassElement[]) {
@@ -144,19 +147,23 @@ export function parseOverpass(payload: unknown): SiteGeometry {
 
     if (tags.man_made === 'pier') {
       summary.piers.push(simplify(ring, 12))
+      // People stand on piers, so a drone path over one is worth flagging.
+      if (isClosed(ring)) structures.push([ring])
       continue
     }
     if (tags.amenity === 'parking') {
       summary.parking.push(simplify(ring, 12))
+      if (isClosed(ring)) structures.push([ring])
       continue
     }
     if (typeof tags.building === 'string') {
       summary.buildings.push(simplify(ring, 8))
+      if (isClosed(ring)) structures.push([ring])
       continue
     }
   }
 
-  return { land: { water, roads }, summary }
+  return { land: { water, roads, structures }, summary }
 }
 
 /** Caps what goes into the prompt so a dense city cannot blow the token budget. */

@@ -1,7 +1,5 @@
 import type { SunPosition } from '../core/sun.ts'
-
-/** Must match --scrub-height in tokens.css. The sheet sizes itself against it. */
-export const SCRUB_HEIGHT = 62
+import { formatClock } from '../core/timezone.ts'
 
 interface TimeScrubberProps {
   start: Date
@@ -11,21 +9,34 @@ interface TimeScrubberProps {
   onChange: (next: number) => void
   at: Date
   sun: SunPosition
+  /** The venue's IANA zone. Every time on this bar is a venue wall clock. */
+  timeZone: string
+  /** Short form of that zone, "EDT", shown beside the time so it is never a guess. */
+  timeZoneAbbr: string
 }
-
-const clock = (date: Date) =>
-  date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
 
 /**
  * Scrubs through the entered window. Everything downstream, the sun rays and
  * every cone's lighting color, recomputes from the scrubbed time, which is what
  * makes a four hour window visibly flip from backlit to front-lit.
  */
-export function TimeScrubber({ start, end, value, onChange, at, sun }: TimeScrubberProps) {
+export function TimeScrubber({
+  start,
+  end,
+  value,
+  onChange,
+  at,
+  sun,
+  timeZone,
+  timeZoneAbbr,
+}: TimeScrubberProps) {
+  const clock = (date: Date) => formatClock(date, timeZone)
+
   return (
     <div className="scrub">
       <div className="scrub__readout">
         <span className="scrub__time num">{clock(at)}</span>
+        <span className="scrub__zone">{timeZoneAbbr}</span>
         <span className="scrub__stat">
           <span className="scrub__stat-label">Az</span>
           <span className="num">{sun.azimuth.toFixed(1)}°</span>
@@ -43,7 +54,7 @@ export function TimeScrubber({ start, end, value, onChange, at, sun }: TimeScrub
         max={1000}
         value={Math.round(value * 1000)}
         aria-label="Time through the window"
-        aria-valuetext={`${clock(at)}, sun at ${sun.azimuth.toFixed(1)} degrees`}
+        aria-valuetext={`${clock(at)} ${timeZoneAbbr}, sun at ${sun.azimuth.toFixed(1)} degrees`}
         onChange={(event) => onChange(Number(event.target.value) / 1000)}
       />
 

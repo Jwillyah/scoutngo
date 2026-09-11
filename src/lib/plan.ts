@@ -9,6 +9,7 @@ import {
 import { DEFAULT_KIT, effectiveSensor, type Body, type Lens } from '../core/kit.ts'
 import { classifyLighting, type LightingResult } from '../core/lighting.ts'
 import { checkSite, EMPTY_LANDCOVER, type Landcover, type SiteWarning } from '../core/siting.ts'
+import type { Platform } from './parsePlan.ts'
 
 /**
  * A camera position. The model proposes where to stand and what to shoot; it
@@ -27,6 +28,10 @@ export interface CameraPosition {
   shot: string
   /** What could go wrong here. Also judgement. */
   risk: string
+  /** Ground or air. Air positions get a dashed cone and a flight path check. */
+  platform: Platform
+  /** Feet above ground, air positions only. */
+  altitudeFeet: number
   /** True once the shooter has dragged this position off where it landed. */
   moved: boolean
 }
@@ -99,7 +104,7 @@ export function planPosition(
     // The single authority on whether this position is backlit.
     lighting: classifyLighting(positionBearing, sunAzimuth),
     cone: fovConePolygon(position.at, cameraBearing, fov.hFOV, rangeMeters),
-    warnings: checkSite(position.at, land),
+    warnings: checkSite(position.at, land, { platform: position.platform, subject }),
   }
 }
 

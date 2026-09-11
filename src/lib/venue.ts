@@ -7,6 +7,14 @@
  */
 
 import type { LatLon } from '../core/geo.ts'
+import {
+  deviceTimeZone,
+  isAwayFromDevice,
+  venueTimeZone,
+  zonedTimeToUtc,
+  zoneLabel,
+  zoneShort,
+} from '../core/timezone.ts'
 
 export interface VenueDraft {
   name: string
@@ -120,17 +128,43 @@ export function hasErrors(errors: VenueErrors): boolean {
 export interface VenueWindow {
   lat: number
   lon: number
+  /**
+   * Absolute instants, resolved through the VENUE's timezone. Every one of these
+   * is what src/core/ wants: a Date is a moment, not a clock reading.
+   */
   start: Date
   middle: Date
   end: Date
-  /** The device timezone the times were read in. Worth surfacing: the venue may not be in it. */
+  /** The venue's own IANA timezone, resolved from its coordinates. */
   timeZone: string
+  /** How to show it: "EDT, UTC-4". Daylight time is decided at the start instant. */
+  timeZoneLabel: string
+  /** The same thing at its shortest, "EDT", for tight spots like the scrubber. */
+  timeZoneShort: string
+  /** True when the venue is not in the zone this device is set to. */
+  travelling: boolean
+  /** The device zone, so the UI can name both when they differ. */
+  deviceTimeZone: string
+  /**
+   * Set when the coordinates resolved to no timezone at all and the device zone
+   * is standing in. Rare, mid ocean mostly, but it must not be silent.
+   */
+  timeZoneFallback: boolean
 }
 
 /**
- * Turns a valid draft into the numbers src/core/ wants. Returns null when the
- * draft is not complete enough to resolve. Times are read in the device's own
- * timezone, which is why timeZone comes back with them.
+ * Turns a valid draft into the instants src/core/ wants. Returns null when the
+ * draft is not complete enough to resolve.
+ *
+ * The times in the form are WALL CLOCK readings at the venue. They are resolved
+ * through the timezone of the venue's own coordinates, not the device's. See the
+ * header of src/core/timezone.ts for the bug this replaced: reading 11:00 in the
+ * device zone while the venue is three zones away put every sun position three
+ * hours out, which is the one thing this tool must not get wrong.
+ *
+ * A consequence worth knowing: moving the venue pin across a timezone boundary
+ * changes these instants without the form text changing, because 11:00 at the new
+ * place is a different moment. That is correct.
  */
 export function resolveWindow(draft: VenueDraft): VenueWindow | null {
   if (hasErrors(validateVenue(draft))) return null
@@ -139,9 +173,12 @@ export function resolveWindow(draft: VenueDraft): VenueWindow | null {
   const lon = parseCoordinate(draft.longitude)
   if (lat === null || lon === null) return null
 
-  const start = new Date(`${draft.date}T${draft.startTime}:00`)
-  const end = new Date(`${draft.date}T${draft.endTime}:00`)
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null
+  const resolved = venueTimeZone(lat, lon)
+  const timeZone = resolved ?? deviceTimeZone()
+
+  const start = zonedTimeToUtc(draft.date, draft.startTime, timeZone)
+  const end = zonedTimeToUtc(draft.date, draft.endTime, timeZone)
+  if (start === null || end === null) return null
 
   return {
     lat,
@@ -149,7 +186,12 @@ export function resolveWindow(draft: VenueDraft): VenueWindow | null {
     start,
     end,
     middle: new Date((start.getTime() + end.getTime()) / 2),
-    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    timeZone,
+    timeZoneLabel: zoneLabel(start, timeZone),
+    timeZoneShort: zoneShort(start, timeZone),
+    travelling: isAwayFromDevice(timeZone),
+    deviceTimeZone: deviceTimeZone(),
+    timeZoneFallback: resolved === null,
   }
 }
 

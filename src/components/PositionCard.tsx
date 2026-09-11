@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { SiteWarning } from '../core/siting.ts'
 import { fetchGroundView, type GroundView } from '../lib/groundView.ts'
+import { FAA_CEILING_FEET } from '../lib/parsePlan.ts'
 import type { PlannedPosition } from '../lib/plan.ts'
 
 interface PositionCardProps {
@@ -19,6 +20,7 @@ const deg = (n: number) => `${n.toFixed(1)}°`
 const WARNING_COPY: Record<SiteWarning, string> = {
   'in-water': 'This position is in water. Nobody can stand here.',
   'in-roadway': 'This position is in a roadway. Check access before committing.',
+  'over-structure': 'This drone path crosses buildings or a gathering area. The Air 3S is too heavy for FAA Category 1 flight over people.',
 }
 
 /**
@@ -103,6 +105,16 @@ export function PositionCard({ planned, onClose }: PositionCardProps) {
         <span className="card__lighting-copy">{LIGHTING_COPY[lighting.classification]}</span>
       </p>
 
+      {position.platform !== 'air' ? null : (
+        <p className="card__air">
+          <span className="card__air-tag">Drone</span>
+          <span className="num">{position.altitudeFeet} ft AGL</span>
+          <span className="card__air-note">
+            FAA ceiling is {FAA_CEILING_FEET} ft above ground level.
+          </span>
+        </p>
+      )}
+
       <dl className="card__stats">
         <div className="card__stat">
           <dt>Focal</dt>
@@ -132,7 +144,7 @@ export function PositionCard({ planned, onClose }: PositionCardProps) {
 
       {position.risk === '' ? null : <p className="card__note">{position.risk}</p>}
 
-      <GroundViewPanel planned={planned} />
+      {position.platform === 'air' ? null : <GroundViewPanel planned={planned} />}
     </aside>
   )
 }

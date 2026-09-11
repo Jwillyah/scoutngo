@@ -35,14 +35,55 @@ So:
 - That prototype failure is a named test in `src/core/lighting.test.ts`. If it
   ever goes green in the wrong direction, the build fails.
 
+## Times are venue local
+
+The date and time window you type are wall clock readings **at the venue**, not on
+your phone. They are resolved through the timezone of the venue's own coordinates,
+found offline from a packed boundary table, and only then handed to the solar core
+as absolute instants.
+
+This is the difference between right and wrong for the entire use case. Standing in
+California planning an 11:00 start in Maryland, the old behaviour read 11:00 Pacific,
+which is 14:00 at the venue: three hours of solar azimuth out, so every lighting
+class on every position was wrong, in the one situation the tool exists for.
+
+The zone is shown, never assumed. The window line says `11:00 to 15:00 EDT`, the sun
+readout names the zone in full, and if your device is set to somewhere else it says
+so. Moving the pin across a timezone boundary changes the underlying instants
+without the form text changing, because 11:00 at the new place is a different
+moment. That is correct, and it is why the zone is on screen.
+
+`src/core/timezone.ts` has the conversion and the reasoning; `src/core/timezone.test.ts`
+pins it, including both sides of a daylight saving change.
+
+## Add to Home Screen
+
+There is a web app manifest and a set of icons, so adding the site to a home screen
+gives a standalone app with no browser chrome, named ScoutNGo, on the same near-black
+theme as everything else.
+
+**There is no service worker, deliberately.** Offline is not a goal yet. The only
+thing worth caching for a venue is satellite imagery, which runs to hundreds of
+megabytes at usable zoom and would sit in device storage indefinitely for a venue you
+visited once. When offline becomes a goal it should cache one venue you asked for, not
+every tile that scrolled past.
+
+The icons are generated from the design tokens by `scripts/make-icons.mjs`, using only
+the standard library. Change the palette or the mark there, run `node scripts/make-icons.mjs`,
+and commit what it writes.
+
 ## Privacy
 
 - No accounts and no sign in.
 - No database. Nothing you enter is persisted server side.
 - No analytics, no telemetry, no tracking, no third party scripts.
-- Your venue notes, kit profile, and uploaded screenshots stay in your browser.
-  The kit profile is saved to `localStorage` on your own device. The venue form
-  is session state and is not saved anywhere at all.
+- Your venue notes, kit profile, saved spots, and uploaded screenshots stay in
+  your browser. The kit profile and any spots you save go to `localStorage` on
+  your own device. The venue form is session state and is not saved unless you
+  save it as a spot.
+- Saved spots never leave the device. There is no account and no sync. Export
+  writes a JSON file you own and can put wherever you like, and import reads one
+  back; that is the whole backup story, deliberately.
 - Bring your own Anthropic API key. It goes in `.env`, which is gitignored, and
   is read only by a serverless function so it never reaches the browser bundle.
 
@@ -96,10 +137,13 @@ data because there is no server holding anything.
 - Overpass, from OpenStreetMap, for real water, building, road and pier shapes
 - Google Street View Static API for the optional ground view
 - `suncalc` for solar position
-- `@turf/turf` for bearings, distances, and destination points
+- `tz-lookup` for the venue's timezone from its coordinates, offline
+- turf for bearings, distances, and destination points, as the seven scoped
+  packages actually used rather than the `@turf/turf` barrel
 - Vitest for the core tests
 - Anthropic API through a Netlify serverless function, so the key is not in the
-  browser
+  browser. The model is `claude-sonnet-5`, named once at the top of
+  `netlify/functions/generate.ts` alongside the token cap and the effort level
 
 ## Run it
 
@@ -143,8 +187,74 @@ npm run test:watch
 
 The suite covers the whole computation core: azimuth conversion, the lighting
 classifier including the wraparound cases, field of view, map geometry and the
-field of view cone, the kit profile, and a calibration case for a real venue
-where the correct answer is already known.
+field of view cone, timezone resolution across a daylight saving change, the kit
+profile, and a calibration case for a real venue where the correct answer is
+already known.
+
+## Deploy your own
+
+ScoutNGo is bring your own API key. There is no hosted instance, no account, and no
+key of ours to use; you deploy a copy and it talks to Anthropic with your key, from
+your own serverless function.
+
+### What Netlify needs
+
+Two environment variables, set in the Netlify UI under **Site configuration →
+Environment variables**. Never in `netlify.toml`, which is committed and therefore
+public.
+
+| Variable | Required | What it is |
+| --- | --- | --- |
+| `ANTHROPIC_API_KEY` | Yes | Your Anthropic key, from <https://console.anthropic.com>. Read only by `netlify/functions/generate.ts`, so it never reaches the browser bundle. Without it, Generate returns a plain message naming the missing variable. |
+| `GOOGLE_MAPS_API_KEY` | No | Enables the optional ground view on a position card, via `netlify/functions/streetview.ts`. Leave it unset and the card says ground view is off; nothing else changes. |
+
+`NODE_VERSION` is pinned to 20 in `netlify.toml`, so there is nothing to set for it.
+
+`.env` is for local development only. It is gitignored, has never been committed,
+and is not read by Netlify's build; the deployed site reads the variables above from
+Netlify's own store.
+
+### Create the repository and deploy
+
+These are the commands, start to finish. **Run them yourself** — read each one first,
+and check `git status` before the first push so you know exactly what is going up.
+
+```sh
+# 1. Confirm nothing secret is staged. .env must NOT appear in this list.
+git status
+git ls-files | grep -i env      # should print only .env.example
+
+# 2. Commit the working tree.
+git add -A
+git commit -m "ScoutNGo"
+
+# 3. Create a PUBLIC repo on GitHub and push. Requires the gh CLI, logged in
+#    with `gh auth login`. Change the name if you want a different one.
+gh repo create scoutngo --public --source=. --remote=origin --push
+
+# 4. Link the directory to a new Netlify site and deploy it.
+#    Requires the netlify CLI: npm i -g netlify-cli && netlify login
+netlify init          # choose "Create & configure a new site"; it reads
+                      # netlify.toml, so accept the build command and publish dir
+
+# 5. Set your key on the site. Do this BEFORE the first production deploy,
+#    or the first Generate will fail with the missing-key message.
+netlify env:set ANTHROPIC_API_KEY "sk-ant-your-key-here"
+netlify env:set GOOGLE_MAPS_API_KEY "your-google-key"   # optional, skip for no ground view
+
+# 6. Deploy to production.
+netlify deploy --build --prod
+```
+
+Step 3 makes the repository **public**. The code is MIT and contains no secrets, but
+that is the step that cannot be undone quietly, so run it knowing that.
+
+After step 6 the CLI prints the live URL. Open it on a phone and use the browser's
+Add to Home Screen to get the standalone app.
+
+Connecting the GitHub repo to Netlify through their web UI instead of `netlify init`
+gets you deploys on every push; either way the environment variables in step 5 still
+have to be set, in the UI or with `netlify env:set`.
 
 ## Status
 
@@ -162,6 +272,11 @@ you judge to be standable.
 A time scrubber runs the whole window. Dragging it recomputes the sun and
 re-lights every position live, so a four hour window flipping from backlit to
 front-lit is something you watch happen.
+
+The brief is anchored to the coordinate it was written about. Move the venue
+more than 500m away and the app says so and refuses to generate until you either
+clear the brief or confirm it still applies, because planning the old event at
+the new place is worse than planning nothing.
 
 Not built, and deliberately: depth of field, exposure, and hyperfocal tools; 3D
 building meshes; accounts; any server side storage.
