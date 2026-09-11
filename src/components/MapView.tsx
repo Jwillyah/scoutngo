@@ -317,7 +317,33 @@ export function MapView({
       console.error('[maplibre error]', event.error?.message ?? '(no message)', event)
     })
 
-    instance.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left')
+    const attribution = new maplibregl.AttributionControl({ compact: true })
+    instance.addControl(attribution, 'bottom-left')
+
+    /*
+     * COLLAPSE THE ATTRIBUTION TO THE (i).
+     *
+     * `compact: true` is necessary but not sufficient. maplibre 6.8's
+     * _updateCompact() adds BOTH `maplibregl-compact` and
+     * `maplibregl-compact-show` on first render, so the control mounts expanded
+     * and only folds away the first time the map is dragged. On a phone that put
+     * a line of Esri credit across the bottom of the map until the user happened
+     * to pan.
+     *
+     * Stripping the show class and the `open` attribute once, after mount, leaves
+     * it collapsed. Clicking the (i) still expands it: maplibre's own
+     * _toggleAttribution handler is bound to that button and toggles the same
+     * class back on. The credit is legally required and is still one tap away; it
+     * is only being folded up, never removed.
+     */
+    const collapseAttribution = () => {
+      const el = instance.getContainer().querySelector('.maplibregl-ctrl-attrib')
+      el?.classList.remove('maplibregl-compact-show')
+      el?.removeAttribute('open')
+    }
+    collapseAttribution()
+    instance.once('load', collapseAttribution)
+
     instance.addControl(new maplibregl.ScaleControl({ unit: 'imperial' }), 'bottom-left')
 
     instance.on('click', (event) => {
@@ -767,6 +793,7 @@ export function MapView({
             focalLength={planned.position.focalLength}
             classification={planned.lighting.classification}
             warnings={planned.warnings}
+            framingWarnings={planned.framingWarnings}
             platform={planned.position.platform}
             altitudeFeet={planned.position.altitudeFeet}
             moved={planned.position.moved}

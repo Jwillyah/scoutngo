@@ -1,8 +1,11 @@
-import { DEFAULT_KIT } from '../core/kit.ts'
+import { computeFOV, SENSORS, standoffBand } from '../core/fov.ts'
+import { DEFAULT_KIT, resolveSensor, selectedDroneCameras } from '../core/kit.ts'
+import { getSunPosition } from '../core/sun.ts'
+import { formatClock } from '../core/timezone.ts'
 import type { KitSelection } from './kitSelection.ts'
-import type { LensSpec } from './parsePlan.ts'
+import type { DroneCameraSpec, LensSpec } from './parsePlan.ts'
 import type { SiteSummary } from './overpass.ts'
-import type { VenueDraft } from './venue.ts'
+import type { VenueDraft, VenueWindow } from './venue.ts'
 
 export interface MapBounds {
   west: number
@@ -27,6 +30,120 @@ export function selectedBodyNames(kit: KitSelection): string[] {
   return DEFAULT_KIT.bodies.filter((b) => kit.bodyIds.includes(b.id)).map((b) => b.name)
 }
 
+/** The drone cameras in play, in the shape the parser validates against. */
+export function selectedDroneCameraSpecs(kit: KitSelection): DroneCameraSpec[] {
+  return selectedDroneCameras(DEFAULT_KIT, kit.droneIds).map((camera) => ({
+    id: camera.id,
+    name: camera.name,
+    equiv35: camera.equiv35,
+  }))
+}
+
+/**
+ * An optic as the MODEL needs to see it: what it is, what focal lengths it has,
+ * and how far back it may stand.
+ *
+ * The standoff numbers are computed here, by src/core/fov.ts, and handed over as
+ * facts. The model is not asked to work out how far 400mm reaches; it is told.
+ * That is the same division as everywhere else: the model receives arithmetic and
+ * never performs it.
+ */
+export interface OpticSpec {
+  id: string
+  name: string
+  kind: 'lens' | 'drone'
+  minFocalLength: number
+  maxFocalLength: number
+  /** Max metres from the subject at the widest end, where the frame opens fastest. */
+  maxStandoffAtMin: number
+  /** Max metres at the longest end. */
+  maxStandoffAtMax: number
+}
+
+const roundTo5 = (n: number) => Math.round(n / 5) * 5
+
+/**
+ * Every optic in play with its standoff band, ground lenses and drone cameras
+ * together. The drone cameras are fixed focal lengths, so both ends of their band
+ * are the same number.
+ */
+export function selectedOptics(kit: KitSelection): OpticSpec[] {
+  const bodies = DEFAULT_KIT.bodies.filter((b) => kit.bodyIds.includes(b.id))
+
+  const lenses: OpticSpec[] = DEFAULT_KIT.lenses
+    .filter((lens) => kit.lensIds.includes(lens.id))
+    .map((lens) => {
+      const sensor = SENSORS[resolveSensor(lens, bodies)]
+      return {
+        id: lens.id,
+        name: lens.name,
+        kind: 'lens' as const,
+        minFocalLength: lens.minFocalLength,
+        maxFocalLength: lens.maxFocalLength,
+        maxStandoffAtMin: roundTo5(
+          standoffBand(computeFOV(lens.minFocalLength, sensor).hFOV, 'ground').maxMeters,
+        ),
+        maxStandoffAtMax: roundTo5(
+          standoffBand(computeFOV(lens.maxFocalLength, sensor).hFOV, 'ground').maxMeters,
+        ),
+      }
+    })
+
+  const cameras: OpticSpec[] = selectedDroneCameras(DEFAULT_KIT, kit.droneIds).map((camera) => {
+    // 35mm equivalent on full frame: the same arithmetic the ground lenses use.
+    const hFOV = computeFOV(camera.equiv35, SENSORS.fullFrame).hFOV
+    const max = roundTo5(standoffBand(hFOV, 'air').maxMeters)
+    return {
+      id: camera.id,
+      name: camera.name,
+      kind: 'drone' as const,
+      minFocalLength: camera.equiv35,
+      maxFocalLength: camera.equiv35,
+      maxStandoffAtMin: max,
+      maxStandoffAtMax: max,
+    }
+  })
+
+  return [...lenses, ...cameras]
+}
+
+/**
+ * Where the sun is at each end of the window and in the middle.
+ *
+ * COMPUTED HERE, BEFORE THE CALL, and sent as fact. This is the change that stops
+ * positions being placed blind: the model used to be told nothing about light and
+ * had no way to prefer one bank of the river over the other, so it placed by
+ * geometry alone and the app labelled the result afterwards.
+ *
+ * The direction of travel is still one way. The model receives these numbers; it
+ * never returns one, and src/core/lighting.ts recomputes every lighting call from
+ * the coordinates that come back regardless of what the model was told.
+ */
+export interface SunFact {
+  label: string
+  /** Venue wall clock, so it lines up with the window the shooter typed. */
+  clock: string
+  azimuth: number
+  altitude: number
+}
+
+export function sunFacts(venueWindow: VenueWindow): SunFact[] {
+  const { lat, lon, timeZone } = venueWindow
+  return [
+    { label: 'Start', at: venueWindow.start },
+    { label: 'Mid', at: venueWindow.middle },
+    { label: 'End', at: venueWindow.end },
+  ].map(({ label, at }) => {
+    const sun = getSunPosition(at, lat, lon)
+    return {
+      label,
+      clock: formatClock(at, timeZone),
+      azimuth: Number(sun.azimuth.toFixed(1)),
+      altitude: Number(sun.altitude.toFixed(1)),
+    }
+  })
+}
+
 export function selectedDroneNames(kit: KitSelection): string[] {
   return DEFAULT_KIT.drones
     .filter((d) => kit.droneIds.includes(d.id))
@@ -48,9 +165,11 @@ export interface GenerateRequestBody {
   /** How the window's zone is written, "EDT, UTC-4". Empty if it did not resolve. */
   timeZoneLabel: string
   style: string
-  bodies: string[]
   drones: string[]
-  lenses: LensSpec[]
+  /** Ground lenses and drone cameras, each with its computed standoff band. */
+  optics: OpticSpec[]
+  /** Sun azimuth and altitude across the window, computed before the call. */
+  sun: SunFact[]
   bounds: MapBounds
   image: string
   mediaType: string
@@ -75,6 +194,8 @@ export function buildGenerateBody(
    * in src/core/ from real instants, and this is context only.
    */
   timeZoneLabel = '',
+  /** Sun across the window. Empty only when the window has not resolved. */
+  sun: SunFact[] = [],
 ): GenerateRequestBody {
   return {
     venueName: venue.name,
@@ -85,9 +206,9 @@ export function buildGenerateBody(
     endTime: venue.endTime,
     timeZoneLabel,
     style: kit.styleNotes,
-    bodies: selectedBodyNames(kit),
     drones: selectedDroneNames(kit),
-    lenses: selectedLenses(kit),
+    optics: selectedOptics(kit),
+    sun,
     bounds: capture.bounds,
     image: stripDataUrl(capture.dataUrl),
     mediaType: capture.mediaType,

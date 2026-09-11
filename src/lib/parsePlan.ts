@@ -7,7 +7,15 @@
  * failure returns the raw text for display rather than throwing.
  *
  * Nothing here reads a lighting or geometry claim. If the model sends one, it is
- * simply not in the shape being parsed, so it is dropped on the floor.
+ * simply not in the shape being parsed, so it is dropped on the floor. The prompt
+ * now TELLS the model the sun's azimuth and altitude so it can choose a vantage
+ * with the light in mind, but that traffic is one way: there is still no lighting
+ * field to parse, and src/core/lighting.ts remains the only thing that decides
+ * how a position is lit.
+ *
+ * `angleRationale` is the model saying WHY a vantage is worth standing in. It is
+ * prose, and it is treated as prose. It is never read for a bearing, an angle, or
+ * a lighting call, and nothing downstream computes anything from it.
  */
 
 export interface LensSpec {
@@ -22,13 +30,24 @@ export type Platform = 'ground' | 'air'
 export interface RawPosition {
   x: number
   y: number
+  /** A ground lens id, or a drone camera id when platform is "air". */
   lensId: string
   focalLength: number
   shot: string
   risk: string
+  /** Why this vantage is worth standing in. Judgement, never geometry. */
+  angleRationale: string
   platform: Platform
   /** Feet above ground for an air position. Zero for a ground one. */
   altitudeFeet: number
+}
+
+/** One fixed drone camera, as the parser needs to see it. */
+export interface DroneCameraSpec {
+  id: string
+  name: string
+  /** The single focal length this camera has. Anything else is rejected. */
+  equiv35: number
 }
 
 export type ParseResult =
@@ -40,6 +59,7 @@ export const MAX_POSITIONS = 6
 export const FAA_CEILING_FEET = 400
 export const SHOT_WORD_CAP = 25
 export const RISK_WORD_CAP = 15
+export const RATIONALE_WORD_CAP = 15
 
 /** Trims to a word count. The prompt asks for this too; this is the enforcement. */
 export function capWords(text: string, maxWords: number): string {
@@ -67,6 +87,7 @@ export function parsePlanResponse(
   raw: string,
   lenses: LensSpec[],
   droneAvailable = false,
+  droneCameras: DroneCameraSpec[] = [],
 ): ParseResult {
   if (lenses.length === 0) {
     return { ok: false, reason: 'No lenses are selected in the kit.', raw }
@@ -102,18 +123,53 @@ export function parsePlanResponse(
   }
 
   const byId = new Map(lenses.map((lens) => [lens.id, lens]))
+  const cameraById = new Map(droneCameras.map((camera) => [camera.id, camera]))
   const kept: RawPosition[] = []
   let dropped = 0
 
   for (const entry of positions.slice(0, MAX_POSITIONS)) {
     const item = entry as Record<string, unknown>
-    const lens = typeof item.lensId === 'string' ? byId.get(item.lensId) : undefined
+    const opticId = typeof item.lensId === 'string' ? item.lensId : ''
 
-    // A lens the shooter does not have is not a position they can take.
-    if (lens === undefined) {
+    // A drone position is only possible if a drone is actually in the kit.
+    const platform: Platform =
+      droneAvailable && item.platform === 'air' ? 'air' : 'ground'
+
+    const camera = cameraById.get(opticId)
+    const lens = byId.get(opticId)
+
+    /*
+     * AIR AND GROUND DRAW FROM DIFFERENT OPTICS, and neither may borrow the
+     * other's. A drone cannot mount the 200-600, and the shooter is not holding
+     * the Air 3S wide camera in their hands.
+     */
+    if (platform === 'air') {
+      /*
+       * THE AIR 3S IS NOT A ZOOM. Its two cameras are fixed at 24mm and 70mm
+       * equivalent, so a focal length that is not exactly one of those describes
+       * a shot the aircraft cannot take. It is REJECTED rather than snapped to
+       * the nearest: silently moving 45mm to 24mm would change the framing the
+       * shot text was written about, and a dropped position is visible while a
+       * quietly rewritten one is not.
+       */
+      if (camera === undefined) {
+        dropped += 1
+        continue
+      }
+      if (
+        typeof item.focalLength !== 'number' ||
+        Math.round(item.focalLength) !== camera.equiv35
+      ) {
+        dropped += 1
+        continue
+      }
+    } else if (lens === undefined || camera !== undefined) {
+      // A lens the shooter does not have is not a position they can take, and a
+      // drone camera is not something they can stand on the ground holding.
       dropped += 1
       continue
     }
+
     if (typeof item.x !== 'number' || typeof item.y !== 'number') {
       dropped += 1
       continue
@@ -124,13 +180,11 @@ export function parsePlanResponse(
     }
 
     const focal =
-      typeof item.focalLength === 'number' && Number.isFinite(item.focalLength)
-        ? Math.round(clamp(item.focalLength, lens.min, lens.max))
-        : lens.min
-
-    // A drone position is only possible if a drone is actually in the kit.
-    const platform: Platform =
-      droneAvailable && item.platform === 'air' ? 'air' : 'ground'
+      camera !== undefined
+        ? camera.equiv35
+        : typeof item.focalLength === 'number' && Number.isFinite(item.focalLength)
+          ? Math.round(clamp(item.focalLength, lens!.min, lens!.max))
+          : lens!.min
 
     /*
      * Clamped to the FAA ceiling. The model does not get to propose an illegal
@@ -152,10 +206,14 @@ export function parsePlanResponse(
     kept.push({
       x: clamp(item.x, 0, 1),
       y: clamp(item.y, 0, 1),
-      lensId: lens.id,
+      lensId: camera?.id ?? lens!.id,
       focalLength: focal,
       shot: capWords(typeof item.shot === 'string' ? item.shot : '', SHOT_WORD_CAP),
       risk: capWords(typeof item.risk === 'string' ? item.risk : '', RISK_WORD_CAP),
+      angleRationale: capWords(
+        typeof item.angleRationale === 'string' ? item.angleRationale : '',
+        RATIONALE_WORD_CAP,
+      ),
       platform,
       altitudeFeet,
     })

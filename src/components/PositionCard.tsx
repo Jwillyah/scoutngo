@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { FramingWarning } from '../core/fov.ts'
 import type { SiteWarning } from '../core/siting.ts'
 import { fetchGroundView, type GroundView } from '../lib/groundView.ts'
 import { FAA_CEILING_FEET } from '../lib/parsePlan.ts'
@@ -17,10 +18,28 @@ const LIGHTING_COPY: Record<string, string> = {
 
 const deg = (n: number) => `${n.toFixed(1)}°`
 
+const METRES_TO_FEET = 3.28084
+
+/** Both units on one line. The kit is metric, the airspace rules are not. */
+const distance = (metres: number) =>
+  `${Math.round(metres)}m · ${Math.round(metres * METRES_TO_FEET)}ft`
+
 const WARNING_COPY: Record<SiteWarning, string> = {
   'in-water': 'This position is in water. Nobody can stand here.',
   'in-roadway': 'This position is in a roadway. Check access before committing.',
   'over-structure': 'This drone path crosses buildings or a gathering area. The Air 3S is too heavy for FAA Category 1 flight over people.',
+}
+
+/**
+ * Framing problems get the same magenta treatment as the site ones, because they
+ * are the same kind of fact: something is wrong with this position and only the
+ * shooter can decide what to do about it. Nothing is moved automatically.
+ */
+const FRAMING_COPY: Record<FramingWarning, string> = {
+  'frame-too-wide':
+    'At this distance the frame is wider than the event. The subject will be a speck. Move in, or go longer.',
+  'beyond-standoff':
+    'Further out than this focal length can carry. Haze and lack of separation will cost more than the extra reach buys.',
 }
 
 /**
@@ -74,7 +93,17 @@ function GroundViewPanel({ planned }: { planned: PlannedPosition }) {
  * supply, and it says nothing about light.
  */
 export function PositionCard({ planned, onClose }: PositionCardProps) {
-  const { position, lens, body, fov, lighting, cameraBearing, rangeMeters, warnings } = planned
+  const {
+    position,
+    fov,
+    lighting,
+    cameraBearing,
+    subjectRangeMeters,
+    frameWidthMeters,
+    standoff,
+    framingWarnings,
+    warnings,
+  } = planned
 
   return (
     <aside className={`card card--${lighting.classification}`} aria-label={`Position ${position.number}`}>
@@ -85,9 +114,12 @@ export function PositionCard({ planned, onClose }: PositionCardProps) {
         </span>
         <div className="card__headings">
           <h2 className="card__title">{position.shot}</h2>
-          <p className="card__lens">
-            {body.name}, {lens.name}
-          </p>
+          {/*
+            * Focal length only. Which body the lens goes on is a decision made on
+            * the day, and "Sony a7III, Sony 200-600" was restating the kit bag
+            * rather than saying anything about this position.
+            */}
+          <p className="card__lens num">{position.focalLength}mm</p>
         </div>
         <button type="button" className="card__close" onClick={onClose} aria-label="Close">
           ✕
@@ -97,6 +129,12 @@ export function PositionCard({ planned, onClose }: PositionCardProps) {
       {warnings.map((warning) => (
         <p className="card__warn" key={warning}>
           {WARNING_COPY[warning]}
+        </p>
+      ))}
+
+      {framingWarnings.map((warning) => (
+        <p className="card__warn" key={warning}>
+          {FRAMING_COPY[warning]}
         </p>
       ))}
 
@@ -117,8 +155,20 @@ export function PositionCard({ planned, onClose }: PositionCardProps) {
 
       <dl className="card__stats">
         <div className="card__stat">
-          <dt>Focal</dt>
-          <dd className="num">{position.focalLength}mm</dd>
+          <dt>Range</dt>
+          <dd className="num">{distance(subjectRangeMeters)}</dd>
+        </div>
+        <div className="card__stat">
+          {/*
+            * The number that says whether the standoff is sane: how much ground
+            * is across the frame at the subject. 2 * range * tan(hFOV / 2).
+            */}
+          <dt>Frame width</dt>
+          <dd className="num">{distance(frameWidthMeters)}</dd>
+        </div>
+        <div className="card__stat">
+          <dt>Usable to</dt>
+          <dd className="num">{Math.round(standoff.maxMeters)}m</dd>
         </div>
         <div className="card__stat">
           <dt>Camera bearing</dt>
@@ -136,11 +186,15 @@ export function PositionCard({ planned, onClose }: PositionCardProps) {
           <dt>FOV v</dt>
           <dd className="num">{deg(fov.vFOV)}</dd>
         </div>
-        <div className="card__stat">
-          <dt>Range</dt>
-          <dd className="num">{Math.round(rangeMeters)}m</dd>
-        </div>
       </dl>
+
+      {/*
+        * Why this vantage. The model's judgement, in its own words, capped at 15
+        * words by the parser. Nothing is computed from it.
+        */}
+      {position.angleRationale === '' ? null : (
+        <p className="card__why">{position.angleRationale}</p>
+      )}
 
       {position.risk === '' ? null : <p className="card__note">{position.risk}</p>}
 

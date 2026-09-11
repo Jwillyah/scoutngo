@@ -1,3 +1,4 @@
+import type { FramingWarning } from '../core/fov.ts'
 import type { Classification } from '../core/lighting.ts'
 import type { SiteWarning } from '../core/siting.ts'
 import type { Platform } from '../lib/parsePlan.ts'
@@ -8,6 +9,8 @@ interface ShooterFigureProps {
   classification: Classification
   /** Ground problems from OSM. Magenta, because that is the hazard color. */
   warnings: SiteWarning[]
+  /** Standoff and framing problems. Same magenta, same treatment. */
+  framingWarnings: FramingWarning[]
   platform: Platform
   /** Feet above ground, air positions only. */
   altitudeFeet: number
@@ -22,26 +25,41 @@ const WARNING_LABEL: Record<SiteWarning, string> = {
   'over-structure': 'over people',
 }
 
+const FRAMING_LABEL: Record<FramingWarning, string> = {
+  'frame-too-wide': 'frame too wide',
+  'beyond-standoff': 'too far',
+}
+
 /**
  * A geometric mark, not a drawing of a person. A filled disc carries the
  * number; the field of view cone on the map does the work of showing which way
  * the camera is pointing, so the mark itself does not need to.
  *
  * The focal length sits on a solid plate underneath at full opacity, because it
- * is a numeric readout and has to survive direct sunlight.
+ * is a numeric readout and has to survive direct sunlight. On an air position the
+ * altitude rides on that SAME plate, as one readout: it used to be a separately
+ * coloured span that read as a second floating thing next to the marker rather
+ * than part of it.
  */
 export function ShooterFigure({
   number,
   focalLength,
   classification,
   warnings,
+  framingWarnings,
   platform,
   altitudeFeet,
   moved,
   selected,
   onSelect,
 }: ShooterFigureProps) {
-  const warning = warnings[0]
+  /* Site and framing problems are the same kind of flag and share one slot. */
+  const warningLabel =
+    warnings.length > 0
+      ? WARNING_LABEL[warnings[0]]
+      : framingWarnings.length > 0
+        ? FRAMING_LABEL[framingWarnings[0]]
+        : undefined
   const air = platform === 'air'
 
   return (
@@ -51,7 +69,7 @@ export function ShooterFigure({
         'shooter',
         air ? 'shooter--air' : '',
         selected ? 'shooter--selected' : '',
-        warning !== undefined ? 'shooter--warned' : '',
+        warningLabel !== undefined ? 'shooter--warned' : '',
       ]
         .filter((c) => c !== '')
         .join(' ')}
@@ -62,7 +80,7 @@ export function ShooterFigure({
         air ? `drone at ${altitudeFeet} feet` : 'ground',
         classification,
         moved ? 'moved by hand' : '',
-        warning === undefined ? '' : WARNING_LABEL[warning],
+        warningLabel ?? '',
       ]
         .filter((part) => part !== '')
         .join(', ')}
@@ -84,13 +102,21 @@ export function ShooterFigure({
         )}
       </span>
 
-      {warning === undefined ? null : (
-        <span className="shooter__warn">{WARNING_LABEL[warning]}</span>
+      {warningLabel === undefined ? null : (
+        <span className="shooter__warn">{warningLabel}</span>
       )}
 
+      {/* One plate, one readout: focal length, then altitude for an air position. */}
       <span className="shooter__focal num">
         {focalLength}
-        {air ? <span className="shooter__alt">{altitudeFeet}ft</span> : null}
+        {air ? (
+          <>
+            <span className="shooter__sep" aria-hidden="true">
+              ·
+            </span>
+            <span className="shooter__alt">{altitudeFeet}ft</span>
+          </>
+        ) : null}
         {moved ? <span className="shooter__moved" aria-hidden="true" /> : null}
       </span>
     </button>

@@ -30,3 +30,4 @@ dist-ssr
 
 # Local Vercel folder: project link, pulled env, and build output.
 .vercel
+.env*

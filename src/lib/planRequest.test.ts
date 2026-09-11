@@ -5,11 +5,13 @@ import {
   buildGenerateBody,
   GENERATE_STAGES,
   selectedLenses,
+  selectedOptics,
   stageIndex,
   stageLabel,
   stripDataUrl,
+  sunFacts,
 } from './planRequest.ts'
-import { CALIBRATION_VENUE } from './venue.ts'
+import { CALIBRATION_VENUE, resolveWindow } from './venue.ts'
 
 const capture = {
   dataUrl: 'data:image/jpeg;base64,AAAA',
@@ -39,8 +41,76 @@ describe('selectedLenses', () => {
   })
 })
 
+describe('sunFacts', () => {
+  const venueWindow = resolveWindow(CALIBRATION_VENUE)!
+  const facts = sunFacts(venueWindow)
+
+  it('covers the start, the middle and the end of the window', () => {
+    expect(facts.map((f) => f.label)).toEqual(['Start', 'Mid', 'End'])
+    expect(facts.map((f) => f.clock)).toEqual(['11:00', '13:00', '15:00'])
+  })
+
+  /*
+   * Same numbers the SunReadout shows, from the same core function. If these ever
+   * diverge, the model is being told one thing and the shooter shown another.
+   */
+  it('matches the solar core, in venue local time', () => {
+    expect(facts[1].azimuth).toBeCloseTo(180.6, 1)
+    expect(facts[0].azimuth).toBeCloseTo(134.4, 1)
+    for (const fact of facts) expect(fact.altitude).toBeGreaterThan(0)
+  })
+
+  it('tracks the sun westward across the window', () => {
+    expect(facts[1].azimuth).toBeGreaterThan(facts[0].azimuth)
+    expect(facts[2].azimuth).toBeGreaterThan(facts[1].azimuth)
+  })
+})
+
+describe('selectedOptics', () => {
+  const optics = selectedOptics(defaultSelection(DEFAULT_KIT))
+  const byId = (id: string) => optics.find((o) => o.id === id)!
+
+  it('carries ground lenses and drone cameras together', () => {
+    expect(byId('sony-200-600').kind).toBe('lens')
+    expect(byId('air-3s-wide').kind).toBe('drone')
+    expect(byId('air-3s-tele').kind).toBe('drone')
+  })
+
+  it('gives a drone camera one focal length, not a range', () => {
+    const wide = byId('air-3s-wide')
+    expect(wide.minFocalLength).toBe(24)
+    expect(wide.maxFocalLength).toBe(24)
+  })
+
+  /*
+   * The whole point of Job 2: the model is TOLD how far back it may stand, as a
+   * number computed by src/core/fov.ts, rather than left to guess. A longer lens
+   * reaches further, and nothing reaches past the practical cap.
+   */
+  it('sends a standoff that grows with focal length and is capped', () => {
+    expect(byId('sigma-28-75').maxStandoffAtMin).toBeLessThan(
+      byId('sigma-28-75').maxStandoffAtMax,
+    )
+    expect(byId('sony-200-600').maxStandoffAtMin).toBeGreaterThan(
+      byId('sigma-28-75').maxStandoffAtMax,
+    )
+    for (const optic of optics) {
+      expect(optic.maxStandoffAtMax).toBeLessThanOrEqual(450)
+      expect(optic.maxStandoffAtMin).toBeGreaterThan(0)
+    }
+  })
+})
+
 describe('buildGenerateBody', () => {
-  const body = buildGenerateBody(CALIBRATION_VENUE, defaultSelection(DEFAULT_KIT), capture)
+  const venueWindow = resolveWindow(CALIBRATION_VENUE)!
+  const body = buildGenerateBody(
+    CALIBRATION_VENUE,
+    defaultSelection(DEFAULT_KIT),
+    capture,
+    undefined,
+    'EDT, UTC-4',
+    sunFacts(venueWindow),
+  )
 
   it('sends the venue text context', () => {
     expect(body.venueName).toContain('Brew River')
@@ -54,12 +124,38 @@ describe('buildGenerateBody', () => {
     expect(body.image).toBe('AAAA')
   })
 
-  it('sends no lighting, bearing, or sun information of any kind', () => {
-    // The model is never given the answer it is forbidden from producing.
-    const serialized = JSON.stringify(body).toLowerCase()
-    for (const banned of ['azimuth', 'backlit', 'front-lit', 'side-lit', 'bearing', 'sunaz']) {
-      expect(serialized).not.toContain(banned)
+  /*
+   * THIS TEST USED TO ASSERT THE OPPOSITE, and the reversal is deliberate.
+   *
+   * It read "sends no lighting, bearing, or sun information of any kind", on the
+   * theory that withholding the answer was what stopped the model producing one.
+   * That was the wrong lever. It left the model placing positions blind to the
+   * light and the app labelling the result afterwards, which is how positions
+   * ended up in a field on the wrong bank.
+   *
+   * Sun azimuth and altitude now go OUT as computed fact. What protects the
+   * lighting call is not secrecy, it is that nothing comes back: there is no
+   * lighting field in the parser, and src/core/lighting.ts recomputes every call
+   * from the returned coordinates. That invariant is pinned in parsePlan.test.ts.
+   */
+  it('sends the sun as computed fact, so positions are not placed blind', () => {
+    expect(body.sun).toHaveLength(3)
+    expect(body.sun[0]).toMatchObject({ label: 'Start', clock: '11:00' })
+    for (const fact of body.sun) {
+      expect(typeof fact.azimuth).toBe('number')
+      expect(typeof fact.altitude).toBe('number')
     }
+  })
+
+  it('sends the standoff limits, so distance is bounded rather than guessed', () => {
+    expect(body.optics.length).toBeGreaterThan(0)
+    for (const optic of body.optics) {
+      expect(optic.maxStandoffAtMax).toBeGreaterThan(0)
+    }
+  })
+
+  it('no longer assigns a body, because that is a decision made on the day', () => {
+    expect(body).not.toHaveProperty('bodies')
   })
 })
 

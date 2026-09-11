@@ -88,13 +88,24 @@
   filter: invert(1);
 }
 
+/*
+ * The scale bar is reference, not a readout you act on, so it is pulled down to
+ * the quietest thing on the map: smaller than the type scale goes, faint type on
+ * a faint rule, and a translucent plate rather than the solid panel every real
+ * control sits on. The readability rule in tokens.css protects NUMERIC READOUTS
+ * on solid surfaces; this is neither.
+ */
 .maplibregl-ctrl-scale {
-  background: var(--color-panel);
-  color: var(--color-text-muted);
-  border-color: var(--color-text-muted);
-  border-radius: 0 0 var(--radius-panel) var(--radius-panel);
+  background: color-mix(in srgb, var(--color-panel) 55%, transparent);
+  color: var(--color-text-faint);
+  border-color: var(--color-text-faint);
+  border-width: 0 var(--line-hair) var(--line-hair);
+  border-radius: 0 0 calc(var(--radius-panel) / 2) calc(var(--radius-panel) / 2);
   font-family: var(--font-mono);
-  font-size: var(--text-xs);
+  font-size: 9px;
+  line-height: 1.2;
+  padding: 0 4px;
+  opacity: 0.75;
 }
 
 .maplibregl-ctrl-attrib a {
@@ -593,6 +604,26 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+
+  /*
+   * BOUNDED, so the card can never grow off the top of the screen.
+   *
+   * It is anchored to its bottom edge above the sheet, so every row added pushes
+   * the HEAD upward. On a 390x844 phone with the shot list open, a warned
+   * position carrying a framing flag, a rationale and seven stats pushed the
+   * title, the lighting tag and the close button clean off the viewport: the
+   * numbers were visible and the thing they described was not.
+   *
+   * Capping against the space actually available and scrolling inside keeps the
+   * head on screen whatever the content does. --card-top-gap leaves room for the
+   * search field and the sun readout above.
+   */
+  --card-top-gap: 140px;
+  max-height: calc(
+    100dvh - var(--dock-height, 0px) - var(--sheet-live-height, 0px) - var(--card-top-gap)
+  );
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .card__head {
@@ -860,6 +891,33 @@
 
 .stages__step--now .stages__state {
   color: var(--color-accent);
+}
+
+/*
+ * The model's reason for a vantage. Set apart from the risk note with a rule
+ * rather than a fill: it is the one line on the card that is judgement rather
+ * than arithmetic, and it should not be mistaken for a computed number.
+ */
+.card__why {
+  margin: var(--space-3) 0 0;
+  padding-left: var(--space-3);
+  border-left: var(--line-rule) solid var(--color-line-strong);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.shot__why {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* Clears every selected lens at once. Carries the count so the filter is never
+   silently on. */
+.chip--clear {
+  border-style: dashed;
 }
 
 .notice {
@@ -1757,9 +1815,19 @@
   width: 20px;
 }
 
+/*
+ * Part of the focal plate, not a separate mark. It used to be tinted with the
+ * shadow-bearing colour, which made it read as its own floating chip beside the
+ * marker and tied it visually to the sun overlay, which it has nothing to do
+ * with. Same plate, same weight, one shade down so the focal length still leads.
+ */
 .shooter__alt {
-  color: var(--sun-shadow);
+  color: var(--color-text-muted);
   font-weight: var(--weight-heavy);
+}
+
+.shooter__sep {
+  color: var(--color-text-faint);
 }
 
 .shot__air {

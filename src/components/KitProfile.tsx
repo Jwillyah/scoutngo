@@ -1,5 +1,5 @@
 import { computeFOV, SENSORS } from '../core/fov.ts'
-import { DEFAULT_KIT, effectiveSensor, type Body, type Lens } from '../core/kit.ts'
+import { DEFAULT_KIT, resolveSensor, type Body, type Lens } from '../core/kit.ts'
 import { defaultSelection, toggleId, type KitSelection } from '../lib/kitSelection.ts'
 import { Group, Section } from './Section.tsx'
 
@@ -38,13 +38,14 @@ function KitRow({ active, name, meta, onToggle }: KitRowProps) {
   )
 }
 
-/** Reference body for lens framing numbers: the first one still in play. */
-function referenceBody(activeIds: string[]): Body {
-  return DEFAULT_KIT.bodies.find((b) => activeIds.includes(b.id)) ?? DEFAULT_KIT.bodies[0]
+/** The bodies still in play. Used only to resolve a forced sensor crop. */
+function activeBodies(activeIds: string[]): Body[] {
+  const chosen = DEFAULT_KIT.bodies.filter((b) => activeIds.includes(b.id))
+  return chosen.length > 0 ? chosen : DEFAULT_KIT.bodies
 }
 
-function lensMeta(lens: Lens, body: Body): string {
-  const sensorName = effectiveSensor(lens, body)
+function lensMeta(lens: Lens, bodies: Body[]): string {
+  const sensorName = resolveSensor(lens, bodies)
   const sensor = SENSORS[sensorName]
   const range =
     lens.minFocalLength === lens.maxFocalLength
@@ -60,12 +61,20 @@ function lensMeta(lens: Lens, body: Body): string {
 
   // Sensor is called out only when the lens forces a crop, because that is the
   // only time it is a surprise.
-  const crop = sensorName === body.sensor ? '' : ' APS-C'
+  const crop = sensorName === 'fullFrame' ? '' : ' APS-C'
   return `${range}${crop} · vFOV ${vertical}`
 }
 
+/** Two fixed cameras, not a zoom, so each is listed with its one focal length. */
+function droneMeta(drone: (typeof DEFAULT_KIT.drones)[number]): string {
+  const cameras = drone.cameras
+    .map((c) => `${c.equiv35}mm f${c.maxAperture}`)
+    .join(' · ')
+  return `${drone.weightGrams}g · ${cameras}`
+}
+
 export function KitProfile({ value, onChange, open, onToggle }: KitProfileProps) {
-  const body = referenceBody(value.bodyIds)
+  const bodies = activeBodies(value.bodyIds)
   const summary =
     `${value.bodyIds.length} bodies, ${value.lensIds.length} lenses, ` +
     `${value.droneIds.length} air`
@@ -100,7 +109,7 @@ export function KitProfile({ value, onChange, open, onToggle }: KitProfileProps)
               key={item.id}
               active={value.lensIds.includes(item.id)}
               name={item.name}
-              meta={lensMeta(item, body)}
+              meta={lensMeta(item, bodies)}
               onToggle={() =>
                 onChange({ ...value, lensIds: toggleId(value.lensIds, item.id) })
               }
@@ -108,8 +117,10 @@ export function KitProfile({ value, onChange, open, onToggle }: KitProfileProps)
           ))}
         </ul>
         <p className="section__note group__foot">
-          Vertical field of view, computed for {body.name}. Vertical is the number
-          that matters for the deliverable.
+          Vertical field of view, the number that matters for the deliverable.
+          Positions no longer carry a body: the only way a body changes these
+          numbers is the a7IV's forced APS-C crop, which is applied whenever that
+          body is packed.
         </p>
       </Group>
 
@@ -120,7 +131,7 @@ export function KitProfile({ value, onChange, open, onToggle }: KitProfileProps)
               key={item.id}
               active={value.droneIds.includes(item.id)}
               name={item.name}
-              meta={`${item.weightGrams}g`}
+              meta={droneMeta(item)}
               onToggle={() =>
                 onChange({ ...value, droneIds: toggleId(value.droneIds, item.id) })
               }

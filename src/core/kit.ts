@@ -26,10 +26,39 @@ export interface Lens {
   notes: string
 }
 
+/**
+ * One fixed camera on a drone.
+ *
+ * THE AIR 3S IS NOT A ZOOM. It carries two separate cameras at two fixed focal
+ * lengths, and the kit used to model it as a focal RANGE, which let the model
+ * ask for 45mm on an aircraft that cannot produce 45mm. Each camera is its own
+ * entry here, with one focal length and no range.
+ *
+ * `equiv35` is the 35mm equivalent, which is how DJI publish these. Field of view
+ * is computed from it against a full frame sensor, because that is precisely what
+ * "35mm equivalent" means: the focal length giving this angle of view on full
+ * frame. That keeps drone optics on the same arithmetic as the ground lenses
+ * instead of a second, parallel calculation. The check that it is right: DJI
+ * quote 84 degrees for the wide camera and 35 for the tele, and computeFOV at 24
+ * and 70 on full frame returns 84.1 and 34.4 diagonal. Pinned in kit.test.ts.
+ */
+export interface DroneCamera {
+  id: string
+  name: string
+  /** 35mm equivalent focal length. The only focal length this camera has. */
+  equiv35: number
+  maxAperture: number
+  /** The physical sensor, recorded from the spec sheet. NOT used by the FOV math. */
+  sensorNote: string
+  /** The manufacturer's published diagonal FOV, kept so the math can be checked. */
+  publishedDiagonalFOV: number
+}
+
 export interface Drone {
   id: string
   name: string
   weightGrams: number
+  cameras: DroneCamera[]
   notes: string
 }
 
@@ -117,8 +146,29 @@ export const DEFAULT_KIT: KitProfile = {
     {
       id: 'dji-air-3s',
       name: 'DJI Air 3S',
-      weightGrams: 720,
-      notes: 'Paired with DJI wireless mics. Too heavy for FAA Category 1 flight over people.',
+      // 724g. Over the 250g registration line and far over the 249g ceiling for
+      // FAA Category 1 operations over people, which is why siting.ts checks the
+      // flight path against buildings and gathering areas.
+      weightGrams: 724,
+      cameras: [
+        {
+          id: 'air-3s-wide',
+          name: 'Air 3S wide',
+          equiv35: 24,
+          maxAperture: 1.8,
+          sensorNote: '1-inch',
+          publishedDiagonalFOV: 84,
+        },
+        {
+          id: 'air-3s-tele',
+          name: 'Air 3S tele',
+          equiv35: 70,
+          maxAperture: 2.8,
+          sensorNote: '1/1.3-inch',
+          publishedDiagonalFOV: 35,
+        },
+      ],
+      notes: 'Two fixed cameras, 24mm and 70mm equivalent. Not a zoom. Paired with DJI wireless mics.',
     },
   ],
   style: {
@@ -139,4 +189,33 @@ export const DEFAULT_KIT: KitProfile = {
 export function effectiveSensor(lens: Lens, body: Body): SensorName {
   const forced = lens.forcesSensor.find((f) => f.bodyId === body.id)
   return forced ? forced.sensor : body.sensor
+}
+
+/**
+ * The sensor a lens will actually be shooting on, given the bodies in the kit.
+ *
+ * Positions no longer carry a body: which camera comes off the shoulder is a
+ * decision made on the day, not something to plan. But the a7IV's forced APS-C
+ * crop with the Sony 10-18 changes the field of view, and a field of view that is
+ * wrong is a cone that is wrong. So bodies stay in the kit for exactly this: if a
+ * body that forces a crop for this lens is in play, the crop applies.
+ *
+ * Conservative on purpose. If the a7IV is packed, the 10-18 is treated as cropped,
+ * because planning the wider frame and then not getting it is the worse error.
+ */
+export function resolveSensor(lens: Lens, bodies: Body[]): SensorName {
+  const forcing = bodies.find((body) =>
+    lens.forcesSensor.some((f) => f.bodyId === body.id),
+  )
+  if (forcing !== undefined) return effectiveSensor(lens, forcing)
+  return bodies[0]?.sensor ?? 'fullFrame'
+}
+
+/** Every drone camera across the drones that are actually coming. */
+export function selectedDroneCameras(kit: KitProfile, droneIds: string[]): DroneCamera[] {
+  return kit.drones.filter((d) => droneIds.includes(d.id)).flatMap((d) => d.cameras)
+}
+
+export function findDroneCamera(kit: KitProfile, cameraId: string): DroneCamera | undefined {
+  return kit.drones.flatMap((d) => d.cameras).find((c) => c.id === cameraId)
 }

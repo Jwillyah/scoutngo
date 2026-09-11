@@ -1,3 +1,4 @@
+import type { FramingWarning } from '../core/fov.ts'
 import type { SiteWarning } from '../core/siting.ts'
 import type { PlannedPosition } from '../lib/plan.ts'
 
@@ -13,6 +14,11 @@ const WARNING_LABEL: Record<SiteWarning, string> = {
   'in-water': 'in water',
   'in-roadway': 'in roadway',
   'over-structure': 'over people',
+}
+
+const FRAMING_LABEL: Record<FramingWarning, string> = {
+  'frame-too-wide': 'frame too wide',
+  'beyond-standoff': 'too far',
 }
 
 /**
@@ -33,7 +39,8 @@ export function ShotList({ plan, selectedId, onPick }: ShotListProps) {
   return (
     <ol className="shots">
       {plan.map((planned) => {
-        const { position, lens, body, fov, lighting, warnings } = planned
+        const { position, fov, lighting, warnings, framingWarnings, subjectRangeMeters } =
+          planned
         return (
           <li key={position.id}>
             <button
@@ -57,17 +64,22 @@ export function ShotList({ plan, selectedId, onPick }: ShotListProps) {
                     {WARNING_LABEL[warning]}
                   </span>
                 ))}
+                {framingWarnings.map((warning) => (
+                  <span className="shot__warn" key={warning}>
+                    {FRAMING_LABEL[warning]}
+                  </span>
+                ))}
               </span>
 
               <span className="shot__shot">{position.shot}</span>
 
-              <span className="shot__gear">
-                {body.name}, {lens.name}
-              </span>
+              {position.angleRationale === '' ? null : (
+                <span className="shot__why">{position.angleRationale}</span>
+              )}
 
               <span className="shot__stats num">
-                {position.focalLength}mm · vFOV {deg(fov.vFOV)} · sun delta{' '}
-                {deg(lighting.delta)}
+                {position.focalLength}mm · {Math.round(subjectRangeMeters)}m · vFOV{' '}
+                {deg(fov.vFOV)} · sun delta {deg(lighting.delta)}
               </span>
 
               {position.risk === '' ? null : (

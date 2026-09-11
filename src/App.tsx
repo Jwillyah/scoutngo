@@ -32,9 +32,11 @@ import {
   droneAvailable,
   GENERATE_STAGES,
   requestPlan,
+  selectedDroneCameraSpecs,
   selectedLenses,
   stageIndex,
   stageLabel,
+  sunFacts,
   type GenerationState,
 } from './lib/planRequest.ts'
 import {
@@ -88,7 +90,8 @@ function App() {
   const [showSun, setShowSun] = useState(true)
   const [showArc, setShowArc] = useState(false)
   const [coneMode, setConeMode] = useState<ConeMode>('none')
-  const [lensFilter, setLensFilter] = useState<string | null>(null)
+  /* Multi select. Empty means no filter, which shows every lens. */
+  const [lensFilters, setLensFilters] = useState<string[]>([])
   const [isolatedId, setIsolatedId] = useState<string | null>(null)
 
   /* Where the brief text was written. See lib/brief.ts. */
@@ -147,10 +150,13 @@ function App() {
     }
   }, [sun, scrubbedAt, centre])
 
-  /* Cones, bearings, lighting and siting, all from src/core/. */
+  /* Cones, bearings, lighting, framing and siting, all from src/core/. */
   const plan = useMemo(
-    () => (aim === null || sun === null ? [] : planPositions(positions, aim, sun.azimuth, land)),
-    [positions, aim, sun, land],
+    () =>
+      aim === null || sun === null
+        ? []
+        : planPositions(positions, aim, sun.azimuth, land, kit.bodyIds),
+    [positions, aim, sun, land, kit.bodyIds],
   )
 
   const selected = plan.find((p) => p.position.id === selectedId) ?? null
@@ -170,8 +176,11 @@ function App() {
 
   /* Markers respect the lens filter; cones additionally respect isolate. */
   const visiblePlan = useMemo(
-    () => (lensFilter === null ? plan : plan.filter((p) => p.position.lensId === lensFilter)),
-    [plan, lensFilter],
+    () =>
+      lensFilters.length === 0
+        ? plan
+        : plan.filter((p) => lensFilters.includes(p.position.lensId)),
+    [plan, lensFilters],
   )
   const conePlan = useMemo(() => {
     if (isolatedId !== null) return visiblePlan.filter((p) => p.position.id === isolatedId)
@@ -316,6 +325,13 @@ function App() {
         capture,
         site.status === 'ok' ? trimSummary(site.geometry.summary) : undefined,
         venueWindow?.timeZoneLabel ?? '',
+        /*
+         * Sun at the start, middle and end, computed HERE before the call. The
+         * model is told where the light is so it can choose a vantage with it in
+         * mind. Nothing comes back about lighting: src/core/lighting.ts still
+         * recomputes every call from the coordinates returned.
+         */
+        venueWindow === null ? [] : sunFacts(venueWindow),
       ),
     )
     if (response.status !== 'ok' || typeof response.raw !== 'string') {
@@ -327,7 +343,12 @@ function App() {
     }
 
     setGeneration({ status: 'working', stage: 'lighting' })
-    const parsed = parsePlanResponse(response.raw, selectedLenses(kit), droneAvailable(kit))
+    const parsed = parsePlanResponse(
+      response.raw,
+      selectedLenses(kit),
+      droneAvailable(kit),
+      selectedDroneCameraSpecs(kit),
+    )
     if (!parsed.ok) {
       setGeneration({ status: 'raw', reason: parsed.reason, raw: parsed.raw })
       return
@@ -336,18 +357,17 @@ function App() {
     // Normalized image coordinates become real ones through the map, using the
     // camera as it was when the image was taken.
     const coords = mapHandle.current?.unprojectFromCapture(capture, parsed.positions) ?? []
-    const bodyId = kit.bodyIds[0] ?? DEFAULT_KIT.bodies[0].id
 
     setPositions(
       parsed.positions.map((raw, index) => ({
         id: `pos-${index + 1}`,
         number: index + 1,
         at: coords[index] ?? { lat: 0, lon: 0 },
-        bodyId,
         lensId: raw.lensId,
         focalLength: raw.focalLength,
         shot: raw.shot,
         risk: raw.risk,
+        angleRationale: raw.angleRationale,
         platform: raw.platform,
         altitudeFeet: raw.altitudeFeet,
         moved: false,
@@ -355,7 +375,7 @@ function App() {
     )
     // Markers only until a cone is asked for. Six overlapping cones is noise.
     setConeMode('none')
-    setLensFilter(null)
+    setLensFilters([])
     setIsolatedId(null)
     setGeneration({ status: 'done', count: parsed.positions.length, dropped: parsed.dropped })
     /*
@@ -383,15 +403,20 @@ function App() {
   const fitTargets = [...plan.map((p) => p.position.at), ...(aim === null ? [] : [aim])]
 
   /*
-   * The window is named with its zone. "11:00 to 15:00" alone is the ambiguity
-   * this whole timezone change exists to remove, and this line is the one part of
-   * the sheet visible at peek.
+   * The window is named with its zone, and it comes FIRST.
+   *
+   * This line is the only part of the sheet visible at peek, it is one line, and
+   * it ellipsizes. With the venue name leading, a 390px phone cut it at
+   * "Brew River Dock Bar · 11:00 to 15:..." and threw away the zone, which is the
+   * exact ambiguity the timezone work existed to remove. The window is the part
+   * that has to survive truncation; the venue name is already on the map.
    */
   const zoneSuffix = venueWindow === null ? '' : ` ${venueWindow.timeZoneShort}`
+  const venueShort = venue.name.split(',')[0]
   const summary =
     venue.name.trim() === ''
       ? 'No venue set'
-      : `${venue.name.split(',')[0]} · ${venue.startTime} to ${venue.endTime}${zoneSuffix}`
+      : `${venue.startTime}–${venue.endTime}${zoneSuffix} · ${venueShort}`
 
   return (
     <div
@@ -551,8 +576,8 @@ function App() {
           plan={plan}
           coneMode={coneMode}
           onConeMode={setConeMode}
-          lensFilter={lensFilter}
-          onLensFilter={setLensFilter}
+          lensFilters={lensFilters}
+          onLensFilters={setLensFilters}
           isolatedId={isolatedId}
           onClearIsolate={() => setIsolatedId(null)}
         />

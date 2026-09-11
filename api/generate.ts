@@ -59,13 +59,15 @@ const SYSTEM_PROMPT = `You are a location scout for a solo photographer and vide
 
 You are looking at a satellite map image of the venue. Propose 4 to 6 camera positions.
 
-WHAT YOU DECIDE: where a shooter should stand, what the shot is, and what the risk is. That is judgement, and it is the only thing you are asked for.
+WHAT YOU DECIDE: where a shooter should stand, what the shot is, why that vantage is worth standing in, and what the risk is. That is judgement, and it is the only thing you are asked for.
 
 WHAT YOU MUST NOT DECIDE: anything geometric or photometric. Do not state or imply whether a position is backlit, front-lit, side-lit, sunlit, shaded, in golden hour, or facing the sun. Do not give bearings, angles, degrees, field of view, or distances. The application computes all of that from your coordinates using tested code, and it discards any lighting or geometry claim you make. Writing one wastes your token budget and changes nothing.
 
+You are GIVEN the sun's position below as fact. Use it to choose where to stand. Do not recompute it, restate it, or report what it implies.
+
 OUTPUT FORMAT. Return a single JSON object and nothing else. No prose before or after. No markdown code fences. No explanation.
 
-{"positions":[{"x":0.0,"y":0.0,"lensId":"","focalLength":0,"shot":"","risk":"","platform":"ground","altitudeFeet":0}]}
+{"positions":[{"x":0.0,"y":0.0,"lensId":"","focalLength":0,"shot":"","risk":"","angleRationale":"","platform":"ground","altitudeFeet":0}]}
 
 FIELD RULES, all mandatory:
 - x, y: numbers from 0 to 1, the position in the image. x is left to right, y is top to bottom.
@@ -75,14 +77,21 @@ WHERE A SHOOTER CAN STAND. When a SITE GEOMETRY block is present it is real Open
 - NEVER place a position on a road centreline. That is standing in traffic.
 - Piers, parking areas, and the ground beside buildings are all good places to stand.
 The application checks every position you return against this same geometry and flags the ones in water or in a roadway, so a bad placement is visible immediately rather than silently accepted.
-- lensId: exactly one of the lens ids listed in the context. Do not invent one.
-- focalLength: millimetres, within that lens's range as listed.
+- lensId: exactly one of the optic ids listed in the context. Do not invent one. GROUND positions must use a ground lens id. AIR positions must use a drone camera id. They are not interchangeable.
+- focalLength: millimetres, within that optic's listed range. A drone camera has ONE focal length and no range: use exactly the number listed. Any other value for an air position is rejected outright and the position is thrown away.
 - shot: what to capture from here. AT MOST 25 WORDS. Hard limit.
 - risk: what could go wrong here, such as access, crowds, obstruction, or distance. AT MOST 15 WORDS. Hard limit.
+- angleRationale: why THIS vantage is worth standing in, rather than anywhere else. AT MOST 15 WORDS. Hard limit. Say what the position gives you: a clean background, a line of pilings running away from camera, separation from the crowd, a foreground element, the light coming across the subject. Do not name a compass bearing, a degree, or a lighting class.
 - platform: "ground" or "air". Use "air" ONLY if a drone is listed in the kit below. An air position is a hover point, so it may sit over water or a road.
 - altitudeFeet: for "air", height above ground in feet, no more than 400, which is the FAA ceiling. For "ground", 0.
 
-Vary the positions. Do not cluster them all on one side. Respect the shooter's stated style and the lenses they actually brought.
+HOW FAR TO STAND BACK. Each optic below carries a MAX STANDOFF in metres, computed by the application for that optic. Do not exceed it. A position beyond it frames so much ground that the subject is a speck, and it is flagged as an error in the app. Closer is usually better: pick the shortest standoff that still gets the shot and still clears the obstacles. Do not park every position on the far bank because the far bank is easy to reach.
+
+WHERE THE LIGHT WANTS YOU. The sun's compass bearing is given below for three moments in the window. A camera whose view direction is roughly 135 to 180 degrees away from the sun's bearing has the sun behind it and the subject lit from the front. PREFER those vantages, all else being equal.
+
+DO NOT ONLY DO THAT. A strong angle in side light beats a dull angle in flat front light every time. Side light across a subject gives shape and texture that front light flattens. Shooting into the sun is a real choice for rim light, spray, and silhouette against water. If a position is the best view of the event, propose it and say why in angleRationale, whatever the light is doing. Light is one input among the background, the foreground, the access, and the geometry of the event itself. Spread the set: a plan where every position sits on the same side of the subject is a worse plan than one that covers it.
+
+Vary the positions. Do not cluster them all on one side. Respect the shooter's stated style and the optics they actually brought.
 
 Stay inside the limits. A response cut off mid JSON is worthless.`
 
@@ -95,9 +104,9 @@ interface GenerateContext {
   endTime?: unknown
   timeZoneLabel?: unknown
   style?: unknown
-  lenses?: unknown
-  bodies?: unknown
+  optics?: unknown
   drones?: unknown
+  sun?: unknown
   bounds?: unknown
   image?: unknown
   mediaType?: unknown
@@ -148,21 +157,52 @@ function renderSite(site: unknown): string {
   return `SITE GEOMETRY, real OpenStreetMap data for this exact view, [longitude, latitude]. This is authoritative over the image.\n${blocks.join('\n')}`
 }
 
+const num = (value: unknown): string => (typeof value === 'number' ? String(value) : '?')
+
+/**
+ * The optics, each with the standoff the app computed for it. A fixed focal
+ * length drone camera is rendered as one number rather than a range, because
+ * writing "24mm to 24mm" invites the model to read it as a zoom.
+ */
+function renderOptics(list: unknown): string {
+  if (!Array.isArray(list) || list.length === 0) return '(none supplied)'
+  return list
+    .map((entry) => {
+      const optic = entry as Record<string, unknown>
+      const min = optic.minFocalLength
+      const max = optic.maxFocalLength
+      const fixed = min === max
+      const kind = optic.kind === 'drone' ? 'DRONE CAMERA, air positions only' : 'ground lens'
+      const focal = fixed
+        ? `FIXED at ${num(min)}mm, this is not a zoom`
+        : `${num(min)}mm to ${num(max)}mm`
+      const standoff = fixed
+        ? `max standoff ${num(optic.maxStandoffAtMin)}m`
+        : `max standoff ${num(optic.maxStandoffAtMin)}m at ${num(min)}mm, ${num(optic.maxStandoffAtMax)}m at ${num(max)}mm`
+      return `- id "${asText(optic.id, 60)}": ${asText(optic.name, 80)}, ${kind}, ${focal}. ${standoff}.`
+    })
+    .join('\n')
+}
+
+/**
+ * Sun position across the window, as fact. Computed by src/core/sun.ts from the
+ * venue's own timezone before this request was made.
+ */
+function renderSun(list: unknown): string {
+  if (!Array.isArray(list) || list.length === 0) {
+    return 'SUN: not available for this window. Place positions on the merits of the view alone.'
+  }
+  const rows = list
+    .map((entry) => {
+      const fact = entry as Record<string, unknown>
+      return `- ${asText(fact.label, 20)} ${asText(fact.clock, 10)}: sun bearing ${num(fact.azimuth)} degrees, altitude ${num(fact.altitude)} degrees`
+    })
+    .join('\n')
+  return `SUN THROUGH THE WINDOW, computed by the application. These are facts, not estimates.\n${rows}\nBearing is a compass direction: 0 is north, 90 east, 180 south, 270 west. Altitude below 0 means the sun is down.`
+}
+
 /** Renders the context the app sent into the user turn. */
 function renderContext(body: GenerateContext): string {
-  const lenses = Array.isArray(body.lenses)
-    ? body.lenses
-        .map((l) => {
-          const lens = l as Record<string, unknown>
-          return `- id "${asText(lens.id, 60)}": ${asText(lens.name, 80)}, ${String(lens.min)}mm to ${String(lens.max)}mm`
-        })
-        .join('\n')
-    : '(none supplied)'
-
-  const bodies = Array.isArray(body.bodies)
-    ? body.bodies.map((b) => asText(b, 80)).join(', ')
-    : ''
-
   const bounds = body.bounds as Record<string, unknown> | undefined
 
   return `VENUE: ${asText(body.venueName, 200)}
@@ -180,12 +220,12 @@ DATE AND WINDOW: ${asText(body.date, 20)}, ${asText(body.startTime, 10)} to ${as
     asText(body.timeZoneLabel, 40) === '' ? '' : ` (${asText(body.timeZoneLabel, 40)})`
   }
 
-BODIES IN PLAY: ${bodies}
+${renderSun(body.sun)}
 
 AIRCRAFT IN PLAY: ${Array.isArray(body.drones) && body.drones.length > 0 ? body.drones.map((d) => asText(d, 80)).join(', ') : 'none, so every position must be "ground"'}
 
-LENSES IN PLAY, use one of these ids:
-${lenses}
+OPTICS IN PLAY, use one of these ids:
+${renderOptics(body.optics)}
 
 MAP BOUNDS of the attached image, for your reference only, do not return coordinates in these units:
 west ${String(bounds?.west)}, south ${String(bounds?.south)}, east ${String(bounds?.east)}, north ${String(bounds?.north)}

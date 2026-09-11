@@ -50,8 +50,12 @@ describe('render smoke', () => {
 
   it('starts as a peek sheet: one summary line and the generate button', () => {
     expect(html).toContain('sheet sheet--peek')
-    // The window carries its zone. Bare "11:00 to 15:00" is the old ambiguity.
-    expect(html).toContain('Brew River Dock Bar · 11:00 to 15:00 EDT')
+    /*
+     * The window carries its zone, and leads, because this line ellipsizes on a
+     * phone and the zone must not be what gets cut. Bare "11:00 to 15:00" is the
+     * old ambiguity.
+     */
+    expect(html).toContain('11:00–15:00 EDT · Brew River Dock Bar')
     expect(html).toContain('Generate')
     expect(html).toContain('<div class="sheet__body" hidden=""')
   })
