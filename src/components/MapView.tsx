@@ -9,6 +9,7 @@ import {
   toPosition,
   type LatLon,
 } from '../core/geo.ts'
+import { fitLongEdge, resolveCaptureLongEdge } from '../core/capture.ts'
 import type { SunArc } from '../core/sun.ts'
 import type { PlannedPosition } from '../lib/plan.ts'
 import type { MapBounds } from '../lib/planRequest.ts'
@@ -31,6 +32,39 @@ import { ShooterFigure } from './ShooterFigure.tsx'
  * a real emitted URL, in both dev and build.
  */
 maplibregl.setWorkerUrl(maplibreWorkerUrl)
+
+/**
+ * The map canvas as a JPEG data URL, downscaled if it is over the configured
+ * long edge.
+ *
+ * See src/core/capture.ts for what the long edge costs and how to A/B it. The
+ * downscale goes through an intermediate canvas because drawImage is the only
+ * resampler available here; it is a one off per generate and measured at a few
+ * milliseconds, so it is not worth moving off the main thread.
+ *
+ * IMPORTANT: this changes the IMAGE only, never the coordinate mapping. The model
+ * answers in normalized 0 to 1 image coordinates and unprojectFromCapture scales
+ * those by the canvas CSS size, which is unaffected by how many device pixels the
+ * JPEG happens to carry. Resolution can be changed freely without moving a pin.
+ */
+function encodeCanvas(canvas: HTMLCanvasElement): string {
+  const source = { width: canvas.width, height: canvas.height }
+  const target = fitLongEdge(source, resolveCaptureLongEdge(window.location.search))
+
+  if (target.width === source.width && target.height === source.height) {
+    return canvas.toDataURL('image/jpeg', 0.85)
+  }
+
+  const scaled = document.createElement('canvas')
+  scaled.width = target.width
+  scaled.height = target.height
+  const context = scaled.getContext('2d')
+  if (context === null) return canvas.toDataURL('image/jpeg', 0.85)
+  context.imageSmoothingEnabled = true
+  context.imageSmoothingQuality = 'high'
+  context.drawImage(canvas, 0, 0, target.width, target.height)
+  return scaled.toDataURL('image/jpeg', 0.85)
+}
 
 /**
  * Esri World Imagery. The tile path is {z}/{y}/{x}, row before column, which is
@@ -563,7 +597,7 @@ export function MapView({
         const bounds = instance.getBounds()
         const centre = instance.getCenter()
         return {
-          dataUrl: canvas.toDataURL('image/jpeg', 0.85),
+          dataUrl: encodeCanvas(canvas),
           mediaType: 'image/jpeg',
           bounds: {
             west: bounds.getWest(),

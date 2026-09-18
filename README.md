@@ -72,6 +72,45 @@ The icons are generated from the design tokens by `scripts/make-icons.mjs`, usin
 the standard library. Change the palette or the mark there, run `node scripts/make-icons.mjs`,
 and commit what it writes.
 
+## The map image sent to the model
+
+The generate request carries a JPEG of the current map view. Its resolution is one
+named value, `CAPTURE_MAX_LONG_EDGE` in `src/core/capture.ts`, and it is set by
+measurement rather than taste.
+
+**To A/B it yourself**, append `?captureEdge=1568` to the app URL. That overrides
+the long edge for that page load only and changes nothing on disk, so the same
+venue can be generated at two resolutions back to back and the resulting plans
+compared.
+
+Compare them on placement, not on the clock. The app already computes everything
+needed: site warnings check every position against real OpenStreetMap water and
+roadways, and the coverage panel reports how many bearing sectors the plan spans
+and how many positions landed on the subject with no sightline at all.
+
+**Result of the last run, 17 September 2026**, three generates per arm at the
+calibration venue, interleaved:
+
+| | 2532px (default) | 1568px |
+| --- | --- | --- |
+| Visual tokens per request | 3,822 | 1,456 |
+| Base64 payload | 699 KB | 347 KB |
+| Model leg, mean | 11,622 ms | 11,795 ms |
+| Positions in water | 0 of 18 | 0 of 18 |
+| Positions in a roadway | 1 of 18 | 1 of 18 |
+| Bearing sectors, mean | 3 | 3 |
+| **Positions landing on the subject** | **0 of 18** | **5 of 18** |
+
+The smaller image was not faster. A generate is dominated by the model composing
+its answer, not by reading the picture, so cutting the input by 62 percent bought
+nothing measurable. It also placed worse: at 1568 the model repeatedly put
+positions on the subject itself, which have no bearing, no sightline and no
+contribution to coverage. At 2532 that did not happen once.
+
+So 2532 stays. Note that total wall clock is *not* a valid comparison here:
+Overpass caches a bounding box server side, so whichever arm queries first in a
+pair looks slower for reasons that have nothing to do with the image.
+
 ## Privacy
 
 - No accounts and no sign in.
