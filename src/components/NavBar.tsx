@@ -1,9 +1,14 @@
-export type Tab = 'plan' | 'shots' | 'sun' | 'kit' | 'spots'
+/*
+ * 'conditions' was 'sun'. The tab held only the solar readout when it was named;
+ * it now carries sun, tide and the window's light together, and "Sun" had
+ * stopped describing it.
+ */
+export type Tab = 'plan' | 'shots' | 'conditions' | 'kit' | 'spots'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'plan', label: 'Plan' },
   { id: 'shots', label: 'Shots' },
-  { id: 'sun', label: 'Sun' },
+  { id: 'conditions', label: 'Conditions' },
   { id: 'kit', label: 'Kit' },
   { id: 'spots', label: 'Spots' },
 ]

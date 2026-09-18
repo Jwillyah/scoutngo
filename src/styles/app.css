@@ -844,6 +844,154 @@
   max-width: 100%;
 }
 
+/* ------------------------------------------------------------------- tide */
+
+.tide__now {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-bottom: var(--line-hair) solid var(--color-line);
+}
+
+.tide__now-label {
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.tide__now-level {
+  font-size: var(--text-num);
+}
+
+.tide__now-dir {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.tide__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tide__row {
+  display: grid;
+  grid-template-columns: 3rem 4.5rem 1fr auto;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: var(--line-hair) solid var(--color-line);
+}
+
+/* A turn inside the window is the one that changes the shoot. */
+.tide__row--in {
+  border-left: var(--line-rule) solid var(--color-text);
+}
+
+.tide__kind {
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.tide__time {
+  font-size: var(--text-num-sm);
+}
+
+.tide__feet {
+  font-size: var(--text-num-sm);
+  color: var(--color-text-muted);
+}
+
+.tide__in {
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text);
+}
+
+.tide__warn {
+  color: var(--color-text);
+}
+
+/* The per position line: a number and a direction, and no judgement. */
+.card__tide {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: var(--text-num-sm);
+}
+
+.card__tide-label {
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.card__tide-dir {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* ------------------------------------------- tide marks on the time scrubber */
+
+/*
+ * Sits directly above the range track, so a turn lines up with the point on the
+ * track where it happens. Pointer events off: the track underneath must stay a
+ * 44px drag target, which the touch pass established.
+ */
+.scrub__tide {
+  position: relative;
+  height: 12px;
+  margin-top: 2px;
+  pointer-events: none;
+}
+
+.scrub__turn {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.scrub__turn::after {
+  content: '';
+  width: var(--line-hair);
+  height: 6px;
+  background: var(--color-text-muted);
+}
+
+.scrub__turn-tag {
+  font-family: var(--font-mono);
+  font-size: var(--text-label);
+  font-weight: var(--weight-heavy);
+  line-height: 1;
+  color: var(--color-text-muted);
+}
+
+/*
+ * High water reads brighter than low: it is the one that hides ground.
+ *
+ * The tag takes the COLOUR and the tick takes the BACKGROUND. Setting both on
+ * both, which a combined selector did, painted a white background behind white
+ * text and turned the label into a solid block.
+ */
+.scrub__turn--high .scrub__turn-tag {
+  color: var(--color-text);
+}
+
+.scrub__turn--high::after {
+  background: var(--color-text);
+}
+
 /* ------------------------------------------------------------------ cloud */
 
 /*

@@ -1,4 +1,5 @@
 import type { SunPosition } from '../core/sun.ts'
+import { positionInWindow, type TideExtreme } from '../core/tide.ts'
 import { formatClock } from '../core/timezone.ts'
 
 interface TimeScrubberProps {
@@ -13,6 +14,12 @@ interface TimeScrubberProps {
   timeZone: string
   /** Short form of that zone, "EDT", shown beside the time so it is never a guess. */
   timeZoneAbbr: string
+  /**
+   * High and low water falling inside the window. Marked on the track so a
+   * window that straddles a turn is visible at a glance rather than only after
+   * opening the Conditions tab.
+   */
+  tideExtremes: TideExtreme[]
 }
 
 /**
@@ -29,8 +36,14 @@ export function TimeScrubber({
   sun,
   timeZone,
   timeZoneAbbr,
+  tideExtremes,
 }: TimeScrubberProps) {
   const clock = (date: Date) => formatClock(date, timeZone)
+
+  /* Only the turns that actually fall on the track can be drawn on it. */
+  const marks = tideExtremes
+    .map((e) => ({ extreme: e, share: positionInWindow(e.at, start, end) }))
+    .filter((m): m is { extreme: TideExtreme; share: number } => m.share !== null)
 
   return (
     <div className="scrub">
@@ -47,6 +60,20 @@ export function TimeScrubber({
         </span>
       </div>
 
+      {marks.length === 0 ? null : (
+        <div className="scrub__tide" aria-hidden="true">
+          {marks.map(({ extreme, share }) => (
+            <span
+              key={extreme.at.toISOString()}
+              className={`scrub__turn scrub__turn--${extreme.kind}`}
+              style={{ left: `${share * 100}%` }}
+            >
+              <span className="scrub__turn-tag">{extreme.kind === 'high' ? 'HW' : 'LW'}</span>
+            </span>
+          ))}
+        </div>
+      )}
+
       <input
         className="scrub__range"
         type="range"
@@ -54,7 +81,11 @@ export function TimeScrubber({
         max={1000}
         value={Math.round(value * 1000)}
         aria-label="Time through the window"
-        aria-valuetext={`${clock(at)} ${timeZoneAbbr}, sun at ${sun.azimuth.toFixed(1)} degrees`}
+        aria-valuetext={[
+          `${clock(at)} ${timeZoneAbbr}`,
+          `sun at ${sun.azimuth.toFixed(1)} degrees`,
+          ...marks.map((m) => `${m.extreme.kind} water at ${clock(m.extreme.at)}`),
+        ].join(', ')}
         onChange={(event) => onChange(Number(event.target.value) / 1000)}
       />
 

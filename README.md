@@ -146,6 +146,19 @@ current map view. That sends the bounding box you are looking at, nothing else.
 Results are cached per view so repeated generates do not re-query, and if
 Overpass is slow or down the app carries on without it.
 
+**Tide.** For a waterfront venue the app asks NOAA CO-OPS at
+`api.tidesandcurrents.noaa.gov` for tide predictions. Your coordinates are **not**
+sent: the full station list is fetched once, cached in `localStorage`, and the
+nearest station is chosen on your own device, so NOAA sees only which station id
+was requested and not where you are. That is deliberately a better position than
+the map tiles, which do disclose the view. If the nearest station is more than
+80km away the app says so and asks for nothing.
+
+**Cloud.** Pressing "Cloud along the sightline" on a position card asks
+Open-Meteo at `api.open-meteo.com` for cloud cover at five points along that
+position's bearing, out to 80km. Those coordinates do leave the device, and
+nothing is sent until you press it.
+
 **Plan generation.** Only when you press Generate, and only then. That request
 carries a JPEG of the current map view plus your text context and the site
 geometry, and it goes to Anthropic through the serverless function so your key
@@ -178,6 +191,8 @@ data because there is no server holding anything.
 - Google Street View Static API for the optional ground view
 - `suncalc` for solar position
 - `tz-lookup` for the venue's timezone from its coordinates, offline
+- NOAA CO-OPS for tide predictions, and Open-Meteo for cloud along the sightline.
+  Both are free and keyless; all the arithmetic over them is in `src/core/`
 - turf for bearings, distances, and destination points, as the seven scoped
   packages actually used rather than the `@turf/turf` barrel
 - Vitest for the core tests
@@ -254,9 +269,10 @@ npm run test:watch
 
 The suite covers the whole computation core: azimuth conversion, the lighting
 classifier including the wraparound cases, field of view, map geometry and the
-field of view cone, timezone resolution across a daylight saving change, the kit
-profile, and a calibration case for a real venue where the correct answer is
-already known.
+field of view cone, timezone resolution across a daylight saving change, bearing
+coverage, cloud along a sightline, tide interpolation and the nearest-station
+bands, the kit profile, and a calibration case for a real venue where the correct
+answer is already known.
 
 ## Deploy your own
 

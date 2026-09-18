@@ -119,6 +119,7 @@ interface GenerateContext {
   sun?: unknown
   subjectPoint?: unknown
   imageNorthBearing?: unknown
+  tide?: unknown
   bounds?: unknown
   image?: unknown
   mediaType?: unknown
@@ -237,6 +238,35 @@ function renderFraming(body: GenerateContext): string {
   return `IMAGE ORIENTATION. ${orientation}\n${subject}`
 }
 
+/**
+ * Tide state, handed over as fact.
+ *
+ * Same contract as the sun figures: the application computed this from NOAA's
+ * published predictions before the request was made, the model uses it as
+ * context, and the model never returns a tide claim. There is no tide field in
+ * the parser, so nothing it says about water level can reach the screen.
+ */
+function renderTide(tide: unknown): string {
+  if (typeof tide !== 'object' || tide === null) {
+    return 'TIDE: no tide station near this venue, or none available. Do not guess at one.'
+  }
+  const t = tide as Record<string, unknown>
+  const turns = Array.isArray(t.turns)
+    ? t.turns
+        .map((raw) => {
+          const turn = raw as Record<string, unknown>
+          return `${asText(turn.kind, 8)} water ${asText(turn.clock, 8)} at ${num(turn.feet)}ft`
+        })
+        .join(', ')
+    : ''
+
+  return `TIDE, from NOAA predictions, computed by the application. Fact, not an estimate.
+- Water level mid window: ${num(t.feet)} feet above MLLW, ${asText(t.direction, 12)}.
+- Station: ${asText(t.station, 80)}, ${num(t.distanceKm)}km from the venue.
+${turns === '' ? '- No high or low water falls inside the window.' : `- Turns inside the window: ${turns}.`}
+Use this to reason about what the waterline and the pilings will look like: a low tide exposes mud, bank and piling that a high tide covers. Do NOT state a tide height, a tide time, or whether anywhere is walkable. The application shows the tide itself and the shooter judges the ground.`
+}
+
 /** Renders the context the app sent into the user turn. */
 function renderContext(body: GenerateContext): string {
   const bounds = body.bounds as Record<string, unknown> | undefined
@@ -259,6 +289,8 @@ DATE AND WINDOW: ${asText(body.date, 20)}, ${asText(body.startTime, 10)} to ${as
 ${renderFraming(body)}
 
 ${renderSun(body.sun)}
+
+${renderTide(body.tide)}
 
 AIRCRAFT IN PLAY: ${Array.isArray(body.drones) && body.drones.length > 0 ? body.drones.map((d) => asText(d, 80)).join(', ') : 'none, so every position must be "ground"'}
 

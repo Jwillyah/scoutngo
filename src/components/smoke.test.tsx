@@ -21,10 +21,17 @@ describe('render smoke', () => {
     expect(html).toContain('class="map__canvas"')
   })
 
+  /*
+   * Scoped to the nav label class on purpose. This used to assert a bare
+   * `>Sun</span>`, which the HUD's own "Sun" readout label also satisfies, so the
+   * check kept passing after the tab was renamed and was no longer testing the
+   * nav at all.
+   */
   it('carries the five tab shell with plan as the default', () => {
-    for (const tab of ['Plan', 'Shots', 'Sun', 'Kit', 'Spots']) {
-      expect(html).toContain(`>${tab}</span>`)
+    for (const tab of ['Plan', 'Shots', 'Conditions', 'Kit', 'Spots']) {
+      expect(html).toContain(`class="nav__label">${tab}</span>`)
     }
+    expect(html).not.toContain('class="nav__label">Sun</span>')
     expect(html).toContain('nav__item nav__item--on')
     expect(html).toContain('Venue and window')
   })

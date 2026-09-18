@@ -127,6 +127,17 @@ export interface SunFact {
   altitude: number
 }
 
+export interface TideFact {
+  /** Feet above MLLW at the middle of the window. */
+  feet: number
+  direction: 'rising' | 'falling' | 'slack'
+  /** Station name and how far it is, so the model knows how local this is. */
+  station: string
+  distanceKm: number
+  /** High and low water inside the window, as venue local clock times. */
+  turns: { kind: 'high' | 'low'; clock: string; feet: number }[]
+}
+
 export function sunFacts(venueWindow: VenueWindow): SunFact[] {
   const { lat, lon, timeZone } = venueWindow
   return [
@@ -171,6 +182,15 @@ export interface GenerateRequestBody {
   /** Sun azimuth and altitude across the window, computed before the call. */
   sun: SunFact[]
   /**
+   * Tide state at the middle of the window, computed from NOAA predictions.
+   *
+   * A FACT HANDED OVER, exactly like the sun figures. The model may use it to
+   * reason about what a bank or a piling will look like; it never computes a
+   * tide, and nothing it says about tide is parsed or reaches the screen. The
+   * only tide on screen comes from src/core/tide.ts.
+   */
+  tide?: TideFact
+  /**
    * Where the subject sits in the attached image, 0 to 1. The model is asked to
    * spread positions AROUND this point, so it has to know where it is.
    */
@@ -211,6 +231,8 @@ export function buildGenerateBody(
   sun: SunFact[] = [],
   /** Where the subject is in the image, and which way the image is oriented. */
   framing: { subjectPoint?: { x: number; y: number }; imageNorthBearing?: number } = {},
+  /** Tide at the middle of the window. Absent inland, or when NOAA is down. */
+  tide?: TideFact,
 ): GenerateRequestBody {
   return {
     venueName: venue.name,
@@ -224,6 +246,7 @@ export function buildGenerateBody(
     drones: selectedDroneNames(kit),
     optics: selectedOptics(kit),
     sun,
+    ...(tide === undefined ? {} : { tide }),
     ...(framing.subjectPoint === undefined ? {} : { subjectPoint: framing.subjectPoint }),
     /*
      * The map camera's bearing is how far the view is rotated clockwise from

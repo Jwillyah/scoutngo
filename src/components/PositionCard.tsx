@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { SightlineCloud } from '../core/cloud.ts'
 import { MIN_BEARING_RANGE_METERS } from '../core/coverage.ts'
+import { feetToMetres, type TideState } from '../core/tide.ts'
 import type { FramingWarning } from '../core/fov.ts'
 import type { SiteWarning } from '../core/siting.ts'
 import { fetchSightlineCloud, type ForecastKind } from '../lib/forecast.ts'
@@ -13,6 +14,8 @@ interface PositionCardProps {
   /** The moment the scrubber is on, and the venue's zone. Null until resolved. */
   shootAt: Date | null
   timeZone: string | null
+  /** Water level and direction at the scrubbed moment. Null away from the coast. */
+  tide: TideState | null
   onClose: () => void
 }
 
@@ -226,7 +229,13 @@ function CloudPanel({
  * the position's coordinates. The shot text is the only part a model will ever
  * supply, and it says nothing about light.
  */
-export function PositionCard({ planned, shootAt, timeZone, onClose }: PositionCardProps) {
+export function PositionCard({
+  planned,
+  shootAt,
+  timeZone,
+  tide,
+  onClose,
+}: PositionCardProps) {
   const {
     position,
     fov,
@@ -331,6 +340,26 @@ export function PositionCard({ planned, shootAt, timeZone, onClose }: PositionCa
       )}
 
       {position.risk === '' ? null : <p className="card__note">{position.risk}</p>}
+
+      {/*
+        * Tide, as a number and a direction and nothing else.
+        *
+        * Deliberately NOT a judgement about whether this spot is walkable. That
+        * depends on mud, rip-rap and fences that nothing in this app can see, and
+        * the shooter is the one who will be standing there. Computed in
+        * src/core/tide.ts from NOAA predictions; never from the model.
+        */}
+      {tide === null ? null : (
+        <p className="card__tide">
+          <span className="card__tide-label">Tide</span>
+          <span className="num">
+            {tide.feet.toFixed(1)}ft · {feetToMetres(tide.feet).toFixed(2)}m
+          </span>
+          <span className="card__tide-dir">
+            {tide.direction === 'slack' ? 'near slack' : tide.direction}
+          </span>
+        </p>
+      )}
 
       <CloudPanel planned={planned} shootAt={shootAt} timeZone={timeZone} />
 

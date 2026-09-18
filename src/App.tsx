@@ -13,10 +13,13 @@ import { PositionCard } from './components/PositionCard.tsx'
 import { SearchField } from './components/SearchField.tsx'
 import { ShotList } from './components/ShotList.tsx'
 import { SunReadout } from './components/SunReadout.tsx'
+import { TideReadout } from './components/TideReadout.tsx'
 import type { LatLon } from './core/geo.ts'
 import { DEFAULT_KIT } from './core/kit.ts'
 import { EMPTY_LANDCOVER, type Landcover } from './core/siting.ts'
 import { getSunArc, getSunPosition } from './core/sun.ts'
+import { extremesAround, tideStateAt } from './core/tide.ts'
+import { formatClock } from './core/timezone.ts'
 import { briefDriftMeters, formatDrift, isBriefStale, type BriefAnchor } from './lib/brief.ts'
 import {
   defaultSelection,
@@ -47,6 +50,7 @@ import {
   type Spot,
 } from './lib/spots.ts'
 import { usePersistentState } from './lib/usePersistentState.ts'
+import { useTide } from './lib/useTide.ts'
 import {
   CALIBRATION_VENUE,
   hasErrors,
@@ -165,6 +169,25 @@ function App() {
    * warning comes back, which is the honest behaviour.
    */
   const planCoverage = useMemo(() => assessPlan(plan), [plan])
+
+  /*
+   * Tide for the venue and the shoot date. Fetched once per day and venue, not
+   * per scrubber drag: see the dependency note in useTide.
+   */
+  const tide = useTide(centre, venueWindow?.middle ?? null)
+
+  /* Turns falling inside the window, for the scrubber marks and the prompt. */
+  const tideExtremes = useMemo(() => {
+    if (tide.status !== 'ok' || venueWindow === null) return []
+    return extremesAround(tide.predictions.extremes, venueWindow.start, venueWindow.end)
+      .inWindow
+  }, [tide, venueWindow])
+
+  /* The tide at the scrubbed moment. Computed in core, never asserted. */
+  const tideNow = useMemo(() => {
+    if (tide.status !== 'ok' || scrubbedAt === null) return null
+    return tideStateAt(tide.predictions.curve, tide.predictions.extremes, scrubbedAt)
+  }, [tide, scrubbedAt])
 
   const selected = plan.find((p) => p.position.id === selectedId) ?? null
 
@@ -376,6 +399,24 @@ function App() {
               : mapHandle.current?.projectToCapture(capture, [aim])[0],
           imageNorthBearing: capture.camera.bearing,
         },
+        /*
+         * Tide as a fact, like the sun figures. Computed in src/core/tide.ts from
+         * NOAA data; the model never performs the arithmetic and never returns a
+         * tide claim, because there is no tide field to parse.
+         */
+        tide.status !== 'ok' || tideNow === null || venueWindow === null
+          ? undefined
+          : {
+              feet: Number(tideNow.feet.toFixed(2)),
+              direction: tideNow.direction,
+              station: tide.station.name,
+              distanceKm: Number(tide.distanceKm.toFixed(1)),
+              turns: tideExtremes.map((e) => ({
+                kind: e.kind,
+                clock: formatClock(e.at, venueWindow.timeZone),
+                feet: Number(e.feet.toFixed(2)),
+              })),
+            },
       ),
     )
     if (response.status !== 'ok' || typeof response.raw !== 'string') {
@@ -435,7 +476,7 @@ function App() {
   const onTab = (next: Tab) => {
     setTab(next)
     // Sun is a full screen readout over a dimmed map; the rest keep the map live.
-    setSheet(next === 'sun' ? 'full' : sheet === 'peek' ? 'half' : sheet)
+    setSheet(next === 'conditions' ? 'full' : sheet === 'peek' ? 'half' : sheet)
   }
 
   const flyToPosition = (id: string) => {
@@ -495,7 +536,7 @@ function App() {
         bottomInset={sheetHeight}
       />
 
-      {tab === 'sun' ? <div className="scrim" /> : null}
+      {tab === 'conditions' ? <div className="scrim" /> : null}
 
       <header className="hud">
         <SearchField onPick={onPick} />
@@ -531,6 +572,7 @@ function App() {
           planned={selected}
           shootAt={scrubbedAt}
           timeZone={venueWindow?.timeZone ?? null}
+          tide={tideNow}
           onClose={() => setSelectedId(null)}
         />
       )}
@@ -605,8 +647,17 @@ function App() {
           />
         ) : null}
 
-        {tab === 'sun' ? (
-          <SunReadout venueWindow={venueWindow} open onToggle={() => {}} />
+        {tab === 'conditions' ? (
+          <>
+            <SunReadout venueWindow={venueWindow} open onToggle={() => {}} />
+            <TideReadout
+              tide={tide}
+              venueWindow={venueWindow}
+              scrubbedAt={scrubbedAt}
+              open
+              onToggle={() => {}}
+            />
+          </>
         ) : null}
 
         {tab === 'kit' ? (
@@ -647,6 +698,7 @@ function App() {
             sun={sun}
             timeZone={venueWindow.timeZone}
             timeZoneAbbr={venueWindow.timeZoneShort}
+            tideExtremes={tideExtremes}
           />
         )}
 
