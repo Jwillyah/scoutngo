@@ -15,6 +15,11 @@ interface FieldCardProps {
   /** Tide at the current clock. Null inland or outside the predicted day. */
   tideNow: TideState | null
   gps: GeoState
+  /**
+   * The ground view from the field pack, when one was prepared for this plan.
+   * Present means no network is needed; absent falls back to a lazy fetch.
+   */
+  cachedImage?: string
   /** Only the visible card fetches its photo. */
   active: boolean
   index: number
@@ -55,13 +60,18 @@ export function FieldCard({
   lightingNow,
   tideNow,
   gps,
+  cachedImage,
   active,
   index,
   total,
 }: FieldCardProps) {
   const { position, fov, cameraBearing, subjectRangeMeters, warnings, framingWarnings } = planned
-  const [view, setView] = useState<GroundView>({ status: 'idle' })
-  const requested = useRef(false)
+  const [view, setView] = useState<GroundView>(() =>
+    cachedImage === undefined
+      ? { status: 'idle' }
+      : { status: 'ok', image: cachedImage },
+  )
+  const requested = useRef(cachedImage !== undefined)
 
   /*
    * Only the card on screen fetches. Six positions eagerly fetching six Street
@@ -73,6 +83,7 @@ export function FieldCard({
    * so there is no extra render just to say so.
    */
   useEffect(() => {
+    // A packed image is already in state, so nothing is fetched.
     if (!active || requested.current) return
     requested.current = true
     fetchGroundView(position.at, cameraBearing, fov.hFOV).then(setView)

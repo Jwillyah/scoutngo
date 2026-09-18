@@ -40,6 +40,16 @@ import {
   SPOTS_STORAGE_KEY,
   type Spot,
 } from './lib/spots.ts'
+import {
+  buildPack,
+  fingerprintPlan,
+  loadPack,
+  packMatches,
+  savePack,
+  windowKeyOf,
+  type FieldPack,
+} from './lib/fieldPack.ts'
+import type { PackBuildState } from './components/FieldPackControl.tsx'
 import { usePersistentState } from './lib/usePersistentState.ts'
 import { useTide } from './lib/useTide.ts'
 import {
@@ -171,6 +181,44 @@ function App() {
     if (tide.status !== 'ok' || scrubbedAt === null) return null
     return tideStateAt(tide.predictions.curve, tide.predictions.extremes, scrubbedAt)
   }, [tide, scrubbedAt])
+
+  /*
+   * THE FIELD PACK. Loaded once at startup, rebuilt only on an explicit press.
+   * The fingerprint is recomputed from the live plan every render, so a pack
+   * that no longer describes what is on screen is reported as stale rather than
+   * used: a pack from a different plan is worse than no pack.
+   */
+  const [pack, setPack] = useState<FieldPack | null>(() => loadPack())
+  const [packState, setPackState] = useState<PackBuildState>({ status: 'idle' })
+
+  const fingerprint = useMemo(
+    () => fingerprintPlan(centre, windowKeyOf(venueWindow), plan),
+    [centre, venueWindow, plan],
+  )
+  const packIsCurrent = packMatches(pack, fingerprint)
+
+  const preparePack = async () => {
+    if (centre === null || plan.length === 0) return
+    setPackState({ status: 'working', done: 0, total: plan.length })
+
+    const built = await buildPack(
+      centre,
+      fingerprint,
+      plan,
+      tide.status === 'ok' ? tide.predictions : undefined,
+      (done, total) => setPackState({ status: 'working', done, total }),
+    )
+
+    /*
+     * Held in memory whatever storage does, so Field mode works this session
+     * even if the browser refused to persist it. The failure is still reported.
+     */
+    setPack(built)
+    const saved = savePack(built)
+    setPackState(
+      saved.status === 'ok' ? { status: 'idle' } : { status: 'error', reason: saved.reason },
+    )
+  }
 
   const selected = plan.find((p) => p.position.id === selectedId) ?? null
 
@@ -585,6 +633,10 @@ function App() {
           siteNote={siteNote}
           onGenerate={onGenerate}
           onSearchPick={onPick}
+          pack={pack}
+          packIsCurrent={packIsCurrent}
+          packState={packState}
+          onPreparePack={() => void preparePack()}
           summary={summary}
           peekStatus={peekStatus}
           fitTargets={fitTargets}
@@ -598,7 +650,13 @@ function App() {
       ) : null}
 
       {mode === 'field' ? (
-        <FieldMode plan={plan} venue={centre} tide={tide} footer={rail} />
+        <FieldMode
+          plan={plan}
+          venue={centre}
+          tide={tide}
+          pack={packIsCurrent ? pack : null}
+          footer={rail}
+        />
       ) : null}
 
     </div>

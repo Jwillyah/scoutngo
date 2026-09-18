@@ -159,6 +159,16 @@ Open-Meteo at `api.open-meteo.com` for cloud cover at five points along that
 position's bearing, out to 80km. Those coordinates do leave the device, and
 nothing is sent until you press it.
 
+**Field pack, opt in and off by default.** Pressing "Prepare field pack" in Plan
+fetches the ground view for *every* position at once, so all of their coordinates
+go to Google's Street View API in one go, through the serverless function. It is
+the only place in the app that sends coordinates in bulk, it never runs
+automatically, and the button states what it will do before you press it. What it
+caches, the computed values, the tide predictions and the photos, is written to
+`localStorage` on your own device and is never uploaded. Without the press,
+nothing is prefetched and Field mode falls back to fetching one photo at a time
+as you swipe.
+
 **Plan generation.** Only when you press Generate, and only then. That request
 carries a JPEG of the current map view plus your text context and the site
 geometry, and it goes to Anthropic through the serverless function so your key

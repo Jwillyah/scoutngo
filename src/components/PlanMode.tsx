@@ -4,11 +4,13 @@ import type { TideExtreme, TideState } from '../core/tide.ts'
 import type { SunArc, SunPosition } from '../core/sun.ts'
 import type { PlanCoverage, PlannedPosition } from '../lib/plan.ts'
 import type { GenerationState } from '../lib/planRequest.ts'
+import type { FieldPack } from '../lib/fieldPack.ts'
 import type { TideInfo } from '../lib/useTide.ts'
 import type { VenueWindow } from '../lib/venue.ts'
 import { BottomSheet, type SheetState } from './BottomSheet.tsx'
 import { ConditionsPanel } from './ConditionsPanel.tsx'
 import { ConeFilter, type ConeMode } from './ConeFilter.tsx'
+import { FieldPackControl, type PackBuildState } from './FieldPackControl.tsx'
 import { MapControls } from './MapControls.tsx'
 import { MapView, type MapHandle, type TapMode } from './MapView.tsx'
 import { OverflowMenu } from './OverflowMenu.tsx'
@@ -65,6 +67,10 @@ interface PlanModeProps {
   summary: string
   peekStatus: { label: string; line: string }
   fitTargets: LatLon[]
+  pack: FieldPack | null
+  packIsCurrent: boolean
+  packState: PackBuildState
+  onPreparePack: () => void
   footer: React.ReactNode
 }
 
@@ -119,6 +125,10 @@ export function PlanMode({
   onSearchPick,
   peekStatus,
   fitTargets,
+  pack,
+  packIsCurrent,
+  packState,
+  onPreparePack,
   footer,
 }: PlanModeProps) {
   const [sheet, setSheet] = useState<SheetState>('peek')
@@ -267,6 +277,14 @@ export function PlanMode({
               generation={generation}
               planCoverage={planCoverage}
               siteNote={siteNote}
+            />
+            <FieldPackControl
+              pack={pack}
+              matches={packIsCurrent}
+              positions={plan.length}
+              state={packState}
+              timeZone={venueWindow?.timeZone ?? null}
+              onPrepare={onPreparePack}
             />
             <ShotList
               plan={visiblePlan}

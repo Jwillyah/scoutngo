@@ -3,6 +3,7 @@ import { classifyLighting } from '../core/lighting.ts'
 import { getSunPosition } from '../core/sun.ts'
 import { tideStateAt } from '../core/tide.ts'
 import type { LatLon } from '../core/geo.ts'
+import type { FieldPack } from '../lib/fieldPack.ts'
 import type { PlannedPosition } from '../lib/plan.ts'
 import { useGeolocation } from '../lib/useGeolocation.ts'
 import { useNow } from '../lib/useNow.ts'
@@ -13,6 +14,8 @@ interface FieldModeProps {
   plan: PlannedPosition[]
   venue: LatLon | null
   tide: TideInfo
+  /** Non-null only when it was built for THIS plan. See lib/fieldPack.ts. */
+  pack: FieldPack | null
   footer: React.ReactNode
 }
 
@@ -29,7 +32,7 @@ interface FieldModeProps {
  * the scrubber was left. That is the difference between a plan and a briefing:
  * by the time anyone is standing here the sun has moved.
  */
-export function FieldMode({ plan, venue, tide, footer }: FieldModeProps) {
+export function FieldMode({ plan, venue, tide, pack, footer }: FieldModeProps) {
   const now = useNow()
   const gps = useGeolocation()
   const [index, setIndex] = useState(0)
@@ -37,10 +40,22 @@ export function FieldMode({ plan, venue, tide, footer }: FieldModeProps) {
 
   /* Sun at the current moment, from the same core the map uses. */
   const sunNow = venue === null ? null : getSunPosition(now, venue.lat, venue.lon)
+
+  /*
+   * Tide from the pack when there is one, because NOAA is not reachable at a
+   * venue with no signal. Falls back to the live fetch, so forgetting to prepare
+   * degrades rather than breaks.
+   */
+  const tideSource =
+    pack?.tide ?? (tide.status === 'ok' ? tide.predictions : null)
   const tideNow =
-    tide.status === 'ok'
-      ? tideStateAt(tide.predictions.curve, tide.predictions.extremes, now)
-      : null
+    tideSource === null ? null : tideStateAt(tideSource.curve, tideSource.extremes, now)
+
+  /** Cached ground view for a position, or undefined to fetch it lazily. */
+  const cachedImage = (id: string): string | undefined => {
+    const packed = pack?.positions.find((p) => p.id === id)
+    return packed?.groundView.status === 'ok' ? packed.groundView.image : undefined
+  }
 
   /* Which card is on screen, read from scroll position rather than tracked by hand. */
   useEffect(() => {
@@ -87,6 +102,7 @@ export function FieldMode({ plan, venue, tide, footer }: FieldModeProps) {
                 }
                 tideNow={tideNow}
                 gps={gps}
+                cachedImage={cachedImage(planned.position.id)}
                 active={i === index}
                 index={i}
                 total={plan.length}
