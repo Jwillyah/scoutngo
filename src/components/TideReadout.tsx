@@ -2,15 +2,13 @@ import { feetToMetres, tidalRangeFeet, tideStateAt, type TideExtreme } from '../
 import { formatClock } from '../core/timezone.ts'
 import type { TideInfo } from '../lib/useTide.ts'
 import type { VenueWindow } from '../lib/venue.ts'
-import { Section } from './Section.tsx'
+import { Panel } from './Panel.tsx'
 
 interface TideReadoutProps {
   tide: TideInfo
   venueWindow: VenueWindow | null
   /** The moment the scrubber is sitting on. */
   scrubbedAt: Date | null
-  open: boolean
-  onToggle: () => void
 }
 
 const feet = (n: number) => `${n.toFixed(1)}ft`
@@ -30,22 +28,7 @@ const DIRECTION_COPY = {
  * is walkable: that is a judgement about mud and rip-rap that no dataset in this
  * app knows about, and it belongs to the person standing there.
  */
-export function TideReadout({
-  tide,
-  venueWindow,
-  scrubbedAt,
-  open,
-  onToggle,
-}: TideReadoutProps) {
-  const summary =
-    tide.status === 'ok'
-      ? `${tide.station.name.split(',')[0]}`
-      : tide.status === 'loading'
-        ? 'Checking NOAA'
-        : tide.status === 'no-station'
-          ? 'No station near'
-          : 'Unavailable'
-
+export function TideReadout({ tide, venueWindow, scrubbedAt }: TideReadoutProps) {
   const body = () => {
     if (tide.status === 'idle') {
       return <p className="readout__empty">Set the venue and the window to read the tide.</p>
@@ -142,8 +125,6 @@ export function TideReadout({
   }
 
   return (
-    <Section index="04" title="Tide" summary={summary} open={open} onToggle={onToggle}>
-      {body()}
-    </Section>
+    <Panel index="04" title="Tide">{body()}</Panel>
   )
 }

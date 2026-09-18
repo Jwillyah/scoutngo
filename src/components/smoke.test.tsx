@@ -16,55 +16,58 @@ import { SunReadout } from './SunReadout.tsx'
 describe('render smoke', () => {
   const html = renderToStaticMarkup(<App />)
 
-  it('renders the map shell with the map as the hero', () => {
-    expect(html).toContain('class="shell"')
-    expect(html).toContain('class="map__canvas"')
+  it('renders the shell', () => {
+    expect(html).toContain('class="shell shell--setup"')
   })
 
   /*
-   * Scoped to the nav label class on purpose. This used to assert a bare
-   * `>Sun</span>`, which the HUD's own "Sun" readout label also satisfies, so the
-   * check kept passing after the tab was renamed and was no longer testing the
-   * nav at all.
+   * THREE MODES ON A TIME AXIS, not five parallel tabs. The old shell offered
+   * Plan, Shots, Conditions, Kit and Spots as equals, though Kit is configured a
+   * week before Shots is read.
    */
-  it('carries the five tab shell with plan as the default', () => {
-    for (const tab of ['Plan', 'Shots', 'Conditions', 'Kit', 'Spots']) {
-      expect(html).toContain(`class="nav__label">${tab}</span>`)
+  it('opens in SETUP and offers three ordered modes', () => {
+    for (const step of ['Setup', 'Plan', 'Field']) {
+      expect(html).toContain(`class="rail__label">${step}</span>`)
     }
-    expect(html).not.toContain('class="nav__label">Sun</span>')
-    expect(html).toContain('nav__item nav__item--on')
+    expect(html).toContain('rail__step--now')
+    // The five tab shell is gone.
+    expect(html).not.toContain('class="nav__item')
+  })
+
+  it('starts in setup, because that is the first step', () => {
+    expect(html).toContain('shell shell--setup')
     expect(html).toContain('Venue and window')
   })
 
-  it('offers search, with the pin modes tucked into the overflow menu', () => {
-    expect(html).toContain('Search for a venue')
-    expect(html).toContain('More map options')
-    // No tap mode is armed until it is chosen; long press is the normal path.
-    expect(html).not.toContain('mode mode--on')
+  /*
+   * FIELD cannot be entered before there is a plan to walk to. That gating is
+   * what makes the rail a sequence rather than a channel selector.
+   */
+  it('locks the field step until a plan exists', () => {
+    expect(html).toContain('rail__step--locked')
   })
 
-  it('shows the sun overlay by default and the sunrise arc off', () => {
-    expect(html).toContain('Hide the sun overlay')
+  /*
+   * ONE reveal mechanism. The accordions are gone: every setup block renders
+   * open, so nothing is folded inside something that is itself folded.
+   */
+  it('renders setup blocks open, with no accordion toggles', () => {
+    expect(html).toContain('section__banner--static')
+    expect(html).not.toContain('aria-expanded')
+    expect(html).toContain('Kit and style')
+    expect(html).toContain('Saved setups')
   })
 
-  it('has no cone filter row until there are positions to filter', () => {
+  /* The map and its chrome belong to PLAN, so none of it renders in SETUP. */
+  it('shows no map chrome in setup', () => {
+    expect(html).not.toContain('class="map__canvas"')
+    expect(html).not.toContain('Search for a venue')
     expect(html).not.toContain('class="cones"')
+    expect(html).not.toContain('class="sheet')
   })
 
   it('shows no stale brief warning when the venue matches the brief', () => {
     expect(html).not.toContain('class="stale"')
-  })
-
-  it('starts as a peek sheet: one summary line and the generate button', () => {
-    expect(html).toContain('sheet sheet--peek')
-    /*
-     * The window carries its zone, and leads, because this line ellipsizes on a
-     * phone and the zone must not be what gets cut. Bare "11:00 to 15:00" is the
-     * old ambiguity.
-     */
-    expect(html).toContain('11:00–15:00 EDT · Brew River Dock Bar')
-    expect(html).toContain('Generate')
-    expect(html).toContain('<div class="sheet__body" hidden=""')
   })
 
   it('shows no validation errors before anything has been touched', () => {
@@ -72,8 +75,10 @@ describe('render smoke', () => {
     expect(html).not.toContain('aria-invalid="true"')
   })
 
-  it('has no positions until generate has run', () => {
-    expect(html).not.toContain('class="shooter')
+  /* Forward is one large action, not a tab tap. */
+  it('offers a single forward action out of setup', () => {
+    expect(html).toContain('forward__btn')
+    expect(html).toContain('Setup done · Plan')
   })
 })
 
@@ -102,7 +107,7 @@ describe('SunReadout', () => {
 
   it('renders real computed sun numbers, not placeholders', () => {
     const html = renderToStaticMarkup(
-      <SunReadout open onToggle={() => {}} venueWindow={resolveWindow(CALIBRATION_VENUE)} />,
+      <SunReadout venueWindow={resolveWindow(CALIBRATION_VENUE)} />,
     )
     // Due south at mid-window, southeast at the start, workable light.
     expect(html).toContain('180.6°')
@@ -112,7 +117,7 @@ describe('SunReadout', () => {
 
   it('shows the window in venue wall clock time and names the zone', () => {
     const html = renderToStaticMarkup(
-      <SunReadout open onToggle={() => {}} venueWindow={resolveWindow(CALIBRATION_VENUE)} />,
+      <SunReadout venueWindow={resolveWindow(CALIBRATION_VENUE)} />,
     )
     // The times entered in the form, read back at the venue: 11:00, 13:00, 15:00.
     expect(html).toContain('>11:00<')

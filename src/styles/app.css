@@ -12,6 +12,159 @@
   overflow: hidden;
 }
 
+/* ------------------------------------------------------------------ modes */
+
+/*
+ * THREE MODES ON A TIME AXIS. Each owns the whole screen; they are never
+ * composited. SETUP and FIELD scroll as ordinary pages, PLAN is the map with
+ * one sheet over it. That is the whole navigation model: no tabs, no detents
+ * beyond open and shut, no accordions.
+ */
+.mode-setup,
+.mode-field {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mode-plan {
+  position: absolute;
+  inset: 0;
+}
+
+/* The scrolling body of a page mode. The foot below it is fixed. */
+.page {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: var(--space-4);
+}
+
+.mode__foot {
+  flex: 0 0 auto;
+  background: var(--color-bg);
+  border-top: var(--line-hair) solid var(--color-line);
+  padding-bottom: var(--safe-bottom);
+}
+
+/* In PLAN the foot floats over the map inside the measured dock. */
+.mode__foot--overlay {
+  background: transparent;
+  border-top: 0;
+  padding-bottom: 0;
+}
+
+/* ------------------------------------------------------------- forward step */
+
+/*
+ * The one way forward, and it is deliberately large. Going back is a small tap
+ * on an earlier step in the rail; going on is this. That asymmetry is what makes
+ * the sequence read as steps rather than as channels.
+ */
+.forward {
+  padding: var(--space-3) var(--page-pad);
+}
+
+.forward__btn {
+  width: 100%;
+}
+
+.forward__why {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* -------------------------------------------------------------- mode rail */
+
+.rail__list {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--page-pad) var(--space-2);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+
+.rail__step {
+  position: relative;
+}
+
+/* The connector: what makes this a line of steps and not three buttons. */
+.rail__step + .rail__step::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--space-2) * -1);
+  top: 18px;
+  width: var(--space-2);
+  height: var(--line-hair);
+  background: var(--color-line);
+}
+
+.rail__btn {
+  width: 100%;
+  min-height: 44px;
+  display: grid;
+  gap: 1px;
+  padding: var(--space-2) var(--space-1);
+  background: transparent;
+  border: 0;
+  border-top: var(--line-rule) solid var(--color-line);
+  color: var(--color-text-faint);
+  text-align: left;
+  cursor: pointer;
+}
+
+.rail__btn:disabled {
+  cursor: not-allowed;
+}
+
+.rail__index {
+  font-size: var(--text-label);
+}
+
+.rail__label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heavy);
+}
+
+.rail__when {
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+/* White marks where you are, exactly as it marks every other active state. */
+.rail__step--now .rail__btn {
+  border-top-color: var(--color-accent);
+  color: var(--color-text);
+}
+
+.rail__step--done .rail__btn {
+  border-top-color: var(--color-line-strong);
+  color: var(--color-text-muted);
+}
+
+.rail__step--locked .rail__btn {
+  color: var(--color-text-faint);
+}
+
+/* A static panel header: no caret, nothing to press, because nothing folds. */
+.section__banner--static {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-3) var(--page-pad);
+  background: transparent;
+  text-align: left;
+}
+
+.btn-row--pad {
+  padding: var(--space-3) var(--page-pad) 0;
+}
+
 /* --------------------------------------------------------------- the map */
 
 .map {

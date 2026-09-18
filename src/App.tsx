@@ -1,19 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { BottomSheet, type SheetState } from './components/BottomSheet.tsx'
-import { KitProfile } from './components/KitProfile.tsx'
-import { ConeFilter, type ConeMode } from './components/ConeFilter.tsx'
-import { MapControls } from './components/MapControls.tsx'
-import { OverflowMenu } from './components/OverflowMenu.tsx'
-import { SpotsPanel } from './components/SpotsPanel.tsx'
-import { MapView, type MapHandle, type TapMode } from './components/MapView.tsx'
-import { TimeScrubber } from './components/TimeScrubber.tsx'
-import { NavBar, type Tab } from './components/NavBar.tsx'
-import { PlanPanel } from './components/PlanPanel.tsx'
-import { PositionCard } from './components/PositionCard.tsx'
-import { SearchField } from './components/SearchField.tsx'
-import { ShotList } from './components/ShotList.tsx'
-import { SunReadout } from './components/SunReadout.tsx'
-import { TideReadout } from './components/TideReadout.tsx'
+import { useCallback, useMemo, useRef, useState } from 'react'
+import { type ConeMode } from './components/ConeFilter.tsx'
+import { type MapHandle, type TapMode } from './components/MapView.tsx'
+import { ModeRail } from './components/ModeRail.tsx'
+import { PlanMode } from './components/PlanMode.tsx'
+import { SetupMode } from './components/SetupMode.tsx'
 import type { LatLon } from './core/geo.ts'
 import { DEFAULT_KIT } from './core/kit.ts'
 import { EMPTY_LANDCOVER, type Landcover } from './core/siting.ts'
@@ -52,6 +42,14 @@ import {
 import { usePersistentState } from './lib/usePersistentState.ts'
 import { useTide } from './lib/useTide.ts'
 import {
+  blockedReason,
+  canEnter,
+  FORWARD_LABEL,
+  nextMode,
+  type Mode,
+  type ModeAvailability,
+} from './lib/mode.ts'
+import {
   CALIBRATION_VENUE,
   hasErrors,
   resolveWindow,
@@ -83,14 +81,15 @@ function App() {
     (raw) => reviveSelection(raw, DEFAULT_KIT),
   )
 
-  const [tab, setTab] = useState<Tab>('plan')
-  const [sheet, setSheet] = useState<SheetState>('peek')
-  const [sheetHeight, setSheetHeight] = useState(108)
-  const [mode, setMode] = useState<TapMode>(null)
+  /*
+   * THE ONE NAVIGATION STATE. Three modes on a time axis, replacing five tabs
+   * plus three sheet detents plus accordions. The sheet keeps its own state
+   * inside PlanMode, because it is a detail of that mode rather than of the app.
+   */
+  const [mode, setMode] = useState<Mode>('setup')
+  const [tapMode, setTapMode] = useState<TapMode>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [submitAttempted, setSubmitAttempted] = useState(false)
-  const [pitch, setPitch] = useState(0)
-  const [venueOpen, setVenueOpen] = useState(false)
   const [showSun, setShowSun] = useState(true)
   const [showArc, setShowArc] = useState(false)
   const [coneMode, setConeMode] = useState<ConeMode>('none')
@@ -106,23 +105,6 @@ function App() {
   const [spots, setSpots] = usePersistentState<Spot[]>(SPOTS_STORAGE_KEY, [], reviveSpots)
 
   const mapHandle = useRef<MapHandle>(null)
-
-  /*
-   * The cone filter, the scrubber and the nav bar stack at the bottom. Their
-   * combined height is MEASURED rather than assembled from per-bar tokens:
-   * the scrubber's real height is set by its own content, and a token that said
-   * 62px while it rendered at 93px silently put it on top of the chips.
-   */
-  const dock = useRef<HTMLDivElement>(null)
-  const [dockHeight, setDockHeight] = useState(0)
-  useEffect(() => {
-    const node = dock.current
-    if (node === null) return
-    const observer = new ResizeObserver(() => setDockHeight(node.offsetHeight))
-    observer.observe(node)
-    setDockHeight(node.offsetHeight)
-    return () => observer.disconnect()
-  }, [])
 
   const errors = useMemo(() => validateVenue(venue), [venue])
   const venueWindow = useMemo(() => resolveWindow(venue), [venue])
@@ -299,22 +281,17 @@ function App() {
     setPositions(spot.positions)
     setBriefAnchor(null)
     setGeneration({ status: 'idle' })
-    setTab('plan')
-    setSheet('peek')
+    setMode('setup')
   }
 
   const onGenerate = async () => {
     setSubmitAttempted(true)
-    if (hasErrors(errors)) {
-      setTab('plan')
-      setVenueOpen(true)
-      setSheet('full')
-      return
-    }
-    // Refuse to plan the wrong event.
-    if (staleBrief) {
-      setTab('plan')
-      setSheet('half')
+    /*
+     * An incomplete venue or a stale brief is a SETUP problem, so send the user
+     * back to the step that owns it rather than opening a panel over the map.
+     */
+    if (hasErrors(errors) || staleBrief) {
+      setMode('setup')
       return
     }
 
@@ -323,7 +300,6 @@ function App() {
      * sheet says is what the app is actually waiting on. See GENERATE_STAGES.
      */
     setGeneration({ status: 'working', stage: 'capture' })
-    setSheet('peek')
 
     /*
      * OVERPASS AND THE IMAGE ENCODE RUN TOGETHER.
@@ -342,7 +318,6 @@ function App() {
     const viewport = mapHandle.current?.viewport() ?? null
     if (viewport === null) {
       setGeneration({ status: 'error', message: 'The map is not ready yet.' })
-      setSheet('half')
       return
     }
 
@@ -358,7 +333,6 @@ function App() {
       // The in-flight request is left to settle on its own; it caches either way.
       void sitePending
       setGeneration({ status: 'error', message: 'The map is not ready yet.' })
-      setSheet('half')
       return
     }
 
@@ -463,20 +437,9 @@ function App() {
     setLensFilters([])
     setIsolatedId(null)
     setGeneration({ status: 'done', count: parsed.positions.length, dropped: parsed.dropped })
-    /*
-     * Stay on the map with the sheet at peek and frame everything. Jumping to
-     * the shot list at half height used to bury a third of the new positions
-     * under the sheet, where they could not be seen or dragged.
-     */
-    setSheet('peek')
+    // Stay on the map and frame everything that was just placed.
     const placed = coords.filter((c) => c !== undefined)
     window.setTimeout(() => mapHandle.current?.fitAll([...placed, ...(aim ? [aim] : [])]), 60)
-  }
-
-  const onTab = (next: Tab) => {
-    setTab(next)
-    // Sun is a full screen readout over a dimmed map; the rest keep the map live.
-    setSheet(next === 'conditions' ? 'full' : sheet === 'peek' ? 'half' : sheet)
   }
 
   const flyToPosition = (id: string) => {
@@ -503,207 +466,154 @@ function App() {
       ? 'No venue set'
       : `${venue.startTime}–${venue.endTime}${zoneSuffix} · ${venueShort}`
 
-  return (
-    <div
-      className="shell"
-      /* Drives the bottom offset of maplibre's own controls, so they ride up
-         with the sheet instead of being covered by it. */
-      style={
-        {
-          ['--sheet-live-height' as string]: `${sheetHeight}px`,
-          ['--dock-height' as string]: `${dockHeight}px`,
-        } as React.CSSProperties
-      }
-    >
-      <MapView
-        handle={mapHandle}
-        venue={centre}
-        onVenueChange={onVenueChange}
-        subject={aim}
-        onSubjectChange={setSubject}
-        mode={mode}
-        plan={visiblePlan}
-        conePlan={conePlan}
-        onPositionMove={onPositionMove}
-        onLongPress={onLongPress}
-        sunAzimuth={sun === null ? null : sun.azimuth}
-        sunOverlay={sunOverlay}
-        showSun={showSun}
-        showArc={showArc}
-        selectedId={selectedId}
-        onSelect={onSelectPosition}
-        onPitchChange={setPitch}
-        bottomInset={sheetHeight}
-      />
+  /* Which steps are reachable. See src/lib/mode.ts. */
+  const available: ModeAvailability = {
+    venueReady: !hasErrors(errors),
+    hasPlan: plan.length > 0,
+  }
 
-      {tab === 'conditions' ? <div className="scrim" /> : null}
+  const goTo = (next: Mode) => {
+    if (canEnter(next, available) || next === mode) setMode(next)
+  }
 
-      <header className="hud">
-        <SearchField onPick={onPick} />
-        <div className="hud__row">
-          {sun === null ? null : (
-            <p className="hud__sun">
-              <span className="hud__sun-label">Sun</span>
-              <span className="num">{sun.azimuth.toFixed(1)}°</span>
-              <span className="num">{sun.altitude.toFixed(1)}° alt</span>
-            </p>
-          )}
-          <OverflowMenu
-            mode={mode}
-            onMode={setMode}
-            showArc={showArc}
-            onShowArc={setShowArc}
-          />
-        </div>
-      </header>
+  const forward = nextMode(mode)
+  const forwardLabel = FORWARD_LABEL[mode]
+  const forwardBlocked = forward === null ? null : blockedReason(forward, available)
 
-      <MapControls
-        showSun={showSun}
-        onShowSun={setShowSun}
-        pitch={pitch}
-        onPitch={(next) => mapHandle.current?.setPitch(next)}
-        onZoom={(delta) => mapHandle.current?.zoomBy(delta)}
-        onFitAll={() => mapHandle.current?.fitAll(fitTargets)}
-        canFitAll={fitTargets.length > 0}
-      />
+  /*
+   * The forward control. Large, singular, and at the bottom of whatever mode you
+   * are in, so moving on reads as finishing a step rather than changing channel.
+   * When the next step is not earned yet it says why instead of vanishing.
+   */
+  const forwardBar =
+    forward === null || forwardLabel === null ? null : (
+      <div className="forward">
+        {forwardBlocked === null ? null : (
+          <p className="forward__why">{forwardBlocked}</p>
+        )}
+        <button
+          type="button"
+          className="btn btn--primary forward__btn"
+          disabled={forwardBlocked !== null}
+          onClick={() => goTo(forward)}
+        >
+          {forwardLabel}
+        </button>
+      </div>
+    )
 
-      {selected === null ? null : (
-        <PositionCard
-          planned={selected}
-          shootAt={scrubbedAt}
-          timeZone={venueWindow?.timeZone ?? null}
-          tide={tideNow}
-          onClose={() => setSelectedId(null)}
-        />
-      )}
+  const rail = <ModeRail mode={mode} available={available} onMode={goTo} />
 
-      <BottomSheet
-        state={sheet}
-        onStateChange={setSheet}
-        onHeightChange={setSheetHeight}
-        reservedBottom={dockHeight}
-        peek={
-          <div className="peek">
-            {/*
-              * Generate collapses the sheet to peek, so this row is the only thing
-              * on screen for the whole wait. While working it carries the step
-              * rather than a stale venue summary next to a dead button.
-              */}
-            <button
-              type="button"
-              className="peek__summary"
-              onClick={() => setSheet(sheet === 'peek' ? 'half' : 'peek')}
-            >
-              {generation.status === 'working' ? (
-                <>
-                  <span className="peek__label">
-                    Generating · step {stageIndex(generation.stage) + 1} of{' '}
-                    {GENERATE_STAGES.length}
-                  </span>
-                  <span className="peek__line">{stageLabel(generation.stage)}</span>
-                </>
-              ) : (
-                <>
-                  <span className="peek__label">{tab === 'plan' ? 'Shoot setup' : tab}</span>
-                  <span className="peek__line">{summary}</span>
-                </>
-              )}
-            </button>
-            <button
-              type="button"
-              className="btn btn--primary"
-              onClick={onGenerate}
-              disabled={generation.status === 'working'}
-            >
-              {generation.status === 'working' ? 'Working' : 'Generate'}
-            </button>
-          </div>
+  const peekStatus =
+    generation.status === 'working'
+      ? {
+          label: `Generating · step ${stageIndex(generation.stage) + 1} of ${GENERATE_STAGES.length}`,
+          line: stageLabel(generation.stage),
         }
-      >
-        {tab === 'plan' ? (
-          <PlanPanel
+      : { label: 'Shoot setup', line: summary }
+
+  return (
+    <div className={`shell shell--${mode}`}>
+      {mode === 'setup' ? (
+        <div className="mode-setup">
+          <SetupMode
             venue={venue}
             errors={errors}
             onVenueChange={onVenueDraftChange}
-            venueOpen={venueOpen}
-            onVenueToggle={() => setVenueOpen((open) => !open)}
             revealAllErrors={submitAttempted}
-            generation={generation}
-            planCoverage={plan.length === 0 ? null : planCoverage}
-            siteNote={siteNote}
             staleBrief={staleBrief}
             drift={drift}
             onClearBrief={clearBrief}
             onKeepBrief={keepBrief}
-          />
-        ) : null}
-
-        {tab === 'shots' ? (
-          <ShotList
-            plan={visiblePlan}
-            planCoverage={plan.length === 0 ? null : planCoverage}
-            selectedId={selectedId}
-            onPick={flyToPosition}
-          />
-        ) : null}
-
-        {tab === 'conditions' ? (
-          <>
-            <SunReadout venueWindow={venueWindow} open onToggle={() => {}} />
-            <TideReadout
-              tide={tide}
-              venueWindow={venueWindow}
-              scrubbedAt={scrubbedAt}
-              open
-              onToggle={() => {}}
-            />
-          </>
-        ) : null}
-
-        {tab === 'kit' ? (
-          <KitProfile value={kit} onChange={setKit} open onToggle={() => {}} />
-        ) : null}
-
-        {tab === 'spots' ? (
-          <SpotsPanel
+            kit={kit}
+            onKit={setKit}
             spots={spots}
-            onSave={saveSpot}
-            onLoad={loadSpot}
-            onDelete={(id) => setSpots(spots.filter((spot) => spot.id !== id))}
-            onImport={(incoming) => setSpots(mergeSpots(spots, incoming))}
+            onSaveSpot={saveSpot}
+            onLoadSpot={loadSpot}
+            onDeleteSpot={(id) => setSpots(spots.filter((spot) => spot.id !== id))}
+            onImportSpots={(incoming) => setSpots(mergeSpots(spots, incoming))}
             suggestedName={venue.name.split(',')[0] ?? ''}
             canSave={centre !== null}
           />
-        ) : null}
-      </BottomSheet>
+          <div className="mode__foot">
+            {forwardBar}
+            {rail}
+          </div>
+        </div>
+      ) : null}
 
-      <div className="dock" ref={dock}>
-        <ConeFilter
+      {mode === 'plan' ? (
+        <PlanMode
+          mapHandle={mapHandle}
+          venue={centre}
+          onVenueChange={onVenueChange}
+          subject={aim}
+          onSubjectChange={setSubject}
+          onLongPress={onLongPress}
+          tapMode={tapMode}
+          onTapMode={setTapMode}
           plan={plan}
+          visiblePlan={visiblePlan}
+          conePlan={conePlan}
+          planCoverage={plan.length === 0 ? null : planCoverage}
+          onPositionMove={onPositionMove}
+          sun={sun}
+          sunOverlay={sunOverlay}
+          showSun={showSun}
+          onShowSun={setShowSun}
+          showArc={showArc}
+          onShowArc={setShowArc}
+          selectedId={selectedId}
+          onSelect={onSelectPosition}
+          selected={selected}
+          onFlyTo={flyToPosition}
           coneMode={coneMode}
           onConeMode={setConeMode}
           lensFilters={lensFilters}
           onLensFilters={setLensFilters}
           isolatedId={isolatedId}
           onClearIsolate={() => setIsolatedId(null)}
+          venueWindow={venueWindow}
+          scrubbedAt={scrubbedAt}
+          scrub={scrub}
+          onScrub={setScrub}
+          tide={tide}
+          tideNow={tideNow}
+          tideExtremes={tideExtremes}
+          generation={generation}
+          siteNote={siteNote}
+          onGenerate={onGenerate}
+          onSearchPick={onPick}
+          summary={summary}
+          peekStatus={peekStatus}
+          fitTargets={fitTargets}
+          footer={
+            <div className="mode__foot mode__foot--overlay">
+              {forwardBar}
+              {rail}
+            </div>
+          }
         />
+      ) : null}
 
-        {venueWindow === null || scrubbedAt === null || sun === null ? null : (
-          <TimeScrubber
-            start={venueWindow.start}
-            end={venueWindow.end}
-            value={scrub}
-            onChange={setScrub}
-            at={scrubbedAt}
-            sun={sun}
-            timeZone={venueWindow.timeZone}
-            timeZoneAbbr={venueWindow.timeZoneShort}
-            tideExtremes={tideExtremes}
-          />
-        )}
-
-        <NavBar tab={tab} onTab={onTab} shotCount={plan.length} />
-      </div>
+      {mode === 'field' ? (
+        <div className="mode-field">
+          {/*
+            * FIELD is the next pass. The step exists and is reachable only once
+            * there is a plan, but the arm's length card, the GPS walk-to and the
+            * offline pack are deliberately not half built here: this pass is the
+            * restructure, and it stays provably behaviour preserving.
+            */}
+          <div className="page">
+            <p className="notice">
+              Field mode is the next pass. It will show one position at a time, full
+              screen, with the heading to point the camera and a walk-to distance
+              from your GPS, cached so it works without signal.
+            </p>
+          </div>
+          <div className="mode__foot">{rail}</div>
+        </div>
+      ) : null}
     </div>
   )
 }

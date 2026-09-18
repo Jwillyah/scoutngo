@@ -1,19 +1,26 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 
-export type SheetState = 'peek' | 'half' | 'full'
+/*
+ * Two stops, not three.
+ *
+ * The old sheet had peek, half and full, which meant the same content could be
+ * in three states while ALSO being inside an accordion inside a tab. One of
+ * those three reveal mechanisms had to survive and the other two had to go: the
+ * sheet survives because the map underneath has to stay visible, and it is
+ * reduced to open or shut so there is nothing to learn about it.
+ */
+export type SheetState = 'peek' | 'open'
 
 const PEEK_PX = 108
-const HALF_FRACTION = 0.5
-const FULL_FRACTION = 0.92
+const OPEN_FRACTION = 0.72
 
 /** Resolved pixel height of each stop, against the current viewport. */
 function heightFor(state: SheetState, viewport: number): number {
-  if (state === 'peek') return PEEK_PX
-  return viewport * (state === 'half' ? HALF_FRACTION : FULL_FRACTION)
+  return state === 'peek' ? PEEK_PX : viewport * OPEN_FRACTION
 }
 
 function nearestState(height: number, viewport: number): SheetState {
-  const stops: SheetState[] = ['peek', 'half', 'full']
+  const stops: SheetState[] = ['peek', 'open']
   return stops.reduce((best, stop) =>
     Math.abs(heightFor(stop, viewport) - height) < Math.abs(heightFor(best, viewport) - height)
       ? stop
@@ -34,9 +41,8 @@ interface BottomSheetProps {
 }
 
 /**
- * The setup form lives here, over the map. The map stays visible and
- * interactive at peek and half. Dragging the grab bar snaps to the nearest of
- * the three stops; tapping it steps up and wraps back to peek from full.
+ * The plan detail lives here, over the map, which stays visible at peek.
+ * Dragging the grab bar snaps to whichever stop is nearer; tapping it toggles.
  */
 export function BottomSheet({
   state,
@@ -77,7 +83,7 @@ export function BottomSheet({
     (event: React.PointerEvent) => {
       if (drag.current === null) return
       const next = drag.current.startHeight + (drag.current.startY - event.clientY)
-      setDragHeight(Math.min(viewport * FULL_FRACTION, Math.max(PEEK_PX, next)))
+      setDragHeight(Math.min(viewport * OPEN_FRACTION, Math.max(PEEK_PX, next)))
     },
     [viewport],
   )
@@ -91,7 +97,7 @@ export function BottomSheet({
   }, [dragHeight, onStateChange, viewport])
 
   const step = () => {
-    onStateChange(state === 'peek' ? 'half' : state === 'half' ? 'full' : 'peek')
+    onStateChange(state === 'peek' ? 'open' : 'peek')
   }
 
   return (

@@ -2,12 +2,10 @@ import { altitudeNote, type AltitudeNote } from '../core/lighting.ts'
 import { getSunPosition, type SunPosition } from '../core/sun.ts'
 import { formatClock } from '../core/timezone.ts'
 import type { VenueWindow } from '../lib/venue.ts'
-import { Section } from './Section.tsx'
+import { Panel } from './Panel.tsx'
 
 interface SunReadoutProps {
   venueWindow: VenueWindow | null
-  open: boolean
-  onToggle: () => void
 }
 
 const COMPASS_POINTS = [
@@ -40,23 +38,17 @@ function sample(key: string, label: string, at: Date, lat: number, lon: number):
   return { key, label, at, sun, note: altitudeNote(sun.altitude) }
 }
 
-export function SunReadout({ venueWindow, open, onToggle }: SunReadoutProps) {
+export function SunReadout({ venueWindow }: SunReadoutProps) {
   if (venueWindow === null) {
     return (
-      <Section
-        index="03"
-        title="Sun through the window"
-        summary="Waiting on the venue"
-        open={open}
-        onToggle={onToggle}
-      >
+      <Panel index="03" title="Sun through the window">
         <div className="readout">
           <p className="readout__empty">
             Enter a valid latitude, longitude, date, and time window above. The
             readout computes as soon as they are all good.
           </p>
         </div>
-      </Section>
+      </Panel>
     )
   }
 
@@ -71,13 +63,7 @@ export function SunReadout({ venueWindow, open, onToggle }: SunReadoutProps) {
   const notes = [...new Set(samples.map((s) => s.note))]
 
   return (
-    <Section
-      index="03"
-      title="Sun through the window"
-      summary={`mid-window azimuth ${degrees(samples[1].sun.azimuth)} · ${venueWindow.timeZoneLabel}`}
-      open={open}
-      onToggle={onToggle}
-    >
+    <Panel index="03" title="Sun through the window">
       <p className="section__note">
         Computed by the solar core, not asserted by anything else. This is the
         layer every later claim about light gets checked against.
@@ -172,6 +158,6 @@ export function SunReadout({ venueWindow, open, onToggle }: SunReadoutProps) {
           ) : null}
         </div>
       </div>
-    </Section>
+    </Panel>
   )
 }

@@ -5,27 +5,13 @@ import {
   type GenerationState,
 } from '../lib/planRequest.ts'
 import type { PlanCoverage } from '../lib/plan.ts'
-import type { VenueDraft, VenueErrors } from '../lib/venue.ts'
 import { CoverageNotice } from './CoverageNotice.tsx'
-import { VenueForm } from './VenueForm.tsx'
 
-interface PlanPanelProps {
-  venue: VenueDraft
-  errors: VenueErrors
-  onVenueChange: (next: VenueDraft) => void
-  venueOpen: boolean
-  onVenueToggle: () => void
-  revealAllErrors: boolean
+interface PlanStatusProps {
   generation: GenerationState
-  /** How well the plan covers the subject. Null until there are positions. */
   planCoverage: PlanCoverage | null
   /** Set when Overpass could not be reached, so siting was not checked. */
   siteNote: string | null
-  /** The venue has moved far from where the brief text was written. */
-  staleBrief: boolean
-  drift: string
-  onClearBrief: () => void
-  onKeepBrief: () => void
 }
 
 /**
@@ -72,48 +58,16 @@ function RawResponse({ reason, raw }: { reason: string; raw: string }) {
   )
 }
 
-export function PlanPanel({
-  venue,
-  errors,
-  onVenueChange,
-  venueOpen,
-  onVenueToggle,
-  revealAllErrors,
-  generation,
-  planCoverage,
-  siteNote,
-  staleBrief,
-  drift,
-  onClearBrief,
-  onKeepBrief,
-}: PlanPanelProps) {
+/**
+ * What the last generate did, and how good the resulting plan is.
+ *
+ * Split out of the old PlanPanel, which also carried the venue form and the
+ * stale brief guard. Those are SETUP concerns, decided at home; this is about
+ * the work and stays with the map.
+ */
+export function PlanStatus({ generation, planCoverage, siteNote }: PlanStatusProps) {
   return (
     <>
-      {/*
-        * The brief is text about one specific place. Moving the venue does not
-        * make it wrong automatically, but it does make it suspect, and only the
-        * shooter can say which. So this blocks Generate until it is answered,
-        * and never edits the text on its own.
-        */}
-      {!staleBrief ? null : (
-        <div className="stale">
-          <p className="stale__head">This brief may be about somewhere else</p>
-          <p className="stale__body">
-            The venue has moved <span className="num">{drift}</span> from where this
-            event description was written. Generating now would plan the old event
-            at the new place.
-          </p>
-          <div className="btn-row">
-            <button type="button" className="btn btn--small btn--primary" onClick={onClearBrief}>
-              Clear the brief
-            </button>
-            <button type="button" className="btn btn--small" onClick={onKeepBrief}>
-              Keep it, still applies
-            </button>
-          </div>
-        </div>
-      )}
-
       {generation.status === 'working' ? <GenerateProgress stage={generation.stage} /> : null}
 
       {generation.status === 'error' ? (
@@ -137,15 +91,6 @@ export function PlanPanel({
       {generation.status === 'raw' ? (
         <RawResponse reason={generation.reason} raw={generation.raw} />
       ) : null}
-
-      <VenueForm
-        value={venue}
-        errors={errors}
-        onChange={onVenueChange}
-        open={venueOpen}
-        onToggle={onVenueToggle}
-        revealAllErrors={revealAllErrors}
-      />
     </>
   )
 }

@@ -5,14 +5,12 @@ import {
   type VenueErrors,
   type VenueField,
 } from '../lib/venue.ts'
-import { Group, Section } from './Section.tsx'
+import { Group, Panel } from './Panel.tsx'
 
 interface VenueFormProps {
   value: VenueDraft
   errors: VenueErrors
   onChange: (next: VenueDraft) => void
-  open: boolean
-  onToggle: () => void
   /**
    * Set when a submit has been attempted, which reveals every outstanding error
    * at once. The generate button will drive this. Until then, errors surface
@@ -55,8 +53,6 @@ export function VenueForm({
   value,
   errors,
   onChange,
-  open,
-  onToggle,
   revealAllErrors = false,
 }: VenueFormProps) {
   /*
@@ -89,19 +85,8 @@ export function VenueForm({
     setTouched([])
   }
 
-  const summary =
-    value.name.trim() === ''
-      ? 'Not set'
-      : `${value.name} · ${value.latitude}, ${value.longitude} · ${value.date} ${value.startTime} to ${value.endTime}`
-
   return (
-    <Section
-      index="01"
-      title="Venue and window"
-      summary={summary}
-      open={open}
-      onToggle={onToggle}
-    >
+    <Panel index="01" title="Venue and window">
       <div className="btn-row">
         <button type="button" className="btn btn--small" onClick={loadCalibration}>
           Load calibration venue
@@ -255,6 +240,6 @@ export function VenueForm({
           </Field>
         </div>
       </Group>
-    </Section>
+    </Panel>
   )
 }

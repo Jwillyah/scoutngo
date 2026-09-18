@@ -1,42 +1,31 @@
 import type { ReactNode } from 'react'
 
-interface SectionProps {
+interface PanelProps {
   /** Chart panel number, shown in the monospace variant. */
   index: string
   title: string
-  /** Shown in the banner when collapsed, so the header carries the state. */
-  summary?: ReactNode
-  open: boolean
-  onToggle: () => void
   children: ReactNode
 }
 
-export function Section({ index, title, summary, open, onToggle, children }: SectionProps) {
-  const bodyId = `section-${index}-body`
-
+/**
+ * A titled block of content. Always open.
+ *
+ * REPLACES the Section accordion. The old shell had three ways to reveal things
+ * at once, tabs and a draggable sheet and accordions inside it, so finding a
+ * field meant guessing which of the three was hiding it. Content is now either
+ * on the screen you are on or it is one deliberate control away, never folded
+ * inside something that is itself folded.
+ */
+export function Panel({ index, title, children }: PanelProps) {
   return (
     <section className="section">
       <h2 className="section__heading">
-        <button
-          type="button"
-          className="section__banner"
-          aria-expanded={open}
-          aria-controls={bodyId}
-          onClick={onToggle}
-        >
+        <div className="section__banner section__banner--static">
           <span className="section__index num">{index}</span>
           <span className="section__title">{title}</span>
-          <span className="section__caret" aria-hidden="true">
-            {open ? '▲' : '▼'}
-          </span>
-          {!open && summary !== undefined ? (
-            <span className="section__summary">{summary}</span>
-          ) : null}
-        </button>
+        </div>
       </h2>
-      <div className="section__body" id={bodyId} hidden={!open}>
-        {children}
-      </div>
+      <div className="section__body">{children}</div>
     </section>
   )
 }

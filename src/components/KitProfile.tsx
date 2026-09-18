@@ -1,13 +1,11 @@
 import { computeFOV, SENSORS } from '../core/fov.ts'
 import { DEFAULT_KIT, resolveSensor, type Body, type Lens } from '../core/kit.ts'
 import { defaultSelection, toggleId, type KitSelection } from '../lib/kitSelection.ts'
-import { Group, Section } from './Section.tsx'
+import { Group, Panel } from './Panel.tsx'
 
 interface KitProfileProps {
   value: KitSelection
   onChange: (next: KitSelection) => void
-  open: boolean
-  onToggle: () => void
 }
 
 const oneDecimal = (n: number) => n.toFixed(1)
@@ -73,14 +71,11 @@ function droneMeta(drone: (typeof DEFAULT_KIT.drones)[number]): string {
   return `${drone.weightGrams}g · ${cameras}`
 }
 
-export function KitProfile({ value, onChange, open, onToggle }: KitProfileProps) {
+export function KitProfile({ value, onChange }: KitProfileProps) {
   const bodies = activeBodies(value.bodyIds)
-  const summary =
-    `${value.bodyIds.length} bodies, ${value.lensIds.length} lenses, ` +
-    `${value.droneIds.length} air`
 
   return (
-    <Section index="02" title="Kit and style" summary={summary} open={open} onToggle={onToggle}>
+    <Panel index="02" title="Kit and style">
       <p className="section__note">
         What is actually coming with you. Saved in this browser only, on this
         device. Nothing is sent anywhere.
@@ -164,6 +159,6 @@ export function KitProfile({ value, onChange, open, onToggle }: KitProfileProps)
           Reset to default kit
         </button>
       </div>
-    </Section>
+    </Panel>
   )
 }
