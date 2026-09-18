@@ -75,7 +75,18 @@ export interface MapCapture {
   camera: CameraState
 }
 
+/** The cheap half of a capture: everything except the image encode. */
+export type MapViewport = Omit<MapCapture, 'dataUrl' | 'mediaType'>
+
 export interface MapHandle {
+  /**
+   * Bounds, camera and canvas size, WITHOUT encoding the image.
+   *
+   * Split out from capture() so the Overpass request can be sent before the
+   * JPEG encode starts: Overpass only needs the bounding box, and waiting for a
+   * ~65ms canvas encode before opening that socket is pure serial dead time.
+   */
+  viewport(): MapViewport | null
   /** Grabs the current view as a JPEG plus everything needed to invert it later. */
   capture(): MapCapture | null
   /**
@@ -521,6 +532,30 @@ export function MapView({
   useImperativeHandle(
     handle,
     (): MapHandle => ({
+      viewport() {
+        const instance = map.current
+        if (instance === null) return null
+        const canvas = instance.getCanvas()
+        const bounds = instance.getBounds()
+        const centre = instance.getCenter()
+        return {
+          bounds: {
+            west: bounds.getWest(),
+            south: bounds.getSouth(),
+            east: bounds.getEast(),
+            north: bounds.getNorth(),
+          },
+          width: canvas.clientWidth,
+          height: canvas.clientHeight,
+          camera: {
+            center: [centre.lng, centre.lat],
+            zoom: instance.getZoom(),
+            bearing: instance.getBearing(),
+            pitch: instance.getPitch(),
+          },
+        }
+      },
+
       capture() {
         const instance = map.current
         if (instance === null) return null

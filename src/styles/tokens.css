@@ -7,9 +7,14 @@
  * THREE SEPARATE PALETTES. Do not mix them.
  *
  * 1. CHROME. Near-black surfaces, off-white type, one accent.
- *    ACCENT is electric lime. Primary action and active states ONLY. It is not
- *    a decorative color and it never fills a panel.
- *    HAZARD is magenta. Airspace and warnings ONLY.
+ *    ACCENT is SIGNAL WHITE. Primary action, active state, selected chip,
+ *    Generate. Nothing else. White is the answer to "what do I tap": if it is
+ *    white it is interactive, and if it is interactive it is white. It never
+ *    fills a panel and it never marks a status.
+ *    HAZARD is RED, and red means hazard and NOTHING else. Not a lighting class,
+ *    not an accent, not a decorative rule. A red thing on this screen is a thing
+ *    that is wrong: standing in water, standing in a road, a frame that swallows
+ *    the venue, a drone path over people.
  *
  * 2. DATA OVERLAY. The lighting classes and the sun. These sit on the map, are
  *    computed by src/core/, and are hard edged with no rounding.
@@ -19,7 +24,13 @@
  *
  * READABILITY RULES, non negotiable, this is used outdoors in sun:
  * - Numeric readouts are monospace at full opacity on a SOLID surface. Never
- *   frosted glass, never a low opacity fill behind a number.
+ *   frosted glass, never a low opacity fill behind a number, and never `opacity`
+ *   on an element that contains one. To quieten a number, use a dimmer COLOR
+ *   token. Opacity multiplies against whatever is behind it, which on satellite
+ *   imagery is unpredictable; a flat color is not.
+ * - LABEL AND NUMBER ARE DIFFERENT SIZES, deliberately far apart. The label is
+ *   small, uppercase and widely tracked; the number is large and heavy. At arm's
+ *   length in sun you read the number first and the label only if you need it.
  * - Rounding is allowed on floating panels only, at --radius-panel. The map and
  *   every data overlay stay hard edged at --radius-flat.
  * - No gradients. No shadows for depth, only a hairline to separate surfaces.
@@ -31,26 +42,41 @@
   color-scheme: dark;
 
   /* ------------------------------------------------------ chrome palette */
-  --black: #0a0b09; /* deepest, the sheet grab area and scrims */
-  --surface-1: #121412; /* floating panels, the bottom sheet */
-  --surface-2: #1c1f1c; /* inputs and rows inside a panel */
-  --surface-3: #2a2e29; /* hairlines and dividers */
-  --white: #f4f6f1; /* primary type */
-  --grey-1: #b6bcb2; /* secondary type */
-  --grey-2: #7f867c; /* faint type, placeholders */
+  /* Neutral near-black, with no green or blue cast. Satellite imagery carries
+     every hue there is, and chrome that leans warm or cool fights it. */
+  --black: #0b0b0b; /* deepest, the sheet grab area and scrims */
+  --surface-1: #141414; /* floating panels, the bottom sheet */
+  --surface-2: #1c1c1c; /* inputs and rows inside a panel */
+  --surface-3: #2b2b2b; /* hairlines and dividers */
+  /* The top edge of a panel catches the light, one hairline brighter than the
+     panel. It is what separates a floating surface from the map without a
+     shadow, which this design does not use. */
+  --edge-top: #3a3a3a;
+  --white: #ffffff; /* primary type, and the accent */
+  --grey-1: #b4b4b4; /* secondary type */
+  --grey-2: #7d7d7d; /* faint type, placeholders */
 
-  --accent: #d6f84c; /* electric lime. primary action, active state. nothing else */
-  --accent-ink: #101208; /* type on top of the accent */
+  --accent: #ffffff; /* SIGNAL WHITE. primary action, active state. nothing else */
+  --accent-ink: #0b0b0b; /* type on top of the accent */
 
-  --hazard: #bd0069; /* magenta. hazard only */
-  --hazard-tint: #2a0518;
+  --hazard: #ff3b30; /* RED. hazard only, and nothing else is red */
+  --hazard-tint: #2e0b08;
 
   /* -------------------------------------------------- data overlay palette */
-  /* Lighting classes, computed by src/core/lighting.ts. Deliberately not lime
-     and not magenta, so a cone can never be mistaken for a control or a warning. */
-  --light-front: #3ddc84; /* front-lit, sun behind the camera */
-  --light-side: #4db8ff; /* side-lit */
-  --light-back: #ff6b3d; /* backlit, shooting into the sun */
+  /*
+   * Lighting classes, computed by src/core/lighting.ts.
+   *
+   * HELD DELIBERATELY QUIET. These are status, not action, and they sit next to
+   * white controls: at full saturation they competed with the thing you are
+   * meant to tap. Muted enough to recede, far enough apart in hue to stay
+   * distinguishable in sun.
+   *
+   * Backlit is amber, NOT the orange-red it used to be. Red now means hazard and
+   * only hazard, and a backlit position is a creative option, not a problem.
+   */
+  --light-front: #5fb98a; /* front-lit, sun behind the camera */
+  --light-side: #5e9cc4; /* side-lit */
+  --light-back: #d08a5a; /* backlit, shooting into the sun */
   --sun: #ffd54a; /* current sun bearing */
   --sun-shadow: #9aa7ff; /* current shadow bearing */
   --sun-rise: #ffa04a; /* sunrise bearing */
@@ -72,6 +98,13 @@
   --color-text-faint: var(--grey-2);
   --color-line: var(--surface-3);
   --color-line-strong: var(--grey-2);
+  --color-edge-top: var(--edge-top);
+  /*
+   * The rule down the left of a computed panel. Grey on purpose: these blocks
+   * state a fact, they are not tappable, and using the accent for them would
+   * spend white on something that does nothing when pressed.
+   */
+  --color-rule-fact: var(--surface-3);
 
   --color-accent: var(--accent);
   --color-accent-ink: var(--accent-ink);
@@ -97,6 +130,17 @@
   --text-lg: 1.0625rem; /* 17 */
   --text-xl: 1.25rem; /* 20 */
 
+  /*
+   * LABELS AND NUMBERS ARE SEPARATE SCALES, and the gap between them is the
+   * point. A label is a small uppercase tag you read once; the number beside it
+   * is the thing you came for. Setting both at --text-sm made every readout a
+   * flat grey paragraph.
+   */
+  --text-label: 0.625rem; /* 10, uppercase, widely tracked */
+  --text-num-sm: 0.9375rem; /* 15, inline with prose */
+  --text-num: 1.125rem; /* 18, the standard readout */
+  --text-num-lg: 1.5rem; /* 24, the headline number on a card */
+
   --leading-tight: 1.1;
   --leading-normal: 1.4;
 
@@ -104,7 +148,8 @@
   --weight-medium: 600;
   --weight-heavy: 800;
 
-  --tracking-label: 0.08em;
+  --tracking-label: 0.14em; /* wide, because a 10px uppercase label needs air */
+  --tracking-num: -0.02em; /* monospace digits set tighter so a big number sits */
   --tracking-tight: -0.01em;
 
   /* -------------------------------------------------------------- spacing */

@@ -1,12 +1,18 @@
 import { useState } from 'react'
+import type { SightlineCloud } from '../core/cloud.ts'
+import { MIN_BEARING_RANGE_METERS } from '../core/coverage.ts'
 import type { FramingWarning } from '../core/fov.ts'
 import type { SiteWarning } from '../core/siting.ts'
+import { fetchSightlineCloud, type ForecastKind } from '../lib/forecast.ts'
 import { fetchGroundView, type GroundView } from '../lib/groundView.ts'
 import { FAA_CEILING_FEET } from '../lib/parsePlan.ts'
 import type { PlannedPosition } from '../lib/plan.ts'
 
 interface PositionCardProps {
   planned: PlannedPosition
+  /** The moment the scrubber is on, and the venue's zone. Null until resolved. */
+  shootAt: Date | null
+  timeZone: string | null
   onClose: () => void
 }
 
@@ -87,12 +93,140 @@ function GroundViewPanel({ planned }: { planned: PlannedPosition }) {
   )
 }
 
+type CloudState =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'ok'; cloud: SightlineCloud; kind: ForecastKind; hour: string }
+  | { status: 'unavailable'; reason: string }
+
+/**
+ * Cloud along this position's sightline. Opt in, per position, like ground view.
+ *
+ * Labelled as a FORECAST, never as a measurement, and labelled as recorded
+ * weather when the date has already passed, because those are different claims.
+ * The numbers come from a weather model over HTTP and the arithmetic over them
+ * from src/core/cloud.ts. No language model is asked, and none would be: a guess
+ * shaped like a forecast is the kind of plausible fiction this tool exists to
+ * avoid.
+ */
+function CloudPanel({
+  planned,
+  shootAt,
+  timeZone,
+}: {
+  planned: PlannedPosition
+  shootAt: Date | null
+  timeZone: string | null
+}) {
+  const [state, setState] = useState<CloudState>({ status: 'idle' })
+
+  if (shootAt === null || timeZone === null) return null
+
+  /*
+   * A position sitting ON the subject has no bearing to look down: bearingBetween
+   * of two identical points is an arbitrary number. Sampling cloud along it would
+   * return five real forecasts for a direction nobody is facing, which is a
+   * confident answer to a question that was never asked. Same reasoning as the
+   * coverage arithmetic in src/core/coverage.ts.
+   */
+  if (planned.subjectRangeMeters < MIN_BEARING_RANGE_METERS) {
+    return (
+      <p className="cloud__note">
+        This position sits on the subject, so there is no sightline to sample cloud
+        along. Move it off the subject to check the sky downrange.
+      </p>
+    )
+  }
+
+  const load = () => {
+    setState({ status: 'loading' })
+    fetchSightlineCloud(
+      [{ id: planned.position.id, from: planned.position.at, bearing: planned.cameraBearing }],
+      shootAt,
+      timeZone,
+    ).then((result) => {
+      if (result.status !== 'ok') {
+        setState({ status: 'unavailable', reason: result.reason })
+        return
+      }
+      const line = result.sightlines.find((s) => s.id === planned.position.id)
+      if (line === undefined) {
+        setState({ status: 'unavailable', reason: 'No forecast came back for this position.' })
+        return
+      }
+      setState({ status: 'ok', cloud: line.cloud, kind: result.kind, hour: result.hour })
+    })
+  }
+
+  if (state.status === 'idle') {
+    return (
+      <button type="button" className="btn btn--small" onClick={load}>
+        Cloud along the sightline
+      </button>
+    )
+  }
+
+  if (state.status === 'loading') {
+    return <p className="cloud__note">Checking cloud downrange…</p>
+  }
+
+  if (state.status === 'unavailable') {
+    return <p className="cloud__note">{state.reason}</p>
+  }
+
+  const { cloud, kind, hour } = state
+
+  return (
+    <div className="cloud">
+      <p className="cloud__head">
+        <span className="cloud__label">Sightline cloud</span>
+        <span className="cloud__verdict">{cloud.verdict}</span>
+      </p>
+
+      {/*
+        * Low cloud on its own line, because it is the layer that decides whether
+        * a low sun arrives at all. Mid and high sit underneath as context.
+        */}
+      <p className="cloud__low">
+        <span className="cloud__low-label">Low cloud, worst</span>
+        <span className="num">{Math.round(cloud.worstLow)}%</span>
+        {cloud.worstLowAtKm === null ? null : (
+          <span className="cloud__at num">at {cloud.worstLowAtKm}km</span>
+        )}
+      </p>
+
+      <ol className="cloud__samples">
+        {cloud.samples.map((sample) => (
+          <li className="cloud__sample" key={sample.distanceKm}>
+            <span className="cloud__km num">{sample.distanceKm}km</span>
+            <span className="cloud__layer num">{Math.round(sample.low)}</span>
+            <span className="cloud__layer cloud__layer--soft num">{Math.round(sample.mid)}</span>
+            <span className="cloud__layer cloud__layer--soft num">{Math.round(sample.high)}</span>
+          </li>
+        ))}
+      </ol>
+      <p className="cloud__legend">
+        Low · mid · high, percent, sampled along the camera bearing.
+      </p>
+
+      <p className="cloud__note">
+        {kind === 'forecast'
+          ? 'Forecast for'
+          : 'Recorded weather for'}{' '}
+        <span className="num">{hour.replace('T', ' ')}</span> venue local, from
+        Open-Meteo. A forecast is a prediction, not a measurement, and cloud at 40km
+        moves.
+      </p>
+    </div>
+  )
+}
+
 /**
  * The card behind a figure. Every number on it was computed by src/core/ from
  * the position's coordinates. The shot text is the only part a model will ever
  * supply, and it says nothing about light.
  */
-export function PositionCard({ planned, onClose }: PositionCardProps) {
+export function PositionCard({ planned, shootAt, timeZone, onClose }: PositionCardProps) {
   const {
     position,
     fov,
@@ -197,6 +331,8 @@ export function PositionCard({ planned, onClose }: PositionCardProps) {
       )}
 
       {position.risk === '' ? null : <p className="card__note">{position.risk}</p>}
+
+      <CloudPanel planned={planned} shootAt={shootAt} timeZone={timeZone} />
 
       {position.platform === 'air' ? null : <GroundViewPanel planned={planned} />}
     </aside>

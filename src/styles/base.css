@@ -56,9 +56,15 @@ button {
  * focal lengths, clock times. Never labels, never prose. Always full opacity on
  * a solid surface, so it survives direct sunlight.
  */
+/*
+ * Every numeric readout in the app. Monospace and tabular so digits do not
+ * shuffle as they tick, heavier and tighter than the prose around them, and at
+ * full opacity always: see the readability rules in tokens.css.
+ */
 .num {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0;
+  letter-spacing: var(--tracking-num);
+  font-weight: var(--weight-heavy);
   opacity: 1;
 }
