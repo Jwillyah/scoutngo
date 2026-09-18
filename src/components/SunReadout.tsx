@@ -1,3 +1,4 @@
+import { compassPoint } from '../core/field.ts'
 import { altitudeNote, type AltitudeNote } from '../core/lighting.ts'
 import { getSunPosition, type SunPosition } from '../core/sun.ts'
 import { formatClock } from '../core/timezone.ts'
@@ -6,15 +7,6 @@ import { Panel } from './Panel.tsx'
 
 interface SunReadoutProps {
   venueWindow: VenueWindow | null
-}
-
-const COMPASS_POINTS = [
-  'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
-  'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW',
-]
-
-function cardinal(degrees: number): string {
-  return COMPASS_POINTS[Math.round(degrees / 22.5) % 16]
 }
 
 const SHORT_NOTE: Record<AltitudeNote, string> = {
@@ -93,7 +85,7 @@ export function SunReadout({ venueWindow }: SunReadoutProps) {
           {samples.map((s) => (
             <div className="readout__cell" key={s.key}>
               <span className="readout__value num">{degrees(s.sun.azimuth)}</span>
-              <span className="readout__sub">{cardinal(s.sun.azimuth)}</span>
+              <span className="readout__sub">{compassPoint(s.sun.azimuth)}</span>
             </div>
           ))}
 
@@ -111,7 +103,7 @@ export function SunReadout({ venueWindow }: SunReadoutProps) {
           {samples.map((s) => (
             <div className="readout__cell" key={s.key}>
               <span className="readout__value num">{degrees(s.sun.shadowBearing)}</span>
-              <span className="readout__sub">{cardinal(s.sun.shadowBearing)}</span>
+              <span className="readout__sub">{compassPoint(s.sun.shadowBearing)}</span>
             </div>
           ))}
 

@@ -12,6 +12,257 @@
   overflow: hidden;
 }
 
+/* ------------------------------------------------------------------ field */
+
+/*
+ * Horizontal paging by scroll snap. The browser does the physics, it works with
+ * a thumb, a trackpad and the arrow keys, and there is no drag handler anywhere
+ * that could be mistaken for something editable.
+ */
+.fieldpager {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.fieldpager__track {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+.fieldpager__track::-webkit-scrollbar {
+  display: none;
+}
+
+.fieldpager__page {
+  flex: 0 0 100%;
+  width: 100%;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.fieldpager__nav {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--page-pad);
+  border-top: var(--line-hair) solid var(--color-line);
+}
+
+/* Large, because this is pressed with one hand while the other is on a controller. */
+.fieldpager__btn {
+  width: 64px;
+  height: 56px;
+  background: var(--color-panel);
+  color: var(--color-text);
+  border: var(--line-hair) solid var(--color-line);
+  border-top-color: var(--color-edge-top);
+  border-radius: var(--radius-panel);
+  font-size: var(--text-xl);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.fieldpager__btn:disabled {
+  color: var(--color-text-faint);
+}
+
+.fieldpager__dots {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.fieldpager__dot {
+  width: 10px;
+  height: 10px;
+  background: var(--color-line-strong);
+}
+
+.fieldpager__dot--on {
+  background: var(--color-accent);
+}
+
+/* ------------------------------------------------------------- field card */
+
+.fc {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--page-pad) var(--space-5);
+}
+
+.fc__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.fc__num {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  font-size: var(--field-stat);
+  font-weight: var(--weight-heavy);
+  padding: 2px 12px;
+  line-height: 1.2;
+}
+
+.fc__of,
+.fc__air {
+  font-size: var(--field-label);
+  letter-spacing: var(--tracking-label);
+  color: var(--color-text-muted);
+}
+
+.fc__air {
+  margin-left: auto;
+  color: var(--color-text);
+}
+
+/* The largest thing on the screen, and deliberately so. */
+.fc__shot {
+  margin: 0;
+  font-size: var(--field-shot);
+  font-weight: var(--weight-heavy);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+}
+
+.fc__block {
+  display: grid;
+  gap: 2px;
+}
+
+.fc__label {
+  margin: 0;
+  font-size: var(--field-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.fc__aim {
+  margin: 0;
+  font-size: var(--field-aim);
+  font-weight: var(--weight-heavy);
+  line-height: 1.05;
+}
+
+.fc__walk {
+  margin: 0;
+  font-size: var(--field-walk);
+  font-weight: var(--weight-heavy);
+  line-height: 1.05;
+}
+
+.fc__gps {
+  margin: 0;
+  font-size: var(--text-md);
+  color: var(--color-text-muted);
+}
+
+.fc__stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding-top: var(--space-2);
+  border-top: var(--line-hair) solid var(--color-line);
+}
+
+.fc__stats dt {
+  font-size: var(--field-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.fc__stats dd {
+  margin: 0;
+  font-size: var(--field-stat);
+  font-weight: var(--weight-heavy);
+  line-height: var(--leading-tight);
+}
+
+.fc__light {
+  margin: 0;
+  font-size: var(--field-walk);
+  font-weight: var(--weight-heavy);
+  line-height: 1.05;
+}
+
+.fc__light--front-lit { color: var(--light-front); }
+.fc__light--side-lit { color: var(--light-side); }
+.fc__light--backlit { color: var(--light-back); }
+
+/*
+ * The light has moved since the plan. Loud, because it is the one thing FIELD
+ * knows that the plan could not.
+ */
+/*
+ * The light has moved since the plan. Loud, because it is the one thing FIELD
+ * knows that the plan could not.
+ *
+ * BOXED, NOT FILLED. An accent fill would have been louder still, but tokens.css
+ * reserves white for things you press, and this is a statement, not a control.
+ * Heavy rules top and bottom carry the emphasis without spending the affordance.
+ */
+.fc__shift {
+  margin: 0;
+  padding: var(--space-3) 0;
+  border-top: var(--line-rule) solid var(--color-text);
+  border-bottom: var(--line-rule) solid var(--color-text);
+  color: var(--color-text);
+  font-size: var(--field-stat);
+  font-weight: var(--weight-heavy);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+}
+
+.fc__cond {
+  margin: 0;
+  font-size: var(--text-md);
+  color: var(--color-text-muted);
+}
+
+.fc__warn {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-hazard);
+  color: var(--white);
+  font-size: var(--field-stat);
+  font-weight: var(--weight-heavy);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+}
+
+.fc__ground {
+  min-height: 2rem;
+}
+
+.fc__img {
+  display: block;
+  width: 100%;
+  border: var(--line-hair) solid var(--color-line);
+}
+
+.fc__risk {
+  margin: 0;
+  padding-left: var(--space-3);
+  border-left: var(--line-rule) solid var(--color-line-strong);
+  font-size: var(--text-md);
+  color: var(--color-text-muted);
+}
+
 /* ------------------------------------------------------------------ modes */
 
 /*

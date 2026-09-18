@@ -136,6 +136,20 @@
    * is the thing you came for. Setting both at --text-sm made every readout a
    * flat grey paragraph.
    */
+  /*
+   * FIELD SCALE. Read at arm's length, outdoors, in sun, one handed, while also
+   * flying a drone. These are deliberately larger than looks comfortable on a
+   * desk: the desk is not where they are read.
+   *
+   * The order is fixed and is the design: the shot in plain words is the largest
+   * thing on the screen, then where to point the camera, then how far to walk.
+   */
+  --field-shot: 2.375rem; /* 38 */
+  --field-aim: 2rem; /* 32 */
+  --field-walk: 1.625rem; /* 26 */
+  --field-stat: 1.25rem; /* 20 */
+  --field-label: 0.8125rem; /* 13, larger than the desk label scale */
+
   --text-label: 0.625rem; /* 10, uppercase, widely tracked */
   --text-num-sm: 0.9375rem; /* 15, inline with prose */
   --text-num: 1.125rem; /* 18, the standard readout */

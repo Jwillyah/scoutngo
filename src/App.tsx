@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import { type ConeMode } from './components/ConeFilter.tsx'
 import { type MapHandle, type TapMode } from './components/MapView.tsx'
 import { ModeRail } from './components/ModeRail.tsx'
+import { FieldMode } from './components/FieldMode.tsx'
 import { PlanMode } from './components/PlanMode.tsx'
 import { SetupMode } from './components/SetupMode.tsx'
 import type { LatLon } from './core/geo.ts'
@@ -597,23 +598,9 @@ function App() {
       ) : null}
 
       {mode === 'field' ? (
-        <div className="mode-field">
-          {/*
-            * FIELD is the next pass. The step exists and is reachable only once
-            * there is a plan, but the arm's length card, the GPS walk-to and the
-            * offline pack are deliberately not half built here: this pass is the
-            * restructure, and it stays provably behaviour preserving.
-            */}
-          <div className="page">
-            <p className="notice">
-              Field mode is the next pass. It will show one position at a time, full
-              screen, with the heading to point the camera and a walk-to distance
-              from your GPS, cached so it works without signal.
-            </p>
-          </div>
-          <div className="mode__foot">{rail}</div>
-        </div>
+        <FieldMode plan={plan} venue={centre} tide={tide} footer={rail} />
       ) : null}
+
     </div>
   )
 }
