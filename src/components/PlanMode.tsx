@@ -4,6 +4,7 @@ import type { TideExtreme, TideState } from '../core/tide.ts'
 import type { SunArc, SunPosition } from '../core/sun.ts'
 import type { PlanCoverage, PlannedPosition } from '../lib/plan.ts'
 import type { GenerationState } from '../lib/planRequest.ts'
+import type { DesiredShot } from '../lib/describe.ts'
 import type { FieldPack } from '../lib/fieldPack.ts'
 import type { TideInfo } from '../lib/useTide.ts'
 import type { VenueWindow } from '../lib/venue.ts'
@@ -71,6 +72,7 @@ interface PlanModeProps {
   packIsCurrent: boolean
   packState: PackBuildState
   onPreparePack: () => void
+  desiredShots: DesiredShot[]
   footer: React.ReactNode
 }
 
@@ -129,6 +131,7 @@ export function PlanMode({
   packIsCurrent,
   packState,
   onPreparePack,
+  desiredShots,
   footer,
 }: PlanModeProps) {
   const [sheet, setSheet] = useState<SheetState>('peek')
@@ -289,6 +292,7 @@ export function PlanMode({
             <ShotList
               plan={visiblePlan}
               planCoverage={null}
+              desiredShots={desiredShots}
               selectedId={selectedId}
               onPick={onFlyTo}
             />

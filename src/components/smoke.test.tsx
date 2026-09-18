@@ -48,14 +48,42 @@ describe('render smoke', () => {
   })
 
   /*
-   * ONE reveal mechanism. The accordions are gone: every setup block renders
-   * open, so nothing is folded inside something that is itself folded.
+   * THE STEP BLOCKS STAY OPEN. Venue and window is part of describing this
+   * shoot, so it is never folded.
+   *
+   * Kit and saved setups DO collapse, which is a deliberate narrowing of the
+   * earlier "no accordions" rule rather than a drift back to it: they are
+   * settings rather than steps, they live in SETUP which has no sheet over it,
+   * and they only start shut once they are configured. The pattern that was
+   * removed was accordions inside a draggable sheet inside a tab; none of that
+   * is back.
    */
-  it('renders setup blocks open, with no accordion toggles', () => {
+  it('keeps the step block open and folds only the settings', () => {
     expect(html).toContain('section__banner--static')
-    expect(html).not.toContain('aria-expanded')
+    expect(html).toContain('Venue and window')
     expect(html).toContain('Kit and style')
     expect(html).toContain('Saved setups')
+  })
+
+  /* The one input at the front of SETUP, and the pasted list beside it. */
+  it('leads with the description box, not the form', () => {
+    // The apostrophe is HTML-escaped in the rendered markup, so match around it.
+    expect(html).toContain('the shoot?')
+    expect(html).toContain('Got a shot list? Paste it.')
+    expect(html).toContain('Read it and fill the form')
+  })
+
+  /* Multiline and roomy, because these are dictated into as often as typed. */
+  it('uses multiline inputs for the description and the shot list', () => {
+    expect(html).toContain('<textarea')
+    expect(html).toContain('id="describe-shoot"')
+    expect(html).toContain('id="describe-shots"')
+  })
+
+  /* No thumbnail until coordinates resolve; the calibration venue has them. */
+  it('confirms the venue with a satellite thumbnail once coordinates resolve', () => {
+    expect(html).toContain('class="thumb"')
+    expect(html).toContain('World_Imagery/MapServer/export')
   })
 
   /* The map and its chrome belong to PLAN, so none of it renders in SETUP. */

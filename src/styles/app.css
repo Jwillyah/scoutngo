@@ -12,6 +12,235 @@
   overflow: hidden;
 }
 
+/* ---------------------------------------------------------------- setup */
+
+/*
+ * SETUP IS NOT A FORM FIRST. The description box is the front door and the form
+ * is what it fills, so the page is paced accordingly: one thing per region,
+ * generous gaps between blocks, and labels that get out of the way of values.
+ */
+.page--setup {
+  display: grid;
+  gap: var(--space-6);
+  padding-bottom: var(--space-6);
+}
+
+.page--setup > * {
+  margin: 0;
+}
+
+/* The venue thumbnail: the only colour on the screen, and full bleed. */
+.thumb {
+  margin: 0;
+  position: relative;
+}
+
+.thumb__img {
+  display: block;
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  background: var(--color-panel-2);
+}
+
+.thumb__cap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--page-pad);
+  background: var(--color-bg);
+  border-top: var(--line-hair) solid var(--color-edge-top);
+}
+
+.thumb__name {
+  font-size: var(--text-md);
+  font-weight: var(--weight-heavy);
+}
+
+.thumb__at {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* --------------------------------------------------------- describe box */
+
+.describe {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0 var(--page-pad);
+}
+
+.describe__label {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-tight);
+}
+
+.describe__label--second {
+  margin-top: var(--space-5);
+}
+
+.describe__label--small {
+  font-size: var(--text-md);
+}
+
+.describe__hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/*
+ * Roomy and multiline, because this is dictated into as often as it is typed.
+ * No speech API: the keyboard's own microphone already does it.
+ */
+.describe__field {
+  width: 100%;
+  padding: var(--space-3);
+  background: var(--color-field);
+  color: var(--color-text);
+  border: var(--line-hair) solid var(--color-line);
+  border-top-color: var(--color-edge-top);
+  border-radius: var(--radius-panel);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  resize: vertical;
+}
+
+.describe__field::placeholder {
+  color: var(--color-text-faint);
+}
+
+.describe__go {
+  width: 100%;
+  margin-top: var(--space-1);
+}
+
+.describe__note {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.describe__note--bad {
+  padding-left: var(--space-3);
+  border-left: var(--line-rule) solid var(--color-hazard);
+  color: var(--color-text);
+}
+
+.describe__raw pre {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2);
+  background: var(--color-panel-2);
+  border-radius: var(--radius-panel);
+  font-size: var(--text-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
+/* Several matches: the shooter picks, the app never guesses. */
+.describe__choices {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--color-panel-2);
+  border-left: var(--line-rule) solid var(--color-hazard);
+  border-radius: var(--radius-panel);
+}
+
+.describe__choice {
+  min-height: var(--control-height);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-panel);
+  color: var(--color-text);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-panel);
+  text-align: left;
+  font-size: var(--text-md);
+  cursor: pointer;
+}
+
+.describe__shots {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.describe__shot {
+  display: grid;
+  grid-template-columns: 1.75rem 1fr;
+  gap: var(--space-2);
+  align-items: baseline;
+  padding: var(--space-2) 0;
+  border-top: var(--line-hair) solid var(--color-line);
+  font-size: var(--text-md);
+}
+
+.describe__shot-n {
+  color: var(--color-text-muted);
+}
+
+/* Quiet marker: where a value came from, never a warning. */
+.field__parsed {
+  margin-left: var(--space-2);
+  padding: 1px 5px;
+  background: var(--color-panel-2);
+  border: var(--line-hair) solid var(--color-line);
+  color: var(--color-text-muted);
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+/* ------------------------------------------------- wanted shots coverage */
+
+.wanted {
+  list-style: none;
+  margin: var(--space-3) var(--page-pad) 0;
+  padding: 0;
+}
+
+.wanted__row {
+  display: grid;
+  grid-template-columns: 2rem 1fr auto;
+  gap: var(--space-2);
+  align-items: baseline;
+  padding: var(--space-2) 0;
+  border-bottom: var(--line-hair) solid var(--color-line);
+  font-size: var(--text-sm);
+}
+
+/* An unclaimed shot is a gap in a list someone is expecting back. */
+.wanted__row--open {
+  border-left: var(--line-rule) solid var(--color-hazard);
+  padding-left: var(--space-2);
+}
+
+.wanted__mark {
+  color: var(--color-text-muted);
+}
+
+.wanted__state {
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.wanted__row--open .wanted__state {
+  color: var(--color-hazard);
+}
+
 /* ------------------------------------------------------------- field pack */
 
 .pack {
@@ -451,9 +680,26 @@
   align-items: baseline;
   gap: var(--space-2);
   width: 100%;
-  padding: var(--space-3) var(--page-pad);
+  padding: var(--space-4) var(--page-pad) var(--space-2);
   background: transparent;
   text-align: left;
+}
+
+/* Values larger, labels smaller. The value is what you check; the label is not. */
+.page--setup .field__label {
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.page--setup .input,
+.page--setup textarea.input {
+  font-size: var(--text-base);
+}
+
+.page--setup .field {
+  margin-bottom: var(--space-4);
 }
 
 .btn-row--pad {

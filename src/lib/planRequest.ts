@@ -182,6 +182,11 @@ export interface GenerateRequestBody {
   /** Sun azimuth and altitude across the window, computed before the call. */
   sun: SunFact[]
   /**
+   * Shots the shooter was asked to get, pasted from a list someone sent them.
+   * When present the plan must cover these rather than invent its own.
+   */
+  requiredShots?: string[]
+  /**
    * Tide state at the middle of the window, computed from NOAA predictions.
    *
    * A FACT HANDED OVER, exactly like the sun figures. The model may use it to
@@ -233,6 +238,8 @@ export function buildGenerateBody(
   framing: { subjectPoint?: { x: number; y: number }; imageNorthBearing?: number } = {},
   /** Tide at the middle of the window. Absent inland, or when NOAA is down. */
   tide?: TideFact,
+  /** The pasted shot list, if there is one. */
+  requiredShots: string[] = [],
 ): GenerateRequestBody {
   return {
     venueName: venue.name,
@@ -247,6 +254,7 @@ export function buildGenerateBody(
     optics: selectedOptics(kit),
     sun,
     ...(tide === undefined ? {} : { tide }),
+    ...(requiredShots.length === 0 ? {} : { requiredShots }),
     ...(framing.subjectPoint === undefined ? {} : { subjectPoint: framing.subjectPoint }),
     /*
      * The map camera's bearing is how far the view is rotated clockwise from

@@ -67,7 +67,7 @@ You are GIVEN the sun's position below as fact. Use it to choose where to stand.
 
 OUTPUT FORMAT. Return a single JSON object and nothing else. No prose before or after. No markdown code fences. No explanation.
 
-{"positions":[{"x":0.0,"y":0.0,"lensId":"","focalLength":0,"shot":"","risk":"","angleRationale":"","platform":"ground","altitudeFeet":0}]}
+{"positions":[{"x":0.0,"y":0.0,"lensId":"","focalLength":0,"shot":"","risk":"","angleRationale":"","platform":"ground","altitudeFeet":0,"coversShot":null}]}
 
 FIELD RULES, all mandatory:
 - x, y: numbers from 0 to 1, the position in the image. x is left to right, y is top to bottom.
@@ -84,6 +84,7 @@ The application checks every position you return against this same geometry and 
 - angleRationale: why THIS vantage is worth standing in, rather than anywhere else. AT MOST 15 WORDS. Hard limit. Say what the position gives you: a clean background, a line of pilings running away from camera, separation from the crowd, a foreground element, the light coming across the subject. Do not name a compass bearing, a degree, or a lighting class.
 - platform: "ground" or "air". Use "air" ONLY if a drone is listed in the kit below. An air position is a hover point, so it may sit over water or a road.
 - altitudeFeet: for "air", height above ground in feet, no more than 400, which is the FAA ceiling. For "ground", 0.
+- coversShot: when a REQUIRED SHOTS list is given below, the zero based index of the shot this position covers. Null when it covers none of them, and null always when no list is given. Never an index outside the list.
 
 HOW FAR TO STAND BACK. Each optic below carries a MAX STANDOFF in metres, computed by the application for that optic. Do not exceed it. A position beyond it frames so much ground that the subject is a speck, and it is flagged as an error in the app. Closer is usually better: pick the shortest standoff that still gets the shot and still clears the obstacles.
 
@@ -120,6 +121,7 @@ interface GenerateContext {
   subjectPoint?: unknown
   imageNorthBearing?: unknown
   tide?: unknown
+  requiredShots?: unknown
   bounds?: unknown
   image?: unknown
   mediaType?: unknown
@@ -267,6 +269,30 @@ ${turns === '' ? '- No high or low water falls inside the window.' : `- Turns in
 Use this to reason about what the waterline and the pilings will look like: a low tide exposes mud, bank and piling that a high tide covers. Do NOT state a tide height, a tide time, or whether anywhere is walkable. The application shows the tide itself and the shooter judges the ground.`
 }
 
+/**
+ * The shot list the shooter was sent, when there is one.
+ *
+ * WHEN THIS IS POPULATED IT IS THE BRIEF. A shooter who has been handed a list
+ * needs those shots covered, not a set of interesting alternatives. The model is
+ * told to serve the list and to say which position serves which entry, and the
+ * app marks anything left unclaimed so a gap is visible rather than discovered
+ * on the day.
+ */
+function renderRequiredShots(list: unknown): string {
+  if (!Array.isArray(list) || list.length === 0) {
+    return 'REQUIRED SHOTS: none given. Propose the shots you judge are worth taking, and set coversShot to null on every position.'
+  }
+  const lines = list
+    .map((entry, index) => `  ${index}. ${asText(entry, 160)}`)
+    .join('\n')
+  return `REQUIRED SHOTS, ${list.length} of them, given to the shooter by someone else. THIS IS THE BRIEF.
+${lines}
+
+Your positions must cover this list. Work through it and place a position for each entry you can serve, then set that position's coversShot to the entry's index.
+DO NOT INVENT SHOTS THAT ARE NOT ON THIS LIST while it is populated. A sixth idea of your own is worth less than the third item on the list going uncovered. If you genuinely cannot serve an entry from anywhere in this view, leave it uncovered rather than pretending: the application shows the shooter which entries no position claimed.
+If you have positions left over after covering the list, and only then, you may add one of your own with coversShot null.`
+}
+
 /** Renders the context the app sent into the user turn. */
 function renderContext(body: GenerateContext): string {
   const bounds = body.bounds as Record<string, unknown> | undefined
@@ -291,6 +317,8 @@ ${renderFraming(body)}
 ${renderSun(body.sun)}
 
 ${renderTide(body.tide)}
+
+${renderRequiredShots(body.requiredShots)}
 
 AIRCRAFT IN PLAY: ${Array.isArray(body.drones) && body.drones.length > 0 ? body.drones.map((d) => asText(d, 80)).join(', ') : 'none, so every position must be "ground"'}
 

@@ -17,6 +17,22 @@ interface VenueFormProps {
    * only on a field the user actually visited and then left.
    */
   revealAllErrors?: boolean
+  /** Keys from describe.ts that were filled by reading the description. */
+  parsedFields?: string[]
+  /** Called when the shooter edits a field, so its marker can be dropped. */
+  onFieldTyped?: (field: string) => void
+}
+
+/** Which form field a parsed value landed in. Mirrors ParsedField in describe.ts. */
+const PARSED_KEY: Partial<Record<VenueField, string>> = {
+  name: 'venue',
+  latitude: 'venue',
+  longitude: 'venue',
+  date: 'date',
+  startTime: 'startTime',
+  endTime: 'endTime',
+  eventDescription: 'brief',
+  desiredOutcome: 'want',
 }
 
 interface FieldProps {
@@ -24,9 +40,11 @@ interface FieldProps {
   hint?: string
   error?: string
   children: (props: { id: string; invalid: boolean; describedBy?: string }) => React.ReactNode
+  /** True when this value was filled by reading the description. */
+  parsed?: boolean
 }
 
-function Field({ label, hint, error, children }: FieldProps) {
+function Field({ label, hint, error, parsed, children }: FieldProps) {
   const id = useId()
   const errorId = `${id}-error`
   return (
@@ -34,6 +52,8 @@ function Field({ label, hint, error, children }: FieldProps) {
       <label className="field__label" htmlFor={id}>
         {label}
         {hint === undefined ? null : <span className="field__hint"> {hint}</span>}
+        {/* Quiet: says where the value came from, never blocks or warns. */}
+        {parsed === true ? <span className="field__parsed">read</span> : null}
       </label>
       {children({
         id,
@@ -54,7 +74,13 @@ export function VenueForm({
   errors,
   onChange,
   revealAllErrors = false,
+  parsedFields = [],
+  onFieldTyped,
 }: VenueFormProps) {
+  const wasParsed = (field: VenueField): boolean => {
+    const key = PARSED_KEY[field]
+    return key !== undefined && parsedFields.includes(key)
+  }
   /*
    * Nothing goes magenta until the user has been in the field and left it, or
    * until a submit is attempted. A field is only "touched" if it was focused
@@ -76,6 +102,8 @@ export function VenueForm({
   }
 
   const set = (field: VenueField) => (next: string) => {
+    const key = PARSED_KEY[field]
+    if (key !== undefined) onFieldTyped?.(key)
     onChange({ ...value, [field]: next })
   }
 
@@ -99,7 +127,7 @@ export function VenueForm({
 
       <Group title="Position">
         <div className="stack">
-          <Field label="Venue name" error={shownError('name')}>
+          <Field label="Venue name" error={shownError('name')} parsed={wasParsed('name')}>
             {({ id, invalid, describedBy }) => (
               <input
                 id={id}
@@ -117,7 +145,7 @@ export function VenueForm({
           </Field>
 
           <div className="row">
-            <Field label="Latitude" hint="-90 to 90" error={shownError('latitude')}>
+            <Field label="Latitude" hint="-90 to 90" error={shownError('latitude')} parsed={wasParsed('latitude')}>
               {({ id, invalid, describedBy }) => (
                 <input
                   id={id}
@@ -136,7 +164,7 @@ export function VenueForm({
               )}
             </Field>
 
-            <Field label="Longitude" hint="-180 to 180" error={shownError('longitude')}>
+            <Field label="Longitude" hint="-180 to 180" error={shownError('longitude')} parsed={wasParsed('longitude')}>
               {({ id, invalid, describedBy }) => (
                 <input
                   id={id}
@@ -160,7 +188,7 @@ export function VenueForm({
 
       <Group title="Window">
         <div className="stack">
-          <Field label="Date" error={shownError('date')}>
+          <Field label="Date" error={shownError('date')} parsed={wasParsed('date')}>
             {({ id, invalid, describedBy }) => (
               <input
                 id={id}
@@ -177,7 +205,7 @@ export function VenueForm({
           </Field>
 
           <div className="row">
-            <Field label="Start time" error={shownError('startTime')}>
+            <Field label="Start time" error={shownError('startTime')} parsed={wasParsed('startTime')}>
               {({ id, invalid, describedBy }) => (
                 <input
                   id={id}
@@ -193,7 +221,7 @@ export function VenueForm({
               )}
             </Field>
 
-            <Field label="End time" error={shownError('endTime')}>
+            <Field label="End time" error={shownError('endTime')} parsed={wasParsed('endTime')}>
               {({ id, invalid, describedBy }) => (
                 <input
                   id={id}
@@ -216,7 +244,7 @@ export function VenueForm({
         <div className="stack">
           <Field
             label="What happens at this event"
-            hint="plain language, what the day actually looks like"
+            hint="plain language, what the day actually looks like" parsed={wasParsed('eventDescription')}
           >
             {({ id }) => (
               <textarea
@@ -228,7 +256,7 @@ export function VenueForm({
             )}
           </Field>
 
-          <Field label="What I want out of it" hint="the deliverable, not the gear">
+          <Field label="What I want out of it" hint="the deliverable, not the gear" parsed={wasParsed('desiredOutcome')}>
             {({ id }) => (
               <textarea
                 id={id}

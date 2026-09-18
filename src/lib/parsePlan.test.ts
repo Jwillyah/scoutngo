@@ -171,6 +171,7 @@ describe('parsePlanResponse', () => {
       'shot',
       'risk',
       'angleRationale',
+      'coversShot',
       'platform',
       'altitudeFeet',
     ])

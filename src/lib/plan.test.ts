@@ -21,6 +21,7 @@ const at = (lat: number, lon: number, over: Partial<CameraPosition> = {}): Camer
   shot: 'Boats hitting the pilings.',
   risk: 'Crowd on the rail.',
   angleRationale: 'Pilings run away from camera, crowd behind.',
+  coversShot: null,
   platform: 'ground',
   altitudeFeet: 0,
   moved: false,

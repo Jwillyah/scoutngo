@@ -37,6 +37,12 @@ export interface RawPosition {
   risk: string
   /** Why this vantage is worth standing in. Judgement, never geometry. */
   angleRationale: string
+  /**
+   * Index into the shooter's pasted shot list that this position covers, or
+   * null. Validated against the real list length: a model naming shot 9 of a
+   * list of 3 is claiming to cover something that does not exist.
+   */
+  coversShot: number | null
   platform: Platform
   /** Feet above ground for an air position. Zero for a ground one. */
   altitudeFeet: number
@@ -88,6 +94,8 @@ export function parsePlanResponse(
   lenses: LensSpec[],
   droneAvailable = false,
   droneCameras: DroneCameraSpec[] = [],
+  /** How many shots the shooter asked for. Bounds any coversShot claim. */
+  requiredShots = 0,
 ): ParseResult {
   if (lenses.length === 0) {
     return { ok: false, reason: 'No lenses are selected in the kit.', raw }
@@ -214,6 +222,13 @@ export function parsePlanResponse(
         typeof item.angleRationale === 'string' ? item.angleRationale : '',
         RATIONALE_WORD_CAP,
       ),
+      coversShot:
+        typeof item.coversShot === 'number' &&
+        Number.isInteger(item.coversShot) &&
+        item.coversShot >= 0 &&
+        item.coversShot < requiredShots
+          ? item.coversShot
+          : null,
       platform,
       altitudeFeet,
     })

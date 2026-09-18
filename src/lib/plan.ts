@@ -62,6 +62,8 @@ export interface CameraPosition {
   risk: string
   /** Why this vantage is worth standing in. Judgement. Never read as geometry. */
   angleRationale: string
+  /** Index of the pasted shot this covers, or null. Validated at parse. */
+  coversShot: number | null
   /** Ground or air. Air positions get a dashed cone and a flight path check. */
   platform: Platform
   /** Feet above ground, air positions only. */

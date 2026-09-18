@@ -1,8 +1,13 @@
+import type { LatLon } from '../core/geo.ts'
+import type { DescribeState, DesiredShot } from '../lib/describe.ts'
+import type { SearchHit } from '../lib/search.ts'
 import type { KitSelection } from '../lib/kitSelection.ts'
 import type { Spot } from '../lib/spots.ts'
 import type { VenueDraft, VenueErrors } from '../lib/venue.ts'
+import { Collapsible } from './Collapsible.tsx'
+import { DescribeShoot } from './DescribeShoot.tsx'
 import { KitProfile } from './KitProfile.tsx'
-import { Panel } from './Panel.tsx'
+import { VenueThumb } from './VenueThumb.tsx'
 import { SpotsPanel } from './SpotsPanel.tsx'
 import { StaleBrief } from './StaleBrief.tsx'
 import { VenueForm } from './VenueForm.tsx'
@@ -25,6 +30,20 @@ interface SetupModeProps {
   onImportSpots: (incoming: Spot[]) => void
   suggestedName: string
   canSave: boolean
+  /* The one input at the front, and everything it produces. */
+  describeText: string
+  onDescribeText: (next: string) => void
+  describeState: DescribeState
+  onDescribe: () => void
+  venueChoices: SearchHit[]
+  onPickVenue: (hit: SearchHit) => void
+  shotListText: string
+  onShotListText: (next: string) => void
+  desiredShots: DesiredShot[]
+  parsedFields: string[]
+  onFieldTyped: (field: string) => void
+  /** Coordinates, once they resolve. Drives the thumbnail. */
+  at: LatLon | null
 }
 
 /**
@@ -56,9 +75,39 @@ export function SetupMode({
   onImportSpots,
   suggestedName,
   canSave,
+  describeText,
+  onDescribeText,
+  describeState,
+  onDescribe,
+  venueChoices,
+  onPickVenue,
+  shotListText,
+  onShotListText,
+  desiredShots,
+  parsedFields,
+  onFieldTyped,
+  at,
 }: SetupModeProps) {
+  /* Settings start shut once they are configured. Steps never do. */
+  const kitConfigured = kit.lensIds.length > 0 && kit.bodyIds.length > 0
+
   return (
-    <div className="page">
+    <div className="page page--setup">
+      {/* Confirmation that the geocoder found the right place, before anything else. */}
+      <VenueThumb at={at} label={venue.name} />
+
+      <DescribeShoot
+        text={describeText}
+        onText={onDescribeText}
+        state={describeState}
+        onRead={onDescribe}
+        choices={venueChoices}
+        onPickVenue={onPickVenue}
+        shotListText={shotListText}
+        onShotListText={onShotListText}
+        desiredShots={desiredShots}
+      />
+
       <StaleBrief
         staleBrief={staleBrief}
         drift={drift}
@@ -71,13 +120,26 @@ export function SetupMode({
         errors={errors}
         onChange={onVenueChange}
         revealAllErrors={revealAllErrors}
+        parsedFields={parsedFields}
+        onFieldTyped={onFieldTyped}
       />
 
-      <KitProfile value={kit} onChange={onKit} />
+      {/* Settings, not steps: shut once configured. */}
+      <Collapsible
+        index="02"
+        title="Kit and style"
+        summary={`${kit.bodyIds.length} bodies, ${kit.lensIds.length} lenses, ${kit.droneIds.length} air`}
+        defaultOpen={!kitConfigured}
+      >
+        <KitProfile value={kit} onChange={onKit} />
+      </Collapsible>
 
-      {/* Spots stop being a tab and become what they are: a way to start from
-          a setup you already made. */}
-      <Panel index="03" title="Saved setups">
+      <Collapsible
+        index="03"
+        title="Saved setups"
+        summary={spots.length === 0 ? 'None saved' : `${spots.length} saved`}
+        defaultOpen={false}
+      >
         <SpotsPanel
           spots={spots}
           onSave={onSaveSpot}
@@ -87,7 +149,7 @@ export function SetupMode({
           suggestedName={suggestedName}
           canSave={canSave}
         />
-      </Panel>
+      </Collapsible>
     </div>
   )
 }

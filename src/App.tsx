@@ -50,6 +50,17 @@ import {
   type FieldPack,
 } from './lib/fieldPack.ts'
 import type { PackBuildState } from './components/FieldPackControl.tsx'
+import {
+  parseDescribeResponse,
+  parseShotList,
+  requestParse,
+  type DesiredShot,
+  type DescribeState,
+  type ParsedField,
+} from './lib/describe.ts'
+import { resolveDate } from './core/when.ts'
+import { venueTimeZone, deviceTimeZone } from './core/timezone.ts'
+import { searchVenues, type SearchHit } from './lib/search.ts'
 import { usePersistentState } from './lib/usePersistentState.ts'
 import { useTide } from './lib/useTide.ts'
 import {
@@ -101,6 +112,20 @@ function App() {
   const [tapMode, setTapMode] = useState<TapMode>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [submitAttempted, setSubmitAttempted] = useState(false)
+
+  /*
+   * THE ONE INPUT AT THE FRONT OF SETUP. What the shooter typed, what came back,
+   * which fields it filled, and any geocoding choice still to be made. The form
+   * underneath is filled from this; it is never replaced by it.
+   */
+  const [describeText, setDescribeText] = useState('')
+  const [describeState, setDescribeState] = useState<DescribeState>({ status: 'idle' })
+  const [parsedFields, setParsedFields] = useState<ParsedField[]>([])
+  const [venueChoices, setVenueChoices] = useState<SearchHit[]>([])
+
+  /* A pasted shot list, if one was sent. Editable lines. */
+  const [shotListText, setShotListText] = useState('')
+  const [desiredShots, setDesiredShots] = useState<DesiredShot[]>([])
   const [showSun, setShowSun] = useState(true)
   const [showArc, setShowArc] = useState(false)
   const [coneMode, setConeMode] = useState<ConeMode>('none')
@@ -116,6 +141,14 @@ function App() {
   const [spots, setSpots] = usePersistentState<Spot[]>(SPOTS_STORAGE_KEY, [], reviveSpots)
 
   const mapHandle = useRef<MapHandle>(null)
+
+  /*
+   * Marks a field as typed the moment the shooter edits it, so the "parsed"
+   * marker disappears from anything they have taken over. Quiet by design: it
+   * says where a value came from, it never blocks or warns.
+   */
+  const untouch = (fields: ParsedField[]) =>
+    setParsedFields((current) => current.filter((f) => !fields.includes(f)))
 
   const errors = useMemo(() => validateVenue(venue), [venue])
   const venueWindow = useMemo(() => resolveWindow(venue), [venue])
@@ -333,6 +366,108 @@ function App() {
     setMode('setup')
   }
 
+  /**
+   * Reads the description, then geocodes the PLACE NAME it returned.
+   *
+   * The model never supplies a coordinate; Nominatim does, and when it offers
+   * more than one match the shooter picks. The date token is resolved here too,
+   * against the venue's own timezone once there is a venue to have one.
+   */
+  const onDescribe = async () => {
+    const text = describeText.trim()
+    if (text === '') return
+    setDescribeState({ status: 'working' })
+    setVenueChoices([])
+
+    const response = await requestParse(text)
+    if (response.status !== 'ok' || typeof response.raw !== 'string') {
+      setDescribeState({
+        status: 'error',
+        message: response.message ?? 'The parse function did not answer.',
+      })
+      return
+    }
+
+    const parsed = parseDescribeResponse(response.raw)
+    if (!parsed.ok) {
+      setDescribeState({ status: 'raw', reason: parsed.reason, raw: parsed.raw })
+      return
+    }
+
+    const { shoot, filled } = parsed
+
+    /* Geocode the name. Never guess between matches. */
+    let hits: SearchHit[] = []
+    if (shoot.venueSearch !== '') {
+      try {
+        hits = await searchVenues(shoot.venueSearch)
+      } catch {
+        hits = []
+      }
+    }
+
+    const chosen = hits.length === 1 ? hits[0] : null
+    const at = chosen === null ? venueLatLon(venue) : { lat: chosen.lat, lon: chosen.lon }
+
+    /*
+     * The date token resolves against the VENUE's clock, so it is done after
+     * geocoding. With no venue yet it falls back to this device, which is the
+     * best available answer and is visible in the form either way.
+     */
+    const zone =
+      at === null ? deviceTimeZone() : (venueTimeZone(at.lat, at.lon) ?? deviceTimeZone())
+    const resolvedDate = shoot.date === '' ? '' : (resolveDate(shoot.date, new Date(), zone) ?? '')
+
+    setVenue((current) => {
+      const next: VenueDraft = {
+        ...current,
+        ...(chosen === null
+          ? {}
+          : {
+              ...withCoordinates(current, { lat: chosen.lat, lon: chosen.lon }),
+              name: chosen.label,
+            }),
+        ...(resolvedDate === '' ? {} : { date: resolvedDate }),
+        ...(shoot.startTime === '' ? {} : { startTime: shoot.startTime }),
+        ...(shoot.endTime === '' ? {} : { endTime: shoot.endTime }),
+        ...(shoot.eventBrief === '' ? {} : { eventDescription: shoot.eventBrief }),
+        ...(shoot.wantOut === '' ? {} : { desiredOutcome: shoot.wantOut }),
+      }
+      return next
+    })
+
+    if (chosen !== null) setBriefAnchor({ at: { lat: chosen.lat, lon: chosen.lon } })
+    if (hits.length > 1) setVenueChoices(hits)
+
+    setParsedFields(resolvedDate === '' ? filled.filter((f) => f !== 'date') : filled)
+    setDescribeState({
+      status: 'done',
+      /*
+       * Counted as FORM INPUTS, not as parsed values, so the number matches what
+       * the shooter can see marked below. One parsed venue fills three inputs:
+       * name, latitude and longitude.
+       */
+      filled: filled.length + (filled.includes('venue') && chosen !== null ? 2 : 0),
+      needsVenue: shoot.venueSearch !== '' && hits.length === 0,
+      searched: shoot.venueSearch,
+    })
+  }
+
+  /** The shooter picked one of several geocoding matches. */
+  const onPickVenue = (hit: SearchHit) => {
+    setVenue((current) => ({
+      ...withCoordinates(current, { lat: hit.lat, lon: hit.lon }),
+      name: hit.label,
+    }))
+    setBriefAnchor({ at: { lat: hit.lat, lon: hit.lon } })
+    setVenueChoices([])
+  }
+
+  const onShotListChange = (text: string) => {
+    setShotListText(text)
+    setDesiredShots(parseShotList(text))
+  }
+
   const onGenerate = async () => {
     setSubmitAttempted(true)
     /*
@@ -440,6 +575,7 @@ function App() {
                 feet: Number(e.feet.toFixed(2)),
               })),
             },
+        desiredShots.map((shot) => shot.text),
       ),
     )
     if (response.status !== 'ok' || typeof response.raw !== 'string') {
@@ -456,6 +592,7 @@ function App() {
       selectedLenses(kit),
       droneAvailable(kit),
       selectedDroneCameraSpecs(kit),
+      desiredShots.length,
     )
     if (!parsed.ok) {
       setGeneration({ status: 'raw', reason: parsed.reason, raw: parsed.raw })
@@ -476,6 +613,7 @@ function App() {
         shot: raw.shot,
         risk: raw.risk,
         angleRationale: raw.angleRationale,
+        coversShot: raw.coversShot,
         platform: raw.platform,
         altitudeFeet: raw.altitudeFeet,
         moved: false,
@@ -583,6 +721,18 @@ function App() {
             onImportSpots={(incoming) => setSpots(mergeSpots(spots, incoming))}
             suggestedName={venue.name.split(',')[0] ?? ''}
             canSave={centre !== null}
+            describeText={describeText}
+            onDescribeText={setDescribeText}
+            describeState={describeState}
+            onDescribe={() => void onDescribe()}
+            venueChoices={venueChoices}
+            onPickVenue={onPickVenue}
+            shotListText={shotListText}
+            onShotListText={onShotListChange}
+            desiredShots={desiredShots}
+            parsedFields={parsedFields}
+            onFieldTyped={(field) => untouch([field as ParsedField])}
+            at={centre}
           />
           <div className="mode__foot">
             {forwardBar}
@@ -637,6 +787,7 @@ function App() {
           packIsCurrent={packIsCurrent}
           packState={packState}
           onPreparePack={() => void preparePack()}
+          desiredShots={desiredShots}
           summary={summary}
           peekStatus={peekStatus}
           fitTargets={fitTargets}
