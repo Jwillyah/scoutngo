@@ -86,7 +86,9 @@ The application checks every position you return against this same geometry and 
 - altitudeFeet: for "air", height above ground in feet, no more than 400, which is the FAA ceiling. For "ground", 0.
 - coversShot: when a REQUIRED SHOTS list is given below, the zero based index of the shot this position covers. Null when it covers none of them, and null always when no list is given. Never an index outside the list.
 
-HOW FAR TO STAND BACK. Each optic below carries a MAX STANDOFF in metres, computed by the application for that optic. Do not exceed it. A position beyond it frames so much ground that the subject is a speck, and it is flagged as an error in the app. Closer is usually better: pick the shortest standoff that still gets the shot and still clears the obstacles.
+HOW FAR THE SHOOTER CAN GET. A REACH LIMIT in metres may be given below. It is the distance from the venue the shooter can physically reach, drawn by hand on a map, and it is a HARD CEILING. It beats every optic's own standoff whenever it is tighter. A position outside it is not an ambitious shot, it is one nobody can take: there is a fence, a private bank or water in the way. The application checks every position you return against it and flags the ones outside, exactly as it flags a position standing in a river.
+
+HOW FAR TO STAND BACK. Each optic below carries a MAX STANDOFF in metres, computed by the application for that optic. Do not exceed it, and do not exceed the reach limit either. The smaller of the two wins. A position beyond it frames so much ground that the subject is a speck, and it is flagged as an error in the app. Closer is usually better: pick the shortest standoff that still gets the shot and still clears the obstacles.
 
 VARY THE RANGE. Do not park every position at its maximum standoff. A plan that is six versions of "as far back as this lens allows" has no near work in it. Include at least one position in the closer half of its optic's range. The application measures this and reports a plan that is entirely parked at the back.
 
@@ -122,6 +124,7 @@ interface GenerateContext {
   imageNorthBearing?: unknown
   tide?: unknown
   requiredShots?: unknown
+  reachMeters?: unknown
   bounds?: unknown
   image?: unknown
   mediaType?: unknown
@@ -319,6 +322,12 @@ ${renderSun(body.sun)}
 ${renderTide(body.tide)}
 
 ${renderRequiredShots(body.requiredShots)}
+
+${
+  typeof body.reachMeters === 'number'
+    ? `REACH LIMIT: ${Math.round(body.reachMeters)} metres from the venue. Every position must be inside this. It overrides any optic standoff that is larger.`
+    : 'REACH LIMIT: none given. Use each optic\'s own max standoff.'
+}
 
 AIRCRAFT IN PLAY: ${Array.isArray(body.drones) && body.drones.length > 0 ? body.drones.map((d) => asText(d, 80)).join(', ') : 'none, so every position must be "ground"'}
 

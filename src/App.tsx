@@ -56,9 +56,9 @@ import {
   requestParse,
   type DesiredShot,
   type DescribeState,
-  type ParsedField,
 } from './lib/describe.ts'
 import { resolveDate } from './core/when.ts'
+import { clampRadius, RADIUS_DEFAULT_METERS } from './core/radius.ts'
 import { venueTimeZone, deviceTimeZone } from './core/timezone.ts'
 import { searchVenues, type SearchHit } from './lib/search.ts'
 import { usePersistentState } from './lib/usePersistentState.ts'
@@ -73,6 +73,7 @@ import {
 } from './lib/mode.ts'
 import {
   CALIBRATION_VENUE,
+  EMPTY_VENUE,
   hasErrors,
   resolveWindow,
   validateVenue,
@@ -81,8 +82,24 @@ import {
   type VenueDraft,
 } from './lib/venue.ts'
 
+/*
+ * The calibration venue is a DEVELOPER SHORTCUT and means nothing to anyone
+ * else, so it is off the screen entirely.
+ *
+ * Chosen: a query parameter, `?calibration=1`, over a long press on the
+ * wordmark. A hidden gesture is undiscoverable for the one person who needs it
+ * and is a surprise for everyone else who finds it by accident; a URL is typed
+ * deliberately, survives a reload, and is trivially reachable from a test
+ * harness, which is where this actually gets used.
+ */
+const wantsCalibration = (): boolean =>
+  typeof window !== 'undefined' &&
+  new URLSearchParams(window.location.search).get('calibration') === '1'
+
 function App() {
-  const [venue, setVenue] = useState<VenueDraft>(CALIBRATION_VENUE)
+  const [venue, setVenue] = useState<VenueDraft>(() =>
+    wantsCalibration() ? CALIBRATION_VENUE : EMPTY_VENUE,
+  )
   /*
    * The subject falls back to the venue coordinate until it is placed by hand.
    * Searching a new venue clears it, so it follows the new place rather than
@@ -111,16 +128,25 @@ function App() {
   const [mode, setMode] = useState<Mode>('setup')
   const [tapMode, setTapMode] = useState<TapMode>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [submitAttempted, setSubmitAttempted] = useState(false)
 
   /*
    * THE ONE INPUT AT THE FRONT OF SETUP. What the shooter typed, what came back,
    * which fields it filled, and any geocoding choice still to be made. The form
    * underneath is filled from this; it is never replaced by it.
    */
+  /*
+   * How far the shooter can get from the venue, dragged on the setup map. A real
+   * constraint, so it becomes a hard ceiling in the prompt and a check on every
+   * returned position. See src/core/radius.ts.
+   */
+  const [reachMeters, setReachMeters] = useState(RADIUS_DEFAULT_METERS)
+  const onReach = (meters: number) => setReachMeters(clampRadius(meters))
+
+  /* The setup map has its own handle; PLAN keeps mapHandle for its capture. */
+  const setupMap = useRef<MapHandle>(null)
+
   const [describeText, setDescribeText] = useState('')
   const [describeState, setDescribeState] = useState<DescribeState>({ status: 'idle' })
-  const [parsedFields, setParsedFields] = useState<ParsedField[]>([])
   const [venueChoices, setVenueChoices] = useState<SearchHit[]>([])
 
   /* A pasted shot list, if one was sent. Editable lines. */
@@ -134,21 +160,13 @@ function App() {
   const [isolatedId, setIsolatedId] = useState<string | null>(null)
 
   /* Where the brief text was written. See lib/brief.ts. */
-  const [briefAnchor, setBriefAnchor] = useState<BriefAnchor | null>({
-    at: { lat: 38.364236, lon: -75.605912 },
-  })
+  const [briefAnchor, setBriefAnchor] = useState<BriefAnchor | null>(() =>
+    wantsCalibration() ? { at: { lat: 38.364236, lon: -75.605912 } } : null,
+  )
 
   const [spots, setSpots] = usePersistentState<Spot[]>(SPOTS_STORAGE_KEY, [], reviveSpots)
 
   const mapHandle = useRef<MapHandle>(null)
-
-  /*
-   * Marks a field as typed the moment the shooter edits it, so the "parsed"
-   * marker disappears from anything they have taken over. Quiet by design: it
-   * says where a value came from, it never blocks or warns.
-   */
-  const untouch = (fields: ParsedField[]) =>
-    setParsedFields((current) => current.filter((f) => !fields.includes(f)))
 
   const errors = useMemo(() => validateVenue(venue), [venue])
   const venueWindow = useMemo(() => resolveWindow(venue), [venue])
@@ -185,8 +203,8 @@ function App() {
     () =>
       aim === null || sun === null
         ? []
-        : planPositions(positions, aim, sun.azimuth, land, kit.bodyIds),
-    [positions, aim, sun, land, kit.bodyIds],
+        : planPositions(positions, aim, sun.azimuth, land, kit.bodyIds, reachMeters, centre),
+    [positions, aim, sun, land, kit.bodyIds, reachMeters, centre],
   )
 
   /*
@@ -439,7 +457,6 @@ function App() {
     if (chosen !== null) setBriefAnchor({ at: { lat: chosen.lat, lon: chosen.lon } })
     if (hits.length > 1) setVenueChoices(hits)
 
-    setParsedFields(resolvedDate === '' ? filled.filter((f) => f !== 'date') : filled)
     setDescribeState({
       status: 'done',
       /*
@@ -469,7 +486,6 @@ function App() {
   }
 
   const onGenerate = async () => {
-    setSubmitAttempted(true)
     /*
      * An incomplete venue or a stale brief is a SETUP problem, so send the user
      * back to the step that owns it rather than opening a panel over the map.
@@ -576,6 +592,7 @@ function App() {
               })),
             },
         desiredShots.map((shot) => shot.text),
+        reachMeters,
       ),
     )
     if (response.status !== 'ok' || typeof response.raw !== 'string') {
@@ -707,7 +724,6 @@ function App() {
             venue={venue}
             errors={errors}
             onVenueChange={onVenueDraftChange}
-            revealAllErrors={submitAttempted}
             staleBrief={staleBrief}
             drift={drift}
             onClearBrief={clearBrief}
@@ -730,9 +746,12 @@ function App() {
             shotListText={shotListText}
             onShotListText={onShotListChange}
             desiredShots={desiredShots}
-            parsedFields={parsedFields}
-            onFieldTyped={(field) => untouch([field as ParsedField])}
             at={centre}
+            onPinChange={onVenueChange}
+            onSearchPick={onPick}
+            reachMeters={reachMeters}
+            onReachChange={onReach}
+            mapHandle={setupMap}
           />
           <div className="mode__foot">
             {forwardBar}

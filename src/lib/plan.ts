@@ -32,6 +32,7 @@ import {
   type RangeVariety,
 } from '../core/coverage.ts'
 import { classifyLighting, type LightingResult } from '../core/lighting.ts'
+import { isWithinRadius, metersBeyondRadius } from '../core/radius.ts'
 import { checkSite, EMPTY_LANDCOVER, type Landcover, type SiteWarning } from '../core/siting.ts'
 import type { Platform } from './parsePlan.ts'
 
@@ -104,6 +105,13 @@ export interface PlannedPosition {
   standoff: StandoffBand
   /** Standoff and framing problems. Flagged in magenta, exactly like site ones. */
   framingWarnings: FramingWarning[]
+  /**
+   * Outside the ring the shooter said they can reach. REPORTED, never moved:
+   * they know whether that far bank is walkable and this app does not.
+   */
+  beyondReach: boolean
+  /** How far outside, so the card can say by how much. Zero when inside. */
+  beyondReachMeters: number
   lighting: LightingResult
   cone: Position[][]
   /**
@@ -162,6 +170,10 @@ export function planPosition(
   land: Landcover = EMPTY_LANDCOVER,
   /** Bodies in the kit. Only used to resolve a forced sensor crop. */
   bodyIds?: string[],
+  /** How far the shooter can get from the venue. Null when unconstrained. */
+  reachMeters?: number | null,
+  /** The venue itself, which the ring is centred on. */
+  venue?: LatLon | null,
 ): PlannedPosition {
   const { optic, sensor, focalLength } = resolveOptic(position, bodyIds)
   const fov = computeFOV(focalLength, SENSORS[sensor])
@@ -185,6 +197,14 @@ export function planPosition(
     frameWidthMeters: frameWidthMeters(subjectRangeMeters, fov.hFOV),
     standoff: standoffBand(fov.hFOV, position.platform),
     framingWarnings: classifyFraming(subjectRangeMeters, fov.hFOV, position.platform),
+    beyondReach:
+      reachMeters == null || venue == null
+        ? false
+        : !isWithinRadius(venue, position.at, reachMeters),
+    beyondReachMeters:
+      reachMeters == null || venue == null
+        ? 0
+        : metersBeyondRadius(venue, position.at, reachMeters),
     // The single authority on whether this position is backlit.
     lighting: classifyLighting(positionBearing, sunAzimuth),
     cone: fovConePolygon(position.at, cameraBearing, fov.hFOV, coneRangeMeters),
@@ -198,9 +218,11 @@ export function planPositions(
   sunAzimuth: number,
   land: Landcover = EMPTY_LANDCOVER,
   bodyIds?: string[],
+  reachMeters?: number | null,
+  venue?: LatLon | null,
 ): PlannedPosition[] {
   return positions.map((position) =>
-    planPosition(position, subject, sunAzimuth, land, bodyIds),
+    planPosition(position, subject, sunAzimuth, land, bodyIds, reachMeters, venue),
   )
 }
 

@@ -15,6 +15,364 @@
 /* ---------------------------------------------------------------- setup */
 
 /*
+ * ONE SCREEN, NO SCROLL, at 390x844. The whole point of the redesign, so the
+ * layout is a fixed column with exactly one flexible region: the map takes its
+ * share, the body takes what is left, and nothing overflows the viewport.
+ */
+.setup {
+  /*
+   * A FLEX CHILD, not absolutely positioned. .mode-setup already lays this out
+   * in a column above the fixed foot; taking it out of flow made it cover the
+   * foot, which then rendered behind the map with the rail showing through the
+   * satellite imagery.
+   */
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  /* The map takes its share of the SCREEN, not of what is left over. */
+  grid-template-rows: 40vh auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.setup__map {
+  position: relative;
+  min-height: 0;
+}
+
+.setup__search {
+  position: absolute;
+  z-index: 4;
+  top: var(--space-2);
+  left: var(--space-2);
+  right: var(--space-2);
+}
+
+/* The resolved place, and the ring. No coordinate fields anywhere. */
+.plate {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  /*
+   * An explicit floor. The row is an `auto` grid track, so it sizes to its
+   * content, and a bare button with no line-height of its own measured zero and
+   * collapsed the whole strip to nine pixels.
+   */
+  min-height: 46px;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--page-pad);
+  background: var(--color-bg);
+  border-bottom: var(--line-hair) solid var(--color-line);
+}
+
+.plate__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.3;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--color-text);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-tight);
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.plate__reach {
+  /* Pushed right so the venue name and the reach never read as one string. */
+  margin-left: auto;
+  font-size: var(--text-sm);
+  color: var(--color-accent);
+}
+
+.plate__coords {
+  flex: 1 0 100%;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.setup__body {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--page-pad) 0;
+  overflow: hidden;
+}
+
+.setup__block {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.setup__label {
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.setup__text {
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-field);
+  color: var(--color-text);
+  border: var(--line-hair) solid var(--color-line);
+  border-top-color: var(--color-edge-top);
+  border-radius: var(--radius-panel);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  resize: none;
+}
+
+.setup__text::placeholder {
+  color: var(--color-text-faint);
+}
+
+.setup__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.setup__read {
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  background: transparent;
+  color: var(--color-accent);
+  border: var(--line-hair) solid var(--color-accent);
+  border-radius: var(--radius-panel);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heavy);
+  cursor: pointer;
+}
+
+.setup__read:disabled {
+  color: var(--color-text-faint);
+  border-color: var(--color-line);
+}
+
+/* Small affordances for the things that are reference, not setup. */
+.setup__link {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.setup__note {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.setup__note--bad {
+  padding-left: var(--space-2);
+  border-left: var(--line-rule) solid var(--color-hazard);
+  color: var(--color-text);
+}
+
+.setup__choices {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.setup__choice {
+  min-height: 40px;
+  padding: var(--space-2);
+  background: var(--color-panel);
+  color: var(--color-text);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-panel);
+  text-align: left;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+/* ------------------------------------------------------------ kit chips */
+
+.kitrow {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.kitrow__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.kitrow__label {
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.kitrow__edit {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.kitrow__scroll {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+
+.kitrow__scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* Selected is filled, unselected is outlined. Nothing else distinguishes them. */
+.kitchip {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  background: transparent;
+  color: var(--color-text-muted);
+  border: var(--line-hair) solid var(--color-line-strong);
+  border-radius: var(--radius-panel);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.kitchip--on {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-ink);
+  font-weight: var(--weight-heavy);
+}
+
+/* --------------------------------------------------------- window pills */
+
+.pills {
+  display: grid;
+  /* minmax(0,…) so a long date or time cannot push the row wider than the screen. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  gap: var(--space-2);
+}
+
+.pill {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-panel);
+  border: var(--line-hair) solid var(--color-line);
+  border-top-color: var(--color-edge-top);
+  border-radius: var(--radius-panel);
+}
+
+.pill__label {
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.pill__pair {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.pill__input {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--color-text);
+  border: 0;
+  font-size: var(--text-base);
+  font-weight: var(--weight-heavy);
+}
+
+/* ---------------------------------------------------------------- drawer */
+
+/*
+ * Reference, not setup: the full kit, the brief and shot list, saved setups.
+ * Opens OVER the screen so it can never make the page taller than the viewport,
+ * which is the one rule this layout has.
+ */
+.drawer {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+}
+
+.drawer__head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--page-pad);
+  border-bottom: var(--line-hair) solid var(--color-line);
+}
+
+.drawer__title {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-heavy);
+}
+
+.drawer__close {
+  min-height: var(--control-height);
+  padding: 0 var(--space-4);
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  border: 0;
+  border-radius: var(--radius-panel);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heavy);
+  cursor: pointer;
+}
+
+.drawer__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.drawer__pad {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--page-pad);
+}
+
+/* The reach ring handle, dragged to set how far you can get. */
+.reach-handle {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: var(--color-accent);
+  border: var(--line-rule) solid var(--mark-edge);
+  border-radius: 50%;
+  cursor: ew-resize;
+}
+
+/*
  * SETUP IS NOT A FORM FIRST. The description box is the front door and the form
  * is what it fills, so the page is paced accordingly: one thing per region,
  * generous gaps between blocks, and labels that get out of the way of values.
@@ -1086,6 +1444,11 @@
   height: 26px;
 }
 
+/* On SETUP the pin and the ring carry the accent, like every other control. */
+.shell--setup .pin {
+  background: var(--color-accent);
+}
+
 .reticle-mark {
   position: relative;
   width: 34px;
@@ -2136,12 +2499,17 @@
   cursor: pointer;
 }
 
-/* The one primary action. This is what the accent is for. */
+/*
+ * The one primary action. This is what the accent is for, and it is the ONLY
+ * thing in the app allowed a gradient or a glow. Both come from tokens.css so a
+ * second use would have to be written deliberately rather than copied.
+ */
 .btn--primary {
-  background: var(--color-accent);
+  background: var(--primary-sheen);
   border-color: var(--color-accent);
   color: var(--color-accent-ink);
   font-weight: var(--weight-heavy);
+  box-shadow: var(--primary-glow);
 }
 
 .btn--small {
@@ -2244,24 +2612,6 @@
 .drop__label {
   font-size: var(--text-sm);
   color: var(--color-text-muted);
-}
-
-.plate {
-  position: relative;
-  display: block;
-  width: 100%;
-  padding: 0;
-  border: var(--line-rule) solid var(--color-line-strong);
-  border-radius: var(--radius-flat);
-  background: var(--color-panel-2);
-  line-height: 0;
-  cursor: crosshair;
-}
-
-.plate__img {
-  display: block;
-  width: 100%;
-  height: auto;
 }
 
 .reticle {

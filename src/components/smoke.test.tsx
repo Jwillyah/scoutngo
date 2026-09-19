@@ -30,80 +30,81 @@ describe('render smoke', () => {
       expect(html).toContain(`class="rail__label">${step}</span>`)
     }
     expect(html).toContain('rail__step--now')
-    // The five tab shell is gone.
     expect(html).not.toContain('class="nav__item')
   })
 
   it('starts in setup, because that is the first step', () => {
     expect(html).toContain('shell shell--setup')
-    expect(html).toContain('Venue and window')
   })
 
-  /*
-   * FIELD cannot be entered before there is a plan to walk to. That gating is
-   * what makes the rail a sequence rather than a channel selector.
-   */
   it('locks the field step until a plan exists', () => {
     expect(html).toContain('rail__step--locked')
   })
 
   /*
-   * THE STEP BLOCKS STAY OPEN. Venue and window is part of describing this
-   * shoot, so it is never folded.
-   *
-   * Kit and saved setups DO collapse, which is a deliberate narrowing of the
-   * earlier "no accordions" rule rather than a drift back to it: they are
-   * settings rather than steps, they live in SETUP which has no sheet over it,
-   * and they only start shut once they are configured. The pattern that was
-   * removed was accordions inside a draggable sheet inside a tab; none of that
-   * is back.
+   * MAP FIRST. Setup used to be ten stacked fields that scrolled for more than
+   * two screens; it is now one screen with the map at the top of it.
    */
-  it('keeps the step block open and folds only the settings', () => {
-    expect(html).toContain('section__banner--static')
-    expect(html).toContain('Venue and window')
-    expect(html).toContain('Kit and style')
-    expect(html).toContain('Saved setups')
-  })
-
-  /* The one input at the front of SETUP, and the pasted list beside it. */
-  it('leads with the description box, not the form', () => {
-    // The apostrophe is HTML-escaped in the rendered markup, so match around it.
+  it('leads with the map and its own search', () => {
+    expect(html).toContain('class="setup"')
+    expect(html).toContain('class="setup__map"')
+    // The apostrophe is HTML-escaped in the rendered markup.
     expect(html).toContain('the shoot?')
-    expect(html).toContain('Got a shot list? Paste it.')
-    expect(html).toContain('Read it and fill the form')
   })
 
-  /* Multiline and roomy, because these are dictated into as often as typed. */
-  it('uses multiline inputs for the description and the shot list', () => {
-    expect(html).toContain('<textarea')
+  /*
+   * THE PIN IS THE COORDINATE. Nobody sets a venue by typing decimal degrees,
+   * and a latitude field here was only ever a form artefact.
+   */
+  it('has no latitude or longitude fields', () => {
+    expect(html).not.toContain('>Latitude')
+    expect(html).not.toContain('>Longitude')
+    expect(html).not.toContain('placeholder="38.3648"')
+  })
+
+  it('states the reach ring, which is a real constraint', () => {
+    expect(html).toContain('plate__reach')
+    expect(html).toContain('400m reach')
+  })
+
+  it('offers one description input and the kit as chips', () => {
     expect(html).toContain('id="describe-shoot"')
-    expect(html).toContain('id="describe-shots"')
+    expect(html).toContain('class="kitrow__scroll"')
+    expect(html).toContain('kitchip')
   })
 
-  /* No thumbnail until coordinates resolve; the calibration venue has them. */
-  it('confirms the venue with a satellite thumbnail once coordinates resolve', () => {
-    expect(html).toContain('class="thumb"')
-    expect(html).toContain('World_Imagery/MapServer/export')
+  it('shows date and window as compact pills, not four stacked fields', () => {
+    expect(html).toContain('class="pills"')
+    expect(html).toContain('type="date"')
+    expect(html).toContain('type="time"')
   })
 
-  /* The map and its chrome belong to PLAN, so none of it renders in SETUP. */
-  it('shows no map chrome in setup', () => {
-    expect(html).not.toContain('class="map__canvas"')
-    expect(html).not.toContain('Search for a venue')
+  /* Reference, not setup: these open OVER the screen rather than on it. */
+  it('keeps kit detail, brief and saved setups behind affordances', () => {
+    expect(html).toContain('Edit kit')
+    expect(html).toContain('Paste a shot list')
+    expect(html).toContain('Saved')
+    expect(html).not.toContain('class="drawer"')
+  })
+
+  /*
+   * The calibration venue is a developer shortcut behind ?calibration=1, so a
+   * cold start has no venue at all.
+   */
+  it('hides the calibration shortcut and starts empty', () => {
+    expect(html).not.toContain('Load calibration venue')
+    expect(html).toContain('Drop a pin or search for the venue')
+  })
+
+  it('shows no PLAN chrome in setup', () => {
     expect(html).not.toContain('class="cones"')
     expect(html).not.toContain('class="sheet')
   })
 
-  it('shows no stale brief warning when the venue matches the brief', () => {
+  it('shows no stale brief warning on a cold start', () => {
     expect(html).not.toContain('class="stale"')
   })
 
-  it('shows no validation errors before anything has been touched', () => {
-    expect(html).not.toContain('field__error')
-    expect(html).not.toContain('aria-invalid="true"')
-  })
-
-  /* Forward is one large action, not a tab tap. */
   it('offers a single forward action out of setup', () => {
     expect(html).toContain('forward__btn')
     expect(html).toContain('Setup done · Plan')

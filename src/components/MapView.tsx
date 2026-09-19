@@ -86,6 +86,7 @@ const LABEL_MIN_METERS = 50
 const LABEL_MAX_METERS = 700
 /** How long a press has to be held before it drops a pin. */
 const LONG_PRESS_MS = 550
+const RADIUS_SOURCE = 'reach-radius'
 const CONE_SOURCE = 'fov-cones'
 const SUN_SOURCE = 'sun-axis'
 const RAY_SOURCE = 'sun-rays'
@@ -172,6 +173,21 @@ interface MapViewProps {
   onSelect: (id: string | null) => void
   onPitchChange: (pitch: number) => void
   bottomInset: number
+  /**
+   * How far from the venue the shooter can actually get, in metres. Drawn as a
+   * ring with a draggable handle. Null hides it entirely, which is what PLAN
+   * and FIELD pass.
+   */
+  radiusMeters?: number | null
+  onRadiusChange?: (meters: number) => void
+  /**
+   * Fired once the map has loaded and the imperative handle is usable.
+   *
+   * Needed because fitting the view is meaningless before the style exists, and
+   * guessing a delay is how you get a fit that silently does nothing on a slow
+   * connection and works on a fast one.
+   */
+  onReady?: () => void
 }
 
 function emptyCollection(): GeoJSON.FeatureCollection {
@@ -281,6 +297,9 @@ export function MapView({
   onSelect,
   onPitchChange,
   bottomInset,
+  radiusMeters = null,
+  onRadiusChange,
+  onReady,
 }: MapViewProps) {
   const container = useRef<HTMLDivElement>(null)
   const map = useRef<maplibregl.Map | null>(null)
@@ -462,6 +481,7 @@ export function MapView({
         readToken('--light-side'),
       ] as unknown as maplibregl.DataDrivenPropertyValueSpecification<string>
 
+      instance.addSource(RADIUS_SOURCE, { type: 'geojson', data: emptyCollection() })
       instance.addSource(CONE_SOURCE, { type: 'geojson', data: emptyCollection() })
       instance.addSource(SUN_SOURCE, { type: 'geojson', data: emptyCollection() })
       instance.addSource(RAY_SOURCE, { type: 'geojson', data: emptyCollection() })
@@ -477,6 +497,30 @@ export function MapView({
         readToken('--sun-shadow'),
         readToken('--sun'),
       ] as unknown as maplibregl.DataDrivenPropertyValueSpecification<string>
+
+      /*
+       * The reachable ring. Added FIRST so every marker and cone sits above it:
+       * it is a boundary, not a subject, and it must never obscure a position.
+       */
+      instance.addLayer({
+        id: 'radius-fill',
+        type: 'fill',
+        source: RADIUS_SOURCE,
+        paint: {
+          'fill-color': readToken('--color-accent', '#d6f84c', container.current),
+          'fill-opacity': 0.08,
+        },
+      })
+      instance.addLayer({
+        id: 'radius-line',
+        type: 'line',
+        source: RADIUS_SOURCE,
+        paint: {
+          'line-color': readToken('--color-accent', '#d6f84c', container.current),
+          'line-width': 2,
+          'line-dasharray': [3, 2],
+        },
+      })
 
       instance.addLayer({
         id: 'cone-fill',
@@ -561,6 +605,67 @@ export function MapView({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    if (ready) onReady?.()
+  }, [ready, onReady])
+
+  /* ----------------------------------------------------------- reach ring */
+  const radiusHandle = useRef<maplibregl.Marker | null>(null)
+
+  useEffect(() => {
+    const instance = map.current
+    if (instance === null || !ready) return
+
+    const source = instance.getSource(RADIUS_SOURCE) as maplibregl.GeoJSONSource | undefined
+    if (source === undefined) return
+
+    if (venue === null || radiusMeters === null) {
+      source.setData(emptyCollection())
+      radiusHandle.current?.remove()
+      radiusHandle.current = null
+      return
+    }
+
+    /*
+     * The ring as a polygon, from the same destinationPoint the cones use. 64
+     * steps is smooth at every zoom this map reaches and costs nothing.
+     */
+    const ring: [number, number][] = []
+    for (let i = 0; i <= 64; i++) {
+      const edge = destinationPoint(venue, (i * 360) / 64, radiusMeters)
+      ring.push([edge.lon, edge.lat])
+    }
+    source.setData({
+      type: 'FeatureCollection',
+      features: [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [ring] } }],
+    })
+
+    if (onRadiusChange === undefined) return
+
+    /*
+     * A handle on the east edge, dragged to resize. Distance from the venue to
+     * wherever it lands IS the new radius, so the gesture and the number are the
+     * same thing and there is no slider to keep in step.
+     */
+    const east = destinationPoint(venue, 90, radiusMeters)
+    if (radiusHandle.current === null) {
+      const el = document.createElement('button')
+      el.type = 'button'
+      el.className = 'reach-handle'
+      el.setAttribute('aria-label', 'Drag to change how far you can get from the venue')
+      const marker = new maplibregl.Marker({ element: el, draggable: true, anchor: 'center' })
+        .setLngLat([east.lon, east.lat])
+        .addTo(instance)
+      marker.on('drag', () => {
+        const at = marker.getLngLat()
+        onRadiusChange(distanceMeters(venue, { lat: at.lat, lon: at.lng }))
+      })
+      radiusHandle.current = marker
+    } else {
+      radiusHandle.current.setLngLat([east.lon, east.lat])
+    }
+  }, [venue, radiusMeters, onRadiusChange, ready])
 
   /* ------------------------------------------------------ imperative handle */
   useImperativeHandle(

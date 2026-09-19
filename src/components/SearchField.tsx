@@ -4,6 +4,8 @@ import { MIN_INTERVAL_MS, OSM_ATTRIBUTION, searchVenues, type SearchHit } from '
 
 interface SearchFieldProps {
   onPick: (at: LatLon, label: string) => void
+  /** Placeholder and accessible name. SETUP asks a different question. */
+  label?: string
 }
 
 /** Nominatim returns one long display_name. The head is the name, the tail the address. */
@@ -13,7 +15,7 @@ function splitLabel(label: string): { name: string; address: string } {
   return { name: label.slice(0, comma), address: label.slice(comma + 1).trim() }
 }
 
-export function SearchField({ onPick }: SearchFieldProps) {
+export function SearchField({ onPick, label = 'Search for a venue' }: SearchFieldProps) {
   const [query, setQuery] = useState('')
   const [hits, setHits] = useState<SearchHit[]>([])
   const [open, setOpen] = useState(false)
@@ -82,8 +84,8 @@ export function SearchField({ onPick }: SearchFieldProps) {
           enterKeyHint="search"
           autoComplete="off"
           value={query}
-          placeholder="Search for a venue"
-          aria-label="Search for a venue"
+          placeholder={label}
+          aria-label={label}
           onChange={(event) => {
             const next = event.target.value
             setQuery(next)

@@ -1,22 +1,28 @@
-import type { LatLon } from '../core/geo.ts'
+import { useEffect, useRef, useState } from 'react'
+import { destinationPoint, type LatLon } from '../core/geo.ts'
 import type { DescribeState, DesiredShot } from '../lib/describe.ts'
-import type { SearchHit } from '../lib/search.ts'
 import type { KitSelection } from '../lib/kitSelection.ts'
+import type { SearchHit } from '../lib/search.ts'
 import type { Spot } from '../lib/spots.ts'
 import type { VenueDraft, VenueErrors } from '../lib/venue.ts'
-import { Collapsible } from './Collapsible.tsx'
-import { DescribeShoot } from './DescribeShoot.tsx'
+import { KitChips } from './KitChips.tsx'
 import { KitProfile } from './KitProfile.tsx'
-import { VenueThumb } from './VenueThumb.tsx'
+import { MapView, type MapHandle } from './MapView.tsx'
+import { SearchField } from './SearchField.tsx'
 import { SpotsPanel } from './SpotsPanel.tsx'
 import { StaleBrief } from './StaleBrief.tsx'
-import { VenueForm } from './VenueForm.tsx'
+import { VenuePlate } from './VenuePlate.tsx'
 
 interface SetupModeProps {
   venue: VenueDraft
   errors: VenueErrors
   onVenueChange: (next: VenueDraft) => void
-  revealAllErrors: boolean
+  at: LatLon | null
+  onPinChange: (at: LatLon) => void
+  onSearchPick: (at: LatLon, label: string) => void
+  reachMeters: number
+  onReachChange: (meters: number) => void
+  mapHandle: React.Ref<MapHandle>
   staleBrief: boolean
   drift: string
   onClearBrief: () => void
@@ -30,7 +36,6 @@ interface SetupModeProps {
   onImportSpots: (incoming: Spot[]) => void
   suggestedName: string
   canSave: boolean
-  /* The one input at the front, and everything it produces. */
   describeText: string
   onDescribeText: (next: string) => void
   describeState: DescribeState
@@ -40,28 +45,34 @@ interface SetupModeProps {
   shotListText: string
   onShotListText: (next: string) => void
   desiredShots: DesiredShot[]
-  parsedFields: string[]
-  onFieldTyped: (field: string) => void
-  /** Coordinates, once they resolve. Drives the thumbnail. */
-  at: LatLon | null
 }
 
+/** What is open over the one screen. Only ever one at a time. */
+type Drawer = 'none' | 'kit' | 'shots' | 'saved'
+
 /**
- * SETUP: everything decided before the day.
+ * SETUP: one screen, map first.
  *
- * A plain scrolling page. No sheet, no accordions, no tabs. Every block is open
- * because there is nothing here worth hiding: this is done at a desk, once, and
- * the cost of scrolling past a section you do not need is far lower than the
- * cost of not finding one you do.
+ * WHAT THIS REPLACED. Ten stacked form fields, including a latitude and a
+ * longitude typed by hand, that scrolled for two and a half screens before
+ * reaching the button. Nobody sets a venue by typing decimal degrees; they point
+ * at it. So the map is the top of the screen, the pin is the coordinate, and the
+ * ring around it is the other fact that was never captured anywhere: how far the
+ * shooter can actually get.
  *
- * Absorbs the old KIT and SPOTS tabs. Spots stop being a destination and become
- * what they always were, a way to start from a setup you already made.
+ * NOTHING SCROLLS. Everything that is part of setting up this shoot is on the
+ * one screen at 390x844. The three things that are reference rather than setup,
+ * the full kit detail, a pasted shot list, and saved setups, open over it and
+ * close again.
  */
 export function SetupMode({
   venue,
-  errors,
-  onVenueChange,
-  revealAllErrors,
+  at,
+  onPinChange,
+  onSearchPick,
+  reachMeters,
+  onReachChange,
+  mapHandle,
   staleBrief,
   drift,
   onClearBrief,
@@ -84,72 +95,215 @@ export function SetupMode({
   shotListText,
   onShotListText,
   desiredShots,
-  parsedFields,
-  onFieldTyped,
-  at,
+  onVenueChange,
 }: SetupModeProps) {
-  /* Settings start shut once they are configured. Steps never do. */
-  const kitConfigured = kit.lensIds.length > 0 && kit.bodyIds.length > 0
+  const [drawer, setDrawer] = useState<Drawer>('none')
+
+  /*
+   * Frame the reach ring whenever the pin moves.
+   *
+   * Without this the default 400m ring sits entirely outside a z16.5 view: the
+   * circle exists, the handle exists, and neither is on screen, so the one
+   * control that makes this a map rather than a picture is invisible. Fitting on
+   * the PIN only, not on the radius, so dragging the handle does not fight the
+   * gesture by re-zooming under the thumb.
+   */
+  const handle = mapHandle as React.RefObject<MapHandle | null>
+  const [mapReady, setMapReady] = useState(false)
+  const framedAt = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!mapReady || at === null) return
+    const key = `${at.lat.toFixed(5)},${at.lon.toFixed(5)}`
+    if (framedAt.current === key) return
+    framedAt.current = key
+    const edges = [0, 90, 180, 270].map((bearing) =>
+      destinationPoint(at, bearing, reachMeters),
+    )
+    handle.current?.fitAll(edges)
+  }, [at, reachMeters, handle, mapReady])
+  const open = (next: Drawer) => setDrawer((current) => (current === next ? 'none' : next))
+
+  const setField = (field: 'date' | 'startTime' | 'endTime') => (value: string) =>
+    onVenueChange({ ...venue, [field]: value })
 
   return (
-    <div className="page page--setup">
-      {/* Confirmation that the geocoder found the right place, before anything else. */}
-      <VenueThumb at={at} label={venue.name} />
-
-      <DescribeShoot
-        text={describeText}
-        onText={onDescribeText}
-        state={describeState}
-        onRead={onDescribe}
-        choices={venueChoices}
-        onPickVenue={onPickVenue}
-        shotListText={shotListText}
-        onShotListText={onShotListText}
-        desiredShots={desiredShots}
-      />
-
-      <StaleBrief
-        staleBrief={staleBrief}
-        drift={drift}
-        onClearBrief={onClearBrief}
-        onKeepBrief={onKeepBrief}
-      />
-
-      <VenueForm
-        value={venue}
-        errors={errors}
-        onChange={onVenueChange}
-        revealAllErrors={revealAllErrors}
-        parsedFields={parsedFields}
-        onFieldTyped={onFieldTyped}
-      />
-
-      {/* Settings, not steps: shut once configured. */}
-      <Collapsible
-        index="02"
-        title="Kit and style"
-        summary={`${kit.bodyIds.length} bodies, ${kit.lensIds.length} lenses, ${kit.droneIds.length} air`}
-        defaultOpen={!kitConfigured}
-      >
-        <KitProfile value={kit} onChange={onKit} />
-      </Collapsible>
-
-      <Collapsible
-        index="03"
-        title="Saved setups"
-        summary={spots.length === 0 ? 'None saved' : `${spots.length} saved`}
-        defaultOpen={false}
-      >
-        <SpotsPanel
-          spots={spots}
-          onSave={onSaveSpot}
-          onLoad={onLoadSpot}
-          onDelete={onDeleteSpot}
-          onImport={onImportSpots}
-          suggestedName={suggestedName}
-          canSave={canSave}
+    <div className="setup">
+      {/* The map is the top of the screen and the pin is the coordinate. */}
+      <div className="setup__map">
+        <MapView
+          handle={mapHandle}
+          venue={at}
+          onVenueChange={onPinChange}
+          subject={at}
+          onSubjectChange={() => {}}
+          mode={null}
+          plan={[]}
+          conePlan={[]}
+          onPositionMove={() => {}}
+          onLongPress={onPinChange}
+          sunAzimuth={null}
+          sunOverlay={null}
+          showSun={false}
+          showArc={false}
+          selectedId={null}
+          onSelect={() => {}}
+          onPitchChange={() => {}}
+          bottomInset={0}
+          radiusMeters={reachMeters}
+          onRadiusChange={onReachChange}
+          onReady={() => setMapReady(true)}
         />
-      </Collapsible>
+        <div className="setup__search">
+          <SearchField onPick={onSearchPick} label="Where's the shoot?" />
+        </div>
+      </div>
+
+      <VenuePlate name={venue.name} at={at} reachMeters={reachMeters} />
+
+      <div className="setup__body">
+        <StaleBrief
+          staleBrief={staleBrief}
+          drift={drift}
+          onClearBrief={onClearBrief}
+          onKeepBrief={onKeepBrief}
+        />
+
+        {venueChoices.length === 0 ? null : (
+          <div className="setup__choices">
+            <p className="setup__label">{venueChoices.length} places match. Which one?</p>
+            {venueChoices.map((hit) => (
+              <button
+                key={hit.id}
+                type="button"
+                className="setup__choice"
+                onClick={() => onPickVenue(hit)}
+              >
+                {hit.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="setup__block">
+          <label className="setup__label" htmlFor="describe-shoot">
+            What's the shoot?
+          </label>
+          <textarea
+            id="describe-shoot"
+            className="setup__text"
+            rows={2}
+            value={describeText}
+            placeholder="Boat docking Saturday 11 to 3, vertical cuts of boats hitting pilings."
+            onChange={(event) => onDescribeText(event.target.value)}
+          />
+          <div className="setup__row">
+            <button
+              type="button"
+              className="setup__read"
+              onClick={onDescribe}
+              disabled={describeState.status === 'working' || describeText.trim() === ''}
+            >
+              {describeState.status === 'working' ? 'Reading…' : 'Read it'}
+            </button>
+            <button type="button" className="setup__link" onClick={() => open('shots')}>
+              {desiredShots.length === 0
+                ? 'Paste a shot list'
+                : `${desiredShots.length} shots listed`}
+            </button>
+            <button type="button" className="setup__link" onClick={() => open('saved')}>
+              Saved
+            </button>
+          </div>
+          {describeState.status === 'done' ? (
+            <p className="setup__note">
+              Read {describeState.filled} fields.
+              {describeState.needsVenue ? ' No map match — drop the pin yourself.' : ''}
+            </p>
+          ) : null}
+          {describeState.status === 'error' ? (
+            <p className="setup__note setup__note--bad">{describeState.message}</p>
+          ) : null}
+          {describeState.status === 'raw' ? (
+            <p className="setup__note setup__note--bad">{describeState.reason}</p>
+          ) : null}
+        </div>
+
+        <KitChips value={kit} onChange={onKit} onEdit={() => open('kit')} />
+
+        {/* Date and window as two pills, not four stacked fields. */}
+        <div className="pills">
+          <label className="pill">
+            <span className="pill__label">Date</span>
+            <input
+              className="pill__input num"
+              type="date"
+              value={venue.date}
+              onChange={(event) => setField('date')(event.target.value)}
+            />
+          </label>
+          <label className="pill">
+            <span className="pill__label">Window</span>
+            <span className="pill__pair">
+              <input
+                className="pill__input num"
+                type="time"
+                value={venue.startTime}
+                onChange={(event) => setField('startTime')(event.target.value)}
+              />
+              <input
+                className="pill__input num"
+                type="time"
+                value={venue.endTime}
+                onChange={(event) => setField('endTime')(event.target.value)}
+              />
+            </span>
+          </label>
+        </div>
+      </div>
+
+      {/* One drawer at a time, over the screen, never pushing it taller. */}
+      {drawer === 'none' ? null : (
+        <div className="drawer">
+          <div className="drawer__head">
+            <span className="drawer__title">
+              {drawer === 'kit' ? 'Kit and style' : drawer === 'shots' ? 'Shot list' : 'Saved setups'}
+            </span>
+            <button type="button" className="drawer__close" onClick={() => setDrawer('none')}>
+              Done
+            </button>
+          </div>
+          <div className="drawer__body">
+            {drawer === 'kit' ? <KitProfile value={kit} onChange={onKit} /> : null}
+            {drawer === 'shots' ? (
+              <div className="drawer__pad">
+                <p className="setup__note">
+                  One shot per line. The plan has to cover these, and anything no
+                  position covers is marked in the shot list.
+                </p>
+                <textarea
+                  className="setup__text"
+                  rows={8}
+                  value={shotListText}
+                  placeholder={'Boats hitting the pilings\nCrowd reaction from the deck'}
+                  onChange={(event) => onShotListText(event.target.value)}
+                />
+              </div>
+            ) : null}
+            {drawer === 'saved' ? (
+              <SpotsPanel
+                spots={spots}
+                onSave={onSaveSpot}
+                onLoad={onLoadSpot}
+                onDelete={onDeleteSpot}
+                onImport={onImportSpots}
+                suggestedName={suggestedName}
+                canSave={canSave}
+              />
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

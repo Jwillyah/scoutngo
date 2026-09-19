@@ -187,6 +187,15 @@ export interface GenerateRequestBody {
    */
   requiredShots?: string[]
   /**
+   * How far from the venue the shooter can physically get, in metres.
+   *
+   * A HARD CEILING, not a preference, and it overrides the per optic standoff
+   * whenever it is tighter. Optics say how far a lens CAN reach; this says how
+   * far the shooter can WALK, and a position outside it is not a hard shot but
+   * an impossible one.
+   */
+  reachMeters?: number
+  /**
    * Tide state at the middle of the window, computed from NOAA predictions.
    *
    * A FACT HANDED OVER, exactly like the sun figures. The model may use it to
@@ -240,6 +249,8 @@ export function buildGenerateBody(
   tide?: TideFact,
   /** The pasted shot list, if there is one. */
   requiredShots: string[] = [],
+  /** The reach ring drawn on the setup map. */
+  reachMeters?: number,
 ): GenerateRequestBody {
   return {
     venueName: venue.name,
@@ -255,6 +266,7 @@ export function buildGenerateBody(
     sun,
     ...(tide === undefined ? {} : { tide }),
     ...(requiredShots.length === 0 ? {} : { requiredShots }),
+    ...(reachMeters === undefined ? {} : { reachMeters }),
     ...(framing.subjectPoint === undefined ? {} : { subjectPoint: framing.subjectPoint }),
     /*
      * The map camera's bearing is how far the view is rotated clockwise from

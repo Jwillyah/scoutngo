@@ -56,8 +56,22 @@
   --grey-1: #b4b4b4; /* secondary type */
   --grey-2: #7d7d7d; /* faint type, placeholders */
 
+  /*
+   * TWO ACCENTS, CHOSEN BY SCREEN, and the reason is what is behind them.
+   *
+   * PLAN and FIELD float over satellite imagery and are read outdoors in direct
+   * sun. Nothing beats white there: it is the brightest thing available and it
+   * cannot be mistaken for part of a photograph.
+   *
+   * SETUP has no imagery to fight. It is done at a desk, and white on near-black
+   * across a whole screen of chrome reads as unfinished rather than as calm, so
+   * it takes the lime. The switch happens once, on .shell--setup below; no
+   * component knows which accent it is wearing.
+   */
   --accent: #ffffff; /* SIGNAL WHITE. primary action, active state. nothing else */
   --accent-ink: #0b0b0b; /* type on top of the accent */
+  --lime: #d6f84c; /* SETUP only. Same rules: action and active state, nothing else */
+  --lime-ink: #101208;
 
   --hazard: #ff3b30; /* RED. hazard only, and nothing else is red */
   --hazard-tint: #2e0b08;
@@ -111,6 +125,20 @@
   --color-hazard: var(--hazard);
   --color-hazard-bg: var(--hazard-tint);
   --color-focus: var(--accent);
+
+  /*
+   * ONE GRADIENT AND ONE GLOW PER SCREEN, on the single primary action and
+   * nowhere else. Not on panels, not on chips, not on anything that is not the
+   * main thing to press. Defined here so there is exactly one place it can come
+   * from, and so a second use has to be a deliberate edit to this file.
+   */
+  --primary-sheen: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-accent) 100%, white 18%) 0%,
+    var(--color-accent) 58%,
+    color-mix(in srgb, var(--color-accent) 86%, black 14%) 100%
+  );
+  --primary-glow: 0 0 18px color-mix(in srgb, var(--color-accent) 42%, transparent);
 
   /* ----------------------------------------------------------------- type */
   /* One family. The monospace variant is for numeric readouts only, applied
@@ -194,4 +222,30 @@
   /* Keep --nav-height in step with NAV_HEIGHT in NavBar.tsx. */
   --nav-height: 56px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/*
+ * SETUP takes the lime. One override, at the shell, so every control below
+ * inherits it without knowing which screen it is on.
+ *
+ * THE SHEEN AND GLOW HAVE TO BE REDECLARED HERE, and this is not redundancy. A
+ * custom property resolves the var() references inside its own value on the
+ * element where it is DECLARED, not where it is used. --primary-sheen declared
+ * on :root therefore bakes in :root's white accent and inherits down already
+ * resolved, so overriding --color-accent further down changes every flat fill
+ * but leaves the gradient white. Measured: the setup button came out white while
+ * every chip beside it was correctly lime.
+ */
+.shell--setup {
+  --color-accent: var(--lime);
+  --color-accent-ink: var(--lime-ink);
+  --color-focus: var(--lime);
+
+  --primary-sheen: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--lime) 100%, white 18%) 0%,
+    var(--lime) 58%,
+    color-mix(in srgb, var(--lime) 86%, black 14%) 100%
+  );
+  --primary-glow: 0 0 18px color-mix(in srgb, var(--lime) 42%, transparent);
 }
