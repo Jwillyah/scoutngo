@@ -139,7 +139,19 @@ export interface MapHandle {
     points: LatLon[],
   ): { x: number; y: number }[]
   flyTo(at: LatLon, zoom?: number): void
-  fitAll(points: LatLon[]): void
+  /**
+   * Frame these points.
+   *
+   * `duration` in ms; pass 0 for a live drag, where a 900ms ease would still be
+   * catching up several slider steps later. `padding` overrides the default
+   * insets, which are sized for PLAN's full height map and leave almost nothing
+   * of SETUP's 270px one.
+   */
+  fitAll(
+    points: LatLon[],
+    duration?: number,
+    padding?: { top: number; left: number; right: number; bottom: number },
+  ): void
   setPitch(pitch: number): void
   zoomBy(delta: number): void
 }
@@ -174,12 +186,21 @@ interface MapViewProps {
   onPitchChange: (pitch: number) => void
   bottomInset: number
   /**
-   * How far from the venue the shooter can actually get, in metres. Drawn as a
-   * ring with a draggable handle. Null hides it entirely, which is what PLAN
-   * and FIELD pass.
+   * How far from the venue the shooter can actually get, in metres. DISPLAY
+   * ONLY: the ring is drawn from this and has no handle on it, because the one
+   * way to change it is the slider under the map. Null hides it entirely, which
+   * is what PLAN and FIELD pass.
    */
   radiusMeters?: number | null
-  onRadiusChange?: (meters: number) => void
+  /**
+   * One sentence under the pin, for a first run. Null hides it.
+   *
+   * It rides on the pin as a marker rather than sitting on the map surface, so
+   * it stays under the thing it is talking about through any pan or zoom.
+   */
+  pinHint?: string | null
+  /** Fired when the venue pin is DRAGGED, as opposed to moved any other way. */
+  onPinDrag?: () => void
   /**
    * Fired once the map has loaded and the imperative handle is usable.
    *
@@ -298,12 +319,14 @@ export function MapView({
   onPitchChange,
   bottomInset,
   radiusMeters = null,
-  onRadiusChange,
+  pinHint = null,
+  onPinDrag,
   onReady,
 }: MapViewProps) {
   const container = useRef<HTMLDivElement>(null)
   const map = useRef<maplibregl.Map | null>(null)
   const venueMarker = useRef<maplibregl.Marker | null>(null)
+  const hintMarker = useRef<maplibregl.Marker | null>(null)
   const subjectMarker = useRef<maplibregl.Marker | null>(null)
   const figureMarkers = useRef(new Map<string, maplibregl.Marker>())
   const rayLabels = useRef<maplibregl.Marker[]>([])
@@ -322,6 +345,7 @@ export function MapView({
     onPositionMove,
     onPitchChange,
     onLongPress,
+    onPinDrag,
   })
   useEffect(() => {
     latest.current = {
@@ -332,6 +356,7 @@ export function MapView({
       onPositionMove,
       onPitchChange,
       onLongPress,
+      onPinDrag,
     }
   }, [
     mode,
@@ -341,6 +366,7 @@ export function MapView({
     onPositionMove,
     onPitchChange,
     onLongPress,
+    onPinDrag,
   ])
 
   const selfMoved = useRef(false)
@@ -596,8 +622,13 @@ export function MapView({
        * StrictMode remounts once in development, which is exactly this path,
        * and it is why the venue pin and the subject reticle were invisible in
        * dev while working in a production build.
+       *
+       * ANY NEW MARKER REF BELONGS IN THIS LIST. The first-run pin hint was
+       * added without it and was invisible in dev for exactly this reason,
+       * creating itself against the first map and then updating an orphan.
        */
       venueMarker.current = null
+      hintMarker.current = null
       subjectMarker.current = null
       figures.clear()
       setFigureEls({})
@@ -611,8 +642,12 @@ export function MapView({
   }, [ready, onReady])
 
   /* ----------------------------------------------------------- reach ring */
-  const radiusHandle = useRef<maplibregl.Marker | null>(null)
-
+  /*
+   * A RING WITH NOTHING TO GRAB. It used to carry a draggable dot on its east
+   * edge, which was the only way to change the reach and looked like a map
+   * decoration. The slider under the map owns the number now; this just draws
+   * whatever that number currently is.
+   */
   useEffect(() => {
     const instance = map.current
     if (instance === null || !ready) return
@@ -622,8 +657,6 @@ export function MapView({
 
     if (venue === null || radiusMeters === null) {
       source.setData(emptyCollection())
-      radiusHandle.current?.remove()
-      radiusHandle.current = null
       return
     }
 
@@ -641,31 +674,7 @@ export function MapView({
       features: [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [ring] } }],
     })
 
-    if (onRadiusChange === undefined) return
-
-    /*
-     * A handle on the east edge, dragged to resize. Distance from the venue to
-     * wherever it lands IS the new radius, so the gesture and the number are the
-     * same thing and there is no slider to keep in step.
-     */
-    const east = destinationPoint(venue, 90, radiusMeters)
-    if (radiusHandle.current === null) {
-      const el = document.createElement('button')
-      el.type = 'button'
-      el.className = 'reach-handle'
-      el.setAttribute('aria-label', 'Drag to change how far you can get from the venue')
-      const marker = new maplibregl.Marker({ element: el, draggable: true, anchor: 'center' })
-        .setLngLat([east.lon, east.lat])
-        .addTo(instance)
-      marker.on('drag', () => {
-        const at = marker.getLngLat()
-        onRadiusChange(distanceMeters(venue, { lat: at.lat, lon: at.lng }))
-      })
-      radiusHandle.current = marker
-    } else {
-      radiusHandle.current.setLngLat([east.lon, east.lat])
-    }
-  }, [venue, radiusMeters, onRadiusChange, ready])
+  }, [venue, radiusMeters, ready])
 
   /* ------------------------------------------------------ imperative handle */
   useImperativeHandle(
@@ -774,16 +783,21 @@ export function MapView({
         })
       },
 
-      fitAll(points) {
+      fitAll(points, duration = 900, padding) {
         const instance = map.current
         if (instance === null || points.length === 0) return
         const bounds = new maplibregl.LngLatBounds()
         for (const p of points) bounds.extend([p.lon, p.lat])
         instance.fitBounds(bounds, {
           // Top clears the search field and the mode row; bottom clears the sheet.
-      padding: { top: 150, left: 52, right: 68, bottom: insetRef.current + 56 },
+          padding: padding ?? {
+            top: 150,
+            left: 52,
+            right: 68,
+            bottom: insetRef.current + 56,
+          },
           maxZoom: 18,
-          duration: 900,
+          duration,
         })
       },
 
@@ -811,6 +825,9 @@ export function MapView({
         const { lng, lat } = marker.getLngLat()
         selfMoved.current = true
         latest.current.onVenueChange({ lat, lon: lng })
+        // A DRAG, specifically. Not a search, not a long press. The first-run
+        // hint is about the gesture, so only the gesture retires it.
+        latest.current.onPinDrag?.()
       })
       marker.setLngLat([venue.lon, venue.lat]).addTo(instance)
       venueMarker.current = marker
@@ -824,6 +841,39 @@ export function MapView({
       instance.easeTo({ center: [venue.lon, venue.lat], duration: 600 })
     }
   }, [venue])
+
+  /* ------------------------------------------------- the one sentence hint */
+  /*
+   * A pin is obviously a place. It is not obviously a THING YOU CAN MOVE, and
+   * the geocoder being a street off is the common case. So the first run says
+   * so once, under the pin, and never again after the first drag.
+   */
+  useEffect(() => {
+    const instance = map.current
+    if (instance === null) return
+
+    if (venue === null || pinHint === null) {
+      hintMarker.current?.remove()
+      hintMarker.current = null
+      return
+    }
+
+    if (hintMarker.current === null) {
+      const el = makeMarkerElement('pin-hint')
+      el.textContent = pinHint
+      hintMarker.current = new maplibregl.Marker({
+        element: el,
+        anchor: 'top',
+        // Clear of the pin's own footprint so it never covers the tip.
+        offset: [0, 10],
+      })
+        .setLngLat([venue.lon, venue.lat])
+        .addTo(instance)
+    } else {
+      hintMarker.current.getElement().textContent = pinHint
+      hintMarker.current.setLngLat([venue.lon, venue.lat])
+    }
+  }, [venue, pinHint])
 
   /* ------------------------------------------------------- subject marker */
   useEffect(() => {

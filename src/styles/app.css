@@ -29,8 +29,15 @@
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  /* The map takes its share of the SCREEN, not of what is left over. */
-  grid-template-rows: 40vh auto minmax(0, 1fr);
+  /*
+   * The map takes its share of the SCREEN, not of what is left over.
+   *
+   * 32vh, down from 40. Two things needed room: the reach slider, which is a new
+   * row between the map and the plate, and the window pills, which had to become
+   * two rows to stop clipping the end time. The map paid for both, about 68px at
+   * 390x844, and nothing below it had to move.
+   */
+  grid-template-rows: 32vh auto auto minmax(0, 1fr);
   overflow: hidden;
 }
 
@@ -47,7 +54,133 @@
   right: var(--space-2);
 }
 
-/* The resolved place, and the ring. No coordinate fields anywhere. */
+/*
+ * HOW FAR CAN YOU GET. The one control for the reach ring.
+ *
+ * It sits directly under the map because it is about the map, and it carries its
+ * own number because a control whose effect is a faint dashed circle three
+ * hundred metres wide needs to say what it just did.
+ */
+.reach {
+  display: grid;
+  padding: var(--space-1) var(--page-pad) 0;
+}
+
+.reach__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.reach__label {
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.reach__out {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+/* Metres lead, feet follow. Both, always: see src/core/reachScale.ts. */
+.reach__metric {
+  font-size: var(--text-num-sm);
+  font-weight: var(--weight-heavy);
+  color: var(--color-accent);
+  letter-spacing: var(--tracking-num);
+}
+
+.reach__imperial {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  letter-spacing: var(--tracking-num);
+}
+
+/*
+ * THUMB SIZED AND FULL WIDTH. The track is hairline thin but the input is a full
+ * 44px tall, so the whole strip is the target and the thin line is only what you
+ * see. A 4px track with a 4px hit area is how you get a control nobody can hit.
+ */
+/*
+ * Still a full 44px target even though the line is 4px, because a 4px hit area
+ * is how you build a control nobody can hit.
+ */
+.reach__track {
+  position: relative;
+  height: var(--control-height);
+}
+
+.reach__slider {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  background: transparent;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+.reach__slider::-webkit-slider-runnable-track {
+  height: 4px;
+  background: var(--color-line);
+  border-radius: 2px;
+}
+
+.reach__slider::-moz-range-track {
+  height: 4px;
+  background: var(--color-line);
+  border-radius: 2px;
+}
+
+.reach__slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 30px;
+  height: 30px;
+  margin-top: -13px;
+  background: var(--primary-sheen);
+  border: var(--line-rule) solid var(--color-bg);
+  border-radius: 50%;
+  box-shadow: var(--primary-glow);
+}
+
+.reach__slider::-moz-range-thumb {
+  width: 30px;
+  height: 30px;
+  background: var(--primary-sheen);
+  border: var(--line-rule) solid var(--color-bg);
+  border-radius: 50%;
+  box-shadow: var(--primary-glow);
+}
+
+.reach__slider:focus-visible {
+  outline: var(--focus-ring) solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* The snap points, marked but not labelled. */
+.reach__ticks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.reach__tick {
+  position: absolute;
+  top: 50%;
+  width: var(--line-rule);
+  height: 10px;
+  margin-top: -5px;
+  background: var(--color-line-strong);
+}
+
+/* The resolved place. No coordinate fields anywhere. */
 .plate {
   display: flex;
   flex-wrap: wrap;
@@ -82,26 +215,26 @@
   cursor: pointer;
 }
 
-.plate__reach {
-  /* Pushed right so the venue name and the reach never read as one string. */
-  margin-left: auto;
-  font-size: var(--text-sm);
-  color: var(--color-accent);
-}
-
 .plate__coords {
   flex: 1 0 100%;
   font-size: var(--text-sm);
   color: var(--color-text-muted);
 }
 
+/*
+ * `overflow: hidden` here is a backstop against a rogue child, NOT a budget.
+ * Anything it actually clips is content the shooter cannot see and cannot
+ * scroll to, which is worse than a scrollbar. The gaps below are tuned so it
+ * clips nothing at 390x844; if that stops being true, the fix is to take the
+ * height from the map, not to let this swallow a row.
+ */
 .setup__body {
   min-width: 0;
   min-height: 0;
   display: grid;
   align-content: start;
-  gap: var(--space-4);
-  padding: var(--space-3) var(--page-pad) 0;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--page-pad) 0;
   overflow: hidden;
 }
 
@@ -347,15 +480,30 @@
 
 .pills {
   display: grid;
-  /* minmax(0,…) so a long date or time cannot push the row wider than the screen. */
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
   gap: var(--space-2);
 }
 
+/*
+ * ONE PILL PER ROW, AND THE LABEL SITS BESIDE THE VALUE.
+ *
+ * WHY THEY CANNOT SHARE A ROW. `input[type=time]` has an intrinsic minimum width
+ * in Chrome that neither `min-width: 0` nor flex shrinking can go below:
+ * measured at 123.8px here, and still 112.7px at 14px type, because most of it
+ * is the control's own chrome rather than the text. Two of them plus the pill
+ * padding need 280px. Beside a date pill that needs 161px, that is 449px of
+ * content in a 358px row, so the end time was being clipped to `03:00 P`.
+ *
+ * Dropping the type size is not the escape hatch: 16px is the floor that stops
+ * iOS zooming the page on focus, which is written down in tokens.css.
+ *
+ * So the row became two rows. The labels moved inline to pay for the height:
+ * stacked labels would have cost 60px, inline costs about 22px.
+ */
 .pill {
-  display: grid;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
   min-width: 0;
-  gap: 2px;
   padding: var(--space-2) var(--space-3);
   background: var(--color-panel);
   border: var(--line-hair) solid var(--color-line);
@@ -364,6 +512,7 @@
 }
 
 .pill__label {
+  flex: 0 0 auto;
   font-size: var(--text-label);
   letter-spacing: var(--tracking-label);
   text-transform: uppercase;
@@ -374,10 +523,15 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  margin-left: auto;
 }
 
+/*
+ * `width: auto` so each control takes its own intrinsic width and renders in
+ * full. They are on their own row now, so there is room for it.
+ */
 .pill__input {
-  width: 100%;
+  width: auto;
   min-width: 0;
   padding: 0;
   background: transparent;
@@ -385,6 +539,10 @@
   border: 0;
   font-size: var(--text-base);
   font-weight: var(--weight-heavy);
+}
+
+.pill > .pill__input {
+  margin-left: auto;
 }
 
 /* ---------------------------------------------------------------- drawer */
@@ -439,17 +597,6 @@
   display: grid;
   gap: var(--space-2);
   padding: var(--space-3) var(--page-pad);
-}
-
-/* The reach ring handle, dragged to set how far you can get. */
-.reach-handle {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  background: var(--color-accent);
-  border: var(--line-rule) solid var(--mark-edge);
-  border-radius: 50%;
-  cursor: ew-resize;
 }
 
 /*
@@ -1508,6 +1655,29 @@
 }
 
 /* ------------------------------------------------------- map marks */
+
+/*
+ * THE ONE SENTENCE UNDER THE PIN. First run only, retired by the first drag.
+ *
+ * Solid, never frosted. It sits on satellite imagery, which carries every hue
+ * there is, and a translucent fill over that is unreadable by definition. It
+ * rides on the pin as a marker rather than sitting on the map surface, so it
+ * stays under the thing it is talking about through any pan or zoom.
+ */
+.pin-hint {
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-panel);
+  border: var(--line-hair) solid var(--color-line);
+  border-top-color: var(--color-edge-top);
+  border-radius: var(--radius-panel);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  text-align: center;
+  white-space: nowrap;
+  /* It explains the pin; it must never be the thing you grab instead of it. */
+  pointer-events: none;
+}
+
 
 /* Data overlays are hard edged. No rounding on anything drawn on the map. */
 .pin {

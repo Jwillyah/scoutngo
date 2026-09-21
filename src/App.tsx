@@ -142,6 +142,16 @@ function App() {
   const [reachMeters, setReachMeters] = useState(RADIUS_DEFAULT_METERS)
   const onReach = (meters: number) => setReachMeters(clampRadius(meters))
 
+  /*
+   * Whether the first run hint under the pin has been retired. Kept on the
+   * device: it answers "can I move this", and once you know, you know.
+   */
+  const [pinHintDone, setPinHintDone] = usePersistentState<boolean>(
+    'scoutngo.pinHintDone',
+    false,
+    (raw) => raw === true,
+  )
+
   /* The setup map has its own handle; PLAN keeps mapHandle for its capture. */
   const setupMap = useRef<MapHandle>(null)
 
@@ -789,6 +799,8 @@ function App() {
             onConfirmPin={confirmPin}
             onCancelPin={cancelPin}
             searchBias={centre}
+            showPinHint={!pinHintDone}
+            onPinDrag={() => setPinHintDone(true)}
           />
           <div className="mode__foot">
             {forwardBar}

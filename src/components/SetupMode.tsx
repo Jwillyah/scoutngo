@@ -9,6 +9,7 @@ import type { VenueDraft, VenueErrors } from '../lib/venue.ts'
 import { KitChips } from './KitChips.tsx'
 import { KitProfile } from './KitProfile.tsx'
 import { MapView, type MapHandle } from './MapView.tsx'
+import { ReachSlider } from './ReachSlider.tsx'
 import { SearchField } from './SearchField.tsx'
 import { SpotsPanel } from './SpotsPanel.tsx'
 import { StaleBrief } from './StaleBrief.tsx'
@@ -53,6 +54,9 @@ interface SetupModeProps {
   onCancelPin: () => void
   /** Where the map is looking, used to rank nearby search results first. */
   searchBias: LatLon | null
+  /** First run only: the one sentence under the pin. Retired by a drag. */
+  showPinHint: boolean
+  onPinDrag: () => void
 }
 
 /** What is open over the one screen. Only ever one at a time. */
@@ -109,6 +113,8 @@ export function SetupMode({
   onConfirmPin,
   onCancelPin,
   searchBias,
+  showPinHint,
+  onPinDrag,
 }: SetupModeProps) {
   /*
    * One example per load, so the placeholder shows the kind of work the reader
@@ -119,27 +125,46 @@ export function SetupMode({
   const [drawer, setDrawer] = useState<Drawer>('none')
 
   /*
-   * Frame the reach ring whenever the pin moves.
+   * Keep the whole reach ring in view, whenever the pin OR the radius changes.
    *
    * Without this the default 400m ring sits entirely outside a z16.5 view: the
-   * circle exists, the handle exists, and neither is on screen, so the one
-   * control that makes this a map rather than a picture is invisible. Fitting on
-   * the PIN only, not on the radius, so dragging the handle does not fight the
-   * gesture by re-zooming under the thumb.
+   * circle exists and none of it is on screen, so the number under the map
+   * describes something invisible.
+   *
+   * IT NOW FOLLOWS THE RADIUS TOO, which it deliberately did not before. The old
+   * reason was that re-zooming while a handle was being dragged fought the
+   * gesture under the thumb. The handle is gone; the thumb is on a slider below
+   * the map now, so the map is free to move and dragging the slider resizes the
+   * ring and reframes it live.
    */
   const handle = mapHandle as React.RefObject<MapHandle | null>
   const [mapReady, setMapReady] = useState(false)
-  const framedAt = useRef<string | null>(null)
+  const framed = useRef<string | null>(null)
 
   useEffect(() => {
     if (!mapReady || at === null) return
-    const key = `${at.lat.toFixed(5)},${at.lon.toFixed(5)}`
-    if (framedAt.current === key) return
-    framedAt.current = key
+    const key = `${at.lat.toFixed(5)},${at.lon.toFixed(5)}@${reachMeters}`
+    if (framed.current === key) return
+    const movedPin = framed.current?.split('@')[0] !== key.split('@')[0]
+    framed.current = key
     const edges = [0, 90, 180, 270].map((bearing) =>
       destinationPoint(at, bearing, reachMeters),
     )
-    handle.current?.fitAll(edges)
+    /*
+     * A pin move is a journey and eases; a slider drag has to keep up with a
+     * thumb, so it snaps.
+     *
+     * The padding is SETUP's own. The default is sized for PLAN's full height
+     * map and reserves 150px at the top and 56 at the bottom, which on a 270px
+     * map leaves 64px to draw the ring in and makes every reach look the same
+     * size. Here the only thing overlapping the map is the search field.
+     */
+    handle.current?.fitAll(edges, movedPin ? 900 : 0, {
+      top: 72,
+      left: 28,
+      right: 28,
+      bottom: 24,
+    })
   }, [at, reachMeters, handle, mapReady])
   const open = (next: Drawer) => setDrawer((current) => (current === next ? 'none' : next))
 
@@ -154,7 +179,13 @@ export function SetupMode({
           handle={mapHandle}
           venue={pendingPin?.at ?? at}
           onVenueChange={pendingPin === null ? onPinChange : onPendingMove}
-          subject={pendingPin?.at ?? at}
+          /*
+           * ONE PIN. The subject crosshair used to sit here on top of the venue
+           * pin: two marks for one place, inviting the question of which one was
+           * the venue. The subject is a PLAN concept now. It defaults to this
+           * pin and is only moved when the action is offset from the venue.
+           */
+          subject={null}
           onSubjectChange={() => {}}
           mode={null}
           plan={[]}
@@ -170,7 +201,8 @@ export function SetupMode({
           onPitchChange={() => {}}
           bottomInset={0}
           radiusMeters={reachMeters}
-          onRadiusChange={onReachChange}
+          pinHint={showPinHint && pendingPin === null ? 'Drag the pin to the exact spot.' : null}
+          onPinDrag={onPinDrag}
           onReady={() => setMapReady(true)}
         />
         <div className="setup__search">
@@ -202,7 +234,9 @@ export function SetupMode({
         )}
       </div>
 
-      <VenuePlate name={venue.name} at={at} reachMeters={reachMeters} />
+      <ReachSlider meters={reachMeters} onChange={onReachChange} />
+
+      <VenuePlate name={venue.name} at={at} />
 
       <div className="setup__body">
         <StaleBrief

@@ -62,9 +62,26 @@ describe('render smoke', () => {
     expect(html).not.toContain('placeholder="38.3648"')
   })
 
-  it('states the reach ring, which is a real constraint', () => {
-    expect(html).toContain('plate__reach')
-    expect(html).toContain('400m reach')
+  /*
+   * ONE PIN, ONE SLIDER. The setup map used to carry three things that did not
+   * explain themselves: the venue pin, a white subject crosshair sitting on top
+   * of it, and an unlabelled dot on the reach ring that was the only way to
+   * change the reach.
+   */
+  it('states the reach on a labelled slider, not an unlabelled dot on a ring', () => {
+    expect(html).toContain('How far can you get?')
+    expect(html).toContain('type="range"')
+    expect(html).toContain('400 m')
+    expect(html).toContain('1,312 ft')
+    // The handle is gone, and so is the reach readout that sat away from it.
+    expect(html).not.toContain('reach-handle')
+    expect(html).not.toContain('plate__reach')
+  })
+
+  it('shows one mark on the setup map, and says it can be moved', () => {
+    expect(html).toContain('class="setup__map"')
+    // The crosshair is a PLAN concept now; SETUP renders no subject marker.
+    expect(html).not.toContain('reticle-mark')
   })
 
   it('offers one description input and the kit as chips', () => {

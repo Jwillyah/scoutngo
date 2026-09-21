@@ -11,6 +11,12 @@ interface OverflowMenuProps {
 /**
  * The explicit pin modes, kept for redoing one deliberately. The everyday path
  * is a long press on the map, so these do not need to sit on the map surface.
+ *
+ * THE SUBJECT LIVES HERE AND ONLY HERE. It used to be a second mark on the
+ * SETUP map, sitting on top of the venue pin and explaining nothing. It defaults
+ * to the venue, which is right for almost every shoot, and it is offered here
+ * for the shoots where it is not: the pilings in the water in front of the deck,
+ * the stage at the far end of the field, the boat rather than the dock.
  */
 export function OverflowMenu({ mode, onMode, showArc, onShowArc }: OverflowMenuProps) {
   const [open, setOpen] = useState(false)
@@ -39,7 +45,7 @@ export function OverflowMenu({ mode, onMode, showArc, onShowArc }: OverflowMenuP
               setOpen(false)
             }}
           >
-            Set venue by tap
+            Move the venue
           </button>
           <button
             type="button"
@@ -51,7 +57,7 @@ export function OverflowMenu({ mode, onMode, showArc, onShowArc }: OverflowMenuP
               setOpen(false)
             }}
           >
-            Set subject by tap
+            Move the subject
           </button>
           <button
             type="button"
@@ -65,7 +71,10 @@ export function OverflowMenu({ mode, onMode, showArc, onShowArc }: OverflowMenuP
           >
             Sunrise and sunset rays
           </button>
-          <p className="overflow__hint">Long press the map to drop a pin.</p>
+          <p className="overflow__hint">
+            The subject is the venue unless you move it. Tap the map with a mode
+            on, or long press it.
+          </p>
         </div>
       )}
     </div>
