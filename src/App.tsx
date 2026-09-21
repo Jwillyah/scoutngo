@@ -60,7 +60,7 @@ import {
 import { resolveDate } from './core/when.ts'
 import { clampRadius, RADIUS_DEFAULT_METERS } from './core/radius.ts'
 import { venueTimeZone, deviceTimeZone } from './core/timezone.ts'
-import { searchVenues, type SearchHit } from './lib/search.ts'
+import { BIAS_HALF_SPAN_METERS, searchVenues, type SearchHit } from './lib/search.ts'
 import { usePersistentState } from './lib/usePersistentState.ts'
 import { useTide } from './lib/useTide.ts'
 import {
@@ -144,6 +144,16 @@ function App() {
 
   /* The setup map has its own handle; PLAN keeps mapHandle for its capture. */
   const setupMap = useRef<MapHandle>(null)
+
+  /*
+   * A PIN IS NEVER ACCEPTED AUTOMATICALLY.
+   *
+   * Searching "atlantic park virginia beach" returned exactly one Nominatim
+   * result, a neighbourhood four kilometres inland, and the app took it. One
+   * result is not one right answer. Every geocoded pin now lands here first, is
+   * flown to, and has to be confirmed, with dragging as the real correction.
+   */
+  const [pendingPin, setPendingPin] = useState<{ at: LatLon; label: string } | null>(null)
 
   const [describeText, setDescribeText] = useState('')
   const [describeState, setDescribeState] = useState<DescribeState>({ status: 'idle' })
@@ -326,12 +336,28 @@ function App() {
     )
   }, [])
 
+  /* A search result is a PROPOSAL. It is confirmed on the map, never taken. */
   const onPick = useCallback((at: LatLon, label: string) => {
-    setVenue((current) => ({ ...withCoordinates(current, at), name: label }))
-    setSubject(null)
-    setPositions([])
-    setGeneration({ status: 'idle' })
+    setPendingPin({ at, label })
   }, [])
+
+  const onPendingMove = useCallback((at: LatLon) => {
+    setPendingPin((current) => (current === null ? null : { ...current, at }))
+  }, [])
+
+  const confirmPin = useCallback(() => {
+    setPendingPin((pin) => {
+      if (pin === null) return null
+      setVenue((current) => ({ ...withCoordinates(current, pin.at), name: pin.label }))
+      setBriefAnchor({ at: pin.at })
+      setSubject(null)
+      setPositions([])
+      setGeneration({ status: 'idle' })
+      return null
+    })
+  }, [])
+
+  const cancelPin = useCallback(() => setPendingPin(null), [])
 
   /* Long press: venue first if it is unset, otherwise the subject. */
   const onLongPress = useCallback(
@@ -418,14 +444,25 @@ function App() {
     let hits: SearchHit[] = []
     if (shoot.venueSearch !== '') {
       try {
-        hits = await searchVenues(shoot.venueSearch)
+        hits = await searchVenues(
+          shoot.venueSearch,
+          undefined,
+          centre === null
+            ? undefined
+            : { centre, halfSpanMeters: BIAS_HALF_SPAN_METERS },
+        )
       } catch {
         hits = []
       }
     }
 
-    const chosen = hits.length === 1 ? hits[0] : null
-    const at = chosen === null ? venueLatLon(venue) : { lat: chosen.lat, lon: chosen.lon }
+    /*
+     * Even a single hit goes to the confirm step. Nothing about "only one
+     * result" means "the right one", and the whole failure this replaces was
+     * the app believing otherwise.
+     */
+    const proposal = hits[0] ?? null
+    const at = proposal === null ? venueLatLon(venue) : { lat: proposal.lat, lon: proposal.lon }
 
     /*
      * The date token resolves against the VENUE's clock, so it is done after
@@ -439,12 +476,6 @@ function App() {
     setVenue((current) => {
       const next: VenueDraft = {
         ...current,
-        ...(chosen === null
-          ? {}
-          : {
-              ...withCoordinates(current, { lat: chosen.lat, lon: chosen.lon }),
-              name: chosen.label,
-            }),
         ...(resolvedDate === '' ? {} : { date: resolvedDate }),
         ...(shoot.startTime === '' ? {} : { startTime: shoot.startTime }),
         ...(shoot.endTime === '' ? {} : { endTime: shoot.endTime }),
@@ -454,8 +485,12 @@ function App() {
       return next
     })
 
-    if (chosen !== null) setBriefAnchor({ at: { lat: chosen.lat, lon: chosen.lon } })
-    if (hits.length > 1) setVenueChoices(hits)
+    /* One hit becomes a pin to confirm; several become a list to choose from. */
+    if (hits.length === 1 && proposal !== null) {
+      setPendingPin({ at: { lat: proposal.lat, lon: proposal.lon }, label: proposal.label })
+    } else if (hits.length > 1) {
+      setVenueChoices(hits)
+    }
 
     setDescribeState({
       status: 'done',
@@ -464,19 +499,16 @@ function App() {
        * the shooter can see marked below. One parsed venue fills three inputs:
        * name, latitude and longitude.
        */
-      filled: filled.length + (filled.includes('venue') && chosen !== null ? 2 : 0),
+      filled: filled.length - (filled.includes('venue') ? 1 : 0),
       needsVenue: shoot.venueSearch !== '' && hits.length === 0,
       searched: shoot.venueSearch,
     })
   }
 
   /** The shooter picked one of several geocoding matches. */
+  /* Choosing from the list still proposes; the map is where it is accepted. */
   const onPickVenue = (hit: SearchHit) => {
-    setVenue((current) => ({
-      ...withCoordinates(current, { lat: hit.lat, lon: hit.lon }),
-      name: hit.label,
-    }))
-    setBriefAnchor({ at: { lat: hit.lat, lon: hit.lon } })
+    setPendingPin({ at: { lat: hit.lat, lon: hit.lon }, label: hit.label })
     setVenueChoices([])
   }
 
@@ -752,6 +784,11 @@ function App() {
             reachMeters={reachMeters}
             onReachChange={onReach}
             mapHandle={setupMap}
+            pendingPin={pendingPin}
+            onPendingMove={onPendingMove}
+            onConfirmPin={confirmPin}
+            onCancelPin={cancelPin}
+            searchBias={centre}
           />
           <div className="mode__foot">
             {forwardBar}

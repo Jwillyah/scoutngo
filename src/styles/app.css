@@ -199,6 +199,80 @@
   cursor: pointer;
 }
 
+/* ------------------------------------------------------- confirm the pin */
+
+/*
+ * A geocoded pin is a proposal until this is answered. Sits over the map, low
+ * enough to leave the pin and the ring visible, because the answer is often
+ * "drag it a bit" rather than yes or no.
+ */
+.confirm {
+  position: absolute;
+  z-index: 5;
+  left: var(--space-2);
+  right: var(--space-2);
+  bottom: var(--space-2);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-panel);
+  border: var(--line-hair) solid var(--color-line);
+  border-top-color: var(--color-edge-top);
+  border-radius: var(--radius-panel);
+}
+
+.confirm__text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.confirm__q {
+  font-size: var(--text-md);
+  font-weight: var(--weight-heavy);
+}
+
+.confirm__name {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The real safety net, said out loud. */
+.confirm__hint {
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+.confirm__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.confirm__no {
+  min-height: var(--control-height);
+  padding: 0 var(--space-3);
+  background: transparent;
+  color: var(--color-text-muted);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-panel);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.confirm__yes {
+  min-height: var(--control-height);
+  padding: 0 var(--space-4);
+  font-size: var(--text-sm);
+}
+
 /* ------------------------------------------------------------ kit chips */
 
 .kitrow {
@@ -256,8 +330,14 @@
   cursor: pointer;
 }
 
+/*
+ * Selected chips carry the same gradient as the primary button, at chip size.
+ * They are the only other thing allowed it, and only on SETUP: PLAN and FIELD
+ * fall back to the flat white accent because --primary-sheen is not overridden
+ * there.
+ */
 .kitchip--on {
-  background: var(--color-accent);
+  background: var(--primary-sheen);
   border-color: var(--color-accent);
   color: var(--color-accent-ink);
   font-weight: var(--weight-heavy);
@@ -1444,9 +1524,36 @@
   height: 26px;
 }
 
-/* On SETUP the pin and the ring carry the accent, like every other control. */
+/*
+ * On SETUP the pin and the ring carry the accent, like every other control.
+ * Flat, not the gradient: a two stop fill on an 18px mark over satellite imagery
+ * stops reading as one object, which is the whole job of a mark.
+ */
 .shell--setup .pin {
   background: var(--color-accent);
+}
+
+/*
+ * A PIN AWAITING CONFIRMATION SAYS SO. The halo is there to answer "can I move
+ * this", because the geocoder being wrong is the common case and dragging is the
+ * only fix. It stops as soon as the pin is confirmed.
+ */
+.setup__map--pending .pin--venue {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 55%, transparent);
+  animation: pin-wait 1.6s ease-in-out infinite;
+}
+
+@keyframes pin-wait {
+  50% {
+    box-shadow: 0 0 0 9px color-mix(in srgb, var(--color-accent) 0%, transparent);
+  }
+}
+
+/* Respect the setting. The hint text carries the same message in words. */
+@media (prefers-reduced-motion: reduce) {
+  .setup__map--pending .pin--venue {
+    animation: none;
+  }
 }
 
 .reticle-mark {

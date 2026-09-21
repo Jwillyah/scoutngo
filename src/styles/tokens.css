@@ -70,8 +70,23 @@
    */
   --accent: #ffffff; /* SIGNAL WHITE. primary action, active state. nothing else */
   --accent-ink: #0b0b0b; /* type on top of the accent */
-  --lime: #d6f84c; /* SETUP only. Same rules: action and active state, nothing else */
-  --lime-ink: #101208;
+  /*
+   * OCEAN. The SETUP accent, and the only gradient in the product.
+   *
+   * Two stops, teal into sky. The ink on top is near-black teal rather than the
+   * chrome black, so the button reads as one object rather than as black text
+   * dropped on a colour. Both stops are checked against that ink in
+   * src/core/contrast.test.ts: they pass WCAG AAA at 7:1 or better, and the
+   * same test asserts that white would have FAILED, which is why the ink is
+   * dark and not a preference.
+   *
+   * --ocean is the solid member of the family. Map overlays take it flat: a
+   * gradient on a ring or a pin fights the imagery underneath and stops reading
+   * as a single object at small sizes.
+   */
+  --ocean: #2dd4bf; /* SETUP accent, solid. Rings, pins, active state */
+  --ocean-far: #38bdf8; /* the far end of the gradient, never used alone */
+  --ocean-ink: #04201c; /* type on top of the gradient */
 
   --hazard: #ff3b30; /* RED. hazard only, and nothing else is red */
   --hazard-tint: #2e0b08;
@@ -225,7 +240,7 @@
 }
 
 /*
- * SETUP takes the lime. One override, at the shell, so every control below
+ * SETUP takes the ocean. One override, at the shell, so every control below
  * inherits it without knowing which screen it is on.
  *
  * THE SHEEN AND GLOW HAVE TO BE REDECLARED HERE, and this is not redundancy. A
@@ -237,15 +252,12 @@
  * every chip beside it was correctly lime.
  */
 .shell--setup {
-  --color-accent: var(--lime);
-  --color-accent-ink: var(--lime-ink);
-  --color-focus: var(--lime);
+  /* The solid member: flat fills, map overlays, focus rings. */
+  --color-accent: var(--ocean);
+  --color-accent-ink: var(--ocean-ink);
+  --color-focus: var(--ocean);
 
-  --primary-sheen: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--lime) 100%, white 18%) 0%,
-    var(--lime) 58%,
-    color-mix(in srgb, var(--lime) 86%, black 14%) 100%
-  );
-  --primary-glow: 0 0 18px color-mix(in srgb, var(--lime) 42%, transparent);
+  /* The gradient, teal into sky, and a glow in the teal end only. */
+  --primary-sheen: linear-gradient(135deg, var(--ocean) 0%, var(--ocean-far) 100%);
+  --primary-glow: 0 0 22px color-mix(in srgb, var(--ocean) 45%, transparent);
 }

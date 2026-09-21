@@ -507,7 +507,7 @@ export function MapView({
         type: 'fill',
         source: RADIUS_SOURCE,
         paint: {
-          'fill-color': readToken('--color-accent', '#d6f84c', container.current),
+          'fill-color': readToken('--color-accent', '#2dd4bf', container.current),
           'fill-opacity': 0.08,
         },
       })
@@ -516,7 +516,7 @@ export function MapView({
         type: 'line',
         source: RADIUS_SOURCE,
         paint: {
-          'line-color': readToken('--color-accent', '#d6f84c', container.current),
+          'line-color': readToken('--color-accent', '#2dd4bf', container.current),
           'line-width': 2,
           'line-dasharray': [3, 2],
         },

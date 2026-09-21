@@ -1,11 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
 import type { LatLon } from '../core/geo.ts'
-import { MIN_INTERVAL_MS, OSM_ATTRIBUTION, searchVenues, type SearchHit } from '../lib/search.ts'
+import {
+  BIAS_HALF_SPAN_METERS,
+  MIN_INTERVAL_MS,
+  OSM_ATTRIBUTION,
+  searchVenues,
+  type SearchHit,
+} from '../lib/search.ts'
 
 interface SearchFieldProps {
   onPick: (at: LatLon, label: string) => void
   /** Placeholder and accessible name. SETUP asks a different question. */
   label?: string
+  /** Where the map is looking. Nearby matches rank first. */
+  bias?: LatLon | null
 }
 
 /** Nominatim returns one long display_name. The head is the name, the tail the address. */
@@ -15,7 +23,19 @@ function splitLabel(label: string): { name: string; address: string } {
   return { name: label.slice(0, comma), address: label.slice(comma + 1).trim() }
 }
 
-export function SearchField({ onPick, label = 'Search for a venue' }: SearchFieldProps) {
+export function SearchField({ onPick, label = 'Search for a venue', bias = null }: SearchFieldProps) {
+  /*
+   * The bias is read through a ref rather than depended on.
+   *
+   * It is the map centre, so it changes on every pan. As an effect dependency it
+   * would re-run the search each time the user nudged the map, which is both
+   * useless and rude to a free service. What matters is where the map was when
+   * the query was typed, which is exactly what the ref holds.
+   */
+  const biasRef = useRef(bias)
+  useEffect(() => {
+    biasRef.current = bias
+  }, [bias])
   const [query, setQuery] = useState('')
   const [hits, setHits] = useState<SearchHit[]>([])
   const [open, setOpen] = useState(false)
@@ -41,7 +61,13 @@ export function SearchField({ onPick, label = 'Search for a venue' }: SearchFiel
     const timer = window.setTimeout(() => {
       lastRequestAt.current = Date.now()
       setBusy(true)
-      searchVenues(trimmed, controller.signal)
+      searchVenues(
+        trimmed,
+        controller.signal,
+        biasRef.current === null
+          ? undefined
+          : { centre: biasRef.current, halfSpanMeters: BIAS_HALF_SPAN_METERS },
+      )
         .then((results) => {
           setHits(results)
           setOpen(true)

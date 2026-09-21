@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { destinationPoint, type LatLon } from '../core/geo.ts'
+import { exampleIndex, SHOOT_EXAMPLES, SHOT_LIST_EXAMPLES } from '../lib/examples.ts'
 import type { DescribeState, DesiredShot } from '../lib/describe.ts'
 import type { KitSelection } from '../lib/kitSelection.ts'
 import type { SearchHit } from '../lib/search.ts'
@@ -45,6 +46,13 @@ interface SetupModeProps {
   shotListText: string
   onShotListText: (next: string) => void
   desiredShots: DesiredShot[]
+  /** A geocoded proposal awaiting confirmation. Never applied on its own. */
+  pendingPin: { at: LatLon; label: string } | null
+  onPendingMove: (at: LatLon) => void
+  onConfirmPin: () => void
+  onCancelPin: () => void
+  /** Where the map is looking, used to rank nearby search results first. */
+  searchBias: LatLon | null
 }
 
 /** What is open over the one screen. Only ever one at a time. */
@@ -96,7 +104,18 @@ export function SetupMode({
   onShotListText,
   desiredShots,
   onVenueChange,
+  pendingPin,
+  onPendingMove,
+  onConfirmPin,
+  onCancelPin,
+  searchBias,
 }: SetupModeProps) {
+  /*
+   * One example per load, so the placeholder shows the kind of work the reader
+   * does rather than the author's own shoot. Fixed for the life of the screen:
+   * a hint that changes while you read it is a distraction.
+   */
+  const [example] = useState(() => exampleIndex(SHOOT_EXAMPLES.length))
   const [drawer, setDrawer] = useState<Drawer>('none')
 
   /*
@@ -130,18 +149,18 @@ export function SetupMode({
   return (
     <div className="setup">
       {/* The map is the top of the screen and the pin is the coordinate. */}
-      <div className="setup__map">
+      <div className={`setup__map${pendingPin === null ? '' : ' setup__map--pending'}`}>
         <MapView
           handle={mapHandle}
-          venue={at}
-          onVenueChange={onPinChange}
-          subject={at}
+          venue={pendingPin?.at ?? at}
+          onVenueChange={pendingPin === null ? onPinChange : onPendingMove}
+          subject={pendingPin?.at ?? at}
           onSubjectChange={() => {}}
           mode={null}
           plan={[]}
           conePlan={[]}
           onPositionMove={() => {}}
-          onLongPress={onPinChange}
+          onLongPress={pendingPin === null ? onPinChange : onPendingMove}
           sunAzimuth={null}
           sunOverlay={null}
           showSun={false}
@@ -155,8 +174,32 @@ export function SetupMode({
           onReady={() => setMapReady(true)}
         />
         <div className="setup__search">
-          <SearchField onPick={onSearchPick} label="Where's the shoot?" />
+          <SearchField onPick={onSearchPick} label="Where's the shoot?" bias={searchBias} />
         </div>
+
+        {/*
+          * IS THIS THE SPOT? A geocoder returning one result is not the same as
+          * one right answer, so nothing is accepted until this is answered. The
+          * pin stays draggable while it is up, and the hint says so, because
+          * dragging is the real safety net.
+          */}
+        {pendingPin === null ? null : (
+          <div className="confirm">
+            <div className="confirm__text">
+              <span className="confirm__q">Is this the spot?</span>
+              <span className="confirm__name">{pendingPin.label.split(',')[0]}</span>
+              <span className="confirm__hint">Drag the pin to fix it</span>
+            </div>
+            <div className="confirm__actions">
+              <button type="button" className="confirm__no" onClick={onCancelPin}>
+                No
+              </button>
+              <button type="button" className="btn btn--primary confirm__yes" onClick={onConfirmPin}>
+                Confirm
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <VenuePlate name={venue.name} at={at} reachMeters={reachMeters} />
@@ -194,7 +237,7 @@ export function SetupMode({
             className="setup__text"
             rows={2}
             value={describeText}
-            placeholder="Boat docking Saturday 11 to 3, vertical cuts of boats hitting pilings."
+            placeholder={SHOOT_EXAMPLES[example]}
             onChange={(event) => onDescribeText(event.target.value)}
           />
           <div className="setup__row">
@@ -285,7 +328,7 @@ export function SetupMode({
                   className="setup__text"
                   rows={8}
                   value={shotListText}
-                  placeholder={'Boats hitting the pilings\nCrowd reaction from the deck'}
+                  placeholder={SHOT_LIST_EXAMPLES[example]}
                   onChange={(event) => onShotListText(event.target.value)}
                 />
               </div>
