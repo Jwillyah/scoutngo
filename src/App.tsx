@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
-import { type ConeMode } from './components/ConeFilter.tsx'
+import { type ConeMode } from './components/ConePicker.tsx'
 import { type MapHandle, type TapMode } from './components/MapView.tsx'
 import { ModeRail } from './components/ModeRail.tsx'
 import { FieldMode } from './components/FieldMode.tsx'
@@ -850,21 +850,23 @@ function App() {
           generation={generation}
           siteNote={siteNote}
           onGenerate={onGenerate}
-          onSearchPick={onPick}
           pack={pack}
           packIsCurrent={packIsCurrent}
           packState={packState}
           onPreparePack={() => void preparePack()}
+          onGoToField={() => goTo('field')}
+          goToFieldBlocked={blockedReason('field', available)}
           desiredShots={desiredShots}
           summary={summary}
           peekStatus={peekStatus}
           fitTargets={fitTargets}
-          footer={
-            <div className="mode__foot mode__foot--overlay">
-              {forwardBar}
-              {rail}
-            </div>
-          }
+          /*
+           * PLAN's foot is the rail and nothing else. Its forward step, "Go to
+           * field", is now a secondary button beside Generate in the sheet:
+           * a full width primary down here was a second loudest thing fighting
+           * the one action this screen exists for.
+           */
+          footer={<div className="mode__foot mode__foot--overlay">{rail}</div>}
         />
       ) : null}
 

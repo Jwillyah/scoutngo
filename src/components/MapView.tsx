@@ -13,6 +13,13 @@ import { fitLongEdge, resolveCaptureLongEdge } from '../core/capture.ts'
 import type { SunArc } from '../core/sun.ts'
 import type { PlannedPosition } from '../lib/plan.ts'
 import type { MapBounds } from '../lib/planRequest.ts'
+import {
+  centredRect,
+  isClear,
+  pad,
+  slideOrder,
+  type Rect,
+} from '../core/labelPlacement.ts'
 import { readToken } from '../lib/tokens.ts'
 import { ShooterFigure } from './ShooterFigure.tsx'
 
@@ -84,6 +91,52 @@ const SUN_RAY_METERS = 900
 const LABEL_SPAN_FRACTION = 0.28
 const LABEL_MIN_METERS = 50
 const LABEL_MAX_METERS = 700
+
+/*
+ * How far along the ray to step while looking for a clear spot, as a fraction
+ * of the preferred distance. Small enough that a label rarely has to travel
+ * far, large enough that the search is a handful of tries rather than a scan.
+ */
+const LABEL_SLIDE_FRACTION = 0.12
+
+/** A breathing gap around every piece of floating chrome, in CSS pixels. */
+const LABEL_CLEARANCE_PX = 6
+
+/*
+ * How close to the pin a label may be pushed WHEN IT HAS TO BE.
+ *
+ * LABEL_MIN_METERS is where a label is allowed to sit by preference; this is
+ * how far the search may go past that to save a reading. The two are different
+ * numbers because the rule is "hide it only if no clear point exists", and a
+ * preference is not an absence.
+ *
+ * It matters most in exactly the reported case. With the venue near the top of
+ * the view the shadow ray runs north, straight off the screen: measured at a
+ * typical zoom, 50m north of the pin was already y=60, inside the HUD, and
+ * every larger distance was further up. The only clear points on that ray are
+ * between the pin and the HUD, which is under 50m.
+ */
+const LABEL_SLIDE_MIN_METERS = 12
+
+/*
+ * EVERY FLOATING CONTROL, and the sheet. These are the things that sit OVER the
+ * map; anything drawn IN the map is not an obstacle, because a label among the
+ * cones and figures is a label in its natural habitat.
+ *
+ * Add to this list when a new floating surface is added to a mode, or the
+ * labels will go back to hiding underneath it.
+ */
+const FLOATING_CHROME = [
+  '.hud',
+  '.mapctl',
+  '.sheet',
+  '.dock',
+  '.card',
+  '.confirm',
+  '.setup__search',
+  '.picker__menu',
+  '.overflow__menu',
+].join(', ')
 /** How long a press has to be held before it drops a pin. */
 const LONG_PRESS_MS = 550
 const RADIUS_SOURCE = 'reach-radius'
@@ -335,6 +388,16 @@ export function MapView({
   const [ready, setReady] = useState(false)
   /* Bumped on every map move so the ray labels can re-place themselves. */
   const [viewTick, setViewTick] = useState(0)
+  /*
+   * Bumped when the FLOATING CHROME changes, which the map never hears about.
+   *
+   * Label placement depends on where the panels are, and panels appear and
+   * vanish without the map moving. Measured: tapping a position flies the map
+   * with the card open, so a label was correctly hidden behind the card; then
+   * closing the card moved nothing, so nothing re-ran, and the label stayed
+   * hidden with an empty screen to sit in.
+   */
+  const [chromeTick, setChromeTick] = useState(0)
   const [figureEls, setFigureEls] = useState<Record<string, HTMLElement>>({})
 
   const latest = useRef({
@@ -964,18 +1027,112 @@ export function MapView({
       Math.max(LABEL_MIN_METERS, spanMeters * LABEL_SPAN_FRACTION),
     )
 
+    /*
+     * KEEP THE LABELS OUT FROM UNDER THE CHROME.
+     *
+     * Read the obstacles ONCE for the whole batch, and the label's own size
+     * once per label, then do the search in arithmetic against projected
+     * points. Measuring a moved marker on every candidate would force a layout
+     * per try, and this effect runs on every map move.
+     */
+    /*
+     * getContainer(), NOT getCanvasContainer(). `project()` returns pixels
+     * relative to the map's own container, so that is the element whose origin
+     * the projected points must be added to. The canvas container is a
+     * positioned child that does not stretch: measured at 390x34 on a full
+     * height map, which as a viewport rejected every candidate and hid every
+     * label.
+     */
+    const canvas = instance.getContainer().getBoundingClientRect()
+    const viewport: Rect = {
+      left: canvas.left,
+      top: canvas.top,
+      right: canvas.right,
+      bottom: canvas.bottom,
+    }
+    const obstacles: Rect[] = [...document.querySelectorAll(FLOATING_CHROME)]
+      .map((node) => node.getBoundingClientRect())
+      .filter((box) => box.width > 0 && box.height > 0)
+      .map((box) =>
+        pad({ left: box.left, top: box.top, right: box.right, bottom: box.bottom },
+          LABEL_CLEARANCE_PX),
+      )
+
+    const distances = slideOrder(
+      labelMeters,
+      LABEL_SLIDE_MIN_METERS,
+      LABEL_MAX_METERS,
+      Math.max(1, labelMeters * LABEL_SLIDE_FRACTION),
+    )
+
     for (const label of labels) {
       const el = makeMarkerElement(`ray-label ray-label--${label.kind}`)
       el.innerHTML =
         `<span class="ray-label__text">${label.text}</span>` +
         `<span class="ray-label__deg num">${label.bearing.toFixed(1)}\u00B0</span>`
-      const at = destinationPoint(venue, label.bearing, labelMeters)
       const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
-        .setLngLat([at.lon, at.lat])
+        .setLngLat([venue.lon, venue.lat])
         .addTo(instance)
+
+      const size = el.getBoundingClientRect()
+      let placed: { lat: number; lon: number } | null = null
+      for (const meters of distances) {
+        const candidate = destinationPoint(venue, label.bearing, meters)
+        const point = instance.project([candidate.lon, candidate.lat])
+        const box = centredRect(
+          canvas.left + point.x,
+          canvas.top + point.y,
+          size.width,
+          size.height,
+        )
+        if (isClear(box, obstacles, viewport)) {
+          placed = candidate
+          break
+        }
+      }
+
+      /*
+       * NOTHING ON THE RAY IS CLEAR, so the label goes. The ray is still drawn:
+       * the direction survives, only the degrees are dropped, which is the
+       * right thing to lose when the alternative is a number half hidden under
+       * a button and read wrong.
+       */
+      if (placed === null) {
+        marker.remove()
+        continue
+      }
+      marker.setLngLat([placed.lon, placed.lat])
       rayLabels.current.push(marker)
     }
-  }, [venue, sunOverlay, showSun, showArc, viewTick])
+  }, [venue, sunOverlay, showSun, showArc, viewTick, chromeTick, bottomInset])
+
+  /*
+   * Watch for floating chrome appearing and disappearing.
+   *
+   * Watched on the MODE container, which is where the chrome actually lives:
+   * the card, the sheet, the dock and the HUD are all direct children of
+   * .mode-plan, while the map is two levels down. Watching the map's own parent
+   * saw only the shooter figures.
+   *
+   * childList only, no subtree: a subtree observer would also fire on every
+   * scrubber tick and every marker update, which is most of a frame's work in
+   * this component.
+   */
+  useEffect(() => {
+    const parent = container.current?.closest('.mode-plan, .mode-setup, .mode-field')
+    if (parent === null || parent === undefined) return
+    let frame = 0
+    const observer = new MutationObserver(() => {
+      cancelAnimationFrame(frame)
+      // One bump per frame, after layout, so rects are read settled.
+      frame = requestAnimationFrame(() => setChromeTick((tick) => tick + 1))
+    })
+    observer.observe(parent, { childList: true })
+    return () => {
+      cancelAnimationFrame(frame)
+      observer.disconnect()
+    }
+  }, [])
 
   /* ----------------------------------------------- shooter figure markers */
   useEffect(() => {

@@ -11,7 +11,16 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
  */
 export type SheetState = 'peek' | 'open'
 
-const PEEK_PX = 108
+/*
+ * The peek now carries the whole action block: the summary, Generate, and the
+ * two secondaries under it. It was 108 when the peek was one line and one
+ * button and the forward step lived in its own bar down in the dock.
+ *
+ * The bottom of this screen still got SHORTER, because two whole bars came off
+ * it: the lens chip row is one control in the HUD now, and the full width
+ * forward button is one of the secondaries here.
+ */
+const PEEK_PX = 176
 const OPEN_FRACTION = 0.72
 
 /** Resolved pixel height of each stop, against the current viewport. */

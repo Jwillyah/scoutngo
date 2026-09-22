@@ -89,10 +89,12 @@ export function TimeScrubber({
         onChange={(event) => onChange(Number(event.target.value) / 1000)}
       />
 
-      <div className="scrub__ends">
-        <span className="num">{clock(start)}</span>
-        <span className="num">{clock(end)}</span>
-      </div>
+      {/*
+        * NO END LABELS. They printed the window's start and end directly under
+        * the peek summary, which states the same window WITH its timezone. Two
+        * bars apart, the same two numbers, and the zone only on one of them.
+        * The scrubber owns the moment; the summary owns the window.
+        */}
     </div>
   )
 }

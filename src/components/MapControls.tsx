@@ -5,18 +5,23 @@ interface MapControlsProps {
   onShowSun: (next: boolean) => void
   pitch: number
   onPitch: (next: number) => void
-  onZoom: (delta: number) => void
   onFitAll: () => void
   canFitAll: boolean
 }
 
-/** Thumb sized map controls. Tilt steps through 0, 45 and 60 degrees. */
+/**
+ * Thumb sized map controls. Tilt steps through 0, 45 and 60 degrees.
+ *
+ * NO ZOOM BUTTONS. Pinch does it, on every device this runs on, and a stacked
+ * plus and minus was two 48px targets spent restating a gesture the map already
+ * had. What is left is the three things a gesture cannot do: turn the sun
+ * overlay off, step the tilt, and frame everything at once.
+ */
 export function MapControls({
   showSun,
   onShowSun,
   pitch,
   onPitch,
-  onZoom,
   onFitAll,
   canFitAll,
 }: MapControlsProps) {
@@ -52,25 +57,6 @@ export function MapControls({
       >
         <span className="mapctl__tilt num">{activeStop}°</span>
       </button>
-
-      <div className="mapctl__stack">
-        <button
-          type="button"
-          className="mapctl__btn"
-          onClick={() => onZoom(1)}
-          aria-label="Zoom in"
-        >
-          +
-        </button>
-        <button
-          type="button"
-          className="mapctl__btn"
-          onClick={() => onZoom(-1)}
-          aria-label="Zoom out"
-        >
-          −
-        </button>
-      </div>
 
       <button
         type="button"

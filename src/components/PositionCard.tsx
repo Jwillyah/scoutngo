@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { SightlineCloud } from '../core/cloud.ts'
 import { MIN_BEARING_RANGE_METERS } from '../core/coverage.ts'
 import { feetToMetres, type TideState } from '../core/tide.ts'
@@ -19,10 +19,17 @@ interface PositionCardProps {
   onClose: () => void
 }
 
-const LIGHTING_COPY: Record<string, string> = {
-  backlit: 'Shooting into the sun',
-  'front-lit': 'Sun behind the camera',
-  'side-lit': 'Sun across the frame',
+/*
+ * ONE ICON, ONE WORD, ONE PHRASE, laid over the photo.
+ *
+ * The glyph is how much of the subject the sun is on: a full disc front-lit, a
+ * half disc side-lit, a rim backlit. It is read at a glance from the shape, and
+ * the word underneath it means nobody has to.
+ */
+const LIGHTING: Record<string, { icon: string; word: string; phrase: string }> = {
+  backlit: { icon: '○', word: 'Backlit', phrase: 'Shooting into the sun' },
+  'front-lit': { icon: '●', word: 'Front-lit', phrase: 'Sun behind the camera' },
+  'side-lit': { icon: '◐', word: 'Side-lit', phrase: 'Sun across the frame' },
 }
 
 const deg = (n: number) => `${n.toFixed(1)}°`
@@ -32,6 +39,18 @@ const METRES_TO_FEET = 3.28084
 /** Both units on one line. The kit is metric, the airspace rules are not. */
 const distance = (metres: number) =>
   `${Math.round(metres)}m · ${Math.round(metres * METRES_TO_FEET)}ft`
+
+const feet = (metres: number) => Math.round(metres * METRES_TO_FEET).toLocaleString('en-US')
+
+/** Rising, falling, or as near to neither as makes no difference. */
+const TIDE_ARROW: Record<string, string> = { rising: '↑', falling: '↓', slack: '·' }
+
+/** Google give "YYYY-MM". The year is the part that matters and the part to show. */
+function imageryYear(date: string | undefined): string | null {
+  if (date === undefined) return null
+  const year = date.slice(0, 4)
+  return /^\d{4}$/.test(year) ? year : null
+}
 
 const WARNING_COPY: Record<SiteWarning, string> = {
   'in-water': 'This position is in water. Nobody can stand here.',
@@ -52,50 +71,91 @@ const FRAMING_COPY: Record<FramingWarning, string> = {
 }
 
 /**
- * Real Street View imagery, or an honest statement that there is none.
- * Never a generated picture: see the note in lib/groundView.ts.
+ * The photo slot. Real Street View imagery, or an honest statement that there
+ * is none, in the same footprint either way.
+ *
+ * NEVER A GENERATED PICTURE: see the note in lib/groundView.ts. The entire value
+ * of this tool is being right about a place the shooter has not seen, and a
+ * plausible fake sightline would look exactly as convincing as a true one.
+ *
+ * IT LOADS WHEN THE CARD OPENS, which it did not before: it used to sit behind a
+ * "Ground view" button. Opening this card is already an explicit, deliberate tap
+ * on one position, and the request carries that one coordinate. The bulk case,
+ * the field pack, sends EVERY position at once and stays behind its own labelled
+ * press for exactly that reason.
  */
-function GroundViewPanel({ planned }: { planned: PlannedPosition }) {
-  const [view, setView] = useState<GroundView>({ status: 'idle' })
+function PhotoSlot({ planned }: { planned: PlannedPosition }) {
+  const { at } = planned.position
+  const { cameraBearing } = planned
+  const { hFOV } = planned.fov
+  const air = planned.position.platform === 'air'
 
-  const load = () => {
-    setView({ status: 'loading' })
-    fetchGroundView(planned.position.at, planned.cameraBearing, planned.fov.hFOV).then(setView)
-  }
+  /*
+   * Loading is the INITIAL state, not something an effect sets on the way in.
+   * This component is keyed by position id at the call site, so opening a
+   * different position mounts a fresh one and the state starts correct rather
+   * than being corrected by a second render.
+   */
+  const [view, setView] = useState<GroundView>({ status: 'loading' })
 
-  if (view.status === 'idle') {
-    return (
-      <button type="button" className="btn btn--small" onClick={load}>
-        Ground view
-      </button>
-    )
-  }
+  useEffect(() => {
+    if (air) return
+    let live = true
+    fetchGroundView(at, cameraBearing, hFOV).then((next) => {
+      if (live) setView(next)
+    })
+    return () => {
+      live = false
+    }
+  }, [air, at, cameraBearing, hFOV])
+
+  const year = view.status === 'ok' ? imageryYear(view.date) : null
 
   return (
-    <div className="ground">
-      {view.status === 'loading' ? <p className="ground__note">Loading ground view…</p> : null}
+    <div className="frame">
+      {air ? (
+        <p className="frame__none">
+          Flown, not walked. There is no ground view for a drone position.
+        </p>
+      ) : null}
+
+      {!air && view.status === 'loading' ? (
+        <p className="frame__none">Loading ground view…</p>
+      ) : null}
 
       {view.status === 'ok' ? (
-        <>
-          <img
-            className="ground__img"
-            src={view.image}
-            alt={`Street View looking ${deg(planned.cameraBearing)} from position ${planned.position.number}`}
-          />
-          <p className="ground__note">
-            Google Street View, aimed at {deg(planned.cameraBearing)} with a{' '}
-            {deg(planned.fov.hFOV)} field of view. Imagery may be years old.
-          </p>
-        </>
+        <img
+          className="frame__img"
+          src={view.image}
+          alt={`Street View looking ${deg(cameraBearing)} from position ${planned.position.number}`}
+        />
       ) : null}
 
       {view.status === 'no-key' || view.status === 'no-coverage' || view.status === 'error' ? (
-        <p className="ground__note">{view.message}</p>
+        <p className="frame__none">{view.message}</p>
       ) : null}
+
+      {/* Quietly, in the corners, so neither competes with the picture. */}
+      <span className="frame__num num">
+        {planned.position.number}
+        {planned.position.moved ? <span className="frame__moved">moved</span> : null}
+      </span>
+      {year === null ? null : <span className="frame__year num">{year}</span>}
+
+      <p className={`frame__light frame__light--${planned.lighting.classification}`}>
+        <span className="frame__light-icon" aria-hidden="true">
+          {LIGHTING[planned.lighting.classification]?.icon}
+        </span>
+        <span className="frame__light-word">
+          {LIGHTING[planned.lighting.classification]?.word}
+        </span>
+        <span className="frame__light-phrase">
+          {LIGHTING[planned.lighting.classification]?.phrase}
+        </span>
+      </p>
     </div>
   )
 }
-
 type CloudState =
   | { status: 'idle' }
   | { status: 'loading' }
@@ -225,9 +285,21 @@ function CloudPanel({
 }
 
 /**
- * The card behind a figure. Every number on it was computed by src/core/ from
- * the position's coordinates. The shot text is the only part a model will ever
- * supply, and it says nothing about light.
+ * The card behind a figure. PHOTO FIRST.
+ *
+ * WHAT THIS REPLACED. A head with a number and a title, then two warning
+ * paragraphs, then a lighting tag, then a seven cell grid of degrees and metres,
+ * then the rationale, then the tide, then two opt-in buttons. Everything was
+ * present and nothing led: the first thing the eye landed on was a field of
+ * numbers, and the picture of the actual place was a button at the bottom.
+ *
+ * Now the place leads, then the shot in plain words, then the three numbers you
+ * act on. NOTHING WAS DELETED. Every value that used to be in that grid is still
+ * on this card, under "Numbers", closed by default.
+ *
+ * Every number here was computed by src/core/ from the position's coordinates.
+ * The shot text and the rationale are the only parts a model supplies, and
+ * neither says anything about light.
  */
 export function PositionCard({
   planned,
@@ -249,42 +321,34 @@ export function PositionCard({
   } = planned
 
   return (
-    <aside className={`card card--${lighting.classification}`} aria-label={`Position ${position.number}`}>
-      <div className="card__head">
-        <span className="card__number num">
-          {position.number}
-          {position.moved ? <span className="card__moved">moved</span> : null}
-        </span>
-        <div className="card__headings">
-          <h2 className="card__title">{position.shot}</h2>
-          {/*
-            * Focal length only. Which body the lens goes on is a decision made on
-            * the day, and "Sony a7III, Sony 200-600" was restating the kit bag
-            * rather than saying anything about this position.
-            */}
-          <p className="card__lens num">{position.focalLength}mm</p>
-        </div>
-        <button type="button" className="card__close" onClick={onClose} aria-label="Close">
-          ✕
-        </button>
-      </div>
+    <aside
+      className={`card card--${lighting.classification}`}
+      aria-label={`Position ${position.number}`}
+    >
+      <button type="button" className="card__close" onClick={onClose} aria-label="Close">
+        ✕
+      </button>
 
+      <PhotoSlot key={position.id} planned={planned} />
+
+      {/* The shot in plain words, and the largest text on the card. */}
+      <p className="card__shot">{position.shot}</p>
+
+      {/*
+        * Hazards stay loud and stay high. A framing problem and a site problem
+        * are the same kind of fact: something is wrong with this position and
+        * only the shooter can decide what to do about it.
+        */}
       {warnings.map((warning) => (
         <p className="card__warn" key={warning}>
           {WARNING_COPY[warning]}
         </p>
       ))}
-
       {framingWarnings.map((warning) => (
         <p className="card__warn" key={warning}>
           {FRAMING_COPY[warning]}
         </p>
       ))}
-
-      <p className={`card__lighting card__lighting--${lighting.classification}`}>
-        <span className="card__lighting-tag">{lighting.classification}</span>
-        <span className="card__lighting-copy">{LIGHTING_COPY[lighting.classification]}</span>
-      </p>
 
       {position.platform !== 'air' ? null : (
         <p className="card__air">
@@ -296,74 +360,106 @@ export function PositionCard({
         </p>
       )}
 
-      <dl className="card__stats">
-        <div className="card__stat">
-          <dt>Range</dt>
-          <dd className="num">{distance(subjectRangeMeters)}</dd>
+      {/*
+        * THREE NUMBERS. What to put on the camera, how far to walk, and what the
+        * water is doing while you do it. Everything else is reference and lives
+        * under the disclosure below.
+        *
+        * Tide is DELIBERATELY NOT a judgement about whether this spot is
+        * walkable. That depends on mud, rip-rap and fences that nothing in this
+        * app can see, and the shooter is the one who will be standing there.
+        * Computed in src/core/tide.ts from NOAA predictions; never from a model.
+        */}
+      <dl className={`three${tide === null ? ' three--pair' : ''}`}>
+        <div className="three__cell">
+          <dt className="three__label">Lens</dt>
+          <dd className="three__value num">{position.focalLength}mm</dd>
         </div>
-        <div className="card__stat">
-          {/*
-            * The number that says whether the standoff is sane: how much ground
-            * is across the frame at the subject. 2 * range * tan(hFOV / 2).
-            */}
-          <dt>Frame width</dt>
-          <dd className="num">{distance(frameWidthMeters)}</dd>
+        <div className="three__cell">
+          <dt className="three__label">Range</dt>
+          <dd className="three__value num">
+            {feet(subjectRangeMeters)}
+            <span className="three__unit">ft</span>
+          </dd>
         </div>
-        <div className="card__stat">
-          <dt>Usable to</dt>
-          <dd className="num">{Math.round(standoff.maxMeters)}m</dd>
-        </div>
-        <div className="card__stat">
-          <dt>Camera bearing</dt>
-          <dd className="num">{deg(cameraBearing)}</dd>
-        </div>
-        <div className="card__stat">
-          <dt>Sun delta</dt>
-          <dd className="num">{deg(lighting.delta)}</dd>
-        </div>
-        <div className="card__stat">
-          <dt>FOV h</dt>
-          <dd className="num">{deg(fov.hFOV)}</dd>
-        </div>
-        <div className="card__stat">
-          <dt>FOV v</dt>
-          <dd className="num">{deg(fov.vFOV)}</dd>
-        </div>
+        {tide === null ? null : (
+          <div className="three__cell">
+            <dt className="three__label">Tide</dt>
+            <dd className="three__value num">
+              {tide.feet.toFixed(1)}
+              <span className="three__unit">ft</span>
+              <span
+                className={`three__arrow three__arrow--${tide.direction}`}
+                aria-label={tide.direction === 'slack' ? 'near slack' : tide.direction}
+              >
+                {TIDE_ARROW[tide.direction]}
+              </span>
+            </dd>
+          </div>
+        )}
       </dl>
 
       {/*
-        * Why this vantage. The model's judgement, in its own words, capped at 15
-        * words by the parser. Nothing is computed from it.
+        * Why this vantage, and what to watch out for. Quiet, against a rule,
+        * because they are the model's judgement in its own words rather than
+        * anything computed. Capped at 15 words by the parser.
         */}
       {position.angleRationale === '' ? null : (
         <p className="card__why">{position.angleRationale}</p>
       )}
-
       {position.risk === '' ? null : <p className="card__note">{position.risk}</p>}
 
       {/*
-        * Tide, as a number and a direction and nothing else.
-        *
-        * Deliberately NOT a judgement about whether this spot is walkable. That
-        * depends on mud, rip-rap and fences that nothing in this app can see, and
-        * the shooter is the one who will be standing there. Computed in
-        * src/core/tide.ts from NOAA predictions; never from the model.
+        * EVERYTHING ELSE, CLOSED. Not deleted, not hidden: one tap away, in the
+        * same order it was always in. These are the numbers you check when you
+        * are questioning the plan, not the ones you read when you are walking
+        * to the spot.
         */}
-      {tide === null ? null : (
-        <p className="card__tide">
-          <span className="card__tide-label">Tide</span>
-          <span className="num">
-            {tide.feet.toFixed(1)}ft · {feetToMetres(tide.feet).toFixed(2)}m
-          </span>
-          <span className="card__tide-dir">
-            {tide.direction === 'slack' ? 'near slack' : tide.direction}
-          </span>
-        </p>
-      )}
+      <details className="more">
+        <summary className="more__summary">Numbers</summary>
+        <div className="more__body">
+          <dl className="card__stats">
+            <div className="card__stat">
+              <dt>Frame width</dt>
+              <dd className="num">{distance(frameWidthMeters)}</dd>
+            </div>
+            <div className="card__stat">
+              <dt>Usable to</dt>
+              <dd className="num">{Math.round(standoff.maxMeters)}m</dd>
+            </div>
+            <div className="card__stat">
+              <dt>Camera bearing</dt>
+              <dd className="num">{deg(cameraBearing)}</dd>
+            </div>
+            <div className="card__stat">
+              <dt>Sun delta</dt>
+              <dd className="num">{deg(lighting.delta)}</dd>
+            </div>
+            <div className="card__stat">
+              <dt>FOV h</dt>
+              <dd className="num">{deg(fov.hFOV)}</dd>
+            </div>
+            <div className="card__stat">
+              <dt>FOV v</dt>
+              <dd className="num">{deg(fov.vFOV)}</dd>
+            </div>
+            <div className="card__stat">
+              <dt>Range</dt>
+              <dd className="num">{distance(subjectRangeMeters)}</dd>
+            </div>
+            {tide === null ? null : (
+              <div className="card__stat">
+                <dt>Tide</dt>
+                <dd className="num">
+                  {tide.feet.toFixed(1)}ft · {feetToMetres(tide.feet).toFixed(2)}m
+                </dd>
+              </div>
+            )}
+          </dl>
 
-      <CloudPanel planned={planned} shootAt={shootAt} timeZone={timeZone} />
-
-      {position.platform === 'air' ? null : <GroundViewPanel planned={planned} />}
+          <CloudPanel planned={planned} shootAt={shootAt} timeZone={timeZone} />
+        </div>
+      </details>
     </aside>
   )
 }

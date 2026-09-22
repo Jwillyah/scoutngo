@@ -177,12 +177,29 @@ writes to no database: `api/generate.ts` says so at the top and explains why.
 Vercel retains function logs in its dashboard, which is precisely why nothing is
 ever written to them.
 
-**Ground view, opt in and off by default.** A position card has a Ground view
-button. Pressing it sends that one position's coordinates to Google's Street
-View API, through a serverless function so the key stays server side. Nothing is
-sent until you press it, and nothing at all is sent if `GOOGLE_MAPS_API_KEY` is
-unset, which is the default: the card simply says ground view is off. That
-function logs nothing either.
+**Ground view, one position at a time, when you tap it.** Tapping a position in
+Plan opens its card, and opening that card sends **that one position's
+coordinate** to Google's Street View API, through a serverless function so the
+key stays server side. It is the tap that sends it: no card open, nothing sent.
+What goes is the latitude and longitude of that single position, the direction
+the camera points, and how wide the lens is. No other position's coordinate goes
+with it, and the venue itself is never sent to Google.
+
+Each distinct view is fetched **once per session**. The result is held in memory,
+keyed on exactly those four parameters, so reopening the same card shows the
+photo it already has without asking Google again or billing a second image. Move
+the position, or re-aim it, and it is a different photograph, so it is fetched
+again. The memory cache is gone on reload; nothing about it is written to disk.
+
+**The field pack is the only thing that sends coordinates in bulk.** Pressing
+"Prepare field pack" fetches the ground view for *every* position at once. That
+is the one place in the app where more than one position's coordinate leaves the
+device in a single action, it never runs automatically, and the button says what
+it will do before you press it.
+
+Nothing at all is sent to Google if `GOOGLE_MAPS_API_KEY` is unset, which is the
+default: the card simply says ground view is off. That function logs nothing
+either.
 
 Ground view shows real Street View imagery or it says plainly that there is
 none. It never generates or illustrates a view. A plausible fake sightline is

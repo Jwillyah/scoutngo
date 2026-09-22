@@ -10,14 +10,13 @@ import type { TideInfo } from '../lib/useTide.ts'
 import type { VenueWindow } from '../lib/venue.ts'
 import { BottomSheet, type SheetState } from './BottomSheet.tsx'
 import { ConditionsPanel } from './ConditionsPanel.tsx'
-import { ConeFilter, type ConeMode } from './ConeFilter.tsx'
+import { ConePicker, type ConeMode } from './ConePicker.tsx'
 import { FieldPackControl, type PackBuildState } from './FieldPackControl.tsx'
 import { MapControls } from './MapControls.tsx'
 import { MapView, type MapHandle, type TapMode } from './MapView.tsx'
 import { OverflowMenu } from './OverflowMenu.tsx'
 import { PlanStatus } from './PlanStatus.tsx'
 import { PositionCard } from './PositionCard.tsx'
-import { SearchField } from './SearchField.tsx'
 import { ShotList } from './ShotList.tsx'
 import { TimeScrubber } from './TimeScrubber.tsx'
 
@@ -64,7 +63,9 @@ interface PlanModeProps {
   generation: GenerationState
   siteNote: string | null
   onGenerate: () => void
-  onSearchPick: (at: LatLon, label: string) => void
+  /** The forward step, offered as a SECONDARY action beside Generate. */
+  onGoToField: () => void
+  goToFieldBlocked: string | null
   summary: string
   peekStatus: { label: string; line: string }
   fitTargets: LatLon[]
@@ -83,6 +84,18 @@ interface PlanModeProps {
  * stops, and its payload is chosen by an explicit control rather than by a tab.
  * Conditions detail comes up in the same sheet instead of being a place you
  * navigate to, because sun and tide belong to the map and the scrubber.
+ *
+ * ONE THING PER REGION, which is what this screen did not have.
+ *
+ *   TOP    one row of reveals: Conditions, Cones, and the overflow.
+ *   RIGHT  three map controls a gesture cannot replace.
+ *   BOTTOM the sheet, carrying the one loud action and its two quiet ones.
+ *   DOCK   time, then the rail. Nothing else.
+ *
+ * What came off: a venue search bar that duplicated SETUP, a sun readout that
+ * duplicated the scrubber, two zoom buttons that duplicated pinch, and a
+ * permanent lens chip row that is now one control. See the comments at each
+ * site.
  */
 export function PlanMode({
   mapHandle,
@@ -124,7 +137,8 @@ export function PlanMode({
   generation,
   siteNote,
   onGenerate,
-  onSearchPick,
+  onGoToField,
+  goToFieldBlocked,
   peekStatus,
   fitTargets,
   pack,
@@ -189,20 +203,36 @@ export function PlanMode({
         bottomInset={sheetHeight}
       />
 
+      {/*
+        * ONE ROW OF REVEALS, and every one of them opens something rather than
+        * stating something.
+        *
+        * THE VENUE SEARCH IS GONE. The venue is set in SETUP, on a screen built
+        * around exactly that, with result merging, a confirm step and a
+        * draggable pin. A second search bar here was a second way to do a job
+        * that already has a home, sitting on top of the map it would move.
+        * Changing the venue means stepping back to SETUP, which the rail does.
+        *
+        * THE SUN READOUT IS GONE TOO. It printed the same azimuth and altitude
+        * the scrubber prints, one screen-height apart, and the scrubber's
+        * version is the honest one: those numbers belong to a MOMENT, and the
+        * scrubber is what chooses the moment.
+        */}
       <header className="hud">
-        <SearchField onPick={onSearchPick} />
         <div className="hud__row">
-          {sun === null ? null : (
-            <p className="hud__sun">
-              <span className="hud__sun-label">Sun</span>
-              <span className="num">{sun.azimuth.toFixed(1)}°</span>
-              <span className="num">{sun.altitude.toFixed(1)}° alt</span>
-            </p>
-          )}
           {/* The single control that reveals sun and tide detail. */}
           <button type="button" className="mode" onClick={() => openWith('conditions')}>
             Conditions
           </button>
+          <ConePicker
+            plan={plan}
+            coneMode={coneMode}
+            onConeMode={onConeMode}
+            lensFilters={lensFilters}
+            onLensFilters={onLensFilters}
+            isolatedId={isolatedId}
+            onClearIsolate={onClearIsolate}
+          />
           <OverflowMenu
             mode={tapMode}
             onMode={onTapMode}
@@ -217,7 +247,6 @@ export function PlanMode({
         onShowSun={onShowSun}
         pitch={pitch}
         onPitch={(next) => handle.current?.setPitch(next)}
-        onZoom={(delta) => handle.current?.zoomBy(delta)}
         onFitAll={() => handle.current?.fitAll(fitTargets)}
         canFitAll={fitTargets.length > 0}
       />
@@ -250,14 +279,47 @@ export function PlanMode({
               <span className="peek__label">{peekStatus.label}</span>
               <span className="peek__line">{peekStatus.line}</span>
             </button>
+
+            {/*
+              * ONE LOUD ACTION. Generate is what this screen is for, so it is
+              * the full width primary in signal white and nothing else on the
+              * screen competes with it. The other two are real actions, not
+              * links, but they are secondary and they sit underneath: preparing
+              * a pack and walking out of the door are both things you do AFTER
+              * there is a plan to do them to.
+              */}
             <button
               type="button"
-              className="btn btn--primary"
+              className="btn btn--primary peek__go"
               onClick={onGenerate}
               disabled={generation.status === 'working'}
             >
               {generation.status === 'working' ? 'Working' : 'Generate'}
             </button>
+
+            <div className="peek__second">
+              <button
+                type="button"
+                className="btn btn--quiet"
+                onClick={onPreparePack}
+                disabled={plan.length === 0 || packState.status === 'working'}
+              >
+                {packState.status === 'working'
+                  ? `Packing ${packState.done}/${packState.total}`
+                  : packIsCurrent
+                    ? 'Pack again'
+                    : 'Prepare field pack'}
+              </button>
+              <button
+                type="button"
+                className="btn btn--quiet"
+                onClick={onGoToField}
+                disabled={goToFieldBlocked !== null}
+                title={goToFieldBlocked ?? undefined}
+              >
+                Go to field
+              </button>
+            </div>
           </div>
         }
       >
@@ -300,17 +362,14 @@ export function PlanMode({
         )}
       </BottomSheet>
 
+      {/*
+        * THE DOCK IS TIME, THEN THE RAIL. It used to be a lens chip row, the
+        * scrubber, a full width forward button and the rail: four stacked bars
+        * over the bottom third of the map. The chips became one control in the
+        * HUD and the forward button became a secondary beside Generate, which
+        * is where the hierarchy belonged anyway.
+        */}
       <div className="dock" ref={measureDock}>
-        <ConeFilter
-          plan={plan}
-          coneMode={coneMode}
-          onConeMode={onConeMode}
-          lensFilters={lensFilters}
-          onLensFilters={onLensFilters}
-          isolatedId={isolatedId}
-          onClearIsolate={onClearIsolate}
-        />
-
         {venueWindow === null || scrubbedAt === null || sun === null ? null : (
           <TimeScrubber
             start={venueWindow.start}

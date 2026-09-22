@@ -1417,25 +1417,6 @@
   gap: var(--space-2);
 }
 
-/* Solid behind the numbers. Never glass, never faded. */
-.hud__sun {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-  background: var(--color-panel);
-  border-top: var(--line-hair) solid var(--color-edge-top);
-  border-radius: var(--radius-panel);
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--text-num-sm);
-}
-
-.hud__sun-label {
-  font-size: var(--text-label);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-}
-
 /*
  * 44px minimum, because this is used one handed on a phone, outdoors, in sun,
  * often with the other hand on a camera. 44 is the smallest reliable thumb
@@ -1541,25 +1522,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-}
-
-.mapctl__stack {
-  display: flex;
-  flex-direction: column;
-  background: var(--color-panel);
-  border: var(--line-hair) solid var(--color-line);
-  border-top-color: var(--color-edge-top);
-  border-radius: var(--radius-panel);
-  overflow: hidden;
-}
-
-.mapctl__stack .mapctl__btn {
-  border: 0;
-  border-radius: 0;
-}
-
-.mapctl__stack .mapctl__btn + .mapctl__btn {
-  border-top: var(--line-hair) solid var(--color-line);
 }
 
 /* Thumb sized, not mouse sized. */
@@ -1951,7 +1913,12 @@
   /* The lit top edge is what lifts a panel off the map. No shadow is used. */
   border-top-color: var(--color-edge-top);
   border-radius: var(--radius-panel);
-  padding: var(--space-3);
+  /*
+   * NO PADDING ON THE CARD ITSELF. The photo is full bleed to the card's own
+   * edges, so every other child carries its own side padding instead.
+   */
+  padding: 0 0 var(--space-3);
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -1969,7 +1936,12 @@
    * head on screen whatever the content does. --card-top-gap leaves room for the
    * search field and the sun readout above.
    */
-  --card-top-gap: 140px;
+  /*
+   * 88px, down from 140. That 140 was reserving room for the venue search field
+   * and the sun readout that used to float above this card. Both are gone, so
+   * the card gets the height back and the photo has somewhere to be.
+   */
+  --card-top-gap: 88px;
   max-height: calc(
     100dvh - var(--dock-height, 0px) - var(--sheet-live-height, 0px) - var(--card-top-gap)
   );
@@ -1977,76 +1949,298 @@
   overscroll-behavior: contain;
 }
 
-.card__head {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: var(--space-3);
-  align-items: start;
+/*
+ * THE PHOTO SLOT. Full width, top of the card, fixed footprint.
+ *
+ * SAME FOOTPRINT WHATEVER HAPPENS. Imagery, no coverage, no key, an error, or a
+ * drone position that was never walked to: all of them occupy this exact box.
+ * A slot that collapses when there is no picture makes the card jump under the
+ * thumb and quietly teaches you that the absence of a photo is nothing worth
+ * reading, when it is in fact the thing the shooter most needs to know.
+ *
+ * 8:5 matches the 640x400 Street View request, so a real frame arrives at its
+ * native aspect and nothing is cropped or letterboxed.
+ */
+.frame {
+  position: relative;
+  /*
+   * `flex: 0 0 auto` is what makes "same footprint" true. The card is a flex
+   * column with a max height, so the default `flex-shrink: 1` let this box be
+   * squeezed to its content: a real photo held 8:5 and the "no ground view"
+   * message collapsed to 120px, which is exactly the jump the fixed slot exists
+   * to prevent.
+   */
+  flex: 0 0 auto;
+  aspect-ratio: 8 / 5;
+  background: var(--surface-2);
+  border-bottom: var(--line-hair) solid var(--color-line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 }
 
-.card__number {
+.frame__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Plain words, centred in the slot. Not an error state: a statement. */
+.frame__none {
+  padding: var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+/*
+ * The corners. Solid plates, never a text shadow over imagery: a Street View
+ * frame can be any brightness and a number that disappears against a white sky
+ * is a number that is not there.
+ */
+.frame__num,
+.frame__year {
+  position: absolute;
+  top: var(--space-2);
+  padding: 2px 7px;
+  border-radius: var(--radius-panel);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+}
+
+.frame__num {
+  left: var(--space-2);
   background: var(--color-accent);
   color: var(--color-accent-ink);
   font-weight: var(--weight-heavy);
-  font-size: var(--text-num-sm);
-  padding: 3px 8px;
-  line-height: 1.2;
 }
 
-.card__title {
-  font-size: var(--text-lg);
-  font-weight: var(--weight-heavy);
-  letter-spacing: var(--tracking-tight);
-  line-height: var(--leading-tight);
+/* Quieter than the number: it is provenance, not identity. */
+/* A position the shooter dragged is a different claim from one the model placed. */
+.frame__moved {
+  margin-left: var(--space-1);
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
 }
 
-.card__lens {
-  margin-top: var(--space-1);
-  font-size: var(--text-sm);
+/*
+ * Held clear of the close control, which shares this corner. At a plain
+ * `right: var(--space-2)` the two stacked and the close button won, so the
+ * imagery date, the one thing on this card saying how old the picture is, was
+ * invisible underneath it.
+ */
+.frame__year {
+  right: calc(var(--space-2) + 42px);
+  background: var(--color-panel);
   color: var(--color-text-muted);
 }
 
-.card__close {
-  background: transparent;
-  border: 0;
-  color: var(--color-text-muted);
-  font-size: var(--text-lg);
-  line-height: 1;
-  padding: var(--space-1);
-  cursor: pointer;
-}
-
-.card__lighting {
+/*
+ * ONE ICON, ONE WORD, ONE PHRASE, across the foot of the photo.
+ *
+ * On a solid bar rather than over the picture directly, for the same reason the
+ * corners are plates. The lighting colour is carried by the ICON only; the
+ * words stay chrome white, so the classification is legible at a glance and
+ * still readable by anyone who cannot separate the three hues.
+ */
+.frame__light {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
   align-items: baseline;
   gap: var(--space-2);
-  flex-wrap: wrap;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-panel);
+  border-top: var(--line-hair) solid var(--color-line);
 }
 
-.card__lighting-tag {
-  font-size: var(--text-xs);
+.frame__light-icon {
+  font-size: var(--text-md);
+  line-height: 1;
+}
+
+.frame__light--backlit .frame__light-icon {
+  color: var(--light-back);
+}
+
+.frame__light--side-lit .frame__light-icon {
+  color: var(--light-side);
+}
+
+.frame__light--front-lit .frame__light-icon {
+  color: var(--light-front);
+}
+
+.frame__light-word {
+  font-size: var(--text-sm);
   font-weight: var(--weight-heavy);
   letter-spacing: var(--tracking-label);
   text-transform: uppercase;
-  padding: 3px 6px;
-  color: var(--color-accent-ink);
 }
 
-.card__lighting--backlit .card__lighting-tag {
-  background: var(--light-back);
-}
-
-.card__lighting--side-lit .card__lighting-tag {
-  background: var(--light-side);
-}
-
-.card__lighting--front-lit .card__lighting-tag {
-  background: var(--light-front);
-}
-
-.card__lighting-copy {
+.frame__light-phrase {
   font-size: var(--text-sm);
   color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/*
+ * THE SHOT IN PLAIN WORDS. Sentence case at the body size, not a heading: it is
+ * a sentence somebody has to read and act on, and setting it as a tracked
+ * uppercase title made it scan as a label instead.
+ */
+.card__shot {
+  padding: 0 var(--space-3);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+}
+
+.card__close {
+  position: absolute;
+  z-index: 2;
+  top: var(--space-2);
+  right: var(--space-2);
+  width: 34px;
+  height: 34px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-panel);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: 50%;
+  color: var(--color-text);
+  font-size: var(--text-md);
+  line-height: 1;
+  cursor: pointer;
+}
+
+/*
+ * The close control sits over the photo, so it only appears once the year plate
+ * has a place to be. It is shown unconditionally; the rule above just keeps the
+ * declaration in one place.
+ */
+.card .card__close {
+  display: flex;
+}
+
+/*
+ * THREE NUMBERS, BIG AND MONOSPACE. What goes on the camera, how far to walk,
+ * and what the water is doing. Full opacity on a solid surface, per the rule in
+ * tokens.css: to quieten a number, use a dimmer colour, never opacity.
+ */
+.three {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0 var(--space-3);
+}
+
+.three--pair {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.three__cell {
+  min-width: 0;
+}
+
+.three__label {
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.three__value {
+  margin: 0;
+  font-size: var(--text-num-lg);
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-num);
+  line-height: var(--leading-tight);
+  white-space: nowrap;
+}
+
+/* The unit rides small beside the figure so the figure keeps the weight. */
+.three__unit {
+  margin-left: 2px;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-muted);
+}
+
+.three__arrow {
+  margin-left: var(--space-1);
+  font-size: var(--text-num);
+}
+
+/*
+ * Rising and falling are facts, not warnings. Chrome white, NOT hazard red and
+ * not a lighting colour: red on this screen means a position that is wrong.
+ */
+.three__arrow--slack {
+  color: var(--color-text-muted);
+}
+
+/* ------------------------------------------------------- numbers, closed */
+
+/*
+ * EVERYTHING ELSE, ONE TAP AWAY. Nothing here was deleted when the card became
+ * photo first; it stopped leading. These are the values you read when you are
+ * questioning the plan, not when you are walking to the spot.
+ */
+.more {
+  padding: 0 var(--space-3);
+}
+
+.more__summary {
+  min-height: var(--control-height);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  border-top: var(--line-hair) solid var(--color-line);
+  color: var(--color-text-muted);
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  cursor: pointer;
+  list-style: none;
+}
+
+.more__summary::-webkit-details-marker {
+  display: none;
+}
+
+.more__summary::after {
+  content: '+';
+  font-size: var(--text-md);
+}
+
+.more[open] .more__summary::after {
+  content: '−';
+}
+
+/*
+ * Reference numbers, set one step down from the three that lead. At the
+ * headline size they wrapped to two and three lines each in a 108px column and
+ * the grid came apart. Size, not opacity: a dimmer number here would break the
+ * readability rule in tokens.css.
+ */
+.more .card__stat dd {
+  font-size: var(--text-num-sm);
+}
+
+.more__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-bottom: var(--space-2);
 }
 
 .card__stats {
@@ -2070,7 +2264,12 @@
   line-height: var(--leading-tight);
 }
 
+/*
+ * Quiet lines against a left rule: the model's judgement, in its own words.
+ * The rule is grey, not accent: these state something, they do nothing.
+ */
 .card__note {
+  margin: 0 var(--space-3);
   font-size: var(--text-sm);
   color: var(--color-text-muted);
   border-left: var(--line-rule) solid var(--color-line);
@@ -2128,6 +2327,7 @@
 
 .sheet__peek {
   flex: 0 0 auto;
+  min-height: 0;
   padding: 0 var(--page-pad) var(--space-3);
 }
 
@@ -2142,11 +2342,28 @@
   display: none;
 }
 
+/*
+ * ONE LOUD ACTION AND TWO QUIET ONES.
+ *
+ * This was a two column row: a summary on the left and Generate on the right,
+ * with the forward step living in its own full width bar down in the dock. Two
+ * competing primaries on one screen, a whole bar apart. Now the hierarchy is
+ * vertical and unambiguous: the summary, then the thing this screen is for,
+ * then the two things you do once it has happened.
+ */
 .peek {
   display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
+}
+
+.peek__go {
+  width: 100%;
+}
+
+.peek__second {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
 }
 
 .peek__summary {
@@ -2253,33 +2470,6 @@
 }
 
 /* The per position line: a number and a direction, and no judgement. */
-.card__tide {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-2);
-  font-size: var(--text-num-sm);
-}
-
-.card__tide-label {
-  font-size: var(--text-label);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-}
-
-.card__tide-dir {
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
-
-/* ------------------------------------------- tide marks on the time scrubber */
-
-/*
- * Sits directly above the range track, so a turn lines up with the point on the
- * track where it happens. Pointer events off: the track underneath must stay a
- * 44px drag target, which the touch pass established.
- */
 .scrub__tide {
   position: relative;
   height: 12px;
@@ -2549,7 +2739,7 @@
  * than arithmetic, and it should not be mistaken for a computed number.
  */
 .card__why {
-  margin: var(--space-3) 0 0;
+  margin: 0 var(--space-3);
   padding-left: var(--space-3);
   border-left: var(--line-rule) solid var(--color-line-strong);
   font-size: var(--text-sm);
@@ -2562,17 +2752,6 @@
   font-size: var(--text-sm);
   color: var(--color-text-muted);
   font-style: italic;
-}
-
-/* Clears every selected lens at once. Carries the count so the filter is never
-   silently on. */
-/*
- * The clear control is an action but not a selection, so it is outlined rather
- * than filled: filling it white would make it compete with the chips it clears.
- */
-.chip--clear {
-  border-style: dashed;
-  color: var(--color-text);
 }
 
 .notice {
@@ -2787,6 +2966,25 @@
   color: var(--color-accent-ink);
   font-weight: var(--weight-heavy);
   box-shadow: var(--primary-glow);
+}
+
+/*
+ * Secondary. Readable, reachable, and visibly not the main event: panel fill,
+ * no accent, no glow, and shorter than the primary above it.
+ */
+.btn--quiet {
+  min-height: 38px;
+  padding: 0 var(--space-2);
+  background: transparent;
+  border-color: var(--color-line-strong);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.btn--quiet:disabled {
+  color: var(--color-text-faint);
+  border-color: var(--color-line);
+  cursor: not-allowed;
 }
 
 .btn--small {
@@ -3136,21 +3334,13 @@
   background: var(--light-front);
 }
 
-.shot__moved,
-.card__moved {
+.shot__moved {
   font-size: var(--text-label);
   letter-spacing: var(--tracking-label);
   text-transform: uppercase;
   color: var(--color-text-muted);
   border: var(--line-hair) solid var(--color-line-strong);
   padding: 1px 4px;
-}
-
-.card__moved {
-  display: block;
-  margin-top: var(--space-1);
-  background: var(--color-panel);
-  color: var(--color-text-muted);
 }
 
 .shot__shot {
@@ -3300,13 +3490,6 @@
   touch-action: pan-y;
 }
 
-.scrub__ends {
-  display: flex;
-  justify-content: space-between;
-  font-size: var(--text-xs);
-  color: var(--color-text-faint);
-}
-
 /* ----------------------------------------------------------- warnings */
 
 .shot__warn {
@@ -3319,7 +3502,10 @@
   padding: 2px 6px;
 }
 
+/* Hazard. Loud, high on the card, and the only red on this screen. */
 .card__warn {
+  margin: 0 var(--space-3);
+  border-radius: var(--radius-panel);
   background: var(--color-hazard-bg);
   border-left: var(--line-rule) solid var(--color-hazard);
   color: var(--white);
@@ -3330,28 +3516,80 @@
 
 /* --------------------------------------------------------- ground view */
 
-.ground {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+/* ------------------------------------------------- overflow and the picker */
+
+.overflow,
+.picker {
+  position: relative;
 }
 
-.ground__img {
-  display: block;
-  width: 100%;
-  height: auto;
+/*
+ * The cones and lens picker, opened from one control in the HUD.
+ *
+ * Same shape as the overflow menu on purpose: both are "a control that reveals
+ * a short list", and giving them two different shapes would be inventing a
+ * distinction the shooter does not have.
+ */
+.picker__menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--space-2));
+  min-width: 13rem;
+  max-height: 60dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-1);
+  background: var(--color-panel);
   border: var(--line-hair) solid var(--color-line);
+  border-top-color: var(--color-edge-top);
+  border-radius: var(--radius-panel);
 }
 
-.ground__note {
-  font-size: var(--text-xs);
+.picker__label {
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  border-top: var(--line-hair) solid var(--color-line);
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
   color: var(--color-text-muted);
 }
 
-/* ------------------------------------------------------------- overflow */
+.picker__item {
+  display: block;
+  width: 100%;
+  min-height: var(--control-height);
+  padding: 0 var(--space-3);
+  background: transparent;
+  border: 0;
+  color: var(--color-text);
+  text-align: left;
+  font-size: var(--text-md);
+  cursor: pointer;
+}
 
-.overflow {
-  position: relative;
+.picker__item--on {
+  color: var(--color-accent);
+  font-weight: var(--weight-heavy);
+}
+
+/*
+ * Clears every selected lens at once, and carries the count so a filter can
+ * never be quietly on. Outlined rather than filled: it is an action but not a
+ * selection, and filling it would make it compete with the lenses it clears.
+ */
+.picker__clear {
+  display: block;
+  width: 100%;
+  min-height: 34px;
+  margin-top: var(--space-1);
+  background: transparent;
+  border: var(--line-hair) dashed var(--color-line-strong);
+  border-radius: var(--radius-panel);
+  color: var(--color-text);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  cursor: pointer;
 }
 
 .mode--icon {
@@ -3395,47 +3633,6 @@
   border-top: var(--line-hair) solid var(--color-line);
   font-size: var(--text-xs);
   color: var(--color-text-faint);
-}
-
-/* ---------------------------------------------------------- cone filter */
-
-.cones {
-  flex: 0 0 auto;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: 0 var(--page-pad);
-  background: var(--black);
-  border-top: var(--line-hair) solid var(--color-line);
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.cones::-webkit-scrollbar {
-  display: none;
-}
-
-.chip {
-  flex: 0 0 auto;
-  min-height: 30px;
-  padding: 0 var(--space-3);
-  background: var(--color-panel-2);
-  border: var(--line-hair) solid var(--color-line);
-  border-radius: var(--radius-panel);
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
-  letter-spacing: var(--tracking-wide);
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.chip--on {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-  color: var(--color-accent-ink);
-  font-weight: var(--weight-heavy);
 }
 
 /* --------------------------------------------------------- stale brief */
@@ -3501,6 +3698,7 @@
 }
 
 .card__air {
+  padding: 0 var(--space-3);
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;

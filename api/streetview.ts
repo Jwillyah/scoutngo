@@ -55,7 +55,7 @@ export async function GET(request: Request): Promise<Response> {
      * before an image request is billed.
      */
     const meta = await fetch(`${META_URL}?location=${location}&key=${key}`)
-    const metaBody = (await meta.json()) as { status?: string }
+    const metaBody = (await meta.json()) as { status?: string; date?: string }
 
     if (metaBody.status === 'ZERO_RESULTS' || metaBody.status === 'NOT_FOUND') {
       return Response.json({
@@ -81,8 +81,18 @@ export async function GET(request: Request): Promise<Response> {
       })
     }
 
+    /*
+     * The capture date comes back on the metadata call already made above, as
+     * "YYYY-MM". Passed through so the card can say how old the imagery is
+     * without a second request and without anyone guessing. A Street View frame
+     * from 2011 is a different claim about a place than one from last year.
+     */
     const bytes = Buffer.from(await image.arrayBuffer()).toString('base64')
-    return Response.json({ status: 'ok', image: `data:image/jpeg;base64,${bytes}` })
+    return Response.json({
+      status: 'ok',
+      image: `data:image/jpeg;base64,${bytes}`,
+      date: typeof metaBody.date === 'string' ? metaBody.date : undefined,
+    })
   } catch {
     return Response.json({ status: 'error', message: 'Could not reach Street View.' })
   }
