@@ -20,6 +20,13 @@ import {
   slideOrder,
   type Rect,
 } from '../core/labelPlacement.ts'
+import {
+  appLayerIdsIn,
+  CONE_SOURCE,
+  RADIUS_SOURCE,
+  RAY_SOURCE,
+  SUN_SOURCE,
+} from '../lib/captureLayers.ts'
 import { readToken } from '../lib/tokens.ts'
 import { ShooterFigure } from './ShooterFigure.tsx'
 
@@ -139,10 +146,39 @@ const FLOATING_CHROME = [
 ].join(', ')
 /** How long a press has to be held before it drops a pin. */
 const LONG_PRESS_MS = 550
-const RADIUS_SOURCE = 'reach-radius'
-const CONE_SOURCE = 'fov-cones'
-const SUN_SOURCE = 'sun-axis'
-const RAY_SOURCE = 'sun-rays'
+
+/**
+ * THE ONE CAPTURE PATH, AND IT CAPTURES IMAGERY ONLY.
+ *
+ * WHAT WENT WRONG. `capture()` read the WebGL canvas, and the WebGL canvas holds
+ * every layer this app draws as well as the satellite tiles. So every generate
+ * since captures began has sent the model a photograph with our own annotations
+ * burned into it: a full height dashed sun axis through the subject, the sun and
+ * shadow rays, and the translucent cone of any isolated position. The model was
+ * then asked to read terrain off it, and told the image was a satellite view.
+ *
+ * Markers are not affected and never were: pins, shooter figures and ray labels
+ * are DOM elements positioned over the canvas, not pixels inside it.
+ *
+ * Hidden, redrawn synchronously, encoded, then restored in a `finally` so a
+ * failed encode cannot leave the map blank. The two redraws happen inside one
+ * task, so nothing is painted in between and there is no flicker.
+ */
+function captureImageryOnly(instance: maplibregl.Map): string {
+  const hidden: string[] = []
+  try {
+    for (const id of appLayerIdsIn(instance.getStyle()?.layers ?? [])) {
+      if (instance.getLayoutProperty(id, 'visibility') === 'none') continue
+      instance.setLayoutProperty(id, 'visibility', 'none')
+      hidden.push(id)
+    }
+    instance.redraw()
+    return encodeCanvas(instance.getCanvas())
+  } finally {
+    for (const id of hidden) instance.setLayoutProperty(id, 'visibility', 'visible')
+    if (hidden.length > 0) instance.redraw()
+  }
+}
 
 export type TapMode = 'venue' | 'subject' | null
 
@@ -774,7 +810,8 @@ export function MapView({
         const bounds = instance.getBounds()
         const centre = instance.getCenter()
         return {
-          dataUrl: encodeCanvas(canvas),
+          // Imagery only. See captureImageryOnly for what used to leak.
+          dataUrl: captureImageryOnly(instance),
           mediaType: 'image/jpeg',
           bounds: {
             west: bounds.getWest(),
