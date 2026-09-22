@@ -29,12 +29,31 @@ export interface ModeAvailability {
 /** Why a mode cannot be entered yet, or null when it can. */
 export function blockedReason(mode: Mode, available: ModeAvailability): string | null {
   if (mode === 'plan' && !available.venueReady) {
-    return 'Set a venue, a date and a window first.'
+    /*
+     * Deliberately not a list of fields. This is the rail's tooltip and the
+     * gate's reason; the forward button says WHICH field is missing, from
+     * SETUP_MISSING_COPY below. Enumerating three fields here named two that
+     * the app now fills in by default.
+     */
+    return 'Finish Setup first.'
   }
   if (mode === 'field' && !available.hasPlan) {
     return 'Generate a plan first. Field mode shows the positions you are walking to.'
   }
   return null
+}
+
+/**
+ * What SETUP is actually still waiting for, said one thing at a time.
+ *
+ * The old line was "Set a venue, a date and a window first" whatever was
+ * missing. With the date and window now defaulted, that sentence named two
+ * things that were already filled in and buried the one that was not.
+ */
+export const SETUP_MISSING_COPY: Record<'venue' | 'date' | 'window', string> = {
+  venue: 'Drop a pin on the venue, or search for it.',
+  date: 'Set the date.',
+  window: 'Set the shooting window.',
 }
 
 export const canEnter = (mode: Mode, available: ModeAvailability): boolean =>

@@ -6,44 +6,68 @@
 
 /* ------------------------------------------------------------------ shell */
 
+/*
+ * 100dvh, NOT inset:0 and not 100vh.
+ *
+ * `vh` on iOS Safari is the LARGE viewport: the height the page would have if
+ * the address bar and toolbar were hidden. With them showing, a 390x844 phone
+ * has about 390x660 of visible page, so everything sized in vh ran off the
+ * bottom. `dvh` is the viewport that is actually there right now.
+ */
 .shell {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100dvh;
   overflow: hidden;
 }
 
 /* ---------------------------------------------------------------- setup */
 
 /*
- * ONE SCREEN, NO SCROLL, at 390x844. The whole point of the redesign, so the
- * layout is a fixed column with exactly one flexible region: the map takes its
- * share, the body takes what is left, and nothing overflows the viewport.
+ * ONE SCREEN AT 390x844 IS A GOAL, NOT A RULE. This column SCROLLS.
+ *
+ * WHAT WENT WRONG. It used to be a fixed grid with `overflow: hidden`, tuned so
+ * nothing overflowed at 390x844. On a real iPhone in Safari, with the address
+ * bar and toolbar showing, the page gets about 390x660 — and `overflow: hidden`
+ * silently ate the difference. The kit row and the date and window pills were
+ * simply not on the screen and could not be scrolled to, so the date could not
+ * be set, so the forward button stayed blocked with no visible cause.
+ *
+ * A SCROLLBAR BEATS AN UNREACHABLE FIELD, every time. Nothing in this column is
+ * allowed to clip its children again: if the content does not fit, it scrolls.
+ * The height is still worth defending, which is what the map's clamp below is
+ * for, but it is defended by taking space from the map, never by hiding a
+ * control.
  */
 .setup {
-  /*
-   * A FLEX CHILD, not absolutely positioned. .mode-setup already lays this out
-   * in a column above the fixed foot; taking it out of flow made it cover the
-   * foot, which then rendered behind the map with the rail showing through the
-   * satellite imagery.
-   */
   flex: 1 1 auto;
   min-height: 0;
-  display: grid;
-  /*
-   * The map takes its share of the SCREEN, not of what is left over.
-   *
-   * 32vh, down from 40. Two things needed room: the reach slider, which is a new
-   * row between the map and the plate, and the window pills, which had to become
-   * two rows to stop clipping the end time. The map paid for both, about 68px at
-   * 390x844, and nothing below it had to move.
-   */
-  grid-template-rows: 32vh auto auto minmax(0, 1fr);
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
+/*
+ * The map gives up height first when the viewport is short, because it is the
+ * only thing here that degrades gracefully: a smaller map is still a map, while
+ * a hidden date field is a dead end.
+ *
+ * clamp in dvh: 180px keeps it usable on the shortest phone, 27dvh is the share
+ * it takes when there is room, 300px stops it dominating a tall window.
+ *
+ * 27dvh rather than 30 buys back the last 20px of scroll at 390x844, so the
+ * installed app still lands on one screen. At 390x660 the floor bites and the
+ * column scrolls, which is the correct answer there: the content genuinely does
+ * not fit, and scrolling is what happens when it does not.
+ */
 .setup__map {
   position: relative;
-  min-height: 0;
+  flex: 0 0 auto;
+  height: clamp(180px, 27dvh, 300px);
 }
 
 .setup__search {
@@ -62,6 +86,7 @@
  * hundred metres wide needs to say what it just did.
  */
 .reach {
+  flex: 0 0 auto;
   display: grid;
   padding: var(--space-1) var(--page-pad) 0;
 }
@@ -182,6 +207,7 @@
 
 /* The resolved place. No coordinate fields anywhere. */
 .plate {
+  flex: 0 0 auto;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -222,20 +248,18 @@
 }
 
 /*
- * `overflow: hidden` here is a backstop against a rogue child, NOT a budget.
- * Anything it actually clips is content the shooter cannot see and cannot
- * scroll to, which is worse than a scrollbar. The gaps below are tuned so it
- * clips nothing at 390x844; if that stops being true, the fix is to take the
- * height from the map, not to let this swallow a row.
+ * NO `overflow: hidden` HERE. It used to carry one, described in this very
+ * comment as "a backstop, not a budget", and it then became the budget: on a
+ * short viewport it clipped the kit row and the pills out of existence. There
+ * is no clipping on this column at any level now.
  */
 .setup__body {
+  flex: 0 0 auto;
   min-width: 0;
-  min-height: 0;
   display: grid;
   align-content: start;
   gap: var(--space-3);
-  padding: var(--space-2) var(--page-pad) 0;
-  overflow: hidden;
+  padding: var(--space-2) var(--page-pad) var(--space-3);
 }
 
 .setup__block {
@@ -502,13 +526,39 @@
 .pill {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  /*
+   * WRAPS RATHER THAN OVERFLOWS. The "default" tag is another item on this row,
+   * and measured at 390px it pushed the window's two time controls 54px past
+   * the pill's own right edge: the same clipped end time this layout was built
+   * to fix, reintroduced by a badge. Wrapping drops the pair onto its own line
+   * when the tag is there, and the row closes up again the moment the field is
+   * edited and the tag goes.
+   */
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
   min-width: 0;
   padding: var(--space-2) var(--space-3);
   background: var(--color-panel);
   border: var(--line-hair) solid var(--color-line);
   border-top-color: var(--color-edge-top);
   border-radius: var(--radius-panel);
+}
+
+/*
+ * A DEFAULT SAYS SO. The date and the window open with values the app chose, so
+ * nobody meets a blocked button because of an empty field they cannot see. That
+ * only works if a chosen value is never mistaken for a decision: the tag sits
+ * beside the label until the field is edited, then it is gone for good.
+ */
+.pill__default {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  border: var(--line-hair) dashed var(--color-line-strong);
+  border-radius: var(--radius-panel);
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
 }
 
 .pill__label {
@@ -1162,6 +1212,33 @@
   background: transparent;
   border-top: 0;
   padding-bottom: 0;
+}
+
+/*
+ * POINTED AT. A two second ring on whatever is blocking the forward button,
+ * after scrolling it into view. Uses the accent rather than hazard red: a field
+ * you have not filled in yet is not an error, it is the next thing to do.
+ */
+.is-wanted {
+  outline: var(--focus-ring) solid var(--color-accent);
+  outline-offset: 2px;
+  animation: wanted 2.2s ease-out;
+}
+
+@keyframes wanted {
+  0%,
+  40% {
+    outline-color: var(--color-accent);
+  }
+  100% {
+    outline-color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-wanted {
+    animation: none;
+  }
 }
 
 /* ------------------------------------------------------------- forward step */
@@ -2966,6 +3043,19 @@
   color: var(--color-accent-ink);
   font-weight: var(--weight-heavy);
   box-shadow: var(--primary-glow);
+}
+
+/*
+ * BLOCKED, NOT DISABLED. It reads as unavailable and it refuses to move on, but
+ * it is still a real button: pressing it scrolls to whatever is missing and
+ * lights it up. A `disabled` attribute here swallowed the press entirely, which
+ * left the shooter with a dead control and a reason they could not act on.
+ */
+.forward__btn--blocked {
+  background: var(--color-panel-2);
+  border-color: var(--color-line-strong);
+  color: var(--color-text-muted);
+  box-shadow: none;
 }
 
 /*

@@ -46,6 +46,44 @@ export const EMPTY_VENUE: VenueDraft = {
 }
 
 /**
+ * Today, as the device reckons it, in the YYYY-MM-DD an `input[type=date]` wants.
+ *
+ * NOT toISOString().slice(0, 10). That is UTC, and for anyone west of Greenwich
+ * it returns tomorrow's date for most of the evening. The date field has to say
+ * what the calendar on the wall says.
+ */
+export function localISODate(now: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+}
+
+/**
+ * The window a cold start begins with.
+ *
+ * WHY THERE IS A DEFAULT AT ALL. An empty date and an empty window blocked the
+ * forward button, and on a short viewport the fields that would have unblocked
+ * it were off the bottom of the screen. Nobody should meet a disabled button
+ * because of a field they cannot see. A default that is wrong is editable in two
+ * taps; a blocked button with no visible cause is a dead end.
+ *
+ * WHY THIS BLOCK. Mid afternoon into evening is where the light this tool exists
+ * to plan actually happens: it spans the sun dropping through the good angles
+ * and, for much of the year at these latitudes, golden hour with it. It is a
+ * starting point, it is marked on screen as a default, and it is editable.
+ */
+export const DEFAULT_START_TIME = '15:00'
+export const DEFAULT_END_TIME = '19:00'
+
+export function defaultVenue(now: Date): VenueDraft {
+  return {
+    ...EMPTY_VENUE,
+    date: localISODate(now),
+    startTime: DEFAULT_START_TIME,
+    endTime: DEFAULT_END_TIME,
+  }
+}
+
+/**
  * The calibration case from docs/brief.md. Brew River Dock Bar, Salisbury MD,
  * Saturday 12 September 2026, 11:00 to 15:00 local. The right answer is already
  * known for this venue, which is what makes it useful for testing fast.

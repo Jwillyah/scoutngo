@@ -57,6 +57,13 @@ interface SetupModeProps {
   /** First run only: the one sentence under the pin. Retired by a drag. */
   showPinHint: boolean
   onPinDrag: () => void
+  /** True while the date, or the window, is still the one the app chose. */
+  defaults: { date: boolean; window: boolean }
+  /**
+   * A request to show the shooter what is blocking them. The tick changes on
+   * every press of a blocked forward button, so pressing it twice points twice.
+   */
+  pointAt: { field: 'venue' | 'date' | 'window' | null; tick: number }
 }
 
 /** What is open over the one screen. Only ever one at a time. */
@@ -115,6 +122,8 @@ export function SetupMode({
   searchBias,
   showPinHint,
   onPinDrag,
+  defaults,
+  pointAt,
 }: SetupModeProps) {
   /*
    * One example per load, so the placeholder shows the kind of work the reader
@@ -166,6 +175,37 @@ export function SetupMode({
       bottom: 24,
     })
   }, [at, reachMeters, handle, mapReady])
+  /*
+   * POINT AT THE PROBLEM.
+   *
+   * A blocked forward button used to print "Set a venue, a date and a window
+   * first" and stop there, which is useless when the field it means is off the
+   * bottom of a short screen. Pressing it now scrolls the missing field into
+   * view and lights it up for a moment.
+   */
+  const venueRef = useRef<HTMLDivElement>(null)
+  const dateRef = useRef<HTMLLabelElement>(null)
+  const windowRef = useRef<HTMLLabelElement>(null)
+
+  /*
+   * The highlight is written straight onto the node rather than held in state.
+   * It is a transient visual cue with a timer on it, nothing else renders from
+   * it, and putting it in state would re-render the whole screen twice to flash
+   * one border.
+   */
+  useEffect(() => {
+    if (pointAt.field === null || pointAt.tick === 0) return
+    const node = { venue: venueRef, date: dateRef, window: windowRef }[pointAt.field].current
+    if (node === null) return
+    node.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    node.classList.add('is-wanted')
+    const timer = window.setTimeout(() => node.classList.remove('is-wanted'), 2200)
+    return () => {
+      window.clearTimeout(timer)
+      node.classList.remove('is-wanted')
+    }
+  }, [pointAt])
+
   const open = (next: Drawer) => setDrawer((current) => (current === next ? 'none' : next))
 
   const setField = (field: 'date' | 'startTime' | 'endTime') => (value: string) =>
@@ -174,7 +214,10 @@ export function SetupMode({
   return (
     <div className="setup">
       {/* The map is the top of the screen and the pin is the coordinate. */}
-      <div className={`setup__map${pendingPin === null ? '' : ' setup__map--pending'}`}>
+      <div
+        ref={venueRef}
+        className={`setup__map${pendingPin === null ? '' : ' setup__map--pending'}`}
+      >
         <MapView
           handle={mapHandle}
           venue={pendingPin?.at ?? at}
@@ -239,6 +282,44 @@ export function SetupMode({
       <VenuePlate name={venue.name} at={at} />
 
       <div className="setup__body">
+        {/*
+          * REQUIRED THINGS FIRST. The date and the window are the only inputs
+          * on this screen that block the forward button, so they sit directly
+          * under the venue and above everything optional. They used to be last,
+          * under the description and the kit, which is how they ended up off
+          * the bottom of a short screen with the button blocked on them.
+          */}
+        <div className="pills">
+          <label className="pill" ref={dateRef}>
+            <span className="pill__label">Date</span>
+            {defaults.date ? <span className="pill__default">default</span> : null}
+            <input
+              className="pill__input num"
+              type="date"
+              value={venue.date}
+              onChange={(event) => setField('date')(event.target.value)}
+            />
+          </label>
+          <label className="pill" ref={windowRef}>
+            <span className="pill__label">Window</span>
+            {defaults.window ? <span className="pill__default">default</span> : null}
+            <span className="pill__pair">
+              <input
+                className="pill__input num"
+                type="time"
+                value={venue.startTime}
+                onChange={(event) => setField('startTime')(event.target.value)}
+              />
+              <input
+                className="pill__input num"
+                type="time"
+                value={venue.endTime}
+                onChange={(event) => setField('endTime')(event.target.value)}
+              />
+            </span>
+          </label>
+        </div>
+
         <StaleBrief
           staleBrief={staleBrief}
           drift={drift}
@@ -306,37 +387,9 @@ export function SetupMode({
           ) : null}
         </div>
 
+        {/* Kit LAST: it ships with defaults, so it can never block anything. */}
         <KitChips value={kit} onChange={onKit} onEdit={() => open('kit')} />
 
-        {/* Date and window as two pills, not four stacked fields. */}
-        <div className="pills">
-          <label className="pill">
-            <span className="pill__label">Date</span>
-            <input
-              className="pill__input num"
-              type="date"
-              value={venue.date}
-              onChange={(event) => setField('date')(event.target.value)}
-            />
-          </label>
-          <label className="pill">
-            <span className="pill__label">Window</span>
-            <span className="pill__pair">
-              <input
-                className="pill__input num"
-                type="time"
-                value={venue.startTime}
-                onChange={(event) => setField('startTime')(event.target.value)}
-              />
-              <input
-                className="pill__input num"
-                type="time"
-                value={venue.endTime}
-                onChange={(event) => setField('endTime')(event.target.value)}
-              />
-            </span>
-          </label>
-        </div>
       </div>
 
       {/* One drawer at a time, over the screen, never pushing it taller. */}

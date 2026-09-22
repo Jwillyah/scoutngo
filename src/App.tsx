@@ -68,12 +68,13 @@ import {
   canEnter,
   FORWARD_LABEL,
   nextMode,
+  SETUP_MISSING_COPY,
   type Mode,
   type ModeAvailability,
 } from './lib/mode.ts'
 import {
   CALIBRATION_VENUE,
-  EMPTY_VENUE,
+  defaultVenue,
   hasErrors,
   resolveWindow,
   validateVenue,
@@ -98,8 +99,17 @@ const wantsCalibration = (): boolean =>
 
 function App() {
   const [venue, setVenue] = useState<VenueDraft>(() =>
-    wantsCalibration() ? CALIBRATION_VENUE : EMPTY_VENUE,
+    wantsCalibration() ? CALIBRATION_VENUE : defaultVenue(new Date()),
   )
+  /*
+   * Which of the date and window values are still the app's choice rather than
+   * the shooter's. Shown on the pills so a default is never mistaken for a
+   * decision, and cleared the moment either is edited or a venue is loaded.
+   */
+  const [defaults, setDefaults] = useState(() => ({
+    date: !wantsCalibration(),
+    window: !wantsCalibration(),
+  }))
   /*
    * The subject falls back to the venue coordinate until it is placed by hand.
    * Searching a new venue clears it, so it follows the new place rather than
@@ -334,6 +344,15 @@ function App() {
           next.eventDescription !== current.eventDescription ||
           next.desiredOutcome !== current.desiredOutcome
         if (briefEdited && centre !== null) setBriefAnchor({ at: centre })
+        /*
+         * A default stops being a default the moment it is touched. Compared
+         * field by field rather than wholesale, so editing the date does not
+         * quietly claim the window was chosen too.
+         */
+        if (next.date !== current.date) setDefaults((d) => ({ ...d, date: false }))
+        if (next.startTime !== current.startTime || next.endTime !== current.endTime) {
+          setDefaults((d) => ({ ...d, window: false }))
+        }
         return next
       })
     },
@@ -412,6 +431,7 @@ function App() {
 
   const loadSpot = (spot: Spot) => {
     setVenue(spot.venue)
+    setDefaults({ date: false, window: false })
     setSubject(spot.subject)
     setKit(spot.kit)
     setPositions(spot.positions)
@@ -712,6 +732,23 @@ function App() {
       ? 'No venue set'
       : `${venue.startTime}–${venue.endTime}${zoneSuffix} · ${venueShort}`
 
+  /*
+   * What is actually missing, for the forward button to point at. Venue first:
+   * it is the only one a cold start has no answer for.
+   */
+  const missing: 'venue' | 'date' | 'window' | null =
+    errors.name !== undefined || errors.latitude !== undefined || errors.longitude !== undefined
+      ? 'venue'
+      : errors.date !== undefined
+        ? 'date'
+        : errors.startTime !== undefined || errors.endTime !== undefined
+          ? 'window'
+          : null
+  const [pointAt, setPointAt] = useState<{
+    field: 'venue' | 'date' | 'window' | null
+    tick: number
+  }>({ field: null, tick: 0 })
+
   /* Which steps are reachable. See src/lib/mode.ts. */
   const available: ModeAvailability = {
     venueReady: !hasErrors(errors),
@@ -731,17 +768,38 @@ function App() {
    * are in, so moving on reads as finishing a step rather than changing channel.
    * When the next step is not earned yet it says why instead of vanishing.
    */
+  /*
+   * A BLOCKED BUTTON IS NOT A DISABLED BUTTON.
+   *
+   * It used to be `disabled`, which meant pressing it did nothing at all: no
+   * event, no feedback, and a one line reason printed above it that said "set a
+   * date" while the date field was off the bottom of the screen. Pressing it now
+   * scrolls the missing field into view and lights it up. It still refuses to
+   * move on, and it still says why, but it answers the question it raises.
+   */
   const forwardBar =
     forward === null || forwardLabel === null ? null : (
       <div className="forward">
         {forwardBlocked === null ? null : (
-          <p className="forward__why">{forwardBlocked}</p>
+          <p className="forward__why">
+            {mode === 'setup' && missing !== null
+              ? SETUP_MISSING_COPY[missing]
+              : forwardBlocked}
+          </p>
         )}
         <button
           type="button"
-          className="btn btn--primary forward__btn"
-          disabled={forwardBlocked !== null}
-          onClick={() => goTo(forward)}
+          className={`btn btn--primary forward__btn${
+            forwardBlocked === null ? '' : ' forward__btn--blocked'
+          }`}
+          aria-disabled={forwardBlocked !== null}
+          onClick={() => {
+            if (forwardBlocked === null) {
+              goTo(forward)
+              return
+            }
+            setPointAt((current) => ({ field: missing, tick: current.tick + 1 }))
+          }}
         >
           {forwardLabel}
         </button>
@@ -801,6 +859,8 @@ function App() {
             searchBias={centre}
             showPinHint={!pinHintDone}
             onPinDrag={() => setPinHintDone(true)}
+            defaults={defaults}
+            pointAt={pointAt}
           />
           <div className="mode__foot">
             {forwardBar}

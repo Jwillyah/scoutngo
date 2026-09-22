@@ -96,6 +96,44 @@ describe('render smoke', () => {
     expect(html).toContain('type="time"')
   })
 
+  /*
+   * REQUIRED THINGS FIRST, and the reason is a bug that shipped.
+   *
+   * Every zero-scroll check was run at 390x844. On a real iPhone in Safari the
+   * bars leave about 390x660, and `overflow: hidden` silently ate the rest: the
+   * pills and the kit were off the screen with no way to scroll to them, so the
+   * date could not be set and the forward button stayed blocked on it.
+   */
+  it('puts the date and window above everything optional', () => {
+    const pills = html.indexOf('class="pills"')
+    expect(pills).toBeGreaterThan(-1)
+    expect(pills).toBeLessThan(html.indexOf('id="describe-shoot"'))
+    expect(pills).toBeLessThan(html.indexOf('class="kitrow'))
+  })
+
+  /* Nobody should meet a blocked button because of a field they cannot see. */
+  it('opens with a real date and window, marked as defaults', () => {
+    expect(html).toMatch(/type="date"[^>]*value="\d{4}-\d{2}-\d{2}"/)
+    expect(html).toContain('>default<')
+    expect(html.match(/>default</g)?.length).toBe(2)
+  })
+
+  /*
+   * BLOCKED IS NOT DISABLED. A disabled button swallows the press, which left
+   * the shooter with a dead control and a reason they could not act on. It is
+   * pressable, and pressing it points at what is missing.
+   */
+  it('leaves the forward button pressable while it is blocked', () => {
+    expect(html).toContain('forward__btn--blocked')
+    expect(html).toContain('aria-disabled="true"')
+    expect(html).not.toMatch(/forward__btn[^>]*\sdisabled[\s=>]/)
+  })
+
+  it('names the one thing that is missing, not three', () => {
+    expect(html).toContain('Drop a pin on the venue')
+    expect(html).not.toContain('Set a venue, a date and a window first.')
+  })
+
   /* Reference, not setup: these open OVER the screen rather than on it. */
   it('keeps kit detail, brief and saved setups behind affordances', () => {
     expect(html).toContain('Edit kit')
