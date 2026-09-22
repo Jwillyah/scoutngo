@@ -31,3 +31,6 @@ dist-ssr
 # Local Vercel folder: project link, pulled env, and build output.
 .vercel
 .env*
+
+# Organizer artwork and other people's images. Ours to read, not ours to ship.
+fixtures/
