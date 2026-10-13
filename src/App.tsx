@@ -567,6 +567,29 @@ function App() {
      */
     if (hasErrors(errors) || staleBrief) {
       setMode('setup')
+      setPointAt((current) => ({ field: missing ?? 'venue', tick: current.tick + 1 }))
+      return
+    }
+
+    /*
+     * NO BRIEF, NO CALL.
+     *
+     * Pressed at an apartment complex with an empty description, this invented a
+     * marina shoot: the model was handed a satellite image and nothing else, and
+     * it is obliged to answer, so it answered about what it thought it saw. That
+     * is the exact failure this app exists to not have.
+     *
+     * The model is never asked a question there is no information to answer. It
+     * costs a request and produces confident fiction, and fiction shaped like a
+     * plan is worse than no plan because it looks finished.
+     */
+    if (venue.eventDescription.trim() === '') {
+      setMode('setup')
+      setPointAt((current) => ({ field: 'brief', tick: current.tick + 1 }))
+      setGeneration({
+        status: 'error',
+        message: 'Tell me what the shoot is first. Without it I would be guessing from the satellite image alone.',
+      })
       return
     }
 
@@ -758,7 +781,7 @@ function App() {
           ? 'window'
           : null
   const [pointAt, setPointAt] = useState<{
-    field: 'venue' | 'date' | 'window' | null
+    field: 'venue' | 'date' | 'window' | 'brief' | null
     tick: number
   }>({ field: null, tick: 0 })
 

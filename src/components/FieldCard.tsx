@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { compassPoint, lightingChange, walkTo } from '../core/field.ts'
+import { awayLabel, compassPoint, lightingChange, walkTo } from '../core/field.ts'
 import type { FramingWarning } from '../core/fov.ts'
 import type { Classification, LightingResult } from '../core/lighting.ts'
 import type { SiteWarning } from '../core/siting.ts'
@@ -122,9 +122,18 @@ export function FieldCard({
         </p>
       </section>
 
-      {/* Where to walk, from the phone's own fix. */}
+      {/*
+        * Where to walk, from the phone's own fix.
+        *
+        * ONLY WHILE WALKING IS THE QUESTION. Opening this at home showed
+        * "9011m" and a compass bearing, which is true and useless: a straight
+        * line across a county, through buildings and a river. Past
+        * TOO_FAR_TO_WALK_METERS the card says how far away you are and stops
+        * talking, because a bearing you cannot act on is noise beside the
+        * numbers you can.
+        */}
       <section className="fc__block">
-        <p className="fc__label">Walk to here</p>
+        <p className="fc__label">{walk?.farAway === true ? 'Distance' : 'Walk to here'}</p>
         {walk === null ? (
           <p className="fc__gps">
             {gps.status === 'locating'
@@ -139,6 +148,8 @@ export function FieldCard({
           </p>
         ) : walk.arrived ? (
           <p className="fc__walk num">You are here</p>
+        ) : walk.farAway ? (
+          <p className="fc__walk num">You are {awayLabel(walk.meters)} away</p>
         ) : (
           <p className="fc__walk num">
             {Math.round(walk.meters)}m · {Math.round(walk.bearing)}° {walk.compass}

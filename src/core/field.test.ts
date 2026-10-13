@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { bearingBetween, destinationPoint, distanceMeters, type LatLon } from './geo.ts'
-import { ARRIVED_METERS, compassPoint, lightingChange, walkTo } from './field.ts'
+import {
+  ARRIVED_METERS,
+  awayLabel,
+  compassPoint,
+  lightingChange,
+  TOO_FAR_TO_WALK_METERS,
+  walkTo,
+} from './field.ts'
 
 const VENUE: LatLon = { lat: 38.364236, lon: -75.605912 }
 
@@ -92,5 +99,59 @@ describe('lightingChange', () => {
 
   it('catches the worst case, front-lit gone backlit', () => {
     expect(lightingChange('front-lit', 'backlit')).not.toBeNull()
+  })
+})
+
+/*
+ * A BEARING IS WALKING ADVICE. Opening Field at home showed "9011m" and a
+ * compass point: true, and useless. It is a straight line across a county,
+ * through buildings and a river, and nobody is walking it.
+ */
+describe('too far to walk', () => {
+  const HERE: LatLon = { lat: 38.364236, lon: -75.605912 }
+  const far = (meters: number) => destinationPoint(HERE, 90, meters)
+
+  it('walks normally inside the threshold', () => {
+    const walk = walkTo(HERE, far(400))
+    expect(walk.farAway).toBe(false)
+    expect(walk.arrived).toBe(false)
+    expect(walk.compass).not.toBe('')
+  })
+
+  it('stops calling it a walk past two kilometres', () => {
+    expect(walkTo(HERE, far(TOO_FAR_TO_WALK_METERS + 1)).farAway).toBe(true)
+    expect(walkTo(HERE, far(9011)).farAway).toBe(true)
+  })
+
+  it('holds the boundary itself as still walkable', () => {
+    expect(walkTo(HERE, far(TOO_FAR_TO_WALK_METERS)).farAway).toBe(false)
+  })
+
+  /* Arrived and far away are different answers and must never both be true. */
+  it('is never both arrived and far away', () => {
+    for (const d of [0, 5, 10, 11, 1999, 2000, 2001, 50_000]) {
+      const walk = walkTo(HERE, far(d))
+      expect(walk.arrived && walk.farAway).toBe(false)
+    }
+  })
+})
+
+describe('awayLabel', () => {
+  /* Coarse on purpose: 9043 m implies a fix this app does not have. */
+  it('rounds metres to ten and kilometres to one place', () => {
+    expect(awayLabel(9011)).toBe('9.0 km')
+    expect(awayLabel(2400)).toBe('2.4 km')
+    expect(awayLabel(844)).toBe('840 m')
+    expect(awayLabel(7)).toBe('10 m')
+  })
+
+  it('switches unit at a kilometre', () => {
+    expect(awayLabel(999)).toBe('1000 m')
+    expect(awayLabel(1000)).toBe('1.0 km')
+  })
+
+  it('says it does not know rather than printing nonsense', () => {
+    expect(awayLabel(Number.NaN)).toBe('an unknown distance')
+    expect(awayLabel(-5)).toBe('an unknown distance')
   })
 })

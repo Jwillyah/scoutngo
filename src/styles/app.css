@@ -1862,6 +1862,7 @@
  */
 .shooter-host,
 .shooter {
+  position: relative;
   touch-action: none;
   -webkit-user-select: none;
   user-select: none;
@@ -1951,17 +1952,6 @@
 
 .shooter--warned .shooter__cam-lens {
   fill: var(--color-hazard);
-}
-
-.shooter__warn {
-  background: var(--color-hazard);
-  color: var(--white);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-heavy);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-  padding: 2px 5px;
-  white-space: nowrap;
 }
 
 /* Readout on the map: solid plate, full opacity, monospace. */
@@ -3697,6 +3687,29 @@
 }
 
 /* ----------------------------------------------------------- warnings */
+
+/*
+ * One small hazard dot on the marker. Solid, flat and opaque: it sits on
+ * satellite imagery in sunlight, where a gradient or a glow behind a warning
+ * would cost the only thing it has to do.
+ */
+.shooter__flag {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-hazard);
+  color: var(--white);
+  border: 2px solid var(--mark-edge);
+  border-radius: 50%;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-heavy);
+  line-height: 1;
+}
 
 .shot__warn {
   background: var(--color-hazard);

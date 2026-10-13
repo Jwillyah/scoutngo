@@ -39,6 +39,13 @@ export interface WalkTo {
   feet: number
   /** True once you are close enough that a bearing stops being meaningful. */
   arrived: boolean
+  /**
+   * True when you are far enough away that a bearing is not walking advice.
+   *
+   * The card shows the plain distance and nothing else in this case. See
+   * TOO_FAR_TO_WALK_METERS.
+   */
+  farAway: boolean
 }
 
 /**
@@ -47,6 +54,21 @@ export interface WalkTo {
  * someone at a bearing from three metres away is pointing them at noise.
  */
 export const ARRIVED_METERS = 10
+
+/**
+ * Past this, "walk to here" is the wrong sentence.
+ *
+ * WHY THIS EXISTS. Opening Field at home showed "9011m" and a compass bearing,
+ * which is true and useless: it is a straight line across a county, through
+ * buildings and a river, and nobody is walking it. A bearing is walking advice,
+ * and walking advice is only advice once you are close enough for a straight
+ * line to resemble the route.
+ *
+ * Two kilometres is about twenty minutes on foot and roughly where a bearing
+ * stops being a direction you walk and starts being a direction you drive. Past
+ * it the card says how far away you are, plainly, and stops talking.
+ */
+export const TOO_FAR_TO_WALK_METERS = 2000
 
 const METRES_TO_FEET = 3.28084
 
@@ -60,7 +82,21 @@ export function walkTo(from: LatLon, to: LatLon): WalkTo {
     meters,
     feet: meters * METRES_TO_FEET,
     arrived: meters <= ARRIVED_METERS,
+    farAway: meters > TOO_FAR_TO_WALK_METERS,
   }
+}
+
+/**
+ * How far away, in the largest unit that still says something.
+ *
+ * Metres below a kilometre, kilometres above it to one place. Deliberately
+ * coarse: a figure that says 9043 m implies the app knows where you are to the
+ * metre, and it does not.
+ */
+export function awayLabel(meters: number): string {
+  if (!Number.isFinite(meters) || meters < 0) return 'an unknown distance'
+  if (meters < 1000) return `${Math.round(meters / 10) * 10} m`
+  return `${(meters / 1000).toFixed(1)} km`
 }
 
 export interface LightingChange {

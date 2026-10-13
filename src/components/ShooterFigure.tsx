@@ -102,8 +102,22 @@ export function ShooterFigure({
         )}
       </span>
 
+      {/*
+        * A FLAG, NOT A BANNER.
+        *
+        * This used to print the warning text on the map beside the marker. With
+        * six positions back from a generate, three of them flagged, the map
+        * carried three red paragraphs overlapping each other and the imagery
+        * they were about. The text is the card's job; out here all that is
+        * needed is "something is wrong with this one".
+        *
+        * The words are still on the marker for a screen reader, in aria-label
+        * above, so nothing is lost to anyone who cannot see the flag.
+        */}
       {warningLabel === undefined ? null : (
-        <span className="shooter__warn">{warningLabel}</span>
+        <span className="shooter__flag" aria-hidden="true">
+          !
+        </span>
       )}
 
       {/* One plate, one readout: focal length, then altitude for an air position. */}

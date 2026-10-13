@@ -66,7 +66,7 @@ interface SetupModeProps {
    * A request to show the shooter what is blocking them. The tick changes on
    * every press of a blocked forward button, so pressing it twice points twice.
    */
-  pointAt: { field: 'venue' | 'date' | 'window' | null; tick: number }
+  pointAt: { field: 'venue' | 'date' | 'window' | 'brief' | null; tick: number }
 }
 
 /** What is open over the one screen. Only ever one at a time. */
@@ -191,6 +191,7 @@ export function SetupMode({
   const venueRef = useRef<HTMLDivElement>(null)
   const dateRef = useRef<HTMLLabelElement>(null)
   const windowRef = useRef<HTMLLabelElement>(null)
+  const briefRef = useRef<HTMLTextAreaElement>(null)
 
   /*
    * The highlight is written straight onto the node rather than held in state.
@@ -200,7 +201,9 @@ export function SetupMode({
    */
   useEffect(() => {
     if (pointAt.field === null || pointAt.tick === 0) return
-    const node = { venue: venueRef, date: dateRef, window: windowRef }[pointAt.field].current
+    const node = { venue: venueRef, date: dateRef, window: windowRef, brief: briefRef }[
+      pointAt.field
+    ].current
     if (node === null) return
     node.scrollIntoView({ behavior: 'smooth', block: 'center' })
     node.classList.add('is-wanted')
@@ -354,6 +357,7 @@ export function SetupMode({
           </label>
           <textarea
             id="describe-shoot"
+            ref={briefRef}
             className="setup__text"
             rows={2}
             value={describeText}
