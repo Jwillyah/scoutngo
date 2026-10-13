@@ -118,12 +118,20 @@ function parseCoordinate(raw: string): number | null {
   return Number.isFinite(value) ? value : null
 }
 
+/**
+ * What blocks SETUP. Only what a computation needs and a visible control sets.
+ *
+ * NOT THE NAME. It used to be required, and dragging the pin writes a coordinate
+ * but no name, so a placed pin sat behind a blocked button that said "Drop a pin
+ * on the venue": it named the pin, which was fine, and hid the name, which had
+ * no input on screen. Sun, tide, lighting, field of view, siting and coverage
+ * all run off latitude and longitude. The name is filled for you by reverse
+ * geocoding a dropped pin, and it is only ever a label.
+ *
+ * Nor the brief. Generate asks for it at the moment it needs it, not here.
+ */
 export function validateVenue(draft: VenueDraft): VenueErrors {
   const errors: VenueErrors = {}
-
-  if (draft.name.trim() === '') {
-    errors.name = 'Name the venue so you can find it again.'
-  }
 
   const lat = parseCoordinate(draft.latitude)
   if (draft.latitude.trim() === '') {

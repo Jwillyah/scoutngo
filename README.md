@@ -137,8 +137,13 @@ imagery. Nothing else is attached: no account, no identifier, no form content.
 **Venue search.** Typing in the search box sends that text to Nominatim at
 `nominatim.openstreetmap.org`, run by the OpenStreetMap Foundation. They see the
 query and, as with any web request, your IP and the referring page. Only what you
-type in that box is sent. If you would rather not search, drop the pin by hand or
-type coordinates; nothing is sent then.
+type in that box is sent.
+
+**Naming a dropped pin.** Dropping or dragging the venue pin sends that one
+coordinate to Nominatim's reverse lookup, to fill the venue name with something
+readable. Only the coordinate is sent, at most once a second, and only while the
+name is still one the app filled in; once you type a name, moving the pin sends
+nothing. If the lookup fails the name reads "Dropped pin" and nothing waits on it.
 
 **Site geometry.** Pressing Generate also asks Overpass, at
 `overpass-api.de`, for the water, buildings, piers, roads, and parking inside the
@@ -213,7 +218,7 @@ data because there is no server holding anything.
 
 - Vite, React, TypeScript
 - `maplibre-gl` for the map, over Esri World Imagery satellite tiles
-- Nominatim, from OpenStreetMap, for venue search
+- Nominatim, from OpenStreetMap, for venue search and for naming a dropped pin
 - Overpass, from OpenStreetMap, for real water, building, road and pier shapes
 - Google Street View Static API for the optional ground view
 - `suncalc` for solar position

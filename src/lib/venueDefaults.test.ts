@@ -40,14 +40,14 @@ describe('defaultVenue', () => {
   /*
    * THE WHOLE POINT. Nobody should meet a disabled forward button because of a
    * date field that is off the bottom of a short screen. After a pin is dropped,
-   * the only thing left to supply is the venue itself.
+   * the only thing left to supply is the venue itself: the pin, not its name.
    */
-  it('leaves only the venue to supply, never the date or the window', () => {
+  it('leaves only the pin to supply, never the date, the window or a name', () => {
     const errors = validateVenue(draft)
     expect(errors.date).toBeUndefined()
     expect(errors.startTime).toBeUndefined()
     expect(errors.endTime).toBeUndefined()
-    expect(Object.keys(errors).sort()).toEqual(['latitude', 'longitude', 'name'])
+    expect(Object.keys(errors).sort()).toEqual(['latitude', 'longitude'])
   })
 
   it('carries no venue of its own, so nothing is invented about where', () => {

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { type ConeMode } from './components/ConePicker.tsx'
 import { type MapHandle, type TapMode } from './components/MapView.tsx'
 import { ModeRail } from './components/ModeRail.tsx'
@@ -68,7 +68,14 @@ import {
 import { resolveDate } from './core/when.ts'
 import { clampRadius, RADIUS_DEFAULT_METERS } from './core/radius.ts'
 import { venueTimeZone, deviceTimeZone } from './core/timezone.ts'
-import { BIAS_HALF_SPAN_METERS, searchVenues, type SearchHit } from './lib/search.ts'
+import {
+  BIAS_HALF_SPAN_METERS,
+  msUntilNominatim,
+  PINNED_PLACEHOLDER,
+  reverseGeocode,
+  searchVenues,
+  type SearchHit,
+} from './lib/search.ts'
 import { usePersistentState } from './lib/usePersistentState.ts'
 import { useTide } from './lib/useTide.ts'
 import {
@@ -76,9 +83,10 @@ import {
   canEnter,
   FORWARD_LABEL,
   nextMode,
-  SETUP_MISSING_COPY,
+  setupGap,
   type Mode,
   type ModeAvailability,
+  type SetupTarget,
 } from './lib/mode.ts'
 import {
   CALIBRATION_VENUE,
@@ -117,6 +125,8 @@ function App() {
   const [defaults, setDefaults] = useState(() => ({
     date: !wantsCalibration(),
     window: !wantsCalibration(),
+    /* The venue name, while it is a reverse geocode or a placeholder. */
+    name: false,
   }))
   /*
    * The subject falls back to the venue coordinate until it is placed by hand.
@@ -427,9 +437,68 @@ function App() {
     setPositions((current) => setOptic(current, id, lensId, focalLength))
   }, [])
 
-  const onVenueChange = useCallback((at: LatLon) => {
-    setVenue((current) => withCoordinates(current, at))
+  /*
+   * NAMING A DROPPED PIN.
+   *
+   * A pin carries a coordinate and nothing else, and the name is never required,
+   * so this only makes the plan read better later. It is filled when the name is
+   * empty or is still one the app filled, never over one the shooter typed or
+   * chose from search.
+   *
+   * The placeholder goes in at once and the lookup replaces it when it answers.
+   * Nothing waits on it: a failure, a timeout or no signal leaves the
+   * placeholder standing. A newer drop cancels an older lookup, and the shared
+   * Nominatim clock keeps it under one request per second alongside search.
+   */
+  const venueNow = useRef(venue)
+  useEffect(() => {
+    venueNow.current = venue
+  }, [venue])
+  const nameIsFilled = useRef(defaults.name)
+  useEffect(() => {
+    nameIsFilled.current = defaults.name
+  }, [defaults.name])
+  const nameLookup = useRef<{ timer: number; controller: AbortController } | null>(null)
+
+  const cancelNameLookup = useCallback(() => {
+    if (nameLookup.current === null) return
+    window.clearTimeout(nameLookup.current.timer)
+    nameLookup.current.controller.abort()
+    nameLookup.current = null
   }, [])
+  useEffect(() => cancelNameLookup, [cancelNameLookup])
+
+  const dropVenuePin = useCallback(
+    (at: LatLon) => {
+      const fill = venueNow.current.name.trim() === '' || nameIsFilled.current
+      setVenue((current) =>
+        fill
+          ? { ...withCoordinates(current, at), name: PINNED_PLACEHOLDER }
+          : withCoordinates(current, at),
+      )
+      if (!fill) return
+
+      nameIsFilled.current = true
+      setDefaults((d) => ({ ...d, name: true }))
+      cancelNameLookup()
+      const controller = new AbortController()
+      const pinned = withCoordinates(venueNow.current, at)
+      const timer = window.setTimeout(() => {
+        void reverseGeocode(at, controller.signal).then((name) => {
+          if (name === null || controller.signal.aborted || !nameIsFilled.current) return
+          setVenue((current) =>
+            current.latitude === pinned.latitude && current.longitude === pinned.longitude
+              ? { ...current, name }
+              : current,
+          )
+        })
+      }, msUntilNominatim())
+      nameLookup.current = { timer, controller }
+    },
+    [cancelNameLookup],
+  )
+
+  const onVenueChange = dropVenuePin
 
   /*
    * Editing the brief re-anchors it to wherever the venue is now: text typed
@@ -448,13 +517,18 @@ function App() {
          * quietly claim the window was chosen too.
          */
         if (next.date !== current.date) setDefaults((d) => ({ ...d, date: false }))
+        if (next.name !== current.name) {
+          nameIsFilled.current = false
+          cancelNameLookup()
+          setDefaults((d) => ({ ...d, name: false }))
+        }
         if (next.startTime !== current.startTime || next.endTime !== current.endTime) {
           setDefaults((d) => ({ ...d, window: false }))
         }
         return next
       })
     },
-    [centre],
+    [centre, cancelNameLookup],
   )
 
   const onPositionMove = useCallback((id: string, at: LatLon) => {
@@ -476,13 +550,17 @@ function App() {
     setPendingPin((pin) => {
       if (pin === null) return null
       setVenue((current) => ({ ...withCoordinates(current, pin.at), name: pin.label }))
+      /* A chosen search result names itself; it is not a guess to overwrite. */
+      nameIsFilled.current = false
+      cancelNameLookup()
+      setDefaults((d) => ({ ...d, name: false }))
       setBriefAnchor({ at: pin.at })
       setSubject(null)
       setPositions([])
       setGeneration({ status: 'idle' })
       return null
     })
-  }, [])
+  }, [cancelNameLookup])
 
   const cancelPin = useCallback(() => setPendingPin(null), [])
 
@@ -490,12 +568,12 @@ function App() {
   const onLongPress = useCallback(
     (at: LatLon) => {
       if (centre === null) {
-        setVenue((current) => withCoordinates(current, at))
+        dropVenuePin(at)
       } else {
         setSubject(at)
       }
     },
-    [centre],
+    [centre, dropVenuePin],
   )
 
   const clearBrief = () => {
@@ -529,7 +607,9 @@ function App() {
 
   const loadSpot = (spot: Spot) => {
     setVenue(spot.venue)
-    setDefaults({ date: false, window: false })
+    cancelNameLookup()
+    nameIsFilled.current = false
+    setDefaults({ date: false, window: false, name: false })
     setSubject(spot.subject)
     setKit(spot.kit)
     setPositions(spot.positions)
@@ -848,26 +928,20 @@ function App() {
    * that has to survive truncation; the venue name is already on the map.
    */
   const zoneSuffix = venueWindow === null ? '' : ` ${venueWindow.timeZoneShort}`
-  const venueShort = venue.name.split(',')[0]
+  const venueShort = venue.name.split(',')[0] || PINNED_PLACEHOLDER
   const summary =
-    venue.name.trim() === ''
+    centre === null
       ? 'No venue set'
       : `${venue.startTime}–${venue.endTime}${zoneSuffix} · ${venueShort}`
 
   /*
-   * What is actually missing, for the forward button to point at. Venue first:
-   * it is the only one a cold start has no answer for.
+   * What is actually missing, for the forward button to point at: the first
+   * field validateVenue flagged, read straight off its errors. See setupGap.
    */
-  const missing: 'venue' | 'date' | 'window' | null =
-    errors.name !== undefined || errors.latitude !== undefined || errors.longitude !== undefined
-      ? 'venue'
-      : errors.date !== undefined
-        ? 'date'
-        : errors.startTime !== undefined || errors.endTime !== undefined
-          ? 'window'
-          : null
+  const gap = setupGap(errors)
+  const missing = gap?.target ?? null
   const [pointAt, setPointAt] = useState<{
-    field: 'venue' | 'date' | 'window' | 'brief' | null
+    field: SetupTarget | 'brief' | null
     tick: number
   }>({ field: null, tick: 0 })
 
@@ -904,9 +978,7 @@ function App() {
       <div className="forward">
         {forwardBlocked === null ? null : (
           <p className="forward__why">
-            {mode === 'setup' && missing !== null
-              ? SETUP_MISSING_COPY[missing]
-              : forwardBlocked}
+            {mode === 'setup' && gap !== null ? gap.copy : forwardBlocked}
           </p>
         )}
         <button

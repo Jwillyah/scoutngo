@@ -271,7 +271,17 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  cursor: pointer;
+  font-family: inherit;
+  cursor: text;
+}
+
+.plate__name::placeholder {
+  color: var(--color-text-faint);
+}
+
+.plate__name:focus-visible {
+  outline: none;
+  border-bottom: var(--line-hair) solid var(--color-accent);
 }
 
 .plate__coords {

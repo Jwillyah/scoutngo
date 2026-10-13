@@ -9,6 +9,8 @@
  * plan to walk to, which is what stops the rail reading as a channel selector.
  */
 
+import type { VenueErrors, VenueField } from './venue.ts'
+
 export type Mode = 'setup' | 'plan' | 'field'
 
 export const MODES: { id: Mode; label: string; when: string }[] = [
@@ -32,7 +34,7 @@ export function blockedReason(mode: Mode, available: ModeAvailability): string |
     /*
      * Deliberately not a list of fields. This is the rail's tooltip and the
      * gate's reason; the forward button says WHICH field is missing, from
-     * SETUP_MISSING_COPY below. Enumerating three fields here named two that
+     * setupGap() below. Enumerating three fields here named two that
      * the app now fills in by default.
      */
     return 'Finish Setup first.'
@@ -43,17 +45,93 @@ export function blockedReason(mode: Mode, available: ModeAvailability): string |
   return null
 }
 
+/** Where on the SETUP screen a field lives, for scrolling to and ringing it. */
+export type SetupTarget = 'venue' | 'date' | 'window'
+
 /**
- * What SETUP is actually still waiting for, said one thing at a time.
+ * Every venue field, and the control that sets it, or null when it never blocks.
  *
- * The old line was "Set a venue, a date and a window first" whatever was
- * missing. With the date and window now defaulted, that sentence named two
- * things that were already filled in and buried the one that was not.
+ * A Record over VenueField rather than a switch, so adding a field to the draft
+ * fails to compile until someone decides here whether it can block, and if so
+ * what on screen fixes it.
  */
-export const SETUP_MISSING_COPY: Record<'venue' | 'date' | 'window', string> = {
+export const SETUP_FIELD_TARGET: Record<VenueField, SetupTarget | null> = {
+  latitude: 'venue',
+  longitude: 'venue',
+  date: 'date',
+  startTime: 'window',
+  endTime: 'window',
+  name: null,
+  eventDescription: null,
+  desiredOutcome: null,
+}
+
+/** In screen order, so the first gap is the highest one on the page. */
+const SETUP_ORDER: VenueField[] = ['latitude', 'longitude', 'date', 'startTime', 'endTime']
+
+const SETUP_FIELD_COPY: Record<SetupTarget, string> = {
   venue: 'Drop a pin on the venue, or search for it.',
   date: 'Set the date.',
   window: 'Set the shooting window.',
+}
+
+export interface SetupGap {
+  /** The field validateVenue actually flagged. */
+  field: VenueField
+  /** The control that fixes it. */
+  target: SetupTarget
+  /** What the forward button says. */
+  copy: string
+}
+
+/**
+ * What SETUP is actually still waiting for, said one thing at a time, and
+ * derived from the errors themselves.
+ *
+ * The old version mapped a hand-written list of fields to a category, and the
+ * category to a sentence. "name" was on that list, so a missing name came out
+ * as "Drop a pin on the venue" with the pin already dropped. Reading the field
+ * straight off the errors means the sentence cannot name something that is
+ * already satisfied: if validateVenue did not flag it, it is not said.
+ *
+ * When the error is more specific than "Required." (an end before the start,
+ * a date that does not exist) that detail is said too, because "Set the
+ * shooting window" over a window that is visibly set is the same bug again.
+ */
+export function setupGap(errors: VenueErrors): SetupGap | null {
+  for (const field of SETUP_ORDER) {
+    const error = errors[field]
+    const target = SETUP_FIELD_TARGET[field]
+    if (error === undefined || target === null) continue
+    const copy =
+      error === 'Required.' || target === 'venue'
+        ? SETUP_FIELD_COPY[target]
+        : `${SETUP_FIELD_COPY[target]} ${error}`
+    return { field, target, copy }
+  }
+  return null
+}
+
+/** The part of a DOM node ringNode touches, so it can be tested without a DOM. */
+export interface RingableNode {
+  scrollIntoView: (options: ScrollIntoViewOptions) => void
+  classList: { add: (name: string) => void; remove: (name: string) => void }
+}
+
+export const RING_MS = 2200
+
+/**
+ * Scrolls a missing field into view and rings it for a moment. Returns the
+ * cleanup, so a second press restarts the ring rather than stacking timers.
+ */
+export function ringNode(node: RingableNode, ms: number = RING_MS): () => void {
+  node.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  node.classList.add('is-wanted')
+  const timer = setTimeout(() => node.classList.remove('is-wanted'), ms)
+  return () => {
+    clearTimeout(timer)
+    node.classList.remove('is-wanted')
+  }
 }
 
 export const canEnter = (mode: Mode, available: ModeAvailability): boolean =>

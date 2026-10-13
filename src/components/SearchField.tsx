@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import type { LatLon } from '../core/geo.ts'
 import {
   BIAS_HALF_SPAN_METERS,
+  markNominatim,
   MIN_INTERVAL_MS,
+  msUntilNominatim,
   OSM_ATTRIBUTION,
   searchVenues,
   type SearchHit,
@@ -42,7 +44,6 @@ export function SearchField({ onPick, label = 'Search for a venue', bias = null 
   const [busy, setBusy] = useState(false)
   /** Bumped by submit to force a lookup without waiting out the debounce. */
   const [submitTick, setSubmitTick] = useState(0)
-  const lastRequestAt = useRef(0)
   const input = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -52,14 +53,15 @@ export function SearchField({ onPick, label = 'Search for a venue', bias = null 
     /*
      * Nominatim's usage policy caps this at one request per second. A full
      * second after the last keystroke, and never less than a second after the
-     * previous request actually went out.
+     * previous Nominatim request actually went out, from here or from the
+     * reverse geocode that names a dropped pin. Submit skips the debounce but
+     * not the cap.
      */
-    const sinceLast = Date.now() - lastRequestAt.current
-    const wait = submitTick > 0 ? 0 : Math.max(MIN_INTERVAL_MS, MIN_INTERVAL_MS - sinceLast)
+    const wait = Math.max(submitTick > 0 ? 0 : MIN_INTERVAL_MS, msUntilNominatim())
 
     const controller = new AbortController()
     const timer = window.setTimeout(() => {
-      lastRequestAt.current = Date.now()
+      markNominatim()
       setBusy(true)
       searchVenues(
         trimmed,

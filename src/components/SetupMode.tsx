@@ -5,6 +5,7 @@ import type { DescribeState, DesiredShot } from '../lib/describe.ts'
 import type { KitProfile as KitProfileType } from '../core/kit.ts'
 import type { KitSelection } from '../lib/kitSelection.ts'
 import type { SearchHit } from '../lib/search.ts'
+import { ringNode, type SetupTarget } from '../lib/mode.ts'
 import type { Spot } from '../lib/spots.ts'
 import type { VenueDraft, VenueErrors } from '../lib/venue.ts'
 import { KitChips } from './KitChips.tsx'
@@ -62,7 +63,7 @@ interface SetupModeProps {
   showPinHint: boolean
   onPinDrag: () => void
   /** True while the date, or the window, is still the one the app chose. */
-  defaults: { date: boolean; window: boolean }
+  defaults: { date: boolean; window: boolean; name: boolean }
   /** The handful of preferences that are genuinely preferences. */
   settings: { showCoords: boolean }
   onSettings: (next: { showCoords: boolean }) => void
@@ -70,7 +71,7 @@ interface SetupModeProps {
    * A request to show the shooter what is blocking them. The tick changes on
    * every press of a blocked forward button, so pressing it twice points twice.
    */
-  pointAt: { field: 'venue' | 'date' | 'window' | 'brief' | null; tick: number }
+  pointAt: { field: SetupTarget | 'brief' | null; tick: number }
 }
 
 /** What is open over the one screen. Only ever one at a time. */
@@ -211,13 +212,7 @@ export function SetupMode({
       pointAt.field
     ].current
     if (node === null) return
-    node.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    node.classList.add('is-wanted')
-    const timer = window.setTimeout(() => node.classList.remove('is-wanted'), 2200)
-    return () => {
-      window.clearTimeout(timer)
-      node.classList.remove('is-wanted')
-    }
+    return ringNode(node)
   }, [pointAt])
 
   const open = (next: Drawer) => setDrawer((current) => (current === next ? 'none' : next))
@@ -293,12 +288,18 @@ export function SetupMode({
 
       <ReachSlider meters={reachMeters} onChange={onReachChange} />
 
-      <VenuePlate name={venue.name} at={at} showCoords={settings.showCoords} />
+      <VenuePlate
+        name={venue.name}
+        onName={(name) => onVenueChange({ ...venue, name })}
+        nameFilled={defaults.name}
+        at={at}
+        showCoords={settings.showCoords}
+      />
 
       <div className="setup__body">
         {/*
-          * REQUIRED THINGS FIRST. The date and the window are the only inputs
-          * on this screen that block the forward button, so they sit directly
+          * REQUIRED THINGS FIRST. The pin, the date and the window are the only
+          * inputs on this screen that block the forward button, so they sit directly
           * under the venue and above everything optional. They used to be last,
           * under the description and the kit, which is how they ended up off
           * the bottom of a short screen with the button blocked on them.

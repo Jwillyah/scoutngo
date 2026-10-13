@@ -177,3 +177,103 @@ export async function searchVenues(
   ])
   return dedupeNearby([...osm, ...photon]).slice(0, 8)
 }
+
+/*
+ * ONE CLOCK FOR NOMINATIM.
+ *
+ * The one-request-per-second cap is per application, not per text box. Search
+ * and reverse geocoding both go to the same server, so both read and stamp
+ * this one clock rather than each keeping its own and together going over.
+ */
+let lastNominatimAt = 0
+
+/** How long to wait before the next Nominatim request may go out. */
+export function msUntilNominatim(now: number = Date.now()): number {
+  return Math.max(0, MIN_INTERVAL_MS - (now - lastNominatimAt))
+}
+
+/** Stamp the clock. Called the moment a request actually leaves. */
+export function markNominatim(now: number = Date.now()): void {
+  lastNominatimAt = now
+}
+
+export const NOMINATIM_REVERSE_URL = 'https://nominatim.openstreetmap.org/reverse'
+
+/*
+ * What the name says when nothing better is known: offline, a timeout, or a pin
+ * in open water. Plain on purpose. It is a label to overwrite, not a claim.
+ */
+export const PINNED_PLACEHOLDER = 'Dropped pin'
+
+export function reverseUrl(at: LatLon): string {
+  const params = new URLSearchParams({
+    format: 'jsonv2',
+    lat: at.lat.toFixed(6),
+    lon: at.lon.toFixed(6),
+    zoom: '18',
+    addressdetails: '1',
+  })
+  return `${NOMINATIM_REVERSE_URL}?${params.toString()}`
+}
+
+/**
+ * A reverse geocode answer as a venue name, or null when there is nothing
+ * usable.
+ *
+ * Short on purpose: the feature's own name (a bar, a park, a pier), or failing
+ * that the street address, then the town. The full display_name runs to county,
+ * postcode and country, which is not a name anybody would give a venue.
+ */
+export function parseReverse(payload: unknown): string | null {
+  if (typeof payload !== 'object' || payload === null) return null
+  const row = payload as { name?: unknown; display_name?: unknown; address?: unknown }
+  const text = (value: unknown) => (typeof value === 'string' ? value.trim() : '')
+  const address =
+    typeof row.address === 'object' && row.address !== null
+      ? (row.address as Record<string, unknown>)
+      : {}
+
+  const street = [text(address.house_number), text(address.road)].filter(Boolean).join(' ')
+  const head = text(row.name) || street
+  const town =
+    text(address.city) ||
+    text(address.town) ||
+    text(address.village) ||
+    text(address.hamlet) ||
+    text(address.suburb)
+
+  if (head !== '') return town === '' || town === head ? head : `${head}, ${town}`
+  const display = text(row.display_name)
+  if (display === '') return town === '' ? null : town
+  return display.split(',').slice(0, 2).map((part) => part.trim()).join(', ')
+}
+
+/**
+ * Names a coordinate. Never throws and never hangs: any failure, including the
+ * timeout, comes back as null and the caller keeps its placeholder.
+ */
+export async function reverseGeocode(
+  at: LatLon,
+  signal?: AbortSignal,
+  timeoutMs = 6000,
+): Promise<string | null> {
+  /* Not AbortSignal.any: older Safari lacks it, and this must never hang there. */
+  const controller = new AbortController()
+  const abort = () => controller.abort()
+  signal?.addEventListener('abort', abort)
+  const timer = setTimeout(abort, timeoutMs)
+  try {
+    markNominatim()
+    const response = await fetch(reverseUrl(at), {
+      signal: controller.signal,
+      headers: { Accept: 'application/json' },
+    })
+    if (!response.ok) return null
+    return parseReverse(await response.json())
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+    signal?.removeEventListener('abort', abort)
+  }
+}
