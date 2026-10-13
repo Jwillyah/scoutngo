@@ -1,11 +1,20 @@
 import { computeFOV, SENSORS } from '../core/fov.ts'
-import { DEFAULT_KIT, resolveSensor, type Body, type Lens } from '../core/kit.ts'
+import {
+  resolveSensor,
+  type Body,
+  type KitProfile as KitProfileType,
+  type Lens,
+} from '../core/kit.ts'
+import { KitEditor } from './KitEditor.tsx'
 import { defaultSelection, toggleId, type KitSelection } from '../lib/kitSelection.ts'
 import { Group, Panel } from './Panel.tsx'
 
 interface KitProfileProps {
   value: KitSelection
   onChange: (next: KitSelection) => void
+  /** The shooter's own gear. Editable: see KitEditor below. */
+  kit: KitProfileType
+  onKitChange: (next: KitProfileType) => void
 }
 
 const oneDecimal = (n: number) => n.toFixed(1)
@@ -37,9 +46,9 @@ function KitRow({ active, name, meta, onToggle }: KitRowProps) {
 }
 
 /** The bodies still in play. Used only to resolve a forced sensor crop. */
-function activeBodies(activeIds: string[]): Body[] {
-  const chosen = DEFAULT_KIT.bodies.filter((b) => activeIds.includes(b.id))
-  return chosen.length > 0 ? chosen : DEFAULT_KIT.bodies
+function activeBodies(kit: KitProfileType, activeIds: string[]): Body[] {
+  const chosen = kit.bodies.filter((b) => activeIds.includes(b.id))
+  return chosen.length > 0 ? chosen : kit.bodies
 }
 
 function lensMeta(lens: Lens, bodies: Body[]): string {
@@ -64,15 +73,15 @@ function lensMeta(lens: Lens, bodies: Body[]): string {
 }
 
 /** Two fixed cameras, not a zoom, so each is listed with its one focal length. */
-function droneMeta(drone: (typeof DEFAULT_KIT.drones)[number]): string {
+function droneMeta(drone: KitProfileType['drones'][number]): string {
   const cameras = drone.cameras
     .map((c) => `${c.equiv35}mm f${c.maxAperture}`)
     .join(' · ')
   return `${drone.weightGrams}g · ${cameras}`
 }
 
-export function KitProfile({ value, onChange }: KitProfileProps) {
-  const bodies = activeBodies(value.bodyIds)
+export function KitProfile({ value, onChange, kit, onKitChange }: KitProfileProps) {
+  const bodies = activeBodies(kit, value.bodyIds)
 
   return (
     <Panel index="02" title="Kit and style">
@@ -83,7 +92,7 @@ export function KitProfile({ value, onChange }: KitProfileProps) {
 
       <Group title="Bodies" meta={<span className="num">{value.bodyIds.length}</span>}>
         <ul className="kit-list">
-          {DEFAULT_KIT.bodies.map((item) => (
+          {kit.bodies.map((item) => (
             <KitRow
               key={item.id}
               active={value.bodyIds.includes(item.id)}
@@ -99,7 +108,7 @@ export function KitProfile({ value, onChange }: KitProfileProps) {
 
       <Group title="Lenses" meta={<span className="num">{value.lensIds.length}</span>}>
         <ul className="kit-list">
-          {DEFAULT_KIT.lenses.map((item) => (
+          {kit.lenses.map((item) => (
             <KitRow
               key={item.id}
               active={value.lensIds.includes(item.id)}
@@ -121,7 +130,7 @@ export function KitProfile({ value, onChange }: KitProfileProps) {
 
       <Group title="Air" meta={<span className="num">{value.droneIds.length}</span>}>
         <ul className="kit-list">
-          {DEFAULT_KIT.drones.map((item) => (
+          {kit.drones.map((item) => (
             <KitRow
               key={item.id}
               active={value.droneIds.includes(item.id)}
@@ -150,11 +159,13 @@ export function KitProfile({ value, onChange }: KitProfileProps) {
         </div>
       </Group>
 
+      <KitEditor kit={kit} onChange={onKitChange} />
+
       <div className="btn-row">
         <button
           type="button"
           className="btn btn--small"
-          onClick={() => onChange(defaultSelection(DEFAULT_KIT))}
+          onClick={() => onChange(defaultSelection(kit))}
         >
           Reset to default kit
         </button>

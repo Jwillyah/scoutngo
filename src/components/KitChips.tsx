@@ -1,9 +1,11 @@
-import { DEFAULT_KIT } from '../core/kit.ts'
+import type { KitProfile } from '../core/kit.ts'
 import { toggleId, type KitSelection } from '../lib/kitSelection.ts'
 
 interface KitChipsProps {
   value: KitSelection
   onChange: (next: KitSelection) => void
+  /** The shooter's own gear. Chips are drawn from this, not from a constant. */
+  kit: KitProfile
   onEdit: () => void
 }
 
@@ -16,7 +18,7 @@ interface KitChipsProps {
  * deciding what is in the bag this morning. Tap to include, tap to drop; the
  * detail moves behind "edit kit" for the day it is actually wanted.
  */
-export function KitChips({ value, onChange, onEdit }: KitChipsProps) {
+export function KitChips({ value, onChange, kit, onEdit }: KitChipsProps) {
   const chip = (
     id: string,
     label: string,
@@ -43,17 +45,17 @@ export function KitChips({ value, onChange, onEdit }: KitChipsProps) {
         </button>
       </div>
       <div className="kitrow__scroll" role="group" aria-label="Kit in play">
-        {DEFAULT_KIT.bodies.map((body) =>
+        {kit.bodies.map((body) =>
           chip(body.id, body.name.replace('Sony ', ''), value.bodyIds.includes(body.id), () =>
             onChange({ ...value, bodyIds: toggleId(value.bodyIds, body.id) }),
           ),
         )}
-        {DEFAULT_KIT.lenses.map((lens) =>
+        {kit.lenses.map((lens) =>
           chip(lens.id, lens.name.replace(/^(Sony|Sigma) /, ''), value.lensIds.includes(lens.id), () =>
             onChange({ ...value, lensIds: toggleId(value.lensIds, lens.id) }),
           ),
         )}
-        {DEFAULT_KIT.drones.map((drone) =>
+        {kit.drones.map((drone) =>
           chip(drone.id, drone.name.replace('DJI ', ''), value.droneIds.includes(drone.id), () =>
             onChange({ ...value, droneIds: toggleId(value.droneIds, drone.id) }),
           ),

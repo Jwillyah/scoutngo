@@ -2495,6 +2495,18 @@
   gap: var(--space-2);
 }
 
+.peek__second--one {
+  grid-template-columns: 1fr;
+}
+
+/* The finishing actions, in the sheet with the plan they finish. */
+.sheetacts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--page-pad) 0;
+}
+
 .peek__summary {
   display: flex;
   flex-direction: column;
@@ -4209,4 +4221,133 @@
  */
 .shooter--manual .shooter__disc {
   box-shadow: 0 0 0 2px var(--color-accent-2);
+}
+
+/* ----------------------------------------------------------- kit editor */
+
+.kited {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4) 0 var(--space-5);
+  border-top: var(--line-hair) solid var(--color-line);
+}
+
+.kited__head {
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.kited__list {
+  display: grid;
+  gap: var(--space-1);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.kited__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  background: var(--panel-sheen-2);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-panel);
+}
+
+.kited__name {
+  font-size: var(--text-md);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kited__meta {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+/* Removing is the only destructive thing here, so it is the only red. */
+.kited__del {
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: 0;
+  color: var(--color-text-faint);
+  font-size: var(--text-md);
+  cursor: pointer;
+}
+
+.kited__del:hover {
+  color: var(--color-hazard);
+}
+
+.kited__adds,
+.kited__formacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.kited__form {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--panel-sheen-2);
+  border: var(--line-hair) solid var(--color-line);
+  border-top-color: var(--color-edge-top);
+  border-radius: var(--radius-panel);
+}
+
+.kited__pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.kitf {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.kitf__label {
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.kitf__input {
+  min-height: var(--control-height);
+  width: 100%;
+  padding: 0 var(--space-2);
+  background: var(--color-field);
+  color: var(--color-text);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-panel);
+  /* 16px floor: below this iOS zooms the page on focus. */
+  font-size: var(--text-base);
+}
+
+.kitf__hint {
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+  line-height: var(--leading-normal);
+}
+
+/*
+ * An invalid number is not a style problem. Every field of view on every card
+ * is computed from these, so the message says what is wrong rather than just
+ * colouring the box.
+ */
+.kitf__error {
+  font-size: var(--text-xs);
+  color: var(--color-hazard);
+  line-height: var(--leading-normal);
 }

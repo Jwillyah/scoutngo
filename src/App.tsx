@@ -6,7 +6,7 @@ import { FieldMode } from './components/FieldMode.tsx'
 import { PlanMode } from './components/PlanMode.tsx'
 import { SetupMode } from './components/SetupMode.tsx'
 import type { LatLon } from './core/geo.ts'
-import { DEFAULT_KIT } from './core/kit.ts'
+import { DEFAULT_KIT, type KitProfile } from './core/kit.ts'
 import { EMPTY_LANDCOVER, type Landcover } from './core/siting.ts'
 import { getSunArc, getSunPosition } from './core/sun.ts'
 import { extremesAround, tideStateAt } from './core/tide.ts'
@@ -15,6 +15,7 @@ import { briefDriftMeters, formatDrift, isBriefStale, type BriefAnchor } from '.
 import {
   defaultSelection,
   KIT_STORAGE_KEY,
+  reviveKitProfile,
   reviveSelection,
   type KitSelection,
 } from './lib/kitSelection.ts'
@@ -164,6 +165,20 @@ function App() {
    * device: it answers "can I move this", and once you know, you know.
    */
   /*
+   * THE KIT IS THE SHOOTER'S, NOT OURS.
+   *
+   * It shipped as a constant taken from the brief, which meant buying a lens
+   * and being unable to use it. It is now editable state on the device, and
+   * DEFAULT_KIT is only the starting point. Every field of view, frame width
+   * and standoff band is computed from whatever is in here.
+   */
+  const [kitProfile, setKitProfile] = usePersistentState<KitProfile>(
+    'scoutngo.kitProfile.v1',
+    DEFAULT_KIT,
+    (raw) => reviveKitProfile(raw),
+  )
+
+  /*
    * Preferences, kept on the device. Small on purpose: a setting is a decision
    * the app could not make for you, and every one of these had to earn its
    * place by being genuinely a matter of taste rather than a default we dodged.
@@ -253,8 +268,17 @@ function App() {
     () =>
       aim === null || sun === null
         ? []
-        : planPositions(positions, aim, sun.azimuth, land, kit.bodyIds, reachMeters, centre),
-    [positions, aim, sun, land, kit.bodyIds, reachMeters, centre],
+        : planPositions(
+            positions,
+            aim,
+            sun.azimuth,
+            land,
+            kit.bodyIds,
+            reachMeters,
+            centre,
+            kitProfile,
+          ),
+    [positions, aim, sun, land, kit.bodyIds, reachMeters, centre, kitProfile],
   )
 
   /*
@@ -362,11 +386,11 @@ function App() {
   /* The glass a new position starts on: the first lens actually packed. */
   const defaultOptic = useMemo(() => {
     const lens =
-      DEFAULT_KIT.lenses.find((l) => kit.lensIds.includes(l.id)) ?? DEFAULT_KIT.lenses[0]
+      kitProfile.lenses.find((l) => kit.lensIds.includes(l.id)) ?? kitProfile.lenses[0]
     return lens === undefined
       ? { lensId: '', focalLength: 50 }
       : { lensId: lens.id, focalLength: lens.minFocalLength }
-  }, [kit.lensIds])
+  }, [kit.lensIds, kitProfile])
 
   const addPositionAt = useCallback(
     (at: LatLon) => {
@@ -928,6 +952,8 @@ function App() {
             onKeepBrief={keepBrief}
             kit={kit}
             onKit={setKit}
+            kitProfile={kitProfile}
+            onKitProfile={setKitProfile}
             spots={spots}
             onSaveSpot={saveSpot}
             onLoadSpot={loadSpot}
@@ -1010,6 +1036,7 @@ function App() {
           generation={generation}
           siteNote={siteNote}
           onGenerate={() => void onGenerate()}
+          kitProfile={kitProfile}
           placing={placing}
           onPlacing={setPlacing}
           onAddAt={addPositionAt}

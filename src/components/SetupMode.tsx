@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { destinationPoint, type LatLon } from '../core/geo.ts'
 import { exampleIndex, SHOOT_EXAMPLES, SHOT_LIST_EXAMPLES } from '../lib/examples.ts'
 import type { DescribeState, DesiredShot } from '../lib/describe.ts'
+import type { KitProfile as KitProfileType } from '../core/kit.ts'
 import type { KitSelection } from '../lib/kitSelection.ts'
 import type { SearchHit } from '../lib/search.ts'
 import type { Spot } from '../lib/spots.ts'
@@ -31,6 +32,9 @@ interface SetupModeProps {
   onKeepBrief: () => void
   kit: KitSelection
   onKit: (next: KitSelection) => void
+  /** The shooter's own gear, editable under Kit and style. */
+  kitProfile: KitProfileType
+  onKitProfile: (next: KitProfileType) => void
   spots: Spot[]
   onSaveSpot: (name: string) => void
   onLoadSpot: (spot: Spot) => void
@@ -101,6 +105,8 @@ export function SetupMode({
   onKeepBrief,
   kit,
   onKit,
+  kitProfile,
+  onKitProfile,
   spots,
   onSaveSpot,
   onLoadSpot,
@@ -400,7 +406,7 @@ export function SetupMode({
         </div>
 
         {/* Kit LAST: it ships with defaults, so it can never block anything. */}
-        <KitChips value={kit} onChange={onKit} onEdit={() => open('kit')} />
+        <KitChips value={kit} onChange={onKit} kit={kitProfile} onEdit={() => open('kit')} />
 
       </div>
 
@@ -422,7 +428,7 @@ export function SetupMode({
             </button>
           </div>
           <div className="drawer__body">
-            {drawer === 'kit' ? <KitProfile value={kit} onChange={onKit} /> : null}
+            {drawer === 'kit' ? <KitProfile value={kit} onChange={onKit} kit={kitProfile} onKitChange={onKitProfile} /> : null}
             {drawer === 'shots' ? (
               <div className="drawer__pad">
                 <p className="setup__note">

@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { DEFAULT_KIT } from '../core/kit.ts'
+import type { KitProfile } from '../core/kit.ts'
 import type { PlannedPosition } from '../lib/plan.ts'
 
 export type ConeMode = 'none' | 'all'
 
 interface ConePickerProps {
+  /** The shooter's own gear, for naming an optic. */
+  kit: KitProfile
   plan: PlannedPosition[]
   coneMode: ConeMode
   onConeMode: (next: ConeMode) => void
@@ -16,10 +18,10 @@ interface ConePickerProps {
 }
 
 /** Ground lenses and drone cameras both land here, so look in both lists. */
-function opticName(id: string): string {
-  const lens = DEFAULT_KIT.lenses.find((l) => l.id === id)
+function opticName(kit: KitProfile, id: string): string {
+  const lens = kit.lenses.find((l) => l.id === id)
   if (lens !== undefined) return lens.name
-  const camera = DEFAULT_KIT.drones.flatMap((d) => d.cameras).find((c) => c.id === id)
+  const camera = kit.drones.flatMap((d) => d.cameras).find((c) => c.id === id)
   return camera?.name ?? id
 }
 
@@ -38,6 +40,7 @@ function opticName(id: string): string {
  * without saying so is how someone walks past the shot.
  */
 export function ConePicker({
+  kit,
   plan,
   coneMode,
   onConeMode,
@@ -123,7 +126,7 @@ export function ConePicker({
                 aria-pressed={on}
                 onClick={() => toggle(id)}
               >
-                {opticName(id)}
+                {opticName(kit, id)}
               </button>
             )
           })}

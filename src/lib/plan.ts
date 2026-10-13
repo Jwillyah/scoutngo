@@ -18,6 +18,7 @@ import {
 } from '../core/geo.ts'
 import {
   DEFAULT_KIT,
+  type KitProfile,
   findDroneCamera,
   resolveSensor,
   type Body,
@@ -137,11 +138,19 @@ export interface PlannedPosition {
   warnings: SiteWarning[]
 }
 
-const findLens = (id: string): Lens =>
-  DEFAULT_KIT.lenses.find((l) => l.id === id) ?? DEFAULT_KIT.lenses[0]
+/*
+ * THE KIT IS EDITABLE, so every lookup takes the live profile.
+ *
+ * It defaults to DEFAULT_KIT so the existing tests and any caller that does not
+ * care keep working, but the app always passes the shooter's own profile. A
+ * lens they added this morning has to resolve here or its field of view falls
+ * back to someone else's glass.
+ */
+const findLens = (kit: KitProfile, id: string): Lens =>
+  kit.lenses.find((l) => l.id === id) ?? kit.lenses[0] ?? DEFAULT_KIT.lenses[0]
 
-const bodiesFrom = (ids: string[] | undefined): Body[] =>
-  ids === undefined ? DEFAULT_KIT.bodies : DEFAULT_KIT.bodies.filter((b) => ids.includes(b.id))
+const bodiesFrom = (kit: KitProfile, ids: string[] | undefined): Body[] =>
+  ids === undefined ? kit.bodies : kit.bodies.filter((b) => ids.includes(b.id))
 
 /**
  * The optic on the front of the camera, and the sensor its field of view is
@@ -154,9 +163,10 @@ const bodiesFrom = (ids: string[] | undefined): Body[] =>
 function resolveOptic(
   position: CameraPosition,
   bodyIds: string[] | undefined,
+  kit: KitProfile,
 ): { optic: PlannedPosition['optic']; sensor: SensorName; focalLength: number } {
   if (position.platform === 'air') {
-    const camera: DroneCamera | undefined = findDroneCamera(DEFAULT_KIT, position.lensId)
+    const camera: DroneCamera | undefined = findDroneCamera(kit, position.lensId)
     if (camera !== undefined) {
       return {
         optic: { id: camera.id, name: camera.name, kind: 'drone' },
@@ -166,10 +176,10 @@ function resolveOptic(
     }
   }
 
-  const lens = findLens(position.lensId)
+  const lens = findLens(kit, position.lensId)
   return {
     optic: { id: lens.id, name: lens.name, kind: 'lens' },
-    sensor: resolveSensor(lens, bodiesFrom(bodyIds)),
+    sensor: resolveSensor(lens, bodiesFrom(kit, bodyIds)),
     focalLength: position.focalLength,
   }
 }
@@ -189,8 +199,10 @@ export function planPosition(
   reachMeters?: number | null,
   /** The venue itself, which the ring is centred on. */
   venue?: LatLon | null,
+  /** The shooter's own kit. Defaults to the shipped profile. */
+  kit: KitProfile = DEFAULT_KIT,
 ): PlannedPosition {
-  const { optic, sensor, focalLength } = resolveOptic(position, bodyIds)
+  const { optic, sensor, focalLength } = resolveOptic(position, bodyIds, kit)
   const fov = computeFOV(focalLength, SENSORS[sensor])
 
   // Both bearings come from turf. The cone points where the camera points.
@@ -235,9 +247,10 @@ export function planPositions(
   bodyIds?: string[],
   reachMeters?: number | null,
   venue?: LatLon | null,
+  kit: KitProfile = DEFAULT_KIT,
 ): PlannedPosition[] {
   return positions.map((position) =>
-    planPosition(position, subject, sunAzimuth, land, bodyIds, reachMeters, venue),
+    planPosition(position, subject, sunAzimuth, land, bodyIds, reachMeters, venue, kit),
   )
 }
 

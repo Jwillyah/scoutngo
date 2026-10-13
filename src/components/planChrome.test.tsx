@@ -1,5 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
+import { DEFAULT_KIT } from '../core/kit.ts'
 import { getSunPosition } from '../core/sun.ts'
 import type { LatLon } from '../core/geo.ts'
 import type { TideState } from '../core/tide.ts'
@@ -79,6 +80,7 @@ describe('ConePicker', () => {
   it('is one control, not a row of chips', () => {
     const html = renderToStaticMarkup(
       <ConePicker
+        kit={DEFAULT_KIT}
         plan={plan}
         coneMode="none"
         onConeMode={() => {}}
@@ -101,6 +103,7 @@ describe('ConePicker', () => {
   it('says on the control when a filter is narrowing the map', () => {
     const html = renderToStaticMarkup(
       <ConePicker
+        kit={DEFAULT_KIT}
         plan={plan}
         coneMode="none"
         onConeMode={() => {}}
@@ -117,6 +120,7 @@ describe('ConePicker', () => {
   it('says when one position is isolated', () => {
     const html = renderToStaticMarkup(
       <ConePicker
+        kit={DEFAULT_KIT}
         plan={plan}
         coneMode="none"
         onConeMode={() => {}}
@@ -133,6 +137,7 @@ describe('ConePicker', () => {
     expect(
       renderToStaticMarkup(
         <ConePicker
+          kit={DEFAULT_KIT}
           plan={[]}
           coneMode="none"
           onConeMode={() => {}}
@@ -149,6 +154,7 @@ describe('ConePicker', () => {
 describe('PositionCard', () => {
   const html = renderToStaticMarkup(
     <PositionCard
+      kit={DEFAULT_KIT}
       planned={plan[0]}
       shootAt={new Date('2026-09-12T13:00:00-04:00')}
       timeZone="America/New_York"
@@ -198,6 +204,7 @@ describe('PositionCard', () => {
   it('drops the tide cell inland rather than printing a dash', () => {
     const dry = renderToStaticMarkup(
       <PositionCard
+      kit={DEFAULT_KIT}
         planned={plan[0]}
         shootAt={null}
         timeZone={null}

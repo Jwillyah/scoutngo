@@ -8,6 +8,7 @@ import type { DesiredShot } from '../lib/describe.ts'
 import type { FieldPack } from '../lib/fieldPack.ts'
 import type { TideInfo } from '../lib/useTide.ts'
 import type { VenueWindow } from '../lib/venue.ts'
+import type { KitProfile as KitProfileType } from '../core/kit.ts'
 import { BottomSheet, type SheetState } from './BottomSheet.tsx'
 import { ConditionsPanel } from './ConditionsPanel.tsx'
 import { ConePicker, type ConeMode } from './ConePicker.tsx'
@@ -63,6 +64,8 @@ interface PlanModeProps {
   generation: GenerationState
   siteNote: string | null
   onGenerate: () => void
+  /** The shooter's own gear. The lens picker and cone labels read it. */
+  kitProfile: KitProfileType
   /** Arms the map so the next tap drops a position. The primary action here. */
   placing: boolean
   onPlacing: (next: boolean) => void
@@ -145,6 +148,7 @@ export function PlanMode({
   generation,
   siteNote,
   onGenerate,
+  kitProfile,
   placing,
   onPlacing,
   onAddAt,
@@ -241,6 +245,7 @@ export function PlanMode({
             Conditions
           </button>
           <ConePicker
+            kit={kitProfile}
             plan={plan}
             coneMode={coneMode}
             onConeMode={onConeMode}
@@ -279,6 +284,7 @@ export function PlanMode({
           onDuplicate={onDuplicatePosition}
           onMove={onMovePosition}
           onSetOptic={onSetOptic}
+          kit={kitProfile}
         />
       )}
 
@@ -326,7 +332,15 @@ export function PlanMode({
               * the day works without signal, and the second opens the screen
               * you hold while walking. Neither of those was guessable.
               */}
-            <div className="peek__second">
+            {/*
+              * THE ONE SECONDARY AT PEEK. Adding and suggesting are the two
+              * things you do WHILE planning, so they are the two things in
+              * reach. Saving a pack and walking out of the door are things you
+              * do once the plan exists, and they live in the sheet with the
+              * plan detail rather than taking a row of the map for the whole
+              * session.
+              */}
+            <div className="peek__second peek__second--one">
               <button
                 type="button"
                 className="act"
@@ -337,9 +351,31 @@ export function PlanMode({
                   {generation.status === 'working' ? 'Suggesting…' : 'Suggest positions'}
                 </span>
                 <span className="act__why">
-                  {generation.status === 'working' ? 'Asking the model' : 'Optional. A starting point'}
+                  {generation.status === 'working'
+                    ? 'Asking the model'
+                    : 'Optional. A starting point to drag'}
                 </span>
               </button>
+            </div>
+          </div>
+        }
+      >
+        {view === 'conditions' ? (
+          <>
+            <div className="btn-row btn-row--pad">
+              <button type="button" className="btn btn--small" onClick={() => setView('plan')}>
+                Back to the plan
+              </button>
+            </div>
+            <ConditionsPanel
+              venueWindow={venueWindow}
+              tide={tide}
+              scrubbedAt={scrubbedAt}
+            />
+          </>
+        ) : (
+          <>
+            <div className="sheetacts">
               <button
                 type="button"
                 className="act"
@@ -377,24 +413,7 @@ export function PlanMode({
                 </span>
               </button>
             </div>
-          </div>
-        }
-      >
-        {view === 'conditions' ? (
-          <>
-            <div className="btn-row btn-row--pad">
-              <button type="button" className="btn btn--small" onClick={() => setView('plan')}>
-                Back to the plan
-              </button>
-            </div>
-            <ConditionsPanel
-              venueWindow={venueWindow}
-              tide={tide}
-              scrubbedAt={scrubbedAt}
-            />
-          </>
-        ) : (
-          <>
+
             <PlanStatus
               generation={generation}
               planCoverage={planCoverage}

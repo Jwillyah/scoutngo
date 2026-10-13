@@ -23,6 +23,16 @@ export interface Lens {
    * one. The Sony 10-18 f4 triggers APS-C crop automatically on the a7IV.
    */
   forcesSensor: { bodyId: string; sensor: SensorName }[]
+  /**
+   * An APS-C lens: it only covers a crop circle, so it is cropped on every
+   * body, not just on the one or two listed in forcesSensor.
+   *
+   * Separate from forcesSensor because they are different facts. forcesSensor
+   * is "this full frame lens triggers a crop mode on that body"; this is "this
+   * lens is not a full frame lens at all". A user adding their own glass knows
+   * the second and cannot be expected to enumerate the first.
+   */
+  apscOnly?: boolean
   notes: string
 }
 
@@ -204,6 +214,8 @@ export function effectiveSensor(lens: Lens, body: Body): SensorName {
  * because planning the wider frame and then not getting it is the worse error.
  */
 export function resolveSensor(lens: Lens, bodies: Body[]): SensorName {
+  // An APS-C lens is cropped everywhere. No body in the bag changes that.
+  if (lens.apscOnly === true) return 'apsc'
   const forcing = bodies.find((body) =>
     lens.forcesSensor.some((f) => f.bodyId === body.id),
   )

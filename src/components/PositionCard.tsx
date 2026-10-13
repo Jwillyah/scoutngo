@@ -6,7 +6,7 @@ import type { FramingWarning } from '../core/fov.ts'
 import type { SiteWarning } from '../core/siting.ts'
 import { fetchSightlineCloud, type ForecastKind } from '../lib/forecast.ts'
 import { fetchGroundView, type GroundView } from '../lib/groundView.ts'
-import { DEFAULT_KIT } from '../core/kit.ts'
+import type { KitProfile as KitProfileType } from '../core/kit.ts'
 import { FAA_CEILING_FEET } from '../lib/parsePlan.ts'
 import type { PlannedPosition } from '../lib/plan.ts'
 
@@ -24,6 +24,8 @@ interface PositionCardProps {
   onDuplicate: (id: string) => void
   onMove: (id: string, delta: number) => void
   onSetOptic: (id: string, lensId: string, focalLength: number) => void
+  /** The shooter's own gear. The picker lists exactly what they own. */
+  kit: KitProfileType
 }
 
 /*
@@ -319,6 +321,7 @@ export function PositionCard({
   onDuplicate,
   onMove,
   onSetOptic,
+  kit,
 }: PositionCardProps) {
   const {
     position,
@@ -332,7 +335,7 @@ export function PositionCard({
     warnings,
   } = planned
 
-  const activeLens = DEFAULT_KIT.lenses.find((lens) => lens.id === position.lensId)
+  const activeLens = kit.lenses.find((lens) => lens.id === position.lensId)
 
   return (
     <aside
@@ -366,7 +369,7 @@ export function PositionCard({
             className="optic__select"
             value={position.lensId}
             onChange={(event) => {
-              const lens = DEFAULT_KIT.lenses.find((l) => l.id === event.target.value)
+              const lens = kit.lenses.find((l) => l.id === event.target.value)
               onSetOptic(
                 position.id,
                 event.target.value,
@@ -376,7 +379,7 @@ export function PositionCard({
               )
             }}
           >
-            {DEFAULT_KIT.lenses.map((lens) => (
+            {kit.lenses.map((lens) => (
               <option key={lens.id} value={lens.id}>
                 {lens.name}
               </option>
