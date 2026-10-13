@@ -71,7 +71,22 @@ export interface CameraPosition {
   altitudeFeet: number
   /** True once the shooter has dragged this position off where it landed. */
   moved: boolean
+  /**
+   * Who put this here.
+   *
+   * MANUAL IS THE DEFAULT WAY TO WORK, not the exception. The model's placements
+   * have never been good enough to trust without correction, and dragging a
+   * position onto a spot you know is both faster and right. A suggested position
+   * is a starting point; a manual one is a decision, and the map says which is
+   * which so a glance tells you how much of the plan is yours.
+   *
+   * It changes NOTHING about the arithmetic. Lighting, field of view, framing,
+   * siting and tide are computed identically for both, from the coordinates.
+   */
+  origin: PositionOrigin
 }
+
+export type PositionOrigin = 'suggested' | 'manual'
 
 /**
  * Everything drawn on the map for one camera position. Every number in here is

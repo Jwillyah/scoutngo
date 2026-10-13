@@ -35,6 +35,7 @@ const at = (over: Partial<CameraPosition> = {}): CameraPosition => ({
   platform: 'ground',
   altitudeFeet: 0,
   moved: false,
+  origin: 'suggested',
   ...over,
 })
 
@@ -153,6 +154,11 @@ describe('PositionCard', () => {
       timeZone="America/New_York"
       tide={RISING}
       onClose={() => {}}
+      count={1}
+      onDelete={() => {}}
+      onDuplicate={() => {}}
+      onMove={() => {}}
+      onSetOptic={() => {}}
     />,
   )
 
@@ -197,6 +203,11 @@ describe('PositionCard', () => {
         timeZone={null}
         tide={null}
         onClose={() => {}}
+        count={1}
+        onDelete={() => {}}
+        onDuplicate={() => {}}
+        onMove={() => {}}
+        onSetOptic={() => {}}
       />,
     )
     const labels = [...dry.matchAll(/class="three__label">([^<]+)</g)].map((m) => m[1])

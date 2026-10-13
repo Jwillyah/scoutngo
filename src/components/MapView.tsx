@@ -180,7 +180,14 @@ function captureImageryOnly(instance: maplibregl.Map): string {
   }
 }
 
-export type TapMode = 'venue' | 'subject' | null
+/**
+ * What a tap on the map does.
+ *
+ * 'add' is the one that is usually on: manual placement is the primary way to
+ * build a plan, so arming the map to drop a position is a first class mode
+ * rather than an editing afterthought.
+ */
+export type TapMode = 'venue' | 'subject' | 'add' | null
 
 export interface CameraState {
   center: [number, number]
@@ -265,6 +272,8 @@ interface MapViewProps {
   onPositionMove: (id: string, next: LatLon) => void
   /** Long press drops the venue if it is unset, otherwise the subject. */
   onLongPress: (at: LatLon) => void
+  /** Where to drop a position, when the map is armed to place one. */
+  onAddAt?: (at: LatLon) => void
   sunAzimuth: number | null
   /** PhotoPills style rays from the venue pin. All four bearings from core. */
   sunOverlay: SunOverlay | null
@@ -399,6 +408,7 @@ export function MapView({
   conePlan,
   onPositionMove,
   onLongPress,
+  onAddAt,
   sunAzimuth,
   sunOverlay,
   showSun,
@@ -445,6 +455,7 @@ export function MapView({
     onPitchChange,
     onLongPress,
     onPinDrag,
+    onAddAt,
   })
   useEffect(() => {
     latest.current = {
@@ -456,6 +467,7 @@ export function MapView({
       onPitchChange,
       onLongPress,
       onPinDrag,
+      onAddAt,
     }
   }, [
     mode,
@@ -466,6 +478,7 @@ export function MapView({
     onPitchChange,
     onLongPress,
     onPinDrag,
+    onAddAt,
   ])
 
   const selfMoved = useRef(false)
@@ -561,6 +574,8 @@ export function MapView({
         l.onVenueChange(next)
       } else if (l.mode === 'subject') {
         l.onSubjectChange(next)
+      } else if (l.mode === 'add') {
+        l.onAddAt?.(next)
       } else {
         l.onSelect(null)
       }
@@ -1244,6 +1259,7 @@ export function MapView({
             platform={planned.position.platform}
             altitudeFeet={planned.position.altitudeFeet}
             moved={planned.position.moved}
+            origin={planned.position.origin}
             selected={selectedId === planned.position.id}
             onSelect={() => {
               if (draggedRecently.current.has(planned.position.id)) return

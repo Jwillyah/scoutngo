@@ -4093,3 +4093,120 @@
   color: var(--color-text-muted);
   line-height: var(--leading-normal);
 }
+
+/* ------------------------------------------------- editing a position */
+
+/*
+ * THE GLASS, ON EVERY POSITION. Changing it recomputes lighting, field of view,
+ * framing, range and the siting flags, because all of those are derived from
+ * the coordinate and the optic and nothing else.
+ */
+.optic {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+}
+
+.optic__field {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.optic__label {
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.optic__select,
+.optic__focal {
+  min-height: var(--control-height);
+  padding: 0 var(--space-2);
+  background: var(--color-field);
+  color: var(--color-text);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-panel);
+  /* 16px floor: below this iOS zooms the page on focus. */
+  font-size: var(--text-base);
+}
+
+.optic__field--focal {
+  position: relative;
+  width: 7.5rem;
+}
+
+.optic__focal {
+  width: 100%;
+  font-weight: var(--weight-heavy);
+}
+
+.optic__unit {
+  position: absolute;
+  right: var(--space-2);
+  bottom: 12px;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+/* Reorder, copy, delete. Small, equal weight, none of them the main event. */
+.cardacts {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+}
+
+.cardacts__btn {
+  min-height: 38px;
+  padding: 0 var(--space-2);
+  background: var(--panel-sheen-2);
+  color: var(--color-text);
+  border: var(--line-hair) solid var(--color-line);
+  border-top-color: var(--color-edge-top);
+  border-radius: var(--radius-panel);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: transform var(--motion-fast) var(--spring);
+}
+
+.cardacts__btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.cardacts__btn:disabled {
+  color: var(--color-text-faint);
+  cursor: not-allowed;
+}
+
+/* Red, because deleting a position is the one destructive thing on this card. */
+.cardacts__btn--danger {
+  color: var(--color-hazard);
+  border-color: color-mix(in srgb, var(--color-hazard) 45%, var(--color-line));
+}
+
+/*
+ * ARMED. The primary says what the map is waiting for, and says it in the
+ * afterglow so "waiting for a tap" never looks like "ready to press again".
+ */
+.peek__go--armed {
+  background: var(--panel-sheen-2);
+  border-color: var(--color-accent-2);
+  color: var(--color-accent-2);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent-2) 45%, transparent),
+    0 2px 26px color-mix(in srgb, var(--color-accent-2) 30%, transparent);
+}
+
+/*
+ * WHO PUT THIS HERE. A manual position carries a thin afterglow ring. It is
+ * emphasis, not an affordance: white is still the only thing on this map that
+ * means "press me".
+ */
+.shooter--manual .shooter__disc {
+  box-shadow: 0 0 0 2px var(--color-accent-2);
+}

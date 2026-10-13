@@ -63,6 +63,14 @@ interface PlanModeProps {
   generation: GenerationState
   siteNote: string | null
   onGenerate: () => void
+  /** Arms the map so the next tap drops a position. The primary action here. */
+  placing: boolean
+  onPlacing: (next: boolean) => void
+  onAddAt: (at: LatLon) => void
+  onDeletePosition: (id: string) => void
+  onDuplicatePosition: (id: string) => void
+  onMovePosition: (id: string, delta: number) => void
+  onSetOptic: (id: string, lensId: string, focalLength: number) => void
   /** The forward step, offered as a SECONDARY action beside Generate. */
   onGoToField: () => void
   goToFieldBlocked: string | null
@@ -137,6 +145,13 @@ export function PlanMode({
   generation,
   siteNote,
   onGenerate,
+  placing,
+  onPlacing,
+  onAddAt,
+  onDeletePosition,
+  onDuplicatePosition,
+  onMovePosition,
+  onSetOptic,
   onGoToField,
   goToFieldBlocked,
   peekStatus,
@@ -188,7 +203,8 @@ export function PlanMode({
         onVenueChange={onVenueChange}
         subject={subject}
         onSubjectChange={onSubjectChange}
-        mode={tapMode}
+        mode={placing ? 'add' : tapMode}
+        onAddAt={onAddAt}
         plan={visiblePlan}
         conePlan={conePlan}
         onPositionMove={onPositionMove}
@@ -258,6 +274,11 @@ export function PlanMode({
           timeZone={venueWindow?.timeZone ?? null}
           tide={tideNow}
           onClose={() => onSelect(null)}
+          count={plan.length}
+          onDelete={onDeletePosition}
+          onDuplicate={onDuplicatePosition}
+          onMove={onMovePosition}
+          onSetOptic={onSetOptic}
         />
       )}
 
@@ -281,20 +302,21 @@ export function PlanMode({
             </button>
 
             {/*
-              * ONE LOUD ACTION. Generate is what this screen is for, so it is
-              * the full width primary in signal white and nothing else on the
-              * screen competes with it. The other two are real actions, not
-              * links, but they are secondary and they sit underneath: preparing
-              * a pack and walking out of the door are both things you do AFTER
-              * there is a plan to do them to.
+              * ADDING A POSITION IS THE LOUD ACTION, and suggesting is not.
+              *
+              * It was the other way round, and it was wrong. Suggestion has
+              * never placed well enough to trust: what actually produces a plan
+              * is the shooter putting a position on a spot they know. So the
+              * primary is the thing that works, and the model is offered
+              * underneath as the optional help it is.
               */}
             <button
               type="button"
-              className="btn btn--primary peek__go"
-              onClick={onGenerate}
-              disabled={generation.status === 'working'}
+              className={`btn btn--primary peek__go${placing ? ' peek__go--armed' : ''}`}
+              onClick={() => onPlacing(!placing)}
+              aria-pressed={placing}
             >
-              {generation.status === 'working' ? 'Working' : 'Generate'}
+              {placing ? 'Tap the map · cancel' : 'Add position'}
             </button>
 
             {/*
@@ -305,6 +327,19 @@ export function PlanMode({
               * you hold while walking. Neither of those was guessable.
               */}
             <div className="peek__second">
+              <button
+                type="button"
+                className="act"
+                onClick={onGenerate}
+                disabled={generation.status === 'working'}
+              >
+                <span className="act__label">
+                  {generation.status === 'working' ? 'Suggesting…' : 'Suggest positions'}
+                </span>
+                <span className="act__why">
+                  {generation.status === 'working' ? 'Asking the model' : 'Optional. A starting point'}
+                </span>
+              </button>
               <button
                 type="button"
                 className="act"

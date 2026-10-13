@@ -6,6 +6,7 @@ import type { FramingWarning } from '../core/fov.ts'
 import type { SiteWarning } from '../core/siting.ts'
 import { fetchSightlineCloud, type ForecastKind } from '../lib/forecast.ts'
 import { fetchGroundView, type GroundView } from '../lib/groundView.ts'
+import { DEFAULT_KIT } from '../core/kit.ts'
 import { FAA_CEILING_FEET } from '../lib/parsePlan.ts'
 import type { PlannedPosition } from '../lib/plan.ts'
 
@@ -17,6 +18,12 @@ interface PositionCardProps {
   /** Water level and direction at the scrubbed moment. Null away from the coast. */
   tide: TideState | null
   onClose: () => void
+  /** How many positions there are, so the reorder ends can be disabled. */
+  count: number
+  onDelete: (id: string) => void
+  onDuplicate: (id: string) => void
+  onMove: (id: string, delta: number) => void
+  onSetOptic: (id: string, lensId: string, focalLength: number) => void
 }
 
 /*
@@ -307,6 +314,11 @@ export function PositionCard({
   timeZone,
   tide,
   onClose,
+  count,
+  onDelete,
+  onDuplicate,
+  onMove,
+  onSetOptic,
 }: PositionCardProps) {
   const {
     position,
@@ -320,6 +332,8 @@ export function PositionCard({
     warnings,
   } = planned
 
+  const activeLens = DEFAULT_KIT.lenses.find((lens) => lens.id === position.lensId)
+
   return (
     <aside
       className={`card card--${lighting.classification}`}
@@ -331,8 +345,62 @@ export function PositionCard({
 
       <PhotoSlot key={position.id} planned={planned} />
 
-      {/* The shot in plain words, and the largest text on the card. */}
-      <p className="card__shot">{position.shot}</p>
+      {/*
+        * The shot in plain words, and the largest text on the card.
+        *
+        * A manually placed position has none until someone writes one, and that
+        * is left blank rather than filled with "Position 4". An empty line here
+        * is honest; a generated-looking one is not.
+        */}
+      {position.shot === '' ? null : <p className="card__shot">{position.shot}</p>}
+
+      {/*
+        * THE GLASS IS EDITABLE, on every position whatever placed it. Standing
+        * in one spot and asking what 200mm does instead of 600mm is the common
+        * question, and all of it, lighting included, recomputes from the answer.
+        */}
+      <div className="optic">
+        <label className="optic__field">
+          <span className="optic__label">Lens</span>
+          <select
+            className="optic__select"
+            value={position.lensId}
+            onChange={(event) => {
+              const lens = DEFAULT_KIT.lenses.find((l) => l.id === event.target.value)
+              onSetOptic(
+                position.id,
+                event.target.value,
+                lens === undefined
+                  ? position.focalLength
+                  : Math.min(lens.maxFocalLength, Math.max(lens.minFocalLength, position.focalLength)),
+              )
+            }}
+          >
+            {DEFAULT_KIT.lenses.map((lens) => (
+              <option key={lens.id} value={lens.id}>
+                {lens.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="optic__field optic__field--focal">
+          <span className="optic__label">Focal</span>
+          <input
+            className="optic__focal num"
+            type="number"
+            inputMode="numeric"
+            min={activeLens?.minFocalLength ?? 1}
+            max={activeLens?.maxFocalLength ?? 2000}
+            value={position.focalLength}
+            onChange={(event) => {
+              const next = Number(event.target.value)
+              if (!Number.isFinite(next)) return
+              onSetOptic(position.id, position.lensId, next)
+            }}
+          />
+          <span className="optic__unit">mm</span>
+        </label>
+      </div>
 
       {/*
         * Hazards stay loud and stay high. A framing problem and a site problem
@@ -408,6 +476,46 @@ export function PositionCard({
         <p className="card__why">{position.angleRationale}</p>
       )}
       {position.risk === '' ? null : <p className="card__note">{position.risk}</p>}
+
+      {/*
+        * REORDER, COPY, DELETE. The copy lands on the same spot with a fresh
+        * id, which is how you compare two focal lengths from one place without
+        * throwing the first away.
+        */}
+      <div className="cardacts">
+        <button
+          type="button"
+          className="cardacts__btn"
+          onClick={() => onMove(position.id, -1)}
+          disabled={position.number <= 1}
+          aria-label="Move earlier"
+        >
+          ↑
+        </button>
+        <button
+          type="button"
+          className="cardacts__btn"
+          onClick={() => onMove(position.id, 1)}
+          disabled={position.number >= count}
+          aria-label="Move later"
+        >
+          ↓
+        </button>
+        <button
+          type="button"
+          className="cardacts__btn cardacts__btn--wide"
+          onClick={() => onDuplicate(position.id)}
+        >
+          Duplicate
+        </button>
+        <button
+          type="button"
+          className="cardacts__btn cardacts__btn--danger"
+          onClick={() => onDelete(position.id)}
+        >
+          Delete
+        </button>
+      </div>
 
       {/*
         * EVERYTHING ELSE, CLOSED. Not deleted, not hidden: one tap away, in the

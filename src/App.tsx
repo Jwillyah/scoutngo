@@ -20,6 +20,13 @@ import {
 } from './lib/kitSelection.ts'
 import { fetchSiteGeometry, trimSummary } from './lib/overpass.ts'
 import { parsePlanResponse } from './lib/parsePlan.ts'
+import {
+  addPosition,
+  duplicatePosition,
+  movePosition,
+  removePosition,
+  setOptic,
+} from './lib/positions.ts'
 import { assessPlan, planPositions, type CameraPosition } from './lib/plan.ts'
 import {
   buildGenerateBody,
@@ -341,6 +348,60 @@ function App() {
     if (isolatedId !== null) return visiblePlan.filter((p) => p.position.id === isolatedId)
     return coneMode === 'all' ? visiblePlan : []
   }, [visiblePlan, isolatedId, coneMode])
+
+  /*
+   * MANUAL PLACEMENT IS THE PRIMARY WAY TO BUILD A PLAN.
+   *
+   * `placing` arms the map: the next tap drops a position rather than clearing
+   * the selection. It disarms itself afterwards, because a mode that stays on
+   * is a mode you forget you are in and then wonder why the map stopped
+   * behaving.
+   */
+  const [placing, setPlacing] = useState(false)
+
+  /* The glass a new position starts on: the first lens actually packed. */
+  const defaultOptic = useMemo(() => {
+    const lens =
+      DEFAULT_KIT.lenses.find((l) => kit.lensIds.includes(l.id)) ?? DEFAULT_KIT.lenses[0]
+    return lens === undefined
+      ? { lensId: '', focalLength: 50 }
+      : { lensId: lens.id, focalLength: lens.minFocalLength }
+  }, [kit.lensIds])
+
+  const addPositionAt = useCallback(
+    (at: LatLon) => {
+      setPlacing(false)
+      setPositions((current) => {
+        const next = addPosition(current, { at, ...defaultOptic })
+        const added = next[next.length - 1]
+        if (added !== undefined) window.setTimeout(() => setSelectedId(added.id), 0)
+        return next
+      })
+    },
+    [defaultOptic],
+  )
+
+  const onDeletePosition = useCallback((id: string) => {
+    setSelectedId(null)
+    setPositions((current) => removePosition(current, id))
+  }, [])
+
+  const onDuplicatePosition = useCallback((id: string) => {
+    setPositions((current) => {
+      const next = duplicatePosition(current, id)
+      const copy = next[next.findIndex((p) => p.id === id) + 1]
+      if (copy !== undefined) window.setTimeout(() => setSelectedId(copy.id), 0)
+      return next
+    })
+  }, [])
+
+  const onMovePosition = useCallback((id: string, delta: number) => {
+    setPositions((current) => movePosition(current, id, delta))
+  }, [])
+
+  const onSetOptic = useCallback((id: string, lensId: string, focalLength: number) => {
+    setPositions((current) => setOptic(current, id, lensId, focalLength))
+  }, [])
 
   const onVenueChange = useCallback((at: LatLon) => {
     setVenue((current) => withCoordinates(current, at))
@@ -732,6 +793,7 @@ function App() {
         platform: raw.platform,
         altitudeFeet: raw.altitudeFeet,
         moved: false,
+        origin: 'suggested',
       })),
     )
     // Markers only until a cone is asked for. Six overlapping cones is noise.
@@ -947,7 +1009,14 @@ function App() {
           tideExtremes={tideExtremes}
           generation={generation}
           siteNote={siteNote}
-          onGenerate={onGenerate}
+          onGenerate={() => void onGenerate()}
+          placing={placing}
+          onPlacing={setPlacing}
+          onAddAt={addPositionAt}
+          onDeletePosition={onDeletePosition}
+          onDuplicatePosition={onDuplicatePosition}
+          onMovePosition={onMovePosition}
+          onSetOptic={onSetOptic}
           pack={pack}
           packIsCurrent={packIsCurrent}
           packState={packState}

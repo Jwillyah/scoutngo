@@ -1,3 +1,4 @@
+import type { PositionOrigin } from '../lib/plan.ts'
 import type { FramingWarning } from '../core/fov.ts'
 import type { Classification } from '../core/lighting.ts'
 import type { SiteWarning } from '../core/siting.ts'
@@ -15,6 +16,8 @@ interface ShooterFigureProps {
   /** Feet above ground, air positions only. */
   altitudeFeet: number
   moved: boolean
+  /** Suggested or placed by hand. Emphasis only; it changes no arithmetic. */
+  origin: PositionOrigin
   selected: boolean
   onSelect: () => void
 }
@@ -51,6 +54,7 @@ export function ShooterFigure({
   altitudeFeet,
   moved,
   selected,
+  origin,
   onSelect,
 }: ShooterFigureProps) {
   /* Site and framing problems are the same kind of flag and share one slot. */
@@ -69,6 +73,7 @@ export function ShooterFigure({
         'shooter',
         air ? 'shooter--air' : '',
         selected ? 'shooter--selected' : '',
+        origin === 'manual' ? 'shooter--manual' : '',
         warningLabel !== undefined ? 'shooter--warned' : '',
       ]
         .filter((c) => c !== '')
@@ -79,6 +84,7 @@ export function ShooterFigure({
         `${focalLength} millimetres`,
         air ? `drone at ${altitudeFeet} feet` : 'ground',
         classification,
+        origin === 'manual' ? 'placed by hand' : 'suggested',
         moved ? 'moved by hand' : '',
         warningLabel ?? '',
       ]

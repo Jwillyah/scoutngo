@@ -25,6 +25,7 @@ const at = (lat: number, lon: number, over: Partial<CameraPosition> = {}): Camer
   platform: 'ground',
   altitudeFeet: 0,
   moved: false,
+  origin: 'suggested',
   ...over,
 })
 
