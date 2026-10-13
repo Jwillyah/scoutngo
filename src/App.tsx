@@ -156,6 +156,19 @@ function App() {
    * Whether the first run hint under the pin has been retired. Kept on the
    * device: it answers "can I move this", and once you know, you know.
    */
+  /*
+   * Preferences, kept on the device. Small on purpose: a setting is a decision
+   * the app could not make for you, and every one of these had to earn its
+   * place by being genuinely a matter of taste rather than a default we dodged.
+   */
+  const [settings, setSettings] = usePersistentState<{ showCoords: boolean }>(
+    'scoutngo.settings',
+    { showCoords: false },
+    (raw) => ({
+      showCoords: (raw as { showCoords?: unknown } | null)?.showCoords === true,
+    }),
+  )
+
   const [pinHintDone, setPinHintDone] = usePersistentState<boolean>(
     'scoutngo.pinHintDone',
     false,
@@ -861,6 +874,8 @@ function App() {
             onPinDrag={() => setPinHintDone(true)}
             defaults={defaults}
             pointAt={pointAt}
+            settings={settings}
+            onSettings={setSettings}
           />
           <div className="mode__foot">
             {forwardBar}

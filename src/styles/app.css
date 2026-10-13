@@ -14,6 +14,12 @@
  * has about 390x660 of visible page, so everything sized in vh ran off the
  * bottom. `dvh` is the viewport that is actually there right now.
  */
+/*
+ * THE BACKGROUND IS LIT, NOT FILLED. --bg-wash is a soft warm light high on the
+ * screen falling into the deeper black below, so the page reads as somewhere
+ * rather than as a switched-off panel. It sits behind everything and is only
+ * visible where the map is not.
+ */
 .shell {
   position: fixed;
   top: 0;
@@ -21,6 +27,23 @@
   right: 0;
   height: 100dvh;
   overflow: hidden;
+  background: var(--bg-wash);
+  background-attachment: local;
+}
+
+/*
+ * SAFE AREA, EVERY MODE.
+ *
+ * index.html sets viewport-fit=cover, which lets the page draw UNDER the status
+ * bar and the home indicator. That is right for satellite imagery and wrong for
+ * every control: the SETUP search field and the PLAN control row were sitting
+ * under the clock on a real iPhone.
+ *
+ * The rule is: imagery may go under the bar, controls may not. So the map stays
+ * full bleed and the things floating ON it pay the inset back themselves.
+ */
+.mode-field {
+  padding-top: var(--safe-top);
 }
 
 /* ---------------------------------------------------------------- setup */
@@ -56,24 +79,29 @@
  * only thing here that degrades gracefully: a smaller map is still a map, while
  * a hidden date field is a dead end.
  *
- * clamp in dvh: 180px keeps it usable on the shortest phone, 27dvh is the share
- * it takes when there is room, 300px stops it dominating a tall window.
+/*
+ * THE MAP IS THE SCREEN. At least half the visible height, and the rest scrolls
+ * under it.
  *
- * 27dvh rather than 30 buys back the last 20px of scroll at 390x844, so the
- * installed app still lands on one screen. At 390x660 the floor bites and the
- * column scrolls, which is the correct answer there: the content genuinely does
- * not fit, and scrolling is what happens when it does not.
+ * It used to be 27dvh, tuned down a few points at a time to protect a zero
+ * scroll target at 390x844. That trade was wrong: this is a map tool, the map
+ * is what the shooter is reading, and a 228px map on a 844px phone was a
+ * thumbnail with a form under it. Zero scroll stopped being worth the cost.
+ *
+ * 52dvh, with a floor so the shortest phone still gets a usable map and a
+ * ceiling so a tall window does not give it the whole screen.
  */
 .setup__map {
   position: relative;
   flex: 0 0 auto;
-  height: clamp(180px, 27dvh, 300px);
+  height: clamp(300px, 52dvh, 560px);
 }
 
 .setup__search {
   position: absolute;
   z-index: 4;
-  top: var(--space-2);
+  /* Clears the status bar. The map behind it is free to run to the edge. */
+  top: calc(var(--space-2) + var(--safe-top));
   left: var(--space-2);
   right: var(--space-2);
 }
@@ -166,6 +194,7 @@
 .reach__slider::-webkit-slider-thumb {
   appearance: none;
   -webkit-appearance: none;
+  transition: transform var(--motion-fast) var(--spring-pop);
   width: 30px;
   height: 30px;
   margin-top: -13px;
@@ -182,6 +211,10 @@
   border: var(--line-rule) solid var(--color-bg);
   border-radius: 50%;
   box-shadow: var(--primary-glow);
+}
+
+.reach__slider:active::-webkit-slider-thumb {
+  transform: scale(1.12);
 }
 
 .reach__slider:focus-visible {
@@ -373,7 +406,7 @@
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-2) var(--space-3);
-  background: var(--color-panel);
+  background: var(--panel-sheen);
   border: var(--line-hair) solid var(--color-line);
   border-top-color: var(--color-edge-top);
   border-radius: var(--radius-panel);
@@ -538,7 +571,7 @@
   gap: var(--space-2) var(--space-3);
   min-width: 0;
   padding: var(--space-2) var(--space-3);
-  background: var(--color-panel);
+  background: var(--panel-sheen);
   border: var(--line-hair) solid var(--color-line);
   border-top-color: var(--color-edge-top);
   border-radius: var(--radius-panel);
@@ -605,6 +638,7 @@
 .drawer {
   position: absolute;
   inset: 0;
+  padding-top: var(--safe-top);
   z-index: 6;
   display: flex;
   flex-direction: column;
@@ -884,7 +918,7 @@
   display: grid;
   gap: var(--space-2);
   justify-items: start;
-  background: var(--color-panel-2);
+  background: var(--panel-sheen-2);
   border-top: var(--line-hair) solid var(--color-edge-top);
   border-left: var(--line-rule) solid var(--color-rule-fact);
   border-radius: var(--radius-panel);
@@ -1179,6 +1213,20 @@
  * one sheet over it. That is the whole navigation model: no tabs, no detents
  * beyond open and shut, no accordions.
  */
+/* Modes cross-fade and settle rather than cutting. */
+@keyframes mode-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.mode-setup,
+.mode-field,
+.mode-plan {
+  animation: mode-in var(--motion-base) var(--spring);
+}
+
 .mode-setup,
 .mode-field {
   position: absolute;
@@ -1479,7 +1527,8 @@
 .hud {
   position: absolute;
   z-index: 4;
-  top: var(--space-3);
+  /* Clears the status bar. See the safe area note on .shell. */
+  top: calc(var(--space-3) + var(--safe-top));
   left: var(--space-3);
   right: var(--space-3);
   display: flex;
@@ -1977,7 +2026,19 @@
 
 /* ---------------------------------------------------------------- card */
 
+/*
+ * Springs in rather than appearing. Fast, one gentle settle, no bounce: it
+ * carries numbers and a readout that wobbles past its value is one you wait for.
+ */
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+}
+
 .card {
+  animation: card-in var(--motion-base) var(--spring-pop);
   position: absolute;
   z-index: 4;
   left: var(--space-3);
@@ -1985,7 +2046,7 @@
   bottom: calc(var(--dock-height, 0px) + var(--sheet-live-height, 0px) + var(--space-3));
   max-width: var(--page-max);
   margin: 0 auto;
-  background: var(--color-panel);
+  background: var(--panel-sheen);
   border: var(--line-hair) solid var(--color-line);
   /* The lit top edge is what lifts a panel off the map. No shadow is used. */
   border-top-color: var(--color-edge-top);
@@ -2364,7 +2425,7 @@
   z-index: 4;
   display: flex;
   flex-direction: column;
-  background: var(--color-panel);
+  background: var(--panel-sheen);
   border-top: var(--line-hair) solid var(--color-edge-top);
   border-radius: var(--radius-panel) var(--radius-panel) 0 0;
   padding-bottom: var(--safe-bottom);
@@ -2372,8 +2433,9 @@
   margin: 0 auto;
 }
 
+/* Spring, so the sheet reads as attached to the thumb rather than animated. */
 .sheet:not(.sheet--dragging) {
-  transition: height 180ms ease-out;
+  transition: height var(--motion-base) var(--spring);
 }
 
 .sheet__grab {
@@ -2834,7 +2896,7 @@
 .notice {
   margin: var(--space-3) var(--page-pad) 0;
   padding: var(--space-3);
-  background: var(--color-panel-2);
+  background: var(--panel-sheen-2);
   border-left: var(--line-rule) solid var(--color-rule-fact);
   border-top: var(--line-hair) solid var(--color-edge-top);
   border-radius: var(--radius-panel);
@@ -3016,6 +3078,9 @@
 /* ---------------------------------------------------------------- buttons */
 
 .btn {
+  transition:
+    transform var(--motion-fast) var(--spring),
+    filter var(--motion-fast) var(--spring);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3037,6 +3102,11 @@
  * thing in the app allowed a gradient or a glow. Both come from tokens.css so a
  * second use would have to be written deliberately rather than copied.
  */
+/* A press should feel like a press. Small, fast, and gone. */
+.btn:active:not(:disabled) {
+  transform: scale(0.975);
+}
+
 .btn--primary {
   background: var(--primary-sheen);
   border-color: var(--color-accent);
@@ -3059,9 +3129,55 @@
 }
 
 /*
- * Secondary. Readable, reachable, and visibly not the main event: panel fill,
- * no accent, no glow, and shorter than the primary above it.
+ * A SECONDARY ACTION THAT EXPLAINS ITSELF. Two lines: what it does, then one
+ * short line of why you would, or why you cannot. Visibly not the main event:
+ * no accent, no glow, and quieter type than the primary above it.
  */
+.act {
+  display: grid;
+  gap: 1px;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--panel-sheen-2);
+  border: var(--line-hair) solid var(--color-line);
+  border-top-color: var(--color-edge-top);
+  border-radius: var(--radius-panel);
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--motion-fast) var(--spring);
+}
+
+.act:active:not(:disabled) {
+  transform: scale(0.975);
+}
+
+.act__label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text);
+}
+
+.act__why {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* Disabled still reads, because the why line is the useful part when it does. */
+.act:disabled {
+  cursor: not-allowed;
+  border-color: var(--color-line);
+}
+
+.act:disabled .act__label {
+  color: var(--color-text-faint);
+}
+
+.act:disabled .act__why {
+  color: var(--color-accent-2-dim);
+}
+
 .btn--quiet {
   min-height: 38px;
   padding: 0 var(--space-2);
@@ -3629,7 +3745,7 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: var(--space-1);
-  background: var(--color-panel);
+  background: var(--panel-sheen);
   border: var(--line-hair) solid var(--color-line);
   border-top-color: var(--color-edge-top);
   border-radius: var(--radius-panel);
@@ -3695,7 +3811,7 @@
   top: calc(100% + var(--space-2));
   min-width: 15rem;
   padding: var(--space-1);
-  background: var(--color-panel);
+  background: var(--panel-sheen);
   border: var(--line-hair) solid var(--color-line);
   border-radius: var(--radius-panel);
 }
@@ -3923,4 +4039,44 @@
   display: flex;
   flex-direction: column;
   background: var(--black);
+}
+
+/* ------------------------------------------------------------- settings */
+
+/*
+ * A preference, with the reason it exists written next to it. The note is not
+ * decoration: every setting here is a thing the app could not decide for you,
+ * and saying which is cheaper than making you find out by toggling it.
+ */
+.toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  cursor: pointer;
+}
+
+.toggle__box {
+  flex: 0 0 auto;
+  width: var(--box-size);
+  height: var(--box-size);
+  margin-top: 2px;
+  accent-color: var(--color-accent);
+}
+
+.toggle__text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.toggle__label {
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+}
+
+.toggle__note {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  line-height: var(--leading-normal);
 }

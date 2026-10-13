@@ -82,3 +82,50 @@ describe('teal does not collide with the status colours', () => {
     expect(colourDistance(OCEAN_TO, HAZARD)).toBeGreaterThan(TELLABLE_APART * 2)
   })
 })
+
+/*
+ * THE SECONDARY ACCENT WAS PICKED BY MEASUREMENT.
+ *
+ * The palette was already crowded: hazard red, three lighting classes, four sun
+ * and shadow bearings, and the ocean pair. A warm accent chosen by eye would
+ * almost certainly have landed on top of one of them, and two colours that mean
+ * different things and look the same is worse than having no second accent.
+ *
+ * These are the numbers that chose it. If a future hue is proposed, it has to
+ * beat them.
+ */
+describe('the afterglow accent', () => {
+  const AFTERGLOW = '#e879f9'
+  const PANEL = '#16141a'
+  const SUNSET = '#ff5fa8'
+  const SHADOW = '#9aa7ff'
+  const SUNRISE = '#ffa04a'
+  const SUN = '#ffd54a'
+  /* Same bar the ocean accent is held to, in the describe above. */
+  const TELLABLE_APART = 120
+
+  it('is further from every taken colour than the runner up was', () => {
+    const nearest = Math.min(
+      ...[SUNSET, SHADOW, SUNRISE, SUN, HAZARD, LIGHT_BACK, LIGHT_SIDE, LIGHT_FRONT,
+        OCEAN_FROM, OCEAN_TO].map((taken) => colourDistance(AFTERGLOW, taken)),
+    )
+    // Measured 133, against 94 for the next candidate that also passed contrast.
+    expect(nearest).toBeGreaterThan(120)
+  })
+
+  /* Sunset pink is the closest thing to it, and the one worth naming. */
+  it('is tellable apart from the sunset ray, which is its nearest neighbour', () => {
+    expect(colourDistance(AFTERGLOW, SUNSET)).toBeGreaterThan(TELLABLE_APART)
+  })
+
+  it('is not red, not amber, and not the side-lit blue', () => {
+    expect(colourDistance(AFTERGLOW, HAZARD)).toBeGreaterThan(TELLABLE_APART)
+    expect(colourDistance(AFTERGLOW, LIGHT_BACK)).toBeGreaterThan(TELLABLE_APART)
+    expect(colourDistance(AFTERGLOW, LIGHT_SIDE)).toBeGreaterThan(TELLABLE_APART)
+  })
+
+  /* It carries text on a panel, so it has to be readable there, not just pretty. */
+  it('passes AAA on a panel', () => {
+    expect(contrastRatio(AFTERGLOW, PANEL)).toBeGreaterThan(7)
+  })
+})

@@ -297,27 +297,49 @@ export function PlanMode({
               {generation.status === 'working' ? 'Working' : 'Generate'}
             </button>
 
+            {/*
+              * EACH SECONDARY SAYS WHAT IT DOES, and when it cannot be pressed
+              * it says why instead. "Prepare field pack" and "Go to field"
+              * named internal concepts: the first one downloads the photos so
+              * the day works without signal, and the second opens the screen
+              * you hold while walking. Neither of those was guessable.
+              */}
             <div className="peek__second">
               <button
                 type="button"
-                className="btn btn--quiet"
+                className="act"
                 onClick={onPreparePack}
                 disabled={plan.length === 0 || packState.status === 'working'}
               >
-                {packState.status === 'working'
-                  ? `Packing ${packState.done}/${packState.total}`
-                  : packIsCurrent
-                    ? 'Pack again'
-                    : 'Prepare field pack'}
+                <span className="act__label">
+                  {packState.status === 'working'
+                    ? `Saving ${packState.done}/${packState.total}`
+                    : packIsCurrent
+                      ? 'Save again'
+                      : 'Save offline'}
+                </span>
+                <span className="act__why">
+                  {plan.length === 0
+                    ? 'Add a position first'
+                    : packState.status === 'working'
+                      ? 'Downloading photos'
+                      : packIsCurrent
+                        ? 'Saved and current'
+                        : 'Works with no signal'}
+                </span>
               </button>
               <button
                 type="button"
-                className="btn btn--quiet"
+                className="act"
                 onClick={onGoToField}
                 disabled={goToFieldBlocked !== null}
-                title={goToFieldBlocked ?? undefined}
               >
-                Go to field
+                <span className="act__label">Start the shoot</span>
+                <span className="act__why">
+                  {goToFieldBlocked === null
+                    ? 'One position at a time'
+                    : 'Add a position first'}
+                </span>
               </button>
             </div>
           </div>

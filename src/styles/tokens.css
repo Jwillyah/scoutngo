@@ -42,16 +42,25 @@
   color-scheme: dark;
 
   /* ------------------------------------------------------ chrome palette */
-  /* Neutral near-black, with no green or blue cast. Satellite imagery carries
-     every hue there is, and chrome that leans warm or cool fights it. */
-  --black: #0b0b0b; /* deepest, the sheet grab area and scrims */
-  --surface-1: #141414; /* floating panels, the bottom sheet */
-  --surface-2: #1c1c1c; /* inputs and rows inside a panel */
-  --surface-3: #2b2b2b; /* hairlines and dividers */
+  /*
+   * NEAR-BLACK, WARMED. It used to be exactly neutral, on the argument that
+   * satellite imagery carries every hue and chrome that leans warm or cool
+   * fights it. That argument holds for the panels that FLOAT ON the map, and
+   * they have barely moved. It does not hold for the app's own background,
+   * which was a flat #0b0b0b field that read as switched off rather than lit.
+   *
+   * So the warmth is tiny in the surfaces, a few points of red and blue over
+   * neutral, and the real depth comes from --bg-wash below: a radial light
+   * behind the content rather than a brighter grey.
+   */
+  --black: #0a090c; /* deepest, the sheet grab area and scrims */
+  --surface-1: #16141a; /* floating panels, the bottom sheet */
+  --surface-2: #1e1b24; /* inputs and rows inside a panel */
+  --surface-3: #2e2a36; /* hairlines and dividers */
   /* The top edge of a panel catches the light, one hairline brighter than the
      panel. It is what separates a floating surface from the map without a
      shadow, which this design does not use. */
-  --edge-top: #3a3a3a;
+  --edge-top: #453f50;
   --white: #ffffff; /* primary type, and the accent */
   --grey-1: #b4b4b4; /* secondary type */
   --grey-2: #7d7d7d; /* faint type, placeholders */
@@ -90,6 +99,24 @@
 
   --hazard: #ff3b30; /* RED. hazard only, and nothing else is red */
   --hazard-tint: #2e0b08;
+
+  /*
+   * AFTERGLOW. The one secondary accent, for emphasis that is not a primary
+   * action: a count that matters, a selected row, the rule beside something the
+   * app is drawing attention to.
+   *
+   * CHOSEN BY MEASUREMENT, not by eye. src/core/contrast.ts has colourDistance,
+   * and this hue was picked as the candidate with the greatest distance from
+   * EVERY colour already spoken for while still passing contrast on a panel.
+   * Measured: 133 from its nearest neighbour, the sunset ray at #ff5fa8, which
+   * is nearly double the next usable candidate, and 7.49:1 on --surface-1,
+   * which is AAA. Both numbers are asserted in src/core/contrast.test.ts.
+   *
+   * It is warm against the teal, and it is deliberately NOT red, NOT amber and
+   * NOT the side-lit blue, because each of those already means something.
+   */
+  --afterglow: #e879f9;
+  --afterglow-dim: #8b5a93;
 
   /* -------------------------------------------------- data overlay palette */
   /*
@@ -135,6 +162,9 @@
    */
   --color-rule-fact: var(--surface-3);
 
+  --color-accent-2: var(--afterglow);
+  --color-accent-2-dim: var(--afterglow-dim);
+
   --color-accent: var(--accent);
   --color-accent-ink: var(--accent-ink);
   --color-hazard: var(--hazard);
@@ -153,7 +183,75 @@
     var(--color-accent) 58%,
     color-mix(in srgb, var(--color-accent) 86%, black 14%) 100%
   );
-  --primary-glow: 0 0 18px color-mix(in srgb, var(--color-accent) 42%, transparent);
+  /*
+   * Two layers, not one. A tight bright ring reads as the button's own edge
+   * catching light; the wide soft one is the light it throws. A single blur did
+   * neither convincingly.
+   */
+  --primary-glow:
+    0 0 0 1px color-mix(in srgb, var(--color-accent) 55%, transparent),
+    0 2px 28px color-mix(in srgb, var(--color-accent) 48%, transparent),
+    0 1px 3px color-mix(in srgb, black 55%, transparent);
+
+  /*
+   * THE BACKGROUND IS NOT A FLAT FIELD. A soft warm light high on the screen,
+   * falling off into the deeper black at the bottom, so the page has somewhere
+   * the light is coming from. Two stops of colour over one grey.
+   */
+  --bg-wash:
+    radial-gradient(
+      120% 65% at 50% -10%,
+      color-mix(in srgb, var(--afterglow) 9%, transparent) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      100% 55% at 18% 8%,
+      color-mix(in srgb, var(--ocean) 7%, transparent) 0%,
+      transparent 55%
+    ),
+    linear-gradient(180deg, #121018 0%, var(--black) 62%);
+
+  /*
+   * PANELS ARE LIT FROM ABOVE, not filled with one grey. The gradient is small,
+   * a few points top to bottom, and it is what stops a stack of panels reading
+   * as a stack of identical rectangles.
+   */
+  --panel-sheen: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-1) 100%, white 5%) 0%,
+    var(--surface-1) 55%,
+    color-mix(in srgb, var(--surface-1) 92%, black 8%) 100%
+  );
+
+  --panel-sheen-2: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-2) 100%, white 4%) 0%,
+    var(--surface-2) 70%
+  );
+
+  /* ---------------------------------------------------------------- motion */
+  /*
+   * SPRING, NOT EASE. Fast out of the gate and settling rather than coasting,
+   * which is what makes a sheet feel attached to the thumb. Deliberately
+   * without overshoot on anything that carries a number: a readout that
+   * wobbles past its value and back is a readout you have to wait for.
+   */
+  --spring: cubic-bezier(0.22, 1, 0.36, 1);
+  /* One gentle overshoot, for things that appear rather than move. */
+  --spring-pop: cubic-bezier(0.34, 1.32, 0.64, 1);
+  --motion-fast: 160ms;
+  --motion-base: 260ms;
+  --motion-slow: 380ms;
+
+  /* -------------------------------------------------------------- insets */
+  /*
+   * viewport-fit=cover lets the page draw UNDER the status bar and the home
+   * indicator. Anything pinned to an edge has to pay these back or it sits
+   * under the clock, which is exactly what happened to the SETUP search field
+   * and the PLAN control row.
+   */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
 
   /* ----------------------------------------------------------------- type */
   /* One family. The monospace variant is for numeric readouts only, applied
@@ -236,7 +334,6 @@
   --sheet-peek: 108px;
   /* Keep --nav-height in step with NAV_HEIGHT in NavBar.tsx. */
   --nav-height: 56px;
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /*
@@ -259,5 +356,21 @@
 
   /* The gradient, teal into sky, and a glow in the teal end only. */
   --primary-sheen: linear-gradient(135deg, var(--ocean) 0%, var(--ocean-far) 100%);
-  --primary-glow: 0 0 22px color-mix(in srgb, var(--ocean) 45%, transparent);
+  --primary-glow:
+    0 0 0 1px color-mix(in srgb, var(--ocean) 60%, transparent),
+    0 2px 30px color-mix(in srgb, var(--ocean) 52%, transparent),
+    0 0 64px color-mix(in srgb, var(--ocean-far) 26%, transparent),
+    0 1px 3px color-mix(in srgb, black 55%, transparent);
+}
+
+/*
+ * REDUCED MOTION IS NOT A SUGGESTION. Every duration in the app resolves
+ * through these, so one block turns all of it off.
+ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-base: 0ms;
+    --motion-slow: 0ms;
+  }
 }

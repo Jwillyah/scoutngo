@@ -59,6 +59,9 @@ interface SetupModeProps {
   onPinDrag: () => void
   /** True while the date, or the window, is still the one the app chose. */
   defaults: { date: boolean; window: boolean }
+  /** The handful of preferences that are genuinely preferences. */
+  settings: { showCoords: boolean }
+  onSettings: (next: { showCoords: boolean }) => void
   /**
    * A request to show the shooter what is blocking them. The tick changes on
    * every press of a blocked forward button, so pressing it twice points twice.
@@ -67,7 +70,7 @@ interface SetupModeProps {
 }
 
 /** What is open over the one screen. Only ever one at a time. */
-type Drawer = 'none' | 'kit' | 'shots' | 'saved'
+type Drawer = 'none' | 'kit' | 'shots' | 'saved' | 'settings'
 
 /**
  * SETUP: one screen, map first.
@@ -124,6 +127,8 @@ export function SetupMode({
   onPinDrag,
   defaults,
   pointAt,
+  settings,
+  onSettings,
 }: SetupModeProps) {
   /*
    * One example per load, so the placeholder shows the kind of work the reader
@@ -279,7 +284,7 @@ export function SetupMode({
 
       <ReachSlider meters={reachMeters} onChange={onReachChange} />
 
-      <VenuePlate name={venue.name} at={at} />
+      <VenuePlate name={venue.name} at={at} showCoords={settings.showCoords} />
 
       <div className="setup__body">
         {/*
@@ -372,6 +377,9 @@ export function SetupMode({
             <button type="button" className="setup__link" onClick={() => open('saved')}>
               Saved
             </button>
+            <button type="button" className="setup__link" onClick={() => open('settings')}>
+              Settings
+            </button>
           </div>
           {describeState.status === 'done' ? (
             <p className="setup__note">
@@ -397,7 +405,13 @@ export function SetupMode({
         <div className="drawer">
           <div className="drawer__head">
             <span className="drawer__title">
-              {drawer === 'kit' ? 'Kit and style' : drawer === 'shots' ? 'Shot list' : 'Saved setups'}
+              {drawer === 'kit'
+                ? 'Kit and style'
+                : drawer === 'shots'
+                  ? 'Shot list'
+                  : drawer === 'settings'
+                    ? 'Settings'
+                    : 'Saved setups'}
             </span>
             <button type="button" className="drawer__close" onClick={() => setDrawer('none')}>
               Done
@@ -420,6 +434,27 @@ export function SetupMode({
                 />
               </div>
             ) : null}
+            {drawer === 'settings' ? (
+              <div className="drawer__pad">
+                <label className="toggle">
+                  <input
+                    type="checkbox"
+                    className="toggle__box"
+                    checked={settings.showCoords}
+                    onChange={(event) => onSettings({ showCoords: event.target.checked })}
+                  />
+                  <span className="toggle__text">
+                    <span className="toggle__label">Show coordinates</span>
+                    <span className="toggle__note">
+                      Prints the venue's latitude and longitude under its name. Off by
+                      default: the pin is the coordinate, and decimal degrees are of no
+                      use to most people standing on a dock.
+                    </span>
+                  </span>
+                </label>
+              </div>
+            ) : null}
+
             {drawer === 'saved' ? (
               <SpotsPanel
                 spots={spots}
