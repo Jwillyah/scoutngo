@@ -1,14 +1,19 @@
 import * as maplibregl from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
-import { useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   axisLine,
+  bearingLineEnd,
   destinationPoint,
-  distanceMeters,
   toPosition,
   type LatLon,
 } from '../core/geo.ts'
+import {
+  steppedBearingLineMeters,
+  viewportSpanMeters,
+  type ViewportBounds,
+} from '../core/viewport.ts'
 import { fitLongEdge, resolveCaptureLongEdge } from '../core/capture.ts'
 import type { SunArc } from '../core/sun.ts'
 import type { PlannedPosition } from '../lib/plan.ts'
@@ -91,9 +96,14 @@ const ESRI_TILES =
 const ESRI_ATTRIBUTION =
   'Tiles by Esri. Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
 
-const SUN_LINE_HALF_METERS = 1200
-/** Length of the four radiating sun lines drawn from the venue pin. */
-const SUN_RAY_METERS = 900
+/*
+ * The sun line and the four rays used to be 1200m and 900m.
+ *
+ * A bearing has no length, so a fixed one is wrong at every zoom but the one
+ * it was chosen at. Measured on the real map at 390x844, the sun ray was 15px
+ * long at zoom 10 and 15,393px at zoom 20. Their length now comes from the
+ * viewport, through src/core/viewport.ts.
+ */
 /** Where the degree labels sit, as a fraction of the shorter visible span. */
 const LABEL_SPAN_FRACTION = 0.28
 const LABEL_MIN_METERS = 50
@@ -329,9 +339,16 @@ function coneCollection(plan: PlannedPosition[]): GeoJSON.FeatureCollection {
   }
 }
 
+/** What the map reports visible, in the shape src/core/viewport.ts takes. */
+function boundsOf(instance: maplibregl.Map): ViewportBounds {
+  const b = instance.getBounds()
+  return { north: b.getNorth(), south: b.getSouth(), east: b.getEast(), west: b.getWest() }
+}
+
 function sunCollection(
   pin: LatLon | null,
   azimuth: number | null,
+  halfLengthMeters: number,
 ): GeoJSON.FeatureCollection {
   if (pin === null || azimuth === null) return emptyCollection()
   return {
@@ -342,7 +359,7 @@ function sunCollection(
         properties: { azimuth },
         geometry: {
           type: 'LineString',
-          coordinates: axisLine(pin, azimuth, SUN_LINE_HALF_METERS),
+          coordinates: axisLine(pin, azimuth, halfLengthMeters),
         },
       },
     ],
@@ -359,6 +376,7 @@ function rayCollection(
   overlay: SunOverlay | null,
   showSun: boolean,
   showArc: boolean,
+  lengthMeters: number,
 ): GeoJSON.FeatureCollection {
   if (venue === null || overlay === null || !showSun) return emptyCollection()
 
@@ -381,9 +399,15 @@ function rayCollection(
       properties: { kind: ray.kind, bearing: ray.bearing },
       geometry: {
         type: 'LineString',
+        /*
+         * A rhumb point, not destinationPoint. A ray shows a compass
+         * direction, and the map draws this two point line as a straight
+         * segment, which in Mercator IS the constant bearing line. See
+         * src/core/geo.ts.
+         */
         coordinates: [
           toPosition(venue),
-          toPosition(destinationPoint(venue, ray.bearing, SUN_RAY_METERS)),
+          toPosition(bearingLineEnd(venue, ray.bearing, lengthMeters)),
         ],
       },
     })),
@@ -1002,17 +1026,65 @@ export function MapView({
     cones?.setData(coneCollection(conePlan))
   }, [conePlan, ready])
 
-  useEffect(() => {
-    if (map.current === null || !ready) return
-    const sun = map.current.getSource(SUN_SOURCE) as maplibregl.GeoJSONSource | undefined
-    sun?.setData(sunCollection(venue, sunAzimuth))
-  }, [venue, sunAzimuth, ready])
+  /*
+   * THE SUN LINE AND THE RAYS, SIZED TO THE VIEWPORT.
+   *
+   * Their length is not a constant, so it cannot live in a dependency array:
+   * it changes as the camera moves. It is also not React state, because the
+   * camera moves every frame of a pinch and re-rendering this component sixty
+   * times a second to redraw four two point lines would be absurd.
+   *
+   * So the inputs are held in a ref and the drawing is a function the map's
+   * own `move` event calls directly. The length is stepped to a power of two
+   * (src/core/viewport.ts), so the sources are actually written a handful of
+   * times per gesture rather than once per frame, and the comparison below is
+   * what skips the rest.
+   */
+  const bearingInputs = useRef({ venue, sunAzimuth, sunOverlay, showSun, showArc })
+  bearingInputs.current = { venue, sunAzimuth, sunOverlay, showSun, showArc }
+  const bearingLengthDrawn = useRef(0)
 
+  const drawBearingLines = useCallback((instance: maplibregl.Map, force: boolean) => {
+    const input = bearingInputs.current
+    /*
+     * No pin, no bearing to draw from. Length still has to be reset, or the
+     * next pin inherits the length of a frame it was never measured against.
+     */
+    if (input.venue === null) {
+      if (!force) return
+      bearingLengthDrawn.current = 0
+    }
+    const length =
+      input.venue === null
+        ? 0
+        : steppedBearingLineMeters(input.venue, boundsOf(instance))
+    if (!force && length === bearingLengthDrawn.current) return
+    bearingLengthDrawn.current = length
+
+    const sun = instance.getSource(SUN_SOURCE) as maplibregl.GeoJSONSource | undefined
+    sun?.setData(sunCollection(input.venue, input.sunAzimuth, length))
+    const rays = instance.getSource(RAY_SOURCE) as maplibregl.GeoJSONSource | undefined
+    rays?.setData(
+      rayCollection(input.venue, input.sunOverlay, input.showSun, input.showArc, length),
+    )
+  }, [])
+
+  /* The inputs changed, so redraw whatever the camera happens to be showing. */
   useEffect(() => {
     if (map.current === null || !ready) return
-    const rays = map.current.getSource(RAY_SOURCE) as maplibregl.GeoJSONSource | undefined
-    rays?.setData(rayCollection(venue, sunOverlay, showSun, showArc))
-  }, [venue, sunOverlay, showSun, showArc, ready])
+    drawBearingLines(map.current, true)
+  }, [venue, sunAzimuth, sunOverlay, showSun, showArc, ready, drawBearingLines])
+
+  /* And the camera changed, so re-length them. */
+  useEffect(() => {
+    const instance = map.current
+    if (instance === null || !ready) return
+    const onMove = () => drawBearingLines(instance, false)
+    instance.on('move', onMove)
+    return () => {
+      instance.off('move', onMove)
+    }
+  }, [ready, drawBearingLines])
 
   /* Degree labels at the end of each ray, in the monospace variant. */
   useEffect(() => {
@@ -1038,17 +1110,7 @@ export function MapView({
      * at the far end of the ray. At a 900m ray they were always off screen,
      * which made the degree readouts useless.
      */
-    const bounds = instance.getBounds()
-    const spanMeters = Math.min(
-      distanceMeters(
-        { lat: bounds.getSouth(), lon: bounds.getWest() },
-        { lat: bounds.getSouth(), lon: bounds.getEast() },
-      ),
-      distanceMeters(
-        { lat: bounds.getSouth(), lon: bounds.getWest() },
-        { lat: bounds.getNorth(), lon: bounds.getWest() },
-      ),
-    )
+    const spanMeters = viewportSpanMeters(boundsOf(instance))
     const labelMeters = Math.min(
       LABEL_MAX_METERS,
       Math.max(LABEL_MIN_METERS, spanMeters * LABEL_SPAN_FRACTION),

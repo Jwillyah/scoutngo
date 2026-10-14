@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest'
 import {
   axisLine,
   bearingBetween,
+  bearingLineEnd,
   destinationPoint,
   distanceMeters,
   fovConePolygon,
+  MERCATOR_MAX_LAT,
+  rhumbPoint,
+  type LatLon,
 } from './geo.ts'
 
 const BREW_RIVER = { lat: 38.3648, lon: -75.6069 }
@@ -85,11 +89,114 @@ describe('fovConePolygon', () => {
   })
 })
 
+/*
+ * A bearing line is drawn as a two point segment, which the map renders
+ * straight in projected space. These two assertions are what make that
+ * drawing correct: the bearing does not drift, and the straight segment is
+ * the line itself rather than a chord across a curve.
+ */
+describe('rhumbPoint holds a constant compass bearing', () => {
+  const MERCATOR_Y = (lat: number) => Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360))
+
+  /** Compass bearing to a point, read off the projection the map draws in. */
+  const mercatorBearing = (to: LatLon) => {
+    const dy = MERCATOR_Y(to.lat) - MERCATOR_Y(BREW_RIVER.lat)
+    const dx = ((to.lon - BREW_RIVER.lon) * Math.PI) / 180
+    return (((Math.atan2(dx, dy) * 180) / Math.PI) + 360) % 360
+  }
+
+  it('holds the bearing the whole way, where a great circle does not', () => {
+    const far = rhumbPoint(BREW_RIVER, 45, 200_000)
+    expect(mercatorBearing(far)).toBeCloseTo(45, 6)
+    /*
+     * And the two really do differ, which is the reason this function exists.
+     * bearingBetween is the great circle's INITIAL bearing, so over 200km it
+     * reads half a degree off the constant bearing actually travelled. Going
+     * the other way, a great circle endpoint read as a compass direction is
+     * wrong by the same amount, which is the skew this replaced.
+     */
+    expect(Math.abs(bearingBetween(BREW_RIVER, far) - 45)).toBeGreaterThan(0.4)
+    expect(Math.abs(mercatorBearing(destinationPoint(BREW_RIVER, 45, 200_000)) - 45)).toBeGreaterThan(0.4)
+  })
+
+  it('is straight in Mercator, so the drawn segment is the line', () => {
+    const bearing = 30
+    const near = rhumbPoint(BREW_RIVER, bearing, 20_000)
+    const far = rhumbPoint(BREW_RIVER, bearing, 80_000)
+    // Equal slope in projected space from the origin to each point.
+    const slope = (p: { lat: number; lon: number }) =>
+      (p.lon - BREW_RIVER.lon) / (MERCATOR_Y(p.lat) - MERCATOR_Y(BREW_RIVER.lat))
+    expect(slope(near)).toBeCloseTo(slope(far), 6)
+  })
+
+  it('travels the distance asked for', () => {
+    // Along a meridian a rhumb and a great circle are the same line.
+    expect(distanceMeters(BREW_RIVER, rhumbPoint(BREW_RIVER, 0, 5000))).toBeCloseTo(5000, 0)
+  })
+})
+
 describe('axisLine', () => {
   it('runs through the centre, out both ways along the azimuth', () => {
     const [back, forward] = axisLine(BREW_RIVER, 180, 1000)
     expect(bearingBetween(BREW_RIVER, { lat: forward[1], lon: forward[0] })).toBeCloseTo(180, 1)
     expect(bearingBetween(BREW_RIVER, { lat: back[1], lon: back[0] })).toBeCloseTo(0, 1)
     expect(distanceMeters(BREW_RIVER, { lat: forward[1], lon: forward[0] })).toBeCloseTo(1000, 0)
+  })
+})
+
+/*
+ * A bearing line is as long as the viewport is wide, which at a wide zoom is
+ * over a degree of latitude, so these are reachable rather than theoretical.
+ */
+describe('bearingLineEnd keeps a long bearing line on the map', () => {
+  it('leaves an ordinary line exactly where the rhumb puts it', () => {
+    const plain = rhumbPoint(BREW_RIVER, 37, 60_000)
+    expect(bearingLineEnd(BREW_RIVER, 37, 60_000)).toEqual(plain)
+  })
+
+  /* The hazard being guarded against, stated on the unguarded function. */
+  it('is guarding against a rhumb that runs over the pole and reverses', () => {
+    const past = rhumbPoint({ lat: 89.9, lon: 15.3 }, 0, 131_000)
+    expect(past.lat).toBeLessThan(89.9)
+    expect(past.lon).toBeCloseTo(15.3, 6)
+  })
+
+  it('stops at the edge of the projection going north', () => {
+    // Svalbard, 78.2N, is a real place to shoot and well inside the limit.
+    const origin = { lat: 84.8, lon: 15.3 }
+    const end = bearingLineEnd(origin, 0, 200_000)
+    expect(end.lat).toBeCloseTo(MERCATOR_MAX_LAT, 4)
+    expect(end.lat).toBeGreaterThan(origin.lat)
+    // Due north, so the line has not been bent sideways to get there.
+    expect(end.lon).toBeCloseTo(origin.lon, 6)
+  })
+
+  it('stops at the edge of the projection going south', () => {
+    const end = bearingLineEnd({ lat: -84.8, lon: 15.3 }, 180, 200_000)
+    expect(end.lat).toBeCloseTo(-MERCATOR_MAX_LAT, 4)
+  })
+
+  it('clamps on the northward component, not only on due north', () => {
+    const end = bearingLineEnd({ lat: 84.9, lon: 15.3 }, 30, 400_000)
+    expect(end.lat).toBeCloseTo(MERCATOR_MAX_LAT, 4)
+    // Still on the 30 degree rhumb, so it has moved east as well as north.
+    expect(end.lon).toBeGreaterThan(15.3)
+  })
+
+  it('does not clamp a line running due east, which never changes latitude', () => {
+    const end = bearingLineEnd({ lat: 84.9, lon: 15.3 }, 90, 400_000)
+    expect(end.lat).toBeCloseTo(84.9, 6)
+  })
+
+  /*
+   * An origin already outside the projection has no line on the map at all,
+   * so it gets a zero length one rather than a wrong one.
+   */
+  it('draws nothing from an origin the projection cannot show', () => {
+    const origin = { lat: 89.9, lon: 15.3 }
+    expect(bearingLineEnd(origin, 0, 131_000)).toEqual(
+      expect.objectContaining({ lon: expect.closeTo(15.3, 6) }),
+    )
+    expect(bearingLineEnd(origin, 0, 131_000).lat).toBeCloseTo(89.9, 6)
   })
 })

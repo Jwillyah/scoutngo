@@ -135,6 +135,68 @@ export const MARKER_ANCHORS = `(() => {
   return bad
 })()`
 
+
+/*
+ * BEARING LINE EXTENT.
+ *
+ * A bearing has no length. The sun, shadow, sunrise and sunset lines show a
+ * compass direction, so they have to run off the edge of the frame at whatever
+ * the frame is currently showing. They used to be a fixed 1200m and 900m,
+ * which measured 15px against a 930px diagonal at zoom 10: the labels were
+ * visible with no lines under them, and at zoom 18 the same lines ran 3848px.
+ *
+ * Checked against the REAL map rather than a model of it, because the claim is
+ * about pixels, and checked under pitch and bearing as well, where a line
+ * drawn in screen space would be wrong.
+ *
+ * TWO DIFFERENT ASSERTIONS, AND WHY.
+ *
+ * Flat, the rule is the simple one: at least the viewport diagonal long on
+ * screen. Under pitch it cannot be, and that is geometry rather than a bug. A
+ * line heading toward the horizon converges ON the horizon, which sits at a
+ * fixed screen row, so its pixel length has a ceiling no distance can beat:
+ * measured at zoom 16 pitch 60, pushing the far end from 4km to 4096km moved
+ * it from 548px to 731px and no further, against a 930px diagonal. The 731px
+ * line does leave the frame, with its far end 397px above the top edge. So
+ * under pitch the assertion is the one that actually matters, which is that
+ * the line leaves the frame at all.
+ */
+export const BEARING_LINE_EXTENT = `(() => {
+  const map = window.__probe?.map
+  if (!map) return { error: 'no probe: load with ?probe=1' }
+  const c = map.getCanvas()
+  const diagonal = Math.hypot(c.clientWidth, c.clientHeight)
+  const rows = []
+  for (const src of ['sun-axis', 'sun-rays']) {
+    const data = map.getStyle().sources[src]?.data
+    if (!data || !data.features) continue
+    for (const f of data.features) {
+      const co = f.geometry.coordinates
+      const a = map.project(co[0]), b = map.project(co[co.length - 1])
+      const lengthPx = Math.hypot(b.x - a.x, b.y - a.y)
+      const outside = (p) => p.x < 0 || p.x > c.clientWidth || p.y < 0 || p.y > c.clientHeight
+      rows.push({
+        kind: f.properties.kind ?? 'sun-axis',
+        lengthPx: Math.round(lengthPx),
+        diagonalPx: Math.round(diagonal),
+        /* An axis line runs both ways from the pin, so each END must be clear. */
+        /*
+         * A ray STARTS at the pin, which is on the frame on purpose, so only
+         * its far end has to clear it. An axis line runs both ways from the
+         * pin, so both of its ends are far ends.
+         */
+        leavesFrame:
+          (f.properties.kind ?? 'sun-axis') === 'sun-axis'
+            ? outside(a) && outside(b)
+            : outside(b),
+        shortfallPx: Math.round(Math.min(0, lengthPx - diagonal)),
+      })
+    }
+  }
+  if (rows.length === 0) return { error: 'no bearing lines drawn' }
+  return rows
+})()`
+
 /*
  * Fixtures live beside this script, so the audits run from a fresh clone and
  * from a git hook without anything being staged into a scratch directory
@@ -163,6 +225,24 @@ const checkMarkers = async (label) => {
   if (bad?.error) return
   if (bad.length > 0) failures += bad.length
   show(`${label}  ${bad.length === 0 ? 'ok' : 'FAIL'}`, bad)
+}
+
+const checkBearingLines = async (label, pitched = false) => {
+  const rows = await ev(BEARING_LINE_EXTENT)
+  if (rows?.error) { console.log(label, rows.error); failures += 1; return }
+  const bad = pitched
+    ? rows.filter((r) => !r.leavesFrame)
+    : rows.filter((r) => r.shortfallPx < 0)
+  if (bad.length > 0) failures += bad.length
+  const worst = Math.min(...rows.map((r) => r.lengthPx))
+  const rule = pitched
+    ? `${rows.filter((r) => r.leavesFrame).length}/${rows.length} leave the frame`
+    : `shortest ${worst}px / ${rows[0].diagonalPx}px diagonal`
+  console.log(
+    `  ${label.padEnd(34)} ${rule.padEnd(34)} ` +
+      (bad.length === 0 ? 'ok' : 'FAIL ' + bad.map((r) => r.kind).join(',')),
+  )
+  if (bad.length > 0) show(label, bad)
 }
 
 const checkCapture = async (label) => {
@@ -211,6 +291,24 @@ for (const [pitch, bearing] of [[0, 0], [60, 0], [45, 137], [60, -82]]) {
   await ev(`window.__probe.map.jumpTo({ zoom: 16, pitch: ${pitch}, bearing: ${bearing} }), 'ok'`)
   await wait(700)
   await checkCapture(`capture pair · pitch ${pitch} bearing ${bearing}`)
+}
+
+/*
+ * JOB 2: every zoom from 10 to 20, each bearing line at least the viewport
+ * diagonal on screen. Then the same under pitch and rotation, where a line
+ * sized in screen space would be wrong.
+ */
+await ev(`window.__probe.map.jumpTo({ pitch: 0, bearing: 0 }), 'ok'`)
+await wait(500)
+console.log('\n### bearing lines reach the frame edge')
+for (let z = 10; z <= 20; z++) {
+  await zoomTo(z); await wait(350)
+  await checkBearingLines(`zoom ${z}`)
+}
+for (const [zoom, pitch, bearing] of [[12, 60, 0], [16, 60, 0], [16, 45, 137], [19, 60, -82], [11, 50, 215]]) {
+  await ev(`window.__probe.map.jumpTo({ zoom: ${zoom}, pitch: ${pitch}, bearing: ${bearing} }), 'ok'`)
+  await wait(500)
+  await checkBearingLines(`zoom ${zoom} pitch ${pitch} bearing ${bearing}`, true)
 }
 
 console.log('\n=== PROJECTION FAILURES: ' + failures + ' ===')
