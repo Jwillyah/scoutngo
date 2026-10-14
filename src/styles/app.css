@@ -645,10 +645,29 @@
  * Opens OVER the screen so it can never make the page taller than the viewport,
  * which is the one rule this layout has.
  */
+/*
+ * FIXED, NOT ABSOLUTE, and the reason is a bug that shipped.
+ *
+ * This drawer is a DOM descendant of .setup, which became a scroll container
+ * when the SETUP trap was fixed. An overlay that covers the viewport while
+ * living inside a box that scrolls underneath it leaves the browser deciding
+ * which scroller a drag belongs to, and iOS resolves that to the OUTER one. The
+ * result on a real iPhone: the gear list visible, the add controls below the
+ * fold, and dragging doing nothing because the gesture was scrolling .setup
+ * behind the drawer.
+ *
+ * `fixed` takes it out of that ancestor's scroll context entirely, so the only
+ * scroller under the thumb is the drawer's own body. The rule generalises: an
+ * overlay sized to the viewport is positioned against the viewport.
+ *
+ * It also pays --safe-bottom now. It paid --safe-top and not its opposite, so
+ * the last row of content sat under the home indicator.
+ */
 .drawer {
-  position: absolute;
+  position: fixed;
   inset: 0;
   padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
   z-index: 6;
   display: flex;
   flex-direction: column;
@@ -681,10 +700,16 @@
   cursor: pointer;
 }
 
+/*
+ * `overscroll-behavior: contain` stops a flick that reaches the end of this
+ * list from continuing into whatever is behind the drawer.
+ */
 .drawer__body {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .drawer__pad {
@@ -1647,13 +1672,24 @@
 
 /* --------------------------------------------------------- map controls */
 
+/*
+ * The column rides above the sheet, but never off the top of the screen.
+ *
+ * `bottom` was the dock plus the sheet plus the attribution row, which is right
+ * while the sheet is at peek and wrong once it opens: at 390x660 with the sheet
+ * at its full stop, that sum pushed the sun toggle and the tilt control clean
+ * off the top edge. Found by the reachability audit, not by looking.
+ *
+ * The min() clamps it to a position where the whole 160px column still fits
+ * under the status bar, so it stops climbing instead of leaving.
+ */
 .mapctl {
   position: absolute;
   z-index: 3;
   right: var(--space-3);
-  /* Clears the dock, the sheet, and maplibre's own attribution row. */
-  bottom: calc(
-    var(--dock-height, 0px) + var(--sheet-live-height, 0px) + 56px + var(--space-3)
+  bottom: min(
+    calc(var(--dock-height, 0px) + var(--sheet-live-height, 0px) + 56px + var(--space-3)),
+    calc(100dvh - var(--safe-top) - 172px)
   );
   display: flex;
   flex-direction: column;
