@@ -28,10 +28,10 @@ describe('coordinates never fall back to a default point', () => {
       const source = readFileSync(file, 'utf8')
       const offending = source
         .split('\n')
-        .map((line, i) => ({ line: line.trim(), n: i + 1 }))
+        .map((line: string, i: number) => ({ line: line.trim(), n: i + 1 }))
         // A comment explaining the old bug is not the old bug.
-        .filter(({ line }) => !line.startsWith('*') && !line.startsWith('//'))
-        .filter(({ line }) =>
+        .filter(({ line }: { line: string }) => !line.startsWith('*') && !line.startsWith('//'))
+        .filter(({ line }: { line: string }) =>
           /\?\?\s*\{\s*lat:\s*0\s*,\s*lon:\s*0\s*\}/.test(line) ||
           /\|\|\s*\{\s*lat:\s*0\s*,\s*lon:\s*0\s*\}/.test(line) ||
           /lat:\s*0\s*,\s*lon:\s*0/.test(line),
