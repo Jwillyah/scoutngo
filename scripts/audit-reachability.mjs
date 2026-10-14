@@ -49,6 +49,12 @@ export const AUDIT = `(() => {
   const clipped = [...document.querySelectorAll('*')].filter((el) => {
     const cs = getComputedStyle(el)
     if (visuallyHidden(el, cs)) return false
+    /*
+     * Behind an open modal and marked inert. Deliberately not reachable, which
+     * is the whole point of a modal, and inert is the browser's own word for
+     * it rather than a guess from z-index.
+     */
+    if (el.closest('[inert]') !== null) return false
     return /hidden|clip/.test(cs.overflowY) && el.scrollHeight > el.clientHeight + 1
   }).map((el) => ({ el: name(el), lost: el.scrollHeight - el.clientHeight }))
 
@@ -66,6 +72,8 @@ export const AUDIT = `(() => {
        * current view is reached by panning, which is not a layout failure.
        */
       if (el.closest('.map__canvas, .shooter-host, .maplibregl-map') !== null) return false
+      // Behind an open modal and marked inert.
+      if (el.closest('[inert]') !== null) return false
       /*
        * Inside a closed disclosure. Not reachable yet is the POINT of a
        * disclosure; the summary that opens it is audited like anything else.
@@ -93,9 +101,24 @@ export const AUDIT = `(() => {
   }
 
   /*
-   * 3. THE STRUCTURAL CHECK, and the one that would have caught the drawer. A
-   * scrolling overlay inside another scroll container leaves the browser to
-   * decide which scroller a drag belongs to, and iOS picks the outer one.
+   * 3. THE STRUCTURAL CHECK: a scroller inside another scroller.
+   *
+   * WHY THIS MISSED THE KIT DRAWER, WHICH IT EXISTED TO CATCH. It used to
+   * carry if (position === 'fixed') { overlay = true; break }, added in the
+   * same pass that made .drawer position: fixed. So the fix and the exemption
+   * that hid the fix's incompleteness shipped together: walking up from
+   * .drawer__body the first ancestor was .drawer, fixed, exempt, and .setup
+   * below it was never reached.
+   *
+   * The reasoning was wrong. position: fixed takes an element out of an
+   * ancestor's scroll GEOMETRY, so it stops moving when the ancestor scrolls.
+   * It does not take it out of the DOM, and touch gestures bubble through the
+   * DOM, so the ancestor scroller can still claim a drag that began inside the
+   * fixed descendant. Nesting is a question of DOM ancestry and nothing else,
+   * so that is the only thing judged here now.
+   *
+   * The real fix for a modal is a portal: out at document.body there is no
+   * ancestor scroller to compete with, and this check passes honestly.
    */
   const nested = []
   for (const el of document.querySelectorAll('*')) {
@@ -103,22 +126,20 @@ export const AUDIT = `(() => {
     if (!/auto|scroll/.test(cs.overflowY)) continue
     if (el.scrollHeight <= el.clientHeight + 1) continue
     /*
-     * A form control that scrolls its own text is not an overlay. iOS routes
-     * the gesture to it correctly; the hazard is a PANEL inside a panel.
+     * A form control that scrolls its own text is not a panel. The hazard is a
+     * PANEL inside a panel.
      */
     if (/^(TEXTAREA|INPUT|SELECT)$/.test(el.tagName)) continue
+    if (el.closest('[inert]') !== null) continue
     let node = el.parentElement
-    let overlay = false
     while (node !== null && node !== document.body) {
       const ncs = getComputedStyle(node)
-      if (ncs.position === 'fixed') { overlay = true; break }
       if (/auto|scroll/.test(ncs.overflowY) && node.scrollHeight > node.clientHeight + 1) {
         nested.push({ inner: name(el), outerScroller: name(node) })
         break
       }
       node = node.parentElement
     }
-    if (overlay) continue
   }
 
   /*

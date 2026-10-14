@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { destinationPoint, type LatLon } from '../core/geo.ts'
 import { exampleIndex, SHOOT_EXAMPLES, SHOT_LIST_EXAMPLES } from '../lib/examples.ts'
 import type { DescribeState, DesiredShot } from '../lib/describe.ts'
@@ -220,8 +221,109 @@ export function SetupMode({
   const setField = (field: 'date' | 'startTime' | 'endTime') => (value: string) =>
     onVenueChange({ ...venue, [field]: value })
 
+  /*
+   * THE DRAWER IS PORTALLED TO document.body, and that is the whole point.
+   *
+   * It used to be rendered inside .setup, which is itself a scroll container.
+   * Two live scrollers stacked, with the drawer a DOM descendant of the outer
+   * one: whatever the browser decides about which scroller owns a drag, the
+   * arrangement is wrong, and three separate fixes have now worked around it
+   * rather than removing it. A portal removes it. Out here the drawer's only
+   * ancestor is document.body, so there is no outer scroller to compete with,
+   * no ancestor stacking context to escape, and nothing of the screen behind
+   * showing underneath it.
+   */
+  /*
+   * LOCK THE SCREEN BEHIND WHILE A DRAWER IS OPEN.
+   *
+   * The layer underneath was still live: its scroller still took gestures, and
+   * the forward button and the mode rail were still sitting there to be tapped
+   * through a modal. One class on the root turns the page behind into exactly
+   * what it looks like, which is background.
+   */
+  useEffect(() => {
+    if (drawer === 'none') return
+    const root = document.documentElement
+    root.classList.add('is-drawer-open')
+    return () => root.classList.remove('is-drawer-open')
+  }, [drawer])
+
+  const drawerPanel =
+    drawer === 'none'
+      ? null
+      : createPortal(
+                <div className="drawer">
+                <div className="drawer__head">
+                  <span className="drawer__title">
+                    {drawer === 'kit'
+                      ? 'Kit and style'
+                      : drawer === 'shots'
+                        ? 'Shot list'
+                        : drawer === 'settings'
+                          ? 'Settings'
+                          : 'Saved setups'}
+                  </span>
+                  <button type="button" className="drawer__close" onClick={() => setDrawer('none')}>
+                    Done
+                  </button>
+                </div>
+                <div className="drawer__body">
+                  {drawer === 'kit' ? <KitProfile value={kit} onChange={onKit} kit={kitProfile} onKitChange={onKitProfile} /> : null}
+                  {drawer === 'shots' ? (
+                    <div className="drawer__pad">
+                      <p className="setup__note">
+                        One shot per line. The plan has to cover these, and anything no
+                        position covers is marked in the shot list.
+                      </p>
+                      <textarea
+                        className="setup__text"
+                        rows={8}
+                        value={shotListText}
+                        placeholder={SHOT_LIST_EXAMPLES[example]}
+                        onChange={(event) => onShotListText(event.target.value)}
+                      />
+                    </div>
+                  ) : null}
+                  {drawer === 'settings' ? (
+                    <div className="drawer__pad">
+                      <label className="toggle">
+                        <input
+                          type="checkbox"
+                          className="toggle__box"
+                          checked={settings.showCoords}
+                          onChange={(event) => onSettings({ showCoords: event.target.checked })}
+                        />
+                        <span className="toggle__text">
+                          <span className="toggle__label">Show coordinates</span>
+                          <span className="toggle__note">
+                            Prints the venue's latitude and longitude under its name. Off by
+                            default: the pin is the coordinate, and decimal degrees are of no
+                            use to most people standing on a dock.
+                          </span>
+                        </span>
+                      </label>
+                    </div>
+                  ) : null}
+
+                  {drawer === 'saved' ? (
+                    <SpotsPanel
+                      spots={spots}
+                      onSave={onSaveSpot}
+                      onLoad={onLoadSpot}
+                      onDelete={onDeleteSpot}
+                      onImport={onImportSpots}
+                      suggestedName={suggestedName}
+                      canSave={canSave}
+                    />
+                  ) : null}
+                </div>
+              </div>,
+          document.body,
+        )
+
   return (
-    <div className="setup">
+    <>
+    <div className="setup" inert={drawer !== 'none'}>
       {/* The map is the top of the screen and the pin is the coordinate. */}
       <div
         ref={venueRef}
@@ -411,75 +513,8 @@ export function SetupMode({
 
       </div>
 
-      {/* One drawer at a time, over the screen, never pushing it taller. */}
-      {drawer === 'none' ? null : (
-        <div className="drawer">
-          <div className="drawer__head">
-            <span className="drawer__title">
-              {drawer === 'kit'
-                ? 'Kit and style'
-                : drawer === 'shots'
-                  ? 'Shot list'
-                  : drawer === 'settings'
-                    ? 'Settings'
-                    : 'Saved setups'}
-            </span>
-            <button type="button" className="drawer__close" onClick={() => setDrawer('none')}>
-              Done
-            </button>
-          </div>
-          <div className="drawer__body">
-            {drawer === 'kit' ? <KitProfile value={kit} onChange={onKit} kit={kitProfile} onKitChange={onKitProfile} /> : null}
-            {drawer === 'shots' ? (
-              <div className="drawer__pad">
-                <p className="setup__note">
-                  One shot per line. The plan has to cover these, and anything no
-                  position covers is marked in the shot list.
-                </p>
-                <textarea
-                  className="setup__text"
-                  rows={8}
-                  value={shotListText}
-                  placeholder={SHOT_LIST_EXAMPLES[example]}
-                  onChange={(event) => onShotListText(event.target.value)}
-                />
-              </div>
-            ) : null}
-            {drawer === 'settings' ? (
-              <div className="drawer__pad">
-                <label className="toggle">
-                  <input
-                    type="checkbox"
-                    className="toggle__box"
-                    checked={settings.showCoords}
-                    onChange={(event) => onSettings({ showCoords: event.target.checked })}
-                  />
-                  <span className="toggle__text">
-                    <span className="toggle__label">Show coordinates</span>
-                    <span className="toggle__note">
-                      Prints the venue's latitude and longitude under its name. Off by
-                      default: the pin is the coordinate, and decimal degrees are of no
-                      use to most people standing on a dock.
-                    </span>
-                  </span>
-                </label>
-              </div>
-            ) : null}
-
-            {drawer === 'saved' ? (
-              <SpotsPanel
-                spots={spots}
-                onSave={onSaveSpot}
-                onLoad={onLoadSpot}
-                onDelete={onDeleteSpot}
-                onImport={onImportSpots}
-                suggestedName={suggestedName}
-                canSave={canSave}
-              />
-            ) : null}
-          </div>
-        </div>
-      )}
     </div>
+      {drawerPanel}
+    </>
   )
 }

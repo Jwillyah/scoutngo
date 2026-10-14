@@ -646,40 +646,46 @@
  * which is the one rule this layout has.
  */
 /*
- * FIXED, NOT ABSOLUTE, and the reason is a bug that shipped.
+ * THE DRAWER: A HEADER AND ONE SCROLLER, AND NOTHING ELSE.
  *
- * This drawer is a DOM descendant of .setup, which became a scroll container
- * when the SETUP trap was fixed. An overlay that covers the viewport while
- * living inside a box that scrolls underneath it leaves the browser deciding
- * which scroller a drag belongs to, and iOS resolves that to the OUTER one. The
- * result on a real iPhone: the gear list visible, the add controls below the
- * fold, and dragging doing nothing because the gesture was scrolling .setup
- * behind the drawer.
+ * THREE ATTEMPTS AT THIS. The content could be dragged up and sprang back on
+ * release, which is iOS rubber-banding a surface that is not really scrolling,
+ * not a blocked scroll. Measured in Chrome the scroller was real and bounded
+ * (1466px of content in a 694px box, overflow-y auto), so the fault was never
+ * going to be visible here. What WAS visible, and wrong, is that the drawer sat
+ * inside .setup, a second live scroller, with the forward button and the mode
+ * rail still showing underneath an open modal.
  *
- * `fixed` takes it out of that ancestor's scroll context entirely, so the only
- * scroller under the thumb is the drawer's own body. The rule generalises: an
- * overlay sized to the viewport is positioned against the viewport.
- *
- * It also pays --safe-bottom now. It paid --safe-top and not its opposite, so
- * the last row of content sat under the home indicator.
+ * So it is portalled to document.body and given explicit heights rather than
+ * heights inherited through a flex chain that reaches back into the layer it is
+ * supposed to be covering. The header is a known height, the body is the
+ * viewport minus that header minus both safe areas, and the body is the ONLY
+ * scroller in the subtree.
  */
 .drawer {
   position: fixed;
   inset: 0;
+  z-index: 60;
+  height: 100dvh;
   padding-top: var(--safe-top);
   padding-bottom: var(--safe-bottom);
-  z-index: 6;
-  display: flex;
-  flex-direction: column;
   background: var(--color-bg);
+  /* No flex and no grid: each part states its own height. */
+  display: block;
+  overflow: hidden;
 }
 
+
+/*
+ * A STATED height, not a measured one, because the body's height is computed
+ * from it. If this ever needs to change, change the token with it.
+ */
 .drawer__head {
-  flex: 0 0 auto;
+  height: var(--drawer-head-height);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-3) var(--page-pad);
+  padding: 0 var(--page-pad);
   border-bottom: var(--line-hair) solid var(--color-line);
 }
 
@@ -704,12 +710,27 @@
  * `overscroll-behavior: contain` stops a flick that reaches the end of this
  * list from continuing into whatever is behind the drawer.
  */
+/*
+ * THE ONE SCROLLER. Its height is stated, not derived: the dynamic viewport
+ * less the header and both safe areas. dvh rather than vh so it is right while
+ * Safari's bars are showing, and it follows them when they move.
+ */
 .drawer__body {
-  flex: 1 1 auto;
-  min-height: 0;
+  height: calc(
+    100dvh - var(--safe-top) - var(--safe-bottom) - var(--drawer-head-height)
+  );
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+}
+
+/*
+ * The screen behind a drawer is background, not a second surface. Its scroller
+ * is stopped and the whole column is inert, so a gesture or a tap that lands
+ * past the drawer does nothing instead of something invisible.
+ */
+.is-drawer-open .setup {
+  overflow: hidden;
 }
 
 .drawer__pad {

@@ -334,6 +334,11 @@
   --sheet-peek: 108px;
   /* Keep --nav-height in step with NAV_HEIGHT in NavBar.tsx. */
   --nav-height: 56px;
+  /*
+   * The drawer header. STATED, because the drawer body's height is the viewport
+   * minus this minus the safe areas, and that arithmetic has to be exact.
+   */
+  --drawer-head-height: 56px;
 }
 
 /*
