@@ -883,11 +883,33 @@ function App() {
     // camera as it was when the image was taken.
     const coords = mapHandle.current?.unprojectFromCapture(capture, parsed.positions) ?? []
 
+    /*
+     * A COORDINATE THAT CANNOT BE RESOLVED FAILS VISIBLY.
+     *
+     * This used to end `?? { lat: 0, lon: 0 }` per position. Null Island is a
+     * real place on the map, so a position that failed to unproject was not
+     * dropped or flagged, it was PLACED, somewhere off West Africa, and then
+     * fitAll framed it: six markers piled in a corner of a view zoomed out to
+     * span an ocean, looking for all the world like a planning result.
+     *
+     * The failure mode mattered more than its likelihood. A position silently
+     * placed somewhere wrong is worse than a position refused, because the
+     * wrong one gets walked to.
+     */
+    if (coords.length !== parsed.positions.length || coords.some((c) => c === undefined)) {
+      setGeneration({
+        status: 'error',
+        message:
+          'The map could not turn those positions into coordinates. Nothing was placed. Try again without moving the map while it works.',
+      })
+      return
+    }
+
     setPositions(
       parsed.positions.map((raw, index) => ({
         id: `pos-${index + 1}`,
         number: index + 1,
-        at: coords[index] ?? { lat: 0, lon: 0 },
+        at: coords[index],
         lensId: raw.lensId,
         focalLength: raw.focalLength,
         shot: raw.shot,
