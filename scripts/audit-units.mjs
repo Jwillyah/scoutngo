@@ -1,0 +1,83 @@
+/*
+ * VIEWPORT UNIT AUDIT
+ *
+ * Usage:  node scripts/audit-units.mjs
+ * Exits:  0 when clean, 1 on any hit, with file and line.
+ *
+ * WHY. `vh` has caused three separate bugs here. On iOS it is the LARGE
+ * viewport: the height the page would have with no browser chrome and no
+ * keyboard. So it is wrong exactly when the keyboard is up, which is exactly
+ * when a form is on screen, and it is wrong again while Safari's bars are
+ * showing, which is most of the time on a phone.
+ *
+ *   1. .setup sized in vh, so the column ran off the bottom
+ *   2. .search__results max-height: 50vh, so results hid behind the keyboard
+ *   3. the map container, which changes height when the bars move
+ *
+ * dvh, dvw, svh and lvh all describe a viewport that is actually there, and are
+ * allowed. lvh IS the large viewport and is therefore the dangerous one, so it
+ * is allowed only with an inline reason on the same line.
+ */
+
+import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { join } from 'node:path'
+
+const ROOTS = ['src', 'public', 'index.html']
+const EXTENSIONS = ['.css', '.html', '.tsx', '.ts']
+
+/* vh, vw, vmin, vmax as a whole unit, not the tail of dvh/svh/lvh/dvw. */
+const BANNED = /(?<![a-z])(\d*\.?\d+)(vh|vw|vmin|vmax)\b/gi
+const ALLOWED_PREFIXED = /(?<=[dsl])(vh|vw|vmin|vmax)\b/i
+
+const files = []
+const walk = (path) => {
+  let s
+  try { s = statSync(path) } catch { return }
+  if (s.isDirectory()) {
+    for (const entry of readdirSync(path)) walk(join(path, entry))
+    return
+  }
+  if (EXTENSIONS.some((e) => path.endsWith(e))) files.push(path)
+}
+for (const root of ROOTS) walk(root)
+
+const hits = []
+for (const file of files) {
+  const lines = readFileSync(file, 'utf8').split('\n')
+  lines.forEach((line, i) => {
+    /*
+     * A line that only TALKS about the unit is not using it. Comments explain
+     * why the rule exists and must not trip the rule.
+     */
+    const code = line.replace(/\/\*.*?\*\//g, '').replace(/^\s*\*.*$/, '').replace(/\/\/.*$/, '')
+    for (const match of code.matchAll(BANNED)) {
+      const unit = match[2].toLowerCase()
+      const before = code.slice(Math.max(0, match.index - 1), match.index)
+      if (/[dsl]/i.test(before) && ALLOWED_PREFIXED.test(unit)) continue
+
+      /*
+       * lvh is the large viewport by definition, so it is the one that needs a
+       * stated reason. It is matched separately below; anything reaching here
+       * is a bare vh/vw/vmin/vmax and is simply not allowed.
+       */
+      hits.push({ file, line: i + 1, unit, text: line.trim().slice(0, 90) })
+    }
+    // lvh is permitted only with a reason written on the same line.
+    for (const m of code.matchAll(/(?<![a-z])\d*\.?\d+lvh\b/gi)) {
+      void m
+      if (!/\/\*|\/\//.test(line)) {
+        hits.push({ file, line: i + 1, unit: 'lvh',
+          text: line.trim().slice(0, 90) + '   (lvh needs an inline reason)' })
+      }
+    }
+  })
+}
+
+if (hits.length === 0) {
+  console.log(`=== UNIT AUDIT: clean. ${files.length} files, no vh/vw/vmin/vmax. ===`)
+  process.exit(0)
+}
+console.log('=== UNIT AUDIT FAILURES ===')
+for (const h of hits) console.log(`${h.file}:${h.line}  ${h.unit}  ${h.text}`)
+console.log(`\n${hits.length} hit(s). Use dvh/dvw/svh, or lvh with an inline reason.`)
+process.exit(1)

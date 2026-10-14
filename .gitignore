@@ -34,3 +34,7 @@ dist-ssr
 
 # Organizer artwork and other people's images. Ours to read, not ours to ship.
 fixtures/
+
+# Audit screenshots. The scripts write them beside themselves unless
+# SCOUTNGO_OUT says otherwise; they are evidence, not source.
+scripts/*.png

@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+#
+# THE COMMIT GATE.
+#
+# WHY THIS EXISTS. The checks were run by hand, chained with &&, and a commit
+# went out with a failing `tsc -b` because the chain stopped at tsc while the
+# `git commit` on the following line ran anyway. The answer to that is not more
+# care. A gate that depends on remembering is not a gate.
+#
+# Everything that can fail a commit runs here, in cheapest-first order so a
+# typo fails in two seconds rather than ninety.
+#
+# The browser audits need the app and a headless Chrome. The hook starts them
+# itself if they are not already up, because a gate you have to prepare for is
+# one you will eventually bypass.
+#
+# Escape hatch, for a genuine emergency only, and it says so loudly:
+#   SCOUTNGO_SKIP_AUDITS=1 git commit ...
+set -uo pipefail
+
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+RED=$'\033[31m'; GREEN=$'\033[32m'; YELLOW=$'\033[33m'; DIM=$'\033[2m'; OFF=$'\033[0m'
+fail() { echo "${RED}✗ $1${OFF}"; echo "${DIM}  commit refused${OFF}"; exit 1; }
+ok()   { echo "${GREEN}✓ $1${OFF}"; }
+step() { echo "${DIM}· $1${OFF}"; }
+
+SCRATCH="$(mktemp -d)"
+trap 'rm -rf "$SCRATCH"' EXIT
+
+# ---------------------------------------------------------------- fast gate
+step "typecheck"
+npx tsc -b > "$SCRATCH/tsc.log" 2>&1 || { cat "$SCRATCH/tsc.log"; fail "tsc -b"; }
+ok "tsc -b"
+
+step "lint"
+npx oxlint --deny-warnings > "$SCRATCH/lint.log" 2>&1 || { cat "$SCRATCH/lint.log"; fail "oxlint --deny-warnings"; }
+ok "oxlint --deny-warnings"
+
+step "viewport units"
+node scripts/audit-units.mjs > "$SCRATCH/units.log" 2>&1 || { cat "$SCRATCH/units.log"; fail "unit audit"; }
+ok "$(tail -1 "$SCRATCH/units.log" | sed 's/=== //;s/ ===//')"
+
+step "tests"
+npm test > "$SCRATCH/test.log" 2>&1 || { tail -40 "$SCRATCH/test.log"; fail "npm test"; }
+ok "$(grep -E '^ *Tests ' "$SCRATCH/test.log" | tail -1 | tr -s ' ' | sed 's/^ //')"
+
+step "build"
+npm run build > "$SCRATCH/build.log" 2>&1 || { tail -20 "$SCRATCH/build.log"; fail "npm run build"; }
+ok "build"
+
+# ------------------------------------------------------------ browser gate
+if [ "${SCOUTNGO_SKIP_AUDITS:-0}" = "1" ]; then
+  echo "${YELLOW}!  BROWSER AUDITS SKIPPED by SCOUTNGO_SKIP_AUDITS=1.${OFF}"
+  echo "${YELLOW}   Reachability and projection were NOT checked for this commit.${OFF}"
+  exit 0
+fi
+
+up() { curl -s -o /dev/null -m 2 "$1" 2>/dev/null; }
+
+if ! up http://127.0.0.1:5173/; then
+  step "starting the app on :5173"
+  nohup npx vercel dev --listen 5173 > "$SCRATCH/dev.log" 2>&1 &
+  for _ in $(seq 1 90); do up http://127.0.0.1:5173/ && break; sleep 1; done
+  up http://127.0.0.1:5173/ || { tail -20 "$SCRATCH/dev.log"; fail "could not start the app"; }
+fi
+ok "app on :5173"
+
+if ! up http://127.0.0.1:9222/json/version; then
+  step "starting headless Chrome on :9222"
+  CHROME="$HOME/Library/Caches/ms-playwright/chromium-1243/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
+  [ -x "$CHROME" ] || CHROME="$(command -v google-chrome-stable || command -v chromium || true)"
+  [ -n "${CHROME:-}" ] || fail "no Chrome found for the browser audits"
+  nohup "$CHROME" --remote-debugging-port=9222 --user-data-dir="$SCRATCH/chrome" \
+    --headless=new --no-first-run --hide-scrollbars \
+    --use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader \
+    about:blank > "$SCRATCH/chrome.log" 2>&1 &
+  for _ in $(seq 1 40); do up http://127.0.0.1:9222/json/version && break; sleep 1; done
+  up http://127.0.0.1:9222/json/version || fail "could not start Chrome"
+fi
+ok "chrome on :9222"
+
+step "reachability audit"
+SCOUTNGO_OUT="$SCRATCH" node scripts/audit-reachability.mjs > "$SCRATCH/reach.log" 2>&1 \
+  || { grep -E 'PROBLEM|TOTAL' "$SCRATCH/reach.log" | tail -20; fail "reachability audit"; }
+ok "$(grep -E 'TOTAL PROBLEMS' "$SCRATCH/reach.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
+
+step "projection audit"
+SCOUTNGO_OUT="$SCRATCH" node scripts/audit-projection.mjs > "$SCRATCH/proj.log" 2>&1 \
+  || { grep -E 'FAIL' "$SCRATCH/proj.log" | tail -20; fail "projection audit"; }
+ok "$(grep -E 'PROJECTION FAILURES' "$SCRATCH/proj.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
+
+echo "${GREEN}all gates passed${OFF}"

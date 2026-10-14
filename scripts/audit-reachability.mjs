@@ -180,11 +180,17 @@ export const AUDIT = `(() => {
            canvasMismatch: canvases, controlsChecked: controls.length }
 })()`
 
-const { ev, ws, wait, send, errs } = await (await import(process.argv[2] + '/cdp.mjs')).connect()
+/*
+ * Fixtures live beside this script, so the audits run from a fresh clone and
+ * from a git hook without anything being staged into a scratch directory
+ * first. An explicit directory argument still overrides, for a one-off.
+ */
+const HERE = new URL('.', import.meta.url).pathname
+const FIXTURES = process.argv[2] ?? HERE
+const { ev, ws, wait, send, errs } = await (await import(FIXTURES + '/cdp.mjs')).connect()
 setTimeout(()=>{console.log('TIMED OUT');process.exit(2)},290000)
-const SP = process.argv[2]
 const { readFileSync } = await import('node:fs')
-await send('Page.addScriptToEvaluateOnNewDocument', { source: readFileSync(SP+'/stub.js','utf8') })
+await send('Page.addScriptToEvaluateOnNewDocument', { source: readFileSync(FIXTURES + '/stub.js','utf8') })
 const show = (l, v) => console.log('\n### ' + l + '\n' + JSON.stringify(v, null, 2))
 let failures = 0
 const check = async (label) => {

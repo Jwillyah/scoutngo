@@ -135,7 +135,14 @@ export const MARKER_ANCHORS = `(() => {
   return bad
 })()`
 
-const { ev, ws, wait, send, errs } = await (await import(process.argv[2] + '/cdp.mjs')).connect()
+/*
+ * Fixtures live beside this script, so the audits run from a fresh clone and
+ * from a git hook without anything being staged into a scratch directory
+ * first. An explicit directory argument still overrides, for a one-off.
+ */
+const HERE = new URL('.', import.meta.url).pathname
+const FIXTURES = process.argv[2] ?? HERE
+const { ev, ws, wait, send, errs } = await (await import(FIXTURES + '/cdp.mjs')).connect()
 setTimeout(() => { console.log('TIMED OUT'); process.exit(2) }, 290000)
 const show = (l, v) => console.log('\n### ' + l + '\n' + JSON.stringify(v, null, 2))
 
