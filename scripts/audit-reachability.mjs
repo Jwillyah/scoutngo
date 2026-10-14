@@ -121,8 +121,42 @@ export const AUDIT = `(() => {
     if (overlay) continue
   }
 
+  /*
+   * 4. A CANVAS SMALLER THAN ITS BOX.
+   *
+   * Every map container here is sized in dvh, which recalculates when Safari's
+   * bars collapse. A WebGL canvas that is not resized with it paints imagery
+   * across the top of its container and black underneath. Nothing else in this
+   * audit would notice: the layout is correct, the controls are all reachable,
+   * and the map is simply the wrong size.
+   */
+  const canvases = [...document.querySelectorAll('.map__canvas')].map((host) => {
+    const canvas = host.querySelector('canvas.maplibregl-canvas')
+    const h = host.getBoundingClientRect()
+    if (canvas === null) {
+      return { el: name(host), problem: 'no canvas', box: Math.round(h.height) }
+    }
+    const c = canvas.getBoundingClientRect()
+    const dpr = window.devicePixelRatio || 1
+    const cssOff = Math.abs(c.height - h.height) > 2 || Math.abs(c.width - h.width) > 2
+    // The drawing buffer has to match too: a correct CSS box over a stale
+    // buffer is the same black band, just harder to see in the DOM.
+    const bufferOff =
+      Math.abs(canvas.height - Math.round(h.height * dpr)) > 3 ||
+      Math.abs(canvas.width - Math.round(h.width * dpr)) > 3
+    if (!cssOff && !bufferOff) return null
+    return {
+      el: name(host),
+      box: Math.round(h.width) + 'x' + Math.round(h.height),
+      canvasCss: Math.round(c.width) + 'x' + Math.round(c.height),
+      buffer: canvas.width + 'x' + canvas.height,
+      expectedBuffer: Math.round(h.width * dpr) + 'x' + Math.round(h.height * dpr),
+      problem: cssOff ? 'canvas smaller than its box' : 'stale drawing buffer',
+    }
+  }).filter((row) => row !== null)
+
   return { viewport: vp.w + 'x' + vp.h, clipped, unreachable, nestedScrollers: nested,
-           controlsChecked: controls.length }
+           canvasMismatch: canvases, controlsChecked: controls.length }
 })()`
 
 const { ev, ws, wait, send, errs } = await (await import(process.argv[2] + '/cdp.mjs')).connect()
@@ -134,7 +168,9 @@ const show = (l, v) => console.log('\n### ' + l + '\n' + JSON.stringify(v, null,
 let failures = 0
 const check = async (label) => {
   const r = await ev(AUDIT)
-  const bad = r.clipped.length + r.unreachable.length + r.nestedScrollers.length
+  const bad =
+    r.clipped.length + r.unreachable.length + r.nestedScrollers.length +
+    r.canvasMismatch.length
   if (bad > 0) failures += bad
   show(label + (bad === 0 ? '  OK' : '  ' + bad + ' PROBLEM(S)'), r)
 }
@@ -149,6 +185,17 @@ for (const h of [844, 660]) {
             document.documentElement.style.setProperty('--safe-bottom','34px')`)
   await wait(400)
   await check(`SETUP ${h}`)
+  /*
+   * THE REGRESSION CASE. Change the viewport height WITHOUT reloading, which is
+   * what Safari does when its bars collapse, and check the canvas followed.
+   */
+  await send('Emulation.setDeviceMetricsOverride',
+    { width: 390, height: h === 844 ? 660 : 844, deviceScaleFactor: 3, mobile: true })
+  await wait(1400)
+  await check(`SETUP ${h} · after the bars moved`)
+  await send('Emulation.setDeviceMetricsOverride',
+    { width: 390, height: h, deviceScaleFactor: 3, mobile: true })
+  await wait(1400)
   for (const [label, finder] of [
     ['kit drawer', `/Edit kit/i`], ['shot list drawer', `/Paste a shot list|shots listed/i`],
     ['saved drawer', `/^Saved$/i`], ['settings drawer', `/^Settings$/i`],

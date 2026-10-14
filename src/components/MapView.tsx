@@ -1159,6 +1159,59 @@ export function MapView({
   }, [venue, sunOverlay, showSun, showArc, viewTick, chromeTick, bottomInset])
 
   /*
+   * KEEP THE CANVAS THE SIZE OF ITS BOX.
+   *
+   * THE BUG THIS FIXES. Every map container in this app is ultimately sized in
+   * dvh: SETUP's map is `clamp(300px, 52dvh, 560px)` and PLAN and FIELD fill a
+   * shell that is `100dvh`. `dvh` is the DYNAMIC viewport, so it recalculates
+   * the moment Safari's bars collapse or appear. The container changes height
+   * at runtime, with no reload and no window resize, and a WebGL canvas that is
+   * not told about it keeps whatever size it had: imagery across the top, black
+   * underneath, exactly as far down as the container used to end.
+   *
+   * MapLibre does run its own ResizeObserver on the container, which is why
+   * this never reproduced in a desktop browser. What it does NOT do is listen
+   * to `visualViewport` — there is not one reference to it in the shipped
+   * bundle — and on iOS that is the event that actually fires when the bars
+   * animate away, while ResizeObserver callbacks are deferred during the
+   * scroll that triggered them.
+   *
+   * So all three signals are wired, and all three funnel into one rAF so a
+   * burst cannot cost more than a single resize per frame:
+   *
+   *   ResizeObserver   the container's own box, whatever changed it
+   *   visualViewport   the bars collapsing, and the keyboard opening
+   *   orientation      a rotation, which changes both at once
+   *
+   * It lives here rather than in a mode, so SETUP, PLAN and FIELD all get it.
+   */
+  useEffect(() => {
+    const node = container.current
+    if (node === null) return
+
+    let frame = 0
+    const resize = () => {
+      cancelAnimationFrame(frame)
+      // After layout, so the box being measured is the settled one.
+      frame = requestAnimationFrame(() => map.current?.resize())
+    }
+
+    const observer = new ResizeObserver(resize)
+    observer.observe(node)
+
+    window.addEventListener('orientationchange', resize)
+    const visual = window.visualViewport
+    visual?.addEventListener('resize', resize)
+
+    return () => {
+      cancelAnimationFrame(frame)
+      observer.disconnect()
+      window.removeEventListener('orientationchange', resize)
+      visual?.removeEventListener('resize', resize)
+    }
+  }, [])
+
+  /*
    * Watch for floating chrome appearing and disappearing.
    *
    * Watched on the MODE container, which is where the chrome actually lives:
