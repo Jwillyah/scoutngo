@@ -131,23 +131,71 @@ const TURF_EARTH_RADIUS = 6371008.8
 export function bearingLineEnd(origin: LatLon, bearing: number, meters: number): LatLon {
   const heading = (normalizeBearing(bearing) * Math.PI) / 180
   const northing = Math.cos(heading)
-  // Due east or west never changes latitude, so there is no limit to reach.
-  if (Math.abs(northing) < 1e-12) return rhumbPoint(origin, bearing, meters)
 
   /*
-   * Along a rhumb, latitude advances linearly with distance: the northward
-   * component is d/R * cos(bearing). So the distance that lands exactly on the
-   * limit is solvable, which is what this does. Scaling the overshot point
-   * instead would not work, because once it has crossed the pole its latitude
-   * is going the wrong way and there is nothing to interpolate against.
+   * LATITUDE FIRST. Along a rhumb, latitude advances linearly with distance:
+   * the northward component is d/R * cos(bearing). So the distance that lands
+   * exactly on the limit is solvable, which is what this does. Scaling the
+   * overshot point instead would not work, because once it has crossed the
+   * pole its latitude is going the wrong way and there is nothing left to
+   * interpolate against.
    *
    * TURF_EARTH_RADIUS has to match the radius rhumbDestination uses, or the
    * clamp lands slightly past the limit it is there to respect.
    */
-  const limit = northing > 0 ? MERCATOR_MAX_LAT : -MERCATOR_MAX_LAT
-  const toLimit =
-    (TURF_EARTH_RADIUS * ((limit - origin.lat) * Math.PI)) / 180 / northing
-  return rhumbPoint(origin, bearing, Math.max(0, Math.min(meters, toLimit)))
+  let length = meters
+  if (Math.abs(northing) > 1e-12) {
+    const limit = northing > 0 ? MERCATOR_MAX_LAT : -MERCATOR_MAX_LAT
+    const toLimit = (TURF_EARTH_RADIUS * ((limit - origin.lat) * Math.PI)) / 180 / northing
+    length = Math.max(0, Math.min(length, toLimit))
+  }
+
+  /*
+   * THEN LONGITUDE, WHICH IS A SEPARATE LIMIT AND NOT AN OBVIOUS ONE.
+   *
+   * A rhumb due east at latitude 25 has a circumference of about 36,300km, so
+   * a bearing line longer than that goes all the way round and comes back.
+   * Measured on the world view, a line of 33,554km due east finished 125px
+   * from where it started, having crossed the entire map to get there. That is
+   * worse than a line that is too short: it is drawn confidently in a
+   * direction it is not going.
+   *
+   * The swing has to be computed rather than read off the endpoint, because
+   * rhumbDestination returns a longitude already wrapped into -180..180, so
+   * the endpoint of a line that went round twice looks like a short hop.
+   *
+   * Half a turn is the cap: 180 degrees of longitude already spans the whole
+   * map, so nothing is lost by stopping there. Scaling is iterated because the
+   * swing per metre depends on the latitudes the line passes through, so one
+   * pass can still land slightly over; it converges immediately in practice
+   * and the loop is bounded regardless.
+   */
+  for (let pass = 0; pass < 4; pass += 1) {
+    const swing = Math.abs(rhumbSwingDegrees(origin, heading, length))
+    if (swing <= 180) break
+    length *= 180 / swing
+  }
+
+  return rhumbPoint(origin, bearing, length)
+}
+
+/**
+ * How many degrees of longitude a rhumb of `meters` covers, UNWRAPPED.
+ *
+ * The standard rhumb relation: latitude moves linearly with distance, and
+ * longitude moves with it divided by q, the ratio between the change in
+ * latitude and the change in Mercator y over the same stretch. Due east or
+ * west that ratio degenerates and the limit is cos(latitude).
+ */
+function rhumbSwingDegrees(origin: LatLon, heading: number, meters: number): number {
+  const angular = meters / TURF_EARTH_RADIUS
+  const lat1 = (origin.lat * Math.PI) / 180
+  const dLat = angular * Math.cos(heading)
+  const lat2 = lat1 + dLat
+  const mercator = (lat: number) => Math.log(Math.tan(lat / 2 + Math.PI / 4))
+  const dPsi = mercator(lat2) - mercator(lat1)
+  const q = Math.abs(dPsi) > 1e-12 ? dLat / dPsi : Math.cos(lat1)
+  return (((angular * Math.sin(heading)) / q) * 180) / Math.PI
 }
 
 /**

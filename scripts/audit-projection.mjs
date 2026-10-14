@@ -257,6 +257,45 @@ const checkCapture = async (label) => {
 const zoomTo = (z) => ev(`window.__probe.map.jumpTo({ zoom: ${z} }), 'ok'`)
 
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 3, mobile: true })
+
+/*
+ * THE COLD START, BEFORE ANYTHING ELSE TOUCHES THE MAP.
+ *
+ * It used to open at zoom 16.5 on the calibration venue in Salisbury
+ * Maryland, which told every new user they were standing in one particular car
+ * park on the Eastern Shore. Checked here because the camera is this file's
+ * business and because a default like that comes back quietly.
+ */
+await send('Page.navigate', { url: 'about:blank' })
+await ev(`localStorage.clear()`)
+await send('Page.navigate', { url: 'http://127.0.0.1:5173/?probe=1' })
+await wait(8000)
+{
+  const cold = await ev(`(() => {
+    const m = window.__probe?.map
+    if (!m) return { error: 'no probe' }
+    const R = 6371008.8, rad = (d) => (d * Math.PI) / 180
+    const c = m.getCenter()
+    const away = (lat, lon) => {
+      const dLat = rad(lat - c.lat), dLon = rad(lon - c.lng)
+      const h = Math.sin(dLat/2)**2 + Math.cos(rad(c.lat))*Math.cos(rad(lat))*Math.sin(dLon/2)**2
+      return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)))
+    }
+    return {
+      zoom: Math.round(m.getZoom() * 100) / 100,
+      kmFromCalibrationVenue: Math.round(away(38.364236, -75.605912) / 1000),
+      offersUseMyLocation: document.querySelector('.locate__btn') !== null,
+    }
+  })()`)
+  const bad =
+    cold.error !== undefined ||
+    cold.zoom > 5 ||
+    cold.kmFromCalibrationVenue < 1000 ||
+    !cold.offersUseMyLocation
+  if (bad) failures += 1
+  show(`cold start  ${bad ? 'FAIL' : 'ok'}`, cold)
+}
+
 await ev(`localStorage.clear()`)
 await send('Page.navigate', { url: 'http://127.0.0.1:5173/?calibration=1&probe=1' })
 await wait(8000)

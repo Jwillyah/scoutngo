@@ -10,7 +10,10 @@ import {
   type LatLon,
 } from '../core/geo.ts'
 import {
+  COLD_START_VIEW,
+  FRAME_VENUE_BELOW_ZOOM,
   steppedBearingLineMeters,
+  VENUE_ZOOM,
   viewportSpanMeters,
   type ViewportBounds,
 } from '../core/viewport.ts'
@@ -523,8 +526,14 @@ export function MapView({
         },
         layers: [{ id: 'esri', type: 'raster', source: 'esri' }],
       },
-      center: venue === null ? [-75.605912, 38.364236] : [venue.lon, venue.lat],
-      zoom: 16.5,
+      /*
+       * NO PIN, NO PLACE. The map opens on a wide view that is asking rather
+       * than answering; see COLD_START_VIEW. It used to open at zoom 16.5 on
+       * the calibration venue in Salisbury Maryland, which told every new user
+       * they were standing in a particular car park on the Eastern Shore.
+       */
+      center: venue === null ? COLD_START_VIEW.center : [venue.lon, venue.lat],
+      zoom: venue === null ? COLD_START_VIEW.zoom : VENUE_ZOOM,
       attributionControl: false,
       // Tilt and rotate. Flat imagery only, no 3D meshes: coverage in these
       // towns is bad enough that a mesh would be a lie, per docs/brief.md.
@@ -982,7 +991,17 @@ export function MapView({
     if (selfMoved.current) {
       selfMoved.current = false
     } else {
-      instance.easeTo({ center: [venue.lon, venue.lat], duration: 600 })
+      /*
+       * Coming off the wide cold start view, the centre on its own is not
+       * enough: the venue would be a dot in the middle of an ocean. Above the
+       * threshold the zoom is the user's and is left alone.
+       */
+      const tooWide = instance.getZoom() < FRAME_VENUE_BELOW_ZOOM
+      instance.easeTo({
+        center: [venue.lon, venue.lat],
+        ...(tooWide ? { zoom: VENUE_ZOOM } : {}),
+        duration: 600,
+      })
     }
   }, [venue])
 

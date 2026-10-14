@@ -4432,3 +4432,49 @@
   white-space: nowrap;
   pointer-events: none;
 }
+
+/*
+ * USE MY LOCATION. Only on a cold start, directly under the search field.
+ *
+ * Quiet on purpose. Search is the primary way to get somewhere, and this is the
+ * shortcut for the common case of already being at the venue, so it reads as a
+ * secondary offer rather than competing with the field above it.
+ */
+.locate {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.locate__btn {
+  min-height: var(--control-height);
+  padding: 0 var(--space-3);
+  background: var(--color-panel);
+  color: var(--color-text);
+  border: var(--line-hair) solid var(--color-line);
+  border-top-color: var(--color-edge-top);
+  border-radius: var(--radius-panel);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.locate__btn:disabled {
+  color: var(--color-text-muted);
+}
+
+/*
+ * The refusal. Not hazard red: a declined permission is an answer, not a
+ * problem, and red here would read as something being broken.
+ */
+.locate__note {
+  margin: 0;
+  max-width: 28ch;
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-panel);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-panel);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}

@@ -135,3 +135,46 @@ export function bearingLineMeters(origin: LatLon, bounds: ViewportBounds): numbe
 export function steppedBearingLineMeters(origin: LatLon, bounds: ViewportBounds): number {
   return 2 ** Math.ceil(Math.log2(bearingLineMeters(origin, bounds)))
 }
+
+/*
+ * WHERE THE MAP STARTS WHEN NOTHING IS KNOWN YET.
+ *
+ * It used to start at 38.364236N 75.605912W, zoom 16.5. That is Brew River in
+ * Salisbury Maryland, the venue this app was calibrated against, framed at
+ * street level about 600m across. Anyone opening the app for the first time
+ * was shown one specific car park on the Eastern Shore, close enough to read
+ * the parking bays, which is a claim about where they are and a wrong one.
+ *
+ * So it starts wide instead, on a view that is plainly asking rather than
+ * answering. The search field is the tool for getting somewhere, and
+ * "Use my location" is there for anyone who would rather tap it.
+ *
+ * NO IP GEOLOCATION, EVER. Not on load, not as a fallback, not for one frame.
+ * An approximate position derived from an IP address is user data, and the way
+ * not to hold it is not to ask for it. tests/noIpGeolocation.test.ts is what
+ * keeps that true.
+ */
+export const COLD_START_VIEW = {
+  /*
+   * The Atlantic, which puts the Americas on one side and Europe and Africa on
+   * the other. Chosen because it is the least like a claim: anybody can see at
+   * a glance that the app does not know where they are.
+   */
+  center: [-30, 25] as [number, number],
+  zoom: 1.7,
+}
+
+/** How close to frame a venue once there is one to frame. */
+export const VENUE_ZOOM = 16.5
+
+/**
+ * Below this, a venue is not visible at all, so a new one gets framed rather
+ * than just centred.
+ *
+ * It exists because the cold start view is now the whole Atlantic: centring a
+ * searched venue there without touching the zoom would leave it a sub pixel
+ * dot in the middle of an ocean. Above the threshold the zoom is left alone,
+ * because someone sitting at zoom 14 looking around the county and dropping a
+ * pin has chosen that view and should keep it.
+ */
+export const FRAME_VENUE_BELOW_ZOOM = 12

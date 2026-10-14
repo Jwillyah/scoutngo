@@ -200,3 +200,62 @@ describe('bearingLineEnd keeps a long bearing line on the map', () => {
     expect(bearingLineEnd(origin, 0, 131_000).lat).toBeCloseTo(89.9, 6)
   })
 })
+
+/*
+ * THE OTHER LIMIT ON A LONG BEARING LINE.
+ *
+ * Latitude is the obvious one. Longitude is not: a rhumb due east at latitude
+ * 25 has a circumference of about 36,300km, so a line longer than that goes
+ * round and comes back, and rhumbDestination hands back a longitude already
+ * wrapped into -180..180 so the endpoint looks like a short hop. Measured on
+ * the world view before the cap, a 33,554km line due east finished 125px from
+ * where it started.
+ */
+describe('bearingLineEnd does not let a line run round the world', () => {
+  /** How far east or west the line actually went, unwrapped. */
+  const swing = (origin: LatLon, bearing: number, meters: number) => {
+    const end = bearingLineEnd(origin, bearing, meters)
+    let d = end.lon - origin.lon
+    while (d > 180) d -= 360
+    while (d < -180) d += 360
+    return d
+  }
+
+  it('caps a line that would go more than half way round', () => {
+    const origin = { lat: 25, lon: -30 }
+    // A full circumference at this latitude is about 36,300km.
+    expect(Math.abs(swing(origin, 90, 33_554_432))).toBeCloseTo(180, 4)
+    expect(Math.abs(swing(origin, 270, 33_554_432))).toBeCloseTo(180, 4)
+  })
+
+  it('leaves a line that does not reach the cap alone', () => {
+    const origin = { lat: 25, lon: -30 }
+    expect(bearingLineEnd(origin, 90, 50_000)).toEqual(rhumbPoint(origin, 90, 50_000))
+  })
+
+  /*
+   * Across latitudes and bearings, because the swing per metre depends on the
+   * latitudes the line passes through, which is why the cap iterates.
+   */
+  it('never swings past half a turn, at any latitude or bearing', () => {
+    for (const lat of [-80, -60, -25, 0, 12, 40, 61, 84]) {
+      for (let bearing = 0; bearing < 360; bearing += 7) {
+        for (const meters of [1e5, 1e6, 1e7, 4e7, 2e8]) {
+          const s = swing({ lat, lon: 0 }, bearing, meters)
+          expect(Math.abs(s), `lat ${lat} bearing ${bearing} ${meters}m`).toBeLessThanOrEqual(
+            180.0001,
+          )
+        }
+      }
+    }
+  })
+
+  it('still respects the latitude limit while capping longitude', () => {
+    for (const lat of [-84, -40, 0, 40, 84]) {
+      for (let bearing = 0; bearing < 360; bearing += 11) {
+        const end = bearingLineEnd({ lat, lon: 0 }, bearing, 2e8)
+        expect(Math.abs(end.lat)).toBeLessThanOrEqual(MERCATOR_MAX_LAT + 1e-6)
+      }
+    }
+  })
+})

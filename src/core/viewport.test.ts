@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { bearingLineEnd, destinationPoint, distanceMeters, type LatLon } from './geo.ts'
 import {
   BEARING_LINE_MIN_METERS,
+  COLD_START_VIEW,
+  FRAME_VENUE_BELOW_ZOOM,
+  VENUE_ZOOM,
   bearingLineMeters,
   viewportCorners,
   viewportDiagonalMeters,
@@ -255,5 +258,91 @@ describe('viewport extents', () => {
       { lat: 38, lon: -75 },
       { lat: 38, lon: -76 },
     ])
+  })
+})
+
+/*
+ * THE COLD START IS NOT A CLAIM ABOUT WHERE ANYBODY IS.
+ *
+ * It used to open at zoom 16.5 on 38.364236N 75.605912W, which is the
+ * calibration venue in Salisbury Maryland framed close enough to count the
+ * parking bays. These numbers are what stops that coming back.
+ */
+describe('the view the map opens on when nothing is known', () => {
+  const CALIBRATION_VENUE = { lat: 38.364236, lon: -75.605912 }
+
+  it('is wide enough that it is plainly asking, not answering', () => {
+    const bounds = boundsFor(
+      { lat: COLD_START_VIEW.center[1], lon: COLD_START_VIEW.center[0] },
+      COLD_START_VIEW.zoom,
+      WIDTH,
+      HEIGHT,
+    )
+    // Thousands of kilometres across. Nobody reads that as "you are here".
+    expect(viewportSpanMeters(bounds)).toBeGreaterThan(3_000_000)
+  })
+
+  it('is nowhere near the venue this app was calibrated on', () => {
+    const centre = { lat: COLD_START_VIEW.center[1], lon: COLD_START_VIEW.center[0] }
+    expect(distanceMeters(centre, CALIBRATION_VENUE)).toBeGreaterThan(1_000_000)
+  })
+
+  it('is well below the zoom at which a venue gets framed', () => {
+    expect(COLD_START_VIEW.zoom).toBeLessThan(FRAME_VENUE_BELOW_ZOOM)
+    expect(FRAME_VENUE_BELOW_ZOOM).toBeLessThan(VENUE_ZOOM)
+  })
+
+  /*
+   * A bearing line still LEAVES this frame, which is the claim that survives
+   * at world scale. The pixel diagonal rule does not, and that is Mercator
+   * rather than a bug: the projection ends at 85 degrees, so a line heading
+   * north from latitude 25 has a hard ceiling on how many pixels it can cover
+   * however far it travels. Measured here, due north tops out at 712px
+   * against a 930px diagonal, with its end well north of the frame.
+   *
+   * Which is why this is the only place the weaker claim is asserted. At the
+   * zooms anyone actually works at, 10 to 20, the diagonal rule holds and is
+   * asserted above.
+   */
+  it('still gets bearing lines that leave it', () => {
+    const centre = { lat: COLD_START_VIEW.center[1], lon: COLD_START_VIEW.center[0] }
+    const zoom = COLD_START_VIEW.zoom
+    const bounds = boundsFor(centre, zoom, WIDTH, HEIGHT)
+    const meters = steppedBearingLineMeters(centre, bounds)
+    const origin = project(centre, zoom)
+    const frame = {
+      left: origin.x - WIDTH / 2,
+      right: origin.x + WIDTH / 2,
+      top: origin.y - HEIGHT / 2,
+      bottom: origin.y + HEIGHT / 2,
+    }
+    for (let bearing = 0; bearing < 360; bearing += 5) {
+      const end = project(bearingLineEnd(centre, bearing, meters), zoom)
+      const inside =
+        end.x >= frame.left && end.x <= frame.right &&
+        end.y >= frame.top && end.y <= frame.bottom
+      expect(inside, `bearing ${bearing} ended inside the world view`).toBe(false)
+    }
+  })
+
+  /*
+   * AND IT DOES NOT WRAP. A rhumb due east at latitude 25 has a 36,300km
+   * circumference, and the line here is 33,554km, so without a cap it goes
+   * most of the way round: measured, it finished 125px from where it started
+   * having crossed the entire map, which draws as a line pointing the wrong
+   * way rather than as a line that is missing.
+   */
+  it('does not let a line run round the world and come back', () => {
+    const centre = { lat: COLD_START_VIEW.center[1], lon: COLD_START_VIEW.center[0] }
+    const bounds = boundsFor(centre, COLD_START_VIEW.zoom, WIDTH, HEIGHT)
+    const meters = steppedBearingLineMeters(centre, bounds)
+    const origin = project(centre, COLD_START_VIEW.zoom)
+    const worldPx = 512 * 2 ** COLD_START_VIEW.zoom
+    for (let bearing = 0; bearing < 360; bearing += 5) {
+      const end = project(bearingLineEnd(centre, bearing, meters), COLD_START_VIEW.zoom)
+      // Never more than half a world of easting, and never less than the frame.
+      expect(Math.abs(end.x - origin.x)).toBeLessThanOrEqual(worldPx / 2 + 1)
+      expect(Math.hypot(end.x - origin.x, end.y - origin.y)).toBeGreaterThan(WIDTH)
+    }
   })
 })

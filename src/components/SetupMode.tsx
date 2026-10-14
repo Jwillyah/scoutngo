@@ -16,6 +16,7 @@ import { ReachSlider } from './ReachSlider.tsx'
 import { SearchField } from './SearchField.tsx'
 import { SpotsPanel } from './SpotsPanel.tsx'
 import { StaleBrief } from './StaleBrief.tsx'
+import { UseMyLocation } from './UseMyLocation.tsx'
 import { VenuePlate } from './VenuePlate.tsx'
 
 interface SetupModeProps {
@@ -63,6 +64,11 @@ interface SetupModeProps {
   /** First run only: the one sentence under the pin. Retired by a drag. */
   showPinHint: boolean
   onPinDrag: () => void
+  /**
+   * Tapped "Use my location", and the browser answered. Moves the map only:
+   * the coordinate is not stored and does not become the pin.
+   */
+  onUseMyLocation: (at: LatLon) => void
   /** True while the date, or the window, is still the one the app chose. */
   defaults: { date: boolean; window: boolean; name: boolean }
   /** The handful of preferences that are genuinely preferences. */
@@ -137,6 +143,7 @@ export function SetupMode({
   pointAt,
   settings,
   onSettings,
+  onUseMyLocation,
 }: SetupModeProps) {
   /*
    * One example per load, so the placeholder shows the kind of work the reader
@@ -353,6 +360,14 @@ export function SetupMode({
         />
         <div className="setup__search">
           <SearchField onPick={onSearchPick} label="Where's the shoot?" bias={searchBias} />
+          {/*
+            * ONLY WHILE THERE IS NOWHERE YET. Once a place is picked this is
+            * clutter: the map is already where it needs to be, and a button
+            * that would move it somewhere else is a way to lose work.
+            */}
+          {at === null && pendingPin === null ? (
+            <UseMyLocation onLocated={onUseMyLocation} />
+          ) : null}
         </div>
 
         {/*

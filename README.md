@@ -156,6 +156,28 @@ pair looks slower for reasons that have nothing to do with the image.
   back; that is the whole backup story, deliberately.
 - Bring your own Anthropic API key. It goes in `.env`, which is gitignored, and
   is read only by a serverless function so it never reaches the browser bundle.
+- **It never asks an IP address where you are.** Not on load, not as a fallback
+  when you decline the browser's own location prompt, not for one frame. An
+  approximate position derived from an IP address is user data, and the way not
+  to hold it is not to ask for it. There is a test in the repo
+  (`tests/noIpGeolocation.test.ts`) that fails the build if such a call, or a
+  read of a platform's `x-vercel-ip-latitude` style header, ever appears.
+
+**Where the map starts, and the one location button.** The app opens on a wide
+view of the Atlantic, which is plainly asking rather than answering. It used to
+open at street level on the venue it was calibrated against, in Salisbury
+Maryland, which told everyone who opened it that they were standing in one
+particular car park.
+
+There is one **Use my location** button on that cold start, and it is the only
+thing in the app that asks your operating system for a position. It asks when
+you tap it and not before, so the permission prompt comes from something you
+did. What comes back moves the map to roughly the right neighbourhood and is
+then gone: it is not stored, not turned into the venue pin, and not sent
+anywhere. If you decline, it says so once and the map stays wide.
+
+The separate live position used in Field mode, for the walk-to line, is the same
+deal: it runs only while Field mode is open and nothing is written down.
 
 Three things leave your device, and you should know exactly what they are.
 

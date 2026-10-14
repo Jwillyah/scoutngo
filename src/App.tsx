@@ -11,6 +11,7 @@ import { EMPTY_LANDCOVER, type Landcover } from './core/siting.ts'
 import { getSunArc, getSunPosition } from './core/sun.ts'
 import { extremesAround, tideStateAt } from './core/tide.ts'
 import { formatClock } from './core/timezone.ts'
+import { LOCATED_ZOOM } from './lib/locateOnce.ts'
 import { briefDriftMeters, formatDrift, isBriefStale, type BriefAnchor } from './lib/brief.ts'
 import {
   defaultSelection,
@@ -701,6 +702,22 @@ function App() {
     })
   }
 
+  /*
+   * USE MY LOCATION moves the camera and nothing else.
+   *
+   * It does NOT set the pin. A browser fix without high accuracy is good to a
+   * few hundred metres over GPS and a few kilometres over wifi, so turning it
+   * straight into a venue coordinate would be the app asserting a precision it
+   * was not given. It takes you to the neighbourhood; the pin is still placed
+   * by hand or by search, which is where the precision actually comes from.
+   *
+   * And nothing is kept. The coordinate goes to flyTo and is not written to
+   * localStorage, not put in a saved spot, and not sent anywhere.
+   */
+  const onUseMyLocation = useCallback((at: LatLon) => {
+    mapHandle.current?.flyTo(at, LOCATED_ZOOM)
+  }, [])
+
   /** The shooter picked one of several geocoding matches. */
   /* Choosing from the list still proposes; the map is where it is accepted. */
   const onPickVenue = (hit: SearchHit) => {
@@ -1061,6 +1078,7 @@ function App() {
             onDescribe={() => void onDescribe()}
             venueChoices={venueChoices}
             onPickVenue={onPickVenue}
+            onUseMyLocation={onUseMyLocation}
             shotListText={shotListText}
             onShotListText={onShotListChange}
             desiredShots={desiredShots}
