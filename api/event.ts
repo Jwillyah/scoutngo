@@ -161,8 +161,7 @@ export async function POST(request: Request): Promise<Response> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
     return Response.json(
-      { status: 'error', message: 'ANTHROPIC_API_KEY is not set on the server.' },
-      { status: 500 },
+      { status: 'no-key', message: 'Reading an event layout needs an Anthropic key.' },
     )
   }
 

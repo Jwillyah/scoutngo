@@ -14,6 +14,37 @@ does not exist is "here is where to stand and what to shoot, for how I shoot."
 Built for solo shooters who fly in cold and burn the first hour working out
 where to stand.
 
+## It works with no API keys
+
+Clone it, `npm install`, `npm run dev`, and the whole planning loop works. No
+account, no keys, no card.
+
+**Free, out of the box:**
+
+- The satellite map, search, and dropping the venue pin
+- **Placing camera positions by hand**, which is the primary way to build a plan
+- Every computed number: sun azimuth and altitude, lighting classification,
+  field of view, frame width, range, standoff bands, the reach ring
+- Siting checks against real OpenStreetMap data: in water, in a roadway, a
+  drone path over a structure
+- Tide from NOAA, and the time scrubber that moves every one of those numbers
+- Shot lists, saved setups, the kit editor, Field mode, offline field packs
+- Installing it to your home screen and using it as an app
+
+**Three optional keys, each adding one thing.** Everything above keeps working
+without them, and anything that needs one says so in a line where the feature
+would be, rather than failing:
+
+| Key | Adds | Without it |
+| --- | --- | --- |
+| `MAPBOX_TOKEN` | Better venue search, autocompleting as you type | Search falls back to OpenStreetMap's Nominatim and Photon, which are good at addresses and weaker on coastal landmark names |
+| `ANTHROPIC_API_KEY` | "Suggest positions", and reading a typed description into the form | Place positions by hand and fill the fields in yourself |
+| `GOOGLE_MAPS_API_KEY` | A Street View photo on each position card | The card says there is no ground view, in the same space |
+
+**No key is ever required for the primary action on any screen.** Suggesting
+positions is a secondary control beside "Add position", and it is labelled
+optional.
+
 ## The rule: the model proposes, code computes
 
 Anything that is arithmetic is arithmetic. The model's job is judgment, meaning
@@ -134,10 +165,34 @@ are looking at, so your venue coordinates are visible to Esri, at roughly the
 zoom level you are viewing. That is unavoidable for any map that streams
 imagery. Nothing else is attached: no account, no identifier, no form content.
 
-**Venue search.** Typing in the search box sends that text to Nominatim at
-`nominatim.openstreetmap.org`, run by the OpenStreetMap Foundation. They see the
-query and, as with any web request, your IP and the referring page. Only what you
-type in that box is sent.
+**Venue search, and this one changed.** With a `MAPBOX_TOKEN` set, typing in the
+search box sends what you type **to Mapbox, as you type it**. Not on submit: a
+request goes out about 300ms after you stop typing, so a query you type in two
+bursts is two requests. It goes through this app's own serverless function so
+the token stays on the server, which means Mapbox sees the request coming from
+the server rather than from your phone, and the function logs nothing. The map
+centre goes with it, so nearby results rank first.
+
+Be clear about the trade. **Mapbox is a company, not a nonprofit.** It is a
+commercial geocoder with a privacy policy and a billing relationship, and OSM's
+Nominatim is run by the OpenStreetMap Foundation. This is a real change in who
+sees your searches, made because the OSM geocoders could not find the places
+this tool is used at: "First Street Jetty Virginia Beach" returns **zero**
+results from Nominatim, and small coastal place names fail the same way. A
+search that cannot find the venue is a search that does not work.
+
+It is deliberately not Google Places, which would have been the other obvious
+choice. That would send every keystroke to Google and change the privacy stance
+of this app much further than this does.
+
+Billing is per *session*, not per keystroke: one token covers a whole typed
+query plus the result you pick, so typing twenty characters is one charge.
+
+**Without a `MAPBOX_TOKEN` nothing goes to Mapbox at all.** Search falls back to
+Nominatim at `nominatim.openstreetmap.org` and Photon at `photon.komoot.io`,
+both OpenStreetMap based, queried no more than once a second per their policy.
+The dropdown names whichever one answered, so you can always see where a result
+came from.
 
 **Naming a dropped pin.** Dropping or dragging the venue pin sends that one
 coordinate to Nominatim's reverse lookup, to fill the venue name with something
@@ -218,7 +273,8 @@ data because there is no server holding anything.
 
 - Vite, React, TypeScript
 - `maplibre-gl` for the map, over Esri World Imagery satellite tiles
-- Nominatim, from OpenStreetMap, for venue search and for naming a dropped pin
+- Mapbox Search Box API for venue search, when a token is set; Nominatim and
+  Photon, both from OpenStreetMap, as the fallback and for naming a dropped pin
 - Overpass, from OpenStreetMap, for real water, building, road and pier shapes
 - Google Street View Static API for the optional ground view
 - `suncalc` for solar position
@@ -292,6 +348,28 @@ npm run preview   # serve the production build
 npm run lint      # oxlint
 ```
 
+### Getting a Mapbox token
+
+Five minutes, no card for the free tier. Mapbox's free allowance is generous for
+one person planning shoots; search is billed per completed *session*, and this
+app uses one session per typed query rather than one per keystroke.
+
+1. Sign up at <https://account.mapbox.com/auth/signup/>.
+2. Go to <https://account.mapbox.com/access-tokens/>.
+3. You can use the **Default public token** that already exists on that page.
+   Its default public scopes cover the Search Box API, which is all this app
+   calls. Copy it; it starts `pk.`.
+4. If you would rather create your own, click **Create a token**, give it a
+   name, and leave the default public scopes ticked. You do **not** need any
+   secret scope, and you do not need `downloads:read`.
+5. Do **not** set an allowed-URL restriction. Those apply to requests made from
+   a browser, and this app calls Mapbox from its own serverless function, so a
+   URL restriction would reject every request.
+6. Put it in `.env` as `MAPBOX_TOKEN=pk.…`, or for a deploy:
+   `vercel env add MAPBOX_TOKEN production`.
+
+The token is read only by `api/search.ts` and never reaches the browser bundle.
+
 ## Run the tests
 
 ```sh
@@ -323,8 +401,9 @@ care about. Never in `vercel.json`, which is committed and therefore public.
 
 | Variable | Required | What it is |
 | --- | --- | --- |
-| `ANTHROPIC_API_KEY` | Yes | Your Anthropic key, from <https://console.anthropic.com>. Read only by `api/generate.ts`, so it never reaches the browser bundle. Without it, Generate returns a plain message naming the missing variable. |
-| `GOOGLE_MAPS_API_KEY` | No | Enables the optional ground view on a position card, via `api/streetview.ts`. Leave it unset and the card says ground view is off; nothing else changes. |
+| `ANTHROPIC_API_KEY` | No | Your Anthropic key, from <https://console.anthropic.com>. Read only by `api/generate.ts`, `api/parse.ts` and `api/event.ts`, so it never reaches the browser bundle. Without it, "Suggest positions" says in one line that it needs a key, and you place positions by hand. |
+| `GOOGLE_MAPS_API_KEY` | No | Enables the optional ground view on a position card, via `api/streetview.ts`. Leave it unset and the card says there is no ground view, in the same space; nothing else changes. |
+| `MAPBOX_TOKEN` | No | Enables the better venue search, via `api/search.ts`. Leave it unset and search falls back to Nominatim and Photon. See "Getting a Mapbox token" below. |
 
 Neither is prefixed `VITE_`, and that is deliberate: Vite only exposes `VITE_`
 variables to the browser bundle, so a plain name cannot leak into client code even

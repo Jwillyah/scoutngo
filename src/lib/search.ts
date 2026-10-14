@@ -43,7 +43,22 @@ export interface SearchHit {
   lat: number
   lon: number
   /** Which gazetteer offered this, shown so a second opinion is visible as one. */
-  source: 'osm' | 'photon'
+  source: 'osm' | 'photon' | 'mapbox'
+  /**
+   * The provider's own id for this place, when it has one.
+   *
+   * THIS IS WHAT STOPS DUPLICATE SAVED SPOTS. "Rodanthe" and "Rodanthe North
+   * Carolina" are the same place reached two ways, and they come back on
+   * slightly different coordinates, so matching on distance alone either
+   * merges things that are not the same or fails to merge things that are.
+   * A provider id is the provider saying "these are one place", which is a
+   * stronger claim than two coordinates being close.
+   *
+   * Absent for a pin dropped by hand, which is correct: a hand-placed pin is
+   * a position, not a gazetteer entry, and two of them near each other are
+   * genuinely two different positions.
+   */
+  placeId?: string
 }
 
 /** Shape Nominatim returns, narrowed to what is used. */

@@ -1641,7 +1641,18 @@
   background: var(--color-panel);
   border: var(--line-hair) solid var(--color-line);
   border-radius: var(--radius-panel);
-  max-height: 50vh;
+  /*
+   * dvh, NOT vh, and this is the bug that hid the results.
+   *
+   * On iOS `vh` is the LARGE viewport: the height the page would have with no
+   * browser chrome and no keyboard. With a keyboard up, 50vh of an 844pt phone
+   * resolves to about 422pt while only about 340pt of page is visible, so the
+   * list was allowed to grow to two and a half times the space it had and every
+   * result below the first sat behind the keyboard.
+   *
+   * `dvh` is the viewport that is actually there, keyboard included.
+   */
+  max-height: 50dvh;
   overflow-y: auto;
 }
 
@@ -3656,7 +3667,7 @@
 .raw__body {
   margin: var(--space-2) var(--space-3) var(--space-3);
   padding: var(--space-2);
-  max-height: 40vh;
+  max-height: 40dvh;
   overflow: auto;
   background: var(--color-panel-2);
   font-family: var(--font-mono);
@@ -4396,4 +4407,23 @@
   font-size: var(--text-xs);
   color: var(--color-hazard);
   line-height: var(--leading-normal);
+}
+
+/* Nothing matched. Says what to try rather than leaving an empty box. */
+.search__empty {
+  padding: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  line-height: var(--leading-normal);
+}
+
+/*
+ * AN OPTIONAL FEATURE THAT IS NOT CONFIGURED. Quiet, and deliberately not
+ * hazard red: nothing is wrong, and spending the warning colour on a missing
+ * environment variable teaches people to ignore it where it means a position
+ * is standing in water.
+ */
+.notice--off {
+  border-left-color: var(--color-accent-2-dim);
+  color: var(--color-text-muted);
 }

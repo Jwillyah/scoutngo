@@ -858,6 +858,18 @@ function App() {
         reachMeters,
       ),
     )
+    /*
+     * No key is not a failure. Suggestion is optional, manual placement is the
+     * primary path, and saying so plainly beats a red error about an
+     * environment variable the reader may not have.
+     */
+    if (response.status === 'no-key') {
+      setGeneration({
+        status: 'no-key',
+        message: response.message ?? 'Suggesting positions needs an Anthropic key.',
+      })
+      return
+    }
     if (response.status !== 'ok' || typeof response.raw !== 'string') {
       setGeneration({
         status: 'error',

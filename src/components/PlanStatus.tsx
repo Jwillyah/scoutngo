@@ -74,6 +74,18 @@ export function PlanStatus({ generation, planCoverage, siteNote }: PlanStatusPro
         <p className="notice notice--hazard">{generation.message}</p>
       ) : null}
 
+      {/*
+        * Not a hazard. An optional feature that is not configured is a fact
+        * about this install, and saying it in red next to "this position is in
+        * water" would teach people to ignore the colour that matters.
+        */}
+      {generation.status === 'no-key' ? (
+        <p className="notice notice--off">
+          {generation.message} Place positions yourself with Add position, which
+          is the primary way to build a plan.
+        </p>
+      ) : null}
+
       {generation.status === 'done' ? (
         <p className="notice">
           {generation.count} positions placed. Lighting and field of view are computed

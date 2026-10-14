@@ -1,9 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import type { LatLon } from '../core/geo.ts'
 import {
+  DEBOUNCE_MS,
+  mapboxRetrieve,
+  mapboxSuggest,
+  MAPBOX_ATTRIBUTION,
+  MIN_QUERY_CHARS,
+  newSessionToken,
+  type MapboxSuggestion,
+} from '../lib/mapboxSearch.ts'
+import {
   BIAS_HALF_SPAN_METERS,
   markNominatim,
-  MIN_INTERVAL_MS,
   msUntilNominatim,
   OSM_ATTRIBUTION,
   searchVenues,
@@ -40,6 +48,20 @@ export function SearchField({ onPick, label = 'Search for a venue', bias = null 
   }, [bias])
   const [query, setQuery] = useState('')
   const [hits, setHits] = useState<SearchHit[]>([])
+  /*
+   * Mapbox answers with labels first and coordinates only on retrieve, so the
+   * two providers cannot share one list shape. These are the Mapbox labels; a
+   * pick turns one into a real SearchHit.
+   */
+  const [suggestions, setSuggestions] = useState<MapboxSuggestion[]>([])
+  /** Which gazetteer answered, so the credit line is never a guess. */
+  const [answered, setAnswered] = useState<'mapbox' | 'osm' | null>(null)
+  /*
+   * One session covers a whole typed query, because Mapbox bills per session
+   * rather than per request. Minted on the first keystroke of a query and
+   * retired when a result is picked.
+   */
+  const session = useRef(newSessionToken())
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   /** Bumped by submit to force a lookup without waiting out the debounce. */
@@ -48,37 +70,67 @@ export function SearchField({ onPick, label = 'Search for a venue', bias = null 
 
   useEffect(() => {
     const trimmed = query.trim()
-    if (trimmed.length < 3) return
-
-    /*
-     * Nominatim's usage policy caps this at one request per second. A full
-     * second after the last keystroke, and never less than a second after the
-     * previous Nominatim request actually went out, from here or from the
-     * reverse geocode that names a dropped pin. Submit skips the debounce but
-     * not the cap.
-     */
-    const wait = Math.max(submitTick > 0 ? 0 : MIN_INTERVAL_MS, msUntilNominatim())
+    if (trimmed.length < MIN_QUERY_CHARS) return
 
     const controller = new AbortController()
-    const timer = window.setTimeout(() => {
-      markNominatim()
+
+    /*
+     * MAPBOX FIRST, OSM ONLY IF THERE IS NO TOKEN.
+     *
+     * The OSM pair is good at addresses and poor at the names people use for
+     * coastal places: measured, "First Street Jetty Virginia Beach" returns
+     * zero results from Nominatim. Mapbox finds it. A search that cannot find
+     * the venue is a search that does not work.
+     *
+     * The two have different rhythms and that is the point. Mapbox debounces at
+     * 300ms and feels like a map app; Nominatim's published policy is one
+     * request per second, so the fallback still waits it out rather than
+     * abusing a free service.
+     */
+    const run = async () => {
       setBusy(true)
-      searchVenues(
-        trimmed,
-        controller.signal,
-        biasRef.current === null
-          ? undefined
-          : { centre: biasRef.current, halfSpanMeters: BIAS_HALF_SPAN_METERS },
-      )
-        .then((results) => {
-          setHits(results)
+      try {
+        const viaMapbox = await mapboxSuggest(
+          trimmed,
+          session.current,
+          biasRef.current,
+          controller.signal,
+        )
+        if (viaMapbox.status === 'ok') {
+          setSuggestions(viaMapbox.suggestions)
+          setHits([])
+          setAnswered('mapbox')
           setOpen(true)
-        })
-        .catch(() => {
-          // Aborted or offline. The dropdown just stays as it was.
-        })
-        .finally(() => setBusy(false))
-    }, wait)
+          return
+        }
+        if (viaMapbox.status === 'error') {
+          // A Mapbox failure is not a dead end: fall through to the OSM pair.
+        }
+
+        const gap = msUntilNominatim()
+        if (gap > 0) await new Promise((r) => window.setTimeout(r, gap))
+        if (controller.signal.aborted) return
+        markNominatim()
+        const results = await searchVenues(
+          trimmed,
+          controller.signal,
+          biasRef.current === null
+            ? undefined
+            : { centre: biasRef.current, halfSpanMeters: BIAS_HALF_SPAN_METERS },
+        )
+        setHits(results)
+        setSuggestions([])
+        setAnswered('osm')
+        setOpen(true)
+      } catch {
+        // Aborted or offline. The dropdown just stays as it was.
+      } finally {
+        setBusy(false)
+      }
+    }
+
+    const wait = submitTick > 0 ? 0 : DEBOUNCE_MS
+    const timer = window.setTimeout(() => void run(), wait)
 
     return () => {
       window.clearTimeout(timer)
@@ -89,8 +141,24 @@ export function SearchField({ onPick, label = 'Search for a venue', bias = null 
   const clear = () => {
     setQuery('')
     setHits([])
+    setSuggestions([])
+    setAnswered(null)
     setOpen(false)
     input.current?.focus()
+  }
+
+  /*
+   * A Mapbox pick costs one retrieve, which is also what ENDS the billing
+   * session, so a fresh token is minted for whatever is typed next.
+   */
+  const pickSuggestion = async (suggestion: MapboxSuggestion) => {
+    setBusy(true)
+    const hit = await mapboxRetrieve(suggestion.id, suggestion.label, session.current)
+    session.current = newSessionToken()
+    setBusy(false)
+    if (hit === null) return
+    setOpen(false)
+    onPick({ lat: hit.lat, lon: hit.lon }, hit.label)
   }
 
   return (
@@ -122,7 +190,7 @@ export function SearchField({ onPick, label = 'Search for a venue', bias = null 
               setOpen(false)
             }
           }}
-          onFocus={() => setOpen(hits.length > 0)}
+          onFocus={() => setOpen(hits.length > 0 || suggestions.length > 0)}
         />
 
         {busy ? (
@@ -138,7 +206,13 @@ export function SearchField({ onPick, label = 'Search for a venue', bias = null 
         )}
       </form>
 
-      {open && hits.length > 0 ? (
+      {/*
+        * `open` is only set true once a search has COMPLETED, so this does not
+        * need a second condition on the result count. Gating it on hits.length
+        * meant the Mapbox path, whose results live in `suggestions`, could
+        * never render at all.
+        */}
+      {open ? (
         <ul className="search__results">
           {hits.map((hit) => {
             const { name, address } = splitLabel(hit.label)
@@ -160,7 +234,34 @@ export function SearchField({ onPick, label = 'Search for a venue', bias = null 
               </li>
             )
           })}
-          <li className="search__credit">{OSM_ATTRIBUTION}</li>
+          {suggestions.map((suggestion) => {
+            const { name, address } = splitLabel(suggestion.label)
+            return (
+              <li key={suggestion.id}>
+                <button
+                  type="button"
+                  className="search__hit"
+                  onClick={() => {
+                    void pickSuggestion(suggestion)
+                    setQuery('')
+                    setSuggestions([])
+                  }}
+                >
+                  <span className="search__name">{name}</span>
+                  {address === '' ? null : <span className="search__addr">{address}</span>}
+                </button>
+              </li>
+            )
+          })}
+          {hits.length === 0 && suggestions.length === 0 ? (
+            <li className="search__empty">
+              Nothing found. Try the place name on its own, or drop the pin by hand.
+            </li>
+          ) : null}
+          {/* Which gazetteer actually answered. Never a guess. */}
+          <li className="search__credit">
+            {answered === 'mapbox' ? MAPBOX_ATTRIBUTION : OSM_ATTRIBUTION}
+          </li>
         </ul>
       ) : null}
     </div>

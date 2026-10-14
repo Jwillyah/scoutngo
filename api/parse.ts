@@ -63,12 +63,12 @@ export async function POST(request: Request): Promise<Response> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
     return Response.json(
+      /* A missing key is a state, not a failure. See the note in generate.ts. */
       {
-        status: 'error',
+        status: 'no-key',
         message:
-          'ANTHROPIC_API_KEY is not set. Copy .env.example to .env, add your own key, and run `vercel dev`.',
+          'Reading a description needs an Anthropic key. Fill the fields in by hand instead.',
       },
-      { status: 500 },
     )
   }
 

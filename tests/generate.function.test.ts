@@ -43,13 +43,20 @@ describe('generate function', () => {
     expect(generate).not.toHaveProperty('default')
   })
 
-  it('says plainly when the key is missing, and names the fix', async () => {
+  /*
+   * A MISSING KEY IS A STATE, NOT A FAILURE. This app is shared free and most
+   * of it works with no keys at all, so an absent key means an optional feature
+   * is off. It answers 200 with a status the UI renders as a plain line, rather
+   * than a 500 the UI renders in hazard red beside real warnings.
+   */
+  it('reports a missing key as a state, not an error', async () => {
     const response = await POST(post({ image: 'AAAA' }))
-    expect(response.status).toBe(500)
+    expect(response.status).toBe(200)
     const body = (await response.json()) as { status: string; message: string }
-    expect(body.status).toBe('error')
-    expect(body.message).toContain('ANTHROPIC_API_KEY')
-    expect(body.message).toContain('vercel dev')
+    expect(body.status).toBe('no-key')
+    expect(body.message).toMatch(/Anthropic key/i)
+    // It names the feature that is off, not the environment variable.
+    expect(body.message).not.toContain('ANTHROPIC_API_KEY')
   })
 
   it('rejects a request with no map image', async () => {

@@ -354,12 +354,13 @@ export async function POST(request: Request): Promise<Response> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
     return Response.json(
-      {
-        status: 'error',
-        message:
-          'ANTHROPIC_API_KEY is not set. Copy .env.example to .env, add your own key, and run `vercel dev`.',
-      },
-      { status: 500 },
+      /*
+        * A MISSING KEY IS A STATE, NOT A FAILURE. This app is shared free and
+        * most of it works with no keys at all, so an absent key is a feature
+        * being off rather than something going wrong. HTTP 200 and a status the
+        * UI can render as a plain line, which is what streetview already did.
+        */
+      { status: 'no-key', message: 'Suggesting positions needs an Anthropic key.' },
     )
   }
 

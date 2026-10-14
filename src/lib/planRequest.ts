@@ -282,7 +282,7 @@ export function buildGenerateBody(
 }
 
 export interface GenerateResponse {
-  status: 'ok' | 'error'
+  status: 'ok' | 'error' | 'no-key'
   raw?: string
   message?: string
   stopReason?: string | null
@@ -357,6 +357,14 @@ export type GenerationState =
   /** Mid flight, on the named step. Nothing here is inferred from elapsed time. */
   | { status: 'working'; stage: GenerateStage }
   | { status: 'error'; message: string }
+  /**
+   * The feature is off because the server has no key for it.
+   *
+   * SEPARATE FROM 'error' ON PURPOSE. Nothing is wrong, a optional feature is
+   * simply not configured, and showing that in hazard red next to real warnings
+   * teaches people to ignore the colour that means a position is in the water.
+   */
+  | { status: 'no-key'; message: string }
   /** Parsing failed. The raw response is shown rather than a dead end. */
   | { status: 'raw'; reason: string; raw: string }
   | { status: 'done'; count: number; dropped: number }
