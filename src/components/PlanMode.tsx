@@ -14,7 +14,7 @@ import { ConditionsPanel } from './ConditionsPanel.tsx'
 import { ConePicker, type ConeMode } from './ConePicker.tsx'
 import { FieldPackControl, type PackBuildState } from './FieldPackControl.tsx'
 import { MapControls } from './MapControls.tsx'
-import { MapView, type MapHandle, type TapMode } from './MapView.tsx'
+import { MapView, type MapHandle } from './MapView.tsx'
 import { OverflowMenu } from './OverflowMenu.tsx'
 import { PlanStatus } from './PlanStatus.tsx'
 import { PositionCard } from './PositionCard.tsx'
@@ -28,11 +28,7 @@ interface PlanModeProps {
   mapHandle: React.Ref<MapHandle>
   venue: LatLon | null
   onVenueChange: (at: LatLon) => void
-  subject: LatLon | null
-  onSubjectChange: (at: LatLon) => void
   onLongPress: (at: LatLon) => void
-  tapMode: TapMode
-  onTapMode: (next: TapMode) => void
   plan: PlannedPosition[]
   visiblePlan: PlannedPosition[]
   conePlan: PlannedPosition[]
@@ -112,11 +108,7 @@ export function PlanMode({
   mapHandle,
   venue,
   onVenueChange,
-  subject,
-  onSubjectChange,
   onLongPress,
-  tapMode,
-  onTapMode,
   plan,
   visiblePlan,
   conePlan,
@@ -205,9 +197,7 @@ export function PlanMode({
         handle={mapHandle}
         venue={venue}
         onVenueChange={onVenueChange}
-        subject={subject}
-        onSubjectChange={onSubjectChange}
-        mode={placing ? 'add' : tapMode}
+        mode={placing ? 'add' : null}
         onAddAt={onAddAt}
         plan={visiblePlan}
         conePlan={conePlan}
@@ -238,6 +228,14 @@ export function PlanMode({
         * version is the honest one: those numbers belong to a MOMENT, and the
         * scrubber is what chooses the moment.
         */}
+      {/*
+        * ARMED, SAID ON THE MAP IN WORDS. The button says what it is for; this
+        * says what the map is now waiting for, where the waiting happens. An
+        * icon would be one more thing to decode on a screen that just lost two
+        * markers for being undecodable.
+        */}
+      {!placing ? null : <p className="tapnote">Tap where you&rsquo;ll stand</p>}
+
       <header className="hud">
         <div className="hud__row">
           {/* The single control that reveals sun and tide detail. */}
@@ -254,12 +252,7 @@ export function PlanMode({
             isolatedId={isolatedId}
             onClearIsolate={onClearIsolate}
           />
-          <OverflowMenu
-            mode={tapMode}
-            onMode={onTapMode}
-            showArc={showArc}
-            onShowArc={onShowArc}
-          />
+          <OverflowMenu showArc={showArc} onShowArc={onShowArc} />
         </div>
       </header>
 

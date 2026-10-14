@@ -1892,42 +1892,6 @@
   }
 }
 
-.reticle-mark {
-  position: relative;
-  width: 34px;
-  height: 34px;
-  cursor: grab;
-}
-
-.reticle-mark__box {
-  position: absolute;
-  inset: 32%;
-  border: var(--line-rule) solid var(--mark);
-  outline: var(--line-hair) solid var(--mark-edge);
-}
-
-.reticle-mark__bar {
-  position: absolute;
-  background: var(--mark);
-  outline: var(--line-hair) solid var(--mark-edge);
-}
-
-.reticle-mark__bar--h {
-  left: 0;
-  right: 0;
-  top: 50%;
-  height: var(--line-rule);
-  transform: translateY(-50%);
-}
-
-.reticle-mark__bar--v {
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  width: var(--line-rule);
-  transform: translateX(-50%);
-}
-
 /* --------------------------------------------------------- shooter figure */
 
 /*
@@ -1938,9 +1902,46 @@
  * that arbitration, which is why it looked fine in a headless browser and did
  * not work on a phone. `none` hands the gesture to maplibre.
  */
-.shooter-host,
+/*
+ * SHRINK TO FIT, AND THIS IS LOAD BEARING.
+ *
+ * A maplibre marker is positioned by translating ITS OWN BOX: anchor 'bottom'
+ * means translate(-50%, -100%), and the percentages are of the element, not of
+ * the thing drawn inside it. This host is a bare div, so without a width it is
+ * block level and stretches to the marker container, which on a phone is 390px.
+ * The anchor then shifted it -195px and the figure drew nearly half a screen
+ * left of the coordinate it belongs to, while the cone, computed from the
+ * stored coordinate, was drawn correctly somewhere else entirely.
+ *
+ * The venue pin never had this because .pin states an 18px box. That is the
+ * whole difference between the marker that was right and the markers that were
+ * wrong.
+ */
+.shooter-host {
+  width: max-content;
+  height: max-content;
+}
+
+/*
+ * THE HOST MUST NOT BE POSITIONED, and this was the second half of the bug.
+ *
+ * MapLibre's own stylesheet sets `position: absolute` on .maplibregl-marker so
+ * that the transform it writes translates from the container's origin. This
+ * rule used to include .shooter-host and overrode that with `relative`, which
+ * means the marker was laid out in NORMAL FLOW first and translated from
+ * wherever it happened to land. The canvas container is static, so every
+ * marker sat below the ones before it: measured, the first position drew 34px
+ * low and the second 84px, because the first had pushed it down.
+ *
+ * .shooter keeps `relative` because the hazard flag is absolutely positioned
+ * against it. The HOST stays unpositioned so maplibre's absolute wins.
+ */
 .shooter {
   position: relative;
+}
+
+.shooter-host,
+.shooter {
   touch-action: none;
   -webkit-user-select: none;
   user-select: none;
@@ -3375,43 +3376,6 @@
   color: var(--color-text-muted);
 }
 
-.reticle {
-  position: absolute;
-  width: 2.25rem;
-  height: 2.25rem;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-}
-
-.reticle__box {
-  position: absolute;
-  inset: 30%;
-  border: var(--line-rule) solid var(--mark);
-  outline: var(--line-hair) solid var(--mark-edge);
-}
-
-.reticle__bar {
-  position: absolute;
-  background: var(--mark);
-  outline: var(--line-hair) solid var(--mark-edge);
-}
-
-.reticle__bar--h {
-  left: 0;
-  right: 0;
-  top: 50%;
-  height: var(--line-rule);
-  transform: translateY(-50%);
-}
-
-.reticle__bar--v {
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  width: var(--line-rule);
-  transform: translateX(-50%);
-}
-
 .capture__caption {
   font-size: var(--text-xs);
   color: var(--color-text-faint);
@@ -4447,4 +4411,24 @@
 .notice--off {
   border-left-color: var(--color-accent-2-dim);
   color: var(--color-text-muted);
+}
+
+/*
+ * Said on the map, while the map is armed. Solid, because it sits on satellite
+ * imagery, and centred near the top where it cannot be under a thumb.
+ */
+.tapnote {
+  position: absolute;
+  z-index: 5;
+  top: calc(var(--space-3) + var(--safe-top) + var(--control-height) + var(--space-2));
+  left: 50%;
+  transform: translateX(-50%);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-panel);
+  border: var(--line-hair) solid var(--color-accent-2);
+  border-radius: var(--radius-panel);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  pointer-events: none;
 }

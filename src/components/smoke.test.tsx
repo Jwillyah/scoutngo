@@ -78,10 +78,17 @@ describe('render smoke', () => {
     expect(html).not.toContain('plate__reach')
   })
 
-  it('shows one mark on the setup map, and says it can be moved', () => {
+  /*
+   * ONE PIN, EVERYWHERE. Two near-identical white marks a few metres apart,
+   * both unlabelled, could not be told apart by someone seeing the app for the
+   * first time. The pin is the thing being shot; positions are where you shoot
+   * from; there is no third thing.
+   */
+  it('shows one mark on the setup map and no second one anywhere', () => {
     expect(html).toContain('class="setup__map"')
-    // The crosshair is a PLAN concept now; SETUP renders no subject marker.
-    expect(html).not.toContain('reticle-mark')
+    expect(html).not.toContain('reticle')
+    expect(html).not.toContain('Move the subject')
+    expect(html).not.toContain('Set subject')
   })
 
   it('offers one description input and the kit as chips', () => {

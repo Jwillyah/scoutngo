@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { type ConeMode } from './components/ConePicker.tsx'
-import { type MapHandle, type TapMode } from './components/MapView.tsx'
+import { type MapHandle } from './components/MapView.tsx'
 import { ModeRail } from './components/ModeRail.tsx'
 import { FieldMode } from './components/FieldMode.tsx'
 import { PlanMode } from './components/PlanMode.tsx'
@@ -128,12 +128,6 @@ function App() {
     /* The venue name, while it is a reverse geocode or a placeholder. */
     name: false,
   }))
-  /*
-   * The subject falls back to the venue coordinate until it is placed by hand.
-   * Searching a new venue clears it, so it follows the new place rather than
-   * pointing every cone back at the old town.
-   */
-  const [subject, setSubject] = useState<LatLon | null>(null)
   const [positions, setPositions] = useState<CameraPosition[]>([])
   const [generation, setGeneration] = useState<GenerationState>({ status: 'idle' })
   /* Real OSM shapes for the generated view. Empty until Overpass answers. */
@@ -154,7 +148,6 @@ function App() {
    * inside PlanMode, because it is a detail of that mode rather than of the app.
    */
   const [mode, setMode] = useState<Mode>('setup')
-  const [tapMode, setTapMode] = useState<TapMode>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   /*
@@ -246,7 +239,14 @@ function App() {
   const errors = useMemo(() => validateVenue(venue), [venue])
   const venueWindow = useMemo(() => resolveWindow(venue), [venue])
   const centre = useMemo(() => venueLatLon(venue), [venue])
-  const aim = subject ?? centre
+  /*
+   * ONE PIN. It is the thing being shot: it centres the map, it anchors the sun
+   * and tide and timezone, and every cone bearing is measured to it. There used
+   * to be a second "subject" coordinate that defaulted to this one and could be
+   * moved separately, which put two near-identical white marks a few metres
+   * apart with nothing to say which was which.
+   */
+  const aim = centre
 
   /* The moment the scrubber is sitting on. */
   const scrubbedAt = useMemo(() => {
@@ -555,7 +555,6 @@ function App() {
       cancelNameLookup()
       setDefaults((d) => ({ ...d, name: false }))
       setBriefAnchor({ at: pin.at })
-      setSubject(null)
       setPositions([])
       setGeneration({ status: 'idle' })
       return null
@@ -564,17 +563,8 @@ function App() {
 
   const cancelPin = useCallback(() => setPendingPin(null), [])
 
-  /* Long press: venue first if it is unset, otherwise the subject. */
-  const onLongPress = useCallback(
-    (at: LatLon) => {
-      if (centre === null) {
-        dropVenuePin(at)
-      } else {
-        setSubject(at)
-      }
-    },
-    [centre, dropVenuePin],
-  )
+  /* Long press drops the pin. With one pin there is nothing else it can mean. */
+  const onLongPress = useCallback((at: LatLon) => dropVenuePin(at), [dropVenuePin])
 
   const clearBrief = () => {
     setVenue((current) => ({ ...current, eventDescription: '', desiredOutcome: '' }))
@@ -598,7 +588,6 @@ function App() {
       name,
       savedAt: new Date().toISOString(),
       venue,
-      subject,
       kit,
       positions,
     }
@@ -610,7 +599,6 @@ function App() {
     cancelNameLookup()
     nameIsFilled.current = false
     setDefaults({ date: false, window: false, name: false })
-    setSubject(spot.subject)
     setKit(spot.kit)
     setPositions(spot.positions)
     setBriefAnchor(null)
@@ -1084,11 +1072,7 @@ function App() {
           mapHandle={mapHandle}
           venue={centre}
           onVenueChange={onVenueChange}
-          subject={aim}
-          onSubjectChange={setSubject}
           onLongPress={onLongPress}
-          tapMode={tapMode}
-          onTapMode={setTapMode}
           plan={plan}
           visiblePlan={visiblePlan}
           conePlan={conePlan}

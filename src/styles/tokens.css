@@ -137,7 +137,7 @@
   --sun-shadow: #9aa7ff; /* current shadow bearing */
   --sun-rise: #ffa04a; /* sunrise bearing */
   --sun-set: #ff5fa8; /* sunset bearing. NOT the magenta hazard token. */
-  --mark: #ffffff; /* subject reticle and venue pin */
+  --mark: #ffffff; /* the venue pin */
   --mark-edge: #0a0b09; /* the dark edging that keeps a mark legible on imagery */
 
   /* --------------------------------------------- chart fallback, unused yet */

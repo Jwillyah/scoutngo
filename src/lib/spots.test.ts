@@ -18,7 +18,6 @@ const spot = (over: Partial<Spot> = {}): Spot => ({
   name: 'Brew River',
   savedAt: '2026-09-12T12:00:00.000Z',
   venue: CALIBRATION_VENUE,
-  subject: { lat: 38.3639, lon: -75.6058 },
   kit: defaultSelection(DEFAULT_KIT),
   positions: [],
   ...over,
@@ -32,7 +31,6 @@ describe('export and import round trip', () => {
     if (!result.ok) return
     expect(result.spots[0].name).toBe('Brew River')
     expect(result.spots[0].venue.latitude).toBe(CALIBRATION_VENUE.latitude)
-    expect(result.spots[0].subject).toEqual({ lat: 38.3639, lon: -75.6058 })
   })
 
   it('accepts a bare array as well as the wrapped file', () => {
@@ -102,7 +100,6 @@ describe('the same place, searched two ways', () => {
     name: 'Rodanthe',
     savedAt: '2026-10-01T10:00:00.000Z',
     venue: { ...EMPTY_VENUE, name: 'Rodanthe' },
-    subject: null,
     kit: { bodyIds: [], lensIds: [], droneIds: [], styleNotes: '' },
     positions: [],
     ...over,

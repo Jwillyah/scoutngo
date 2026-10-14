@@ -183,11 +183,12 @@ function captureImageryOnly(instance: maplibregl.Map): string {
 /**
  * What a tap on the map does.
  *
- * 'add' is the one that is usually on: manual placement is the primary way to
- * build a plan, so arming the map to drop a position is a first class mode
- * rather than an editing afterthought.
+ * ONE PIN AND ONE KIND OF TAP. There used to be a 'venue' mode and a 'subject'
+ * mode, which put two near-identical white marks a few metres apart and asked
+ * the shooter to know which was which. The pin is the thing being shot and
+ * positions are where you shoot from; there is nothing else to move.
  */
-export type TapMode = 'venue' | 'subject' | 'add' | null
+export type TapMode = 'add' | null
 
 export interface CameraState {
   center: [number, number]
@@ -262,8 +263,6 @@ interface MapViewProps {
   handle?: React.Ref<MapHandle>
   venue: LatLon | null
   onVenueChange: (next: LatLon) => void
-  subject: LatLon | null
-  onSubjectChange: (next: LatLon) => void
   mode: TapMode
   /** Every position, drawn as a marker. */
   plan: PlannedPosition[]
@@ -331,10 +330,10 @@ function coneCollection(plan: PlannedPosition[]): GeoJSON.FeatureCollection {
 }
 
 function sunCollection(
-  subject: LatLon | null,
+  pin: LatLon | null,
   azimuth: number | null,
 ): GeoJSON.FeatureCollection {
-  if (subject === null || azimuth === null) return emptyCollection()
+  if (pin === null || azimuth === null) return emptyCollection()
   return {
     type: 'FeatureCollection',
     features: [
@@ -343,7 +342,7 @@ function sunCollection(
         properties: { azimuth },
         geometry: {
           type: 'LineString',
-          coordinates: axisLine(subject, azimuth, SUN_LINE_HALF_METERS),
+          coordinates: axisLine(pin, azimuth, SUN_LINE_HALF_METERS),
         },
       },
     ],
@@ -401,8 +400,6 @@ export function MapView({
   handle,
   venue,
   onVenueChange,
-  subject,
-  onSubjectChange,
   mode,
   plan,
   conePlan,
@@ -426,7 +423,6 @@ export function MapView({
   const map = useRef<maplibregl.Map | null>(null)
   const venueMarker = useRef<maplibregl.Marker | null>(null)
   const hintMarker = useRef<maplibregl.Marker | null>(null)
-  const subjectMarker = useRef<maplibregl.Marker | null>(null)
   const figureMarkers = useRef(new Map<string, maplibregl.Marker>())
   const rayLabels = useRef<maplibregl.Marker[]>([])
   const draggedRecently = useRef(new Set<string>())
@@ -449,7 +445,6 @@ export function MapView({
   const latest = useRef({
     mode,
     onVenueChange,
-    onSubjectChange,
     onSelect,
     onPositionMove,
     onPitchChange,
@@ -461,8 +456,7 @@ export function MapView({
     latest.current = {
       mode,
       onVenueChange,
-      onSubjectChange,
-      onSelect,
+        onSelect,
       onPositionMove,
       onPitchChange,
       onLongPress,
@@ -472,7 +466,6 @@ export function MapView({
   }, [
     mode,
     onVenueChange,
-    onSubjectChange,
     onSelect,
     onPositionMove,
     onPitchChange,
@@ -566,15 +559,10 @@ export function MapView({
        * deselected it, and the card never appeared.
        */
       const target = event.originalEvent.target as HTMLElement | null
-      if (target?.closest('.shooter-host, .pin, .reticle-mark, .ray-label') != null) return
+      if (target?.closest('.shooter-host, .pin, .ray-label') != null) return
 
       const next = { lat: event.lngLat.lat, lon: event.lngLat.lng }
-      if (l.mode === 'venue') {
-        selfMoved.current = true
-        l.onVenueChange(next)
-      } else if (l.mode === 'subject') {
-        l.onSubjectChange(next)
-      } else if (l.mode === 'add') {
+      if (l.mode === 'add') {
         l.onAddAt?.(next)
       } else {
         l.onSelect(null)
@@ -724,6 +712,24 @@ export function MapView({
     })
 
     map.current = instance
+
+    /*
+     * A TEST SEAM, and a deliberately narrow one.
+     *
+     * Projection bugs have shipped three times in this repo and each was found
+     * by eye rather than by a check. They cannot be caught from the outside:
+     * a marker in the wrong place looks identical to a marker in the right
+     * place on a map that has since panned, which is exactly what confounded
+     * the first attempt to measure this one.
+     *
+     * So with ?probe=1 the map instance is reachable and
+     * scripts/audit-projection.mjs can assert the round trips directly. Absent
+     * otherwise, including in production, where the query string is not set.
+     */
+    if (new URLSearchParams(window.location.search).get('probe') === '1') {
+      ;(window as unknown as { __probe?: unknown }).__probe = { map: instance }
+    }
+
     return () => {
       cancelPress()
       instance.remove()
@@ -734,7 +740,7 @@ export function MapView({
        * effects see a non-null ref, take their "already exists" branch, and
        * call setLngLat on an orphan that was never added to the new map. React
        * StrictMode remounts once in development, which is exactly this path,
-       * and it is why the venue pin and the subject reticle were invisible in
+       * and it is why the venue pin and the shooter figures were invisible in
        * dev while working in a production build.
        *
        * ANY NEW MARKER REF BELONGS IN THIS LIST. The first-run pin hint was
@@ -743,7 +749,6 @@ export function MapView({
        */
       venueMarker.current = null
       hintMarker.current = null
-      subjectMarker.current = null
       figures.clear()
       setFigureEls({})
       setReady(false)
@@ -990,36 +995,6 @@ export function MapView({
     }
   }, [venue, pinHint])
 
-  /* ------------------------------------------------------- subject marker */
-  useEffect(() => {
-    const instance = map.current
-    if (instance === null) return
-
-    if (subject === null) {
-      subjectMarker.current?.remove()
-      subjectMarker.current = null
-      return
-    }
-
-    if (subjectMarker.current === null) {
-      const el = makeMarkerElement('reticle-mark')
-      el.innerHTML =
-        '<span class="reticle-mark__bar reticle-mark__bar--h"></span>' +
-        '<span class="reticle-mark__bar reticle-mark__bar--v"></span>' +
-        '<span class="reticle-mark__box"></span>'
-      const marker = new maplibregl.Marker({ element: el, draggable: true, anchor: 'center' })
-      // Moving the subject re-aims every cone at once.
-      marker.on('dragend', () => {
-        const { lng, lat } = marker.getLngLat()
-        latest.current.onSubjectChange({ lat, lon: lng })
-      })
-      marker.setLngLat([subject.lon, subject.lat]).addTo(instance)
-      subjectMarker.current = marker
-    } else {
-      subjectMarker.current.setLngLat([subject.lon, subject.lat])
-    }
-  }, [subject])
-
   /* --------------------------------------------------- cones and sun line */
   useEffect(() => {
     if (map.current === null || !ready) return
@@ -1030,8 +1005,8 @@ export function MapView({
   useEffect(() => {
     if (map.current === null || !ready) return
     const sun = map.current.getSource(SUN_SOURCE) as maplibregl.GeoJSONSource | undefined
-    sun?.setData(sunCollection(subject, sunAzimuth))
-  }, [subject, sunAzimuth, ready])
+    sun?.setData(sunCollection(venue, sunAzimuth))
+  }, [venue, sunAzimuth, ready])
 
   useEffect(() => {
     if (map.current === null || !ready) return

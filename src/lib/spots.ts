@@ -7,7 +7,6 @@
  * is the entire backup story, and it is deliberate.
  */
 
-import type { LatLon } from '../core/geo.ts'
 import type { KitSelection } from './kitSelection.ts'
 import type { CameraPosition } from './plan.ts'
 import type { VenueDraft } from './venue.ts'
@@ -22,7 +21,6 @@ export interface Spot {
   /** ISO string, so an exported file is readable and stable. */
   savedAt: string
   venue: VenueDraft
-  subject: LatLon | null
   kit: KitSelection
   positions: CameraPosition[]
   /**
@@ -61,7 +59,7 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
  */
 export function reviveSpot(raw: unknown): Spot | null {
   if (!isObject(raw)) return null
-  const { id, name, savedAt, venue, subject, kit, positions } = raw
+  const { id, name, savedAt, venue, kit, positions } = raw
 
   if (typeof id !== 'string' || typeof name !== 'string') return null
   if (!isObject(venue) || !isObject(kit)) return null
@@ -71,10 +69,6 @@ export function reviveSpot(raw: unknown): Spot | null {
     name,
     savedAt: typeof savedAt === 'string' ? savedAt : new Date().toISOString(),
     venue: venue as unknown as VenueDraft,
-    subject:
-      isObject(subject) && typeof subject.lat === 'number' && typeof subject.lon === 'number'
-        ? { lat: subject.lat, lon: subject.lon }
-        : null,
     kit: kit as unknown as KitSelection,
     positions: Array.isArray(positions) ? (positions as CameraPosition[]) : [],
     ...(typeof (raw as Record<string, unknown>).placeId === 'string'

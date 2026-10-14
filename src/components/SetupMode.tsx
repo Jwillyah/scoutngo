@@ -333,14 +333,6 @@ export function SetupMode({
           handle={mapHandle}
           venue={pendingPin?.at ?? at}
           onVenueChange={pendingPin === null ? onPinChange : onPendingMove}
-          /*
-           * ONE PIN. The subject crosshair used to sit here on top of the venue
-           * pin: two marks for one place, inviting the question of which one was
-           * the venue. The subject is a PLAN concept now. It defaults to this
-           * pin and is only moved when the action is offset from the venue.
-           */
-          subject={null}
-          onSubjectChange={() => {}}
           mode={null}
           plan={[]}
           conePlan={[]}
