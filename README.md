@@ -27,6 +27,10 @@ account, no keys, no card.
   field of view, frame width, range, standoff bands, the reach ring
 - Siting checks against real OpenStreetMap data: in water, in a roadway, a
   drone path over a structure
+- A Ground / Air / Both filter, which decides both what the map shows and what
+  a generate is allowed to come back with
+- Air positions with an altitude in feet above ground, and a pilot position you
+  place to measure the distance from
 - Tide from NOAA, and the time scrubber that moves every one of those numbers
 - Shot lists, saved setups, the kit editor, Field mode, offline field packs
 - Installing it to your home screen and using it as an app
@@ -141,6 +145,31 @@ contribution to coverage. At 2532 that did not happen once.
 So 2532 stays. Note that total wall clock is *not* a valid comparison here:
 Overpass caches a bounding box server side, so whichever arm queries first in a
 pair looks slower for reasons that have nothing to do with the image.
+
+## Drones, and what this app will not tell you
+
+An air position carries an altitude in feet above ground level. The field
+defaults to 200 and stops at 400, which is the altitude limit in FAA Part 107.
+Putting the limit at the top of the field is a convenience, not a verdict:
+staying under it does not make a flight lawful, and this app does not know your
+airspace, your aircraft, your waiver, or your certificate.
+
+The altitude is in the arithmetic, not just printed. It used to be printed
+only, which meant a drone hovering 200 ft directly over the subject was
+reported as being 0 m away and framing 0.0 m, with no warning. The true figures
+are a 61 m slant range framing 91 m, which is a landscape rather than the shot.
+Range, frame width, the standoff band and the framing warnings all come off the
+slant range now.
+
+You can place a **pilot position**, and the map draws a dashed line from it to
+each air position. The card prints two numbers: the distance across the ground,
+and the real distance from the pilot to the aircraft, which at 400 ft is 122 m
+of it before any horizontal distance at all.
+
+**Those are measurements.** They are not a line-of-sight check, they are not a
+clearance, and they do not say whether a flight is permitted. The app computes
+the distance and shows it; the judgement is yours, because you are the one who
+can see the site and the sky.
 
 ## Privacy
 

@@ -1,3 +1,4 @@
+import { slantRangeMeters } from '../core/air.ts'
 import {
   classifyFraming,
   computeFOV,
@@ -107,8 +108,18 @@ export interface PlannedPosition {
   /**
    * The TRUE distance from the camera to the subject. This is the number shown
    * on the card and the one every framing judgement is made from.
+   *
+   * FOR AN AIR POSITION THIS IS THE SLANT RANGE, not the distance between two
+   * points on the map. A drone at 200ft hovering over the subject is 61m from
+   * it, not 0m. See src/core/air.ts for what that was getting wrong.
    */
   subjectRangeMeters: number
+  /**
+   * The distance ACROSS THE GROUND to the subject, which is what you pace out
+   * and what the cone is drawn from. Same as subjectRangeMeters for a ground
+   * position; shorter than it for an air one.
+   */
+  groundRangeMeters: number
   /**
    * How long the cone is DRAWN, which is not the same thing: it overshoots the
    * subject so the cone reads as pointing at it, and has a floor so a close
@@ -209,8 +220,29 @@ export function planPosition(
   const cameraBearing = bearingBetween(position.at, subject)
   const positionBearing = bearingBetween(subject, position.at)
 
-  const subjectRangeMeters = distanceMeters(position.at, subject)
-  const coneRangeMeters = Math.max(MIN_CONE_METERS, subjectRangeMeters * CONE_OVERSHOOT)
+  /*
+   * THE RANGE TO THE SUBJECT, WHICH FOR AN AIRCRAFT IS THE HYPOTENUSE.
+   *
+   * `groundRangeMeters` is the distance between two points on the map. For a
+   * ground position that is also the distance from the lens to the subject.
+   * For an air position it is not, and the difference is not small: at 200ft a
+   * drone hovering over the subject used to report a range of 0m and a frame
+   * width of 0.0m with no warning, where the truth is 61m and 91m. See
+   * src/core/air.ts.
+   */
+  const groundRangeMeters = distanceMeters(position.at, subject)
+  const subjectRangeMeters =
+    position.platform === 'air'
+      ? slantRangeMeters(groundRangeMeters, position.altitudeFeet)
+      : groundRangeMeters
+
+  /*
+   * The cone is drawn on the GROUND, so it is sized from the ground range. The
+   * cone is where the camera is looking across the map; the slant range is how
+   * far away the subject is through the air, and using one for the other would
+   * draw an air cone overshooting the subject by the altitude.
+   */
+  const coneRangeMeters = Math.max(MIN_CONE_METERS, groundRangeMeters * CONE_OVERSHOOT)
 
   return {
     position,
@@ -220,6 +252,7 @@ export function planPosition(
     cameraBearing,
     positionBearing,
     subjectRangeMeters,
+    groundRangeMeters,
     coneRangeMeters,
     frameWidthMeters: frameWidthMeters(subjectRangeMeters, fov.hFOV),
     standoff: standoffBand(fov.hFOV, position.platform),

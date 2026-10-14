@@ -6,7 +6,15 @@ import { FieldMode } from './components/FieldMode.tsx'
 import { PlanMode } from './components/PlanMode.tsx'
 import { SetupMode } from './components/SetupMode.tsx'
 import type { LatLon } from './core/geo.ts'
-import { DEFAULT_KIT, type KitProfile } from './core/kit.ts'
+import { DEFAULT_ALTITUDE_FEET } from './core/air.ts'
+import {
+  allowedPlatforms,
+  DEFAULT_PLATFORM_FILTER,
+  platformCounts,
+  showsPlatform,
+  type PlatformFilter,
+} from './core/platformFilter.ts'
+import { DEFAULT_KIT, selectedDroneCameras, type KitProfile } from './core/kit.ts'
 import { EMPTY_LANDCOVER, type Landcover } from './core/siting.ts'
 import { getSunArc, getSunPosition } from './core/sun.ts'
 import { extremesAround, tideStateAt } from './core/tide.ts'
@@ -27,6 +35,7 @@ import {
   duplicatePosition,
   movePosition,
   removePosition,
+  setAltitude,
   setOptic,
 } from './lib/positions.ts'
 import { assessPlan, planPositions, type CameraPosition } from './lib/plan.ts'
@@ -372,12 +381,29 @@ function App() {
   const drift = formatDrift(briefDriftMeters(briefAnchor, centre))
 
   /* Markers respect the lens filter; cones additionally respect isolate. */
-  const visiblePlan = useMemo(
-    () =>
-      lensFilters.length === 0
-        ? plan
-        : plan.filter((p) => lensFilters.includes(p.position.lensId)),
-    [plan, lensFilters],
+  /*
+   * GROUND, AIR OR BOTH. One choice, applied to what the map shows AND to what
+   * a generate is allowed to come back with, through the same predicate in
+   * src/core/platformFilter.ts. Two copies of that rule drift, and the way it
+   * shows up is a position in the plan that never appears on the map.
+   */
+  const [platformFilter, setPlatformFilter] = useState<PlatformFilter>(DEFAULT_PLATFORM_FILTER)
+
+  const visiblePlan = useMemo(() => {
+    const byPlatform = plan.filter((p) => showsPlatform(platformFilter, p.position.platform))
+    return lensFilters.length === 0
+      ? byPlatform
+      : byPlatform.filter((p) => lensFilters.includes(p.position.lensId))
+  }, [plan, lensFilters, platformFilter])
+
+  /** How many the platform choice is hiding, so the control can say so. */
+  const hiddenByPlatform = useMemo(
+    () => plan.length - plan.filter((p) => showsPlatform(platformFilter, p.position.platform)).length,
+    [plan, platformFilter],
+  )
+  const platformTally = useMemo(
+    () => platformCounts(plan.map((p) => ({ platform: p.position.platform }))),
+    [plan],
   )
   const conePlan = useMemo(() => {
     if (isolatedId !== null) return visiblePlan.filter((p) => p.position.id === isolatedId)
@@ -394,6 +420,21 @@ function App() {
    */
   const [placing, setPlacing] = useState(false)
 
+  /*
+   * WHERE THE PILOT STANDS. One position for the whole plan, because the pilot
+   * stands somewhere and the aircraft moves between hover points.
+   *
+   * Placed by tapping the map, like a position, and draggable afterwards. It
+   * is used for exactly one thing: measuring the distance to each air
+   * position. It is not a check and it does not gate anything.
+   */
+  const [pilotAt, setPilotAt] = useState<LatLon | null>(null)
+  const [placingPilot, setPlacingPilot] = useState(false)
+  const onPilotMove = useCallback((at: LatLon) => {
+    setPlacingPilot(false)
+    setPilotAt(at)
+  }, [])
+
   /* The glass a new position starts on: the first lens actually packed. */
   const defaultOptic = useMemo(() => {
     const lens =
@@ -403,17 +444,45 @@ function App() {
       : { lensId: lens.id, focalLength: lens.minFocalLength }
   }, [kit.lensIds, kitProfile])
 
+  /*
+   * WHAT A NEW POSITION IS, WHICH THE FILTER DECIDES.
+   *
+   * With the filter on Air, adding a GROUND position would drop something on
+   * the map and hide it in the same gesture. So the filter controls what you
+   * make as well as what you see, and the button says which it will be.
+   *
+   * An air position needs a drone CAMERA rather than a lens: the aircraft
+   * cannot mount the 200-600, and plan.ts resolves the optic by id. Fixed
+   * focal length, because the Air 3S cameras are not zooms.
+   */
+  const defaultAirOptic = useMemo(() => {
+    const camera = selectedDroneCameras(kitProfile, kit.droneIds)[0]
+    return camera === undefined
+      ? null
+      : { lensId: camera.id, focalLength: camera.equiv35 }
+  }, [kit.droneIds, kitProfile])
+
+  const addsAir = platformFilter === 'air' && defaultAirOptic !== null
+
   const addPositionAt = useCallback(
     (at: LatLon) => {
       setPlacing(false)
       setPositions((current) => {
-        const next = addPosition(current, { at, ...defaultOptic })
+        const next =
+          addsAir && defaultAirOptic !== null
+            ? addPosition(current, {
+                at,
+                ...defaultAirOptic,
+                platform: 'air',
+                altitudeFeet: DEFAULT_ALTITUDE_FEET,
+              })
+            : addPosition(current, { at, ...defaultOptic })
         const added = next[next.length - 1]
         if (added !== undefined) window.setTimeout(() => setSelectedId(added.id), 0)
         return next
       })
     },
-    [defaultOptic],
+    [defaultOptic, defaultAirOptic, addsAir],
   )
 
   const onDeletePosition = useCallback((id: string) => {
@@ -436,6 +505,11 @@ function App() {
 
   const onSetOptic = useCallback((id: string, lensId: string, focalLength: number) => {
     setPositions((current) => setOptic(current, id, lensId, focalLength))
+  }, [])
+
+  /* Clamped in core, so a typed 900 and a model's 900 both become 400. */
+  const onSetAltitude = useCallback((id: string, feet: number) => {
+    setPositions((current) => setAltitude(current, id, feet))
   }, [])
 
   /*
@@ -861,6 +935,11 @@ function App() {
             },
         desiredShots.map((shot) => shot.text),
         reachMeters,
+        /*
+         * The Ground/Air/Both choice. Asked for here and enforced in the
+         * parser, so a plan can never contain a platform the map is hiding.
+         */
+        allowedPlatforms(platformFilter),
       ),
     )
     /*
@@ -890,6 +969,7 @@ function App() {
       droneAvailable(kit),
       selectedDroneCameraSpecs(kit),
       desiredShots.length,
+      allowedPlatforms(platformFilter),
     )
     if (!parsed.ok) {
       setGeneration({ status: 'raw', reason: parsed.reason, raw: parsed.raw })
@@ -1116,6 +1196,17 @@ function App() {
           plan={plan}
           visiblePlan={visiblePlan}
           conePlan={conePlan}
+          platformFilter={platformFilter}
+          onPlatformFilter={setPlatformFilter}
+          platformCounts={platformTally}
+          hiddenByPlatform={hiddenByPlatform}
+          airAvailable={droneAvailable(kit)}
+          pilotAt={pilotAt}
+          onPilotMove={onPilotMove}
+          addsAir={addsAir}
+          placingPilot={placingPilot}
+          onPlacingPilot={setPlacingPilot}
+          onSetAltitude={onSetAltitude}
           planCoverage={plan.length === 0 ? null : planCoverage}
           onPositionMove={onPositionMove}
           sun={sun}

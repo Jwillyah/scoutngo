@@ -20,6 +20,8 @@ export const RADIUS_SOURCE = 'reach-radius'
 export const CONE_SOURCE = 'fov-cones'
 export const SUN_SOURCE = 'sun-axis'
 export const RAY_SOURCE = 'sun-rays'
+/** The measured line from the pilot to each air position. */
+export const PILOT_SOURCE = 'pilot-links'
 
 /** Every source this app draws with. The basemap is NOT here and must not be. */
 export const APP_SOURCES: readonly string[] = [
@@ -27,6 +29,7 @@ export const APP_SOURCES: readonly string[] = [
   CONE_SOURCE,
   SUN_SOURCE,
   RAY_SOURCE,
+  PILOT_SOURCE,
 ]
 
 /**

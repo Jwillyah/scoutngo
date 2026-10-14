@@ -31,6 +31,7 @@ import {
 import {
   appLayerIdsIn,
   CONE_SOURCE,
+  PILOT_SOURCE,
   RADIUS_SOURCE,
   RAY_SOURCE,
   SUN_SOURCE,
@@ -201,7 +202,13 @@ function captureImageryOnly(instance: maplibregl.Map): string {
  * the shooter to know which was which. The pin is the thing being shot and
  * positions are where you shoot from; there is nothing else to move.
  */
-export type TapMode = 'add' | null
+/**
+ * What the next tap on the map does.
+ *
+ * Both arming modes disarm themselves after one tap. A mode that stays on is a
+ * mode you forget you are in and then wonder why the map stopped behaving.
+ */
+export type TapMode = 'add' | 'pilot' | null
 
 export interface CameraState {
   center: [number, number]
@@ -281,6 +288,15 @@ interface MapViewProps {
   plan: PlannedPosition[]
   /** The subset whose cones are drawn. Filtering lives in App. */
   conePlan: PlannedPosition[]
+  /**
+   * Where the pilot is standing. Null until it is placed.
+   *
+   * Drawn as a marker with a dashed line to every air position. It is a
+   * measured separation, not a statement that the flight is permitted.
+   */
+  pilotAt?: LatLon | null
+  /** Dragged the pilot marker. */
+  onPilotMove?: (at: LatLon) => void
   onPositionMove: (id: string, next: LatLon) => void
   /** Long press drops the venue if it is unset, otherwise the subject. */
   onLongPress: (at: LatLon) => void
@@ -338,6 +354,33 @@ function coneCollection(plan: PlannedPosition[]): GeoJSON.FeatureCollection {
         platform: p.position.platform,
       },
       geometry: { type: 'Polygon', coordinates: p.cone },
+    })),
+  }
+}
+
+/**
+ * The line from the pilot to each air position.
+ *
+ * ONE PILOT, SEVERAL AIRCRAFT POSITIONS. The pilot stands in one place and the
+ * aircraft moves between hover points, so there is one line per air position
+ * rather than one line. Ground positions get none: there is nothing to measure.
+ */
+function pilotCollection(
+  pilot: LatLon | null,
+  plan: PlannedPosition[],
+): GeoJSON.FeatureCollection {
+  if (pilot === null) return emptyCollection()
+  const air = plan.filter((p) => p.position.platform === 'air')
+  if (air.length === 0) return emptyCollection()
+  return {
+    type: 'FeatureCollection',
+    features: air.map((p) => ({
+      type: 'Feature',
+      properties: { id: p.position.id, number: p.position.number },
+      geometry: {
+        type: 'LineString',
+        coordinates: [toPosition(pilot), toPosition(p.position.at)],
+      },
     })),
   }
 }
@@ -445,6 +488,8 @@ export function MapView({
   pinHint = null,
   onPinDrag,
   onReady,
+  pilotAt = null,
+  onPilotMove,
 }: MapViewProps) {
   const container = useRef<HTMLDivElement>(null)
   const map = useRef<maplibregl.Map | null>(null)
@@ -478,6 +523,7 @@ export function MapView({
     onLongPress,
     onPinDrag,
     onAddAt,
+    onPilotMove,
   })
   useEffect(() => {
     latest.current = {
@@ -489,6 +535,7 @@ export function MapView({
       onLongPress,
       onPinDrag,
       onAddAt,
+      onPilotMove,
     }
   }, [
     mode,
@@ -499,6 +546,7 @@ export function MapView({
     onLongPress,
     onPinDrag,
     onAddAt,
+    onPilotMove,
   ])
 
   const selfMoved = useRef(false)
@@ -597,6 +645,8 @@ export function MapView({
       const next = { lat: event.lngLat.lat, lon: event.lngLat.lng }
       if (l.mode === 'add') {
         l.onAddAt?.(next)
+      } else if (l.mode === 'pilot') {
+        l.onPilotMove?.(next)
       } else {
         l.onSelect(null)
       }
@@ -646,6 +696,7 @@ export function MapView({
       instance.addSource(CONE_SOURCE, { type: 'geojson', data: emptyCollection() })
       instance.addSource(SUN_SOURCE, { type: 'geojson', data: emptyCollection() })
       instance.addSource(RAY_SOURCE, { type: 'geojson', data: emptyCollection() })
+      instance.addSource(PILOT_SOURCE, { type: 'geojson', data: emptyCollection() })
 
       const rayColor = [
         'match',
@@ -739,6 +790,39 @@ export function MapView({
         type: 'line',
         source: RAY_SOURCE,
         paint: { 'line-color': rayColor, 'line-width': 2, 'line-opacity': 0.35 },
+      })
+
+      /*
+       * THE PILOT LINE. Where the pilot is standing, to where the aircraft is.
+       *
+       * Dashed, like the air cone, because it is not something on the ground
+       * you can walk along. It is a MEASURED SEPARATION and nothing more: it
+       * does not say the aircraft can be seen from there, and it does not say
+       * a flight is permitted. The length is printed on the card.
+       *
+       * The secondary accent, not red. Red is hazard in this app and a measured
+       * distance is not a hazard.
+       */
+      instance.addLayer({
+        id: 'pilot-line-casing',
+        type: 'line',
+        source: PILOT_SOURCE,
+        paint: {
+          'line-color': readToken('--mark-edge'),
+          'line-width': 5,
+          'line-opacity': 0.3,
+        },
+      })
+      instance.addLayer({
+        id: 'pilot-line',
+        type: 'line',
+        source: PILOT_SOURCE,
+        paint: {
+          'line-color': readToken('--color-accent-2', '#c9a227', container.current),
+          'line-width': 2,
+          'line-dasharray': [4, 3],
+          'line-opacity': 0.95,
+        },
       })
 
       setReady(true)
@@ -1044,6 +1128,45 @@ export function MapView({
     const cones = map.current.getSource(CONE_SOURCE) as maplibregl.GeoJSONSource | undefined
     cones?.setData(coneCollection(conePlan))
   }, [conePlan, ready])
+
+  /*
+   * THE PILOT MARKER. Draggable, like the venue pin, because where you stand
+   * is a decision made by looking at the site rather than by typing.
+   */
+  const pilotMarker = useRef<maplibregl.Marker | null>(null)
+  useEffect(() => {
+    const instance = map.current
+    if (instance === null) return
+    if (pilotAt === null) {
+      pilotMarker.current?.remove()
+      pilotMarker.current = null
+      return
+    }
+    if (pilotMarker.current === null) {
+      const el = makeMarkerElement('pin pin--pilot')
+      el.textContent = 'P'
+      el.title = 'Pilot position'
+      const marker = new maplibregl.Marker({ element: el, draggable: true, anchor: 'bottom' })
+      marker.on('dragend', () => {
+        const { lng, lat } = marker.getLngLat()
+        latest.current.onPilotMove?.({ lat, lon: lng })
+      })
+      marker.setLngLat([pilotAt.lon, pilotAt.lat]).addTo(instance)
+      pilotMarker.current = marker
+    } else {
+      pilotMarker.current.setLngLat([pilotAt.lon, pilotAt.lat])
+    }
+  }, [pilotAt])
+
+  /*
+   * The pilot lines. Sized from real coordinates, so unlike the bearing lines
+   * they have a length of their own and do not care about the viewport.
+   */
+  useEffect(() => {
+    if (map.current === null || !ready) return
+    const links = map.current.getSource(PILOT_SOURCE) as maplibregl.GeoJSONSource | undefined
+    links?.setData(pilotCollection(pilotAt, plan))
+  }, [pilotAt, plan, ready])
 
   /*
    * THE SUN LINE AND THE RAYS, SIZED TO THE VIEWPORT.

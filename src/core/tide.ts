@@ -23,6 +23,7 @@
  */
 
 import { distanceMeters, type LatLon } from './geo.ts'
+import { feetToMeters } from './reachScale.ts'
 
 export interface TideStation {
   id: string
@@ -131,9 +132,8 @@ export interface TideState {
   previous: TideExtreme | null
 }
 
-const FEET_TO_METRES = 0.3048
-
-export const feetToMetres = (feet: number): number => feet * FEET_TO_METRES
+/** Kept as the tide module's name for it; the arithmetic is in reachScale.ts. */
+export const feetToMetres = (feet: number): number => feetToMeters(feet)
 
 /**
  * The water level at an arbitrary moment, interpolated between the two nearest

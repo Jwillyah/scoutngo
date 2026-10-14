@@ -1,3 +1,4 @@
+import type { Platform } from '../core/platformFilter.ts'
 import { computeFOV, SENSORS, standoffBand } from '../core/fov.ts'
 import { DEFAULT_KIT, resolveSensor, selectedDroneCameras } from '../core/kit.ts'
 import { getSunPosition, normalizeBearing } from '../core/sun.ts'
@@ -177,6 +178,11 @@ export interface GenerateRequestBody {
   timeZoneLabel: string
   style: string
   drones: string[]
+  /**
+   * Which platforms this plan may use. Always at least one. The prompt reads
+   * this to say "ground only" or "air only" rather than offering both.
+   */
+  platforms: Platform[]
   /** Ground lenses and drone cameras, each with its computed standoff band. */
   optics: OpticSpec[]
   /** Sun azimuth and altitude across the window, computed before the call. */
@@ -251,6 +257,15 @@ export function buildGenerateBody(
   requiredShots: string[] = [],
   /** The reach ring drawn on the setup map. */
   reachMeters?: number,
+  /**
+   * Which platforms the Ground/Air/Both choice allows.
+   *
+   * ASKED HERE, ENFORCED IN THE PARSER. Telling the model is the polite half;
+   * parsePlanResponse drops anything outside this regardless, because a model
+   * is free to ignore an instruction and a position the map would then hide is
+   * worse than no position at all.
+   */
+  platforms: readonly Platform[] = ['ground', 'air'],
 ): GenerateRequestBody {
   return {
     venueName: venue.name,
@@ -262,6 +277,7 @@ export function buildGenerateBody(
     timeZoneLabel,
     style: kit.styleNotes,
     drones: selectedDroneNames(kit),
+    platforms: [...platforms],
     optics: selectedOptics(kit),
     sun,
     ...(tide === undefined ? {} : { tide }),

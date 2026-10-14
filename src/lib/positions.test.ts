@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { MAX_ALTITUDE_FEET, MIN_ALTITUDE_FEET } from '../core/air.ts'
 import type { CameraPosition } from './plan.ts'
 import {
   addPosition,
@@ -7,6 +8,7 @@ import {
   movePosition,
   removePosition,
   renumber,
+  setAltitude,
   setOptic,
 } from './positions.ts'
 
@@ -124,5 +126,53 @@ describe('setOptic', () => {
     expect(after[1].focalLength).toBe(70)
     expect(after[1].at).toEqual(list[1].at)
     expect(after[0]).toEqual(list[0])
+  })
+})
+
+/*
+ * ALTITUDE IS NOW A NUMBER THAT MATTERS.
+ *
+ * It used to be printed and nothing else. It is in the geometry now, so the
+ * edit path is clamped the same way the model's answer is clamped: see
+ * src/core/air.ts for what reading it as zero was getting wrong.
+ */
+describe('setAltitude', () => {
+  const air = (over: Partial<CameraPosition> = {}) =>
+    addPosition([], { at: AT, lensId: 'air-3s-wide', focalLength: 24, platform: 'air', altitudeFeet: 200 })
+      .map((p) => ({ ...p, ...over }))
+
+  it('changes how high an air position flies', () => {
+    const list = air()
+    expect(setAltitude(list, list[0].id, 320)[0].altitudeFeet).toBe(320)
+  })
+
+  it('caps at the Part 107 limit, whatever is typed', () => {
+    const list = air()
+    expect(setAltitude(list, list[0].id, 1200)[0].altitudeFeet).toBe(MAX_ALTITUDE_FEET)
+  })
+
+  it('will not put an air position on the ground', () => {
+    const list = air()
+    expect(setAltitude(list, list[0].id, 0)[0].altitudeFeet).toBe(MIN_ALTITUDE_FEET)
+  })
+
+  /*
+   * An altitude on something standing on the ground is not a number, it is a
+   * contradiction, so it is refused rather than stored and ignored.
+   */
+  it('leaves a ground position alone', () => {
+    const ground = addPosition([], { at: AT, lensId: 'sony-200-600', focalLength: 400 })
+    const after = setAltitude(ground, ground[0].id, 300)
+    expect(after[0].altitudeFeet).toBe(0)
+  })
+
+  it('touches no other position', () => {
+    const two = addPosition(
+      addPosition([], { at: AT, lensId: 'air-3s-wide', focalLength: 24, platform: 'air' }),
+      { at: AT, lensId: 'air-3s-wide', focalLength: 24, platform: 'air' },
+    )
+    const after = setAltitude(two, two[0].id, 350)
+    expect(after[0].altitudeFeet).toBe(350)
+    expect(after[1].altitudeFeet).toBe(two[1].altitudeFeet)
   })
 })

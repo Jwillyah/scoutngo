@@ -3970,13 +3970,119 @@
   padding: 2px 6px;
 }
 
+/*
+ * THE AIR BLOCK. Altitude is now a FIELD rather than a printed number, and the
+ * pilot separation sits under it.
+ */
 .card__air {
+  display: grid;
+  gap: var(--space-1);
   padding: 0 var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.card__air-row {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   gap: var(--space-2);
-  font-size: var(--text-sm);
+}
+
+.card__alt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.card__alt-input {
+  width: 5.5ch;
+  padding: 2px var(--space-1);
+  background: var(--color-field);
+  color: var(--color-text);
+  border: var(--line-hair) solid var(--color-line);
+  border-top-color: var(--color-edge-top);
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  letter-spacing: var(--tracking-num);
+  text-align: right;
+}
+
+.card__alt-unit {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.card__air-place {
+  padding: 0;
+  background: none;
+  border: 0;
+  border-bottom: var(--line-hair) solid currentcolor;
+  color: var(--color-accent-2);
+  font-size: var(--text-xs);
+}
+
+/*
+ * THE PILOT SEPARATION. Two measured numbers and a sentence saying that is all
+ * they are.
+ *
+ * Plain cells, no glow behind a number, and the secondary accent on the labels
+ * rather than hazard red: a measured distance is not a warning, and dressing it
+ * as one would be the app making the judgement instead of the reader.
+ */
+.card__pilot {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-1) var(--space-2);
+  background: var(--surface-2);
+  border-left: var(--line-rule) solid var(--color-accent-2);
+}
+
+.card__pilot-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.card__pilot-cell dt {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.card__pilot-cell dd {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  letter-spacing: var(--tracking-num);
+}
+
+.card__pilot-alt {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.card__pilot-note {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+
+/*
+ * ARMED, for a secondary action. Same afterglow as the primary's armed state,
+ * at the weight a secondary carries.
+ */
+.act--armed {
+  border-color: var(--color-accent-2);
+  color: var(--color-accent-2);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent-2) 40%, transparent);
 }
 
 .card__air-tag {
@@ -4477,4 +4583,92 @@
   color: var(--color-text-muted);
   font-size: var(--text-xs);
   line-height: var(--leading-normal);
+}
+
+/*
+ * GROUND / AIR / BOTH. A segmented control in the PLAN header row.
+ *
+ * White is the tap affordance on PLAN, so the selected segment takes it and
+ * the others stay quiet. No red anywhere: this is a view choice, not a hazard.
+ */
+.plat {
+  display: grid;
+  gap: 2px;
+  justify-items: stretch;
+}
+
+.plat__seg {
+  display: flex;
+  background: var(--color-panel);
+  border: var(--line-hair) solid var(--color-line);
+  border-top-color: var(--color-edge-top);
+  border-radius: var(--radius-panel);
+  overflow: hidden;
+}
+
+.plat__btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: var(--control-height);
+  padding: 0 var(--space-2);
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 0;
+  border-right: var(--line-hair) solid var(--color-line);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.plat__btn:last-child {
+  border-right: 0;
+}
+
+.plat__btn--on {
+  background: var(--white);
+  color: var(--black);
+}
+
+.plat__btn:disabled {
+  color: var(--color-text-faint);
+}
+
+/* The count rides beside the label, never in a badge with a glow behind it. */
+.plat__n {
+  font-family: var(--font-mono);
+  letter-spacing: var(--tracking-num);
+}
+
+/*
+ * WHAT IS BEING HIDDEN, SAID OUT LOUD. Muted rather than hazard red: hiding
+ * things is what the control is for, and the risk is forgetting, not danger.
+ */
+.plat__hidden {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  text-align: center;
+}
+
+/*
+ * THE PILOT MARKER. Square, lettered, and in the secondary accent.
+ *
+ * Deliberately not the venue pin's shape and deliberately not red: it is a
+ * different KIND of thing from both the subject and a hazard. It is where a
+ * person is standing, which is also why it is draggable.
+ */
+.pin--pilot {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  background: var(--color-accent-2);
+  border-color: var(--mark-edge);
+  color: var(--black);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-heavy);
+  letter-spacing: 0;
 }

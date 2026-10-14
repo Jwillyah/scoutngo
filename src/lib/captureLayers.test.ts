@@ -50,9 +50,15 @@ describe('appLayerIdsIn', () => {
     expect(appLayerIdsIn(withNewLayer)).toContain('cone-label')
   })
 
-  it('knows the four sources this app owns', () => {
+  /*
+   * EXHAUSTIVE ON PURPOSE. A new source has to be added here by hand, which is
+   * the point: the original bug was app annotations burned into the image sent
+   * to the model, and it survived because nothing forced anyone to notice a new
+   * layer. The pilot line was added to this list because this test failed.
+   */
+  it('knows the five sources this app owns', () => {
     expect([...APP_SOURCES].sort()).toEqual(
-      ['fov-cones', 'reach-radius', 'sun-axis', 'sun-rays'],
+      ['fov-cones', 'pilot-links', 'reach-radius', 'sun-axis', 'sun-rays'],
     )
   })
 

@@ -14,6 +14,7 @@
 
 import { bearingBetween, distanceMeters, type LatLon } from './geo.ts'
 import type { Classification } from './lighting.ts'
+import { metersToFeet } from './reachScale.ts'
 import { normalizeBearing } from './sun.ts'
 
 const COMPASS_POINTS = [
@@ -70,8 +71,6 @@ export const ARRIVED_METERS = 10
  */
 export const TOO_FAR_TO_WALK_METERS = 2000
 
-const METRES_TO_FEET = 3.28084
-
 /** Where to walk, from wherever the phone currently thinks it is. */
 export function walkTo(from: LatLon, to: LatLon): WalkTo {
   const meters = distanceMeters(from, to)
@@ -80,7 +79,7 @@ export function walkTo(from: LatLon, to: LatLon): WalkTo {
     bearing,
     compass: compassPoint(bearing),
     meters,
-    feet: meters * METRES_TO_FEET,
+    feet: metersToFeet(meters),
     arrived: meters <= ARRIVED_METERS,
     farAway: meters > TOO_FAR_TO_WALK_METERS,
   }

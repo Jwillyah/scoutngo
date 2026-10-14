@@ -82,7 +82,7 @@ The application checks every position you return against this same geometry and 
 - shot: what to capture from here. AT MOST 25 WORDS. Hard limit.
 - risk: what could go wrong here, such as access, crowds, obstruction, or distance. AT MOST 15 WORDS. Hard limit.
 - angleRationale: why THIS vantage is worth standing in, rather than anywhere else. AT MOST 15 WORDS. Hard limit. Say what the position gives you: a clean background, a line of pilings running away from camera, separation from the crowd, a foreground element, the light coming across the subject. Do not name a compass bearing, a degree, or a lighting class.
-- platform: "ground" or "air". Use "air" ONLY if a drone is listed in the kit below. An air position is a hover point, so it may sit over water or a road.
+- platform: "ground" or "air", and ONLY what PLATFORMS ALLOWED below permits. Use "air" only if a drone is also listed in the kit. An air position is a hover point, so it may sit over water or a road. A position on a platform that is not allowed is thrown away by the application, so returning one wastes a position out of a small budget.
 - altitudeFeet: for "air", height above ground in feet, no more than 400, which is the FAA ceiling. For "ground", 0.
 - coversShot: when a REQUIRED SHOTS list is given below, the zero based index of the shot this position covers. Null when it covers none of them, and null always when no list is given. Never an index outside the list.
 
@@ -119,6 +119,7 @@ interface GenerateContext {
   style?: unknown
   optics?: unknown
   drones?: unknown
+  platforms?: unknown
   sun?: unknown
   subjectPoint?: unknown
   imageNorthBearing?: unknown
@@ -129,6 +130,25 @@ interface GenerateContext {
   image?: unknown
   mediaType?: unknown
   site?: unknown
+}
+
+/**
+ * Which platforms this plan may use, from the Ground/Air/Both control.
+ *
+ * The application drops anything outside this whatever comes back, so the line
+ * exists to stop the model spending positions that will be thrown away rather
+ * than to be the thing that enforces it.
+ */
+function platformLine(platforms: unknown): string {
+  const list = Array.isArray(platforms)
+    ? platforms.filter((p): p is string => p === 'ground' || p === 'air')
+    : []
+  if (list.length === 0 || list.length === 2) {
+    return 'PLATFORMS ALLOWED: ground and air.'
+  }
+  return list[0] === 'air'
+    ? 'PLATFORMS ALLOWED: air only. EVERY position must be "air". A ground position is thrown away.'
+    : 'PLATFORMS ALLOWED: ground only. EVERY position must be "ground". An air position is thrown away.'
 }
 
 const asText = (value: unknown, cap: number): string =>
@@ -330,6 +350,7 @@ ${
 }
 
 AIRCRAFT IN PLAY: ${Array.isArray(body.drones) && body.drones.length > 0 ? body.drones.map((d) => asText(d, 80)).join(', ') : 'none, so every position must be "ground"'}
+${platformLine(body.platforms)}
 
 OPTICS IN PLAY, use one of these ids:
 ${renderOptics(body.optics)}

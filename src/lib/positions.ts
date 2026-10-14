@@ -13,8 +13,9 @@
  * hold on to.
  */
 
-import type { CameraPosition, PositionOrigin } from './plan.ts'
+import { clampAltitudeFeet } from '../core/air.ts'
 import type { LatLon } from '../core/geo.ts'
+import type { CameraPosition, PositionOrigin } from './plan.ts'
 
 /** A plan longer than this is a list nobody reads on a phone in the field. */
 export const MAX_POSITIONS = 12
@@ -107,6 +108,26 @@ export function movePosition(
   const [moved] = next.splice(from, 1)
   next.splice(to, 0, moved)
   return renumber(next)
+}
+
+/**
+ * Changes how high an air position is flying.
+ *
+ * Clamped in core, to the same bounds the model's answer is clamped to, so a
+ * typed 900 and a proposed 900 both become 400. Ground positions are left
+ * alone: an altitude on something standing on the ground is not a number, it
+ * is a contradiction.
+ */
+export function setAltitude(
+  list: CameraPosition[],
+  id: string,
+  altitudeFeet: number,
+): CameraPosition[] {
+  return list.map((position) =>
+    position.id === id && position.platform === 'air'
+      ? { ...position, altitudeFeet: clampAltitudeFeet(altitudeFeet) }
+      : position,
+  )
 }
 
 /** Changes the glass on one position. Everything downstream recomputes from it. */

@@ -1,4 +1,9 @@
 import { useEffect, useState } from 'react'
+import {
+  MAX_ALTITUDE_FEET,
+  MIN_ALTITUDE_FEET,
+  pilotSeparation,
+} from '../core/air.ts'
 import type { SightlineCloud } from '../core/cloud.ts'
 import { MIN_BEARING_RANGE_METERS } from '../core/coverage.ts'
 import { feetToMetres, type TideState } from '../core/tide.ts'
@@ -8,6 +13,8 @@ import { fetchSightlineCloud, type ForecastKind } from '../lib/forecast.ts'
 import { fetchGroundView, type GroundView } from '../lib/groundView.ts'
 import type { KitProfile as KitProfileType } from '../core/kit.ts'
 import { FAA_CEILING_FEET } from '../lib/parsePlan.ts'
+import type { LatLon } from '../core/geo.ts'
+import { formatReach } from '../core/reachScale.ts'
 import type { PlannedPosition } from '../lib/plan.ts'
 
 interface PositionCardProps {
@@ -26,6 +33,17 @@ interface PositionCardProps {
   onSetOptic: (id: string, lensId: string, focalLength: number) => void
   /** The shooter's own gear. The picker lists exactly what they own. */
   kit: KitProfileType
+  /** How high an air position flies, in feet AGL. Clamped in core. */
+  onSetAltitude: (id: string, feet: number) => void
+  /**
+   * Where the pilot is standing, or null if it has not been placed.
+   *
+   * Used ONLY to measure a distance. It is not a check, a clearance or a
+   * permission, and nothing here decides whether a flight can happen.
+   */
+  pilotAt: LatLon | null
+  /** Arms the map to place the pilot. */
+  onPlacePilot: () => void
 }
 
 /*
@@ -322,6 +340,9 @@ export function PositionCard({
   onMove,
   onSetOptic,
   kit,
+  onSetAltitude,
+  pilotAt,
+  onPlacePilot,
 }: PositionCardProps) {
   const {
     position,
@@ -336,6 +357,22 @@ export function PositionCard({
   } = planned
 
   const activeLens = kit.lenses.find((lens) => lens.id === position.lensId)
+
+  /*
+   * THE PILOT SEPARATION, MEASURED IN CORE.
+   *
+   * Two numbers because they are two questions: across the ground is what you
+   * pace out, and pilot-to-aircraft is the real distance, which at 400ft is
+   * 122m of it before any horizontal distance at all.
+   *
+   * Neither is a clearance. See src/core/air.ts.
+   */
+  const separation =
+    pilotAt === null || position.platform !== 'air'
+      ? null
+      : pilotSeparation(pilotAt, position.at, position.altitudeFeet)
+  const pilotAcross = separation === null ? null : formatReach(separation.horizontalMeters)
+  const pilotSlant = separation === null ? null : formatReach(separation.slantMeters)
 
   return (
     <aside
@@ -422,13 +459,82 @@ export function PositionCard({
       ))}
 
       {position.platform !== 'air' ? null : (
-        <p className="card__air">
-          <span className="card__air-tag">Drone</span>
-          <span className="num">{position.altitudeFeet} ft AGL</span>
-          <span className="card__air-note">
-            FAA ceiling is {FAA_CEILING_FEET} ft above ground level.
-          </span>
-        </p>
+        <div className="card__air">
+          <div className="card__air-row">
+            <span className="card__air-tag">Drone</span>
+            <label className="card__alt">
+              <input
+                className="card__alt-input num"
+                type="number"
+                inputMode="numeric"
+                min={MIN_ALTITUDE_FEET}
+                max={MAX_ALTITUDE_FEET}
+                step={10}
+                value={position.altitudeFeet}
+                aria-label="Altitude, feet above ground level"
+                onChange={(event) =>
+                  onSetAltitude(position.id, Number(event.target.value))
+                }
+              />
+              <span className="card__alt-unit">ft AGL</span>
+            </label>
+          </div>
+
+          {/*
+            * The ceiling, stated as the rule it is. It says what the limit in
+            * the regulation is. It does NOT say this flight is permitted,
+            * cleared or compliant: that depends on the airspace, the aircraft
+            * and the operator, none of which this app knows.
+            */}
+          <p className="card__air-note">
+            Part 107 sets the altitude limit at {FAA_CEILING_FEET} ft above ground level. The
+            field stops there.
+          </p>
+
+          {/*
+            * THE PILOT SEPARATION. A MEASUREMENT, NOT A CLEARANCE.
+            *
+            * Two numbers because they answer different questions: across the
+            * ground is what you pace out, and the slant is how far away the
+            * aircraft actually is, which at 400ft is 122m of it before any
+            * horizontal distance at all.
+            *
+            * Nothing here says whether the aircraft can be seen from there or
+            * whether the flight is allowed. It says how far apart two points
+            * are, and the judgement is the reader's.
+            */}
+          {separation === null || pilotAcross === null || pilotSlant === null ? (
+            <p className="card__air-note">
+              <button type="button" className="card__air-place" onClick={onPlacePilot}>
+                Place the pilot position
+              </button>{' '}
+              to measure the distance from it.
+            </p>
+          ) : (
+            <div className="card__pilot">
+              <dl className="card__pilot-pair">
+                <div className="card__pilot-cell">
+                  <dt>Pilot, across ground</dt>
+                  <dd>
+                    <span className="num">{pilotAcross.metric}</span>
+                    <span className="card__pilot-alt num">{pilotAcross.imperial}</span>
+                  </dd>
+                </div>
+                <div className="card__pilot-cell">
+                  <dt>Pilot to aircraft</dt>
+                  <dd>
+                    <span className="num">{pilotSlant.metric}</span>
+                    <span className="card__pilot-alt num">{pilotSlant.imperial}</span>
+                  </dd>
+                </div>
+              </dl>
+              <p className="card__pilot-note">
+                Measured distances, nothing more. Not a statement about line of sight, and not a
+                statement about whether this flight is permitted.
+              </p>
+            </div>
+          )}
+        </div>
       )}
 
       {/*

@@ -1,5 +1,9 @@
 import { useRef, useState } from 'react'
 import type { LatLon } from '../core/geo.ts'
+import type {
+  Platform,
+  PlatformFilter as PlatformFilterValue,
+} from '../core/platformFilter.ts'
 import type { TideExtreme, TideState } from '../core/tide.ts'
 import type { SunArc, SunPosition } from '../core/sun.ts'
 import type { PlanCoverage, PlannedPosition } from '../lib/plan.ts'
@@ -16,6 +20,7 @@ import { FieldPackControl, type PackBuildState } from './FieldPackControl.tsx'
 import { MapControls } from './MapControls.tsx'
 import { MapView, type MapHandle } from './MapView.tsx'
 import { OverflowMenu } from './OverflowMenu.tsx'
+import { PlatformFilter } from './PlatformFilter.tsx'
 import { PlanStatus } from './PlanStatus.tsx'
 import { PositionCard } from './PositionCard.tsx'
 import { ShotList } from './ShotList.tsx'
@@ -70,6 +75,8 @@ interface PlanModeProps {
   onDuplicatePosition: (id: string) => void
   onMovePosition: (id: string, delta: number) => void
   onSetOptic: (id: string, lensId: string, focalLength: number) => void
+  /** How high an air position flies, in feet above ground. Clamped in core. */
+  onSetAltitude: (id: string, feet: number) => void
   /** The forward step, offered as a SECONDARY action beside Generate. */
   onGoToField: () => void
   goToFieldBlocked: string | null
@@ -82,6 +89,32 @@ interface PlanModeProps {
   onPreparePack: () => void
   desiredShots: DesiredShot[]
   footer: React.ReactNode
+  /** Ground, air or both. Decides what shows here AND what a generate asks for. */
+  platformFilter: PlatformFilterValue
+  onPlatformFilter: (next: PlatformFilterValue) => void
+  platformCounts: Record<Platform, number>
+  /** How many positions the platform choice is hiding. */
+  hiddenByPlatform: number
+  /** False with no drone in the kit, which makes Air a dead end rather than a choice. */
+  airAvailable: boolean
+  /**
+   * Where the pilot is standing, and the arming for placing it.
+   *
+   * It is one position for the whole plan: the pilot stands somewhere and the
+   * aircraft moves between hover points. Null until placed.
+   */
+  pilotAt: LatLon | null
+  onPilotMove: (at: LatLon) => void
+  placingPilot: boolean
+  onPlacingPilot: (next: boolean) => void
+  /**
+   * Whether the next tap will add an AIR position.
+   *
+   * True when the filter is on Air and a drone is in the kit. The button says
+   * so, because adding a ground position while the filter hides ground would
+   * drop something on the map and hide it in the same gesture.
+   */
+  addsAir: boolean
 }
 
 /**
@@ -148,6 +181,7 @@ export function PlanMode({
   onDuplicatePosition,
   onMovePosition,
   onSetOptic,
+  onSetAltitude,
   onGoToField,
   goToFieldBlocked,
   peekStatus,
@@ -158,6 +192,16 @@ export function PlanMode({
   onPreparePack,
   desiredShots,
   footer,
+  platformFilter,
+  onPlatformFilter,
+  platformCounts,
+  hiddenByPlatform,
+  airAvailable,
+  pilotAt,
+  onPilotMove,
+  placingPilot,
+  onPlacingPilot,
+  addsAir,
 }: PlanModeProps) {
   const [sheet, setSheet] = useState<SheetState>('peek')
   const [sheetHeight, setSheetHeight] = useState(108)
@@ -183,6 +227,9 @@ export function PlanMode({
 
   const handle = mapHandle as React.RefObject<MapHandle | null>
 
+  /* Whether anything is in the air, which is what the pilot control is for. */
+  const airPositions = plan.filter((p) => p.position.platform === 'air').length
+
   return (
     <div
       className="mode-plan"
@@ -197,10 +244,12 @@ export function PlanMode({
         handle={mapHandle}
         venue={venue}
         onVenueChange={onVenueChange}
-        mode={placing ? 'add' : null}
+        mode={placing ? 'add' : placingPilot ? 'pilot' : null}
         onAddAt={onAddAt}
         plan={visiblePlan}
         conePlan={conePlan}
+        pilotAt={pilotAt}
+        onPilotMove={onPilotMove}
         onPositionMove={onPositionMove}
         onLongPress={onLongPress}
         sunAzimuth={sun === null ? null : sun.azimuth}
@@ -235,6 +284,12 @@ export function PlanMode({
         * markers for being undecodable.
         */}
       {!placing ? null : <p className="tapnote">Tap where you&rsquo;ll stand</p>}
+      {/*
+        * The same affordance for the pilot, with its own words, because
+        * "tap where you'll stand" is what the other one says and these are
+        * two different standing places.
+        */}
+      {!placingPilot ? null : <p className="tapnote">Tap where the pilot stands</p>}
 
       <header className="hud">
         <div className="hud__row">
@@ -251,6 +306,13 @@ export function PlanMode({
             onLensFilters={onLensFilters}
             isolatedId={isolatedId}
             onClearIsolate={onClearIsolate}
+          />
+          <PlatformFilter
+            value={platformFilter}
+            onChange={onPlatformFilter}
+            counts={platformCounts}
+            hidden={hiddenByPlatform}
+            airAvailable={airAvailable}
           />
           <OverflowMenu showArc={showArc} onShowArc={onShowArc} />
         </div>
@@ -277,7 +339,10 @@ export function PlanMode({
           onDuplicate={onDuplicatePosition}
           onMove={onMovePosition}
           onSetOptic={onSetOptic}
+          onSetAltitude={onSetAltitude}
           kit={kitProfile}
+          pilotAt={pilotAt}
+          onPlacePilot={() => onPlacingPilot(true)}
         />
       )}
 
@@ -315,7 +380,11 @@ export function PlanMode({
               onClick={() => onPlacing(!placing)}
               aria-pressed={placing}
             >
-              {placing ? 'Tap the map · cancel' : 'Add position'}
+              {placing
+                ? 'Tap the map · cancel'
+                : addsAir
+                  ? 'Add air position'
+                  : 'Add position'}
             </button>
 
             {/*
@@ -369,6 +438,37 @@ export function PlanMode({
         ) : (
           <>
             <div className="sheetacts">
+              {/*
+                * THE PILOT POSITION. Only offered when something is actually
+                * flying: with no air positions there is nothing to measure
+                * from, and a control for it would be a question about a plan
+                * that does not have the thing it is asking about.
+                *
+                * It exists to MEASURE. Placing it draws a line to each air
+                * position and prints the distance on that position's card.
+                * Nothing about it is a check, a clearance or a permission.
+                */}
+              {airPositions === 0 ? null : (
+                <button
+                  type="button"
+                  className={`act${placingPilot ? ' act--armed' : ''}`}
+                  onClick={() => onPlacingPilot(!placingPilot)}
+                  aria-pressed={placingPilot}
+                >
+                  <span className="act__label">
+                    {placingPilot
+                      ? 'Tap the map · cancel'
+                      : pilotAt === null
+                        ? 'Place the pilot position'
+                        : 'Move the pilot position'}
+                  </span>
+                  <span className="act__why">
+                    {pilotAt === null
+                      ? 'Measures the distance to each air position'
+                      : 'Drag the P marker, or tap a new spot'}
+                  </span>
+                </button>
+              )}
               <button
                 type="button"
                 className="act"

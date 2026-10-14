@@ -85,10 +85,23 @@ export function stopPositions(): number[] {
   return REACH_STOPS.map((_, i) => (i + 1) / SEGMENTS)
 }
 
+/*
+ * ONE FOOT, FOR THE WHOLE APP.
+ *
+ * There were three of these: 3.280839895 here, 3.28084 in field.ts and 0.3048
+ * in tide.ts. They agree to six figures so nothing was ever visibly wrong,
+ * which is exactly why a fourth was about to be added for drone altitude. The
+ * other two now import these.
+ */
 export const FEET_PER_METER = 3.280839895
+export const METERS_PER_FOOT = 0.3048
 
 export function metersToFeet(meters: number): number {
   return meters * FEET_PER_METER
+}
+
+export function feetToMeters(feet: number): number {
+  return feet * METERS_PER_FOOT
 }
 
 /**

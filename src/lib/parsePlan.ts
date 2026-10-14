@@ -18,6 +18,13 @@
  * a lighting call, and nothing downstream computes anything from it.
  */
 
+import {
+  clampAltitudeFeet,
+  DEFAULT_ALTITUDE_FEET,
+  MAX_ALTITUDE_FEET,
+} from '../core/air.ts'
+import type { Platform } from '../core/platformFilter.ts'
+
 export interface LensSpec {
   id: string
   name: string
@@ -25,7 +32,7 @@ export interface LensSpec {
   max: number
 }
 
-export type Platform = 'ground' | 'air'
+export type { Platform }
 
 export interface RawPosition {
   x: number
@@ -61,8 +68,15 @@ export type ParseResult =
   | { ok: false; reason: string; raw: string }
 
 export const MAX_POSITIONS = 6
-/** FAA ceiling for uncrewed aircraft, feet above ground level. */
-export const FAA_CEILING_FEET = 400
+/**
+ * The FAA Part 107 altitude limit, feet above ground level, re-exported from
+ * core so the parser, the altitude field and the card all cap at one number.
+ *
+ * It is a limit written in a rule. It is not a statement that a flight at or
+ * under it is permitted; that depends on the airspace, the aircraft and the
+ * operator, none of which this app knows.
+ */
+export const FAA_CEILING_FEET = MAX_ALTITUDE_FEET
 export const SHOT_WORD_CAP = 25
 export const RISK_WORD_CAP = 15
 export const RATIONALE_WORD_CAP = 15
@@ -96,6 +110,16 @@ export function parsePlanResponse(
   droneCameras: DroneCameraSpec[] = [],
   /** How many shots the shooter asked for. Bounds any coversShot claim. */
   requiredShots = 0,
+  /**
+   * Which platforms the Ground/Air/Both choice allows.
+   *
+   * THE PROMPT ASKS AND THIS ENFORCES. The request tells the model which to
+   * use, and a model is free to ignore it, so the filter is applied here as
+   * well. Without this, asking for air only and getting ground positions back
+   * would put things in the plan that the map then hides, which is a plan
+   * quietly missing most of the day.
+   */
+  allowed: readonly Platform[] = ['ground', 'air'],
 ): ParseResult {
   if (lenses.length === 0) {
     return { ok: false, reason: 'No lenses are selected in the kit.', raw }
@@ -142,6 +166,17 @@ export function parsePlanResponse(
     // A drone position is only possible if a drone is actually in the kit.
     const platform: Platform =
       droneAvailable && item.platform === 'air' ? 'air' : 'ground'
+
+    /*
+     * DROPPED, NOT COERCED. Turning an unwanted air position into a ground one
+     * would invent a position nobody proposed: the shot text, the optic and
+     * the altitude were all written about being in the air. A dropped position
+     * is counted and reported; a coerced one looks like a real plan.
+     */
+    if (!allowed.includes(platform)) {
+      dropped += 1
+      continue
+    }
 
     const camera = cameraById.get(opticId)
     const lens = byId.get(opticId)
@@ -195,19 +230,15 @@ export function parsePlanResponse(
           : lens!.min
 
     /*
-     * Clamped to the FAA ceiling. The model does not get to propose an illegal
-     * altitude, and the card states the rule regardless of what came back.
+     * Clamped in core, to the same bounds the altitude field uses. A model
+     * answering 1200 gets 400 and a model answering nothing gets the default,
+     * and in neither case does a number it proposed reach the geometry
+     * unchecked. The card states the ceiling regardless of what came back.
      */
     const altitudeFeet =
       platform === 'air'
-        ? Math.round(
-            clamp(
-              typeof item.altitudeFeet === 'number' && Number.isFinite(item.altitudeFeet)
-                ? item.altitudeFeet
-                : 150,
-              0,
-              FAA_CEILING_FEET,
-            ),
+        ? clampAltitudeFeet(
+            typeof item.altitudeFeet === 'number' ? item.altitudeFeet : DEFAULT_ALTITUDE_FEET,
           )
         : 0
 

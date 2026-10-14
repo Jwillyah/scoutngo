@@ -165,6 +165,9 @@ describe('PositionCard', () => {
       onDuplicate={() => {}}
       onMove={() => {}}
       onSetOptic={() => {}}
+      onSetAltitude={() => {}}
+      pilotAt={null}
+      onPlacePilot={() => {}}
     />,
   )
 
@@ -215,6 +218,9 @@ describe('PositionCard', () => {
         onDuplicate={() => {}}
         onMove={() => {}}
         onSetOptic={() => {}}
+      onSetAltitude={() => {}}
+      pilotAt={null}
+      onPlacePilot={() => {}}
       />,
     )
     const labels = [...dry.matchAll(/class="three__label">([^<]+)</g)].map((m) => m[1])
