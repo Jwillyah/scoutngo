@@ -186,17 +186,55 @@ for (const [name, fx, fy] of PLACES) {
   await check(`pin ${name}`)
 }
 
-/* And at a few zooms, because the label distance is a fraction of the view. */
-for (const zoom of [12, 15, 18]) {
+/*
+ * And at a few zooms, because the label distance is a fraction of the view.
+ *
+ * RE-CENTRED FIRST. The sweep above leaves the pin at the left edge, and
+ * zooming in from there walks it off the screen entirely, at which point no
+ * label can be placed and a clean run means nothing. Centring the venue makes
+ * the zoom cases about the zoom.
+ */
+await ev(`window.__probe.map.jumpTo({ center: [-75.605912, 38.364236] }), 'ok'`)
+await wait(500)
+
+for (const zoom of [11, 13, 15, 17, 19]) {
   await ev(`window.__probe.map.jumpTo({ zoom: ${zoom} }), 'ok'`)
   await wait(700)
   await check(`zoom ${zoom}`)
 }
 
-/* With the sheet open, which is the biggest obstacle on the screen. */
+/*
+ * With the sheet open, which is the biggest obstacle on the screen, and at a
+ * zoom where the labels have somewhere to go.
+ */
+await ev(`window.__probe.map.jumpTo({ center: [-75.605912, 38.364236], zoom: 15 }), 'ok'`)
+await wait(500)
+await ev(`document.querySelector('.peek__summary')?.click()`)
+await wait(1500)
+await check('sheet open')
+
+/*
+ * HOW MANY READOUTS SURVIVE, which is the other half of the complaint. A run
+ * with every label hidden has no collisions and is no use: the readings are
+ * the point. Reported rather than asserted at a threshold, because how many
+ * can fit genuinely depends on where the pin is, and a hard number here would
+ * be a number invented to make a test pass.
+ */
+/*
+ * The sheet is CLOSED for this, because with it open the pin itself is behind
+ * it and hiding every readout is then the right answer. The question here is
+ * whether the ordinary case has somewhere to put them.
+ */
 await ev(`document.querySelector('.peek__summary')?.click()`)
 await wait(1200)
-await check('sheet open')
+await ev(`window.__probe.map.jumpTo({ center: [-75.605912, 38.364236], zoom: 15 }), 'ok'`)
+await wait(900)
+const visible = await ev(`document.querySelectorAll('.ray-label').length`)
+console.log(`\n  readouts visible, venue centred at zoom 15, sheet at peek: ${visible}`)
+if (visible === 0) {
+  console.log('      PROBLEM: every readout is hidden, so the placement has nowhere to go')
+  problems += 1
+}
 
 console.log('\n=== LABEL PROBLEMS: ' + problems + ' ===')
 if (errs.length > 0) console.log('console errors:', JSON.stringify(errs.slice(0, 3)))

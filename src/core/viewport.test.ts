@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { bearingLineEnd, destinationPoint, distanceMeters, type LatLon } from './geo.ts'
 import {
   BEARING_LINE_MIN_METERS,
+  labelDistances,
+  LABEL_SPAN_FRACTION,
   COLD_START_VIEW,
   FRAME_VENUE_BELOW_ZOOM,
   VENUE_ZOOM,
@@ -344,5 +346,83 @@ describe('the view the map opens on when nothing is known', () => {
       expect(Math.abs(end.x - origin.x)).toBeLessThanOrEqual(worldPx / 2 + 1)
       expect(Math.hypot(end.x - origin.x, end.y - origin.y)).toBeGreaterThan(WIDTH)
     }
+  })
+})
+
+/*
+ * THE LABEL DISTANCES, WHICH ARE THE SAME BUG AS THE BEARING LINES.
+ *
+ * `span * 0.28` clamped between 50m and 700m. Measured on a 390x844 viewport
+ * at latitude 38, in pixels from the pin, against an intended constant 109:
+ *
+ *   zoom 10   700m cap    11.7px     zoom 19   50m floor  427.1px
+ *   zoom 12   700m cap    46.7px     zoom 20   50m floor  854.3px
+ *   zoom 14   uncapped   109.2px
+ *
+ * Only the middle four zooms behaved. These assert the fix the way Job 2 asked
+ * for the lines: the same number of PIXELS at every zoom.
+ */
+describe('a ray label sits the same distance from the pin at every zoom', () => {
+  const pixelsFromPin = (zoom: number) => {
+    const bounds = boundsFor(BREW_RIVER, zoom, WIDTH, HEIGHT)
+    const { preferredMeters } = labelDistances(viewportSpanMeters(bounds))
+    const origin = project(BREW_RIVER, zoom)
+    const out = project(bearingLineEnd(BREW_RIVER, 90, preferredMeters), zoom)
+    return Math.hypot(out.x - origin.x, out.y - origin.y)
+  }
+
+  /*
+   * Within a percent, not bit identical. viewportSpanMeters measures along the
+   * SOUTHERN edge of the bounds, and a wide view covers enough latitude that
+   * its southern edge is a slightly different scale from its centre line:
+   * measured, 109.37px at zoom 10 against 109.54px at zoom 11, a sixth of a
+   * pixel. The old clamps were out by a factor of eight.
+   */
+  it('is a constant number of pixels from zoom 10 to 20', () => {
+    const at10 = pixelsFromPin(10)
+    for (let zoom = 10; zoom <= 20; zoom++) {
+      const px = pixelsFromPin(zoom)
+      expect(Math.abs(px - at10) / at10, `zoom ${zoom} was ${px.toFixed(1)}px`).toBeLessThan(
+        0.01,
+      )
+    }
+  })
+
+  /* And that constant is the fraction asked for: 28% of a 390px width. */
+  it('is about 28 percent of the shorter side', () => {
+    expect(pixelsFromPin(15)).toBeCloseTo(WIDTH * LABEL_SPAN_FRACTION, 0)
+  })
+
+  /*
+   * NEITHER ON THE PIN NOR OFF THE SCREEN, which is what the two clamps did.
+   */
+  it('is never on top of the pin and never off the screen', () => {
+    for (let zoom = 10; zoom <= 20; zoom++) {
+      const px = pixelsFromPin(zoom)
+      expect(px, `zoom ${zoom} is on the pin`).toBeGreaterThan(40)
+      expect(px, `zoom ${zoom} is off screen`).toBeLessThan(WIDTH / 2)
+    }
+  })
+
+  it('bounds the search inside the view, and inward past the preference', () => {
+    const bounds = boundsFor(BREW_RIVER, 15, WIDTH, HEIGHT)
+    const d = labelDistances(viewportSpanMeters(bounds))
+    expect(d.minMeters).toBeLessThan(d.preferredMeters)
+    expect(d.maxMeters).toBeGreaterThan(d.preferredMeters)
+    // The furthest the search may go is still inside the shorter side.
+    expect(d.maxMeters).toBeLessThan(viewportSpanMeters(bounds))
+  })
+
+  it('scales all three together, because all three are fractions', () => {
+    const wide = labelDistances(10_000)
+    const tight = labelDistances(100)
+    expect(wide.preferredMeters / tight.preferredMeters).toBeCloseTo(100, 6)
+    expect(wide.minMeters / tight.minMeters).toBeCloseTo(100, 6)
+    expect(wide.maxMeters / tight.maxMeters).toBeCloseTo(100, 6)
+  })
+
+  it('survives a viewport that has not been measured yet', () => {
+    expect(labelDistances(0)).toEqual({ preferredMeters: 0, minMeters: 0, maxMeters: 0 })
+    expect(labelDistances(-5).preferredMeters).toBe(0)
   })
 })

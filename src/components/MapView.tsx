@@ -12,6 +12,7 @@ import {
 import { classificationOf } from '../core/lighting.ts'
 import {
   COLD_START_VIEW,
+  labelDistances,
   FRAME_VENUE_BELOW_ZOOM,
   steppedBearingLineMeters,
   VENUE_ZOOM,
@@ -110,10 +111,13 @@ const ESRI_ATTRIBUTION =
  * long at zoom 10 and 15,393px at zoom 20. Their length now comes from the
  * viewport, through src/core/viewport.ts.
  */
-/** Where the degree labels sit, as a fraction of the shorter visible span. */
-const LABEL_SPAN_FRACTION = 0.28
-const LABEL_MIN_METERS = 50
-const LABEL_MAX_METERS = 700
+/*
+ * The label distances used to be `span * 0.28` clamped between 50m and 700m,
+ * and both clamps broke it: 11.7px from the pin at zoom 10 and 854px at zoom
+ * 20, against an intended constant 109px. They are fractions of the span in
+ * src/core/viewport.ts now, which is what makes them a constant number of
+ * pixels at every zoom.
+ */
 
 /*
  * How far along the ray to step while looking for a clear spot, as a fraction
@@ -125,21 +129,6 @@ const LABEL_SLIDE_FRACTION = 0.12
 /** A breathing gap around every piece of floating chrome, in CSS pixels. */
 const LABEL_CLEARANCE_PX = 6
 
-/*
- * How close to the pin a label may be pushed WHEN IT HAS TO BE.
- *
- * LABEL_MIN_METERS is where a label is allowed to sit by preference; this is
- * how far the search may go past that to save a reading. The two are different
- * numbers because the rule is "hide it only if no clear point exists", and a
- * preference is not an absence.
- *
- * It matters most in exactly the reported case. With the venue near the top of
- * the view the shadow ray runs north, straight off the screen: measured at a
- * typical zoom, 50m north of the pin was already y=60, inside the HUD, and
- * every larger distance was further up. The only clear points on that ray are
- * between the pin and the HUD, which is under 50m.
- */
-const LABEL_SLIDE_MIN_METERS = 12
 
 /*
  * EVERY FLOATING CONTROL, and the sheet. These are the things that sit OVER the
@@ -1430,10 +1419,8 @@ export function MapView({
      * which made the degree readouts useless.
      */
     const spanMeters = viewportSpanMeters(boundsOf(instance))
-    const labelMeters = Math.min(
-      LABEL_MAX_METERS,
-      Math.max(LABEL_MIN_METERS, spanMeters * LABEL_SPAN_FRACTION),
-    )
+    const distances_ = labelDistances(spanMeters)
+    const labelMeters = distances_.preferredMeters
 
     /*
      * KEEP THE LABELS OUT FROM UNDER THE CHROME.
@@ -1479,8 +1466,8 @@ export function MapView({
 
     const distances = slideOrder(
       labelMeters,
-      LABEL_SLIDE_MIN_METERS,
-      LABEL_MAX_METERS,
+      distances_.minMeters,
+      distances_.maxMeters,
       Math.max(1, labelMeters * LABEL_SLIDE_FRACTION),
     )
 

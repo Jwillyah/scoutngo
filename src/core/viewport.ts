@@ -178,3 +178,64 @@ export const VENUE_ZOOM = 16.5
  * pin has chosen that view and should keep it.
  */
 export const FRAME_VENUE_BELOW_ZOOM = 12
+
+/*
+ * WHERE A RAY LABEL SITS, AND HOW FAR IT MAY BE SLID.
+ *
+ * THE SAME BUG AS THE BEARING LINES, IN A SECOND PLACE. The label distance was
+ * `span * 0.28` clamped between 50m and 700m, and both clamps broke it at
+ * opposite ends of the zoom range. Measured on a 390x844 viewport at latitude
+ * 38, in pixels from the pin, where the intent is a constant 109:
+ *
+ *   zoom 10   700m cap    11.7px   on top of the pin
+ *   zoom 12   700m cap    46.7px
+ *   zoom 14   uncapped   109.2px   as intended
+ *   zoom 17   uncapped   109.2px   as intended
+ *   zoom 19   50m floor  427.1px   off a 390px screen
+ *   zoom 20   50m floor  854.3px   off a 390px screen
+ *
+ * So the readouts piled onto the pin at a wide zoom and vanished entirely at a
+ * tight one, and only the middle four zooms behaved. Expressing the distance
+ * as a fraction of the span is what makes it a constant number of PIXELS; a
+ * metre clamp on top of that is the thing that stops it being one.
+ *
+ * Everything here is a fraction of the shorter visible side for that reason.
+ */
+
+/** How far along its ray a label prefers to sit. About 109px on a 390px view. */
+export const LABEL_SPAN_FRACTION = 0.28
+
+/**
+ * How close to the pin a label may be pushed when it has to be.
+ *
+ * A preference is not an absence: the rule is to hide a readout only when no
+ * clear point exists on its ray, so the search is allowed much closer in than
+ * the preferred distance. About 12px on a 390px view, which is clear of the
+ * pin's own 22px box once the clearance padding is counted.
+ */
+export const LABEL_MIN_SPAN_FRACTION = 0.032
+
+/**
+ * And how far out. Beyond about three fifths of the shorter side a label is
+ * leaving the view anyway, and labelPlacement refuses a candidate that is not
+ * fully on screen, so searching further is wasted work.
+ */
+export const LABEL_MAX_SPAN_FRACTION = 0.6
+
+export interface LabelDistances {
+  /** Where it wants to be. */
+  preferredMeters: number
+  /** The closest the search may push it to the pin. */
+  minMeters: number
+  /** The furthest out the search may push it. */
+  maxMeters: number
+}
+
+export function labelDistances(spanMeters: number): LabelDistances {
+  const span = Math.max(0, spanMeters)
+  return {
+    preferredMeters: span * LABEL_SPAN_FRACTION,
+    minMeters: span * LABEL_MIN_SPAN_FRACTION,
+    maxMeters: span * LABEL_MAX_SPAN_FRACTION,
+  }
+}
