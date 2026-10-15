@@ -31,6 +31,7 @@
  */
 
 import type { Aim, ShotType } from './shotType.ts'
+import { sunBand, type SunBand } from './sunBand.ts'
 import { getSunPosition, normalizeBearing, type SunPosition } from './sun.ts'
 
 export type Classification = 'backlit' | 'front-lit' | 'side-lit'
@@ -43,10 +44,6 @@ export interface LightingResult {
   cameraBearing: number
 }
 
-export type AltitudeNote =
-  | 'low sun, long shadows, flare risk'
-  | 'flat overhead light'
-  | 'workable'
 
 /**
  * THE ARITHMETIC, AND IT IS PRIVATE.
@@ -251,18 +248,20 @@ export function classificationOf(read: LightingRead): Classification | null {
   return read.shotType === 'framed' ? read.lighting.classification : null
 }
 
-export function altitudeNote(altitude: number): AltitudeNote {
-  if (altitude < 15) return 'low sun, long shadows, flare risk'
-  if (altitude > 60) return 'flat overhead light'
-  return 'workable'
-}
 
 export interface WindowSample {
   at: Date
   sun: SunPosition
   /** Whatever is true about the light here, which depends on the shot type. */
   read: LightingRead
-  altitudeNote: AltitudeNote
+  /**
+   * Which altitude band the sun is in.
+   *
+   * This replaced `altitudeNote`, which derived a single note from
+   * `altitude < 15` and therefore reported "low sun, long shadows, flare risk"
+   * with the sun fifteen degrees BELOW the horizon. See src/core/sunBand.ts.
+   */
+  band: SunBand
 }
 
 export interface WindowEvaluation {
@@ -278,7 +277,7 @@ export interface WindowEvaluation {
 
 function sample(aim: Aim, lat: number, lon: number, at: Date): WindowSample {
   const sun = getSunPosition(at, lat, lon)
-  return { at, sun, read: classifyLighting(aim, sun), altitudeNote: altitudeNote(sun.altitude) }
+  return { at, sun, read: classifyLighting(aim, sun), band: sunBand(sun.altitude) }
 }
 
 /**

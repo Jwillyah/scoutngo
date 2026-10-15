@@ -200,10 +200,25 @@ describe('SunReadout', () => {
     const html = renderToStaticMarkup(
       <SunReadout venueWindow={resolveWindow(CALIBRATION_VENUE)} />,
     )
-    // Due south at mid-window, southeast at the start, workable light.
+    // Due south at mid-window, southeast at the start, sun well up.
     expect(html).toContain('180.6°')
     expect(html).toContain('134.4°')
-    expect(html).toContain('workable')
+    expect(html).toContain('open sun')
+  })
+
+  /*
+   * A MIDDAY WINDOW SAYS NOTHING ABOUT NIGHT. The old readout printed "Sun is
+   * below the horizon for part of this window. There is nothing to light a
+   * position with." whenever any sample was at or under zero; this checks the
+   * daytime case stays as quiet as it always was.
+   */
+  it('carries no night or sky line for a midday window', () => {
+    const html = renderToStaticMarkup(
+      <SunReadout venueWindow={resolveWindow(CALIBRATION_VENUE)} />,
+    )
+    expect(html).not.toContain('readout__night')
+    expect(html).not.toContain('readout__sky')
+    expect(html).not.toContain('nothing to light')
   })
 
   it('shows the window in venue wall clock time and names the zone', () => {

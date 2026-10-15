@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { altitudeNote, classificationOf, classifyLighting, evaluateWindow } from './lighting.ts'
+import { classificationOf, classifyLighting, evaluateWindow } from './lighting.ts'
 import type { Aim } from './shotType.ts'
+import { SUN_BAND_NOTE, sunBand } from './sunBand.ts'
 import type { SunPosition } from './sun.ts'
 
 // positionBearing is FROM the venue TO the camera. cameraBearing is the reciprocal.
@@ -102,22 +103,38 @@ describe('classifyLighting', () => {
   })
 })
 
-describe('altitudeNote', () => {
-  it('flags low sun below 15 degrees', () => {
-    expect(altitudeNote(0)).toBe('low sun, long shadows, flare risk')
-    expect(altitudeNote(14.9)).toBe('low sun, long shadows, flare risk')
-    expect(altitudeNote(-5)).toBe('low sun, long shadows, flare risk')
+/*
+ * altitudeNote IS GONE, AND THESE PIN WHY.
+ *
+ * It derived one note from `altitude < 15`, so it reported "low sun, long
+ * shadows, flare risk" for an altitude of -5: five degrees BELOW the horizon,
+ * where there are no shadows and nothing to flare. The old tests asserted
+ * exactly that, which is how a wrong statement stays wrong. sunBand replaces
+ * it; see src/core/sunBand.ts.
+ */
+describe('the altitude band, which replaced altitudeNote', () => {
+  it('no longer claims long shadows below the horizon', () => {
+    // The old function returned 'low sun, long shadows, flare risk' here.
+    expect(sunBand(-5)).toBe('blue-hour')
+    expect(SUN_BAND_NOTE['blue-hour']).not.toContain('shadow')
+    expect(SUN_BAND_NOTE['blue-hour']).not.toContain('flare')
   })
 
-  it('flags flat light above 60 degrees', () => {
-    expect(altitudeNote(60.1)).toBe('flat overhead light')
-    expect(altitudeNote(89)).toBe('flat overhead light')
+  it('still separates a low sun from an overhead one above the horizon', () => {
+    expect(sunBand(3)).toBe('late-golden')
+    expect(SUN_BAND_NOTE['late-golden']).toContain('Long shadows')
+    expect(sunBand(40)).toBe('open')
+    expect(sunBand(70)).toBe('flat-overhead')
   })
 
-  it('calls the middle band workable, boundaries included', () => {
-    expect(altitudeNote(15)).toBe('workable')
-    expect(altitudeNote(40)).toBe('workable')
-    expect(altitudeNote(60)).toBe('workable')
+  it('distinguishes the bands the old single bucket ran together', () => {
+    // All four of these were one note before.
+    expect(new Set([sunBand(14.9), sunBand(3), sunBand(-0.2), sunBand(-5)]).size).toBe(4)
+  })
+
+  it('exports no altitudeNote any more', async () => {
+    const module = await import('./lighting.ts')
+    expect(module).not.toHaveProperty('altitudeNote')
   })
 })
 
@@ -164,11 +181,22 @@ describe('evaluateWindow', () => {
     expect(classificationOf(dawnToDusk.start.read)).not.toBe(classificationOf(dawnToDusk.end.read))
     expect(dawnToDusk.flips).toBe(true)
   })
-
-  it('carries the altitude note for each sample', () => {
-    const w = evaluateWindow(aimAt(180), BREW_RIVER.lat, BREW_RIVER.lon, start, end)
-    expect(w.middle.altitudeNote).toBe('workable')
-    expect(w.middle.sun.altitude).toBeGreaterThan(15)
+  /*
+   * The band, not the old altitudeNote. That note came from `altitude < 15`
+   * and so reported "low sun, long shadows, flare risk" with the sun fifteen
+   * degrees BELOW the horizon. See src/core/sunBand.ts.
+   */
+  it('carries the sun band for each sample', () => {
+    const w = evaluateWindow(
+      aimAt(180),
+      BREW_RIVER.lat,
+      BREW_RIVER.lon,
+      new Date('2026-09-12T12:30:00-04:00'),
+      new Date('2026-09-12T13:30:00-04:00'),
+    )
+    for (const s of [w.start, w.middle, w.end]) {
+      expect(s.band).toBe(sunBand(s.sun.altitude))
+    }
   })
 })
 

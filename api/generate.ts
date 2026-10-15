@@ -236,7 +236,8 @@ function renderSun(list: unknown): string {
       return `- ${asText(fact.label, 20)} ${asText(fact.clock, 10)}: sun bearing ${num(fact.azimuth)} degrees, altitude ${num(fact.altitude)} degrees`
     })
     .join('\n')
-  return `SUN THROUGH THE WINDOW, computed by the application. These are facts, not estimates.\n${rows}\nBearing is a compass direction: 0 is north, 90 east, 180 south, 270 west. Altitude below 0 means the sun is down.`
+  return `SUN THROUGH THE WINDOW, computed by the application. These are facts, not estimates.\n${rows}\nBearing is a compass direction: 0 is north, 90 east, 180 south, 270 west. Altitude below 0 means the sun is down.
+A WINDOW WITH THE SUN BELOW THE HORIZON IS NOT AN EMPTY WINDOW. Between 0 and -6 degrees is afterglow and blue hour: no direct light on anything, and the brightest colour of the day in the sky. If the altitudes above are negative, choose vantages for what the SKY is doing, with the subject reading as a silhouette or a shape against it, and say so in the shot text.`
 }
 
 /**

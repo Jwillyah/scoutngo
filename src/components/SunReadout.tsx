@@ -1,5 +1,13 @@
 import { compassPoint } from '../core/field.ts'
-import { altitudeNote, type AltitudeNote } from '../core/lighting.ts'
+import {
+  bandsAcross,
+  skyCarriesTheShot,
+  SUN_BAND_LABEL,
+  SUN_BAND_NOTE,
+  sunBand,
+  unlitGroundShare,
+  type SunBand,
+} from '../core/sunBand.ts'
 import { getSunPosition, type SunPosition } from '../core/sun.ts'
 import { formatClock } from '../core/timezone.ts'
 import type { VenueWindow } from '../lib/venue.ts'
@@ -9,12 +17,6 @@ interface SunReadoutProps {
   venueWindow: VenueWindow | null
 }
 
-const SHORT_NOTE: Record<AltitudeNote, string> = {
-  'low sun, long shadows, flare risk': 'low sun',
-  'flat overhead light': 'flat',
-  workable: 'workable',
-}
-
 const degrees = (n: number) => `${n.toFixed(1)}°`
 
 interface Sample {
@@ -22,12 +24,12 @@ interface Sample {
   label: string
   at: Date
   sun: SunPosition
-  note: AltitudeNote
+  band: SunBand
 }
 
 function sample(key: string, label: string, at: Date, lat: number, lon: number): Sample {
   const sun = getSunPosition(at, lat, lon)
-  return { key, label, at, sun, note: altitudeNote(sun.altitude) }
+  return { key, label, at, sun, band: sunBand(sun.altitude) }
 }
 
 export function SunReadout({ venueWindow }: SunReadoutProps) {
@@ -51,8 +53,31 @@ export function SunReadout({ venueWindow }: SunReadoutProps) {
     sample('end', 'End', venueWindow.end, lat, lon),
   ]
 
-  const belowHorizon = samples.filter((s) => s.sun.altitude <= 0)
-  const notes = [...new Set(samples.map((s) => s.note))]
+  /*
+   * WHAT THE WINDOW ACTUALLY SPANS, as bands.
+   *
+   * It used to compute `belowHorizon` and print "Sun is below the horizon for
+   * part of this window. There is nothing to light a position with." Measured
+   * at Lesner Bridge for a 06:00 to 07:45 sunrise window, that line covered
+   * every sample from -15.5 through -0.7 degrees: night, nautical and
+   * afterglow, which is the whole of a backlit cloud shoot. For that shot the
+   * statement is not merely unhelpful, it is false.
+   */
+  /*
+   * ACROSS THE WHOLE WINDOW, not across the three samples shown.
+   *
+   * Naming the bands from the three visible samples misses the ones in
+   * between: measured at Lesner Bridge for 18:10 to 19:30, the three samples
+   * land on late golden, nautical and night, so a window that goes straight
+   * through sunset and afterglow would have mentioned neither. That is the
+   * same mistake in a new place, a true statement about a sample presented as
+   * a statement about the shoot.
+   */
+  const altitudeAt = (at: Date) => getSunPosition(at, lat, lon).altitude
+  const bands = bandsAcross(altitudeAt, venueWindow.start, venueWindow.end)
+  const skyBands = bands.filter(skyCarriesTheShot)
+  /** A subject that needs light on its FACE. The only case the old line fit. */
+  const unlitShare = unlitGroundShare(altitudeAt, venueWindow.start, venueWindow.end)
 
   return (
     <Panel index="03" title="Sun through the window">
@@ -107,24 +132,51 @@ export function SunReadout({ venueWindow }: SunReadoutProps) {
             </div>
           ))}
 
-          <div className="readout__cell">Light</div>
+          <div className="readout__cell">Band</div>
           {samples.map((s) => (
             <div className="readout__cell" key={s.key}>
-              {SHORT_NOTE[s.note]}
+              {SUN_BAND_LABEL[s.band]}
             </div>
           ))}
         </div>
 
         <div className="readout__foot">
-          {belowHorizon.length > 0 ? (
-            <p className="readout__night">
-              Sun is below the horizon for part of this window. There is nothing to
-              light a position with.
-            </p>
-          ) : null}
-          {notes.map((note) => (
-            <p key={note}>{note}</p>
+          {/*
+            * WHAT EACH BAND IS. A state, never a verdict: "blue hour peak" is
+            * not a warning, it is a fifteen minute window somebody set an
+            * alarm for. One line per band the window actually crosses.
+            */}
+          {bands.map((band) => (
+            <p key={band}>{SUN_BAND_NOTE[band]}</p>
           ))}
+
+          {/*
+            * AND WHEN THE SKY IS THE SUBJECT, SAY SO. This is the sentence the
+            * old warning should always have been: it names what IS there
+            * instead of reporting the absence of something else.
+            */}
+          {skyBands.length === 0 ? null : (
+            <p className="readout__sky">
+              The sun is at or under the horizon for part of this window, which is when
+              the sky carries the picture: backlit cloud, colour, and a lit skyline.
+            </p>
+          )}
+
+          {/*
+            * THE WARNING, KEPT ONLY WHERE IT IS TRUE.
+            *
+            * Scoped to a subject that needs light on its face, which is the
+            * only thing the old blanket line was ever right about. It does not
+            * say there is nothing to shoot, and it does not call the band a
+            * problem.
+            */}
+          {unlitShare === 0 ? null : (
+            <p className="readout__night">
+              A subject on the ground has no direct light on its face for{' '}
+              {unlitShare >= 0.999 ? 'any' : 'part'} of this window. That is a limit on a
+              lit face, not on the shoot.
+            </p>
+          )}
           {/*
             * The timezone is stated rather than assumed. Times are resolved
             * through the venue's own zone, so this is a fact about the numbers

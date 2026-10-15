@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
-  altitudeNote,
   classificationOf,
   classifyLighting,
   evaluateWindow,
 } from './lighting.ts'
 import type { Aim } from './shotType.ts'
+import { sunBand } from './sunBand.ts'
 import { getSunPosition, type SunPosition } from './sun.ts'
 
 /**
@@ -110,6 +110,6 @@ describe('Brew River calibration', () => {
 
   it('reports workable midday light, not a low sun flare situation', () => {
     const { altitude } = getSunPosition(AT_1300, LAT, LON)
-    expect(altitudeNote(altitude)).toBe('workable')
+    expect(sunBand(altitude)).toBe('open')
   })
 })
