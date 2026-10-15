@@ -27,6 +27,32 @@ export const PILOT_SOURCE = 'pilot-links'
  * it, and a horizon ring with the sun marked on it. Neither is a cone.
  */
 export const FOOTPRINT_SOURCE = 'shot-footprints'
+/**
+ * GOES-19 cloud imagery.
+ *
+ * HIDDEN BEFORE A CAPTURE, like everything else here, though for a different
+ * reason. The rest of this list is annotation THIS APP DREW, and the capture
+ * hides it so a model is not handed our own drawings as a photograph. Cloud is
+ * not an annotation; it is observed weather. But the capture exists so a model
+ * can read the GROUND and put positions on it, and a cloud layer at 55 percent
+ * over the imagery hides the ground, which defeats the capture whatever the
+ * cloud is.
+ *
+ * So the test is not "did we draw it", it is "does it stop the capture showing
+ * the ground". Both answers are yes here.
+ */
+export const GOES_SOURCE = 'goes-sky'
+
+/**
+ * Both bands get their own source, so switching at dawn is a visibility change
+ * rather than a source swap that drops the tiles and refetches them.
+ *
+ * BOTH IDS ARE LISTED because appLayerIdsIn matches a layer's `source` exactly.
+ * Listing the `goes-sky` prefix alone matched nothing, and the first version of
+ * the test for this passed only because its fixture used the prefix as a source
+ * id, which no layer in the app does.
+ */
+export const GOES_BAND_SOURCES = [`${GOES_SOURCE}-visible`, `${GOES_SOURCE}-infrared`] as const
 
 /** Every source this app draws with. The basemap is NOT here and must not be. */
 export const APP_SOURCES: readonly string[] = [
@@ -36,6 +62,7 @@ export const APP_SOURCES: readonly string[] = [
   RAY_SOURCE,
   PILOT_SOURCE,
   FOOTPRINT_SOURCE,
+  ...GOES_BAND_SOURCES,
 ]
 
 /**

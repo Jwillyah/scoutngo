@@ -426,6 +426,15 @@ function App() {
   /* Whether a newer build is deployed. Reports only; never reloads by itself. */
   const newBuild = useNewBuild()
 
+  /*
+   * THE SKY LAYER, off by default.
+   *
+   * It is a different kind of thing from everything else on the map: observed
+   * weather rather than computed geometry, and it covers the imagery. Nobody
+   * planning a client event shoot needs it, so it is asked for.
+   */
+  const [showSky, setShowSky] = useState(false)
+
   const [placing, setPlacing] = useState(false)
 
   /*
@@ -1252,6 +1261,8 @@ function App() {
           onShowSun={setShowSun}
           showArc={showArc}
           onShowArc={setShowArc}
+          showSky={showSky}
+          onShowSky={setShowSky}
           selectedId={selectedId}
           onSelect={onSelectPosition}
           selected={selected}

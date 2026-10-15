@@ -56,10 +56,42 @@ describe('appLayerIdsIn', () => {
    * to the model, and it survived because nothing forced anyone to notice a new
    * layer. The pilot line was added to this list because this test failed.
    */
-  it('knows the six sources this app owns', () => {
+  it('knows the seven sources hidden before a capture', () => {
     expect([...APP_SOURCES].sort()).toEqual(
-      ['fov-cones', 'pilot-links', 'reach-radius', 'shot-footprints', 'sun-axis', 'sun-rays'],
+      [
+        'fov-cones',
+        'goes-sky-infrared',
+        'goes-sky-visible',
+        'pilot-links',
+        'reach-radius',
+        'shot-footprints',
+        'sun-axis',
+        'sun-rays',
+      ],
     )
+  })
+
+  /*
+   * THE CLOUD LAYER IS HIDDEN FOR A DIFFERENT REASON FROM THE REST.
+   *
+   * Everything else here is annotation this app drew. GOES cloud is observed
+   * weather, not a drawing, but the capture exists so a model can read the
+   * GROUND and place positions on it, and a cloud layer over the imagery hides
+   * the ground. The test is "does it stop the capture showing the ground",
+   * not "did we draw it".
+   */
+  it('hides the cloud layer, which is not an annotation but still covers the ground', () => {
+    /* The REAL source ids: each band has its own source, not a shared prefix. */
+    const style = [
+      { id: 'esri', source: 'esri' },
+      { id: 'goes-sky-visible', source: 'goes-sky-visible' },
+      { id: 'goes-sky-infrared', source: 'goes-sky-infrared' },
+    ]
+    const hidden = appLayerIdsIn(style)
+    expect(hidden).toContain('goes-sky-visible')
+    expect(hidden).toContain('goes-sky-infrared')
+    // And never the basemap, which would capture a blank rectangle.
+    expect(hidden).not.toContain('esri')
   })
 
   it('returns nothing for a style with no app layers at all', () => {

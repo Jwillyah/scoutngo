@@ -236,13 +236,31 @@ anywhere. If you decline, it says so once and the map stays wide.
 The separate live position used in Field mode, for the walk-to line, is the same
 deal: it runs only while Field mode is open and nothing is written down.
 
-Three things leave your device, and you should know exactly what they are.
+Several things leave your device, and you should know exactly what they are.
 
 **Map tiles.** The satellite map fetches imagery from Esri at
 `server.arcgisonline.com`. Requesting a tile tells that server which tile you
 are looking at, so your venue coordinates are visible to Esri, at roughly the
 zoom level you are viewing. That is unavoidable for any map that streams
 imagery. Nothing else is attached: no account, no identifier, no form content.
+
+**The sky layer, when you turn it on.** Tapping **Sky** overlays GOES-19
+satellite cloud imagery on the map. The tiles come from the Iowa Environmental
+Mesonet at `mesonet.agron.iastate.edu`, which reprojects NOAA NESDIS imagery
+and serves it as map tiles. Requesting a tile tells that server which tile you
+are looking at, exactly like the Esri imagery above. No key, no account,
+nothing else attached. It is **off by default**, so if you never tap it nothing
+goes there.
+
+The band is chosen for you from the sun's altitude, because visible light is
+black before sunrise: above about 3° you get band 2 (visible, 0.5 km), below it
+band 13 (longwave infrared, 2 km), which sees cloud by its temperature and so
+works in the dark. The button says which one you will get.
+
+**Wind.** Open-Meteo at `api.open-meteo.com`, the same keyless service the cloud
+forecast already uses, gets the venue coordinate and returns wind speed,
+direction and gusts for the hour. It is the same one coordinate that service
+already receives.
 
 **Venue search, and this one changed.** With a `MAPBOX_TOKEN` set, typing in the
 search box sends what you type **to Mapbox, as you type it**. Not on submit: a

@@ -9,7 +9,9 @@ import {
   toPosition,
   type LatLon,
 } from '../core/geo.ts'
+import { GOES_ATTRIBUTION, goesBandFor } from '../core/goes.ts'
 import { classificationOf } from '../core/lighting.ts'
+import { goesTileUrl } from '../lib/goesLayer.ts'
 import {
   COLD_START_VIEW,
   labelDistances,
@@ -34,6 +36,7 @@ import {
   appLayerIdsIn,
   CONE_SOURCE,
   FOOTPRINT_SOURCE,
+  GOES_SOURCE,
   PILOT_SOURCE,
   RADIUS_SOURCE,
   RAY_SOURCE,
@@ -314,6 +317,21 @@ interface MapViewProps {
   /** Where to drop a position, when the map is armed to place one. */
   onAddAt?: (at: LatLon) => void
   sunAzimuth: number | null
+  /**
+   * The sun's altitude, for choosing the GOES band.
+   *
+   * Separate from sunOverlay because the sky layer is useful with the sun
+   * overlay switched off: the cloud is the subject, not the bearings.
+   */
+  sunAltitude?: number | null
+  /**
+   * Show the GOES-19 cloud layer over the imagery.
+   *
+   * The BAND is not a prop: it is chosen from the altitude above in
+   * src/core/goes.ts, because visible light is black before sunrise and that
+   * is when this app is used most.
+   */
+  showSky?: boolean
   /** PhotoPills style rays from the venue pin. All four bearings from core. */
   sunOverlay: SunOverlay | null
   showSun: boolean
@@ -569,6 +587,8 @@ export function MapView({
   pinHint = null,
   onPinDrag,
   onReady,
+  sunAltitude = null,
+  showSky = false,
   pilotAt = null,
   onPilotMove,
 }: MapViewProps) {
@@ -772,6 +792,38 @@ export function MapView({
         readToken('--light-front'),
         readToken('--light-side'),
       ] as unknown as maplibregl.DataDrivenPropertyValueSpecification<string>
+
+      /*
+       * THE SKY, UNDER EVERYTHING THIS APP DRAWS.
+       *
+       * Added first so it sits directly on the satellite imagery and beneath
+       * every cone, ray and marker: it is weather over the ground, not an
+       * annotation, and a cloud layer on top of the plan would hide the plan.
+       *
+       * Both bands get a source, so switching between them at dawn is a
+       * visibility change rather than a source swap that drops the tiles and
+       * refetches. Neither is visible until asked for.
+       */
+      for (const band of ['visible', 'infrared'] as const) {
+        instance.addSource(`${GOES_SOURCE}-${band}`, {
+          type: 'raster',
+          tiles: [goesTileUrl(band)],
+          tileSize: 256,
+          attribution: GOES_ATTRIBUTION,
+        })
+        instance.addLayer({
+          id: `${GOES_SOURCE}-${band}`,
+          type: 'raster',
+          source: `${GOES_SOURCE}-${band}`,
+          layout: { visibility: 'none' },
+          /*
+           * Partly transparent, because the point is cloud OVER a place you
+           * recognise. An opaque satellite image of cloud is a weather map,
+           * and this app already has a map.
+           */
+          paint: { 'raster-opacity': 0.55 },
+        })
+      }
 
       instance.addSource(RADIUS_SOURCE, { type: 'geojson', data: emptyCollection() })
       instance.addSource(CONE_SOURCE, { type: 'geojson', data: emptyCollection() })
@@ -1333,6 +1385,27 @@ export function MapView({
     const links = map.current.getSource(PILOT_SOURCE) as maplibregl.GeoJSONSource | undefined
     links?.setData(pilotCollection(pilotAt, plan))
   }, [pilotAt, plan, ready])
+
+  /*
+   * THE SKY LAYER, AND WHICH BAND OF IT.
+   *
+   * The band follows the sun rather than a setting: visible light is black
+   * before sunrise, which is exactly when a backlit cloud shoot happens, so
+   * leaving a shooter to remember the switch is how somebody stares at a black
+   * rectangle at 05:40 and concludes it is broken. src/core/goes.ts decides.
+   */
+  useEffect(() => {
+    const instance = map.current
+    if (instance === null || !ready) return
+    const wanted = sunAltitude === null ? 'infrared' : goesBandFor(sunAltitude)
+    for (const band of ['visible', 'infrared'] as const) {
+      instance.setLayoutProperty(
+        `${GOES_SOURCE}-${band}`,
+        'visibility',
+        showSky && band === wanted ? 'visible' : 'none',
+      )
+    }
+  }, [showSky, sunAltitude, ready])
 
   /*
    * THE SUN LINE AND THE RAYS, SIZED TO THE VIEWPORT.

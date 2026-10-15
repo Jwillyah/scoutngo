@@ -46,6 +46,9 @@ interface PlanModeProps {
   onShowSun: (next: boolean) => void
   showArc: boolean
   onShowArc: (next: boolean) => void
+  /** The GOES-19 cloud layer over the imagery. */
+  showSky: boolean
+  onShowSky: (next: boolean) => void
   selectedId: string | null
   onSelect: (id: string | null) => void
   selected: PlannedPosition | null
@@ -158,6 +161,8 @@ export function PlanMode({
   onShowSun,
   showArc,
   onShowArc,
+  showSky,
+  onShowSky,
   selectedId,
   onSelect,
   selected,
@@ -260,6 +265,8 @@ export function PlanMode({
         onPositionMove={onPositionMove}
         onLongPress={onLongPress}
         sunAzimuth={sun === null ? null : sun.azimuth}
+        sunAltitude={sun?.altitude ?? null}
+        showSky={showSky}
         sunOverlay={sunOverlay}
         showSun={showSun}
         showArc={showArc}
@@ -321,7 +328,13 @@ export function PlanMode({
             hidden={hiddenByPlatform}
             airAvailable={airAvailable}
           />
-          <OverflowMenu showArc={showArc} onShowArc={onShowArc} />
+          <OverflowMenu
+            showArc={showArc}
+            onShowArc={onShowArc}
+            showSky={showSky}
+            onShowSky={onShowSky}
+            sunAltitude={sun?.altitude ?? null}
+          />
         </div>
       </header>
 

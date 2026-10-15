@@ -23,6 +23,7 @@ import {
   type SightlineCloud,
 } from '../core/cloud.ts'
 import type { LatLon } from '../core/geo.ts'
+import type { Wind } from '../core/upwind.ts'
 
 export const OPEN_METEO_URL = 'https://api.open-meteo.com/v1/forecast'
 export const TIMEOUT_MS = 8000
@@ -210,6 +211,120 @@ export async function fetchSightlineCloud(
         error instanceof Error && error.name === 'AbortError'
           ? 'The cloud forecast timed out.'
           : 'Could not reach the cloud forecast.',
+    }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/*
+ * WIND AT THE VENUE.
+ *
+ * Separate from the sightline cloud above, which samples along each position's
+ * own bearing and is per position. Wind is one reading at one place, and two
+ * things want it: a drone pilot, for whom wind speed and gusts decide whether
+ * the aircraft goes up at all, and the upwind ranking in src/core/upwind.ts,
+ * which needs the direction to work out which camera is showing what is coming.
+ *
+ * SAME PROVIDER, SAME DISCLOSURE. Open-Meteo, keyless, already named in the
+ * README privacy section for the cloud forecast. One coordinate goes out, the
+ * venue's, which is the one it already sends.
+ */
+export type WindResult =
+  | { status: 'ok'; wind: Wind; gustMps: number | null; at: Date }
+  | { status: 'unavailable'; reason: string }
+
+interface WindRow {
+  time?: unknown
+  wind_speed_10m?: unknown
+  wind_direction_10m?: unknown
+  wind_gusts_10m?: unknown
+}
+
+/** Open-Meteo reports km/h by default; everything in core is metres per second. */
+const KMH_TO_MPS = 1 / 3.6
+
+/**
+ * A number, or null when it is not there.
+ *
+ * NOT numberAt, which returns 0 for a missing value. For a cloud percentage
+ * that reads as "clear"; for a wind DIRECTION it reads as "due north" and for
+ * a speed as "calm", and a wind direction invented as north would rank the
+ * upwind list confidently wrong. Absent has to stay absent.
+ */
+const numberOrNull = (list: unknown, index: number): number | null => {
+  if (!Array.isArray(list)) return null
+  const value = list[index]
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+export function parseWind(payload: unknown, at: Date): WindResult {
+  const hourly = (payload as { hourly?: WindRow } | null)?.hourly
+  const times = Array.isArray(hourly?.time) ? (hourly.time as string[]) : []
+  if (times.length === 0) return { status: 'unavailable', reason: 'No wind in the response.' }
+
+  /*
+   * The hour the shoot is in, not the first hour of the day. Open-Meteo
+   * returns local wall-clock stamps for the timezone asked for, so these are
+   * compared as text against the same hour rendered the same way.
+   */
+  const wanted = isoHour(at)
+  const index = times.findIndex((t) => t.startsWith(wanted))
+  const row = index === -1 ? 0 : index
+
+  const speed = numberOrNull(hourly?.wind_speed_10m, row)
+  const direction = numberOrNull(hourly?.wind_direction_10m, row)
+  if (speed === null || direction === null) {
+    return { status: 'unavailable', reason: 'Wind was missing for that hour.' }
+  }
+  const gust = numberOrNull(hourly?.wind_gusts_10m, row)
+
+  return {
+    status: 'ok',
+    wind: { fromDegrees: direction, speedMps: speed * KMH_TO_MPS },
+    gustMps: gust === null ? null : gust * KMH_TO_MPS,
+    at: new Date(times[row]),
+  }
+}
+
+/** yyyy-mm-ddTHH, which is how an Open-Meteo hourly stamp starts. */
+function isoHour(at: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}T${pad(at.getHours())}`
+}
+
+export async function fetchWind(
+  at: LatLon,
+  when: Date,
+  timeZone: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<WindResult> {
+  const params = new URLSearchParams({
+    latitude: at.lat.toFixed(4),
+    longitude: at.lon.toFixed(4),
+    hourly: 'wind_speed_10m,wind_direction_10m,wind_gusts_10m',
+    start_date: isoDate(when),
+    end_date: isoDate(when),
+    timezone: timeZone,
+  })
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
+  try {
+    const response = await fetchImpl(`${OPEN_METEO_URL}?${params.toString()}`, {
+      signal: controller.signal,
+    })
+    if (!response.ok) {
+      return { status: 'unavailable', reason: `Open-Meteo returned HTTP ${response.status}.` }
+    }
+    return parseWind(await response.json(), when)
+  } catch (error) {
+    return {
+      status: 'unavailable',
+      reason:
+        error instanceof Error && error.name === 'AbortError'
+          ? 'The wind lookup timed out.'
+          : 'Could not reach Open-Meteo for wind.',
     }
   } finally {
     clearTimeout(timer)
