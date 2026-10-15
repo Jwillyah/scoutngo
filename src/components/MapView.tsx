@@ -33,8 +33,10 @@ import {
   slideOrder,
   type Rect,
 } from '../core/labelPlacement.ts'
+import { cellPolygon, type ForecastCell } from '../core/cloudGrid.ts'
 import {
   appLayerIdsIn,
+  CLOUD_FORECAST_SOURCE,
   CONE_SOURCE,
   FOOTPRINT_SOURCE,
   GOES_SOURCE,
@@ -344,6 +346,17 @@ interface MapViewProps {
    */
   showSky?: boolean
   /**
+   * The GOES frame to show, or null when the scrubber is in the future.
+   *
+   * Null is what switches the satellite off and the forecast grid on. There is
+   * no satellite image of the future and the layer must not pretend otherwise.
+   */
+  skyFrameAt?: Date | null
+  /** The forecast cloud cells, empty unless the scrubber is in the future. */
+  skyForecast?: readonly ForecastCell[]
+  /** How solid to draw them, which falls with how far ahead they are. */
+  skyForecastOpacity?: number
+  /**
    * The camera's zoom and the map's width in CSS pixels, whenever either moves.
    *
    * The sky layer's zoom warning depends on how many SCREEN pixels one
@@ -416,6 +429,26 @@ function coneCollection(plan: PlannedPosition[]): GeoJSON.FeatureCollection {
           platform: p.position.platform,
         },
         geometry: { type: 'Polygon' as const, coordinates: p.cone },
+      })),
+  }
+}
+
+/**
+ * The forecast cloud grid, as coarse squares.
+ *
+ * One feature per cell, carrying its cover so the paint expression can shade
+ * it. A cell the forecast did not cover is DROPPED rather than drawn at zero:
+ * an unshaded square would read as clear sky.
+ */
+function cloudForecastCollection(cells: readonly ForecastCell[]): GeoJSON.FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: cells
+      .filter((cell) => cell.cover !== null)
+      .map((cell) => ({
+        type: 'Feature' as const,
+        properties: { cover: cell.cover },
+        geometry: { type: 'Polygon' as const, coordinates: cellPolygon(cell.at) },
       })),
   }
 }
@@ -608,6 +641,9 @@ export function MapView({
   onReady,
   sunAltitude = null,
   showSky = false,
+  skyFrameAt = null,
+  skyForecast = [],
+  skyForecastOpacity = 0.5,
   onViewChange,
   pilotAt = null,
   onPilotMove,
@@ -865,6 +901,27 @@ export function MapView({
           paint: { 'raster-opacity': 0.55 },
         })
       }
+
+      /*
+       * The forecast grid sits with the satellite, under everything this app
+       * draws, because it is weather over the ground rather than annotation.
+       */
+      instance.addSource(CLOUD_FORECAST_SOURCE, { type: 'geojson', data: emptyCollection() })
+      instance.addLayer({
+        id: 'cloud-forecast-fill',
+        type: 'fill',
+        source: CLOUD_FORECAST_SOURCE,
+        layout: { visibility: 'none' },
+        paint: {
+          /*
+           * Plain white cloud over the imagery, and hard edged: the squares
+           * ARE the signal that this is a model and not a photograph.
+           */
+          'fill-color': readToken('--white', '#ffffff', container.current),
+          'fill-opacity': 0,
+          'fill-outline-color': readToken('--color-accent-2', '#c9a227', container.current),
+        },
+      })
 
       instance.addSource(RADIUS_SOURCE, { type: 'geojson', data: emptyCollection() })
       instance.addSource(CONE_SOURCE, { type: 'geojson', data: emptyCollection() })
@@ -1439,14 +1496,66 @@ export function MapView({
     const instance = map.current
     if (instance === null || !ready) return
     const wanted = sunAltitude === null ? 'infrared' : goesBandFor(sunAltitude)
+
+    /*
+     * THE SATELLITE SHOWS ONLY PAST AND NOW. There is no GOES frame of the
+     * future, so when the scrubber goes past now both bands go dark and the
+     * forecast grid below takes over. Never both: a model result under a
+     * caption that says observed is the failure this whole split exists to
+     * avoid.
+     */
+    const satellite = showSky && skyFrameAt !== null
+
     for (const band of ['visible', 'infrared'] as const) {
+      const id = `${GOES_SOURCE}-${band}`
       instance.setLayoutProperty(
-        `${GOES_SOURCE}-${band}`,
+        id,
         'visibility',
-        showSky && band === wanted ? 'visible' : 'none',
+        satellite && band === wanted ? 'visible' : 'none',
       )
     }
-  }, [showSky, sunAltitude, ready])
+
+    /*
+     * RETILED FOR THE FRAME, which is what makes the scrub animate. maplibre
+     * has no public API for changing a raster source's tile template, so the
+     * source's own tiles array is replaced and its cache cleared through the
+     * documented setTiles where available, falling back to removing and
+     * re-adding the source.
+     */
+    if (!satellite || skyFrameAt === null) return
+    const source = instance.getSource(`${GOES_SOURCE}-${wanted}`) as
+      | (maplibregl.RasterTileSource & { setTiles?: (tiles: string[]) => void })
+      | undefined
+    source?.setTiles?.([goesTileUrl(wanted, skyFrameAt)])
+  }, [showSky, sunAltitude, skyFrameAt, ready])
+
+  /*
+   * THE FORECAST GRID, which is what the future looks like.
+   *
+   * Coarse squares on purpose: the satellite layer is a photograph and this is
+   * a model, and they must not be mistakable at a glance. Hard edges beside
+   * real imagery is the difference, visible before any label is read. The
+   * opacity comes from how far ahead it is, so a forecast a week out is drawn
+   * faint and one past a week is not drawn at all.
+   */
+  useEffect(() => {
+    const instance = map.current
+    if (instance === null || !ready) return
+    const source = instance.getSource(CLOUD_FORECAST_SOURCE) as
+      | maplibregl.GeoJSONSource
+      | undefined
+    source?.setData(cloudForecastCollection(skyForecast))
+    instance.setLayoutProperty(
+      'cloud-forecast-fill',
+      'visibility',
+      showSky && skyForecast.length > 0 ? 'visible' : 'none',
+    )
+    instance.setPaintProperty('cloud-forecast-fill', 'fill-opacity', [
+      'min',
+      ['*', ['get', 'cover'], 0.01, skyForecastOpacity],
+      skyForecastOpacity,
+    ])
+  }, [showSky, skyForecast, skyForecastOpacity, ready])
 
   /*
    * THE SUN LINE AND THE RAYS, SIZED TO THE VIEWPORT.

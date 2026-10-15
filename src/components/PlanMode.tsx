@@ -6,6 +6,9 @@ import type {
 } from '../core/platformFilter.ts'
 import type { ShotType } from '../core/shotType.ts'
 import { goesBandFor, zoomAdvice } from '../core/goes.ts'
+import { boundaryNote } from '../core/skyTime.ts'
+import { formatClock } from '../core/timezone.ts'
+import type { SkyState } from '../lib/useSkyFrames.ts'
 import type { Wind } from '../core/upwind.ts'
 import type { LevelWind } from '../core/windProfile.ts'
 import type { SightlineCloud } from '../core/cloud.ts'
@@ -71,6 +74,8 @@ interface PlanModeProps {
   ratedWindSource: string
   /** Cloud for the selected position, when it has been asked for. */
   selectedCloud: SightlineCloud | null
+  /** Which sky source answers for the scrubbed moment, and its frames. */
+  sky: SkyState
   selectedId: string | null
   onSelect: (id: string | null) => void
   selected: PlannedPosition | null
@@ -194,6 +199,7 @@ export function PlanMode({
   ratedWindMps,
   ratedWindSource,
   selectedCloud,
+  sky,
   selectedId,
   onSelect,
   selected,
@@ -307,6 +313,9 @@ export function PlanMode({
         sunAzimuth={sun === null ? null : sun.azimuth}
         sunAltitude={sun?.altitude ?? null}
         showSky={showSky}
+        skyFrameAt={sky.frameAt}
+        skyForecast={sky.cells}
+        skyForecastOpacity={sky.opacity}
         sunOverlay={sunOverlay}
         showSun={showSun}
         showArc={showArc}
@@ -394,6 +403,15 @@ export function PlanMode({
         <SkyLegend
           band={skyBand}
           advice={zoomAdvice(skyBand, venue?.lat ?? 0, mapWidth, mapZoom)}
+          sky={sky}
+          clock={(at) =>
+            venueWindow === null ? at.toISOString().slice(11, 16) : formatClock(at, venueWindow.timeZone)
+          }
+          boundary={
+            venueWindow === null
+              ? null
+              : boundaryNote(new Date(), (at) => formatClock(at, venueWindow.timeZone))
+          }
         />
       )}
 

@@ -8,11 +8,19 @@ import {
 import { thinLegend, VISIBLE_LEGEND_NOTE } from '../core/goesLegend.ts'
 import { fetchGoesLegend, type ColormapResult } from '../lib/goesColormap.ts'
 import type { ZoomAdvice } from '../core/goes.ts'
+import { FORECAST_TRUST_NOTE } from '../core/skyTime.ts'
+import type { SkyState } from '../lib/useSkyFrames.ts'
 
 interface SkyLegendProps {
   band: GoesBand
   /** Whether the layer has detail at the current zoom, and what to say. */
   advice: ZoomAdvice
+  /** Which source is answering for the scrubbed moment, and how far out. */
+  sky: SkyState
+  /** Renders an instant in the venue's own zone. */
+  clock: (at: Date) => string
+  /** Where the split between observed and modelled falls. */
+  boundary: string | null
 }
 
 /**
@@ -32,7 +40,7 @@ interface SkyLegendProps {
  * The visible band has no table and GIBS publishes none, so it gets a sentence
  * about what greyscale reflectance is instead of a fabricated scale.
  */
-export function SkyLegend({ band, advice }: SkyLegendProps) {
+export function SkyLegend({ band, advice, sky, clock, boundary }: SkyLegendProps) {
   const [table, setTable] = useState<ColormapResult | null>(null)
 
   useEffect(() => {
@@ -49,16 +57,62 @@ export function SkyLegend({ band, advice }: SkyLegendProps) {
 
   return (
     <div className="skykey">
-      <p className="skykey__band">
-        <span className="skykey__label">{GOES_BAND_LABEL[band]}</span>
-        <span className="skykey__note">{GOES_BAND_NOTE[band]}</span>
-      </p>
+      {/*
+        * WHICH SOURCE, FIRST AND UNMISTAKABLY.
+        *
+        * There is no satellite image of the future, so past and now get a real
+        * frame and the future gets a model. They never share a caption: a
+        * model result under a label that says observed is the exact failure
+        * this split exists to avoid.
+        */}
+      {sky.source.kind === 'satellite' ? (
+        <p className="skykey__src skykey__src--obs">
+          <span className="skykey__badge">Satellite</span>
+          <span className="skykey__srcnote">
+            Frame <span className="num">{clock(sky.source.frameAt)}</span>, observed.
+            {sky.source.far
+              ? ` Nearest frame is ${Math.round(
+                  sky.source.offsetMinutes,
+                )} min from where you are scrubbing.`
+              : ''}
+          </span>
+        </p>
+      ) : (
+        <p className="skykey__src skykey__src--fc">
+          <span className="skykey__badge skykey__badge--fc">Forecast</span>
+          <span className="skykey__srcnote">
+            {sky.source.hoursAhead < 1
+              ? 'Just past now, so this is a model and not a picture.'
+              : `${Math.round(sky.source.hoursAhead)} h ahead. A model, not a picture.`}{' '}
+            {FORECAST_TRUST_NOTE[sky.source.trust]}
+          </span>
+        </p>
+      )}
+
+      {boundary === null ? null : <p className="skykey__boundary">{boundary}</p>}
+
+      {sky.forecastProblem === null ? null : (
+        <p className="skykey__grey">{sky.forecastProblem}</p>
+      )}
+
+      {/*
+        * The band and its colour key only describe the SATELLITE. A forecast
+        * grid is white squares shaded by cover and has nothing to do with
+        * brightness temperature, so showing the ramp beside it would key the
+        * wrong picture.
+        */}
+      {sky.source.kind !== 'satellite' ? null : (
+        <p className="skykey__band">
+          <span className="skykey__label">{GOES_BAND_LABEL[band]}</span>
+          <span className="skykey__note">{GOES_BAND_NOTE[band]}</span>
+        </p>
+      )}
 
       {/*
         * TOO CLOSE IS ITS OWN STATE, and it comes first: a key for colours
         * that are a flat wash is not the thing to read next.
         */}
-      {advice.readable ? null : (
+      {advice.readable || sky.source.kind !== 'satellite' ? null : (
         <p className="skykey__wash">
           {advice.message}
           {advice.zoomOutTo === null ? null : (
@@ -67,7 +121,12 @@ export function SkyLegend({ band, advice }: SkyLegendProps) {
         </p>
       )}
 
-      {band === 'visible' ? (
+      {sky.source.kind !== 'satellite' ? (
+        <p className="skykey__grey">
+          Shaded squares are cloud cover from the Open-Meteo forecast, one cell per model
+          point. Coarse and hard edged on purpose: it is a model, not a photograph.
+        </p>
+      ) : band === 'visible' ? (
         <p className="skykey__grey">{VISIBLE_LEGEND_NOTE}</p>
       ) : table === null ? (
         <p className="skykey__grey">Reading the colour table from NASA GIBS…</p>

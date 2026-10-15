@@ -54,6 +54,16 @@ export const GOES_SOURCE = 'goes-sky'
  */
 export const GOES_BAND_SOURCES = [`${GOES_SOURCE}-visible`, `${GOES_SOURCE}-infrared`] as const
 
+/**
+ * The forecast cloud grid, which stands in for the satellite when the
+ * scrubber goes past now.
+ *
+ * Hidden before a capture for the same reason as the satellite layer: the
+ * capture exists so a model can read the GROUND, and a cloud field over it
+ * hides the ground whatever the cloud is made of.
+ */
+export const CLOUD_FORECAST_SOURCE = 'cloud-forecast'
+
 /** Every source this app draws with. The basemap is NOT here and must not be. */
 export const APP_SOURCES: readonly string[] = [
   RADIUS_SOURCE,
@@ -63,6 +73,7 @@ export const APP_SOURCES: readonly string[] = [
   PILOT_SOURCE,
   FOOTPRINT_SOURCE,
   ...GOES_BAND_SOURCES,
+  CLOUD_FORECAST_SOURCE,
 ]
 
 /**

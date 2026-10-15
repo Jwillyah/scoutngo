@@ -301,17 +301,31 @@ inventing one. Wind comes from Open-Meteo. Nothing is dropped: a downwind
 camera is listed with its angle, so you can see why it is at the bottom.
 
 **The sky layer, when you turn it on.** Tapping **Sky** overlays GOES-19
-satellite cloud imagery on the map. The tiles come from the Iowa Environmental
-Mesonet at `mesonet.agron.iastate.edu`, which reprojects NOAA NESDIS imagery
+satellite cloud imagery on the map. The tiles come from **NASA GIBS** at
+`gibs.earthdata.nasa.gov`, which reprojects and archives NOAA NESDIS imagery
 and serves it as map tiles. Requesting a tile tells that server which tile you
 are looking at, exactly like the Esri imagery above. No key, no account,
 nothing else attached. It is **off by default**, so if you never tap it nothing
 goes there.
 
 The band is chosen for you from the sun's altitude, because visible light is
-black before sunrise: above about 3° you get band 2 (visible, 0.5 km), below it
+black before sunrise: above about 3° you get band 2 (visible, 1 km), below it
 band 13 (longwave infrared, 2 km), which sees cloud by its temperature and so
-works in the dark. The button says which one you will get.
+works in the dark. The button says which one you will get. The colour key is
+built from the colour table GIBS publishes for the layer — nothing in this app
+writes down a colour or a temperature, because a legend invented from memory
+would be a confident wrong answer about someone else's data.
+
+**The layer follows the time bar, and splits honestly.** Scrub back and you get
+the real GOES frame nearest that moment, with the frame's own timestamp shown
+rather than the scrubber's. Scrub forward and there is no satellite image of
+the future, so it switches to the Open-Meteo cloud forecast, drawn as coarse
+hard-edged squares that cannot be mistaken for imagery and labelled
+**FORECAST**. The two are never blended, and the key names the exact moment the
+split falls on. A forecast is drawn fainter the further out it is and **not at
+all past a week**, because a cloud map at that range would look just as
+confident as one for tomorrow. Frames live in memory for the session only:
+never written to storage, never put in a field pack.
 
 **Wind.** Open-Meteo at `api.open-meteo.com`, the same keyless service the cloud
 forecast already uses, gets the venue coordinate and returns wind speed,

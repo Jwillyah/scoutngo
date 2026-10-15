@@ -5233,3 +5233,52 @@
   color: var(--color-accent-2);
   font-weight: var(--weight-heavy);
 }
+
+/*
+ * WHICH SOURCE THE SKY LAYER IS SHOWING.
+ *
+ * There is no satellite image of the future, so past and now are a real frame
+ * and the future is a model. They must never be mistakable, so they get
+ * different badges and different colours, and the forecast one is never the
+ * colour used for observed facts.
+ */
+.skykey__src {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+}
+
+.skykey__badge {
+  justify-self: start;
+  padding: 1px 5px;
+  background: var(--mark);
+  color: var(--black);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+/* Forecast is the secondary accent: a different kind of claim, not a hazard. */
+.skykey__badge--fc {
+  background: var(--color-accent-2);
+}
+
+.skykey__srcnote {
+  color: var(--color-text);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+
+/*
+ * WHERE THE SPLIT IS. The reader needs the exact point where they stop looking
+ * at what happened and start looking at what a model thinks.
+ */
+.skykey__boundary {
+  margin: 0;
+  padding-top: 2px;
+  border-top: var(--line-hair) solid var(--color-line);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}

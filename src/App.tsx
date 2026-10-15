@@ -25,6 +25,7 @@ import { extremesAround, tideStateAt } from './core/tide.ts'
 import { formatClock } from './core/timezone.ts'
 import { LOCATED_ZOOM } from './lib/locateOnce.ts'
 import { useNewBuild } from './lib/useNewBuild.ts'
+import { useSkyFrames } from './lib/useSkyFrames.ts'
 import { useWind } from './lib/useWind.ts'
 import { briefDriftMeters, formatDrift, isBriefStale, type BriefAnchor } from './lib/brief.ts'
 import {
@@ -437,6 +438,13 @@ function App() {
    * planning a client event shoot needs it, so it is asked for.
    */
   const [showSky, setShowSky] = useState(false)
+
+  /*
+   * WHAT THE SKY LAYER SHOWS FOR THE SCRUBBED MOMENT. Past and now get a real
+   * GOES frame; the future gets the Open-Meteo cloud grid. Frames live in
+   * memory for the session only and never reach a field pack.
+   */
+  const sky = useSkyFrames(aim, scrubbedAt, venueWindow?.timeZone ?? null, showSky)
 
   /*
    * THE SHOOT CHIPS. One tap sets the platform filter and the window, with no
@@ -1366,6 +1374,7 @@ function App() {
           ratedWindMps={rated.mps}
           ratedWindSource={rated.source}
           selectedCloud={null}
+          sky={sky}
           selectedId={selectedId}
           onSelect={onSelectPosition}
           selected={selected}

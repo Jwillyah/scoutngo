@@ -56,9 +56,10 @@ describe('appLayerIdsIn', () => {
    * to the model, and it survived because nothing forced anyone to notice a new
    * layer. The pilot line was added to this list because this test failed.
    */
-  it('knows the seven sources hidden before a capture', () => {
+  it('knows the eight sources hidden before a capture', () => {
     expect([...APP_SOURCES].sort()).toEqual(
       [
+        'cloud-forecast',
         'fov-cones',
         'goes-sky-infrared',
         'goes-sky-visible',

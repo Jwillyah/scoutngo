@@ -25,6 +25,7 @@ import {
 import type { LatLon } from '../core/geo.ts'
 import type { Wind } from '../core/upwind.ts'
 import { WIND_LEVELS_METERS, type LevelWind } from '../core/windProfile.ts'
+import { cellCover, cloudGridPoints } from '../core/cloudGrid.ts'
 
 export const OPEN_METEO_URL = 'https://api.open-meteo.com/v1/forecast'
 export const TIMEOUT_MS = 8000
@@ -360,6 +361,101 @@ export async function fetchWind(
         error instanceof Error && error.name === 'AbortError'
           ? 'The wind lookup timed out.'
           : 'Could not reach Open-Meteo for wind.',
+    }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/*
+ * THE FORECAST CLOUD FIELD, for the map layer that stands in for the
+ * satellite when the scrubber goes into the future.
+ *
+ * ONE REQUEST FOR THE WHOLE GRID, the same comma-separated point list the
+ * sightline forecast already uses. Twenty-five points is one call, which is
+ * what makes a map layer out of a point API without abusing a free service.
+ */
+export interface GridCell {
+  ix: number
+  iy: number
+  at: LatLon
+  /** The most blocking single layer, or null where the forecast did not say. */
+  cover: number | null
+}
+
+export type CloudGridResult =
+  | { status: 'ok'; cells: GridCell[]; at: Date }
+  | { status: 'unavailable'; reason: string }
+
+export async function fetchCloudGrid(
+  centre: LatLon,
+  when: Date,
+  timeZone: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<CloudGridResult> {
+  const ahead = daysAhead(when, new Date())
+  if (ahead > FORECAST_HORIZON_DAYS) {
+    return {
+      status: 'unavailable',
+      reason: `That date is ${ahead} days out. Forecasts only run ${FORECAST_HORIZON_DAYS} days ahead.`,
+    }
+  }
+
+  const points = cloudGridPoints(centre)
+  const params = new URLSearchParams({
+    latitude: points.map((p) => p.at.lat.toFixed(4)).join(','),
+    longitude: points.map((p) => p.at.lon.toFixed(4)).join(','),
+    hourly: 'cloud_cover_low,cloud_cover_mid,cloud_cover_high',
+    start_date: isoDate(when),
+    end_date: isoDate(when),
+    timezone: timeZone,
+  })
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
+  try {
+    const response = await fetchImpl(`${OPEN_METEO_URL}?${params.toString()}`, {
+      signal: controller.signal,
+    })
+    if (!response.ok) {
+      return { status: 'unavailable', reason: `Open-Meteo returned HTTP ${response.status}.` }
+    }
+    const payload = await response.json()
+    /* A multi-point answer is an array; a single point is one object. */
+    const list = Array.isArray(payload) ? payload : [payload]
+    const times = (list[0]?.hourly?.time as string[] | undefined) ?? []
+    if (times.length === 0) {
+      return { status: 'unavailable', reason: 'No cloud in the response.' }
+    }
+    /*
+     * The same wall-clock hour match the sightline forecast uses: Open-Meteo
+     * is asked for the venue's own timezone, so its stamps are local without
+     * an offset and `isoHour` renders the wanted hour the same way.
+     */
+    const row = hourIndexFor(times, `${isoHour(when)}:00`)
+
+    const cells: GridCell[] = points.map((point, i) => {
+      const hourly = list[i]?.hourly
+      return {
+        ix: point.ix,
+        iy: point.iy,
+        at: point.at,
+        cover: cellCover({
+          low: numberOrNull(hourly?.cloud_cover_low, row),
+          mid: numberOrNull(hourly?.cloud_cover_mid, row),
+          high: numberOrNull(hourly?.cloud_cover_high, row),
+        }),
+      }
+    })
+
+    return { status: 'ok', cells, at: new Date(times[row]) }
+  } catch (error) {
+    return {
+      status: 'unavailable',
+      reason:
+        error instanceof Error && error.name === 'AbortError'
+          ? 'The cloud forecast timed out.'
+          : 'Could not reach Open-Meteo for the cloud forecast.',
     }
   } finally {
     clearTimeout(timer)
