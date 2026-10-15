@@ -3748,21 +3748,35 @@
  * would cost the only thing it has to do.
  */
 .shooter__flag {
+  /*
+   * A WORD, NOT A ROUND BADGE WITH AN EXCLAMATION MARK IN IT.
+   *
+   * It was an 18px circle containing "!", which is a red dot that has to be
+   * explained to mean anything. It carries the reason now: water, road,
+   * people, wide, far. Sized to its content rather than to a circle, and
+   * hard-edged like every other data overlay in this app.
+   *
+   * Positioned above the disc rather than beside it, so two markers side by
+   * side do not push their words into each other, and with the number still
+   * readable underneath.
+   */
   position: absolute;
-  top: -4px;
-  right: -4px;
-  width: 18px;
-  height: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 4px;
+  max-width: 11ch;
   background: var(--color-hazard);
   color: var(--white);
-  border: 2px solid var(--mark-edge);
-  border-radius: 50%;
+  border: var(--line-hair) solid var(--mark-edge);
   font-size: var(--text-xs);
   font-weight: var(--weight-heavy);
-  line-height: 1;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  line-height: 1.2;
+  white-space: nowrap;
+  /* It explains the marker; it must never be the thing you tap instead of it. */
+  pointer-events: none;
 }
 
 .shot__warn {
@@ -4808,4 +4822,117 @@
   color: var(--color-text-muted);
   font-size: var(--text-xs);
   line-height: var(--leading-normal);
+}
+
+/*
+ * WIND, as a readout line. The speed leads because it is the number that
+ * decides whether the aircraft goes up.
+ */
+.windline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-mono);
+}
+
+.windline__value {
+  font-size: var(--text-num);
+  color: var(--color-text);
+}
+
+.windline__sub,
+.windline__from {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.windline__gust {
+  font-size: var(--text-xs);
+  color: var(--color-accent-2);
+}
+
+/*
+ * SKY CAMERAS, ranked. The list is a file in this repo and these are plain
+ * links out; nothing is embedded, proxied or cached.
+ *
+ * Upwind entries carry the secondary accent on their edge, because being
+ * upwind is the whole reason one is above another and the order alone does not
+ * say where the line is drawn.
+ */
+.cams {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.cams__note,
+.cams__foot,
+.cams__empty {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+
+.cams__list {
+  display: grid;
+  gap: var(--line-hair);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cam {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: var(--surface-2);
+  border-left: var(--line-rule) solid transparent;
+}
+
+.cam--upwind {
+  border-left-color: var(--color-accent-2);
+}
+
+.cam__link {
+  flex: 1 1 auto;
+  display: grid;
+  gap: 1px;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.cam__name {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.cam__where {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  letter-spacing: var(--tracking-num);
+}
+
+.cam__why {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.cam--upwind .cam__why {
+  color: var(--color-accent-2);
+}
+
+.cam__who {
+  flex: 0 0 auto;
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+}
+
+/* Paid is stated, not hidden. Not hazard red: paying is not a danger. */
+.cam__who--paid {
+  color: var(--color-text-muted);
+  font-weight: var(--weight-medium);
 }

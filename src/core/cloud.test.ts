@@ -114,3 +114,82 @@ describe('summariseSightline', () => {
     expect(summary.worstLowAtKm).toBeNull()
   })
 })
+
+/*
+ * MISSING IS NOT ZERO.
+ *
+ * The reader returned 0 for an absent value and summariseSightline([])
+ * returned 'clear sightline', so a forecast that said nothing came out as the
+ * most optimistic claim available about a shoot. Same mistake as a coordinate
+ * falling back to Null Island, a drone's slant range reading 0m, a lens
+ * standing in for a drone camera, and an undefined light read out of a field
+ * pack. Low risk was never the test; the test is whether it states something
+ * false.
+ */
+describe('a forecast that did not say', () => {
+  const sample = (distanceKm: number, low: number | null, mid: number | null, high: number | null) =>
+    ({ distanceKm, low, mid, high })
+
+  it('reports no verdict rather than a clear sightline when there are no samples', () => {
+    const out = summariseSightline([])
+    expect(out.verdict).toBe('no cloud forecast for this sightline')
+    expect(out.worstLow).toBeNull()
+    expect(out.meanLow).toBeNull()
+  })
+
+  it('reports no verdict when every low reading is missing', () => {
+    const out = summariseSightline([sample(10, null, 20, 30), sample(20, null, 25, 35)])
+    expect(out.verdict).toBe('no cloud forecast for this sightline')
+    expect(out.worstLow).toBeNull()
+    expect(out.worstLowAtKm).toBeNull()
+  })
+
+  /*
+   * A HIGH LAYER ALONE CANNOT SAY THE SIGHTLINE IS CLEAR. Low cloud is the
+   * thing that removes a low sun, and that is exactly what is unknown.
+   */
+  it('will not call it clear on the strength of the high layer', () => {
+    const out = summariseSightline([sample(10, null, 0, 0)])
+    expect(out.verdict).not.toBe('clear sightline')
+    expect(out.meanHigh).toBe(0)
+  })
+
+  it('uses the readings it does have and ignores the gaps', () => {
+    const out = summariseSightline([
+      sample(10, 80, null, null),
+      sample(20, null, null, null),
+      sample(40, 10, 50, null),
+    ])
+    expect(out.worstLow).toBe(80)
+    expect(out.worstLowAtKm).toBe(10)
+    // The mean of the two known lows, not of three with a zero invented.
+    expect(out.meanLow).toBeCloseTo(45, 6)
+    expect(out.meanMid).toBe(50)
+    expect(out.meanHigh).toBeNull()
+    expect(out.verdict).toBe('low cloud blocks the sightline')
+  })
+
+  /*
+   * AND A REAL ZERO STILL MEANS ZERO. The fix must not turn a forecast of
+   * clear sky into "not forecast", which would be the same error mirrored.
+   */
+  it('still reports a genuine nought as clear', () => {
+    const out = summariseSightline([sample(10, 0, 0, 0), sample(20, 0, 0, 0)])
+    expect(out.worstLow).toBe(0)
+    expect(out.meanLow).toBe(0)
+    expect(out.verdict).toBe('clear sightline')
+  })
+
+  it('refuses a verdict from a null low directly', () => {
+    expect(cloudVerdict({ worstLow: null, meanHigh: 90, meanMid: 90 })).toBe(
+      'no cloud forecast for this sightline',
+    )
+  })
+
+  it('tolerates missing mid and high when the low is known', () => {
+    expect(cloudVerdict({ worstLow: 5, meanHigh: null, meanMid: null })).toBe('clear sightline')
+    expect(cloudVerdict({ worstLow: 85, meanHigh: null, meanMid: null })).toBe(
+      'low cloud blocks the sightline',
+    )
+  })
+})

@@ -23,6 +23,7 @@ import { extremesAround, tideStateAt } from './core/tide.ts'
 import { formatClock } from './core/timezone.ts'
 import { LOCATED_ZOOM } from './lib/locateOnce.ts'
 import { useNewBuild } from './lib/useNewBuild.ts'
+import { useWind } from './lib/useWind.ts'
 import { briefDriftMeters, formatDrift, isBriefStale, type BriefAnchor } from './lib/brief.ts'
 import {
   defaultSelection,
@@ -434,6 +435,12 @@ function App() {
    * planning a client event shoot needs it, so it is asked for.
    */
   const [showSky, setShowSky] = useState(false)
+
+  /*
+   * Wind at the venue, for the hour the scrubber is on. Feeds the readout and
+   * the cam ranking; every failure is null and both say so.
+   */
+  const { wind, gustMps } = useWind(aim, scrubbedAt, venueWindow?.timeZone ?? null)
 
   const [placing, setPlacing] = useState(false)
 
@@ -1263,6 +1270,8 @@ function App() {
           onShowArc={setShowArc}
           showSky={showSky}
           onShowSky={setShowSky}
+          wind={wind}
+          gustMps={gustMps}
           selectedId={selectedId}
           onSelect={onSelectPosition}
           selected={selected}

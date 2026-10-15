@@ -65,7 +65,19 @@ export const MEASURE = `(() => {
   }
 
   const pins = [...document.querySelectorAll('.pin')].map((n) => ({ what: 'pin', ...box(n) }))
-  const labels = [...document.querySelectorAll('.ray-label')].map((n) => ({
+  const discs = [...document.querySelectorAll('.shooter__disc')].map((n) => ({
+    what: 'position disc',
+    ...box(n),
+  }))
+  /*
+   * THE WARNING WORDS ON THE MARKERS COUNT AS LABELS TOO.
+   *
+   * These printed the full phrase once and six positions back from a generate
+   * put three overlapping red paragraphs across the map, so they were cut to a
+   * bare "!". They carry one word each now, and the overlap that caused the
+   * original retreat is measured here rather than avoided by saying nothing.
+   */
+  const labels = [...document.querySelectorAll('.ray-label, .shooter__flag')].map((n) => ({
     what: n.className.replace(/\\s+/g, '.'),
     text: n.textContent.replace(/\\s+/g, ' ').trim(),
     ...box(n),
@@ -74,7 +86,7 @@ export const MEASURE = `(() => {
   const canvas = map.getCanvas()
   const viewport = box(canvas)
 
-  return { viewport, chrome, pins, labels }
+  return { viewport, chrome, pins, discs, labels }
 })()`
 
 const overlaps = (a, b) =>
@@ -92,16 +104,34 @@ const check = async (label) => {
     problems += 1
     return
   }
-  const { viewport, chrome, pins, labels } = out
+  const { viewport, chrome, pins, discs, labels } = out
   const hits = []
 
   for (const l of labels) {
+    /*
+     * A WARNING WORD CANNOT MOVE, so the chrome and edge rules do not apply to
+     * it. It is anchored above its own marker, and the marker is wherever the
+     * position is: a position near the edge of the view or under the HUD has
+     * its word there too, and the only way to change that would be to detach
+     * the word from the thing it describes. What IS checked for these is that
+     * they do not cover another position's number, below, and that the ray
+     * readouts move out of THEIR way, which is why they are obstacles in
+     * MapView rather than candidates here.
+     */
+    const anchored = String(l.what).includes('shooter__flag')
+    if (anchored) continue
+
     for (const c of chrome) {
       if (overlaps(l, c)) hits.push(`${l.text || l.what} over ${c.what}`)
     }
     for (const p of pins) {
       if (overlaps(l, p)) hits.push(`${l.text || l.what} over the venue pin`)
     }
+    /*
+     * A warning word may sit over its OWN marker's furniture, which is where
+     * it belongs, but not over another position's disc: the number underneath
+     * is how you tell the positions apart.
+     */
     /*
      * HALF A READOUT AT THE EDGE IS A DIFFERENT NUMBER, which is worse than no
      * number, and labelPlacement already refuses a candidate that is not fully
@@ -117,7 +147,29 @@ const check = async (label) => {
     }
   }
 
-  /* And labels must not stack on each other: two readouts in one place is one unreadable one. */
+  /*
+   * A WARNING WORD MUST NOT COVER ANOTHER POSITION'S NUMBER. Its own marker is
+   * fine, which is why the overlap has to be more than a touch: the word is
+   * anchored directly above its own disc.
+   */
+  for (const l of labels) {
+    if (!String(l.what).includes('shooter__flag')) continue
+    for (const d of discs) {
+      if (!overlaps(l, d)) continue
+      const sharedWidth = Math.min(l.right, d.right) - Math.max(l.left, d.left)
+      const sharedHeight = Math.min(l.bottom, d.bottom) - Math.max(l.top, d.top)
+      /* Its own disc sits directly underneath, so a sliver is expected. */
+      if (sharedWidth * sharedHeight > 24) {
+        hits.push(`warning word "${l.text}" covers a position disc`)
+      }
+    }
+  }
+
+  /*
+   * And nothing readable stacks on anything else readable: two readouts in one
+   * place is one unreadable readout. This DOES include the warning words,
+   * because a ray readout can move out of their way.
+   */
   for (let i = 0; i < labels.length; i++) {
     for (let j = i + 1; j < labels.length; j++) {
       if (overlaps(labels[i], labels[j])) {
@@ -144,6 +196,45 @@ await wait(4000)
 /* The arc adds sunrise and sunset readouts, which is the crowded case. */
 await ev(`[...document.querySelectorAll('button')].find(b=>/Sun arc/i.test(b.textContent))?.click()`)
 await wait(1500)
+
+/*
+ * POSITIONS, SO THE WARNING WORDS EXIST TO BE MEASURED.
+ *
+ * Without any the marker-flag check below is vacuous. A position a few hundred
+ * metres from the subject on the default 28mm frames far more than the 60m an
+ * event shot lives in, so `frame-too-wide` fires from geometry alone and needs
+ * no network: three positions, three "wide" words.
+ */
+await ev(`window.__probe.map.jumpTo({ zoom: 15 }), 'ok'`)
+await wait(500)
+for (const [fx, fy] of [[0.3, 0.3], [0.44, 0.34], [0.58, 0.3]]) {
+  await ev(`document.querySelector('.peek__go')?.click()`)
+  await wait(350)
+  await ev(`(() => {
+    const c = document.querySelector('.maplibregl-canvas')
+    const r = c.getBoundingClientRect()
+    for (const t of ['pointerdown','pointerup','click']) {
+      c.dispatchEvent(new PointerEvent(t, { clientX: r.left + r.width*${fx},
+        clientY: r.top + r.height*${fy}, bubbles: true, pointerId: 1, isPrimary: true }))
+    }
+    return 'ok'
+  })()`)
+  await wait(1500)
+  await ev(`document.querySelector('.card__close')?.click()`)
+  await wait(500)
+}
+
+const flagged = await ev(
+  `[...document.querySelectorAll('.shooter__flag')].map((n) => n.textContent)`,
+)
+console.log(`\n  warning words on the map: ${JSON.stringify(flagged)}`)
+if (!Array.isArray(flagged) || flagged.length === 0) {
+  console.log('      PROBLEM: no warning word rendered, so the marker check tests nothing')
+  problems += 1
+} else if (flagged.some((w) => !w || w === '!' || w.length < 3)) {
+  console.log('      PROBLEM: a marker is flagged without saying why')
+  problems += 1
+}
 
 console.log('\n### label collisions')
 

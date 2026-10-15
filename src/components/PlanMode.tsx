@@ -5,6 +5,7 @@ import type {
   PlatformFilter as PlatformFilterValue,
 } from '../core/platformFilter.ts'
 import type { ShotType } from '../core/shotType.ts'
+import type { Wind } from '../core/upwind.ts'
 import type { TideExtreme, TideState } from '../core/tide.ts'
 import type { SunArc, SunPosition } from '../core/sun.ts'
 import type { PlanCoverage, PlannedPosition } from '../lib/plan.ts'
@@ -49,6 +50,9 @@ interface PlanModeProps {
   /** The GOES-19 cloud layer over the imagery. */
   showSky: boolean
   onShowSky: (next: boolean) => void
+  /** Wind at the venue. Null until it answers, or when it fails. */
+  wind: Wind | null
+  gustMps: number | null
   selectedId: string | null
   onSelect: (id: string | null) => void
   selected: PlannedPosition | null
@@ -163,6 +167,8 @@ export function PlanMode({
   onShowArc,
   showSky,
   onShowSky,
+  wind,
+  gustMps,
   selectedId,
   onSelect,
   selected,
@@ -455,6 +461,9 @@ export function PlanMode({
               venueWindow={venueWindow}
               tide={tide}
               scrubbedAt={scrubbedAt}
+              venue={venue}
+              wind={wind}
+              gustMps={gustMps}
             />
           </>
         ) : (

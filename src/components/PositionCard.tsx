@@ -73,6 +73,9 @@ interface PositionCardProps {
 
 const deg = (n: number) => `${n.toFixed(1)}°`
 
+/** A percentage, or a dash. NEVER a zero standing in for a missing reading. */
+const pct = (n: number | null) => (n === null ? '–' : String(Math.round(n)))
+
 /**
  * Both units on one line. The kit is metric, the airspace rules are not.
  *
@@ -311,9 +314,18 @@ function CloudPanel({
         * Low cloud on its own line, because it is the layer that decides whether
         * a low sun arrives at all. Mid and high sit underneath as context.
         */}
+      {/*
+        * A DASH FOR A MISSING READING, never a zero.
+        *
+        * "0%" is a forecast of clear sky; the forecast not having said is a
+        * different thing and looks different. Same rule in the per-sample
+        * table below.
+        */}
       <p className="cloud__low">
         <span className="cloud__low-label">Low cloud, worst</span>
-        <span className="num">{Math.round(cloud.worstLow)}%</span>
+        <span className="num">
+          {cloud.worstLow === null ? 'not forecast' : `${Math.round(cloud.worstLow)}%`}
+        </span>
         {cloud.worstLowAtKm === null ? null : (
           <span className="cloud__at num">at {cloud.worstLowAtKm}km</span>
         )}
@@ -323,14 +335,15 @@ function CloudPanel({
         {cloud.samples.map((sample) => (
           <li className="cloud__sample" key={sample.distanceKm}>
             <span className="cloud__km num">{sample.distanceKm}km</span>
-            <span className="cloud__layer num">{Math.round(sample.low)}</span>
-            <span className="cloud__layer cloud__layer--soft num">{Math.round(sample.mid)}</span>
-            <span className="cloud__layer cloud__layer--soft num">{Math.round(sample.high)}</span>
+            <span className="cloud__layer num">{pct(sample.low)}</span>
+            <span className="cloud__layer cloud__layer--soft num">{pct(sample.mid)}</span>
+            <span className="cloud__layer cloud__layer--soft num">{pct(sample.high)}</span>
           </li>
         ))}
       </ol>
       <p className="cloud__legend">
-        Low · mid · high, percent, sampled along the camera bearing.
+        Low · mid · high, percent, sampled along the camera bearing. A dash is the
+        forecast not saying, which is not the same as nought.
       </p>
 
       <p className="cloud__note">

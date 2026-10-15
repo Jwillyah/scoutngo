@@ -28,6 +28,7 @@ import type { MapBounds } from '../lib/planRequest.ts'
 import {
   centredRect,
   isClear,
+  overlaps,
   pad,
   slideOrder,
   type Rect,
@@ -131,6 +132,15 @@ const LABEL_SLIDE_FRACTION = 0.12
 
 /** A breathing gap around every piece of floating chrome, in CSS pixels. */
 const LABEL_CLEARANCE_PX = 6
+
+/**
+ * How much of a position's disc a warning word may cover before it is hidden.
+ *
+ * Square pixels, and not zero: a word is anchored directly above its OWN disc,
+ * so a sliver of shared edge is the normal case and only a real overlap means
+ * it is sitting on a neighbour's number.
+ */
+const FLAG_DISC_OVERLAP_PX = 24
 
 
 /*
@@ -1467,6 +1477,72 @@ export function MapView({
     }
   }, [ready, drawBearingLines])
 
+  /*
+   * WARNING WORDS THAT WOULD BE UNREADABLE ARE HIDDEN, NOT SHRUNK.
+   *
+   * A word is wider than the "!" it replaced, so zoomed out far enough the
+   * words of neighbouring positions overlap each other and each other's
+   * numbers. Measured by scripts/audit-labels.mjs with three flagged positions
+   * at zoom 11 and 13: three word-on-word collisions and two words covering a
+   * neighbour's disc.
+   *
+   * The rule is the one the ray readouts already follow: show it where it can
+   * be read, hide it where it cannot, and never show it wrong. What survives a
+   * hidden word is the marker's own magenta colouring, which still says
+   * something is wrong here, and the full phrase on the card, which still says
+   * what. Nothing is lost that was not already unreadable.
+   *
+   * First come, first served, in document order, so the result is stable
+   * across a pan rather than flickering between equally valid choices.
+   *
+   * DECLARED BEFORE THE RAY LABEL EFFECT ON PURPOSE. Effects run in
+   * declaration order, and the ray readouts treat these flags as obstacles, so
+   * the flags have to settle first or the readouts place themselves against
+   * last pass's layout. Measured: with the order the other way round a shadow
+   * readout landed on a "wide" flag at zoom 15. The dependency is one way,
+   * because a flag's position is fixed and only the readouts move.
+   */
+  useEffect(() => {
+    const flags = [...document.querySelectorAll<HTMLElement>('.shooter__flag')]
+    if (flags.length === 0) return
+
+    /*
+     * Shown first, so a flag hidden on the last pass can be measured on this
+     * one. `display`, not `visibility`: getBoundingClientRect still returns a
+     * full box for a visibility-hidden element, so the collision pass below
+     * and the audit would both keep seeing a word nobody can read.
+     */
+    for (const flag of flags) flag.style.display = ''
+
+    const discs = [...document.querySelectorAll('.shooter__disc')].map((node) => {
+      const r = node.getBoundingClientRect()
+      return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }
+    })
+
+    const kept: Rect[] = []
+    for (const flag of flags) {
+      const r = flag.getBoundingClientRect()
+      const box = { left: r.left, top: r.top, right: r.right, bottom: r.bottom }
+
+      /*
+       * Its OWN disc sits directly underneath by design, so a disc only counts
+       * as covered when the shared area is more than a sliver.
+       */
+      const coversADisc = discs.some((disc) => {
+        if (!overlaps(box, disc)) return false
+        const w = Math.min(box.right, disc.right) - Math.max(box.left, disc.left)
+        const h = Math.min(box.bottom, disc.bottom) - Math.max(box.top, disc.top)
+        return w * h > FLAG_DISC_OVERLAP_PX
+      })
+
+      if (coversADisc || kept.some((other) => overlaps(box, other))) {
+        flag.style.display = 'none'
+        continue
+      }
+      kept.push(box)
+    }
+  }, [plan, viewTick, chromeTick, figureEls])
+
   /* Degree labels at the end of each ray, in the monospace variant. */
   useEffect(() => {
     const instance = map.current
@@ -1527,8 +1603,18 @@ export function MapView({
      * by scripts/audit-labels.mjs with the pin near the top-left of the view,
      * where two readouts landed on it and on each other.
      */
+    /*
+     * AND THE WARNING WORDS ON THE MARKERS.
+     *
+     * A readout can slide along its own ray; a warning word cannot move at
+     * all, because it belongs to the marker underneath it and detaching it
+     * from that marker would make it meaningless. So the fixed thing is the
+     * obstacle and the movable thing moves. Measured by
+     * scripts/audit-labels.mjs with three flagged positions, which found the
+     * shadow readout sitting on top of a "wide" flag.
+     */
     const obstacles: Rect[] = [
-      ...document.querySelectorAll(`${FLOATING_CHROME}, .pin`),
+      ...document.querySelectorAll(`${FLOATING_CHROME}, .pin, .shooter__flag`),
     ]
       .map((node) => node.getBoundingClientRect())
       .filter((box) => box.width > 0 && box.height > 0)

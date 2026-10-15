@@ -42,6 +42,31 @@ const FRAMING_LABEL: Record<FramingWarning, string> = {
   'beyond-standoff': 'too far',
 }
 
+/*
+ * ONE WORD FOR THE MAP, because a bare "!" tells the next person holding the
+ * phone nothing.
+ *
+ * The marker used to print the full phrase, and six positions back from a
+ * generate put three overlapping red paragraphs across the imagery they were
+ * about, so it was cut to an exclamation mark. That fixed the overlap and lost
+ * the meaning: "something is wrong with this one" is not the same as knowing a
+ * position is standing in a river.
+ *
+ * One word each is short enough not to bring the paragraphs back and specific
+ * enough to act on. The full phrase is still on the card and still in the
+ * marker's aria-label, so this adds a reading rather than replacing one.
+ */
+const WARNING_WORD: Record<SiteWarning, string> = {
+  'in-water': 'water',
+  'in-roadway': 'road',
+  'over-structure': 'people',
+}
+
+const FRAMING_WORD: Record<FramingWarning, string> = {
+  'frame-too-wide': 'wide',
+  'beyond-standoff': 'far',
+}
+
 /**
  * A geometric mark, not a drawing of a person. A filled disc carries the
  * number; the field of view cone on the map does the work of showing which way
@@ -68,6 +93,12 @@ export function ShooterFigure({
   onSelect,
 }: ShooterFigureProps) {
   /* Site and framing problems are the same kind of flag and share one slot. */
+  const warningWord =
+    warnings.length > 0
+      ? WARNING_WORD[warnings[0]]
+      : framingWarnings.length > 0
+        ? FRAMING_WORD[framingWarnings[0]]
+        : undefined
   const warningLabel =
     warnings.length > 0
       ? WARNING_LABEL[warnings[0]]
@@ -119,21 +150,25 @@ export function ShooterFigure({
       </span>
 
       {/*
-        * A FLAG, NOT A BANNER.
+        * ONE WORD, NOT A BANNER AND NOT A BARE EXCLAMATION MARK.
         *
-        * This used to print the warning text on the map beside the marker. With
-        * six positions back from a generate, three of them flagged, the map
-        * carried three red paragraphs overlapping each other and the imagery
-        * they were about. The text is the card's job; out here all that is
-        * needed is "something is wrong with this one".
+        * This printed the full phrase once, and six positions back from a
+        * generate put three overlapping red paragraphs across the imagery they
+        * were about. It was cut to "!", which fixed the overlap and left a red
+        * badge that means nothing to anyone who has not been told: "something
+        * is wrong with this one" is not the same as knowing a position is
+        * standing in a river.
         *
-        * The words are still on the marker for a screen reader, in aria-label
-        * above, so nothing is lost to anyone who cannot see the flag.
+        * One word is short enough not to bring the paragraphs back and
+        * specific enough to act on. scripts/audit-labels.mjs measures these
+        * against each other and against the chrome, so the overlap that caused
+        * the original retreat is now checked rather than avoided.
+        *
+        * The full phrase is still on the card and still in the aria-label
+        * above, so this adds a reading rather than replacing one.
         */}
-      {warningLabel === undefined ? null : (
-        <span className="shooter__flag" aria-hidden="true">
-          !
-        </span>
+      {warningWord === undefined ? null : (
+        <span className="shooter__flag">{warningWord}</span>
       )}
 
       {/* One plate, one readout: focal length, then altitude for an air position. */}

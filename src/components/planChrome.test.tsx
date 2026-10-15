@@ -9,6 +9,7 @@ import { planPositions, type CameraPosition } from '../lib/plan.ts'
 import { ConePicker } from './ConePicker.tsx'
 import { MapControls } from './MapControls.tsx'
 import { PositionCard } from './PositionCard.tsx'
+import { ShooterFigure } from './ShooterFigure.tsx'
 
 /**
  * PLAN's chrome, after the cut.
@@ -265,5 +266,68 @@ describe('PositionCard', () => {
   it('states the imagery footprint even before any image arrives', () => {
     expect(html).toContain('class="frame"')
     expect(html).toContain('Loading ground view')
+  })
+})
+
+/*
+ * THE MAGENTA MARKER SAYS WHY, ON SCREEN.
+ *
+ * It printed the full phrase once; six positions back from a generate put
+ * three overlapping red paragraphs across the imagery, so it was cut to a bare
+ * "!". That fixed the overlap and left a red badge that means nothing to
+ * anyone who has not been told what it is. One word each now.
+ */
+describe('a flagged position says what is wrong with it', () => {
+  const flagged = (over: Partial<CameraPosition>) =>
+    renderToStaticMarkup(
+      <ShooterFigure
+        number={3}
+        focalLength={400}
+        classification="side-lit"
+        shotType="framed"
+        warnings={[]}
+        framingWarnings={[]}
+        platform="ground"
+        altitudeFeet={0}
+        moved={false}
+        origin="manual"
+        selected={false}
+        onSelect={() => {}}
+        {...(over as Record<string, never>)}
+      />,
+    )
+
+  it('prints the word, not an exclamation mark', () => {
+    const html = flagged({ warnings: ['in-water'] } as never)
+    expect(html).toContain('shooter__flag')
+    expect(html).toContain('water')
+    expect(html).not.toMatch(/shooter__flag[^>]*>!</)
+  })
+
+  it('has a word for every site warning', () => {
+    expect(flagged({ warnings: ['in-water'] } as never)).toContain('water')
+    expect(flagged({ warnings: ['in-roadway'] } as never)).toContain('road')
+    expect(flagged({ warnings: ['over-structure'] } as never)).toContain('people')
+  })
+
+  it('has a word for every framing warning', () => {
+    expect(flagged({ framingWarnings: ['frame-too-wide'] } as never)).toContain('wide')
+    expect(flagged({ framingWarnings: ['beyond-standoff'] } as never)).toContain('far')
+  })
+
+  /* And an unflagged position carries no flag at all. */
+  it('says nothing when there is nothing wrong', () => {
+    expect(flagged({})).not.toContain('shooter__flag')
+  })
+
+  /*
+   * THE WORD IS NOT HIDDEN FROM A SCREEN READER, which the "!" was: it carried
+   * aria-hidden and the meaning lived only in the marker's aria-label. The
+   * full phrase is still in the aria-label as well, which is the longer form.
+   */
+  it('is readable by a screen reader, and the full phrase is still in the label', () => {
+    const html = flagged({ warnings: ['in-water'] } as never)
+    expect(html).not.toMatch(/shooter__flag"[^>]*aria-hidden/)
+    expect(html).toContain('in water')
   })
 })

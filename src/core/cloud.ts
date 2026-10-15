@@ -44,11 +44,20 @@ export function sightlineSamplePoints(from: LatLon, bearing: number): CloudSampl
   }))
 }
 
-/** One sample's three layers, each 0 to 100 percent. */
+/*
+ * One sample's three layers, each 0 to 100 percent, OR NULL.
+ *
+ * MISSING IS NOT ZERO. These used to be plain numbers, with the reader
+ * returning 0 for an absent value, which reads as "clear sky": the most
+ * optimistic lie available about a shoot, synthesised out of an absence. Same
+ * mistake as a coordinate falling back to Null Island and a drone's slant
+ * range reading 0m. Null travels all the way through to the verdict, which has
+ * a variant for not knowing.
+ */
 export interface CloudLayers {
-  low: number
-  mid: number
-  high: number
+  low: number | null
+  mid: number | null
+  high: number | null
 }
 
 export interface CloudSample extends CloudLayers {
@@ -64,11 +73,12 @@ export interface CloudSample extends CloudLayers {
  */
 export interface SightlineCloud {
   samples: CloudSample[]
-  worstLow: number
+  /** Null when no sample reported a low layer at all. */
+  worstLow: number | null
   worstLowAtKm: number | null
-  meanLow: number
-  meanMid: number
-  meanHigh: number
+  meanLow: number | null
+  meanMid: number | null
+  meanHigh: number | null
   verdict: CloudVerdict
 }
 
@@ -83,43 +93,72 @@ export type CloudVerdict =
   | 'thin high cloud, soft light'
   | 'broken low cloud, light will come and go'
   | 'low cloud blocks the sightline'
+  /*
+   * NOT AN ERROR AND NOT A CLEAR SKY. The forecast did not say, which is a
+   * third thing, and it used to be reported as the second: an empty sample set
+   * returned 'clear sightline', and a missing percentage became 0.
+   */
+  | 'no cloud forecast for this sightline'
 
 export const LOW_CLOUD_BLOCKS = 70
 export const LOW_CLOUD_BROKEN = 30
 export const HIGH_CLOUD_DIFFUSES = 40
 
 export function cloudVerdict(layers: {
-  worstLow: number
-  meanHigh: number
-  meanMid: number
+  worstLow: number | null
+  meanHigh: number | null
+  meanMid: number | null
 }): CloudVerdict {
+  /*
+   * THE LOW LAYER DECIDES, so without it there is no verdict. A reading for
+   * the high layer alone cannot say the sightline is clear, because low cloud
+   * is the thing that removes a low sun and that is exactly what is unknown.
+   */
+  if (layers.worstLow === null) return 'no cloud forecast for this sightline'
   if (layers.worstLow >= LOW_CLOUD_BLOCKS) return 'low cloud blocks the sightline'
   if (layers.worstLow >= LOW_CLOUD_BROKEN) return 'broken low cloud, light will come and go'
-  if (layers.meanHigh >= HIGH_CLOUD_DIFFUSES || layers.meanMid >= HIGH_CLOUD_DIFFUSES) {
+  if (
+    (layers.meanHigh ?? 0) >= HIGH_CLOUD_DIFFUSES ||
+    (layers.meanMid ?? 0) >= HIGH_CLOUD_DIFFUSES
+  ) {
     return 'thin high cloud, soft light'
   }
   return 'clear sightline'
 }
 
-const mean = (values: number[]): number =>
-  values.length === 0 ? 0 : values.reduce((a, b) => a + b, 0) / values.length
+/**
+ * The mean of what is actually there.
+ *
+ * Nulls are skipped rather than counted as zero, and all-null is null rather
+ * than zero: the average of nothing is not clear sky.
+ */
+const mean = (values: (number | null)[]): number | null => {
+  const known = values.filter((v): v is number => v !== null)
+  return known.length === 0 ? null : known.reduce((a, b) => a + b, 0) / known.length
+}
 
 export function summariseSightline(samples: CloudSample[]): SightlineCloud {
-  if (samples.length === 0) {
+  /*
+   * NO SAMPLES IS NOT A CLEAR SIGHTLINE. This used to return worstLow 0 and
+   * 'clear sightline', which is a confident forecast built from nothing at all.
+   */
+  const withLow = samples.filter((s): s is CloudSample & { low: number } => s.low !== null)
+  const meanMid = mean(samples.map((s) => s.mid))
+  const meanHigh = mean(samples.map((s) => s.high))
+
+  if (withLow.length === 0) {
     return {
       samples,
-      worstLow: 0,
+      worstLow: null,
       worstLowAtKm: null,
-      meanLow: 0,
-      meanMid: 0,
-      meanHigh: 0,
-      verdict: 'clear sightline',
+      meanLow: null,
+      meanMid,
+      meanHigh,
+      verdict: cloudVerdict({ worstLow: null, meanHigh, meanMid }),
     }
   }
 
-  const worst = samples.reduce((a, b) => (b.low > a.low ? b : a))
-  const meanMid = mean(samples.map((s) => s.mid))
-  const meanHigh = mean(samples.map((s) => s.high))
+  const worst = withLow.reduce((a, b) => (b.low > a.low ? b : a))
 
   return {
     samples,

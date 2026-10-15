@@ -83,10 +83,23 @@ interface OpenMeteoPoint {
   }
 }
 
-const numberAt = (list: unknown, index: number): number => {
-  if (!Array.isArray(list)) return 0
+/*
+ * MISSING IS NOT ZERO.
+ *
+ * This returned 0 for an absent value, which for a cloud percentage reads as
+ * "clear sky". That is the same mistake as a coordinate falling back to Null
+ * Island, a drone's slant range reading 0m, and a lens standing in for a drone
+ * camera: a confident claim synthesised out of an absence. It does not matter
+ * that Open-Meteo rarely omits an hour inside the day it was asked for. The
+ * test is whether the app can state something false, and "0% cloud, clear" is
+ * the most optimistic lie available about a shoot.
+ *
+ * Absent stays absent, and every caller has to decide what to do about it.
+ */
+const numberOrNull = (list: unknown, index: number): number | null => {
+  if (!Array.isArray(list)) return null
   const value = list[index]
-  return typeof value === 'number' && Number.isFinite(value) ? value : 0
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
 /**
@@ -184,9 +197,9 @@ export async function fetchSightlineCloud(
       const hourly = list[i]?.hourly
       const sample: CloudSample = {
         distanceKm: point.distanceKm,
-        low: numberAt(hourly?.cloud_cover_low, index),
-        mid: numberAt(hourly?.cloud_cover_mid, index),
-        high: numberAt(hourly?.cloud_cover_high, index),
+        low: numberOrNull(hourly?.cloud_cover_low, index),
+        mid: numberOrNull(hourly?.cloud_cover_mid, index),
+        high: numberOrNull(hourly?.cloud_cover_high, index),
       }
       const existing = byId.get(point.id)
       if (existing === undefined) byId.set(point.id, [sample])
@@ -243,20 +256,6 @@ interface WindRow {
 
 /** Open-Meteo reports km/h by default; everything in core is metres per second. */
 const KMH_TO_MPS = 1 / 3.6
-
-/**
- * A number, or null when it is not there.
- *
- * NOT numberAt, which returns 0 for a missing value. For a cloud percentage
- * that reads as "clear"; for a wind DIRECTION it reads as "due north" and for
- * a speed as "calm", and a wind direction invented as north would rank the
- * upwind list confidently wrong. Absent has to stay absent.
- */
-const numberOrNull = (list: unknown, index: number): number | null => {
-  if (!Array.isArray(list)) return null
-  const value = list[index]
-  return typeof value === 'number' && Number.isFinite(value) ? value : null
-}
 
 export function parseWind(payload: unknown, at: Date): WindResult {
   const hourly = (payload as { hourly?: WindRow } | null)?.hourly

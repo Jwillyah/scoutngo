@@ -244,6 +244,62 @@ are looking at, so your venue coordinates are visible to Esri, at roughly the
 zoom level you are viewing. That is unavoidable for any map that streams
 imagery. Nothing else is attached: no account, no identifier, no form content.
 
+**Sky cameras: nothing leaves at all.** The camera list is a **file in this
+repo**, `src/data/cams.ts`. There is no cam API, no key and no account, and
+your venue coordinate never leaves the device: "which cameras are near me" is
+answered locally against data already in the app bundle. Any camera service
+would have required sending the venue somewhere, which is the thing this app
+exists to avoid.
+
+The app ranks them and offers a link. That is all. Nothing is embedded in an
+iframe, nothing is proxied through our own function, no stream or manifest is
+pulled for a thumbnail, and no frame is ever saved anywhere — including into an
+offline field pack, which is the one place it would be most tempting. Tapping a
+camera opens that operator's own site in a new tab, and from that point it is
+between you and them. `tests/camsLinkOnly.test.ts` fails the build if any of
+that changes.
+
+### Adding a camera
+
+Append an entry to `src/data/cams.ts`. Six fields, no build step, no coordinate
+lookup service:
+
+```ts
+{
+  id: 'my-pier-cam',                       // unique, stable, kebab-case
+  name: 'My Pier',                         // what you'd call it
+  at: { lat: 35.9570, lon: -75.6240 },     // read off any map; see below
+  url: 'https://example.com/pier-cam/',    // the page a tap should open
+  operator: 'My Pier',                     // whose site you land on
+  access: 'free',                          // or 'paid'
+},
+```
+
+A lat and lon off any map is fine. They are only used to rank by direction and
+distance from your venue, where a few hundred metres changes nothing — a camera
+is useful because it is twenty kilometres upwind, and twenty kilometres is not
+sensitive to which end of a pier the camera is bolted to.
+
+Two things to keep true: the URL must be `https`, and it must not carry a key
+or a token, because this file is meant to be shared. The test checks both, plus
+that ids and URLs are unique. **This is the easiest file in the project to
+contribute to, and that is deliberate** — the list is seeded with the
+mid-Atlantic coast because that is where it is used, not because that is where
+it should end.
+
+Every seeded URL was requested and returned 200 before being committed, except
+the two Surfline pages: Surfline answers 403 to any automated request, so those
+two could not be machine checked. They are marked `paid`.
+
+**How they are ranked.** A camera downwind is showing weather that has already
+gone past; a camera upwind is showing the next hour. So the list is upwind
+first, then by how soon that weather arrives — and only the component *along*
+the wind counts toward that, because weather travels along the wind rather than
+toward you. A camera 18 km out but 60° off the wind is 15 minutes away, not 30.
+In a calm there is no lead time at all and the list says so rather than
+inventing one. Wind comes from Open-Meteo. Nothing is dropped: a downwind
+camera is listed with its angle, so you can see why it is at the bottom.
+
 **The sky layer, when you turn it on.** Tapping **Sky** overlays GOES-19
 satellite cloud imagery on the map. The tiles come from the Iowa Environmental
 Mesonet at `mesonet.agron.iastate.edu`, which reprojects NOAA NESDIS imagery
