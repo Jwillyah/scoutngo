@@ -33,7 +33,9 @@ import {
   type Coverage,
   type RangeVariety,
 } from '../core/coverage.ts'
-import { classifyLighting, type LightingResult } from '../core/lighting.ts'
+import { classifyLighting, type LightingRead } from '../core/lighting.ts'
+import { cameraBearingOf, drawsCone, type Aim, type ShotType } from '../core/shotType.ts'
+import type { SunPosition } from '../core/sun.ts'
 import { isWithinRadius, metersBeyondRadius } from '../core/radius.ts'
 import { checkSite, EMPTY_LANDCOVER, type Landcover, type SiteWarning } from '../core/siting.ts'
 import type { Platform } from './parsePlan.ts'
@@ -69,6 +71,22 @@ export interface CameraPosition {
   coversShot: number | null
   /** Ground or air. Air positions get a dashed cone and a flight path check. */
   platform: Platform
+  /**
+   * WHAT KIND OF SHOT THIS IS, which decides what geometry it has.
+   *
+   * `framed` is the default and is what this app has always done. The other
+   * two do not aim the camera at the pin at all, so they have no bearing and
+   * get no lighting class. See src/core/shotType.ts.
+   */
+  shotType: ShotType
+  /**
+   * Which way the top-down rectangle is turned, in degrees.
+   *
+   * NOT A CAMERA BEARING. The camera points at the ground whatever this is;
+   * the yaw decides which way the frame lies so the shadows can be lined up
+   * with it. Zero and ignored for every other shot type.
+   */
+  yawDegrees: number
   /** Feet above ground, air positions only. */
   altitudeFeet: number
   /** True once the shooter has dragged this position off where it landed. */
@@ -101,10 +119,19 @@ export interface PlannedPosition {
   optic: { id: string; name: string; kind: 'lens' | 'drone' }
   sensor: SensorName
   fov: FOV
-  /** Where the camera points: from the position toward the subject. */
-  cameraBearing: number
-  /** From the subject toward the position. What classifyLighting wants. */
-  positionBearing: number
+  /**
+   * WHAT THIS POSITION IS AIMED AT, which is a different shape per shot type.
+   *
+   * This replaced a pair of bare `cameraBearing` and `positionBearing` numbers
+   * that every position carried whether or not it had one. A 360 sees every
+   * direction and a top-down sees the ground, so for those two the numbers
+   * were meaningless and nothing stopped them being read. See
+   * src/core/shotType.ts.
+   *
+   * Read the bearing with cameraBearingOf(aim), which returns null when the
+   * shot type has none.
+   */
+  aim: Aim
   /**
    * The TRUE distance from the camera to the subject. This is the number shown
    * on the card and the one every framing judgement is made from.
@@ -139,7 +166,19 @@ export interface PlannedPosition {
   beyondReach: boolean
   /** How far outside, so the card can say by how much. Zero when inside. */
   beyondReachMeters: number
-  lighting: LightingResult
+  /**
+   * Whatever is true about the light here. A framed read carries a lighting
+   * classification; a top-down carries shadow direction and length; a 360
+   * carries where the sun sits on the ring. Narrow on `read.shotType`.
+   */
+  read: LightingRead
+  /**
+   * The field of view cone, toward the subject.
+   *
+   * EMPTY for a top-down and a 360, because neither sees a cone: one sees a
+   * rectangle on the ground and the other sees everything. Drawing a cone for
+   * them would be drawing a direction that does not exist.
+   */
   cone: Position[][]
   /**
    * Problems with the ground itself, from OSM geometry. Reported, never acted
@@ -202,7 +241,15 @@ const MIN_CONE_METERS = 60
 export function planPosition(
   position: CameraPosition,
   subject: LatLon,
-  sunAzimuth: number,
+  /*
+   * THE WHOLE SUN, not just its azimuth.
+   *
+   * It used to be `sunAzimuth: number`, which was all a framed shot's lighting
+   * class needs. A top-down read is about shadow LENGTH, which is a function
+   * of altitude, and a 360 read is about how far the sun is above the horizon
+   * ring, so both of them need the figure the old signature threw away.
+   */
+  sun: SunPosition,
   land: Landcover = EMPTY_LANDCOVER,
   /** Bodies in the kit. Only used to resolve a forced sensor crop. */
   bodyIds?: string[],
@@ -216,9 +263,25 @@ export function planPosition(
   const { optic, sensor, focalLength } = resolveOptic(position, bodyIds, kit)
   const fov = computeFOV(focalLength, SENSORS[sensor])
 
-  // Both bearings come from turf. The cone points where the camera points.
-  const cameraBearing = bearingBetween(position.at, subject)
-  const positionBearing = bearingBetween(subject, position.at)
+  /*
+   * THE AIM, which only a framed shot gets a bearing for.
+   *
+   * The bearings still come from turf, and they are still computed from the
+   * coordinates rather than taken from anything a model said. What changed is
+   * that they are only computed for a shot type that HAS them: see
+   * src/core/shotType.ts for why a made up bearing on a 360 is the same class
+   * of bug as a coordinate falling back to Null Island.
+   */
+  const aim: Aim =
+    position.shotType === 'framed'
+      ? {
+          shotType: 'framed',
+          positionBearing: bearingBetween(subject, position.at),
+          cameraBearing: bearingBetween(position.at, subject),
+        }
+      : position.shotType === 'top-down'
+        ? { shotType: 'top-down', yawDegrees: position.yawDegrees }
+        : { shotType: 'orbit' }
 
   /*
    * THE RANGE TO THE SUBJECT, WHICH FOR AN AIRCRAFT IS THE HYPOTENUSE.
@@ -249,8 +312,7 @@ export function planPosition(
     optic,
     sensor,
     fov,
-    cameraBearing,
-    positionBearing,
+    aim,
     subjectRangeMeters,
     groundRangeMeters,
     coneRangeMeters,
@@ -265,9 +327,26 @@ export function planPosition(
       reachMeters == null || venue == null
         ? 0
         : metersBeyondRadius(venue, position.at, reachMeters),
-    // The single authority on whether this position is backlit.
-    lighting: classifyLighting(positionBearing, sunAzimuth),
-    cone: fovConePolygon(position.at, cameraBearing, fov.hFOV, coneRangeMeters),
+    /*
+     * The single authority on the light here, and it REFUSES to classify a
+     * shot type with no bearing rather than guessing one.
+     */
+    read: classifyLighting(aim, sun),
+    /*
+     * A cone only for a framed shot. The other two are drawn differently, as a
+     * ground rectangle and as a horizon ring, and an empty cone here is what
+     * keeps a wrong one off the map in the meantime.
+     */
+    /*
+     * drawsCone is the predicate, and the aim check beside it is what narrows
+     * the union: only a framed aim has a camera bearing, so only a framed aim
+     * can produce a cone. Writing it this way means the type system agrees
+     * with the predicate rather than being told to trust it.
+     */
+    cone:
+      drawsCone(position.shotType) && aim.shotType === 'framed'
+        ? fovConePolygon(position.at, aim.cameraBearing, fov.hFOV, coneRangeMeters)
+        : [],
     warnings: checkSite(position.at, land, { platform: position.platform, subject }),
   }
 }
@@ -275,7 +354,7 @@ export function planPosition(
 export function planPositions(
   positions: CameraPosition[],
   subject: LatLon,
-  sunAzimuth: number,
+  sun: SunPosition,
   land: Landcover = EMPTY_LANDCOVER,
   bodyIds?: string[],
   reachMeters?: number | null,
@@ -283,7 +362,7 @@ export function planPositions(
   kit: KitProfile = DEFAULT_KIT,
 ): PlannedPosition[] {
   return positions.map((position) =>
-    planPosition(position, subject, sunAzimuth, land, bodyIds, reachMeters, venue, kit),
+    planPosition(position, subject, sun, land, bodyIds, reachMeters, venue, kit),
   )
 }
 
@@ -306,14 +385,32 @@ export function assessPlan(plan: PlannedPosition[]): PlanCoverage {
    * A position sitting on the subject has no direction from it, so it cannot
    * count toward covering a sector. Splitting rather than filtering, so the count
    * of what was left out can be reported instead of quietly vanishing.
+   *
+   * A TOP-DOWN AND A 360 JOIN THAT SAME PATH, for the same reason and with the
+   * same honesty: neither has a bearing from the subject, so neither can cover
+   * a sector, and both are counted as left out rather than dropped. They are
+   * not errors. A nadir shot over the middle of a site is a legitimate shot
+   * that simply does not contribute a direction, which is word for word what
+   * was already true of a position standing on the subject.
    */
-  const directional = plan.filter((p) => p.subjectRangeMeters >= MIN_BEARING_RANGE_METERS)
-  const onSubject = plan.length - directional.length
+  const directional = plan.filter(
+    (p) => p.aim.shotType === 'framed' && p.subjectRangeMeters >= MIN_BEARING_RANGE_METERS,
+  )
+  const withoutBearing = plan.length - directional.length
 
   return {
     coverage: assessCoverage(
-      directional.map((p) => p.positionBearing),
-      onSubject,
+      directional.flatMap((p) => {
+        const bearing = cameraBearingOf(p.aim)
+        /*
+         * flatMap with an empty array rather than a non-null assertion. The
+         * filter above already guarantees a framed aim, and writing it this
+         * way means a later change to that filter cannot smuggle a null
+         * through as a zero.
+         */
+        return bearing === null ? [] : [(bearing + 180) % 360]
+      }),
+      withoutBearing,
     ),
     rangeVariety: assessRangeVariety(
       directional.map((p) => ({

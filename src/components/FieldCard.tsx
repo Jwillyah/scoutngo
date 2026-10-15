@@ -1,17 +1,23 @@
 import { useEffect, useRef, useState } from 'react'
 import { awayLabel, compassPoint, lightingChange, walkTo } from '../core/field.ts'
+import { cameraBearingOf } from '../core/shotType.ts'
 import type { FramingWarning } from '../core/fov.ts'
-import type { Classification, LightingResult } from '../core/lighting.ts'
+import { classificationOf, type LightingRead } from '../core/lighting.ts'
 import type { SiteWarning } from '../core/siting.ts'
 import { feetToMetres, type TideState } from '../core/tide.ts'
 import type { GeoState } from '../lib/useGeolocation.ts'
 import { fetchGroundView, type GroundView } from '../lib/groundView.ts'
+import { lightLine } from '../lib/lightCopy.ts'
 import type { PlannedPosition } from '../lib/plan.ts'
 
 interface FieldCardProps {
   planned: PlannedPosition
   /** Lighting recomputed from the CURRENT clock, not the scrubbed one. */
-  lightingNow: LightingResult
+  /**
+   * What is true about the light RIGHT NOW, recomputed from the position's own
+   * aim. A framed read carries a class; a top-down and a 360 do not have one.
+   */
+  readNow: LightingRead
   /** Tide at the current clock. Null inland or outside the predicted day. */
   tideNow: TideState | null
   gps: GeoState
@@ -26,10 +32,17 @@ interface FieldCardProps {
   total: number
 }
 
-const LIGHTING_COPY: Record<Classification, string> = {
-  backlit: 'Into the sun',
-  'front-lit': 'Sun behind you',
-  'side-lit': 'Sun across',
+/**
+ * Where the sun is, for a read that has no lens to measure against.
+ *
+ * A top-down knows the shadow bearing, which is the sun's azimuth plus 180, so
+ * it is turned back rather than recomputed from scratch. A 360 carries the
+ * azimuth directly.
+ */
+function sunBearingOf(read: LightingRead): number {
+  if (read.shotType === 'orbit') return read.sunBearing
+  if (read.shotType === 'top-down') return (read.shadowBearing + 180) % 360
+  return read.lighting.cameraBearing
 }
 
 const WARNING_COPY: Record<SiteWarning, string> = {
@@ -57,7 +70,7 @@ const FRAMING_COPY: Record<FramingWarning, string> = {
  */
 export function FieldCard({
   planned,
-  lightingNow,
+  readNow,
   tideNow,
   gps,
   cachedImage,
@@ -65,7 +78,12 @@ export function FieldCard({
   index,
   total,
 }: FieldCardProps) {
-  const { position, fov, cameraBearing, subjectRangeMeters, warnings, framingWarnings } = planned
+  const { position, fov, subjectRangeMeters, warnings, framingWarnings } = planned
+  /*
+   * STREET VIEW NEEDS A DIRECTION TO LOOK, so only a framed position has one.
+   * Null for a top-down and a 360, and the fetch below does not run.
+   */
+  const cameraBearing = cameraBearingOf(planned.aim)
   const [view, setView] = useState<GroundView>(() =>
     cachedImage === undefined
       ? { status: 'idle' }
@@ -84,12 +102,21 @@ export function FieldCard({
    */
   useEffect(() => {
     // A packed image is already in state, so nothing is fetched.
-    if (!active || requested.current) return
+    if (!active || requested.current || cameraBearing === null) return
     requested.current = true
     fetchGroundView(position.at, cameraBearing, fov.hFOV).then(setView)
   }, [active, position.at, cameraBearing, fov.hFOV])
 
-  const shift = lightingChange(planned.lighting.classification, lightingNow.classification)
+  /*
+   * A LIGHTING SHIFT ONLY EXISTS WHERE A CLASS DOES. classificationOf returns
+   * null for a top-down and a 360, and lightingChange is only asked when both
+   * sides have one, so nothing compares a class against an absent one.
+   */
+  const now = lightLine(readNow)
+  const plannedClass = classificationOf(planned.read)
+  const nowClass = classificationOf(readNow)
+  const shift =
+    plannedClass === null || nowClass === null ? null : lightingChange(plannedClass, nowClass)
   const walk = gps.status === 'ok' ? walkTo(gps.at, position.at) : null
 
   return (
@@ -114,12 +141,27 @@ export function FieldCard({
           </p>
         ))}
 
-      {/* Where to point. Static bearing: no needle, no permission, no drift. */}
+      {/*
+        * Where to point. Static bearing: no needle, no permission, no drift.
+        *
+        * ONLY WHERE THERE IS A DIRECTION TO POINT. A top-down points at the
+        * ground and a 360 points everywhere, so instead of a bearing they get
+        * the sentence that says what the camera is doing. Printing "0 degrees
+        * N" over a nadir shot would be an instruction to do the wrong thing.
+        */}
       <section className="fc__block">
         <p className="fc__label">Point the camera</p>
-        <p className="fc__aim num">
-          {Math.round(cameraBearing)}° {compassPoint(cameraBearing)}
-        </p>
+        {cameraBearing === null ? (
+          <p className="fc__aimnone">
+            {planned.aim.shotType === 'top-down'
+              ? `Straight down. Frame turned to ${Math.round(planned.position.yawDegrees)}°.`
+              : 'Everywhere. It is a 360.'}
+          </p>
+        ) : (
+          <p className="fc__aim num">
+            {Math.round(cameraBearing)}° {compassPoint(cameraBearing)}
+          </p>
+        )}
       </section>
 
       {/*
@@ -175,9 +217,14 @@ export function FieldCard({
         */}
       <section className="fc__block">
         <p className="fc__label">Light now</p>
-        <p className={`fc__light fc__light--${lightingNow.classification}`}>
-          {LIGHTING_COPY[lightingNow.classification]}
-        </p>
+        {/*
+          * ONE OF THREE READS, chosen by the shot type. A framed position gets
+          * the classification it always got; a top-down gets shadow direction
+          * and length, which is the whole read on a nadir shot; a 360 gets
+          * where the sun sits on the ring. Worded in src/lib/lightCopy.ts.
+          */}
+        <p className={`fc__light fc__light--${now.tone}`}>{now.word}</p>
+        {now.hasClass ? null : <p className="fc__lightwhy">{now.phrase}</p>}
       </section>
 
       {/*
@@ -191,7 +238,10 @@ export function FieldCard({
       )}
 
       <p className="fc__cond num">
-        Sun {Math.round(lightingNow.delta)}° off the lens
+        {/* "Off the lens" needs a lens direction, so only a framed shot has it. */}
+        {readNow.shotType === 'framed'
+          ? `Sun ${Math.round(readNow.lighting.delta)}° off the lens`
+          : `Sun ${Math.round(sunBearingOf(readNow))}°`}
         {tideNow === null
           ? ''
           : ` · tide ${tideNow.feet.toFixed(1)}ft (${feetToMetres(tideNow.feet).toFixed(1)}m) ${
@@ -204,7 +254,7 @@ export function FieldCard({
           <img
             className="fc__img"
             src={view.image}
-            alt={`Street View looking ${Math.round(cameraBearing)} degrees from position ${position.number}`}
+            alt={`Street View looking ${Math.round(cameraBearing ?? 0)} degrees from position ${position.number}`}
           />
         ) : (
           <p className="fc__gps">

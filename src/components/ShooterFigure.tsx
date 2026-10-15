@@ -1,3 +1,4 @@
+import { SHOT_TYPE_LABEL, type ShotType } from '../core/shotType.ts'
 import type { PositionOrigin } from '../lib/plan.ts'
 import type { FramingWarning } from '../core/fov.ts'
 import type { Classification } from '../core/lighting.ts'
@@ -7,7 +8,15 @@ import type { Platform } from '../lib/parsePlan.ts'
 interface ShooterFigureProps {
   number: number
   focalLength: number
-  classification: Classification
+  /**
+   * The lighting class, or null when the shot type has none.
+   *
+   * Null for a top-down and a 360. The label says the shot type instead, so a
+   * screen reader is told "360" rather than being told a direction the camera
+   * is not pointing.
+   */
+  classification: Classification | null
+  shotType: ShotType
   /** Ground problems from OSM. Magenta, because that is the hazard color. */
   warnings: SiteWarning[]
   /** Standoff and framing problems. Same magenta, same treatment. */
@@ -48,6 +57,7 @@ export function ShooterFigure({
   number,
   focalLength,
   classification,
+  shotType,
   warnings,
   framingWarnings,
   platform,
@@ -83,7 +93,8 @@ export function ShooterFigure({
         `Position ${number}`,
         `${focalLength} millimetres`,
         air ? `drone at ${altitudeFeet} feet` : 'ground',
-        classification,
+        classification ?? SHOT_TYPE_LABEL[shotType],
+  shotType,
         origin === 'manual' ? 'placed by hand' : 'suggested',
         moved ? 'moved by hand' : '',
         warningLabel ?? '',

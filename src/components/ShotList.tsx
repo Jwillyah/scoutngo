@@ -1,3 +1,5 @@
+import { SHOT_TYPE_LABEL } from '../core/shotType.ts'
+import { lightLine } from '../lib/lightCopy.ts'
 import type { FramingWarning } from '../core/fov.ts'
 import type { SiteWarning } from '../core/siting.ts'
 import type { DesiredShot } from '../lib/describe.ts'
@@ -86,8 +88,15 @@ export function ShotList({
 
       <ol className="shots">
       {plan.map((planned) => {
-        const { position, fov, lighting, warnings, framingWarnings, subjectRangeMeters } =
+        const { position, fov, read, warnings, framingWarnings, subjectRangeMeters } =
           planned
+        /*
+         * A FRAMED SHOT SHOWS ITS CLASSIFICATION, as it always has. The other
+         * two show what they are instead, in their own tone, because printing
+         * "backlit" beside a 360 would be stating a direction the camera is
+         * not pointing. src/lib/lightCopy.ts does the wording.
+         */
+        const line = lightLine(read)
         return (
           <li key={position.id}>
             <button
@@ -97,10 +106,8 @@ export function ShotList({
             >
               <span className="shot__head">
                 <span className="shot__number num">{position.number}</span>
-                <span
-                  className={`shot__light shot__light--${lighting.classification}`}
-                >
-                  {lighting.classification}
+                <span className={`shot__light shot__light--${line.tone}`}>
+                  {line.hasClass ? line.word.toLowerCase() : SHOT_TYPE_LABEL[position.shotType]}
                 </span>
                 {position.platform === 'air' ? (
                   <span className="shot__air num">{position.altitudeFeet}ft</span>
@@ -126,7 +133,17 @@ export function ShotList({
 
               <span className="shot__stats num">
                 {position.focalLength}mm · {Math.round(subjectRangeMeters)}m · vFOV{' '}
-                {deg(fov.vFOV)} · sun delta {deg(lighting.delta)}
+                {deg(fov.vFOV)}
+                {/* Sun delta needs a lens direction. Shadow length is the top-down read. */}
+                {read.shotType === 'framed'
+                  ? ` · sun delta ${deg(read.lighting.delta)}`
+                  : read.shotType === 'top-down'
+                    ? ` · shadows ${
+                        read.shadowLengthRatio === null
+                          ? 'none'
+                          : `${read.shadowLengthRatio.toFixed(1)}×`
+                      }`
+                    : ` · sun ${Math.round(read.sunAltitude)}° up`}
               </span>
 
               {position.risk === '' ? null : (

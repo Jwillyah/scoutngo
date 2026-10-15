@@ -14,7 +14,15 @@ import { fetchGroundView, type GroundView } from '../lib/groundView.ts'
 import type { KitProfile as KitProfileType } from '../core/kit.ts'
 import { FAA_CEILING_FEET } from '../lib/parsePlan.ts'
 import type { LatLon } from '../core/geo.ts'
-import { formatReach } from '../core/reachScale.ts'
+import { formatReach, metersToFeet } from '../core/reachScale.ts'
+import {
+  cameraBearingOf,
+  PIN_ROLE,
+  SHOT_TYPE_LABEL,
+  SHOT_TYPES,
+  type ShotType,
+} from '../core/shotType.ts'
+import { lightLine } from '../lib/lightCopy.ts'
 import type { PlannedPosition } from '../lib/plan.ts'
 
 interface PositionCardProps {
@@ -35,6 +43,10 @@ interface PositionCardProps {
   kit: KitProfileType
   /** How high an air position flies, in feet AGL. Clamped in core. */
   onSetAltitude: (id: string, feet: number) => void
+  /** What kind of shot this position is. Framed, top-down or 360. */
+  onSetShotType: (id: string, shotType: ShotType) => void
+  /** Which way a top-down's rectangle is turned. Never a camera bearing. */
+  onSetYaw: (id: string, degrees: number) => void
   /**
    * Where the pilot is standing, or null if it has not been placed.
    *
@@ -53,21 +65,24 @@ interface PositionCardProps {
  * half disc side-lit, a rim backlit. It is read at a glance from the shape, and
  * the word underneath it means nobody has to.
  */
-const LIGHTING: Record<string, { icon: string; word: string; phrase: string }> = {
-  backlit: { icon: '○', word: 'Backlit', phrase: 'Shooting into the sun' },
-  'front-lit': { icon: '●', word: 'Front-lit', phrase: 'Sun behind the camera' },
-  'side-lit': { icon: '◐', word: 'Side-lit', phrase: 'Sun across the frame' },
-}
+/* The words themselves now live in src/lib/lightCopy.ts, shared with the shot
+ * list and the field card, because there are three kinds of read to word and
+ * three private copies of that switch would be three chances to print a
+ * lighting class over a nadir shot. */
 
 const deg = (n: number) => `${n.toFixed(1)}°`
 
-const METRES_TO_FEET = 3.28084
-
-/** Both units on one line. The kit is metric, the airspace rules are not. */
+/**
+ * Both units on one line. The kit is metric, the airspace rules are not.
+ *
+ * metersToFeet from core, not a local 3.28084. This file had the FOURTH copy of
+ * that constant; the other three were consolidated into reachScale.ts and this
+ * one was missed because it is in a component rather than in core.
+ */
 const distance = (metres: number) =>
-  `${Math.round(metres)}m · ${Math.round(metres * METRES_TO_FEET)}ft`
+  `${Math.round(metres)}m · ${Math.round(metersToFeet(metres))}ft`
 
-const feet = (metres: number) => Math.round(metres * METRES_TO_FEET).toLocaleString('en-US')
+const feet = (metres: number) => Math.round(metersToFeet(metres)).toLocaleString('en-US')
 
 /** Rising, falling, or as near to neither as makes no difference. */
 const TIDE_ARROW: Record<string, string> = { rising: '↑', falling: '↓', slack: '·' }
@@ -113,7 +128,8 @@ const FRAMING_COPY: Record<FramingWarning, string> = {
  */
 function PhotoSlot({ planned }: { planned: PlannedPosition }) {
   const { at } = planned.position
-  const { cameraBearing } = planned
+  /* Street View needs a direction to look. Only a framed shot has one. */
+  const cameraBearing = cameraBearingOf(planned.aim)
   const { hFOV } = planned.fov
   const air = planned.position.platform === 'air'
 
@@ -126,7 +142,7 @@ function PhotoSlot({ planned }: { planned: PlannedPosition }) {
   const [view, setView] = useState<GroundView>({ status: 'loading' })
 
   useEffect(() => {
-    if (air) return
+    if (air || cameraBearing === null) return
     let live = true
     fetchGroundView(at, cameraBearing, hFOV).then((next) => {
       if (live) setView(next)
@@ -137,6 +153,8 @@ function PhotoSlot({ planned }: { planned: PlannedPosition }) {
   }, [air, at, cameraBearing, hFOV])
 
   const year = view.status === 'ok' ? imageryYear(view.date) : null
+
+  const line = lightLine(planned.read)
 
   return (
     <div className="frame">
@@ -154,7 +172,7 @@ function PhotoSlot({ planned }: { planned: PlannedPosition }) {
         <img
           className="frame__img"
           src={view.image}
-          alt={`Street View looking ${deg(cameraBearing)} from position ${planned.position.number}`}
+          alt={`Street View looking ${deg(cameraBearing ?? 0)} from position ${planned.position.number}`}
         />
       ) : null}
 
@@ -169,16 +187,21 @@ function PhotoSlot({ planned }: { planned: PlannedPosition }) {
       </span>
       {year === null ? null : <span className="frame__year num">{year}</span>}
 
-      <p className={`frame__light frame__light--${planned.lighting.classification}`}>
+      {/*
+        * THE LIGHT ROW, which is a different read per shot type and says so.
+        *
+        * A framed shot gets the classification it always got. The other two
+        * get what IS true instead, and the phrase carries the reason there is
+        * no class, because a missing classification where one used to be
+        * reads as a broken app rather than as a deliberate refusal. Worded in
+        * src/lib/lightCopy.ts, computed in src/core/lighting.ts.
+        */}
+      <p className={`frame__light frame__light--${line.tone}`}>
         <span className="frame__light-icon" aria-hidden="true">
-          {LIGHTING[planned.lighting.classification]?.icon}
+          {line.icon}
         </span>
-        <span className="frame__light-word">
-          {LIGHTING[planned.lighting.classification]?.word}
-        </span>
-        <span className="frame__light-phrase">
-          {LIGHTING[planned.lighting.classification]?.phrase}
-        </span>
+        <span className="frame__light-word">{line.word}</span>
+        <span className="frame__light-phrase">{line.phrase}</span>
       </p>
     </div>
   )
@@ -231,7 +254,17 @@ function CloudPanel({
   const load = () => {
     setState({ status: 'loading' })
     fetchSightlineCloud(
-      [{ id: planned.position.id, from: planned.position.at, bearing: planned.cameraBearing }],
+      /*
+       * A SIGHTLINE NEEDS A DIRECTION TO LOOK ALONG. Only a framed shot has
+       * one; the control that calls this is hidden for the other two.
+       */
+      [
+        {
+          id: planned.position.id,
+          from: planned.position.at,
+          bearing: cameraBearingOf(planned.aim) ?? 0,
+        },
+      ],
       shootAt,
       timeZone,
     ).then((result) => {
@@ -343,12 +376,13 @@ export function PositionCard({
   onSetAltitude,
   pilotAt,
   onPlacePilot,
+  onSetShotType,
+  onSetYaw,
 }: PositionCardProps) {
   const {
     position,
     fov,
-    lighting,
-    cameraBearing,
+    read,
     subjectRangeMeters,
     frameWidthMeters,
     standoff,
@@ -376,7 +410,7 @@ export function PositionCard({
 
   return (
     <aside
-      className={`card card--${lighting.classification}`}
+      className={`card card--${lightLine(read).tone}`}
       aria-label={`Position ${position.number}`}
     >
       <button type="button" className="card__close" onClick={onClose} aria-label="Close">
@@ -441,6 +475,71 @@ export function PositionCard({
           <span className="optic__unit">mm</span>
         </label>
       </div>
+
+      {/*
+        * WHAT KIND OF SHOT THIS IS.
+        *
+        * A select rather than a row of segments, so a shoot that only uses
+        * framed positions gains ONE line on the card and no new chrome
+        * anywhere else: no map control, no header row, nothing in the sheet.
+        * A client event shoot looks as it did.
+        *
+        * It sits under the lens because it is the same kind of decision, about
+        * what this one position is, and everything downstream recomputes from
+        * it: the lighting read, the cone, and whether there is a bearing at
+        * all.
+        */}
+      <div className="optic">
+        <label className="optic__field">
+          <span className="optic__label">Shot</span>
+          <select
+            className="optic__select"
+            value={position.shotType}
+            onChange={(event) => onSetShotType(position.id, event.target.value as ShotType)}
+          >
+            {SHOT_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {SHOT_TYPE_LABEL[type]}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {/*
+          * YAW, only for a top-down, because only a top-down has a rectangle
+          * to turn. It is NOT a camera bearing and the label does not call it
+          * one: the camera points at the ground whatever this says.
+          */}
+        {position.shotType !== 'top-down' ? null : (
+          <label className="optic__field optic__field--focal">
+            <span className="optic__label">Frame</span>
+            <input
+              className="optic__focal num"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              max={359}
+              step={5}
+              value={position.yawDegrees}
+              aria-label="Which way the top-down frame is turned, in degrees"
+              onChange={(event) => onSetYaw(position.id, Number(event.target.value))}
+            />
+            <span className="optic__unit">°</span>
+          </label>
+        )}
+      </div>
+
+      {/*
+        * WHAT THE PIN IS DOING FOR THIS SHOT TYPE.
+        *
+        * Said only when it is not the obvious thing. For a framed shot the pin
+        * is the subject and the camera is aimed at it, which the whole card
+        * already says; for the other two it is a place the aircraft is, and
+        * leaving that unsaid is how a pin quietly gets treated as a subject.
+        */}
+      {position.shotType === 'framed' ? null : (
+        <p className="card__pinrole">The pin is {PIN_ROLE[position.shotType]}.</p>
+      )}
 
       {/*
         * Hazards stay loud and stay high. A framing problem and a site problem
@@ -644,14 +743,54 @@ export function PositionCard({
               <dt>Usable to</dt>
               <dd className="num">{Math.round(standoff.maxMeters)}m</dd>
             </div>
-            <div className="card__stat">
-              <dt>Camera bearing</dt>
-              <dd className="num">{deg(cameraBearing)}</dd>
-            </div>
-            <div className="card__stat">
-              <dt>Sun delta</dt>
-              <dd className="num">{deg(lighting.delta)}</dd>
-            </div>
+            {/*
+              * CAMERA BEARING AND SUN DELTA ONLY EXIST FOR A FRAMED SHOT.
+              *
+              * Both are statements about where the lens points. A top-down
+              * gets the shadow figures instead, which is the read that
+              * matters there, and a 360 gets where the sun sits on the ring.
+              * Neither gets a dash where a number used to be.
+              */}
+            {read.shotType === 'framed' ? (
+              <>
+                <div className="card__stat">
+                  <dt>Camera bearing</dt>
+                  <dd className="num">{deg(read.lighting.cameraBearing)}</dd>
+                </div>
+                <div className="card__stat">
+                  <dt>Sun delta</dt>
+                  <dd className="num">{deg(read.lighting.delta)}</dd>
+                </div>
+              </>
+            ) : null}
+            {read.shotType !== 'top-down' ? null : (
+              <>
+                <div className="card__stat">
+                  <dt>Shadow bearing</dt>
+                  <dd className="num">{deg(read.shadowBearing)}</dd>
+                </div>
+                <div className="card__stat">
+                  <dt>Shadow length</dt>
+                  <dd className="num">
+                    {read.shadowLengthRatio === null
+                      ? 'none'
+                      : `${read.shadowLengthRatio.toFixed(1)}×`}
+                  </dd>
+                </div>
+              </>
+            )}
+            {read.shotType !== 'orbit' ? null : (
+              <>
+                <div className="card__stat">
+                  <dt>Sun on the ring</dt>
+                  <dd className="num">{deg(read.sunBearing)}</dd>
+                </div>
+                <div className="card__stat">
+                  <dt>Sun altitude</dt>
+                  <dd className="num">{deg(read.sunAltitude)}</dd>
+                </div>
+              </>
+            )}
             <div className="card__stat">
               <dt>FOV h</dt>
               <dd className="num">{deg(fov.hFOV)}</dd>

@@ -1,5 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
+import { classificationOf } from '../core/lighting.ts'
 import { DEFAULT_KIT } from '../core/kit.ts'
 import { getSunPosition } from '../core/sun.ts'
 import type { LatLon } from '../core/geo.ts'
@@ -20,8 +21,12 @@ import { PositionCard } from './PositionCard.tsx'
 
 const VENUE: LatLon = { lat: 38.364236, lon: -75.605912 }
 const SUBJECT: LatLon = { lat: 38.3639, lon: -75.6058 }
-const sunAzimuth = getSunPosition(new Date('2026-09-12T13:00:00-04:00'), VENUE.lat, VENUE.lon)
-  .azimuth
+/*
+ * THE WHOLE SUN, because planPosition takes a SunPosition now rather than a
+ * bare azimuth: a top-down read needs the altitude for shadow length and a 360
+ * read needs it for where the sun sits against the horizon ring.
+ */
+const sun = getSunPosition(new Date('2026-09-12T13:00:00-04:00'), VENUE.lat, VENUE.lon)
 
 const at = (over: Partial<CameraPosition> = {}): CameraPosition => ({
   id: 'p1',
@@ -35,12 +40,14 @@ const at = (over: Partial<CameraPosition> = {}): CameraPosition => ({
   coversShot: null,
   platform: 'ground',
   altitudeFeet: 0,
+  shotType: 'framed',
+  yawDegrees: 0,
   moved: false,
   origin: 'suggested',
   ...over,
 })
 
-const plan = planPositions([at()], SUBJECT, sunAzimuth)
+const plan = planPositions([at()], SUBJECT, sun)
 
 /* A rising tide at the scrubbed moment. The card shows the level and the arrow. */
 const RISING: TideState = {
@@ -166,6 +173,8 @@ describe('PositionCard', () => {
       onMove={() => {}}
       onSetOptic={() => {}}
       onSetAltitude={() => {}}
+      onSetShotType={() => {}}
+      onSetYaw={() => {}}
       pilotAt={null}
       onPlacePilot={() => {}}
     />,
@@ -184,16 +193,19 @@ describe('PositionCard', () => {
    * directly would be asserting my guess about the arithmetic.
    */
   it('states the lighting as an icon, a word and a phrase', () => {
-    const copy = {
+    const COPY: Record<string, [string, string]> = {
       backlit: ['Backlit', 'Shooting into the sun'],
       'front-lit': ['Front-lit', 'Sun behind the camera'],
       'side-lit': ['Side-lit', 'Sun across the frame'],
-    }[plan[0].lighting.classification]
+    }
+    const classification = classificationOf(plan[0].read)
+    expect(classification).not.toBeNull()
+    const copy = COPY[classification ?? '']
     expect(copy).toBeDefined()
     expect(html).toContain('frame__light-icon')
     expect(html).toContain(copy![0])
     expect(html).toContain(copy![1])
-    expect(html).toContain(`frame__light--${plan[0].lighting.classification}`)
+    expect(html).toContain(`frame__light--${classificationOf(plan[0].read)}`)
   })
 
   /* Focal length, range in feet, tide with a direction. Nothing else. */
@@ -219,6 +231,8 @@ describe('PositionCard', () => {
         onMove={() => {}}
         onSetOptic={() => {}}
       onSetAltitude={() => {}}
+      onSetShotType={() => {}}
+      onSetYaw={() => {}}
       pilotAt={null}
       onPlacePilot={() => {}}
       />,

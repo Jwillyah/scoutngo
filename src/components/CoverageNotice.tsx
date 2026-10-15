@@ -68,13 +68,23 @@ export function CoverageNotice({ planCoverage }: CoverageNoticeProps) {
         </p>
       )}
 
+      {/*
+        * POSITIONS WITH NO BEARING, counted rather than dropped.
+        *
+        * Two reasons now reach here and they are deliberately said the same
+        * way, because they are the same fact: standing on the subject, and
+        * being a top-down or a 360. Neither has a direction from the subject,
+        * so neither can cover a sector, and neither is an error. The wording
+        * no longer claims they are all sitting on the subject, which stopped
+        * being true when shot types arrived.
+        */}
       {coverage.withoutBearing === 0 ? null : (
         <p className="coverage__sectors">
           <span className="num">{coverage.withoutBearing}</span>{' '}
-          {coverage.withoutBearing === 1 ? 'position sits' : 'positions sit'} on the
-          subject, so {coverage.withoutBearing === 1 ? 'it has' : 'they have'} no
-          bearing from it and {coverage.withoutBearing === 1 ? 'is' : 'are'} not
-          counted above. That is a legitimate wide shot, not an error.
+          {coverage.withoutBearing === 1 ? 'position has' : 'positions have'} no bearing
+          from the subject, either sitting on top of it or shooting top-down or 360, so{' '}
+          {coverage.withoutBearing === 1 ? 'it is' : 'they are'} not counted above. Those
+          are legitimate shots, not errors.
         </p>
       )}
 

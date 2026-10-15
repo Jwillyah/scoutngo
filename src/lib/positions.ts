@@ -14,6 +14,11 @@
  */
 
 import { clampAltitudeFeet } from '../core/air.ts'
+import {
+  DEFAULT_SHOT_TYPE,
+  DEFAULT_YAW_DEGREES,
+  type ShotType,
+} from '../core/shotType.ts'
 import type { LatLon } from '../core/geo.ts'
 import type { CameraPosition, PositionOrigin } from './plan.ts'
 
@@ -39,6 +44,8 @@ export interface NewPosition {
   focalLength: number
   platform?: 'ground' | 'air'
   altitudeFeet?: number
+  shotType?: ShotType
+  yawDegrees?: number
   origin?: PositionOrigin
 }
 
@@ -63,6 +70,12 @@ export function addPosition(list: CameraPosition[], next: NewPosition): CameraPo
     coversShot: null,
     platform: next.platform ?? 'ground',
     altitudeFeet: next.altitudeFeet ?? 0,
+    /*
+     * FRAMED BY DEFAULT, always. A client event shoot uses nothing else, and
+     * the other two must never arrive without being chosen.
+     */
+    shotType: next.shotType ?? DEFAULT_SHOT_TYPE,
+    yawDegrees: next.yawDegrees ?? DEFAULT_YAW_DEGREES,
     moved: false,
     origin: next.origin ?? 'manual',
   }
@@ -141,5 +154,28 @@ export function setOptic(
     position.id === id
       ? { ...position, lensId, focalLength: Math.round(focalLength) }
       : position,
+  )
+}
+
+/**
+ * Changes what kind of shot a position is.
+ *
+ * Switching AWAY from top-down leaves the yaw where it was rather than zeroing
+ * it, so flipping to 360 to look and back again does not lose the angle that
+ * was lined up with the shadows.
+ */
+export function setShotType(
+  list: CameraPosition[],
+  id: string,
+  shotType: ShotType,
+): CameraPosition[] {
+  return list.map((position) => (position.id === id ? { ...position, shotType } : position))
+}
+
+/** Turns the top-down rectangle. Normalised, because a yaw of 370 is a yaw of 10. */
+export function setYaw(list: CameraPosition[], id: string, yawDegrees: number): CameraPosition[] {
+  const normalised = ((yawDegrees % 360) + 360) % 360
+  return list.map((position) =>
+    position.id === id ? { ...position, yawDegrees: Math.round(normalised) } : position,
   )
 }

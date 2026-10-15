@@ -8,6 +8,7 @@ import { NewBuildNotice } from './components/NewBuildNotice.tsx'
 import { SetupMode } from './components/SetupMode.tsx'
 import type { LatLon } from './core/geo.ts'
 import { DEFAULT_ALTITUDE_FEET } from './core/air.ts'
+import { DEFAULT_SHOT_TYPE, DEFAULT_YAW_DEGREES, type ShotType } from './core/shotType.ts'
 import {
   allowedPlatforms,
   DEFAULT_PLATFORM_FILTER,
@@ -39,6 +40,8 @@ import {
   removePosition,
   setAltitude,
   setOptic,
+  setShotType,
+  setYaw,
 } from './lib/positions.ts'
 import { assessPlan, planPositions, type CameraPosition } from './lib/plan.ts'
 import {
@@ -293,7 +296,7 @@ function App() {
         : planPositions(
             positions,
             aim,
-            sun.azimuth,
+            sun,
             land,
             kit.bodyIds,
             reachMeters,
@@ -515,6 +518,19 @@ function App() {
   /* Clamped in core, so a typed 900 and a model's 900 both become 400. */
   const onSetAltitude = useCallback((id: string, feet: number) => {
     setPositions((current) => setAltitude(current, id, feet))
+  }, [])
+
+  /*
+   * WHAT KIND OF SHOT A POSITION IS. Everything downstream recomputes from it:
+   * whether there is a camera bearing at all, therefore whether there is a
+   * lighting class, and therefore whether a cone is drawn.
+   */
+  const onSetShotType = useCallback((id: string, shotType: ShotType) => {
+    setPositions((current) => setShotType(current, id, shotType))
+  }, [])
+
+  const onSetYaw = useCallback((id: string, degrees: number) => {
+    setPositions((current) => setYaw(current, id, degrees))
   }, [])
 
   /*
@@ -1020,6 +1036,14 @@ function App() {
         coversShot: raw.coversShot,
         platform: raw.platform,
         altitudeFeet: raw.altitudeFeet,
+        /*
+         * A SUGGESTED POSITION IS ALWAYS FRAMED. The model is not asked for a
+         * shot type and does not get to choose one: a 360 or a top-down is a
+         * decision about what picture you are making, which is the shooter's,
+         * and there is no bearing to recover if a model picks wrong.
+         */
+        shotType: DEFAULT_SHOT_TYPE,
+        yawDegrees: DEFAULT_YAW_DEGREES,
         moved: false,
         origin: 'suggested',
       })),
@@ -1218,6 +1242,8 @@ function App() {
           placingPilot={placingPilot}
           onPlacingPilot={setPlacingPilot}
           onSetAltitude={onSetAltitude}
+          onSetShotType={onSetShotType}
+          onSetYaw={onSetYaw}
           planCoverage={plan.length === 0 ? null : planCoverage}
           onPositionMove={onPositionMove}
           sun={sun}

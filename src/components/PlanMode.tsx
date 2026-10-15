@@ -4,6 +4,7 @@ import type {
   Platform,
   PlatformFilter as PlatformFilterValue,
 } from '../core/platformFilter.ts'
+import type { ShotType } from '../core/shotType.ts'
 import type { TideExtreme, TideState } from '../core/tide.ts'
 import type { SunArc, SunPosition } from '../core/sun.ts'
 import type { PlanCoverage, PlannedPosition } from '../lib/plan.ts'
@@ -77,6 +78,10 @@ interface PlanModeProps {
   onSetOptic: (id: string, lensId: string, focalLength: number) => void
   /** How high an air position flies, in feet above ground. Clamped in core. */
   onSetAltitude: (id: string, feet: number) => void
+  /** Framed, top-down or 360. Decides what geometry the position has at all. */
+  onSetShotType: (id: string, shotType: ShotType) => void
+  /** Which way a top-down's rectangle is turned. Never a camera bearing. */
+  onSetYaw: (id: string, degrees: number) => void
   /** The forward step, offered as a SECONDARY action beside Generate. */
   onGoToField: () => void
   goToFieldBlocked: string | null
@@ -182,6 +187,8 @@ export function PlanMode({
   onMovePosition,
   onSetOptic,
   onSetAltitude,
+  onSetShotType,
+  onSetYaw,
   onGoToField,
   goToFieldBlocked,
   peekStatus,
@@ -340,6 +347,8 @@ export function PlanMode({
           onMove={onMovePosition}
           onSetOptic={onSetOptic}
           onSetAltitude={onSetAltitude}
+          onSetShotType={onSetShotType}
+          onSetYaw={onSetYaw}
           kit={kitProfile}
           pilotAt={pilotAt}
           onPlacePilot={() => onPlacingPilot(true)}

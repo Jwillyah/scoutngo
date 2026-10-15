@@ -11,8 +11,12 @@ import { PositionCard } from './PositionCard.tsx'
 const VENUE: LatLon = { lat: 38.364236, lon: -75.605912 }
 const SUBJECT: LatLon = { lat: 38.3639, lon: -75.6058 }
 const PILOT: LatLon = { lat: 38.3652, lon: -75.6071 }
-const sunAzimuth = getSunPosition(new Date('2026-09-12T13:00:00-04:00'), VENUE.lat, VENUE.lon)
-  .azimuth
+/*
+ * THE WHOLE SUN, because planPosition takes a SunPosition now rather than a
+ * bare azimuth: a top-down read needs the altitude for shadow length and a 360
+ * read needs it for where the sun sits against the horizon ring.
+ */
+const sun = getSunPosition(new Date('2026-09-12T13:00:00-04:00'), VENUE.lat, VENUE.lon)
 
 const air = (over: Partial<CameraPosition> = {}): CameraPosition => ({
   id: 'a1',
@@ -26,6 +30,8 @@ const air = (over: Partial<CameraPosition> = {}): CameraPosition => ({
   coversShot: null,
   platform: 'air',
   altitudeFeet: 200,
+  shotType: 'framed',
+  yawDegrees: 0,
   moved: false,
   origin: 'manual',
   ...over,
@@ -34,7 +40,7 @@ const air = (over: Partial<CameraPosition> = {}): CameraPosition => ({
 const card = (pilotAt: LatLon | null, over: Partial<CameraPosition> = {}) =>
   renderToStaticMarkup(
     <PositionCard
-      planned={planPositions([air(over)], SUBJECT, sunAzimuth)[0]}
+      planned={planPositions([air(over)], SUBJECT, sun)[0]}
       shootAt={null}
       timeZone={null}
       tide={null}
@@ -45,6 +51,8 @@ const card = (pilotAt: LatLon | null, over: Partial<CameraPosition> = {}) =>
       onMove={() => {}}
       onSetOptic={() => {}}
       onSetAltitude={() => {}}
+      onSetShotType={() => {}}
+      onSetYaw={() => {}}
       kit={DEFAULT_KIT}
       pilotAt={pilotAt}
       onPlacePilot={() => {}}
@@ -167,7 +175,7 @@ describe('the pilot separation is shown', () => {
           planPositions(
             [air({ platform: 'ground', altitudeFeet: 0, lensId: 'sony-200-600', focalLength: 400 })],
             SUBJECT,
-            sunAzimuth,
+            sun,
           )[0]
         }
         shootAt={null}
@@ -180,6 +188,8 @@ describe('the pilot separation is shown', () => {
         onMove={() => {}}
         onSetOptic={() => {}}
         onSetAltitude={() => {}}
+      onSetShotType={() => {}}
+      onSetYaw={() => {}}
         kit={DEFAULT_KIT}
         pilotAt={PILOT}
         onPlacePilot={() => {}}

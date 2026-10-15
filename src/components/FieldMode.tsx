@@ -95,10 +95,14 @@ export function FieldMode({ plan, venue, tide, pack, footer }: FieldModeProps) {
             <div className="fieldpager__page" key={planned.position.id}>
               <FieldCard
                 planned={planned}
-                lightingNow={
-                  sunNow === null
-                    ? planned.lighting
-                    : classifyLighting(planned.positionBearing, sunNow.azimuth)
+                /*
+                 * RECOMPUTED AT THE CURRENT MOMENT, through the position's own
+                 * aim. A top-down or a 360 comes back as the read for that
+                 * type, not as a lighting class, which is what stops FIELD
+                 * printing "backlit" over a nadir shot.
+                 */
+                readNow={
+                  sunNow === null ? planned.read : classifyLighting(planned.aim, sunNow)
                 }
                 tideNow={tideNow}
                 gps={gps}

@@ -9,6 +9,7 @@ import {
   toPosition,
   type LatLon,
 } from '../core/geo.ts'
+import { classificationOf } from '../core/lighting.ts'
 import {
   COLD_START_VIEW,
   FRAME_VENUE_BELOW_ZOOM,
@@ -344,17 +345,31 @@ function emptyCollection(): GeoJSON.FeatureCollection {
 function coneCollection(plan: PlannedPosition[]): GeoJSON.FeatureCollection {
   return {
     type: 'FeatureCollection',
-    features: plan.map((p) => ({
-      type: 'Feature',
-      // Every value here came out of src/core. None of it is asserted.
-      properties: {
-        id: p.position.id,
-        lighting: p.lighting.classification,
-        hFOV: p.fov.hFOV,
-        platform: p.position.platform,
-      },
-      geometry: { type: 'Polygon', coordinates: p.cone },
-    })),
+    /*
+     * Only positions that HAVE a cone. plan.ts gives a top-down and a 360 an
+     * empty one, because a cone is a claim about a direction and neither has
+     * one. An empty polygon would be a feature with no coordinates rather than
+     * no feature, which is the sort of thing that renders as a stray point.
+     */
+    features: plan
+      .filter((p) => p.cone.length > 0)
+      .map((p) => ({
+        type: 'Feature' as const,
+        // Every value here came out of src/core. None of it is asserted.
+        properties: {
+          id: p.position.id,
+          /*
+           * Only framed positions reach here: a cone is a claim about a
+           * direction, and the other two shot types have none, so plan.ts
+           * gives them an empty cone and the filter above drops them. The
+           * lighting class is therefore always present.
+           */
+          lighting: classificationOf(p.read),
+          hFOV: p.fov.hFOV,
+          platform: p.position.platform,
+        },
+        geometry: { type: 'Polygon' as const, coordinates: p.cone },
+      })),
   }
 }
 
@@ -1485,7 +1500,8 @@ export function MapView({
           <ShooterFigure
             number={planned.position.number}
             focalLength={planned.position.focalLength}
-            classification={planned.lighting.classification}
+            classification={classificationOf(planned.read)}
+            shotType={planned.position.shotType}
             warnings={planned.warnings}
             framingWarnings={planned.framingWarnings}
             platform={planned.position.platform}

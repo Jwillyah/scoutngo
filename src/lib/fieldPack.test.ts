@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   FIELD_PACK_KEY,
+  FIELD_PACK_VERSION,
   clearPack,
   fingerprintPlan,
   loadPack,
@@ -115,8 +116,11 @@ describe('fingerprintPlan', () => {
   })
 })
 
+/* The CONSTANT, not a literal 1: the version is bumped whenever the packed
+ * shape changes, and a fixture pinned to a number silently stops testing the
+ * round trip the moment that happens. */
 const pack = (over: Partial<FieldPack> = {}): FieldPack => ({
-  version: 1,
+  version: FIELD_PACK_VERSION,
   madeAt: '2026-09-17T12:00:00.000Z',
   fingerprint: 'fp',
   venue: VENUE,

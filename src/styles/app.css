@@ -4746,3 +4746,66 @@
   font-size: var(--text-sm);
   font-weight: var(--weight-heavy);
 }
+
+/*
+ * SHOT TYPES WITH NO LIGHTING CLASS.
+ *
+ * A top-down and a 360 get their own quiet tone rather than borrowing one of
+ * the three lighting colours. That is the point: those colours MEAN backlit,
+ * side-lit and front-lit, and lending one to a shot that has no class would be
+ * saying the thing the refusal exists to avoid saying.
+ *
+ * The secondary accent, which is already the app's "this is a different kind of
+ * thing" colour. Not red: there is nothing wrong with a 360.
+ */
+.frame__light--top-down .frame__light-icon,
+.frame__light--orbit .frame__light-icon {
+  color: var(--color-accent-2);
+}
+
+.shot__light--top-down,
+.shot__light--orbit {
+  background: var(--color-accent-2);
+}
+
+.fc__light--top-down,
+.fc__light--orbit {
+  color: var(--color-accent-2);
+}
+
+/*
+ * WHY THERE IS NO LIGHTING CLASS, in FIELD.
+ *
+ * A blank where a classification used to be reads as a broken app, so the
+ * sentence is shown rather than the gap. Quiet, because it is an explanation
+ * and not a warning.
+ */
+.fc__lightwhy {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+
+/* Where to point, when the answer is not a bearing. */
+.fc__aimnone {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+}
+
+/*
+ * WHAT THE PIN IS DOING, said only when it is not the obvious thing.
+ *
+ * For a framed shot the pin is the subject and the whole card says so. For a
+ * top-down or a 360 it is a place the aircraft is, and leaving that unsaid is
+ * how a pin quietly gets treated as a subject.
+ */
+.card__pinrole {
+  margin: 0;
+  padding: 0 var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}

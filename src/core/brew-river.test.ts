@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { altitudeNote, classifyLighting, evaluateWindow } from './lighting.ts'
-import { getSunPosition } from './sun.ts'
+import {
+  altitudeNote,
+  classificationOf,
+  classifyLighting,
+  evaluateWindow,
+} from './lighting.ts'
+import type { Aim } from './shotType.ts'
+import { getSunPosition, type SunPosition } from './sun.ts'
 
 /**
  * Calibration case from the brief: Brew River Dock Bar, Salisbury MD, on a
@@ -19,6 +25,31 @@ const AT_1300 = new Date('2026-09-12T13:00:00-04:00')
 // positionBearing is FROM the venue TO the camera position.
 const NORTH_BANK = 0
 const SOUTH_BANK = 180
+
+
+const sunAt = (azimuth: number, altitude = 30): SunPosition => ({
+  azimuth,
+  altitude,
+  shadowBearing: (azimuth + 180) % 360,
+})
+/*
+ * A framed aim for the tests. cameraBearing is the exact reciprocal here on
+ * purpose: these cases are about the lighting arithmetic, which reads
+ * positionBearing, and a test that invented a different forward azimuth would
+ * be testing turf rather than this module.
+ */
+const aimAt = (positionBearing: number): Aim => ({
+  shotType: 'framed',
+  positionBearing,
+  cameraBearing: (positionBearing + 180) % 360,
+})
+
+/** The framed read, unwrapped, so these assertions read as they always did. */
+const framed = (positionBearing: number, sunAzimuth: number) => {
+  const read = classifyLighting(aimAt(positionBearing), sunAt(sunAzimuth))
+  if (read.shotType !== 'framed') throw new Error('expected a framed read')
+  return read.lighting
+}
 
 describe('Brew River calibration', () => {
   it('is in fact a Saturday afternoon in EDT', () => {
@@ -41,13 +72,13 @@ describe('Brew River calibration', () => {
 
   it('calls a north bank position backlit', () => {
     const { azimuth } = getSunPosition(AT_1300, LAT, LON)
-    const result = classifyLighting(NORTH_BANK, azimuth)
+    const result = framed(NORTH_BANK, azimuth)
     expect(result.classification).toBe('backlit')
   })
 
   it('calls a south bank position front-lit', () => {
     const { azimuth } = getSunPosition(AT_1300, LAT, LON)
-    const result = classifyLighting(SOUTH_BANK, azimuth)
+    const result = framed(SOUTH_BANK, azimuth)
     expect(result.classification).toBe('front-lit')
   })
 
@@ -55,20 +86,20 @@ describe('Brew River calibration', () => {
     const start = new Date('2026-09-12T11:00:00-04:00')
     const end = new Date('2026-09-12T15:00:00-04:00')
 
-    const south = evaluateWindow(SOUTH_BANK, LAT, LON, start, end)
-    const north = evaluateWindow(NORTH_BANK, LAT, LON, start, end)
+    const south = evaluateWindow(aimAt(SOUTH_BANK), LAT, LON, start, end)
+    const north = evaluateWindow(aimAt(NORTH_BANK), LAT, LON, start, end)
 
     // The south bank is front-lit through the core of the window and never
     // worse than side-lit at the edges: it is never a bad call.
-    expect(south.middle.lighting.classification).toBe('front-lit')
+    expect(classificationOf(south.middle.read)).toBe('front-lit')
     for (const sample of [south.start, south.middle, south.end]) {
-      expect(sample.lighting.classification).not.toBe('backlit')
+      expect(classificationOf(sample.read)).not.toBe('backlit')
     }
 
     // The north bank is the mirror image: backlit at the core, never front-lit.
-    expect(north.middle.lighting.classification).toBe('backlit')
+    expect(classificationOf(north.middle.read)).toBe('backlit')
     for (const sample of [north.start, north.middle, north.end]) {
-      expect(sample.lighting.classification).not.toBe('front-lit')
+      expect(classificationOf(sample.read)).not.toBe('front-lit')
     }
 
     // Both banks change label across four hours, which is exactly why the

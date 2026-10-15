@@ -21,7 +21,8 @@
 
 import type { FramingWarning } from '../core/fov.ts'
 import type { LatLon } from '../core/geo.ts'
-import type { Classification } from '../core/lighting.ts'
+import { classificationOf, type Classification } from '../core/lighting.ts'
+import { cameraBearingOf, type Aim, type ShotType } from '../core/shotType.ts'
 import type { SiteWarning } from '../core/siting.ts'
 import type { TideExtreme, TideSample } from '../core/tide.ts'
 import { fetchGroundView } from './groundView.ts'
@@ -29,7 +30,16 @@ import type { PlannedPosition } from './plan.ts'
 import type { Platform } from './parsePlan.ts'
 
 export const FIELD_PACK_KEY = 'scoutngo.fieldpack.v1'
-export const FIELD_PACK_VERSION = 1
+/*
+ * BUMPED FROM 1 WHEN SHOT TYPES ARRIVED.
+ *
+ * A packed position used to carry `cameraBearing` and `positionBearing` as bare
+ * numbers; it now carries an Aim, which is a different shape per shot type. A
+ * version 1 pack has no aim at all, and loadPack rejects a version mismatch
+ * outright, so an old pack is treated as absent and rebuilt rather than read
+ * with fields that are not there.
+ */
+export const FIELD_PACK_VERSION = 2
 
 /** One position, flattened to exactly what a field card renders. */
 export interface PackedPosition {
@@ -41,13 +51,26 @@ export interface PackedPosition {
   platform: Platform
   altitudeFeet: number
   at: LatLon
-  /** Where the camera points. Computed by src/core/, stored, never re-derived. */
-  cameraBearing: number
-  /** From the subject outward. What classifyLighting wants at any moment. */
-  positionBearing: number
+  /**
+   * THE AIM, stored whole rather than as a pair of bare bearings.
+   *
+   * It used to be `cameraBearing` and `positionBearing`, which every packed
+   * position carried whether or not it had one. FIELD recomputes the light at
+   * the moment you are standing there, and it does that through this aim, so a
+   * packed top-down comes back as a shadow read rather than as a lighting
+   * class. See src/core/shotType.ts.
+   */
+  aim: Aim
+  shotType: ShotType
+  /** Which way a top-down's rectangle is turned. Zero for the other types. */
+  yawDegrees: number
   subjectRangeMeters: number
-  /** The class at the time the plan was made, for the "light has moved" line. */
-  lightingPlanned: Classification
+  /**
+   * The class at the time the plan was made, for the "light has moved" line.
+   * Null for a shot type that has no class, which is also what suppresses that
+   * line: a 360 cannot have changed from one class to another.
+   */
+  lightingPlanned: Classification | null
   warnings: SiteWarning[]
   framingWarnings: FramingWarning[]
   /** Base64 data URL, or a plain reason there is no picture. */
@@ -187,10 +210,28 @@ export function loadPack(): FieldPack | null {
     const pack = JSON.parse(raw) as FieldPack
     if (pack?.version !== FIELD_PACK_VERSION) return null
     if (!Array.isArray(pack.positions) || typeof pack.fingerprint !== 'string') return null
+    /*
+     * EVERY PACKED POSITION NEEDS A USABLE AIM, because FIELD recomputes the
+     * light from it at the moment you are standing there. A pack missing one,
+     * or carrying a shape from a hand edit, is treated as absent rather than
+     * loaded and allowed to throw in the middle of a shoot.
+     */
+    if (!pack.positions.every((p) => isAim(p?.aim))) return null
     return revivePack(pack)
   } catch {
     return null
   }
+}
+
+/** Narrow enough to be worth checking: the discriminant and its own field. */
+function isAim(value: unknown): boolean {
+  const aim = value as { shotType?: unknown; positionBearing?: unknown; cameraBearing?: unknown; yawDegrees?: unknown } | null
+  if (aim === null || typeof aim !== 'object') return false
+  if (aim.shotType === 'framed') {
+    return typeof aim.positionBearing === 'number' && typeof aim.cameraBearing === 'number'
+  }
+  if (aim.shotType === 'top-down') return typeof aim.yawDegrees === 'number'
+  return aim.shotType === 'orbit'
 }
 
 /** JSON has no Date, so the tide instants come back as strings. */
@@ -238,7 +279,22 @@ export async function buildPack(
 
   for (const [index, entry] of plan.entries()) {
     const p = entry.position
-    const view = await fetchGroundView(p.at, entry.cameraBearing, entry.fov.hFOV)
+    /*
+     * A Street View frame needs a direction to look. A top-down and a 360 have
+     * none, so they are packed without one rather than with a view of
+     * somewhere the camera is not pointing.
+     */
+    const bearing = cameraBearingOf(entry.aim)
+    const view =
+      bearing === null
+        ? ({
+            status: 'none',
+            message:
+              entry.aim.shotType === 'top-down'
+                ? 'Camera points straight down, so there is no ground view to fetch.'
+                : 'A 360 sees every direction, so there is no single ground view.',
+          } as const)
+        : await fetchGroundView(p.at, bearing, entry.fov.hFOV)
     positions.push({
       id: p.id,
       number: p.number,
@@ -248,10 +304,11 @@ export async function buildPack(
       platform: p.platform,
       altitudeFeet: p.altitudeFeet,
       at: p.at,
-      cameraBearing: entry.cameraBearing,
-      positionBearing: entry.positionBearing,
+      aim: entry.aim,
+      shotType: p.shotType,
+      yawDegrees: p.yawDegrees,
       subjectRangeMeters: entry.subjectRangeMeters,
-      lightingPlanned: entry.lighting.classification,
+      lightingPlanned: classificationOf(entry.read),
       warnings: entry.warnings,
       framingWarnings: entry.framingWarnings,
       groundView:
