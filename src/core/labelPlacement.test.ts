@@ -137,3 +137,51 @@ describe('centredRect and pad', () => {
     expect(pad(r(10, 10, 20, 20), 5)).toEqual({ left: 5, top: 5, right: 25, bottom: 25 })
   })
 })
+
+/*
+ * LABELS MUST NOT STACK ON EACH OTHER.
+ *
+ * Found by scripts/audit-labels.mjs at zoom 12, where the rays converge enough
+ * that Shadow, Rise and Set all wanted the same spot: three overlaps at once,
+ * and the result is one unreadable readout rather than three.
+ *
+ * The placement loop accumulates each label's box as it goes, so every label
+ * is checked against the ones already placed as well as against the chrome.
+ * These pin the arithmetic that makes that work.
+ */
+describe('a label placed against the ones already placed', () => {
+  const viewport: Rect = { left: 0, top: 0, right: 390, bottom: 844 }
+  const taken: Rect = { left: 100, top: 100, right: 160, bottom: 140 }
+
+  it('refuses a spot an earlier label already took', () => {
+    const wanted: Rect = { left: 120, top: 110, right: 180, bottom: 150 }
+    expect(isClear(wanted, [], viewport)).toBe(true)
+    expect(isClear(wanted, [taken], viewport)).toBe(false)
+  })
+
+  it('accepts a spot that only touches it', () => {
+    // Touching edges do not count as an overlap, which overlaps() documents.
+    const abutting: Rect = { left: 160, top: 100, right: 220, bottom: 140 }
+    expect(isClear(abutting, [taken], viewport)).toBe(true)
+  })
+
+  /*
+   * THE ACCUMULATION ORDER MATTERS: the first label gets its first choice and
+   * later ones move. That is deliberate, and it is why the list grows rather
+   * than being computed up front.
+   */
+  it('lets the first label keep its spot and moves the second', () => {
+    const first: Rect = { left: 100, top: 100, right: 160, bottom: 140 }
+    const placed: Rect[] = []
+    expect(isClear(first, placed, viewport)).toBe(true)
+    placed.push(first)
+    expect(isClear(first, placed, viewport)).toBe(false)
+  })
+
+  /* And the venue pin is in the same list, for the same reason. */
+  it('treats the pin as something to avoid', () => {
+    const pin: Rect = { left: 184, top: 410, right: 206, bottom: 436 }
+    const onThePin: Rect = { left: 180, top: 405, right: 240, bottom: 445 }
+    expect(isClear(onThePin, [pin], viewport)).toBe(false)
+  })
+})

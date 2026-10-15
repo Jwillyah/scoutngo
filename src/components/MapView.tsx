@@ -159,6 +159,26 @@ const FLOATING_CHROME = [
   '.setup__search',
   '.picker__menu',
   '.overflow__menu',
+  '.plat',
+  '.newbuild',
+  '.tapnote',
+  '.locate',
+  /*
+   * MAPLIBRE'S OWN CONTROL CORNERS, which were the whole complaint and were
+   * never in this list.
+   *
+   * The scale bar and the attribution (i) are added to 'bottom-left', so that
+   * corner has had two pieces of chrome in it since those controls went in,
+   * and the placement code could not see either of them. The one corner the
+   * readouts were reported stacking in was the one corner nothing was
+   * reserving. All four corners are listed rather than just the one, because
+   * a control moved to a different corner later would otherwise reintroduce
+   * exactly this.
+   */
+  '.maplibregl-ctrl-top-left',
+  '.maplibregl-ctrl-top-right',
+  '.maplibregl-ctrl-bottom-left',
+  '.maplibregl-ctrl-bottom-right',
 ].join(', ')
 /** How long a press has to be held before it drops a pin. */
 const LONG_PRESS_MS = 550
@@ -1438,7 +1458,18 @@ export function MapView({
       right: canvas.right,
       bottom: canvas.bottom,
     }
-    const obstacles: Rect[] = [...document.querySelectorAll(FLOATING_CHROME)]
+    /*
+     * THE PIN IS AN OBSTACLE TOO.
+     *
+     * A readout printed over the venue pin hides the one mark on the map that
+     * says where the venue is, and the labels all radiate FROM that pin, so
+     * the shortest candidate distance puts them straight on top of it. Found
+     * by scripts/audit-labels.mjs with the pin near the top-left of the view,
+     * where two readouts landed on it and on each other.
+     */
+    const obstacles: Rect[] = [
+      ...document.querySelectorAll(`${FLOATING_CHROME}, .pin`),
+    ]
       .map((node) => node.getBoundingClientRect())
       .filter((box) => box.width > 0 && box.height > 0)
       .map((box) =>
@@ -1453,6 +1484,9 @@ export function MapView({
       Math.max(1, labelMeters * LABEL_SLIDE_FRACTION),
     )
 
+    /** Where the labels placed so far ended up, so the next one avoids them. */
+    const takenBoxes: Rect[] = []
+
     for (const label of labels) {
       const el = makeMarkerElement(`ray-label ray-label--${label.kind}`)
       el.innerHTML =
@@ -1464,6 +1498,7 @@ export function MapView({
 
       const size = el.getBoundingClientRect()
       let placed: { lat: number; lon: number } | null = null
+      let placedBox: Rect | null = null
       for (const meters of distances) {
         const candidate = destinationPoint(venue, label.bearing, meters)
         const point = instance.project([candidate.lon, candidate.lat])
@@ -1473,8 +1508,15 @@ export function MapView({
           size.width,
           size.height,
         )
-        if (isClear(box, obstacles, viewport)) {
+        /*
+         * AND AGAINST THE LABELS ALREADY PLACED. Two readouts in one place is
+         * one unreadable readout, and at a wide zoom the rays converge enough
+         * that Shadow, Rise and Set all wanted the same spot. Measured by the
+         * audit at zoom 12: three overlaps at once.
+         */
+        if (isClear(box, [...obstacles, ...takenBoxes], viewport)) {
           placed = candidate
+          placedBox = box
           break
         }
       }
@@ -1490,6 +1532,7 @@ export function MapView({
         continue
       }
       marker.setLngLat([placed.lon, placed.lat])
+      if (placedBox !== null) takenBoxes.push(placedBox)
       rayLabels.current.push(marker)
     }
   }, [venue, sunOverlay, showSun, showArc, viewTick, chromeTick, bottomInset])
@@ -1557,21 +1600,53 @@ export function MapView({
    *
    * childList only, no subtree: a subtree observer would also fire on every
    * scrubber tick and every marker update, which is most of a frame's work in
-   * this component.
+   * this component. Size changes are caught by the ResizeObserver below
+   * instead, which only watches the chrome itself and so never sees a marker.
    */
   useEffect(() => {
     const parent = container.current?.closest('.mode-plan, .mode-setup, .mode-field')
     if (parent === null || parent === undefined) return
     let frame = 0
-    const observer = new MutationObserver(() => {
+    const bump = () => {
       cancelAnimationFrame(frame)
       // One bump per frame, after layout, so rects are read settled.
       frame = requestAnimationFrame(() => setChromeTick((tick) => tick + 1))
+    }
+
+    /*
+     * AND WHEN A PIECE OF CHROME CHANGES SIZE, not only when one appears.
+     *
+     * The sheet does not appear, it GROWS: measured, opening it animates its
+     * top edge from 508px to 192px over about 400ms. Its height reaches React
+     * as state the moment the gesture ends, so the label effect re-ran once,
+     * early, against a rect the animation had not finished moving, placed a
+     * readout at y=263, and the sheet then rose to 192 and swallowed it. The
+     * label was never re-placed because nothing had changed since.
+     *
+     * Found by scripts/audit-labels.mjs, which measures the real rectangles
+     * with the sheet open. A ResizeObserver rather than a transitionend
+     * listener, because the thing that matters is the size changing, whatever
+     * moved it: a keyboard, a rotation, or a drag that never ends in a
+     * transition at all.
+     */
+    const resize = new ResizeObserver(bump)
+    const watchChrome = () => {
+      resize.disconnect()
+      for (const node of parent.querySelectorAll(FLOATING_CHROME)) resize.observe(node)
+    }
+
+    const observer = new MutationObserver(() => {
+      // Chrome comes and goes, so what is being watched has to be re-read.
+      watchChrome()
+      bump()
     })
     observer.observe(parent, { childList: true })
+    watchChrome()
+
     return () => {
       cancelAnimationFrame(frame)
       observer.disconnect()
+      resize.disconnect()
     }
   }, [])
 

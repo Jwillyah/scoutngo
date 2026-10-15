@@ -94,7 +94,6 @@ export function ShooterFigure({
         `${focalLength} millimetres`,
         air ? `drone at ${altitudeFeet} feet` : 'ground',
         classification ?? SHOT_TYPE_LABEL[shotType],
-  shotType,
         origin === 'manual' ? 'placed by hand' : 'suggested',
         moved ? 'moved by hand' : '',
         warningLabel ?? '',
