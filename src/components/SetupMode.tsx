@@ -6,6 +6,8 @@ import { exampleIndex, SHOOT_EXAMPLES, SHOT_LIST_EXAMPLES } from '../lib/example
 import type { DescribeState, DesiredShot } from '../lib/describe.ts'
 import type { KitProfile as KitProfileType } from '../core/kit.ts'
 import type { KitSelection } from '../lib/kitSelection.ts'
+import type { PlatformFilter } from '../core/platformFilter.ts'
+import type { ShootKind } from '../core/shootWindow.ts'
 import type { SearchHit } from '../lib/search.ts'
 import { ringNode, type SetupTarget } from '../lib/mode.ts'
 import type { Spot } from '../lib/spots.ts'
@@ -16,6 +18,7 @@ import { MapView, type MapHandle } from './MapView.tsx'
 import { ReachSlider } from './ReachSlider.tsx'
 import { SearchField } from './SearchField.tsx'
 import { SpotsPanel } from './SpotsPanel.tsx'
+import { ShootChips } from './ShootChips.tsx'
 import { StaleBrief } from './StaleBrief.tsx'
 import { UseMyLocation } from './UseMyLocation.tsx'
 import { VenuePlate } from './VenuePlate.tsx'
@@ -65,6 +68,16 @@ interface SetupModeProps {
   /** First run only: the one sentence under the pin. Retired by a drag. */
   showPinHint: boolean
   onPinDrag: () => void
+  /** Which kind of shoot the chips are on, or null before one is tapped. */
+  shootKind: ShootKind | null
+  onShootKind: (next: ShootKind) => void
+  /** The platform chips share the map's own filter: one choice, not two. */
+  platformFilter: PlatformFilter
+  onPlatformFilter: (next: PlatformFilter) => void
+  /** What the last chip did to the window, or why it could not. */
+  shootLine: string | null
+  /** False with no drone in the kit. */
+  airAvailable: boolean
   /**
    * Tapped "Use my location", and the browser answered. Moves the map only:
    * the coordinate is not stored and does not become the pin.
@@ -145,6 +158,12 @@ export function SetupMode({
   settings,
   onSettings,
   onUseMyLocation,
+  shootKind,
+  onShootKind,
+  platformFilter,
+  onPlatformFilter,
+  shootLine,
+  airAvailable,
 }: SetupModeProps) {
   /*
    * One example per load, so the placeholder shows the kind of work the reader
@@ -491,10 +510,41 @@ export function SetupMode({
           </div>
         )}
 
+        {/*
+          * CHIPS FIRST, BOX SECOND.
+          *
+          * The box used to be the primary way to say what the shoot was, and
+          * its answer went to a model to extract a date, a window and a
+          * platform: an API call, a key, a wait and a chance of being misread,
+          * for three things that are two taps. The chips do those three with
+          * no network at all, which is what the common case deserves and what
+          * an app expecting bring-your-own-key should not charge for.
+          */}
+        <div className="setup__block">
+          <p className="setup__label">What kind of shoot?</p>
+          <ShootChips
+            kind={shootKind}
+            onKind={onShootKind}
+            platform={platformFilter}
+            onPlatform={onPlatformFilter}
+            windowLine={shootLine}
+            airAvailable={airAvailable}
+          />
+        </div>
+
+        {/*
+          * AND THE BOX, FOR WHAT IT IS ACTUALLY GOOD AT: a real client brief
+          * or a pasted shot list. That is prose nobody wants to retype and
+          * the one case where a model call earns itself.
+          */}
         <div className="setup__block">
           <label className="setup__label" htmlFor="describe-shoot">
-            What's the shoot?
+            Paste a client brief
           </label>
+          <p className="setup__hint">
+            Optional, and the only part of setup that needs a key. The chips above cover the
+            usual case without one.
+          </p>
           <textarea
             id="describe-shoot"
             ref={briefRef}

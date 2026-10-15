@@ -4936,3 +4936,85 @@
   color: var(--color-text-muted);
   font-weight: var(--weight-medium);
 }
+
+/*
+ * SHOOT CHIPS. Two rows, and the common case needs no key at all.
+ *
+ * Tall enough for a thumb, because this is now the first thing anybody touches
+ * on setup. White is the tap affordance across the app, so a chosen chip takes
+ * it and the rest stay quiet.
+ */
+.chips {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.chips__row {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.chip {
+  flex: 1 1 0;
+  min-height: var(--control-height);
+  padding: 0 var(--space-2);
+  background: var(--color-panel);
+  color: var(--color-text);
+  border: var(--line-hair) solid var(--color-line);
+  border-top-color: var(--color-edge-top);
+  border-radius: var(--radius-panel);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.chip--on {
+  background: var(--color-accent);
+  color: var(--accent-ink);
+  border-color: var(--color-accent);
+}
+
+.chip:disabled {
+  color: var(--color-text-faint);
+  background: var(--surface-2);
+}
+
+/*
+ * WHAT THE CHIP DID. A control that silently changes the window above it is a
+ * control you stop trusting, so it says so, including when it could not.
+ */
+.chips__note {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+
+/* The brief box is optional now, and the hint under its label says so. */
+.setup__hint {
+  margin: 0 0 var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+
+/*
+ * THE PEAK. The one line in this readout that says what to DO, so it is the
+ * one line that gets emphasis.
+ *
+ * The secondary accent, not hazard red and not the sun's own yellow: it is a
+ * recommendation about timing, not a warning and not a measurement of the sun.
+ */
+.readout__peak {
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  background: var(--surface-2);
+  border-left: var(--line-rule) solid var(--color-accent-2);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.readout__peak strong {
+  color: var(--color-accent-2);
+  font-weight: var(--weight-heavy);
+}

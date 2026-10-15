@@ -117,3 +117,56 @@ describe('a post-sunset window', () => {
     expect(last).toBeGreaterThan(first)
   })
 })
+
+/*
+ * THE PEAK, IN THE READOUT ITSELF.
+ *
+ * Measured on rewind cameras at Virginia Beach on 15 October 2026: the best
+ * light was 06:49 with the sun 4.8 degrees under, twenty-two minutes before
+ * sunrise, and washed out by 07:09. The app named every band correctly and
+ * never said which minute to be in the air for.
+ */
+const VB = {
+  ...EMPTY_VENUE,
+  name: 'Virginia Beach',
+  latitude: '36.8529',
+  longitude: '-75.9780',
+  date: '2026-10-15',
+  startTime: '06:13',
+  endTime: '07:45',
+}
+
+describe('the readout points at the peak', () => {
+  const html = renderToStaticMarkup(<SunReadout venueWindow={resolveWindow(VB)} />)
+
+  it('names the band and its times', () => {
+    expect(html).toContain('readout__peak')
+    expect(html).toContain('blue hour peak')
+    expect(html).toContain('06:43')
+    expect(html).toContain('06:53')
+  })
+
+  it('says when to be standing there, not just when the light is', () => {
+    expect(html).toContain('Be set up by')
+    expect(html).toContain('06:38')
+  })
+
+  /* It does not promise. One cloud setup is not a law. */
+  it('says usually, and hands the judgement to the sky', () => {
+    expect(html).toContain('usually concentrates')
+    expect(html).toContain('Cloud decides whether it happens')
+    const text = html.replace(/<[^>]*>/g, ' ').toLowerCase()
+    for (const word of ['will be the best', 'guaranteed', 'perfect light']) {
+      expect(text).not.toContain(word)
+    }
+  })
+
+  /* A midday window has no peak band in it and says nothing about one. */
+  it('names no peak for a window that has none', () => {
+    const noon = renderToStaticMarkup(
+      <SunReadout venueWindow={resolveWindow({ ...VB, startTime: '11:00', endTime: '14:00' })} />,
+    )
+    expect(noon).not.toContain('readout__peak')
+    expect(noon).not.toContain('usually concentrates')
+  })
+})

@@ -9,6 +9,8 @@ import { SetupMode } from './components/SetupMode.tsx'
 import type { LatLon } from './core/geo.ts'
 import { DEFAULT_ALTITUDE_FEET } from './core/air.ts'
 import { DEFAULT_SHOT_TYPE, DEFAULT_YAW_DEGREES, type ShotType } from './core/shotType.ts'
+import type { ShootKind } from './core/shootWindow.ts'
+import { shootPreset } from './lib/shootPreset.ts'
 import {
   allowedPlatforms,
   DEFAULT_PLATFORM_FILTER,
@@ -435,6 +437,50 @@ function App() {
    * planning a client event shoot needs it, so it is asked for.
    */
   const [showSky, setShowSky] = useState(false)
+
+  /*
+   * THE SHOOT CHIPS. One tap sets the platform filter and the window, with no
+   * model call: see src/core/shootWindow.ts for the arithmetic and
+   * src/lib/shootPreset.ts for the glue.
+   */
+  const [shootKind, setShootKind] = useState<ShootKind | null>(null)
+  const [shootLine, setShootLine] = useState<string | null>(null)
+
+  const onShootKind = useCallback(
+    (kind: ShootKind) => {
+      setShootKind(kind)
+
+      /*
+       * A chip always does the platform half of its job. The window half needs
+       * a pin, a date and a resolved zone, and when any of those is missing it
+       * says which rather than silently doing nothing.
+       */
+      if (kind === 'daytime') setPlatformFilter('both')
+
+      if (centre === null) {
+        setShootLine('Drop the venue pin and the chip will set the window too.')
+        return
+      }
+      const zone = venueWindow?.timeZone ?? venueTimeZone(centre.lat, centre.lon)
+      if (zone === null || venue.date === '') {
+        setShootLine('Set the date and the chip will set the window too.')
+        return
+      }
+      const preset = shootPreset(kind, centre, venue.date, zone)
+      if (preset === null) {
+        setShootLine(`No ${kind} at this latitude on that date.`)
+        return
+      }
+      setShootLine(preset.line)
+      setVenue((current) => ({
+        ...current,
+        startTime: preset.startTime,
+        endTime: preset.endTime,
+      }))
+      setDefaults((current) => ({ ...current, window: false }))
+    },
+    [centre, venue.date, venueWindow],
+  )
 
   /*
    * Wind at the venue, for the hour the scrubber is on. Feeds the readout and
@@ -1209,6 +1255,12 @@ function App() {
             onDescribe={() => void onDescribe()}
             venueChoices={venueChoices}
             onPickVenue={onPickVenue}
+            shootKind={shootKind}
+            onShootKind={onShootKind}
+            platformFilter={platformFilter}
+            onPlatformFilter={setPlatformFilter}
+            shootLine={shootLine}
+            airAvailable={droneAvailable(kit)}
             onUseMyLocation={onUseMyLocation}
             shotListText={shotListText}
             onShotListText={onShotListChange}

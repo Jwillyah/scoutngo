@@ -1,4 +1,5 @@
 import { compassPoint } from '../core/field.ts'
+import { bandIntervals, peakIn } from '../core/shootWindow.ts'
 import {
   bandsAcross,
   skyCarriesTheShot,
@@ -75,6 +76,23 @@ export function SunReadout({ venueWindow }: SunReadoutProps) {
    */
   const altitudeAt = (at: Date) => getSunPosition(at, lat, lon).altitude
   const bands = bandsAcross(altitudeAt, venueWindow.start, venueWindow.end)
+
+  /*
+   * WHICH BAND TO BE IN THE AIR FOR.
+   *
+   * Naming the bands was not enough. Measured on rewind cameras at Virginia
+   * Beach on 15 October 2026, the best light was at 06:49 with the sun 4.8
+   * degrees under, twenty-two minutes BEFORE sunrise, and it was flat and
+   * washed out by 07:09. The app named all of that correctly and never said
+   * which minute mattered.
+   *
+   * The kind of shoot is inferred from the window itself rather than asked
+   * for: a window that ends with the sun higher than it started is a sunrise.
+   * That keeps this readout useful whether or not a chip was tapped.
+   */
+  const intervals = bandIntervals(altitudeAt, venueWindow.start, venueWindow.end)
+  const rising = altitudeAt(venueWindow.end) > altitudeAt(venueWindow.start)
+  const peak = peakIn(rising ? 'sunrise' : 'sunset', intervals)
   const skyBands = bands.filter(skyCarriesTheShot)
   /** A subject that needs light on its FACE. The only case the old line fit. */
   const unlitShare = unlitGroundShare(altitudeAt, venueWindow.start, venueWindow.end)
@@ -149,6 +167,28 @@ export function SunReadout({ venueWindow }: SunReadoutProps) {
           {bands.map((band) => (
             <p key={band}>{SUN_BAND_NOTE[band]}</p>
           ))}
+
+          {/*
+            * THE PEAK, SAID PLAINLY AND WITHOUT A PROMISE.
+            *
+            * "Usually concentrates" rather than "will be": one morning with a
+            * high thin deck and a clear slot at the horizon is one cloud
+            * setup, not a law, and a solid overcast has no peak at all. This
+            * module cannot tell which sky it is looking at; only the sky can.
+            */}
+          {peak === null ? null : (
+            <p className="readout__peak">
+              Light usually concentrates in{' '}
+              <strong>{SUN_BAND_LABEL[peak.band]}</strong>,{' '}
+              <span className="num">
+                {formatClock(peak.from, venueWindow.timeZone)}–
+                {formatClock(peak.to, venueWindow.timeZone)}
+              </span>
+              . Be set up by{' '}
+              <span className="num">{formatClock(peak.beSetUpBy, venueWindow.timeZone)}</span>.
+              Cloud decides whether it happens.
+            </p>
+          )}
 
           {/*
             * AND WHEN THE SKY IS THE SUBJECT, SAY SO. This is the sentence the
