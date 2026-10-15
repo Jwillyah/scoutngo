@@ -241,16 +241,29 @@ describe('range and framing', () => {
     expect(planned.frameWidthMeters).toBeCloseTo(26.9, 0)
   })
 
-  it('flags a wide lens parked far out, which is the reported failure', () => {
+  it('flags a wide lens parked far out, once it knows how big the subject is', () => {
+    const wide = { ...west(300), lensId: 'sigma-28-75', focalLength: 28 }
+    const plan = (subjectMeters: number | null) =>
+      planPosition(wide, SUBJECT, sun, undefined, undefined, undefined, undefined, undefined, subjectMeters)
+
     // The same distance on the 400mm is fine; it is the focal length that decides.
     expect(planPosition(west(300), SUBJECT, sun).framingWarnings).toEqual([])
 
-    const wideAndFar = planPosition(
-      { ...west(300), lensId: 'sigma-28-75', focalLength: 28 },
-      SUBJECT,
-      sun,
-    )
-    expect(wideAndFar.framingWarnings).toContain('frame-too-wide')
+    /*
+     * WITH NO SUBJECT SIZE, NOTHING IS CLAIMED. This is the bug: the app does
+     * not know how big the restaurant is, so "the subject will be a speck" was
+     * never its to say. The frame width is still measured either way.
+     */
+    expect(plan(null).framingWarnings).toEqual([])
+    expect(plan(null).frameWidthMeters).toBeGreaterThan(300)
+    expect(plan(null).frameSubjectRatio).toBeNull()
+    expect(plan(null).subjectMeters).toBeNull()
+
+    expect(plan(13).framingWarnings).toContain('frame-wider-than-subject')
+    expect(plan(13).frameSubjectRatio).toBeCloseTo(plan(13).frameWidthMeters / 13, 6)
+
+    /* The same geometry over a big subject is a shot, not a mistake. */
+    expect(plan(400).framingWarnings).toEqual([])
   })
 
   it('leaves a sensible long lens position unflagged', () => {

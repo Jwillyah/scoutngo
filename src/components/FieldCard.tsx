@@ -52,8 +52,17 @@ const WARNING_COPY: Record<SiteWarning, string> = {
 }
 
 const FRAMING_COPY: Record<FramingWarning, string> = {
-  'frame-too-wide': 'Frame too wide',
+  'frame-wider-than-subject': 'The frame is much wider than the subject.',
   'beyond-standoff': 'Too far out',
+}
+
+/*
+ * Same split as the plan screen: beyond-standoff is a hazard, a wide frame is
+ * a note. See the note in src/core/fov.ts for why.
+ */
+const FRAMING_SEVERITY: Record<FramingWarning, 'hazard' | 'note'> = {
+  'frame-wider-than-subject': 'note',
+  'beyond-standoff': 'hazard',
 }
 
 /**
@@ -134,12 +143,17 @@ export function FieldCard({
       {/* The largest thing on the screen. */}
       <h2 className="fc__shot">{position.shot}</h2>
 
-      {[...warnings.map((w) => WARNING_COPY[w]), ...framingWarnings.map((w) => FRAMING_COPY[w])]
-        .map((text) => (
-          <p className="fc__warn" key={text}>
-            {text}
-          </p>
-        ))}
+      {[
+        ...warnings.map((w) => ({ text: WARNING_COPY[w], severity: 'hazard' as const })),
+        ...framingWarnings.map((w) => ({
+          text: FRAMING_COPY[w],
+          severity: FRAMING_SEVERITY[w],
+        })),
+      ].map(({ text, severity }) => (
+        <p className={severity === 'hazard' ? 'fc__warn' : 'fc__note'} key={text}>
+          {text}
+        </p>
+      ))}
 
       {/*
         * Where to point. Static bearing: no needle, no permission, no drift.

@@ -64,6 +64,13 @@ export const SETUP_FIELD_TARGET: Record<VenueField, SetupTarget | null> = {
   name: null,
   eventDescription: null,
   desiredOutcome: null,
+  /*
+   * NEVER BLOCKS. An empty subject size is a perfectly good state: it means
+   * nobody has said, and the app then measures the frame and claims nothing
+   * about it. Blocking on it would be demanding a number in order to produce a
+   * judgement the shooter never asked for.
+   */
+  subjectAcrossMeters: null,
 }
 
 /** In screen order, so the first gap is the highest one on the page. */

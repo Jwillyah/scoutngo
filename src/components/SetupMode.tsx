@@ -243,10 +243,13 @@ export function SetupMode({
     return ringNode(node)
   }, [pointAt])
 
+  const subjectRef = useRef<HTMLLabelElement>(null)
+
   const open = (next: Drawer) => setDrawer((current) => (current === next ? 'none' : next))
 
-  const setField = (field: 'date' | 'startTime' | 'endTime') => (value: string) =>
-    onVenueChange({ ...venue, [field]: value })
+  const setField =
+    (field: 'date' | 'startTime' | 'endTime' | 'subjectAcrossMeters') => (value: string) =>
+      onVenueChange({ ...venue, [field]: value })
 
   /*
    * THE DRAWER IS PORTALLED TO document.body, and that is the whole point.
@@ -483,6 +486,34 @@ export function SetupMode({
                 value={venue.endTime}
                 onChange={(event) => setField('endTime')(event.target.value)}
               />
+            </span>
+          </label>
+          {/*
+            * HOW BIG THE SUBJECT IS, ASKED RATHER THAN ASSUMED.
+            *
+            * This number used to be 60, hard-coded in core/fov.ts, and the only
+            * sign of it was a red badge saying the subject would be a speck. It
+            * sits beside the date because it belongs to the shoot: a marina and
+            * a food truck are not the same shoot even from the same spot.
+            *
+            * BLANK IS A VALID ANSWER and it is the default. Left blank, the
+            * card measures the frame and says nothing about whether that is
+            * too wide, because without this it does not know.
+            */}
+          <label className="pill" ref={subjectRef}>
+            <span className="pill__label">Subject across</span>
+            <span className="pill__pair">
+              <input
+                className="pill__input num"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                placeholder="—"
+                aria-label="How wide the subject is, in metres. Leave blank if unknown."
+                value={venue.subjectAcrossMeters}
+                onChange={(event) => setField('subjectAcrossMeters')(event.target.value)}
+              />
+              <span className="pill__unit">m</span>
             </span>
           </label>
         </div>

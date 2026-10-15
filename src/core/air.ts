@@ -8,14 +8,13 @@
  *
  *   drone 200ft AGL, Air 3S wide, directly over the subject
  *     computed    range 0m, frame width 0.0m, no warning
- *     true        slant range 61m, frame width 91m, frame too wide
+ *     true        slant range 61m, frame width 91m
  *
  *   drone 200ft AGL, 25m horizontally from the subject
  *     computed    range 25m, frame width 37.4m, no warning
- *     true        slant range 66m, frame width 98.6m, frame too wide
+ *     true        slant range 66m, frame width 98.6m
  *
- * A position hovering over the subject was reported as framing nothing at all,
- * and reported as fine. So the altitude is in the geometry now, and this is
+ * A position hovering over the subject was reported as framing nothing at all. So the altitude is in the geometry now, and this is
  * where that arithmetic lives.
  *
  * NOTHING HERE IS A LEGAL JUDGEMENT. There is a 400ft cap on the altitude

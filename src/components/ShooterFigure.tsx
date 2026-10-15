@@ -1,4 +1,6 @@
+import { opticTag } from '../core/opticTag.ts'
 import { SHOT_TYPE_LABEL, type ShotType } from '../core/shotType.ts'
+import { wideFrameWord } from '../lib/framingCopy.ts'
 import type { PositionOrigin } from '../lib/plan.ts'
 import type { FramingWarning } from '../core/fov.ts'
 import type { Classification } from '../core/lighting.ts'
@@ -7,7 +9,17 @@ import type { Platform } from '../lib/parsePlan.ts'
 
 interface ShooterFigureProps {
   number: number
+  /**
+   * The focal length the field of view was computed from, and the name of the
+   * optic it belongs to.
+   *
+   * THE NAME IS NOT OPTIONAL. The plate used to read "28" on its own. "28 on
+   * what? A focal length with no camera is the same ambiguity that let the
+   * Sigma stand in for my drone in the first place." Shortened in
+   * core/opticTag.ts so it fits beside the number.
+   */
   focalLength: number
+  opticName: string
   /**
    * The lighting class, or null when the shot type has none.
    *
@@ -19,8 +31,19 @@ interface ShooterFigureProps {
   shotType: ShotType
   /** Ground problems from OSM. Magenta, because that is the hazard color. */
   warnings: SiteWarning[]
-  /** Standoff and framing problems. Same magenta, same treatment. */
+  /**
+   * Standoff and framing problems. NOT all the same treatment any more: see
+   * FRAMING_SEVERITY. beyond-standoff is a hazard; a wide frame is a note.
+   */
   framingWarnings: FramingWarning[]
+  /**
+   * How many times wider than the subject the frame is, or null when the
+   * shooter has not said how big the subject is.
+   *
+   * The flag prints this number rather than the word "wide", because the
+   * number is a measurement and the word was a verdict.
+   */
+  frameSubjectRatio: number | null
   platform: Platform
   /** Feet above ground, air positions only. */
   altitudeFeet: number
@@ -38,8 +61,25 @@ const WARNING_LABEL: Record<SiteWarning, string> = {
 }
 
 const FRAMING_LABEL: Record<FramingWarning, string> = {
-  'frame-too-wide': 'frame too wide',
+  'frame-wider-than-subject': 'frame much wider than the subject',
   'beyond-standoff': 'too far',
+}
+
+/**
+ * WHICH OF THESE IS RED.
+ *
+ * WHAT WAS REPORTED. All three positions of a drone shoot carrying a red WIDE
+ * badge. "A warning that fires on everything is not a warning, it is wallpaper,
+ * and it trains me to ignore the one time it matters." And: "Red is for
+ * something being wrong. A wide frame is a choice."
+ *
+ * So a wide frame reads as a readout, in the same plate colour as the focal
+ * length, and the magenta is kept for the two things that genuinely are wrong:
+ * standing in a river, and standing further out than the shot can carry.
+ */
+const FRAMING_SEVERITY: Record<FramingWarning, 'hazard' | 'note'> = {
+  'frame-wider-than-subject': 'note',
+  'beyond-standoff': 'hazard',
 }
 
 /*
@@ -63,7 +103,8 @@ const WARNING_WORD: Record<SiteWarning, string> = {
 }
 
 const FRAMING_WORD: Record<FramingWarning, string> = {
-  'frame-too-wide': 'wide',
+  /* Replaced by the measured multiple when there is one. See wideFrameWord. */
+  'frame-wider-than-subject': 'wide',
   'beyond-standoff': 'far',
 }
 
@@ -81,10 +122,12 @@ const FRAMING_WORD: Record<FramingWarning, string> = {
 export function ShooterFigure({
   number,
   focalLength,
+  opticName,
   classification,
   shotType,
   warnings,
   framingWarnings,
+  frameSubjectRatio,
   platform,
   altitudeFeet,
   moved,
@@ -92,19 +135,29 @@ export function ShooterFigure({
   origin,
   onSelect,
 }: ShooterFigureProps) {
-  /* Site and framing problems are the same kind of flag and share one slot. */
-  const warningWord =
+  /*
+   * ONE FLAG SLOT, TWO SEVERITIES. A site problem outranks a framing one, and
+   * a hazard outranks a note, so the thing shown is the worst thing true.
+   */
+  const framing = framingWarnings[0]
+  const flag =
     warnings.length > 0
-      ? WARNING_WORD[warnings[0]]
-      : framingWarnings.length > 0
-        ? FRAMING_WORD[framingWarnings[0]]
-        : undefined
-  const warningLabel =
-    warnings.length > 0
-      ? WARNING_LABEL[warnings[0]]
-      : framingWarnings.length > 0
-        ? FRAMING_LABEL[framingWarnings[0]]
-        : undefined
+      ? { word: WARNING_WORD[warnings[0]], label: WARNING_LABEL[warnings[0]], severity: 'hazard' as const }
+      : framing === undefined
+        ? null
+        : {
+            /*
+             * The multiple, not the word: "4.2x wide" is measured, "WIDE" was
+             * a verdict. The word is the fallback for a flag that has no
+             * number, which beyond-standoff does not.
+             */
+            word:
+              (framing === 'frame-wider-than-subject'
+                ? wideFrameWord(frameSubjectRatio)
+                : null) ?? FRAMING_WORD[framing],
+            label: FRAMING_LABEL[framing],
+            severity: FRAMING_SEVERITY[framing],
+          }
   const air = platform === 'air'
 
   return (
@@ -115,19 +168,23 @@ export function ShooterFigure({
         air ? 'shooter--air' : '',
         selected ? 'shooter--selected' : '',
         origin === 'manual' ? 'shooter--manual' : '',
-        warningLabel !== undefined ? 'shooter--warned' : '',
+        /*
+         * The disc goes magenta for a HAZARD only. It used to go magenta for
+         * anything flagged, which on a drone shoot was every position.
+         */
+        flag?.severity === 'hazard' ? 'shooter--warned' : '',
       ]
         .filter((c) => c !== '')
         .join(' ')}
       onClick={onSelect}
       aria-label={[
         `Position ${number}`,
-        `${focalLength} millimetres`,
+        `${opticName}, ${focalLength} millimetres`,
         air ? `drone at ${altitudeFeet} feet` : 'ground',
         classification ?? SHOT_TYPE_LABEL[shotType],
         origin === 'manual' ? 'placed by hand' : 'suggested',
         moved ? 'moved by hand' : '',
-        warningLabel ?? '',
+        flag?.label ?? '',
       ]
         .filter((part) => part !== '')
         .join(', ')}
@@ -167,12 +224,25 @@ export function ShooterFigure({
         * The full phrase is still on the card and still in the aria-label
         * above, so this adds a reading rather than replacing one.
         */}
-      {warningWord === undefined ? null : (
-        <span className="shooter__flag">{warningWord}</span>
+      {flag === null ? null : (
+        <span className={`shooter__flag shooter__flag--${flag.severity}`}>{flag.word}</span>
       )}
 
-      {/* One plate, one readout: focal length, then altitude for an air position. */}
+      {/*
+        * ONE PLATE, ONE READOUT: which optic, at what focal length, and for an
+        * air position how high.
+        *
+        * THE OPTIC NAME IS THE FIX FOR "28 ON WHAT". A focal length alone does
+        * not say whether the geometry under it was drawn for a lens in a hand
+        * or a camera on an aircraft, and that ambiguity is exactly what let a
+        * Sigma stand in for a Mavic without the screen looking wrong.
+        * Shortened in core/opticTag.ts, because the full name does not fit
+        * beside six markers.
+        */}
       <span className="shooter__focal num">
+        {opticTag(opticName) === '' ? null : (
+          <span className="shooter__optic">{opticTag(opticName)}</span>
+        )}
         {focalLength}
         {air ? (
           <>

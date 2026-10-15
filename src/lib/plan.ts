@@ -10,6 +10,7 @@ import {
 import {
   classifyFraming,
   computeFOV,
+  frameSubjectRatio,
   frameWidthMeters,
   SENSORS,
   standoffBand,
@@ -161,8 +162,25 @@ export interface PlannedPosition {
    * position still draws something visible. Never use it as a distance.
    */
   coneRangeMeters: number
+  /**
+   * THE FOCAL LENGTH THE FIELD OF VIEW WAS ACTUALLY COMPUTED FROM.
+   *
+   * Not position.focalLength, which is what is stored, but what resolveOptic
+   * returned: for an air position that is the camera's published 35mm
+   * equivalent, which is the only focal length the aircraft has. Anything that
+   * prints a focal length beside this geometry prints this one, so a screen
+   * cannot show a number the cone was not drawn from.
+   */
+  focalLength: number
   /** How wide the frame is at the subject, in metres. 2 * range * tan(hFOV/2). */
   frameWidthMeters: number
+  /**
+   * How wide the shooter said the subject is, in metres, and how many times
+   * that the frame covers. Both null when they have not said, because a card
+   * that printed a ratio against an assumed size is the bug this replaced.
+   */
+  subjectMeters: number | null
+  frameSubjectRatio: number | null
   /** The usable standoff band for this field of view. */
   standoff: StandoffBand
   /** Standoff and framing problems. Flagged in magenta, exactly like site ones. */
@@ -232,14 +250,33 @@ function resolveOptic(
   bodyIds: string[] | undefined,
   kit: KitProfile,
 ): { optic: PlannedPosition['optic']; sensor: SensorName; focalLength: number } {
+  /*
+   * AN AIR POSITION RESOLVES TO AN AIRCRAFT CAMERA OR TO NOTHING.
+   *
+   * This used to fall through to findLens when no camera matched, which is the
+   * read side of the reported bug: an air position holding a ground lens id
+   * would compute its field of view from the Sigma and print the Sigma's name
+   * on the card. The cone would be drawn for glass that is not on the
+   * aircraft.
+   *
+   * There is no fallback now because there is no legitimate way in. The picker
+   * offers only this platform's optics, setOptic refuses the rest, addPosition
+   * starts an air position on a camera, and parsePlan drops any air position
+   * whose optic is not an aircraft camera at exactly its published focal
+   * length. A mismatch arriving here is a bug in one of those, and it says so
+   * rather than quietly substituting the wrong lens.
+   */
   if (position.platform === 'air') {
     const camera: DroneCamera | undefined = findDroneCamera(kit, position.lensId)
-    if (camera !== undefined) {
-      return {
-        optic: { id: camera.id, name: camera.name, kind: 'drone' },
-        sensor: 'fullFrame',
-        focalLength: camera.equiv35,
-      }
+    if (camera === undefined) {
+      throw new Error(
+        `resolveOptic: air position ${position.id} holds ${position.lensId}, which is not a camera on any aircraft in the kit`,
+      )
+    }
+    return {
+      optic: { id: camera.id, name: camera.name, kind: 'drone' },
+      sensor: 'fullFrame',
+      focalLength: camera.equiv35,
     }
   }
 
@@ -328,6 +365,15 @@ export function planPosition(
   venue?: LatLon | null,
   /** The shooter's own kit. Defaults to the shipped profile. */
   kit: KitProfile = DEFAULT_KIT,
+  /**
+   * HOW WIDE THE SUBJECT IS, when the shooter has said, in metres.
+   *
+   * Null means nobody has said, and nothing downstream then compares the frame
+   * to it. The frame width itself is still measured and still shown: that is a
+   * fact about the lens and the distance. Whether it is too wide is a fact
+   * about the building, and this app only knows that one if it is told.
+   */
+  subjectMeters: number | null = null,
 ): PlannedPosition {
   const { optic, sensor, focalLength } = resolveOptic(position, bodyIds, kit)
   const fov = computeFOV(focalLength, SENSORS[sensor])
@@ -385,9 +431,20 @@ export function planPosition(
     subjectRangeMeters,
     groundRangeMeters,
     coneRangeMeters,
+    focalLength,
     frameWidthMeters: frameWidthMeters(subjectRangeMeters, fov.hFOV),
-    standoff: standoffBand(fov.hFOV, position.platform),
-    framingWarnings: classifyFraming(subjectRangeMeters, fov.hFOV, position.platform),
+    standoff: standoffBand(fov.hFOV, position.platform, subjectMeters),
+    framingWarnings: classifyFraming(
+      subjectRangeMeters,
+      fov.hFOV,
+      position.platform,
+      subjectMeters,
+    ),
+    subjectMeters,
+    frameSubjectRatio: frameSubjectRatio(
+      frameWidthMeters(subjectRangeMeters, fov.hFOV),
+      subjectMeters,
+    ),
     beyondReach:
       reachMeters == null || venue == null
         ? false
@@ -430,9 +487,10 @@ export function planPositions(
   reachMeters?: number | null,
   venue?: LatLon | null,
   kit: KitProfile = DEFAULT_KIT,
+  subjectMeters: number | null = null,
 ): PlannedPosition[] {
   return positions.map((position) =>
-    planPosition(position, subject, sun, land, bodyIds, reachMeters, venue, kit),
+    planPosition(position, subject, sun, land, bodyIds, reachMeters, venue, kit, subjectMeters),
   )
 }
 

@@ -21,6 +21,7 @@ import type { FieldPack } from '../lib/fieldPack.ts'
 import type { TideInfo } from '../lib/useTide.ts'
 import type { VenueWindow } from '../lib/venue.ts'
 import type { KitProfile as KitProfileType } from '../core/kit.ts'
+import type { OpticSelection } from '../core/optics.ts'
 import { BottomSheet, type SheetState } from './BottomSheet.tsx'
 import { ConditionsPanel } from './ConditionsPanel.tsx'
 import { ConePicker, type ConeMode } from './ConePicker.tsx'
@@ -98,6 +99,8 @@ interface PlanModeProps {
   onGenerate: () => void
   /** The shooter's own gear. The lens picker and cone labels read it. */
   kitProfile: KitProfileType
+  /** Which of the kit is packed, so the optic picker offers only that. */
+  kitSelection: OpticSelection
   /** Arms the map so the next tap drops a position. The primary action here. */
   placing: boolean
   onPlacing: (next: boolean) => void
@@ -221,6 +224,7 @@ export function PlanMode({
   siteNote,
   onGenerate,
   kitProfile,
+  kitSelection,
   placing,
   onPlacing,
   onAddAt,
@@ -440,6 +444,7 @@ export function PlanMode({
           onSetShotType={onSetShotType}
           onSetYaw={onSetYaw}
           kit={kitProfile}
+          selection={kitSelection}
           pilotAt={pilotAt}
           onPlacePilot={() => onPlacingPilot(true)}
         />

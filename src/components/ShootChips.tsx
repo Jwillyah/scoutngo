@@ -29,10 +29,14 @@ interface ShootChipsProps {
  * SO THE COMMON CASE NEEDS NO KEY AT ALL, which matters for an app that is
  * given away and expects people to bring their own.
  *
- * Each chip sets three things at once: the platform filter, which decides what
- * shows and what a generate may return; which shot types make sense, since a
- * top-down and a 360 are drone work; and a suggested window computed from the
- * sun's own bands in src/core/shootWindow.ts rather than guessed at.
+ * THE TWO ROWS ARE INDEPENDENT, which is the whole of a reported bug. One row
+ * says WHEN: it suggests a window computed from the sun's own bands in
+ * src/core/shootWindow.ts rather than guessed at. The other says WHAT IS
+ * FLYING: it sets the platform filter, which decides what shows, what a
+ * generate may return, and what an Add makes. Neither row gets to change the
+ * other's answer. A daytime drone shoot is Daytime then Drone in either order,
+ * and tapping one after the other used to leave the platform on Both and hand
+ * back a ground position. See onShootKind in src/App.tsx.
  */
 export function ShootChips({
   kind,

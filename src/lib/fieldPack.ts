@@ -38,8 +38,15 @@ export const FIELD_PACK_KEY = 'scoutngo.fieldpack.v1'
  * version 1 pack has no aim at all, and loadPack rejects a version mismatch
  * outright, so an old pack is treated as absent and rebuilt rather than read
  * with fields that are not there.
+ *
+ * VERSION 3: the framing warnings were renamed. `frame-too-wide` became
+ * `frame-wider-than-subject`, because the old one was a verdict drawn from an
+ * assumed subject size and the new one is a comparison against a size the
+ * shooter entered. A version 2 pack carries the old string, which no longer has
+ * a line of copy behind it, and a field card rendering it would print an empty
+ * block on a phone with no signal. Rejected and rebuilt instead.
  */
-export const FIELD_PACK_VERSION = 2
+export const FIELD_PACK_VERSION = 3
 
 /** One position, flattened to exactly what a field card renders. */
 export interface PackedPosition {

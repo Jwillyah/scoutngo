@@ -24,6 +24,8 @@ import {
   type ShotType,
 } from '../core/shotType.ts'
 import { lightLine } from '../lib/lightCopy.ts'
+import { focalOn, opticsFor, type OpticSelection } from '../core/optics.ts'
+import { frameLine, wideFrameLine } from '../lib/framingCopy.ts'
 import type { PlannedPosition } from '../lib/plan.ts'
 
 interface PositionCardProps {
@@ -42,6 +44,8 @@ interface PositionCardProps {
   onSetOptic: (id: string, lensId: string, focalLength: number) => void
   /** The shooter's own gear. The picker lists exactly what they own. */
   kit: KitProfileType
+  /** Which of that gear is packed for this shoot. Narrows the optic picker. */
+  selection: OpticSelection
   /** How high an air position flies, in feet AGL. Clamped in core. */
   onSetAltitude: (id: string, feet: number) => void
   /** What kind of shot this position is. Framed, top-down or 360. */
@@ -105,13 +109,26 @@ const WARNING_COPY: Record<SiteWarning, string> = {
 }
 
 /**
- * Framing problems get the same magenta treatment as the site ones, because they
- * are the same kind of fact: something is wrong with this position and only the
- * shooter can decide what to do about it. Nothing is moved automatically.
+ * TWO SEVERITIES, BECAUSE THEY ARE TWO DIFFERENT KINDS OF THING.
+ *
+ * beyond-standoff is a hazard and keeps the magenta: the shot will not work at
+ * that distance, and on the air side the aircraft is at the edge of being seen.
+ * It is also rare, firing past 450 m on the ground and 400 m in the air.
+ *
+ * A WIDE FRAME IS NOT A HAZARD, it is a choice, and on an aerial it is usually
+ * the reason for flying. It used to be magenta on all three positions of a
+ * drone shoot. "Red is for something being wrong. A wide frame is a choice."
+ * So it reads as a note, and the words are a measurement rather than a verdict:
+ * see src/lib/framingCopy.ts.
  */
+const FRAMING_SEVERITY: Record<FramingWarning, 'hazard' | 'note'> = {
+  'frame-wider-than-subject': 'note',
+  'beyond-standoff': 'hazard',
+}
+
 const FRAMING_COPY: Record<FramingWarning, string> = {
-  'frame-too-wide':
-    'At this distance the frame is wider than the event. The subject will be a speck. Move in, or go longer.',
+  /* Said with the real numbers by framingCopy; this is the aria/no-data case. */
+  'frame-wider-than-subject': 'The frame is much wider than the subject.',
   'beyond-standoff':
     'Further out than this focal length can carry. Haze and lack of separation will cost more than the extra reach buys.',
 }
@@ -387,6 +404,7 @@ export function PositionCard({
   onMove,
   onSetOptic,
   kit,
+  selection,
   onSetAltitude,
   pilotAt,
   onPlacePilot,
@@ -404,7 +422,15 @@ export function PositionCard({
     warnings,
   } = planned
 
-  const activeLens = kit.lenses.find((lens) => lens.id === position.lensId)
+  /*
+   * WHAT THIS POSITION MAY SHOOT WITH, decided by its platform. An air
+   * position gets the aircraft's cameras and nothing else; a ground position
+   * gets the packed glass and none of the aircraft's cameras.
+   */
+  const optics = opticsFor(position.platform, kit, selection, position.lensId)
+  const activeOptic = optics.find((optic) => optic.id === position.lensId)
+  /* "Lens" is wrong on an aircraft: the Air 3S cameras are not lenses. */
+  const opticWord = position.platform === 'air' ? 'Camera' : 'Lens'
 
   /*
    * THE PILOT SEPARATION, MEASURED IN CORE.
@@ -446,27 +472,30 @@ export function PositionCard({
         * THE GLASS IS EDITABLE, on every position whatever placed it. Standing
         * in one spot and asking what 200mm does instead of 600mm is the common
         * question, and all of it, lighting included, recomputes from the answer.
+        *
+        * THE LIST COMES FROM THE PLATFORM. It used to be kit.lenses whatever
+        * the position was, which is how a drone position came to read "Sigma
+        * 28-75 f2.8" at 28mm: the held value was air-3s-wide, no option
+        * matched it, and a select with no matching option displays its FIRST
+        * one. The label lied about the position and a touch would have written
+        * that lie into it. core/optics.ts answers what the platform can carry
+        * and guarantees the held optic is among the options.
         */}
       <div className="optic">
         <label className="optic__field">
-          <span className="optic__label">Lens</span>
+          <span className="optic__label">{opticWord}</span>
           <select
             className="optic__select"
             value={position.lensId}
             onChange={(event) => {
-              const lens = kit.lenses.find((l) => l.id === event.target.value)
-              onSetOptic(
-                position.id,
-                event.target.value,
-                lens === undefined
-                  ? position.focalLength
-                  : Math.min(lens.maxFocalLength, Math.max(lens.minFocalLength, position.focalLength)),
-              )
+              const optic = optics.find((o) => o.id === event.target.value)
+              if (optic === undefined) return
+              onSetOptic(position.id, optic.id, focalOn(optic, position.focalLength))
             }}
           >
-            {kit.lenses.map((lens) => (
-              <option key={lens.id} value={lens.id}>
-                {lens.name}
+            {optics.map((optic) => (
+              <option key={optic.id} value={optic.id}>
+                {optic.name}
               </option>
             ))}
           </select>
@@ -477,8 +506,14 @@ export function PositionCard({
             className="optic__focal num"
             type="number"
             inputMode="numeric"
-            min={activeLens?.minFocalLength ?? 1}
-            max={activeLens?.maxFocalLength ?? 2000}
+            min={activeOptic?.minFocalLength ?? 1}
+            max={activeOptic?.maxFocalLength ?? 2000}
+            /*
+             * A DRONE CAMERA IS A PRIME, so there is nothing to type: the Air
+             * 3S wide is 24mm and has no other setting. Read-only beats a field
+             * that accepts 45 and silently snaps back.
+             */
+            readOnly={activeOptic?.kind === 'drone'}
             value={position.focalLength}
             onChange={(event) => {
               const next = Number(event.target.value)
@@ -565,11 +600,30 @@ export function PositionCard({
           {WARNING_COPY[warning]}
         </p>
       ))}
-      {framingWarnings.map((warning) => (
-        <p className="card__warn" key={warning}>
-          {FRAMING_COPY[warning]}
-        </p>
-      ))}
+      {/*
+        * THE MEASUREMENT, ON EVERY POSITION. What this lens frames from here,
+        * which is the sentence the shooter asked for and the one thing here
+        * that is true without being told anything about the subject.
+        */}
+      <p className="card__frame">
+        {frameLine(planned)}
+        {wideFrameLine(planned) === null ? null : (
+          <span className="card__frame-wide"> {wideFrameLine(planned)}</span>
+        )}
+      </p>
+
+      {/*
+        * ONLY THE HAZARDS GET THE MAGENTA BLOCK. A wide frame is said in the
+        * line above, in the same type as everything else on the card, because
+        * it is a measurement and not a problem.
+        */}
+      {framingWarnings
+        .filter((warning) => FRAMING_SEVERITY[warning] === 'hazard')
+        .map((warning) => (
+          <p className="card__warn" key={warning}>
+            {FRAMING_COPY[warning]}
+          </p>
+        ))}
 
       {!usesAltitude(position.platform, position.shotType) ? null : (
         <div className="card__air">

@@ -2002,11 +2002,13 @@ export function MapView({
         return createPortal(
           <ShooterFigure
             number={planned.position.number}
-            focalLength={planned.position.focalLength}
+            focalLength={planned.focalLength}
+            opticName={planned.optic.name}
             classification={classificationOf(planned.read)}
             shotType={planned.position.shotType}
             warnings={planned.warnings}
             framingWarnings={planned.framingWarnings}
+            frameSubjectRatio={planned.frameSubjectRatio}
             platform={planned.position.platform}
             altitudeFeet={planned.position.altitudeFeet}
             moved={planned.position.moved}

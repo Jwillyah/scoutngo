@@ -71,6 +71,31 @@ So:
 - That prototype failure is a named test in `src/core/lighting.test.ts`. If it
   ever goes green in the wrong direction, the build fails.
 
+### The same rule applies to the app's own guesses
+
+A model is not the only thing that can state something it does not know. The
+app used to put a red badge on a position reading "the frame is wider than the
+event, the subject will be a speck", which it worked out by comparing the frame
+width against a flat 60 metres hard-coded in `src/core/fov.ts`. Nobody had ever
+been asked how big the subject was. On a drone shoot it fired on every position,
+because flying is how you get wide.
+
+So the frame width, which is measurable, is printed on every card: "at 24mm from
+here you frame 152 m across". The judgement, which is not, needs a number from
+the shooter. **Subject across**, in Setup, is that number, in metres, and it is
+blank by default. Blank means nothing is claimed: no comparison, no flag. Filled
+in, the card states the multiple and the map flag carries it, and neither is red,
+because a wide frame is a choice rather than a fault.
+
+### An air position can only use the aircraft's cameras
+
+A drone position's optic picker lists the aircraft's own cameras and nothing
+else, and a ground position's lists glass and no aircraft cameras.
+`src/core/optics.ts` is the only place an optic list is built, `setOptic` throws
+on an optic the platform cannot carry, and `parsePlanResponse` drops a model's
+air position whose optic is not a published aircraft camera at its published
+focal length. The wrong thing is not hidden, it is unreachable.
+
 ## Times are venue local
 
 The date and time window you type are wall clock readings **at the venue**, not on

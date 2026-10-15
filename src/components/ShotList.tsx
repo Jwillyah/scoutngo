@@ -25,8 +25,19 @@ const WARNING_LABEL: Record<SiteWarning, string> = {
 }
 
 const FRAMING_LABEL: Record<FramingWarning, string> = {
-  'frame-too-wide': 'frame too wide',
+  'frame-wider-than-subject': 'wide frame',
   'beyond-standoff': 'too far',
+}
+
+/*
+ * A WIDE FRAME IS NOT A HAZARD. It used to share the magenta chip with "in
+ * water" and "over people", and on a drone shoot that painted every row. Red
+ * is for something being wrong; a wide frame is a choice. See the note in
+ * src/core/fov.ts.
+ */
+const FRAMING_SEVERITY: Record<FramingWarning, 'hazard' | 'note'> = {
+  'frame-wider-than-subject': 'note',
+  'beyond-standoff': 'hazard',
 }
 
 /**
@@ -119,7 +130,12 @@ export function ShotList({
                   </span>
                 ))}
                 {framingWarnings.map((warning) => (
-                  <span className="shot__warn" key={warning}>
+                  <span
+                    className={
+                      FRAMING_SEVERITY[warning] === 'hazard' ? 'shot__warn' : 'shot__note'
+                    }
+                    key={warning}
+                  >
                     {FRAMING_LABEL[warning]}
                   </span>
                 ))}

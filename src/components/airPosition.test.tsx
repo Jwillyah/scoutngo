@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { MAX_ALTITUDE_FEET, pilotSeparation } from '../core/air.ts'
 import type { LatLon } from '../core/geo.ts'
+import { defaultSelection } from '../lib/kitSelection.ts'
 import { DEFAULT_KIT } from '../core/kit.ts'
 import { getSunPosition } from '../core/sun.ts'
 import { planPositions, type CameraPosition } from '../lib/plan.ts'
@@ -37,6 +38,10 @@ const air = (over: Partial<CameraPosition> = {}): CameraPosition => ({
   ...over,
 })
 
+/** The same card on a GROUND position, for the either-way assertions. */
+const groundCard = () =>
+  card(PILOT, { platform: 'ground', altitudeFeet: 0, lensId: 'sony-200-600', focalLength: 400 })
+
 const card = (pilotAt: LatLon | null, over: Partial<CameraPosition> = {}) =>
   renderToStaticMarkup(
     <PositionCard
@@ -54,6 +59,7 @@ const card = (pilotAt: LatLon | null, over: Partial<CameraPosition> = {}) =>
       onSetShotType={() => {}}
       onSetYaw={() => {}}
       kit={DEFAULT_KIT}
+        selection={defaultSelection(DEFAULT_KIT)}
       pilotAt={pilotAt}
       onPlacePilot={() => {}}
     />,
@@ -169,32 +175,7 @@ describe('the pilot separation is shown', () => {
    * aircraft to be separated from.
    */
   it('shows nothing of the sort on a ground position', () => {
-    const ground = renderToStaticMarkup(
-      <PositionCard
-        planned={
-          planPositions(
-            [air({ platform: 'ground', altitudeFeet: 0, lensId: 'sony-200-600', focalLength: 400 })],
-            SUBJECT,
-            sun,
-          )[0]
-        }
-        shootAt={null}
-        timeZone={null}
-        tide={null}
-        onClose={() => {}}
-        count={1}
-        onDelete={() => {}}
-        onDuplicate={() => {}}
-        onMove={() => {}}
-        onSetOptic={() => {}}
-        onSetAltitude={() => {}}
-      onSetShotType={() => {}}
-      onSetYaw={() => {}}
-        kit={DEFAULT_KIT}
-        pilotAt={PILOT}
-        onPlacePilot={() => {}}
-      />,
-    )
+    const ground = groundCard()
     expect(ground).not.toContain('ft AGL')
     expect(ground).not.toContain('Pilot to aircraft')
   })
@@ -236,5 +217,73 @@ describe('the Ground / Air / Both control', () => {
   it('disables Air when there is no drone in the kit', () => {
     expect(render({ airAvailable: false })).toContain('disabled=""')
     expect(render({ airAvailable: false })).toContain('No drone in the kit.')
+  })
+})
+
+/**
+ * THE LENS PICKER, AS IT READS ON SCREEN.
+ *
+ * WHAT WAS REPORTED. A drone position offering "Sigma 28-75 f2.8" at 28mm. "I
+ * cannot mount a Sigma on a Mavic." The position really was air, holding
+ * air-3s-wide: the picker listed kit.lenses whatever the platform was, no
+ * option matched the held id, and a select with no matching option displays
+ * its FIRST option. So the card named a lens the position was not using, and
+ * one touch would have written that lens onto the aircraft.
+ *
+ * Asserted on the RENDERED OPTIONS rather than on the source, because the
+ * question is what the shooter is offered.
+ */
+describe('the optic picker is the platform\'s own', () => {
+  const options = (html: string) =>
+    [...html.matchAll(/<option value="([^"]+)"[^>]*>([^<]*)</g)].map((m) => ({
+      id: m[1],
+      label: m[2],
+    }))
+  const GLASS = DEFAULT_KIT.lenses.map((lens) => lens.name)
+  const CAMERAS = DEFAULT_KIT.drones.flatMap((drone) => drone.cameras.map((c) => c.name))
+
+  it('offers the aircraft cameras on an air position, and nothing else', () => {
+    const shown = options(card(PILOT))
+      .filter((option) => CAMERAS.includes(option.label) || GLASS.includes(option.label))
+      .map((option) => option.label)
+    expect(shown).toEqual(CAMERAS)
+  })
+
+  it('offers no ground glass on an air position', () => {
+    const html = card(PILOT)
+    for (const name of GLASS) {
+      expect(html, `air card offers "${name}"`).not.toContain(`>${name}<`)
+    }
+    /* The named lens from the report, spelled out. */
+    expect(html).not.toContain('Sigma 28-75')
+  })
+
+  /*
+   * And the select's value is one of its own options, which is the invariant
+   * whose absence made the card lie: it is what decides which name is drawn.
+   */
+  it('selects the camera the position is actually using', () => {
+    const html = card(PILOT)
+    expect(html).toContain('value="air-3s-wide"')
+    expect(options(html).some((option) => option.id === 'air-3s-wide')).toBe(true)
+  })
+
+  /* "Lens" is the wrong word for a fixed camera on an aircraft. */
+  it('calls it a camera on an air position', () => {
+    expect(card(PILOT)).toContain('Camera')
+  })
+
+  it('offers the glass on a ground position, and no aircraft camera', () => {
+    const html = groundCard()
+    for (const name of CAMERAS) {
+      expect(html, `ground card offers "${name}"`).not.toContain(`>${name}<`)
+    }
+    for (const name of GLASS) expect(html).toContain(`>${name}<`)
+  })
+
+  /* The check can fail: these names really are findable when they are there. */
+  it('would see an aircraft camera on a ground card if one were offered', () => {
+    expect(CAMERAS.length).toBeGreaterThan(0)
+    for (const name of CAMERAS) expect(card(PILOT)).toContain(`>${name}<`)
   })
 })

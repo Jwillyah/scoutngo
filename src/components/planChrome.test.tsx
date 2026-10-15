@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { classificationOf } from '../core/lighting.ts'
+import { defaultSelection } from '../lib/kitSelection.ts'
 import { DEFAULT_KIT } from '../core/kit.ts'
 import { getSunPosition } from '../core/sun.ts'
 import type { LatLon } from '../core/geo.ts'
@@ -163,6 +164,7 @@ describe('PositionCard', () => {
   const html = renderToStaticMarkup(
     <PositionCard
       kit={DEFAULT_KIT}
+        selection={defaultSelection(DEFAULT_KIT)}
       planned={plan[0]}
       shootAt={new Date('2026-09-12T13:00:00-04:00')}
       timeZone="America/New_York"
@@ -221,6 +223,7 @@ describe('PositionCard', () => {
     const dry = renderToStaticMarkup(
       <PositionCard
       kit={DEFAULT_KIT}
+        selection={defaultSelection(DEFAULT_KIT)}
         planned={plan[0]}
         shootAt={null}
         timeZone={null}
@@ -282,11 +285,13 @@ describe('a flagged position says what is wrong with it', () => {
     renderToStaticMarkup(
       <ShooterFigure
         number={3}
+        opticName="Sigma 28-75 f2.8"
         focalLength={400}
         classification="side-lit"
         shotType="framed"
         warnings={[]}
         framingWarnings={[]}
+        frameSubjectRatio={null}
         platform="ground"
         altitudeFeet={0}
         moved={false}
@@ -311,8 +316,63 @@ describe('a flagged position says what is wrong with it', () => {
   })
 
   it('has a word for every framing warning', () => {
-    expect(flagged({ framingWarnings: ['frame-too-wide'] } as never)).toContain('wide')
+    expect(flagged({ framingWarnings: ['frame-wider-than-subject'] } as never)).toContain('wide')
     expect(flagged({ framingWarnings: ['beyond-standoff'] } as never)).toContain('far')
+  })
+
+  /*
+   * THE MEASURED MULTIPLE, NOT THE WORD. "WIDE" was a verdict in one word, in
+   * hazard red, on all three positions of a drone shoot. The flag carries the
+   * number when there is one.
+   */
+  it('prints the multiple when the subject size is known', () => {
+    const html = flagged({
+      framingWarnings: ['frame-wider-than-subject'],
+      frameSubjectRatio: 4.17,
+    } as never)
+    expect(html).toContain('4.2x wide')
+  })
+
+  /*
+   * AND A WIDE FRAME IS NOT RED. Red is for something being wrong: standing in
+   * a river, or further out than the shot can carry. A wide frame is a choice.
+   */
+  it('keeps the magenta for hazards and uses a plain plate for a wide frame', () => {
+    const wide = flagged({
+      framingWarnings: ['frame-wider-than-subject'],
+      frameSubjectRatio: 4.17,
+    } as never)
+    expect(wide).toContain('shooter__flag--note')
+    expect(wide).not.toContain('shooter__flag--hazard')
+    /* The disc itself stays its normal colour too. */
+    expect(wide).not.toContain('shooter--warned')
+
+    for (const hazard of [
+      { warnings: ['in-water'] },
+      { framingWarnings: ['beyond-standoff'] },
+    ]) {
+      const html = flagged(hazard as never)
+      expect(html).toContain('shooter__flag--hazard')
+      expect(html).toContain('shooter--warned')
+    }
+  })
+
+  /*
+   * ITEM 3: the plate said "28" and nothing else. "28 on what? A focal length
+   * with no camera is the same ambiguity that let the Sigma stand in for my
+   * drone in the first place."
+   */
+  it('names the optic on the plate beside the focal length', () => {
+    const html = flagged({ opticName: 'Air 3S wide', focalLength: 24 } as never)
+    expect(html).toContain('AIR 3S')
+    expect(html).toContain('24')
+    expect(html).toContain('shooter__optic')
+  })
+
+  it('names it in the aria-label too, not only on the plate', () => {
+    expect(flagged({ opticName: 'Air 3S wide', focalLength: 24 } as never)).toContain(
+      'Air 3S wide, 24 millimetres',
+    )
   })
 
   /* And an unflagged position carries no flag at all. */

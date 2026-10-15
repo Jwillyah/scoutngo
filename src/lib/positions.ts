@@ -20,6 +20,8 @@ import {
   type ShotType,
 } from '../core/shotType.ts'
 import type { LatLon } from '../core/geo.ts'
+import type { KitProfile } from '../core/kit.ts'
+import { focalOn, platformOptics } from '../core/optics.ts'
 import type { CameraPosition, PositionOrigin } from './plan.ts'
 
 /** A plan longer than this is a list nobody reads on a phone in the field. */
@@ -149,18 +151,37 @@ export function setAltitude(
   )
 }
 
-/** Changes the glass on one position. Everything downstream recomputes from it. */
+/**
+ * Changes the glass on one position. Everything downstream recomputes from it.
+ *
+ * IT REFUSES AN OPTIC THE PLATFORM CANNOT CARRY. Not clamps, not ignores:
+ * throws, because by the time this is called the picker has already narrowed
+ * its options to the platform's own optics (see core/optics.ts) and the only
+ * way to arrive here with a mismatch is a caller that built its own list.
+ * The same treatment classifyLighting gives a camera bearing on a 360: the
+ * invalid state is refused at the boundary rather than carried inward and
+ * quietly computed with.
+ *
+ * The focal length is clamped to what the optic can produce, so a drone camera
+ * cannot be set to a focal length the aircraft has no lens for.
+ */
 export function setOptic(
   list: CameraPosition[],
+  kit: KitProfile,
   id: string,
   lensId: string,
   focalLength: number,
 ): CameraPosition[] {
-  return list.map((position) =>
-    position.id === id
-      ? { ...position, lensId, focalLength: Math.round(focalLength) }
-      : position,
-  )
+  return list.map((position) => {
+    if (position.id !== id) return position
+    const optic = platformOptics(position.platform, kit).find((o) => o.id === lensId)
+    if (optic === undefined) {
+      throw new Error(
+        `setOptic: ${lensId} is not an optic a ${position.platform} position can carry`,
+      )
+    }
+    return { ...position, lensId, focalLength: focalOn(optic, focalLength) }
+  })
 }
 
 /**

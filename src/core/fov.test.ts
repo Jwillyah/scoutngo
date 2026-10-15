@@ -7,7 +7,9 @@ import {
   rangeForFrameWidth,
   SENSORS,
   standoffBand,
+  frameSubjectRatio,
   USABLE_FRAME_WIDTH_METERS,
+  WIDE_FRAME_RATIO,
 } from './fov.ts'
 
 describe('computeFOV', () => {
@@ -122,15 +124,80 @@ describe('classifyFraming', () => {
     expect(classifyFraming(280, hFOV(400), 'ground')).toEqual([])
   })
 
-  /* The reported failure: a wide lens parked far away, framing a whole field. */
-  it('flags a wide lens standing much too far back', () => {
-    expect(classifyFraming(300, hFOV(28), 'ground')).toContain('frame-too-wide')
+  /*
+   * THE COMPARISON NEEDS A SUBJECT SIZE AND SAYS NOTHING WITHOUT ONE.
+   *
+   * This is the reported bug, as an assertion. A 28mm at 300 m frames about
+   * 385 m across. Whether that is too wide depends entirely on how big the
+   * thing in the middle is, and the app only knows that if it is told. Told
+   * nothing, it says nothing; told 13 m, it says the frame is 30 times it.
+   */
+  it('says nothing about a wide frame when the subject size is unknown', () => {
+    expect(classifyFraming(300, hFOV(28), 'ground')).toEqual([])
+    expect(classifyFraming(300, hFOV(28), 'ground', null)).toEqual([])
+  })
+
+  it('flags a wide lens standing much too far back from a small subject', () => {
+    expect(classifyFraming(300, hFOV(28), 'ground', 13)).toContain('frame-wider-than-subject')
+  })
+
+  /*
+   * AND THE SAME GEOMETRY IS FINE FOR A BIG SUBJECT. 385 m of frame on a 200 m
+   * marina is under twice its width, which is a shot, not a mistake. This is
+   * the pair that the flat 60 m threshold could not tell apart.
+   */
+  it('says nothing about the same frame when the subject is large', () => {
+    expect(classifyFraming(300, hFOV(28), 'ground', 200)).toEqual([])
+  })
+
+  /*
+   * WIDE IS THE NORMAL STATE OF AN AERIAL, so the ratio has to behave the same
+   * in the air as on the ground: the platform must not enter it. A 400 ft
+   * aerial framing its subject says nothing; the aerial 500 m out from a food
+   * truck still does.
+   */
+  it('judges an aerial by the same ratio as the ground, not a different number', () => {
+    expect(classifyFraming(150, hFOV(24), 'air', 200)).toEqual([])
+    expect(classifyFraming(150, hFOV(24), 'air', 13)).toContain('frame-wider-than-subject')
+    expect(classifyFraming(150, hFOV(24), 'ground', 200)).toEqual([])
+  })
+
+  /* The ratio is exactly WIDE_FRAME_RATIO at the boundary, and exclusive. */
+  it('fires above the ratio, not at it', () => {
+    const range = 300
+    const width = frameWidthMeters(range, hFOV(28))
+    expect(classifyFraming(range, hFOV(28), 'ground', width / WIDE_FRAME_RATIO)).toEqual([])
+    expect(
+      classifyFraming(range, hFOV(28), 'ground', width / WIDE_FRAME_RATIO - 0.01),
+    ).toContain('frame-wider-than-subject')
+  })
+
+  describe('frameSubjectRatio states the multiple', () => {
+    it('divides the frame by the subject', () => {
+      expect(frameSubjectRatio(90, 30)).toBeCloseTo(3, 6)
+    })
+
+    /* Null in, null out. Never a zero or a one standing in for unknown. */
+    it('is null with no subject size', () => {
+      expect(frameSubjectRatio(90, null)).toBeNull()
+      expect(frameSubjectRatio(90, 0)).toBeNull()
+      expect(frameSubjectRatio(90, -5)).toBeNull()
+      expect(frameSubjectRatio(0, 30)).toBeNull()
+    })
   })
 
   it('flags a long lens beyond the practical standoff even when the frame is tight', () => {
-    const warnings = classifyFraming(800, hFOV(600), 'ground')
+    /*
+     * A 600mm at 800 m frames about 54 m. Against a 30 m subject that is 1.8
+     * times, which is a tight frame, and the only thing wrong with the
+     * position is the distance itself: haze, shimmer, no separation. Those do
+     * not care how big the subject is, which is why beyond-standoff stayed a
+     * flat distance when the framing judgement became a ratio.
+     */
+    const warnings = classifyFraming(800, hFOV(600), 'ground', 30)
+    expect(frameWidthMeters(800, hFOV(600))).toBeLessThan(30 * WIDE_FRAME_RATIO)
     expect(warnings).toContain('beyond-standoff')
-    expect(warnings).not.toContain('frame-too-wide')
+    expect(warnings).not.toContain('frame-wider-than-subject')
   })
 
   /*
@@ -139,10 +206,10 @@ describe('classifyFraming', () => {
    * its job. Flagging it would cry wolf on the most common correct position.
    */
   it('says nothing about a very tight frame from long glass', () => {
-    expect(classifyFraming(400, hFOV(600), 'ground')).toEqual([])
+    expect(classifyFraming(400, hFOV(600), 'ground', 13)).toEqual([])
   })
 
   it('says nothing about a position sitting on the subject', () => {
-    expect(classifyFraming(0, hFOV(28), 'ground')).toEqual([])
+    expect(classifyFraming(0, hFOV(28), 'ground', 13)).toEqual([])
   })
 })

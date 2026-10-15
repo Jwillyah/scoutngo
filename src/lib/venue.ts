@@ -28,6 +28,22 @@ export interface VenueDraft {
   endTime: string
   eventDescription: string
   desiredOutcome: string
+  /**
+   * HOW WIDE THE SUBJECT IS, ACROSS, IN METRES. Raw text, like the coordinates,
+   * so a half-typed number does not fight the user.
+   *
+   * WHY IT EXISTS. This number used to be a constant: 60 m, in
+   * USABLE_FRAME_WIDTH_METERS, behind a red badge that told the shooter their
+   * subject would be a speck. Nobody had ever been asked how big the subject
+   * was. "If a subject size is assumed somewhere, show it to me and let me set
+   * it." So it is shown, and set, and when it is EMPTY nothing is claimed: the
+   * frame width is still measured and printed, and no comparison is made.
+   *
+   * It is one number rather than a length and a width because the frame
+   * comparison is horizontal. A building 40 m across is 40 whichever way its
+   * depth runs.
+   */
+  subjectAcrossMeters: string
 }
 
 export type VenueField = keyof VenueDraft
@@ -43,6 +59,8 @@ export const EMPTY_VENUE: VenueDraft = {
   endTime: '',
   eventDescription: '',
   desiredOutcome: '',
+  /* EMPTY, not 60. An assumed subject size is what caused the bug. */
+  subjectAcrossMeters: '',
 }
 
 /**
@@ -95,6 +113,8 @@ export const CALIBRATION_VENUE: VenueDraft = {
   date: '2026-09-12',
   startTime: '11:00',
   endTime: '15:00',
+  /* The dock bar and its deck, paced off the satellite image. */
+  subjectAcrossMeters: '45',
   eventDescription:
     'Boat docking contest on the Wicomico River. The river runs southwest to ' +
     'northeast. The dock bar, the deck and the crowd are on the north bank. The ' +
@@ -257,4 +277,20 @@ export function venueLatLon(draft: VenueDraft): LatLon | null {
 /** Writes a map derived coordinate back into the form, at pin resolution. */
 export function withCoordinates(draft: VenueDraft, at: LatLon): VenueDraft {
   return { ...draft, latitude: at.lat.toFixed(6), longitude: at.lon.toFixed(6) }
+}
+
+/**
+ * The subject width as a number, or null when it has not been given.
+ *
+ * NULL IS THE DEFAULT AND NULL MEANS NULL. Nothing downstream substitutes a
+ * figure for it: classifyFraming makes no comparison, the card prints the frame
+ * width alone, and the map carries no flag. A dash beats a zero, and an absent
+ * judgement beats an invented one.
+ */
+export function subjectAcrossMeters(venue: VenueDraft): number | null {
+  const raw = venue.subjectAcrossMeters.trim()
+  if (raw === '') return null
+  const value = Number(raw)
+  if (!Number.isFinite(value) || value <= 0) return null
+  return value
 }

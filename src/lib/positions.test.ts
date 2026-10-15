@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MAX_ALTITUDE_FEET, MIN_ALTITUDE_FEET } from '../core/air.ts'
+import { DEFAULT_KIT } from '../core/kit.ts'
 import type { CameraPosition } from './plan.ts'
 import {
   addPosition,
@@ -121,11 +122,54 @@ describe('movePosition', () => {
 describe('setOptic', () => {
   it('changes the glass and leaves the spot alone', () => {
     const list = make(2)
-    const after = setOptic(list, list[1].id, 'sigma-28-75', 70)
+    const after = setOptic(list, DEFAULT_KIT, list[1].id, 'sigma-28-75', 70)
     expect(after[1].lensId).toBe('sigma-28-75')
     expect(after[1].focalLength).toBe(70)
     expect(after[1].at).toEqual(list[1].at)
     expect(after[0]).toEqual(list[0])
+  })
+
+  /*
+   * THE SIGMA CANNOT REACH AN AIRCRAFT AND THE AIR 3S CANNOT REACH A HAND.
+   *
+   * The reported bug: a drone position offering "Sigma 28-75 f2.8" at 28mm.
+   * The picker no longer lists it, and this is the floor under that: even a
+   * caller that builds its own list cannot get a ground lens onto an air
+   * position or a drone camera onto a ground one.
+   */
+  const air = addPosition([], {
+    at: AT,
+    lensId: 'air-3s-wide',
+    focalLength: 24,
+    platform: 'air',
+    altitudeFeet: 200,
+  })
+
+  it('refuses ground glass on an air position', () => {
+    expect(() => setOptic(air, DEFAULT_KIT, air[0].id, 'sigma-28-75', 28)).toThrow(
+      /not an optic a air position can carry/,
+    )
+  })
+
+  it('refuses an aircraft camera on a ground position', () => {
+    const list = make(1)
+    expect(() => setOptic(list, DEFAULT_KIT, list[0].id, 'air-3s-tele', 70)).toThrow(
+      /not an optic a ground position can carry/,
+    )
+  })
+
+  it('still lets an air position change between the aircraft own cameras', () => {
+    const after = setOptic(air, DEFAULT_KIT, air[0].id, 'air-3s-tele', 24)
+    expect(after[0].lensId).toBe('air-3s-tele')
+    /* Clamped to the camera: the tele is a 70mm prime, so 24 is not on offer. */
+    expect(after[0].focalLength).toBe(70)
+  })
+
+  /* A focal length the lens cannot produce is clamped, not stored. */
+  it('clamps the focal length to the optic', () => {
+    const list = make(1)
+    expect(setOptic(list, DEFAULT_KIT, list[0].id, 'sigma-28-75', 300)[0].focalLength).toBe(75)
+    expect(setOptic(list, DEFAULT_KIT, list[0].id, 'sigma-28-75', 5)[0].focalLength).toBe(28)
   })
 })
 

@@ -1243,6 +1243,18 @@
   letter-spacing: var(--tracking-label);
 }
 
+/* A framing note in the field: stated, not shouted. No magenta. */
+.fc__note {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-panel-2);
+  color: var(--color-text-muted);
+  font-size: var(--field-stat);
+  font-weight: var(--weight-heavy);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+}
+
 .fc__ground {
   min-height: 2rem;
 }
@@ -3765,9 +3777,12 @@
   left: 50%;
   transform: translateX(-50%);
   padding: 1px 4px;
-  max-width: 11ch;
-  background: var(--color-hazard);
-  color: var(--white);
+  /*
+   * Wider than it was, because the flag now carries a measured multiple
+   * ("4.2x wide") rather than the single word "wide". Still measured against
+   * everything else on the map by scripts/audit-labels.mjs.
+   */
+  max-width: 13ch;
   border: var(--line-hair) solid var(--mark-edge);
   font-size: var(--text-xs);
   font-weight: var(--weight-heavy);
@@ -3779,6 +3794,48 @@
   pointer-events: none;
 }
 
+/*
+ * TWO SEVERITIES, AND ONLY ONE OF THEM IS RED.
+ *
+ * Every framing flag used to be hazard magenta, which on a drone shoot meant
+ * three red badges on three good positions. "A warning that fires on
+ * everything is not a warning, it is wallpaper." Magenta is now kept for
+ * standing in a river, in a roadway, over people, or further out than the shot
+ * can carry. A wide frame reads as what it is: a readout, on the same plate
+ * colour as the focal length under it.
+ */
+.shooter__flag--hazard {
+  background: var(--color-hazard);
+  color: var(--white);
+}
+
+.shooter__flag--note {
+  background: var(--mark-edge);
+  color: var(--color-text);
+}
+
+/*
+ * WHICH OPTIC THE FOCAL LENGTH BELONGS TO. The plate read "28" alone, and "28
+ * on what" is the same ambiguity that let a Sigma stand in for a drone. Dimmer
+ * than the number, because the number is the thing being read and this is what
+ * it is attached to.
+ */
+.shooter__optic {
+  color: var(--color-text-muted);
+  font-weight: var(--weight-medium);
+}
+
+/* The same chip without the alarm, for a framing note. */
+.shot__note {
+  background: var(--color-panel-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  padding: 2px 6px;
+}
+
 .shot__warn {
   background: var(--color-hazard);
   color: var(--white);
@@ -3787,6 +3844,45 @@
   letter-spacing: var(--tracking-label);
   text-transform: uppercase;
   padding: 2px 6px;
+}
+
+/*
+ * A MEASUREMENT, NOT A WARNING. What this lens frames from here, in the card's
+ * own type. It replaced a magenta block reading "the subject will be a speck",
+ * which was a verdict drawn from a subject size nobody had entered, and which
+ * sat on every position of a drone shoot.
+ */
+.card__frame {
+  margin: 0 var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+/*
+ * The multiple, when there is a subject size to measure against. Brighter than
+ * the sentence it follows and still not red: red is for something being wrong,
+ * and a wide frame is a choice.
+ */
+.card__frame-wide {
+  color: var(--color-text);
+  font-weight: var(--weight-heavy);
+}
+
+/*
+ * A NOTE IS NOT A HAZARD. Same shape as .card__warn so it reads as the same
+ * kind of block, with the grey fact rule instead of the magenta one. See
+ * --color-rule-fact: these state something, they are not an alarm.
+ */
+.card__note {
+  margin: 0 var(--space-3);
+  border-radius: var(--radius-panel);
+  background: var(--color-panel-2);
+  border-left: var(--line-rule) solid var(--color-rule-fact);
+  color: var(--color-text-muted);
+  padding: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
 }
 
 /* Hazard. Loud, high on the card, and the only red on this screen. */

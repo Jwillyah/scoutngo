@@ -80,11 +80,23 @@ describe('a camera in the air is not a camera on the ground', () => {
     expect(right).toBeCloseTo(91.2, 1)
   })
 
+  /*
+   * The slant range matters to the framing judgement, not just to the printed
+   * distance: a 13 m subject under a drone at 200 ft is inside the frame four
+   * times over, and the old ground-range arithmetic could not see it. The
+   * subject size is given, because without one nothing is claimed either way.
+   */
   it('warns about a frame the old arithmetic called fine', () => {
+    expect(classifyFraming(25, AIR_3S_WIDE.hFOV, 'air', 13)).toEqual([])
+    expect(
+      classifyFraming(slantRangeMeters(25, 200), AIR_3S_WIDE.hFOV, 'air', 13),
+    ).toContain('frame-wider-than-subject')
+  })
+
+  /* And with no subject size, neither range is judged at all. */
+  it('claims nothing about either frame when the subject size is unknown', () => {
     expect(classifyFraming(25, AIR_3S_WIDE.hFOV, 'air')).toEqual([])
-    expect(classifyFraming(slantRangeMeters(25, 200), AIR_3S_WIDE.hFOV, 'air')).toContain(
-      'frame-too-wide',
-    )
+    expect(classifyFraming(slantRangeMeters(25, 200), AIR_3S_WIDE.hFOV, 'air')).toEqual([])
   })
 
   it('never returns less than the altitude, whatever the horizontal is', () => {

@@ -6,7 +6,7 @@ import { formatClock } from '../core/timezone.ts'
 import type { KitSelection } from './kitSelection.ts'
 import type { DroneCameraSpec, LensSpec } from './parsePlan.ts'
 import type { SiteSummary } from './overpass.ts'
-import type { VenueDraft, VenueWindow } from './venue.ts'
+import { subjectAcrossMeters, type VenueDraft, type VenueWindow } from './venue.ts'
 
 export interface MapBounds {
   west: number
@@ -68,7 +68,17 @@ const roundTo5 = (n: number) => Math.round(n / 5) * 5
  * together. The drone cameras are fixed focal lengths, so both ends of their band
  * are the same number.
  */
-export function selectedOptics(kit: KitSelection): OpticSpec[] {
+export function selectedOptics(
+  kit: KitSelection,
+  /**
+   * How wide the subject is, when the shooter has said.
+   *
+   * It bounds the standoffs the model is given. Without it the bound comes from
+   * USABLE_FRAME_WIDTH_METERS, a flat 60 m, which asked for a 200 m marina from
+   * the same distance as a food truck.
+   */
+  subjectMeters: number | null = null,
+): OpticSpec[] {
   const bodies = DEFAULT_KIT.bodies.filter((b) => kit.bodyIds.includes(b.id))
 
   const lenses: OpticSpec[] = DEFAULT_KIT.lenses
@@ -82,10 +92,12 @@ export function selectedOptics(kit: KitSelection): OpticSpec[] {
         minFocalLength: lens.minFocalLength,
         maxFocalLength: lens.maxFocalLength,
         maxStandoffAtMin: roundTo5(
-          standoffBand(computeFOV(lens.minFocalLength, sensor).hFOV, 'ground').maxMeters,
+          standoffBand(computeFOV(lens.minFocalLength, sensor).hFOV, 'ground', subjectMeters)
+            .maxMeters,
         ),
         maxStandoffAtMax: roundTo5(
-          standoffBand(computeFOV(lens.maxFocalLength, sensor).hFOV, 'ground').maxMeters,
+          standoffBand(computeFOV(lens.maxFocalLength, sensor).hFOV, 'ground', subjectMeters)
+            .maxMeters,
         ),
       }
     })
@@ -93,7 +105,7 @@ export function selectedOptics(kit: KitSelection): OpticSpec[] {
   const cameras: OpticSpec[] = selectedDroneCameras(DEFAULT_KIT, kit.droneIds).map((camera) => {
     // 35mm equivalent on full frame: the same arithmetic the ground lenses use.
     const hFOV = computeFOV(camera.equiv35, SENSORS.fullFrame).hFOV
-    const max = roundTo5(standoffBand(hFOV, 'air').maxMeters)
+    const max = roundTo5(standoffBand(hFOV, 'air', subjectMeters).maxMeters)
     return {
       id: camera.id,
       name: camera.name,
@@ -278,7 +290,7 @@ export function buildGenerateBody(
     style: kit.styleNotes,
     drones: selectedDroneNames(kit),
     platforms: [...platforms],
-    optics: selectedOptics(kit),
+    optics: selectedOptics(kit, subjectAcrossMeters(venue)),
     sun,
     ...(tide === undefined ? {} : { tide }),
     ...(requiredShots.length === 0 ? {} : { requiredShots }),

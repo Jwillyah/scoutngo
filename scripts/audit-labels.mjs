@@ -200,10 +200,15 @@ await wait(1500)
 /*
  * POSITIONS, SO THE WARNING WORDS EXIST TO BE MEASURED.
  *
- * Without any the marker-flag check below is vacuous. A position a few hundred
- * metres from the subject on the default 28mm frames far more than the 60m an
- * event shot lives in, so `frame-too-wide` fires from geometry alone and needs
- * no network: three positions, three "wide" words.
+ * Without any the marker-flag check below is vacuous.
+ *
+ * THE FLAG NEEDS A SUBJECT SIZE NOW. It used to fire from geometry alone,
+ * against a flat 60 m standing in for the subject, which is exactly the bug
+ * that put a red WIDE badge on every position of a drone shoot. The
+ * calibration venue carries subjectAcrossMeters: the dock bar and its deck,
+ * 45 m across. A position a few hundred metres out on the default 28mm frames
+ * several hundred metres, which is many times 45, so three positions still
+ * produce three flags and the collision check still has words to measure.
  */
 await ev(`window.__probe.map.jumpTo({ zoom: 15 }), 'ok'`)
 await wait(500)
@@ -233,6 +238,25 @@ if (!Array.isArray(flagged) || flagged.length === 0) {
   problems += 1
 } else if (flagged.some((w) => !w || w === '!' || w.length < 3)) {
   console.log('      PROBLEM: a marker is flagged without saying why')
+  problems += 1
+}
+
+/*
+ * AND THE PLATE NAMES THE OPTIC. "28" on its own does not say what it is 28 of,
+ * which is the ambiguity that let a ground lens stand in for a drone camera
+ * without the screen looking wrong. Checked here as well as in the unit tests
+ * because this is the one place the real rendered plate is measured, and a
+ * name that does not fit is a collision rather than a wrong string.
+ */
+const plates = await ev(
+  `[...document.querySelectorAll('.shooter__focal')].map((n) => n.textContent)`,
+)
+console.log(`  focal plates: ${JSON.stringify(plates)}`)
+if (!Array.isArray(plates) || plates.length === 0) {
+  console.log('      PROBLEM: no focal plate rendered, so the optic name is untested')
+  problems += 1
+} else if (plates.some((t) => !/[A-Z]{3}/.test(String(t)))) {
+  console.log('      PROBLEM: a focal plate shows a number with no optic name')
   problems += 1
 }
 

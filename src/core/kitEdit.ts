@@ -4,8 +4,8 @@
  * WHY THIS IS CORE AND NOT A FORM. Every number on every card is computed from
  * these values. A lens with its focal range typed in backwards does not produce
  * a slightly wrong label, it produces a wrong field of view, a wrong frame
- * width, a wrong standoff band and a wrong "frame too wide" verdict, all of
- * which look exactly as confident as the right ones.
+ * width, a wrong standoff band and a wrong multiple against the subject size,
+ * all of which look exactly as confident as the right ones.
  *
  * So the numbers are validated here, in one place, with tests, and the form
  * upstairs only renders what this says.

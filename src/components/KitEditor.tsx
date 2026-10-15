@@ -67,8 +67,8 @@ function Field({
  *
  * VALIDATION IS NOT POLITENESS. A focal range typed in backwards does not
  * produce a slightly wrong label, it produces a wrong field of view, a wrong
- * frame width and a wrong "frame too wide" verdict, each looking exactly as
- * confident as the right one. The rules live in src/core/kitEdit.ts with tests;
+ * frame width and a wrong multiple against the subject size, each looking
+ * exactly as confident as the right one. The rules live in src/core/kitEdit.ts with tests;
  * this form only renders what they say.
  */
 export function KitEditor({ kit, onChange }: KitEditorProps) {

@@ -18,7 +18,8 @@ import {
   showsPlatform,
   type PlatformFilter,
 } from './core/platformFilter.ts'
-import { DEFAULT_KIT, selectedDroneCameras, type KitProfile } from './core/kit.ts'
+import { DEFAULT_KIT, type KitProfile } from './core/kit.ts'
+import { defaultOpticFor } from './core/optics.ts'
 import { EMPTY_LANDCOVER, type Landcover } from './core/siting.ts'
 import { getSunArc, getSunPosition } from './core/sun.ts'
 import { extremesAround, tideStateAt } from './core/tide.ts'
@@ -112,6 +113,7 @@ import {
   defaultVenue,
   hasErrors,
   resolveWindow,
+  subjectAcrossMeters,
   validateVenue,
   venueLatLon,
   withCoordinates,
@@ -292,6 +294,16 @@ function App() {
     }
   }, [sun, scrubbedAt, centre])
 
+  /*
+   * HOW WIDE THE SUBJECT IS, OR NULL BECAUSE NOBODY SAID.
+   *
+   * Null travels all the way down. classifyFraming makes no comparison, the
+   * card prints the frame width on its own and the map carries no flag. The
+   * alternative, which is what this replaced, was a hidden 60 m and a red badge
+   * on every position of a drone shoot.
+   */
+  const subjectMeters = useMemo(() => subjectAcrossMeters(venue), [venue])
+
   /* Cones, bearings, lighting, framing and siting, all from src/core/. */
   const plan = useMemo(
     () =>
@@ -306,8 +318,9 @@ function App() {
             reachMeters,
             centre,
             kitProfile,
+            subjectMeters,
           ),
-    [positions, aim, sun, land, kit.bodyIds, reachMeters, centre, kitProfile],
+    [positions, aim, sun, land, kit.bodyIds, reachMeters, centre, kitProfile, subjectMeters],
   )
 
   /*
@@ -459,11 +472,24 @@ function App() {
       setShootKind(kind)
 
       /*
-       * A chip always does the platform half of its job. The window half needs
-       * a pin, a date and a resolved zone, and when any of those is missing it
-       * says which rather than silently doing nothing.
+       * THE TIME-OF-DAY CHIP DOES NOT TOUCH THE PLATFORM.
+       *
+       * It used to: `if (kind === 'daytime') setPlatformFilter('both')`, meant
+       * as "a daytime shoot is usually both". It silently undid an explicit
+       * choice the shooter had already made, and that is the whole of the
+       * reported bug. Measured in the browser, tapping Drone and then Daytime:
+       *
+       *   after Drone     Drone=true
+       *   after Daytime   Both=true, Drone=false
+       *   PLAN filter     Both
+       *   add button      "Add position", not "Add air position"
+       *   result          a ground Framed position
+       *
+       * Which is exactly what a daytime aerial shoot looks like to tap, so the
+       * one ordering a drone pilot would actually use was the one that broke.
+       * The two rows are independent: one says when, the other says what is
+       * flying, and neither gets to overrule the other.
        */
-      if (kind === 'daytime') setPlatformFilter('both')
 
       if (centre === null) {
         setShootLine('Drop the venue pin and the chip will set the window too.')
@@ -548,14 +574,22 @@ function App() {
     setPilotAt(at)
   }, [])
 
-  /* The glass a new position starts on: the first lens actually packed. */
+  /*
+   * THE GLASS A NEW POSITION STARTS ON, ASKED OF THE PLATFORM.
+   *
+   * Both of these used to be built here, by hand, out of different pieces of
+   * the kit: the ground one from kit.lenses and the air one from
+   * selectedDroneCameras. Two hand-rolled optic lists is how the card came to
+   * have a third, which offered ground glass on an aircraft. There is one
+   * answer to "what can this platform shoot with" now and it lives in
+   * core/optics.ts; everything that needs an optic asks it.
+   */
   const defaultOptic = useMemo(() => {
-    const lens =
-      kitProfile.lenses.find((l) => kit.lensIds.includes(l.id)) ?? kitProfile.lenses[0]
-    return lens === undefined
+    const optic = defaultOpticFor('ground', kitProfile, kit)
+    return optic === null
       ? { lensId: '', focalLength: 50 }
-      : { lensId: lens.id, focalLength: lens.minFocalLength }
-  }, [kit.lensIds, kitProfile])
+      : { lensId: optic.id, focalLength: optic.minFocalLength }
+  }, [kit, kitProfile])
 
   /*
    * WHAT A NEW POSITION IS, WHICH THE FILTER DECIDES.
@@ -569,11 +603,9 @@ function App() {
    * focal length, because the Air 3S cameras are not zooms.
    */
   const defaultAirOptic = useMemo(() => {
-    const camera = selectedDroneCameras(kitProfile, kit.droneIds)[0]
-    return camera === undefined
-      ? null
-      : { lensId: camera.id, focalLength: camera.equiv35 }
-  }, [kit.droneIds, kitProfile])
+    const optic = defaultOpticFor('air', kitProfile, kit)
+    return optic === null ? null : { lensId: optic.id, focalLength: optic.minFocalLength }
+  }, [kit, kitProfile])
 
   const addsAir = platformFilter === 'air' && defaultAirOptic !== null
 
@@ -617,8 +649,8 @@ function App() {
   }, [])
 
   const onSetOptic = useCallback((id: string, lensId: string, focalLength: number) => {
-    setPositions((current) => setOptic(current, id, lensId, focalLength))
-  }, [])
+    setPositions((current) => setOptic(current, kitProfile, id, lensId, focalLength))
+  }, [kitProfile])
 
   /* Clamped in core, so a typed 900 and a model's 900 both become 400. */
   const onSetAltitude = useCallback((id: string, feet: number) => {
@@ -1396,6 +1428,7 @@ function App() {
           siteNote={siteNote}
           onGenerate={() => void onGenerate()}
           kitProfile={kitProfile}
+          kitSelection={kit}
           placing={placing}
           onPlacing={setPlacing}
           onAddAt={addPositionAt}
