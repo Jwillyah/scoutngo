@@ -194,6 +194,14 @@ export function addDrone(kit: KitProfile, draft: DroneDraft): KitProfile {
     weightGrams: Math.round(Number(draft.weightGrams)),
     cameras,
     notes: '',
+    /*
+     * NULL FOR AN AIRCRAFT SOMEBODY ADDED BY HAND, because this app has not
+     * read its spec sheet. A wind limit invented for an aircraft is the worst
+     * kind of confident wrong answer: somebody could fly on it. The panel
+     * states the gust alone when there is no rating to state it against.
+     */
+    maxWindMps: null,
+    maxWindSource: '',
   }
   return { ...kit, drones: [...kit.drones, drone] }
 }

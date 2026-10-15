@@ -24,6 +24,7 @@ import {
 } from '../core/cloud.ts'
 import type { LatLon } from '../core/geo.ts'
 import type { Wind } from '../core/upwind.ts'
+import { WIND_LEVELS_METERS, type LevelWind } from '../core/windProfile.ts'
 
 export const OPEN_METEO_URL = 'https://api.open-meteo.com/v1/forecast'
 export const TIMEOUT_MS = 8000
@@ -244,14 +245,31 @@ export async function fetchSightlineCloud(
  * venue's, which is the one it already sends.
  */
 export type WindResult =
-  | { status: 'ok'; wind: Wind; gustMps: number | null; at: Date }
+  | {
+      status: 'ok'
+      /** Ground wind, which is what every other weather app shows. */
+      wind: Wind
+      /**
+       * All four heights Open-Meteo serves, for interpolating to a flight
+       * altitude in src/core/windProfile.ts. A level the model did not fill in
+       * arrives null rather than zero.
+       */
+      levels: LevelWind[]
+      /**
+       * The gust, AT TEN METRES ONLY. Open-Meteo serves no gust above the
+       * surface: wind_gusts_180m is rejected as an invalid variable. So the
+       * panel labels it as a surface gust rather than implying it is the gust
+       * at altitude.
+       */
+      gustMps: number | null
+      at: Date
+    }
   | { status: 'unavailable'; reason: string }
 
 interface WindRow {
   time?: unknown
-  wind_speed_10m?: unknown
-  wind_direction_10m?: unknown
   wind_gusts_10m?: unknown
+  [key: string]: unknown
 }
 
 /** Open-Meteo reports km/h by default; everything in core is metres per second. */
@@ -271,16 +289,26 @@ export function parseWind(payload: unknown, at: Date): WindResult {
   const index = times.findIndex((t) => t.startsWith(wanted))
   const row = index === -1 ? 0 : index
 
-  const speed = numberOrNull(hourly?.wind_speed_10m, row)
-  const direction = numberOrNull(hourly?.wind_direction_10m, row)
-  if (speed === null || direction === null) {
+  const levels: LevelWind[] = WIND_LEVELS_METERS.map((heightMeters) => {
+    const speed = numberOrNull(hourly?.[`wind_speed_${heightMeters}m`], row)
+    const direction = numberOrNull(hourly?.[`wind_direction_${heightMeters}m`], row)
+    return {
+      heightMeters,
+      speedMps: speed === null ? null : speed * KMH_TO_MPS,
+      fromDegrees: direction,
+    }
+  })
+
+  const ground = levels[0]
+  if (ground.speedMps === null || ground.fromDegrees === null) {
     return { status: 'unavailable', reason: 'Wind was missing for that hour.' }
   }
   const gust = numberOrNull(hourly?.wind_gusts_10m, row)
 
   return {
     status: 'ok',
-    wind: { fromDegrees: direction, speedMps: speed * KMH_TO_MPS },
+    wind: { fromDegrees: ground.fromDegrees, speedMps: ground.speedMps },
+    levels,
     gustMps: gust === null ? null : gust * KMH_TO_MPS,
     at: new Date(times[row]),
   }
@@ -301,7 +329,15 @@ export async function fetchWind(
   const params = new URLSearchParams({
     latitude: at.lat.toFixed(4),
     longitude: at.lon.toFixed(4),
-    hourly: 'wind_speed_10m,wind_direction_10m,wind_gusts_10m',
+    /*
+     * ALL FOUR HEIGHTS. 180m is about 590ft, which covers a whole Part 107
+     * altitude range, so nothing has to be extrapolated upward. Gusts exist at
+     * ten metres only: wind_gusts_180m is rejected as an invalid variable.
+     */
+    hourly: [
+      ...WIND_LEVELS_METERS.flatMap((h) => [`wind_speed_${h}m`, `wind_direction_${h}m`]),
+      'wind_gusts_10m',
+    ].join(','),
     start_date: isoDate(when),
     end_date: isoDate(when),
     timezone: timeZone,

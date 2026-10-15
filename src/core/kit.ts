@@ -70,6 +70,21 @@ export interface Drone {
   weightGrams: number
   cameras: DroneCamera[]
   notes: string
+  /**
+   * The manufacturer's published maximum wind speed resistance, in m/s.
+   *
+   * RECORDED FROM THE SPEC SHEET, the same way the camera figures are, and
+   * NULL when it has not been confirmed. It is stated on screen beside a
+   * measured gust and nothing more: not a verdict, not a go or no-go, exactly
+   * like the Part 107 ceiling. Whether to fly is the operator's call.
+   *
+   * An unconfirmed limit is left null rather than guessed, because a wind
+   * limit invented for an aircraft is the worst kind of confident wrong
+   * answer: somebody could fly on it.
+   */
+  maxWindMps: number | null
+  /** Where maxWindMps came from, so it can be checked. Empty when null. */
+  maxWindSource: string
 }
 
 export interface ShootingStyle {
@@ -160,6 +175,12 @@ export const DEFAULT_KIT: KitProfile = {
       // FAA Category 1 operations over people, which is why siting.ts checks the
       // flight path against buildings and gathering areas.
       weightGrams: 724,
+      /*
+       * "Max Wind Speed Resistance 12 m/s", read from DJI's own published
+       * specification page for the Air 3S. 12 m/s is about 23 knots.
+       */
+      maxWindMps: 12,
+      maxWindSource: 'DJI published specs, dji.com/air-3s/specs',
       cameras: [
         {
           id: 'air-3s-wide',

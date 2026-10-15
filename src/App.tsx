@@ -486,7 +486,42 @@ function App() {
    * Wind at the venue, for the hour the scrubber is on. Feeds the readout and
    * the cam ranking; every failure is null and both say so.
    */
-  const { wind, gustMps } = useWind(aim, scrubbedAt, venueWindow?.timeZone ?? null)
+  const {
+    wind,
+    levels: windLevels,
+    gustMps,
+    at: windAt,
+    past: windPast,
+  } = useWind(aim, scrubbedAt, venueWindow?.timeZone ?? null)
+
+  /*
+   * THE HEIGHT TO READ THE WIND AT.
+   *
+   * The highest air position in the plan, because that is the one the wind
+   * limits first. Null with nothing in the air, and the panel then reads the
+   * ground and says so: every other weather app shows ground wind, and at
+   * four hundred feet that is a different day.
+   */
+  const flightFeet = useMemo(() => {
+    const air = positions.filter((p) => p.platform === 'air')
+    return air.length === 0 ? null : Math.max(...air.map((p) => p.altitudeFeet))
+  }, [positions])
+
+  /*
+   * The published wind rating of the aircraft actually coming, when there is
+   * one. Null is left null: an invented wind limit is something somebody could
+   * fly on. See src/core/kit.ts.
+   */
+  const rated = useMemo(() => {
+    const drones = kitProfile.drones.filter((d) => kit.droneIds.includes(d.id))
+    const withRating = drones.filter((d) => d.maxWindMps !== null)
+    if (withRating.length === 0) return { mps: null, source: '' }
+    /* The most limiting aircraft in the bag, which is the one that decides. */
+    const lowest = withRating.reduce((a, b) =>
+      (a.maxWindMps ?? Infinity) <= (b.maxWindMps ?? Infinity) ? a : b,
+    )
+    return { mps: lowest.maxWindMps, source: lowest.maxWindSource }
+  }, [kit.droneIds, kitProfile])
 
   const [placing, setPlacing] = useState(false)
 
@@ -1323,7 +1358,14 @@ function App() {
           showSky={showSky}
           onShowSky={setShowSky}
           wind={wind}
+          windLevels={windLevels}
           gustMps={gustMps}
+          windAt={windAt}
+          windPast={windPast}
+          flightFeet={flightFeet}
+          ratedWindMps={rated.mps}
+          ratedWindSource={rated.source}
+          selectedCloud={null}
           selectedId={selectedId}
           onSelect={onSelectPosition}
           selected={selected}

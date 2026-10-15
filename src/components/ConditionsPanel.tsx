@@ -1,20 +1,34 @@
+import type { SightlineCloud } from '../core/cloud.ts'
 import type { LatLon } from '../core/geo.ts'
+import type { TideState } from '../core/tide.ts'
+import type { LevelWind } from '../core/windProfile.ts'
 import type { Wind } from '../core/upwind.ts'
 import type { TideInfo } from '../lib/useTide.ts'
 import type { VenueWindow } from '../lib/venue.ts'
 import { CamList } from './CamList.tsx'
 import { Panel } from './Panel.tsx'
 import { SunReadout } from './SunReadout.tsx'
-import { TideReadout } from './TideReadout.tsx'
+import { WeatherPanel } from './WeatherPanel.tsx'
 
 interface ConditionsPanelProps {
   venueWindow: VenueWindow | null
   tide: TideInfo
   scrubbedAt: Date | null
   venue: LatLon | null
-  /** Null until the wind lookup answers, or when it fails. */
+  /** Ground wind, which is what the cam ranking wants. Null until it answers. */
   wind: Wind | null
+  /** All four served heights, for interpolating to a flight altitude. */
+  windLevels: LevelWind[]
   gustMps: number | null
+  /** The hour the wind is for, and whether it has already happened. */
+  windAt: Date | null
+  windPast: boolean
+  /** The air position's height in feet, or null with nothing in the air. */
+  flightFeet: number | null
+  ratedWindMps: number | null
+  ratedWindSource: string
+  tideNow: TideState | null
+  cloud: SightlineCloud | null
 }
 
 /**
@@ -30,40 +44,46 @@ export function ConditionsPanel({
   scrubbedAt,
   venue,
   wind,
+  windLevels,
   gustMps,
+  windAt,
+  windPast,
+  flightFeet,
+  ratedWindMps,
+  ratedWindSource,
+  tideNow,
+  cloud,
 }: ConditionsPanelProps) {
   return (
     <>
-      <SunReadout venueWindow={venueWindow} />
-      <TideReadout tide={tide} venueWindow={venueWindow} scrubbedAt={scrubbedAt} />
+      {/*
+        * WEATHER FIRST, because it is what the panel is for now. Three
+        * readings: wind at the height being flown, tide state and the next
+        * turn, cloud on the sightline. Everything for the scrubbed moment.
+        */}
+      <Panel index="03" title="Weather">
+        <WeatherPanel
+          at={windAt ?? scrubbedAt}
+          timeZone={venueWindow?.timeZone ?? null}
+          past={windPast}
+          levels={windLevels}
+          gustMps={gustMps}
+          flightFeet={flightFeet}
+          ratedWindMps={ratedWindMps}
+          ratedWindSource={ratedWindSource}
+          tide={tide}
+          tideNow={tideNow}
+          cloud={cloud}
+        />
+      </Panel>
 
       {/*
-        * WIND, then the cameras it ranks.
-        *
-        * Wind earns its own readout before the cams do: for anyone flying, the
-        * speed and the gust decide whether the aircraft goes up at all, and
-        * that is a bigger question than which camera to look at.
+        * The sun detail keeps its own panel. It is the layer every later claim
+        * about light is checked against, and it carries the peak.
         */}
-      <Panel index="05" title="Wind and sky cameras">
-        {wind === null ? (
-          <p className="readout__empty">
-            Wind has not come back yet. Open-Meteo answers in a second or two, and the
-            cameras below fall back to nearest first until it does.
-          </p>
-        ) : (
-          <p className="windline">
-            <span className="windline__value num">{Math.round(wind.speedMps)} m/s</span>
-            <span className="windline__sub num">
-              {Math.round(wind.speedMps * 2.237)} mph
-            </span>
-            <span className="windline__from num">from {Math.round(wind.fromDegrees)}°</span>
-            {gustMps === null ? null : (
-              <span className="windline__gust num">
-                gusting {Math.round(gustMps)} m/s · {Math.round(gustMps * 2.237)} mph
-              </span>
-            )}
-          </p>
-        )}
+      <SunReadout venueWindow={venueWindow} />
+
+      <Panel index="05" title="Sky cameras">
         <CamList venue={venue} wind={wind} />
       </Panel>
     </>

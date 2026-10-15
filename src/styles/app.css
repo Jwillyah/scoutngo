@@ -5124,3 +5124,112 @@
   color: var(--color-text-muted);
   letter-spacing: 0;
 }
+
+/*
+ * THE WEATHER PANEL. Three readings, not a dashboard.
+ *
+ * What it replaced was a grid of azimuth, altitude, shadow bearing and light
+ * class at three times: a table of numbers rather than something you read
+ * one-handed in sunlight. Each reading here is a label, one big figure and at
+ * most two short lines under it.
+ *
+ * Nautical vernacular, consistent with the rest of the app: knots, feet,
+ * "slack", "next low". No rounded cards, no grid.
+ */
+.wx {
+  display: grid;
+  gap: var(--space-3);
+  padding: 0 var(--page-pad) var(--space-2);
+}
+
+/*
+ * WHICH MOMENT, AND WHETHER IT HAS HAPPENED. The panel follows the time bar,
+ * so the hour has to be on screen or the numbers are unattributed.
+ */
+.wx__when {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  padding-bottom: var(--space-1);
+  border-bottom: var(--line-hair) solid var(--color-line);
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+  color: var(--color-text);
+}
+
+.wx__source {
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.wx__read {
+  display: grid;
+  gap: 2px;
+}
+
+.wx__label {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+/* One big figure per reading. Never a glow behind a number. */
+.wx__value {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-num);
+  letter-spacing: var(--tracking-num);
+  color: var(--color-text);
+}
+
+.wx__from {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  letter-spacing: var(--tracking-num);
+}
+
+.wx__note {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+
+.wx__note--quiet {
+  color: var(--color-text-faint);
+}
+
+/* The gust is what ends a flight, so it reads louder than the average. */
+.wx__gust {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-accent-2);
+  letter-spacing: var(--tracking-num);
+}
+
+/*
+ * THE RATING BESIDE THE GUST. A measurement, not a verdict, so it is not
+ * coloured as a warning even when the gust is over it: the figure changing
+ * colour would be the app making the judgement.
+ */
+.wx__rated {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+
+.wx__rated--over .num {
+  color: var(--color-accent-2);
+  font-weight: var(--weight-heavy);
+}

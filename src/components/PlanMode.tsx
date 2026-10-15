@@ -7,6 +7,8 @@ import type {
 import type { ShotType } from '../core/shotType.ts'
 import { goesBandFor, zoomAdvice } from '../core/goes.ts'
 import type { Wind } from '../core/upwind.ts'
+import type { LevelWind } from '../core/windProfile.ts'
+import type { SightlineCloud } from '../core/cloud.ts'
 import type { TideExtreme, TideState } from '../core/tide.ts'
 import type { SunArc, SunPosition } from '../core/sun.ts'
 import type { PlanCoverage, PlannedPosition } from '../lib/plan.ts'
@@ -54,7 +56,21 @@ interface PlanModeProps {
   onShowSky: (next: boolean) => void
   /** Wind at the venue. Null until it answers, or when it fails. */
   wind: Wind | null
+  windLevels: LevelWind[]
   gustMps: number | null
+  windAt: Date | null
+  windPast: boolean
+  /**
+   * The height to read the wind at, in feet, or null with nothing in the air.
+   *
+   * Taken from the air positions in the plan: the highest of them, because
+   * that is the one the wind limits first.
+   */
+  flightFeet: number | null
+  ratedWindMps: number | null
+  ratedWindSource: string
+  /** Cloud for the selected position, when it has been asked for. */
+  selectedCloud: SightlineCloud | null
   selectedId: string | null
   onSelect: (id: string | null) => void
   selected: PlannedPosition | null
@@ -170,7 +186,14 @@ export function PlanMode({
   showSky,
   onShowSky,
   wind,
+  windLevels,
   gustMps,
+  windAt,
+  windPast,
+  flightFeet,
+  ratedWindMps,
+  ratedWindSource,
+  selectedCloud,
   selectedId,
   onSelect,
   selected,
@@ -493,7 +516,15 @@ export function PlanMode({
               scrubbedAt={scrubbedAt}
               venue={venue}
               wind={wind}
+              windLevels={windLevels}
               gustMps={gustMps}
+              windAt={windAt}
+              windPast={windPast}
+              flightFeet={flightFeet}
+              ratedWindMps={ratedWindMps}
+              ratedWindSource={ratedWindSource}
+              tideNow={tideNow}
+              cloud={selectedCloud}
             />
           </>
         ) : (
