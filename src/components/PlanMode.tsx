@@ -5,6 +5,7 @@ import type {
   PlatformFilter as PlatformFilterValue,
 } from '../core/platformFilter.ts'
 import type { ShotType } from '../core/shotType.ts'
+import { goesBandFor, zoomAdvice } from '../core/goes.ts'
 import type { Wind } from '../core/upwind.ts'
 import type { TideExtreme, TideState } from '../core/tide.ts'
 import type { SunArc, SunPosition } from '../core/sun.ts'
@@ -23,6 +24,7 @@ import { MapControls } from './MapControls.tsx'
 import { MapView, type MapHandle } from './MapView.tsx'
 import { OverflowMenu } from './OverflowMenu.tsx'
 import { PlatformFilter } from './PlatformFilter.tsx'
+import { SkyLegend } from './SkyLegend.tsx'
 import { PlanStatus } from './PlanStatus.tsx'
 import { PositionCard } from './PositionCard.tsx'
 import { ShotList } from './ShotList.tsx'
@@ -245,6 +247,15 @@ export function PlanMode({
 
   const handle = mapHandle as React.RefObject<MapHandle | null>
 
+  /*
+   * The band on screen and the zoom to judge it at. The band follows the sun
+   * (src/core/goes.ts); the zoom and the width come from the map itself,
+   * because the threshold depends on how wide the screen actually is.
+   */
+  const skyBand = goesBandFor(sun?.altitude ?? -90)
+  const [mapZoom, setMapZoom] = useState(16.5)
+  const [mapWidth, setMapWidth] = useState(390)
+
   /* Whether anything is in the air, which is what the pilot control is for. */
   const airPositions = plan.filter((p) => p.position.platform === 'air').length
 
@@ -279,6 +290,10 @@ export function PlanMode({
         selectedId={selectedId}
         onSelect={onSelect}
         onPitchChange={setPitch}
+        onViewChange={(zoom: number, width: number) => {
+          setMapZoom(zoom)
+          setMapWidth(width)
+        }}
         bottomInset={sheetHeight}
       />
 
@@ -343,6 +358,21 @@ export function PlanMode({
           />
         </div>
       </header>
+
+      {/*
+        * THE SKY KEY, only while the layer is on.
+        *
+        * It carries the colour table NASA GIBS publishes for the band on
+        * screen, and the zoom warning when one satellite pixel has grown
+        * bigger than the view. Both are about the layer, so both live with it
+        * rather than in a panel somewhere else.
+        */}
+      {!showSky ? null : (
+        <SkyLegend
+          band={skyBand}
+          advice={zoomAdvice(skyBand, venue?.lat ?? 0, mapWidth, mapZoom)}
+        />
+      )}
 
       <MapControls
         showSun={showSun}

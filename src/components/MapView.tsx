@@ -9,7 +9,7 @@ import {
   toPosition,
   type LatLon,
 } from '../core/geo.ts'
-import { GOES_ATTRIBUTION, goesBandFor } from '../core/goes.ts'
+import { GOES_ATTRIBUTION, goesBandFor, GOES_MAX_TILE_ZOOM } from '../core/goes.ts'
 import { classificationOf } from '../core/lighting.ts'
 import { goesTileUrl } from '../lib/goesLayer.ts'
 import {
@@ -165,6 +165,7 @@ const FLOATING_CHROME = [
   '.newbuild',
   '.tapnote',
   '.locate',
+  '.skykey',
   /*
    * MAPLIBRE'S OWN CONTROL CORNERS, which were the whole complaint and were
    * never in this list.
@@ -342,6 +343,14 @@ interface MapViewProps {
    * is when this app is used most.
    */
   showSky?: boolean
+  /**
+   * The camera's zoom and the map's width in CSS pixels, whenever either moves.
+   *
+   * The sky layer's zoom warning depends on how many SCREEN pixels one
+   * satellite pixel covers, so it needs the real width rather than an assumed
+   * phone. Reported from here because the map is the only thing that knows.
+   */
+  onViewChange?: (zoom: number, widthPx: number) => void
   /** PhotoPills style rays from the venue pin. All four bearings from core. */
   sunOverlay: SunOverlay | null
   showSun: boolean
@@ -599,6 +608,7 @@ export function MapView({
   onReady,
   sunAltitude = null,
   showSky = false,
+  onViewChange,
   pilotAt = null,
   onPilotMove,
 }: MapViewProps) {
@@ -659,6 +669,10 @@ export function MapView({
     onAddAt,
     onPilotMove,
   ])
+
+  /* Read through a ref so a handler bound once at build stays current. */
+  const latestView = useRef(onViewChange)
+  latestView.current = onViewChange
 
   const selfMoved = useRef(false)
   const insetRef = useRef(bottomInset)
@@ -791,6 +805,16 @@ export function MapView({
 
     instance.on('pitchend', () => latest.current.onPitchChange(instance.getPitch()))
     instance.on('moveend', () => setViewTick((tick) => tick + 1))
+    /*
+     * Zoom and width, on every move rather than on moveend: the sky layer's
+     * warning should appear while a pinch is still happening, not a beat after
+     * it stops.
+     */
+    const reportView = () => {
+      latestView.current?.(instance.getZoom(), instance.getCanvas().clientWidth)
+    }
+    instance.on('move', reportView)
+    instance.once('load', reportView)
 
     instance.on('load', () => {
       const lighting = [
@@ -819,6 +843,13 @@ export function MapView({
           type: 'raster',
           tiles: [goesTileUrl(band)],
           tileSize: 256,
+          /*
+           * MAXZOOM IS WHAT GIBS ACTUALLY SERVES: level 6 for infrared and 7
+           * for visible, from its own tile matrix set names. Without it
+           * maplibre requests tiles that do not exist and gets nothing at all
+           * close in, instead of stretching the deepest ones it has.
+           */
+          maxzoom: GOES_MAX_TILE_ZOOM[band],
           attribution: GOES_ATTRIBUTION,
         })
         instance.addLayer({

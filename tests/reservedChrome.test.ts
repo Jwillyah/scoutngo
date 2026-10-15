@@ -60,6 +60,7 @@ describe('the reserved list', () => {
     '.newbuild',
     '.tapnote',
     '.locate',
+    '.skykey',
   ]
 
   it('reserves every floating surface this app renders', () => {
