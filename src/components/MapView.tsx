@@ -32,6 +32,7 @@ import {
 import {
   appLayerIdsIn,
   CONE_SOURCE,
+  FOOTPRINT_SOURCE,
   PILOT_SOURCE,
   RADIUS_SOURCE,
   RAY_SOURCE,
@@ -374,6 +375,62 @@ function coneCollection(plan: PlannedPosition[]): GeoJSON.FeatureCollection {
 }
 
 /**
+ * WHAT A TOP-DOWN AND A 360 SEE.
+ *
+ * Three kinds of feature in one source, told apart by a `kind` property so one
+ * layer per kind can filter on it: the ground rectangle a nadir frame covers,
+ * the shadow direction across that rectangle, and the horizon ring of a 360
+ * with a tick where the sun is.
+ *
+ * NONE OF THEM IS A CONE, which is the point. A cone is a claim about a
+ * direction and neither shot type has one. All of the geometry comes out of
+ * src/core/footprint.ts; nothing here computes a coordinate.
+ */
+function footprintCollection(plan: PlannedPosition[]): GeoJSON.FeatureCollection {
+  const features: GeoJSON.Feature[] = []
+
+  for (const p of plan) {
+    const draw = p.footprint
+    if (draw === null) continue
+
+    if (draw.shotType === 'top-down') {
+      if (draw.rect.length > 0) {
+        features.push({
+          type: 'Feature',
+          properties: { kind: 'rect', id: p.position.id },
+          geometry: { type: 'Polygon', coordinates: draw.rect },
+        })
+      }
+      if (draw.shadow.length > 0) {
+        features.push({
+          type: 'Feature',
+          properties: { kind: 'shadow', id: p.position.id },
+          geometry: { type: 'LineString', coordinates: draw.shadow },
+        })
+      }
+      continue
+    }
+
+    if (draw.ring.length > 0) {
+      features.push({
+        type: 'Feature',
+        properties: { kind: 'ring', id: p.position.id },
+        geometry: { type: 'LineString', coordinates: draw.ring },
+      })
+    }
+    if (draw.sunTick.length > 0) {
+      features.push({
+        type: 'Feature',
+        properties: { kind: 'suntick', id: p.position.id },
+        geometry: { type: 'LineString', coordinates: draw.sunTick },
+      })
+    }
+  }
+
+  return { type: 'FeatureCollection', features }
+}
+
+/**
  * The line from the pilot to each air position.
  *
  * ONE PILOT, SEVERAL AIRCRAFT POSITIONS. The pilot stands in one place and the
@@ -712,6 +769,7 @@ export function MapView({
       instance.addSource(SUN_SOURCE, { type: 'geojson', data: emptyCollection() })
       instance.addSource(RAY_SOURCE, { type: 'geojson', data: emptyCollection() })
       instance.addSource(PILOT_SOURCE, { type: 'geojson', data: emptyCollection() })
+      instance.addSource(FOOTPRINT_SOURCE, { type: 'geojson', data: emptyCollection() })
 
       const rayColor = [
         'match',
@@ -818,6 +876,78 @@ export function MapView({
        * The secondary accent, not red. Red is hazard in this app and a measured
        * distance is not a hazard.
        */
+      /*
+       * THE NADIR FOOTPRINT: a rectangle, not a cone.
+       *
+       * Faint fill and a hard edge, in the same lighting colour the cones use,
+       * because it is the same kind of fact: this is what the frame contains.
+       * Square corners on purpose, since that is literally what the sensor
+       * lays on the ground.
+       */
+      instance.addLayer({
+        id: 'footprint-fill',
+        type: 'fill',
+        source: FOOTPRINT_SOURCE,
+        filter: ['==', ['get', 'kind'], 'rect'],
+        paint: { 'fill-color': lighting, 'fill-opacity': 0.16 },
+      })
+      instance.addLayer({
+        id: 'footprint-line',
+        type: 'line',
+        source: FOOTPRINT_SOURCE,
+        filter: ['==', ['get', 'kind'], 'rect'],
+        paint: { 'line-color': lighting, 'line-width': 1.5, 'line-opacity': 0.95 },
+      })
+
+      /*
+       * THE SHADOW DIRECTION ACROSS THE FRAME. The whole reason the yaw is
+       * adjustable: you line the frame up with the shadows by eye against
+       * this. Drawn in the shadow colour, which is what the sun axis already
+       * uses, so the two read as the same fact.
+       */
+      instance.addLayer({
+        id: 'footprint-shadow',
+        type: 'line',
+        source: FOOTPRINT_SOURCE,
+        filter: ['==', ['get', 'kind'], 'shadow'],
+        paint: {
+          'line-color': readToken('--sun-shadow', '#8b8f7a', container.current),
+          'line-width': 2,
+          'line-dasharray': [2, 2],
+          'line-opacity': 0.95,
+        },
+      })
+
+      /*
+       * THE HORIZON RING OF A 360, at the distance the horizon actually sits:
+       * about 28km at 200ft. A line, not a fill, because it is the edge of
+       * what the shot contains rather than an area it covers.
+       */
+      instance.addLayer({
+        id: 'footprint-ring',
+        type: 'line',
+        source: FOOTPRINT_SOURCE,
+        filter: ['==', ['get', 'kind'], 'ring'],
+        paint: {
+          'line-color': readToken('--color-accent-2', '#c9a227', container.current),
+          'line-width': 1.5,
+          'line-dasharray': [6, 4],
+          'line-opacity': 0.9,
+        },
+      })
+      /* Where the sun sits on that ring. The sun's own colour, not the ring's. */
+      instance.addLayer({
+        id: 'footprint-suntick',
+        type: 'line',
+        source: FOOTPRINT_SOURCE,
+        filter: ['==', ['get', 'kind'], 'suntick'],
+        paint: {
+          'line-color': readToken('--sun', '#f2c14e', container.current),
+          'line-width': 4,
+          'line-opacity': 1,
+        },
+      })
+
       instance.addLayer({
         id: 'pilot-line-casing',
         type: 'line',
@@ -1172,6 +1302,18 @@ export function MapView({
       pilotMarker.current.setLngLat([pilotAt.lon, pilotAt.lat])
     }
   }, [pilotAt])
+
+  /*
+   * The footprints and rings. Driven by the same conePlan the cones are, so
+   * the one control that reveals shapes reveals all of them.
+   */
+  useEffect(() => {
+    if (map.current === null || !ready) return
+    const source = map.current.getSource(FOOTPRINT_SOURCE) as
+      | maplibregl.GeoJSONSource
+      | undefined
+    source?.setData(footprintCollection(conePlan))
+  }, [conePlan, ready])
 
   /*
    * The pilot lines. Sized from real coordinates, so unlike the bearing lines

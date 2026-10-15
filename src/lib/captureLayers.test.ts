@@ -56,9 +56,9 @@ describe('appLayerIdsIn', () => {
    * to the model, and it survived because nothing forced anyone to notice a new
    * layer. The pilot line was added to this list because this test failed.
    */
-  it('knows the five sources this app owns', () => {
+  it('knows the six sources this app owns', () => {
     expect([...APP_SOURCES].sort()).toEqual(
-      ['fov-cones', 'pilot-links', 'reach-radius', 'sun-axis', 'sun-rays'],
+      ['fov-cones', 'pilot-links', 'reach-radius', 'shot-footprints', 'sun-axis', 'sun-rays'],
     )
   })
 

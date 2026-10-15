@@ -3,6 +3,7 @@ import {
   MAX_ALTITUDE_FEET,
   MIN_ALTITUDE_FEET,
   pilotSeparation,
+  usesAltitude,
 } from '../core/air.ts'
 import type { SightlineCloud } from '../core/cloud.ts'
 import { MIN_BEARING_RANGE_METERS } from '../core/coverage.ts'
@@ -557,10 +558,17 @@ export function PositionCard({
         </p>
       ))}
 
-      {position.platform !== 'air' ? null : (
+      {!usesAltitude(position.platform, position.shotType) ? null : (
         <div className="card__air">
           <div className="card__air-row">
-            <span className="card__air-tag">Drone</span>
+            {/*
+              * "Drone" only when it IS one. A top-down or a 360 from the
+              * ground is a mast or a tripod, and the height still sizes the
+              * rectangle and the ring, so the field is there either way.
+              */}
+            <span className="card__air-tag">
+              {position.platform === 'air' ? 'Drone' : 'Height'}
+            </span>
             <label className="card__alt">
               <input
                 className="card__alt-input num"
@@ -570,7 +578,7 @@ export function PositionCard({
                 max={MAX_ALTITUDE_FEET}
                 step={10}
                 value={position.altitudeFeet}
-                aria-label="Altitude, feet above ground level"
+                aria-label="Camera height, feet above ground level"
                 onChange={(event) =>
                   onSetAltitude(position.id, Number(event.target.value))
                 }
@@ -585,10 +593,19 @@ export function PositionCard({
             * cleared or compliant: that depends on the airspace, the aircraft
             * and the operator, none of which this app knows.
             */}
-          <p className="card__air-note">
-            Part 107 sets the altitude limit at {FAA_CEILING_FEET} ft above ground level. The
-            field stops there.
-          </p>
+          {/*
+            * ONLY FOR AN AIRCRAFT. Part 107 is a rule about uncrewed
+            * aircraft; printing it beside a tripod height would be an
+            * aviation rule attached to something it does not govern, which is
+            * its own kind of false statement. The field still stops at 400
+            * either way, which is a field limit and says so.
+            */}
+          {position.platform !== 'air' ? null : (
+            <p className="card__air-note">
+              Part 107 sets the altitude limit at {FAA_CEILING_FEET} ft above ground level.
+              The field stops there.
+            </p>
+          )}
 
           {/*
             * THE PILOT SEPARATION. A MEASUREMENT, NOT A CLEARANCE.
@@ -602,7 +619,9 @@ export function PositionCard({
             * whether the flight is allowed. It says how far apart two points
             * are, and the judgement is the reader's.
             */}
-          {separation === null || pilotAcross === null || pilotSlant === null ? (
+          {position.platform !== 'air' ? null : separation === null ||
+            pilotAcross === null ||
+            pilotSlant === null ? (
             <p className="card__air-note">
               <button type="button" className="card__air-place" onClick={onPlacePilot}>
                 Place the pilot position
@@ -763,6 +782,29 @@ export function PositionCard({
                 </div>
               </>
             ) : null}
+            {/*
+              * WHAT THE FRAME ACTUALLY COVERS ON THE GROUND, which is the
+              * number a nadir shot is planned with: at 200ft the Air 3S wide
+              * camera lays 91 by 61 metres on the ground. Computed in
+              * src/core/footprint.ts from the altitude and the sensor.
+              */}
+            {planned.footprint?.shotType !== 'top-down' ? null : (
+              <div className="card__stat">
+                <dt>Ground covered</dt>
+                <dd className="num">
+                  {Math.round(planned.footprint.widthMeters)} ×{' '}
+                  {Math.round(planned.footprint.heightMeters)} m
+                </dd>
+              </div>
+            )}
+            {planned.footprint?.shotType !== 'orbit' ? null : (
+              <div className="card__stat">
+                <dt>Horizon</dt>
+                <dd className="num">
+                  {(planned.footprint.horizonMeters / 1000).toFixed(1)} km
+                </dd>
+              </div>
+            )}
             {read.shotType !== 'top-down' ? null : (
               <>
                 <div className="card__stat">

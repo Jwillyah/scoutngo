@@ -108,3 +108,23 @@ export function pilotSeparation(
     altitudeFeet: clampAltitudeFeet(altitudeFeet),
   }
 }
+
+/**
+ * WHETHER A POSITION'S GEOMETRY USES A CAMERA HEIGHT.
+ *
+ * It used to be "is this an air position", and that was right while altitude
+ * only fed the slant range. It is not right any more: a top-down's ground
+ * rectangle and a 360's horizon ring are both sized from the height of the
+ * camera, whatever it is standing on. A tripod 360 at eye level has a horizon
+ * about 5km out; the same 360 from 200ft has one about 28km out, and that is
+ * the difference between two quite different pictures.
+ *
+ * So the question is about the GEOMETRY, not the platform. Asking it this way
+ * is what stops a top-down being sized from a height the shooter cannot set.
+ */
+export function usesAltitude(
+  platform: 'ground' | 'air',
+  shotType: 'framed' | 'top-down' | 'orbit',
+): boolean {
+  return platform === 'air' || shotType === 'top-down' || shotType === 'orbit'
+}

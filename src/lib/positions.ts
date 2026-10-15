@@ -13,7 +13,7 @@
  * hold on to.
  */
 
-import { clampAltitudeFeet } from '../core/air.ts'
+import { clampAltitudeFeet, DEFAULT_ALTITUDE_FEET, usesAltitude } from '../core/air.ts'
 import {
   DEFAULT_SHOT_TYPE,
   DEFAULT_YAW_DEGREES,
@@ -124,12 +124,18 @@ export function movePosition(
 }
 
 /**
- * Changes how high an air position is flying.
+ * Changes the camera height.
  *
  * Clamped in core, to the same bounds the model's answer is clamped to, so a
- * typed 900 and a proposed 900 both become 400. Ground positions are left
- * alone: an altitude on something standing on the ground is not a number, it
- * is a contradiction.
+ * typed 900 and a proposed 900 both become 400.
+ *
+ * THE GUARD IS ABOUT THE GEOMETRY, NOT THE PLATFORM. It used to refuse any
+ * ground position, on the grounds that an altitude on something standing on
+ * the ground is a contradiction. That stopped being true when shot types
+ * arrived: a top-down's ground rectangle and a 360's horizon ring are both
+ * sized from the camera's height whatever it is standing on, so refusing to
+ * set it left those shapes sized from a floor the shooter could not move. A
+ * framed ground position still has no use for it and is still left alone.
  */
 export function setAltitude(
   list: CameraPosition[],
@@ -137,7 +143,7 @@ export function setAltitude(
   altitudeFeet: number,
 ): CameraPosition[] {
   return list.map((position) =>
-    position.id === id && position.platform === 'air'
+    position.id === id && usesAltitude(position.platform, position.shotType)
       ? { ...position, altitudeFeet: clampAltitudeFeet(altitudeFeet) }
       : position,
   )
@@ -160,6 +166,10 @@ export function setOptic(
 /**
  * Changes what kind of shot a position is.
  *
+ * Going to a shot type whose geometry needs a camera height gives it the
+ * default rather than leaving it at zero, because a rectangle or a ring sized
+ * from zero has no size at all.
+ *
  * Switching AWAY from top-down leaves the yaw where it was rather than zeroing
  * it, so flipping to 360 to look and back again does not lose the angle that
  * was lined up with the shadows.
@@ -169,7 +179,18 @@ export function setShotType(
   id: string,
   shotType: ShotType,
 ): CameraPosition[] {
-  return list.map((position) => (position.id === id ? { ...position, shotType } : position))
+  return list.map((position) => {
+    if (position.id !== id) return position
+    const needsHeight = usesAltitude(position.platform, shotType)
+    return {
+      ...position,
+      shotType,
+      altitudeFeet:
+        needsHeight && position.altitudeFeet <= 0
+          ? DEFAULT_ALTITUDE_FEET
+          : position.altitudeFeet,
+    }
+  })
 }
 
 /** Turns the top-down rectangle. Normalised, because a yaw of 370 is a yaw of 10. */

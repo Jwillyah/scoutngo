@@ -1,5 +1,13 @@
 import { slantRangeMeters } from '../core/air.ts'
 import {
+  footprintSize,
+  groundFootprint,
+  horizonDistanceMeters,
+  horizonRing,
+  shadowAcrossFootprint,
+  sunTickOnRing,
+} from '../core/footprint.ts'
+import {
   classifyFraming,
   computeFOV,
   frameWidthMeters,
@@ -181,6 +189,15 @@ export interface PlannedPosition {
    */
   cone: Position[][]
   /**
+   * WHAT A TOP-DOWN OR A 360 ACTUALLY SEES, drawn instead of a cone.
+   *
+   * A top-down gets a rectangle on the ground with the shadows across it; a
+   * 360 gets a ring at the real horizon distance with the sun marked on it.
+   * Both are empty for the shot types they do not apply to, so there is never
+   * more than one shape per position. See src/core/footprint.ts.
+   */
+  footprint: FootprintDraw | null
+  /**
    * Problems with the ground itself, from OSM geometry. Reported, never acted
    * on: the position stays exactly where it was put so the shooter can judge it
    * and drag it themselves.
@@ -237,6 +254,58 @@ function resolveOptic(
 /** The cone is drawn a little past the subject so it reads as pointing at it. */
 const CONE_OVERSHOOT = 1.25
 const MIN_CONE_METERS = 60
+
+/**
+ * The shapes for a shot type that has no cone.
+ *
+ * Null for a framed shot, which has a cone instead. Narrowed on the AIM rather
+ * than on the shot type alone, so the yaw can only be read where it exists.
+ */
+function footprintFor(
+  position: CameraPosition,
+  aim: Aim,
+  sun: SunPosition,
+  fov: FOV,
+): FootprintDraw | null {
+  if (aim.shotType === 'top-down') {
+    const size = footprintSize(position.altitudeFeet, fov.hFOV, fov.vFOV)
+    return {
+      shotType: 'top-down',
+      rect: groundFootprint(
+        position.at,
+        position.altitudeFeet,
+        fov.hFOV,
+        fov.vFOV,
+        aim.yawDegrees,
+      ),
+      /*
+       * No shadow line below the horizon, because there is no shadow. An
+       * arrow drawn anyway would be an instruction to line the frame up with
+       * something that is not there.
+       */
+      shadow:
+        sun.altitude > 0
+          ? shadowAcrossFootprint(position.at, sun.shadowBearing, size.diagonalMeters)
+          : [],
+      widthMeters: size.widthMeters,
+      heightMeters: size.heightMeters,
+    }
+  }
+
+  if (aim.shotType === 'orbit') {
+    const horizonMeters = horizonDistanceMeters(position.altitudeFeet)
+    return {
+      shotType: 'orbit',
+      ring: horizonRing(position.at, horizonMeters),
+      /* Nothing to mark on the ring when the sun is under it. */
+      sunTick:
+        sun.altitude > 0 ? sunTickOnRing(position.at, sun.azimuth, horizonMeters) : [],
+      horizonMeters,
+    }
+  }
+
+  return null
+}
 
 export function planPosition(
   position: CameraPosition,
@@ -347,6 +416,7 @@ export function planPosition(
       drawsCone(position.shotType) && aim.shotType === 'framed'
         ? fovConePolygon(position.at, aim.cameraBearing, fov.hFOV, coneRangeMeters)
         : [],
+    footprint: footprintFor(position, aim, sun, fov),
     warnings: checkSite(position.at, land, { platform: position.platform, subject }),
   }
 }
@@ -366,6 +436,31 @@ export function planPositions(
   )
 }
 
+
+/**
+ * The shapes a non-framed position is drawn with.
+ *
+ * One variant per shot type that has one, so a card or a map layer cannot read
+ * a ring off a top-down or a rectangle off a 360.
+ */
+export type FootprintDraw =
+  | {
+      shotType: 'top-down'
+      /** The rectangle on the ground, as a closed polygon ring. */
+      rect: Position[][]
+      /** The shadow direction through its centre. Empty below the horizon. */
+      shadow: Position[]
+      widthMeters: number
+      heightMeters: number
+    }
+  | {
+      shotType: 'orbit'
+      /** The horizon, at the distance it actually sits. A closed line. */
+      ring: Position[]
+      /** A radial tick where the sun is. Empty when the sun is down. */
+      sunTick: Position[]
+      horizonMeters: number
+    }
 
 export interface PlanCoverage {
   coverage: Coverage

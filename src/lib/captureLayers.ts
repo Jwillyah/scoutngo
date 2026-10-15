@@ -22,6 +22,11 @@ export const SUN_SOURCE = 'sun-axis'
 export const RAY_SOURCE = 'sun-rays'
 /** The measured line from the pilot to each air position. */
 export const PILOT_SOURCE = 'pilot-links'
+/**
+ * What a top-down and a 360 see: a ground rectangle with the shadows across
+ * it, and a horizon ring with the sun marked on it. Neither is a cone.
+ */
+export const FOOTPRINT_SOURCE = 'shot-footprints'
 
 /** Every source this app draws with. The basemap is NOT here and must not be. */
 export const APP_SOURCES: readonly string[] = [
@@ -30,6 +35,7 @@ export const APP_SOURCES: readonly string[] = [
   SUN_SOURCE,
   RAY_SOURCE,
   PILOT_SOURCE,
+  FOOTPRINT_SOURCE,
 ]
 
 /**

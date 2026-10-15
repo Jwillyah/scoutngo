@@ -168,3 +168,88 @@ describe('shot types add no chrome to the app shell', () => {
     expect(html).toContain('class="shell shell--setup"')
   })
 })
+
+/*
+ * WHAT GETS DRAWN, PER SHOT TYPE. Exactly one shape each, and never a cone
+ * for a type with no direction.
+ */
+describe('the shapes each shot type is drawn with', () => {
+  const make = (over: Partial<CameraPosition>): CameraPosition => ({
+    id: 'x',
+    number: 1,
+    at: { lat: 38.3655, lon: -75.6058 },
+    lensId: 'air-3s-wide',
+    focalLength: 24,
+    shot: '',
+    risk: '',
+    angleRationale: '',
+    coversShot: null,
+    platform: 'air',
+    altitudeFeet: 200,
+    shotType: 'framed',
+    yawDegrees: 0,
+    moved: false,
+    origin: 'manual',
+    ...over,
+  })
+  const plan = (over: Partial<CameraPosition>) => planPositions([make(over)], SUBJECT, sun)[0]
+
+  it('gives a framed shot a cone and no footprint', () => {
+    const p = plan({ shotType: 'framed' })
+    expect(p.cone.length).toBeGreaterThan(0)
+    expect(p.footprint).toBeNull()
+  })
+
+  it('gives a top-down a rectangle and no cone', () => {
+    const p = plan({ shotType: 'top-down' })
+    expect(p.cone).toEqual([])
+    expect(p.footprint?.shotType).toBe('top-down')
+    if (p.footprint?.shotType !== 'top-down') return
+    // A closed ring of four corners, and the measured 91 by 61 at 200ft.
+    expect(p.footprint.rect[0]).toHaveLength(5)
+    expect(Math.round(p.footprint.widthMeters)).toBe(91)
+    expect(Math.round(p.footprint.heightMeters)).toBe(61)
+  })
+
+  it('gives a 360 a horizon ring and no cone', () => {
+    const p = plan({ shotType: 'orbit' })
+    expect(p.cone).toEqual([])
+    expect(p.footprint?.shotType).toBe('orbit')
+    if (p.footprint?.shotType !== 'orbit') return
+    expect(p.footprint.ring.length).toBeGreaterThan(20)
+    // About 28km at 200ft, which is where the horizon actually is.
+    expect(p.footprint.horizonMeters / 1000).toBeCloseTo(27.9, 1)
+  })
+
+  /*
+   * NO SHADOW ARROW WITHOUT A SHADOW, and no sun tick with the sun down. An
+   * arrow drawn anyway would be an instruction to line the frame up with
+   * something that is not there.
+   */
+  it('draws no shadow line and no sun tick with the sun below the horizon', () => {
+    const night = getSunPosition(new Date('2026-09-12T03:00:00-04:00'), VENUE.lat, VENUE.lon)
+    expect(night.altitude).toBeLessThan(0)
+    const nadir = planPositions([make({ shotType: 'top-down' })], SUBJECT, night)[0]
+    const globe = planPositions([make({ shotType: 'orbit' })], SUBJECT, night)[0]
+    if (nadir.footprint?.shotType !== 'top-down') throw new Error('expected top-down')
+    if (globe.footprint?.shotType !== 'orbit') throw new Error('expected orbit')
+    expect(nadir.footprint.shadow).toEqual([])
+    expect(globe.footprint.sunTick).toEqual([])
+    // The shapes themselves are still there: the frame still covers ground.
+    expect(nadir.footprint.rect[0]).toHaveLength(5)
+    expect(globe.footprint.ring.length).toBeGreaterThan(20)
+  })
+
+  /*
+   * A TOP-DOWN OR A 360 FROM THE GROUND IS A MAST OR A TRIPOD, and its height
+   * still sizes the rectangle and the ring. The height field is offered
+   * whenever the geometry uses it, not only when a drone is flying.
+   */
+  it('sizes a ground top-down from its own camera height', () => {
+    const low = plan({ shotType: 'top-down', platform: 'ground', altitudeFeet: 12 })
+    const high = plan({ shotType: 'top-down', platform: 'ground', altitudeFeet: 48 })
+    if (low.footprint?.shotType !== 'top-down') throw new Error('expected top-down')
+    if (high.footprint?.shotType !== 'top-down') throw new Error('expected top-down')
+    expect(high.footprint.widthMeters / low.footprint.widthMeters).toBeCloseTo(4, 1)
+  })
+})

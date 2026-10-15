@@ -64,7 +64,7 @@ describe('the altitude is a field, not a printed number', () => {
 
   it('offers an editable altitude', () => {
     expect(html).toContain('type="number"')
-    expect(html).toContain('aria-label="Altitude, feet above ground level"')
+    expect(html).toContain('aria-label="Camera height, feet above ground level"')
     expect(html).toContain('value="200"')
   })
 
