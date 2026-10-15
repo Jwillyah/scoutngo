@@ -107,6 +107,27 @@ export interface TideExtreme {
   kind: 'high' | 'low'
 }
 
+/**
+ * Where the water level curve came from.
+ *
+ * NOAA publishes two different things and not every station publishes both.
+ * A REFERENCE station (type R) publishes a six minute curve. A SUBORDINATE
+ * station (type S) publishes only the high and low waters, because it is
+ * defined as a set of time and height offsets from a reference station rather
+ * than measured and harmonically analysed in its own right.
+ *
+ * That distinction is why this exists. The app used to require both and throw
+ * away any station that could not supply the curve, which at Lynnhaven Inlet
+ * meant throwing away all three nearest stations and telling the user there
+ * were no tide predictions, while the station 570m from the shot was
+ * publishing perfectly good high and low water.
+ *
+ * So a derived curve is computed here instead, and it is LABELLED. A number the
+ * app worked out is not the same as a number NOAA published, and the screen
+ * says which it is looking at.
+ */
+export type CurveSource = 'published' | 'derived'
+
 /** One point on the predicted water level curve. */
 export interface TideSample {
   at: Date
@@ -143,6 +164,58 @@ export const feetToMetres = (feet: number): number => feetToMeters(feet)
  * six minute gap is well inside the precision of the prediction itself. Null
  * when the moment is outside the samples: extrapolating a tide is inventing one.
  */
+/**
+ * A water level curve built from the high and low waters alone.
+ *
+ * FOR SUBORDINATE STATIONS, which publish no six minute curve. See CurveSource.
+ *
+ * HALF A COSINE BETWEEN CONSECUTIVE TURNS, not a straight line. A tide is not
+ * triangular: it moves slowly either side of a turn and fastest halfway
+ * between, which is the behaviour the sailor's rule of twelfths approximates
+ * (a twelfth of the range in the first hour of six, then two, three, three,
+ * two, one). Straight line interpolation between a high and a low six hours
+ * apart puts the first hour at two twelfths, which is twice the real movement
+ * and exactly the hour that decides whether a sandbar is out.
+ *
+ *   h(t) = mid + half * cos(pi * share)
+ *
+ * which lands on each published extreme exactly at its published time, so the
+ * derived curve never disagrees with the numbers it was built from.
+ */
+export function curveFromExtremes(
+  extremes: TideExtreme[],
+  stepMinutes = 6,
+): TideSample[] {
+  const sorted = [...extremes].sort((a, b) => a.at.getTime() - b.at.getTime())
+  if (sorted.length < 2) return []
+
+  const step = stepMinutes * 60_000
+  const out: TideSample[] = []
+
+  for (let i = 1; i < sorted.length; i++) {
+    const from = sorted[i - 1]
+    const to = sorted[i]
+    const span = to.at.getTime() - from.at.getTime()
+    if (span <= 0) continue
+
+    const mid = (from.feet + to.feet) / 2
+    const half = (from.feet - to.feet) / 2
+
+    /*
+     * The last sample of each leg is left to the next leg's first, so a turn
+     * is not emitted twice. The final extreme is appended after the loop.
+     */
+    for (let t = from.at.getTime(); t < to.at.getTime(); t += step) {
+      const share = (t - from.at.getTime()) / span
+      out.push({ at: new Date(t), feet: mid + half * Math.cos(Math.PI * share) })
+    }
+  }
+
+  const last = sorted[sorted.length - 1]
+  out.push({ at: new Date(last.at.getTime()), feet: last.feet })
+  return out
+}
+
 export function levelAt(curve: TideSample[], at: Date): number | null {
   if (curve.length === 0) return null
   const t = at.getTime()

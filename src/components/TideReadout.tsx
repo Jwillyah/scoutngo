@@ -115,6 +115,25 @@ export function TideReadout({ tide, venueWindow, scrubbedAt }: TideReadoutProps)
               as approximate for this venue.
             </p>
           )}
+          {/*
+            * WHERE THE CURVE CAME FROM.
+            *
+            * NOAA publishes a six minute curve for a reference station and the
+            * turns only for a subordinate one, which is most of the small
+            * stations and nearly all the ones actually at a venue. The app
+            * used to discard a station that could not supply the curve, which
+            * at Lynnhaven Inlet discarded the three nearest and reported no
+            * tide at all. It derives the curve from the turns instead, and
+            * says so: a number the app worked out is not a number NOAA
+            * published, and the difference belongs on screen.
+            */}
+          {predictions.curveSource === 'published' ? null : (
+            <p>
+              This station publishes its high and low waters but not a
+              six-minute curve, so the level between turns is computed here
+              from those turns. The turn times and heights are NOAA&rsquo;s.
+            </p>
+          )}
           <p>
             Predicted by NOAA, not measured. Wind and river flow move real water
             away from the prediction.

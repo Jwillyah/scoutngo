@@ -31,7 +31,8 @@ account, no keys, no card.
   a generate is allowed to come back with
 - Air positions with an altitude in feet above ground, and a pilot position you
   place to measure the distance from
-- Tide from NOAA, and the time scrubber that moves every one of those numbers
+- Tide from NOAA, including the small subordinate stations that are usually the
+  ones actually at a venue, and the time scrubber that moves every number
 - Shot lists, saved setups, the kit editor, Field mode, offline field packs
 - Installing it to your home screen and using it as an app
 
@@ -145,6 +146,33 @@ contribution to coverage. At 2532 that did not happen once.
 So 2532 stays. Note that total wall clock is *not* a valid comparison here:
 Overpass caches a bounding box server side, so whichever arm queries first in a
 pair looks slower for reasons that have nothing to do with the image.
+
+## Which build am I looking at
+
+There is **no service worker**. Not one line: no registration, no workbox, no
+PWA plugin, nothing in the build output, and a test
+(`tests/noServiceWorker.test.ts`) that fails the build if one ever appears.
+Offline field packs are `localStorage`, so nothing about working offline needs
+one; what a service worker would add is a second invisible cache, owned by the
+browser, that survives a reload and serves old code to someone standing on a
+dock.
+
+What *does* hold a stale build is iOS Safari, and a home-screen app more
+stubbornly still, keeping `index.html` and therefore keeping the hashed asset
+URLs that document names.
+
+So the short commit hash is compiled in and shown under **Settings**. A `+`
+after it means that build came from a tree with uncommitted changes, so it
+corresponds to no commit. Quote it with a screenshot and there is nothing left
+to disagree about.
+
+The app also checks, on a fifteen-minute timer and whenever it comes back to
+the foreground, whether a different build is deployed: one request for
+`index.html` with `cache: 'no-store'`, comparing the stamp in it against the
+one compiled in. If they differ it says so and offers a button. **It never
+reloads by itself** — you may be mid-shoot — and offline the check is silent,
+because no signal is not an error. Saved spots and field packs are in
+`localStorage` and survive the reload either way.
 
 ## Drones, and what this app will not tell you
 

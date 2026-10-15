@@ -4,6 +4,7 @@ import { type MapHandle } from './components/MapView.tsx'
 import { ModeRail } from './components/ModeRail.tsx'
 import { FieldMode } from './components/FieldMode.tsx'
 import { PlanMode } from './components/PlanMode.tsx'
+import { NewBuildNotice } from './components/NewBuildNotice.tsx'
 import { SetupMode } from './components/SetupMode.tsx'
 import type { LatLon } from './core/geo.ts'
 import { DEFAULT_ALTITUDE_FEET } from './core/air.ts'
@@ -20,6 +21,7 @@ import { getSunArc, getSunPosition } from './core/sun.ts'
 import { extremesAround, tideStateAt } from './core/tide.ts'
 import { formatClock } from './core/timezone.ts'
 import { LOCATED_ZOOM } from './lib/locateOnce.ts'
+import { useNewBuild } from './lib/useNewBuild.ts'
 import { briefDriftMeters, formatDrift, isBriefStale, type BriefAnchor } from './lib/brief.ts'
 import {
   defaultSelection,
@@ -418,6 +420,9 @@ function App() {
    * is a mode you forget you are in and then wonder why the map stopped
    * behaving.
    */
+  /* Whether a newer build is deployed. Reports only; never reloads by itself. */
+  const newBuild = useNewBuild()
+
   const [placing, setPlacing] = useState(false)
 
   /*
@@ -1131,6 +1136,12 @@ function App() {
 
   return (
     <div className={`shell shell--${mode}`}>
+      {/*
+        * A NEWER BUILD ANNOUNCES ITSELF HERE, above everything, in every mode.
+        * There is no service worker in this app; what holds a stale build is
+        * iOS Safari keeping index.html. See src/lib/build.ts.
+        */}
+      <NewBuildNotice check={newBuild} />
       {mode === 'setup' ? (
         <div className="mode-setup">
           <SetupMode

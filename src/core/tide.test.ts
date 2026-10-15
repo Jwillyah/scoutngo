@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  curveFromExtremes,
   directionAt,
   extremesAround,
   feetToMetres,
@@ -231,5 +232,132 @@ describe('tidalRangeFeet', () => {
 describe('feetToMetres', () => {
   it('converts for the dual unit readouts the rest of the app uses', () => {
     expect(feetToMetres(3.3)).toBeCloseTo(1.006, 3)
+  })
+})
+
+/*
+ * A DERIVED CURVE, FOR SUBORDINATE STATIONS.
+ *
+ * NOAA publishes a six minute curve for reference stations and high and low
+ * water only for subordinate ones. The app used to require both and discard
+ * any station that could not supply the curve, which at Lynnhaven Inlet meant
+ * discarding all three nearest stations and reporting no tide predictions,
+ * while the station 570m from the shot published good high and low water.
+ */
+describe('curveFromExtremes', () => {
+  /* A clean six hour fall from 4ft to 0ft, starting at midnight UTC. */
+  const HIGH = new Date('2026-10-20T00:00:00Z')
+  const LOW = new Date('2026-10-20T06:00:00Z')
+  const extremes: TideExtreme[] = [
+    { at: HIGH, feet: 4, kind: 'high' },
+    { at: LOW, feet: 0, kind: 'low' },
+  ]
+
+  it('lands exactly on every published extreme', () => {
+    const curve = curveFromExtremes(extremes)
+    expect(levelAt(curve, HIGH)).toBeCloseTo(4, 6)
+    expect(levelAt(curve, LOW)).toBeCloseTo(0, 6)
+  })
+
+  it('is the mean halfway between the turns', () => {
+    const curve = curveFromExtremes(extremes)
+    expect(levelAt(curve, new Date('2026-10-20T03:00:00Z'))).toBeCloseTo(2, 2)
+  })
+
+  /*
+   * THE RULE OF TWELFTHS, which is the reason this is a cosine and not a
+   * straight line. Over six hours a tide moves 1, 2, 3, 3, 2, 1 twelfths of
+   * its range, and a 4ft range is 0.333ft per twelfth.
+   *
+   * THE RULE IS THE ROUNDED VERSION OF THIS, not the other way round. The
+   * cosine is exact at hours 2, 3, 4 and 6 and sits 0.065ft off at hours 1 and
+   * 5, which is the rounding in the rule itself: the true first hour is 0.80
+   * of a twelfth and the rule calls it 1. So this asserts agreement to within
+   * a quarter of a twelfth rather than pretending the rule is the truth. The
+   * largest real gap is 0.20 of a twelfth, which on a 4ft range is 0.065ft.
+   */
+  it('matches the rule of twelfths, where a straight line does not', () => {
+    const curve = curveFromExtremes(extremes)
+    const twelfth = 4 / 12
+    const fallen = (hours: number) =>
+      4 - (levelAt(curve, new Date(HIGH.getTime() + hours * 3_600_000)) ?? 0)
+
+    // 1, 3, 6, 9, 11, 12 twelfths fallen by the end of each hour.
+    for (const [hour, twelfths] of [[1, 1], [2, 3], [3, 6], [4, 9], [5, 11], [6, 12]] as const) {
+      expect(
+        Math.abs(fallen(hour) - twelfths * twelfth),
+        `hour ${hour}: cosine ${fallen(hour).toFixed(3)}ft vs rule ${(twelfths * twelfth).toFixed(3)}ft`,
+      ).toBeLessThan(twelfth / 4)
+    }
+
+    // Exact where the rule does no rounding.
+    for (const [hour, twelfths] of [[2, 3], [3, 6], [4, 9], [6, 12]] as const) {
+      expect(fallen(hour), `hour ${hour}`).toBeCloseTo(twelfths * twelfth, 6)
+    }
+
+    /*
+     * And the first hour is far from what a straight line would claim, which
+     * is the hour that decides whether a sandbar is out.
+     */
+    const straightLine = 4 / 6
+    expect(fallen(1)).toBeLessThan(straightLine * 0.45)
+  })
+
+  it('never goes outside the range it was built from', () => {
+    const curve = curveFromExtremes(extremes)
+    for (const sample of curve) {
+      expect(sample.feet).toBeGreaterThanOrEqual(-1e-9)
+      expect(sample.feet).toBeLessThanOrEqual(4 + 1e-9)
+    }
+  })
+
+  it('covers the whole span at the step asked for', () => {
+    const curve = curveFromExtremes(extremes, 6)
+    expect(curve[0].at.getTime()).toBe(HIGH.getTime())
+    expect(curve[curve.length - 1].at.getTime()).toBe(LOW.getTime())
+    // Six hours at six minutes is sixty steps, plus the closing sample.
+    expect(curve.length).toBe(61)
+  })
+
+  it('runs through a whole day of turns without emitting one twice', () => {
+    const day: TideExtreme[] = [
+      { at: new Date('2026-10-20T00:10:00Z'), feet: 3.4, kind: 'high' },
+      { at: new Date('2026-10-20T06:22:00Z'), feet: 0.2, kind: 'low' },
+      { at: new Date('2026-10-20T12:41:00Z'), feet: 3.6, kind: 'high' },
+      { at: new Date('2026-10-20T18:55:00Z'), feet: 0.1, kind: 'low' },
+    ]
+    const curve = curveFromExtremes(day)
+    const times = curve.map((s) => s.at.getTime())
+    expect(new Set(times).size).toBe(times.length)
+    expect(times).toEqual([...times].sort((a, b) => a - b))
+    for (const extreme of day) {
+      expect(levelAt(curve, extreme.at)).toBeCloseTo(extreme.feet, 6)
+    }
+  })
+
+  it('rises as well as falls', () => {
+    const rising = curveFromExtremes([
+      { at: HIGH, feet: 0, kind: 'low' },
+      { at: LOW, feet: 4, kind: 'high' },
+    ])
+    expect(levelAt(rising, new Date('2026-10-20T03:00:00Z'))).toBeCloseTo(2, 2)
+    expect(levelAt(rising, LOW)).toBeCloseTo(4, 6)
+  })
+
+  /* One turn is not a curve. Nothing to interpolate between. */
+  it('returns nothing when there is less than one leg', () => {
+    expect(curveFromExtremes([])).toEqual([])
+    expect(curveFromExtremes([{ at: HIGH, feet: 4, kind: 'high' }])).toEqual([])
+  })
+
+  /* And the whole point: tideStateAt works off it. */
+  it('drives a full tide state, direction and turns included', () => {
+    const curve = curveFromExtremes(extremes)
+    const state = tideStateAt(curve, extremes, new Date('2026-10-20T02:00:00Z'))
+    expect(state).not.toBeNull()
+    expect(state?.direction).toBe('falling')
+    expect(state?.next?.kind).toBe('low')
+    expect(state?.feet).toBeGreaterThan(2)
+    expect(state?.feet).toBeLessThan(4)
   })
 })

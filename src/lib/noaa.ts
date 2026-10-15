@@ -16,7 +16,7 @@
  * in localStorage, which takes it to roughly a tenth of the size.
  */
 
-import type { TideExtreme, TideSample, TideStation } from '../core/tide.ts'
+import { curveFromExtremes, type CurveSource, type TideExtreme, type TideSample, type TideStation } from '../core/tide.ts'
 
 export const STATIONS_URL =
   'https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations.json?type=tidepredictions'
@@ -138,6 +138,12 @@ export async function fetchStations(): Promise<StationsResult> {
 export interface TidePredictions {
   extremes: TideExtreme[]
   curve: TideSample[]
+  /**
+   * Whether NOAA published the curve or this app derived it from the high and
+   * low waters. Shown on screen, because a number the app worked out is not
+   * the same as a number NOAA published.
+   */
+  curveSource: CurveSource
 }
 
 export type PredictionsResult =
@@ -249,7 +255,33 @@ export async function fetchPredictions(
       getJson(new URLSearchParams(base), controller.signal),
     ])
 
-    const failure = noaaError(hiloRaw) ?? noaaError(curveRaw)
+    /*
+     * THE HIGH AND LOW WATERS ARE REQUIRED. THE SIX MINUTE CURVE IS NOT.
+     *
+     * This used to be `noaaError(hiloRaw) ?? noaaError(curveRaw)`, failing the
+     * whole station if EITHER request errored. That threw away every
+     * subordinate station in the country, because a subordinate station is
+     * defined as offsets from a reference station and NOAA publishes only its
+     * turns, answering the curve request with "No Predictions data was found.
+     * Please make sure the Datum input is valid."
+     *
+     * Measured at Lynnhaven Inlet, where the sandbars are the shot:
+     *
+     *   8638888  Lynnhaven Inlet, Virginia Pilots Dock  0.57km  S  hilo OK, curve ERROR
+     *   8638916  Long Creek                             1.25km  S  hilo OK, curve ERROR
+     *   8638923  Broad Bay Canal                        2.01km  S  hilo OK, curve ERROR
+     *   8638863  Chesapeake Bay Bridge Tunnel           7.22km  R  hilo OK, curve OK
+     *
+     * STATION_ATTEMPTS is 3, so all three attempts were subordinate stations,
+     * all three were discarded, and the panel said there were no tide
+     * predictions for the date. The nearest station, 570m from the bridge, was
+     * publishing good high and low water the whole time.
+     *
+     * Falling back to the Bridge Tunnel instead would be worse than deriving
+     * the curve: it is 7km away through an inlet, and tide phase shifts along
+     * an inlet, which is the entire reason the station distance is on screen.
+     */
+    const failure = noaaError(hiloRaw)
     if (failure !== null) {
       /*
        * NOAA answers a station that publishes nothing against MLLW with a
@@ -270,17 +302,37 @@ export async function fetchPredictions(
     }
 
     const extremes = parseExtremes(hiloRaw)
-    const curve = parseCurve(curveRaw)
-    if (extremes.length === 0 || curve.length === 0) {
+    if (extremes.length === 0) {
       const result: PredictionsResult = {
         status: 'unavailable',
-        reason: 'That station published no predictions for this date.',
+        reason: 'That station published no high or low water for this date.',
       }
       cache.set(key, result)
       return result
     }
 
-    const result: PredictionsResult = { status: 'ok', predictions: { extremes, curve } }
+    /*
+     * The published curve when there is one, and one derived from the turns
+     * when there is not. Derived in core, labelled either way.
+     */
+    const published = noaaError(curveRaw) === null ? parseCurve(curveRaw) : []
+    const curveSource: CurveSource = published.length > 0 ? 'published' : 'derived'
+    const curve = published.length > 0 ? published : curveFromExtremes(extremes)
+
+    /* Two turns is the least that can be interpolated between. */
+    if (curve.length === 0) {
+      const result: PredictionsResult = {
+        status: 'unavailable',
+        reason: 'That station published only one turn for this date, which is not a curve.',
+      }
+      cache.set(key, result)
+      return result
+    }
+
+    const result: PredictionsResult = {
+      status: 'ok',
+      predictions: { extremes, curve, curveSource },
+    }
     cache.set(key, result)
     return result
   } catch (error) {

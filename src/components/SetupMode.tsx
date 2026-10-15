@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { destinationPoint, type LatLon } from '../core/geo.ts'
+import { buildLabel } from '../lib/build.ts'
 import { exampleIndex, SHOOT_EXAMPLES, SHOT_LIST_EXAMPLES } from '../lib/examples.ts'
 import type { DescribeState, DesiredShot } from '../lib/describe.ts'
 import type { KitProfile as KitProfileType } from '../core/kit.ts'
@@ -309,6 +310,29 @@ export function SetupMode({
                           </span>
                         </span>
                       </label>
+
+                      {/*
+                        * WHICH BUILD IS THIS.
+                        *
+                        * A whole pass went on disagreeing about screenshots,
+                        * because there was no way to tell from a phone whether
+                        * the screen in front of you was the code that had just
+                        * been pushed. There is no service worker in this app;
+                        * what holds a stale build is iOS Safari, and a
+                        * home-screen app more stubbornly still, keeping
+                        * index.html and therefore the asset URLs it names.
+                        *
+                        * Monospace, because it is an identifier to read out
+                        * loud or type into a message, not prose.
+                        */}
+                      <p className="build">
+                        <span className="build__label">Build</span>
+                        <span className="build__id num">{buildLabel()}</span>
+                        <span className="build__note">
+                          The commit this was built from. Quote it with a screenshot and there
+                          is nothing to disagree about.
+                        </span>
+                      </p>
                     </div>
                   ) : null}
 

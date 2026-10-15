@@ -32,6 +32,15 @@
          insets in tokens.css already account for. -->
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="ScoutNGo" />
+
+    <!--
+      WHICH BUILD THIS IS. Replaced at build time by the plugin in
+      vite.config.ts. src/lib/build.ts fetches this document with
+      cache: 'no-store' and compares this against the id compiled into the
+      running bundle, which is how a phone holding a stale index.html finds
+      out that it is holding one. There is no service worker in this app.
+    -->
+    <meta name="scoutngo-build" content="__BUILD_ID__" />
   </head>
   <body>
     <div id="root"></div>
