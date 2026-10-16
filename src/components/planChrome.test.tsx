@@ -165,6 +165,7 @@ describe('PositionCard', () => {
     <PositionCard
       kit={DEFAULT_KIT}
         selection={defaultSelection(DEFAULT_KIT)}
+        marks={[]}
       planned={plan[0]}
       shootAt={new Date('2026-09-12T13:00:00-04:00')}
       timeZone="America/New_York"
@@ -224,6 +225,7 @@ describe('PositionCard', () => {
       <PositionCard
       kit={DEFAULT_KIT}
         selection={defaultSelection(DEFAULT_KIT)}
+        marks={[]}
         planned={plan[0]}
         shootAt={null}
         timeZone={null}
@@ -292,6 +294,7 @@ describe('a flagged position says what is wrong with it', () => {
         warnings={[]}
         framingWarnings={[]}
         frameSubjectRatio={null}
+        blockedCount={0}
         platform="ground"
         altitudeFeet={0}
         moved={false}

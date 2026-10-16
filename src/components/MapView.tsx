@@ -40,11 +40,15 @@ import {
   CONE_SOURCE,
   FOOTPRINT_SOURCE,
   GOES_SOURCE,
+  MARK_DRAFT_SOURCE,
+  MARK_SOURCE,
   PILOT_SOURCE,
   RADIUS_SOURCE,
   RAY_SOURCE,
   SUN_SOURCE,
 } from '../lib/captureLayers.ts'
+import { markCollection, draftCollection } from '../lib/markLayer.ts'
+import type { SiteMark } from '../core/siteMark.ts'
 import { readToken } from '../lib/tokens.ts'
 import { ShooterFigure } from './ShooterFigure.tsx'
 
@@ -235,7 +239,17 @@ function captureImageryOnly(instance: maplibregl.Map): string {
  * Both arming modes disarm themselves after one tap. A mode that stays on is a
  * mode you forget you are in and then wonder why the map stopped behaving.
  */
-export type TapMode = 'add' | 'pilot' | null
+/*
+ * MARKING IS THE ONE MODE THAT STAYS ON. The two above disarm after one tap,
+ * because dropping one position or one pilot is one decision. Marking a site
+ * is not: a car park with wires down two sides is six or seven marks in a row,
+ * and a mode that disarmed between each would be six trips to the button.
+ * It is turned off explicitly, and the screen says it is on the whole time.
+ */
+export const MARK_LINE_LAYER = 'site-mark-line'
+export const MARK_NODE_LAYER = 'site-mark-node'
+
+export type TapMode = 'add' | 'pilot' | 'mark' | null
 
 export interface CameraState {
   center: [number, number]
@@ -298,6 +312,8 @@ export interface MapHandle {
   ): void
   setPitch(pitch: number): void
   zoomBy(delta: number): void
+  /** Goes to an exact zoom, keeping the centre. Used by the sky layer nudge. */
+  zoomTo(zoom: number): void
 }
 
 export interface SunOverlay {
@@ -329,6 +345,18 @@ interface MapViewProps {
   onLongPress: (at: LatLon) => void
   /** Where to drop a position, when the map is armed to place one. */
   onAddAt?: (at: LatLon) => void
+  /**
+   * The marked hazards and notes to draw, and the drawing in progress.
+   *
+   * `markDraft` is a line being built tap by tap. It is NOT a mark: it has no
+   * kind and no height, and nothing can compute a sightline from it.
+   */
+  marks?: readonly SiteMark[]
+  markDraft?: readonly LatLon[]
+  /** A tap while marking: adds a point, or a vertex to the line being drawn. */
+  onMarkAt?: (at: LatLon) => void
+  /** Tapped an existing mark. */
+  onSelectMark?: (id: string) => void
   sunAzimuth: number | null
   /**
    * The sun's altitude, for choosing the GOES band.
@@ -627,6 +655,10 @@ export function MapView({
   onPositionMove,
   onLongPress,
   onAddAt,
+  marks,
+  markDraft,
+  onMarkAt,
+  onSelectMark,
   sunAzimuth,
   sunOverlay,
   showSun,
@@ -681,6 +713,8 @@ export function MapView({
     onPinDrag,
     onAddAt,
     onPilotMove,
+    onMarkAt,
+    onSelectMark,
   })
   useEffect(() => {
     latest.current = {
@@ -693,6 +727,8 @@ export function MapView({
       onPinDrag,
       onAddAt,
       onPilotMove,
+      onMarkAt,
+      onSelectMark,
     }
   }, [
     mode,
@@ -704,6 +740,8 @@ export function MapView({
     onPinDrag,
     onAddAt,
     onPilotMove,
+    onMarkAt,
+    onSelectMark,
   ])
 
   /* Read through a ref so a handler bound once at build stays current. */
@@ -804,6 +842,23 @@ export function MapView({
       if (target?.closest('.shooter-host, .pin, .ray-label') != null) return
 
       const next = { lat: event.lngLat.lat, lon: event.lngLat.lng }
+      if (l.mode === 'mark') {
+        /*
+         * A TAP ON AN EXISTING MARK OPENS IT; a tap on empty map adds to the
+         * one being drawn. Queried against the mark layers rather than against
+         * a radius, so what counts as a hit is exactly what is drawn.
+         */
+        const hit = instance.queryRenderedFeatures(event.point, {
+          layers: [MARK_LINE_LAYER, MARK_NODE_LAYER],
+        })[0]
+        const id = hit?.properties?.id
+        if (typeof id === 'string' && hit?.properties?.draft !== true) {
+          l.onSelectMark?.(id)
+        } else {
+          l.onMarkAt?.(next)
+        }
+        return
+      }
       if (l.mode === 'add') {
         l.onAddAt?.(next)
       } else if (l.mode === 'pilot') {
@@ -929,6 +984,8 @@ export function MapView({
       instance.addSource(RAY_SOURCE, { type: 'geojson', data: emptyCollection() })
       instance.addSource(PILOT_SOURCE, { type: 'geojson', data: emptyCollection() })
       instance.addSource(FOOTPRINT_SOURCE, { type: 'geojson', data: emptyCollection() })
+      instance.addSource(MARK_SOURCE, { type: 'geojson', data: emptyCollection() })
+      instance.addSource(MARK_DRAFT_SOURCE, { type: 'geojson', data: emptyCollection() })
 
       const rayColor = [
         'match',
@@ -1056,6 +1113,98 @@ export function MapView({
         source: FOOTPRINT_SOURCE,
         filter: ['==', ['get', 'kind'], 'rect'],
         paint: { 'line-color': lighting, 'line-width': 1.5, 'line-opacity': 0.95 },
+      })
+
+
+      /*
+       * WHAT IS DANGEROUS AND WHAT IS IN THE WAY.
+       *
+       * Drawn like a chart draws an obstruction: hard lines, no fill, and the
+       * line is the thing rather than a label pointing at it.
+       *
+       * THREE THINGS ARE ENCODED, and they are encoded SEPARATELY because
+       * they are separate questions:
+       *
+       *   COLOUR says hazard or note. Hazard takes the same magenta the site
+       *   warnings use, because it is the same kind of fact. A note, a launch
+       *   spot or a car park, takes the cyan that air positions use: useful,
+       *   not dangerous.
+       *
+       *   DASH says where it came from. Solid for something the shooter
+       *   marked standing there. Dashed for what OpenStreetMap has mapped,
+       *   because "somebody surveyed this" and "I saw this" are different
+       *   claims and the shooter is entitled to know which they are looking
+       *   at. Transmission lines are mapped well; local distribution is
+       *   patchy, and a dash that says "this came from a database" is the
+       *   only honest way to draw a layer with holes in it.
+       *
+       *   OPACITY says confirmed or not. Everything is confirmed today. The
+       *   dimmer treatment is the seam for a later model pass, whose
+       *   proposals must never look like the other two.
+       */
+      instance.addLayer({
+        id: MARK_LINE_LAYER,
+        type: 'line',
+        source: MARK_SOURCE,
+        filter: ['==', ['geometry-type'], 'LineString'],
+        paint: {
+          'line-color': [
+            'case',
+            ['get', 'hazard'],
+            readToken('--color-hazard', '#ff3da6', container.current),
+            readToken('--platform-air', '#3fd0e6', container.current),
+          ],
+          'line-width': 3,
+          'line-opacity': ['case', ['get', 'confirmed'], 0.95, 0.5],
+          'line-dasharray': ['case', ['==', ['get', 'source'], 'osm'], ['literal', [2, 2]], ['literal', [1, 0]]],
+        },
+      })
+      instance.addLayer({
+        id: MARK_NODE_LAYER,
+        type: 'circle',
+        source: MARK_SOURCE,
+        filter: ['==', ['geometry-type'], 'Point'],
+        paint: {
+          'circle-radius': 5,
+          'circle-color': [
+            'case',
+            ['get', 'hazard'],
+            readToken('--color-hazard', '#ff3da6', container.current),
+            readToken('--platform-air', '#3fd0e6', container.current),
+          ],
+          'circle-opacity': ['case', ['get', 'confirmed'], 0.95, 0.5],
+          'circle-stroke-width': 1.5,
+          'circle-stroke-color': readToken('--mark-edge', '#0a0b09', container.current),
+        },
+      })
+
+      /*
+       * THE LINE BEING DRAWN. White, so it reads as the thing under the thumb
+       * rather than as a finished mark, and it carries no kind or colour
+       * because it has neither until it is finished.
+       */
+      instance.addLayer({
+        id: 'site-mark-draft-line',
+        type: 'line',
+        source: MARK_DRAFT_SOURCE,
+        filter: ['==', ['geometry-type'], 'LineString'],
+        paint: {
+          'line-color': readToken('--mark', '#ffffff', container.current),
+          'line-width': 2,
+          'line-dasharray': [3, 2],
+        },
+      })
+      instance.addLayer({
+        id: 'site-mark-draft-node',
+        type: 'circle',
+        source: MARK_DRAFT_SOURCE,
+        filter: ['==', ['geometry-type'], 'Point'],
+        paint: {
+          'circle-radius': 4,
+          'circle-color': readToken('--mark', '#ffffff', container.current),
+          'circle-stroke-width': 1.5,
+          'circle-stroke-color': readToken('--mark-edge', '#0a0b09', container.current),
+        },
       })
 
       /*
@@ -1347,6 +1496,9 @@ export function MapView({
         latest.current.onPitchChange(pitch)
       },
 
+      zoomTo(zoom) {
+        map.current?.easeTo({ zoom, duration: 400 })
+      },
       zoomBy(delta) {
         map.current?.easeTo({ zoom: (map.current.getZoom() ?? 16) + delta, duration: 250 })
       },
@@ -1473,6 +1625,15 @@ export function MapView({
       | undefined
     source?.setData(footprintCollection(conePlan))
   }, [conePlan, ready])
+
+  /* The marked hazards and notes, and the line being drawn over them. */
+  useEffect(() => {
+    if (map.current === null || !ready) return
+    const marked = map.current.getSource(MARK_SOURCE) as maplibregl.GeoJSONSource | undefined
+    marked?.setData(markCollection(marks ?? []))
+    const draft = map.current.getSource(MARK_DRAFT_SOURCE) as maplibregl.GeoJSONSource | undefined
+    draft?.setData(draftCollection(markDraft ?? []))
+  }, [marks, markDraft, ready])
 
   /*
    * The pilot lines. Sized from real coordinates, so unlike the bearing lines
@@ -2009,6 +2170,7 @@ export function MapView({
             warnings={planned.warnings}
             framingWarnings={planned.framingWarnings}
             frameSubjectRatio={planned.frameSubjectRatio}
+            blockedCount={planned.blockedBy.length}
             platform={planned.position.platform}
             altitudeFeet={planned.position.altitudeFeet}
             moved={planned.position.moved}

@@ -7,6 +7,7 @@ import {
   rangeForFrameWidth,
   SENSORS,
   standoffBand,
+  framingJudgementApplies,
   frameSubjectRatio,
   USABLE_FRAME_WIDTH_METERS,
   WIDE_FRAME_RATIO,
@@ -151,15 +152,16 @@ describe('classifyFraming', () => {
   })
 
   /*
-   * WIDE IS THE NORMAL STATE OF AN AERIAL, so the ratio has to behave the same
-   * in the air as on the ground: the platform must not enter it. A 400 ft
-   * aerial framing its subject says nothing; the aerial 500 m out from a food
-   * truck still does.
+   * WIDE IS THE NORMAL STATE OF AN AERIAL. The ratio quietened most of these;
+   * the right answer for an aircraft turned out to be silence. See
+   * framingJudgementApplies and the block of tests at the end of this file.
    */
-  it('judges an aerial by the same ratio as the ground, not a different number', () => {
+  it('says nothing about an aerial however wide the frame is', () => {
     expect(classifyFraming(150, hFOV(24), 'air', 200)).toEqual([])
-    expect(classifyFraming(150, hFOV(24), 'air', 13)).toContain('frame-wider-than-subject')
+    expect(classifyFraming(150, hFOV(24), 'air', 13)).toEqual([])
     expect(classifyFraming(150, hFOV(24), 'ground', 200)).toEqual([])
+    /* The same geometry on the ground, against the same small subject, does. */
+    expect(classifyFraming(150, hFOV(24), 'ground', 13)).toContain('frame-wider-than-subject')
   })
 
   /* The ratio is exactly WIDE_FRAME_RATIO at the boundary, and exclusive. */
@@ -211,5 +213,67 @@ describe('classifyFraming', () => {
 
   it('says nothing about a position sitting on the subject', () => {
     expect(classifyFraming(0, hFOV(28), 'ground', 13)).toEqual([])
+  })
+})
+
+/*
+ * ITEM 3: WIDE IS THE INTENT, NOT A PROBLEM, FOR EVERYTHING BUT A GROUND
+ * FRAMED SHOT.
+ *
+ * Reported after the ratio landed: "Better than yesterday, it fired on two of
+ * three instead of all three. But those are aerials. Wide is what I flew for."
+ */
+describe('the wide frame judgement only applies to a ground framed shot', () => {
+  const hFOV = (focal: number) => computeFOV(focal, SENSORS.fullFrame).hFOV
+  /* A frame 30 times the subject: as wide as it gets, so nothing is marginal. */
+  const wide = (platform: 'ground' | 'air', shotType: 'framed' | 'top-down' | 'orbit') =>
+    classifyFraming(300, hFOV(28), platform, 13, shotType)
+
+  it('fires on a ground framed shot, which is the one case it helps', () => {
+    expect(wide('ground', 'framed')).toContain('frame-wider-than-subject')
+  })
+
+  it('says nothing on an air position, whatever the numbers are', () => {
+    expect(wide('air', 'framed')).not.toContain('frame-wider-than-subject')
+  })
+
+  it('says nothing on a top-down, where the frame is the composition', () => {
+    expect(wide('ground', 'top-down')).not.toContain('frame-wider-than-subject')
+    expect(wide('air', 'top-down')).not.toContain('frame-wider-than-subject')
+  })
+
+  it('says nothing on a 360, which has no frame to be wide', () => {
+    expect(wide('ground', 'orbit')).not.toContain('frame-wider-than-subject')
+    expect(wide('air', 'orbit')).not.toContain('frame-wider-than-subject')
+  })
+
+  /*
+   * THE DISTANCE WARNING IS UNTOUCHED. An aircraft 600 m out is out of sight
+   * whatever it is pointing at, and that has nothing to do with framing.
+   */
+  it('still reports a position beyond the practical standoff in the air', () => {
+    expect(classifyFraming(600, hFOV(24), 'air', 13, 'framed')).toContain('beyond-standoff')
+    expect(classifyFraming(600, hFOV(24), 'air', 13, 'orbit')).toContain('beyond-standoff')
+  })
+
+  it('states the rule in one place', () => {
+    expect(framingJudgementApplies('ground', 'framed')).toBe(true)
+    for (const [platform, shotType] of [
+      ['air', 'framed'],
+      ['ground', 'top-down'],
+      ['ground', 'orbit'],
+      ['air', 'top-down'],
+      ['air', 'orbit'],
+    ] as const) {
+      expect(framingJudgementApplies(platform, shotType), `${platform}/${shotType}`).toBe(false)
+    }
+  })
+
+  /*
+   * AND THE MEASUREMENT SURVIVES. Suppressing the judgement must not suppress
+   * the frame width, which is a fact and is useful on an aerial.
+   */
+  it('still measures the frame for the shots it says nothing about', () => {
+    expect(frameWidthMeters(300, hFOV(28))).toBeGreaterThan(300)
   })
 })

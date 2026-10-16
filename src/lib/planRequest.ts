@@ -1,6 +1,7 @@
 import type { Platform } from '../core/platformFilter.ts'
 import { computeFOV, SENSORS, standoffBand } from '../core/fov.ts'
-import { DEFAULT_KIT, resolveSensor, selectedDroneCameras } from '../core/kit.ts'
+import { DEFAULT_KIT, resolveSensor, selectedDroneCameras, type KitProfile } from '../core/kit.ts'
+import { defaultOpticFor } from '../core/optics.ts'
 import { getSunPosition, normalizeBearing } from '../core/sun.ts'
 import { formatClock } from '../core/timezone.ts'
 import type { KitSelection } from './kitSelection.ts'
@@ -174,9 +175,33 @@ export function selectedDroneNames(kit: KitSelection): string[] {
     .map((d) => `${d.name}, ${d.weightGrams}g`)
 }
 
-/** Air positions are only offered when a drone is actually coming. */
-export function droneAvailable(kit: KitSelection): boolean {
-  return kit.droneIds.length > 0
+/**
+ * Whether an air position can actually be MADE.
+ *
+ * WHY THIS IS NOT `droneIds.length > 0`, WHICH IS WHAT IT USED TO BE.
+ *
+ * That counted ids. Whether an air position can be made depends on whether
+ * those ids RESOLVE to a camera, and the two answers can disagree. Measured in
+ * the browser on a saved spot carrying a drone id that is not in the kit:
+ *
+ *   kit.droneIds     ["air-3s"]            (the id in the spot)
+ *   profile drones   [{id: "dji-air-3s"}]  (the id in the kit)
+ *   Drone chip       pressed, NOT disabled
+ *   defaultAirOptic  null
+ *   addsAir          false
+ *   ADD BUTTON       "Add position"
+ *   position made    ground, picker: Sigma 28-75, Sigma 30mm, Sony 75-300, …
+ *
+ * So the chip offered Air, the filter went to Air, and every Add silently made
+ * a ground position with ground glass on it. That is the reported bug, three
+ * times over, and it was never in the picker: the picker was right about a
+ * position that should never have been ground.
+ *
+ * ONE QUESTION, ONE ANSWER. Both this and the default optic now come from
+ * core/optics.ts, so a chip can only offer Air when Air has something to fly.
+ */
+export function droneAvailable(kit: KitSelection, profile: KitProfile = DEFAULT_KIT): boolean {
+  return defaultOpticFor('air', profile, kit) !== null
 }
 
 export interface GenerateRequestBody {
@@ -379,12 +404,23 @@ export function stageLabel(stage: GenerateStage): string {
   return GENERATE_STAGES.find((entry) => entry.key === stage)?.label ?? ''
 }
 
+import type { GenerateBlock } from './generateGate.ts'
+
 /** What the Plan panel shows about the last generate attempt. */
 export type GenerationState =
   | { status: 'idle' }
   /** Mid flight, on the named step. Nothing here is inferred from elapsed time. */
   | { status: 'working'; stage: GenerateStage }
   | { status: 'error'; message: string }
+  /**
+   * It cannot run yet, and this says why, ON THE SCREEN THE BUTTON IS ON.
+   *
+   * SEPARATE FROM 'error' because nothing has gone wrong: something is missing.
+   * It used to be an 'error' set in the same breath as a navigation to Setup,
+   * which unmounted the only component that renders an error, so the button
+   * silently did nothing. See src/lib/generateGate.ts.
+   */
+  | { status: 'blocked'; block: GenerateBlock }
   /**
    * The feature is off because the server has no key for it.
    *

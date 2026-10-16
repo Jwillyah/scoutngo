@@ -64,6 +64,20 @@ export const GOES_BAND_SOURCES = [`${GOES_SOURCE}-visible`, `${GOES_SOURCE}-infr
  */
 export const CLOUD_FORECAST_SOURCE = 'cloud-forecast'
 
+/**
+ * The marked hazards and notes: wires, trees, buildings, launch spots.
+ *
+ * HIDDEN BEFORE A CAPTURE, for the first reason on this list rather than the
+ * cloud one. These are annotations THIS APP DREW. Sending the model a
+ * photograph with our own hazard lines burned into it would invite it to
+ * describe them back as things it saw in the imagery, and a model repeating
+ * our own marks to us is the model appearing to confirm them.
+ */
+export const MARK_SOURCE = 'site-marks'
+
+/** The line being drawn, which is also ours and also must not reach a capture. */
+export const MARK_DRAFT_SOURCE = 'site-mark-draft'
+
 /** Every source this app draws with. The basemap is NOT here and must not be. */
 export const APP_SOURCES: readonly string[] = [
   RADIUS_SOURCE,
@@ -74,6 +88,8 @@ export const APP_SOURCES: readonly string[] = [
   FOOTPRINT_SOURCE,
   ...GOES_BAND_SOURCES,
   CLOUD_FORECAST_SOURCE,
+  MARK_SOURCE,
+  MARK_DRAFT_SOURCE,
 ]
 
 /**

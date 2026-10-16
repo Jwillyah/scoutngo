@@ -137,6 +137,20 @@
   --sun-shadow: #9aa7ff; /* current shadow bearing */
   --sun-rise: #ffa04a; /* sunrise bearing */
   --sun-set: #ff5fa8; /* sunset bearing. NOT the magenta hazard token. */
+  /*
+   * WHAT A POSITION IS STANDING ON. Two marks that have to be told apart in
+   * sunlight, at a glance, with a thumb over half the screen.
+   *
+   * Air was borrowing --sun-shadow, the periwinkle used for the shadow bearing
+   * on the sun overlay. Two different meanings in one colour on one map, and
+   * the shape difference, a 50% radius against a 20% one, is not a difference
+   * at 30px. Air has its own hue now, a cyan that collides with nothing else
+   * here: not the magenta hazard, not the yellow sun, not the orange and pink
+   * bearings, not the lighting classes, and not the white of the pin.
+   */
+  --platform-ground: #ffffff; /* ground: a white circle, the resting mark */
+  --platform-air: #3fd0e6; /* air: a cyan square. Cyan reads as sky, not alarm */
+
   --mark: #ffffff; /* the venue pin */
   --mark-edge: #0a0b09; /* the dark edging that keeps a mark legible on imagery */
 

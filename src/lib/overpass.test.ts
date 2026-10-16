@@ -143,3 +143,92 @@ describe('simplify and trimSummary', () => {
     expect(trimmed.roads.length).toBeLessThanOrEqual(60)
   })
 })
+
+/*
+ * ITEM 6a: WHAT OSM HAS MAPPED OF THE POWER NETWORK.
+ *
+ * "This site is full of power lines." Transmission is mapped well; local
+ * distribution is patchy, which is why these arrive labelled with their source
+ * and why nothing anywhere reads an empty list as an answer about the site.
+ */
+describe('power lines come back as site marks', () => {
+  const payload = {
+    elements: [
+      {
+        type: 'way',
+        id: 1,
+        tags: { power: 'line' },
+        geometry: [
+          { lat: 37.0869, lon: -76.4746 },
+          { lat: 37.0875, lon: -76.474 },
+        ],
+      },
+      {
+        type: 'way',
+        id: 2,
+        tags: { power: 'minor_line' },
+        geometry: [
+          { lat: 37.086, lon: -76.475 },
+          { lat: 37.0865, lon: -76.4744 },
+        ],
+      },
+      { type: 'node', id: 3, tags: { power: 'pole' }, lat: 37.0866, lon: -76.4748 },
+      { type: 'node', id: 4, tags: { power: 'tower', height: '28' }, lat: 37.0872, lon: -76.4742 },
+    ],
+  }
+  const { power } = parseOverpass(payload)
+
+  it('reads both line tags and both node tags', () => {
+    expect(power).toHaveLength(4)
+    expect(power.map((m) => m.note)).toEqual(['Line', 'Line', 'Pole', 'Tower'])
+  })
+
+  it('makes a way into a line and a node into a point', () => {
+    expect(power[0].shape.kind).toBe('line')
+    expect(power[2].shape.kind).toBe('point')
+    if (power[2].shape.kind === 'point') {
+      expect(power[2].shape.at).toEqual({ lat: 37.0866, lon: -76.4748 })
+    }
+  })
+
+  it('labels every one of them as coming from OSM', () => {
+    for (const mark of power) {
+      expect(mark.source).toBe('osm')
+      expect(mark.kind).toBe('power-line')
+    }
+  })
+
+  /*
+   * NO INVENTED HEIGHT. OSM almost never carries one for a line, and a default
+   * here would put a made-up number into the sightline geometry that decides
+   * whether a position is usable.
+   */
+  it('leaves the height null unless OSM actually carries one', () => {
+    expect(power[0].heightMeters).toBeNull()
+    expect(power[1].heightMeters).toBeNull()
+    expect(power[2].heightMeters).toBeNull()
+    expect(power[3].heightMeters).toBe(28)
+  })
+
+  it('asks Overpass for all four tags', () => {
+    const query = buildQuery({ west: -76.48, south: 37.08, east: -76.47, north: 37.09 })
+    expect(query).toContain('way["power"="line"]')
+    expect(query).toContain('way["power"="minor_line"]')
+    expect(query).toContain('node["power"="tower"]')
+    expect(query).toContain('node["power"="pole"]')
+  })
+
+  /* A site with none mapped returns an empty list, which is not a statement. */
+  it('returns an empty list when nothing is mapped', () => {
+    expect(parseOverpass({ elements: [] }).power).toEqual([])
+    expect(parseOverpass(null).power).toEqual([])
+  })
+
+  /* And power features never leak into the land geometry a position stands on. */
+  it('keeps power out of the landcover', () => {
+    const { land, summary } = parseOverpass(payload)
+    expect(land.structures).toEqual([])
+    expect(land.roads).toEqual([])
+    expect(summary.buildings).toEqual([])
+  })
+})

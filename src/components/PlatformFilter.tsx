@@ -25,6 +25,16 @@ interface PlatformFilterProps {
  * plan, so the count sits under the control whenever it is not zero. The same
  * reason the segments carry their own counts: a tab that turns out to be empty
  * should look empty before it is tapped.
+ *
+ * AND IT IS THE KEY TO THE MAP. The Ground and Air segments carry the actual
+ * marker glyph, in the actual colour, at the actual shape. Asked for because
+ * the two kinds of position have to read apart at a glance and nothing on
+ * screen said which was which: "a small key somewhere so a person who did not
+ * build this can tell which is which."
+ *
+ * HERE RATHER THAN IN A LEGEND PANEL, because this control already names both
+ * platforms and already sits above the map, so the key costs no space and is
+ * never somewhere else from the thing it explains.
  */
 export function PlatformFilter({
   value,
@@ -60,6 +70,9 @@ export function PlatformFilter({
               title={dead ? 'No drone in the kit.' : undefined}
               onClick={() => onChange(filter)}
             >
+              {filter === 'both' ? null : (
+                <span className={`plat__key plat__key--${filter}`} aria-hidden="true" />
+              )}
               <span className="plat__label">{PLATFORM_FILTER_LABEL[filter]}</span>
               {count === null ? null : <span className="plat__n num">{count}</span>}
             </button>

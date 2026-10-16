@@ -14,6 +14,7 @@
 
 import type { Position } from '../core/geo.ts'
 import type { Landcover, Ring, RoadLine } from '../core/siting.ts'
+import type { SiteMark } from '../core/siteMark.ts'
 import type { MapBounds } from './planRequest.ts'
 
 export const OVERPASS_URL = 'https://overpass-api.de/api/interpreter'
@@ -47,6 +48,10 @@ export function buildQuery(bounds: MapBounds): string {
   way["man_made"="pier"](${bbox});
   way["highway"](${bbox});
   way["amenity"="parking"](${bbox});
+  way["power"="line"](${bbox});
+  way["power"="minor_line"](${bbox});
+  node["power"="tower"](${bbox});
+  node["power"="pole"](${bbox});
 );
 out geom;`
 }
@@ -62,12 +67,34 @@ export interface OverpassElement {
   id?: unknown
   tags?: Record<string, string>
   geometry?: { lat: number; lon: number }[]
+  /** A node has a coordinate rather than a geometry. Poles and towers are nodes. */
+  lat?: unknown
+  lon?: unknown
 }
 
 export interface SiteGeometry {
   land: Landcover
   /** Compact shapes for the model, already trimmed for token budget. */
   summary: SiteSummary
+  /**
+   * WHAT OSM HAS MAPPED OF THE POWER NETWORK, as site marks.
+   *
+   * SEPARATE FROM `land`, which is about where a position may STAND. These are
+   * about what is in the air above it, which is a different question with a
+   * different answer and a different reliability.
+   *
+   * THE RELIABILITY IS THE POINT. Transmission lines are mapped well in OSM
+   * because they are large and visible from imagery. Local distribution, the
+   * wires on wooden poles down the side of a car park, is patchy to absent.
+   * So these arrive labelled with their source and nothing anywhere treats an
+   * empty list as an answer about the site. See src/core/siteMark.ts.
+   *
+   * NO HEIGHTS. OSM rarely carries one for a line, and a default height here
+   * would put an invented number into the sightline geometry. They come
+   * through with heightMeters null, are drawn, and take no part in the
+   * sightline check until the shooter gives one.
+   */
+  power: SiteMark[]
 }
 
 export interface SiteSummary {
@@ -109,16 +136,43 @@ export function simplify(ring: Position[], maxPoints: number): Position[] {
 export function parseOverpass(payload: unknown): SiteGeometry {
   const elements = (payload as { elements?: unknown })?.elements
   if (!Array.isArray(elements)) {
-    return { land: { water: [], roads: [], structures: [] }, summary: EMPTY_SUMMARY }
+    return { land: { water: [], roads: [], structures: [] }, summary: EMPTY_SUMMARY, power: [] }
   }
 
   const water: Ring[][] = []
   const roads: RoadLine[] = []
   const structures: Ring[][] = []
   const summary: SiteSummary = { water: [], buildings: [], piers: [], roads: [], parking: [] }
+  const power: SiteMark[] = []
 
   for (const raw of elements as OverpassElement[]) {
     const tags = raw.tags ?? {}
+
+    /*
+     * POWER FIRST, because a pole is a NODE with a lat and lon rather than a
+     * way with a geometry, so it has to be read before toRing rejects it.
+     */
+    const powerTag = tags.power
+    if (powerTag === 'line' || powerTag === 'minor_line') {
+      const path = (raw.geometry ?? []).map((p) => ({ lat: round6(p.lat), lon: round6(p.lon) }))
+      if (path.length >= 2) {
+        power.push(osmMark(`osm-${String(raw.id)}`, { kind: 'line', path }, tags))
+      }
+      continue
+    }
+    if (powerTag === 'tower' || powerTag === 'pole') {
+      if (typeof raw.lat === 'number' && typeof raw.lon === 'number') {
+        power.push(
+          osmMark(
+            `osm-${String(raw.id)}`,
+            { kind: 'point', at: { lat: round6(raw.lat), lon: round6(raw.lon) } },
+            tags,
+          ),
+        )
+      }
+      continue
+    }
+
     const ring = toRing(raw)
     if (ring === null) continue
 
@@ -163,7 +217,31 @@ export function parseOverpass(payload: unknown): SiteGeometry {
     }
   }
 
-  return { land: { water, roads, structures }, summary }
+  return { land: { water, roads, structures }, summary, power }
+}
+
+/**
+ * One OSM power feature as a site mark.
+ *
+ * CONFIRMED, because OpenStreetMap is a record of something somebody surveyed,
+ * not a guess. It is still labelled 'osm' everywhere it is drawn, because
+ * "somebody mapped this" and "I stood here and saw it" are different claims and
+ * the shooter is entitled to know which they are looking at.
+ *
+ * NO HEIGHT unless OSM carries one, which it almost never does for a line.
+ */
+function osmMark(id: string, shape: SiteMark['shape'], tags: Record<string, string>): SiteMark {
+  const tagged = Number(tags['height'] ?? tags['tower:height'] ?? '')
+  return {
+    id,
+    kind: 'power-line',
+    shape,
+    heightMeters: Number.isFinite(tagged) && tagged > 0 ? tagged : null,
+    foliage: 'solid',
+    source: 'osm',
+    confirmed: true,
+    note: tags.power === 'tower' ? 'Tower' : tags.power === 'pole' ? 'Pole' : 'Line',
+  }
 }
 
 /** Caps what goes into the prompt so a dense city cannot blow the token budget. */

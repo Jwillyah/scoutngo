@@ -7,6 +7,7 @@
  * is the entire backup story, and it is deliberate.
  */
 
+import type { SiteMark } from '../core/siteMark.ts'
 import type { KitSelection } from './kitSelection.ts'
 import type { CameraPosition } from './plan.ts'
 import type { VenueDraft } from './venue.ts'
@@ -23,6 +24,15 @@ export interface Spot {
   venue: VenueDraft
   kit: KitSelection
   positions: CameraPosition[]
+  /**
+   * The hazards and notes marked at this place.
+   *
+   * OPTIONAL, because every spot saved before this existed has none, and a
+   * spot without the field is a spot with no marks rather than a broken one.
+   * "The second time I shoot a place the wires are already drawn" is the whole
+   * reason these live with the venue rather than with the session.
+   */
+  marks?: SiteMark[]
   /**
    * The gazetteer's own id for this venue, when it came from a search.
    *

@@ -5,10 +5,13 @@ import {
   type GenerationState,
 } from '../lib/planRequest.ts'
 import type { PlanCoverage } from '../lib/plan.ts'
+import type { SetupTarget } from '../lib/mode.ts'
 import { CoverageNotice } from './CoverageNotice.tsx'
 
 interface PlanStatusProps {
   generation: GenerationState
+  /** Goes and fixes whatever a block named. See src/lib/generateGate.ts. */
+  onFixBlock: (field: SetupTarget | 'brief' | null) => void
   planCoverage: PlanCoverage | null
   /** Set when Overpass could not be reached, so siting was not checked. */
   siteNote: string | null
@@ -65,13 +68,38 @@ function RawResponse({ reason, raw }: { reason: string; raw: string }) {
  * stale brief guard. Those are SETUP concerns, decided at home; this is about
  * the work and stays with the map.
  */
-export function PlanStatus({ generation, planCoverage, siteNote }: PlanStatusProps) {
+export function PlanStatus({ generation, onFixBlock, planCoverage, siteNote }: PlanStatusProps) {
   return (
     <>
       {generation.status === 'working' ? <GenerateProgress stage={generation.stage} /> : null}
 
       {generation.status === 'error' ? (
         <p className="notice notice--hazard">{generation.message}</p>
+      ) : null}
+
+      {/*
+        * BLOCKED IS NOT BROKEN, AND IT IS NEVER SILENT.
+        *
+        * The reported bug: tapping Suggest positions did nothing at all. The
+        * handler computed the reason, wrote it into this state, and navigated
+        * to Setup in the same breath, which unmounted this component before it
+        * drew. So the one thing the app knew was thrown away.
+        *
+        * It stays on this screen now, and the way to Setup is a button the
+        * shooter presses after reading why, rather than something that happens
+        * to them instead of being told.
+        */}
+      {generation.status === 'blocked' ? (
+        <div className="notice notice--blocked">
+          <p className="notice__text">{generation.block.message}</p>
+          <button
+            type="button"
+            className="notice__go"
+            onClick={() => onFixBlock(generation.block.field)}
+          >
+            {generation.block.action}
+          </button>
+        </div>
       ) : null}
 
       {/*

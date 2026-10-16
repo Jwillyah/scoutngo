@@ -40,7 +40,7 @@ const render = (over: Partial<Parameters<typeof WeatherPanel>[0]> = {}) =>
       past
       levels={LEVELS}
       gustMps={11.8}
-      flightFeet={400}
+      windHeight={{ feet: 400, source: 'position' }}
       ratedWindMps={12}
       ratedWindSource="DJI published specs, dji.com/air-3s/specs"
       tide={TIDE_OK}
@@ -62,7 +62,7 @@ describe('wind at the height being flown', () => {
 
   it('always says which height the number is for', () => {
     expect(html).toContain('Wind at 400 ft')
-    expect(render({ flightFeet: null })).toContain('at the ground, 10 m')
+    expect(render({ windHeight: { feet: null, source: 'ground' } })).toContain('at the ground, 10 m')
   })
 
   /* An interpolated figure is a reasonable number, not a measurement. */
@@ -78,13 +78,13 @@ describe('wind at the height being flown', () => {
    * is inventing weather.
    */
   it('says when it is on a served level instead of interpolating', () => {
-    const above = render({ flightFeet: 700 })
+    const above = render({ windHeight: { feet: 700, source: 'position' } })
     expect(above).toContain('At the 180 m level')
     expect(above).not.toContain('Interpolated')
   })
 
   it('still interpolates a few feet below the top level', () => {
-    expect(render({ flightFeet: 590 })).toContain('Interpolated between the 120 m and 180 m')
+    expect(render({ windHeight: { feet: 590, source: 'position' } })).toContain('Interpolated between the 120 m and 180 m')
   })
 
   /*

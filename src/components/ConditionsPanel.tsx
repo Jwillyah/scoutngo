@@ -1,3 +1,4 @@
+import type { WindHeight } from '../core/windHeight.ts'
 import type { SightlineCloud } from '../core/cloud.ts'
 import type { LatLon } from '../core/geo.ts'
 import type { TideState } from '../core/tide.ts'
@@ -23,8 +24,8 @@ interface ConditionsPanelProps {
   /** The hour the wind is for, and whether it has already happened. */
   windAt: Date | null
   windPast: boolean
-  /** The air position's height in feet, or null with nothing in the air. */
-  flightFeet: number | null
+  /** Which height the wind is read at, and whether that height is assumed. */
+  windHeight: WindHeight
   ratedWindMps: number | null
   ratedWindSource: string
   tideNow: TideState | null
@@ -48,7 +49,7 @@ export function ConditionsPanel({
   gustMps,
   windAt,
   windPast,
-  flightFeet,
+  windHeight,
   ratedWindMps,
   ratedWindSource,
   tideNow,
@@ -68,7 +69,7 @@ export function ConditionsPanel({
           past={windPast}
           levels={windLevels}
           gustMps={gustMps}
-          flightFeet={flightFeet}
+          windHeight={windHeight}
           ratedWindMps={ratedWindMps}
           ratedWindSource={ratedWindSource}
           tide={tide}

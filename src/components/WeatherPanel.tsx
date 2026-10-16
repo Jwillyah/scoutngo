@@ -2,6 +2,12 @@ import { feetToMeters } from '../core/reachScale.ts'
 import { compareToRating, knots, windAtHeight, type LevelWind } from '../core/windProfile.ts'
 import type { SightlineCloud } from '../core/cloud.ts'
 import type { TideState } from '../core/tide.ts'
+import {
+  GROUND_WIND_METERS,
+  windHeightLabel,
+  windHeightNote,
+  type WindHeight,
+} from '../core/windHeight.ts'
 import { formatClock } from '../core/timezone.ts'
 import type { TideInfo } from '../lib/useTide.ts'
 
@@ -26,8 +32,12 @@ interface WeatherPanelProps {
    * THE WHOLE REASON THIS PANEL EXISTS. Every weather app shows ten metre
    * wind, and at four hundred feet that is a different day: measured at
    * Lynnhaven Inlet at 07:00, ground 7.5 km/h and 180m 27.0 km/h.
+   *
+   * It carries WHICH height and WHY: a placed position, the default for a
+   * drone shoot with nothing placed yet, or the ground. See
+   * src/core/windHeight.ts.
    */
-  flightFeet: number | null
+  windHeight: WindHeight
   /** The published rating of the aircraft, and where it came from. Null if unknown. */
   ratedWindMps: number | null
   ratedWindSource: string
@@ -62,7 +72,7 @@ export function WeatherPanel({
   past,
   levels,
   gustMps,
-  flightFeet,
+  windHeight,
   ratedWindMps,
   ratedWindSource,
   tide,
@@ -76,7 +86,8 @@ export function WeatherPanel({
    * serves, or at the ground when nothing is in the air. The height is always
    * stated: a wind speed with no height attached is meaningless.
    */
-  const height = flightFeet === null ? 10 : feetToMeters(flightFeet)
+  const height =
+    windHeight.feet === null ? GROUND_WIND_METERS : feetToMeters(windHeight.feet)
   const aloft = windAtHeight(levels, height)
   const against = compareToRating(gustMps, ratedWindMps)
 
@@ -84,8 +95,12 @@ export function WeatherPanel({
     aloft.speedMps === null
       ? DASH
       : `${Math.round(knots(aloft.speedMps))} kts`
-  const heightLine =
-    flightFeet === null ? 'at the ground, 10 m' : `at ${Math.round(flightFeet)} ft`
+  const heightLine = windHeightLabel(windHeight)
+  /*
+   * AN ASSUMED HEIGHT SAYS SO. Reading at 200 ft because the Drone chip is on
+   * is useful; letting that look like a height the shooter chose is not.
+   */
+  const heightNote = windHeightNote(windHeight)
 
   return (
     <section className="wx" aria-label="Weather">
@@ -103,6 +118,7 @@ export function WeatherPanel({
       {/* ------------------------------------------------------------ wind */}
       <div className="wx__read">
         <p className="wx__label">Wind {heightLine}</p>
+        {heightNote === null ? null : <p className="wx__assumed">{heightNote}</p>}
         <p className="wx__value num">
           {speedLine}
           {aloft.fromDegrees === null ? null : (

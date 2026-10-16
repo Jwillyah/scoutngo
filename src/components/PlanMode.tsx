@@ -22,6 +22,10 @@ import type { TideInfo } from '../lib/useTide.ts'
 import type { VenueWindow } from '../lib/venue.ts'
 import type { KitProfile as KitProfileType } from '../core/kit.ts'
 import type { OpticSelection } from '../core/optics.ts'
+import type { SetupTarget } from '../lib/mode.ts'
+import type { WindHeight } from '../core/windHeight.ts'
+import type { MarkKind, SiteMark } from '../core/siteMark.ts'
+import { HazardPanel } from './HazardPanel.tsx'
 import { BottomSheet, type SheetState } from './BottomSheet.tsx'
 import { ConditionsPanel } from './ConditionsPanel.tsx'
 import { ConePicker, type ConeMode } from './ConePicker.tsx'
@@ -70,7 +74,8 @@ interface PlanModeProps {
    * Taken from the air positions in the plan: the highest of them, because
    * that is the one the wind limits first.
    */
-  flightFeet: number | null
+  /** Which height the wind is read at, and whether that height is assumed. */
+  windHeight: WindHeight
   ratedWindMps: number | null
   ratedWindSource: string
   /** Cloud for the selected position, when it has been asked for. */
@@ -97,10 +102,34 @@ interface PlanModeProps {
   generation: GenerationState
   siteNote: string | null
   onGenerate: () => void
+  /** Takes the shooter to whatever a blocked generate named. */
+  onFixBlock: (field: SetupTarget | 'brief' | null) => void
   /** The shooter's own gear. The lens picker and cone labels read it. */
   kitProfile: KitProfileType
   /** Which of the kit is packed, so the optic picker offers only that. */
   kitSelection: OpticSelection
+  /** The marked hazards and notes at this place. */
+  marks: readonly SiteMark[]
+  /** Marking mode, which stays on until it is turned off. See HazardPanel. */
+  marking: boolean
+  onMarking: (next: boolean) => void
+  markKind: MarkKind
+  onMarkKind: (next: MarkKind) => void
+  markDrawing: 'point' | 'line'
+  onMarkDrawing: (next: 'point' | 'line') => void
+  markDraft: readonly LatLon[]
+  onMarkAt: (at: LatLon) => void
+  onFinishLine: () => void
+  onCancelLine: () => void
+  selectedMark: SiteMark | null
+  onSelectMark: (id: string | null) => void
+  onChangeMark: (
+    id: string,
+    change: Partial<Pick<SiteMark, 'kind' | 'heightMeters' | 'foliage' | 'note'>>,
+  ) => void
+  onDeleteMark: (id: string) => void
+  /** The shoot date, yyyy-mm-dd, for the leaf answer on a deciduous mark. */
+  shootDate: string
   /** Arms the map so the next tap drops a position. The primary action here. */
   placing: boolean
   onPlacing: (next: boolean) => void
@@ -198,7 +227,7 @@ export function PlanMode({
   gustMps,
   windAt,
   windPast,
-  flightFeet,
+  windHeight,
   ratedWindMps,
   ratedWindSource,
   selectedCloud,
@@ -223,8 +252,25 @@ export function PlanMode({
   generation,
   siteNote,
   onGenerate,
+  onFixBlock,
   kitProfile,
   kitSelection,
+  marks,
+  marking,
+  onMarking,
+  markKind,
+  onMarkKind,
+  markDrawing,
+  onMarkDrawing,
+  markDraft,
+  onMarkAt,
+  onFinishLine,
+  onCancelLine,
+  selectedMark,
+  onSelectMark,
+  onChangeMark,
+  onDeleteMark,
+  shootDate,
   placing,
   onPlacing,
   onAddAt,
@@ -306,7 +352,11 @@ export function PlanMode({
         handle={mapHandle}
         venue={venue}
         onVenueChange={onVenueChange}
-        mode={placing ? 'add' : placingPilot ? 'pilot' : null}
+        mode={marking ? 'mark' : placing ? 'add' : placingPilot ? 'pilot' : null}
+        marks={marks}
+        markDraft={markDraft}
+        onMarkAt={onMarkAt}
+        onSelectMark={onSelectMark}
         onAddAt={onAddAt}
         plan={visiblePlan}
         conePlan={conePlan}
@@ -368,6 +418,22 @@ export function PlanMode({
           <button type="button" className="mode" onClick={() => openWith('conditions')}>
             Conditions
           </button>
+          {/*
+            * HAZARDS. Up here with the other reveals rather than buried in the
+            * overflow, because on a site full of wires this is the first thing
+            * touched and the count has to be visible without opening anything.
+            */}
+          <button
+            type="button"
+            className={`mode${marking ? ' mode--on' : ''}`}
+            aria-pressed={marking}
+            onClick={() => onMarking(!marking)}
+          >
+            Hazards
+            {marks.length === 0 ? null : (
+              <span className="mode__n num"> {marks.length}</span>
+            )}
+          </button>
           <ConePicker
             kit={kitProfile}
             plan={plan}
@@ -403,6 +469,26 @@ export function PlanMode({
         * bigger than the view. Both are about the layer, so both live with it
         * rather than in a panel somewhere else.
         */}
+      {!marking ? null : (
+        <HazardPanel
+          marks={marks}
+          kind={markKind}
+          onKind={onMarkKind}
+          drawing={markDrawing}
+          onDrawing={onMarkDrawing}
+          draft={markDraft}
+          onFinishLine={onFinishLine}
+          onCancelLine={onCancelLine}
+          selected={selectedMark}
+          onSelect={onSelectMark}
+          onChange={onChangeMark}
+          onDelete={onDeleteMark}
+          onClose={() => onMarking(false)}
+          date={shootDate}
+          latitude={venue?.lat ?? null}
+        />
+      )}
+
       {!showSky ? null : (
         <SkyLegend
           band={skyBand}
@@ -416,6 +502,12 @@ export function PlanMode({
               ? null
               : boundaryNote(new Date(), (at) => formatClock(at, venueWindow.timeZone))
           }
+          /*
+           * THE NUDGE IS ACTIONABLE, not just informative. "Nothing happened"
+           * is what the map looks like from here, so the panel that explains
+           * it also fixes it in one tap.
+           */
+          onZoomOut={(zoom) => handle.current?.zoomTo(zoom)}
         />
       )}
 
@@ -445,6 +537,7 @@ export function PlanMode({
           onSetYaw={onSetYaw}
           kit={kitProfile}
           selection={kitSelection}
+          marks={marks}
           pilotAt={pilotAt}
           onPlacePilot={() => onPlacingPilot(true)}
         />
@@ -543,7 +636,7 @@ export function PlanMode({
               gustMps={gustMps}
               windAt={windAt}
               windPast={windPast}
-              flightFeet={flightFeet}
+              windHeight={windHeight}
               ratedWindMps={ratedWindMps}
               ratedWindSource={ratedWindSource}
               tideNow={tideNow}
@@ -624,6 +717,7 @@ export function PlanMode({
 
             <PlanStatus
               generation={generation}
+              onFixBlock={onFixBlock}
               planCoverage={planCoverage}
               siteNote={siteNote}
             />

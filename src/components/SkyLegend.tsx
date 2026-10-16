@@ -21,6 +21,8 @@ interface SkyLegendProps {
   clock: (at: Date) => string
   /** Where the split between observed and modelled falls. */
   boundary: string | null
+  /** Takes the map out to where the layer has something to show. */
+  onZoomOut: (zoom: number) => void
 }
 
 /**
@@ -40,7 +42,7 @@ interface SkyLegendProps {
  * The visible band has no table and GIBS publishes none, so it gets a sentence
  * about what greyscale reflectance is instead of a fabricated scale.
  */
-export function SkyLegend({ band, advice, sky, clock, boundary }: SkyLegendProps) {
+export function SkyLegend({ band, advice, sky, clock, boundary, onZoomOut }: SkyLegendProps) {
   const [table, setTable] = useState<ColormapResult | null>(null)
 
   useEffect(() => {
@@ -54,6 +56,47 @@ export function SkyLegend({ band, advice, sky, clock, boundary }: SkyLegendProps
   }, [band])
 
   const stops = table?.status === 'ok' ? thinLegend(table.legend) : []
+
+  /*
+   * TOO CLOSE IS NOT A FOOTNOTE, IT IS THE WHOLE ANSWER.
+   *
+   * WHAT WAS REPORTED. "At venue zoom I turn it on and see no change and no
+   * explanation." The explanation was there. Measured in the browser at the
+   * venue zoom the app itself opens on:
+   *
+   *   .skykey rendered   true
+   *   .skykey__wash      "Too close for the sky layer: one visible pixel
+   *                       covers 2 screens. Zoom out to see cloud. Zoom 13 or
+   *                       wider."
+   *   skykey rect        top 430, 272x298, visible, opacity 1
+   *
+   * It was the FIFTH block in a 298px panel, under the source badge, the
+   * boundary note, the band name and a sentence about what the band is. The
+   * comment above it said "it comes first"; it did not. And the map behind it
+   * showed nothing at all, which is what "nothing happened" looks like.
+   *
+   * So when the layer has nothing to show, this panel is ONLY that: the
+   * reason, and a button that fixes it. A colour key for a flat wash is not
+   * the next thing to read, and the band name is not either. Everything else
+   * comes back the moment the layer is readable.
+   */
+  if (!advice.readable && sky.source.kind === 'satellite') {
+    return (
+      <div className="skykey skykey--wash">
+        <p className="skykey__washhead">Nothing to show at this zoom</p>
+        <p className="skykey__wash">{advice.message}</p>
+        {advice.zoomOutTo === null ? null : (
+          <button
+            type="button"
+            className="skykey__zoomout"
+            onClick={() => onZoomOut(advice.zoomOutTo as number)}
+          >
+            Zoom out to <span className="num">{advice.zoomOutTo}</span>
+          </button>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="skykey">
@@ -105,19 +148,6 @@ export function SkyLegend({ band, advice, sky, clock, boundary }: SkyLegendProps
         <p className="skykey__band">
           <span className="skykey__label">{GOES_BAND_LABEL[band]}</span>
           <span className="skykey__note">{GOES_BAND_NOTE[band]}</span>
-        </p>
-      )}
-
-      {/*
-        * TOO CLOSE IS ITS OWN STATE, and it comes first: a key for colours
-        * that are a flat wash is not the thing to read next.
-        */}
-      {advice.readable || sky.source.kind !== 'satellite' ? null : (
-        <p className="skykey__wash">
-          {advice.message}
-          {advice.zoomOutTo === null ? null : (
-            <span className="skykey__zoomto num"> Zoom {advice.zoomOutTo} or wider.</span>
-          )}
         </p>
       )}
 

@@ -39,6 +39,8 @@ export function computeFOV(focalLength: number, sensor: SensorSize): FOV {
   }
 }
 
+import type { ShotType } from './shotType.ts'
+
 const DEG_TO_RAD = Math.PI / 180
 
 /**
@@ -194,17 +196,49 @@ export function frameSubjectRatio(
   return frameWidth / subjectMeters
 }
 
+/**
+ * WHETHER A WIDE FRAME IS WORTH REMARKING ON AT ALL, FOR THIS KIND OF SHOT.
+ *
+ * ONLY A GROUND FRAMED SHOT. Everything else is wide ON PURPOSE:
+ *
+ *   AIR. "Those are aerials. Wide is what I flew for." Flying is how you get
+ *   wide; an aerial that frames only its subject is a shot you could have taken
+ *   from the car park. The ratio against the subject already quietened most of
+ *   these, but quieter is not the same as right, and the right answer for an
+ *   aircraft is nothing.
+ *
+ *   TOP-DOWN. The frame is the ground. How much of it you take is the entire
+ *   composition, and the app has no opinion about it.
+ *
+ *   360. There is no frame. A full sphere is wider than everything by
+ *   construction, so the comparison is not false, it is meaningless.
+ *
+ * The frame WIDTH is still measured and printed for all of them, because that
+ * is a fact about the optic and the distance and it is useful on an aerial.
+ * What goes away is the suggestion that the number is a problem.
+ */
+export function framingJudgementApplies(
+  platform: 'ground' | 'air',
+  shotType: ShotType,
+): boolean {
+  return platform === 'ground' && shotType === 'framed'
+}
+
 export function classifyFraming(
   subjectRangeMeters: number,
   hFOV: number,
   platform: 'ground' | 'air',
   /** How wide the subject is, or null when nobody has said. */
   subjectMeters: number | null = null,
+  /** What kind of shot this is. A wide frame only means anything for one. */
+  shotType: ShotType = 'framed',
 ): FramingWarning[] {
   const warnings: FramingWarning[] = []
   if (subjectRangeMeters <= 0) return warnings
 
-  const ratio = frameSubjectRatio(frameWidthMeters(subjectRangeMeters, hFOV), subjectMeters)
+  const ratio = framingJudgementApplies(platform, shotType)
+    ? frameSubjectRatio(frameWidthMeters(subjectRangeMeters, hFOV), subjectMeters)
+    : null
   if (ratio !== null && ratio > WIDE_FRAME_RATIO) {
     warnings.push('frame-wider-than-subject')
   }

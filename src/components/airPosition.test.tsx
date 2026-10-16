@@ -60,6 +60,7 @@ const card = (pilotAt: LatLon | null, over: Partial<CameraPosition> = {}) =>
       onSetYaw={() => {}}
       kit={DEFAULT_KIT}
         selection={defaultSelection(DEFAULT_KIT)}
+        marks={[]}
       pilotAt={pilotAt}
       onPlacePilot={() => {}}
     />,
@@ -211,7 +212,13 @@ describe('the Ground / Air / Both control', () => {
   it('says how many it is hiding', () => {
     expect(render({ value: 'air', hidden: 3 })).toContain('3 positions hidden')
     expect(render({ value: 'air', hidden: 1 })).toContain('1 position hidden')
-    expect(render({ hidden: 0 })).not.toContain('hidden')
+    /*
+     * The LINE, not the word. This matched on the bare string "hidden" and
+     * started failing when the platform key arrived carrying aria-hidden, which
+     * is a test that was checking the wrong thing and got away with it.
+     */
+    expect(render({ hidden: 0 })).not.toContain('positions hidden')
+    expect(render({ hidden: 0 })).not.toContain('plat__hidden')
   })
 
   it('disables Air when there is no drone in the kit', () => {
@@ -285,5 +292,57 @@ describe('the optic picker is the platform\'s own', () => {
   it('would see an aircraft camera on a ground card if one were offered', () => {
     expect(CAMERAS.length).toBeGreaterThan(0)
     for (const name of CAMERAS) expect(card(PILOT)).toContain(`>${name}<`)
+  })
+})
+
+/*
+ * ITEM 4: GROUND AND AIR HAVE TO READ APART AT A GLANCE.
+ *
+ * "There is already a shape difference, lavender square for air and circle for
+ * ground, but the red warning badges drown it." Once item 3 quietened those,
+ * the two marks still had to be deliberately different, and the control above
+ * the map had to say which is which.
+ */
+describe('the platform key', () => {
+  it('puts a glyph for each platform on the filter, which is the key', () => {
+    const html = renderToStaticMarkup(
+      <PlatformFilter
+        value="both"
+        onChange={() => {}}
+        counts={{ ground: 2, air: 1 }}
+        hidden={0}
+        airAvailable
+      />,
+    )
+    expect(html).toContain('plat__key--ground')
+    expect(html).toContain('plat__key--air')
+  })
+
+  /* Both is not a platform, so it gets no glyph: there is nothing to key. */
+  it('puts no glyph on Both', () => {
+    const html = renderToStaticMarkup(
+      <PlatformFilter
+        value="both"
+        onChange={() => {}}
+        counts={{ ground: 0, air: 0 }}
+        hidden={0}
+        airAvailable
+      />,
+    )
+    expect(html.match(/plat__key--/g)?.length).toBe(2)
+  })
+
+  /* The glyphs are decoration beside a word; a screen reader reads the word. */
+  it('hides the glyphs from a screen reader', () => {
+    const html = renderToStaticMarkup(
+      <PlatformFilter
+        value="both"
+        onChange={() => {}}
+        counts={{ ground: 1, air: 1 }}
+        hidden={0}
+        airAvailable
+      />,
+    )
+    expect(html).toMatch(/plat__key plat__key--ground"[^>]*aria-hidden="true"/)
   })
 })

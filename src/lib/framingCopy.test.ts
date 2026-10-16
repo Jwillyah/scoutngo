@@ -113,7 +113,7 @@ describe('the comparison appears only when there is something to compare', () =>
   })
 
   it('states the multiple and the size the shooter set, when it fires', () => {
-    const shot = planned(10)
+    const shot = planned(10, { platform: 'ground', altitudeFeet: 0, lensId: 'sigma-28-75', focalLength: 28 })
     const line = wideFrameLine(shot)
     expect(line).not.toBeNull()
     expect(line).toContain('10 m subject you set')
@@ -139,12 +139,36 @@ describe('the comparison appears only when there is something to compare', () =>
    * building is 3.4 times, which is an ordinary aerial with its surroundings
    * in it, and the whole complaint was about flags on ordinary aerials.
    */
-  it('says nothing about an ordinary aerial with context in the frame', () => {
-    /* 82 m out at 200 ft, which is the 3.4x the browser measured on the real card. */
-    const shot = planned(45, { at: destinationPoint(SUBJECT, 270, 82), altitudeFeet: 200 })
-    expect(shot.frameSubjectRatio).toBeGreaterThan(3)
-    expect(shot.frameSubjectRatio).toBeLessThan(4)
-    expect(wideFrameLine(shot)).toBeNull()
+  /*
+   * ITEM 3: AN AERIAL IS NEVER JUDGED, at any ratio. "Those are aerials. Wide
+   * is what I flew for." The frame WIDTH is still stated, because that is a
+   * measurement and it is useful; the ratio and the flag are not.
+   */
+  it('says nothing at all about an aerial, however wide the frame', () => {
+    for (const subject of [5, 10, 45, 400]) {
+      const shot = planned(subject)
+      expect(shot.position.platform).toBe('air')
+      expect(wideFrameLine(shot), `aerial judged at ${subject} m`).toBeNull()
+      expect(shot.framingWarnings).not.toContain('frame-wider-than-subject')
+      expect(shot.frameSubjectRatio, `aerial given a ratio at ${subject} m`).toBeNull()
+      /* And the measurement survives the silence. */
+      expect(frameLine(shot)).toMatch(/you frame \d+ m across/)
+    }
+  })
+
+  /* A top-down and a 360 are silent too, on either platform. */
+  it('says nothing about a top-down or a 360', () => {
+    for (const shotType of ['top-down', 'orbit'] as const) {
+      for (const platform of ['ground', 'air'] as const) {
+        const shot = planned(5, {
+          platform,
+          shotType,
+          altitudeFeet: platform === 'air' ? 200 : 30,
+          ...(platform === 'ground' ? { lensId: 'sigma-28-75', focalLength: 28 } : {}),
+        })
+        expect(wideFrameLine(shot), `${platform}/${shotType}`).toBeNull()
+      }
+    }
   })
 })
 

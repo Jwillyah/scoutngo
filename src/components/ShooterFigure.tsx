@@ -1,6 +1,7 @@
 import { opticTag } from '../core/opticTag.ts'
 import { SHOT_TYPE_LABEL, type ShotType } from '../core/shotType.ts'
 import { wideFrameWord } from '../lib/framingCopy.ts'
+import { BLOCKED_WORD } from '../lib/sightlineCopy.ts'
 import type { PositionOrigin } from '../lib/plan.ts'
 import type { FramingWarning } from '../core/fov.ts'
 import type { Classification } from '../core/lighting.ts'
@@ -44,6 +45,15 @@ interface ShooterFigureProps {
    * number is a measurement and the word was a verdict.
    */
   frameSubjectRatio: number | null
+  /**
+   * How many marked obstructions stand between this position and the subject.
+   *
+   * A HAZARD, and it outranks the framing note: a position you cannot see the
+   * subject from does not work, whatever the frame is doing. Zero means
+   * nothing is MARKED in the way and draws nothing at all; it is never a
+   * statement that the way is clear. See src/core/siteMark.ts.
+   */
+  blockedCount: number
   platform: Platform
   /** Feet above ground, air positions only. */
   altitudeFeet: number
@@ -128,6 +138,7 @@ export function ShooterFigure({
   warnings,
   framingWarnings,
   frameSubjectRatio,
+  blockedCount,
   platform,
   altitudeFeet,
   moved,
@@ -141,7 +152,16 @@ export function ShooterFigure({
    */
   const framing = framingWarnings[0]
   const flag =
-    warnings.length > 0
+    blockedCount > 0
+      ? {
+          word: BLOCKED_WORD,
+          label:
+            blockedCount === 1
+              ? 'one marked obstruction in the way'
+              : `${blockedCount} marked obstructions in the way`,
+          severity: 'hazard' as const,
+        }
+      : warnings.length > 0
       ? { word: WARNING_WORD[warnings[0]], label: WARNING_LABEL[warnings[0]], severity: 'hazard' as const }
       : framing === undefined
         ? null

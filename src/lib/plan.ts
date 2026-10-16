@@ -1,3 +1,5 @@
+import { blockers, cameraHeightMeters, type Blocker } from '../core/sightline.ts'
+import type { SiteMark } from '../core/siteMark.ts'
 import { slantRangeMeters } from '../core/air.ts'
 import {
   footprintSize,
@@ -10,6 +12,7 @@ import {
 import {
   classifyFraming,
   computeFOV,
+  framingJudgementApplies,
   frameSubjectRatio,
   frameWidthMeters,
   SENSORS,
@@ -185,6 +188,13 @@ export interface PlannedPosition {
   standoff: StandoffBand
   /** Standoff and framing problems. Flagged in magenta, exactly like site ones. */
   framingWarnings: FramingWarning[]
+  /**
+   * Marked obstructions standing above the line to the subject, worst first.
+   *
+   * EMPTY MEANS NOTHING IS MARKED IN THE WAY, and nothing anywhere renders it
+   * as anything else. See the hard rule in src/core/siteMark.ts.
+   */
+  blockedBy: Blocker[]
   /**
    * Outside the ring the shooter said they can reach. REPORTED, never moved:
    * they know whether that far bank is walkable and this app does not.
@@ -374,6 +384,14 @@ export function planPosition(
    * about the building, and this app only knows that one if it is told.
    */
   subjectMeters: number | null = null,
+  /**
+   * The hazards marked at this place, and the date, for the sightline check.
+   *
+   * Empty by default, which produces an empty list of blockers, which means
+   * NOTHING IS MARKED IN THE WAY. It never means the way is clear. See
+   * src/core/siteMark.ts for why that distinction is structural here.
+   */
+  site: { marks: readonly SiteMark[]; date: string } = { marks: [], date: '' },
 ): PlannedPosition {
   const { optic, sensor, focalLength } = resolveOptic(position, bodyIds, kit)
   const fov = computeFOV(focalLength, SENSORS[sensor])
@@ -439,12 +457,32 @@ export function planPosition(
       fov.hFOV,
       position.platform,
       subjectMeters,
+      position.shotType,
     ),
     subjectMeters,
-    frameSubjectRatio: frameSubjectRatio(
-      frameWidthMeters(subjectRangeMeters, fov.hFOV),
-      subjectMeters,
-    ),
+    /*
+     * Null wherever a wide frame is the intent rather than a problem, so the
+     * map flag and the card sentence go quiet together with the warning. See
+     * framingJudgementApplies.
+     */
+    frameSubjectRatio: framingJudgementApplies(position.platform, position.shotType)
+      ? frameSubjectRatio(frameWidthMeters(subjectRangeMeters, fov.hFOV), subjectMeters)
+      : null,
+    /*
+     * WHAT IS MARKED BETWEEN THIS POSITION AND THE SUBJECT.
+     *
+     * Seen from eye height on the ground and from the flight altitude in the
+     * air, which is the whole reason it is computed per position: the oak that
+     * kills a tripod shot is irrelevant at 200 feet.
+     */
+    blockedBy: blockers({
+      camera: position.at,
+      cameraHeightMeters: cameraHeightMeters(position.platform, position.altitudeFeet),
+      subject,
+      subjectHeightMeters: SUBJECT_AIM_HEIGHT_METERS,
+      marks: site.marks,
+      date: site.date,
+    }),
     beyondReach:
       reachMeters == null || venue == null
         ? false
@@ -488,11 +526,33 @@ export function planPositions(
   venue?: LatLon | null,
   kit: KitProfile = DEFAULT_KIT,
   subjectMeters: number | null = null,
+  site: { marks: readonly SiteMark[]; date: string } = { marks: [], date: '' },
 ): PlannedPosition[] {
   return positions.map((position) =>
-    planPosition(position, subject, sun, land, bodyIds, reachMeters, venue, kit, subjectMeters),
+    planPosition(
+      position,
+      subject,
+      sun,
+      land,
+      bodyIds,
+      reachMeters,
+      venue,
+      kit,
+      subjectMeters,
+      site,
+    ),
   )
 }
+
+/**
+ * How high up the subject a shot is aimed, in metres.
+ *
+ * A standing figure, a shopfront sign, the first floor of a building: the
+ * sightline is not aimed at the shooter's feet. One number because the app has
+ * not been told the subject's height, and it is small enough that a tree
+ * clearing it clears the shot too.
+ */
+const SUBJECT_AIM_HEIGHT_METERS = 2
 
 
 /**

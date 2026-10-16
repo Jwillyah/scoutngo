@@ -119,6 +119,18 @@ import {
   withCoordinates,
   type VenueDraft,
 } from './lib/venue.ts'
+import {
+  addMark,
+  allMarks,
+  makeMark,
+  MARKS_STORAGE_KEY,
+  removeMark,
+  reviveMarks,
+  updateMark,
+} from './lib/marks.ts'
+import type { MarkKind, SiteMark } from './core/siteMark.ts'
+import { windHeightFor } from './core/windHeight.ts'
+import { generateBlock } from './lib/generateGate.ts'
 
 /*
  * The calibration venue is a DEVELOPER SHORTCUT and means nothing to anyone
@@ -150,6 +162,93 @@ function App() {
     name: false,
   }))
   const [positions, setPositions] = useState<CameraPosition[]>([])
+
+  /*
+   * WHAT IS DANGEROUS AND WHAT IS IN THE WAY, marked by the shooter.
+   *
+   * PERSISTED, unlike positions, because a position belongs to a plan and a
+   * wire belongs to a place. The wire is still there next year.
+   */
+  const [marks, setMarks] = usePersistentState<SiteMark[]>(
+    MARKS_STORAGE_KEY,
+    [],
+    (raw) => reviveMarks(raw),
+  )
+
+  /*
+   * What OSM had mapped of the power network, last time a generate read the
+   * area. NOT PERSISTED: it belongs to a bounding box and a moment, and a
+   * stale copy would draw wires from a box the shooter has since left.
+   */
+  const [osmPower, setOsmPower] = useState<SiteMark[]>([])
+
+  /** Everything drawn and everything computed with. OSM first, so mine draw over. */
+  const siteMarks = useMemo(() => allMarks(marks, osmPower), [marks, osmPower])
+
+  /*
+   * MARKING MODE. Unlike placing a position, it stays on until it is turned
+   * off: a car park with wires down two sides is six marks in a row, and a
+   * mode that disarmed between each would be six trips to the button.
+   */
+  const [marking, setMarking] = useState(false)
+  const [markKind, setMarkKind] = useState<MarkKind>('power-line')
+  const [markDrawing, setMarkDrawing] = useState<'point' | 'line'>('point')
+  const [markDraft, setMarkDraft] = useState<LatLon[]>([])
+  const [selectedMarkId, setSelectedMarkId] = useState<string | null>(null)
+
+  const selectedMark = useMemo(
+    () => siteMarks.find((mark) => mark.id === selectedMarkId) ?? null,
+    [siteMarks, selectedMarkId],
+  )
+
+  /** A tap while marking: a point lands straight away, a line gathers vertices. */
+  const onMarkAt = useCallback(
+    (at: LatLon) => {
+      if (markDrawing === 'line') {
+        setMarkDraft((current) => [...current, at])
+        return
+      }
+      const mark = makeMark(markKind, { kind: 'point', at })
+      setMarks(addMark(marks, mark))
+      setSelectedMarkId(mark.id)
+    },
+    [markDrawing, markKind, marks, setMarks],
+  )
+
+  const onFinishLine = useCallback(() => {
+    if (markDraft.length < 2) return
+    const mark = makeMark(markKind, { kind: 'line', path: markDraft })
+    setMarks(addMark(marks, mark))
+    setMarkDraft([])
+    setSelectedMarkId(mark.id)
+  }, [markDraft, markKind, marks, setMarks])
+
+  /*
+   * EDITING AN OSM MARK MAKES IT YOURS. Giving a height to a wire OSM mapped
+   * is the shooter saying "I have looked at this one", which is a stronger
+   * claim than the database made, and it should stop being drawn as a dashed
+   * guess. Nothing is lost: the original is still in OSM.
+   */
+  const onChangeMark = useCallback(
+    (id: string, change: Parameters<typeof updateMark>[2]) => {
+      if (marks.some((mark) => mark.id === id)) {
+        setMarks(updateMark(marks, id, change))
+        return
+      }
+      const adopted = osmPower.find((mark) => mark.id === id)
+      if (adopted === undefined) return
+      setMarks(updateMark(addMark(marks, { ...adopted, source: 'manual' }), id, change))
+    },
+    [marks, osmPower, setMarks],
+  )
+
+  const onDeleteMark = useCallback(
+    (id: string) => {
+      setMarks(removeMark(marks, id))
+      setSelectedMarkId(null)
+    },
+    [marks, setMarks],
+  )
   const [generation, setGeneration] = useState<GenerationState>({ status: 'idle' })
   /* Real OSM shapes for the generated view. Empty until Overpass answers. */
   const [land, setLand] = useState<Landcover>(EMPTY_LANDCOVER)
@@ -157,10 +256,35 @@ function App() {
   /* 0 at the start of the window, 1 at the end. Starts at the midpoint. */
   const [scrub, setScrub] = useState(0.5)
 
+  /*
+   * THE KIT IS THE SHOOTER'S, NOT OURS.
+   *
+   * It shipped as a constant taken from the brief, which meant buying a lens
+   * and being unable to use it. It is now editable state on the device, and
+   * DEFAULT_KIT is only the starting point. Every field of view, frame width
+   * and standoff band is computed from whatever is in here.
+   */
+  const [kitProfile, setKitProfile] = usePersistentState<KitProfile>(
+    'scoutngo.kitProfile.v1',
+    DEFAULT_KIT,
+    (raw) => reviveKitProfile(raw),
+  )
+
+  /*
+   * REVIVED AGAINST THE SHOOTER'S OWN KIT, not against DEFAULT_KIT.
+   *
+   * DEFAULT_KIT is only the starting point; the profile above is editable, so
+   * a drone or a lens somebody added themselves has an id that DEFAULT_KIT has
+   * never heard of. Reviving against the shipped profile stripped those ids on
+   * every reload, which left a selection that counted as empty and a Drone chip
+   * that could not make an air position. Same bug as the stale spot id, from
+   * the other direction: the thing validated against has to be the thing the
+   * app actually computes with.
+   */
   const [kit, setKit] = usePersistentState<KitSelection>(
     KIT_STORAGE_KEY,
     defaultSelection(DEFAULT_KIT),
-    (raw) => reviveSelection(raw, DEFAULT_KIT),
+    (raw) => reviveSelection(raw, kitProfile),
   )
 
   /*
@@ -188,19 +312,6 @@ function App() {
    * Whether the first run hint under the pin has been retired. Kept on the
    * device: it answers "can I move this", and once you know, you know.
    */
-  /*
-   * THE KIT IS THE SHOOTER'S, NOT OURS.
-   *
-   * It shipped as a constant taken from the brief, which meant buying a lens
-   * and being unable to use it. It is now editable state on the device, and
-   * DEFAULT_KIT is only the starting point. Every field of view, frame width
-   * and standoff band is computed from whatever is in here.
-   */
-  const [kitProfile, setKitProfile] = usePersistentState<KitProfile>(
-    'scoutngo.kitProfile.v1',
-    DEFAULT_KIT,
-    (raw) => reviveKitProfile(raw),
-  )
 
   /*
    * Preferences, kept on the device. Small on purpose: a setting is a decision
@@ -319,8 +430,21 @@ function App() {
             centre,
             kitProfile,
             subjectMeters,
+            { marks: siteMarks, date: venue.date },
           ),
-    [positions, aim, sun, land, kit.bodyIds, reachMeters, centre, kitProfile, subjectMeters],
+    [
+      positions,
+      aim,
+      sun,
+      land,
+      kit.bodyIds,
+      reachMeters,
+      centre,
+      kitProfile,
+      subjectMeters,
+      siteMarks,
+      venue.date,
+    ],
   )
 
   /*
@@ -531,15 +655,20 @@ function App() {
   /*
    * THE HEIGHT TO READ THE WIND AT.
    *
-   * The highest air position in the plan, because that is the one the wind
-   * limits first. Null with nothing in the air, and the panel then reads the
-   * ground and says so: every other weather app shows ground wind, and at
-   * four hundred feet that is a different day.
+   * The highest air position in the plan, or the default flight height when
+   * the shoot is set to Drone and nothing is placed yet, or the ground. The
+   * rule is in src/core/windHeight.ts and the panel says which of the three it
+   * gave: an assumed height that reads like a planned one is the app putting
+   * words in the shooter's mouth about how high they are going.
    */
-  const flightFeet = useMemo(() => {
-    const air = positions.filter((p) => p.platform === 'air')
-    return air.length === 0 ? null : Math.max(...air.map((p) => p.altitudeFeet))
-  }, [positions])
+  const windHeight = useMemo(
+    () =>
+      windHeightFor(
+        positions.filter((p) => p.platform === 'air').map((p) => p.altitudeFeet),
+        platformFilter,
+      ),
+    [positions, platformFilter],
+  )
 
   /*
    * The published wind rating of the aircraft actually coming, when there is
@@ -823,6 +952,8 @@ function App() {
       venue,
       kit,
       positions,
+      /* The wires go with the place, which is the point of saving a place. */
+      marks,
     }
     setSpots(mergeSpots(spots, [spot]))
   }
@@ -832,8 +963,21 @@ function App() {
     cancelNameLookup()
     nameIsFilled.current = false
     setDefaults({ date: false, window: false, name: false })
-    setKit(spot.kit)
+    /*
+     * THE SPOT'S KIT IS REVIVED AGAINST THE KIT, NOT TRUSTED.
+     *
+     * A spot is JSON: saved months ago, exported, imported from someone else,
+     * or written when an id was spelled differently. An id that no longer
+     * resolves used to travel straight into the selection, where it counted
+     * towards "a drone is available" while resolving to no camera. The Drone
+     * chip was then offerable and every air position it promised came out
+     * ground. reviveSelection drops what the kit does not have, which is the
+     * same treatment the stored selection in localStorage already got.
+     */
+    setKit(reviveSelection(spot.kit, kitProfile))
     setPositions(spot.positions)
+    /* Revived rather than trusted, for the same reason the kit is. */
+    setMarks(reviveMarks(spot.marks ?? []))
     setBriefAnchor(null)
     setGeneration({ status: 'idle' })
     setMode('setup')
@@ -964,34 +1108,22 @@ function App() {
 
   const onGenerate = async () => {
     /*
-     * An incomplete venue or a stale brief is a SETUP problem, so send the user
-     * back to the step that owns it rather than opening a panel over the map.
-     */
-    if (hasErrors(errors) || staleBrief) {
-      setMode('setup')
-      setPointAt((current) => ({ field: missing ?? 'venue', tick: current.tick + 1 }))
-      return
-    }
-
-    /*
-     * NO BRIEF, NO CALL.
+     * WHY IT CANNOT RUN, SAID ON THE SCREEN THE BUTTON IS ON.
      *
-     * Pressed at an apartment complex with an empty description, this invented a
-     * marina shoot: the model was handed a satellite image and nothing else, and
-     * it is obliged to answer, so it answered about what it thought it saw. That
-     * is the exact failure this app exists to not have.
+     * This used to navigate to SETUP from inside the handler, in the same
+     * breath as writing the reason into generation state. PlanStatus, the only
+     * thing that renders that state, lives inside PlanMode, so the navigation
+     * unmounted the message before a frame was drawn. The button did nothing,
+     * visibly, every time the brief was empty, which since the chips arrived is
+     * most of the time. Measured in the browser; see src/lib/generateGate.ts.
      *
-     * The model is never asked a question there is no information to answer. It
-     * costs a request and produces confident fiction, and fiction shaped like a
-     * plan is worse than no plan because it looks finished.
+     * Nothing navigates here now. The block is shown where it happened, with a
+     * button that goes and fixes it, so leaving the screen is a choice the
+     * shooter makes after reading why.
      */
-    if (venue.eventDescription.trim() === '') {
-      setMode('setup')
-      setPointAt((current) => ({ field: 'brief', tick: current.tick + 1 }))
-      setGeneration({
-        status: 'error',
-        message: 'Tell me what the shoot is first. Without it I would be guessing from the satellite image alone.',
-      })
+    const block = generateBlock({ errors, missing, staleBrief, venue })
+    if (block !== null) {
+      setGeneration({ status: 'blocked', block })
       return
     }
 
@@ -1040,6 +1172,7 @@ function App() {
     const site = await sitePending
     if (site.status === 'ok') {
       setLand(site.geometry.land)
+      setOsmPower(site.geometry.power)
       setSiteNote(null)
     } else {
       setLand(EMPTY_LANDCOVER)
@@ -1230,6 +1363,13 @@ function App() {
     tick: number
   }>({ field: null, tick: 0 })
 
+  /** Takes the shooter to the thing a block named, and points at it. */
+  const onFixBlock = useCallback((field: SetupTarget | 'brief' | null) => {
+    setMode('setup')
+    if (field !== null) setPointAt((current) => ({ field, tick: current.tick + 1 }))
+    setGeneration({ status: 'idle' })
+  }, [])
+
   /* Which steps are reachable. See src/lib/mode.ts. */
   const available: ModeAvailability = {
     venueReady: !hasErrors(errors),
@@ -1335,7 +1475,7 @@ function App() {
             platformFilter={platformFilter}
             onPlatformFilter={setPlatformFilter}
             shootLine={shootLine}
-            airAvailable={droneAvailable(kit)}
+            airAvailable={droneAvailable(kit, kitProfile)}
             onUseMyLocation={onUseMyLocation}
             shotListText={shotListText}
             onShotListText={onShotListChange}
@@ -1378,7 +1518,7 @@ function App() {
           onPlatformFilter={setPlatformFilter}
           platformCounts={platformTally}
           hiddenByPlatform={hiddenByPlatform}
-          airAvailable={droneAvailable(kit)}
+          airAvailable={droneAvailable(kit, kitProfile)}
           pilotAt={pilotAt}
           onPilotMove={onPilotMove}
           addsAir={addsAir}
@@ -1402,7 +1542,7 @@ function App() {
           gustMps={gustMps}
           windAt={windAt}
           windPast={windPast}
-          flightFeet={flightFeet}
+          windHeight={windHeight}
           ratedWindMps={rated.mps}
           ratedWindSource={rated.source}
           selectedCloud={null}
@@ -1427,8 +1567,34 @@ function App() {
           generation={generation}
           siteNote={siteNote}
           onGenerate={() => void onGenerate()}
+          onFixBlock={onFixBlock}
           kitProfile={kitProfile}
           kitSelection={kit}
+          marks={siteMarks}
+          marking={marking}
+          onMarking={(next) => {
+            setMarking(next)
+            if (!next) {
+              setMarkDraft([])
+              setSelectedMarkId(null)
+            }
+          }}
+          markKind={markKind}
+          onMarkKind={setMarkKind}
+          markDrawing={markDrawing}
+          onMarkDrawing={(next) => {
+            setMarkDrawing(next)
+            setMarkDraft([])
+          }}
+          markDraft={markDraft}
+          onMarkAt={onMarkAt}
+          onFinishLine={onFinishLine}
+          onCancelLine={() => setMarkDraft([])}
+          selectedMark={selectedMark}
+          onSelectMark={setSelectedMarkId}
+          onChangeMark={onChangeMark}
+          onDeleteMark={onDeleteMark}
+          shootDate={venue.date}
           placing={placing}
           onPlacing={setPlacing}
           onAddAt={addPositionAt}

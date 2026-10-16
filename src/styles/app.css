@@ -1989,7 +1989,7 @@
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: var(--color-accent);
+  background: var(--platform-ground);
   border: var(--line-rule) solid var(--mark-edge);
 }
 
@@ -1997,7 +1997,7 @@
   font-size: var(--text-md);
   font-weight: var(--weight-heavy);
   line-height: 1;
-  color: var(--color-accent-ink);
+  color: var(--black);
 }
 
 /* Small silhouette, only to say what the disc is. */
@@ -2994,6 +2994,38 @@
   border-top: var(--line-hair) solid var(--color-edge-top);
   border-radius: var(--radius-panel);
   font-size: var(--text-sm);
+}
+
+/*
+ * A GENERATE THAT CANNOT RUN, SAYING SO WHERE THE BUTTON IS.
+ *
+ * The accent rule rather than the hazard one: nothing is broken, something is
+ * missing, and the way out is the button underneath. Red here would sit beside
+ * "this position is in the water" and teach the eye to skip both.
+ */
+.notice--blocked {
+  border-left-color: var(--color-accent);
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+}
+
+.notice__text {
+  margin: 0;
+}
+
+.notice__go {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  border: 0;
+  border-radius: var(--radius-panel);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  /* A real target, not a text link, because it is pressed with a thumb. */
+  min-height: 44px;
 }
 
 /* --------------------------------------------------------------- sections */
@@ -4044,9 +4076,26 @@
 
 /* ---------------------------------------------------------- drone bits */
 
+/*
+ * AIR IS A CYAN SQUARE, GROUND IS A WHITE CIRCLE.
+ *
+ * It was a periwinkle rounded-rectangle against a white circle, which is two
+ * marks that look alike at 30px wearing a colour that already means the shadow
+ * bearing on the same map. Reported as not reading apart once the red badges
+ * stopped drowning everything.
+ *
+ * A HARD SQUARE, not a 20% radius: the silhouette is the fast read, and a
+ * rounded square and a circle have the same silhouette in peripheral vision.
+ * Every other data overlay in this app is hard-edged, so a square is also the
+ * house style rather than a new idea. The key for both is on the Ground/Air
+ * control above the map.
+ */
 .shooter--air .shooter__disc {
-  background: var(--sun-shadow);
-  border-radius: 20%;
+  background: var(--platform-air);
+  border-radius: 2px;
+  /* Slightly squarer footprint than the circle, so the two differ in mass too. */
+  width: 28px;
+  height: 28px;
 }
 
 .shooter--air .shooter__number {
@@ -5377,4 +5426,398 @@
   color: var(--color-text-muted);
   font-size: var(--text-xs);
   line-height: var(--leading-normal);
+}
+
+/*
+ * THE MAP KEY, ON THE CONTROL THAT ALREADY NAMES BOTH PLATFORMS.
+ *
+ * The same colour and the same shape as the marker it stands for, so there is
+ * nothing to learn: the white circle on the map is the white circle here.
+ * Small, because it explains the control rather than competing with it.
+ */
+.plat__key {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  /* No margin: .plat__btn is a flex row with its own gap. */
+  border: var(--line-hair) solid var(--mark-edge);
+  flex: none;
+}
+
+.plat__key--ground {
+  background: var(--platform-ground);
+  border-radius: 50%;
+}
+
+.plat__key--air {
+  background: var(--platform-air);
+  border-radius: 1px;
+}
+
+/* On the selected segment the plate goes light, so the white circle needs an edge. */
+.plat__btn--on .plat__key--ground {
+  border-color: var(--color-line-strong);
+}
+
+/* ------------------------------------------------------------- hazards */
+
+/*
+ * MARKING WHAT IS DANGEROUS AND WHAT IS IN THE WAY.
+ *
+ * A panel over the map rather than a sheet, because the map is the thing being
+ * marked and the panel has to be beside it rather than on top of it. Same
+ * plate treatment as the sky key, which is the other thing that explains a
+ * layer while the layer is on.
+ */
+.hz {
+  position: absolute;
+  left: var(--space-2);
+  right: var(--space-2);
+  bottom: calc(var(--sheet-live-height) + var(--space-2));
+  z-index: 6;
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--color-panel);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-panel);
+  /* dvh, not vh: the mobile toolbars move and the panel has to move with them. */
+  max-height: 52dvh;
+  overflow-y: auto;
+}
+
+.hz__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.hz__title {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.hz__x {
+  background: transparent;
+  border: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heavy);
+  min-height: 44px;
+  padding: 0 var(--space-2);
+}
+
+.hz__kinds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.hz__kind {
+  background: var(--color-field);
+  color: var(--color-text-muted);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-panel);
+  padding: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  min-height: 38px;
+}
+
+/*
+ * A HAZARD AND A NOTE ARE DIFFERENT THINGS AND READ DIFFERENTLY WHEN CHOSEN.
+ * Magenta for the things that can hurt you, cyan for the things that help.
+ * Unselected they are both quiet: a row of seven coloured chips is a row
+ * nobody can read.
+ */
+.hz__kind--on.hz__kind--hazard {
+  background: var(--color-hazard);
+  color: var(--white);
+  border-color: var(--color-hazard);
+}
+
+.hz__kind--on.hz__kind--note {
+  background: var(--platform-air);
+  color: var(--black);
+  border-color: var(--platform-air);
+}
+
+.hz__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-2);
+}
+
+.hz__field {
+  display: grid;
+  gap: 2px;
+  flex: 1 1 10ch;
+  min-width: 0;
+}
+
+.hz__field--num {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 1 auto;
+}
+
+.hz__label {
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+
+.hz__select,
+.hz__text,
+.hz__num {
+  background: var(--color-field);
+  color: var(--color-text);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-panel);
+  padding: var(--space-2);
+  font-size: var(--text-sm);
+  min-height: 40px;
+  min-width: 0;
+}
+
+.hz__num {
+  width: 6ch;
+}
+
+.hz__unit,
+.hz__leaf {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.hz__shape {
+  display: flex;
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-panel);
+  overflow: hidden;
+}
+
+.hz__shape-btn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 0;
+  padding: 0 var(--space-3);
+  min-height: 40px;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.hz__shape-btn--on {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+}
+
+.hz__draft {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.hz__draft-n {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heavy);
+  color: var(--color-text);
+}
+
+.hz__done,
+.hz__cancel,
+.hz__del {
+  border: 0;
+  border-radius: var(--radius-panel);
+  padding: 0 var(--space-3);
+  min-height: 40px;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.hz__done {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+}
+
+.hz__done:disabled {
+  opacity: 0.4;
+}
+
+.hz__cancel {
+  background: var(--color-field);
+  color: var(--color-text-muted);
+}
+
+.hz__del {
+  background: var(--color-hazard-bg);
+  color: var(--white);
+}
+
+.hz__hint,
+.hz__tally,
+.hz__caveat {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/*
+ * THE CAVEAT IS NOT DECORATION. The OSM power layer has holes in it, and the
+ * one thing this panel must never let anyone conclude is that an unmarked
+ * area is clear. Quiet, present, and always there rather than behind a tap.
+ */
+.hz__caveat {
+  color: var(--color-text-faint);
+  border-top: var(--line-hair) solid var(--color-line);
+  padding-top: var(--space-2);
+}
+
+.hz__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.hz__src {
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.mode__n {
+  color: var(--color-text-muted);
+  font-weight: var(--weight-heavy);
+}
+
+/* A blocked position, named and measured. See src/lib/sightlineCopy.ts. */
+.card__blocked {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.card__blocked-head {
+  margin: 0;
+  font-weight: var(--weight-heavy);
+}
+
+.card__blocked-list {
+  margin: 0;
+  padding-left: var(--space-3);
+  display: grid;
+  gap: 2px;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/*
+ * HOW OLD THE GROUND VIEW IS.
+ *
+ * The year was always in the corner in the same grey, so "2018" on a shot
+ * where trees were the problem read exactly like "2026". Three treatments now,
+ * and only the oldest is loud: see src/core/imageryAge.ts for the bands.
+ */
+.frame__year--current {
+  /* Unchanged from what it always was: quiet, present, not worth a glance. */
+  opacity: 0.8;
+}
+
+.frame__year--ageing {
+  background: var(--color-panel-2);
+  color: var(--color-text);
+  opacity: 1;
+}
+
+.frame__year--old {
+  background: var(--color-hazard);
+  color: var(--white);
+  opacity: 1;
+  font-weight: var(--weight-heavy);
+}
+
+/*
+ * The sentence, over the picture rather than under it, because the picture is
+ * the thing being qualified and a line below it gets scrolled past.
+ */
+.frame__age {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: 0;
+  padding: var(--space-2);
+  font-size: var(--text-xs);
+  line-height: 1.3;
+  background: color-mix(in srgb, var(--black) 78%, transparent);
+  color: var(--color-text);
+}
+
+.frame__age--old {
+  /* The reported case. A rule in the hazard colour, not a block of it. */
+  border-left: var(--line-rule) solid var(--color-hazard);
+}
+
+.frame__age--ageing {
+  border-left: var(--line-rule) solid var(--color-rule-fact);
+}
+
+/* An assumed wind height says so, under the reading it qualifies. */
+.wx__assumed {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+}
+
+/*
+ * THE SKY LAYER HAS NOTHING TO SHOW AT THIS ZOOM.
+ *
+ * The reason used to be the fifth block in a 298px key, under the source
+ * badge, the boundary note, the band name and a sentence about the band, with
+ * an unchanged map behind it. Reported as "no change and no explanation", and
+ * from there that is exactly what it was.
+ *
+ * It is the whole panel now, in the accent rather than the hazard colour:
+ * nothing is wrong, the view is just too close, and the button fixes it.
+ */
+.skykey--wash {
+  border-left: var(--line-rule) solid var(--color-accent);
+  gap: var(--space-2);
+}
+
+.skykey__washhead {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text);
+}
+
+.skykey__zoomout {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  border: 0;
+  border-radius: var(--radius-panel);
+  padding: var(--space-2) var(--space-3);
+  min-height: 44px;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  justify-self: start;
 }

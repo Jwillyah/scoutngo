@@ -23,9 +23,17 @@ import {
   SHOT_TYPES,
   type ShotType,
 } from '../core/shotType.ts'
+import {
+  imageryAge,
+  imageryNote,
+  imageryYear,
+  imageryYearsOld,
+} from '../core/imageryAge.ts'
 import { lightLine } from '../lib/lightCopy.ts'
 import { focalOn, opticsFor, type OpticSelection } from '../core/optics.ts'
 import { frameLine, wideFrameLine } from '../lib/framingCopy.ts'
+import { blockedLine, blockerLine } from '../lib/sightlineCopy.ts'
+import type { SiteMark } from '../core/siteMark.ts'
 import type { PlannedPosition } from '../lib/plan.ts'
 
 interface PositionCardProps {
@@ -46,6 +54,8 @@ interface PositionCardProps {
   kit: KitProfileType
   /** Which of that gear is packed for this shoot. Narrows the optic picker. */
   selection: OpticSelection
+  /** The marked hazards, so a blocker can be named rather than numbered. */
+  marks: readonly SiteMark[]
   /** How high an air position flies, in feet AGL. Clamped in core. */
   onSetAltitude: (id: string, feet: number) => void
   /** What kind of shot this position is. Framed, top-down or 360. */
@@ -95,13 +105,6 @@ const feet = (metres: number) => Math.round(metersToFeet(metres)).toLocaleString
 /** Rising, falling, or as near to neither as makes no difference. */
 const TIDE_ARROW: Record<string, string> = { rising: '↑', falling: '↓', slack: '·' }
 
-/** Google give "YYYY-MM". The year is the part that matters and the part to show. */
-function imageryYear(date: string | undefined): string | null {
-  if (date === undefined) return null
-  const year = date.slice(0, 4)
-  return /^\d{4}$/.test(year) ? year : null
-}
-
 const WARNING_COPY: Record<SiteWarning, string> = {
   'in-water': 'This position is in water. Nobody can stand here.',
   'in-roadway': 'This position is in a roadway. Check access before committing.',
@@ -147,7 +150,14 @@ const FRAMING_COPY: Record<FramingWarning, string> = {
  * the field pack, sends EVERY position at once and stays behind its own labelled
  * press for exactly that reason.
  */
-function PhotoSlot({ planned }: { planned: PlannedPosition }) {
+function PhotoSlot({
+  planned,
+  shootAt,
+}: {
+  planned: PlannedPosition
+  /** The day being planned, so the imagery age is measured against it. */
+  shootAt: Date | null
+}) {
   const { at } = planned.position
   /* Street View needs a direction to look. Only a framed shot has one. */
   const cameraBearing = cameraBearingOf(planned.aim)
@@ -173,7 +183,18 @@ function PhotoSlot({ planned }: { planned: PlannedPosition }) {
     }
   }, [air, at, cameraBearing, hFOV])
 
+  /*
+   * HOW OLD THE VIEW IS, AND HOW LOUDLY TO SAY SO.
+   *
+   * The year was always in the corner and always looked the same, so a 2018
+   * on a shot where trees were the problem read exactly like a 2026. The band
+   * changes the treatment; the rule is in src/core/imageryAge.ts.
+   */
   const year = view.status === 'ok' ? imageryYear(view.date) : null
+  const shootYear = Number((shootAt ?? new Date()).getFullYear())
+  const age = imageryAge(year, shootYear)
+  const yearsOld = imageryYearsOld(year, shootYear)
+  const ageNote = imageryNote(age, yearsOld)
 
   const line = lightLine(planned.read)
 
@@ -206,7 +227,16 @@ function PhotoSlot({ planned }: { planned: PlannedPosition }) {
         {planned.position.number}
         {planned.position.moved ? <span className="frame__moved">moved</span> : null}
       </span>
-      {year === null ? null : <span className="frame__year num">{year}</span>}
+      {year === null ? null : (
+        <span className={`frame__year num frame__year--${age}`}>{year}</span>
+      )}
+
+      {/*
+        * AND THE SENTENCE, WHEN IT IS OLD ENOUGH TO MATTER. Over the picture
+        * rather than under it, because the picture is the thing being
+        * qualified and a line below it is a line that gets scrolled past.
+        */}
+      {ageNote === null ? null : <p className={`frame__age frame__age--${age}`}>{ageNote}</p>}
 
       {/*
         * THE LIGHT ROW, which is a different read per shot type and says so.
@@ -405,6 +435,7 @@ export function PositionCard({
   onSetOptic,
   kit,
   selection,
+  marks,
   onSetAltitude,
   pilotAt,
   onPlacePilot,
@@ -457,7 +488,7 @@ export function PositionCard({
         ✕
       </button>
 
-      <PhotoSlot key={position.id} planned={planned} />
+      <PhotoSlot key={position.id} planned={planned} shootAt={shootAt} />
 
       {/*
         * The shot in plain words, and the largest text on the card.
@@ -611,6 +642,29 @@ export function PositionCard({
           <span className="card__frame-wide"> {wideFrameLine(planned)}</span>
         )}
       </p>
+
+      {/*
+        * WHAT IS MARKED IN THE WAY.
+        *
+        * A hazard, because a position you cannot see the subject from is a
+        * position that does not work. Named and measured from the shooter's
+        * own marks; see src/lib/sightlineCopy.ts.
+        *
+        * NOTHING IS DRAWN WHEN THE LIST IS EMPTY, deliberately. The only true
+        * sentence would be "nothing is marked between here and the subject",
+        * which beside a plan reads as "this is clear". It is not the same
+        * claim and this app does not make the second one.
+        */}
+      {planned.blockedBy.length === 0 ? null : (
+        <div className="card__warn card__blocked">
+          <p className="card__blocked-head">{blockedLine(planned.blockedBy, marks)}</p>
+          <ul className="card__blocked-list">
+            {planned.blockedBy.map((blocker) => (
+              <li key={blocker.markId}>{blockerLine(blocker, marks)}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/*
         * ONLY THE HAZARDS GET THE MAGENTA BLOCK. A wide frame is said in the

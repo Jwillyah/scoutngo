@@ -86,17 +86,30 @@ describe('a camera in the air is not a camera on the ground', () => {
    * times over, and the old ground-range arithmetic could not see it. The
    * subject size is given, because without one nothing is claimed either way.
    */
-  it('warns about a frame the old arithmetic called fine', () => {
-    expect(classifyFraming(25, AIR_3S_WIDE.hFOV, 'air', 13)).toEqual([])
-    expect(
-      classifyFraming(slantRangeMeters(25, 200), AIR_3S_WIDE.hFOV, 'air', 13),
-    ).toContain('frame-wider-than-subject')
+  /*
+   * THE SLANT RANGE CHANGES THE FRAME, which is the point of this file. A
+   * drone at 200 ft over a subject 25 m away is 66 m from it, not 25, and the
+   * frame is 98.6 m across rather than 37.4.
+   *
+   * ASSERTED ON THE WIDTH, NOT ON A WARNING. It used to be asserted on
+   * classifyFraming returning 'frame-too-wide', which no longer fires in the
+   * air at all: "those are aerials, wide is what I flew for". The measurement
+   * is the thing this module is responsible for and the thing that was wrong.
+   */
+  it('frames much more from the slant range than from the ground range', () => {
+    const ground = frameWidthMeters(25, AIR_3S_WIDE.hFOV)
+    const real = frameWidthMeters(slantRangeMeters(25, 200), AIR_3S_WIDE.hFOV)
+    expect(ground).toBeCloseTo(37.4, 1)
+    expect(real).toBeCloseTo(98.6, 1)
+    expect(real).toBeGreaterThan(ground * 2.5)
   })
 
-  /* And with no subject size, neither range is judged at all. */
-  it('claims nothing about either frame when the subject size is unknown', () => {
-    expect(classifyFraming(25, AIR_3S_WIDE.hFOV, 'air')).toEqual([])
-    expect(classifyFraming(slantRangeMeters(25, 200), AIR_3S_WIDE.hFOV, 'air')).toEqual([])
+  /* And an aerial is never told its frame is too wide, at any range or size. */
+  it('passes no framing judgement on an aircraft', () => {
+    for (const subject of [null, 5, 13, 400]) {
+      expect(classifyFraming(slantRangeMeters(25, 200), AIR_3S_WIDE.hFOV, 'air', subject))
+        .not.toContain('frame-wider-than-subject')
+    }
   })
 
   it('never returns less than the altitude, whatever the horizontal is', () => {
