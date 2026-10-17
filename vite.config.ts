@@ -15,12 +15,24 @@ import { configDefaults, defineConfig } from 'vitest/config'
  * time from git, falling back to the platform's own commit variables on Vercel
  * where .git may not be present, and to "dev" when neither exists.
  */
-function buildId(): string {
-  const fromEnv =
+/**
+ * The commit a build platform says this is, or null when nothing says so.
+ *
+ * ONE PLACE, because three different functions were each deciding separately
+ * whether they were on a platform, and buildDirty was reaching a different
+ * answer from buildId in the same environment.
+ */
+function platformCommit(): string | null {
+  const sha =
     process.env.VERCEL_GIT_COMMIT_SHA ??
     process.env.GITHUB_SHA ??
     process.env.COMMIT_REF
-  if (typeof fromEnv === 'string' && fromEnv.length >= 7) return fromEnv.slice(0, 7)
+  return typeof sha === 'string' && sha.length >= 7 ? sha.slice(0, 7) : null
+}
+
+function buildId(): string {
+  const fromEnv = platformCommit()
+  if (fromEnv !== null) return fromEnv
   try {
     return execSync('git rev-parse --short=7 HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
       .toString()
@@ -67,7 +79,7 @@ function repoSlug(): string {
  * It is the LOCAL case this exists to catch.
  */
 function buildPushed(): boolean {
-  if (typeof process.env.VERCEL_GIT_COMMIT_SHA === 'string') return true
+  if (platformCommit() !== null) return true
   try {
     const on = execSync('git branch -r --contains HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
       .toString()
@@ -78,8 +90,37 @@ function buildPushed(): boolean {
   }
 }
 
-/** Whether the working tree had uncommitted changes when this was built. */
+/**
+ * Whether the working tree had uncommitted changes when this was built.
+ *
+ * THE PLATFORM IS BELIEVED, exactly as buildId already believes it.
+ *
+ * WHAT WAS REPORTED. "The build stamp says dd4fef1+ and the tree was clean. A
+ * stamp that warns when nothing is wrong is a stamp I stop reading, which is
+ * the exact failure it exists to prevent."
+ *
+ * The detection itself is sound: a pristine clone of that very commit, with
+ * npm ci and a build run in it, reports nothing from `git status --porcelain`
+ * and stamps `dd4fef1` with no plus. Checked, not assumed.
+ *
+ * What differs on a deploy is the WORKING DIRECTORY, not the source. The
+ * platform checks out a named commit and then puts its own things beside it,
+ * and `git status` answers about the directory rather than about the code. So
+ * the plus was reporting the build system's housekeeping as the author's
+ * uncommitted work.
+ *
+ * ON A PLATFORM BUILD THE SOURCE IS THAT COMMIT, BY DEFINITION. buildId
+ * already takes the platform's word for which commit this is; asking git a
+ * different question in the same environment, and trusting that answer more,
+ * is two sources for one fact. One source: if the platform named the commit,
+ * the tree is that commit.
+ *
+ * LOCALLY IT STILL MEANS WHAT IT SAYS, and it still counts untracked files: a
+ * new source file that is imported but never committed makes a build that
+ * matches no commit just as surely as an edit to a tracked one does.
+ */
 function buildDirty(): boolean {
+  if (platformCommit() !== null) return false
   try {
     return (
       execSync('git status --porcelain', { stdio: ['ignore', 'pipe', 'ignore'] })

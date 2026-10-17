@@ -1,7 +1,11 @@
 import type { KitProfile } from '../core/kit.ts'
+import { kitRowOrder } from '../core/kitOrder.ts'
+import type { PlatformFilter } from '../core/platformFilter.ts'
 import { toggleId, type KitSelection } from '../lib/kitSelection.ts'
 
 interface KitChipsProps {
+  /** Which platform the chips packed for, which decides what leads the row. */
+  platform: PlatformFilter
   value: KitSelection
   onChange: (next: KitSelection) => void
   /** The shooter's own gear. Chips are drawn from this, not from a constant. */
@@ -18,7 +22,7 @@ interface KitChipsProps {
  * deciding what is in the bag this morning. Tap to include, tap to drop; the
  * detail moves behind "edit kit" for the day it is actually wanted.
  */
-export function KitChips({ value, onChange, kit, onEdit }: KitChipsProps) {
+export function KitChips({ value, onChange, kit, onEdit, platform }: KitChipsProps) {
   const chip = (
     id: string,
     label: string,
@@ -44,22 +48,23 @@ export function KitChips({ value, onChange, kit, onEdit }: KitChipsProps) {
           Edit kit
         </button>
       </div>
+      {/*
+        * WHATEVER THE CHIP PACKED LEADS. The row used to be in profile order
+        * always, which is a fact about the file and not about the shoot: on a
+        * drone shoot the one thing coming was the last thing shown and off the
+        * right edge. See src/core/kitOrder.ts.
+        */}
       <div className="kitrow__scroll" role="group" aria-label="Kit in play">
-        {kit.bodies.map((body) =>
-          chip(body.id, body.name.replace('Sony ', ''), value.bodyIds.includes(body.id), () =>
-            onChange({ ...value, bodyIds: toggleId(value.bodyIds, body.id) }),
-          ),
-        )}
-        {kit.lenses.map((lens) =>
-          chip(lens.id, lens.name.replace(/^(Sony|Sigma) /, ''), value.lensIds.includes(lens.id), () =>
-            onChange({ ...value, lensIds: toggleId(value.lensIds, lens.id) }),
-          ),
-        )}
-        {kit.drones.map((drone) =>
-          chip(drone.id, drone.name.replace('DJI ', ''), value.droneIds.includes(drone.id), () =>
-            onChange({ ...value, droneIds: toggleId(value.droneIds, drone.id) }),
-          ),
-        )}
+        {kitRowOrder(platform, kit).map((entry) => {
+          const ids =
+            entry.kind === 'body' ? value.bodyIds : entry.kind === 'lens' ? value.lensIds : value.droneIds
+          const key =
+            entry.kind === 'body' ? 'bodyIds' : entry.kind === 'lens' ? 'lensIds' : 'droneIds'
+          const label = entry.name.replace(/^(Sony|Sigma|DJI) /, '')
+          return chip(entry.id, label, ids.includes(entry.id), () =>
+            onChange({ ...value, [key]: toggleId(ids, entry.id) }),
+          )
+        })}
       </div>
     </div>
   )

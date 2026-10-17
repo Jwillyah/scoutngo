@@ -5194,9 +5194,32 @@
 .skykey {
   position: absolute;
   left: var(--space-2);
-  bottom: calc(var(--sheet-peek) + var(--space-2));
+  /*
+   * ABOVE THE SHEET AND THE DOCK.
+   *
+   * WHAT WAS ACTUALLY BROKEN, measured at 390x844 rather than guessed at:
+   * nothing overflowed and nothing clipped. The panel was 240 by 151 at
+   * top 577, running to 728, and the two things under it are the time bar and
+   * the stage rail. It covered the sheet by 25,786 square pixels and the dock
+   * by 10,467, and with the info open by 47,872 and 11,853.
+   *
+   * So it was not too big. It was in the wrong place, and making it smaller
+   * again would have moved the overlap without removing it.
+   *
+   * THE OFFSET IS --sheet-peek, WHICH IS A CONSTANT. The sheet's real height
+   * is live and the dock sits BELOW the sheet, so the distance from the bottom
+   * of the screen is both of them added. The hazard panel and the tap note
+   * already learned this; this is the third place with the same arithmetic,
+   * and now all three read the same two variables.
+   */
+  bottom: calc(var(--dock-height) + var(--sheet-live-height) + var(--space-2));
+  /* And never up over the control row that opened it. */
+  top: calc(var(--safe-top) + var(--space-3) + var(--hud-height, 150px));
+  overflow-y: auto;
   z-index: 5;
   max-width: 17rem;
+  /* Pinned to its own bottom so a short panel sits above the sheet, not high. */
+  align-content: end;
   display: grid;
   gap: 3px;
   padding: var(--space-2);
@@ -5983,14 +6006,21 @@
 /*
  * WHAT THIS IS, BEFORE THE MAP.
  *
- * The app's own vernacular, not a product page: the same dark ground, the same
- * numbered sections the panels use, rules instead of cards, and monospace for
- * anything that is a figure. Read in a car park at six in the morning on the
- * same phone at the same brightness as everything else.
+ * THE FIRST VERSION WAS FLAT BLACK WITH ONE CYAN RULE, and that was a default
+ * wearing restraint's clothes. The lesson is recorded in another project's log
+ * and it applies here exactly: the app already has a palette, and reaching for
+ * austerity instead of reaching for the product's own look is still reaching
+ * for something other than the product.
  *
- * The button is pinned to the bottom and the text scrolls behind it, so the
- * way in is reachable with a thumb however long the page is and whatever the
- * phone's toolbars are doing.
+ * SO THIS PAGE IS SETUP. It takes the ocean override wholesale: the same
+ * cyan-to-blue gradient that is on SETUP DONE · PLAN, the same accent, the
+ * same ink on top of it. Not a landing-page palette invented alongside the
+ * app, the app's own, so the first screen somebody sees is the screen they are
+ * about to be in.
+ *
+ * The other colours are borrowed the same way and each means on this page what
+ * it means on the map: amber is the sun, violet is the shadow, magenta is an
+ * armed control, white is the one thing to press.
  */
 .land {
   position: fixed;
@@ -6000,17 +6030,36 @@
   grid-template-rows: 1fr auto;
   background: var(--color-bg);
   color: var(--color-text);
+
+  /* SETUP's own accent. One override, exactly as the SETUP shell does it. */
+  --color-accent: var(--ocean);
+  --color-accent-ink: var(--ocean-ink);
+  --primary-sheen: linear-gradient(135deg, var(--ocean) 0%, var(--ocean-far) 100%);
 }
 
+/*
+ * THE SAME BACKGROUND THE APP HAS. A soft light high on the page falling off
+ * into the deeper black, so the page has somewhere the light comes from. It is
+ * not a flat field anywhere else in this product and it is not one here.
+ */
 .land__scroll {
   overflow-y: auto;
   padding: calc(var(--safe-top) + var(--space-4)) var(--page-pad) var(--space-3);
   -webkit-overflow-scrolling: touch;
+  background: var(--bg-wash);
 }
 
 .land__head {
   padding-bottom: var(--space-3);
-  border-bottom: var(--line-rule) solid var(--color-accent);
+}
+
+/* The coordinate above the name: this app's first fact is always a position. */
+.land__eyebrow {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ocean);
 }
 
 .land__name {
@@ -6027,10 +6076,143 @@
   color: var(--color-text-muted);
 }
 
+/* ----------------------------------------------------------- the hero */
+
 /*
- * Index down the left, body to the right: the same shape as Panel, so the
- * first screen somebody sees is the shape of every screen after it.
+ * A REAL MAP FRAME DOING THE THING. Esri imagery with the app's own overlays
+ * on it: see src/components/LandingHero.tsx for why it is a tile and not a
+ * drawing.
  */
+.hero {
+  margin: var(--space-3) 0 0;
+}
+
+.hero__frame {
+  position: relative;
+  aspect-ratio: 320 / 200;
+  overflow: hidden;
+  border-radius: var(--radius-panel);
+  /* The ocean edge, so the frame belongs to SETUP like everything else here. */
+  border: var(--line-hair) solid color-mix(in srgb, var(--ocean) 40%, transparent);
+  /* If the tile never arrives, this is still the chart ground. */
+  background: var(--surface-1);
+}
+
+.hero__tile {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Sat imagery is bright; the overlays have to win. */
+  filter: saturate(0.85) brightness(0.72);
+}
+
+.hero__draw {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* The cone, in the colour of its own lighting read. Backlit, at this hour. */
+.hero__cone {
+  fill: color-mix(in srgb, var(--light-back) 30%, transparent);
+  stroke: var(--light-back);
+  stroke-width: 1.2;
+}
+
+.hero__ray {
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.hero__ray--sun {
+  stroke: var(--sun);
+}
+
+.hero__ray--shadow {
+  stroke: var(--sun-shadow);
+  stroke-dasharray: 5 4;
+}
+
+.hero__pin {
+  fill: var(--mark);
+  stroke: var(--mark-edge);
+  stroke-width: 1.5;
+}
+
+.hero__disc {
+  fill: var(--platform-ground);
+  stroke: var(--mark-edge);
+  stroke-width: 2;
+}
+
+.hero__num {
+  fill: var(--black);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+/*
+ * THE PLATES. The most characteristic surface in this product: a hard black
+ * rectangle with a measured number on it, built to be read in direct sun.
+ */
+.hero__plate {
+  position: absolute;
+  margin: 0;
+  display: grid;
+  padding: 3px 6px;
+  background: var(--mark-edge);
+  color: var(--color-text);
+  border: var(--line-hair) solid color-mix(in srgb, var(--white) 18%, transparent);
+  line-height: 1.1;
+}
+
+.hero__plate--sun {
+  left: 4%;
+  bottom: 22%;
+  border-left: var(--line-rule) solid var(--sun);
+}
+
+.hero__plate--shadow {
+  right: 4%;
+  top: 16%;
+  border-left: var(--line-rule) solid var(--sun-shadow);
+}
+
+.hero__plate--optic {
+  left: 50%;
+  bottom: 5%;
+  transform: translateX(-50%);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-label);
+  border-left: var(--line-rule) solid var(--light-back);
+}
+
+.hero__plate-label {
+  font-size: 9px;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.hero__plate-value {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heavy);
+}
+
+.hero__credit {
+  margin: var(--space-2) 0 0;
+  font-size: 10px;
+  color: var(--color-text-faint);
+  line-height: 1.3;
+}
+
+/* --------------------------------------------------------- the sections */
+
 .land__sec {
   display: grid;
   grid-template-columns: 2.5rem 1fr;
@@ -6038,9 +6220,10 @@
   padding: var(--space-4) 0 0;
 }
 
+/* The index takes the ocean, like every numbered thing in SETUP. */
 .land__idx {
   margin: 0;
-  color: var(--color-text-faint);
+  color: var(--ocean);
   font-size: var(--text-xs);
   font-weight: var(--weight-heavy);
 }
@@ -6069,6 +6252,10 @@
   font-size: var(--text-xs);
 }
 
+/*
+ * THE THREE STAGES, AS THE RAIL DRAWS THEM. Each takes its own rule, so the
+ * page teaches the colour before the app uses it.
+ */
 .land__stages {
   margin: 0;
   display: grid;
@@ -6078,8 +6265,22 @@
 .land__stage {
   display: grid;
   gap: 2px;
-  padding-top: var(--space-2);
-  border-top: var(--line-hair) solid var(--color-line);
+  padding: var(--space-2) 0 var(--space-2) var(--space-3);
+  background: var(--panel-sheen-2);
+  border-left: var(--line-rule) solid var(--color-line);
+  border-radius: 0 var(--radius-panel) var(--radius-panel) 0;
+}
+
+.land__stage--1 {
+  border-left-color: var(--ocean);
+}
+
+.land__stage--2 {
+  border-left-color: var(--white);
+}
+
+.land__stage--3 {
+  border-left-color: var(--afterglow);
 }
 
 .land__stage-name {
@@ -6092,8 +6293,16 @@
   text-transform: uppercase;
 }
 
-.land__stage-n {
-  color: var(--color-accent);
+.land__stage--1 .land__stage-n {
+  color: var(--ocean);
+}
+
+.land__stage--2 .land__stage-n {
+  color: var(--white);
+}
+
+.land__stage--3 .land__stage-n {
+  color: var(--afterglow);
 }
 
 .land__stage-when,
@@ -6109,6 +6318,42 @@
   text-transform: uppercase;
 }
 
+/*
+ * FOUR READOUTS, AS THE APP DRAWS THEM. The rule section argues that these
+ * numbers are computed; showing them as the plates they actually are is a
+ * stronger argument than the sentence above it.
+ */
+.land__plates {
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: 4px;
+}
+
+.land__plate {
+  display: grid;
+  gap: 1px;
+  padding: var(--space-2);
+  background: var(--mark-edge);
+  border: var(--line-hair) solid color-mix(in srgb, var(--white) 12%, transparent);
+  border-radius: 2px;
+}
+
+.land__plate-k {
+  font-size: 9px;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+
+.land__plate-v {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heavy);
+  color: var(--color-text);
+}
+
 .land__foot {
   display: grid;
   gap: var(--space-2);
@@ -6118,11 +6363,16 @@
   background: var(--color-bg);
 }
 
-/* The one action on the page, and the only white thing on it. */
+/*
+ * THE ONE ACTION, wearing the gradient it wears on SETUP DONE · PLAN. The
+ * same sheen, the same glow, the same ink. It is the button they are about to
+ * press again at the bottom of the next screen.
+ */
 .land__go {
   width: 100%;
   min-height: 52px;
-  background: var(--color-accent);
+  background: var(--primary-sheen);
+  box-shadow: var(--primary-glow);
   color: var(--color-accent-ink);
   border: 0;
   border-radius: var(--radius-panel);
@@ -6363,4 +6613,53 @@
   letter-spacing: var(--tracking-label);
   text-transform: uppercase;
   color: var(--color-text-muted);
+}
+
+/*
+ * THE REORDER CONTROL SAYS WHAT IT IS.
+ *
+ * Two bare arrows on a card can mean half a dozen things, and the only thing
+ * being told which was a screen reader. The word and the position-in-order sit
+ * between them, so the arrows read as what they do.
+ */
+.cardacts__order {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 var(--space-2) 0 0;
+  border-right: var(--line-hair) solid var(--color-line);
+  margin-right: var(--space-2);
+}
+
+.cardacts__order-label {
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+
+.cardacts__order-n {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-heavy);
+  color: var(--color-text-muted);
+  min-width: 4ch;
+  text-align: center;
+}
+
+/*
+ * A PILL THAT EXPLAINS ITSELF.
+ *
+ * "When it is shown, say in the field what it does, not just m." A unit is not
+ * a reason, and nobody types into a box that has not said what the number is
+ * for. Full width because the sentence needs the room the two time pills do
+ * not.
+ */
+.pill--wide {
+  flex-basis: 100%;
+}
+
+.pill__why {
+  font-size: var(--text-xs);
+  line-height: 1.35;
+  color: var(--color-text-faint);
 }

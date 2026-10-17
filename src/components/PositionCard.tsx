@@ -14,7 +14,7 @@ import { fetchSightlineCloud, type ForecastKind } from '../lib/forecast.ts'
 import { fetchGroundView, type GroundView } from '../lib/groundView.ts'
 import type { KitProfile as KitProfileType } from '../core/kit.ts'
 import { FAA_CEILING_FEET } from '../lib/parsePlan.ts'
-import { bearingBetween, type LatLon } from '../core/geo.ts'
+import type { LatLon } from '../core/geo.ts'
 import { formatReach, metersToFeet } from '../core/reachScale.ts'
 import {
   cameraBearingOf,
@@ -33,6 +33,7 @@ import { lightLine } from '../lib/lightCopy.ts'
 import { focalOn, opticsFor, type OpticSelection } from '../core/optics.ts'
 import { frameLine, wideFrameLine } from '../lib/framingCopy.ts'
 import { blockedLine, blockerLine } from '../lib/sightlineCopy.ts'
+import { groundViewAim } from '../lib/groundViewAim.ts'
 import type { SiteMark } from '../core/siteMark.ts'
 import type { PlannedPosition } from '../lib/plan.ts'
 
@@ -170,25 +171,37 @@ function PhotoSlot({
   const air = planned.position.platform === 'air'
 
   /*
-   * AN AIR POSITION BORROWS THE VIEW FROM THE PIN.
+   * AN AIR POSITION LOOKS AT THE SUBJECT, FROM ITS OWN SIDE.
    *
-   * "Flown, not walked. There is no ground view for a drone position" is true
-   * and it was the whole card: a drone position showed no image at all. "I
-   * still want to see the place. Seeing the surroundings is most of the value."
+   * THE FIRST VERSION HAD THIS BACKWARDS. It stood at the venue pin and looked
+   * towards the position, which at a building is a wall from ten feet away:
+   * "That is backwards for what I need."
    *
-   * There is no Street View car at 200 feet, so the honest substitute is the
-   * one place on the ground that certainly has coverage and is certainly
-   * relevant: the pin. Looking FROM the pin TOWARDS the position, because that
-   * is the ground the aircraft will be over and the direction the wires and
-   * the trees will be in.
+   * What the aircraft is going to be looking AT is the subject, and the thing
+   * that makes the picture useful is seeing the subject from the side the
+   * aircraft will be on. So the camera goes where the POSITION is and points
+   * at the SUBJECT, which is exactly what a ground position already does.
    *
-   * IT IS LABELLED AS WHAT IT IS. A photograph from somewhere other than the
-   * position, presented as the view from the position, would be the same class
+   * THERE IS NO STREET VIEW CAR AT 200 FEET, and that was the original
+   * reasoning for standing at the pin instead. It was the wrong conclusion
+   * from a true fact: Street View is at ground level wherever you ask from, so
+   * asking from the position's coordinate returns the nearest road imagery to
+   * that spot, which is "roughly where it will be looking from". The altitude
+   * was never the thing that could be honoured.
+   *
+   * IT STILL SAYS WHAT IT IS, every time. A photograph from a road near the
+   * position, presented as the view from the aircraft, would be the same class
    * of error as the lens that was not on the aircraft.
+   *
+   * A TOP-DOWN AND A 360 HAVE NO CAMERA BEARING, by construction: one points
+   * at the ground and the other at everything. They still get a view, aimed
+   * from the position at the subject, because what is around the subject is
+   * the useful part for both.
    */
-  const borrowed = air && subject !== null
-  const viewFrom = borrowed ? subject : at
-  const viewBearing = borrowed ? bearingBetween(subject, at) : cameraBearing
+  const aim = groundViewAim({ at, subject, cameraBearing, air })
+  const borrowed = aim.disclose
+  const viewFrom = aim.from
+  const viewBearing = aim.bearing
 
   /*
    * Loading is the INITIAL state, not something an effect sets on the way in.
@@ -228,7 +241,7 @@ function PhotoSlot({
     <div className="frame">
       {air && !borrowed ? (
         <p className="frame__none">
-          Flown, not walked, and there is no venue pin to borrow a view from.
+          Flown, not walked, and there is no venue pin to aim a ground view at.
         </p>
       ) : null}
 
@@ -252,7 +265,15 @@ function PhotoSlot({
             * venue pin, not about the position, and "no imagery at this spot"
             * would send somebody looking at the wrong coordinate.
             */}
-          {borrowed ? ' That is the venue pin, which is where a drone position borrows its view from.' : ''}
+          {/*
+            * WHERE "HERE" WAS, and no substitute. "If no usable imagery
+            * exists on that bearing, say so rather than showing me something
+            * pointing elsewhere." So there is no second attempt from a
+            * different spot: the absence is reported.
+            */}
+          {borrowed
+            ? ' That is street level near this position. Nothing is shown from another spot instead.'
+            : ''}
         </p>
       ) : null}
 
@@ -280,8 +301,8 @@ function PhotoSlot({
         <div className="frame__foot">
           {!borrowed || view.status !== 'ok' ? null : (
             <p className="frame__borrowed">
-              From the venue pin, looking towards this position. Not the view
-              from the aircraft.
+              Street level near this position, looking at the subject. Not the
+              view from the aircraft.
             </p>
           )}
           {ageNote === null ? null : (
@@ -886,24 +907,42 @@ export function PositionCard({
         * throwing the first away.
         */}
       <div className="cardacts">
-        <button
-          type="button"
-          className="cardacts__btn"
-          onClick={() => onMove(position.id, -1)}
-          disabled={position.number <= 1}
-          aria-label="Move earlier"
-        >
-          ↑
-        </button>
-        <button
-          type="button"
-          className="cardacts__btn"
-          onClick={() => onMove(position.id, 1)}
-          disabled={position.number >= count}
-          aria-label="Move later"
-        >
-          ↓
-        </button>
+        {/*
+          * THE ARROWS SAY WHAT THEY DO.
+          *
+          * They were a bare up and a bare down. "They reorder positions and
+          * nothing says so." An arrow on a card can mean half a dozen things
+          * and a screen reader was the only thing being told which: the
+          * aria-labels were right and nobody holding the phone could see them.
+          *
+          * The word is ORDER, which is what the number on the disc is. The
+          * arrows keep their shape because the shape is what says which way,
+          * and the label stops them being a guess.
+          */}
+        <span className="cardacts__order">
+          <span className="cardacts__order-label">Order</span>
+          <button
+            type="button"
+            className="cardacts__btn"
+            onClick={() => onMove(position.id, -1)}
+            disabled={position.number <= 1}
+            aria-label="Move earlier in the order"
+          >
+            ↑
+          </button>
+          <span className="cardacts__order-n num">
+            {position.number}/{count}
+          </span>
+          <button
+            type="button"
+            className="cardacts__btn"
+            onClick={() => onMove(position.id, 1)}
+            disabled={position.number >= count}
+            aria-label="Move later in the order"
+          >
+            ↓
+          </button>
+        </span>
         <button
           type="button"
           className="cardacts__btn cardacts__btn--wide"

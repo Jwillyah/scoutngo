@@ -379,21 +379,22 @@ describe('what a tap is about to place', () => {
  * the venue pin instead, clearly labelled as the view from the pin and not
  * from the position."
  */
-describe('a drone position borrows a view from the pin', () => {
-  it('labels it as the pin, not the aircraft', () => {
+describe('a drone position looks at the subject from its own side', () => {
+  it('no longer refuses a view outright', () => {
     const html = card(PILOT)
-    /*
-     * The label renders only once imagery arrives, which a server render has
-     * no network for. The string is asserted where it is defined so the
-     * wording cannot drift; the browser run is what proves it appears.
-     */
     expect(html).not.toContain('There is no ground view for a drone position')
   })
 
-  it('says what is missing when there is no pin to borrow from', () => {
+  /*
+   * THE CASE WITH NOTHING TO AIM AT is a top-down or a 360 with no pin: a
+   * FRAMED shot carries a measured camera bearing and can aim without one,
+   * which is why the first version of this test was wrong about its own
+   * fixture rather than about the code.
+   */
+  it('says what is missing when there is nothing to aim at', () => {
     const html = renderToStaticMarkup(
       <PositionCard
-        planned={planPositions([air()], SUBJECT, sun)[0]}
+        planned={planPositions([air({ shotType: 'top-down' })], SUBJECT, sun)[0]}
         shootAt={null}
         timeZone={null}
         tide={null}
@@ -414,6 +415,6 @@ describe('a drone position borrows a view from the pin', () => {
         onPlacePilot={() => {}}
       />,
     )
-    expect(html).toContain('no venue pin to borrow a view from')
+    expect(html).toContain('no venue pin to aim a ground view at')
   })
 })

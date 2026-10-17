@@ -22,6 +22,7 @@ import {
 import { DEFAULT_KIT, type KitProfile } from './core/kit.ts'
 import { defaultOpticFor } from './core/optics.ts'
 import { sharedOptic } from './core/mapLabel.ts'
+import { subjectSizeMatters } from './core/fov.ts'
 import { skyLayerOn, type MapPanel } from './core/mapPanel.ts'
 import { hudState, type HudState } from './core/hud.ts'
 import {
@@ -1691,6 +1692,12 @@ function App() {
              * in src/core/kitPacking.ts.
              */
             airAvailable={canPackAir(kitProfile)}
+            subjectMatters={subjectSizeMatters(
+              visiblePlan.map((p) => ({
+                platform: p.position.platform,
+                shotType: p.position.shotType,
+              })),
+            )}
             newBuild={newBuild}
             onShowLanding={() => setLandingSeen(false)}
             onUseMyLocation={onUseMyLocation}

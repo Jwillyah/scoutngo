@@ -113,7 +113,7 @@ function encodeCanvas(canvas: HTMLCanvasElement): string {
 const ESRI_TILES =
   'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
 
-const ESRI_ATTRIBUTION =
+export const ESRI_ATTRIBUTION =
   'Tiles by Esri. Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
 
 /*

@@ -224,6 +224,34 @@ export function framingJudgementApplies(
   return platform === 'ground' && shotType === 'framed'
 }
 
+/**
+ * WHETHER ASKING FOR THE SUBJECT'S SIZE CAN CHANGE ANYTHING ON SCREEN.
+ *
+ * WHAT WAS REPORTED. "Subject across does nothing on a drone shoot. It exists
+ * to make the wide-frame judgement possible, and that judgement is suppressed
+ * for air positions. So on my shoots it asks a question with no consequence
+ * and I did not know what it was."
+ *
+ * Both halves of that are right and they were introduced one pass apart: the
+ * field was added so the judgement would stop guessing at a subject size, and
+ * then the judgement was switched off for air, top-down and 360 because wide
+ * is the intent there. Nobody went back to the field.
+ *
+ * A FIELD WITH NO CONSEQUENCE IS WORSE THAN A MISSING ONE. It reads as
+ * something that matters, so it gets filled in, and then nothing happens and
+ * the next field is trusted a little less.
+ *
+ * So the question is asked only where an answer would change something, and
+ * that is exactly the set framingJudgementApplies already defines. One rule,
+ * asked twice: once of a position to decide whether to judge it, and once of
+ * the plan to decide whether to ask at all.
+ */
+export function subjectSizeMatters(
+  positions: readonly { platform: 'ground' | 'air'; shotType: ShotType }[],
+): boolean {
+  return positions.some((p) => framingJudgementApplies(p.platform, p.shotType))
+}
+
 export function classifyFraming(
   subjectRangeMeters: number,
   hFOV: number,

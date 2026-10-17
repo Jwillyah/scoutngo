@@ -1,4 +1,5 @@
 import { buildLabel } from '../lib/build.ts'
+import { LandingHero } from './LandingHero.tsx'
 
 /**
  * WHAT THIS IS, BEFORE THE MAP.
@@ -21,12 +22,28 @@ export function Landing({ onDismiss }: { onDismiss: () => void }) {
   return (
     <div className="land">
       <div className="land__scroll">
+        {/*
+          * ONE LOCKUP, not a label stuck above a headline. The name, the rule
+          * it runs on, and the sentence that says what it is, as one block
+          * with the ocean rule under it.
+          */}
         <header className="land__head">
+          {/*
+            * NO COORDINATE HERE. The first draft printed the demo venue's
+            * latitude and longitude, and src/components/coldStart.test.tsx
+            * caught it: on a first run the app must not put a coordinate on
+            * screen, because the one thing a person reads a coordinate on a
+            * cold start as is their own position. The app does not know it and
+            * does not ask. The test was right and the eyebrow was wrong.
+            */}
+          <p className="land__eyebrow">Sun · light · distance, computed</p>
           <h1 className="land__name">ScoutNGo</h1>
           <p className="land__what">
             Plan a shoot at a place you have never stood in.
           </p>
         </header>
+
+        <LandingHero />
 
         <section className="land__sec">
           <p className="land__idx num">01</p>
@@ -37,7 +54,7 @@ export function Landing({ onDismiss }: { onDismiss: () => void }) {
               runs left to right.
             </p>
             <dl className="land__stages">
-              <div className="land__stage">
+              <div className="land__stage land__stage--1">
                 <dt className="land__stage-name">
                   <span className="land__stage-n num">1</span> Setup
                 </dt>
@@ -46,7 +63,7 @@ export function Landing({ onDismiss }: { onDismiss: () => void }) {
                   Drop the pin, say when, pack the kit.
                 </dd>
               </div>
-              <div className="land__stage">
+              <div className="land__stage land__stage--2">
                 <dt className="land__stage-name">
                   <span className="land__stage-n num">2</span> Plan
                 </dt>
@@ -55,7 +72,7 @@ export function Landing({ onDismiss }: { onDismiss: () => void }) {
                   Place positions, read the light, mark the wires.
                 </dd>
               </div>
-              <div className="land__stage">
+              <div className="land__stage land__stage--3">
                 <dt className="land__stage-name">
                   <span className="land__stage-n num">3</span> Field
                 </dt>
@@ -77,6 +94,30 @@ export function Landing({ onDismiss }: { onDismiss: () => void }) {
               from a distance, how far anything is from anything else: all of it
               is arithmetic, computed here, from coordinates.
             </p>
+
+            {/*
+              * The app's own plates, at the app's own size. Four readouts that
+              * exist on the map, shown as the things they are rather than
+              * described.
+              */}
+            <ul className="land__plates">
+              <li className="land__plate">
+                <span className="land__plate-k">Sun</span>
+                <span className="land__plate-v num">254.1°</span>
+              </li>
+              <li className="land__plate">
+                <span className="land__plate-k">Alt</span>
+                <span className="land__plate-v num">8.2°</span>
+              </li>
+              <li className="land__plate">
+                <span className="land__plate-k">Frame</span>
+                <span className="land__plate-v num">90 m</span>
+              </li>
+              <li className="land__plate">
+                <span className="land__plate-k">Reach</span>
+                <span className="land__plate-v num">400 ft</span>
+              </li>
+            </ul>
             <p className="land__p">
               A model can suggest somewhere to stand and write down what the
               shot is. It is never asked for a number, and anything it says

@@ -55,12 +55,45 @@ describe('the landing page says the four things and stops', () => {
     expect(html.match(/class="land__sec"/g)).toHaveLength(3)
   })
 
-  /* The vernacular: no cards, no stock photography, no SaaS furniture. */
-  it('has no imagery and no feature grid', () => {
-    expect(html).not.toContain('<img')
+  /*
+   * THE VERNACULAR. No cards, no SaaS furniture, and no stock photography.
+   *
+   * THIS RULE CHANGED, and the reason is worth keeping. It used to be "no
+   * imagery at all", which was the austere reading: flat black and one rule.
+   * That is a default wearing restraint's clothes. The hero is the PRODUCT
+   * now, which means a real map frame with real imagery in it, so "no img" is
+   * the wrong test. What is actually forbidden is a picture of something that
+   * is not this app.
+   */
+  it('has no feature grid and no SaaS furniture', () => {
     expect(html).not.toContain('card')
     expect(text.toLowerCase()).not.toContain('get started')
     expect(text.toLowerCase()).not.toContain('sign up')
+    expect(text.toLowerCase()).not.toContain('trusted by')
+  })
+
+  it('shows the product itself, not a picture of one', () => {
+    /* The one image is a tile from the same basemap the map uses. */
+    const images = [...html.matchAll(/<img[^>]*src="([^"]*)"/g)].map((m) => m[1])
+    expect(images).toHaveLength(1)
+    expect(images[0]).toContain('World_Imagery/MapServer/tile')
+    /* With the app's own overlays on it, not a caption describing them. */
+    for (const part of ['hero__cone', 'hero__ray--sun', 'hero__ray--shadow', 'hero__disc']) {
+      expect(html, part).toContain(part)
+    }
+  })
+
+  it('credits the imagery and says whose place it is', () => {
+    expect(text).toContain('An example venue, not your location')
+    expect(text).toContain('Esri')
+  })
+
+  /*
+   * AND NO COORDINATE ON THE FIRST SCREEN. The app does not know where you
+   * are and does not ask; a latitude on the cold start reads as your own.
+   */
+  it('prints no coordinate', () => {
+    expect(text).not.toMatch(/\d{1,3}\.\d{3,}/)
   })
 })
 

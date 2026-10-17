@@ -49,8 +49,21 @@ const PANELS = [
   { id: 'conditions', button: /^Conditions/, selector: '.sheet--open' },
 ]
 
-/** Chrome a panel must never cover: the row that opened it, and the map controls. */
-const PROTECTED = ['.hud', '.map-ctl', '.plat']
+/**
+ * Chrome a panel must never cover.
+ *
+ * THE FIRST VERSION OF THIS LIST WAS TOO SHORT and missed a real one. It held
+ * the control row and the map controls, and the sky key was reported clean
+ * while sitting on the time bar and the stage rail: 25,786 square pixels of
+ * the sheet and 10,467 of the dock, measured by hand afterwards.
+ *
+ * Same shape as every blind check before it. The list was written from the
+ * panels that had gone wrong so far rather than from what a panel must not
+ * cover, so the next kind of wrong was outside it. These four are now the
+ * answer to the second question: the row that opened it, the map controls, the
+ * sheet, and the dock that carries the time bar and the stage rail.
+ */
+const PROTECTED = ['.hud', '.map-ctl', '.plat', '.sheet', '.dock']
 
 const press = (re) =>
   `(() => {
@@ -81,6 +94,13 @@ const overlaps = (sel) =>
      const hits = []
      for (const key of ${JSON.stringify(PROTECTED)}) {
        for (const c of document.querySelectorAll(key)) {
+         /*
+          * A PANEL CANNOT COVER ITSELF. The conditions panel IS the sheet, so
+          * without this it reported 192,063 square pixels of overlap with its
+          * own element. Skipping the panel, anything inside it and anything it
+          * sits inside is the rule; two separate things overlapping is not.
+          */
+         if (c === p || c.contains(p) || p.contains(c)) continue
          const q = c.getBoundingClientRect()
          if (q.width === 0 || q.height === 0) continue
          const w = Math.min(r.right, q.right) - Math.max(r.left, q.left)

@@ -80,6 +80,8 @@ interface SetupModeProps {
   shootLine: string | null
   /** False with no drone in the kit. */
   airAvailable: boolean
+  /** Whether any visible position could use a subject size. */
+  subjectMatters: boolean
   /**
    * Tapped "Use my location", and the browser answered. Moves the map only:
    * the coordinate is not stored and does not become the pin.
@@ -170,6 +172,7 @@ export function SetupMode({
   onPlatformFilter,
   shootLine,
   airAvailable,
+  subjectMatters,
   newBuild,
   onShowLanding,
 }: SetupModeProps) {
@@ -504,33 +507,44 @@ export function SetupMode({
             </span>
           </label>
           {/*
-            * HOW BIG THE SUBJECT IS, ASKED RATHER THAN ASSUMED.
+            * HOW BIG THE SUBJECT IS, ASKED ONLY WHERE IT CHANGES SOMETHING.
             *
-            * This number used to be 60, hard-coded in core/fov.ts, and the only
-            * sign of it was a red badge saying the subject would be a speck. It
-            * sits beside the date because it belongs to the shoot: a marina and
-            * a food truck are not the same shoot even from the same spot.
+            * It was always on screen, and on a drone shoot it changed nothing
+            * at all: the wide-frame judgement it feeds is suppressed for air,
+            * top-down and 360. A field with no consequence is worse than a
+            * missing one, because it reads as something that matters, so it
+            * gets filled in, and then nothing happens.
             *
-            * BLANK IS A VALID ANSWER and it is the default. Left blank, the
-            * card measures the frame and says nothing about whether that is
-            * too wide, because without this it does not know.
+            * See subjectSizeMatters in src/core/fov.ts: the same rule that
+            * decides whether to judge a position decides whether to ask.
             */}
-          <label className="pill" ref={subjectRef}>
-            <span className="pill__label">Subject across</span>
-            <span className="pill__pair">
-              <input
-                className="pill__input num"
-                type="number"
-                inputMode="numeric"
-                min={1}
-                placeholder="—"
-                aria-label="How wide the subject is, in metres. Leave blank if unknown."
-                value={venue.subjectAcrossMeters}
-                onChange={(event) => setField('subjectAcrossMeters')(event.target.value)}
-              />
-              <span className="pill__unit">m</span>
-            </span>
-          </label>
+          {!subjectMatters ? null : (
+            <label className="pill pill--wide" ref={subjectRef}>
+              <span className="pill__label">Subject across</span>
+              <span className="pill__pair">
+                <input
+                  className="pill__input num"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  placeholder="—"
+                  aria-label="How wide the subject is, in metres. Leave blank if unknown."
+                  value={venue.subjectAcrossMeters}
+                  onChange={(event) => setField('subjectAcrossMeters')(event.target.value)}
+                />
+                <span className="pill__unit">m</span>
+              </span>
+              {/*
+                * WHAT IT DOES, IN THE FIELD. It said "m", which is a unit and
+                * not a reason. Nobody types a number into a box that has not
+                * said what the number is for.
+                */}
+              <span className="pill__why">
+                Lets a ground framed shot say how many times wider than the
+                subject it frames. Blank claims nothing.
+              </span>
+            </label>
+          )}
         </div>
 
         {/*
@@ -643,7 +657,8 @@ export function SetupMode({
         </div>
 
         {/* Kit LAST: it ships with defaults, so it can never block anything. */}
-        <KitChips value={kit} onChange={onKit} kit={kitProfile} onEdit={() => open('kit')} />
+        <KitChips value={kit}
+            platform={platformFilter} onChange={onKit} kit={kitProfile} onEdit={() => open('kit')} />
 
       </div>
 
