@@ -10,6 +10,15 @@ import { fetchGoesLegend, type ColormapResult } from '../lib/goesColormap.ts'
 import type { ZoomAdvice } from '../core/goes.ts'
 import { FORECAST_TRUST_NOTE } from '../core/skyTime.ts'
 import type { SkyState } from '../lib/useSkyFrames.ts'
+import {
+  gridExtentLine,
+  hasSatellite,
+  SKY_LAYERS,
+  SKY_LAYER_LABEL,
+  WIND_BAND_LABEL,
+  type SkyLayerKind,
+} from '../core/skyLayer.ts'
+import { windHeightLabel, type WindHeight } from '../core/windHeight.ts'
 
 interface SkyLegendProps {
   band: GoesBand
@@ -23,6 +32,12 @@ interface SkyLegendProps {
   boundary: string | null
   /** Takes the map out to where the layer has something to show. */
   onZoomOut: (zoom: number) => void
+  /** Which measure the layer paints, and the picker that changes it. */
+  layer: SkyLayerKind
+  onLayer: (next: SkyLayerKind) => void
+  /** The height the wind layer reads at, and what it is measured against. */
+  windHeight: WindHeight
+  ratedWindMps: number | null
 }
 
 /**
@@ -42,7 +57,18 @@ interface SkyLegendProps {
  * The visible band has no table and GIBS publishes none, so it gets a sentence
  * about what greyscale reflectance is instead of a fabricated scale.
  */
-export function SkyLegend({ band, advice, sky, clock, boundary, onZoomOut }: SkyLegendProps) {
+export function SkyLegend({
+  band,
+  advice,
+  sky,
+  clock,
+  boundary,
+  onZoomOut,
+  layer,
+  onLayer,
+  windHeight,
+  ratedWindMps,
+}: SkyLegendProps) {
   const [table, setTable] = useState<ColormapResult | null>(null)
 
   useEffect(() => {
@@ -80,9 +106,35 @@ export function SkyLegend({ band, advice, sky, clock, boundary, onZoomOut }: Sky
    * the next thing to read, and the band name is not either. Everything else
    * comes back the moment the layer is readable.
    */
-  if (!advice.readable && sky.source.kind === 'satellite') {
+  /*
+   * THE ZOOM WARNING IS ABOUT THE SATELLITE PIXEL, so it only applies to the
+   * layer that has one. The wind grid is 25 model points whatever the zoom is:
+   * too close for it means too close to see the whole square, which the extent
+   * line says instead.
+   */
+  if (!advice.readable && sky.source.kind === 'satellite' && hasSatellite(layer)) {
     return (
       <div className="skykey skykey--wash">
+      {/*
+        * ONE PICKER, IN THE SAME PLACE, for everything this layer can show.
+        * Cloud decides whether there is light; wind decides whether the
+        * aircraft leaves the bag. See src/core/skyLayer.ts for why those two
+        * and not a longer list.
+        */}
+      <div className="skykey__pick" role="group" aria-label="What the sky layer shows">
+        {SKY_LAYERS.map((kind) => (
+          <button
+            key={kind}
+            type="button"
+            className={`skykey__pick-btn${layer === kind ? ' skykey__pick-btn--on' : ''}`}
+            aria-pressed={layer === kind}
+            onClick={() => onLayer(kind)}
+          >
+            {SKY_LAYER_LABEL[kind]}
+          </button>
+        ))}
+      </div>
+
         <p className="skykey__washhead">Nothing to show at this zoom</p>
         <p className="skykey__wash">{advice.message}</p>
         {advice.zoomOutTo === null ? null : (
@@ -98,8 +150,101 @@ export function SkyLegend({ band, advice, sky, clock, boundary, onZoomOut }: Sky
     )
   }
 
+  /*
+   * WIND HAS NO PHOTOGRAPH, EVER. Not for the future and not for an hour that
+   * has already happened: there is no satellite image of wind at 200 feet. So
+   * the wind layer never borrows the word "observed" from the layer beside it,
+   * and it says what height it is for, because a wind speed with no height is
+   * meaningless.
+   */
+  if (layer === 'wind') {
+    return (
+      <div className="skykey">
+      {/*
+        * ONE PICKER, IN THE SAME PLACE, for everything this layer can show.
+        * Cloud decides whether there is light; wind decides whether the
+        * aircraft leaves the bag. See src/core/skyLayer.ts for why those two
+        * and not a longer list.
+        */}
+      <div className="skykey__pick" role="group" aria-label="What the sky layer shows">
+        {SKY_LAYERS.map((kind) => (
+          <button
+            key={kind}
+            type="button"
+            className={`skykey__pick-btn${layer === kind ? ' skykey__pick-btn--on' : ''}`}
+            aria-pressed={layer === kind}
+            onClick={() => onLayer(kind)}
+          >
+            {SKY_LAYER_LABEL[kind]}
+          </button>
+        ))}
+      </div>
+
+        <p className="skykey__src skykey__src--fc">
+          <span className="skykey__badge skykey__badge--fc">Forecast</span>
+          <span className="skykey__srcnote">
+            Wind {windHeightLabel(windHeight)}, from the Open-Meteo model. There is no
+            satellite picture of wind, so every hour of this is modelled, including the
+            ones already past.
+          </span>
+        </p>
+
+        {/*
+          * WHY THERE IS NOTHING ON THE MAP, when there is nothing on the map.
+          *
+          * This was missing and it cost a long diagnosis: the grid came back
+          * unavailable, the layer drew nothing, and the key carried on
+          * describing bands that were not there. A layer that is empty for a
+          * reason has to say the reason, or it is indistinguishable from a
+          * layer that does not work. The cloud branch below always did this;
+          * the wind branch was written without it.
+          */}
+        {sky.forecastProblem === null ? null : (
+          <p className="skykey__grey">{sky.forecastProblem}</p>
+        )}
+
+        <ul className="skykey__ramp">
+          {(['calm', 'workable', 'near-limit', 'over'] as const).map((band) => (
+            <li className="skykey__stop" key={band}>
+              <span className={`skykey__swatch skykey__swatch--${band}`} aria-hidden="true" />
+              <span className="skykey__value">{WIND_BAND_LABEL[band]}</span>
+            </li>
+          ))}
+        </ul>
+
+        <p className="skykey__grey">
+          {ratedWindMps === null
+            ? 'No aircraft in the kit publishes a wind rating, so the cells are shaded by speed alone and the bands above do not apply. An invented limit is something somebody could fly on.'
+            : `Measured against ${ratedWindMps} m/s, the published rating of the most limiting aircraft you have packed.`}
+        </p>
+
+        <p className="skykey__grey">{gridExtentLine()}</p>
+      </div>
+    )
+  }
+
   return (
     <div className="skykey">
+      {/*
+        * ONE PICKER, IN THE SAME PLACE, for everything this layer can show.
+        * Cloud decides whether there is light; wind decides whether the
+        * aircraft leaves the bag. See src/core/skyLayer.ts for why those two
+        * and not a longer list.
+        */}
+      <div className="skykey__pick" role="group" aria-label="What the sky layer shows">
+        {SKY_LAYERS.map((kind) => (
+          <button
+            key={kind}
+            type="button"
+            className={`skykey__pick-btn${layer === kind ? ' skykey__pick-btn--on' : ''}`}
+            aria-pressed={layer === kind}
+            onClick={() => onLayer(kind)}
+          >
+            {SKY_LAYER_LABEL[kind]}
+          </button>
+        ))}
+      </div>
+
       {/*
         * WHICH SOURCE, FIRST AND UNMISTAKABLY.
         *
@@ -152,10 +297,18 @@ export function SkyLegend({ band, advice, sky, clock, boundary, onZoomOut }: Sky
       )}
 
       {sky.source.kind !== 'satellite' ? (
-        <p className="skykey__grey">
-          Shaded squares are cloud cover from the Open-Meteo forecast, one cell per model
-          point. Coarse and hard edged on purpose: it is a model, not a photograph.
-        </p>
+        <>
+          <p className="skykey__grey">
+            Shaded squares are cloud cover from the Open-Meteo forecast, one cell per model
+            point. Coarse and hard edged on purpose: it is a model, not a photograph.
+          </p>
+          {/*
+            * HOW BIG THE SQUARE IS. "At 50 mi the forecast cells cover a small
+            * square around the venue with nothing around it, which reads as
+            * broken." It is not broken; it was simply never told.
+            */}
+          <p className="skykey__grey">{gridExtentLine()}</p>
+        </>
       ) : band === 'visible' ? (
         <p className="skykey__grey">{VISIBLE_LEGEND_NOTE}</p>
       ) : table === null ? (

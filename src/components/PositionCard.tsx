@@ -14,7 +14,7 @@ import { fetchSightlineCloud, type ForecastKind } from '../lib/forecast.ts'
 import { fetchGroundView, type GroundView } from '../lib/groundView.ts'
 import type { KitProfile as KitProfileType } from '../core/kit.ts'
 import { FAA_CEILING_FEET } from '../lib/parsePlan.ts'
-import type { LatLon } from '../core/geo.ts'
+import { bearingBetween, type LatLon } from '../core/geo.ts'
 import { formatReach, metersToFeet } from '../core/reachScale.ts'
 import {
   cameraBearingOf,
@@ -56,6 +56,8 @@ interface PositionCardProps {
   selection: OpticSelection
   /** The marked hazards, so a blocker can be named rather than numbered. */
   marks: readonly SiteMark[]
+  /** The venue pin. An air position borrows its ground view from here. */
+  subject: LatLon | null
   /** How high an air position flies, in feet AGL. Clamped in core. */
   onSetAltitude: (id: string, feet: number) => void
   /** What kind of shot this position is. Framed, top-down or 360. */
@@ -153,16 +155,40 @@ const FRAMING_COPY: Record<FramingWarning, string> = {
 function PhotoSlot({
   planned,
   shootAt,
+  subject,
 }: {
   planned: PlannedPosition
   /** The day being planned, so the imagery age is measured against it. */
   shootAt: Date | null
+  /** The venue pin, which is where an air position borrows a view from. */
+  subject: LatLon | null
 }) {
   const { at } = planned.position
   /* Street View needs a direction to look. Only a framed shot has one. */
   const cameraBearing = cameraBearingOf(planned.aim)
   const { hFOV } = planned.fov
   const air = planned.position.platform === 'air'
+
+  /*
+   * AN AIR POSITION BORROWS THE VIEW FROM THE PIN.
+   *
+   * "Flown, not walked. There is no ground view for a drone position" is true
+   * and it was the whole card: a drone position showed no image at all. "I
+   * still want to see the place. Seeing the surroundings is most of the value."
+   *
+   * There is no Street View car at 200 feet, so the honest substitute is the
+   * one place on the ground that certainly has coverage and is certainly
+   * relevant: the pin. Looking FROM the pin TOWARDS the position, because that
+   * is the ground the aircraft will be over and the direction the wires and
+   * the trees will be in.
+   *
+   * IT IS LABELLED AS WHAT IT IS. A photograph from somewhere other than the
+   * position, presented as the view from the position, would be the same class
+   * of error as the lens that was not on the aircraft.
+   */
+  const borrowed = air && subject !== null
+  const viewFrom = borrowed ? subject : at
+  const viewBearing = borrowed ? bearingBetween(subject, at) : cameraBearing
 
   /*
    * Loading is the INITIAL state, not something an effect sets on the way in.
@@ -173,15 +199,15 @@ function PhotoSlot({
   const [view, setView] = useState<GroundView>({ status: 'loading' })
 
   useEffect(() => {
-    if (air || cameraBearing === null) return
+    if (viewBearing === null) return
     let live = true
-    fetchGroundView(at, cameraBearing, hFOV).then((next) => {
+    fetchGroundView(viewFrom, viewBearing, hFOV).then((next) => {
       if (live) setView(next)
     })
     return () => {
       live = false
     }
-  }, [air, at, cameraBearing, hFOV])
+  }, [viewFrom, viewBearing, hFOV])
 
   /*
    * HOW OLD THE VIEW IS, AND HOW LOUDLY TO SAY SO.
@@ -200,13 +226,13 @@ function PhotoSlot({
 
   return (
     <div className="frame">
-      {air ? (
+      {air && !borrowed ? (
         <p className="frame__none">
-          Flown, not walked. There is no ground view for a drone position.
+          Flown, not walked, and there is no venue pin to borrow a view from.
         </p>
       ) : null}
 
-      {!air && view.status === 'loading' ? (
+      {viewBearing !== null && view.status === 'loading' ? (
         <p className="frame__none">Loading ground view…</p>
       ) : null}
 
@@ -219,7 +245,15 @@ function PhotoSlot({
       ) : null}
 
       {view.status === 'no-key' || view.status === 'no-coverage' || view.status === 'error' ? (
-        <p className="frame__none">{view.message}</p>
+        <p className="frame__none">
+          {view.message}
+          {/*
+            * WHERE "HERE" WAS. On a borrowed view the message is about the
+            * venue pin, not about the position, and "no imagery at this spot"
+            * would send somebody looking at the wrong coordinate.
+            */}
+          {borrowed ? ' That is the venue pin, which is where a drone position borrows its view from.' : ''}
+        </p>
       ) : null}
 
       {/* Quietly, in the corners, so neither competes with the picture. */}
@@ -232,11 +266,31 @@ function PhotoSlot({
       )}
 
       {/*
-        * AND THE SENTENCE, WHEN IT IS OLD ENOUGH TO MATTER. Over the picture
-        * rather than under it, because the picture is the thing being
-        * qualified and a line below it is a line that gets scrolled past.
+        * THE TWO THINGS SAID OVER THE PICTURE, STACKED.
+        *
+        * Both are qualifications of the photograph, so both sit on it rather
+        * than under it where they would be scrolled past, and they stack
+        * rather than overlapping: a drone position on 2018 imagery has
+        * something to say twice.
+        *
+        * WHOSE VIEW IT IS comes first, because it changes what the picture is
+        * rather than how much to trust it.
         */}
-      {ageNote === null ? null : <p className={`frame__age frame__age--${age}`}>{ageNote}</p>}
+      {ageNote === null && !(borrowed && view.status === 'ok') ? null : (
+        <div className="frame__foot">
+          {!borrowed || view.status !== 'ok' ? null : (
+            <p className="frame__borrowed">
+              From the venue pin, looking towards this position. Not the view
+              from the aircraft.
+            </p>
+          )}
+          {ageNote === null ? null : (
+            <p className={`frame__age frame__age--${age}`}>{ageNote}</p>
+          )}
+        </div>
+      )}
+
+
 
       {/*
         * THE LIGHT ROW, which is a different read per shot type and says so.
@@ -436,6 +490,7 @@ export function PositionCard({
   kit,
   selection,
   marks,
+  subject,
   onSetAltitude,
   pilotAt,
   onPlacePilot,
@@ -488,7 +543,7 @@ export function PositionCard({
         ✕
       </button>
 
-      <PhotoSlot key={position.id} planned={planned} shootAt={shootAt} />
+      <PhotoSlot key={position.id} planned={planned} shootAt={shootAt} subject={subject} />
 
       {/*
         * The shot in plain words, and the largest text on the card.

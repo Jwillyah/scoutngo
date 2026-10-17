@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { OnThisDevice } from './OnThisDevice.tsx'
 import {
   exportFilename,
   parseSpotsFile,
@@ -83,10 +84,7 @@ export function SpotsPanel({
 
   return (
     <div className="spots">
-      <p className="section__note">
-        Saved on this device only. Nothing is uploaded and there is no account.
-        Export the file if you want a copy you control.
-      </p>
+      <OnThisDevice what="saved spots" />
 
       <div className="field">
         <label className="field__label" htmlFor="spot-name">

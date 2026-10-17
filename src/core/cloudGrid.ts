@@ -14,6 +14,7 @@
  */
 
 import { destinationPoint, toPosition, type LatLon, type Position } from './geo.ts'
+import type { LevelWind } from './windProfile.ts'
 
 /** Cells across and down. Odd, so one cell is centred on the venue. */
 export const GRID_CELLS = 5
@@ -114,4 +115,14 @@ export interface ForecastCell {
   at: LatLon
   /** Percent, or null where the forecast did not cover this cell. */
   cover: number | null
+  /**
+   * Wind at each level the model serves for this cell.
+   *
+   * Carried as LEVELS rather than one speed, because the height that matters
+   * is the one being flown and that is decided elsewhere. Interpolating here
+   * would be a second answer to a question src/core/windProfile.ts already
+   * answers for the readout, and two answers to one question is the shape of
+   * most of this app's history.
+   */
+  wind: LevelWind[]
 }

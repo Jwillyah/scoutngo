@@ -75,3 +75,18 @@ export function hiddenByFilter<T extends { platform: Platform }>(
 ): number {
   return list.length - filterByPlatform(list, filter).length
 }
+
+
+/**
+ * WHAT A TAP ON THE MAP IS ABOUT TO PLACE, said truthfully for each platform.
+ *
+ * "Tap where you'll stand" was shown for every position. For an air one that
+ * is simply false: "I am not standing anywhere, the aircraft is flying."
+ *
+ * The pilot's own position is a third thing again, and it IS somewhere a
+ * person stands, so it keeps the standing word.
+ */
+export function placingHint(what: 'position' | 'pilot', platform: Platform): string {
+  if (what === 'pilot') return 'Tap where the pilot stands'
+  return platform === 'air' ? 'Tap where the aircraft will be' : "Tap where you'll stand"
+}

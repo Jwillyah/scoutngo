@@ -33,7 +33,7 @@ import {
   slideOrder,
   type Rect,
 } from '../core/labelPlacement.ts'
-import { cellPolygon, type ForecastCell } from '../core/cloudGrid.ts'
+import type { ForecastCell } from '../core/cloudGrid.ts'
 import {
   appLayerIdsIn,
   CLOUD_FORECAST_SOURCE,
@@ -48,6 +48,8 @@ import {
   SUN_SOURCE,
 } from '../lib/captureLayers.ts'
 import { markCollection, draftCollection } from '../lib/markLayer.ts'
+import { cloudForecastCollection } from '../lib/skyLayerSource.ts'
+import type { SkyLayerKind } from '../core/skyLayer.ts'
 import type { SiteMark } from '../core/siteMark.ts'
 import { readToken } from '../lib/tokens.ts'
 import { ShooterFigure } from './ShooterFigure.tsx'
@@ -352,6 +354,12 @@ interface MapViewProps {
    * kind and no height, and nothing can compute a sightline from it.
    */
   marks?: readonly SiteMark[]
+  /** Which measure the sky layer paints: cloud, or wind at the flown height. */
+  skyLayer?: SkyLayerKind
+  /** The height the wind layer reads at, in metres. */
+  windMeters?: number
+  /** The aircraft's published wind rating, or null when none is known. */
+  ratedWindMps?: number | null
   markDraft?: readonly LatLon[]
   /** A tap while marking: adds a point, or a vertex to the line being drawn. */
   onMarkAt?: (at: LatLon) => void
@@ -468,18 +476,6 @@ function coneCollection(plan: PlannedPosition[]): GeoJSON.FeatureCollection {
  * it. A cell the forecast did not cover is DROPPED rather than drawn at zero:
  * an unshaded square would read as clear sky.
  */
-function cloudForecastCollection(cells: readonly ForecastCell[]): GeoJSON.FeatureCollection {
-  return {
-    type: 'FeatureCollection',
-    features: cells
-      .filter((cell) => cell.cover !== null)
-      .map((cell) => ({
-        type: 'Feature' as const,
-        properties: { cover: cell.cover },
-        geometry: { type: 'Polygon' as const, coordinates: cellPolygon(cell.at) },
-      })),
-  }
-}
 
 /**
  * WHAT A TOP-DOWN AND A 360 SEE.
@@ -656,6 +652,9 @@ export function MapView({
   onLongPress,
   onAddAt,
   marks,
+  skyLayer = 'cloud',
+  windMeters = 10,
+  ratedWindMps = null,
   markDraft,
   onMarkAt,
   onSelectMark,
@@ -969,10 +968,29 @@ export function MapView({
         layout: { visibility: 'none' },
         paint: {
           /*
-           * Plain white cloud over the imagery, and hard edged: the squares
+           * CLOUD: plain white over the imagery, and hard edged. The squares
            * ARE the signal that this is a model and not a photograph.
+           *
+           * WIND: coloured by band against the aircraft's published rating,
+           * because a wind speed on its own is a number and a wind speed
+           * against what the machine is rated for is a decision. Calm is left
+           * almost clear so the eye goes to the cells that are not.
            */
-          'fill-color': readToken('--white', '#ffffff', container.current),
+          'fill-color': [
+            'match',
+            ['get', 'band'],
+            'calm',
+            readToken('--platform-air', '#3fd0e6', container.current),
+            'workable',
+            readToken('--platform-air', '#3fd0e6', container.current),
+            'near-limit',
+            readToken('--sun-rise', '#ffa04a', container.current),
+            'over',
+            readToken('--color-hazard', '#ff3da6', container.current),
+            'unrated',
+            readToken('--white', '#ffffff', container.current),
+            readToken('--white', '#ffffff', container.current),
+          ],
           'fill-opacity': 0,
           'fill-outline-color': readToken('--color-accent-2', '#c9a227', container.current),
         },
@@ -1705,18 +1723,38 @@ export function MapView({
     const source = instance.getSource(CLOUD_FORECAST_SOURCE) as
       | maplibregl.GeoJSONSource
       | undefined
-    source?.setData(cloudForecastCollection(skyForecast))
+    const data = cloudForecastCollection(skyForecast, skyLayer, windMeters, ratedWindMps)
+    source?.setData(data)
     instance.setLayoutProperty(
       'cloud-forecast-fill',
       'visibility',
-      showSky && skyForecast.length > 0 ? 'visible' : 'none',
+      showSky && data.features.length > 0 ? 'visible' : 'none',
     )
-    instance.setPaintProperty('cloud-forecast-fill', 'fill-opacity', [
-      'min',
-      ['*', ['get', 'cover'], 0.01, skyForecastOpacity],
-      skyForecastOpacity,
-    ])
-  }, [showSky, skyForecast, skyForecastOpacity, ready])
+    instance.setPaintProperty(
+      'cloud-forecast-fill',
+      'fill-opacity',
+      skyLayer === 'wind'
+        ? /*
+           * WIND IS BANDED, NOT A GRADIENT. The question is which side of the
+           * aircraft's rating a cell is on, and a smooth ramp blurs exactly
+           * the boundary that decides whether it flies.
+           */
+          [
+            'match',
+            ['get', 'band'],
+            'calm',
+            0.18,
+            'workable',
+            0.34,
+            'near-limit',
+            0.5,
+            'over',
+            0.62,
+            0.34,
+          ]
+        : ['min', ['*', ['get', 'cover'], 0.01, skyForecastOpacity], skyForecastOpacity],
+    )
+  }, [showSky, skyForecast, skyForecastOpacity, skyLayer, windMeters, ratedWindMps, ready])
 
   /*
    * THE SUN LINE AND THE RAYS, SIZED TO THE VIEWPORT.

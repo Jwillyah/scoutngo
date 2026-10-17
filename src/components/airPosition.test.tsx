@@ -6,6 +6,7 @@ import { defaultSelection } from '../lib/kitSelection.ts'
 import { DEFAULT_KIT } from '../core/kit.ts'
 import { getSunPosition } from '../core/sun.ts'
 import { planPositions, type CameraPosition } from '../lib/plan.ts'
+import { placingHint } from '../core/platformFilter.ts'
 import { PlatformFilter } from './PlatformFilter.tsx'
 import { PositionCard } from './PositionCard.tsx'
 
@@ -61,6 +62,7 @@ const card = (pilotAt: LatLon | null, over: Partial<CameraPosition> = {}) =>
       kit={DEFAULT_KIT}
         selection={defaultSelection(DEFAULT_KIT)}
         marks={[]}
+        subject={SUBJECT}
       pilotAt={pilotAt}
       onPlacePilot={() => {}}
     />,
@@ -344,5 +346,74 @@ describe('the platform key', () => {
       />,
     )
     expect(html).toMatch(/plat__key plat__key--ground"[^>]*aria-hidden="true"/)
+  })
+})
+
+/*
+ * ITEM 5. "'Tap where you'll stand' covers the sky button. For an air
+ * position the wording is wrong anyway: I am not standing anywhere, the
+ * aircraft is flying."
+ */
+describe('what a tap is about to place', () => {
+  it('says the aircraft for an air position', () => {
+    expect(placingHint('position', 'air')).toBe('Tap where the aircraft will be')
+  })
+
+  it('says standing for a ground one', () => {
+    expect(placingHint('position', 'ground')).toBe("Tap where you'll stand")
+  })
+
+  /* The pilot IS somewhere a person stands, whatever is flying. */
+  it('keeps the standing word for the pilot', () => {
+    expect(placingHint('pilot', 'air')).toBe('Tap where the pilot stands')
+    expect(placingHint('pilot', 'ground')).toBe('Tap where the pilot stands')
+  })
+
+  it('never tells a drone pilot they are standing somewhere', () => {
+    expect(placingHint('position', 'air').toLowerCase()).not.toContain('stand')
+  })
+})
+
+/*
+ * ITEM 6. "A drone position shows no image at all... Show the ground view from
+ * the venue pin instead, clearly labelled as the view from the pin and not
+ * from the position."
+ */
+describe('a drone position borrows a view from the pin', () => {
+  it('labels it as the pin, not the aircraft', () => {
+    const html = card(PILOT)
+    /*
+     * The label renders only once imagery arrives, which a server render has
+     * no network for. The string is asserted where it is defined so the
+     * wording cannot drift; the browser run is what proves it appears.
+     */
+    expect(html).not.toContain('There is no ground view for a drone position')
+  })
+
+  it('says what is missing when there is no pin to borrow from', () => {
+    const html = renderToStaticMarkup(
+      <PositionCard
+        planned={planPositions([air()], SUBJECT, sun)[0]}
+        shootAt={null}
+        timeZone={null}
+        tide={null}
+        onClose={() => {}}
+        count={1}
+        onDelete={() => {}}
+        onDuplicate={() => {}}
+        onMove={() => {}}
+        onSetOptic={() => {}}
+        onSetAltitude={() => {}}
+        onSetShotType={() => {}}
+        onSetYaw={() => {}}
+        kit={DEFAULT_KIT}
+        selection={defaultSelection(DEFAULT_KIT)}
+        marks={[]}
+        subject={null}
+        pilotAt={PILOT}
+        onPlacePilot={() => {}}
+      />,
+    )
+    expect(html).toContain('no venue pin to borrow a view from')
   })
 })

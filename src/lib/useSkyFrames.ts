@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { hasSatellite, type SkyLayerKind } from '../core/skyLayer.ts'
 import type { ForecastCell } from '../core/cloudGrid.ts'
 import type { LatLon } from '../core/geo.ts'
 import { FORECAST_OPACITY, skySourceFor, type SkySource } from '../core/skyTime.ts'
@@ -34,6 +35,19 @@ export function useSkyFrames(
   scrubbedAt: Date | null,
   timeZone: string | null,
   enabled: boolean,
+  /**
+   * WHICH LAYER IS BEING SHOWN, because it decides whether the model grid is
+   * needed at all.
+   *
+   * CLOUD has a photograph for now and the past, so the grid is only fetched
+   * for the future. WIND HAS NO PHOTOGRAPH AT ANY TIME: there is no satellite
+   * image of wind at 200 feet, so the grid is the only source there is and it
+   * is fetched for every hour, including ones already past.
+   *
+   * Without this the wind layer drew nothing except for future hours, which
+   * on a map looks exactly like a layer that does not work.
+   */
+  layer: SkyLayerKind = 'cloud',
 ): SkyState {
   const [cells, setCells] = useState<ForecastCell[]>([])
   const [forecastProblem, setProblem] = useState<string | null>(null)
@@ -59,7 +73,9 @@ export function useSkyFrames(
       : `${venue.lat.toFixed(3)},${venue.lon.toFixed(3)}|${scrubbedAt.toDateString()}|${scrubbedAt.getHours()}`
 
   const wantForecast =
-    enabled && source !== null && source.kind === 'forecast' && source.draw
+    enabled &&
+    source !== null &&
+    (hasSatellite(layer) ? source.kind === 'forecast' && source.draw : true)
 
   useEffect(() => {
     if (!wantForecast || venue === null || scrubbedAt === null || timeZone === null) {
@@ -84,7 +100,11 @@ export function useSkyFrames(
         setProblem(result.reason)
         return
       }
-      const next = result.cells.map((cell) => ({ at: cell.at, cover: cell.cover }))
+      const next = result.cells.map((cell) => ({
+        at: cell.at,
+        cover: cell.cover,
+        wind: cell.wind,
+      }))
       grids.current.set(hourKey, next)
       setCells(next)
       setProblem(null)
@@ -101,7 +121,11 @@ export function useSkyFrames(
   return {
     source: resolved,
     frameAt: resolved.kind === 'satellite' ? resolved.frameAt : null,
-    cells: resolved.kind === 'forecast' ? cells : [],
+    /*
+     * The wind grid is shown whatever the clock says, because wind has no
+     * satellite frame to prefer over it.
+     */
+    cells: hasSatellite(layer) ? (resolved.kind === 'forecast' ? cells : []) : cells,
     opacity: resolved.kind === 'forecast' ? FORECAST_OPACITY[resolved.trust] : 1,
     forecastProblem,
   }

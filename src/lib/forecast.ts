@@ -164,7 +164,19 @@ export async function fetchSightlineCloud(
   const params = new URLSearchParams({
     latitude: points.map((p) => p.at.lat.toFixed(4)).join(','),
     longitude: points.map((p) => p.at.lon.toFixed(4)).join(','),
-    hourly: 'cloud_cover_low,cloud_cover_mid,cloud_cover_high',
+    /*
+     * CLOUD AND WIND IN ONE REQUEST. The grid is 25 points and Open-Meteo is a
+     * free service, so asking twice for the same 25 points because somebody
+     * flipped a picker would be the rude way to build this. One request
+     * carries both layers and the picker is then a repaint.
+     */
+    hourly: [
+      'cloud_cover_low',
+      'cloud_cover_mid',
+      'cloud_cover_high',
+      ...WIND_LEVELS_METERS.map((m) => `wind_speed_${m}m`),
+      ...WIND_LEVELS_METERS.map((m) => `wind_direction_${m}m`),
+    ].join(','),
     start_date: date,
     end_date: date,
     timezone: timeZone,
@@ -381,6 +393,19 @@ export interface GridCell {
   at: LatLon
   /** The most blocking single layer, or null where the forecast did not say. */
   cover: number | null
+  /**
+   * Wind at each level the model serves, for the wind layer.
+   *
+   * THE LEVELS RATHER THAN ONE NUMBER, because the height that matters is the
+   * one being flown and it is chosen elsewhere: src/core/windProfile.ts
+   * interpolates between these the same way the Conditions readout does. One
+   * pre-picked speed here would be a second answer to a question already
+   * answered, which is the shape of most of this app's bugs.
+   *
+   * Null entries stay null. A level the model did not return is not a calm
+   * one.
+   */
+  wind: LevelWind[]
 }
 
 export type CloudGridResult =
@@ -405,7 +430,19 @@ export async function fetchCloudGrid(
   const params = new URLSearchParams({
     latitude: points.map((p) => p.at.lat.toFixed(4)).join(','),
     longitude: points.map((p) => p.at.lon.toFixed(4)).join(','),
-    hourly: 'cloud_cover_low,cloud_cover_mid,cloud_cover_high',
+    /*
+     * CLOUD AND WIND IN ONE REQUEST. The grid is 25 points and Open-Meteo is a
+     * free service, so asking twice for the same 25 points because somebody
+     * flipped a picker would be the rude way to build this. One request
+     * carries both layers and the picker is then a repaint.
+     */
+    hourly: [
+      'cloud_cover_low',
+      'cloud_cover_mid',
+      'cloud_cover_high',
+      ...WIND_LEVELS_METERS.map((m) => `wind_speed_${m}m`),
+      ...WIND_LEVELS_METERS.map((m) => `wind_direction_${m}m`),
+    ].join(','),
     start_date: isoDate(when),
     end_date: isoDate(when),
     timezone: timeZone,
@@ -445,6 +482,19 @@ export async function fetchCloudGrid(
           mid: numberOrNull(hourly?.cloud_cover_mid, row),
           high: numberOrNull(hourly?.cloud_cover_high, row),
         }),
+        /*
+         * km/h out, m/s in: Open-Meteo serves wind in km/h and every piece of
+         * arithmetic in this app is metric base units. Converted once, here,
+         * at the boundary, exactly as the point forecast does.
+         */
+        wind: WIND_LEVELS_METERS.map((metres) => ({
+          heightMeters: metres,
+          speedMps: (() => {
+            const kmh = numberOrNull(hourly?.[`wind_speed_${metres}m`], row)
+            return kmh === null ? null : kmh * KMH_TO_MPS
+          })(),
+          fromDegrees: numberOrNull(hourly?.[`wind_direction_${metres}m`], row),
+        })),
       }
     })
 

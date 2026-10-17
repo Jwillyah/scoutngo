@@ -6,6 +6,7 @@ import {
   type Lens,
 } from '../core/kit.ts'
 import { KitEditor } from './KitEditor.tsx'
+import { OnThisDevice } from './OnThisDevice.tsx'
 import { useMemo } from 'react'
 import { auditKit, kitAuditLines } from '../lib/kitAudit.ts'
 import {
@@ -119,10 +120,8 @@ export function KitProfile({ value, onChange, kit, onKitChange }: KitProfileProp
 
   return (
     <Panel index="02" title="Kit and style">
-      <p className="section__note">
-        What is actually coming with you. Saved in this browser only, on this
-        device. Nothing is sent anywhere.
-      </p>
+      <p className="section__note">What is actually coming with you.</p>
+      <OnThisDevice what="kit and gear" />
 
       {news.length === 0 ? null : (
         <ul className="kitaudit">

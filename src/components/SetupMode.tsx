@@ -18,6 +18,7 @@ import { KitProfile } from './KitProfile.tsx'
 import { MapView, type MapHandle } from './MapView.tsx'
 import { ReachSlider } from './ReachSlider.tsx'
 import { SearchField } from './SearchField.tsx'
+import { ColdStart } from './ColdStart.tsx'
 import { SpotsPanel } from './SpotsPanel.tsx'
 import { ShootChips } from './ShootChips.tsx'
 import { StaleBrief } from './StaleBrief.tsx'
@@ -96,6 +97,8 @@ interface SetupModeProps {
   pointAt: { field: SetupTarget | 'brief' | null; tick: number }
   /** Whether a newer build is deployed, for the stamp under Settings. */
   newBuild: BuildCheck
+  /** Brings back the landing page, which is otherwise shown once. */
+  onShowLanding: () => void
 }
 
 /** What is open over the one screen. Only ever one at a time. */
@@ -168,6 +171,7 @@ export function SetupMode({
   shootLine,
   airAvailable,
   newBuild,
+  onShowLanding,
 }: SetupModeProps) {
   /*
    * One example per load, so the placeholder shows the kind of work the reader
@@ -351,6 +355,20 @@ export function SetupMode({
                         * Monospace, because it is an identifier to read out
                         * loud or type into a message, not prose.
                         */}
+                      {/*
+                        * THE WAY BACK TO THE LANDING PAGE. It is shown once,
+                        * so the only way to read it again is here, with the
+                        * other things that are about the app rather than
+                        * about the shoot.
+                        */}
+                      <button type="button" className="settings__row" onClick={onShowLanding}>
+                        What this is
+                        <span className="settings__hint">
+                          The page you saw first. Three stages, the rule, and
+                          where your data lives.
+                        </span>
+                      </button>
+
                       <BuildStamp deployed={newBuild} />
                     </div>
                   ) : null}
@@ -514,6 +532,13 @@ export function SetupMode({
             </span>
           </label>
         </div>
+
+        {/*
+          * NO PIN YET, SO OFFER THE PLACES ALREADY KNOWN. The map opens on the
+          * Atlantic because the app does not know where you are and will not
+          * find out; a list of spots is the answer that needs no guess.
+          */}
+        {at !== null ? null : <ColdStart spots={spots} onLoad={onLoadSpot} />}
 
         <StaleBrief
           staleBrief={staleBrief}

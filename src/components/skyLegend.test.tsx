@@ -24,6 +24,10 @@ const render = (zoom: number) =>
       clock={(at) => at.toISOString().slice(11, 16)}
       boundary={null}
       onZoomOut={() => {}}
+      layer="cloud"
+      onLayer={() => {}}
+      windHeight={{ feet: 200, source: 'position' }}
+      ratedWindMps={12}
     />,
   )
 
@@ -93,5 +97,87 @@ describe('zoomed out, the key is the key again', () => {
 describe('the two states differ', () => {
   it('renders different markup close in and far out', () => {
     expect(render(16.5)).not.toBe(render(10))
+  })
+})
+
+/*
+ * ITEM 8: ONE PICKER, SAME PLACE, and the wind half never borrows the word
+ * "observed" from the cloud half.
+ */
+describe('the layer picker', () => {
+  const windKey = (over: Partial<Parameters<typeof SkyLegend>[0]> = {}) =>
+    renderToStaticMarkup(
+      <SkyLegend
+        band="visible"
+        advice={zoomAdvice('visible', 38.36, 390, 10)}
+        sky={SATELLITE}
+        clock={(at) => at.toISOString().slice(11, 16)}
+        boundary={null}
+        onZoomOut={() => {}}
+        layer="wind"
+        onLayer={() => {}}
+        windHeight={{ feet: 200, source: 'position' }}
+        ratedWindMps={12}
+        {...over}
+      />,
+    )
+
+  it('offers both layers wherever it is', () => {
+    expect(render(10)).toContain('skykey__pick')
+    expect(render(16.5)).toContain('skykey__pick')
+    expect(windKey()).toContain('skykey__pick')
+  })
+
+  /*
+   * THE ZOOM WARNING IS ABOUT THE SATELLITE PIXEL, so it does not apply to a
+   * grid of model points. Too close in must still offer the picker, because
+   * switching layer is the thing somebody does from that state.
+   */
+  it('shows the wind layer even when the satellite would be too close', () => {
+    const close = windKey({ advice: zoomAdvice('visible', 38.36, 390, 16.5) })
+    expect(close).not.toContain('Nothing to show at this zoom')
+    expect(close).toContain('skykey__pick')
+  })
+
+  it('calls the wind layer a forecast, at every hour', () => {
+    const html = windKey()
+    expect(html).toContain('Forecast')
+    expect(html).not.toContain('Satellite')
+    expect(html).toContain('no satellite picture of wind')
+    expect(html).toContain('including the ones already past')
+  })
+
+  it('states the height the wind is read at', () => {
+    expect(windKey()).toContain('at 200 ft')
+  })
+
+  it('names what the bands are measured against', () => {
+    expect(windKey()).toContain('12 m/s')
+    expect(windKey()).toContain('published rating')
+  })
+
+  /* No rating, no bands, and it says so rather than implying one. */
+  it('says the bands do not apply with no published rating', () => {
+    const html = windKey({ ratedWindMps: null })
+    expect(html).toContain('No aircraft in the kit publishes a wind rating')
+    expect(html).toContain('invented limit')
+  })
+
+  /*
+   * AND IT SAYS WHY THE MAP IS EMPTY WHEN IT IS. This was missing and cost a
+   * long diagnosis: the grid came back unavailable, the layer drew nothing,
+   * and the key carried on describing bands that were not there.
+   */
+  it('shows the reason when the grid could not be fetched', () => {
+    const html = windKey({
+      sky: { ...SATELLITE, forecastProblem: 'Open-Meteo returned HTTP 429.' } as never,
+    })
+    expect(html).toContain('HTTP 429')
+  })
+
+  /* The square announces its own edges, on both layers. */
+  it('states the grid extent', () => {
+    expect(windKey()).toContain('model points')
+    expect(windKey()).toContain('not clear sky')
   })
 })

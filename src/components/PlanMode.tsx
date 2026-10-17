@@ -22,8 +22,10 @@ import type { TideInfo } from '../lib/useTide.ts'
 import type { VenueWindow } from '../lib/venue.ts'
 import type { KitProfile as KitProfileType } from '../core/kit.ts'
 import type { OpticSelection } from '../core/optics.ts'
+import { placingHint } from '../core/platformFilter.ts'
 import type { SetupTarget } from '../lib/mode.ts'
-import type { WindHeight } from '../core/windHeight.ts'
+import { GROUND_WIND_METERS, type WindHeight } from '../core/windHeight.ts'
+import type { SkyLayerKind } from '../core/skyLayer.ts'
 import type { MarkKind, SiteMark } from '../core/siteMark.ts'
 import { HazardPanel } from './HazardPanel.tsx'
 import { BottomSheet, type SheetState } from './BottomSheet.tsx'
@@ -134,6 +136,9 @@ interface PlanModeProps {
   shootDate: string
   /** Which brief a generate would send: the typed one, or the chips. */
   briefSource: string
+  /** Which measure the sky layer paints. */
+  skyLayer: SkyLayerKind
+  onSkyLayer: (next: SkyLayerKind) => void
   /** Arms the map so the next tap drops a position. The primary action here. */
   placing: boolean
   onPlacing: (next: boolean) => void
@@ -277,6 +282,8 @@ export function PlanMode({
   onDeleteMark,
   shootDate,
   briefSource,
+  skyLayer,
+  onSkyLayer,
   placing,
   onPlacing,
   onAddAt,
@@ -375,6 +382,9 @@ export function PlanMode({
         showSky={showSky}
         skyFrameAt={sky.frameAt}
         skyForecast={sky.cells}
+        skyLayer={skyLayer}
+        windMeters={windHeight.feet === null ? GROUND_WIND_METERS : windHeight.feet * 0.3048}
+        ratedWindMps={ratedWindMps}
         skyForecastOpacity={sky.opacity}
         sunOverlay={sunOverlay}
         showSun={showSun}
@@ -410,13 +420,15 @@ export function PlanMode({
         * icon would be one more thing to decode on a screen that just lost two
         * markers for being undecodable.
         */}
-      {!placing ? null : <p className="tapnote">Tap where you&rsquo;ll stand</p>}
+      {!placing ? null : (
+        <p className="tapnote">{placingHint('position', addsAir ? 'air' : 'ground')}</p>
+      )}
       {/*
         * The same affordance for the pilot, with its own words, because
         * "tap where you'll stand" is what the other one says and these are
         * two different standing places.
         */}
-      {!placingPilot ? null : <p className="tapnote">Tap where the pilot stands</p>}
+      {!placingPilot ? null : <p className="tapnote">{placingHint('pilot', 'ground')}</p>}
 
       <header className="hud">
         <div className="hud__row">
@@ -514,6 +526,10 @@ export function PlanMode({
            * it also fixes it in one tap.
            */
           onZoomOut={(zoom) => handle.current?.zoomTo(zoom)}
+          layer={skyLayer}
+          onLayer={onSkyLayer}
+          windHeight={windHeight}
+          ratedWindMps={ratedWindMps}
         />
       )}
 
@@ -544,6 +560,7 @@ export function PlanMode({
           kit={kitProfile}
           selection={kitSelection}
           marks={marks}
+          subject={venue}
           pilotAt={pilotAt}
           onPlacePilot={() => onPlacingPilot(true)}
         />

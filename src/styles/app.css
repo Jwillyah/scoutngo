@@ -4685,9 +4685,28 @@
 .tapnote {
   position: absolute;
   z-index: 5;
-  top: calc(var(--space-3) + var(--safe-top) + var(--control-height) + var(--space-2));
+  /*
+   * ABOVE THE SHEET, NOT UNDER THE CONTROLS.
+   *
+   * It used to sit one control-height below the top, which was written when
+   * the HUD had one row. The HUD has two, so the note landed squarely on the
+   * second one and covered the Sky button: reported as exactly that.
+   *
+   * Down here it covers nothing: the sheet's own height is a live variable, so
+   * the note rides above it whatever detent the sheet is at, and it is next to
+   * the thumb that is about to tap.
+   */
+  /*
+   * THE DOCK IS BELOW THE SHEET, so the sheet's own height is not the distance
+   * from the bottom of the screen. Measured: viewport 844, dock 160, sheet
+   * 176 sitting at 508-684. Offsetting by the sheet alone put the note at
+   * 621, which is inside it and across the Suggest button.
+   */
+  bottom: calc(var(--dock-height) + var(--sheet-live-height) + var(--space-3));
   left: 50%;
   transform: translateX(-50%);
+  /* One line on a 390px phone with room either side. */
+  max-width: calc(100% - var(--space-3) * 2);
   padding: var(--space-2) var(--space-3);
   background: var(--color-panel);
   border: var(--line-hair) solid var(--color-accent-2);
@@ -5755,10 +5774,6 @@
  * the thing being qualified and a line below it gets scrolled past.
  */
 .frame__age {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
   margin: 0;
   padding: var(--space-2);
   font-size: var(--text-xs);
@@ -5894,4 +5909,369 @@
 .build__line--fact {
   border-left: var(--line-rule) solid var(--color-rule-fact);
   color: var(--color-text-muted);
+}
+
+/*
+ * WHOSE VIEW THE PICTURE IS.
+ *
+ * A drone position has no Street View of its own, so it borrows the one from
+ * the venue pin: "I still want to see the place. Seeing the surroundings is
+ * most of the value." A borrowed photograph presented as the view from the
+ * position would be the same class of error as a lens that is not on the
+ * aircraft, so it says where it was taken, every time it is shown.
+ *
+ * Over the image, at the bottom, like the imagery age note.
+ */
+.frame__foot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+}
+
+.frame__borrowed {
+  margin: 0;
+  padding: var(--space-2);
+  background: color-mix(in srgb, var(--black) 78%, transparent);
+  border-left: var(--line-rule) solid var(--platform-air);
+  color: var(--color-text);
+  font-size: var(--text-xs);
+  line-height: 1.3;
+}
+
+/*
+ * WHERE ANY OF THIS LIVES, said once and the same way in both places.
+ *
+ * "It is a feature, not an apology, but I need to know before I rely on it."
+ * So it is not a warning colour and not a hazard rule: it is a fact about the
+ * app, in the quiet grey the other facts use, with the one phrase that matters
+ * carried in the brighter ink.
+ */
+.device {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2);
+  border-radius: var(--radius-panel);
+  background: var(--color-panel-2);
+  border-left: var(--line-rule) solid var(--color-rule-fact);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+}
+
+.device__head {
+  color: var(--color-text);
+  font-weight: var(--weight-heavy);
+}
+
+/* ------------------------------------------------------------- landing */
+
+/*
+ * WHAT THIS IS, BEFORE THE MAP.
+ *
+ * The app's own vernacular, not a product page: the same dark ground, the same
+ * numbered sections the panels use, rules instead of cards, and monospace for
+ * anything that is a figure. Read in a car park at six in the morning on the
+ * same phone at the same brightness as everything else.
+ *
+ * The button is pinned to the bottom and the text scrolls behind it, so the
+ * way in is reachable with a thumb however long the page is and whatever the
+ * phone's toolbars are doing.
+ */
+.land {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.land__scroll {
+  overflow-y: auto;
+  padding: calc(var(--safe-top) + var(--space-4)) var(--page-pad) var(--space-3);
+  -webkit-overflow-scrolling: touch;
+}
+
+.land__head {
+  padding-bottom: var(--space-3);
+  border-bottom: var(--line-rule) solid var(--color-accent);
+}
+
+.land__name {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.land__what {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-md);
+  color: var(--color-text-muted);
+}
+
+/*
+ * Index down the left, body to the right: the same shape as Panel, so the
+ * first screen somebody sees is the shape of every screen after it.
+ */
+.land__sec {
+  display: grid;
+  grid-template-columns: 2.5rem 1fr;
+  gap: var(--space-2);
+  padding: var(--space-4) 0 0;
+}
+
+.land__idx {
+  margin: 0;
+  color: var(--color-text-faint);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-heavy);
+}
+
+.land__body {
+  min-width: 0;
+}
+
+.land__h {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.land__p {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+
+.land__p--dim {
+  color: var(--color-text-faint);
+  font-size: var(--text-xs);
+}
+
+.land__stages {
+  margin: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.land__stage {
+  display: grid;
+  gap: 2px;
+  padding-top: var(--space-2);
+  border-top: var(--line-hair) solid var(--color-line);
+}
+
+.land__stage-name {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.land__stage-n {
+  color: var(--color-accent);
+}
+
+.land__stage-when,
+.land__stage-what {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.land__stage-when {
+  color: var(--color-text-faint);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.land__foot {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: center;
+  padding: var(--space-3) var(--page-pad) calc(var(--safe-bottom) + var(--space-3));
+  border-top: var(--line-hair) solid var(--color-line);
+  background: var(--color-bg);
+}
+
+/* The one action on the page, and the only white thing on it. */
+.land__go {
+  width: 100%;
+  min-height: 52px;
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  border: 0;
+  border-radius: var(--radius-panel);
+  font-size: var(--text-md);
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.land__build {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+  text-align: center;
+}
+
+/*
+ * THE SPOTS LIST ON A COLD START.
+ *
+ * "Opening on the mid-Atlantic is useless... put my saved spots on that
+ * screen. I shoot the same places." The map behind it stays where it is: the
+ * answer to not knowing where somebody is was never a better guess.
+ */
+.cold {
+  margin: var(--space-3) 0;
+  padding: var(--space-3);
+  background: var(--color-panel);
+  border: var(--line-hair) solid var(--color-line);
+  border-left: var(--line-rule) solid var(--color-accent);
+  border-radius: var(--radius-panel);
+}
+
+.cold__head {
+  display: grid;
+  gap: 2px;
+  margin: 0 0 var(--space-2);
+}
+
+.cold__label {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text);
+}
+
+.cold__note {
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+}
+
+.cold__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+}
+
+.cold__spot {
+  width: 100%;
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  text-align: left;
+  min-height: 44px;
+  padding: var(--space-2);
+  background: var(--color-field);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-panel);
+  color: var(--color-text);
+}
+
+.cold__name {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heavy);
+}
+
+.cold__meta {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/*
+ * A SETTINGS ROW THAT IS AN ACTION RATHER THAN A SWITCH.
+ *
+ * Shaped like the toggle above it so the drawer reads as one list, but it goes
+ * somewhere instead of changing something.
+ */
+.settings__row {
+  width: 100%;
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  text-align: left;
+  min-height: 44px;
+  margin-top: var(--space-3);
+  padding: var(--space-2);
+  background: var(--color-field);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-panel);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heavy);
+}
+
+.settings__hint {
+  font-weight: var(--weight-medium);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  line-height: 1.35;
+}
+
+/*
+ * THE SKY LAYER PICKER, in the key that explains the layer.
+ *
+ * "One picker, same place." It sits at the top of the key in both states,
+ * including the too-close one, because changing the layer is a thing somebody
+ * does FROM that state: wind has no satellite pixel to be too close to.
+ */
+.skykey__pick {
+  display: flex;
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-panel);
+  overflow: hidden;
+  align-self: start;
+}
+
+.skykey__pick-btn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 0;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.skykey__pick-btn--on {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+}
+
+/*
+ * THE WIND BANDS. Calm and workable share the air colour because they are the
+ * same decision; the two that are not take the warning colours. Shaded to
+ * match the map so the key and the layer cannot drift apart by eye.
+ */
+.skykey__swatch--calm {
+  background: var(--platform-air);
+  opacity: 0.35;
+}
+
+.skykey__swatch--workable {
+  background: var(--platform-air);
+}
+
+.skykey__swatch--near-limit {
+  background: var(--sun-rise);
+}
+
+.skykey__swatch--over {
+  background: var(--color-hazard);
 }

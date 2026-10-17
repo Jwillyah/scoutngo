@@ -5,6 +5,7 @@ import { ModeRail } from './components/ModeRail.tsx'
 import { FieldMode } from './components/FieldMode.tsx'
 import { PlanMode } from './components/PlanMode.tsx'
 import { NewBuildNotice } from './components/NewBuildNotice.tsx'
+import { Landing } from './components/Landing.tsx'
 import { SetupMode } from './components/SetupMode.tsx'
 import type { LatLon } from './core/geo.ts'
 import { DEFAULT_ALTITUDE_FEET } from './core/air.ts'
@@ -132,6 +133,7 @@ import {
 import type { MarkKind, SiteMark } from './core/siteMark.ts'
 import { windHeightFor } from './core/windHeight.ts'
 import { briefIsTyped, briefSourceLine } from './core/shootBrief.ts'
+import type { SkyLayerKind } from './core/skyLayer.ts'
 import { revivalNote, revivePositions } from './lib/revivePositions.ts'
 import { generateBlock } from './lib/generateGate.ts'
 
@@ -578,6 +580,23 @@ function App() {
   const newBuild = useNewBuild()
 
   /*
+   * THE LANDING PAGE, SHOWN ONCE.
+   *
+   * A returning shooter goes straight to the map. An app that explains itself
+   * every time is an app that does not trust you to have read it, and this one
+   * is used at six in the morning in a car park.
+   *
+   * Persisted like everything else: in this browser, on this device. Clearing
+   * site data shows it again, which is the correct behaviour for something
+   * whose whole claim is that it keeps nothing anywhere else.
+   */
+  const [landingSeen, setLandingSeen] = usePersistentState<boolean>(
+    'scoutngo.landing.v1',
+    false,
+    (raw) => raw === true,
+  )
+
+  /*
    * THE SKY LAYER, off by default.
    *
    * It is a different kind of thing from everything else on the map: observed
@@ -587,11 +606,17 @@ function App() {
   const [showSky, setShowSky] = useState(false)
 
   /*
+   * WHAT THE SKY LAYER PAINTS. Cloud decides whether there is light; wind
+   * decides whether the aircraft leaves the bag. See src/core/skyLayer.ts.
+   */
+  const [skyLayer, setSkyLayer] = useState<SkyLayerKind>('cloud')
+
+  /*
    * WHAT THE SKY LAYER SHOWS FOR THE SCRUBBED MOMENT. Past and now get a real
    * GOES frame; the future gets the Open-Meteo cloud grid. Frames live in
    * memory for the session only and never reach a field pack.
    */
-  const sky = useSkyFrames(aim, scrubbedAt, venueWindow?.timeZone ?? null, showSky)
+  const sky = useSkyFrames(aim, scrubbedAt, venueWindow?.timeZone ?? null, showSky, skyLayer)
 
   /*
    * THE SHOOT CHIPS. One tap sets the platform filter and the window, with no
@@ -1529,6 +1554,8 @@ function App() {
         * There is no service worker in this app; what holds a stale build is
         * iOS Safari keeping index.html. See src/lib/build.ts.
         */}
+      {landingSeen ? null : <Landing onDismiss={() => setLandingSeen(true)} />}
+
       <NewBuildNotice check={newBuild} />
       {mode === 'setup' ? (
         <div className="mode-setup">
@@ -1564,6 +1591,7 @@ function App() {
             shootLine={shootLine}
             airAvailable={droneAvailable(kit, kitProfile)}
             newBuild={newBuild}
+            onShowLanding={() => setLandingSeen(false)}
             onUseMyLocation={onUseMyLocation}
             shotListText={shotListText}
             onShotListText={onShotListChange}
@@ -1685,6 +1713,8 @@ function App() {
           onDeleteMark={onDeleteMark}
           shootDate={venue.date}
           briefSource={briefSource}
+          skyLayer={skyLayer}
+          onSkyLayer={setSkyLayer}
           placing={placing}
           onPlacing={setPlacing}
           onAddAt={addPositionAt}
