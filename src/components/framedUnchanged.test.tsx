@@ -246,8 +246,17 @@ describe('the shapes each shot type is drawn with', () => {
    * whenever the geometry uses it, not only when a drone is flying.
    */
   it('sizes a ground top-down from its own camera height', () => {
-    const low = plan({ shotType: 'top-down', platform: 'ground', altitudeFeet: 12 })
-    const high = plan({ shotType: 'top-down', platform: 'ground', altitudeFeet: 48 })
+    /*
+     * ON A GROUND LENS, because this fixture is an AIR position and only the
+     * platform was being overridden. That left a mast carrying the aircraft's
+     * camera, which plan.ts now refuses rather than quietly resolving to the
+     * first lens in the bag: see the note on resolveOptic. The old silent
+     * fallback is why this fixture passed for months while describing a
+     * position that could not exist.
+     */
+    const mast = { shotType: 'top-down', platform: 'ground', lensId: 'sony-10-18', focalLength: 10 } as const
+    const low = plan({ ...mast, altitudeFeet: 12 })
+    const high = plan({ ...mast, altitudeFeet: 48 })
     if (low.footprint?.shotType !== 'top-down') throw new Error('expected top-down')
     if (high.footprint?.shotType !== 'top-down') throw new Error('expected top-down')
     expect(high.footprint.widthMeters / low.footprint.widthMeters).toBeCloseTo(4, 1)

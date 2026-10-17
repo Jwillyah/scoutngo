@@ -101,6 +101,8 @@ interface PlanModeProps {
   tideExtremes: TideExtreme[]
   generation: GenerationState
   siteNote: string | null
+  /** What loading a saved plan had to change to make sense of it. */
+  positionNote: string | null
   onGenerate: () => void
   /** Takes the shooter to whatever a blocked generate named. */
   onFixBlock: (field: SetupTarget | 'brief' | null) => void
@@ -253,6 +255,7 @@ export function PlanMode({
   tideExtremes,
   generation,
   siteNote,
+  positionNote,
   onGenerate,
   onFixBlock,
   kitProfile,
@@ -730,6 +733,7 @@ export function PlanMode({
               onFixBlock={onFixBlock}
               planCoverage={planCoverage}
               siteNote={siteNote}
+              positionNote={positionNote}
             />
             <FieldPackControl
               pack={pack}

@@ -132,6 +132,7 @@ import {
 import type { MarkKind, SiteMark } from './core/siteMark.ts'
 import { windHeightFor } from './core/windHeight.ts'
 import { briefIsTyped, briefSourceLine } from './core/shootBrief.ts'
+import { revivalNote, revivePositions } from './lib/revivePositions.ts'
 import { generateBlock } from './lib/generateGate.ts'
 
 /*
@@ -164,6 +165,13 @@ function App() {
     name: false,
   }))
   const [positions, setPositions] = useState<CameraPosition[]>([])
+
+  /*
+   * What loading a saved plan had to change to make sense of it, or null.
+   * Shown rather than done quietly: silently correcting saved work is how a
+   * plan changes under the shooter between one visit and the next.
+   */
+  const [positionNote, setPositionNote] = useState<string | null>(null)
 
   /*
    * WHAT IS DANGEROUS AND WHAT IS IN THE WAY, marked by the shooter.
@@ -1002,8 +1010,15 @@ function App() {
      * same treatment the stored selection in localStorage already got.
      */
     setKit(reviveSelection(spot.kit, kitProfile))
-    setPositions(spot.positions)
-    /* Revived rather than trusted, for the same reason the kit is. */
+    /*
+     * POSITIONS ARE REVIVED, NOT TRUSTED, for the same reason the kit is and
+     * for a sharper one: a spot saved while an older bug was live is a fossil
+     * of that bug, and loading it restores the contradiction on a build where
+     * the bug has since been fixed twice. See src/lib/revivePositions.ts.
+     */
+    const revival = revivePositions(spot.positions, kitProfile)
+    setPositions(revival.positions)
+    setPositionNote(revivalNote(revival))
     setMarks(reviveMarks(spot.marks ?? []))
     setBriefAnchor(null)
     setGeneration({ status: 'idle' })
@@ -1605,6 +1620,7 @@ function App() {
           tideExtremes={tideExtremes}
           generation={generation}
           siteNote={siteNote}
+          positionNote={positionNote}
           onGenerate={() => void onGenerate()}
           onFixBlock={onFixBlock}
           kitProfile={kitProfile}

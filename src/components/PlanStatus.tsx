@@ -15,6 +15,14 @@ interface PlanStatusProps {
   planCoverage: PlanCoverage | null
   /** Set when Overpass could not be reached, so siting was not checked. */
   siteNote: string | null
+  /**
+   * What loading a saved plan had to change to make sense of it.
+   *
+   * A HAZARD TONE, because it means the plan on screen is not byte for byte
+   * the plan that was saved. Silently correcting somebody's saved work is how
+   * a plan changes under them between one visit and the next.
+   */
+  positionNote: string | null
 }
 
 /**
@@ -68,10 +76,20 @@ function RawResponse({ reason, raw }: { reason: string; raw: string }) {
  * stale brief guard. Those are SETUP concerns, decided at home; this is about
  * the work and stays with the map.
  */
-export function PlanStatus({ generation, onFixBlock, planCoverage, siteNote }: PlanStatusProps) {
+export function PlanStatus({
+  generation,
+  onFixBlock,
+  planCoverage,
+  siteNote,
+  positionNote,
+}: PlanStatusProps) {
   return (
     <>
       {generation.status === 'working' ? <GenerateProgress stage={generation.stage} /> : null}
+
+      {positionNote === null ? null : (
+        <p className="notice notice--hazard">{positionNote}</p>
+      )}
 
       {generation.status === 'error' ? (
         <p className="notice notice--hazard">{generation.message}</p>

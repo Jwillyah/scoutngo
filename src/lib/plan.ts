@@ -241,8 +241,8 @@ export interface PlannedPosition {
  * lens they added this morning has to resolve here or its field of view falls
  * back to someone else's glass.
  */
-const findLens = (kit: KitProfile, id: string): Lens =>
-  kit.lenses.find((l) => l.id === id) ?? kit.lenses[0] ?? DEFAULT_KIT.lenses[0]
+const findLens = (kit: KitProfile, id: string): Lens | undefined =>
+  kit.lenses.find((l) => l.id === id)
 
 const bodiesFrom = (kit: KitProfile, ids: string[] | undefined): Body[] =>
   ids === undefined ? kit.bodies : kit.bodies.filter((b) => ids.includes(b.id))
@@ -290,7 +290,45 @@ function resolveOptic(
     }
   }
 
+  /*
+   * AND A GROUND POSITION RESOLVES TO A LENS OR TO NOTHING.
+   *
+   * THIS IS THE FOURTH REPORT OF THE SAME SCREEN, and this line is the half
+   * that kept producing it. findLens used to end in
+   * `?? kit.lenses[0] ?? DEFAULT_KIT.lenses[0]`: a silent substitution of the
+   * first lens in the bag for any id it could not resolve.
+   *
+   * So a position carrying a DRONE optic while its platform said ground
+   * resolved to the Sigma, and the card read:
+   *
+   *   LENS   Sigma 28-75 f2.8      (from the fallback)
+   *   FOCAL  24 mm                 (the aircraft's, still stored)
+   *
+   * which is exactly the reported screen. Measured on this code:
+   *
+   *   storedPlatform     "ground"
+   *   storedLensId       "air-3s-wide"
+   *   resolvedOpticId    "sigma-28-75"
+   *   resolvedOpticName  "Sigma 28-75 f2.8"
+   *   computedFocal      24
+   *
+   * Two fixes had held: the add path makes air positions correctly and the
+   * picker lists the right optics. Neither touched this, because this is the
+   * READ side, and it was quietly repairing the contradiction into something
+   * that looked plausible instead of letting it be seen.
+   *
+   * Same rule as the Null Island coordinate and the aircraft camera above: a
+   * thing that cannot be resolved is not swapped for a different thing. A
+   * position reaching here with an unresolvable optic is a bug in
+   * revivePositions, which is the one place a position enters from storage.
+   */
   const lens = findLens(kit, position.lensId)
+  if (lens === undefined) {
+    throw new Error(
+      `resolveOptic: ground position ${position.id} holds ${position.lensId}, which is not a lens in the kit`,
+    )
+  }
+
   return {
     optic: { id: lens.id, name: lens.name, kind: 'lens' },
     sensor: resolveSensor(lens, bodiesFrom(kit, bodyIds)),
