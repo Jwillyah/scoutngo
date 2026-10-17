@@ -252,7 +252,12 @@ function captureImageryOnly(instance: maplibregl.Map): string {
 export const MARK_LINE_LAYER = 'site-mark-line'
 export const MARK_NODE_LAYER = 'site-mark-node'
 
-export type TapMode = 'add' | 'pilot' | 'mark' | null
+/*
+ * 'aim' is the reverse sun search picking a thing to aim at. It is a pure
+ * READ of a coordinate: it adds nothing to the plan and moves nothing, which
+ * is why it sits beside the placing modes rather than inside them.
+ */
+export type TapMode = 'add' | 'pilot' | 'mark' | 'aim' | null
 
 export interface CameraState {
   center: [number, number]
@@ -343,6 +348,8 @@ interface MapViewProps {
   pilotAt?: LatLon | null
   /** Dragged the pilot marker. */
   onPilotMove?: (at: LatLon) => void
+  /** Where the sun-search is pointed. Reads a coordinate, changes no plan. */
+  onAimAt?: (at: LatLon) => void
   onPositionMove: (id: string, next: LatLon) => void
   /** Long press drops the venue if it is unset, otherwise the subject. */
   onLongPress: (at: LatLon) => void
@@ -679,6 +686,7 @@ export function MapView({
   onViewChange,
   pilotAt = null,
   onPilotMove,
+  onAimAt,
 }: MapViewProps) {
   const container = useRef<HTMLDivElement>(null)
   const map = useRef<maplibregl.Map | null>(null)
@@ -722,6 +730,7 @@ export function MapView({
     onPinDrag,
     onAddAt,
     onPilotMove,
+    onAimAt,
     onMarkAt,
     onSelectMark,
   })
@@ -736,6 +745,7 @@ export function MapView({
       onPinDrag,
       onAddAt,
       onPilotMove,
+    onAimAt,
       onMarkAt,
       onSelectMark,
     }
@@ -749,6 +759,7 @@ export function MapView({
     onPinDrag,
     onAddAt,
     onPilotMove,
+    onAimAt,
     onMarkAt,
     onSelectMark,
   ])
@@ -872,6 +883,8 @@ export function MapView({
         l.onAddAt?.(next)
       } else if (l.mode === 'pilot') {
         l.onPilotMove?.(next)
+      } else if (l.mode === 'aim') {
+        l.onAimAt?.(next)
       } else {
         l.onSelect(null)
       }

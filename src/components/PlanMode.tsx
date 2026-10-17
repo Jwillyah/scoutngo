@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import type { LatLon } from '../core/geo.ts'
 import type {
   Platform,
@@ -27,9 +27,11 @@ import type { SetupTarget } from '../lib/mode.ts'
 import { GROUND_WIND_METERS, type WindHeight } from '../core/windHeight.ts'
 import type { SkyLayerKind } from '../core/skyLayer.ts'
 import { hudToggleLabel, type HudState } from '../core/hud.ts'
+import { phaseAt, phaseSpans } from '../core/nightWindow.ts'
 import type { MarkKind, SiteMark } from '../core/siteMark.ts'
 import { HazardPanel } from './HazardPanel.tsx'
 import { BottomSheet, type SheetState } from './BottomSheet.tsx'
+import { AirspacePanel } from './AirspacePanel.tsx'
 import { ConditionsPanel } from './ConditionsPanel.tsx'
 import { ConePicker, type ConeMode } from './ConePicker.tsx'
 import { FieldPackControl, type PackBuildState } from './FieldPackControl.tsx'
@@ -41,10 +43,19 @@ import { SkyLegend } from './SkyLegend.tsx'
 import { PlanStatus } from './PlanStatus.tsx'
 import { PositionCard } from './PositionCard.tsx'
 import { ShotList } from './ShotList.tsx'
+import { SunSearchPanel } from './SunSearchPanel.tsx'
 import { TimeScrubber } from './TimeScrubber.tsx'
 
 /** What the one sheet is currently showing. Chosen by an explicit control. */
-type SheetView = 'plan' | 'conditions'
+/*
+ * ONE VALUE, SO THE VIEWS CANNOT BOTH BE OPEN.
+ *
+ * Same structural argument as MapPanel. Four booleans would be sixteen states,
+ * twelve of them meaningless and at least one of them the bug where two
+ * surfaces render over each other. A union has exactly four states and all
+ * four are legal.
+ */
+type SheetView = 'plan' | 'conditions' | 'airspace' | 'sunsearch'
 
 interface PlanModeProps {
   mapHandle: React.Ref<MapHandle>
@@ -186,6 +197,18 @@ interface PlanModeProps {
   pilotAt: LatLon | null
   onPilotMove: (at: LatLon) => void
   placingPilot: boolean
+  /** What the reverse sun search points at, and the mode that picks it. */
+  aimAt: LatLon | null
+  placingAim: boolean
+  onPlacingAim: (next: boolean) => void
+  onAimAt: (at: LatLon) => void
+  /**
+   * The planned air altitude in feet, or null with nothing in the air.
+   *
+   * Only ever a PLANNED altitude: see plannedAltitudeFeet in App.tsx for why
+   * the assumed drone default is deliberately not passed here.
+   */
+  airAltitudeFeet: number | null
   onPlacingPilot: (next: boolean) => void
   /**
    * Whether the next tap will add an AIR position.
@@ -318,6 +341,11 @@ export function PlanMode({
   pilotAt,
   onPilotMove,
   placingPilot,
+  aimAt,
+  placingAim,
+  onPlacingAim,
+  onAimAt,
+  airAltitudeFeet,
   onPlacingPilot,
   addsAir,
 }: PlanModeProps) {
@@ -343,6 +371,29 @@ export function PlanMode({
   const [sheetHeight, setSheetHeight] = useState(108)
   const [view, setView] = useState<SheetView>('plan')
   const [pitch, setPitch] = useState(0)
+
+  /*
+   * DAY, CIVIL TWILIGHT AND NIGHT ACROSS THE WINDOW.
+   *
+   * Computed here rather than in the scrubber because the scrubber draws what
+   * it is given and this needs the venue coordinate. Memoised on the window
+   * and the venue: the band edges do not move as the bar is dragged, only the
+   * marker on them does, and recomputing four solar events per frame while a
+   * thumb is down is work for an answer that cannot have changed.
+   */
+  const nightBands = useMemo(
+    () =>
+      venueWindow === null || venue === null
+        ? []
+        : phaseSpans(venueWindow.start, venueWindow.end, venue.lat, venue.lon),
+    [venueWindow, venue],
+  )
+
+  const nightPhase = useMemo(
+    () =>
+      scrubbedAt === null || venue === null ? null : phaseAt(scrubbedAt, venue.lat, venue.lon),
+    [scrubbedAt, venue],
+  )
 
   /*
    * The dock height is MEASURED rather than assembled from per-bar tokens: the
@@ -375,6 +426,12 @@ export function PlanMode({
     /* The other direction: opening the sheet closes whatever is over the map. */
     if (marking) onMarking(false)
     if (showSky) onShowSky(false)
+    /*
+     * Aim picking is a map mode, so it has to die with any sheet change too.
+     * Leaving it armed meant the next tap on the map moved the sun search's
+     * target while the shooter thought they were dismissing a panel.
+     */
+    if (placingAim && next !== 'sunsearch') onPlacingAim(false)
   }
 
   const handle = mapHandle as React.RefObject<MapHandle | null>
@@ -413,7 +470,9 @@ export function PlanMode({
         handle={mapHandle}
         venue={venue}
         onVenueChange={onVenueChange}
-        mode={marking ? 'mark' : placing ? 'add' : placingPilot ? 'pilot' : null}
+        mode={
+          marking ? 'mark' : placing ? 'add' : placingPilot ? 'pilot' : placingAim ? 'aim' : null
+        }
         marks={marks}
         markDraft={markDraft}
         onMarkAt={onMarkAt}
@@ -423,6 +482,7 @@ export function PlanMode({
         conePlan={conePlan}
         pilotAt={pilotAt}
         onPilotMove={onPilotMove}
+        onAimAt={onAimAt}
         onPositionMove={onPositionMove}
         onLongPress={onLongPress}
         sunAzimuth={sun === null ? null : sun.azimuth}
@@ -477,6 +537,9 @@ export function PlanMode({
         * two different standing places.
         */}
       {!placingPilot ? null : <p className="tapnote">{placingHint('pilot', 'ground')}</p>}
+      {!placingAim ? null : (
+        <p className="tapnote">Tap the thing you want the sun behind.</p>
+      )}
 
       {/*
         * THE CONTROL ROW, COLLAPSED ONCE THERE IS A PLAN.
@@ -516,6 +579,23 @@ export function PlanMode({
             {/* The single control that reveals sun and tide detail. */}
             <button type="button" className="mode" onClick={() => openWith('conditions')}>
               Conditions
+            </button>
+            {/*
+              * AIRSPACE. A reveal like Conditions, not a map preference, so it
+              * sits with the reveals rather than in the overflow.
+              *
+              * ONLY WITH SOMETHING IN THE AIR. Part 107 paperwork beside a
+              * tripod-only plan is an aviation process attached to something it
+              * does not govern, which is the same mistake as printing the 400ft
+              * ceiling on a ground position's card.
+              */}
+            {airPositions === 0 ? null : (
+              <button type="button" className="mode" onClick={() => openWith('airspace')}>
+                Airspace
+              </button>
+            )}
+            <button type="button" className="mode" onClick={() => openWith('sunsearch')}>
+              Sun when
             </button>
             {/*
               * HAZARDS. Up here with the other reveals rather than buried in
@@ -725,7 +805,32 @@ export function PlanMode({
           </div>
         }
       >
-        {view === 'conditions' ? (
+        {view === 'airspace' ? (
+          <>
+            <div className="btn-row btn-row--pad">
+              <button type="button" className="btn btn--small" onClick={() => setView('plan')}>
+                Back to the plan
+              </button>
+            </div>
+            <AirspacePanel venue={venue} altitudeFeet={airAltitudeFeet} />
+          </>
+        ) : view === 'sunsearch' ? (
+          <>
+            <div className="btn-row btn-row--pad">
+              <button type="button" className="btn btn--small" onClick={() => setView('plan')}>
+                Back to the plan
+              </button>
+            </div>
+            <SunSearchPanel
+              venue={venue}
+              timeZone={venueWindow?.timeZone ?? null}
+              timeZoneAbbr={venueWindow?.timeZoneShort ?? null}
+              target={aimAt}
+              picking={placingAim}
+              onPickTarget={() => onPlacingAim(!placingAim)}
+            />
+          </>
+        ) : view === 'conditions' ? (
           <>
             <div className="btn-row btn-row--pad">
               <button type="button" className="btn btn--small" onClick={() => setView('plan')}>
@@ -866,6 +971,8 @@ export function PlanMode({
             timeZone={venueWindow.timeZone}
             timeZoneAbbr={venueWindow.timeZoneShort}
             tideExtremes={tideExtremes}
+            phases={nightBands}
+            phase={nightPhase}
           />
         )}
 

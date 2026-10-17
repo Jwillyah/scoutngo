@@ -791,6 +791,33 @@ function App() {
   }, [])
 
   /*
+   * THE ALTITUDE THE LAANC PANEL ANSWERS AGAINST.
+   *
+   * ONLY A PLANNED ONE, never the assumed drone default. windHeightFor also
+   * answers with a default height when the shoot is set to Drone and nothing
+   * is placed yet, which is right for reading the wind off a forecast and
+   * wrong here: that panel compares the map's ceiling against "the altitude I
+   * have set", and an assumed height would produce a paperwork route that
+   * looked computed from a number the shooter never chose.
+   */
+  const plannedAltitudeFeet = windHeight.source === 'position' ? windHeight.feet : null
+
+  /*
+   * WHAT THE REVERSE SUN SEARCH IS POINTED AT.
+   *
+   * Tapped on the map, and used for exactly one thing: deriving the bearing
+   * from the venue to it, so "when is the sun behind that building" and "when
+   * is the sun on bearing 254" are the same question. It is READ ONLY: it adds
+   * no position, moves nothing, and is not part of the plan or the field pack.
+   */
+  const [aimAt, setAimAt] = useState<LatLon | null>(null)
+  const [placingAim, setPlacingAim] = useState(false)
+  const onAimAt = useCallback((at: LatLon) => {
+    setPlacingAim(false)
+    setAimAt(at)
+  }, [])
+
+  /*
    * THE GLASS A NEW POSITION STARTS ON, ASKED OF THE PLATFORM.
    *
    * Both of these used to be built here, by hand, out of different pieces of
@@ -1747,6 +1774,11 @@ function App() {
           onPilotMove={onPilotMove}
           addsAir={addsAir}
           placingPilot={placingPilot}
+          aimAt={aimAt}
+          placingAim={placingAim}
+          onPlacingAim={setPlacingAim}
+          onAimAt={onAimAt}
+          airAltitudeFeet={plannedAltitudeFeet}
           onPlacingPilot={setPlacingPilot}
           onSetAltitude={onSetAltitude}
           onSetShotType={onSetShotType}

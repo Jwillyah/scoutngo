@@ -55,8 +55,18 @@ export function ConditionsPanel({
   tideNow,
   cloud,
 }: ConditionsPanelProps) {
+  /*
+   * AN IDENTIFIED ROOT, not a bare fragment.
+   *
+   * The sheet hosts several views and they all render inside the same
+   * .sheet--open element, so a check that asks "is Conditions on screen" by
+   * looking at the sheet gets yes for every view. The panel audit reported
+   * Conditions and Sun when as both open at once for exactly that reason: the
+   * two selectors were the same node. Each view owns a class now, so "which
+   * view is showing" is answerable.
+   */
   return (
-    <>
+    <div className="cond">
       {/*
         * WEATHER FIRST, because it is what the panel is for now. Three
         * readings: wind at the height being flown, tide state and the next
@@ -87,6 +97,6 @@ export function ConditionsPanel({
       <Panel index="05" title="Sky cameras">
         <CamList venue={venue} wind={wind} />
       </Panel>
-    </>
+    </div>
   )
 }

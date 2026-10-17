@@ -1,3 +1,11 @@
+import {
+  PHASE_LABEL,
+  anticollisionRequired,
+  nightTrainingRequired,
+  phaseRequirements,
+  type LightPhase,
+  type PhaseSpan,
+} from '../core/nightWindow.ts'
 import type { SunPosition } from '../core/sun.ts'
 import { positionInWindow, type TideExtreme } from '../core/tide.ts'
 import { formatClock } from '../core/timezone.ts'
@@ -20,6 +28,17 @@ interface TimeScrubberProps {
    * opening the Conditions tab.
    */
   tideExtremes: TideExtreme[]
+  /**
+   * DAY, CIVIL TWILIGHT AND NIGHT ACROSS THE WINDOW, as bands on the track.
+   *
+   * The app already held these boundaries and never drew them. A window
+   * reported as "blue hour peak 18:44 to 18:53" sat entirely inside civil
+   * twilight, where anti-collision lighting is required, and nothing on the
+   * screen said so. Empty when the venue has no location to compute from.
+   */
+  phases: PhaseSpan[]
+  /** The phase at the scrubbed moment, or null with nothing to compute from. */
+  phase: LightPhase | null
 }
 
 /**
@@ -37,8 +56,25 @@ export function TimeScrubber({
   timeZone,
   timeZoneAbbr,
   tideExtremes,
+  phases,
+  phase,
 }: TimeScrubberProps) {
   const clock = (date: Date) => formatClock(date, timeZone)
+
+  /*
+   * Bands as a share of the track, clipped to it. positionInWindow already
+   * answers "where on this bar" for tide turns, and a band is the same
+   * question asked of two instants instead of one.
+   */
+  const span = end.getTime() - start.getTime()
+  const bands =
+    span <= 0
+      ? []
+      : phases.map((p) => ({
+          phase: p.phase,
+          left: Math.max(0, (p.start.getTime() - start.getTime()) / span),
+          right: Math.min(1, (p.end.getTime() - start.getTime()) / span),
+        })).filter((b) => b.right > b.left)
 
   /* Only the turns that actually fall on the track can be drawn on it. */
   const marks = tideExtremes
@@ -74,6 +110,18 @@ export function TimeScrubber({
         </div>
       )}
 
+      {bands.length === 0 ? null : (
+        <div className="scrub__phases" aria-hidden="true">
+          {bands.map((band) => (
+            <span
+              key={`${band.phase}-${band.left}`}
+              className={`scrub__phase scrub__phase--${band.phase}`}
+              style={{ left: `${band.left * 100}%`, width: `${(band.right - band.left) * 100}%` }}
+            />
+          ))}
+        </div>
+      )}
+
       <input
         className="scrub__range"
         type="range"
@@ -88,6 +136,34 @@ export function TimeScrubber({
         ].join(', ')}
         onChange={(event) => onChange(Number(event.target.value) / 1000)}
       />
+
+      {/*
+        * WHAT THE PHASE REQUIRES, AT THE MOMENT ON THE BAR.
+        *
+        * Stated as the rule and the boundary, never as a verdict on the
+        * flight. The two requirements have DIFFERENT boundaries and are listed
+        * separately for that reason: 107.29 lighting starts at sunset, and
+        * 107.65 night training starts at dusk. Collapsing them into "night
+        * rules" would misstate both edges.
+        */}
+      {phase === null || phaseRequirements(phase).length === 0 ? null : (
+        <div className={`scrub__rule scrub__rule--${phase}`}>
+          <p className="scrub__rule-phase">
+            <span className="scrub__rule-tag">{PHASE_LABEL[phase]}</span>
+            {anticollisionRequired(phase) ? (
+              <span className="scrub__rule-need">Anti-collision lights</span>
+            ) : null}
+            {nightTrainingRequired(phase) ? (
+              <span className="scrub__rule-need">107.65 night training</span>
+            ) : null}
+          </p>
+          <ul className="scrub__rule-list">
+            {phaseRequirements(phase).map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/*
         * NO END LABELS. They printed the window's start and end directly under

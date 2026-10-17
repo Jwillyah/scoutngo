@@ -224,6 +224,115 @@ clearance, and they do not say whether a flight is permitted. The app computes
 the distance and shows it; the judgement is yours, because you are the one who
 can see the site and the sky.
 
+### The Part 107 night window
+
+suncalc already solves for the six degrees of solar depression that 14 CFR
+107.29 uses to define civil twilight, so the bands are drawn on the time axis
+rather than described beside it:
+
+| Band | Boundaries |
+|---|---|
+| Day | sunrise to sunset |
+| Civil twilight | dawn to sunrise, and sunset to dusk |
+| Night | before dawn, after dusk |
+
+In **civil twilight and at night**, 107.29 requires anti-collision lighting
+visible for three statute miles, and it may never be switched off in flight.
+**Night** additionally requires the 107.65 night operations training. The two
+have different boundaries on purpose: the lighting requirement starts at
+sunset, the training requirement at dusk, and collapsing them into "night
+rules" misstates both.
+
+This exists because the app once reported a blue hour window of 18:44 to 18:53
+and said nothing about lighting, when by its own numbers sunset was 18:27 and
+dusk 18:53 — the whole window was inside civil twilight. The boundary was in
+the arithmetic and not on the screen.
+
+The bands state the rule and the computed boundary. They do not say whether a
+flight is legal, cleared, compliant or permitted, and a test fails on those
+words.
+
+### Airspace and the LAANC path
+
+The FAA publishes **UAS Facility Maps** and **Class Airspace** as keyless,
+public domain feature services. This app bakes both into the repo rather than
+querying them:
+
+```bash
+node scripts/bake-faa.mjs            # both layers
+node scripts/bake-faa.mjs uasfm      # just the facility maps
+node scripts/bake-faa.mjs airspace   # just the airspace
+```
+
+**Re-run it on the 56-day chart cycle.** The extract carries the effective date
+it was cut from, and the Airspace panel prints whether that cycle is current or
+superseded, so a stale bake announces itself instead of quietly answering with
+last year's ceilings. `src/core/chartCycle.ts` is the arithmetic.
+
+Baking rather than querying is a privacy decision before it is a performance
+one. Every facility-map cell is a regular grid square, so the polygon geometry
+carries nothing the row and column do not: strip it and the lookup is two
+`Math.floor` calls against a table already in the bundle. No key, no account,
+no request, and **the venue coordinate never leaves the device** because there
+is nowhere for it to go. It also works with no signal, which is the condition a
+site survey is actually conducted in.
+
+Two things worth knowing if you re-bake:
+
+- **The cells are half an arc-minute, not one.** They are commonly described as
+  one arc-minute. 720 sampled geometries came back as quads measuring exactly
+  0.5 x 0.5 arc-minutes. At one arc-minute the lookup merges each pair of cells,
+  and 14.5% of the merged cells contain two different ceilings.
+- **`LOWER_CODE = 'SFC'` is a datum, not a claim that the airspace touches the
+  ground.** The service carries rows reading `LOWER_VAL 700` with
+  `LOWER_CODE SFC` — Class E5 transition areas, which begin 700 ft up and need
+  no Part 107 authorization. The surface test is both halves:
+  `LOWER_VAL = 0 AND LOWER_CODE = 'SFC'`.
+
+Against the altitude set on your air positions, the panel reports which path
+the venue takes:
+
+| The map says | Path |
+|---|---|
+| ceiling at or above your altitude | LAANC auto-approval, usually minutes |
+| above it but the ceiling is not zero | Further Coordination, plan 90 days |
+| ceiling zero, or no cell in the extract | manual DroneZone application |
+
+With one correction the published rule misses: the route is read from the FAA's
+own per-facility capability field, not inferred from the ceiling. **22,213 cells
+carry a workable non-zero ceiling at a facility with no Part 107 LAANC route at
+all.** The ceiling-only rule promises those "auto-approval, minutes" when the
+real path is a manual application — wrong in the one direction that costs a
+shoot day.
+
+**None of it is an authorization.** The FAA's own words are that these maps do
+not grant approval and are informational only, and the panel carries that.
+
+**TFRs and NOTAMs are not checked.** There is no usable keyless public feed for
+temporary flight restrictions and NOTAMs need OAuth2 client credentials, so
+this app checks neither and says so where it cannot be missed. A TFR can close
+the airspace with nothing above changing. Check
+[tfr.faa.gov](https://tfr.faa.gov/) before you fly. An unchecked TFR and an
+unmarked power line are the same class of lie.
+
+Airspace and facility map data is published by the Federal Aviation
+Administration. This project is not endorsed by or affiliated with the FAA,
+uses no FAA seal or logo, and does not carry "FAA" in its name.
+
+### Running the sun math backwards
+
+The app can say where the sun is at a given time. It can also answer the
+inverse: **what date and time does the sun sit on a given bearing from the
+pin**, or behind a thing you tap. Optionally constrained by altitude, for light
+low enough to rake across something.
+
+Pure inversion of the suncalc already in the bundle — no new data and no
+network. It looks for sign changes in the signed error and bisects them, rather
+than scanning for samples that happen to fall inside the tolerance: the sun
+moves about 15 degrees an hour, so a ten-minute step moves two and a half
+degrees, and a tolerance scan misses narrow alignments entirely and gets
+*worse* as you tighten the tolerance.
+
 ## Privacy
 
 - No accounts and no sign in.

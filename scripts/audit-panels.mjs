@@ -43,10 +43,32 @@ const OUT = process.env.SCOUTNGO_OUT ?? '.'
  * question being asked is about what is on the screen rather than about the
  * tree that produced it.
  */
+/*
+ * EVERY SURFACE THIS SCREEN CAN OPEN GOES IN HERE WHEN IT IS ADDED, not after
+ * it has gone wrong. That ordering is the whole difference between this audit
+ * and the three checks before it that were blind to what they existed for.
+ *
+ * ONE KNOWN GAP, STATED RATHER THAN PAPERED OVER: the Airspace view only
+ * exists with an air position in the plan, and this probe builds a plan by
+ * loading the calibration venue, which has none. So Airspace is not reachable
+ * here and is NOT covered below. It shares the sheet with Conditions and Sun
+ * when, so the sheet's own geometry is exercised; what is untested is Airspace
+ * specifically. Writing it in as if it were covered would be worse than this
+ * comment.
+ */
 const PANELS = [
   { id: 'hazards', button: /^Hazards/, selector: '.hz' },
   { id: 'sky', button: /^Sky/, selector: '.skykey' },
-  { id: 'conditions', button: /^Conditions/, selector: '.sheet--open' },
+  /*
+   * SHEET VIEWS ARE IDENTIFIED BY THEIR OWN CONTENT, not by the sheet.
+   *
+   * Both of these render inside .sheet--open, so selecting the sheet made the
+   * pair test meaningless: it compared one element against itself and reported
+   * every combination as two panels open at once. The selector has to name the
+   * VIEW for "which one is showing" to be a real question.
+   */
+  { id: 'conditions', button: /^Conditions/, selector: '.cond' },
+  { id: 'sunsearch', button: /^Sun when/, selector: '.sunq' },
 ]
 
 /**
@@ -85,24 +107,53 @@ const visible = (sel) =>
      return { top: Math.round(r.top), left: Math.round(r.left), right: Math.round(r.right), bottom: Math.round(r.bottom) }
    })()`
 
+/*
+ * WHAT IS ACTUALLY ON SCREEN, not what the layout box says.
+ *
+ * A view inside the bottom sheet is a tall element in a SCROLLING parent: its
+ * own rect runs to 2,335px while only the 260px inside the sheet is visible.
+ * Measuring the raw rect reported the sheet views as covering the dock by
+ * 65,000 square pixels, which is not something a shooter could ever see.
+ *
+ * So a panel's rect is intersected with every ancestor that clips. That is the
+ * region a person can actually see, which is the only region that can actually
+ * cover a control.
+ */
+const CLIPPED_RECT = `
+  (node) => {
+    let r = node.getBoundingClientRect()
+    let top = r.top, left = r.left, right = r.right, bottom = r.bottom
+    for (let p = node.parentElement; p !== null; p = p.parentElement) {
+      const cs = getComputedStyle(p)
+      const clips = /auto|hidden|scroll|clip/.test(cs.overflow + cs.overflowX + cs.overflowY)
+      if (!clips) continue
+      const q = p.getBoundingClientRect()
+      top = Math.max(top, q.top); left = Math.max(left, q.left)
+      right = Math.min(right, q.right); bottom = Math.min(bottom, q.bottom)
+    }
+    return { top, left, right, bottom }
+  }
+`
+
 const overlaps = (sel) =>
   `(() => {
+     const clipped = ${CLIPPED_RECT}
      const p = document.querySelector('${sel}')
      if (p === null) return []
-     const r = p.getBoundingClientRect()
-     if (r.width === 0 || r.height === 0) return []
+     const r = clipped(p)
+     if (r.right <= r.left || r.bottom <= r.top) return []
      const hits = []
      for (const key of ${JSON.stringify(PROTECTED)}) {
        for (const c of document.querySelectorAll(key)) {
          /*
-          * A PANEL CANNOT COVER ITSELF. The conditions panel IS the sheet, so
-          * without this it reported 192,063 square pixels of overlap with its
-          * own element. Skipping the panel, anything inside it and anything it
-          * sits inside is the rule; two separate things overlapping is not.
+          * A PANEL CANNOT COVER ITSELF. The conditions view lives inside the
+          * sheet, so without this it reported its own container as covered.
+          * Skipping the panel, anything inside it and anything it sits inside
+          * is the rule; two separate things overlapping is not.
           */
          if (c === p || c.contains(p) || p.contains(c)) continue
-         const q = c.getBoundingClientRect()
-         if (q.width === 0 || q.height === 0) continue
+         const q = clipped(c)
+         if (q.right <= q.left || q.bottom <= q.top) continue
          const w = Math.min(r.right, q.right) - Math.max(r.left, q.left)
          const h = Math.min(r.bottom, q.bottom) - Math.max(r.top, q.top)
          /* A hairline touch is not a cover. 120 square pixels is a thumb. */

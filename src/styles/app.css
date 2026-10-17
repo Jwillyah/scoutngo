@@ -3763,6 +3763,110 @@
 }
 
 /*
+ * ------------------------------------------------- the Part 107 light bands
+ *
+ * Day, civil twilight and night, drawn ON the time axis rather than described
+ * beside it, because the question is always "where in my window does this
+ * change" and that is a position on this bar.
+ *
+ * THE COLOURS ARE THE APP'S OWN SUN COLOURS, not a new traffic-light set. Day
+ * is the sun token, twilight the sunset token, night the shadow violet, which
+ * is the same vocabulary the map rays use, so a band means on this bar what
+ * its colour means everywhere else.
+ *
+ * Low alpha and 3px tall: this is a stratum under the control, not a control.
+ * It must never compete with the thumb for the eye or for the touch, which is
+ * why it is aria-hidden and sits above the input in source order but carries
+ * no pointer events of its own.
+ */
+.scrub__phases {
+  position: relative;
+  height: 3px;
+  margin-top: var(--space-1);
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--surface-3);
+  pointer-events: none;
+}
+
+.scrub__phase {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.scrub__phase--day {
+  background: color-mix(in srgb, var(--sun) 55%, transparent);
+}
+
+.scrub__phase--civil-twilight {
+  background: color-mix(in srgb, var(--sun-set) 70%, transparent);
+}
+
+.scrub__phase--night {
+  background: color-mix(in srgb, var(--sun-shadow) 70%, transparent);
+}
+
+/*
+ * WHAT THE PHASE REQUIRES. Only rendered when something applies, so in plain
+ * daylight the dock does not grow by an empty box.
+ *
+ * The left rule carries the phase colour so the sentence and the band it came
+ * from are the same colour, which is cheaper to connect than a legend.
+ */
+.scrub__rule {
+  margin-top: var(--space-2);
+  padding: var(--space-1) 0 var(--space-1) var(--space-2);
+  border-left: var(--line-rule) solid var(--sun-set);
+}
+
+.scrub__rule--night {
+  border-left-color: var(--sun-shadow);
+}
+
+.scrub__rule-phase {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+  margin: 0;
+}
+
+.scrub__rule-tag {
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  font-weight: var(--weight-heavy);
+  color: var(--color-text);
+}
+
+/*
+ * The requirement as a chip, because it is the thing to act on. Outlined
+ * rather than filled: a filled warning colour here would read as an alarm,
+ * and needing strobes at 18:44 is not an alarm, it is the kit list.
+ */
+.scrub__rule-need {
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  padding: 1px var(--space-1);
+  border: var(--line-hair) solid var(--color-line-strong);
+  border-radius: var(--radius-1, 3px);
+  color: var(--color-text-muted);
+}
+
+.scrub__rule-list {
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 2px;
+  font-size: var(--text-sm);
+  line-height: 1.35;
+  color: var(--color-text-muted);
+}
+
+/*
  * The HIT AREA is 44px tall; the drawn track stays slim.
  *
  * A range input's height is its touch target, and the browser draws the track
@@ -6662,4 +6766,265 @@
   font-size: var(--text-xs);
   line-height: 1.35;
   color: var(--color-text-faint);
+}
+
+/* ------------------------------------------------------- the airspace panel */
+
+/*
+ * The paperwork answer, and whether authorization attaches at all.
+ *
+ * NO TRAFFIC LIGHTS. The three routes are not good, warning and bad: they are
+ * three different processes with three different lead times, and colouring
+ * auto-approval green would be the app issuing the verdict it is careful never
+ * to issue in words. The route is set in type, not in colour.
+ */
+.air {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.air__verdict {
+  padding: var(--space-2);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-2, 4px);
+  background: var(--surface-2, var(--black));
+}
+
+.air__route {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-heavy);
+  color: var(--color-text);
+}
+
+.air__timing {
+  margin: 2px 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.air__pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+}
+
+.air__cell dt {
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.air__cell dd {
+  margin: 2px 0 0;
+  font-size: var(--text-num-sm);
+  font-weight: var(--weight-heavy);
+}
+
+/*
+ * A DASH, NOT A ZERO. Outside facility-map coverage there is no ceiling to
+ * print, and a 0 there would read as a measured ground-level ceiling, which is
+ * a completely different and much worse answer than "no data here".
+ */
+.air__dash {
+  color: var(--color-text-muted);
+}
+
+.air__why,
+.air__facility,
+.air__informational,
+.air__cycle,
+.air__rule,
+.air__slop,
+.air__state,
+.air__tfr,
+.air__credit,
+.air__none {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
+.air__state {
+  color: var(--color-text);
+}
+
+/*
+ * THE TFR NOTICE IS THE ONE THING HERE THAT IS MARKED.
+ *
+ * Everything else on this panel is an answer. This is the absence of one, and
+ * an absence that is not visible reads as nothing to report. The magenta is
+ * the app's existing armed/hazard colour, used here for the same reason it is
+ * used on the map: this is the thing the app cannot see for you.
+ */
+.air__tfr {
+  padding-left: var(--space-2);
+  border-left: var(--line-rule) solid var(--afterglow);
+  color: var(--color-text);
+}
+
+.air__credit {
+  padding-top: var(--space-2);
+  border-top: var(--line-hair) solid var(--color-line);
+  font-size: var(--text-label);
+}
+
+.air__shapes {
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.air__shapes li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  font-size: var(--text-sm);
+}
+
+.air__class {
+  min-width: 1.4em;
+  padding: 0 var(--space-1);
+  text-align: center;
+  font-weight: var(--weight-heavy);
+  border: var(--line-hair) solid var(--color-line-strong);
+  border-radius: var(--radius-1, 3px);
+}
+
+.air__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--color-text);
+}
+
+.air__upper {
+  color: var(--color-text-muted);
+}
+
+.air__link {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+}
+
+/* --------------------------------------------------- the reverse sun search */
+
+.sunq {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.sunq__aim {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.sunq__knobs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.sunq__field {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+}
+
+.sunq__label {
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/*
+ * min-width: 0 so the number fields can actually shrink inside the two-column
+ * grid at 390px. Without it an input's default intrinsic width wins and the
+ * second column is pushed off the panel.
+ */
+.sunq__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: var(--space-1);
+  background: var(--black);
+  color: var(--color-text);
+  border: var(--line-hair) solid var(--color-line-strong);
+  border-radius: var(--radius-1, 3px);
+  font-size: var(--text-num-sm);
+}
+
+.sunq__input:disabled {
+  color: var(--color-text-muted);
+  border-style: dashed;
+}
+
+.sunq__unit {
+  color: var(--color-text-muted);
+}
+
+.sunq__derived,
+.sunq__none {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
+.sunq__spans {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.sunq__hits {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-1);
+}
+
+/*
+ * One row per alignment. It wraps rather than scrolling sideways: at 390px a
+ * date, a time, a window and an altitude do not fit on one line, and a row
+ * that wraps is readable where a row that clips is not.
+ */
+.sunq__hit {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  padding: var(--space-1) 0;
+  border-bottom: var(--line-hair) solid var(--color-line);
+  font-size: var(--text-sm);
+}
+
+.sunq__date {
+  min-width: 6.5em;
+  color: var(--color-text);
+}
+
+.sunq__time {
+  font-weight: var(--weight-heavy);
+  font-size: var(--text-num-sm);
+}
+
+.sunq__window,
+.sunq__alt,
+.sunq__zone {
+  color: var(--color-text-muted);
+}
+
+.sunq__zone {
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
 }
