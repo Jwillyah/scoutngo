@@ -144,6 +144,19 @@ export function Landing({ onDismiss }: { onDismiss: () => void }) {
       </div>
 
       <div className="land__foot">
+        {/*
+          * STILL ONE BUTTON.
+          *
+          * The NOW glance wants to be one tap from launch, and a second
+          * button here was the obvious place to put it. It is the wrong
+          * place: this page is shown once, ever, and "ends with one button"
+          * is a rule this page has because a cover page with two calls to
+          * action asks the reader to choose before they know anything.
+          *
+          * One tap from launch is satisfied in the shell instead, where the
+          * Now control sits beside the rail on every launch after this one.
+          * landingAndDevice.test.tsx caught the regression.
+          */}
         <button type="button" className="land__go" onClick={onDismiss}>
           Dive in
         </button>

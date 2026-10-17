@@ -1,3 +1,4 @@
+import { Receipt } from '../lib/numerals.tsx'
 import { compassPoint } from '../core/field.ts'
 import type { LatLon } from '../core/geo.ts'
 import { metersToFeet } from '../core/reachScale.ts'
@@ -51,7 +52,7 @@ export function CamList({ venue, wind }: CamListProps) {
       <p className="cams__note">
         {wind === null
           ? 'Nearest first. The wind has not come back yet, so nothing here is ranked by what is upwind.'
-          : `Upwind first, then soonest. Wind from ${Math.round(wind.fromDegrees)}° ${compassPoint(
+          : `Upwind first, then soonest. Wind from ${compassPoint(
               wind.fromDegrees,
             )} at ${Math.round(wind.speedMps)} m/s.`}
       </p>
@@ -80,7 +81,21 @@ export function CamList({ venue, wind }: CamListProps) {
                   ? entry.leadMinutes === null
                     ? 'upwind'
                     : `upwind · about ${Math.round(entry.leadMinutes)} min out`
-                  : `${Math.round(entry.offWindDegrees)}° off the wind`}
+                  : (
+                      <>
+                        {/*
+                          * The word has to carry the meaning on its own:
+                          * "off the wind" with the number gone reads as a
+                          * fragment, so the phrase changes rather than losing
+                          * its subject.
+                          */}
+                        not upwind
+                        <Receipt kind="bearing">
+                          {' · '}
+                          {Math.round(entry.offWindDegrees)}° off
+                        </Receipt>
+                      </>
+                    )}
               </span>
             </a>
             <span className={`cam__who${entry.item.access === 'paid' ? ' cam__who--paid' : ''}`}>

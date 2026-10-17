@@ -1,4 +1,5 @@
 import { renderToStaticMarkup } from 'react-dom/server'
+import { NumeralsProvider } from '../lib/numerals.tsx'
 import { describe, expect, it } from 'vitest'
 import { classificationOf } from '../core/lighting.ts'
 import { defaultSelection } from '../lib/kitSelection.ts'
@@ -161,7 +162,17 @@ describe('ConePicker', () => {
 })
 
 describe('PositionCard', () => {
+  /*
+   * RENDERED WITH THE RECEIPTS ON.
+   *
+   * Bearings, solar degrees and the FOV plate are hidden by default now
+   * (src/core/numerals.ts), and each is hidden together with its own label,
+   * because a "Camera bearing" heading above an empty cell is worse than
+   * neither. This describe is about what the CARD contains and where it sits,
+   * so it asks for everything; what the switch hides is numerals.test.tsx.
+   */
   const html = renderToStaticMarkup(
+    <NumeralsProvider show>
     <PositionCard
       kit={DEFAULT_KIT}
         selection={defaultSelection(DEFAULT_KIT)}
@@ -182,7 +193,8 @@ describe('PositionCard', () => {
       onSetYaw={() => {}}
       pilotAt={null}
       onPlacePilot={() => {}}
-    />,
+    />
+    </NumeralsProvider>,
   )
 
   /* The place leads. The numbers used to. */

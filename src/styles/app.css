@@ -7028,3 +7028,228 @@
   letter-spacing: var(--tracking-label);
   text-transform: uppercase;
 }
+
+/* ============================================================ the NOW screen */
+
+/*
+ * GLANCED AT WHILE STOPPED, NOT SCROLLED.
+ *
+ * The whole design constraint is the moment it is for: pulled over at the side
+ * of a road with the light going, where looking at a phone for more than about
+ * two seconds is the wrong thing to be doing. So:
+ *
+ *   it is a full screen, over everything, with one way out
+ *   the countdown is the biggest type in the app by a wide margin
+ *   the lines are in a fixed order and there are six of them
+ *   nothing scrolls, nothing animates, and nothing is behind a tap
+ *
+ * NO MAP. A map here would be a second thing to read and a WebGL context to
+ * spin up, for a question that has a one line answer.
+ */
+.now {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  align-content: center;
+  gap: var(--space-4);
+  padding: calc(var(--safe-top) + var(--space-5)) var(--page-pad)
+    calc(var(--safe-bottom) + var(--space-5));
+  background: var(--black);
+  /* Nothing scrolls. If it does not fit, it is too much for this screen. */
+  overflow: hidden;
+}
+
+.now__close {
+  position: absolute;
+  top: calc(var(--safe-top) + var(--space-2));
+  right: var(--space-2);
+  width: var(--control-height);
+  height: var(--control-height);
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--text-md);
+}
+
+/* --------------------------------------------------------- asking for a fix */
+
+.now__ask {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.now__askhead {
+  margin: 0;
+  font-size: var(--text-xl, 1.75rem);
+  font-weight: var(--weight-heavy);
+  line-height: 1.1;
+}
+
+.now__askwhy {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+
+.now__refused {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+/* ------------------------------------------------------------- the readout */
+
+.now__sheet {
+  display: grid;
+  gap: var(--space-2);
+}
+
+/*
+ * THE ONE LINE THAT HAS TO SURVIVE A ONE SECOND GLANCE.
+ *
+ * Deliberately the largest type anywhere in this app. clamp so it is big on a
+ * phone and does not become absurd on a tablet, and a tight line height
+ * because it is two or three words.
+ */
+.now__head {
+  margin: 0;
+  font-size: clamp(2.25rem, 11dvw, 3.25rem);
+  line-height: 1;
+  font-weight: var(--weight-heavy);
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+}
+
+/*
+ * WHICH WAY, in the sun's own colour, second-largest.
+ *
+ * Amber because that is what the sun is everywhere else in this app: the ray
+ * on the map, the plate beside it, the band on the time bar. A new colour here
+ * would make this screen a different product.
+ */
+.now__look {
+  margin: 0;
+  font-size: clamp(1.25rem, 6dvw, 1.75rem);
+  line-height: 1.1;
+  font-weight: var(--weight-heavy);
+  color: var(--sun);
+}
+
+.now__peak {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-heavy);
+}
+
+.now__peak--none,
+.now__left,
+.now__sky,
+.now__ground {
+  margin: 0;
+  font-size: var(--text-md);
+  line-height: 1.35;
+  color: var(--color-text);
+}
+
+.now__left {
+  color: var(--color-text-muted);
+}
+
+/* The sky line and the ground line are the hedged ones, so they sit quieter. */
+.now__sky,
+.now__ground {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.now__caveat,
+.now__icsnote,
+.now__stamp {
+  margin: 0;
+  font-size: var(--text-label);
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
+.now__acts {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+/*
+ * THE DOOR INTO THE APP, carrying this app's own primary gradient so the
+ * glance and the planner are visibly one product.
+ */
+.now__go {
+  width: 100%;
+  min-height: var(--control-height);
+  border: 0;
+  border-radius: var(--radius-2, 4px);
+  background: var(--primary-sheen);
+  box-shadow: var(--primary-glow);
+  color: var(--color-accent-ink);
+  font-size: var(--text-md);
+  font-weight: var(--weight-heavy);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+}
+
+.now__go:disabled {
+  opacity: 0.6;
+}
+
+.now__second {
+  width: 100%;
+  min-height: var(--control-height);
+  border: var(--line-hair) solid var(--color-line-strong);
+  border-radius: var(--radius-2, 4px);
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--text-sm);
+}
+
+.now__stamp {
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: var(--line-hair) solid var(--color-line);
+}
+
+/* ------------------------------------------------- the one tap into it */
+
+/*
+ * The shell's nav row: the three-stage rail, plus the glance.
+ *
+ * The rail takes the space it needs and NOW is a fixed narrow column beside
+ * it, so adding this control did not shrink the three steps into each other.
+ */
+.shell__nav {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-1);
+}
+
+.shell__nav .rail {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/*
+ * ALWAYS ENABLED, NEVER GATED. The rail's steps lock until they are earned;
+ * this one answers before anything has been set up, which is the whole point,
+ * so it never greys out.
+ */
+.shell__now {
+  flex: 0 0 auto;
+  padding: 0 var(--space-2);
+  border: var(--line-hair) solid var(--color-line-strong);
+  border-radius: var(--radius-1, 3px);
+  background: transparent;
+  color: var(--sun);
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  font-weight: var(--weight-heavy);
+}

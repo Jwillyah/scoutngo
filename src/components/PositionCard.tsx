@@ -1,3 +1,4 @@
+import { Receipt } from '../lib/numerals.tsx'
 import { useEffect, useState } from 'react'
 import {
   MAX_ALTITUDE_FEET,
@@ -987,14 +988,16 @@ export function PositionCard({
               */}
             {read.shotType === 'framed' ? (
               <>
-                <div className="card__stat">
-                  <dt>Camera bearing</dt>
-                  <dd className="num">{deg(read.lighting.cameraBearing)}</dd>
-                </div>
-                <div className="card__stat">
-                  <dt>Sun delta</dt>
-                  <dd className="num">{deg(read.lighting.delta)}</dd>
-                </div>
+                <Receipt kind="bearing">
+                  <div className="card__stat">
+                    <dt>Camera bearing</dt>
+                    <dd className="num">{deg(read.lighting.cameraBearing)}</dd>
+                  </div>
+                  <div className="card__stat">
+                    <dt>Sun delta</dt>
+                    <dd className="num">{deg(read.lighting.delta)}</dd>
+                  </div>
+                </Receipt>
               </>
             ) : null}
             {/*
@@ -1022,10 +1025,12 @@ export function PositionCard({
             )}
             {read.shotType !== 'top-down' ? null : (
               <>
-                <div className="card__stat">
-                  <dt>Shadow bearing</dt>
-                  <dd className="num">{deg(read.shadowBearing)}</dd>
-                </div>
+                <Receipt kind="bearing">
+                  <div className="card__stat">
+                    <dt>Shadow bearing</dt>
+                    <dd className="num">{deg(read.shadowBearing)}</dd>
+                  </div>
+                </Receipt>
                 <div className="card__stat">
                   <dt>Shadow length</dt>
                   <dd className="num">
@@ -1038,24 +1043,28 @@ export function PositionCard({
             )}
             {read.shotType !== 'orbit' ? null : (
               <>
-                <div className="card__stat">
-                  <dt>Sun on the ring</dt>
-                  <dd className="num">{deg(read.sunBearing)}</dd>
-                </div>
-                <div className="card__stat">
-                  <dt>Sun altitude</dt>
-                  <dd className="num">{deg(read.sunAltitude)}</dd>
-                </div>
+                <Receipt kind="solar">
+                  <div className="card__stat">
+                    <dt>Sun on the ring</dt>
+                    <dd className="num">{deg(read.sunBearing)}</dd>
+                  </div>
+                  <div className="card__stat">
+                    <dt>Sun altitude</dt>
+                    <dd className="num">{deg(read.sunAltitude)}</dd>
+                  </div>
+                </Receipt>
               </>
             )}
-            <div className="card__stat">
-              <dt>FOV h</dt>
-              <dd className="num">{deg(fov.hFOV)}</dd>
-            </div>
-            <div className="card__stat">
-              <dt>FOV v</dt>
-              <dd className="num">{deg(fov.vFOV)}</dd>
-            </div>
+            <Receipt kind="focal">
+              <div className="card__stat">
+                <dt>FOV h</dt>
+                <dd className="num">{deg(fov.hFOV)}</dd>
+              </div>
+              <div className="card__stat">
+                <dt>FOV v</dt>
+                <dd className="num">{deg(fov.vFOV)}</dd>
+              </div>
+            </Receipt>
             <div className="card__stat">
               <dt>Range</dt>
               <dd className="num">{distance(subjectRangeMeters)}</dd>

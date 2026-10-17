@@ -1,3 +1,4 @@
+import { Receipt } from '../lib/numerals.tsx'
 import { SHOT_TYPE_LABEL } from '../core/shotType.ts'
 import { lightLine } from '../lib/lightCopy.ts'
 import type { FramingWarning } from '../core/fov.ts'
@@ -152,15 +153,29 @@ export function ShotList({
                 {deg(fov.vFOV)}
                 {/* Sun delta needs a lens direction. Shadow length is the top-down read. */}
                 {read.shotType === 'framed'
-                  ? ` · sun delta ${deg(read.lighting.delta)}`
+                  ? ' · sun delta'
                   : read.shotType === 'top-down'
                     ? ` · shadows ${
                         read.shadowLengthRatio === null
                           ? 'none'
                           : `${read.shadowLengthRatio.toFixed(1)}×`
                       }`
-                    : ` · sun ${Math.round(read.sunAltitude)}° up`}
+                    : ' · sun up'}
               </span>
+              {/*
+                * The degrees that went with those two phrases. Kept beside
+                * them rather than inside the template string, so the words
+                * survive the switch and only the numbers go.
+                */}
+              <Receipt kind="solar">
+                <span className="shot__read-deg num">
+                  {read.shotType === 'framed'
+                    ? ` ${deg(read.lighting.delta)}`
+                    : read.shotType === 'orbit'
+                      ? ` ${Math.round(read.sunAltitude)}°`
+                      : ''}
+                </span>
+              </Receipt>
 
               {position.risk === '' ? null : (
                 <span className="shot__risk">{position.risk}</span>

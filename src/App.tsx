@@ -6,6 +6,9 @@ import { FieldMode } from './components/FieldMode.tsx'
 import { PlanMode } from './components/PlanMode.tsx'
 import { NewBuildNotice } from './components/NewBuildNotice.tsx'
 import { Landing } from './components/Landing.tsx'
+import { NowScreen } from './components/NowScreen.tsx'
+import { NUMERALS_DEFAULT } from './core/numerals.ts'
+import { NumeralsProvider } from './lib/numerals.tsx'
 import { SetupMode } from './components/SetupMode.tsx'
 import type { LatLon } from './core/geo.ts'
 import { DEFAULT_ALTITUDE_FEET } from './core/air.ts'
@@ -356,12 +359,23 @@ function App() {
    * the app could not make for you, and every one of these had to earn its
    * place by being genuinely a matter of taste rather than a default we dodged.
    */
-  const [settings, setSettings] = usePersistentState<{ showCoords: boolean }>(
+  const [settings, setSettings] = usePersistentState<{ showNumbers: boolean }>(
     'scoutngo.settings',
-    { showCoords: false },
-    (raw) => ({
-      showCoords: (raw as { showCoords?: unknown } | null)?.showCoords === true,
-    }),
+    { showNumbers: NUMERALS_DEFAULT },
+    (raw) => {
+      const stored = raw as { showNumbers?: unknown; showCoords?: unknown } | null
+      /*
+       * MIGRATED FROM showCoords, WHICH THIS REPLACES RATHER THAN JOINS.
+       *
+       * The old setting printed the venue's latitude and longitude and
+       * nothing else. It was the same idea at one call site, so it becomes
+       * this one rather than sitting beside it: two switches for "how much
+       * detail" is exactly the two-modes problem in miniature. Anybody who
+       * had coordinates on wanted the receipts, so they keep them.
+       */
+      if (typeof stored?.showNumbers === 'boolean') return { showNumbers: stored.showNumbers }
+      return { showNumbers: stored?.showCoords === true }
+    },
   )
 
   const [pinHintDone, setPinHintDone] = usePersistentState<boolean>(
@@ -1056,6 +1070,45 @@ function App() {
     [cancelNameLookup],
   )
 
+  /*
+   * THE NOW SCREEN.
+   *
+   * ONE TAP FROM LAUNCH, and not a fourth mode on the rail. The rail is a
+   * progression along one axis, SETUP then PLAN then FIELD, and this is not a
+   * stage of that: it is a glance that answers a question before any of them
+   * have been started. Putting it on the rail would mean either a step that is
+   * always available out of order or a step that gates the others, and it is
+   * neither.
+   *
+   * NOT PERSISTED. It opens closed every launch. A screen that remembered
+   * being open would hide the app from somebody who left it open once.
+   */
+  const [nowOpen, setNowOpen] = useState(false)
+
+  /*
+   * THE DOOR OUT OF IT: the glance becomes a plan with nothing typed.
+   *
+   * Carries the coordinate as the pin and TODAY as the date, because the whole
+   * premise of the screen is that this is happening now. The window is left
+   * alone: Setup already proposes one from the date, and overriding it here
+   * would be this screen deciding what kind of shoot it is.
+   */
+  const planFromNow = useCallback(
+    (at: LatLon) => {
+      setNowOpen(false)
+      const today = new Date()
+      const iso = [
+        today.getFullYear(),
+        String(today.getMonth() + 1).padStart(2, '0'),
+        String(today.getDate()).padStart(2, '0'),
+      ].join('-')
+      setVenue((current) => ({ ...withCoordinates(current, at), date: iso }))
+      setDefaults((d) => ({ ...d, date: true }))
+      setMode('setup')
+    },
+    [],
+  )
+
   const onVenueChange = dropVenuePin
 
   /*
@@ -1660,7 +1713,28 @@ function App() {
       </div>
     )
 
-  const rail = <ModeRail mode={mode} available={available} onMode={goTo} />
+  /*
+   * THE RAIL, PLUS THE ONE TAP INTO THE GLANCE.
+   *
+   * Beside the rail rather than inside it: the rail is the three stages of a
+   * shoot and NOW is not one of them. It is always enabled and never gated,
+   * because the whole point is that it answers before anything has been set
+   * up, and it is in the shell rather than in a menu because a menu is one tap
+   * too many for the moment it is for.
+   */
+  const rail = (
+    <div className="shell__nav">
+      <ModeRail mode={mode} available={available} onMode={goTo} />
+      <button
+        type="button"
+        className="shell__now"
+        onClick={() => setNowOpen(true)}
+        title="What the sky is doing, right now, from your location"
+      >
+        Now
+      </button>
+    </div>
+  )
 
   const peekStatus =
     generation.status === 'working'
@@ -1671,6 +1745,12 @@ function App() {
       : { label: 'Shoot setup', line: summary }
 
   return (
+    /*
+     * ONE PROVIDER AT THE ROOT, so the switch reaches the ray plates on the
+     * map and the degrees on the time bar in the same flip. There is no
+     * subtree anywhere that wants a different answer.
+     */
+    <NumeralsProvider show={settings.showNumbers}>
     <div className={`shell shell--${mode}`}>
       {/*
         * A NEWER BUILD ANNOUNCES ITSELF HERE, above everything, in every mode.
@@ -1678,6 +1758,9 @@ function App() {
         * iOS Safari keeping index.html. See src/lib/build.ts.
         */}
       {landingSeen ? null : <Landing onDismiss={() => setLandingSeen(true)} />}
+      {!nowOpen ? null : (
+        <NowScreen onClose={() => setNowOpen(false)} onPlanHere={planFromNow} />
+      )}
 
       <NewBuildNotice check={newBuild} />
       {mode === 'setup' ? (
@@ -1905,6 +1988,7 @@ function App() {
       ) : null}
 
     </div>
+    </NumeralsProvider>
   )
 }
 

@@ -1,3 +1,4 @@
+import { Receipt } from '../lib/numerals.tsx'
 import { compassPoint } from '../core/field.ts'
 import { bandIntervals, peakIn } from '../core/shootWindow.ts'
 import {
@@ -127,7 +128,9 @@ export function SunReadout({ venueWindow }: SunReadoutProps) {
           <div className="readout__cell">Azimuth</div>
           {samples.map((s) => (
             <div className="readout__cell" key={s.key}>
-              <span className="readout__value num">{degrees(s.sun.azimuth)}</span>
+              <Receipt kind="solar">
+                <span className="readout__value num">{degrees(s.sun.azimuth)}</span>
+              </Receipt>
               <span className="readout__sub">{compassPoint(s.sun.azimuth)}</span>
             </div>
           ))}
@@ -135,7 +138,9 @@ export function SunReadout({ venueWindow }: SunReadoutProps) {
           <div className="readout__cell">Altitude</div>
           {samples.map((s) => (
             <div className="readout__cell" key={s.key}>
-              <span className="readout__value num">{degrees(s.sun.altitude)}</span>
+              <Receipt kind="solar">
+                <span className="readout__value num">{degrees(s.sun.altitude)}</span>
+              </Receipt>
               <span className="readout__sub">
                 {s.sun.altitude > 0 ? 'above horizon' : 'below'}
               </span>
@@ -145,7 +150,9 @@ export function SunReadout({ venueWindow }: SunReadoutProps) {
           <div className="readout__cell">Shadow</div>
           {samples.map((s) => (
             <div className="readout__cell" key={s.key}>
-              <span className="readout__value num">{degrees(s.sun.shadowBearing)}</span>
+              <Receipt kind="bearing">
+                <span className="readout__value num">{degrees(s.sun.shadowBearing)}</span>
+              </Receipt>
               <span className="readout__sub">{compassPoint(s.sun.shadowBearing)}</span>
             </div>
           ))}

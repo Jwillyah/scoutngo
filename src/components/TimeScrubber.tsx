@@ -1,3 +1,4 @@
+import { Receipt } from '../lib/numerals.tsx'
 import {
   PHASE_LABEL,
   anticollisionRequired,
@@ -86,14 +87,22 @@ export function TimeScrubber({
       <div className="scrub__readout">
         <span className="scrub__time num">{clock(at)}</span>
         <span className="scrub__zone">{timeZoneAbbr}</span>
-        <span className="scrub__stat">
-          <span className="scrub__stat-label">Az</span>
-          <span className="num">{sun.azimuth.toFixed(1)}°</span>
-        </span>
-        <span className="scrub__stat">
-          <span className="scrub__stat-label">Alt</span>
-          <span className="num">{sun.altitude.toFixed(1)}°</span>
-        </span>
+        {/*
+          * AZ AND ALT ARE RECEIPTS. The band under the bar and the light word
+          * on each card already say what the sun is doing; these two restate
+          * it in degrees. The label goes with the number, because "Az" with
+          * nothing after it is worse than neither.
+          */}
+        <Receipt kind="solar">
+          <span className="scrub__stat">
+            <span className="scrub__stat-label">Az</span>
+            <span className="num">{sun.azimuth.toFixed(1)}°</span>
+          </span>
+          <span className="scrub__stat">
+            <span className="scrub__stat-label">Alt</span>
+            <span className="num">{sun.altitude.toFixed(1)}°</span>
+          </span>
+        </Receipt>
       </div>
 
       {marks.length === 0 ? null : (

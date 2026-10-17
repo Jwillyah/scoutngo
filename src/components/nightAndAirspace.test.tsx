@@ -254,9 +254,16 @@ describe('the reverse sun search', () => {
   it('shows the bearing a tapped point implies, and locks the field', () => {
     const html = render({ target: { lat: 36.6, lon: -76.3 } })
     const shown = text(html)
-    expect(shown).toContain('from the pin')
+    expect(shown).toContain('of the pin')
     expect(shown).toContain('The search is the same either way')
     expect(html).toContain('disabled')
+    /*
+     * The INPUT keeps its degrees either way: you cannot type into a field
+     * that is not there, and a bearing is the question here rather than the
+     * receipt. What the switch hides is the derived restatement of it, so
+     * with the receipts off this says the direction in words instead.
+     */
+    expect(shown).toMatch(/west|east|north|south/)
   })
 
   it('reports the aim as armed while picking', () => {

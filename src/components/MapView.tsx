@@ -1,3 +1,4 @@
+import { useNumerals } from '../lib/numeralsContext.ts'
 import * as maplibregl from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
@@ -688,6 +689,13 @@ export function MapView({
   onPilotMove,
   onAimAt,
 }: MapViewProps) {
+  /*
+   * The ray plates are built imperatively into marker elements, so the switch
+   * has to arrive as a value and sit in the effect's dependencies rather than
+   * being read inside JSX.
+   */
+  const showNumerals = useNumerals()
+
   const container = useRef<HTMLDivElement>(null)
   const map = useRef<maplibregl.Map | null>(null)
   const venueMarker = useRef<maplibregl.Marker | null>(null)
@@ -1997,9 +2005,18 @@ export function MapView({
 
     for (const label of labels) {
       const el = makeMarkerElement(`ray-label ray-label--${label.kind}`)
+      /*
+       * THE PLATE KEEPS ITS WORD AND LOSES ITS NUMBER.
+       *
+       * "SUN" and "SHADOW" are what the ray is; the bearing is the receipt for
+       * it. With the receipts off the plate is still a labelled ray pointing
+       * somewhere, which is the whole content of the overlay.
+       */
       el.innerHTML =
         `<span class="ray-label__text">${label.text}</span>` +
-        `<span class="ray-label__deg num">${label.bearing.toFixed(1)}\u00B0</span>`
+        (showNumerals
+          ? `<span class="ray-label__deg num">${label.bearing.toFixed(1)}\u00B0</span>`
+          : '')
       const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
         .setLngLat([venue.lon, venue.lat])
         .addTo(instance)
@@ -2043,7 +2060,7 @@ export function MapView({
       if (placedBox !== null) takenBoxes.push(placedBox)
       rayLabels.current.push(marker)
     }
-  }, [venue, sunOverlay, showSun, showArc, viewTick, chromeTick, bottomInset])
+  }, [venue, sunOverlay, showSun, showArc, viewTick, chromeTick, bottomInset, showNumerals])
 
   /*
    * KEEP THE CANVAS THE SIZE OF ITS BOX.

@@ -1,3 +1,4 @@
+import { Receipt } from '../lib/numerals.tsx'
 import type { LatLon } from '../core/geo.ts'
 import { thumbUrl } from '../lib/thumb.ts'
 
@@ -30,9 +31,11 @@ export function VenueThumb({ at, label }: VenueThumbProps) {
       />
       <figcaption className="thumb__cap">
         <span className="thumb__name">{label === '' ? 'Venue' : label.split(',')[0]}</span>
-        <span className="num thumb__at">
-          {at.lat.toFixed(5)}, {at.lon.toFixed(5)}
-        </span>
+        <Receipt kind="coordinate">
+          <span className="num thumb__at">
+            {at.lat.toFixed(5)}, {at.lon.toFixed(5)}
+          </span>
+        </Receipt>
       </figcaption>
     </figure>
   )

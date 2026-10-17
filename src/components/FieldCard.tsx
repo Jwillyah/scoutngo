@@ -1,3 +1,4 @@
+import { Receipt } from '../lib/numerals.tsx'
 import { useEffect, useRef, useState } from 'react'
 import { awayLabel, compassPoint, lightingChange, walkTo } from '../core/field.ts'
 import { cameraBearingOf } from '../core/shotType.ts'
@@ -168,12 +169,26 @@ export function FieldCard({
         {cameraBearing === null ? (
           <p className="fc__aimnone">
             {planned.aim.shotType === 'top-down'
-              ? `Straight down. Frame turned to ${Math.round(planned.position.yawDegrees)}°.`
+              ? 'Straight down.'
               : 'Everywhere. It is a 360.'}
+            {planned.aim.shotType === 'top-down' ? (
+              <Receipt kind="bearing">
+                {' '}
+                Frame turned to {Math.round(planned.position.yawDegrees)}°.
+              </Receipt>
+            ) : null}
           </p>
         ) : (
           <p className="fc__aim num">
-            {Math.round(cameraBearing)}° {compassPoint(cameraBearing)}
+            {/*
+              * THE WORD SURVIVES, THE DEGREES DO NOT. "WSW" is what you turn
+              * the camera to while holding it; the 254 is the receipt for it.
+              * Dropping both would leave this block saying "Point the camera"
+              * and nothing else, which is the failure the quiet switch has to
+              * avoid.
+              */}
+            <Receipt kind="bearing">{Math.round(cameraBearing)}° </Receipt>
+            {compassPoint(cameraBearing)}
           </p>
         )}
       </section>
@@ -208,7 +223,10 @@ export function FieldCard({
           <p className="fc__walk num">You are {awayLabel(walk.meters)} away</p>
         ) : (
           <p className="fc__walk num">
-            {Math.round(walk.meters)}m · {Math.round(walk.bearing)}° {walk.compass}
+            {/* The distance is the thing you act on and always stays. */}
+            {Math.round(walk.meters)}m ·{' '}
+            <Receipt kind="bearing">{Math.round(walk.bearing)}° </Receipt>
+            {walk.compass}
           </p>
         )}
       </section>

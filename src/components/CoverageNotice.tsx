@@ -1,3 +1,4 @@
+import { Receipt } from '../lib/numerals.tsx'
 import { MIN_SECTORS, SECTOR_NAMES } from '../core/coverage.ts'
 import type { PlanCoverage } from '../lib/plan.ts'
 
@@ -39,7 +40,8 @@ export function CoverageNotice({ planCoverage }: CoverageNoticeProps) {
       <p className="coverage__head">
         <span className="coverage__label">Coverage</span>
         <span className="num">
-          {coverage.sectorCount} of 4 sectors · {compass(coverage.spreadDegrees)} spread
+          {coverage.sectorCount} of 4 sectors
+          <Receipt kind="bearing"> · {compass(coverage.spreadDegrees)} spread</Receipt>
         </span>
       </p>
 
@@ -61,9 +63,9 @@ export function CoverageNotice({ planCoverage }: CoverageNoticeProps) {
         <p className="coverage__warn">
           Nothing on the far side. Every position is within 90° of the same
           direction
-          {coverage.dominantBearing === null
-            ? ''
-            : `, around ${compass(coverage.dominantBearing)}`}
+          {coverage.dominantBearing === null ? null : (
+            <Receipt kind="bearing">, around {compass(coverage.dominantBearing)}</Receipt>
+          )}
           . There is no reverse angle here, and no backlit option to weigh up.
         </p>
       )}

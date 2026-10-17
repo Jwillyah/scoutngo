@@ -1,4 +1,5 @@
 import { renderToStaticMarkup } from 'react-dom/server'
+import { NumeralsProvider } from '../lib/numerals.tsx'
 import { describe, expect, it } from 'vitest'
 import App from '../App.tsx'
 import { CALIBRATION_VENUE, resolveWindow } from '../lib/venue.ts'
@@ -196,9 +197,19 @@ describe('SunReadout', () => {
     expect(venueWindow.timeZoneFallback).toBe(false)
   })
 
+  /*
+   * WITH THE RECEIPTS ON, because that is what this test is about.
+   *
+   * The degrees are hidden by default now (src/core/numerals.ts). This test
+   * exists to prove the solar core is actually wired to the readout rather
+   * than a placeholder being printed, so it needs the numbers visible. The
+   * separate question of what the switch hides is numerals.test.tsx.
+   */
   it('renders real computed sun numbers, not placeholders', () => {
     const html = renderToStaticMarkup(
-      <SunReadout venueWindow={resolveWindow(CALIBRATION_VENUE)} />,
+      <NumeralsProvider show>
+        <SunReadout venueWindow={resolveWindow(CALIBRATION_VENUE)} />
+      </NumeralsProvider>,
     )
     // Due south at mid-window, southeast at the start, sun well up.
     expect(html).toContain('180.6°')

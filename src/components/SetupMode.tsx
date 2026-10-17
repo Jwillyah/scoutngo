@@ -14,6 +14,7 @@ import { ringNode, type SetupTarget } from '../lib/mode.ts'
 import type { Spot } from '../lib/spots.ts'
 import type { VenueDraft, VenueErrors } from '../lib/venue.ts'
 import { KitChips } from './KitChips.tsx'
+import { NUMERALS_LABEL, NUMERALS_NOTE } from '../core/numerals.ts'
 import { KitProfile } from './KitProfile.tsx'
 import { MapView, type MapHandle } from './MapView.tsx'
 import { ReachSlider } from './ReachSlider.tsx'
@@ -90,8 +91,8 @@ interface SetupModeProps {
   /** True while the date, or the window, is still the one the app chose. */
   defaults: { date: boolean; window: boolean; name: boolean }
   /** The handful of preferences that are genuinely preferences. */
-  settings: { showCoords: boolean }
-  onSettings: (next: { showCoords: boolean }) => void
+  settings: { showNumbers: boolean }
+  onSettings: (next: { showNumbers: boolean }) => void
   /**
    * A request to show the shooter what is blocking them. The tick changes on
    * every press of a blocked forward button, so pressing it twice points twice.
@@ -327,20 +328,25 @@ export function SetupMode({
                   ) : null}
                   {drawer === 'settings' ? (
                     <div className="drawer__pad">
+                      {/*
+                        * THE ONE DISCLOSURE, and the only one.
+                        *
+                        * It replaced "Show coordinates", which did this for a
+                        * single line of a single component. Two switches for
+                        * "how much detail do I want" is the two-modes problem
+                        * in miniature, so there is one, it is remembered, and
+                        * it flips the whole app.
+                        */}
                       <label className="toggle">
                         <input
                           type="checkbox"
                           className="toggle__box"
-                          checked={settings.showCoords}
-                          onChange={(event) => onSettings({ showCoords: event.target.checked })}
+                          checked={settings.showNumbers}
+                          onChange={(event) => onSettings({ showNumbers: event.target.checked })}
                         />
                         <span className="toggle__text">
-                          <span className="toggle__label">Show coordinates</span>
-                          <span className="toggle__note">
-                            Prints the venue's latitude and longitude under its name. Off by
-                            default: the pin is the coordinate, and decimal degrees are of no
-                            use to most people standing on a dock.
-                          </span>
+                          <span className="toggle__label">{NUMERALS_LABEL}</span>
+                          <span className="toggle__note">{NUMERALS_NOTE}</span>
                         </span>
                       </label>
 
@@ -466,7 +472,6 @@ export function SetupMode({
         onName={(name) => onVenueChange({ ...venue, name })}
         nameFilled={defaults.name}
         at={at}
-        showCoords={settings.showCoords}
       />
 
       <div className="setup__body">

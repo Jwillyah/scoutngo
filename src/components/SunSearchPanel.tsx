@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
+import { compassWord } from '../core/compassWords.ts'
 import { bearingBetween, type LatLon } from '../core/geo.ts'
+import { Receipt } from '../lib/numerals.tsx'
 import { sunAimTimes } from '../core/sunInverse.ts'
 import { formatClock } from '../core/timezone.ts'
 import { Group } from './Panel.tsx'
@@ -140,8 +142,17 @@ export function SunSearchPanel({
 
         {targetBearing === null ? null : (
           <p className="sunq__derived">
-            That point is on bearing <span className="num">{targetBearing.toFixed(1)}°</span> from
-            the pin. The search is the same either way.
+            {/*
+              * THE INPUT KEEPS ITS DEGREES EITHER WAY. You cannot type into a
+              * field that is not there, and this panel is the one place in the
+              * app where a bearing IS the question rather than the receipt.
+              * What is hidden is this derived restatement of it.
+              */}
+            That point is {compassWord(targetBearing)} of the pin
+            <Receipt kind="bearing">
+              , on bearing <span className="num">{targetBearing.toFixed(1)}°</span>
+            </Receipt>
+            . The search is the same either way.
           </p>
         )}
 
@@ -224,7 +235,9 @@ export function SunSearchPanel({
                 <span className="sunq__window num">
                   {clock(hit.from)}–{clock(hit.to)}
                 </span>
-                <span className="sunq__alt num">{hit.altitude.toFixed(1)}° up</span>
+                <Receipt kind="solar">
+                  <span className="sunq__alt num">{hit.altitude.toFixed(1)}° up</span>
+                </Receipt>
                 {timeZoneAbbr === null ? null : (
                   <span className="sunq__zone">{timeZoneAbbr}</span>
                 )}

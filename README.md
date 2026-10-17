@@ -50,6 +50,79 @@ would be, rather than failing:
 positions is a secondary control beside "Add position", and it is labelled
 optional.
 
+## The NOW screen
+
+One tap from launch, for the moment the app was useless in: driving, the sky
+goes off, and there is no time to enter a pin, a date and a window.
+
+No map, no scrubber, no setup, nothing to scroll. Six lines in a fixed order,
+largest first:
+
+```
+SUNSET IN 14 MIN
+Look west-southwest.
+Peak light 18:44 to 18:53.
+
+Looks like thick mid cloud with a clear slot at the horizon.
+
+Nearest open ground that way: 0.4 mi, a beach
+```
+
+**Direction in words, never degrees.** "Look west-southwest" is something you
+can act on at a windscreen; 254.1° needs a compass app and thirty seconds
+nobody has. The degrees are the receipt and they belong in the planner. A test
+asserts there is no degree sign and no coordinate anywhere on the screen.
+
+**It asks for your location on the tap, and keeps nothing.** Same rule as
+everywhere else: never an IP lookup, never stored, gone when you close it.
+
+**"Open ground" never means "clear view."** The line reports that
+OpenStreetMap has water, beach, park, farmland, meadow or parking mapped
+within a few miles in roughly the sun's direction. It cannot know what is
+standing in the way — a treeline, a dune, a row of houses on the far side of
+the field — so it does not say. Same rule as the hazard layer. And if nothing
+is mapped it says so, because silence there would read as a claim about the
+ground rather than about the map.
+
+It ends with **PLAN THIS SPOT**, which drops into Setup with that coordinate as
+the pin and today's date already set. The glance is a door into the app, not a
+dead end.
+
+**Remind me tomorrow** downloads an `.ics` file for tomorrow's peak window.
+Generated on the device: no server, no subscription feed, nothing to revoke.
+The event says in its own description that it is *a reminder to look, not a
+prediction* — the sun times are arithmetic, tomorrow's sky is not, and nothing
+here knows it from today.
+
+## One switch for the numbers
+
+The app is full of degrees and coordinates and almost none of them are the
+answer. It says "SIDE-LIT, sun across the frame", which is the answer, and then
+prints 254.9°, which is the receipt.
+
+Every receipt sits behind **one** control, under Settings, remembered on the
+device and **off by default**. Not two modes — two modes means two builds to
+test and a bug report where the first question is "which mode were you in" —
+and not a hamburger, which hides things people need.
+
+| Behind the switch | Always visible |
+|---|---|
+| compass bearings in degrees | the light word and its explanation |
+| solar azimuth and altitude | the band name and the peak window |
+| latitude and longitude | the time |
+| the raw FOV plate | altitude in feet, wind, tide, distances |
+| | every warning and every honesty line |
+
+Hiding a receipt takes its own label with it: a "Camera bearing" heading above
+an empty cell is worse than neither. What it never takes is a sentence.
+`src/components/numerals.test.tsx` asserts that every warning and honesty line
+survives with the numbers off, and that no paragraph or list item present with
+them on goes missing with them off. **Quiet is not the same as simple.**
+
+The direction survives where the degrees go: the field card still says `WSW`
+and still gives the distance in metres, because those are what you act on while
+walking.
+
 ## The rule: the model proposes, code computes
 
 Anything that is arithmetic is arithmetic. The model's job is judgment, meaning

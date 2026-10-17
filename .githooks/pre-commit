@@ -66,6 +66,32 @@ if ! up http://127.0.0.1:5173/; then
 fi
 ok "app on :5173"
 
+# ------------------------------------------------------------------ warm up
+#
+# WHY A WARM-UP AND NOT JUST A PORT CHECK.
+#
+# `vercel dev` answers 200 on / the moment it is listening, which is BEFORE
+# Vite has compiled the module graph. The first real page load then takes
+# longer than the audits' seven second settle, and the probe clicks into a
+# half-rendered app: the reachability audit threw, printed no problems at all,
+# and the hook refused a commit whose code was fine.
+#
+# That is the worst failure a gate can have. A check that fails for reasons
+# unrelated to the change teaches you to re-run it until it passes, which is
+# the same habit as ignoring it. So the app is asked for the real page and
+# given until it serves the app shell before anything is audited.
+step "warming the app"
+WARM=0
+for _ in $(seq 1 60); do
+  if curl -s -m 5 http://127.0.0.1:5173/ | grep -q 'id="root"'; then WARM=1; break; fi
+  sleep 1
+done
+[ "$WARM" = "1" ] || fail "the app never served its shell on :5173"
+# One more fetch, so the first audit is not the request that triggers the
+# dependency pre-bundle.
+curl -s -o /dev/null -m 20 http://127.0.0.1:5173/ || true
+ok "app warm"
+
 if ! up http://127.0.0.1:9222/json/version; then
   step "starting headless Chrome on :9222"
   CHROME="$HOME/Library/Caches/ms-playwright/chromium-1243/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
@@ -79,6 +105,18 @@ if ! up http://127.0.0.1:9222/json/version; then
   up http://127.0.0.1:9222/json/version || fail "could not start Chrome"
 fi
 ok "chrome on :9222"
+
+# connect() in scripts/cdp.mjs picks the first target of type "page". A Chrome
+# that has only just started may not have one yet, and the audit throws on
+# `target.webSocketDebuggerUrl` of undefined.
+step "waiting for a page target"
+for _ in $(seq 1 30); do
+  curl -s -m 3 http://127.0.0.1:9222/json/list | grep -q '"type": *"page"' && break
+  sleep 1
+done
+curl -s -m 3 http://127.0.0.1:9222/json/list | grep -q '"type": *"page"' \
+  || fail "Chrome started but never opened a page target"
+ok "page target ready"
 
 step "reachability audit"
 SCOUTNGO_OUT="$SCRATCH" node scripts/audit-reachability.mjs > "$SCRATCH/reach.log" 2>&1 \

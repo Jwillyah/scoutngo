@@ -1,3 +1,4 @@
+import { Receipt } from '../lib/numerals.tsx'
 import type { LatLon } from '../core/geo.ts'
 
 interface VenuePlateProps {
@@ -7,7 +8,6 @@ interface VenuePlateProps {
   nameFilled: boolean
   at: LatLon | null
   /** Off by default. Turned on under Settings, for people who want the numbers. */
-  showCoords: boolean
 }
 
 /**
@@ -31,7 +31,7 @@ interface VenuePlateProps {
  * because a number printed away from its control is a number you have to go
  * looking for the control of.
  */
-export function VenuePlate({ name, onName, nameFilled, at, showCoords }: VenuePlateProps) {
+export function VenuePlate({ name, onName, nameFilled, at }: VenuePlateProps) {
   return (
     <div className="plate">
       <input
@@ -45,10 +45,12 @@ export function VenuePlate({ name, onName, nameFilled, at, showCoords }: VenuePl
         onChange={(event) => onName(event.target.value)}
       />
       {nameFilled ? <span className="pill__default">filled for you</span> : null}
-      {!showCoords || at === null ? null : (
-        <span className="plate__coords num">
-          {at.lat.toFixed(5)}, {at.lon.toFixed(5)}
-        </span>
+      {at === null ? null : (
+        <Receipt kind="coordinate">
+          <span className="plate__coords num">
+            {at.lat.toFixed(5)}, {at.lon.toFixed(5)}
+          </span>
+        </Receipt>
       )}
     </div>
   )
