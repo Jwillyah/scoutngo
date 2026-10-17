@@ -60,8 +60,17 @@ describe('the kind chip sets the window, not the platform', () => {
   it('found the real handler', () => {
     /* If the extractor missed, every assertion below would be vacuous. */
     expect(body).toContain('setShootKind(kind)')
-    expect(body).toContain('shootPreset(')
-    expect(body.length).toBeGreaterThan(200)
+  })
+
+  /*
+   * THE HANDLER ONLY RECORDS THE CHOICE NOW. Setting the window moved out of
+   * it, because a handler runs once and a chip tapped before the pin existed
+   * could only leave a note saying it had done nothing. The rule watches the
+   * condition instead: see src/lib/chipWindow.ts.
+   */
+  it('records the choice and leaves the window to the rule that watches for it', () => {
+    expect(body).not.toContain('shootPreset(')
+    expect(body).not.toMatch(/setVenue\s*\(/)
   })
 
   /*
@@ -76,9 +85,14 @@ describe('the kind chip sets the window, not the platform', () => {
     expect(stripped).toContain('b()')
   })
 
-  /* The handler does still explain the removal, in prose, where it happened. */
-  it('leaves the explanation in place', () => {
-    expect(callbackBody(APP, 'onShootKind')).toContain('DOES NOT TOUCH THE PLATFORM')
+  /*
+   * And the app still applies a chip in either order, which is the behaviour
+   * the handler gave up. Asserted on the rule that replaced it, so removing
+   * the handler's logic cannot quietly remove the feature with it.
+   */
+  it('still sets the window from the chip, somewhere', () => {
+    expect(APP).toContain('chipWindow(')
+    expect(APP).toMatch(/chipOutcome\.action !== 'apply'/)
   })
 
   it('does not set the platform filter', () => {

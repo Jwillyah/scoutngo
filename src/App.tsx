@@ -10,7 +10,7 @@ import type { LatLon } from './core/geo.ts'
 import { DEFAULT_ALTITUDE_FEET } from './core/air.ts'
 import { DEFAULT_SHOT_TYPE, DEFAULT_YAW_DEGREES, type ShotType } from './core/shotType.ts'
 import type { ShootKind } from './core/shootWindow.ts'
-import { shootPreset } from './lib/shootPreset.ts'
+import { chipWindow, type WindowSource } from './lib/chipWindow.ts'
 import {
   allowedPlatforms,
   DEFAULT_PLATFORM_FILTER,
@@ -599,56 +599,83 @@ function App() {
    * src/lib/shootPreset.ts for the glue.
    */
   const [shootKind, setShootKind] = useState<ShootKind | null>(null)
-  const [shootLine, setShootLine] = useState<string | null>(null)
 
-  const onShootKind = useCallback(
-    (kind: ShootKind) => {
-      setShootKind(kind)
+  /*
+   * THE CHIP SETS THE WINDOW IN EITHER ORDER.
+   *
+   * It used to be done in the tap handler, which runs once, so a chip tapped
+   * before the pin existed left a note saying it had done nothing and nothing
+   * ever came back to finish it. "That ordering trap is on me to remember and
+   * it should not be."
+   *
+   * So the tap only records the choice, and the rule is a CONDITION watched by
+   * the effect below: whenever a kind and a pin and a date all exist, the
+   * window follows the chip. See src/lib/chipWindow.ts.
+   */
+  const onShootKind = useCallback((kind: ShootKind) => {
+    setShootKind(kind)
+  }, [])
 
-      /*
-       * THE TIME-OF-DAY CHIP DOES NOT TOUCH THE PLATFORM.
-       *
-       * It used to: `if (kind === 'daytime') setPlatformFilter('both')`, meant
-       * as "a daytime shoot is usually both". It silently undid an explicit
-       * choice the shooter had already made, and that is the whole of the
-       * reported bug. Measured in the browser, tapping Drone and then Daytime:
-       *
-       *   after Drone     Drone=true
-       *   after Daytime   Both=true, Drone=false
-       *   PLAN filter     Both
-       *   add button      "Add position", not "Add air position"
-       *   result          a ground Framed position
-       *
-       * Which is exactly what a daytime aerial shoot looks like to tap, so the
-       * one ordering a drone pilot would actually use was the one that broke.
-       * The two rows are independent: one says when, the other says what is
-       * flying, and neither gets to overrule the other.
-       */
+  /*
+   * WHERE THE WINDOW CAME FROM, which "has it changed" cannot tell you once a
+   * chip has changed it once. A window the app chose is a guess waiting to be
+   * improved; a window the shooter typed is an instruction.
+   */
+  const [windowSource, setWindowSource] = useState<WindowSource>('default')
 
-      if (centre === null) {
-        setShootLine('Drop the venue pin and the chip will set the window too.')
-        return
-      }
-      const zone = venueWindow?.timeZone ?? venueTimeZone(centre.lat, centre.lon)
-      if (zone === null || venue.date === '') {
-        setShootLine('Set the date and the chip will set the window too.')
-        return
-      }
-      const preset = shootPreset(kind, centre, venue.date, zone)
-      if (preset === null) {
-        setShootLine(`No ${kind} at this latitude on that date.`)
-        return
-      }
-      setShootLine(preset.line)
-      setVenue((current) => ({
-        ...current,
-        startTime: preset.startTime,
-        endTime: preset.endTime,
-      }))
-      setDefaults((current) => ({ ...current, window: false }))
-    },
-    [centre, venue.date, venueWindow],
+  /*
+   * DERIVED DURING RENDER, not stored. What the chip would do is a function of
+   * the chip, the pin and the date, so holding it in state would mean two
+   * answers to one question, which is the shape of most of the bugs in this
+   * file's history.
+   */
+  const chipOutcome = useMemo(
+    () =>
+      chipWindow({
+        kind: shootKind,
+        source: windowSource,
+        centre,
+        date: venue.date,
+        timeZone:
+          venueWindow?.timeZone ?? (centre === null ? null : venueTimeZone(centre.lat, centre.lon)),
+      }),
+    [shootKind, windowSource, centre, venue.date, venueWindow],
   )
+  const shootLine = chipOutcome.line
+
+  /*
+   * THE ONE SIDE EFFECT: writing the times the chip decided on.
+   *
+   * WHY AN EFFECT AND NOT THE EVENT HANDLERS, which is what the lint rule
+   * below would prefer. The condition depends on three things that arrive
+   * independently: the chip, the pin and the date. Doing it from the event
+   * means doing it from every event that can change any of them, which today
+   * is the chip, a pin drag, a map tap, a search result, the date field,
+   * loading a saved spot, and a parsed brief. Seven call sites for one rule is
+   * the shape that produced the bug this fixes, and the eighth one added next
+   * month is the one that would be forgotten.
+   *
+   * So the rule lives in one place and watches the condition. The write is
+   * guarded above, so it fires once and does not loop.
+   */
+  /* oxlint-disable react/set-state-in-effect -- one rule, one place; see above */
+  useEffect(() => {
+    if (chipOutcome.action !== 'apply') return
+    /*
+     * Already says this, so there is nothing to write. The source is left
+     * alone deliberately: marking it here would be a state write that changes
+     * nothing, and the next render re-derives the same answer anyway.
+     */
+    if (venue.startTime === chipOutcome.startTime && venue.endTime === chipOutcome.endTime) return
+    setVenue((current) => ({
+      ...current,
+      startTime: chipOutcome.startTime,
+      endTime: chipOutcome.endTime,
+    }))
+    setWindowSource('chip')
+    setDefaults((current) => ({ ...current, window: false }))
+  }, [chipOutcome, venue.startTime, venue.endTime])
+  /* oxlint-enable react/set-state-in-effect */
 
   /*
    * Wind at the venue, for the hour the scrubber is on. Feeds the readout and
@@ -921,6 +948,12 @@ function App() {
         }
         if (next.startTime !== current.startTime || next.endTime !== current.endTime) {
           setDefaults((d) => ({ ...d, window: false }))
+          /*
+           * TYPED, and from here a chip leaves it alone and says so. The
+           * chip's own write goes through the effect above and never through
+           * here, so this only ever fires for a real edit.
+           */
+          setWindowSource('typed')
         }
         return next
       })
