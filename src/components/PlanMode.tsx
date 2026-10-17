@@ -130,6 +130,8 @@ interface PlanModeProps {
   onDeleteMark: (id: string) => void
   /** The shoot date, yyyy-mm-dd, for the leaf answer on a deciduous mark. */
   shootDate: string
+  /** Which brief a generate would send: the typed one, or the chips. */
+  briefSource: string
   /** Arms the map so the next tap drops a position. The primary action here. */
   placing: boolean
   onPlacing: (next: boolean) => void
@@ -271,6 +273,7 @@ export function PlanMode({
   onChangeMark,
   onDeleteMark,
   shootDate,
+  briefSource,
   placing,
   onPlacing,
   onAddAt,
@@ -609,10 +612,17 @@ export function PlanMode({
                 <span className="act__label">
                   {generation.status === 'working' ? 'Suggesting…' : 'Suggest positions'}
                 </span>
+                {/*
+                  * WHICH BRIEF IS GOING, said before it goes.
+                  *
+                  * The typed box is no longer a gate: the chips are the
+                  * intent and the brief is built from them. That is only
+                  * honest if the shooter can see which of the two is being
+                  * sent, so the button says so rather than substituting
+                  * quietly. See src/core/shootBrief.ts.
+                  */}
                 <span className="act__why">
-                  {generation.status === 'working'
-                    ? 'Asking the model'
-                    : 'Optional. A starting point to drag'}
+                  {generation.status === 'working' ? 'Asking the model' : briefSource}
                 </span>
               </button>
             </div>

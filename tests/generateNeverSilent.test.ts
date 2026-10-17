@@ -85,6 +85,68 @@ describe('deciding it cannot run does not leave the screen', () => {
 })
 
 /**
+ * THE TYPED BRIEF IS NOT A GATE ANY MORE, AND IT MUST NOT BECOME ONE AGAIN.
+ *
+ * "The chips already say what the shoot is: Sunrise, Drone. Making me type a
+ * sentence as well re-adds the text box we just demoted, as a gate."
+ *
+ * So the gate may not read eventDescription at all. If it does, the sentence
+ * is back to being required, whatever the message says.
+ */
+describe('the gate does not require prose', () => {
+  const gate = withoutComments(
+    readFileSync(new URL('../src/lib/generateGate.ts', import.meta.url), 'utf8'),
+  )
+
+  it('never inspects the typed brief', () => {
+    expect(gate).not.toMatch(/eventDescription/)
+    expect(gate).not.toMatch(/desiredOutcome/)
+  })
+
+  it('still blocks on the venue, which is the case with genuinely nothing', () => {
+    expect(gate).toContain('hasErrors')
+    expect(gate).toContain('staleBrief')
+  })
+
+  /* The check can fail. */
+  it('would catch the requirement coming back', () => {
+    expect(/eventDescription/.test("if (venue.eventDescription.trim() === '') return block")).toBe(
+      true,
+    )
+  })
+
+  /* And something really does build a brief out of the chips instead. */
+  it('hands the job to the chips', () => {
+    const request = readFileSync(new URL('../src/lib/planRequest.ts', import.meta.url), 'utf8')
+    expect(request).toContain('resolveBrief')
+    expect(withoutComments(request)).toMatch(/event:\s*brief\.event/)
+    expect(withoutComments(request)).toMatch(/outcome:\s*brief\.outcome/)
+  })
+
+  /*
+   * AND THE EMPTY STRING NEVER GOES OUT. That is the one value that produced
+   * the invented marina shoot, and it is what this whole change could
+   * reintroduce by accident.
+   */
+  it('lets the raw typed fields reach resolveBrief and nowhere else', () => {
+    const request = withoutComments(
+      readFileSync(new URL('../src/lib/planRequest.ts', import.meta.url), 'utf8'),
+    )
+    /*
+     * The raw fields appear exactly once each, inside the resolveBrief call.
+     * Anywhere else and an empty string can reach the wire again, which is
+     * the value that produced the invented marina shoot.
+     */
+    expect(request.match(/venue\.eventDescription/g)).toHaveLength(1)
+    expect(request.match(/venue\.desiredOutcome/g)).toHaveLength(1)
+    const at = request.indexOf('resolveBrief(')
+    const call = request.slice(at, request.indexOf('return {', at))
+    expect(call).toContain('venue.eventDescription')
+    expect(call).toContain('venue.desiredOutcome')
+  })
+})
+
+/**
  * AND THE BLOCK IS RENDERED WHERE THE BUTTON IS. The other half: a value
  * nothing draws is the same silence wearing a type.
  */

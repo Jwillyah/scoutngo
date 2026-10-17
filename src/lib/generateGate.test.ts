@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { generateBlock } from './generateGate.ts'
-import { CALIBRATION_VENUE, EMPTY_VENUE, type VenueDraft } from './venue.ts'
 
-const ok = { errors: {}, missing: null, staleBrief: false, venue: CALIBRATION_VENUE }
+const ok = { errors: {}, missing: null, staleBrief: false }
 
 /*
  * THE REPORTED BUG, AS AN ASSERTION. "I tap it and nothing happens. No
@@ -16,19 +15,17 @@ const ok = { errors: {}, missing: null, staleBrief: false, venue: CALIBRATION_VE
  * now, and these tests are about whether it is a USEFUL one.
  */
 describe('a generate that cannot run says why', () => {
-  it('runs when the venue and the brief are both there', () => {
+  it('runs when the venue is set', () => {
     expect(generateBlock(ok)).toBeNull()
   })
 
-  it('blocks an empty brief, which is what the chips path leaves', () => {
-    const block = generateBlock({ ...ok, venue: { ...CALIBRATION_VENUE, eventDescription: '' } })
-    expect(block).not.toBeNull()
-    expect(block?.field).toBe('brief')
-  })
-
-  it('blocks a brief that is only whitespace', () => {
-    expect(generateBlock({ ...ok, venue: { ...CALIBRATION_VENUE, eventDescription: '   \n ' } }))
-      .not.toBeNull()
+  /*
+   * AND IT RUNS WITH NO TYPED BRIEF, which is the follow-up. The chips say
+   * what the shoot is; requiring a sentence as well re-added the text box the
+   * chips replaced, as a gate. See src/core/shootBrief.ts.
+   */
+  it('runs with no typed brief at all', () => {
+    expect(generateBlock({ errors: {}, missing: null, staleBrief: false })).toBeNull()
   })
 
   it('blocks an incomplete venue and carries which field is missing', () => {
@@ -36,7 +33,6 @@ describe('a generate that cannot run says why', () => {
       ...ok,
       errors: { latitude: 'required' },
       missing: 'venue',
-      venue: EMPTY_VENUE,
     })
     expect(block?.field).toBe('venue')
   })
@@ -47,27 +43,21 @@ describe('a generate that cannot run says why', () => {
   })
 
   /*
-   * ORDER MATTERS. An incomplete venue is reported before a missing brief,
-   * because writing a brief for a venue that is not set yet is wasted typing.
+   * ORDER MATTERS. An incomplete venue is reported before a stale brief,
+   * because resolving a brief for a venue that is not set yet is wasted work.
    */
   it('reports the venue before the brief when both are wrong', () => {
     const block = generateBlock({
       errors: { latitude: 'required' },
       missing: 'venue',
       staleBrief: true,
-      venue: EMPTY_VENUE,
     })
     expect(block?.field).toBe('venue')
   })
 })
 
-/*
- * EVERY BLOCK IS SAYABLE AND ACTIONABLE. A block with an empty message is the
- * silent button again, wearing a different type.
- */
 describe('every block can be read and acted on', () => {
   const cases: { label: string; input: Parameters<typeof generateBlock>[0] }[] = [
-    { label: 'empty brief', input: { ...ok, venue: { ...CALIBRATION_VENUE, eventDescription: '' } } },
     { label: 'stale brief', input: { ...ok, staleBrief: true } },
     { label: 'bad venue', input: { ...ok, errors: { latitude: 'x' }, missing: 'venue' } },
   ]
@@ -88,10 +78,10 @@ describe('every block can be read and acted on', () => {
    * is the silent button with words on it.
    */
   it('names the thing that is missing', () => {
-    const brief = generateBlock({ ...ok, venue: { ...CALIBRATION_VENUE, eventDescription: '' } })
-    expect(brief!.message.toLowerCase()).toContain('what the shoot is')
-    /* And it says the chips are not enough, since that is the shooter's path. */
-    expect(brief!.message.toLowerCase()).toContain('chips')
+    const venue = generateBlock({ ...ok, errors: { latitude: 'x' }, missing: 'venue' })
+    expect(venue!.message.toLowerCase()).toContain('venue')
+    const stale = generateBlock({ ...ok, staleBrief: true })
+    expect(stale!.message.toLowerCase()).toContain('pin moved')
   })
 
   it('claims nothing about a model or a server', () => {
@@ -114,24 +104,20 @@ describe('every block can be read and acted on', () => {
  */
 describe('the block is shown, not navigated away from', () => {
   it('is a pure function with no side effects to lose', () => {
-    const before = { ...ok, venue: { ...CALIBRATION_VENUE, eventDescription: '' } }
-    const first = generateBlock(before)
-    const second = generateBlock(before)
-    expect(first).toEqual(second)
+    const before = { ...ok, staleBrief: true }
+    expect(generateBlock(before)).toEqual(generateBlock(before))
     /* It did not mutate what it was handed. */
-    expect(before.venue.eventDescription).toBe('')
+    expect(before.staleBrief).toBe(true)
   })
 })
 
 /* An empty venue blocks on the venue, never silently on nothing. */
 describe('a blank start blocks on something', () => {
   it('never returns null for a venue with nothing in it', () => {
-    const blank: VenueDraft = EMPTY_VENUE
     const block = generateBlock({
       errors: { latitude: 'required', longitude: 'required' },
       missing: 'venue',
       staleBrief: false,
-      venue: blank,
     })
     expect(block).not.toBeNull()
   })

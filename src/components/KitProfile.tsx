@@ -6,7 +6,14 @@ import {
   type Lens,
 } from '../core/kit.ts'
 import { KitEditor } from './KitEditor.tsx'
-import { defaultSelection, toggleId, type KitSelection } from '../lib/kitSelection.ts'
+import { useMemo } from 'react'
+import { auditKit, kitAuditLines } from '../lib/kitAudit.ts'
+import {
+  defaultSelection,
+  KIT_PROFILE_STORAGE_KEY,
+  toggleId,
+  type KitSelection,
+} from '../lib/kitSelection.ts'
 import { Group, Panel } from './Panel.tsx'
 
 interface KitProfileProps {
@@ -83,12 +90,49 @@ function droneMeta(drone: KitProfileType['drones'][number]): string {
 export function KitProfile({ value, onChange, kit, onKitChange }: KitProfileProps) {
   const bodies = activeBodies(kit, value.bodyIds)
 
+  /*
+   * WHAT IS IN STORAGE, AGAINST THE SHIPPED LIST.
+   *
+   * A stored SELECTION used to be revived against the shipped kit rather than
+   * against this one, so gear added by hand came back unticked on every
+   * reload, silently. The gear itself survived; the packing list did not, and
+   * a spot saved in that state recorded the loss.
+   *
+   * It is fixed, but "did I lose anything" is a question about THIS device
+   * that no amount of fixing answers. So the kit screen answers it, reading
+   * the raw storage back and comparing. It prints only facts about storage:
+   * no lines means nothing to report, and there is no line that says the kit
+   * is fine. See src/lib/kitAudit.ts.
+   */
+  const audit = useMemo(() => {
+    let raw: unknown = null
+    try {
+      const stored = localStorage.getItem(KIT_PROFILE_STORAGE_KEY)
+      raw = stored === null ? null : (JSON.parse(stored) as unknown)
+    } catch {
+      /* Storage blocked or unparseable. Reported as a replaced profile below. */
+      raw = {}
+    }
+    return auditKit(raw, kit, value)
+  }, [kit, value])
+  const news = kitAuditLines(audit)
+
   return (
     <Panel index="02" title="Kit and style">
       <p className="section__note">
         What is actually coming with you. Saved in this browser only, on this
         device. Nothing is sent anywhere.
       </p>
+
+      {news.length === 0 ? null : (
+        <ul className="kitaudit">
+          {news.map((line) => (
+            <li className={`kitaudit__line kitaudit__line--${line.tone}`} key={line.text}>
+              {line.text}
+            </li>
+          ))}
+        </ul>
+      )}
 
       <Group title="Bodies" meta={<span className="num">{value.bodyIds.length}</span>}>
         <ul className="kit-list">

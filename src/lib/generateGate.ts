@@ -1,5 +1,5 @@
 import type { SetupTarget } from './mode.ts'
-import type { VenueDraft, VenueErrors } from './venue.ts'
+import type { VenueErrors } from './venue.ts'
 import { hasErrors } from './venue.ts'
 
 /**
@@ -51,7 +51,6 @@ export function generateBlock(input: {
   errors: VenueErrors
   missing: SetupTarget | null
   staleBrief: boolean
-  venue: VenueDraft
 }): GenerateBlock | null {
   if (hasErrors(input.errors)) {
     return {
@@ -72,19 +71,25 @@ export function generateBlock(input: {
   }
 
   /*
-   * NO BRIEF, NO CALL. Pressed at an apartment complex with an empty
-   * description, this once invented a marina shoot: handed a satellite image
-   * and nothing else, the model is obliged to answer, so it answered about
-   * what it thought it saw. The refusal is right. Only the silence was wrong.
+   * THE TYPED BRIEF IS NOT REQUIRED, AND THE GUARD THAT REQUIRED IT IS GONE.
+   *
+   * It used to block here on an empty eventDescription. That was the right
+   * instinct aimed at the wrong thing: the failure it was protecting against
+   * is a model handed a satellite image and NOTHING ELSE, which once invented
+   * a marina shoot at an apartment complex. The fix for that is to send
+   * something true, not to demand prose.
+   *
+   * The chips already say what the shoot is, more precisely than a sentence
+   * would: "Sunrise" is a band of the sun's own altitude computed for this
+   * venue on this date, and "Drone" is a platform the parser enforces. So the
+   * brief is built from them in src/core/shootBrief.ts, and that text states
+   * plainly that no event was described and must not be invented.
+   *
+   * Requiring the sentence as well re-added, as a gate, the text box the chips
+   * were built to demote.
+   *
+   * WHAT STILL BLOCKS is the case where there genuinely is nothing: no pin, no
+   * date. That is the branch above, and it is unchanged.
    */
-  if (input.venue.eventDescription.trim() === '') {
-    return {
-      message:
-        'Tell me what the shoot is first. With only a satellite image to go on I would be guessing, and a guess shaped like a plan is worse than no plan. Chips set the window and the platform; this needs words.',
-      field: 'brief',
-      action: 'Describe the shoot',
-    }
-  }
-
   return null
 }

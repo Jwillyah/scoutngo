@@ -7,6 +7,7 @@ import { formatClock } from '../core/timezone.ts'
 import type { KitSelection } from './kitSelection.ts'
 import type { DroneCameraSpec, LensSpec } from './parsePlan.ts'
 import type { SiteSummary } from './overpass.ts'
+import { resolveBrief, type ChipIntent } from '../core/shootBrief.ts'
 import { subjectAcrossMeters, type VenueDraft, type VenueWindow } from './venue.ts'
 
 export interface MapBounds {
@@ -303,11 +304,24 @@ export function buildGenerateBody(
    * worse than no position at all.
    */
   platforms: readonly Platform[] = ['ground', 'air'],
+  /**
+   * WHAT THE CHIPS SAY, when no brief was typed.
+   *
+   * The empty-brief guard is gone: the chips are the intent, structured, and
+   * more precise than a sentence. See src/core/shootBrief.ts for why an empty
+   * string here is the thing that once invented a marina shoot, and why this
+   * is not one.
+   */
+  intent: ChipIntent = { kind: null, platform: 'both', venueName: '', shotCount: 0 },
 ): GenerateRequestBody {
+  const brief = resolveBrief(
+    { event: venue.eventDescription, outcome: venue.desiredOutcome },
+    intent,
+  )
   return {
     venueName: venue.name,
-    event: venue.eventDescription,
-    outcome: venue.desiredOutcome,
+    event: brief.event,
+    outcome: brief.outcome,
     date: venue.date,
     startTime: venue.startTime,
     endTime: venue.endTime,

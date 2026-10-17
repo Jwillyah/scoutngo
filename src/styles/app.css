@@ -5821,3 +5821,40 @@
   text-transform: uppercase;
   justify-self: start;
 }
+
+/*
+ * WHAT IS IN STORAGE, AGAINST THE SHIPPED LIST.
+ *
+ * Two tones, because two different things are being said. A LOSS is something
+ * that is not here any more, and it gets the hazard rule: nothing else would
+ * have told the shooter. A FACT is "this is yours and not in the shipped
+ * list", which is just the inventory and should not look like an alarm.
+ *
+ * No lines at all is the "nothing to report" state. There is deliberately no
+ * line saying the kit is fine: see src/lib/kitAudit.ts.
+ */
+.kitaudit {
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.kitaudit__line {
+  padding: var(--space-2);
+  border-radius: var(--radius-panel);
+  background: var(--color-panel-2);
+  font-size: var(--text-xs);
+  line-height: 1.35;
+}
+
+.kitaudit__line--loss {
+  border-left: var(--line-rule) solid var(--color-hazard);
+  color: var(--color-text);
+}
+
+.kitaudit__line--fact {
+  border-left: var(--line-rule) solid var(--color-rule-fact);
+  color: var(--color-text-muted);
+}

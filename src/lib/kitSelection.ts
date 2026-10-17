@@ -13,6 +13,16 @@ export interface KitSelection {
 
 export const KIT_STORAGE_KEY = 'scoutngo.kit.v1'
 
+/**
+ * Where the editable kit profile lives.
+ *
+ * NAMED HERE rather than written at the useState call, because the kit screen
+ * reads the raw JSON back to report what survived reviving, and two copies of
+ * a storage key is how one of them ends up reading nothing and reporting all
+ * clear. See src/lib/kitAudit.ts.
+ */
+export const KIT_PROFILE_STORAGE_KEY = 'scoutngo.kitProfile.v1'
+
 export function defaultSelection(kit: KitProfile): KitSelection {
   return {
     bodyIds: kit.bodies.map((b) => b.id),

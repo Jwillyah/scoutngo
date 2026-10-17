@@ -31,6 +31,7 @@ import { useWind } from './lib/useWind.ts'
 import { briefDriftMeters, formatDrift, isBriefStale, type BriefAnchor } from './lib/brief.ts'
 import {
   defaultSelection,
+  KIT_PROFILE_STORAGE_KEY,
   KIT_STORAGE_KEY,
   reviveKitProfile,
   reviveSelection,
@@ -130,6 +131,7 @@ import {
 } from './lib/marks.ts'
 import type { MarkKind, SiteMark } from './core/siteMark.ts'
 import { windHeightFor } from './core/windHeight.ts'
+import { briefIsTyped, briefSourceLine } from './core/shootBrief.ts'
 import { generateBlock } from './lib/generateGate.ts'
 
 /*
@@ -265,7 +267,7 @@ function App() {
    * and standoff band is computed from whatever is in here.
    */
   const [kitProfile, setKitProfile] = usePersistentState<KitProfile>(
-    'scoutngo.kitProfile.v1',
+    KIT_PROFILE_STORAGE_KEY,
     DEFAULT_KIT,
     (raw) => reviveKitProfile(raw),
   )
@@ -736,6 +738,31 @@ function App() {
     return optic === null ? null : { lensId: optic.id, focalLength: optic.minFocalLength }
   }, [kit, kitProfile])
 
+  /*
+   * WHICH BRIEF A GENERATE WOULD SEND. Shown on the button, because the chips
+   * standing in for a typed brief is only honest if it is visible.
+   */
+  const briefSource = useMemo(
+    () =>
+      briefSourceLine(
+        {
+          kind: shootKind,
+          platform: platformFilter,
+          venueName: venue.name,
+          shotCount: desiredShots.length,
+        },
+        briefIsTyped({ event: venue.eventDescription, outcome: venue.desiredOutcome }),
+      ),
+    [
+      shootKind,
+      platformFilter,
+      venue.name,
+      venue.eventDescription,
+      venue.desiredOutcome,
+      desiredShots.length,
+    ],
+  )
+
   const addsAir = platformFilter === 'air' && defaultAirOptic !== null
 
   const addPositionAt = useCallback(
@@ -1121,7 +1148,7 @@ function App() {
      * button that goes and fixes it, so leaving the screen is a choice the
      * shooter makes after reading why.
      */
-    const block = generateBlock({ errors, missing, staleBrief, venue })
+    const block = generateBlock({ errors, missing, staleBrief })
     if (block !== null) {
       setGeneration({ status: 'blocked', block })
       return
@@ -1231,6 +1258,18 @@ function App() {
          * parser, so a plan can never contain a platform the map is hiding.
          */
         allowedPlatforms(platformFilter),
+        /*
+         * WHAT THE CHIPS SAY, which stands in for a typed brief. Sunrise plus
+         * Drone plus this venue and this window is the shoot, structured, and
+         * the model is told in as many words that no event was described and
+         * that it must not invent one.
+         */
+        {
+          kind: shootKind,
+          platform: platformFilter,
+          venueName: venue.name,
+          shotCount: desiredShots.length,
+        },
       ),
     )
     /*
@@ -1595,6 +1634,7 @@ function App() {
           onChangeMark={onChangeMark}
           onDeleteMark={onDeleteMark}
           shootDate={venue.date}
+          briefSource={briefSource}
           placing={placing}
           onPlacing={setPlacing}
           onAddAt={addPositionAt}
