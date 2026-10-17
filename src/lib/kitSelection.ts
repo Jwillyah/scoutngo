@@ -58,41 +58,64 @@ export function toggleId(ids: string[], id: string): string[] {
 }
 
 /**
+ * WHAT A STORED ENTRY HAS TO HAVE TO BE USABLE.
+ *
+ * EXPORTED, AND THE ONLY COPY. The kit screen reports which stored entries
+ * failed to come back, and it has to ask the same question the reviver asked.
+ * Two copies of "is this readable" is how the reviver drops a lens while the
+ * report says everything arrived, which is the exact drift this week has been
+ * spent closing. One predicate, two callers.
+ *
+ * STRICT ON PURPOSE. A half-revived lens with a missing focal length would
+ * compute a field of view from undefined and put a confident number on a card,
+ * so anything that fails is DROPPED rather than patched up. Re-typing one lens
+ * costs nothing; a broken entry downstream is new surface for every bug this
+ * validation exists to prevent.
+ */
+export const isStoredBody = (b: unknown): b is KitProfile['bodies'][number] => {
+  const body = b as Partial<KitProfile['bodies'][number]> | null
+  return (
+    typeof body?.id === 'string' &&
+    typeof body?.name === 'string' &&
+    (body?.sensor === 'fullFrame' || body?.sensor === 'apsc')
+  )
+}
+
+export const isStoredLens = (l: unknown): l is KitProfile['lenses'][number] => {
+  const lens = l as Partial<KitProfile['lenses'][number]> | null
+  return (
+    typeof lens?.id === 'string' &&
+    typeof lens?.name === 'string' &&
+    Number.isFinite(lens?.minFocalLength) &&
+    Number.isFinite(lens?.maxFocalLength) &&
+    Array.isArray(lens?.forcesSensor)
+  )
+}
+
+export const isStoredDrone = (d: unknown): d is KitProfile['drones'][number] => {
+  const drone = d as Partial<KitProfile['drones'][number]> | null
+  return (
+    typeof drone?.id === 'string' &&
+    typeof drone?.name === 'string' &&
+    Number.isFinite(drone?.weightGrams) &&
+    Array.isArray(drone?.cameras)
+  )
+}
+
+/**
  * Brings a stored kit profile back, tolerating any shape.
  *
- * ANYTHING MALFORMED FALLS BACK TO THE SHIPPED PROFILE rather than being
- * patched up. A half-revived lens with a missing focal length would compute a
- * field of view from undefined and put a confident number on a card, which is
- * worse than starting from the default and being told to add it again.
+ * ANYTHING MALFORMED IS DROPPED rather than patched up, and the kit screen
+ * says which one went and what could be read of it. See src/lib/kitAudit.ts:
+ * dropping silently was the bug; dropping is not.
  */
 export function reviveKitProfile(raw: unknown): KitProfile {
   if (typeof raw !== 'object' || raw === null) return DEFAULT_KIT
   const stored = raw as Partial<KitProfile>
 
-  const lenses = Array.isArray(stored.lenses)
-    ? stored.lenses.filter(
-        (l): l is KitProfile['lenses'][number] =>
-          typeof l?.id === 'string' &&
-          typeof l?.name === 'string' &&
-          Number.isFinite(l?.minFocalLength) &&
-          Number.isFinite(l?.maxFocalLength) &&
-          Array.isArray(l?.forcesSensor),
-      )
-    : null
-  const bodies = Array.isArray(stored.bodies)
-    ? stored.bodies.filter(
-        (b): b is KitProfile['bodies'][number] =>
-          typeof b?.id === 'string' && typeof b?.name === 'string' &&
-          (b?.sensor === 'fullFrame' || b?.sensor === 'apsc'),
-      )
-    : null
-  const drones = Array.isArray(stored.drones)
-    ? stored.drones.filter(
-        (d): d is KitProfile['drones'][number] =>
-          typeof d?.id === 'string' && typeof d?.name === 'string' &&
-          Number.isFinite(d?.weightGrams) && Array.isArray(d?.cameras),
-      )
-    : null
+  const lenses = Array.isArray(stored.lenses) ? stored.lenses.filter(isStoredLens) : null
+  const bodies = Array.isArray(stored.bodies) ? stored.bodies.filter(isStoredBody) : null
+  const drones = Array.isArray(stored.drones) ? stored.drones.filter(isStoredDrone) : null
 
   if (lenses === null || bodies === null || drones === null) return DEFAULT_KIT
 

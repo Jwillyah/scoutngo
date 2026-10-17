@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_KIT, type Body, type Drone, type KitProfile, type Lens } from '../core/kit.ts'
 import { defaultOpticFor, opticsFor } from '../core/optics.ts'
-import { auditKit, kitAuditHasNews, kitAuditLines } from './kitAudit.ts'
+import { auditKit, describeDropped, kitAuditHasNews, kitAuditLines } from './kitAudit.ts'
 import {
   defaultSelection,
   reviveKitProfile,
@@ -238,32 +238,140 @@ describe('the kit screen reports what storage holds', () => {
   })
 
   /*
-   * A REAL LOSS, REPORTED AS ONE. reviveKitProfile silently drops entries that
-   * fail validation, and nothing else would ever say so.
+   * A REAL LOSS, REPORTED AS ONE, AND NAMED.
+   *
+   * reviveKitProfile drops entries that fail validation and nothing else
+   * would ever say so. Dropping is right: a half-read lens would compute a
+   * field of view from undefined. But "1 stored lens could not be read back"
+   * does not say WHICH one to re-add, so the line carries whatever was
+   * legible in the entry.
    */
-  it('reports an entry that was in storage and could not be read back', () => {
+  it('names what it could read of a dropped lens', () => {
     const corrupt = {
-      ...roundTrip(MINE) as Record<string, unknown>,
-      lenses: [...MINE.lenses, { id: 'broken', name: 'Half a lens' }],
+      ...(roundTrip(MINE) as Record<string, unknown>),
+      /* A real-looking lens missing forcesSensor, so it fails validation. */
+      lenses: [
+        ...MINE.lenses,
+        { id: 'sigma-30', name: 'Sigma 30', minFocalLength: 30, maxFocalLength: 30, maxAperture: 1.4 },
+      ],
     }
     const revived = reviveKitProfile(corrupt)
+    expect(revived.lenses.some((l) => l.name === 'Sigma 30')).toBe(false)
+
     const audit = auditKit(corrupt, revived, PACKED)
     expect(audit.unreadable).toHaveLength(1)
     expect(audit.unreadable[0].kind).toBe('lens')
+    expect(audit.unreadable[0].fragment).toBe('Sigma 30, 30mm, f1.4')
+
     const loss = kitAuditLines(audit).find((line) => line.tone === 'loss')
-    expect(loss?.text).toContain('could not be read back')
-    /* Singular, because "1 stored lenses" reads like a second bug. */
-    expect(loss?.text).toContain('1 stored lens could not be read back and is')
+    expect(loss?.text).toContain('A stored lens could not be read back')
+    expect(loss?.text).toContain('It looked like: Sigma 30, 30mm, f1.4.')
+    expect(loss?.text).toContain('Add it again')
   })
 
-  it('pluralises when more than one went missing', () => {
+  it('reads a zoom range, and a prime as one figure', () => {
+    expect(
+      describeDropped('lens', { name: 'Sony 70-200', minFocalLength: 70, maxFocalLength: 200 }),
+    ).toBe('Sony 70-200, 70-200mm')
+    expect(describeDropped('lens', { minFocalLength: 50, maxFocalLength: 50 })).toBe('50mm')
+  })
+
+  /* It never fills in the half it does not have. */
+  it('does not assume a prime from one focal length', () => {
+    expect(describeDropped('lens', { minFocalLength: 24 })).toBe('24mm and no longer end')
+    expect(describeDropped('lens', { maxFocalLength: 70 })).toBe('up to 70mm')
+  })
+
+  it('describes a body and an aircraft by what they carry', () => {
+    expect(describeDropped('body', { name: 'Sony FX3', sensor: 'fullFrame', role: 'video' })).toBe(
+      'Sony FX3, full frame, video',
+    )
+    expect(describeDropped('drone', { name: 'Mini 4', weightGrams: 249, cameras: [{}] })).toBe(
+      'Mini 4, 249g, 1 camera',
+    )
+  })
+
+  /*
+   * NOTHING LEGIBLE SAYS SO, rather than inventing a description. An invented
+   * name on a loss notice is the same failure as an invented reading anywhere
+   * else in this app.
+   */
+  it('says nothing was legible when nothing was', () => {
+    for (const nothing of [{}, { name: '' }, { name: 42 }, { name: '   ' }, null, 'x', 7]) {
+      expect(describeDropped('lens', nothing), JSON.stringify(nothing)).toBeNull()
+    }
+    const audit = auditKit(
+      { ...(roundTrip(MINE) as Record<string, unknown>), lenses: [...MINE.lenses, {}] },
+      MINE,
+      PACKED,
+    )
+    const loss = kitAuditLines(audit).find((line) => line.tone === 'loss')
+    expect(loss?.text).toContain('Nothing in it was legible')
+    expect(loss?.text).not.toContain('It looked like')
+  })
+
+  /* The id is a last resort, not the headline. */
+  it('falls back to the id only when there is nothing human', () => {
+    expect(describeDropped('lens', { id: 'laowa-9' })).toBe('id laowa-9')
+    expect(describeDropped('lens', { id: 'laowa-9', name: 'Laowa 9mm' })).toBe('Laowa 9mm')
+  })
+
+  /*
+   * IT IS CORRUPT DATA GOING ON A SCREEN. A 40,000 character name must not
+   * take the kit screen with it, and control bytes must not reach the DOM.
+   */
+  it('caps and cleans what it prints', () => {
+    const long = describeDropped('lens', { name: 'x'.repeat(500) })
+    expect(long!.length).toBeLessThan(50)
+    expect(long!.endsWith('...')).toBe(true)
+
+    /* And a truncated fragment is not given a second full stop after it. */
+    const audit = auditKit(
+      {
+        ...(roundTrip(MINE) as Record<string, unknown>),
+        lenses: [...MINE.lenses, { name: 'x'.repeat(500) }],
+      },
+      MINE,
+      PACKED,
+    )
+    const loss = kitAuditLines(audit).find((line) => line.tone === 'loss')
+    expect(loss?.text).not.toContain('....')
+    expect(loss?.text).toContain('... Add it again')
+    expect(describeDropped('lens', { name: 'Sig\u0000ma\u00079' })).toBe('Sig ma 9')
+  })
+
+  /* One line per entry, so two losses are two lines rather than a count. */
+  it('reports each dropped entry separately', () => {
     const corrupt = {
       ...(roundTrip(MINE) as Record<string, unknown>),
-      lenses: [...MINE.lenses, { id: 'a' }, { id: 'b' }],
+      lenses: [...MINE.lenses, { name: 'One' }, { name: 'Two' }],
     }
     const audit = auditKit(corrupt, reviveKitProfile(corrupt), PACKED)
-    const loss = kitAuditLines(audit).find((line) => line.tone === 'loss')
-    expect(loss?.text).toContain('2 stored lenses could not be read back and are')
+    expect(audit.unreadable).toHaveLength(2)
+    const losses = kitAuditLines(audit).filter((line) => line.tone === 'loss')
+    expect(losses).toHaveLength(2)
+    expect(losses[0].text).toContain('One')
+    expect(losses[1].text).toContain('Two')
+  })
+
+  /*
+   * THE AUDIT AND THE REVIVER ASK THE SAME QUESTION. If they ever disagree,
+   * the reviver drops a lens while the report says everything arrived, which
+   * is the drift this whole week has been spent closing.
+   */
+  it('agrees with the reviver about what is readable', () => {
+    const entries = [
+      { id: 'a', name: 'A', minFocalLength: 1, maxFocalLength: 2, forcesSensor: [] },
+      { id: 'b', name: 'B', minFocalLength: 1, maxFocalLength: 2 },
+      { id: 'c', name: 'C', forcesSensor: [] },
+      { name: 'D', minFocalLength: 1, maxFocalLength: 2, forcesSensor: [] },
+    ]
+    const corrupt = { ...(roundTrip(MINE) as Record<string, unknown>), lenses: entries }
+    const revived = reviveKitProfile(corrupt)
+    const audit = auditKit(corrupt, revived, PACKED)
+    expect(revived.lenses).toHaveLength(1)
+    expect(audit.unreadable).toHaveLength(3)
+    expect(revived.lenses.length + audit.unreadable.length).toBe(entries.length)
   })
 
   it('reports the whole profile falling back to the shipped one', () => {

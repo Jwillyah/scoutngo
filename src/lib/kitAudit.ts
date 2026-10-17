@@ -1,5 +1,10 @@
 import { DEFAULT_KIT, type KitProfile } from '../core/kit.ts'
-import type { KitSelection } from './kitSelection.ts'
+import {
+  isStoredBody,
+  isStoredDrone,
+  isStoredLens,
+  type KitSelection,
+} from './kitSelection.ts'
 
 /**
  * WHAT IS ACTUALLY IN THE STORED KIT, AGAINST THE SHIPPED ONE.
@@ -50,8 +55,14 @@ export interface KitAudit {
    *
    * A REAL LOSS, not a tick. Reported loudly because nothing else would say
    * so: the entry is simply absent afterwards.
+   *
+   * EACH ONE CARRIES WHATEVER WAS LEGIBLE IN IT. "1 stored lens could not be
+   * read back" does not say which one to re-add. "It looked like: Sigma 30,
+   * 30mm" does, and that is the whole value of the line. The fragment is built
+   * ONLY from fields that actually held a usable value; when nothing did, it
+   * is null and the line says so rather than inventing a description.
    */
-  unreadable: { kind: GearKind; index: number }[]
+  unreadable: DroppedEntry[]
   /** True when the whole stored profile was unusable and the shipped one is in use. */
   profileReplaced: boolean
   /**
@@ -63,17 +74,121 @@ export interface KitAudit {
   dangling: { kind: GearKind; id: string }[]
 }
 
+export interface DroppedEntry {
+  kind: GearKind
+  /**
+   * Whatever was legible in it, or null when nothing was.
+   *
+   * Never a guess. If the entry held a name, the name is here; if it held a
+   * focal length, that is here; if it held neither, this is null and the
+   * line says nothing was readable rather than describing a thing it cannot
+   * describe.
+   */
+  fragment: string | null
+}
+
 const refs = (profile: KitProfile): GearRef[] => [
   ...profile.bodies.map((b) => ({ kind: 'body' as const, id: b.id, name: b.name })),
   ...profile.lenses.map((l) => ({ kind: 'lens' as const, id: l.id, name: l.name })),
   ...profile.drones.map((d) => ({ kind: 'drone' as const, id: d.id, name: d.name })),
 ]
 
-/** How many entries of each kind storage held, before anything was dropped. */
-function storedCount(raw: unknown, key: 'bodies' | 'lenses' | 'drones'): number | null {
+/** The stored list for one kind, or null when storage did not hold a list. */
+function storedList(raw: unknown, key: 'bodies' | 'lenses' | 'drones'): unknown[] | null {
   if (typeof raw !== 'object' || raw === null) return null
   const list = (raw as Record<string, unknown>)[key]
-  return Array.isArray(list) ? list.length : null
+  return Array.isArray(list) ? list : null
+}
+
+/**
+ * One readable string out of an unvalidated value.
+ *
+ * THIS IS CORRUPT DATA BEING PUT ON A SCREEN, so it is trimmed, length-capped
+ * and stripped of control characters. React escapes the markup; this is about
+ * a 40,000 character "name" pushing the rest of the kit screen off the phone.
+ */
+function readableText(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  /*
+   * Filtered by CODE POINT rather than by a character class. A class needs
+   * literal control characters or escape sequences in the source, and the
+   * first version of this line ended up with real control bytes written into
+   * the file: unreadable, and quietly wrong if one were ever normalised away.
+   */
+  const clean = [...value]
+    .map((ch) => {
+      const code = ch.codePointAt(0) ?? 0
+      return code < 0x20 || (code >= 0x7f && code <= 0x9f) ? ' ' : ch
+    })
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (clean === '') return null
+  return clean.length > MAX_FRAGMENT_CHARS ? `${clean.slice(0, MAX_FRAGMENT_CHARS)}...` : clean
+}
+
+/** Long enough to recognise a lens by, short enough not to take the screen. */
+const MAX_FRAGMENT_CHARS = 40
+
+/** A finite number, or null. Zero is a real value and survives. */
+function readableNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+/**
+ * What could be read of an entry that failed to revive.
+ *
+ * Each kind is asked for the fields a person would recognise it by, in the
+ * order they would say them. Nothing is inferred from anything else: a lens
+ * with a min focal length and no max reports the min alone rather than
+ * assuming a prime.
+ */
+export function describeDropped(kind: GearKind, raw: unknown): string | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const entry = raw as Record<string, unknown>
+  const parts: string[] = []
+
+  const name = readableText(entry.name)
+  if (name !== null) parts.push(name)
+
+  if (kind === 'lens') {
+    const min = readableNumber(entry.minFocalLength)
+    const max = readableNumber(entry.maxFocalLength)
+    if (min !== null && max !== null) parts.push(min === max ? `${min}mm` : `${min}-${max}mm`)
+    else if (min !== null) parts.push(`${min}mm and no longer end`)
+    else if (max !== null) parts.push(`up to ${max}mm`)
+
+    const aperture = readableNumber(entry.maxAperture)
+    if (aperture !== null) parts.push(`f${aperture}`)
+  }
+
+  if (kind === 'body') {
+    const sensor = entry.sensor
+    if (sensor === 'fullFrame') parts.push('full frame')
+    else if (sensor === 'apsc') parts.push('APS-C')
+    const role = readableText(entry.role)
+    if (role !== null) parts.push(role)
+  }
+
+  if (kind === 'drone') {
+    const grams = readableNumber(entry.weightGrams)
+    if (grams !== null) parts.push(`${grams}g`)
+    if (Array.isArray(entry.cameras)) {
+      parts.push(entry.cameras.length === 1 ? '1 camera' : `${entry.cameras.length} cameras`)
+    }
+  }
+
+  /*
+   * THE ID LAST, and only when nothing else was legible. It is the least
+   * human of the fields and is usually the one thing a corrupt entry still
+   * has, so leading with it would bury a real name behind "sigma-30".
+   */
+  if (parts.length === 0) {
+    const id = readableText(entry.id)
+    if (id !== null) parts.push(`id ${id}`)
+  }
+
+  return parts.length === 0 ? null : parts.join(', ')
 }
 
 export function auditKit(
@@ -93,20 +208,25 @@ export function auditKit(
   const removed = theirs.filter((ref) => !mine.some((other) => sameRef(ref, other)))
 
   /*
-   * ENTRIES THAT WENT MISSING BETWEEN STORAGE AND HERE. Counted rather than
-   * named, because an entry that failed to revive has no trustworthy name to
-   * print. The count is what matters: it says something was there and is not.
+   * ENTRIES THAT WENT MISSING BETWEEN STORAGE AND HERE, each with whatever
+   * was legible in it.
+   *
+   * FOUND WITH THE REVIVER'S OWN PREDICATE rather than by subtracting counts.
+   * Counting says how many went; asking the same question the reviver asked
+   * says WHICH, and which is the only version of this line worth reading:
+   * "1 stored lens could not be read back" does not tell anyone what to
+   * re-add. It also means the two can never disagree about what readable is.
    */
-  const unreadable: KitAudit['unreadable'] = []
-  const pairs: [GearKind, 'bodies' | 'lenses' | 'drones', number][] = [
-    ['body', 'bodies', profile.bodies.length],
-    ['lens', 'lenses', profile.lenses.length],
-    ['drone', 'drones', profile.drones.length],
+  const unreadable: DroppedEntry[] = []
+  const kinds: [GearKind, 'bodies' | 'lenses' | 'drones', (v: unknown) => boolean][] = [
+    ['body', 'bodies', isStoredBody],
+    ['lens', 'lenses', isStoredLens],
+    ['drone', 'drones', isStoredDrone],
   ]
-  for (const [kind, key, kept] of pairs) {
-    const was = storedCount(rawProfile, key)
-    if (was !== null && was > kept) {
-      for (let i = 0; i < was - kept; i++) unreadable.push({ kind, index: i })
+  for (const [kind, key, isReadable] of kinds) {
+    for (const entry of storedList(rawProfile, key) ?? []) {
+      if (isReadable(entry)) continue
+      unreadable.push({ kind, fragment: describeDropped(kind, entry) })
     }
   }
 
@@ -114,12 +234,12 @@ export function auditKit(
    * THE WHOLE PROFILE FELL BACK. reviveKitProfile returns the shipped kit if
    * the stored lenses, bodies or drones are not arrays, which silently
    * replaces everything. Detected by storage having had a profile at all
-   * while nothing of it survived as added or removed gear.
+   * while one of the three lists was not a list.
    */
   const hadProfile = typeof rawProfile === 'object' && rawProfile !== null
   const profileReplaced =
     hadProfile &&
-    (['bodies', 'lenses', 'drones'] as const).some((key) => storedCount(rawProfile, key) === null)
+    (['bodies', 'lenses', 'drones'] as const).some((key) => storedList(rawProfile, key) === null)
 
   const dangling: KitAudit['dangling'] = [
     ...selection.bodyIds
@@ -168,17 +288,31 @@ export function kitAuditLines(audit: KitAudit): { tone: 'loss' | 'fact'; text: s
     })
   }
 
-  for (const kind of ['body', 'lens', 'drone'] as const) {
-    const lost = audit.unreadable.filter((entry) => entry.kind === kind).length
-    if (lost > 0) {
-      const word = lost === 1 ? KIND_WORD[kind].one : KIND_WORD[kind].many
-      lines.push({
-        tone: 'loss',
-        text: `${lost} stored ${word} could not be read back and ${
-          lost === 1 ? 'is' : 'are'
-        } no longer here. Whatever ${lost === 1 ? 'it was, it is' : 'they were, they are'} not in this list.`,
-      })
-    }
+  /*
+   * ONE LINE PER DROPPED ENTRY, carrying what was legible in it.
+   *
+   * Not a count. The point of the line is knowing WHICH lens to re-add, and
+   * "1 stored lens could not be read back" does not say. Where nothing was
+   * legible the line says that instead of describing something it cannot
+   * describe: an invented name on a loss notice is the same failure as an
+   * invented reading anywhere else in this app.
+   */
+  for (const entry of audit.unreadable) {
+    const what = KIND_WORD[entry.kind].one
+    lines.push({
+      tone: 'loss',
+      text:
+        entry.fragment === null
+          ? `A stored ${what} could not be read back and is no longer here. Nothing in it was legible, so there is nothing to go on: check the list against what you own.`
+          : /*
+             * No second full stop after a fragment that was truncated: the
+             * cap already ends it in an ellipsis, and "xxx.... Add it again"
+             * reads like a typo in the one line that has to be trusted.
+             */
+            `A stored ${what} could not be read back and is no longer here. It looked like: ${entry.fragment}${
+              entry.fragment.endsWith('...') ? '' : '.'
+            } Add it again if you still have it.`,
+    })
   }
 
   if (audit.dangling.length > 0) {
