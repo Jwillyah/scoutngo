@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { destinationPoint, type LatLon } from '../core/geo.ts'
-import { buildLabel } from '../lib/build.ts'
+import type { BuildCheck } from '../lib/build.ts'
+import { BuildStamp } from './BuildStamp.tsx'
 import { exampleIndex, SHOOT_EXAMPLES, SHOT_LIST_EXAMPLES } from '../lib/examples.ts'
 import type { DescribeState, DesiredShot } from '../lib/describe.ts'
 import type { KitProfile as KitProfileType } from '../core/kit.ts'
@@ -93,6 +94,8 @@ interface SetupModeProps {
    * every press of a blocked forward button, so pressing it twice points twice.
    */
   pointAt: { field: SetupTarget | 'brief' | null; tick: number }
+  /** Whether a newer build is deployed, for the stamp under Settings. */
+  newBuild: BuildCheck
 }
 
 /** What is open over the one screen. Only ever one at a time. */
@@ -164,6 +167,7 @@ export function SetupMode({
   onPlatformFilter,
   shootLine,
   airAvailable,
+  newBuild,
 }: SetupModeProps) {
   /*
    * One example per load, so the placeholder shows the kind of work the reader
@@ -347,14 +351,7 @@ export function SetupMode({
                         * Monospace, because it is an identifier to read out
                         * loud or type into a message, not prose.
                         */}
-                      <p className="build">
-                        <span className="build__label">Build</span>
-                        <span className="build__id num">{buildLabel()}</span>
-                        <span className="build__note">
-                          The commit this was built from. Quote it with a screenshot and there
-                          is nothing to disagree about.
-                        </span>
-                      </p>
+                      <BuildStamp deployed={newBuild} />
                     </div>
                   ) : null}
 

@@ -31,6 +31,53 @@ function buildId(): string {
   }
 }
 
+/**
+ * WHICH REPOSITORY THIS IS, so the running app can ask what is on origin.
+ *
+ * Read from the git remote rather than written down, so a fork checks its own
+ * origin and not this one. Empty when there is no remote, and the app then
+ * says it cannot check rather than checking the wrong thing.
+ */
+function repoSlug(): string {
+  const fromEnv = process.env.VERCEL_GIT_REPO_OWNER
+  const name = process.env.VERCEL_GIT_REPO_SLUG
+  if (typeof fromEnv === 'string' && typeof name === 'string' && fromEnv !== '') {
+    return `${fromEnv}/${name}`
+  }
+  try {
+    const url = execSync('git remote get-url origin', { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim()
+    const match = /github\.com[:/]([^/]+)\/(.+?)(?:\.git)?$/.exec(url)
+    return match === null ? '' : `${match[1]}/${match[2]}`
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * WHETHER THE COMMIT THIS WAS BUILT FROM HAD BEEN PUSHED.
+ *
+ * A local build of unpushed work is the thing that cost three days: it looks
+ * exactly like a deployed build, on the same laptop, serving the same screen.
+ * Compiled in so the stamp can say so out loud rather than leaving somebody to
+ * compare hashes by hand.
+ *
+ * On a deploy this is always true: the platform builds from a pushed commit.
+ * It is the LOCAL case this exists to catch.
+ */
+function buildPushed(): boolean {
+  if (typeof process.env.VERCEL_GIT_COMMIT_SHA === 'string') return true
+  try {
+    const on = execSync('git branch -r --contains HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim()
+    return on !== ''
+  } catch {
+    return false
+  }
+}
+
 /** Whether the working tree had uncommitted changes when this was built. */
 function buildDirty(): boolean {
   try {
@@ -69,6 +116,8 @@ export default defineConfig({
     __BUILD_ID__: JSON.stringify(buildId()),
     __BUILD_DIRTY__: JSON.stringify(buildDirty()),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+    __BUILD_PUSHED__: JSON.stringify(buildPushed()),
+    __REPO_SLUG__: JSON.stringify(repoSlug()),
   },
   /*
    * Bind to every interface so a phone on the same wifi can reach the dev

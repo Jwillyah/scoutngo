@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+#
+# WHAT JUST HAPPENED, AND WHETHER ANYONE ELSE CAN SEE IT.
+#
+# The pre-commit hook gates hard and then says nothing about whether the commit
+# it just allowed will ever leave this machine. That gap cost three days: field
+# reports made against a deployed build four commits behind, and a pass spent
+# re-fixing what was already fixed and sitting here unpushed.
+#
+# This does NOT push. Pushing stays something a person asks for. It only makes
+# the state impossible to not know, at the one moment it has just changed.
+set -uo pipefail
+cd "$(git rev-parse --show-toplevel)" || exit 0
+node scripts/push-state.mjs || true

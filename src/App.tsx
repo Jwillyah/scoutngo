@@ -1530,6 +1530,7 @@ function App() {
             onPlatformFilter={setPlatformFilter}
             shootLine={shootLine}
             airAvailable={droneAvailable(kit, kitProfile)}
+            newBuild={newBuild}
             onUseMyLocation={onUseMyLocation}
             shotListText={shotListText}
             onShotListText={onShotListChange}

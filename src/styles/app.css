@@ -5858,3 +5858,40 @@
   border-left: var(--line-rule) solid var(--color-rule-fact);
   color: var(--color-text-muted);
 }
+
+/*
+ * THE BUILD STAMP, WHICH NOW ANSWERS INSTEAD OF ASKING.
+ *
+ * It was a hash and a note explaining that it was a hash. Comparing it to
+ * anything meant having something to compare it to, so nobody did, and three
+ * days of field reports went against a deployed build four commits behind.
+ *
+ * Each line is one answered question. A 'loss' line means what you are looking
+ * at is not the current code, which is the thing that has to be impossible to
+ * miss, so it takes the hazard rule like every other real loss in this app.
+ */
+.build__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.build__line {
+  margin: 0;
+  padding: var(--space-2);
+  border-radius: var(--radius-panel);
+  background: var(--color-panel-2);
+  font-size: var(--text-xs);
+  line-height: 1.35;
+}
+
+.build__line--loss {
+  border-left: var(--line-rule) solid var(--color-hazard);
+  color: var(--color-text);
+}
+
+.build__line--fact {
+  border-left: var(--line-rule) solid var(--color-rule-fact);
+  color: var(--color-text-muted);
+}
