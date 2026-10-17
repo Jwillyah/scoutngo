@@ -1,4 +1,3 @@
-import { opticTag } from '../core/opticTag.ts'
 import { SHOT_TYPE_LABEL, type ShotType } from '../core/shotType.ts'
 import { wideFrameWord } from '../lib/framingCopy.ts'
 import { BLOCKED_WORD } from '../lib/sightlineCopy.ts'
@@ -21,6 +20,15 @@ interface ShooterFigureProps {
    */
   focalLength: number
   opticName: string
+  /**
+   * The short tag to print, or null when every plate on this map would carry
+   * the same one and it therefore distinguishes nothing. See core/mapLabel.ts.
+   *
+   * The full `opticName` is still required and still goes in the aria-label:
+   * a screen reader reads one position at a time, so "28 millimetres" with no
+   * optic is as ambiguous for it as it was on screen.
+   */
+  opticTag: string | null
   /**
    * The lighting class, or null when the shot type has none.
    *
@@ -133,6 +141,7 @@ export function ShooterFigure({
   number,
   focalLength,
   opticName,
+  opticTag,
   classification,
   shotType,
   warnings,
@@ -260,8 +269,8 @@ export function ShooterFigure({
         * beside six markers.
         */}
       <span className="shooter__focal num">
-        {opticTag(opticName) === '' ? null : (
-          <span className="shooter__optic">{opticTag(opticName)}</span>
+        {opticTag === null || opticTag === '' ? null : (
+          <span className="shooter__optic">{opticTag}</span>
         )}
         {focalLength}
         {air ? (

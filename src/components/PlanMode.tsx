@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import type { LatLon } from '../core/geo.ts'
 import type {
   Platform,
@@ -26,6 +26,7 @@ import { placingHint } from '../core/platformFilter.ts'
 import type { SetupTarget } from '../lib/mode.ts'
 import { GROUND_WIND_METERS, type WindHeight } from '../core/windHeight.ts'
 import type { SkyLayerKind } from '../core/skyLayer.ts'
+import { hudToggleLabel, type HudState } from '../core/hud.ts'
 import type { MarkKind, SiteMark } from '../core/siteMark.ts'
 import { HazardPanel } from './HazardPanel.tsx'
 import { BottomSheet, type SheetState } from './BottomSheet.tsx'
@@ -136,6 +137,9 @@ interface PlanModeProps {
   shootDate: string
   /** Which brief a generate would send: the typed one, or the chips. */
   briefSource: string
+  /** Whether the control row is collapsed, and the shooter's own choice. */
+  hud: HudState
+  onHudOverride: (next: HudState) => void
   /** Which measure the sky layer paints. */
   skyLayer: SkyLayerKind
   onSkyLayer: (next: SkyLayerKind) => void
@@ -282,6 +286,8 @@ export function PlanMode({
   onDeleteMark,
   shootDate,
   briefSource,
+  hud,
+  onHudOverride,
   skyLayer,
   onSkyLayer,
   placing,
@@ -316,6 +322,24 @@ export function PlanMode({
   addsAir,
 }: PlanModeProps) {
   const [sheet, setSheet] = useState<SheetState>('peek')
+
+  /*
+   * A MAP PANEL AND AN OPEN SHEET CANNOT BOTH EXIST.
+   *
+   * DERIVED, not remembered. src/core/mapPanel.ts made the two map panels
+   * mutually exclusive by giving them one value; the sheet is a different kind
+   * of thing with its own detents, so it cannot join that type. The same
+   * guarantee is had by making the combination unrepresentable in what is
+   * RENDERED: while a panel is open the sheet is at peek, whatever its own
+   * state says.
+   *
+   * It matters more than tidiness. Measured with both open, the hazard panel
+   * was squeezed to 26 pixels tall: the sheet took its room and it had nowhere
+   * to go. A panel that exists and cannot be used is the thing this audit
+   * exists to catch.
+   */
+  const panelOpen = marking || showSky
+  const sheetState: SheetState = panelOpen && sheet === 'open' ? 'peek' : sheet
   const [sheetHeight, setSheetHeight] = useState(108)
   const [view, setView] = useState<SheetView>('plan')
   const [pitch, setPitch] = useState(0)
@@ -332,9 +356,25 @@ export function PlanMode({
     if (node !== null) setDockHeight(node.offsetHeight)
   }
 
+  /*
+   * The control row's own height, watched rather than read once: it changes
+   * when the row collapses and when a count gains a digit.
+   */
+  const [hudHeight, setHudHeight] = useState(0)
+  const measureHud = useCallback((node: HTMLElement | null) => {
+    if (node === null) return
+    setHudHeight(node.offsetHeight)
+    const observer = new ResizeObserver(() => setHudHeight(node.offsetHeight))
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [])
+
   const openWith = (next: SheetView) => {
     setView(next)
     setSheet('open')
+    /* The other direction: opening the sheet closes whatever is over the map. */
+    if (marking) onMarking(false)
+    if (showSky) onShowSky(false)
   }
 
   const handle = mapHandle as React.RefObject<MapHandle | null>
@@ -358,6 +398,14 @@ export function PlanMode({
         {
           ['--sheet-live-height' as string]: `${sheetHeight}px`,
           ['--dock-height' as string]: `${dockHeight}px`,
+          /*
+           * MEASURED, not guessed. The row changes height when it collapses
+           * and when the platform counts gain a digit, and the hazard panel
+           * is positioned below it: a hard-coded number here is how a panel
+           * ends up across the button that closes it, which is exactly what
+           * the panel audit caught.
+           */
+          ['--hud-height' as string]: `${hudHeight}px`,
         } as React.CSSProperties
       }
     >
@@ -430,38 +478,22 @@ export function PlanMode({
         */}
       {!placingPilot ? null : <p className="tapnote">{placingHint('pilot', 'ground')}</p>}
 
-      <header className="hud">
+      {/*
+        * THE CONTROL ROW, COLLAPSED ONCE THERE IS A PLAN.
+        *
+        * Measured at 390x844 it was 150px over three lines, 18 percent of the
+        * screen before any map. One line was the alternative and is not
+        * possible: the controls are about 650px of legible text end to end,
+        * and the only way to fit them is icons, which trades the thing that
+        * makes a control usable in sun for space that can be found another
+        * way. See src/core/hud.ts for the reasoning in full.
+        *
+        * THE PLATFORM SWITCH STAYS because it is the only one here that
+        * changes what the NEXT TAP DOES rather than what is drawn, and it
+        * carries the counts that say whether the filter is hiding anything.
+        */}
+      <header className={`hud hud--${hud}`} ref={measureHud}>
         <div className="hud__row">
-          {/* The single control that reveals sun and tide detail. */}
-          <button type="button" className="mode" onClick={() => openWith('conditions')}>
-            Conditions
-          </button>
-          {/*
-            * HAZARDS. Up here with the other reveals rather than buried in the
-            * overflow, because on a site full of wires this is the first thing
-            * touched and the count has to be visible without opening anything.
-            */}
-          <button
-            type="button"
-            className={`mode${marking ? ' mode--on' : ''}`}
-            aria-pressed={marking}
-            onClick={() => onMarking(!marking)}
-          >
-            Hazards
-            {marks.length === 0 ? null : (
-              <span className="mode__n num"> {marks.length}</span>
-            )}
-          </button>
-          <ConePicker
-            kit={kitProfile}
-            plan={plan}
-            coneMode={coneMode}
-            onConeMode={onConeMode}
-            lensFilters={lensFilters}
-            onLensFilters={onLensFilters}
-            isolatedId={isolatedId}
-            onClearIsolate={onClearIsolate}
-          />
           <PlatformFilter
             value={platformFilter}
             onChange={onPlatformFilter}
@@ -469,14 +501,58 @@ export function PlanMode({
             hidden={hiddenByPlatform}
             airAvailable={airAvailable}
           />
-          <OverflowMenu
-            showArc={showArc}
-            onShowArc={onShowArc}
-            showSky={showSky}
-            onShowSky={onShowSky}
-            sunAltitude={sun?.altitude ?? null}
-          />
+          <button
+            type="button"
+            className="mode hud__toggle"
+            aria-expanded={hud === 'open'}
+            onClick={() => onHudOverride(hud === 'open' ? 'collapsed' : 'open')}
+          >
+            {hudToggleLabel(hud)}
+          </button>
         </div>
+
+        {hud === 'collapsed' ? null : (
+          <div className="hud__row hud__row--more">
+            {/* The single control that reveals sun and tide detail. */}
+            <button type="button" className="mode" onClick={() => openWith('conditions')}>
+              Conditions
+            </button>
+            {/*
+              * HAZARDS. Up here with the other reveals rather than buried in
+              * the overflow, because on a site full of wires this is the first
+              * thing touched and the count has to be visible without opening
+              * anything.
+              */}
+            <button
+              type="button"
+              className={`mode${marking ? ' mode--on' : ''}`}
+              aria-pressed={marking}
+              onClick={() => onMarking(!marking)}
+            >
+              Hazards
+              {marks.length === 0 ? null : (
+                <span className="mode__n num"> {marks.length}</span>
+              )}
+            </button>
+            <ConePicker
+              kit={kitProfile}
+              plan={plan}
+              coneMode={coneMode}
+              onConeMode={onConeMode}
+              lensFilters={lensFilters}
+              onLensFilters={onLensFilters}
+              isolatedId={isolatedId}
+              onClearIsolate={onClearIsolate}
+            />
+            <OverflowMenu
+              showArc={showArc}
+              onShowArc={onShowArc}
+              showSky={showSky}
+              onShowSky={onShowSky}
+              sunAltitude={sun?.altitude ?? null}
+            />
+          </div>
+        )}
       </header>
 
       {/*
@@ -567,7 +643,7 @@ export function PlanMode({
       )}
 
       <BottomSheet
-        state={sheet}
+        state={sheetState}
         onStateChange={setSheet}
         onHeightChange={setSheetHeight}
         reservedBottom={dockHeight}
@@ -578,7 +654,7 @@ export function PlanMode({
               className="peek__summary"
               onClick={() => {
                 setView('plan')
-                setSheet(sheet === 'peek' ? 'open' : 'peek')
+                setSheet(sheetState === 'peek' ? 'open' : 'peek')
               }}
             >
               <span className="peek__label">{peekStatus.label}</span>

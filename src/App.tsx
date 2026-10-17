@@ -21,6 +21,16 @@ import {
 } from './core/platformFilter.ts'
 import { DEFAULT_KIT, type KitProfile } from './core/kit.ts'
 import { defaultOpticFor } from './core/optics.ts'
+import { sharedOptic } from './core/mapLabel.ts'
+import { skyLayerOn, type MapPanel } from './core/mapPanel.ts'
+import { hudState, type HudState } from './core/hud.ts'
+import {
+  holdToggle,
+  NO_HOLDS,
+  canPackAir,
+  packForPlatform,
+  type KitHolds,
+} from './core/kitPacking.ts'
 import { EMPTY_LANDCOVER, type Landcover } from './core/siting.ts'
 import { getSunArc, getSunPosition } from './core/sun.ts'
 import { extremesAround, tideStateAt } from './core/tide.ts'
@@ -198,11 +208,26 @@ function App() {
   const siteMarks = useMemo(() => allMarks(marks, osmPower), [marks, osmPower])
 
   /*
+   * ONE PANEL OVER THE MAP, AT MOST. Two booleans had four states and only
+   * three were legal; this type has three and all three are. See
+   * src/core/mapPanel.ts for why that is the fix rather than each button
+   * remembering to close the other.
+   */
+  const [mapPanel, setMapPanel] = useState<MapPanel>('none')
+
+  /*
+   * The shooter's own choice about the control row, remembered for the
+   * session. Null means the rule in src/core/hud.ts decides.
+   */
+  const [hudOverride, setHudOverride] = useState<HudState | null>(null)
+  const showSky = skyLayerOn(mapPanel)
+
+  /*
    * MARKING MODE. Unlike placing a position, it stays on until it is turned
    * off: a car park with wires down two sides is six marks in a row, and a
    * mode that disarmed between each would be six trips to the button.
    */
-  const [marking, setMarking] = useState(false)
+  const marking = mapPanel === 'hazards'
   const [markKind, setMarkKind] = useState<MarkKind>('power-line')
   const [markDrawing, setMarkDrawing] = useState<'point' | 'line'>('point')
   const [markDraft, setMarkDraft] = useState<LatLon[]>([])
@@ -603,7 +628,6 @@ function App() {
    * weather rather than computed geometry, and it covers the imagery. Nobody
    * planning a client event shoot needs it, so it is asked for.
    */
-  const [showSky, setShowSky] = useState(false)
 
   /*
    * WHAT THE SKY LAYER PAINTS. Cloud decides whether there is light; wind
@@ -822,6 +846,63 @@ function App() {
       desiredShots.length,
     ],
   )
+
+  /*
+   * WHAT THE SHOOTER TICKED BY HAND, so a chip never undoes it.
+   *
+   * Recorded by DIFFING the selection rather than by every chip row reporting
+   * which id it changed. The kit is edited from two places, the chip row and
+   * the full kit panel, and both hand back a whole selection; asking each of
+   * them to also report the id is two chances to forget. The diff cannot
+   * forget, and it is how an import or a restore gets treated as the shooter's
+   * choice too, which it is.
+   */
+  const [kitHolds, setKitHolds] = useState<KitHolds>(NO_HOLDS)
+
+  const onKitChange = useCallback(
+    (next: KitSelection) => {
+      setKitHolds((held) => {
+        let out = held
+        for (const key of ['bodyIds', 'lensIds', 'droneIds'] as const) {
+          const before = new Set(kit[key])
+          const after = new Set(next[key])
+          for (const id of after) if (!before.has(id)) out = holdToggle(out, id, true)
+          for (const id of before) if (!after.has(id)) out = holdToggle(out, id, false)
+        }
+        return out
+      })
+      setKit(next)
+    },
+    [kit, setKit],
+  )
+
+  /*
+   * THE PLATFORM CHIP PACKS THE BAG.
+   *
+   * "Drone selected, and the kit row has a7IV, a7III, 28-75 and 200-600 all
+   * ticked." The chip said what was flying and the bag still held everything.
+   *
+   * A WATCHED CONDITION, like the window in src/lib/chipWindow.ts, rather than
+   * something the chip's own handler does: the packing depends on the filter
+   * AND the profile AND the holds, and doing it from the one handler that
+   * changes the first of those is how an ordering trap gets built. The rule is
+   * in src/core/kitPacking.ts and returns the selection UNCHANGED when there is
+   * nothing to do, which is what stops this looping.
+   */
+  // oxlint-disable react/set-state-in-effect -- one rule, one place; see above
+  useEffect(() => {
+    const packed = packForPlatform(platformFilter, kitProfile, kit, kitHolds)
+    if (packed === kit) return
+    if (
+      packed.bodyIds.join() === kit.bodyIds.join() &&
+      packed.lensIds.join() === kit.lensIds.join() &&
+      packed.droneIds.join() === kit.droneIds.join()
+    ) {
+      return
+    }
+    setKit({ ...kit, ...packed })
+  }, [platformFilter, kitProfile, kit, kitHolds, setKit])
+  // oxlint-enable react/set-state-in-effect
 
   const addsAir = platformFilter === 'air' && defaultAirOptic !== null
 
@@ -1459,10 +1540,24 @@ function App() {
    */
   const zoneSuffix = venueWindow === null ? '' : ` ${venueWindow.timeZoneShort}`
   const venueShort = venue.name.split(',')[0] || PINNED_PLACEHOLDER
+  /*
+   * THE OPTIC, SAID ONCE, when every position shares it.
+   *
+   * The map plates drop it in that case, because six plates reading SIGMA is
+   * six copies of a constant. The answer to "on what" still has to exist
+   * somewhere, so it moves here, in full rather than as the short tag: this
+   * line has room and "Sigma 28-75 f2.8" is the real answer that "SIGMA" is
+   * only shorthand for. Null when the positions differ, because then every
+   * plate is already carrying its own and this would be the repetition.
+   */
+  const oneOptic = sharedOptic(visiblePlan.map((p) => ({ opticName: p.optic.name })))
+
   const summary =
     centre === null
       ? 'No venue set'
-      : `${venue.startTime}–${venue.endTime}${zoneSuffix} · ${venueShort}`
+      : `${venue.startTime}–${venue.endTime}${zoneSuffix} · ${venueShort}${
+          oneOptic === null ? '' : ` · ${oneOptic}`
+        }`
 
   /*
    * What is actually missing, for the forward button to point at: the first
@@ -1568,7 +1663,7 @@ function App() {
             onClearBrief={clearBrief}
             onKeepBrief={keepBrief}
             kit={kit}
-            onKit={setKit}
+            onKit={onKitChange}
             kitProfile={kitProfile}
             onKitProfile={setKitProfile}
             spots={spots}
@@ -1589,7 +1684,13 @@ function App() {
             platformFilter={platformFilter}
             onPlatformFilter={setPlatformFilter}
             shootLine={shootLine}
-            airAvailable={droneAvailable(kit, kitProfile)}
+            /*
+             * THE PROFILE, NOT THE SELECTION. The Drone chip PACKS the
+             * aircraft, so reading its availability from what is packed lets
+             * Ground untick the aircraft and strand the chip. See canPackAir
+             * in src/core/kitPacking.ts.
+             */
+            airAvailable={canPackAir(kitProfile)}
             newBuild={newBuild}
             onShowLanding={() => setLandingSeen(false)}
             onUseMyLocation={onUseMyLocation}
@@ -1652,7 +1753,17 @@ function App() {
           showArc={showArc}
           onShowArc={setShowArc}
           showSky={showSky}
-          onShowSky={setShowSky}
+          onShowSky={(next) => {
+            /*
+             * Through the one panel value, so opening the sky key closes
+             * whatever else was open rather than stacking on it.
+             */
+            setMapPanel(next ? 'sky' : 'none')
+            if (next) {
+              setMarkDraft([])
+              setSelectedMarkId(null)
+            }
+          }}
           wind={wind}
           windLevels={windLevels}
           gustMps={gustMps}
@@ -1690,7 +1801,7 @@ function App() {
           marks={siteMarks}
           marking={marking}
           onMarking={(next) => {
-            setMarking(next)
+            setMapPanel(next ? 'hazards' : 'none')
             if (!next) {
               setMarkDraft([])
               setSelectedMarkId(null)
@@ -1713,6 +1824,8 @@ function App() {
           onDeleteMark={onDeleteMark}
           shootDate={venue.date}
           briefSource={briefSource}
+          hud={hudState(positions.length, hudOverride)}
+          onHudOverride={setHudOverride}
           skyLayer={skyLayer}
           onSkyLayer={setSkyLayer}
           placing={placing}

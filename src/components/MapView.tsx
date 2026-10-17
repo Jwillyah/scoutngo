@@ -50,6 +50,7 @@ import {
 import { markCollection, draftCollection } from '../lib/markLayer.ts'
 import { cloudForecastCollection } from '../lib/skyLayerSource.ts'
 import type { SkyLayerKind } from '../core/skyLayer.ts'
+import { plateLabels } from '../core/mapLabel.ts'
 import type { SiteMark } from '../core/siteMark.ts'
 import { readToken } from '../lib/tokens.ts'
 import { ShooterFigure } from './ShooterFigure.tsx'
@@ -688,6 +689,15 @@ export function MapView({
   const draggedRecently = useRef(new Set<string>())
 
   const [ready, setReady] = useState(false)
+  /*
+   * WHAT EACH PLATE SAYS, DECIDED ACROSS THE WHOLE SET. What one plate should
+   * carry depends on what the others carry, so it cannot be worked out one
+   * position at a time: that is how it came to print SIGMA six times.
+   */
+  const plates = plateLabels(
+    plan.map((p) => ({ opticName: p.optic.name, focalLength: p.focalLength })),
+  )
+
   /* Bumped on every map move so the ray labels can re-place themselves. */
   const [viewTick, setViewTick] = useState(0)
   /*
@@ -2195,14 +2205,19 @@ export function MapView({
   return (
     <div className={`map${mode === null ? '' : ' map--picking'}`}>
       <div className="map__canvas" ref={container} />
-      {plan.map((planned) => {
+      {plan.map((planned, index) => {
         const host = figureEls[planned.position.id]
         if (host === undefined) return null
         return createPortal(
           <ShooterFigure
             number={planned.position.number}
             focalLength={planned.focalLength}
+            /*
+             * NULL WHEN EVERY PLATE WOULD CARRY THE SAME WORD. Six plates
+             * reading SIGMA is six copies of a constant; see core/mapLabel.ts.
+             */
             opticName={planned.optic.name}
+            opticTag={plates[index]?.tag ?? null}
             classification={classificationOf(planned.read)}
             shotType={planned.position.shotType}
             warnings={planned.warnings}

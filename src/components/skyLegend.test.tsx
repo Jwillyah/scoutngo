@@ -139,28 +139,44 @@ describe('the layer picker', () => {
     expect(close).toContain('skykey__pick')
   })
 
-  it('calls the wind layer a forecast, at every hour', () => {
+  it('calls the wind layer a forecast', () => {
     const html = windKey()
     expect(html).toContain('Forecast')
     expect(html).not.toContain('Satellite')
-    expect(html).toContain('no satellite picture of wind')
-    expect(html).toContain('including the ones already past')
   })
 
   it('states the height the wind is read at', () => {
     expect(windKey()).toContain('at 200 ft')
   })
 
-  it('names what the bands are measured against', () => {
+  /*
+   * COMPACT BY DEFAULT. "CLOUD and WIND is a layer picker, so I need to see
+   * the layer change while I tap it." The bar carries what changes with the
+   * tap: the tabs, the band key, the height, and the number the bands mean.
+   */
+  it('keeps the number the bands mean, because without it they mean nothing', () => {
     expect(windKey()).toContain('12 m/s')
-    expect(windKey()).toContain('published rating')
   })
 
-  /* No rating, no bands, and it says so rather than implying one. */
-  it('says the bands do not apply with no published rating', () => {
-    const html = windKey({ ratedWindMps: null })
-    expect(html).toContain('No aircraft in the kit publishes a wind rating')
-    expect(html).toContain('invented limit')
+  it('says unbanded on the bar when there is no rating', () => {
+    expect(windKey({ ratedWindMps: null })).toContain('No published rating')
+  })
+
+  /*
+   * AND THE PROSE IS GONE FROM THE BAR, not from the app: it is behind the
+   * info tap. Asserted as absent here and present in the source below, so
+   * "compact" cannot be achieved by deleting the honesty.
+   */
+  it('does not put the explanation on the bar', () => {
+    const html = windKey()
+    expect(html).not.toContain('no satellite picture of wind')
+    expect(html).not.toContain('published rating of the most limiting')
+    expect(html).not.toContain('model points')
+  })
+
+  it('offers the info tap that carries it', () => {
+    expect(windKey()).toContain('skykey__info')
+    expect(windKey()).toContain('What this layer is')
   })
 
   /*
@@ -175,9 +191,5 @@ describe('the layer picker', () => {
     expect(html).toContain('HTTP 429')
   })
 
-  /* The square announces its own edges, on both layers. */
-  it('states the grid extent', () => {
-    expect(windKey()).toContain('model points')
-    expect(windKey()).toContain('not clear sky')
-  })
+
 })

@@ -290,6 +290,7 @@ describe('a flagged position says what is wrong with it', () => {
       <ShooterFigure
         number={3}
         opticName="Sigma 28-75 f2.8"
+        opticTag="SIGMA"
         focalLength={400}
         classification="side-lit"
         shotType="framed"
@@ -368,10 +369,29 @@ describe('a flagged position says what is wrong with it', () => {
    * drone in the first place."
    */
   it('names the optic on the plate beside the focal length', () => {
-    const html = flagged({ opticName: 'Air 3S wide', focalLength: 24 } as never)
+    const html = flagged({ opticName: 'Air 3S wide', opticTag: 'AIR 3S', focalLength: 24 } as never)
     expect(html).toContain('AIR 3S')
     expect(html).toContain('24')
     expect(html).toContain('shooter__optic')
+  })
+
+  /*
+   * AND IT DROPS THE TAG WHEN EVERY PLATE WOULD CARRY THE SAME ONE. "The word
+   * SIGMA is on all six, so it carries no information." The decision is made
+   * across the whole set in core/mapLabel.ts; the figure only renders it.
+   */
+  it('prints no tag when it was given none', () => {
+    const html = flagged({ opticName: 'Sigma 28-75 f2.8', opticTag: null, focalLength: 40 } as never)
+    expect(html).not.toContain('shooter__optic')
+    expect(html).not.toContain('SIGMA')
+    expect(html).toContain('40')
+  })
+
+  /* The screen reader still gets the optic: it reads one position at a time. */
+  it('still names the optic in the aria-label with no tag', () => {
+    expect(
+      flagged({ opticName: 'Sigma 28-75 f2.8', opticTag: null, focalLength: 40 } as never),
+    ).toContain('Sigma 28-75 f2.8, 40 millimetres')
   })
 
   it('names it in the aria-label too, not only on the plate', () => {

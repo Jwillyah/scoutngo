@@ -1,0 +1,191 @@
+/*
+ * PANEL COMBINATION AUDIT
+ *
+ * Usage:  node scripts/audit-panels.mjs
+ * Needs:  the app on http://127.0.0.1:5173 and Chrome on --remote-debugging-port=9222
+ * Exits:  0 when every pair of panels is clean, 1 otherwise.
+ *
+ * WHY THIS EXISTS, AND WHY IT IS NOT PART OF THE REACHABILITY AUDIT.
+ *
+ * Marking and the sky key were both open at once, one bleeding through the
+ * other, both scrolling. The reachability audit reported 0 problems with that
+ * on screen, and it was right to: every control WAS reachable. It opens one
+ * surface, checks it, closes it, opens the next.
+ *
+ * That is the third check in this repo to be blind to the thing it existed
+ * for, and all three failed the same way:
+ *
+ *   the fixed-position exemption that excused the drawer it was meant to catch
+ *   the count subtraction that could say how many lenses were lost, never which
+ *   and now a surface audit that cannot see a two-surface bug
+ *
+ * Every one of them tested ONE THING AT A TIME and the fault lived in the
+ * combination. So this audit's unit is the PAIR. It opens every panel against
+ * every other panel and asserts two things:
+ *
+ *   1. They are never both on screen. Not "the second one wins visually", not
+ *      "one is on top": the other must not be rendered at all.
+ *   2. Whatever IS open does not cover the control row that opened it, and
+ *      does not sit over the map controls down the right-hand side.
+ *
+ * THE SECOND IS NOT A STYLE CHECK. A panel over the button that closes it is a
+ * panel you cannot close, and a panel over the zoom controls is a map you
+ * cannot drive while reading it.
+ */
+import { connect } from './cdp.mjs'
+
+const OUT = process.env.SCOUTNGO_OUT ?? '.'
+
+/**
+ * The panels this screen can open, and how to open each one.
+ *
+ * NAMED BY THE BUTTON THE SHOOTER PRESSES, not by the component, because the
+ * question being asked is about what is on the screen rather than about the
+ * tree that produced it.
+ */
+const PANELS = [
+  { id: 'hazards', button: /^Hazards/, selector: '.hz' },
+  { id: 'sky', button: /^Sky/, selector: '.skykey' },
+  { id: 'conditions', button: /^Conditions/, selector: '.sheet--open' },
+]
+
+/** Chrome a panel must never cover: the row that opened it, and the map controls. */
+const PROTECTED = ['.hud', '.map-ctl', '.plat']
+
+const press = (re) =>
+  `(() => {
+     const b = [...document.querySelectorAll('button')].find((x) => ${re}.test(x.textContent.trim()))
+     if (b === undefined) return 'no button'
+     b.click()
+     return 'ok'
+   })()`
+
+const visible = (sel) =>
+  `(() => {
+     const n = document.querySelector('${sel}')
+     if (n === null) return null
+     const r = n.getBoundingClientRect()
+     const cs = getComputedStyle(n)
+     if (cs.display === 'none' || cs.visibility === 'hidden' || r.width === 0 || r.height === 0) {
+       return null
+     }
+     return { top: Math.round(r.top), left: Math.round(r.left), right: Math.round(r.right), bottom: Math.round(r.bottom) }
+   })()`
+
+const overlaps = (sel) =>
+  `(() => {
+     const p = document.querySelector('${sel}')
+     if (p === null) return []
+     const r = p.getBoundingClientRect()
+     if (r.width === 0 || r.height === 0) return []
+     const hits = []
+     for (const key of ${JSON.stringify(PROTECTED)}) {
+       for (const c of document.querySelectorAll(key)) {
+         const q = c.getBoundingClientRect()
+         if (q.width === 0 || q.height === 0) continue
+         const w = Math.min(r.right, q.right) - Math.max(r.left, q.left)
+         const h = Math.min(r.bottom, q.bottom) - Math.max(r.top, q.top)
+         /* A hairline touch is not a cover. 120 square pixels is a thumb. */
+         if (w > 0 && h > 0 && w * h > 120) {
+           hits.push(key + ' by ' + Math.round(w * h) + 'px')
+         }
+       }
+     }
+     return hits
+   })()`
+
+const { ev, wait, shot, send, load, errs } = await connect()
+
+let problems = 0
+const fail = (line) => {
+  console.log('      PROBLEM: ' + line)
+  problems += 1
+}
+
+await send('Emulation.setDeviceMetricsOverride', {
+  width: 390,
+  height: 844,
+  deviceScaleFactor: 3,
+  mobile: true,
+})
+await ev(`localStorage.clear()`)
+await load('http://127.0.0.1:5173/?calibration=1&probe=1')
+/* The landing page is shown once and is not one of the panels under test. */
+await ev(`localStorage.setItem('scoutngo.landing.v1','true')`)
+await load('http://127.0.0.1:5173/?calibration=1&probe=1')
+await wait(6000)
+await ev(`[...document.querySelectorAll('.rail__btn')].find(b=>/Plan/.test(b.textContent))?.click()`)
+await wait(4000)
+
+/** Shuts everything, so each case starts from a known screen. */
+async function closeAll() {
+  for (const panel of PANELS) {
+    const open = await ev(visible(panel.selector))
+    if (open !== null) {
+      await ev(press(panel.button))
+      await wait(500)
+    }
+  }
+  /* The sheet closes by its grip rather than by the button that opened it. */
+  await ev(`document.querySelector('.sheet--open .sheet__grip')?.click()`)
+  await wait(400)
+}
+
+console.log('### one panel at a time')
+
+for (const first of PANELS) {
+  for (const second of PANELS) {
+    if (first.id === second.id) continue
+
+    await closeAll()
+    await ev(press(first.button))
+    await wait(900)
+    const firstOpen = await ev(visible(first.selector))
+    if (firstOpen === null) {
+      console.log(`  ${first.id} did not open, skipping its pairs`)
+      break
+    }
+
+    await ev(press(second.button))
+    await wait(900)
+
+    const a = await ev(visible(first.selector))
+    const b = await ev(visible(second.selector))
+    const both = a !== null && b !== null
+
+    console.log(
+      `  open ${first.id.padEnd(11)} then ${second.id.padEnd(11)} ` +
+        `${first.id}=${a === null ? 'closed' : 'OPEN'} ${second.id}=${b === null ? 'closed' : 'OPEN'} ` +
+        `${both ? 'FAIL' : 'ok'}`,
+    )
+
+    if (both) {
+      fail(`${first.id} and ${second.id} are both on screen at once`)
+      await shot(OUT, `panels-${first.id}-${second.id}`)
+    }
+  }
+}
+
+console.log('\n### an open panel covers no control')
+
+for (const panel of PANELS) {
+  await closeAll()
+  await ev(press(panel.button))
+  await wait(900)
+  const open = await ev(visible(panel.selector))
+  if (open === null) {
+    console.log(`  ${panel.id.padEnd(11)} did not open`)
+    continue
+  }
+  const hits = await ev(overlaps(panel.selector))
+  console.log(
+    `  ${panel.id.padEnd(11)} ${JSON.stringify(open).padEnd(52)} ${hits.length === 0 ? 'ok' : 'FAIL'}`,
+  )
+  for (const hit of hits) fail(`${panel.id} covers ${hit}`)
+}
+
+const noise = errs.filter((e) => !/arcgis|AJAXError|Failed to fetch/.test(e))
+if (noise.length > 0) console.log('\nconsole errors: ' + JSON.stringify(noise.slice(0, 3)))
+
+console.log('\n=== PANEL PROBLEMS: ' + problems + ' ===')
+process.exit(problems === 0 ? 0 : 1)

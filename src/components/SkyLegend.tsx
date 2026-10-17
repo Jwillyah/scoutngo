@@ -71,6 +71,21 @@ export function SkyLegend({
 }: SkyLegendProps) {
   const [table, setTable] = useState<ColormapResult | null>(null)
 
+  /*
+   * COMPACT BY DEFAULT, BECAUSE THIS IS A LAYER PICKER.
+   *
+   * "CLOUD and WIND is a layer picker, so I need to see the layer change while
+   * I tap it. Right now the panel takes half the screen and the explanation of
+   * what the cells mean takes most of that."
+   *
+   * None of that prose is wrong and none of it is cut. It is about what the
+   * layer IS, which is a thing you read once and then know; the layer itself is
+   * a thing you watch while you tap. So the bar carries what changes with the
+   * tap, and the explaining goes behind the same info tap the rest of the app
+   * uses.
+   */
+  const [showInfo, setShowInfo] = useState(false)
+
   useEffect(() => {
     let live = true
     void fetchGoesLegend(band).then((result) => {
@@ -121,18 +136,29 @@ export function SkyLegend({
         * aircraft leaves the bag. See src/core/skyLayer.ts for why those two
         * and not a longer list.
         */}
-      <div className="skykey__pick" role="group" aria-label="What the sky layer shows">
-        {SKY_LAYERS.map((kind) => (
-          <button
-            key={kind}
-            type="button"
-            className={`skykey__pick-btn${layer === kind ? ' skykey__pick-btn--on' : ''}`}
-            aria-pressed={layer === kind}
-            onClick={() => onLayer(kind)}
-          >
-            {SKY_LAYER_LABEL[kind]}
-          </button>
-        ))}
+      <div className="skykey__bar">
+        <div className="skykey__pick" role="group" aria-label="What the sky layer shows">
+          {SKY_LAYERS.map((kind) => (
+            <button
+              key={kind}
+              type="button"
+              className={`skykey__pick-btn${layer === kind ? ' skykey__pick-btn--on' : ''}`}
+              aria-pressed={layer === kind}
+              onClick={() => onLayer(kind)}
+            >
+              {SKY_LAYER_LABEL[kind]}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          className={`skykey__info${showInfo ? ' skykey__info--on' : ''}`}
+          aria-pressed={showInfo}
+          aria-label="What this layer is"
+          onClick={() => setShowInfo(!showInfo)}
+        >
+          i
+        </button>
       </div>
 
         <p className="skykey__washhead">Nothing to show at this zoom</p>
@@ -166,27 +192,38 @@ export function SkyLegend({
         * aircraft leaves the bag. See src/core/skyLayer.ts for why those two
         * and not a longer list.
         */}
-      <div className="skykey__pick" role="group" aria-label="What the sky layer shows">
-        {SKY_LAYERS.map((kind) => (
-          <button
-            key={kind}
-            type="button"
-            className={`skykey__pick-btn${layer === kind ? ' skykey__pick-btn--on' : ''}`}
-            aria-pressed={layer === kind}
-            onClick={() => onLayer(kind)}
-          >
-            {SKY_LAYER_LABEL[kind]}
-          </button>
-        ))}
+      <div className="skykey__bar">
+        <div className="skykey__pick" role="group" aria-label="What the sky layer shows">
+          {SKY_LAYERS.map((kind) => (
+            <button
+              key={kind}
+              type="button"
+              className={`skykey__pick-btn${layer === kind ? ' skykey__pick-btn--on' : ''}`}
+              aria-pressed={layer === kind}
+              onClick={() => onLayer(kind)}
+            >
+              {SKY_LAYER_LABEL[kind]}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          className={`skykey__info${showInfo ? ' skykey__info--on' : ''}`}
+          aria-pressed={showInfo}
+          aria-label="What this layer is"
+          onClick={() => setShowInfo(!showInfo)}
+        >
+          i
+        </button>
       </div>
 
+        {/*
+          * THE ONE LINE THAT MATTERS: which height, and that it is a model.
+          * Everything else about what a model is goes behind the info tap.
+          */}
         <p className="skykey__src skykey__src--fc">
           <span className="skykey__badge skykey__badge--fc">Forecast</span>
-          <span className="skykey__srcnote">
-            Wind {windHeightLabel(windHeight)}, from the Open-Meteo model. There is no
-            satellite picture of wind, so every hour of this is modelled, including the
-            ones already past.
-          </span>
+          <span className="skykey__srcnote">Wind {windHeightLabel(windHeight)}</span>
         </p>
 
         {/*
@@ -212,13 +249,28 @@ export function SkyLegend({
           ))}
         </ul>
 
-        <p className="skykey__grey">
-          {ratedWindMps === null
-            ? 'No aircraft in the kit publishes a wind rating, so the cells are shaded by speed alone and the bands above do not apply. An invented limit is something somebody could fly on.'
-            : `Measured against ${ratedWindMps} m/s, the published rating of the most limiting aircraft you have packed.`}
+        {/*
+          * THE RATING IS NOT PROSE, it is the number the bands mean. Without
+          * it "near the limit" is near nothing, so it stays on the bar.
+          */}
+        <p className="skykey__against">
+          {ratedWindMps === null ? 'No published rating: unbanded' : `vs ${ratedWindMps} m/s rated`}
         </p>
 
-        <p className="skykey__grey">{gridExtentLine()}</p>
+        {!showInfo ? null : (
+          <div className="skykey__info-body">
+            <p className="skykey__grey">
+              There is no satellite picture of wind, so every hour of this is modelled,
+              including the ones already past.
+            </p>
+            <p className="skykey__grey">
+              {ratedWindMps === null
+                ? 'No aircraft in the kit publishes a wind rating, so the cells are shaded by speed alone and the bands above do not apply. An invented limit is something somebody could fly on.'
+                : `Measured against ${ratedWindMps} m/s, the published rating of the most limiting aircraft you have packed.`}
+            </p>
+            <p className="skykey__grey">{gridExtentLine()}</p>
+          </div>
+        )}
       </div>
     )
   }
@@ -231,18 +283,29 @@ export function SkyLegend({
         * aircraft leaves the bag. See src/core/skyLayer.ts for why those two
         * and not a longer list.
         */}
-      <div className="skykey__pick" role="group" aria-label="What the sky layer shows">
-        {SKY_LAYERS.map((kind) => (
-          <button
-            key={kind}
-            type="button"
-            className={`skykey__pick-btn${layer === kind ? ' skykey__pick-btn--on' : ''}`}
-            aria-pressed={layer === kind}
-            onClick={() => onLayer(kind)}
-          >
-            {SKY_LAYER_LABEL[kind]}
-          </button>
-        ))}
+      <div className="skykey__bar">
+        <div className="skykey__pick" role="group" aria-label="What the sky layer shows">
+          {SKY_LAYERS.map((kind) => (
+            <button
+              key={kind}
+              type="button"
+              className={`skykey__pick-btn${layer === kind ? ' skykey__pick-btn--on' : ''}`}
+              aria-pressed={layer === kind}
+              onClick={() => onLayer(kind)}
+            >
+              {SKY_LAYER_LABEL[kind]}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          className={`skykey__info${showInfo ? ' skykey__info--on' : ''}`}
+          aria-pressed={showInfo}
+          aria-label="What this layer is"
+          onClick={() => setShowInfo(!showInfo)}
+        >
+          i
+        </button>
       </div>
 
       {/*
@@ -277,8 +340,11 @@ export function SkyLegend({
         </p>
       )}
 
-      {boundary === null ? null : <p className="skykey__boundary">{boundary}</p>}
-
+      {/*
+        * A PROBLEM IS NEVER BEHIND THE INFO TAP. It says why the map is
+        * empty, which is the one thing somebody looking at an empty map needs
+        * without going looking for it.
+        */}
       {sky.forecastProblem === null ? null : (
         <p className="skykey__grey">{sky.forecastProblem}</p>
       )}
@@ -292,25 +358,28 @@ export function SkyLegend({
       {sky.source.kind !== 'satellite' ? null : (
         <p className="skykey__band">
           <span className="skykey__label">{GOES_BAND_LABEL[band]}</span>
-          <span className="skykey__note">{GOES_BAND_NOTE[band]}</span>
+          {/* The band's own explanation is reference, so it goes behind the i. */}
+          {!showInfo ? null : <span className="skykey__note">{GOES_BAND_NOTE[band]}</span>}
         </p>
       )}
 
       {sky.source.kind !== 'satellite' ? (
-        <>
-          <p className="skykey__grey">
-            Shaded squares are cloud cover from the Open-Meteo forecast, one cell per model
-            point. Coarse and hard edged on purpose: it is a model, not a photograph.
-          </p>
-          {/*
-            * HOW BIG THE SQUARE IS. "At 50 mi the forecast cells cover a small
-            * square around the venue with nothing around it, which reads as
-            * broken." It is not broken; it was simply never told.
-            */}
-          <p className="skykey__grey">{gridExtentLine()}</p>
-        </>
+        !showInfo ? null : (
+          <div className="skykey__info-body">
+            <p className="skykey__grey">
+              Shaded squares are cloud cover from the Open-Meteo forecast, one cell per model
+              point. Coarse and hard edged on purpose: it is a model, not a photograph.
+            </p>
+            {/*
+              * HOW BIG THE SQUARE IS. "At 50 mi the forecast cells cover a
+              * small square around the venue with nothing around it, which
+              * reads as broken." It is not broken; it was simply never told.
+              */}
+            <p className="skykey__grey">{gridExtentLine()}</p>
+          </div>
+        )
       ) : band === 'visible' ? (
-        <p className="skykey__grey">{VISIBLE_LEGEND_NOTE}</p>
+        !showInfo ? null : <p className="skykey__grey">{VISIBLE_LEGEND_NOTE}</p>
       ) : table === null ? (
         <p className="skykey__grey">Reading the colour table from NASA GIBS…</p>
       ) : table.status === 'ok' ? (
@@ -331,11 +400,16 @@ export function SkyLegend({
               </li>
             ))}
           </ul>
-          <p className="skykey__grey">
-            Colder cloud tops are higher cloud. {stops.length} of{' '}
-            <span className="num">{table.legend.stops.length}</span> steps shown, from the
-            table NASA GIBS publishes for this layer.
-          </p>
+          {!showInfo ? null : (
+            <p className="skykey__grey">
+              Colder cloud tops are higher cloud. {stops.length} of{' '}
+              <span className="num">{table.legend.stops.length}</span> steps shown, from the
+              table NASA GIBS publishes for this layer.
+            </p>
+          )}
+          {!showInfo || boundary === null ? null : (
+            <p className="skykey__boundary">{boundary}</p>
+          )}
         </>
       ) : (
         /*

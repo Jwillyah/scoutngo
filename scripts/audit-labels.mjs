@@ -242,22 +242,48 @@ if (!Array.isArray(flagged) || flagged.length === 0) {
 }
 
 /*
- * AND THE PLATE NAMES THE OPTIC. "28" on its own does not say what it is 28 of,
- * which is the ambiguity that let a ground lens stand in for a drone camera
- * without the screen looking wrong. Checked here as well as in the unit tests
- * because this is the one place the real rendered plate is measured, and a
- * name that does not fit is a collision rather than a wrong string.
+ * AND THE PLATE SAYS WHAT DISTINGUISHES IT, AND NOTHING ELSE.
+ *
+ * This check used to be "every plate names its optic", added when a bare "28"
+ * could not say whether the geometry under it was drawn for a lens in a hand
+ * or a camera on an aircraft.
+ *
+ * That was half the rule. The other half arrived as six plates reading SIGMA
+ * 40, SIGMA 50, SIGMA 55, SIGMA 65, SIGMA 70, SIGMA 75: a word on all six
+ * carries no information and six copies of it is noise over the map. So the
+ * rule is now the shooter's own: a label repeats nothing that every other
+ * label also says.
+ *
+ * WHAT THAT MEANS HERE, and it is stricter than what it replaced:
+ *
+ *   ALL the plates carry a tag, or NONE of them do. A mix would make the
+ *   PRESENCE of a word a code for "this one is different", which is a thing
+ *   nobody can read off a map.
+ *
+ *   When none of them do, the optic is named ONCE somewhere else. Dropping it
+ *   from the plates is only honest if the answer to "28 on what" still exists.
  */
 const plates = await ev(
   `[...document.querySelectorAll('.shooter__focal')].map((n) => n.textContent)`,
 )
 console.log(`  focal plates: ${JSON.stringify(plates)}`)
+
+const tagged = (t) => /[A-Z]{3}/.test(String(t))
 if (!Array.isArray(plates) || plates.length === 0) {
-  console.log('      PROBLEM: no focal plate rendered, so the optic name is untested')
+  console.log('      PROBLEM: no focal plate rendered, so the labels are untested')
   problems += 1
-} else if (plates.some((t) => !/[A-Z]{3}/.test(String(t)))) {
-  console.log('      PROBLEM: a focal plate shows a number with no optic name')
+} else if (plates.some(tagged) && !plates.every(tagged)) {
+  console.log('      PROBLEM: some plates name an optic and some do not, which reads as a code')
   problems += 1
+} else if (!plates.some(tagged)) {
+  /* No plate names it, so the plan has to, exactly once. */
+  const summary = await ev(`document.querySelector('.peek')?.textContent ?? ''`)
+  const named = /Sigma|Sony|Air 3S|Laowa/.test(String(summary))
+  console.log(`  optic named once: ${named}`)
+  if (!named) {
+    console.log('      PROBLEM: no plate names the optic and neither does the plan summary')
+    problems += 1
+  }
 }
 
 console.log('\n### label collisions')

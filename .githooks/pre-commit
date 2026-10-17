@@ -90,6 +90,11 @@ SCOUTNGO_OUT="$SCRATCH" node scripts/audit-labels.mjs > "$SCRATCH/labels.log" 2>
   || { grep -E 'FAIL|LABEL PROBLEMS|over ' "$SCRATCH/labels.log" | tail -20; fail "label audit"; }
 ok "$(grep -E 'LABEL PROBLEMS' "$SCRATCH/labels.log" | tail -1)"
 
+step "panel combination audit"
+SCOUTNGO_OUT="$SCRATCH" node scripts/audit-panels.mjs > "$SCRATCH/panels.log" 2>&1 \
+  || { grep -E 'PROBLEM|FAIL' "$SCRATCH/panels.log" | tail -20; fail "panel audit"; }
+ok "$(grep -E 'PANEL PROBLEMS' "$SCRATCH/panels.log" | tail -1)"
+
 step "projection audit"
 SCOUTNGO_OUT="$SCRATCH" node scripts/audit-projection.mjs > "$SCRATCH/proj.log" 2>&1 \
   || { grep -E 'FAIL' "$SCRATCH/proj.log" | tail -20; fail "projection audit"; }
