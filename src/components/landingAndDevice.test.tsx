@@ -1,7 +1,8 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { ColdStart } from './ColdStart.tsx'
-import { Landing, LandingDetails } from './Landing.tsx'
+import { Landing } from './Landing.tsx'
+import { HowPage } from './HowPage.tsx'
 import { OnThisDevice } from './OnThisDevice.tsx'
 import type { Spot } from '../lib/spots.ts'
 
@@ -12,128 +13,62 @@ const html = renderToStaticMarkup(<Landing onDismiss={() => {}} />)
 const text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ')
 
 /*
- * ITEM 10. The content was specified exactly: what it is, the three stages,
- * the rule, and privacy as the feature it is. "Content, no more than this."
+ * THE COVER IS FIVE ELEMENTS AND TWO QUIET LINES, AND NOTHING ELSE.
+ *
+ * The list is the specification, so the test is a count as well as a content
+ * check: a sixth element added in six months fails here rather than being
+ * noticed on a phone.
  */
-describe('the landing page says the four things and stops', () => {
-  it('says what it is, in the words it was given', () => {
+describe('the cover carries five elements and stops', () => {
+  it('leads with the eyebrow, the wordmark and the headline', () => {
+    expect(text).toContain('Sun · light · distance, computed')
+    expect(text).toContain('ScoutNGo')
     expect(text).toContain('Plan a shoot at a place you have never stood in')
   })
 
-  it('names the three stages and what each is for', () => {
-    for (const [stage, when] of [
-      ['Setup', 'Before the day'],
-      ['Plan', 'The work'],
-      ['Field', 'On the day'],
-    ]) {
-      expect(text, stage).toContain(stage)
-      expect(text, when).toContain(when)
-    }
+  it('has exactly one primary action and it says what it does', () => {
+    expect(html.match(/class="cover__go"/g)).toHaveLength(1)
+    expect(text).toContain('Open the map')
+  })
+
+  it('carries the two quiet lines, in their places', () => {
+    expect(html.match(/class="cover__more"/g)).toHaveLength(1)
+    expect(text).toContain('How it computes, and what leaves the device')
+    expect(text).toContain('Free · open source · no account')
+  })
+
+  it('puts the render behind everything, full bleed', () => {
+    const images = [...html.matchAll(/<img[^>]*class="([^"]*)"[^>]*src="([^"]*)"/g)]
+    expect(images).toHaveLength(1)
+    expect(images[0]?.[1]).toContain('cover__frame')
+    expect(images[0]?.[2]).toBe('/cover-frame.jpg')
+    expect(html).toContain('cover__scrim')
+  })
+
+  it('carries the scrubber as the seam, above the attribution', () => {
+    expect(html).toContain('cover__scrub')
+    expect(html.indexOf('cover__scrub')).toBeLessThan(html.indexOf('cover__attrib'))
   })
 
   /*
-   * THE TWO RULES, ONE LINE EACH. The argument behind them moved to the
-   * details view; the rules themselves are still on the cover, because a
-   * cover that does not say what the thing is built on is a splash screen.
+   * WHAT WAS DELETED FROM THE COVER. Each of these was on it and is now on
+   * /how. The point of naming them here is that a future edit that drags one
+   * back onto the cover fails a test rather than quietly undoing the pass.
    */
-  it('states both rules in one line each', () => {
-    expect(text).toContain('Computed')
-    expect(text.toLowerCase()).toContain('arithmetic from coordinates')
-    expect(text.toLowerCase()).toContain('never asked for one')
-
-    expect(text).toContain('Yours')
-    expect(text.toLowerCase()).toContain('no account, no database, no analytics')
-    expect(text.toLowerCase()).toContain('stays in this browser')
+  it('no longer carries the three stages, the two rule blocks or the build hash', () => {
+    expect(text).not.toContain('Three stages')
+    expect(text).not.toContain('Before the day')
+    expect(text).not.toMatch(/\bComputed\b\s*Every number/)
+    expect(text).not.toContain('Yours')
+    expect(text).not.toContain('Build ')
+    expect(text).not.toContain('this page is in Settings')
   })
 
-  /*
-   * ONE PRIMARY ACTION, which is the rule this page actually has.
-   *
-   * It used to be "exactly one <button>", and that rule caught a real
-   * regression when the NOW entry was put here. The detail link is not the
-   * same thing: it is set as type, it competes with nothing, and the
-   * alternative to having it is a cover page that has to be scrolled. So the
-   * rule is now one PRIMARY action and one disclosure, counted separately.
-   */
-  it('has one primary action and one link to the detail', () => {
-    expect(text).toContain('Dive in')
-    expect(html.match(/class="land__go"/g)).toHaveLength(1)
-    expect(html.match(/class="land__more"/g)).toHaveLength(1)
-    expect(text.toLowerCase()).toContain('what does leave the device')
-  })
-
-  /*
-   * THE COVER IS THE HERO, THE STAGES, AND THE TWO RULES. One section, which
-   * is the three stages. A second section on the cover is the thing this pass
-   * removed.
-   */
-  it('has one section on the cover', () => {
-    expect(html.match(/class="land__sec"/g)).toHaveLength(1)
-    expect(text).toContain('Three stages')
-  })
-
-/*
- * NOTHING WAS DELETED ON ITS WAY OFF THE FRONT PAGE.
- *
- * This is the test that matters for this change. The instruction was to cut
- * the cover and MOVE the detail, not to lose any of it, and "moved" is only
- * verifiable by asserting the moved sentences are still rendered somewhere.
- * Every line below was on the cover before and is on the details view now,
- * word for word.
- */
-  it('keeps every honesty line, on the details view', () => {
-    const detail = text_(renderToStaticMarkup(<LandingDetails onBack={() => {}} />))
-
-    for (const line of [
-      'The model proposes, code computes',
-      'all of it is arithmetic, computed here, from coordinates',
-      'It is never asked for a number',
-      'recomputed before you see it',
-      'No account. No database. No analytics.',
-      'go nowhere else',
-      'What does leave the device: map tiles',
-      'the public map data behind the hazard layer',
-      'Never the plan, and never a coordinate attached to you',
-    ]) {
-      expect(detail, `LOST on the way to the details view: "${line}"`).toContain(line)
-    }
-  })
-
-  /* And the details view says the things the app refuses to say. */
-  it('states the refusals on the details view', () => {
-    const detail = text_(renderToStaticMarkup(<LandingDetails onBack={() => {}} />))
-    expect(detail).toContain('never says an area is clear of hazards')
-    expect(detail).toContain('never says a flight is legal, cleared or compliant')
-    expect(detail).toContain('Temporary flight restrictions are not checked')
-    expect(detail).toContain('prints a dash')
-  })
-
-  /*
-   * THE VERNACULAR. No cards, no SaaS furniture, and no stock photography.
-   *
-   * THIS RULE CHANGED, and the reason is worth keeping. It used to be "no
-   * imagery at all", which was the austere reading: flat black and one rule.
-   * That is a default wearing restraint's clothes. The hero is the PRODUCT
-   * now, which means a real map frame with real imagery in it, so "no img" is
-   * the wrong test. What is actually forbidden is a picture of something that
-   * is not this app.
-   */
   it('has no feature grid and no SaaS furniture', () => {
     expect(html).not.toContain('card')
     expect(text.toLowerCase()).not.toContain('get started')
     expect(text.toLowerCase()).not.toContain('sign up')
     expect(text.toLowerCase()).not.toContain('trusted by')
-  })
-
-  it('shows the product itself, not a picture of one', () => {
-    /* The one image is a tile from the same basemap the map uses. */
-    const images = [...html.matchAll(/<img[^>]*src="([^"]*)"/g)].map((m) => m[1])
-    expect(images).toHaveLength(1)
-    expect(images[0]).toContain('World_Imagery/MapServer/tile')
-    /* With the app's own overlays on it, not a caption describing them. */
-    for (const part of ['hero__cone', 'hero__ray--sun', 'hero__ray--shadow', 'hero__disc']) {
-      expect(html, part).toContain(part)
-    }
   })
 
   it('credits the imagery and says whose place it is', () => {
@@ -147,6 +82,89 @@ describe('the landing page says the four things and stops', () => {
    */
   it('prints no coordinate', () => {
     expect(text).not.toMatch(/\d{1,3}\.\d{3,}/)
+  })
+})
+
+/*
+ * NOTHING WAS DELETED ON ITS WAY OFF THE COVER.
+ *
+ * This is the test that matters for this change. The instruction was to move
+ * the cover's content to the page below, not to lose any of it, and "moved"
+ * is only verifiable by asserting the moved sentences are still rendered.
+ */
+describe('/how carries everything the cover gave up, and more', () => {
+  const how = text_(renderToStaticMarkup(<HowPage onBack={() => {}} />))
+
+  it('carries the three stages that left the cover', () => {
+    for (const [stage, when] of [
+      ['Setup', 'Before the day'],
+      ['Plan', 'The work'],
+      ['Field', 'On the day'],
+    ]) {
+      expect(how, stage).toContain(stage)
+      expect(how, when).toContain(when)
+    }
+  })
+
+  it('carries the computed rule and the privacy rule', () => {
+    expect(how.toLowerCase()).toContain('arithmetic from coordinates')
+    expect(how.toLowerCase()).toContain('never asked for one')
+    expect(how.toLowerCase()).toContain('no account, no database, no analytics')
+  })
+
+  it('names what is computed, rather than only claiming that things are', () => {
+    for (const named of [
+      'Sun azimuth and altitude',
+      'Lighting classification',
+      'Field of view',
+      'slant range',
+      'Tide',
+      'Airspace',
+      'Celestial positions',
+    ]) {
+      expect(how, named).toContain(named)
+    }
+  })
+
+  it('says plainly what the model is for', () => {
+    expect(how).toContain('What the model is for')
+    expect(how).toContain('Words, and only words')
+    expect(how).toContain('never asked for a bearing')
+  })
+
+  it('states the refusals', () => {
+    expect(how).toContain('never says an area is clear of hazards')
+    expect(how).toContain('never says a flight is legal, cleared or compliant')
+    expect(how).toContain('Temporary flight restrictions are not checked')
+    expect(how).toContain('prints a dash')
+  })
+
+  it('says what leaves the device as fact, not as a promise', () => {
+    expect(how).toContain('stay in this browser')
+    expect(how).toContain('no telemetry')
+    expect(how).toContain('It logs nothing')
+    /* A pledge is what a page says when it cannot show you the source. */
+    expect(how.toLowerCase()).not.toContain('we will never')
+    expect(how.toLowerCase()).not.toContain('we promise')
+  })
+
+  it('says what this is not', () => {
+    expect(how).toContain('not a forecast app')
+    expect(how).toContain('not a safety authority')
+    expect(how).toContain('not a substitute for checking the airspace')
+  })
+
+  it('carries the footer the cover gave up', () => {
+    expect(how).toContain('Build')
+    expect(how).toContain('github.com/Jwillyah/scoutngo')
+    expect(how).toContain('Esri')
+    expect(how).toContain('OpenStreetMap')
+    expect(how).toContain('This page is in Settings whenever you want it')
+  })
+
+  it('writes the colour rule down where a reader can find it', () => {
+    expect(how).toContain('Teal is chrome')
+    expect(how).toContain('never styles a reading')
   })
 })
 

@@ -675,6 +675,19 @@ function App() {
    * site data shows it again, which is the correct behaviour for something
    * whose whole claim is that it keeps nothing anywhere else.
    */
+  /*
+   * Whether the browser is sitting on /how. Kept in state rather than read on
+   * every render so a popstate (the back button) re-renders the app.
+   */
+  const [atHowPath, setAtHowPath] = useState(
+    () => typeof window !== 'undefined' && window.location.pathname === '/how',
+  )
+  useEffect(() => {
+    const onPop = () => setAtHowPath(window.location.pathname === '/how')
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
+
   const [landingSeen, setLandingSeen] = usePersistentState<boolean>(
     'scoutngo.landing.v1',
     false,
@@ -1817,7 +1830,17 @@ function App() {
         * There is no service worker in this app; what holds a stale build is
         * iOS Safari keeping index.html. See src/lib/build.ts.
         */}
-      {landingSeen ? null : <Landing onDismiss={() => setLandingSeen(true)} />}
+      {/*
+        * THE COVER ON A FIRST RUN, AND /how WHENEVER IT IS ASKED FOR.
+        *
+        * `landingSeen` decides the FIRST RUN. The path decides everything
+        * after it: /how is a real URL, so it has to render the page whether or
+        * not the shooter has been here before, including when it is pasted to
+        * somebody who has the app already.
+        */}
+      {landingSeen && !atHowPath ? null : (
+        <Landing onDismiss={() => { setLandingSeen(true); setAtHowPath(false) }} />
+      )}
       {!nowOpen ? null : (
         <NowScreen onClose={() => setNowOpen(false)} onPlanHere={planFromNow} />
       )}
@@ -1869,7 +1892,10 @@ function App() {
               })),
             )}
             newBuild={newBuild}
-            onShowLanding={() => setLandingSeen(false)}
+            onShowLanding={() => {
+              setAtHowPath(true)
+              window.history.pushState({}, '', '/how')
+            }}
             onUseMyLocation={onUseMyLocation}
             shotListText={shotListText}
             onShotListText={onShotListChange}

@@ -380,11 +380,19 @@ export function SetupMode({
                         * other things that are about the app rather than
                         * about the shoot.
                         */}
+                      {/*
+                        * STRAIGHT TO /how, NOT TO THE COVER.
+                        *
+                        * The cover is a name and a picture; somebody opening
+                        * Settings to check what leaves their device wants the
+                        * page with the answer on it, not the one with the
+                        * button on it. /how has a way back to the cover.
+                        */}
                       <button type="button" className="settings__row" onClick={onShowLanding}>
-                        What this is
+                        How it computes
                         <span className="settings__hint">
-                          The page you saw first. Three stages, the rule, and
-                          where your data lives.
+                          The three stages, what is arithmetic, what leaves
+                          the device, and what this is not.
                         </span>
                       </button>
 

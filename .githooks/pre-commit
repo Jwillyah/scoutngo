@@ -41,6 +41,10 @@ step "viewport units"
 node scripts/audit-units.mjs > "$SCRATCH/units.log" 2>&1 || { cat "$SCRATCH/units.log"; fail "unit audit"; }
 ok "$(tail -1 "$SCRATCH/units.log" | sed 's/=== //;s/ ===//')"
 
+step "colour roles"
+node scripts/audit-colors.mjs > "$SCRATCH/colors.log" 2>&1 || { cat "$SCRATCH/colors.log"; fail "colour audit"; }
+ok "$(tail -1 "$SCRATCH/colors.log" | sed 's/=== //;s/ ===//')"
+
 step "tests"
 npm test > "$SCRATCH/test.log" 2>&1 || { tail -40 "$SCRATCH/test.log"; fail "npm test"; }
 ok "$(grep -E '^ *Tests ' "$SCRATCH/test.log" | tail -1 | tr -s ' ' | sed 's/^ //')"
