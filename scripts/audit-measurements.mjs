@@ -226,10 +226,12 @@ for (const path of files.sort()) {
     const lineNumber = block.start + block.lines.findIndex((l) => CLAIM.test(l))
     const where = `${path}:${lineNumber}`
     const summary = claimLine.replace(/^\s*[*/]*\s*/, '').trim().slice(0, 92)
+    /* Stable across edits that move the line but not the words. */
+    const key = `${path}::${summary.slice(0, 48).trim()}`
 
     const refs = [...body.matchAll(REFERENCE)].map((m) => m[0])
     if (refs.length === 0) {
-      untraced.push({ where, summary })
+      untraced.push({ where, summary, key })
       continue
     }
 
@@ -256,8 +258,24 @@ for (const path of files.sort()) {
 /* --------------------------------------------------------------- baseline */
 
 const baselineText = existsSync(BASELINE) ? readFileSync(BASELINE, 'utf8') : ''
+/*
+ * KEYED ON THE CLAIM'S TEXT, NOT ITS LINE NUMBER.
+ *
+ * The first version keyed on path:line. Adding one line to PlanMode.tsx moved
+ * two claims down by one, which made them look NEW and made their baseline
+ * entries look STALE -- four failures from an edit that touched neither
+ * claim. A ratchet that fires on unrelated edits is a ratchet people learn to
+ * regenerate without reading, which is how it stops being a ratchet.
+ *
+ * The keys live in a generated block at the foot of the file so the prose
+ * above it stays something a person reads rather than a data format.
+ */
+const RATCHET = /<!-- ratchet\n([\s\S]*?)-->/
 const baselineKeys = new Set(
-  [...baselineText.matchAll(/^- `([^`]+)`/gm)].map((m) => m[1]),
+  (RATCHET.exec(baselineText)?.[1] ?? '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== ''),
 )
 
 console.log('### measured claims')
@@ -283,7 +301,7 @@ if (broken.length > 0) {
 if (untraced.length > 0) {
   console.log('\n### untraced  (no measurements/ file named)')
   for (const row of untraced) {
-    const known = baselineKeys.has(row.where)
+    const known = baselineKeys.has(row.key)
     console.log(`  ${known ? ' ' : 'NEW '}${row.where}`)
     console.log(`      ${row.summary}`)
     if (!known) {
@@ -300,11 +318,17 @@ if (untraced.length > 0) {
  * list silently becomes a collection of line numbers nobody can find, which
  * is how an exceptions list rots into noise.
  */
-const live = new Set(untraced.map((r) => r.where))
+const live = new Set(untraced.map((r) => r.key))
 const stale = [...baselineKeys].filter((key) => !live.has(key))
 if (stale.length > 0) {
   console.log('\n### baseline entries that no longer match anything')
-  for (const key of stale) fail(`${BASELINE} still lists ${key}, which is no longer an untraced claim`)
+  for (const key of stale) fail(`${BASELINE} still lists "${key}", which is no longer an untraced claim`)
+}
+
+if (process.env.SCOUTNGO_RATCHET === '1') {
+  console.log('\n<!-- ratchet')
+  for (const row of untraced) console.log(row.key)
+  console.log('-->')
 }
 
 console.log(`\n=== MEASUREMENT PROBLEMS: ${problems} ===`)

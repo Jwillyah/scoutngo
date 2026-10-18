@@ -41,6 +41,7 @@ import { FieldPackControl, type PackBuildState } from './FieldPackControl.tsx'
 import { MapRail } from './MapRail.tsx'
 import { SheetSection } from './SheetSection.tsx'
 import { SkyPanel } from './SkyPanel.tsx'
+import { SunCurve } from './SunCurve.tsx'
 import { BUILDINGS_MIN_ZOOM, MapView, type MapHandle } from './MapView.tsx'
 import { buildingsToGeoJson, fetchBuildings } from '../lib/buildings.ts'
 import { PlatformFilter } from './PlatformFilter.tsx'
@@ -849,14 +850,6 @@ export function PlanMode({
                 phases={nightBands}
                 phase={nightPhase}
                 flying={{ airPositions, dronePlatform: platformFilter === 'air' }}
-                /*
-                 * THE STRIP AT PEEK, THE CURVE AT HALF AND FULL. One control,
-                 * one piece of state: `value` and `onChange` are the same in
-                 * both, so changing detent cannot move the time.
-                 */
-                expanded={sheet !== 'peek'}
-                venue={venue}
-                horizon={horizonProfile}
               />
             )}
           </div>
@@ -1034,6 +1027,32 @@ export function PlanMode({
             {airPositions === 0 ? null : (
               <SheetSection title="Airspace">
                 <AirspacePanel venue={venue} altitudeFeet={airAltitudeFeet} />
+              </SheetSection>
+            )}
+
+            {/*
+              * THE CURVE IS ONE SECTION, AT FULL.
+              *
+              * It briefly replaced the whole of HALF -- positions list, chips,
+              * Generate -- and took the sheet's gesture with it, which left
+              * the screen with no controls and no way back. A chart is a
+              * thing to read, so it sits where things to read sit.
+              */}
+            {venue === null ? null : venueWindow === null ? null : (
+              <SheetSection title="Sun curve">
+                <SunCurve
+                  start={venueWindow.start}
+                  end={venueWindow.end}
+                  value={scrub}
+                  onChange={onScrub}
+                  at={scrubbedAt ?? venueWindow.start}
+                  venue={venue}
+                  horizon={horizonProfile}
+                  timeZone={venueWindow.timeZone}
+                  timeZoneAbbr={venueWindow.timeZoneShort}
+                  terrainOn={showTerrain}
+                  onShowTerrain={onShowTerrain}
+                />
               </SheetSection>
             )}
 

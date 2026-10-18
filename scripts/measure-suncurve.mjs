@@ -175,26 +175,21 @@ try {
   await wait(4000)
 
   /*
-   * BACK TO HALF. The handle STEPS UP AND WRAPS -- peek, half, full, peek --
-   * so from full a single click lands on peek, not half. A first run ended
-   * there, reported "no curve at HALF", and the curve was fine: the script
-   * was looking at the peek. Two clicks, and then the detent is asserted
-   * rather than assumed.
+   * THE CURVE IS AT FULL, IN ITS OWN SECTION. It was briefly the whole of
+   * HALF, which replaced the positions list and the chips with a chart and
+   * swallowed the sheet's gesture. HALF is the shoot line, the scrubber, the
+   * positions list and the chips; this shoots both.
    */
-  await ev(`[...document.querySelectorAll('.sheet__handle')][0]?.click()`)
-  await wait(600)
-  await ev(`[...document.querySelectorAll('.sheet__handle')][0]?.click()`)
-  await wait(1500)
   const detentNow = await step(
     'detent before shooting',
     `document.querySelector('.sheet')?.getAttribute('data-detent')`,
   )
-  if (detentNow !== 'half') {
-    throw new Error(`expected the sheet at half, found ${String(detentNow)}`)
+  if (detentNow !== 'full') {
+    throw new Error(`expected the sheet at full, found ${String(detentNow)}`)
   }
 
   const half = await step(
-    'HALF sheet + curve',
+    'FULL sheet + curve',
     `(() => {
        const sheet = document.querySelector('.sheet')
        return JSON.stringify({
@@ -304,9 +299,68 @@ try {
     )
   }
 
+  const axis = await step(
+    'x axis labels (the day)',
+    `JSON.stringify([...document.querySelectorAll('.curve__x-label')].map(n=>n.textContent))`,
+  )
+  const moon = await step(
+    'moon: readout vs line',
+    `(() => {
+       const read = document.querySelector('.curve__read--moon')
+       const line = document.querySelector('.curve__moon')
+       const opacity = line ? Number(getComputedStyle(line).opacity) : 0
+       return JSON.stringify({
+         readout: read ? read.textContent.trim() : null,
+         line: line !== null,
+         opacity: +opacity.toFixed(2),
+         points: line ? (line.getAttribute('points') ?? '').split(' ').length : 0,
+       })
+     })()`,
+  )
+  const shootBand = await step(
+    'shoot window banded',
+    `document.querySelectorAll('.curve__shoot').length`,
+  )
+
   const note = await step('note', `document.querySelector('.curve__note')?.textContent`)
-  const halfTime = await step('HALF time', `document.querySelector('.scrub__time')?.textContent`)
+  const halfTime = await step('FULL time', `document.querySelector('.scrub__time')?.textContent`)
   const readout = await step('readout', `document.querySelector('.curve__readout')?.textContent`)
+  /*
+   * SCROLL THE CURVE INTO VIEW. It is one section among several at FULL, so
+   * it is below the fold on a 390x844 screen -- which is the point of it
+   * being a section rather than the whole sheet.
+   */
+  await step(
+    'scroll to the curve',
+    `(() => {
+       const section = [...document.querySelectorAll('[data-section]')]
+         .find((n) => /sun curve/i.test(n.getAttribute('data-section') ?? ''))
+       if (!section) return 'no Sun curve section'
+       section.scrollIntoView({ block: 'start' })
+       return 'scrolled'
+     })()`,
+  )
+  await wait(900)
+  await shot('curve-full')
+
+  /* And HALF: the positions list and the chips, with no chart in sight. */
+  await ev(`[...document.querySelectorAll('.sheet__handle')][0]?.click()`)
+  await wait(500)
+  await ev(`[...document.querySelectorAll('.sheet__handle')][0]?.click()`)
+  await wait(1200)
+  const atHalf = await step(
+    'HALF: list and chips, no curve',
+    `(() => {
+       const sheet = document.querySelector('.sheet')
+       return JSON.stringify({
+         detent: sheet?.getAttribute('data-detent'),
+         curve: document.querySelectorAll('.curve').length,
+         strip: document.querySelectorAll('.scrub__phases').length,
+         chips: document.querySelectorAll('.plat__btn').length,
+         list: document.querySelectorAll('.plist__add').length,
+       })
+     })()`,
+  )
   await shot('curve-half')
 
   report = {
@@ -318,6 +372,10 @@ try {
     note,
     readout,
     profile,
+    axis: JSON.parse(axis),
+    moon: JSON.parse(moon),
+    shootBand,
+    atHalf: JSON.parse(atHalf),
   }
 } finally {
   watchdog.stop()
@@ -328,8 +386,16 @@ const problems = []
 if (report === null) problems.push('nothing was captured')
 else {
   if (report.peek?.height !== 88) problems.push(`PEEK is ${report.peek?.height}px, not 88`)
-  if (report.half.curve !== 1) problems.push('no curve at HALF')
-  if (report.half.strip !== 0) problems.push('the strip is still drawn at HALF')
+  if (report.half.curve !== 1) problems.push('no curve at FULL')
+  if (report.shootBand !== 1) problems.push('the shoot window is not banded on the day')
+  if (report.atHalf.curve !== 0) problems.push('the curve is still at HALF')
+  if (report.atHalf.strip !== 1) problems.push('the strip is missing at HALF')
+  if (report.atHalf.chips < 3) problems.push('the chips are missing at HALF')
+  if (report.atHalf.list !== 1) problems.push('the positions list is missing at HALF')
+  /* ONE SOURCE, ONE FACT: a moon in the readout means a moon on the chart. */
+  if (report.moon.readout !== null && (!report.moon.line || report.moon.opacity < 0.2)) {
+    problems.push(`the readout says "${report.moon.readout}" with no visible moon line`)
+  }
   if (report.drawn.terrain !== 1) problems.push('no terrain horizon drawn')
   if (report.drawn.flat !== 1) problems.push('no flat line drawn for comparison')
   if (report.drawn.sun !== 1) problems.push('no sun curve')

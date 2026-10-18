@@ -97,16 +97,49 @@ value.
 
 ---
 
+## D · A feature that hides its own dependency
+
+A feature that covers, disables or otherwise blocks the control it needs to
+work. The user is told what is missing and cannot get to it.
+
+**Instances**
+
+| the feature | the dependency it hid |
+|---|---|
+| the drone chip | derived its enabled state from the selection it exists to change, so it could not be used to make itself usable |
+| the elevation curve | needed terrain, terrain is in Layers, Layers is in the sheet, and the curve took the whole sheet — then printed "no elevation data here" |
+
+The second one went further: the chart's drag handler also swallowed the
+sheet's detent gesture, so at HALF there was no way to move the sheet, no
+controls on screen, and no way out at all.
+
+**Fix.** A message that names a missing capability carries the control that
+supplies it. Not a pointer to where the control lives — the control.
+
+`SunCurve`'s "no elevation data here" is a button that turns terrain on in
+place. It does not flip the toggle by itself: the tap is the user's, because
+terrain costs frames on a phone and they turned it off for a reason.
+
+The surface audit now checks both halves of this: every detent must be
+**reachable by drag** from every other, and every message naming a missing
+capability must have a control beside it.
+
+---
+
 ## The thread
 
-All three are the same mistake at different distances: **believing a value
+A, B and C are the same mistake at different distances: **believing a value
 without establishing what produced it.**
 
 A reads two values and does not ask which is authoritative. B reads a result
 and does not ask whether anything was examined. C reads a number and does not
 ask what it is a number *about*.
 
-The fix in every case is to make the provenance part of the value — the key
+D is a different mistake and worth keeping separate: not believing a wrong
+value, but leaving the user somewhere they cannot act. Its test is not "is
+this true" but "can they do anything about it from here".
+
+The fix for the first three is to make the provenance part of the value — the key
 beside the name, the count beside the verdict, the build date beside the
 measurement — so that a value with no provenance cannot be mistaken for one
 that has it.

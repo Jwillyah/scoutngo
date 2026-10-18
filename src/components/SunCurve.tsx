@@ -1,13 +1,13 @@
-import { useMemo } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import {
   altitudeRange,
   band,
+  dayExtent,
   minutesApart,
   samplePath,
   SHOW_BOTH_MINUTES,
   sunCrossings,
   terrainHorizonCurve,
-  type PathSample,
 } from '../core/sunPath.ts'
 import type { HorizonInput } from '../core/skyWindow.ts'
 import { formatClock } from '../core/timezone.ts'
@@ -47,6 +47,18 @@ interface SunCurveProps {
   horizon: HorizonInput
   timeZone: string
   timeZoneAbbr: string
+  /*
+   * TURNING TERRAIN ON, FROM HERE.
+   *
+   * NO FEATURE MAY HIDE THE CONTROL IT DEPENDS ON. The curve needs the DEM,
+   * the DEM arrives with the Terrain layer, and the message that said "no
+   * elevation data here" pointed at a toggle in another section. This makes
+   * the message the control. It does NOT flip it by itself: the tap is the
+   * shooter's, because terrain costs frames on a phone and they turned it off
+   * for a reason.
+   */
+  terrainOn: boolean
+  onShowTerrain: (next: boolean) => void
 }
 
 /*
@@ -68,6 +80,8 @@ export function SunCurve({
   horizon,
   timeZone,
   timeZoneAbbr,
+  terrainOn,
+  onShowTerrain,
 }: SunCurveProps) {
   const clock = (date: Date) => formatClock(date, timeZone)
 
@@ -87,21 +101,50 @@ export function SunCurve({
   const terrain = useMemo(() => terrainHorizonCurve(horizon, dayPath), [horizon, dayPath])
   const crossings = useMemo(() => sunCrossings(dayPath, terrain), [dayPath, terrain])
 
-  const span = end.getTime() - start.getTime()
+  /*
+   * THE AXIS IS THE DAY, THE SHOOT WINDOW IS A MARK ON IT.
+   *
+   * The first version used the shoot window as the extent, which for an 18:02
+   * to 18:55 window drew 53 minutes of arc -- a segment with no shape in it.
+   * The point of putting altitude on an axis is seeing the shape of the day,
+   * and then seeing where the shoot sits in it.
+   */
+  const extent = useMemo(() => dayExtent(dayPath), [dayPath])
+  const axisStart = extent?.start ?? start
+  const axisEnd = extent?.end ?? end
+  const span = axisEnd.getTime() - axisStart.getTime()
 
-  /* Only the samples inside the window are drawn, plus one either side so the
-   * curve runs to the edges instead of stopping short of them. */
   const shown = useMemo(() => {
     if (span <= 0) return []
-    const inside: PathSample[] = []
-    for (let i = 0; i < dayPath.length; i += 1) {
-      const sample = dayPath[i]
-      if (sample === undefined) continue
-      const offset = sample.t.getTime() - start.getTime()
-      if (offset >= -600_000 && offset <= span + 600_000) inside.push(sample)
-    }
-    return inside
-  }, [dayPath, start, span])
+    return dayPath.filter((sample) => {
+      const offset = sample.t.getTime() - axisStart.getTime()
+      return offset >= -600_000 && offset <= span + 600_000
+    })
+  }, [dayPath, axisStart, span])
+
+  const scrubbing = useRef(false)
+
+  /*
+   * A TAP OR A THUMB DRAG MAPS THE PIXEL TO THE SHOOT WINDOW, not to the
+   * axis. The axis is the whole day; the shooter scrubs the window they
+   * entered, which is the same 0..1 value the strip at PEEK uses. Outside the
+   * window the value clamps, because there is no shoot there to scrub to.
+   */
+  const seekTo = useCallback(
+    (clientX: number, plot: Element | null) => {
+      const box = (plot ?? null)?.getBoundingClientRect()
+      if (box === undefined || box === null || box.width <= 0) return
+      const shootSpan = end.getTime() - start.getTime()
+      if (shootSpan <= 0) return
+      const axisSpanMs = axisEnd.getTime() - axisStart.getTime()
+      if (axisSpanMs <= 0) return
+      const share = (clientX - box.left) / box.width
+      const atMs = axisStart.getTime() + share * axisSpanMs
+      const next = (atMs - start.getTime()) / shootSpan
+      onChange(Math.min(1, Math.max(0, next)))
+    },
+    [start, end, axisStart, axisEnd, onChange],
+  )
 
   const range = useMemo(
     () => altitudeRange(shown, 3, terrain.kind === 'terrain' ? terrain.angles : []),
@@ -112,7 +155,7 @@ export function SunCurve({
     return <p className="curve__none">No window to draw.</p>
   }
 
-  const x = (t: Date) => ((t.getTime() - start.getTime()) / span) * VB_W
+  const x = (t: Date) => ((t.getTime() - axisStart.getTime()) / span) * VB_W
   const y = (altitude: number) =>
     VB_H - ((altitude - range.min) / (range.max - range.min)) * VB_H
 
@@ -144,6 +187,14 @@ export function SunCurve({
    */
   const illumination =
     shown.reduce((acc, s) => acc + s.moonIllumination, 0) / Math.max(1, shown.length)
+
+  /*
+   * A FLOOR THAT IS ACTUALLY VISIBLE. It was 0.06, which renders as nothing,
+   * while the readout went on printing "moon 24 degrees" -- a readout and a
+   * curve disagreeing about whether there is a moon. The illuminated fraction
+   * still drives the weight, so a new moon is faint; it is no longer absent.
+   */
+  const moonOpacity = Math.max(0.3, illumination)
 
   const terrainLine =
     terrain.kind === 'terrain'
@@ -182,7 +233,7 @@ export function SunCurve({
   const drawFlat = terrain.kind === 'flat' || showBoth
 
   /* Three at most: the two ends and the middle. */
-  const xLabels = [start, new Date(start.getTime() + span / 2), end]
+  const xLabels = [axisStart, new Date(axisStart.getTime() + span / 2), axisEnd]
 
   return (
     <div className="curve">
@@ -191,6 +242,7 @@ export function SunCurve({
         viewBox={`0 0 ${VB_W} ${VB_H}`}
         preserveAspectRatio="none"
         aria-hidden="true"
+        onClick={(event) => seekTo(event.clientX, event.currentTarget)}
       >
         {runs.map((run) => (
           <rect
@@ -202,6 +254,21 @@ export function SunCurve({
             height={VB_H}
           />
         ))}
+
+        {/*
+          * THE SHOOT WINDOW, MARKED ON THE DAY. Drawn under the curves and
+          * over the bands: it is not a measurement, it is where the shooter
+          * said they would be standing.
+          */}
+        {span <= 0 ? null : (
+          <rect
+            className="curve__shoot"
+            x={Math.max(0, x(start))}
+            y={0}
+            width={Math.max(0, Math.min(VB_W, x(end)) - Math.max(0, x(start)))}
+            height={VB_H}
+          />
+        )}
 
         {!drawFlat ? null : (
           <line
@@ -225,7 +292,7 @@ export function SunCurve({
         <polyline
           className="curve__moon"
           points={moonLine}
-          style={{ opacity: Math.max(0.06, illumination) }}
+          style={{ opacity: moonOpacity }}
           vectorEffect="non-scaling-stroke"
         />
 
@@ -244,24 +311,50 @@ export function SunCurve({
       </svg>
 
       {/*
-        * THE HIT TARGET, STRETCHED INVISIBLY OVER THE CHART. It is the same
-        * input the strip uses, so the detents share one piece of state and
-        * expanding the sheet cannot move the time.
+        * THE THUMB IS THE ONLY THING HERE THAT CLAIMS A DRAG.
+        *
+        * data-scrub tells BottomSheet to leave this gesture alone; everything
+        * else inside the sheet drags the sheet. The previous version put a
+        * full-width range input across the plot, which swallowed every
+        * gesture and left the sheet unmovable with no controls on screen.
+        *
+        * It is a plain div rather than part of the svg so it can carry a
+        * finger-sized hit area without changing what is drawn.
         */}
-      <input
-        className="curve__range"
-        type="range"
-        min={0}
-        max={1000}
-        value={Math.round(value * 1000)}
-        aria-label="Time through the window"
-        aria-valuetext={`${clock(at)} ${timeZoneAbbr}, sun ${current.sunAltitude.toFixed(
-          1,
-        )} degrees up at ${current.sunAzimuth.toFixed(0)} degrees`}
-        onChange={(event) => onChange(Number(event.target.value) / 1000)}
+      <div
+        className="curve__grip"
+        data-scrub="thumb"
+        style={{ left: `${(thumbX / VB_W) * 100}%`, top: `${(thumbY / VB_H) * 100}%` }}
+        role="slider"
+        tabIndex={0}
+        aria-label="Time through the shoot window"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(value * 100)}
+        aria-valuetext={`${clock(at)} ${timeZoneAbbr}, sun ${current.sunAltitude.toFixed(1)} degrees up`}
+        onPointerDown={(event) => {
+          event.currentTarget.setPointerCapture(event.pointerId)
+          scrubbing.current = true
+        }}
+        onPointerMove={(event) => {
+          if (!scrubbing.current) return
+          seekTo(event.clientX, event.currentTarget.parentElement)
+        }}
+        onPointerUp={() => {
+          scrubbing.current = false
+        }}
+        onPointerCancel={() => {
+          scrubbing.current = false
+        }}
+        onKeyDown={(event) => {
+          const step = event.key === 'ArrowLeft' ? -0.02 : event.key === 'ArrowRight' ? 0.02 : 0
+          if (step === 0) return
+          event.preventDefault()
+          onChange(Math.min(1, Math.max(0, value + step)))
+        }}
       />
 
-      <p className="curve__x" aria-hidden="true">
+            <p className="curve__x" aria-hidden="true">
         {xLabels.map((label) => (
           <span className="curve__x-label num" key={label.toISOString()}>
             {clock(label)}
@@ -287,7 +380,22 @@ export function SunCurve({
         * number that says why this is not just a table lookup.
         */}
       {terrain.kind === 'flat' ? (
-        <p className="curve__note">{terrain.reason}</p>
+        /*
+         * THE MESSAGE IS THE CONTROL. It names what is missing and fixes it
+         * in one tap, from the screen that needs it, rather than pointing at
+         * a toggle in a section this chart used to be covering.
+         */
+        <button
+          type="button"
+          className="curve__fix"
+          onClick={() => onShowTerrain(true)}
+          disabled={terrainOn}
+        >
+          <span className="curve__fix-why">{terrain.reason}</span>
+          <span className="curve__fix-do">
+            {terrainOn ? 'Terrain is on — waiting for the elevation data' : 'Turn terrain on'}
+          </span>
+        </button>
       ) : showBoth ? (
         <p className="curve__note curve__note--both">
           {crossings.terrainRise === null || crossings.flatRise === null ? null : (

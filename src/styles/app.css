@@ -8052,15 +8052,67 @@
  * drawn on the curve; this is what makes the gesture, the keyboard and the
  * screen reader work.
  */
-.curve__range {
+/*
+ * THE GRIP: a finger-sized hit area on the thumb, and the ONLY thing in the
+ * chart that claims a drag. It replaced a full-width range input that sat
+ * across the plot and swallowed every gesture, which left the sheet unmovable
+ * at HALF with no controls on screen.
+ */
+.curve__grip {
   position: absolute;
-  top: 0;
-  left: 0;
+  width: 44px;
+  height: 44px;
+  margin-left: -22px;
+  margin-top: -22px;
+  border-radius: 50%;
+  cursor: grab;
+  touch-action: none;
+}
+
+.curve__grip:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -4px;
+}
+
+/* The shoot window, marked on the day. Not a measurement: a plan. */
+.curve__shoot {
+  fill: color-mix(in srgb, var(--accent) 7%, transparent);
+  stroke: color-mix(in srgb, var(--accent) 28%, transparent);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+/*
+ * THE MESSAGE THAT IS ALSO THE CONTROL. No feature may hide the control it
+ * depends on: this names the missing capability and turns it on in one tap,
+ * from the screen that needs it.
+ */
+.curve__fix {
+  display: grid;
+  gap: 2px;
   width: 100%;
-  height: 100px;
-  margin: 0;
-  opacity: 0;
+  text-align: left;
+  padding: var(--space-2);
+  background: var(--color-field);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel);
+  color: inherit;
   cursor: pointer;
+}
+
+.curve__fix[disabled] {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.curve__fix-why {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.curve__fix-do {
+  font-size: var(--text-sm);
+  color: var(--ocean);
 }
 
 .curve__x {

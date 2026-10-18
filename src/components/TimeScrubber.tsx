@@ -10,8 +10,6 @@ import {
   type PhaseSpan,
 } from '../core/nightWindow.ts'
 import type { SunPosition } from '../core/sun.ts'
-import type { HorizonInput } from '../core/skyWindow.ts'
-import { SunCurve } from './SunCurve.tsx'
 import { positionInWindow, type TideExtreme } from '../core/tide.ts'
 import { formatClock } from '../core/timezone.ts'
 
@@ -49,22 +47,6 @@ interface TimeScrubberProps {
    * belong on this bar at all. The band and its times do not depend on it.
    */
   flying: FlyingContext
-  /*
-   * SAME CONTROL, TWO RESOLUTIONS.
-   *
-   * false at PEEK: the thin gradient strip, exactly as it was, because 88pt
-   * stays 88pt and the peek has room for the shoot line and this and nothing
-   * else. true at HALF and FULL: the strip becomes the altitude curve.
-   *
-   * THE STATE IS SHARED, NOT MIRRORED. `value` and `onChange` are the same
-   * props in both, so expanding the sheet cannot move the time and collapsing
-   * it cannot lose it. There is no second copy of the thumb position to drift.
-   */
-  expanded?: boolean
-  /** The venue, needed to compute the curve. Null keeps the strip. */
-  venue?: { lat: number; lon: number } | null
-  /** The real skyline, or flat. Only read when expanded. */
-  horizon?: HorizonInput
 }
 
 /**
@@ -85,11 +67,15 @@ export function TimeScrubber({
   phases,
   phase,
   flying,
-  expanded = false,
-  venue = null,
-  horizon = { kind: 'flat' },
 }: TimeScrubberProps) {
-  const showCurve = expanded && venue !== null
+  /*
+   * THE STRIP IS THE STRIP, AT EVERY DETENT.
+   *
+   * It briefly became the elevation curve at HALF, which replaced the whole
+   * of HALF -- the positions list, the chips, the Generate button -- with a
+   * chart, and took the sheet's gesture with it. The curve is one section at
+   * FULL now. See SunCurve.tsx.
+   */
   const clock = (date: Date) => formatClock(date, timeZone)
 
   /*
@@ -149,19 +135,7 @@ export function TimeScrubber({
         </div>
       )}
 
-      {showCurve ? (
-        <SunCurve
-          start={start}
-          end={end}
-          value={value}
-          onChange={onChange}
-          at={at}
-          venue={venue}
-          horizon={horizon}
-          timeZone={timeZone}
-          timeZoneAbbr={timeZoneAbbr}
-        />
-      ) : bands.length === 0 ? null : (
+      {bands.length === 0 ? null : (
         <div className="scrub__phases" aria-hidden="true">
           {bands.map((band) => (
             <span
@@ -173,7 +147,6 @@ export function TimeScrubber({
         </div>
       )}
 
-      {showCurve ? null : (
       <input
         className="scrub__range"
         type="range"
@@ -188,7 +161,6 @@ export function TimeScrubber({
         ].join(', ')}
         onChange={(event) => onChange(Number(event.target.value) / 1000)}
       />
-      )}
 
       {/*
         * WHAT THE PHASE REQUIRES, AT THE MOMENT ON THE BAR.

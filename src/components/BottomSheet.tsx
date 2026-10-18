@@ -97,6 +97,20 @@ export function BottomSheet({
   const viewport = Math.max(PEEK_PX * 2, rawViewport - reservedBottom)
   const [dragHeight, setDragHeight] = useState<number | null>(null)
   const drag = useRef<{ startY: number; startHeight: number } | null>(null)
+  /*
+   * THE LIVE HEIGHT, IN A REF AS WELL AS IN STATE.
+   *
+   * endDrag used to read the STATE, which is only correct if React has
+   * rendered between the last move and the release. It usually has, because a
+   * real pointer delivers those in separate tasks -- but not always, and not
+   * when the three events arrive in one batch. Then `dragHeight` was still
+   * null at release, `settled` was null, and the drag ended with no detent
+   * change at all: the sheet snapped back and nothing moved.
+   *
+   * The ref is written synchronously on every move, so the release always has
+   * the height the finger actually ended on.
+   */
+  const dragHeightRef = useRef<number | null>(null)
 
   useEffect(() => {
     const onResize = () => setViewport(window.innerHeight)
@@ -115,8 +129,42 @@ export function BottomSheet({
     onHeightChange?.(height)
   }, [height, onHeightChange])
 
+  /*
+   * THE SHEET'S DRAG WINS, FROM ANYWHERE IN THE SHEET.
+   *
+   * WHAT HAPPENED. The elevation curve put a full-width range input across
+   * its plot. The sheet could only be dragged by its 12px grabber, so once
+   * the sheet was at HALF the chart swallowed every gesture on it and there
+   * was no way back: no controls on screen, no detent change, nothing. The
+   * surface audit passed that screen with zero failures, because it checked
+   * that a grabber EXISTS rather than that a drag CHANGES anything.
+   *
+   * SO THE RULE IS THE OTHER WAY ROUND NOW. A drag starting anywhere in the
+   * sheet moves the sheet, and a child has to claim the gesture explicitly to
+   * keep it. One thing does: the chart's thumb, marked data-scrub. Everything
+   * else -- the plot, the sections, the empty space -- drags the sheet.
+   *
+   * WHAT STILL DOES NOT DRAG IT:
+   *
+   *   a real control, because a drag that starts on a button or a select is
+   *   that control's gesture and always was
+   *
+   *   a scroller that is not at the top, because at FULL the body scrolls and
+   *   pulling the sheet down from halfway through a list is not what anyone
+   *   means
+   */
   const onPointerDown = useCallback(
     (event: React.PointerEvent) => {
+      const target = event.target as HTMLElement | null
+      if (target !== null) {
+        /* A child that claims the gesture keeps it. */
+        if (target.closest('[data-scrub]') !== null) return
+        /* A real control's own gesture. */
+        if (target.closest('input, select, textarea, a, [role="slider"]') !== null) return
+        /* Mid-scroll in the body: that is a scroll, not a sheet drag. */
+        const scroller = target.closest('.sheet__body')
+        if (scroller !== null && scroller.scrollTop > 0) return
+      }
       drag.current = { startY: event.clientY, startHeight: heightFor(detent, viewport) }
       event.currentTarget.setPointerCapture(event.pointerId)
     },
@@ -127,18 +175,21 @@ export function BottomSheet({
     (event: React.PointerEvent) => {
       if (drag.current === null) return
       const raw = drag.current.startHeight + (drag.current.startY - event.clientY)
-      setDragHeight(rubberBand(raw, PEEK_PX, viewport * FULL_FRACTION))
+      const next = rubberBand(raw, PEEK_PX, viewport * FULL_FRACTION)
+      dragHeightRef.current = next
+      setDragHeight(next)
     },
     [viewport],
   )
 
   const endDrag = useCallback(() => {
     if (drag.current === null) return
-    const settled = dragHeight
+    const settled = dragHeightRef.current
     drag.current = null
+    dragHeightRef.current = null
     setDragHeight(null)
     if (settled !== null) onDetentChange(nearestDetent(settled, viewport))
-  }, [dragHeight, onDetentChange, viewport])
+  }, [onDetentChange, viewport])
 
   /** Tapping the grabber steps up, and wraps from the top back to peek. */
   const step = () => {
@@ -152,14 +203,12 @@ export function BottomSheet({
       style={{ height: `${height}px` }}
       aria-label="Shoot setup"
       data-detent={detent}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
     >
-      <div
-        className="sheet__grab"
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
-      >
+      <div className="sheet__grab">
         <button
           type="button"
           className="sheet__handle"

@@ -85,3 +85,35 @@ different word so the marker keeps its meaning.
   than special-cased: a matcher that quietly skipped negations would be one
   more rule nobody can see, and the honest fix is probably to change the
   wording here rather than the matcher.
+
+---
+
+The block below is generated and is what the audit matches on. Keyed on the
+claim's own words rather than its line number, so an edit elsewhere in the
+file does not make a claim look new. Regenerate with
+`SCOUTNGO_RATCHET=1 node scripts/audit-measurements.mjs`.
+
+<!-- ratchet
+scripts/audit-labels.mjs::POSITIONS, SO THE WARNING WORDS EXIST TO BE MEAS
+scripts/audit-projection.mjs::still MEASURED and printed, because it is worth
+src/components/MapView.tsx::you can walk along. It is a MEASURED SEPARATION
+src/components/MapView.tsx::A MEASURED HEIGHT AND A NOMINAL ONE ARE DRAWN DI
+src/components/MapView.tsx::THE MEASURED/NOMINAL DISTINCTION LIVES IN THE CO
+src/components/MapView.tsx::THE ONE NUMBER THAT IS ACTUALLY MEASURED, from t
+src/components/PlanMode.tsx::The dock height is MEASURED rather than assemble
+src/components/PlanMode.tsx::MEASURED, not guessed. The row changes height wh
+src/components/PositionCard.tsx::THE PILOT SEPARATION, MEASURED IN CORE.
+src/components/planChrome.test.tsx::THE MEASURED MULTIPLE, NOT THE WORD. "WIDE" was
+src/components/weatherPanel.test.tsx::THE MEASURED PROFILE. Lynnhaven Inlet, 07:00 on
+src/core/capture.ts::to be MEASURED at a real venue, not guessed, and
+src/core/capture.ts::MEASURED AGAINST 1568, AND KEPT. Three generates
+src/core/captureTerrain.ts::MEASURED, NOT ASSUMED. Generation works by unpro
+src/core/exposure.ts::A TABLE OF STARTING POINTS. NOT MEASURED, NOT CO
+src/core/goes.test.ts::MEASURED at Virginia Beach, 36.85N, on a 390px s
+src/core/shotType.ts::BOTH ARE MEASURED, neither is derived from the o
+src/core/sunBand.test.ts::THE MEASURED WINDOW THAT PROMPTED THIS. Lesner B
+src/core/sunSky.ts::MAPLIBRE'S ACTUAL CONVENTION, MEASURED RATHER TH
+src/lib/buildings.ts::WHETHER THE HEIGHT IS MEASURED, carried into the
+src/lib/groundViewAim.ts::THE MEASURED BEARING WINS WHERE THERE IS ONE. Fo
+src/lib/plan.test.ts::The MEASURED forward azimuth, off the aim, not d
+-->

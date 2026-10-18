@@ -296,6 +296,45 @@ export function minutesApart(a: Date | null, b: Date | null): number | null {
 }
 
 /**
+ * THE DAY'S OWN EXTENT: astronomical dawn to astronomical dusk.
+ *
+ * NOT THE SHOOT WINDOW, which is what the first version used and which made
+ * the chart useless: an 18:02 to 18:55 window drew a 53-minute segment of a
+ * curve, which has no shape in it at all. A day has a shape; a shoot window
+ * is a mark ON that shape.
+ *
+ * Falls back to the whole local day where there is no astronomical twilight
+ * to find -- a polar summer has no dawn, and the honest extent there is the
+ * day itself rather than nothing.
+ */
+export function dayExtent(
+  samples: readonly PathSample[],
+): { start: Date; end: Date } | null {
+  if (samples.length < 2) return null
+  const first = samples[0]
+  const last = samples[samples.length - 1]
+  if (first === undefined || last === undefined) return null
+
+  let dawn: Date | null = null
+  let dusk: Date | null = null
+  for (let i = 1; i < samples.length; i += 1) {
+    const previous = samples[i - 1]
+    const current = samples[i]
+    if (previous === undefined || current === undefined) continue
+    const was = previous.sunAltitude > BAND_THRESHOLDS.astronomical
+    const is = current.sunAltitude > BAND_THRESHOLDS.astronomical
+    if (!was && is && dawn === null) dawn = current.t
+    if (was && !is) dusk = current.t
+  }
+  if (dawn === null || dusk === null || dusk.getTime() <= dawn.getTime()) {
+    return { start: first.t, end: last.t }
+  }
+  /* A little air either side so the curve does not start on the frame edge. */
+  const pad = 20 * 60_000
+  return { start: new Date(dawn.getTime() - pad), end: new Date(dusk.getTime() + pad) }
+}
+
+/**
  * The altitude range to draw, with headroom, never degenerate.
  *
  * THE HORIZON IS ALWAYS IN RANGE, and that is not a nicety. Auto-ranging to
@@ -309,6 +348,15 @@ export function altitudeRange(
   samples: readonly PathSample[],
   padDegrees = 3,
   horizonAngles: readonly number[] = [],
+  /*
+   * THE MOON IS IN RANGE WHENEVER IT IS UP.
+   *
+   * ONE SOURCE, ONE FACT. The readout printed "moon 24 degrees" beside a
+   * chart with no moon line on it, because the range was built from the sun
+   * alone and the moon's arc fell outside it. A readout and a curve that
+   * disagree about whether there is a moon are two sources for one fact.
+   */
+  includeMoon = true,
 ): { min: number; max: number } {
   if (samples.length === 0) return { min: -10, max: 10 }
   let min = Number.POSITIVE_INFINITY
@@ -325,6 +373,15 @@ export function altitudeRange(
    * drawn at zero whenever the two horizons are being compared and a
    * comparison with one line off screen is not a comparison.
    */
+  if (includeMoon) {
+    for (const sample of samples) {
+      if (!Number.isFinite(sample.moonAltitude)) continue
+      if (sample.moonAltitude <= 0) continue
+      min = Math.min(min, sample.moonAltitude)
+      max = Math.max(max, sample.moonAltitude)
+    }
+  }
+
   for (const angle of [0, ...horizonAngles]) {
     if (!Number.isFinite(angle)) continue
     min = Math.min(min, angle)

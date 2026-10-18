@@ -242,6 +242,109 @@ for (const detent of ['peek', 'half', 'full']) {
   }
 }
 
+/* --------------------------------------- every detent reaches every other */
+
+/*
+ * A DRAG ON THE SHEET MUST CHANGE THE DETENT. ALL SIX WAYS.
+ *
+ * WHY THIS EXISTS. The elevation curve put a full-width range input across
+ * its plot. At HALF it swallowed every gesture on the sheet, the sheet could
+ * not be moved, and the screen had no controls on it: a dead end with no way
+ * out. THIS AUDIT PASSED THAT SCREEN WITH ZERO FAILURES, because it checked
+ * that a grabber EXISTS rather than that a drag DOES anything.
+ *
+ * So the assertion is the gesture, not the furniture. Six transitions, each
+ * performed as a real pointer drag on the sheet body, each verified by
+ * reading data-detent afterwards.
+ */
+console.log('\n### every detent is reachable from every other, by drag')
+
+const dragSheet = async (from, to) => {
+  if (!(await setDetent(from))) return `could not reach ${from} to start`
+  const result = await ev(`(() => {
+    const sheet = document.querySelector('.sheet')
+    if (!sheet) return 'no sheet'
+    const box = sheet.getBoundingClientRect()
+    const viewport = window.innerHeight
+    /* Where the sheet top must end up for the target detent. */
+    const wanted = { peek: 88, half: viewport * 0.45, full: viewport * 0.92 }['${to}']
+    const startY = box.top + 40
+    const endY = viewport - wanted
+    /*
+     * Grab somewhere in the sheet that is NOT the grabber and NOT a control,
+     * because the point is that the sheet drags from its body.
+     */
+    const target = document.elementFromPoint(box.left + box.width / 2, startY) ?? sheet
+    const fire = (type, y) =>
+      target.dispatchEvent(new PointerEvent(type, {
+        clientX: box.left + box.width / 2, clientY: y,
+        bubbles: true, cancelable: true, pointerId: 1, isPrimary: true, buttons: 1,
+      }))
+    fire('pointerdown', startY)
+    fire('pointermove', (startY + endY) / 2)
+    fire('pointermove', endY)
+    fire('pointerup', endY)
+    return 'dragged from ' + (target.className || target.tagName)
+  })()`)
+  await wait(700)
+  const landed = await ev(`document.querySelector('.sheet')?.getAttribute('data-detent')`)
+  return landed === to ? null : `${from} -> ${to}: landed on ${landed} (${result})`
+}
+
+for (const from of ['peek', 'half', 'full']) {
+  for (const to of ['peek', 'half', 'full']) {
+    if (from === to) continue
+    const problem = await dragSheet(from, to)
+    console.log(`  ${from.padEnd(5)} -> ${to.padEnd(5)} ${problem === null ? 'ok' : 'FAILED'}`)
+    if (problem !== null) fail(problem)
+  }
+}
+
+/* ------------------------------------ a named missing capability is fixable */
+
+/*
+ * NO FEATURE MAY HIDE THE CONTROL IT DEPENDS ON.
+ *
+ * A message that names something missing -- "no elevation data", "no drone in
+ * the kit" -- is only useful if the thing that supplies it can be reached
+ * from where the message is. The elevation curve said "no elevation data
+ * here" while covering the Layers section that turns the DEM on.
+ *
+ * The check is deliberately shallow and mechanical: find the messages, and
+ * require a control next to each. It cannot prove the control works; it can
+ * prove the shooter is not told about a missing thing with no way to supply
+ * it, which is the dead end that happened.
+ */
+console.log('\n### a message that names a missing capability offers the control')
+
+if (await setDetent('full')) {
+  const dead = await ev(`(() => {
+    const WANTED = [/no elevation data/i, /turn terrain on/i]
+    const out = []
+    for (const node of document.querySelectorAll('p, span, button')) {
+      const text = (node.textContent ?? '').trim()
+      if (text === '' || text.length > 200) continue
+      if (!WANTED.some((re) => re.test(text))) continue
+      if (node.getBoundingClientRect().width === 0) continue
+      /* The control is the node itself, or one inside the same block. */
+      const isControl = node.tagName === 'BUTTON' || node.closest('button') !== null
+      const nearControl = node.parentElement?.querySelector('button') !== null
+      out.push({ text: text.slice(0, 70), fixable: isControl || nearControl })
+    }
+    return JSON.stringify(out)
+  })()`)
+  const rows = JSON.parse(dead)
+  if (rows.length === 0) {
+    console.log('  no missing-capability message on screen')
+  }
+  for (const row of rows) {
+    console.log(`  ${row.fixable ? 'ok    ' : 'DEAD  '} ${row.text}`)
+    if (!row.fixable) {
+      fail(`"${row.text}" names a missing capability with no control to supply it`)
+    }
+  }
+}
+
 /* ------------------------------------------------- and not over each other */
 
 /*
