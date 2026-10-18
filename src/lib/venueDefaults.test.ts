@@ -51,7 +51,8 @@ describe('defaultVenue', () => {
   })
 
   it('carries no venue of its own, so nothing is invented about where', () => {
-    expect(draft.name).toBe('')
+    /* null, not '': nothing is known about the name of nowhere. */
+    expect(draft.name).toBeNull()
     expect(draft.latitude).toBe('')
     expect(draft.longitude).toBe('')
   })

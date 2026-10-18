@@ -319,7 +319,8 @@ export function buildGenerateBody(
     intent,
   )
   return {
-    venueName: venue.name,
+    /* The resolved label, not the cache: the model is sent a name or nothing. */
+    venueName: venue.name?.name ?? '',
     event: brief.event,
     outcome: brief.outcome,
     date: venue.date,

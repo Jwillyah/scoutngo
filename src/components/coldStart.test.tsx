@@ -33,6 +33,6 @@ describe('cold start', () => {
    * start that pre-named the place would be the same wrong claim in text.
    */
   it('leaves the venue name empty', () => {
-    expect(html).toContain('placeholder="Drop a pin or search for the venue"')
+    expect(html).toContain('Drop a pin or search for the venue')
   })
 })

@@ -31,7 +31,7 @@ const CLUSTERED = {
 }
 
 const WINDOW = resolveWindow({
-  name: 'Test',
+  name: { key: `${'36.726000'}|${'-75.940000'}`, name: 'Test' },
   latitude: '36.726000',
   longitude: '-75.940000',
   date: '2026-10-15',
@@ -70,7 +70,14 @@ const SUBJECTS: { label: string; node: ReactElement }[] = [
   { label: 'the sun readout', node: <SunReadout venueWindow={WINDOW} /> },
   {
     label: 'the venue plate',
-    node: <VenuePlate name="Test" onName={() => {}} nameFilled={false} at={VENUE} />,
+    node: (
+      <VenuePlate
+        state={{ kind: 'name', name: 'Test' }}
+        latitude="38.3642"
+        longitude="-75.6059"
+        at={VENUE}
+      />
+    ),
   },
 ]
 
@@ -194,7 +201,7 @@ describe('turning the numbers off does remove the numbers', () => {
      * because the plate renders it as an input VALUE, and an attribute is not
      * text content.
      */
-    expect(off).toContain('value="Test"')
+    expect(off).toContain('>Test<')
   })
 
   it('drops the solar degrees from the sun readout', () => {

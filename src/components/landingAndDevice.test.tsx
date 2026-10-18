@@ -178,7 +178,7 @@ describe('the cold start offers saved spots', () => {
     name,
     savedAt,
     venue: {
-      name,
+      name: { key: '36.7362|-75.9360', name },
       latitude: '36.7362',
       longitude: '-75.9360',
       date: '2026-10-18',

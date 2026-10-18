@@ -149,7 +149,7 @@ describe('a saved spot keeps the gear it was saved with', () => {
     name: 'Capital Trace',
     savedAt: '2026-10-17T12:00:00.000Z',
     venue: {
-      name: 'Capital Trace',
+      name: { key: `${'37.0869'}|${'-76.4746'}`, name: 'Capital Trace' },
       latitude: '37.0869',
       longitude: '-76.4746',
       date: '2026-10-17',

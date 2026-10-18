@@ -106,12 +106,17 @@ import { venueTimeZone, deviceTimeZone } from './core/timezone.ts'
 import {
   BIAS_HALF_SPAN_METERS,
   msUntilNominatim,
-  PINNED_PLACEHOLDER,
   reverseGeocode,
   searchVenues,
   type SearchHit,
 } from './lib/search.ts'
 import { usePersistentState } from './lib/usePersistentState.ts'
+import {
+  placeKey,
+  shortVenueLabel,
+  venueLabel,
+  venueNameFor,
+} from './core/venueName.ts'
 import { useTide } from './lib/useTide.ts'
 import {
   blockedReason,
@@ -188,6 +193,15 @@ function App() {
    * Shown rather than done quietly: silently correcting saved work is how a
    * plan changes under the shooter between one visit and the next.
    */
+  /*
+   * WHETHER A NAME LOOKUP IS IN FLIGHT.
+   *
+   * Not part of the venue: it is a fact about the network, not about the
+   * place. It only decides whether an absent name reads as "looking" (show
+   * the coordinate) or "unknown" (say so).
+   */
+  const [lookingUpName, setLookingUpName] = useState(false)
+
   const [positionNote, setPositionNote] = useState<string | null>(null)
 
   /*
@@ -926,13 +940,27 @@ function App() {
    * WHICH BRIEF A GENERATE WOULD SEND. Shown on the button, because the chips
    * standing in for a typed brief is only honest if it is visible.
    */
+  /*
+   * THE NAME, DERIVED. Every place that shows a venue name reads this, and
+   * never venue.name directly: a cached name whose key does not match this
+   * coordinate is a name for somewhere else.
+   */
+  const venueNameState = useMemo(
+    () => venueNameFor(venue.name, venue.latitude, venue.longitude, lookingUpName),
+    [venue.name, venue.latitude, venue.longitude, lookingUpName],
+  )
+  const venueNameLine = useMemo(
+    () => venueLabel(venueNameState, venue.latitude, venue.longitude),
+    [venueNameState, venue.latitude, venue.longitude],
+  )
+
   const briefSource = useMemo(
     () =>
       briefSourceLine(
         {
           kind: shootKind,
           platform: platformFilter,
-          venueName: venue.name,
+          venueName: venueNameLine,
           shotCount: desiredShots.length,
         },
         briefIsTyped({ event: venue.eventDescription, outcome: venue.desiredOutcome }),
@@ -940,7 +968,7 @@ function App() {
     [
       shootKind,
       platformFilter,
-      venue.name,
+      venueNameLine,
       venue.eventDescription,
       venue.desiredOutcome,
       desiredShots.length,
@@ -1100,25 +1128,36 @@ function App() {
 
   const dropVenuePin = useCallback(
     (at: LatLon) => {
-      const fill = venueNow.current.name.trim() === '' || nameIsFilled.current
-      setVenue((current) =>
-        fill
-          ? { ...withCoordinates(current, at), name: PINNED_PLACEHOLDER }
-          : withCoordinates(current, at),
-      )
-      if (!fill) return
+      /*
+       * NO "SHOULD WE REFILL IT" QUESTION ANY MORE.
+       *
+       * This used to ask whether the name was blank or auto-filled before
+       * touching it, and left a hand-typed name alone -- which is exactly how
+       * the header kept saying Brew River Dock Bar in Shenandoah. The name is
+       * keyed on the coordinate now, so moving the pin invalidates it by
+       * construction and there is nothing to decide.
+       */
+      setVenue((current) => withCoordinates(current, at))
 
       nameIsFilled.current = true
+      setLookingUpName(true)
       setDefaults((d) => ({ ...d, name: true }))
       cancelNameLookup()
       const controller = new AbortController()
       const pinned = withCoordinates(venueNow.current, at)
       const timer = window.setTimeout(() => {
         void reverseGeocode(at, controller.signal).then((name) => {
-          if (name === null || controller.signal.aborted || !nameIsFilled.current) return
+          if (controller.signal.aborted) return
+          setLookingUpName(false)
+          /*
+           * A FAILED LOOKUP LEAVES THE NAME ABSENT, not stale. venueNameFor
+           * then reports 'unknown' and the plate says so, which is a true
+           * statement; keeping the previous name would be a false one.
+           */
+          if (name === null) return
           setVenue((current) =>
             current.latitude === pinned.latitude && current.longitude === pinned.longitude
-              ? { ...current, name }
+              ? { ...current, name: { key: placeKey(current.latitude, current.longitude), name } }
               : current,
           )
         })
@@ -1186,7 +1225,7 @@ function App() {
          * quietly claim the window was chosen too.
          */
         if (next.date !== current.date) setDefaults((d) => ({ ...d, date: false }))
-        if (next.name !== current.name) {
+        if ((next.name?.name ?? null) !== (current.name?.name ?? null)) {
           nameIsFilled.current = false
           cancelNameLookup()
           setDefaults((d) => ({ ...d, name: false }))
@@ -1224,7 +1263,13 @@ function App() {
   const confirmPin = useCallback(() => {
     setPendingPin((pin) => {
       if (pin === null) return null
-      setVenue((current) => ({ ...withCoordinates(current, pin.at), name: pin.label }))
+      setVenue((current) => {
+        const moved = withCoordinates(current, pin.at)
+        return {
+          ...moved,
+          name: { key: placeKey(moved.latitude, moved.longitude), name: pin.label },
+        }
+      })
       /* A chosen search result names itself; it is not a guess to overwrite. */
       nameIsFilled.current = false
       cancelNameLookup()
@@ -1561,7 +1606,7 @@ function App() {
         {
           kind: shootKind,
           platform: platformFilter,
-          venueName: venue.name,
+          venueName: venueNameLine,
           shotCount: desiredShots.length,
         },
       ),
@@ -1679,7 +1724,7 @@ function App() {
    * that has to survive truncation; the venue name is already on the map.
    */
   const zoneSuffix = venueWindow === null ? '' : ` ${venueWindow.timeZoneShort}`
-  const venueShort = venue.name.split(',')[0] || PINNED_PLACEHOLDER
+  const venueShort = shortVenueLabel(venueNameState, venue.latitude, venue.longitude)
   /*
    * THE OPTIC, SAID ONCE, when every position shares it.
    *
@@ -1865,7 +1910,7 @@ function App() {
             onLoadSpot={loadSpot}
             onDeleteSpot={(id) => setSpots(spots.filter((spot) => spot.id !== id))}
             onImportSpots={(incoming) => setSpots(mergeSpots(spots, incoming))}
-            suggestedName={venue.name.split(',')[0] ?? ''}
+            suggestedName={shortVenueLabel(venueNameState, venue.latitude, venue.longitude)}
             canSave={centre !== null}
             describeText={describeText}
             onDescribeText={setDescribeText}
@@ -1892,6 +1937,7 @@ function App() {
               })),
             )}
             newBuild={newBuild}
+            venueNameState={venueNameState}
             onShowLanding={() => {
               setAtHowPath(true)
               window.history.pushState({}, '', '/how')

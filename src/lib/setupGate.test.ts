@@ -22,7 +22,8 @@ const dragged = withCoordinates(defaultVenue(now), PIN)
  */
 describe('a dragged pin with no name', () => {
   it('is a complete venue', () => {
-    expect(dragged.name).toBe('')
+    /* The name is a cache now: absent until it resolves for THIS pin. */
+    expect(dragged.name).toBeNull()
     expect(validateVenue(dragged)).toEqual({})
     expect(setupGap(validateVenue(dragged))).toBeNull()
   })
@@ -46,7 +47,7 @@ const BROKEN: VenueDraft[] = [
   { ...dragged, startTime: '' },
   { ...dragged, endTime: '' },
   { ...dragged, startTime: '18:00', endTime: '09:00' },
-  { ...dragged, name: '', eventDescription: '', desiredOutcome: '' },
+  { ...dragged, name: null, eventDescription: '', desiredOutcome: '' },
 ]
 
 describe('setupGap', () => {

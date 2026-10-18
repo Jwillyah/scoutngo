@@ -24,6 +24,7 @@ import { SpotsPanel } from './SpotsPanel.tsx'
 import { ShootChips } from './ShootChips.tsx'
 import { StaleBrief } from './StaleBrief.tsx'
 import { UseMyLocation } from './UseMyLocation.tsx'
+import type { ResolvedName } from '../core/venueName.ts'
 import { VenuePlate } from './VenuePlate.tsx'
 
 interface SetupModeProps {
@@ -112,6 +113,8 @@ interface SetupModeProps {
   newBuild: BuildCheck
   /** Brings back the landing page, which is otherwise shown once. */
   onShowLanding: () => void
+  /** What the app knows about the venue's name. Derived in App, never typed. */
+  venueNameState: ResolvedName
 }
 
 /** What is open over the one screen. Only ever one at a time. */
@@ -186,6 +189,7 @@ export function SetupMode({
   subjectMatters,
   newBuild,
   onShowLanding,
+  venueNameState,
 }: SetupModeProps) {
   /*
    * One example per load, so the placeholder shows the kind of work the reader
@@ -486,9 +490,9 @@ export function SetupMode({
       <ReachSlider meters={reachMeters} onChange={onReachChange} />
 
       <VenuePlate
-        name={venue.name}
-        onName={(name) => onVenueChange({ ...venue, name })}
-        nameFilled={defaults.name}
+        state={venueNameState}
+        latitude={venue.latitude}
+        longitude={venue.longitude}
         at={at}
       />
 

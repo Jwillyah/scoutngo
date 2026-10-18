@@ -1,13 +1,13 @@
 import { Receipt } from '../lib/numerals.tsx'
+import { venueLabel, type ResolvedName } from '../core/venueName.ts'
 import type { LatLon } from '../core/geo.ts'
 
 interface VenuePlateProps {
-  name: string
-  onName: (next: string) => void
-  /** True while the name is still the app's guess rather than the shooter's. */
-  nameFilled: boolean
+  /** What the app knows about this place's name. Derived, never typed. */
+  state: ResolvedName
+  latitude: string
+  longitude: string
   at: LatLon | null
-  /** Off by default. Turned on under Settings, for people who want the numbers. */
 }
 
 /**
@@ -31,20 +31,33 @@ interface VenuePlateProps {
  * because a number printed away from its control is a number you have to go
  * looking for the control of.
  */
-export function VenuePlate({ name, onName, nameFilled, at }: VenuePlateProps) {
+/*
+ * THE NAME IS NOT AN INPUT ANY MORE.
+ *
+ * It was a text field, which made it the SECOND writer of a fact the geocoder
+ * also wrote, and that is how the header kept reading "Brew River Dock Bar"
+ * after the pin moved to Shenandoah. A name typed here could not be reconciled
+ * with the coordinate, because nothing recorded which place it was typed for.
+ *
+ * WHERE THE SHOOTER'S OWN WORDS WENT: nowhere, because they already had a
+ * home. A saved spot carries a name the shooter chooses, and that one is about
+ * the SPOT -- "the layby below the switchback" -- rather than about what the
+ * place is called. Those were always two different things sharing one field.
+ */
+export function VenuePlate({ state, latitude, longitude, at }: VenuePlateProps) {
   return (
     <div className="plate">
-      <input
-        className="plate__name"
-        type="text"
-        value={name}
-        placeholder={at === null ? 'Drop a pin or search for the venue' : 'Name this spot'}
+      <p
+        className={`plate__name plate__name--${state.kind}`}
         aria-label="Venue name"
-        autoComplete="off"
-        enterKeyHint="done"
-        onChange={(event) => onName(event.target.value)}
-      />
-      {nameFilled ? <span className="pill__default">filled for you</span> : null}
+      >
+        {at === null
+          ? 'Drop a pin or search for the venue'
+          : venueLabel(state, latitude, longitude)}
+      </p>
+      {state.kind === 'looking' && at !== null ? (
+        <span className="pill__default">looking it up</span>
+      ) : null}
       {at === null ? null : (
         <Receipt kind="coordinate">
           <span className="plate__coords num">

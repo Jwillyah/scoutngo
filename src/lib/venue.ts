@@ -7,6 +7,7 @@
  */
 
 import type { LatLon } from '../core/geo.ts'
+import { placeKey, type VenueName } from '../core/venueName.ts'
 import {
   deviceTimeZone,
   isAwayFromDevice,
@@ -17,7 +18,19 @@ import {
 } from '../core/timezone.ts'
 
 export interface VenueDraft {
-  name: string
+  /**
+   * The resolved place name AND the coordinate it was resolved for.
+   *
+   * ONE VALUE, NOT TWO. It used to be a bare string sitting beside the
+   * coordinates, which meant dragging the pin to Shenandoah left the header
+   * reading "Brew River Dock Bar": two sources for one fact, disagreeing,
+   * with nothing in the code able to say which was right. Pairing the name
+   * with its key makes a mismatch unrepresentable as "the name of this
+   * place" -- see src/core/venueName.ts.
+   *
+   * null means nothing is known yet, which is a real state and not an error.
+   */
+  name: VenueName | null
   /** Kept as raw text so partial input like "-" or "38." does not fight the user. */
   latitude: string
   longitude: string
@@ -51,7 +64,7 @@ export type VenueField = keyof VenueDraft
 export type VenueErrors = Partial<Record<VenueField, string>>
 
 export const EMPTY_VENUE: VenueDraft = {
-  name: '',
+  name: null,
   latitude: '',
   longitude: '',
   date: '',
@@ -107,7 +120,15 @@ export function defaultVenue(now: Date): VenueDraft {
  * known for this venue, which is what makes it useful for testing fast.
  */
 export const CALIBRATION_VENUE: VenueDraft = {
-  name: 'Brew River Dock Bar, Salisbury MD',
+  /*
+   * THE NAME CARRIES ITS OWN KEY, so the calibration venue displays its name
+   * only while the pin is where the name was resolved for. Drag it and the
+   * header stops claiming Salisbury, which is the whole point of the change.
+   */
+  name: {
+    key: placeKey('38.364236', '-75.605912'),
+    name: 'Brew River Dock Bar, Salisbury MD',
+  },
   latitude: '38.364236',
   longitude: '-75.605912',
   date: '2026-09-12',

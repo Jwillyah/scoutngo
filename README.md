@@ -14,6 +14,14 @@ does not exist is "here is where to stand and what to shoot, for how I shoot."
 Built for solo shooters who fly in cold and burn the first hour working out
 where to stand.
 
+## How it goes wrong
+
+Three failure shapes account for almost every real defect in this repo: two
+sources for one fact, a check that cannot fail, and a check pointed at the
+wrong object. They are written down with their real instances in
+[docs/failure-modes.md](docs/failure-modes.md), which is worth reading before
+adding a check of your own.
+
 ## It works with no API keys
 
 Clone it, `npm install`, `npm run dev`, and the whole planning loop works. No

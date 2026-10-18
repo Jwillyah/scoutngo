@@ -99,7 +99,7 @@ describe('the same place, searched two ways', () => {
     id: newSpotId(),
     name: 'Rodanthe',
     savedAt: '2026-10-01T10:00:00.000Z',
-    venue: { ...EMPTY_VENUE, name: 'Rodanthe' },
+    venue: { ...EMPTY_VENUE, name: { key: 'x|y', name: 'Rodanthe' } },
     kit: { bodyIds: [], lensIds: [], droneIds: [], styleNotes: '' },
     positions: [],
     ...over,

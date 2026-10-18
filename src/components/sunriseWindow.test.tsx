@@ -18,7 +18,7 @@ import { EMPTY_VENUE } from '../lib/venue.ts'
  */
 const LESNER = {
   ...EMPTY_VENUE,
-  name: 'Lesner Bridge',
+  name: { key: `${'36.9063'}|${'-76.0836'}`, name: 'Lesner Bridge' },
   latitude: '36.9063',
   longitude: '-76.0836',
   date: '2026-10-20',
@@ -128,7 +128,7 @@ describe('a post-sunset window', () => {
  */
 const VB = {
   ...EMPTY_VENUE,
-  name: 'Virginia Beach',
+  name: { key: `${'36.8529'}|${'-75.9780'}`, name: 'Virginia Beach' },
   latitude: '36.8529',
   longitude: '-75.9780',
   date: '2026-10-15',

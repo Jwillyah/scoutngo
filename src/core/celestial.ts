@@ -12,14 +12,14 @@
  *
  * ACCURACY, MEASURED RATHER THAN CLAIMED. Checked against four JPL Horizons
  * apparent positions spanning four latitudes from -34 to +70 degrees; the
- * worst disagreement is 0.0024 degrees, about 8.6 arcseconds. The run that
+ * worst disagreement is 0.0024 degrees, 8.5 arcseconds. The run that
  * produced those residuals wrote them to
  * measurements/2026-10-18-celestial-vs-horizons.md and the four reference
  * values are literals in celestial.test.ts.
  *
  * WHY IT IS NOT EXACT, AND WHY THAT IS FINE. This uses MEAN sidereal time and
  * ignores nutation, so it is off by the equation of the equinoxes, which
- * reaches about 1.1 seconds of time -- the 8.6 arcseconds above. The question
+ * reaches about 1.1 seconds of time -- the 8.5 arcseconds above. The question
  * this file exists to answer is whether a radiant clears a ridge, and a ridge
  * edge is not knowable to a tenth of a degree from a 30 m DEM. Adding nutation
  * would buy precision the inputs cannot support. It is NOT ignored silently:
