@@ -141,6 +141,7 @@ const SURFACES = `(() => {
       cls: String(t.el.className).slice(0, 40),
       label: t.el.getAttribute('aria-label') ?? null,
       coversPct: +((over(t.r) / area(map)) * 100).toFixed(1),
+      rect: { left: t.r.left, top: t.r.top, right: t.r.right, bottom: t.r.bottom },
     })),
   }
 })()`
@@ -221,6 +222,14 @@ for (const detent of ['peek', 'half', 'full']) {
     `  ${detent.padEnd(5)} map visible ${String(visible).padStart(5)}%  surfaces: ${names}`,
   )
   /*
+   * THE FRAME IS KEPT WHETHER OR NOT IT FAILED. It used to be written only on
+   * a failure, which meant a passing run left nothing to look at -- and the
+   * rail sitting on top of the sheet at full was a PASSING run. Three frames
+   * per run is cheap and it is the only part of this audit a person can check
+   * with their own eyes.
+   */
+  await shot(OUT, `surface-${detent}`)
+  /*
    * THE SHEET AND THE RAIL. The rail is named here because it is the one
    * thing the rule explicitly allows: it has no content, opens nothing, and
    * is 40px of the right edge. Everything else is a failure by count.
@@ -230,8 +239,57 @@ for (const detent of ['peek', 'half', 'full']) {
       `${extra.length} surface(s) over the map besides the sheet and the rail: ` +
         extra.map((s) => s.cls || s.tag).join(', '),
     )
-    await shot(OUT, `surface-${detent}`)
   }
+}
+
+/* ------------------------------------------------- and not over each other */
+
+/*
+ * A SURFACE MAY NOT COVER ANOTHER SURFACE.
+ *
+ * WHY THIS IS HERE AT ALL. The check above asks what covers the MAP, and the
+ * rail is allowed, so the rail floating on top of the SHEET passed it clean.
+ * It was caught in a screenshot: at full the sheet is 92% of the screen and
+ * four map controls sat on roughly 40x130px of the shoot line and the
+ * scrubber. A check that passes a surface sitting on text is not measuring
+ * the thing it was written for.
+ *
+ * AND IT IS NOT THE PROTECTED LIST COMING BACK. That list named elements a
+ * panel must not cover and grew an entry per bug; what it was reaching for
+ * was this, which needs no names: the surfaces are already enumerated by
+ * POSITION above, so checking them against each other is three comparisons
+ * and nothing to maintain. A seventh surface is included the day it appears.
+ */
+console.log('\n### no surface may cover another surface')
+for (const detent of ['peek', 'half', 'full']) {
+  if (!(await setDetent(detent))) {
+    fail(`could not reach the ${detent} detent`)
+    continue
+  }
+  const found = await ev(SURFACES)
+  if (found?.error) {
+    fail(found.error)
+    continue
+  }
+  const list = found.surfaces
+  const hits = []
+  for (let i = 0; i < list.length; i += 1) {
+    for (let j = i + 1; j < list.length; j += 1) {
+      const a = list[i].rect
+      const b = list[j].rect
+      const w = Math.min(a.right, b.right) - Math.max(a.left, b.left)
+      const h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top)
+      if (w > 1 && h > 1) {
+        hits.push(
+          `${list[i].cls || list[i].tag} over ${list[j].cls || list[j].tag}` +
+            ` by ${Math.round(w)}x${Math.round(h)}px`,
+        )
+      }
+    }
+  }
+  console.log(`  ${detent.padEnd(5)} ${list.length} surfaces, ${hits.length} overlapping`)
+  for (const hit of hits) fail(hit)
+  if (hits.length > 0) await shot(OUT, `overlap-${detent}`)
 }
 
 /* ------------------------------------------------ the detent survives a render */

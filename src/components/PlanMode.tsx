@@ -757,6 +757,28 @@ export function PlanMode({
         * belong and does not qualify, because it has content, and content
         * lives in the sheet. That exception is the one worth refusing.
         */}
+      {/*
+        * AND IT IS GONE AT FULL, because at FULL there is no map to steer.
+        *
+        * CAUGHT IN A SCREENSHOT, not by a check, which is the part worth
+        * recording. The sheet at full covers 92% of the screen and the rail
+        * kept floating above it: four map controls on roughly 40x130px of the
+        * shoot line and the scrubber's right edge. The new surface audit
+        * passed it, because the rail is an allowed surface and the assertion
+        * only asked what covers the MAP, never what covers the sheet.
+        *
+        * That is the same blind spot the deleted PROTECTED list was invented
+        * to patch, arriving in new clothes exactly as predicted. The fix is
+        * the general rule rather than another entry: a surface may not cover
+        * another surface, asserted pairwise by position in audit-surface.mjs,
+        * three elements and no list.
+        *
+        * Hiding it is right rather than merely convenient. Every control here
+        * acts on the map immediately, and at full the map is 6.7% of the
+        * screen -- there is nothing left to act on, and the shooter at full
+        * is reading, not steering.
+        */}
+      {sheet === 'full' ? null : (
       <MapRail
         showSun={showSun}
         onShowSun={onShowSun}
@@ -767,6 +789,7 @@ export function PlanMode({
         onFitAll={() => handle.current?.fitAll(fitTargets)}
         canFitAll={fitTargets.length > 0}
       />
+      )}
 
       <BottomSheet
         detent={sheet}
