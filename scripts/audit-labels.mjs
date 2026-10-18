@@ -212,7 +212,7 @@ await ev(`[...document.querySelectorAll('button')].find(b=>/Sun arc/i.test(b.tex
 await wait(1500)
 
 /*
- * POSITIONS, SO THE WARNING WORDS EXIST TO BE MEASURED.
+ * POSITIONS, SO THE WARNING WORDS EXIST TO BE CHECKED.
  *
  * Without any the marker-flag check below is vacuous.
  *

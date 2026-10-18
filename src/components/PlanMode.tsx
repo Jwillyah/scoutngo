@@ -428,7 +428,7 @@ export function PlanMode({
   )
 
   /*
-   * The dock height is MEASURED rather than assembled from per-bar tokens: the
+   * The dock height is READ AT RUNTIME rather than assembled from per-bar tokens: the
    * scrubber's real height is set by its own content, and a token that said 62px
    * while it rendered at 93px silently put it on top of the chips.
    */
@@ -636,7 +636,7 @@ export function PlanMode({
           ['--sheet-live-height' as string]: `${sheetHeight}px`,
           ['--dock-height' as string]: `${dockHeight}px`,
           /*
-           * MEASURED, not guessed. The row changes height when it collapses
+           * READ AT RUNTIME, not guessed. The row changes height when it collapses
            * and when the platform counts gain a digit, and the hazard panel
            * is positioned below it: a hard-coded number here is how a panel
            * ends up across the button that closes it, which is exactly what

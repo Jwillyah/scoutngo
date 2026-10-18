@@ -41,7 +41,7 @@ export function groundViewAim(input: {
   const toSubject = input.subject === null ? null : bearingBetween(input.at, input.subject)
 
   /*
-   * THE MEASURED BEARING WINS WHERE THERE IS ONE. For a framed shot it is the
+   * THE COMPUTED BEARING WINS WHERE THERE IS ONE. For a framed shot it is the
    * forward azimuth turf computed, and recomputing it here from the same two
    * points would be a second answer to a question already answered.
    */

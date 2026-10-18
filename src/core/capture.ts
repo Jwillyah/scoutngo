@@ -5,7 +5,7 @@
  * single largest thing in a generate request, and its size trades two things
  * against each other that cannot both be maximised: latency and cost on one
  * side, and how well the model can read the ground on the other. That trade has
- * to be MEASURED at a real venue, not guessed, and re-measured whenever the
+ * to be measured at a real venue, not guessed, and re-measured whenever the
  * model changes. So the resolution is one named value with a documented way to
  * A/B it.
  *
@@ -37,7 +37,17 @@ export interface PixelSize {
  * 2532 is the natural height of a 390pt phone canvas at 3x, which is to say
  * "whatever the screen already is, unscaled".
  *
- * MEASURED AGAINST 1568, AND KEPT. Three generates per arm at the calibration
+ * HISTORICAL, 2026-09-17, AND IT PREDATES THE MEASUREMENT RULE.
+ *
+ * There is no artefact in measurements/ behind the figures below, and there
+ * will not be one: the run happened before this repo required a measuring
+ * script to write its raw output down, and re-running it now would be a
+ * different experiment on a different model. The numbers are kept because the
+ * DECISION they produced is still in force and a reader deserves to see what
+ * it rested on. They are not citable evidence and nothing new should lean on
+ * them.
+ *
+ * Measured against 1568, and kept. Three generates per arm at the calibration
  * venue, interleaved, on 2026-09-17:
  *
  *   model leg      2532: mean 11622ms   1568: mean 11795ms

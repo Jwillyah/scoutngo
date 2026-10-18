@@ -1,90 +1,59 @@
 # Untraced measured claims
 
-Every line in the tree that says **MEASURED** without naming the file the run
-wrote. `scripts/audit-measurements.mjs` reads this file as a ratchet: these
-are known, a **new** one fails the commit gate, and an entry here that no
-longer matches anything in the tree also fails, so the list cannot rot.
+**None.** All 22 have been resolved. The audit reads the generated block at the
+foot of this file as a ratchet: a new untraced claim fails the commit gate, and
+a baseline entry matching nothing in the tree also fails, so the list cannot
+rot into an allowlist.
 
-Nothing here has been deleted, reworded or backfilled. Each needs a decision:
-**re-measure** (do the run, write the file, cite it), or **reword** (the word
-is doing prose duty and should go), or **delete**.
+Kept as the record of what each one became.
 
 ---
 
-## 1 · Real numeric claims with no file behind them
+## Deleted
 
-These quote numbers that came out of an actual run. They are the ones that
-matter: a reader cannot check any of them, and I cannot prove from the repo
-that the run happened.
+- **`MapView.tsx` — the fps table.** 17.2 / 3.2 fps and 42 / 78 MB, gone. The
+  harness was abandoned as unreliable and the figures came off a throttled
+  desktop profile standing in for a phone. A number from a proxy for the
+  device, taken with a harness nobody trusts, reads like evidence and is not.
+  The note that terrain performance is unmeasured on real hardware stays, and
+  the design now rests on the mechanism — rotation is continuous re-tiling —
+  rather than on a figure.
 
-- `src/components/MapView.tsx:2407` — **the fps table.** `17.2 fps` terrain
-  off / `3.2 fps` on, heap `42 MB` / `78 MB`, at z16, pitch 60, 4× CPU
-  throttle, rotating continuously. This is the one real figure from item 1,
-  and the comment already admits idle and gesture are unmeasured on both
-  profiles. No file; the run was never written down.
-- `src/core/capture.ts:40` — **the 2532 vs 1568 capture A/B.** Three generates
-  per arm, interleaved, at the calibration venue on 2026-09-17: model leg
-  `2532: mean 11622ms`, `1568: mean 11795ms`. A real interleaved experiment
-  with no artefact.
-- `src/core/goes.test.ts:90` — **the GOES legibility table.** Virginia Beach,
-  36.85 N, 390 px screen, screen pixels per satellite pixel across zoom 7–13
-  with the scale bar at each. Looks like a careful sit-down with the app.
-- `src/components/weatherPanel.test.tsx:8` — **the Lynnhaven Inlet wind
-  profile.** 07:00 on 15 October 2026 from Open-Meteo: ground `2.08` m/s,
-  180 m `7.50` m/s, 22 degrees apart. This is the observation the whole panel
-  was built for and it exists only in a test comment.
-- `src/core/sunBand.test.ts:158` — **the Lesner Bridge window.** 20 Oct 2026,
-  sunrise 07:15 local, the stretch that used to read "nothing to light a
-  position with".
-- `src/core/shotType.ts:76` — **meridian convergence**, "measured here at 6e-5
-  degrees over 400 m at this latitude". A real number from a real check.
-- `src/core/sunSky.ts:118` — **MapLibre's camera convention**, "MEASURED
-  RATHER THAN GUESSED": principal point at the padded box centre, focal length
-  from the full canvas height. The comment says it was got wrong twice before
-  this, which is exactly the kind of finding that should have an artefact.
+## Re-measured, with an artefact
 
-## 2 · The word is doing prose duty
+| claim | file | what the re-run found |
+|---|---|---|
+| Lynnhaven wind profile | `2026-10-18-lynnhaven-wind-profile.md` | **Did not reproduce.** Seven mornings gave 1.2×–2.3×, turns 0–49°. The 3.5× / 22° case did not appear — and is not refuted: shear is largest when the surface is calm, and the calmest morning sampled gave the largest ratio. The fixture is now labelled a shear case, not an observation. |
+| GOES legibility | `2026-10-18-derivations.md` | **Reproduced exactly.** 2 / 8 / 131 / 1046 px at zooms 7 / 9 / 13 / 16. |
+| Lesner sunrise | `2026-10-18-derivations.md` | 07:16:40, not 07:15. A minute and a half out. |
+| meridian convergence | `2026-10-18-derivations.md` | **Wrong by 45×.** 2.7e-3°, not 6e-5°. Checked by hand as well: Δλ·sin(φ) = 0.004494 × 0.6004. Nothing behaved differently because of it — the point was only that it is not zero — but it was an uncheckable number and it was wrong. |
+| capture drift with terrain | `2026-10-18-terrain-capture-drift.md` | **Sound, and incomplete.** Settled, the round trip is 0.0 px at every camera. The drift appears only when `project` is asked about a camera no frame has been drawn for — 54.4 px at 45° of pitch, 324.5 at 60, 381 at 75. The old figure of 57 was right for the middle of the range and said nothing about the top of it. |
 
-No run behind these. "Measured" here means *computed from data* or *read from
-the DOM at runtime*, which is a different claim and arguably should use a
-different word so the marker keeps its meaning.
+A first run of the drift measurement sampled only settled cameras, got 0.0 px
+everywhere, and would have read as refuting the claim. It was measuring the
+wrong thing. The script now runs both arms and says so.
 
-- `src/components/MapView.tsx:1597` — "a MEASURED SEPARATION": the pilot
-  distance, computed in core.
-- `src/components/MapView.tsx:2284` — "A MEASURED HEIGHT AND A NOMINAL ONE":
-  OSM-tagged height versus an assumed one. A domain term, not a run.
-- `src/components/MapView.tsx:2320` — "THE MEASURED/NOMINAL DISTINCTION":
-  same term, about where it is encoded.
-- `src/lib/buildings.ts:114` — "WHETHER THE HEIGHT IS MEASURED": same again.
-- `src/components/PlanMode.tsx:430` — "the dock height is MEASURED rather than
-  assembled from per-bar tokens": measured from the live DOM at runtime.
-- `src/components/PlanMode.tsx:638` — "MEASURED, not guessed": same, the row
-  height.
-- `src/components/PositionCard.tsx:544` — "THE PILOT SEPARATION, MEASURED IN
-  CORE": computed.
-- `src/components/planChrome.test.tsx:342` — "THE MEASURED MULTIPLE": the
-  frame-to-subject ratio, computed.
-- `src/lib/groundViewAim.ts:44` — "THE MEASURED BEARING WINS": the forward
-  azimuth already computed elsewhere.
-- `src/lib/plan.test.ts:56` — "The MEASURED forward azimuth": same.
-- `src/core/captureTerrain.ts:4` — "MEASURED, NOT ASSUMED": prose about the
-  method, though the 57 px figure it leads to is a real measurement and is
-  cited nowhere.
-- `src/core/capture.ts:8` — "to be MEASURED at a real venue, not guessed": an
-  instruction to a future reader, not a claim.
-- `scripts/audit-labels.mjs:215` — "SO THE WARNING WORDS EXIST TO BE
-  MEASURED": prose about the fixture.
-- `scripts/audit-projection.mjs:186` — "still MEASURED and printed": prose
-  about `endsInFrame`.
+## Marked historical
 
-## 3 · A false positive of the current matcher
+- **`capture.ts` — the 2532 vs 1568 A/B, 2026-09-17.** Labelled with its date
+  and marked as predating the measurement rule. The run cannot be reproduced —
+  it was a different model — so the figures are kept because the decision they
+  produced is still in force, explicitly flagged as not citable evidence.
 
-- `src/core/exposure.ts:135` — "A TABLE OF STARTING POINTS. **NOT MEASURED**,
-  NOT COMPUTED, NOT A PROMISE." The line exists precisely to deny that these
-  are measured, and the audit flags it for containing the word. Left in rather
-  than special-cased: a matcher that quietly skipped negations would be one
-  more rule nobody can see, and the honest fix is probably to change the
-  wording here rather than the matcher.
+## Reworded
+
+The word was doing prose duty for something else in sixteen places. It now
+says what is true: **computed** where a value comes out of arithmetic
+(`MapView`, `PositionCard`, `planChrome`, `groundViewAim`, `plan.test`,
+`audit-projection`), **read at runtime** where it comes off the DOM
+(`PlanMode`, twice), **surveyed** where it means an OSM-tagged height
+(`MapView` twice, `buildings`), **established** for a convention rather than a
+number (`sunSky`, `captureTerrain`), **checked** for a test fixture
+(`audit-labels`), and **not derived** in `exposure.ts`, which exists to deny
+that the table is measured and was being flagged for containing the word.
+
+Not special-casing negations was the right call: a matcher with a quiet
+exception is one more invisible rule.
 
 ---
 
@@ -94,26 +63,4 @@ file does not make a claim look new. Regenerate with
 `SCOUTNGO_RATCHET=1 node scripts/audit-measurements.mjs`.
 
 <!-- ratchet
-scripts/audit-labels.mjs::POSITIONS, SO THE WARNING WORDS EXIST TO BE MEAS
-scripts/audit-projection.mjs::still MEASURED and printed, because it is worth
-src/components/MapView.tsx::you can walk along. It is a MEASURED SEPARATION
-src/components/MapView.tsx::A MEASURED HEIGHT AND A NOMINAL ONE ARE DRAWN DI
-src/components/MapView.tsx::THE MEASURED/NOMINAL DISTINCTION LIVES IN THE CO
-src/components/MapView.tsx::THE ONE NUMBER THAT IS ACTUALLY MEASURED, from t
-src/components/PlanMode.tsx::The dock height is MEASURED rather than assemble
-src/components/PlanMode.tsx::MEASURED, not guessed. The row changes height wh
-src/components/PositionCard.tsx::THE PILOT SEPARATION, MEASURED IN CORE.
-src/components/planChrome.test.tsx::THE MEASURED MULTIPLE, NOT THE WORD. "WIDE" was
-src/components/weatherPanel.test.tsx::THE MEASURED PROFILE. Lynnhaven Inlet, 07:00 on
-src/core/capture.ts::to be MEASURED at a real venue, not guessed, and
-src/core/capture.ts::MEASURED AGAINST 1568, AND KEPT. Three generates
-src/core/captureTerrain.ts::MEASURED, NOT ASSUMED. Generation works by unpro
-src/core/exposure.ts::A TABLE OF STARTING POINTS. NOT MEASURED, NOT CO
-src/core/goes.test.ts::MEASURED at Virginia Beach, 36.85N, on a 390px s
-src/core/shotType.ts::BOTH ARE MEASURED, neither is derived from the o
-src/core/sunBand.test.ts::THE MEASURED WINDOW THAT PROMPTED THIS. Lesner B
-src/core/sunSky.ts::MAPLIBRE'S ACTUAL CONVENTION, MEASURED RATHER TH
-src/lib/buildings.ts::WHETHER THE HEIGHT IS MEASURED, carried into the
-src/lib/groundViewAim.ts::THE MEASURED BEARING WINS WHERE THERE IS ONE. Fo
-src/lib/plan.test.ts::The MEASURED forward azimuth, off the aim, not d
 -->

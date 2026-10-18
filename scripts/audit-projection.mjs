@@ -183,7 +183,7 @@ export const MARKER_ANCHORS = `(() => {
  *
  * Containment is not something the cap promises and not something it controls
  * -- the pin can be anywhere, including behind the sheet -- so endsInFrame is
- * still MEASURED and printed, because it is worth seeing, and it decides
+ * still computed and printed, because it is worth seeing, and it decides
  * nothing.
  */
 export const BEARING_LINE_EXTENT = `(() => {

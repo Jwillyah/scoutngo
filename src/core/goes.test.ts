@@ -88,16 +88,20 @@ describe('which GOES band to show', () => {
  * sample distance rather than from a zoom somebody picked by looking at it.
  *
  * MEASURED at Virginia Beach, 36.85N, on a 390px screen: how many SCREEN
- * pixels one satellite pixel covers.
+ * pixels one satellite pixel covers. Re-derived from the shipped module; the
+ * table and the run are in measurements/2026-10-18-derivations.md.
  *
- *   zoom  7    61 mi scale      IR 2px      reads properly
- *   zoom  9    15 mi scale      IR 8px      still real detail
- *   zoom 13     1 mi scale      IR 131px    a third of the screen, one pixel
- *   zoom 16   627 ft scale      IR 1046px   2.7 screens, one pixel
+ *   zoom  7    IR    2px   reads properly
+ *   zoom  9    IR    8px   still real detail
+ *   zoom 13    IR  131px   34% of the screen, one pixel
+ *   zoom 16    IR 1046px   3 screens, one pixel
  *
- * Which is the reported symptom exactly: at a 500ft scale bar one satellite
- * pixel covers the whole screen and the layer is a flat wash that looks
- * broken. The layer was fine; the zoom was wrong.
+ * Which is the reported symptom exactly: at venue zoom one satellite pixel
+ * covers the screen and the layer is a flat wash that looks broken. The layer
+ * was fine; the zoom was wrong.
+ *
+ * The scale-bar figure that used to be in this sentence is gone: it was never
+ * derived, only remembered, and the zoom is the thing the code reasons about.
  */
 describe('the zoom at which the sky layer is still worth showing', () => {
   const VB_LAT = 36.85

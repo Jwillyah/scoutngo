@@ -541,7 +541,7 @@ export function PositionCard({
   const opticWord = position.platform === 'air' ? 'Camera' : 'Lens'
 
   /*
-   * THE PILOT SEPARATION, MEASURED IN CORE.
+   * THE PILOT SEPARATION, COMPUTED IN CORE.
    *
    * Two numbers because they are two questions: across the ground is what you
    * pace out, and pilot-to-aircraft is the real distance, which at 400ft is

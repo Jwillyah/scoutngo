@@ -1594,7 +1594,7 @@ export function MapView({
        * THE PILOT LINE. Where the pilot is standing, to where the aircraft is.
        *
        * Dashed, like the air cone, because it is not something on the ground
-       * you can walk along. It is a MEASURED SEPARATION and nothing more: it
+       * you can walk along. It is a COMPUTED SEPARATION and nothing more: it
        * does not say the aircraft can be seen from there, and it does not say
        * a flight is permitted. The length is printed on the card.
        *
@@ -2281,7 +2281,7 @@ export function MapView({
    * obstruction to work against, and anything more decorative would compete
    * with the plan drawn on top of them.
    *
-   * A MEASURED HEIGHT AND A NOMINAL ONE ARE DRAWN DIFFERENTLY. An unmapped
+   * A SURVEYED HEIGHT AND A NOMINAL ONE ARE DRAWN DIFFERENTLY. An unmapped
    * height is a nominal box, and a city block of identical nominal boxes that
    * looked surveyed would be the map asserting something nobody recorded. The
    * measured ones are solid; the nominal ones are flatter and more
@@ -2317,7 +2317,7 @@ export function MapView({
           minzoom: BUILDINGS_MIN_ZOOM,
           paint: {
             /*
-             * THE MEASURED/NOMINAL DISTINCTION LIVES IN THE COLOUR, NOT THE
+             * THE SURVEYED/NOMINAL DISTINCTION LIVES IN THE COLOUR, NOT THE
              * OPACITY. fill-extrusion-opacity takes no data expression in
              * MapLibre: passing one made the whole layer invalid and it was
              * never added, so nothing drew at all and the only hint was a
@@ -2404,19 +2404,20 @@ export function MapView({
   /*
    * TERRAIN IS SUSPENDED DURING A GESTURE, NOT BY ZOOM.
    *
-   * THE ONE NUMBER THAT IS ACTUALLY MEASURED, from the previous pass, at z16
-   * with pitch 60 on a 4x CPU-throttled profile, rotating continuously:
+   * TERRAIN PERFORMANCE IS UNMEASURED ON REAL HARDWARE, and no numbers are
+   * written here.
    *
-   *   terrain off   17.2 fps        terrain on   3.2 fps
-   *   heap          42 MB                        78 MB
+   * There were figures in this comment -- an fps and heap pair for terrain on
+   * and off. They came off a throttled desktop profile standing in for a
+   * phone, through a harness that was abandoned as unreliable, and they were
+   * deleted rather than re-run: a number from a proxy for the device, taken
+   * with a harness nobody trusts, is worse than no number, because it reads
+   * like evidence.
    *
-   * That is a rotating measurement and rotation is the whole cost: it is
-   * continuous re-tiling, which is what a gesture is. Idle and gesture have
-   * NOT been measured separately yet, on either profile, so no table is
-   * written here claiming they have been. The design below follows from the
-   * rotating number and from where the cost obviously comes from; the figures
-   * that would confirm it are being measured and this comment gets them when
-   * they exist.
+   * What the design below rests on is not a measurement but a mechanism:
+   * rotation is continuous re-tiling, which is what a gesture is, and that is
+   * where the cost obviously comes from. Suspending during the gesture
+   * follows from that. A real figure needs the phone it is about.
    *
    * WHY NOT BY ZOOM. Because venue zoom is 17 to 19 and that is the only zoom
    * anybody plans at, so a zoom rule suspended it exactly where it was wanted.

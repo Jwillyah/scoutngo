@@ -5,10 +5,24 @@ import type { TideState } from '../core/tide.ts'
 import { WeatherPanel } from './WeatherPanel.tsx'
 
 /*
- * THE MEASURED PROFILE. Lynnhaven Inlet, 07:00 on 15 October 2026, from
- * Open-Meteo, in m/s: ground 2.08 and 180m 7.50, three and a half times as
- * much from a direction twenty-two degrees away. Every other weather app shows
- * the first number and this panel exists to show the second.
+ * A SHEAR CASE, AS A FIXTURE. Not an observation.
+ *
+ * These four levels used to be labelled "the measured profile" from Lynnhaven
+ * Inlet on 15 October 2026, and that observation existed nowhere but in this
+ * comment. It was re-run live and the result is in
+ * measurements/2026-10-18-lynnhaven-wind-profile.md.
+ *
+ * WHAT THE RE-RUN FOUND, AND IT IS NOT A CONFIRMATION. Across seven mornings
+ * at 07:00 the 180 m wind ran 1.2x to 2.3x the ground wind, turning by 0 to
+ * 49 degrees. The sharp 3.5x case these numbers describe did NOT appear. It
+ * is not refuted either: shear is largest when the surface is calm, the
+ * calmest morning sampled (4.34 m/s at the ground) gave the largest ratio,
+ * and the original morning was calmer still.
+ *
+ * So these stay, as what they actually are: a fixture that exercises a strong
+ * shear, chosen because the panel has to be right in that case. The claim
+ * that they were measured on a particular morning is gone, because nothing
+ * can check it.
  */
 const LEVELS: LevelWind[] = [
   { heightMeters: 10, speedMps: 2.08, fromDegrees: 338 },

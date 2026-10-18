@@ -53,7 +53,7 @@ describe('planPosition', () => {
   const north = at(38.3648, -75.6059)
   const planned = planPosition(north, SUBJECT, sun)
 
-  /** The MEASURED forward azimuth, off the aim, not derived from anything. */
+  /** The COMPUTED forward azimuth, off the aim, not derived from anything. */
   const aimOf = (p: typeof planned) => {
     if (p.aim.shotType !== 'framed') throw new Error('expected a framed aim')
     return p.aim

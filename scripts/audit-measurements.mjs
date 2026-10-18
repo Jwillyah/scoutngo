@@ -49,7 +49,13 @@ const BASELINE = 'docs/untraced-measurements.md'
 const CLAIM = /\bMEASURED\b/
 
 /** A reference to the run that produced it. */
-const REFERENCE = /measurements\/[A-Za-z0-9._-]+/g
+/*
+ * ENDS ON AN ALPHANUMERIC, so a sentence's full stop is not part of the path.
+ * "...written to measurements/2026-10-18-derivations.md." was being read as a
+ * file named "derivations.md." and reported as missing -- the audit failing on
+ * punctuation rather than on provenance.
+ */
+const REFERENCE = /measurements\/[A-Za-z0-9._-]*[A-Za-z0-9]/g
 
 let problems = 0
 const fail = (line) => {

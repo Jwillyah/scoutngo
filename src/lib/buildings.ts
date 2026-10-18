@@ -111,7 +111,7 @@ export function buildingsToGeoJson(buildings: readonly Building[]): {
         drawMetres: b.height.drawMetres,
         baseMetres: b.height.baseMetres,
         /*
-         * WHETHER THE HEIGHT IS MEASURED, carried into the paint so an
+         * WHETHER THE HEIGHT IS SURVEYED, carried into the paint so an
          * unmapped height can be drawn differently from a known one. A city
          * block of identical nominal boxes claiming to be surveyed is the
          * thing this avoids.

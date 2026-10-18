@@ -132,7 +132,7 @@ export interface StartingExposure {
 }
 
 /*
- * A TABLE OF STARTING POINTS. NOT MEASURED, NOT COMPUTED, NOT A PROMISE.
+ * A TABLE OF STARTING POINTS. NOT DERIVED, NOT COMPUTED, NOT A PROMISE.
  *
  * These are the settings a night shooter dials in before taking the first
  * frame and then changes. They come from the common practice of the craft, not

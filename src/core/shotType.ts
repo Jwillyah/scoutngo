@@ -76,7 +76,16 @@ export type Aim =
        * BOTH ARE MEASURED, neither is derived from the other. They are not
        * exactly 180 apart: on a sphere the forward and reverse azimuths
        * between two points differ by the convergence of the meridians between
-       * them, measured here at 6e-5 degrees over 400m at this latitude.
+       * them, measured at 2.7e-3 degrees over 400m east at this latitude and
+       * written to measurements/2026-10-18-derivations.md.
+       *
+       * THIS COMMENT SAID 6e-5 AND WAS WRONG BY A FACTOR OF 45. The textbook
+       * convergence is the longitude difference times sin(latitude), which
+       * for 400 m east at 36.9 N is 0.004494 x 0.6004 = 2.70e-3 degrees. The
+       * re-derivation and an independent hand calculation agree. Nothing in
+       * the app behaved differently because of it -- the point was never the
+       * size of the number, only that it is not zero -- but it was a number
+       * in a comment that nobody could check, and it was wrong.
        * Tiny, but deriving one from the other would mean the bearing shown on
        * the card and sent to Street View was an approximation of a number
        * turf could have given exactly.

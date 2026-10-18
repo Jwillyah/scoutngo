@@ -1,7 +1,7 @@
 /*
  * WHY A GENERATED PLAN IS MADE FROM A FLAT MAP, EVEN WITH TERRAIN ON.
  *
- * MEASURED, NOT ASSUMED. Generation works by unprojecting normalised image
+ * ESTABLISHED, NOT ASSUMED. Generation works by unprojecting normalised image
  * coordinates against the camera that took the image, and the whole method
  * rests on that inversion being exact. It is exact under pitch and rotation on
  * a flat map, which is what the projection audit has always proved. With
@@ -49,9 +49,17 @@ export const CAPTURE_FLATTENED_NOTE =
  * Why, in one line, for a place with no room for the paragraph.
  *
  * Deliberately says the measurement exists rather than quoting it: a number
- * in a status line invites the reader to judge whether 57 pixels matters,
+ * in a status line invites the reader to judge whether 54 pixels matters,
  * which is not a question they have the context to answer standing in a car
  * park.
+ *
+ * THE NUMBER, RE-MEASURED: measurements/2026-10-18-terrain-capture-drift.md.
+ * At a SETTLED camera the round trip is exact -- 0.0 px at every pitch. The
+ * drift appears only when `project` is asked about a camera no frame has been
+ * drawn for, which is the sequence a capture performs: 54.4 px at 45 degrees
+ * of pitch, 324.5 at 60, and 381 at 75. The comment used to say 57 and that
+ * was sound for the middle of the range; it did not say that the same
+ * sequence is seven times worse at the pitch this app now allows.
  */
 export const CAPTURE_FLATTENED_SHORT = 'Generated from a flattened map.'
 

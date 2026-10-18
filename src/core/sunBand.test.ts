@@ -156,7 +156,12 @@ describe('whether a ground subject has light on its face', () => {
 
 /*
  * THE MEASURED WINDOW THAT PROMPTED THIS. Lesner Bridge, 20 Oct 2026, sunrise
- * 07:15 local. Every one of these read "nothing to light a position with".
+ * 07:16 local, re-derived from suncalc and written to
+ * measurements/2026-10-18-derivations.md. Every one of these read "nothing to
+ * light a position with".
+ *
+ * The comment said 07:15 before it was checked; suncalc gives 07:16:40 for
+ * that date and coordinate. A minute and a half, and wrong is wrong.
  */
 describe('the sunrise window at Lesner Bridge', () => {
   it('bands the stretch that used to be called empty', () => {

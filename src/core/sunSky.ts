@@ -115,7 +115,7 @@ export function projectSky(azimuth: number, altitude: number, camera: SkyCamera)
   const depth = dot(s, f)
 
   /*
-   * MAPLIBRE'S ACTUAL CONVENTION, MEASURED RATHER THAN GUESSED.
+   * MAPLIBRE'S ACTUAL CONVENTION, ESTABLISHED RATHER THAN GUESSED.
    *
    * The principal point is the centre of the PADDED box, and the focal length
    * comes from the FULL canvas height. That pairing is not the obvious one and

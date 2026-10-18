@@ -339,7 +339,7 @@ describe('a flagged position says what is wrong with it', () => {
   })
 
   /*
-   * THE MEASURED MULTIPLE, NOT THE WORD. "WIDE" was a verdict in one word, in
+   * THE COMPUTED MULTIPLE, NOT THE WORD. "WIDE" was a verdict in one word, in
    * hazard red, on all three positions of a drone shoot. The flag carries the
    * number when there is one.
    */
