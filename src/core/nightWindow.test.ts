@@ -3,8 +3,11 @@ import { getPosition, getTimes } from 'suncalc'
 import {
   CIVIL_TWILIGHT_ALTITUDE_DEG,
   HORIZON_ALTITUDE_DEG,
+  PHASE_BOUNDS,
+  PHASE_LABEL,
   anticollisionRequired,
   civilTimes,
+  part107Applies,
   nightTrainingRequired,
   phaseAt,
   phaseRequirements,
@@ -117,17 +120,23 @@ describe('the two requirements have different boundaries', () => {
   })
 
   it('states both plainly where they apply', () => {
-    const twilight = phaseRequirements('civil-twilight').join(' ')
+    /*
+     * WITH AN AIRCRAFT. The default context is deliberately ground, so a
+     * caller that forgets to say what is flying gets silence rather than an
+     * aviation rule it cannot justify. This test is about the air case.
+     */
+    const FLYING = { airPositions: 1, dronePlatform: true }
+    const twilight = phaseRequirements('civil-twilight', FLYING).join(' ')
     expect(twilight).toContain('107.29')
     expect(twilight).toContain('3 statute miles')
     expect(twilight).toContain('never be switched off in flight')
     expect(twilight).not.toContain('107.65')
 
-    const night = phaseRequirements('night').join(' ')
+    const night = phaseRequirements('night', FLYING).join(' ')
     expect(night).toContain('107.29')
     expect(night).toContain('107.65')
 
-    expect(phaseRequirements('day')).toEqual([])
+    expect(phaseRequirements('day', FLYING)).toEqual([])
   })
 })
 
@@ -232,5 +241,52 @@ describe('the night wording states no legal conclusion', () => {
   it('would catch a verdict if one were written', () => {
     const bad = 'This flight is cleared and compliant, you may fly.'.toLowerCase()
     expect(BANNED.some((phrase) => bad.includes(phrase))).toBe(true)
+  })
+})
+
+/*
+ * PART 107 IS A RULE ABOUT AN AIRCRAFT.
+ *
+ * Reported from a real session: GROUND 1, AIR 0, no drone anywhere, and the
+ * band said 107.29 requires anti-collision lighting. The gate lives here so
+ * the component cannot be the only thing holding it.
+ */
+describe('the aircraft rules only apply when something flies', () => {
+  const GROUND = { airPositions: 0, dronePlatform: false }
+
+  it('is silent for a ground-only plan in every phase', () => {
+    for (const phase of ['day', 'civil-twilight', 'night'] as const) {
+      expect(phaseRequirements(phase, GROUND), phase).toEqual([])
+    }
+  })
+
+  it('applies once a position is in the air', () => {
+    const flying = { airPositions: 1, dronePlatform: false }
+    expect(part107Applies(flying)).toBe(true)
+    expect(phaseRequirements('civil-twilight', flying).join(' ')).toContain('107.29')
+    expect(phaseRequirements('night', flying).join(' ')).toContain('107.65')
+  })
+
+  /* The intent comes before the position: the chip alone is enough. */
+  it('applies on the Drone chip with nothing placed yet', () => {
+    const intending = { airPositions: 0, dronePlatform: true }
+    expect(part107Applies(intending)).toBe(true)
+    expect(phaseRequirements('civil-twilight', intending).length).toBe(1)
+  })
+
+  it('does not apply to a ground plan', () => {
+    expect(part107Applies(GROUND)).toBe(false)
+  })
+
+  /*
+   * The band boundaries are NOT conditional on flying. Civil twilight is when
+   * the light is, which is why a ground shooter is out there at all.
+   */
+  it('still reports the phase and its bounds for a ground shoot', () => {
+    expect(PHASE_LABEL['civil-twilight']).toBe('Civil twilight')
+    expect(PHASE_BOUNDS['civil-twilight']).toContain('sunset to dusk')
+    expect(phaseAt(new Date('2026-10-15T22:48:00Z'), SANDBRIDGE.lat, SANDBRIDGE.lon)).toBe(
+      'civil-twilight',
+    )
   })
 })

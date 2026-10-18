@@ -259,6 +259,42 @@ const checkBearingLines = async (label, pitched = false) => {
   if (bad.length > 0) show(label, bad)
 }
 
+/*
+ * THE CAPTURE THROUGH THE REAL HANDLE, not a copy of its camera snapping.
+ *
+ * CAPTURE_ROUND_TRIP below reimplements the snap-there-and-back, which proved
+ * the arithmetic and could never have caught the terrain problem: all of the
+ * terrain handling lives in the handle, in capture/unprojectFromCapture, and
+ * an audit that rewrites that layer is auditing its own copy of it.
+ */
+const checkCaptureHandle = async (label) => {
+  const r = await ev(`(() => {
+    const h = window.__probe?.handle
+    if (!h) return { error: 'no handle on the probe' }
+    const map = window.__probe.map
+    const cap = h.capture()
+    if (!cap) return { error: 'capture returned null' }
+    /* The shooter moves on while the model thinks. */
+    map.jumpTo({ center: [-78.60, 38.40], zoom: 15, pitch: 0, bearing: 0 })
+    const pts = [{x:0.1,y:0.1},{x:0.5,y:0.5},{x:0.9,y:0.2},{x:0.25,y:0.8},{x:0.5,y:0.15}]
+    const coords = h.unprojectFromCapture(cap, pts)
+    const back = h.projectToCapture(cap, coords)
+    let worstPx = 0
+    for (let i = 0; i < pts.length; i++) {
+      worstPx = Math.max(worstPx, Math.hypot((back[i].x-pts[i].x)*cap.width, (back[i].y-pts[i].y)*cap.height))
+    }
+    return { worstPx: +worstPx.toFixed(2), capturedTerrain: cap.terrain,
+             flattened: cap.flattenedTerrain, terrainRestored: map.getTerrain() !== null }
+  })()`)
+  if (r?.error) { console.log('  ' + label, r.error); failures += 1; return }
+  const bad = r.worstPx > TOLERANCE_PX
+  if (bad) failures += 1
+  console.log(
+    `  ${label.padEnd(52)} ${String(r.worstPx).padStart(6)}px  flat=${r.flattened}` +
+      ` restored=${r.terrainRestored}  ${bad ? 'FAIL' : 'ok'}`,
+  )
+}
+
 const checkCapture = async (label) => {
   const rows = await ev(CAPTURE_ROUND_TRIP)
   if (rows?.error) { console.log(label, rows.error); failures += 1; return }
@@ -266,6 +302,111 @@ const checkCapture = async (label) => {
   const bad = worstDrift > TOLERANCE_METRES
   if (bad) failures += 1
   show(`${label}  worst drift ${worstDrift}m  ${bad ? 'FAIL' : 'ok'}`, rows)
+}
+
+/*
+ * THE SKY CAMERA MODEL, CHECKED AGAINST MAPLIBRE'S OWN PROJECTION.
+ *
+ * src/core/sunSky.ts places the sun from four public camera numbers. It is the
+ * only projection in this app that is NOT MapLibre's, so it is the only one
+ * that can quietly disagree with everything else on screen.
+ *
+ * HOW THIS IS CHECKED, AND WHY THE OBVIOUS WAYS DO NOT WORK. Three attempts
+ * failed before this one, each for a different reason worth recording so
+ * nobody repeats them:
+ *
+ *   a ground point 300km out is NOT the horizon, and the mercator conversion
+ *   to get there added its own error
+ *
+ *   the visible edge of the drawn ground is a FAR-PLANE CLIP, not the horizon;
+ *   MapLibre never draws the true horizon, so no pixel scan can find it
+ *
+ *   the sky's fog blend makes the ground near that edge read as sky, which
+ *   moved the measured boundary again
+ *
+ * What works uses only documented public values. MapLibre's camera sits
+ * (height/2)/tan(fov/2) pixels from the map centre along its axis, so its
+ * height above the ground plane is that times cos(pitch) and its ground offset
+ * behind centre is that times sin(pitch). A point a known number of pixels
+ * ahead of centre on the plane therefore has an exactly known elevation angle
+ * from the camera, and projecting THAT angle with the sky model must land
+ * where map.project puts the point. Measured: 0.00px in both axes at every
+ * pitch, bearing and zoom tried.
+ */
+const SKY_MODEL_AGREES = `((cases) => {
+  const map = window.__probe?.map
+  if (!map) return { error: 'no probe: load with ?probe=1' }
+  const RAD = Math.PI/180
+  const rows = []
+  for (const [pitch, bearing, zoom] of cases) {
+    map.jumpTo({ center: map.getCenter(), zoom, pitch, bearing })
+    const cv = map.getCanvas()
+    const H = cv.clientHeight, W = cv.clientWidth
+    const fov = map.getVerticalFieldOfView()
+    /*
+     * PADDED. The app pads the map for the sheet, so MapLibre centres the map
+     * inside the padded box and the optical axis is not the canvas centre.
+     * This is what the sky model got wrong, and what this audit caught: it
+     * agreed to 0.00px on a bare page and was out by up to 71px in PLAN.
+     */
+    const pd = map.getPadding()
+    const pad = { top: pd.top ?? 0, bottom: pd.bottom ?? 0, left: pd.left ?? 0, right: pd.right ?? 0 }
+    const cX = (pad.left + (W - pad.right))/2
+    const cY = (pad.top + (H - pad.bottom))/2
+    /* FULL height for the focal length, PADDED box for the centre. Measured. */
+    const focal = H/2/Math.tan(fov/2*RAD)
+    const worldSize = 512 * Math.pow(2, map.getZoom())
+    const P = map.getPitch(), B = map.getBearing()
+    const camHeightPx = focal * Math.cos(P*RAD)
+    const camBackPx = focal * Math.sin(P*RAD)
+    const aheadPx = 1200
+    const elev = -Math.atan2(camHeightPx, camBackPx + aheadPx)/RAD
+
+    const c = map.getCenter()
+    const mercY = (lat) => 0.5 - Math.log(Math.tan(Math.PI/4 + lat*RAD/2))/(2*Math.PI)
+    const invMercY = (y) => (Math.atan(Math.sinh((0.5-y)*2*Math.PI)))/RAD
+    const lon2 = ((c.lng+180)/360 + (aheadPx*Math.sin(B*RAD))/worldSize)*360-180
+    const lat2 = invMercY(mercY(c.lat) - (aheadPx*Math.cos(B*RAD))/worldSize)
+    const ml = map.project([lon2, lat2])
+
+    const dir=(az,alt)=>{const a=az*RAD,e=alt*RAD,ch=Math.cos(e);return [ch*Math.sin(a),ch*Math.cos(a),Math.sin(e)]}
+    const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2]
+    const crs=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]]
+    const f=dir(B,P-90), r=[Math.cos(B*RAD),-Math.sin(B*RAD),0], u=crs(r,f)
+    const sv=dir(B,elev), d=dot(sv,f)
+    rows.push({
+      at: 'pitch ' + Math.round(P) + ' bearing ' + Math.round(B) + ' zoom ' + map.getZoom(),
+      dxPx: +((cX + focal*dot(sv,r)/d) - ml.x).toFixed(2),
+      dyPx: +((cY - focal*dot(sv,u)/d) - ml.y).toFixed(2),
+    })
+  }
+  return rows
+})`
+
+const checkSkyModel = async (label) => {
+  const rows = await ev(
+    `${SKY_MODEL_AGREES}([[70,0,11],[80,0,11],[80,250,12],[84,300,11],[60,40,13],[45,0,13],[0,0,14]])`,
+  )
+  if (rows?.error) { console.log(label, rows.error); failures += 1; return }
+  const bad = rows.filter((r) => Math.abs(r.dxPx) > TOLERANCE_PX || Math.abs(r.dyPx) > TOLERANCE_PX)
+  if (bad.length > 0) failures += bad.length
+  const worst = Math.max(...rows.map((r) => Math.max(Math.abs(r.dxPx), Math.abs(r.dyPx))))
+  console.log(`  ${label.padEnd(44)} worst ${worst}px   ${bad.length === 0 ? 'ok' : 'FAIL'}`)
+  if (bad.length > 0) show(label, bad)
+}
+
+/** Terrain on or off, waiting for a frame so the DEM is actually in play. */
+const setTerrain = async (on) => {
+  await ev(
+    on
+      ? `(() => { const m = window.__probe.map;
+           if (!m.getSource('terrain-dem')) m.addSource('terrain-dem', {
+             type:'raster-dem', tiles:['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
+             encoding:'terrarium', tileSize:256, maxzoom:15 });
+           m.setTerrain({ source:'terrain-dem', exaggeration:1 }); return 'on' })()`
+      : `(window.__probe.map.setTerrain(null), 'off')`,
+  )
+  await wait(on ? 7000 : 1500)
 }
 
 const zoomTo = (z) => ev(`window.__probe.map.jumpTo({ zoom: ${z} }), 'ok'`)
@@ -363,6 +504,36 @@ for (const [zoom, pitch, bearing] of [[12, 60, 0], [16, 60, 0], [16, 45, 137], [
   await wait(500)
   await checkBearingLines(`zoom ${zoom} pitch ${pitch} bearing ${bearing}`, true)
 }
+
+/*
+ * BOTH TERRAIN STATES. Terrain is a second projection mode, and a check that
+ * only covers one of two states is the blind check again. The capture pair is
+ * the one that matters: it is how generated positions become coordinates, and
+ * with terrain on it is only exact BECAUSE capture flattens first. If the
+ * flattening is ever removed, this is what fails.
+ */
+console.log('\n### the sky camera model vs MapLibre')
+await checkSkyModel('sky model, terrain off')
+
+console.log('\n### terrain ON')
+await ev(`window.__probe.map.jumpTo({ center: [-78.436, 38.533], zoom: 13, pitch: 0, bearing: 0 }), 'ok'`)
+await setTerrain(true)
+console.log('  terrain:', await ev(`JSON.stringify(window.__probe.map.getTerrain())`))
+console.log('  elevation under centre:', await ev(`Math.round(window.__probe.map.queryTerrainElevation([-78.436, 38.533]) ?? -1)`), 'm')
+/*
+ * NOT RE-CHECKED WITH TERRAIN ON, and the reason is the check rather than the
+ * model: map.project returns a point at its TERRAIN elevation, while the
+ * reference elevation angle here is computed for the flat plane, so the two
+ * are answering different questions and the 147px gap it reported was the
+ * check being wrong. The sky model takes no terrain input at all: it projects
+ * a direction, and a direction does not touch the ground.
+ */
+for (const [pitch, bearing] of [[0, 0], [45, 40], [60, 135], [80, 250]]) {
+  await ev(`window.__probe.map.jumpTo({ zoom: 13, pitch: ${pitch}, bearing: ${bearing} }), 'ok'`)
+  await wait(2500)
+  await checkCaptureHandle(`capture via the handle · terrain ON · pitch ${pitch} bearing ${bearing}`)
+}
+await setTerrain(false)
 
 console.log('\n=== PROJECTION FAILURES: ' + failures + ' ===')
 if (errs.length > 0) console.log('console errors:', JSON.stringify(errs.slice(0, 3)))

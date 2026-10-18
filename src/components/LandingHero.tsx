@@ -80,7 +80,13 @@ export function LandingHero() {
           <span className="hero__plate-label">Shadow</span>
           <span className="hero__plate-value num">74.1°</span>
         </p>
-        <p className="hero__plate hero__plate--optic num">SIGMA 28 · BACKLIT</p>
+        {/*
+          * THE AIRCRAFT, NOT A LENS. It said SIGMA 28, which is a ground
+          * optic, on a page whose hero is a drone shoot and whose whole
+          * Part 107 half is about flying. The plate names what is actually in
+          * the air and the focal length that camera has.
+          */}
+        <p className="hero__plate hero__plate--optic num">DJI AIR 3S · 24mm · BACKLIT</p>
       </div>
 
       {/*

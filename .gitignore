@@ -38,3 +38,15 @@ fixtures/
 # Audit screenshots. The scripts write them beside themselves unless
 # SCOUTNGO_OUT says otherwise; they are evidence, not source.
 scripts/*.png
+
+# Screenshots the browser audits drop when they find a problem.
+#
+# They default to the repo root because SCOUTNGO_OUT defaults to '.', which is
+# right for running an audit by hand and wrong for committing: four of them
+# went in with a commit as "new files" because the audit had failed earlier in
+# the same session. The hook passes a scratch directory; this covers the
+# by-hand runs.
+panels-*.png
+labels-*.png
+reach-*.png
+proj-*.png

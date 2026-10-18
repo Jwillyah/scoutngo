@@ -3,7 +3,9 @@ import {
   PHASE_LABEL,
   anticollisionRequired,
   nightTrainingRequired,
+  part107Applies,
   phaseRequirements,
+  type FlyingContext,
   type LightPhase,
   type PhaseSpan,
 } from '../core/nightWindow.ts'
@@ -40,6 +42,11 @@ interface TimeScrubberProps {
   phases: PhaseSpan[]
   /** The phase at the scrubbed moment, or null with nothing to compute from. */
   phase: LightPhase | null
+  /**
+   * WHETHER ANYTHING IS FLYING, which decides whether the Part 107 lines
+   * belong on this bar at all. The band and its times do not depend on it.
+   */
+  flying: FlyingContext
 }
 
 /**
@@ -59,6 +66,7 @@ export function TimeScrubber({
   tideExtremes,
   phases,
   phase,
+  flying,
 }: TimeScrubberProps) {
   const clock = (date: Date) => formatClock(date, timeZone)
 
@@ -155,22 +163,36 @@ export function TimeScrubber({
         * 107.65 night training starts at dusk. Collapsing them into "night
         * rules" would misstate both edges.
         */}
-      {phase === null || phaseRequirements(phase).length === 0 ? null : (
+      {/*
+        * THE BAND ALWAYS, THE AIRCRAFT RULES ONLY WHEN SOMETHING FLIES.
+        *
+        * Civil twilight is when the light is, which is why a ground shooter is
+        * standing there, so the phase and its boundary are not conditional.
+        * 107.29 and 107.65 govern an uncrewed aircraft, and with GROUND 1 and
+        * AIR 0 there is no aircraft for them to govern.
+        */}
+      {phase === null || phase === 'day' ? null : (
         <div className={`scrub__rule scrub__rule--${phase}`}>
           <p className="scrub__rule-phase">
             <span className="scrub__rule-tag">{PHASE_LABEL[phase]}</span>
-            {anticollisionRequired(phase) ? (
-              <span className="scrub__rule-need">Anti-collision lights</span>
-            ) : null}
-            {nightTrainingRequired(phase) ? (
-              <span className="scrub__rule-need">107.65 night training</span>
-            ) : null}
+            {!part107Applies(flying) ? null : (
+              <>
+                {anticollisionRequired(phase) ? (
+                  <span className="scrub__rule-need">Anti-collision lights</span>
+                ) : null}
+                {nightTrainingRequired(phase) ? (
+                  <span className="scrub__rule-need">107.65 night training</span>
+                ) : null}
+              </>
+            )}
           </p>
-          <ul className="scrub__rule-list">
-            {phaseRequirements(phase).map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
+          {phaseRequirements(phase, flying).length === 0 ? null : (
+            <ul className="scrub__rule-list">
+              {phaseRequirements(phase, flying).map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 

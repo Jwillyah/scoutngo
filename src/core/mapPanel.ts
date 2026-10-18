@@ -21,9 +21,19 @@
  * audit checks is that it does not END UP over the map controls, which is a
  * different question and is asked separately.
  */
-export type MapPanel = 'none' | 'hazards' | 'sky'
+/*
+ * 'layers' JOINED THIS UNION RATHER THAN BECOMING A FOURTH BOOLEAN, which is
+ * the whole argument above applied to the next panel. It is the list of what
+ * draws on the map: a short popover of toggles, over the map, which is exactly
+ * the thing this type exists to keep to one.
+ */
+export type MapPanel = 'none' | 'hazards' | 'sky' | 'layers'
 
-export const MAP_PANELS: readonly Exclude<MapPanel, 'none'>[] = ['hazards', 'sky'] as const
+export const MAP_PANELS: readonly Exclude<MapPanel, 'none'>[] = [
+  'hazards',
+  'sky',
+  'layers',
+] as const
 
 /**
  * Toggling a panel: tapping the open one closes it, tapping another swaps.

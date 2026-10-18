@@ -58,6 +58,7 @@ const SUBJECTS: { label: string; node: ReactElement }[] = [
         tideExtremes={[]}
         phases={[]}
         phase="civil-twilight"
+        flying={{ airPositions: 1, dronePlatform: true }}
       />
     ),
   },

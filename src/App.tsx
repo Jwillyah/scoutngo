@@ -145,6 +145,8 @@ import {
   updateMark,
 } from './lib/marks.ts'
 import type { MarkKind, SiteMark } from './core/siteMark.ts'
+import { CAPTURE_FLATTENED_NOTE, captureWasFlattened } from './core/captureTerrain.ts'
+import { kitLine } from './core/kitLine.ts'
 import { windHeightFor } from './core/windHeight.ts'
 import { briefIsTyped, briefSourceLine } from './core/shootBrief.ts'
 import type { SkyLayerKind } from './core/skyLayer.ts'
@@ -227,6 +229,12 @@ function App() {
   const showSky = skyLayerOn(mapPanel)
 
   /*
+   * THE LAYERS LIST is a map panel like the other two, so it cannot be open
+   * beside them by construction. See src/core/mapPanel.ts.
+   */
+  const layersOpen = mapPanel === 'layers'
+
+  /*
    * MARKING MODE. Unlike placing a position, it stays on until it is turned
    * off: a car park with wires down two sides is six marks in a row, and a
    * mode that disarmed between each would be six trips to the button.
@@ -294,6 +302,15 @@ function App() {
   /* Real OSM shapes for the generated view. Empty until Overpass answers. */
   const [land, setLand] = useState<Landcover>(EMPTY_LANDCOVER)
   const [siteNote, setSiteNote] = useState<string | null>(null)
+
+  /*
+   * WHETHER THE PLAN ON SCREEN WAS GENERATED FROM A FLATTENED MAP.
+   *
+   * Held from the moment of capture rather than derived from whether terrain
+   * is on NOW, because turning terrain on afterwards does not make the plan
+   * any better informed about the ridge. See src/core/captureTerrain.ts.
+   */
+  const [terrainNote, setTerrainNote] = useState<string | null>(null)
   /* 0 at the start of the window, 1 at the end. Starts at the midpoint. */
   const [scrub, setScrub] = useState(0.5)
 
@@ -359,9 +376,19 @@ function App() {
    * the app could not make for you, and every one of these had to earn its
    * place by being genuinely a matter of taste rather than a default we dodged.
    */
-  const [settings, setSettings] = usePersistentState<{ showNumbers: boolean }>(
+  const [settings, setSettings] = usePersistentState<{
+    showNumbers: boolean
+    showLabels: boolean
+    showTerrain: boolean
+    showBuildings: boolean
+  }>(
     'scoutngo.settings',
-    { showNumbers: NUMERALS_DEFAULT },
+    {
+      showNumbers: NUMERALS_DEFAULT,
+      showLabels: false,
+      showTerrain: false,
+      showBuildings: false,
+    },
     (raw) => {
       const stored = raw as { showNumbers?: unknown; showCoords?: unknown } | null
       /*
@@ -373,8 +400,29 @@ function App() {
        * detail" is exactly the two-modes problem in miniature. Anybody who
        * had coordinates on wanted the receipts, so they keep them.
        */
-      if (typeof stored?.showNumbers === 'boolean') return { showNumbers: stored.showNumbers }
-      return { showNumbers: stored?.showCoords === true }
+      /*
+       * Labels default OFF: the clean image is the point while reading a
+       * venue. Remembered, because which job somebody is doing does not
+       * change between launches.
+       */
+      const showLabels = (stored as { showLabels?: unknown } | null)?.showLabels === true
+      /*
+       * TERRAIN DEFAULTS OFF AND IS REMEMBERED. Off because it costs tiles and
+       * frames and most venues are flat enough not to need it; remembered
+       * because somebody shooting ridgelines is shooting ridgelines every time.
+       */
+      const showTerrain = (stored as { showTerrain?: unknown } | null)?.showTerrain === true
+      const showBuildings =
+        (stored as { showBuildings?: unknown } | null)?.showBuildings === true
+      if (typeof stored?.showNumbers === 'boolean') {
+        return { showNumbers: stored.showNumbers, showLabels, showTerrain, showBuildings }
+      }
+      return {
+        showNumbers: stored?.showCoords === true,
+        showLabels,
+        showTerrain,
+        showBuildings,
+      }
     },
   )
 
@@ -1423,6 +1471,7 @@ function App() {
     const sitePending = fetchSiteGeometry(viewport.bounds)
 
     const capture = mapHandle.current?.capture() ?? null
+    setTerrainNote(captureWasFlattened(capture) ? CAPTURE_FLATTENED_NOTE : null)
     if (capture === null) {
       // The in-flight request is left to settle on its own; it caches either way.
       void sitePending
@@ -1633,11 +1682,25 @@ function App() {
    */
   const oneOptic = sharedOptic(visiblePlan.map((p) => ({ opticName: p.optic.name })))
 
+  /*
+   * WHAT IS COMING, FROM THE PACKED KIT RATHER THAN FROM THE PLAN.
+   *
+   * The plan's shared optic is the right answer once positions exist and says
+   * nothing before they do, which is most of the time somebody is looking at
+   * this line. And on a drone shoot it named a lens: see src/core/kitLine.ts,
+   * where the per-platform rule lives.
+   *
+   * The plan's optic still wins when there IS one, because by then it is the
+   * measured answer for the positions on screen rather than what is in the bag.
+   */
+  const packedLine = kitLine(kitProfile, kit, platformFilter)
+  const gearLine = oneOptic ?? packedLine
+
   const summary =
     centre === null
       ? 'No venue set'
       : `${venue.startTime}–${venue.endTime}${zoneSuffix} · ${venueShort}${
-          oneOptic === null ? '' : ` · ${oneOptic}`
+          gearLine === null ? '' : ` · ${gearLine}`
         }`
 
   /*
@@ -1849,6 +1912,14 @@ function App() {
           visiblePlan={visiblePlan}
           conePlan={conePlan}
           platformFilter={platformFilter}
+          layersOpen={layersOpen}
+          onLayers={(next) => setMapPanel(next ? 'layers' : 'none')}
+          showLabels={settings.showLabels}
+          onShowLabels={(next) => setSettings({ ...settings, showLabels: next })}
+          showTerrain={settings.showTerrain}
+          onShowTerrain={(next) => setSettings({ ...settings, showTerrain: next })}
+          showBuildings={settings.showBuildings}
+          onShowBuildings={(next) => setSettings({ ...settings, showBuildings: next })}
           onPlatformFilter={setPlatformFilter}
           platformCounts={platformTally}
           hiddenByPlatform={hiddenByPlatform}
@@ -1915,6 +1986,7 @@ function App() {
           tideExtremes={tideExtremes}
           generation={generation}
           siteNote={siteNote}
+          terrainNote={terrainNote}
           positionNote={positionNote}
           onGenerate={() => void onGenerate()}
           onFixBlock={onFixBlock}

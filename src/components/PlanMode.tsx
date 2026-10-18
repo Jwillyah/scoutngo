@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { LatLon } from '../core/geo.ts'
 import type {
   Platform,
@@ -30,14 +30,15 @@ import { hudToggleLabel, type HudState } from '../core/hud.ts'
 import { phaseAt, phaseSpans } from '../core/nightWindow.ts'
 import type { MarkKind, SiteMark } from '../core/siteMark.ts'
 import { HazardPanel } from './HazardPanel.tsx'
+import { LayersPanel } from './LayersPanel.tsx'
 import { BottomSheet, type SheetState } from './BottomSheet.tsx'
 import { AirspacePanel } from './AirspacePanel.tsx'
 import { ConditionsPanel } from './ConditionsPanel.tsx'
-import { ConePicker, type ConeMode } from './ConePicker.tsx'
+import type { ConeMode } from './ConePicker.tsx'
 import { FieldPackControl, type PackBuildState } from './FieldPackControl.tsx'
 import { MapControls } from './MapControls.tsx'
-import { MapView, type MapHandle } from './MapView.tsx'
-import { OverflowMenu } from './OverflowMenu.tsx'
+import { BUILDINGS_MIN_ZOOM, MapView, TERRAIN_MAX_ZOOM, type MapHandle } from './MapView.tsx'
+import { buildingsToGeoJson, fetchBuildings } from '../lib/buildings.ts'
 import { PlatformFilter } from './PlatformFilter.tsx'
 import { SkyLegend } from './SkyLegend.tsx'
 import { PlanStatus } from './PlanStatus.tsx'
@@ -115,6 +116,7 @@ interface PlanModeProps {
   tideExtremes: TideExtreme[]
   generation: GenerationState
   siteNote: string | null
+  terrainNote: string | null
   /** What loading a saved plan had to change to make sense of it. */
   positionNote: string | null
   onGenerate: () => void
@@ -182,6 +184,15 @@ interface PlanModeProps {
   footer: React.ReactNode
   /** Ground, air or both. Decides what shows here AND what a generate asks for. */
   platformFilter: PlatformFilterValue
+  /** The layers list, which is itself one of the map panels. */
+  layersOpen: boolean
+  onLayers: (next: boolean) => void
+  showLabels: boolean
+  onShowLabels: (next: boolean) => void
+  showTerrain: boolean
+  onShowTerrain: (next: boolean) => void
+  showBuildings: boolean
+  onShowBuildings: (next: boolean) => void
   onPlatformFilter: (next: PlatformFilterValue) => void
   platformCounts: Record<Platform, number>
   /** How many positions the platform choice is hiding. */
@@ -287,6 +298,7 @@ export function PlanMode({
   tideExtremes,
   generation,
   siteNote,
+  terrainNote,
   positionNote,
   onGenerate,
   onFixBlock,
@@ -334,6 +346,14 @@ export function PlanMode({
   desiredShots,
   footer,
   platformFilter,
+  layersOpen,
+  onLayers,
+  showLabels,
+  onShowLabels,
+  showTerrain,
+  onShowTerrain,
+  showBuildings,
+  onShowBuildings,
   onPlatformFilter,
   platformCounts,
   hiddenByPlatform,
@@ -366,7 +386,16 @@ export function PlanMode({
    * to go. A panel that exists and cannot be used is the thing this audit
    * exists to catch.
    */
-  const panelOpen = marking || showSky
+  /*
+   * THE LAYERS LIST COUNTS AS A PANEL HERE.
+   *
+   * Leaving it out let the sheet stay fully open underneath it, and the panel
+   * audit caught exactly that: "layers and conditions are both on screen at
+   * once". Same bug as the one this mechanism was built for, one panel later,
+   * which is the argument for adding a new surface to the audit in the pass
+   * that adds it rather than the pass that breaks it.
+   */
+  const panelOpen = marking || showSky || layersOpen
   const sheetState: SheetState = panelOpen && sheet === 'open' ? 'peek' : sheet
   const [sheetHeight, setSheetHeight] = useState(108)
   const [view, setView] = useState<SheetView>('plan')
@@ -426,6 +455,7 @@ export function PlanMode({
     /* The other direction: opening the sheet closes whatever is over the map. */
     if (marking) onMarking(false)
     if (showSky) onShowSky(false)
+    if (layersOpen) onLayers(false)
     /*
      * Aim picking is a map mode, so it has to die with any sheet change too.
      * Leaving it armed meant the next tap on the map moved the sun search's
@@ -443,10 +473,89 @@ export function PlanMode({
    */
   const skyBand = goesBandFor(sun?.altitude ?? -90)
   const [mapZoom, setMapZoom] = useState(16.5)
+
+  /*
+   * THE BUILDING FOOTPRINTS, FETCHED FOR THE VIEW.
+   *
+   * Only while the layer is on and only once zoomed in enough to draw them, so
+   * nothing is requested for a shooter who never turns them on. Keyed on the
+   * rounded viewport so panning a little does not re-ask.
+   *
+   * THE FAILURE IS A SENTENCE, NOT A BLANK. Overpass coverage is uneven and
+   * Overpass itself is often unavailable, and an empty map with no explanation
+   * reads as "no buildings here", which is a claim about the ground. See
+   * BUILDINGS_COVERAGE_NOTE.
+   */
+  const [buildingData, setBuildingData] = useState<GeoJSON.FeatureCollection | null>(null)
+  const [buildingsNote, setBuildingsNote] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!showBuildings || venue === null) {
+      setBuildingData(null)
+      setBuildingsNote(null)
+      return
+    }
+    if (mapZoom < BUILDINGS_MIN_ZOOM) {
+      setBuildingData(null)
+      setBuildingsNote('Zoom in to load buildings.')
+      return
+    }
+    let live = true
+    /* A box around the venue, which is what the extrusion needs covering. */
+    const span = 0.01
+    void fetchBuildings({
+      west: venue.lon - span,
+      east: venue.lon + span,
+      south: venue.lat - span,
+      north: venue.lat + span,
+    }).then(
+      (result) => {
+        if (!live) return
+        if (result.status === 'ok') {
+          setBuildingData(buildingsToGeoJson(result.buildings) as GeoJSON.FeatureCollection)
+          setBuildingsNote(
+            result.buildings.length === 0
+              ? 'OpenStreetMap has no buildings mapped here. That is the map being empty, not the ground.'
+              : null,
+          )
+        } else {
+          setBuildingData(null)
+          setBuildingsNote(`Buildings could not be loaded: ${result.reason}`)
+        }
+      },
+      () => {
+        if (!live) return
+        setBuildingData(null)
+        setBuildingsNote('Buildings could not be loaded.')
+      },
+    )
+    return () => {
+      live = false
+    }
+    /* mapZoom only matters for crossing the threshold, not every nudge. */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showBuildings, venue, mapZoom >= BUILDINGS_MIN_ZOOM])
+
   const [mapWidth, setMapWidth] = useState(390)
 
   /* Whether anything is in the air, which is what the pilot control is for. */
   const airPositions = plan.filter((p) => p.position.platform === 'air').length
+
+  /*
+   * HOW MANY LAYERS ARE DRAWING, on the button itself.
+   *
+   * So the collapsed row still answers "is anything on" without being opened.
+   * Cones count when they are not 'none'; the two panel-backed layers count
+   * when their panel is open, which is when they are drawing.
+   */
+  const activeLayers =
+    (coneMode === 'none' ? 0 : 1) +
+    (showArc ? 1 : 0) +
+    (showLabels ? 1 : 0) +
+    (showTerrain ? 1 : 0) +
+    (showBuildings ? 1 : 0) +
+    (showSky ? 1 : 0) +
+    (marking ? 1 : 0)
 
   return (
     <div
@@ -488,6 +597,10 @@ export function PlanMode({
         sunAzimuth={sun === null ? null : sun.azimuth}
         sunAltitude={sun?.altitude ?? null}
         showSky={showSky}
+        showLabels={showLabels}
+        showTerrain={showTerrain}
+        showBuildings={showBuildings}
+        buildings={buildingData}
         skyFrameAt={sky.frameAt}
         skyForecast={sky.cells}
         skyLayer={skyLayer}
@@ -576,61 +689,50 @@ export function PlanMode({
 
         {hud === 'collapsed' ? null : (
           <div className="hud__row hud__row--more">
-            {/* The single control that reveals sun and tide detail. */}
+            {/*
+              * TWO KINDS OF CONTROL, AND THEY LOOK DIFFERENT NOW.
+              *
+              * The row carried eight controls over three rows and read as
+              * noise, because things that DRAW on the map sat beside things
+              * that OPEN over it with nothing to tell them apart. Sun when
+              * made it worse by landing on a row that was already full.
+              *
+              * LAYERS is one button onto one list, where each layer's state is
+              * visible and each says what it does before you tap it. PANELS
+              * stay as their own buttons, because a list of things that open is
+              * just a menu with extra steps.
+              *
+              * The platform switch is above this row and stays visible: it is
+              * the only control here that changes what the next tap DOES.
+              */}
+            <button
+              type="button"
+              className={`mode${layersOpen ? ' mode--on' : ''}`}
+              aria-pressed={layersOpen}
+              onClick={() => onLayers(!layersOpen)}
+            >
+              Layers
+              {activeLayers === 0 ? null : (
+                <span className="mode__n num"> {activeLayers}</span>
+              )}
+            </button>
+
             <button type="button" className="mode" onClick={() => openWith('conditions')}>
               Conditions
             </button>
+            <button type="button" className="mode" onClick={() => openWith('sunsearch')}>
+              Sun when
+            </button>
             {/*
-              * AIRSPACE. A reveal like Conditions, not a map preference, so it
-              * sits with the reveals rather than in the overflow.
-              *
-              * ONLY WITH SOMETHING IN THE AIR. Part 107 paperwork beside a
-              * tripod-only plan is an aviation process attached to something it
-              * does not govern, which is the same mistake as printing the 400ft
-              * ceiling on a ground position's card.
+              * AIRSPACE. Only with something in the air: Part 107 paperwork
+              * beside a tripod-only plan is an aviation process attached to
+              * something it does not govern.
               */}
             {airPositions === 0 ? null : (
               <button type="button" className="mode" onClick={() => openWith('airspace')}>
                 Airspace
               </button>
             )}
-            <button type="button" className="mode" onClick={() => openWith('sunsearch')}>
-              Sun when
-            </button>
-            {/*
-              * HAZARDS. Up here with the other reveals rather than buried in
-              * the overflow, because on a site full of wires this is the first
-              * thing touched and the count has to be visible without opening
-              * anything.
-              */}
-            <button
-              type="button"
-              className={`mode${marking ? ' mode--on' : ''}`}
-              aria-pressed={marking}
-              onClick={() => onMarking(!marking)}
-            >
-              Hazards
-              {marks.length === 0 ? null : (
-                <span className="mode__n num"> {marks.length}</span>
-              )}
-            </button>
-            <ConePicker
-              kit={kitProfile}
-              plan={plan}
-              coneMode={coneMode}
-              onConeMode={onConeMode}
-              lensFilters={lensFilters}
-              onLensFilters={onLensFilters}
-              isolatedId={isolatedId}
-              onClearIsolate={onClearIsolate}
-            />
-            <OverflowMenu
-              showArc={showArc}
-              onShowArc={onShowArc}
-              showSky={showSky}
-              onShowSky={onShowSky}
-              sunAltitude={sun?.altitude ?? null}
-            />
           </div>
         )}
       </header>
@@ -643,6 +745,36 @@ export function PlanMode({
         * bigger than the view. Both are about the layer, so both live with it
         * rather than in a panel somewhere else.
         */}
+      {!layersOpen ? null : (
+        <LayersPanel
+          kitProfile={kitProfile}
+          plan={plan}
+          coneMode={coneMode}
+          onConeMode={onConeMode}
+          lensFilters={lensFilters}
+          onLensFilters={onLensFilters}
+          isolatedId={isolatedId}
+          onClearIsolate={onClearIsolate}
+          showArc={showArc}
+          onShowArc={onShowArc}
+          showLabels={showLabels}
+          onShowLabels={onShowLabels}
+          showTerrain={showTerrain}
+          onShowTerrain={onShowTerrain}
+          showBuildings={showBuildings}
+          onShowBuildings={onShowBuildings}
+          buildingsNote={buildingsNote}
+          terrainSuspended={showTerrain && mapZoom > TERRAIN_MAX_ZOOM}
+          showSky={showSky}
+          onShowSky={onShowSky}
+          marking={marking}
+          onMarking={onMarking}
+          markCount={marks.length}
+          sunAltitude={sun?.altitude ?? null}
+          onClose={() => onLayers(false)}
+        />
+      )}
+
       {!marking ? null : (
         <HazardPanel
           marks={marks}
@@ -931,6 +1063,7 @@ export function PlanMode({
               onFixBlock={onFixBlock}
               planCoverage={planCoverage}
               siteNote={siteNote}
+          terrainNote={terrainNote}
               positionNote={positionNote}
             />
             <FieldPackControl
@@ -973,6 +1106,7 @@ export function PlanMode({
             tideExtremes={tideExtremes}
             phases={nightBands}
             phase={nightPhase}
+            flying={{ airPositions, dronePlatform: platformFilter === 'air' }}
           />
         )}
 

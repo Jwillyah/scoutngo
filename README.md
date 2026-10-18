@@ -381,6 +381,76 @@ shoot day.
 **None of it is an authorization.** The FAA's own words are that these maps do
 not grant approval and are informational only, and the panel carries that.
 
+### Terrain, and the sun in the sky
+
+Satellite imagery draped over real elevation, from AWS's keyless Terrarium
+tiles. Verified before it was wired, by decoding three tiles and checking them
+against elevations known independently:
+
+| | decoded | known |
+|---|---|---|
+| Skyline Drive, Shenandoah | 1027.4 m | ridge, about 1000 |
+| Sandbridge beach | 1.1 m | sea level |
+| Death Valley | −79.0 m | below sea level |
+
+Death Valley matters more than it looks: terrarium stores elevation as
+`(R × 256 + G + B/256) − 32768`, so a sign error reads it as +32689 m and every
+ridge as a plateau. **The tiles are 256 px, not the 512 MapLibre's `raster-dem`
+defaults to** — at the wrong size every slope is halved and nothing on screen
+looks broken enough to notice.
+
+**The sun is drawn in the sky at its real azimuth *and* altitude**, which is
+the whole reason the terrain is worth having: an altitude has nowhere to live
+on a flat map, where 8° and 48° produce the same ray. It moves as you scrub and
+dims behind a ridge when the DEM says a ridge is in the way. The pitch ceiling
+went from 60° to 85° because at 60° with MapLibre's 36.87° field of view the
+horizon is still above the top edge — the old tilt had no sky to show.
+
+**Terrain is suspended above zoom 15, and the layers list says so.** Measured
+on a 4× CPU-throttled phone profile at venue zoom, rotating: 17.2 fps without
+terrain, 3.2 fps with it, an 81% loss, heap 42 → 78 MB. Zoom 15 is the DEM's own
+maxzoom, so above it the cost is the same and the detail is not. A 3D view that
+silently flattens as you zoom in would be the kind of surprise this app is
+supposed not to have.
+
+**Generated plans are made from a flattened map, and say so.** The capture path
+unprojects normalised image coordinates against the recorded camera, and with
+terrain on that inversion is out by up to 57 px at capture resolution — hundreds
+of metres of ground. Not a rounding error: MapLibre resolves elevation for
+projection against state a render pass updates, and the inversion deliberately
+draws no frame. So capture switches terrain off for the moment of the image,
+which puts the round trip back to 0 px at every pitch and bearing, and the plan
+carries a note saying the model never saw the hillside.
+
+Buildings are OSM footprints extruded to their mapped heights. The heights are
+the point rather than the look: they are the same input the shadow casting and
+the sightline check need, so they are stored as data with their *source*
+recorded, and a missing height stays `null` for the arithmetic while being drawn
+as a visibly dimmer nominal box. An undrawn building is one nobody mapped, not
+an empty lot.
+
+### Landowner rules are not airspace rules
+
+**No airspace layer will ever warn you about a National Park.** Shenandoah is
+the case that made this worth writing down: the National Park Service bans
+launching, landing and operating a drone anywhere inside park boundaries under
+36 CFR 1.5. The airspace over Skyline Drive is largely Class G, so every
+airspace source in this app — the facility maps, the Class Airspace extract,
+the LAANC route — will correctly report that no ATC authorization attaches, and
+every one of them is answering a different question from the one that stops you
+flying there.
+
+It is a **landowner** rule. So is a city park ordinance, a state park rule, a
+private venue's own policy, and the wildlife closure on a beach in nesting
+season. None of them are in any aeronautical dataset because none of them are
+aeronautical.
+
+If park or other land boundaries are added later they are labelled as a
+**ground rule**, in their own section, never folded into the airspace answer.
+An airspace panel that reported a Park Service ban as airspace would be
+wrong twice: wrong about what the rule is, and wrong in a way that teaches you
+to expect airspace data to cover things it has never covered.
+
 **TFRs and NOTAMs are not checked.** There is no usable keyless public feed for
 temporary flight restrictions and NOTAMs need OAuth2 client credentials, so
 this app checks neither and says so where it cannot be missed. A TFR can close

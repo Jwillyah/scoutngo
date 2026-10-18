@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { buildLabel } from '../lib/build.ts'
 import { LandingHero } from './LandingHero.tsx'
 
@@ -14,11 +15,25 @@ import { LandingHero } from './LandingHero.tsx'
  * the same phone at the same brightness as the rest of it. No feature grid, no
  * rounded tiles, no photograph of somebody else's shoot.
  *
- * IT SAYS FOUR THINGS AND STOPS. What it is, the three stages, the rule the
- * whole thing is built on, and where the data lives. Anything else belongs on
- * the screen where it is needed.
+ * THE FIRST SCREEN IS THE HERO, THE THREE STAGES, AND ONE LINE EACH on the
+ * rule the whole thing is built on and where the data lives. That is the
+ * whole cover.
+ *
+ * EVERYTHING ELSE MOVED BEHIND A LINK, AND NOTHING WAS DELETED. The full
+ * privacy explanation, the list of what actually leaves the device, the
+ * plates and the longer argument about the model are all on the details view
+ * below, reachable in one tap and gone again in one. An honesty line is not
+ * less true further down a page, but it is less read on a first screen
+ * somebody is scrolling past to get to the map, and a cover page that has to
+ * be scrolled is not a cover page.
  */
 export function Landing({ onDismiss }: { onDismiss: () => void }) {
+  const [view, setView] = useState<'cover' | 'details'>('cover')
+
+  if (view === 'details') {
+    return <LandingDetails onBack={() => setView('cover')} />
+  }
+
   return (
     <div className="land">
       <div className="land__scroll">
@@ -85,8 +100,87 @@ export function Landing({ onDismiss }: { onDismiss: () => void }) {
           </div>
         </section>
 
-        <section className="land__sec">
-          <p className="land__idx num">02</p>
+        {/*
+          * ONE LINE EACH, AND THEY ARE THE TWO RULES THAT MATTER.
+          *
+          * The computed rule and the privacy rule, as rules rather than as
+          * sections. The argument behind each is one tap away and is not
+          * shortened there, only moved.
+          *
+          * COLOUR CARRIES THROUGH FROM THE HERO. The amber is the sun, the
+          * violet is the shadow and the magenta is the armed state, which is
+          * what each means on the map; they stopped at the hero before and the
+          * page went monochrome underneath it.
+          */}
+        <ul className="land__rules">
+          <li className="land__rule land__rule--sun">
+            <span className="land__rule-k">Computed</span>
+            <span className="land__rule-v">
+              Every number is arithmetic from coordinates. The model is never asked for one.
+            </span>
+          </li>
+          <li className="land__rule land__rule--shadow">
+            <span className="land__rule-k">Yours</span>
+            <span className="land__rule-v">
+              No account, no database, no analytics. Your plan stays in this browser.
+            </span>
+          </li>
+        </ul>
+
+        <p className="land__moreline">
+          <button type="button" className="land__more" onClick={() => setView('details')}>
+            How it computes, and what does leave the device
+          </button>
+        </p>
+      </div>
+
+      <div className="land__foot">
+        {/*
+          * STILL ONE BUTTON.
+          *
+          * The NOW glance wants to be one tap from launch, and a second
+          * button here was the obvious place to put it. It is the wrong
+          * place: this page is shown once, ever, and "ends with one button"
+          * is a rule this page has because a cover page with two calls to
+          * action asks the reader to choose before they know anything.
+          *
+          * One tap from launch is satisfied in the shell instead, where the
+          * Now control sits beside the rail on every launch after this one.
+          * landingAndDevice.test.tsx caught the regression.
+          */}
+        <button type="button" className="land__go" onClick={onDismiss}>
+          Dive in
+        </button>
+        <p className="land__build">
+          Build <span className="num">{buildLabel()}</span> · open source · this
+          page is in Settings whenever you want it
+        </p>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * THE DETAIL, ONE TAP BEHIND THE COVER.
+ *
+ * NOTHING HERE WAS SHORTENED ON ITS WAY DOWN. The privacy explanation, the
+ * list of what leaves the device and the argument about the model are the same
+ * sentences that were on the front page; they are here because a cover page
+ * with all of it on it is a page nobody finishes, not because any of it
+ * stopped being true.
+ */
+export function LandingDetails({ onBack }: { onBack: () => void }) {
+  return (
+    <div className="land land--details">
+      <div className="land__scroll">
+        <p className="land__moreline">
+          <button type="button" className="land__more land__more--back" onClick={onBack}>
+            ← Back
+          </button>
+        </p>
+
+        <section className="land__sec land__sec--sun">
+          <p className="land__idx num">01</p>
           <div className="land__body">
             <h2 className="land__h">The model proposes, code computes</h2>
             <p className="land__p">
@@ -126,8 +220,8 @@ export function Landing({ onDismiss }: { onDismiss: () => void }) {
           </div>
         </section>
 
-        <section className="land__sec">
-          <p className="land__idx num">03</p>
+        <section className="land__sec land__sec--shadow">
+          <p className="land__idx num">02</p>
           <div className="land__body">
             <h2 className="land__h">It stays on your phone</h2>
             <p className="land__p">
@@ -141,29 +235,30 @@ export function Landing({ onDismiss }: { onDismiss: () => void }) {
             </p>
           </div>
         </section>
+
+        <section className="land__sec land__sec--armed">
+          <p className="land__idx num">03</p>
+          <div className="land__body">
+            <h2 className="land__h">What it will not tell you</h2>
+            <p className="land__p">
+              It never says an area is clear of hazards, from any source. It
+              never says a flight is legal, cleared or compliant. Temporary
+              flight restrictions are not checked at all, and it says so where
+              that matters rather than leaving the silence to be read as
+              nothing to report.
+            </p>
+            <p className="land__p land__p--dim">
+              Where a number is not known it prints a dash. A dash and "the
+              forecast did not say" beats a zero every time.
+            </p>
+          </div>
+        </section>
       </div>
 
       <div className="land__foot">
-        {/*
-          * STILL ONE BUTTON.
-          *
-          * The NOW glance wants to be one tap from launch, and a second
-          * button here was the obvious place to put it. It is the wrong
-          * place: this page is shown once, ever, and "ends with one button"
-          * is a rule this page has because a cover page with two calls to
-          * action asks the reader to choose before they know anything.
-          *
-          * One tap from launch is satisfied in the shell instead, where the
-          * Now control sits beside the rail on every launch after this one.
-          * landingAndDevice.test.tsx caught the regression.
-          */}
-        <button type="button" className="land__go" onClick={onDismiss}>
-          Dive in
+        <button type="button" className="land__go" onClick={onBack}>
+          Back to the start
         </button>
-        <p className="land__build">
-          Build <span className="num">{buildLabel()}</span> · open source · this
-          page is in Settings whenever you want it
-        </p>
       </div>
     </div>
   )

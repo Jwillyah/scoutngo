@@ -7253,3 +7253,315 @@
   text-transform: uppercase;
   font-weight: var(--weight-heavy);
 }
+
+/* ========================================================== the layers list */
+
+/*
+ * WHAT DRAWS ON THE MAP, in one list instead of across the control row.
+ *
+ * Positioned exactly like the hazard panel, and for the same reasons: above
+ * the sheet and the dock, capped below the control row so it cannot walk up
+ * the screen over the button that opened it, scrolling inside instead. The
+ * arithmetic is the live sheet height plus the dock, not the sheet alone,
+ * which is the third place in this app that has to get that right.
+ */
+.lay {
+  position: absolute;
+  left: var(--space-2);
+  right: var(--space-2);
+  bottom: calc(var(--dock-height) + var(--sheet-live-height) + var(--space-2));
+  top: calc(var(--safe-top) + var(--space-3) + var(--hud-height, 150px));
+  z-index: 6;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--color-panel);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-panel);
+  overflow: hidden;
+}
+
+.lay__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.lay__title {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.lay__close {
+  min-height: var(--control-height);
+  padding: 0 var(--space-2);
+  border: var(--line-hair) solid var(--color-line-strong);
+  border-radius: var(--radius-1, 3px);
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--text-sm);
+}
+
+.lay__list {
+  display: grid;
+  gap: var(--space-1);
+  align-content: start;
+  overflow-y: auto;
+}
+
+/*
+ * A ROW IS A WHOLE BUTTON, label and explanation and state together, so the
+ * target is the row rather than a switch at the end of it. On a phone held in
+ * one hand outdoors, a 44px row is a target and a 30px switch is a game.
+ */
+.lay__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--control-height);
+  padding: var(--space-2);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-1, 3px);
+  background: transparent;
+  color: var(--color-text);
+  text-align: left;
+}
+
+/*
+ * ON IS THE APP'S OWN ACCENT, not green. There is no good and bad here: a
+ * layer is drawn or it is not, and colouring that as a verdict would be the
+ * same mistake as a traffic light on a paperwork route.
+ */
+.lay__row--on {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+
+.lay__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.lay__label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heavy);
+}
+
+.lay__note {
+  font-size: var(--text-label);
+  line-height: 1.35;
+  color: var(--color-text-muted);
+}
+
+.lay__state {
+  flex: 0 0 auto;
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  font-weight: var(--weight-heavy);
+  color: var(--color-text-muted);
+}
+
+.lay__row--on .lay__state {
+  color: var(--color-accent);
+}
+
+.lay__n {
+  color: var(--color-accent-2);
+}
+
+/* Cones keep their own control, so the row is a block rather than a button. */
+.lay__cones {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-1, 3px);
+}
+
+/* ------------------------------------------- the cover page, carrying colour */
+
+/*
+ * THE AMBER, VIOLET AND MAGENTA RUN PAST THE HERO NOW.
+ *
+ * They stopped at the hero and the page went monochrome underneath it, which
+ * made the hero look like a picture dropped onto a different document. Each
+ * colour means on this page what it means on the map: amber is the sun, violet
+ * is the shadow, magenta is the armed state. That is the reason to use them
+ * here rather than decoration, and the reason not to invent a fourth.
+ */
+.land__rules {
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.land__rule {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--color-line-strong);
+}
+
+.land__rule--sun {
+  border-left-color: var(--sun);
+}
+
+.land__rule--shadow {
+  border-left-color: var(--sun-shadow);
+}
+
+.land__rule-k {
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  font-weight: var(--weight-heavy);
+}
+
+.land__rule--sun .land__rule-k {
+  color: var(--sun);
+}
+
+.land__rule--shadow .land__rule-k {
+  color: var(--sun-shadow);
+}
+
+.land__rule-v {
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+
+/*
+ * THE LINK TO THE DETAIL. A link, not a second call to action: it is set as
+ * type rather than as a control, so the one button on this page stays the one
+ * button. The cover's rule is one primary action, and a text link to the
+ * argument behind it is not competing with "Dive in".
+ */
+.land__moreline {
+  margin: var(--space-4) 0 0;
+}
+
+.land__more {
+  padding: var(--space-1) 0;
+  border: 0;
+  background: transparent;
+  color: var(--afterglow);
+  font-size: var(--text-sm);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.land__more--back {
+  color: var(--color-text-muted);
+  text-decoration: none;
+}
+
+/* The details view: one accent per section, same vocabulary as the map. */
+.land__sec--sun .land__idx {
+  color: var(--sun);
+}
+
+.land__sec--shadow .land__idx {
+  color: var(--sun-shadow);
+}
+
+.land__sec--armed .land__idx {
+  color: var(--afterglow);
+}
+
+.land__sec--sun .land__h {
+  color: var(--sun);
+}
+
+.land__sec--shadow .land__h {
+  color: var(--sun-shadow);
+}
+
+.land__sec--armed .land__h {
+  color: var(--afterglow);
+}
+
+/* =============================================== the sun, in the sky */
+
+/*
+ * A DISC AT A COMPUTED PLACE, not a decoration.
+ *
+ * It sits at the sun's real azimuth AND altitude in a tilted view, which is
+ * the one thing a flat map cannot show: eight degrees and forty-eight degrees
+ * produce the same ray on the ground and completely different light.
+ *
+ * pointer-events none throughout. It is over the map and the map is dragged.
+ */
+.sunsky {
+  position: absolute;
+  z-index: 4;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+}
+
+.sunsky__disc {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--sun);
+  /*
+   * The glow is the only soft thing in this app's visual language and it earns
+   * it: a hard-edged circle at this size reads as a button, and this is the
+   * one element on screen that is not tappable.
+   */
+  box-shadow:
+    0 0 10px 4px color-mix(in srgb, var(--sun) 55%, transparent),
+    0 0 28px 12px color-mix(in srgb, var(--sun) 25%, transparent);
+}
+
+/*
+ * BEHIND A RIDGE: dimmed, outlined, and labelled.
+ *
+ * Still drawn, because where the sun is remains true and useful when you
+ * cannot see it; the glow goes, because a glow through a mountain is the
+ * picture being wrong.
+ */
+.sunsky--behind .sunsky__disc {
+  background: color-mix(in srgb, var(--sun) 28%, transparent);
+  border: var(--line-hair) dashed var(--sun);
+  box-shadow: none;
+}
+
+.sunsky__tag {
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  white-space: nowrap;
+  padding: 1px var(--space-1);
+  background: var(--black);
+  color: var(--sun);
+  border-radius: var(--radius-1, 3px);
+}
+
+/*
+ * OFF FRAME: clamped to the edge and shrunk, so it reads as "that way" rather
+ * than as a sun sitting on the border. Dropping it entirely would make a
+ * rotating map look like the sun had set.
+ */
+.sunsky--off .sunsky__disc {
+  width: 14px;
+  height: 14px;
+  opacity: 0.75;
+  box-shadow: 0 0 8px 3px color-mix(in srgb, var(--sun) 40%, transparent);
+}
+
+.sunsky--off .sunsky__tag {
+  display: none;
+}

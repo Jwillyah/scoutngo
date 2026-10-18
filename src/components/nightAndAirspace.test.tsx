@@ -18,7 +18,14 @@ const text = (html: string) => html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' '
 const WINDOW_START = new Date('2026-10-15T21:00:00Z') // 17:00 EDT
 const WINDOW_END = new Date('2026-10-15T23:30:00Z') // 19:30 EDT
 
-function scrubber(at: Date) {
+/*
+ * FLYING, because these tests are about the Part 107 lines. The band and its
+ * times are asserted the same way either side of that; what needs an aircraft
+ * is 107.29 and 107.65, and the ground case has its own describe below.
+ */
+const FLYING = { airPositions: 1, dronePlatform: true }
+
+function scrubber(at: Date, flying = FLYING) {
   return renderToStaticMarkup(
     <TimeScrubber
       start={WINDOW_START}
@@ -32,6 +39,7 @@ function scrubber(at: Date) {
       tideExtremes={[]}
       phases={phaseSpans(WINDOW_START, WINDOW_END, SANDBRIDGE.lat, SANDBRIDGE.lon)}
       phase={phaseAt(at, SANDBRIDGE.lat, SANDBRIDGE.lon)}
+      flying={flying}
     />,
   )
 }
@@ -91,6 +99,54 @@ describe('what the bar says at each moment', () => {
     expect(shown).toContain('107.29')
     expect(shown).toContain('107.65')
     expect(shown).toContain('night operations training')
+  })
+})
+
+/*
+ * THE REPORT: "GROUND 1, AIR 0, no drone anywhere, and the band under the
+ * scrubber says 107.29 requires anti-collision lighting."
+ *
+ * Part 107 governs an uncrewed aircraft. With nothing in the air there is no
+ * aircraft for it to govern, and printing the rule anyway is the same class of
+ * error as the 400ft ceiling beside a tripod: true in general, false here.
+ */
+describe('a ground shoot gets the band and no aircraft rule', () => {
+  const GROUND = { airPositions: 0, dronePlatform: false }
+  const twilight = new Date('2026-10-15T22:48:00Z')
+
+  it('still names the phase and draws the bands', () => {
+    const shown = text(scrubber(twilight, GROUND))
+    expect(shown).toContain('Civil twilight')
+    expect(scrubber(twilight, GROUND)).toContain('scrub__phase--civil-twilight')
+  })
+
+  it('says nothing about anti-collision lighting', () => {
+    const shown = text(scrubber(twilight, GROUND))
+    expect(shown).not.toContain('Anti-collision')
+    expect(shown).not.toContain('107.29')
+    expect(shown).not.toContain('statute miles')
+  })
+
+  it('says nothing about the night training, even at night', () => {
+    const shown = text(scrubber(new Date('2026-10-15T23:20:00Z'), GROUND))
+    expect(shown).toContain('Night')
+    expect(shown).not.toContain('107.65')
+  })
+
+  /*
+   * THE CHIP COUNTS, NOT ONLY A PLACED POSITION. Somebody who has switched to
+   * Air and not yet placed anything is planning a flight, and the lighting
+   * requirement is exactly what they want to know before driving out.
+   */
+  it('shows the rules once the Drone chip is on, before any position exists', () => {
+    const shown = text(scrubber(twilight, { airPositions: 0, dronePlatform: true }))
+    expect(shown).toContain('Anti-collision')
+    expect(shown).toContain('107.29')
+  })
+
+  it('shows the rules for a placed air position on the Both chip', () => {
+    const shown = text(scrubber(twilight, { airPositions: 2, dronePlatform: false }))
+    expect(shown).toContain('Anti-collision')
   })
 })
 

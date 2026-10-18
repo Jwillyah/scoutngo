@@ -1,4 +1,14 @@
-const PITCH_STOPS = [0, 45, 60]
+/*
+ * FOUR STOPS, AND THE LAST ONE IS THE POINT.
+ *
+ * 80 degrees is where the horizon is actually in frame, which is where the sun
+ * can be drawn at its real altitude and where a ridge can stand in front of
+ * it. Below about 72 there is no sky on screen at all (half of MapLibre's
+ * 36.87 degree field of view above an optical axis that is still pointing at
+ * the ground), so the old top stop of 60 was a tilt with nothing to show for
+ * itself.
+ */
+const PITCH_STOPS = [0, 45, 60, 80]
 
 interface MapControlsProps {
   showSun: boolean

@@ -91,8 +91,18 @@ interface SetupModeProps {
   /** True while the date, or the window, is still the one the app chose. */
   defaults: { date: boolean; window: boolean; name: boolean }
   /** The handful of preferences that are genuinely preferences. */
-  settings: { showNumbers: boolean }
-  onSettings: (next: { showNumbers: boolean }) => void
+  settings: {
+    showNumbers: boolean
+    showLabels: boolean
+    showTerrain: boolean
+    showBuildings: boolean
+  }
+  onSettings: (next: {
+    showNumbers: boolean
+    showLabels: boolean
+    showTerrain: boolean
+    showBuildings: boolean
+  }) => void
   /**
    * A request to show the shooter what is blocking them. The tick changes on
    * every press of a blocked forward button, so pressing it twice points twice.
@@ -342,7 +352,7 @@ export function SetupMode({
                           type="checkbox"
                           className="toggle__box"
                           checked={settings.showNumbers}
-                          onChange={(event) => onSettings({ showNumbers: event.target.checked })}
+                          onChange={(event) => onSettings({ ...settings, showNumbers: event.target.checked })}
                         />
                         <span className="toggle__text">
                           <span className="toggle__label">{NUMERALS_LABEL}</span>

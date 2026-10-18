@@ -71,8 +71,17 @@ const OUT = process.env.SCOUTNGO_OUT ?? '.'
  * comment.
  */
 const PANELS = [
-  { id: 'hazards', button: /^Hazards/, selector: '.hz' },
-  { id: 'sky', button: /^Sky/, selector: '.skykey' },
+  /*
+   * `via` IS THE CONTROL THAT HAS TO BE OPENED FIRST.
+   *
+   * Hazards and the sky key used to be buttons on the control row. They are
+   * rows inside the Layers list now, so their buttons do not exist in the
+   * document until Layers is open, and an audit that pressed by text alone
+   * reported them as "did not open" and quietly skipped half its own pairs.
+   * That is a check going blind because the UI moved under it.
+   */
+  { id: 'hazards', button: /^Hazards/, selector: '.hz', via: /^Layers/ },
+  { id: 'sky', button: /^Sky/, selector: '.skykey', via: /^Layers/ },
   /*
    * SHEET VIEWS ARE IDENTIFIED BY THEIR OWN CONTENT, not by the sheet.
    *
@@ -83,6 +92,13 @@ const PANELS = [
    */
   { id: 'conditions', button: /^Conditions/, selector: '.cond' },
   { id: 'sunsearch', button: /^Sun when/, selector: '.sunq' },
+  /*
+   * THE LAYERS LIST, added here in the same pass that added the panel rather
+   * than after it went wrong. It is a map panel like the hazard editor and the
+   * sky key, so it is in MapPanel's union and cannot coexist with them by
+   * construction; this is what proves the construction holds on screen.
+   */
+  { id: 'layers', button: /^Layers/, selector: '.lay' },
 ]
 
 /**
@@ -100,6 +116,30 @@ const PANELS = [
  * sheet, and the dock that carries the time bar and the stage rail.
  */
 const PROTECTED = ['.hud', '.map-ctl', '.plat', '.sheet', '.dock']
+
+/**
+ * Opens a panel, including whatever has to be opened to reach its control.
+ *
+ * IDEMPOTENT ON THE PARENT, and that is not a nicety. The first version just
+ * pressed `via`, which TOGGLES: with the layers list already open from the
+ * previous step it closed it, so the nested control was not in the document
+ * and nothing opened at all. The pair then reported "neither is open" as a
+ * pass. A check that succeeds because it did nothing is worse than one that
+ * fails, so the parent is only pressed when the child's control is absent.
+ */
+const openPanel = async (panel) => {
+  if (panel.via !== undefined) {
+    const reachable = await ev(
+      `[...document.querySelectorAll('button')].some((b) => ${panel.button}.test(b.textContent.trim()))`,
+    )
+    if (reachable !== true) {
+      await ev(press(panel.via))
+      await wait(700)
+    }
+  }
+  await ev(press(panel.button))
+  await wait(900)
+}
 
 const press = (re) =>
   `(() => {
@@ -225,16 +265,14 @@ for (const first of PANELS) {
     if (first.id === second.id) continue
 
     await closeAll()
-    await ev(press(first.button))
-    await wait(900)
+    await openPanel(first)
     const firstOpen = await ev(visible(first.selector))
     if (firstOpen === null) {
       console.log(`  ${first.id} did not open, skipping its pairs`)
       break
     }
 
-    await ev(press(second.button))
-    await wait(900)
+    await openPanel(second)
 
     const a = await ev(visible(first.selector))
     const b = await ev(visible(second.selector))
@@ -258,8 +296,7 @@ console.log('\n### an open panel covers no control')
 
 for (const panel of PANELS) {
   await closeAll()
-  await ev(press(panel.button))
-  await wait(900)
+  await openPanel(panel)
   const open = await ev(visible(panel.selector))
   if (open === null) {
     console.log(`  ${panel.id.padEnd(11)} did not open`)

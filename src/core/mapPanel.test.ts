@@ -22,8 +22,14 @@ describe('one panel at a time', () => {
 
   /*
    * THE STATE SPACE IS THE PROOF. Two booleans have four states and one of
-   * them is the bug; one value of this type has three and all three are legal.
-   * Asserted by walking every reachable state from every start.
+   * them is the bug; one value of this type has one state per panel plus
+   * 'none', and all of them are legal. Asserted by walking every reachable
+   * state from every start.
+   *
+   * DERIVED FROM MAP_PANELS RATHER THAN LISTED. The first version hardcoded
+   * ['hazards', 'none', 'sky'], so adding the layers panel failed this test on
+   * the one thing that had not changed: the guarantee. What matters is that
+   * the reachable set is exactly the panels plus none, however many there are.
    */
   it('can never reach a state with two open, from anywhere', () => {
     const seen = new Set<MapPanel>()
@@ -33,7 +39,9 @@ describe('one panel at a time', () => {
       for (const panel of MAP_PANELS) walk(togglePanel(from, panel))
     }
     walk('none')
-    expect([...seen].sort()).toEqual(['hazards', 'none', 'sky'])
+    expect([...seen].sort()).toEqual([...MAP_PANELS, 'none'].sort())
+    /* And it really is every panel, not a subset that happens to match. */
+    for (const panel of MAP_PANELS) expect(seen.has(panel), panel).toBe(true)
     /* There is no value of the type that means two are open. */
     for (const state of seen) {
       expect(MAP_PANELS.filter((p) => p === state).length).toBeLessThanOrEqual(1)

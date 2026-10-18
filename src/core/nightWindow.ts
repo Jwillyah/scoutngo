@@ -242,14 +242,54 @@ export const PHASE_BOUNDS: Record<LightPhase, string> = {
 }
 
 /**
+ * WHETHER PART 107 IS IN PLAY AT ALL.
+ *
+ * Part 107 is a rule about an uncrewed AIRCRAFT. Printed beside a tripod it is
+ * an aviation regulation attached to something it does not govern, which is
+ * the same mistake as the 400ft ceiling on a ground position's card.
+ *
+ * THE BUG THIS NAMES. With GROUND 1 and AIR 0 and no drone anywhere, the band
+ * under the scrubber said "107.29 requires anti-collision lighting". True in
+ * general, false here, and false in the specific way this app keeps having to
+ * unlearn: a statement about aircraft rendered for somebody carrying a camera
+ * on a stick.
+ *
+ * EITHER a planned air position OR the Drone chip counts. The chip matters
+ * because the intent comes before the position: somebody who has switched to
+ * Air and not yet placed anything is planning a flight, and the lighting
+ * requirement is exactly the thing they want to know before they drive out.
+ */
+export interface FlyingContext {
+  /** How many air positions the plan contains. */
+  airPositions: number
+  /** True when the platform filter is set to air rather than ground. */
+  dronePlatform: boolean
+}
+
+export function part107Applies(context: FlyingContext): boolean {
+  return context.airPositions > 0 || context.dronePlatform
+}
+
+/**
  * THE REQUIREMENTS THAT APPLY IN A PHASE, each stated as the rule it comes
  * from.
  *
  * Every string names the section and says what the section requires. None of
  * them says anything about this flight, this pilot or this aircraft, because
  * this file knows none of those things.
+ *
+ * THE BAND ITSELF IS NOT CONDITIONAL. Only these two lines are. Civil twilight
+ * matters to a ground shoot too: it is when the light is, which is the reason
+ * somebody is standing there. It just does not come with a drone rule
+ * attached, so the phase and its times are always drawn and this list is
+ * empty when nothing is flying.
  */
-export function phaseRequirements(phase: LightPhase): readonly string[] {
+export function phaseRequirements(
+  phase: LightPhase,
+  context: FlyingContext = { airPositions: 0, dronePlatform: false },
+): readonly string[] {
+  if (!part107Applies(context)) return []
+
   const out: string[] = []
   if (anticollisionRequired(phase)) {
     out.push(

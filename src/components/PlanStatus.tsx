@@ -16,6 +16,14 @@ interface PlanStatusProps {
   /** Set when Overpass could not be reached, so siting was not checked. */
   siteNote: string | null
   /**
+   * Set when terrain was flattened to take the image this plan came from.
+   *
+   * SAME TONE AND SAME REASON AS siteNote: it names something the plan could
+   * not take into account. The model placed these positions on a flat map, so
+   * on a ridgeline venue it did not know a position is over a drop.
+   */
+  terrainNote: string | null
+  /**
    * What loading a saved plan had to change to make sense of it.
    *
    * A HAZARD TONE, because it means the plan on screen is not byte for byte
@@ -81,6 +89,7 @@ export function PlanStatus({
   onFixBlock,
   planCoverage,
   siteNote,
+  terrainNote,
   positionNote,
 }: PlanStatusProps) {
   return (
@@ -145,6 +154,7 @@ export function PlanStatus({
       <CoverageNotice planCoverage={planCoverage} />
 
       {siteNote === null ? null : <p className="notice">{siteNote}</p>}
+      {terrainNote === null ? null : <p className="notice">{terrainNote}</p>}
 
       {generation.status === 'raw' ? (
         <RawResponse reason={generation.reason} raw={generation.raw} />

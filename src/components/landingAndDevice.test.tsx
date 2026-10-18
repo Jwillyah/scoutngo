@@ -1,9 +1,12 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { ColdStart } from './ColdStart.tsx'
-import { Landing } from './Landing.tsx'
+import { Landing, LandingDetails } from './Landing.tsx'
 import { OnThisDevice } from './OnThisDevice.tsx'
 import type { Spot } from '../lib/spots.ts'
+
+const text_ = (markup: string) =>
+  markup.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
 
 const html = renderToStaticMarkup(<Landing onDismiss={() => {}} />)
 const text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ')
@@ -28,31 +31,81 @@ describe('the landing page says the four things and stops', () => {
     }
   })
 
-  it('states the rule the whole app is built on', () => {
-    expect(text).toContain('The model proposes, code computes')
-    expect(text.toLowerCase()).toContain('arithmetic')
-  })
+  /*
+   * THE TWO RULES, ONE LINE EACH. The argument behind them moved to the
+   * details view; the rules themselves are still on the cover, because a
+   * cover that does not say what the thing is built on is a splash screen.
+   */
+  it('states both rules in one line each', () => {
+    expect(text).toContain('Computed')
+    expect(text.toLowerCase()).toContain('arithmetic from coordinates')
+    expect(text.toLowerCase()).toContain('never asked for one')
 
-  it('states the privacy as a feature rather than an apology', () => {
-    expect(text).toContain('No account')
-    expect(text).toContain('No database')
-    expect(text).toContain('No analytics')
-    /* And says what DOES leave, because the claim is worthless if it is vague. */
-    expect(text.toLowerCase()).toContain('what does leave the device')
-  })
-
-  it('ends with one button', () => {
-    expect(text).toContain('Dive in')
-    const buttons = html.match(/<button/g) ?? []
-    expect(buttons).toHaveLength(1)
+    expect(text).toContain('Yours')
+    expect(text.toLowerCase()).toContain('no account, no database, no analytics')
+    expect(text.toLowerCase()).toContain('stays in this browser')
   })
 
   /*
-   * AND NOTHING ELSE. "Content, no more than this." A fifth section is scope
-   * creep on a page whose whole virtue is being short.
+   * ONE PRIMARY ACTION, which is the rule this page actually has.
+   *
+   * It used to be "exactly one <button>", and that rule caught a real
+   * regression when the NOW entry was put here. The detail link is not the
+   * same thing: it is set as type, it competes with nothing, and the
+   * alternative to having it is a cover page that has to be scrolled. So the
+   * rule is now one PRIMARY action and one disclosure, counted separately.
    */
-  it('has exactly three sections', () => {
-    expect(html.match(/class="land__sec"/g)).toHaveLength(3)
+  it('has one primary action and one link to the detail', () => {
+    expect(text).toContain('Dive in')
+    expect(html.match(/class="land__go"/g)).toHaveLength(1)
+    expect(html.match(/class="land__more"/g)).toHaveLength(1)
+    expect(text.toLowerCase()).toContain('what does leave the device')
+  })
+
+  /*
+   * THE COVER IS THE HERO, THE STAGES, AND THE TWO RULES. One section, which
+   * is the three stages. A second section on the cover is the thing this pass
+   * removed.
+   */
+  it('has one section on the cover', () => {
+    expect(html.match(/class="land__sec"/g)).toHaveLength(1)
+    expect(text).toContain('Three stages')
+  })
+
+/*
+ * NOTHING WAS DELETED ON ITS WAY OFF THE FRONT PAGE.
+ *
+ * This is the test that matters for this change. The instruction was to cut
+ * the cover and MOVE the detail, not to lose any of it, and "moved" is only
+ * verifiable by asserting the moved sentences are still rendered somewhere.
+ * Every line below was on the cover before and is on the details view now,
+ * word for word.
+ */
+  it('keeps every honesty line, on the details view', () => {
+    const detail = text_(renderToStaticMarkup(<LandingDetails onBack={() => {}} />))
+
+    for (const line of [
+      'The model proposes, code computes',
+      'all of it is arithmetic, computed here, from coordinates',
+      'It is never asked for a number',
+      'recomputed before you see it',
+      'No account. No database. No analytics.',
+      'go nowhere else',
+      'What does leave the device: map tiles',
+      'the public map data behind the hazard layer',
+      'Never the plan, and never a coordinate attached to you',
+    ]) {
+      expect(detail, `LOST on the way to the details view: "${line}"`).toContain(line)
+    }
+  })
+
+  /* And the details view says the things the app refuses to say. */
+  it('states the refusals on the details view', () => {
+    const detail = text_(renderToStaticMarkup(<LandingDetails onBack={() => {}} />))
+    expect(detail).toContain('never says an area is clear of hazards')
+    expect(detail).toContain('never says a flight is legal, cleared or compliant')
+    expect(detail).toContain('Temporary flight restrictions are not checked')
+    expect(detail).toContain('prints a dash')
   })
 
   /*
