@@ -1,6 +1,34 @@
+import { ensureApp, ensureBrowser, PreflightError } from './preflight.mjs'
+
+/*
+ * ONE WAY IN FOR EVERY BROWSER AUDIT, AND IT CHECKS IT CAN LOOK FIRST.
+ *
+ * This used to fetch the target list and read .webSocketDebuggerUrl straight
+ * off the first page target. With no browser running that is a TypeError on
+ * undefined, and with no app running every selector comes back empty, so an
+ * audit reported nothing and the gate refused a clean commit with one red
+ * line and no reason.
+ *
+ * ensureApp and ensureBrowser now start whatever is missing and throw a
+ * sentence when they cannot, and guardAudit turns any throw into a stated
+ * exit. See scripts/preflight.mjs.
+ */
 export async function connect() {
-  const list = await (await fetch('http://127.0.0.1:9222/json/list')).json()
+  const app = await ensureApp()
+  const browser = await ensureBrowser()
+
+  const response = await fetch('http://127.0.0.1:9222/json/list')
+  if (!response.ok) {
+    throw new PreflightError(`the browser's target list answered HTTP ${response.status}`)
+  }
+  const list = await response.json()
   const target = list.find((x) => x.type === 'page')
+  if (target === undefined) {
+    throw new PreflightError('the browser has no page target to attach to')
+  }
+  if (typeof target.webSocketDebuggerUrl !== 'string') {
+    throw new PreflightError('the page target has no debugger URL')
+  }
   const ws = new WebSocket(target.webSocketDebuggerUrl)
   await new Promise((r) => (ws.onopen = r))
   let id = 0; const p = new Map(); const errs = []
@@ -23,5 +51,17 @@ export async function connect() {
   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 3, mobile: true })
   await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 })
   const load = async (url = 'http://127.0.0.1:5173/?calibration=1') => { await send('Page.navigate', { url }); await wait(7000) }
-  return { ws, send, ev, wait, shot, load, errs }
+
+  /*
+   * Stop only what WE started. An audit run inside the commit hook finds the
+   * app the hook started and leaves it for the next audit; an audit run on its
+   * own starts one and takes it away again.
+   */
+  const dispose = async () => {
+    try { ws.close() } catch { /* already closed */ }
+    await browser.stop()
+    await app.stop()
+  }
+
+  return { ws, send, ev, wait, shot, load, errs, dispose, startedApp: app.started, startedBrowser: browser.started }
 }

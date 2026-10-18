@@ -25,10 +25,24 @@
  * the whole point of it.
  */
 
+import { guardAudit, startWatchdog } from './preflight.mjs'
+
+/*
+ * ARMED BEFORE ANYTHING ELSE CAN THROW.
+ *
+ * This audit used to die on a TypeError when the thing it needed was not
+ * there, printing a stack trace into a log the commit hook greps for a problem
+ * count. It matched nothing, so the hook refused the commit with one red line
+ * and no reason. Any throw from here on prints one sentence saying the audit
+ * could not LOOK, and exits 2 so that is distinguishable from a problem found.
+ */
+guardAudit('label')
+
+
 const HERE = new URL('.', import.meta.url).pathname
 const FIXTURES = process.argv[2] ?? HERE
-const { ev, ws, wait, send, errs } = await (await import(FIXTURES + '/cdp.mjs')).connect()
-setTimeout(() => { console.log('TIMED OUT'); process.exit(2) }, 290000)
+const { ev, ws, wait, send, errs, dispose } = await (await import(FIXTURES + '/cdp.mjs')).connect()
+const watchdog = startWatchdog('label')
 
 /*
  * Everything a label must stay out from under, measured from the live DOM.
@@ -379,5 +393,7 @@ if (visible === 0) {
 
 console.log('\n=== LABEL PROBLEMS: ' + problems + ' ===')
 if (errs.length > 0) console.log('console errors:', JSON.stringify(errs.slice(0, 3)))
+watchdog.stop()
 ws.close()
+await dispose()
 process.exit(problems === 0 ? 0 : 1)

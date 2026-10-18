@@ -9,6 +9,20 @@
  * opening every drawer, the sheet, a position card and its disclosure, and
  * asserts that nothing on any of them is visible but unreachable.
  */
+
+import { guardAudit, startWatchdog } from './preflight.mjs'
+
+/*
+ * ARMED BEFORE ANYTHING ELSE CAN THROW.
+ *
+ * This audit used to die on a TypeError when the thing it needed was not
+ * there, printing a stack trace into a log the commit hook greps for a problem
+ * count. It matched nothing, so the hook refused the commit with one red line
+ * and no reason. Any throw from here on prints one sentence saying the audit
+ * could not LOOK, and exits 2 so that is distinguishable from a problem found.
+ */
+guardAudit('reachability')
+
 /*
  * THE REACHABILITY AUDIT.
  *
@@ -187,11 +201,19 @@ export const AUDIT = `(() => {
  */
 const HERE = new URL('.', import.meta.url).pathname
 const FIXTURES = process.argv[2] ?? HERE
-const { ev, ws, wait, send, errs } = await (await import(FIXTURES + '/cdp.mjs')).connect()
-setTimeout(()=>{console.log('TIMED OUT');process.exit(2)},290000)
+const { ev, ws, wait, send, errs, dispose } = await (await import(FIXTURES + '/cdp.mjs')).connect()
+const watchdog = startWatchdog('reachability')
 const { readFileSync } = await import('node:fs')
 await send('Page.addScriptToEvaluateOnNewDocument', { source: readFileSync(FIXTURES + '/stub.js','utf8') })
-const show = (l, v) => console.log('\n### ' + l + '\n' + JSON.stringify(v, null, 2))
+const show = (l, v) => {
+  /*
+   * Every scenario reports through here, so this is the one place that knows
+   * how far the run got. The watchdog prints it if it fires, which turns
+   * "timed out" into "timed out after PLAN 660 card open".
+   */
+  watchdog.note(l)
+  console.log('\n### ' + l + '\n' + JSON.stringify(v, null, 2))
+}
 let failures = 0
 const check = async (label) => {
   const r = await ev(AUDIT)
@@ -257,4 +279,5 @@ for (const h of [844, 660]) {
 }
 console.log('\n=== TOTAL PROBLEMS: ' + failures + ' ===')
 console.log('errors:', JSON.stringify(errs.slice(0,3)))
-ws.close(); process.exit(failures === 0 ? 0 : 1)
+watchdog.stop()
+ws.close(); await dispose(); process.exit(failures === 0 ? 0 : 1)

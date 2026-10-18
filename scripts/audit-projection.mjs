@@ -25,6 +25,20 @@
  *      bounds-based reasoning is precisely what breaks there.
  */
 
+import { guardAudit, startWatchdog } from './preflight.mjs'
+
+/*
+ * ARMED BEFORE ANYTHING ELSE CAN THROW.
+ *
+ * This audit used to die on a TypeError when the thing it needed was not
+ * there, printing a stack trace into a log the commit hook greps for a problem
+ * count. It matched nothing, so the hook refused the commit with one red line
+ * and no reason. Any throw from here on prints one sentence saying the audit
+ * could not LOOK, and exits 2 so that is distinguishable from a problem found.
+ */
+guardAudit('projection')
+
+
 const TOLERANCE_PX = 1
 const TOLERANCE_METRES = 0.5
 
@@ -204,8 +218,8 @@ export const BEARING_LINE_EXTENT = `(() => {
  */
 const HERE = new URL('.', import.meta.url).pathname
 const FIXTURES = process.argv[2] ?? HERE
-const { ev, ws, wait, send, errs } = await (await import(FIXTURES + '/cdp.mjs')).connect()
-setTimeout(() => { console.log('TIMED OUT'); process.exit(2) }, 290000)
+const { ev, ws, wait, send, errs, dispose } = await (await import(FIXTURES + '/cdp.mjs')).connect()
+const watchdog = startWatchdog('projection')
 const show = (l, v) => console.log('\n### ' + l + '\n' + JSON.stringify(v, null, 2))
 
 let failures = 0
@@ -352,5 +366,7 @@ for (const [zoom, pitch, bearing] of [[12, 60, 0], [16, 60, 0], [16, 45, 137], [
 
 console.log('\n=== PROJECTION FAILURES: ' + failures + ' ===')
 if (errs.length > 0) console.log('console errors:', JSON.stringify(errs.slice(0, 3)))
+watchdog.stop()
 ws.close()
+await dispose()
 process.exit(failures === 0 ? 0 : 1)

@@ -118,24 +118,50 @@ curl -s -m 3 http://127.0.0.1:9222/json/list | grep -q '"type": *"page"' \
   || fail "Chrome started but never opened a page target"
 ok "page target ready"
 
-step "reachability audit"
-SCOUTNGO_OUT="$SCRATCH" node scripts/audit-reachability.mjs > "$SCRATCH/reach.log" 2>&1 \
-  || { grep -E 'PROBLEM|TOTAL' "$SCRATCH/reach.log" | tail -20; fail "reachability audit"; }
+
+# ---------------------------------------------------------------- audit runner
+#
+# WHY THIS IS A FUNCTION AND NOT FOUR GREPS.
+#
+# Each audit used to be run as:
+#
+#   node scripts/audit-x.mjs > log || { grep -E 'PROBLEM|TOTAL' log; fail "x"; }
+#
+# which prints a reason ONLY IF the audit happened to use one of the words in
+# that grep. The reachability audit's watchdog printed "TIMED OUT", which
+# matches none of them, so a slow run refused a commit with one red line and
+# no explanation. Twice.
+#
+# The lesson is not "add TIMED OUT to the grep". It is that a reporter which
+# can only report what it was told to expect will go silent the first time
+# something new goes wrong, which is the same shape as every blind check in
+# this repo. So on failure this prints the TAIL OF THE LOG unconditionally,
+# whatever is in it, and the grep is only there to put the interesting lines
+# first. There is no longer any way for an audit to fail without saying
+# something.
+run_audit() {
+  local name="$1" script="$2" log="$3" pattern="$4"
+  step "$name"
+  if SCOUTNGO_OUT="$SCRATCH" node "$script" > "$log" 2>&1; then
+    return 0
+  fi
+  echo "${YELLOW}  --- what $name actually printed (last 25 lines) ---${OFF}"
+  tail -25 "$log"
+  echo "${YELLOW}  --- lines matching $pattern ---${OFF}"
+  grep -E "$pattern" "$log" | tail -20 || echo "  (none: see the tail above)"
+  fail "$name"
+}
+
+run_audit "reachability audit" scripts/audit-reachability.mjs "$SCRATCH/reach.log" 'PROBLEM|TOTAL|ABORTED'
 ok "$(grep -E 'TOTAL PROBLEMS' "$SCRATCH/reach.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
 
-step "label collision audit"
-SCOUTNGO_OUT="$SCRATCH" node scripts/audit-labels.mjs > "$SCRATCH/labels.log" 2>&1 \
-  || { grep -E 'FAIL|LABEL PROBLEMS|over ' "$SCRATCH/labels.log" | tail -20; fail "label audit"; }
+run_audit "label collision audit" scripts/audit-labels.mjs "$SCRATCH/labels.log" 'FAIL|LABEL PROBLEMS|over |ABORTED'
 ok "$(grep -E 'LABEL PROBLEMS' "$SCRATCH/labels.log" | tail -1)"
 
-step "panel combination audit"
-SCOUTNGO_OUT="$SCRATCH" node scripts/audit-panels.mjs > "$SCRATCH/panels.log" 2>&1 \
-  || { grep -E 'PROBLEM|FAIL' "$SCRATCH/panels.log" | tail -20; fail "panel audit"; }
+run_audit "panel combination audit" scripts/audit-panels.mjs "$SCRATCH/panels.log" 'PROBLEM|FAIL|ABORTED'
 ok "$(grep -E 'PANEL PROBLEMS' "$SCRATCH/panels.log" | tail -1)"
 
-step "projection audit"
-SCOUTNGO_OUT="$SCRATCH" node scripts/audit-projection.mjs > "$SCRATCH/proj.log" 2>&1 \
-  || { grep -E 'FAIL' "$SCRATCH/proj.log" | tail -20; fail "projection audit"; }
+run_audit "projection audit" scripts/audit-projection.mjs "$SCRATCH/proj.log" 'FAIL|ABORTED'
 ok "$(grep -E 'PROJECTION FAILURES' "$SCRATCH/proj.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
 
 echo "${GREEN}all gates passed${OFF}"

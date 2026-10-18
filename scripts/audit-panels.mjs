@@ -32,6 +32,20 @@
  * panel you cannot close, and a panel over the zoom controls is a map you
  * cannot drive while reading it.
  */
+
+import { guardAudit, startWatchdog } from './preflight.mjs'
+
+/*
+ * ARMED BEFORE ANYTHING ELSE CAN THROW.
+ *
+ * This audit used to die on a TypeError when the thing it needed was not
+ * there, printing a stack trace into a log the commit hook greps for a problem
+ * count. It matched nothing, so the hook refused the commit with one red line
+ * and no reason. Any throw from here on prints one sentence saying the audit
+ * could not LOOK, and exits 2 so that is distinguishable from a problem found.
+ */
+guardAudit('panel')
+
 import { connect } from './cdp.mjs'
 
 const OUT = process.env.SCOUTNGO_OUT ?? '.'
@@ -165,7 +179,8 @@ const overlaps = (sel) =>
      return hits
    })()`
 
-const { ev, wait, shot, send, load, errs } = await connect()
+const watchdog = startWatchdog('panel')
+const { ev, wait, shot, send, load, errs, dispose } = await connect()
 
 let problems = 0
 const fail = (line) => {
@@ -202,6 +217,7 @@ async function closeAll() {
   await wait(400)
 }
 
+watchdog.note('starting the pair tests')
 console.log('### one panel at a time')
 
 for (const first of PANELS) {
@@ -237,6 +253,7 @@ for (const first of PANELS) {
   }
 }
 
+watchdog.note('starting the cover tests')
 console.log('\n### an open panel covers no control')
 
 for (const panel of PANELS) {
@@ -259,4 +276,6 @@ const noise = errs.filter((e) => !/arcgis|AJAXError|Failed to fetch/.test(e))
 if (noise.length > 0) console.log('\nconsole errors: ' + JSON.stringify(noise.slice(0, 3)))
 
 console.log('\n=== PANEL PROBLEMS: ' + problems + ' ===')
+watchdog.stop()
+await dispose()
 process.exit(problems === 0 ? 0 : 1)
