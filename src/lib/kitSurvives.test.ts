@@ -34,6 +34,9 @@ const MY_BODY: Body = {
   name: 'Sony FX3',
   role: 'video',
   sensor: 'fullFrame',
+  /* A body the shipped kit never heard of, so nobody has recorded its pixels. */
+  horizontalPixels: null,
+  verticalPixels: null,
   notes: 'Bought after the kit shipped.',
 }
 

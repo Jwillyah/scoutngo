@@ -122,6 +122,18 @@ export function addBody(kit: KitProfile, draft: BodyDraft): KitProfile {
     name: trimmed(draft.name),
     role: 'photo',
     sensor: draft.sensor,
+    /*
+     * NULL, AND IT STAYS NULL UNTIL SOMEBODY TYPES IT.
+     *
+     * The add-a-body form asks for a name and a sensor format, which is all it
+     * needs for the field of view. It does not ask for a pixel count and must
+     * not invent one: a full frame body could be 24 or 33 or 61 megapixels and
+     * the NPF time differs by more than a factor of two across that range.
+     * npfForCamera turns this null into "No pixel count recorded for the
+     * <name>", which is a sentence the shooter can act on.
+     */
+    horizontalPixels: null,
+    verticalPixels: null,
     notes: '',
   }
   return { ...kit, bodies: [...kit.bodies, body] }

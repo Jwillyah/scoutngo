@@ -33,12 +33,14 @@ import { HazardPanel } from './HazardPanel.tsx'
 import { LayersPanel } from './LayersPanel.tsx'
 import { BottomSheet } from './BottomSheet.tsx'
 import { raisedTo, type SheetDetent } from '../core/sheetDetent.ts'
+import type { HorizonInput } from '../core/skyWindow.ts'
 import { AirspacePanel } from './AirspacePanel.tsx'
 import { ConditionsPanel } from './ConditionsPanel.tsx'
 import type { ConeMode } from './ConePicker.tsx'
 import { FieldPackControl, type PackBuildState } from './FieldPackControl.tsx'
 import { MapRail } from './MapRail.tsx'
 import { SheetSection } from './SheetSection.tsx'
+import { SkyPanel } from './SkyPanel.tsx'
 import { BUILDINGS_MIN_ZOOM, MapView, type MapHandle } from './MapView.tsx'
 import { buildingsToGeoJson, fetchBuildings } from '../lib/buildings.ts'
 import { PlatformFilter } from './PlatformFilter.tsx'
@@ -505,6 +507,54 @@ export function PlanMode({
   const onPeekTap = raiseToHalf
 
   const handle = mapHandle as React.RefObject<MapHandle | null>
+
+  /*
+   * THE SKYLINE AT THIS VENUE, read once from the DEM already in memory.
+   *
+   * RECOMPUTED ON THE VENUE AND ON TERRAIN, NOT ON THE CAMERA. It is a
+   * property of where the shooter is standing, not of where the map happens
+   * to be pointed, so panning must not change it and must not re-run 288
+   * elevation lookups. It starts flat and is labelled flat until the DEM
+   * actually answers, which is the honest order.
+   */
+  const [horizonProfile, setHorizonProfile] = useState<HorizonInput>({ kind: 'flat' })
+
+  useEffect(() => {
+    if (venue === null) {
+      setHorizonProfile({ kind: 'flat' })
+      return
+    }
+    /*
+     * ONE FRAME LATE, deliberately. The terrain source is added when the style
+     * loads and queryTerrainElevation answers null until its tiles arrive, so
+     * reading synchronously here would record a flat horizon and keep it. The
+     * retry is cheap and stops as soon as the DEM speaks.
+     */
+    let cancelled = false
+    let tries = 0
+    const read = () => {
+      if (cancelled) return
+      const got = handle.current?.horizonAt(venue) ?? { kind: 'flat' as const }
+      if (got.kind === 'terrain' || tries > 20) {
+        setHorizonProfile(got)
+        return
+      }
+      tries += 1
+      window.setTimeout(read, 500)
+    }
+    read()
+    return () => {
+      cancelled = true
+    }
+  }, [venue, handle])
+
+  /*
+   * Now, fixed at mount. A listing that recomputed `new Date()` every render
+   * would re-derive ninety days of events on every keystroke elsewhere in the
+   * sheet, and the first row would occasionally shuffle under the finger.
+   */
+  const [skyNow] = useState(() => new Date())
+
 
   /*
    * The band on screen and the zoom to judge it at. The band follows the sun
@@ -974,14 +1024,30 @@ export function PlanMode({
               />
             </SheetSection>
 
-            <SheetSection title="Sun when">
-              <SunSearchPanel
+            {/*
+              * SKY ABSORBED SUN WHEN rather than sitting beside it. Same venue,
+              * same question -- where is a thing in the sky from here, and when
+              * -- at a wider scale. Sun When is the first row of it and does
+              * exactly what it did. Five sections stay five.
+              */}
+            <SheetSection title="Sky">
+              <SkyPanel
                 venue={venue}
                 timeZone={venueWindow?.timeZone ?? null}
                 timeZoneAbbr={venueWindow?.timeZoneShort ?? null}
-                target={aimAt}
-                picking={placingAim}
-                onPickTarget={() => onPlacingAim(!placingAim)}
+                horizon={horizonProfile}
+                kit={kitProfile}
+                now={skyNow}
+                sunWhen={
+                  <SunSearchPanel
+                    venue={venue}
+                    timeZone={venueWindow?.timeZone ?? null}
+                    timeZoneAbbr={venueWindow?.timeZoneShort ?? null}
+                    target={aimAt}
+                    picking={placingAim}
+                    onPickTarget={() => onPlacingAim(!placingAim)}
+                  />
+                }
               />
             </SheetSection>
 
@@ -1042,7 +1108,7 @@ export function PlanMode({
               />
             </SheetSection>
 
-            <SheetSection title="Sky">
+            <SheetSection title="Cloud layer">
               <SkyLegend
                 band={skyBand}
                 advice={zoomAdvice(skyBand, venue?.lat ?? 0, mapWidth, mapZoom)}

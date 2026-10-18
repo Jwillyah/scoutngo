@@ -7862,3 +7862,170 @@
   border-color: var(--afterglow);
   color: var(--afterglow);
 }
+
+/* ---------------------------------------------------------------- SKY EVENTS
+ *
+ * The SKY section: a dated list of what is happening overhead, each row
+ * expanding into the window block. No floating anything -- this lives in the
+ * sheet like every other section, which is the rule the surface audit holds.
+ */
+
+.skyev {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.skyev__lead,
+.skyev__none {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.skyev__row {
+  border-top: 1px solid var(--color-line);
+  padding-top: var(--space-2);
+}
+
+.skyev__head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-1) var(--space-2);
+  align-items: baseline;
+  width: 100%;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.skyev__name {
+  font-weight: 600;
+}
+
+.skyev__when {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+/*
+ * THE BINDING CONSTRAINT IN ONE LINE, under the name and spanning both
+ * columns. It is the row's whole reason for existing, so it is not truncated
+ * and not put behind the tap.
+ */
+.skyev__why {
+  grid-column: 1 / -1;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.skyev__body {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2) 0 var(--space-3);
+}
+
+.skyev__constraints {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.skyev__constraint {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* The answer. Bigger than the constraints above it, because it is the answer. */
+.skyev__window {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2);
+  background: var(--color-field);
+  border-radius: var(--radius-panel);
+}
+
+.skyev__window-label {
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.skyev__window-times {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+.skyev__window-length {
+  color: var(--color-text-muted);
+}
+
+.skyev__binding,
+.skyev__horizon,
+.skyev__cloud,
+.skyev__reason,
+.skyev__npf-note,
+.skyev__ics-note {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/*
+ * A MISSING FORECAST IS NOT STYLED AS A WARNING. It is a fact about the
+ * forecast, not about the night, and colouring it red would read as "bad sky".
+ */
+.skyev__cloud--none {
+  font-style: italic;
+}
+
+.skyev__kit {
+  display: grid;
+  gap: var(--space-1);
+  border-top: 1px solid var(--color-line);
+  padding-top: var(--space-2);
+}
+
+.skyev__kit-head {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.skyev__lenses {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.skyev__lens {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+}
+
+.skyev__lens-reason {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.skyev__ics {
+  justify-self: start;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-field);
+  color: inherit;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-panel);
+  cursor: pointer;
+}

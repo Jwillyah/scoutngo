@@ -8,6 +8,30 @@ export interface Body {
   role: BodyRole
   /** Native sensor area of the body. A lens may force a smaller one. */
   sensor: SensorName
+  /**
+   * Pixels across the full sensor width, or null when not recorded.
+   *
+   * WHY THIS IS ON THE BODY AND NOT ON THE SENSOR. It was asked for on the
+   * SENSORS table in fov.ts, and it cannot live there and be right: this kit
+   * has two full frame bodies, the a7IV at 7008 across and the a7III at 6000,
+   * so one pixel count per sensor FORMAT would be wrong for one of them. The
+   * pitch that follows differs by 16 percent, and the pitch is half of the NPF
+   * rule, so that error would land directly on the shutter time. SENSORS keeps
+   * the physical dimensions, which really are a property of the format.
+   *
+   * NULL IS A REAL VALUE and means exactly "nobody has recorded this". It
+   * makes npfForCamera return a reason naming the body rather than a number.
+   * Nothing in this codebase may infer a pixel count from a sensor size, a
+   * megapixel headline or another body.
+   *
+   * A CROP DOES NOT CHANGE THE PITCH, which is why there is no second field
+   * for APS-C mode. The a7IV in crop reads a smaller rectangle of the same
+   * photosites, so pixelPitchMicrons must be given the FULL sensor width and
+   * this full-width count whatever mode the lens forces.
+   */
+  horizontalPixels: number | null
+  /** Pixels down the full sensor height, or null. Same rules as above. */
+  verticalPixels: number | null
   notes: string
 }
 
@@ -117,8 +141,42 @@ export const DEFAULT_KIT: KitProfile = {
   id: 'default',
   name: 'Default kit',
   bodies: [
-    { id: 'a7iv', name: 'Sony a7IV', role: 'video', sensor: 'fullFrame', notes: 'Primary video body' },
-    { id: 'a7iii', name: 'Sony a7III', role: 'photo', sensor: 'fullFrame', notes: 'Primary photo body' },
+    /*
+     * 7008 x 4672, 33.0 effective megapixels, on a 35.9 x 23.9 mm sensor.
+     *
+     * Sony's own specification pages refuse automated requests from here (403
+     * from sony.com, sony.co.uk, sony.com.au and sony-asia.com), so this is
+     * taken from the Imaging Resource transcription of the ILCE-7M4
+     * specification, imaging-resource.com/cameras/sony-a7-iv-review/
+     * specifications/, read 2026-10-18. It cross-checks against Sony's own
+     * published pixel pitch for this body: 35.9 mm / 7008 = 5.12 microns.
+     * Recorded as a transcription rather than as the manufacturer page,
+     * because that is what it is.
+     */
+    {
+      id: 'a7iv',
+      name: 'Sony a7IV',
+      role: 'video',
+      sensor: 'fullFrame',
+      horizontalPixels: 7008,
+      verticalPixels: 4672,
+      notes: 'Primary video body',
+    },
+    /*
+     * 6000 x 4000, 24 effective megapixels, on a 35.6 x 23.8 mm sensor.
+     * Wikipedia's ILCE-7M3 specification table, read 2026-10-18, for the same
+     * reason as above. Cross-checks against the published 5.93 micron pitch:
+     * 35.6 mm / 6000 = 5.93.
+     */
+    {
+      id: 'a7iii',
+      name: 'Sony a7III',
+      role: 'photo',
+      sensor: 'fullFrame',
+      horizontalPixels: 6000,
+      verticalPixels: 4000,
+      notes: 'Primary photo body',
+    },
   ],
   lenses: [
     {

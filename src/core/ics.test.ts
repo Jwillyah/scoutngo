@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ICS_REMINDER_NOTE, foldLine, icsFilename, icsStamp, icsText, peakEventIcs } from './ics.ts'
+import { ICS_REMINDER_NOTE, foldLine, icsFilename, icsStamp, icsText, peakEventIcs, skyEventIcs, skyEventIcsFilename } from './ics.ts'
 
 const BASE = {
   from: new Date('2026-10-16T22:44:00Z'),
@@ -141,5 +141,89 @@ describe('the file', () => {
 describe('the filename', () => {
   it('says what it is and sorts by date', () => {
     expect(icsFilename(new Date('2026-10-16T22:44:00Z'))).toBe('scoutngo-peak-2026-10-16.ics')
+  })
+})
+
+describe('a sky event window as an .ics', () => {
+  const base = {
+    from: new Date('2026-10-22T07:31:00Z'),
+    to: new Date('2026-10-22T10:00:00Z'),
+    title: 'Orionids — meteor window',
+    constraintLines: [
+      'Target clears the horizon 22:38',
+      'Moon down 03:31 to 06:00',
+      'Astronomical dark 19:55 to 06:00',
+    ],
+    kitLines: ['Sigma 28-75 f2.8 at 28mm: NPF 9.0s on the Sony a7III.'],
+    stamp: new Date('2026-10-18T12:00:00Z'),
+    uid: 'shower-orionids-2026-10-21@scoutngo.local',
+  } as const
+
+  it('carries the computed window as DTSTART and DTEND', () => {
+    const text = skyEventIcs({ ...base, horizonSource: 'terrain' })
+    expect(text).toContain('DTSTART:20261022T073100Z')
+    expect(text).toContain('DTEND:20261022T100000Z')
+  })
+
+  it('puts every constraint in the description', () => {
+    const text = skyEventIcs({ ...base, horizonSource: 'terrain' })
+    for (const line of base.constraintLines) {
+      /* Folding can break a long line, so the check is on a short distinctive run. */
+      expect(text.replace(/\r\n /g, '')).toContain(line)
+    }
+  })
+
+  it('says which horizon produced the times', () => {
+    const terrain = skyEventIcs({ ...base, horizonSource: 'terrain' }).replace(/\r\n /g, '')
+    const flat = skyEventIcs({ ...base, horizonSource: 'flat' }).replace(/\r\n /g, '')
+    expect(terrain).toMatch(/terrain horizon/i)
+    expect(flat).toMatch(/flat horizon/i)
+    expect(flat).toMatch(/no elevation data/i)
+  })
+
+  it('leads with the reminder note, so a notification shows it first', () => {
+    const text = skyEventIcs({ ...base, horizonSource: 'terrain' }).replace(/\r\n /g, '')
+    const description = text.split('DESCRIPTION:')[1] ?? ''
+    /*
+     * Compared against the ESCAPED note, not the raw one. RFC 5545 escapes
+     * commas and semicolons inside a property value, and the note has both,
+     * so a raw comparison fails on correct output. icsText is the same
+     * function the writer used, which is the point.
+     */
+    expect(description.startsWith(icsText(ICS_REMINDER_NOTE).slice(0, 40))).toBe(true)
+  })
+
+  it('never claims the night will be clear', () => {
+    const text = skyEventIcs({ ...base, horizonSource: 'flat' })
+    expect(text).not.toMatch(/\bclear\b/i)
+    expect(text).not.toMatch(/\bguaranteed\b/i)
+  })
+
+  it('does not put the venue coordinate in the file', () => {
+    const text = skyEventIcs({ ...base, horizonSource: 'terrain' })
+    expect(text).not.toMatch(/38\.75/)
+    expect(text).not.toMatch(/-78\.26/)
+    expect(text).not.toMatch(/GEO:/)
+  })
+
+  it('is stable for the same window, so a second download updates rather than duplicates', () => {
+    const a = skyEventIcs({ ...base, horizonSource: 'terrain' })
+    const b = skyEventIcs({ ...base, horizonSource: 'terrain' })
+    expect(a).toBe(b)
+    expect(a).toContain(`UID:${base.uid}`)
+  })
+
+  it('uses CRLF throughout, which the spec requires', () => {
+    const text = skyEventIcs({ ...base, horizonSource: 'terrain' })
+    expect(text.split('\n').every((line) => line === '' || line.endsWith('\r'))).toBe(true)
+  })
+
+  it('names the file by the night, so downloads sort', () => {
+    expect(skyEventIcsFilename('Orionids', base.from)).toBe('scoutngo-orionids-2026-10-22.ics')
+  })
+
+  it('warns far enough ahead to drive somewhere dark', () => {
+    const text = skyEventIcs({ ...base, horizonSource: 'terrain' })
+    expect(text).toContain('TRIGGER:-PT40M')
   })
 })

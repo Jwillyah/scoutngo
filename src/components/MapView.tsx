@@ -5,6 +5,8 @@ import { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'r
 import { createPortal } from 'react-dom'
 import { SunInSky } from './SunInSky.tsx'
 import { readSkyFrame, type SkyFrame } from '../lib/skyFrame.ts'
+import { readHorizonProfile } from '../lib/horizonProfile.ts'
+import type { HorizonInput } from '../core/skyWindow.ts'
 import {
   axisLine,
   bearingLineEnd,
@@ -525,6 +527,17 @@ export interface MapCapture {
 export type MapViewport = Omit<MapCapture, 'dataUrl' | 'mediaType'>
 
 export interface MapHandle {
+  /**
+   * The skyline all the way round at a venue, from the DEM already in memory.
+   *
+   * ON THE HANDLE because only this component owns the maplibre instance, and
+   * queryTerrainElevation is a method on it. The sky window needs the whole
+   * circle rather than one bearing, so it cannot reuse readSkyFrame.
+   *
+   * Returns a FLAT horizon, labelled, when terrain is off or the DEM is
+   * silent. It never returns a terrain profile it does not have.
+   */
+  horizonAt(venue: LatLon | null): HorizonInput
   /**
    * Bounds, camera and canvas size, WITHOUT encoding the image.
    *
@@ -1881,6 +1894,11 @@ export function MapView({
   useImperativeHandle(
     handle,
     (): MapHandle => probeHandle({
+      horizonAt(venue: LatLon | null): HorizonInput {
+        const instance = map.current
+        if (instance === null) return { kind: 'flat' }
+        return readHorizonProfile(instance, venue)
+      },
       viewport() {
         const instance = map.current
         if (instance === null) return null

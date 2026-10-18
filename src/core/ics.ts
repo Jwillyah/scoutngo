@@ -150,3 +150,92 @@ export function peakEventIcs(input: PeakEventInput): string {
 export function icsFilename(from: Date): string {
   return `scoutngo-peak-${from.toISOString().slice(0, 10)}.ics`
 }
+
+/* ------------------------------------------------------- a sky event window */
+
+/**
+ * The constraints that produced a window, as the .ics description.
+ *
+ * THE CONSTRAINTS GO IN THE FILE, not just the times. A calendar entry that
+ * says 03:31 to 06:00 and nothing else is a number with no provenance three
+ * weeks later, and the first question standing in a field at 03:20 is "why
+ * does this start now" -- which is answerable only if the answer travelled
+ * with the event.
+ */
+export interface SkyEventIcsInput {
+  /** The computed window. */
+  from: Date
+  to: Date
+  /** What the night is for. Becomes the SUMMARY. */
+  title: string
+  /** One line per constraint, already formatted in venue local time. */
+  constraintLines: readonly string[]
+  /** Which horizon produced it, stated rather than implied. */
+  horizonSource: 'terrain' | 'flat'
+  /** The NPF and starting exposure lines, when the kit produced any. */
+  kitLines: readonly string[]
+  stamp: Date
+  uid: string
+}
+
+/**
+ * A sky event as a complete .ics file.
+ *
+ * IT REUSES ICS_REMINDER_NOTE, deliberately. A meteor window is arithmetic in
+ * exactly the way a peak light band is arithmetic, and the sky over it is
+ * unknown in exactly the same way. The same sentence is the honest one, and
+ * having one constant means it cannot be softened in one place and not the
+ * other.
+ */
+export function skyEventIcs(input: SkyEventIcsInput): string {
+  const horizon =
+    input.horizonSource === 'terrain'
+      ? 'Times use the terrain horizon from the elevation data.'
+      : 'Times use a flat horizon: no elevation data was available for this venue.'
+
+  const description = [
+    ICS_REMINDER_NOTE,
+    horizon,
+    ...input.constraintLines,
+    ...input.kitLines,
+  ].join(' \\n')
+
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//ScoutNGo//Sky event window//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `UID:${icsText(input.uid)}`,
+    `DTSTAMP:${icsStamp(input.stamp)}`,
+    `DTSTART:${icsStamp(input.from)}`,
+    `DTEND:${icsStamp(input.to)}`,
+    `SUMMARY:${icsText(input.title)}`,
+    `DESCRIPTION:${icsText(description)}`,
+    /*
+     * Forty minutes, not fifteen. A sky window is somewhere dark, which means
+     * a drive and a walk, and the alarm has to fire while there is still time
+     * to do both. The peak-light alarm is fifteen because that one is about
+     * stepping outside.
+     */
+    'BEGIN:VALARM',
+    'TRIGGER:-PT40M',
+    'ACTION:DISPLAY',
+    `DESCRIPTION:${icsText(`${input.title} window opens soon`)}`,
+    'END:VALARM',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ]
+
+  return `${lines.map(foldLine).join('\r\n')}\r\n`
+}
+
+/** A filename that sorts and says which night it is. */
+export function skyEventIcsFilename(title: string, from: Date): string {
+  const slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+  return `scoutngo-${slug}-${from.toISOString().slice(0, 10)}.ics`
+}

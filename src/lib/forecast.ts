@@ -511,3 +511,95 @@ export async function fetchCloudGrid(
     clearTimeout(timer)
   }
 }
+
+/* ----------------------------------------------- cloud over one whole night */
+
+/** One hour of total cloud at the venue. */
+export interface NightCloudHour {
+  at: Date
+  totalPercent: number | null
+}
+
+export type NightCloudResult =
+  | { status: 'ok'; hours: NightCloudHour[] }
+  | { status: 'unavailable'; reason: string }
+
+/**
+ * Total cloud cover at the venue, hour by hour, across one night.
+ *
+ * THE SAME SERVICE AND THE SAME ENDPOINT the sightline forecast already uses.
+ * This is not a new data source and not a new dependency: it is the cloud
+ * forecast the app already has, asked a different question. One coordinate,
+ * two calendar days, which is what "the night of the 21st" spans.
+ *
+ * TOTAL COVER, not the three layers. The sightline code wants the layers apart
+ * because low cloud blocks a sightline and high cloud only softens it. For a
+ * sky window anything in the way is in the way, so `cloud_cover` is the honest
+ * single number and three columns would be three nobody reads at 3am.
+ *
+ * NOTHING IS INVENTED WHERE IT DOES NOT REACH. Open-Meteo answers about two
+ * weeks ahead; most of a ninety day listing is far past that. An hour the
+ * service did not return is simply absent, and cloudForWindow turns an empty
+ * set into "the cloud forecast does not reach this night" rather than silence
+ * or a zero.
+ */
+export async function fetchNightCloud(
+  at: { lat: number; lon: number },
+  nightStart: Date,
+  nightEnd: Date,
+  timeZone: string,
+): Promise<NightCloudResult> {
+  const day = (d: Date): string =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+  const params = new URLSearchParams({
+    latitude: at.lat.toFixed(4),
+    longitude: at.lon.toFixed(4),
+    hourly: 'cloud_cover',
+    start_date: day(nightStart),
+    end_date: day(nightEnd),
+    timezone: timeZone,
+  })
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
+  try {
+    const response = await fetch(`${OPEN_METEO_URL}?${params.toString()}`, {
+      signal: controller.signal,
+    })
+    if (!response.ok) {
+      return { status: 'unavailable', reason: `Open-Meteo returned HTTP ${response.status}` }
+    }
+    const payload = (await response.json()) as {
+      hourly?: { time?: string[]; cloud_cover?: (number | null)[] }
+    }
+    const times = payload.hourly?.time ?? []
+    const cover = payload.hourly?.cloud_cover ?? []
+    if (times.length === 0) {
+      return { status: 'unavailable', reason: 'Open-Meteo returned no hours for that night' }
+    }
+    const hours: NightCloudHour[] = times.map((stamp, i) => {
+      const value = cover[i]
+      return {
+        /*
+         * The stamps come back in the venue's own zone with no offset on them,
+         * so they parse as local wall clock. That matches every other time on
+         * the sky panel, which is a venue wall clock by design.
+         */
+        at: new Date(stamp),
+        totalPercent: typeof value === 'number' && Number.isFinite(value) ? value : null,
+      }
+    })
+    return { status: 'ok', hours }
+  } catch (error) {
+    return {
+      status: 'unavailable',
+      reason:
+        error instanceof Error && error.name === 'AbortError'
+          ? 'The cloud forecast timed out'
+          : 'The cloud forecast could not be reached',
+    }
+  } finally {
+    clearTimeout(timer)
+  }
+}
