@@ -456,6 +456,48 @@ export function PlanMode({
   }, [])
 
   /*
+   * SELECTING RAISES, DESELECTING DOES NOT LOWER.
+   *
+   * The whole detent rule for selection, in one place. A card at PEEK is 88px
+   * of a card, so a tap lifts a peeking sheet to HALF; a sheet the shooter has
+   * already put at HALF or FULL is left exactly where it is; and clearing the
+   * selection changes only what the sheet shows. Nothing here can lower it,
+   * because raisedTo cannot, for any pair of detents.
+   *
+   * SELECTION AND DETENT ARE SEPARATE STATE. Neither reads the other, so a
+   * re-render changes neither: the card appears because `selected` is not
+   * null, and the sheet is as tall as `sheet` says, and those two facts never
+   * consult each other.
+   */
+  const onSelectAndRaise = useCallback(
+    (id: string | null) => {
+      onSelect(id)
+      if (id !== null) raiseToHalf()
+    },
+    [onSelect, raiseToHalf],
+  )
+
+  /*
+   * TWO WAYS TO SELECT, ONE RULE.
+   *
+   * A position is selected by tapping it on the map, which arrives as
+   * onSelect, OR by tapping its row in the list, which arrives as onFlyTo and
+   * selects on the way to flying there. The surface audit caught the second
+   * one going around the rule: a tap at PEEK left the sheet at PEEK, so the
+   * card was selected behind an 88px sheet and the shooter saw nothing happen.
+   *
+   * Both go through raiseToHalf now. The lesson is the usual one: a rule
+   * enforced at one of two entry points is a rule enforced at neither.
+   */
+  const onPickAndRaise = useCallback(
+    (id: string) => {
+      onFlyTo(id)
+      raiseToHalf()
+    },
+    [onFlyTo, raiseToHalf],
+  )
+
+  /*
    * TAPPING THE SHOOT LINE RAISES, like tapping a position will in the next
    * commit. Same rule, same helper: peek goes to half, anything else is left
    * exactly where the shooter put it.
@@ -619,7 +661,7 @@ export function PlanMode({
         showSun={showSun}
         showArc={showArc}
         selectedId={selectedId}
-        onSelect={onSelect}
+        onSelect={onSelectAndRaise}
         onPitchChange={setPitch}
         onViewChange={(zoom: number, width: number) => {
           setMapZoom(zoom)
@@ -726,36 +768,6 @@ export function PlanMode({
         canFitAll={fitTargets.length > 0}
       />
 
-      {/*
-        * STILL FLOATING, FOR ONE COMMIT MORE. The card is the fourth surface
-        * and it moves into the sheet in the next commit, where the detent
-        * rules for selection live. Splitting it off is deliberate: it is the
-        * densest screen in the app and it deserves its own diff.
-        */}
-      {selected === null ? null : (
-        <PositionCard
-          planned={selected}
-          shootAt={scrubbedAt}
-          timeZone={venueWindow?.timeZone ?? null}
-          tide={tideNow}
-          onClose={() => onSelect(null)}
-          count={plan.length}
-          onDelete={onDeletePosition}
-          onDuplicate={onDuplicatePosition}
-          onMove={onMovePosition}
-          onSetOptic={onSetOptic}
-          onSetAltitude={onSetAltitude}
-          onSetShotType={onSetShotType}
-          onSetYaw={onSetYaw}
-          kit={kitProfile}
-          selection={kitSelection}
-          marks={marks}
-          subject={venue}
-          pilotAt={pilotAt}
-          onPlacePilot={() => onPlacingPilot(true)}
-        />
-      )}
-
       <BottomSheet
         detent={sheet}
         onDetentChange={setSheet}
@@ -799,75 +811,111 @@ export function PlanMode({
         half={
           <div className="sheet__half">
             {/*
-              * THE FILTER LIVES WITH WHAT IT FILTERS. It was a floating row
-              * over the top-left of the map, three pills away from the list
-              * whose contents it changed.
+              * THE SELECTED POSITION'S CARD IS THE HALF CONTENT.
+              *
+              * It was the fourth and last surface floating over the map, with
+              * z-index 4 and its bottom offset computed from the dock plus the
+              * live sheet height. Selection now changes WHAT the sheet shows
+              * and the detent decides HOW MUCH of it, which are two separate
+              * questions that one absolute position had tangled together.
+              *
+              * THE FILTER LIVES WITH WHAT IT FILTERS, which is the list, so it
+              * goes with the list rather than with the card.
               */}
-            <PlatformFilter
-              value={platformFilter}
-              onChange={onPlatformFilter}
-              counts={platformCounts}
-              hidden={hiddenByPlatform}
-              airAvailable={airAvailable}
-            />
+            {selected !== null ? null : (
+              <PlatformFilter
+                value={platformFilter}
+                onChange={onPlatformFilter}
+                counts={platformCounts}
+                hidden={hiddenByPlatform}
+                airAvailable={airAvailable}
+              />
+            )}
 
-            {/*
-              * THE SLAB IS GONE. A full width ADD POSITION button owned a
-              * whole row of the screen for an action the map itself already
-              * performs on a tap. What is left is a 32px + at the head of the
-              * list it adds to, and suggesting is a text action beside it
-              * rather than a second slab: the model has never placed well
-              * enough to deserve equal weight with the shooter's own tap.
-              */}
-            <div className="plist__head">
-              <h2 className="plist__title">
-                Positions
-                <span className="plist__n num"> {plan.length}</span>
-              </h2>
-              <div className="plist__acts">
-                <button
-                  type="button"
-                  className={`plist__add${placing ? ' plist__add--armed' : ''}`}
-                  onClick={() => onPlacing(!placing)}
-                  aria-pressed={placing}
-                  aria-label={
-                    placing
-                      ? 'Cancel adding a position'
-                      : addsAir
-                        ? 'Add an air position by tapping the map'
-                        : 'Add a position by tapping the map'
-                  }
-                >
-                  {placing ? '\u00D7' : '+'}
-                </button>
-                <button
-                  type="button"
-                  className="plist__suggest"
-                  onClick={onGenerate}
-                  disabled={generation.status === 'working'}
-                >
-                  {generation.status === 'working' ? 'Suggesting\u2026' : 'Suggest'}
-                  <span className="plist__why">{briefSource}</span>
-                </button>
-              </div>
-            </div>
+            {selected !== null ? (
+              <PositionCard
+                planned={selected}
+                shootAt={scrubbedAt}
+                timeZone={venueWindow?.timeZone ?? null}
+                tide={tideNow}
+                onClose={() => onSelect(null)}
+                count={plan.length}
+                onDelete={onDeletePosition}
+                onDuplicate={onDuplicatePosition}
+                onMove={onMovePosition}
+                onSetOptic={onSetOptic}
+                onSetAltitude={onSetAltitude}
+                onSetShotType={onSetShotType}
+                onSetYaw={onSetYaw}
+                kit={kitProfile}
+                selection={kitSelection}
+                marks={marks}
+                subject={venue}
+                pilotAt={pilotAt}
+                onPlacePilot={() => onPlacingPilot(true)}
+              />
+            ) : (
+              <>
+                {/*
+                  * THE SLAB IS GONE. A full width ADD POSITION button owned a
+                  * whole row of the screen for an action the map itself
+                  * already performs on a tap. What is left is a 32px + at the
+                  * head of the list it adds to, and suggesting is a text
+                  * action beside it rather than a second slab: the model has
+                  * never placed well enough to deserve equal weight with the
+                  * shooter's own tap on ground they know.
+                  */}
+                <div className="plist__head">
+                  <h2 className="plist__title">
+                    Positions
+                    <span className="plist__n num"> {plan.length}</span>
+                  </h2>
+                  <div className="plist__acts">
+                    <button
+                      type="button"
+                      className={`plist__add${placing ? ' plist__add--armed' : ''}`}
+                      onClick={() => onPlacing(!placing)}
+                      aria-pressed={placing}
+                      aria-label={
+                        placing
+                          ? 'Cancel adding a position'
+                          : addsAir
+                            ? 'Add an air position by tapping the map'
+                            : 'Add a position by tapping the map'
+                      }
+                    >
+                      {placing ? '\u00D7' : '+'}
+                    </button>
+                    <button
+                      type="button"
+                      className="plist__suggest"
+                      onClick={onGenerate}
+                      disabled={generation.status === 'working'}
+                    >
+                      {generation.status === 'working' ? 'Suggesting\u2026' : 'Suggest'}
+                      <span className="plist__why">{briefSource}</span>
+                    </button>
+                  </div>
+                </div>
 
-            <ShotList
-              plan={visiblePlan}
-              planCoverage={null}
-              desiredShots={desiredShots}
-              selectedId={selectedId}
-              onPick={onFlyTo}
-            />
+                <ShotList
+                  plan={visiblePlan}
+                  planCoverage={null}
+                  desiredShots={desiredShots}
+                  selectedId={selectedId}
+                  onPick={onPickAndRaise}
+                />
 
-            <PlanStatus
-              generation={generation}
-              onFixBlock={onFixBlock}
-              planCoverage={planCoverage}
-              siteNote={siteNote}
-              terrainNote={terrainNote}
-              positionNote={positionNote}
-            />
+                <PlanStatus
+                  generation={generation}
+                  onFixBlock={onFixBlock}
+                  planCoverage={planCoverage}
+                  siteNote={siteNote}
+                  terrainNote={terrainNote}
+                  positionNote={positionNote}
+                />
+              </>
+            )}
           </div>
         }
         full={

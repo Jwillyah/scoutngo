@@ -226,8 +226,37 @@ await wait(1500)
  */
 await ev(`window.__probe.map.jumpTo({ zoom: 15 }), 'ok'`)
 await wait(500)
+
+/*
+ * ARMING PLACEMENT MOVED INTO THE SHEET, so this audit has to open the sheet.
+ *
+ * It used to click `.peek__go`, a primary button in the peek. Item 3 took the
+ * peek down to the shoot line and the scrubber, and the add control went where
+ * the thing it acts on lives: `.plist__add`, in the positions list at HALF.
+ *
+ * WHAT THAT COST, AND WHY IT IS WORTH READING. Nobody changed a label, a
+ * placement rule or a collision. The selector this script drives the app with
+ * went stale, every position tap landed on an unarmed map, and the run came
+ * back with no figures at all. The two checks below then reported exactly the
+ * right thing -- "no warning word rendered, so the marker check tests
+ * nothing", not "the labels are fine" -- which is the only reason this was a
+ * refused commit rather than a silent green one over an app with no markers.
+ *
+ * A check that cannot tell "the code is broken" from "I could not look" would
+ * have passed here. That is the fifth time this week, and it stayed caught
+ * because both checks fail on an empty list instead of iterating over it.
+ */
+await ev(`[...document.querySelectorAll('.sheet__handle')][0]?.click()`)
+await wait(600)
+const armable = await ev(`document.querySelector('.plist__add') !== null`)
+console.log(`  add control reachable at half: ${armable}`)
+if (armable !== true) {
+  console.log('      PROBLEM: no .plist__add at half, so no position can be placed')
+  problems += 1
+}
+
 for (const [fx, fy] of [[0.3, 0.3], [0.44, 0.34], [0.58, 0.3]]) {
-  await ev(`document.querySelector('.peek__go')?.click()`)
+  await ev(`document.querySelector('.plist__add')?.click()`)
   await wait(350)
   await ev(`(() => {
     const c = document.querySelector('.maplibregl-canvas')

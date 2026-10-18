@@ -158,8 +158,8 @@ ok "$(grep -E 'TOTAL PROBLEMS' "$SCRATCH/reach.log" | tail -1 | tr -d '=' | sed 
 run_audit "label collision audit" scripts/audit-labels.mjs "$SCRATCH/labels.log" 'FAIL|LABEL PROBLEMS|over |ABORTED'
 ok "$(grep -E 'LABEL PROBLEMS' "$SCRATCH/labels.log" | tail -1)"
 
-run_audit "panel combination audit" scripts/audit-panels.mjs "$SCRATCH/panels.log" 'PROBLEM|FAIL|ABORTED'
-ok "$(grep -E 'PANEL PROBLEMS' "$SCRATCH/panels.log" | tail -1)"
+run_audit "one surface audit" scripts/audit-surface.mjs "$SCRATCH/surface.log" 'PROBLEM|FAIL|ABORTED'
+ok "$(grep -E 'SURFACE PROBLEMS' "$SCRATCH/surface.log" | tail -1)"
 
 run_audit "projection audit" scripts/audit-projection.mjs "$SCRATCH/proj.log" 'FAIL|ABORTED'
 ok "$(grep -E 'PROJECTION FAILURES' "$SCRATCH/proj.log" | tail -1 | tr -d '=' | sed 's/^ *//')"

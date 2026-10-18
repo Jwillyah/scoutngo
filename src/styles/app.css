@@ -2118,13 +2118,17 @@
   }
 }
 
+/*
+ * THE CARD IS SHEET CONTENT, NOT A SURFACE.
+ *
+ * It was the fourth and last thing floating over the map: absolutely
+ * positioned, z-index 4, with its bottom offset computed from the dock plus
+ * the live sheet height. That arithmetic is deleted rather than adjusted,
+ * along with the entrance animation, which existed to make a panel feel like
+ * it had arrived over the map. It has not arrived anywhere; it is what the
+ * sheet is showing.
+ */
 .card {
-  animation: card-in var(--motion-base) var(--spring-pop);
-  position: absolute;
-  z-index: 4;
-  left: var(--space-3);
-  right: var(--space-3);
-  bottom: calc(var(--dock-height, 0px) + var(--sheet-live-height, 0px) + var(--space-3));
   max-width: var(--page-max);
   margin: 0 auto;
   background: var(--panel-sheen);
