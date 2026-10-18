@@ -5295,9 +5295,16 @@
  * label placement knows about it, so this can live here without pushing the
  * ray readouts anywhere they cannot go.
  */
+/*
+ * THE SKY KEY: IN FLOW, NOT FLOATING.
+ *
+ * It was absolutely positioned over the map, with its bottom offset
+ * computed from the live sheet height PLUS the dock and a top cap so it
+ * could not walk up over the control row. Three bugs came out of that
+ * arithmetic in three separate passes. All of it is gone with the float:
+ * this is a section in the one sheet, and the sheet knows its own height.
+ */
 .skykey {
-  position: absolute;
-  left: var(--space-2);
   /*
    * ABOVE THE SHEET AND THE DOCK.
    *
@@ -5316,11 +5323,8 @@
    * already learned this; this is the third place with the same arithmetic,
    * and now all three read the same two variables.
    */
-  bottom: calc(var(--dock-height) + var(--sheet-live-height) + var(--space-2));
   /* And never up over the control row that opened it. */
-  top: calc(var(--safe-top) + var(--space-3) + var(--hud-height, 150px));
   overflow-y: auto;
-  z-index: 5;
   max-width: 17rem;
   /* Pinned to its own bottom so a short panel sits above the sheet, not high. */
   align-content: end;
@@ -5615,10 +5619,16 @@
  * plate treatment as the sky key, which is the other thing that explains a
  * layer while the layer is on.
  */
+/*
+ * THE HAZARD EDITOR: IN FLOW, NOT FLOATING.
+ *
+ * It was absolutely positioned over the map, with its bottom offset
+ * computed from the live sheet height PLUS the dock and a top cap so it
+ * could not walk up over the control row. Three bugs came out of that
+ * arithmetic in three separate passes. All of it is gone with the float:
+ * this is a section in the one sheet, and the sheet knows its own height.
+ */
 .hz {
-  position: absolute;
-  left: var(--space-2);
-  right: var(--space-2);
   /*
    * ABOVE THE SHEET AND THE DOCK, and never over the control row.
    *
@@ -5629,13 +5639,10 @@
    * The dock sits BELOW the sheet, so the sheet's own height is not the
    * distance from the bottom. Same arithmetic the tap note needed.
    */
-  bottom: calc(var(--dock-height) + var(--sheet-live-height) + var(--space-2));
   /*
    * And it never grows past the control row. The cap is what stops it walking
    * up the screen; the panel scrolls inside instead.
    */
-  top: calc(var(--safe-top) + var(--space-3) + var(--hud-height, 150px));
-  z-index: 6;
   display: grid;
   gap: var(--space-2);
   padding: var(--space-3);
@@ -7265,13 +7272,16 @@
  * arithmetic is the live sheet height plus the dock, not the sheet alone,
  * which is the third place in this app that has to get that right.
  */
+/*
+ * THE LAYERS LIST: IN FLOW, NOT FLOATING.
+ *
+ * It was absolutely positioned over the map, with its bottom offset
+ * computed from the live sheet height PLUS the dock and a top cap so it
+ * could not walk up over the control row. Three bugs came out of that
+ * arithmetic in three separate passes. All of it is gone with the float:
+ * this is a section in the one sheet, and the sheet knows its own height.
+ */
 .lay {
-  position: absolute;
-  left: var(--space-2);
-  right: var(--space-2);
-  bottom: calc(var(--dock-height) + var(--sheet-live-height) + var(--space-2));
-  top: calc(var(--safe-top) + var(--space-3) + var(--hud-height, 150px));
-  z-index: 6;
   display: grid;
   grid-template-rows: auto 1fr;
   gap: var(--space-2);
@@ -7564,4 +7574,287 @@
 
 .sunsky--off .sunsky__tag {
   display: none;
+}
+
+/*
+ * THE IMAGERY LINE IN THE LAYERS LIST. A statement, not a control: there is
+ * one source and no choice to offer, so it is set as type and has no ON/OFF.
+ */
+.lay__imagery {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: var(--space-2);
+  border-bottom: var(--line-hair) solid var(--color-line);
+}
+
+/*
+ * "over-zoomed" is the one word here that is a warning, so it is the one word
+ * that is coloured. Amber rather than red: scaling the last tile is a fact
+ * about the picture, not a fault.
+ */
+.lay__over {
+  color: var(--sun);
+  font-weight: var(--weight-heavy);
+}
+
+/* ===================================== the sheet at three detents, and the rail */
+
+/*
+ * PEEK IS 88px AND CARRIES TWO THINGS.
+ *
+ * The shoot line says what you are looking at and the scrubber is the thing
+ * you touch most, and they are read together. They used to be in two separate
+ * bars: a 176px peek with a summary, a full-width primary and a secondary row,
+ * and a scrubber dock below it. Two bars, 270px of the screen, for one idea.
+ */
+.peek {
+  display: grid;
+  gap: var(--space-1);
+  padding: 0 var(--page-pad);
+}
+
+.peek__line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  text-align: left;
+}
+
+.peek__label {
+  flex: 0 0 auto;
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.peek__value {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* HALF: the positions list and the filter that filters it. */
+.sheet__half {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--page-pad) 0;
+}
+
+/*
+ * THE LIST HEAD, WHICH IS WHERE THE SLAB WENT.
+ *
+ * A full-width ADD POSITION button owned a row of the screen for something
+ * the map already does on a tap. What replaced it is a 32px + at the head of
+ * the list it adds to, and Suggest as a text action beside it: the model has
+ * never placed well enough to deserve equal visual weight with the shooter's
+ * own tap on ground they know.
+ */
+.plist__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.plist__title {
+  margin: 0;
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.plist__n {
+  color: var(--color-text);
+  font-weight: var(--weight-heavy);
+}
+
+.plist__acts {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* 32px, as asked. Square, so it reads as an add and not as a word button. */
+.plist__add {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: var(--line-hair) solid var(--color-accent);
+  border-radius: var(--radius-1, 3px);
+  background: transparent;
+  color: var(--color-accent);
+  font-size: var(--text-md);
+  line-height: 1;
+}
+
+.plist__add--armed {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+}
+
+.plist__suggest {
+  display: grid;
+  gap: 0;
+  padding: var(--space-1) 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  text-align: right;
+}
+
+.plist__suggest:disabled {
+  color: var(--color-text-muted);
+}
+
+.plist__why {
+  font-size: var(--text-label);
+  color: var(--color-text-muted);
+}
+
+/* FULL: the sections, stacked, one scroll. */
+.sheet__sections {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--page-pad) var(--space-5);
+}
+
+.sect {
+  border-top: var(--line-hair) solid var(--color-line);
+}
+
+.sect__head {
+  margin: 0;
+}
+
+.sect__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: var(--control-height);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+}
+
+.sect__title {
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  font-weight: var(--weight-heavy);
+}
+
+.sect__chev {
+  color: var(--color-text-muted);
+  font-size: var(--text-md);
+}
+
+.sect__body {
+  padding-bottom: var(--space-2);
+}
+
+.sheet__acts {
+  display: grid;
+  gap: var(--space-2);
+}
+
+/* ------------------------------------------------------------------ the rail */
+
+/*
+ * 40px WIDE, RIGHT EDGE, 8px GAPS. Four icons and nothing else floats.
+ *
+ * This replaced two rows of word-pills across the top-left of the map, which
+ * at 390px took a third of the width and, expanded, three rows of height.
+ * Icons cost learnability, and that is paid for twice: an aria-label on every
+ * button, and a long press that shows the same words on screen.
+ */
+.rail2 {
+  position: absolute;
+  top: calc(var(--safe-top) + var(--space-3));
+  right: var(--space-2);
+  z-index: 5;
+  display: grid;
+  gap: 8px;
+  width: 40px;
+}
+
+.rail2__slot {
+  position: relative;
+  display: grid;
+}
+
+.rail2__btn {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: var(--line-hair) solid var(--color-line-strong);
+  border-radius: var(--radius-1, 3px);
+  background: color-mix(in srgb, var(--black) 72%, transparent);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+}
+
+.rail2__btn--on {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.rail2__btn:disabled {
+  color: var(--color-text-muted);
+  border-color: var(--color-line);
+}
+
+.rail2__glyph {
+  line-height: 1;
+}
+
+/*
+ * THE LONG-PRESS LABEL, to the LEFT of the rail, because the rail is on the
+ * right edge and a label to its right would be off screen.
+ */
+.rail2__name {
+  position: absolute;
+  right: calc(100% + var(--space-1));
+  top: 50%;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  padding: var(--space-1) var(--space-2);
+  background: var(--black);
+  border: var(--line-hair) solid var(--color-line-strong);
+  border-radius: var(--radius-1, 3px);
+  font-size: var(--text-label);
+  color: var(--color-text);
+  pointer-events: none;
+}
+
+/* The hazard section's arm control, which replaced its close button. */
+.hz__arm {
+  width: 100%;
+  min-height: var(--control-height);
+  border: var(--line-hair) solid var(--color-line-strong);
+  border-radius: var(--radius-1, 3px);
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--text-sm);
+}
+
+.hz__arm--on {
+  border-color: var(--afterglow);
+  color: var(--afterglow);
 }

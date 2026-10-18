@@ -159,11 +159,20 @@ describe('the blocked state is actually drawn', () => {
     expect(code).toContain('onFixBlock')
   })
 
-  /* And PlanStatus is on the Plan screen, which is where the button is. */
+  /*
+   * And PlanStatus is on the Plan screen, which is where the button is.
+   *
+   * ASSERTED ON THE HANDLER, NOT THE LABEL. It used to match /Suggest
+   * positions/, and the label is now "Suggest" with the brief source beneath
+   * it, because the button stopped being a full-width slab and became a text
+   * action in the positions list header. The thing worth holding is that the
+   * control which can FAIL and the panel which EXPLAINS the failure are on one
+   * screen; the words on the button are not that.
+   */
   it('sits on the same screen as the button', () => {
     const plan = readFileSync(new URL('../src/components/PlanMode.tsx', import.meta.url), 'utf8')
     expect(plan).toContain('<PlanStatus')
-    expect(plan).toMatch(/Suggest positions/)
+    expect(plan).toContain('onClick={onGenerate}')
   })
 
   /* Every branch of GenerationState has something that draws it. */

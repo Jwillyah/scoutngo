@@ -27,7 +27,6 @@ import { defaultOpticFor } from './core/optics.ts'
 import { sharedOptic } from './core/mapLabel.ts'
 import { subjectSizeMatters } from './core/fov.ts'
 import { skyLayerOn, type MapPanel } from './core/mapPanel.ts'
-import { hudState, type HudState } from './core/hud.ts'
 import {
   holdToggle,
   NO_HOLDS,
@@ -225,14 +224,12 @@ function App() {
    * The shooter's own choice about the control row, remembered for the
    * session. Null means the rule in src/core/hud.ts decides.
    */
-  const [hudOverride, setHudOverride] = useState<HudState | null>(null)
   const showSky = skyLayerOn(mapPanel)
 
   /*
    * THE LAYERS LIST is a map panel like the other two, so it cannot be open
    * beside them by construction. See src/core/mapPanel.ts.
    */
-  const layersOpen = mapPanel === 'layers'
 
   /*
    * MARKING MODE. Unlike placing a position, it stays on until it is turned
@@ -1912,8 +1909,6 @@ function App() {
           visiblePlan={visiblePlan}
           conePlan={conePlan}
           platformFilter={platformFilter}
-          layersOpen={layersOpen}
-          onLayers={(next) => setMapPanel(next ? 'layers' : 'none')}
           showLabels={settings.showLabels}
           onShowLabels={(next) => setSettings({ ...settings, showLabels: next })}
           showTerrain={settings.showTerrain}
@@ -2018,8 +2013,6 @@ function App() {
           onDeleteMark={onDeleteMark}
           shootDate={venue.date}
           briefSource={briefSource}
-          hud={hudState(positions.length, hudOverride)}
-          onHudOverride={setHudOverride}
           skyLayer={skyLayer}
           onSkyLayer={setSkyLayer}
           placing={placing}

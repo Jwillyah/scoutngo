@@ -23,21 +23,23 @@ import type { VenueWindow } from '../lib/venue.ts'
 import type { KitProfile as KitProfileType } from '../core/kit.ts'
 import type { OpticSelection } from '../core/optics.ts'
 import { placingHint } from '../core/platformFilter.ts'
+import { locateOnce } from '../lib/locateOnce.ts'
 import type { SetupTarget } from '../lib/mode.ts'
 import { GROUND_WIND_METERS, type WindHeight } from '../core/windHeight.ts'
 import type { SkyLayerKind } from '../core/skyLayer.ts'
-import { hudToggleLabel, type HudState } from '../core/hud.ts'
 import { phaseAt, phaseSpans } from '../core/nightWindow.ts'
 import type { MarkKind, SiteMark } from '../core/siteMark.ts'
 import { HazardPanel } from './HazardPanel.tsx'
 import { LayersPanel } from './LayersPanel.tsx'
-import { BottomSheet, type SheetState } from './BottomSheet.tsx'
+import { BottomSheet } from './BottomSheet.tsx'
+import { raisedTo, type SheetDetent } from '../core/sheetDetent.ts'
 import { AirspacePanel } from './AirspacePanel.tsx'
 import { ConditionsPanel } from './ConditionsPanel.tsx'
 import type { ConeMode } from './ConePicker.tsx'
 import { FieldPackControl, type PackBuildState } from './FieldPackControl.tsx'
-import { MapControls } from './MapControls.tsx'
-import { BUILDINGS_MIN_ZOOM, MapView, TERRAIN_MAX_ZOOM, type MapHandle } from './MapView.tsx'
+import { MapRail } from './MapRail.tsx'
+import { SheetSection } from './SheetSection.tsx'
+import { BUILDINGS_MIN_ZOOM, MapView, type MapHandle } from './MapView.tsx'
 import { buildingsToGeoJson, fetchBuildings } from '../lib/buildings.ts'
 import { PlatformFilter } from './PlatformFilter.tsx'
 import { SkyLegend } from './SkyLegend.tsx'
@@ -49,14 +51,16 @@ import { TimeScrubber } from './TimeScrubber.tsx'
 
 /** What the one sheet is currently showing. Chosen by an explicit control. */
 /*
- * ONE VALUE, SO THE VIEWS CANNOT BOTH BE OPEN.
+ * THERE IS NO SHEET VIEW ANY MORE.
  *
- * Same structural argument as MapPanel. Four booleans would be sixteen states,
- * twelve of them meaningless and at least one of them the bug where two
- * surfaces render over each other. A union has exactly four states and all
- * four are legal.
+ * It was 'plan' | 'conditions' | 'airspace' | 'sunsearch': four whole-sheet
+ * screens that replaced each other, each with its own "Back to the plan"
+ * button. That is a tab bar wearing a sheet, and it meant the plan and the
+ * conditions could not be read in the same scroll.
+ *
+ * They are stacked SECTIONS now. One scroll, no back buttons, nothing to
+ * switch between.
  */
-type SheetView = 'plan' | 'conditions' | 'airspace' | 'sunsearch'
 
 interface PlanModeProps {
   mapHandle: React.Ref<MapHandle>
@@ -150,9 +154,6 @@ interface PlanModeProps {
   shootDate: string
   /** Which brief a generate would send: the typed one, or the chips. */
   briefSource: string
-  /** Whether the control row is collapsed, and the shooter's own choice. */
-  hud: HudState
-  onHudOverride: (next: HudState) => void
   /** Which measure the sky layer paints. */
   skyLayer: SkyLayerKind
   onSkyLayer: (next: SkyLayerKind) => void
@@ -184,9 +185,6 @@ interface PlanModeProps {
   footer: React.ReactNode
   /** Ground, air or both. Decides what shows here AND what a generate asks for. */
   platformFilter: PlatformFilterValue
-  /** The layers list, which is itself one of the map panels. */
-  layersOpen: boolean
-  onLayers: (next: boolean) => void
   showLabels: boolean
   onShowLabels: (next: boolean) => void
   showTerrain: boolean
@@ -321,8 +319,6 @@ export function PlanMode({
   onDeleteMark,
   shootDate,
   briefSource,
-  hud,
-  onHudOverride,
   skyLayer,
   onSkyLayer,
   placing,
@@ -346,8 +342,6 @@ export function PlanMode({
   desiredShots,
   footer,
   platformFilter,
-  layersOpen,
-  onLayers,
   showLabels,
   onShowLabels,
   showTerrain,
@@ -369,7 +363,7 @@ export function PlanMode({
   onPlacingPilot,
   addsAir,
 }: PlanModeProps) {
-  const [sheet, setSheet] = useState<SheetState>('peek')
+  const [sheet, setSheet] = useState<SheetDetent>('peek')
 
   /*
    * A MAP PANEL AND AN OPEN SHEET CANNOT BOTH EXIST.
@@ -395,10 +389,16 @@ export function PlanMode({
    * which is the argument for adding a new surface to the audit in the pass
    * that adds it rather than the pass that breaks it.
    */
-  const panelOpen = marking || showSky || layersOpen
-  const sheetState: SheetState = panelOpen && sheet === 'open' ? 'peek' : sheet
+  /*
+   * NOTHING FORCES THE SHEET DOWN ANY MORE.
+   *
+   * There used to be a `panelOpen` that demoted an open sheet to peek whenever
+   * a floating panel appeared, because two surfaces could otherwise cover each
+   * other. There is one surface now: the panels are sections inside it, so
+   * there is nothing to yield to and the detent the shooter set is the detent
+   * they keep.
+   */
   const [sheetHeight, setSheetHeight] = useState(108)
-  const [view, setView] = useState<SheetView>('plan')
   const [pitch, setPitch] = useState(0)
 
   /*
@@ -440,29 +440,27 @@ export function PlanMode({
    * The control row's own height, watched rather than read once: it changes
    * when the row collapses and when a count gains a digit.
    */
-  const [hudHeight, setHudHeight] = useState(0)
-  const measureHud = useCallback((node: HTMLElement | null) => {
-    if (node === null) return
-    setHudHeight(node.offsetHeight)
-    const observer = new ResizeObserver(() => setHudHeight(node.offsetHeight))
-    observer.observe(node)
-    return () => observer.disconnect()
+  const [hudHeight] = useState(0)
+
+  /*
+   * RAISE, NEVER LOWER.
+   *
+   * The only programmatic detent change in the app. A card or a section at
+   * PEEK is content nobody can read, so opening one lifts a peeking sheet to
+   * HALF — and does nothing at all if the shooter has already put it at HALF
+   * or FULL. Nothing anywhere lowers the sheet, which is the rule that makes
+   * the detent theirs rather than the app's.
+   */
+  const raiseToHalf = useCallback(() => {
+    setSheet((current) => raisedTo(current, 'half'))
   }, [])
 
-  const openWith = (next: SheetView) => {
-    setView(next)
-    setSheet('open')
-    /* The other direction: opening the sheet closes whatever is over the map. */
-    if (marking) onMarking(false)
-    if (showSky) onShowSky(false)
-    if (layersOpen) onLayers(false)
-    /*
-     * Aim picking is a map mode, so it has to die with any sheet change too.
-     * Leaving it armed meant the next tap on the map moved the sun search's
-     * target while the shooter thought they were dismissing a panel.
-     */
-    if (placingAim && next !== 'sunsearch') onPlacingAim(false)
-  }
+  /*
+   * TAPPING THE SHOOT LINE RAISES, like tapping a position will in the next
+   * commit. Same rule, same helper: peek goes to half, anything else is left
+   * exactly where the shooter put it.
+   */
+  const onPeekTap = raiseToHalf
 
   const handle = mapHandle as React.RefObject<MapHandle | null>
 
@@ -473,6 +471,28 @@ export function PlanMode({
    */
   const skyBand = goesBandFor(sun?.altitude ?? -90)
   const [mapZoom, setMapZoom] = useState(16.5)
+
+  /*
+   * LOCATE, FROM THE RAIL.
+   *
+   * ONE QUESTION, ONE ANSWER, NOTHING KEPT. locateOnce asks the browser once
+   * and the coordinate moves the camera and is then gone: not stored, not
+   * written to the venue, not turned into a pin. Same rule as the NOW screen
+   * and as Setup's own locate button.
+   *
+   * NEVER AN IP LOOKUP. A refusal is an answer and the map simply stays where
+   * it was.
+   */
+  const [locating, setLocating] = useState(false)
+  const onLocate = useCallback(() => {
+    setLocating(true)
+    void locateOnce().then((result) => {
+      setLocating(false)
+      if (result.status !== 'ok') return
+      handle.current?.flyTo(result.at, Math.max(mapZoom, 15))
+    })
+  }, [handle, mapZoom])
+
 
   /*
    * THE BUILDING FOOTPRINTS, FETCHED FOR THE VIEW.
@@ -486,6 +506,8 @@ export function PlanMode({
    * reads as "no buildings here", which is a claim about the ground. See
    * BUILDINGS_COVERAGE_NOTE.
    */
+  const [terrainPaused, setTerrainPaused] = useState(false)
+
   const [buildingData, setBuildingData] = useState<GeoJSON.FeatureCollection | null>(null)
   const [buildingsNote, setBuildingsNote] = useState<string | null>(null)
 
@@ -541,21 +563,6 @@ export function PlanMode({
   /* Whether anything is in the air, which is what the pilot control is for. */
   const airPositions = plan.filter((p) => p.position.platform === 'air').length
 
-  /*
-   * HOW MANY LAYERS ARE DRAWING, on the button itself.
-   *
-   * So the collapsed row still answers "is anything on" without being opened.
-   * Cones count when they are not 'none'; the two panel-backed layers count
-   * when their panel is open, which is when they are drawing.
-   */
-  const activeLayers =
-    (coneMode === 'none' ? 0 : 1) +
-    (showArc ? 1 : 0) +
-    (showLabels ? 1 : 0) +
-    (showTerrain ? 1 : 0) +
-    (showBuildings ? 1 : 0) +
-    (showSky ? 1 : 0) +
-    (marking ? 1 : 0)
 
   return (
     <div
@@ -599,6 +606,7 @@ export function PlanMode({
         showSky={showSky}
         showLabels={showLabels}
         showTerrain={showTerrain}
+        onTerrainPaused={setTerrainPaused}
         showBuildings={showBuildings}
         buildings={buildingData}
         skyFrameAt={sky.frameAt}
@@ -668,74 +676,27 @@ export function PlanMode({
         * changes what the NEXT TAP DOES rather than what is drawn, and it
         * carries the counts that say whether the filter is hiding anything.
         */}
-      <header className={`hud hud--${hud}`} ref={measureHud}>
-        <div className="hud__row">
-          <PlatformFilter
-            value={platformFilter}
-            onChange={onPlatformFilter}
-            counts={platformCounts}
-            hidden={hiddenByPlatform}
-            airAvailable={airAvailable}
-          />
-          <button
-            type="button"
-            className="mode hud__toggle"
-            aria-expanded={hud === 'open'}
-            onClick={() => onHudOverride(hud === 'open' ? 'collapsed' : 'open')}
-          >
-            {hudToggleLabel(hud)}
-          </button>
-        </div>
-
-        {hud === 'collapsed' ? null : (
-          <div className="hud__row hud__row--more">
-            {/*
-              * TWO KINDS OF CONTROL, AND THEY LOOK DIFFERENT NOW.
-              *
-              * The row carried eight controls over three rows and read as
-              * noise, because things that DRAW on the map sat beside things
-              * that OPEN over it with nothing to tell them apart. Sun when
-              * made it worse by landing on a row that was already full.
-              *
-              * LAYERS is one button onto one list, where each layer's state is
-              * visible and each says what it does before you tap it. PANELS
-              * stay as their own buttons, because a list of things that open is
-              * just a menu with extra steps.
-              *
-              * The platform switch is above this row and stays visible: it is
-              * the only control here that changes what the next tap DOES.
-              */}
-            <button
-              type="button"
-              className={`mode${layersOpen ? ' mode--on' : ''}`}
-              aria-pressed={layersOpen}
-              onClick={() => onLayers(!layersOpen)}
-            >
-              Layers
-              {activeLayers === 0 ? null : (
-                <span className="mode__n num"> {activeLayers}</span>
-              )}
-            </button>
-
-            <button type="button" className="mode" onClick={() => openWith('conditions')}>
-              Conditions
-            </button>
-            <button type="button" className="mode" onClick={() => openWith('sunsearch')}>
-              Sun when
-            </button>
-            {/*
-              * AIRSPACE. Only with something in the air: Part 107 paperwork
-              * beside a tripod-only plan is an aviation process attached to
-              * something it does not govern.
-              */}
-            {airPositions === 0 ? null : (
-              <button type="button" className="mode" onClick={() => openWith('airspace')}>
-                Airspace
-              </button>
-            )}
-          </div>
-        )}
-      </header>
+      {/*
+        * NOTHING FLOATS OVER THE TOP-LEFT OF THE MAP ANY MORE.
+        *
+        * The HUD was two rows of word-pills: the platform switch, a LESS/MORE
+        * disclosure, and up to six reveals. Every one of them has a better
+        * home:
+        *
+        *   the platform switch is a filter, so it moved to the head of the
+        *   list it filters, inside the sheet
+        *
+        *   Conditions, Sun when, Airspace, Layers and Hazards are content, so
+        *   they are sections in the sheet
+        *
+        *   the LESS/MORE disclosure went with them: there is nothing left to
+        *   disclose, so a control for disclosing it is a control for nothing
+        *
+        * What acts on the map immediately with no surface at all is in the
+        * rail on the right edge. That is the whole rule, and the layers
+        * control is the test of it: it looks small enough to put in the rail
+        * and it has content, so it is a section.
+        */}
 
       {/*
         * THE SKY KEY, only while the layer is on.
@@ -745,91 +706,32 @@ export function PlanMode({
         * bigger than the view. Both are about the layer, so both live with it
         * rather than in a panel somewhere else.
         */}
-      {!layersOpen ? null : (
-        <LayersPanel
-          kitProfile={kitProfile}
-          plan={plan}
-          coneMode={coneMode}
-          onConeMode={onConeMode}
-          lensFilters={lensFilters}
-          onLensFilters={onLensFilters}
-          isolatedId={isolatedId}
-          onClearIsolate={onClearIsolate}
-          showArc={showArc}
-          onShowArc={onShowArc}
-          showLabels={showLabels}
-          onShowLabels={onShowLabels}
-          showTerrain={showTerrain}
-          onShowTerrain={onShowTerrain}
-          showBuildings={showBuildings}
-          onShowBuildings={onShowBuildings}
-          buildingsNote={buildingsNote}
-          terrainSuspended={showTerrain && mapZoom > TERRAIN_MAX_ZOOM}
-          showSky={showSky}
-          onShowSky={onShowSky}
-          marking={marking}
-          onMarking={onMarking}
-          markCount={marks.length}
-          sunAltitude={sun?.altitude ?? null}
-          onClose={() => onLayers(false)}
-        />
-      )}
-
-      {!marking ? null : (
-        <HazardPanel
-          marks={marks}
-          kind={markKind}
-          onKind={onMarkKind}
-          drawing={markDrawing}
-          onDrawing={onMarkDrawing}
-          draft={markDraft}
-          onFinishLine={onFinishLine}
-          onCancelLine={onCancelLine}
-          selected={selectedMark}
-          onSelect={onSelectMark}
-          onChange={onChangeMark}
-          onDelete={onDeleteMark}
-          onClose={() => onMarking(false)}
-          date={shootDate}
-          latitude={venue?.lat ?? null}
-        />
-      )}
-
-      {!showSky ? null : (
-        <SkyLegend
-          band={skyBand}
-          advice={zoomAdvice(skyBand, venue?.lat ?? 0, mapWidth, mapZoom)}
-          sky={sky}
-          clock={(at) =>
-            venueWindow === null ? at.toISOString().slice(11, 16) : formatClock(at, venueWindow.timeZone)
-          }
-          boundary={
-            venueWindow === null
-              ? null
-              : boundaryNote(new Date(), (at) => formatClock(at, venueWindow.timeZone))
-          }
-          /*
-           * THE NUDGE IS ACTIONABLE, not just informative. "Nothing happened"
-           * is what the map looks like from here, so the panel that explains
-           * it also fixes it in one tap.
-           */
-          onZoomOut={(zoom) => handle.current?.zoomTo(zoom)}
-          layer={skyLayer}
-          onLayer={onSkyLayer}
-          windHeight={windHeight}
-          ratedWindMps={ratedWindMps}
-        />
-      )}
-
-      <MapControls
+      {/*
+        * THE RAIL. Four icons, right edge, and nothing else floats.
+        *
+        * THE RULE IT ENFORCES: a control belongs here only if it acts on the
+        * map IMMEDIATELY and opens NO surface. Sun overlay, pitch reset,
+        * locate and fit-all all do exactly that. Layers looks small enough to
+        * belong and does not qualify, because it has content, and content
+        * lives in the sheet. That exception is the one worth refusing.
+        */}
+      <MapRail
         showSun={showSun}
         onShowSun={onShowSun}
         pitch={pitch}
-        onPitch={(next) => handle.current?.setPitch(next)}
+        onResetPitch={() => handle.current?.setPitch(0)}
+        onLocate={onLocate}
+        locating={locating}
         onFitAll={() => handle.current?.fitAll(fitTargets)}
         canFitAll={fitTargets.length > 0}
       />
 
+      {/*
+        * STILL FLOATING, FOR ONE COMMIT MORE. The card is the fourth surface
+        * and it moves into the sheet in the next commit, where the detent
+        * rules for selection live. Splitting it off is deliberate: it is the
+        * densest screen in the app and it deserves its own diff.
+        */}
       {selected === null ? null : (
         <PositionCard
           planned={selected}
@@ -855,171 +757,244 @@ export function PlanMode({
       )}
 
       <BottomSheet
-        state={sheetState}
-        onStateChange={setSheet}
+        detent={sheet}
+        onDetentChange={setSheet}
         onHeightChange={setSheetHeight}
         reservedBottom={dockHeight}
         peek={
           <div className="peek">
-            <button
-              type="button"
-              className="peek__summary"
-              onClick={() => {
-                setView('plan')
-                setSheet(sheetState === 'peek' ? 'open' : 'peek')
-              }}
-            >
-              <span className="peek__label">{peekStatus.label}</span>
-              <span className="peek__line">{peekStatus.line}</span>
-            </button>
-
             {/*
-              * ADDING A POSITION IS THE LOUD ACTION, and suggesting is not.
+              * PEEK IS THE SHOOT LINE AND THE SCRUBBER. Nothing else.
               *
-              * It was the other way round, and it was wrong. Suggestion has
-              * never placed well enough to trust: what actually produces a plan
-              * is the shooter putting a position on a spot they know. So the
-              * primary is the thing that works, and the model is offered
-              * underneath as the optional help it is.
+              * It used to be a summary, a full width primary and a secondary
+              * row, 176px of it, while the scrubber sat in its own bar below.
+              * Two bars for two things that are read together. The scrubber is
+              * the thing you touch most and the shoot line is what tells you
+              * what you are scrubbing, so they are the peek and everything
+              * that acts on the PLAN moved in with the plan.
               */}
-            <button
-              type="button"
-              className={`btn btn--primary peek__go${placing ? ' peek__go--armed' : ''}`}
-              onClick={() => onPlacing(!placing)}
-              aria-pressed={placing}
-            >
-              {placing
-                ? 'Tap the map · cancel'
-                : addsAir
-                  ? 'Add air position'
-                  : 'Add position'}
+            <button type="button" className="peek__line" onClick={onPeekTap}>
+              <span className="peek__label">{peekStatus.label}</span>
+              <span className="peek__value">{peekStatus.line}</span>
             </button>
 
-            {/*
-              * EACH SECONDARY SAYS WHAT IT DOES, and when it cannot be pressed
-              * it says why instead. "Prepare field pack" and "Go to field"
-              * named internal concepts: the first one downloads the photos so
-              * the day works without signal, and the second opens the screen
-              * you hold while walking. Neither of those was guessable.
-              */}
-            {/*
-              * THE ONE SECONDARY AT PEEK. Adding and suggesting are the two
-              * things you do WHILE planning, so they are the two things in
-              * reach. Saving a pack and walking out of the door are things you
-              * do once the plan exists, and they live in the sheet with the
-              * plan detail rather than taking a row of the map for the whole
-              * session.
-              */}
-            <div className="peek__second peek__second--one">
-              <button
-                type="button"
-                className="act"
-                onClick={onGenerate}
-                disabled={generation.status === 'working'}
-              >
-                <span className="act__label">
-                  {generation.status === 'working' ? 'Suggesting…' : 'Suggest positions'}
-                </span>
-                {/*
-                  * WHICH BRIEF IS GOING, said before it goes.
-                  *
-                  * The typed box is no longer a gate: the chips are the
-                  * intent and the brief is built from them. That is only
-                  * honest if the shooter can see which of the two is being
-                  * sent, so the button says so rather than substituting
-                  * quietly. See src/core/shootBrief.ts.
-                  */}
-                <span className="act__why">
-                  {generation.status === 'working' ? 'Asking the model' : briefSource}
-                </span>
-              </button>
-            </div>
+            {venueWindow === null || scrubbedAt === null || sun === null ? null : (
+              <TimeScrubber
+                start={venueWindow.start}
+                end={venueWindow.end}
+                value={scrub}
+                onChange={onScrub}
+                at={scrubbedAt}
+                sun={sun}
+                timeZone={venueWindow.timeZone}
+                timeZoneAbbr={venueWindow.timeZoneShort}
+                tideExtremes={tideExtremes}
+                phases={nightBands}
+                phase={nightPhase}
+                flying={{ airPositions, dronePlatform: platformFilter === 'air' }}
+              />
+            )}
           </div>
         }
-      >
-        {view === 'airspace' ? (
-          <>
-            <div className="btn-row btn-row--pad">
-              <button type="button" className="btn btn--small" onClick={() => setView('plan')}>
-                Back to the plan
-              </button>
-            </div>
-            <AirspacePanel venue={venue} altitudeFeet={airAltitudeFeet} />
-          </>
-        ) : view === 'sunsearch' ? (
-          <>
-            <div className="btn-row btn-row--pad">
-              <button type="button" className="btn btn--small" onClick={() => setView('plan')}>
-                Back to the plan
-              </button>
-            </div>
-            <SunSearchPanel
-              venue={venue}
-              timeZone={venueWindow?.timeZone ?? null}
-              timeZoneAbbr={venueWindow?.timeZoneShort ?? null}
-              target={aimAt}
-              picking={placingAim}
-              onPickTarget={() => onPlacingAim(!placingAim)}
+        half={
+          <div className="sheet__half">
+            {/*
+              * THE FILTER LIVES WITH WHAT IT FILTERS. It was a floating row
+              * over the top-left of the map, three pills away from the list
+              * whose contents it changed.
+              */}
+            <PlatformFilter
+              value={platformFilter}
+              onChange={onPlatformFilter}
+              counts={platformCounts}
+              hidden={hiddenByPlatform}
+              airAvailable={airAvailable}
             />
-          </>
-        ) : view === 'conditions' ? (
-          <>
-            <div className="btn-row btn-row--pad">
-              <button type="button" className="btn btn--small" onClick={() => setView('plan')}>
-                Back to the plan
-              </button>
-            </div>
-            <ConditionsPanel
-              venueWindow={venueWindow}
-              tide={tide}
-              scrubbedAt={scrubbedAt}
-              venue={venue}
-              wind={wind}
-              windLevels={windLevels}
-              gustMps={gustMps}
-              windAt={windAt}
-              windPast={windPast}
-              windHeight={windHeight}
-              ratedWindMps={ratedWindMps}
-              ratedWindSource={ratedWindSource}
-              tideNow={tideNow}
-              cloud={selectedCloud}
-            />
-          </>
-        ) : (
-          <>
-            <div className="sheetacts">
-              {/*
-                * THE PILOT POSITION. Only offered when something is actually
-                * flying: with no air positions there is nothing to measure
-                * from, and a control for it would be a question about a plan
-                * that does not have the thing it is asking about.
-                *
-                * It exists to MEASURE. Placing it draws a line to each air
-                * position and prints the distance on that position's card.
-                * Nothing about it is a check, a clearance or a permission.
-                */}
-              {airPositions === 0 ? null : (
+
+            {/*
+              * THE SLAB IS GONE. A full width ADD POSITION button owned a
+              * whole row of the screen for an action the map itself already
+              * performs on a tap. What is left is a 32px + at the head of the
+              * list it adds to, and suggesting is a text action beside it
+              * rather than a second slab: the model has never placed well
+              * enough to deserve equal weight with the shooter's own tap.
+              */}
+            <div className="plist__head">
+              <h2 className="plist__title">
+                Positions
+                <span className="plist__n num"> {plan.length}</span>
+              </h2>
+              <div className="plist__acts">
                 <button
                   type="button"
-                  className={`act${placingPilot ? ' act--armed' : ''}`}
-                  onClick={() => onPlacingPilot(!placingPilot)}
-                  aria-pressed={placingPilot}
+                  className={`plist__add${placing ? ' plist__add--armed' : ''}`}
+                  onClick={() => onPlacing(!placing)}
+                  aria-pressed={placing}
+                  aria-label={
+                    placing
+                      ? 'Cancel adding a position'
+                      : addsAir
+                        ? 'Add an air position by tapping the map'
+                        : 'Add a position by tapping the map'
+                  }
                 >
-                  <span className="act__label">
-                    {placingPilot
-                      ? 'Tap the map · cancel'
-                      : pilotAt === null
-                        ? 'Place the pilot position'
-                        : 'Move the pilot position'}
-                  </span>
-                  <span className="act__why">
-                    {pilotAt === null
-                      ? 'Measures the distance to each air position'
-                      : 'Drag the P marker, or tap a new spot'}
-                  </span>
+                  {placing ? '\u00D7' : '+'}
                 </button>
-              )}
+                <button
+                  type="button"
+                  className="plist__suggest"
+                  onClick={onGenerate}
+                  disabled={generation.status === 'working'}
+                >
+                  {generation.status === 'working' ? 'Suggesting\u2026' : 'Suggest'}
+                  <span className="plist__why">{briefSource}</span>
+                </button>
+              </div>
+            </div>
+
+            <ShotList
+              plan={visiblePlan}
+              planCoverage={null}
+              desiredShots={desiredShots}
+              selectedId={selectedId}
+              onPick={onFlyTo}
+            />
+
+            <PlanStatus
+              generation={generation}
+              onFixBlock={onFixBlock}
+              planCoverage={planCoverage}
+              siteNote={siteNote}
+              terrainNote={terrainNote}
+              positionNote={positionNote}
+            />
+          </div>
+        }
+        full={
+          <div className="sheet__sections">
+            {/*
+              * FIVE SECTIONS, ONE SCROLL, no back buttons and nothing to
+              * switch between. Each was its own surface over the map; three of
+              * them were absolutely positioned with their own bottom-offset
+              * arithmetic against the live sheet height, which is where three
+              * separate bugs came from.
+              *
+              * A SIXTH APPEARS WHEN SOMETHING IS FLYING. Airspace is gated on
+              * an air position for the same reason it always was: Part 107
+              * paperwork beside a tripod is a rule attached to something it
+              * does not govern.
+              */}
+            <SheetSection title="Conditions">
+              <ConditionsPanel
+                venueWindow={venueWindow}
+                tide={tide}
+                scrubbedAt={scrubbedAt}
+                venue={venue}
+                wind={wind}
+                windLevels={windLevels}
+                gustMps={gustMps}
+                windAt={windAt}
+                windPast={windPast}
+                windHeight={windHeight}
+                ratedWindMps={ratedWindMps}
+                ratedWindSource={ratedWindSource}
+                tideNow={tideNow}
+                cloud={selectedCloud}
+              />
+            </SheetSection>
+
+            <SheetSection title="Sun when">
+              <SunSearchPanel
+                venue={venue}
+                timeZone={venueWindow?.timeZone ?? null}
+                timeZoneAbbr={venueWindow?.timeZoneShort ?? null}
+                target={aimAt}
+                picking={placingAim}
+                onPickTarget={() => onPlacingAim(!placingAim)}
+              />
+            </SheetSection>
+
+            {airPositions === 0 ? null : (
+              <SheetSection title="Airspace">
+                <AirspacePanel venue={venue} altitudeFeet={airAltitudeFeet} />
+              </SheetSection>
+            )}
+
+            <SheetSection title="Layers">
+              <LayersPanel
+                kitProfile={kitProfile}
+                plan={plan}
+                coneMode={coneMode}
+                onConeMode={onConeMode}
+                lensFilters={lensFilters}
+                onLensFilters={onLensFilters}
+                isolatedId={isolatedId}
+                onClearIsolate={onClearIsolate}
+                showArc={showArc}
+                onShowArc={onShowArc}
+                showLabels={showLabels}
+                onShowLabels={onShowLabels}
+                showTerrain={showTerrain}
+                onShowTerrain={onShowTerrain}
+                showBuildings={showBuildings}
+                onShowBuildings={onShowBuildings}
+                buildingsNote={buildingsNote}
+                terrainSuspended={terrainPaused}
+                showSky={showSky}
+                onShowSky={onShowSky}
+                marking={marking}
+                onMarking={onMarking}
+                markCount={marks.length}
+                sunAltitude={sun?.altitude ?? null}
+                mapZoom={mapZoom}
+              />
+            </SheetSection>
+
+            <SheetSection title="Hazards">
+              <HazardPanel
+                marks={marks}
+                kind={markKind}
+                onKind={onMarkKind}
+                drawing={markDrawing}
+                onDrawing={onMarkDrawing}
+                draft={markDraft}
+                onFinishLine={onFinishLine}
+                onCancelLine={onCancelLine}
+                selected={selectedMark}
+                onSelect={onSelectMark}
+                onChange={onChangeMark}
+                onDelete={onDeleteMark}
+                marking={marking}
+                onMarking={onMarking}
+                date={shootDate}
+                latitude={venue?.lat ?? null}
+              />
+            </SheetSection>
+
+            <SheetSection title="Sky">
+              <SkyLegend
+                band={skyBand}
+                advice={zoomAdvice(skyBand, venue?.lat ?? 0, mapWidth, mapZoom)}
+                sky={sky}
+                clock={(at) =>
+                  venueWindow === null
+                    ? at.toISOString().slice(11, 16)
+                    : formatClock(at, venueWindow.timeZone)
+                }
+                boundary={
+                  venueWindow === null
+                    ? null
+                    : boundaryNote(new Date(), (at) => formatClock(at, venueWindow.timeZone))
+                }
+                onZoomOut={(zoom) => handle.current?.zoomTo(zoom)}
+                layer={skyLayer}
+                onLayer={onSkyLayer}
+                windHeight={windHeight}
+                ratedWindMps={ratedWindMps}
+              />
+            </SheetSection>
+
+            <div className="sheet__acts">
               <button
                 type="button"
                 className="act"
@@ -1051,21 +1026,28 @@ export function PlanMode({
               >
                 <span className="act__label">Start the shoot</span>
                 <span className="act__why">
-                  {goToFieldBlocked === null
-                    ? 'One position at a time'
-                    : 'Add a position first'}
+                  {goToFieldBlocked === null ? 'One position at a time' : 'Add a position first'}
                 </span>
               </button>
+              {airPositions === 0 ? null : (
+                <button
+                  type="button"
+                  className={`act${placingPilot ? ' act--armed' : ''}`}
+                  onClick={() => onPlacingPilot(!placingPilot)}
+                  aria-pressed={placingPilot}
+                >
+                  <span className="act__label">
+                    {placingPilot
+                      ? 'Tap the map \u00b7 cancel'
+                      : pilotAt === null
+                        ? 'Place the pilot position'
+                        : 'Move the pilot position'}
+                  </span>
+                  <span className="act__why">Measures the distance to each aircraft</span>
+                </button>
+              )}
             </div>
 
-            <PlanStatus
-              generation={generation}
-              onFixBlock={onFixBlock}
-              planCoverage={planCoverage}
-              siteNote={siteNote}
-          terrainNote={terrainNote}
-              positionNote={positionNote}
-            />
             <FieldPackControl
               pack={pack}
               matches={packIsCurrent}
@@ -1074,42 +1056,12 @@ export function PlanMode({
               timeZone={venueWindow?.timeZone ?? null}
               onPrepare={onPreparePack}
             />
-            <ShotList
-              plan={visiblePlan}
-              planCoverage={null}
-              desiredShots={desiredShots}
-              selectedId={selectedId}
-              onPick={onFlyTo}
-            />
-          </>
-        )}
-      </BottomSheet>
+          </div>
+        }
+      />
 
-      {/*
-        * THE DOCK IS TIME, THEN THE RAIL. It used to be a lens chip row, the
-        * scrubber, a full width forward button and the rail: four stacked bars
-        * over the bottom third of the map. The chips became one control in the
-        * HUD and the forward button became a secondary beside Generate, which
-        * is where the hierarchy belonged anyway.
-        */}
+      {/* The mode rail only. The scrubber moved into the sheet's peek. */}
       <div className="dock" ref={measureDock}>
-        {venueWindow === null || scrubbedAt === null || sun === null ? null : (
-          <TimeScrubber
-            start={venueWindow.start}
-            end={venueWindow.end}
-            value={scrub}
-            onChange={onScrub}
-            at={scrubbedAt}
-            sun={sun}
-            timeZone={venueWindow.timeZone}
-            timeZoneAbbr={venueWindow.timeZoneShort}
-            tideExtremes={tideExtremes}
-            phases={nightBands}
-            phase={nightPhase}
-            flying={{ airPositions, dronePlatform: platformFilter === 'air' }}
-          />
-        )}
-
         {footer}
       </div>
     </div>

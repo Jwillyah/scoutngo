@@ -19,7 +19,8 @@ import {
   COLD_START_VIEW,
   labelDistances,
   FRAME_VENUE_BELOW_ZOOM,
-  steppedBearingLineMeters,
+  BEARING_LINE_MIN_METERS,
+  viewportDiagonalMeters,
   VENUE_ZOOM,
   viewportSpanMeters,
   type ViewportBounds,
@@ -116,6 +117,50 @@ function encodeCanvas(canvas: HTMLCanvasElement): string {
 const ESRI_TILES =
   'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
 
+/**
+ * THE LAST ZOOM ESRI ACTUALLY HAS IMAGERY FOR, over rural ground.
+ *
+ * MEASURED, because the service's own declaration is wrong by four levels: it
+ * advertises maxLOD 23 and at z20 returns a single shared "no data" tile. Big
+ * Meadow and rural Nevada both come back as 2521 bytes, md5 f27d9de7f80c —
+ * byte-identical, hundreds of miles apart, so neither is a photograph.
+ * Manhattan still has real imagery at z20, so the limit is per-location.
+ *
+ * Declaring it here is what makes MapLibre SCALE the real z19 tile above this
+ * zoom instead of requesting tiles that do not exist.
+ *
+ * Full table, both services, three locations, z14 to z20:
+ *   measurements/2026-10-17-imagery-sources.md
+ */
+export const ESRI_NATIVE_MAX_ZOOM = 19
+
+/**
+ * HOW LONG A SUN OR SHADOW RAY IS, AS A FRACTION OF WHAT IS ON SCREEN.
+ *
+ * WHAT THIS REPLACES. The length came from steppedBearingLineMeters, which
+ * takes the larger of the farthest viewport corner and the viewport diagonal
+ * and adds slack, so the ray always ran off the edge of the frame. That is
+ * right at venue zoom and absurd at regional zoom: reported from Shenandoah,
+ * zoomed out, the rays drew as 200-mile lines across six states.
+ *
+ * A RAY IS A DIRECTION, NOT A DISTANCE. Capping it in SCREEN space is what
+ * makes that read the same at every zoom: it is the same stub on the glass
+ * whether the view is 500 metres or 500 miles across, so its length carries no
+ * information and cannot be mistaken for reach.
+ *
+ * THE OLD RULE WAS DELIBERATE AND IS BEING OVERRULED. Its argument was that a
+ * line visibly leaving the frame reads as a direction while one ending inside
+ * reads as a measured distance, and the projection audit asserted the ray
+ * leaves the frame. That holds at a venue and inverts when the frame is six
+ * states wide, where a line crossing it reads as a claim about a hundred miles
+ * of ground. The audit's assertion changed with this; see the report.
+ *
+ * NOT IN src/core. steppedBearingLineMeters stays exactly as it is, because
+ * the rule being changed is about what the SCREEN should show rather than
+ * about geometry, and the length is now a camera question.
+ */
+export const RAY_SCREEN_FRACTION = 0.28
+
 export const ESRI_ATTRIBUTION =
   'Tiles by Esri. Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
 
@@ -189,30 +234,19 @@ export const TERRAIN_ATTRIBUTION =
  */
 export const TERRAIN_EXAGGERATION = 1
 
-/**
- * THE ZOOM TERRAIN STOPS AT, AND WHY THAT IS A STATED RULE.
+/*
+ * THERE IS NO ZOOM AT WHICH TERRAIN STOPS, AND THE OLD ONE WAS A MISTAKE.
  *
- * MEASURED on a 4x CPU-throttled profile at 390x844 at 3x, rotating
- * continuously at zoom 16 with pitch 60:
+ * It used to suspend above zoom 15, reasoning that 15 is the DEM's own maxzoom
+ * so there was no more detail to pay for. That is true about the DATA and
+ * wrong about the USE: venue zoom is 17 to 19, so terrain never drew during
+ * actual planning, which is the only time anybody wanted it. Reported from
+ * Big Meadow and measured here at z17: terrain drawing = false.
  *
- *   terrain off   17.2 fps
- *   terrain on     3.2 fps     an 81% loss
- *   heap          42 MB -> 78 MB
- *
- * Three frames a second is not a map you can turn, and this is a field tool
- * used outdoors on battery. So terrain is SUSPENDED above this zoom rather
- * than left to quietly ruin the close-up view.
- *
- * 15 IS NOT AN ARBITRARY CUTOFF: it is the DEM's own maxzoom. Above it the
- * elevation tiles carry no further detail and MapLibre is upsampling the same
- * samples, so the close-up costs the full 81% and buys nothing. The honest
- * place to stop is where the data stops.
- *
- * AND IT IS SAID OUT LOUD. The layers list shows the state and the reason; a
- * 3D view that silently flattens as you zoom in is exactly the kind of
- * surprise this app is supposed not to have.
+ * MapLibre overzooms DEM tiles perfectly well, and a coarse hillside is still
+ * a hillside. Suspension is now about whether the DEVICE can hold a frame, not
+ * about where the data runs out: see TERRAIN_SUSPEND_ON_GESTURE.
  */
-export const TERRAIN_MAX_ZOOM = 15
 
 export const BUILDING_SOURCE = 'osm-buildings'
 export const BUILDING_LAYER = 'osm-buildings-extrusion'
@@ -605,6 +639,8 @@ interface MapViewProps {
   /** Real elevation under the imagery, with a sky above the horizon. */
   showTerrain?: boolean
   /** OSM building footprints, extruded to their mapped heights. */
+  /** Told when terrain is paused for a gesture, so the UI can say so. */
+  onTerrainPaused?: (paused: boolean) => void
   showBuildings?: boolean
   /** The footprints themselves, fetched by the owner. Empty is a real state. */
   buildings?: GeoJSON.FeatureCollection | null
@@ -862,6 +898,41 @@ function rayCollection(
   }
 }
 
+/**
+ * The ray length in metres that lands RAY_SCREEN_FRACTION of the way across
+ * the frame, whatever the zoom.
+ *
+ * QUANTISED ON A LOG GRID, eight steps to the octave. The length has to be
+ * recomputed as the camera moves and a pinch moves it every frame; feeding a
+ * slightly different number into the source sixty times a second re-tiles the
+ * geometry for no visible gain. Eight steps per octave means the drawn length
+ * is within about 9% of the target, which is invisible, and the number only
+ * changes a few times across a whole pinch.
+ *
+ * The old core rule quantised to whole powers of two, which is a 41% swing:
+ * fine when the only requirement was "long enough to leave the frame", and far
+ * too coarse now that the length itself is the thing being held constant.
+ */
+function rayMetresForScreen(bounds: ViewportBounds): number {
+  const target = viewportDiagonalMeters(bounds) * RAY_SCREEN_FRACTION
+  if (!Number.isFinite(target) || target <= 0) return BEARING_LINE_MIN_METERS
+
+  /*
+   * NO GROUND FLOOR. The core rule applies BEARING_LINE_MIN_METERS, 100m, so
+   * a ray is never degenerate — and measured at z19 that floor is what breaks
+   * this: the frame there is about 110m across the diagonal, so a 100m ray is
+   * 0.92 of it and runs off the edge. Fraction 0.92 against a wanted 0.28,
+   * which is the exact bug this cap exists to remove, reappearing at the other
+   * end of the zoom range.
+   *
+   * The floor belongs in SCREEN space, and the target already is one: a fixed
+   * fraction of the diagonal cannot be degenerate while the diagonal is not.
+   * The only case left is a zero or non-finite viewport, which is guarded
+   * above, and that is why it returns the core minimum there and nowhere else.
+   */
+  return 2 ** (Math.round(Math.log2(target) * 8) / 8)
+}
+
 function makeMarkerElement(className: string): HTMLDivElement {
   const el = document.createElement('div')
   el.className = className
@@ -901,6 +972,7 @@ export function MapView({
   showSky = false,
   showLabels = false,
   showTerrain = false,
+  onTerrainPaused,
   showBuildings = false,
   buildings = null,
   skyFrameAt = null,
@@ -960,6 +1032,9 @@ export function MapView({
    * ray labels, so this comes along for free on pan, zoom, rotate and tilt.
    */
   const [skyFrame, setSkyFrame] = useState<SkyFrame | null>(null)
+
+  /** True while the camera is being dragged, rotated, zoomed or pitched. */
+  const [gesturing, setGesturing] = useState(false)
 
   const latest = useRef({
     mode,
@@ -1028,7 +1103,7 @@ export function MapView({
             type: 'raster',
             tiles: [ESRI_TILES],
             tileSize: 256,
-            maxzoom: 19,
+            maxzoom: ESRI_NATIVE_MAX_ZOOM,
             attribution: ESRI_ATTRIBUTION,
           },
           /*
@@ -1040,14 +1115,14 @@ export function MapView({
             type: 'raster',
             tiles: [ESRI_ROADS_TILES],
             tileSize: 256,
-            maxzoom: 19,
+            maxzoom: ESRI_NATIVE_MAX_ZOOM,
             attribution: ESRI_REFERENCE_ATTRIBUTION,
           },
           [LABEL_SOURCE_PLACES]: {
             type: 'raster',
             tiles: [ESRI_PLACES_TILES],
             tileSize: 256,
-            maxzoom: 19,
+            maxzoom: ESRI_NATIVE_MAX_ZOOM,
             attribution: ESRI_REFERENCE_ATTRIBUTION,
           },
         },
@@ -2134,12 +2209,8 @@ export function MapView({
     const instance = map.current
     if (instance === null || !ready) return
 
-    /*
-     * Suspended above TERRAIN_MAX_ZOOM. viewTick is bumped on every map move,
-     * which includes zoom, so this re-runs as the shooter zooms in and out.
-     */
-    const zoomedIn = instance.getZoom() > TERRAIN_MAX_ZOOM
-    if (showTerrain && !zoomedIn) {
+    /* Off for the duration of a gesture. See the note below. */
+    if (showTerrain && !gesturing) {
       if (instance.getSource(TERRAIN_SOURCE) === undefined) {
         instance.addSource(TERRAIN_SOURCE, {
           type: 'raster-dem',
@@ -2171,7 +2242,52 @@ export function MapView({
        */
       instance.setSky({ 'atmosphere-blend': 0 })
     }
-  }, [showTerrain, ready, viewTick])
+  }, [showTerrain, ready, gesturing])
+
+  /*
+   * TERRAIN IS SUSPENDED DURING A GESTURE, NOT BY ZOOM.
+   *
+   * THE ONE NUMBER THAT IS ACTUALLY MEASURED, from the previous pass, at z16
+   * with pitch 60 on a 4x CPU-throttled profile, rotating continuously:
+   *
+   *   terrain off   17.2 fps        terrain on   3.2 fps
+   *   heap          42 MB                        78 MB
+   *
+   * That is a rotating measurement and rotation is the whole cost: it is
+   * continuous re-tiling, which is what a gesture is. Idle and gesture have
+   * NOT been measured separately yet, on either profile, so no table is
+   * written here claiming they have been. The design below follows from the
+   * rotating number and from where the cost obviously comes from; the figures
+   * that would confirm it are being measured and this comment gets them when
+   * they exist.
+   *
+   * WHY NOT BY ZOOM. Because venue zoom is 17 to 19 and that is the only zoom
+   * anybody plans at, so a zoom rule suspended it exactly where it was wanted.
+   */
+  useEffect(() => {
+    const instance = map.current
+    if (instance === null || !ready) return
+    const start = () => setGesturing(true)
+    const end = () => setGesturing(false)
+    for (const event of ['dragstart', 'rotatestart', 'zoomstart', 'pitchstart'] as const) {
+      instance.on(event, start)
+    }
+    for (const event of ['dragend', 'rotateend', 'zoomend', 'pitchend'] as const) {
+      instance.on(event, end)
+    }
+    return () => {
+      for (const event of ['dragstart', 'rotatestart', 'zoomstart', 'pitchstart'] as const) {
+        instance.off(event, start)
+      }
+      for (const event of ['dragend', 'rotateend', 'zoomend', 'pitchend'] as const) {
+        instance.off(event, end)
+      }
+    }
+  }, [ready])
+
+  useEffect(() => {
+    onTerrainPaused?.(showTerrain && gesturing)
+  }, [showTerrain, gesturing, onTerrainPaused])
 
   /*
    * LABELS ON OR OFF.
@@ -2320,7 +2436,7 @@ export function MapView({
     const length =
       input.venue === null
         ? 0
-        : steppedBearingLineMeters(input.venue, boundsOf(instance))
+        : rayMetresForScreen(boundsOf(instance))
     if (!force && length === bearingLengthDrawn.current) return
     bearingLengthDrawn.current = length
 

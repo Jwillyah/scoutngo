@@ -31,7 +31,9 @@ interface HazardPanelProps {
     change: Partial<Pick<SiteMark, 'kind' | 'heightMeters' | 'foliage' | 'note'>>,
   ) => void
   onDelete: (id: string) => void
-  onClose: () => void
+  /** Marking mode: the tap mode that puts a mark on the map. */
+  marking: boolean
+  onMarking: (next: boolean) => void
   /** The shoot date and the venue latitude, for the leaf answer. */
   date: string
   latitude: number | null
@@ -68,7 +70,8 @@ export function HazardPanel({
   onSelect,
   onChange,
   onDelete,
-  onClose,
+  marking,
+  onMarking,
   date,
   latitude,
 }: HazardPanelProps) {
@@ -194,12 +197,23 @@ export function HazardPanel({
 
   return (
     <div className="hz">
-      <div className="hz__head">
-        <span className="hz__title">Marking</span>
-        <button type="button" className="hz__x" onClick={onClose} aria-label="Stop marking">
-          Done
-        </button>
-      </div>
+      {/*
+        * THE HEAD IS A MODE TOGGLE NOW, NOT A CLOSE BUTTON.
+        *
+        * The panel used to float, so "Done" meant "get this off my map" and
+        * closing it was how you stopped marking. It is a section in the sheet
+        * now and the sheet's detent is what hides it, so the only thing left
+        * for a control here to do is the thing that was always conflated with
+        * closing: arm or disarm the tap mode that puts a mark down.
+        */}
+      <button
+        type="button"
+        className={`hz__arm${marking ? ' hz__arm--on' : ''}`}
+        aria-pressed={marking}
+        onClick={() => onMarking(!marking)}
+      >
+        {marking ? 'Tap the map to mark \u00b7 stop' : 'Start marking'}
+      </button>
 
       <div className="hz__kinds" role="group" aria-label="What to mark">
         {[...HAZARD_KINDS, ...NOTE_KINDS].map((k) => (

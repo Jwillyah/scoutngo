@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { GOES_BAND_LABEL, goesBandFor } from '../core/goes.ts'
 import { ConePicker, type ConeMode } from './ConePicker.tsx'
+import { ESRI_NATIVE_MAX_ZOOM } from './MapView.tsx'
 import type { KitProfile } from '../core/kit.ts'
 import type { PlannedPosition } from '../lib/plan.ts'
 
@@ -22,9 +23,8 @@ interface LayersPanelProps {
   showTerrain: boolean
   onShowTerrain: (next: boolean) => void
   /**
-   * TRUE WHEN TERRAIN IS ON BUT NOT DRAWING, because the view is zoomed past
-   * the DEM's own detail. Said out loud rather than left as a surprise: see
-   * TERRAIN_MAX_ZOOM in MapView for the measurement behind it.
+   * TRUE WHILE TERRAIN IS PAUSED FOR A GESTURE, which is the only time it is
+   * on and not drawing now. Said out loud rather than left as a flicker.
    */
   terrainSuspended: boolean
   showBuildings: boolean
@@ -44,7 +44,11 @@ interface LayersPanelProps {
 
   /** Sun altitude, so the sky row can say which band it will show. */
   sunAltitude: number | null
-  onClose: () => void
+  /**
+   * The current map zoom, so the imagery line can say whether the view has
+   * gone past the last zoom the source actually has pictures for.
+   */
+  mapZoom: number
 }
 
 function Row({
@@ -140,20 +144,44 @@ export function LayersPanel({
   onMarking,
   markCount,
   sunAltitude,
-  onClose,
+  mapZoom,
 }: LayersPanelProps) {
   const band = sunAltitude === null ? null : goesBandFor(sunAltitude)
 
   return (
-    <div className="lay" role="dialog" aria-label="Map layers">
-      <div className="lay__head">
-        <span className="lay__title">Layers</span>
-        <button type="button" className="lay__close" onClick={onClose}>
-          Done
-        </button>
-      </div>
+    <div className="lay">
 
       <div className="lay__list">
+        {/*
+          * WHAT IS UNDER EVERYTHING, AND WHETHER IT IS REAL AT THIS ZOOM.
+          *
+          * A STATEMENT, NOT A TOGGLE: there is one imagery source and no
+          * choice to offer, so this is a line rather than a row with an OFF
+          * state that would mean a blank map.
+          *
+          * It says "over-zoomed" because that is the honest word for what the
+          * screen is doing. Past z19 rurally there is no further photography
+          * and MapLibre is scaling the last real tile, which looks like
+          * detail and is not. Somebody reading a venue at z19 should know
+          * that sharpening is the renderer, not the ground. The z20
+          * measurement behind the number is in
+          * measurements/2026-10-17-imagery-sources.md.
+          */}
+        <p className="lay__imagery">
+          <span className="lay__label">Imagery</span>
+          <span className="lay__note">
+            Esri World Imagery · native to z{ESRI_NATIVE_MAX_ZOOM}
+            {mapZoom > ESRI_NATIVE_MAX_ZOOM ? (
+              <>
+                {' · '}
+                <span className="lay__over">over-zoomed</span>
+                {', the last real tile is being scaled'}
+              </>
+            ) : (
+              ` · showing z${Math.floor(mapZoom)}`
+            )}
+          </span>
+        </p>
         {/*
           * CONES KEEP THEIR OWN CONTROL. They are not a boolean: there is a
           * mode, a lens filter and an isolate, and flattening that into ON and
@@ -192,8 +220,8 @@ export function LayersPanel({
           label="Terrain"
           note={
             terrainSuspended
-              ? 'On, but not drawing: zoomed in past the elevation data. Zoom out to see it.'
-              : 'Real elevation under the imagery, with a sky. Tilt to 80° to see it. Costs about 80% of the frame rate.'
+              ? 'Paused while you move the map, back on when it settles.'
+              : 'Real elevation under the imagery, with a sky. Tilt to 80° to see it. Free at rest; paused during a gesture.'
           }
           on={showTerrain}
           onToggle={() => onShowTerrain(!showTerrain)}

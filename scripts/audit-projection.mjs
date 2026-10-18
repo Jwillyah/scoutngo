@@ -193,17 +193,20 @@ export const BEARING_LINE_EXTENT = `(() => {
         kind: f.properties.kind ?? 'sun-axis',
         lengthPx: Math.round(lengthPx),
         diagonalPx: Math.round(diagonal),
-        /* An axis line runs both ways from the pin, so each END must be clear. */
         /*
-         * A ray STARTS at the pin, which is on the frame on purpose, so only
-         * its far end has to clear it. An axis line runs both ways from the
-         * pin, so both of its ends are far ends.
+         * THE RAY IS A FIXED FRACTION OF THE FRAME, which is what replaced
+         * "it must leave the frame". See RAY_SCREEN_FRACTION in MapView: a
+         * line that crosses a six-state view reads as a claim about a hundred
+         * miles of ground, so the length is now held constant on the glass
+         * and carries no information at all.
+         *
+         * An AXIS line runs both ways from the pin, so it is two rays and its
+         * end-to-end length is twice the fraction.
          */
-        leavesFrame:
-          (f.properties.kind ?? 'sun-axis') === 'sun-axis'
-            ? outside(a) && outside(b)
-            : outside(b),
-        shortfallPx: Math.round(Math.min(0, lengthPx - diagonal)),
+        screenFraction: +(
+          lengthPx / diagonal / ((f.properties.kind ?? 'sun-axis') === 'sun-axis' ? 2 : 1)
+        ).toFixed(3),
+        endsInFrame: !outside(b),
       })
     }
   }
@@ -241,20 +244,47 @@ const checkMarkers = async (label) => {
   show(`${label}  ${bad.length === 0 ? 'ok' : 'FAIL'}`, bad)
 }
 
-const checkBearingLines = async (label, pitched = false) => {
+/*
+ * WHAT THIS ASSERTED BEFORE, AND WHY IT CHANGED.
+ *
+ * It asserted the ray LEAVES THE FRAME: `leavesFrame` under pitch and
+ * `shortfallPx >= 0` flat. That encoded a real argument — a line running off
+ * the edge reads as a direction, a line stopping short reads as a measured
+ * distance — and it was right at venue zoom and wrong at regional zoom, where
+ * the ray drew as a 200-mile line across six states and the "direction" read
+ * as a claim about the ground.
+ *
+ * So the property being held is now the opposite one and is checked as such:
+ * the ray is a FIXED FRACTION of the viewport diagonal at every zoom, and its
+ * far end is inside the frame. Both old fields are gone rather than left
+ * sitting unasserted, because a probe that still computes a value nobody
+ * checks is how the next reader concludes it is still guaranteed.
+ *
+ * The tolerance is the quantisation: the length is stepped eight times to the
+ * octave so it does not re-tile every frame of a pinch, which is about 9%.
+ */
+const RAY_FRACTION_TOLERANCE = 0.12
+
+/*
+ * NO `pitched` FLAG ANY MORE. It existed because the old rule needed a
+ * different assertion under pitch (leaves-frame) from flat (long enough).
+ * The screen-fraction rule is the same question either way, which is most of
+ * why it is a better rule: there is one property, checked one way, at every
+ * camera.
+ */
+const checkBearingLines = async (label) => {
   const rows = await ev(BEARING_LINE_EXTENT)
   if (rows?.error) { console.log(label, rows.error); failures += 1; return }
-  const bad = pitched
-    ? rows.filter((r) => !r.leavesFrame)
-    : rows.filter((r) => r.shortfallPx < 0)
+  const want = 0.28
+  const bad = rows.filter(
+    (r) => Math.abs(r.screenFraction - want) > RAY_FRACTION_TOLERANCE || !r.endsInFrame,
+  )
   if (bad.length > 0) failures += bad.length
-  const worst = Math.min(...rows.map((r) => r.lengthPx))
-  const rule = pitched
-    ? `${rows.filter((r) => r.leavesFrame).length}/${rows.length} leave the frame`
-    : `shortest ${worst}px / ${rows[0].diagonalPx}px diagonal`
+  const worst = Math.max(...rows.map((r) => Math.abs(r.screenFraction - want)))
+  const rule = `fraction ${rows.map((r) => r.screenFraction).join('/')} (want ${want})`
   console.log(
-    `  ${label.padEnd(34)} ${rule.padEnd(34)} ` +
-      (bad.length === 0 ? 'ok' : 'FAIL ' + bad.map((r) => r.kind).join(',')),
+    `  ${label.padEnd(34)} ${rule.padEnd(40)} ` +
+      (bad.length === 0 ? `ok  worst off by ${worst.toFixed(3)}` : 'FAIL ' + bad.map((r) => r.kind).join(',')),
   )
   if (bad.length > 0) show(label, bad)
 }
@@ -502,7 +532,7 @@ for (let z = 10; z <= 20; z++) {
 for (const [zoom, pitch, bearing] of [[12, 60, 0], [16, 60, 0], [16, 45, 137], [19, 60, -82], [11, 50, 215]]) {
   await ev(`window.__probe.map.jumpTo({ zoom: ${zoom}, pitch: ${pitch}, bearing: ${bearing} }), 'ok'`)
   await wait(500)
-  await checkBearingLines(`zoom ${zoom} pitch ${pitch} bearing ${bearing}`, true)
+  await checkBearingLines(`zoom ${zoom} pitch ${pitch} bearing ${bearing}`)
 }
 
 /*
