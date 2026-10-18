@@ -7948,3 +7948,159 @@
 .how__link {
   color: var(--ocean);
 }
+
+/* --------------------------------------------------------------- SUN CURVE
+ *
+ * The scrubber at HALF and FULL: the day as an altitude curve.
+ *
+ * A DARK INSTRUMENT. Daytime is not lighter than night here. Every band is
+ * dark and what changes is WHICH dark, because this is read on a phone in
+ * direct sun and a chart that went white at noon would be unreadable exactly
+ * when it is needed. The hues are the ones already in use -- the amber is the
+ * sun token, the periwinkle is the shadow token -- mixed down into the ground.
+ */
+
+.curve {
+  display: grid;
+  gap: var(--space-1);
+  position: relative;
+}
+
+.curve__plot {
+  display: block;
+  width: 100%;
+  height: 100px;
+  border-radius: var(--radius-flat);
+}
+
+/* Hard edges, no gradient between bands: a boundary here is a stated altitude. */
+.curve__band--day {
+  fill: var(--color-panel);
+}
+
+.curve__band--golden {
+  fill: color-mix(in srgb, var(--sun) 22%, #0b0b0d);
+}
+
+.curve__band--blue {
+  fill: color-mix(in srgb, var(--sun-shadow) 26%, #0b0b0d);
+}
+
+.curve__band--nautical {
+  fill: color-mix(in srgb, var(--sun-shadow) 14%, #08080a);
+}
+
+.curve__band--astronomical {
+  fill: color-mix(in srgb, var(--sun-shadow) 7%, #050506);
+}
+
+.curve__band--night {
+  fill: #030304;
+}
+
+.curve__sun {
+  fill: none;
+  stroke: var(--sun);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+/*
+ * COOL GREY, DASHED, AND ITS OPACITY IS ITS ILLUMINATION. A new moon's line
+ * is nearly invisible, which is correct: there is nearly nothing up there.
+ */
+.curve__moon {
+  fill: none;
+  stroke: var(--grey-1);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+  stroke-linejoin: round;
+}
+
+/* The real skyline. A solid hairline, following the sun's own azimuth. */
+.curve__terrain {
+  fill: none;
+  stroke: var(--grey-1);
+  stroke-width: 1;
+  opacity: 0.85;
+}
+
+/*
+ * THE FLAT LINE IS DOTTED AND FAINT, so it can never be read as the terrain
+ * hairline above. It appears as the fallback when there is no DEM, and as the
+ * labelled comparison when there is one and the two disagree.
+ */
+.curve__flat {
+  stroke: var(--grey-2);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+  opacity: 0.8;
+}
+
+.curve__stem {
+  stroke: var(--accent);
+  stroke-width: 1;
+  opacity: 0.35;
+}
+
+.curve__thumb {
+  fill: var(--accent);
+}
+
+/*
+ * THE HIT TARGET, STRETCHED OVER THE PLOT AND INVISIBLE. The visible thumb is
+ * drawn on the curve; this is what makes the gesture, the keyboard and the
+ * screen reader work.
+ */
+.curve__range {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100px;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.curve__x {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+}
+
+.curve__x-label {
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+}
+
+.curve__readout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.curve__read-zone {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.curve__read--moon {
+  color: var(--color-text-muted);
+}
+
+.curve__note,
+.curve__none {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.curve__note--both {
+  display: grid;
+  gap: 2px;
+}

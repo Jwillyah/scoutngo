@@ -509,44 +509,15 @@ export function PlanMode({
   const handle = mapHandle as React.RefObject<MapHandle | null>
 
   /*
-   * THE SKYLINE AT THIS VENUE, read once from the DEM already in memory.
+   * THE SKYLINE, REPORTED BY MapView WHEN ITS TILES SETTLE.
    *
-   * RECOMPUTED ON THE VENUE AND ON TERRAIN, NOT ON THE CAMERA. It is a
-   * property of where the shooter is standing, not of where the map happens
-   * to be pointed, so panning must not change it and must not re-run 288
-   * elevation lookups. It starts flat and is labelled flat until the DEM
-   * actually answers, which is the honest order.
+   * This used to poll MapHandle.horizonAt on a timer and stop when two reads
+   * agreed, which settled on whatever was loaded at that instant rather than
+   * on the finished DEM. MapView watches the map's own `idle` event now, which
+   * is the one signal that actually means "the elevation data is here".
    */
   const [horizonProfile, setHorizonProfile] = useState<HorizonInput>({ kind: 'flat' })
 
-  useEffect(() => {
-    if (venue === null) {
-      setHorizonProfile({ kind: 'flat' })
-      return
-    }
-    /*
-     * ONE FRAME LATE, deliberately. The terrain source is added when the style
-     * loads and queryTerrainElevation answers null until its tiles arrive, so
-     * reading synchronously here would record a flat horizon and keep it. The
-     * retry is cheap and stops as soon as the DEM speaks.
-     */
-    let cancelled = false
-    let tries = 0
-    const read = () => {
-      if (cancelled) return
-      const got = handle.current?.horizonAt(venue) ?? { kind: 'flat' as const }
-      if (got.kind === 'terrain' || tries > 20) {
-        setHorizonProfile(got)
-        return
-      }
-      tries += 1
-      window.setTimeout(read, 500)
-    }
-    read()
-    return () => {
-      cancelled = true
-    }
-  }, [venue, handle])
 
   /*
    * Now, fixed at mount. A listing that recomputed `new Date()` every render
@@ -675,6 +646,7 @@ export function PlanMode({
       }
     >
       <MapView
+        onHorizon={setHorizonProfile}
         handle={mapHandle}
         venue={venue}
         onVenueChange={onVenueChange}
@@ -877,6 +849,14 @@ export function PlanMode({
                 phases={nightBands}
                 phase={nightPhase}
                 flying={{ airPositions, dronePlatform: platformFilter === 'air' }}
+                /*
+                 * THE STRIP AT PEEK, THE CURVE AT HALF AND FULL. One control,
+                 * one piece of state: `value` and `onChange` are the same in
+                 * both, so changing detent cannot move the time.
+                 */
+                expanded={sheet !== 'peek'}
+                venue={venue}
+                horizon={horizonProfile}
               />
             )}
           </div>

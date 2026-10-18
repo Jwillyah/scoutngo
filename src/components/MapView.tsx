@@ -651,6 +651,16 @@ interface MapViewProps {
   showLabels?: boolean
   /** Real elevation under the imagery, with a sky above the horizon. */
   showTerrain?: boolean
+  /**
+   * The venue's skyline, pushed up whenever the DEM has finished arriving.
+   *
+   * MapView OWNS THIS because it owns the map and its events. PlanMode used to
+   * poll MapHandle.horizonAt until two reads agreed, which settled on whatever
+   * tiles happened to be loaded at the time -- at a Shenandoah hollow that was
+   * a 1.2 degree skyline where the real one is 16.5. Recomputing on the map's
+   * own `idle` event asks at the one moment the answer is actually ready.
+   */
+  onHorizon?: (horizon: HorizonInput) => void
   /** OSM building footprints, extruded to their mapped heights. */
   /** Told when terrain is paused for a gesture, so the UI can say so. */
   onTerrainPaused?: (paused: boolean) => void
@@ -1081,6 +1091,7 @@ export function MapView({
   showSky = false,
   showLabels = false,
   showTerrain = false,
+  onHorizon,
   onTerrainPaused,
   showBuildings = false,
   buildings = null,
@@ -1890,6 +1901,38 @@ export function MapView({
     }
     return api
   }, [])
+
+  /*
+   * THE SKYLINE, RECOMPUTED WHEN THE TILES STOP ARRIVING.
+   *
+   * `idle` fires when MapLibre has finished loading and rendering everything
+   * for the current view, which is exactly the condition
+   * queryTerrainElevation needs and the one a timer cannot express. The shape
+   * is compared before reporting so a pan that changes nothing does not push
+   * an identical profile up and re-render the sheet.
+   */
+  const horizonShape = useRef('')
+  useEffect(() => {
+    const instance = map.current
+    if (instance === null || !ready || onHorizon === undefined) return
+
+    const report = () => {
+      const got = readHorizonProfile(instance, venue)
+      const shape =
+        got.kind === 'terrain'
+          ? got.samples.map((s) => `${s.azimuth}:${s.angleDegrees.toFixed(2)}`).join(',')
+          : 'flat'
+      if (shape === horizonShape.current) return
+      horizonShape.current = shape
+      onHorizon(got)
+    }
+
+    report()
+    instance.on('idle', report)
+    return () => {
+      instance.off('idle', report)
+    }
+  }, [venue, showTerrain, ready, onHorizon])
 
   useImperativeHandle(
     handle,
