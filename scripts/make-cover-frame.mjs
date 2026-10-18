@@ -71,11 +71,62 @@ try {
    * were right and the pixels were of the wrong screen entirely, which is why
    * the frame is looked at and not just counted.
    */
+  /*
+   * MARK THE COVER SEEN AND RELOAD, rather than hunting for its button.
+   *
+   * Clicking it was fragile: a run reported "no landing shown", carried on,
+   * and photographed the cover page while every click landed correctly on the
+   * map underneath. Setting the flag and reloading means the cover never
+   * renders at all, which cannot half-work.
+   */
+  /*
+   * BOTH SET BEFORE THE RELOAD. Numerals were being switched on AFTER the
+   * page had rendered, so nothing re-read them and SUN and SHADOW stayed
+   * bare -- one flag drives both plates, so they are both labelled or
+   * neither is, and "neither" was not the intent.
+   */
   await step(
-    'dismiss landing',
-    `(() => { const b = document.querySelector('.land__go'); if(!b) return 'no landing shown'; b.click(); return 'dismissed' })()`,
+    'mark the cover seen, numerals on',
+    `(() => {
+       localStorage.setItem('scoutngo.landing.v1', 'true')
+       const raw = localStorage.getItem('scoutngo.settings')
+       const settings = raw ? JSON.parse(raw) : {}
+       /* The key is showNumbers, not showNumerals -- a first attempt wrote a
+        * field nothing reads and the plates stayed bare. */
+       settings.showNumbers = true
+       localStorage.setItem('scoutngo.settings', JSON.stringify(settings))
+       return 'set'
+     })()`,
   )
-  await wait(1500)
+  await send('Page.reload', {})
+  await wait(8000)
+  await step('cover gone', `document.querySelector('.cover') === null`)
+
+
+  /*
+   * PACK THE DRONE FIRST, IN SETUP.
+   *
+   * The AIR segment is enabled by the kit SELECTION, not by the kit profile:
+   * defaultOpticFor('air', ...) reads which gear is ticked. This flow went
+   * straight to Plan and never visited Setup, so the selection was empty and
+   * AIR came back DISABLED -- which the guard caught rather than quietly
+   * placing three ground positions and labelling two of them wrong.
+   */
+  await step(
+    'into setup',
+    `(() => { const b = [...document.querySelectorAll('.rail__btn')].find(x=>/Setup/.test(x.textContent)); if(!b) return 'no setup'; b.click(); return 'ok' })()`,
+  )
+  await wait(2500)
+  await step(
+    'pack the drone',
+    `(() => {
+       const chip = [...document.querySelectorAll('.kitchip')].find(c => /air 3s/i.test(c.textContent ?? ''))
+       if (!chip) return 'no drone chip'
+       if (chip.getAttribute('aria-pressed') !== 'true') chip.click()
+       return chip.getAttribute('aria-pressed') === 'true' ? 'packed' : 'still off'
+     })()`,
+  )
+  await wait(1200)
 
   await step(
     'into plan',
@@ -144,23 +195,48 @@ try {
   await wait(500)
 
   /*
-   * TWO POSITIONS WITH DIFFERENT OPTICS, made the way a shooter makes them:
-   * the platform filter decides what the next position is, so one is placed
-   * on GROUND with the Sigma and one on AIR with the drone camera. Different
-   * optics, different focal lengths, and therefore visibly different cones.
+   * THREE POSITIONS, AND TWO OF THEM FLY.
+   *
+   * A bare focal length does not distinguish a drone from a tripod, which is
+   * the only reason to show more than one. So the frame carries a ground
+   * position on long glass and two air positions on the drone's 70mm, and the
+   * plates now say which is which.
+   *
+   * THE PLATFORM SEGMENT DECIDES WHAT THE NEXT TAP MAKES. A previous run
+   * found AIR disabled and silently placed a second ground position instead;
+   * this one asserts the segment took.
    */
+  const platform = async (which) => {
+    const got = await step(
+      `platform ${which}`,
+      `(() => {
+         const b = [...document.querySelectorAll('.plat__btn')]
+           .find(x => /${which}/i.test(x.querySelector('.plat__label')?.textContent ?? ''))
+         if (!b) return 'no segment'
+         if (b.disabled) return 'DISABLED'
+         b.click(); return 'ok'
+       })()`,
+    )
+    if (got === 'DISABLED' || got === 'no segment') {
+      const state = await ev(`JSON.stringify({
+        buttons: [...document.querySelectorAll('.plat__btn')].map(b => ({
+          text: (b.textContent ?? '').trim(), disabled: b.disabled, title: b.title,
+        })),
+        chips: [...document.querySelectorAll('.kitchip')].map(c => (c.textContent ?? '').trim() + '=' + c.getAttribute('aria-pressed')),
+        landing: document.querySelector('.cover') !== null,
+      })`)
+      console.log(`      STATE: ${state}`)
+      throw new Error(`the ${which} segment is ${got}; the frame would be wrong about its platforms`)
+    }
+    await wait(800)
+  }
+
   /*
-   * TWO GROUND POSITIONS WITH DIFFERENT LENSES.
+   * ARM, TAP, OPTIONALLY CHANGE THE LENS, CLOSE THE CARD.
    *
-   * NOT one ground and one air, which was the first attempt: the AIR segment
-   * is disabled until a drone is packed in the kit, and the run reported
-   * "segment disabled" and then placed the second position on the ground
-   * anyway. Two ground positions with genuinely different glass give the same
-   * thing the brief wanted -- two visibly different cones -- through a control
-   * that is available from a cold start.
-   *
-   * The lens is changed through the card's own optic picker, with the native
-   * value setter so React sees the change.
+   * The lens is changed through the card's own optic picker with the native
+   * value setter, so React sees it. Null leaves whatever the platform's
+   * default optic is, which for air is the drone's own camera.
    */
   const addAt = async (label, fx, fy, lensMatch) => {
     await step(
@@ -190,8 +266,32 @@ try {
     await wait(600)
   }
 
-  await addAt('near', 0.44, 0.57, '75-300')
-  await addAt('long', 0.74, 0.52, '200-600')
+  /*
+   * LEFT, ground, on the long glass. Then two over the field on the drone.
+   * Placed before the camera is tilted, so a screen fraction is predictable.
+   */
+  /*
+   * AIR FIRST, AND THE ORDER IS NOT COSMETIC.
+   *
+   * Selecting GROUND re-packs the kit selection without the drone, which then
+   * disables the AIR segment: "No drone in the kit", with every kit chip
+   * ticked. Measured, with the state dumped at the failure. That is shape D
+   * in docs/failure-modes.md -- the drone chip deriving its enabled state
+   * from the selection it exists to change -- still live in the platform
+   * filter, and it makes the transition one-way.
+   *
+   * This script works around it by taking the air positions before the ground
+   * one. The app should not need the workaround; flagged rather than fixed
+   * here, because this pass is about the cover.
+   */
+  await platform('air')
+  await addAt('right air', 0.70, 0.47, 'tele')
+  await addAt('behind air', 0.50, 0.405, 'tele')
+
+  await platform('ground')
+  await addAt('left ground', 0.54, 0.62, '200-600')
+
+  await platform('both')
 
   /*
    * CONES ARE OFF BY DEFAULT. conePlan is empty unless coneMode is 'all' or a
@@ -254,7 +354,7 @@ try {
         * the target away from the container centre, which puts the plan in
         * the top half and leaves the ground below it to be covered by type.
         */
-       m.easeTo({ pitch: 62, bearing: -18, zoom: 16.35, offset: [52, -140], duration: 0 })
+       m.easeTo({ pitch: 54, bearing: -12, zoom: 16.7, offset: [206, -248], duration: 0 })
        return JSON.stringify({ pitch: m.getPitch(), bearing: Math.round(m.getBearing()), zoom: +m.getZoom().toFixed(2), terrain: m.getTerrain() !== null })
      })()`,
   )
@@ -271,9 +371,12 @@ try {
    * with text that contains no other counted element.
    */
   const labels = await ev(`(() => {
-    const nodes = [...document.querySelectorAll(
-      '.shooter__focal, .shooter__flag, .shooter__number'
-    )].filter((n) => n.getBoundingClientRect().width > 0)
+    /*
+     * THE NUMBERED DISC IS THE MARKER, NOT A LABEL. It is the pin itself --
+     * the thing the chip is attached to -- so counting it doubles every
+     * position. Five labelled things means three chips, SUN and SHADOW.
+     */
+    const nodes = [...document.querySelectorAll('.shooter__focal, .shooter__flag')].filter((n) => n.getBoundingClientRect().width > 0)
     const outer = nodes.filter((n) => !nodes.some((other) => other !== n && other.contains(n)))
     const readouts = [...document.querySelectorAll('.ray-label')]
       .filter((n) => n.getBoundingClientRect().width > 0)
@@ -295,7 +398,17 @@ try {
     const c = document.querySelector('.maplibregl-canvas')
     if (!c) return 0
     const r = c.getBoundingClientRect()
-    const covered = [...document.querySelectorAll('.land, .land__scroll')]
+    /*
+     * THE CLASS THIS LOOKED FOR NO LONGER EXISTS.
+     *
+     * It checked for '.land', which was the landing page's class before the
+     * cover pass renamed it to '.cover'. So the guard that exists precisely
+     * to stop this script photographing the cover page had been checking for
+     * an element that cannot be on the page -- a check that could not fail,
+     * standing in front of a check pointed at the wrong object. Both named
+     * shapes, in one line, and it let a cover-page screenshot through again.
+     */
+    const covered = [...document.querySelectorAll('.cover, .land, .how')]
       .filter((n) => n.getBoundingClientRect().width > 0).length
     return covered > 0 ? -1 : +((r.width * r.height) / (innerWidth * innerHeight)).toFixed(2)
   })()`)
@@ -331,6 +444,81 @@ try {
   )
   await wait(1200)
 
+  /*
+   * THE CHIPS MUST BE READABLE, WHICH IS A GEOMETRY QUESTION.
+   *
+   * Three plates in the upper two thirds, none clipped by the frame edge,
+   * none overlapping another, and none under the scrim where the wordmark
+   * sits. A frame whose whole argument is "this is the real thing" cannot
+   * have the real thing jammed into a corner under the type.
+   *
+   * SAFE AREA: the top 62% of the frame, inset 16px from each edge. 62%
+   * because the scrim is transparent to 42% and solid by 72%, so anything
+   * meant to be READ has to finish before the fade bites.
+   */
+  const chipProblems = await ev(`(() => {
+    const INSET = 16
+    const SAFE_BOTTOM = 0.62
+    const plates = [...document.querySelectorAll('.shooter__focal')]
+      .map((n) => ({ text: (n.textContent ?? '').trim(), r: n.getBoundingClientRect() }))
+      .filter((p) => p.r.width > 0)
+    /*
+     * THE RAY PLATES COUNT AS THINGS A CHIP CAN COLLIDE WITH. A first frame
+     * had the SUN plate sitting on top of a drone chip; the check compared
+     * chips only to each other and passed it. Anything with words on it is
+     * something a chip can be unreadable against.
+     */
+    const others = [...document.querySelectorAll('.ray-label')]
+      .map((n) => ({ text: (n.textContent ?? '').trim(), r: n.getBoundingClientRect() }))
+      .filter((p) => p.r.width > 0)
+    const problems = []
+    if (plates.length !== 3) problems.push('expected 3 chips, found ' + plates.length)
+    const limit = innerHeight * SAFE_BOTTOM
+    for (const p of plates) {
+      if (p.r.left < INSET || p.r.right > innerWidth - INSET) {
+        problems.push('chip "' + p.text + '" is clipped by the frame edge')
+      }
+      if (p.r.bottom > limit) {
+        problems.push('chip "' + p.text + '" sits below the safe area, under the scrim')
+      }
+      if (!/TRIPOD|DRONE/.test(p.text)) {
+        problems.push('chip "' + p.text + '" does not name its platform')
+      }
+    }
+    const all = [...plates, ...others]
+    for (let i = 0; i < all.length; i += 1) {
+      for (let j = i + 1; j < all.length; j += 1) {
+        const a = all[i].r, b = all[j].r
+        const w = Math.min(a.right, b.right) - Math.max(a.left, b.left)
+        const h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top)
+        if (w > 1 && h > 1) {
+          problems.push('"' + all[i].text + '" and "' + all[j].text + '" overlap')
+        }
+      }
+    }
+    return JSON.stringify({
+      problems,
+      plates: plates.map((p) => p.text),
+      rays: others.map((p) => ({
+        t: p.text.slice(0, 10),
+        x: Math.round(p.r.left), y: Math.round(p.r.top),
+        w: Math.round(p.r.width), h: Math.round(p.r.height),
+      })),
+      rects: plates.map((p) => ({
+        t: p.text.slice(0, 12),
+        x: Math.round(p.r.left), y: Math.round(p.r.top),
+        w: Math.round(p.r.width), h: Math.round(p.r.height),
+      })),
+      viewport: { w: innerWidth, h: innerHeight, safeBottom: Math.round(innerHeight * SAFE_BOTTOM) },
+    })
+  })()`)
+  const chips = JSON.parse(chipProblems)
+  console.log(`  ${'chips'.padEnd(26)} ${JSON.stringify(chips.plates)}`)
+  console.log(`  ${'chip rects'.padEnd(26)} ${JSON.stringify(chips.rects)}`)
+  console.log(`  ${'ray rects'.padEnd(26)} ${JSON.stringify(chips.rays)}`)
+  console.log(`  ${'viewport'.padEnd(26)} ${JSON.stringify(chips.viewport)}`)
+  for (const problem of chips.problems) console.log(`      CHIP: ${problem}`)
+
   const shot = await send('Page.captureScreenshot', { format: 'jpeg', quality: 86 })
   const bytes = Buffer.from(shot.result.data, 'base64')
   writeFileSync('public/cover-frame.jpg', bytes)
@@ -343,6 +531,7 @@ try {
     labels,
     bytes: bytes.length,
     layers: JSON.parse(errors),
+    chipProblems: chips.problems,
   }
 } finally {
   watchdog.stop()
@@ -360,8 +549,9 @@ if (report === null) {
  * "this is the real thing" cannot be a real render of an empty map.
  */
 const missing = []
-if (report.positions < 2) missing.push(`two positions (found ${report.positions})`)
-if (report.cones < 2) missing.push(`two coverage cones (found ${report.cones})`)
+if (report.positions < 3) missing.push(`three positions (found ${report.positions})`)
+if (report.cones < 3) missing.push(`three coverage cones (found ${report.cones})`)
+for (const problem of report.chipProblems ?? []) missing.push(problem)
 if (!report.rays.includes('sun')) missing.push('a sun ray')
 if (!report.rays.includes('shadow')) missing.push('a shadow ray')
 if (report.marks < 1) missing.push(`one hazard mark (found ${report.marks})`)

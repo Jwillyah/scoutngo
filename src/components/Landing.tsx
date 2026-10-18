@@ -1,9 +1,5 @@
-import { useMemo, useState } from 'react'
-import { CALIBRATION_VENUE, resolveWindow } from '../lib/venue.ts'
-import { getSunPosition } from '../core/sun.ts'
-import { phaseAt, phaseSpans } from '../core/nightWindow.ts'
+import { useState } from 'react'
 import { ESRI_ATTRIBUTION } from './MapView.tsx'
-import { TimeScrubber } from './TimeScrubber.tsx'
 import { HowPage } from './HowPage.tsx'
 
 /**
@@ -61,37 +57,14 @@ export function Landing({ onDismiss }: { onDismiss: () => void }) {
 
 function Cover({ onDismiss, onHow }: { onDismiss: () => void; onHow: () => void }) {
   /*
-   * THE SCRUBBER'S INPUTS ARE COMPUTED, not faked.
+   * THE FAKE CONTROL IS GONE.
    *
-   * The venue in the frame is the calibration venue, so the window, the sun
-   * and the twilight bands on this bar are the real arithmetic for that place
-   * on that date. There is no network here and no stored state: it is
-   * src/core, given a coordinate and a clock.
+   * The cover carried a real TimeScrubber -- readout, twilight strip, thumb --
+   * computed from the calibration venue. It was real arithmetic and it was
+   * still the wrong thing: this page is a still frame of the app, and a slider
+   * on a still frame is a control that cannot do anything. A picture of an
+   * instrument is not an instrument.
    */
-  const venueWindow = useMemo(() => resolveWindow(CALIBRATION_VENUE), [])
-  const [scrub, setScrub] = useState(0.5)
-
-  const at = useMemo(() => {
-    if (venueWindow === null) return null
-    const span = venueWindow.end.getTime() - venueWindow.start.getTime()
-    return new Date(venueWindow.start.getTime() + span * scrub)
-  }, [venueWindow, scrub])
-
-  const sun = useMemo(
-    () =>
-      venueWindow === null || at === null
-        ? null
-        : getSunPosition(at, venueWindow.lat, venueWindow.lon),
-    [venueWindow, at],
-  )
-
-  const bands = useMemo(
-    () =>
-      venueWindow === null
-        ? []
-        : phaseSpans(venueWindow.start, venueWindow.end, venueWindow.lat, venueWindow.lon),
-    [venueWindow],
-  )
 
   return (
     <div className="cover">
@@ -125,36 +98,21 @@ function Cover({ onDismiss, onHow }: { onDismiss: () => void; onHow: () => void 
           </button>
         </p>
 
-        {/*
-          * THE SEAM. Above the attribution, below the words, and real.
-          */}
-        {venueWindow === null || at === null || sun === null ? null : (
-          <div className="cover__scrub">
-            <TimeScrubber
-              start={venueWindow.start}
-              end={venueWindow.end}
-              value={scrub}
-              onChange={setScrub}
-              at={at}
-              sun={sun}
-              timeZone={venueWindow.timeZone}
-              timeZoneAbbr={venueWindow.timeZoneShort}
-              tideExtremes={[]}
-              phases={bands}
-              phase={phaseAt(at, venueWindow.lat, venueWindow.lon)}
-              flying={{ airPositions: 0, dronePlatform: false }}
-            />
-          </div>
-        )}
-
-        <p className="cover__attrib">
-          An example venue, not your location. {ESRI_ATTRIBUTION}
-        </p>
-
         <button type="button" className="cover__go" onClick={onDismiss}>
           Open the map
         </button>
         <p className="cover__licence">Free · open source · no account</p>
+
+        {/*
+          * ATTRIBUTION LAST, AND SMALLEST.
+          *
+          * It sat between the link and the button, so the path from reading
+          * what this is to doing something about it ran through a licensing
+          * credit. The credit is owed and it is not a step in that path.
+          */}
+        <p className="cover__attrib">
+          An example venue, not your location. {ESRI_ATTRIBUTION}
+        </p>
       </div>
     </div>
   )

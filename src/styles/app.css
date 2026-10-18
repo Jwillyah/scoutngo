@@ -3965,6 +3965,15 @@
   font-weight: var(--weight-medium);
 }
 
+/*
+ * WHAT THE POSITION IS ON. Quieter than the focal length, because the number
+ * is the reading and this is the context for it.
+ */
+.shooter__platform {
+  color: var(--color-text-muted);
+  font-weight: var(--weight-medium);
+}
+
 /* The same chip without the alarm, for a framing note. */
 .shot__note {
   background: var(--color-panel-2);
@@ -7742,11 +7751,18 @@
   margin-top: var(--space-1);
 }
 
-.cover__attrib,
 .cover__licence {
   margin: 0;
   font-size: var(--text-xs);
   color: var(--color-text-muted);
+}
+
+/* Smallest type on the page, and last. The credit is owed; it is not a step. */
+.cover__attrib {
+  margin: 0;
+  font-size: 0.625rem;
+  line-height: 1.5;
+  color: var(--color-text-faint);
 }
 
 .cover__licence {
@@ -7765,10 +7781,24 @@
 .cover__go {
   width: 100%;
   min-height: 52px;
-  background: var(--ocean);
-  color: var(--accent-ink);
+  /*
+   * PILL, AND A GRADIENT WITHIN THE TEAL FAMILY.
+   *
+   * STILL CHROME UNDER THE COLOUR RULE. The rule is about which HUE means
+   * what -- teal is controls, every other hue is a reading -- and this is
+   * teal into --ocean-far, the lighter cyan this repo already defines as "the
+   * far end of the gradient, never used alone". No new colour: the constraint
+   * was to build from what is in use, and this was already in use. It never
+   * reaches a hue that means something on the map.
+   *
+   * AND NO OUTER GLOW. The glow was the thing that read as a different
+   * product: nothing else in this app is lit from behind, and a control that
+   * is cannot be the same kind of object as the plates on the map.
+   */
+  background: linear-gradient(90deg, var(--ocean) 0%, var(--ocean-far) 100%);
+  color: var(--ocean-ink);
   border: 0;
-  border-radius: var(--radius-flat);
+  border-radius: 999px;
   font-family: var(--font-mono);
   font-size: var(--text-md);
   font-weight: var(--weight-heavy);

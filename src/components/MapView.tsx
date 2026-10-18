@@ -2832,6 +2832,11 @@ export function MapView({
        * "SUN" and "SHADOW" are what the ray is; the bearing is the receipt for
        * it. With the receipts off the plate is still a labelled ray pointing
        * somewhere, which is the whole content of the overlay.
+       *
+       * BOTH PLATES OR NEITHER. showNumerals is one flag for every ray, so SUN
+       * and SHADOW cannot end up with one carrying a bearing and the other
+       * bare -- which would read as "we know where the sun is and not the
+       * shadow", a claim about the data rather than about the setting.
        */
       el.innerHTML =
         `<span class="ray-label__text">${label.text}</span>` +

@@ -270,9 +270,25 @@ export function ShooterFigure({
         */}
       <span className="shooter__focal num">
         {opticTag === null || opticTag === '' ? null : (
-          <span className="shooter__optic">{opticTag}</span>
+          <>
+            <span className="shooter__optic">{opticTag}</span>
+            {/* A space, so "AIR 3S" and "70mm" do not run together. */}
+            <span className="shooter__sep" aria-hidden="true">
+              {' '}
+            </span>
+          </>
         )}
-        {focalLength}
+        {focalLength}mm
+        {/*
+          * AND WHAT IT IS ON. A bare focal length does not distinguish a drone
+          * from a tripod, which is the only reason to show two of them: "70mm"
+          * beside "200mm" reads as two lenses, and the thing that actually
+          * differs is that one of them is in the air.
+          */}
+        <span className="shooter__sep" aria-hidden="true">
+          ·
+        </span>
+        <span className="shooter__platform">{air ? 'DRONE' : 'TRIPOD'}</span>
         {air ? (
           <>
             <span className="shooter__sep" aria-hidden="true">

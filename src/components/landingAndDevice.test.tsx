@@ -45,9 +45,32 @@ describe('the cover carries five elements and stops', () => {
     expect(html).toContain('cover__scrim')
   })
 
-  it('carries the scrubber as the seam, above the attribution', () => {
-    expect(html).toContain('cover__scrub')
-    expect(html.indexOf('cover__scrub')).toBeLessThan(html.indexOf('cover__attrib'))
+  it('carries no control at all, because a still frame cannot have one', () => {
+    /*
+     * The cover briefly carried a real TimeScrubber, computed from the
+     * calibration venue. It was real arithmetic and still the wrong thing:
+     * this page is a picture of the app, and a slider on a picture is a
+     * control that cannot do anything.
+     */
+    expect(html).not.toContain('cover__scrub')
+    expect(html).not.toContain('scrub__range')
+    expect(html).not.toContain('scrub__phases')
+  })
+
+  it('puts the attribution last, after the button and the licence line', () => {
+    /*
+     * It sat between the link and the button, so the path from reading what
+     * this is to doing something about it ran through a licensing credit.
+     */
+    expect(html.indexOf('cover__attrib')).toBeGreaterThan(html.indexOf('cover__go'))
+    expect(html.indexOf('cover__attrib')).toBeGreaterThan(html.indexOf('cover__licence'))
+  })
+
+  it('orders the copy: wordmark, headline, link, button, licence, attribution', () => {
+    const order = ['cover__name', 'cover__head', 'cover__more', 'cover__go', 'cover__licence', 'cover__attrib']
+    const at = order.map((c) => html.indexOf(c))
+    expect(at.every((i) => i >= 0)).toBe(true)
+    for (let i = 1; i < at.length; i += 1) expect(at[i]).toBeGreaterThan(at[i - 1] ?? -1)
   })
 
   /*
