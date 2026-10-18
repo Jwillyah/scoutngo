@@ -28,11 +28,7 @@ import { sharedOptic } from './core/mapLabel.ts'
 import { subjectSizeMatters } from './core/fov.ts'
 import { skyLayerOn, type MapPanel } from './core/mapPanel.ts'
 import {
-  holdToggle,
-  NO_HOLDS,
   canPackAir,
-  packForPlatform,
-  type KitHolds,
 } from './core/kitPacking.ts'
 import { EMPTY_LANDCOVER, type Landcover } from './core/siting.ts'
 import { getSunArc, getSunPosition } from './core/sun.ts'
@@ -976,61 +972,41 @@ function App() {
   )
 
   /*
-   * WHAT THE SHOOTER TICKED BY HAND, so a chip never undoes it.
+   * NO HOLDS ANY MORE, AND NOTHING LOST.
    *
-   * Recorded by DIFFING the selection rather than by every chip row reporting
-   * which id it changed. The kit is edited from two places, the chip row and
-   * the full kit panel, and both hand back a whole selection; asking each of
-   * them to also report the id is two chances to forget. The diff cannot
-   * forget, and it is how an import or a restore gets treated as the shooter's
-   * choice too, which it is.
+   * KitHolds existed to remember which ids the shooter had ticked BY HAND, so
+   * the packing chip could not undo them. With the chip no longer writing to
+   * the kit, every tick in the selection is a hand tick: the selection IS the
+   * record of what the shooter chose, and a second structure describing which
+   * parts of it are "really" theirs is a second source for one fact.
    */
-  const [kitHolds, setKitHolds] = useState<KitHolds>(NO_HOLDS)
-
-  const onKitChange = useCallback(
-    (next: KitSelection) => {
-      setKitHolds((held) => {
-        let out = held
-        for (const key of ['bodyIds', 'lensIds', 'droneIds'] as const) {
-          const before = new Set(kit[key])
-          const after = new Set(next[key])
-          for (const id of after) if (!before.has(id)) out = holdToggle(out, id, true)
-          for (const id of before) if (!after.has(id)) out = holdToggle(out, id, false)
-        }
-        return out
-      })
-      setKit(next)
-    },
-    [kit, setKit],
-  )
+  const onKitChange = useCallback((next: KitSelection) => setKit(next), [setKit])
 
   /*
-   * THE PLATFORM CHIP PACKS THE BAG.
+   * THE FILTER DOES NOT PACK THE BAG. IT NEVER DID, HONESTLY.
    *
-   * "Drone selected, and the kit row has a7IV, a7III, 28-75 and 200-600 all
-   * ticked." The chip said what was flying and the bag still held everything.
+   * THE RULE, STATED ONCE: the kit is what the shooter OWNS; the filter is
+   * what they want to SEE. A view filter never writes to the kit.
    *
-   * A WATCHED CONDITION, like the window in src/lib/chipWindow.ts, rather than
-   * something the chip's own handler does: the packing depends on the filter
-   * AND the profile AND the holds, and doing it from the one handler that
-   * changes the first of those is how an ordering trap gets built. The rule is
-   * in src/core/kitPacking.ts and returns the selection UNCHANGED when there is
-   * nothing to do, which is what stops this looping.
+   * WHAT WAS HERE. An effect watched platformFilter and rewrote the kit
+   * selection through packForPlatform: picking DRONE unticked the bodies and
+   * glass, picking GROUND unticked the aircraft. It was asked for and it read
+   * as sensible, and it made the control ONE-WAY. Selecting GROUND removed
+   * the drone from the selection, droneAvailable then answered false, and the
+   * AIR segment came back disabled with the title "No drone in the kit" --
+   * with every kit chip in Setup still ticked. There was no way back to AIR
+   * except reloading.
+   *
+   * That is the drone chip bug a second time, and the first fix was local:
+   * a control deriving its enabled state from a selection it is the only way
+   * to change. The shape is in docs/failure-modes.md as D.
+   *
+   * WHAT REPLACED IT: nothing. GROUND hides air positions and air optics from
+   * the VIEW -- visiblePlan and opticsFor already do that, by platform, at
+   * read time -- and the aircraft stays in the kit. Packing is now only what
+   * the shooter does by hand in the kit row, which is the one place that
+   * means "this is what I am carrying".
    */
-  // oxlint-disable react/set-state-in-effect -- one rule, one place; see above
-  useEffect(() => {
-    const packed = packForPlatform(platformFilter, kitProfile, kit, kitHolds)
-    if (packed === kit) return
-    if (
-      packed.bodyIds.join() === kit.bodyIds.join() &&
-      packed.lensIds.join() === kit.lensIds.join() &&
-      packed.droneIds.join() === kit.droneIds.join()
-    ) {
-      return
-    }
-    setKit({ ...kit, ...packed })
-  }, [platformFilter, kitProfile, kit, kitHolds, setKit])
-  // oxlint-enable react/set-state-in-effect
 
   const addsAir = platformFilter === 'air' && defaultAirOptic !== null
 
@@ -1990,7 +1966,14 @@ function App() {
           onPlatformFilter={setPlatformFilter}
           platformCounts={platformTally}
           hiddenByPlatform={hiddenByPlatform}
-          airAvailable={droneAvailable(kit, kitProfile)}
+          /*
+           * WHAT THE SHOOTER OWNS, NOT WHAT IS TICKED RIGHT NOW. This read
+           * droneAvailable(kit, ...), which asks the SELECTION -- so any
+           * state that emptied the selection of drones disabled the segment
+           * that is the only way to get them back. canPackAir asks the
+           * profile: a drone in the bag means AIR is selectable, always.
+           */
+          airAvailable={canPackAir(kitProfile)}
           pilotAt={pilotAt}
           onPilotMove={onPilotMove}
           addsAir={addsAir}

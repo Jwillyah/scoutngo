@@ -95,6 +95,21 @@ value.
 - **Wait for the real signal.** `idle` means the tiles have arrived; a timer
   means a timer elapsed.
 
+### A guard that names what it does not want is disarmed by a rename
+
+The `.land` guard, written to stop the frame script photographing the cover
+page, passed silently when the cover pass renamed `.land` to `.cover`. It
+spent two passes checking for an element that could not be on the page, and a
+cover-page screenshot went through underneath it.
+
+A negative guard has a dependency nobody records: every name it excludes.
+Rename any of them and the guard still runs, still passes, and guards nothing.
+
+**Fix: assert a positive property of the object you DO want.** "The map canvas
+is visible and covers more than 60% of the viewport" survives any rename
+elsewhere in the tree, because it describes the thing being measured rather
+than the things that might be in the way.
+
 ---
 
 ## D · A feature that hides its own dependency

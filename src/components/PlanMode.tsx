@@ -1084,6 +1084,35 @@ export function PlanMode({
                 sunAltitude={sun?.altitude ?? null}
                 mapZoom={mapZoom}
               />
+
+              {/*
+                * CLOUD IS A LAYER, SO IT LIVES IN LAYERS.
+                *
+                * It was its own section, which made six. The key belongs with
+                * the thing it is a key FOR: the toggle that draws the cloud is
+                * three rows above this, and having the legend in a separate
+                * section meant reading one to understand the other.
+                */}
+              <SkyLegend
+                band={skyBand}
+                advice={zoomAdvice(skyBand, venue?.lat ?? 0, mapWidth, mapZoom)}
+                sky={sky}
+                clock={(at) =>
+                  venueWindow === null
+                    ? at.toISOString().slice(11, 16)
+                    : formatClock(at, venueWindow.timeZone)
+                }
+                boundary={
+                  venueWindow === null
+                    ? null
+                    : boundaryNote(new Date(), (at) => formatClock(at, venueWindow.timeZone))
+                }
+                onZoomOut={(zoom) => handle.current?.zoomTo(zoom)}
+                layer={skyLayer}
+                onLayer={onSkyLayer}
+                windHeight={windHeight}
+                ratedWindMps={ratedWindMps}
+              />
             </SheetSection>
 
             <SheetSection title="Hazards">
@@ -1104,29 +1133,6 @@ export function PlanMode({
                 onMarking={onMarking}
                 date={shootDate}
                 latitude={venue?.lat ?? null}
-              />
-            </SheetSection>
-
-            <SheetSection title="Cloud layer">
-              <SkyLegend
-                band={skyBand}
-                advice={zoomAdvice(skyBand, venue?.lat ?? 0, mapWidth, mapZoom)}
-                sky={sky}
-                clock={(at) =>
-                  venueWindow === null
-                    ? at.toISOString().slice(11, 16)
-                    : formatClock(at, venueWindow.timeZone)
-                }
-                boundary={
-                  venueWindow === null
-                    ? null
-                    : boundaryNote(new Date(), (at) => formatClock(at, venueWindow.timeZone))
-                }
-                onZoomOut={(zoom) => handle.current?.zoomTo(zoom)}
-                layer={skyLayer}
-                onLayer={onSkyLayer}
-                windHeight={windHeight}
-                ratedWindMps={ratedWindMps}
               />
             </SheetSection>
 

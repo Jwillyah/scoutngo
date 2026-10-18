@@ -390,45 +390,17 @@ try {
   )
 
   /*
-   * THE MAP MUST BE THE FRAME. Counting features off window.__probe proves the
-   * map STATE is right; it says nothing about what is on the glass. This
-   * checks the canvas is actually the thing being photographed.
-   */
-  const canvasShare = await ev(`(() => {
-    const c = document.querySelector('.maplibregl-canvas')
-    if (!c) return 0
-    const r = c.getBoundingClientRect()
-    /*
-     * THE CLASS THIS LOOKED FOR NO LONGER EXISTS.
-     *
-     * It checked for '.land', which was the landing page's class before the
-     * cover pass renamed it to '.cover'. So the guard that exists precisely
-     * to stop this script photographing the cover page had been checking for
-     * an element that cannot be on the page -- a check that could not fail,
-     * standing in front of a check pointed at the wrong object. Both named
-     * shapes, in one line, and it let a cover-page screenshot through again.
-     */
-    const covered = [...document.querySelectorAll('.cover, .land, .how')]
-      .filter((n) => n.getBoundingClientRect().width > 0).length
-    return covered > 0 ? -1 : +((r.width * r.height) / (innerWidth * innerHeight)).toFixed(2)
-  })()`)
-  console.log(`  ${'map share of viewport'.padEnd(26)} ${canvasShare}`)
-  if (canvasShare <= 0) {
-    throw new Error('the landing page is still covering the map; nothing was captured')
-  }
-
-  /*
    * THE APP'S OWN CHROME COMES OFF BEFORE THE SHUTTER.
    *
-   * The cover puts its own eyebrow, wordmark, scrubber and button on top of
-   * this image. Leaving the real sheet, rail, dock and map controls baked into
-   * it would put two sets of UI on one screen -- a photograph of a phone
-   * inside a phone, which is exactly the stock-mockup look the brief rules
-   * out. What stays is the MAP and everything the app DREW on it: the cones,
-   * the rays, the plates, the pin, the mark.
+   * The cover puts its own wordmark, headline and button on top of this
+   * image. Leaving the real sheet, rail, dock and map controls baked in would
+   * put two sets of UI on one screen. What stays is the MAP and everything
+   * the app DREW on it.
    *
-   * Hidden by inline style on a throwaway page, so nothing here changes the
-   * app. The page is navigated away from immediately afterwards.
+   * This step was lost in an edit and the loss was nearly invisible: the
+   * frame came back with the sheet and the dock in it, and the guard below
+   * passed it at 0.67 because the floor was set at 0.60. A floor loose enough
+   * to admit a third of the frame being covered is not a guard.
    */
   await step(
     'hide app chrome',
@@ -436,7 +408,7 @@ try {
        const gone = []
        for (const sel of ['.sheet', '.dock', '.rail2', '.maplibregl-ctrl-bottom-left',
                           '.maplibregl-ctrl-bottom-right', '.maplibregl-ctrl-top-right',
-                          '.nowbtn', '.now-btn']) {
+                          '.shell__now', '.nowbtn']) {
          for (const n of document.querySelectorAll(sel)) { n.style.display = 'none'; gone.push(sel) }
        }
        return gone.join(' ')
@@ -445,79 +417,76 @@ try {
   await wait(1200)
 
   /*
-   * THE CHIPS MUST BE READABLE, WHICH IS A GEOMETRY QUESTION.
+   * THE MAP MUST BE THE FRAME, ASSERTED POSITIVELY.
    *
-   * Three plates in the upper two thirds, none clipped by the frame edge,
-   * none overlapping another, and none under the scrim where the wordmark
-   * sits. A frame whose whole argument is "this is the real thing" cannot
-   * have the real thing jammed into a corner under the type.
+   * THE GUARD THIS REPLACES NAMED WHAT IT DID NOT WANT. It looked for '.land'
+   * and refused if it found one. The cover pass renamed that class to
+   * '.cover', which disarmed the guard without touching it: it went on
+   * running, went on passing, and a cover-page screenshot went through
+   * underneath it. A negative guard depends on every name it excludes, and
+   * nothing records that dependency.
    *
-   * SAFE AREA: the top 62% of the frame, inset 16px from each edge. 62%
-   * because the scrim is transparent to 42% and solid by 72%, so anything
-   * meant to be READ has to finish before the fade bites.
+   * SO THIS ASSERTS A PROPERTY OF THE THING IT WANTS. The map canvas must be
+   * visible and must cover most of the viewport. Rename every overlay in the
+   * app and this still holds, because it describes the object being measured
+   * rather than the objects that might be in front of it.
+   *
+   * 95%, not 60. The chrome is hidden above, so a healthy frame measures
+   * 1.00 and there is nothing legitimate left to cover the map. A floor of
+   * 0.60 was tried first and it passed a frame with the sheet and the dock
+   * still in it -- loose enough to admit the exact failure it was written
+   * for.
    */
-  const chipProblems = await ev(`(() => {
-    const INSET = 16
-    const SAFE_BOTTOM = 0.62
-    const plates = [...document.querySelectorAll('.shooter__focal')]
-      .map((n) => ({ text: (n.textContent ?? '').trim(), r: n.getBoundingClientRect() }))
-      .filter((p) => p.r.width > 0)
+  const framing = await ev(`(() => {
+    const canvas = document.querySelector('.maplibregl-canvas')
+    if (!canvas) return JSON.stringify({ ok: false, why: 'there is no map canvas on the page' })
+    const map = canvas.closest('.maplibregl-map') ?? canvas.parentElement ?? canvas
+    const r = canvas.getBoundingClientRect()
+    if (r.width <= 0 || r.height <= 0) {
+      return JSON.stringify({ ok: false, why: 'the map canvas has no size' })
+    }
+    const style = getComputedStyle(canvas)
+    if (style.visibility === 'hidden' || style.display === 'none' || Number(style.opacity) === 0) {
+      return JSON.stringify({ ok: false, why: 'the map canvas is not visible' })
+    }
+
     /*
-     * THE RAY PLATES COUNT AS THINGS A CHIP CAN COLLIDE WITH. A first frame
-     * had the SUN plate sitting on top of a drone chip; the check compared
-     * chips only to each other and passed it. Anything with words on it is
-     * something a chip can be unreadable against.
+     * VISIBLE share, not laid-out share: sample a grid of points across the
+     * canvas and ask the document what is actually on top at each one. That
+     * is what catches something covering it, whatever the covering thing is
+     * called.
      */
-    const others = [...document.querySelectorAll('.ray-label')]
-      .map((n) => ({ text: (n.textContent ?? '').trim(), r: n.getBoundingClientRect() }))
-      .filter((p) => p.r.width > 0)
-    const problems = []
-    if (plates.length !== 3) problems.push('expected 3 chips, found ' + plates.length)
-    const limit = innerHeight * SAFE_BOTTOM
-    for (const p of plates) {
-      if (p.r.left < INSET || p.r.right > innerWidth - INSET) {
-        problems.push('chip "' + p.text + '" is clipped by the frame edge')
-      }
-      if (p.r.bottom > limit) {
-        problems.push('chip "' + p.text + '" sits below the safe area, under the scrim')
-      }
-      if (!/TRIPOD|DRONE/.test(p.text)) {
-        problems.push('chip "' + p.text + '" does not name its platform')
-      }
-    }
-    const all = [...plates, ...others]
-    for (let i = 0; i < all.length; i += 1) {
-      for (let j = i + 1; j < all.length; j += 1) {
-        const a = all[i].r, b = all[j].r
-        const w = Math.min(a.right, b.right) - Math.max(a.left, b.left)
-        const h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top)
-        if (w > 1 && h > 1) {
-          problems.push('"' + all[i].text + '" and "' + all[j].text + '" overlap')
-        }
+    let onTop = 0
+    let total = 0
+    for (let fx = 0.1; fx <= 0.9; fx += 0.1) {
+      for (let fy = 0.1; fy <= 0.9; fy += 0.1) {
+        const x = r.left + r.width * fx
+        const y = r.top + r.height * fy
+        const hit = document.elementFromPoint(x, y)
+        total += 1
+        /*
+         * THE MAP AND ITS OWN OVERLAYS COUNT AS THE MAP.
+         *
+         * Testing against the bare canvas scored 0.91 on a perfectly good
+         * frame, because the app's markers -- the chips, the ray plates, the
+         * pins -- are DOM elements over the canvas and they are exactly what
+         * the frame is FOR. MapLibre puts them inside its own container, so
+         * the honest question is whether the hit is inside the map at all.
+         * A cover page, a sheet or a modal is not.
+         */
+        if (map.contains(hit)) onTop += 1
       }
     }
+    const share = total === 0 ? 0 : onTop / total
     return JSON.stringify({
-      problems,
-      plates: plates.map((p) => p.text),
-      rays: others.map((p) => ({
-        t: p.text.slice(0, 10),
-        x: Math.round(p.r.left), y: Math.round(p.r.top),
-        w: Math.round(p.r.width), h: Math.round(p.r.height),
-      })),
-      rects: plates.map((p) => ({
-        t: p.text.slice(0, 12),
-        x: Math.round(p.r.left), y: Math.round(p.r.top),
-        w: Math.round(p.r.width), h: Math.round(p.r.height),
-      })),
-      viewport: { w: innerWidth, h: innerHeight, safeBottom: Math.round(innerHeight * SAFE_BOTTOM) },
+      ok: share >= 0.95,
+      share: +share.toFixed(2),
+      why: share >= 0.95 ? 'the map is the frame' : 'something is covering the map: visible share ' + share.toFixed(2),
     })
   })()`)
-  const chips = JSON.parse(chipProblems)
-  console.log(`  ${'chips'.padEnd(26)} ${JSON.stringify(chips.plates)}`)
-  console.log(`  ${'chip rects'.padEnd(26)} ${JSON.stringify(chips.rects)}`)
-  console.log(`  ${'ray rects'.padEnd(26)} ${JSON.stringify(chips.rays)}`)
-  console.log(`  ${'viewport'.padEnd(26)} ${JSON.stringify(chips.viewport)}`)
-  for (const problem of chips.problems) console.log(`      CHIP: ${problem}`)
+  const frame = JSON.parse(framing)
+  console.log(`  ${'map is the frame'.padEnd(26)} ${frame.share ?? '—'} (${frame.why})`)
+  if (!frame.ok) throw new Error(frame.why)
 
   const shot = await send('Page.captureScreenshot', { format: 'jpeg', quality: 86 })
   const bytes = Buffer.from(shot.result.data, 'base64')

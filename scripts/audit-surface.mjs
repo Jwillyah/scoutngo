@@ -300,6 +300,87 @@ for (const from of ['peek', 'half', 'full']) {
   }
 }
 
+/* ------------------------------- every segment reaches every other segment */
+
+/*
+ * A SEGMENTED CONTROL MUST BE A CONTROL, NOT A TRAPDOOR.
+ *
+ * WHY THIS EXISTS. The platform filter was one-way. Selecting GROUND rewrote
+ * the kit selection to drop the aircraft; the AIR segment then asked the
+ * SELECTION whether a drone was available, got no, and disabled itself --
+ * with the drone still in the bag and every kit chip still ticked. The only
+ * way back to AIR was reloading the app.
+ *
+ * Same shape as the detent assertion above, and the same lesson: the check
+ * has to be the GESTURE. "The segment exists" and "the segment is enabled
+ * right now" both pass a control you can enter and not leave.
+ *
+ * GENERIC, BY CONSTRUCTION. Every group of aria-pressed buttons is tested,
+ * so a segmented control added in six months is covered without anybody
+ * remembering to list it here.
+ */
+console.log('\n### every segment of every segmented control reaches every other')
+
+if (await setDetent('full')) {
+  const groups = await ev(`(() => {
+    const out = []
+    for (const group of document.querySelectorAll('[role="group"]')) {
+      const buttons = [...group.querySelectorAll('button[aria-pressed]')]
+        .filter((b) => b.getBoundingClientRect().width > 0)
+      if (buttons.length < 2) continue
+      out.push({
+        label: group.getAttribute('aria-label') ?? '(unlabelled group)',
+        segments: buttons.map((b) => (b.textContent ?? '').trim().slice(0, 24)),
+      })
+    }
+    return JSON.stringify(out)
+  })()`)
+
+  const parsed = JSON.parse(groups)
+  if (parsed.length === 0) console.log('  no segmented control on screen')
+
+  for (const group of parsed) {
+    console.log(`  ${group.label}: ${group.segments.join(' | ')}`)
+    for (const from of group.segments) {
+      for (const to of group.segments) {
+        if (from === to) continue
+        const result = await ev(`(() => {
+          const group = [...document.querySelectorAll('[role="group"]')]
+            .find((g) => (g.getAttribute('aria-label') ?? '(unlabelled group)') === ${JSON.stringify(group.label)})
+          if (!group) return 'group gone'
+          const find = (text) => [...group.querySelectorAll('button[aria-pressed]')]
+            .find((b) => (b.textContent ?? '').trim().slice(0, 24) === text)
+          const a = find(${JSON.stringify(from)})
+          const b = find(${JSON.stringify(to)})
+          if (!a || !b) return 'segment gone'
+          if (a.disabled) return 'cannot start: ' + ${JSON.stringify(from)} + ' is disabled'
+          a.click()
+          return 'moved to start'
+        })()`)
+        if (result !== 'moved to start') {
+          fail(`${group.label}: ${result}`)
+          continue
+        }
+        await wait(350)
+        const landed = await ev(`(() => {
+          const group = [...document.querySelectorAll('[role="group"]')]
+            .find((g) => (g.getAttribute('aria-label') ?? '(unlabelled group)') === ${JSON.stringify(group.label)})
+          const b = [...group.querySelectorAll('button[aria-pressed]')]
+            .find((x) => (x.textContent ?? '').trim().slice(0, 24) === ${JSON.stringify(to)})
+          if (!b) return 'gone'
+          if (b.disabled) return 'DISABLED: ' + (b.title || 'no reason given')
+          b.click()
+          return 'clicked'
+        })()`)
+        await wait(350)
+        if (landed !== 'clicked') {
+          fail(`${group.label}: from "${from}" the segment "${to}" is unreachable (${landed})`)
+        }
+      }
+    }
+  }
+}
+
 /* ------------------------------------ a named missing capability is fixable */
 
 /*
