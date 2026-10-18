@@ -163,17 +163,28 @@ export const MARKER_ANCHORS = `(() => {
  * about pixels, and checked under pitch and bearing as well, where a line
  * drawn in screen space would be wrong.
  *
- * TWO DIFFERENT ASSERTIONS, AND WHY.
+ * ONE ASSERTION: THE LENGTH ON THE GLASS. Nothing else.
  *
- * Flat, the rule is the simple one: at least the viewport diagonal long on
- * screen. Under pitch it cannot be, and that is geometry rather than a bug. A
- * line heading toward the horizon converges ON the horizon, which sits at a
- * fixed screen row, so its pixel length has a ceiling no distance can beat:
- * measured at zoom 16 pitch 60, pushing the far end from 4km to 4096km moved
- * it from 548px to 731px and no further, against a 930px diagonal. The 731px
- * line does leave the frame, with its far end 397px above the top edge. So
- * under pitch the assertion is the one that actually matters, which is that
- * the line leaves the frame at all.
+ * WHAT WAS ALSO ASSERTED, AND WHY IT WAS DELETED. This also required that the
+ * far end leave the frame, which was the ORIGINAL rule from when the only
+ * requirement was "long enough to read as a direction". When the fixed
+ * fraction replaced it, the old clause stayed, and the two cannot both hold:
+ *
+ *   diagonal at 390x844            929.8 px
+ *   a ray at the wanted 0.28       260.3 px
+ *   a centred pin to the side      195.0 px
+ *
+ * A correctly capped ray from a centred pin LEAVES a portrait phone frame for
+ * any bearing within 49 degrees of horizontal, which is more than half the
+ * compass. So the clause did not express a property of the ray at all: it
+ * reported where the pin happened to be sitting, and it failed precisely when
+ * the length it sat next to was right. Three cases failed on it with the
+ * fraction off by 0.008.
+ *
+ * Containment is not something the cap promises and not something it controls
+ * -- the pin can be anywhere, including behind the sheet -- so endsInFrame is
+ * still MEASURED and printed, because it is worth seeing, and it decides
+ * nothing.
  */
 export const BEARING_LINE_EXTENT = `(() => {
   const map = window.__probe?.map
@@ -276,9 +287,7 @@ const checkBearingLines = async (label) => {
   const rows = await ev(BEARING_LINE_EXTENT)
   if (rows?.error) { console.log(label, rows.error); failures += 1; return }
   const want = 0.28
-  const bad = rows.filter(
-    (r) => Math.abs(r.screenFraction - want) > RAY_FRACTION_TOLERANCE || !r.endsInFrame,
-  )
+  const bad = rows.filter((r) => Math.abs(r.screenFraction - want) > RAY_FRACTION_TOLERANCE)
   if (bad.length > 0) failures += bad.length
   const worst = Math.max(...rows.map((r) => Math.abs(r.screenFraction - want)))
   const rule = `fraction ${rows.map((r) => r.screenFraction).join('/')} (want ${want})`

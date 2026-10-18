@@ -860,7 +860,18 @@ function rayCollection(
   overlay: SunOverlay | null,
   showSun: boolean,
   showArc: boolean,
-  lengthMeters: number,
+  /*
+   * A LENGTH PER BEARING, not one length for all of them.
+   *
+   * It was a single number, and the projection audit caught what that costs
+   * under pitch: one ground length drawn in four directions came back as four
+   * different lengths on the glass. At zoom 12 pitch 60 the axis measured
+   * 0.436 of the diagonal, the sun ray 0.63 and the shadow 0.242, from the
+   * same metres. A ray pointing toward the horizon is stretched and one
+   * pointing toward the camera is compressed, so holding a screen fraction
+   * means asking the camera per direction.
+   */
+  lengthFor: (bearing: number) => number,
 ): GeoJSON.FeatureCollection {
   if (venue === null || overlay === null || !showSun) return emptyCollection()
 
@@ -891,7 +902,7 @@ function rayCollection(
          */
         coordinates: [
           toPosition(venue),
-          toPosition(bearingLineEnd(venue, ray.bearing, lengthMeters)),
+          toPosition(bearingLineEnd(venue, ray.bearing, lengthFor(ray.bearing))),
         ],
       },
     })),
@@ -913,7 +924,7 @@ function rayCollection(
  * fine when the only requirement was "long enough to leave the frame", and far
  * too coarse now that the length itself is the thing being held constant.
  */
-function rayMetresForScreen(bounds: ViewportBounds): number {
+function raySeedMetres(bounds: ViewportBounds): number {
   const target = viewportDiagonalMeters(bounds) * RAY_SCREEN_FRACTION
   if (!Number.isFinite(target) || target <= 0) return BEARING_LINE_MIN_METERS
 
@@ -931,6 +942,91 @@ function rayMetresForScreen(bounds: ViewportBounds): number {
    * above, and that is why it returns the core minimum there and nowhere else.
    */
   return 2 ** (Math.round(Math.log2(target) * 8) / 8)
+}
+
+/*
+ * THE RAY LENGTH, SOLVED THROUGH THE CAMERA.
+ *
+ * WHAT WAS WRONG, AND IT WAS WRONG FROM THE MOMENT IT WAS WRITTEN. The cap was
+ * asked for in SCREEN space and computed in GROUND space: a fraction of
+ * viewportDiagonalMeters, which is the ground distance across what the map
+ * reports visible. Those two agree looking straight down and diverge the
+ * instant the camera tilts, because a pitched view reports a vastly larger
+ * ground box while the far half of it compresses into a few rows of pixels.
+ *
+ * Measured by scripts/audit-projection.mjs: flat, every zoom from 10 to 20
+ * landed on 0.27 against a wanted 0.28. Pitched, the same code gave 0.436,
+ * 0.63 and 0.242 in three directions at once, and the long ones ran off the
+ * edge of the frame, which is the exact behaviour the cap exists to remove.
+ *
+ * THE FIX IS TO STOP APPROXIMATING THE CAMERA AND ASK IT. Project a trial
+ * length, measure the pixels it actually drew, scale by the ratio, repeat. In
+ * the near field pixel length is close to linear in ground distance so this
+ * converges in two or three steps; the loop is capped anyway so a pathological
+ * camera costs a fixed handful of projections rather than hanging.
+ *
+ * WHY SCALING AND NOT A BISECTION. Scaling needs no bracket. A bracket needs
+ * an upper bound that is known to overshoot, and under pitch there may not be
+ * one: a line toward the horizon converges ON the horizon, so its pixel length
+ * has a ceiling that no distance can beat. Shortening is always in the
+ * well behaved region, and shortening is the only thing this is ever asked to
+ * do, since the seed is the flat answer and the flat answer is the longest.
+ *
+ * STILL QUANTISED, same log grid as before and for the same reason: the number
+ * is recomputed on every move event and feeding a slightly different one into
+ * the source re-tiles the geometry for no visible gain. Eight steps to the
+ * octave is within about 9% of the target, well inside the audit's 0.12.
+ */
+const RAY_SOLVER_STEPS = 4
+
+/** Close enough to stop, as a fraction of the target pixel length. */
+const RAY_SOLVER_TOLERANCE = 0.02
+
+/** The ray length wanted on the glass, in CSS pixels. */
+function rayTargetPx(instance: maplibregl.Map): number {
+  const canvas = instance.getCanvas()
+  return Math.hypot(canvas.clientWidth, canvas.clientHeight) * RAY_SCREEN_FRACTION
+}
+
+function quantiseMetres(metres: number): number {
+  return 2 ** (Math.round(Math.log2(metres) * 8) / 8)
+}
+
+/**
+ * The ground distance whose DRAWN length is `targetPx` on the glass.
+ *
+ * `ends` returns the two coordinates of the line for a trial distance, so the
+ * same solver serves a one sided ray and a two sided axis: the axis passes its
+ * end-to-end pair and asks for twice the fraction, which is how
+ * scripts/audit-projection.mjs measures it.
+ */
+function solveRayMetres(
+  instance: maplibregl.Map,
+  ends: (metres: number) => readonly GeoJSON.Position[],
+  targetPx: number,
+  seedMetres: number,
+): number {
+  let metres = seedMetres
+  for (let step = 0; step < RAY_SOLVER_STEPS; step += 1) {
+    const line = ends(metres)
+    const first = line[0]
+    const last = line[line.length - 1]
+    if (first === undefined || last === undefined) break
+    const a = instance.project([first[0] ?? 0, first[1] ?? 0])
+    const b = instance.project([last[0] ?? 0, last[1] ?? 0])
+    const px = Math.hypot(b.x - a.x, b.y - a.y)
+    /*
+     * A degenerate measurement is the one case where scaling cannot help: a
+     * sub-pixel line gives a ratio with no information in it, and projecting
+     * through a camera mid-resize can give a non-finite one. Keep what we had.
+     */
+    if (!Number.isFinite(px) || px < 1) break
+    if (Math.abs(px - targetPx) <= targetPx * RAY_SOLVER_TOLERANCE) break
+    const next = metres * (targetPx / px)
+    if (!Number.isFinite(next) || next <= 0) break
+    metres = next
+  }
+  return quantiseMetres(metres)
 }
 
 function makeMarkerElement(className: string): HTMLDivElement {
@@ -2421,7 +2517,11 @@ export function MapView({
    */
   const bearingInputs = useRef({ venue, sunAzimuth, sunOverlay, showSun, showArc })
   bearingInputs.current = { venue, sunAzimuth, sunOverlay, showSun, showArc }
-  const bearingLengthDrawn = useRef(0)
+  /*
+   * The lengths last drawn, joined, so a move that changes none of them does
+   * no work. It was one number; there is a length per ray now.
+   */
+  const bearingLengthDrawn = useRef('')
 
   const drawBearingLines = useCallback((instance: maplibregl.Map, force: boolean) => {
     const input = bearingInputs.current
@@ -2431,21 +2531,62 @@ export function MapView({
      */
     if (input.venue === null) {
       if (!force) return
-      bearingLengthDrawn.current = 0
+      bearingLengthDrawn.current = ''
     }
-    const length =
-      input.venue === null
+
+    const pin = input.venue
+    const azimuth = input.sunAzimuth
+    const targetPx = rayTargetPx(instance)
+    /*
+     * THE FLAT ANSWER IS THE SEED. It is exact looking straight down, which
+     * is the common case, so the solver usually confirms it in one step and
+     * only works when the camera is tilted.
+     */
+    const seed = raySeedMetres(boundsOf(instance))
+
+    /*
+     * THE AXIS IS SOLVED END TO END, which is also how the audit measures it:
+     * its two halves have different pixel lengths under pitch, so there is no
+     * single half length that is right for both and the honest thing to hold
+     * constant is the whole line.
+     */
+    const halfLength =
+      pin === null || azimuth === null
         ? 0
-        : rayMetresForScreen(boundsOf(instance))
-    if (!force && length === bearingLengthDrawn.current) return
-    bearingLengthDrawn.current = length
+        : solveRayMetres(
+            instance,
+            (metres) => axisLine(pin, azimuth, metres),
+            targetPx * 2,
+            seed,
+          )
+
+    /* Recorded as they are solved, for the redraw key. */
+    const solved: number[] = []
+    const lengthFor =
+      pin === null
+        ? () => 0
+        : (bearing: number) => {
+            const metres = solveRayMetres(
+              instance,
+              (trial) => [toPosition(pin), toPosition(bearingLineEnd(pin, bearing, trial))],
+              targetPx,
+              seed,
+            )
+            solved.push(metres)
+            return metres
+          }
+
+    const sunData = sunCollection(pin, azimuth, halfLength)
+    const rayData = rayCollection(pin, input.sunOverlay, input.showSun, input.showArc, lengthFor)
+
+    const key = `${halfLength}|${solved.join(',')}`
+    if (!force && key === bearingLengthDrawn.current) return
+    bearingLengthDrawn.current = key
 
     const sun = instance.getSource(SUN_SOURCE) as maplibregl.GeoJSONSource | undefined
-    sun?.setData(sunCollection(input.venue, input.sunAzimuth, length))
+    sun?.setData(sunData)
     const rays = instance.getSource(RAY_SOURCE) as maplibregl.GeoJSONSource | undefined
-    rays?.setData(
-      rayCollection(input.venue, input.sunOverlay, input.showSun, input.showArc, length),
-    )
+    rays?.setData(rayData)
   }, [])
 
   /* The inputs changed, so redraw whatever the camera happens to be showing. */

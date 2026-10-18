@@ -29,7 +29,8 @@
  *      have been, so a red line always says which kind of red it is.
  */
 import { spawn } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, readdirSync, statSync } from 'node:fs'
+import { join } from 'node:path'
 
 export const APP_ORIGIN = 'http://127.0.0.1:5173'
 export const CDP_ORIGIN = 'http://127.0.0.1:9222'
@@ -111,6 +112,85 @@ function findChrome() {
   return null
 }
 
+/*
+ * IS THE APP ON THE PORT THE APP IN THE EDITOR?
+ *
+ * WHAT HAPPENED, AND IT WASTED A WHOLE DIAGNOSIS. The commit hook builds, then
+ * serves, then runs four audits against the port. A refused commit left that
+ * server up. The projection audit was then run by hand against it, a fix was
+ * written, it was run again, and it reported the SAME numbers to three decimal
+ * places -- because the port was serving dist/assets/index-CKnsJGVQ.js, a
+ * bundle built before the fix existed. The fix was never measured. Worse, a
+ * stash was taken to compare two commits and BOTH runs measured the same stale
+ * bundle, so the identical numbers were read as evidence that the older commit
+ * was already broken. That conclusion was manufactured entirely by this bug.
+ *
+ * This is the same shape as every other blind check here: a run that cannot
+ * tell "the code is broken" from "I could not look" at the code. It is worse
+ * than the usual case, because it does not merely fail to look -- it looks at
+ * something else and reports with full confidence.
+ *
+ * SO THE SOURCE IS COMPARED TO THE BUNDLE, by modification time, and an audit
+ * refuses to measure a bundle older than the code it is supposed to be
+ * measuring. An app served from live source has nothing to go stale and passes
+ * straight through.
+ */
+const FRESHNESS_WATCHED = ['src', 'index.html', 'vite.config.ts', 'api', 'netlify']
+
+/** The newest modification time under a path, and which file carried it. */
+function newestMtime(path, best = { ms: 0, path: null }) {
+  if (!existsSync(path)) return best
+  const stat = statSync(path)
+  if (stat.isDirectory()) {
+    for (const entry of readdirSync(path)) {
+      if (entry === 'node_modules' || entry.startsWith('.')) continue
+      best = newestMtime(join(path, entry), best)
+    }
+    return best
+  }
+  return stat.mtimeMs > best.ms ? { ms: stat.mtimeMs, path } : best
+}
+
+/** The bundle the served index.html points at, or null when served from source. */
+async function servedBundle() {
+  try {
+    const res = await fetch(APP_ORIGIN, { signal: AbortSignal.timeout(4000) })
+    const html = await res.text()
+    return /src="(\/assets\/[^"]+\.js)"/.exec(html)?.[1] ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Whether what is on the port was built from what is on disk.
+ *
+ * Returns a reason rather than throwing, so the caller decides whether a stale
+ * bundle aborts the audit or is rebuilt.
+ */
+export async function servedAppFreshness() {
+  const asset = await servedBundle()
+  if (asset === null) return { fresh: true, why: 'served from source, nothing to go stale' }
+
+  const file = join(process.cwd(), 'dist', asset.replace(/^\//, ''))
+  if (!existsSync(file)) {
+    return { fresh: false, why: `the served bundle ${asset} is not in dist/, so it cannot be dated` }
+  }
+
+  const built = statSync(file).mtimeMs
+  const newest = FRESHNESS_WATCHED.reduce((best, p) => newestMtime(p, best), { ms: 0, path: null })
+  if (newest.path !== null && newest.ms > built) {
+    const seconds = Math.round((newest.ms - built) / 1000)
+    return {
+      fresh: false,
+      why:
+        `${newest.path} was changed ${seconds}s after ${asset} was built, so the port is ` +
+        `serving older code than the editor has. Run npm run build.`,
+    }
+  }
+  return { fresh: true, why: `${asset} is newer than every watched source file` }
+}
+
 /**
  * Make sure the app is there, starting one if it is not.
  *
@@ -121,7 +201,16 @@ function findChrome() {
  */
 export async function ensureApp({ start = true } = {}) {
   const first = await appIsServing()
-  if (first.up) return { started: false, stop: async () => {} }
+  if (first.up) {
+    /*
+     * Reusing a server is where staleness lives: the hook builds once and
+     * leaves the server up, so a hand run after an edit measures the build.
+     */
+    const fresh = await servedAppFreshness()
+    if (!fresh.fresh) throw new PreflightError(fresh.why)
+    process.stderr.write(`  ${fresh.why}\n`)
+    return { started: false, stop: async () => {} }
+  }
 
   if (first.reason.startsWith('something else')) {
     /* Never try to start a second one on an occupied port. */
