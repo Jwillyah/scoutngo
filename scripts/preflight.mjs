@@ -373,3 +373,85 @@ export function guardAudit(name) {
     die(error instanceof Error ? error.message : String(error))
   })
 }
+
+/**
+ * GO TO A STAGE, AND FAIL LOUDLY IF YOU CANNOT.
+ *
+ * WHY THIS IS A SHARED FUNCTION AND NOT A LINE IN EACH SCRIPT.
+ *
+ * Nine browser scripts each carried their own copy of
+ *
+ *   [...document.querySelectorAll('.rail__btn')].find(b=>/Plan/.test(b.textContent))?.click()
+ *
+ * When the three-step progress rail was replaced by the bottom nav, every one
+ * of those nine selectors stopped matching anything. The optional chain
+ * swallowed it: no error, no warning, nine scripts quietly running every
+ * assertion they had against the SETUP screen. The surface audit reported
+ * twenty-two problems -- no sheet, no detents, no chips, no cards -- and not
+ * one of them was the actual fault.
+ *
+ * THAT IS SHAPE C IN docs/failure-modes.md: a check pointed at the wrong
+ * object. The guard rule there says to assert a positive property rather than
+ * trust a name, so this does both things the nine copies did not:
+ *
+ *   it THROWS when the button is not found, instead of returning undefined
+ *   it VERIFIES ARRIVAL by reading the shell's own stage class afterwards
+ *
+ * A rename now produces one sentence naming the selector, in one file, rather
+ * than a page of symptoms in whichever audit ran first.
+ *
+ * MATCHED ON THE BUTTON'S OWN TEXT, not on a class name, so the nav can be
+ * restyled without breaking every script again.
+ *
+ * TAKES THE MODE ID, NOT THE LABEL ON THE BUTTON. The first stage is `setup`
+ * in the code and reads MAP on the screen -- it is the map you set the pin on
+ * -- so the caller names the mode and this does the one translation, in one
+ * place. A caller passing the label would be a caller guessing.
+ */
+const NAV_LABEL = { setup: 'MAP', plan: 'PLAN', field: 'FIELD' }
+
+export async function goToStage(ev, wait, stage) {
+  const want = stage.toLowerCase()
+  const label = NAV_LABEL[want]
+  if (label === undefined) {
+    throw new PreflightError(
+      `no such stage "${stage}". The three are: ${Object.keys(NAV_LABEL).join(', ')}.`,
+    )
+  }
+
+  const clicked = await ev(`(() => {
+    const buttons = [...document.querySelectorAll('nav[aria-label="Stage"] button')]
+    if (buttons.length === 0) return 'no stage nav on screen'
+    const hit = buttons.find((b) => (b.textContent ?? '').trim().toUpperCase() === ${JSON.stringify(label)})
+    if (!hit) return 'no ' + ${JSON.stringify(label)} + ' button; the nav offers: ' +
+      buttons.map((b) => (b.textContent ?? '').trim()).join(', ')
+    if (hit.disabled) return ${JSON.stringify(label)} + ' is disabled'
+    hit.click()
+    return 'ok'
+  })()`)
+
+  if (clicked !== 'ok') {
+    throw new PreflightError(
+      `could not navigate to ${label}: ${clicked}. ` +
+        'The stage nav is <nav aria-label="Stage"> in src/components/BottomNav.tsx.',
+    )
+  }
+
+  await wait(600)
+
+  /*
+   * AND CONFIRM IT. A click that lands on the right button and changes nothing
+   * is the gesture-deadlock shape: the control exists, the control is enabled,
+   * and the app is still where it was.
+   */
+  const arrived = await ev(
+    `document.querySelector('.shell')?.className.match(/shell--([a-z]+)/)?.[1] ?? null`,
+  )
+  if (arrived !== want) {
+    throw new PreflightError(
+      `clicked ${label} and the shell is still "${arrived}". ` +
+        'The nav is navigation, not a progress bar: see BottomNav.tsx.',
+    )
+  }
+  return arrived
+}

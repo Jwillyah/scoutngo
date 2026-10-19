@@ -25,7 +25,7 @@
  * the whole point of it.
  */
 
-import { guardAudit, startWatchdog } from './preflight.mjs'
+import { goToStage, guardAudit, startWatchdog } from './preflight.mjs'
 
 /*
  * ARMED BEFORE ANYTHING ELSE CAN THROW.
@@ -205,7 +205,7 @@ await ev(`localStorage.clear()`)
 await send('Page.navigate', { url: 'http://127.0.0.1:5173/?calibration=1&probe=1' })
 await wait(8000)
 
-await ev(`[...document.querySelectorAll('.rail__btn')].find(b=>/Plan/.test(b.textContent))?.click()`)
+await goToStage(ev, wait, 'plan')
 await wait(4000)
 /* The arc adds sunrise and sunset readouts, which is the crowded case. */
 await ev(`[...document.querySelectorAll('button')].find(b=>/Sun arc/i.test(b.textContent))?.click()`)
@@ -232,7 +232,10 @@ await wait(500)
  *
  * It used to click `.peek__go`, a primary button in the peek. Item 3 took the
  * peek down to the shoot line and the scrubber, and the add control went where
- * the thing it acts on lives: `.plist__add`, in the positions list at HALF.
+ * the thing it acts on lives: `.shootc__add`, at the head of the position
+ * list on the shoot card. It was `.plist__add` on the old positions SECTION;
+ * the shell rebuild moved it and the optional chain here reported "no position
+ * can be placed" rather than "the selector is gone".
  *
  * WHAT THAT COST, AND WHY IT IS WORTH READING. Nobody changed a label, a
  * placement rule or a collision. The selector this script drives the app with
@@ -248,15 +251,15 @@ await wait(500)
  */
 await ev(`[...document.querySelectorAll('.sheet__handle')][0]?.click()`)
 await wait(600)
-const armable = await ev(`document.querySelector('.plist__add') !== null`)
+const armable = await ev(`document.querySelector('.shootc__add') !== null`)
 console.log(`  add control reachable at half: ${armable}`)
 if (armable !== true) {
-  console.log('      PROBLEM: no .plist__add at half, so no position can be placed')
+  console.log('      PROBLEM: no .shootc__add at half, so no position can be placed')
   problems += 1
 }
 
 for (const [fx, fy] of [[0.3, 0.3], [0.44, 0.34], [0.58, 0.3]]) {
-  await ev(`document.querySelector('.plist__add')?.click()`)
+  await ev(`document.querySelector('.shootc__add')?.click()`)
   await wait(350)
   await ev(`(() => {
     const c = document.querySelector('.maplibregl-canvas')

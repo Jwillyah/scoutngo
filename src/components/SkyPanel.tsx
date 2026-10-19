@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getMoonIllumination, getMoonTimes } from 'suncalc'
 import type { LatLon } from '../core/geo.ts'
 import type { KitProfile } from '../core/kit.ts'
@@ -49,7 +49,6 @@ interface SkyPanelProps {
   horizon: HorizonInput
   kit: KitProfile
   /** Sun When, unchanged, as the first row of this list. */
-  sunWhen: ReactNode
   /** Today, injected so the listing is testable and does not drift mid-render. */
   now: Date
 }
@@ -66,7 +65,6 @@ export function SkyPanel({
   timeZoneAbbr,
   horizon,
   kit,
-  sunWhen,
   now,
 }: SkyPanelProps) {
   const [openId, setOpenId] = useState<string | null>(null)
@@ -242,18 +240,17 @@ export function SkyPanel({
   return (
     <div className="skyev">
       {/*
-        * SUN WHEN, FIRST AND UNCHANGED. It is the one row about today, so it
-        * sits above the dated list rather than inside it.
+        * SUN TODAY HAS MOVED TO THE LIGHT CARD.
+        *
+        * It was the first row here: a disclosure headed "Where the sun is
+        * from here, and when", holding the bearing search. It is a question
+        * about the sun's position today, and this card is a list of what the
+        * sky does over the next thirty nights plus the cameras pointed at it
+        * right now. Three subjects on one surface, and this card was the
+        * tallest in the app at 94% of the two-viewport limit because of it.
+        *
+        * The light card is about the sun. That is where the question goes.
         */}
-      <details className="skyev__row skyev__row--sun">
-        <summary className="skyev__head">
-          <span className="skyev__name">Sun today</span>
-          <span className="skyev__when">now</span>
-          <span className="skyev__why">Where the sun is from here, and when</span>
-        </summary>
-        <div className="skyev__body">{sunWhen}</div>
-      </details>
-
       <p className="skyev__lead">
         The next {SKY_EVENT_DAYS} days at this venue, computed from published tables. Peak dates
         shift up to a day from year to year, so every shower is offered as two nights.

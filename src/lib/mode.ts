@@ -141,8 +141,18 @@ export function ringNode(node: RingableNode, ms: number = RING_MS): () => void {
   }
 }
 
-export const canEnter = (mode: Mode, available: ModeAvailability): boolean =>
-  blockedReason(mode, available) === null
+/*
+ * canEnter IS GONE WITH THE STEPPER.
+ *
+ * It was `blockedReason(mode, available) === null`, and its only caller was
+ * App's goTo, which refused to change stage when it returned false. The nav
+ * is navigation now -- any stage from any stage -- so there is nothing left
+ * that asks permission to move, and a helper whose whole purpose was granting
+ * it is better deleted than left for somebody to find and reuse.
+ *
+ * blockedReason stays. It says WHY the next step is not earned yet, which is
+ * a statement about the work; it is not a lock on the navigation.
+ */
 
 /** The next mode along, or null at the end of the line. */
 export function nextMode(mode: Mode): Mode | null {

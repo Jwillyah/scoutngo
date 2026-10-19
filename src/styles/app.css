@@ -1378,79 +1378,15 @@
   color: var(--color-text-muted);
 }
 
-/* -------------------------------------------------------------- mode rail */
-
-.rail__list {
-  list-style: none;
-  margin: 0;
-  padding: 0 var(--page-pad) var(--space-2);
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-2);
-}
-
-.rail__step {
-  position: relative;
-}
-
-/* The connector: what makes this a line of steps and not three buttons. */
-.rail__step + .rail__step::before {
-  content: '';
-  position: absolute;
-  left: calc(var(--space-2) * -1);
-  top: 18px;
-  width: var(--space-2);
-  height: var(--line-hair);
-  background: var(--color-line);
-}
-
-.rail__btn {
-  width: 100%;
-  min-height: 44px;
-  display: grid;
-  gap: 1px;
-  padding: var(--space-2) var(--space-1);
-  background: transparent;
-  border: 0;
-  border-top: var(--line-rule) solid var(--color-line);
-  color: var(--color-text-faint);
-  text-align: left;
-  cursor: pointer;
-}
-
-.rail__btn:disabled {
-  cursor: not-allowed;
-}
-
-.rail__index {
-  font-size: var(--text-label);
-}
-
-.rail__label {
-  font-size: var(--text-sm);
-  font-weight: var(--weight-heavy);
-}
-
-.rail__when {
-  font-size: var(--text-label);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-}
-
-/* White marks where you are, exactly as it marks every other active state. */
-.rail__step--now .rail__btn {
-  border-top-color: var(--color-accent);
-  color: var(--color-text);
-}
-
-.rail__step--done .rail__btn {
-  border-top-color: var(--color-line-strong);
-  color: var(--color-text-muted);
-}
-
-.rail__step--locked .rail__btn {
-  color: var(--color-text-faint);
-}
+/*
+ * THE STEPPER'S CSS IS GONE WITH THE STEPPER.
+ *
+ * .rail__list, .rail__step, .rail__btn, .rail__index, .rail__label, .rail__when
+ * and the --now/--done/--locked states styled a three-step progress rail where
+ * a step you had not earned was disabled. The shell has a bottom nav now --
+ * MAP, PLAN, FIELD, any stage from any stage -- so there is no locked state to
+ * style. See .bnav below, and BottomNav.tsx for why there are exactly three.
+ */
 
 /* A static panel header: no caret, nothing to press, because nothing folds. */
 .section__banner--static {
@@ -1540,7 +1476,46 @@
 .maplibregl-ctrl-bottom-left,
 .maplibregl-ctrl-bottom-right {
   z-index: 1;
-  bottom: calc(var(--dock-height, 0px) + var(--sheet-live-height, 0px));
+  /*
+   * AND THEY STOP BELOW THE CHROME AT THE TOP.
+   *
+   * Riding up with the sheet is right until the sheet is at FULL, where it
+   * put the scale bar at 78px -- underneath the GOLDEN chip, with "200 ft"
+   * half visible behind it. --top-chrome is the measured bottom edge of the
+   * chip row, set from PlanMode next to --dock-height.
+   *
+   * CLAMPED RATHER THAN HIDDEN, deliberately. The rail hides itself at FULL
+   * because its controls act on a map nobody can see; the attribution cannot
+   * take that exit, because OSM requires it to be visible wherever their data
+   * is shown. So it stops climbing instead, and the sheet passes in front of
+   * it -- which is also why it is z-index 1 and every surface of ours is 4.
+   */
+  bottom: min(
+    calc(var(--dock-height, 0px) + var(--sheet-live-height, 0px)),
+    calc(100% - var(--top-chrome, 0px))
+  );
+  /*
+   * AND A CEILING, so the stack cannot grow up past the chrome.
+   *
+   * `bottom` alone clamps the BOTTOM edge, and maplibre stacks its controls
+   * upward from there: with the scale bar above the attribution, clamping
+   * the bottom to just under the chip row put the scale bar back behind the
+   * GOLDEN chip -- "200 ft" half visible through a reading. Setting `top` as
+   * well bounds the box at both ends; flex-end keeps the controls sitting on
+   * its lower edge rather than floating at the top of the gap.
+   */
+  top: var(--top-chrome, 0px);
+  /*
+   * AND THEY STILL HUG THE SHEET. With both edges set the box spans from the
+   * chrome ceiling down to just above the sheet; without these three lines
+   * maplibre's container stacks its children from the TOP of that box, which
+   * pinned the scale bar under the chip row and left it floating in the
+   * middle of the map at PEEK. flex-end keeps the original behaviour -- the
+   * controls ride up with the sheet -- and the ceiling is what they stop at.
+   */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
   transition: bottom 180ms ease-out;
 }
 
@@ -2705,52 +2680,15 @@
   color: var(--color-text);
 }
 
-/* The per position line: a number and a direction, and no judgement. */
-.scrub__tide {
-  position: relative;
-  height: 12px;
-  margin-top: 2px;
-  pointer-events: none;
-}
-
-.scrub__turn {
-  position: absolute;
-  top: 0;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.scrub__turn::after {
-  content: '';
-  width: var(--line-hair);
-  height: 6px;
-  background: var(--color-text-muted);
-}
-
-.scrub__turn-tag {
-  font-family: var(--font-mono);
-  font-size: var(--text-label);
-  font-weight: var(--weight-heavy);
-  line-height: 1;
-  color: var(--color-text-muted);
-}
-
 /*
- * High water reads brighter than low: it is the one that hides ground.
+ * THE TIDE TURN TAGS ARE GONE WITH THE TWO-BAR SCRUBBER.
  *
- * The tag takes the COLOUR and the tick takes the BACKGROUND. Setting both on
- * both, which a combined selector did, painted a white background behind white
- * text and turned the label into a solid block.
+ * .scrub__tide, .scrub__turn and .scrub__turn-tag drew HW and LW flags above
+ * the time track. The track is 3px now and a flag has nowhere to sit on it;
+ * an untagged tick on a rail is a mystery rather than a reading. The tide
+ * card names the next turn with its height and its clock time, which is the
+ * same fact said once, in the card about the tide.
  */
-.scrub__turn--high .scrub__turn-tag {
-  color: var(--color-text);
-}
-
-.scrub__turn--high::after {
-  background: var(--color-text);
-}
 
 /* ------------------------------------------------------------------ cloud */
 
@@ -3720,95 +3658,173 @@
   color: var(--color-text-muted);
 }
 
-/* --------------------------------------------------------- time scrubber */
-
-.scrub {
-  padding: var(--space-2) var(--page-pad);
-  background: var(--black);
-  border-top: var(--line-hair) solid var(--color-line);
-}
-
-.scrub__readout {
+/* ----------------------------------------------------------- the time strip
+ *
+ * ONE ROW, 34px, AND IT IS THE WHOLE TIME CONTROL.
+ *
+ * WHAT IT REPLACED: .scrub, a ~250px panel holding a clock, two receipts in
+ * degrees, a row of tide-turn tags, a twilight band, a range input drawing
+ * its own grey track, and the Part 107 requirements. It sat above every card,
+ * so on the wind card it was larger than the wind and on About it pushed the
+ * copy off the bottom of the screen.
+ *
+ * THE GRADIENT IS THE TRACK. There were two bars for one axis and the thumb
+ * was on the one carrying no information. The twilight bands are the rail now
+ * and the thumb rides on them, so "18:40 is inside civil twilight" is a thing
+ * you see rather than infer from two bars that happen to line up.
+ *
+ * The rule block below (.scrub__rule) kept its names: it moved to the light
+ * card as PhaseRule and is the same markup.
+ */
+.tstrip {
   display: flex;
-  align-items: baseline;
-  gap: var(--space-3);
+  align-items: center;
+  gap: var(--space-2);
+  height: 34px;
+  padding: 0 var(--page-pad);
 }
 
-.scrub__time {
-  font-size: var(--text-num);
+.tstrip__time {
+  flex: 0 0 auto;
+  font-size: 16px;
+  line-height: 1;
   font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-num);
+  color: var(--color-text);
 }
 
-/*
- * The zone sits tight against the time, not spaced like a stat, because it is part
- * of reading the time rather than a separate number. The negative margin pulls it
- * inside the flex gap the readout sets for real columns.
- */
-.scrub__zone {
-  margin-left: calc(var(--space-3) * -1 + var(--space-1));
+.tstrip__zone {
+  flex: 0 0 auto;
   font-size: var(--text-label);
   letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-}
-
-.scrub__stat {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-1);
-  font-size: var(--text-md);
-}
-
-.scrub__stat-label {
-  font-size: var(--text-label);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
   color: var(--color-text-muted);
 }
 
 /*
- * ------------------------------------------------- the Part 107 light bands
- *
- * Day, civil twilight and night, drawn ON the time axis rather than described
- * beside it, because the question is always "where in my window does this
- * change" and that is a position on this bar.
- *
- * THE COLOURS ARE THE APP'S OWN SUN COLOURS, not a new traffic-light set. Day
- * is the sun token, twilight the sunset token, night the shadow violet, which
- * is the same vocabulary the map rays use, so a band means on this bar what
- * its colour means everywhere else.
- *
- * Low alpha and 3px tall: this is a stratum under the control, not a control.
- * It must never compete with the thumb for the eye or for the touch, which is
- * why it is aria-hidden and sits above the input in source order but carries
- * no pointer events of its own.
+ * THE RAIL TAKES THE REST OF THE ROW. It is 3px of paint in a 34px box: the
+ * box is the touch target, the paint is the thing you aim at. A 3px hit area
+ * would be unusable with a thumb and a 34px bar would be the old panel again.
  */
-.scrub__phases {
+.tstrip__rail {
   position: relative;
-  height: 3px;
-  margin-top: var(--space-1);
-  border-radius: 2px;
-  overflow: hidden;
-  background: var(--surface-3);
-  pointer-events: none;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 34px;
+  display: block;
 }
 
-.scrub__phase {
+.tstrip__rail::before {
+  content: '';
   position: absolute;
-  top: 0;
-  bottom: 0;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 3px;
+  margin-top: -1.5px;
+  border-radius: 2px;
+  background: var(--surface-3);
 }
 
-.scrub__phase--day {
+.tstrip__band {
+  position: absolute;
+  top: 50%;
+  height: 3px;
+  margin-top: -1.5px;
+}
+
+.tstrip__band:first-of-type {
+  border-radius: 2px 0 0 2px;
+}
+
+.tstrip__band:last-of-type {
+  border-radius: 0 2px 2px 0;
+}
+
+/* The same three roles the bands always had. No new colour. */
+.tstrip__band--day {
   background: color-mix(in srgb, var(--sun) 55%, transparent);
 }
 
-.scrub__phase--civil-twilight {
+.tstrip__band--civil-twilight {
   background: color-mix(in srgb, var(--sun-set) 70%, transparent);
 }
 
-.scrub__phase--night {
+.tstrip__band--night {
   background: color-mix(in srgb, var(--sun-shadow) 70%, transparent);
+}
+
+/*
+ * 13px, CENTRED ON ITS OWN POSITION. translateX(-50%) rather than a margin,
+ * so the thumb's centre is the moment and the ends of the rail are the ends
+ * of the window.
+ */
+.tstrip__thumb {
+  position: absolute;
+  top: 50%;
+  width: 13px;
+  height: 13px;
+  margin-top: -6.5px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: var(--color-text);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--black) 70%, transparent);
+  pointer-events: none;
+}
+
+/*
+ * THE REAL CONTROL, INVISIBLE, OVER THE RAIL ONLY.
+ *
+ * opacity 0 rather than display:none or a hidden input: it has to stay
+ * hittable, focusable and reachable by a screen reader. Its own thumb is
+ * sized to the touch target rather than to the 13px dot, because what the
+ * finger needs and what the eye needs are different numbers.
+ */
+.tstrip__range {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  /*
+   * HORIZONTAL IS THIS CONTROL'S; VERTICAL BELONGS TO THE SHEET.
+   *
+   * The strip sits at the top of the sheet, which is where a thumb reaches
+   * to resize it. Without this a vertical swipe starting on the rail is the
+   * slider's gesture and the sheet does not move -- the elevation curve's
+   * deadlock, in a 34px row. pan-y hands vertical pans back to the ancestor
+   * and keeps horizontal ones here, which is the split the two gestures
+   * actually want.
+   */
+  touch-action: pan-y;
+}
+
+.tstrip__range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+}
+
+.tstrip__range::-moz-range-thumb {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+}
+
+.tstrip__range:focus-visible {
+  outline: none;
+}
+
+.tstrip__range:focus-visible + .tstrip__thumb,
+.tstrip:focus-within .tstrip__thumb {
+  box-shadow: 0 0 0 2px var(--color-focus);
 }
 
 /*
@@ -3871,26 +3887,11 @@
 }
 
 /*
- * The HIT AREA is 44px tall; the drawn track stays slim.
- *
- * A range input's height is its touch target, and the browser draws the track
- * and thumb centred inside whatever height it is given. At 28px this was the
- * hardest control in the app to grab while moving, and it is the one control
- * that gets dragged rather than tapped. Raising the height costs nothing
- * visually: the bar looks identical, there is simply more of it to hit.
- *
- * The negative margin keeps the dock from growing by the 16px this adds, so the
- * map does not lose height to a change that is only about the thumb.
+ * .scrub__range IS GONE: the time control's input is .tstrip__range now, laid
+ * over the twilight rail at opacity 0 rather than drawing its own grey track
+ * under it. The touch-target argument that lived here still holds and moved
+ * with it -- the input's own thumb is 34px, the painted dot is 13.
  */
-.scrub__range {
-  width: 100%;
-  margin: calc(var(--space-1) - 8px) 0 -8px;
-  accent-color: var(--color-accent);
-  height: var(--control-height);
-  /* No vertical padding: on a range input that shrinks the track, not the box. */
-  padding: 0;
-  touch-action: pan-y;
-}
 
 /* ----------------------------------------------------------- warnings */
 
@@ -6919,15 +6920,15 @@
   gap: var(--space-1);
 }
 
-.shell__nav .rail {
+.shell__nav .bnav {
   flex: 1 1 auto;
   min-width: 0;
 }
 
 /*
- * ALWAYS ENABLED, NEVER GATED. The rail's steps lock until they are earned;
- * this one answers before anything has been set up, which is the whole point,
- * so it never greys out.
+ * ALWAYS ENABLED, NEVER GATED. Nothing in the nav gates either, now that the
+ * stepper is gone, but this one is the reason the rule was written: it answers
+ * before anything has been set up, which is the whole point of it.
  */
 .shell__now {
   flex: 0 0 auto;
@@ -7377,14 +7378,24 @@
  * Icons cost learnability, and that is paid for twice: an aria-label on every
  * button, and a long press that shows the same words on screen.
  */
+/*
+ * THE RAIL ON THE RIGHT EDGE: LAYERS, TILT, LOCATE. Icons only, 48px.
+ *
+ * 48 RATHER THAN 40 because these are the three controls used with one thumb
+ * while holding a tripod, and 40 was below the size that survives that.
+ *
+ * IT STARTS BELOW THE CHIPS, not beside them: the chip row spans the full
+ * width, so a rail at the old top would be a 48px button sitting on top of
+ * the CLOUD chip's value.
+ */
 .rail2 {
   position: absolute;
-  top: calc(var(--safe-top) + var(--space-3));
-  right: var(--space-2);
+  top: calc(var(--safe-top) + var(--space-2) + 44px + var(--space-2) + 46px + var(--space-3));
+  right: var(--space-3);
   z-index: 5;
   display: grid;
-  gap: 8px;
-  width: 40px;
+  gap: var(--space-2);
+  width: 48px;
 }
 
 .rail2__slot {
@@ -7393,8 +7404,8 @@
 }
 
 .rail2__btn {
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
   display: grid;
   place-items: center;
   border: var(--line-hair) solid var(--color-line-strong);
@@ -8185,4 +8196,931 @@
 .curve__note--both {
   display: grid;
   gap: 2px;
+}
+
+
+/* ================================================================= THE SHELL
+ *
+ * ONE MAP, ONE NAV, FOUR CHIPS, AND CARDS.
+ *
+ * WHAT THIS REPLACED. A sheet of five stacked sections -- conditions, layers,
+ * positions, sky, hazards -- each with its own heading, its own prose and its
+ * own disclosure, all in one scroll. It worked as a document and failed as a
+ * tool: finding the wind meant scrolling past the layer list, and nothing on
+ * the screen told you what the app thought was important.
+ *
+ * THE SHAPE INSTEAD IS THE ONE EVERY MAP APP CONVERGED ON, for the reason they
+ * all converged on it: the map is the subject, a bar at the top says what it
+ * is OF, a row of readings says whether to go, a rail on the edge changes how
+ * it looks, and one surface at the bottom holds the thing you are reading now.
+ *
+ * NO NEW COLOUR. Every value below resolves to a token that already existed.
+ */
+
+/* --------------------------------------------------------- the venue bar
+ *
+ * SEARCH-FIELD SHAPED ON PURPOSE. Not because anything is typed into it --
+ * the venue is set in MAP -- but because that shape is where the eye goes
+ * first on a map screen, and what this bar says (where, and when) is what you
+ * want to confirm first. Rounded, panel coloured, floating clear of the edge.
+ *
+ * IT IS ALSO THE ONLY DOOR TO SETTINGS. The round button at its right end is
+ * the account button's position in every map app, and settings being there
+ * rather than in the nav is what keeps the nav at three.
+ */
+.vbar {
+  position: absolute;
+  z-index: 5;
+  top: calc(var(--safe-top) + var(--space-2));
+  left: var(--space-3);
+  right: var(--space-3);
+  max-width: calc(var(--page-max) - 2 * var(--space-3));
+  margin: 0 auto;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-1) 0 var(--space-3);
+  border: var(--line-hair) solid var(--color-line-strong);
+  border-radius: 22px;
+  background: var(--panel-sheen);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--black) 55%, transparent);
+}
+
+.vbar__pin {
+  flex: 0 0 auto;
+  color: var(--color-accent);
+}
+
+/*
+ * THE NAME TAKES THE SLACK AND TRUNCATES. A long venue name pushing the date
+ * off the bar would lose the more decision-relevant of the two.
+ */
+.vbar__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.vbar__date {
+  flex: 0 0 auto;
+  font-size: var(--text-num-sm);
+  letter-spacing: var(--tracking-num);
+  color: var(--color-text-muted);
+}
+
+/*
+ * 36px, FILLED, inside a 44px bar: a target that is still a target in gloves
+ * and, more to the point, one you can see. It was a ring in the line colour
+ * holding a middot, which over satellite imagery was nearly invisible -- the
+ * only door to settings on the screen, reading as a smudge.
+ */
+.vbar__about {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  /*
+   * THE OCEAN TEAL, NOT --color-accent.
+   *
+   * --color-accent is signal white in PLAN -- "primary action and active
+   * state, and nothing else" -- and a filled white disc in the venue bar is
+   * the loudest thing on the screen for the least urgent control in the app.
+   * --ocean is the identity accent: rings, pins, the setup colour. An
+   * account button is identity, so it takes that one.
+   */
+  background: var(--ocean);
+  color: var(--ocean-ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heavy);
+  line-height: 1;
+}
+
+.vbar__about:active {
+  background: color-mix(in srgb, var(--ocean) 80%, var(--black));
+}
+
+/* ------------------------------------------------------------- the chips
+ *
+ * FOUR, FIXED, EQUAL WIDTH, NO SCROLL. The rule and the argument are in
+ * docs/chips.md and asserted in scripts/audit-surface.mjs. The short version:
+ * a row that scrolls has no fixed number of chips, and a row with no fixed
+ * number of chips is a place where every future reading gets added, which is
+ * how you arrive back at the five-section sheet by a different route.
+ *
+ * TWO LINES EACH. One line cannot hold a label and a value with its unit, and
+ * dropping the unit is how "14" comes to mean knots to the person who wrote it
+ * and miles per hour to the person reading it.
+ */
+.chips2 {
+  position: absolute;
+  z-index: 5;
+  top: calc(var(--safe-top) + var(--space-2) + 44px + var(--space-2));
+  left: var(--space-3);
+  right: var(--space-3);
+  max-width: calc(var(--page-max) - 2 * var(--space-3));
+  margin: 0 auto;
+  display: grid;
+  /* Four equal columns. NOT flex with overflow: a grid cannot grow a fifth. */
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-1);
+  /* Belt and braces: if a fifth ever appears it wraps and the audit sees it. */
+  overflow: visible;
+}
+
+/*
+ * A SOLID PLATE, NOT A TEXT FIELD.
+ *
+ * It was a 1px border round a translucent ground with a 12px radius, which
+ * is this app's input treatment -- the venue search field, the kit fields,
+ * the coordinate boxes. Four of them in a row at the top of the map read as
+ * four empty inputs waiting to be filled in, which is the opposite of what
+ * they are: they are readings, and they are the only readings on the screen
+ * that could make you not go.
+ */
+.chip2 {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+  padding: var(--space-1) var(--space-2) 5px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--surface-raised);
+  text-align: left;
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--black) 55%, transparent);
+}
+
+/*
+ * THE ACTIVE CHIP TINTS ITS OWN GROUND rather than gaining an outline. An
+ * outline on one of four plates is a fifth shape on the screen; a lifted
+ * ground is the plate itself saying it is the one you are reading.
+ */
+.chip2--on {
+  background: color-mix(in srgb, var(--ocean) 22%, var(--surface-raised));
+}
+
+/*
+ * NO DATA DIMS THE WHOLE CHIP, LABEL INCLUDED.
+ *
+ * The label is a promise of a number. A bright "CLOUD" over a faint "no
+ * data" says the reading is missing from a working chip; dimming both says
+ * the chip has nothing to tell you, which is the true statement and the one
+ * that stops three of them in a row reading as a broken app.
+ */
+/*
+ * THE PLATE STAYS SOLID. The first version dropped the chip's ground to 55%
+ * opacity, and over bright satellite imagery the map came through it: the
+ * chip stopped looking like a reading with nothing in it and started looking
+ * like a chip that had failed to paint, which is the exact impression the
+ * dash was removed for. Only the type dims.
+ */
+.chip2--none {
+  background: var(--surface-raised);
+}
+
+.chip2--none .chip2__label,
+.chip2--none .chip2__value {
+  color: var(--color-text-faint);
+}
+
+/*
+ * URGENT IS THE DATA COLOUR, not a new one: the same hazard role the rated
+ * wind line and the Part 107 ceiling already use, so "this is the reason not
+ * to go" looks the same wherever it appears.
+ */
+.chip2--urgent {
+  border-color: var(--color-hazard);
+}
+
+.chip2__label {
+  font-size: 8px;
+  line-height: 1.1;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chip2__value {
+  font-size: 14px;
+  line-height: 1.15;
+  font-weight: var(--weight-heavy);
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chip2--urgent .chip2__value {
+  color: var(--color-hazard);
+}
+
+/* --------------------------------------------------------- the bottom nav
+ *
+ * 64px, ICON OVER LABEL. Three equal thirds, filling whatever the dock gives
+ * it. The active tab is marked by the accent on both glyph and word -- not by
+ * a filled pill, because a filled pill at the bottom of a dark map reads as a
+ * button you have not pressed yet.
+ */
+.bnav {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  min-height: 64px;
+  border-top: var(--line-hair) solid var(--color-line);
+}
+
+.bnav__btn {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 3px;
+  padding: var(--space-1) 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+.bnav__btn--on {
+  color: var(--color-accent);
+}
+
+.bnav__icon {
+  display: block;
+}
+
+.bnav__label {
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  font-weight: var(--weight-medium);
+}
+
+/* ------------------------------------------------------------ the sheet card
+ *
+ * ONE SUBJECT PER SURFACE. The sheet holds exactly one card, and a card is
+ * about one thing. The two-viewport ceiling in scripts/audit-surface.mjs is
+ * what keeps that from eroding: a card that needs more than two screens is a
+ * card that has become a page, and it gets split or cut.
+ */
+.sheet__card {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--page-pad) var(--space-5);
+}
+
+.card2 {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.card2__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.card2__title {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.card2__tools {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.card2__at {
+  font-size: var(--text-num-sm);
+  letter-spacing: var(--tracking-num);
+  color: var(--color-text-muted);
+}
+
+.card2__i,
+.card2__x {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  line-height: 1;
+}
+
+/*
+ * THE HEADLINE IS THE WHOLE POINT OF THE CARD: big number, unit beside it.
+ * Beside and not inside, so the number stays a number at 46px and the unit
+ * stays legible at 13.
+ */
+.card2__headline {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.card2__big {
+  font-size: 46px;
+  line-height: 1;
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-tight);
+  color: var(--color-text);
+}
+
+.card2__unit {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.card2__note {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--color-text);
+}
+
+.card2__note--warn {
+  color: var(--color-hazard);
+}
+
+.card2__eyebrow {
+  margin: 0;
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+
+/* ALWAYS LAST, ALWAYS QUIET. The receipt, not the argument. */
+.card2__source {
+  margin: 0;
+  font-size: var(--text-label);
+  line-height: var(--leading-normal);
+  color: var(--color-text-faint);
+}
+
+/*
+ * THE JUDGEMENT. A rule, a reading, and whose decision it is -- marked with a
+ * bar down its left edge so it reads as a quotation of a limit rather than as
+ * the app's own verdict.
+ */
+.judge {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.judge__bar {
+  flex: 0 0 2px;
+  border-radius: 1px;
+  background: var(--color-line-strong);
+}
+
+.judge--warn .judge__bar {
+  background: var(--color-hazard);
+}
+
+.judge__body {
+  display: grid;
+  gap: 2px;
+}
+
+.judge__rule {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heavy);
+  color: var(--color-text);
+}
+
+.judge--warn .judge__rule {
+  color: var(--color-hazard);
+}
+
+.judge__detail {
+  margin: 0;
+  font-size: var(--text-label);
+  line-height: var(--leading-normal);
+  color: var(--color-text-muted);
+}
+
+/* -------------------------------------------------------- the wind bars
+ *
+ * THREE HEIGHTS, AND YOU READ WHICH BAR CROSSES THE LINE. This is the card
+ * that justifies the app: every weather app shows the 10 m wind, and the
+ * aircraft is at 120 m where it is routinely half as much again.
+ */
+.bars {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.bars__row {
+  display: grid;
+  grid-template-columns: 52px 1fr 32px;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.bars__at {
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.bars__track {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.bars__fill {
+  display: block;
+  height: 100%;
+  border-radius: 5px;
+  background: var(--color-line-strong);
+}
+
+.bars__fill--under {
+  background: var(--color-accent);
+}
+
+.bars__fill--near {
+  background: var(--color-accent-2);
+}
+
+.bars__fill--over {
+  background: var(--color-hazard);
+}
+
+.bars__value {
+  font-size: var(--text-num-sm);
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-num);
+  text-align: right;
+  color: var(--color-text);
+}
+
+.bars__value--over {
+  color: var(--color-hazard);
+}
+
+.bars__value--near {
+  color: var(--color-accent-2);
+}
+
+/* ------------------------------------------------------------ the shoot card
+ *
+ * THE HOME CARD IS THE SHOOT, because that is what the app is for. One line
+ * saying what is being shot and when, the positions as a row of thumbnails,
+ * and a + at the head of that row. Nothing else: every reading is a chip
+ * away, and the shoot is the thing you come back to when you dismiss one.
+ */
+.shootc {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.shootc__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.shootc__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--text-md);
+  font-weight: var(--weight-heavy);
+  color: var(--color-text);
+}
+
+.shootc__when {
+  flex: 0 0 auto;
+  font-size: var(--text-num-sm);
+  letter-spacing: var(--tracking-num);
+  color: var(--color-text-muted);
+}
+
+.shootc__acts {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/*
+ * SQUARE AND 32px WHEN IDLE, so it reads as an add and not as a word button.
+ * It holds a bare + there, at the head of the list it adds to.
+ */
+.shootc__add {
+  min-width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: var(--line-hair) solid var(--color-accent);
+  border-radius: var(--radius-flat);
+  background: transparent;
+  color: var(--color-accent);
+  font-size: var(--text-md);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/*
+ * ARMED IT CARRIES A SENTENCE, so it stops being a square: the instruction
+ * is the point, and a 32px box with "Tap the map · stop" in it overlapped
+ * the Suggest button beside it in the first run of this screen.
+ */
+.shootc__add--armed {
+  padding: 0 var(--space-3);
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  font-size: var(--text-sm);
+}
+
+.shootc__gen {
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--text-sm);
+}
+
+.shootc__gen:disabled {
+  color: var(--color-text-muted);
+}
+
+/* ------------------------------------------------------------ the layer tiles
+ *
+ * PICTURES, NOT PROSE. Eight overlay tiles in a four column grid and three
+ * base thumbnails above them. The state is on the tile -- a lit border and a
+ * word under the label -- so it is readable without reading.
+ *
+ * THE PROSE IS NOT DELETED. It is behind the one circled i at the foot,
+ * alongside the single line stating what the imagery is and at what zoom.
+ */
+.tiles {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.tiles__head {
+  margin: 0;
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+
+.tiles__base {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+
+.tiles__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-2);
+}
+
+.tile {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: center;
+}
+
+/*
+ * THE ART IS THE BUTTON. The border is the state, which is why it is on the
+ * picture and not on the whole tile: a lit box around a label is chrome, a lit
+ * frame around a drawing of cones is the cone layer being on.
+ */
+.tile__art {
+  aspect-ratio: 70 / 62;
+  overflow: hidden;
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-flat);
+  background: var(--surface-2);
+}
+
+.tile__art--on {
+  border-color: var(--ocean);
+  box-shadow: inset 0 0 0 1px var(--ocean);
+}
+
+.tile__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.tile__label {
+  font-size: var(--text-label);
+  line-height: 1.15;
+  color: var(--color-text);
+}
+
+/* THE WORD UNDER THE LABEL IS THE STATE, in the accent when it is on. */
+.tile__state {
+  font-size: 9px;
+  line-height: 1.1;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+
+.tile__state--on {
+  color: var(--ocean);
+}
+
+.tiles__foot {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: var(--line-hair) solid var(--color-line);
+}
+
+.tiles__source {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: var(--text-label);
+  line-height: var(--leading-normal);
+  color: var(--color-text-faint);
+}
+
+.tiles__i {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--text-label);
+  line-height: 1;
+}
+
+.tiles__i--on {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.tiles__prose {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.tiles__prose p {
+  margin: 0;
+  font-size: var(--text-label);
+  line-height: var(--leading-normal);
+  color: var(--color-text-muted);
+}
+
+/* ------------------------------------------------------------ the about sheet
+ *
+ * THE SAME CONTENT AS /how, NOT A SECOND COPY OF IT. The three HOW IT WORKS
+ * rows open the /how sections; this sheet is the index, the page is the text.
+ */
+.about {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.about__eyebrow {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+
+.about__eyebrow--dim {
+  color: var(--color-text-faint);
+}
+
+.about__why {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--color-text);
+}
+
+.about__row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  border: 0;
+  border-bottom: var(--line-hair) solid var(--color-line);
+  background: transparent;
+  text-align: left;
+}
+
+.about__row-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.about__row-title {
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.about__row-note {
+  font-size: var(--text-label);
+  line-height: var(--leading-normal);
+  color: var(--color-text-muted);
+}
+
+.about__chev {
+  flex: 0 0 auto;
+  color: var(--color-text-faint);
+}
+
+.about__units {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.about__unit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.about__unit-label {
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.about__foot {
+  margin: 0;
+  font-size: var(--text-label);
+  line-height: var(--leading-normal);
+  color: var(--color-text-faint);
+}
+
+.about__by {
+  color: var(--color-text-faint);
+}
+
+/* A segmented control: the one place a filled state is right, because the
+ * choice is exclusive and the fill is what says which one you are in. */
+.seg {
+  flex: 0 0 auto;
+  display: flex;
+  border: var(--line-hair) solid var(--color-line-strong);
+  border-radius: var(--radius-flat);
+  overflow: hidden;
+}
+
+.seg__btn {
+  min-width: 44px;
+  padding: 5px var(--space-2);
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--text-label);
+  line-height: 1.3;
+}
+
+.seg__btn + .seg__btn {
+  border-left: var(--line-hair) solid var(--color-line-strong);
+}
+
+.seg__btn--on {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+}
+
+/* The sky camera list's one-line refusal, when nothing is near enough to be
+ * worth listing. A sentence, not twenty rows at 6,600 km. */
+.cams__empty {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--color-text-muted);
+}
+
+/* The door to the next subject. See CardMore in src/components/Card.tsx. */
+.more2 {
+  display: grid;
+  border-top: var(--line-hair) solid var(--color-line);
+}
+
+.more2__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.more2__row + .more2__row {
+  border-top: var(--line-hair) solid var(--color-line);
+}
+
+.more2__label {
+  flex: 1 1 auto;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.more2__chev {
+  flex: 0 0 auto;
+  color: var(--color-text-faint);
+}
+
+/*
+ * THE CONTROL BESIDE THE MESSAGE.
+ *
+ * A notice that names something missing -- no positions, no elevation data,
+ * no drone in the kit -- has to offer the thing that supplies it, or it is a
+ * dead end. Asserted live in scripts/audit-surface.mjs.
+ */
+.notice__act {
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: var(--line-hair) solid var(--color-accent);
+  border-radius: var(--radius-flat);
+  background: transparent;
+  color: var(--color-accent);
+  font-size: var(--text-sm);
+}
+
+/*
+ * WHEN IS THE SUN HERE AGAIN, on the light card.
+ *
+ * It was the first row of the Sky card, headed "Sun today", styled with that
+ * card's event-row classes. It is a disclosure on the light card now, closed
+ * by default: the question is a planning one -- which morning in the next
+ * fortnight puts the sun behind that building -- and the card's job on the
+ * day is the light right now.
+ */
+.sunwhen {
+  border-top: var(--line-hair) solid var(--color-line);
+  padding-top: var(--space-3);
+}
+
+.sunwhen__head {
+  display: grid;
+  gap: 2px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.sunwhen__head::-webkit-details-marker {
+  display: none;
+}
+
+.sunwhen__name {
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.sunwhen__why {
+  font-size: var(--text-label);
+  line-height: var(--leading-normal);
+  color: var(--color-text-muted);
+}
+
+.sunwhen[open] .sunwhen__head {
+  margin-bottom: var(--space-3);
 }

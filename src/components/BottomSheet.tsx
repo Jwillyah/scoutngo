@@ -80,6 +80,29 @@ interface BottomSheetProps {
   onHeightChange?: (height: number) => void
   /** Space taken by the fixed nav rail underneath, excluded from every stop. */
   reservedBottom?: number
+  /*
+   * SPACE TAKEN BY THE CHROME ABOVE, excluded from every stop as well.
+   *
+   * WHY THIS EXISTS. FULL is 92% of the space the sheet is allowed, and the
+   * space it was allowed used to be the whole viewport minus the dock. The
+   * venue bar and the chip row sit over the map at the top of the screen, so
+   * the sheet at FULL grew up behind them: the pairwise surface check measured
+   * the chip row sitting on 366x34px of the sheet, with the CLOUD chip's value
+   * line over the card's own content.
+   *
+   * TAKEN FROM THE ELEMENT, NOT FROM A TOKEN. Same reason as reservedBottom:
+   * the chrome's height is set by its own content, and a constant that agreed
+   * with it today would be the dock-height bug again with a different element
+   * the first time a venue name wrapped the chip values to two lines. The
+   * height this renders at, and the sheet's top edge at each detent, are in
+   * measurements/2026-10-19-shell-rebuild.md.
+   *
+   * AND IT KEEPS THE CHIPS USABLE AT EVERY DETENT, which is the point. The
+   * rail hides itself at FULL because its controls act on a map that is no
+   * longer visible; the chips are not map controls, they are how you change
+   * which card you are reading, so they have to stay reachable while reading.
+   */
+  reservedTop?: number
 }
 
 export function BottomSheet({
@@ -90,11 +113,12 @@ export function BottomSheet({
   full,
   onHeightChange,
   reservedBottom = 0,
+  reservedTop = 0,
 }: BottomSheetProps) {
   const [rawViewport, setViewport] = useState(() =>
     typeof window === 'undefined' ? 800 : window.innerHeight,
   )
-  const viewport = Math.max(PEEK_PX * 2, rawViewport - reservedBottom)
+  const viewport = Math.max(PEEK_PX * 2, rawViewport - reservedBottom - reservedTop)
   const [dragHeight, setDragHeight] = useState<number | null>(null)
   const drag = useRef<{ startY: number; startHeight: number } | null>(null)
   /*

@@ -598,6 +598,11 @@ interface MapViewProps {
   /** The subset whose cones are drawn. Filtering lives in App. */
   conePlan: PlannedPosition[]
   /**
+   * The position whose cone is drawn filled, when one is isolated. Every
+   * other cone in conePlan is drawn as an outline. Null fills them all.
+   */
+  isolatedId: string | null
+  /**
    * Where the pilot is standing. Null until it is placed.
    *
    * Drawn as a marker with a dashed line to every air position. It is a
@@ -724,7 +729,11 @@ function emptyCollection(): GeoJSON.FeatureCollection {
   return { type: 'FeatureCollection', features: [] }
 }
 
-function coneCollection(plan: PlannedPosition[]): GeoJSON.FeatureCollection {
+function coneCollection(
+  plan: PlannedPosition[],
+  /** The position whose cone is filled. Null fills every one of them. */
+  isolatedId: string | null,
+): GeoJSON.FeatureCollection {
   return {
     type: 'FeatureCollection',
     /*
@@ -749,6 +758,12 @@ function coneCollection(plan: PlannedPosition[]): GeoJSON.FeatureCollection {
           lighting: classificationOf(p.read),
           hFOV: p.fov.hFOV,
           platform: p.position.platform,
+          /*
+           * FILLED, OR ONLY OUTLINED. With one position isolated the others
+           * keep their edge and lose their wash, so the comparison stays on
+           * screen without three translucent fills compounding into a mass.
+           */
+          filled: isolatedId === null || p.position.id === isolatedId,
         },
         geometry: { type: 'Polygon' as const, coordinates: p.cone },
       })),
@@ -1065,6 +1080,7 @@ export function MapView({
   mode,
   plan,
   conePlan,
+  isolatedId,
   onPositionMove,
   onLongPress,
   onAddAt,
@@ -1536,6 +1552,8 @@ export function MapView({
         id: 'cone-fill',
         type: 'fill',
         source: CONE_SOURCE,
+        /* Outlined-only cones keep their line and lose their wash. */
+        filter: ['==', ['get', 'filled'], true],
         paint: { 'fill-color': lighting, 'fill-opacity': 0.22 },
       })
       instance.addLayer({
@@ -2192,8 +2210,8 @@ export function MapView({
   useEffect(() => {
     if (map.current === null || !ready) return
     const cones = map.current.getSource(CONE_SOURCE) as maplibregl.GeoJSONSource | undefined
-    cones?.setData(coneCollection(conePlan))
-  }, [conePlan, ready])
+    cones?.setData(coneCollection(conePlan, isolatedId))
+  }, [conePlan, isolatedId, ready])
 
   /*
    * THE PILOT MARKER. Draggable, like the venue pin, because where you stand

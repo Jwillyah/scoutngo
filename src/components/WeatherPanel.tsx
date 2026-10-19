@@ -10,6 +10,7 @@ import {
 } from '../core/windHeight.ts'
 import { formatClock } from '../core/timezone.ts'
 import type { TideInfo } from '../lib/useTide.ts'
+import { formatRange, type Units } from '../lib/units.ts'
 
 interface WeatherPanelProps {
   /** The instant the time bar is on. Everything here is for that moment. */
@@ -44,6 +45,15 @@ interface WeatherPanelProps {
   tide: TideInfo
   tideNow: TideState | null
   cloud: SightlineCloud | null
+  /*
+   * WHICH READING TO SHOW. The panel held all three -- wind, tide, cloud --
+   * one under another, which was right when the sheet was one scrolling page
+   * about everything. Each is its own card opened from its own chip now, and
+   * a card about the wind that also carries the tide is not one subject.
+   */
+  show?: 'all' | 'wind' | 'tide' | 'cloud'
+  /** Which system the shooter reads distances in. See src/lib/units.ts. */
+  units: Units
 }
 
 /** A dash. NEVER a zero standing in for a reading that did not arrive. */
@@ -78,7 +88,10 @@ export function WeatherPanel({
   tide,
   tideNow,
   cloud,
+  show = 'all',
+  units,
 }: WeatherPanelProps) {
+  const shows = (which: 'wind' | 'tide' | 'cloud') => show === 'all' || show === which
   const clock = at === null || timeZone === null ? null : formatClock(at, timeZone)
 
   /*
@@ -116,6 +129,7 @@ export function WeatherPanel({
       </p>
 
       {/* ------------------------------------------------------------ wind */}
+      {!shows('wind') ? null : (
       <div className="wx__read">
         <p className="wx__label">Wind {heightLine}</p>
         {heightNote === null ? null : <p className="wx__assumed">{heightNote}</p>}
@@ -178,7 +192,10 @@ export function WeatherPanel({
         )}
       </div>
 
+      )}
+
       {/* ------------------------------------------------------------ tide */}
+      {!shows('tide') ? null : (
       <div className="wx__read">
         <p className="wx__label">Tide</p>
         {tide.status !== 'ok' || tideNow === null ? (
@@ -186,9 +203,10 @@ export function WeatherPanel({
             <p className="wx__value num">{DASH}</p>
             <p className="wx__note">
               {tide.status === 'no-station'
-                ? `No station near this venue. The closest is ${Math.round(
-                    tide.nearestKm,
-                  )} km away.`
+                ? `No station near this venue. The closest is ${formatRange(
+                    tide.nearestKm * 1000,
+                    units.distance,
+                  )} away.`
                 : tide.status === 'unavailable'
                   ? tide.reason
                   : 'Waiting for NOAA.'}
@@ -217,7 +235,8 @@ export function WeatherPanel({
               </p>
             )}
             <p className="wx__note wx__note--quiet">
-              {tide.station.name}, <span className="num">{tide.distanceKm.toFixed(1)} km</span>
+              {tide.station.name},{' '}
+              <span className="num">{formatRange(tide.distanceKm * 1000, units.distance)}</span>
               {tide.predictions.curveSource === 'published'
                 ? '.'
                 : '. Level between turns computed here from the turns; the turns are NOAA’s.'}
@@ -226,7 +245,10 @@ export function WeatherPanel({
         )}
       </div>
 
+      )}
+
       {/* ----------------------------------------------------------- cloud */}
+      {!shows('cloud') ? null : (
       <div className="wx__read">
         <p className="wx__label">Cloud on the sightline</p>
         {cloud === null ? (
@@ -248,6 +270,7 @@ export function WeatherPanel({
           </>
         )}
       </div>
+      )}
     </section>
   )
 }

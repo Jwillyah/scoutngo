@@ -45,16 +45,28 @@ describe('the cover carries five elements and stops', () => {
     expect(html).toContain('cover__scrim')
   })
 
-  it('carries no control at all, because a still frame cannot have one', () => {
+  it('carries no scrubbing control, because a still frame cannot have one', () => {
     /*
-     * The cover briefly carried a real TimeScrubber, computed from the
+     * The cover briefly carried a real time scrubber, computed from the
      * calibration venue. It was real arithmetic and still the wrong thing:
      * this page is a picture of the app, and a slider on a picture is a
      * control that cannot do anything.
+     *
+     * ASSERTED AS A PROPERTY, NOT AS THREE CLASS NAMES. It was
+     * `not.toContain('scrub__range')` and two more like it -- a blocklist of
+     * spellings, which passes the moment somebody renames the thing it is
+     * watching for. That happened: the scrubber became the time strip and
+     * every one of those three names stopped existing, so the test went on
+     * passing while checking nothing. Shape C in docs/failure-modes.md, and
+     * the guard rule there is to assert the positive property instead.
+     *
+     * The property is that the cover holds no slider of any kind. The GO
+     * button is a control and is meant to be there, so this cannot simply
+     * forbid interactivity.
      */
-    expect(html).not.toContain('cover__scrub')
-    expect(html).not.toContain('scrub__range')
-    expect(html).not.toContain('scrub__phases')
+    expect(html).not.toContain('type="range"')
+    expect(html).not.toContain('role="slider"')
+    expect(html).not.toMatch(/<input\b/)
   })
 
   it('puts the attribution last, after the button and the licence line', () => {

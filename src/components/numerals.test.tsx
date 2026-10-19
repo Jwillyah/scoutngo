@@ -3,13 +3,14 @@ import type { ReactElement } from 'react'
 import { describe, expect, it } from 'vitest'
 import { assessCoverage, assessRangeVariety } from '../core/coverage.ts'
 import { isReceipt, NUMERALS_DEFAULT, type NumeralKind } from '../core/numerals.ts'
-import { getSunPosition } from '../core/sun.ts'
 import { resolveWindow } from '../lib/venue.ts'
 import { NumeralsProvider } from '../lib/numerals.tsx'
 import { CamList } from './CamList.tsx'
+import { DEFAULT_UNITS } from '../lib/units.ts'
 import { CoverageNotice } from './CoverageNotice.tsx'
 import { SunReadout } from './SunReadout.tsx'
-import { TimeScrubber } from './TimeScrubber.tsx'
+import { TimeStrip } from './TimeStrip.tsx'
+import { PhaseRule } from './PhaseRule.tsx'
 import { VenuePlate } from './VenuePlate.tsx'
 
 const VENUE = { lat: 36.726, lon: -75.94 }
@@ -46,26 +47,22 @@ const SUBJECTS: { label: string; node: ReactElement }[] = [
   {
     label: 'the time bar',
     node: (
-      <TimeScrubber
+      <TimeStrip
         start={new Date('2026-10-15T21:00:00Z')}
         end={new Date('2026-10-15T23:30:00Z')}
         value={0.5}
         onChange={() => {}}
         at={new Date('2026-10-15T22:00:00Z')}
-        sun={getSunPosition(new Date('2026-10-15T22:00:00Z'), VENUE.lat, VENUE.lon)}
         timeZone="America/New_York"
         timeZoneAbbr="EDT"
-        tideExtremes={[]}
         phases={[]}
-        phase="civil-twilight"
-        flying={{ airPositions: 1, dronePlatform: true }}
       />
     ),
   },
   { label: 'the coverage notice', node: <CoverageNotice planCoverage={CLUSTERED} /> },
   {
     label: 'the camera list',
-    node: <CamList venue={VENUE} wind={{ fromDegrees: 230, speedMps: 6 }} />,
+    node: <CamList venue={VENUE} wind={{ fromDegrees: 230, speedMps: 6 }} units={DEFAULT_UNITS} />,
   },
   { label: 'the sun readout', node: <SunReadout venueWindow={WINDOW} /> },
   {
@@ -79,6 +76,16 @@ const SUBJECTS: { label: string; node: ReactElement }[] = [
       />
     ),
   },
+  /*
+   * THE PHASE RULE, which used to be inside the time bar and is now its own
+   * component on the light card. It is in this sweep for the same reason it
+   * was before: 107.29 and 107.65 are prose a shooter acts on, and the
+   * numerals switch must never take a sentence with it.
+   */
+  {
+    label: 'the phase rule',
+    node: <PhaseRule phase="civil-twilight" flying={{ airPositions: 1, dronePlatform: true }} />,
+  }
 ]
 
 /*
@@ -104,7 +111,7 @@ const MUST_SURVIVE: { label: string; node: ReactElement; lines: string[] }[] = [
   },
   {
     label: 'the camera list',
-    node: <CamList venue={VENUE} wind={{ fromDegrees: 230, speedMps: 6 }} />,
+    node: <CamList venue={VENUE} wind={{ fromDegrees: 230, speedMps: 6 }} units={DEFAULT_UNITS} />,
     lines: [
       'This list is a file in the app',
       'nothing about your venue is sent anywhere',
@@ -113,7 +120,7 @@ const MUST_SURVIVE: { label: string; node: ReactElement; lines: string[] }[] = [
   },
   {
     label: 'the camera list with no wind yet',
-    node: <CamList venue={VENUE} wind={null} />,
+    node: <CamList venue={VENUE} wind={null} units={DEFAULT_UNITS} />,
     lines: ['The wind has not come back yet, so nothing here is ranked by what is upwind'],
   },
 ]
@@ -184,11 +191,22 @@ describe('turning the numbers off removes no warning and no honesty line', () =>
 
 describe('turning the numbers off does remove the numbers', () => {
   /* The switch has to actually do something, or the test above passes forever. */
-  it('drops the solar degrees from the time bar', () => {
+  /*
+   * THE TIME BAR HAS NO RECEIPTS LEFT TO DROP.
+   *
+   * This asserted that turning numbers off removed "255.5°" from the bar.
+   * The bar carried Az and Alt in degrees; it is a 34px control now and
+   * carries neither, because the light card already printed both from the
+   * same core call -- two sources for one fact, to different precisions.
+   *
+   * SO THE ASSERTION IS THE OTHER HALF OF THE OLD ONE: the clock survives
+   * the switch, because a clock is not a receipt. The degrees are still
+   * tested where they still exist, on the sun readout, below.
+   */
+  it('keeps the clock on the time bar with numbers off, and shows no degrees either way', () => {
     const { on, off } = both(SUBJECTS[0].node)
-    expect(on).toMatch(/\d+\.\d°/)
+    expect(on).not.toMatch(/\d+\.\d°/)
     expect(off).not.toMatch(/\d+\.\d°/)
-    /* And the time itself stays, because a clock is not a receipt. */
     expect(text(off)).toMatch(/\d{1,2}:\d{2}/)
   })
 

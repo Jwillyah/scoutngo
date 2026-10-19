@@ -15,7 +15,7 @@
  * much rather than to remember.
  */
 import { writeFileSync } from 'node:fs'
-import { guardAudit, startWatchdog } from './preflight.mjs'
+import { goToStage, guardAudit, startWatchdog } from './preflight.mjs'
 
 guardAudit('drift')
 
@@ -43,7 +43,7 @@ try {
   await wait(8000)
   await ev(`document.querySelector('.cover__go')?.click()`)
   await wait(1200)
-  await ev(`[...document.querySelectorAll('.rail__btn')].find(x=>/Plan/.test(x.textContent))?.click()`)
+  await goToStage(ev, wait, 'plan')
   await wait(3500)
   await ev(`[...document.querySelectorAll('.sheet__handle')][0]?.click()`); await wait(400)
   await ev(`[...document.querySelectorAll('.sheet__handle')][0]?.click()`); await wait(1200)

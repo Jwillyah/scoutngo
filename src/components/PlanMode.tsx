@@ -1,12 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { LatLon } from '../core/geo.ts'
 import type {
   Platform,
   PlatformFilter as PlatformFilterValue,
 } from '../core/platformFilter.ts'
 import type { ShotType } from '../core/shotType.ts'
-import { goesBandFor, zoomAdvice } from '../core/goes.ts'
-import { boundaryNote } from '../core/skyTime.ts'
 import { formatClock } from '../core/timezone.ts'
 import type { SkyState } from '../lib/useSkyFrames.ts'
 import type { Wind } from '../core/upwind.ts'
@@ -27,30 +25,42 @@ import { locateOnce } from '../lib/locateOnce.ts'
 import type { SetupTarget } from '../lib/mode.ts'
 import { GROUND_WIND_METERS, type WindHeight } from '../core/windHeight.ts'
 import type { SkyLayerKind } from '../core/skyLayer.ts'
+import { goesBandFor, zoomAdvice } from '../core/goes.ts'
+import { boundaryNote } from '../core/skyTime.ts'
 import { phaseAt, phaseSpans } from '../core/nightWindow.ts'
 import type { MarkKind, SiteMark } from '../core/siteMark.ts'
 import { HazardPanel } from './HazardPanel.tsx'
-import { LayersPanel } from './LayersPanel.tsx'
 import { BottomSheet } from './BottomSheet.tsx'
 import { raisedTo, type SheetDetent } from '../core/sheetDetent.ts'
 import type { HorizonInput } from '../core/skyWindow.ts'
 import { AirspacePanel } from './AirspacePanel.tsx'
-import { ConditionsPanel } from './ConditionsPanel.tsx'
-import type { ConeMode } from './ConePicker.tsx'
+import type { ConeMode } from '../lib/coneMode.ts'
 import { FieldPackControl, type PackBuildState } from './FieldPackControl.tsx'
 import { MapRail } from './MapRail.tsx'
-import { SheetSection } from './SheetSection.tsx'
 import { SkyPanel } from './SkyPanel.tsx'
+import { HOME, TIME_MATTERS, type CardKind, type SheetCard } from '../lib/sheetCard.ts'
+import { formatWind, type Units } from '../lib/units.ts'
+import { Card, CardMore } from './Card.tsx'
+import { SkyLegend } from './SkyLegend.tsx'
+import { WindCard } from './WindCard.tsx'
+import { ChipRow, type Chip } from './ChipRow.tsx'
+import { VenueBar } from './VenueBar.tsx'
+import { AboutSheet, type HowSection } from './AboutSheet.tsx'
+import { LayerTiles } from './LayerTiles.tsx'
+import { TILE_ART } from './tileArt.tsx'
+import { WeatherPanel } from './WeatherPanel.tsx'
+import { SunReadout } from './SunReadout.tsx'
+import { CamList } from './CamList.tsx'
 import { SunCurve } from './SunCurve.tsx'
-import { BUILDINGS_MIN_ZOOM, MapView, type MapHandle } from './MapView.tsx'
+import { BUILDINGS_MIN_ZOOM, ESRI_NATIVE_MAX_ZOOM, MapView, type MapHandle } from './MapView.tsx'
 import { buildingsToGeoJson, fetchBuildings } from '../lib/buildings.ts'
 import { PlatformFilter } from './PlatformFilter.tsx'
-import { SkyLegend } from './SkyLegend.tsx'
 import { PlanStatus } from './PlanStatus.tsx'
 import { PositionCard } from './PositionCard.tsx'
 import { ShotList } from './ShotList.tsx'
 import { SunSearchPanel } from './SunSearchPanel.tsx'
-import { TimeScrubber } from './TimeScrubber.tsx'
+import { TimeStrip } from './TimeStrip.tsx'
+import { PhaseRule } from './PhaseRule.tsx'
 
 /** What the one sheet is currently showing. Chosen by an explicit control. */
 /*
@@ -114,6 +124,7 @@ interface PlanModeProps {
   onLensFilters: (next: string[]) => void
   isolatedId: string | null
   onClearIsolate: () => void
+  onIsolate: (id: string | null) => void
   venueWindow: VenueWindow | null
   scrubbedAt: Date | null
   scrub: number
@@ -153,6 +164,27 @@ interface PlanModeProps {
     change: Partial<Pick<SiteMark, 'kind' | 'heightMeters' | 'foliage' | 'note'>>,
   ) => void
   onDeleteMark: (id: string) => void
+  /*
+   * UNITS AND THE DOORS OUT OF ABOUT.
+   *
+   * The About card is the only place settings live -- the bottom nav is three
+   * stages and gets no fourth slot -- so everything that used to be a
+   * Settings row arrives here.
+   */
+  /** The resolved venue name, already keyed to the coordinate. */
+  venueNameLine: string
+  /*
+   * The town, which the venue bar has no room for. Null where the venue line
+   * is one part -- "Big Meadow" -- or a coordinate.
+   */
+  venueTownLine: string | null
+  units: Units
+  onUnits: (next: Units) => void
+  onHow: (section: HowSection) => void
+  onEditKit: () => void
+  onOpenSpots: () => void
+  onOpenSettings: () => void
+  savedSpotCount: number
   /** The shoot date, yyyy-mm-dd, for the leaf answer on a deciduous mark. */
   shootDate: string
   /** Which brief a generate would send: the typed one, or the chips. */
@@ -178,7 +210,11 @@ interface PlanModeProps {
   onGoToField: () => void
   goToFieldBlocked: string | null
   summary: string
-  peekStatus: { label: string; line: string }
+  /*
+   * The peek's one line, or null when there is nothing to report that the
+   * venue bar does not already say. See App.tsx.
+   */
+  peekStatus: { label: string; line: string } | null
   fitTargets: LatLon[]
   pack: FieldPack | null
   packIsCurrent: boolean
@@ -286,10 +322,8 @@ export function PlanMode({
   onFlyTo,
   coneMode,
   onConeMode,
-  lensFilters,
-  onLensFilters,
   isolatedId,
-  onClearIsolate,
+  onIsolate,
   venueWindow,
   scrubbedAt,
   scrub,
@@ -320,8 +354,16 @@ export function PlanMode({
   onSelectMark,
   onChangeMark,
   onDeleteMark,
+  venueNameLine,
+  venueTownLine,
+  units,
+  onUnits,
+  onHow,
+  onEditKit,
+  onOpenSpots,
+  onOpenSettings,
+  savedSpotCount,
   shootDate,
-  briefSource,
   skyLayer,
   onSkyLayer,
   placing,
@@ -334,10 +376,7 @@ export function PlanMode({
   onSetAltitude,
   onSetShotType,
   onSetYaw,
-  onGoToField,
-  goToFieldBlocked,
   peekStatus,
-  fitTargets,
   pack,
   packIsCurrent,
   packState,
@@ -401,6 +440,8 @@ export function PlanMode({
    * there is nothing to yield to and the detent the shooter set is the detent
    * they keep.
    */
+  const [terrainPaused, setTerrainPaused] = useState(false)
+  const [buildingsNote, setBuildingsNote] = useState<string | null>(null)
   const [sheetHeight, setSheetHeight] = useState(108)
   const [pitch, setPitch] = useState(0)
 
@@ -434,10 +475,33 @@ export function PlanMode({
    */
   const dock = useRef<HTMLDivElement>(null)
   const [dockHeight, setDockHeight] = useState(0)
+  /*
+   * THE MAP'S WIDTH IN CSS PIXELS, reported by the map on every move.
+   *
+   * zoomAdvice needs the real width to say whether the satellite layer has
+   * any detail left at this zoom: the answer is about how many ground metres
+   * one GOES pixel covers across the screen, and an assumed 390 is wrong on
+   * every device that is not this one.
+   */
+  const [mapWidth, setMapWidth] = useState(390)
   const measureDock = (node: HTMLDivElement | null) => {
     dock.current = node
     if (node !== null) setDockHeight(node.offsetHeight)
   }
+
+  /*
+   * THE CHROME OVER THE TOP OF THE MAP, measured the same way as the dock.
+   *
+   * The venue bar and the chip row float above the map, and the sheet at FULL
+   * would otherwise grow up behind them. Measured from the chip row's own
+   * bottom edge rather than summed from CSS, because the chip values wrap to
+   * two lines at some venue names and the row is then taller than any
+   * constant written here would say.
+   */
+  const [topChrome, setTopChrome] = useState(0)
+  const measureChips = useCallback((node: HTMLDivElement | null) => {
+    if (node !== null) setTopChrome(Math.round(node.getBoundingClientRect().bottom))
+  }, [])
 
   /*
    * The control row's own height, watched rather than read once: it changes
@@ -533,7 +597,6 @@ export function PlanMode({
    * (src/core/goes.ts); the zoom and the width come from the map itself,
    * because the threshold depends on how wide the screen actually is.
    */
-  const skyBand = goesBandFor(sun?.altitude ?? -90)
   const [mapZoom, setMapZoom] = useState(16.5)
 
   /*
@@ -570,10 +633,8 @@ export function PlanMode({
    * reads as "no buildings here", which is a claim about the ground. See
    * BUILDINGS_COVERAGE_NOTE.
    */
-  const [terrainPaused, setTerrainPaused] = useState(false)
 
   const [buildingData, setBuildingData] = useState<GeoJSON.FeatureCollection | null>(null)
-  const [buildingsNote, setBuildingsNote] = useState<string | null>(null)
 
   useEffect(() => {
     if (!showBuildings || venue === null) {
@@ -622,11 +683,592 @@ export function PlanMode({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showBuildings, venue, mapZoom >= BUILDINGS_MIN_ZOOM])
 
-  const [mapWidth, setMapWidth] = useState(390)
-
   /* Whether anything is in the air, which is what the pilot control is for. */
   const airPositions = plan.filter((p) => p.position.platform === 'air').length
 
+
+  /* ------------------------------------------------------------ the card */
+
+  /*
+   * THE SHEET SHOWS ONE SUBJECT. `card` is the whole of what is in it.
+   *
+   * Dismissing any card returns to the shoot, which is a member of the union
+   * like the rest rather than a special case: "go back" is "show the shoot".
+   */
+  const [card, setCard] = useState<SheetCard>(HOME)
+  const home = useCallback(() => setCard(HOME), [])
+
+  /*
+   * WHAT THE VENUE BAR SAYS. The name is already resolved upstream and is
+   * never stale -- see src/core/venueName.ts -- and the date is the shoot's,
+   * short, because the bar is a glance not a form.
+   */
+  const dateLabel = useMemo(
+    () =>
+      venueWindow === null
+        ? '—'
+        : venueWindow.start
+            .toLocaleDateString('en-US', {
+              timeZone: venueWindow.timeZone,
+              weekday: 'short',
+              day: 'numeric',
+            })
+            .toUpperCase(),
+    [venueWindow],
+  )
+
+  /*
+   * OPENING A CARD RAISES THE SHEET, by the same rule a position tap does:
+   * a card behind an 88px peek is a card nobody can read. It never lowers.
+   */
+  const openCard = useCallback(
+    (kind: CardKind) => {
+      setCard((current) => (current.kind === kind ? HOME : ({ kind } as SheetCard)))
+      raiseToHalf()
+    },
+    [raiseToHalf],
+  )
+
+  const clock = useCallback(
+    (at: Date | null) =>
+      at === null || venueWindow === null ? null : formatClock(at, venueWindow.timeZone),
+    [venueWindow],
+  )
+
+  /*
+   * THE FOUR CHIPS. The rule is in docs/chips.md and the surface audit holds
+   * the count: a chip earns its place only if its value could make you not
+   * go. Every value carries its unit, and a value that is not known is a
+   * dash rather than a zero.
+   */
+  const chips: Chip[] = useMemo(() => {
+    const goldenLeft =
+      venueWindow === null || scrubbedAt === null
+        ? null
+        : Math.round((venueWindow.end.getTime() - scrubbedAt.getTime()) / 60_000)
+    const groundWind = wind?.speedMps ?? null
+    const overRated =
+      ratedWindMps !== null && groundWind !== null && groundWind > ratedWindMps
+    const lowTide = tideExtremes.find((e) => e.kind === 'low') ?? null
+    const cloudPct = selectedCloud?.meanLow ?? null
+
+    return [
+      {
+        kind: 'golden',
+        label: 'GOLDEN',
+        value: goldenLeft === null ? null : goldenLeft <= 0 ? 'past' : `${goldenLeft} min`,
+        urgent: goldenLeft !== null && goldenLeft > 0 && goldenLeft <= 60,
+      },
+      {
+        kind: 'wind',
+        label: 'WIND',
+        /*
+         * NULL, NOT formatWind's DASH. formatWind returns '—' for an absent
+         * reading, which is right in a sentence and wrong on a chip -- see
+         * the note on Chip.value in ChipRow.tsx.
+         */
+        value: groundWind === null ? null : formatWind(groundWind, units.wind),
+        urgent: overRated,
+      },
+      {
+        kind: 'cloud',
+        label: 'CLOUD',
+        value: cloudPct === null ? null : `${Math.round(cloudPct)}%`,
+      },
+      {
+        kind: 'tide',
+        label: 'LOW TIDE',
+        value: lowTide === null ? null : clock(lowTide.at),
+      },
+    ]
+  }, [venueWindow, scrubbedAt, wind, ratedWindMps, tideExtremes, selectedCloud, units, clock])
+
+  /*
+   * WHICH GOES BAND THE SKY LAYER PAINTS, from the sun's altitude: visible
+   * light has nothing to show after dark, and the infrared band does.
+   */
+  const skyBand = goesBandFor(sun?.altitude ?? -90)
+
+  const weatherCommon = {
+    at: scrubbedAt,
+    timeZone: venueWindow?.timeZone ?? null,
+    timeZoneAbbr: venueWindow?.timeZoneShort ?? null,
+    wind,
+    levels: windLevels,
+    past: windPast,
+    gustMps,
+    windAt,
+    windHeight,
+    ratedWindMps,
+    ratedWindSource,
+    tide,
+    tideNow,
+    tideExtremes,
+    cloud: selectedCloud,
+    units,
+  }
+
+  /*
+   * HOME: THE SHOOT. The window, and the positions as thumbnails in a row
+   * with a + at the end. Not a list of rows -- a shoot is a handful of places
+   * you are going to stand, and a row of pictures is how that reads.
+   */
+  const shootCard = (
+    <div className="shootc">
+      <div className="shootc__head">
+        {/*
+          * THE TOWN LIVES HERE, because the venue bar could not hold it. The
+          * bar names the venue; this says where in the world that is, once.
+          */}
+        <span className="shootc__title">{venueTownLine ?? 'The shoot'}</span>
+        <span className="shootc__when num">
+          {venueWindow === null
+            ? '—'
+            : `${clock(venueWindow.start) ?? '—'}–${clock(venueWindow.end) ?? '—'}`}
+          {` · ${plan.length} ${plan.length === 1 ? 'position' : 'positions'}`}
+        </span>
+      </div>
+
+      {selected !== null ? (
+        <PositionCard
+          planned={selected}
+          shootAt={scrubbedAt}
+          timeZone={venueWindow?.timeZone ?? null}
+          tide={tideNow}
+          onClose={() => onSelect(null)}
+          count={plan.length}
+          onDelete={onDeletePosition}
+          onDuplicate={onDuplicatePosition}
+          isolated={isolatedId === selected.position.id}
+          onIsolate={onIsolate}
+          onMove={onMovePosition}
+          onSetOptic={onSetOptic}
+          onSetAltitude={onSetAltitude}
+          onSetShotType={onSetShotType}
+          onSetYaw={onSetYaw}
+          kit={kitProfile}
+          selection={kitSelection}
+          marks={marks}
+          subject={venue}
+          pilotAt={pilotAt}
+          onPlacePilot={() => onPlacingPilot(true)}
+              />
+      ) : (
+        <>
+          {/*
+            * THE TWO THINGS YOU DO FROM HERE, AT THE HEAD OF THE LIST THEY
+            * ADD TO. Add a position by hand, or ask for a plan.
+            *
+            * THEY WERE UNDER THE STATUS PARAGRAPH, which put both of them off
+            * the bottom of the sheet at HALF: the screen said "no positions
+            * yet" and the only two controls that fix that were somewhere
+            * below the fold. A message that names a missing thing has to
+            * offer the thing, and on the home card the offer comes first.
+            *
+            * Everything else that used to be in this footer -- start the
+            * shoot, the airspace jump -- belongs to the stage that does it,
+            * and the nav reaches every stage now.
+            */}
+          <div className="shootc__acts">
+            {/*
+              * A 32px SQUARE + WHEN IDLE, A SENTENCE WHEN ARMED.
+              *
+              * The + is at the head of the list it adds to and needs no
+              * label there: it is the universal shape, and the aria-label
+              * carries the words for anybody who cannot see it.
+              *
+              * ARMED IS DIFFERENT, and it is the one state that must use
+              * words. "The button is lit" does not tell you the next thing
+              * to do is tap the map, and an armed map that looks like an
+              * ordinary map is how somebody drops a position by accident.
+              */}
+            <button
+              type="button"
+              className={`shootc__add${placing ? ' shootc__add--armed' : ''}`}
+              aria-pressed={placing}
+              aria-label={placing ? 'Stop placing positions' : 'Add a position'}
+              onClick={() => onPlacing(!placing)}
+            >
+              {placing ? 'Tap the map · stop' : '+'}
+            </button>
+            <button type="button" className="shootc__gen" onClick={onGenerate}>
+              Suggest
+            </button>
+          </div>
+
+          <PlatformFilter
+            value={platformFilter}
+            onChange={onPlatformFilter}
+            counts={platformCounts}
+            hidden={hiddenByPlatform}
+            airAvailable={airAvailable}
+          />
+          <ShotList
+            plan={visiblePlan}
+            planCoverage={null}
+            desiredShots={desiredShots}
+            selectedId={selectedId}
+            onPick={onPickAndRaise}
+          />
+          <PlanStatus
+            generation={generation}
+            onFixBlock={onFixBlock}
+            planCoverage={planCoverage}
+            siteNote={siteNote}
+            terrainNote={terrainNote}
+            positionNote={positionNote}
+          />
+
+          {/*
+            * SAVE OFFLINE STAYS ON THE SHOOT, because it is about this shoot:
+            * the photos for these positions, on this phone, for a place with
+            * no signal. It was in a footer under five sections; it is one
+            * control on the card about the thing it saves.
+            */}
+          <FieldPackControl
+            pack={pack}
+            matches={packIsCurrent}
+            positions={plan.length}
+            state={packState}
+            timeZone={venueWindow?.timeZone ?? null}
+            onPrepare={onPreparePack}
+          />
+        </>
+      )}
+    </div>
+  )
+
+  /*
+   * LAYERS AS TILES. Every tile is a drawing of what it does and carries its
+   * own state; the paragraphs that used to be on every row are behind the i.
+   */
+  const layersCard = (
+    <LayerTiles
+      base={[
+        {
+          id: 'satellite',
+          label: 'Satellite',
+          state: `ON · z${Math.round(mapZoom)}`,
+          on: true,
+          art: TILE_ART.satellite,
+          onToggle: () => {},
+        },
+        {
+          id: 'terrain',
+          label: 'Terrain 3D',
+          /* The tile says what the layer is actually doing, suspension included. */
+          state: !showTerrain ? 'OFF' : terrainPaused ? 'PAUSED' : `ON · ${Math.round(pitch)}°`,
+          on: showTerrain,
+          art: TILE_ART.terrain,
+          onToggle: () => onShowTerrain(!showTerrain),
+        },
+        {
+          id: 'chart',
+          label: 'Chart',
+          state: showLabels ? 'ON' : 'OFF',
+          on: showLabels,
+          art: TILE_ART.chart,
+          onToggle: () => onShowLabels(!showLabels),
+        },
+      ]}
+      overlays={[
+        { id: 'cones', label: 'Cones', state: coneMode === 'all' ? 'ON' : 'OFF', on: coneMode === 'all', art: TILE_ART.cones, onToggle: () => onConeMode(coneMode === 'all' ? 'none' : 'all') },
+        { id: 'sun', label: 'Sun arc', state: showArc ? 'ON' : 'OFF', on: showArc, art: TILE_ART.sunArc, onToggle: () => onShowArc(!showArc) },
+        { id: 'shadows', label: 'Shadows', state: showSun ? 'ON' : 'OFF', on: showSun, art: TILE_ART.shadows, onToggle: () => onShowSun(!showSun) },
+        { id: 'cloud', label: 'Cloud', state: showSky ? 'ON' : 'OFF', on: showSky, art: TILE_ART.cloud, onToggle: () => onShowSky(!showSky) },
+        {
+          id: 'hazards',
+          label: 'Hazards',
+          state: marks.length === 0 ? 'NONE' : `${marks.length} MARKED`,
+          on: marks.length > 0,
+          art: TILE_ART.hazards,
+          onToggle: () => setCard({ kind: 'hazards' }),
+        },
+        {
+          id: 'buildings',
+          label: 'Buildings',
+          /* A note from the fetch -- "none mapped here" -- is the state. */
+          state: !showBuildings ? 'OFF' : (buildingsNote ?? 'ON'),
+          on: showBuildings,
+          art: TILE_ART.buildings,
+          onToggle: () => onShowBuildings(!showBuildings),
+        },
+        { id: 'labels', label: 'Labels', state: showLabels ? 'ON' : 'OFF', on: showLabels, art: TILE_ART.labels, onToggle: () => onShowLabels(!showLabels) },
+        {
+          id: 'airspace',
+          label: 'Airspace',
+          state: airPositions === 0 ? 'NO AIR' : 'OPEN',
+          on: airPositions > 0,
+          art: TILE_ART.airspace,
+          onToggle: () => setCard({ kind: 'airspace' }),
+        },
+      ]}
+      sourceLine={`Esri World Imagery · native to z${ESRI_NATIVE_MAX_ZOOM} · showing z${Math.round(mapZoom)}`}
+      about={
+        <p className="tiles__prose">
+          Cones are what each position can actually frame. The sun arc is where the sun rises and
+          sets. Shadows are thrown from the marked heights. Cloud is GOES satellite imagery over the
+          map. Hazards are what you marked plus what OpenStreetMap has. Labels are place names over
+          the imagery, off while reading a venue and on while hunting for one.
+        </p>
+      }
+    />
+  )
+
+  /*
+   * ONE SWITCH, EXHAUSTIVE BY CONSTRUCTION. A new card is a new member of the
+   * union and TypeScript asks for its body here; there is no list to forget
+   * to append to.
+   */
+  const cardBody = ((): ReactNode => {
+    switch (card.kind) {
+      case 'shoot':
+        return shootCard
+      case 'wind':
+        return (
+          <WindCard
+            wind={wind}
+            levels={windLevels}
+            gustMps={gustMps}
+            ratedWindMps={ratedWindMps}
+            ratedWindSource={ratedWindSource}
+            atLabel={clock(scrubbedAt)}
+            units={units}
+            onClose={home}
+          />
+        )
+      case 'cloud':
+        return (
+          <Card title="Cloud" at={clock(scrubbedAt)} onClose={home}>
+            <WeatherPanel {...weatherCommon} show="cloud" />
+
+            {/*
+              * THE SATELLITE LAYER'S KEY LIVES HERE, WITH THE SUBJECT IT IS
+              * ABOUT.
+              *
+              * It was in the conditions SECTION, which the shell rebuild
+              * deleted -- and for a while the Cloud tile in Layers turned on
+              * a layer that painted colours across the map with nothing
+              * anywhere to say what they meant and no way to change what it
+              * painted. A layer with no key is decoration; a layer whose
+              * picker has no home is a feature hiding its own dependency,
+              * which is shape D in docs/failure-modes.md.
+              *
+              * The cloud card is the right home rather than a convenient
+              * one: the sky layer paints cloud, and this card is the one
+              * about cloud. One subject, two views of it -- the forecast
+              * number and the satellite picture.
+              */}
+            {!showSky ? null : (
+              <SkyLegend
+                band={skyBand}
+                advice={zoomAdvice(skyBand, venue?.lat ?? 0, mapWidth, mapZoom)}
+                sky={sky}
+                clock={(at) =>
+                  venueWindow === null
+                    ? at.toISOString().slice(11, 16)
+                    : formatClock(at, venueWindow.timeZone)
+                }
+                boundary={
+                  venueWindow === null
+                    ? null
+                    : boundaryNote(new Date(), (at) => formatClock(at, venueWindow.timeZone))
+                }
+                onZoomOut={(zoom) => handle.current?.zoomTo(zoom)}
+                layer={skyLayer}
+                onLayer={onSkyLayer}
+                windHeight={windHeight}
+                ratedWindMps={ratedWindMps}
+              />
+            )}
+
+            {/* The cameras show the sky the forecast is modelling. */}
+            <CardMore links={[{ label: 'Sky cameras near here', onOpen: () => openCard('cams') }]} />
+          </Card>
+        )
+      case 'tide':
+        return (
+          <Card title="Tide" at={clock(scrubbedAt)} onClose={home}>
+            <WeatherPanel {...weatherCommon} show="tide" />
+          </Card>
+        )
+      case 'golden':
+        return (
+          <Card title="The light" at={clock(scrubbedAt)} onClose={home}>
+            <SunReadout venueWindow={venueWindow} />
+            {/*
+              * WHAT THE PHASE REQUIRES, which came off the time scrubber when
+              * that became a 34px control. It is a statement about the light
+              * phase, and this is the card about the light phase.
+              */}
+            <PhaseRule
+              phase={nightPhase}
+              flying={{ airPositions, dronePlatform: platformFilter === 'air' }}
+            />
+
+            {/*
+              * WHEN IS THE SUN BEHIND THAT BUILDING. It was the first row of
+              * the Sky card, above a list of meteor showers -- a question
+              * about the sun's bearing today, filed under what the sky does
+              * over the next thirty nights. The sky card was the tallest in
+              * the app at 94% of the two-viewport limit, and this is why.
+              *
+              * It is the same subject as the rest of this card: where the
+              * light comes from, asked forward in time instead of now.
+              */}
+            <details className="sunwhen">
+              <summary className="sunwhen__head">
+                <span className="sunwhen__name">When is the sun here again</span>
+                <span className="sunwhen__why">Pick a point and get the dates and times</span>
+              </summary>
+              <div className="sunwhen__body">
+                <SunSearchPanel
+                  venue={venue}
+                  timeZone={venueWindow?.timeZone ?? null}
+                  timeZoneAbbr={venueWindow?.timeZoneShort ?? null}
+                  target={aimAt}
+                  picking={placingAim}
+                  onPickTarget={() => onPlacingAim(!placingAim)}
+                />
+              </div>
+            </details>
+            <CardMore
+              links={[
+                { label: 'The sun through the day', onOpen: () => openCard('suncurve') },
+                /*
+                 * THE SKY CARD'S DOOR. It used to be opened from the cloud
+                 * card's "Sky cameras near here" row -- which was already
+                 * the wrong name for it, and became no door at all when the
+                 * cameras were split onto their own card. The list is what
+                 * the sky does at this venue over the next thirty nights,
+                 * which is the same subject as the light asked much further
+                 * forward, so it opens from here.
+                 */
+                { label: 'The next 30 nights', onOpen: () => openCard('sky') },
+              ]}
+            />
+          </Card>
+        )
+      case 'suncurve':
+        return venue === null || venueWindow === null ? (
+          <Card title="The day" onClose={home}>
+            <p className="card2__source">Set the venue and this fills in.</p>
+          </Card>
+        ) : (
+          <Card title="The day" onClose={home}>
+            <SunCurve
+              start={venueWindow.start}
+              end={venueWindow.end}
+              value={scrub}
+              onChange={onScrub}
+              at={scrubbedAt ?? venueWindow.start}
+              venue={venue}
+              horizon={horizonProfile}
+              timeZone={venueWindow.timeZone}
+              timeZoneAbbr={venueWindow.timeZoneShort}
+              terrainOn={showTerrain}
+              onShowTerrain={onShowTerrain}
+            />
+          </Card>
+        )
+      case 'sky':
+        return (
+          <Card title="Sky" onClose={home}>
+            <SkyPanel
+              venue={venue}
+              timeZone={venueWindow?.timeZone ?? null}
+              timeZoneAbbr={venueWindow?.timeZoneShort ?? null}
+              horizon={horizonProfile}
+              kit={kitProfile}
+              now={skyNow}
+            />
+            {/*
+              * THE CAMERAS ARE THEIR OWN CARD NOW.
+              *
+              * This card was the tallest in the app -- 1589px, 94% of the
+              * two-viewport limit -- because it held three subjects: where
+              * the sun is today, what the sky does over the next thirty
+              * nights, and which cameras are pointed at it this minute. The
+              * first went to the light card; the cameras are here.
+              *
+              * AND IT FIXES A MISLABELLED DOOR. The cloud card's row read
+              * "Sky cameras near here" and opened this card, which is mostly
+              * meteor showers. Now it opens the cameras.
+              */}
+            <CardMore links={[{ label: 'Sky cameras near here', onOpen: () => openCard('cams') }]} />
+          </Card>
+        )
+      case 'cams':
+        return (
+          <Card title="Sky cameras" onClose={home}>
+            <CamList venue={venue} wind={wind} units={units} />
+          </Card>
+        )
+      case 'hazards':
+        return (
+          <Card title="Hazards" onClose={home}>
+            <HazardPanel
+              marks={marks}
+              kind={markKind}
+              onKind={onMarkKind}
+              drawing={markDrawing}
+              onDrawing={onMarkDrawing}
+              draft={markDraft}
+              onFinishLine={onFinishLine}
+              onCancelLine={onCancelLine}
+              selected={selectedMark}
+              onSelect={onSelectMark}
+              onChange={onChangeMark}
+              onDelete={onDeleteMark}
+              marking={marking}
+              onMarking={onMarking}
+              date={shootDate}
+              latitude={venue?.lat ?? null}
+            />
+          </Card>
+        )
+      case 'airspace':
+        return (
+          <Card title="Airspace" onClose={home}>
+            <AirspacePanel venue={venue} altitudeFeet={airAltitudeFeet} />
+          </Card>
+        )
+      case 'layers':
+        return (
+          <Card title="Map & layers" onClose={home}>
+            {layersCard}
+            {/*
+              * THE TILE TURNS THE LAYER ON; THE ROW OPENS WHAT IT DREW. Two
+              * different questions -- "is it on" and "what is actually here"
+              * -- and putting the second on the tile is what made the old
+              * layer list a page of prose.
+              */}
+            <CardMore
+              links={[
+                { label: 'What is mapped here', onOpen: () => openCard('hazards') },
+                { label: 'Airspace over this venue', onOpen: () => openCard('airspace') },
+              ]}
+            />
+          </Card>
+        )
+      case 'about':
+        return (
+          <Card title="About" onClose={home}>
+            <AboutSheet
+              units={units}
+              onUnits={onUnits}
+              onHow={onHow}
+              onKit={onEditKit}
+              onSpots={onOpenSpots}
+              onApiKey={onOpenSettings}
+              kitLine={`${kitProfile.bodies.length} bodies · ${kitProfile.lenses.length} lenses`}
+              spotsLine={`${savedSpotCount} saved`}
+              apiKeyLine="bring your own"
+            />
+          </Card>
+        )
+    }
+  })()
 
   return (
     <div
@@ -635,6 +1277,12 @@ export function PlanMode({
         {
           ['--sheet-live-height' as string]: `${sheetHeight}px`,
           ['--dock-height' as string]: `${dockHeight}px`,
+          /*
+           * How far down the venue bar and the chip row reach. The map's own
+           * scale bar and attribution ride up with the sheet; this is the
+           * ceiling that stops them riding up behind the chips.
+           */
+          ['--top-chrome' as string]: `${topChrome}px`,
           /*
            * READ AT RUNTIME, not guessed. The row changes height when it collapses
            * and when the platform counts gain a digit, and the hazard panel
@@ -661,6 +1309,7 @@ export function PlanMode({
         onAddAt={onAddAt}
         plan={visiblePlan}
         conePlan={conePlan}
+        isolatedId={isolatedId}
         pilotAt={pilotAt}
         onPilotMove={onPilotMove}
         onAimAt={onAimAt}
@@ -801,16 +1450,29 @@ export function PlanMode({
         * screen -- there is nothing left to act on, and the shooter at full
         * is reading, not steering.
         */}
+      {/*
+        * THE VENUE BAR AND THE CHIPS SIT OVER THE MAP, not in the sheet. They
+        * are what the map is OF -- where, when, and the four numbers that
+        * could make you not go -- so they stay put while the sheet changes
+        * what it is about.
+        */}
+      <VenueBar
+        venueName={venueNameLine}
+        dateLabel={dateLabel}
+        initial={null}
+        onAbout={() => openCard('about')}
+      />
+
+      <ChipRow chips={chips} active={card.kind} onOpen={openCard} measureRef={measureChips} />
+
       {sheet === 'full' ? null : (
       <MapRail
-        showSun={showSun}
-        onShowSun={onShowSun}
+        onLayers={() => openCard('layers')}
+        layersOpen={card.kind === 'layers'}
         pitch={pitch}
         onResetPitch={() => handle.current?.setPitch(0)}
         onLocate={onLocate}
         locating={locating}
-        onFitAll={() => handle.current?.fitAll(fitTargets)}
-        canFitAll={fitTargets.length > 0}
       />
       )}
 
@@ -819,387 +1481,71 @@ export function PlanMode({
         onDetentChange={setSheet}
         onHeightChange={setSheetHeight}
         reservedBottom={dockHeight}
+        reservedTop={topChrome}
         peek={
           <div className="peek">
             {/*
-              * PEEK IS THE SHOOT LINE AND THE SCRUBBER. Nothing else.
+              * PEEK IS THE SCRUBBER, AND A LINE ONLY WHEN THERE IS ONE.
               *
               * It used to be a summary, a full width primary and a secondary
               * row, 176px of it, while the scrubber sat in its own bar below.
-              * Two bars for two things that are read together. The scrubber is
-              * the thing you touch most and the shoot line is what tells you
-              * what you are scrubbing, so they are the peek and everything
-              * that acts on the PLAN moved in with the plan.
+              * Two bars for two things that are read together.
+              *
+              * THE SHOOT LINE IS GONE FROM THE IDLE PEEK. It read "Shoot
+              * setup · 11:00-15:00 EDT · Brew River Dock Bar, Salisbury MD",
+              * which is exactly what the venue bar says a hundred pixels
+              * above it -- and the peek is at the top of the sheet, so every
+              * card in the app started fifty pixels lower to make room for a
+              * repeat. It comes back while a plan generates, because the step
+              * count is reported nowhere else.
+              *
+              * WHAT IT IS NOT IS A LOST TAP TARGET: the grabber above raises
+              * the sheet, and so does tapping any card the sheet is showing.
               */}
-            <button type="button" className="peek__line" onClick={onPeekTap}>
-              <span className="peek__label">{peekStatus.label}</span>
-              <span className="peek__value">{peekStatus.line}</span>
-            </button>
+            {peekStatus === null ? null : (
+              <button type="button" className="peek__line" onClick={onPeekTap}>
+                <span className="peek__label">{peekStatus.label}</span>
+                <span className="peek__value">{peekStatus.line}</span>
+              </button>
+            )}
 
-            {venueWindow === null || scrubbedAt === null || sun === null ? null : (
-              <TimeScrubber
+            {/*
+              * THE TIME STRIP, ONLY WHERE TIME CHANGES THE READING.
+              *
+              * It used to be here unconditionally, which put a 250px time
+              * panel above the layer tiles and above About. Which cards it
+              * belongs on is one table in src/lib/sheetCard.ts rather than a
+              * condition repeated at eleven call sites.
+              */}
+            {!TIME_MATTERS[card.kind] || venueWindow === null || scrubbedAt === null ? null : (
+              <TimeStrip
                 start={venueWindow.start}
                 end={venueWindow.end}
                 value={scrub}
                 onChange={onScrub}
                 at={scrubbedAt}
-                sun={sun}
                 timeZone={venueWindow.timeZone}
                 timeZoneAbbr={venueWindow.timeZoneShort}
-                tideExtremes={tideExtremes}
                 phases={nightBands}
-                phase={nightPhase}
-                flying={{ airPositions, dronePlatform: platformFilter === 'air' }}
               />
             )}
           </div>
         }
         half={
-          <div className="sheet__half">
-            {/*
-              * THE SELECTED POSITION'S CARD IS THE HALF CONTENT.
-              *
-              * It was the fourth and last surface floating over the map, with
-              * z-index 4 and its bottom offset computed from the dock plus the
-              * live sheet height. Selection now changes WHAT the sheet shows
-              * and the detent decides HOW MUCH of it, which are two separate
-              * questions that one absolute position had tangled together.
-              *
-              * THE FILTER LIVES WITH WHAT IT FILTERS, which is the list, so it
-              * goes with the list rather than with the card.
-              */}
-            {selected !== null ? null : (
-              <PlatformFilter
-                value={platformFilter}
-                onChange={onPlatformFilter}
-                counts={platformCounts}
-                hidden={hiddenByPlatform}
-                airAvailable={airAvailable}
-              />
-            )}
-
-            {selected !== null ? (
-              <PositionCard
-                planned={selected}
-                shootAt={scrubbedAt}
-                timeZone={venueWindow?.timeZone ?? null}
-                tide={tideNow}
-                onClose={() => onSelect(null)}
-                count={plan.length}
-                onDelete={onDeletePosition}
-                onDuplicate={onDuplicatePosition}
-                onMove={onMovePosition}
-                onSetOptic={onSetOptic}
-                onSetAltitude={onSetAltitude}
-                onSetShotType={onSetShotType}
-                onSetYaw={onSetYaw}
-                kit={kitProfile}
-                selection={kitSelection}
-                marks={marks}
-                subject={venue}
-                pilotAt={pilotAt}
-                onPlacePilot={() => onPlacingPilot(true)}
-              />
-            ) : (
-              <>
-                {/*
-                  * THE SLAB IS GONE. A full width ADD POSITION button owned a
-                  * whole row of the screen for an action the map itself
-                  * already performs on a tap. What is left is a 32px + at the
-                  * head of the list it adds to, and suggesting is a text
-                  * action beside it rather than a second slab: the model has
-                  * never placed well enough to deserve equal weight with the
-                  * shooter's own tap on ground they know.
-                  */}
-                <div className="plist__head">
-                  <h2 className="plist__title">
-                    Positions
-                    <span className="plist__n num"> {plan.length}</span>
-                  </h2>
-                  <div className="plist__acts">
-                    <button
-                      type="button"
-                      className={`plist__add${placing ? ' plist__add--armed' : ''}`}
-                      onClick={() => onPlacing(!placing)}
-                      aria-pressed={placing}
-                      aria-label={
-                        placing
-                          ? 'Cancel adding a position'
-                          : addsAir
-                            ? 'Add an air position by tapping the map'
-                            : 'Add a position by tapping the map'
-                      }
-                    >
-                      {placing ? '\u00D7' : '+'}
-                    </button>
-                    <button
-                      type="button"
-                      className="plist__suggest"
-                      onClick={onGenerate}
-                      disabled={generation.status === 'working'}
-                    >
-                      {generation.status === 'working' ? 'Suggesting\u2026' : 'Suggest'}
-                      <span className="plist__why">{briefSource}</span>
-                    </button>
-                  </div>
-                </div>
-
-                <ShotList
-                  plan={visiblePlan}
-                  planCoverage={null}
-                  desiredShots={desiredShots}
-                  selectedId={selectedId}
-                  onPick={onPickAndRaise}
-                />
-
-                <PlanStatus
-                  generation={generation}
-                  onFixBlock={onFixBlock}
-                  planCoverage={planCoverage}
-                  siteNote={siteNote}
-                  terrainNote={terrainNote}
-                  positionNote={positionNote}
-                />
-              </>
-            )}
+          /*
+           * ONE SUBJECT. The sheet shows exactly one card, because its
+           * content IS a SheetCard and that union has one member at a time.
+           *
+           * WHAT THIS REPLACES: five sections in one scroll -- Conditions,
+           * Sky, Sun curve, Layers, Hazards -- stacked, the first of them
+           * 1937 px tall. Reading the wind meant scrolling past the tide, the
+           * cloud, the airspace and the sun. See src/lib/sheetCard.ts.
+           */
+          <div className="sheet__card" data-card={card.kind}>
+            {cardBody}
           </div>
         }
-        full={
-          <div className="sheet__sections">
-            {/*
-              * FIVE SECTIONS, ONE SCROLL, no back buttons and nothing to
-              * switch between. Each was its own surface over the map; three of
-              * them were absolutely positioned with their own bottom-offset
-              * arithmetic against the live sheet height, which is where three
-              * separate bugs came from.
-              *
-              * A SIXTH APPEARS WHEN SOMETHING IS FLYING. Airspace is gated on
-              * an air position for the same reason it always was: Part 107
-              * paperwork beside a tripod is a rule attached to something it
-              * does not govern.
-              */}
-            <SheetSection title="Conditions">
-              <ConditionsPanel
-                venueWindow={venueWindow}
-                tide={tide}
-                scrubbedAt={scrubbedAt}
-                venue={venue}
-                wind={wind}
-                windLevels={windLevels}
-                gustMps={gustMps}
-                windAt={windAt}
-                windPast={windPast}
-                windHeight={windHeight}
-                ratedWindMps={ratedWindMps}
-                ratedWindSource={ratedWindSource}
-                tideNow={tideNow}
-                cloud={selectedCloud}
-              />
-            </SheetSection>
-
-            {/*
-              * SKY ABSORBED SUN WHEN rather than sitting beside it. Same venue,
-              * same question -- where is a thing in the sky from here, and when
-              * -- at a wider scale. Sun When is the first row of it and does
-              * exactly what it did. Five sections stay five.
-              */}
-            <SheetSection title="Sky">
-              <SkyPanel
-                venue={venue}
-                timeZone={venueWindow?.timeZone ?? null}
-                timeZoneAbbr={venueWindow?.timeZoneShort ?? null}
-                horizon={horizonProfile}
-                kit={kitProfile}
-                now={skyNow}
-                sunWhen={
-                  <SunSearchPanel
-                    venue={venue}
-                    timeZone={venueWindow?.timeZone ?? null}
-                    timeZoneAbbr={venueWindow?.timeZoneShort ?? null}
-                    target={aimAt}
-                    picking={placingAim}
-                    onPickTarget={() => onPlacingAim(!placingAim)}
-                  />
-                }
-              />
-            </SheetSection>
-
-            {airPositions === 0 ? null : (
-              <SheetSection title="Airspace">
-                <AirspacePanel venue={venue} altitudeFeet={airAltitudeFeet} />
-              </SheetSection>
-            )}
-
-            {/*
-              * THE CURVE IS ONE SECTION, AT FULL.
-              *
-              * It briefly replaced the whole of HALF -- positions list, chips,
-              * Generate -- and took the sheet's gesture with it, which left
-              * the screen with no controls and no way back. A chart is a
-              * thing to read, so it sits where things to read sit.
-              */}
-            {venue === null ? null : venueWindow === null ? null : (
-              <SheetSection title="Sun curve">
-                <SunCurve
-                  start={venueWindow.start}
-                  end={venueWindow.end}
-                  value={scrub}
-                  onChange={onScrub}
-                  at={scrubbedAt ?? venueWindow.start}
-                  venue={venue}
-                  horizon={horizonProfile}
-                  timeZone={venueWindow.timeZone}
-                  timeZoneAbbr={venueWindow.timeZoneShort}
-                  terrainOn={showTerrain}
-                  onShowTerrain={onShowTerrain}
-                />
-              </SheetSection>
-            )}
-
-            <SheetSection title="Layers">
-              <LayersPanel
-                kitProfile={kitProfile}
-                plan={plan}
-                coneMode={coneMode}
-                onConeMode={onConeMode}
-                lensFilters={lensFilters}
-                onLensFilters={onLensFilters}
-                isolatedId={isolatedId}
-                onClearIsolate={onClearIsolate}
-                showArc={showArc}
-                onShowArc={onShowArc}
-                showLabels={showLabels}
-                onShowLabels={onShowLabels}
-                showTerrain={showTerrain}
-                onShowTerrain={onShowTerrain}
-                showBuildings={showBuildings}
-                onShowBuildings={onShowBuildings}
-                buildingsNote={buildingsNote}
-                terrainSuspended={terrainPaused}
-                showSky={showSky}
-                onShowSky={onShowSky}
-                marking={marking}
-                onMarking={onMarking}
-                markCount={marks.length}
-                sunAltitude={sun?.altitude ?? null}
-                mapZoom={mapZoom}
-              />
-
-              {/*
-                * CLOUD IS A LAYER, SO IT LIVES IN LAYERS.
-                *
-                * It was its own section, which made six. The key belongs with
-                * the thing it is a key FOR: the toggle that draws the cloud is
-                * three rows above this, and having the legend in a separate
-                * section meant reading one to understand the other.
-                */}
-              <SkyLegend
-                band={skyBand}
-                advice={zoomAdvice(skyBand, venue?.lat ?? 0, mapWidth, mapZoom)}
-                sky={sky}
-                clock={(at) =>
-                  venueWindow === null
-                    ? at.toISOString().slice(11, 16)
-                    : formatClock(at, venueWindow.timeZone)
-                }
-                boundary={
-                  venueWindow === null
-                    ? null
-                    : boundaryNote(new Date(), (at) => formatClock(at, venueWindow.timeZone))
-                }
-                onZoomOut={(zoom) => handle.current?.zoomTo(zoom)}
-                layer={skyLayer}
-                onLayer={onSkyLayer}
-                windHeight={windHeight}
-                ratedWindMps={ratedWindMps}
-              />
-            </SheetSection>
-
-            <SheetSection title="Hazards">
-              <HazardPanel
-                marks={marks}
-                kind={markKind}
-                onKind={onMarkKind}
-                drawing={markDrawing}
-                onDrawing={onMarkDrawing}
-                draft={markDraft}
-                onFinishLine={onFinishLine}
-                onCancelLine={onCancelLine}
-                selected={selectedMark}
-                onSelect={onSelectMark}
-                onChange={onChangeMark}
-                onDelete={onDeleteMark}
-                marking={marking}
-                onMarking={onMarking}
-                date={shootDate}
-                latitude={venue?.lat ?? null}
-              />
-            </SheetSection>
-
-            <div className="sheet__acts">
-              <button
-                type="button"
-                className="act"
-                onClick={onPreparePack}
-                disabled={plan.length === 0 || packState.status === 'working'}
-              >
-                <span className="act__label">
-                  {packState.status === 'working'
-                    ? `Saving ${packState.done}/${packState.total}`
-                    : packIsCurrent
-                      ? 'Save again'
-                      : 'Save offline'}
-                </span>
-                <span className="act__why">
-                  {plan.length === 0
-                    ? 'Add a position first'
-                    : packState.status === 'working'
-                      ? 'Downloading photos'
-                      : packIsCurrent
-                        ? 'Saved and current'
-                        : 'Works with no signal'}
-                </span>
-              </button>
-              <button
-                type="button"
-                className="act"
-                onClick={onGoToField}
-                disabled={goToFieldBlocked !== null}
-              >
-                <span className="act__label">Start the shoot</span>
-                <span className="act__why">
-                  {goToFieldBlocked === null ? 'One position at a time' : 'Add a position first'}
-                </span>
-              </button>
-              {airPositions === 0 ? null : (
-                <button
-                  type="button"
-                  className={`act${placingPilot ? ' act--armed' : ''}`}
-                  onClick={() => onPlacingPilot(!placingPilot)}
-                  aria-pressed={placingPilot}
-                >
-                  <span className="act__label">
-                    {placingPilot
-                      ? 'Tap the map \u00b7 cancel'
-                      : pilotAt === null
-                        ? 'Place the pilot position'
-                        : 'Move the pilot position'}
-                  </span>
-                  <span className="act__why">Measures the distance to each aircraft</span>
-                </button>
-              )}
-            </div>
-
-            <FieldPackControl
-              pack={pack}
-              matches={packIsCurrent}
-              positions={plan.length}
-              state={packState}
-              timeZone={venueWindow?.timeZone ?? null}
-              onPrepare={onPreparePack}
-            />
-          </div>
-        }
+        full={null}
       />
 
       {/* The mode rail only. The scrubber moved into the sheet's peek. */}

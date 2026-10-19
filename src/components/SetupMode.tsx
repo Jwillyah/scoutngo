@@ -25,6 +25,7 @@ import { ShootChips } from './ShootChips.tsx'
 import { StaleBrief } from './StaleBrief.tsx'
 import { UseMyLocation } from './UseMyLocation.tsx'
 import type { ResolvedName } from '../core/venueName.ts'
+import type { Units } from '../lib/units.ts'
 import { VenuePlate } from './VenuePlate.tsx'
 
 interface SetupModeProps {
@@ -97,12 +98,14 @@ interface SetupModeProps {
     showLabels: boolean
     showTerrain: boolean
     showBuildings: boolean
+    units: Units
   }
   onSettings: (next: {
     showNumbers: boolean
     showLabels: boolean
     showTerrain: boolean
     showBuildings: boolean
+    units: Units
   }) => void
   /**
    * A request to show the shooter what is blocking them. The tick changes on
@@ -435,6 +438,7 @@ export function SetupMode({
           mode={null}
           plan={[]}
           conePlan={[]}
+        isolatedId={null}
           onPositionMove={() => {}}
           onLongPress={pendingPin === null ? onPinChange : onPendingMove}
           sunAzimuth={null}

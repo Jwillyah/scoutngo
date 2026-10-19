@@ -46,6 +46,8 @@ const groundCard = () =>
 const card = (pilotAt: LatLon | null, over: Partial<CameraPosition> = {}) =>
   renderToStaticMarkup(
     <PositionCard
+      isolated={false}
+      onIsolate={() => {}}
       planned={planPositions([air(over)], SUBJECT, sun)[0]}
       shootAt={null}
       timeZone={null}
@@ -394,6 +396,8 @@ describe('a drone position looks at the subject from its own side', () => {
   it('says what is missing when there is nothing to aim at', () => {
     const html = renderToStaticMarkup(
       <PositionCard
+      isolated={false}
+      onIsolate={() => {}}
         planned={planPositions([air({ shotType: 'top-down' })], SUBJECT, sun)[0]}
         shootAt={null}
         timeZone={null}

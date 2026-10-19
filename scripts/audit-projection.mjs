@@ -25,7 +25,7 @@
  *      bounds-based reasoning is precisely what breaks there.
  */
 
-import { guardAudit, startWatchdog } from './preflight.mjs'
+import { goToStage, guardAudit, startWatchdog } from './preflight.mjs'
 
 /*
  * ARMED BEFORE ANYTHING ELSE CAN THROW.
@@ -501,7 +501,7 @@ for (const [z, name] of [[13, 'wide'], [16, 'mid'], [19, 'tight']]) {
 
 await checkMarkers('SETUP · marker anchoring')
 
-await ev(`[...document.querySelectorAll('.rail__btn')].find(b=>/Plan/.test(b.textContent))?.click()`)
+await goToStage(ev, wait, 'plan')
 await wait(4000)
 await ev(`[...document.querySelectorAll('.act')].find(b=>/Suggest/.test(b.textContent))?.click()`)
 await wait(12000)

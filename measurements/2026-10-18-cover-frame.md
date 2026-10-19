@@ -4,7 +4,7 @@
 **Question:** Can the cover carry a real rendered frame of the app, in 3D
 with terrain, showing two positions with different optics, both cones, a sun
 ray, a shadow ray and a hazard mark?  
-**Outcome:** Yes. public/cover-frame.jpg, 519 KB.
+**Outcome:** Yes. public/cover-frame.jpg, 635 KB.
 
 ## MapHandle.capture() cannot produce this frame
 
@@ -34,10 +34,10 @@ drawn by the script and nothing is composited afterwards.
 | positions drawn | 3 |
 | coverage cones | 3 |
 | rays | sun, shadow |
-| hazard marks | 1 |
+| hazard marks | 0 |
 | style layers | 23 |
-| labelled things | 5 (ceiling 6) |
+| labelled things | 3 (ceiling 6) |
 
-Labels: `SONY 200mm·TRIPOD`, `AIR 3S 70mm·DRONE·200ft`, `AIR 3S 70mm·DRONE·200ft`, `Sun180.6°`, `Shadow0.6°`
+Labels: `SONY 200mm·TRIPOD`, `AIR 3S 24mm·DRONE·120ft`, `AIR 3S 70mm·DRONE·300ft`
 
 Reproduce with `node scripts/make-cover-frame.mjs`.

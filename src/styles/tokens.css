@@ -57,6 +57,19 @@
   --surface-1: #16141a; /* floating panels, the bottom sheet */
   --surface-2: #1e1b24; /* inputs and rows inside a panel */
   --surface-3: #2e2a36; /* hairlines and dividers */
+  /*
+   * THE CHIP PLATE. Lighter than the sheet and solid, so a chip reads as a
+   * raised plate rather than as an empty text field waiting to be typed in,
+   * which is what a 1px border on a transparent ground made it.
+   *
+   * NOT A NEW MEANING COLOUR. The rule the colour audit enforces is about
+   * the seven hues that carry meaning -- the chrome teal and the six data
+   * hues in src/core/colorRole.ts -- and this is a neutral surface, in the
+   * same family as the three above it. It is cooler than they are on
+   * purpose: the chips sit over satellite imagery rather than inside a
+   * panel, and the warm greys read as brown against it.
+   */
+  --surface-raised: #1a212b; /* chips, over the map rather than in a panel */
   /* The top edge of a panel catches the light, one hairline brighter than the
      panel. It is what separates a floating surface from the map without a
      shadow, which this design does not use. */

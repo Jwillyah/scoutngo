@@ -50,6 +50,22 @@ interface PositionCardProps {
   count: number
   onDelete: (id: string) => void
   onDuplicate: (id: string) => void
+  /*
+   * WHETHER ONLY THIS POSITION'S COVERAGE IS DRAWN.
+   *
+   * THE CONTROL WENT MISSING. It used to live in ConePicker, a disclosure
+   * over the map; the shell rebuild made Layers a card of tiles and the
+   * picker was never rehomed. `isolatedId` went on being threaded from App
+   * through PlanMode to MapView, `onClearIsolate` went on being declared as
+   * a prop, and nothing anywhere could set either -- so the feature was dead
+   * with its whole wiring intact. Shape D in docs/failure-modes.md: a
+   * feature that hides its own dependency, here by losing its only door.
+   *
+   * THE POSITION CARD IS THE RIGHT HOME. "Show only this one's coverage" is
+   * a question about THIS position, and this is the card about it.
+   */
+  isolated: boolean
+  onIsolate: (id: string | null) => void
   onMove: (id: string, delta: number) => void
   onSetOptic: (id: string, lensId: string, focalLength: number) => void
   /** The shooter's own gear. The picker lists exactly what they own. */
@@ -507,6 +523,8 @@ export function PositionCard({
   count,
   onDelete,
   onDuplicate,
+  isolated,
+  onIsolate,
   onMove,
   onSetOptic,
   kit,
@@ -944,6 +962,19 @@ export function PositionCard({
             ↓
           </button>
         </span>
+        {/*
+          * ISOLATE: one cone filled, the others outlined rather than hidden.
+          * Seeing what this position covers THAT THE OTHERS DO NOT is the
+          * question people have when they ask for one cone.
+          */}
+        <button
+          type="button"
+          className={`cardacts__btn${isolated ? ' cardacts__btn--on' : ''}`}
+          aria-pressed={isolated}
+          onClick={() => onIsolate(isolated ? null : position.id)}
+        >
+          Only this
+        </button>
         <button
           type="button"
           className="cardacts__btn cardacts__btn--wide"

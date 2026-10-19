@@ -10,7 +10,7 @@
  * asserts that nothing on any of them is visible but unreachable.
  */
 
-import { guardAudit, startWatchdog } from './preflight.mjs'
+import { goToStage, guardAudit, startWatchdog } from './preflight.mjs'
 
 /*
  * ARMED BEFORE ANYTHING ELSE CAN THROW.
@@ -255,7 +255,7 @@ for (const h of [844, 660]) {
     await ev(`[...document.querySelectorAll('.drawer__close')].pop()?.click()`)
     await wait(600)
   }
-  await ev(`[...document.querySelectorAll('.rail__btn')].find(b=>/Plan/.test(b.textContent))?.click()`)
+  await goToStage(ev, wait, 'plan')
   await wait(3500)
   await check(`PLAN ${h}`)
   await ev(`[...document.querySelectorAll('.act')].find(b=>/Suggest/.test(b.textContent))?.click()`)
@@ -273,7 +273,7 @@ for (const h of [844, 660]) {
   await check(`PLAN ${h} · card numbers open`)
   await ev(`document.querySelector('.card__close')?.click()`)
   await wait(600)
-  await ev(`[...document.querySelectorAll('.rail__btn')].find(b=>/Field/.test(b.textContent))?.click()`)
+  await goToStage(ev, wait, 'field')
   await wait(3500)
   await check(`FIELD ${h}`)
 }

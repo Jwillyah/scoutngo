@@ -16,6 +16,14 @@ interface FieldModeProps {
   tide: TideInfo
   /** Non-null only when it was built for THIS plan. See lib/fieldPack.ts. */
   pack: FieldPack | null
+  /*
+   * THE WAY OUT OF THE EMPTY SCREEN. FIELD is reachable with no plan -- the
+   * nav is navigation, not a progress bar -- so the screen that has nothing
+   * to show has to offer the thing that fills it. A message naming a missing
+   * capability with no control beside it is the dead end the surface audit
+   * exists to catch.
+   */
+  onPlan: () => void
   footer: React.ReactNode
 }
 
@@ -32,7 +40,7 @@ interface FieldModeProps {
  * the scrubber was left. That is the difference between a plan and a briefing:
  * by the time anyone is standing here the sun has moved.
  */
-export function FieldMode({ plan, venue, tide, pack, footer }: FieldModeProps) {
+export function FieldMode({ plan, venue, tide, pack, onPlan, footer }: FieldModeProps) {
   const now = useNow()
   const gps = useGeolocation()
   const [index, setIndex] = useState(0)
@@ -80,7 +88,10 @@ export function FieldMode({ plan, venue, tide, pack, footer }: FieldModeProps) {
     return (
       <div className="mode-field">
         <div className="page">
-          <p className="notice">No positions yet. Generate a plan first.</p>
+          <p className="notice">No positions yet.</p>
+          <button type="button" className="notice__act" onClick={onPlan}>
+            Go to PLAN and place one
+          </button>
         </div>
         <div className="mode__foot">{footer}</div>
       </div>

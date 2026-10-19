@@ -22,24 +22,40 @@ describe('render smoke', () => {
   })
 
   /*
-   * THREE MODES ON A TIME AXIS, not five parallel tabs. The old shell offered
-   * Plan, Shots, Conditions, Kit and Spots as equals, though Kit is configured a
-   * week before Shots is read.
+   * MAP, PLAN, FIELD. Three, and exactly three: a settings tab would spend a
+   * permanent quarter of the primary navigation on a screen opened twice a
+   * year, which is why settings is behind the venue bar's round button.
    */
-  it('opens in SETUP and offers three ordered modes', () => {
-    for (const step of ['Setup', 'Plan', 'Field']) {
-      expect(html).toContain(`class="rail__label">${step}</span>`)
+  it('offers exactly three stages, named MAP PLAN FIELD', () => {
+    for (const label of ['MAP', 'PLAN', 'FIELD']) {
+      expect(html).toContain(`class="bnav__label">${label}</span>`)
     }
-    expect(html).toContain('rail__step--now')
-    expect(html).not.toContain('class="nav__item')
+    expect(html.match(/class="bnav__btn/g)?.length).toBe(3)
   })
 
-  it('starts in setup, because that is the first step', () => {
+  it('starts in setup, because that is where the pin gets set', () => {
     expect(html).toContain('shell shell--setup')
   })
 
-  it('locks the field step until a plan exists', () => {
-    expect(html).toContain('rail__step--locked')
+  /*
+   * ANY STAGE FROM ANY STAGE. This test is the inverse of the one it replaced.
+   *
+   * The old assertion was `expect(html).toContain('rail__step--locked')` -- it
+   * required that FIELD be disabled until a plan existed. That was the stepper
+   * reading of the shell, and it was wrong: somebody standing in a car park
+   * wanting to look at the map does not want to be told they have not finished
+   * Setup. A screen with nothing to show says so in its own content.
+   *
+   * ASSERTED AS A POSITIVE PROPERTY -- no disabled attribute in the nav --
+   * rather than as the absence of a class name, which is the guard rule in
+   * docs/failure-modes.md: a check for a name you do not want passes the
+   * moment somebody renames it. See shape C.
+   */
+  it('never disables a stage', () => {
+    const nav = html.slice(html.indexOf('<nav class="bnav"'))
+    const end = nav.indexOf('</nav>')
+    expect(end).toBeGreaterThan(0)
+    expect(nav.slice(0, end)).not.toContain('disabled')
   })
 
   /*

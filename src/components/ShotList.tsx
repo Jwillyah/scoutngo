@@ -63,13 +63,14 @@ export function ShotList({
     const index = planned.position.coversShot
     if (index !== null && !claimedBy.has(index)) claimedBy.set(index, planned.position.number)
   }
+  /*
+   * THE EMPTY LINE SAID "press Generate on the Plan tab" -- while rendering
+   * ON the Plan tab, under a + and a Suggest button. Directions to the screen
+   * you are standing on. The two controls are directly above this line now,
+   * so the line's whole job is to say the list is empty.
+   */
   if (plan.length === 0) {
-    return (
-      <p className="empty">
-        No positions yet. Set the venue and the subject point, then press Generate
-        on the Plan tab.
-      </p>
-    )
+    return <p className="empty">No positions yet. Add one above, or ask for a plan.</p>
   }
 
   return (

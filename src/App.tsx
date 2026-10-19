@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { type ConeMode } from './components/ConePicker.tsx'
+import { type ConeMode } from './lib/coneMode.ts'
 import { type MapHandle } from './components/MapView.tsx'
-import { ModeRail } from './components/ModeRail.tsx'
+import { BottomNav } from './components/BottomNav.tsx'
 import { FieldMode } from './components/FieldMode.tsx'
 import { PlanMode } from './components/PlanMode.tsx'
 import { NewBuildNotice } from './components/NewBuildNotice.tsx'
@@ -107,6 +107,8 @@ import {
   type SearchHit,
 } from './lib/search.ts'
 import { usePersistentState } from './lib/usePersistentState.ts'
+import { venueTown } from './lib/venueParts.ts'
+import { DEFAULT_UNITS, type Units } from './lib/units.ts'
 import {
   placeKey,
   shortVenueLabel,
@@ -116,7 +118,6 @@ import {
 import { useTide } from './lib/useTide.ts'
 import {
   blockedReason,
-  canEnter,
   FORWARD_LABEL,
   nextMode,
   setupGap,
@@ -388,12 +389,19 @@ function App() {
     showLabels: boolean
     showTerrain: boolean
     showBuildings: boolean
+    /*
+     * WHICH UNITS EVERY NUMBER RENDERS IN, the chips included. A preference
+     * persisting itself, which is the one direction a view control is allowed
+     * to write: see docs/failure-modes.md on the kit and the filter.
+     */
+    units: Units
   }>(
     'scoutngo.settings',
     {
       showNumbers: NUMERALS_DEFAULT,
       showLabels: false,
       showTerrain: false,
+      units: DEFAULT_UNITS,
       showBuildings: false,
     },
     (raw) => {
@@ -421,14 +429,32 @@ function App() {
       const showTerrain = (stored as { showTerrain?: unknown } | null)?.showTerrain === true
       const showBuildings =
         (stored as { showBuildings?: unknown } | null)?.showBuildings === true
+      /*
+       * UNITS, REVIVED FIELD BY FIELD. A stored object from before units
+       * existed has none, and a half-written one could have a wind unit this
+       * build does not know; either way the default stands rather than a
+       * string nothing can convert reaching a readout.
+       */
+      const storedUnits = (stored as { units?: { wind?: unknown; distance?: unknown } } | null)?.units
+      const units: Units = {
+        wind:
+          storedUnits?.wind === 'mph' || storedUnits?.wind === 'ms' || storedUnits?.wind === 'kt'
+            ? storedUnits.wind
+            : DEFAULT_UNITS.wind,
+        distance:
+          storedUnits?.distance === 'm' || storedUnits?.distance === 'ft'
+            ? storedUnits.distance
+            : DEFAULT_UNITS.distance,
+      }
       if (typeof stored?.showNumbers === 'boolean') {
-        return { showNumbers: stored.showNumbers, showLabels, showTerrain, showBuildings }
+        return { showNumbers: stored.showNumbers, showLabels, showTerrain, showBuildings, units }
       }
       return {
         showNumbers: stored?.showCoords === true,
         showLabels,
         showTerrain,
         showBuildings,
+        units,
       }
     },
   )
@@ -658,8 +684,25 @@ function App() {
     () => platformCounts(plan.map((p) => ({ platform: p.position.platform }))),
     [plan],
   )
+  /*
+   * ISOLATING ONE CONE NO LONGER DELETES THE OTHERS; IT OUTLINES THEM.
+   *
+   * It used to filter the list down to the isolated position, so the other
+   * cones vanished. That answers "what does this one see" and loses the
+   * question people are actually asking when they isolate, which is "what
+   * does this one see THAT THE OTHERS DO NOT". An outline costs nothing to
+   * read and keeps the comparison on screen.
+   *
+   * It is also what three overlapping translucent cones need. Stacked fills
+   * at 0.22 compound into one green mass with no edges in it; one fill and
+   * two outlines reads as a plan with a subject.
+   *
+   * The filled/outlined split is a PROPERTY on the feature, not two sources:
+   * one collection, and the paint decides. Two sources would be two places
+   * for one set of cones to get out of step.
+   */
   const conePlan = useMemo(() => {
-    if (isolatedId !== null) return visiblePlan.filter((p) => p.position.id === isolatedId)
+    if (isolatedId !== null) return visiblePlan
     return coneMode === 'all' ? visiblePlan : []
   }, [visiblePlan, isolatedId, coneMode])
 
@@ -1758,9 +1801,28 @@ function App() {
     hasPlan: plan.length > 0,
   }
 
-  const goTo = (next: Mode) => {
-    if (canEnter(next, available) || next === mode) setMode(next)
-  }
+  /*
+   * ANY STAGE FROM ANY STAGE. NO GATE.
+   *
+   * WHAT WAS HERE: `if (canEnter(next, available) || next === mode) setMode(next)`
+   * -- the availability check, with a comment above the nav insisting the nav
+   * called this "directly rather than through the availability gate". The
+   * comment was written when the stepper was replaced and the gate was left
+   * in. Pressing FIELD with no plan did nothing at all: no event, no feedback,
+   * nothing to press next. The reachability audit found it by clicking FIELD
+   * and reading the shell's own stage class afterwards.
+   *
+   * A SCREEN WITH NOTHING TO SHOW SAYS SO IN ITS OWN CONTENT, which is a
+   * better place for it than a tab that refuses to move -- and that content
+   * has to offer the control, which is why FIELD's empty state now carries a
+   * button back to PLAN rather than the sentence "Generate a plan first".
+   *
+   * `blockedReason` stays, and is the only thing left of the gate: the
+   * forward bar says why the next step is not earned yet, which is a
+   * statement about the work and not a lock on the navigation. `canEnter`
+   * existed only to make this line refuse, and is deleted with it.
+   */
+  const goTo = (next: Mode) => setMode(next)
 
   const forward = nextMode(mode)
   const forwardLabel = FORWARD_LABEL[mode]
@@ -1816,9 +1878,15 @@ function App() {
    * up, and it is in the shell rather than in a menu because a menu is one tap
    * too many for the moment it is for.
    */
+  /*
+   * THE BOTTOM NAV, NOT A STEPPER. Any stage from any stage, at any time:
+   * `goTo` is called directly rather than through the availability gate,
+   * because a screen that has nothing to show yet says so in its own content
+   * and that is a better place for it than a disabled tab.
+   */
   const rail = (
     <div className="shell__nav">
-      <ModeRail mode={mode} available={available} onMode={goTo} />
+      <BottomNav mode={mode} onMode={goTo} />
       <button
         type="button"
         className="shell__now"
@@ -1830,13 +1898,25 @@ function App() {
     </div>
   )
 
+  /*
+   * THE PEEK LINE SAYS SOMETHING OR IT IS NOT THERE.
+   *
+   * It used to read `Shoot setup · 11:00-15:00 EDT · Brew River Dock Bar,
+   * Salisbury MD` whenever nothing was happening -- which is the venue bar's
+   * two fields, word for word, a hundred pixels below the venue bar. Two
+   * sources for one fact (shape A in docs/failure-modes.md), and it cost
+   * every card in the sheet about fifty pixels before the card began.
+   *
+   * While a plan is generating it is a different matter: the step count is
+   * the only place that progress is reported, and nothing above says it.
+   */
   const peekStatus =
     generation.status === 'working'
       ? {
           label: `Generating · step ${stageIndex(generation.stage) + 1} of ${GENERATE_STAGES.length}`,
           line: stageLabel(generation.stage),
         }
-      : { label: 'Shoot setup', line: summary }
+      : null
 
   return (
     /*
@@ -1949,6 +2029,28 @@ function App() {
 
       {mode === 'plan' ? (
         <PlanMode
+          /*
+           * THE BAR GETS THE NAME, THE SHOOT CARD GETS THE TOWN. One line
+           * does not fit beside a date and an avatar at 390px. Both halves
+           * come from core's own boundary; see src/lib/venueParts.ts.
+           */
+          venueNameLine={venueShort}
+          venueTownLine={venueTown(venueNameLine, venueShort)}
+          units={settings.units ?? DEFAULT_UNITS}
+          onUnits={(next) => setSettings({ ...settings, units: next })}
+          /*
+           * ABOUT'S DOORS. /how is one page with two entry points, and kit,
+           * spots and the key already live in Setup -- About points at them
+           * rather than growing a second copy of each.
+           */
+          onHow={() => {
+            setAtHowPath(true)
+            window.history.pushState({}, '', '/how')
+          }}
+          onEditKit={() => setMode('setup')}
+          onOpenSpots={() => setMode('setup')}
+          onOpenSettings={() => setMode('setup')}
+          savedSpotCount={spots.length}
           mapHandle={mapHandle}
           venue={centre}
           onVenueChange={onVenueChange}
@@ -2027,6 +2129,7 @@ function App() {
           onLensFilters={setLensFilters}
           isolatedId={isolatedId}
           onClearIsolate={() => setIsolatedId(null)}
+          onIsolate={setIsolatedId}
           venueWindow={venueWindow}
           scrubbedAt={scrubbedAt}
           scrub={scrub}
@@ -2103,6 +2206,7 @@ function App() {
           venue={centre}
           tide={tide}
           pack={packIsCurrent ? pack : null}
+          onPlan={() => setMode('plan')}
           footer={rail}
         />
       ) : null}

@@ -1,14 +1,25 @@
 import { Receipt } from '../lib/numerals.tsx'
 import { compassPoint } from '../core/field.ts'
 import type { LatLon } from '../core/geo.ts'
-import { metersToFeet } from '../core/reachScale.ts'
 import { rankUpwind, UPWIND_CONE_DEGREES, type Wind } from '../core/upwind.ts'
+import { formatRange, type Units } from '../lib/units.ts'
 import { CAMS } from '../data/cams.ts'
+
+/*
+ * 200 km: about three hours of a brisk airmass, which is the outer edge of
+ * "what is coming next". Past it a camera shows a different day's weather.
+ */
+const USEFUL_METERS = 200_000
+
+/** Six. A longer list is one nobody reads to the bottom of. */
+const MOST_SHOWN = 6
 
 interface CamListProps {
   venue: LatLon | null
   /** Null until the wind lookup answers, or when it fails. */
   wind: Wind | null
+  /** Which system the shooter reads distances in. See src/lib/units.ts. */
+  units: Units
 }
 
 /**
@@ -29,7 +40,7 @@ interface CamListProps {
  * saved, including into an offline field pack. Tapping one is you visiting that
  * operator's site; the app's involvement ends at the href.
  */
-export function CamList({ venue, wind }: CamListProps) {
+export function CamList({ venue, wind, units }: CamListProps) {
   if (venue === null) {
     return (
       <p className="cams__empty">
@@ -39,14 +50,55 @@ export function CamList({ venue, wind }: CamListProps) {
   }
 
   /*
+   * ONE DISTANCE, IN THE UNIT THE SHOOTER CHOSE.
+   *
+   * It printed both -- "180 km · 112 mi" -- which is what you do when there
+   * is no preference to read. There is one now, in About, and it was being
+   * offered while nothing in the app honoured it: a control that does
+   * nothing is shape D in docs/failure-modes.md read from the other side.
+   */
+  const range = (metres: number) => formatRange(metres, units.distance)
+
+  /*
    * NO WIND, NO RANKING CLAIM. Without a direction there is no upwind, so the
    * list falls back to nearest first and says that is what it is doing rather
    * than implying an order it cannot compute.
    */
-  const ranked = rankUpwind(venue, CAMS, wind ?? { fromDegrees: 0, speedMps: 0 })
-  const km = (metres: number) => `${(metres / 1000).toFixed(0)} km`
-  const miles = (metres: number) => `${Math.round(metersToFeet(metres) / 5280)} mi`
 
+  const all = rankUpwind(venue, CAMS, wind ?? { fromDegrees: 0, speedMps: 0 })
+
+  /*
+   * SIX, AND ONLY WHERE A CAM IS ACTUALLY NEAR.
+   *
+   * WHAT THIS REPLACES. Every cam in the file, ranked, however far away: at a
+   * Shenandoah venue that was twenty entries beginning at 6,600 km. A cam
+   * 6,600 km away is not weather information, it is a row, and twenty of them
+   * is a wall that buries the two that matter when there ARE two that matter.
+   *
+   * A CAM IS USEFUL WHEN ITS WEATHER CAN REACH YOU. 200 km is about three
+   * hours of a brisk airmass, which is the outer edge of "the next hour or
+   * two", and past it the picture is of a different day's weather. So the
+   * list is cut there and the count is capped at six -- more than six is a
+   * list nobody reads to the bottom of.
+   *
+   * AND WHEN NOTHING IS WITHIN REACH IT SAYS SO IN ONE LINE. Not an empty
+   * list, not twenty distant rows: a sentence saying there is no camera near
+   * this venue, with the nearest distance so the reader knows it looked.
+   */
+  const ranked = all.filter((entry) => entry.distanceMeters <= USEFUL_METERS).slice(0, MOST_SHOWN)
+
+  if (ranked.length === 0) {
+    const nearest = all[0]
+    return (
+      <div className="cams">
+        <p className="cams__empty">
+          {nearest === undefined
+            ? 'No sky cameras are listed.'
+            : `No sky camera near this venue. The closest is ${range(nearest.distanceMeters)} away, which is too far to be showing your weather.`}
+        </p>
+      </div>
+    )
+  }
   return (
     <div className="cams">
       <p className="cams__note">
@@ -73,8 +125,7 @@ export function CamList({ venue, wind }: CamListProps) {
             >
               <span className="cam__name">{entry.item.name}</span>
               <span className="cam__where num">
-                {km(entry.distanceMeters)} · {miles(entry.distanceMeters)}{' '}
-                {compassPoint(entry.bearingDegrees)}
+                {range(entry.distanceMeters)} {compassPoint(entry.bearingDegrees)}
               </span>
               <span className="cam__why">
                 {entry.isUpwind

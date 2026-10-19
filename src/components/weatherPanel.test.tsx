@@ -1,4 +1,5 @@
 import { renderToStaticMarkup } from 'react-dom/server'
+import { DEFAULT_UNITS } from '../lib/units.ts'
 import { describe, expect, it } from 'vitest'
 import type { LevelWind } from '../core/windProfile.ts'
 import type { TideState } from '../core/tide.ts'
@@ -54,6 +55,7 @@ const render = (over: Partial<Parameters<typeof WeatherPanel>[0]> = {}) =>
       past
       levels={LEVELS}
       gustMps={11.8}
+      units={DEFAULT_UNITS}
       windHeight={{ feet: 400, source: 'position' }}
       ratedWindMps={12}
       ratedWindSource="DJI published specs, dji.com/air-3s/specs"
@@ -202,9 +204,26 @@ describe('tide, short', () => {
     expect(html).toContain('1.0 ft')
   })
 
-  it('keeps the station and its distance', () => {
+  /*
+   * THE STATION, AND HOW FAR IT IS IN THE UNIT THE SHOOTER CHOSE.
+   *
+   * This asserted the literal string "0.6 km", which was right when the
+   * panel had the unit baked in and is the wrong question now: the panel's
+   * job is to render the distance in the chosen system, and a test pinned to
+   * one spelling of it passes whether or not the preference is honoured.
+   *
+   * 0.57 km is 1,870 ft and 570 m. Both are checked, because a conversion
+   * that is wired in one direction only is the shape this whole preference
+   * was added to avoid.
+   */
+  it('keeps the station and its distance, in the chosen unit', () => {
     expect(html).toContain('Lynnhaven Inlet')
-    expect(html).toContain('0.6 km')
+    expect(html).toContain('1,870 ft')
+    expect(html).not.toContain('km')
+
+    const metric = render({ units: { wind: 'kt', distance: 'm' } })
+    expect(metric).toContain('570 m')
+    expect(metric).not.toContain('ft.')
   })
 
   /* And still says when the curve was computed here rather than published. */

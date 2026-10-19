@@ -71,7 +71,14 @@ try {
 
   await step(
     'into plan',
-    `(() => { const b = [...document.querySelectorAll('.rail__btn')].find(x=>/Plan/.test(x.textContent)); if(!b) return 'no plan'; b.click(); return 'ok' })()`,
+    `(() => {
+       const buttons = [...document.querySelectorAll('nav[aria-label="Stage"] button')]
+       if (buttons.length === 0) return 'no stage nav'
+       const b = buttons.find(x => (x.textContent ?? '').trim().toUpperCase() === 'PLAN')
+       if (!b) return 'no PLAN button; the nav offers: ' + buttons.map(x => (x.textContent ?? '').trim()).join(', ')
+       b.click()
+       return 'ok'
+     })()`,
   )
   await wait(4000)
 
@@ -97,7 +104,14 @@ try {
   /* Move the venue to the overlook: Setup mode, camera there, tap the map. */
   await step(
     'into setup',
-    `(() => { const b = [...document.querySelectorAll('.rail__btn')].find(x=>/Setup/.test(x.textContent)); if(!b) return 'no setup'; b.click(); return 'ok' })()`,
+    `(() => {
+       const buttons = [...document.querySelectorAll('nav[aria-label="Stage"] button')]
+       if (buttons.length === 0) return 'no stage nav'
+       const b = buttons.find(x => (x.textContent ?? '').trim().toUpperCase() === 'MAP')
+       if (!b) return 'no MAP button; the nav offers: ' + buttons.map(x => (x.textContent ?? '').trim()).join(', ')
+       b.click()
+       return 'ok'
+     })()`,
   )
   await wait(2500)
   await step(
@@ -143,7 +157,14 @@ try {
 
   await step(
     'back to plan',
-    `(() => { const b = [...document.querySelectorAll('.rail__btn')].find(x=>/Plan/.test(x.textContent)); if(!b) return 'no plan'; b.click(); return 'ok' })()`,
+    `(() => {
+       const buttons = [...document.querySelectorAll('nav[aria-label="Stage"] button')]
+       if (buttons.length === 0) return 'no stage nav'
+       const b = buttons.find(x => (x.textContent ?? '').trim().toUpperCase() === 'PLAN')
+       if (!b) return 'no PLAN button; the nav offers: ' + buttons.map(x => (x.textContent ?? '').trim()).join(', ')
+       b.click()
+       return 'ok'
+     })()`,
   )
   await wait(3000)
 
@@ -357,7 +378,7 @@ try {
          curve: document.querySelectorAll('.curve').length,
          strip: document.querySelectorAll('.scrub__phases').length,
          chips: document.querySelectorAll('.plat__btn').length,
-         list: document.querySelectorAll('.plist__add').length,
+         list: document.querySelectorAll('.shootc__add').length,
        })
      })()`,
   )

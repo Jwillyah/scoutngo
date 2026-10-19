@@ -2,10 +2,10 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { LatLon } from '../core/geo.ts'
 import { phaseAt, phaseSpans } from '../core/nightWindow.ts'
-import { getSunPosition } from '../core/sun.ts'
 import { AirspacePanel } from './AirspacePanel.tsx'
 import { SunSearchPanel } from './SunSearchPanel.tsx'
-import { TimeScrubber } from './TimeScrubber.tsx'
+import { TimeStrip } from './TimeStrip.tsx'
+import { PhaseRule } from './PhaseRule.tsx'
 
 const SANDBRIDGE: LatLon = { lat: 36.726, lon: -75.94 }
 const text = (html: string) => html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
@@ -25,32 +25,43 @@ const WINDOW_END = new Date('2026-10-15T23:30:00Z') // 19:30 EDT
  */
 const FLYING = { airPositions: 1, dronePlatform: true }
 
-function scrubber(at: Date, flying = FLYING) {
+/*
+ * TWO RENDERERS, BECAUSE THIS IS NOW TWO COMPONENTS.
+ *
+ * It was one: TimeScrubber drew the twilight bands AND printed what the
+ * phase required. The scrubber is a 34px control now -- a clock, a rail and
+ * a thumb -- and the Part 107 requirements moved to the light card, where a
+ * statement about the phase belongs. The assertions did not change, only
+ * which of the two they are asked of.
+ */
+function strip(at: Date) {
   return renderToStaticMarkup(
-    <TimeScrubber
+    <TimeStrip
       start={WINDOW_START}
       end={WINDOW_END}
       value={0.5}
       onChange={() => {}}
       at={at}
-      sun={getSunPosition(at, SANDBRIDGE.lat, SANDBRIDGE.lon)}
       timeZone="America/New_York"
       timeZoneAbbr="EDT"
-      tideExtremes={[]}
       phases={phaseSpans(WINDOW_START, WINDOW_END, SANDBRIDGE.lat, SANDBRIDGE.lon)}
-      phase={phaseAt(at, SANDBRIDGE.lat, SANDBRIDGE.lon)}
-      flying={flying}
     />,
   )
 }
 
+function rule(at: Date, flying = FLYING) {
+  return renderToStaticMarkup(
+    <PhaseRule phase={phaseAt(at, SANDBRIDGE.lat, SANDBRIDGE.lon)} flying={flying} />,
+  )
+}
+
 describe('the bands on the time axis', () => {
-  const html = scrubber(new Date('2026-10-15T21:30:00Z'))
+  const html = strip(new Date('2026-10-15T21:30:00Z'))
 
   it('draws one band per phase the window crosses', () => {
-    expect(html).toContain('scrub__phase--day')
-    expect(html).toContain('scrub__phase--civil-twilight')
-    expect(html).toContain('scrub__phase--night')
+    expect(html).toContain('tstrip__band--day')
+    expect(html).toContain('tstrip__band--civil-twilight')
+    expect(html).toContain('tstrip__band--night')
   })
 
   it('draws them as a contiguous run of the whole track', () => {
@@ -60,15 +71,41 @@ describe('the bands on the time axis', () => {
     expect(total).toBeCloseTo(100, 1)
   })
 
-  it('is hidden from the accessibility tree, being a stratum not a control', () => {
-    expect(html).toMatch(/class="scrub__phases"\s+aria-hidden="true"/)
+  it('hides the bands from the accessibility tree, being a stratum not a control', () => {
+    for (const band of html.matchAll(/class="tstrip__band[^"]*"[^>]*/g)) {
+      expect(band[0]).toContain('aria-hidden="true"')
+    }
+  })
+
+  /*
+   * ONE RAIL DOES BOTH JOBS. There were two bars -- a twilight gradient and
+   * a range input drawing its own grey track -- for one axis, with the thumb
+   * on the one carrying no information. The input is still the control, and
+   * it is laid over the gradient rather than beside it.
+   */
+  it('puts the control on the same rail as the gradient', () => {
+    const rail = html.slice(html.indexOf('tstrip__rail'))
+    expect(rail).toContain('tstrip__band')
+    expect(rail).toContain('tstrip__thumb')
+    expect(rail).toContain('type="range"')
+  })
+
+  /*
+   * AND THE RECEIPTS ARE GONE. Az and Alt in degrees were printed here and
+   * on the light card, from the same core call, to different precisions --
+   * two sources for one fact, shape A in docs/failure-modes.md. The light
+   * card keeps them, with a compass point and an above-horizon word beside
+   * them; the control prints the clock and nothing else.
+   */
+  it('prints the clock and its zone, and no other reading', () => {
+    expect(text(html)).toMatch(/^\s*\d{2}:\d{2}\s*EDT\s*$/)
   })
 })
 
-describe('what the bar says at each moment', () => {
+describe('what the light card says at each moment', () => {
   /* 17:30 EDT: full daylight. Nothing applies and nothing is claimed. */
   it('says nothing in daylight', () => {
-    const html = scrubber(new Date('2026-10-15T21:30:00Z'))
+    const html = rule(new Date('2026-10-15T21:30:00Z'))
     expect(text(html)).not.toContain('Anti-collision')
     expect(html).not.toContain('scrub__rule-need')
   })
@@ -78,7 +115,7 @@ describe('what the bar says at each moment', () => {
    * nothing about. This is the regression, rendered.
    */
   it('requires anti-collision lighting in civil twilight', () => {
-    const html = scrubber(new Date('2026-10-15T22:48:00Z'))
+    const html = rule(new Date('2026-10-15T22:48:00Z'))
     const shown = text(html)
     expect(shown).toContain('Civil twilight')
     expect(shown).toContain('Anti-collision lights')
@@ -89,12 +126,12 @@ describe('what the bar says at each moment', () => {
 
   /* And it does NOT add the night training, which starts later, at dusk. */
   it('does not claim the night training in civil twilight', () => {
-    const shown = text(scrubber(new Date('2026-10-15T22:48:00Z')))
+    const shown = text(rule(new Date('2026-10-15T22:48:00Z')))
     expect(shown).not.toContain('107.65')
   })
 
   it('adds the night training after dusk', () => {
-    const shown = text(scrubber(new Date('2026-10-15T23:20:00Z')))
+    const shown = text(rule(new Date('2026-10-15T23:20:00Z')))
     expect(shown).toContain('Night')
     expect(shown).toContain('107.29')
     expect(shown).toContain('107.65')
@@ -110,25 +147,24 @@ describe('what the bar says at each moment', () => {
  * aircraft for it to govern, and printing the rule anyway is the same class of
  * error as the 400ft ceiling beside a tripod: true in general, false here.
  */
-describe('a ground shoot gets the band and no aircraft rule', () => {
+describe('a ground shoot gets the phase and no aircraft rule', () => {
   const GROUND = { airPositions: 0, dronePlatform: false }
   const twilight = new Date('2026-10-15T22:48:00Z')
 
   it('still names the phase and draws the bands', () => {
-    const shown = text(scrubber(twilight, GROUND))
-    expect(shown).toContain('Civil twilight')
-    expect(scrubber(twilight, GROUND)).toContain('scrub__phase--civil-twilight')
+    expect(text(rule(twilight, GROUND))).toContain('Civil twilight')
+    expect(strip(twilight)).toContain('tstrip__band--civil-twilight')
   })
 
   it('says nothing about anti-collision lighting', () => {
-    const shown = text(scrubber(twilight, GROUND))
+    const shown = text(rule(twilight, GROUND))
     expect(shown).not.toContain('Anti-collision')
     expect(shown).not.toContain('107.29')
     expect(shown).not.toContain('statute miles')
   })
 
   it('says nothing about the night training, even at night', () => {
-    const shown = text(scrubber(new Date('2026-10-15T23:20:00Z'), GROUND))
+    const shown = text(rule(new Date('2026-10-15T23:20:00Z'), GROUND))
     expect(shown).toContain('Night')
     expect(shown).not.toContain('107.65')
   })
@@ -139,13 +175,13 @@ describe('a ground shoot gets the band and no aircraft rule', () => {
    * requirement is exactly what they want to know before driving out.
    */
   it('shows the rules once the Drone chip is on, before any position exists', () => {
-    const shown = text(scrubber(twilight, { airPositions: 0, dronePlatform: true }))
+    const shown = text(rule(twilight, { airPositions: 0, dronePlatform: true }))
     expect(shown).toContain('Anti-collision')
     expect(shown).toContain('107.29')
   })
 
   it('shows the rules for a placed air position on the Both chip', () => {
-    const shown = text(scrubber(twilight, { airPositions: 2, dronePlatform: false }))
+    const shown = text(rule(twilight, { airPositions: 2, dronePlatform: false }))
     expect(shown).toContain('Anti-collision')
   })
 })

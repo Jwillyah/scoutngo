@@ -8,7 +8,6 @@ import { getSunPosition } from '../core/sun.ts'
 import type { LatLon } from '../core/geo.ts'
 import type { TideState } from '../core/tide.ts'
 import { planPositions, type CameraPosition } from '../lib/plan.ts'
-import { ConePicker } from './ConePicker.tsx'
 import { MapControls } from './MapControls.tsx'
 import { PositionCard } from './PositionCard.tsx'
 import { ShooterFigure } from './ShooterFigure.tsx'
@@ -86,80 +85,21 @@ describe('MapControls', () => {
   })
 })
 
-describe('ConePicker', () => {
-  it('is one control, not a row of chips', () => {
-    const html = renderToStaticMarkup(
-      <ConePicker
-        kit={DEFAULT_KIT}
-        plan={plan}
-        coneMode="none"
-        onConeMode={() => {}}
-        lensFilters={[]}
-        onLensFilters={() => {}}
-        isolatedId={null}
-        onClearIsolate={() => {}}
-      />,
-    )
-    expect(html).toContain('class="picker"')
-    expect(html).not.toContain('class="cones"')
-    // Closed by default: the optic list is not on the map surface.
-    expect(html).not.toContain('Sony 200-600')
-  })
-
-  /*
-   * A filter that hides positions without saying so is how someone walks past
-   * the shot, so the count is on the control itself.
-   */
-  it('says on the control when a filter is narrowing the map', () => {
-    const html = renderToStaticMarkup(
-      <ConePicker
-        kit={DEFAULT_KIT}
-        plan={plan}
-        coneMode="none"
-        onConeMode={() => {}}
-        lensFilters={['sony-200-600']}
-        onLensFilters={() => {}}
-        isolatedId={null}
-        onClearIsolate={() => {}}
-      />,
-    )
-    expect(html).toContain('Lenses · 1')
-    expect(html).toContain('mode--on')
-  })
-
-  it('says when one position is isolated', () => {
-    const html = renderToStaticMarkup(
-      <ConePicker
-        kit={DEFAULT_KIT}
-        plan={plan}
-        coneMode="none"
-        onConeMode={() => {}}
-        lensFilters={[]}
-        onLensFilters={() => {}}
-        isolatedId="p1"
-        onClearIsolate={() => {}}
-      />,
-    )
-    expect(html).toContain('Isolated')
-  })
-
-  it('renders nothing before there is a plan', () => {
-    expect(
-      renderToStaticMarkup(
-        <ConePicker
-          kit={DEFAULT_KIT}
-          plan={[]}
-          coneMode="none"
-          onConeMode={() => {}}
-          lensFilters={[]}
-          onLensFilters={() => {}}
-          isolatedId={null}
-          onClearIsolate={() => {}}
-        />,
-      ),
-    ).toBe('')
-  })
-})
+/*
+ * ConePicker's tests went with ConePicker.
+ *
+ * It asserted that the picker was one control rather than a row of chips,
+ * that a narrowing lens filter said so on the control, that an isolated
+ * position was announced, and that it rendered nothing before there was a
+ * plan. All four were about a disclosure that sat over the map and that the
+ * shell rebuild replaced with the Cones tile in the layers card.
+ *
+ * THE ONE BEHAVIOUR WORTH KEEPING MOVED WITH THE FEATURE. "Only this" is a
+ * control on the position card now, and it is asserted in the PositionCard
+ * block below -- including the part that actually broke: for a while the app
+ * had `isolatedId` threaded from App through PlanMode to MapView with no way
+ * on earth to set it.
+ */
 
 describe('PositionCard', () => {
   /*
@@ -174,6 +114,8 @@ describe('PositionCard', () => {
   const html = renderToStaticMarkup(
     <NumeralsProvider show>
     <PositionCard
+      isolated={false}
+      onIsolate={() => {}}
       kit={DEFAULT_KIT}
         selection={defaultSelection(DEFAULT_KIT)}
         marks={[]}
@@ -236,6 +178,8 @@ describe('PositionCard', () => {
   it('drops the tide cell inland rather than printing a dash', () => {
     const dry = renderToStaticMarkup(
       <PositionCard
+      isolated={false}
+      onIsolate={() => {}}
       kit={DEFAULT_KIT}
         selection={defaultSelection(DEFAULT_KIT)}
         marks={[]}
@@ -296,6 +240,81 @@ describe('PositionCard', () => {
  * "!". That fixed the overlap and left a red badge that means nothing to
  * anyone who has not been told what it is. One word each now.
  */
+/*
+ * ONLY THIS ONE'S COVERAGE.
+ *
+ * THE CONTROL DISAPPEARED AND NOTHING NOTICED. It lived in ConePicker, a
+ * disclosure over the map; the shell rebuild replaced that with the Cones
+ * tile and the picker was never rehomed. `isolatedId` went on being passed
+ * from App to PlanMode to MapView, `onClearIsolate` went on being declared,
+ * and no screen in the app could set either -- a feature complete in every
+ * part except a door. Shape D in docs/failure-modes.md.
+ *
+ * ASSERTED AS THE TWO DIRECTIONS, because a one-way control is the other
+ * failure this repo keeps finding: isolating has to be undoable from the
+ * same button, or it is the platform filter again.
+ */
+describe('isolating one position', () => {
+  const card = (isolated: boolean, onIsolate: (id: string | null) => void = () => {}) =>
+    renderToStaticMarkup(
+      <NumeralsProvider show>
+        <PositionCard
+          isolated={isolated}
+          onIsolate={onIsolate}
+          kit={DEFAULT_KIT}
+          selection={defaultSelection(DEFAULT_KIT)}
+          marks={[]}
+          subject={SUBJECT}
+          planned={plan[0]}
+          shootAt={null}
+          timeZone={null}
+          tide={null}
+          onClose={() => {}}
+          count={plan.length}
+          onDelete={() => {}}
+          onDuplicate={() => {}}
+          onMove={() => {}}
+          onSetOptic={() => {}}
+          onSetAltitude={() => {}}
+          onSetShotType={() => {}}
+          onSetYaw={() => {}}
+          pilotAt={null}
+          onPlacePilot={() => {}}
+        />
+      </NumeralsProvider>,
+    )
+
+  it('offers the control on the position it is about', () => {
+    expect(card(false)).toContain('Only this')
+  })
+
+  it('says which state it is in, rather than only looking different', () => {
+    expect(card(false)).toContain('aria-pressed="false"')
+    expect(card(true)).toContain('aria-pressed="true"')
+  })
+
+  /*
+   * THE WAY BACK IS THE SAME BUTTON, AND IT IS NEVER DISABLED.
+   *
+   * A control you can enter and not leave is the one-way platform filter,
+   * which needed a page reload to escape. Asserted on the rendered control
+   * rather than on a stub: a first draft of this test declared its own
+   * `onIsolate` and called it, which proved that calling a function calls it
+   * -- shape B in docs/failure-modes.md, a check that cannot fail.
+   *
+   * renderToStaticMarkup cannot click, so what is checked here is the
+   * property that makes the click possible: the isolated card still offers
+   * an enabled control with the same label. The handler's one line --
+   * onIsolate(isolated ? null : id) -- is then the whole mechanism.
+   */
+  it('still offers an enabled control while isolated', () => {
+    const on = card(true)
+    expect(on).toContain('Only this')
+    const button = on.slice(on.indexOf('aria-pressed="true"'))
+    expect(button.slice(0, button.indexOf('</button>'))).not.toContain('disabled')
+  })
+})
+
 describe('a flagged position says what is wrong with it', () => {
   const flagged = (over: Partial<CameraPosition>) =>
     renderToStaticMarkup(

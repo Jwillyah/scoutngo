@@ -51,7 +51,8 @@
  *      when pressing the parent toggled it shut. Dead: sections are reached by
  *      opening the sheet, which is one action with no nesting.
  */
-import { guardAudit, startWatchdog } from './preflight.mjs'
+import { readFileSync } from 'node:fs'
+import { goToStage, guardAudit, startWatchdog } from './preflight.mjs'
 
 guardAudit('surface')
 
@@ -79,7 +80,7 @@ await load('http://127.0.0.1:5173/?calibration=1&probe=1')
 await ev(`localStorage.setItem('scoutngo.landing.v1','true')`)
 await load('http://127.0.0.1:5173/?calibration=1&probe=1')
 await wait(6000)
-await ev(`[...document.querySelectorAll('.rail__btn')].find(b=>/Plan/.test(b.textContent))?.click()`)
+await goToStage(ev, wait, 'plan')
 await wait(4500)
 
 /*
@@ -141,6 +142,14 @@ const SURFACES = `(() => {
       cls: String(t.el.className).slice(0, 40),
       label: t.el.getAttribute('aria-label') ?? null,
       coversPct: +((over(t.r) / area(map)) * 100).toFixed(1),
+      /*
+       * DOES IT HOLD A SCROLL? The property that separates a panel from a
+       * piece of chrome, measured rather than inferred from its name.
+       */
+      scrolls: [t.el, ...t.el.querySelectorAll('*')].some((n) => {
+        const o = getComputedStyle(n).overflowY
+        return (o === 'auto' || o === 'scroll') && n.scrollHeight > n.clientHeight + 4
+      }),
       rect: { left: t.r.left, top: t.r.top, right: t.r.right, bottom: t.r.bottom },
     })),
   }
@@ -197,30 +206,69 @@ for (const detent of ['peek', 'half', 'full']) {
     continue
   }
   const visible = await ev(MAP_VISIBLE)
-  const names = found.surfaces.map((s) => `${s.cls || s.tag}(${s.coversPct}%)`).join(' ')
+  const names = found.surfaces
+    .map((s) => `${s.cls || s.tag}(${s.coversPct}%${s.scrolls ? ', scrolls' : ''})`)
+    .join(' ')
+
   /*
-   * ONE DISMISSABLE SURFACE, PLUS PERSISTENT FURNITURE.
+   * ONE SURFACE, ASSERTED AS TWO PROPERTIES INSTEAD OF AN EXCLUSION LIST.
    *
-   * The sheet is the surface: it carries content, it moves, it can hide the
-   * map. The two rails are furniture: the icon rail on the right edge and the
-   * stage rail along the bottom. Neither carries dismissable content, neither
-   * ever changes size, and the sheet measures its own detents against the
-   * bottom one.
+   * WHAT THIS REPLACED, AND WHY IT HAD TO GO. The filter here was
    *
-   * THIS IS NOT THE OLD ALLOWLIST. The old PROTECTED list named elements a
-   * panel must not cover, and grew an entry every time a new panel covered
-   * something nobody had listed. This names the two things that are not
-   * surfaces at all, and the assertion on everything else is a COUNT: a
-   * seventh panel added in six months is caught by arithmetic, not by being
-   * remembered.
+   *   !/\bsheet\b/.test(cls) && !/\brail2\b/.test(cls) && !/\bdock\b/.test(cls)
+   *
+   * with a comment above it insisting this was "not the old allowlist". It
+   * was. It named three elements and failed everything else by count, so the
+   * day the shell gained a venue bar and a chip row over the map -- both of
+   * them deliberate, both of them in the brief -- the audit reported two
+   * problems at all three detents and the only available fix was to add two
+   * more names to the list. That is shape C in docs/failure-modes.md, and the
+   * guard rule there is the answer: ASSERT A POSITIVE PROPERTY, NOT A NAME
+   * YOU DO NOT WANT.
+   *
+   * SO WHAT IS ACTUALLY TRUE OF A SURFACE, AS OPPOSED TO CHROME?
+   *
+   *   IT HIDES THE MAP. The sheet at full covers 85% of it. The venue bar
+   *   covers 4.9%, the chip row 4.1%, the rail 3%, the dock 7.6%. A fifth of
+   *   the map is the line: nothing that is merely furniture comes near it.
+   *
+   *   IT HOLDS A SCROLL. Content you read, which is the thing two of cannot
+   *   be read at once -- and the original failure this audit was written for
+   *   was two readable panels over one map. Chrome never scrolls.
+   *
+   * Both are measured off the live element. A seventh panel in six months is
+   * caught because it covers the map and scrolls, whatever it is called, and
+   * a ninth piece of chrome is not reported as a problem because it is not
+   * one.
    */
-  const extra = found.surfaces.filter(
-    (s) => !/\bsheet\b/.test(s.cls) && !/\brail2\b/.test(s.cls) && !/\bdock\b/.test(s.cls),
-  )
+  const BIG_SHARE = 20
+  const big = found.surfaces.filter((s) => s.coversPct >= BIG_SHARE)
+  const scrolling = found.surfaces.filter((s) => s.scrolls)
+
+  /*
+   * THE CHROME'S HEIGHT AND THE SHEET'S TOP EDGE, PRINTED. The sheet reserves
+   * the space above it (reservedTop in BottomSheet.tsx) so it cannot grow up
+   * behind the venue bar and the chips; the two numbers side by side are what
+   * shows that it worked, and the gap between them is the margin.
+   */
+  const geometry = await ev(`(() => {
+    const chips = document.querySelector('.chips2')
+    const sheet = document.querySelector('.sheet')
+    return {
+      chromeBottom: chips === null ? null : Math.round(chips.getBoundingClientRect().bottom),
+      sheetTop: sheet === null ? null : Math.round(sheet.getBoundingClientRect().top),
+    }
+  })()`)
 
   console.log(
-    `  ${detent.padEnd(5)} map visible ${String(visible).padStart(5)}%  surfaces: ${names}`,
+    `  ${detent.padEnd(5)} map visible ${String(visible).padStart(5)}%  ` +
+      `chrome ends ${geometry.chromeBottom}px, sheet starts ${geometry.sheetTop}px  surfaces: ${names}`,
   )
+  if (geometry.chromeBottom !== null && geometry.sheetTop !== null && geometry.sheetTop < geometry.chromeBottom) {
+    fail(
+      `the sheet starts at ${geometry.sheetTop}px, above the chrome that ends at ${geometry.chromeBottom}px, at ${detent}`,
+    )
+  }
   /*
    * THE FRAME IS KEPT WHETHER OR NOT IT FAILED. It used to be written only on
    * a failure, which meant a passing run left nothing to look at -- and the
@@ -229,16 +277,60 @@ for (const detent of ['peek', 'half', 'full']) {
    * with their own eyes.
    */
   await shot(OUT, `surface-${detent}`)
-  /*
-   * THE SHEET AND THE RAIL. The rail is named here because it is the one
-   * thing the rule explicitly allows: it has no content, opens nothing, and
-   * is 40px of the right edge. Everything else is a failure by count.
-   */
-  if (extra.length > 0) {
+
+  if (big.length > 1) {
     fail(
-      `${extra.length} surface(s) over the map besides the sheet and the rail: ` +
-        extra.map((s) => s.cls || s.tag).join(', '),
+      `${big.length} surfaces each cover ${BIG_SHARE}%+ of the map at ${detent}: ` +
+        big.map((s) => `${s.cls || s.tag} (${s.coversPct}%)`).join(', '),
     )
+  }
+  if (scrolling.length > 1) {
+    fail(
+      `${scrolling.length} scrolling surfaces over the map at ${detent}: ` +
+        scrolling.map((s) => s.cls || s.tag).join(', ') +
+        '. Only one thing on screen may be read at a time.',
+    )
+  }
+}
+
+/*
+ * AND THE RULE IS PROVEN TO FAIL, by growing a piece of chrome until it is a
+ * surface. Without this, "at most one covers a fifth of the map" is a
+ * threshold nobody has ever seen trip -- shape B, a check that cannot fail.
+ */
+console.log('\n### and the one-surface rule is proven to fail')
+if (await setDetent('half')) {
+  const grew = await ev(`(() => {
+    const row = document.querySelector('.chips2')
+    if (!row) return 'no chrome to grow'
+    row.dataset.auditGrown = '1'
+    row.style.height = '500px'
+    return 'grown'
+  })()`)
+  if (grew !== 'grown') {
+    fail(`could not grow a piece of chrome to prove the rule fails: ${grew}`)
+  } else {
+    await wait(200)
+    const after = await ev(SURFACES)
+    const bigNow = (after.surfaces ?? []).filter((x) => x.coversPct >= 20)
+    await ev(`(() => {
+      const row = document.querySelector('[data-audit-grown]')
+      if (row) { row.style.height = ''; delete row.dataset.auditGrown }
+      return 'restored'
+    })()`)
+    await wait(200)
+    if (bigNow.length > 1) {
+      console.log(
+        `  a 500px chip row was caught as a second surface: ` +
+          bigNow.map((x) => `${x.cls || x.tag} (${x.coversPct}%)`).join(', '),
+      )
+    } else {
+      fail('a 500px chip row covered the map and the one-surface rule passed anyway')
+    }
+    const restored = (await ev(SURFACES)).surfaces ?? []
+    if (restored.filter((x) => x.coversPct >= 20).length > 1) {
+      fail('the chip row did not shrink back after the injection')
+    }
   }
 }
 
@@ -268,16 +360,59 @@ const dragSheet = async (from, to) => {
     const viewport = window.innerHeight
     /* Where the sheet top must end up for the target detent. */
     const wanted = { peek: 88, half: viewport * 0.45, full: viewport * 0.92 }['${to}']
-    const startY = box.top + 40
     const endY = viewport - wanted
     /*
-     * Grab somewhere in the sheet that is NOT the grabber and NOT a control,
-     * because the point is that the sheet drags from its body.
+     * GRAB SOMEWHERE IN THE SHEET THAT IS NOT THE GRABBER AND NOT A CONTROL,
+     * AND PROVE SUCH A PLACE EXISTS.
+     *
+     * This used to take box.top + 40 and drag from whatever was there,
+     * reporting the element's class afterwards. The comment said "not a
+     * control"; nothing checked, and when the time strip moved to the top of
+     * the sheet every one of the six drags landed on its range input, which
+     * owns horizontal gestures and swallowed all six.
+     *
+     * THE RULE THIS PROTECTS IS NOT "EVERY PIXEL DRAGS THE SHEET". A control
+     * inside the sheet keeps its own gesture, and must: that is what makes
+     * the rail scrub. The rule is that a shooter can always find somewhere to
+     * take hold of -- which is exactly what the elevation curve destroyed
+     * when its full-width input covered the whole of HALF, leaving no way
+     * back and no control on screen.
+     *
+     * SO IT IS A SHARE, NOT A REGION. Scan the whole sheet in 6px rows, count
+     * how many are body rather than control, and require that a fifth of it
+     * is grabbable. Then drag from the topmost such row.
+     *
+     * The first version of this scanned only the top half, which failed at
+     * PEEK for a true reason and the wrong one: the sheet there is 88px, so
+     * its top half is the grabber and the 34px time strip, and the 30px of
+     * body below the strip -- which is plenty to take hold of -- was outside
+     * the window being looked at. A share counts that 30px; a region did not.
+     *
+     * And it still catches what it was written for: the elevation curve
+     * covered essentially the whole sheet at HALF, so its body share was
+     * near zero from any starting row.
      */
-    const target = document.elementFromPoint(box.left + box.width / 2, startY) ?? sheet
+    const x = box.left + box.width / 2
+    const CONTROLS = 'input, select, textarea, button, a, [role=slider], .sheet__grab'
+    let startY = null
+    let body = 0
+    let rows = 0
+    for (let y = box.top + 2; y < Math.min(box.bottom, viewport) - 2; y += 6) {
+      const el = document.elementFromPoint(x, y)
+      if (!el) continue
+      rows += 1
+      if (el.closest(CONTROLS)) continue
+      body += 1
+      if (startY === null) startY = y
+    }
+    const share = rows === 0 ? 0 : body / rows
+    if (startY === null || share < 0.2) {
+      return 'NO GRAB AREA: only ' + Math.round(share * 100) + '% of the sheet is not a control'
+    }
+    const target = document.elementFromPoint(x, startY) ?? sheet
     const fire = (type, y) =>
       target.dispatchEvent(new PointerEvent(type, {
-        clientX: box.left + box.width / 2, clientY: y,
+        clientX: x, clientY: y,
         bubbles: true, cancelable: true, pointerId: 1, isPrimary: true, buttons: 1,
       }))
     fire('pointerdown', startY)
@@ -286,6 +421,9 @@ const dragSheet = async (from, to) => {
     fire('pointerup', endY)
     return 'dragged from ' + (target.className || target.tagName)
   })()`)
+  if (typeof result === 'string' && result.startsWith('NO GRAB AREA')) {
+    return `${from} -> ${to}: ${result}`
+  }
   await wait(700)
   const landed = await ev(`document.querySelector('.sheet')?.getAttribute('data-detent')`)
   return landed === to ? null : `${from} -> ${to}: landed on ${landed} (${result})`
@@ -298,6 +436,139 @@ for (const from of ['peek', 'half', 'full']) {
     console.log(`  ${from.padEnd(5)} -> ${to.padEnd(5)} ${problem === null ? 'ok' : 'FAILED'}`)
     if (problem !== null) fail(problem)
   }
+}
+
+/* ----- and the grab-area rule is proven to fail, by covering the sheet in control */
+
+/*
+ * THE ELEVATION CURVE, RECONSTRUCTED. Its full-width range input covered the
+ * whole of HALF and there was no way back: no controls on screen, no detent
+ * change, nothing. The share check above exists for that, so it has to be
+ * shown catching it rather than trusted to.
+ */
+console.log('\n### and the grab-area rule is proven to fail')
+if (await setDetent('half')) {
+  const covered = await ev(`(() => {
+    const body = document.querySelector('.sheet__body')
+    if (!body) return 'no sheet body'
+    const input = document.createElement('input')
+    input.type = 'range'
+    input.id = 'audit-swallower'
+    input.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;z-index:99;opacity:0.01'
+    body.style.position = 'relative'
+    body.appendChild(input)
+    return 'covered'
+  })()`)
+  if (covered !== 'covered') {
+    fail(`could not cover the sheet to prove the grab-area rule fails: ${covered}`)
+  } else {
+    await wait(200)
+    const swallowed = await dragSheet('half', 'full')
+    await ev(`(() => {
+      document.getElementById('audit-swallower')?.remove()
+      const body = document.querySelector('.sheet__body')
+      if (body) body.style.position = ''
+      return 'restored'
+    })()`)
+    await wait(300)
+    if (swallowed === null) {
+      fail('the sheet was covered in one range input and the drag rule passed anyway')
+    } else {
+      console.log(`  a sheet-sized range input was caught: ${swallowed}`)
+    }
+    await setDetent('half')
+    const after = await dragSheet('half', 'full')
+    if (after !== null) fail(`the sheet did not recover after the injection: ${after}`)
+    await setDetent('half')
+  }
+}
+
+/* ----------------------------------- every stage reaches every other stage */
+
+/*
+ * THE NAV IS NAVIGATION, NOT A PROGRESS BAR, ASSERTED AS SIX GESTURES.
+ *
+ * WHY THIS EXISTS, AND IT IS THE THIRD TIME THIS LESSON HAS BEEN LEARNED IN
+ * THIS FILE. The stepper was replaced by the bottom nav and the comment above
+ * App's goTo was updated to say the nav called setMode "directly rather than
+ * through the availability gate". The gate was still in the function:
+ *
+ *   if (canEnter(next, available) || next === mode) setMode(next)
+ *
+ * Pressing FIELD with no plan did nothing. No event, no feedback, no disabled
+ * attribute to find -- the markup was clean, so the render smoke test passed,
+ * and so would any check that looked at the DOM instead of pressing the
+ * button. The same shape as the gesture deadlock and as the one-way platform
+ * filter: THE CHECK HAS TO BE THE GESTURE.
+ *
+ * SIX PAIRS, FROM THE NAV'S OWN BUTTONS. Nothing here names a stage, so a
+ * fourth one -- which there should never be, see BottomNav.tsx -- would be
+ * walked without anybody adding it.
+ */
+console.log('\n### every stage reaches every other stage, by pressing the nav')
+
+const STAGES = `(() => {
+  const buttons = [...document.querySelectorAll('nav[aria-label="Stage"] button')]
+  return buttons.map((b) => (b.textContent ?? '').trim())
+})()`
+
+const stageNow = () =>
+  ev(`document.querySelector('.shell')?.className.match(/shell--([a-z]+)/)?.[1] ?? null`)
+
+const pressStage = async (label) => {
+  const result = await ev(`(() => {
+    const hit = [...document.querySelectorAll('nav[aria-label="Stage"] button')]
+      .find((b) => (b.textContent ?? '').trim() === ${JSON.stringify(label)})
+    if (!hit) return 'gone'
+    if (hit.disabled) return 'disabled'
+    hit.click()
+    return 'pressed'
+  })()`)
+  await wait(900)
+  return result
+}
+
+const stages = await ev(STAGES)
+if (!Array.isArray(stages) || stages.length === 0) {
+  fail('no stage nav on screen')
+} else {
+  console.log(`  the nav offers: ${stages.join(' | ')}`)
+  /*
+   * EXACTLY THREE. A settings tab would spend a permanent quarter of the
+   * primary navigation on a screen opened twice a year; it lives behind the
+   * venue bar's round button instead. Same argument as the four chips, and
+   * the same reason it is a number in an audit rather than a note in a file.
+   */
+  if (stages.length !== 3) fail(`the nav offers ${stages.length} stages, not 3`)
+
+  for (const from of stages) {
+    for (const to of stages) {
+      if (from === to) continue
+      const got = await pressStage(from)
+      if (got !== 'pressed') {
+        fail(`cannot start from ${from}: ${got}`)
+        continue
+      }
+      const start = await stageNow()
+      const went = await pressStage(to)
+      if (went !== 'pressed') {
+        fail(`from ${from}, the ${to} tab is ${went}`)
+        continue
+      }
+      const landed = await stageNow()
+      const moved = landed !== start
+      console.log(`  ${from.padEnd(5)} -> ${to.padEnd(5)} ${moved ? 'ok' : 'FAILED'} (${start} -> ${landed})`)
+      if (!moved) {
+        fail(
+          `pressed ${to} from ${from} and the shell stayed on "${landed}". ` +
+            'Any stage from any stage: a screen with nothing to show says so in its own content.',
+        )
+      }
+    }
+  }
+  /* Back to PLAN, which is what the rest of this audit is about. */
+  await goToStage(ev, wait, 'plan')
+  await wait(2500)
 }
 
 /* ------------------------------- every segment reaches every other segment */
@@ -357,7 +628,32 @@ if (await setDetent('full')) {
           a.click()
           return 'moved to start'
         })()`)
-        if (result !== 'moved to start') {
+        /*
+         * A GROUP CAN BE UNMOUNTED BY SOMETHING ELSE ON SCREEN, so getting
+         * back to it is part of the check rather than a reason to fail.
+         *
+         * The chip row used to be role="group" and clicking a chip replaces
+         * the sheet's content, which unmounted the platform filter mid-walk:
+         * six "group gone" problems for a control that worked. The chips are
+         * role="toolbar" now, which is what they are -- but a group living
+         * inside a card is always one tap away from being replaced, so the
+         * walk re-establishes the screen and tries once more before failing.
+         */
+        if (result === 'group gone') {
+          await ev(`document.querySelector('.card2__x')?.click()`)
+          await wait(400)
+          await setDetent('full')
+          const again = await ev(`(() => {
+            const group = [...document.querySelectorAll('[role="group"]')]
+              .find((g) => (g.getAttribute('aria-label') ?? '(unlabelled group)') === ${JSON.stringify(group.label)})
+            return group ? 'back' : 'still gone'
+          })()`)
+          if (again !== 'back') {
+            fail(`${group.label}: the group is gone and returning to the shoot card did not bring it back`)
+            continue
+          }
+          console.log(`    (${group.label} was replaced and came back)`)
+        } else if (result !== 'moved to start') {
           fail(`${group.label}: ${result}`)
           continue
         }
@@ -518,7 +814,34 @@ for (const detent of ['half', 'full']) {
  */
 console.log('\n### tapping a position never lowers the sheet')
 await setDetent('half')
-await ev(`document.querySelector('.plist__add')?.click()`)
+/*
+ * ARM THE MAP, AND FAIL IF THE CONTROL IS NOT THERE. This was
+ * `.plist__add` -- the add button on the old positions SECTION -- and the
+ * optional chain meant the audit happily carried on against a map that was
+ * never armed, then reported "could not create a position". Same silent-miss
+ * shape as the nine copies of the stage-rail selector; see goToStage.
+ */
+const found = await ev(`(() => {
+  const add = document.querySelector('.shootc__add')
+  if (!add) return 'no add-position control on the shoot card'
+  add.click()
+  return 'clicked'
+})()`)
+if (found !== 'clicked') {
+  fail(`could not arm the map to place a position: ${found}`)
+}
+/*
+ * READ THE ARMED STATE AFTER A RENDER, NOT IN THE SAME EVALUATION.
+ *
+ * The first version of this clicked and read aria-pressed in one expression
+ * and reported "clicked but not armed" on a run that went on to place a
+ * position successfully. React had not re-rendered yet: the assertion was
+ * about the DOM one microtask too early, which is a false alarm rather than a
+ * finding, and a false alarm in a gate costs the same attention as a real one.
+ */
+await wait(400)
+const armed = await ev(`document.querySelector('.shootc__add')?.getAttribute('aria-pressed') ?? 'gone'`)
+if (armed !== 'true') fail(`clicked add-position and it did not arm (aria-pressed: ${armed})`)
 await wait(500)
 /*
  * THE MAP'S OWN CLICK HANDLER, FIRED DIRECTLY.
@@ -585,36 +908,461 @@ for (const detent of ['peek', 'half', 'full']) {
   await wait(600)
 }
 
-/* ------------------------------------------- every section reachable at FULL */
+/* ------------------------------------------------------ the chip row is four */
 
-console.log('\n### every section is reachable at FULL from 390x844')
-await ev(`document.querySelector('.card__close')?.click()`)
-await wait(400)
-if (!(await setDetent('full'))) {
-  fail('could not reach full')
-} else {
-  const sections = await ev(`(() => {
-    const out = []
-    const body = document.querySelector('.sheet__body')
-    for (const el of document.querySelectorAll('.sect')) {
-      const r = el.getBoundingClientRect()
-      out.push({ name: el.dataset.section, height: Math.round(r.height) })
-    }
-    return { sections: out, scrollable: body === null ? null : body.scrollHeight > body.clientHeight }
-  })()`)
-  console.log(`  ${sections.sections.length} sections, body scrolls: ${sections.scrollable}`)
-  for (const s of sections.sections) {
-    /*
-     * REACHABLE MEANS SCROLLABLE-TO, not on screen at once. Six sections
-     * cannot fit 844px and are not supposed to; what must be true is that
-     * each one is in the scroll and has a real height when opened.
-     */
-    const ok = s.height > 20
-    console.log(`    ${String(s.name).padEnd(12)} ${String(s.height).padStart(5)}px  ${ok ? 'ok' : 'FAIL'}`)
-    if (!ok) fail(`section ${s.name} has no height at FULL`)
+/*
+ * EXACTLY FOUR CHIPS, TWO LINES EACH, AND THE ROW DOES NOT SCROLL.
+ *
+ * WHY THIS IS AN AUDIT AND NOT A CODE REVIEW NOTE. The five-section sheet did
+ * not arrive as five sections. It arrived as two, and each of the next three
+ * was obviously the last one. A row of readings has the same gradient: every
+ * future number has a reason, each one costs eight pixels, and the row that
+ * scrolls is where they all end up. docs/chips.md carries the rule; this is
+ * the thing that enforces it.
+ *
+ * WITH THE UNIT, because a chip reading "14" means knots to the person who
+ * wrote it and miles per hour to somebody who set the app to mph. Asserted as
+ * a positive property -- the value line contains a non-numeric character --
+ * rather than as a list of unit spellings nobody will keep current.
+ *
+ * AND THE CHECK IS PROVEN TO FAIL, by injecting a fifth chip and requiring
+ * that the same measurement reports it. Shape B in docs/failure-modes.md: a
+ * check that cannot fail is not a check, and "exactly four" read off a row
+ * that the audit never tried to break is a comment with a line number.
+ */
+console.log('\n### the chip row: exactly four chips, two lines, no horizontal scroll')
+
+const CHIPS = `(() => {
+  const row = document.querySelector('.chips2')
+  if (!row) return { error: 'no chip row on screen' }
+  const kids = [...row.children].filter((c) => c.getBoundingClientRect().width > 0)
+  const widths = kids.map((k) => Math.round(k.getBoundingClientRect().width))
+  return {
+    count: kids.length,
+    scrollWidth: Math.round(row.scrollWidth),
+    clientWidth: Math.round(row.clientWidth),
+    overflowX: getComputedStyle(row).overflowX,
+    /* Distinct top edges: a chip that wrapped is on a second row. */
+    rows: new Set(kids.map((k) => Math.round(k.getBoundingClientRect().top))).size,
+    chips: kids.map((k) => ({
+      label: (k.querySelector('.chip2__label')?.textContent ?? '').trim(),
+      value: (k.querySelector('.chip2__value')?.textContent ?? '').trim(),
+      lines: k.querySelectorAll('.chip2__label, .chip2__value').length,
+    })),
+    widthSpread: widths.length === 0 ? 0 : Math.max(...widths) - Math.min(...widths),
   }
-  if (sections.sections.length === 0) fail('no sections at FULL')
+})()`
+
+/* The same judgement, applied to a measurement, so the injected fifth chip is
+ * judged by the identical rule rather than by a second copy of it. */
+const judgeChips = (m) => {
+  const bad = []
+  if (m.error !== undefined) return [m.error]
+  if (m.count !== 4) bad.push(`${m.count} chips, not 4`)
+  if (m.rows !== 1) bad.push(`the chips wrap onto ${m.rows} rows`)
+  if (m.scrollWidth > m.clientWidth + 1) {
+    bad.push(`the row scrolls horizontally (${m.scrollWidth}px of content in ${m.clientWidth}px)`)
+  }
+  if (m.overflowX === 'auto' || m.overflowX === 'scroll') {
+    bad.push(`overflow-x is ${m.overflowX}: the row is allowed to scroll`)
+  }
+  if (m.widthSpread > 2) bad.push(`chips are not equal width (${m.widthSpread}px spread)`)
+  for (const chip of m.chips) {
+    if (chip.lines !== 2) bad.push(`chip "${chip.label}" has ${chip.lines} lines, not 2`)
+    if (chip.label === '') bad.push('a chip has no label line')
+    if (chip.value === '') bad.push(`chip "${chip.label}" has no value line`)
+    else if (!/[^0-9.,:\s-]/.test(chip.value)) {
+      bad.push(`chip "${chip.label}" reads "${chip.value}" with no unit`)
+    }
+  }
+  return bad
 }
+
+const chipMeasure = await ev(CHIPS)
+for (const chip of chipMeasure.chips ?? []) {
+  console.log(`  ${chip.label.padEnd(8)} ${chip.value}`)
+}
+console.log(
+  `  ${chipMeasure.count} chips, ${chipMeasure.rows} row, content ${chipMeasure.scrollWidth}px in ${chipMeasure.clientWidth}px, overflow-x: ${chipMeasure.overflowX}`,
+)
+for (const bad of judgeChips(chipMeasure)) fail(`chip row: ${bad}`)
+
+/* ------ and now break it on purpose, because a check that cannot fail is not one */
+
+const fifth = await ev(`(() => {
+  const row = document.querySelector('.chips2')
+  if (!row || !row.firstElementChild) return 'no row to break'
+  const clone = row.firstElementChild.cloneNode(true)
+  clone.id = 'audit-fifth-chip'
+  row.appendChild(clone)
+  return 'added'
+})()`)
+
+if (fifth !== 'added') {
+  fail(`could not inject a fifth chip to prove the check fails: ${fifth}`)
+} else {
+  await wait(120)
+  const broken = judgeChips(await ev(CHIPS))
+  await ev(`document.getElementById('audit-fifth-chip')?.remove()`)
+  await wait(120)
+  if (broken.length === 0) {
+    fail('a fifth chip was added and the chip check passed anyway')
+  } else {
+    console.log(`  a fifth chip was injected and the check caught it: ${broken[0]}`)
+  }
+  const after = judgeChips(await ev(CHIPS))
+  if (after.length > 0) fail(`the chip row did not recover after the injection: ${after[0]}`)
+}
+
+/* -------------------------------------- the venue is named once, not twice */
+
+/*
+ * ONE FACT, ONE PLACE ON THE SCREEN.
+ *
+ * WHY THIS EXISTS. The peek line read "Shoot setup · 11:00-15:00 EDT · Brew
+ * River Dock Bar, Salisbury MD" whenever nothing was happening. The venue bar
+ * a hundred pixels above it read "Brew River Dock Bar, Salisbury MD · 12 SAT".
+ * The same venue name, twice, on one screen -- and because the peek sits at
+ * the top of the sheet, every card in the app started fifty pixels lower to
+ * make room for the repeat.
+ *
+ * SHAPE A IN docs/failure-modes.md is two SOURCES for one fact, and the
+ * reason it is a shape is that the two drift. This is the visible form of it:
+ * if the venue name is rendered from two places, one of them will one day
+ * show the cache while the other shows the geocode.
+ *
+ * MECHANICAL, AND SCOPED TO THE ONE STRING IT CAN CHECK HONESTLY. It takes
+ * the venue name from the venue bar -- the element whose job that is -- and
+ * requires that no other visible element on the screen contains it. Map
+ * labels are excluded: the venue's name printed on the map is the map's own
+ * cartography, not the app restating a fact.
+ */
+console.log('\n### the venue is named once on the screen')
+
+if (await setDetent('half')) {
+  const named = await ev(`(() => {
+    const bar = document.querySelector('.vbar__name')
+    if (!bar) return { error: 'no venue name in the venue bar' }
+    const name = (bar.textContent ?? '').trim()
+    if (name === '' || name === '—') return { error: 'the venue bar names no venue' }
+    const canvas = document.querySelector('.map__canvas')
+    const others = []
+    for (const el of document.querySelectorAll('body *')) {
+      if (el === bar || el.contains(bar)) continue
+      if (canvas !== null && (canvas.contains(el) || el === canvas)) continue
+      if (el.getBoundingClientRect().width === 0) continue
+      /* The deepest element holding the text, so one line is not reported ten times. */
+      if ([...el.children].some((c) => (c.textContent ?? '').includes(name))) continue
+      if ((el.textContent ?? '').includes(name)) {
+        others.push(String(el.className || el.tagName).slice(0, 40))
+      }
+    }
+    return { name, others }
+  })()`)
+
+  if (named.error !== undefined) {
+    fail(named.error)
+  } else {
+    console.log(`  "${named.name}" appears in the venue bar and ${named.others.length} other place(s)`)
+    if (named.others.length > 0) {
+      fail(
+        `the venue name is on the screen ${named.others.length + 1} times: the venue bar, and ` +
+          named.others.join(', ') +
+          '. One fact, one place.',
+      )
+    }
+  }
+}
+
+/* ------------------------------------------- no card exceeds two viewports */
+
+/*
+ * THE SHEET'S CONTENT HEIGHT MAY NOT EXCEED TWO VIEWPORT HEIGHTS, AT ANY
+ * DETENT, ON ANY CARD.
+ *
+ * WHAT THIS REPLACED. "Every section is reachable at FULL", which walked the
+ * five `.sect` elements and asserted each had a height over 20px. It was a
+ * true check of a shape that no longer exists, and it was also the wrong
+ * question: it asked whether you could get to the bottom of the page, and the
+ * problem was that there was a page.
+ *
+ * ONE SUBJECT PER SURFACE IS NOT SELF-ENFORCING. Nothing stops a card
+ * growing: a caveat here, a second reading there, and the wind card is the
+ * conditions section again under a new name. A ceiling measured from the live
+ * DOM is the only thing that makes "too much in it" a fact rather than an
+ * opinion, and 2x844 = 1688px is the number: a card you can read in two
+ * screens is still one subject, three screens is a document.
+ *
+ * TAKEN PER CARD AND REPORTED FOR EVERY ONE, passing or failing, because the
+ * margin is the useful part. A card at 1650px passes and is the next one to
+ * break. The figures this run produced are in
+ * measurements/2026-10-19-shell-rebuild.md.
+ *
+ * THE WALK IS DISCOVERED, NOT LISTED. Every control that changes the card is
+ * found by class -- a chip, the rail's layers button, the venue bar's about
+ * button, a CardMore row -- so a card added in six months with a door of one
+ * of those four kinds is measured without anybody adding it here. The names
+ * come from data-card on the sheet's card slot.
+ */
+console.log('\n### no card exceeds two viewport heights at any detent')
+
+const LIMIT = VIEWPORT.height * 2
+
+const cardNow = () => ev(`document.querySelector('.sheet__card')?.dataset.card ?? null`)
+
+const OPENERS = `(() => {
+  const out = []
+  const add = (sel, i, name) => out.push({ sel, i, name })
+  document.querySelectorAll('.chip2').forEach((b, i) =>
+    add('.chip2', i, (b.querySelector('.chip2__label')?.textContent ?? '').trim()))
+  document.querySelectorAll('.rail2__btn').forEach((b, i) => {
+    if ((b.getAttribute('aria-label') ?? '').toLowerCase().includes('layer')) add('.rail2__btn', i, 'layers')
+  })
+  if (document.querySelector('.vbar__about')) add('.vbar__about', 0, 'about')
+  document.querySelectorAll('.more2__row').forEach((b, i) =>
+    add('.more2__row', i, (b.textContent ?? '').trim()))
+  return out
+})()`
+
+const click = async (sel, i) => {
+  await ev(`(() => {
+    const el = document.querySelectorAll(${JSON.stringify(sel)})[${i}]
+    if (el) el.click()
+    return el ? 'clicked' : 'gone'
+  })()`)
+  await wait(420)
+}
+
+const homeCard = async () => {
+  for (let i = 0; i < 4; i += 1) {
+    if ((await cardNow()) === 'shoot') return true
+    await ev(`document.querySelector('.card2__x')?.click()`)
+    await wait(350)
+  }
+  return (await cardNow()) === 'shoot'
+}
+
+/*
+ * THE CONTENT height, not the sheet's. The sheet is as tall as the detent
+ * says; what matters is how much is in it, which is the scroll height of the
+ * slot the card is rendered into.
+ */
+const CARD_HEIGHT = `(() => {
+  const card = document.querySelector('.sheet__card')
+  const body = document.querySelector('.sheet__body')
+  if (!card) return { error: 'no card slot' }
+  const cs = getComputedStyle(card)
+  /*
+   * THE TIME STRIP IS TAKEN HERE TOO, on the same pass, because its whole
+   * reason for existing is that it was 250px of chrome above every card.
+   * The heights this run produced are in
+   * measurements/2026-10-19-shell-polish.md.
+   */
+  const strip = document.querySelector('.tstrip')
+  return {
+    card: card.dataset.card ?? '(unnamed)',
+    content: Math.round(card.scrollHeight + parseFloat(cs.marginTop || '0') + parseFloat(cs.marginBottom || '0')),
+    visible: body === null ? null : Math.round(body.clientHeight),
+    strip: strip === null ? null : Math.round(strip.getBoundingClientRect().height),
+  }
+})()`
+
+/* Paths from the shoot card: one hop for the doors on screen at home, two for
+ * the doors that only exist inside another card. */
+const walked = new Map()
+const queue = [[]]
+const seen = new Set()
+
+while (queue.length > 0) {
+  const path = queue.shift()
+  if (!(await homeCard())) {
+    fail('could not get back to the shoot card')
+    break
+  }
+  if (!(await setDetent('half'))) {
+    fail('could not reach half to walk the cards')
+    break
+  }
+  for (const step of path) await click(step.sel, step.i)
+
+  const here = await cardNow()
+  if (here === null) continue
+  if (path.length > 0 && walked.has(here)) continue
+
+  if (path.length > 0) {
+    /* Measure this card at every detent it can be read at. */
+    const heights = {}
+    for (const detent of ['half', 'full']) {
+      if (!(await setDetent(detent))) continue
+      const m = await ev(CARD_HEIGHT)
+      if (m.error === undefined) heights[detent] = m
+    }
+    walked.set(here, heights)
+    await setDetent('half')
+  }
+
+  /* Two hops is enough: a third would be a navigation hierarchy. */
+  if (path.length >= 1) continue
+
+  const openers = await ev(OPENERS)
+  for (const opener of openers ?? []) {
+    const key = `${path.map((s) => s.sel + s.i).join('>')}|${opener.sel}${opener.i}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    queue.push([...path, opener])
+  }
+}
+
+/* The shoot card itself, which is where the walk starts and has no door. */
+if (await homeCard()) {
+  const heights = {}
+  for (const detent of ['half', 'full']) {
+    if (await setDetent(detent)) {
+      const m = await ev(CARD_HEIGHT)
+      if (m.error === undefined) heights[detent] = m
+    }
+  }
+  walked.set('shoot', heights)
+}
+
+/* Then the doors that only open from inside another card. */
+if (await homeCard()) {
+  await setDetent('half')
+  const inner = await ev(OPENERS)
+  for (const first of inner ?? []) {
+    if (!(await homeCard())) break
+    await setDetent('half')
+    await click(first.sel, first.i)
+    const doors = await ev(`(() => [...document.querySelectorAll('.more2__row')].map((b, i) => ({ sel: '.more2__row', i, name: (b.textContent ?? '').trim() })))()`)
+    for (const door of doors ?? []) {
+      if (!(await homeCard())) break
+      await setDetent('half')
+      await click(first.sel, first.i)
+      await click(door.sel, door.i)
+      const here = await cardNow()
+      if (here === null || walked.has(here)) continue
+      const heights = {}
+      for (const detent of ['half', 'full']) {
+        if (await setDetent(detent)) {
+          const m = await ev(CARD_HEIGHT)
+          if (m.error === undefined) heights[detent] = m
+        }
+      }
+      walked.set(here, heights)
+    }
+  }
+}
+
+/* ------------------------------------------ the time strip is small, and placed */
+
+/*
+ * THE TIME CONTROL IS A STRIP, AND IT IS ONLY WHERE TIME MATTERS.
+ *
+ * WHAT IT WAS. A ~250px panel above every card, carrying a clock, two
+ * receipts in degrees, tide tags, a twilight band, a range input with its own
+ * track, and the Part 107 requirements. On the wind card it was taller than
+ * the wind. On About it pushed the copy off the bottom of the screen. On the
+ * layer tiles it was a time panel above a grid of pictures, which has nothing
+ * to do with time at all.
+ *
+ * TWO PROPERTIES, BOTH READ OFF THE RENDERED STRIP (the figures are in
+ * measurements/2026-10-19-shell-polish.md):
+ *
+ *   IT IS UNDER 48px. A control, not a panel. 48 rather than its nominal 34
+ *   so a line-height change is not a failure, and far enough under 250 that
+ *   the panel cannot creep back one row at a time.
+ *
+ *   IT IS ABSENT WHERE TIME CHANGES NOTHING. A tile grid, a settings sheet
+ *   and a list of ground marks read the same at 06:00 and at 18:00.
+ *
+ * THE TABLE BELOW IS THE BRIEF, NOT THE CODE. src/lib/sheetCard.ts holds the
+ * same list, and checking the app against its own table would be shape B in
+ * docs/failure-modes.md -- a check that cannot fail, because both sides move
+ * together. These are written out here so that changing the app's mind about
+ * a card fails until somebody changes this too.
+ */
+console.log('\n### the time strip is a strip, and only where time matters')
+
+const STRIP_BELONGS = ['shoot', 'golden', 'wind', 'cloud', 'tide', 'sky']
+/*
+ * 'cams' is not in the brief's list because the card did not exist when the
+ * brief was written: the sky card was split to get it under the limit. It is
+ * forbidden for the same reason as the other three -- a camera feed is
+ * whatever the operator is publishing this minute, and a strip that scrubbed
+ * every other reading while leaving these alone is a control that appears to
+ * work and does not.
+ */
+const STRIP_FORBIDDEN = ['layers', 'about', 'hazards', 'cams']
+const STRIP_MAX = 48
+
+console.log(`  the limit is 2 x ${VIEWPORT.height} = ${LIMIT}px of content`)
+console.log(`  card          half     full     worst   of limit   strip`)
+let worstCard = null
+for (const [name, heights] of [...walked.entries()].sort()) {
+  const half = heights.half?.content ?? null
+  const full = heights.full?.content ?? null
+  const worst = Math.max(half ?? 0, full ?? 0)
+  const pct = Math.round((100 * worst) / LIMIT)
+  const over = worst > LIMIT
+  if (worstCard === null || worst > worstCard[1]) worstCard = [name, worst]
+
+  /* The strip, as the same walk saw it on this card. */
+  const strip = heights.half?.strip ?? heights.full?.strip ?? null
+  const stripText = strip === null ? 'none' : `${strip}px`
+
+  console.log(
+    `  ${name.padEnd(12)} ${String(half ?? '-').padStart(6)}  ${String(full ?? '-').padStart(6)}  ${String(worst).padStart(6)}  ${String(pct).padStart(5)}%  ${over ? 'OVER' : 'ok'}  ${stripText.padStart(6)}`,
+  )
+
+  if (strip !== null && strip > STRIP_MAX) {
+    fail(`the time strip is ${strip}px on the ${name} card, over the ${STRIP_MAX}px limit`)
+  }
+  if (STRIP_FORBIDDEN.includes(name) && strip !== null) {
+    fail(
+      `the ${name} card renders the time strip (${strip}px) and nothing on it changes with time`,
+    )
+  }
+  if (STRIP_BELONGS.includes(name) && strip === null) {
+    fail(`the ${name} card has no time strip, and its reading is for a moment`)
+  }
+  if (over) {
+    fail(`the ${name} card is ${worst}px of content, over the ${LIMIT}px limit: split it or cut it`)
+  }
+  if (half === null && full === null) fail(`the ${name} card could not be measured at any detent`)
+}
+if (walked.size < 4) fail(`only ${walked.size} cards were reached: the walk found no doors`)
+
+/*
+ * EVERY CARD IN THE UNION HAS A DOOR.
+ *
+ * WHY THIS EXISTS. Splitting the sky card moved the camera list onto its own
+ * card and repointed the cloud card's row at it -- which was the right fix
+ * for a mislabelled door and left the SKY card with no entrance at all. The
+ * walk above dutifully reported eleven cards and said nothing, because it
+ * reports what it can reach and had no idea what it could not.
+ *
+ * THE FULL SET COMES FROM THE UNION ITSELF, read out of src/lib/sheetCard.ts
+ * rather than listed here. A twelfth kind added without a way in fails this
+ * without anybody remembering to add it, which is the whole point; a list in
+ * this file would be one more thing to keep in step.
+ */
+const UNION = readFileSync('src/lib/sheetCard.ts', 'utf8')
+const declared = [...UNION.matchAll(/\|\s*\{\s*kind:\s*'([a-z]+)'\s*\}/g)].map((m) => m[1])
+if (declared.length < 5) {
+  fail('could not read the card kinds out of src/lib/sheetCard.ts')
+} else {
+  const missed = declared.filter((kind) => !walked.has(kind))
+  console.log(`  ${declared.length} kinds declared, ${walked.size} reached`)
+  if (missed.length > 0) {
+    fail(
+      `${missed.length} card(s) in the union have no door: ${missed.join(', ')}. ` +
+        'A card nothing opens is a card nobody can read.',
+    )
+  }
+}
+console.log(`  ${walked.size} cards measured; tallest is ${worstCard?.[0]} at ${worstCard?.[1]}px`)
+
+await homeCard()
 
 const noise = errs.filter((e) => !/arcgis|AJAXError|Failed to fetch|overpass|elevation-tiles/i.test(e))
 if (noise.length > 0) console.log('\nconsole errors: ' + JSON.stringify(noise.slice(0, 3)))

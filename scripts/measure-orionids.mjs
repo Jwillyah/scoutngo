@@ -18,7 +18,7 @@
  * them IS the result.
  */
 import { writeFileSync } from 'node:fs'
-import { guardAudit, startWatchdog } from './preflight.mjs'
+import { goToStage, guardAudit, startWatchdog } from './preflight.mjs'
 
 guardAudit('orionids')
 
@@ -55,7 +55,7 @@ try {
   await wait(8000)
 
   /* Into Plan mode, which is where the map and the Sky panel live. */
-  await ev(`[...document.querySelectorAll('.rail__btn')].find(b=>/Plan/.test(b.textContent))?.click()`)
+  await goToStage(ev, wait, 'plan')
   await wait(4000)
 
   /* To the overlook, at the zoom the terrain actually draws at. */

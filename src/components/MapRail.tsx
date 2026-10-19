@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useRef, useState, type ReactNode } from 'react'
 
 /*
  * THE RAIL: the only thing left floating over the map besides the sheet.
@@ -26,27 +26,58 @@ import { useCallback, useRef, useState } from 'react'
 
 const LONG_PRESS_MS = 400
 
+/*
+ * Two planes seen from above and in front, the upper one offset. Drawn rather
+ * than set in a font: a glyph's weight is whatever the system font decides,
+ * and this sits on satellite imagery at 48px where a hairline disappears.
+ */
+const LAYERS_ICON = (
+  <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+    <path
+      d="M10 2.5 17.5 6.5 10 10.5 2.5 6.5z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M3.4 10 10 13.5 16.6 10"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M3.4 13.5 10 17 16.6 13.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      opacity="0.55"
+    />
+  </svg>
+)
+
 interface MapRailProps {
-  showSun: boolean
-  onShowSun: (next: boolean) => void
+  /** Opens the layers card. The rail's first job in every map app. */
+  onLayers: () => void
+  layersOpen: boolean
   /** Current pitch, shown on the face so the reset says what it will undo. */
   pitch: number
   onResetPitch: () => void
   onLocate: () => void
   locating: boolean
-  onFitAll: () => void
-  canFitAll: boolean
 }
 
 export function MapRail({
-  showSun,
-  onShowSun,
+  onLayers,
+  layersOpen,
   pitch,
   onResetPitch,
   onLocate,
   locating,
-  onFitAll,
-  canFitAll,
 }: MapRailProps) {
   /** Which button is showing its text label, from a long press. */
   const [named, setNamed] = useState<string | null>(null)
@@ -65,7 +96,7 @@ export function MapRail({
   const button = (
     id: string,
     label: string,
-    glyph: string,
+    glyph: ReactNode,
     onClick: () => void,
     opts: { on?: boolean; disabled?: boolean; face?: string } = {},
   ) => (
@@ -101,38 +132,46 @@ export function MapRail({
 
   return (
     <nav className="rail2" aria-label="Map controls">
-      {button(
-        'sun',
-        showSun ? 'Hide the sun overlay' : 'Show the sun overlay',
-        '☀',
-        () => onShowSun(!showSun),
-        { on: showSun },
-      )}
-
       {/*
-        * THE FACE IS THE CURRENT ANGLE, so the button says what it is about to
-        * undo. At 0 it is already flat, so there is nothing to reset and it
-        * reads as the state rather than an action.
+        * LAYERS, TILT, LOCATE. Three, and layers is first because it is the
+        * one people reach for.
+        *
+        * LAYERS IS IN THE RAIL NOW, AND IT WAS DELIBERATELY NOT BEFORE. The
+        * old rule was "a control is in the rail only if it opens NO surface",
+        * and layers has content, so it lived in the sheet. That rule was
+        * right when the sheet was one scrolling page: putting layers in the
+        * rail then meant a fifth section. The sheet shows ONE CARD now, so
+        * opening layers is replacing the card rather than stacking a surface,
+        * and the thing the old rule protected against cannot happen.
         */}
+      {/*
+        * STACKED PLANES, NOT A HAMBURGER.
+        *
+        * It was \u2630, the trigram -- three equal bars, which is the glyph
+        * for "menu" in every app that has one. This button does not open a
+        * menu; it opens the layer tiles. Every map application draws this
+        * control as two sheets seen in perspective, one over the other,
+        * because that is what a layer is, and a shooter looking for layers
+        * scans for that shape rather than reading the rail.
+        */}
+      {button('layers', 'Map and layers', LAYERS_ICON, onLayers, { on: layersOpen })}
+
       {button(
         'pitch',
         pitch < 1 ? 'Tilt is flat' : `Reset tilt from ${Math.round(pitch)} degrees to flat`,
-        '△',
+        '\u25B3',
         onResetPitch,
-        { on: pitch >= 1, disabled: pitch < 1, face: `${Math.round(pitch)}°` },
+        { on: pitch >= 1, disabled: pitch < 1, face: `${Math.round(pitch)}\u00B0` },
       )}
 
       {button(
         'locate',
         locating ? 'Finding your location' : 'Centre the map on your location',
-        '◉',
+        '\u25C9',
         onLocate,
         { on: locating },
       )}
 
-      {button('fit', 'Fit all positions and the subject', '⤢', onFitAll, {
-        disabled: !canFitAll,
-      })}
     </nav>
   )
 }
