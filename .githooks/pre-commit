@@ -57,6 +57,12 @@ step "build"
 npm run build > "$SCRATCH/build.log" 2>&1 || { tail -20 "$SCRATCH/build.log"; fail "npm run build"; }
 ok "build"
 
+# The document and the bundle must agree about which commit built them. The
+# whole stale-build mechanism is that comparison; see docs/deploys.md.
+step "build stamp"
+node scripts/audit-build-stamp.mjs > "$SCRATCH/stamp.log" 2>&1 || { cat "$SCRATCH/stamp.log"; fail "build stamp audit"; }
+ok "$(tail -1 "$SCRATCH/stamp.log" | sed 's/=== //;s/ ===//')"
+
 # ------------------------------------------------------------ browser gate
 if [ "${SCOUTNGO_SKIP_AUDITS:-0}" = "1" ]; then
   echo "${YELLOW}!  BROWSER AUDITS SKIPPED by SCOUTNGO_SKIP_AUDITS=1.${OFF}"

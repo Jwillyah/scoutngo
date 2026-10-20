@@ -146,15 +146,42 @@ function stampBuildId(id: string) {
   return {
     name: 'scoutngo-build-stamp',
     transformIndexHtml(html: string) {
+      if (!html.includes('__BUILD_ID__')) {
+        /*
+         * The placeholder is the only thing that puts the id in the
+         * document. If it is ever renamed out of index.html this plugin
+         * would silently stamp nothing, the meta tag would read
+         * "__BUILD_ID__", and every running copy would compare its real id
+         * against that string and declare itself stale forever.
+         */
+        throw new Error('index.html has no __BUILD_ID__ placeholder to stamp')
+      }
       return html.replace('__BUILD_ID__', id)
     },
   }
 }
 
+/*
+ * ONE BUILD ID, COMPUTED ONCE.
+ *
+ * It was `stampBuildId(buildId())` and `__BUILD_ID__: JSON.stringify(buildId())`
+ * -- two calls, each shelling out to git or reading the platform's environment
+ * at a different moment in the same build. Two sources for one fact, which is
+ * shape A in docs/failure-modes.md, and this is the worst place in the app to
+ * have one: the whole stale-build check works by comparing the id in the
+ * DOCUMENT against the id in the BUNDLE. If those two ever disagreed, every
+ * copy of the app would compare a build against itself, conclude it was stale,
+ * and say so forever -- or, now that a cold load adopts a newer build by
+ * itself, reload in a loop.
+ *
+ * They agree today. The point is that nothing made them agree.
+ */
+const BUILD_ID_ONCE = buildId()
+
 export default defineConfig({
-  plugins: [react(), stampBuildId(buildId())],
+  plugins: [react(), stampBuildId(BUILD_ID_ONCE)],
   define: {
-    __BUILD_ID__: JSON.stringify(buildId()),
+    __BUILD_ID__: JSON.stringify(BUILD_ID_ONCE),
     __BUILD_DIRTY__: JSON.stringify(buildDirty()),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
     __BUILD_PUSHED__: JSON.stringify(buildPushed()),
