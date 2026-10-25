@@ -1,6 +1,7 @@
 import { buildLabel } from '../lib/build.ts'
 import type { ReadFile } from '../lib/scoutFile.ts'
 import { BackupFile } from './BackupFile.tsx'
+import { ApiKeyField } from './ApiKeyField.tsx'
 import { StorageProbe } from './StorageProbe.tsx'
 import {
   DISTANCE_UNITS,
@@ -133,6 +134,8 @@ export function AboutSheet({
           </div>
         </div>
       </div>
+
+      <ApiKeyField />
 
       <p className="about__eyebrow about__eyebrow--dim">Yours</p>
       {(

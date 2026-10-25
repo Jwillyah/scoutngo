@@ -10369,3 +10369,72 @@
   background: var(--black);
   font-size: var(--text-label);
 }
+
+/* ----------------------------------------------------------- call sheet */
+
+.callsheet {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.callsheet__say,
+.callsheet__note {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.callsheet__box {
+  min-height: 6.5em;
+  resize: vertical;
+}
+
+.callsheet__error {
+  margin: 0;
+  color: var(--color-text);
+}
+
+.callsheet__check {
+  margin: 0;
+  padding-left: var(--space-2);
+  border-left: var(--line-rule) solid var(--white);
+  font-size: var(--text-sm);
+}
+
+.callsheet__check ul {
+  margin: var(--space-1) 0 0;
+  padding-left: 1.2em;
+}
+
+.callsheet__text {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: var(--text-base);
+  line-height: 1.45;
+  color: var(--color-text);
+}
+
+.callsheet__playbook summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  color: var(--color-text);
+}
+
+.apikey {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.apikey__say {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.apikey__held {
+  align-self: center;
+  color: var(--color-text);
+}

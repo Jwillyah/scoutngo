@@ -196,6 +196,9 @@ ok "$(grep -E 'API URL PROBLEMS' "$SCRATCH/apiurl.log" | tail -1 | tr -d '=' | s
 run_audit "airspace audit" scripts/audit-airspace.mjs "$SCRATCH/airspace.log" 'PROBLEM|ABORTED'
 ok "$(grep -E 'AIRSPACE PROBLEMS' "$SCRATCH/airspace.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
 
+run_audit "call sheet audit" scripts/audit-callsheet.mjs "$SCRATCH/callsheet.log" 'PROBLEM|ABORTED'
+ok "$(grep -E 'CALL SHEET PROBLEMS' "$SCRATCH/callsheet.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
+
 run_audit "service worker audit" scripts/audit-sw-update.mjs "$SCRATCH/sw.log" 'PROBLEM|ABORTED'
 ok "$(grep -E 'SERVICE WORKER PROBLEMS' "$SCRATCH/sw.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
 

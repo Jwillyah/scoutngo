@@ -40,6 +40,8 @@ export type SheetCard =
   | { kind: 'suncurve' }
   /** From the venue bar. Settings live here and nowhere else. */
   | { kind: 'about' }
+  /** From the menu: the call sheet, written on the shooter's own key. */
+  | { kind: 'callsheet' }
 
 export type CardKind = SheetCard['kind']
 
@@ -59,6 +61,7 @@ export const CARD_TITLE: Record<CardKind, string> = {
   cams: 'Sky cameras',
   suncurve: 'The day',
   about: 'About',
+  callsheet: 'Call sheet',
 }
 
 /**
@@ -122,4 +125,6 @@ export const TIME_MATTERS: Record<CardKind, boolean> = {
   about: false,
   hazards: false,
   airspace: false,
+  /* Written for the whole window, not the moment on the bar. */
+  callsheet: false,
 }

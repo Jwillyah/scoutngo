@@ -11,6 +11,7 @@ export type MenuItem =
   | 'saved'
   | 'now'
   | 'viewfinder'
+  | 'callsheet'
   | 'about'
 
 export const MENU_ITEMS: readonly { id: MenuItem; label: string; note: string }[] = [
@@ -21,6 +22,7 @@ export const MENU_ITEMS: readonly { id: MenuItem; label: string; note: string }[
   { id: 'saved', label: 'Saved spots', note: 'On this phone' },
   { id: 'field', label: 'Field', note: 'One position at a time, offline' },
   { id: 'now', label: 'Now', note: 'What the sky is doing where you are' },
+  { id: 'callsheet', label: 'Call sheet', note: 'Run of show and shot list, on your own key' },
   { id: 'viewfinder', label: 'Viewfinder', note: 'The camera with the sun and your frames on it' },
   { id: 'about', label: 'About', note: 'Units, backup, what leaves your phone' },
 ]

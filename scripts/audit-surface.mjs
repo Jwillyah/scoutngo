@@ -1167,6 +1167,7 @@ const OPENERS = `(() => {
   if (document.querySelector('button[aria-label="Menu"]')) {
     add('menu', 'About', 'about')
     add('menu', 'Sky', 'sky')
+    add('menu', 'Call sheet', 'callsheet')
   }
   document.querySelectorAll('.more2__row').forEach((b, i) =>
     add('.more2__row', i, (b.textContent ?? '').trim()))

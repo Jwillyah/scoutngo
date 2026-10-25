@@ -79,6 +79,10 @@ import { SunSearchPanel } from './SunSearchPanel.tsx'
 import { TimeBar } from './TimeBar.tsx'
 import { ToolDock } from './ToolDock.tsx'
 import { SkyCard } from './SkyCard.tsx'
+import { CallSheetCard } from './CallSheetCard.tsx'
+import type { ToolContext } from '../core/callSheetTools.ts'
+import type { KitSelection } from '../lib/kitSelection.ts'
+import { classificationOf } from '../core/lighting.ts'
 import { LightNowBlock } from './LightNowBlock.tsx'
 import { getMoonArc } from '../core/moonArc.ts'
 import type { SkyTab } from '../lib/skyTab.ts'
@@ -278,7 +282,9 @@ interface PlanModeProps {
   onMenu: () => void
   menuOpen: boolean
   /** The menu asked for a card: Sky or About. The tick makes a repeat ask open it again. */
-  cardRequest: { kind: 'sky' | 'about'; tick: number }
+  cardRequest: { kind: 'sky' | 'about' | 'callsheet'; tick: number }
+  /** What is in the bag, for the call sheet's kit tool. */
+  bag: KitSelection
   /** The search pill was tapped: go and search. */
   onSearch: () => void
   /** Ground, air or both. Decides what shows here AND what a generate asks for. */
@@ -455,6 +461,7 @@ export function PlanMode({
   onMenu,
   menuOpen,
   cardRequest,
+  bag,
   onSearch,
   platformFilter,
   showLabels,
@@ -702,6 +709,42 @@ export function PlanMode({
     },
     [venueWindow, onScrub],
   )
+  /*
+   * WHAT THE CALL SHEET'S TOOLS ANSWER FROM. Built here, on the phone; the
+   * coordinate in it is used by the tools and never put in an answer.
+   */
+  const callSheetContext = useMemo((): ToolContext | null => {
+    if (venue === null || venueWindow === null) return null
+    const names = (ids: string[], list: { id: string; name: string }[]) => list.filter((g) => ids.includes(g.id)).map((g) => g.name)
+    return {
+      venue,
+      timeZone: venueWindow.timeZone,
+      window: { start: venueWindow.start, end: venueWindow.end },
+      positions: plan.map((p) => ({
+        number: p.position.number,
+        platform: p.position.platform,
+        optic: p.optic.name,
+        focalMm: p.focalLength,
+        altitudeFeet: p.position.altitudeFeet,
+        toSubjectMeters: p.groundRangeMeters,
+        cameraBearing: p.aim.shotType === 'framed' ? p.aim.cameraBearing : null,
+        light: p.read.shotType === 'framed' ? classificationOf(p.read) : null,
+      })),
+      bag: {
+        bodies: names(bag.bodyIds, kitProfile.bodies),
+        lenses: names(bag.lensIds, kitProfile.lenses),
+        drones: names(bag.droneIds, kitProfile.drones),
+      },
+      conditions: {
+        lowCloudPercent: venueCloud?.low ?? null,
+        windKnots: wind === null ? null : wind.speedMps * 1.943844,
+        lowTide: lowTide === null ? null : formatClock(lowTide.at, venueWindow.timeZone),
+      },
+      playbook: '',
+      units: units.distance,
+    }
+  }, [venue, venueWindow, plan, bag, kitProfile, venueCloud, wind, lowTide, units.distance])
+
   /* Which page of the Sky card is open. The dock's calendar opens it at the calendar. */
   const [skyTab, setSkyTab] = useState<SkyTab>('tonight')
   /*
@@ -1458,6 +1501,12 @@ export function PlanMode({
               terrainOn={showTerrain}
               onShowTerrain={turnTerrain}
             />
+          </Card>
+        )
+      case 'callsheet':
+        return (
+          <Card title="Call sheet" onClose={home}>
+            <CallSheetCard context={callSheetContext} onOpenKey={() => openCard('about')} />
           </Card>
         )
       case 'sky':

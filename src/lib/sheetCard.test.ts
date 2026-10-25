@@ -25,6 +25,7 @@ const EVERY_KIND: CardKind[] = [
   'cams',
   'suncurve',
   'about',
+  'callsheet',
 ]
 
 describe('the sheet card union', () => {

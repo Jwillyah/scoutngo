@@ -1251,7 +1251,7 @@ function App() {
     drawer: 'kit',
     tick: 0,
   })
-  const [cardRequest, setCardRequest] = useState<{ kind: 'sky' | 'about'; tick: number }>({
+  const [cardRequest, setCardRequest] = useState<{ kind: 'sky' | 'about' | 'callsheet'; tick: number }>({
     kind: 'sky',
     tick: 0,
   })
@@ -1273,6 +1273,7 @@ function App() {
         return
       case 'sky':
       case 'about':
+      case 'callsheet':
         setMode('plan')
         setCardRequest((r) => ({ kind: item, tick: r.tick + 1 }))
         return
@@ -2010,6 +2011,7 @@ function App() {
           onMenu={() => setMenuOpen(true)}
           menuOpen={menuOpen}
           cardRequest={cardRequest}
+          bag={kit}
           onSearch={() => setMode('setup')}
         />
       ) : null}
