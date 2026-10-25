@@ -1,4 +1,4 @@
-import { dedupeNearby, biasBox } from '../core/geocode.ts'
+import { dedupeNearby, biasBox, kindFromOsm, rankForShoot, type PlaceKind } from '../core/geocode.ts'
 import type { LatLon } from '../core/geo.ts'
 /**
  * Venue search through Nominatim.
@@ -59,6 +59,8 @@ export interface SearchHit {
    * genuinely two different positions.
    */
   placeId?: string
+  /** What sort of place: a venue ranks above an area. See rankForShoot in core/geocode.ts. */
+  kind?: PlaceKind
 }
 
 /** Shape Nominatim returns, narrowed to what is used. */
@@ -67,6 +69,8 @@ interface NominatimRow {
   display_name?: unknown
   lat?: unknown
   lon?: unknown
+  class?: unknown
+  type?: unknown
 }
 
 export function parseSearchRows(rows: unknown): SearchHit[] {
@@ -83,6 +87,10 @@ export function parseSearchRows(rows: unknown): SearchHit[] {
       lat,
       lon,
       source: 'osm',
+      kind: kindFromOsm(
+        typeof row.class === 'string' ? row.class : '',
+        typeof row.type === 'string' ? row.type : '',
+      ),
     })
   }
   return hits.slice(0, 6)
@@ -152,6 +160,7 @@ export function parsePhotonFeatures(payload: unknown): SearchHit[] {
       lat,
       lon,
       source: 'photon',
+      kind: kindFromOsm(text('osm_key'), text('osm_value')),
     })
   }
   return hits.slice(0, 6)
@@ -166,7 +175,8 @@ async function fromNominatim(query: string, bias?: SearchBias, signal?: AbortSig
   return parseSearchRows(await response.json())
 }
 
-async function fromPhoton(query: string, bias?: SearchBias, signal?: AbortSignal) {
+/** Photon alone: no published rate rule, so it can run beside Mapbox. */
+export async function fromPhoton(query: string, bias?: SearchBias, signal?: AbortSignal) {
   const response = await fetch(photonUrl(query, bias), { signal })
   if (!response.ok) return []
   return parsePhotonFeatures(await response.json())
@@ -190,7 +200,8 @@ export async function searchVenues(
     fromNominatim(query, bias, signal).catch(() => []),
     fromPhoton(query, bias, signal).catch(() => []),
   ])
-  return dedupeNearby([...osm, ...photon]).slice(0, 8)
+  /* Venues before areas before roads: see rankForShoot in src/core/geocode.ts. */
+  return rankForShoot(dedupeNearby([...osm, ...photon]), query).slice(0, 8)
 }
 
 /*

@@ -20,7 +20,9 @@ entirely.
 ## Privacy, which is not negotiable
 
 No IP geolocation, ever. The venue coordinate never leaves the device.
-localStorage only: no account, no database, no analytics, no telemetry.
+localStorage for what is yours (kit, spots, settings, saved forecasts); Cache
+Storage holds map tiles and the app shell, nothing about the user. No account,
+no database, no analytics, no telemetry.
 
 ## The gate
 
@@ -29,6 +31,7 @@ localStorage only: no account, no database, no analytics, no telemetry.
 ```
 tsc -b → oxlint --deny-warnings → viewport units → colour roles → tests
        → build → reachability → labels → surface → projection → offline
+       → service worker
 ```
 
 All of it must be clean before reporting. `SCOUTNGO_SKIP_AUDITS=1` exists and

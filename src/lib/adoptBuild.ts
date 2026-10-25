@@ -9,10 +9,10 @@
  * something newer the whole time, which is what "no push will ever reach
  * them" means in practice.
  *
- * THERE IS NO SERVICE WORKER IN THIS APP -- checked, not assumed: no
- * registration, no workbox, no PWA plugin, and no sw.js on the deployed site.
- * Offline is field packs in localStorage and map tiles in Cache Storage, both
- * data and never code: no document or bundle is put in that cache. What holds a stale build is the browser's own
+ * THE ONE SERVICE WORKER KEEPS THE APP SHELL AND CANNOT PIN A BUILD: the
+ * document is network-first, hashed assets are cache-first by name, and the
+ * build check passes through it. A cold launch with signal is the new build;
+ * proved end to end by scripts/audit-sw-update.mjs. What holds a stale build is the browser's own
  * document cache, and on iOS a home-screen app launching its start_url is
  * the stubborn case.
  *

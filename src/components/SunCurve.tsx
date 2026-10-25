@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { TILE_TIMEOUT_MS } from '../lib/offlineCache.ts'
 import {
   altitudeRange,
   band,
@@ -84,6 +85,25 @@ export function SunCurve({
   onShowTerrain,
 }: SunCurveProps) {
   const clock = (date: Date) => formatClock(date, timeZone)
+
+  /*
+   * TERRAIN ON AND NOTHING ARRIVING IS AN ANSWER, NOT A WAIT.
+   *
+   * With terrain on and no signal, this said "waiting for the elevation data"
+   * for as long as anyone looked. The elevation tiles get the same give-up as
+   * every other tile (TILE_TIMEOUT_MS, src/lib/offlineCache.ts): past it, the
+   * flat horizon stays, and the line says nothing came and why it might not.
+   */
+  const waitingFlat = terrainOn && horizon.kind === 'flat'
+  const [gaveUp, setGaveUp] = useState(false)
+  useEffect(() => {
+    if (!waitingFlat) {
+      const reset = setTimeout(() => setGaveUp(false), 0)
+      return () => clearTimeout(reset)
+    }
+    const timer = setTimeout(() => setGaveUp(true), TILE_TIMEOUT_MS)
+    return () => clearTimeout(timer)
+  }, [waitingFlat, venue.lat, venue.lon])
 
   /*
    * THE WHOLE DAY IS SAMPLED, THE WINDOW IS DRAWN.
@@ -393,7 +413,11 @@ export function SunCurve({
         >
           <span className="curve__fix-why">{terrain.reason}</span>
           <span className="curve__fix-do">
-            {terrainOn ? 'Terrain is on — waiting for the elevation data' : 'Turn terrain on'}
+            {!terrainOn
+              ? 'Turn terrain on'
+              : gaveUp
+                ? 'Terrain is on, but no elevation arrived. With no signal it only exists where the venue was saved.'
+                : 'Terrain is on — waiting for the elevation data'}
           </span>
         </button>
       ) : showBoth ? (

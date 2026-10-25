@@ -61,8 +61,37 @@ export type ForecastResult =
     }
   | { status: 'unavailable'; reason: string }
 
-/** yyyy-mm-dd in UTC, which is the format Open-Meteo's date range wants. */
-const isoDate = (date: Date): string => date.toISOString().slice(0, 10)
+/**
+ * THE VENUE'S OWN CALENDAR DATE AND HOUR for an instant.
+ *
+ * THE BUG THIS REPLACES. The date range was `toISOString().slice(0, 10)`, the
+ * UTC date. On the US east coast every instant after 20:00 EDT is already
+ * tomorrow in UTC, so an evening shoot asked Open-Meteo for the wrong day,
+ * found no row for its hour, and silently read 00:00 of that wrong day
+ * instead. The wanted hour was matched on the DEVICE's clock as well, which
+ * is a second wrong answer for a phone in another zone from the venue.
+ *
+ * Open-Meteo is asked in the venue's zone and answers in local wall-clock
+ * stamps with no offset, so both the date asked for and the hour looked up
+ * have to be that same wall clock. One function for both, so they cannot
+ * disagree.
+ */
+export function venueClock(at: Date, timeZone: string): { date: string; hour: string } {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      hourCycle: 'h23',
+    })
+      .formatToParts(at)
+      .map((p) => [p.type, p.value]),
+  )
+  const date = `${parts.year}-${parts.month}-${parts.day}`
+  return { date, hour: `${date}T${parts.hour}` }
+}
 
 /** Whole days from today to the shoot, negative for a date already past. */
 export function daysAhead(at: Date, now: Date = new Date()): number {
@@ -154,7 +183,7 @@ export async function fetchSightlineCloud(
     sightlineSamplePoints(line.from, line.bearing).map((p) => ({ id: line.id, ...p })),
   )
 
-  const date = isoDate(at)
+  const { date, hour: localHour } = venueClock(at, timeZone)
   const key = `${date}|${timeZone}|${points
     .map((p) => `${p.at.lat.toFixed(3)},${p.at.lon.toFixed(3)}`)
     .join(';')}`
@@ -203,7 +232,7 @@ export async function fetchSightlineCloud(
     if (times.length === 0) {
       return { status: 'unavailable', reason: 'Open-Meteo returned no hours for that date.' }
     }
-    const venueHour = `${date}T${String(at.getHours()).padStart(2, '0')}:00`
+    const venueHour = `${localHour}:00`
     const index = hourIndexFor(times, venueHour)
 
     const byId = new Map<string, CloudSample[]>()
@@ -288,7 +317,7 @@ interface WindRow {
 /** Open-Meteo reports km/h by default; everything in core is metres per second. */
 const KMH_TO_MPS = 1 / 3.6
 
-export function parseWind(payload: unknown, at: Date): WindResult {
+export function parseWind(payload: unknown, at: Date, timeZone: string): WindResult {
   const hourly = (payload as { hourly?: WindRow } | null)?.hourly
   const times = Array.isArray(hourly?.time) ? (hourly.time as string[]) : []
   if (times.length === 0) return { status: 'unavailable', reason: 'No wind in the response.' }
@@ -298,9 +327,15 @@ export function parseWind(payload: unknown, at: Date): WindResult {
    * returns local wall-clock stamps for the timezone asked for, so these are
    * compared as text against the same hour rendered the same way.
    */
-  const wanted = isoHour(at)
-  const index = times.findIndex((t) => t.startsWith(wanted))
-  const row = index === -1 ? 0 : index
+  const wanted = venueClock(at, timeZone).hour
+  const row = times.findIndex((t) => t.startsWith(wanted))
+  /*
+   * NO ROW FOR THE HOUR IS NOT THE FIRST ROW. This used to fall back to row 0,
+   * which is how an evening shoot was handed midnight's wind as its own.
+   */
+  if (row === -1) {
+    return { status: 'unavailable', reason: `The forecast has no row for ${wanted.slice(11)}:00.` }
+  }
 
   const levels: LevelWind[] = WIND_LEVELS_METERS.map((heightMeters) => {
     const speed = numberOrNull(hourly?.[`wind_speed_${heightMeters}m`], row)
@@ -352,12 +387,16 @@ export interface VenueCloud {
  * cloud was asked for looks like. Same hour rule as parseWind, on purpose:
  * one rule for which row is "now", not two that can pick different hours.
  */
-export function parseVenueCloud(payload: unknown, at: Date): VenueCloud | null {
+export function parseVenueCloud(
+  payload: unknown,
+  at: Date,
+  timeZone: string,
+): VenueCloud | null {
   const hourly = (payload as { hourly?: Record<string, unknown> } | null)?.hourly
   const times = Array.isArray(hourly?.time) ? (hourly.time as string[]) : []
   if (times.length === 0 || !Array.isArray(hourly?.cloud_cover_low)) return null
-  const index = times.findIndex((t) => t.startsWith(isoHour(at)))
-  const row = index === -1 ? 0 : index
+  const row = times.findIndex((t) => t.startsWith(venueClock(at, timeZone).hour))
+  if (row === -1) return null
   return {
     at: new Date(times[row]),
     totalPercent: numberOrNull(hourly?.cloud_cover, row),
@@ -367,11 +406,6 @@ export function parseVenueCloud(payload: unknown, at: Date): VenueCloud | null {
   }
 }
 
-/** yyyy-mm-ddTHH, which is how an Open-Meteo hourly stamp starts. */
-function isoHour(at: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}T${pad(at.getHours())}`
-}
 
 export async function fetchWind(
   at: LatLon,
@@ -380,7 +414,7 @@ export async function fetchWind(
   fetchImpl: typeof fetch = fetch,
 ): Promise<WindResult> {
   const day = await fetchVenueDay(at, when, timeZone, fetchImpl)
-  return day.status === 'ok' ? parseWind(day.payload, when) : day
+  return day.status === 'ok' ? parseWind(day.payload, when, timeZone) : day
 }
 
 export type VenueDayResult =
@@ -421,8 +455,8 @@ export async function fetchVenueDay(
       'wind_gusts_10m',
       ...VENUE_CLOUD_VARIABLES,
     ].join(','),
-    start_date: isoDate(when),
-    end_date: isoDate(when),
+    start_date: venueClock(when, timeZone).date,
+    end_date: venueClock(when, timeZone).date,
     timezone: timeZone,
   })
 
@@ -514,8 +548,8 @@ export async function fetchCloudGrid(
       ...WIND_LEVELS_METERS.map((m) => `wind_speed_${m}m`),
       ...WIND_LEVELS_METERS.map((m) => `wind_direction_${m}m`),
     ].join(','),
-    start_date: isoDate(when),
-    end_date: isoDate(when),
+    start_date: venueClock(when, timeZone).date,
+    end_date: venueClock(when, timeZone).date,
     timezone: timeZone,
   })
 
@@ -538,9 +572,9 @@ export async function fetchCloudGrid(
     /*
      * The same wall-clock hour match the sightline forecast uses: Open-Meteo
      * is asked for the venue's own timezone, so its stamps are local without
-     * an offset and `isoHour` renders the wanted hour the same way.
+     * an offset and `venueClock` renders the wanted hour the same way.
      */
-    const row = hourIndexFor(times, `${isoHour(when)}:00`)
+    const row = hourIndexFor(times, `${venueClock(when, timeZone).hour}:00`)
 
     const cells: GridCell[] = points.map((point, i) => {
       const hourly = list[i]?.hourly

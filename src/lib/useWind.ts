@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { LatLon } from '../core/geo.ts'
 import type { Wind } from '../core/upwind.ts'
 import type { LevelWind } from '../core/windProfile.ts'
-import { fetchVenueDay, parseVenueCloud, parseWind, type VenueCloud } from './forecast.ts'
+import { fetchVenueDay, parseVenueCloud, parseWind, venueClock, type VenueCloud } from './forecast.ts'
 import { reportNetwork } from './offlineCache.ts'
 import { readForecast, saveForecast, venueDayKey, type Provenance } from './savedForecast.ts'
 
@@ -61,12 +61,14 @@ const EMPTY: WindState = {
   reason: null,
 }
 
-/** The date Open-Meteo is asked for: the same isoDate the request uses. */
-const requestDay = (at: Date): string => at.toISOString().slice(0, 10)
-
-function fromPayload(payload: unknown, at: Date, provenance: Provenance): WindState {
-  const wind = parseWind(payload, at)
-  const cloud = parseVenueCloud(payload, at)
+function fromPayload(
+  payload: unknown,
+  at: Date,
+  timeZone: string,
+  provenance: Provenance,
+): WindState {
+  const wind = parseWind(payload, at, timeZone)
+  const cloud = parseVenueCloud(payload, at, timeZone)
   if (wind.status !== 'ok') {
     return { ...EMPTY, cloud, provenance, reason: wind.reason }
   }
@@ -101,13 +103,14 @@ export function useWind(
       return
     }
     let live = true
-    const key = venueDayKey(lat, lon, requestDay(at), timeZone)
+    /* The venue's own date: the same one the request asks for. */
+    const key = venueDayKey(lat, lon, venueClock(at, timeZone).date, timeZone)
     void fetchVenueDay({ lat, lon }, at, timeZone).then((result) => {
       if (!live) return
       if (result.status === 'ok') {
         reportNetwork(true)
         saveForecast(key, result.payload)
-        setState(fromPayload(result.payload, at, { kind: 'live' }))
+        setState(fromPayload(result.payload, at, timeZone, { kind: 'live' }))
         return
       }
       if (result.unreachable === true) reportNetwork(false)
@@ -118,7 +121,7 @@ export function useWind(
               ...EMPTY,
               reason: `${result.reason} Nothing is saved for this venue and day.`,
             }
-          : fromPayload(saved.payload, at, { kind: 'saved', fetchedAt: saved.fetchedAt }),
+          : fromPayload(saved.payload, at, timeZone, { kind: 'saved', fetchedAt: saved.fetchedAt }),
       )
     })
     return () => {

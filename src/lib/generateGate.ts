@@ -50,7 +50,6 @@ export interface GenerateBlock {
 export function generateBlock(input: {
   errors: VenueErrors
   missing: SetupTarget | null
-  staleBrief: boolean
 }): GenerateBlock | null {
   if (hasErrors(input.errors)) {
     return {
@@ -61,14 +60,12 @@ export function generateBlock(input: {
     }
   }
 
-  if (input.staleBrief) {
-    return {
-      message:
-        'The pin moved after the brief was written, so the brief describes somewhere else. Keep it or clear it in Setup before suggesting positions.',
-      field: 'brief',
-      action: 'Sort out the brief',
-    }
-  }
+  /*
+   * A STALE BRIEF NO LONGER BLOCKS. It did, when Suggest sent the brief to a
+   * model: a brief describing somewhere the pin had left was a wrong fact in
+   * the prompt. Suggest is arithmetic now (src/core/suggest.ts) and never
+   * reads the brief, so blocking on it would be a reason that is not true.
+   */
 
   /*
    * THE TYPED BRIEF IS NOT REQUIRED, AND THE GUARD THAT REQUIRED IT IS GONE.

@@ -46,10 +46,17 @@ describe('coordinates never fall back to a default point', () => {
    * And the positive half: an unresolvable set has to stop the generate rather
    * than place what it managed.
    */
-  it('refuses the whole plan when the unprojection comes back short', () => {
-    const source = readFileSync('src/App.tsx', 'utf8')
-    expect(source).toContain('coords.length !== parsed.positions.length')
-    expect(source).toMatch(/Nothing was placed/)
+  /*
+   * SUGGEST NO LONGER UNPROJECTS ANYTHING. The model's image coordinates were
+   * turned back into map coordinates, and that is where a short answer could
+   * have become Null Island. Positions are computed now (src/core/suggest.ts):
+   * each one is the engine's own coordinate, and none is ever a default.
+   */
+  it('places suggested positions at the coordinates the engine computed, and nowhere else', () => {
+    const run = readFileSync('src/lib/suggestRun.ts', 'utf8')
+    expect(run).toMatch(/at: c\.at,/)
+    expect(run).not.toMatch(/lat:\s*0\b|lon:\s*0\b/)
+    expect(readFileSync('src/App.tsx', 'utf8')).not.toContain('unprojectFromCapture(capture, parsed')
   })
 })
 

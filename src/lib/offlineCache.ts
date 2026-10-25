@@ -7,12 +7,12 @@
  * you: tiles are kept in Cache Storage, keyed by their real URL, and the map
  * asks for them through a MapLibre protocol that looks here first.
  *
- * WHY addProtocol AND NOT A SERVICE WORKER. The app registers no service
- * worker and must not start (tests/noServiceWorker.test.ts): a worker is a
- * second cache in front of the CODE and is how an old bundle ends up on a
- * phone. This caches DATA only, map tiles, and only the map reads it.
- * transformRequest could not do this: it is synchronous and cannot read a
- * store. A protocol handler is async.
+ * WHY addProtocol AND NOT THE SERVICE WORKER. The app's one worker
+ * (src/sw/sw.ts) keeps the app shell and passes every other origin through;
+ * tiles are not its business and are never duplicated into its cache. This
+ * caches DATA only, map tiles, and only the map reads it. transformRequest
+ * could not do this: it is synchronous and cannot read a store. A protocol
+ * handler is async.
  *
  * FAIL FAST, NEVER HANG. A dead cell does not refuse a request, it sends it
  * and never answers. The map used to build its overlays on MapLibre's `load`,

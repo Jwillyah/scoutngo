@@ -5,9 +5,10 @@
  * there was no way to tell, from a phone, whether the screen in front of you
  * was the code that had just been pushed.
  *
- * THERE IS NO SERVICE WORKER IN THIS APP. Not one line: no registration, no
- * workbox, no PWA plugin, nothing in the build output. So nothing here is
- * about a service worker cache. What actually holds a stale build is iOS
+ * ONE SERVICE WORKER, FOR THE APP SHELL, AND IT CANNOT HOLD A STALE BUILD: the
+ * document is network-first and the no-store fetch below is never answered
+ * by it (src/sw/shellRoutes.ts, proved by scripts/audit-sw-update.mjs). What
+ * actually holds a stale build is iOS
  * Safari, and a home-screen app more stubbornly still, keeping index.html and
  * therefore keeping the old hashed asset URLs it names.
  *

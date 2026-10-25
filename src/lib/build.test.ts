@@ -12,9 +12,9 @@ import {
  *
  * A pass was spent disagreeing about screenshots because there was no way to
  * tell, from a phone, whether the screen was the code that had just been
- * pushed. There is NO SERVICE WORKER in this app; what holds a stale build is
- * iOS Safari keeping index.html, and therefore keeping the hashed asset URLs
- * that document names.
+ * pushed. The one service worker fetches the document network-first and never
+ * answers this check (src/sw/shellRoutes.ts); what holds a stale build is iOS
+ * Safari keeping index.html, and therefore the hashed asset URLs it names.
  */
 const page = (id: string) =>
   `<!doctype html><html><head><meta name="${BUILD_META_NAME}" content="${id}" /></head><body></body></html>`

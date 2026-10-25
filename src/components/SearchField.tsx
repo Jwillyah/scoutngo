@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { LatLon } from '../core/geo.ts'
+import { rankForShoot, type PlaceKind } from '../core/geocode.ts'
 import {
   DEBOUNCE_MS,
   mapboxRetrieve,
@@ -11,6 +12,7 @@ import {
 } from '../lib/mapboxSearch.ts'
 import {
   BIAS_HALF_SPAN_METERS,
+  fromPhoton,
   markNominatim,
   msUntilNominatim,
   OSM_ATTRIBUTION,
@@ -55,7 +57,7 @@ export function SearchField({ onPick, label = 'Search for a venue', bias = null 
    */
   const [suggestions, setSuggestions] = useState<MapboxSuggestion[]>([])
   /** Which gazetteer answered, so the credit line is never a guess. */
-  const [answered, setAnswered] = useState<'mapbox' | 'osm' | null>(null)
+  const [answered, setAnswered] = useState<'mapbox' | 'osm' | 'both' | null>(null)
   /*
    * One session covers a whole typed query, because Mapbox bills per session
    * rather than per request. Minted on the first keystroke of a query and
@@ -87,19 +89,28 @@ export function SearchField({ onPick, label = 'Search for a venue', bias = null 
      * request per second, so the fallback still waits it out rather than
      * abusing a free service.
      */
+    /*
+     * AND PHOTON BESIDE IT. Mapbox alone did not know the Atlantic Park surf
+     * park at all; its only "Atlantic Park" was a neighbourhood 3 km inland,
+     * and the pin went there. Photon (OpenStreetMap) has the venue. It has no
+     * published rate rule, so it runs alongside Mapbox; Nominatim still only
+     * runs as the fallback, under its one-a-second clock.
+     */
     const run = async () => {
       setBusy(true)
       try {
-        const viaMapbox = await mapboxSuggest(
-          trimmed,
-          session.current,
-          biasRef.current,
-          controller.signal,
-        )
+        const osmBias =
+          biasRef.current === null
+            ? undefined
+            : { centre: biasRef.current, halfSpanMeters: BIAS_HALF_SPAN_METERS }
+        const [viaMapbox, viaPhoton] = await Promise.all([
+          mapboxSuggest(trimmed, session.current, biasRef.current, controller.signal),
+          fromPhoton(trimmed, osmBias, controller.signal).catch(() => [] as SearchHit[]),
+        ])
         if (viaMapbox.status === 'ok') {
           setSuggestions(viaMapbox.suggestions)
-          setHits([])
-          setAnswered('mapbox')
+          setHits(viaPhoton)
+          setAnswered(viaPhoton.length > 0 ? 'both' : 'mapbox')
           setOpen(true)
           return
         }
@@ -161,6 +172,51 @@ export function SearchField({ onPick, label = 'Search for a venue', bias = null 
     onPick({ lat: hit.lat, lon: hit.lon }, hit.label)
   }
 
+  /*
+   * ONE LIST, RANKED FOR A SHOOT. Mapbox labels (coordinate on pick) and OSM
+   * hits (coordinate now), venues first, areas after, roads last. An OSM hit
+   * with the same name and kind as a Mapbox one is the same place twice and
+   * is dropped. See rankForShoot in src/core/geocode.ts.
+   */
+  const entries = useMemo(() => {
+    const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+    const merged: { kind: PlaceKind; key: string; label: string; pick: () => void }[] = [
+      ...suggestions.map((suggestion) => ({
+        kind: suggestion.kind,
+        key: suggestion.id,
+        label: suggestion.label,
+        pick: () => {
+          void pickSuggestion(suggestion)
+          setQuery('')
+          setSuggestions([])
+          setHits([])
+        },
+      })),
+      ...hits
+        .filter(
+          (hit) =>
+            !suggestions.some(
+              (s) => same(s.name, splitLabel(hit.label).name) && s.kind === (hit.kind ?? 'other'),
+            ),
+        )
+        .map((hit) => ({
+          kind: hit.kind ?? ('other' as const),
+          key: hit.id,
+          label: hit.label,
+          pick: () => {
+            onPick({ lat: hit.lat, lon: hit.lon }, hit.label)
+            setOpen(false)
+            setQuery('')
+            setHits([])
+            setSuggestions([])
+          },
+        })),
+    ]
+    return rankForShoot(merged, query)
+    // pickSuggestion and onPick are stable enough per render; the lists are what change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hits, suggestions, query])
+
   return (
     <div className="search">
       <form
@@ -214,39 +270,11 @@ export function SearchField({ onPick, label = 'Search for a venue', bias = null 
         */}
       {open ? (
         <ul className="search__results">
-          {hits.map((hit) => {
-            const { name, address } = splitLabel(hit.label)
+          {entries.map((entry) => {
+            const { name, address } = splitLabel(entry.label)
             return (
-              <li key={hit.id}>
-                <button
-                  type="button"
-                  className="search__hit"
-                  onClick={() => {
-                    onPick({ lat: hit.lat, lon: hit.lon }, hit.label)
-                    setOpen(false)
-                    setQuery('')
-                    setHits([])
-                  }}
-                >
-                  <span className="search__name">{name}</span>
-                  {address === '' ? null : <span className="search__addr">{address}</span>}
-                </button>
-              </li>
-            )
-          })}
-          {suggestions.map((suggestion) => {
-            const { name, address } = splitLabel(suggestion.label)
-            return (
-              <li key={suggestion.id}>
-                <button
-                  type="button"
-                  className="search__hit"
-                  onClick={() => {
-                    void pickSuggestion(suggestion)
-                    setQuery('')
-                    setSuggestions([])
-                  }}
-                >
+              <li key={entry.key}>
+                <button type="button" className="search__hit" onClick={entry.pick}>
                   <span className="search__name">{name}</span>
                   {address === '' ? null : <span className="search__addr">{address}</span>}
                 </button>
@@ -260,7 +288,11 @@ export function SearchField({ onPick, label = 'Search for a venue', bias = null 
           ) : null}
           {/* Which gazetteer actually answered. Never a guess. */}
           <li className="search__credit">
-            {answered === 'mapbox' ? MAPBOX_ATTRIBUTION : OSM_ATTRIBUTION}
+            {answered === 'mapbox'
+              ? MAPBOX_ATTRIBUTION
+              : answered === 'both'
+                ? `${MAPBOX_ATTRIBUTION} · ${OSM_ATTRIBUTION}`
+                : OSM_ATTRIBUTION}
           </li>
         </ul>
       ) : null}

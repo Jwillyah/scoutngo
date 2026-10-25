@@ -555,6 +555,12 @@ export interface MapHandle {
    */
   horizonAt(venue: LatLon | null): HorizonInput
   /**
+   * Ground elevation in metres from the terrain already loaded, or null when
+   * terrain is off or the DEM has no answer there. For Suggest's terrain
+   * line-of-sight; never fetches anything.
+   */
+  elevationAt(at: LatLon): number | null
+  /**
    * Bounds, camera and canvas size, WITHOUT encoding the image.
    *
    * Split out from capture() so the Overpass request can be sent before the
@@ -1991,6 +1997,12 @@ export function MapView({
         const instance = map.current
         if (instance === null) return { kind: 'flat' }
         return readHorizonProfile(instance, venue)
+      },
+      elevationAt(at) {
+        const instance = map.current
+        if (instance === null || instance.getTerrain() === null) return null
+        const metres = instance.queryTerrainElevation([at.lon, at.lat])
+        return typeof metres === 'number' && Number.isFinite(metres) ? metres : null
       },
       viewport() {
         const instance = map.current

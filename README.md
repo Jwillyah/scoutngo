@@ -51,12 +51,13 @@ would be, rather than failing:
 | Key | Adds | Without it |
 | --- | --- | --- |
 | `MAPBOX_TOKEN` | Better venue search, autocompleting as you type | Search falls back to OpenStreetMap's Nominatim and Photon, which are good at addresses and weaker on coastal landmark names |
-| `ANTHROPIC_API_KEY` | "Suggest positions", and reading a typed description into the form | Place positions by hand and fill the fields in yourself |
+| `ANTHROPIC_API_KEY` | Nothing in the app calls a model any more: Suggest is arithmetic (`src/core/suggest.ts`) and the brief box is gone | Everything works |
 | `GOOGLE_MAPS_API_KEY` | A Street View photo on each position card | The card says there is no ground view, in the same space |
 
 **No key is ever required for the primary action on any screen.** Suggesting
-positions is a secondary control beside "Add position", and it is labelled
-optional.
+positions needs no key at all: it works out where to stand from the kit in the
+bag, building footprints and heights, water, airspace, your marks, terrain when
+it is on, and the sun. No model chooses, moves or scores a position.
 
 ## The NOW screen
 
@@ -204,16 +205,15 @@ There is a web app manifest and a set of icons, so adding the site to a home scr
 gives a standalone app with no browser chrome, named ScoutNGo, on the same near-black
 theme as everything else.
 
-**There is no service worker, deliberately**, and offline is now a goal: the app
-was unusable in Shenandoah with no service. Opening a venue with signal saves its
+**Offline is a goal**: the app was unusable in Shenandoah with no service. One
+service worker keeps the app shell so a cold launch with no signal opens. Opening a venue with signal saves its
 imagery (z14–18) and terrain for the reach ring, measured and shown before it
 downloads: 2.34 MB at the default 400 m ring and 29.61 MB at the 2000 m maximum
 (`measurements/2026-10-25-venue-cache-400m.md`,
 `measurements/2026-10-25-venue-cache-2000m.md`). "Take this area offline" on the
 shoot card saves a wider area for a trip, size first. Tiles live in Cache Storage
-and are read by the map through a MapLibre protocol, not a worker. Everything
-computed works with the radio off. See [docs/offline.md](docs/offline.md), including
-the one thing this does not cover: a cold launch with no signal.
+and are read by the map through a MapLibre protocol, not the worker. Everything
+computed works with the radio off. See [docs/offline.md](docs/offline.md).
 
 The icons are generated from the design tokens by `scripts/make-icons.mjs`, using only
 the standard library. Change the palette or the mark there, run `node scripts/make-icons.mjs`,
@@ -260,14 +260,15 @@ pair looks slower for reasons that have nothing to do with the image.
 
 ## Which build am I looking at
 
-There is **no service worker**. Not one line: no registration, no workbox, no
-PWA plugin, nothing in the build output, and a test
-(`tests/noServiceWorker.test.ts`) that fails the build if one ever appears.
-Offline works without one: field packs are `localStorage`, and saved map tiles
-are Cache Storage read through a MapLibre protocol (`src/lib/offlineCache.ts`).
-Both are data, never code. What a service worker would add is a second invisible
-cache in front of the CODE, owned by the browser, that survives a reload and
-serves an old bundle to someone standing on a dock.
+There is **one service worker, for the app shell only** (`src/sw/`), so a cold
+launch with no signal opens the app. It was kept out for years for one reason: a
+worker is a cache in front of the code, and the classic failure is a phone on an
+old bundle forever. It cannot do that here. The document is network-first with a
+3 s timeout, only content-hashed `/assets/` are cache-first, and everything else
+passes through, including map tiles and the build check's no-store fetch of `/`.
+`scripts/audit-sw-update.mjs` proves it in the commit gate with two real builds:
+a new deploy is adopted on the next cold launch, and an offline cold launch opens
+whichever build was last seen. `tests/serviceWorker.test.ts` holds the rules.
 
 What *does* hold a stale build is iOS Safari, and a home-screen app more
 stubbornly still, keeping `index.html` and therefore keeping the hashed asset
@@ -862,7 +863,7 @@ care about. Never in `vercel.json`, which is committed and therefore public.
 
 | Variable | Required | What it is |
 | --- | --- | --- |
-| `ANTHROPIC_API_KEY` | No | Your Anthropic key, from <https://console.anthropic.com>. Read only by `api/generate.ts`, `api/parse.ts` and `api/event.ts`, so it never reaches the browser bundle. Without it, "Suggest positions" says in one line that it needs a key, and you place positions by hand. |
+| `ANTHROPIC_API_KEY` | No | Your Anthropic key, from <https://console.anthropic.com>. Read only by `api/generate.ts`, `api/parse.ts` and `api/event.ts`, so it never reaches the browser bundle. No screen calls those functions now; they remain on the server unused. |
 | `GOOGLE_MAPS_API_KEY` | No | Enables the optional ground view on a position card, via `api/streetview.ts`. Leave it unset and the card says there is no ground view, in the same space; nothing else changes. |
 | `MAPBOX_TOKEN` | No | Enables the better venue search, via `api/search.ts`. Leave it unset and search falls back to Nominatim and Photon. See "Getting a Mapbox token" below. |
 

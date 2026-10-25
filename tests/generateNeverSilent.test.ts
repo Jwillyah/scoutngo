@@ -43,9 +43,11 @@ function handlerBody(source: string): string {
 describe('deciding it cannot run does not leave the screen', () => {
   const body = withoutComments(handlerBody(APP))
 
+  /* Suggest is arithmetic now: the handler gates, then runs the code in src/core/suggest.ts. */
   it('found the real handler', () => {
     expect(body).toContain('generateBlock(')
-    expect(body).toContain('requestPlan(')
+    expect(body).toContain('runSuggest(')
+    expect(body).not.toContain('requestPlan(')
     expect(body.length).toBeGreaterThan(500)
   })
 
@@ -105,7 +107,8 @@ describe('the gate does not require prose', () => {
 
   it('still blocks on the venue, which is the case with genuinely nothing', () => {
     expect(gate).toContain('hasErrors')
-    expect(gate).toContain('staleBrief')
+    /* And no longer on the brief, which Suggest never reads. */
+    expect(gate).not.toMatch(/input\.staleBrief/)
   })
 
   /* The check can fail. */

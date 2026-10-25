@@ -1,3 +1,4 @@
+import type { SuggestSummary } from '../lib/suggestRun.ts'
 import {
   GENERATE_STAGES,
   stageIndex,
@@ -60,6 +61,57 @@ function GenerateProgress({ stage }: { stage: GenerateStage }) {
         )
       })}
     </ol>
+  )
+}
+
+/*
+ * WHAT SUGGEST DID, ALL OF IT. Every candidate is accounted for: how many were
+ * tried, how many each step dropped and why, what survived, why each pick was
+ * picked and why the nearest runners-up lost. A result that cannot say why it
+ * chose is a result nobody can check, which is the reason a model no longer
+ * chooses. See src/core/suggest.ts.
+ */
+function SuggestAccount({ count, summary }: { count: number; summary: SuggestSummary }) {
+  return (
+    <div className="suggested">
+      <p className="notice">
+        {count === 0 ? 'No position survived.' : `${count} positions, worked out, not asked for.`}{' '}
+        <span className="num">
+          {summary.considered} tried, {summary.survivors} survived.
+        </span>
+      </p>
+      {summary.picked.length === 0 ? null : (
+        <ol className="suggested__picks">
+          {summary.picked.map((why) => (
+            <li key={why}>{why}</li>
+          ))}
+        </ol>
+      )}
+      <details className="suggested__more">
+        <summary>Why the others were dropped</summary>
+        <ul className="suggested__drops num">
+          {summary.drops
+            .filter((d) => d.count > 0)
+            .map((d) => (
+              <li key={d.step}>
+                {d.count} {d.step}
+              </li>
+            ))}
+        </ul>
+        {summary.runnersUp.length === 0 ? null : (
+          <ul className="suggested__runners">
+            {summary.runnersUp.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        )}
+      </details>
+      {summary.notes.map((note) => (
+        <p className="suggested__note" key={note}>
+          {note}
+        </p>
+      ))}
+    </div>
   )
 }
 
@@ -142,13 +194,14 @@ export function PlanStatus({
       ) : null}
 
       {generation.status === 'done' ? (
-        <p className="notice">
-          {generation.count} positions placed. Lighting and field of view are computed
-          by the app, not by the model.
-          {generation.dropped > 0
-            ? ` ${generation.dropped} were dropped for naming a lens that is not in your kit.`
-            : ''}
-        </p>
+        generation.summary === undefined ? (
+          <p className="notice">
+            {generation.count} positions placed. Lighting and field of view are computed
+            by the app.
+          </p>
+        ) : (
+          <SuggestAccount count={generation.count} summary={generation.summary} />
+        )
       ) : null}
 
       <CoverageNotice planCoverage={planCoverage} />

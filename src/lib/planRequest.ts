@@ -417,11 +417,15 @@ export async function requestPlan(body: GenerateRequestBody): Promise<GenerateRe
  * If a step is added to onGenerate, add it here. If one is removed, remove it here.
  * Nothing advances on its own.
  */
+/*
+ * SUGGEST'S STEPS, as it actually runs them (src/lib/suggestRun.ts). There is
+ * no "asking" step any more: nothing is asked.
+ */
 export const GENERATE_STAGES = [
-  { key: 'capture', label: 'Capturing the view' },
-  { key: 'terrain', label: 'Reading the terrain' },
-  { key: 'positions', label: 'Asking for positions' },
-  { key: 'lighting', label: 'Computing lighting' },
+  { key: 'capture', label: 'Reading buildings and water' },
+  { key: 'terrain', label: 'Reading airspace' },
+  { key: 'positions', label: 'Testing every position' },
+  { key: 'lighting', label: 'Scoring the light' },
 ] as const
 
 export type GenerateStage = (typeof GENERATE_STAGES)[number]['key']
@@ -436,6 +440,7 @@ export function stageLabel(stage: GenerateStage): string {
 }
 
 import type { GenerateBlock } from './generateGate.ts'
+import type { SuggestSummary } from './suggestRun.ts'
 
 /** What the Plan panel shows about the last generate attempt. */
 export type GenerationState =
@@ -462,4 +467,5 @@ export type GenerationState =
   | { status: 'no-key'; message: string }
   /** Parsing failed. The raw response is shown rather than a dead end. */
   | { status: 'raw'; reason: string; raw: string }
-  | { status: 'done'; count: number; dropped: number }
+  /** Placed. `summary` is Suggest's account of every candidate: see src/lib/suggestRun.ts. */
+  | { status: 'done'; count: number; dropped: number; summary?: SuggestSummary }

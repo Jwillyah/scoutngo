@@ -24,13 +24,26 @@ repository"* when the deploy lags.
 
 ## 3 · The phone is running that deploy
 
-**There is no service worker in this app.** Not one line: no registration, no
-workbox, no PWA plugin, and no `sw.js` on the deployed site. Offline is field
-packs in `localStorage` (`src/lib/fieldPack.ts`) and saved map tiles in Cache
-Storage (`scoutngo-tiles-v1`, `src/lib/offlineCache.ts`), keyed by Esri and AWS
-tile URLs and read only by the map's tile protocol. Both are data, not code: no
-document and no bundle is ever put in that cache, so nothing the app writes can
-hold an old bundle.
+**One service worker, for the app shell only** (`src/sw/sw.ts`, served as
+`/sw.js` with `no-cache`). It exists so a cold launch with no signal opens the
+app, and it cannot hold an old build:
+
+- the **document is network-first** with a 3 s timeout; the saved copy is used
+  only when the network fails or hangs, and a good answer replaces it
+- only **`/assets/*` is cache-first**, and those names carry their content hash
+- the **build check passes through**: `fetch('/', { cache: 'no-store' })` is not
+  a navigation, so the worker never answers it from its cache
+- every new deploy writes a byte-different `sw.js` (it names the build and its
+  hashed files), so the browser installs the new worker and it drops the old
+  build's files
+
+`scripts/audit-sw-update.mjs` proves all of it in the commit gate with two real
+builds served under these headers: install A, cold launch offline and with no
+bars (A), deploy B, the build check sees B, cold launch with signal (B), the
+new worker drops A, cold launch offline (B).
+
+Map tiles are a separate cache (`scoutngo-tiles-v1`, `src/lib/offlineCache.ts`)
+that the worker never touches, and field packs are `localStorage`. Both are data.
 
 What holds a stale build is the browser's own document cache, and on iOS a
 home-screen app launching its `start_url` is the stubborn case.
@@ -45,6 +58,7 @@ new code with it automatically.
 |---|---|---|
 | `/` and `/how` | `max-age=0, must-revalidate` | the document must never be served without asking |
 | `/assets/*` | `max-age=31536000, immutable` | the filename contains the content hash, so it can never go stale |
+| `/sw.js` | `no-cache, no-store, must-revalidate` | the browser must see every new worker; it names the build |
 
 Set in `vercel.json` rather than left to a default, because a default is a
 thing that can change without anyone noticing.

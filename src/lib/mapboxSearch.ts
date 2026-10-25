@@ -1,3 +1,4 @@
+import { kindFromMapbox, type PlaceKind } from '../core/geocode.ts'
 /**
  * Venue search through the Mapbox Search Box API.
  *
@@ -66,6 +67,10 @@ interface Suggestion {
 export interface MapboxSuggestion {
   id: string
   label: string
+  /** The name alone, for matching against the same place from OSM. */
+  name: string
+  /** From feature_type: a neighbourhood is an area, a POI is a venue. */
+  kind: PlaceKind
 }
 
 export type MapboxState =
@@ -84,6 +89,8 @@ export function parseSuggestions(payload: unknown): MapboxSuggestion[] {
     out.push({
       id: item.mapbox_id,
       label: where === '' ? item.name : `${item.name}, ${where}`,
+      name: item.name,
+      kind: kindFromMapbox(typeof item.feature_type === 'string' ? item.feature_type : ''),
     })
   }
   return out

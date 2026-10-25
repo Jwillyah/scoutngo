@@ -12,7 +12,7 @@ import { NumeralsProvider } from './lib/numerals.tsx'
 import { SetupMode } from './components/SetupMode.tsx'
 import type { LatLon } from './core/geo.ts'
 import { DEFAULT_ALTITUDE_FEET } from './core/air.ts'
-import { DEFAULT_SHOT_TYPE, DEFAULT_YAW_DEGREES, type ShotType } from './core/shotType.ts'
+import type { ShotType } from './core/shotType.ts'
 import type { ShootKind } from './core/shootWindow.ts'
 import { chipWindow, type WindowSource } from './lib/chipWindow.ts'
 import {
@@ -33,7 +33,6 @@ import {
 import { EMPTY_LANDCOVER, type Landcover } from './core/siting.ts'
 import { getSunArc, getSunPosition } from './core/sun.ts'
 import { extremesAround, tideStateAt } from './core/tide.ts'
-import { formatClock } from './core/timezone.ts'
 import { LOCATED_ZOOM } from './lib/locateOnce.ts'
 import { useNewBuild } from './lib/useNewBuild.ts'
 import { useSkyFrames } from './lib/useSkyFrames.ts'
@@ -52,8 +51,6 @@ import {
   type KitSelection,
 } from './lib/kitSelection.ts'
 import { applyAmendments, readApplied, writeApplied } from './lib/kitAmendments.ts'
-import { fetchSiteGeometry, trimSummary } from './lib/overpass.ts'
-import { parsePlanResponse } from './lib/parsePlan.ts'
 import {
   addPosition,
   duplicatePosition,
@@ -66,15 +63,9 @@ import {
 } from './lib/positions.ts'
 import { assessPlan, planPositions, type CameraPosition } from './lib/plan.ts'
 import {
-  buildGenerateBody,
-  droneAvailable,
   GENERATE_STAGES,
-  requestPlan,
-  selectedDroneCameraSpecs,
-  selectedLenses,
   stageIndex,
   stageLabel,
-  sunFacts,
   type GenerationState,
 } from './lib/planRequest.ts'
 import {
@@ -94,23 +85,10 @@ import {
   type FieldPack,
 } from './lib/fieldPack.ts'
 import type { PackBuildState } from './components/FieldPackControl.tsx'
-import {
-  parseDescribeResponse,
-  parseShotList,
-  requestParse,
-  type DesiredShot,
-  type DescribeState,
-} from './lib/describe.ts'
-import { resolveDate } from './core/when.ts'
+import { parseShotList, type DesiredShot } from './lib/describe.ts'
 import { clampRadius, RADIUS_DEFAULT_METERS } from './core/radius.ts'
-import { venueTimeZone, deviceTimeZone } from './core/timezone.ts'
-import {
-  BIAS_HALF_SPAN_METERS,
-  msUntilNominatim,
-  reverseGeocode,
-  searchVenues,
-  type SearchHit,
-} from './lib/search.ts'
+import { venueTimeZone } from './core/timezone.ts'
+import { msUntilNominatim, reverseGeocode } from './lib/search.ts'
 import { usePersistentState } from './lib/usePersistentState.ts'
 import { venueTown } from './lib/venueParts.ts'
 import { DEFAULT_UNITS, reviveUnits, type Units } from './lib/units.ts'
@@ -124,6 +102,7 @@ import { useTide } from './lib/useTide.ts'
 import { lowTideNearest } from './lib/lowTide.ts'
 import { useVenueCache } from './lib/useVenueCache.ts'
 import { buildScoutFile, saveScoutFile, scoutFilename, type ReadFile } from './lib/scoutFile.ts'
+import { runSuggest } from './lib/suggestRun.ts'
 import {
   blockedReason,
   FORWARD_LABEL,
@@ -154,7 +133,6 @@ import {
   updateMark,
 } from './lib/marks.ts'
 import type { MarkKind, SiteMark } from './core/siteMark.ts'
-import { CAPTURE_FLATTENED_NOTE, captureWasFlattened } from './core/captureTerrain.ts'
 import { kitLine } from './core/kitLine.ts'
 import { windHeightFor } from './core/windHeight.ts'
 import { briefIsTyped, briefSourceLine } from './core/shootBrief.ts'
@@ -525,9 +503,6 @@ function App() {
    */
   const [pendingPin, setPendingPin] = useState<{ at: LatLon; label: string } | null>(null)
 
-  const [describeText, setDescribeText] = useState('')
-  const [describeState, setDescribeState] = useState<DescribeState>({ status: 'idle' })
-  const [venueChoices, setVenueChoices] = useState<SearchHit[]>([])
 
   /* A pasted shot list, if one was sent. Editable lines. */
   const [shotListText, setShotListText] = useState('')
@@ -1467,101 +1442,6 @@ function App() {
     setMode('setup')
   }
 
-  /**
-   * Reads the description, then geocodes the PLACE NAME it returned.
-   *
-   * The model never supplies a coordinate; Nominatim does, and when it offers
-   * more than one match the shooter picks. The date token is resolved here too,
-   * against the venue's own timezone once there is a venue to have one.
-   */
-  const onDescribe = async () => {
-    const text = describeText.trim()
-    if (text === '') return
-    setDescribeState({ status: 'working' })
-    setVenueChoices([])
-
-    const response = await requestParse(text)
-    if (response.status !== 'ok' || typeof response.raw !== 'string') {
-      setDescribeState({
-        status: 'error',
-        message: response.message ?? 'The parse function did not answer.',
-      })
-      return
-    }
-
-    const parsed = parseDescribeResponse(response.raw)
-    if (!parsed.ok) {
-      setDescribeState({ status: 'raw', reason: parsed.reason, raw: parsed.raw })
-      return
-    }
-
-    const { shoot, filled } = parsed
-
-    /* Geocode the name. Never guess between matches. */
-    let hits: SearchHit[] = []
-    if (shoot.venueSearch !== '') {
-      try {
-        hits = await searchVenues(
-          shoot.venueSearch,
-          undefined,
-          centre === null
-            ? undefined
-            : { centre, halfSpanMeters: BIAS_HALF_SPAN_METERS },
-        )
-      } catch {
-        hits = []
-      }
-    }
-
-    /*
-     * Even a single hit goes to the confirm step. Nothing about "only one
-     * result" means "the right one", and the whole failure this replaces was
-     * the app believing otherwise.
-     */
-    const proposal = hits[0] ?? null
-    const at = proposal === null ? venueLatLon(venue) : { lat: proposal.lat, lon: proposal.lon }
-
-    /*
-     * The date token resolves against the VENUE's clock, so it is done after
-     * geocoding. With no venue yet it falls back to this device, which is the
-     * best available answer and is visible in the form either way.
-     */
-    const zone =
-      at === null ? deviceTimeZone() : (venueTimeZone(at.lat, at.lon) ?? deviceTimeZone())
-    const resolvedDate = shoot.date === '' ? '' : (resolveDate(shoot.date, new Date(), zone) ?? '')
-
-    setVenue((current) => {
-      const next: VenueDraft = {
-        ...current,
-        ...(resolvedDate === '' ? {} : { date: resolvedDate }),
-        ...(shoot.startTime === '' ? {} : { startTime: shoot.startTime }),
-        ...(shoot.endTime === '' ? {} : { endTime: shoot.endTime }),
-        ...(shoot.eventBrief === '' ? {} : { eventDescription: shoot.eventBrief }),
-        ...(shoot.wantOut === '' ? {} : { desiredOutcome: shoot.wantOut }),
-      }
-      return next
-    })
-
-    /* One hit becomes a pin to confirm; several become a list to choose from. */
-    if (hits.length === 1 && proposal !== null) {
-      setPendingPin({ at: { lat: proposal.lat, lon: proposal.lon }, label: proposal.label })
-    } else if (hits.length > 1) {
-      setVenueChoices(hits)
-    }
-
-    setDescribeState({
-      status: 'done',
-      /*
-       * Counted as FORM INPUTS, not as parsed values, so the number matches what
-       * the shooter can see marked below. One parsed venue fills three inputs:
-       * name, latitude and longitude.
-       */
-      filled: filled.length - (filled.includes('venue') ? 1 : 0),
-      needsVenue: shoot.venueSearch !== '' && hits.length === 0,
-      searched: shoot.venueSearch,
-    })
-  }
-
   /*
    * USE MY LOCATION moves the camera and nothing else.
    *
@@ -1577,13 +1457,6 @@ function App() {
   const onUseMyLocation = useCallback((at: LatLon) => {
     mapHandle.current?.flyTo(at, LOCATED_ZOOM)
   }, [])
-
-  /** The shooter picked one of several geocoding matches. */
-  /* Choosing from the list still proposes; the map is where it is accepted. */
-  const onPickVenue = (hit: SearchHit) => {
-    setPendingPin({ at: { lat: hit.lat, lon: hit.lon }, label: hit.label })
-    setVenueChoices([])
-  }
 
   const onShotListChange = (text: string) => {
     setShotListText(text)
@@ -1605,225 +1478,72 @@ function App() {
      * button that goes and fixes it, so leaving the screen is a choice the
      * shooter makes after reading why.
      */
-    const block = generateBlock({ errors, missing, staleBrief })
+    const block = generateBlock({ errors, missing })
     if (block !== null) {
       setGeneration({ status: 'blocked', block })
       return
     }
 
     /*
-     * From here the stage is set immediately before the work it names, so what the
-     * sheet says is what the app is actually waiting on. See GENERATE_STAGES.
+     * SUGGEST IS ARITHMETIC NOW, NOT A MODEL.
+     *
+     * This used to capture the map as a JPEG and ask a model where to stand.
+     * From straight above a model cannot tell a two-storey building from a
+     * twelve-storey one, so it put tripods behind hotels. The positions are
+     * worked out in src/core/suggest.ts from the kit in the bag, building
+     * footprints and heights, water, airspace, the shooter's own marks, the
+     * terrain when it is on, and the sun at the scrubbed moment.
      */
+    if (aim === null || centre === null || venueWindow === null) {
+      setGeneration({ status: 'error', message: 'Set the venue and the window first.' })
+      return
+    }
+    const shootAt = scrubbedAt ?? venueWindow.middle
+    /* Notes from the old capture path would describe a run that no longer happens. */
+    setSiteNote(null)
+    setTerrainNote(null)
     setGeneration({ status: 'working', stage: 'capture' })
-
-    /*
-     * OVERPASS AND THE IMAGE ENCODE RUN TOGETHER.
-     *
-     * Overpass only needs the bounding box, which is free to read, while the
-     * expensive part of a capture is the JPEG encode of the canvas. Reading the
-     * viewport first lets the request go out before the encode starts, so the two
-     * overlap instead of queueing.
-     *
-     * Be honest about the size of this: measured on a real run, the encode is
-     * about 65ms and Overpass about 1.1s, so this removes the encode from the
-     * critical path and no more. The 11s the model takes is untouched, and it is
-     * where the wait actually lives. The structure is still right: nothing here
-     * should wait on something it does not need.
-     */
-    const viewport = mapHandle.current?.viewport() ?? null
-    if (viewport === null) {
-      setGeneration({ status: 'error', message: 'The map is not ready yet.' })
+    const outcome = await runSuggest({
+      subject: aim,
+      reach: { centre, radiusMeters: reachMeters },
+      profile: kitProfile,
+      bag: kit,
+      platforms: allowedPlatforms(platformFilter),
+      airAltitudeFeet: DEFAULT_ALTITUDE_FEET,
+      sun: getSunPosition(shootAt, aim.lat, aim.lon),
+      subjectWidthMeters: subjectAcrossMeters(venue),
+      date: venue.date,
+      /* The shooter's marks and the power lines OSM maps: sightline.ts judges both. */
+      marks: siteMarks,
+      ...(mapHandle.current?.elevationAt === undefined || !settings.showTerrain
+        ? {}
+        : { elevationAt: (at: LatLon) => mapHandle.current?.elevationAt(at) ?? null }),
+      units: settings.units,
+      onStage: (stage) => setGeneration({ status: 'working', stage }),
+    })
+    if (outcome.status === 'error') {
+      setGeneration({ status: 'error', message: outcome.message })
       return
     }
-
-    /*
-     * Started, deliberately not awaited. If Overpass is slow or down this still
-     * falls straight back to the old behaviour: no shapes in the prompt and no
-     * siting warnings afterwards, on its own internal timeout.
-     */
-    const sitePending = fetchSiteGeometry(viewport.bounds)
-
-    const capture = mapHandle.current?.capture() ?? null
-    setTerrainNote(captureWasFlattened(capture) ? CAPTURE_FLATTENED_NOTE : null)
-    if (capture === null) {
-      // The in-flight request is left to settle on its own; it caches either way.
-      void sitePending
-      setGeneration({ status: 'error', message: 'The map is not ready yet.' })
-      return
+    if (outcome.site !== null) {
+      setLand(outcome.site.land)
+      setOsmPower(outcome.site.power)
     }
 
-    setGeneration({ status: 'working', stage: 'terrain' })
-    const site = await sitePending
-    if (site.status === 'ok') {
-      setLand(site.geometry.land)
-      setOsmPower(site.geometry.power)
-      setSiteNote(null)
-    } else {
-      setLand(EMPTY_LANDCOVER)
-      setSiteNote(`${site.reason} Positions were not checked against land and water.`)
-    }
-
-    setGeneration({ status: 'working', stage: 'positions' })
-    const response = await requestPlan(
-      buildGenerateBody(
-        venue,
-        kit,
-        capture,
-        site.status === 'ok' ? trimSummary(site.geometry.summary) : undefined,
-        venueWindow?.timeZoneLabel ?? '',
-        /*
-         * Sun at the start, middle and end, computed HERE before the call. The
-         * model is told where the light is so it can choose a vantage with it in
-         * mind. Nothing comes back about lighting: src/core/lighting.ts still
-         * recomputes every call from the coordinates returned.
-         */
-        venueWindow === null ? [] : sunFacts(venueWindow),
-        /*
-         * Where the subject is in the captured image, and which way that image is
-         * oriented. Without these the model is told the sun sits at 134 degrees
-         * while looking at a picture with no compass on it, and has to guess.
-         */
-        {
-          subjectPoint:
-            aim === null
-              ? undefined
-              : mapHandle.current?.projectToCapture(capture, [aim])[0],
-          imageNorthBearing: capture.camera.bearing,
-        },
-        /*
-         * Tide as a fact, like the sun figures. Computed in src/core/tide.ts from
-         * NOAA data; the model never performs the arithmetic and never returns a
-         * tide claim, because there is no tide field to parse.
-         */
-        tide.status !== 'ok' || tideNow === null || venueWindow === null
-          ? undefined
-          : {
-              feet: Number(tideNow.feet.toFixed(2)),
-              direction: tideNow.direction,
-              station: tide.station.name,
-              distanceKm: Number(tide.distanceKm.toFixed(1)),
-              turns: tideExtremes.map((e) => ({
-                kind: e.kind,
-                clock: formatClock(e.at, venueWindow.timeZone),
-                feet: Number(e.feet.toFixed(2)),
-              })),
-            },
-        desiredShots.map((shot) => shot.text),
-        reachMeters,
-        /*
-         * The Ground/Air/Both choice. Asked for here and enforced in the
-         * parser, so a plan can never contain a platform the map is hiding.
-         */
-        allowedPlatforms(platformFilter),
-        /*
-         * WHAT THE CHIPS SAY, which stands in for a typed brief. Sunrise plus
-         * Drone plus this venue and this window is the shoot, structured, and
-         * the model is told in as many words that no event was described and
-         * that it must not invent one.
-         */
-        {
-          kind: shootKind,
-          platform: platformFilter,
-          venueName: venueNameLine,
-          shotCount: desiredShots.length,
-        },
-        kitProfile,
-      ),
-    )
-    /*
-     * No key is not a failure. Suggestion is optional, manual placement is the
-     * primary path, and saying so plainly beats a red error about an
-     * environment variable the reader may not have.
-     */
-    if (response.status === 'no-key') {
-      setGeneration({
-        status: 'no-key',
-        message: response.message ?? 'Suggesting positions needs an Anthropic key.',
-      })
-      return
-    }
-    if (response.status !== 'ok' || typeof response.raw !== 'string') {
-      setGeneration({
-        status: 'error',
-        message: response.message ?? 'The generate function did not return a plan.',
-      })
-      return
-    }
-
-    setGeneration({ status: 'working', stage: 'lighting' })
-    const parsed = parsePlanResponse(
-      response.raw,
-      selectedLenses(kit, kitProfile),
-      droneAvailable(kit, kitProfile),
-      selectedDroneCameraSpecs(kit, kitProfile),
-      desiredShots.length,
-      allowedPlatforms(platformFilter),
-    )
-    if (!parsed.ok) {
-      setGeneration({ status: 'raw', reason: parsed.reason, raw: parsed.raw })
-      return
-    }
-
-    // Normalized image coordinates become real ones through the map, using the
-    // camera as it was when the image was taken.
-    const coords = mapHandle.current?.unprojectFromCapture(capture, parsed.positions) ?? []
-
-    /*
-     * A COORDINATE THAT CANNOT BE RESOLVED FAILS VISIBLY.
-     *
-     * This used to end `?? { lat: 0, lon: 0 }` per position. Null Island is a
-     * real place on the map, so a position that failed to unproject was not
-     * dropped or flagged, it was PLACED, somewhere off West Africa, and then
-     * fitAll framed it: six markers piled in a corner of a view zoomed out to
-     * span an ocean, looking for all the world like a planning result.
-     *
-     * The failure mode mattered more than its likelihood. A position silently
-     * placed somewhere wrong is worse than a position refused, because the
-     * wrong one gets walked to.
-     */
-    if (coords.length !== parsed.positions.length || coords.some((c) => c === undefined)) {
-      setGeneration({
-        status: 'error',
-        message:
-          'The map could not turn those positions into coordinates. Nothing was placed. Try again without moving the map while it works.',
-      })
-      return
-    }
-
-    setPositions(
-      parsed.positions.map((raw, index) => ({
-        id: `pos-${index + 1}`,
-        number: index + 1,
-        at: coords[index],
-        lensId: raw.lensId,
-        focalLength: raw.focalLength,
-        shot: raw.shot,
-        risk: raw.risk,
-        angleRationale: raw.angleRationale,
-        coversShot: raw.coversShot,
-        platform: raw.platform,
-        altitudeFeet: raw.altitudeFeet,
-        /*
-         * A SUGGESTED POSITION IS ALWAYS FRAMED. The model is not asked for a
-         * shot type and does not get to choose one: a 360 or a top-down is a
-         * decision about what picture you are making, which is the shooter's,
-         * and there is no bearing to recover if a model picks wrong.
-         */
-        shotType: DEFAULT_SHOT_TYPE,
-        yawDegrees: DEFAULT_YAW_DEGREES,
-        moved: false,
-        origin: 'suggested',
-      })),
-    )
+    setPositions(outcome.positions)
     // Markers only until a cone is asked for. Six overlapping cones is noise.
     setConeMode('none')
     setLensFilters([])
     setIsolatedId(null)
-    setGeneration({ status: 'done', count: parsed.positions.length, dropped: parsed.dropped })
+    setGeneration({
+      status: 'done',
+      count: outcome.positions.length,
+      dropped: 0,
+      summary: outcome.summary,
+    })
     // Stay on the map and frame everything that was just placed.
-    const placed = coords.filter((c) => c !== undefined)
-    window.setTimeout(() => mapHandle.current?.fitAll([...placed, ...(aim ? [aim] : [])]), 60)
+    const placed = outcome.positions.map((p) => p.at)
+    window.setTimeout(() => mapHandle.current?.fitAll([...placed, aim]), 60)
   }
 
   const flyToPosition = (id: string) => {
@@ -2029,8 +1749,9 @@ function App() {
     <div className={`shell shell--${mode}`}>
       {/*
         * A NEWER BUILD ANNOUNCES ITSELF HERE, above everything, in every mode.
-        * There is no service worker in this app; what holds a stale build is
-        * iOS Safari keeping index.html. See src/lib/build.ts.
+        * The one service worker keeps the app shell network-first, so it holds
+        * no stale build; what can is iOS Safari keeping index.html. See
+        * src/lib/build.ts and src/sw/shellRoutes.ts.
         */}
       {/*
         * THE COVER ON A FIRST RUN, AND /how WHENEVER IT IS ASKED FOR.
@@ -2072,12 +1793,6 @@ function App() {
             onImportSpots={(incoming) => setSpots(mergeSpots(spots, incoming))}
             suggestedName={shortVenueLabel(venueNameState, venue.latitude, venue.longitude)}
             canSave={centre !== null}
-            describeText={describeText}
-            onDescribeText={setDescribeText}
-            describeState={describeState}
-            onDescribe={() => void onDescribe()}
-            venueChoices={venueChoices}
-            onPickVenue={onPickVenue}
             shootKind={shootKind}
             onShootKind={onShootKind}
             platformFilter={platformFilter}

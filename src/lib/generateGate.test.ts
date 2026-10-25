@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { generateBlock } from './generateGate.ts'
 
-const ok = { errors: {}, missing: null, staleBrief: false }
+const ok = { errors: {}, missing: null }
 
 /*
  * THE REPORTED BUG, AS AN ASSERTION. "I tap it and nothing happens. No
@@ -25,7 +25,7 @@ describe('a generate that cannot run says why', () => {
    * chips replaced, as a gate. See src/core/shootBrief.ts.
    */
   it('runs with no typed brief at all', () => {
-    expect(generateBlock({ errors: {}, missing: null, staleBrief: false })).toBeNull()
+    expect(generateBlock({ errors: {}, missing: null })).toBeNull()
   })
 
   it('blocks an incomplete venue and carries which field is missing', () => {
@@ -37,28 +37,19 @@ describe('a generate that cannot run says why', () => {
     expect(block?.field).toBe('venue')
   })
 
-  it('blocks a brief that describes somewhere the pin has left', () => {
-    const block = generateBlock({ ...ok, staleBrief: true })
-    expect(block?.message).toMatch(/pin moved/i)
-  })
-
   /*
-   * ORDER MATTERS. An incomplete venue is reported before a stale brief,
-   * because resolving a brief for a venue that is not set yet is wasted work.
+   * SUGGEST NEVER READS THE BRIEF NOW (src/core/suggest.ts), so a brief that
+   * describes somewhere else is not a reason to refuse. There is no longer a
+   * brief input to this gate at all.
    */
-  it('reports the venue before the brief when both are wrong', () => {
-    const block = generateBlock({
-      errors: { latitude: 'required' },
-      missing: 'venue',
-      staleBrief: true,
-    })
-    expect(block?.field).toBe('venue')
+  it('has no brief to block on', () => {
+    expect(generateBlock.length).toBe(1)
+    expect(Object.keys(ok)).not.toContain('staleBrief')
   })
 })
 
 describe('every block can be read and acted on', () => {
   const cases: { label: string; input: Parameters<typeof generateBlock>[0] }[] = [
-    { label: 'stale brief', input: { ...ok, staleBrief: true } },
     { label: 'bad venue', input: { ...ok, errors: { latitude: 'x' }, missing: 'venue' } },
   ]
 
@@ -80,8 +71,6 @@ describe('every block can be read and acted on', () => {
   it('names the thing that is missing', () => {
     const venue = generateBlock({ ...ok, errors: { latitude: 'x' }, missing: 'venue' })
     expect(venue!.message.toLowerCase()).toContain('venue')
-    const stale = generateBlock({ ...ok, staleBrief: true })
-    expect(stale!.message.toLowerCase()).toContain('pin moved')
   })
 
   it('claims nothing about a model or a server', () => {
@@ -104,10 +93,10 @@ describe('every block can be read and acted on', () => {
  */
 describe('the block is shown, not navigated away from', () => {
   it('is a pure function with no side effects to lose', () => {
-    const before = { ...ok, staleBrief: true }
+    const before = { errors: { latitude: 'required' }, missing: 'venue' as const }
     expect(generateBlock(before)).toEqual(generateBlock(before))
     /* It did not mutate what it was handed. */
-    expect(before.staleBrief).toBe(true)
+    expect(before.errors.latitude).toBe('required')
   })
 })
 
@@ -117,7 +106,6 @@ describe('a blank start blocks on something', () => {
     const block = generateBlock({
       errors: { latitude: 'required', longitude: 'required' },
       missing: 'venue',
-      staleBrief: false,
     })
     expect(block).not.toBeNull()
   })

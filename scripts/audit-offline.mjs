@@ -274,6 +274,30 @@ for (const run of MODES) {
   await shot(OUT, `offline-${run}-day`)
 
   /*
+   * TERRAIN ON, NO SIGNAL: the day card used to say "waiting for the
+   * elevation data" forever. Past the tile give-up it must say nothing came,
+   * and keep the flat horizon. Online the DEM arrives, so only the two
+   * no-signal modes are judged.
+   */
+  if (run !== 'online') {
+    const turned = await ev(`(() => {
+      const fix = document.querySelector('.curve__fix')
+      if (!fix) return 'no terrain control on the day card'
+      fix.click()
+      return 'ok'
+    })()`)
+    if (turned !== 'ok') problem(run, turned)
+    await wait(1500)
+    const early = await ev(`document.querySelector('.curve__fix')?.textContent ?? ''`)
+    await wait(9000)
+    const late = await ev(`document.querySelector('.curve__fix')?.textContent ?? ''`)
+    console.log(`  terrain on, after 1.5 s: ${/waiting/.test(early) ? 'waiting' : JSON.stringify(early.slice(0, 60))}`)
+    console.log(`  terrain on, after 10.5 s: ${/no elevation arrived/.test(late) ? 'gave up, flat horizon' : JSON.stringify(late.slice(0, 80))}`)
+    if (/waiting/.test(late)) problem(run, 'terrain is still "waiting for the elevation data" after 10 s')
+    if (!/no elevation arrived/.test(late)) problem(run, `the day card does not say elevation never came: "${late.slice(0, 80)}"`)
+  }
+
+  /*
    * A5: ONE QUIET MARK, and A4: AN EMPTY FORECAST SAYS WHY. Only in the two
    * no-signal modes; with the network up the mark must NOT be there, which is
    * what makes the check able to fail in both directions.

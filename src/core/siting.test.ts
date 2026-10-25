@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest'
 import {
   checkSite,
   isInRoadway,
+  isInSea,
   isInWater,
   pathCrossesStructure,
+  SEA_SEARCH_METERS,
   type Landcover,
   type Ring,
 } from './siting.ts'
+import type { Position } from './geo.ts'
 
 /** A square of water around the Wicomico, in [lon, lat]. */
 const RIVER: Ring[] = [
@@ -160,5 +163,44 @@ describe('pathCrossesStructure, the drone check', () => {
         subject: { lat: 38.364, lon: -75.6055 },
       }),
     ).toEqual(['over-structure'])
+  })
+})
+
+/*
+ * THE SEA IS NOT A POLYGON. OSM maps it as coastline ways with the land on the
+ * left and the water on the right. At Atlantic Park, Virginia Beach, the
+ * coast runs roughly north, so the Atlantic is to the east of it.
+ */
+describe('in the sea', () => {
+  /* A straight north-running coast at -75.9740, like the Virginia Beach oceanfront. */
+  const COAST: Position[][] = [
+    [
+      [-75.974, 36.84],
+      [-75.974, 36.855],
+    ],
+  ]
+
+  it('east of a north-running coast is the sea', () => {
+    expect(isInSea({ lat: 36.8466, lon: -75.9725 }, COAST)).toBe(true)
+  })
+
+  it('west of it is land', () => {
+    expect(isInSea({ lat: 36.8466, lon: -75.9767 }, COAST)).toBe(false)
+  })
+
+  it('reversing the way reverses the answer, which is what the side rule means', () => {
+    const reversed = [[...COAST[0]].reverse()]
+    expect(isInSea({ lat: 36.8466, lon: -75.9725 }, reversed)).toBe(false)
+  })
+
+  it(`says nothing past ${SEA_SEARCH_METERS} m of any coastline`, () => {
+    expect(isInSea({ lat: 36.8466, lon: -75.9 }, COAST)).toBe(false)
+    expect(isInSea({ lat: 36.8466, lon: -75.97 }, [])).toBe(false)
+  })
+
+  it('makes a ground position in the surf a water warning', () => {
+    const land: Landcover = { water: [], roads: [], structures: [], coastline: COAST }
+    expect(checkSite({ lat: 36.8466, lon: -75.9725 }, land)).toContain('in-water')
+    expect(checkSite({ lat: 36.8466, lon: -75.9767 }, land)).not.toContain('in-water')
   })
 })

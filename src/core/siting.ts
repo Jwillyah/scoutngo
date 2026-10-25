@@ -30,6 +30,20 @@ export interface Landcover {
   roads: RoadLine[]
   /** Buildings and other places people gather, used for the drone path check. */
   structures: Ring[][]
+  /**
+   * OSM COASTLINE WAYS, which is how the SEA is mapped. Optional, because
+   * everything built before this has none.
+   *
+   * WHY. The ocean is not a water polygon in OpenStreetMap: it is the space to
+   * the right of the coastline ways. isInWater looks only at polygons, so the
+   * sea was invisible to every water check, and a position placed in the surf
+   * read as dry land. See isInSea.
+   *
+   * THE LINE IS ONLY AS GOOD AS OSM'S. At Atlantic Park the mapped coastline is
+   * 41 points over 9 km and sits about 70 m seaward of the surf in the Esri
+   * imagery, so the last stretch of beach reads as land either way.
+   */
+  coastline?: Position[][]
 }
 
 export const EMPTY_LANDCOVER: Landcover = { water: [], roads: [], structures: [] }
@@ -58,6 +72,47 @@ export function isInWater(at: LatLon, water: Ring[][]): boolean {
     }
   }
   return false
+}
+
+/** How far to look for a coastline. Past this, the sea is not the question. */
+export const SEA_SEARCH_METERS = 3000
+
+/**
+ * IS THIS IN THE SEA? OSM draws every coastline way with the land on its LEFT
+ * and the water on its RIGHT, so the answer is which side of the nearest
+ * coastline segment the point lies on.
+ *
+ * Planar, in metres around the point: over the few hundred metres a venue
+ * spans that is exact enough, and it keeps the cross product readable. No
+ * coastline within SEA_SEARCH_METERS is "not the sea", never a guess.
+ */
+export function isInSea(at: LatLon, coastlines: readonly Position[][]): boolean {
+  const kx = 111_320 * Math.cos((at.lat * Math.PI) / 180)
+  const ky = 110_540
+  const local = ([lon, lat]: Position) => [(lon - at.lon) * kx, (lat - at.lat) * ky] as const
+  let best = Infinity
+  let side = 0
+  for (const way of coastlines) {
+    for (let i = 0; i + 1 < way.length; i++) {
+      const [ax, ay] = local(way[i])
+      const [bx, by] = local(way[i + 1])
+      const dx = bx - ax
+      const dy = by - ay
+      const length2 = dx * dx + dy * dy
+      if (length2 === 0) continue
+      /* The point is the origin; t is how far along the segment its foot lies. */
+      const t = Math.max(0, Math.min(1, -(ax * dx + ay * dy) / length2))
+      const fx = ax + t * dx
+      const fy = ay + t * dy
+      const distance = Math.hypot(fx, fy)
+      if (distance < best) {
+        best = distance
+        /* Cross of the segment with the point: negative is to the right, the water side. */
+        side = dx * (0 - ay) - dy * (0 - ax)
+      }
+    }
+  }
+  return best <= SEA_SEARCH_METERS && side < 0
 }
 
 export function isInRoadway(at: LatLon, roads: RoadLine[]): boolean {
@@ -121,7 +176,7 @@ export function checkSite(at: LatLon, land: Landcover, context?: SiteContext): S
 
   // A drone is not standing anywhere, so water and roads underneath are fine.
   if (context?.platform !== 'air') {
-    if (isInWater(at, land.water)) warnings.push('in-water')
+    if (isInWater(at, land.water) || isInSea(at, land.coastline ?? [])) warnings.push('in-water')
     if (isInRoadway(at, land.roads)) warnings.push('in-roadway')
   } else if (pathCrossesStructure(at, context.subject, land.structures)) {
     warnings.push('over-structure')

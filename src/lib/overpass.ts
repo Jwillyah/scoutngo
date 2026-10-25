@@ -43,6 +43,7 @@ export function buildQuery(bounds: MapBounds): string {
   return `[out:json][timeout:20];
 (
   way["natural"="water"](${bbox});
+  way["natural"="coastline"](${bbox});
   way["waterway"](${bbox});
   way["building"](${bbox});
   way["man_made"="pier"](${bbox});
@@ -136,12 +137,18 @@ export function simplify(ring: Position[], maxPoints: number): Position[] {
 export function parseOverpass(payload: unknown): SiteGeometry {
   const elements = (payload as { elements?: unknown })?.elements
   if (!Array.isArray(elements)) {
-    return { land: { water: [], roads: [], structures: [] }, summary: EMPTY_SUMMARY, power: [] }
+    return {
+      land: { water: [], roads: [], structures: [], coastline: [] },
+      summary: EMPTY_SUMMARY,
+      power: [],
+    }
   }
 
   const water: Ring[][] = []
   const roads: RoadLine[] = []
   const structures: Ring[][] = []
+  /* The sea: open ways with the water on their right. See isInSea in core/siting.ts. */
+  const coastline: Position[][] = []
   const summary: SiteSummary = { water: [], buildings: [], piers: [], roads: [], parking: [] }
   const power: SiteMark[] = []
 
@@ -188,6 +195,11 @@ export function parseOverpass(payload: unknown): SiteGeometry {
       continue
     }
 
+    if (tags.natural === 'coastline') {
+      coastline.push(ring)
+      continue
+    }
+
     if (tags.natural === 'water' || typeof tags.waterway === 'string') {
       // Only a closed way bounds an area. A river centreline does not.
       if (isClosed(ring)) {
@@ -217,7 +229,7 @@ export function parseOverpass(payload: unknown): SiteGeometry {
     }
   }
 
-  return { land: { water, roads, structures }, summary, power }
+  return { land: { water, roads, structures, coastline }, summary, power }
 }
 
 /**

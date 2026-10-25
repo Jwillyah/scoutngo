@@ -30,6 +30,7 @@ device, fails at once when the device says it is offline, or gives up after
 | the venue's wind and cloud for the shoot day | localStorage `scoutngo.forecast.v1`, with the time it arrived | every time it is fetched |
 | NOAA tide predictions for the station and dates | same | every time they are fetched |
 | ground views, the plan | localStorage field pack | "Prepare field pack" |
+| the app shell: the document and its hashed files | Cache Storage `scoutngo-shell-v1`, via the service worker | on install, and each new document that arrives |
 
 One venue weighs 2.34 MB at the default 400 m ring and 29.61 MB at the 2000 m
 maximum (`measurements/2026-10-25-venue-cache-400m.md`,
@@ -56,28 +57,27 @@ screen says "terrain estimated".
   retry loop. "No connection" means `navigator.onLine` is false **or** the last
   request failed, because `navigator.onLine` is true on a mountain.
 
-## The one thing this does not cover: a cold launch with no signal
+## A cold launch with no signal
 
-There is no service worker, by rule. Without one, **the app's own page cannot be
-served from the device**. `/` is sent `max-age=0, must-revalidate` (see
-`docs/deploys.md`), which forbids serving a stale copy without asking the server.
+The app is often swiped away before the shoot, and a cold launch on a ridge used
+to have nothing to show: `/` is sent `must-revalidate`, which forbids serving a
+stale copy without asking the server.
 
-So everything above works when the app is **already open**: launched with signal,
-or still in memory from the drive in. If iOS has evicted it and it is launched cold
-on the ridge, Safari has nothing to show.
+**One service worker now keeps the app shell** (`src/sw/`): the document and the
+hashed bundle, nothing else. A launch with no signal, or with signal that never
+answers, opens the last build this phone saw within `NAVIGATION_TIMEOUT_MS` (3 s).
+The map tiles, forecasts and kit it then shows come from the stores in the table
+above, exactly as when the app was left open.
 
-Until that is decided, the habit that covers it: **open the venue before you lose
-signal, and do not swipe the app away.**
+It cannot pin an old build, and the gate proves it rather than arguing it
+(`scripts/audit-sw-update.mjs`, two real builds in a real browser): the document
+is network-first, only content-hashed `/assets/` are cache-first, the build
+check's no-store fetch of `/` passes straight through, and a new deploy writes a
+new `sw.js` that replaces the old shell. The rules are in
+`tests/serviceWorker.test.ts`.
 
-Changing it means one of:
-
-1. Allowing a service worker for the document only, which `tests/noServiceWorker.test.ts`
-   forbids and `docs/deploys.md` argues against.
-2. Relaxing `must-revalidate` on `/` so Safari may serve its stale copy when offline.
-   That weakens the stale-build mechanism the header exists for, and whether iOS
-   honours it for a Home Screen launch is untested.
-
-Both are the owner's call, not a formatting choice.
+**It needs one launch with signal first**, to install. A phone that has never
+opened the app online since this shipped has nothing saved yet.
 
 ## Clearing Safari
 

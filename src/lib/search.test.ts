@@ -61,8 +61,15 @@ describe('parseSearchRows', () => {
 
   it('reads the rows Nominatim returns, and says where they came from', () => {
     expect(parseSearchRows([row])).toEqual([
-      { id: '1', label: 'Brew River, Salisbury', lat: 38.36, lon: -75.6, source: 'osm' },
+      { id: '1', label: 'Brew River, Salisbury', lat: 38.36, lon: -75.6, source: 'osm', kind: 'other' },
     ])
+  })
+
+  it('says what kind of place a row is, from its class and type', () => {
+    const area = { ...row, class: 'place', type: 'neighbourhood' }
+    const venue = { ...row, class: 'amenity', type: 'bar' }
+    expect(parseSearchRows([area])[0].kind).toBe('area')
+    expect(parseSearchRows([venue])[0].kind).toBe('venue')
   })
 
   it('drops rows with unusable coordinates', () => {

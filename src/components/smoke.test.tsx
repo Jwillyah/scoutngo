@@ -108,8 +108,13 @@ describe('render smoke', () => {
     expect(html).not.toContain('Set subject')
   })
 
-  it('offers one description input and the kit as chips', () => {
-    expect(html).toContain('id="describe-shoot"')
+  /*
+   * NO BRIEF BOX. "Paste a client brief" is gone: the chips say what the shoot
+   * is, and Suggest is arithmetic that never read the brief.
+   */
+  it('offers the kit as chips and no brief box', () => {
+    expect(html).not.toContain('id="describe-shoot"')
+    expect(html).not.toContain('Paste a client brief')
     expect(html).toContain('class="kitrow__scroll"')
     expect(html).toContain('kitchip')
   })
@@ -131,7 +136,7 @@ describe('render smoke', () => {
   it('puts the date and window above everything optional', () => {
     const pills = html.indexOf('class="pills"')
     expect(pills).toBeGreaterThan(-1)
-    expect(pills).toBeLessThan(html.indexOf('id="describe-shoot"'))
+    expect(pills).toBeLessThan(html.indexOf('Paste a shot list'))
     expect(pills).toBeLessThan(html.indexOf('class="kitrow'))
   })
 

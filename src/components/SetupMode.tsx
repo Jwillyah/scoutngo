@@ -4,12 +4,11 @@ import { destinationPoint, type LatLon } from '../core/geo.ts'
 import type { BuildCheck } from '../lib/build.ts'
 import { BuildStamp } from './BuildStamp.tsx'
 import { exampleIndex, SHOOT_EXAMPLES, SHOT_LIST_EXAMPLES } from '../lib/examples.ts'
-import type { DescribeState, DesiredShot } from '../lib/describe.ts'
+import type { DesiredShot } from '../lib/describe.ts'
 import type { KitProfile as KitProfileType } from '../core/kit.ts'
 import { pickableKit, type KitSelection } from '../lib/kitSelection.ts'
 import type { PlatformFilter } from '../core/platformFilter.ts'
 import type { ShootKind } from '../core/shootWindow.ts'
-import type { SearchHit } from '../lib/search.ts'
 import { ringNode, type SetupTarget } from '../lib/mode.ts'
 import type { Spot } from '../lib/spots.ts'
 import type { VenueDraft, VenueErrors } from '../lib/venue.ts'
@@ -59,12 +58,6 @@ interface SetupModeProps {
   onImportSpots: (incoming: Spot[]) => void
   suggestedName: string
   canSave: boolean
-  describeText: string
-  onDescribeText: (next: string) => void
-  describeState: DescribeState
-  onDescribe: () => void
-  venueChoices: SearchHit[]
-  onPickVenue: (hit: SearchHit) => void
   shotListText: string
   onShotListText: (next: string) => void
   desiredShots: DesiredShot[]
@@ -169,12 +162,6 @@ export function SetupMode({
   onImportSpots,
   suggestedName,
   canSave,
-  describeText,
-  onDescribeText,
-  describeState,
-  onDescribe,
-  venueChoices,
-  onPickVenue,
   shotListText,
   onShotListText,
   desiredShots,
@@ -263,7 +250,6 @@ export function SetupMode({
   const venueRef = useRef<HTMLDivElement>(null)
   const dateRef = useRef<HTMLLabelElement>(null)
   const windowRef = useRef<HTMLLabelElement>(null)
-  const briefRef = useRef<HTMLTextAreaElement>(null)
 
   /*
    * The highlight is written straight onto the node rather than held in state.
@@ -273,7 +259,8 @@ export function SetupMode({
    */
   useEffect(() => {
     if (pointAt.field === null || pointAt.tick === 0) return
-    const node = { venue: venueRef, date: dateRef, window: windowRef, brief: briefRef }[
+    /* The brief box is gone; a stale brief is now flagged beside the venue, so point there. */
+    const node = { venue: venueRef, date: dateRef, window: windowRef, brief: venueRef }[
       pointAt.field
     ].current
     if (node === null) return
@@ -381,8 +368,8 @@ export function SetupMode({
                         * A whole pass went on disagreeing about screenshots,
                         * because there was no way to tell from a phone whether
                         * the screen in front of you was the code that had just
-                        * been pushed. There is no service worker in this app;
-                        * what holds a stale build is iOS Safari, and a
+                        * been pushed. The app's one service worker fetches the
+                        * document network-first; what holds a stale build is iOS Safari, and a
                         * home-screen app more stubbornly still, keeping
                         * index.html and therefore the asset URLs it names.
                         *
@@ -600,22 +587,6 @@ export function SetupMode({
           onKeepBrief={onKeepBrief}
         />
 
-        {venueChoices.length === 0 ? null : (
-          <div className="setup__choices">
-            <p className="setup__label">{venueChoices.length} places match. Which one?</p>
-            {venueChoices.map((hit) => (
-              <button
-                key={hit.id}
-                type="button"
-                className="setup__choice"
-                onClick={() => onPickVenue(hit)}
-              >
-                {hit.label}
-              </button>
-            ))}
-          </div>
-        )}
-
         {/*
           * CHIPS FIRST, BOX SECOND.
           *
@@ -639,36 +610,13 @@ export function SetupMode({
         </div>
 
         {/*
-          * AND THE BOX, FOR WHAT IT IS ACTUALLY GOOD AT: a real client brief
-          * or a pasted shot list. That is prose nobody wants to retype and
-          * the one case where a model call earns itself.
+          * NO BRIEF BOX. "Paste a client brief" sent prose to a model to pull
+          * out a date, a window and a place; the chips do the first two with no
+          * network and the search does the third, and Suggest no longer reads a
+          * brief at all (src/core/suggest.ts). What stays is the row of links.
           */}
         <div className="setup__block">
-          <label className="setup__label" htmlFor="describe-shoot">
-            Paste a client brief
-          </label>
-          <p className="setup__hint">
-            Optional, and the only part of setup that needs a key. The chips above cover the
-            usual case without one.
-          </p>
-          <textarea
-            id="describe-shoot"
-            ref={briefRef}
-            className="setup__text"
-            rows={2}
-            value={describeText}
-            placeholder={SHOOT_EXAMPLES[example]}
-            onChange={(event) => onDescribeText(event.target.value)}
-          />
           <div className="setup__row">
-            <button
-              type="button"
-              className="setup__read"
-              onClick={onDescribe}
-              disabled={describeState.status === 'working' || describeText.trim() === ''}
-            >
-              {describeState.status === 'working' ? 'Reading…' : 'Read it'}
-            </button>
             <button type="button" className="setup__link" onClick={() => open('shots')}>
               {desiredShots.length === 0
                 ? 'Paste a shot list'
@@ -681,18 +629,6 @@ export function SetupMode({
               Settings
             </button>
           </div>
-          {describeState.status === 'done' ? (
-            <p className="setup__note">
-              Read {describeState.filled} fields.
-              {describeState.needsVenue ? ' No map match — drop the pin yourself.' : ''}
-            </p>
-          ) : null}
-          {describeState.status === 'error' ? (
-            <p className="setup__note setup__note--bad">{describeState.message}</p>
-          ) : null}
-          {describeState.status === 'raw' ? (
-            <p className="setup__note setup__note--bad">{describeState.reason}</p>
-          ) : null}
         </div>
 
         {/* Kit LAST: it ships with defaults, so it can never block anything. */}

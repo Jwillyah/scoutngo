@@ -176,10 +176,55 @@ function stampBuildId(id: string) {
  *
  * They agree today. The point is that nothing made them agree.
  */
+/*
+ * THE SERVICE WORKER, BUILT AS /sw.js. See src/sw/shellRoutes.ts for what it
+ * does and why it cannot hold an old build.
+ *
+ * Emitted as its own chunk at a fixed name (a worker's URL must not carry a
+ * hash, or the browser could never find the next one), then finished in
+ * generateBundle: the placeholder becomes the exact list of hashed files this
+ * build wrote, and the first line names the build. Build only: the dev server
+ * registers no worker.
+ */
+function serviceWorker(id: string) {
+  return {
+    name: 'scoutngo-service-worker',
+    apply: 'build' as const,
+    buildStart(this: { emitFile: (file: { type: 'chunk'; id: string; fileName: string }) => string }) {
+      this.emitFile({ type: 'chunk', id: 'src/sw/sw.ts', fileName: 'sw.js' })
+    },
+    generateBundle(
+      _options: unknown,
+      bundle: Record<string, { type: string; fileName: string; code?: string; imports?: string[] }>,
+    ) {
+      const sw = bundle['sw.js']
+      if (sw === undefined || sw.type !== 'chunk' || typeof sw.code !== 'string') {
+        throw new Error('the service worker chunk sw.js was not built')
+      }
+      if (!sw.code.includes('__SCOUTNGO_SW_ASSETS__')) {
+        /* Same reason as the build stamp: a renamed placeholder would ship an empty shell. */
+        throw new Error('sw.js has no __SCOUTNGO_SW_ASSETS__ placeholder to fill')
+      }
+      if ((sw.imports ?? []).length > 0) {
+        /* A worker that imports a shared chunk would need module workers. Keep it whole. */
+        throw new Error(`sw.js imports other chunks: ${(sw.imports ?? []).join(', ')}`)
+      }
+      const assets = Object.values(bundle)
+        .map((file) => file.fileName)
+        .filter((name) => name.startsWith('assets/'))
+        .map((name) => `/${name}`)
+        .sort()
+      sw.code =
+        `/* scoutngo service worker, build ${id} */\n` +
+        sw.code.replace('__SCOUTNGO_SW_ASSETS__', JSON.stringify(assets).replace(/'/g, "\\'"))
+    },
+  }
+}
+
 const BUILD_ID_ONCE = buildId()
 
 export default defineConfig({
-  plugins: [react(), stampBuildId(BUILD_ID_ONCE)],
+  plugins: [react(), stampBuildId(BUILD_ID_ONCE), serviceWorker(BUILD_ID_ONCE)],
   define: {
     __BUILD_ID__: JSON.stringify(BUILD_ID_ONCE),
     __BUILD_DIRTY__: JSON.stringify(buildDirty()),

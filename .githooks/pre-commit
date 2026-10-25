@@ -185,4 +185,10 @@ ok "$(grep -E 'PROJECTION FAILURES' "$SCRATCH/proj.log" | tail -1 | tr -d '=' | 
 run_audit "offline audit" scripts/audit-offline.mjs "$SCRATCH/offline.log" 'PROBLEM|ABORTED'
 ok "$(grep -E 'OFFLINE PROBLEMS' "$SCRATCH/offline.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
 
+# The service worker keeps the app shell for a cold launch with no signal. The
+# condition for having one at all: a new deploy is still adopted. Two real
+# builds, a real browser, every step named. See docs/deploys.md.
+run_audit "service worker audit" scripts/audit-sw-update.mjs "$SCRATCH/sw.log" 'PROBLEM|ABORTED'
+ok "$(grep -E 'SERVICE WORKER PROBLEMS' "$SCRATCH/sw.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
+
 echo "${GREEN}all gates passed${OFF}"
