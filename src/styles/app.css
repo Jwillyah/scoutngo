@@ -10438,3 +10438,20 @@
   align-self: center;
   color: var(--color-text);
 }
+
+/* A camera on the map: a link to its operator, nothing more. */
+.linkpin {
+  display: block;
+  max-width: 11em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--black);
+  border: 1.5px solid var(--white);
+  color: var(--white);
+  font-size: var(--text-label);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-decoration: none;
+}

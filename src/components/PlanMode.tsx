@@ -79,6 +79,7 @@ import { SunSearchPanel } from './SunSearchPanel.tsx'
 import { TimeBar } from './TimeBar.tsx'
 import { ToolDock } from './ToolDock.tsx'
 import { SkyCard } from './SkyCard.tsx'
+import { CAMS, camKind } from '../data/cams.ts'
 import { CallSheetCard } from './CallSheetCard.tsx'
 import type { ToolContext } from '../core/callSheetTools.ts'
 import type { KitSelection } from '../lib/kitSelection.ts'
@@ -745,6 +746,9 @@ export function PlanMode({
     }
   }, [venue, venueWindow, plan, bag, kitProfile, venueCloud, wind, lowTide, units.distance])
 
+  /* Coast or road cameras on the cams card, and their pins on the map while it is open. */
+  const [camKindShown, setCamKindShown] = useState<'coast' | 'road'>('coast')
+
   /* Which page of the Sky card is open. The dock's calendar opens it at the calendar. */
   const [skyTab, setSkyTab] = useState<SkyTab>('tonight')
   /*
@@ -937,6 +941,13 @@ export function PlanMode({
    * like the rest rather than a special case: "go back" is "show the shoot".
    */
   const [card, setCard] = useState<SheetCard>(HOME)
+  const camPins = useMemo(
+    () =>
+      card.kind !== 'cams'
+        ? []
+        : CAMS.filter((cam) => camKind(cam) === camKindShown).map((cam) => ({ id: cam.id, label: cam.name, at: cam.at, href: cam.url })),
+    [card.kind, camKindShown],
+  )
   /* No connection: one quiet mark in the venue bar, and nothing else. */
   const online = useOnline()
   const home = useCallback(() => setCard(HOME), [])
@@ -1563,8 +1574,8 @@ export function PlanMode({
         )
       case 'cams':
         return (
-          <Card title="Sky cameras" onClose={home}>
-            <CamList venue={venue} wind={wind} units={units} />
+          <Card title={camKindShown === 'road' ? 'Road cameras' : 'Sky cameras'} onClose={home}>
+            <CamList venue={venue} wind={wind} units={units} kind={camKindShown} onKind={setCamKindShown} />
           </Card>
         )
       case 'hazards':
@@ -1714,6 +1725,7 @@ export function PlanMode({
             : { ...sunOverlay, moon: getMoonArc(scrubbedAt, venue.lat, venue.lon) }
         }
         shadowFeatures={shadowFeatures}
+        linkPins={camPins}
         rayClock={venueWindow === null ? undefined : (at: Date) => formatClock(at, venueWindow.timeZone)}
         showSun={showSun}
         showArc={showArc}

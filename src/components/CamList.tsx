@@ -4,7 +4,7 @@ import { compassPoint } from '../core/field.ts'
 import type { LatLon } from '../core/geo.ts'
 import { rankUpwind, UPWIND_CONE_DEGREES, type Wind } from '../core/upwind.ts'
 import { formatRange, type Units } from '../lib/units.ts'
-import { CAMS } from '../data/cams.ts'
+import { CAMS, camKind } from '../data/cams.ts'
 
 /*
  * 200 km: about three hours of a brisk airmass, which is the outer edge of
@@ -21,6 +21,9 @@ interface CamListProps {
   wind: Wind | null
   /** Which system the shooter reads distances in. See src/lib/units.ts. */
   units: Units
+  /** Which cameras: the coast, or the state road maps. */
+  kind: 'coast' | 'road'
+  onKind: (kind: 'coast' | 'road') => void
 }
 
 /**
@@ -41,7 +44,23 @@ interface CamListProps {
  * saved, including into an offline field pack. Tapping one is you visiting that
  * operator's site; the app's involvement ends at the href.
  */
-export function CamList({ venue, wind, units }: CamListProps) {
+export function CamList({ venue, wind, units, kind, onKind }: CamListProps) {
+  /* COAST OR ROADS, one at a time: a beach cam and a traffic camera answer different questions. */
+  const toggle = (
+    <div className="seg cams__kind" role="group" aria-label="Which cameras">
+      {(
+        [
+          ['coast', 'Coast'],
+          ['road', 'Roads'],
+        ] as const
+      ).map(([id, label]) => (
+        <button key={id} type="button" className={`seg__btn${kind === id ? ' seg__btn--on' : ''}`} aria-pressed={kind === id} onClick={() => onKind(id)}>
+          {label}
+        </button>
+      ))}
+    </div>
+  )
+
   if (venue === null) {
     return (
       <p className="cams__empty">
@@ -66,7 +85,7 @@ export function CamList({ venue, wind, units }: CamListProps) {
    * than implying an order it cannot compute.
    */
 
-  const all = rankUpwind(venue, CAMS, wind ?? { fromDegrees: 0, speedMps: 0 })
+  const all = rankUpwind(venue, CAMS.filter((cam) => camKind(cam) === kind), wind ?? { fromDegrees: 0, speedMps: 0 })
 
   /*
    * SIX, AND ONLY WHERE A CAM IS ACTUALLY NEAR.
@@ -92,16 +111,18 @@ export function CamList({ venue, wind, units }: CamListProps) {
     const nearest = all[0]
     return (
       <div className="cams">
+        {toggle}
         <p className="cams__empty">
           {nearest === undefined
-            ? 'No sky cameras are listed.'
-            : `No sky camera near this venue. The closest is ${range(nearest.distanceMeters)} away, which is too far to be showing your weather.`}
+            ? 'No cameras of this kind are listed.'
+            : `No ${kind === 'road' ? 'road camera map' : 'sky camera'} near this venue. The closest is ${range(nearest.distanceMeters)} away, which is too far to be showing your weather.`}
         </p>
       </div>
     )
   }
   return (
     <div className="cams">
+      {toggle}
       <p className="cams__note">
         {wind === null
           ? 'Nearest first. The wind has not come back yet, so nothing here is ranked by what is upwind.'

@@ -62,7 +62,7 @@ const SUBJECTS: { label: string; node: ReactElement }[] = [
   { label: 'the coverage notice', node: <CoverageNotice planCoverage={CLUSTERED} /> },
   {
     label: 'the camera list',
-    node: <CamList venue={VENUE} wind={{ fromDegrees: 230, speedMps: 6 }} units={DEFAULT_UNITS} />,
+    node: <CamList venue={VENUE} wind={{ fromDegrees: 230, speedMps: 6 }} units={DEFAULT_UNITS} kind="coast" onKind={() => {}} />,
   },
   { label: 'the sun readout', node: <SunReadout venueWindow={WINDOW} /> },
   {
@@ -111,7 +111,7 @@ const MUST_SURVIVE: { label: string; node: ReactElement; lines: string[] }[] = [
   },
   {
     label: 'the camera list',
-    node: <CamList venue={VENUE} wind={{ fromDegrees: 230, speedMps: 6 }} units={DEFAULT_UNITS} />,
+    node: <CamList venue={VENUE} wind={{ fromDegrees: 230, speedMps: 6 }} units={DEFAULT_UNITS} kind="coast" onKind={() => {}} />,
     lines: [
       'This list is a file in the app',
       'nothing about your venue is sent anywhere',
@@ -120,7 +120,7 @@ const MUST_SURVIVE: { label: string; node: ReactElement; lines: string[] }[] = [
   },
   {
     label: 'the camera list with no wind yet',
-    node: <CamList venue={VENUE} wind={null} units={DEFAULT_UNITS} />,
+    node: <CamList venue={VENUE} wind={null} units={DEFAULT_UNITS} kind="coast" onKind={() => {}} />,
     lines: ['The wind has not come back yet, so nothing here is ranked by what is upwind'],
   },
 ]

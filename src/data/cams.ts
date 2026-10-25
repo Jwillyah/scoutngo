@@ -52,6 +52,16 @@ export interface Cam {
    * finding out it is paid by arriving at a paywall at 05:40 is.
    */
   access: 'free' | 'paid'
+  /**
+   * What it looks at. Absent is 'coast', every entry written before roads
+   * existed. A road entry is a state transport department's own map of its
+   * traffic cameras: for the drive in, and for the weather at road level.
+   */
+  kind?: 'coast' | 'road'
+}
+
+export function camKind(cam: Cam): 'coast' | 'road' {
+  return cam.kind ?? 'coast'
 }
 
 /**
@@ -193,5 +203,50 @@ export const CAMS: readonly Cam[] = [
     url: 'https://www.surfline.com/surf-reports-forecasts-cams/united-states/north-carolina/2141250',
     operator: 'Surfline',
     access: 'paid',
+  },
+
+  /*
+   * ------------------------------------------------- roads: the state maps
+   *
+   * Each is the department's own public map of its traffic cameras, pinned
+   * at the stretch of road it covers nearest the coast. They are maps of many
+   * cameras, named as such, so the pin is where to look on that map rather
+   * than one camera's position. Requested 2026-10-25 and returned 200.
+   */
+  {
+    id: 'vdot-511-virginia-beach',
+    name: 'VDOT 511 camera map, Virginia Beach',
+    at: { lat: 36.845, lon: -76.03 },
+    url: 'https://511.vdot.virginia.gov/',
+    operator: 'Virginia DOT',
+    access: 'free',
+    kind: 'road',
+  },
+  {
+    id: 'md-chart-us50',
+    name: 'Maryland CHART camera map, US 50',
+    at: { lat: 38.36, lon: -75.55 },
+    url: 'https://chart.maryland.gov/',
+    operator: 'Maryland CHART',
+    access: 'free',
+    kind: 'road',
+  },
+  {
+    id: 'deldot-route-1',
+    name: 'DelDOT camera map, Route 1',
+    at: { lat: 38.7, lon: -75.1 },
+    url: 'https://deldot.gov/map/index.shtml',
+    operator: 'Delaware DOT',
+    access: 'free',
+    kind: 'road',
+  },
+  {
+    id: 'drivenc-outer-banks',
+    name: 'DriveNC camera map, Outer Banks',
+    at: { lat: 35.96, lon: -75.63 },
+    url: 'https://drivenc.gov/',
+    operator: 'NCDOT',
+    access: 'free',
+    kind: 'road',
   },
 ]

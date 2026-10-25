@@ -450,6 +450,7 @@ export const MARK_NODE_LAYER = 'site-mark-node'
  */
 /** A stable empty list, so a default prop does not re-run the effect every render. */
 const NO_PINS: readonly LatLon[] = []
+const NO_LINK_PINS: readonly { id: string; label: string; at: LatLon; href: string }[] = []
 
 export type TapMode = 'add' | 'pilot' | 'mark' | 'aim' | 'measure' | null
 
@@ -685,6 +686,11 @@ interface MapViewProps {
    * rays leave the screen. Absent, no pills.
    */
   rayClock?: (at: Date) => string
+  /**
+   * Pins that are links: the cameras, each opening its operator's own page.
+   * The map draws an anchor and nothing else; it never loads what is behind it.
+   */
+  linkPins?: readonly { id: string; label: string; at: LatLon; href: string }[]
   /** Building shadows and the subject's shadow, as features. See src/lib/shadowLayer.ts. */
   shadowFeatures?: GeoJSON.FeatureCollection | null
   /** The two-pin measure's pins, none to two. The numbers are src/core/measure.ts. */
@@ -1140,6 +1146,7 @@ export function MapView({
   measurePins = NO_PINS,
   rayClock,
   shadowFeatures = null,
+  linkPins = NO_LINK_PINS,
   onMeasureAt,
   pilotAt = null,
   onPilotMove,
@@ -1375,7 +1382,7 @@ export function MapView({
        * deselected it, and the card never appeared.
        */
       const target = event.originalEvent.target as HTMLElement | null
-      if (target?.closest('.shooter-host, .pin, .ray-label') != null) return
+      if (target?.closest('.shooter-host, .pin, .ray-label, .linkpin') != null) return
 
       const next = { lat: event.lngLat.lat, lon: event.lngLat.lng }
       if (l.mode === 'mark') {
@@ -2495,6 +2502,22 @@ export function MapView({
       clearTags()
     }
   }, [airspace, ready])
+
+  /* Link pins: an anchor per camera, opened in a new tab, nothing fetched. */
+  useEffect(() => {
+    const instance = map.current
+    if (instance === null || !ready) return
+    const markers = linkPins.map((pin) => {
+      const el = document.createElement('a')
+      el.className = 'linkpin'
+      el.href = pin.href
+      el.target = '_blank'
+      el.rel = 'noreferrer noopener'
+      el.textContent = pin.label
+      return new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([pin.at.lon, pin.at.lat]).addTo(instance)
+    })
+    return () => markers.forEach((m) => m.remove())
+  }, [linkPins, ready])
 
   /* The shadows for the moment on the time bar. */
   useEffect(() => {
