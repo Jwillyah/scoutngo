@@ -1,6 +1,12 @@
 /*
  * ===========================================================================
- * THIS FUNCTION LOGS NOTHING. DELIBERATELY. Same rule as generate.ts.
+ * THIS FUNCTION LOGS NOTHING. DELIBERATELY.
+ *
+ * AND THE QUERY IS IN THE BODY, NOT THE URL. Vercel keeps the request path of
+ * every function call, query string included, whatever the function itself
+ * writes. A GET with ?q=atlantic+park&lat=36.84&lon=-75.97 put the venue and the
+ * map centre in those logs. A POST body is not logged. tests/apiBodies.test.ts
+ * and scripts/audit-api-urls.mjs hold the line.
  *
  * It receives what the shooter is typing into the venue search, one keystroke
  * at a time, and the coordinate their map is centred on. That is a live record
@@ -21,12 +27,18 @@ const RETRIEVE_URL = 'https://api.mapbox.com/search/searchbox/v1/retrieve'
 /** Mapbox caps this at 10. Six is what the dropdown can show without scrolling. */
 const LIMIT = 6
 
-const str = (value: string | null): string => (value === null ? '' : value.trim())
+const str = (value: unknown): string => (typeof value === 'string' ? value.trim() : '')
 
-const num = (value: string | null): number | null => {
-  if (value === null) return null
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : null
+const num = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isFinite(value) ? value : null
+
+interface SearchBody {
+  action?: unknown
+  session?: unknown
+  id?: unknown
+  q?: unknown
+  lat?: unknown
+  lon?: unknown
 }
 
 /*
@@ -41,8 +53,13 @@ const num = (value: string | null): number | null => {
  * field is focused and keeps it until a result is picked, which turns a typed
  * query of twenty keystrokes into one charge instead of twenty.
  */
-export async function GET(request: Request): Promise<Response> {
-  const url = new URL(request.url)
+export async function POST(request: Request): Promise<Response> {
+  let body: SearchBody
+  try {
+    body = (await request.json()) as SearchBody
+  } catch {
+    return Response.json({ status: 'error', message: 'Expected a JSON body.' }, { status: 400 })
+  }
   const token = process.env.MAPBOX_TOKEN
 
   if (!token) {
@@ -53,15 +70,15 @@ export async function GET(request: Request): Promise<Response> {
     return Response.json({ status: 'no-token' })
   }
 
-  const action = url.searchParams.get('action') === 'retrieve' ? 'retrieve' : 'suggest'
-  const session = str(url.searchParams.get('session'))
+  const action = body.action === 'retrieve' ? 'retrieve' : 'suggest'
+  const session = str(body.session)
   if (session === '') {
     return Response.json({ status: 'error', message: 'Missing session token.' }, { status: 400 })
   }
 
   try {
     if (action === 'retrieve') {
-      const id = str(url.searchParams.get('id'))
+      const id = str(body.id)
       if (id === '') {
         return Response.json({ status: 'error', message: 'Missing id.' }, { status: 400 })
       }
@@ -78,7 +95,7 @@ export async function GET(request: Request): Promise<Response> {
       return Response.json({ status: 'ok', body: await response.json() })
     }
 
-    const q = str(url.searchParams.get('q'))
+    const q = str(body.q)
     if (q === '') {
       return Response.json({ status: 'error', message: 'Missing q.' }, { status: 400 })
     }
@@ -94,8 +111,8 @@ export async function GET(request: Request): Promise<Response> {
      * WITHOUT excluding anything, which is the behaviour wanted: a venue two
      * towns over should rank second, not vanish.
      */
-    const lat = num(url.searchParams.get('lat'))
-    const lon = num(url.searchParams.get('lon'))
+    const lat = num(body.lat)
+    const lon = num(body.lon)
     if (lat !== null && lon !== null) {
       target.searchParams.set('proximity', `${lon},${lat}`)
     }

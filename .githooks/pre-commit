@@ -188,6 +188,11 @@ ok "$(grep -E 'OFFLINE PROBLEMS' "$SCRATCH/offline.log" | tail -1 | tr -d '=' | 
 # The service worker keeps the app shell for a cold launch with no signal. The
 # condition for having one at all: a new deploy is still adopted. Two real
 # builds, a real browser, every step named. See docs/deploys.md.
+# Vercel logs request paths. No coordinate, place or date may ride in an /api
+# URL: the running app's own calls are watched, and both endpoints must be seen.
+run_audit "api url audit" scripts/audit-api-urls.mjs "$SCRATCH/apiurl.log" 'PROBLEM|ABORTED'
+ok "$(grep -E 'API URL PROBLEMS' "$SCRATCH/apiurl.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
+
 run_audit "service worker audit" scripts/audit-sw-update.mjs "$SCRATCH/sw.log" 'PROBLEM|ABORTED'
 ok "$(grep -E 'SERVICE WORKER PROBLEMS' "$SCRATCH/sw.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
 

@@ -1,6 +1,10 @@
 /*
  * ===========================================================================
- * THIS FUNCTION LOGS NOTHING. DELIBERATELY. Same rule as generate.ts.
+ * THIS FUNCTION LOGS NOTHING. DELIBERATELY.
+ *
+ * AND THE COORDINATE IS IN THE BODY, NOT THE URL. Vercel keeps the request path
+ * of every call, query string included, so ?lat=&lon= put every spot somebody
+ * considered standing on into those logs. A POST body is not logged.
  *
  * It receives a coordinate the shooter is considering standing on. That is the
  * same category of information as the venue itself, so it is never written to a
@@ -13,23 +17,24 @@ const META_URL = 'https://maps.googleapis.com/maps/api/streetview/metadata'
 const IMAGE_URL = 'https://maps.googleapis.com/maps/api/streetview'
 const SIZE = '640x400'
 
-const num = (value: string | null): number | null => {
-  if (value === null) return null
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : null
-}
+const num = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isFinite(value) ? value : null
 
 /*
- * A Vercel Web Handler. GET is the only export: this reads its input from the
- * query string, and Vercel answers any other method with 405 before this module
- * is reached.
+ * A Vercel Web Handler. POST is the only export, reading a JSON body, and
+ * Vercel answers any other method with 405 before this module is reached.
  */
-export async function GET(request: Request): Promise<Response> {
-  const url = new URL(request.url)
-  const lat = num(url.searchParams.get('lat'))
-  const lon = num(url.searchParams.get('lon'))
-  const heading = num(url.searchParams.get('heading')) ?? 0
-  const fov = Math.min(120, Math.max(10, num(url.searchParams.get('fov')) ?? 60))
+export async function POST(request: Request): Promise<Response> {
+  let body: { lat?: unknown; lon?: unknown; heading?: unknown; fov?: unknown }
+  try {
+    body = (await request.json()) as typeof body
+  } catch {
+    return Response.json({ status: 'error', message: 'Expected a JSON body.' }, { status: 400 })
+  }
+  const lat = num(body.lat)
+  const lon = num(body.lon)
+  const heading = num(body.heading) ?? 0
+  const fov = Math.min(120, Math.max(10, num(body.fov) ?? 60))
 
   if (lat === null || lon === null) {
     return Response.json({ status: 'error', message: 'Missing lat or lon.' }, { status: 400 })

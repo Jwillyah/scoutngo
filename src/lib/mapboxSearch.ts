@@ -132,8 +132,18 @@ export function parseRetrieved(payload: unknown, fallbackLabel: string): SearchH
   }
 }
 
-async function call(params: URLSearchParams, signal?: AbortSignal): Promise<unknown> {
-  const response = await fetch(`${MAPBOX_ENDPOINT}?${params.toString()}`, { signal })
+/*
+ * A POST WITH A JSON BODY, NEVER A QUERY STRING. Vercel keeps the path of every
+ * function call; ?q=atlantic+park&lat=&lon= put the venue and the map centre in
+ * those logs. See tests/apiBodies.test.ts.
+ */
+async function call(input: Record<string, string | number>, signal?: AbortSignal): Promise<unknown> {
+  const response = await fetch(MAPBOX_ENDPOINT, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+    signal,
+  })
   const text = await response.text()
   try {
     return JSON.parse(text) as unknown
@@ -149,10 +159,10 @@ export async function mapboxSuggest(
   bias: LatLon | null,
   signal?: AbortSignal,
 ): Promise<MapboxState> {
-  const params = new URLSearchParams({ action: 'suggest', q: query, session })
+  const params: Record<string, string | number> = { action: 'suggest', q: query, session }
   if (bias !== null) {
-    params.set('lat', bias.lat.toFixed(6))
-    params.set('lon', bias.lon.toFixed(6))
+    params.lat = Number(bias.lat.toFixed(6))
+    params.lon = Number(bias.lon.toFixed(6))
   }
   const body = (await call(params, signal)) as {
     status?: unknown
@@ -175,7 +185,7 @@ export async function mapboxRetrieve(
   session: string,
   signal?: AbortSignal,
 ): Promise<SearchHit | null> {
-  const params = new URLSearchParams({ action: 'retrieve', id, session })
+  const params = { action: 'retrieve', id, session }
   const body = (await call(params, signal)) as { status?: unknown; body?: unknown }
   if (body?.status !== 'ok') return null
   return parseRetrieved(body.body, label)

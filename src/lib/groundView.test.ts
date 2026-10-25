@@ -3,7 +3,7 @@ import {
   clearGroundViewCache,
   fetchGroundView,
   groundViewCacheSize,
-  groundViewUrl,
+  groundViewBody,
 } from './groundView.ts'
 
 const AT = { lat: 38.364236, lon: -75.605912 }
@@ -16,13 +16,25 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('groundViewUrl', () => {
+describe('groundViewBody', () => {
   it('pins the precision, which is what makes it a usable cache key', () => {
-    const url = groundViewUrl(AT, 87.32, 5.14)
-    expect(url).toContain('lat=38.364236')
-    expect(url).toContain('lon=-75.605912')
-    expect(url).toContain('heading=87.3')
-    expect(url).toContain('fov=5.1')
+    expect(groundViewBody(AT, 87.32, 5.14)).toEqual({
+      lat: 38.364236,
+      lon: -75.605912,
+      heading: 87.3,
+      fov: 5.1,
+    })
+  })
+
+  /* The coordinate goes in the body. A query string would sit in Vercel's request log. */
+  it('posts the coordinate in the body, never in the URL', async () => {
+    const fetchSpy = vi.fn(async (_url: string, _init?: RequestInit) => reply({ status: 'no-key', message: 'x' }))
+    vi.stubGlobal('fetch', fetchSpy)
+    await fetchGroundView(AT, 87.32, 5.14)
+    const [url, init] = fetchSpy.mock.calls[0]
+    expect(url).toBe('/api/streetview')
+    expect(init?.method).toBe('POST')
+    expect(String(init?.body)).toContain('38.364236')
   })
 })
 

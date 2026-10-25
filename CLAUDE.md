@@ -31,7 +31,7 @@ no database, no analytics, no telemetry.
 ```
 tsc -b → oxlint --deny-warnings → viewport units → colour roles → tests
        → build → reachability → labels → surface → projection → offline
-       → service worker
+       → api urls → service worker
 ```
 
 All of it must be clean before reporting. `SCOUTNGO_SKIP_AUDITS=1` exists and

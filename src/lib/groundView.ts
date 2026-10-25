@@ -22,14 +22,18 @@ export type GroundView =
   | { status: 'no-coverage'; message: string }
   | { status: 'error'; message: string }
 
-export function groundViewUrl(at: { lat: number; lon: number }, heading: number, fov: number) {
-  const params = new URLSearchParams({
-    lat: at.lat.toFixed(6),
-    lon: at.lon.toFixed(6),
-    heading: heading.toFixed(1),
-    fov: fov.toFixed(1),
-  })
-  return `${GROUND_VIEW_ENDPOINT}?${params.toString()}`
+/**
+ * What is sent, as a JSON BODY. Never a query string: Vercel logs request
+ * paths, and a coordinate in one would sit in those logs. Rounded the same
+ * way the cache key is, so the key and the request describe one thing.
+ */
+export function groundViewBody(at: { lat: number; lon: number }, heading: number, fov: number) {
+  return {
+    lat: Number(at.lat.toFixed(6)),
+    lon: Number(at.lon.toFixed(6)),
+    heading: Number(heading.toFixed(1)),
+    fov: Number(fov.toFixed(1)),
+  }
 }
 
 /*
@@ -74,11 +78,12 @@ export async function fetchGroundView(
   heading: number,
   fov: number,
 ): Promise<GroundView> {
-  const key = groundViewUrl(at, heading, fov)
+  const body = groundViewBody(at, heading, fov)
+  const key = JSON.stringify(body)
   const hit = cache.get(key)
   if (hit !== undefined) return hit
 
-  const pending = requestGroundView(key)
+  const pending = requestGroundView(body)
   cache.set(key, pending)
   if (cache.size > CACHE_LIMIT) {
     const oldest = cache.keys().next()
@@ -96,10 +101,14 @@ export async function fetchGroundView(
   return result
 }
 
-async function requestGroundView(url: string): Promise<GroundView> {
+async function requestGroundView(input: ReturnType<typeof groundViewBody>): Promise<GroundView> {
   let response: Response
   try {
-    response = await fetch(url)
+    response = await fetch(GROUND_VIEW_ENDPOINT, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input),
+    })
   } catch {
     return { status: 'error', message: 'Could not reach the ground view function.' }
   }

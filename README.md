@@ -539,6 +539,13 @@ Saving a venue for offline asks Esri and AWS for the tiles of the box around the
 reach ring ahead of time: the same servers, the same kind of request, for the
 place you already opened. Saved tiles are read back from this device.
 
+**Our own two functions keep nothing in their URLs.** Venue search
+(`api/search.ts`) and ground view (`api/streetview.ts`) take a POST with a JSON
+body. Vercel keeps the request path of every function call in its logs, query
+string included, so a coordinate or a place name in a URL would sit there; in a
+body it does not. `tests/apiBodies.test.ts` reads the source and
+`scripts/audit-api-urls.mjs` watches the running app's requests in the commit gate.
+
 **Sky cameras: nothing leaves at all.** The camera list is a **file in this
 repo**, `src/data/cams.ts`. There is no cam API, no key and no account, and
 your venue coordinate never leaves the device: "which cameras are near me" is
