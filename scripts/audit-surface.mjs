@@ -409,7 +409,8 @@ const dragSheet = async (from, to) => {
       const el = document.elementFromPoint(x, y)
       if (!el) continue
       rows += 1
-      if (el.closest(CONTROLS)) continue
+      /* An axis-locked strip scrubs sideways and hands up-and-down drags to the sheet: it is grab area. */
+      if (el.closest(CONTROLS) && !el.closest('[data-axis-lock]')) continue
       body += 1
       if (startY === null) startY = y
     }
@@ -457,14 +458,20 @@ for (const from of ['peek', 'half', 'full']) {
 console.log('\n### and the grab-area rule is proven to fail')
 if (await setDetent('half')) {
   const covered = await ev(`(() => {
-    const body = document.querySelector('.sheet__body')
-    if (!body) return 'no sheet body'
+    /*
+     * THE WHOLE SHEET BELOW THE GRABBER, not only its body: the peek holds the
+     * time bar's strip, which is real grab area, so covering the body alone
+     * no longer covers the sheet.
+     */
+    const sheet = document.querySelector('.sheet')
+    const grab = document.querySelector('.sheet__grab')
+    if (!sheet || !grab) return 'no sheet'
     const input = document.createElement('input')
     input.type = 'range'
     input.id = 'audit-swallower'
-    input.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;z-index:99;opacity:0.01'
-    body.style.position = 'relative'
-    body.appendChild(input)
+    const top = Math.round(grab.getBoundingClientRect().bottom - sheet.getBoundingClientRect().top)
+    input.style.cssText = 'position:absolute;left:0;right:0;bottom:0;top:' + top + 'px;width:100%;z-index:99;opacity:0.01'
+    sheet.appendChild(input)
     return 'covered'
   })()`)
   if (covered !== 'covered') {
@@ -474,8 +481,6 @@ if (await setDetent('half')) {
     const swallowed = await dragSheet('half', 'full')
     await ev(`(() => {
       document.getElementById('audit-swallower')?.remove()
-      const body = document.querySelector('.sheet__body')
-      if (body) body.style.position = ''
       return 'restored'
     })()`)
     await wait(300)
@@ -1148,6 +1153,12 @@ const OPENERS = `(() => {
   document.querySelectorAll('.rail2__btn').forEach((b, i) => {
     if ((b.getAttribute('aria-label') ?? '').toLowerCase().includes('layer')) add('.rail2__btn', i, 'layers')
   })
+  /* The tool dock: Layers moved here from the rail, and the calendar opens the Sky card. */
+  document.querySelectorAll('.tooldock__btn').forEach((b, i) => {
+    const label = (b.getAttribute('aria-label') ?? '').toLowerCase()
+    if (label.includes('layer')) add('.tooldock__btn', i, 'layers')
+    if (label.includes('calendar')) add('.tooldock__btn', i, 'sky')
+  })
   /*
    * THE MENU'S CARD DOORS. About and Sky open cards from the side menu now, so
    * a door is "open the menu, pick this item"; the item's own words are its
@@ -1208,7 +1219,7 @@ const CARD_HEIGHT = `(() => {
    * The heights this run produced are in
    * measurements/2026-10-19-shell-polish.md.
    */
-  const strip = document.querySelector('.tstrip')
+  const strip = document.querySelector('.tstrip, .tbar')
   return {
     card: card.dataset.card ?? '(unnamed)',
     content: Math.round(card.scrollHeight + parseFloat(cs.marginTop || '0') + parseFloat(cs.marginBottom || '0')),
@@ -1343,7 +1354,16 @@ const STRIP_BELONGS = ['shoot', 'golden', 'wind', 'cloud', 'tide', 'sky']
  * work and does not.
  */
 const STRIP_FORBIDDEN = ['layers', 'about', 'hazards', 'cams']
-const STRIP_MAX = 48
+/*
+ * THE TIME BAR IS 130 PX BY DESIGN. This limit was 48 when the strip was a
+ * one-line scrubber and every pixel of it came out of the card. The combined
+ * brief of 25 October asked for a docked bar with the sun's height curve,
+ * the horizon, a tick ruler and a big date and time, which measured 130 px at
+ * 390 wide; it replaces the scrubber, and the sheet's peek grew to hold it
+ * rather than the cards shrinking. The limit is that bar plus 10, so a bar
+ * that grows past its design still fails here.
+ */
+const STRIP_MAX = 140
 
 console.log(`  the limit is 2 x ${VIEWPORT.height} = ${LIMIT}px of content`)
 console.log(`  card          half     full     worst   of limit   strip`)

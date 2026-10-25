@@ -35,7 +35,7 @@ import { GROUND_WIND_METERS, type WindHeight } from '../core/windHeight.ts'
 import type { SkyLayerKind } from '../core/skyLayer.ts'
 import { goesBandFor, zoomAdvice } from '../core/goes.ts'
 import { boundaryNote } from '../core/skyTime.ts'
-import { phaseAt, phaseSpans } from '../core/nightWindow.ts'
+import { phaseAt } from '../core/nightWindow.ts'
 import type { MarkKind, SiteMark } from '../core/siteMark.ts'
 import { HazardPanel } from './HazardPanel.tsx'
 import { BottomSheet } from './BottomSheet.tsx'
@@ -67,14 +67,29 @@ import { SunReadout } from './SunReadout.tsx'
 import { CamList } from './CamList.tsx'
 import { SunCurve } from './SunCurve.tsx'
 import { BUILDINGS_MIN_ZOOM, ESRI_NATIVE_MAX_ZOOM, MapView, type MapHandle } from './MapView.tsx'
-import { buildingsToGeoJson, fetchBuildings } from '../lib/buildings.ts'
+import { buildingsToGeoJson, fetchBuildings, type Building } from '../lib/buildings.ts'
+import { shadowMap } from '../core/shadowMap.ts'
+import { shadowCollection } from '../lib/shadowLayer.ts'
+import { lightNow } from '../core/lightNow.ts'
 import { PlatformFilter } from './PlatformFilter.tsx'
 import { PlanStatus } from './PlanStatus.tsx'
 import { PositionCard } from './PositionCard.tsx'
 import { ShotList } from './ShotList.tsx'
 import { SunSearchPanel } from './SunSearchPanel.tsx'
-import { TimeStrip } from './TimeStrip.tsx'
+import { TimeBar } from './TimeBar.tsx'
+import { ToolDock } from './ToolDock.tsx'
+import { SkyCard } from './SkyCard.tsx'
+import { LightNowBlock } from './LightNowBlock.tsx'
+import { getMoonArc } from '../core/moonArc.ts'
+import type { SkyTab } from '../lib/skyTab.ts'
 import { PhaseRule } from './PhaseRule.tsx'
+
+
+/*
+ * Room for the time bar at peek, measured at 390 wide: the grabber row 21,
+ * the bar 130 (date line and strip with its hour labels), and 13 to spare.
+ */
+const PLAN_PEEK_PX = 164
 
 /** What the one sheet is currently showing. Chosen by an explicit control. */
 /*
@@ -505,23 +520,6 @@ export function PlanMode({
   const [sheetHeight, setSheetHeight] = useState(108)
   const [pitch, setPitch] = useState(0)
 
-  /*
-   * DAY, CIVIL TWILIGHT AND NIGHT ACROSS THE WINDOW.
-   *
-   * Computed here rather than in the scrubber because the scrubber draws what
-   * it is given and this needs the venue coordinate. Memoised on the window
-   * and the venue: the band edges do not move as the bar is dragged, only the
-   * marker on them does, and recomputing four solar events per frame while a
-   * thumb is down is work for an answer that cannot have changed.
-   */
-  const nightBands = useMemo(
-    () =>
-      venueWindow === null || venue === null
-        ? []
-        : phaseSpans(venueWindow.start, venueWindow.end, venue.lat, venue.lon),
-    [venueWindow, venue],
-  )
-
   const nightPhase = useMemo(
     () =>
       scrubbedAt === null || venue === null ? null : phaseAt(scrubbedAt, venue.lat, venue.lon),
@@ -690,6 +688,22 @@ export function PlanMode({
    */
   const [mapBearing, setMapBearing] = useState(0)
   const [followHeading, setFollowHeading] = useState(false)
+  /* The dock's Sun/Moon switch: the moon's line on the time bar and its rays on the map. */
+  const [moonOn, setMoonOn] = useState(false)
+  /*
+   * PUT THE TIME BAR ON AN INSTANT. The window is the unit, so the moment can
+   * sit anywhere in the day and beyond; a jump from the Sky card lands here too.
+   */
+  const scrubTo = useCallback(
+    (next: Date) => {
+      if (venueWindow === null) return
+      const span = Math.max(60_000, venueWindow.end.getTime() - venueWindow.start.getTime())
+      onScrub((next.getTime() - venueWindow.start.getTime()) / span)
+    },
+    [venueWindow, onScrub],
+  )
+  /* Which page of the Sky card is open. The dock's calendar opens it at the calendar. */
+  const [skyTab, setSkyTab] = useState<SkyTab>('tonight')
   /*
    * TWO-PIN MEASURE. Null is off; on, each tap drops a pin and a third tap
    * starts over. The pins are not a plan: they are not saved or sent.
@@ -796,10 +810,14 @@ export function PlanMode({
    */
 
   const [buildingData, setBuildingData] = useState<GeoJSON.FeatureCollection | null>(null)
+  /* The footprints themselves, for the shadows. Loaded for either switch. */
+  const [buildingList, setBuildingList] = useState<Building[] | null>(null)
+  const wantBuildings = showBuildings || showSun
 
   useEffect(() => {
-    if (!showBuildings || venue === null) {
+    if (!wantBuildings || venue === null) {
       setBuildingData(null)
+      setBuildingList(null)
       setBuildingsNote(null)
       return
     }
@@ -820,6 +838,7 @@ export function PlanMode({
       (result) => {
         if (!live) return
         if (result.status === 'ok') {
+          setBuildingList(result.buildings)
           setBuildingData(buildingsToGeoJson(result.buildings) as GeoJSON.FeatureCollection)
           setBuildingsNote(
             result.buildings.length === 0
@@ -842,7 +861,25 @@ export function PlanMode({
     }
     /* mapZoom only matters for crossing the threshold, not every nudge. */
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showBuildings, venue, mapZoom >= BUILDINGS_MIN_ZOOM])
+  }, [wantBuildings, venue, mapZoom >= BUILDINGS_MIN_ZOOM])
+
+  /*
+   * THE SHADOW MAP, for the moment on the time bar. Footprint swept by
+   * height / tan(sun altitude), src/core/shadowMap.ts; flat ground; a building
+   * with no known height casts nothing and is counted, never guessed.
+   */
+  const shadows = useMemo(() => {
+    if (!showSun || buildingList === null || sun === null) return null
+    return shadowMap(
+      buildingList.map((b) => ({ id: b.id, ring: b.ring, heightMeters: b.height.metres })),
+      { azimuth: sun.azimuth, altitude: sun.altitude },
+    )
+  }, [showSun, buildingList, sun])
+  const shadowFeatures = useMemo(() => {
+    if (!showSun || venue === null || scrubbedAt === null) return null
+    const person = lightNow(scrubbedAt, venue.lat, venue.lon).personShadow
+    return shadowCollection(shadows, person === null ? null : { at: venue, lengthMeters: person.lengthMeters, bearing: person.bearing })
+  }, [showSun, venue, scrubbedAt, shadows])
 
   /* Whether anything is in the air, which is what the pilot control is for. */
   const airPositions = plan.filter((p) => p.position.platform === 'air').length
@@ -1346,6 +1383,7 @@ export function PlanMode({
       case 'golden':
         return (
           <Card title="The light" at={clock(scrubbedAt)} onClose={home}>
+            {venue === null || scrubbedAt === null ? null : <LightNowBlock at={scrubbedAt} venue={venue} units={units} />}
             <SunReadout venueWindow={venueWindow} />
             {/*
               * WHAT THE PHASE REQUIRES, which came off the time scrubber when
@@ -1425,14 +1463,39 @@ export function PlanMode({
       case 'sky':
         return (
           <Card title="Sky" onClose={home}>
-            <SkyPanel
-              venue={venue}
-              timeZone={venueWindow?.timeZone ?? null}
-              timeZoneAbbr={venueWindow?.timeZoneShort ?? null}
-              horizon={horizonProfile}
-              kit={kitProfile}
-              now={skyNow}
-            />
+            {venue === null || venueWindow === null || scrubbedAt === null ? (
+              <SkyPanel
+                venue={venue}
+                timeZone={venueWindow?.timeZone ?? null}
+                timeZoneAbbr={venueWindow?.timeZoneShort ?? null}
+                horizon={horizonProfile}
+                kit={kitProfile}
+                now={skyNow}
+              />
+            ) : (
+              <SkyCard
+                venue={venue}
+                timeZone={venueWindow.timeZone}
+                timeZoneAbbr={venueWindow.timeZoneShort}
+                at={scrubbedAt}
+                tab={skyTab}
+                onTab={setSkyTab}
+                onJump={scrubTo}
+                target={aimAt}
+                picking={placingAim}
+                onPickTarget={() => onPlacingAim(!placingAim)}
+                events={
+                  <SkyPanel
+                    venue={venue}
+                    timeZone={venueWindow.timeZone}
+                    timeZoneAbbr={venueWindow.timeZoneShort}
+                    horizon={horizonProfile}
+                    kit={kitProfile}
+                    now={skyNow}
+                  />
+                }
+              />
+            )}
             {/*
               * THE CAMERAS ARE THEIR OWN CARD NOW.
               *
@@ -1596,7 +1659,13 @@ export function PlanMode({
         windMeters={windHeight.feet === null ? GROUND_WIND_METERS : windHeight.feet * 0.3048}
         ratedWindMps={ratedWindMps}
         skyForecastOpacity={sky.opacity}
-        sunOverlay={sunOverlay}
+        sunOverlay={
+          sunOverlay === null || !moonOn || venue === null || scrubbedAt === null
+            ? sunOverlay
+            : { ...sunOverlay, moon: getMoonArc(scrubbedAt, venue.lat, venue.lon) }
+        }
+        shadowFeatures={shadowFeatures}
+        rayClock={venueWindow === null ? undefined : (at: Date) => formatClock(at, venueWindow.timeZone)}
         showSun={showSun}
         showArc={showArc}
         selectedId={selectedId}
@@ -1665,6 +1734,20 @@ export function PlanMode({
       {!placingPilot ? null : <p className="tapnote">{placingHint('pilot', 'ground')}</p>}
       {!placingAim ? null : (
         <p className="tapnote">Tap the thing you want the sun behind.</p>
+      )}
+      {/*
+        * THE SHADOW LEGEND: what the dark shapes are and what is missing from
+        * them. A building OpenStreetMap gives no height for casts nothing here,
+        * and the count says how many that is rather than letting a sunny
+        * patch read as sun.
+        */}
+      {shadows === null ? null : (
+        <p className="shadowkey" role="status">
+          {shadows.status === 'no-sun'
+            ? 'No shadows: the sun is down.'
+            : `Shadows from ${shadows.shadows.length} ${shadows.shadows.length === 1 ? 'building' : 'buildings'} with a known height.`}
+          {shadows.skippedNoHeight === 0 ? '' : ` ${shadows.skippedNoHeight} more have no height and cast none here.`} Flat ground.
+        </p>
       )}
       {measurePins === null ? null : (
         <p className="tapnote num" role="status">
@@ -1778,8 +1861,6 @@ export function PlanMode({
 
       {sheet === 'full' ? null : (
       <MapRail
-        onLayers={() => openCard('layers')}
-        layersOpen={card.kind === 'layers'}
         pitch={pitch}
         onPitch={(next) => handle.current?.setPitch(next)}
         bearing={mapBearing}
@@ -1790,7 +1871,31 @@ export function PlanMode({
       />
       )}
 
+      {sheet === 'full' ? null : (
+        <ToolDock
+          moon={moonOn}
+          onMoon={() => setMoonOn(!moonOn)}
+          onCalendar={() => {
+            setSkyTab('calendar')
+            openCard('sky')
+          }}
+          lens={coneMode === 'all'}
+          onLens={() => onConeMode(coneMode === 'all' ? 'none' : 'all')}
+          layersOpen={card.kind === 'layers'}
+          onLayers={() => openCard('layers')}
+          onReset={() => {
+            if (followHeading) onCompass()
+            handle.current?.setBearing(0)
+            handle.current?.setPitch(0)
+            if (venue !== null) handle.current?.flyTo(venue)
+            onScrub(0.5)
+          }}
+        />
+      )}
+
       <BottomSheet
+        /* Room for the time bar: its date line and its strip, measured, not the old one-line scrubber. */
+        peekPx={PLAN_PEEK_PX}
         detent={sheet}
         onDetentChange={setSheet}
         onHeightChange={setSheetHeight}
@@ -1832,15 +1937,15 @@ export function PlanMode({
               * condition repeated at eleven call sites.
               */}
             {!TIME_MATTERS[card.kind] || venueWindow === null || scrubbedAt === null ? null : (
-              <TimeStrip
-                start={venueWindow.start}
-                end={venueWindow.end}
-                value={scrub}
-                onChange={onScrub}
+              <TimeBar
                 at={scrubbedAt}
+                lat={venue?.lat ?? 0}
+                lon={venue?.lon ?? 0}
                 timeZone={venueWindow.timeZone}
                 timeZoneAbbr={venueWindow.timeZoneShort}
-                phases={nightBands}
+                moon={moonOn}
+                onAt={scrubTo}
+                onReset={() => onScrub(0.5)}
               />
             )}
           </div>

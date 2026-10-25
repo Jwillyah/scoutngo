@@ -154,7 +154,7 @@ for (const run of MODES) {
    * the layers card; asserting coverage with them off would be asserting
    * nothing. Fails if the tile is not there or does not turn on.
    */
-  await ev(`document.querySelector('nav[aria-label="Map controls"] button[aria-label="Map and layers"]')?.click()`)
+  await ev(`document.querySelector('nav[aria-label="Tools"] button[aria-label="Map and layers"]')?.click()`)
   await wait(700)
   const cones = await ev(`(() => {
     const tile = [...document.querySelectorAll('.tile')]

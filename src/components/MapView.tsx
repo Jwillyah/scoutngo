@@ -33,6 +33,8 @@ import {
 } from '../core/viewport.ts'
 import { fitLongEdge, resolveCaptureLongEdge } from '../core/capture.ts'
 import type { SunArc } from '../core/sun.ts'
+import type { MoonArc } from '../core/moonArc.ts'
+import { edgePoint } from '../core/edgePoint.ts'
 import type { PlannedPosition } from '../lib/plan.ts'
 import type { MapBounds } from '../lib/generation.ts'
 import {
@@ -54,6 +56,7 @@ import {
   MARK_SOURCE,
   AIRSPACE_SOURCE,
   MEASURE_SOURCE,
+  SHADOW_SOURCE,
   PILOT_SOURCE,
   RADIUS_SOURCE,
   RAY_SOURCE,
@@ -562,6 +565,8 @@ export interface SunOverlay {
   azimuth: number
   shadowBearing: number
   arc: SunArc
+  /** The moon's rise, set and place, when the dock's moon switch is on. See src/core/moonArc.ts. */
+  moon?: MoonArc | null
 }
 
 interface MapViewProps {
@@ -675,6 +680,13 @@ interface MapViewProps {
   airspace?: AirspaceOverlay | null
   /** Whether the grid was left out because the view held too many squares. */
   onAirspaceDense?: (dense: boolean) => void
+  /**
+   * The venue's clock, for the time pills where the sunrise, sunset and moon
+   * rays leave the screen. Absent, no pills.
+   */
+  rayClock?: (at: Date) => string
+  /** Building shadows and the subject's shadow, as features. See src/lib/shadowLayer.ts. */
+  shadowFeatures?: GeoJSON.FeatureCollection | null
   /** The two-pin measure's pins, none to two. The numbers are src/core/measure.ts. */
   measurePins?: readonly LatLon[]
   /** A tap while measuring. */
@@ -924,6 +936,13 @@ function rayCollection(
   if (showArc && overlay.arc.sunset !== null) {
     rays.push({ kind: 'sunset', bearing: overlay.arc.sunset.azimuth })
   }
+  /* The moon, when asked for: where it rises and sets, and where it is if it is up. */
+  const moon = overlay.moon ?? null
+  if (moon !== null) {
+    if (moon.rise !== null) rays.push({ kind: 'moonrise', bearing: moon.rise.azimuth })
+    if (moon.set !== null) rays.push({ kind: 'moonset', bearing: moon.set.azimuth })
+    if (moon.altitude > 0) rays.push({ kind: 'moon', bearing: moon.azimuth })
+  }
 
   return {
     type: 'FeatureCollection',
@@ -1119,6 +1138,8 @@ export function MapView({
   airspace = null,
   onAirspaceDense,
   measurePins = NO_PINS,
+  rayClock,
+  shadowFeatures = null,
   onMeasureAt,
   pilotAt = null,
   onPilotMove,
@@ -1542,6 +1563,7 @@ export function MapView({
       instance.addSource(MARK_DRAFT_SOURCE, { type: 'geojson', data: emptyCollection() })
       instance.addSource(AIRSPACE_SOURCE, { type: 'geojson', data: emptyCollection() })
       instance.addSource(MEASURE_SOURCE, { type: 'geojson', data: emptyCollection() })
+      instance.addSource(SHADOW_SOURCE, { type: 'geojson', data: emptyCollection() })
 
       const rayColor = [
         'match',
@@ -1552,6 +1574,12 @@ export function MapView({
         readToken('--sun-set'),
         'shadow',
         readToken('--sun-shadow'),
+        'moonrise',
+        readToken('--grey-1'),
+        'moonset',
+        readToken('--grey-1'),
+        'moon',
+        readToken('--white'),
         readToken('--sun'),
       ] as unknown as maplibregl.DataDrivenPropertyValueSpecification<string>
 
@@ -1615,6 +1643,25 @@ export function MapView({
           'line-color': readToken('--hazard', '#ff3b30', container.current),
           'line-width': 3,
         },
+      })
+
+      /*
+       * SHADOWS: dark, translucent, under everything placed. The subject's own
+       * shadow is a short heavy line from the pin.
+       */
+      instance.addLayer({
+        id: 'shadow-fill',
+        type: 'fill',
+        source: SHADOW_SOURCE,
+        filter: ['==', ['get', 'kind'], 'building'],
+        paint: { 'fill-color': readToken('--black', '#0a090c', container.current), 'fill-opacity': 0.45 },
+      })
+      instance.addLayer({
+        id: 'shadow-subject',
+        type: 'line',
+        source: SHADOW_SOURCE,
+        filter: ['==', ['get', 'kind'], 'subject'],
+        paint: { 'line-color': readToken('--black', '#0a090c', container.current), 'line-width': 6, 'line-opacity': 0.6 },
       })
 
       /* The two-pin measure: a plain white line with a dark edge, readable on imagery. */
@@ -2449,6 +2496,13 @@ export function MapView({
     }
   }, [airspace, ready])
 
+  /* The shadows for the moment on the time bar. */
+  useEffect(() => {
+    if (map.current === null || !ready) return
+    const source = map.current.getSource(SHADOW_SOURCE) as maplibregl.GeoJSONSource | undefined
+    source?.setData(shadowFeatures ?? emptyCollection())
+  }, [shadowFeatures, ready])
+
   /* The two-pin measure: its pins, and the line once there are two. */
   useEffect(() => {
     if (map.current === null || !ready) return
@@ -2886,6 +2940,67 @@ export function MapView({
     rays?.setData(rayData)
   }, [])
 
+  /*
+   * THE TIME PILLS AT THE RAYS' ENDS.
+   *
+   * Each sunrise, sunset, moonrise and moonset ray ends in a pill saying
+   * when, placed where the ray leaves the free map -- below the top bar and
+   * chips, above the sheet -- so the time is read where the eye follows the
+   * line to. Imperative, on every move, like the rays themselves. Decoration:
+   * the same times are in words on the Sky card and the time bar.
+   */
+  const pillLayer = useRef<HTMLDivElement>(null)
+  const latestClock = useRef(rayClock)
+  latestClock.current = rayClock
+  const drawPills = useCallback((instance: maplibregl.Map) => {
+    const layer = pillLayer.current
+    if (layer === null) return
+    const input = bearingInputs.current
+    const clock = latestClock.current
+    const overlay = input.sunOverlay
+    const pin = input.venue
+    const wanted: { kind: string; bearing: number; at: Date }[] = []
+    if (clock !== undefined && pin !== null && overlay !== null && input.showSun) {
+      if (input.showArc && overlay.arc.sunrise !== null) wanted.push({ kind: 'sunrise', ...overlay.arc.sunrise, bearing: overlay.arc.sunrise.azimuth })
+      if (input.showArc && overlay.arc.sunset !== null) wanted.push({ kind: 'sunset', ...overlay.arc.sunset, bearing: overlay.arc.sunset.azimuth })
+      const moon = overlay.moon ?? null
+      if (moon?.rise) wanted.push({ kind: 'moonrise', at: moon.rise.at, bearing: moon.rise.azimuth })
+      if (moon?.set) wanted.push({ kind: 'moonset', at: moon.set.at, bearing: moon.set.azimuth })
+    }
+    while (layer.children.length > wanted.length) layer.lastElementChild?.remove()
+    while (layer.children.length < wanted.length) {
+      const el = document.createElement('span')
+      layer.append(el)
+    }
+    if (pin === null || wanted.length === 0) return
+    const frame = instance.getContainer().getBoundingClientRect()
+    const below = (sel: string) => Math.max(0, ...[...document.querySelectorAll(sel)].map((n) => n.getBoundingClientRect().bottom - frame.top))
+    const above = (sel: string) => Math.min(frame.height, ...[...document.querySelectorAll(sel)].map((n) => n.getBoundingClientRect().top - frame.top))
+    const box = { left: 8, right: frame.width - 8, top: below('.topbar, .chips2') + 6, bottom: above('.sheet, .tooldock') - 6 }
+    const origin = instance.project([pin.lon, pin.lat])
+    wanted.forEach((pill, i) => {
+      const el = layer.children[i] as HTMLElement
+      el.className = `raypill raypill--${pill.kind} num`
+      el.textContent = clock?.(pill.at) ?? ''
+      const far = bearingLineEnd(pin, pill.bearing, 50_000)
+      const end = instance.project([far.lon, far.lat])
+      const size = el.getBoundingClientRect()
+      const at = edgePoint(origin, { x: end.x - origin.x, y: end.y - origin.y }, box, { w: size.width / 2 + 2, h: size.height / 2 + 2 })
+      el.hidden = at === null
+      if (at !== null) el.style.transform = `translate(${at.x - size.width / 2}px, ${at.y - size.height / 2}px)`
+    })
+  }, [])
+  useEffect(() => {
+    const instance = map.current
+    if (instance === null || !ready) return
+    drawPills(instance)
+    const onMove = () => drawPills(instance)
+    instance.on('move', onMove)
+    return () => {
+      instance.off('move', onMove)
+    }
+  }, [ready, drawPills, venue, sunOverlay, showSun, showArc, rayClock])
+
   /* The inputs changed, so redraw whatever the camera happens to be showing. */
   useEffect(() => {
     if (map.current === null || !ready) return
@@ -3296,6 +3411,7 @@ export function MapView({
   return (
     <div className={`map${mode === null ? '' : ' map--picking'}`}>
       <div className="map__canvas" ref={container} />
+      <div className="raypills" ref={pillLayer} aria-hidden="true" />
       {/*
         * THE SUN, IN THE SKY, OVER THE CANVAS.
         *

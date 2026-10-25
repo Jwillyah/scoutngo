@@ -26,44 +26,8 @@ import { useCallback, useRef, useState, type ReactNode } from 'react'
 
 const LONG_PRESS_MS = 400
 
-/*
- * Two planes seen from above and in front, the upper one offset. Drawn rather
- * than set in a font: a glyph's weight is whatever the system font decides,
- * and this sits on satellite imagery at 48px where a hairline disappears.
- */
-const LAYERS_ICON = (
-  <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
-    <path
-      d="M10 2.5 17.5 6.5 10 10.5 2.5 6.5z"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M3.4 10 10 13.5 16.6 10"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M3.4 13.5 10 17 16.6 13.5"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      opacity="0.55"
-    />
-  </svg>
-)
 
 interface MapRailProps {
-  /** Opens the layers card. The rail's first job in every map app. */
-  onLayers: () => void
-  layersOpen: boolean
   /** Current pitch: flat is 2D, tilted is 3D. */
   pitch: number
   onPitch: (next: number) => void
@@ -81,8 +45,6 @@ interface MapRailProps {
 const TILT_3D_DEGREES = 60
 
 export function MapRail({
-  onLayers,
-  layersOpen,
   pitch,
   onPitch,
   bearing,
@@ -193,7 +155,7 @@ export function MapRail({
         { on: pitch >= 1, face: pitch >= 1 ? '2D' : '3D' },
       )}
 
-      {button('layers', 'Map and layers', LAYERS_ICON, onLayers, { on: layersOpen })}
+      {/* Layers moved to the tool dock: one Layers button on screen, not two. */}
       {button(
         'measure',
         measuring ? 'Stop measuring' : 'Measure between two points',

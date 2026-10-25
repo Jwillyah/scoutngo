@@ -4781,7 +4781,8 @@
    * 176 sitting at 508-684. Offsetting by the sheet alone put the note at
    * 621, which is inside it and across the Suggest button.
    */
-  bottom: calc(var(--dock-height) + var(--sheet-live-height) + var(--space-3));
+  /* And above the tool dock, which rides the top of the sheet. */
+  bottom: calc(var(--dock-height) + var(--sheet-live-height) + var(--tooldock-height) + var(--space-3));
   left: 50%;
   transform: translateX(-50%);
   /* One line on a 390px phone with room either side. */
@@ -9694,4 +9695,512 @@
 
 .plan__ics {
   margin-top: var(--space-3);
+}
+
+/*
+ * THE TOOL DOCK: a glass pill centred over the map, riding the top of the
+ * sheet. Five round buttons, 44 px targets.
+ */
+.tooldock {
+  position: absolute;
+  z-index: 6;
+  bottom: calc(var(--dock-height) + var(--sheet-live-height));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  margin-bottom: var(--space-2);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-1) 72%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: var(--line-hair) solid var(--color-line);
+  /* No transition on bottom: a frozen transition left it 42 px into the sheet in the audits. */
+}
+
+.tooldock__btn {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text);
+}
+
+.tooldock__btn--on {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* ------------------------------------------------------------ time bar */
+
+.tbar {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-1) 0 var(--space-2);
+}
+
+.tbar__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+/* The big date and time; the real control is the invisible input over it. */
+.tbar__when {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-height: 44px;
+}
+
+.tbar__day {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.tbar__time {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.tbar__zone {
+  font-size: var(--text-label);
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.tbar__jump {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  font-size: var(--text-base);
+}
+
+.tbar__reset {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text);
+}
+
+.tbar__strip {
+  overflow: hidden;
+  border-radius: var(--radius-flat);
+  touch-action: pan-y;
+  cursor: grab;
+}
+
+.tbar__strip svg {
+  display: block;
+}
+
+.tbar__horizon {
+  stroke: var(--white);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+  opacity: 0.7;
+}
+
+.tbar__sun {
+  fill: none;
+  stroke: var(--sun);
+  stroke-width: 2.5;
+}
+
+.tbar__moon {
+  fill: none;
+  stroke: var(--grey-1);
+  stroke-width: 2;
+  stroke-dasharray: 5 3;
+}
+
+.tbar__mark circle {
+  fill: var(--black);
+  stroke: var(--sun);
+  stroke-width: 1.5;
+}
+
+.tbar__mark path {
+  fill: none;
+  stroke: var(--sun);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+.tbar__mark--moon circle,
+.tbar__mark--moon path {
+  stroke: var(--grey-1);
+}
+
+.tbar__tick line {
+  stroke: var(--grey-2);
+  stroke-width: 1;
+}
+
+.tbar__tick text {
+  fill: var(--color-text-muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The needle: the accent white. Red in this app is hazard and nothing else. */
+.tbar__needle {
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+/* ------------------------------------------------------------ sky card */
+
+.skyc__tabs {
+  display: flex;
+  gap: var(--space-1);
+  overflow-x: auto;
+  margin-bottom: var(--space-3);
+}
+
+.skyc__tab {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.skyc__tab--on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.skyc__pic {
+  display: block;
+  width: 100%;
+  max-width: 260px;
+  margin: 0 auto var(--space-2);
+}
+
+.skyc__pic--wide {
+  max-width: 100%;
+}
+
+.skyc__ring {
+  fill: none;
+  stroke: var(--color-line-strong);
+}
+
+.skyc__cardinal {
+  fill: var(--color-text-muted);
+  font-size: 10px;
+}
+
+.skyc__night {
+  fill: #030304;
+}
+
+.skyc__horizon {
+  stroke: var(--white);
+  stroke-dasharray: 2 4;
+  opacity: 0.7;
+}
+
+.skyc__thing--moon circle {
+  fill: var(--white);
+}
+
+.skyc__thing--core ellipse {
+  fill: color-mix(in srgb, var(--white) 55%, transparent);
+}
+
+.skyc__thing--pole path,
+.skyc__thing--radiant path {
+  fill: none;
+  stroke: var(--white);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+.skyc__ray {
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.skyc__ray--rise {
+  stroke: var(--sun-rise);
+}
+
+.skyc__ray--set {
+  stroke: var(--sun-set);
+}
+
+.skyc__ray--june-solstice {
+  stroke: var(--sun);
+}
+
+.skyc__ray--december-solstice {
+  stroke: var(--sun-shadow);
+}
+
+.skyc__ray--march-equinox,
+.skyc__ray--september-equinox {
+  stroke: var(--grey-1);
+}
+
+.skyc__ray--today {
+  stroke: var(--white);
+  stroke-dasharray: 4 3;
+}
+
+.skyc__sun {
+  fill: var(--sun);
+}
+
+.skyc__moondark {
+  fill: var(--surface-2);
+}
+
+.skyc__moonlit {
+  fill: var(--white);
+}
+
+.skyc__facts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.skyc__facts li {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+}
+
+.skyc__facts--pairs div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.skyc__facts--pairs dt {
+  color: var(--color-text-muted);
+}
+
+.skyc__facts--pairs dd {
+  margin: 0;
+  text-align: right;
+}
+
+.skyc__key {
+  flex: 0 0 auto;
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--white);
+}
+
+.skyc__key--june-solstice {
+  background: var(--sun);
+}
+
+.skyc__key--december-solstice {
+  background: var(--sun-shadow);
+}
+
+.skyc__key--march-equinox,
+.skyc__key--september-equinox {
+  background: var(--grey-1);
+}
+
+.skyc__head {
+  margin: var(--space-3) 0 var(--space-1);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.skyc__note {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.skyc__modes {
+  display: flex;
+  gap: var(--space-1);
+  margin: var(--space-2) 0;
+}
+
+.skyc__mode {
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+.skyc__mode--on {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.skyc__list,
+.skyc__bars {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 2px;
+}
+
+.skyc__row {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  align-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  text-align: left;
+}
+
+.skyc__why {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.skyc__bar {
+  position: relative;
+  width: 100%;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+}
+
+.skyc__bardate {
+  flex: 0 0 3.2em;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.skyc__barfill {
+  height: 10px;
+  min-width: 2px;
+  border-radius: 5px;
+  background: var(--white);
+}
+
+.skyc__barscore {
+  font-size: var(--text-sm);
+}
+
+.skyc__bar:disabled .skyc__barfill {
+  background: var(--surface-3);
+}
+
+/* Time pills where the sunrise, sunset and moon rays leave the screen. Decoration. */
+.raypills {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.raypill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--black);
+  border: 1.5px solid var(--sun);
+  color: var(--white);
+  font-size: var(--text-label);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.raypill--sunrise {
+  border-color: var(--sun-rise);
+}
+
+.raypill--sunset {
+  border-color: var(--sun-set);
+}
+
+.raypill--moonrise,
+.raypill--moonset {
+  border-color: var(--grey-1);
+}
+
+/* The light now: the band in large type, then two plain lines. */
+.lightnow {
+  margin-bottom: var(--space-3);
+}
+
+.lightnow__band {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.lightnow__band--golden {
+  color: var(--sun);
+}
+
+.lightnow__band--blue {
+  color: var(--sun-shadow);
+}
+
+.lightnow__line {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+:root {
+  /* The tool dock's height with its margin: 44 px buttons, 4 px padding each side, 8 px clear above the sheet. */
+  --tooldock-height: 62px;
+}
+
+/* The shadow legend: a quiet line under the chips, saying what is missing from the shadows. */
+.shadowkey {
+  position: absolute;
+  z-index: 5;
+  left: var(--space-2);
+  right: var(--space-2);
+  bottom: calc(var(--dock-height) + var(--sheet-live-height) + var(--tooldock-height) + var(--space-3));
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-flat);
+  background: color-mix(in srgb, var(--black) 78%, transparent);
+  color: var(--color-text);
+  font-size: var(--text-label);
+  line-height: 1.35;
 }

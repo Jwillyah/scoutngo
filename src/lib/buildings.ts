@@ -17,6 +17,7 @@
  * the forecast already make. Nothing is stored and there is no key.
  */
 
+import { readSavedBuildings, saveBuildings } from './savedBuildings.ts'
 import {
   parseBuildingHeight,
   type BuildingHeight,
@@ -124,7 +125,8 @@ export function buildingsToGeoJson(buildings: readonly Building[]): {
 }
 
 export type BuildingsResult =
-  | { status: 'ok'; buildings: Building[]; cached: boolean }
+  /** `savedAt` when the list came from the phone because Overpass could not be reached. */
+  | { status: 'ok'; buildings: Building[]; cached: boolean; savedAt?: string }
   | { status: 'unavailable'; reason: string }
 
 const cache = new Map<string, Building[]>()
@@ -163,8 +165,12 @@ export async function fetchBuildings(bounds: MapBounds): Promise<BuildingsResult
     }
     const buildings = parseBuildings(await response.json())
     cache.set(cacheKey, buildings)
+    saveBuildings(cacheKey, buildings)
     return { status: 'ok', buildings, cached: false }
   } catch {
+    /* No signal: the copy kept on the phone, said with its age. */
+    const saved = readSavedBuildings(cacheKey)
+    if (saved !== null) return { status: 'ok', buildings: saved.buildings, cached: true, savedAt: saved.fetchedAt }
     return {
       status: 'unavailable',
       reason: controller.signal.aborted

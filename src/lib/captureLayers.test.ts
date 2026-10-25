@@ -56,7 +56,7 @@ describe('appLayerIdsIn', () => {
    * to the model, and it survived because nothing forced anyone to notice a new
    * layer. The pilot line was added to this list because this test failed.
    */
-  it('knows the thirteen sources hidden before a capture', () => {
+  it('knows the fourteen sources hidden before a capture', () => {
     expect([...APP_SOURCES].sort()).toEqual(
       [
         /* The airspace overlay and the two-pin measure. */
@@ -68,6 +68,8 @@ describe('appLayerIdsIn', () => {
         'measure-line',
         'pilot-links',
         'reach-radius',
+        /* Building shadows and the subject's. */
+        'shadow-map',
         'shot-footprints',
         /* The marked hazards, and the line being drawn. Our own drawings. */
         'site-mark-draft',

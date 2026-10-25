@@ -81,6 +81,9 @@ export const MARK_DRAFT_SOURCE = 'site-mark-draft'
 /** The airspace overlay: class areas, the facility grid, restricted areas, parks. */
 export const AIRSPACE_SOURCE = 'airspace-overlay'
 
+/** Building shadows and the subject's shadow, for the time on the bar. */
+export const SHADOW_SOURCE = 'shadow-map'
+
 /** The two-pin measure line. */
 export const MEASURE_SOURCE = 'measure-line'
 
@@ -98,6 +101,7 @@ export const APP_SOURCES: readonly string[] = [
   MARK_DRAFT_SOURCE,
   AIRSPACE_SOURCE,
   MEASURE_SOURCE,
+  SHADOW_SOURCE,
 ]
 
 /**

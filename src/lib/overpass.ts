@@ -45,6 +45,8 @@ export function buildQuery(bounds: MapBounds): string {
   way["natural"="water"](${bbox});
   way["natural"="coastline"](${bbox});
   way["waterway"](${bbox});
+  relation["natural"="water"](${bbox});
+  relation["waterway"="riverbank"](${bbox});
   way["building"](${bbox});
   way["man_made"="pier"](${bbox});
   way["highway"](${bbox});
@@ -71,6 +73,42 @@ export interface OverpassElement {
   /** A node has a coordinate rather than a geometry. Poles and towers are nodes. */
   lat?: unknown
   lon?: unknown
+  /** A relation's members, each way with its own geometry under `out geom`. */
+  members?: { type?: unknown; role?: unknown; geometry?: { lat: number; lon: number }[] }[]
+}
+
+/*
+ * RIVERS ARE OFTEN RELATIONS, NOT WAYS. The Wicomico at Brew River is three
+ * multipolygon relations, and this parser read water WAYS only, so Suggest
+ * could stand a tripod in it and the water check said nothing. A relation's
+ * outline is its member ways joined end to end; this joins them into closed
+ * rings. A chain that never closes is dropped rather than closed by guesswork.
+ */
+export function stitchRings(lines: readonly Position[][]): Position[][] {
+  const key = (p: Position) => `${p[0]},${p[1]}`
+  const pool = lines.filter((l) => l.length >= 2).map((l) => [...l])
+  const rings: Position[][] = []
+  while (pool.length > 0) {
+    let ring = pool.shift() ?? []
+    for (let guard = 0; guard < 10_000 && key(ring[0]) !== key(ring[ring.length - 1]); guard += 1) {
+      const end = key(ring[ring.length - 1])
+      const i = pool.findIndex((l) => key(l[0]) === end || key(l[l.length - 1]) === end)
+      if (i === -1) break
+      const next = pool.splice(i, 1)[0]
+      ring = ring.concat(key(next[0]) === end ? next.slice(1) : [...next].reverse().slice(1))
+    }
+    if (ring.length >= 4 && key(ring[0]) === key(ring[ring.length - 1])) rings.push(ring)
+  }
+  return rings
+}
+
+function relationWater(raw: OverpassElement): Ring[][] {
+  const ways = (role: string) =>
+    (raw.members ?? [])
+      .filter((m) => m.type === 'way' && m.role === role && Array.isArray(m.geometry))
+      .map((m) => (m.geometry ?? []).map((g) => [round6(g.lon), round6(g.lat)] as Position))
+  const inners = stitchRings(ways('inner'))
+  return stitchRings(ways('outer')).map((outer) => [outer, ...inners])
 }
 
 export interface SiteGeometry {
@@ -154,6 +192,16 @@ export function parseOverpass(payload: unknown): SiteGeometry {
 
   for (const raw of elements as OverpassElement[]) {
     const tags = raw.tags ?? {}
+
+    if (raw.type === 'relation') {
+      if (tags.natural === 'water' || tags.waterway === 'riverbank') {
+        for (const shape of relationWater(raw)) {
+          water.push(shape)
+          summary.water.push(simplify(shape[0], 24))
+        }
+      }
+      continue
+    }
 
     /*
      * POWER FIRST, because a pole is a NODE with a lat and lon rather than a

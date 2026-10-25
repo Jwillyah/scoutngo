@@ -119,12 +119,18 @@ export function equatorialToHorizontal(
 /**
  * Sagittarius A*, the galactic centre.
  *
- * J2000: RA 17h45m40.0s = 266.4167 degrees, Dec -29d00m28s = -28.9408 degrees.
+ * J2000: RA 17h45m40.0s = 266.4167 degrees, Dec -29d00m28s = -29.0078 degrees.
+ *
+ * THIS SAID -28.9408, an arithmetic slip: -(29 + 0/60 + 28/3600) is -29.0078.
+ * Fifteen hundredths of a degree, which moved nothing a shooter could see,
+ * but it was a number nobody could check against its own comment. The test
+ * now derives it from the sexagesimal figures instead of restating it.
+ *
  * Rounded to the figures the shoot actually uses. The bright part of the Milky
  * Way that a photographer frames is a region many degrees across, so a tenth
  * of a degree on its centre is far below the thing being pointed at.
  */
-export const GALACTIC_CORE = { ra: 266.4, dec: -28.94 } as const
+export const GALACTIC_CORE = { ra: 266.42, dec: -29.008 } as const
 
 export type ShowerId =
   | 'quadrantids'

@@ -52,6 +52,7 @@ describe('the reserved list', () => {
     '.topbar',
     '.chips2',
     '.rail2',
+    '.tooldock',
     '.hud',
     '.mapctl',
     '.sheet',
@@ -64,6 +65,7 @@ describe('the reserved list', () => {
     '.newbuild',
     '.tapnote',
     '.skykey',
+    '.shadowkey',
   ]
 
   it('reserves every floating surface this app renders', () => {

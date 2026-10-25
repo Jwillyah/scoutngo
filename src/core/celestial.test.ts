@@ -210,8 +210,9 @@ describe('the shower table', () => {
   })
 
   it('puts the galactic core where Sagittarius A* is', () => {
-    expect(GALACTIC_CORE.ra).toBeCloseTo(266.4, 1)
-    expect(GALACTIC_CORE.dec).toBeCloseTo(-28.94, 2)
+    /* Derived from Sgr A*'s J2000 sexagesimal position, not restated. */
+    expect(GALACTIC_CORE.ra).toBeCloseTo(((17 + 45 / 60 + 40.0 / 3600) * 15), 1)
+    expect(GALACTIC_CORE.dec).toBeCloseTo(-(29 + 28 / 3600), 2) /* -29d 00m 28s */
   })
 
   it('has the Orionid radiant up before dawn in late October from Virginia', () => {

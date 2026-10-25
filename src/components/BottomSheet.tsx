@@ -34,20 +34,40 @@ export type { SheetDetent }
  * the thing they act on lives.
  */
 const PEEK_PX = 88
+
+/*
+ * A SHEET MAY ASK FOR A TALLER PEEK. The plan sheet's peek carries the time
+ * bar -- a date line and a strip of sky -- which does not fit in 88 and was
+ * measured cut off at the screen edge with only its header showing.
+ */
 const HALF_FRACTION = 0.45
+/** The least card a half sheet shows below its peek. */
+const HALF_BODY_MIN_PX = 200
 const FULL_FRACTION = 0.92
+
+/** How far a drag on an axis-locked region moves before its direction decides whose it is. */
+const AXIS_SLOP_PX = 8
 
 /** How far past a detent a drag may stretch before it stops following. */
 const RUBBER_BAND_PX = 64
 
-function heightFor(detent: SheetDetent, viewport: number): number {
-  if (detent === 'peek') return PEEK_PX
-  return viewport * (detent === 'half' ? HALF_FRACTION : FULL_FRACTION)
+function heightFor(detent: SheetDetent, viewport: number, peekPx: number = PEEK_PX): number {
+  if (detent === 'peek') return peekPx
+  /*
+   * HALF LEAVES ROOM UNDER THE PEEK. With the time bar the peek is 164, and at
+   * 660 tall 45% left 134 px of body, which no shot row could land in. Half is
+   * never less than the peek plus HALF_BODY_MIN_PX of card, and never more
+   * than full.
+   */
+  if (detent === 'half') {
+    return Math.min(viewport * FULL_FRACTION, Math.max(viewport * HALF_FRACTION, peekPx + HALF_BODY_MIN_PX))
+  }
+  return viewport * FULL_FRACTION
 }
 
-function nearestDetent(height: number, viewport: number): SheetDetent {
+function nearestDetent(height: number, viewport: number, peekPx: number): SheetDetent {
   return SHEET_DETENTS.reduce((best, stop) =>
-    Math.abs(heightFor(stop, viewport) - height) < Math.abs(heightFor(best, viewport) - height)
+    Math.abs(heightFor(stop, viewport, peekPx) - height) < Math.abs(heightFor(best, viewport, peekPx) - height)
       ? stop
       : best,
   )
@@ -68,6 +88,8 @@ function rubberBand(height: number, min: number, max: number): number {
 }
 
 interface BottomSheetProps {
+  /** The peek's height in CSS px. Default 88: one line and a control. */
+  peekPx?: number
   detent: SheetDetent
   onDetentChange: (next: SheetDetent) => void
   /** Always visible, at every detent. */
@@ -109,6 +131,7 @@ export function BottomSheet({
   detent,
   onDetentChange,
   peek,
+  peekPx = PEEK_PX,
   half,
   full,
   onHeightChange,
@@ -147,7 +170,7 @@ export function BottomSheet({
    * derived from it every time rather than held anywhere. The only local state
    * is the live drag, which is null except between pointerdown and pointerup.
    */
-  const height = dragHeight ?? heightFor(detent, viewport)
+  const height = dragHeight ?? heightFor(detent, viewport, peekPx)
 
   useEffect(() => {
     onHeightChange?.(height)
@@ -177,9 +200,21 @@ export function BottomSheet({
    *   pulling the sheet down from halfway through a list is not what anyone
    *   means
    */
+  /*
+   * AN AXIS-LOCKED REGION: the time bar's strip, which scrubs sideways. A drag
+   * that starts there is held undecided until it has moved; up or down makes
+   * it the sheet's, sideways leaves it to the strip. Without this the strip
+   * covered most of the peek and the sheet could only be moved by its grabber.
+   */
+  const pending = useRef<{ x: number; y: number; id: number; el: Element } | null>(null)
+
   const onPointerDown = useCallback(
     (event: React.PointerEvent) => {
       const target = event.target as HTMLElement | null
+      if (target !== null && target.closest('[data-axis-lock]') !== null) {
+        pending.current = { x: event.clientX, y: event.clientY, id: event.pointerId, el: event.currentTarget }
+        return
+      }
       if (target !== null) {
         /* A child that claims the gesture keeps it. */
         if (target.closest('[data-scrub]') !== null) return
@@ -189,31 +224,50 @@ export function BottomSheet({
         const scroller = target.closest('.sheet__body')
         if (scroller !== null && scroller.scrollTop > 0) return
       }
-      drag.current = { startY: event.clientY, startHeight: heightFor(detent, viewport) }
+      drag.current = { startY: event.clientY, startHeight: heightFor(detent, viewport, peekPx) }
       event.currentTarget.setPointerCapture(event.pointerId)
     },
-    [detent, viewport],
+    [detent, viewport, peekPx],
   )
 
   const onPointerMove = useCallback(
     (event: React.PointerEvent) => {
+      const waiting = pending.current
+      if (waiting !== null && drag.current === null) {
+        const dx = Math.abs(event.clientX - waiting.x)
+        const dy = Math.abs(event.clientY - waiting.y)
+        if (dx > AXIS_SLOP_PX && dx >= dy) {
+          pending.current = null
+          return
+        }
+        if (dy > AXIS_SLOP_PX && dy > dx) {
+          pending.current = null
+          drag.current = { startY: waiting.y, startHeight: heightFor(detent, viewport, peekPx) }
+          try {
+            ;(waiting.el as HTMLElement).setPointerCapture(waiting.id)
+          } catch {
+            /* A synthetic pointer has nothing to capture; the drag still runs on bubbled moves. */
+          }
+        }
+      }
       if (drag.current === null) return
       const raw = drag.current.startHeight + (drag.current.startY - event.clientY)
-      const next = rubberBand(raw, PEEK_PX, viewport * FULL_FRACTION)
+      const next = rubberBand(raw, peekPx, viewport * FULL_FRACTION)
       dragHeightRef.current = next
       setDragHeight(next)
     },
-    [viewport],
+    [viewport, detent, peekPx],
   )
 
   const endDrag = useCallback(() => {
+    pending.current = null
     if (drag.current === null) return
     const settled = dragHeightRef.current
     drag.current = null
     dragHeightRef.current = null
     setDragHeight(null)
-    if (settled !== null) onDetentChange(nearestDetent(settled, viewport))
-  }, [onDetentChange, viewport])
+    if (settled !== null) onDetentChange(nearestDetent(settled, viewport, peekPx))
+  }, [onDetentChange, viewport, peekPx])
 
   /** Tapping the grabber steps up, and wraps from the top back to peek. */
   const step = () => {

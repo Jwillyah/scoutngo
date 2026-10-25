@@ -501,7 +501,7 @@ try {
   await step(
     'open layers',
     `(() => {
-       const b = [...document.querySelectorAll('.rail2__btn')]
+       const b = [...document.querySelectorAll('.rail2__btn, .tooldock__btn')]
          .find(x => /layer/i.test(x.getAttribute('aria-label') ?? ''))
        if (!b) return 'NO LAYERS BUTTON'
        b.click()
@@ -639,7 +639,7 @@ try {
   await step(
     'open layers',
     `(() => {
-       const b = [...document.querySelectorAll('.rail2__btn')]
+       const b = [...document.querySelectorAll('.rail2__btn, .tooldock__btn')]
          .find(x => /layer/i.test(x.getAttribute('aria-label') ?? ''))
        if (!b) return 'NO LAYERS BUTTON'
        b.click()

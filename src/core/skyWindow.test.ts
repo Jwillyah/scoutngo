@@ -232,7 +232,7 @@ describe('a reason, never a guess', () => {
 
   it('says so when the target never clears the horizon', () => {
     /*
-     * The galactic core sits at dec -28.94, so from Tromso at 69.6 N its
+     * The galactic core sits at dec -29.01, so from Tromso at 69.6 N its
      * highest possible altitude is about -8.6 degrees: it never rises, ever.
      * Tromso in late October does get astronomically dark, so the TARGET is
      * the binding constraint here and not the sun.
