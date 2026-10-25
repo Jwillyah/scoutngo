@@ -27,7 +27,7 @@ import type { SiteWarning } from '../core/siting.ts'
 import type { TideExtreme, TideSample } from '../core/tide.ts'
 import { fetchGroundView } from './groundView.ts'
 import type { PlannedPosition } from './plan.ts'
-import type { Platform } from './parsePlan.ts'
+import type { Platform } from '../core/platformFilter.ts'
 
 export const FIELD_PACK_KEY = 'scoutngo.fieldpack.v1'
 /*

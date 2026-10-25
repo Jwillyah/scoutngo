@@ -50,7 +50,7 @@ import { cameraBearingOf, drawsCone, type Aim, type ShotType } from '../core/sho
 import type { SunPosition } from '../core/sun.ts'
 import { isWithinRadius, metersBeyondRadius } from '../core/radius.ts'
 import { checkSite, EMPTY_LANDCOVER, type Landcover, type SiteWarning } from '../core/siting.ts'
-import type { Platform } from './parsePlan.ts'
+import type { Platform } from '../core/platformFilter.ts'
 
 /**
  * A camera position. The model proposes where to stand and what to shoot; it
@@ -271,9 +271,9 @@ function resolveOptic(
    *
    * There is no fallback now because there is no legitimate way in. The picker
    * offers only this platform's optics, setOptic refuses the rest, addPosition
-   * starts an air position on a camera, and parsePlan drops any air position
-   * whose optic is not an aircraft camera at exactly its published focal
-   * length. A mismatch arriving here is a bug in one of those, and it says so
+   * starts an air position on a camera, and Suggest builds an air position
+   * only from an aircraft camera in the bag, at its published focal length.
+   * A mismatch arriving here is a bug in one of those, and it says so
    * rather than quietly substituting the wrong lens.
    */
   if (position.platform === 'air') {

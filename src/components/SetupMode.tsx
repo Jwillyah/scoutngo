@@ -4,7 +4,7 @@ import { destinationPoint, type LatLon } from '../core/geo.ts'
 import type { BuildCheck } from '../lib/build.ts'
 import { BuildStamp } from './BuildStamp.tsx'
 import { exampleIndex, SHOOT_EXAMPLES, SHOT_LIST_EXAMPLES } from '../lib/examples.ts'
-import type { DesiredShot } from '../lib/describe.ts'
+import type { DesiredShot } from '../lib/shotList.ts'
 import type { KitProfile as KitProfileType } from '../core/kit.ts'
 import { pickableKit, type KitSelection } from '../lib/kitSelection.ts'
 import type { PlatformFilter } from '../core/platformFilter.ts'
@@ -21,7 +21,6 @@ import { SearchField } from './SearchField.tsx'
 import { ColdStart } from './ColdStart.tsx'
 import { SpotsPanel } from './SpotsPanel.tsx'
 import { ShootChips } from './ShootChips.tsx'
-import { StaleBrief } from './StaleBrief.tsx'
 import { UseMyLocation } from './UseMyLocation.tsx'
 import type { ResolvedName } from '../core/venueName.ts'
 import type { Units } from '../lib/units.ts'
@@ -37,10 +36,6 @@ interface SetupModeProps {
   reachMeters: number
   onReachChange: (meters: number) => void
   mapHandle: React.Ref<MapHandle>
-  staleBrief: boolean
-  drift: string
-  onClearBrief: () => void
-  onKeepBrief: () => void
   kit: KitSelection
   onKit: (next: KitSelection) => void
   /** The shooter's own gear, editable under Kit and style. */
@@ -109,7 +104,7 @@ interface SetupModeProps {
    * A request to show the shooter what is blocking them. The tick changes on
    * every press of a blocked forward button, so pressing it twice points twice.
    */
-  pointAt: { field: SetupTarget | 'brief' | null; tick: number }
+  pointAt: { field: SetupTarget | null; tick: number }
   /** Whether a newer build is deployed, for the stamp under Settings. */
   newBuild: BuildCheck
   /** Brings back the landing page, which is otherwise shown once. */
@@ -144,10 +139,6 @@ export function SetupMode({
   reachMeters,
   onReachChange,
   mapHandle,
-  staleBrief,
-  drift,
-  onClearBrief,
-  onKeepBrief,
   kit,
   onKit,
   kitProfile,
@@ -259,8 +250,7 @@ export function SetupMode({
    */
   useEffect(() => {
     if (pointAt.field === null || pointAt.tick === 0) return
-    /* The brief box is gone; a stale brief is now flagged beside the venue, so point there. */
-    const node = { venue: venueRef, date: dateRef, window: windowRef, brief: venueRef }[
+    const node = { venue: venueRef, date: dateRef, window: windowRef }[
       pointAt.field
     ].current
     if (node === null) return
@@ -579,13 +569,6 @@ export function SetupMode({
           * find out; a list of spots is the answer that needs no guess.
           */}
         {at !== null ? null : <ColdStart spots={spots} onLoad={onLoadSpot} />}
-
-        <StaleBrief
-          staleBrief={staleBrief}
-          drift={drift}
-          onClearBrief={onClearBrief}
-          onKeepBrief={onKeepBrief}
-        />
 
         {/*
           * CHIPS FIRST, BOX SECOND.

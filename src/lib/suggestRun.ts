@@ -33,7 +33,7 @@ import { fetchBuildings } from './buildings.ts'
 import type { KitSelection } from './kitSelection.ts'
 import { fetchSiteGeometry, type SiteGeometry } from './overpass.ts'
 import type { CameraPosition } from './plan.ts'
-import type { MapBounds } from './planRequest.ts'
+import type { MapBounds } from './generation.ts'
 import { boxAround } from './tileRange.ts'
 import { formatRange, type Units } from './units.ts'
 

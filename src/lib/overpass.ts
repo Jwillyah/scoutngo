@@ -15,7 +15,7 @@
 import type { Position } from '../core/geo.ts'
 import type { Landcover, Ring, RoadLine } from '../core/siting.ts'
 import type { SiteMark } from '../core/siteMark.ts'
-import type { MapBounds } from './planRequest.ts'
+import type { MapBounds } from './generation.ts'
 
 export const OVERPASS_URL = 'https://overpass-api.de/api/interpreter'
 /** Their own guidance is to keep it modest. One call per generate, minimum gap. */

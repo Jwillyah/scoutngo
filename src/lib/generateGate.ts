@@ -36,7 +36,7 @@ export interface GenerateBlock {
   /** What to say, in the shooter's terms. */
   message: string
   /** What tapping "Fix it" should point at in Setup, or null to just go there. */
-  field: SetupTarget | 'brief' | null
+  field: SetupTarget | null
   /** The label on the button that goes and fixes it. */
   action: string
 }
@@ -78,9 +78,8 @@ export function generateBlock(input: {
    *
    * The chips already say what the shoot is, more precisely than a sentence
    * would: "Sunrise" is a band of the sun's own altitude computed for this
-   * venue on this date, and "Drone" is a platform the parser enforces. So the
-   * brief is built from them in src/core/shootBrief.ts, and that text states
-   * plainly that no event was described and must not be invented.
+   * venue on this date, and "Drone" is a platform Suggest enforces. No brief is
+   * needed at all now: Suggest is arithmetic and reads none.
    *
    * Requiring the sentence as well re-added, as a gate, the text box the chips
    * were built to demote.

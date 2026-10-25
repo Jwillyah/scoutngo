@@ -4,7 +4,7 @@ import {
   stageIndex,
   type GenerateStage,
   type GenerationState,
-} from '../lib/planRequest.ts'
+} from '../lib/generation.ts'
 import type { PlanCoverage } from '../lib/plan.ts'
 import type { SetupTarget } from '../lib/mode.ts'
 import { CoverageNotice } from './CoverageNotice.tsx'
@@ -12,7 +12,7 @@ import { CoverageNotice } from './CoverageNotice.tsx'
 interface PlanStatusProps {
   generation: GenerationState
   /** Goes and fixes whatever a block named. See src/lib/generateGate.ts. */
-  onFixBlock: (field: SetupTarget | 'brief' | null) => void
+  onFixBlock: (field: SetupTarget | null) => void
   planCoverage: PlanCoverage | null
   /** Set when Overpass could not be reached, so siting was not checked. */
   siteNote: string | null

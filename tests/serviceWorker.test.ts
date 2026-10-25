@@ -125,7 +125,7 @@ describe('what it touches', () => {
   it('leaves map tiles, the API and other hosts alone', () => {
     expect(get('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/18/1/2')).toBe('pass')
     expect(get('https://s3.amazonaws.com/elevation-tiles-prod/terrarium/15/1/2.png')).toBe('pass')
-    expect(get(`${ORIGIN}/api/generate`)).toBe('pass')
+    expect(get(`${ORIGIN}/api/search`)).toBe('pass')
     expect(get(`${ORIGIN}/sw.js`)).toBe('pass')
     expect(routeOf({ url: `${ORIGIN}/assets/x.js`, method: 'POST', mode: 'cors' }, ORIGIN)).toBe('pass')
   })

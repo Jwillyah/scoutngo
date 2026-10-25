@@ -14,7 +14,7 @@ import type { SiteWarning } from '../core/siting.ts'
 import { fetchSightlineCloud, type ForecastKind } from '../lib/forecast.ts'
 import { fetchGroundView, type GroundView } from '../lib/groundView.ts'
 import type { KitProfile as KitProfileType } from '../core/kit.ts'
-import { FAA_CEILING_FEET } from '../lib/parsePlan.ts'
+import { MAX_ALTITUDE_FEET as FAA_CEILING_FEET } from '../core/air.ts'
 import type { LatLon } from '../core/geo.ts'
 import { formatReach, metersToFeet } from '../core/reachScale.ts'
 import {

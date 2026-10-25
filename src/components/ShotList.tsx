@@ -3,7 +3,7 @@ import { SHOT_TYPE_LABEL } from '../core/shotType.ts'
 import { lightLine } from '../lib/lightCopy.ts'
 import type { FramingWarning } from '../core/fov.ts'
 import type { SiteWarning } from '../core/siting.ts'
-import type { DesiredShot } from '../lib/describe.ts'
+import type { DesiredShot } from '../lib/shotList.ts'
 import type { PlanCoverage, PlannedPosition } from '../lib/plan.ts'
 import { CoverageNotice } from './CoverageNotice.tsx'
 

@@ -4151,30 +4151,6 @@
   color: var(--color-text-faint);
 }
 
-/* --------------------------------------------------------- stale brief */
-
-.stale {
-  margin: var(--space-3) var(--page-pad) 0;
-  padding: var(--space-3);
-  background: var(--color-hazard-bg);
-  border-left: var(--line-heavy, 3px) solid var(--color-hazard);
-  border-radius: var(--radius-panel);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.stale__head {
-  font-size: var(--text-md);
-  font-weight: var(--weight-heavy);
-  color: var(--white);
-}
-
-.stale__body {
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
-
 /* ---------------------------------------------------------- drone bits */
 
 /*

@@ -22,7 +22,7 @@ describe('a generate that cannot run says why', () => {
   /*
    * AND IT RUNS WITH NO TYPED BRIEF, which is the follow-up. The chips say
    * what the shoot is; requiring a sentence as well re-added the text box the
-   * chips replaced, as a gate. See src/core/shootBrief.ts.
+   * chips replaced, as a gate.
    */
   it('runs with no typed brief at all', () => {
     expect(generateBlock({ errors: {}, missing: null })).toBeNull()

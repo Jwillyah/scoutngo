@@ -14,8 +14,8 @@ import { forecastAge, type Provenance } from '../lib/savedForecast.ts'
 import type { TideExtreme, TideState } from '../core/tide.ts'
 import type { SunArc, SunPosition } from '../core/sun.ts'
 import type { PlanCoverage, PlannedPosition } from '../lib/plan.ts'
-import type { GenerationState } from '../lib/planRequest.ts'
-import type { DesiredShot } from '../lib/describe.ts'
+import type { GenerationState } from '../lib/generation.ts'
+import type { DesiredShot } from '../lib/shotList.ts'
 import type { FieldPack } from '../lib/fieldPack.ts'
 import type { TideInfo } from '../lib/useTide.ts'
 import type { VenueWindow } from '../lib/venue.ts'
@@ -164,7 +164,7 @@ interface PlanModeProps {
   positionNote: string | null
   onGenerate: () => void
   /** Takes the shooter to whatever a blocked generate named. */
-  onFixBlock: (field: SetupTarget | 'brief' | null) => void
+  onFixBlock: (field: SetupTarget | null) => void
   /** The shooter's own gear. The lens picker and cone labels read it. */
   kitProfile: KitProfileType
   /** Which of the kit is packed, so the optic picker offers only that. */
@@ -213,7 +213,6 @@ interface PlanModeProps {
   /** The shoot date, yyyy-mm-dd, for the leaf answer on a deciduous mark. */
   shootDate: string
   /** Which brief a generate would send: the typed one, or the chips. */
-  briefSource: string
   /** Which measure the sky layer paints. */
   skyLayer: SkyLayerKind
   onSkyLayer: (next: SkyLayerKind) => void

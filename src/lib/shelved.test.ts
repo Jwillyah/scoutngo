@@ -11,7 +11,7 @@ import {
   setShelved,
   withoutShelved,
 } from './kitSelection.ts'
-import { selectedLenses, selectedOptics } from './planRequest.ts'
+import { bagOptics } from './suggestRun.ts'
 
 /*
  * SHELVED: MINE, BUT STOP OFFERING IT. Three states, and the one this file is
@@ -44,8 +44,7 @@ describe('three states for one piece of gear', () => {
 
   it('never appears in what the position card offers or the model is sent', () => {
     expect(opticsFor('ground', DEFAULT_KIT, bag).map((o) => o.id)).not.toContain('sony-75-300')
-    expect(selectedLenses(bag).map((l) => l.id)).not.toContain('sony-75-300')
-    expect(selectedOptics(bag).map((o) => o.id)).not.toContain('sony-75-300')
+    expect(bagOptics(DEFAULT_KIT, bag).map((o) => o.id)).not.toContain('sony-75-300')
     expect(defaultOpticFor('ground', DEFAULT_KIT, bag)?.id).not.toBe('sony-75-300')
   })
 
@@ -83,9 +82,36 @@ describe('the amendment asked for by name', () => {
     expect(second.said).toEqual([])
   })
 
-  it('invents nothing about the lens it was not told', () => {
+  it('adds the lens as named: the f/2.8 GM II', () => {
     const lens = AMENDMENTS[0].addLenses[0]
-    expect(lens).toMatchObject({ minFocalLength: 70, maxFocalLength: 200, maxAperture: null })
+    expect(lens).toMatchObject({ name: 'Sony 70-200 f2.8 GM II', minFocalLength: 70, maxFocalLength: 200, maxAperture: 2.8 })
+  })
+
+  /*
+   * THE PHONE THAT ALREADY HAS IT. The first amendment ran there with no
+   * aperture; the second corrects that lens in place and touches nothing else.
+   */
+  it('corrects the 70-200 already on a phone from the first amendment', () => {
+    const before = {
+      ...DEFAULT_KIT,
+      lenses: [
+        ...DEFAULT_KIT.lenses,
+        { id: 'sony-70-200', name: 'Sony 70-200', minFocalLength: 70, maxFocalLength: 200, maxAperture: null, forcesSensor: [], notes: '' },
+      ],
+    }
+    const after = applyAmendments(before, ['sony-75-300'], [AMENDMENTS[0].id])
+    expect(after.profile.lenses.find((l) => l.id === 'sony-70-200')).toMatchObject({
+      name: 'Sony 70-200 f2.8 GM II',
+      maxAperture: 2.8,
+    })
+    expect(after.profile.lenses.filter((l) => l.id !== 'sony-70-200')).toEqual(DEFAULT_KIT.lenses)
+    expect(after.shelved).toEqual(['sony-75-300'])
+    expect(after.said).toEqual(['The 70-200 is the f/2.8 GM II, as you said on 26 October.'])
+  })
+
+  it('leaves a kit alone where the 70-200 was since removed', () => {
+    const after = applyAmendments(DEFAULT_KIT, [], [AMENDMENTS[0].id])
+    expect(after.profile.lenses.map((l) => l.id)).not.toContain('sony-70-200')
   })
 
   it('does not add a lens that is already there', () => {
@@ -96,16 +122,16 @@ describe('the amendment asked for by name', () => {
 })
 
 /*
- * THE MODEL WAS SENT THE SHIPPED KIT. planRequest read DEFAULT_KIT, so a lens
- * added by hand was in the bag and never offered for a suggested plan.
+ * SUGGEST WORKS FROM THE SHOOTER'S OWN KIT. The model request it replaced read
+ * DEFAULT_KIT, so a lens added by hand was never offered; Suggest's optics come
+ * from the live profile and the bag, and shelved gear never reaches it.
  */
-describe('a suggested plan is offered the shooter\'s own kit', () => {
-  it('offers a lens the shooter added', () => {
+describe('Suggest is given the shooter\'s own kit', () => {
+  it('offers a lens the shooter added, and nothing shelved', () => {
     const profile = applyAmendments(DEFAULT_KIT, [], []).profile
-    const bag = { ...defaultSelection(profile, ['sony-75-300']) }
-    expect(selectedLenses(bag, profile).map((l) => l.id)).toContain('sony-70-200')
-    expect(selectedOptics(bag, null, profile).map((o) => o.id)).toContain('sony-70-200')
-    /* And the shipped default alone could not have: */
-    expect(selectedLenses(bag).map((l) => l.id)).not.toContain('sony-70-200')
+    const bag = defaultSelection(profile, ['sony-75-300'])
+    const ids = bagOptics(profile, bag).map((o) => o.id)
+    expect(ids).toContain('sony-70-200')
+    expect(ids).not.toContain('sony-75-300')
   })
 })

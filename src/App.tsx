@@ -37,7 +37,6 @@ import { LOCATED_ZOOM } from './lib/locateOnce.ts'
 import { useNewBuild } from './lib/useNewBuild.ts'
 import { useSkyFrames } from './lib/useSkyFrames.ts'
 import { useWind } from './lib/useWind.ts'
-import { briefDriftMeters, formatDrift, isBriefStale, type BriefAnchor } from './lib/brief.ts'
 import {
   defaultSelection,
   KIT_PROFILE_STORAGE_KEY,
@@ -67,7 +66,7 @@ import {
   stageIndex,
   stageLabel,
   type GenerationState,
-} from './lib/planRequest.ts'
+} from './lib/generation.ts'
 import {
   mergeSpots,
   newSpotId,
@@ -85,7 +84,7 @@ import {
   type FieldPack,
 } from './lib/fieldPack.ts'
 import type { PackBuildState } from './components/FieldPackControl.tsx'
-import { parseShotList, type DesiredShot } from './lib/describe.ts'
+import { parseShotList, type DesiredShot } from './lib/shotList.ts'
 import { clampRadius, RADIUS_DEFAULT_METERS } from './core/radius.ts'
 import { venueTimeZone } from './core/timezone.ts'
 import { msUntilNominatim, reverseGeocode } from './lib/search.ts'
@@ -135,7 +134,6 @@ import {
 import type { MarkKind, SiteMark } from './core/siteMark.ts'
 import { kitLine } from './core/kitLine.ts'
 import { windHeightFor } from './core/windHeight.ts'
-import { briefIsTyped, briefSourceLine } from './core/shootBrief.ts'
 import type { SkyLayerKind } from './core/skyLayer.ts'
 import { revivalNote, revivePositions } from './lib/revivePositions.ts'
 import { generateBlock } from './lib/generateGate.ts'
@@ -514,11 +512,6 @@ function App() {
   const [lensFilters, setLensFilters] = useState<string[]>([])
   const [isolatedId, setIsolatedId] = useState<string | null>(null)
 
-  /* Where the brief text was written. See lib/brief.ts. */
-  const [briefAnchor, setBriefAnchor] = useState<BriefAnchor | null>(() =>
-    wantsCalibration() ? { at: { lat: 38.364236, lon: -75.605912 } } : null,
-  )
-
   const [spots, setSpots] = usePersistentState<Spot[]>(SPOTS_STORAGE_KEY, [], reviveSpots)
 
   /*
@@ -709,19 +702,6 @@ function App() {
   }
 
   const selected = plan.find((p) => p.position.id === selectedId) ?? null
-
-  /*
-   * The brief was written about one place. If the venue has moved far from it,
-   * say so loudly and refuse to generate until it is resolved. Silently planning
-   * a boat docking contest at a beach park is the failure this prevents.
-   */
-  const staleBrief = isBriefStale(
-    briefAnchor,
-    centre,
-    venue.eventDescription,
-    venue.desiredOutcome,
-  )
-  const drift = formatDrift(briefDriftMeters(briefAnchor, centre))
 
   /* Markers respect the lens filter; cones additionally respect isolate. */
   /*
@@ -1068,26 +1048,6 @@ function App() {
    */
   const venueCache = useVenueCache(centre, reachMeters, venueNameLine)
 
-  const briefSource = useMemo(
-    () =>
-      briefSourceLine(
-        {
-          kind: shootKind,
-          platform: platformFilter,
-          venueName: venueNameLine,
-          shotCount: desiredShots.length,
-        },
-        briefIsTyped({ event: venue.eventDescription, outcome: venue.desiredOutcome }),
-      ),
-    [
-      shootKind,
-      platformFilter,
-      venueNameLine,
-      venue.eventDescription,
-      venue.desiredOutcome,
-      desiredShots.length,
-    ],
-  )
 
   /*
    * NO HOLDS ANY MORE, AND NOTHING LOST.
@@ -1302,17 +1262,9 @@ function App() {
 
   const onVenueChange = dropVenuePin
 
-  /*
-   * Editing the brief re-anchors it to wherever the venue is now: text typed
-   * here is by definition about here. Only coordinate changes make it stale.
-   */
   const onVenueDraftChange = useCallback(
     (next: VenueDraft) => {
       setVenue((current) => {
-        const briefEdited =
-          next.eventDescription !== current.eventDescription ||
-          next.desiredOutcome !== current.desiredOutcome
-        if (briefEdited && centre !== null) setBriefAnchor({ at: centre })
         /*
          * A default stops being a default the moment it is touched. Compared
          * field by field rather than wholesale, so editing the date does not
@@ -1336,7 +1288,7 @@ function App() {
         return next
       })
     },
-    [centre, cancelNameLookup],
+    [cancelNameLookup],
   )
 
   const onPositionMove = useCallback((id: string, at: LatLon) => {
@@ -1368,7 +1320,6 @@ function App() {
       nameIsFilled.current = false
       cancelNameLookup()
       setDefaults((d) => ({ ...d, name: false }))
-      setBriefAnchor({ at: pin.at })
       setPositions([])
       setGeneration({ status: 'idle' })
       return null
@@ -1379,16 +1330,6 @@ function App() {
 
   /* Long press drops the pin. With one pin there is nothing else it can mean. */
   const onLongPress = useCallback((at: LatLon) => dropVenuePin(at), [dropVenuePin])
-
-  const clearBrief = () => {
-    setVenue((current) => ({ ...current, eventDescription: '', desiredOutcome: '' }))
-    setBriefAnchor(centre === null ? null : { at: centre })
-  }
-
-  /* Keeping it is a deliberate acknowledgement, so re-anchor here. */
-  const keepBrief = () => {
-    setBriefAnchor(centre === null ? null : { at: centre })
-  }
 
   const onSelectPosition = (id: string | null) => {
     setSelectedId(id)
@@ -1437,7 +1378,6 @@ function App() {
     setPositions(revival.positions)
     setPositionNote(revivalNote(revival))
     setMarks(reviveMarks(spot.marks ?? []))
-    setBriefAnchor(null)
     setGeneration({ status: 'idle' })
     setMode('setup')
   }
@@ -1605,12 +1545,12 @@ function App() {
   const gap = setupGap(errors)
   const missing = gap?.target ?? null
   const [pointAt, setPointAt] = useState<{
-    field: SetupTarget | 'brief' | null
+    field: SetupTarget | null
     tick: number
   }>({ field: null, tick: 0 })
 
   /** Takes the shooter to the thing a block named, and points at it. */
-  const onFixBlock = useCallback((field: SetupTarget | 'brief' | null) => {
+  const onFixBlock = useCallback((field: SetupTarget | null) => {
     setMode('setup')
     if (field !== null) setPointAt((current) => ({ field, tick: current.tick + 1 }))
     setGeneration({ status: 'idle' })
@@ -1775,10 +1715,6 @@ function App() {
             venue={venue}
             errors={errors}
             onVenueChange={onVenueDraftChange}
-            staleBrief={staleBrief}
-            drift={drift}
-            onClearBrief={clearBrief}
-            onKeepBrief={keepBrief}
             kit={kit}
             onKit={onKitChange}
             kitProfile={kitProfile}
@@ -1996,7 +1932,6 @@ function App() {
           onChangeMark={onChangeMark}
           onDeleteMark={onDeleteMark}
           shootDate={venue.date}
-          briefSource={briefSource}
           skyLayer={skyLayer}
           onSkyLayer={setSkyLayer}
           placing={placing}

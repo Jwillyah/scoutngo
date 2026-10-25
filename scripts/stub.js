@@ -1,24 +1,11 @@
 (() => {
   const real = window.fetch.bind(window)
-  const PLAN = { positions: [
-    { x: 0.32, y: 0.44, lensId: 'sony-200-600', focalLength: 400,
-      shot: 'Boats coming off the dock with the bridge behind them.',
-      angleRationale: 'Low bank puts the hulls against open water, not parked cars.',
-      risk: 'Bank is soft below the rip-rap. Check footing before committing.' },
-    { x: 0.61, y: 0.38, lensId: 'sigma-28-75', focalLength: 35,
-      shot: 'Wide of the whole basin as the fleet turns in.',
-      angleRationale: 'Only vantage that holds both piers in one frame.', risk: '' },
-    { x: 0.5, y: 0.62, lensId: 'air-3s-wide', focalLength: 24, platform: 'air', altitudeFeet: 180,
-      shot: 'Top down of the wake pattern across the channel.',
-      angleRationale: 'Pattern only reads from directly above.',
-      risk: 'Crosses the public pier. Keep the line over water.' },
-  ] }
+  /*
+   * No /api/generate stub: Suggest is arithmetic now (src/core/suggest.ts) and
+   * calls no endpoint. It reads buildings and water from Overpass directly.
+   */
   window.fetch = async (input, init) => {
     const url = typeof input === 'string' ? input : (input?.url ?? String(input))
-    if (url.includes('/api/generate')) {
-      try { window.__sentImage = JSON.parse(init.body).image } catch {}
-      return new Response(JSON.stringify({ status: 'ok', raw: JSON.stringify(PLAN) }), { headers: { 'content-type': 'application/json' } })
-    }
     if (url.includes('/api/streetview')) {
       const c = document.createElement('canvas'); c.width = 640; c.height = 400
       const g = c.getContext('2d')

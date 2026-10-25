@@ -22,7 +22,7 @@ import {
   type BuildingHeight,
   type BuildingTags,
 } from '../core/buildingHeight.ts'
-import type { MapBounds } from './planRequest.ts'
+import type { MapBounds } from './generation.ts'
 import { MIN_INTERVAL_MS, OVERPASS_URL, TIMEOUT_MS, type OverpassElement } from './overpass.ts'
 
 export interface Building {

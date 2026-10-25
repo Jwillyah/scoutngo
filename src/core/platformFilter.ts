@@ -12,7 +12,7 @@
  * edit, or one in the plan that never appears.
  */
 
-/** What a camera is standing on. Matches Platform in src/lib/parsePlan.ts. */
+/** What a camera is standing on. The one Platform type the app uses. */
 export type Platform = 'ground' | 'air'
 
 export type PlatformFilter = 'both' | 'ground' | 'air'

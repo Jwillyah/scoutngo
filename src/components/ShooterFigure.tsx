@@ -5,7 +5,7 @@ import type { PositionOrigin } from '../lib/plan.ts'
 import type { FramingWarning } from '../core/fov.ts'
 import type { Classification } from '../core/lighting.ts'
 import type { SiteWarning } from '../core/siting.ts'
-import type { Platform } from '../lib/parsePlan.ts'
+import type { Platform } from '../core/platformFilter.ts'
 
 interface ShooterFigureProps {
   number: number

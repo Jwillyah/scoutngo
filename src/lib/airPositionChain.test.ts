@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_KIT, type KitProfile } from '../core/kit.ts'
 import { defaultOpticFor, opticsFor } from '../core/optics.ts'
 import { defaultSelection, reviveSelection, type KitSelection } from './kitSelection.ts'
-import { droneAvailable } from './planRequest.ts'
+/* Whether an air position can be made: an aircraft camera resolves from the bag. */
+const droneAvailable = (selection: Parameters<typeof defaultOpticFor>[2], profile: Parameters<typeof defaultOpticFor>[1]) =>
+  defaultOpticFor('air', profile, selection) !== null
 import { addPosition } from './positions.ts'
 
 /**

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 /**
@@ -118,34 +118,14 @@ describe('the gate does not require prose', () => {
     )
   })
 
-  /* And something really does build a brief out of the chips instead. */
-  it('hands the job to the chips', () => {
-    const request = readFileSync(new URL('../src/lib/planRequest.ts', import.meta.url), 'utf8')
-    expect(request).toContain('resolveBrief')
-    expect(withoutComments(request)).toMatch(/event:\s*brief\.event/)
-    expect(withoutComments(request)).toMatch(/outcome:\s*brief\.outcome/)
-  })
-
   /*
-   * AND THE EMPTY STRING NEVER GOES OUT. That is the one value that produced
-   * the invented marina shoot, and it is what this whole change could
-   * reintroduce by accident.
+   * NO BRIEF GOES ANYWHERE NOW. It used to be built from the chips and sent to
+   * a model; Suggest is arithmetic (src/core/suggest.ts) and the request and
+   * the endpoint are gone.
    */
-  it('lets the raw typed fields reach resolveBrief and nowhere else', () => {
-    const request = withoutComments(
-      readFileSync(new URL('../src/lib/planRequest.ts', import.meta.url), 'utf8'),
-    )
-    /*
-     * The raw fields appear exactly once each, inside the resolveBrief call.
-     * Anywhere else and an empty string can reach the wire again, which is
-     * the value that produced the invented marina shoot.
-     */
-    expect(request.match(/venue\.eventDescription/g)).toHaveLength(1)
-    expect(request.match(/venue\.desiredOutcome/g)).toHaveLength(1)
-    const at = request.indexOf('resolveBrief(')
-    const call = request.slice(at, request.indexOf('return {', at))
-    expect(call).toContain('venue.eventDescription')
-    expect(call).toContain('venue.desiredOutcome')
+  it('sends no brief, because nothing is asked', () => {
+    expect(existsSync(new URL('../api/generate.ts', import.meta.url))).toBe(false)
+    expect(existsSync(new URL('../src/lib/planRequest.ts', import.meta.url))).toBe(false)
   })
 })
 

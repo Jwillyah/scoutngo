@@ -9,9 +9,9 @@
  * recorded as applied so it never runs twice: removing the lens afterwards,
  * or taking the 75-300 back off the shelf, sticks.
  *
- * NOTHING IS INVENTED. Only what was asked for: the lens's name and focal
- * range. The aperture is null, which the kit reads as "not stated", because
- * "a Sony 70-200" is an f/4 or an f/2.8 and nobody said which.
+ * NOTHING IS INVENTED. Only what was asked for. The 70-200 first went in with
+ * no aperture, because "a Sony 70-200" is an f/4 or an f/2.8 and nobody had
+ * said which; it is the f/2.8 GM II, said on 26 October.
  */
 import type { KitProfile, Lens } from '../core/kit.ts'
 
@@ -23,7 +23,18 @@ export interface KitAmendment {
   says: string
   addLenses: Lens[]
   shelve: string[]
+  /** Fields to set on a lens the kit already has. A lens it does not have is left alone. */
+  updateLenses?: { id: string; set: Partial<Pick<Lens, 'name' | 'maxAperture'>> }[]
 }
+
+/*
+ * THE LENS AS NAMED ON 25 OCTOBER, IN FULL: the Sony FE 70-200mm f/2.8 GM II.
+ * The first amendment shipped it with no aperture because nobody had said
+ * which 70-200 it was; a phone that already applied that one is corrected by
+ * the second, a fresh one gets it right first time.
+ */
+const SONY_70_200_NAME = 'Sony 70-200 f2.8 GM II'
+const SONY_70_200_APERTURE = 2.8
 
 export const AMENDMENTS: readonly KitAmendment[] = [
   {
@@ -32,15 +43,24 @@ export const AMENDMENTS: readonly KitAmendment[] = [
     addLenses: [
       {
         id: 'sony-70-200',
-        name: 'Sony 70-200',
+        name: SONY_70_200_NAME,
         minFocalLength: 70,
         maxFocalLength: 200,
-        maxAperture: null,
+        maxAperture: SONY_70_200_APERTURE,
         forcesSensor: [],
         notes: '',
       },
     ],
     shelve: ['sony-75-300'],
+  },
+  {
+    id: '2026-10-26-sony-70-200-f2.8',
+    says: 'The 70-200 is the f/2.8 GM II, as you said on 26 October.',
+    addLenses: [],
+    shelve: [],
+    updateLenses: [
+      { id: 'sony-70-200', set: { name: SONY_70_200_NAME, maxAperture: SONY_70_200_APERTURE } },
+    ],
   },
 ]
 
@@ -72,11 +92,20 @@ export function applyAmendments(
 
   for (const amendment of amendments) {
     if (nextApplied.includes(amendment.id)) continue
+    const before = JSON.stringify([nextProfile, nextShelved])
     const missing = amendment.addLenses.filter(
       (lens) => !nextProfile.lenses.some((existing) => existing.id === lens.id),
     )
     if (missing.length > 0) {
       nextProfile = { ...nextProfile, lenses: [...nextProfile.lenses, ...missing] }
+    }
+    for (const update of amendment.updateLenses ?? []) {
+      nextProfile = {
+        ...nextProfile,
+        lenses: nextProfile.lenses.map((lens) =>
+          lens.id === update.id ? { ...lens, ...update.set } : lens,
+        ),
+      }
     }
     for (const id of amendment.shelve) {
       const owned = [...nextProfile.lenses, ...nextProfile.bodies, ...nextProfile.drones].some(
@@ -85,7 +114,8 @@ export function applyAmendments(
       if (owned && !nextShelved.includes(id)) nextShelved = [...nextShelved, id]
     }
     nextApplied.push(amendment.id)
-    said.push(amendment.says)
+    /* Said only when it changed something: a fresh kit already has the corrected lens. */
+    if (JSON.stringify([nextProfile, nextShelved]) !== before) said.push(amendment.says)
   }
 
   return { profile: nextProfile, shelved: nextShelved, applied: nextApplied, said }

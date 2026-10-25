@@ -32,7 +32,7 @@ import {
 import { fitLongEdge, resolveCaptureLongEdge } from '../core/capture.ts'
 import type { SunArc } from '../core/sun.ts'
 import type { PlannedPosition } from '../lib/plan.ts'
-import type { MapBounds } from '../lib/planRequest.ts'
+import type { MapBounds } from '../lib/generation.ts'
 import {
   centredRect,
   isClear,

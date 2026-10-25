@@ -51,7 +51,6 @@ would be, rather than failing:
 | Key | Adds | Without it |
 | --- | --- | --- |
 | `MAPBOX_TOKEN` | Better venue search, autocompleting as you type | Search falls back to OpenStreetMap's Nominatim and Photon, which are good at addresses and weaker on coastal landmark names |
-| `ANTHROPIC_API_KEY` | Nothing in the app calls a model any more: Suggest is arithmetic (`src/core/suggest.ts`) and the brief box is gone | Everything works |
 | `GOOGLE_MAPS_API_KEY` | A Street View photo on each position card | The card says there is no ground view, in the same space |
 
 **No key is ever required for the primary action on any screen.** Suggesting
@@ -174,9 +173,9 @@ because a wide frame is a choice rather than a fault.
 A drone position's optic picker lists the aircraft's own cameras and nothing
 else, and a ground position's lists glass and no aircraft cameras.
 `src/core/optics.ts` is the only place an optic list is built, `setOptic` throws
-on an optic the platform cannot carry, and `parsePlanResponse` drops a model's
-air position whose optic is not a published aircraft camera at its published
-focal length. The wrong thing is not hidden, it is unreachable.
+on an optic the platform cannot carry, and Suggest builds an air position only
+from an aircraft camera in the bag, at its published focal length. The wrong
+thing is not hidden, it is unreachable.
 
 ## Times are venue local
 
@@ -503,8 +502,9 @@ degrees, and a tolerance scan misses narrow alignments entirely and gets
 - Saved spots never leave the device. There is no account and no sync. Export
   writes a JSON file you own and can put wherever you like, and import reads one
   back; that is the whole backup story, deliberately.
-- Bring your own Anthropic API key. It goes in `.env`, which is gitignored, and
-  is read only by a serverless function so it never reaches the browser bundle.
+- **No model is called, and no AI key is needed.** Suggest works out positions
+  in `src/core/suggest.ts`. AI is planned to return as bring-your-own-key,
+  called from the phone with no server in between; until then there is none.
 - **It never asks an IP address where you are.** Not on load, not as a fallback
   when you decline the browser's own location prompt, not for one frame. An
   approximate position derived from an IP address is user data, and the way not
@@ -691,13 +691,10 @@ caches, the computed values, the tide predictions and the photos, is written to
 nothing is prefetched and Field mode falls back to fetching one photo at a time
 as you swipe.
 
-**Plan generation.** Only when you press Generate, and only then. That request
-carries a JPEG of the current map view plus your text context and the site
-geometry, and it goes to Anthropic through the serverless function so your key
-stays out of the browser. The function logs nothing at all, stores nothing, and
-writes to no database: `api/generate.ts` says so at the top and explains why.
-Vercel retains function logs in its dashboard, which is precisely why nothing is
-ever written to them.
+**Suggest.** Only when you press it. It sends Overpass a bounding box around the
+reach ring, to read building footprints, their heights and water, and works out
+every position on the device (`src/core/suggest.ts`). No image of the map and no
+text goes anywhere: there is no model and no AI endpoint.
 
 **Ground view, one position at a time, when you tap it.** Tapping a position in
 Plan opens its card, and opening that card sends **that one position's
@@ -746,9 +743,6 @@ data because there is no server holding anything.
 - turf for bearings, distances, and destination points, as the seven scoped
   packages actually used rather than the `@turf/turf` barrel
 - Vitest for the core tests
-- Anthropic API through a Vercel Function, so the key is not in the browser. The
-  model is `claude-sonnet-5`, named once at the top of `api/generate.ts` alongside
-  the token cap and the effort level
 
 ## Run it
 
@@ -756,8 +750,8 @@ Requires Node 20 or newer.
 
 ```sh
 npm install
-cp .env.example .env   # then paste in your own Anthropic key
-                       # GOOGLE_MAPS_API_KEY is optional, for ground view
+cp .env.example .env   # every key in it is optional
+                       # GOOGLE_MAPS_API_KEY for ground view, MAPBOX_TOKEN for search
 npm run dev
 ```
 
@@ -775,8 +769,8 @@ npm i -g vercel        # once
 vercel dev             # app + functions, http://localhost:3000
 ```
 
-`vercel dev` runs Vite as its dev command and serves `api/generate.ts` and
-`api/streetview.ts` alongside it at `/api/generate` and `/api/streetview`, which
+`vercel dev` runs Vite as its dev command and serves `api/search.ts` and
+`api/streetview.ts` alongside it at `/api/search` and `/api/streetview`, which
 are the same paths production uses. No proxy config, no second port.
 
 **It is already on your LAN.** `vercel dev` binds `0.0.0.0:3000` by default, and
@@ -848,12 +842,13 @@ answer is already known.
 
 ## Deploy your own
 
-ScoutNGo is bring your own API key. There is no hosted instance, no account, and no
-key of ours to use; you fork it, deploy your own copy, and it talks to Anthropic with
-your key from your own serverless function.
+ScoutNGo is bring your own key, and every key is optional. There is no hosted
+instance, no account, and no key of ours to use; you fork it and deploy your own
+copy.
 
-Hosted on **Vercel**. The two functions live in `api/` and deploy automatically as
-Vercel Functions; the Vite app builds to `dist` and is served as static files.
+Hosted on **Vercel**. The two functions, search and Street View, live in `api/`
+and deploy automatically as Vercel Functions; the Vite app builds to `dist` and is
+served as static files.
 
 ### What Vercel needs
 
@@ -863,7 +858,6 @@ care about. Never in `vercel.json`, which is committed and therefore public.
 
 | Variable | Required | What it is |
 | --- | --- | --- |
-| `ANTHROPIC_API_KEY` | No | Your Anthropic key, from <https://console.anthropic.com>. Read only by `api/generate.ts`, `api/parse.ts` and `api/event.ts`, so it never reaches the browser bundle. No screen calls those functions now; they remain on the server unused. |
 | `GOOGLE_MAPS_API_KEY` | No | Enables the optional ground view on a position card, via `api/streetview.ts`. Leave it unset and the card says there is no ground view, in the same space; nothing else changes. |
 | `MAPBOX_TOKEN` | No | Enables the better venue search, via `api/search.ts`. Leave it unset and search falls back to Nominatim and Photon. See "Getting a Mapbox token" below. |
 
@@ -910,12 +904,10 @@ vercel link           # choose your scope, then "Create a new project"
                       # it reads vercel.json and detects Vite, so accept
                       # the build command (npm run build) and output dir (dist)
 
-# 5. Set your keys. Do this BEFORE the first production deploy, or the first
-#    Generate will fail with the missing-key message. Each command prompts for
-#    the value, so the key is never typed into your shell history.
-vercel env add ANTHROPIC_API_KEY production
-vercel env add ANTHROPIC_API_KEY preview
+# 5. Set any optional keys. Each command prompts for the value, so the key is
+#    never typed into your shell history.
 vercel env add GOOGLE_MAPS_API_KEY production   # optional, skip for no ground view
+vercel env add MAPBOX_TOKEN production          # optional, skip for OSM search
 
 # 6. Deploy to production.
 vercel deploy --prod

@@ -8,7 +8,9 @@ import {
   reviveSelection,
   type KitSelection,
 } from './kitSelection.ts'
-import { droneAvailable } from './planRequest.ts'
+/* Whether an air position can be made: an aircraft camera resolves from the bag. */
+const droneAvailable = (selection: Parameters<typeof defaultOpticFor>[2], profile: Parameters<typeof defaultOpticFor>[1]) =>
+  defaultOpticFor('air', profile, selection) !== null
 import { mergeSpots, type Spot } from './spots.ts'
 
 /**
