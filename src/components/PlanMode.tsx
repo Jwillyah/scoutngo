@@ -9,7 +9,8 @@ import { formatClock } from '../core/timezone.ts'
 import type { SkyState } from '../lib/useSkyFrames.ts'
 import type { Wind } from '../core/upwind.ts'
 import type { LevelWind } from '../core/windProfile.ts'
-import type { SightlineCloud } from '../core/cloud.ts'
+import type { VenueCloud } from '../lib/forecast.ts'
+import { forecastAge, type Provenance } from '../lib/savedForecast.ts'
 import type { TideExtreme, TideState } from '../core/tide.ts'
 import type { SunArc, SunPosition } from '../core/sun.ts'
 import type { PlanCoverage, PlannedPosition } from '../lib/plan.ts'
@@ -36,6 +37,11 @@ import type { HorizonInput } from '../core/skyWindow.ts'
 import { AirspacePanel } from './AirspacePanel.tsx'
 import type { ConeMode } from '../lib/coneMode.ts'
 import { FieldPackControl, type PackBuildState } from './FieldPackControl.tsx'
+import { OfflineAreas } from './OfflineAreas.tsx'
+import type { VenueCacheState } from '../lib/useVenueCache.ts'
+import type { Box } from '../lib/tileRange.ts'
+import type { ReadFile } from '../lib/scoutFile.ts'
+import { useOnline } from '../lib/useOnline.ts'
 import { MapRail } from './MapRail.tsx'
 import { SkyPanel } from './SkyPanel.tsx'
 import { HOME, TIME_MATTERS, type CardKind, type SheetCard } from '../lib/sheetCard.ts'
@@ -110,8 +116,27 @@ interface PlanModeProps {
   windHeight: WindHeight
   ratedWindMps: number | null
   ratedWindSource: string
-  /** Cloud for the selected position, when it has been asked for. */
-  selectedCloud: SightlineCloud | null
+  /**
+   * CLOUD OVER THE VENUE for the scrubbed hour, from the same request as the
+   * wind. This was `selectedCloud`, and App passed it the literal null, so
+   * the CLOUD chip said "no data" everywhere. The sightline cloud for one
+   * position is still on that position's card.
+   */
+  venueCloud: VenueCloud | null
+  /** Write the one ScoutNGo file: kit, shelved gear, units, spots. */
+  onExport: () => void
+  /** Apply a read ScoutNGo file, and say what changed. */
+  onImport: (file: ReadFile) => string
+  /** The venue saving itself for offline. See src/lib/useVenueCache.ts. */
+  venueCache: VenueCacheState
+  /** The map's current view, for "take this area offline". */
+  getView: () => Box | null
+  /** Whether the wind and cloud are live or saved, and when they arrived. */
+  forecast: Provenance
+  /** Why there is no forecast at all, in words. Null when there is one. */
+  forecastReason: string | null
+  /** The low water nearest the shoot window. See src/lib/lowTide.ts. */
+  lowTide: TideExtreme | null
   /** Which sky source answers for the scrubbed moment, and its frames. */
   sky: SkyState
   selectedId: string | null
@@ -314,7 +339,14 @@ export function PlanMode({
   windHeight,
   ratedWindMps,
   ratedWindSource,
-  selectedCloud,
+  venueCloud,
+  venueCache,
+  getView,
+  onExport,
+  onImport,
+  forecast,
+  forecastReason,
+  lowTide,
   sky,
   selectedId,
   onSelect,
@@ -696,6 +728,8 @@ export function PlanMode({
    * like the rest rather than a special case: "go back" is "show the shoot".
    */
   const [card, setCard] = useState<SheetCard>(HOME)
+  /* No connection: one quiet mark in the venue bar, and nothing else. */
+  const online = useOnline()
   const home = useCallback(() => setCard(HOME), [])
 
   /*
@@ -749,8 +783,10 @@ export function PlanMode({
     const groundWind = wind?.speedMps ?? null
     const overRated =
       ratedWindMps !== null && groundWind !== null && groundWind > ratedWindMps
-    const lowTide = tideExtremes.find((e) => e.kind === 'low') ?? null
-    const cloudPct = selectedCloud?.meanLow ?? null
+    /* LOW cloud: the layer that takes the sun away. The card shows all three. */
+    const cloudPct = venueCloud?.low ?? null
+    /* A saved forecast carries its age onto the chip; a live one carries nothing. */
+    const age = forecast.kind === 'saved' ? forecastAge(forecast.fetchedAt, new Date()) : null
 
     return [
       {
@@ -769,19 +805,23 @@ export function PlanMode({
          */
         value: groundWind === null ? null : formatWind(groundWind, units.wind),
         urgent: overRated,
+        age: groundWind === null ? null : age,
       },
       {
         kind: 'cloud',
         label: 'CLOUD',
         value: cloudPct === null ? null : `${Math.round(cloudPct)}%`,
+        age: cloudPct === null ? null : age,
       },
       {
         kind: 'tide',
         label: 'LOW TIDE',
         value: lowTide === null ? null : clock(lowTide.at),
+        /* The zone is the unit of a clock time; see Chip.unit. */
+        ...(venueWindow === null ? {} : { unit: venueWindow.timeZoneShort }),
       },
     ]
-  }, [venueWindow, scrubbedAt, wind, ratedWindMps, tideExtremes, selectedCloud, units, clock])
+  }, [venueWindow, scrubbedAt, wind, ratedWindMps, lowTide, venueCloud, forecast, units, clock])
 
   /*
    * WHICH GOES BAND THE SKY LAYER PAINTS, from the sun's altitude: visible
@@ -804,7 +844,9 @@ export function PlanMode({
     tide,
     tideNow,
     tideExtremes,
-    cloud: selectedCloud,
+    cloud: venueCloud,
+    forecast,
+    forecastReason,
     units,
   }
 
@@ -932,6 +974,17 @@ export function PlanMode({
             state={packState}
             timeZone={venueWindow?.timeZone ?? null}
             onPrepare={onPreparePack}
+          />
+
+          {/*
+            * THE MAP, OFFLINE. The venue saves itself; a trip is taken by
+            * hand, size first. See OfflineAreas.tsx.
+            */}
+          <OfflineAreas
+            venueCache={venueCache}
+            getView={getView}
+            venueName={venueNameLine}
+            online={online}
           />
         </>
       )}
@@ -1264,6 +1317,8 @@ export function PlanMode({
               kitLine={`${kitProfile.bodies.length} bodies · ${kitProfile.lenses.length} lenses`}
               spotsLine={`${savedSpotCount} saved`}
               apiKeyLine="bring your own"
+              onExport={onExport}
+              onImport={onImport}
             />
           </Card>
         )
@@ -1461,6 +1516,7 @@ export function PlanMode({
         dateLabel={dateLabel}
         initial={null}
         onAbout={() => openCard('about')}
+        online={online}
       />
 
       <ChipRow chips={chips} active={card.kind} onOpen={openCard} measureRef={measureChips} />

@@ -21,6 +21,41 @@ import {
 interface KitEditorProps {
   kit: KitProfile
   onChange: (next: KitProfile) => void
+  /** Gear that is the shooter's but is never offered. Listed here and only here. */
+  shelved?: readonly string[]
+  onShelve?: (id: string, on: boolean) => void
+}
+
+/*
+ * SHELVE, NOT DELETE. Deleting a lens loses its focal range and every saved
+ * spot that used it stops resolving. Shelving keeps it owned and findable --
+ * this list is where you go looking -- and keeps it out of every suggestion,
+ * every picker and the bag.
+ */
+function ShelveButton({
+  id,
+  name,
+  shelved,
+  onShelve,
+}: {
+  id: string
+  name: string
+  shelved: readonly string[]
+  onShelve?: (id: string, on: boolean) => void
+}) {
+  if (onShelve === undefined) return null
+  const on = shelved.includes(id)
+  return (
+    <button
+      type="button"
+      className="kited__shelve"
+      aria-pressed={on}
+      onClick={() => onShelve(id, !on)}
+      aria-label={on ? `Take ${name} off the shelf` : `Shelve ${name}`}
+    >
+      {on ? 'Unshelve' : 'Shelve'}
+    </button>
+  )
 }
 
 type Adding = 'none' | 'lens' | 'body' | 'drone'
@@ -71,7 +106,7 @@ function Field({
  * exactly as confident as the right one. The rules live in src/core/kitEdit.ts with tests;
  * this form only renders what they say.
  */
-export function KitEditor({ kit, onChange }: KitEditorProps) {
+export function KitEditor({ kit, onChange, shelved = [], onShelve }: KitEditorProps) {
   const [adding, setAdding] = useState<Adding>('none')
   const [lens, setLens] = useState<LensDraft>(EMPTY_LENS)
   const [body, setBody] = useState<BodyDraft>(EMPTY_BODY)
@@ -114,14 +149,21 @@ export function KitEditor({ kit, onChange }: KitEditorProps) {
 
       <ul className="kited__list">
         {kit.lenses.map((item) => (
-          <li className="kited__row" key={item.id}>
-            <span className="kited__name">{item.name}</span>
+          <li
+            className={`kited__row${shelved.includes(item.id) ? ' kited__row--shelved' : ''}`}
+            key={item.id}
+          >
+            <span className="kited__name">
+              {item.name}
+              {shelved.includes(item.id) ? <span className="kited__tag"> · shelved</span> : null}
+            </span>
             <span className="kited__meta num">
               {item.minFocalLength === item.maxFocalLength
                 ? `${item.minFocalLength}mm`
                 : `${item.minFocalLength}–${item.maxFocalLength}mm`}
               {item.apscOnly === true ? ' · APS-C' : ''}
             </span>
+            <ShelveButton id={item.id} name={item.name} shelved={shelved} onShelve={onShelve} />
             <button
               type="button"
               className="kited__del"
@@ -133,11 +175,18 @@ export function KitEditor({ kit, onChange }: KitEditorProps) {
           </li>
         ))}
         {kit.bodies.map((item) => (
-          <li className="kited__row" key={item.id}>
-            <span className="kited__name">{item.name}</span>
+          <li
+            className={`kited__row${shelved.includes(item.id) ? ' kited__row--shelved' : ''}`}
+            key={item.id}
+          >
+            <span className="kited__name">
+              {item.name}
+              {shelved.includes(item.id) ? <span className="kited__tag"> · shelved</span> : null}
+            </span>
             <span className="kited__meta num">
               {item.sensor === 'apsc' ? 'APS-C' : 'Full frame'}
             </span>
+            <ShelveButton id={item.id} name={item.name} shelved={shelved} onShelve={onShelve} />
             <button
               type="button"
               className="kited__del"
@@ -149,11 +198,18 @@ export function KitEditor({ kit, onChange }: KitEditorProps) {
           </li>
         ))}
         {kit.drones.map((item) => (
-          <li className="kited__row" key={item.id}>
-            <span className="kited__name">{item.name}</span>
+          <li
+            className={`kited__row${shelved.includes(item.id) ? ' kited__row--shelved' : ''}`}
+            key={item.id}
+          >
+            <span className="kited__name">
+              {item.name}
+              {shelved.includes(item.id) ? <span className="kited__tag"> · shelved</span> : null}
+            </span>
             <span className="kited__meta num">
               {item.weightGrams}g · {item.cameras.map((c) => `${c.equiv35}mm`).join(' ')}
             </span>
+            <ShelveButton id={item.id} name={item.name} shelved={shelved} onShelve={onShelve} />
             <button
               type="button"
               className="kited__del"

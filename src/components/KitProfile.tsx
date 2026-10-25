@@ -12,6 +12,7 @@ import { auditKit, kitAuditLines } from '../lib/kitAudit.ts'
 import {
   defaultSelection,
   KIT_PROFILE_STORAGE_KEY,
+  pickableKit,
   toggleId,
   type KitSelection,
 } from '../lib/kitSelection.ts'
@@ -23,6 +24,11 @@ interface KitProfileProps {
   /** The shooter's own gear. Editable: see KitEditor below. */
   kit: KitProfileType
   onKitChange: (next: KitProfileType) => void
+  /** Shelved gear: never in these lists, never ticked. The editor below lists it. */
+  shelved?: readonly string[]
+  onShelve?: (id: string, on: boolean) => void
+  /** A change made to the kit on this load, said rather than done silently. */
+  note?: string | null
 }
 
 const oneDecimal = (n: number) => n.toFixed(1)
@@ -88,8 +94,18 @@ function droneMeta(drone: KitProfileType['drones'][number]): string {
   return `${drone.weightGrams}g · ${cameras}`
 }
 
-export function KitProfile({ value, onChange, kit, onKitChange }: KitProfileProps) {
+export function KitProfile({
+  value,
+  onChange,
+  kit,
+  onKitChange,
+  shelved = [],
+  onShelve,
+  note = null,
+}: KitProfileProps) {
   const bodies = activeBodies(kit, value.bodyIds)
+  /* What the bag can be packed from: everything owned, nothing shelved. */
+  const pickable = pickableKit(kit, shelved)
 
   /*
    * WHAT IS IN STORAGE, AGAINST THE SHIPPED LIST.
@@ -122,6 +138,7 @@ export function KitProfile({ value, onChange, kit, onKitChange }: KitProfileProp
     <Panel index="02" title="Kit and style">
       <p className="section__note">What is actually coming with you.</p>
       <OnThisDevice what="kit and gear" />
+      {note === null ? null : <p className="section__note kit__changed">{note}</p>}
 
       {news.length === 0 ? null : (
         <ul className="kitaudit">
@@ -135,7 +152,7 @@ export function KitProfile({ value, onChange, kit, onKitChange }: KitProfileProp
 
       <Group title="Bodies" meta={<span className="num">{value.bodyIds.length}</span>}>
         <ul className="kit-list">
-          {kit.bodies.map((item) => (
+          {pickable.bodies.map((item) => (
             <KitRow
               key={item.id}
               active={value.bodyIds.includes(item.id)}
@@ -151,7 +168,7 @@ export function KitProfile({ value, onChange, kit, onKitChange }: KitProfileProp
 
       <Group title="Lenses" meta={<span className="num">{value.lensIds.length}</span>}>
         <ul className="kit-list">
-          {kit.lenses.map((item) => (
+          {pickable.lenses.map((item) => (
             <KitRow
               key={item.id}
               active={value.lensIds.includes(item.id)}
@@ -173,7 +190,7 @@ export function KitProfile({ value, onChange, kit, onKitChange }: KitProfileProp
 
       <Group title="Air" meta={<span className="num">{value.droneIds.length}</span>}>
         <ul className="kit-list">
-          {kit.drones.map((item) => (
+          {pickable.drones.map((item) => (
             <KitRow
               key={item.id}
               active={value.droneIds.includes(item.id)}
@@ -202,13 +219,18 @@ export function KitProfile({ value, onChange, kit, onKitChange }: KitProfileProp
         </div>
       </Group>
 
-      <KitEditor kit={kit} onChange={onKitChange} />
+      {shelved.length === 0 ? null : (
+        <p className="section__note num">
+          {shelved.length} shelved: yours, never offered. They are listed under Your gear.
+        </p>
+      )}
+      <KitEditor kit={kit} onChange={onKitChange} shelved={shelved} onShelve={onShelve} />
 
       <div className="btn-row">
         <button
           type="button"
           className="btn btn--small"
-          onClick={() => onChange(defaultSelection(kit))}
+          onClick={() => onChange(defaultSelection(kit, shelved))}
         >
           Reset to default kit
         </button>

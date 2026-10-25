@@ -9,10 +9,10 @@
  * something newer the whole time, which is what "no push will ever reach
  * them" means in practice.
  *
- * THERE IS NO SERVICE WORKER AND NO CACHE STORAGE IN THIS APP -- checked,
- * not assumed: no registration, no workbox, no PWA plugin, and no sw.js on
- * the deployed site. The offline feature is field packs in localStorage,
- * which are data and not code. What holds a stale build is the browser's own
+ * THERE IS NO SERVICE WORKER IN THIS APP -- checked, not assumed: no
+ * registration, no workbox, no PWA plugin, and no sw.js on the deployed site.
+ * Offline is field packs in localStorage and map tiles in Cache Storage, both
+ * data and never code: no document or bundle is put in that cache. What holds a stale build is the browser's own
  * document cache, and on iOS a home-screen app launching its start_url is
  * the stubborn case.
  *

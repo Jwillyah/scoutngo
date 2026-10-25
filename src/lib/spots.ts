@@ -3,7 +3,7 @@
  * name.
  *
  * localStorage ONLY. There is no account, no server, and no sync. Export writes
- * a JSON file you own and can put wherever you like; import reads one back. That
+ * a ScoutNGo file you own (src/lib/scoutFile.ts) and import reads one back. That
  * is the entire backup story, and it is deliberate.
  */
 
@@ -13,8 +13,11 @@ import type { CameraPosition } from './plan.ts'
 import type { VenueDraft } from './venue.ts'
 
 export const SPOTS_STORAGE_KEY = 'scoutngo.spots.v1'
+/*
+ * THE OLDER SPOTS-ONLY FILE'S FORMAT NAME, kept so those files still import.
+ * Nothing writes it any more: every file is a ScoutNGo file, src/lib/scoutFile.ts.
+ */
 export const SPOTS_FORMAT = 'scoutngo.spots'
-export const SPOTS_VERSION = 1
 
 export interface Spot {
   id: string
@@ -48,12 +51,6 @@ export interface Spot {
    * Merging those would throw away the distinction the shooter made on purpose.
    */
   placeId?: string
-}
-
-export interface SpotsFile {
-  format: string
-  version: number
-  spots: Spot[]
 }
 
 export function newSpotId(): string {
@@ -92,39 +89,6 @@ export function reviveSpots(raw: unknown): Spot[] {
   return list.map(reviveSpot).filter((spot): spot is Spot => spot !== null)
 }
 
-export function toFile(spots: Spot[]): SpotsFile {
-  return { format: SPOTS_FORMAT, version: SPOTS_VERSION, spots }
-}
-
-export type ImportResult =
-  | { ok: true; spots: Spot[]; skipped: number }
-  | { ok: false; reason: string }
-
-export function parseSpotsFile(text: string): ImportResult {
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(text)
-  } catch {
-    return { ok: false, reason: 'That file is not valid JSON.' }
-  }
-
-  const list = Array.isArray(parsed)
-    ? parsed
-    : isObject(parsed) && Array.isArray(parsed.spots)
-      ? parsed.spots
-      : null
-
-  if (list === null) {
-    return { ok: false, reason: 'That file has no spots in it.' }
-  }
-
-  const spots = list.map(reviveSpot).filter((spot): spot is Spot => spot !== null)
-  if (spots.length === 0) {
-    return { ok: false, reason: 'No readable spots in that file.' }
-  }
-  return { ok: true, spots, skipped: list.length - spots.length }
-}
-
 /**
  * Is this the same place, searched two different ways?
  *
@@ -157,8 +121,4 @@ export function mergeSpots(existing: Spot[], incoming: Spot[]): Spot[] {
     kept.push(spot)
   }
   return kept
-}
-
-export function exportFilename(now = new Date()): string {
-  return `scoutngo-spots-${now.toISOString().slice(0, 10)}.json`
 }

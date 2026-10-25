@@ -29,6 +29,25 @@ export interface Units {
  */
 export const DEFAULT_UNITS: Units = { wind: 'kt', distance: 'ft' }
 
+/**
+ * Units out of anything stored or imported, field by field.
+ *
+ * ONE COPY. The settings reviver and the ScoutNGo file import both read units
+ * from JSON somebody else wrote; two copies of "is this a unit" is how one of
+ * them comes to accept a string the converters cannot handle.
+ */
+export function reviveUnits(raw: unknown): Units {
+  const stored = raw as { wind?: unknown; distance?: unknown } | null | undefined
+  return {
+    wind:
+      stored?.wind === 'mph' || stored?.wind === 'ms' || stored?.wind === 'kt'
+        ? stored.wind
+        : DEFAULT_UNITS.wind,
+    distance:
+      stored?.distance === 'm' || stored?.distance === 'ft' ? stored.distance : DEFAULT_UNITS.distance,
+  }
+}
+
 export const WIND_UNITS: readonly { id: WindUnit; label: string }[] = [
   { id: 'kt', label: 'kt' },
   { id: 'mph', label: 'mph' },

@@ -45,8 +45,13 @@ import {
   KIT_STORAGE_KEY,
   reviveKitProfile,
   reviveSelection,
+  reviveShelved,
+  setShelved,
+  SHELVED_STORAGE_KEY,
+  withoutShelved,
   type KitSelection,
 } from './lib/kitSelection.ts'
+import { applyAmendments, readApplied, writeApplied } from './lib/kitAmendments.ts'
 import { fetchSiteGeometry, trimSummary } from './lib/overpass.ts'
 import { parsePlanResponse } from './lib/parsePlan.ts'
 import {
@@ -108,7 +113,7 @@ import {
 } from './lib/search.ts'
 import { usePersistentState } from './lib/usePersistentState.ts'
 import { venueTown } from './lib/venueParts.ts'
-import { DEFAULT_UNITS, type Units } from './lib/units.ts'
+import { DEFAULT_UNITS, reviveUnits, type Units } from './lib/units.ts'
 import {
   placeKey,
   shortVenueLabel,
@@ -116,6 +121,9 @@ import {
   venueNameFor,
 } from './core/venueName.ts'
 import { useTide } from './lib/useTide.ts'
+import { lowTideNearest } from './lib/lowTide.ts'
+import { useVenueCache } from './lib/useVenueCache.ts'
+import { buildScoutFile, saveScoutFile, scoutFilename, type ReadFile } from './lib/scoutFile.ts'
 import {
   blockedReason,
   FORWARD_LABEL,
@@ -347,11 +355,60 @@ function App() {
    * the other direction: the thing validated against has to be the thing the
    * app actually computes with.
    */
-  const [kit, setKit] = usePersistentState<KitSelection>(
+  /*
+   * SHELVED GEAR: the shooter's, never offered. Its own list, because it is a
+   * fact about owning the gear and not about one shoot; see SHELVED_STORAGE_KEY.
+   */
+  const [shelved, setShelvedIds] = usePersistentState<string[]>(SHELVED_STORAGE_KEY, [], (raw) =>
+    reviveShelved(raw, kitProfile),
+  )
+
+  const [kit, setKitStored] = usePersistentState<KitSelection>(
     KIT_STORAGE_KEY,
     defaultSelection(DEFAULT_KIT),
-    (raw) => reviveSelection(raw, kitProfile),
+    (raw) => reviveSelection(raw, kitProfile, shelved),
   )
+  /*
+   * EVERY WRITE OF THE BAG GOES THROUGH THE SHELF. Nothing shelved can be put
+   * in it, by a toggle, a reset, a spot loading, or a file importing.
+   */
+  const setKit = useCallback(
+    (next: KitSelection) => setKitStored(withoutShelved(next, shelved)),
+    [setKitStored, shelved],
+  )
+  const onShelve = useCallback(
+    (id: string, on: boolean) => {
+      const next = setShelved(shelved, id, on)
+      setShelvedIds(next)
+      if (on) setKitStored(withoutShelved(kit, next))
+    },
+    [shelved, setShelvedIds, setKitStored, kit],
+  )
+
+  /*
+   * KIT CHANGES ASKED FOR BY NAME, applied to the stored kit once per device.
+   * See src/lib/kitAmendments.ts for why this is not an edit to DEFAULT_KIT.
+   */
+  const [kitNote, setKitNote] = useState<string | null>(null)
+  useEffect(() => {
+    const result = applyAmendments(kitProfile, shelved, readApplied())
+    writeApplied(result.applied)
+    if (result.said.length === 0) return
+    const added = result.profile.lenses
+      .filter((lens) => !kitProfile.lenses.some((l) => l.id === lens.id))
+      .map((lens) => lens.id)
+    /* oxlint-disable react/set-state-in-effect -- a one-time migration of stored state */
+    setKitProfile(result.profile)
+    setShelvedIds(result.shelved)
+    /* A lens added by name is in the bag, like the one it replaces was. */
+    setKitStored(
+      withoutShelved({ ...kit, lensIds: [...kit.lensIds, ...added] }, result.shelved),
+    )
+    setKitNote(result.said.join(' '))
+    /* oxlint-enable react/set-state-in-effect */
+    /* Once, on load: the stored values above are what it reads. */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   /*
    * THE ONE NAVIGATION STATE. Three modes on a time axis, replacing five tabs
@@ -435,17 +492,7 @@ function App() {
        * build does not know; either way the default stands rather than a
        * string nothing can convert reaching a readout.
        */
-      const storedUnits = (stored as { units?: { wind?: unknown; distance?: unknown } } | null)?.units
-      const units: Units = {
-        wind:
-          storedUnits?.wind === 'mph' || storedUnits?.wind === 'ms' || storedUnits?.wind === 'kt'
-            ? storedUnits.wind
-            : DEFAULT_UNITS.wind,
-        distance:
-          storedUnits?.distance === 'm' || storedUnits?.distance === 'ft'
-            ? storedUnits.distance
-            : DEFAULT_UNITS.distance,
-      }
+      const units: Units = reviveUnits((stored as { units?: unknown } | null)?.units)
       if (typeof stored?.showNumbers === 'boolean') {
         return { showNumbers: stored.showNumbers, showLabels, showTerrain, showBuildings, units }
       }
@@ -498,6 +545,39 @@ function App() {
   )
 
   const [spots, setSpots] = usePersistentState<Spot[]>(SPOTS_STORAGE_KEY, [], reviveSpots)
+
+  /*
+   * THE ONE FILE, OUT AND IN. Kit, shelved gear, units and spots. Kit and
+   * units replace what is here, because a backup is the kit; spots are added,
+   * because two devices' spots are both worth keeping. See src/lib/scoutFile.ts.
+   */
+  const onExportAll = () =>
+    saveScoutFile(
+      buildScoutFile({
+        kit: { profile: kitProfile, selection: kit, shelved },
+        units: settings.units,
+        spots,
+      }),
+      scoutFilename('backup'),
+    )
+  const onImportFile = (file: ReadFile): string => {
+    const did: string[] = []
+    if (file.kit !== null) {
+      setKitProfile(file.kit.profile)
+      setShelvedIds(file.kit.shelved)
+      setKitStored(withoutShelved(file.kit.selection, file.kit.shelved))
+      did.push('kit replaced')
+    }
+    if (file.units !== null) {
+      setSettings({ ...settings, units: file.units })
+      did.push('units replaced')
+    }
+    if (file.spots.length > 0) {
+      setSpots(mergeSpots(spots, file.spots))
+      did.push(`${file.spots.length} ${file.spots.length === 1 ? 'spot' : 'spots'} added`)
+    }
+    return `Imported: ${did.join(', ')}.`
+  }
 
   const mapHandle = useRef<MapHandle>(null)
 
@@ -598,6 +678,15 @@ function App() {
     if (tide.status !== 'ok' || venueWindow === null) return []
     return extremesAround(tide.predictions.extremes, venueWindow.start, venueWindow.end)
       .inWindow
+  }, [tide, venueWindow])
+
+  /*
+   * THE LOW WATER THE CHIP SHOWS: the one nearest the window, not only one
+   * inside it. See src/lib/lowTide.ts for why "inside" read "no data".
+   */
+  const lowTide = useMemo(() => {
+    if (tide.status !== 'ok' || venueWindow === null) return null
+    return lowTideNearest(tide.predictions.extremes, venueWindow.start, venueWindow.end)
   }, [tide, venueWindow])
 
   /* The tide at the scrubbed moment. Computed in core, never asserted. */
@@ -862,6 +951,9 @@ function App() {
     gustMps,
     at: windAt,
     past: windPast,
+    cloud: venueCloud,
+    provenance: forecastProvenance,
+    reason: forecastReason,
   } = useWind(aim, scrubbedAt, venueWindow?.timeZone ?? null)
 
   /*
@@ -992,6 +1084,14 @@ function App() {
     () => venueLabel(venueNameState, venue.latitude, venue.longitude),
     [venueNameState, venue.latitude, venue.longitude],
   )
+
+  /*
+   * THE VENUE SAVES ITSELF FOR OFFLINE when it is opened with signal: its
+   * imagery and terrain for the ring the shooter can reach, size measured and
+   * shown first. No button, because the button was forgotten and the trip
+   * failed. See src/lib/useVenueCache.ts.
+   */
+  const venueCache = useVenueCache(centre, reachMeters, venueNameLine)
 
   const briefSource = useMemo(
     () =>
@@ -1351,7 +1451,7 @@ function App() {
      * ground. reviveSelection drops what the kit does not have, which is the
      * same treatment the stored selection in localStorage already got.
      */
-    setKit(reviveSelection(spot.kit, kitProfile))
+    setKit(reviveSelection(spot.kit, kitProfile, shelved))
     /*
      * POSITIONS ARE REVIVED, NOT TRUSTED, for the same reason the kit is and
      * for a sharper one: a spot saved while an older bug was live is a fossil
@@ -1628,6 +1728,7 @@ function App() {
           venueName: venueNameLine,
           shotCount: desiredShots.length,
         },
+        kitProfile,
       ),
     )
     /*
@@ -1653,9 +1754,9 @@ function App() {
     setGeneration({ status: 'working', stage: 'lighting' })
     const parsed = parsePlanResponse(
       response.raw,
-      selectedLenses(kit),
-      droneAvailable(kit),
-      selectedDroneCameraSpecs(kit),
+      selectedLenses(kit, kitProfile),
+      droneAvailable(kit, kitProfile),
+      selectedDroneCameraSpecs(kit, kitProfile),
       desiredShots.length,
       allowedPlatforms(platformFilter),
     )
@@ -1961,6 +2062,9 @@ function App() {
             onKit={onKitChange}
             kitProfile={kitProfile}
             onKitProfile={setKitProfile}
+            shelved={shelved}
+            onShelve={onShelve}
+            kitNote={kitNote}
             spots={spots}
             onSaveSpot={saveSpot}
             onLoadSpot={loadSpot}
@@ -2117,7 +2221,14 @@ function App() {
           windHeight={windHeight}
           ratedWindMps={rated.mps}
           ratedWindSource={rated.source}
-          selectedCloud={null}
+          venueCloud={venueCloud}
+          onExport={onExportAll}
+          onImport={onImportFile}
+          venueCache={venueCache}
+          getView={() => mapHandle.current?.viewport()?.bounds ?? null}
+          forecast={forecastProvenance}
+          forecastReason={forecastReason}
+          lowTide={lowTide}
           sky={sky}
           selectedId={selectedId}
           onSelect={onSelectPosition}

@@ -24,10 +24,12 @@ repository"* when the deploy lags.
 
 ## 3 · The phone is running that deploy
 
-**There is no service worker in this app and no Cache Storage.** Not one line:
-no registration, no workbox, no PWA plugin, and no `sw.js` on the deployed
-site. The "save offline" feature is field packs in `localStorage`
-(`src/lib/fieldPack.ts`) — shoot data, not code. Nothing the app writes can
+**There is no service worker in this app.** Not one line: no registration, no
+workbox, no PWA plugin, and no `sw.js` on the deployed site. Offline is field
+packs in `localStorage` (`src/lib/fieldPack.ts`) and saved map tiles in Cache
+Storage (`scoutngo-tiles-v1`, `src/lib/offlineCache.ts`), keyed by Esri and AWS
+tile URLs and read only by the map's tile protocol. Both are data, not code: no
+document and no bundle is ever put in that cache, so nothing the app writes can
 hold an old bundle.
 
 What holds a stale build is the browser's own document cache, and on iOS a

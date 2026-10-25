@@ -4674,7 +4674,8 @@
 
 .kited__row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  /* Name, meta, shelve, remove. */
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   align-items: center;
   gap: var(--space-2);
   min-height: 44px;
@@ -8425,6 +8426,31 @@
   color: var(--color-hazard);
 }
 
+/*
+ * A SAVED READING CARRIES ITS AGE ON THE LABEL. No new colour: over twelve
+ * hours the age is lifted to full text so it is noticed; over thirty-six the
+ * value dims like a missing one, because it is closer to missing than to
+ * current. See src/lib/savedForecast.ts for the thresholds.
+ */
+.chip2__age {
+  text-transform: none;
+}
+
+/* A unit that does not fit at value size: smaller, same line, same colour role. */
+.chip2__unit {
+  font-size: 9px;
+  font-weight: var(--weight-medium);
+  color: var(--color-text-muted);
+}
+
+.chip2--aged .chip2__age {
+  color: var(--color-text);
+}
+
+.chip2--old .chip2__value {
+  color: var(--color-text-faint);
+}
+
 /* --------------------------------------------------------- the bottom nav
  *
  * 64px, ICON OVER LABEL. Three equal thirds, filling whatever the dock gives
@@ -9123,4 +9149,163 @@
 
 .sunwhen[open] .sunwhen__head {
   margin-bottom: var(--space-3);
+}
+
+/*
+ * A SAVED FORECAST, SAID BESIDE THE VALUE. Plain under twelve hours, marked
+ * over twelve, and over thirty-six the whole reading dims: an old forecast is
+ * shown, never as if it were current.
+ */
+.wx__age {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.wx__age--marked,
+.wx__age--dimmed {
+  color: var(--color-text);
+  font-weight: var(--weight-heavy);
+}
+
+.wx__read--old .wx__value {
+  color: var(--color-text-faint);
+}
+
+/*
+ * NO CONNECTION: ONE QUIET WORD IN THE VENUE BAR. Not a colour, not a badge
+ * that pulses -- the faint text role, because nothing is wrong with what is
+ * on screen. See src/lib/useOnline.ts for what "offline" means here.
+ */
+.vbar__offline {
+  flex: none;
+  font-size: 10px;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* ---------------------------------------------------------------- offline
+ *
+ * THE SAME BLOCK AS THE FIELD PACK beside it: one rule down the left, a hair
+ * across the top, the shoot card's own ground. Offline is a fact about the
+ * shoot, not a feature with its own look.
+ */
+.offl {
+  margin: var(--space-3) var(--page-pad) 0;
+  padding: var(--space-3);
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  background: var(--panel-sheen-2);
+  border-top: var(--line-hair) solid var(--color-edge-top);
+  border-left: var(--line-rule) solid var(--color-rule-fact);
+  border-radius: var(--radius-panel);
+  font-size: var(--text-sm);
+}
+
+.offl__venue,
+.offl__area,
+.offl__size {
+  margin: 0;
+  color: var(--color-text);
+}
+
+.offl__size {
+  font-weight: var(--weight-heavy);
+}
+
+.offl__note {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.offl__trip {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  width: 100%;
+}
+
+.offl__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.offl__bar {
+  width: 100%;
+  accent-color: var(--ocean);
+}
+
+.offl__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  text-decoration: underline;
+  font: inherit;
+}
+
+.offl__saved {
+  width: 100%;
+}
+
+.offl__sum {
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.offl__list {
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.offl__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.offl__name {
+  display: grid;
+  min-width: 0;
+  color: var(--color-text);
+}
+
+.offl__meta {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+/*
+ * SHELVED GEAR: in the editor, findable, and visibly not in play. The row
+ * keeps its name at full strength -- it is still yours -- and the tag says
+ * why it is never offered.
+ */
+.kited__shelve {
+  min-height: 36px;
+  padding: 0 var(--space-2);
+  background: transparent;
+  border: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.kited__row--shelved .kited__meta {
+  color: var(--color-text-faint);
+}
+
+.kited__tag {
+  color: var(--color-text-muted);
+}
+
+.kit__changed {
+  color: var(--color-text);
 }

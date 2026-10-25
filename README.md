@@ -204,11 +204,16 @@ There is a web app manifest and a set of icons, so adding the site to a home scr
 gives a standalone app with no browser chrome, named ScoutNGo, on the same near-black
 theme as everything else.
 
-**There is no service worker, deliberately.** Offline is not a goal yet. The only
-thing worth caching for a venue is satellite imagery, which runs to hundreds of
-megabytes at usable zoom and would sit in device storage indefinitely for a venue you
-visited once. When offline becomes a goal it should cache one venue you asked for, not
-every tile that scrolled past.
+**There is no service worker, deliberately**, and offline is now a goal: the app
+was unusable in Shenandoah with no service. Opening a venue with signal saves its
+imagery (z14–18) and terrain for the reach ring, measured and shown before it
+downloads: 2.34 MB at the default 400 m ring and 29.61 MB at the 2000 m maximum
+(`measurements/2026-10-25-venue-cache-400m.md`,
+`measurements/2026-10-25-venue-cache-2000m.md`). "Take this area offline" on the
+shoot card saves a wider area for a trip, size first. Tiles live in Cache Storage
+and are read by the map through a MapLibre protocol, not a worker. Everything
+computed works with the radio off. See [docs/offline.md](docs/offline.md), including
+the one thing this does not cover: a cold launch with no signal.
 
 The icons are generated from the design tokens by `scripts/make-icons.mjs`, using only
 the standard library. Change the palette or the mark there, run `node scripts/make-icons.mjs`,
@@ -258,10 +263,11 @@ pair looks slower for reasons that have nothing to do with the image.
 There is **no service worker**. Not one line: no registration, no workbox, no
 PWA plugin, nothing in the build output, and a test
 (`tests/noServiceWorker.test.ts`) that fails the build if one ever appears.
-Offline field packs are `localStorage`, so nothing about working offline needs
-one; what a service worker would add is a second invisible cache, owned by the
-browser, that survives a reload and serves old code to someone standing on a
-dock.
+Offline works without one: field packs are `localStorage`, and saved map tiles
+are Cache Storage read through a MapLibre protocol (`src/lib/offlineCache.ts`).
+Both are data, never code. What a service worker would add is a second invisible
+cache in front of the CODE, owned by the browser, that survives a reload and
+serves an old bundle to someone standing on a dock.
 
 What *does* hold a stale build is iOS Safari, and a home-screen app more
 stubbornly still, keeping `index.html` and therefore keeping the hashed asset
@@ -528,6 +534,9 @@ Several things leave your device, and you should know exactly what they are.
 are looking at, so your venue coordinates are visible to Esri, at roughly the
 zoom level you are viewing. That is unavoidable for any map that streams
 imagery. Nothing else is attached: no account, no identifier, no form content.
+Saving a venue for offline asks Esri and AWS for the tiles of the box around the
+reach ring ahead of time: the same servers, the same kind of request, for the
+place you already opened. Saved tiles are read back from this device.
 
 **Sky cameras: nothing leaves at all.** The camera list is a **file in this
 repo**, `src/data/cams.ts`. There is no cam API, no key and no account, and

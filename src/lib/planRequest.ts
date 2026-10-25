@@ -17,9 +17,19 @@ export interface MapBounds {
   north: number
 }
 
+/*
+ * THE SHOOTER'S OWN KIT, NOT THE SHIPPED ONE.
+ *
+ * Every helper here read DEFAULT_KIT, so a lens added by hand was in the bag
+ * and on the position card and was never offered to the model: the 70-200
+ * bought last week did not exist as far as a suggested plan was concerned. The
+ * profile is passed in now; DEFAULT_KIT stays as the default only so a caller
+ * that does not care, a test, keeps working.
+ */
+
 /** Only the lenses actually coming on the shoot are offered to the model. */
-export function selectedLenses(kit: KitSelection): LensSpec[] {
-  return DEFAULT_KIT.lenses
+export function selectedLenses(kit: KitSelection, profile: KitProfile = DEFAULT_KIT): LensSpec[] {
+  return profile.lenses
     .filter((lens) => kit.lensIds.includes(lens.id))
     .map((lens) => ({
       id: lens.id,
@@ -29,13 +39,16 @@ export function selectedLenses(kit: KitSelection): LensSpec[] {
     }))
 }
 
-export function selectedBodyNames(kit: KitSelection): string[] {
-  return DEFAULT_KIT.bodies.filter((b) => kit.bodyIds.includes(b.id)).map((b) => b.name)
+export function selectedBodyNames(kit: KitSelection, profile: KitProfile = DEFAULT_KIT): string[] {
+  return profile.bodies.filter((b) => kit.bodyIds.includes(b.id)).map((b) => b.name)
 }
 
 /** The drone cameras in play, in the shape the parser validates against. */
-export function selectedDroneCameraSpecs(kit: KitSelection): DroneCameraSpec[] {
-  return selectedDroneCameras(DEFAULT_KIT, kit.droneIds).map((camera) => ({
+export function selectedDroneCameraSpecs(
+  kit: KitSelection,
+  profile: KitProfile = DEFAULT_KIT,
+): DroneCameraSpec[] {
+  return selectedDroneCameras(profile, kit.droneIds).map((camera) => ({
     id: camera.id,
     name: camera.name,
     equiv35: camera.equiv35,
@@ -80,10 +93,11 @@ export function selectedOptics(
    * the same distance as a food truck.
    */
   subjectMeters: number | null = null,
+  profile: KitProfile = DEFAULT_KIT,
 ): OpticSpec[] {
-  const bodies = DEFAULT_KIT.bodies.filter((b) => kit.bodyIds.includes(b.id))
+  const bodies = profile.bodies.filter((b) => kit.bodyIds.includes(b.id))
 
-  const lenses: OpticSpec[] = DEFAULT_KIT.lenses
+  const lenses: OpticSpec[] = profile.lenses
     .filter((lens) => kit.lensIds.includes(lens.id))
     .map((lens) => {
       const sensor = SENSORS[resolveSensor(lens, bodies)]
@@ -104,7 +118,7 @@ export function selectedOptics(
       }
     })
 
-  const cameras: OpticSpec[] = selectedDroneCameras(DEFAULT_KIT, kit.droneIds).map((camera) => {
+  const cameras: OpticSpec[] = selectedDroneCameras(profile, kit.droneIds).map((camera) => {
     // 35mm equivalent on full frame: the same arithmetic the ground lenses use.
     const hFOV = computeFOV(camera.equiv35, SENSORS.fullFrame).hFOV
     const max = roundTo5(standoffBand(hFOV, 'air', subjectMeters).maxMeters)
@@ -170,8 +184,8 @@ export function sunFacts(venueWindow: VenueWindow): SunFact[] {
   })
 }
 
-export function selectedDroneNames(kit: KitSelection): string[] {
-  return DEFAULT_KIT.drones
+export function selectedDroneNames(kit: KitSelection, profile: KitProfile = DEFAULT_KIT): string[] {
+  return profile.drones
     .filter((d) => kit.droneIds.includes(d.id))
     .map((d) => `${d.name}, ${d.weightGrams}g`)
 }
@@ -313,6 +327,8 @@ export function buildGenerateBody(
    * is not one.
    */
   intent: ChipIntent = { kind: null, platform: 'both', venueName: '', shotCount: 0 },
+  /** The shooter's kit profile, so gear they added is offered. See selectedLenses. */
+  profile: KitProfile = DEFAULT_KIT,
 ): GenerateRequestBody {
   const brief = resolveBrief(
     { event: venue.eventDescription, outcome: venue.desiredOutcome },
@@ -328,9 +344,9 @@ export function buildGenerateBody(
     endTime: venue.endTime,
     timeZoneLabel,
     style: kit.styleNotes,
-    drones: selectedDroneNames(kit),
+    drones: selectedDroneNames(kit, profile),
     platforms: [...platforms],
-    optics: selectedOptics(kit, subjectAcrossMeters(venue)),
+    optics: selectedOptics(kit, subjectAcrossMeters(venue), profile),
     sun,
     ...(tide === undefined ? {} : { tide }),
     ...(requiredShots.length === 0 ? {} : { requiredShots }),

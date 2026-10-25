@@ -23,13 +23,95 @@ export const KIT_STORAGE_KEY = 'scoutngo.kit.v1'
  */
 export const KIT_PROFILE_STORAGE_KEY = 'scoutngo.kitProfile.v1'
 
-export function defaultSelection(kit: KitProfile): KitSelection {
+/*
+ * SHELVED: MINE, BUT STOP OFFERING IT.
+ *
+ * Three states, not two:
+ *
+ *   IN THE BAG  ticked for this shoot       in the selection's ids
+ *   OWNED       mine, not in the bag today  in the profile, not in the ids
+ *   SHELVED     mine, but stop offering it  in the profile and in this list
+ *
+ * WHY ITS OWN LIST AND NOT A FIELD ON THE SELECTION. Shelving is a fact about
+ * owning the gear, not about one shoot. A saved spot carries its own
+ * selection, and if shelving lived there, loading last summer's spot would
+ * quietly take the 75-300 back off the shelf. One list, on this device, and
+ * every selection is passed through it on the way in.
+ *
+ * NEVER IN THE BAG. Every write of a selection -- revive, a spot loading, a
+ * toggle, reset -- strips shelved ids, so nothing downstream of the bag (the
+ * position card's picker, the model's optics, the default optic for a new
+ * position) can ever see shelved gear. Only the kit editor lists it, which is
+ * where you go looking.
+ */
+export const SHELVED_STORAGE_KEY = 'scoutngo.shelved.v1'
+
+export type GearState = 'bag' | 'owned' | 'shelved'
+
+const allIds = (kit: KitProfile): string[] => [
+  ...kit.bodies.map((b) => b.id),
+  ...kit.lenses.map((l) => l.id),
+  ...kit.drones.map((d) => d.id),
+]
+
+/** Only ids this kit actually has, so a deleted lens cannot stay shelved forever. */
+export function reviveShelved(raw: unknown, kit: KitProfile): string[] {
+  if (!Array.isArray(raw)) return []
+  const known = allIds(kit)
+  return raw.filter((id): id is string => typeof id === 'string' && known.includes(id))
+}
+
+/** The selection with nothing shelved in the bag. */
+export function withoutShelved(selection: KitSelection, shelved: readonly string[]): KitSelection {
+  if (shelved.length === 0) return selection
+  const keep = (ids: string[]) => ids.filter((id) => !shelved.includes(id))
   return {
-    bodyIds: kit.bodies.map((b) => b.id),
-    lensIds: kit.lenses.map((l) => l.id),
-    droneIds: kit.drones.map((d) => d.id),
-    styleNotes: kit.style.notes.join('\n'),
+    ...selection,
+    bodyIds: keep(selection.bodyIds),
+    lensIds: keep(selection.lensIds),
+    droneIds: keep(selection.droneIds),
   }
+}
+
+/** The profile as the PICKERS see it: shelved gear left out. Never used for resolving optics. */
+export function pickableKit(kit: KitProfile, shelved: readonly string[]): KitProfile {
+  if (shelved.length === 0) return kit
+  return {
+    ...kit,
+    bodies: kit.bodies.filter((b) => !shelved.includes(b.id)),
+    lenses: kit.lenses.filter((l) => !shelved.includes(l.id)),
+    drones: kit.drones.filter((d) => !shelved.includes(d.id)),
+  }
+}
+
+export function gearState(
+  id: string,
+  selection: KitSelection,
+  shelved: readonly string[],
+): GearState {
+  if (shelved.includes(id)) return 'shelved'
+  return [...selection.bodyIds, ...selection.lensIds, ...selection.droneIds].includes(id)
+    ? 'bag'
+    : 'owned'
+}
+
+/** Shelve or unshelve. Unshelving returns gear to OWNED, not to the bag. */
+export function setShelved(shelved: readonly string[], id: string, on: boolean): string[] {
+  const without = shelved.filter((existing) => existing !== id)
+  return on ? [...without, id] : without
+}
+
+/** Everything owned and not shelved, in the bag. What "reset" and a first run start from. */
+export function defaultSelection(kit: KitProfile, shelved: readonly string[] = []): KitSelection {
+  return withoutShelved(
+    {
+      bodyIds: kit.bodies.map((b) => b.id),
+      lensIds: kit.lenses.map((l) => l.id),
+      droneIds: kit.drones.map((d) => d.id),
+      styleNotes: kit.style.notes.join('\n'),
+    },
+    shelved,
+  )
 }
 
 function idsFrom(raw: unknown, allowed: string[]): string[] | null {
@@ -39,18 +121,27 @@ function idsFrom(raw: unknown, allowed: string[]): string[] | null {
 }
 
 /** Merges whatever is in storage with the current kit. Tolerates any shape. */
-export function reviveSelection(raw: unknown, kit: KitProfile): KitSelection {
-  const fallback = defaultSelection(kit)
+export function reviveSelection(
+  raw: unknown,
+  kit: KitProfile,
+  shelved: readonly string[] = [],
+): KitSelection {
+  const fallback = defaultSelection(kit, shelved)
   if (typeof raw !== 'object' || raw === null) return fallback
 
+  /* Known ids are checked against the whole kit; shelved ones are then taken out. */
+  const known = defaultSelection(kit)
   const stored = raw as Partial<Record<keyof KitSelection, unknown>>
-  return {
-    bodyIds: idsFrom(stored.bodyIds, fallback.bodyIds) ?? fallback.bodyIds,
-    lensIds: idsFrom(stored.lensIds, fallback.lensIds) ?? fallback.lensIds,
-    droneIds: idsFrom(stored.droneIds, fallback.droneIds) ?? fallback.droneIds,
-    styleNotes:
-      typeof stored.styleNotes === 'string' ? stored.styleNotes : fallback.styleNotes,
-  }
+  return withoutShelved(
+    {
+      bodyIds: idsFrom(stored.bodyIds, known.bodyIds) ?? fallback.bodyIds,
+      lensIds: idsFrom(stored.lensIds, known.lensIds) ?? fallback.lensIds,
+      droneIds: idsFrom(stored.droneIds, known.droneIds) ?? fallback.droneIds,
+      styleNotes:
+        typeof stored.styleNotes === 'string' ? stored.styleNotes : fallback.styleNotes,
+    },
+    shelved,
+  )
 }
 
 export function toggleId(ids: string[], id: string): string[] {

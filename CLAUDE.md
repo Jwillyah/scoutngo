@@ -28,7 +28,7 @@ localStorage only: no account, no database, no analytics, no telemetry.
 
 ```
 tsc -b → oxlint --deny-warnings → viewport units → colour roles → tests
-       → build → reachability → labels → surface → projection → measurements
+       → build → reachability → labels → surface → projection → offline
 ```
 
 All of it must be clean before reporting. `SCOUTNGO_SKIP_AUDITS=1` exists and

@@ -17,6 +17,8 @@
  */
 
 import { curveFromExtremes, type CurveSource, type TideExtreme, type TideSample, type TideStation } from '../core/tide.ts'
+import { readForecast, saveForecast, tideKey, type Provenance } from './savedForecast.ts'
+import { reportNetwork } from './offlineCache.ts'
 
 export const STATIONS_URL =
   'https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations.json?type=tidepredictions'
@@ -144,6 +146,12 @@ export interface TidePredictions {
    * the same as a number NOAA published.
    */
   curveSource: CurveSource
+  /**
+   * Live from NOAA, or saved on this device with the time it arrived. A tide
+   * table does not go stale the way a weather forecast does -- the turns are
+   * astronomy -- but where it came from is still said.
+   */
+  provenance: Provenance
 }
 
 export type PredictionsResult =
@@ -331,17 +339,38 @@ export async function fetchPredictions(
 
     const result: PredictionsResult = {
       status: 'ok',
-      predictions: { extremes, curve, curveSource },
+      predictions: { extremes, curve, curveSource, provenance: { kind: 'live' } },
     }
     cache.set(key, result)
+    reportNetwork(true)
+    saveForecast(tideKey(stationId, begin, end), { extremes, curve, curveSource })
     return result
   } catch (error) {
+    reportNetwork(false)
+    /*
+     * NO SIGNAL: THE SAVED TABLE, IF THERE IS ONE, SAYING IT IS SAVED. Not put
+     * in the in-memory cache, so the next attempt with signal asks NOAA again.
+     */
+    const saved = readForecast<{ extremes: TideExtreme[]; curve: TideSample[]; curveSource: CurveSource }>(
+      tideKey(stationId, begin, end),
+    )
+    if (saved !== null && Array.isArray(saved.payload?.extremes)) {
+      return {
+        status: 'ok',
+        predictions: {
+          extremes: saved.payload.extremes.map((e) => ({ ...e, at: new Date(e.at) })),
+          curve: saved.payload.curve.map((c) => ({ ...c, at: new Date(c.at) })),
+          curveSource: saved.payload.curveSource,
+          provenance: { kind: 'saved', fetchedAt: saved.fetchedAt },
+        },
+      }
+    }
     return {
       status: 'unavailable',
       reason:
         error instanceof Error && error.name === 'AbortError'
-          ? 'The tide prediction timed out.'
-          : 'Could not reach NOAA for tide predictions.',
+          ? 'The tide prediction timed out, and none is saved for this date.'
+          : 'Could not reach NOAA for tide predictions, and none is saved for this date.',
     }
   } finally {
     clearTimeout(timer)

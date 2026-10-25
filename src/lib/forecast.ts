@@ -327,6 +327,46 @@ export function parseWind(payload: unknown, at: Date): WindResult {
   }
 }
 
+/* -------------------------------------------------- cloud at the venue */
+
+const VENUE_CLOUD_VARIABLES = [
+  'cloud_cover',
+  'cloud_cover_low',
+  'cloud_cover_mid',
+  'cloud_cover_high',
+] as const
+
+/** Cloud over the venue for one hour. Every layer may be absent; absent is not clear. */
+export interface VenueCloud {
+  at: Date
+  totalPercent: number | null
+  low: number | null
+  mid: number | null
+  high: number | null
+}
+
+/**
+ * The cloud at the venue for the hour the shoot is in, out of the venue day.
+ *
+ * Null when the day carries no cloud at all, which is what a day saved before
+ * cloud was asked for looks like. Same hour rule as parseWind, on purpose:
+ * one rule for which row is "now", not two that can pick different hours.
+ */
+export function parseVenueCloud(payload: unknown, at: Date): VenueCloud | null {
+  const hourly = (payload as { hourly?: Record<string, unknown> } | null)?.hourly
+  const times = Array.isArray(hourly?.time) ? (hourly.time as string[]) : []
+  if (times.length === 0 || !Array.isArray(hourly?.cloud_cover_low)) return null
+  const index = times.findIndex((t) => t.startsWith(isoHour(at)))
+  const row = index === -1 ? 0 : index
+  return {
+    at: new Date(times[row]),
+    totalPercent: numberOrNull(hourly?.cloud_cover, row),
+    low: numberOrNull(hourly?.cloud_cover_low, row),
+    mid: numberOrNull(hourly?.cloud_cover_mid, row),
+    high: numberOrNull(hourly?.cloud_cover_high, row),
+  }
+}
+
 /** yyyy-mm-ddTHH, which is how an Open-Meteo hourly stamp starts. */
 function isoHour(at: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0')
@@ -339,6 +379,35 @@ export async function fetchWind(
   timeZone: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<WindResult> {
+  const day = await fetchVenueDay(at, when, timeZone, fetchImpl)
+  return day.status === 'ok' ? parseWind(day.payload, when) : day
+}
+
+export type VenueDayResult =
+  | { status: 'ok'; payload: unknown }
+  /** `unreachable` when no answer came back at all, as opposed to a refusal. */
+  | { status: 'unavailable'; reason: string; unreachable?: boolean }
+
+/**
+ * THE VENUE'S DAY, RAW: wind at every level, the surface gust, and the cloud.
+ *
+ * WHY RAW. The whole day comes back in one answer, and it is the thing kept on
+ * the device for offline use (src/lib/savedForecast.ts), so scrubbing to
+ * another hour with no signal reads the saved day rather than nothing.
+ *
+ * WHY CLOUD IS IN IT. The CLOUD chip read `selectedCloud`, and App passed it
+ * the literal `null` from the commit that introduced it: no request was ever
+ * made for the chip, so it said "no data" at every venue, Atlantic Park
+ * included, where Open-Meteo answers perfectly well. The cloud at the venue is
+ * four more columns on a request already being made for the same coordinate,
+ * so it costs no new disclosure.
+ */
+export async function fetchVenueDay(
+  at: LatLon,
+  when: Date,
+  timeZone: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<VenueDayResult> {
   const params = new URLSearchParams({
     latitude: at.lat.toFixed(4),
     longitude: at.lon.toFixed(4),
@@ -350,6 +419,7 @@ export async function fetchWind(
     hourly: [
       ...WIND_LEVELS_METERS.flatMap((h) => [`wind_speed_${h}m`, `wind_direction_${h}m`]),
       'wind_gusts_10m',
+      ...VENUE_CLOUD_VARIABLES,
     ].join(','),
     start_date: isoDate(when),
     end_date: isoDate(when),
@@ -365,14 +435,15 @@ export async function fetchWind(
     if (!response.ok) {
       return { status: 'unavailable', reason: `Open-Meteo returned HTTP ${response.status}.` }
     }
-    return parseWind(await response.json(), when)
+    return { status: 'ok', payload: await response.json() }
   } catch (error) {
     return {
       status: 'unavailable',
+      unreachable: true,
       reason:
         error instanceof Error && error.name === 'AbortError'
-          ? 'The wind lookup timed out.'
-          : 'Could not reach Open-Meteo for wind.',
+          ? 'The forecast timed out.'
+          : 'Could not reach Open-Meteo.',
     }
   } finally {
     clearTimeout(timer)

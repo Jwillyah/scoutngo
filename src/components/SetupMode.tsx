@@ -6,7 +6,7 @@ import { BuildStamp } from './BuildStamp.tsx'
 import { exampleIndex, SHOOT_EXAMPLES, SHOT_LIST_EXAMPLES } from '../lib/examples.ts'
 import type { DescribeState, DesiredShot } from '../lib/describe.ts'
 import type { KitProfile as KitProfileType } from '../core/kit.ts'
-import type { KitSelection } from '../lib/kitSelection.ts'
+import { pickableKit, type KitSelection } from '../lib/kitSelection.ts'
 import type { PlatformFilter } from '../core/platformFilter.ts'
 import type { ShootKind } from '../core/shootWindow.ts'
 import type { SearchHit } from '../lib/search.ts'
@@ -47,6 +47,11 @@ interface SetupModeProps {
   /** The shooter's own gear, editable under Kit and style. */
   kitProfile: KitProfileType
   onKitProfile: (next: KitProfileType) => void
+  /** Shelved gear ids. See SHELVED_STORAGE_KEY in src/lib/kitSelection.ts. */
+  shelved: readonly string[]
+  onShelve: (id: string, on: boolean) => void
+  /** A change made to the kit on this load, said once. */
+  kitNote: string | null
   spots: Spot[]
   onSaveSpot: (name: string) => void
   onLoadSpot: (spot: Spot) => void
@@ -154,6 +159,9 @@ export function SetupMode({
   onKit,
   kitProfile,
   onKitProfile,
+  shelved,
+  onShelve,
+  kitNote,
   spots,
   onSaveSpot,
   onLoadSpot,
@@ -327,7 +335,7 @@ export function SetupMode({
                   </button>
                 </div>
                 <div className="drawer__body">
-                  {drawer === 'kit' ? <KitProfile value={kit} onChange={onKit} kit={kitProfile} onKitChange={onKitProfile} /> : null}
+                  {drawer === 'kit' ? <KitProfile value={kit} onChange={onKit} kit={kitProfile} onKitChange={onKitProfile} shelved={shelved} onShelve={onShelve} note={kitNote} /> : null}
                   {drawer === 'shots' ? (
                     <div className="drawer__pad">
                       <p className="setup__note">
@@ -689,7 +697,7 @@ export function SetupMode({
 
         {/* Kit LAST: it ships with defaults, so it can never block anything. */}
         <KitChips value={kit}
-            platform={platformFilter} onChange={onKit} kit={kitProfile} onEdit={() => open('kit')} />
+            platform={platformFilter} onChange={onKit} kit={pickableKit(kitProfile, shelved)} onEdit={() => open('kit')} />
 
       </div>
 

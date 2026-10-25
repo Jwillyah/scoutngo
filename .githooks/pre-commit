@@ -178,4 +178,11 @@ ok "$(grep -E 'SURFACE PROBLEMS' "$SCRATCH/surface.log" | tail -1)"
 run_audit "projection audit" scripts/audit-projection.mjs "$SCRATCH/proj.log" 'FAIL|ABORTED'
 ok "$(grep -E 'PROJECTION FAILURES' "$SCRATCH/proj.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
 
+# With every request off the app's origin cut, in airplane mode AND with
+# requests that hang: sun, moon, a position, its cone and the sun ray must be
+# on the glass with no error state. See docs/offline.md for why "hang" is the
+# case that broke in Shenandoah.
+run_audit "offline audit" scripts/audit-offline.mjs "$SCRATCH/offline.log" 'PROBLEM|ABORTED'
+ok "$(grep -E 'OFFLINE PROBLEMS' "$SCRATCH/offline.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
+
 echo "${GREEN}all gates passed${OFF}"

@@ -1,5 +1,7 @@
 import { useNumerals } from '../lib/numeralsContext.ts'
 import * as maplibregl from 'maplibre-gl'
+import { loadTile, PROTOCOL, viaProtocol } from '../lib/offlineCache.ts'
+import { IMAGERY_TEMPLATE, TERRAIN_TEMPLATE } from '../lib/offlineSources.ts'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -78,6 +80,14 @@ import { ShooterFigure } from './ShooterFigure.tsx'
  */
 maplibregl.setWorkerUrl(maplibreWorkerUrl)
 
+/*
+ * SAVED TILES FIRST, AND NEVER A HANG. Every imagery and terrain URL below
+ * carries the scoutngo:// scheme, and this is what answers it. Registered once,
+ * at module scope, because MapLibre keeps protocols globally. See
+ * src/lib/offlineCache.ts.
+ */
+maplibregl.addProtocol(PROTOCOL, loadTile)
+
 /**
  * The map canvas as a JPEG data URL, downscaled if it is over the configured
  * long edge.
@@ -116,8 +126,13 @@ function encodeCanvas(canvas: HTMLCanvasElement): string {
  * Esri's ordering and not the usual one. MapLibre fills in {x} as the column and
  * {y} as the row, so this template is correct as written.
  */
-const ESRI_TILES =
-  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+/*
+ * THROUGH THE scoutngo:// PROTOCOL, so a saved tile is read from the device
+ * and a dead network fails fast instead of hanging. The real template lives in
+ * src/lib/offlineSources.ts, the one place the cache, the measuring script and
+ * the map all read it from. See src/lib/offlineCache.ts.
+ */
+const ESRI_TILES = viaProtocol(IMAGERY_TEMPLATE)
 
 /**
  * THE LAST ZOOM ESRI ACTUALLY HAS IMAGERY FOR, over rural ground.
@@ -220,7 +235,8 @@ export const ESRI_REFERENCE_ATTRIBUTION =
  * above uses. Two sources, two orderings, both correct as written.
  */
 const TERRAIN_SOURCE = 'terrain-dem'
-const TERRARIUM_TILES = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'
+/* Through the protocol too, for the same reason as ESRI_TILES. */
+const TERRARIUM_TILES = viaProtocol(TERRAIN_TEMPLATE)
 
 export const TERRAIN_ATTRIBUTION =
   'Elevation tiles by Mapzen and AWS Open Data, from SRTM, NED, and other public sources'
@@ -1413,7 +1429,22 @@ export function MapView({
     instance.on('move', reportView)
     instance.once('load', reportView)
 
-    instance.on('load', () => {
+    /*
+     * THE OVERLAYS ARE BUILT WHEN THE STYLE IS READY, NOT WHEN THE TILES ARE.
+     *
+     * This was `instance.on('load', ...)`. MapLibre fires `load` only once
+     * every tile in view has loaded or errored, and a dead cell does neither:
+     * the request is sent and never answered. So on a mountain with no bars
+     * the cones, the sun and shadow rays, the radius ring and the sun in the
+     * sky waited for imagery that was never coming, and the computed geometry
+     * -- which needs no network at all -- never reached the glass.
+     *
+     * scripts/audit-offline.mjs in hang mode, run before the change, found
+     * cones and rays not drawn because no overlay layer existed. The style is
+     * an inline object with no glyphs and no sprite, so `style.load` needs no
+     * network and fires on any connection.
+     */
+    const buildOverlays = () => {
       const lighting = [
         'match',
         ['get', 'lighting'],
@@ -1806,7 +1837,8 @@ export function MapView({
       })
 
       setReady(true)
-    })
+    }
+    instance.once('style.load', buildOverlays)
 
     map.current = instance
 

@@ -1,6 +1,7 @@
 import { feetToMeters } from '../core/reachScale.ts'
 import { compareToRating, knots, windAtHeight, type LevelWind } from '../core/windProfile.ts'
-import type { SightlineCloud } from '../core/cloud.ts'
+import type { VenueCloud } from '../lib/forecast.ts'
+import { forecastAge, type Provenance } from '../lib/savedForecast.ts'
 import type { TideState } from '../core/tide.ts'
 import {
   GROUND_WIND_METERS,
@@ -44,7 +45,12 @@ interface WeatherPanelProps {
   ratedWindSource: string
   tide: TideInfo
   tideNow: TideState | null
-  cloud: SightlineCloud | null
+  /** Cloud over the venue for the hour, from the same request as the wind. */
+  cloud: VenueCloud | null
+  /** Live, or saved with the time it arrived. Saved always shows its age. */
+  forecast: Provenance
+  /** Why there is no forecast, in words, when there is none. */
+  forecastReason: string | null
   /*
    * WHICH READING TO SHOW. The panel held all three -- wind, tide, cloud --
    * one under another, which was right when the sheet was one scrolling page
@@ -58,6 +64,31 @@ interface WeatherPanelProps {
 
 /** A dash. NEVER a zero standing in for a reading that did not arrive. */
 const DASH = '–'
+
+/*
+ * A SAVED FORECAST SAYS SO, BESIDE THE VALUE, EVERY TIME.
+ *
+ * Never rendered as if it were current: under twelve hours the age is shown
+ * plainly, over twelve it is marked, over thirty-six the reading is dimmed
+ * and called an old forecast. A live one carries nothing, because a reading
+ * with no qualifier is the live reading.
+ */
+function SavedAge({ provenance, what }: { provenance: Provenance; what: string }) {
+  if (provenance.kind !== 'saved') return null
+  const age = forecastAge(provenance.fetchedAt)
+  return (
+    <p className={`wx__age wx__age--${age.mark}`}>
+      {age.mark === 'dimmed' ? `Old ${what}, ` : `Saved ${what}, `}
+      <span className="num">{age.text}</span>
+      {age.mark === 'dimmed' ? '. It may have changed since.' : '. No signal for a newer one.'}
+    </p>
+  )
+}
+
+const dimmedIf = (provenance: Provenance): string =>
+  provenance.kind === 'saved' && forecastAge(provenance.fetchedAt).mark === 'dimmed'
+    ? ' wx__read--old'
+    : ''
 
 /**
  * THREE READINGS, NOT A DASHBOARD.
@@ -88,6 +119,8 @@ export function WeatherPanel({
   tide,
   tideNow,
   cloud,
+  forecast,
+  forecastReason,
   show = 'all',
   units,
 }: WeatherPanelProps) {
@@ -130,7 +163,7 @@ export function WeatherPanel({
 
       {/* ------------------------------------------------------------ wind */}
       {!shows('wind') ? null : (
-      <div className="wx__read">
+      <div className={`wx__read${dimmedIf(forecast)}`}>
         <p className="wx__label">Wind {heightLine}</p>
         {heightNote === null ? null : <p className="wx__assumed">{heightNote}</p>}
         <p className="wx__value num">
@@ -140,8 +173,9 @@ export function WeatherPanel({
           )}
         </p>
 
+        {aloft.speedMps === null ? null : <SavedAge provenance={forecast} what="forecast" />}
         {aloft.speedMps === null ? (
-          <p className="wx__note">The forecast did not say.</p>
+          <p className="wx__note">{forecastReason ?? 'The forecast did not say.'}</p>
         ) : (
           <>
             {/*
@@ -234,6 +268,14 @@ export function WeatherPanel({
                 .
               </p>
             )}
+            {/* A tide table is astronomy and does not go stale, but where it came from is said. */}
+            {tide.predictions.provenance.kind === 'saved' ? (
+              <p className="wx__age wx__age--plain">
+                Saved from NOAA,{' '}
+                <span className="num">{forecastAge(tide.predictions.provenance.fetchedAt).text}</span>.
+                Predicted turns do not change.
+              </p>
+            ) : null}
             <p className="wx__note wx__note--quiet">
               {tide.station.name},{' '}
               <span className="num">{formatRange(tide.distanceKm * 1000, units.distance)}</span>
@@ -249,23 +291,44 @@ export function WeatherPanel({
 
       {/* ----------------------------------------------------------- cloud */}
       {!shows('cloud') ? null : (
-      <div className="wx__read">
-        <p className="wx__label">Cloud on the sightline</p>
+      <div className={`wx__read${dimmedIf(forecast)}`}>
+        <p className="wx__label">Cloud over the venue</p>
+        {/*
+          * THE VENUE'S CLOUD, from the request the wind already makes. This
+          * card used to be fed the literal null and asked the shooter to
+          * select a position, while the chip above it said "no data". The
+          * cloud along one position's sightline is still on that position's
+          * card, where it belongs.
+          */}
         {cloud === null ? (
           <>
             <p className="wx__value num">{DASH}</p>
             <p className="wx__note">
-              Select a position and ask for its cloud; it is one forecast call per
-              sightline.
+              {forecastReason ??
+                (clock === null ? 'Set the venue and the window.' : 'Waiting for Open-Meteo.')}
             </p>
           </>
         ) : (
           <>
-            <p className="wx__value">
-              {cloud.worstLow === null ? DASH : `${Math.round(cloud.worstLow)}% low`}
+            <p className="wx__value num">
+              {cloud.low === null ? DASH : `${Math.round(cloud.low)}% low`}
             </p>
-            <p className="wx__note">
-              {cloud.worstLow === null ? 'The forecast did not say.' : cloud.verdict}
+            <SavedAge provenance={forecast} what="forecast" />
+            <p className="wx__note num">
+              {[
+                cloud.mid === null ? null : `mid ${Math.round(cloud.mid)}%`,
+                cloud.high === null ? null : `high ${Math.round(cloud.high)}%`,
+                cloud.totalPercent === null ? null : `total ${Math.round(cloud.totalPercent)}%`,
+              ]
+                .filter((part) => part !== null)
+                .join(' · ') || 'The forecast gave no layers above the low one.'}
+            </p>
+            {cloud.low === null ? (
+              <p className="wx__note">The forecast did not say how much low cloud.</p>
+            ) : null}
+            <p className="wx__note wx__note--quiet">
+              Open-Meteo, over the venue for this hour. Low cloud is the layer that takes
+              the sun away. Each position's sightline is on its own card.
             </p>
           </>
         )}

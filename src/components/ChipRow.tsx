@@ -1,4 +1,5 @@
 import type { CardKind } from '../lib/sheetCard.ts'
+import type { ForecastAge } from '../lib/savedForecast.ts'
 
 /*
  * FOUR CHIPS, TWO LINES EACH, FIXED.
@@ -46,11 +47,24 @@ export interface Chip {
    */
   value: string | null
   /**
+   * A unit set smaller after the value, for a value whose unit does not fit
+   * at full size: a clock time's unit is its zone, and "10:29 EDT" at 14px is
+   * two pixels wider than a chip. Still part of the value line, so the value
+   * never reads as a bare number.
+   */
+  unit?: string
+  /**
    * Whether this chip is the one worth looking at right now -- golden hour
    * running out, wind over the aircraft's rating. Lit, not coloured by rule:
    * see src/core/colorRole.ts, the hue still means what it means.
    */
   urgent?: boolean
+  /**
+   * THE AGE OF A SAVED READING, which rides on the label. Null or absent for a
+   * live one. A saved forecast on a chip with no age would be a stale value
+   * rendered as current, which this app does not do.
+   */
+  age?: ForecastAge | null
 }
 
 interface ChipRowProps {
@@ -99,15 +113,28 @@ export function ChipRow({ chips, active, onOpen, measureRef }: ChipRowProps) {
              * a number, and a bright promise over "no data" is the thing
              * that read as broken. */
             chip.value === null ? 'chip2--none' : '',
+            chip.age?.mark === 'marked' ? 'chip2--aged' : '',
+            chip.age?.mark === 'dimmed' ? 'chip2--old' : '',
           ]
             .filter((c) => c !== '')
             .join(' ')}
           aria-pressed={active === chip.kind}
           onClick={() => onOpen(chip.kind)}
         >
-          <span className="chip2__label">{chip.label}</span>
+          <span className="chip2__label">
+            {chip.label}
+            {chip.age === null || chip.age === undefined ? null : (
+              <span className="chip2__age">
+                {/* The short form: an 8px label has no room for "3 h old". The card says it in full. */}
+                {chip.age.mark === 'dimmed' ? ` · old ${chip.age.short}` : ` · ${chip.age.short}`}
+              </span>
+            )}
+          </span>
           <span className={`chip2__value${chip.value === null ? '' : ' num'}`}>
             {chip.value ?? NO_DATA}
+            {chip.value === null || chip.unit === undefined ? null : (
+              <span className="chip2__unit"> {chip.unit}</span>
+            )}
           </span>
         </button>
       ))}

@@ -1,9 +1,7 @@
 import { useRef, useState } from 'react'
 import { OnThisDevice } from './OnThisDevice.tsx'
+import { buildScoutFile, readScoutFile, saveScoutFile, scoutFilename } from '../lib/scoutFile.ts'
 import {
-  exportFilename,
-  parseSpotsFile,
-  toFile,
   type Spot,
 } from '../lib/spots.ts'
 
@@ -52,16 +50,13 @@ export function SpotsPanel({
     setNote(`Saved "${trimmed}" to this device.`)
   }
 
+  /*
+   * THE SAME FILE AS THE BACKUP, CARRYING ONLY SPOTS. One format: the reader
+   * in src/lib/scoutFile.ts takes this, a full backup, and the older spots-only
+   * files alike. This is also what a plan shared as a file will be.
+   */
   const exportSpots = () => {
-    const blob = new Blob([JSON.stringify(toFile(spots), null, 2)], {
-      type: 'application/json',
-    })
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = exportFilename()
-    anchor.click()
-    URL.revokeObjectURL(url)
+    saveScoutFile(buildScoutFile({ spots }), scoutFilename('spots'))
     setNote(`Exported ${spots.length} spots.`)
   }
 
@@ -69,14 +64,22 @@ export function SpotsPanel({
     file
       .text()
       .then((text) => {
-        const result = parseSpotsFile(text)
+        const result = readScoutFile(text)
         if (!result.ok) {
           setNote(result.reason)
           return
         }
-        onImport(result.spots)
+        if (result.file.spots.length === 0) {
+          setNote('That file has no spots. A kit or units in it import from About, under Backup.')
+          return
+        }
+        onImport(result.file.spots)
+        const extra =
+          result.file.kit !== null || result.file.units !== null
+            ? ' Its kit and units were left alone; import those from About, under Backup.'
+            : ''
         setNote(
-          `Imported ${result.spots.length} spots${result.skipped > 0 ? `, skipped ${result.skipped} unreadable` : ''}.`,
+          `Imported ${result.file.spots.length} spots${result.file.skippedSpots > 0 ? `, skipped ${result.file.skippedSpots} unreadable` : ''}.${extra}`,
         )
       })
       .catch(() => setNote('Could not read that file.'))

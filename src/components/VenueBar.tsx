@@ -19,9 +19,16 @@ interface VenueBarProps {
   onAbout: () => void
   /** The initial on the button, or null for a generic glyph. */
   initial: string | null
+  /**
+   * False when there is no connection. One quiet mark beside the date, and
+   * nothing else: no modal, no toast, no retry loop. Everything computed
+   * still works and everything saved still shows, so there is nothing to
+   * interrupt anyone about.
+   */
+  online?: boolean
 }
 
-export function VenueBar({ venueName, dateLabel, onAbout, initial }: VenueBarProps) {
+export function VenueBar({ venueName, dateLabel, onAbout, initial, online = true }: VenueBarProps) {
   return (
     <div className="vbar">
       <svg className="vbar__pin" width="15" height="15" viewBox="0 0 16 16" aria-hidden="true">
@@ -42,6 +49,11 @@ export function VenueBar({ venueName, dateLabel, onAbout, initial }: VenueBarPro
         * src/lib/venueParts.ts.
         */}
       <span className="vbar__name">{venueName}</span>
+      {online ? null : (
+        <span className="vbar__offline" role="status" aria-label="No connection">
+          offline
+        </span>
+      )}
       <span className="vbar__date num">{dateLabel}</span>
 
       {/*

@@ -1,4 +1,7 @@
 import { buildLabel } from '../lib/build.ts'
+import type { ReadFile } from '../lib/scoutFile.ts'
+import { BackupFile } from './BackupFile.tsx'
+import { StorageProbe } from './StorageProbe.tsx'
 import {
   DISTANCE_UNITS,
   WIND_UNITS,
@@ -38,6 +41,9 @@ interface AboutSheetProps {
   kitLine: string
   spotsLine: string
   apiKeyLine: string
+  /** Export and import, one file. See BackupFile.tsx. */
+  onExport: () => void
+  onImport: (file: ReadFile) => string
 }
 
 export function AboutSheet({
@@ -50,6 +56,8 @@ export function AboutSheet({
   kitLine,
   spotsLine,
   apiKeyLine,
+  onExport,
+  onImport,
 }: AboutSheetProps) {
   return (
     <div className="about">
@@ -141,6 +149,16 @@ export function AboutSheet({
           </span>
         </button>
       ))}
+
+      {/*
+        * THE BACKUP, beside the things it backs up. Clearing Safari's data
+        * wipes localStorage, and that was the only place the kit lived.
+        */}
+      <p className="about__eyebrow about__eyebrow--dim">Backup</p>
+      <BackupFile onExport={onExport} onImport={onImport} />
+
+      <p className="about__eyebrow about__eyebrow--dim">Does clearing Safari erase this?</p>
+      <StorageProbe />
 
       <p className="about__foot">
         <span>Free · open source · no account</span>

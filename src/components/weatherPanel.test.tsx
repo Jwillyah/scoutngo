@@ -37,7 +37,7 @@ const TIDE_OK = {
   station: { id: '8638888', name: 'Lynnhaven Inlet', at: { lat: 36.9, lon: -76.08 }, state: 'VA' },
   distanceKm: 0.57,
   distant: false,
-  predictions: { extremes: [], curve: [], curveSource: 'derived' as const },
+  predictions: { extremes: [], curve: [], curveSource: 'derived' as const, provenance: { kind: 'live' as const } },
 }
 
 const RISING: TideState = {
@@ -62,6 +62,8 @@ const render = (over: Partial<Parameters<typeof WeatherPanel>[0]> = {}) =>
       tide={TIDE_OK}
       tideNow={RISING}
       cloud={null}
+      forecast={{ kind: 'live' }}
+      forecastReason={null}
       {...over}
     />,
   )
@@ -159,17 +161,63 @@ describe('a reading that did not arrive', () => {
 
   it('says the forecast did not say for a cloud reading with no low layer', () => {
     const html = render({
-      cloud: {
-        samples: [],
-        worstLow: null,
-        worstLowAtKm: null,
-        meanLow: null,
-        meanMid: null,
-        meanHigh: null,
-        verdict: 'no cloud forecast for this sightline',
-      },
+      cloud: { at: new Date('2026-10-15T11:00:00Z'), totalPercent: 40, low: null, mid: 20, high: 30 },
     })
     expect(html).toContain('The forecast did not say')
+    /* Missing is not clear: no "0% low" invented for the absent layer. */
+    expect(html).not.toContain('0% low')
+  })
+
+  /*
+   * THE REPORTED BUG. The card was fed null and asked the shooter to select a
+   * position. It now shows the venue's cloud for the hour.
+   */
+  it('shows the cloud over the venue', () => {
+    const text = render({
+      cloud: { at: new Date('2026-10-15T11:00:00Z'), totalPercent: 62, low: 3, mid: 41, high: 88 },
+    }).replace(/<[^>]*>/g, '')
+    expect(text).toContain('3% low')
+    expect(text).toContain('mid 41% · high 88% · total 62%')
+    expect(text).not.toContain('Select a position')
+  })
+
+  it('an empty cloud card says why, in words', () => {
+    const text = render({
+      forecastReason: 'Could not reach Open-Meteo. Nothing is saved for this venue and day.',
+    }).replace(/<[^>]*>/g, '')
+    expect(text).toContain('Nothing is saved for this venue and day.')
+  })
+})
+
+/*
+ * A SAVED FORECAST NEVER RENDERS AS CURRENT. Every saved reading carries its
+ * age beside it; past twelve hours it is marked, past thirty-six it is dimmed
+ * and called old.
+ */
+describe('a saved forecast says how old it is', () => {
+  const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString()
+  const cloud = { at: new Date('2026-10-15T11:00:00Z'), totalPercent: 62, low: 3, mid: 41, high: 88 }
+
+  it('a live reading carries no qualifier', () => {
+    expect(render({ cloud })).not.toContain('Saved forecast')
+  })
+
+  it('a saved one carries its age beside the value', () => {
+    const html = render({ cloud, forecast: { kind: 'saved', fetchedAt: hoursAgo(3) } })
+    expect(html.replace(/<[^>]*>/g, '')).toContain('Saved forecast, 3 h old')
+    expect(html).toContain('wx__age--plain')
+  })
+
+  it('marks one over twelve hours', () => {
+    expect(render({ cloud, forecast: { kind: 'saved', fetchedAt: hoursAgo(14) } })).toContain(
+      'wx__age--marked',
+    )
+  })
+
+  it('dims and labels one over thirty-six hours', () => {
+    const html = render({ cloud, forecast: { kind: 'saved', fetchedAt: hoursAgo(40) } })
+    expect(html).toContain('wx__read--old')
+    expect(html.replace(/<[^>]*>/g, '')).toContain('Old forecast, 40 h old')
   })
 })
 
