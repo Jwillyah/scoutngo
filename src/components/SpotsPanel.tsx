@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { OnThisDevice } from './OnThisDevice.tsx'
 import { buildScoutFile, readScoutFile, saveScoutFile, scoutFilename } from '../lib/scoutFile.ts'
+import { shareLink } from '../lib/planShare.ts'
 import {
   type Spot,
 } from '../lib/spots.ts'
@@ -14,6 +15,8 @@ interface SpotsPanelProps {
   /** Name suggested for a new save, usually the current venue. */
   suggestedName: string
   canSave: boolean
+  /** The plan on screen now, as a spot, for the file and the link. Null with no venue yet. */
+  currentPlan: () => Spot | null
 }
 
 const shortDate = (iso: string) => {
@@ -34,6 +37,7 @@ export function SpotsPanel({
   onImport,
   suggestedName,
   canSave,
+  currentPlan,
 }: SpotsPanelProps) {
   const [name, setName] = useState('')
   const [note, setNote] = useState<string | null>(null)
@@ -60,6 +64,36 @@ export function SpotsPanel({
     setNote(`Exported ${spots.length} spots.`)
   }
 
+  /* THE PLAN ON SCREEN, as a file and as a link. One format: a ScoutNGo file. */
+  const savePlanFile = () => {
+    const plan = currentPlan()
+    if (plan === null) return
+    saveScoutFile(buildScoutFile({ plan }), scoutFilename('plan'))
+    setNote(`Saved "${plan.name}" as a file.`)
+  }
+
+  /*
+   * THE LINK CARRIES THE PLAN AFTER THE #, which no request ever includes:
+   * whoever opens it fetches the app and nothing about the shoot reaches a
+   * server. Sent only when the shooter taps this, to whoever they pick.
+   */
+  const sharePlan = async () => {
+    const plan = currentPlan()
+    if (plan === null) return
+    const link = await shareLink(window.location.href, plan)
+    try {
+      if (typeof navigator.share === 'function') {
+        await navigator.share({ title: plan.name, url: link })
+        setNote('Shared.')
+        return
+      }
+      await navigator.clipboard.writeText(link)
+      setNote('Link copied. The plan is inside the link itself; no server holds it.')
+    } catch {
+      setNote('Not shared.')
+    }
+  }
+
   const importSpots = (file: File) => {
     file
       .text()
@@ -67,6 +101,11 @@ export function SpotsPanel({
         const result = readScoutFile(text)
         if (!result.ok) {
           setNote(result.reason)
+          return
+        }
+        if (result.file.plan !== null) {
+          onLoad(result.file.plan)
+          setNote(`Opened the plan "${result.file.plan.name}".`)
           return
         }
         if (result.file.spots.length === 0) {
@@ -133,6 +172,19 @@ export function SpotsPanel({
             event.target.value = ''
           }}
         />
+      </div>
+
+      <div className="field">
+        <p className="field__label">This plan</p>
+        <div className="btn-row">
+          <button type="button" className="btn btn--small" onClick={savePlanFile} disabled={!canSave}>
+            Save plan to a file
+          </button>
+          <button type="button" className="btn btn--small" onClick={() => void sharePlan()} disabled={!canSave}>
+            Share plan link
+          </button>
+        </div>
+        <p className="field__hint">A plan file opens with Import JSON.</p>
       </div>
 
       {note === null ? null : <p className="notice">{note}</p>}

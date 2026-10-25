@@ -9659,3 +9659,39 @@
 .eventday__why {
   color: var(--color-text-muted);
 }
+
+/* Cloud by layer: three short rows, the value on the right. */
+.wx__layers {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+}
+
+.wx__layer dt {
+  font-size: var(--text-label);
+  color: var(--color-text-muted);
+}
+
+.wx__layer dd {
+  margin: 0;
+  font-size: var(--text-base);
+  color: var(--color-text);
+}
+
+.wx__color strong {
+  color: var(--color-text);
+}
+
+/* The shared-plan offer: over every stage, under the top bar, until answered. */
+.confirm--shared {
+  position: fixed;
+  z-index: 60;
+  top: calc(env(safe-area-inset-top, 0px) + 72px);
+  bottom: auto;
+  flex-wrap: wrap;
+}
+
+.plan__ics {
+  margin-top: var(--space-3);
+}

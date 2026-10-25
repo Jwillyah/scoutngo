@@ -54,6 +54,8 @@ interface SetupModeProps {
   onLoadSpot: (spot: Spot) => void
   onDeleteSpot: (id: string) => void
   onImportSpots: (incoming: Spot[]) => void
+  /** The plan on screen as a spot, for Save plan and Share. */
+  currentPlan: () => Spot | null
   suggestedName: string
   canSave: boolean
   shotListText: string
@@ -164,6 +166,7 @@ export function SetupMode({
   onLoadSpot,
   onDeleteSpot,
   onImportSpots,
+  currentPlan,
   suggestedName,
   canSave,
   shotListText,
@@ -439,6 +442,7 @@ export function SetupMode({
                       onImport={onImportSpots}
                       suggestedName={suggestedName}
                       canSave={canSave}
+                      currentPlan={currentPlan}
                     />
                   ) : null}
                 </div>

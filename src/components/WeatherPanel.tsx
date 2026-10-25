@@ -1,3 +1,4 @@
+import { colorChance, COLOR_WORDS } from '../core/colorChance.ts'
 import { feetToMeters } from '../core/reachScale.ts'
 import { compareToRating, knots, windAtHeight, type LevelWind } from '../core/windProfile.ts'
 import type { VenueCloud } from '../lib/forecast.ts'
@@ -314,15 +315,32 @@ export function WeatherPanel({
               {cloud.low === null ? DASH : `${Math.round(cloud.low)}% low`}
             </p>
             <SavedAge provenance={forecast} what="forecast" />
-            <p className="wx__note num">
-              {[
-                cloud.mid === null ? null : `mid ${Math.round(cloud.mid)}%`,
-                cloud.high === null ? null : `high ${Math.round(cloud.high)}%`,
-                cloud.totalPercent === null ? null : `total ${Math.round(cloud.totalPercent)}%`,
-              ]
-                .filter((part) => part !== null)
-                .join(' · ') || 'The forecast gave no layers above the low one.'}
-            </p>
+            {/*
+              * THE THREE LAYERS, each its own row, a dash where the forecast
+              * did not say. The chip above stays one value, the low layer.
+              */}
+            <dl className="wx__layers num">
+              {(
+                [
+                  ['Low', cloud.low],
+                  ['Mid', cloud.mid],
+                  ['High', cloud.high],
+                ] as const
+              ).map(([name, value]) => (
+                <div key={name} className="wx__layer">
+                  <dt>{name}</dt>
+                  <dd>{value === null ? DASH : `${Math.round(value)}%`}</dd>
+                </div>
+              ))}
+            </dl>
+            {(() => {
+              const read = colorChance(cloud)
+              return (
+                <p className="wx__note wx__color">
+                  <strong>{COLOR_WORDS[read.chance]}.</strong> {read.why} Matters when the sun is low.
+                </p>
+              )
+            })()}
             {cloud.low === null ? (
               <p className="wx__note">The forecast did not say how much low cloud.</p>
             ) : null}

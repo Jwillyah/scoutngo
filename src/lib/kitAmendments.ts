@@ -13,7 +13,7 @@
  * no aperture, because "a Sony 70-200" is an f/4 or an f/2.8 and nobody had
  * said which; it is the f/2.8 GM II, said on 26 October.
  */
-import type { KitProfile, Lens } from '../core/kit.ts'
+import type { Body, KitProfile, Lens } from '../core/kit.ts'
 
 export const AMENDMENTS_STORAGE_KEY = 'scoutngo.kitAmendments.v1'
 
@@ -22,6 +22,8 @@ export interface KitAmendment {
   /** What it did, said on the kit screen the once it is applied. */
   says: string
   addLenses: Lens[]
+  /** Bodies to add when the kit does not have one with that id. Optional: older amendments added none. */
+  addBodies?: Body[]
   shelve: string[]
   /** Fields to set on a lens the kit already has. A lens it does not have is left alone. */
   updateLenses?: { id: string; set: Partial<Pick<Lens, 'name' | 'maxAperture'>> }[]
@@ -62,6 +64,30 @@ export const AMENDMENTS: readonly KitAmendment[] = [
       { id: 'sony-70-200', set: { name: SONY_70_200_NAME, maxAperture: SONY_70_200_APERTURE } },
     ],
   },
+  /*
+   * THE a6300, from the combined brief of 25 October: "bodies a7IV, a7III,
+   * a6300". 6000 x 4000 on a 23.5 x 15.6 mm APS-C sensor, from Wikipedia's
+   * Sony a6300 specification table, read 2026-10-25 (Sony's own pages refuse
+   * automated requests from here; see the a7IV note in src/core/kit.ts).
+   * Native APS-C, so the 10-18 needs no crop on it.
+   */
+  {
+    id: '2026-10-25-sony-a6300',
+    says: 'Added the Sony a6300, as asked on 25 October.',
+    addLenses: [],
+    addBodies: [
+      {
+        id: 'a6300',
+        name: 'Sony a6300',
+        role: 'photo',
+        sensor: 'apsc',
+        horizontalPixels: 6000,
+        verticalPixels: 4000,
+        notes: 'APS-C body',
+      },
+    ],
+    shelve: [],
+  },
 ]
 
 export interface Amended {
@@ -98,6 +124,12 @@ export function applyAmendments(
     )
     if (missing.length > 0) {
       nextProfile = { ...nextProfile, lenses: [...nextProfile.lenses, ...missing] }
+    }
+    const newBodies = (amendment.addBodies ?? []).filter(
+      (body) => !nextProfile.bodies.some((existing) => existing.id === body.id),
+    )
+    if (newBodies.length > 0) {
+      nextProfile = { ...nextProfile, bodies: [...nextProfile.bodies, ...newBodies] }
     }
     for (const update of amendment.updateLenses ?? []) {
       nextProfile = {

@@ -177,7 +177,9 @@ describe('a reading that did not arrive', () => {
       cloud: { at: new Date('2026-10-15T11:00:00Z'), totalPercent: 62, low: 3, mid: 41, high: 88 },
     }).replace(/<[^>]*>/g, '')
     expect(text).toContain('3% low')
-    expect(text).toContain('mid 41% · high 88% · total 62%')
+    expect(text).toContain('Low3%Mid41%High88%')
+    /* High at 88% is past the canvas range: a lid more often than a canvas. */
+    expect(text).toContain('Color chance: some.')
     expect(text).not.toContain('Select a position')
   })
 

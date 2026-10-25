@@ -1,3 +1,4 @@
+import { lightGoneLine } from '../core/lightGone.ts'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { TILE_TIMEOUT_MS } from '../lib/offlineCache.ts'
 import {
@@ -429,10 +430,8 @@ export function SunCurve({
             </span>
           )}
           {crossings.terrainSet === null || crossings.flatSet === null ? null : (
-            <span className="curve__gap">
-              Sunset <span className="num">{clock(crossings.terrainSet)}</span> over the ridge,{' '}
-              <span className="num">{clock(crossings.flatSet)}</span> flat
-            </span>
+            /* THE RIDGE GAP, said as what it costs. See src/core/lightGone.ts. */
+            <span className="curve__gap num">{lightGoneLine(crossings.terrainSet, crossings.flatSet, clock)}</span>
           )}
         </p>
       ) : (

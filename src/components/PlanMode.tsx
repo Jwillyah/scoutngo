@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import type { LatLon } from '../core/geo.ts'
 import { loadAirspaceOverlay, type AirspaceOverlay } from '../lib/airspaceOverlay.ts'
 import { measureWords } from '../lib/measureWords.ts'
+import { shootDayIcs } from '../core/shootIcs.ts'
+import { saveText } from '../lib/saveText.ts'
 import { isEventDay, venueToday } from '../core/eventDay.ts'
 import { TFR_URL } from '../core/airspaceLookup.ts'
 import type {
@@ -1105,6 +1107,35 @@ export function PlanMode({
             * no signal. It was in a footer under five sections; it is one
             * control on the card about the thing it saves.
             */}
+          {/*
+            * THE SHOOT DAY IN THE PHONE'S CALENDAR: the window, golden hour
+            * starting, and the end of civil twilight for the strobe, each with
+            * an alarm. Times from src/core/shootIcs.ts.
+            */}
+          {venueWindow === null || venue === null ? null : (
+            <button
+              type="button"
+              className="btn btn--small plan__ics"
+              onClick={() =>
+                saveText(
+                  shootDayIcs({
+                    name: venueNameLine,
+                    lat: venue.lat,
+                    lon: venue.lon,
+                    start: venueWindow.start,
+                    end: venueWindow.end,
+                    stamp: new Date(),
+                    uid: `scoutngo-${venue.lat.toFixed(5)}-${venue.lon.toFixed(5)}-${venueWindow.start.toISOString()}`,
+                  }),
+                  'text/calendar;charset=utf-8',
+                  `scoutngo-shoot-${venueWindow.start.toISOString().slice(0, 10)}.ics`,
+                )
+              }
+            >
+              Add to calendar, with alarms
+            </button>
+          )}
+
           {/*
             * ON THE DAY, WITH A DRONE IN THE PLAN: today's restrictions are
             * the one thing this app cannot check. A link, never a verdict:

@@ -24,9 +24,12 @@ const watchdog = startWatchdog('api url', 300_000)
 const { send, ev, wait, ws, dispose } = await connect()
 
 const seen = []
+/* Every page load the browser asks the server for: what a log of the share link would hold. */
+const documents = []
 ws.addEventListener('message', (event) => {
   const m = JSON.parse(event.data)
   if (m.method !== 'Network.requestWillBeSent') return
+  if (m.params.type === 'Document') documents.push(m.params.request.url)
   const url = new URL(m.params.request.url)
   /*
    * THE APP'S OWN /api ONLY. NOAA and Photon have /api/ paths too, and the
@@ -85,6 +88,43 @@ for (const path of ['/api/search', '/api/streetview']) {
     process.exit(2)
   }
 }
+
+/*
+ * THE SHARE LINK. Built in the page from the plan on screen, opened as a fresh
+ * load, and the document request the browser actually sent is read: it must
+ * be the bare app address, with the plan nowhere in it. Then the offer must
+ * appear and open the same venue, or the link carried nothing worth checking.
+ */
+const link = await ev(`(async () => {
+  const { shareLink } = await import('/src/lib/planShare.ts')
+  const { EMPTY_VENUE } = await import('/src/lib/venue.ts')
+  const venue = { ...EMPTY_VENUE, latitude: '36.846580', longitude: '-75.976660', date: '2026-10-25', startTime: '17:00', endTime: '18:30', eventDescription: 'share audit' }
+  return shareLink('http://127.0.0.1:5173/', { id: 'a', name: 'Share audit', savedAt: new Date().toISOString(), venue, kit: {}, positions: [], marks: [] })
+})()`)
+if (typeof link !== 'string' || !link.includes('#plan=')) {
+  console.log(`=== API URL AUDIT ABORTED: no share link was built (${String(link).slice(0, 80)}) ===`)
+  process.exit(2)
+}
+documents.length = 0
+await send('Page.navigate', { url: link })
+await wait(6000)
+const asked = documents.find((u) => u.startsWith('http://127.0.0.1:5173'))
+if (asked === undefined) {
+  console.log('=== API URL AUDIT ABORTED: the share link load sent no document request to watch ===')
+  process.exit(2)
+}
+const bare = asked === 'http://127.0.0.1:5173/'
+console.log(`  ${bare ? 'ok     ' : 'PROBLEM'} share link load asked the server for ${asked}`)
+if (!bare) problems += 1
+const offered = await ev(`document.querySelector('.confirm--shared .confirm__name')?.textContent ?? null`)
+if (offered !== 'Share audit') {
+  console.log(`=== API URL AUDIT ABORTED: the shared plan was not offered (saw ${offered}), so the link was not proven to carry it ===`)
+  process.exit(2)
+}
+console.log(`  ok      the plan arrived from the fragment alone: offered "${offered}"`)
+const cleared = await ev(`window.location.hash`)
+console.log(`  ${cleared === '' ? 'ok     ' : 'PROBLEM'} the fragment is cleared from the address bar ("${cleared.slice(0, 20)}")`)
+if (cleared !== '') problems += 1
 
 watchdog.stop()
 await dispose()

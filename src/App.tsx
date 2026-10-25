@@ -101,6 +101,7 @@ import { lowTideNearest } from './lib/lowTide.ts'
 import { useVenueCache } from './lib/useVenueCache.ts'
 import { buildScoutFile, saveScoutFile, scoutFilename, type ReadFile } from './lib/scoutFile.ts'
 import { runSuggest } from './lib/suggestRun.ts'
+import { readShareHash, SHARE_PREFIX } from './lib/planShare.ts'
 import { SideMenu } from './components/SideMenu.tsx'
 import type { MenuItem } from './lib/menu.ts'
 import {
@@ -1378,18 +1379,43 @@ function App() {
     setIsolatedId((current) => (id === null ? null : current === id ? null : id))
   }
 
-  const saveSpot = (name: string) => {
-    const spot: Spot = {
-      id: newSpotId(),
-      name,
-      savedAt: new Date().toISOString(),
-      venue,
-      kit,
-      positions,
-      /* The wires go with the place, which is the point of saving a place. */
-      marks,
+  /*
+   * A PLAN ARRIVING IN THE LINK'S FRAGMENT (src/lib/planShare.ts). Read once
+   * at launch, then the fragment is cleared from the address bar so a reload
+   * does not offer it again.
+   */
+  const [sharedPlan, setSharedPlan] = useState<Spot | null>(null)
+  useEffect(() => {
+    if (!window.location.hash.startsWith(SHARE_PREFIX)) return
+    let live = true
+    void readShareHash(window.location.hash).then((plan) => {
+      if (!live) return
+      window.history.replaceState(null, '', window.location.pathname + window.location.search)
+      setSharedPlan(plan)
+    })
+    return () => {
+      live = false
     }
-    setSpots(mergeSpots(spots, [spot]))
+  }, [])
+
+  const spotNamed = (name: string): Spot => ({
+    id: newSpotId(),
+    name,
+    savedAt: new Date().toISOString(),
+    venue,
+    kit,
+    positions,
+    /* The wires go with the place, which is the point of saving a place. */
+    marks,
+  })
+
+  const saveSpot = (name: string) => setSpots(mergeSpots(spots, [spotNamed(name)]))
+
+  /* The plan on screen, for Save plan and Share. Named for the venue, or its coordinate. */
+  const currentPlan = (): Spot | null => {
+    if (centre === null) return null
+    const named = venue.name !== null && venue.name.key === placeKey(venue.latitude, venue.longitude) ? venue.name.name : null
+    return spotNamed(named ?? `${venue.latitude}, ${venue.longitude}`)
   }
 
   const loadSpot = (spot: Spot) => {
@@ -1740,6 +1766,7 @@ function App() {
             onLoadSpot={loadSpot}
             onDeleteSpot={(id) => setSpots(spots.filter((spot) => spot.id !== id))}
             onImportSpots={(incoming) => setSpots(mergeSpots(spots, incoming))}
+            currentPlan={currentPlan}
             suggestedName={shortVenueLabel(venueNameState, venue.latitude, venue.longitude)}
             canSave={centre !== null}
             shootKind={shootKind}
@@ -1992,6 +2019,35 @@ function App() {
           menuOpen={menuOpen}
         />
       ) : null}
+
+      {/*
+        * A SHARED PLAN IS OFFERED, NOT APPLIED. Opening a link should never
+        * silently replace what someone was working on.
+        */}
+      {sharedPlan === null ? null : (
+        <div className="confirm confirm--shared" role="dialog" aria-label="Shared plan">
+          <div className="confirm__text">
+            <span className="confirm__q">Open the shared plan?</span>
+            <span className="confirm__name">{sharedPlan.name}</span>
+            <span className="confirm__hint">It replaces the plan on screen. Save yours first if you want it.</span>
+          </div>
+          <div className="confirm__actions">
+            <button type="button" className="confirm__no" onClick={() => setSharedPlan(null)}>
+              Not now
+            </button>
+            <button
+              type="button"
+              className="btn btn--primary confirm__yes"
+              onClick={() => {
+                loadSpot(sharedPlan)
+                setSharedPlan(null)
+              }}
+            >
+              Open
+            </button>
+          </div>
+        </div>
+      )}
 
       <SideMenu
         open={menuOpen}

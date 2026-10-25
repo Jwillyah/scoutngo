@@ -73,7 +73,10 @@ describe('the amendment asked for by name', () => {
     const first = applyAmendments(DEFAULT_KIT, [], [])
     expect(first.profile.lenses.map((l) => l.id)).toContain('sony-70-200')
     expect(first.shelved).toEqual(['sony-75-300'])
-    expect(first.said).toHaveLength(1)
+    expect(first.said).toEqual([
+      'Added the Sony 70-200 and shelved the Sony 75-300, as asked on 25 October.',
+      'Added the Sony a6300, as asked on 25 October.',
+    ])
 
     /* Removing the lens afterwards sticks: the amendment never runs twice. */
     const removed = { ...first.profile, lenses: first.profile.lenses.filter((l) => l.id !== 'sony-70-200') }
@@ -99,7 +102,7 @@ describe('the amendment asked for by name', () => {
         { id: 'sony-70-200', name: 'Sony 70-200', minFocalLength: 70, maxFocalLength: 200, maxAperture: null, forcesSensor: [], notes: '' },
       ],
     }
-    const after = applyAmendments(before, ['sony-75-300'], [AMENDMENTS[0].id])
+    const after = applyAmendments(before, ['sony-75-300'], [AMENDMENTS[0].id, '2026-10-25-sony-a6300'])
     expect(after.profile.lenses.find((l) => l.id === 'sony-70-200')).toMatchObject({
       name: 'Sony 70-200 f2.8 GM II',
       maxAperture: 2.8,
@@ -133,5 +136,31 @@ describe('Suggest is given the shooter\'s own kit', () => {
     const ids = bagOptics(profile, bag).map((o) => o.id)
     expect(ids).toContain('sony-70-200')
     expect(ids).not.toContain('sony-75-300')
+  })
+})
+
+/*
+ * THE KIT AS THE BRIEF NAMES IT. "Bodies a7IV, a7III, a6300; lenses 70-200
+ * f/2.8 GM II, Sigma 28-75 f/2.8, Sigma 30mm, Sony 10-18 f/4, 200-600; 75-300
+ * shelved." What is in the bag after every amendment, on a fresh phone.
+ */
+describe('the kit the brief names', () => {
+  const { profile, shelved } = applyAmendments(DEFAULT_KIT, [], [])
+  const active = <T extends { id: string }>(list: T[]) => list.filter((g) => !shelved.includes(g.id)).map((g) => g.id).sort()
+
+  it('has the three bodies and the five lenses, and the 75-300 on the shelf', () => {
+    expect(active(profile.bodies)).toEqual(['a6300', 'a7iii', 'a7iv'])
+    expect(active(profile.lenses)).toEqual(['sigma-28-75', 'sigma-30', 'sony-10-18', 'sony-200-600', 'sony-70-200'])
+    expect(shelved).toEqual(['sony-75-300'])
+  })
+
+  it('adds the a6300 as an APS-C body with its own pixel count', () => {
+    expect(profile.bodies.find((b) => b.id === 'a6300')).toMatchObject({ sensor: 'apsc', horizontalPixels: 6000, verticalPixels: 4000 })
+  })
+
+  it('adds it once: a phone that removed it keeps it removed', () => {
+    const first = applyAmendments(DEFAULT_KIT, [], [])
+    const removed = { ...first.profile, bodies: first.profile.bodies.filter((b) => b.id !== 'a6300') }
+    expect(applyAmendments(removed, first.shelved, first.applied).profile.bodies.map((b) => b.id)).not.toContain('a6300')
   })
 })

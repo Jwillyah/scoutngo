@@ -32,7 +32,12 @@ import { reviveSpot, SPOTS_FORMAT, type Spot } from './spots.ts'
 import { reviveUnits, type Units } from './units.ts'
 
 export const SCOUT_FILE_FORMAT = 'scoutngo'
-export const SCOUT_FILE_VERSION = 1
+/*
+ * 2 added `plan`: one plan on its own, the file "Save plan" writes and a
+ * shared plan travels as. A version 1 file has no plan and reads exactly as it
+ * always did.
+ */
+export const SCOUT_FILE_VERSION = 2
 
 /** The kit as a file carries it: what is owned, what is packed, what is shelved. */
 export interface FileKit {
@@ -50,12 +55,15 @@ export interface ScoutFile {
   units?: Units
   /** Saved spots: a venue, its window, kit and positions, under a name. The plans. */
   spots?: Spot[]
+  /** One plan: the venue, window, kit, positions and marks in front of you. Version 2. */
+  plan?: Spot
 }
 
 export interface ScoutFileParts {
   kit?: FileKit
   units?: Units
   spots?: Spot[]
+  plan?: Spot
 }
 
 export function buildScoutFile(parts: ScoutFileParts, now: Date = new Date()): ScoutFile {
@@ -66,6 +74,7 @@ export function buildScoutFile(parts: ScoutFileParts, now: Date = new Date()): S
     ...(parts.kit === undefined ? {} : { kit: parts.kit }),
     ...(parts.units === undefined ? {} : { units: parts.units }),
     ...(parts.spots === undefined ? {} : { spots: parts.spots }),
+    ...(parts.plan === undefined ? {} : { plan: parts.plan }),
   }
 }
 
@@ -74,10 +83,12 @@ export interface ReadFile {
   kit: FileKit | null
   units: Units | null
   spots: Spot[]
+  /** The one plan a "Save plan" file carries, or null. */
+  plan: Spot | null
   /** Spots in the file that could not be read. */
   skippedSpots: number
   /** "a backup", "spots", "an older spots file": what to call it on screen. */
-  kind: 'backup' | 'spots' | 'legacy-spots'
+  kind: 'backup' | 'spots' | 'legacy-spots' | 'plan'
 }
 
 export type ReadResult = { ok: true; file: ReadFile } | { ok: false; reason: string }
@@ -108,7 +119,7 @@ export function readScoutFile(text: string): ReadResult {
     if (spots.length === 0) return { ok: false, reason: 'No readable spots in that file.' }
     return {
       ok: true,
-      file: { kit: null, units: null, spots, skippedSpots: list.length - spots.length, kind: 'legacy-spots' },
+      file: { kit: null, units: null, spots, plan: null, skippedSpots: list.length - spots.length, kind: 'legacy-spots' },
     }
   }
 
@@ -132,8 +143,9 @@ export function readScoutFile(text: string): ReadResult {
   const units = isObject(parsed.units) ? reviveUnits(parsed.units) : null
   const list = Array.isArray(parsed.spots) ? parsed.spots : []
   const spots = list.map(reviveSpot).filter((s): s is Spot => s !== null)
+  const plan = parsed.plan === undefined ? null : reviveSpot(parsed.plan)
 
-  if (kit === null && units === null && spots.length === 0) {
+  if (kit === null && units === null && spots.length === 0 && plan === null) {
     return { ok: false, reason: 'That file has nothing in it this app can read.' }
   }
   return {
@@ -142,8 +154,9 @@ export function readScoutFile(text: string): ReadResult {
       kit,
       units,
       spots,
+      plan,
       skippedSpots: list.length - spots.length,
-      kind: kit === null && units === null ? 'spots' : 'backup',
+      kind: plan !== null && kit === null && units === null && spots.length === 0 ? 'plan' : kit === null && units === null ? 'spots' : 'backup',
     },
   }
 }
@@ -158,12 +171,13 @@ export function describeFile(file: ReadFile): string {
     )
   }
   if (file.units !== null) parts.push(`units: wind in ${file.units.wind}, distance in ${file.units.distance}`)
+  if (file.plan !== null) parts.push(`the plan "${file.plan.name}"`)
   if (file.spots.length > 0) parts.push(`${file.spots.length} ${file.spots.length === 1 ? 'spot' : 'spots'}`)
   const skipped = file.skippedSpots === 0 ? '' : ` (${file.skippedSpots} unreadable, left out)`
   return `${parts.join(' · ')}${skipped}`
 }
 
-export function scoutFilename(kind: 'backup' | 'spots', now: Date = new Date()): string {
+export function scoutFilename(kind: 'backup' | 'spots' | 'plan', now: Date = new Date()): string {
   return `scoutngo-${kind}-${now.toISOString().slice(0, 10)}.json`
 }
 

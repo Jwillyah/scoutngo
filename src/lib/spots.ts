@@ -78,6 +78,14 @@ export function reviveSpot(raw: unknown): Spot | null {
     venue: venue as unknown as VenueDraft,
     kit: kit as unknown as KitSelection,
     positions: Array.isArray(positions) ? (positions as CameraPosition[]) : [],
+    /*
+     * KEPT. This field was left out of the rebuild, so every stored spot lost
+     * its marks on the next launch. They are revived properly on load
+     * (reviveMarks in App); here they only have to survive.
+     */
+    ...(Array.isArray((raw as Record<string, unknown>).marks)
+      ? { marks: (raw as Record<string, unknown>).marks as SiteMark[] }
+      : {}),
     ...(typeof (raw as Record<string, unknown>).placeId === 'string'
       ? { placeId: (raw as Record<string, unknown>).placeId as string }
       : {}),

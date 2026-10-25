@@ -137,3 +137,37 @@ describe('reading is defensive, the file may be hand edited', () => {
     )
   })
 })
+
+describe('version 2: a plan on its own', () => {
+  const plan = {
+    id: 'p1',
+    name: 'Atlantic Park',
+    savedAt: '2026-10-25T12:00:00.000Z',
+    venue: { name: null, latitude: '36.84658', longitude: '-75.97666', date: '2026-10-25', startTime: '17:00', endTime: '18:30', eventDescription: '', desiredOutcome: '', subjectAcrossMeters: '' },
+    kit: {},
+    positions: [],
+    marks: [],
+  }
+
+  it('writes version 2 and reads the plan back', () => {
+    const file = buildScoutFile({ plan: plan as never })
+    expect(file.version).toBe(2)
+    const read = readScoutFile(JSON.stringify(file))
+    expect(read.ok && read.file.kind).toBe('plan')
+    expect(read.ok && read.file.plan?.name).toBe('Atlantic Park')
+  })
+
+  it('still reads a version 1 backup exactly as before, with no plan', () => {
+    const v1 = { format: 'scoutngo', version: 1, exportedAt: '2026-10-01T00:00:00Z', units: { wind: 'kt', distance: 'ft' } }
+    const read = readScoutFile(JSON.stringify(v1))
+    expect(read.ok).toBe(true)
+    if (!read.ok) return
+    expect(read.file.plan).toBeNull()
+    expect(read.file.kind).toBe('backup')
+  })
+
+  it('refuses a file from a newer app rather than half reading it', () => {
+    const read = readScoutFile(JSON.stringify({ format: 'scoutngo', version: 3, exportedAt: '' }))
+    expect(read.ok).toBe(false)
+  })
+})
