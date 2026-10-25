@@ -10204,3 +10204,168 @@
   font-size: var(--text-label);
   line-height: 1.35;
 }
+
+/* ---------------------------------------------------------- viewfinder */
+
+.vf {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: var(--black);
+  color: var(--color-text);
+}
+
+.vf--ask {
+  display: grid;
+  align-content: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.vf__title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.vf__say,
+.vf__refused {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.vf__refused {
+  color: var(--color-text);
+}
+
+.vf__video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.vf__overlay {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.vf__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.vf__horizon {
+  fill: none;
+  stroke: var(--white);
+  stroke-width: 0.4;
+  stroke-dasharray: 1 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.vf__sunpath {
+  fill: none;
+  stroke: var(--sun);
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.vf__moonpath {
+  fill: none;
+  stroke: var(--grey-1);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.vf__hour,
+.vf__pin {
+  position: absolute;
+  transform: translate(-50%, -130%);
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--black);
+  color: var(--white);
+  font-size: var(--text-label);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.vf__pin {
+  border: 1.5px solid var(--white);
+}
+
+.vf__sun {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  transform: translate(-50%, -50%);
+  border: 3px solid var(--sun);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.vf__frame {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border: 2px solid var(--white);
+  pointer-events: none;
+}
+
+.vf__framelabel {
+  position: absolute;
+  left: 4px;
+  top: 2px;
+  font-size: var(--text-label);
+  text-shadow: 0 1px 2px var(--black);
+}
+
+.vf__bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3) calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+  background: color-mix(in srgb, var(--black) 75%, transparent);
+}
+
+.vf__note {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.vf__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.vf__lens {
+  display: grid;
+  gap: 2px;
+}
+
+.vf__lenslabel {
+  font-size: var(--text-label);
+  color: var(--color-text-muted);
+}
+
+.vf__wider {
+  position: relative;
+  display: block;
+  margin: var(--space-2) auto 0;
+  width: fit-content;
+  top: calc(env(safe-area-inset-top, 0px) + var(--space-3));
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--black);
+  font-size: var(--text-label);
+}

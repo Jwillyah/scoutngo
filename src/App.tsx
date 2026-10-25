@@ -102,6 +102,7 @@ import { useVenueCache } from './lib/useVenueCache.ts'
 import { buildScoutFile, saveScoutFile, scoutFilename, type ReadFile } from './lib/scoutFile.ts'
 import { runSuggest } from './lib/suggestRun.ts'
 import { readShareHash, SHARE_PREFIX } from './lib/planShare.ts'
+import { Viewfinder, ViewfinderNeedsPlace } from './components/Viewfinder.tsx'
 import { SideMenu } from './components/SideMenu.tsx'
 import type { MenuItem } from './lib/menu.ts'
 import {
@@ -1254,6 +1255,9 @@ function App() {
     kind: 'sky',
     tick: 0,
   })
+  /* The viewfinder: the camera with the plan over it. Opened from the menu, asks for its permissions on a tap. */
+  const [viewfinderOpen, setViewfinderOpen] = useState(false)
+
   const onMenuPick = (item: MenuItem) => {
     switch (item) {
       case 'plan':
@@ -1263,6 +1267,9 @@ function App() {
         return
       case 'now':
         setNowOpen(true)
+        return
+      case 'viewfinder':
+        setViewfinderOpen(true)
         return
       case 'sky':
       case 'about':
@@ -2048,6 +2055,27 @@ function App() {
           </div>
         </div>
       )}
+
+      {viewfinderOpen && centre === null ? (
+        <ViewfinderNeedsPlace
+          onSetup={() => {
+            setViewfinderOpen(false)
+            setMode('setup')
+          }}
+          onClose={() => setViewfinderOpen(false)}
+        />
+      ) : null}
+      {viewfinderOpen && centre !== null ? (
+        <Viewfinder
+          venue={centre}
+          pins={plan.map((p) => ({ id: p.position.id, label: String(p.position.number), at: p.position.at }))}
+          profile={kitProfile}
+          bag={kit}
+          timeZone={venueWindow?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}
+          units={settings.units}
+          onClose={() => setViewfinderOpen(false)}
+        />
+      ) : null}
 
       <SideMenu
         open={menuOpen}
