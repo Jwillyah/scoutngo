@@ -11,6 +11,7 @@ import type { Wind } from '../core/upwind.ts'
 import type { LevelWind } from '../core/windProfile.ts'
 import type { VenueCloud } from '../lib/forecast.ts'
 import { forecastAge, type Provenance } from '../lib/savedForecast.ts'
+import { durationWords } from '../core/duration.ts'
 import type { TideExtreme, TideState } from '../core/tide.ts'
 import type { SunArc, SunPosition } from '../core/sun.ts'
 import type { PlanCoverage, PlannedPosition } from '../lib/plan.ts'
@@ -50,7 +51,8 @@ import { Card, CardMore } from './Card.tsx'
 import { SkyLegend } from './SkyLegend.tsx'
 import { WindCard } from './WindCard.tsx'
 import { ChipRow, type Chip } from './ChipRow.tsx'
-import { VenueBar } from './VenueBar.tsx'
+import { TopBar } from './TopBar.tsx'
+import { startHeading } from '../lib/heading.ts'
 import { AboutSheet, type HowSection } from './AboutSheet.tsx'
 import { LayerTiles } from './LayerTiles.tsx'
 import { TILE_ART } from './tileArt.tsx'
@@ -80,6 +82,11 @@ import { PhaseRule } from './PhaseRule.tsx'
  * They are stacked SECTIONS now. One scroll, no back buttons, nothing to
  * switch between.
  */
+
+/** How far terrain tilts the map when it is turned on. Enough to see a ridge stand up. */
+const TERRAIN_TILT_DEGREES = 60
+/** Whether the two-finger tilt hint has been shown on this phone. */
+const TILT_HINT_KEY = 'scoutngo.tiltHint.v1'
 
 interface PlanModeProps {
   mapHandle: React.Ref<MapHandle>
@@ -246,6 +253,13 @@ interface PlanModeProps {
   onPreparePack: () => void
   desiredShots: DesiredShot[]
   footer: React.ReactNode
+  /* The shell's pieces, owned by App. */
+  onMenu: () => void
+  menuOpen: boolean
+  /** The menu asked for a card: Sky or About. The tick makes a repeat ask open it again. */
+  cardRequest: { kind: 'sky' | 'about'; tick: number }
+  /** The search pill was tapped: go and search. */
+  onSearch: () => void
   /** Ground, air or both. Decides what shows here AND what a generate asks for. */
   platformFilter: PlatformFilterValue
   showLabels: boolean
@@ -414,6 +428,10 @@ export function PlanMode({
   onPreparePack,
   desiredShots,
   footer,
+  onMenu,
+  menuOpen,
+  cardRequest,
+  onSearch,
   platformFilter,
   showLabels,
   onShowLabels,
@@ -576,6 +594,19 @@ export function PlanMode({
   )
 
   /*
+   * A NEW SELECTION FROM ANYWHERE RAISES, placing included. Adding a position
+   * selects it, and that path went around onSelectAndRaise: the card was
+   * selected behind the peek. While still placing, the map stays clear; the
+   * card comes up when placing stops.
+   */
+  const selectedKey = selected?.position.id ?? null
+  useEffect(() => {
+    if (selectedKey === null || placing) return
+    const timer = setTimeout(raiseToHalf, 0)
+    return () => clearTimeout(timer)
+  }, [selectedKey, placing, raiseToHalf])
+
+  /*
    * TWO WAYS TO SELECT, ONE RULE.
    *
    * A position is selected by tapping it on the map, which arrives as
@@ -641,6 +672,62 @@ export function PlanMode({
    * NEVER AN IP LOOKUP. A refusal is an answer and the map simply stays where
    * it was.
    */
+  /*
+   * THE COMPASS. The needle follows the map's rotation; a tap turns the map
+   * with the phone's heading, another puts north back at the top. See
+   * src/lib/heading.ts for the iPhone permission and what is never kept.
+   */
+  const [mapBearing, setMapBearing] = useState(0)
+  const [followHeading, setFollowHeading] = useState(false)
+  const [headingNote, setHeadingNote] = useState<string | null>(null)
+  const stopHeading = useRef<(() => void) | null>(null)
+  const onCompass = useCallback(() => {
+    if (stopHeading.current !== null) {
+      stopHeading.current()
+      stopHeading.current = null
+      setFollowHeading(false)
+      handle.current?.setBearing(0)
+      return
+    }
+    void startHeading((degrees) => handle.current?.setBearing(degrees, true)).then((started) => {
+      if (!started.ok) {
+        setHeadingNote(started.reason)
+        handle.current?.setBearing(0)
+        return
+      }
+      setHeadingNote(null)
+      stopHeading.current = started.stop
+      setFollowHeading(true)
+    })
+  }, [handle])
+  useEffect(() => () => stopHeading.current?.(), [])
+
+  /*
+   * TERRAIN ON TILTS THE MAP. A ridge seen from straight above is a stain; the
+   * height is the reason to turn terrain on, so the map tilts to show it. The
+   * first time, one line says how to tilt by hand, and then never again.
+   */
+  const [tiltHint, setTiltHint] = useState(false)
+  const turnTerrain = useCallback(
+    (on: boolean) => {
+      onShowTerrain(on)
+      if (!on) return
+      handle.current?.setPitch(TERRAIN_TILT_DEGREES)
+      let seen = false
+      try {
+        seen = localStorage.getItem(TILT_HINT_KEY) === 'seen'
+        localStorage.setItem(TILT_HINT_KEY, 'seen')
+      } catch {
+        /* Storage refused: show it; it is one line. */
+      }
+      if (!seen) {
+        setTiltHint(true)
+        window.setTimeout(() => setTiltHint(false), 6000)
+      }
+    },
+    [onShowTerrain, handle],
+  )
+
   const [locating, setLocating] = useState(false)
   const onLocate = useCallback(() => {
     setLocating(true)
@@ -762,6 +849,17 @@ export function PlanMode({
     [raiseToHalf],
   )
 
+  /* The menu's Sky and About open here, on the card they name, half up. */
+  useEffect(() => {
+    if (cardRequest.tick === 0) return
+    const timer = setTimeout(() => {
+      setCard({ kind: cardRequest.kind } as SheetCard)
+      raiseToHalf()
+    }, 0)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cardRequest])
+
   const clock = useCallback(
     (at: Date | null) =>
       at === null || venueWindow === null ? null : formatClock(at, venueWindow.timeZone),
@@ -791,7 +889,7 @@ export function PlanMode({
       {
         kind: 'golden',
         label: 'GOLDEN',
-        value: goldenLeft === null ? null : goldenLeft <= 0 ? 'past' : `${goldenLeft} min`,
+        value: goldenLeft === null ? null : goldenLeft <= 0 ? 'past' : durationWords(goldenLeft),
         urgent: goldenLeft !== null && goldenLeft > 0 && goldenLeft <= 60,
       },
       {
@@ -1012,16 +1110,14 @@ export function PlanMode({
           state: !showTerrain ? 'OFF' : terrainPaused ? 'PAUSED' : `ON · ${Math.round(pitch)}°`,
           on: showTerrain,
           art: TILE_ART.terrain,
-          onToggle: () => onShowTerrain(!showTerrain),
+          onToggle: () => turnTerrain(!showTerrain),
         },
-        {
-          id: 'chart',
-          label: 'Chart',
-          state: showLabels ? 'ON' : 'OFF',
-          on: showLabels,
-          art: TILE_ART.chart,
-          onToggle: () => onShowLabels(!showLabels),
-        },
+        /*
+         * NO CHART TILE. It toggled the same setting as Labels -- the Esri
+         * roads and place names -- under a drawing of a nautical chart the app
+         * does not have. Two tiles for one switch, one of them promising a
+         * layer that does not exist: merged into Labels.
+         */
       ]}
       overlays={[
         { id: 'cones', label: 'Cones', state: coneMode === 'all' ? 'ON' : 'OFF', on: coneMode === 'all', art: TILE_ART.cones, onToggle: () => onConeMode(coneMode === 'all' ? 'none' : 'all') },
@@ -1219,7 +1315,7 @@ export function PlanMode({
               timeZone={venueWindow.timeZone}
               timeZoneAbbr={venueWindow.timeZoneShort}
               terrainOn={showTerrain}
-              onShowTerrain={onShowTerrain}
+              onShowTerrain={turnTerrain}
             />
           </Card>
         )
@@ -1389,6 +1485,7 @@ export function PlanMode({
         selectedId={selectedId}
         onSelect={onSelectAndRaise}
         onPitchChange={setPitch}
+        onBearingChange={setMapBearing}
         onViewChange={(zoom: number, width: number) => {
           setMapZoom(zoom)
           setMapWidth(width)
@@ -1417,6 +1514,29 @@ export function PlanMode({
         * icon would be one more thing to decode on a screen that just lost two
         * markers for being undecodable.
         */}
+      {/*
+        * THE SUN'S SIDE OF THE MAP, A FAINT WARM EDGE. Which way the light
+        * comes from, before reading any number: the edge of the screen facing
+        * the sun, turned with the map. Only while the sun is up; at night
+        * there is no side to show.
+        */}
+      {sun === null || sun.altitude <= 0 ? null : (
+        <div
+          className="suntint"
+          aria-hidden="true"
+          style={{ ['--sun-side' as string]: `${(sun.azimuth - mapBearing + 360) % 360}deg` }}
+        />
+      )}
+      {!tiltHint ? null : (
+        <p className="tapnote" role="status">
+          Tilt with two fingers: drag up or down.
+        </p>
+      )}
+      {headingNote === null ? null : (
+        <p className="tapnote" role="status">
+          {headingNote}
+        </p>
+      )}
       {!placing ? null : (
         <p className="tapnote">{placingHint('position', addsAir ? 'air' : 'ground')}</p>
       )}
@@ -1510,11 +1630,25 @@ export function PlanMode({
         * could make you not go -- so they stay put while the sheet changes
         * what it is about.
         */}
-      <VenueBar
-        venueName={venueNameLine}
-        dateLabel={dateLabel}
-        initial={null}
-        onAbout={() => openCard('about')}
+      <TopBar
+        onMenu={onMenu}
+        menuOpen={menuOpen}
+        pill={
+          /*
+           * THE PILL NAMES THE PLACE AND THE DAY, and a tap goes to search it,
+           * which is what a search pill is for. The venue bar this replaced
+           * carried the same two facts in a row of its own.
+           */
+          <button type="button" className="pill-venue" onClick={onSearch} aria-label="Search for a venue">
+            <span className="pill-venue__name">{venueNameLine}</span>
+            <span className="pill-venue__date num">{dateLabel}</span>
+          </button>
+        }
+        onAdd={() => onPlacing(!placing)}
+        adding={placing}
+        onLocate={onLocate}
+        locating={locating}
+        locateNote={null}
         online={online}
       />
 
@@ -1525,9 +1659,10 @@ export function PlanMode({
         onLayers={() => openCard('layers')}
         layersOpen={card.kind === 'layers'}
         pitch={pitch}
-        onResetPitch={() => handle.current?.setPitch(0)}
-        onLocate={onLocate}
-        locating={locating}
+        onPitch={(next) => handle.current?.setPitch(next)}
+        bearing={mapBearing}
+        heading={followHeading}
+        onCompass={onCompass}
       />
       )}
 

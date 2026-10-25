@@ -9,6 +9,8 @@ import { useGeolocation } from '../lib/useGeolocation.ts'
 import { useNow } from '../lib/useNow.ts'
 import type { TideInfo } from '../lib/useTide.ts'
 import { FieldCard } from './FieldCard.tsx'
+import { TopBar } from './TopBar.tsx'
+import { useOnline } from '../lib/useOnline.ts'
 
 interface FieldModeProps {
   plan: PlannedPosition[]
@@ -25,6 +27,9 @@ interface FieldModeProps {
    */
   onPlan: () => void
   footer: React.ReactNode
+  /* The menu, so Field can be left without a tab row. */
+  onMenu: () => void
+  menuOpen: boolean
 }
 
 /**
@@ -40,7 +45,22 @@ interface FieldModeProps {
  * the scrubber was left. That is the difference between a plan and a briefing:
  * by the time anyone is standing here the sun has moved.
  */
-export function FieldMode({ plan, venue, tide, pack, onPlan, footer }: FieldModeProps) {
+export function FieldMode({ plan, venue, tide, pack, onPlan, footer, onMenu, menuOpen }: FieldModeProps) {
+  const online = useOnline()
+  /* No map here, so no + and no locate: the menu and what this screen is. */
+  const bar = (
+    <TopBar
+      onMenu={onMenu}
+      menuOpen={menuOpen}
+      pill={<span className="pill-venue pill-venue--static">Field</span>}
+      onAdd={null}
+      adding={false}
+      onLocate={null}
+      locating={false}
+      locateNote={null}
+      online={online}
+    />
+  )
   const now = useNow()
   const gps = useGeolocation()
   const [index, setIndex] = useState(0)
@@ -87,6 +107,8 @@ export function FieldMode({ plan, venue, tide, pack, onPlan, footer }: FieldMode
   if (plan.length === 0) {
     return (
       <div className="mode-field">
+      {bar}
+        {bar}
         <div className="page">
           <p className="notice">No positions yet.</p>
           <button type="button" className="notice__act" onClick={onPlan}>

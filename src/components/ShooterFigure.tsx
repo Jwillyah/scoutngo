@@ -268,6 +268,12 @@ export function ShooterFigure({
         * Shortened in core/opticTag.ts, because the full name does not fit
         * beside six markers.
         */}
+      {/*
+        * ONLY ON THE SELECTED ONE. Six plates in a cluster were the crowding:
+        * the number and the camera glyph say which position is which, and the
+        * one you tapped says what it is shooting with.
+        */}
+      {!selected ? null : (
       <span className="shooter__focal num">
         {opticTag === null || opticTag === '' ? null : (
           <>
@@ -299,6 +305,7 @@ export function ShooterFigure({
         ) : null}
         {moved ? <span className="shooter__moved" aria-hidden="true" /> : null}
       </span>
+      )}
     </button>
   )
 }

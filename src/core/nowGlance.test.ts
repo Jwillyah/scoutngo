@@ -17,7 +17,7 @@ describe('the drive this exists for', () => {
   it('leads with the countdown to sunset', () => {
     expect(glance.phase).toBe('sunset-soon')
     expect(glance.minutesTo).toBe(14)
-    expect(glanceHeadline(glance)).toBe('Sunset in 14 min')
+    expect(glanceHeadline(glance)).toBe('Sunset in 14 m')
   })
 
   it('says where to look in words, not degrees', () => {
@@ -107,7 +107,7 @@ describe('the phases', () => {
     const glance = nowGlance(SANDBRIDGE, new Date(sunrise.getTime() - 20 * 60_000))
     expect(glance.phase).toBe('sunrise-soon')
     expect(glance.minutesTo).toBe(20)
-    expect(glanceHeadline(glance)).toBe('Sunrise in 20 min')
+    expect(glanceHeadline(glance)).toBe('Sunrise in 20 m')
     /* The morning sun comes up in the east, so the word must flip. */
     expect(glance.look?.word).toMatch(/east/)
   })
@@ -146,21 +146,22 @@ describe('the polar case', () => {
 })
 
 describe('spans read at a glance', () => {
-  it('uses minutes up to ninety', () => {
-    expect(spanWords(1)).toBe('1 min')
-    expect(spanWords(14)).toBe('14 min')
-    expect(spanWords(89)).toBe('89 min')
+  /* Hours and minutes, never a pile of minutes: "1 h 16 m", not "76 min". */
+  it('uses minutes under an hour', () => {
+    expect(spanWords(1)).toBe('1 m')
+    expect(spanWords(14)).toBe('14 m')
+    expect(spanWords(59)).toBe('59 m')
   })
 
-  /* "in 95 min" is arithmetic the reader has to do at a windscreen. */
-  it('switches to hours past that', () => {
-    expect(spanWords(90)).toBe('1 h 30')
+  it('switches to hours and minutes from an hour', () => {
+    expect(spanWords(76)).toBe('1 h 16 m')
+    expect(spanWords(90)).toBe('1 h 30 m')
     expect(spanWords(120)).toBe('2 h')
-    expect(spanWords(275)).toBe('4 h 35')
+    expect(spanWords(275)).toBe('4 h 35 m')
   })
 
   it('never goes negative', () => {
-    expect(spanWords(-5)).toBe('0 min')
+    expect(spanWords(-5)).toBe('0 m')
   })
 })
 
@@ -169,7 +170,7 @@ describe('how long have I got', () => {
     const at = after(10)
     const words = timeLeftWords(nowGlance(SANDBRIDGE, at), at)
     expect(words).toContain('Light for about')
-    expect(words).toContain('min')
+    expect(words).toMatch(/\d+ (m|h)\b/)
   })
 
   /* A "0 min left" would read as urgency when it means the opposite. */

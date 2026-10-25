@@ -216,8 +216,8 @@ describe('PositionCard', () => {
       'Usable to',
       'Camera bearing',
       'Sun delta',
-      'FOV h',
-      'FOV v',
+      'How wide it sees',
+      'How tall it sees',
     ]) {
       expect(html).toContain(label)
     }
@@ -399,8 +399,17 @@ describe('a flagged position says what is wrong with it', () => {
    * with no camera is the same ambiguity that let the Sigma stand in for my
    * drone in the first place."
    */
+  /*
+   * THE PLATE IS ON THE SELECTED POSITION ONLY. Six plates in a cluster were
+   * the crowding the layout brief named; the number says which is which.
+   */
+  it('shows no plate on a position that is not selected', () => {
+    const html = flagged({ opticName: 'Air 3S wide', opticTag: 'AIR 3S', focalLength: 24, selected: false } as never)
+    expect(html).not.toContain('shooter__focal')
+  })
+
   it('names the optic on the plate beside the focal length', () => {
-    const html = flagged({ opticName: 'Air 3S wide', opticTag: 'AIR 3S', focalLength: 24 } as never)
+    const html = flagged({ opticName: 'Air 3S wide', opticTag: 'AIR 3S', focalLength: 24, selected: true } as never)
     expect(html).toContain('AIR 3S')
     expect(html).toContain('24')
     expect(html).toContain('shooter__optic')

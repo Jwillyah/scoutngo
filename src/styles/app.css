@@ -1519,6 +1519,25 @@
 }
 
 /*
+ * THE ESRI CREDIT IS A ROUND i UNTIL TAPPED. It is required, so it stays; it
+ * does not need to be a dark bar across the corner of the map while nobody is
+ * reading it. Collapsed it is the button alone, open it is the full line.
+ */
+.maplibregl-ctrl-attrib.maplibregl-compact:not(.maplibregl-compact-show) {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.maplibregl-ctrl-attrib.maplibregl-compact:not(.maplibregl-compact-show) .maplibregl-ctrl-attrib-inner {
+  display: none;
+}
+
+/*
  * The scale bar is reference, not a readout you act on, so it is pulled down to
  * the quietest thing on the map: smaller than the type scale goes, faint type on
  * a faint rule, and a translucent plate rather than the solid panel every real
@@ -2105,29 +2124,11 @@
   gap: var(--space-3);
 
   /*
-   * BOUNDED, so the card can never grow off the top of the screen.
-   *
-   * It is anchored to its bottom edge above the sheet, so every row added pushes
-   * the HEAD upward. On a 390x844 phone with the shot list open, a warned
-   * position carrying a framing flag, a rationale and seven stats pushed the
-   * title, the lighting tag and the close button clean off the viewport: the
-   * numbers were visible and the thing they described was not.
-   *
-   * Capping against the space actually available and scrolling inside keeps the
-   * head on screen whatever the content does. --card-top-gap leaves room for the
-   * search field and the sun readout above.
+   * NOT BOUNDED, AND NO SCROLL OF ITS OWN. The cap and the inner scroll were for
+   * when this card floated over the map. It lives in the sheet now, and the
+   * sheet is the scroll: a second one inside it was the nested scroller the
+   * reachability audit reported the first time it actually opened a card.
    */
-  /*
-   * 88px, down from 140. That 140 was reserving room for the venue search field
-   * and the sun readout that used to float above this card. Both are gone, so
-   * the card gets the height back and the photo has somewhere to be.
-   */
-  --card-top-gap: 88px;
-  max-height: calc(
-    100dvh - var(--dock-height, 0px) - var(--sheet-live-height, 0px) - var(--card-top-gap)
-  );
-  overflow-y: auto;
-  overscroll-behavior: contain;
 }
 
 /*
@@ -9302,4 +9303,261 @@
   margin: 0;
   color: var(--color-text-muted);
   font-size: var(--text-sm);
+}
+
+/* ---------------------------------------------------------------- top bar
+ *
+ * ONE ROW, IN THE VENUE BAR'S OLD PLACE AND HEIGHT, so the chips and the
+ * rail below it keep the measured positions they already had. Menu on the
+ * left, the pill in the middle, + and locate on the right. The map is the
+ * screen on every mode now, and this is the only chrome across its top.
+ */
+.topbar {
+  position: absolute;
+  z-index: 6;
+  top: calc(var(--safe-top) + var(--space-2));
+  left: var(--space-3);
+  right: var(--space-3);
+  max-width: calc(var(--page-max) - 2 * var(--space-3));
+  margin: 0 auto;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.topbar__btn {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: var(--line-hair) solid var(--color-line-strong);
+  border-radius: 22px;
+  background: var(--panel-sheen);
+  color: var(--color-text);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--black) 55%, transparent);
+  cursor: pointer;
+}
+
+.topbar__btn--on {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.topbar__btn:disabled {
+  color: var(--color-text-faint);
+}
+
+.topbar__pill {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+/* The search field, when the pill IS the field: rounded like the bar it sits in. */
+.topbar__pill .search {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.topbar__pill .search__input {
+  height: 44px;
+  border-radius: 22px;
+  border-color: var(--color-line-strong);
+  background: var(--panel-sheen);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--black) 55%, transparent);
+}
+
+.topbar__pill .search__results {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  z-index: 7;
+}
+
+.topbar__offline {
+  position: absolute;
+  right: var(--space-3);
+  font-size: 10px;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.topbar__note {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  max-width: 80%;
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-panel);
+  background: var(--color-panel);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+}
+
+/* The pill when it names the place: the venue on the left, the day on the right. */
+.pill-venue {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  border: var(--line-hair) solid var(--color-line-strong);
+  border-radius: 22px;
+  background: var(--panel-sheen);
+  color: var(--color-text);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--black) 55%, transparent);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pill-venue--static {
+  cursor: default;
+}
+
+.pill-venue__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pill-venue__date {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+/* -------------------------------------------------------------- side menu */
+
+.sidemenu {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+}
+
+.sidemenu__scrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: color-mix(in srgb, var(--black) 55%, transparent);
+  cursor: pointer;
+}
+
+.sidemenu__panel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(84%, 320px);
+  padding: calc(var(--safe-top) + var(--space-3)) var(--space-2) calc(var(--safe-bottom) + var(--space-3));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  overflow-y: auto;
+  background: var(--color-bg);
+  border-right: var(--line-hair) solid var(--color-line);
+}
+
+.sidemenu__brand {
+  margin: 0 var(--space-2) var(--space-2);
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.sidemenu__item {
+  display: grid;
+  gap: 2px;
+  min-height: 52px;
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-panel);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sidemenu__item--on {
+  background: color-mix(in srgb, var(--ocean) 22%, var(--surface-raised));
+}
+
+.sidemenu__label {
+  font-weight: var(--weight-heavy);
+}
+
+.sidemenu__note {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* ------------------------------------------------- setup: the map is the screen
+ *
+ * It was a scrolling column with the map as a box at its top. The map fills
+ * the screen now, as it does in the plan, and the form is a sheet over it.
+ */
+.mode-setup .setup {
+  position: absolute;
+  inset: 0;
+  display: block;
+  overflow: hidden;
+}
+
+.mode-setup .setup__map {
+  position: absolute;
+  inset: 0;
+  height: auto;
+}
+
+.setup__sheet {
+  display: grid;
+  gap: var(--space-2);
+  padding-bottom: var(--space-4);
+}
+
+/* The forward button is the peek of the setup sheet: always there, one tap. */
+.mode-setup .sheet__peek .forward {
+  padding: 0 var(--space-3) var(--space-2);
+}
+
+/* Field has no map: its top bar is the head of the page, not a float over it. */
+.mode-field .topbar {
+  position: relative;
+  top: auto;
+  margin: var(--space-2) var(--space-3);
+  left: auto;
+  right: auto;
+}
+
+/*
+ * THE SUN'S SIDE: a faint gradient on the edge of the map facing the sun.
+ * The gradient runs toward --sun-side, the sun's bearing on the screen (0 is
+ * the top of the screen, 90 the right), so the warm edge is the sunny one.
+ * Under every control, over the map, never catches a tap.
+ */
+.suntint {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(
+    var(--sun-side, 0deg),
+    transparent 62%,
+    color-mix(in srgb, var(--sun) 22%, transparent) 100%
+  );
 }

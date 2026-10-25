@@ -1,3 +1,4 @@
+import { durationWords } from '../core/duration.ts'
 import { useEffect, useState } from 'react'
 import {
   GOES_ATTRIBUTION,
@@ -322,9 +323,7 @@ export function SkyLegend({
           <span className="skykey__srcnote">
             Frame <span className="num">{clock(sky.source.frameAt)}</span>, observed.
             {sky.source.far
-              ? ` Nearest frame is ${Math.round(
-                  sky.source.offsetMinutes,
-                )} min from where you are scrubbing.`
+              ? ` Nearest frame is ${durationWords(sky.source.offsetMinutes)} from where you are scrubbing.`
               : ''}
           </span>
         </p>

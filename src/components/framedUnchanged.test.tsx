@@ -158,10 +158,12 @@ describe('shot types add no chrome to the app shell', () => {
   const html = renderToStaticMarkup(<App />)
 
   it('puts nothing about shot types on SETUP', () => {
-    expect(html).not.toContain('Top-down')
-    expect(html).not.toContain('top-down')
-    expect(html).not.toContain('360')
-    expect(html).not.toContain('The pin is')
+    /* The words on screen, not the markup: a sheet 360px tall is not a 360. */
+    const text = html.replace(/<[^>]*>/g, ' ')
+    expect(text).not.toContain('Top-down')
+    expect(text).not.toContain('top-down')
+    expect(text).not.toContain('360')
+    expect(text).not.toContain('The pin is')
   })
 
   it('still renders the shell it always did', () => {

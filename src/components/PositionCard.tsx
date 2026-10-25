@@ -799,7 +799,7 @@ export function PositionCard({
                   onSetAltitude(position.id, Number(event.target.value))
                 }
               />
-              <span className="card__alt-unit">ft AGL</span>
+              <span className="card__alt-unit">ft above ground</span>
             </label>
           </div>
 
@@ -1087,12 +1087,22 @@ export function PositionCard({
               </>
             )}
             <Receipt kind="focal">
+              {/*
+                * PLAIN WORDS ON THE LABEL, the expert term in the detail line.
+                * "FOV h" is shorthand only somebody who already knows it can read.
+                */}
               <div className="card__stat">
-                <dt>FOV h</dt>
+                <dt>
+                  How wide it sees
+                  <span className="card__term">field of view, across</span>
+                </dt>
                 <dd className="num">{deg(fov.hFOV)}</dd>
               </div>
               <div className="card__stat">
-                <dt>FOV v</dt>
+                <dt>
+                  How tall it sees
+                  <span className="card__term">field of view, up</span>
+                </dt>
                 <dd className="num">{deg(fov.vFOV)}</dd>
               </div>
             </Receipt>

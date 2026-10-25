@@ -115,7 +115,7 @@ export function forecastAge(fetchedAt: string, now: Date = new Date()): Forecast
     hours > DIM_AFTER_HOURS ? 'dimmed' : hours > MARK_AFTER_HOURS ? 'marked' : 'plain'
   const text =
     hours < 1
-      ? `${Math.max(1, Math.round(ms / 60_000))} min old`
+      ? `${Math.max(1, Math.round(ms / 60_000))} m old`
       : hours < 48
         ? `${Math.round(hours)} h old`
         : `${Math.round(hours / 24)} days old`

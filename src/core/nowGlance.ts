@@ -15,6 +15,7 @@
  * way, and this app cannot see that from here.
  */
 
+import { durationWords } from './duration.ts'
 import { compassWord } from './compassWords.ts'
 import type { LatLon } from './geo.ts'
 import { civilTimes } from './nightWindow.ts'
@@ -217,13 +218,9 @@ export function glanceHeadline(glance: NowGlance): string {
   }
 }
 
-/** Whole minutes as something readable at a glance. */
+/** Whole minutes as something readable at a glance: "1 h 16 m", never "76 min". */
 export function spanWords(minutes: number): string {
-  const whole = Math.max(0, Math.round(minutes))
-  if (whole < 90) return `${whole} min`
-  const hours = Math.floor(whole / 60)
-  const rest = whole % 60
-  return rest === 0 ? `${hours} h` : `${hours} h ${rest}`
+  return durationWords(minutes)
 }
 
 /**

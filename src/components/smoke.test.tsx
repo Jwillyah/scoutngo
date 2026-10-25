@@ -26,11 +26,13 @@ describe('render smoke', () => {
    * permanent quarter of the primary navigation on a screen opened twice a
    * year, which is why settings is behind the venue bar's round button.
    */
-  it('offers exactly three stages, named MAP PLAN FIELD', () => {
-    for (const label of ['MAP', 'PLAN', 'FIELD']) {
-      expect(html).toContain(`class="bnav__label">${label}</span>`)
-    }
-    expect(html.match(/class="bnav__btn/g)?.length).toBe(3)
+  /*
+   * NO TAB ROW. The stages and the rest are behind the top bar's menu button,
+   * so the bottom of the screen is the map's and the sheet's.
+   */
+  it('has a menu button and no bottom tab row', () => {
+    expect(html).toContain('aria-label="Menu"')
+    expect(html).not.toContain('class="bnav')
   })
 
   it('starts in setup, because that is where the pin gets set', () => {
@@ -51,11 +53,10 @@ describe('render smoke', () => {
    * docs/failure-modes.md: a check for a name you do not want passes the
    * moment somebody renames it. See shape C.
    */
-  it('never disables a stage', () => {
-    const nav = html.slice(html.indexOf('<nav class="bnav"'))
-    const end = nav.indexOf('</nav>')
-    expect(end).toBeGreaterThan(0)
-    expect(nav.slice(0, end)).not.toContain('disabled')
+  it('never disables the way to the other stages', () => {
+    const menu = html.slice(html.indexOf('aria-label="Menu"') - 200, html.indexOf('aria-label="Menu"') + 50)
+    expect(menu).toContain('topbar__btn')
+    expect(menu).not.toContain('disabled')
   })
 
   /*
@@ -180,9 +181,11 @@ describe('render smoke', () => {
     expect(html).toContain('Drop a pin or search for the venue')
   })
 
+  /* Setup has its own sheet now; what it must not have is the plan's chips and rail. */
   it('shows no PLAN chrome in setup', () => {
     expect(html).not.toContain('class="cones"')
-    expect(html).not.toContain('class="sheet')
+    expect(html).not.toContain('class="chips2"')
+    expect(html).not.toContain('class="rail2"')
   })
 
   it('shows no stale brief warning on a cold start', () => {

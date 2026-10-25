@@ -108,6 +108,12 @@ const SURFACES = `(() => {
     if (cs.display === 'none' || cs.visibility === 'hidden') continue
     if (Number(cs.opacity) === 0) continue
     /*
+     * DECORATION IS NOT A SURFACE: something that cannot take a tap AND is
+     * hidden from a screen reader holds nothing and blocks nothing. The sun-side
+     * tint is the case; it is excluded by those two properties, not by name.
+     */
+    if (cs.pointerEvents === 'none' && el.getAttribute('aria-hidden') === 'true') continue
+    /*
      * THE MAP IS NOT OVER ITSELF. MapLibre's own canvas is absolutely
      * positioned and full bleed, and its attribution controls sit inside the
      * same container. The first run reported maplibregl-canvas as a surface
@@ -164,6 +170,8 @@ const MAP_VISIBLE = `(() => {
     const cs = getComputedStyle(el)
     if (cs.position !== 'absolute' && cs.position !== 'fixed') continue
     if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) === 0) continue
+    /* Decoration that takes no tap and no reader: see SURFACES. */
+    if (cs.pointerEvents === 'none' && el.getAttribute('aria-hidden') === 'true') continue
     /*
      * Containers the map lives inside cover nothing, and neither does the map
      * itself or its own attribution chrome.
@@ -507,18 +515,38 @@ if (await setDetent('half')) {
  */
 console.log('\n### every stage reaches every other stage, by pressing the nav')
 
+/*
+ * THROUGH THE MENU NOW. The tab row is gone: the stages are items in the side
+ * menu behind the top bar's menu button, so pressing a stage is two gestures,
+ * open and pick, and both are pressed here rather than assumed.
+ */
+const STAGE_LABELS = ['Shoot setup', 'Plan', 'Field']
+
+const openMenu = () =>
+  ev(`(() => {
+    if (document.querySelector('nav[aria-label="Stage"]')) return 'open'
+    const menu = document.querySelector('button[aria-label="Menu"]')
+    if (!menu) return 'no menu button'
+    if (menu.disabled) return 'menu button disabled'
+    menu.click()
+    return 'open'
+  })()`)
+
 const STAGES = `(() => {
-  const buttons = [...document.querySelectorAll('nav[aria-label="Stage"] button')]
-  return buttons.map((b) => (b.textContent ?? '').trim())
+  const labels = [...document.querySelectorAll('nav[aria-label="Stage"] .sidemenu__label')]
+  return labels.map((l) => (l.textContent ?? '').trim())
 })()`
 
 const stageNow = () =>
   ev(`document.querySelector('.shell')?.className.match(/shell--([a-z]+)/)?.[1] ?? null`)
 
 const pressStage = async (label) => {
+  const opened = await openMenu()
+  if (opened !== 'open') return opened
+  await wait(300)
   const result = await ev(`(() => {
     const hit = [...document.querySelectorAll('nav[aria-label="Stage"] button')]
-      .find((b) => (b.textContent ?? '').trim() === ${JSON.stringify(label)})
+      .find((b) => (b.querySelector('.sidemenu__label')?.textContent ?? '').trim() === ${JSON.stringify(label)})
     if (!hit) return 'gone'
     if (hit.disabled) return 'disabled'
     hit.click()
@@ -528,18 +556,20 @@ const pressStage = async (label) => {
   return result
 }
 
-const stages = await ev(STAGES)
-if (!Array.isArray(stages) || stages.length === 0) {
-  fail('no stage nav on screen')
+await openMenu()
+await wait(300)
+const offered = await ev(STAGES)
+await ev(`document.querySelector('.sidemenu__scrim')?.click()`)
+await wait(300)
+const stages = STAGE_LABELS.filter((l) => Array.isArray(offered) && offered.includes(l))
+if (!Array.isArray(offered) || offered.length === 0) {
+  fail('no stage nav on screen: the menu opened nothing')
 } else {
-  console.log(`  the nav offers: ${stages.join(' | ')}`)
-  /*
-   * EXACTLY THREE. A settings tab would spend a permanent quarter of the
-   * primary navigation on a screen opened twice a year; it lives behind the
-   * venue bar's round button instead. Same argument as the four chips, and
-   * the same reason it is a number in an audit rather than a note in a file.
-   */
-  if (stages.length !== 3) fail(`the nav offers ${stages.length} stages, not 3`)
+  console.log(`  the menu offers: ${offered.join(' | ')}`)
+  /* EVERY STAGE IS IN THE MENU. A missing one is a screen nobody can reach. */
+  for (const label of STAGE_LABELS) {
+    if (!offered.includes(label)) fail(`the menu has no ${label}`)
+  }
 
   for (const from of stages) {
     for (const to of stages) {
@@ -1041,7 +1071,7 @@ console.log('\n### the venue is named once on the screen')
 
 if (await setDetent('half')) {
   const named = await ev(`(() => {
-    const bar = document.querySelector('.vbar__name')
+    const bar = document.querySelector('.pill-venue__name')
     if (!bar) return { error: 'no venue name in the venue bar' }
     const name = (bar.textContent ?? '').trim()
     if (name === '' || name === '—') return { error: 'the venue bar names no venue' }
@@ -1118,13 +1148,33 @@ const OPENERS = `(() => {
   document.querySelectorAll('.rail2__btn').forEach((b, i) => {
     if ((b.getAttribute('aria-label') ?? '').toLowerCase().includes('layer')) add('.rail2__btn', i, 'layers')
   })
-  if (document.querySelector('.vbar__about')) add('.vbar__about', 0, 'about')
+  /*
+   * THE MENU'S CARD DOORS. About and Sky open cards from the side menu now, so
+   * a door is "open the menu, pick this item"; the item's own words are its
+   * index. Found by the menu button being there, not by a list of cards.
+   */
+  if (document.querySelector('button[aria-label="Menu"]')) {
+    add('menu', 'About', 'about')
+    add('menu', 'Sky', 'sky')
+  }
   document.querySelectorAll('.more2__row').forEach((b, i) =>
     add('.more2__row', i, (b.textContent ?? '').trim()))
   return out
 })()`
 
 const click = async (sel, i) => {
+  if (sel === 'menu') {
+    await ev(`document.querySelector('button[aria-label="Menu"]')?.click()`)
+    await wait(300)
+    await ev(`(() => {
+      const hit = [...document.querySelectorAll('nav[aria-label="Stage"] button')]
+        .find((b) => (b.querySelector('.sidemenu__label')?.textContent ?? '').trim() === ${JSON.stringify(i)})
+      if (hit) hit.click()
+      return hit ? 'clicked' : 'gone'
+    })()`)
+    await wait(600)
+    return
+  }
   await ev(`(() => {
     const el = document.querySelectorAll(${JSON.stringify(sel)})[${i}]
     if (el) el.click()

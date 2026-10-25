@@ -1,3 +1,4 @@
+import { durationWords } from '../core/duration.ts'
 import { Receipt } from '../lib/numerals.tsx'
 import { compassPoint } from '../core/field.ts'
 import type { LatLon } from '../core/geo.ts'
@@ -131,7 +132,7 @@ export function CamList({ venue, wind, units }: CamListProps) {
                 {entry.isUpwind
                   ? entry.leadMinutes === null
                     ? 'upwind'
-                    : `upwind · about ${Math.round(entry.leadMinutes)} min out`
+                    : `upwind · about ${durationWords(entry.leadMinutes)} out`
                   : (
                       <>
                         {/*

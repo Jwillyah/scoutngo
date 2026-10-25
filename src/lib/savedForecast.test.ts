@@ -68,7 +68,7 @@ describe('how old, and how loudly that is said', () => {
   })
 
   it('never says "now": a saved value is always some age', () => {
-    expect(forecastAge(NOW.toISOString(), NOW).text).toBe('1 min old')
+    expect(forecastAge(NOW.toISOString(), NOW).text).toBe('1 m old')
   })
 })
 

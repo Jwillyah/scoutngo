@@ -64,20 +64,27 @@ interface MapRailProps {
   /** Opens the layers card. The rail's first job in every map app. */
   onLayers: () => void
   layersOpen: boolean
-  /** Current pitch, shown on the face so the reset says what it will undo. */
+  /** Current pitch: flat is 2D, tilted is 3D. */
   pitch: number
-  onResetPitch: () => void
-  onLocate: () => void
-  locating: boolean
+  onPitch: (next: number) => void
+  /** The map's rotation, so the compass needle points at real north. */
+  bearing: number
+  /** Whether the map is turning with the phone's heading. */
+  heading: boolean
+  onCompass: () => void
 }
+
+/** How far a 3D tap tilts the map. Steep enough to see a ridge, short of the horizon. */
+const TILT_3D_DEGREES = 60
 
 export function MapRail({
   onLayers,
   layersOpen,
   pitch,
-  onResetPitch,
-  onLocate,
-  locating,
+  onPitch,
+  bearing,
+  heading,
+  onCompass,
 }: MapRailProps) {
   /** Which button is showing its text label, from a long press. */
   const [named, setNamed] = useState<string | null>(null)
@@ -154,23 +161,34 @@ export function MapRail({
         * because that is what a layer is, and a shooter looking for layers
         * scans for that shape rather than reading the rail.
         */}
+      {/*
+        * THE COMPASS. The needle points at real north whichever way the map is
+        * turned. A tap turns the map with the phone's heading; another puts
+        * north back at the top.
+        */}
+      {button(
+        'compass',
+        heading ? 'Turning with you. Tap for north up' : 'Turn the map with your heading',
+        <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+          <g transform={`rotate(${-bearing} 10 10)`}>
+            <path d="M10 2.5 12.6 10H7.4z" fill="currentColor" />
+            <path d="M10 17.5 7.4 10h5.2z" fill="none" stroke="currentColor" strokeWidth="1.2" />
+          </g>
+        </svg>,
+        onCompass,
+        { on: heading },
+      )}
+
+      {/* 2D OR 3D, said on the face. Tilting by hand is a two-finger drag. */}
+      {button(
+        'tilt',
+        pitch >= 1 ? 'Flatten the map to 2D' : 'Tilt the map to 3D',
+        null,
+        () => onPitch(pitch >= 1 ? 0 : TILT_3D_DEGREES),
+        { on: pitch >= 1, face: pitch >= 1 ? '2D' : '3D' },
+      )}
+
       {button('layers', 'Map and layers', LAYERS_ICON, onLayers, { on: layersOpen })}
-
-      {button(
-        'pitch',
-        pitch < 1 ? 'Tilt is flat' : `Reset tilt from ${Math.round(pitch)} degrees to flat`,
-        '\u25B3',
-        onResetPitch,
-        { on: pitch >= 1, disabled: pitch < 1, face: `${Math.round(pitch)}\u00B0` },
-      )}
-
-      {button(
-        'locate',
-        locating ? 'Finding your location' : 'Centre the map on your location',
-        '\u25C9',
-        onLocate,
-        { on: locating },
-      )}
 
     </nav>
   )

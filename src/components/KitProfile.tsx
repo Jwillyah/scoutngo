@@ -83,7 +83,7 @@ function lensMeta(lens: Lens, bodies: Body[]): string {
   // Sensor is called out only when the lens forces a crop, because that is the
   // only time it is a surprise.
   const crop = sensorName === 'fullFrame' ? '' : ' APS-C'
-  return `${range}${crop} · vFOV ${vertical}`
+  return `${range}${crop} · sees ${vertical} tall`
 }
 
 /** Two fixed cameras, not a zoom, so each is listed with its one focal length. */

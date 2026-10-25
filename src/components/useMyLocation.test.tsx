@@ -1,6 +1,22 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { UseMyLocation } from './UseMyLocation.tsx'
+import { TopBar } from './TopBar.tsx'
+
+/* The locate button lives in the top bar now. */
+const bar = (note: string | null = null) =>
+  renderToStaticMarkup(
+    <TopBar
+      onMenu={() => {}}
+      menuOpen={false}
+      pill={null}
+      onAdd={null}
+      adding={false}
+      onLocate={() => {}}
+      locating={false}
+      locateNote={note}
+      online
+    />,
+  )
 
 /*
  * NOT ON LOAD. The whole point of this control is that the question is asked
@@ -22,15 +38,16 @@ describe('Use my location', () => {
       configurable: true,
     })
 
-    const html = renderToStaticMarkup(<UseMyLocation onLocated={() => {}} />)
+    const html = bar()
     expect(getCurrentPosition).not.toHaveBeenCalled()
     expect(watchPosition).not.toHaveBeenCalled()
-    expect(html).toContain('Use my location')
+    expect(html).toContain('Go to where I am')
   })
 
   it('offers the control and no message until something has been tried', () => {
-    const html = renderToStaticMarkup(<UseMyLocation onLocated={() => {}} />)
-    expect(html).toContain('locate__btn')
-    expect(html).not.toContain('locate__note')
+    expect(bar()).toContain('Go to where I am')
+    expect(bar()).not.toContain('topbar__note')
+    /* And a refusal is one plain sentence where the control is. */
+    expect(bar('Location was not allowed.')).toContain('Location was not allowed.')
   })
 })

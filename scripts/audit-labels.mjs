@@ -25,7 +25,8 @@
  * the whole point of it.
  */
 
-import { goToStage, guardAudit, startWatchdog } from './preflight.mjs'
+import { goToStage, guardAudit, setSheet, startWatchdog } from './preflight.mjs'
+import { FLOATING_CHROME_SELECTORS } from '../src/lib/floatingChrome.ts'
 
 /*
  * ARMED BEFORE ANYTHING ELSE CAN THROW.
@@ -62,13 +63,8 @@ export const MEASURE = `(() => {
   }
   const real = (b) => b.width > 0.5 && b.height > 0.5
 
-  const CHROME = [
-    '.hud', '.mapctl', '.sheet', '.dock', '.card', '.confirm',
-    '.setup__search', '.picker__menu', '.overflow__menu', '.plat',
-    '.newbuild', '.tapnote', '.locate',
-    '.maplibregl-ctrl-bottom-left', '.maplibregl-ctrl-bottom-right',
-    '.maplibregl-ctrl-top-left', '.maplibregl-ctrl-top-right',
-  ]
+  /* The map's own list, not a copy of it: src/lib/floatingChrome.ts. */
+  const CHROME = ${JSON.stringify(FLOATING_CHROME_SELECTORS)}
 
   const chrome = []
   for (const selector of CHROME) {
@@ -309,9 +305,21 @@ if (!Array.isArray(flagged) || flagged.length === 0) {
  *   When none of them do, the optic is named ONCE somewhere else. Dropping it
  *   from the plates is only honest if the answer to "28 on what" still exists.
  */
+/*
+ * A PLATE IS ON THE SELECTED POSITION ONLY now (the layout brief: labels only
+ * on the selected one), so one is selected first and exactly one plate must
+ * then be on the map. Zero means the check looked at nothing; more than one
+ * means the rule broke.
+ */
+await ev(`document.querySelector('button.shooter')?.click()`)
+await wait(900)
 const plates = await ev(
   `[...document.querySelectorAll('.shooter__focal')].map((n) => n.textContent)`,
 )
+if (Array.isArray(plates) && plates.length > 1) {
+  console.log(`      PROBLEM: ${plates.length} plates on the map with one position selected`)
+  problems += 1
+}
 console.log(`  focal plates: ${JSON.stringify(plates)}`)
 
 const tagged = (t) => /[A-Z]{3}/.test(String(t))
@@ -396,8 +404,8 @@ for (const zoom of [11, 13, 15, 17, 19]) {
  */
 await ev(`window.__probe.map.jumpTo({ center: [-75.605912, 38.364236], zoom: 15 }), 'ok'`)
 await wait(500)
-await ev(`document.querySelector('.peek__summary')?.click()`)
-await wait(1500)
+await setSheet(ev, wait, 'half')
+await wait(800)
 await check('sheet open')
 
 /*
@@ -412,8 +420,8 @@ await check('sheet open')
  * it and hiding every readout is then the right answer. The question here is
  * whether the ordinary case has somewhere to put them.
  */
-await ev(`document.querySelector('.peek__summary')?.click()`)
-await wait(1200)
+await setSheet(ev, wait, 'peek')
+await wait(800)
 await ev(`window.__probe.map.jumpTo({ center: [-75.605912, 38.364236], zoom: 15 }), 'ok'`)
 await wait(900)
 const visible = await ev(`document.querySelectorAll('.ray-label').length`)

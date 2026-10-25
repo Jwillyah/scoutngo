@@ -181,7 +181,15 @@ describe('the pilot separation is shown', () => {
    */
   it('shows nothing of the sort on a ground position', () => {
     const ground = groundCard()
-    expect(ground).not.toContain('ft AGL')
+    /*
+     * The words the altitude field actually carries. This said 'ft AGL', and
+     * after the label became plain words it could no longer fail: a guard on a
+     * name that is gone (docs/failure-modes.md, shape C). The positive half
+     * is below.
+     */
+    expect(ground).not.toContain('ft above ground')
+    /* And the air card does carry it, so the line above can fail. */
+    expect(card(null)).toContain('ft above ground')
     expect(ground).not.toContain('Pilot to aircraft')
   })
 })

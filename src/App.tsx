@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { type ConeMode } from './lib/coneMode.ts'
 import { type MapHandle } from './components/MapView.tsx'
-import { BottomNav } from './components/BottomNav.tsx'
 import { FieldMode } from './components/FieldMode.tsx'
 import { PlanMode } from './components/PlanMode.tsx'
 import { NewBuildNotice } from './components/NewBuildNotice.tsx'
@@ -102,6 +101,8 @@ import { lowTideNearest } from './lib/lowTide.ts'
 import { useVenueCache } from './lib/useVenueCache.ts'
 import { buildScoutFile, saveScoutFile, scoutFilename, type ReadFile } from './lib/scoutFile.ts'
 import { runSuggest } from './lib/suggestRun.ts'
+import { SideMenu } from './components/SideMenu.tsx'
+import type { MenuItem } from './lib/menu.ts'
 import {
   blockedReason,
   FORWARD_LABEL,
@@ -1237,6 +1238,44 @@ function App() {
   const [nowOpen, setNowOpen] = useState(false)
 
   /*
+   * THE MENU, AND WHAT ITS ITEMS ASK FOR. The bottom tab row is gone; every
+   * place it went, and the cards and drawers it could not reach, is one item in
+   * the side menu. A request carries a tick so asking twice opens twice.
+   */
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [drawerRequest, setDrawerRequest] = useState<{ drawer: 'kit' | 'saved'; tick: number }>({
+    drawer: 'kit',
+    tick: 0,
+  })
+  const [cardRequest, setCardRequest] = useState<{ kind: 'sky' | 'about'; tick: number }>({
+    kind: 'sky',
+    tick: 0,
+  })
+  const onMenuPick = (item: MenuItem) => {
+    switch (item) {
+      case 'plan':
+      case 'setup':
+      case 'field':
+        setMode(item)
+        return
+      case 'now':
+        setNowOpen(true)
+        return
+      case 'sky':
+      case 'about':
+        setMode('plan')
+        setCardRequest((r) => ({ kind: item, tick: r.tick + 1 }))
+        return
+      case 'kit':
+      case 'saved':
+        setMode('setup')
+        setDrawerRequest((r) => ({ drawer: item, tick: r.tick + 1 }))
+        return
+    }
+  }
+  const menuCurrent: MenuItem = mode
+
+  /*
    * THE DOOR OUT OF IT: the glance becomes a plan with nothing typed.
    *
    * Carries the coordinate as the pin and TODAY as the date, because the whole
@@ -1631,35 +1670,6 @@ function App() {
     )
 
   /*
-   * THE RAIL, PLUS THE ONE TAP INTO THE GLANCE.
-   *
-   * Beside the rail rather than inside it: the rail is the three stages of a
-   * shoot and NOW is not one of them. It is always enabled and never gated,
-   * because the whole point is that it answers before anything has been set
-   * up, and it is in the shell rather than in a menu because a menu is one tap
-   * too many for the moment it is for.
-   */
-  /*
-   * THE BOTTOM NAV, NOT A STEPPER. Any stage from any stage, at any time:
-   * `goTo` is called directly rather than through the availability gate,
-   * because a screen that has nothing to show yet says so in its own content
-   * and that is a better place for it than a disabled tab.
-   */
-  const rail = (
-    <div className="shell__nav">
-      <BottomNav mode={mode} onMode={goTo} />
-      <button
-        type="button"
-        className="shell__now"
-        onClick={() => setNowOpen(true)}
-        title="What the sky is doing, right now, from your location"
-      >
-        Now
-      </button>
-    </div>
-  )
-
-  /*
    * THE PEEK LINE SAYS SOMETHING OR IT IS NOT THERE.
    *
    * It used to read `Shoot setup · 11:00-15:00 EDT · Brew River Dock Bar,
@@ -1774,11 +1784,16 @@ function App() {
             pointAt={pointAt}
             settings={settings}
             onSettings={setSettings}
+            onMenu={() => setMenuOpen(true)}
+            menuOpen={menuOpen}
+            forward={forwardBar}
+            drawerRequest={drawerRequest}
+            onAddPosition={() => {
+              /* There are no positions in setup: the + goes to the plan, armed. */
+              setMode('plan')
+              setPlacing(true)
+            }}
           />
-          <div className="mode__foot">
-            {forwardBar}
-            {rail}
-          </div>
         </div>
       ) : null}
 
@@ -1951,13 +1966,12 @@ function App() {
           summary={summary}
           peekStatus={peekStatus}
           fitTargets={fitTargets}
-          /*
-           * PLAN's foot is the rail and nothing else. Its forward step, "Go to
-           * field", is now a secondary button beside Generate in the sheet:
-           * a full width primary down here was a second loudest thing fighting
-           * the one action this screen exists for.
-           */
-          footer={<div className="mode__foot mode__foot--overlay">{rail}</div>}
+          /* No foot: the tab row is gone, and the menu is in the top bar. */
+          footer={null}
+          onMenu={() => setMenuOpen(true)}
+          menuOpen={menuOpen}
+          cardRequest={cardRequest}
+          onSearch={() => setMode('setup')}
         />
       ) : null}
 
@@ -1968,9 +1982,18 @@ function App() {
           tide={tide}
           pack={packIsCurrent ? pack : null}
           onPlan={() => setMode('plan')}
-          footer={rail}
+          footer={null}
+          onMenu={() => setMenuOpen(true)}
+          menuOpen={menuOpen}
         />
       ) : null}
+
+      <SideMenu
+        open={menuOpen}
+        current={nowOpen ? 'now' : menuCurrent}
+        onPick={onMenuPick}
+        onClose={() => setMenuOpen(false)}
+      />
 
     </div>
     </NumeralsProvider>

@@ -1,6 +1,8 @@
 import { useNumerals } from '../lib/numeralsContext.ts'
 import * as maplibregl from 'maplibre-gl'
 import { loadTile, PROTOCOL, viaProtocol } from '../lib/offlineCache.ts'
+import { RAY_SCREEN_FRACTION } from '../lib/rayLength.ts'
+import { FLOATING_CHROME_SELECTORS } from '../lib/floatingChrome.ts'
 import { IMAGERY_TEMPLATE, TERRAIN_TEMPLATE } from '../lib/offlineSources.ts'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
@@ -151,32 +153,6 @@ const ESRI_TILES = viaProtocol(IMAGERY_TEMPLATE)
  */
 export const ESRI_NATIVE_MAX_ZOOM = 19
 
-/**
- * HOW LONG A SUN OR SHADOW RAY IS, AS A FRACTION OF WHAT IS ON SCREEN.
- *
- * WHAT THIS REPLACES. The length came from steppedBearingLineMeters, which
- * takes the larger of the farthest viewport corner and the viewport diagonal
- * and adds slack, so the ray always ran off the edge of the frame. That is
- * right at venue zoom and absurd at regional zoom: reported from Shenandoah,
- * zoomed out, the rays drew as 200-mile lines across six states.
- *
- * A RAY IS A DIRECTION, NOT A DISTANCE. Capping it in SCREEN space is what
- * makes that read the same at every zoom: it is the same stub on the glass
- * whether the view is 500 metres or 500 miles across, so its length carries no
- * information and cannot be mistaken for reach.
- *
- * THE OLD RULE WAS DELIBERATE AND IS BEING OVERRULED. Its argument was that a
- * line visibly leaving the frame reads as a direction while one ending inside
- * reads as a measured distance, and the projection audit asserted the ray
- * leaves the frame. That holds at a venue and inverts when the frame is six
- * states wide, where a line crossing it reads as a claim about a hundred miles
- * of ground. The audit's assertion changed with this; see the report.
- *
- * NOT IN src/core. steppedBearingLineMeters stays exactly as it is, because
- * the rule being changed is about what the SCREEN should show rather than
- * about geometry, and the length is now a camera question.
- */
-export const RAY_SCREEN_FRACTION = 0.28
 
 export const ESRI_ATTRIBUTION =
   'Tiles by Esri. Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
@@ -371,38 +347,8 @@ const FLAG_DISC_OVERLAP_PX = 24
  * Add to this list when a new floating surface is added to a mode, or the
  * labels will go back to hiding underneath it.
  */
-const FLOATING_CHROME = [
-  '.hud',
-  '.mapctl',
-  '.sheet',
-  '.dock',
-  '.card',
-  '.confirm',
-  '.setup__search',
-  '.picker__menu',
-  '.overflow__menu',
-  '.plat',
-  '.newbuild',
-  '.tapnote',
-  '.locate',
-  '.skykey',
-  /*
-   * MAPLIBRE'S OWN CONTROL CORNERS, which were the whole complaint and were
-   * never in this list.
-   *
-   * The scale bar and the attribution (i) are added to 'bottom-left', so that
-   * corner has had two pieces of chrome in it since those controls went in,
-   * and the placement code could not see either of them. The one corner the
-   * readouts were reported stacking in was the one corner nothing was
-   * reserving. All four corners are listed rather than just the one, because
-   * a control moved to a different corner later would otherwise reintroduce
-   * exactly this.
-   */
-  '.maplibregl-ctrl-top-left',
-  '.maplibregl-ctrl-top-right',
-  '.maplibregl-ctrl-bottom-left',
-  '.maplibregl-ctrl-bottom-right',
-].join(', ')
+/* One list for the map and the label audit: src/lib/floatingChrome.ts. */
+const FLOATING_CHROME = FLOATING_CHROME_SELECTORS.join(', ')
 /** How long a press has to be held before it drops a pin. */
 const LONG_PRESS_MS = 550
 
@@ -599,6 +545,8 @@ export interface MapHandle {
     padding?: { top: number; left: number; right: number; bottom: number },
   ): void
   setPitch(pitch: number): void
+  /** Turns the map. `instant` for following a heading, eased otherwise. */
+  setBearing(bearing: number, instant?: boolean): void
   zoomBy(delta: number): void
   /** Goes to an exact zoom, keeping the centre. Used by the sky layer nudge. */
   zoomTo(zoom: number): void
@@ -720,6 +668,8 @@ interface MapViewProps {
   selectedId: string | null
   onSelect: (id: string | null) => void
   onPitchChange: (pitch: number) => void
+  /** The map's rotation in degrees, reported as it turns, for the compass needle. */
+  onBearingChange?: (bearing: number) => void
   bottomInset: number
   /**
    * How far from the venue the shooter can actually get, in metres. DISPLAY
@@ -1120,6 +1070,7 @@ export function MapView({
   selectedId,
   onSelect,
   onPitchChange,
+  onBearingChange,
   bottomInset,
   radiusMeters = null,
   pinHint = null,
@@ -1200,6 +1151,7 @@ export function MapView({
     onSelect,
     onPositionMove,
     onPitchChange,
+    onBearingChange,
     onLongPress,
     onPinDrag,
     onAddAt,
@@ -1215,6 +1167,7 @@ export function MapView({
         onSelect,
       onPositionMove,
       onPitchChange,
+      onBearingChange,
       onLongPress,
       onPinDrag,
       onAddAt,
@@ -1229,6 +1182,7 @@ export function MapView({
     onSelect,
     onPositionMove,
     onPitchChange,
+    onBearingChange,
     onLongPress,
     onPinDrag,
     onAddAt,
@@ -1423,6 +1377,7 @@ export function MapView({
     }
 
     instance.on('pitchend', () => latest.current.onPitchChange(instance.getPitch()))
+    instance.on('rotate', () => latest.current.onBearingChange?.(instance.getBearing()))
     instance.on('moveend', () => setViewTick((tick) => tick + 1))
     /*
      * Zoom and width, on every move rather than on moveend: the sky layer's
@@ -2163,6 +2118,10 @@ export function MapView({
         })
       },
 
+      setBearing(bearing, instant) {
+        if (instant === true) map.current?.setBearing(bearing)
+        else map.current?.easeTo({ bearing, duration: 400 })
+      },
       setPitch(pitch) {
         map.current?.easeTo({ pitch, duration: 400 })
         latest.current.onPitchChange(pitch)

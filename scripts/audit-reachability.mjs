@@ -10,7 +10,7 @@
  * asserts that nothing on any of them is visible but unreachable.
  */
 
-import { goToStage, guardAudit, startWatchdog } from './preflight.mjs'
+import { goToStage, guardAudit, pressSuggest, setSheet, startWatchdog } from './preflight.mjs'
 
 /*
  * ARMED BEFORE ANYTHING ELSE CAN THROW.
@@ -258,11 +258,10 @@ for (const h of [844, 660]) {
   await goToStage(ev, wait, 'plan')
   await wait(3500)
   await check(`PLAN ${h}`)
-  await ev(`[...document.querySelectorAll('.act')].find(b=>/Suggest/.test(b.textContent))?.click()`)
-  await wait(12000)
+  await pressSuggest(ev, wait)
   await check(`PLAN ${h} · after suggest`)
-  await ev(`document.querySelector('.peek__summary')?.click()`)
-  await wait(1000)
+  await setSheet(ev, wait, 'half')
+  await wait(400)
   await check(`PLAN ${h} · sheet open`)
   await ev(`(() => { const f=[...document.querySelectorAll('button.shooter')]
     ;(f.find(x=>!x.classList.contains('shooter--air')) ?? f[0])?.click() })()`)

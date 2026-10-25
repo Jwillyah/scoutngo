@@ -249,6 +249,11 @@ export default defineConfig({
      * would otherwise collect and run them as a second, broken set of the same
      * tests.
      */
-    exclude: [...configDefaults.exclude, '.vercel/**'],
+    /*
+     * .claude/worktrees holds whole separate checkouts of this repo, each with
+     * its own tests. Collected from here, they ran twice over and counted
+     * against this checkout.
+     */
+    exclude: [...configDefaults.exclude, '.vercel/**', '.claude/**'],
   },
 })

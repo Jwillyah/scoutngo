@@ -21,10 +21,13 @@ import { SearchField } from './SearchField.tsx'
 import { ColdStart } from './ColdStart.tsx'
 import { SpotsPanel } from './SpotsPanel.tsx'
 import { ShootChips } from './ShootChips.tsx'
-import { UseMyLocation } from './UseMyLocation.tsx'
 import type { ResolvedName } from '../core/venueName.ts'
 import type { Units } from '../lib/units.ts'
 import { VenuePlate } from './VenuePlate.tsx'
+import { TopBar } from './TopBar.tsx'
+import { BottomSheet, type SheetDetent } from './BottomSheet.tsx'
+import { useOnline } from '../lib/useOnline.ts'
+import { locateOnce, LOCATE_MESSAGE } from '../lib/locateOnce.ts'
 
 interface SetupModeProps {
   venue: VenueDraft
@@ -107,6 +110,16 @@ interface SetupModeProps {
   pointAt: { field: SetupTarget | null; tick: number }
   /** Whether a newer build is deployed, for the stamp under Settings. */
   newBuild: BuildCheck
+  /*
+   * THE SHELL'S PIECES, owned by App: the menu, the forward button that moves
+   * to the plan, and a request from the menu to open a drawer.
+   */
+  onMenu: () => void
+  menuOpen: boolean
+  forward: React.ReactNode
+  drawerRequest: { drawer: 'kit' | 'saved'; tick: number }
+  /** The top bar's +: there are no positions in setup, so it moves to the plan. */
+  onAddPosition: () => void
   /** Brings back the landing page, which is otherwise shown once. */
   onShowLanding: () => void
   /** What the app knows about the venue's name. Derived in App, never typed. */
@@ -179,6 +192,11 @@ export function SetupMode({
   newBuild,
   onShowLanding,
   venueNameState,
+  onMenu,
+  menuOpen,
+  forward,
+  drawerRequest,
+  onAddPosition,
 }: SetupModeProps) {
   /*
    * One example per load, so the placeholder shows the kind of work the reader
@@ -187,6 +205,26 @@ export function SetupMode({
    */
   const [example] = useState(() => exampleIndex(SHOOT_EXAMPLES.length))
   const [drawer, setDrawer] = useState<Drawer>('none')
+  /* The menu's Kit and Saved spots land here, on the drawer they name. */
+  useEffect(() => {
+    if (drawerRequest.tick === 0) return
+    const timer = setTimeout(() => setDrawer(drawerRequest.drawer), 0)
+    return () => clearTimeout(timer)
+  }, [drawerRequest])
+  /* The form is a sheet over the full-screen map, half up by default. */
+  const [sheet, setSheet] = useState<SheetDetent>('half')
+  const online = useOnline()
+  const [locating, setLocating] = useState(false)
+  const [locateNote, setLocateNote] = useState<string | null>(null)
+  const locate = () => {
+    setLocating(true)
+    setLocateNote(null)
+    void locateOnce().then((result) => {
+      setLocating(false)
+      if (result.status === 'ok') onUseMyLocation(result.at)
+      else setLocateNote(result.status === 'error' ? result.message : LOCATE_MESSAGE[result.status])
+    })
+  }
 
   /*
    * Keep the whole reach ring in view, whenever the pin OR the radius changes.
@@ -439,18 +477,6 @@ export function SetupMode({
           onPinDrag={onPinDrag}
           onReady={() => setMapReady(true)}
         />
-        <div className="setup__search">
-          <SearchField onPick={onSearchPick} label="Where's the shoot?" bias={searchBias} />
-          {/*
-            * ONLY WHILE THERE IS NOWHERE YET. Once a place is picked this is
-            * clutter: the map is already where it needs to be, and a button
-            * that would move it somewhere else is a way to lose work.
-            */}
-          {at === null && pendingPin === null ? (
-            <UseMyLocation onLocated={onUseMyLocation} />
-          ) : null}
-        </div>
-
         {/*
           * IS THIS THE SPOT? A geocoder returning one result is not the same as
           * one right answer, so nothing is accepted until this is answered. The
@@ -476,6 +502,28 @@ export function SetupMode({
         )}
       </div>
 
+      {/*
+        * THE TOP BAR, OVER THE MAP: the menu, the search pill, + and locate.
+        * The search used to sit in a box over a map that was itself a box.
+        */}
+      <TopBar
+        onMenu={onMenu}
+        menuOpen={menuOpen}
+        pill={<SearchField onPick={onSearchPick} label="Where's the shoot?" bias={searchBias} />}
+        onAdd={onAddPosition}
+        adding={false}
+        onLocate={locate}
+        locating={locating}
+        locateNote={locateNote}
+        online={online}
+      />
+
+      <BottomSheet
+        detent={sheet}
+        onDetentChange={setSheet}
+        peek={forward}
+        half={
+          <div className="setup__sheet">
       <ReachSlider meters={reachMeters} onChange={onReachChange} />
 
       <VenuePlate
@@ -619,7 +667,10 @@ export function SetupMode({
             platform={platformFilter} onChange={onKit} kit={pickableKit(kitProfile, shelved)} onEdit={() => open('kit')} />
 
       </div>
-
+          </div>
+        }
+        full={null}
+      />
     </div>
       {drawerPanel}
     </>

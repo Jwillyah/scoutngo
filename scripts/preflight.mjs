@@ -408,7 +408,12 @@ export function guardAudit(name) {
  * -- so the caller names the mode and this does the one translation, in one
  * place. A caller passing the label would be a caller guessing.
  */
-const NAV_LABEL = { setup: 'MAP', plan: 'PLAN', field: 'FIELD' }
+/*
+ * THE MENU, NOT A TAB ROW. The bottom nav is gone: every stage is one item in
+ * the side menu, opened by the top bar's menu button. Two steps, both checked.
+ * The labels are the menu's own words (src/lib/menu.ts).
+ */
+const NAV_LABEL = { setup: 'Shoot setup', plan: 'Plan', field: 'Field' }
 
 export async function goToStage(ev, wait, stage) {
   const want = stage.toLowerCase()
@@ -419,13 +424,24 @@ export async function goToStage(ev, wait, stage) {
     )
   }
 
+  const opened = await ev(`(() => {
+    if (document.querySelector('nav[aria-label="Stage"]')) return 'ok'
+    const menu = document.querySelector('button[aria-label="Menu"]')
+    if (!menu) return 'no menu button in the top bar'
+    menu.click()
+    return 'ok'
+  })()`)
+  if (opened !== 'ok') {
+    throw new PreflightError(`could not open the menu: ${opened}. It is the top bar's first button, src/components/TopBar.tsx.`)
+  }
+  await wait(300)
+
   const clicked = await ev(`(() => {
     const buttons = [...document.querySelectorAll('nav[aria-label="Stage"] button')]
-    if (buttons.length === 0) return 'no stage nav on screen'
-    const hit = buttons.find((b) => (b.textContent ?? '').trim().toUpperCase() === ${JSON.stringify(label)})
-    if (!hit) return 'no ' + ${JSON.stringify(label)} + ' button; the nav offers: ' +
-      buttons.map((b) => (b.textContent ?? '').trim()).join(', ')
-    if (hit.disabled) return ${JSON.stringify(label)} + ' is disabled'
+    if (buttons.length === 0) return 'the menu opened no stage nav'
+    const hit = buttons.find((b) => (b.querySelector('.sidemenu__label')?.textContent ?? '').trim() === ${JSON.stringify(label)})
+    if (!hit) return 'no ' + ${JSON.stringify(label)} + ' item; the menu offers: ' +
+      buttons.map((b) => (b.querySelector('.sidemenu__label')?.textContent ?? '').trim()).join(', ')
     hit.click()
     return 'ok'
   })()`)
@@ -433,7 +449,7 @@ export async function goToStage(ev, wait, stage) {
   if (clicked !== 'ok') {
     throw new PreflightError(
       `could not navigate to ${label}: ${clicked}. ` +
-        'The stage nav is <nav aria-label="Stage"> in src/components/BottomNav.tsx.',
+        'The stage nav is the side menu, src/components/SideMenu.tsx.',
     )
   }
 
@@ -450,8 +466,56 @@ export async function goToStage(ev, wait, stage) {
   if (arrived !== want) {
     throw new PreflightError(
       `clicked ${label} and the shell is still "${arrived}". ` +
-        'The nav is navigation, not a progress bar: see BottomNav.tsx.',
+        'The menu is navigation, not a progress bar: see SideMenu.tsx.',
     )
   }
   return arrived
+}
+
+/*
+ * PUT THE SHEET AT A DETENT, AND FAIL LOUDLY IF YOU CANNOT.
+ *
+ * Three audits opened the sheet by clicking `.peek__summary`, which stopped
+ * existing when the peek became the time strip. The optional chain swallowed
+ * it and every "sheet open" check ran against a sheet at peek -- shape C, a
+ * check pointed at the wrong object. This reads `data-detent` back, which is
+ * the sheet's own word for where it is.
+ */
+export async function setSheet(ev, wait, want) {
+  for (let i = 0; i < 4; i += 1) {
+    const now = await ev(`document.querySelector('.sheet')?.dataset.detent ?? null`)
+    if (now === want) return want
+    if (now === null) throw new PreflightError('no sheet on screen to move')
+    await ev(`document.querySelector('.sheet__handle')?.click()`)
+    await wait(600)
+  }
+  const last = await ev(`document.querySelector('.sheet')?.dataset.detent ?? null`)
+  if (last !== want) throw new PreflightError(`could not put the sheet at ${want}; it is at ${last}`)
+  return want
+}
+
+/*
+ * PRESS SUGGEST, AND FAIL LOUDLY IF IT IS NOT THERE.
+ *
+ * Two audits looked for Suggest as `.act`, which has not been its class for
+ * several passes, so neither has run Suggest in that time and both reported
+ * on a plan with no suggested positions. The button is `.shootc__gen` on the
+ * shoot card; the sheet has to be up for it to be in the DOM.
+ */
+export async function pressSuggest(ev, wait) {
+  await setSheet(ev, wait, 'half')
+  const pressed = await ev(`(() => {
+    const b = document.querySelector('.shootc__gen')
+    if (!b) return 'no Suggest button on the shoot card'
+    b.click()
+    return 'pressed'
+  })()`)
+  if (pressed !== 'pressed') throw new PreflightError(pressed)
+  /* Suggest is arithmetic plus two Overpass reads; wait for it to say it is done. */
+  for (let i = 0; i < 40; i += 1) {
+    await wait(1000)
+    const state = await ev(`document.querySelector('.suggested') ? 'done' : document.querySelector('.stages') ? 'working' : 'idle'`)
+    if (state === 'done') return
+  }
+  throw new PreflightError('pressed Suggest and it never reported a result in 40 s')
 }

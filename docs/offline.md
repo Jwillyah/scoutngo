@@ -53,7 +53,7 @@ screen says "terrain estimated".
   and do not go stale, so it is not dimmed.
 - **Nothing saved:** the card says so in words ("Could not reach Open-Meteo. Nothing
   is saved for this venue and day."). It does not blank.
-- **No connection:** one word, "offline", in the venue bar. No modal, no toast, no
+- **No connection:** one word, "offline", in the top bar. No modal, no toast, no
   retry loop. "No connection" means `navigator.onLine` is false **or** the last
   request failed, because `navigator.onLine` is true on a mountain.
 

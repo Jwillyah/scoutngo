@@ -25,7 +25,8 @@
  *      bounds-based reasoning is precisely what breaks there.
  */
 
-import { goToStage, guardAudit, startWatchdog } from './preflight.mjs'
+import { RAY_SCREEN_FRACTION } from '../src/lib/rayLength.ts'
+import { goToStage, guardAudit, pressSuggest, setSheet, startWatchdog } from './preflight.mjs'
 
 /*
  * ARMED BEFORE ANYTHING ELSE CAN THROW.
@@ -218,6 +219,8 @@ export const BEARING_LINE_EXTENT = `(() => {
           lengthPx / diagonal / ((f.properties.kind ?? 'sun-axis') === 'sun-axis' ? 2 : 1)
         ).toFixed(3),
         endsInFrame: !outside(b),
+        startsInFrame: !outside(a),
+        pitch: Math.round(map.getPitch()),
       })
     }
   }
@@ -286,10 +289,29 @@ const RAY_FRACTION_TOLERANCE = 0.12
 const checkBearingLines = async (label) => {
   const rows = await ev(BEARING_LINE_EXTENT)
   if (rows?.error) { console.log(label, rows.error); failures += 1; return }
-  const want = 0.28
-  const bad = rows.filter((r) => Math.abs(r.screenFraction - want) > RAY_FRACTION_TOLERANCE)
+  /* The map's own number, not a copy of it: src/lib/rayLength.ts. */
+  const want = RAY_SCREEN_FRACTION
+  /*
+   * TWO PROPERTIES NOW, and they can both hold: the ray is one screen
+   * diagonal long, and a ray that starts on screen ends off it. The longest
+   * line inside a rectangle IS its diagonal, so a full diagonal from any
+   * point inside always leaves. The old pair (0.28 AND leaves) could not both
+   * hold; see the note above.
+   */
+  /*
+   * FLAT: one diagonal long, and off the screen. TILTED: off the screen. A ray
+   * running toward or away from a tilted camera cannot keep one length on the
+   * glass -- it foreshortens toward the horizon or runs off the bottom -- and
+   * what was asked for is "to the edge of the screen". In the first run, at pitch 60 a
+   * southward ray reads 0.54 of the diagonal and still leaves the frame.
+   */
+  const bad = rows.filter((r) => {
+    const stays = r.startsInFrame && r.endsInFrame && r.kind !== 'sun-axis'
+    if (r.pitch >= 1) return stays
+    return Math.abs(r.screenFraction - want) > RAY_FRACTION_TOLERANCE || stays
+  })
   if (bad.length > 0) failures += bad.length
-  const worst = Math.max(...rows.map((r) => Math.abs(r.screenFraction - want)))
+  const worst = Math.max(...rows.filter((r) => r.pitch < 1).map((r) => Math.abs(r.screenFraction - want)), 0)
   const rule = `fraction ${rows.map((r) => r.screenFraction).join('/')} (want ${want})`
   console.log(
     `  ${label.padEnd(34)} ${rule.padEnd(40)} ` +
@@ -478,7 +500,8 @@ await wait(8000)
     return {
       zoom: Math.round(m.getZoom() * 100) / 100,
       kmFromCalibrationVenue: Math.round(away(38.364236, -75.605912) / 1000),
-      offersUseMyLocation: document.querySelector('.locate__btn') !== null,
+      /* The locate button is the top bar's arrow now. */
+      offersUseMyLocation: document.querySelector('button[aria-label="Go to where I am"]') !== null,
     }
   })()`)
   const bad =
@@ -503,21 +526,21 @@ await checkMarkers('SETUP · marker anchoring')
 
 await goToStage(ev, wait, 'plan')
 await wait(4000)
-await ev(`[...document.querySelectorAll('.act')].find(b=>/Suggest/.test(b.textContent))?.click()`)
-await wait(12000)
+await pressSuggest(ev, wait)
+await setSheet(ev, wait, 'peek')
 await checkMarkers('PLAN · marker anchoring, several positions')
 for (const [z, name] of [[13, 'wide'], [16, 'mid'], [19, 'tight']]) {
   await zoomTo(z); await wait(600)
   await checkPixels(`PLAN · sheet closed · zoom ${z} (${name})`)
 }
-await ev(`document.querySelector('.peek__summary')?.click()`)
-await wait(1200)
+await setSheet(ev, wait, 'half')
+await wait(600)
 for (const [z, name] of [[13, 'wide'], [16, 'mid'], [19, 'tight']]) {
   await zoomTo(z); await wait(600)
   await checkPixels(`PLAN · sheet OPEN · zoom ${z} (${name})`)
 }
-await ev(`document.querySelector('.peek__summary')?.click()`)
-await wait(900)
+await setSheet(ev, wait, 'peek')
+await wait(600)
 
 /* The capture pair, flat and then under pitch and rotation. */
 for (const [pitch, bearing] of [[0, 0], [60, 0], [45, 137], [60, -82]]) {

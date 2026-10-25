@@ -302,7 +302,7 @@ for (const run of MODES) {
    * no-signal modes; with the network up the mark must NOT be there, which is
    * what makes the check able to fail in both directions.
    */
-  const mark = await ev(`document.querySelector('.vbar__offline') !== null`)
+  const mark = await ev(`document.querySelector('.topbar__offline') !== null`)
   console.log(`  offline mark in the venue bar: ${mark}`)
   if (run === 'online' && mark) problem(run, 'the venue bar says offline with the network up')
   if (run !== 'online' && !mark) problem(run, 'no offline mark in the venue bar')

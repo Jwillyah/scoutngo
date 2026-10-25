@@ -1,12 +1,13 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { FLOATING_CHROME_SELECTORS } from '../src/lib/floatingChrome.ts'
 
 /*
  * EVERYTHING THAT FLOATS OVER THE MAP MUST BE IN THE RESERVED LIST.
  *
  * src/core/labelPlacement.ts slides a readout along its own ray until it is
  * clear, and it works, but it can only avoid obstacles it is told about. The
- * list in MapView is hand maintained, and it had drifted: maplibre's own
+ * list in src/lib/floatingChrome.ts is hand maintained, and it had drifted: maplibre's own
  * control corners were never in it, so the bottom-left corner, which holds the
  * scale bar and the attribution (i), was the one corner nothing was reserving
  * and the one corner the readouts were reported stacking in.
@@ -19,13 +20,14 @@ import { describe, expect, it } from 'vitest'
  */
 const SOURCE = readFileSync('src/components/MapView.tsx', 'utf8')
 
-const FLOATING_CHROME = (() => {
-  const start = SOURCE.indexOf('const FLOATING_CHROME = [')
-  const end = SOURCE.indexOf("].join(', ')", start)
-  expect(start).toBeGreaterThan(-1)
-  expect(end).toBeGreaterThan(start)
-  return SOURCE.slice(start, end)
-})()
+/* The list itself, imported: one source, read by the placer and the label audit. */
+const FLOATING_CHROME = FLOATING_CHROME_SELECTORS.map((s) => `'${s}'`).join(', ')
+
+/* And MapView reads that list rather than keeping a copy that could drift. */
+it('MapView places labels against the shared list', () => {
+  expect(SOURCE).toContain('FLOATING_CHROME_SELECTORS.join(')
+  expect(SOURCE).not.toContain('const FLOATING_CHROME = [')
+})
 
 describe('the reserved list', () => {
   /*
@@ -47,19 +49,20 @@ describe('the reserved list', () => {
    * screenshot three weeks later.
    */
   const SURFACES = [
+    '.topbar',
+    '.chips2',
+    '.rail2',
     '.hud',
     '.mapctl',
     '.sheet',
     '.dock',
     '.card',
     '.confirm',
-    '.setup__search',
     '.picker__menu',
     '.overflow__menu',
     '.plat',
     '.newbuild',
     '.tapnote',
-    '.locate',
     '.skykey',
   ]
 

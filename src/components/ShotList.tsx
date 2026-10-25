@@ -150,8 +150,8 @@ export function ShotList({
               )}
 
               <span className="shot__stats num">
-                {position.focalLength}mm · {Math.round(subjectRangeMeters)}m · vFOV{' '}
-                {deg(fov.vFOV)}
+                {position.focalLength}mm · {Math.round(subjectRangeMeters)}m · sees{' '}
+                {deg(fov.vFOV)} tall
                 {/* Sun delta needs a lens direction. Shadow length is the top-down read. */}
                 {read.shotType === 'framed'
                   ? ' · sun delta'

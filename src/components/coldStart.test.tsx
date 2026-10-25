@@ -12,8 +12,9 @@ import App from '../App.tsx'
 describe('cold start', () => {
   const html = renderToStaticMarkup(<App />)
 
-  it('offers Use my location while there is nowhere yet', () => {
-    expect(html).toContain('Use my location')
+  /* The locate button is the top bar's arrow now, there on every screen. */
+  it('offers to go to where you are', () => {
+    expect(html).toContain('Go to where I am')
   })
 
   it('asks where the shoot is rather than naming a place', () => {
