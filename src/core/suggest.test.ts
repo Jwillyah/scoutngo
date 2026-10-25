@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { SENSORS } from './fov.ts'
 import { destinationPoint, distanceMeters, type LatLon, type Position } from './geo.ts'
-import type { AirspaceShape } from './airspaceLookup.ts'
+import { airspaceAt, type AirspaceShape } from './airspaceLookup.ts'
 import {
   DROP_STEPS,
   lineWords,
@@ -256,5 +256,81 @@ describe('what it says it assumed', () => {
   it('does not score light with the sun down', () => {
     const r = suggestPositions({ ...BASE, sun: { azimuth: 300, altitude: -10 } as SuggestInput['sun'] })
     expect(r.picked.every((c) => c.light === null)).toBe(true)
+  })
+})
+
+/*
+ * THE LAANC SWITCH. Off: controlled airspace drops a drone spot, as it always
+ * did. On: kept, and never flown above the facility map's ceiling where it
+ * ends up. Restricted areas and park units drop it either way.
+ */
+describe('the "I have LAANC here" switch', () => {
+  /* Inside the test's controlled airspace, which is what the switch is about. */
+  const inWest = (c: { at: LatLon }) => airspaceAt([WEST], c.at).length > 0
+  const all = (r: ReturnType<typeof suggestPositions>) => [...r.picked, ...r.runnersUp.map((x) => x.candidate)]
+
+  it('off, or absent, changes nothing', () => {
+    const off = suggestPositions({ ...BASE, laanc: { enabled: false, ceilingAt: () => 400 } })
+    expect(off.dropped['controlled-airspace']).toBe(suggestPositions(BASE).dropped['controlled-airspace'])
+    expect(off.dropped['controlled-airspace']).toBeGreaterThan(0)
+  })
+
+  it('on, keeps drone spots in controlled airspace under the grid ceiling', () => {
+    /* The reach ring inside the controlled airspace, so whatever is picked was tested by it. */
+    const on = suggestPositions({
+      ...BASE,
+      platforms: ['air'],
+      reach: { centre: destinationPoint(SUBJECT, 270, 120), radiusMeters: 90 },
+      laanc: { enabled: true, ceilingAt: () => 100 },
+    })
+    expect(on.dropped['controlled-airspace']).toBe(0)
+    const west = all(on).filter(inWest)
+    expect(west.length).toBeGreaterThan(0)
+    for (const c of west) {
+      expect(c.gridCeilingFeet).toBe(100)
+      expect(c.altitudeFeet).toBeLessThanOrEqual(100)
+    }
+    expect(total(on)).toBe(on.considered)
+  })
+
+  it('on, still drops a square whose ceiling is 0', () => {
+    const zero = suggestPositions({ ...BASE, platforms: ['air'], laanc: { enabled: true, ceilingAt: () => 0 } })
+    expect(zero.dropped['grid-ceiling-too-low']).toBeGreaterThan(0)
+    expect(all(zero).some(inWest)).toBe(false)
+  })
+
+  it('reads the ceiling again where the drone ends up after flying lower', () => {
+    /* 400 ft near the subject, 50 ft further out: the lowered drone moves outward into the 50 ft square. */
+    const ceilingAt = (p: LatLon) => (distanceMeters(SUBJECT, p) < 70 ? 400 : 50)
+    const r = suggestPositions({ ...BASE, platforms: ['air'], laanc: { enabled: true, ceilingAt } })
+    for (const c of all(r).filter(inWest)) expect(c.altitudeFeet).toBeLessThanOrEqual(ceilingAt(c.at))
+  })
+})
+
+describe('parks and restricted areas drop drone spots, LAANC or not', () => {
+  /* The whole neighbourhood, as flat rings, for restrictions.ts. */
+  const everywhere = { rings: [[-76.1, 36.7, -75.8, 36.7, -75.8, 37.0, -76.1, 37.0, -76.1, 36.7]], bbox: [-76.1, 36.7, -75.8, 37.0] as [number, number, number, number] }
+  const park = { code: 'TEST', name: 'Test Park', unitType: 'National Parks', state: 'VA', ...everywhere }
+  const restricted = (floor: number, floorRef: string) => ({
+    type: 'R' as const, name: 'R-TEST', floor, floorUom: 'FT', floorRef, ceiling: 18000, ceilingUom: 'FT', agency: '', times: '', state: 'VA', ...everywhere,
+  })
+  const laanc = { enabled: true, ceilingAt: () => 400 }
+
+  it('drops every drone spot in a park unit and keeps the ground ones', () => {
+    const r = suggestPositions({ ...BASE, parks: [park], laanc })
+    expect(r.dropped['national-park']).toBeGreaterThan(0)
+    expect(r.picked.some((c) => c.platform === 'air')).toBe(false)
+    expect(r.picked.some((c) => c.platform === 'ground')).toBe(true)
+  })
+
+  it('drops drone spots where a restricted floor reaches them', () => {
+    const r = suggestPositions({ ...BASE, specialUse: [restricted(0, 'SFC')], laanc })
+    expect(r.dropped['restricted-or-prohibited']).toBeGreaterThan(0)
+    expect(r.picked.some((c) => c.platform === 'air')).toBe(false)
+  })
+
+  it('keeps them under a restricted area whose floor is far above', () => {
+    const r = suggestPositions({ ...BASE, specialUse: [restricted(18000, 'MSL')], laanc })
+    expect(r.dropped['restricted-or-prohibited']).toBe(0)
   })
 })
