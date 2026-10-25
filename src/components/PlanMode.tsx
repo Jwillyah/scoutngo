@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { LatLon } from '../core/geo.ts'
+import { loadAirspaceOverlay, type AirspaceOverlay } from '../lib/airspaceOverlay.ts'
+import { measureWords } from '../lib/measureWords.ts'
+import { isEventDay, venueToday } from '../core/eventDay.ts'
+import { TFR_URL } from '../core/airspaceLookup.ts'
 import type {
   Platform,
   PlatformFilter as PlatformFilterValue,
@@ -295,6 +299,9 @@ interface PlanModeProps {
    * the assumed drone default is deliberately not passed here.
    */
   airAltitudeFeet: number | null
+  /** "I have LAANC here", for this venue. See laancHere in src/lib/venue.ts. */
+  laanc: boolean
+  onLaanc: (on: boolean) => void
   onPlacingPilot: (next: boolean) => void
   /**
    * Whether the next tap will add an AIR position.
@@ -451,6 +458,8 @@ export function PlanMode({
   onPlacingAim,
   onAimAt,
   airAltitudeFeet,
+  laanc,
+  onLaanc,
   onPlacingPilot,
   addsAir,
 }: PlanModeProps) {
@@ -679,6 +688,38 @@ export function PlanMode({
    */
   const [mapBearing, setMapBearing] = useState(0)
   const [followHeading, setFollowHeading] = useState(false)
+  /*
+   * TWO-PIN MEASURE. Null is off; on, each tap drops a pin and a third tap
+   * starts over. The pins are not a plan: they are not saved or sent.
+   */
+  const [measurePins, setMeasurePins] = useState<LatLon[] | null>(null)
+  const onMeasureAt = useCallback(
+    (at: LatLon) => setMeasurePins((pins) => (pins === null ? null : pins.length >= 2 ? [at] : [...pins, at])),
+    [],
+  )
+  /*
+   * THE AIRSPACE OVERLAY. The data loads the first time it is switched on and
+   * stays loaded; switching off only stops drawing it.
+   */
+  const [airspaceOn, setAirspaceOn] = useState(false)
+  const [airspaceOverlay, setAirspaceOverlay] = useState<AirspaceOverlay | null>(null)
+  const [airspaceDense, setAirspaceDense] = useState(false)
+  const [airspaceFailed, setAirspaceFailed] = useState(false)
+  useEffect(() => {
+    if (!airspaceOn || airspaceOverlay !== null) return
+    let live = true
+    loadAirspaceOverlay().then(
+      (overlay) => {
+        if (live) setAirspaceOverlay(() => overlay)
+      },
+      () => {
+        if (live) setAirspaceFailed(true)
+      },
+    )
+    return () => {
+      live = false
+    }
+  }, [airspaceOn, airspaceOverlay])
   const [headingNote, setHeadingNote] = useState<string | null>(null)
   const stopHeading = useRef<(() => void) | null>(null)
   const onCompass = useCallback(() => {
@@ -1064,6 +1105,22 @@ export function PlanMode({
             * no signal. It was in a footer under five sections; it is one
             * control on the card about the thing it saves.
             */}
+          {/*
+            * ON THE DAY, WITH A DRONE IN THE PLAN: today's restrictions are
+            * the one thing this app cannot check. A link, never a verdict:
+            * nothing here ever says there are none.
+            */}
+          {venueWindow !== null &&
+          (airPositions > 0 || platformFilter === 'air') &&
+          isEventDay(venueToday(venueWindow.start, venueWindow.timeZone), venueWindow.timeZone, new Date()) ? (
+            <p className="eventday">
+              <a href={TFR_URL} target="_blank" rel="noreferrer noopener">
+                Check today's flight restrictions
+              </a>
+              <span className="eventday__why">This app does not check them.</span>
+            </p>
+          ) : null}
+
           <FieldPackControl
             pack={pack}
             matches={packIsCurrent}
@@ -1145,10 +1202,23 @@ export function PlanMode({
         {
           id: 'airspace',
           label: 'Airspace',
-          state: airPositions === 0 ? 'NO AIR' : 'OPEN',
-          on: airPositions > 0,
+          /* The state says what is on the map, including when the grid is left out. */
+          state: !airspaceOn
+            ? 'OFF'
+            : airspaceFailed
+              ? 'DID NOT LOAD'
+              : airspaceOverlay === null
+                ? 'LOADING'
+                : airspaceDense
+                  ? 'ON · ZOOM IN FOR GRID'
+                  : 'ON',
+          on: airspaceOn,
           art: TILE_ART.airspace,
-          onToggle: () => setCard({ kind: 'airspace' }),
+          /* On also opens the card: the shapes on the map, the words for the venue. */
+          onToggle: () => {
+            if (!airspaceOn) setCard({ kind: 'airspace' })
+            setAirspaceOn(!airspaceOn)
+          },
         },
       ]}
       sourceLine={`Esri World Imagery · native to z${ESRI_NATIVE_MAX_ZOOM} · showing z${Math.round(mapZoom)}`}
@@ -1157,7 +1227,9 @@ export function PlanMode({
           Cones are what each position can actually frame. The sun arc is where the sun rises and
           sets. Shadows are thrown from the marked heights. Cloud is GOES satellite imagery over the
           map. Hazards are what you marked plus what OpenStreetMap has. Labels are place names over
-          the imagery, off while reading a venue and on while hunting for one.
+          the imagery, off while reading a venue and on while hunting for one. Airspace draws
+          controlled airspace as white dashes, the FAA grid squares with the most LAANC can
+          approve on each, and restricted areas and national parks in red.
         </p>
       }
     />
@@ -1378,7 +1450,7 @@ export function PlanMode({
       case 'airspace':
         return (
           <Card title="Airspace" onClose={home}>
-            <AirspacePanel venue={venue} altitudeFeet={airAltitudeFeet} />
+            <AirspacePanel venue={venue} altitudeFeet={airAltitudeFeet} laanc={laanc} onLaanc={onLaanc} />
           </Card>
         )
       case 'layers':
@@ -1445,12 +1517,26 @@ export function PlanMode({
       }
     >
       <MapView
+        airspace={airspaceOn ? airspaceOverlay : null}
+        onAirspaceDense={setAirspaceDense}
+        measurePins={measurePins ?? undefined}
+        onMeasureAt={onMeasureAt}
         onHorizon={setHorizonProfile}
         handle={mapHandle}
         venue={venue}
         onVenueChange={onVenueChange}
         mode={
-          marking ? 'mark' : placing ? 'add' : placingPilot ? 'pilot' : placingAim ? 'aim' : null
+          marking
+            ? 'mark'
+            : placing
+              ? 'add'
+              : placingPilot
+                ? 'pilot'
+                : placingAim
+                  ? 'aim'
+                  : measurePins !== null
+                    ? 'measure'
+                    : null
         }
         marks={marks}
         markDraft={markDraft}
@@ -1548,6 +1634,11 @@ export function PlanMode({
       {!placingPilot ? null : <p className="tapnote">{placingHint('pilot', 'ground')}</p>}
       {!placingAim ? null : (
         <p className="tapnote">Tap the thing you want the sun behind.</p>
+      )}
+      {measurePins === null ? null : (
+        <p className="tapnote num" role="status">
+          {measureWords(measurePins, units.distance)}
+        </p>
       )}
 
       {/*
@@ -1663,6 +1754,8 @@ export function PlanMode({
         bearing={mapBearing}
         heading={followHeading}
         onCompass={onCompass}
+        measuring={measurePins !== null}
+        onMeasure={() => setMeasurePins((pins) => (pins === null ? [] : null))}
       />
       )}
 

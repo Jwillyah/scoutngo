@@ -12,7 +12,17 @@ import type { LatLon } from '../core/geo.ts'
 import { ROUTE_LABEL, ROUTE_TIMING, laancPath, laancWhy } from '../core/laanc.ts'
 import { airspaceAnswer, type AirspaceAnswer } from '../lib/airspace.ts'
 import { facilityCellAt, facilityEffective } from '../lib/uasfm.ts'
+import { airspaceCard, type CardLine } from '../core/airspaceCard.ts'
+import { airspaceAtPoint } from '../lib/airspaceAtPoint.ts'
 import { Group } from './Panel.tsx'
+
+/*
+ * THE HEIGHT A RESTRICTED AREA'S FLOOR IS JUDGED AGAINST with nothing in the
+ * air: 400 ft, the most Part 107 allows (14 CFR 107.51). The highest a drone
+ * can legally be is the height at which the most floors reach it, so the
+ * card errs towards keeping it out.
+ */
+const PART_107_CEILING_FEET = 400
 
 interface AirspacePanelProps {
   venue: LatLon | null
@@ -24,6 +34,9 @@ interface AirspacePanelProps {
    * an altitude that is actually planned. Null with nothing in the air.
    */
   altitudeFeet: number | null
+  /** The shooter's "I have LAANC here" switch for this venue. Kept on this phone. */
+  laanc: boolean
+  onLaanc: (on: boolean) => void
 }
 
 /**
@@ -42,7 +55,7 @@ interface AirspacePanelProps {
  * NOTHING HERE IS AN AUTHORIZATION, and the panel says so in the FAA's own
  * terms rather than in a disclaimer at the bottom nobody reads.
  */
-export function AirspacePanel({ venue, altitudeFeet }: AirspacePanelProps) {
+export function AirspacePanel({ venue, altitudeFeet, laanc, onLaanc }: AirspacePanelProps) {
   /*
    * THE ANSWER CARRIES THE PIN IT IS FOR.
    *
@@ -75,6 +88,30 @@ export function AirspacePanel({ venue, altitudeFeet }: AirspacePanelProps) {
     }
   }, [venue])
 
+  /* The plain-words card, carrying the pin and the height it is for, like the answer. */
+  const droneFeet = altitudeFeet ?? PART_107_CEILING_FEET
+  const [plain, setPlain] = useState<{ at: LatLon; feet: number; lines: CardLine[] } | null>(null)
+  useEffect(() => {
+    if (venue === null) return
+    let live = true
+    void airspaceAtPoint(venue, droneFeet).then(
+      (point) => {
+        if (live) setPlain({ at: venue, feet: droneFeet, lines: airspaceCard(point) })
+      },
+      () => {
+        if (live) setPlain(null)
+      },
+    )
+    return () => {
+      live = false
+    }
+  }, [venue, droneFeet])
+  const lines =
+    plain !== null && venue !== null && plain.at.lat === venue.lat && plain.at.lon === venue.lon && plain.feet === droneFeet
+      ? plain.lines
+      : null
+  const controlled = lines?.some((line) => line.tone === 'authorization') ?? false
+
   const current =
     loaded !== null && venue !== null && loaded.at.lat === venue.lat && loaded.at.lon === venue.lon
       ? loaded
@@ -101,6 +138,49 @@ export function AirspacePanel({ venue, altitudeFeet }: AirspacePanelProps) {
 
   return (
     <div className="air">
+      <Group title="Here">
+        {lines === null ? (
+          <p className="air__none">Reading what the app holds for this point…</p>
+        ) : (
+          <ul className="air__lines">
+            {lines.map((line) => (
+              <li key={line.text} className={`air__line air__line--${line.tone}`}>
+                <p className="air__main">{line.text}</p>
+                <p className="air__detail">{line.detail}</p>
+                {line.tone === 'note' && line.text.startsWith('Check today') ? (
+                  <a className="air__tfrlink" href={TFR_URL} target="_blank" rel="noreferrer noopener">
+                    Today's flight restrictions
+                  </a>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+        {altitudeFeet === null ? (
+          <p className="air__detail">
+            Judged at {PART_107_CEILING_FEET} ft above the ground, the most a drone may fly, because nothing is in
+            the air in this plan yet.
+          </p>
+        ) : null}
+        {/*
+          * THE SWITCH ONLY WHERE IT MEANS SOMETHING. In controlled airspace,
+          * or already on. It changes what Suggest keeps; it never says the
+          * flight is approved, and it is never sent anywhere.
+          */}
+        {controlled || laanc ? (
+          <label className="air__switch">
+            <input type="checkbox" checked={laanc} onChange={(event) => onLaanc(event.target.checked)} />
+            <span className="air__switchtext">
+              I have LAANC here
+              <span className="air__detail">
+                Suggest then keeps drone spots in controlled airspace, up to the grid ceiling. Saved on this phone with
+                this spot; moving the pin turns it off.
+              </span>
+            </span>
+          </label>
+        ) : null}
+      </Group>
+
       <Group title="LAANC path" meta={path === null ? undefined : ROUTE_LABEL[path.route]}>
         {path === null ? (
           <p className="air__none">

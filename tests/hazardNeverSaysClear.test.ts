@@ -40,6 +40,9 @@ const HAZARD_FILES = [
   'lib/sightlineCopy.ts',
   'lib/overpass.ts',
   'components/HazardPanel.tsx',
+  'core/airspaceCard.ts',
+  'core/airspaceLookup.ts',
+  'components/AirspacePanel.tsx',
 ]
 
 /**
@@ -57,6 +60,9 @@ const FORBIDDEN: { pattern: RegExp; why: string }[] = [
   { pattern: /\b(hazard|obstruction)[- ]free\b/i, why: 'says hazard free' },
   { pattern: /\ball\s+clear\b/i, why: 'says all clear' },
   { pattern: /\bunobstructed\b/i, why: 'says unobstructed' },
+  /* "No controlled airspace here", "no restricted or prohibited airspace": a verdict on the sky. */
+  { pattern: /\bno\s+(?:[a-z-]+,?\s+(?:or\s+|and\s+)?){0,4}airspace\b/i, why: 'says there is no airspace' },
+  { pattern: /\b(ok|okay|fine|free|allowed|legal)\s+to\s+fly\b/i, why: 'says flying is allowed' },
 ]
 
 /** Comments explain; they are not shown to anyone holding the phone. */
@@ -100,6 +106,9 @@ describe('nothing in the hazard path says an area is clear', () => {
       'say("All clear")',
       'summary: "unobstructed sightline"',
       'if (x) return "no known obstructions"',
+      "'Nothing in the extract here: no controlled, restricted or prohibited airspace'",
+      'text: "No controlled airspace here."',
+      'text: "OK to fly"',
     ]
     for (const line of wouldBeCaught) {
       expect(

@@ -78,6 +78,12 @@ export const MARK_SOURCE = 'site-marks'
 /** The line being drawn, which is also ours and also must not reach a capture. */
 export const MARK_DRAFT_SOURCE = 'site-mark-draft'
 
+/** The airspace overlay: class areas, the facility grid, restricted areas, parks. */
+export const AIRSPACE_SOURCE = 'airspace-overlay'
+
+/** The two-pin measure line. */
+export const MEASURE_SOURCE = 'measure-line'
+
 /** Every source this app draws with. The basemap is NOT here and must not be. */
 export const APP_SOURCES: readonly string[] = [
   RADIUS_SOURCE,
@@ -90,6 +96,8 @@ export const APP_SOURCES: readonly string[] = [
   CLOUD_FORECAST_SOURCE,
   MARK_SOURCE,
   MARK_DRAFT_SOURCE,
+  AIRSPACE_SOURCE,
+  MEASURE_SOURCE,
 ]
 
 /**

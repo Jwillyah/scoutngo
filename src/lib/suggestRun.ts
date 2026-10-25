@@ -29,6 +29,8 @@ import {
   type SuggestResult,
 } from '../core/suggest.ts'
 import { airspaceShapes } from './airspace.ts'
+import { restrictions } from './restrictions.ts'
+import { facilityCellAt } from './uasfm.ts'
 import { fetchBuildings } from './buildings.ts'
 import type { KitSelection } from './kitSelection.ts'
 import { fetchSiteGeometry, type SiteGeometry } from './overpass.ts'
@@ -88,7 +90,8 @@ export function whyLine(candidate: Candidate, units: Units): string {
   const optic = `${candidate.opticName} ${candidate.focalLength}mm`
   const where =
     candidate.platform === 'air'
-      ? `${formatRange(candidate.rangeMeters, units.distance)} out at ${candidate.altitudeFeet} ft`
+      ? `${formatRange(candidate.rangeMeters, units.distance)} out at ${candidate.altitudeFeet} ft` +
+        (candidate.gridCeilingFeet === undefined ? '' : ` (under LAANC, grid ceiling ${candidate.gridCeilingFeet} ft)`)
       : formatRange(candidate.rangeMeters, units.distance)
   return `${lightWords(candidate.light)}, ${where} ${sideWords(candidate)}, ${lineWords(candidate)} · ${optic}`
 }
@@ -117,6 +120,12 @@ export interface SuggestArgs {
   marks: readonly SiteMark[]
   elevationAt?: (at: LatLon) => number | null
   units: Units
+  /**
+   * The shooter's "I have LAANC here" switch for this venue (laancHere in
+   * src/lib/venue.ts). On: drones stay in controlled airspace up to the
+   * facility map's ceiling. It never opens a restricted area or a park.
+   */
+  laanc: boolean
   onStage?: (stage: 'capture' | 'terrain' | 'positions' | 'lighting') => void
 }
 
@@ -144,7 +153,10 @@ export async function runSuggest(args: SuggestArgs): Promise<SuggestOutcome> {
   args.onStage?.('capture')
   const [buildings, site] = await Promise.all([fetchBuildings(bounds), fetchSiteGeometry(bounds)])
   args.onStage?.('terrain')
-  const airspace = args.platforms.includes('air') ? await airspaceShapes() : []
+  const flying = args.platforms.includes('air')
+  const [airspace, closed] = flying
+    ? await Promise.all([airspaceShapes(), restrictions()])
+    : [[], { specialUse: [], parks: [] }]
 
   args.onStage?.('positions')
   const result = suggestPositions({
@@ -163,6 +175,12 @@ export async function runSuggest(args: SuggestArgs): Promise<SuggestOutcome> {
     water: site.status === 'ok' ? site.geometry.land.water : [],
     coastline: site.status === 'ok' ? (site.geometry.land.coastline ?? []) : [],
     airspace,
+    specialUse: closed.specialUse,
+    parks: closed.parks,
+    laanc: {
+      enabled: args.laanc,
+      ceilingAt: (at: LatLon) => facilityCellAt(at.lat, at.lon)?.ceilingFeet ?? null,
+    },
     marks: args.marks,
     date: args.date,
     ...(args.elevationAt === undefined ? {} : { elevationAt: args.elevationAt }),

@@ -1,6 +1,7 @@
 import { blockers, cameraHeightMeters, type Blocker } from '../core/sightline.ts'
 import type { SiteMark } from '../core/siteMark.ts'
-import { slantRangeMeters } from '../core/air.ts'
+import { clampAltitudeFeet, slantRangeMeters } from '../core/air.ts'
+import { droneFootprint } from '../core/droneFootprint.ts'
 import {
   footprintSize,
   groundFootprint,
@@ -351,7 +352,34 @@ function footprintFor(
   aim: Aim,
   sun: SunPosition,
   fov: FOV,
+  subject: LatLon,
 ): FootprintDraw | null {
+  /*
+   * A FRAMED DRONE SHOT, PUT ON THE GROUND. The camera is tilted down at the
+   * subject from the height it flies at, so the frame lands as a trapezoid,
+   * not the cone a tripod gets. Worked out in src/core/droneFootprint.ts from
+   * the four corner rays meeting flat ground.
+   */
+  if (aim.shotType === 'framed' && position.platform === 'air') {
+    const heightMeters = clampAltitudeFeet(position.altitudeFeet) * 0.3048
+    const tiltDegrees = (Math.atan2(heightMeters, distanceMeters(position.at, subject)) * 180) / Math.PI
+    const ground = droneFootprint({
+      at: position.at,
+      altitudeFeet: clampAltitudeFeet(position.altitudeFeet),
+      tiltDegrees,
+      headingDegrees: aim.cameraBearing,
+      hFOV: fov.hFOV,
+      vFOV: fov.vFOV,
+    })
+    return {
+      shotType: 'framed',
+      ground: [ground.ring],
+      nearMeters: ground.nearMeters,
+      farMeters: ground.farMeters,
+      reachesHorizon: ground.reachesHorizon,
+    }
+  }
+
   if (aim.shotType === 'top-down') {
     const size = footprintSize(position.altitudeFeet, fov.hFOV, fov.vFOV)
     return {
@@ -549,7 +577,7 @@ export function planPosition(
       drawsCone(position.shotType) && aim.shotType === 'framed'
         ? fovConePolygon(position.at, aim.cameraBearing, fov.hFOV, coneRangeMeters)
         : [],
-    footprint: footprintFor(position, aim, sun, fov),
+    footprint: footprintFor(position, aim, sun, fov, subject),
     warnings: checkSite(position.at, land, { platform: position.platform, subject }),
   }
 }
@@ -600,6 +628,15 @@ const SUBJECT_AIM_HEIGHT_METERS = 2
  * a ring off a top-down or a rectangle off a 360.
  */
 export type FootprintDraw =
+  | {
+      /* A framed drone shot: what the tilted frame covers on flat ground. */
+      shotType: 'framed'
+      ground: Position[][]
+      nearMeters: number
+      farMeters: number
+      /** The top of the frame never meets the ground; its far edge was cut off. */
+      reachesHorizon: boolean
+    }
   | {
       shotType: 'top-down'
       /** The rectangle on the ground, as a closed polygon ring. */

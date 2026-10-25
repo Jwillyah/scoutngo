@@ -57,6 +57,17 @@ export interface VenueDraft {
    * depth runs.
    */
   subjectAcrossMeters: string
+  /**
+   * "I HAVE LAANC HERE": the placeKey of the coordinate the shooter said it
+   * for, or absent. Read with laancHere, never directly.
+   *
+   * KEYED TO THE PLACE, like the name. An authorization is for a place, so
+   * moving the pin anywhere at all turns it off by itself: the key no longer
+   * matches and nothing has to remember to clear it. It lives on the venue so
+   * a saved spot and the backup file carry it with no second copy, and it
+   * stays on this phone: no request ever includes it.
+   */
+  laanc?: string
 }
 
 export type VenueField = keyof VenueDraft
@@ -293,6 +304,17 @@ export function venueLatLon(draft: VenueDraft): LatLon | null {
   const lat = parseCoordinate(draft.latitude)
   const lon = parseCoordinate(draft.longitude)
   return lat === null || lon === null ? null : { lat, lon }
+}
+
+/** Whether the shooter has said they hold LAANC at THIS coordinate. */
+export function laancHere(draft: VenueDraft): boolean {
+  return draft.laanc !== undefined && draft.laanc === placeKey(draft.latitude, draft.longitude)
+}
+
+/** The venue with the switch set for its current coordinate. */
+export function withLaanc(draft: VenueDraft, on: boolean): VenueDraft {
+  const { laanc: _old, ...rest } = draft
+  return on ? { ...rest, laanc: placeKey(draft.latitude, draft.longitude) } : rest
 }
 
 /** Writes a map derived coordinate back into the form, at pin resolution. */

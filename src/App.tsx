@@ -119,6 +119,8 @@ import {
   resolveWindow,
   subjectAcrossMeters,
   validateVenue,
+  laancHere,
+  withLaanc,
   venueLatLon,
   withCoordinates,
   type VenueDraft,
@@ -1498,6 +1500,7 @@ function App() {
         ? {}
         : { elevationAt: (at: LatLon) => mapHandle.current?.elevationAt(at) ?? null }),
       units: settings.units,
+      laanc: laancHere(venue),
       onStage: (stage) => setGeneration({ status: 'working', stage }),
     })
     if (outcome.status === 'error') {
@@ -1855,6 +1858,8 @@ function App() {
           onPlacingAim={setPlacingAim}
           onAimAt={onAimAt}
           airAltitudeFeet={plannedAltitudeFeet}
+          laanc={laancHere(venue)}
+          onLaanc={(on) => setVenue((current) => withLaanc(current, on))}
           onPlacingPilot={setPlacingPilot}
           onSetAltitude={onSetAltitude}
           onSetShotType={onSetShotType}

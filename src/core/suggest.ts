@@ -11,9 +11,11 @@
  *   1  CANDIDATES. A ring around the subject for every optic in the bag, at
  *      the distances that optic frames the subject (fov.ts), every
  *      BEARING_STEP_DEGREES.
- *   2  WHERE YOU CANNOT STAND. Inside a building footprint or in water
- *      (ground), in surface-area controlled airspace (air), or outside the
- *      reach ring the shooter drew.
+ *   2  WHERE YOU CANNOT STAND OR FLY. Inside a building footprint or in
+ *      water (ground); in a national park unit, a restricted or prohibited
+ *      area, or surface-area controlled airspace (air) -- the last kept only
+ *      when the shooter has LAANC there, and flown no higher than the grid
+ *      ceiling; or outside the reach ring the shooter drew.
  *   3  LINE OF SIGHT. The straight line to the subject, against building
  *      footprints with their heights, the terrain, and the shooter's own
  *      hazard marks (sightline.ts). A footprint OpenStreetMap gives no height
@@ -37,6 +39,7 @@ import { computeFOV, PRACTICAL_MAX_STANDOFF_METERS, rangeForFrameWidth, standoff
 import { bearingBetween, destinationPoint, distanceMeters, type LatLon, type Position } from './geo.ts'
 import { classifyLighting, classificationOf, type Classification } from './lighting.ts'
 import { airspaceAt, type AirspaceShape } from './airspaceLookup.ts'
+import { floorReaches, insideShape, type ParkUnit, type SpecialUseArea } from './restrictions.ts'
 import { compassWord } from './compassWords.ts'
 import { isInSea, isInWater, type Ring } from './siting.ts'
 import type { SiteMark } from './siteMark.ts'
@@ -135,8 +138,24 @@ export interface SuggestInput {
   water: Ring[][]
   /** OSM coastline ways: the sea is on their right. See isInSea in siting.ts. */
   coastline?: readonly Position[][]
-  /** Surface-area controlled airspace in the extract. Air candidates inside are dropped. */
+  /** Surface-area controlled airspace in the extract. Air candidates inside are dropped, unless `laanc` is on. */
   airspace: readonly AirspaceShape[]
+  /**
+   * Restricted and prohibited areas (restrictions.ts). An air candidate whose
+   * height the area's floor reaches, or may reach, is dropped, LAANC or not:
+   * LAANC does not open a restricted area.
+   */
+  specialUse?: readonly SpecialUseArea[]
+  /** National Park Service units. No drone launch inside one: air candidates there are dropped. */
+  parks?: readonly ParkUnit[]
+  /**
+   * THE "I HAVE LAANC HERE" SWITCH, per saved spot, on the phone only.
+   *
+   * On: an air candidate in controlled airspace is KEPT where the facility
+   * map has a ceiling above 0, and flown no higher than that ceiling at its
+   * own grid square. Off or absent: controlled airspace drops it, as before.
+   */
+  laanc?: { enabled: boolean; ceilingAt: (at: LatLon) => number | null }
   marks: readonly SiteMark[]
   /** yyyy-mm-dd, for the leaf question in sightline.ts. */
   date: string
@@ -151,7 +170,10 @@ export type DropStep =
   | 'cannot-frame-from-altitude'
   | 'inside-building'
   | 'in-water'
+  | 'national-park'
+  | 'restricted-or-prohibited'
   | 'controlled-airspace'
+  | 'grid-ceiling-too-low'
   | 'building-in-line'
   | 'terrain-in-line'
   | 'marked-hazard-in-line'
@@ -162,7 +184,10 @@ export const DROP_STEPS: readonly DropStep[] = [
   'cannot-frame-from-altitude',
   'inside-building',
   'in-water',
+  'national-park',
+  'restricted-or-prohibited',
   'controlled-airspace',
+  'grid-ceiling-too-low',
   'building-in-line',
   'terrain-in-line',
   'marked-hazard-in-line',
@@ -173,7 +198,10 @@ export const DROP_WORDS: Record<DropStep, string> = {
   'cannot-frame-from-altitude': `would have to fly under ${MIN_AIR_ALTITUDE_FEET} ft to frame the subject`,
   'inside-building': 'inside a building footprint',
   'in-water': 'in water',
+  'national-park': 'a drone launch inside a national park unit',
+  'restricted-or-prohibited': 'in a restricted or prohibited area',
   'controlled-airspace': 'in controlled airspace (needs authorization)',
+  'grid-ceiling-too-low': `grid ceiling too low to fly ${MIN_AIR_ALTITUDE_FEET} ft or more here`,
   'building-in-line': 'a building of known height in the line',
   'terrain-in-line': 'terrain in the line',
   'marked-hazard-in-line': 'a marked hazard in the line',
@@ -192,6 +220,11 @@ export interface Candidate {
   /** FROM the candidate TO the subject: where the camera points. */
   cameraBearing: number
   altitudeFeet: number
+  /**
+   * The facility map's ceiling at this point when the drone is flying under
+   * LAANC in controlled airspace. Absent otherwise. altitudeFeet never exceeds it.
+   */
+  gridCeilingFeet?: number
   /** Null when the sun is down: there is no light class to score. */
   light: Classification | null
   /** Degrees between where the camera points and the sun: 90 is pure side light. */
@@ -416,29 +449,76 @@ export function suggestPositions(input: SuggestInput): SuggestResult {
      * the planned ceiling if that is lower; the ground distance is what is left.
      */
     const ceilingMeters = input.airAltitudeFeet * 0.3048
-    const altitudeMeters =
+    const ringAltitudeMeters =
       ring.platform === 'air'
         ? Math.min(ceilingMeters, ring.framingMeters * Math.sin((AIR_LOOK_DOWN_DEGREES * Math.PI) / 180))
         : 0
-    const altitudeFeet = Math.round(altitudeMeters / 0.3048 / 5) * 5
+    const ringAltitudeFeet = Math.round(ringAltitudeMeters / 0.3048 / 5) * 5
+    const groundRangeAt = (metres: number) =>
+      ring.platform === 'air' ? Math.sqrt(Math.max(0, ring.framingMeters ** 2 - metres ** 2)) : ring.framingMeters
     for (let positionBearing = 0; positionBearing < 360; positionBearing += BEARING_STEP_DEGREES) {
       considered += 1
 
-      if (ring.platform === 'air' && altitudeFeet < MIN_AIR_ALTITUDE_FEET) {
+      if (ring.platform === 'air' && ringAltitudeFeet < MIN_AIR_ALTITUDE_FEET) {
         dropped['cannot-frame-from-altitude'] += 1
         continue
       }
-      const groundRange =
-        ring.platform === 'air'
-          ? Math.sqrt(Math.max(0, ring.framingMeters ** 2 - altitudeMeters ** 2))
-          : ring.framingMeters
+      let altitudeFeet = ringAltitudeFeet
+      let groundRange = groundRangeAt(ringAltitudeMeters)
+      let at = destinationPoint(input.subject, positionBearing, groundRange)
+      let gridCeilingFeet: number | undefined
 
-      const at = destinationPoint(input.subject, positionBearing, groundRange)
+      /*
+       * CONTROLLED AIRSPACE, AND THE LAANC SWITCH. Off: dropped, as it always
+       * was. On: flown no higher than the facility map's ceiling. Flying lower
+       * moves the aircraft OUT along its framing slant, which can land it in a
+       * different grid square, so the ceiling is read again where it ends up
+       * and the candidate goes if it would still be above it.
+       */
+      if (ring.platform === 'air' && airspaceAt(input.airspace, at).length > 0) {
+        if (input.laanc?.enabled !== true) {
+          dropped['controlled-airspace'] += 1
+          continue
+        }
+        let ok = false
+        for (let pass = 0; pass < 3; pass++) {
+          const ceiling = input.laanc.ceilingAt(at)
+          if (ceiling === null || ceiling <= 0) break
+          if (altitudeFeet <= ceiling) {
+            gridCeilingFeet = ceiling
+            ok = true
+            break
+          }
+          altitudeFeet = Math.floor(ceiling / 5) * 5
+          if (altitudeFeet < MIN_AIR_ALTITUDE_FEET) break
+          groundRange = groundRangeAt(altitudeFeet * 0.3048)
+          at = destinationPoint(input.subject, positionBearing, groundRange)
+        }
+        if (!ok) {
+          dropped['grid-ceiling-too-low'] += 1
+          continue
+        }
+      }
 
       /* Step 2: where nobody can stand or fly. */
       if (distanceMeters(input.reach.centre, at) > input.reach.radiusMeters) {
         dropped['outside-reach'] += 1
         continue
+      }
+      if (ring.platform === 'air') {
+        /* No launch in a park unit; no flight where a restricted or prohibited floor reaches. */
+        if ((input.parks ?? []).some((park) => insideShape(park, at))) {
+          dropped['national-park'] += 1
+          continue
+        }
+        if (
+          (input.specialUse ?? []).some(
+            (area) => insideShape(area, at) && floorReaches(area, altitudeFeet) !== 'above',
+          )
+        ) {
+          dropped['restricted-or-prohibited'] += 1
+          continue
+        }
       }
       if (ring.platform === 'ground') {
         if (buildings.some((b) => insideBox(b, at) && inRing(b.footprint.ring, at))) {
@@ -449,9 +529,6 @@ export function suggestPositions(input: SuggestInput): SuggestResult {
           dropped['in-water'] += 1
           continue
         }
-      } else if (airspaceAt(input.airspace, at).length > 0) {
-        dropped['controlled-airspace'] += 1
-        continue
       }
 
       /* Step 3: the line to the subject. */
@@ -480,6 +557,7 @@ export function suggestPositions(input: SuggestInput): SuggestResult {
         positionBearing: positionBearingExact,
         cameraBearing,
         altitudeFeet: ring.platform === 'air' ? altitudeFeet : 0,
+        ...(gridCeilingFeet === undefined ? {} : { gridCeilingFeet }),
         light,
         lightDelta,
         lineOfSight: verdict.unverified ? 'unverified' : 'nothing-mapped',

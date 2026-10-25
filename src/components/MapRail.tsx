@@ -72,6 +72,9 @@ interface MapRailProps {
   /** Whether the map is turning with the phone's heading. */
   heading: boolean
   onCompass: () => void
+  /** Two-pin measure: on while the next taps drop pins. */
+  measuring: boolean
+  onMeasure: () => void
 }
 
 /** How far a 3D tap tilts the map. Steep enough to see a ridge, short of the horizon. */
@@ -85,6 +88,8 @@ export function MapRail({
   bearing,
   heading,
   onCompass,
+  measuring,
+  onMeasure,
 }: MapRailProps) {
   /** Which button is showing its text label, from a long press. */
   const [named, setNamed] = useState<string | null>(null)
@@ -189,6 +194,22 @@ export function MapRail({
       )}
 
       {button('layers', 'Map and layers', LAYERS_ICON, onLayers, { on: layersOpen })}
+      {button(
+        'measure',
+        measuring ? 'Stop measuring' : 'Measure between two points',
+        <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+          <path
+            d="M3 13.5 13.5 3l3.5 3.5L6.5 17z M6 10.5l1.5 1.5 M8.5 8l2 2 M11 5.5l1.5 1.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+        </svg>,
+        onMeasure,
+        { on: measuring },
+      )}
 
     </nav>
   )

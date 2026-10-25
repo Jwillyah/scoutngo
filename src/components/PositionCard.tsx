@@ -1046,6 +1046,27 @@ export function PositionCard({
                 </dd>
               </div>
             )}
+            {/*
+              * A FRAMED DRONE SHOT'S GROUND: from the near edge to the far
+              * edge, measured from the point under the drone, on flat ground.
+              * src/core/droneFootprint.ts. A frame whose top never meets the
+              * ground says so rather than printing the cut-off distance.
+              */}
+            {planned.footprint?.shotType !== 'framed' ? null : (
+              <div className="card__stat">
+                <dt>
+                  Ground in frame
+                  <span className="card__term">from under the drone, flat ground</span>
+                </dt>
+                <dd className="num">
+                  {Math.round(planned.footprint.nearMeters)} m to{' '}
+                  {planned.footprint.reachesHorizon
+                    ? 'the horizon'
+                    : `${Math.round(planned.footprint.farMeters)} m`}{' '}
+                  out
+                </dd>
+              </div>
+            )}
             {planned.footprint?.shotType !== 'orbit' ? null : (
               <div className="card__stat">
                 <dt>Horizon</dt>

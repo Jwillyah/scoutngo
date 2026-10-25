@@ -188,7 +188,7 @@ describe('a ground shoot gets the phase and no aircraft rule', () => {
 
 describe('the airspace panel', () => {
   const render = (venue: LatLon | null, altitudeFeet: number | null) =>
-    renderToStaticMarkup(<AirspacePanel venue={venue} altitudeFeet={altitudeFeet} />)
+    renderToStaticMarkup(<AirspacePanel venue={venue} altitudeFeet={altitudeFeet} laanc={false} onLaanc={() => {}} />)
 
   it('asks for a venue when there is none', () => {
     expect(text(render(null, 200))).toContain('Set a venue')
@@ -285,7 +285,7 @@ describe('the airspace wording states no legal conclusion', () => {
   for (const [label, venue, altitude] of CASES) {
     it(`says nothing conclusive: ${label}`, () => {
       const shown = text(
-        renderToStaticMarkup(<AirspacePanel venue={venue} altitudeFeet={altitude} />),
+        renderToStaticMarkup(<AirspacePanel venue={venue} altitudeFeet={altitude} laanc={false} onLaanc={() => {}} />),
       ).toLowerCase()
       for (const phrase of BANNED) {
         expect(shown, `${label} contains "${phrase}"`).not.toContain(phrase)
@@ -305,7 +305,7 @@ describe('the airspace wording states no legal conclusion', () => {
    * held to the banned-word rule there, in airspaceLookup.test.ts.
    */
   it('says it is reading, rather than showing an answer it does not have yet', () => {
-    const shown = text(renderToStaticMarkup(<AirspacePanel venue={SANDBRIDGE} altitudeFeet={200} />))
+    const shown = text(renderToStaticMarkup(<AirspacePanel venue={SANDBRIDGE} altitudeFeet={200} laanc={false} onLaanc={() => {}} />))
     expect(shown).toContain('Reading the airspace extract')
   })
 })

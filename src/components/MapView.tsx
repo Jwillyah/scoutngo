@@ -52,6 +52,8 @@ import {
   GOES_SOURCE,
   MARK_DRAFT_SOURCE,
   MARK_SOURCE,
+  AIRSPACE_SOURCE,
+  MEASURE_SOURCE,
   PILOT_SOURCE,
   RADIUS_SOURCE,
   RAY_SOURCE,
@@ -63,6 +65,7 @@ import type { SkyLayerKind } from '../core/skyLayer.ts'
 import { plateLabels } from '../core/mapLabel.ts'
 import type { SiteMark } from '../core/siteMark.ts'
 import { readToken } from '../lib/tokens.ts'
+import type { AirspaceOverlay } from '../lib/airspaceOverlay.ts'
 import { ShooterFigure } from './ShooterFigure.tsx'
 
 /*
@@ -442,7 +445,10 @@ export const MARK_NODE_LAYER = 'site-mark-node'
  * READ of a coordinate: it adds nothing to the plan and moves nothing, which
  * is why it sits beside the placing modes rather than inside them.
  */
-export type TapMode = 'add' | 'pilot' | 'mark' | 'aim' | null
+/** A stable empty list, so a default prop does not re-run the effect every render. */
+const NO_PINS: readonly LatLon[] = []
+
+export type TapMode = 'add' | 'pilot' | 'mark' | 'aim' | 'measure' | null
 
 export interface CameraState {
   center: [number, number]
@@ -661,6 +667,18 @@ interface MapViewProps {
    * phone. Reported from here because the map is the only thing that knows.
    */
   onViewChange?: (zoom: number, widthPx: number) => void
+  /**
+   * The airspace overlay, or null when it is off. A function of the view, so
+   * the map redraws it on every pan from data already loaded. See
+   * src/lib/airspaceOverlay.ts.
+   */
+  airspace?: AirspaceOverlay | null
+  /** Whether the grid was left out because the view held too many squares. */
+  onAirspaceDense?: (dense: boolean) => void
+  /** The two-pin measure's pins, none to two. The numbers are src/core/measure.ts. */
+  measurePins?: readonly LatLon[]
+  /** A tap while measuring. */
+  onMeasureAt?: (at: LatLon) => void
   /** PhotoPills style rays from the venue pin. All four bearings from core. */
   sunOverlay: SunOverlay | null
   showSun: boolean
@@ -768,6 +786,16 @@ function footprintCollection(plan: PlannedPosition[]): GeoJSON.FeatureCollection
   for (const p of plan) {
     const draw = p.footprint
     if (draw === null) continue
+
+    /* A framed drone shot: the tilted frame on the ground, drawn like a top-down rectangle. */
+    if (draw.shotType === 'framed') {
+      features.push({
+        type: 'Feature',
+        properties: { kind: 'rect', id: p.position.id },
+        geometry: { type: 'Polygon', coordinates: draw.ground },
+      })
+      continue
+    }
 
     if (draw.shotType === 'top-down') {
       if (draw.rect.length > 0) {
@@ -1088,6 +1116,10 @@ export function MapView({
   skyForecast = [],
   skyForecastOpacity = 0.5,
   onViewChange,
+  airspace = null,
+  onAirspaceDense,
+  measurePins = NO_PINS,
+  onMeasureAt,
   pilotAt = null,
   onPilotMove,
   onAimAt,
@@ -1159,12 +1191,13 @@ export function MapView({
     onAimAt,
     onMarkAt,
     onSelectMark,
+    onMeasureAt,
   })
   useEffect(() => {
     latest.current = {
       mode,
       onVenueChange,
-        onSelect,
+      onSelect,
       onPositionMove,
       onPitchChange,
       onBearingChange,
@@ -1172,9 +1205,10 @@ export function MapView({
       onPinDrag,
       onAddAt,
       onPilotMove,
-    onAimAt,
+      onAimAt,
       onMarkAt,
       onSelectMark,
+      onMeasureAt,
     }
   }, [
     mode,
@@ -1190,6 +1224,7 @@ export function MapView({
     onAimAt,
     onMarkAt,
     onSelectMark,
+    onMeasureAt,
   ])
 
   /* Read through a ref so a handler bound once at build stays current. */
@@ -1345,6 +1380,8 @@ export function MapView({
         l.onPilotMove?.(next)
       } else if (l.mode === 'aim') {
         l.onAimAt?.(next)
+      } else if (l.mode === 'measure') {
+        l.onMeasureAt?.(next)
       } else {
         l.onSelect(null)
       }
@@ -1503,6 +1540,8 @@ export function MapView({
       instance.addSource(FOOTPRINT_SOURCE, { type: 'geojson', data: emptyCollection() })
       instance.addSource(MARK_SOURCE, { type: 'geojson', data: emptyCollection() })
       instance.addSource(MARK_DRAFT_SOURCE, { type: 'geojson', data: emptyCollection() })
+      instance.addSource(AIRSPACE_SOURCE, { type: 'geojson', data: emptyCollection() })
+      instance.addSource(MEASURE_SOURCE, { type: 'geojson', data: emptyCollection() })
 
       const rayColor = [
         'match',
@@ -1515,6 +1554,96 @@ export function MapView({
         readToken('--sun-shadow'),
         readToken('--sun'),
       ] as unknown as maplibregl.DataDrivenPropertyValueSpecification<string>
+
+      /*
+       * THE AIRSPACE OVERLAY, under everything the shooter placed.
+       *
+       * Grid squares are filled darker the lower their ceiling, so a 0 ft
+       * square reads as the darkest thing on the map; the number is on the
+       * square. Controlled airspace is a white dashed outline: paperwork, not
+       * danger. Restricted and prohibited areas and park units are red,
+       * because they are the hazard layer of the sky: no flying, no launch.
+       */
+      instance.addLayer({
+        id: 'airspace-cell-fill',
+        type: 'fill',
+        source: AIRSPACE_SOURCE,
+        filter: ['==', ['get', 'kind'], 'cell'],
+        paint: {
+          'fill-color': readToken('--black', '#0a090c', container.current),
+          'fill-opacity': ['interpolate', ['linear'], ['get', 'feet'], 0, 0.55, 400, 0.08],
+        },
+      })
+      instance.addLayer({
+        id: 'airspace-cell-line',
+        type: 'line',
+        source: AIRSPACE_SOURCE,
+        filter: ['==', ['get', 'kind'], 'cell'],
+        paint: { 'line-color': readToken('--white', '#ffffff', container.current), 'line-width': 0.75, 'line-opacity': 0.45 },
+      })
+      instance.addLayer({
+        id: 'airspace-class-fill',
+        type: 'fill',
+        source: AIRSPACE_SOURCE,
+        filter: ['all', ['==', ['get', 'kind'], 'class'], ['==', ['get', 'draw'], 'fill']],
+        paint: { 'fill-color': readToken('--white', '#ffffff', container.current), 'fill-opacity': 0.1 },
+      })
+      instance.addLayer({
+        id: 'airspace-closed-fill',
+        type: 'fill',
+        source: AIRSPACE_SOURCE,
+        filter: ['all', ['in', ['get', 'kind'], ['literal', ['restricted', 'park']]], ['==', ['get', 'draw'], 'fill']],
+        paint: { 'fill-color': readToken('--hazard', '#ff3b30', container.current), 'fill-opacity': 0.14 },
+      })
+      instance.addLayer({
+        id: 'airspace-class-line',
+        type: 'line',
+        source: AIRSPACE_SOURCE,
+        filter: ['all', ['==', ['get', 'kind'], 'class'], ['==', ['get', 'draw'], 'line']],
+        paint: {
+          'line-color': readToken('--white', '#ffffff', container.current),
+          'line-width': 2.5,
+          'line-dasharray': [3, 2],
+        },
+      })
+      instance.addLayer({
+        id: 'airspace-closed-line',
+        type: 'line',
+        source: AIRSPACE_SOURCE,
+        filter: ['all', ['in', ['get', 'kind'], ['literal', ['restricted', 'park']]], ['==', ['get', 'draw'], 'line']],
+        paint: {
+          'line-color': readToken('--hazard', '#ff3b30', container.current),
+          'line-width': 3,
+        },
+      })
+
+      /* The two-pin measure: a plain white line with a dark edge, readable on imagery. */
+      instance.addLayer({
+        id: 'measure-edge',
+        type: 'line',
+        source: MEASURE_SOURCE,
+        filter: ['==', ['get', 'kind'], 'line'],
+        paint: { 'line-color': readToken('--mark-edge', '#0a0b09', container.current), 'line-width': 5 },
+      })
+      instance.addLayer({
+        id: 'measure-line',
+        type: 'line',
+        source: MEASURE_SOURCE,
+        filter: ['==', ['get', 'kind'], 'line'],
+        paint: { 'line-color': readToken('--white', '#ffffff', container.current), 'line-width': 2.5 },
+      })
+      instance.addLayer({
+        id: 'measure-pin',
+        type: 'circle',
+        source: MEASURE_SOURCE,
+        filter: ['==', ['get', 'kind'], 'pin'],
+        paint: {
+          'circle-radius': 6,
+          'circle-color': readToken('--white', '#ffffff', container.current),
+          'circle-stroke-color': readToken('--mark-edge', '#0a0b09', container.current),
+          'circle-stroke-width': 2,
+        },
+      })
 
       /*
        * The reachable ring. Added FIRST so every marker and cone sits above it:
@@ -2256,6 +2385,91 @@ export function MapView({
       | undefined
     source?.setData(footprintCollection(conePlan))
   }, [conePlan, ready])
+
+  /*
+   * THE AIRSPACE OVERLAY, redrawn for the view after every move.
+   *
+   * The ceiling numbers are small markers rather than a symbol layer, because
+   * this style carries no glyphs. They are decoration -- aria-hidden, no
+   * pointer events -- and the same number is on the airspace card in words.
+   */
+  const latestDense = useRef(onAirspaceDense)
+  latestDense.current = onAirspaceDense
+  useEffect(() => {
+    const instance = map.current
+    if (instance === null || !ready) return
+    const source = instance.getSource(AIRSPACE_SOURCE) as maplibregl.GeoJSONSource | undefined
+    let tags: maplibregl.Marker[] = []
+    const clearTags = () => {
+      for (const tag of tags) tag.remove()
+      tags = []
+    }
+    if (airspace === null) {
+      source?.setData(emptyCollection())
+      latestDense.current?.(false)
+      return
+    }
+    const draw = () => {
+      const b = instance.getBounds()
+      const layer = airspace({ south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast() })
+      source?.setData(layer.collection)
+      latestDense.current?.(layer.gridTooDense)
+      clearTags()
+      for (const label of layer.gridLabels) {
+        const el = document.createElement('div')
+        el.className = 'gridtag num'
+        el.setAttribute('aria-hidden', 'true')
+        el.textContent = String(label.feet)
+        tags.push(new maplibregl.Marker({ element: el }).setLngLat([label.at.lon, label.at.lat]).addTo(instance))
+      }
+      /*
+       * NOT UNDER THE CHROME. A ceiling half hidden by the scale bar or the
+       * chip row reads as a different number, so a tag under any floating
+       * surface -- the same reserved list the ray labels avoid -- is hidden.
+       */
+      /*
+       * A maplibre control CORNER is a tall empty column (408 px measured on a
+       * 390 x 844 phone) with the scale bar at its foot, so its controls are
+       * what is reserved here, not the empty box around them.
+       */
+      const chrome = [...document.querySelectorAll(FLOATING_CHROME)]
+        .flatMap((n) => (n.className.toString().includes('maplibregl-ctrl-') ? [...n.children] : [n]))
+        .map((n) => n.getBoundingClientRect())
+      for (const tag of tags) {
+        const r = tag.getElement().getBoundingClientRect()
+        const under = chrome.some((c) => r.left < c.right && r.right > c.left && r.top < c.bottom && r.bottom > c.top)
+        tag.getElement().style.visibility = under ? 'hidden' : ''
+      }
+    }
+    draw()
+    instance.on('moveend', draw)
+    return () => {
+      instance.off('moveend', draw)
+      clearTags()
+    }
+  }, [airspace, ready])
+
+  /* The two-pin measure: its pins, and the line once there are two. */
+  useEffect(() => {
+    if (map.current === null || !ready) return
+    const source = map.current.getSource(MEASURE_SOURCE) as maplibregl.GeoJSONSource | undefined
+    const points: GeoJSON.Feature[] = measurePins.map((p) => ({
+      type: 'Feature',
+      properties: { kind: 'pin' },
+      geometry: { type: 'Point', coordinates: [p.lon, p.lat] },
+    }))
+    const line: GeoJSON.Feature[] =
+      measurePins.length === 2
+        ? [
+            {
+              type: 'Feature',
+              properties: { kind: 'line' },
+              geometry: { type: 'LineString', coordinates: measurePins.map((p) => [p.lon, p.lat]) },
+            },
+          ]
+        : []
+    source?.setData({ type: 'FeatureCollection', features: [...line, ...points] })
+  }, [measurePins, ready])
 
   /* The marked hazards and notes, and the line being drawn over them. */
   useEffect(() => {

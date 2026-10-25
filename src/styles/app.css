@@ -9561,3 +9561,101 @@
     color-mix(in srgb, var(--sun) 22%, transparent) 100%
   );
 }
+
+/*
+ * THE AIRSPACE CARD IN PLAIN WORDS. One main sentence per line, the expert
+ * term in the detail under it. Red only for the lines that are a hazard: a
+ * park, a restricted or prohibited area. Controlled airspace is paperwork,
+ * not danger, so it is white type with a white rule.
+ */
+.air__lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.air__line {
+  padding-left: var(--space-2);
+  border-left: var(--line-rule) solid var(--color-line-strong);
+}
+
+.air__line--hazard {
+  border-left-color: var(--hazard);
+}
+
+.air__line--authorization {
+  border-left-color: var(--white);
+}
+
+.air__main {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--color-text);
+}
+
+.air__detail {
+  display: block;
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
+.air__tfrlink {
+  display: inline-block;
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.air__switch {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  margin-top: var(--space-3);
+  min-height: 44px;
+  color: var(--color-text);
+}
+
+.air__switch input {
+  width: 22px;
+  height: 22px;
+  margin: 2px 0 0;
+  accent-color: var(--white);
+}
+
+/* A facility map ceiling on its grid square. Decoration: the card says it in words. */
+.gridtag {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--black);
+  color: var(--white);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: 1.2;
+  pointer-events: none;
+}
+
+/* The shoot-day line: a link to today's restrictions, and why it is there. */
+.eventday {
+  display: grid;
+  gap: var(--space-1);
+  margin: var(--space-3) 0 0;
+  padding-left: var(--space-2);
+  border-left: var(--line-rule) solid var(--white);
+  font-size: var(--text-sm);
+}
+
+.eventday a {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.eventday__why {
+  color: var(--color-text-muted);
+}

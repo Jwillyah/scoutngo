@@ -196,10 +196,26 @@ describe('the shapes each shot type is drawn with', () => {
   })
   const plan = (over: Partial<CameraPosition>) => planPositions([make(over)], SUBJECT, sun)[0]
 
-  it('gives a framed shot a cone and no footprint', () => {
-    const p = plan({ shotType: 'framed' })
+  it('gives a framed ground shot a cone and no footprint', () => {
+    const p = plan({ shotType: 'framed', platform: 'ground', lensId: 'sigma-28-75', focalLength: 50, altitudeFeet: 0 })
     expect(p.cone.length).toBeGreaterThan(0)
     expect(p.footprint).toBeNull()
+  })
+
+  /*
+   * A FRAMED DRONE SHOT keeps its cone and also gets the ground its tilted
+   * frame covers: near edge closer than the subject, far edge past it, since
+   * the camera is aimed at the subject.
+   */
+  it('gives a framed drone shot a cone and the ground its tilted frame covers', () => {
+    const p = plan({ shotType: 'framed' })
+    expect(p.cone.length).toBeGreaterThan(0)
+    expect(p.footprint?.shotType).toBe('framed')
+    if (p.footprint?.shotType !== 'framed') return
+    expect(p.footprint.ground[0]).toHaveLength(5)
+    const toSubject = p.groundRangeMeters
+    expect(p.footprint.nearMeters).toBeLessThan(toSubject)
+    expect(p.footprint.reachesHorizon || p.footprint.farMeters > toSubject).toBe(true)
   })
 
   it('gives a top-down a rectangle and no cone', () => {
