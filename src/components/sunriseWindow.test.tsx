@@ -142,13 +142,12 @@ describe('the readout points at the peak', () => {
   it('names the band and its times', () => {
     expect(html).toContain('readout__peak')
     expect(html).toContain('blue hour peak')
-    expect(html).toContain('06:43')
-    expect(html).toContain('06:53')
+    expect(html).toContain('6:43–6:53 AM')
   })
 
   it('says when to be standing there, not just when the light is', () => {
     expect(html).toContain('Be set up by')
-    expect(html).toContain('06:38')
+    expect(html).toContain('6:38 AM')
   })
 
   /* It does not promise. One cloud setup is not a law. */

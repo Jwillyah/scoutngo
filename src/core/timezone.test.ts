@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
+  deviceTimeZone,
   formatClock,
+  formatHour,
+  formatSpan,
+  formatWallTime,
+  setClockHours,
+  venueAndYours,
+  zoneWord,
   formatOffset,
   isAwayFromDevice,
   venueTimeZone,
@@ -73,7 +80,7 @@ describe('zonedTimeToUtc', () => {
     for (const zone of ['America/New_York', 'Asia/Tokyo', 'Asia/Kathmandu', 'Pacific/Auckland']) {
       for (const time of ['00:00', '06:30', '11:00', '23:45']) {
         const at = zonedTimeToUtc('2026-09-12', time, zone)
-        expect(formatClock(at!, zone), `${zone} ${time}`).toBe(time)
+        expect(formatClock(at!, zone, 24), `${zone} ${time}`).toBe(time)
       }
     }
   })
@@ -106,15 +113,56 @@ describe('zonedTimeToUtc', () => {
 })
 
 describe('formatClock', () => {
-  it('shows the venue wall clock, not the device one', () => {
+  it('shows the venue wall clock, not the device one, 12 hour by default', () => {
     const noonUtc = new Date('2026-09-12T12:00:00Z')
-    expect(formatClock(noonUtc, 'America/New_York')).toBe('08:00')
-    expect(formatClock(noonUtc, 'Asia/Tokyo')).toBe('21:00')
-    expect(formatClock(noonUtc, 'UTC')).toBe('12:00')
+    expect(formatClock(noonUtc, 'America/New_York')).toBe('8:00 AM')
+    expect(formatClock(noonUtc, 'Asia/Tokyo')).toBe('9:00 PM')
+    expect(formatClock(noonUtc, 'UTC')).toBe('12:00 PM')
   })
 
-  it('uses a 24 hour clock with no midnight 24', () => {
-    expect(formatClock(new Date('2026-09-12T04:00:00Z'), 'America/New_York')).toBe('00:00')
+  it('reads 6:14 PM, with a plain space, and midnight as 12:00 AM', () => {
+    expect(formatClock(new Date('2026-10-25T22:14:00Z'), 'America/New_York')).toBe('6:14 PM')
+    expect(formatClock(new Date('2026-09-12T04:00:00Z'), 'America/New_York')).toBe('12:00 AM')
+  })
+
+  it('on a 24 hour clock reads 18:14, with no midnight 24', () => {
+    expect(formatClock(new Date('2026-10-25T22:14:00Z'), 'America/New_York', 24)).toBe('18:14')
+    expect(formatClock(new Date('2026-09-12T04:00:00Z'), 'America/New_York', 24)).toBe('00:00')
+  })
+
+  it('follows the setting', () => {
+    setClockHours(24)
+    expect(formatClock(new Date('2026-10-25T22:14:00Z'), 'America/New_York')).toBe('18:14')
+    setClockHours(12)
+    expect(formatClock(new Date('2026-10-25T22:14:00Z'), 'America/New_York')).toBe('6:14 PM')
+  })
+})
+
+describe('the helpers beside it', () => {
+  it('writes hours, typed times and spans the same way', () => {
+    expect(formatHour(new Date('2026-10-25T22:00:00Z'), 'America/New_York')).toBe('6 PM')
+    expect(formatHour(new Date('2026-10-25T22:00:00Z'), 'America/New_York', 24)).toBe('18')
+    expect(formatWallTime('17:00')).toBe('5:00 PM')
+    expect(formatWallTime('17:00', 24)).toBe('17:00')
+    expect(formatWallTime('noon')).toBeNull()
+    expect(formatSpan('5:00 PM', '6:30 PM')).toBe('5:00–6:30 PM')
+    expect(formatSpan('11:30 AM', '1:00 PM')).toBe('11:30 AM–1:00 PM')
+    expect(formatSpan('17:00', '18:30', 24)).toBe('17:00–18:30')
+  })
+
+  it('says both clocks only when they differ at that instant', () => {
+    const at = new Date('2026-10-25T22:14:00Z')
+    const here = deviceTimeZone()
+    expect(venueAndYours(at, here)).toBe(formatClock(at, here))
+    expect(zoneWord(at, here)).toBe('')
+    const away = here === 'Pacific/Honolulu' ? 'Asia/Tokyo' : 'Pacific/Honolulu'
+    expect(venueAndYours(at, away)).toBe(`${formatClock(at, away)} venue time · ${formatClock(at, here)} yours`)
+    expect(zoneWord(at, away)).toBe('venue time')
+  })
+
+  it('compares the clocks, not the zone names: Detroit reads New York time', () => {
+    const at = new Date('2026-10-25T22:14:00Z')
+    expect(zoneOffsetMs(at, 'America/Detroit')).toBe(zoneOffsetMs(at, 'America/New_York'))
   })
 })
 

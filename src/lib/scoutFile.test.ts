@@ -44,7 +44,7 @@ describe('one file carries kit, shelved gear, units and spots', () => {
           selection: defaultSelection(withLens, ['sony-75-300']),
           shelved: ['sony-75-300'],
         },
-        units: { wind: 'mph', distance: 'm' },
+        units: { wind: 'mph', distance: 'm', clock: 24 },
         spots: [spot()],
       }),
     )
@@ -56,7 +56,7 @@ describe('one file carries kit, shelved gear, units and spots', () => {
     expect(read.file.kit?.shelved).toEqual(['sony-75-300'])
     /* Shelved gear does not come back in the bag, whatever the file says. */
     expect(read.file.kit?.selection.lensIds).not.toContain('sony-75-300')
-    expect(read.file.units).toEqual({ wind: 'mph', distance: 'm' })
+    expect(read.file.units).toEqual({ wind: 'mph', distance: 'm', clock: 24 })
     expect(read.file.spots[0].name).toBe('Brew River')
   })
 
@@ -127,7 +127,7 @@ describe('reading is defensive, the file may be hand edited', () => {
       JSON.stringify(
         buildScoutFile({
           kit: { profile: withLens, selection: defaultSelection(withLens), shelved: ['sony-75-300'] },
-          units: { wind: 'kt', distance: 'ft' },
+          units: { wind: 'kt', distance: 'ft', clock: 12 },
           spots: [spot()],
         }),
       ),

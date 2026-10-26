@@ -1,4 +1,5 @@
 import type { FieldPack } from '../lib/fieldPack.ts'
+import { deviceTimeZone, formatDayTime } from '../core/timezone.ts'
 
 export type PackBuildState =
   | { status: 'idle' }
@@ -18,14 +19,7 @@ interface FieldPackControlProps {
 const when = (iso: string, timeZone: string | null): string => {
   const at = new Date(iso)
   if (Number.isNaN(at.getTime())) return 'an unknown time'
-  return at.toLocaleString([], {
-    ...(timeZone === null ? {} : { timeZone }),
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  })
+  return formatDayTime(at, timeZone ?? deviceTimeZone())
 }
 
 /**

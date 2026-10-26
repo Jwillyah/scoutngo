@@ -45,6 +45,11 @@ step "colour roles"
 node scripts/audit-colors.mjs > "$SCRATCH/colors.log" 2>&1 || { cat "$SCRATCH/colors.log"; fail "colour audit"; }
 ok "$(tail -1 "$SCRATCH/colors.log" | sed 's/=== //;s/ ===//')"
 
+# Every time goes through formatClock (src/core/timezone.ts); see the script.
+step "clock"
+node scripts/audit-clock.mjs > "$SCRATCH/clock.log" 2>&1 || { cat "$SCRATCH/clock.log"; fail "clock audit"; }
+ok "$(tail -1 "$SCRATCH/clock.log" | sed 's/=== //;s/ ===//')"
+
 step "measured claims"
 node scripts/audit-measurements.mjs > "$SCRATCH/measured.log" 2>&1 || { tail -40 "$SCRATCH/measured.log"; fail "measurement audit"; }
 ok "$(tail -1 "$SCRATCH/measured.log" | sed 's/=== //;s/ ===//')"
@@ -198,6 +203,10 @@ ok "$(grep -E 'AIRSPACE PROBLEMS' "$SCRATCH/airspace.log" | tail -1 | tr -d '=' 
 
 run_audit "call sheet audit" scripts/audit-callsheet.mjs "$SCRATCH/callsheet.log" 'PROBLEM|ABORTED'
 ok "$(grep -E 'CALL SHEET PROBLEMS' "$SCRATCH/callsheet.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
+
+# The times on the glass, at 12 hour and at 24: none that missed the formatter.
+run_audit "clock screen audit" scripts/audit-clock-screen.mjs "$SCRATCH/clockscreen.log" 'PROBLEM|ABORTED'
+ok "$(grep -E 'CLOCK SCREEN PROBLEMS' "$SCRATCH/clockscreen.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
 
 run_audit "service worker audit" scripts/audit-sw-update.mjs "$SCRATCH/sw.log" 'PROBLEM|ABORTED'
 ok "$(grep -E 'SERVICE WORKER PROBLEMS' "$SCRATCH/sw.log" | tail -1 | tr -d '=' | sed 's/^ *//')"

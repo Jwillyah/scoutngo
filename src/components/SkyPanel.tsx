@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getMoonIllumination, getMoonTimes } from 'suncalc'
+import { deviceTimeZone, formatClock } from '../core/timezone.ts'
 import type { LatLon } from '../core/geo.ts'
 import type { KitProfile } from '../core/kit.ts'
 import { SENSORS } from '../core/fov.ts'
@@ -80,13 +81,7 @@ export function SkyPanel({
   const [cloudFailed, setCloudFailed] = useState<Record<string, string>>({})
 
   const clock = useCallback(
-    (at: Date): string =>
-      at.toLocaleTimeString('en-US', {
-        ...(timeZone === null ? {} : { timeZone }),
-        hour12: false,
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
+    (at: Date): string => formatClock(at, timeZone ?? deviceTimeZone()),
     [timeZone],
   )
 

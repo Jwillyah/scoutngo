@@ -3,20 +3,13 @@ import type { ReadFile } from '../lib/scoutFile.ts'
 import { BackupFile } from './BackupFile.tsx'
 import { ApiKeyField } from './ApiKeyField.tsx'
 import { StorageProbe } from './StorageProbe.tsx'
-import {
-  DISTANCE_UNITS,
-  WIND_UNITS,
-  type DistanceUnit,
-  type Units,
-  type WindUnit,
-} from '../lib/units.ts'
 
 /*
- * ABOUT: WHY THIS EXISTS, HOW IT WORKS, UNITS, YOURS.
+ * ABOUT: WHY THIS EXISTS, HOW IT WORKS, YOURS.
  *
- * ONE SHEET, FROM THE ROUND BUTTON ON THE VENUE BAR. That button is where the
- * account control sits in every map app, and this is the only door to
- * settings -- the bottom nav is three stages and gets no fourth slot.
+ * FROM THE MENU. The units and the clock moved out to Settings, beside it in
+ * the same menu (SettingsSheet.tsx), so this is the story, the key and the
+ * backup.
  *
  * THE SAME CONTENT AS /how, NOT A SECOND COPY. The three HOW IT WORKS rows
  * open the matching section of the /how page rather than restating it here.
@@ -32,8 +25,6 @@ import {
 export type HowSection = 'computed' | 'leaves' | 'refuses'
 
 interface AboutSheetProps {
-  units: Units
-  onUnits: (next: Units) => void
   /** Opens /how at the matching section. One content, two entry points. */
   onHow: (section: HowSection) => void
   onKit: () => void
@@ -48,8 +39,6 @@ interface AboutSheetProps {
 }
 
 export function AboutSheet({
-  units,
-  onUnits,
   onHow,
   onKit,
   onSpots,
@@ -93,47 +82,6 @@ export function AboutSheet({
           </span>
         </button>
       ))}
-
-      {/*
-        * UNITS, ANSWERED ONCE AND FOR ALL. Every number in the app renders in
-        * what is chosen here, the chips included -- one converter, in
-        * src/lib/units.ts, asked by every readout.
-        */}
-      <p className="about__eyebrow about__eyebrow--dim">Units</p>
-      <div className="about__units">
-        <div className="about__unit">
-          <p className="about__unit-label">Wind</p>
-          <div className="seg" role="group" aria-label="Wind units">
-            {WIND_UNITS.map((option) => (
-              <button
-                type="button"
-                key={option.id}
-                className={`seg__btn${units.wind === option.id ? ' seg__btn--on' : ''}`}
-                aria-pressed={units.wind === option.id}
-                onClick={() => onUnits({ ...units, wind: option.id as WindUnit })}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="about__unit">
-          <p className="about__unit-label">Distance</p>
-          <div className="seg" role="group" aria-label="Distance units">
-            {DISTANCE_UNITS.map((option) => (
-              <button
-                type="button"
-                key={option.id}
-                className={`seg__btn${units.distance === option.id ? ' seg__btn--on' : ''}`}
-                aria-pressed={units.distance === option.id}
-                onClick={() => onUnits({ ...units, distance: option.id as DistanceUnit })}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
 
       <ApiKeyField />
 

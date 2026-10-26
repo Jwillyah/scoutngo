@@ -158,7 +158,7 @@ export function NowScreen({ onClose, onPlanHere }: NowScreenProps) {
 
   const zone = at === null ? null : venueTimeZone(at.lat, at.lon)
   const clock = (when: Date) =>
-    zone === null ? when.toISOString().slice(11, 16) : formatClock(when, zone)
+    zone === null ? `${formatClock(when, 'UTC')} UTC` : formatClock(when, zone)
 
   /*
    * TOMORROW'S PEAK AS A FILE, built on the device and handed over once.

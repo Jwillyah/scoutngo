@@ -95,6 +95,7 @@ export function useWind(
   const lat = venue?.lat ?? null
   const lon = venue?.lon ?? null
   /* The hour, so dragging the scrubber inside one hour refetches nothing. */
+  // clock-audit: data, a cache key per hour
   const hourKey = at === null ? null : `${at.toDateString()}|${at.getHours()}`
 
   useEffect(() => {

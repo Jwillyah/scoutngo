@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { minutesForDrag, timeBarModel } from '../core/timeBar.ts'
-import { formatClock, zonedTimeToUtc } from '../core/timezone.ts'
+import { formatClock, venueAndYours, zonedTimeToUtc } from '../core/timezone.ts'
 
 /*
  * THE DOCKED TIME BAR.
@@ -21,7 +21,6 @@ interface TimeBarProps {
   lat: number
   lon: number
   timeZone: string
-  timeZoneAbbr: string
   moon: boolean
   onAt: (next: Date) => void
   /** Back to the middle of the shoot window. */
@@ -30,13 +29,13 @@ interface TimeBarProps {
 
 const HEIGHT = 52
 
-/* yyyy-mm-dd and HH:MM at the venue, for the jump field. */
+/* yyyy-mm-dd and HH:MM at the venue, for the jump field: the input's own format, always 24 hour. */
 function venueParts(at: Date, timeZone: string): { date: string; time: string } {
   const date = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(at)
-  return { date, time: formatClock(at, timeZone) }
+  return { date, time: formatClock(at, timeZone, 24) }
 }
 
-export function TimeBar({ at, lat, lon, timeZone, timeZoneAbbr, moon, onAt, onReset }: TimeBarProps) {
+export function TimeBar({ at, lat, lon, timeZone, moon, onAt, onReset }: TimeBarProps) {
   const strip = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(360)
   useEffect(() => {
@@ -99,7 +98,7 @@ export function TimeBar({ at, lat, lon, timeZone, timeZoneAbbr, moon, onAt, onRe
         <label className="tbar__when">
           <span className="tbar__day">{day}</span>
           <span className="tbar__time num">
-            {parts.time} <span className="tbar__zone">{timeZoneAbbr}</span>
+            {venueAndYours(at, timeZone)}
           </span>
           {/* The real control, over the text: tap the time to jump to any moment. */}
           <input
@@ -129,7 +128,7 @@ export function TimeBar({ at, lat, lon, timeZone, timeZoneAbbr, moon, onAt, onRe
         data-axis-lock
         role="slider"
         aria-label="Time of day. Drag sideways to move through it."
-        aria-valuetext={`${parts.time} ${timeZoneAbbr}`}
+        aria-valuetext={venueAndYours(at, timeZone)}
         aria-valuenow={at.getTime()}
         tabIndex={0}
         onKeyDown={(event) => {
@@ -160,7 +159,7 @@ export function TimeBar({ at, lat, lon, timeZone, timeZoneAbbr, moon, onAt, onRe
               {/* A label the strip's edge would cut in half reads as another hour: left off. */}
               {t.label === null || t.x < 10 || t.x > width - 10 ? null : (
                 <text x={t.x} y={HEIGHT + 17} textAnchor="middle">
-                  {t.label.slice(0, 2)}
+                  {t.label}
                 </text>
               )}
             </g>

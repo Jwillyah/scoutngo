@@ -1168,6 +1168,7 @@ const OPENERS = `(() => {
     add('menu', 'About', 'about')
     add('menu', 'Sky', 'sky')
     add('menu', 'Call sheet', 'callsheet')
+    add('menu', 'Settings', 'settings')
   }
   document.querySelectorAll('.more2__row').forEach((b, i) =>
     add('.more2__row', i, (b.textContent ?? '').trim()))

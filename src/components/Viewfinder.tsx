@@ -13,7 +13,7 @@ import { computeFOV, SENSORS } from '../core/fov.ts'
 import { bearingBetween, distanceMeters, type LatLon } from '../core/geo.ts'
 import { resolveSensor, type KitProfile } from '../core/kit.ts'
 import { normalizeBearing } from '../core/sun.ts'
-import { formatClock } from '../core/timezone.ts'
+import { formatHour } from '../core/timezone.ts'
 import type { KitSelection } from '../lib/kitSelection.ts'
 import { LOCATE_MESSAGE, locateOnce } from '../lib/locateOnce.ts'
 import { formatRange, type Units } from '../lib/units.ts'
@@ -275,7 +275,7 @@ export function Viewfinder({ venue, pins, profile, bag, timeZone, units, onClose
           if (s === null || s.x < 0 || s.x > 1 || s.y < 0 || s.y > 1) return null
           return (
             <span key={p.t.getTime()} className="vf__hour num" style={{ left: `${s.x * 100}%`, top: `${s.y * 100}%` }}>
-              {formatClock(p.t, timeZone).slice(0, 2)}
+              {formatHour(p.t, timeZone)}
             </span>
           )
         })}

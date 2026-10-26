@@ -230,7 +230,7 @@ describe('a saved forecast says how old it is', () => {
 describe('the moment the readings are for', () => {
   it('prints the hour and calls it observed in the past', () => {
     const html = render({ past: true })
-    expect(html).toContain('07:00')
+    expect(html).toContain('7:00 AM')
     expect(html).toContain('observed')
   })
 
@@ -271,7 +271,7 @@ describe('tide, short', () => {
     expect(html).toContain('1,870 ft')
     expect(html).not.toContain('km')
 
-    const metric = render({ units: { wind: 'kt', distance: 'm' } })
+    const metric = render({ units: { wind: 'kt', distance: 'm', clock: 12 } })
     expect(metric).toContain('570 m')
     expect(metric).not.toContain('ft.')
   })

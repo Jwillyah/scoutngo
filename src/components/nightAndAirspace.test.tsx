@@ -43,7 +43,7 @@ function strip(at: Date) {
       onChange={() => {}}
       at={at}
       timeZone="America/New_York"
-      timeZoneAbbr="EDT"
+      timeZoneAbbr=""
       phases={phaseSpans(WINDOW_START, WINDOW_END, SANDBRIDGE.lat, SANDBRIDGE.lon)}
     />,
   )
@@ -97,8 +97,8 @@ describe('the bands on the time axis', () => {
    * card keeps them, with a compass point and an above-horizon word beside
    * them; the control prints the clock and nothing else.
    */
-  it('prints the clock and its zone, and no other reading', () => {
-    expect(text(html)).toMatch(/^\s*\d{2}:\d{2}\s*EDT\s*$/)
+  it('prints the clock, a zone word only away from home, and no other reading', () => {
+    expect(text(html)).toMatch(/^\s*\d{1,2}:\d{2} [AP]M\s*(venue time)?\s*$/)
   })
 })
 

@@ -112,21 +112,109 @@ export function zonedTimeToUtc(date: string, time: string, timeZone: string): Da
   return Number.isNaN(secondPass) ? null : new Date(secondPass)
 }
 
-const clockFormatters = new Map<string, Intl.DateTimeFormat>()
+/*
+ * THE ONE CLOCK. Every time the app prints -- chips, cards, the time bar, the
+ * call sheet, the calendar file -- goes through formatClock or one of the
+ * helpers beside it, and scripts/audit-clock.mjs fails the gate on a time
+ * formatted anywhere else.
+ *
+ * 12 HOUR BY DEFAULT, "6:14 PM", because that is how a clock reads in the
+ * country this app is used in; 24 hour, "18:14", is a setting. The setting is
+ * held here as module state, set by the app from the stored units on every
+ * render (setClockHours), so that core code which prints a time -- the call
+ * sheet's tools, the time bar's ticks -- prints it the shooter's way without
+ * every caller threading a flag through. It changes how a time is WRITTEN,
+ * never which instant it is.
+ *
+ * NO ZONE LABEL BY DEFAULT. A venue in the phone's own zone needs none. When
+ * the venue's clock differs from the phone's at that instant, venueAndYours
+ * says both: "6:14 PM venue time · 3:14 PM yours". The test is the offset at
+ * the instant, not the zone's name: America/Detroit and America/New_York
+ * read the same clock.
+ */
+export type ClockHours = 12 | 24
+export const DEFAULT_CLOCK_HOURS: ClockHours = 12
+let clockHours: ClockHours = DEFAULT_CLOCK_HOURS
 
-/** HH:MM at the venue, 24 hour, for an instant. */
-export function formatClock(at: Date, timeZone: string): string {
-  const held = clockFormatters.get(timeZone)
-  const formatter =
-    held ??
-    new Intl.DateTimeFormat('en-GB', {
-      timeZone,
-      hourCycle: 'h23',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  if (held === undefined) clockFormatters.set(timeZone, formatter)
-  return formatter.format(at)
+export function setClockHours(hours: ClockHours): void {
+  clockHours = hours
+}
+
+export function currentClockHours(): ClockHours {
+  return clockHours
+}
+
+/** Hour 0-23 and minute 0-59 on the zone's wall clock at an instant. */
+function wallClock(at: Date, timeZone: string): { hour: number; minute: number } | null {
+  const parts = partFormatter(timeZone).formatToParts(at)
+  const hour = Number(parts.find((p) => p.type === 'hour')?.value)
+  const minute = Number(parts.find((p) => p.type === 'minute')?.value)
+  return Number.isFinite(hour) && Number.isFinite(minute) ? { hour, minute } : null
+}
+
+/** "6:14 PM" or "18:14", from an hour and minute. The one place the shape is decided. */
+export function writeClock(hour: number, minute: number, hours: ClockHours = clockHours): string {
+  const mm = String(minute).padStart(2, '0')
+  if (hours === 24) return `${String(hour).padStart(2, '0')}:${mm}`
+  return `${hour % 12 === 0 ? 12 : hour % 12}:${mm} ${hour < 12 ? 'AM' : 'PM'}`
+}
+
+/** The time at the venue for an instant: "6:14 PM", or "18:14" on a 24 hour clock. */
+export function formatClock(at: Date, timeZone: string, hours: ClockHours = clockHours): string {
+  const wall = wallClock(at, timeZone)
+  return wall === null ? '--:--' : writeClock(wall.hour, wall.minute, hours)
+}
+
+/** The hour alone, for ticks too narrow for minutes: "6 PM", or "18". */
+export function formatHour(at: Date, timeZone: string, hours: ClockHours = clockHours): string {
+  const wall = wallClock(at, timeZone)
+  if (wall === null) return '--'
+  if (hours === 24) return String(wall.hour).padStart(2, '0')
+  return `${wall.hour % 12 === 0 ? 12 : wall.hour % 12} ${wall.hour < 12 ? 'AM' : 'PM'}`
+}
+
+/** A time typed as "17:00" (an <input type="time"> value), written the shooter's way. Null when it is not one. */
+export function formatWallTime(typed: string, hours: ClockHours = clockHours): string | null {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(typed.trim())
+  if (match === null) return null
+  const hour = Number(match[1])
+  const minute = Number(match[2])
+  return hour > 23 || minute > 59 ? null : writeClock(hour, minute, hours)
+}
+
+/**
+ * Two times as a span: "5:00–6:30 PM" when both are in the same half of the
+ * day, "11:30 AM–1:00 PM" when not, "17:00–18:30" on a 24 hour clock.
+ */
+export function formatSpan(from: string, to: string, hours: ClockHours = clockHours): string {
+  if (hours === 12 && from.slice(-2) === to.slice(-2) && /[AP]M$/.test(from)) return `${from.slice(0, -3)}–${to}`
+  return `${from}–${to}`
+}
+
+/** A day and a time, for when something was saved: "Oct 25, 6:14 PM". */
+export function formatDayTime(at: Date, timeZone: string, hours: ClockHours = clockHours): string {
+  const day = new Intl.DateTimeFormat('en-US', { timeZone, month: 'short', day: 'numeric' }).format(at)
+  return `${day}, ${formatClock(at, timeZone, hours)}`
+}
+
+/** Whether the venue's clock reads differently from this phone's at that instant. */
+export function differsFromDevice(at: Date, timeZone: string): boolean {
+  return zoneOffsetMs(at, timeZone) !== zoneOffsetMs(at, deviceTimeZone())
+}
+
+/**
+ * The time, with the phone's own beside it only when the two clocks differ:
+ * "6:14 PM", or "6:14 PM venue time · 3:14 PM yours".
+ */
+export function venueAndYours(at: Date, timeZone: string, hours: ClockHours = clockHours): string {
+  const venue = formatClock(at, timeZone, hours)
+  if (!differsFromDevice(at, timeZone)) return venue
+  return `${venue} venue time · ${formatClock(at, deviceTimeZone(), hours)} yours`
+}
+
+/** The short word after a time where there is no room for both clocks: "" at home, "venue time" away. */
+export function zoneWord(at: Date, timeZone: string): string {
+  return differsFromDevice(at, timeZone) ? 'venue time' : ''
 }
 
 /** "UTC-4", "UTC+9:30". The offset written the way a person reads it. */

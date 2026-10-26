@@ -256,15 +256,16 @@ describe('SunReadout', () => {
     expect(html).not.toContain('nothing to light')
   })
 
-  it('shows the window in venue wall clock time and names the zone', () => {
-    const html = renderToStaticMarkup(
-      <SunReadout venueWindow={resolveWindow(CALIBRATION_VENUE)} />,
-    )
+  it('shows the window in venue wall clock time, 12 hour, and names the zone only away from home', () => {
+    const window = resolveWindow(CALIBRATION_VENUE)!
+    const html = renderToStaticMarkup(<SunReadout venueWindow={{ ...window, travelling: false }} />)
     // The times entered in the form, read back at the venue: 11:00, 13:00, 15:00.
-    expect(html).toContain('>11:00<')
-    expect(html).toContain('>13:00<')
-    expect(html).toContain('>15:00<')
-    expect(html).toContain('EDT, UTC-4')
-    expect(html).toContain('America/New_York')
+    expect(html).toContain('>11:00 AM<')
+    expect(html).toContain('>1:00 PM<')
+    expect(html).toContain('>3:00 PM<')
+    expect(html).not.toContain('EDT, UTC-4')
+    const away = renderToStaticMarkup(<SunReadout venueWindow={{ ...window, travelling: true, deviceTimeZone: 'America/Los_Angeles' }} />)
+    expect(away).toContain('EDT, UTC-4')
+    expect(away).toContain('America/Los_Angeles')
   })
 })

@@ -38,7 +38,7 @@ export interface PeakEventInput {
 export function icsStamp(at: Date): string {
   const pad = (n: number, width = 2) => String(n).padStart(width, '0')
   return (
-    `${at.getUTCFullYear()}${pad(at.getUTCMonth() + 1)}${pad(at.getUTCDate())}` +
+    `${at.getUTCFullYear()}${pad(at.getUTCMonth() + 1)}${pad(at.getUTCDate())}` + // clock-audit: data, an iCalendar UTC stamp
     `T${pad(at.getUTCHours())}${pad(at.getUTCMinutes())}${pad(at.getUTCSeconds())}Z`
   )
 }

@@ -11,7 +11,7 @@ import {
   type SunBand,
 } from '../core/sunBand.ts'
 import { getSunPosition, type SunPosition } from '../core/sun.ts'
-import { formatClock } from '../core/timezone.ts'
+import { formatClock, formatSpan } from '../core/timezone.ts'
 import type { VenueWindow } from '../lib/venue.ts'
 import { Panel } from './Panel.tsx'
 
@@ -188,8 +188,7 @@ export function SunReadout({ venueWindow }: SunReadoutProps) {
               Light usually concentrates in{' '}
               <strong>{SUN_BAND_LABEL[peak.band]}</strong>,{' '}
               <span className="num">
-                {formatClock(peak.from, venueWindow.timeZone)}–
-                {formatClock(peak.to, venueWindow.timeZone)}
+                {formatSpan(formatClock(peak.from, venueWindow.timeZone), formatClock(peak.to, venueWindow.timeZone))}
               </span>
               . Be set up by{' '}
               <span className="num">{formatClock(peak.beSetUpBy, venueWindow.timeZone)}</span>.
@@ -229,16 +228,15 @@ export function SunReadout({ venueWindow }: SunReadoutProps) {
             * through the venue's own zone, so this is a fact about the numbers
             * above, not a warning to check something by hand.
             */}
-          <p>
-            Times are venue local:{' '}
-            <span className="num">{venueWindow.timeZoneLabel}</span> at{' '}
-            <span className="num">{venueWindow.timeZone}</span>.
-          </p>
+          {/*
+            * SAID ONLY WHEN IT MATTERS. In the phone's own zone a zone label is
+            * noise; away from it, the times are venue time and that is stated.
+            */}
           {venueWindow.travelling ? (
             <p>
-              This device is set to{' '}
-              <span className="num">{venueWindow.deviceTimeZone}</span>, so the clock
-              on your screen is not the clock these times are in.
+              Times are venue time: <span className="num">{venueWindow.timeZoneLabel}</span>. This phone
+              is set to <span className="num">{venueWindow.deviceTimeZone}</span>, so the clock on your
+              screen is not the clock these times are in.
             </p>
           ) : null}
           {venueWindow.timeZoneFallback ? (

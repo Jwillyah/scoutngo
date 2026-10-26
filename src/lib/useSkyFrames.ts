@@ -70,7 +70,8 @@ export function useSkyFrames(
   const hourKey =
     venue === null || scrubbedAt === null
       ? null
-      : `${venue.lat.toFixed(3)},${venue.lon.toFixed(3)}|${scrubbedAt.toDateString()}|${scrubbedAt.getHours()}`
+      : // clock-audit: data, a cache key per hour
+        `${venue.lat.toFixed(3)},${venue.lon.toFixed(3)}|${scrubbedAt.toDateString()}|${scrubbedAt.getHours()}`
 
   const wantForecast =
     enabled &&

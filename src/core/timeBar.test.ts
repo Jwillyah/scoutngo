@@ -18,8 +18,8 @@ describe('the time bar', () => {
 
   it('labels the hours in the venue clock, not the device or UTC', () => {
     const labels = timeBarModel(base).ticks.filter((t) => t.major).map((t) => t.label)
-    expect(labels).toContain('17:00')
-    expect(labels).not.toContain('21:00')
+    expect(labels).toContain('5 PM')
+    expect(labels).not.toContain('9 PM')
   })
 
   it('runs golden then blue into the evening, in that order', () => {

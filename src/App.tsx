@@ -85,7 +85,7 @@ import {
 import type { PackBuildState } from './components/FieldPackControl.tsx'
 import { parseShotList, type DesiredShot } from './lib/shotList.ts'
 import { clampRadius, RADIUS_DEFAULT_METERS } from './core/radius.ts'
-import { venueTimeZone } from './core/timezone.ts'
+import { formatSpan, formatWallTime, setClockHours, venueTimeZone } from './core/timezone.ts'
 import { msUntilNominatim, reverseGeocode } from './lib/search.ts'
 import { usePersistentState } from './lib/usePersistentState.ts'
 import { venueTown } from './lib/venueParts.ts'
@@ -488,6 +488,13 @@ function App() {
       }
     },
   )
+
+  /*
+   * THE CLOCK THE WHOLE APP WRITES IN, set from the stored units during
+   * render rather than in an effect, so the first paint is already in the
+   * shooter's clock. Idempotent. See formatClock in src/core/timezone.ts.
+   */
+  setClockHours(settings.units.clock)
 
   const [pinHintDone, setPinHintDone] = usePersistentState<boolean>(
     'scoutngo.pinHintDone',
@@ -1253,7 +1260,7 @@ function App() {
     drawer: 'kit',
     tick: 0,
   })
-  const [cardRequest, setCardRequest] = useState<{ kind: 'sky' | 'about' | 'callsheet'; tick: number }>({
+  const [cardRequest, setCardRequest] = useState<{ kind: 'sky' | 'settings' | 'about' | 'callsheet'; tick: number }>({
     kind: 'sky',
     tick: 0,
   })
@@ -1274,6 +1281,7 @@ function App() {
         setViewfinderOpen(true)
         return
       case 'sky':
+      case 'settings':
       case 'about':
       case 'callsheet':
         setMode('plan')
@@ -1583,7 +1591,8 @@ function App() {
    * exact ambiguity the timezone work existed to remove. The window is the part
    * that has to survive truncation; the venue name is already on the map.
    */
-  const zoneSuffix = venueWindow === null ? '' : ` ${venueWindow.timeZoneShort}`
+  const zoneSuffix = venueWindow === null || venueWindow.timeZoneShort === '' ? '' : ` ${venueWindow.timeZoneShort}`
+  const windowSpan = formatSpan(formatWallTime(venue.startTime) ?? venue.startTime, formatWallTime(venue.endTime) ?? venue.endTime)
   const venueShort = shortVenueLabel(venueNameState, venue.latitude, venue.longitude)
   /*
    * THE OPTIC, SAID ONCE, when every position shares it.
@@ -1614,7 +1623,7 @@ function App() {
   const summary =
     centre === null
       ? 'No venue set'
-      : `${venue.startTime}–${venue.endTime}${zoneSuffix} · ${venueShort}${
+      : `${windowSpan}${zoneSuffix} · ${venueShort}${
           gearLine === null ? '' : ` · ${gearLine}`
         }`
 

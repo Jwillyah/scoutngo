@@ -29,9 +29,10 @@ no database, no analytics, no telemetry.
 `.githooks/pre-commit` runs, in order:
 
 ```
-tsc -b → oxlint --deny-warnings → viewport units → colour roles → measurements
-       → tests → build → build stamp → reachability → labels → surface
-       → projection → offline → api urls → airspace → call sheet → service worker
+tsc -b → oxlint --deny-warnings → viewport units → colour roles → clock
+       → measurements → tests → build → build stamp → reachability → labels
+       → surface → projection → offline → api urls → airspace → call sheet
+       → clock screen → service worker
 ```
 
 All of it must be clean before reporting. `SCOUTNGO_SKIP_AUDITS=1` exists and

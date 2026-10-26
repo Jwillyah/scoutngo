@@ -59,6 +59,7 @@ import { WindCard } from './WindCard.tsx'
 import { ChipRow, type Chip } from './ChipRow.tsx'
 import { TopBar } from './TopBar.tsx'
 import { startHeading } from '../lib/heading.ts'
+import { SettingsSheet } from './SettingsSheet.tsx'
 import { AboutSheet, type HowSection } from './AboutSheet.tsx'
 import { LayerTiles } from './LayerTiles.tsx'
 import { TILE_ART } from './tileArt.tsx'
@@ -283,7 +284,7 @@ interface PlanModeProps {
   onMenu: () => void
   menuOpen: boolean
   /** The menu asked for a card: Sky or About. The tick makes a repeat ask open it again. */
-  cardRequest: { kind: 'sky' | 'about' | 'callsheet'; tick: number }
+  cardRequest: { kind: 'sky' | 'settings' | 'about' | 'callsheet'; tick: number }
   /** What is in the bag, for the call sheet's kit tool. */
   bag: KitSelection
   /** The search pill was tapped: go and search. */
@@ -1053,8 +1054,8 @@ export function PlanMode({
         kind: 'tide',
         label: 'LOW TIDE',
         value: lowTide === null ? null : clock(lowTide.at),
-        /* The zone is the unit of a clock time; see Chip.unit. */
-        ...(venueWindow === null ? {} : { unit: venueWindow.timeZoneShort }),
+        /* The zone is the unit of a clock time, said only away from the phone's own zone; see Chip.unit. */
+        ...(venueWindow === null || venueWindow.timeZoneShort === '' ? {} : { unit: venueWindow.timeZoneShort }),
       },
     ]
   }, [venueWindow, scrubbedAt, wind, ratedWindMps, lowTide, venueCloud, forecast, units, clock])
@@ -1413,7 +1414,7 @@ export function PlanMode({
                 sky={sky}
                 clock={(at) =>
                   venueWindow === null
-                    ? at.toISOString().slice(11, 16)
+                    ? `${formatClock(at, 'UTC')} UTC`
                     : formatClock(at, venueWindow.timeZone)
                 }
                 boundary={
@@ -1637,12 +1638,16 @@ export function PlanMode({
             />
           </Card>
         )
+      case 'settings':
+        return (
+          <Card title="Settings" onClose={home}>
+            <SettingsSheet units={units} onUnits={onUnits} />
+          </Card>
+        )
       case 'about':
         return (
           <Card title="About" onClose={home}>
             <AboutSheet
-              units={units}
-              onUnits={onUnits}
               onHow={onHow}
               onKit={onEditKit}
               onSpots={onOpenSpots}
@@ -2015,7 +2020,6 @@ export function PlanMode({
                 lat={venue?.lat ?? 0}
                 lon={venue?.lon ?? 0}
                 timeZone={venueWindow.timeZone}
-                timeZoneAbbr={venueWindow.timeZoneShort}
                 moon={moonOn}
                 onAt={scrubTo}
                 onReset={() => onScrub(0.5)}

@@ -119,7 +119,7 @@ if (shown.text === null) {
   process.exit(2)
 }
 check(!shown.text.includes('7:12'), `the invented 7:12 PM is gone from the sheet: "${shown.text.replace(/\n/g, ' / ')}"`)
-check(/Sunset \d{2}:\d{2}/.test(shown.text), 'the sheet shows a sunset in the app’s clock in its place')
+check(/Sunset \d{1,2}:\d{2} [AP]M/.test(shown.text), 'the sheet shows a sunset in the app’s clock, 12 hour, in its place')
 check(shown.fixed !== null && shown.fixed.includes("7:12 PM replaced with the app's sunset"), `the card says what it replaced: "${shown.fixed}"`)
 
 await send('Fetch.disable')

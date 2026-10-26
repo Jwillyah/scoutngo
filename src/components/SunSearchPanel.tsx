@@ -90,7 +90,7 @@ export function SunSearchPanel({
   }, [venue, bearing, altitude, tolerance, spanDays])
 
   const clock = (at: Date) =>
-    timeZone === null ? at.toISOString().slice(11, 16) : formatClock(at, timeZone)
+    timeZone === null ? `${formatClock(at, 'UTC')} UTC` : formatClock(at, timeZone)
   const date = (at: Date) =>
     at.toLocaleDateString('en-GB', {
       weekday: 'short',

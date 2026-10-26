@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { deviceTimeZone, formatDayTime } from '../core/timezone.ts'
 import { readProbe } from '../lib/storageProbe.ts'
 
 /*
@@ -17,12 +18,7 @@ export function StorageProbe() {
     return <p className="probe__line">This browser refused storage, so there is nothing to test.</p>
   }
 
-  const when = new Date(reading.marker.writtenAt).toLocaleString([], {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  const when = formatDayTime(new Date(reading.marker.writtenAt), deviceTimeZone())
 
   return (
     <div className="probe">

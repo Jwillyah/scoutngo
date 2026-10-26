@@ -139,8 +139,8 @@ describe('the defaults and the offered choices', () => {
    * KNOTS AND FEET, because the two things this app is for -- flying a drone
    * and reading a marine forecast -- are both quoted that way.
    */
-  it('defaults to knots and feet', () => {
-    expect(DEFAULT_UNITS).toEqual({ wind: 'kt', distance: 'ft' })
+  it('defaults to knots, feet and a 12 hour clock', () => {
+    expect(DEFAULT_UNITS).toEqual({ wind: 'kt', distance: 'ft', clock: 12 })
   })
 
   /*

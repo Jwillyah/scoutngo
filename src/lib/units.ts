@@ -13,12 +13,16 @@
  * would be a core function that is no longer a fact.
  */
 
+import { DEFAULT_CLOCK_HOURS, type ClockHours } from '../core/timezone.ts'
+
 export type WindUnit = 'kt' | 'mph' | 'ms'
 export type DistanceUnit = 'ft' | 'm'
 
 export interface Units {
   wind: WindUnit
   distance: DistanceUnit
+  /** 12 or 24 hour. Kept with the units because it is the same kind of choice: how a value is read, never what it is. */
+  clock: ClockHours
 }
 
 /*
@@ -27,7 +31,7 @@ export interface Units {
  * aircraft's own rating is published in m/s and converted once rather than
  * every time somebody reads it.
  */
-export const DEFAULT_UNITS: Units = { wind: 'kt', distance: 'ft' }
+export const DEFAULT_UNITS: Units = { wind: 'kt', distance: 'ft', clock: DEFAULT_CLOCK_HOURS }
 
 /**
  * Units out of anything stored or imported, field by field.
@@ -37,7 +41,7 @@ export const DEFAULT_UNITS: Units = { wind: 'kt', distance: 'ft' }
  * them comes to accept a string the converters cannot handle.
  */
 export function reviveUnits(raw: unknown): Units {
-  const stored = raw as { wind?: unknown; distance?: unknown } | null | undefined
+  const stored = raw as { wind?: unknown; distance?: unknown; clock?: unknown } | null | undefined
   return {
     wind:
       stored?.wind === 'mph' || stored?.wind === 'ms' || stored?.wind === 'kt'
@@ -45,6 +49,7 @@ export function reviveUnits(raw: unknown): Units {
         : DEFAULT_UNITS.wind,
     distance:
       stored?.distance === 'm' || stored?.distance === 'ft' ? stored.distance : DEFAULT_UNITS.distance,
+    clock: stored?.clock === 24 || stored?.clock === 12 ? stored.clock : DEFAULT_UNITS.clock,
   }
 }
 
@@ -52,6 +57,11 @@ export const WIND_UNITS: readonly { id: WindUnit; label: string }[] = [
   { id: 'kt', label: 'kt' },
   { id: 'mph', label: 'mph' },
   { id: 'ms', label: 'm/s' },
+] as const
+
+export const CLOCK_OPTIONS: readonly { id: ClockHours; label: string }[] = [
+  { id: 12, label: '12 hour' },
+  { id: 24, label: '24 hour' },
 ] as const
 
 export const DISTANCE_UNITS: readonly { id: DistanceUnit; label: string }[] = [

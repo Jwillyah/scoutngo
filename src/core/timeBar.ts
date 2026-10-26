@@ -17,7 +17,7 @@
  */
 import { getMoonPosition, getPosition } from 'suncalc'
 import { band, BAND_THRESHOLDS, type SunBand } from './sunPath.ts'
-import { formatClock } from './timezone.ts'
+import { formatClock, formatHour } from './timezone.ts'
 
 /** How much time the strip shows across its width. */
 export const MINUTES_ACROSS = 360
@@ -98,9 +98,9 @@ export function timeBarModel(input: TimeBarInput): TimeBarModel {
   const ticks: TimeBarModel['ticks'] = []
   const quarter = 15 * MINUTE
   for (let t = Math.ceil(from / quarter) * quarter; t <= to; t += quarter) {
-    const label = formatClock(new Date(t), input.timeZone)
-    const major = label.endsWith(':00')
-    ticks.push({ x: x(t), major, label: major ? label : null })
+    /* On the hour by the venue's clock, which is not always on the UTC hour (UTC+5:30, +5:45). */
+    const major = formatClock(new Date(t), input.timeZone, 24).endsWith(':00')
+    ticks.push({ x: x(t), major, label: major ? formatHour(new Date(t), input.timeZone) : null })
   }
 
   return {

@@ -27,10 +27,10 @@ describe('the sunrise chip at Virginia Beach', () => {
    */
   it('names the peak, its times, and when to be standing there', () => {
     if (preset === null) throw new Error('expected a preset')
-    expect(preset.line).toContain('06:13–07:45')
+    expect(preset.line).toContain('6:13–7:45 AM')
     expect(preset.line).toContain('blue hour peak')
-    expect(preset.line).toContain('06:43–06:53')
-    expect(preset.line).toContain('Be set up by 06:38')
+    expect(preset.line).toContain('6:43–6:53 AM')
+    expect(preset.line).toContain('Be set up by 6:38 AM')
     expect(preset.peak?.band).toBe('blue-hour')
   })
 

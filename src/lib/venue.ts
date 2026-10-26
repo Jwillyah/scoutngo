@@ -11,11 +11,11 @@ import { MAX_ALTITUDE_FEET } from '../core/air.ts'
 import { placeKey, type VenueName } from '../core/venueName.ts'
 import {
   deviceTimeZone,
-  isAwayFromDevice,
+  differsFromDevice,
   venueTimeZone,
   zonedTimeToUtc,
   zoneLabel,
-  zoneShort,
+  zoneWord,
 } from '../core/timezone.ts'
 
 export interface VenueDraft {
@@ -296,8 +296,9 @@ export function resolveWindow(draft: VenueDraft): VenueWindow | null {
     middle: new Date((start.getTime() + end.getTime()) / 2),
     timeZone,
     timeZoneLabel: zoneLabel(start, timeZone),
-    timeZoneShort: zoneShort(start, timeZone),
-    travelling: isAwayFromDevice(timeZone),
+    /* No zone word at home; "venue time" when the venue's clock reads differently from the phone's. */
+    timeZoneShort: zoneWord(start, timeZone),
+    travelling: differsFromDevice(start, timeZone),
     deviceTimeZone: deviceTimeZone(),
     timeZoneFallback: resolved === null,
   }

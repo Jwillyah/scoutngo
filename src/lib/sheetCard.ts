@@ -38,7 +38,9 @@ export type SheetCard =
   | { kind: 'sky' }
   | { kind: 'cams' }
   | { kind: 'suncurve' }
-  /** From the venue bar. Settings live here and nowhere else. */
+  /** From the menu: the clock and the units, stored on the phone. */
+  | { kind: 'settings' }
+  /** From the menu: backup, the API key, what leaves the phone. */
   | { kind: 'about' }
   /** From the menu: the call sheet, written on the shooter's own key. */
   | { kind: 'callsheet' }
@@ -60,6 +62,7 @@ export const CARD_TITLE: Record<CardKind, string> = {
   sky: 'Sky',
   cams: 'Sky cameras',
   suncurve: 'The day',
+  settings: 'Settings',
   about: 'About',
   callsheet: 'Call sheet',
 }
@@ -96,7 +99,8 @@ export function isHome(card: SheetCard): boolean {
  * THE FOUR THAT DO NOT GET IT, AND WHY:
  *
  *   layers    a tile grid. Nothing on it moves with the clock.
- *   about     settings and prose. Same.
+ *   settings  the clock and the units. Same.
+ *   about     prose and the backup. Same.
  *   hazards   a mark on the ground is there at 6am and at 6pm.
  *   airspace  the FAA ceiling over a venue is not a function of the hour.
  *
@@ -122,6 +126,7 @@ export const TIME_MATTERS: Record<CardKind, boolean> = {
   cams: false,
   suncurve: false,
   layers: false,
+  settings: false,
   about: false,
   hazards: false,
   airspace: false,

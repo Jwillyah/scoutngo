@@ -8,7 +8,7 @@ import {
   type ShootKind,
 } from '../core/shootWindow.ts'
 import { SUN_BAND_LABEL } from '../core/sunBand.ts'
-import { formatClock, zonedTimeToUtc } from '../core/timezone.ts'
+import { formatClock, formatSpan, zonedTimeToUtc } from '../core/timezone.ts'
 
 /**
  * A SHOOT CHIP, TURNED INTO FORM FIELDS.
@@ -57,8 +57,10 @@ export function shootPreset(
   if (window === null) return null
 
   const peak = peakIn(kind, bandIntervals(altitudeAt, window.start, window.end))
-  const startTime = formatClock(window.start, timeZone)
-  const endTime = formatClock(window.end, timeZone)
+  /* The form's own values, "HH:MM" for an <input type="time">: always 24 hour. The sentence is the shooter's clock. */
+  const startTime = formatClock(window.start, timeZone, 24)
+  const endTime = formatClock(window.end, timeZone, 24)
+  const span = formatSpan(formatClock(window.start, timeZone), formatClock(window.end, timeZone))
 
   /*
    * THE SENTENCE SAYS WHERE THE LIGHT USUALLY CONCENTRATES. Not what will
@@ -67,13 +69,10 @@ export function shootPreset(
    */
   const line =
     peak === null
-      ? `Window set to ${startTime}–${endTime}.`
-      : `Window set to ${startTime}–${endTime}. Light usually concentrates in ${
+      ? `Window set to ${span}.`
+      : `Window set to ${span}. Light usually concentrates in ${
           SUN_BAND_LABEL[peak.band]
-        }, ${formatClock(peak.from, timeZone)}–${formatClock(
-          peak.to,
-          timeZone,
-        )}. Be set up by ${formatClock(peak.beSetUpBy, timeZone)}.`
+        }, ${formatSpan(formatClock(peak.from, timeZone), formatClock(peak.to, timeZone))}. Be set up by ${formatClock(peak.beSetUpBy, timeZone)}.`
 
   return { startTime, endTime, line, peak }
 }

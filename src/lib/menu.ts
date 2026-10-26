@@ -12,6 +12,7 @@ export type MenuItem =
   | 'now'
   | 'viewfinder'
   | 'callsheet'
+  | 'settings'
   | 'about'
 
 export const MENU_ITEMS: readonly { id: MenuItem; label: string; note: string }[] = [
@@ -24,6 +25,7 @@ export const MENU_ITEMS: readonly { id: MenuItem; label: string; note: string }[
   { id: 'now', label: 'Now', note: 'What the sky is doing where you are' },
   { id: 'callsheet', label: 'Call sheet', note: 'Run of show and shot list, on your own key' },
   { id: 'viewfinder', label: 'Viewfinder', note: 'The camera with the sun and your frames on it' },
-  { id: 'about', label: 'About', note: 'Units, backup, what leaves your phone' },
+  { id: 'settings', label: 'Settings', note: 'Clock, wind and distance' },
+  { id: 'about', label: 'About', note: 'Backup, your key, what leaves your phone' },
 ]
 
