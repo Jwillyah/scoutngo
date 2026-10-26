@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { getMoonIllumination, getMoonTimes } from 'suncalc'
+import { getMoonIllumination } from 'suncalc'
+import { moonTimesOnLocalDay } from '../core/moonTimes.ts'
 import { deviceTimeZone, formatClock } from '../core/timezone.ts'
 import type { LatLon } from '../core/geo.ts'
 import type { KitProfile } from '../core/kit.ts'
@@ -124,10 +125,8 @@ export function SkyPanel({
       days: SKY_EVENT_DAYS,
       illumination: (at) => getMoonIllumination(at).fraction,
       moonrise: (at) => {
-        const times = getMoonTimes(at, venue.lat, venue.lon)
-        return times.rise instanceof Date && !Number.isNaN(times.rise.getTime())
-          ? times.rise
-          : null
+        /* The venue's day containing that instant, not the UTC one: see moonTimes.ts. */
+        return moonTimesOnLocalDay(at, venue.lat, venue.lon, timeZone ?? undefined).rise
       },
       milkyWayShootable: (eveningOf) =>
         skyWindow({
@@ -137,7 +136,7 @@ export function SkyPanel({
           horizon,
         }).kind === 'window',
     })
-  }, [venue, horizon, now])
+  }, [venue, horizon, now, timeZone])
 
   /*
    * THE KIT LINE. Only the lenses that are actually in the profile, each named,

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { getMoonIllumination, getMoonTimes } from 'suncalc'
+import { getMoonIllumination } from 'suncalc'
+import { moonTimesOnLocalDay } from './moonTimes.ts'
 import {
   moonTurningPoints,
   showerEventsBetween,
@@ -11,10 +12,7 @@ import { skyWindow } from './skyWindow.ts'
 const OVERLOOK = { lat: 38.7567229, lon: -78.2675403 }
 
 const illumination = (at: Date): number => getMoonIllumination(at).fraction
-const moonrise = (at: Date): Date | null => {
-  const times = getMoonTimes(at, OVERLOOK.lat, OVERLOOK.lon)
-  return times.rise instanceof Date && !Number.isNaN(times.rise.getTime()) ? times.rise : null
-}
+const moonrise = (at: Date): Date | null => moonTimesOnLocalDay(at, OVERLOOK.lat, OVERLOOK.lon).rise
 const milkyWayShootable = (eveningOf: Date): boolean =>
   skyWindow({
     target: { kind: 'milkyway' },

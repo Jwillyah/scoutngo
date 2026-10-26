@@ -6,7 +6,8 @@
  * moonset -- the moon's day is about fifty minutes longer than ours -- and
  * that is null, said, never a borrowed time from the day before.
  */
-import { getMoonPosition, getMoonTimes } from 'suncalc'
+import { getMoonPosition } from 'suncalc'
+import { moonTimesOnLocalDay } from './moonTimes.ts'
 import type { SunEvent } from './sun.ts'
 import { normalizeBearing } from './sun.ts'
 
@@ -21,7 +22,8 @@ export interface MoonArc {
 const usable = (d: unknown): d is Date => d instanceof Date && !Number.isNaN(d.getTime())
 
 export function getMoonArc(at: Date, lat: number, lon: number): MoonArc {
-  const times = getMoonTimes(at, lat, lon)
+  /* The venue's own day, not suncalc's UTC one: see moonTimes.ts. */
+  const times = moonTimesOnLocalDay(at, lat, lon)
   const event = (when: unknown): SunEvent | null =>
     usable(when) ? { at: when, azimuth: normalizeBearing(getMoonPosition(when, lat, lon).azimuth) } : null
   const now = getMoonPosition(at, lat, lon)

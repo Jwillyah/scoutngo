@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { getMoonIllumination, getMoonTimes, getTimes } from 'suncalc'
+import { getMoonIllumination, getTimes } from 'suncalc'
+import { moonTimesOnLocalDay } from '../core/moonTimes.ts'
 import { findAlignments, targetAltitude, type AlignMode, type Body } from '../core/alignment.ts'
 import { compassWord } from '../core/compassWords.ts'
 import type { LatLon } from '../core/geo.ts'
@@ -253,7 +254,7 @@ export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump,
     )
   } else if (tab === 'moon') {
     const ill = getMoonIllumination(at)
-    const times = getMoonTimes(at, venue.lat, venue.lon)
+    const times = moonTimesOnLocalDay(at, venue.lat, venue.lon, timeZone)
     const ok = (d: unknown): d is Date => d instanceof Date && !Number.isNaN(d.getTime())
     body = (
       <>
