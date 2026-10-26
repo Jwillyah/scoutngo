@@ -104,7 +104,7 @@ import { runSuggest } from './lib/suggestRun.ts'
 import { readShareHash, SHARE_PREFIX } from './lib/planShare.ts'
 import { Viewfinder, ViewfinderNeedsPlace } from './components/Viewfinder.tsx'
 import { SideMenu } from './components/SideMenu.tsx'
-import type { MenuItem } from './lib/menu.ts'
+import { pathToMenuItem, type MenuItem } from './lib/menu.ts'
 import {
   blockedReason,
   FORWARD_LABEL,
@@ -1297,6 +1297,22 @@ function App() {
   const menuCurrent: MenuItem = mode
 
   /*
+   * A PLACE THAT MOVED IS STILL A PLACE. /field, /now and the rest are the
+   * names of places (src/lib/menu.ts OLD_PATHS); vercel.json serves the app
+   * for each, and here the app goes there once and puts the address back.
+   */
+  const menuPickRef = useRef(onMenuPick)
+  useEffect(() => {
+    menuPickRef.current = onMenuPick
+  })
+  useEffect(() => {
+    const item = pathToMenuItem(window.location.pathname)
+    if (item === null) return
+    window.history.replaceState(null, '', '/' + window.location.search + window.location.hash)
+    menuPickRef.current(item)
+  }, [])
+
+  /*
    * THE DOOR OUT OF IT: the glance becomes a plan with nothing typed.
    *
    * Carries the coordinate as the pin and TODAY as the date, because the whole
@@ -2028,6 +2044,7 @@ function App() {
           cardRequest={cardRequest}
           bag={kit}
           onSearch={() => setMode('setup')}
+          onOpenNow={() => setNowOpen(true)}
         />
       ) : null}
 

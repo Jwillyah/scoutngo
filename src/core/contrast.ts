@@ -71,3 +71,26 @@ export function colourDistance(a: string, b: string): number {
     (2 + rMean / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rMean) / 256) * db * db,
   )
 }
+
+const hex2 = (n: number) => Math.round(Math.min(255, Math.max(0, n))).toString(16).padStart(2, '0')
+
+/** `a` moved a fraction `t` of the way to `b`, in sRGB. */
+export function mixHex(a: string, b: string, t: number): string {
+  const x = parseHex(a)
+  const y = parseHex(b)
+  if (x === null || y === null) return a
+  return `#${hex2(x.r + (y.r - x.r) * t)}${hex2(x.g + (y.g - x.g) * t)}${hex2(x.b + (y.b - x.b) * t)}`
+}
+
+/**
+ * The colour, walked toward `toward` in 1% steps until `ink` on it reaches
+ * `ratio`. Unchanged when it already does. Walking toward the tile's own dark
+ * stop keeps the hue: a gold tile gets a deeper gold, not a grey.
+ */
+export function deepenFor(ink: string, colour: string, toward: string, ratio: number): string {
+  for (let step = 0; step <= 100; step += 1) {
+    const candidate = mixHex(colour, toward, step / 100)
+    if (contrastRatio(ink, candidate) >= ratio) return candidate
+  }
+  return toward
+}

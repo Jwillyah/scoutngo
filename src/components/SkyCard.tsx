@@ -42,6 +42,8 @@ interface SkyCardProps {
   events: ReactNode
   /** Opens the moonrise shot list. */
   onPlanMoonrise?: () => void
+  /** The Now screen: what the sky is doing where you are standing. It used to be its own menu item. */
+  onOpenNow?: () => void
 }
 
 const DEG = Math.PI / 180
@@ -198,7 +200,7 @@ function Finder({
   )
 }
 
-export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump, target, picking, onPickTarget, events, onPlanMoonrise }: SkyCardProps) {
+export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump, target, picking, onPickTarget, events, onPlanMoonrise, onOpenNow }: SkyCardProps) {
   const clock = (d: Date) => `${formatClock(d, timeZone)}`
   const finderProps = { venue, target, picking, onPickTarget, onJump, clock, timeZone }
 
@@ -216,6 +218,11 @@ export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump,
   if (tab === 'tonight') {
     body = (
       <>
+        {onOpenNow === undefined ? null : (
+          <button type="button" className="btn btn--small skyc__now" onClick={onOpenNow}>
+            Now, where I am
+          </button>
+        )}
         <Panorama things={tonight.things} />
         <p className="skyc__note num">Drawn for {clock(tonight.when)} {timeZoneAbbr}, the middle of tonight's dark.</p>
         <ul className="skyc__facts">

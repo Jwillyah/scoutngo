@@ -5,6 +5,10 @@
     {
       "source": "/how",
       "destination": "/"
+    },
+    {
+      "source": "/:place(plan|setup|field|now|sky|kit|saved|settings|about)",
+      "destination": "/"
     }
   ],
   "headers": [
@@ -41,6 +45,15 @@
         {
           "key": "Cache-Control",
           "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/:place(plan|setup|field|now|sky|kit|saved|settings|about)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
         }
       ]
     }

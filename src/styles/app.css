@@ -9486,11 +9486,16 @@
   font-size: var(--text-sm);
 }
 
-.sidemenu__item {
+.sidemenu__group {
   display: grid;
-  gap: 2px;
-  min-height: 52px;
-  padding: var(--space-2);
+}
+
+.sidemenu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 56px;
+  padding: var(--space-1) var(--space-2);
   border: 0;
   border-radius: var(--radius-panel);
   background: transparent;
@@ -9498,6 +9503,12 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+.sidemenu__words {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
 }
 
 .sidemenu__item--on {
@@ -9511,6 +9522,30 @@
 .sidemenu__note {
   font-size: var(--text-sm);
   color: var(--color-text-muted);
+}
+
+/* Plan's folded doors: under its words, lined up with them, 44 px tall. */
+.sidemenu__subs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  padding: 0 var(--space-2) var(--space-1) calc(var(--space-2) + 42px + var(--space-3));
+}
+
+.sidemenu__sub {
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.sidemenu__sub--on {
+  background: color-mix(in srgb, var(--ocean) 22%, var(--surface-raised));
 }
 
 /* ------------------------------------------------- setup: the map is the screen
@@ -9748,15 +9783,17 @@
   height: 44px;
   display: grid;
   place-items: center;
+  padding: 0;
   border: 0;
-  border-radius: 50%;
+  border-radius: 14px;
   background: transparent;
   color: var(--color-text);
 }
 
-.tooldock__btn--on {
-  background: var(--accent);
-  color: var(--accent-ink);
+/* On: a white ring round the tile, which keeps its own colour. */
+.tooldock__btn--on .icon {
+  outline: 2px solid var(--white);
+  outline-offset: 1px;
 }
 
 /* ------------------------------------------------------------ time bar */
@@ -10543,4 +10580,48 @@
 .skyc__moonrise {
   justify-self: start;
   margin-top: var(--space-2);
+}
+
+/* -------------------------------------------------------------- icon tiles
+ *
+ * THE GOLDEN BUBBLE TILE (src/components/Icon.tsx). Every length is a share of
+ * --icon-size, taken from the design at 72 and 42 px: corner 0.306, glyph
+ * 0.555, gloss 44% tall. The colours come in as three custom properties from
+ * src/lib/iconPalette.ts, which is the only place they are written down.
+ */
+.icon {
+  --icon-unit: calc(var(--icon-size) / 42);
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-size);
+  height: var(--icon-size);
+  border-radius: calc(var(--icon-size) * 0.306);
+  background: linear-gradient(150deg, var(--icon-light) 0%, var(--icon-middle) 50%, var(--icon-dark) 100%);
+  box-shadow:
+    inset 0 var(--icon-unit) 0 rgb(255 255 255 / 0.6),
+    inset 0 calc(var(--icon-unit) * -3) calc(var(--icon-unit) * 5) rgb(0 0 0 / 0.2),
+    0 calc(var(--icon-unit) * 2) 0 rgb(0 0 0 / 0.25),
+    0 calc(var(--icon-unit) * 8) calc(var(--icon-unit) * 14) calc(var(--icon-unit) * -6) var(--icon-middle);
+}
+
+.icon::before {
+  content: '';
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  top: 5%;
+  height: 44%;
+  border-radius: calc(var(--icon-size) * 0.24) calc(var(--icon-size) * 0.24) 50% 50%;
+  background: linear-gradient(rgb(255 255 255 / 0.45), rgb(255 255 255 / 0));
+  pointer-events: none;
+}
+
+.icon__glyph {
+  position: relative;
+  width: calc(var(--icon-size) * 0.555);
+  height: calc(var(--icon-size) * 0.555);
+  filter: drop-shadow(0 calc(var(--icon-unit) * 1.5) calc(var(--icon-unit) * 1.5) rgb(0 0 0 / 0.25));
 }

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { MENU_ITEMS, type MenuItem } from '../lib/menu.ts'
+import { MENU_ITEMS, menuHome, type MenuItem } from '../lib/menu.ts'
+import { Icon } from './Icon.tsx'
 
 /*
  * THE MENU, FROM THE LEFT.
@@ -41,22 +42,47 @@ export function SideMenu({ open, current, onPick, onClose }: SideMenuProps) {
       <button type="button" className="sidemenu__scrim" aria-label="Close the menu" onClick={onClose} />
       <nav className="sidemenu__panel" aria-label="Stage">
         <p className="sidemenu__brand">ScoutNGo</p>
-        {MENU_ITEMS.map((item, index) => (
-          <button
-            type="button"
-            key={item.id}
-            ref={index === 0 ? first : undefined}
-            className={`sidemenu__item${current === item.id ? ' sidemenu__item--on' : ''}`}
-            aria-current={current === item.id ? 'page' : undefined}
-            onClick={() => {
-              onPick(item.id)
-              onClose()
-            }}
-          >
-            <span className="sidemenu__label">{item.label}</span>
-            <span className="sidemenu__note">{item.note}</span>
-          </button>
-        ))}
+        {MENU_ITEMS.map((item, index) => {
+          const here = current !== null && menuHome(current) === item.id
+          return (
+            <div key={item.id} className="sidemenu__group">
+              <button
+                type="button"
+                ref={index === 0 ? first : undefined}
+                className={`sidemenu__item${here ? ' sidemenu__item--on' : ''}`}
+                aria-current={current === item.id ? 'page' : undefined}
+                onClick={() => {
+                  onPick(item.id)
+                  onClose()
+                }}
+              >
+                <Icon glyph={item.icon} size={42} />
+                <span className="sidemenu__words">
+                  <span className="sidemenu__label">{item.label}</span>
+                  <span className="sidemenu__note">{item.note}</span>
+                </span>
+              </button>
+              {item.subs === undefined ? null : (
+                <div className="sidemenu__subs">
+                  {item.subs.map((sub) => (
+                    <button
+                      type="button"
+                      key={sub.id}
+                      className={`sidemenu__sub${current === sub.id ? ' sidemenu__sub--on' : ''}`}
+                      aria-current={current === sub.id ? 'page' : undefined}
+                      onClick={() => {
+                        onPick(sub.id)
+                        onClose()
+                      }}
+                    >
+                      <span className="sidemenu__label">{sub.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
       </nav>
     </div>
   )

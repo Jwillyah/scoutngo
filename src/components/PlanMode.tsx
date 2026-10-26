@@ -293,6 +293,8 @@ interface PlanModeProps {
   bag: KitSelection
   /** The search pill was tapped: go and search. */
   onSearch: () => void
+  /** The Now screen, from Sky's Tonight page. */
+  onOpenNow: () => void
   /** Ground, air or both. Decides what shows here AND what a generate asks for. */
   platformFilter: PlatformFilterValue
   showLabels: boolean
@@ -472,6 +474,7 @@ export function PlanMode({
   cardRequest,
   bag,
   onSearch,
+  onOpenNow,
   platformFilter,
   showLabels,
   onShowLabels,
@@ -1575,6 +1578,7 @@ export function PlanMode({
                 picking={placingAim}
                 onPickTarget={() => onPlacingAim(!placingAim)}
                 onPlanMoonrise={() => openCard('moonrise')}
+                onOpenNow={onOpenNow}
                 events={
                   <SkyPanel
                     venue={venue}
