@@ -1169,6 +1169,8 @@ const OPENERS = `(() => {
     add('menu', 'Sky', 'sky')
     add('menu', 'Call sheet', 'callsheet')
     add('menu', 'Settings', 'settings')
+    /* Behind the Sky card's Moon page: a door two taps deep, walked the way a person walks it. */
+    add('skymoon', 'Plan this moonrise', 'moonrise')
   }
   document.querySelectorAll('.more2__row').forEach((b, i) =>
     add('.more2__row', i, (b.textContent ?? '').trim()))
@@ -1176,6 +1178,14 @@ const OPENERS = `(() => {
 })()`
 
 const click = async (sel, i) => {
+  if (sel === 'skymoon') {
+    await click('menu', 'Sky')
+    await ev(`[...document.querySelectorAll('[role="tab"]')].find((b) => b.textContent.trim() === 'Moon')?.click()`)
+    await wait(500)
+    await ev(`[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === ${JSON.stringify(i)})?.click()`)
+    await wait(600)
+    return
+  }
   if (sel === 'menu') {
     await ev(`document.querySelector('button[aria-label="Menu"]')?.click()`)
     await wait(300)

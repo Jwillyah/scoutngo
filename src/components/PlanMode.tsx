@@ -59,6 +59,10 @@ import { WindCard } from './WindCard.tsx'
 import { ChipRow, type Chip } from './ChipRow.tsx'
 import { TopBar } from './TopBar.tsx'
 import { startHeading } from '../lib/heading.ts'
+import { MoonriseCard } from './MoonriseCard.tsx'
+import { readCeilingFeet } from '../lib/venue.ts'
+import { MAX_ALTITUDE_FEET } from '../core/air.ts'
+import { facilityCellAt } from '../lib/uasfm.ts'
 import { SettingsSheet } from './SettingsSheet.tsx'
 import { AboutSheet, type HowSection } from './AboutSheet.tsx'
 import { LayerTiles } from './LayerTiles.tsx'
@@ -751,6 +755,26 @@ export function PlanMode({
       units: units.distance,
     }
   }, [venue, venueWindow, plan, bag, kitProfile, venueCloud, wind, lowTide, units.distance])
+
+  /*
+   * THE MOONRISE PLAN'S INPUTS. The lenses and drone in the bag, and the
+   * drone's height: only with the LAANC switch on here, under the lower of
+   * the grid and the approved ceiling, and never over 400 ft.
+   */
+  const moonriseInput = useMemo(() => {
+    if (venue === null || venueWindow === null) return null
+    const lenses = kitProfile.lenses.filter((l) => bag.lensIds.includes(l.id))
+    const drone = kitProfile.drones.find((d) => bag.droneIds.includes(d.id))?.name ?? null
+    const grid = facilityCellAt(venue.lat, venue.lon)?.ceilingFeet ?? null
+    const approved = readCeilingFeet(approvedCeiling)
+    const ceiling = Math.min(MAX_ALTITUDE_FEET, grid === null ? (approved ?? MAX_ALTITUDE_FEET) : Math.min(grid, approved ?? grid))
+    const droneCeiling = !laanc
+      ? { reason: 'the LAANC switch is off at this spot.' }
+      : ceiling <= 0
+        ? { reason: 'the grid ceiling here is 0 ft.' }
+        : { feet: ceiling }
+    return { venue, timeZone: venueWindow.timeZone, from: skyNow, lenses, drone, droneCeiling }
+  }, [venue, venueWindow, kitProfile, bag, laanc, approvedCeiling, skyNow])
 
   /* Coast or road cameras on the cams card, and their pins on the map while it is open. */
   const [camKindShown, setCamKindShown] = useState<'coast' | 'road'>('coast')
@@ -1550,6 +1574,7 @@ export function PlanMode({
                 target={aimAt}
                 picking={placingAim}
                 onPickTarget={() => onPlacingAim(!placingAim)}
+                onPlanMoonrise={() => openCard('moonrise')}
                 events={
                   <SkyPanel
                     venue={venue}
@@ -1636,6 +1661,24 @@ export function PlanMode({
                 { label: 'Airspace over this venue', onOpen: () => openCard('airspace') },
               ]}
             />
+          </Card>
+        )
+      case 'moonrise':
+        return (
+          <Card title="Moonrise" onClose={home}>
+            {moonriseInput === null ? (
+              <p className="moonrise__none">Set the venue first: the moonrise is worked out for a place.</p>
+            ) : (
+              <MoonriseCard
+                input={moonriseInput}
+                target={aimAt}
+                picking={placingAim}
+                onPickTarget={() => onPlacingAim(!placingAim)}
+                units={units}
+                context={callSheetContext}
+                onOpenKey={() => openCard('about')}
+              />
+            )}
           </Card>
         )
       case 'settings':

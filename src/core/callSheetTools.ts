@@ -41,6 +41,13 @@ export interface ToolContext {
   conditions: { lowCloudPercent: number | null; windKnots: number | null; lowTide: string | null }
   playbook: string
   units: 'ft' | 'm'
+  /**
+   * THE MOONRISE PRESET, when the call sheet is asked to word one. The shot
+   * list is already worked out and written (src/lib/moonriseWords.ts): the
+   * model rewords it, it does not plan it. `values` are its times by label,
+   * for repairing an invented one.
+   */
+  moonrise?: { night: string[]; shots: { title: string; when: string; lines: string[] }[]; values: Record<string, string> }
 }
 
 /** The tool list in the Messages API's own shape. */
@@ -88,6 +95,12 @@ export const CALL_SHEET_TOOLS = [
     input_schema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
+    name: 'moonrise_plan',
+    description:
+      'The moonrise shot list, worked out by the app: the night, moonrise and where, when the moon clears 2 degrees, sunset and civil dusk, and four shots in order (wide opener, line-up, mid, drone) with lens, facing, where to stand and settings. When it is there, the sheet is this list, reworded, in this order, with every number as given.',
+    input_schema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
     name: 'playbook',
     description: 'The shooter’s own playbook: the shots and rules they always use. Follow it.',
     input_schema: { type: 'object', properties: {}, additionalProperties: false },
@@ -114,6 +127,7 @@ export function codeValues(ctx: ToolContext): Record<string, string> {
   put('solar noon', clock(t.solarNoon))
   put('start', clock(ctx.window.start))
   put('end', clock(ctx.window.end))
+  for (const [label, value] of Object.entries(ctx.moonrise?.values ?? {})) put(label, value)
   return out
 }
 
@@ -172,6 +186,8 @@ export function runTool(name: string, input: Record<string, unknown>, ctx: ToolC
       }
     case 'playbook':
       return { playbook: ctx.playbook }
+    case 'moonrise_plan':
+      return ctx.moonrise === undefined ? { note: 'No moonrise plan for this call sheet.' } : { night: ctx.moonrise.night, shots: ctx.moonrise.shots }
     default:
       return { error: `No tool named ${name}.` }
   }

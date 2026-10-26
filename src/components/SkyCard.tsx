@@ -40,6 +40,8 @@ interface SkyCardProps {
   onPickTarget: () => void
   /** The existing list of showers and moons, shown under the calendar. */
   events: ReactNode
+  /** Opens the moonrise shot list. */
+  onPlanMoonrise?: () => void
 }
 
 const DEG = Math.PI / 180
@@ -196,7 +198,7 @@ function Finder({
   )
 }
 
-export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump, target, picking, onPickTarget, events }: SkyCardProps) {
+export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump, target, picking, onPickTarget, events, onPlanMoonrise }: SkyCardProps) {
   const clock = (d: Date) => `${formatClock(d, timeZone)}`
   const finderProps = { venue, target, picking, onPickTarget, onJump, clock, timeZone }
 
@@ -264,6 +266,11 @@ export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump,
           <div><dt>Moonrise</dt><dd>{ok(times.rise) ? clock(times.rise) : 'not today'}</dd></div>
           <div><dt>Moonset</dt><dd>{ok(times.set) ? clock(times.set) : 'not today'}</dd></div>
         </dl>
+        {onPlanMoonrise === undefined ? null : (
+          <button type="button" className="btn btn--small skyc__moonrise" onClick={onPlanMoonrise}>
+            Plan this moonrise
+          </button>
+        )}
         <Finder body="moon" {...finderProps} />
       </>
     )

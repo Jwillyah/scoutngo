@@ -38,6 +38,8 @@ export type SheetCard =
   | { kind: 'sky' }
   | { kind: 'cams' }
   | { kind: 'suncurve' }
+  /** From Sky › Moon: the moonrise shot list, worked out. */
+  | { kind: 'moonrise' }
   /** From the menu: the clock and the units, stored on the phone. */
   | { kind: 'settings' }
   /** From the menu: backup, the API key, what leaves the phone. */
@@ -62,6 +64,7 @@ export const CARD_TITLE: Record<CardKind, string> = {
   sky: 'Sky',
   cams: 'Sky cameras',
   suncurve: 'The day',
+  moonrise: 'Moonrise',
   settings: 'Settings',
   about: 'About',
   callsheet: 'Call sheet',
@@ -126,6 +129,8 @@ export const TIME_MATTERS: Record<CardKind, boolean> = {
   cams: false,
   suncurve: false,
   layers: false,
+  /* A plan for a night, not a reading at the bar's moment. */
+  moonrise: false,
   settings: false,
   about: false,
   hazards: false,

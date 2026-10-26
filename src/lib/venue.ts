@@ -335,7 +335,12 @@ export function withLaanc(draft: VenueDraft, on: boolean): VenueDraft {
 export function approvedCeilingHere(draft: VenueDraft): number | null {
   /* A string as typed; a hand-edited backup can hold anything, so it is checked, not trusted. */
   if (!laancHere(draft) || typeof draft.laancCeilingFeet !== 'string') return null
-  const typed = draft.laancCeilingFeet.trim()
+  return readCeilingFeet(draft.laancCeilingFeet)
+}
+
+/** Whole feet from 1 to 400 out of what was typed, or null. */
+export function readCeilingFeet(typedRaw: string): number | null {
+  const typed = typedRaw.trim()
   const feet = Number(typed)
   return typed !== '' && Number.isInteger(feet) && feet > 0 && feet <= MAX_ALTITUDE_FEET ? feet : null
 }

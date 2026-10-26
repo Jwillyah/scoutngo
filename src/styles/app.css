@@ -10479,3 +10479,68 @@
   text-overflow: ellipsis;
   text-decoration: none;
 }
+
+/* The moonrise shot list: the night, then four shots in the order they happen. */
+.moonrise {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.moonrise__night,
+.moonrise__shots {
+  margin: 0;
+  padding-left: var(--space-4);
+  display: grid;
+  gap: var(--space-1);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+}
+
+.moonrise__night {
+  list-style: none;
+  padding-left: 0;
+}
+
+.moonrise__shots {
+  gap: var(--space-3);
+}
+
+.moonrise__title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.moonrise__when {
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.moonrise__line,
+.moonrise__note,
+.moonrise__none {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.moonrise__target {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.moonrise__heightrow {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.moonrise__heightrow .input {
+  width: 6.5em;
+  min-height: 44px;
+}
+
+.skyc__moonrise {
+  justify-self: start;
+  margin-top: var(--space-2);
+}
