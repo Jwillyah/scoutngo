@@ -141,7 +141,11 @@ const key = (b: MapBounds) =>
   [b.west, b.south, b.east, b.north].map((n) => n.toFixed(3)).join(',')
 
 /** Never throws. Overpass being unreachable is a sentence, not a blank. */
-export async function fetchBuildings(bounds: MapBounds): Promise<BuildingsResult> {
+/**
+ * `timeoutMs`: the 2D map waits TIMEOUT_MS; the 3D view loads its buildings
+ * behind a line that says so and can wait longer for a busy Overpass.
+ */
+export async function fetchBuildings(bounds: MapBounds, timeoutMs: number = TIMEOUT_MS): Promise<BuildingsResult> {
   const cacheKey = key(bounds)
   const hit = cache.get(cacheKey)
   if (hit !== undefined) return { status: 'ok', buildings: hit, cached: true }
@@ -151,7 +155,7 @@ export async function fetchBuildings(bounds: MapBounds): Promise<BuildingsResult
   }
 
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
     lastCallAt = Date.now()
     const response = await fetch(OVERPASS_URL, {
@@ -161,6 +165,9 @@ export async function fetchBuildings(bounds: MapBounds): Promise<BuildingsResult
       signal: controller.signal,
     })
     if (!response.ok) {
+      /* A busy or broken server is no different from no signal: the saved copy, said with its age. */
+      const saved = readSavedBuildings(cacheKey)
+      if (saved !== null) return { status: 'ok', buildings: saved.buildings, cached: true, savedAt: saved.fetchedAt }
       return { status: 'unavailable', reason: `Overpass returned HTTP ${response.status}.` }
     }
     const buildings = parseBuildings(await response.json())

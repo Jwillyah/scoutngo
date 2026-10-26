@@ -31,8 +31,8 @@ no database, no analytics, no telemetry.
 ```
 tsc -b → oxlint --deny-warnings → viewport units → colour roles → clock
        → measurements → tests → build → build stamp → reachability → labels
-       → surface → projection → offline → api urls → airspace → call sheet
-       → clock screen → service worker
+       → surface → projection → offline → api urls → 3d network → airspace
+       → call sheet → clock screen → service worker
 ```
 
 All of it must be clean before reporting. `SCOUTNGO_SKIP_AUDITS=1` exists and

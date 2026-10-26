@@ -1312,9 +1312,13 @@ export function MapView({
       center: venue === null ? COLD_START_VIEW.center : [venue.lon, venue.lat],
       zoom: venue === null ? COLD_START_VIEW.zoom : VENUE_ZOOM,
       attributionControl: false,
-      // Tilt and rotate. Flat imagery only, no 3D meshes: coverage in these
-      // towns is bad enough that a mesh would be a lie, per docs/brief.md.
-      pitchWithRotate: true,
+      /*
+       * ROTATE, NO TILT BY HAND. 2D is 2D: the 3D button opens the clay
+       * model (src/components/Clay3D.tsx) instead of tilting this map. Code
+       * can still pitch it, which the sun-in-the-sky view and the audits use.
+       */
+      pitchWithRotate: false,
+      touchPitch: false,
       /*
        * 85, NOT 60, SO THERE IS A SKY TO PUT A SUN IN.
        *

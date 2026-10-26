@@ -198,6 +198,10 @@ ok "$(grep -E 'OFFLINE PROBLEMS' "$SCRATCH/offline.log" | tail -1 | tr -d '=' | 
 run_audit "api url audit" scripts/audit-api-urls.mjs "$SCRATCH/apiurl.log" 'PROBLEM|ABORTED'
 ok "$(grep -E 'API URL PROBLEMS' "$SCRATCH/apiurl.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
 
+# The 3D clay model: only the app's own hosts, and it opens with no signal.
+run_audit "3d network audit" scripts/audit-3d-network.mjs "$SCRATCH/3dnetwork.log" 'PROBLEM|ABORTED'
+ok "$(grep -E '3D NETWORK PROBLEMS' "$SCRATCH/3dnetwork.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
+
 run_audit "airspace audit" scripts/audit-airspace.mjs "$SCRATCH/airspace.log" 'PROBLEM|ABORTED'
 ok "$(grep -E 'AIRSPACE PROBLEMS' "$SCRATCH/airspace.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
 

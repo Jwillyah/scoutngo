@@ -28,9 +28,11 @@ const LONG_PRESS_MS = 400
 
 
 interface MapRailProps {
-  /** Current pitch: flat is 2D, tilted is 3D. */
-  pitch: number
-  onPitch: (next: number) => void
+  /** Whether the 3D clay model is showing instead of the 2D map. */
+  threeD: boolean
+  onThreeD: () => void
+  /** Why 3D cannot open here, said beside the button, or null. */
+  threeDNote: string | null
   /** The map's rotation, so the compass needle points at real north. */
   bearing: number
   /** Whether the map is turning with the phone's heading. */
@@ -41,12 +43,10 @@ interface MapRailProps {
   onMeasure: () => void
 }
 
-/** How far a 3D tap tilts the map. Steep enough to see a ridge, short of the horizon. */
-const TILT_3D_DEGREES = 60
-
 export function MapRail({
-  pitch,
-  onPitch,
+  threeD,
+  onThreeD,
+  threeDNote,
   bearing,
   heading,
   onCompass,
@@ -146,14 +146,15 @@ export function MapRail({
         { on: heading },
       )}
 
-      {/* 2D OR 3D, said on the face. Tilting by hand is a two-finger drag. */}
+      {/* 2D OR 3D, said on the face. 3D is the clay model of the same place at the same time. */}
       {button(
         'tilt',
-        pitch >= 1 ? 'Flatten the map to 2D' : 'Tilt the map to 3D',
+        threeD ? 'Back to the 2D map' : 'Open the 3D clay model',
         null,
-        () => onPitch(pitch >= 1 ? 0 : TILT_3D_DEGREES),
-        { on: pitch >= 1, face: pitch >= 1 ? '2D' : '3D' },
+        onThreeD,
+        { on: threeD, face: threeD ? '2D' : '3D' },
       )}
+      {threeDNote === null ? null : <p className="rail2__note">{threeDNote}</p>}
 
       {/* Layers moved to the tool dock: one Layers button on screen, not two. */}
       {button(

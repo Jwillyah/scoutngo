@@ -32,10 +32,14 @@ export async function connect() {
   const ws = new WebSocket(target.webSocketDebuggerUrl)
   await new Promise((r) => (ws.onopen = r))
   let id = 0; const p = new Map(); const errs = []
+  /* Protocol events, for an audit that has to watch rather than ask (audit-3d-network.mjs). */
+  const listeners = new Map()
+  const onEvent = (method, fn) => listeners.set(method, [...(listeners.get(method) ?? []), fn])
   ws.onmessage = (e) => {
     const m = JSON.parse(e.data)
     if (m.method === 'Runtime.exceptionThrown') errs.push('EXC: ' + m.params.exceptionDetails.text + ' ' + (m.params.exceptionDetails.exception?.description || '').split('\n')[0])
     if (m.method === 'Runtime.consoleAPICalled' && m.params.type === 'error') errs.push(m.params.args.map(a => a.value ?? a.description).join(' ').slice(0, 180))
+    if (m.method && listeners.has(m.method)) for (const fn of listeners.get(m.method)) fn(m.params)
     if (m.id && p.has(m.id)) { p.get(m.id)(m); p.delete(m.id) }
   }
   const send = (m, q = {}) => new Promise((res) => { const i = ++id; p.set(i, res); ws.send(JSON.stringify({ id: i, method: m, params: q })) })
@@ -63,5 +67,5 @@ export async function connect() {
     await app.stop()
   }
 
-  return { ws, send, ev, wait, shot, load, errs, dispose, startedApp: app.started, startedBrowser: browser.started }
+  return { ws, send, ev, wait, shot, load, errs, onEvent, dispose, startedApp: app.started, startedBrowser: browser.started }
 }

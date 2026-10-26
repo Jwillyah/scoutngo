@@ -16,6 +16,7 @@ import {
   SHELL_CACHE,
   SHELL_DOCUMENT,
   SHELL_PUBLIC,
+  installAssets,
   staleShellEntries,
 } from './shellRoutes.ts'
 
@@ -43,7 +44,7 @@ worker.addEventListener('install', (event) => {
       const cache = await caches.open(SHELL_CACHE)
       /* The document fresh from the network, never from the HTTP cache. */
       await cache.put(SHELL_DOCUMENT, await fetch(new Request(SHELL_DOCUMENT, { cache: 'reload' })))
-      await cache.addAll(SHELL_ASSETS)
+      await cache.addAll(installAssets(SHELL_ASSETS))
       /* Public files are a nicety: one missing must not stop the shell installing. */
       await Promise.all(SHELL_PUBLIC.map((path) => cache.add(path).catch(() => undefined)))
       await worker.skipWaiting()

@@ -228,7 +228,8 @@ export async function loadTile(
 
 /* -------------------------------------------------------------------- areas */
 
-export type AreaKind = 'venue' | 'trip'
+/** venue: the automatic ring. trip: taken by hand. 3d: the coarse tiles over a venue the 3D overview needs. */
+export type AreaKind = 'venue' | 'trip' | '3d'
 
 /** One saved area, as the list shows it and as deletion recomputes it. */
 export interface SavedArea {
@@ -288,7 +289,7 @@ export function reviveAreas(raw: unknown): SavedArea[] {
     const area = a as Partial<SavedArea> | null
     return (
       typeof area?.id === 'string' &&
-      (area.kind === 'venue' || area.kind === 'trip') &&
+      (area.kind === 'venue' || area.kind === 'trip' || area.kind === '3d') &&
       typeof area.label === 'string' &&
       isBox(area.box) &&
       isZooms(area.imageryZooms) &&
@@ -543,9 +544,11 @@ export async function downloadArea(
 
   const areas = loadAreas()
   const next = [area, ...areas]
-  /* Old automatic venues go first; a trip is only ever deleted by hand. */
-  const autos = next.filter((a) => a.kind === 'venue')
-  const dropped = autos.slice(AUTO_AREAS_KEPT)
+  /* Old automatic venues and 3D overviews go first, each kept to its own count; a trip is only ever deleted by hand. */
+  const dropped = [
+    ...next.filter((a) => a.kind === 'venue').slice(AUTO_AREAS_KEPT),
+    ...next.filter((a) => a.kind === '3d').slice(AUTO_AREAS_KEPT),
+  ]
   for (const old of dropped) {
     const freed = urlsFreedBy(old, next)
     await Promise.all(freed.map((url) => cache.delete(url).catch(() => false)))

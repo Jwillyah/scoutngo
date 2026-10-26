@@ -54,6 +54,17 @@ describe('buildings kept on the phone', () => {
     expect(typeof offline.savedAt).toBe('string')
   })
 
+  it('reads the kept copy when Overpass answers but with an error (502 when it is overloaded)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(payload), { status: 200 })))
+    await fetchBuildings(bounds)
+    clearBuildingsCache()
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('Bad Gateway', { status: 502 })))
+    const busy = await fetchBuildings(bounds)
+    expect(busy.status).toBe('ok')
+    if (busy.status !== 'ok') return
+    expect(typeof busy.savedAt).toBe('string')
+  })
+
   it('with nothing kept, still says why rather than an empty map', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch') }))
     const out = await fetchBuildings(bounds)

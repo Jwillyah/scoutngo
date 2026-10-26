@@ -10756,3 +10756,132 @@
   grid-template-columns: 1fr 1fr;
   gap: var(--space-2);
 }
+
+/* ------------------------------------------------------------- the 3D view
+ *
+ * Where the map is, under the same chrome. Everything on it is dark glass;
+ * the colour is in the model's own sky arcs and the golden pins.
+ */
+.clay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: #05070a;
+}
+
+.clay__canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.clay__canvas .cesium-widget,
+.clay__canvas .cesium-widget canvas {
+  width: 100%;
+  height: 100%;
+}
+
+/*
+ * THE CREDITS STAY, small, above the sheet: Esri for the imagery, AWS for the
+ * elevation. The engine's own logo does not: it advertises Cesium ion, and
+ * nothing here comes from ion.
+ */
+.clay__canvas .cesium-credit-logoContainer {
+  display: none !important;
+}
+
+.clay__canvas .cesium-widget-credits {
+  font-size: 9px;
+  bottom: calc(var(--dock-height) + var(--sheet-live-height) + var(--tooldock-height) + 4px) !important;
+}
+
+.clay__frame {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border: 2px solid var(--white);
+  box-shadow: 0 0 0 9999px rgb(0 0 0 / 0.28);
+  pointer-events: none;
+}
+
+.clay__legend {
+  position: absolute;
+  left: var(--space-2);
+  right: 72px;
+  bottom: calc(var(--dock-height) + var(--sheet-live-height) + var(--tooldock-height) + 24px);
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  pointer-events: none;
+}
+
+.clay__note,
+.clay__line {
+  margin: 0;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-1) 78%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: var(--color-text);
+  font-size: var(--text-xs);
+}
+
+.clay__swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 4px;
+  vertical-align: -1px;
+  border-radius: 2px;
+}
+
+.clay__swatch--unknown {
+  background: repeating-linear-gradient(90deg, #f8f5ef 0 3px, #ddd3c3 3px 6px);
+}
+
+.clay__stand {
+  position: absolute;
+  left: var(--space-2);
+  right: 72px;
+  top: calc(var(--safe-top, 0px) + 116px);
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border-radius: var(--radius-panel);
+  background: color-mix(in srgb, var(--surface-1) 82%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: var(--line-hair) solid var(--color-line);
+}
+
+.clay__standname {
+  margin: 0;
+  font-weight: var(--weight-heavy);
+  font-size: var(--text-sm);
+}
+
+.clay__zoom {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.clay__zoom input {
+  min-height: 44px;
+  accent-color: var(--action-mid);
+}
+
+.rail2__note {
+  position: absolute;
+  right: 56px;
+  top: 0;
+  width: 220px;
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-1) 88%, transparent);
+  color: var(--color-text);
+  font-size: var(--text-xs);
+}

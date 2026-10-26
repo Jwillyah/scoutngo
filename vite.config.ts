@@ -1,4 +1,6 @@
 import { execSync } from 'node:child_process'
+import { cpSync, createReadStream, existsSync, readFileSync, statSync } from 'node:fs'
+import { extname, join, normalize } from 'node:path'
 import react from '@vitejs/plugin-react'
 import { configDefaults, defineConfig } from 'vitest/config'
 
@@ -221,16 +223,69 @@ function serviceWorker(id: string) {
   }
 }
 
+/*
+ * CESIUM'S RUNTIME FILES, FROM THIS ORIGIN.
+ *
+ * The 3D view (src/three/) is CesiumJS, and Cesium loads its web workers and
+ * a few data files at run time from CESIUM_BASE_URL. They are served from
+ * here, at /cesium/<version>/, so the only hosts the 3D view ever talks to
+ * are this app's, Esri's and AWS's (scripts/audit-3d-network.mjs). The
+ * version is in the path so a new Cesium is a new URL and nothing cached for
+ * the old one can be served for it.
+ *
+ * Dev: a middleware reads them out of node_modules. Build: they are copied
+ * into dist. Only Workers, Assets and ThirdParty: the widgets are not used.
+ */
+const CESIUM_BUILD = 'node_modules/@cesium/engine/Build'
+const CESIUM_VERSION = (JSON.parse(readFileSync('node_modules/@cesium/engine/package.json', 'utf8')) as { version: string }).version
+const CESIUM_BASE = `/cesium/${CESIUM_VERSION}/`
+const CESIUM_DIRS = ['Workers', 'Assets', 'ThirdParty']
+const CESIUM_TYPES: Record<string, string> = {
+  '.js': 'text/javascript',
+  '.json': 'application/json',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.wasm': 'application/wasm',
+  '.xml': 'application/xml',
+  '.css': 'text/css',
+}
+
+function cesiumRuntime() {
+  return {
+    name: 'scoutngo-cesium-runtime',
+    configureServer(server: { middlewares: { use: (fn: (req: { url?: string }, res: { setHeader: (k: string, v: string) => void; end: () => void; statusCode: number } & NodeJS.WritableStream, next: () => void) => void) => void } }) {
+      server.middlewares.use((req, res, next) => {
+        const path = (req.url ?? '').split('?')[0]
+        if (!path.startsWith(CESIUM_BASE)) return next()
+        const rel = normalize(path.slice(CESIUM_BASE.length))
+        if (rel.startsWith('..') || !CESIUM_DIRS.some((d) => rel.startsWith(d + '/'))) return next()
+        const file = join(CESIUM_BUILD, rel)
+        if (!existsSync(file) || !statSync(file).isFile()) {
+          res.statusCode = 404
+          return res.end()
+        }
+        res.setHeader('Content-Type', CESIUM_TYPES[extname(file)] ?? 'application/octet-stream')
+        createReadStream(file).pipe(res)
+      })
+    },
+    closeBundle() {
+      if (!existsSync('dist')) return
+      for (const dir of CESIUM_DIRS) cpSync(join(CESIUM_BUILD, dir), join('dist', 'cesium', CESIUM_VERSION, dir), { recursive: true })
+    },
+  }
+}
+
 const BUILD_ID_ONCE = buildId()
 
 export default defineConfig({
-  plugins: [react(), stampBuildId(BUILD_ID_ONCE), serviceWorker(BUILD_ID_ONCE)],
+  plugins: [react(), stampBuildId(BUILD_ID_ONCE), serviceWorker(BUILD_ID_ONCE), cesiumRuntime()],
   define: {
     __BUILD_ID__: JSON.stringify(BUILD_ID_ONCE),
     __BUILD_DIRTY__: JSON.stringify(buildDirty()),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
     __BUILD_PUSHED__: JSON.stringify(buildPushed()),
     __REPO_SLUG__: JSON.stringify(repoSlug()),
+    __CESIUM_BASE__: JSON.stringify(CESIUM_BASE),
   },
   /*
    * Bind to every interface so a phone on the same wifi can reach the dev
@@ -242,6 +297,21 @@ export default defineConfig({
   // The maplibre worker is an ES module and imports a sibling chunk, so it has
   // to stay ESM after bundling.
   worker: { format: 'es' },
+  build: {
+    rollupOptions: {
+      output: {
+        /*
+         * CESIUM IN ITS OWN CHUNK, named so the service worker can leave it
+         * out of the install: it is only fetched when 3D is opened, and cached
+         * then (src/sw/shellRoutes.ts, isLazy3d).
+         */
+        manualChunks(id: string) {
+          if (id.includes('node_modules/@cesium/')) return 'cesium'
+          return undefined
+        },
+      },
+    },
+  },
   test: {
     /*
      * .vercel holds the project link and, after `vercel build`, a compiled copy of

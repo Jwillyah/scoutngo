@@ -267,7 +267,7 @@ export function OfflineAreas({ venueCache, getView, venueName, online }: Offline
                 <span className="offl__name">
                   {areaLabel(area.label, venueName)}
                   <span className="offl__meta num">
-                    {area.kind === 'venue' ? 'venue' : 'trip'} · {formatBytes(area.bytes)} ·{' '}
+                    {area.kind === 'venue' ? 'venue' : area.kind === '3d' ? '3D overview' : 'trip'} · {formatBytes(area.bytes)} ·{' '}
                     {day(area.savedAt)}
                   </span>
                 </span>

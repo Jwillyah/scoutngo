@@ -83,6 +83,8 @@ import { ShotList } from './ShotList.tsx'
 import { SunSearchPanel } from './SunSearchPanel.tsx'
 import { TimeBar } from './TimeBar.tsx'
 import { ToolDock } from './ToolDock.tsx'
+import { Clay3D } from './Clay3D.tsx'
+import { hasWebGL2 } from '../lib/webgl.ts'
 import { ExposurePlayground } from './ExposurePlayground.tsx'
 import { SkyCard } from './SkyCard.tsx'
 import { CAMS, camKind } from '../data/cams.ts'
@@ -115,10 +117,6 @@ const PLAN_PEEK_PX = 164
  * switch between.
  */
 
-/** How far terrain tilts the map when it is turned on. Enough to see a ridge stand up. */
-const TERRAIN_TILT_DEGREES = 60
-/** Whether the two-finger tilt hint has been shown on this phone. */
-const TILT_HINT_KEY = 'scoutngo.tiltHint.v1'
 
 interface PlanModeProps {
   mapHandle: React.Ref<MapHandle>
@@ -544,6 +542,21 @@ export function PlanMode({
   const [buildingsNote, setBuildingsNote] = useState<string | null>(null)
   const [sheetHeight, setSheetHeight] = useState(108)
   const [pitch, setPitch] = useState(0)
+  /*
+   * THE 3D VIEW. The rail's 3D button swaps the 2D map for the clay model of
+   * the same place at the same time.
+   */
+  const [threeD, setThreeD] = useState(false)
+  const [threeDNote, setThreeDNote] = useState<string | null>(null)
+  const toggleThreeD = useCallback(() => {
+    if (!hasWebGL2()) {
+      setThreeDNote('3D needs WebGL 2, which this browser does not have. The 2D map works as before.')
+      return
+    }
+    setThreeDNote(null)
+    setThreeD((on) => !on)
+  }, [])
+  const threeDPins = useMemo(() => plan.map((p) => ({ number: p.position.number, at: p.position.at })), [plan])
 
   const nightPhase = useMemo(
     () =>
@@ -844,30 +857,11 @@ export function PlanMode({
   useEffect(() => () => stopHeading.current?.(), [])
 
   /*
-   * TERRAIN ON TILTS THE MAP. A ridge seen from straight above is a stain; the
-   * height is the reason to turn terrain on, so the map tilts to show it. The
-   * first time, one line says how to tilt by hand, and then never again.
+   * TERRAIN NO LONGER TILTS THE MAP. 2D stays flat; the 3D button opens the
+   * clay model, which has the terrain in it. Terrain here still feeds the
+   * horizon and the sun curve.
    */
-  const [tiltHint, setTiltHint] = useState(false)
-  const turnTerrain = useCallback(
-    (on: boolean) => {
-      onShowTerrain(on)
-      if (!on) return
-      handle.current?.setPitch(TERRAIN_TILT_DEGREES)
-      let seen = false
-      try {
-        seen = localStorage.getItem(TILT_HINT_KEY) === 'seen'
-        localStorage.setItem(TILT_HINT_KEY, 'seen')
-      } catch {
-        /* Storage refused: show it; it is one line. */
-      }
-      if (!seen) {
-        setTiltHint(true)
-        window.setTimeout(() => setTiltHint(false), 6000)
-      }
-    },
-    [onShowTerrain, handle],
-  )
+  const turnTerrain = useCallback((on: boolean) => onShowTerrain(on), [onShowTerrain])
 
   const [locating, setLocating] = useState(false)
   const onLocate = useCallback(() => {
@@ -1815,6 +1809,16 @@ export function PlanMode({
         bottomInset={sheetHeight}
       />
 
+      {threeD && venue !== null && venueWindow !== null && scrubbedAt !== null ? (
+        <Clay3D
+          venue={venue}
+          venueLabel={venueNameLine}
+          at={scrubbedAt}
+          timeZone={venueWindow.timeZone}
+          pins={threeDPins}
+        />
+      ) : null}
+
       {/*
         * ONE ROW OF REVEALS, and every one of them opens something rather than
         * stating something.
@@ -1848,11 +1852,6 @@ export function PlanMode({
           aria-hidden="true"
           style={{ ['--sun-side' as string]: `${(sun.azimuth - mapBearing + 360) % 360}deg` }}
         />
-      )}
-      {!tiltHint ? null : (
-        <p className="tapnote" role="status">
-          Tilt with two fingers: drag up or down.
-        </p>
       )}
       {headingNote === null ? null : (
         <p className="tapnote" role="status">
@@ -1997,8 +1996,9 @@ export function PlanMode({
 
       {sheet === 'full' ? null : (
       <MapRail
-        pitch={pitch}
-        onPitch={(next) => handle.current?.setPitch(next)}
+        threeD={threeD}
+        onThreeD={toggleThreeD}
+        threeDNote={threeDNote}
         bearing={mapBearing}
         heading={followHeading}
         onCompass={onCompass}
