@@ -83,6 +83,7 @@ import { ShotList } from './ShotList.tsx'
 import { SunSearchPanel } from './SunSearchPanel.tsx'
 import { TimeBar } from './TimeBar.tsx'
 import { ToolDock } from './ToolDock.tsx'
+import { ExposurePlayground } from './ExposurePlayground.tsx'
 import { SkyCard } from './SkyCard.tsx'
 import { CAMS, camKind } from '../data/cams.ts'
 import { CallSheetCard } from './CallSheetCard.tsx'
@@ -288,7 +289,7 @@ interface PlanModeProps {
   onMenu: () => void
   menuOpen: boolean
   /** The menu asked for a card: Sky or About. The tick makes a repeat ask open it again. */
-  cardRequest: { kind: 'sky' | 'settings' | 'about' | 'callsheet'; tick: number }
+  cardRequest: { kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure'; tick: number }
   /** What is in the bag, for the call sheet's kit tool. */
   bag: KitSelection
   /** The search pill was tapped: go and search. */
@@ -1020,7 +1021,13 @@ export function PlanMode({
   useEffect(() => {
     if (cardRequest.tick === 0) return
     const timer = setTimeout(() => {
-      setCard({ kind: cardRequest.kind } as SheetCard)
+      /* The exposure playground is a page of the Sky card. */
+      if (cardRequest.kind === 'exposure') {
+        setSkyTab('exposure')
+        setCard({ kind: 'sky' } as SheetCard)
+      } else {
+        setCard({ kind: cardRequest.kind } as SheetCard)
+      }
       raiseToHalf()
     }, 0)
     return () => clearTimeout(timer)
@@ -1579,6 +1586,7 @@ export function PlanMode({
                 onPickTarget={() => onPlacingAim(!placingAim)}
                 onPlanMoonrise={() => openCard('moonrise')}
                 onOpenNow={onOpenNow}
+                exposure={<ExposurePlayground kit={kitProfile} bag={bag} />}
                 events={
                   <SkyPanel
                     venue={venue}

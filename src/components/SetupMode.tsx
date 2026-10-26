@@ -120,6 +120,8 @@ interface SetupModeProps {
   menuOpen: boolean
   forward: React.ReactNode
   drawerRequest: { drawer: 'kit' | 'saved'; tick: number }
+  /** Sky › Exposure: try the bag's body and lens on a photo. */
+  onOpenExposure: () => void
   /** The top bar's +: there are no positions in setup, so it moves to the plan. */
   onAddPosition: () => void
   /** Brings back the landing page, which is otherwise shown once. */
@@ -199,6 +201,7 @@ export function SetupMode({
   menuOpen,
   forward,
   drawerRequest,
+  onOpenExposure,
   onAddPosition,
 }: SetupModeProps) {
   /*
@@ -353,7 +356,16 @@ export function SetupMode({
                   </button>
                 </div>
                 <div className="drawer__body">
-                  {drawer === 'kit' ? <KitProfile value={kit} onChange={onKit} kit={kitProfile} onKitChange={onKitProfile} shelved={shelved} onShelve={onShelve} note={kitNote} /> : null}
+                  {drawer === 'kit' ? (
+                    <>
+                      <div className="drawer__pad">
+                        <button type="button" className="btn btn--small" onClick={onOpenExposure}>
+                          Try your settings on a photo
+                        </button>
+                      </div>
+                      <KitProfile value={kit} onChange={onKit} kit={kitProfile} onKitChange={onKitProfile} shelved={shelved} onShelve={onShelve} note={kitNote} />
+                    </>
+                  ) : null}
                   {drawer === 'shots' ? (
                     <div className="drawer__pad">
                       <p className="setup__note">

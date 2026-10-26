@@ -1260,7 +1260,7 @@ function App() {
     drawer: 'kit',
     tick: 0,
   })
-  const [cardRequest, setCardRequest] = useState<{ kind: 'sky' | 'settings' | 'about' | 'callsheet'; tick: number }>({
+  const [cardRequest, setCardRequest] = useState<{ kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure'; tick: number }>({
     kind: 'sky',
     tick: 0,
   })
@@ -1855,6 +1855,10 @@ function App() {
             menuOpen={menuOpen}
             forward={forwardBar}
             drawerRequest={drawerRequest}
+            onOpenExposure={() => {
+              setMode('plan')
+              setCardRequest((r) => ({ kind: 'exposure', tick: r.tick + 1 }))
+            }}
             onAddPosition={() => {
               /* There are no positions in setup: the + goes to the plan, armed. */
               setMode('plan')

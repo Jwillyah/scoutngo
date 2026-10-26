@@ -180,3 +180,43 @@ export function startingExposure(
 ): StartingExposure | null {
   return STARTING_EXPOSURE[target]?.[darkness] ?? null
 }
+
+/*
+ * EXPOSURE VALUE, AND HOW FAR A SETTING IS FROM RIGHT. Computed, unlike the
+ * table above: this is the definition of EV and nothing in it is a choice.
+ *
+ *   EV100 = log2(N^2 / t) - log2(ISO / 100)
+ *
+ * A scene that needs EV100 15 is exposed right by any settings that come to
+ * 15; settings that come to 13 let in two stops more light than it needs.
+ * The exposure playground (src/core/playground.ts) reads its brightness and
+ * its light meter from these and nowhere else.
+ */
+export function ev100(seconds: number, aperture: number, iso: number): number {
+  return Math.log2((aperture * aperture) / seconds) - Math.log2(iso / 100)
+}
+
+/** Stops brighter (positive) or darker (negative) than right, for a scene needing `sceneEv`. */
+export function stopsOver(sceneEv: number, seconds: number, aperture: number, iso: number): number {
+  return sceneEv - ev100(seconds, aperture, iso)
+}
+
+export type MeterReading = 'too dark' | 'right' | 'too bright'
+
+/** Within two thirds of a stop reads as right: about what a camera's own meter tolerates. */
+export const METER_RIGHT_STOPS = 2 / 3
+
+export function meterReading(stops: number): MeterReading {
+  if (stops < -METER_RIGHT_STOPS) return 'too dark'
+  if (stops > METER_RIGHT_STOPS) return 'too bright'
+  return 'right'
+}
+
+/**
+ * The multiplier on an sRGB picture's values that shows `stops` more light.
+ * Light adds linearly, 2^stops; the values are gamma encoded at about 2.2, so
+ * the factor on them is that to the 1/2.2.
+ */
+export function brightnessFactor(stops: number): number {
+  return Math.pow(2, stops / 2.2)
+}
