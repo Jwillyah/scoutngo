@@ -296,6 +296,8 @@ interface PlanModeProps {
   onSearch: () => void
   /** The Now screen, from Sky's Tonight page. */
   onOpenNow: () => void
+  /** The dock's Back to now: the current time at the venue, today if the shoot day is not today. */
+  onBackToNow: () => void
   /** Ground, air or both. Decides what shows here AND what a generate asks for. */
   platformFilter: PlatformFilterValue
   showLabels: boolean
@@ -476,6 +478,7 @@ export function PlanMode({
   bag,
   onSearch,
   onOpenNow,
+  onBackToNow,
   platformFilter,
   showLabels,
   onShowLabels,
@@ -2021,7 +2024,7 @@ export function PlanMode({
             handle.current?.setBearing(0)
             handle.current?.setPitch(0)
             if (venue !== null) handle.current?.flyTo(venue)
-            onScrub(0.5)
+            onBackToNow()
           }}
         />
       )}

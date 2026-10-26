@@ -104,6 +104,7 @@ import { runSuggest } from './lib/suggestRun.ts'
 import { readShareHash, SHARE_PREFIX } from './lib/planShare.ts'
 import { Viewfinder, ViewfinderNeedsPlace } from './components/Viewfinder.tsx'
 import { SideMenu } from './components/SideMenu.tsx'
+import { backToNow } from './lib/backToNow.ts'
 import { pathToMenuItem, type MenuItem } from './lib/menu.ts'
 import {
   blockedReason,
@@ -1296,6 +1297,15 @@ function App() {
   }
   const menuCurrent: MenuItem = mode
 
+  /* The dock's Back to now: this minute at the venue, moving the shoot day to today if it is not. See src/lib/backToNow.ts. */
+  const onBackToNow = useCallback(() => {
+    const got = backToNow(venue, new Date())
+    if (got === null) return
+    const date = got.date
+    if (date !== null) setVenue((current) => ({ ...current, date }))
+    setScrub(got.scrub)
+  }, [venue])
+
   /*
    * A PLACE THAT MOVED IS STILL A PLACE. /field, /now and the rest are the
    * names of places (src/lib/menu.ts OLD_PATHS); vercel.json serves the app
@@ -2049,6 +2059,7 @@ function App() {
           bag={kit}
           onSearch={() => setMode('setup')}
           onOpenNow={() => setNowOpen(true)}
+          onBackToNow={onBackToNow}
         />
       ) : null}
 

@@ -60,6 +60,13 @@ describe('the playground, from the photo outwards', () => {
     expect(addedBlur(backgroundDiscPx(200, 22, 'fullFrame'), REFERENCE_DISC_PX)).toBe(0)
   })
 
+  it('nearer, the same lens and aperture soften the crowd far more: the distance slider is what makes aperture visible', () => {
+    const far = backgroundDiscPx(200, 2.8, 'fullFrame', 53)
+    const near = backgroundDiscPx(200, 2.8, 'fullFrame', 10)
+    expect(near / far).toBeGreaterThan(5)
+    expect(playgroundFrame({ seconds: 1 / 1600, aperture: 2.8, iso: 200 }, 200, 'fullFrame', 'midday', 10).backgroundSigmaPx).toBeGreaterThan(10)
+  })
+
   it('grain is added only above the photo\'s own ISO, and grows with it', () => {
     expect(addedGrain(100)).toBe(0)
     expect(addedGrain(200)).toBe(0)

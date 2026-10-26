@@ -110,10 +110,24 @@ export function backgroundDiscMm(focalMm: number, aperture: number, subjectM: nu
 }
 
 /** The background blur disc in the delivered frame's pixels. */
-export function backgroundDiscPx(focalMm: number, aperture: number, sensor: SensorName): number {
-  const s = subjectDistanceMeters(focalMm, sensor)
-  return backgroundDiscMm(focalMm, aperture, s, s + SCENE.backgroundBehindMeters) * pxPerSensorMm(sensor)
+export function backgroundDiscPx(
+  focalMm: number,
+  aperture: number,
+  sensor: SensorName,
+  /** How far away he is. Omitted, the distance that frames him as the photo does. */
+  subjectM: number = subjectDistanceMeters(focalMm, sensor),
+): number {
+  return backgroundDiscMm(focalMm, aperture, subjectM, subjectM + SCENE.backgroundBehindMeters) * pxPerSensorMm(sensor)
 }
+
+/*
+ * HOW FAR AWAY HE IS, as a slider. The photo stays as it was shot; the
+ * distance changes only the depth of field, through the same thin-lens disc
+ * above. At 53 m (what the board's size gives at 281 mm) the crowd is near
+ * the photo's own softness; at 10 m the same lens and aperture throw it well
+ * out of focus, which is the lesson the aperture slider could not show alone.
+ */
+export const DISTANCE_RANGE = { min: 10, max: 80, start: 53 } as const
 
 export const REFERENCE_DISC_PX = backgroundDiscPx(REFERENCE.focalMm, REFERENCE.aperture, REFERENCE.sensor)
 
@@ -167,9 +181,15 @@ export interface PlaygroundFrame {
   streakPx: number
 }
 
-export function playgroundFrame(s: Settings, focalMm: number, sensor: SensorName, light: Light = 'midday'): PlaygroundFrame {
+export function playgroundFrame(
+  s: Settings,
+  focalMm: number,
+  sensor: SensorName,
+  light: Light = 'midday',
+  subjectM: number = subjectDistanceMeters(focalMm, sensor),
+): PlaygroundFrame {
   const stops = stopsFromScene(s, light)
-  const disc = backgroundDiscPx(focalMm, s.aperture, sensor)
+  const disc = backgroundDiscPx(focalMm, s.aperture, sensor, subjectM)
   const streak = motionStreakPx(s.seconds)
   return {
     stops,
@@ -178,7 +198,7 @@ export function playgroundFrame(s: Settings, focalMm: number, sensor: SensorName
     motionSigmaPx: streakSigma(addedBlur(streak, REFERENCE_STREAK_PX)),
     backgroundSigmaPx: discSigma(addedBlur(disc, REFERENCE_DISC_PX)),
     grain: addedGrain(s.iso),
-    subjectMeters: subjectDistanceMeters(focalMm, sensor),
+    subjectMeters: subjectM,
     backgroundDiscPx: disc,
     streakPx: streak,
   }

@@ -8,9 +8,8 @@ import { Icon, type GlyphId } from './Icon.tsx'
  *   Calendar     the Sky card, at the calendar
  *   Lens         what each position frames: the cones
  *   Layers       the map and its layers
- *   Back         to the venue, north up, flat, and the shoot window. The
- *                design calls it Back to now; it goes to the middle of the
- *                shoot window, so the words say that
+ *   Back to now  the venue, north up, flat, and the current time; today
+ *                becomes the shoot day if it was another (src/lib/backToNow.ts)
  *
  * Plain words on each button for a screen reader and on a long press; the
  * tile is the label at a glance. Blue hour colours, src/lib/iconPalette.ts.
@@ -39,7 +38,7 @@ export function ToolDock({ moon, onMoon, onCalendar, lens, onLens, layersOpen, o
       {button('Calendar of the sky', 'calendar', onCalendar)}
       {button(lens ? 'What each lens sees, shown. Tap to hide' : 'Show what each lens sees', 'lens', onLens, lens)}
       {button('Map and layers', 'layers', onLayers, layersOpen)}
-      {button('Back to the start: the venue, north up, the shoot window', 'now', onReset)}
+      {button('Back to now: the venue, north up, the current time', 'now', onReset)}
     </nav>
   )
 }

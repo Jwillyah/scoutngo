@@ -22,7 +22,21 @@ Tried on the running app at Brew River Dock Bar, MapLibre GL 6.8.0.
 The viewfinder (phase 5) is the honest eye-level view: the real scene through
 the phone's camera, with the sun's path and the frames drawn on it.
 
-## Photorealistic 3D: cost and terms only, as asked
+The 3D pass (October 2026) builds an eye-level view in CesiumJS instead, on a
+clay model that says what it is: buildings from map data, unknown heights
+shown lighter.
+
+## Photorealistic 3D: decided against, for privacy
+
+**Decision, 26 October 2026: not built.** Every Photorealistic 3D tile
+request tells Google the area being looked at, which is the venue, and the
+viewer's IP address with it. That is the coordinate leaving the device, which
+the privacy rule does not allow. The 3D view is CesiumJS drawing a clay model
+from the data the app already fetches (Esri imagery, AWS Terrarium elevation,
+OpenStreetMap buildings), with no Google and no Cesium ion.
+
+The cost and terms, as looked at before the decision:
+
 
 Google Map Tiles API, Photorealistic 3D Tiles: $6.00 per 1,000 root tileset
 requests after a free 1,000 a month, falling to $2.40 per 1,000 past five

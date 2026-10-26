@@ -3,6 +3,7 @@ import { METER_RIGHT_STOPS } from '../core/exposure.ts'
 import { effectiveSensor, type KitProfile } from '../core/kit.ts'
 import {
   APERTURE_STOPS,
+  DISTANCE_RANGE,
   ISO_STOPS,
   LIGHTS,
   PHOTO,
@@ -63,11 +64,12 @@ export function ExposurePlayground({ kit, bag }: ExposurePlaygroundProps) {
   const apertures = APERTURE_STOPS.filter((n) => n >= widest - 0.05)
 
   const [light, setLight] = useState<Light>('midday')
+  const [distance, setDistance] = useState<number>(DISTANCE_RANGE.start)
   const [settings, setSettings] = useState<Settings>({ seconds: REFERENCE.seconds, aperture: REFERENCE.aperture, iso: REFERENCE.iso })
   const aperture = apertures.includes(settings.aperture as (typeof apertures)[number]) ? settings.aperture : apertures[nearest(apertures, settings.aperture)]
   const s = { ...settings, aperture }
 
-  const frame = useMemo(() => playgroundFrame(s, focal, sensor, light), [s.seconds, s.aperture, s.iso, focal, sensor, light]) // eslint-disable-line react-hooks/exhaustive-deps
+  const frame = useMemo(() => playgroundFrame(s, focal, sensor, light, distance), [s.seconds, s.aperture, s.iso, focal, sensor, light, distance]) // eslint-disable-line react-hooks/exhaustive-deps
   const box = surferBox()
   const { width: W, height: H } = PHOTO.original
 
@@ -169,6 +171,24 @@ export function ExposurePlayground({ kit, bag }: ExposurePlaygroundProps) {
         onIndex={(i) => setSettings({ ...s, iso: ISO_STOPS[i] })}
       />
 
+      <label className="play__slider">
+        <span className="play__ends">
+          <span>How far away is he</span>
+        </span>
+        <input
+          type="range"
+          min={DISTANCE_RANGE.min}
+          max={DISTANCE_RANGE.max}
+          step={1}
+          value={distance}
+          onChange={(e) => setDistance(Number(e.target.value))}
+          aria-valuetext={`${distance} m`}
+        />
+        <span className="play__term num">
+          Distance · {distance} m
+        </span>
+      </label>
+
       <div className="play__light" role="group" aria-label="The light">
         {LIGHTS.map((l) => (
           <button key={l.id} type="button" className="seg__btn" aria-pressed={light === l.id} onClick={() => setLight(l.id)}>
@@ -203,9 +223,10 @@ export function ExposurePlayground({ kit, bag }: ExposurePlaygroundProps) {
       </div>
 
       <p className="play__note num">
-        At {focal}mm on this {sensor === 'fullFrame' ? 'full frame' : 'APS-C'} body, framed like the photo, he is about{' '}
-        {Math.round(frame.subjectMeters)} m away. Assumed: a {SCENE.boardMeters} m board, the crowd {SCENE.backgroundBehindMeters} m behind him, and him moving at{' '}
-        {SCENE.subjectSpeedMps} m/s. It cannot show the photo sharper or cleaner than it was taken ({shutterWords(REFERENCE.seconds)}, f/{REFERENCE.aperture}, ISO {REFERENCE.iso}).
+        {focal}mm on this {sensor === 'fullFrame' ? 'full frame' : 'APS-C'} body, focused on him at {Math.round(frame.subjectMeters)} m. Assumed: the crowd{' '}
+        {SCENE.backgroundBehindMeters} m behind him, him moving at {SCENE.subjectSpeedMps} m/s, and a {SCENE.boardMeters} m board for the scale of the streak. The distance
+        changes only the blur behind him; the photo stays framed as shot. It cannot show the photo sharper or cleaner than it was taken (
+        {shutterWords(REFERENCE.seconds)}, f/{REFERENCE.aperture}, ISO {REFERENCE.iso}).
       </p>
       <p className="play__note">Everything here runs on this phone. Nothing is uploaded.</p>
     </div>

@@ -14,8 +14,10 @@ describe('the exposure playground', () => {
     expect(text).toContain('Nothing is uploaded.')
   })
 
-  it('three sliders in plain words, the camera term small underneath', () => {
-    expect(html.match(/type="range"/g)?.length).toBe(3)
+  it('three sliders in plain words, the camera term small underneath, and the distance', () => {
+    expect(html.match(/type="range"/g)?.length).toBe(4)
+    expect(text).toContain('How far away is he')
+    expect(html).toMatch(/min="10" max="80"[^>]*value="53"/)
     for (const w of ['Freeze motion', 'Show motion', 'Background sharp', 'Background soft', 'Clean, dark', 'Grainy, bright']) expect(text).toContain(w)
     for (const t of ['Shutter speed', 'Aperture', 'ISO']) expect(text).toContain(t)
   })
