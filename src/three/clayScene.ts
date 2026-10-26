@@ -63,6 +63,7 @@ import { heightGrid, sourceFor } from '../core/terrarium.ts'
 import { formatHour } from '../core/timezone.ts'
 import type { Building } from '../lib/buildings.ts'
 import { loadTile } from '../lib/offlineCache.ts'
+import { onSeaMask } from '../lib/seaMask.ts'
 import { IMAGERY_TEMPLATE, TERRAIN_TEMPLATE } from '../lib/offlineSources.ts'
 import { tileUrl } from '../lib/tileRange.ts'
 import { NOMINAL_TREE_HEIGHT, type MappedTree } from '../lib/trees.ts'
@@ -73,7 +74,8 @@ const CLAY_UNKNOWN_A = '#f8f5ef'
 const CLAY_UNKNOWN_B = '#ddd3c3'
 const TREE_GREEN = '#a9b694'
 const SKY_RADIUS = 1500
-const HEIGHT_SAMPLES = 65
+/* 129 across a 256 px tile: every other pixel, close enough to read within a metre of the 2D map. */
+const HEIGHT_SAMPLES = 129
 const ESRI_CREDIT = 'Tiles by Esri. Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
 
 const token = (name: string, fallback: string) => {
@@ -220,6 +222,12 @@ export function createClayScene(
   })
   const scene = widget.scene
   widget.imageryLayers.add(new ImageryLayer(new CachedImagery()))
+  /* The coastline arrived after tiles were read: read the elevation again, now cleaned (src/lib/seaMask.ts). */
+  const stopSea = onSeaMask(() => {
+    decoded.clear()
+    widget.terrainProvider = terrarium(status, onStatus)
+    scene.requestRender()
+  })
   scene.globe.enableLighting = true
   scene.globe.dynamicAtmosphereLighting = false
   scene.globe.depthTestAgainstTerrain = true
@@ -232,9 +240,14 @@ export function createClayScene(
    * put the 39 m block's shadow on the ground beside it and clear the
    * stripes. _terrainBias is the engine's own, unexported: pinned to
    * @cesium/engine 26.4.0, which package.json holds exactly.
+   *
+   * SOFT EDGES. Hard edges at 2048 drew the long evening shadows of the
+   * Virginia Beach hotels as 5 to 10 m stair-steps across the beach; soft
+   * filtering takes the steps out at the same map size (4096 would cost a
+   * phone about 64 MB of graphics memory).
    */
   if (scene.shadowMap !== undefined) {
-    scene.shadowMap.softShadows = false
+    scene.shadowMap.softShadows = true
     scene.shadowMap.size = 2048
     scene.shadowMap.maximumDistance = 1500
     scene.shadowMap.darkness = 0.45
@@ -474,6 +487,9 @@ export function createClayScene(
       scene.requestRender()
     },
     widget,
-    destroy: () => widget.destroy(),
+    destroy: () => {
+      stopSea()
+      widget.destroy()
+    },
   }
 }

@@ -1,6 +1,6 @@
 # Brew River at solar noon: 3D shadows against the 2D shadow polygons
 
-Run: 2026-10-26T17:48:25.113Z · node scripts/measure-3d-shadows.mjs · calibration venue 38.364236, -75.605912 · river from https://overpass-api.de/api/interpreter
+Run: 2026-10-26T21:44:34.187Z · node scripts/measure-3d-shadows.mjs · calibration venue 38.364236, -75.605912 · river from https://overpass-api.de/api/interpreter
 Solar noon 12:58 PM on 2026-09-12: sun at azimuth 180.0°, altitude 55.6°.
 Buildings drawn: 830, of which 821 have no recorded height and cast no shadow in either view. Globe loaded: true.
 South bank points: 167 (land, not under a roof, river within 60 m to the north, 12 m grid); 167 on screen and not hidden behind a building (checked against the depth buffer).
@@ -15,7 +15,7 @@ Transect north from the tallest building with a recorded height (39 m; its noon 
 | 2 | shadow | 0.45 | shadow |
 | 5 | shadow | 0.45 | shadow |
 | 10 | shadow | 0.45 | shadow |
-| 15 | shadow | 0.45 | shadow |
+| 15 | shadow | 0.44 | shadow |
 | 20 | shadow | 0.47 | shadow |
 | 25 | shadow | 0.46 | shadow |
 | 30 | sun | 1.00 | sun |

@@ -542,7 +542,7 @@ export function PlanMode({
   const [terrainPaused, setTerrainPaused] = useState(false)
   const [buildingsNote, setBuildingsNote] = useState<string | null>(null)
   const [sheetHeight, setSheetHeight] = useState(108)
-  const [pitch, setPitch] = useState(0)
+  const [, setPitch] = useState(0)
   /*
    * THE 3D VIEW. The rail's 3D button swaps the 2D map for the clay model of
    * the same place at the same time; Stand here puts the eye at a position.
@@ -1340,9 +1340,10 @@ export function PlanMode({
         },
         {
           id: 'terrain',
-          label: 'Terrain 3D',
+          /* Elevation for the horizon and the sun curve. 2D no longer tilts; the 3D button is the clay model. */
+          label: 'Terrain',
           /* The tile says what the layer is actually doing, suspension included. */
-          state: !showTerrain ? 'OFF' : terrainPaused ? 'PAUSED' : `ON · ${Math.round(pitch)}°`,
+          state: !showTerrain ? 'OFF' : terrainPaused ? 'PAUSED' : 'ON',
           on: showTerrain,
           art: TILE_ART.terrain,
           onToggle: () => turnTerrain(!showTerrain),

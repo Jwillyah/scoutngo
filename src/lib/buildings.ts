@@ -141,6 +141,11 @@ const key = (b: MapBounds) =>
   [b.west, b.south, b.east, b.north].map((n) => n.toFixed(3)).join(',')
 
 /** Never throws. Overpass being unreachable is a sentence, not a blank. */
+/** The copy kept on the phone for these bounds, with when it was fetched, or null. */
+export function savedBuildingsFor(bounds: MapBounds): { buildings: Building[]; fetchedAt: string } | null {
+  return readSavedBuildings(key(bounds))
+}
+
 /**
  * `timeoutMs`: the 2D map waits TIMEOUT_MS; the 3D view loads its buildings
  * behind a line that says so and can wait longer for a busy Overpass.

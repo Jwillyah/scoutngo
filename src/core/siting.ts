@@ -87,11 +87,27 @@ export const SEA_SEARCH_METERS = 3000
  * coastline within SEA_SEARCH_METERS is "not the sea", never a guess.
  */
 export function isInSea(at: LatLon, coastlines: readonly Position[][]): boolean {
+  const near = nearestCoast(at, coastlines)
+  return near !== null && near.distance <= SEA_SEARCH_METERS && near.sea
+}
+
+export interface NearestCoast {
+  /** Metres to the nearest coastline segment. */
+  distance: number
+  /** True on the water side (the right of the way). */
+  sea: boolean
+  /** Compass bearing pointing inland, square to that segment. */
+  inland: number
+}
+
+/** The nearest coastline segment to a point: how far, which side, and which way is inland. Null with no coastline. */
+export function nearestCoast(at: LatLon, coastlines: readonly Position[][]): NearestCoast | null {
   const kx = 111_320 * Math.cos((at.lat * Math.PI) / 180)
   const ky = 110_540
   const local = ([lon, lat]: Position) => [(lon - at.lon) * kx, (lat - at.lat) * ky] as const
   let best = Infinity
   let side = 0
+  let inland = 0
   for (const way of coastlines) {
     for (let i = 0; i + 1 < way.length; i++) {
       const [ax, ay] = local(way[i])
@@ -109,10 +125,12 @@ export function isInSea(at: LatLon, coastlines: readonly Position[][]): boolean 
         best = distance
         /* Cross of the segment with the point: negative is to the right, the water side. */
         side = dx * (0 - ay) - dy * (0 - ax)
+        /* Land is on the left: the segment's direction turned a quarter anticlockwise. */
+        inland = ((Math.atan2(dx, dy) * 180) / Math.PI + 270) % 360
       }
     }
   }
-  return best <= SEA_SEARCH_METERS && side < 0
+  return best === Infinity ? null : { distance: best, sea: side < 0, inland }
 }
 
 export function isInRoadway(at: LatLon, roads: RoadLine[]): boolean {

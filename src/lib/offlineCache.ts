@@ -34,6 +34,7 @@ import {
   TERRAIN_TEMPLATE,
   TERRAIN_ZOOMS,
 } from './offlineSources.ts'
+import { cleanTerrainBytes } from './seaMask.ts'
 import { boxAround, tilesForRange, tileUrl, type Box } from './tileRange.ts'
 
 export const TILE_CACHE = 'scoutngo-tiles-v1'
@@ -209,7 +210,8 @@ export async function loadTile(
 ): Promise<{ data: ArrayBuffer }> {
   const url = realUrl(params.url)
   const saved = await readSaved(url)
-  if (saved !== null) return { data: saved }
+  /* Elevation tiles have the sea put at sea level first (src/lib/seaMask.ts), for 2D and 3D alike. */
+  if (saved !== null) return { data: await cleanTerrainBytes(url, saved) }
 
   if (!deviceOnline()) throw new Error(`offline and not saved: ${url}`)
 
@@ -223,7 +225,7 @@ export async function loadTile(
   }
   reportNetwork(true)
   if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`)
-  return { data: await response.arrayBuffer() }
+  return { data: await cleanTerrainBytes(url, await response.arrayBuffer()) }
 }
 
 /* -------------------------------------------------------------------- areas */

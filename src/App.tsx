@@ -105,6 +105,7 @@ import { readShareHash, SHARE_PREFIX } from './lib/planShare.ts'
 import { Viewfinder, ViewfinderNeedsPlace } from './components/Viewfinder.tsx'
 import { SideMenu } from './components/SideMenu.tsx'
 import { backToNow } from './lib/backToNow.ts'
+import { loadSeaMask, setSeaMask } from './lib/seaMask.ts'
 import { pathToMenuItem, type MenuItem } from './lib/menu.ts'
 import {
   blockedReason,
@@ -575,6 +576,18 @@ function App() {
    * apart with nothing to say which was which.
    */
   const aim = centre
+
+  /*
+   * THE COASTLINE AROUND THE VENUE, so the elevation both views read has the
+   * sea at sea level (src/lib/seaMask.ts). Saved on the phone once fetched.
+   */
+  useEffect(() => {
+    if (centre === null) {
+      setSeaMask(null)
+      return
+    }
+    void loadSeaMask(centre)
+  }, [centre])
 
   /* The moment the scrubber is sitting on. */
   const scrubbedAt = useMemo(() => {

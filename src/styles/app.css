@@ -10885,3 +10885,12 @@
   color: var(--color-text);
   font-size: var(--text-xs);
 }
+
+/* A legend line that carries its own fix: clickable, unlike the rest of the legend. */
+.clay__line--act {
+  pointer-events: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}

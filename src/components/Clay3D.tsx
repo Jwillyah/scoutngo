@@ -4,7 +4,8 @@ import type { LatLon } from '../core/geo.ts'
 import { frameBox, observerPose, viewWidthDegrees, zoomWithin } from '../core/observer.ts'
 import { zonedTimeToUtc } from '../core/timezone.ts'
 import { localDate } from '../core/moonTimes.ts'
-import { fetchBuildings, type Building } from '../lib/buildings.ts'
+import { fetchBuildings, savedBuildingsFor, type Building } from '../lib/buildings.ts'
+import { loadSeaMask, onSeaMask, seaStatus, type SeaStatus } from '../lib/seaMask.ts'
 import { ensure3dOverview } from '../lib/offline3d.ts'
 import { MIN_INTERVAL_MS } from '../lib/overpass.ts'
 import { boxAround } from '../lib/tileRange.ts'
@@ -40,8 +41,13 @@ interface Clay3DProps {
 
 /* 600 m around the venue for buildings: past that a clay box is a speck. */
 const BUILDING_REACH_M = 600
-/* Overpass can take most of a minute when it is busy; the 2D map's 12 s would give up. */
-const BUILDING_WAIT_MS = 60_000
+/*
+ * The longest "Loading buildings" may stay on screen before it says they did
+ * not load. 50 s from the moment the scene is up, so that with the scene's own
+ * few seconds the answer is on screen within a minute of tapping 3D: measured
+ * 62 s at 60.
+ */
+export const BUILDING_DEADLINE_MS = 50_000
 
 export const CLAY_NOTE = 'Clay model from map data. Real buildings may differ; unknown heights shown lighter.'
 
@@ -50,7 +56,8 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
   const scene = useRef<ClayScene | null>(null)
   const [ready, setReady] = useState(false)
   const [failed, setFailed] = useState<string | null>(null)
-  const [buildings, setBuildings] = useState<{ total: number; unknown: number } | { problem: string } | 'loading'>('loading')
+  const [buildings, setBuildings] = useState<{ total: number; unknown: number; savedAt: string | null } | { problem: string } | 'loading'>('loading')
+  const [buildingsTry, setBuildingsTry] = useState(0)
   const [trees, setTrees] = useState<TreesResult | null>(null)
   const [flat, setFlat] = useState(0)
   /* The zoom belongs to one Stand here: a new one starts at its own focal length. */
@@ -80,31 +87,41 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
   }, [venue, timeZone])
 
   /*
-   * THE BUILDINGS, THEN THE TREES, from the same Overpass the 2D map uses and
-   * saved on the phone like 2D's. One at a time and politely spaced: Overpass
-   * refuses a second call inside MIN_INTERVAL_MS, and the 2D map may have
-   * just made one, and it is often busy, so a refusal is waited out and
-   * tried again, four times, each wait twice the last.
+   * THE BUILDINGS, THEN THE TREES, from the same Overpass the 2D map uses.
+   *
+   * WITHIN A MINUTE, ONE WAY OR THE OTHER. "Loading buildings…" once sat on
+   * screen for good at Virginia Beach while Overpass retried and timed out
+   * behind it. Now: the copy saved on the phone is drawn at once when there
+   * is one (and refreshed behind it); otherwise one fetch, waited out once if
+   * Overpass says it was asked moments ago, and given up on at
+   * BUILDING_DEADLINE_MS with "Buildings didn't load" and a Retry.
    */
   useEffect(() => {
     if (!ready) return
     let cancelled = false
-    const pause = (times = 1) => new Promise((resolve) => setTimeout(resolve, (MIN_INTERVAL_MS + 250) * times))
+    const bounds = boxAround(venue, BUILDING_REACH_M)
+    const started = Date.now()
+    const left = () => BUILDING_DEADLINE_MS - (Date.now() - started)
+    const draw = (list: readonly Building[], savedAt: string | null) => {
+      scene.current?.setBuildings(list)
+      setBuildings({ total: list.length, unknown: list.filter((b) => b.height.metres === null).length, savedAt })
+    }
+    const saved = savedBuildingsFor(bounds)
     void (async () => {
-      let result = await fetchBuildings(boxAround(venue, BUILDING_REACH_M), BUILDING_WAIT_MS)
-      for (let i = 0; i < 4 && result.status !== 'ok' && !cancelled; i += 1) {
-        await pause(2 ** i)
-        result = await fetchBuildings(boxAround(venue, BUILDING_REACH_M), BUILDING_WAIT_MS)
+      await Promise.resolve()
+      if (cancelled) return
+      if (saved !== null) draw(saved.buildings, saved.fetchedAt)
+      else setBuildings('loading')
+      let result = await fetchBuildings(bounds, Math.max(1000, left()))
+      if (result.status !== 'ok' && result.reason.includes('moments ago') && left() > MIN_INTERVAL_MS + 2000) {
+        await new Promise((resolve) => setTimeout(resolve, MIN_INTERVAL_MS + 250))
+        if (cancelled) return
+        result = await fetchBuildings(bounds, Math.max(1000, left()))
       }
       if (cancelled) return
-      if (result.status === 'ok') {
-        const list: readonly Building[] = result.buildings
-        scene.current?.setBuildings(list)
-        setBuildings({ total: list.length, unknown: list.filter((b) => b.height.metres === null).length })
-      } else {
-        setBuildings({ problem: result.reason })
-      }
-      await pause()
+      if (result.status === 'ok') draw(result.buildings, result.cached && result.savedAt !== undefined ? result.savedAt : null)
+      else if (saved === null) setBuildings({ problem: result.reason })
+      await new Promise((resolve) => setTimeout(resolve, MIN_INTERVAL_MS + 250))
       if (cancelled) return
       const trees = await fetchTrees(venue)
       if (cancelled) return
@@ -114,7 +131,11 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
     return () => {
       cancelled = true
     }
-  }, [ready, venue])
+  }, [ready, venue, buildingsTry])
+
+  /* The coastline the elevation is cleaned against (src/lib/seaMask.ts): said while it loads, and if it did not. */
+  const [sea, setSea] = useState<SeaStatus>(() => seaStatus())
+  useEffect(() => onSeaMask(() => setSea(seaStatus())), [])
 
   /* The coarse tiles the overview stands on, saved once per venue so 3D opens with no signal (src/lib/offline3d.ts). */
   useEffect(() => {
@@ -186,10 +207,15 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
         {buildings === 'loading' ? (
           ready ? <p className="clay__line">Loading buildings…</p> : null
         ) : 'problem' in buildings ? (
-          <p className="clay__line">No buildings: {buildings.problem} None are saved for here.</p>
+          <p className="clay__line clay__line--act">
+            Buildings didn't load. {buildings.problem} None are saved on this phone for here.{' '}
+            <button type="button" className="btn btn--small" onClick={() => setBuildingsTry((n) => n + 1)}>
+              Retry
+            </button>
+          </p>
         ) : (
           <p className="clay__line num">
-            {buildings.total} buildings
+            {buildings.total} buildings{buildings.savedAt === null ? '' : `, saved on this phone ${buildings.savedAt.slice(0, 10)}`}
             {buildings.unknown > 0 ? (
               <>
                 {' · '}
@@ -209,6 +235,15 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
           </p>
         )}
         {flat > 0 ? <p className="clay__line">Some ground has no saved elevation and is drawn flat.</p> : null}
+        {sea === 'loading' ? <p className="clay__line">Checking the coastline…</p> : null}
+        {sea === 'failed' ? (
+          <p className="clay__line clay__line--act">
+            Coastline didn't load: at the coast the sea may not sit at sea level.{' '}
+            <button type="button" className="btn btn--small" onClick={() => void loadSeaMask(venue)}>
+              Retry
+            </button>
+          </p>
+        ) : null}
       </div>
       {stand === null || lensFocal === null ? null : (
         <div className="clay__stand">
