@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { readShareHash, shareLink, SHARE_PREFIX } from './planShare.ts'
 import type { Spot } from './spots.ts'
-import { EMPTY_VENUE, withLaanc } from './venue.ts'
+import { EMPTY_VENUE, withApprovedCeiling, withLaanc } from './venue.ts'
 
-const venue = withLaanc({ ...EMPTY_VENUE, latitude: '36.846580', longitude: '-75.976660', date: '2026-10-25', eventDescription: 'Atlantic Park surf' }, true)
+const venue = withApprovedCeiling(
+  withLaanc({ ...EMPTY_VENUE, latitude: '36.846580', longitude: '-75.976660', date: '2026-10-25', eventDescription: 'Atlantic Park surf' }, true),
+  '200',
+)
 const spot: Spot = {
   id: 'spot-1',
   name: 'Atlantic Park',
@@ -34,7 +37,9 @@ describe('a plan as a link', () => {
 
   it("never carries the sender's LAANC switch", async () => {
     const link = await shareLink('https://scoutngo.vercel.app/', spot)
-    expect((await readShareHash(new URL(link).hash))?.venue.laanc).toBeUndefined()
+    const back = await readShareHash(new URL(link).hash)
+    expect(back?.venue.laanc).toBeUndefined()
+    expect(back?.venue.laancCeilingFeet).toBeUndefined()
   })
 
   it('reads nothing from a link that is not a plan, or is damaged', async () => {

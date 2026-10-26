@@ -326,6 +326,9 @@ interface PlanModeProps {
   /** "I have LAANC here", for this venue. See laancHere in src/lib/venue.ts. */
   laanc: boolean
   onLaanc: (on: boolean) => void
+  /** "My approved ceiling" as typed for this venue, '' for the grid's. See approvedCeilingHere. */
+  approvedCeiling: string
+  onApprovedCeiling: (typed: string) => void
   onPlacingPilot: (next: boolean) => void
   /**
    * Whether the next tap will add an AIR position.
@@ -485,6 +488,8 @@ export function PlanMode({
   airAltitudeFeet,
   laanc,
   onLaanc,
+  approvedCeiling,
+  onApprovedCeiling,
   onPlacingPilot,
   addsAir,
 }: PlanModeProps) {
@@ -1604,7 +1609,14 @@ export function PlanMode({
       case 'airspace':
         return (
           <Card title="Airspace" onClose={home}>
-            <AirspacePanel venue={venue} altitudeFeet={airAltitudeFeet} laanc={laanc} onLaanc={onLaanc} />
+            <AirspacePanel
+              venue={venue}
+              altitudeFeet={airAltitudeFeet}
+              laanc={laanc}
+              onLaanc={onLaanc}
+              approvedCeiling={approvedCeiling}
+              onApprovedCeiling={onApprovedCeiling}
+            />
           </Card>
         )
       case 'layers':

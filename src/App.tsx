@@ -123,6 +123,8 @@ import {
   validateVenue,
   laancHere,
   withLaanc,
+  withApprovedCeiling,
+  approvedCeilingHere,
   venueLatLon,
   withCoordinates,
   type VenueDraft,
@@ -1535,6 +1537,8 @@ function App() {
         : { elevationAt: (at: LatLon) => mapHandle.current?.elevationAt(at) ?? null }),
       units: settings.units,
       laanc: laancHere(venue),
+      approvedCeilingFeet: approvedCeilingHere(venue),
+      shootAt,
       onStage: (stage) => setGeneration({ status: 'working', stage }),
     })
     if (outcome.status === 'error') {
@@ -1895,6 +1899,8 @@ function App() {
           airAltitudeFeet={plannedAltitudeFeet}
           laanc={laancHere(venue)}
           onLaanc={(on) => setVenue((current) => withLaanc(current, on))}
+          approvedCeiling={laancHere(venue) ? (venue.laancCeilingFeet ?? '') : ''}
+          onApprovedCeiling={(typed) => setVenue((current) => withApprovedCeiling(current, typed))}
           onPlacingPilot={setPlacingPilot}
           onSetAltitude={onSetAltitude}
           onSetShotType={onSetShotType}

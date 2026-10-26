@@ -13,7 +13,7 @@
  * no aperture, because "a Sony 70-200" is an f/4 or an f/2.8 and nobody had
  * said which; it is the f/2.8 GM II, said on 26 October.
  */
-import type { Body, KitProfile, Lens } from '../core/kit.ts'
+import { DEFAULT_KIT, type Body, type KitProfile, type Lens } from '../core/kit.ts'
 
 export const AMENDMENTS_STORAGE_KEY = 'scoutngo.kitAmendments.v1'
 
@@ -24,6 +24,8 @@ export interface KitAmendment {
   addLenses: Lens[]
   /** Bodies to add when the kit does not have one with that id. Optional: older amendments added none. */
   addBodies?: Body[]
+  /** Where the added bodies go: straight after the body with this id when the kit has it, else at the end. */
+  bodiesAfter?: string
   shelve: string[]
   /** Fields to set on a lens the kit already has. A lens it does not have is left alone. */
   updateLenses?: { id: string; set: Partial<Pick<Lens, 'name' | 'maxAperture'>> }[]
@@ -37,6 +39,9 @@ export interface KitAmendment {
  */
 const SONY_70_200_NAME = 'Sony 70-200 f2.8 GM II'
 const SONY_70_200_APERTURE = 2.8
+
+/* The same record DEFAULT_KIT seeds, so the two cannot disagree (failure mode A). */
+const A7III = DEFAULT_KIT.bodies.find((b) => b.id === 'a7iii') as Body
 
 export const AMENDMENTS: readonly KitAmendment[] = [
   {
@@ -88,6 +93,23 @@ export const AMENDMENTS: readonly KitAmendment[] = [
     ],
     shelve: [],
   },
+  /*
+   * THE a7III, from the fixes brief of 25 October: "the brief asked for the
+   * a7III (photo body), not the a6300". It has been in DEFAULT_KIT since 18
+   * October, but DEFAULT_KIT only seeds a first run, so a phone whose stored
+   * kit lacks it never got it. 6000 x 4000 on a 35.6 x 23.8 mm full-frame
+   * sensor, checked again against Wikipedia's Sony a7 III specification table
+   * on 2026-10-25 ("35.6 x 23.8 mm (Full frame type)", "6000 x 4000"). Placed
+   * after the a7IV so the bodies read a7IV, a7III, a6300.
+   */
+  {
+    id: '2026-10-25-sony-a7iii',
+    says: 'Added the Sony a7III as the photo body, as asked on 25 October.',
+    addLenses: [],
+    addBodies: [A7III],
+    bodiesAfter: 'a7iv',
+    shelve: [],
+  },
 ]
 
 export interface Amended {
@@ -129,7 +151,10 @@ export function applyAmendments(
       (body) => !nextProfile.bodies.some((existing) => existing.id === body.id),
     )
     if (newBodies.length > 0) {
-      nextProfile = { ...nextProfile, bodies: [...nextProfile.bodies, ...newBodies] }
+      const at = nextProfile.bodies.findIndex((b) => b.id === amendment.bodiesAfter)
+      const bodies = [...nextProfile.bodies]
+      bodies.splice(at === -1 ? bodies.length : at + 1, 0, ...newBodies)
+      nextProfile = { ...nextProfile, bodies }
     }
     for (const update of amendment.updateLenses ?? []) {
       nextProfile = {

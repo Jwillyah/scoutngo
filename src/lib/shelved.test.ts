@@ -164,3 +164,34 @@ describe('the kit the brief names', () => {
     expect(applyAmendments(removed, first.shelved, first.applied).profile.bodies.map((b) => b.id)).not.toContain('a6300')
   })
 })
+
+/*
+ * THE PHONE THE FIX IS FOR: a stored kit with the a7IV and the a6300 but no
+ * a7III, every earlier amendment already applied. DEFAULT_KIT has the a7III,
+ * and that is exactly why a fresh-phone test could not see this gap.
+ */
+describe('the a7III on a phone that never had it', () => {
+  const earlier = AMENDMENTS.filter((a) => a.id !== '2026-10-25-sony-a7iii').map((a) => a.id)
+  const stored = {
+    ...DEFAULT_KIT,
+    bodies: [DEFAULT_KIT.bodies[0], { id: 'a6300', name: 'Sony a6300', role: 'photo' as const, sensor: 'apsc' as const, horizontalPixels: 6000, verticalPixels: 4000, notes: '' }],
+  }
+  const after = applyAmendments(stored, [], earlier)
+
+  it('puts it in as the photo body, between the a7IV and the a6300', () => {
+    expect(after.profile.bodies.map((b) => b.id)).toEqual(['a7iv', 'a7iii', 'a6300'])
+    expect(after.said).toEqual(['Added the Sony a7III as the photo body, as asked on 25 October.'])
+  })
+
+  it('with the spec table figures: full frame, 6000 x 4000', () => {
+    expect(after.profile.bodies.find((b) => b.id === 'a7iii')).toMatchObject({ role: 'photo', sensor: 'fullFrame', horizontalPixels: 6000, verticalPixels: 4000 })
+  })
+
+  it('is the same record DEFAULT_KIT seeds', () => {
+    expect(AMENDMENTS.find((a) => a.id === '2026-10-25-sony-a7iii')?.addBodies).toEqual([DEFAULT_KIT.bodies.find((b) => b.id === 'a7iii')])
+  })
+
+  it('says nothing on a phone that already has it', () => {
+    expect(applyAmendments(DEFAULT_KIT, [], earlier).said).toEqual([])
+  })
+})

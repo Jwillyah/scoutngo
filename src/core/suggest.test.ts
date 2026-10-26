@@ -287,7 +287,7 @@ describe('the "I have LAANC here" switch', () => {
     const west = all(on).filter(inWest)
     expect(west.length).toBeGreaterThan(0)
     for (const c of west) {
-      expect(c.gridCeilingFeet).toBe(100)
+      expect(c.ceilingFeet).toBe(100)
       expect(c.altitudeFeet).toBeLessThanOrEqual(100)
     }
     expect(total(on)).toBe(on.considered)

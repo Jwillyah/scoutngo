@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ToolContext } from '../core/callSheetTools.ts'
-import { readApiKey } from '../lib/apiKey.ts'
+import { CALL_SHEET_MODELS, readApiKey, readModelChoice } from '../lib/apiKey.ts'
 import { writeCallSheet, type CallSheetOutcome } from '../lib/callSheet.ts'
 import { readPlaybook, savePlaybook } from '../lib/playbook.ts'
 
@@ -44,7 +44,7 @@ export function CallSheetCard({ context, onOpenKey }: CallSheetCardProps) {
   const write = async () => {
     if (context === null) return
     setBusy(true)
-    setOutcome(await writeCallSheet(prompt, key, { ...context, playbook }))
+    setOutcome(await writeCallSheet(prompt, key, { ...context, playbook }, fetch, CALL_SHEET_MODELS[readModelChoice()]))
     setBusy(false)
   }
 

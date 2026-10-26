@@ -37,6 +37,9 @@ interface AirspacePanelProps {
   /** The shooter's "I have LAANC here" switch for this venue. Kept on this phone. */
   laanc: boolean
   onLaanc: (on: boolean) => void
+  /** "My approved ceiling" as typed, or '' for the grid value. See approvedCeilingHere in src/lib/venue.ts. */
+  approvedCeiling?: string
+  onApprovedCeiling?: (typed: string) => void
 }
 
 /**
@@ -55,7 +58,7 @@ interface AirspacePanelProps {
  * NOTHING HERE IS AN AUTHORIZATION, and the panel says so in the FAA's own
  * terms rather than in a disclaimer at the bottom nobody reads.
  */
-export function AirspacePanel({ venue, altitudeFeet, laanc, onLaanc }: AirspacePanelProps) {
+export function AirspacePanel({ venue, altitudeFeet, laanc, onLaanc, approvedCeiling = '', onApprovedCeiling }: AirspacePanelProps) {
   /*
    * THE ANSWER CARRIES THE PIN IT IS FOR.
    *
@@ -173,9 +176,41 @@ export function AirspacePanel({ venue, altitudeFeet, laanc, onLaanc }: AirspaceP
             <span className="air__switchtext">
               I have LAANC here
               <span className="air__detail">
-                Suggest then keeps drone spots in controlled airspace, up to the grid ceiling. Saved on this phone with
-                this spot; moving the pin turns it off.
+                Suggest then keeps drone spots in controlled airspace, up to the lower of the grid ceiling and your
+                approved ceiling. Saved on this phone with this spot; moving the pin turns it off.
               </span>
+            </span>
+          </label>
+        ) : null}
+        {/*
+          * MY APPROVED CEILING, beside the switch and only while it is on. It
+          * starts at the grid's value, shown as the placeholder, because an
+          * authorization is never above the grid; typing a lower one is how a
+          * 200 ft approval under a 250 ft square gets planned at 200.
+          */}
+        {laanc && onApprovedCeiling !== undefined ? (
+          <label className="field air__ceiling">
+            <span className="field__label">My approved ceiling</span>
+            <span className="air__ceilingrow">
+              <input
+                className="input num"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={PART_107_CEILING_FEET}
+                step={1}
+                value={approvedCeiling}
+                placeholder={cell === null ? '' : String(cell.ceilingFeet)}
+                onChange={(event) => onApprovedCeiling(event.target.value)}
+              />
+              <span className="air__detail">ft above ground</span>
+            </span>
+            <span className="air__detail">
+              {cell === null
+                ? 'No grid square here, so Suggest keeps drones out of the controlled airspace whatever is typed.'
+                : approvedCeiling.trim() === ''
+                  ? `The grid's ${cell.ceilingFeet} ft until you change it.`
+                  : `Suggest flies under the lower of this and the grid's ${cell.ceilingFeet} ft.`}
             </span>
           </label>
         ) : null}

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { FLOATING_CHROME_SELECTORS } from '../src/lib/floatingChrome.ts'
+import { FLOATING_CHROME_SELECTORS, floatingChromeNodes } from '../src/lib/floatingChrome.ts'
 
 /*
  * EVERYTHING THAT FLOATS OVER THE MAP MUST BE IN THE RESERVED LIST.
@@ -90,5 +90,30 @@ describe('the reserved list', () => {
   it('reserves the venue pin', () => {
     const effect = SOURCE.slice(SOURCE.indexOf('const obstacles: Rect[]'))
     expect(effect.slice(0, 400)).toContain('.pin')
+  })
+})
+
+/*
+ * A CONTROL CORNER COUNTS AS WHAT IS IN IT. The bottom-left corner is 102 x
+ * 577 and holds two small controls (measurements/2026-10-25-ray-label-corner.md);
+ * reserving the container kept ray labels out of an empty strip. Every place
+ * that reserves chrome goes through floatingChromeNodes.
+ */
+describe('control corners are measured by their children', () => {
+  const el = (className: string, children: object[] = []) => ({ className, children })
+  const scale = el('maplibregl-ctrl maplibregl-ctrl-scale')
+  const credit = el('maplibregl-ctrl maplibregl-ctrl-attrib')
+  const corner = el('maplibregl-ctrl-bottom-left ', [scale, credit])
+  const topbar = el('topbar')
+  const root = { querySelectorAll: () => [corner, topbar] } as unknown as ParentNode
+
+  it('expands a corner into its controls and keeps everything else whole', () => {
+    expect(floatingChromeNodes(root, FLOATING_CHROME_SELECTORS)).toEqual([scale, credit, topbar])
+  })
+
+  it('is what the ray labels, the grid tags and the label audit all use', () => {
+    expect(SOURCE.match(/floatingChromeNodes\(document/g)?.length).toBe(2)
+    expect(SOURCE).not.toContain("includes('maplibregl-ctrl-')")
+    expect(readFileSync('scripts/audit-labels.mjs', 'utf8')).toContain('floatingChromeNodes.toString()')
   })
 })

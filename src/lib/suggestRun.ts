@@ -38,6 +38,11 @@ import type { CameraPosition } from './plan.ts'
 import type { MapBounds } from './generation.ts'
 import { boxAround } from './tileRange.ts'
 import { formatRange, type Units } from './units.ts'
+import { aerialHero, type AerialHero, type HeroResult } from '../core/aerialHero.ts'
+import { compassWord } from '../core/compassWords.ts'
+import { shootMoments } from '../core/shootIcs.ts'
+import { getSunPosition } from '../core/sun.ts'
+import { flyCeiling } from './venue.ts'
 
 /** The data box reaches this far past the reach ring, for lines that leave it. */
 export const DATA_MARGIN_METERS = 100
@@ -83,6 +88,8 @@ export interface SuggestSummary {
   picked: string[]
   runnersUp: string[]
   notes: string[]
+  /** The hero wide push in words, or why there is none. Absent when no drone is in the run. */
+  hero?: string
 }
 
 /** "side light, 180 ft from the southwest, nothing mapped in the line · Sony 70-200 118mm". */
@@ -91,7 +98,7 @@ export function whyLine(candidate: Candidate, units: Units): string {
   const where =
     candidate.platform === 'air'
       ? `${formatRange(candidate.rangeMeters, units.distance)} out at ${candidate.altitudeFeet} ft` +
-        (candidate.gridCeilingFeet === undefined ? '' : ` (under LAANC, grid ceiling ${candidate.gridCeilingFeet} ft)`)
+        (candidate.ceilingFeet === undefined ? '' : ` (under LAANC, ceiling ${candidate.ceilingFeet} ft)`)
       : formatRange(candidate.rangeMeters, units.distance)
   return `${lightWords(candidate.light)}, ${where} ${sideWords(candidate)}, ${lineWords(candidate)} · ${optic}`
 }
@@ -126,6 +133,13 @@ export interface SuggestArgs {
    * facility map's ceiling. It never opens a restricted area or a park.
    */
   laanc: boolean
+  /**
+   * "My approved ceiling" at this venue (approvedCeilingHere), or null for
+   * the grid's. Suggest flies under the lower of the two.
+   */
+  approvedCeilingFeet: number | null
+  /** The shoot time, for the golden hour the hero push is planned at. */
+  shootAt: Date
   onStage?: (stage: 'capture' | 'terrain' | 'positions' | 'lighting') => void
 }
 
@@ -159,6 +173,12 @@ export async function runSuggest(args: SuggestArgs): Promise<SuggestOutcome> {
     : [[], { specialUse: [], parks: [] }]
 
   args.onStage?.('positions')
+  const laanc = {
+    enabled: args.laanc,
+    ceilingAt: (at: LatLon) => flyCeiling(facilityCellAt(at.lat, at.lon)?.ceilingFeet ?? null, args.approvedCeilingFeet),
+  }
+  const footprints =
+    buildings.status === 'ok' ? buildings.buildings.map((b) => ({ id: b.id, ring: b.ring, heightMeters: b.height.metres })) : []
   const result = suggestPositions({
     subject: args.subject,
     subjectHeightMeters: SUBJECT_AIM_METERS,
@@ -168,23 +188,18 @@ export async function runSuggest(args: SuggestArgs): Promise<SuggestOutcome> {
     platforms: args.platforms,
     airAltitudeFeet: args.airAltitudeFeet,
     sun: args.sun,
-    footprints:
-      buildings.status === 'ok'
-        ? buildings.buildings.map((b) => ({ id: b.id, ring: b.ring, heightMeters: b.height.metres }))
-        : [],
+    footprints,
     water: site.status === 'ok' ? site.geometry.land.water : [],
     coastline: site.status === 'ok' ? (site.geometry.land.coastline ?? []) : [],
     airspace,
     specialUse: closed.specialUse,
     parks: closed.parks,
-    laanc: {
-      enabled: args.laanc,
-      ceilingAt: (at: LatLon) => facilityCellAt(at.lat, at.lon)?.ceilingFeet ?? null,
-    },
+    laanc,
     marks: args.marks,
     date: args.date,
     ...(args.elevationAt === undefined ? {} : { elevationAt: args.elevationAt }),
   })
+  const hero = flying ? heroFor(args, optics, footprints, airspace, closed, laanc) : null
   args.onStage?.('lighting')
 
   /* Said, never silent: a check that could not run is not a check that passed. */
@@ -211,11 +226,79 @@ export async function runSuggest(args: SuggestArgs): Promise<SuggestOutcome> {
     moved: false,
     origin: 'suggested',
   }))
+  if (hero?.status === 'ok') positions.push(heroPosition(hero.hero, positions.length + 1, args.units))
 
   return {
     status: 'ok',
     positions,
-    summary: { ...summarise(result, args.units), notes },
+    summary: {
+      ...summarise(result, args.units),
+      notes,
+      ...(hero === null ? {} : { hero: hero.status === 'ok' ? heroLine(hero.hero, args.units) : `No hero push: ${hero.reason}` }),
+    },
     site: site.status === 'ok' ? site.geometry : null,
+  }
+}
+
+/* ------------------------------------------------------------- the hero push */
+
+/** The sun at golden hour on the shoot date: the evening's when the shoot is after noon, the morning's before. */
+export function goldenSun(at: LatLon, shootAt: Date): SunPosition | null {
+  const golden = shootMoments({ lat: at.lat, lon: at.lon, start: shootAt, end: shootAt }).goldenStarts
+  return golden === null ? null : getSunPosition(golden, at.lat, at.lon)
+}
+
+function heroFor(
+  args: SuggestArgs,
+  optics: SuggestOptic[],
+  footprints: Parameters<typeof aerialHero>[0]['footprints'],
+  airspace: Parameters<typeof aerialHero>[0]['airspace'],
+  closed: { specialUse: Parameters<typeof aerialHero>[0]['specialUse']; parks: Parameters<typeof aerialHero>[0]['parks'] },
+  laanc: Parameters<typeof aerialHero>[0]['laanc'],
+): HeroResult {
+  return aerialHero({
+    subject: args.subject,
+    optics: optics.filter((o) => o.kind === 'drone').map((o) => ({ id: o.id, name: o.name, focalLength: o.minFocalLength, sensor: o.sensor })),
+    sun: goldenSun(args.subject, args.shootAt),
+    footprints,
+    airspace,
+    specialUse: closed.specialUse,
+    parks: closed.parks,
+    laanc,
+  })
+}
+
+/** "Hero wide push at golden hour: from 746 ft out to the east at 200 ft, push 456 ft in, camera faces west, skyline behind, back light · Air 3S wide 24mm". */
+export function heroLine(hero: AerialHero, units: Units): string {
+  const ceiling = hero.ceilingFeet === null ? '' : ` (under LAANC, ceiling ${hero.ceilingFeet} ft)`
+  const behind =
+    hero.backdropBy === 'height'
+      ? `${hero.backdropCount} mapped buildings behind the subject`
+      : `${hero.backdropCount} mapped buildings behind the subject, weighed by footprint because none has a mapped height`
+  return (
+    `Hero wide push at golden hour: from ${formatRange(hero.startMeters, units.distance)} out to the ${compassWord((hero.cameraBearing + 180) % 360)} ` +
+    `at ${hero.altitudeFeet} ft${ceiling}, push ${formatRange(hero.pushMeters, units.distance)} in, camera faces ${compassWord(hero.cameraBearing)}, ` +
+    `${behind}, ${lightWords(hero.light)} · ${hero.opticName} ${hero.focalLength}mm`
+  )
+}
+
+function heroPosition(hero: AerialHero, number: number, units: Units): CameraPosition {
+  return {
+    id: `pos-${number}`,
+    number,
+    at: hero.start,
+    lensId: hero.opticId,
+    focalLength: hero.focalLength,
+    /* WHAT, this once, is the code's: the hero is a named shot, not a framing spot. */
+    shot: 'Hero wide push at golden hour',
+    risk: '',
+    angleRationale: heroLine(hero, units),
+    coversShot: null,
+    platform: 'air',
+    altitudeFeet: hero.altitudeFeet,
+    shotType: DEFAULT_SHOT_TYPE,
+    yawDegrees: DEFAULT_YAW_DEGREES,
+    moved: false,
+    origin: 'suggested',
   }
 }

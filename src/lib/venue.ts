@@ -7,6 +7,7 @@
  */
 
 import type { LatLon } from '../core/geo.ts'
+import { MAX_ALTITUDE_FEET } from '../core/air.ts'
 import { placeKey, type VenueName } from '../core/venueName.ts'
 import {
   deviceTimeZone,
@@ -68,6 +69,15 @@ export interface VenueDraft {
    * stays on this phone: no request ever includes it.
    */
   laanc?: string
+  /**
+   * "MY APPROVED CEILING", in feet above the ground, as typed. The shooter's
+   * own authorization can be lower than the grid: Atlantic Park's grid says
+   * 250 ft and the authorization held there is 200. Read with
+   * approvedCeilingHere, which answers only where the switch holds, so a
+   * moved pin cannot carry a number approved for somewhere else. Absent
+   * means the grid value, which is what the field shows until it is changed.
+   */
+  laancCeilingFeet?: string
 }
 
 export type VenueField = keyof VenueDraft
@@ -311,10 +321,38 @@ export function laancHere(draft: VenueDraft): boolean {
   return draft.laanc !== undefined && draft.laanc === placeKey(draft.latitude, draft.longitude)
 }
 
-/** The venue with the switch set for its current coordinate. */
+/**
+ * The venue with the switch set for its current coordinate. Either way the
+ * approved ceiling goes with the old setting: a new switch starts at the grid.
+ */
 export function withLaanc(draft: VenueDraft, on: boolean): VenueDraft {
-  const { laanc: _old, ...rest } = draft
+  const { laanc: _old, laancCeilingFeet: _ceiling, ...rest } = draft
   return on ? { ...rest, laanc: placeKey(draft.latitude, draft.longitude) } : rest
+}
+
+/** The shooter's approved ceiling at THIS coordinate, in feet, or null: switch off, pin moved, or not set. */
+export function approvedCeilingHere(draft: VenueDraft): number | null {
+  /* A string as typed; a hand-edited backup can hold anything, so it is checked, not trusted. */
+  if (!laancHere(draft) || typeof draft.laancCeilingFeet !== 'string') return null
+  const typed = draft.laancCeilingFeet.trim()
+  const feet = Number(typed)
+  return typed !== '' && Number.isInteger(feet) && feet > 0 && feet <= MAX_ALTITUDE_FEET ? feet : null
+}
+
+/** The venue with the approved ceiling as typed; an empty box goes back to the grid. */
+export function withApprovedCeiling(draft: VenueDraft, typed: string): VenueDraft {
+  const { laancCeilingFeet: _old, ...rest } = draft
+  return typed.trim() === '' ? rest : { ...rest, laancCeilingFeet: typed }
+}
+
+/**
+ * THE CEILING SUGGEST FLIES UNDER: the lower of the grid and the approved
+ * ceiling. No grid square, no ceiling: an authorization is for a grid square,
+ * so a number typed here never opens one the map does not have.
+ */
+export function flyCeiling(grid: number | null, approved: number | null): number | null {
+  if (grid === null) return null
+  return approved === null ? grid : Math.min(grid, approved)
 }
 
 /** Writes a map derived coordinate back into the form, at pin resolution. */

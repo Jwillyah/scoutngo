@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { deleteApiKey, readApiKey, saveApiKey } from '../lib/apiKey.ts'
+import { deleteApiKey, readApiKey, readModelChoice, saveApiKey, saveModelChoice, type CallSheetModelChoice } from '../lib/apiKey.ts'
 
 /*
  * YOUR API KEY, in About. Stored on this phone and nowhere else, never in a
@@ -10,6 +10,11 @@ export function ApiKeyField() {
   const [stored, setStored] = useState(readApiKey)
   const [draft, setDraft] = useState('')
   const [note, setNote] = useState<string | null>(null)
+  const [model, setModel] = useState(readModelChoice)
+  const MODEL_OPTIONS: { id: CallSheetModelChoice; label: string }[] = [
+    { id: 'sonnet', label: 'Sonnet, cheaper' },
+    { id: 'opus', label: 'Opus' },
+  ]
   return (
     <div className="apikey">
       <p className="about__eyebrow about__eyebrow--dim">Your API key</p>
@@ -65,6 +70,23 @@ export function ApiKeyField() {
           </button>
         </div>
       )}
+      <p className="about__unit-label">Model that writes it</p>
+      <div className="seg" role="group" aria-label="Model that writes the call sheet">
+        {MODEL_OPTIONS.map((option) => (
+          <button
+            type="button"
+            key={option.id}
+            className={`seg__btn${model === option.id ? ' seg__btn--on' : ''}`}
+            aria-pressed={model === option.id}
+            onClick={() => {
+              saveModelChoice(option.id)
+              setModel(option.id)
+            }}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
       {note === null ? null : <p className="notice">{note}</p>}
     </div>
   )

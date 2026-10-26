@@ -4,6 +4,7 @@ import { CALL_SHEET_TOOLS, runTool, type ToolContext } from '../core/callSheetTo
 import { formatClock } from '../core/timezone.ts'
 import { ANTHROPIC_URL, writeCallSheet } from './callSheet.ts'
 import { SEED_PLAYBOOK } from './playbook.ts'
+import { CALL_SHEET_MODELS, MODEL_STORAGE, readModelChoice, saveModelChoice } from './apiKey.ts'
 
 /* Atlantic Park, 25 October 2026, 17:00 to 18:30 EDT. */
 const ctx: ToolContext = {
@@ -89,5 +90,30 @@ describe('the venue coordinate never leaves the phone', () => {
     const { fetchImpl, calls } = scripted('ok')
     await writeCallSheet('Surf contest.', 'k', ctx, fetchImpl)
     for (const c of calls) expect(String(c.init.body)).not.toMatch(coordinate)
+  })
+})
+
+describe('which model writes it', () => {
+  it('is Sonnet by default, cheaper on the shooter’s own key', async () => {
+    const { fetchImpl, calls } = scripted('Run of show')
+    await writeCallSheet('Surf contest.', 'sk-test', ctx, fetchImpl)
+    expect(JSON.parse(String(calls[0].init.body)).model).toBe('claude-sonnet-5-5')
+  })
+
+  it('is Opus when the shooter chose it', async () => {
+    const { fetchImpl, calls } = scripted('Run of show')
+    await writeCallSheet('Surf contest.', 'sk-test', ctx, fetchImpl, CALL_SHEET_MODELS.opus)
+    expect(JSON.parse(String(calls[0].init.body)).model).toBe('claude-opus-5-5')
+  })
+
+  it('reads the stored choice, and anything unknown falls back to Sonnet', () => {
+    const store = new Map<string, string>()
+    vi.stubGlobal('localStorage', { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => store.set(k, v) })
+    expect(readModelChoice()).toBe('sonnet')
+    saveModelChoice('opus')
+    expect(readModelChoice()).toBe('opus')
+    store.set(MODEL_STORAGE, 'claude-3-haiku')
+    expect(readModelChoice()).toBe('sonnet')
+    vi.unstubAllGlobals()
   })
 })

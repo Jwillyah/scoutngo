@@ -16,9 +16,9 @@
  */
 import { checkNumbers, repair, type CheckResult, type RepairResult } from '../core/numberCheck.ts'
 import { CALL_SHEET_TOOLS, codeValues, runTool, type ToolContext } from '../core/callSheetTools.ts'
+import { CALL_SHEET_MODELS, DEFAULT_CALL_SHEET_MODEL } from './apiKey.ts'
 
 export const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages'
-export const CALL_SHEET_MODEL = 'claude-opus-5-5'
 const MAX_TURNS = 8
 const MAX_TOKENS = 4000
 
@@ -56,6 +56,8 @@ export async function writeCallSheet(
   key: string,
   ctx: ToolContext,
   fetchImpl: typeof fetch = fetch,
+  /** A model id from CALL_SHEET_MODELS; Sonnet unless the shooter chose Opus. */
+  model: string = CALL_SHEET_MODELS[DEFAULT_CALL_SHEET_MODEL],
 ): Promise<CallSheetOutcome> {
   const messages: { role: 'user' | 'assistant'; content: unknown }[] = [{ role: 'user', content: prompt }]
   const results: unknown[] = []
@@ -73,7 +75,7 @@ export async function writeCallSheet(
           'anthropic-dangerous-direct-browser-access': 'true',
         },
         body: JSON.stringify({
-          model: CALL_SHEET_MODEL,
+          model,
           max_tokens: MAX_TOKENS,
           system: CALL_SHEET_SYSTEM,
           tools: CALL_SHEET_TOOLS,

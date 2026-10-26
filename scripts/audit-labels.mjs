@@ -26,7 +26,7 @@
  */
 
 import { goToStage, guardAudit, setSheet, startWatchdog } from './preflight.mjs'
-import { FLOATING_CHROME_SELECTORS } from '../src/lib/floatingChrome.ts'
+import { FLOATING_CHROME_SELECTORS, floatingChromeNodes } from '../src/lib/floatingChrome.ts'
 
 /*
  * ARMED BEFORE ANYTHING ELSE CAN THROW.
@@ -66,12 +66,11 @@ export const MEASURE = `(() => {
   /* The map's own list, not a copy of it: src/lib/floatingChrome.ts. */
   const CHROME = ${JSON.stringify(FLOATING_CHROME_SELECTORS)}
 
+  /* And the map's own function for it, sent as source: a control corner counts as what is in it. */
   const chrome = []
-  for (const selector of CHROME) {
-    for (const node of document.querySelectorAll(selector)) {
-      const b = box(node)
-      if (real(b)) chrome.push({ what: selector, ...b })
-    }
+  for (const node of (${floatingChromeNodes.toString()})(document, CHROME)) {
+    const b = box(node)
+    if (real(b)) chrome.push({ what: node.className.toString().split(' ')[0], ...b })
   }
 
   const pins = [...document.querySelectorAll('.pin')].map((n) => ({ what: 'pin', ...box(n) }))

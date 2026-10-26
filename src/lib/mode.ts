@@ -66,6 +66,8 @@ export const SETUP_FIELD_TARGET: Record<VenueField, SetupTarget | null> = {
   desiredOutcome: null,
   /* NEVER BLOCKS. Off is the default and keeps drones out of controlled airspace. */
   laanc: null,
+  /* NEVER BLOCKS. Empty means the grid value. */
+  laancCeilingFeet: null,
   /*
    * NEVER BLOCKS. An empty subject size is a perfectly good state: it means
    * nobody has said, and the app then measures the frame and claims nothing

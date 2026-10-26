@@ -36,7 +36,7 @@ async function pipe(bytes: Uint8Array, stream: CompressionStream | Decompression
 
 /** The plan without what must not travel. */
 export function shareableSpot(spot: Spot): Spot {
-  const { laanc: _laanc, ...venue } = spot.venue
+  const { laanc: _laanc, laancCeilingFeet: _ceiling, ...venue } = spot.venue
   return { ...spot, venue }
 }
 
@@ -57,7 +57,7 @@ export async function readShareHash(hash: string): Promise<Spot | null> {
     const json = await pipe(fromBase64Url(hash.slice(SHARE_PREFIX.length)), new DecompressionStream('deflate-raw'))
     const spot = reviveSpot(JSON.parse(new TextDecoder().decode(json)))
     if (spot === null) return null
-    const { laanc: _laanc, ...venue } = spot.venue
+    const { laanc: _laanc, laancCeilingFeet: _ceiling, ...venue } = spot.venue
     return { ...spot, venue, id: `shared-${Date.now().toString(36)}` }
   } catch {
     return null

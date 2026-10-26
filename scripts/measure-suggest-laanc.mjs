@@ -1,8 +1,9 @@
 /*
  * SUGGEST AT ATLANTIC PARK WITH "I HAVE LAANC HERE" ON.
  *
- * Usage:  node scripts/measure-suggest-laanc.mjs [overpass-url]
- * Writes: measurements/<today>-suggest-atlantic-park-laanc.md
+ * Usage:  node scripts/measure-suggest-laanc.mjs [--approved <feet>] [overpass-url]
+ * Writes: measurements/<today>-suggest-atlantic-park-laanc.md, or with
+ *         --approved, measurements/<today>-suggest-atlantic-park-approved-<feet>.md
  * Exits:  0 when drone picks appear and none is above the facility map's
  *         ceiling at its own position; 1 when that fails; 2 when it could not
  *         look (Overpass down, no ceiling found).
@@ -20,6 +21,13 @@
  * failure of the switch, so the drone-only run is the one that must show drone
  * picks. The same code the app runs: the engine, the kit, the queries, the
  * baked facility map, class airspace, restricted areas and park units.
+ *
+ * MY APPROVED CEILING AND THE HERO PUSH (fixes brief, 25 October). The grid
+ * says 250 ft; the authorization held there is 200. With --approved, every
+ * run flies under the lower of the two, exactly as suggestRun does through
+ * flyCeiling, and each run also plans the hero wide push (aerialHero.ts) at
+ * golden hour. A hero above the approved ceiling, or above the grid at any
+ * sample of its push, fails the run.
  */
 import { writeFileSync } from 'node:fs'
 import { DEFAULT_KIT } from '../src/core/kit.ts'
@@ -39,8 +47,19 @@ import { boxAround } from '../src/lib/tileRange.ts'
 import { AIRSPACE_SHAPES, AIRSPACE_COORD_PRECISION } from '../src/data/airspace.ts'
 import { PARK_UNITS, RESTRICTIONS_COORD_PRECISION, SPECIAL_USE } from '../src/data/restrictions.ts'
 import { DEFAULT_UNITS } from '../src/lib/units.ts'
+import { flyCeiling } from '../src/lib/venue.ts'
+import { goldenSun, heroLine } from '../src/lib/suggestRun.ts'
+import { aerialHero } from '../src/core/aerialHero.ts'
+import { destinationPoint, distanceMeters } from '../src/core/geo.ts'
 
-const ENDPOINT = process.argv[2] ?? 'https://overpass-api.de/api/interpreter'
+const argv = process.argv.slice(2)
+const approvedAt = argv.indexOf('--approved')
+const APPROVED = approvedAt === -1 ? null : Number(argv[approvedAt + 1])
+if (APPROVED !== null && !(Number.isInteger(APPROVED) && APPROVED > 0 && APPROVED <= 400)) {
+  console.log(`=== LAANC MEASUREMENT ABORTED: --approved needs whole feet from 1 to 400, got ${argv[approvedAt + 1]} ===`)
+  process.exit(2)
+}
+const ENDPOINT = argv.filter((a, i) => a !== '--approved' && i !== approvedAt + 1)[0] ?? 'https://overpass-api.de/api/interpreter'
 const VENUE = { lat: 36.8465792, lon: -75.9766619, name: 'Atlantic Park Surf, Virginia Beach' }
 const TZ = 'America/New_York'
 
@@ -99,8 +118,9 @@ if (buildings.length === 0) {
   process.exit(2)
 }
 
-const ceilingAt = (p) => facilityCellAt(p.lat, p.lon)?.ceilingFeet ?? null
-const venueCeiling = ceilingAt(VENUE)
+const gridAt = (p) => facilityCellAt(p.lat, p.lon)?.ceilingFeet ?? null
+const ceilingAt = (p) => flyCeiling(gridAt(p), APPROVED)
+const venueCeiling = gridAt(VENUE)
 if (venueCeiling === null) {
   console.log('=== LAANC MEASUREMENT ABORTED: the facility map has no cell at the venue ===')
   process.exit(2)
@@ -132,15 +152,28 @@ const run = (platforms, laancOn) =>
     date: today,
   })
 
+const golden = goldenSun(VENUE, shoot)
+const heroRun = (laancOn) =>
+  aerialHero({
+    subject: VENUE,
+    optics: optics.filter((o) => o.kind === 'drone').map((o) => ({ id: o.id, name: o.name, focalLength: o.minFocalLength, sensor: o.sensor })),
+    sun: golden,
+    footprints: buildings.map((b) => ({ id: b.id, ring: b.ring, heightMeters: b.height.metres })),
+    airspace,
+    specialUse,
+    parks,
+    laanc: { enabled: laancOn, ceilingAt },
+  })
+
 const cases = [
-  { label: 'Ground and air, LAANC off (as before)', result: run(['ground', 'air'], false) },
-  { label: 'Ground and air, LAANC on', result: run(['ground', 'air'], true) },
+  { label: 'Ground and air, LAANC off (as before)', result: { ...run(['ground', 'air'], false), laancOn: false } },
+  { label: 'Ground and air, LAANC on', result: { ...run(['ground', 'air'], true), laancOn: true } },
   { label: 'Drone only, LAANC on', result: run(['air'], true) },
 ]
 
 let failures = 0
 const lines = [
-  `# Suggest at ${VENUE.name}, with "I have LAANC here" on`,
+  `# Suggest at ${VENUE.name}, with "I have LAANC here" on${APPROVED === null ? '' : ` and an approved ceiling of ${APPROVED} ft`}`,
   '',
   `**Date:** ${today}`,
   `**Script:** \`scripts/measure-suggest-laanc.mjs\``,
@@ -150,6 +183,8 @@ const lines = [
   `**Airspace over the subject:** ${airspaceAt(airspace, VENUE).map((a) => `${a.name} (Class ${a.cls})`).join(', ')}`,
   `**Facility map ceiling at the subject:** ${venueCeiling} ft (chart effective ${facilityEffective})`,
   `**Planned altitude cap:** ${DEFAULT_ALTITUDE_FEET} ft; the drone flies lower where that frames the subject`,
+  `**My approved ceiling:** ${APPROVED === null ? 'not set (the grid value)' : `${APPROVED} ft; Suggest flies under the lower of this and the grid`}`,
+  `**Golden hour sun (hero push):** ${golden === null ? 'none on this date' : `azimuth ${golden.azimuth.toFixed(1)}°, altitude ${golden.altitude.toFixed(1)}°`}`,
   `**Buildings:** ${buildings.length} footprints, ${buildings.filter((b) => b.height.metres !== null).length} with a height or levels tag`,
   '',
 ]
@@ -162,15 +197,37 @@ for (const { label, result } of cases) {
   lines.push('Picked:', '')
   result.picked.forEach((c, i) => {
     const ceiling = c.platform === 'air' ? ceilingAt(c.at) : null
+    const grid = c.platform === 'air' ? gridAt(c.at) : null
     const over = c.platform === 'air' && ceiling !== null && c.altitudeFeet > ceiling
     if (over) failures += 1
     lines.push(
       `${i + 1}. ${summary.picked[i]}` +
-        (c.platform === 'air' ? ` (flying ${c.altitudeFeet} ft, grid ceiling here ${ceiling ?? 'none'} ft${over ? ', ABOVE THE CEILING' : ''})` : '') +
+        (c.platform === 'air' ? ` (flying ${c.altitudeFeet} ft, grid ceiling here ${grid ?? 'none'} ft, flown under ${ceiling ?? 'none'} ft${over ? ', ABOVE THE CEILING' : ''})` : '') +
         ` at ${c.at.lat.toFixed(6)}, ${c.at.lon.toFixed(6)}`,
     )
   })
   lines.push('', `Drone picks: ${drones.length}. Highest drone pick: ${drones.length === 0 ? 'none' : `${Math.max(...drones.map((c) => c.altitudeFeet))} ft`}.`, '')
+  if (result.laancOn !== undefined) {
+    const h = heroRun(result.laancOn)
+    if (h.status === 'ok') {
+      /* Every sample of the push, against the grid and the approved ceiling. */
+      const samples = Array.from({ length: 13 }, (_, i) => destinationPoint(VENUE, (h.hero.cameraBearing + 180) % 360, h.hero.startMeters - (h.hero.pushMeters * i) / 12))
+      const worst = samples.map((p) => (airspaceAt(airspace, p).length > 0 ? gridAt(p) : 400)).reduce((a, b) => Math.min(a ?? 0, b ?? 0), 400)
+      const overGrid = h.hero.altitudeFeet > (worst ?? 0)
+      const overApproved = APPROVED !== null && h.hero.ceilingFeet !== null && h.hero.altitudeFeet > APPROVED
+      if (overGrid || overApproved) failures += 1
+      lines.push(
+        `Hero push: ${heroLine(h.hero, DEFAULT_UNITS)}.`,
+        '',
+        `Hero start ${h.hero.start.lat.toFixed(6)}, ${h.hero.start.lon.toFixed(6)}, end ${h.hero.end.lat.toFixed(6)}, ${h.hero.end.lon.toFixed(6)}; ` +
+          `${Math.round(distanceMeters(VENUE, h.hero.start))} m from the subject; flying ${h.hero.altitudeFeet} ft; lowest grid ceiling along the push ${worst} ft` +
+          `${overGrid ? ', ABOVE THE GRID' : ''}${overApproved ? ', ABOVE THE APPROVED CEILING' : ''}.`,
+        '',
+      )
+    } else {
+      lines.push(`Hero push: none. ${h.reason}`, '')
+    }
+  }
 }
 
 const droneOnly = cases[2].result.picked.filter((c) => c.platform === 'air')
@@ -180,12 +237,12 @@ lines.push(
   '',
   droneOnly.length === 0
     ? 'FAILED: no drone picks appeared with the switch on.'
-    : `${droneOnly.length} drone picks with the switch on, none above the grid ceiling at its own position. ` +
+    : `${droneOnly.length} drone picks with the switch on, none above the ${APPROVED === null ? 'grid ceiling' : `lower of the grid and the approved ${APPROVED} ft`} at its own position. ` +
         `Highest: ${Math.max(...droneOnly.map((c) => c.altitudeFeet))} ft against a ${venueCeiling} ft ceiling at the subject.`,
   '',
 )
 
-const file = `measurements/${today}-suggest-atlantic-park-laanc.md`
+const file = `measurements/${today}-suggest-atlantic-park-${APPROVED === null ? 'laanc' : `approved-${APPROVED}`}.md`
 writeFileSync(file, lines.join('\n'))
 console.log(lines.join('\n'))
 console.log(`written to ${file}`)

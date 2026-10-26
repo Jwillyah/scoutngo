@@ -221,10 +221,12 @@ export interface Candidate {
   cameraBearing: number
   altitudeFeet: number
   /**
-   * The facility map's ceiling at this point when the drone is flying under
-   * LAANC in controlled airspace. Absent otherwise. altitudeFeet never exceeds it.
+   * The ceiling this point is flown under when the drone is flying under LAANC
+   * in controlled airspace: the facility map's, or the shooter's approved
+   * ceiling where that is lower (flyCeiling in src/lib/venue.ts). Absent
+   * otherwise. altitudeFeet never exceeds it.
    */
-  gridCeilingFeet?: number
+  ceilingFeet?: number
   /** Null when the sun is down: there is no light class to score. */
   light: Classification | null
   /** Degrees between where the camera points and the sun: 90 is pure side light. */
@@ -466,7 +468,7 @@ export function suggestPositions(input: SuggestInput): SuggestResult {
       let altitudeFeet = ringAltitudeFeet
       let groundRange = groundRangeAt(ringAltitudeMeters)
       let at = destinationPoint(input.subject, positionBearing, groundRange)
-      let gridCeilingFeet: number | undefined
+      let ceilingFeet: number | undefined
 
       /*
        * CONTROLLED AIRSPACE, AND THE LAANC SWITCH. Off: dropped, as it always
@@ -485,7 +487,7 @@ export function suggestPositions(input: SuggestInput): SuggestResult {
           const ceiling = input.laanc.ceilingAt(at)
           if (ceiling === null || ceiling <= 0) break
           if (altitudeFeet <= ceiling) {
-            gridCeilingFeet = ceiling
+            ceilingFeet = ceiling
             ok = true
             break
           }
@@ -557,7 +559,7 @@ export function suggestPositions(input: SuggestInput): SuggestResult {
         positionBearing: positionBearingExact,
         cameraBearing,
         altitudeFeet: ring.platform === 'air' ? altitudeFeet : 0,
-        ...(gridCeilingFeet === undefined ? {} : { gridCeilingFeet }),
+        ...(ceilingFeet === undefined ? {} : { ceilingFeet }),
         light,
         lightDelta,
         lineOfSight: verdict.unverified ? 'unverified' : 'nothing-mapped',

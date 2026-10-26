@@ -2,7 +2,7 @@ import { useNumerals } from '../lib/numeralsContext.ts'
 import * as maplibregl from 'maplibre-gl'
 import { loadTile, PROTOCOL, viaProtocol } from '../lib/offlineCache.ts'
 import { RAY_SCREEN_FRACTION } from '../lib/rayLength.ts'
-import { FLOATING_CHROME_SELECTORS } from '../lib/floatingChrome.ts'
+import { FLOATING_CHROME_SELECTORS, floatingChromeNodes } from '../lib/floatingChrome.ts'
 import { IMAGERY_TEMPLATE, TERRAIN_TEMPLATE } from '../lib/offlineSources.ts'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
@@ -2486,9 +2486,7 @@ export function MapView({
        * 390 x 844 phone) with the scale bar at its foot, so its controls are
        * what is reserved here, not the empty box around them.
        */
-      const chrome = [...document.querySelectorAll(FLOATING_CHROME)]
-        .flatMap((n) => (n.className.toString().includes('maplibregl-ctrl-') ? [...n.children] : [n]))
-        .map((n) => n.getBoundingClientRect())
+      const chrome = floatingChromeNodes(document, FLOATING_CHROME_SELECTORS).map((n) => n.getBoundingClientRect())
       for (const tag of tags) {
         const r = tag.getElement().getBoundingClientRect()
         const under = chrome.some((c) => r.left < c.right && r.right > c.left && r.top < c.bottom && r.bottom > c.top)
@@ -3178,7 +3176,7 @@ export function MapView({
      * shadow readout sitting on top of a "wide" flag.
      */
     const obstacles: Rect[] = [
-      ...document.querySelectorAll(`${FLOATING_CHROME}, .pin, .shooter__flag`),
+      ...floatingChromeNodes(document, [...FLOATING_CHROME_SELECTORS, '.pin', '.shooter__flag']),
     ]
       .map((node) => node.getBoundingClientRect())
       .filter((box) => box.width > 0 && box.height > 0)

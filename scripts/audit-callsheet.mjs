@@ -12,6 +12,7 @@
  *      only there; the key is in a header, never the URL
  *   2  no request body carries the venue's coordinate
  *   3  the card shows the app's own sunset in place of 7:12 PM, and says so
+ *   4  with no choice made, the model asked for is Sonnet
  *
  * SHAPE B GUARD: fails unless at least two Anthropic requests were seen and
  * the card rendered a sheet.
@@ -109,6 +110,8 @@ check(seen.every((r) => Object.entries(r.headers).some(([k, v]) => k.toLowerCase
 const lat = venue.lat.toFixed(3)
 const lon = Math.abs(venue.lon).toFixed(3)
 check(seen.every((r) => !r.body.includes(lat) && !r.body.includes(lon)), `no request body carries the venue (${lat}, -${lon})`)
+const models = [...new Set(seen.map((r) => { try { return JSON.parse(r.body).model } catch { return null } }))]
+check(models.length === 1 && models[0] === 'claude-sonnet-5-5', `the default model is Sonnet: ${JSON.stringify(models)}`)
 
 const shown = await ev(`({ text: document.querySelector('.callsheet__text')?.textContent ?? null, fixed: document.querySelector('.callsheet__check--fixed')?.textContent ?? null })`)
 if (shown.text === null) {

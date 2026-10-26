@@ -87,6 +87,8 @@ function SuggestAccount({ count, summary }: { count: number; summary: SuggestSum
           ))}
         </ol>
       )}
+      {/* The venue-wide aerial: its own line, after the framing spots it is not one of. */}
+      {summary.hero === undefined ? null : <p className="suggested__hero">{summary.hero}</p>}
       <details className="suggested__more">
         <summary>Why the others were dropped</summary>
         <ul className="suggested__drops num">
