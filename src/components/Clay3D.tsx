@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import { SENSORS } from '../core/fov.ts'
 import type { LatLon } from '../core/geo.ts'
+import { frameBox, observerPose, viewWidthDegrees, zoomWithin } from '../core/observer.ts'
 import { zonedTimeToUtc } from '../core/timezone.ts'
 import { localDate } from '../core/moonTimes.ts'
 import { fetchBuildings, type Building } from '../lib/buildings.ts'
@@ -7,6 +9,7 @@ import { ensure3dOverview } from '../lib/offline3d.ts'
 import { MIN_INTERVAL_MS } from '../lib/overpass.ts'
 import { boxAround } from '../lib/tileRange.ts'
 import { fetchTrees, type TreesResult } from '../lib/trees.ts'
+import type { StandRequest } from '../lib/standRequest.ts'
 import type { ClayScene, GroundStatus, Pin } from '../three/clayScene.ts'
 
 /*
@@ -15,7 +18,10 @@ import type { ClayScene, GroundStatus, Pin } from '../three/clayScene.ts'
  * It sits where the map is, under the same top bar, sheet and time bar, so
  * the plan's controls keep working on it. CesiumJS is only fetched when this
  * opens (the import below), and its files come from this app's own origin.
-
+ *
+ * STAND HERE puts the eye at a position: 1.6 m up on foot, or the planned
+ * height for a drone spot, facing the aim, with the lens's frame drawn on the
+ * screen and a zoom between the lens's two ends.
  */
 
 declare const __CESIUM_BASE__: string
@@ -28,6 +34,8 @@ interface Clay3DProps {
   at: Date
   timeZone: string
   pins: readonly Pin[]
+  stand: StandRequest | null
+  onLeaveStand: () => void
 }
 
 /* 600 m around the venue for buildings: past that a clay box is a speck. */
@@ -37,7 +45,7 @@ const BUILDING_WAIT_MS = 60_000
 
 export const CLAY_NOTE = 'Clay model from map data. Real buildings may differ; unknown heights shown lighter.'
 
-export function Clay3D({ venue, venueLabel, at, timeZone, pins }: Clay3DProps) {
+export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveStand }: Clay3DProps) {
   const host = useRef<HTMLDivElement>(null)
   const scene = useRef<ClayScene | null>(null)
   const [ready, setReady] = useState(false)
@@ -45,6 +53,9 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins }: Clay3DProps) {
   const [buildings, setBuildings] = useState<{ total: number; unknown: number } | { problem: string } | 'loading'>('loading')
   const [trees, setTrees] = useState<TreesResult | null>(null)
   const [flat, setFlat] = useState(0)
+  /* The zoom belongs to one Stand here: a new one starts at its own focal length. */
+  const [zoom, setZoom] = useState<{ tick: number; focal: number } | null>(null)
+  const [width, setWidth] = useState(0)
   const status = useRef<GroundStatus>({ flatTiles: 0 })
 
   /* Build the scene once, for this venue. */
@@ -128,10 +139,46 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins }: Clay3DProps) {
     if (ready) scene.current?.setTime(at)
   }, [ready, at])
 
+  /* The canvas's width, for the frame box. */
+  useEffect(() => {
+    const el = host.current
+    if (el === null) return
+    const observer = new ResizeObserver(() => setWidth(el.clientWidth))
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  /* Stand here, or back to the overview. */
+  const lensFocal =
+    stand === null ? null : zoomWithin(zoom !== null && zoom.tick === stand.tick ? zoom.focal : stand.focal, stand.lensMin, stand.lensMax)
+  useEffect(() => {
+    if (!ready) return
+    if (stand === null) {
+      scene.current?.orbit()
+      return
+    }
+    const pose = observerPose({ standAt: stand.at, aimAt: stand.aimAt, droneFeet: stand.droneFeet })
+    const lens = frameBox(stand.focal, SENSORS[stand.sensor], 60, 100)
+    void scene.current?.observe({
+      at: stand.at,
+      heightAboveGround: pose.heightAboveGround,
+      heading: stand.bearing ?? pose.heading,
+      pitch: pose.pitch,
+      viewHorizontal: viewWidthDegrees(lens.lensHorizontal),
+    })
+  }, [ready, stand])
+
+  const box =
+    stand === null || lensFocal === null || width === 0
+      ? null
+      : frameBox(lensFocal, SENSORS[stand.sensor], viewWidthDegrees(frameBox(stand.focal, SENSORS[stand.sensor], 60, 100).lensHorizontal), width)
 
   return (
     <div className="clay">
       <div ref={host} className="clay__canvas" />
+      {box === null ? null : (
+        <div className="clay__frame" style={{ width: `${box.width}px`, height: `${box.height}px` }} aria-hidden="true" />
+      )}
       <div className="clay__legend">
         <p className="clay__note">{CLAY_NOTE}</p>
         {failed !== null ? <p className="clay__line">3D could not start: {failed}</p> : null}
@@ -163,6 +210,33 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins }: Clay3DProps) {
         )}
         {flat > 0 ? <p className="clay__line">Some ground has no saved elevation and is drawn flat.</p> : null}
       </div>
+      {stand === null || lensFocal === null ? null : (
+        <div className="clay__stand">
+          <p className="clay__standname">
+            Standing at {stand.label}
+            {stand.droneFeet === null ? ', eye height 1.6 m' : `, ${stand.droneFeet} ft up`}
+          </p>
+          {stand.lensMin < stand.lensMax ? (
+            <label className="clay__zoom">
+              <span className="num">{Math.round(lensFocal)}mm</span>
+              <input
+                type="range"
+                min={stand.lensMin}
+                max={stand.lensMax}
+                step={1}
+                value={lensFocal}
+                onChange={(e) => setZoom({ tick: stand.tick, focal: Number(e.target.value) })}
+                aria-label="Zoom between the lens's two ends"
+              />
+            </label>
+          ) : (
+            <p className="clay__line num">{Math.round(lensFocal)}mm, fixed</p>
+          )}
+          <button type="button" className="btn btn--small" onClick={onLeaveStand}>
+            Back to the overview
+          </button>
+        </div>
+      )}
     </div>
   )
 }

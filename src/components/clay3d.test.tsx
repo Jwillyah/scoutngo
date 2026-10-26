@@ -68,7 +68,7 @@ describe('the 3D button', () => {
 describe('the clay model says what it is', () => {
   it('on screen, from the first frame', () => {
     const html = renderToStaticMarkup(
-      <Clay3D venue={{ lat: 38.36, lon: -75.6 }} venueLabel="Brew River" at={new Date()} timeZone="America/New_York" pins={[]} />,
+      <Clay3D venue={{ lat: 38.36, lon: -75.6 }} venueLabel="Brew River" at={new Date()} timeZone="America/New_York" pins={[]} stand={null} onLeaveStand={() => {}} />,
     )
     expect(CLAY_NOTE).toBe('Clay model from map data. Real buildings may differ; unknown heights shown lighter.')
     expect(html).toContain(CLAY_NOTE)

@@ -26,7 +26,7 @@ import type { DesiredShot } from '../lib/shotList.ts'
 import type { FieldPack } from '../lib/fieldPack.ts'
 import type { TideInfo } from '../lib/useTide.ts'
 import type { VenueWindow } from '../lib/venue.ts'
-import type { KitProfile as KitProfileType } from '../core/kit.ts'
+import { effectiveSensor, type KitProfile as KitProfileType } from '../core/kit.ts'
 import type { OpticSelection } from '../core/optics.ts'
 import { placingHint } from '../core/platformFilter.ts'
 import { locateOnce } from '../lib/locateOnce.ts'
@@ -85,6 +85,7 @@ import { TimeBar } from './TimeBar.tsx'
 import { ToolDock } from './ToolDock.tsx'
 import { Clay3D } from './Clay3D.tsx'
 import { hasWebGL2 } from '../lib/webgl.ts'
+import { standAtPosition, standForLineUp, type StandRequest } from '../lib/standRequest.ts'
 import { ExposurePlayground } from './ExposurePlayground.tsx'
 import { SkyCard } from './SkyCard.tsx'
 import { CAMS, camKind } from '../data/cams.ts'
@@ -544,9 +545,10 @@ export function PlanMode({
   const [pitch, setPitch] = useState(0)
   /*
    * THE 3D VIEW. The rail's 3D button swaps the 2D map for the clay model of
-   * the same place at the same time.
+   * the same place at the same time; Stand here puts the eye at a position.
    */
   const [threeD, setThreeD] = useState(false)
+  const [stand, setStand] = useState<StandRequest | null>(null)
   const [threeDNote, setThreeDNote] = useState<string | null>(null)
   const toggleThreeD = useCallback(() => {
     if (!hasWebGL2()) {
@@ -554,7 +556,10 @@ export function PlanMode({
       return
     }
     setThreeDNote(null)
-    setThreeD((on) => !on)
+    setThreeD((on) => {
+      if (on) setStand(null)
+      return !on
+    })
   }, [])
   const threeDPins = useMemo(() => plan.map((p) => ({ number: p.position.number, at: p.position.at })), [plan])
 
@@ -1162,6 +1167,20 @@ export function PlanMode({
           subject={venue}
           pilotAt={pilotAt}
           onPlacePilot={() => onPlacingPilot(true)}
+          onStandHere={
+            venue === null
+              ? undefined
+              : () => {
+                  if (!hasWebGL2()) {
+                    setThreeDNote('3D needs WebGL 2, which this browser does not have. The 2D map works as before.')
+                    return
+                  }
+                  setStand(standAtPosition(selected, kitProfile, venue, Date.now()))
+                  setThreeD(true)
+                  /* The eye-level view needs the screen: the sheet goes down to its time bar. */
+                  setSheet('peek')
+                }
+          }
               />
       ) : (
         <>
@@ -1686,6 +1705,20 @@ export function PlanMode({
                 units={units}
                 context={callSheetContext}
                 onOpenKey={() => openCard('about')}
+                onLineUp={(first, lens) => {
+                  if (aimAt === null) return
+                  if (!hasWebGL2()) {
+                    setThreeDNote('3D needs WebGL 2, which this browser does not have. The 2D map works as before.')
+                    return
+                  }
+                  const body = kitProfile.bodies.find((b) => bag.bodyIds.includes(b.id) && b.role !== 'drone')
+                  const kitLens = lens === null ? undefined : kitProfile.lenses.find((l) => l.id === lens.id)
+                  const sensor = body !== undefined && kitLens !== undefined ? effectiveSensor(kitLens, body) : 'fullFrame'
+                  scrubTo(first.at)
+                  setStand(standForLineUp(first, aimAt, lens, sensor, Date.now()))
+                  setThreeD(true)
+                  setSheet('peek')
+                }}
               />
             )}
           </Card>
@@ -1816,6 +1849,8 @@ export function PlanMode({
           at={scrubbedAt}
           timeZone={venueWindow.timeZone}
           pins={threeDPins}
+          stand={stand}
+          onLeaveStand={() => setStand(null)}
         />
       ) : null}
 
@@ -2072,7 +2107,8 @@ export function PlanMode({
               * belongs on is one table in src/lib/sheetCard.ts rather than a
               * condition repeated at eleven call sites.
               */}
-            {!TIME_MATTERS[card.kind] || venueWindow === null || scrubbedAt === null ? null : (
+            {/* In 3D the time bar always shows: the light, the shadows and the sky all run on it. */}
+            {(!TIME_MATTERS[card.kind] && !threeD) || venueWindow === null || scrubbedAt === null ? null : (
               <TimeBar
                 at={scrubbedAt}
                 lat={venue?.lat ?? 0}

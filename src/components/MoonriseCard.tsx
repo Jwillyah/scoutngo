@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { ToolContext } from '../core/callSheetTools.ts'
 import type { LatLon } from '../core/geo.ts'
-import { moonrisePlan, type MoonriseInput } from '../core/moonrisePlan.ts'
+import { moonrisePlan, type LineUpStand, type MoonriseInput, type PlanLens } from '../core/moonrisePlan.ts'
 import { moonriseIcs, moonriseIcsFilename } from '../core/moonriseIcs.ts'
 import { CALL_SHEET_MODELS, readApiKey, readModelChoice } from '../lib/apiKey.ts'
 import { writeCallSheet, type CallSheetOutcome } from '../lib/callSheet.ts'
@@ -28,11 +28,13 @@ interface MoonriseCardProps {
   /** The call sheet's context, for wording with the shooter's key; null when the venue is not set. */
   context: ToolContext | null
   onOpenKey: () => void
+  /** The 3D view at the line-up's first stand, at the 2 degree time. */
+  onLineUp?: (stand: LineUpStand, lens: PlanLens | null) => void
 }
 
 const FT = 0.3048
 
-export function MoonriseCard({ input, target, picking, onPickTarget, units, context, onOpenKey }: MoonriseCardProps) {
+export function MoonriseCard({ input, target, picking, onPickTarget, units, context, onOpenKey, onLineUp }: MoonriseCardProps) {
   const [heightText, setHeightText] = useState('')
   const [busy, setBusy] = useState(false)
   const [worded, setWorded] = useState<CallSheetOutcome | null>(null)
@@ -98,6 +100,11 @@ export function MoonriseCard({ input, target, picking, onPickTarget, units, cont
                       <span>{units.distance === 'ft' ? 'ft above ground' : 'm above ground'}</span>
                     </span>
                   </label>
+                  {onLineUp !== undefined && shot.stands !== null && shot.stands.length > 0 ? (
+                    <button type="button" className="btn btn--small" onClick={() => onLineUp(shot.stands![0], shot.lens)}>
+                      Check the line-up in 3D
+                    </button>
+                  ) : null}
                 </div>
               ) : null}
             </li>

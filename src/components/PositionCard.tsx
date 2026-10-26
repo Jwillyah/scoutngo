@@ -91,6 +91,8 @@ interface PositionCardProps {
   pilotAt: LatLon | null
   /** Arms the map to place the pilot. */
   onPlacePilot: () => void
+  /** The 3D view, from this position's own eye: 1.6 m up, or its planned drone height. */
+  onStandHere?: () => void
 }
 
 /*
@@ -534,6 +536,7 @@ export function PositionCard({
   onSetAltitude,
   pilotAt,
   onPlacePilot,
+  onStandHere,
   onSetShotType,
   onSetYaw,
 }: PositionCardProps) {
@@ -967,6 +970,11 @@ export function PositionCard({
           * Seeing what this position covers THAT THE OTHERS DO NOT is the
           * question people have when they ask for one cone.
           */}
+        {onStandHere === undefined ? null : (
+          <button type="button" className="cardacts__btn cardacts__btn--wide" onClick={onStandHere}>
+            Stand here
+          </button>
+        )}
         <button
           type="button"
           className={`cardacts__btn${isolated ? ' cardacts__btn--on' : ''}`}
