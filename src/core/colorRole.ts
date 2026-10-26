@@ -32,6 +32,16 @@
  * src/styles/tokens.css, so a token that drifts into the wrong role fails.
  */
 
+/*
+ * WHERE COLOUR LIVES, since the golden bubble pass: in the icons (the
+ * sunset tiles, src/lib/iconPalette.ts), in the time bar, and on the home
+ * page. Everything sitting on the map -- the top bar, the sheets, the cards,
+ * the chips -- stays dark glass. The main action is the gold pill
+ * (--action-* in tokens.css); teal is small chrome only. None of that changes
+ * the data colours below: amber is still the golden hour, periwinkle the moon,
+ * and red is still only a hazard.
+ */
+
 /** What a colour is allowed to be used for. */
 export type ColorRole =
   /** Controls and furniture. The shooter touches these. */

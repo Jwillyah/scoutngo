@@ -69,7 +69,7 @@ export function TopBar({
 
       <button
         type="button"
-        className={`topbar__btn${adding ? ' topbar__btn--on' : ''}`}
+        className={`topbar__btn topbar__btn--add${adding ? ' topbar__btn--on' : ''}`}
         onClick={onAdd ?? undefined}
         disabled={onAdd === null}
         aria-pressed={adding}

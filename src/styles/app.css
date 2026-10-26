@@ -3158,12 +3158,13 @@
   transform: scale(0.975);
 }
 
+/* Gold: the main action (tokens.css, --action-*). Teal is small chrome now. */
 .btn--primary {
-  background: var(--primary-sheen);
-  border-color: var(--color-accent);
-  color: var(--color-accent-ink);
+  background: var(--action-sheen);
+  border-color: var(--action-mid);
+  color: var(--action-ink);
   font-weight: var(--weight-heavy);
-  box-shadow: var(--primary-glow);
+  box-shadow: var(--action-glow);
 }
 
 /*
@@ -6839,9 +6840,9 @@
   min-height: var(--control-height);
   border: 0;
   border-radius: var(--radius-2, 4px);
-  background: var(--primary-sheen);
-  box-shadow: var(--primary-glow);
-  color: var(--color-accent-ink);
+  background: var(--action-sheen);
+  box-shadow: var(--action-glow);
+  color: var(--action-ink);
   font-size: var(--text-md);
   font-weight: var(--weight-heavy);
   text-transform: uppercase;
@@ -7611,123 +7612,107 @@
   inset: 0;
   z-index: 60;
   overflow: hidden;
-  background: var(--color-bg);
+  background: #05070a;
+  color: #fff;
 }
 
-/* The frame covers the viewport whatever the aspect, and is never letterboxed. */
+/* The picture: photo, sky, sun and plan in one SVG, covering the screen and never letterboxed. */
 .cover__frame {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  /*
-   * The frame was shot at 390x844. On a wider screen object-fit crops the
-   * sides rather than the top, which is where the plan is.
-   */
-  object-position: 50% 30%;
 }
 
-/*
- * THE SCRIM. Transparent over the plan, solid under the words.
- *
- * Two stops rather than a smooth fade across the whole height: a linear fade
- * from the top would dim the cones and the rays, which are the one thing the
- * picture is there to show.
- */
-.cover__scrim {
-  position: absolute;
-  inset: 0;
-  /*
-   * A SMALL ONE AT THE TOP TOO, and it is not decoration.
-   *
-   * The eyebrow is teal type floating over satellite imagery, and over bright
-   * concrete it was unreadable: measured against the first capture, the
-   * letters sat on a near-white roof. A text-shadow heavy enough to fix that
-   * would have been a glow, which the colour rule just took off the button.
-   * 90 px of very slight darkening costs the picture nothing and keeps the
-   * eyebrow the same teal it has always been.
-   */
-  background:
-    linear-gradient(to bottom, rgb(8 8 10 / 0.55) 0, transparent 90px),
-    linear-gradient(
-    to bottom,
-    transparent 0%,
-    transparent 42%,
-    rgb(8 8 10 / 0.72) 58%,
-    rgb(8 8 10 / 0.94) 72%,
-    rgb(8 8 10 / 0.98) 100%
-  );
+.cover__pinnum {
+  fill: #fff;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
 }
 
-/* Top-left, over the map, as the one thing above the scrim. */
-.cover__eyebrow {
+.cover__brand {
   position: absolute;
-  top: max(var(--space-3), env(safe-area-inset-top));
-  left: var(--space-3);
-  right: var(--space-3);
-  margin: 0;
-  color: var(--ocean);
-  font-size: var(--text-xs);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-  text-shadow: 0 1px 3px rgb(0 0 0 / 0.8);
-}
-
-.cover__copy {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: grid;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  padding-bottom: max(var(--space-3), env(safe-area-inset-bottom));
+  left: var(--space-4, 24px);
+  right: var(--space-4, 24px);
+  top: max(44px, calc(env(safe-area-inset-top) + 20px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
 }
 
 .cover__name {
-  margin: 0;
-  font-size: var(--text-xl);
-  font-weight: var(--weight-heavy);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
+  margin: 14px 0 0;
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #fff;
+  text-shadow: 0 2px 18px rgb(40 10 60 / 0.45);
 }
 
 .cover__head {
-  margin: 0;
-  font-size: var(--text-lg);
-  line-height: 1.3;
+  margin: 10px 0 0;
+  max-width: 300px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #fff;
+  text-shadow: 0 1px 10px rgb(40 10 60 / 0.5);
 }
 
-.cover__moreline {
-  margin: 0;
-}
-
-/*
- * A LINK, SET AS TYPE. It competes with nothing: no border, no fill, no
- * colour of its own beyond the muted text the rest of the page uses.
- */
-.cover__more {
-  background: none;
-  border: 0;
+.cover__feats {
+  margin: 26px 0 0;
   padding: 0;
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  cursor: pointer;
-  text-align: left;
+  width: 100%;
+  list-style: none;
+  display: flex;
+  gap: 10px;
 }
 
-/* The seam. The real control, at its own size. */
-.cover__scrub {
-  margin-top: var(--space-1);
+.cover__feat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+}
+
+.cover__featlabel {
+  max-width: 72px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #3a1430;
+}
+
+.cover__foot {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: max(26px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
 }
 
 .cover__licence {
   margin: 0;
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
+  font-size: 12px;
+  color: #d5dae3;
+  text-align: center;
+}
+
+.cover__more {
+  min-height: 44px;
+  padding: 0 2px;
+  background: none;
+  border: 0;
+  color: #ffe0b0;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
 }
 
 /* Smallest type on the page, and last. The credit is owed; it is not a step. */
@@ -7735,49 +7720,36 @@
   margin: 0;
   font-size: 0.625rem;
   line-height: 1.5;
-  color: var(--color-text-faint);
-}
-
-.cover__licence {
+  color: #aab2bf;
   text-align: center;
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
 }
 
-/*
- * SOLID TEAL, NEAR-BLACK INK, SQUARED, MONOSPACE, LETTERSPACED.
- *
- * No gradient, no glow, no rounding beyond what the rest of the app uses.
- * It replaced .land__go, which used --primary-sheen and --primary-glow: the
- * only two tokens on the page that no instrument reading uses.
- */
+/* THE MAIN ACTION: the glossy gold pill (tokens.css, --action-*). */
 .cover__go {
+  position: relative;
   width: 100%;
-  min-height: 52px;
-  /*
-   * PILL, AND A GRADIENT WITHIN THE TEAL FAMILY.
-   *
-   * STILL CHROME UNDER THE COLOUR RULE. The rule is about which HUE means
-   * what -- teal is controls, every other hue is a reading -- and this is
-   * teal into --ocean-far, the lighter cyan this repo already defines as "the
-   * far end of the gradient, never used alone". No new colour: the constraint
-   * was to build from what is in use, and this was already in use. It never
-   * reaches a hue that means something on the map.
-   *
-   * AND NO OUTER GLOW. The glow was the thing that read as a different
-   * product: nothing else in this app is lit from behind, and a control that
-   * is cannot be the same kind of object as the plates on the map.
-   */
-  background: linear-gradient(90deg, var(--ocean) 0%, var(--ocean-far) 100%);
-  color: var(--ocean-ink);
+  min-height: 58px;
   border: 0;
-  border-radius: 999px;
-  font-family: var(--font-mono);
-  font-size: var(--text-md);
-  font-weight: var(--weight-heavy);
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
+  border-radius: 29px;
+  background: var(--action-sheen);
+  box-shadow: var(--action-glow);
+  color: var(--action-ink);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   cursor: pointer;
+}
+
+.cover__go::before {
+  content: '';
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  top: 5%;
+  height: 44%;
+  border-radius: 40% 40% 50% 50%;
+  background: linear-gradient(rgb(255 255 255 / 0.45), rgb(255 255 255 / 0));
+  pointer-events: none;
 }
 
 /* -------------------------------------------------------------------- /HOW
@@ -8728,11 +8700,12 @@
   display: grid;
   place-items: center;
   padding: 0;
-  border: var(--line-hair) solid var(--color-accent);
+  border: var(--line-hair) solid var(--action-mid);
   border-radius: var(--radius-flat);
-  background: transparent;
-  color: var(--color-accent);
+  background: var(--action-sheen);
+  color: var(--action-ink);
   font-size: var(--text-md);
+  font-weight: var(--weight-heavy);
   line-height: 1;
   white-space: nowrap;
 }
@@ -8744,8 +8717,10 @@
  */
 .shootc__add--armed {
   padding: 0 var(--space-3);
-  background: var(--color-accent);
-  color: var(--color-accent-ink);
+  background: var(--action-sheen);
+  color: var(--action-ink);
+  outline: 2px solid var(--white);
+  outline-offset: 1px;
   font-size: var(--text-sm);
 }
 
@@ -9350,6 +9325,27 @@
 .topbar__btn--on {
   color: var(--color-accent);
   border-color: var(--color-accent);
+}
+
+/* The + is the main action on the map: gold. Armed, it keeps the gold and gains a white ring. */
+.topbar__btn--add {
+  border-color: var(--action-mid);
+  background: var(--action-sheen);
+  color: var(--action-ink);
+  box-shadow: var(--action-glow);
+}
+
+.topbar__btn--add.topbar__btn--on {
+  color: var(--action-ink);
+  outline: 2px solid var(--white);
+  outline-offset: 1px;
+}
+
+.topbar__btn--add:disabled {
+  background: var(--panel-sheen);
+  border-color: var(--color-line-strong);
+  color: var(--color-text-faint);
+  box-shadow: none;
 }
 
 .topbar__btn:disabled {

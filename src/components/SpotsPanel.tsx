@@ -143,7 +143,7 @@ export function SpotsPanel({
       </div>
 
       <div className="btn-row">
-        <button type="button" className="btn btn--small" onClick={save} disabled={!canSave}>
+        <button type="button" className="btn btn--small btn--primary" onClick={save} disabled={!canSave}>
           Save spot
         </button>
         <button

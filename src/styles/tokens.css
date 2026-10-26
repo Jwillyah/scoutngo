@@ -192,6 +192,25 @@
   --color-accent-2: var(--afterglow);
   --color-accent-2-dim: var(--afterglow-dim);
 
+  /*
+   * THE MAIN ACTION IS GOLD. One glossy gold pill per screen: Open the map,
+   * the forward button, Save spot, the + that adds a position. It took the
+   * job from teal, which stays for small chrome: rings, chips, the slider's
+   * thumb, the current place in the menu. The stops are the home design's
+   * button (design/home-golden.html); dark ink on all three, checked in
+   * tests/actionColour.test.ts.
+   */
+  --action-light: #ffe58a;
+  --action-mid: #f5b021;
+  --action-dark: #e2621b;
+  --action-ink: #2a1606;
+  --action-sheen: linear-gradient(150deg, var(--action-light) 0%, var(--action-mid) 48%, var(--action-dark) 100%);
+  --action-glow:
+    inset 0 1px 0 rgb(255 255 255 / 0.6),
+    inset 0 -3px 6px rgb(0 0 0 / 0.22),
+    0 2px 0 rgb(0 0 0 / 0.28),
+    0 10px 18px -8px var(--action-mid);
+
   --color-accent: var(--accent);
   --color-accent-ink: var(--accent-ink);
   --color-hazard: var(--hazard);

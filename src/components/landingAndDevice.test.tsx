@@ -20,10 +20,9 @@ const text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ')
  * noticed on a phone.
  */
 describe('the cover carries five elements and stops', () => {
-  it('leads with the eyebrow, the wordmark and the headline', () => {
-    expect(text).toContain('Sun · light · distance, computed')
+  it('leads with the wordmark and the line', () => {
     expect(text).toContain('ScoutNGo')
-    expect(text).toContain('Plan a shoot at a place you have never stood in')
+    expect(text).toContain('Plan the shot before you get there. Where to stand, which lens, and when the light is right.')
   })
 
   it('has exactly one primary action and it says what it does', () => {
@@ -33,16 +32,15 @@ describe('the cover carries five elements and stops', () => {
 
   it('carries the two quiet lines, in their places', () => {
     expect(html.match(/class="cover__more"/g)).toHaveLength(1)
-    expect(text).toContain('How it computes, and what leaves the device')
-    expect(text).toContain('Free · open source · no account')
+    expect(text).toContain('Free · open source · no account · How it works')
   })
 
   it('puts the render behind everything, full bleed', () => {
-    const images = [...html.matchAll(/<img[^>]*class="([^"]*)"[^>]*src="([^"]*)"/g)]
+    /* One picture, inside the SVG that covers the screen, so the pins drawn on it stay on it. */
+    expect(html).toMatch(/<svg[^>]*class="cover__frame"[^>]*preserveAspectRatio="xMidYMid slice"/)
+    const images = [...html.matchAll(/<image[^>]*href="([^"]*)"/g)]
     expect(images).toHaveLength(1)
-    expect(images[0]?.[1]).toContain('cover__frame')
-    expect(images[0]?.[2]).toBe('/cover-frame.jpg')
-    expect(html).toContain('cover__scrim')
+    expect(images[0]?.[1]).toBe('/home-frame.jpg')
   })
 
   it('carries no scrubbing control, because a still frame cannot have one', () => {
@@ -78,8 +76,8 @@ describe('the cover carries five elements and stops', () => {
     expect(html.indexOf('cover__attrib')).toBeGreaterThan(html.indexOf('cover__licence'))
   })
 
-  it('orders the copy: wordmark, headline, link, button, licence, attribution', () => {
-    const order = ['cover__name', 'cover__head', 'cover__more', 'cover__go', 'cover__licence', 'cover__attrib']
+  it('orders the copy: wordmark, line, features, button, footer with its link, attribution', () => {
+    const order = ['cover__name', 'cover__head', 'cover__feats', 'cover__go', 'cover__licence', 'cover__more', 'cover__attrib']
     const at = order.map((c) => html.indexOf(c))
     expect(at.every((i) => i >= 0)).toBe(true)
     for (let i = 1; i < at.length; i += 1) expect(at[i]).toBeGreaterThan(at[i - 1] ?? -1)
@@ -99,7 +97,8 @@ describe('the cover carries five elements and stops', () => {
     expect(text).not.toContain('this page is in Settings')
   })
 
-  it('has no feature grid and no SaaS furniture', () => {
+  /* The four feature tiles were asked for by name; the rest of the furniture still is not. */
+  it('has no SaaS furniture', () => {
     expect(html).not.toContain('card')
     expect(text.toLowerCase()).not.toContain('get started')
     expect(text.toLowerCase()).not.toContain('sign up')
