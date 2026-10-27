@@ -105,7 +105,7 @@ import { readShareHash, SHARE_PREFIX } from './lib/planShare.ts'
 import { Viewfinder, ViewfinderNeedsPlace } from './components/Viewfinder.tsx'
 import { SideMenu } from './components/SideMenu.tsx'
 import { backToNow } from './lib/backToNow.ts'
-import { loadSeaMask, setSeaMask } from './lib/seaMask.ts'
+import { clearPlace, loadPlace } from './lib/place.ts'
 import { pathToMenuItem, type MenuItem } from './lib/menu.ts'
 import {
   blockedReason,
@@ -578,15 +578,16 @@ function App() {
   const aim = centre
 
   /*
-   * THE COASTLINE AROUND THE VENUE, so the elevation both views read has the
-   * sea at sea level (src/lib/seaMask.ts). Saved on the phone once fetched.
+   * THE PLACE AROUND THE VENUE, in one Overpass request (src/lib/place.ts):
+   * the coastline the elevation both views read is cleaned against, and the
+   * buildings and trees the 3D view draws. Saved on the phone once fetched.
    */
   useEffect(() => {
     if (centre === null) {
-      setSeaMask(null)
+      clearPlace()
       return
     }
-    void loadSeaMask(centre)
+    void loadPlace(centre)
   }, [centre])
 
   /* The moment the scrubber is sitting on. */

@@ -23,7 +23,8 @@
 
 import type { GroundCandidate, GroundKind } from '../core/openGround.ts'
 import type { LatLon } from '../core/geo.ts'
-import { MIN_INTERVAL_MS, OVERPASS_URL, TIMEOUT_MS, type OverpassElement } from './overpass.ts'
+import { MIN_INTERVAL_MS, TIMEOUT_MS, type OverpassElement } from './overpass.ts'
+import { askOverpass } from './overpassClient.ts'
 
 /** A few miles, as degrees of latitude. About 5km. */
 const HALF_SPAN_DEG = 0.045
@@ -128,40 +129,17 @@ export async function fetchOpenGround(at: LatLon): Promise<OpenGroundResult> {
     return { status: 'unavailable', reason: 'Overpass was queried moments ago.' }
   }
 
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
-  try {
-    lastCallAt = Date.now()
-    const response = await fetch(OVERPASS_URL, {
-      method: 'POST',
-      headers: { 'content-type': 'text/plain;charset=UTF-8' },
-      body: buildOpenGroundQuery(at),
-      signal: controller.signal,
-    })
-    if (!response.ok) {
-      return { status: 'unavailable', reason: `Overpass returned HTTP ${response.status}.` }
-    }
-    const candidates = parseOpenGround(await response.json())
-    cache.set(key, candidates)
-    return { status: 'ok', candidates, cached: false }
-  } catch {
-    /*
-     * A TIMEOUT AND A REFUSAL ARE DIFFERENT THINGS TO SAY.
-     *
-     * Reported as "did not answer in time" for everything, this said the
-     * wrong thing in the case that actually happens: overpass-api.de answering
-     * 406 arrives in the browser as a network error, because an nginx error
-     * page carries no CORS headers, and calling that a timeout sends somebody
-     * to check their signal when the service turned them down. Only an abort
-     * is a timeout.
-     */
-    return {
-      status: 'unavailable',
-      reason: controller.signal.aborted
-        ? 'Overpass did not answer in time.'
-        : 'Overpass could not be reached.',
-    }
-  } finally {
-    clearTimeout(timer)
-  }
+  lastCallAt = Date.now()
+  /*
+   * A TIMEOUT AND A REFUSAL ARE DIFFERENT THINGS TO SAY. overpass-api.de
+   * answering 406 arrives in the browser as a network error (an nginx error
+   * page carries no CORS headers), and calling that a timeout sends somebody
+   * to check their signal when the service turned them down. The client
+   * (overpassClient.ts) says "did not answer in time" only for a timeout.
+   */
+  const answer = await askOverpass(buildOpenGroundQuery(at), { budgetMs: TIMEOUT_MS })
+  if (!answer.ok) return { status: 'unavailable', reason: answer.reason }
+  const candidates = parseOpenGround(answer.payload)
+  cache.set(key, candidates)
+  return { status: 'ok', candidates, cached: false }
 }

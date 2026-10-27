@@ -24,7 +24,8 @@ import {
   type BuildingTags,
 } from '../core/buildingHeight.ts'
 import type { MapBounds } from './generation.ts'
-import { MIN_INTERVAL_MS, OVERPASS_URL, TIMEOUT_MS, type OverpassElement } from './overpass.ts'
+import { MIN_INTERVAL_MS, TIMEOUT_MS, type OverpassElement } from './overpass.ts'
+import { askOverpass } from './overpassClient.ts'
 
 export interface Building {
   id: string
@@ -140,10 +141,15 @@ export function clearBuildingsCache(): void {
 const key = (b: MapBounds) =>
   [b.west, b.south, b.east, b.north].map((n) => n.toFixed(3)).join(',')
 
-/** Never throws. Overpass being unreachable is a sentence, not a blank. */
 /** The copy kept on the phone for these bounds, with when it was fetched, or null. */
 export function savedBuildingsFor(bounds: MapBounds): { buildings: Building[]; fetchedAt: string } | null {
   return readSavedBuildings(key(bounds))
+}
+
+/** Buildings fetched some other way (the place request, place.ts): kept for these bounds like a fetch of them. */
+export function keepBuildings(bounds: MapBounds, buildings: Building[]): void {
+  cache.set(key(bounds), buildings)
+  saveBuildings(key(bounds), buildings)
 }
 
 /**
@@ -159,37 +165,17 @@ export async function fetchBuildings(bounds: MapBounds, timeoutMs: number = TIME
     return { status: 'unavailable', reason: 'Overpass was queried moments ago.' }
   }
 
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
-  try {
-    lastCallAt = Date.now()
-    const response = await fetch(OVERPASS_URL, {
-      method: 'POST',
-      headers: { 'content-type': 'text/plain;charset=UTF-8' },
-      body: buildBuildingsQuery(bounds),
-      signal: controller.signal,
-    })
-    if (!response.ok) {
-      /* A busy or broken server is no different from no signal: the saved copy, said with its age. */
-      const saved = readSavedBuildings(cacheKey)
-      if (saved !== null) return { status: 'ok', buildings: saved.buildings, cached: true, savedAt: saved.fetchedAt }
-      return { status: 'unavailable', reason: `Overpass returned HTTP ${response.status}.` }
-    }
-    const buildings = parseBuildings(await response.json())
+  lastCallAt = Date.now()
+  /* Never throws. Overpass being unreachable is a sentence, not a blank. */
+  const answer = await askOverpass(buildBuildingsQuery(bounds), { budgetMs: timeoutMs })
+  if (answer.ok) {
+    const buildings = parseBuildings(answer.payload)
     cache.set(cacheKey, buildings)
     saveBuildings(cacheKey, buildings)
     return { status: 'ok', buildings, cached: false }
-  } catch {
-    /* No signal: the copy kept on the phone, said with its age. */
-    const saved = readSavedBuildings(cacheKey)
-    if (saved !== null) return { status: 'ok', buildings: saved.buildings, cached: true, savedAt: saved.fetchedAt }
-    return {
-      status: 'unavailable',
-      reason: controller.signal.aborted
-        ? 'Overpass did not answer in time.'
-        : 'Overpass could not be reached.',
-    }
-  } finally {
-    clearTimeout(timer)
   }
+  /* No signal, or a busy or broken server: the copy kept on the phone, said with its age. */
+  const saved = readSavedBuildings(cacheKey)
+  if (saved !== null) return { status: 'ok', buildings: saved.buildings, cached: true, savedAt: saved.fetchedAt }
+  return { status: 'unavailable', reason: answer.reason }
 }

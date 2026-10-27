@@ -198,6 +198,23 @@ async function fetchWithin(
 }
 
 /**
+ * A tile's bytes as they were saved or served, nothing done to them, or null
+ * when they cannot be had: the neighbours the elevation cleanup reads around
+ * a coastal tile (src/lib/seaMask.ts).
+ */
+export async function loadRawTile(url: string): Promise<ArrayBuffer | null> {
+  const saved = await readSaved(url)
+  if (saved !== null) return saved
+  if (!deviceOnline()) return null
+  try {
+    const response = await fetchWithin(url, TILE_TIMEOUT_MS)
+    return response.ok ? await response.arrayBuffer() : null
+  } catch {
+    return null
+  }
+}
+
+/**
  * THE MAP'S TILE LOADER, registered as the scoutngo:// protocol.
  *
  * Saved first, network second, and a refusal at once when the device says it
@@ -211,7 +228,7 @@ export async function loadTile(
   const url = realUrl(params.url)
   const saved = await readSaved(url)
   /* Elevation tiles have the sea put at sea level first (src/lib/seaMask.ts), for 2D and 3D alike. */
-  if (saved !== null) return { data: await cleanTerrainBytes(url, saved) }
+  if (saved !== null) return { data: await cleanTerrainBytes(url, saved, loadRawTile) }
 
   if (!deviceOnline()) throw new Error(`offline and not saved: ${url}`)
 
@@ -225,7 +242,7 @@ export async function loadTile(
   }
   reportNetwork(true)
   if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`)
-  return { data: await cleanTerrainBytes(url, await response.arrayBuffer()) }
+  return { data: await cleanTerrainBytes(url, await response.arrayBuffer(), loadRawTile) }
 }
 
 /* -------------------------------------------------------------------- areas */

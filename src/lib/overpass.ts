@@ -17,7 +17,10 @@ import type { Landcover, Ring, RoadLine } from '../core/siting.ts'
 import type { SiteMark } from '../core/siteMark.ts'
 import type { MapBounds } from './generation.ts'
 
-export const OVERPASS_URL = 'https://overpass-api.de/api/interpreter'
+import { askOverpass, OVERPASS_SERVERS } from './overpassClient.ts'
+
+/** The first of the servers the app asks (overpassClient.ts has all three, and the order). */
+export const OVERPASS_URL = OVERPASS_SERVERS[0]
 /** Their own guidance is to keep it modest. One call per generate, minimum gap. */
 export const MIN_INTERVAL_MS = 5000
 export const TIMEOUT_MS = 12000
@@ -341,31 +344,10 @@ export async function fetchSiteGeometry(bounds: MapBounds): Promise<SiteGeometry
     return { status: 'unavailable', reason: 'Overpass was queried moments ago; skipping.' }
   }
 
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
-  try {
-    lastCallAt = Date.now()
-    const response = await fetch(OVERPASS_URL, {
-      method: 'POST',
-      headers: { 'content-type': 'text/plain;charset=UTF-8' },
-      body: buildQuery(bounds),
-      signal: controller.signal,
-    })
-    if (!response.ok) {
-      return { status: 'unavailable', reason: `Overpass returned HTTP ${response.status}.` }
-    }
-    const geometry = parseOverpass(await response.json())
-    cache.set(key, geometry)
-    return { status: 'ok', geometry, cached: false }
-  } catch (error) {
-    return {
-      status: 'unavailable',
-      reason:
-        error instanceof Error && error.name === 'AbortError'
-          ? 'Overpass timed out.'
-          : 'Overpass could not be reached.',
-    }
-  } finally {
-    clearTimeout(timer)
-  }
+  lastCallAt = Date.now()
+  const answer = await askOverpass(buildQuery(bounds), { budgetMs: TIMEOUT_MS })
+  if (!answer.ok) return { status: 'unavailable', reason: answer.reason }
+  const geometry = parseOverpass(answer.payload)
+  cache.set(key, geometry)
+  return { status: 'ok', geometry, cached: false }
 }

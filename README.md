@@ -675,6 +675,18 @@ current map view. That sends the bounding box you are looking at, nothing else.
 Results are cached per view so repeated generates do not re-query, and if
 Overpass is slow or down the app carries on without it.
 
+**The place around a venue.** Setting a venue sends Overpass one request for a
+box around it: the buildings and trees within 600 to 700 m that the 3D view
+draws, the mapped water within 1 km, and the coastline within 4.5 km, which the
+elevation is cleaned against so the sea sits at sea level in 2D and 3D. That is a
+box containing the venue, nothing else, sent once per venue and kept on the
+phone afterwards (`src/lib/place.ts`). Every Overpass request the app makes,
+this one and the ones below, goes one at a time to `overpass-api.de`, and only
+when that fails to `overpass.kumi.systems`, then `overpass.private.coffee`: three
+public servers of the same OpenStreetMap data (`src/lib/overpassClient.ts`). If
+none answers, the 3D view says "Map data didn't load" with a Retry, and the
+elevation is cleaned from its own shape instead.
+
 **Tide.** For a waterfront venue the app asks NOAA CO-OPS at
 `api.tidesandcurrents.noaa.gov` for tide predictions. Your coordinates are **not**
 sent: the full station list is fetched once, cached in `localStorage`, and the

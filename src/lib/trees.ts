@@ -13,7 +13,6 @@
  */
 import { boxAround } from './tileRange.ts'
 import type { LatLon } from '../core/geo.ts'
-import { OVERPASS_URL, TIMEOUT_MS } from './overpass.ts'
 
 export const TREE_BOX_METERS = 700
 export const SPARSE_TREES = 25
@@ -51,18 +50,5 @@ export function parseTrees(payload: unknown): MappedTree[] {
   return out
 }
 
+/** Fetched with the rest of the place, in one request (place.ts). */
 export type TreesResult = { status: 'drawn'; trees: MappedTree[] } | { status: 'sparse'; count: number } | { status: 'unavailable' }
-
-export async function fetchTrees(at: LatLon, fetcher: typeof fetch = fetch): Promise<TreesResult> {
-  try {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
-    const res = await fetcher(OVERPASS_URL, { method: 'POST', body: new URLSearchParams({ data: treesQuery(at) }), signal: controller.signal })
-    clearTimeout(timer)
-    if (!res.ok) return { status: 'unavailable' }
-    const trees = parseTrees(await res.json())
-    return trees.length < SPARSE_TREES ? { status: 'sparse', count: trees.length } : { status: 'drawn', trees }
-  } catch {
-    return { status: 'unavailable' }
-  }
-}

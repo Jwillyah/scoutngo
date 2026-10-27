@@ -4,12 +4,8 @@ import type { LatLon } from '../core/geo.ts'
 import { frameBox, observerPose, viewWidthDegrees, zoomWithin } from '../core/observer.ts'
 import { zonedTimeToUtc } from '../core/timezone.ts'
 import { localDate } from '../core/moonTimes.ts'
-import { fetchBuildings, savedBuildingsFor, type Building } from '../lib/buildings.ts'
-import { loadSeaMask, onSeaMask, seaStatus, type SeaStatus } from '../lib/seaMask.ts'
 import { ensure3dOverview } from '../lib/offline3d.ts'
-import { MIN_INTERVAL_MS } from '../lib/overpass.ts'
-import { boxAround } from '../lib/tileRange.ts'
-import { fetchTrees, type TreesResult } from '../lib/trees.ts'
+import { loadPlace, onPlace, placeState, type PlaceState } from '../lib/place.ts'
 import type { StandRequest } from '../lib/standRequest.ts'
 import type { ClayScene, GroundStatus, Pin } from '../three/clayScene.ts'
 
@@ -39,16 +35,6 @@ interface Clay3DProps {
   onLeaveStand: () => void
 }
 
-/* 600 m around the venue for buildings: past that a clay box is a speck. */
-const BUILDING_REACH_M = 600
-/*
- * The longest "Loading buildings" may stay on screen before it says they did
- * not load. 50 s from the moment the scene is up, so that with the scene's own
- * few seconds the answer is on screen within a minute of tapping 3D: measured
- * 62 s at 60.
- */
-export const BUILDING_DEADLINE_MS = 50_000
-
 export const CLAY_NOTE = 'Clay model from map data. Real buildings may differ; unknown heights shown lighter.'
 
 export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveStand }: Clay3DProps) {
@@ -56,9 +42,7 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
   const scene = useRef<ClayScene | null>(null)
   const [ready, setReady] = useState(false)
   const [failed, setFailed] = useState<string | null>(null)
-  const [buildings, setBuildings] = useState<{ total: number; unknown: number; savedAt: string | null } | { problem: string } | 'loading'>('loading')
-  const [buildingsTry, setBuildingsTry] = useState(0)
-  const [trees, setTrees] = useState<TreesResult | null>(null)
+  const [place, setPlace] = useState<PlaceState>(() => placeState())
   const [flat, setFlat] = useState(0)
   /* The zoom belongs to one Stand here: a new one starts at its own focal length. */
   const [zoom, setZoom] = useState<{ tick: number; focal: number } | null>(null)
@@ -87,55 +71,18 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
   }, [venue, timeZone])
 
   /*
-   * THE BUILDINGS, THEN THE TREES, from the same Overpass the 2D map uses.
-   *
-   * WITHIN A MINUTE, ONE WAY OR THE OTHER. "Loading buildings…" once sat on
-   * screen for good at Virginia Beach while Overpass retried and timed out
-   * behind it. Now: the copy saved on the phone is drawn at once when there
-   * is one (and refreshed behind it); otherwise one fetch, waited out once if
-   * Overpass says it was asked moments ago, and given up on at
-   * BUILDING_DEADLINE_MS with "Buildings didn't load" and a Retry.
+   * THE BUILDINGS AND TREES, from the place request App makes when the venue
+   * is set (src/lib/place.ts): one Overpass request for buildings, trees,
+   * coastline and water, never more than one in flight, answered or given up
+   * on within PLACE_BUDGET_MS. The copy saved on the phone is drawn at once.
    */
+  useEffect(() => onPlace(setPlace), [])
   useEffect(() => {
-    if (!ready) return
-    let cancelled = false
-    const bounds = boxAround(venue, BUILDING_REACH_M)
-    const started = Date.now()
-    const left = () => BUILDING_DEADLINE_MS - (Date.now() - started)
-    const draw = (list: readonly Building[], savedAt: string | null) => {
-      scene.current?.setBuildings(list)
-      setBuildings({ total: list.length, unknown: list.filter((b) => b.height.metres === null).length, savedAt })
-    }
-    const saved = savedBuildingsFor(bounds)
-    void (async () => {
-      await Promise.resolve()
-      if (cancelled) return
-      if (saved !== null) draw(saved.buildings, saved.fetchedAt)
-      else setBuildings('loading')
-      let result = await fetchBuildings(bounds, Math.max(1000, left()))
-      if (result.status !== 'ok' && result.reason.includes('moments ago') && left() > MIN_INTERVAL_MS + 2000) {
-        await new Promise((resolve) => setTimeout(resolve, MIN_INTERVAL_MS + 250))
-        if (cancelled) return
-        result = await fetchBuildings(bounds, Math.max(1000, left()))
-      }
-      if (cancelled) return
-      if (result.status === 'ok') draw(result.buildings, result.cached && result.savedAt !== undefined ? result.savedAt : null)
-      else if (saved === null) setBuildings({ problem: result.reason })
-      await new Promise((resolve) => setTimeout(resolve, MIN_INTERVAL_MS + 250))
-      if (cancelled) return
-      const trees = await fetchTrees(venue)
-      if (cancelled) return
-      setTrees(trees)
-      if (trees.status === 'drawn') scene.current?.setTrees(trees.trees)
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [ready, venue, buildingsTry])
-
-  /* The coastline the elevation is cleaned against (src/lib/seaMask.ts): said while it loads, and if it did not. */
-  const [sea, setSea] = useState<SeaStatus>(() => seaStatus())
-  useEffect(() => onSeaMask(() => setSea(seaStatus())), [])
+    if (ready && place.buildings !== null) scene.current?.setBuildings(place.buildings.list)
+  }, [ready, place.buildings])
+  useEffect(() => {
+    if (ready && place.trees?.status === 'drawn') scene.current?.setTrees(place.trees.trees)
+  }, [ready, place.trees])
 
   /* The coarse tiles the overview stands on, saved once per venue so 3D opens with no signal (src/lib/offline3d.ts). */
   useEffect(() => {
@@ -189,6 +136,8 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
     })
   }, [ready, stand])
 
+  const unknown = place.buildings?.list.filter((b) => b.height.metres === null).length ?? 0
+
   const box =
     stand === null || lensFocal === null || width === 0
       ? null
@@ -204,46 +153,26 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
         <p className="clay__note">{CLAY_NOTE}</p>
         {failed !== null ? <p className="clay__line">3D could not start: {failed}</p> : null}
         {!ready && failed === null ? <p className="clay__line">Loading the 3D view…</p> : null}
-        {buildings === 'loading' ? (
-          ready ? <p className="clay__line">Loading buildings…</p> : null
-        ) : 'problem' in buildings ? (
-          <p className="clay__line clay__line--act">
-            Buildings didn't load. {buildings.problem} None are saved on this phone for here.{' '}
-            <button type="button" className="btn btn--small" onClick={() => setBuildingsTry((n) => n + 1)}>
-              Retry
-            </button>
-          </p>
-        ) : (
+        {place.buildings === null ? null : (
           <p className="clay__line num">
-            {buildings.total} buildings{buildings.savedAt === null ? '' : `, saved on this phone ${buildings.savedAt.slice(0, 10)}`}
-            {buildings.unknown > 0 ? (
+            {place.buildings.list.length} buildings
+            {place.buildings.savedAt === null ? '' : `, saved on this phone ${place.buildings.savedAt.slice(0, 10)}`}
+            {unknown > 0 ? (
               <>
                 {' · '}
                 <span className="clay__swatch clay__swatch--unknown" aria-hidden="true" />
-                {buildings.unknown} height unknown, drawn lighter, no shadow
+                {unknown} height unknown, drawn lighter, no shadow
               </>
             ) : null}
-          </p>
-        )}
-        {trees === null ? null : (
-          <p className="clay__line num">
-            {trees.status === 'drawn'
-              ? `${trees.trees.length} mapped trees drawn`
-              : trees.status === 'sparse'
-                ? `Trees: none drawn, only ${trees.count} mapped here`
-                : 'Trees: map data did not answer'}
+            {place.trees?.status === 'drawn'
+              ? ` · ${place.trees.trees.length} mapped trees`
+              : place.trees?.status === 'sparse'
+                ? ` · no trees drawn, only ${place.trees.count} mapped here`
+                : ''}
           </p>
         )}
         {flat > 0 ? <p className="clay__line">Some ground has no saved elevation and is drawn flat.</p> : null}
-        {sea === 'loading' ? <p className="clay__line">Checking the coastline…</p> : null}
-        {sea === 'failed' ? (
-          <p className="clay__line clay__line--act">
-            Coastline didn't load: at the coast the sea may not sit at sea level.{' '}
-            <button type="button" className="btn btn--small" onClick={() => void loadSeaMask(venue)}>
-              Retry
-            </button>
-          </p>
-        ) : null}
+        <PlacePill place={place} onRetry={() => void loadPlace(venue, { retry: true })} />
       </div>
       {stand === null || lensFocal === null ? null : (
         <div className="clay__stand">
@@ -276,3 +205,22 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
   )
 }
 
+
+/*
+ * ONE STATUS FOR THE MAP DATA, as a small pill rather than a box per thing
+ * that failed: buildings, trees and the coastline come in one request now,
+ * so they load, or fail, together. Only the Retry takes a touch; the rest of
+ * the pill lets the map underneath have it.
+ */
+export function PlacePill({ place, onRetry }: { place: PlaceState; onRetry: () => void }) {
+  if (place.status === 'loading') return <p className="clay__pill">Loading map data…</p>
+  if (place.status !== 'failed') return null
+  return (
+    <p className="clay__pill" title={place.reason ?? undefined}>
+      Map data didn't load ·{' '}
+      <button type="button" className="clay__pillbtn" onClick={onRetry}>
+        Retry
+      </button>
+    </p>
+  )
+}

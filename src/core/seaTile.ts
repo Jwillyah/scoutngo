@@ -67,9 +67,11 @@ export const SEA_LEVEL_RGB = [128, 0, 0] as const
 export const SHORE_BAND_M = 20
 export const SHORE_MARGIN_M = 1
 
-const decode = (rgba: ArrayLike<number>, i: number) => rgba[i * 4] * 256 + rgba[i * 4 + 1] + rgba[i * 4 + 2] / 256 - 32768
+/** Pixel i of a Terrarium RGBA tile, in metres. */
+export const decode = (rgba: ArrayLike<number>, i: number) => rgba[i * 4] * 256 + rgba[i * 4 + 1] + rgba[i * 4 + 2] / 256 - 32768
 
-function encode(rgba: Uint8ClampedArray | Uint8Array, i: number, metres: number): void {
+/** Writes metres into pixel i of a Terrarium RGBA tile. */
+export function encode(rgba: Uint8ClampedArray | Uint8Array, i: number, metres: number): void {
   const v = Math.max(0, Math.min(65535.996, metres + 32768))
   rgba[i * 4] = Math.floor(v / 256)
   rgba[i * 4 + 1] = Math.floor(v) % 256
