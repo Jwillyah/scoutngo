@@ -167,6 +167,12 @@ export function HowPage({ onBack }: { onBack: () => void }) {
               It is not a safety authority. It never says a flight is legal, cleared or compliant.
             </p>
             <p className="how__p">
+              Fly it yourself is a flight model, not a physics simulator: it moves the drone the way the
+              sticks ask, at the Air 3S's published top speed and climb (other speeds assumed), stops at
+              your ceiling and at what the scan has in the way, and drifts a little with the forecast
+              wind. Real wind, signal and battery behave in ways it does not.
+            </p>
+            <p className="how__p">
               It is not a substitute for checking the airspace yourself before you fly. Temporary
               flight restrictions are not checked at all, and it says so where that matters rather
               than leaving the silence to be read as nothing to report.

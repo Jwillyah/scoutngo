@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { AIR3S, pathFor, type Move } from '../../core/flight.ts'
+import { AIR3S, pathFor, type Move, type PathPoint } from '../../core/flight.ts'
 import type { LatLon } from '../../core/geo.ts'
 import type { LevelWind } from '../../core/windProfile.ts'
 import type { Building } from '../buildings.ts'
@@ -53,6 +53,8 @@ export function usePreflight({ venue, pilotAt, buildings, winds, scan }: Preflig
   const [focal, setFocal] = useState<24 | 70>(24)
   const [radiusM, setRadiusM] = useState(80)
   const [kept, setKept] = useState(readKept)
+  /* A flight flown by hand (Fly it yourself): kept as the plan, its own path and timing. */
+  const [flown, setFlown] = useState<PathPoint[] | null>(null)
   const keep = (next: Partial<typeof kept>) => {
     const v = { ...kept, ...next }
     setKept(v)
@@ -68,6 +70,11 @@ export function usePreflight({ venue, pilotAt, buildings, winds, scan }: Preflig
   const pilot = pilotAt ?? venue
 
   const move = useMemo((): Move | null => {
+    if (flown !== null && flown.length > 1) {
+      /* Every 2 s of the flight as a waypoint: the move's own shape, for the card's second look at the length. */
+      const every = flown.filter((_, i) => i % 4 === 0 || i === flown.length - 1)
+      return { kind: 'waypoints', points: every.map((p) => ({ at: p.at, heightFt: p.ft })) }
+    }
     if (venue === null) return null
     if (points.length < POINTS_NEEDED[kind]) return null
     switch (kind) {
@@ -83,10 +90,10 @@ export function usePreflight({ venue, pilotAt, buildings, winds, scan }: Preflig
       case 'waypoints':
         return { kind, points: points.map((at) => ({ at, heightFt })) }
     }
-  }, [kind, points, venue, radiusM, heightFt])
+  }, [kind, points, venue, radiusM, heightFt, flown])
 
   const heights = useMemo(() => preflightHeights(scan, buildings), [scan, buildings])
-  const path = useMemo(() => (move === null ? [] : pathFor(move, { speedMps, capFt, stepS: 0.5 })), [move, speedMps, capFt])
+  const path = useMemo(() => (flown !== null && flown.length > 1 ? flown : move === null ? [] : pathFor(move, { speedMps, capFt, stepS: 0.5 })), [move, speedMps, capFt, flown])
   const card = useMemo((): FlightCard | null => {
     if (move === null || pilot === null || path.length < 2) return null
     return flightCard({
@@ -109,7 +116,11 @@ export function usePreflight({ venue, pilotAt, buildings, winds, scan }: Preflig
     setKind: (k: MoveKind) => {
       setKind(k)
       setPoints([])
+      setFlown(null)
     },
+    flown,
+    setFlown,
+    heights,
     points,
     addPoint: (at: LatLon) => setPoints((ps) => (kind === 'push-in' || kind === 'pull-back' || kind === 'rise' ? [at] : [...ps, at])),
     clearPoints: () => setPoints([]),

@@ -11588,3 +11588,120 @@
   gap: var(--space-2);
   align-items: center;
 }
+
+/* ------------------------------------------------- fly it yourself (3a) */
+
+.fly {
+  /* Over the app's own chrome while flying: the sticks must be what a thumb lands on. */
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: calc(env(safe-area-inset-top, 0px) + 112px);
+  /* Rendered on the page body (Clay3D's portal), so the sheet's own variables are not here: the peek's height, and the safe area. */
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 200px);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+  pointer-events: none;
+}
+
+.fly > * {
+  pointer-events: auto;
+}
+
+.fly__hud,
+.fly__bars {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px var(--space-2);
+  padding: 4px var(--space-2);
+  border-radius: var(--radius-panel);
+  background: color-mix(in srgb, var(--surface-1) 70%, transparent);
+  color: var(--color-text);
+  font-size: var(--text-xs);
+}
+
+.fly--hidden .fly__hud {
+  box-shadow: 0 0 0 3px var(--sun);
+}
+
+.fly__los {
+  color: var(--sun);
+}
+
+.fly__arrow {
+  display: inline-block;
+}
+
+.fly__modes {
+  align-self: flex-start;
+}
+
+/* The sticks sit at the foot, above the sheet. */
+.fly__sticks {
+  margin-top: auto;
+}
+
+.fly .fly__small {
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-panel);
+  background: color-mix(in srgb, var(--surface-1) 70%, transparent);
+}
+
+/* While flying, the 3D view's legend steps aside for the HUD. */
+.clay--flying .clay__legend {
+  display: none;
+}
+
+.fly__sticks {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.fly__stick {
+  position: relative;
+  width: min(36dvw, 150px);
+  aspect-ratio: 1;
+  justify-self: center;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--white) 50%, transparent);
+  background: color-mix(in srgb, var(--surface-1) 45%, transparent);
+  touch-action: none;
+}
+
+.fly__knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--white) 75%, transparent);
+}
+
+.fly__wheel {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+}
+
+.fly__wheel input {
+  writing-mode: vertical-lr;
+  direction: rtl;
+  height: 110px;
+}
+
+.fly__small {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.fly__exit {
+  align-self: center;
+}

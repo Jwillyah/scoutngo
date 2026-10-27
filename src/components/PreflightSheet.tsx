@@ -21,6 +21,8 @@ interface PreflightSheetProps {
   picking: boolean
   onPick: (next: boolean) => void
   onPlay: () => void
+  /** Fly it yourself in the 3D view, the sticks on screen; recorded when asked. */
+  onFly: (record: boolean) => void
   onRecord: () => void
   recordNote: string | null
   /** The recorded preview, to hand to the share sheet. */
@@ -54,7 +56,7 @@ async function share(name: string, text: string | Blob, type: string): Promise<s
   }
 }
 
-export function PreflightSheet({ pf, picking, onPick, onPlay, onRecord, recordNote, clip, onPlacePilot, pilotSet, onClose }: PreflightSheetProps) {
+export function PreflightSheet({ pf, picking, onPick, onPlay, onFly, onRecord, recordNote, clip, onPlacePilot, pilotSet, onClose }: PreflightSheetProps) {
   const card = pf.card
   const need = POINTS_NEEDED[pf.kind]
   return (
@@ -125,6 +127,16 @@ export function PreflightSheet({ pf, picking, onPick, onPlay, onRecord, recordNo
           {pilotSet ? 'Move where you stand' : 'Tap where you will stand (else the venue pin)'}
         </button>
       </div>
+
+      <p className="pf__prompt">
+        {pf.flown !== null ? 'This is the flight you flew by hand; pick a move to draw instead. ' : ''}
+        <button type="button" className="btn btn--small" onClick={() => onFly(false)}>
+          Fly it yourself
+        </button>{' '}
+        <button type="button" className="clay__link" onClick={() => onFly(true)}>
+          Fly and record
+        </button>
+      </p>
 
       {card === null ? (
         <p className="pf__prompt">{need === 0 ? 'Set a venue to draw the move.' : 'Tap the map to draw the move.'}</p>

@@ -209,6 +209,9 @@ export interface ClayScene {
   orbit(): void
   /** Fly a Preflight move; with record, resolves to the watermarked clip. */
   playPath(play: FlightPlay, onTime: (at: Date) => void): Promise<Blob | null>
+  droneView(at: LatLon, altAbsM: number, yaw: number, gimbal: number, focal: number): void
+  setCeiling(centre: LatLon | null, altAbsM: number, alpha: number): void
+  startRecording(): { stop: () => Promise<Blob | null> } | null
   observe(view: ObserverView): Promise<void>
   /**
    * What is under a screen pixel, by the depth buffer: buildings included.
@@ -520,6 +523,62 @@ export function createClayScene(
    * and recorded (MediaRecorder): the clip comes back as a Blob.
    */
   let playing: { stop: () => void } | null = null
+  /*
+   * RECORDING: every frame drawn onto a second canvas with the watermark, and
+   * that canvas recorded (MediaRecorder). Null where the browser cannot.
+   */
+  const startRecording = (): { stop: () => Promise<Blob | null> } | null => {
+    if (typeof MediaRecorder === 'undefined') return null
+    const canvas = widget.canvas
+    const out = document.createElement('canvas')
+    out.width = canvas.width
+    out.height = canvas.height
+    const ctx = out.getContext('2d')
+    const compose = () => {
+      if (ctx === null) return
+      ctx.drawImage(canvas, 0, 0)
+      ctx.font = `${Math.round(out.height / 40)}px system-ui, sans-serif`
+      ctx.fillStyle = 'rgba(255,255,255,0.85)'
+      ctx.fillText(WATERMARK, Math.round(out.width / 30), out.height - Math.round(out.height / 30))
+    }
+    scene.postRender.addEventListener(compose)
+    const type = ['video/mp4', 'video/webm;codecs=vp9', 'video/webm'].find((t) => MediaRecorder.isTypeSupported(t)) ?? ''
+    const recorder = new MediaRecorder(out.captureStream(30), type === '' ? undefined : { mimeType: type })
+    const chunks: Blob[] = []
+    recorder.ondataavailable = (e) => chunks.push(e.data)
+    recorder.start()
+    return {
+      stop: () =>
+        new Promise<Blob | null>((resolve) => {
+          scene.postRender.removeEventListener(compose)
+          recorder.onstop = () => resolve(new Blob(chunks, { type: recorder.mimeType || 'video/webm' }))
+          recorder.stop()
+        }),
+    }
+  }
+
+  /* FLYING IT YOURSELF: the camera is the drone; a faint glass plane at the ceiling when near it. */
+  let ceilingPlane: Entity | null = null
+  const droneView = (at: LatLon, altAbsM: number, yaw: number, gimbal: number, focal: number) => {
+    const canvas = widget.canvas
+    const frustum = widget.camera.frustum as { fov?: number }
+    const horizontal = CMath.toRadians(horizontalFov(focal))
+    frustum.fov = canvas.clientWidth >= canvas.clientHeight ? horizontal : 2 * Math.atan(Math.tan(horizontal / 2) * (canvas.clientHeight / canvas.clientWidth))
+    widget.camera.setView({ destination: Cartesian3.fromDegrees(at.lon, at.lat, altAbsM), orientation: { heading: CMath.toRadians(yaw), pitch: CMath.toRadians(gimbal), roll: 0 } })
+  }
+  const setCeiling = (centre: LatLon | null, altAbsM: number, alpha: number) => {
+    if (ceilingPlane !== null) widget.entities.remove(ceilingPlane)
+    ceilingPlane = null
+    if (centre === null || alpha <= 0) return
+    const d = 0.01
+    ceilingPlane = widget.entities.add({
+      polygon: {
+        hierarchy: Cartesian3.fromDegreesArrayHeights([centre.lon - d, centre.lat - d, altAbsM, centre.lon + d, centre.lat - d, altAbsM, centre.lon + d, centre.lat + d, altAbsM, centre.lon - d, centre.lat + d, altAbsM]),
+        perPositionHeight: true,
+        material: Color.WHITE.withAlpha(alpha),
+      },
+    })
+  }
   const playPath = async (play: FlightPlay, onTime: (at: Date) => void): Promise<Blob | null> => {
     playing?.stop()
     const [g] = await sampleTerrain(widget.terrainProvider, 15, [Cartographic.fromDegrees(play.takeoff.lon, play.takeoff.lat)])
@@ -539,27 +598,7 @@ export function createClayScene(
       const f = b.t === a.t ? 0 : Math.max(0, Math.min(1, (t - a.t) / (b.t - a.t)))
       return { lat: a.at.lat + (b.at.lat - a.at.lat) * f, lon: a.at.lon + (b.at.lon - a.at.lon) * f, ft: a.ft + (b.ft - a.ft) * f }
     }
-    let recorder: MediaRecorder | null = null
-    const chunks: Blob[] = []
-    let compose: (() => void) | null = null
-    if (play.record && typeof MediaRecorder !== 'undefined') {
-      const out = document.createElement('canvas')
-      out.width = canvas.width
-      out.height = canvas.height
-      const ctx = out.getContext('2d')
-      compose = () => {
-        if (ctx === null) return
-        ctx.drawImage(canvas, 0, 0)
-        ctx.font = `${Math.round(out.height / 40)}px system-ui, sans-serif`
-        ctx.fillStyle = 'rgba(255,255,255,0.85)'
-        ctx.fillText(WATERMARK, Math.round(out.width / 30), out.height - Math.round(out.height / 30))
-      }
-      scene.postRender.addEventListener(compose)
-      const type = ['video/mp4', 'video/webm;codecs=vp9', 'video/webm'].find((t) => MediaRecorder.isTypeSupported(t)) ?? ''
-      recorder = new MediaRecorder(out.captureStream(30), type === '' ? undefined : { mimeType: type })
-      recorder.ondataavailable = (e) => chunks.push(e.data)
-      recorder.start()
-    }
+    const rec = play.record ? startRecording() : null
     const started = performance.now()
     let lastTime = -1
     const renderMode = scene.requestRenderMode
@@ -587,14 +626,7 @@ export function createClayScene(
     })
     playing = null
     scene.requestRenderMode = renderMode
-    if (compose !== null) scene.postRender.removeEventListener(compose)
-    if (recorder === null) return null
-    const rec = recorder
-    await new Promise<void>((resolve) => {
-      rec.onstop = () => resolve()
-      rec.stop()
-    })
-    return new Blob(chunks, { type: rec.mimeType || 'video/webm' })
+    return rec === null ? null : rec.stop()
   }
 
   const project = (at: LatLon, height = 0) => {
@@ -639,6 +671,9 @@ export function createClayScene(
     orbit,
     observe,
     playPath,
+    droneView,
+    setCeiling,
+    startRecording,
     project,
     counts: tileCounts,
     buildings: () => drawnBuildings,

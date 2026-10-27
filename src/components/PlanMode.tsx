@@ -92,6 +92,9 @@ import type { ScanContext } from '../lib/lidar/applyScan.ts'
 import { usePreflight } from '../lib/preflight/usePreflight.ts'
 import { PreflightSheet } from './PreflightSheet.tsx'
 import type { FlightPlay } from '../lib/preflight/play.ts'
+import type { FlySession } from '../lib/fly/session.ts'
+import { hiddenByMarch } from '../core/flight.ts'
+import { ndFor } from '../core/ndFilter.ts'
 import type { Building as PlanBuilding } from '../lib/buildings.ts'
 
 const NO_BUILDINGS: readonly PlanBuilding[] = []
@@ -99,7 +102,7 @@ import { useSurfSetting } from '../lib/surfSetting.ts'
 import { LAYER_FAILED } from '../lib/layerFailed.ts'
 import type { PlanForNow } from '../lib/planForNow.ts'
 import { goldenNext } from '../core/goldenNext.ts'
-import { getPosition } from 'suncalc'
+import { getPosition, getTimes } from 'suncalc'
 import { hasWebGL2 } from '../lib/webgl.ts'
 import { standAtPosition, standForLineUp, type StandRequest } from '../lib/standRequest.ts'
 import { ExposurePlayground } from './ExposurePlayground.tsx'
@@ -1004,6 +1007,37 @@ export function PlanMode({
   const [flightPicking, setFlightPicking] = useState(false)
   const [flightPlay, setFlightPlay] = useState<FlightPlay | null>(null)
   const [recordNote, setRecordNote] = useState<string | null>(null)
+  const [flySession, setFlySession] = useState<FlySession | null>(null)
+  const startFly = (record: boolean) => {
+    if (venue === null || pf.pilot === null || scrubbedAt === null) return
+    if (!hasWebGL2()) {
+      setThreeDNote('3D needs WebGL 2, which this browser does not have. The 2D map works as before.')
+      return
+    }
+    const w = windLevels.find((l) => l.heightMeters === 80)
+    const sunset = getTimes(scrubbedAt, venue.lat, venue.lon).sunset
+    const nd = ndFor({ minutesBeforeSunset: sunset == null ? Number.NaN : (sunset.getTime() - scrubbedAt.getTime()) / 60_000, sky: 'full-sun', mode: 'default', overWater: false })
+    const heights = pf.heights
+    const pilot = pf.pilot
+    setThreeD(true)
+    setFlightPlay(null)
+    /* The sheet down out of the way: the sticks sit just above it. */
+    setSheet('peek')
+    setFlySession((f) => ({
+      takeoff: pilot,
+      ceilingFt: pf.capFt,
+      focal: pf.focal,
+      flightMinutes: pf.flightMinutes,
+      wind: w === undefined || w.speedMps === null || w.fromDegrees === null ? null : { fromDeg: w.fromDegrees, mps: w.speedMps },
+      surfaceAt: (at) => heights.surfaceAt(at),
+      surfaceRelative: heights.source.kind === 'map',
+      hiddenAt: (at, ft) => hiddenByMarch(pilot, { t: 0, at, ft, askedFt: ft }, heights),
+      /* Your ND table (src/core/ndFilter.ts), and the 180-degree shutter at 30 fps. */
+      exposure: `${nd.nd ?? 'No ND'} · 1/60 s`,
+      record,
+      tick: (f?.tick ?? 0) + 1,
+    }))
+  }
   /* The last recorded preview, shared from the card by a fresh tap (the share sheet needs one). */
   const [recordedClip, setRecordedClip] = useState<Blob | null>(null)
   const playFlight = (record: boolean) => {
@@ -1609,6 +1643,7 @@ export function PlanMode({
             picking={flightPicking}
             onPick={setFlightPicking}
             onPlay={() => playFlight(false)}
+            onFly={startFly}
             onRecord={() => playFlight(true)}
             recordNote={recordNote}
             clip={recordedClip}
@@ -2003,6 +2038,17 @@ export function PlanMode({
           onLeaveStand={() => setStand(null)}
           flight={flightPlay}
           onFlightTime={scrubTo}
+          fly={flySession}
+          onLanded={(track, clip) => {
+            setFlySession(null)
+            if (track.length > 1) pf.setFlown(track)
+            if (clip !== null) {
+              setRecordedClip(clip)
+              setRecordNote('Your flight, recorded and watermarked.')
+            }
+            /* Back to the card, open (openCard would toggle it shut). */
+            setCard({ kind: 'preflight' } as SheetCard)
+          }}
           onRecorded={(clip: Blob | null, note: string) => {
             setRecordNote(note)
             setRecordedClip(clip)

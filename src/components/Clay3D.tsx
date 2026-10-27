@@ -1,5 +1,6 @@
 import { clayStatus, type ClayStatus } from '../lib/clayStatus.ts'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { SENSORS } from '../core/fov.ts'
 import type { LatLon } from '../core/geo.ts'
 import { frameBox, observerPose, viewWidthDegrees, zoomWithin } from '../core/observer.ts'
@@ -15,6 +16,12 @@ import { scanLabel } from '../lib/lidar/applyScan.ts'
 import { canopyPeaks, footprintMask } from '../lib/lidar/canopy.ts'
 import type { Building } from '../lib/buildings.ts'
 import type { FlightPlay } from '../lib/preflight/play.ts'
+import type { FlySession } from '../lib/fly/session.ts'
+import { NO_STICKS, useFly } from '../lib/fly/useFly.ts'
+import { obstacleBars, type FlyMode, type Sticks } from '../core/flyModel.ts'
+import { destinationPoint } from '../core/geo.ts'
+import type { PathPoint } from '../core/flight.ts'
+import { FlyControls } from './FlyControls.tsx'
 
 const EMPTY: readonly Building[] = []
 
@@ -48,11 +55,15 @@ interface Clay3DProps {
   onFlightTime?: (at: Date) => void
   /** A recorded preview, or null with why. */
   onRecorded?: (clip: Blob | null, note: string) => void
+  /** Fly it yourself (Phase 3a), or null. */
+  fly?: FlySession | null
+  /** Landed: the track flown, and the recording if one was asked for. */
+  onLanded?: (track: PathPoint[], clip: Blob | null) => void
 }
 
 export const CLAY_NOTE = 'Clay model from map data; real buildings may differ'
 
-export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveStand, flight = null, onFlightTime, onRecorded }: Clay3DProps) {
+export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveStand, flight = null, onFlightTime, onRecorded, fly = null, onLanded }: Clay3DProps) {
   const host = useRef<HTMLDivElement>(null)
   const scene = useRef<ClayScene | null>(null)
   /* How many times the scene has been built: every build (a scan arriving rebuilds it) re-runs the effects that feed it. 0 is not built yet. */
@@ -175,6 +186,62 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, shown, flight?.tick])
 
+  /* FLY IT YOURSELF: the ground at takeoff, the sticks, the loop, the ceiling glass, the recording. */
+  const [flyGround, setFlyGround] = useState<{ tick: number; m: number } | null>(null)
+  const [flyMode, setFlyMode] = useState<FlyMode>('normal')
+  const sticks = useRef<Sticks>(NO_STICKS)
+  const recording = useRef<{ stop: () => Promise<Blob | null> } | null>(null)
+  useEffect(() => {
+    if (!ready || fly === null) return
+    let live = true
+    void scene.current?.groundAt(fly.takeoff).then((m) => {
+      if (live) setFlyGround({ tick: fly.tick, m: m ?? 0 })
+    })
+    return () => {
+      live = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, fly?.tick])
+  const flying = fly !== null && shown && flyGround !== null && flyGround.tick === fly.tick
+  const groundM = flyGround?.m ?? 0
+  const surfaceAbsAt = (p: LatLon) => {
+    if (fly === null) return null
+    const v = fly.surfaceAt(p)
+    return v === null ? null : fly.surfaceRelative ? groundM + v : v
+  }
+  const { hud, track } = useFly(flying, {
+    takeoff: fly?.takeoff ?? venue,
+    groundM,
+    env: { mode: flyMode, ceilingM: (fly?.ceilingFt ?? 400) * 0.3048, wind: fly?.wind ?? null, surfaceAbsAt },
+    view: (p, alt, yaw, gimbal) => scene.current?.droneView(p, alt, yaw, gimbal, fly?.focal ?? 24),
+    hiddenAt: (p, ft) => fly?.hiddenAt(p, ft) ?? false,
+    sticks,
+    mode: flyMode,
+  })
+  const nearCeiling = hud?.nearCeiling === true
+  useEffect(() => {
+    if (!ready) return
+    scene.current?.setCeiling(flying && fly !== null ? fly.takeoff : null, groundM + (fly?.ceilingFt ?? 400) * 0.3048, nearCeiling ? 0.18 : 0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, flying, nearCeiling])
+  useEffect(() => {
+    if (!flying || fly === null || !fly.record) return
+    recording.current = scene.current?.startRecording() ?? null
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flying])
+  const bars =
+    hud === null || fly === null
+      ? null
+      : obstacleBars(hud.state, {
+          mode: flyMode,
+          ceilingM: fly.ceilingFt * 0.3048,
+          wind: fly.wind,
+          surfaceAt: (x, y) => {
+            const abs = surfaceAbsAt(destinationPoint(destinationPoint(fly.takeoff, 90, x), 0, y))
+            return abs === null ? null : abs - groundM
+          },
+        })
+
   /* The canvas's width, for the frame box. */
   useEffect(() => {
     const el = host.current
@@ -213,7 +280,7 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
       : frameBox(lensFocal, SENSORS[stand.sensor], viewWidthDegrees(frameBox(stand.focal, SENSORS[stand.sensor], 60, 100).lensHorizontal), width)
 
   return (
-    <div className={shown ? 'clay clay--shown' : 'clay clay--waiting'}>
+    <div className={`${shown ? 'clay clay--shown' : 'clay clay--waiting'}${flying ? ' clay--flying' : ''}`}>
       <div ref={host} className="clay__canvas" />
       {box === null ? null : (
         <div className="clay__frame" style={{ width: `${box.width}px`, height: `${box.height}px` }} aria-hidden="true" />
@@ -260,6 +327,28 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
           </div>
         )}
       </div>
+      {!flying || fly === null ? null : createPortal(
+        <FlyControls
+          onSticks={(part) => {
+            sticks.current = { ...sticks.current, ...part }
+          }}
+          mode={flyMode}
+          onMode={setFlyMode}
+          hud={hud}
+          ceilingFt={fly.ceilingFt}
+          flightMinutes={fly.flightMinutes}
+          wind={fly.wind}
+          exposure={fly.exposure}
+          bars={bars}
+          onExit={() => {
+            const rec = recording.current
+            recording.current = null
+            void (rec === null ? Promise.resolve(null) : rec.stop()).then((clip) => onLanded?.([...track.current], clip))
+          }}
+        />,
+        /* On the page itself, over every bit of the app's chrome: the sticks are what a thumb must land on. */
+        document.body,
+      )}
       {stand === null || lensFocal === null ? null : (
         <div className="clay__stand">
           <p className="clay__standname">
