@@ -46,6 +46,8 @@ export type SheetCard =
   | { kind: 'about' }
   /** From the menu: the call sheet, written on the shooter's own key. */
   | { kind: 'callsheet' }
+  /* Preflight: draw a drone move, see its flight card, play it in 3D (PreflightSheet.tsx). */
+  | { kind: 'preflight' }
 
 export type CardKind = SheetCard['kind']
 
@@ -68,6 +70,7 @@ export const CARD_TITLE: Record<CardKind, string> = {
   settings: 'Settings',
   about: 'About',
   callsheet: 'Call sheet',
+  preflight: 'Preflight',
 }
 
 /**
@@ -138,4 +141,6 @@ export const TIME_MATTERS: Record<CardKind, boolean> = {
   airspace: false,
   /* Written for the whole window, not the moment on the bar. */
   callsheet: false,
+  /* The move is flown at a time: the bar sets the light it is played in. */
+  preflight: true,
 }

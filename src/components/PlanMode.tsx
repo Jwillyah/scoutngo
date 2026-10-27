@@ -87,7 +87,14 @@ import { Clay3D } from './Clay3D.tsx'
 import { goldenChip } from '../lib/goldenChip.ts'
 import { TideSheet } from './TideSheet.tsx'
 import { useTideSheet } from '../lib/useTideSheet.ts'
-import { SCAN_EVENT } from '../lib/lidar/useScan.ts'
+import { SCAN_EVENT, scanContextAt } from '../lib/lidar/useScan.ts'
+import type { ScanContext } from '../lib/lidar/applyScan.ts'
+import { usePreflight } from '../lib/preflight/usePreflight.ts'
+import { PreflightSheet } from './PreflightSheet.tsx'
+import type { FlightPlay } from '../lib/preflight/play.ts'
+import type { Building as PlanBuilding } from '../lib/buildings.ts'
+
+const NO_BUILDINGS: readonly PlanBuilding[] = []
 import { useSurfSetting } from '../lib/surfSetting.ts'
 import { LAYER_FAILED } from '../lib/layerFailed.ts'
 import type { PlanForNow } from '../lib/planForNow.ts'
@@ -981,6 +988,35 @@ export function PlanMode({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wantBuildings, venue, mapZoom >= BUILDINGS_MIN_ZOOM, buildingsAttempt])
 
+  /* The kept 3D scan for this place, for Preflight's ground and surface (src/lib/preflight/heights.ts). */
+  const [scanCtx, setScanCtx] = useState<ScanContext | null>(null)
+  useEffect(() => {
+    if (venue === null) return
+    let live = true
+    void scanContextAt(venue.lat, venue.lon).then((c) => {
+      if (live) setScanCtx(c)
+    })
+    return () => {
+      live = false
+    }
+  }, [venue, buildingsAttempt])
+  const pf = usePreflight({ venue, pilotAt, buildings: buildingList ?? NO_BUILDINGS, winds: windLevels, scan: venue === null ? null : scanCtx })
+  const [flightPicking, setFlightPicking] = useState(false)
+  const [flightPlay, setFlightPlay] = useState<FlightPlay | null>(null)
+  const [recordNote, setRecordNote] = useState<string | null>(null)
+  /* The last recorded preview, shared from the card by a fresh tap (the share sheet needs one). */
+  const [recordedClip, setRecordedClip] = useState<Blob | null>(null)
+  const playFlight = (record: boolean) => {
+    if (venue === null || pf.path.length < 2 || scrubbedAt === null) return
+    if (!hasWebGL2()) {
+      setThreeDNote('3D needs WebGL 2, which this browser does not have. The 2D map works as before.')
+      return
+    }
+    setRecordNote(record ? 'Recording in the 3D view…' : null)
+    setThreeD(true)
+    setFlightPlay((f: FlightPlay | null) => ({ path: pf.path, subject: venue, takeoff: pf.pilot ?? venue, focal: pf.focal, startAt: scrubbedAt, record, tick: (f?.tick ?? 0) + 1 }))
+  }
+
   /* The year of the 3D scan whose heights the buildings carry, or undefined when none do. */
   const scanYearUsed = buildingList?.find((b) => b.height.source === 'lidar')?.height.scanYear
 
@@ -1460,6 +1496,14 @@ export function PlanMode({
       ]}
       tools={[
         {
+          id: 'preflight',
+          label: 'Preflight',
+          state: 'Draw a move',
+          on: false,
+          art: TILE_ART.preflight,
+          onToggle: () => openCard('preflight'),
+        },
+        {
           id: 'measure',
           label: 'Measure',
           state: measurePins === null ? 'OFF' : 'ON',
@@ -1557,6 +1601,21 @@ export function PlanMode({
             {/* The cameras show the sky the forecast is modelling. */}
             <CardMore links={[{ label: 'Sky cameras near here', onOpen: () => openCard('cams') }]} />
           </Card>
+        )
+      case 'preflight':
+        return (
+          <PreflightSheet
+            pf={pf}
+            picking={flightPicking}
+            onPick={setFlightPicking}
+            onPlay={() => playFlight(false)}
+            onRecord={() => playFlight(true)}
+            recordNote={recordNote}
+            clip={recordedClip}
+            onPlacePilot={() => onPlacingPilot(true)}
+            pilotSet={pilotAt !== null}
+            onClose={home}
+          />
         )
       case 'tide':
         /* A page of its own (TideSheet.tsx): the curve there is the time control, so the time bar steps aside. */
@@ -1864,6 +1923,8 @@ export function PlanMode({
         onAirspaceDense={setAirspaceDense}
         measurePins={measurePins ?? undefined}
         onMeasureAt={onMeasureAt}
+        onFlightAt={pf.addPoint}
+        flight={card.kind === 'preflight' ? pf.features : null}
         onHorizon={setHorizonProfile}
         handle={mapHandle}
         venue={venue}
@@ -1879,7 +1940,9 @@ export function PlanMode({
                   ? 'aim'
                   : measurePins !== null
                     ? 'measure'
-                    : null
+                    : flightPicking && card.kind === 'preflight'
+                      ? 'flight'
+                      : null
         }
         marks={marks}
         markDraft={markDraft}
@@ -1938,6 +2001,12 @@ export function PlanMode({
           pins={threeDPins}
           stand={stand}
           onLeaveStand={() => setStand(null)}
+          flight={flightPlay}
+          onFlightTime={scrubTo}
+          onRecorded={(clip: Blob | null, note: string) => {
+            setRecordNote(note)
+            setRecordedClip(clip)
+          }}
         />
       ) : null}
 

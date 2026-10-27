@@ -14,6 +14,7 @@ import type { ScanContext } from '../lib/lidar/applyScan.ts'
 import { scanLabel } from '../lib/lidar/applyScan.ts'
 import { canopyPeaks, footprintMask } from '../lib/lidar/canopy.ts'
 import type { Building } from '../lib/buildings.ts'
+import type { FlightPlay } from '../lib/preflight/play.ts'
 
 const EMPTY: readonly Building[] = []
 
@@ -41,11 +42,17 @@ interface Clay3DProps {
   pins: readonly Pin[]
   stand: StandRequest | null
   onLeaveStand: () => void
+  /** A Preflight move to fly (src/lib/preflight/play.ts), or null. */
+  flight?: FlightPlay | null
+  /** The time bar follows the move. */
+  onFlightTime?: (at: Date) => void
+  /** A recorded preview, or null with why. */
+  onRecorded?: (clip: Blob | null, note: string) => void
 }
 
 export const CLAY_NOTE = 'Clay model from map data; real buildings may differ'
 
-export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveStand }: Clay3DProps) {
+export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveStand, flight = null, onFlightTime, onRecorded }: Clay3DProps) {
   const host = useRef<HTMLDivElement>(null)
   const scene = useRef<ClayScene | null>(null)
   /* How many times the scene has been built: every build (a scan arriving rebuilds it) re-runs the effects that feed it. 0 is not built yet. */
@@ -157,6 +164,16 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
   useEffect(() => {
     if (ready) scene.current?.setTime(at)
   }, [ready, at])
+
+  /* Preflight: fly the move once the scene is up; a recorded clip goes back to the card. */
+  useEffect(() => {
+    if (!ready || !shown || flight === null) return
+    void scene.current?.playPath(flight, (t) => onFlightTime?.(t)).then((clip) => {
+      if (!flight.record) return
+      onRecorded?.(clip, clip === null ? 'This browser cannot record the 3D view.' : `Recorded ${Math.round(clip.size / 1e5) / 10} MB, watermarked "Simulated from public map data".`)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, shown, flight?.tick])
 
   /* The canvas's width, for the frame box. */
   useEffect(() => {

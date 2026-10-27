@@ -655,6 +655,14 @@ used. Outside lidar coverage, Fill in heights asks Overture Maps' buildings
 tiles (`overturemaps-extras-us-west-2.s3.amazonaws.com`) after a tap, for the
 heights Esri Community Maps contributed. The How page lists every host.
 
+**Preflight** (Layers, Tools) draws a drone move on the map and works it out
+on the phone: its length and time, the closest it comes to roofs and trees,
+every second it is hidden from where you stand, the grid ceiling along it, the
+wind aloft on each leg and the battery, each number two ways. It never says a
+flight is safe, legal or clear, and always ends: pull LAANC, check TFRs, look at
+the site. Exports (GPX, KML, the watermarked preview) go to the share sheet
+only. Nothing about the move leaves the phone.
+
 **Surf** (Settings, Surf: Auto shows it within 2 km of the ocean and never
 inland). The breaking height is worked out on the phone from the Open-Meteo
 Marine swell. Beside it, the nearest NOAA NDBC buoy's latest waves: the phone

@@ -193,6 +193,16 @@ const glyphs = (dark: string): Record<GlyphId, ReactNode> => ({
       <path d="M7.2 13.4l1.8 1.8M9.6 11l1.2 1.2M12 8.6l1.8 1.8M14.4 6.2l1.2 1.2" stroke={dark} strokeWidth="1.4" strokeLinecap="round" />
     </>
   ),
+  /* Preflight: a small drone and the curve of its move. */
+  preflight: (
+    <>
+      <path d="M4 18c3-8 9-11 16-12" fill="none" stroke="#FFF" strokeWidth="1.8" strokeLinecap="round" strokeDasharray="2.4 2.2" />
+      <circle cx="17" cy="7" r="1.9" fill="#FFF" />
+      <circle cx="21" cy="7" r="1.6" fill="#FFF" />
+      <rect x="15.6" y="5.6" width="6.8" height="2.8" rx="1.2" fill="#FFF" />
+      <circle cx="4.6" cy="18" r="2" fill="#FFF" />
+    </>
+  ),
   layers: (
     <>
       <path d="M12 13.4l-9-4.2 9-4.2 9 4.2z" fill="#FFF" />

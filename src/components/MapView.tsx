@@ -454,7 +454,7 @@ export const MARK_NODE_LAYER = 'site-mark-node'
 const NO_PINS: readonly LatLon[] = []
 const NO_LINK_PINS: readonly { id: string; label: string; at: LatLon; href: string }[] = []
 
-export type TapMode = 'add' | 'pilot' | 'mark' | 'aim' | 'measure' | null
+export type TapMode = 'add' | 'pilot' | 'mark' | 'aim' | 'measure' | 'flight' | null
 
 export interface CameraState {
   center: [number, number]
@@ -699,6 +699,10 @@ interface MapViewProps {
   measurePins?: readonly LatLon[]
   /** A tap while measuring. */
   onMeasureAt?: (at: LatLon) => void
+  /* Preflight: a tap in 'flight' mode adds a point to the move being drawn. */
+  onFlightAt?: (at: LatLon) => void
+  /* The move's path: 'line', 'hidden' (amber: out of the pilot's sight) and 'vertex' features. */
+  flight?: GeoJSON.FeatureCollection | null
   /** PhotoPills style rays from the venue pin. All four bearings from core. */
   sunOverlay: SunOverlay | null
   showSun: boolean
@@ -1150,6 +1154,8 @@ export function MapView({
   shadowFeatures = null,
   linkPins = NO_LINK_PINS,
   onMeasureAt,
+  onFlightAt,
+  flight = null,
   pilotAt = null,
   onPilotMove,
   onAimAt,
@@ -1224,6 +1230,7 @@ export function MapView({
     onMarkAt,
     onSelectMark,
     onMeasureAt,
+    onFlightAt,
   })
   useEffect(() => {
     latest.current = {
@@ -1241,6 +1248,7 @@ export function MapView({
       onMarkAt,
       onSelectMark,
       onMeasureAt,
+      onFlightAt,
     }
   }, [
     mode,
@@ -1257,6 +1265,7 @@ export function MapView({
     onMarkAt,
     onSelectMark,
     onMeasureAt,
+    onFlightAt,
   ])
 
   /* Read through a ref so a handler bound once at build stays current. */
@@ -1419,6 +1428,8 @@ export function MapView({
         l.onAimAt?.(next)
       } else if (l.mode === 'measure') {
         l.onMeasureAt?.(next)
+      } else if (l.mode === 'flight') {
+        l.onFlightAt?.(next)
       } else {
         l.onSelect(null)
       }
@@ -1579,6 +1590,7 @@ export function MapView({
       instance.addSource(MARK_DRAFT_SOURCE, { type: 'geojson', data: emptyCollection() })
       instance.addSource(AIRSPACE_SOURCE, { type: 'geojson', data: emptyCollection() })
       instance.addSource(MEASURE_SOURCE, { type: 'geojson', data: emptyCollection() })
+      instance.addSource('flight', { type: 'geojson', data: emptyCollection() })
       instance.addSource(SHADOW_SOURCE, { type: 'geojson', data: emptyCollection() })
 
       const rayColor = [
@@ -1678,6 +1690,22 @@ export function MapView({
         source: SHADOW_SOURCE,
         filter: ['==', ['get', 'kind'], 'subject'],
         paint: { 'line-color': readToken('--black', '#0a090c', container.current), 'line-width': 6, 'line-opacity': 0.6 },
+      })
+
+      /*
+       * PREFLIGHT: the move's path, white with a dark edge; the stretches the
+       * drone is hidden from the pilot drawn over it in amber, the sun's
+       * colour (src/core/flight.ts); its points as small rings. Never red.
+       */
+      instance.addLayer({ id: 'flight-edge', type: 'line', source: 'flight', filter: ['==', ['get', 'kind'], 'line'], paint: { 'line-color': readToken('--mark-edge', '#0a0b09', container.current), 'line-width': 6 } })
+      instance.addLayer({ id: 'flight-line', type: 'line', source: 'flight', filter: ['==', ['get', 'kind'], 'line'], paint: { 'line-color': readToken('--white', '#ffffff', container.current), 'line-width': 3 } })
+      instance.addLayer({ id: 'flight-hidden', type: 'line', source: 'flight', filter: ['==', ['get', 'kind'], 'hidden'], paint: { 'line-color': readToken('--sun', '#ffd54a', container.current), 'line-width': 4 } })
+      instance.addLayer({
+        id: 'flight-vertex',
+        type: 'circle',
+        source: 'flight',
+        filter: ['==', ['get', 'kind'], 'vertex'],
+        paint: { 'circle-radius': 5, 'circle-color': readToken('--white', '#ffffff', container.current), 'circle-stroke-color': readToken('--mark-edge', '#0a0b09', container.current), 'circle-stroke-width': 2 },
       })
 
       /* The two-pin measure: a plain white line with a dark edge, readable on imagery. */
@@ -2532,6 +2560,13 @@ export function MapView({
     const source = map.current.getSource(SHADOW_SOURCE) as maplibregl.GeoJSONSource | undefined
     source?.setData(shadowFeatures ?? emptyCollection())
   }, [shadowFeatures, ready])
+
+  /* Preflight's path (PlanMode builds the features). */
+  useEffect(() => {
+    if (map.current === null || !ready) return
+    const source = map.current.getSource('flight') as maplibregl.GeoJSONSource | undefined
+    source?.setData(flight ?? emptyCollection())
+  }, [flight, ready])
 
   /* The two-pin measure: its pins, and the line once there are two. */
   useEffect(() => {

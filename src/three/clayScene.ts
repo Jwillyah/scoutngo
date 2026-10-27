@@ -66,6 +66,8 @@ import { CLAY_LIGHT_INTENSITY, clayLight, domePoint, skyArc, sunlightEnu, type S
 import { getSunPosition } from '../core/sun.ts'
 import { heightGrid, sourceFor } from '../core/terrarium.ts'
 import { overlayDtm } from '../lib/lidar/terrain.ts'
+import { horizontalFov, WATERMARK, type FlightPlay } from '../lib/preflight/play.ts'
+import { bearingBetween, distanceMeters } from '../core/geo.ts'
 import type { Rasters } from '../lib/lidar/raster.ts'
 import { formatHour } from '../core/timezone.ts'
 import type { Building } from '../lib/buildings.ts'
@@ -205,6 +207,8 @@ export interface ClayScene {
   setPins(pins: readonly Pin[]): void
   setSkyDay(dayStart: Date): void
   orbit(): void
+  /** Fly a Preflight move; with record, resolves to the watermarked clip. */
+  playPath(play: FlightPlay, onTime: (at: Date) => void): Promise<Blob | null>
   observe(view: ObserverView): Promise<void>
   /**
    * What is under a screen pixel, by the depth buffer: buildings included.
@@ -508,6 +512,91 @@ export function createClayScene(
     scene.requestRender()
   }
 
+  /*
+   * PREFLIGHT: FLY THE MOVE. The camera rides the path, metres above the
+   * takeoff point's ground, looking at the subject through the chosen
+   * camera's horizontal field of view, and the time follows the move. With
+   * `record`, every frame is drawn onto a second canvas with the watermark
+   * and recorded (MediaRecorder): the clip comes back as a Blob.
+   */
+  let playing: { stop: () => void } | null = null
+  const playPath = async (play: FlightPlay, onTime: (at: Date) => void): Promise<Blob | null> => {
+    playing?.stop()
+    const [g] = await sampleTerrain(widget.terrainProvider, 15, [Cartographic.fromDegrees(play.takeoff.lon, play.takeoff.lat)])
+    const base = g?.height ?? 0
+    const [sg] = await sampleTerrain(widget.terrainProvider, 15, [Cartographic.fromDegrees(play.subject.lon, play.subject.lat)])
+    const subjectH = (sg?.height ?? 0) + 2
+    const canvas = widget.canvas
+    const frustum = widget.camera.frustum as { fov?: number }
+    const horizontal = CMath.toRadians(horizontalFov(play.focal))
+    frustum.fov = canvas.clientWidth >= canvas.clientHeight ? horizontal : 2 * Math.atan(Math.tan(horizontal / 2) * (canvas.clientHeight / canvas.clientWidth))
+    const end = play.path[play.path.length - 1].t
+    const at = (t: number) => {
+      let i = 0
+      while (i + 1 < play.path.length && play.path[i + 1].t < t) i += 1
+      const a = play.path[i]
+      const b = play.path[Math.min(play.path.length - 1, i + 1)]
+      const f = b.t === a.t ? 0 : Math.max(0, Math.min(1, (t - a.t) / (b.t - a.t)))
+      return { lat: a.at.lat + (b.at.lat - a.at.lat) * f, lon: a.at.lon + (b.at.lon - a.at.lon) * f, ft: a.ft + (b.ft - a.ft) * f }
+    }
+    let recorder: MediaRecorder | null = null
+    const chunks: Blob[] = []
+    let compose: (() => void) | null = null
+    if (play.record && typeof MediaRecorder !== 'undefined') {
+      const out = document.createElement('canvas')
+      out.width = canvas.width
+      out.height = canvas.height
+      const ctx = out.getContext('2d')
+      compose = () => {
+        if (ctx === null) return
+        ctx.drawImage(canvas, 0, 0)
+        ctx.font = `${Math.round(out.height / 40)}px system-ui, sans-serif`
+        ctx.fillStyle = 'rgba(255,255,255,0.85)'
+        ctx.fillText(WATERMARK, Math.round(out.width / 30), out.height - Math.round(out.height / 30))
+      }
+      scene.postRender.addEventListener(compose)
+      const type = ['video/mp4', 'video/webm;codecs=vp9', 'video/webm'].find((t) => MediaRecorder.isTypeSupported(t)) ?? ''
+      recorder = new MediaRecorder(out.captureStream(30), type === '' ? undefined : { mimeType: type })
+      recorder.ondataavailable = (e) => chunks.push(e.data)
+      recorder.start()
+    }
+    const started = performance.now()
+    let lastTime = -1
+    const renderMode = scene.requestRenderMode
+    scene.requestRenderMode = false
+    await new Promise<void>((resolve) => {
+      let raf = 0
+      const frame = () => {
+        const t = Math.min(end, (performance.now() - started) / 1000)
+        const p = at(t)
+        const h = base + p.ft * 0.3048
+        const dist = Math.max(1, distanceMeters({ lat: p.lat, lon: p.lon }, play.subject))
+        widget.camera.setView({
+          destination: Cartesian3.fromDegrees(p.lon, p.lat, h),
+          orientation: { heading: CMath.toRadians(bearingBetween({ lat: p.lat, lon: p.lon }, play.subject)), pitch: Math.atan2(subjectH - h, dist), roll: 0 },
+        })
+        if (Math.floor(t * 2) !== lastTime) {
+          lastTime = Math.floor(t * 2)
+          onTime(new Date(play.startAt.getTime() + t * 1000))
+        }
+        if (t >= end) return resolve()
+        raf = requestAnimationFrame(frame)
+      }
+      playing = { stop: () => { cancelAnimationFrame(raf); resolve() } }
+      raf = requestAnimationFrame(frame)
+    })
+    playing = null
+    scene.requestRenderMode = renderMode
+    if (compose !== null) scene.postRender.removeEventListener(compose)
+    if (recorder === null) return null
+    const rec = recorder
+    await new Promise<void>((resolve) => {
+      rec.onstop = () => resolve()
+      rec.stop()
+    })
+    return new Blob(chunks, { type: rec.mimeType || 'video/webm' })
+  }
+
   const project = (at: LatLon, height = 0) => {
     const p = scene.cartesianToCanvasCoordinates(Cartesian3.fromDegrees(at.lon, at.lat, height))
     return p === undefined ? null : { x: p.x, y: p.y }
@@ -549,6 +638,7 @@ export function createClayScene(
     setSkyDay,
     orbit,
     observe,
+    playPath,
     project,
     counts: tileCounts,
     buildings: () => drawnBuildings,

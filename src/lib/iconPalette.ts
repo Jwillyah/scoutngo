@@ -42,8 +42,9 @@ export type IconId =
   | 'buildings'
   | 'labels'
   | 'airspace'
-  /* Tools in Layers: the two-pin measure. */
+  /* Tools in Layers: the two-pin measure, and Preflight. */
   | 'measure'
+  | 'preflight'
 
 export interface TileStops {
   /** Top left, the light end. */
@@ -91,6 +92,7 @@ export const DESIGN_TILES: Readonly<Record<IconId, TileStops>> = {
   labels: { light: '#ffb0cc', middle: '#e5559a', dark: '#8d1f5a' },
   airspace: { light: '#efb2f5', middle: '#b952d2', dark: '#5e1e79' },
   measure: { light: '#8fe6f4', middle: '#22aacb', dark: '#0a4c66' },
+  preflight: { light: '#b6aeff', middle: '#5e51dc', dark: '#231a7d' },
 }
 
 export const GLYPH_INK = '#ffffff'

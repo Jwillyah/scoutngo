@@ -1138,6 +1138,8 @@ const OPENERS = `(() => {
     const label = (b.getAttribute('aria-label') ?? '').toLowerCase()
     if (label.includes('layer')) add('.tooldock__btn', i, 'layers')
     if (label.includes('calendar')) add('.tooldock__btn', i, 'sky')
+    /* Behind Layers, under Tools: Preflight, a door two taps deep. */
+    if (label.includes('layer')) add('layerstool', 'Preflight', 'preflight')
   })
   /*
    * THE MENU'S CARD DOORS. About and Sky open cards from the side menu now, so
@@ -1158,6 +1160,13 @@ const OPENERS = `(() => {
 })()`
 
 const click = async (sel, i) => {
+  if (sel === 'layerstool') {
+    await ev(`(() => { const b = document.querySelector('button[aria-label="Map and layers"]'); if (b && b.getAttribute('aria-pressed') !== 'true') b.click(); return 1 })()`)
+    await wait(600)
+    await ev(`[...document.querySelectorAll('button.tile')].find((t) => t.querySelector('.tile__label')?.textContent === ${JSON.stringify(i)})?.click()`)
+    await wait(600)
+    return
+  }
   if (sel === 'skymoon') {
     await click('menu', 'Sky')
     await ev(`[...document.querySelectorAll('[role="tab"]')].find((b) => b.textContent.trim() === 'Moon')?.click()`)
