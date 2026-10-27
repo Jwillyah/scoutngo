@@ -87,6 +87,7 @@ import { Clay3D } from './Clay3D.tsx'
 import { goldenChip } from '../lib/goldenChip.ts'
 import { TideSheet } from './TideSheet.tsx'
 import { useTideSheet } from '../lib/useTideSheet.ts'
+import { useSurfSetting } from '../lib/surfSetting.ts'
 import { LAYER_FAILED } from '../lib/layerFailed.ts'
 import type { PlanForNow } from '../lib/planForNow.ts'
 import { goldenNext } from '../core/goldenNext.ts'
@@ -1016,7 +1017,8 @@ export function PlanMode({
   const online = useOnline()
   const home = useCallback(() => setCard(HOME), [])
   /* The Tide sheet's month, wind, sea and beach facing: asked only while it is open. */
-  const tideSheet = useTideSheet(card.kind === 'tide', venue, tide.status === 'ok' ? tide.station.id : null)
+  const [surfSetting] = useSurfSetting()
+  const tideSheet = useTideSheet(card.kind === 'tide', venue, tide.status === 'ok' ? tide.station.id : null, surfSetting)
 
   /*
    * WHAT THE VENUE BAR SAYS. The name is already resolved upstream and is

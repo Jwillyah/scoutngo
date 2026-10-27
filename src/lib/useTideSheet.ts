@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import type { LatLon } from '../core/geo.ts'
 import type { TideExtreme } from '../core/tide.ts'
-import { coastFacing, type CoastFacing } from './coast.ts'
+import { coastFacing, metresToSea, type CoastFacing } from './coast.ts'
+import { latestBuoyWaves, type BuoyReading } from './buoy.ts'
+import { showSurf, SURF_COAST_M, type SurfSetting } from './surfSetting.ts'
 import { retrying } from './retrying.ts'
 import { fetchMarine, fetchMonthExtremes, fetchWindMonth, type Hourly } from './tideSheetData.ts'
 
@@ -26,9 +28,17 @@ export interface TideSheetData {
   month: Loaded<TideExtreme[]>
   wind: Loaded<Hourly>
   marine: Loaded<Hourly | 'inland'>
+  /** Metres to the ocean within SURF_COAST_M, or null when none is (the surf row's Auto test). */
+  seaM: Loaded<number | null>
+  /** The nearest buoy's latest waves, asked only when the surf row shows. */
+  buoy: BuoyReading | null
+  /** Whether the surf row shows: the setting, and on Auto the sea within SURF_COAST_M. */
+  surf: boolean
 }
 
-export function useTideSheet(open: boolean, venue: LatLon | null, stationId: string | null): TideSheetData {
+export function useTideSheet(open: boolean, venue: LatLon | null, stationId: string | null, surfSetting: SurfSetting = 'auto'): TideSheetData {
+  const [seaM, setSeaM] = useState<Loaded<number | null>>(LOADING)
+  const [buoy, setBuoy] = useState<BuoyReading | null>(null)
   const [facing, setFacing] = useState<Loaded<CoastFacing | 'inland'>>(LOADING)
   const [month, setMonth] = useState<Loaded<TideExtreme[]>>(LOADING)
   const [wind, setWind] = useState<Loaded<Hourly>>(LOADING)
@@ -65,6 +75,14 @@ export function useTideSheet(open: boolean, venue: LatLon | null, stationId: str
     )
     stops.push(
       retrying(async () => {
+        const m = await metresToSea(at, SURF_COAST_M)
+        if (!live) return true
+        setSeaM({ value: m, savedAt: null, status: 'ready' })
+        return true
+      }),
+    )
+    stops.push(
+      retrying(async () => {
         const w = await fetchWindMonth(at)
         if (!live) return true
         setWind(w === null ? { value: null, savedAt: null, status: 'failed' } : { value: w.value, savedAt: w.savedAt, status: 'ready' })
@@ -89,5 +107,17 @@ export function useTideSheet(open: boolean, venue: LatLon | null, stationId: str
     })
   }, [open, stationId])
 
-  return { facing, month, wind, marine }
+  const surfWanted = showSurf(surfSetting, seaM.value)
+  useEffect(() => {
+    if (!open || !surfWanted || lat === null || lon === null) return
+    let live = true
+    return retrying(async () => {
+      const b = await latestBuoyWaves({ lat, lon })
+      if (!live) return true
+      setBuoy(b)
+      return b.status === 'ok' || b.reason !== "The buoy didn't load."
+    })
+  }, [open, surfWanted, lat, lon])
+
+  return { facing, month, wind, marine, seaM, buoy, surf: surfWanted }
 }

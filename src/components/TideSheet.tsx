@@ -9,6 +9,9 @@ import { tideRate } from '../core/tideRate.ts'
 import { formatClock } from '../core/timezone.ts'
 import { forgetPhoto, keepPhoto, readPhoto } from '../lib/explainerPhoto.ts'
 import { tideDayModel } from '../lib/tideDay.ts'
+import { surfAt, surfDay } from '../lib/surfDay.ts'
+import { surfShape } from '../core/surf.ts'
+import { SurfRow } from './SurfRow.tsx'
 import { hourlyAt } from '../lib/tideSheetData.ts'
 import { celsiusToF, compass, glassRead, metresToFeet, motionWords } from '../lib/tideWords.ts'
 import type { TideInfo } from '../lib/useTide.ts'
@@ -39,7 +42,7 @@ interface TideSheetProps {
   onClose: () => void
 }
 
-const CURVE_H = 132
+const CURVE_H = 112
 const STRIP_DAYS = 30
 
 export function TideSheet({ tide, at, timeZone, venue, units, data, onAt, onJumpDay, onClose }: TideSheetProps) {
@@ -83,6 +86,10 @@ export function TideSheet({ tide, at, timeZone, venue, units, data, onAt, onJump
   const waveDir = marine === null ? null : hourlyAt(marine, 'wave_direction', at)
   const water = marine === null ? null : hourlyAt(marine, 'sea_surface_temperature', at)
 
+  const surfNow = !data.surf || marine === null ? null : surfAt(marine, at, facing)
+  const surfShapeNow = surfNow === null || windSpeed === null || windFrom === null ? null : surfShape(windSpeed, windFrom, facing)
+  const surfBars = useMemo(() => (!data.surf || marine === null || model === null ? [] : surfDay(marine, model.from, facing)), [data.surf, marine, model, facing])
+
   const mornings = useMemo((): Morning[] => {
     const today = localDate(new Date(), timeZone)
     const days = Array.from({ length: STRIP_DAYS }, (_, i) => {
@@ -96,8 +103,9 @@ export function TideSheet({ tide, at, timeZone, venue, units, data, onAt, onJump
       const f = hourlyAt(wind, 'wind_direction_10m', t)
       return s === null || f === null ? null : { speedMps: s, fromDeg: f }
     }
-    return glassMornings(days, lows, windAt, facing)
-  }, [data.month.value, wind, facing, timeZone, venue.lat, venue.lon])
+    const surfFtAt = (t: Date) => (!data.surf || marine === null ? null : (surfAt(marine, t, facing)?.estimate.faceFt ?? null))
+    return glassMornings(days, lows, windAt, facing, surfFtAt)
+  }, [data.month.value, data.surf, marine, wind, facing, timeZone, venue.lat, venue.lon])
 
   const drag = useRef(false)
   const pick = (event: ReactPointerEvent<SVGSVGElement>) => {
@@ -166,6 +174,11 @@ export function TideSheet({ tide, at, timeZone, venue, units, data, onAt, onJump
                 </text>
               </g>
             ))}
+            {/* The surf estimate, hour by hour, as short bars along the foot (1 px = 1/2 ft, capped at 8 ft). */}
+            {surfBars.map((h) => {
+              const tall = Math.min(8, h.estimate.faceFt) * 2
+              return <rect key={h.at.getTime()} className="tides__surfbar" x={model.xOf(h.at.getTime()) - 3} y={CURVE_H - 18 - tall} width={6} height={tall} />
+            })}
             <path className="tides__line" d={model.path} />
             {model.marks.map((m) => (
               <g key={m.at.getTime()} className={`tides__mark tides__mark--${m.kind}`}>
@@ -205,10 +218,17 @@ export function TideSheet({ tide, at, timeZone, venue, units, data, onAt, onJump
         </div>
       </div>
 
+      {!data.surf ? null : <SurfRow now={surfNow} shape={surfShapeNow} buoy={data.buoy} venue={venue} units={units} timeZone={timeZone} />}
+
       <div className="tides__strip">
         <p className="tides__striphead">
           Glass mornings: low tide near sunrise, calm water
           <span className="tides__key">
+            {data.surf ? (
+              <>
+                <i className="tides__dot tides__dot--surf-glass" /> surf + glass{' '}
+              </>
+            ) : null}
             <i className="tides__dot tides__dot--glass" /> glass <i className="tides__dot tides__dot--tide-only" /> tide only <i className="tides__dot tides__dot--windy" /> windy
           </span>
         </p>
@@ -219,7 +239,7 @@ export function TideSheet({ tide, at, timeZone, venue, units, data, onAt, onJump
               type="button"
               className={`tides__day tides__day--${m.mark}${m.date === date ? ' tides__day--on' : ''}`}
               onClick={() => (m.sunrise === null ? undefined : onJumpDay(m.date, m.sunrise))}
-              aria-label={`${m.date}: ${m.mark === 'glass' ? 'glass morning' : m.mark === 'tide-only' ? 'low tide near sunrise, wind not forecast yet' : m.mark === 'windy' ? 'low tide near sunrise, windy' : 'no low tide near sunrise'}${m.low === null ? '' : `, low ${formatClock(m.low, timeZone)}`}`}
+              aria-label={`${m.date}: ${m.mark === 'surf-glass' ? 'glass morning with surf' : m.mark === 'glass' ? 'glass morning' : m.mark === 'tide-only' ? 'low tide near sunrise, wind not forecast yet' : m.mark === 'windy' ? 'low tide near sunrise, windy' : 'no low tide near sunrise'}${m.low === null ? '' : `, low ${formatClock(m.low, timeZone)}`}`}
             >
               <span className="num">{Number(m.date.slice(8))}</span>
             </button>
@@ -230,10 +250,10 @@ export function TideSheet({ tide, at, timeZone, venue, units, data, onAt, onJump
 
       <div className="tides__explain">
         <button type="button" className="tides__why" onClick={() => setExplainer('mirror')}>
-          Why low tide + sunrise + calm = mirror
+          Why mirror mornings
         </button>
         <button type="button" className="tides__why" onClick={() => setExplainer('spring')}>
-          What a big tide does
+          What big tides do
         </button>
       </div>
 

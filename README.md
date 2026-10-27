@@ -644,6 +644,15 @@ water temperature back). Which way the beach faces is worked out on the phone
 from the map tiles it already has. An example photo you add to an explainer
 is shrunk and kept on the phone, never sent anywhere.
 
+**Surf** (Settings, Surf: Auto shows it within 2 km of the ocean and never
+inland). The breaking height is worked out on the phone from the Open-Meteo
+Marine swell. Beside it, the nearest NOAA NDBC buoy's latest waves: the phone
+picks the buoy from a list built into the app (`scripts/bake-ndbc.mjs`) and
+sends only the buoy's number to this app's own function, `api/buoy.ts`, which
+reads `www.ndbc.noaa.gov` (NDBC sends no CORS header, so a browser cannot read
+it directly). The function logs nothing and keeps nothing, and never sees the
+venue. The surf cams are links out, as everywhere else.
+
 **Venue search, and this one changed.** With a `MAPBOX_TOKEN` set, typing in the
 search box sends what you type **to Mapbox, as you type it**. Not on submit: a
 request goes out about 300ms after you stop typing, so a query you type in two

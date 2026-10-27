@@ -14,7 +14,11 @@ export interface MorningInput {
   sunrise: Date | null
 }
 
-export type MorningMark = 'glass' | 'windy' | 'tide-only' | 'none'
+/* 'surf-glass': a glass morning with surf at sunrise (Small or bigger), where the sea is forecast. */
+export type MorningMark = 'surf-glass' | 'glass' | 'windy' | 'tide-only' | 'none'
+
+/** Surf at least this big (face feet) turns a glass morning into a surf + glass one: Small and up. */
+export const SURF_GLASS_FT = 1
 
 export interface Morning {
   date: string
@@ -30,6 +34,7 @@ export function glassMornings(
   lows: readonly Date[],
   windAt: (at: Date) => { speedMps: number; fromDeg: number } | null,
   facing: number | null,
+  surfFtAt: (at: Date) => number | null = () => null,
 ): Morning[] {
   return days.map((day) => {
     if (day.sunrise === null) return { date: day.date, sunrise: null, low: null, minutesFromSunrise: null, mark: 'none' }
@@ -41,6 +46,8 @@ export function glassMornings(
     const wind = windAt(day.sunrise)
     if (wind === null) return { date: day.date, sunrise: day.sunrise, low, minutesFromSunrise, mark: 'tide-only' }
     const glassy = isGlassy(wind.speedMps, facing === null ? null : windToBeach(wind.fromDeg, facing))
-    return { date: day.date, sunrise: day.sunrise, low, minutesFromSunrise, mark: glassy ? 'glass' : 'windy' }
+    if (!glassy) return { date: day.date, sunrise: day.sunrise, low, minutesFromSunrise, mark: 'windy' }
+    const surf = surfFtAt(day.sunrise)
+    return { date: day.date, sunrise: day.sunrise, low, minutesFromSunrise, mark: surf !== null && surf >= SURF_GLASS_FT ? 'surf-glass' : 'glass' }
   })
 }

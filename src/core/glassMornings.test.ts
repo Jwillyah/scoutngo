@@ -23,3 +23,12 @@ describe('glass mornings', () => {
     expect(got[0].mark).toBe('glass')
   })
 })
+
+describe('surf + glass mornings', () => {
+  it('a glass morning with surf at sunrise is marked surf + glass; without surf, glass', () => {
+    const calm = () => ({ speedMps: 1, fromDeg: 90 })
+    expect(glassMornings(days.slice(0, 1), lows, calm, 90, () => 2.5)[0].mark).toBe('surf-glass')
+    expect(glassMornings(days.slice(0, 1), lows, calm, 90, () => 0.4)[0].mark).toBe('glass')
+    expect(glassMornings(days.slice(0, 1), lows, calm, 90, () => null)[0].mark).toBe('glass')
+  })
+})
