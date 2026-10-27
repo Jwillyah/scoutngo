@@ -147,6 +147,7 @@
   --light-side: #5e9cc4; /* side-lit */
   --light-back: #d08a5a; /* backlit, shooting into the sun */
   --sun: #ffd54a; /* current sun bearing */
+  --tide: #6cc4ff; /* the water: the tide curve and the glass mornings (Tide sheet) */
   --sun-shadow: #9aa7ff; /* current shadow bearing */
   --sun-rise: #ffa04a; /* sunrise bearing */
   --sun-set: #ff5fa8; /* sunset bearing. NOT the magenta hazard token. */

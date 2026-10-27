@@ -605,7 +605,18 @@ function App() {
    * window on any other (src/lib/backToNow.ts openingScrub). Again whenever
    * the place, the day or the window changes.
    */
+  /* A day picked on the Tide sheet: the bar opens at its sunrise, not at now. */
+  const jumpTo = useRef<number | null>(null)
   useEffect(() => {
+    const target = jumpTo.current
+    jumpTo.current = null
+    if (target !== null) {
+      const w = resolveWindow(venue)
+      if (w !== null) {
+        setScrub((target - w.start.getTime()) / Math.max(60_000, w.end.getTime() - w.start.getTime()))
+        return
+      }
+    }
     setScrub(openingScrub(venue, new Date()))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [venue.latitude, venue.longitude, venue.date, venue.startTime, venue.endTime])
@@ -2073,6 +2084,14 @@ function App() {
           scrub={scrub}
           onScrub={setScrub}
           onResetTime={() => setScrub(openingScrub(venue, new Date()))}
+          onJumpDay={(date: string, at: Date) => {
+            jumpTo.current = at.getTime()
+            if (date === venue.date) {
+              const w = resolveWindow(venue)
+              jumpTo.current = null
+              if (w !== null) setScrub((at.getTime() - w.start.getTime()) / Math.max(60_000, w.end.getTime() - w.start.getTime()))
+            } else setVenue((current) => ({ ...current, date }))
+          }}
           planNow={planNowOffer}
           onPlanForNow={onPlanForNow}
           tide={tide}

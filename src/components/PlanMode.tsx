@@ -85,6 +85,8 @@ import { TimeBar } from './TimeBar.tsx'
 import { ToolDock } from './ToolDock.tsx'
 import { Clay3D } from './Clay3D.tsx'
 import { goldenChip } from '../lib/goldenChip.ts'
+import { TideSheet } from './TideSheet.tsx'
+import { useTideSheet } from '../lib/useTideSheet.ts'
 import { LAYER_FAILED } from '../lib/layerFailed.ts'
 import type { PlanForNow } from '../lib/planForNow.ts'
 import { goldenNext } from '../core/goldenNext.ts'
@@ -198,6 +200,8 @@ interface PlanModeProps {
   onScrub: (next: number) => void
   /** The time bar's reset: now on the shoot day, the middle of the window otherwise. */
   onResetTime: () => void
+  /** Move the shoot day to `date`, the time to `at` (the Tide sheet's glass mornings). */
+  onJumpDay: (date: string, at: Date) => void
   /** Today's window from now, when the saved one is not this one (src/lib/planForNow.ts). */
   planNow: PlanForNow | null
   onPlanForNow: () => void
@@ -425,6 +429,7 @@ export function PlanMode({
   scrub,
   onScrub,
   onResetTime,
+  onJumpDay,
   planNow,
   onPlanForNow,
   tide,
@@ -1010,6 +1015,8 @@ export function PlanMode({
   /* No connection: one quiet mark in the venue bar, and nothing else. */
   const online = useOnline()
   const home = useCallback(() => setCard(HOME), [])
+  /* The Tide sheet's month, wind, sea and beach facing: asked only while it is open. */
+  const tideSheet = useTideSheet(card.kind === 'tide', venue, tide.status === 'ok' ? tide.station.id : null)
 
   /*
    * WHAT THE VENUE BAR SAYS. The name is already resolved upstream and is
@@ -1043,7 +1050,7 @@ export function PlanMode({
     (kind: CardKind) => {
       setCard((current) => (current.kind === kind ? HOME : ({ kind } as SheetCard)))
       /* Layers is a page of its own: full, and it fits with no scrolling (scripts/audit-overflow.mjs). */
-      if (kind === 'layers') setSheet('full')
+      if (kind === 'layers' || kind === 'tide') setSheet('full')
       else raiseToHalf()
     },
     [raiseToHalf],
@@ -1541,10 +1548,23 @@ export function PlanMode({
           </Card>
         )
       case 'tide':
-        return (
+        /* A page of its own (TideSheet.tsx): the curve there is the time control, so the time bar steps aside. */
+        return venue === null || scrubbedAt === null || venueWindow === null ? (
           <Card title="Tide" at={clock(scrubbedAt)} onClose={home}>
             <WeatherPanel {...weatherCommon} show="tide" />
           </Card>
+        ) : (
+          <TideSheet
+            tide={tide}
+            at={scrubbedAt}
+            timeZone={venueWindow.timeZone}
+            venue={venue}
+            units={units}
+            data={tideSheet}
+            onAt={scrubTo}
+            onJumpDay={onJumpDay}
+            onClose={home}
+          />
         )
       case 'golden':
         return (

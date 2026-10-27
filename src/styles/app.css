@@ -11131,3 +11131,270 @@
   font-weight: 600;
   cursor: pointer;
 }
+
+/* ------------------------------------------------------------ tide sheet */
+
+/*
+ * THE TIDE SHEET (TideSheet.tsx): a page that fits a 390 x 844 phone with no
+ * scrolling (scripts/audit-overflow.mjs). Words big, numbers small, the curve
+ * the width of the sheet.
+ */
+.tides {
+  position: relative;
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.tides__head {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tides__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* The Card's own close, so the sheet closes the way every card does. */
+.tides .card2__x {
+  flex: 0 0 auto;
+}
+
+.tides__lead {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-heavy);
+  color: var(--color-text);
+}
+
+.tides__sub,
+.tides__small {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.tides__curve {
+  min-width: 0;
+  border-radius: var(--radius-panel);
+  overflow: hidden;
+  touch-action: none;
+}
+
+.tides__curve svg {
+  display: block;
+  cursor: ew-resize;
+}
+
+.tides__line {
+  fill: none;
+  stroke: var(--tide);
+  stroke-width: 2.5;
+}
+
+.tides__mark circle {
+  fill: var(--tide);
+}
+
+.tides__mark text {
+  fill: var(--color-text);
+  font-size: 10px;
+  font-family: var(--font-mono);
+}
+
+.tides__sunmark line {
+  stroke: var(--sun);
+  stroke-width: 2;
+}
+
+.tides__sunmark text {
+  fill: var(--sun);
+  font-size: 9px;
+}
+
+.tides__needle {
+  stroke: var(--white);
+  stroke-width: 1.5;
+}
+
+.tides__glass {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-2);
+  border-radius: var(--radius-panel);
+  background: color-mix(in srgb, var(--surface-2) 80%, transparent);
+}
+
+.tides__glassline {
+  margin: 0;
+  color: var(--color-text);
+  font-weight: var(--weight-heavy);
+}
+
+.tides__sun {
+  fill: var(--sun);
+}
+
+.tides__wave {
+  fill: none;
+  stroke: var(--tide);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+
+.tides__strip {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.tides__striphead {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--color-text);
+}
+
+.tides__key {
+  color: var(--color-text-muted);
+}
+
+.tides__dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-left: 6px;
+}
+
+.tides__days {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.tides__day {
+  min-height: 28px;
+  padding: 0;
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-faint);
+  font-size: var(--text-xs);
+}
+
+.tides__day--glass,
+.tides__dot--glass {
+  background: var(--tide);
+  border-color: var(--tide);
+  color: var(--black);
+}
+
+.tides__day--tide-only,
+.tides__dot--tide-only {
+  border-color: var(--tide);
+  color: var(--color-text);
+}
+
+.tides__dot--tide-only {
+  border: 1.5px solid var(--tide);
+}
+
+.tides__dot--windy {
+  background: var(--color-text-faint);
+}
+
+.tides__day--windy {
+  background: var(--surface-2);
+  border-color: var(--color-line-strong);
+  color: var(--color-text-muted);
+}
+
+.tides__day--on {
+  outline: 2px solid var(--white);
+  outline-offset: 1px;
+}
+
+.tides__explain {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.tides__why {
+  min-height: 40px;
+  padding: var(--space-1) var(--space-2);
+  border: var(--line-hair) solid var(--color-line-strong);
+  border-radius: var(--radius-panel);
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--text-xs);
+  text-align: left;
+}
+
+.tides__explainer {
+  position: absolute;
+  /* Past the edges, so the selected day's outline behind it never shows. */
+  inset: -6px;
+  z-index: 2;
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  padding: var(--space-1);
+  background: var(--surface-1);
+  overflow: hidden;
+}
+
+.tides__picture {
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-panel);
+}
+
+.tides__words {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--text-sm);
+}
+
+.tides__photo {
+  max-height: 180px;
+  width: auto;
+  max-width: 100%;
+  border-radius: var(--radius-panel);
+}
+
+.tides__add {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.tides__add input {
+  display: block;
+  max-width: 100%;
+  margin-top: var(--space-1);
+}
+
+.pic__sky { fill: #1f2a44; }
+.pic__sun { fill: var(--sun); }
+.pic__sea { fill: color-mix(in srgb, var(--tide) 55%, #12233a); }
+.pic__wet { fill: color-mix(in srgb, var(--tide) 30%, #3a3328); }
+.pic__glint { fill: var(--sun); opacity: 0.85; }
+.pic__ripple { stroke: var(--sun); stroke-width: 1.5; opacity: 0.6; fill: none; }
+.pic__sand { fill: #6b5a43; }
+.pic__line { stroke: var(--tide); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.pic__line--big { stroke-width: 2.5; stroke-dasharray: none; }
+.pic__label { fill: var(--white); font-size: 10px; }

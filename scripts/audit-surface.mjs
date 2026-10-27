@@ -1212,7 +1212,10 @@ const CARD_HEIGHT = `(() => {
    * measurements/2026-10-19-shell-polish.md.
    */
   const strip = document.querySelector('.tstrip, .tbar')
+  /* The Tide sheet's curve is its time control (TideSheet.tsx): dragging it moves the same moment as the bar. */
+  const curve = document.querySelector('.tides__curve [role="slider"]')
   return {
+    slider: curve !== null,
     card: card.dataset.card ?? '(unnamed)',
     content: Math.round(card.scrollHeight + parseFloat(cs.marginTop || '0') + parseFloat(cs.marginBottom || '0')),
     visible: body === null ? null : Math.round(body.clientHeight),
@@ -1384,7 +1387,8 @@ for (const [name, heights] of [...walked.entries()].sort()) {
       `the ${name} card renders the time strip (${strip}px) and nothing on it changes with time`,
     )
   }
-  if (STRIP_BELONGS.includes(name) && strip === null) {
+  const slider = heights.half?.slider ?? heights.full?.slider ?? false
+  if (STRIP_BELONGS.includes(name) && strip === null && !(name === 'tide' && slider)) {
     fail(`the ${name} card has no time strip, and its reading is for a moment`)
   }
   if (over) {

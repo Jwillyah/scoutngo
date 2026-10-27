@@ -86,6 +86,12 @@ export const COLOR_ROLES: readonly RoleAssignment[] = [
     means: 'Where the light comes from. The current sun bearing.',
   },
   {
+    token: 'tide',
+    role: 'data',
+    value: '#6cc4ff',
+    means: 'The water. The tide curve and the glass mornings on the Tide sheet.',
+  },
+  {
     token: 'hazard',
     role: 'data',
     value: '#ff3b30',

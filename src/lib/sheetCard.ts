@@ -118,7 +118,8 @@ export const TIME_MATTERS: Record<CardKind, boolean> = {
   golden: true,
   wind: true,
   cloud: true,
-  tide: true,
+  /* The Tide sheet's own curve moves the same moment as the bar (TideSheet.tsx), and the page needs the room. */
+  tide: false,
   sky: true,
   /*
    * A CAMERA IMAGE IS NOT SCRUBBED. The feeds are whatever each operator is

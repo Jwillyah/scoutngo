@@ -634,6 +634,16 @@ forecast already uses, gets the venue coordinate and returns wind speed,
 direction and gusts for the hour. It is the same one coordinate that service
 already receives.
 
+**The Tide sheet.** Opened from the Tide chip, and only then, it asks for:
+NOAA's highs and lows for the next month at the station the day's table came
+from (`api.tidesandcurrents.noaa.gov`, a station number and dates); the hourly
+wind for as far as Open-Meteo forecasts (`api.open-meteo.com`, the venue
+coordinate); and, only where a beach is within 1.5 km, the sea from Open-Meteo
+Marine at `marine-api.open-meteo.com` (the venue coordinate; waves, swell and
+water temperature back). Which way the beach faces is worked out on the phone
+from the map tiles it already has. An example photo you add to an explainer
+is shrunk and kept on the phone, never sent anywhere.
+
 **Venue search, and this one changed.** With a `MAPBOX_TOKEN` set, typing in the
 search box sends what you type **to Mapbox, as you type it**. Not on submit: a
 request goes out about 300ms after you stop typing, so a query you type in two

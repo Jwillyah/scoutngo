@@ -175,6 +175,37 @@ try {
     const label = await ev(`(() => { const c = document.querySelectorAll('.chips2 .chip2')[${i}]; c.click(); return c.querySelector('.chip2__label')?.textContent ?? 'chip' })()`)
     await check(`Plan, ${label} card`, '.sheet')
   }
+  /* THE TIDE SHEET IS A PAGE TOO: opened from its chip, full, nothing scrolls, an explainer included. */
+  const noScroll = (selector) => `JSON.stringify((() => {
+    const sheet = document.querySelector('.sheet')
+    const page = document.querySelector('${selector}')
+    if (!sheet || !page) return { missing: true }
+    const scrolls = [...sheet.querySelectorAll('*')].filter((e) => { const s = getComputedStyle(e); return /(auto|scroll)/.test(s.overflowY) && e.scrollHeight > e.clientHeight + 1 }).map((e) => e.className + ' ' + e.scrollHeight + '/' + e.clientHeight)
+    const clipped = [...page.querySelectorAll('*')].filter((e) => e.getBoundingClientRect().bottom > innerHeight + 1 && e.getBoundingClientRect().height > 0).length
+    return { detent: sheet.dataset.detent, scrolls, clipped }
+  })())`
+  /* Opened, not toggled: the chip walk above may have left it open already. */
+  await ev(`document.querySelector('.tides') ? 1 : [...document.querySelectorAll('.chip2')].find((c) => /TIDE/.test(c.textContent))?.click()`)
+  await wait(1500)
+  for (const [label, open] of [['Tide sheet', null], ['Tide sheet, an explainer open', '.tides__why']]) {
+    if (open !== null) await ev(`document.querySelector('${open}')?.click()`)
+    await wait(600)
+    const t = JSON.parse(await ev(noScroll('.tides')))
+    if (t.missing) {
+      fail(`${label}: not on screen, so it was not checked`)
+      continue
+    }
+    await check(`Plan, ${label}`, '.tides')
+    console.log(`  ${label}: sheet ${t.detent}, scrolling boxes ${t.scrolls.length}, parts below the screen ${t.clipped}`)
+    if (t.detent !== 'full') fail(`${label} opened at ${t.detent}, not full`)
+    for (const x of t.scrolls) fail(`${label} scrolls: ${x}`)
+    if (t.clipped > 0) fail(`${label}: ${t.clipped} parts run below the screen`)
+  }
+  await ev(`document.querySelector('.tides__explainer .card__close')?.click()`)
+  await ev(`document.querySelector('.tides .card__close')?.click()`)
+  await wait(500)
+  await setSheet(ev, wait, 'peek')
+
   /*
    * LAYERS IS A PAGE: it opens full and fits 390 x 844 with no scrolling, the
    * Tools row and the source line included (27 Oct: it scrolled, with a caps
