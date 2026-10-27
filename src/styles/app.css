@@ -11441,3 +11441,80 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* The 3D view's one line and its i (Clay3D.tsx). */
+.clay__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  pointer-events: auto;
+}
+
+.clay__line--one {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.clay__i {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 14px;
+  border: var(--line-hair) solid var(--color-line-strong);
+  background: color-mix(in srgb, var(--surface-1) 78%, transparent);
+  color: var(--color-text);
+  font: italic var(--weight-heavy) var(--text-sm) / 1 Georgia, 'Times New Roman', serif;
+}
+
+.clay__info {
+  position: absolute;
+  left: var(--space-2);
+  right: var(--space-2);
+  bottom: calc(var(--dock-height) + var(--sheet-live-height) + var(--tooldock-height) + 60px);
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-panel);
+  background: var(--color-panel);
+  border: var(--line-hair) solid var(--color-line-strong);
+  z-index: 3;
+}
+
+.clay__infoline {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text);
+}
+
+.clay__link {
+  border: 0;
+  background: none;
+  padding: 6px 0;
+  color: var(--color-accent);
+  font: inherit;
+  font-size: var(--text-xs);
+  text-align: left;
+}
+
+.how__hosts {
+  margin: var(--space-2) 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.how__host dt {
+  font-size: var(--text-xs);
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.how__host dd {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}

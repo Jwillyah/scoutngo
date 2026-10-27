@@ -122,9 +122,10 @@ const treesFrom = (trees: MappedTree[]): TreesResult =>
  * venue asked twice shares the one load; `retry` asks again after a failure,
  * of the buildings or of the trees. Never throws.
  */
-export function loadPlace(venue: LatLon, options: { retry?: boolean; budgetMs?: number; fetcher?: typeof fetch; sleep?: (ms: number) => Promise<void> } = {}): Promise<PlaceState> {
+export function loadPlace(venue: LatLon, options: { retry?: boolean; refresh?: boolean; budgetMs?: number; fetcher?: typeof fetch; sleep?: (ms: number) => Promise<void> } = {}): Promise<PlaceState> {
   const key = keyFor(venue)
-  const again = options.retry === true && (state.status === 'failed' || state.trees?.status === 'unavailable')
+  /* `refresh`: ask again even after a success, because the heights changed (a 3D scan arrived). */
+  const again = options.refresh === true || (options.retry === true && (state.status === 'failed' || state.trees?.status === 'unavailable'))
   if (current !== null && current.key === key && !again) return current.run
   /* A Retry pressed asks the map tiles again now, not when their failure is forgotten (vectorTiles.ts). */
   if (again) forgetVectorFailures()

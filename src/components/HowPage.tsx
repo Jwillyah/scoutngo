@@ -1,3 +1,4 @@
+import { HOSTS } from '../lib/hosts.ts'
 import { buildLabel } from '../lib/build.ts'
 import { COLOR_RULE } from '../core/colorRole.ts'
 import { ESRI_ATTRIBUTION } from './MapView.tsx'
@@ -139,6 +140,18 @@ export function HowPage({ onBack }: { onBack: () => void }) {
               and the map screenshot. The serverless function that carries that request exists to
               hold the API key so it is not in the page. It logs nothing.
             </p>
+            {/* Every host, what it learns, when (src/lib/hosts.ts). */}
+            <dl className="how__hosts">
+              {HOSTS.map((h) => (
+                <div key={h.host} className="how__host">
+                  <dt className="num">{h.host}</dt>
+                  <dd>
+                    {h.who}: learns {h.learns}; {h.when}.
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            <p className="how__p how__p--dim">Nothing about you is stored on any server. This app's own functions log nothing and keep nothing.</p>
           </div>
         </section>
 

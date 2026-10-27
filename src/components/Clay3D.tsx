@@ -1,5 +1,5 @@
 import { clayStatus, type ClayStatus } from '../lib/clayStatus.ts'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { SENSORS } from '../core/fov.ts'
 import type { LatLon } from '../core/geo.ts'
 import { frameBox, observerPose, viewWidthDegrees, zoomWithin } from '../core/observer.ts'
@@ -9,6 +9,13 @@ import { ensure3dOverview } from '../lib/offline3d.ts'
 import { loadPlace, onPlace, placeState, type PlaceState } from '../lib/place.ts'
 import type { StandRequest } from '../lib/standRequest.ts'
 import type { ClayScene, GroundStatus, Pin } from '../three/clayScene.ts'
+import { SCAN_EVENT, scanContextAt, useScan } from '../lib/lidar/useScan.ts'
+import type { ScanContext } from '../lib/lidar/applyScan.ts'
+import { scanLabel } from '../lib/lidar/applyScan.ts'
+import { canopyPeaks, footprintMask } from '../lib/lidar/canopy.ts'
+import type { Building } from '../lib/buildings.ts'
+
+const EMPTY: readonly Building[] = []
 
 /*
  * THE 3D VIEW: a clay model of the place, at the time on the time bar.
@@ -41,7 +48,8 @@ export const CLAY_NOTE = 'Clay model from map data; real buildings may differ'
 export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveStand }: Clay3DProps) {
   const host = useRef<HTMLDivElement>(null)
   const scene = useRef<ClayScene | null>(null)
-  const [ready, setReady] = useState(false)
+  /* How many times the scene has been built: every build (a scan arriving rebuilds it) re-runs the effects that feed it. 0 is not built yet. */
+  const [ready, setReady] = useState(0)
   /* The first view's tiles have arrived: until then the canvas is hidden and the 2D map shows through. */
   const [shown, setShown] = useState(false)
   const [failed, setFailed] = useState<string | null>(null)
@@ -51,19 +59,46 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
   const [zoom, setZoom] = useState<{ tick: number; focal: number } | null>(null)
   const [width, setWidth] = useState(0)
   const status = useRef<GroundStatus>({ flatTiles: 0 })
-
-  /* Build the scene once, for this venue. */
+  /* The 3D scan kept for this place, if any (src/lib/lidar/), read before the scene is built; a new one rebuilds it. */
+  const [scanVersion, setScanVersion] = useState(0)
+  /* Keyed by the place and the scan's version: anything else reads as still loading. */
+  const scanKey = `${venue.lat},${venue.lon},${scanVersion}`
+  const [scanLoaded, setScanLoaded] = useState<{ key: string; ctx: ScanContext | null } | null>(null)
+  const scanCtx: ScanContext | null | 'loading' = scanLoaded !== null && scanLoaded.key === scanKey ? scanLoaded.ctx : 'loading'
+  const [infoOpen, setInfoOpen] = useState(false)
   useEffect(() => {
+    const on = () => setScanVersion((n) => n + 1)
+    window.addEventListener(SCAN_EVENT, on)
+    return () => window.removeEventListener(SCAN_EVENT, on)
+  }, [])
+  useEffect(() => {
+    let live = true
+    void scanContextAt(venue.lat, venue.lon).then((c) => {
+      if (live) setScanLoaded({ key: scanKey, ctx: c })
+    })
+    /* The place's buildings are fetched again so they carry the new heights (fetchBuildings applies the scan). */
+    if (scanVersion > 0) void loadPlace(venue, { refresh: true })
+    return () => {
+      live = false
+    }
+  }, [scanKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  const scanRasters = scanCtx === 'loading' || scanCtx === null ? null : scanCtx.rasters
+  const scanYear = scanCtx === 'loading' || scanCtx === null ? null : scanCtx.scan.year
+  const scanFlow = useScan(venue, place.buildings?.list ?? EMPTY)
+
+  /* Build the scene once, for this venue (and again when a scan arrives). */
+  useEffect(() => {
+    if (scanCtx === 'loading') return
     let cancelled = false
     let made: ClayScene | null = null
     ;(window as unknown as { CESIUM_BASE_URL: string }).CESIUM_BASE_URL = __CESIUM_BASE__
     import('../three/clayScene.ts')
       .then(({ createClayScene }) => {
         if (cancelled || host.current === null) return
-        made = createClayScene(host.current, venue, timeZone, status.current, () => setFlat(status.current.flatTiles))
+        made = createClayScene(host.current, venue, timeZone, status.current, () => setFlat(status.current.flatTiles), scanRasters)
         scene.current = made
         ;(window as unknown as { __clay?: ClayScene }).__clay = made
-        setReady(true)
+        setReady((n) => n + 1)
         void made.whenShown().then(() => {
           if (!cancelled) setShown(true)
         })
@@ -76,7 +111,7 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
       setShown(false)
     }
     /* The coordinate, not the object: the same place must not rebuild the engine. */
-  }, [venue.lat, venue.lon, timeZone]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [venue.lat, venue.lon, timeZone, scanCtx === 'loading' ? 'loading' : (scanCtx?.scan.savedAt ?? 'none')]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /*
    * THE BUILDINGS AND TREES, from the place App loads when the venue is set
@@ -89,9 +124,16 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
   useEffect(() => {
     if (ready && place.buildings !== null) scene.current?.setBuildings(place.buildings.list)
   }, [ready, place.buildings])
+  /* With a scan, the trees are its tall things outside the footprints (src/lib/lidar/canopy.ts); without, Overpass's mapped trees. */
+  const scanTrees = useMemo(() => {
+    if (scanRasters === null || place.buildings === null) return null
+    return canopyPeaks(scanRasters, footprintMask(scanRasters, place.buildings.list.map((b) => b.ring)))
+  }, [scanRasters, place.buildings])
   useEffect(() => {
-    if (ready && place.trees?.status === 'drawn') scene.current?.setTrees(place.trees.trees)
-  }, [ready, place.trees])
+    if (!ready) return
+    if (scanTrees !== null) scene.current?.setTrees(scanTrees.map((t) => ({ at: { lat: t.lat, lon: t.lon }, height: t.height })))
+    else if (place.trees?.status === 'drawn') scene.current?.setTrees(place.trees.trees)
+  }, [ready, place.trees, scanTrees])
 
   /* The coarse tiles the overview stands on, saved once per venue so 3D opens with no signal (src/lib/offline3d.ts). */
   useEffect(() => {
@@ -164,34 +206,41 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
         * one over another here. Now the most important status is the one
         * pill (claySatus below); with nothing to report, the one legend line.
         */}
+      {!infoOpen ? null : (
+        <div className="clay__info" role="dialog" aria-label="About this 3D model">
+          <p className="clay__infoline">{CLAY_NOTE}. Lighter blocks have no known height and cast no shadow.</p>
+          {place.buildings?.savedAt == null ? null : <p className="clay__infoline">Buildings saved on this phone {place.buildings.savedAt.slice(0, 10)}.</p>}
+          <ScanPanel flow={scanFlow} keptYear={scanYear} />
+        </div>
+      )}
       <div className="clay__legend">
         {pill !== null ? (
           <ClayPill status={pill} reason={place.reason} onRetry={() => void loadPlace(venue, { retry: true })} />
         ) : (
-          <p className="clay__line">
-            <span className="clay__note">{CLAY_NOTE}</span>
-            {place.buildings === null ? null : (
-              <>
-                {` · ${place.buildings.list.length} buildings`}
-                {place.buildings.savedAt === null ? '' : `, saved on this phone ${place.buildings.savedAt.slice(0, 10)}`}
-                {unknown > 0 ? (
-                  <>
-                    {' · '}
-                    <span className="clay__swatch clay__swatch--unknown" aria-hidden="true" />
-                    {unknown} heights unknown (lighter, no shadow)
-                  </>
-                ) : null}
-                {place.trees?.status === 'drawn'
+          /*
+            * ONE LINE (1st St jetty, 27 Oct: two boxes stacked again):
+            * "127 buildings · 21 height unknown · trees didn't load". The
+            * clay disclaimer, the scan and its download are behind the i.
+            */
+          <div className="clay__row">
+            <p className="clay__line clay__line--one num">
+              {place.buildings === null ? '' : `${place.buildings.list.length} buildings`}
+              {unknown > 0 ? ` · ${unknown} height unknown` : ''}
+              {scanTrees !== null
+                ? ` · ${scanTrees.length} trees from the scan`
+                : place.trees?.status === 'drawn'
                   ? ` · ${place.trees.trees.length} mapped trees`
                   : place.trees?.status === 'sparse'
-                    ? ` · no trees drawn, only ${place.trees.count} mapped here`
+                    ? ` · ${place.trees.count} trees mapped`
                     : place.trees?.status === 'unavailable'
                       ? " · trees didn't load"
                       : ''}
-              </>
-            )}
-            {flat > 0 ? ' · some ground flat (no saved elevation)' : ''}
-          </p>
+              {flat > 0 ? ' · some ground flat' : ''}
+            </p>
+            <button type="button" className="clay__i" aria-expanded={infoOpen} aria-label="About this 3D model and its scan" onClick={() => setInfoOpen(!infoOpen)}>
+              i
+            </button>
+          </div>
         )}
       </div>
       {stand === null || lensFocal === null ? null : (
@@ -243,5 +292,65 @@ export function ClayPill({ status, reason, onRetry }: { status: ClayStatus; reas
         Retry
       </button>
     </p>
+  )
+}
+
+/*
+ * THE 3D SCAN, OPT-IN, PER PLACE: what it would cost and how old it is, said
+ * before anything is asked of anyone; the download as it goes; and once kept,
+ * the label every use carries. High detail is four times the size and best
+ * on Wi-Fi; Safari does not say whether the phone is on Wi-Fi, so the button
+ * says it rather than checking.
+ */
+function ScanPanel({ flow, keptYear }: { flow: ReturnType<typeof useScan>; keptYear: number | null }) {
+  const { state } = flow
+  const mb = (bytes: number) => Math.max(1, Math.round(bytes / 1e6))
+  const year = (y: number | null) => (y === null ? 'year not named' : `scanned ${y}`)
+  if (state.status === 'kept') {
+    return (
+      <>
+        <p className="clay__infoline">{scanLabel(state.scan.year ?? keptYear)}</p>
+        <p className="clay__infoline num">
+          {mb(state.scan.bytes)} MB on this phone, {state.scan.density.toFixed(1)} points per m².{' '}
+          <button type="button" className="clay__link" onClick={() => void flow.forget(state.scan.id)}>
+            Remove the scan
+          </button>
+        </p>
+      </>
+    )
+  }
+  if (state.status === 'fetching-overture') return <p className="clay__infoline">Asking Overture Maps for heights…</p>
+  if (state.status === 'none') {
+    return (
+      <>
+        <p className="clay__infoline">No public lidar scan covers this place. Heights are from the map.</p>
+        {state.overture === null ? (
+          <button type="button" className="clay__link" onClick={() => void flow.fillFromOverture()}>
+            Fill in missing heights from Overture Maps (Esri Community Maps heights; a few hundred KB)
+          </button>
+        ) : (
+          <p className="clay__infoline num">{state.overture} heights filled in from Overture Maps (Esri Community Maps).</p>
+        )}
+      </>
+    )
+  }
+  if (state.status === 'downloading') {
+    const p = state.progress
+    return <p className="clay__infoline num">Downloading the scan{p === null ? '…' : `: ${p.done} of ${p.total} parts, ${mb(p.bytes)} MB`}</p>
+  }
+  const offer = state.offer
+  return (
+    <>
+      {state.status === 'failed' ? <p className="clay__infoline">The scan didn't download: {state.reason}</p> : null}
+      <button type="button" className="btn btn--small" onClick={() => void flow.download(offer)}>
+        Download 3D scan for this place (≈ {mb(offer.bytes)} MB, {year(offer.year)})
+      </button>
+      {state.status === 'offered' && state.high !== null ? (
+        <button type="button" className="clay__link" onClick={() => void flow.download(state.high as NonNullable<typeof state.high>)}>
+          High detail, ≈ {mb(state.high.bytes)} MB, best on Wi-Fi
+        </button>
+      ) : null}
+      <p className="clay__infoline">From USGS 3DEP public lidar, straight to this phone. Nothing is downloaded until you tap.</p>
+    </>
   )
 }

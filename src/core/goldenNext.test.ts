@@ -2,6 +2,7 @@ import { getPosition } from 'suncalc'
 import { describe, expect, it } from 'vitest'
 import { goldenNext } from './goldenNext.ts'
 import { band } from './sunPath.ts'
+import { goldenChip } from '../lib/goldenChip.ts'
 
 const PIER = { lat: 36.8435575, lon: -75.9713104 }
 const alt = (at: Date) => getPosition(at, PIER.lat, PIER.lon).altitude
@@ -30,6 +31,17 @@ describe('goldenNext at Virginia Beach Fishing Pier, 27 Oct 2026', () => {
     expect(got.minutesLeft).toBeGreaterThan(10)
     expect(got.minutesLeft).toBeLessThan(90)
     expect(golden(new Date(inside.getTime() + got.minutesLeft * 60_000))).toBe(false)
+  })
+
+  /* 1st St jetty, 27 Oct: the chip said "10 h" at 9:24 AM; evening golden starts about 5:35 PM, 8 h on. */
+  it('at 9:24 AM, counts about 8 h to the evening golden light', () => {
+    const at = new Date('2026-10-27T13:24:00Z')
+    const got = goldenNext(alt, at)
+    expect(got.kind).toBe('next')
+    if (got.kind !== 'next') return
+    expect(got.minutesUntil / 60).toBeGreaterThan(7.5)
+    expect(got.minutesUntil / 60).toBeLessThan(8.5)
+    expect(goldenChip(got).value).toBe('in 8 h')
   })
 
   it('at noon, counts to the evening golden light', () => {

@@ -93,8 +93,16 @@ export interface BuildingHeight {
    * Where it came from, so a readout can say how much to trust it. 'tile':
    * OpenStreetMap's height or storeys as the map tiles carry it, rounded to
    * whole metres, the two no longer told apart (tileBuildingHeight).
+   * 'lidar': measured from the venue's downloaded scan (src/lib/lidar/applyScan.ts),
+   * in the year `scanYear`.
    */
-  source: 'height' | 'levels' | 'tile' | 'unknown'
+  source: 'height' | 'levels' | 'tile' | 'lidar' | 'overture' | 'unknown'
+  /** For an 'overture' height, whose it is (Esri Community Maps). */
+  overtureSource?: string
+  /** The scan's acquisition year, for a 'lidar' height, or for a footprint newer than the scan. */
+  scanYear?: number | null
+  /** A footprint inside the scan with no building points in it: built since, or not a building then. */
+  newerThanScan?: boolean
   /** What to extrude for the picture. Never null, and never geometric truth. */
   drawMetres: number
   /** Metres the footprint starts at, for a building on a podium. */

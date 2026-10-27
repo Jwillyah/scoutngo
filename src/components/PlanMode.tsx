@@ -87,6 +87,7 @@ import { Clay3D } from './Clay3D.tsx'
 import { goldenChip } from '../lib/goldenChip.ts'
 import { TideSheet } from './TideSheet.tsx'
 import { useTideSheet } from '../lib/useTideSheet.ts'
+import { SCAN_EVENT } from '../lib/lidar/useScan.ts'
 import { useSurfSetting } from '../lib/surfSetting.ts'
 import { LAYER_FAILED } from '../lib/layerFailed.ts'
 import type { PlanForNow } from '../lib/planForNow.ts'
@@ -558,8 +559,13 @@ export function PlanMode({
    */
   const [terrainPaused, setTerrainPaused] = useState(false)
   const [buildingsNote, setBuildingsNote] = useState<string | null>(null)
-  /* A Retry on the Buildings tile asks again. */
+  /* A Retry on the Buildings tile asks again; so does a 3D scan arriving or going (the heights changed). */
   const [buildingsAttempt, setBuildingsAttempt] = useState(0)
+  useEffect(() => {
+    const on = () => setBuildingsAttempt((n) => n + 1)
+    window.addEventListener(SCAN_EVENT, on)
+    return () => window.removeEventListener(SCAN_EVENT, on)
+  }, [])
   const [sheetHeight, setSheetHeight] = useState(108)
   const [, setPitch] = useState(0)
   /*
@@ -974,6 +980,9 @@ export function PlanMode({
     /* mapZoom only matters for crossing the threshold, not every nudge. */
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wantBuildings, venue, mapZoom >= BUILDINGS_MIN_ZOOM, buildingsAttempt])
+
+  /* The year of the 3D scan whose heights the buildings carry, or undefined when none do. */
+  const scanYearUsed = buildingList?.find((b) => b.height.source === 'lidar')?.height.scanYear
 
   /*
    * THE SHADOW MAP, for the moment on the time bar. Footprint swept by
@@ -1994,6 +2003,8 @@ export function PlanMode({
             ? 'No shadows: the sun is down.'
             : `Shadows from ${shadows.shadows.length} ${shadows.shadows.length === 1 ? 'building' : 'buildings'} with a known height.`}
           {shadows.skippedNoHeight === 0 ? '' : ` ${shadows.skippedNoHeight} more have no height and cast none here.`} Flat ground.
+          {/* The scan year wherever its heights are used. */}
+          {scanYearUsed === undefined ? '' : ` Heights from the ${scanYearUsed ?? 'public'} lidar scan; newer buildings may be missing.`}
         </p>
       )}
       {measurePins === null ? null : (

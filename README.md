@@ -644,6 +644,17 @@ water temperature back). Which way the beach faces is worked out on the phone
 from the map tiles it already has. An example photo you add to an explainer
 is shrunk and kept on the phone, never sent anywhere.
 
+**The 3D scan** (opt-in, per place, in the 3D view's i). Public USGS 3DEP
+lidar, read straight from `s3-us-west-2.amazonaws.com` (the `usgs-lidar-public`
+bucket, Entwine Point Tiles, public domain) to the phone, never through any
+server of ours, and only after you tap Download. The button says the size and
+the scan's year first, worked out on the phone from an index built into the
+app. The scan is kept on the phone (IndexedDB): the ground, the top surface and
+each building's measured height, with the year shown wherever those heights are
+used. Outside lidar coverage, Fill in heights asks Overture Maps' buildings
+tiles (`overturemaps-extras-us-west-2.s3.amazonaws.com`) after a tap, for the
+heights Esri Community Maps contributed. The How page lists every host.
+
 **Surf** (Settings, Surf: Auto shows it within 2 km of the ocean and never
 inland). The breaking height is worked out on the phone from the Open-Meteo
 Marine swell. Beside it, the nearest NOAA NDBC buoy's latest waves: the phone

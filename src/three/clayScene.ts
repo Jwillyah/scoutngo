@@ -4,10 +4,12 @@
  *
  *   ground     Esri imagery draped on AWS Terrarium elevation, lit by the
  *              sun so ridgelines read
- *   buildings  OpenStreetMap footprints, extruded in warm clay; a building
- *              with no recorded height is drawn lighter, hatched, at the
- *              nominal picture height, and casts NO shadow (as in 2D:
- *              src/core/shadowMap.ts, "no height, no shadow")
+ *   buildings  OpenStreetMap footprints, extruded in warm clay, each with
+ *              its outline on the ground; a building with no recorded
+ *              height is drawn a flat lighter tone at the nominal picture
+ *              height, and casts NO shadow (as in 2D: src/core/shadowMap.ts,
+ *              "no height, no shadow"). With a kept 3D scan, the heights,
+ *              the ground and the trees are the scan's (src/lib/lidar/)
  *   trees      mapped single trees as rounded clay-green shapes, or none
  *              where the mapping is sparse (src/lib/trees.ts)
  *   light      one directional light along suncalc's sun (src/core/sky3d.ts),
@@ -50,8 +52,6 @@ import {
   Matrix4,
   sampleTerrain,
   ShadowMode,
-  StripeMaterialProperty,
-  StripeOrientation,
   Transforms,
   UrlTemplateImageryProvider,
   VerticalOrigin,
@@ -65,6 +65,8 @@ import type { LatLon } from '../core/geo.ts'
 import { CLAY_LIGHT_INTENSITY, clayLight, domePoint, skyArc, sunlightEnu, type SkyArc } from '../core/sky3d.ts'
 import { getSunPosition } from '../core/sun.ts'
 import { heightGrid, sourceFor } from '../core/terrarium.ts'
+import { overlayDtm } from '../lib/lidar/terrain.ts'
+import type { Rasters } from '../lib/lidar/raster.ts'
 import { formatHour } from '../core/timezone.ts'
 import type { Building } from '../lib/buildings.ts'
 import { loadTile } from '../lib/offlineCache.ts'
@@ -74,8 +76,9 @@ import { NOMINAL_TREE_HEIGHT, type MappedTree } from '../lib/trees.ts'
 
 export const CLAY = '#ede6da'
 /* Unknown height: lighter, hatched. */
-const CLAY_UNKNOWN_A = '#f8f5ef'
-const CLAY_UNKNOWN_B = '#ddd3c3'
+const CLAY_UNKNOWN = '#f7f3ec'
+/* The footprint drawn on the ground, so a block that leans in the photo still sits on its own outline. */
+const FOOTPRINT = '#f7f3ec'
 const TREE_GREEN = '#a9b694'
 const SKY_RADIUS = 1500
 /* The longest the canvas stays hidden waiting for its first tiles. */
@@ -108,11 +111,11 @@ async function tileBytes(url: string): Promise<ArrayBuffer> {
 
 /** Esri imagery, read through the 2D map's tile cache. */
 class CachedImagery extends UrlTemplateImageryProvider {
-  constructor() {
+  constructor(maximumLevel = 19) {
     super({
       url: IMAGERY_TEMPLATE,
       tilingScheme: new WebMercatorTilingScheme(),
-      maximumLevel: 19,
+      maximumLevel,
       credit: new Credit(ESRI_CREDIT),
     })
   }
@@ -150,7 +153,7 @@ export interface GroundStatus {
   flatTiles: number
 }
 
-function terrarium(status: GroundStatus, onChange: () => void): TerrainProvider {
+function terrarium(status: GroundStatus, onChange: () => void, scan: Rasters | null): TerrainProvider {
   return new CustomHeightmapTerrainProvider({
     width: HEIGHT_SAMPLES,
     height: HEIGHT_SAMPLES,
@@ -161,7 +164,10 @@ function terrarium(status: GroundStatus, onChange: () => void): TerrainProvider 
       try {
         const px = await terrariumPixels(src.tile.x, src.tile.y, src.tile.z)
         tileCounts.terrain += 1
-        return heightGrid(px, Math.round(Math.sqrt(px.length / 4)), HEIGHT_SAMPLES, src.u0, src.v0, src.span)
+        const grid = heightGrid(px, Math.round(Math.sqrt(px.length / 4)), HEIGHT_SAMPLES, src.u0, src.v0, src.span)
+        /* Inside a kept scan's patch, the lidar ground (src/lib/lidar/terrain.ts). */
+        if (scan !== null && level >= 13) overlayDtm(grid, HEIGHT_SAMPLES, { x, y, z: level }, scan)
+        return grid
       } catch {
         /* Not saved and no signal. Drawn flat, and counted so the screen can say so. */
         status.flatTiles += 1
@@ -226,10 +232,11 @@ export function createClayScene(
   timeZone: string,
   status: GroundStatus,
   onStatus: () => void,
+  scan: Rasters | null = null,
 ): ClayScene {
   const widget = new CesiumWidget(container, {
     baseLayer: false,
-    terrainProvider: terrarium(status, onStatus),
+    terrainProvider: terrarium(status, onStatus, scan),
     /* No stars, and no engine sun or moon: the sky's bodies are ours. */
     skyBox: false,
     shadows: true,
@@ -238,6 +245,14 @@ export function createClayScene(
     msaaSamples: 4,
   })
   const scene = widget.scene
+  /*
+   * NEVER A HOLE. A coarse layer (to zoom 13, a handful of tiles that arrive
+   * first) lies under the sharp one, so where a sharp tile has not loaded or
+   * failed the coarser picture shows instead of a dark patch. 1st St jetty,
+   * 27 Oct: a patchwork with dark green holes. The engine has no cross-fade
+   * between imagery levels, so the change from coarse to sharp is a swap.
+   */
+  widget.imageryLayers.add(new ImageryLayer(new CachedImagery(13)))
   widget.imageryLayers.add(new ImageryLayer(new CachedImagery()))
   /* Where a tile has not arrived yet: a dark ground, not the engine's bright blue. */
   scene.globe.baseColor = Color.fromCssColorString('#1d2124')
@@ -268,6 +283,17 @@ export function createClayScene(
     if (bias !== undefined) {
       bias.depthBias = 0.002
       bias.normalOffsetScale = 3
+    }
+    /*
+     * AND THE BUILDINGS' OWN. Roofs and walls flickered with a sawtooth at the
+     * 1st St jetty on 27 Oct: each face shadowing itself (shadow acne). The
+     * primitive bias, same engine object, pushes the comparison off the face.
+     */
+    const prim = (scene.shadowMap as unknown as { _primitiveBias?: { depthBias: number; normalOffsetScale: number; normalShading: boolean } })._primitiveBias
+    if (prim !== undefined) {
+      prim.depthBias = 0.0004
+      prim.normalOffsetScale = 0.6
+      prim.normalShading = true
     }
   }
   widget.clock.shouldAnimate = false
@@ -314,16 +340,28 @@ export function createClayScene(
             heightReference: HeightReference.CLAMP_TO_GROUND,
             extrudedHeight: known ? (b.height.metres as number) : NOMINAL_DRAW_HEIGHT,
             extrudedHeightReference: HeightReference.RELATIVE_TO_GROUND,
-            material: known
-              ? new ColorMaterialProperty(Color.fromCssColorString(CLAY))
-              : new StripeMaterialProperty({
-                  evenColor: Color.fromCssColorString(CLAY_UNKNOWN_A),
-                  oddColor: Color.fromCssColorString(CLAY_UNKNOWN_B),
-                  repeat: 6,
-                  orientation: StripeOrientation.VERTICAL,
-                }),
+            /*
+             * UNKNOWN HEIGHT IS A FLAT LIGHTER TONE, NO PATTERN. The stripes it
+             * had aliased into a speckle on a phone (1st St jetty, 27 Oct).
+             */
+            material: new ColorMaterialProperty(Color.fromCssColorString(known ? CLAY : CLAY_UNKNOWN)),
             /* Unknown height casts nothing: a shadow from an invented height is invented shade. */
             shadows: known ? ShadowMode.ENABLED : ShadowMode.RECEIVE_ONLY,
+          },
+        }),
+      )
+      /*
+       * ITS FOOTPRINT ON THE GROUND. Satellite photos lean: a tall block's
+       * roof sits off its base in the picture. A soft outline at the base lets
+       * the eye match block to photo (1st St jetty, 27 Oct).
+       */
+      buildingEntities.push(
+        widget.entities.add({
+          polyline: {
+            positions: Cartesian3.fromDegreesArray([...flat, flat[0], flat[1]]),
+            clampToGround: true,
+            width: 1.5,
+            material: Color.fromCssColorString(FOOTPRINT).withAlpha(0.7),
           },
         }),
       )

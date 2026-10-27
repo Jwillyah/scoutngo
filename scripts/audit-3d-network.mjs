@@ -16,6 +16,8 @@
  * THEN OFFLINE: the network cut, 3D reopened, and it must load with the
  * venue's ground at the height it had online (src/lib/offline3d.ts).
  *
+ * THEN THE 3D SCAN: its host is allowed only after the Download tap.
+ *
  * IT MUST HAVE LOOKED (docs/failure-modes.md, B). Tiles can come from the
  * phone's own cache with no network at all, so "no bad requests" proves
  * nothing by itself: the model must report that it drew imagery and
@@ -129,6 +131,41 @@ try {
     const ok = ALLOWED.has(host)
     console.log(`    ${ok ? 'ok ' : 'BAD'} ${host}  ${n}`)
     if (!ok) fail(`the 3D view contacted ${host}, which is not one of the app's hosts`)
+  }
+
+  /*
+   * THE 3D SCAN IS OPT-IN: its host (the USGS lidar bucket) is in no list
+   * above, so contacting it before the tap already failed. After the tap it
+   * must appear, and nothing else new may (src/lib/lidar/, src/lib/hosts.ts).
+   */
+  console.log('### the 3D scan, after the tap')
+  await ev(`document.querySelector('button[aria-label="Back to the 2D map"]') ? 1 : document.querySelector('button[aria-label="Open the 3D clay model"]')?.click()`)
+  for (let i = 0; i < 30; i += 1) {
+    await wait(1000)
+    if (await ev(`!!document.querySelector('.clay__i')`)) break
+  }
+  await ev(`document.querySelector('.clay__info') ? 1 : document.querySelector('.clay__i')?.click()`)
+  await wait(800)
+  const offered = await ev(`[...document.querySelectorAll('.clay__info button')].find((b) => b.textContent.startsWith('Download 3D scan'))?.textContent ?? null`)
+  console.log(`  offered: ${offered ?? 'nothing'}`)
+  if (offered === null) fail('no 3D scan offered at Brew River, which USGS covers')
+  else {
+    seen.clear()
+    armed = true
+    await ev(`[...document.querySelectorAll('.clay__info button')].find((b) => b.textContent.startsWith('Download 3D scan'))?.click()`)
+    await wait(12000)
+    armed = false
+    const LIDAR = 's3-us-west-2.amazonaws.com'
+    for (const [host, n] of [...seen].sort()) {
+      const ok = ALLOWED.has(host) || host === LIDAR
+      console.log(`    ${ok ? 'ok ' : 'BAD'} ${host}  ${n}`)
+      if (!ok) fail(`after the tap the 3D view contacted ${host}`)
+    }
+    if (!seen.has(LIDAR)) fail('the tap asked nothing of the USGS lidar bucket')
+    /* Leave nothing behind for the next audit. */
+    await send('Page.navigate', { url: 'http://127.0.0.1:5173/' })
+    await wait(1500)
+    await ev(`indexedDB.deleteDatabase('scoutngo-lidar'), 1`)
   }
 } catch (error) {
   fail(`could not run: ${error instanceof Error ? error.message : String(error)}`)

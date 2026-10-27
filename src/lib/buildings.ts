@@ -159,18 +159,25 @@ export function savedBuildingsFor(bounds: MapBounds): { buildings: Building[]; f
  * its age. Never throws.
  */
 export async function fetchBuildings(bounds: MapBounds): Promise<BuildingsResult> {
+  /*
+   * WITH THE SCAN'S HEIGHTS, when a 3D scan of this patch is kept on the phone
+   * (src/lib/lidar/useScan.ts): the one place every user of buildings asks,
+   * so the 3D view, the 2D shadows, the sightlines and Suggest agree.
+   */
+  const centre = { lat: (bounds.south + bounds.north) / 2, lon: (bounds.west + bounds.east) / 2 }
+  const scanned = async (list: Building[]) => (await import('./lidar/useScan.ts')).withScan(list, centre)
   const cacheKey = key(bounds)
   const hit = cache.get(cacheKey)
-  if (hit !== undefined) return { status: 'ok', buildings: hit, cached: true }
+  if (hit !== undefined) return { status: 'ok', buildings: await scanned(hit), cached: true }
 
   const answer = await buildingsFromTiles(bounds)
   if (answer.status === 'ok') {
     cache.set(cacheKey, answer.buildings)
     saveBuildings(cacheKey, answer.buildings)
-    return { status: 'ok', buildings: answer.buildings, cached: false }
+    return { status: 'ok', buildings: await scanned(answer.buildings), cached: false }
   }
   /* No signal and not saved: the list kept on the phone, said with its age. */
   const saved = readSavedBuildings(cacheKey)
-  if (saved !== null) return { status: 'ok', buildings: saved.buildings, cached: true, savedAt: saved.fetchedAt }
+  if (saved !== null) return { status: 'ok', buildings: await scanned(saved.buildings), cached: true, savedAt: saved.fetchedAt }
   return { status: 'unavailable', reason: answer.reason }
 }
