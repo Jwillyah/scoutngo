@@ -38,6 +38,8 @@ export interface Rasters {
   kind: Uint8Array
   /** 1 where any water return (class 9) fell in the cell, whatever was on top. */
   water?: Uint8Array
+  /** 1 where ground returns (class 2) fell in the cell: measured ground, not filled in. */
+  ground?: Uint8Array
 }
 
 const kindOf = (cls: number): number => (cls === 2 ? KIND.ground : cls === 6 ? KIND.building : cls >= 3 && cls <= 5 ? KIND.vegetation : cls === 9 ? KIND.water : KIND.other)
@@ -117,7 +119,8 @@ export function buildRasters(points: Float64Array, area: LidarArea): Rasters {
   for (let i = 0; i < n; i += 1) {
     if ((top[i] === KIND.other || top[i] === KIND.ground) && dsm[i] - dtm[i] > TALL_ABOVE_M) top[i] = multi[i] === 1 ? KIND.vegetation : KIND.tall
   }
-  return { width, height, cell, minx: area.minx, maxy: area.maxy, dtm, dsm, kind: top, water }
+  const ground = Uint8Array.from(gCount, (c) => (c > 0 ? 1 : 0))
+  return { width, height, cell, minx: area.minx, maxy: area.maxy, dtm, dsm, kind: top, water, ground }
 }
 
 /** Raster index of a Web Mercator point, or -1 outside. */

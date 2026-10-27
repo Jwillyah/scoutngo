@@ -231,10 +231,35 @@ try {
     if (!layers.tools) fail('no Measure under Tools in Layers')
     if (layers.longest > 24) fail(`a tile state runs to ${layers.longest} characters; a state is a few words`)
   }
-  await ev(`document.querySelector('button[aria-label="Map and layers"]')?.click()`)
-  await wait(500)
-  /* Back down: at full the map's rail, the 3D button with it, is put away. */
+  /*
+   * A NOTE WITH A CLOSE (measuring here; the waterline's is the same note):
+   * inside the screen, and its × is what a tap there lands on. 27 Oct: the ×
+   * sat at x 1224 on a 390 px screen and let taps through to the map.
+   */
+  await ev(`[...document.querySelectorAll('.tile')].find((t) => t.querySelector('.tile__label')?.textContent === 'Measure')?.click()`)
+  await wait(700)
+  if (await ev(`document.querySelector('button[aria-label="Map and layers"]')?.getAttribute('aria-pressed') === 'true'`)) {
+    await ev(`document.querySelector('button[aria-label="Map and layers"]')?.click()`)
+    await wait(500)
+  }
   await setSheet(ev, wait, 'peek')
+  const note = JSON.parse(await ev(`JSON.stringify((() => {
+    const b = document.querySelector('.tapnote__close')
+    if (!b) return { missing: true }
+    const n = b.closest('.tapnote').getBoundingClientRect()
+    const r = b.getBoundingClientRect()
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+    return { left: Math.round(n.left), right: Math.round(n.right), x: Math.round(r.left + r.width / 2), vw: innerWidth, lands: hit === b || b.contains(hit) }
+  })())`))
+  if (note.missing) fail('Measure under Tools put up no note with a close, so the note was not checked')
+  else {
+    console.log(`  the measure note: ${note.left} to ${note.right} px of ${note.vw}, its × at x ${note.x}, a tap there lands on it: ${note.lands}`)
+    if (note.left < 0 || note.right > note.vw) fail(`the measure note runs past the edge (${note.left} to ${note.right} px)`)
+    if (!note.lands) fail(`a tap on the note's × (x ${note.x} on ${note.vw} px) does not land on it`)
+    await ev(`document.querySelector('.tapnote__close')?.click()`)
+    await wait(400)
+    if (await ev(`!!document.querySelector('.tapnote__close')`)) fail('the note\'s × did not close it')
+  }
 
   await ev(`document.querySelector('button[aria-label="Menu"]')?.click()`)
   await check('the menu', 'nav[aria-label="Stage"]')

@@ -703,6 +703,8 @@ interface MapViewProps {
   onFlightAt?: (at: LatLon) => void
   /* The move's path: 'line', 'hidden' (amber: out of the pilot's sight) and 'vertex' features. */
   flight?: GeoJSON.FeatureCollection | null
+  /* The waterline over the scanned patch, as an image (src/lib/waterline/useWaterline.ts). */
+  waterline?: { url: string; coordinates: [[number, number], [number, number], [number, number], [number, number]] } | null
   /** PhotoPills style rays from the venue pin. All four bearings from core. */
   sunOverlay: SunOverlay | null
   showSun: boolean
@@ -1156,6 +1158,7 @@ export function MapView({
   onMeasureAt,
   onFlightAt,
   flight = null,
+  waterline = null,
   pilotAt = null,
   onPilotMove,
   onAimAt,
@@ -2560,6 +2563,23 @@ export function MapView({
     const source = map.current.getSource(SHADOW_SOURCE) as maplibregl.GeoJSONSource | undefined
     source?.setData(shadowFeatures ?? emptyCollection())
   }, [shadowFeatures, ready])
+
+  /* The waterline: an image source over the scan's patch, added under everything drawn on top. */
+  useEffect(() => {
+    const m = map.current
+    if (m === null || !ready) return
+    const src = m.getSource('waterline') as maplibregl.ImageSource | undefined
+    if (waterline === null) {
+      if (m.getLayer('waterline')) m.removeLayer('waterline')
+      if (src !== undefined) m.removeSource('waterline')
+      return
+    }
+    if (src !== undefined) src.updateImage({ url: waterline.url, coordinates: waterline.coordinates })
+    else {
+      m.addSource('waterline', { type: 'image', url: waterline.url, coordinates: waterline.coordinates })
+      m.addLayer({ id: 'waterline', type: 'raster', source: 'waterline', paint: { 'raster-opacity': 1, 'raster-resampling': 'nearest' } }, m.getLayer('flight-edge') ? 'flight-edge' : undefined)
+    }
+  }, [waterline, ready])
 
   /* Preflight's path (PlanMode builds the features). */
   useEffect(() => {

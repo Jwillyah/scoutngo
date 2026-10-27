@@ -11,6 +11,6 @@ export interface ScanJob {
 
 export type ScanMessage =
   | { kind: 'progress'; done: number; total: number; bytes: number }
-  | { kind: 'done'; width: number; height: number; cell: number; minx: number; maxy: number; dtm: Float32Array; dsm: Float32Array; kind2: Uint8Array; water: Uint8Array; heights: Record<string, { metres: number; byRaster: number } | 'newer'>; bytes: number; points: number }
+  | { kind: 'done'; width: number; height: number; cell: number; minx: number; maxy: number; dtm: Float32Array; dsm: Float32Array; kind2: Uint8Array; water: Uint8Array; ground: Uint8Array; heights: Record<string, { metres: number; byRaster: number } | 'newer'>; bytes: number; points: number }
   | { kind: 'failed'; reason: string }
 

@@ -4899,6 +4899,39 @@
 }
 
 /*
+ * A NOTE WITH A CLOSE (the waterline, measuring): longer than one line, so it
+ * wraps inside the screen, and its × takes the tap the rest of the note lets
+ * through to the map. Measured before: the × sat at x 1224 on a 390 px screen
+ * with pointer-events none.
+ */
+.tapnote--closable {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  width: max-content;
+  white-space: normal;
+}
+
+.tapnote--closable .tapnote__text {
+  min-width: 0;
+}
+
+.tapnote__close {
+  pointer-events: auto;
+  flex: none;
+  min-width: var(--control-height);
+  min-height: var(--control-height);
+  margin: calc(var(--space-2) * -1) calc(var(--space-3) * -1) calc(var(--space-2) * -1) 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-lg);
+  cursor: pointer;
+}
+
+/*
  * A TOAST (Toast.tsx): one small line where the tap note sits, above the
  * dock and the sheet, gone after four seconds or at a tap. The line itself
  * is the button that closes it; nothing around it takes the map's touches.

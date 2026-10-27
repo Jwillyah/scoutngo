@@ -87,6 +87,8 @@ import { Clay3D } from './Clay3D.tsx'
 import { goldenChip } from '../lib/goldenChip.ts'
 import { TideSheet } from './TideSheet.tsx'
 import { useTideSheet } from '../lib/useTideSheet.ts'
+import { useWaterline } from '../lib/waterline/useWaterline.ts'
+import { waterlineLine } from '../lib/waterline/words.ts'
 import { SCAN_EVENT, scanContextAt } from '../lib/lidar/useScan.ts'
 import type { ScanContext } from '../lib/lidar/applyScan.ts'
 import { usePreflight } from '../lib/preflight/usePreflight.ts'
@@ -1007,6 +1009,9 @@ export function PlanMode({
   const [flightPicking, setFlightPicking] = useState(false)
   const [flightPlay, setFlightPlay] = useState<FlightPlay | null>(null)
   const [recordNote, setRecordNote] = useState<string | null>(null)
+  /* The waterline on the 2D map, from the Tide sheet (src/lib/waterline/). */
+  const [showWaterline, setShowWaterline] = useState(false)
+  const waterline = useWaterline(showWaterline, venue, tide, venue === null ? null : scanCtx, scrubbedAt)
   const [flySession, setFlySession] = useState<FlySession | null>(null)
   const startFly = (record: boolean) => {
     if (venue === null || pf.pilot === null || scrubbedAt === null) return
@@ -1669,6 +1674,19 @@ export function PlanMode({
             onAt={scrubTo}
             onJumpDay={onJumpDay}
             onClose={home}
+            waterline={{
+              shown: showWaterline,
+              scanKept: scanCtx !== null,
+              line: waterlineLine(waterline, units),
+              onShow: (on: boolean) => {
+                setShowWaterline(on)
+                /* Off to the map, with the time bar, to see it and move the tide. */
+                if (on) {
+                  setCard(HOME)
+                  setSheet('peek')
+                }
+              },
+            }}
           />
         )
       case 'golden':
@@ -1960,6 +1978,7 @@ export function PlanMode({
         onMeasureAt={onMeasureAt}
         onFlightAt={pf.addPoint}
         flight={card.kind === 'preflight' ? pf.features : null}
+        waterline={waterline !== null && waterline !== 'no-offset' ? { url: waterline.url, coordinates: waterline.coordinates } : null}
         onHorizon={setHorizonProfile}
         handle={mapHandle}
         venue={venue}
@@ -2122,8 +2141,16 @@ export function PlanMode({
           {scanYearUsed === undefined ? '' : ` Heights from the ${scanYearUsed ?? 'public'} lidar scan; newer buildings may be missing.`}
         </p>
       )}
+      {!showWaterline || sheet === 'full' ? null : (
+        <p className="tapnote tapnote--closable num" role="status">
+          <span className="tapnote__text">{waterlineLine(waterline, units)}</span>
+          <button type="button" className="tapnote__close" onClick={() => setShowWaterline(false)} aria-label="Hide the waterline">
+            ×
+          </button>
+        </p>
+      )}
       {measurePins === null ? null : (
-        <p className="tapnote tapnote--measure num" role="status">
+        <p className="tapnote tapnote--measure tapnote--closable num" role="status">
           <span className="tapnote__text">{measureWords(measurePins, units.distance)}</span>
           <button type="button" className="tapnote__close" onClick={() => setMeasurePins(null)} aria-label="Stop measuring">
             ×

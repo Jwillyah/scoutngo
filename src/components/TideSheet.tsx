@@ -40,12 +40,14 @@ interface TideSheetProps {
   /** Jump the app to a day, at that morning's sunrise. */
   onJumpDay: (date: string, at: Date) => void
   onClose: () => void
+  /** The waterline on the 2D map (Phase 4): only with a kept 3D scan. */
+  waterline?: { shown: boolean; scanKept: boolean; line: string; onShow: (on: boolean) => void }
 }
 
-const CURVE_H = 112
+const CURVE_H = 104
 const STRIP_DAYS = 30
 
-export function TideSheet({ tide, at, timeZone, venue, units, data, onAt, onJumpDay, onClose }: TideSheetProps) {
+export function TideSheet({ tide, at, timeZone, venue, units, data, onAt, onJumpDay, onClose, waterline }: TideSheetProps) {
   const box = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(340)
   const [explainer, setExplainer] = useState<'mirror' | 'spring' | null>(null)
@@ -194,9 +196,19 @@ export function TideSheet({ tide, at, timeZone, venue, units, data, onAt, onJump
       </div>
       {ok === null ? null : (
         <p className="tides__small">
-          Feet above the station's datum (MLLW, the average lowest tide each day) · {ok.station.name},{' '}
+          Feet above MLLW (the average lowest tide) · {ok.station.name},{' '}
           <span className="num">{formatRange(ok.distanceKm * 1000, units.distance)}</span>
-          {ok.predictions.curveSource === 'published' ? '' : ' · curve worked out from NOAA’s turns'}
+          {ok.predictions.curveSource === 'published' ? '' : ' · curve from NOAA’s turns'}
+          {waterline === undefined || data.facing.value === 'inland' ? null : waterline.scanKept ? (
+            <>
+              {' · '}
+              <button type="button" className="clay__link" onClick={() => waterline.onShow(!waterline.shown)}>
+                {waterline.shown ? 'Hide the waterline' : 'Waterline on the map'}
+              </button>
+            </>
+          ) : (
+            ' · the waterline needs the 3D scan (3D view, i)'
+          )}
         </p>
       )}
 

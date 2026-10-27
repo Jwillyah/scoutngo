@@ -22,6 +22,8 @@ export interface StoredScan {
   kind: Uint8Array
   /** 1 where water returns fell (raster.ts). */
   water?: Uint8Array
+  /** 1 where ground returns fell (raster.ts). */
+  ground?: Uint8Array
   /**
    * Each footprint's height from the scan, measured two ways at download time
    * (buildingHeights.ts), by the footprint's id; 'newer' when it has no roof
@@ -47,7 +49,7 @@ export const toDecimetres = (g: Float32Array): Int16Array => Int16Array.from(g, 
 export const fromDecimetres = (g: Int16Array): Float32Array => Float32Array.from(g, (v) => (v === -32768 ? Number.NaN : v / 10))
 
 export function rastersOf(s: StoredScan): Rasters {
-  return { width: s.width, height: s.height, cell: s.cell, minx: s.minx, maxy: s.maxy, dtm: fromDecimetres(s.dtm), dsm: fromDecimetres(s.dsm), kind: s.kind, water: s.water }
+  return { width: s.width, height: s.height, cell: s.cell, minx: s.minx, maxy: s.maxy, dtm: fromDecimetres(s.dtm), dsm: fromDecimetres(s.dsm), kind: s.kind, water: s.water, ground: s.ground }
 }
 
 export async function saveScan(scan: StoredScan): Promise<boolean> {

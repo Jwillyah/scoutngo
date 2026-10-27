@@ -45,7 +45,7 @@ self.onmessage = async (event: MessageEvent<ScanJob>) => {
       if (h.kind === 'measured') heights[f.id] = { metres: h.metres, byRaster: h.byRaster }
       else if (h.kind === 'newer-than-scan') heights[f.id] = 'newer'
     }
-    post({ kind: 'done', width: r.width, height: r.height, cell: r.cell, minx: r.minx, maxy: r.maxy, dtm: r.dtm, dsm: r.dsm, kind2: r.kind, water: r.water ?? new Uint8Array(0), heights, bytes, points: used / STRIDE }, [r.dtm.buffer, r.dsm.buffer, r.kind.buffer, ...(r.water === undefined ? [] : [r.water.buffer])])
+    post({ kind: 'done', width: r.width, height: r.height, cell: r.cell, minx: r.minx, maxy: r.maxy, dtm: r.dtm, dsm: r.dsm, kind2: r.kind, water: r.water ?? new Uint8Array(0), ground: r.ground ?? new Uint8Array(0), heights, bytes, points: used / STRIDE }, [r.dtm.buffer, r.dsm.buffer, r.kind.buffer, ...(r.water === undefined ? [] : [r.water.buffer]), ...(r.ground === undefined ? [] : [r.ground.buffer])])
   } catch (error) {
     post({ kind: 'failed', reason: error instanceof Error ? error.message : String(error) })
   }

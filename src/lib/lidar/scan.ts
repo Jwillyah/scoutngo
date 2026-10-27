@@ -53,6 +53,7 @@ export async function downloadScan(offer: LidarOffer, density: number, buildings
       dsm: toDecimetres(done.dsm),
       kind: done.kind2,
       water: done.water,
+      ground: done.ground,
       heights: done.heights,
     }
     if (!(await saveScan(scan))) throw new Error('This phone would not keep the scan.')
