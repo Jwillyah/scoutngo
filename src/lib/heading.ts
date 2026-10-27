@@ -4,7 +4,8 @@
  * iPHONE ASKS FIRST. Safari only gives orientation after
  * DeviceOrientationEvent.requestPermission() is called from a tap, so this is
  * started from the compass button and never on load. A refusal is an answer,
- * said in one sentence, and the map stays north up.
+ * said in one sentence with the way out (Safari will not ask again until the
+ * page reloads), and the map stays north up.
  *
  * NOTHING IS KEPT. The heading turns the map and is not stored or sent.
  *
@@ -13,6 +14,9 @@
  * so the heading is 360 minus it; a relative alpha says nothing about north
  * and is refused rather than shown as if it were.
  */
+
+/** What a refusal says: what it means and how to undo it. */
+export const MOTION_REFUSED = 'Compass needs motion access. Reload and tap the compass again, then Allow.'
 
 export type HeadingStart =
   | { ok: true; stop: () => void }
@@ -44,10 +48,10 @@ export async function startHeading(onHeading: (degrees: number) => void): Promis
   if (typeof ask === 'function') {
     try {
       if ((await ask()) !== 'granted') {
-        return { ok: false, reason: 'Motion access was not allowed, so the map stays north up.' }
+        return { ok: false, reason: MOTION_REFUSED }
       }
     } catch {
-      return { ok: false, reason: 'Motion access was not allowed, so the map stays north up.' }
+      return { ok: false, reason: MOTION_REFUSED }
     }
   }
   const listener = (event: Event) => {

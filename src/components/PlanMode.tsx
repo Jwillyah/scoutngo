@@ -59,6 +59,7 @@ import { WindCard } from './WindCard.tsx'
 import { ChipRow, type Chip } from './ChipRow.tsx'
 import { TopBar } from './TopBar.tsx'
 import { startHeading } from '../lib/heading.ts'
+import { Toast } from './Toast.tsx'
 import { MoonriseCard } from './MoonriseCard.tsx'
 import { readCeilingFeet } from '../lib/venue.ts'
 import { MAX_ALTITUDE_FEET } from '../core/air.ts'
@@ -838,7 +839,9 @@ export function PlanMode({
       live = false
     }
   }, [airspaceOn, airspaceOverlay])
+  /* A refusal is said once, as a toast that goes by itself (Toast.tsx), never a box left over the map. */
   const [headingNote, setHeadingNote] = useState<string | null>(null)
+  const dismissHeadingNote = useCallback(() => setHeadingNote(null), [])
   const stopHeading = useRef<(() => void) | null>(null)
   const onCompass = useCallback(() => {
     if (stopHeading.current !== null) {
@@ -1889,11 +1892,7 @@ export function PlanMode({
           style={{ ['--sun-side' as string]: `${(sun.azimuth - mapBearing + 360) % 360}deg` }}
         />
       )}
-      {headingNote === null ? null : (
-        <p className="tapnote" role="status">
-          {headingNote}
-        </p>
-      )}
+      {headingNote === null ? null : <Toast message={headingNote} onDone={dismissHeadingNote} />}
       {!placing ? null : (
         <p className="tapnote">{placingHint('position', addsAir ? 'air' : 'ground')}</p>
       )}

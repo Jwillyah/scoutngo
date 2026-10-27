@@ -4799,6 +4799,38 @@
 }
 
 /*
+ * A TOAST (Toast.tsx): one small line where the tap note sits, above the
+ * dock and the sheet, gone after four seconds or at a tap. The line itself
+ * is the button that closes it; nothing around it takes the map's touches.
+ */
+.toast {
+  position: absolute;
+  z-index: 6;
+  bottom: calc(var(--dock-height) + var(--sheet-live-height) + var(--tooldock-height) + var(--space-3));
+  left: 50%;
+  transform: translateX(-50%);
+  /* Its own width, not half the screen's: centred by left 50%, it would otherwise wrap at the middle. */
+  width: max-content;
+  max-width: calc(100% - var(--space-3) * 2);
+  pointer-events: none;
+}
+
+.toast__btn {
+  pointer-events: auto;
+  display: block;
+  max-width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-panel) 90%, transparent);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-xs);
+  text-align: center;
+  cursor: pointer;
+}
+
+/*
  * USE MY LOCATION. Only on a cold start, directly under the search field.
  *
  * Quiet on purpose. Search is the primary way to get somewhere, and this is the
