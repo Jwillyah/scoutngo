@@ -41,6 +41,8 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
   const host = useRef<HTMLDivElement>(null)
   const scene = useRef<ClayScene | null>(null)
   const [ready, setReady] = useState(false)
+  /* The first view's tiles have arrived: until then the canvas is hidden and the 2D map shows through. */
+  const [shown, setShown] = useState(false)
   const [failed, setFailed] = useState<string | null>(null)
   const [place, setPlace] = useState<PlaceState>(() => placeState())
   const [flat, setFlat] = useState(0)
@@ -61,20 +63,26 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
         scene.current = made
         ;(window as unknown as { __clay?: ClayScene }).__clay = made
         setReady(true)
+        void made.whenShown().then(() => {
+          if (!cancelled) setShown(true)
+        })
       })
       .catch((error: unknown) => setFailed(error instanceof Error ? error.message : String(error)))
     return () => {
       cancelled = true
       made?.destroy()
       scene.current = null
+      setShown(false)
     }
-  }, [venue, timeZone])
+    /* The coordinate, not the object: the same place must not rebuild the engine. */
+  }, [venue.lat, venue.lon, timeZone]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /*
-   * THE BUILDINGS AND TREES, from the place request App makes when the venue
-   * is set (src/lib/place.ts): one Overpass request for buildings, trees,
-   * coastline and water, never more than one in flight, answered or given up
-   * on within PLACE_BUDGET_MS. The copy saved on the phone is drawn at once.
+   * THE BUILDINGS AND TREES, from the place App loads when the venue is set
+   * (src/lib/place.ts): buildings from the map tiles, trees from Overpass
+   * after them. The copy saved on the phone is drawn at once. Only the
+   * buildings can put up the pill; trees that did not load are a word in the
+   * legend.
    */
   useEffect(() => onPlace(setPlace), [])
   useEffect(() => {
@@ -144,7 +152,7 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
       : frameBox(lensFocal, SENSORS[stand.sensor], viewWidthDegrees(frameBox(stand.focal, SENSORS[stand.sensor], 60, 100).lensHorizontal), width)
 
   return (
-    <div className="clay">
+    <div className={shown ? 'clay clay--shown' : 'clay clay--waiting'}>
       <div ref={host} className="clay__canvas" />
       {box === null ? null : (
         <div className="clay__frame" style={{ width: `${box.width}px`, height: `${box.height}px` }} aria-hidden="true" />
@@ -152,7 +160,7 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
       <div className="clay__legend">
         <p className="clay__note">{CLAY_NOTE}</p>
         {failed !== null ? <p className="clay__line">3D could not start: {failed}</p> : null}
-        {!ready && failed === null ? <p className="clay__line">Loading the 3D view…</p> : null}
+        {!shown && failed === null ? <p className="clay__line">Loading the 3D view…</p> : null}
         {place.buildings === null ? null : (
           <p className="clay__line num">
             {place.buildings.list.length} buildings
@@ -168,7 +176,9 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
               ? ` · ${place.trees.trees.length} mapped trees`
               : place.trees?.status === 'sparse'
                 ? ` · no trees drawn, only ${place.trees.count} mapped here`
-                : ''}
+                : place.trees?.status === 'unavailable'
+                  ? " · trees didn't load"
+                  : ''}
           </p>
         )}
         {flat > 0 ? <p className="clay__line">Some ground has no saved elevation and is drawn flat.</p> : null}
@@ -208,9 +218,9 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
 
 /*
  * ONE STATUS FOR THE MAP DATA, as a small pill rather than a box per thing
- * that failed: buildings, trees and the coastline come in one request now,
- * so they load, or fail, together. Only the Retry takes a touch; the rest of
- * the pill lets the map underneath have it.
+ * that failed. It speaks for the buildings, which come from the map tiles;
+ * the trees, from Overpass, never put it up. Only the Retry takes a touch;
+ * the rest of the pill lets the map underneath have it.
  */
 export function PlacePill({ place, onRetry }: { place: PlaceState; onRetry: () => void }) {
   if (place.status === 'loading') return <p className="clay__pill">Loading map data…</p>

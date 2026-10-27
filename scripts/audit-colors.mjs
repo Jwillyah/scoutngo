@@ -17,6 +17,8 @@
  *   the chrome teal is not also a data hue
  *   red is reserved: exactly one token is #ff3b30 and it is --hazard
  *   no data hue is reused as a chrome hue
+ *   "starting soon" is the sun's amber and never the hazard red: the golden
+ *   chip read "47 m" in red on a phone on 27 Oct, saying the light was a hazard
  */
 import { readFileSync } from 'node:fs'
 
@@ -68,6 +70,18 @@ for (const hue of data) {
 const reds = entries.filter((e) => e.value === '#ff3b30')
 if (reds.length !== 1 || reds[0]?.token !== 'hazard') {
   fail(`red is reserved for hazards; found it on ${reds.map((r) => r.token).join(', ') || 'nothing'}`)
+}
+
+const APP_CSS = readFileSync('src/styles/app.css', 'utf8')
+const ruleBody = (selector) => {
+  const at = APP_CSS.indexOf(`\n${selector} {`)
+  return at === -1 ? null : APP_CSS.slice(at, APP_CSS.indexOf('}', at))
+}
+for (const selector of ['.chip2--soon', '.chip2--soon .chip2__value']) {
+  const body = ruleBody(selector)
+  if (body === null) fail(`${selector} is not in app.css`)
+  else if (/hazard|#ff3b30/i.test(body) || !body.includes('var(--sun)')) fail(`${selector} must be the sun's amber and never the hazard red`)
+  else console.log(`  ${selector.padEnd(28)} amber, not red  ok`)
 }
 
 console.log(`\n=== COLOUR PROBLEMS: ${problems} ===`)

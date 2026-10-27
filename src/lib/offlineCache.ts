@@ -23,8 +23,9 @@
  * says it is offline.
  *
  * NOTHING HERE IS SENT ANYWHERE NEW. The tiles were always fetched from Esri
- * and AWS by the map; this fetches the same URLs, for a box around the venue,
- * ahead of time.
+ * and AWS by the map, and the buildings and the sea from OpenFreeMap's map
+ * tiles (src/lib/vectorTiles.ts); this fetches the same URLs, for a box
+ * around the venue, ahead of time.
  */
 
 import type { LatLon } from '../core/geo.ts'
@@ -33,6 +34,8 @@ import {
   IMAGERY_ZOOMS,
   TERRAIN_TEMPLATE,
   TERRAIN_ZOOMS,
+  VECTOR_TEMPLATE,
+  vectorZoomsFor,
 } from './offlineSources.ts'
 import { cleanTerrainBytes } from './seaMask.ts'
 import { boxAround, tilesForRange, tileUrl, type Box } from './tileRange.ts'
@@ -79,6 +82,15 @@ export const AUTO_CACHE_CEILING_BYTES = 40_000_000
  * measurements/2026-10-25-venue-cache-2000m.md.
  */
 export const TERRAIN_TILE_MEAN_BYTES = 72559
+
+/**
+ * What one OpenFreeMap vector tile weighs, for the same reason: its server
+ * answers HEAD with no length. 28286 bytes over 28 tiles at Big Meadow and
+ * Virginia Beach Fishing Pier, MEASURED in measurements/2026-10-27-vector-tiles.md.
+ * A beach town's tiles run heavier than forest's, which is why it is said as
+ * an estimate.
+ */
+export const VECTOR_TILE_MEAN_BYTES = 28286
 
 /** Automatic venue areas kept before the oldest is dropped. Trips are never dropped. */
 export const AUTO_AREAS_KEPT = 5
@@ -205,7 +217,8 @@ async function fetchWithin(
 export async function loadRawTile(url: string): Promise<ArrayBuffer | null> {
   const saved = await readSaved(url)
   if (saved !== null) return saved
-  if (!deviceOnline()) return null
+  /* Not while the last request timed out or failed: a side read must not sit out a dead network's timeout. */
+  if (!isOnline()) return null
   try {
     const response = await fetchWithin(url, TILE_TIMEOUT_MS)
     return response.ok ? await response.arrayBuffer() : null
@@ -269,12 +282,17 @@ export interface SavedArea {
   note?: string
 }
 
-/** The URLs an area covers, imagery and terrain. */
+/**
+ * The URLs an area covers: imagery, terrain, and the map tiles its buildings
+ * and its sea come from, at the zooms its terrain is cleaned against
+ * (vectorZoomsFor), so the area works with no signal.
+ */
 export function areaUrls(
   box: Box,
   imageryZooms: readonly [number, number] = IMAGERY_ZOOMS,
   terrainZooms: readonly [number, number] = TERRAIN_ZOOMS,
-): { imagery: string[]; terrain: string[] } {
+): { imagery: string[]; terrain: string[]; vector: string[] } {
+  const vectorZooms = vectorZoomsFor(terrainZooms)
   return {
     imagery: tilesForRange(box, imageryZooms[0], imageryZooms[1]).map((t) =>
       tileUrl(IMAGERY_TEMPLATE, t),
@@ -282,6 +300,10 @@ export function areaUrls(
     terrain: tilesForRange(box, terrainZooms[0], terrainZooms[1]).map((t) =>
       tileUrl(TERRAIN_TEMPLATE, t),
     ),
+    vector:
+      vectorZooms === null
+        ? []
+        : tilesForRange(box, vectorZooms[0], vectorZooms[1]).map((t) => tileUrl(VECTOR_TEMPLATE, t)),
   }
 }
 
@@ -354,7 +376,7 @@ export const sameBox = (a: Box, b: Box): boolean =>
 
 const allUrls = (area: Pick<SavedArea, 'box' | 'imageryZooms' | 'terrainZooms'>): string[] => {
   const urls = areaUrls(area.box, area.imageryZooms, area.terrainZooms)
-  return [...urls.imagery, ...urls.terrain]
+  return [...urls.imagery, ...urls.terrain, ...urls.vector]
 }
 
 /**
@@ -392,6 +414,10 @@ export interface AreaSize {
   imageryBytes: number | null
   /** Count times TERRAIN_TILE_MEAN_BYTES. Labelled as an estimate. */
   terrainBytesEstimate: number
+  /** The map tiles for buildings and the sea, not already on the device. */
+  vectorTiles: number
+  /** Count times VECTOR_TILE_MEAN_BYTES. Labelled as an estimate. */
+  vectorBytesEstimate: number
   /** Tiles already saved by another area, which cost nothing more. */
   alreadySaved: number
 }
@@ -441,9 +467,10 @@ export async function measureArea(
   onProgress?: (done: number, total: number) => void,
 ): Promise<AreaSize> {
   const urls = areaUrls(box, imageryZooms, terrainZooms)
-  const saved = await savedSet([...urls.imagery, ...urls.terrain])
+  const saved = await savedSet([...urls.imagery, ...urls.terrain, ...urls.vector])
   const imagery = urls.imagery.filter((u) => !saved.has(u))
   const terrain = urls.terrain.filter((u) => !saved.has(u))
+  const vector = urls.vector.filter((u) => !saved.has(u))
 
   let imageryBytes: number | null = 0
   let done = 0
@@ -473,6 +500,8 @@ export async function measureArea(
     terrainTiles: terrain.length,
     imageryBytes,
     terrainBytesEstimate: terrain.length * TERRAIN_TILE_MEAN_BYTES,
+    vectorTiles: vector.length,
+    vectorBytesEstimate: vector.length * VECTOR_TILE_MEAN_BYTES,
     alreadySaved: saved.size,
   }
 }
@@ -612,20 +641,26 @@ export function formatBytes(bytes: number): string {
 
 /** Imagery measured plus terrain estimated, or null when imagery could not be measured. */
 export const totalBytes = (size: AreaSize): number | null =>
-  size.imageryBytes === null ? null : size.imageryBytes + size.terrainBytesEstimate
+  size.imageryBytes === null ? null : size.imageryBytes + estimatedBytes(size)
+
+/** The share that is an estimate: terrain and map tiles, a count times a measured mean. */
+const estimatedBytes = (size: AreaSize): number => size.terrainBytesEstimate + size.vectorBytesEstimate
+
+/** Every tile an area still needs. */
+export const tilesToFetch = (size: AreaSize): number => size.imageryTiles + size.terrainTiles + size.vectorTiles
 
 /** The size line shown before a download, saying which half is measured. */
 export function sizeLine(size: AreaSize): string {
-  const terrain = size.terrainBytesEstimate
-  if (size.imageryTiles + size.terrainTiles === 0) return 'Already saved on this device.'
+  const estimate = estimatedBytes(size)
+  if (tilesToFetch(size) === 0) return 'Already saved on this device.'
   if (size.imageryBytes === null) {
-    return `${size.imageryTiles + size.terrainTiles} tiles. The size could not be measured with this signal.`
+    return `${tilesToFetch(size)} tiles. The size could not be measured with this signal.`
   }
-  const total = size.imageryBytes + terrain
+  const total = size.imageryBytes + estimate
   const line =
-    terrain === 0
+    estimate === 0
       ? `${formatBytes(total)}, measured`
-      : `${formatBytes(total)} · imagery measured, terrain estimated`
+      : `${formatBytes(total)} · imagery measured, terrain and map data estimated`
   /*
    * WHAT IS ALREADY HERE COSTS NOTHING, and is said, or the saved list -- which
    * counts every tile an area holds -- reads as a different, larger number.
@@ -638,7 +673,7 @@ export function sizeLine(size: AreaSize): string {
 /** Whether a measured size fits under the automatic cache's ceiling. */
 export const fitsCeiling = (size: AreaSize): boolean =>
   size.imageryBytes !== null &&
-  size.imageryBytes + size.terrainBytesEstimate <= AUTO_CACHE_CEILING_BYTES
+  size.imageryBytes + estimatedBytes(size) <= AUTO_CACHE_CEILING_BYTES
 
 /** Past this many imagery tiles a view is too wide to measure tile by tile. */
 export const MAX_TRIP_TILES = 4000

@@ -7,9 +7,11 @@
  * Opens the 3D clay model at the calibration venue, waits for the globe to
  * finish loading, and records every request made from the moment the 3D
  * button was pressed. The allowed hosts are this app, Esri's imagery, AWS's
- * Terrarium elevation and Overpass, on any of the three servers the app's
- * one Overpass client asks in turn (src/lib/overpassClient.ts). Cesium ion,
- * Bing, Google or anything else fails the gate, by name.
+ * Terrarium elevation, OpenFreeMap's map tiles (the buildings and the sea,
+ * src/lib/vectorTiles.ts) and Overpass, on any of the three servers the
+ * app's one Overpass client asks in turn (src/lib/overpassClient.ts), for
+ * the trees. Cesium ion, Bing, Google or anything else fails the gate, by
+ * name.
  *
  * THEN OFFLINE: the network cut, 3D reopened, and it must load with the
  * venue's ground at the height it had online (src/lib/offline3d.ts).
@@ -29,6 +31,7 @@ const ALLOWED = new Set([
   'localhost:5173',
   'server.arcgisonline.com',
   's3.amazonaws.com',
+  'tiles.openfreemap.org',
   'overpass-api.de',
   'overpass.kumi.systems',
   'overpass.private.coffee',

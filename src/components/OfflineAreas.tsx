@@ -10,6 +10,7 @@ import {
   measureArea,
   onAreasChanged,
   sizeLine,
+  tilesToFetch,
   totalBytes,
   type AreaSize,
   type SavedArea,
@@ -101,7 +102,7 @@ export function OfflineAreas({ venueCache, getView, venueName, online }: Offline
     abort.current?.abort()
     const controller = new AbortController()
     abort.current = controller
-    const total = size.imageryTiles + size.terrainTiles
+    const total = tilesToFetch(size)
     setTrip({ status: 'downloading', box, size, done: 0, total, bytes: 0 })
     const result = await downloadArea(
       {
@@ -192,7 +193,7 @@ export function OfflineAreas({ venueCache, getView, venueName, online }: Offline
           <div className="offl__acts">
             {/* NO SIZE, NO DOWNLOAD: this button exists only once one is showing. */}
             {trip.size.imageryBytes === null ||
-            trip.size.imageryTiles + trip.size.terrainTiles === 0 ? null : (
+            tilesToFetch(trip.size) === 0 ? null : (
               <button
                 type="button"
                 className="btn btn--small"

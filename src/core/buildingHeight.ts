@@ -89,8 +89,12 @@ export interface BuildingHeight {
    * filled in with a guess.
    */
   metres: number | null
-  /** Where it came from, so a readout can say how much to trust it. */
-  source: 'height' | 'levels' | 'unknown'
+  /**
+   * Where it came from, so a readout can say how much to trust it. 'tile':
+   * OpenStreetMap's height or storeys as the map tiles carry it, rounded to
+   * whole metres, the two no longer told apart (tileBuildingHeight).
+   */
+  source: 'height' | 'levels' | 'tile' | 'unknown'
   /** What to extrude for the picture. Never null, and never geometric truth. */
   drawMetres: number
   /** Metres the footprint starts at, for a building on a podium. */
@@ -126,6 +130,27 @@ export function parseBuildingHeight(tags: BuildingTags): BuildingHeight {
   }
 
   return { metres: null, source: 'unknown', drawMetres: NOMINAL_DRAW_HEIGHT, baseMetres: 0 }
+}
+
+/*
+ * HEIGHTS FROM THE MAP TILES (OpenFreeMap, OpenMapTiles schema). Each
+ * footprint carries one number, `render_height`, and not the tags it was
+ * made from: OSM's height in whole metres, or a height from its storeys,
+ * or for a building with neither, 5. At Virginia Beach Fishing Pier all
+ * 86 buildings with no height and no storeys in OSM read 5, 199 had a height,
+ * and 10 and 14 storeys read 37 and 52, MEASURED in
+ * measurements/2026-10-27-tile-heights.md. So 5 cannot be told from "nobody
+ * recorded a height", and is read as unknown: drawn at the nominal picture
+ * height, null for the arithmetic. A building really 5 m tall is drawn
+ * lighter and casts no shadow, which is the safe side.
+ */
+export const TILE_DEFAULT_HEIGHT = 5
+
+export function tileBuildingHeight(renderHeight: unknown, renderMinHeight: unknown): BuildingHeight {
+  const h = typeof renderHeight === 'number' && Number.isFinite(renderHeight) ? renderHeight : null
+  const base = typeof renderMinHeight === 'number' && Number.isFinite(renderMinHeight) && renderMinHeight > 0 ? renderMinHeight : 0
+  if (h === null || h <= 0 || h === TILE_DEFAULT_HEIGHT) return { metres: null, source: 'unknown', drawMetres: NOMINAL_DRAW_HEIGHT, baseMetres: 0 }
+  return { metres: h, source: 'tile', drawMetres: h, baseMetres: base < h ? base : 0 }
 }
 
 /**

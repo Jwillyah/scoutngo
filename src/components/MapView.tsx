@@ -1,7 +1,6 @@
 import { useNumerals } from '../lib/numeralsContext.ts'
 import * as maplibregl from 'maplibre-gl'
 import { loadTile, PROTOCOL, viaProtocol } from '../lib/offlineCache.ts'
-import { onSeaMask } from '../lib/seaMask.ts'
 import { RAY_SCREEN_FRACTION } from '../lib/rayLength.ts'
 import { FLOATING_CHROME_SELECTORS, floatingChromeNodes } from '../lib/floatingChrome.ts'
 import { IMAGERY_TEMPLATE, TERRAIN_TEMPLATE } from '../lib/offlineSources.ts'
@@ -2677,20 +2676,6 @@ export function MapView({
    * blue as every other screen, so a tilted map still looks like this app
    * rather than like a different product that happens to be embedded in it.
    */
-  /*
-   * THE COASTLINE ARRIVED (src/lib/seaMask.ts): the elevation tiles already
-   * drawn were read before the sea was put at sea level, so they are asked
-   * for again, through the same loader that now cleans them.
-   */
-  useEffect(
-    () =>
-      onSeaMask(() => {
-        const source = map.current?.getSource(TERRAIN_SOURCE) as maplibregl.RasterDEMTileSource | undefined
-        source?.setTiles([TERRARIUM_TILES])
-      }),
-    [],
-  )
-
   useEffect(() => {
     const instance = map.current
     if (instance === null || !ready) return

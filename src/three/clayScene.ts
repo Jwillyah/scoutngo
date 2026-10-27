@@ -10,8 +10,13 @@
  *              src/core/shadowMap.ts, "no height, no shadow")
  *   trees      mapped single trees as rounded clay-green shapes, or none
  *              where the mapping is sparse (src/lib/trees.ts)
- *   light      one directional light along suncalc's sun (src/core/sky3d.ts);
- *              the engine's own sun and moon are not added
+ *   light      one directional light along suncalc's sun (src/core/sky3d.ts),
+ *              always at the day's strength so dawn and dusk read; shadows
+ *              only while the sun is up. The engine's own sun and moon are
+ *              not added
+ *   loading    the canvas stays hidden, with the 2D map showing through,
+ *              until the first view's tiles have all arrived (whenShown):
+ *              no white sky and no blank globe while it loads
  *   sky        the sun and moon arcs from suncalc, hour dots, time pills
  *
  * NO CESIUM ION, NO BING, NO GOOGLE. The base layer is turned off, there is
@@ -57,13 +62,12 @@ import {
 } from '@cesium/engine'
 import { NOMINAL_DRAW_HEIGHT } from '../core/buildingHeight.ts'
 import type { LatLon } from '../core/geo.ts'
-import { domePoint, skyArc, sunlightEnu, type SkyArc } from '../core/sky3d.ts'
+import { CLAY_LIGHT_INTENSITY, clayLight, domePoint, skyArc, sunlightEnu, type SkyArc } from '../core/sky3d.ts'
 import { getSunPosition } from '../core/sun.ts'
 import { heightGrid, sourceFor } from '../core/terrarium.ts'
 import { formatHour } from '../core/timezone.ts'
 import type { Building } from '../lib/buildings.ts'
 import { loadTile } from '../lib/offlineCache.ts'
-import { onSeaMask } from '../lib/seaMask.ts'
 import { IMAGERY_TEMPLATE, TERRAIN_TEMPLATE } from '../lib/offlineSources.ts'
 import { tileUrl } from '../lib/tileRange.ts'
 import { NOMINAL_TREE_HEIGHT, type MappedTree } from '../lib/trees.ts'
@@ -74,6 +78,8 @@ const CLAY_UNKNOWN_A = '#f8f5ef'
 const CLAY_UNKNOWN_B = '#ddd3c3'
 const TREE_GREEN = '#a9b694'
 const SKY_RADIUS = 1500
+/* The longest the canvas stays hidden waiting for its first tiles. */
+export const SHOW_WITHIN_MS = 30_000
 /* 129 across a 256 px tile: every other pixel, close enough to read within a metre of the 2D map. */
 const HEIGHT_SAMPLES = 129
 const ESRI_CREDIT = 'Tiles by Esri. Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
@@ -81,6 +87,13 @@ const ESRI_CREDIT = 'Tiles by Esri. Source: Esri, Maxar, Earthstar Geographics, 
 const token = (name: string, fallback: string) => {
   const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
   return v === '' ? fallback : v
+}
+
+/** Twice a ring's area in square degrees, unsigned: zero for a line or a point. */
+function ringDegrees2(ring: readonly [number, number][]): number {
+  let sum = 0
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) sum += (ring[j][0] - ring[i][0]) * (ring[j][1] + ring[i][1])
+  return Math.abs(sum)
 }
 
 /* ------------------------------------------------------------- tile sources */
@@ -176,6 +189,10 @@ export interface ObserverView {
 }
 
 export interface ClayScene {
+  /** Resolves once the first view's tiles have arrived, or SHOW_WITHIN_MS has passed. */
+  whenShown(): Promise<void>
+  /** The sun the light was last set from, for checks. */
+  sunNow(): { azimuth: number; altitude: number }
   setTime(at: Date): void
   setBuildings(buildings: readonly Building[]): void
   setTrees(trees: readonly MappedTree[]): void
@@ -222,12 +239,8 @@ export function createClayScene(
   })
   const scene = widget.scene
   widget.imageryLayers.add(new ImageryLayer(new CachedImagery()))
-  /* The coastline arrived after tiles were read: read the elevation again, now cleaned (src/lib/seaMask.ts). */
-  const stopSea = onSeaMask(() => {
-    decoded.clear()
-    widget.terrainProvider = terrarium(status, onStatus)
-    scene.requestRender()
-  })
+  /* Where a tile has not arrived yet: a dark ground, not the engine's bright blue. */
+  scene.globe.baseColor = Color.fromCssColorString('#1d2124')
   scene.globe.enableLighting = true
   scene.globe.dynamicAtmosphereLighting = false
   scene.globe.depthTestAgainstTerrain = true
@@ -267,7 +280,7 @@ export function createClayScene(
   const enuToFixedPoint = (v: [number, number, number]) => Matrix4.multiplyByPoint(enu, new Cartesian3(v[0], v[1], v[2]), new Cartesian3())
 
   /* ------------------------------------------------------------ the light */
-  const light = new DirectionalLight({ direction: enuToFixedVector([0, 0, -1]), intensity: 2.2 })
+  const light = new DirectionalLight({ direction: enuToFixedVector([0, 0, -1]), intensity: CLAY_LIGHT_INTENSITY })
   scene.light = light
   let sunNow = { azimuth: 180, altitude: 45 }
   const setTime = (at: Date) => {
@@ -275,9 +288,10 @@ export function createClayScene(
     const sun = getSunPosition(at, venue.lat, venue.lon)
     sunNow = sun
     light.direction = enuToFixedVector(sunlightEnu(at, venue.lat, venue.lon))
-    /* Below the horizon there is no sunlight to cast anything: dim, and no shadows. */
-    light.intensity = sun.altitude > 0 ? 2.2 : 0.25
-    if (scene.shadowMap !== undefined) scene.shadowMap.enabled = sun.altitude > 0
+    /* The base light always; below the horizon there is no sunlight to cast anything, so no shadows. */
+    const lit = clayLight(sun.altitude)
+    light.intensity = lit.intensity
+    if (scene.shadowMap !== undefined) scene.shadowMap.enabled = lit.shadows
     scene.requestRender()
   }
 
@@ -291,7 +305,8 @@ export function createClayScene(
     for (const b of buildings) {
       const known = b.height.metres !== null
       const flat = b.ring.flatMap(([lon, lat]) => [lon, lat])
-      if (flat.length < 6) continue
+      /* A footprint of no area, from any source, would stop the engine for good: its centre is found by dividing by the area. */
+      if (flat.length < 6 || !flat.every(Number.isFinite) || ringDegrees2(b.ring) === 0) continue
       buildingEntities.push(
         widget.entities.add({
           polygon: {
@@ -460,8 +475,35 @@ export function createClayScene(
     return p === undefined ? null : { x: p.x, y: p.y }
   }
 
+  /*
+   * SHOWN ONCE THE FIRST VIEW HAS ARRIVED: every tile it asked for loaded
+   * (or failed and drawn flat), at least one of them this scene's. Until
+   * then Clay3D keeps the canvas hidden and the 2D map shows through. Shown
+   * anyway after SHOW_WITHIN_MS, so a stuck tile cannot hide the model.
+   */
+  const startCounts = { ...tileCounts, flat: status.flatTiles }
+  const probe = window as unknown as { __clayShown?: { by: string; ms: number } }
+  const builtAt = performance.now()
+  const shown = new Promise<void>((resolve) => {
+    const timer = setTimeout(() => done('timer'), SHOW_WITHIN_MS)
+    function done(by: 'tiles' | 'timer') {
+      clearTimeout(timer)
+      scene.postRender.removeEventListener(check)
+      probe.__clayShown = { by, ms: Math.round(performance.now() - builtAt) }
+      resolve()
+    }
+    function check() {
+      const arrived = tileCounts.imagery > startCounts.imagery && (tileCounts.terrain > startCounts.terrain || status.flatTiles > startCounts.flat)
+      if (arrived && scene.globe.tilesLoaded) done('tiles')
+    }
+    scene.postRender.addEventListener(check)
+  })
+
   orbit()
+  ;(window as unknown as { __clayBuilds?: number }).__clayBuilds = ((window as unknown as { __clayBuilds?: number }).__clayBuilds ?? 0) + 1
   return {
+    whenShown: () => shown,
+    sunNow: () => sunNow,
     setTime,
     setBuildings,
     setTrees,
@@ -487,9 +529,6 @@ export function createClayScene(
       scene.requestRender()
     },
     widget,
-    destroy: () => {
-      stopSea()
-      widget.destroy()
-    },
+    destroy: () => widget.destroy(),
   }
 }

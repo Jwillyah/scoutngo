@@ -180,6 +180,11 @@ ok "$(grep -E 'LABEL PROBLEMS' "$SCRATCH/labels.log" | tail -1)"
 run_audit "one surface audit" scripts/audit-surface.mjs "$SCRATCH/surface.log" 'PROBLEM|FAIL|ABORTED'
 ok "$(grep -E 'SURFACE PROBLEMS' "$SCRATCH/surface.log" | tail -1)"
 
+# Nothing scrolls sideways: every screen at 390 px, with a long venue name,
+# which is what pushed the Setup sheet off an iPhone on 27 Oct.
+run_audit "overflow audit" scripts/audit-overflow.mjs "$SCRATCH/overflow.log" 'PROBLEM|ABORTED'
+ok "$(grep -E 'OVERFLOW PROBLEMS' "$SCRATCH/overflow.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
+
 run_audit "projection audit" scripts/audit-projection.mjs "$SCRATCH/proj.log" 'FAIL|ABORTED'
 ok "$(grep -E 'PROJECTION FAILURES' "$SCRATCH/proj.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
 

@@ -1,6 +1,10 @@
 /*
  * OSM BUILDING FOOTPRINTS, WITH THEIR HEIGHTS.
  *
+ * FROM THE MAP TILES NOW (fetchBuildings, below, and src/lib/vectorTiles.ts).
+ * The Overpass query and its parser stay for the measuring scripts that
+ * read past results with them.
+ *
  * WHY A SEPARATE QUERY FROM fetchSiteGeometry, which already asks for
  * buildings. That one asks over the map viewport for the SITING decision and
  * trims the rings hard for the model's token budget: simplify() drops points
@@ -24,8 +28,8 @@ import {
   type BuildingTags,
 } from '../core/buildingHeight.ts'
 import type { MapBounds } from './generation.ts'
-import { MIN_INTERVAL_MS, TIMEOUT_MS, type OverpassElement } from './overpass.ts'
-import { askOverpass } from './overpassClient.ts'
+import type { OverpassElement } from './overpass.ts'
+import { buildingsFromTiles } from './vectorTiles.ts'
 
 export interface Building {
   id: string
@@ -126,16 +130,14 @@ export function buildingsToGeoJson(buildings: readonly Building[]): {
 }
 
 export type BuildingsResult =
-  /** `savedAt` when the list came from the phone because Overpass could not be reached. */
+  /** `savedAt` when the list came from the phone because the map tiles could not be had. */
   | { status: 'ok'; buildings: Building[]; cached: boolean; savedAt?: string }
   | { status: 'unavailable'; reason: string }
 
 const cache = new Map<string, Building[]>()
-let lastCallAt = 0
 
 export function clearBuildingsCache(): void {
   cache.clear()
-  lastCallAt = 0
 }
 
 const key = (b: MapBounds) =>
@@ -146,35 +148,28 @@ export function savedBuildingsFor(bounds: MapBounds): { buildings: Building[]; f
   return readSavedBuildings(key(bounds))
 }
 
-/** Buildings fetched some other way (the place request, place.ts): kept for these bounds like a fetch of them. */
-export function keepBuildings(bounds: MapBounds, buildings: Building[]): void {
-  cache.set(key(bounds), buildings)
-  saveBuildings(key(bounds), buildings)
-}
-
 /**
- * `timeoutMs`: the 2D map waits TIMEOUT_MS; the 3D view loads its buildings
- * behind a line that says so and can wait longer for a busy Overpass.
+ * THE BUILDINGS OVER SOME BOUNDS, FROM THE MAP TILES (src/lib/vectorTiles.ts):
+ * OpenFreeMap's footprints with their heights, for the 2D map, the 3D view
+ * and the run suggestion alike. No longer Overpass, which at Virginia Beach
+ * on 27 Oct answered a Mac and not an iPhone behind Private Relay.
+ *
+ * The tiles come from the phone's saved copy or the network under the tile
+ * timeout. When they cannot be had, the list kept from last time, said with
+ * its age. Never throws.
  */
-export async function fetchBuildings(bounds: MapBounds, timeoutMs: number = TIMEOUT_MS): Promise<BuildingsResult> {
+export async function fetchBuildings(bounds: MapBounds): Promise<BuildingsResult> {
   const cacheKey = key(bounds)
   const hit = cache.get(cacheKey)
   if (hit !== undefined) return { status: 'ok', buildings: hit, cached: true }
 
-  if (lastCallAt !== 0 && Date.now() - lastCallAt < MIN_INTERVAL_MS) {
-    return { status: 'unavailable', reason: 'Overpass was queried moments ago.' }
+  const answer = await buildingsFromTiles(bounds)
+  if (answer.status === 'ok') {
+    cache.set(cacheKey, answer.buildings)
+    saveBuildings(cacheKey, answer.buildings)
+    return { status: 'ok', buildings: answer.buildings, cached: false }
   }
-
-  lastCallAt = Date.now()
-  /* Never throws. Overpass being unreachable is a sentence, not a blank. */
-  const answer = await askOverpass(buildBuildingsQuery(bounds), { budgetMs: timeoutMs })
-  if (answer.ok) {
-    const buildings = parseBuildings(answer.payload)
-    cache.set(cacheKey, buildings)
-    saveBuildings(cacheKey, buildings)
-    return { status: 'ok', buildings, cached: false }
-  }
-  /* No signal, or a busy or broken server: the copy kept on the phone, said with its age. */
+  /* No signal and not saved: the list kept on the phone, said with its age. */
   const saved = readSavedBuildings(cacheKey)
   if (saved !== null) return { status: 'ok', buildings: saved.buildings, cached: true, savedAt: saved.fetchedAt }
   return { status: 'unavailable', reason: answer.reason }

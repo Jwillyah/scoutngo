@@ -17,7 +17,6 @@ import type { Wind } from '../core/upwind.ts'
 import type { LevelWind } from '../core/windProfile.ts'
 import type { VenueCloud } from '../lib/forecast.ts'
 import { forecastAge, type Provenance } from '../lib/savedForecast.ts'
-import { durationWords } from '../core/duration.ts'
 import type { TideExtreme, TideState } from '../core/tide.ts'
 import type { SunArc, SunPosition } from '../core/sun.ts'
 import type { PlanCoverage, PlannedPosition } from '../lib/plan.ts'
@@ -85,6 +84,7 @@ import { SunSearchPanel } from './SunSearchPanel.tsx'
 import { TimeBar } from './TimeBar.tsx'
 import { ToolDock } from './ToolDock.tsx'
 import { Clay3D } from './Clay3D.tsx'
+import { goldenChip } from '../lib/goldenChip.ts'
 import { hasWebGL2 } from '../lib/webgl.ts'
 import { standAtPosition, standForLineUp, type StandRequest } from '../lib/standRequest.ts'
 import { ExposurePlayground } from './ExposurePlayground.tsx'
@@ -1065,12 +1065,7 @@ export function PlanMode({
     const age = forecast.kind === 'saved' ? forecastAge(forecast.fetchedAt, new Date()) : null
 
     return [
-      {
-        kind: 'golden',
-        label: 'GOLDEN',
-        value: goldenLeft === null ? null : goldenLeft <= 0 ? 'past' : durationWords(goldenLeft),
-        urgent: goldenLeft !== null && goldenLeft > 0 && goldenLeft <= 60,
-      },
+      goldenChip(goldenLeft),
       {
         kind: 'wind',
         label: 'WIND',
@@ -1909,9 +1904,12 @@ export function PlanMode({
         * THE SHADOW LEGEND: what the dark shapes are and what is missing from
         * them. A building OpenStreetMap gives no height for casts nothing here,
         * and the count says how many that is rather than letting a sunny
-        * patch read as sun.
+        * patch read as sun. It speaks for the 2D map's shadow shapes, so not
+        * over the 3D view, which has its own legend and drew this one on top
+        * of it; and, like the rail and the dock, not with the sheet at full,
+        * when it rode up the screen into the chip row.
         */}
-      {shadows === null ? null : (
+      {shadows === null || threeD || sheet === 'full' ? null : (
         <p className="shadowkey" role="status">
           {shadows.status === 'no-sun'
             ? 'No shadows: the sun is down.'

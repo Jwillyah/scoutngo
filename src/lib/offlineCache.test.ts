@@ -12,6 +12,7 @@ import {
   reviveAreas,
   sizeLine,
   TERRAIN_TILE_MEAN_BYTES,
+  VECTOR_TILE_MEAN_BYTES,
   urlsFreedBy,
   venueBox,
   viaProtocol,
@@ -166,7 +167,7 @@ describe('saved areas', () => {
     const a = area('a', 38.5195)
     const far = area('far', 36.8466)
     const all = areaUrls(a.box)
-    expect(urlsFreedBy(a, [a, far]).length).toBe(all.imagery.length + all.terrain.length)
+    expect(urlsFreedBy(a, [a, far]).length).toBe(all.imagery.length + all.terrain.length + all.vector.length)
   })
 
   it('drops an unreadable stored entry rather than throwing', () => {
@@ -183,9 +184,19 @@ describe('the size line says which half is measured', () => {
         terrainTiles: 6,
         imageryBytes: 1_747_203,
         terrainBytesEstimate: 6 * TERRAIN_TILE_MEAN_BYTES,
+        vectorTiles: 2,
+        vectorBytesEstimate: 2 * VECTOR_TILE_MEAN_BYTES,
         alreadySaved: 0,
       }),
-    ).toBe('2.2 MB · imagery measured, terrain estimated')
+    ).toBe('2.2 MB · imagery measured, terrain and map data estimated')
+  })
+
+  it('saves the map tiles the buildings and the sea come from, at the zooms the terrain reads them', () => {
+    const ring = areaUrls(venueBox(BIG_MEADOW, 400))
+    expect(ring.vector.length).toBeGreaterThan(0)
+    expect(ring.vector.every((u) => /^https:\/\/tiles\.openfreemap\.org\/planet\/latest\/14\//.test(u))).toBe(true)
+    const overview = areaUrls(venueBox(BIG_MEADOW, 1500), [0, 13], [0, 15])
+    expect(new Set(overview.vector.map((u) => u.split('/')[5]))).toEqual(new Set(['12', '13', '14']))
   })
 
   it('never prints a size it could not measure', () => {
@@ -194,6 +205,8 @@ describe('the size line says which half is measured', () => {
       terrainTiles: 2,
       imageryBytes: null,
       terrainBytesEstimate: 2 * TERRAIN_TILE_MEAN_BYTES,
+      vectorTiles: 0,
+      vectorBytesEstimate: 0,
       alreadySaved: 0,
     })
     expect(line).not.toMatch(/MB/)
@@ -202,7 +215,7 @@ describe('the size line says which half is measured', () => {
 
   it('an unmeasured area never counts as fitting the ceiling', () => {
     expect(
-      fitsCeiling({ imageryTiles: 1, terrainTiles: 0, imageryBytes: null, terrainBytesEstimate: 0, alreadySaved: 0 }),
+      fitsCeiling({ imageryTiles: 1, terrainTiles: 0, imageryBytes: null, terrainBytesEstimate: 0, vectorTiles: 0, vectorBytesEstimate: 0, alreadySaved: 0 }),
     ).toBe(false)
     expect(
       fitsCeiling({
@@ -210,6 +223,8 @@ describe('the size line says which half is measured', () => {
         terrainTiles: 0,
         imageryBytes: AUTO_CACHE_CEILING_BYTES + 1,
         terrainBytesEstimate: 0,
+        vectorTiles: 0,
+        vectorBytesEstimate: 0,
         alreadySaved: 0,
       }),
     ).toBe(false)

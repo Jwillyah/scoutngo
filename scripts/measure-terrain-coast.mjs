@@ -1,31 +1,32 @@
 /*
  * VIRGINIA BEACH FISHING PIER: THE 3D GROUND AGAINST 2D, AND THE SHORELINE.
  *
- * Usage:  node scripts/measure-terrain-coast.mjs [--overpass-blocked | --coastline-served]   (app on :5173, Chrome on :9222)
- * Writes: measurements/<today>-terrain-virginia-beach.md, or
- *         measurements/<today>-terrain-virginia-beach-no-overpass.md with
- *         --overpass-blocked: every Overpass server refused in the browser and
- *         nothing saved on the phone, so the app has no coastline and the
- *         elevation is cleaned from its own shape (src/core/coastArtefacts.ts).
- *         --coastline-served answers the app's Overpass request with the
- *         fixture's coastline (and nothing else), so the coastline path is
- *         measured whether or not Overpass is up tonight:
- *         measurements/<today>-terrain-virginia-beach-coastline.md.
- * Exits:  0 every point within 1 m of 2D and no shoreline step over 3 m;
- *         1 not; 2 could not look.
+ * Usage:  node scripts/measure-terrain-coast.mjs [--tiles-blocked]   (app on :5173, Chrome on :9222)
+ * Writes: measurements/<today>-terrain-virginia-beach-tiles.md: the map tiles
+ *         open, so the elevation is cleaned against their ocean polygons
+ *         (src/core/oceanMask.ts); or, with --tiles-blocked,
+ *         measurements/<today>-terrain-virginia-beach-no-tiles.md: the map
+ *         tiles refused too, so it is cleaned from its own shape
+ *         (src/core/coastArtefacts.ts).
+ *         Every run: every Overpass server refused, as on the iPhone behind
+ *         Private Relay, and nothing saved on the phone (local storage and
+ *         the tile cache emptied), so the run measures this network and not
+ *         an earlier one's leftovers.
+ * Exits:  0 every point within 1 m of 2D, no shoreline step over 3 m, and the
+ *         tiles cleaned the way the mode says; 1 not; 2 could not look.
  *
  * WHAT WAS WRONG. Terrarium's elevation off this beach carries bumps of 20 to
  * 77 m standing on the water, and its zoom 13 and 14 tiles carry the sea bed
  * where zoom 15 carries 0, so the 3D ground stood up in cliffs and stepped at
- * tile edges. The fix puts every pixel OpenStreetMap's coastline places in the
- * sea at 0 m before either view reads it (src/core/seaTile.ts). The "raw"
- * column here is the tile as AWS serves it, decoded in this script, so the
- * before and after are side by side.
+ * tile edges. The fix puts every pixel the map tiles' ocean covers at 0 m
+ * before either view reads it (src/lib/seaMask.ts). The "raw" column here is
+ * the tile as AWS serves it, decoded in this script, so the before and after
+ * are side by side.
  *
  * THE COASTLINE THE POINTS ARE PLACED BY is OpenStreetMap's, fetched once
  * and kept in scripts/fixtures/virginia-beach-coastline.json, so the points
  * are the same every run and this script needs no Overpass. The app gets its
- * own coastline, or none (--overpass-blocked).
+ * sea from the map tiles, or none (--tiles-blocked).
  *
  * THE POINTS. Ten along the pier, root to end. Ten along the beach: points on
  * the OSM coastline either side of the pier, moved 25 m inland, which is the
@@ -47,6 +48,7 @@ import { shareLink } from '../src/lib/planShare.ts'
 import { parseCoastlines } from '../src/lib/seaMask.ts'
 import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
 import { OVERPASS_SERVERS } from '../src/lib/overpassClient.ts'
+import { VECTOR_ZOOMS } from '../src/lib/offlineSources.ts'
 
 guardAudit('terrain coast')
 const watchdog = startWatchdog('terrain coast', 600_000)
@@ -57,8 +59,8 @@ const WITHIN_M = 1
 const MAX_STEP_M = 3
 
 /* --------------------------------------------- the coastline, for the points */
-const BLOCKED = process.argv.includes('--overpass-blocked')
-const SERVED = process.argv.includes('--coastline-served')
+const BLOCKED = process.argv.includes('--tiles-blocked')
+const TILE_HOST = 'tiles.openfreemap.org'
 const FIXTURE = 'scripts/fixtures/virginia-beach-coastline.json'
 const fixture = JSON.parse(readFileSync(FIXTURE, 'utf8'))
 const coast = parseCoastlines(fixture)
@@ -147,33 +149,31 @@ const venue = { ...CALIBRATION_VENUE, name: null, latitude: String(PIER.lat), lo
 const link = await shareLink('http://127.0.0.1:5173/', { id: 'vb', name: 'Virginia Beach Fishing Pier', savedAt: '2026-10-26T00:00:00Z', venue, kit: { bodyIds: [], lensIds: [], droneIds: [], styleNotes: '' }, positions: [] })
 const { send, ev, wait, dispose, onEvent } = await connect()
 let result = null
-let seaStatus = 'unknown'
 let seaTiles = null
 const overpassAsked = []
+const tilesAsked = []
 try {
   await send('Network.enable', {})
   onEvent('Network.requestWillBeSent', (p) => {
-    if (/overpass/.test(p.request.url)) overpassAsked.push(new URL(p.request.url).host)
+    const host = new URL(p.request.url).host
+    if (OVERPASS_SERVERS.some((u) => new URL(u).host === host)) overpassAsked.push(host)
+    if (host === TILE_HOST) tilesAsked.push(p.request.url)
   })
-  await send('Network.setBlockedURLs', { urls: BLOCKED ? OVERPASS_SERVERS.map((u) => `*${new URL(u).host}*`) : [] })
-  if (SERVED) {
-    const body = Buffer.from(JSON.stringify({ elements: fixture.elements })).toString('base64')
-    await send('Fetch.enable', { patterns: OVERPASS_SERVERS.map((u) => ({ urlPattern: `${u}*`, requestStage: 'Request' })) })
-    onEvent('Fetch.requestPaused', (p) =>
-      void send('Fetch.fulfillRequest', { requestId: p.requestId, responseCode: 200, responseHeaders: [{ name: 'Access-Control-Allow-Origin', value: '*' }, { name: 'Content-Type', value: 'application/json' }], body }),
-    )
-  }
+  await send('Network.setBlockedURLs', { urls: [...OVERPASS_SERVERS.map((u) => `*${new URL(u).host}*`), ...(BLOCKED ? [`*${TILE_HOST}*`] : [])] })
   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true })
   await send('Page.navigate', { url: 'http://127.0.0.1:5173/' })
   await wait(2000)
   await ev(`localStorage.setItem('scoutngo.landing.v1','true')`)
-  /* Blocked means nothing to fall back on: no coastline, buildings or place saved from an earlier run. */
-  if (BLOCKED || SERVED) await ev(`['scoutngo.coastline.v1','scoutngo.place.v1','scoutngo.buildings.v1'].forEach((k) => localStorage.removeItem(k))`)
+  /* Nothing to fall back on: no buildings, trees, saved areas or saved tiles from an earlier run. */
+  await ev(`(async () => { localStorage.clear(); localStorage.setItem('scoutngo.landing.v1','true'); await caches.delete('scoutngo-tiles-v1'); return 1 })()`)
   await send('Page.navigate', { url: 'about:blank' })
   /* The probe the audits read the map through only exists with ?probe=1; shareLink keeps the query empty. */
   await send('Page.navigate', { url: link.replace('/#plan=', '/?probe=1#plan=') })
-  await wait(6000)
-  const opened = await ev(`(() => { const b = document.querySelector('.confirm__yes'); if (!b) return false; b.click(); return true })()`)
+  let opened = false
+  for (let i = 0; i < 40 && !opened; i += 1) {
+    await wait(500)
+    opened = await ev(`(() => { const b = document.querySelector('.confirm__yes'); if (!b) return false; b.click(); return true })()`)
+  }
   if (!opened) throw new Error('the shared plan for the pier was not offered')
   await wait(2500)
   await goToStage(ev, wait, 'plan')
@@ -201,15 +201,7 @@ try {
     if (i % 5 === 0) console.log("  2D at the pier end:", sea, await ev(`!!window.__probe.map.getTerrain()`), await ev(`window.__probe.map.getZoom().toFixed(1)`))
     seaReady = typeof sea === "number" && Math.abs(sea) < 0.5
   }
-  if (!seaReady) throw new Error(BLOCKED ? '2D never read sea level at the pier end with Overpass blocked' : '2D never read sea level at the pier end: the coastline did not arrive')
-  /* Open: wait for the place request to end, so the record says which cleaning the run measured. */
-  for (let i = 0; i < 40 && (await ev(`window.__probe.sea?.() ?? 'unknown'`)) === 'loading'; i += 1) await wait(1500)
-  seaStatus = await ev(`window.__probe.sea?.() ?? 'unknown'`)
-  console.log('  coastline in the mask:', await ev(`JSON.stringify((() => { const m = window.__probe.seaMaskNow?.(); return m ? m.coastlines.length : null })())`))
-  if (!BLOCKED && seaStatus === 'ready') {
-    /* The coastline arrived after the tiles were drawn: let both views redraw against it. */
-    await wait(4000)
-  }
+  if (!seaReady) throw new Error(`2D never read sea level at the pier end${BLOCKED ? ' with the map tiles blocked' : ''}`)
   await ev(`new Promise((r) => { const m = window.__probe.map; if (m.loaded() && !m.isMoving()) return r(1); m.once('idle', () => r(1)); setTimeout(() => r(0), 20000) })`)
   const twoD = await ev(`JSON.stringify(${all}.map((p) => window.__probe.map.queryTerrainElevation(p)))`)
 
@@ -268,7 +260,15 @@ const rows = points.map((x, i) => {
   return { ...x, raw: raw[i], d2, d3, diff }
 })
 const off = rows.filter((r) => r.diff === null || r.diff > WITHIN_M)
-const pass = off.length === 0 && alongStep <= MAX_STEP_M && acrossStep <= MAX_STEP_M
+/*
+ * The check must be on the path it names (docs/failure-modes.md, C). Blocked:
+ * nothing against the ocean. Open: something against the ocean, and nothing
+ * from the shape at the zooms the map tiles cover.
+ */
+const total = (byZ, from = 0) => Object.entries(byZ).reduce((n, [z, c]) => (Number(z) >= from ? n + c : n), 0)
+const byZoom = (byZ) => (Object.keys(byZ).length === 0 ? 'none' : Object.entries(byZ).map(([z, c]) => `z${z} ${c}`).join(', '))
+const pathOk = seaTiles !== null && (BLOCKED ? total(seaTiles.ocean) === 0 && total(seaTiles.shape) > 0 : total(seaTiles.ocean) > 0 && total(seaTiles.shape, VECTOR_ZOOMS[0]) === 0)
+const pass = off.length === 0 && alongStep <= MAX_STEP_M && acrossStep <= MAX_STEP_M && pathOk
 const f = (n) => (typeof n === 'number' ? n.toFixed(2) : '—')
 
 const out = [
@@ -278,12 +278,12 @@ const out = [
   `Coastline: ${coast.length} OpenStreetMap ways; ${shore.length} shoreline samples within 1 km of the pier, every 5 m.`,
   'Raw is the Terrarium tile as AWS serves it at zoom 15, decoded in this script, before the sea is put at sea level. 2D is MapLibre terrain; 3D is the clay model.',
   `Points placed by the OpenStreetMap coastline in ${FIXTURE} (${fixture.source}).`,
-  `Elevation tiles cleaned in this run: ${seaTiles === null ? 'not reported' : `${seaTiles.coastline} against the coastline, ${seaTiles.shape} from their own shape`}.`,
+  `Elevation tiles cleaned in this run, by zoom: ${seaTiles === null ? 'not reported' : `against the map tiles' ocean ${byZoom(seaTiles.ocean)}; from their own shape ${byZoom(seaTiles.shape)}. Below zoom ${VECTOR_ZOOMS[0]} (the 3D view's distant ground) there are no map tiles to read, and the shape is used by design`}.`,
+  `Overpass: BLOCKED in the browser (${OVERPASS_SERVERS.map((u) => new URL(u).host).join(', ')}); the app asked ${overpassAsked.length} time(s). Nothing saved on the phone at the start.`,
   BLOCKED
-    ? `Overpass: BLOCKED in the browser (${OVERPASS_SERVERS.map((u) => new URL(u).host).join(', ')}), nothing saved on the phone. The app asked ${overpassAsked.length} time(s) and got nothing, so it had no coastline: the elevation was cleaned from its own shape (src/core/coastArtefacts.ts).`
-    : SERVED
-      ? `Overpass: its ${overpassAsked.length} request(s) answered with the fixture's coastline and nothing else; the app's coastline: ${seaStatus}.`
-      : `Overpass: open. The app asked ${overpassAsked.length} time(s); its coastline: ${seaStatus === 'ready' ? 'arrived, so the elevation was cleaned against it (src/core/seaTile.ts)' : `${seaStatus}, so the elevation was cleaned from its own shape (src/core/coastArtefacts.ts)`}.`,
+    ? `Map tiles (${TILE_HOST}): BLOCKED too; the app asked ${tilesAsked.length} time(s). The elevation was cleaned from its own shape (src/core/coastArtefacts.ts).`
+    : `Map tiles (${TILE_HOST}): open; the app fetched ${tilesAsked.length}. The elevation was cleaned against their ocean polygons (src/core/oceanMask.ts).`,
+  `Cleaned the way this run says: ${pathOk ? 'yes' : 'NO'}.`,
   '',
   '| point | lat | lon | raw (m) | 2D (m) | 3D (m) | 3D − 2D |',
   '|---|---|---|---|---|---|---|',
@@ -296,7 +296,7 @@ const out = [
   '',
   ...(worst.length === 0 ? [] : ['Steps over the limit:', '', '| where | lat | lon | from (m) | to (m) | raw here (m) |', '|---|---|---|---|---|---|', ...worst.map((w) => `| ${w.where} | ${w.p.lat.toFixed(6)} | ${w.p.lon.toFixed(6)} | ${f(w.from)} | ${f(w.to)} | ${f(w.raw)} |`), '']),
 ]
-const file = `measurements/${new Date().toISOString().slice(0, 10)}-terrain-virginia-beach${BLOCKED ? '-no-overpass' : SERVED ? '-coastline' : ''}.md`
+const file = `measurements/${new Date().toISOString().slice(0, 10)}-terrain-virginia-beach${BLOCKED ? '-no-tiles' : '-tiles'}.md`
 writeFileSync(file, out.join('\n'))
 console.log(out.join('\n'))
 process.exit(pass ? 0 : 1)

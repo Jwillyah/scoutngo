@@ -8,6 +8,7 @@ import {
   measureArea,
   sameBox,
   sizeLine,
+  tilesToFetch,
   venueBox,
   type SavedArea,
 } from './offlineCache.ts'
@@ -101,7 +102,7 @@ export function useVenueCache(
         }
 
         const line = sizeLine(size)
-        setState({ status: 'saving', size: line, done: 0, total: size.imageryTiles + size.terrainTiles, note })
+        setState({ status: 'saving', size: line, done: 0, total: tilesToFetch(size), note })
         const result = await downloadArea(
           {
             kind: 'venue',

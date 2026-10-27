@@ -675,17 +675,23 @@ current map view. That sends the bounding box you are looking at, nothing else.
 Results are cached per view so repeated generates do not re-query, and if
 Overpass is slow or down the app carries on without it.
 
-**The place around a venue.** Setting a venue sends Overpass one request for a
-box around it: the buildings and trees within 600 to 700 m that the 3D view
-draws, the mapped water within 1 km, and the coastline within 4.5 km, which the
-elevation is cleaned against so the sea sits at sea level in 2D and 3D. That is a
-box containing the venue, nothing else, sent once per venue and kept on the
-phone afterwards (`src/lib/place.ts`). Every Overpass request the app makes,
+**The place around a venue.** The buildings the 3D view draws (footprints with
+their heights, within 600 m) and the sea the elevation is cleaned against, so
+it sits at sea level in 2D and 3D, come from OpenFreeMap's map tiles at
+`tiles.openfreemap.org` (`src/lib/vectorTiles.ts`). What goes there is tile
+numbers around where the map is looking, the same thing the photograph and
+elevation tiles already send to Esri and AWS: no key, no cookies. The tiles are
+kept with a venue's saved area, so they work with no signal. If they cannot be
+had, the 3D view says "Map data didn't load" with a Retry, and the elevation is
+cleaned from its own shape instead.
+
+The mapped single trees, which the tiles do not carry, still come from Overpass:
+a box around the venue, sent once per venue and kept on the phone afterwards
+(`src/lib/place.ts`). If Overpass does not answer, the 3D view still draws and
+its legend says the trees did not load. Every Overpass request the app makes,
 this one and the ones below, goes one at a time to `overpass-api.de`, and only
 when that fails to `overpass.kumi.systems`, then `overpass.private.coffee`: three
-public servers of the same OpenStreetMap data (`src/lib/overpassClient.ts`). If
-none answers, the 3D view says "Map data didn't load" with a Retry, and the
-elevation is cleaned from its own shape instead.
+public servers of the same OpenStreetMap data (`src/lib/overpassClient.ts`).
 
 **Tide.** For a waterfront venue the app asks NOAA CO-OPS at
 `api.tidesandcurrents.noaa.gov` for tide predictions. Your coordinates are **not**
@@ -710,8 +716,9 @@ caches, the computed values, the tide predictions and the photos, is written to
 nothing is prefetched and Field mode falls back to fetching one photo at a time
 as you swipe.
 
-**Suggest.** Only when you press it. It sends Overpass a bounding box around the
-reach ring, to read building footprints, their heights and water, and works out
+**Suggest.** Only when you press it. It reads the building footprints and their
+heights from the map tiles, sends Overpass a bounding box around the reach ring
+for the water and the rest of the site, and works out
 every position on the device (`src/core/suggest.ts`). No image of the map and no
 text goes anywhere: there is no model and no AI endpoint.
 
@@ -753,7 +760,9 @@ data because there is no server holding anything.
 - `maplibre-gl` for the map, over Esri World Imagery satellite tiles
 - Mapbox Search Box API for venue search, when a token is set; Nominatim and
   Photon, both from OpenStreetMap, as the fallback and for naming a dropped pin
-- Overpass, from OpenStreetMap, for real water, building, road and pier shapes
+- OpenFreeMap vector tiles (OpenMapTiles schema), from OpenStreetMap, for
+  building footprints with their heights and the sea
+- Overpass, from OpenStreetMap, for real water, road and pier shapes, and trees
 - Google Street View Static API for the optional ground view
 - `suncalc` for solar position
 - `tz-lookup` for the venue's timezone from its coordinates, offline

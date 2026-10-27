@@ -567,7 +567,14 @@ function App() {
 
   const errors = useMemo(() => validateVenue(venue), [venue])
   const venueWindow = useMemo(() => resolveWindow(venue), [venue])
-  const centre = useMemo(() => venueLatLon(venue), [venue])
+  /*
+   * KEYED ON THE COORDINATE, NOT THE VENUE OBJECT. Anything else about the
+   * venue changing (its name filled in, its window) made a new centre with
+   * the same numbers, and the 3D view, keyed on it, tore down its engine and
+   * built it again while it was open: a second white flash and a second load.
+   */
+  const point = venueLatLon(venue)
+  const centre = useMemo(() => (point === null ? null : { lat: point.lat, lon: point.lon }), [point?.lat, point?.lon]) // eslint-disable-line react-hooks/exhaustive-deps
   /*
    * ONE PIN. It is the thing being shot: it centres the map, it anchors the sun
    * and tide and timezone, and every cone bearing is measured to it. There used

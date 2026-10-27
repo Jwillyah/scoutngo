@@ -21,6 +21,22 @@ export function enuToward(azimuthDeg: number, altitudeDeg: number): [number, num
   return [Math.sin(az) * Math.cos(alt), Math.cos(az) * Math.cos(alt), Math.sin(alt)]
 }
 
+/*
+ * THE BASE LIGHT. The scene is always lit at the day's strength, whatever
+ * the sun is doing, and the sun only decides the shadows. The light used to
+ * drop to 0.25 once the sun was down, and the engine multiplies the ground's
+ * photograph by the light's colour, so at Virginia Beach at 7:11 AM on 27 Oct
+ * (sun below the horizon) the view was pitch dark: 13.2 against noon's 45.7
+ * in mean luminance. The time of day is read from the sky arcs, the time bar
+ * and the shadows, never from a picture too dark to read.
+ */
+export const CLAY_LIGHT_INTENSITY = 2.2
+
+/** What the 3D view is lit with at a sun altitude: the base light always, shadows only while the sun is up. */
+export function clayLight(sunAltitudeDeg: number): { intensity: number; shadows: boolean } {
+  return { intensity: CLAY_LIGHT_INTENSITY, shadows: sunAltitudeDeg > 0 }
+}
+
 /** The direction the sunlight TRAVELS, East-North-Up: from the sun, toward the ground. */
 export function sunlightEnu(at: Date, lat: number, lon: number): [number, number, number] {
   const sun = getSunPosition(at, lat, lon)

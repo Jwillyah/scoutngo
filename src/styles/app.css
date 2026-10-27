@@ -241,6 +241,7 @@
 /* The resolved place. No coordinate fields anywhere. */
 .plate {
   flex: 0 0 auto;
+  min-width: 0;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -300,6 +301,8 @@
   flex: 0 0 auto;
   min-width: 0;
   display: grid;
+  /* The column is the screen's width, never its content's: see .setup__sheet. */
+  grid-template-columns: minmax(0, 1fr);
   align-content: start;
   gap: var(--space-3);
   padding: var(--space-2) var(--page-pad) var(--space-3);
@@ -307,6 +310,7 @@
 
 .setup__block {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-2);
 }
 
@@ -460,6 +464,7 @@
 
 .kitrow {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-2);
 }
 
@@ -486,21 +491,24 @@
   cursor: pointer;
 }
 
+/*
+ * WRAPS, NEVER SCROLLS SIDEWAYS. It was a sideways scroller: 731 px of chips
+ * in 358 px at 390, and the ones past the edge were kit nobody saw was in
+ * play. Nothing in the app scrolls sideways (scripts/audit-overflow.mjs).
+ */
 .kitrow__scroll {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
-  overflow-x: auto;
-  scrollbar-width: none;
-  padding-bottom: 2px;
+  min-width: 0;
 }
 
-.kitrow__scroll::-webkit-scrollbar {
-  display: none;
-}
-
-/* Selected is filled, unselected is outlined. Nothing else distinguishes them. */
+/* Selected is filled, unselected is outlined. Nothing else distinguishes them. A name too long for the row is cut short. */
 .kitchip {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   min-height: 36px;
   padding: 0 var(--space-3);
   background: transparent;
@@ -530,6 +538,7 @@
 
 .pills {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-2);
 }
 
@@ -599,6 +608,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  min-width: 0;
   margin-left: auto;
 }
 
@@ -619,6 +629,23 @@
 
 .pill > .pill__input {
   margin-left: auto;
+}
+
+/*
+ * iOS SAFARI'S DATE AND TIME CONTROLS carry their own width and chrome, wider
+ * than Chrome's, and ignore a narrower width while they keep it. Only there
+ * (the touch-callout test is true in iOS Safari alone), they are drawn as
+ * plain text that fits its box; a tap still opens the system picker.
+ */
+@supports (-webkit-touch-callout: none) {
+  .pill__input {
+    -webkit-appearance: none;
+    appearance: none;
+    max-width: 100%;
+  }
+  .pill__input::-webkit-date-and-time-value {
+    text-align: right;
+  }
 }
 
 /* ---------------------------------------------------------------- drawer */
@@ -8391,6 +8418,15 @@
   color: var(--color-hazard);
 }
 
+/* Starting soon: the sun's amber, never the hazard red (ChipRow.tsx, Chip.soon). */
+.chip2--soon {
+  border-color: var(--sun);
+}
+
+.chip2--soon .chip2__value {
+  color: var(--sun);
+}
+
 /*
  * A SAVED READING CARRIES ITS AGE ON THE LABEL. No new colour: over twelve
  * hours the age is lifted to full text so it is noticed; over thirty-six the
@@ -9594,8 +9630,17 @@
   height: auto;
 }
 
+/*
+ * ONE COLUMN AS WIDE AS THE SCREEN, NEVER AS WIDE AS ITS CONTENT. A grid's
+ * own column sizes to the widest thing in it, and the venue name is one line
+ * that does not wrap: on an iPhone on 27 Oct a long name widened the column
+ * past the screen and took the Date and Window boxes with it (749 px of sheet
+ * on a 390 px screen, scripts/audit-overflow.mjs). minmax(0, 1fr) holds the
+ * column to the sheet, and the name is cut short with an ellipsis instead.
+ */
 .setup__sheet {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-2);
   padding-bottom: var(--space-4);
 }
@@ -10794,16 +10839,32 @@
  * Where the map is, under the same chrome. Everything on it is dark glass;
  * the colour is in the model's own sky arcs and the golden pins.
  */
+/*
+ * NO FLASH WHILE 3D LOADS. Until the first view's tiles have arrived the
+ * view is see-through and the canvas hidden, so the 2D map underneath is what
+ * shows; then the model fades in over it (clayScene.ts, whenShown). Before,
+ * the engine's white sky and blue globe filled the screen for seconds.
+ */
 .clay {
   position: absolute;
   inset: 0;
   z-index: 2;
+  background: transparent;
+}
+
+.clay--shown {
   background: #05070a;
 }
 
 .clay__canvas {
   position: absolute;
   inset: 0;
+  opacity: 0;
+  transition: opacity 0.25s ease-out;
+}
+
+.clay--shown .clay__canvas {
+  opacity: 1;
 }
 
 .clay__canvas .cesium-widget,

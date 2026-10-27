@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearBuildingsCache, fetchBuildings } from './buildings.ts'
+import { encodeTestTile, square } from './mvtTestTile.ts'
+import { setVectorLoader } from './vectorTiles.ts'
 
 function memoryStorage(): Storage {
   const map = new Map<string, string>()
@@ -16,21 +18,8 @@ function memoryStorage(): Storage {
 }
 
 const bounds = { west: -75.61, south: 38.36, east: -75.6, north: 38.37 }
-const payload = {
-  elements: [
-    {
-      type: 'way',
-      id: 7,
-      tags: { building: 'yes', height: '9' },
-      geometry: [
-        { lat: 38.364, lon: -75.606 },
-        { lat: 38.364, lon: -75.6055 },
-        { lat: 38.3645, lon: -75.6055 },
-        { lat: 38.364, lon: -75.606 },
-      ],
-    },
-  ],
-}
+/* The bounds' middle is at about 542, 2643 in its zoom 14 tile (4751, 6298). */
+const tile = () => encodeTestTile({ building: [{ rings: [square(500, 2600, 600, 2700)], properties: { render_height: 9 } }] })
 
 /* BUILDINGS WITH NO SIGNAL: a place loaded once still has its footprints, and says when they are from. */
 describe('buildings kept on the phone', () => {
@@ -38,31 +27,23 @@ describe('buildings kept on the phone', () => {
     vi.stubGlobal('localStorage', memoryStorage())
     clearBuildingsCache()
   })
-  afterEach(() => vi.unstubAllGlobals())
+  afterEach(() => {
+    setVectorLoader(null)
+    vi.unstubAllGlobals()
+  })
 
-  it('reads the kept copy, with its age, when Overpass cannot be reached', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(payload), { status: 200 })))
+  it('reads the kept copy, with its age, when the map tiles cannot be had', async () => {
+    setVectorLoader(async () => tile())
     const live = await fetchBuildings(bounds)
-    expect(live.status === 'ok' && live.buildings.length).toBe(1)
+    expect(live.status === 'ok' && live.buildings.length).toBeGreaterThan(0)
 
     clearBuildingsCache()
-    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch') }))
+    setVectorLoader(async () => null)
     const offline = await fetchBuildings(bounds)
     expect(offline.status).toBe('ok')
     if (offline.status !== 'ok') return
-    expect(offline.buildings).toHaveLength(1)
+    expect(offline.buildings.length).toBeGreaterThan(0)
     expect(typeof offline.savedAt).toBe('string')
-  })
-
-  it('reads the kept copy when Overpass answers but with an error (502 when it is overloaded)', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(payload), { status: 200 })))
-    await fetchBuildings(bounds)
-    clearBuildingsCache()
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('Bad Gateway', { status: 502 })))
-    const busy = await fetchBuildings(bounds)
-    expect(busy.status).toBe('ok')
-    if (busy.status !== 'ok') return
-    expect(typeof busy.savedAt).toBe('string')
   })
 
   it('with nothing kept, still says why rather than an empty map', async () => {

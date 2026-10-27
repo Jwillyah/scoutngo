@@ -60,6 +60,13 @@ export interface Chip {
    */
   urgent?: boolean
   /**
+   * STARTING SOON, which is not a hazard: golden hour with under an hour of
+   * it left. Amber, the sun's own colour. Red is only ever a reason not to
+   * go (src/core/colorRole.ts), and a chip that read "47 m" in red said the
+   * light was dangerous.
+   */
+  soon?: boolean
+  /**
    * THE AGE OF A SAVED READING, which rides on the label. Null or absent for a
    * live one. A saved forecast on a chip with no age would be a stale value
    * rendered as current, which this app does not do.
@@ -109,6 +116,7 @@ export function ChipRow({ chips, active, onOpen, measureRef }: ChipRowProps) {
             'chip2',
             active === chip.kind ? 'chip2--on' : '',
             chip.urgent === true ? 'chip2--urgent' : '',
+            chip.soon === true ? 'chip2--soon' : '',
             /* The WHOLE chip dims, label included: the label is a promise of
              * a number, and a bright promise over "no data" is the thing
              * that read as broken. */
