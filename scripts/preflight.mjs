@@ -415,6 +415,18 @@ export function guardAudit(name) {
  */
 const NAV_LABEL = { setup: 'Shoot setup', plan: 'Plan', field: 'Field' }
 
+/*
+ * SHOOT SETUP AND FIELD LEFT THE MENU on 27 Oct: Shoot setup lives inside
+ * Plan (the venue pill in Plan's top bar opens it), and Field is reached by
+ * its own address, /field (src/lib/menu.ts OLD_PATHS), which the app follows
+ * on back and forward too. Both checked the same way as a menu pick.
+ */
+async function arrivedAt(ev, want, how) {
+  const arrived = await ev(`document.querySelector('.shell')?.className.match(/shell--([a-z]+)/)?.[1] ?? null`)
+  if (arrived !== want) throw new PreflightError(`${how} and the shell is still "${arrived}"`)
+  return arrived
+}
+
 export async function goToStage(ev, wait, stage) {
   const want = stage.toLowerCase()
   const label = NAV_LABEL[want]
@@ -423,7 +435,26 @@ export async function goToStage(ev, wait, stage) {
       `no such stage "${stage}". The three are: ${Object.keys(NAV_LABEL).join(', ')}.`,
     )
   }
+  if (want === 'field') {
+    await ev(`(() => { history.pushState(null, '', '/field' + location.search + location.hash); dispatchEvent(new PopStateEvent('popstate')); return 1 })()`)
+    await wait(600)
+    return arrivedAt(ev, want, 'went to /field')
+  }
+  if (want === 'setup') {
+    const now = await ev(`document.querySelector('.shell')?.className.match(/shell--([a-z]+)/)?.[1] ?? null`)
+    if (now === 'setup') return now
+    if (now !== 'plan') await goToStage(ev, wait, 'plan')
+    const tapped = await ev(`(() => { const b = document.querySelector('button.pill-venue'); if (!b) return false; b.click(); return true })()`)
+    if (!tapped) throw new PreflightError("no venue pill in Plan's top bar to open Shoot setup from (src/components/PlanMode.tsx)")
+    await wait(600)
+    return arrivedAt(ev, want, "tapped Plan's venue pill")
+  }
 
+  /* A first load on a cold dev server can take a while: wait for the top bar, up to 15 s. */
+  for (let i = 0; i < 30; i += 1) {
+    if (await ev(`!!document.querySelector('nav[aria-label="Stage"], button[aria-label="Menu"]')`)) break
+    await wait(500)
+  }
   const opened = await ev(`(() => {
     if (document.querySelector('nav[aria-label="Stage"]')) return 'ok'
     const menu = document.querySelector('button[aria-label="Menu"]')

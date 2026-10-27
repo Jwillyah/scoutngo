@@ -28,3 +28,16 @@ export function backToNow(venue: VenueDraft, now: Date): BackToNow | null {
   const span = Math.max(60_000, window.end.getTime() - window.start.getTime())
   return { date, scrub: (now.getTime() - window.start.getTime()) / span }
 }
+
+/**
+ * WHERE THE TIME BAR OPENS. At now when today, at the venue, is the shoot
+ * day; otherwise the middle of the window. On 27 Oct at Virginia Beach a
+ * morning visit opened at 5:00 PM, the middle of a saved afternoon window.
+ */
+export function openingScrub(venue: VenueDraft, now: Date): number {
+  const planned = resolveWindow(venue)
+  if (planned === null) return 0.5
+  if (localDate(now, planned.timeZone) !== venue.date) return 0.5
+  const span = Math.max(60_000, planned.end.getTime() - planned.start.getTime())
+  return (now.getTime() - planned.start.getTime()) / span
+}

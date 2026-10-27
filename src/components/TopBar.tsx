@@ -60,10 +60,14 @@ export function TopBar({
 
       <div className="topbar__pill">
         {pill}
+        {/*
+          * A DOT, NOT A WORD. "OFFLINE" sat over the date on 27 Oct and read
+          * "OTUE|27". One status at a time, never over the date: the dot sits
+          * on the pill's edge, and says what it means to a screen reader and
+          * to a long press.
+          */}
         {online ? null : (
-          <span className="topbar__offline" role="status" aria-label="No connection">
-            offline
-          </span>
+          <span className="topbar__offline" role="status" aria-label="No connection" title="No connection" />
         )}
       </div>
 
@@ -75,7 +79,7 @@ export function TopBar({
         aria-pressed={adding}
         aria-label={adding ? 'Tap the map to place it' : 'Add a position'}
       >
-        {icon(<path d="M10 4v12M4 10h12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />)}
+        {icon(<path d="M10 4v12M4 10h12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />)}
       </button>
       {onLocate === null ? null : (
       <button

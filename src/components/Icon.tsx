@@ -5,17 +5,33 @@ import { shippedTile, type IconId } from '../lib/iconPalette.ts'
  * THE ONE ICON: a golden bubble tile with a white glyph on it.
  *
  * Inline SVG on a CSS tile, no image files. The tile is a three-stop
- * gradient with a gloss across its top and a glow underneath in its own
- * middle colour; the corner is 0.306 of the side, which is the design's
- * 22 px at 72 and 13 px at 42. The glyph paths are the design's, exactly
- * (design/icons-golden-bubble.html); cut-outs are painted in the tile's dark
- * stop so they read as holes.
+ * gradient with a soft gloss across its top and a faint shadow underneath;
+ * the corner is 0.306 of the side, which is the design's 22 px at 72 and
+ * 13 px at 42. The menu glyphs are the design's (design/icons-golden-bubble.html);
+ * the lens is now a camera view cone, and the layer tiles' symbols are drawn
+ * here in the same manner. Cut-outs are painted in the tile's dark stop so
+ * they read as holes.
  *
  * DECORATIVE ON ITS OWN. The icon is aria-hidden: the button it sits in
  * carries the words, as an aria-label or as visible text.
  */
 
 export type GlyphId = Exclude<IconId, 'offline'>
+
+/*
+ * The cone's geometry, in the glyph's 24 unit box. The apex is the lens at
+ * (7.2, 12); the rays run to (21.2, 3.8) and (21.2, 20.2), a 60 degree
+ * fan, and the arc between their ends is centred on the apex, so it is the
+ * cone's own far edge.
+ */
+const CONE_APEX = [7.2, 12] as const
+const CONE_TOP = [21.2, 3.8] as const
+const CONE_BOTTOM = [21.2, 20.2] as const
+const CONE_RADIUS = Math.hypot(CONE_TOP[0] - CONE_APEX[0], CONE_TOP[1] - CONE_APEX[1])
+const r1 = (n: number) => Math.round(n * 10) / 10
+const CONE_ARC = `A${r1(CONE_RADIUS)} ${r1(CONE_RADIUS)} 0 0 1 ${CONE_BOTTOM.join(' ')}`
+const CONE_FAN = `M${CONE_APEX.join(' ')}L${CONE_TOP.join(' ')}${CONE_ARC}Z`
+const CONE_EDGE = `M${CONE_TOP.join(' ')}L${CONE_APEX.join(' ')}L${CONE_BOTTOM.join(' ')}M${CONE_TOP.join(' ')}${CONE_ARC}`
 
 const glyphs = (dark: string): Record<GlyphId, ReactNode> => ({
   plan: (
@@ -31,6 +47,14 @@ const glyphs = (dark: string): Record<GlyphId, ReactNode> => ({
       <path d="M6.5 16.5a5.5 5.5 0 0 1 11 0z" fill="#FFF" />
       <path d="M12 6.2v2.2M6.2 9.4l1.5 1.5M17.8 9.4l-1.5 1.5M3.8 14.2h1.9M18.3 14.2h1.9" stroke="#FFF" strokeWidth="2" strokeLinecap="round" />
       <rect x="3" y="17.6" width="18" height="2.2" rx="1.1" fill="#FFF" fillOpacity="0.85" />
+    </>
+  ),
+  /* An aperture: the ring of the lens and the six-sided opening its blades leave. */
+  exposure: (
+    <>
+      <circle cx="12" cy="12" r="8.6" fill="#FFF" />
+      <path d="M12 7.4l4 2.3v4.6l-4 2.3-4-2.3V9.7z" fill={dark} />
+      <path d="M12 7.4l4 2.3M16 9.7v4.6M16 14.3l-4 2.3M12 16.6l-4-2.3M8 14.3V9.7M8 9.7l4-2.3" stroke="#FFF" strokeWidth="0.9" strokeOpacity="0.55" />
     </>
   ),
   kit: (
@@ -92,10 +116,81 @@ const glyphs = (dark: string): Record<GlyphId, ReactNode> => ({
       <circle cx="15.4" cy="15.4" r="1.9" fill={dark} />
     </>
   ),
+  /*
+   * THE CAMERA'S VIEW CONE. A small camera body at the left, and two straight
+   * rays fanning out from its lens to a shallow arc, the field of view filled
+   * faintly between them. It was a white disc with a dark hexagon in it, which
+   * read as a screw head. The cone layer's tile uses this same glyph.
+   */
   lens: (
     <>
-      <circle cx="12" cy="12" r="9" fill="#FFF" />
-      <path d="M12 7.6l3.8 2.2v4.4L12 16.4l-3.8-2.2V9.8z" fill={dark} />
+      <path d={CONE_FAN} fill="#FFF" fillOpacity="0.28" />
+      <path d={CONE_EDGE} fill="none" stroke="#FFF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="1.2" y="9.2" width="6.6" height="5.6" rx="1.4" fill="#FFF" />
+      <circle cx="4.5" cy="12" r="1.3" fill={dark} />
+    </>
+  ),
+  /* A globe: the photograph of the ground. */
+  satellite: (
+    <>
+      <circle cx="12" cy="12" r="8.6" fill="none" stroke="#FFF" strokeWidth="2.4" />
+      <path d="M3.6 12h16.8M12 3.4c-3.6 4.6-3.6 12.6 0 17.2M12 3.4c3.6 4.6 3.6 12.6 0 17.2" fill="none" stroke="#FFF" strokeWidth="2" />
+    </>
+  ),
+  /* A ridge: height. */
+  terrain: <path d="M2.4 19.2 9.2 7.6l4.1 6.4 2.6-3.6 5.7 8.8z" fill="#FFF" stroke="#FFF" strokeWidth="1.2" strokeLinejoin="round" />,
+  /* The sun on its arc. */
+  sunArc: (
+    <>
+      <path d="M3.6 18.4a8.4 8.4 0 0 1 16.8 0" fill="none" stroke="#FFF" strokeWidth="2.4" strokeLinecap="round" />
+      <circle cx="17.4" cy="11.6" r="3.4" fill="#FFF" />
+    </>
+  ),
+  /* A post and the shadow it throws along the ground. */
+  shadows: (
+    <>
+      <path d="M17.6 18.6 4 15.4" stroke="#FFF" strokeOpacity="0.55" strokeWidth="3.4" strokeLinecap="round" />
+      <path d="M17.6 4.4v14.2" stroke="#FFF" strokeWidth="3.2" strokeLinecap="round" />
+    </>
+  ),
+  /* A cloud. */
+  cloud: <path d="M7.2 18.8h10.2a4.4 4.4 0 0 0 .5-8.8 6 6 0 0 0-11.4-1.3 5.1 5.1 0 0 0 .7 10.1z" fill="#FFF" />,
+  /* A warning triangle: what is marked. */
+  hazards: (
+    <>
+      <path d="M12 3.6 21.4 19.6H2.6z" fill="#FFF" stroke="#FFF" strokeWidth="1.6" strokeLinejoin="round" />
+      <rect x="10.9" y="8.8" width="2.2" height="6" rx="1.1" fill={dark} />
+      <circle cx="12" cy="17.1" r="1.25" fill={dark} />
+    </>
+  ),
+  /* Two blocks: buildings. */
+  buildings: (
+    <>
+      <rect x="3.4" y="10" width="7" height="10.4" rx="1" fill="#FFF" fillOpacity="0.75" />
+      <rect x="11.4" y="3.6" width="9.2" height="16.8" rx="1" fill="#FFF" />
+      <path d="M14.2 7.6h3.6M14.2 11h3.6M14.2 14.4h3.6" stroke={dark} strokeWidth="1.6" strokeLinecap="round" />
+    </>
+  ),
+  /* A label tag: names and roads. */
+  labels: (
+    <>
+      <path d="M3.4 6.6h11.4l6 5.4-6 5.4H3.4a1 1 0 0 1-1-1V7.6a1 1 0 0 1 1-1z" fill="#FFF" />
+      <circle cx="14.8" cy="12" r="1.6" fill={dark} />
+      <path d="M5.6 10.4h5.4M5.6 13.6h3.6" stroke={dark} strokeWidth="1.5" strokeLinecap="round" />
+    </>
+  ),
+  /* Rings around a point: controlled airspace. */
+  airspace: (
+    <>
+      <circle cx="12" cy="12" r="8.6" fill="none" stroke="#FFF" strokeWidth="2" strokeDasharray="3.4 2.4" />
+      <circle cx="12" cy="12" r="4" fill="#FFF" />
+    </>
+  ),
+  /* A ruler on the slant, with its marks cut in. */
+  measure: (
+    <>
+      <path d="M3.4 15.6L15.6 3.4l5 5L8.4 20.6z" fill="#FFF" />
+      <path d="M7.2 13.4l1.8 1.8M9.6 11l1.2 1.2M12 8.6l1.8 1.8M14.4 6.2l1.2 1.2" stroke={dark} strokeWidth="1.4" strokeLinecap="round" />
     </>
   ),
   layers: (

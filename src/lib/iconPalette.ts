@@ -18,6 +18,7 @@ import { contrastRatio, deepenFor } from '../core/contrast.ts'
 export type IconId =
   | 'plan'
   | 'sky'
+  | 'exposure'
   | 'kit'
   | 'saved'
   | 'viewfinder'
@@ -31,6 +32,18 @@ export type IconId =
   | 'now'
   | 'app'
   | 'offline'
+  /* The layer tiles (src/components/tileArt.tsx). Cones borrow 'lens'. */
+  | 'satellite'
+  | 'terrain'
+  | 'sunArc'
+  | 'shadows'
+  | 'cloud'
+  | 'hazards'
+  | 'buildings'
+  | 'labels'
+  | 'airspace'
+  /* Tools in Layers: the two-pin measure. */
+  | 'measure'
 
 export interface TileStops {
   /** Top left, the light end. */
@@ -44,6 +57,8 @@ export interface TileStops {
 export const DESIGN_TILES: Readonly<Record<IconId, TileStops>> = {
   plan: { light: '#ffe58a', middle: '#f5b021', dark: '#a86a05' },
   sky: { light: '#ffcb8a', middle: '#f68b2e', dark: '#a9460c' },
+  /* Golden, between Plan's gold and Sky's orange: its own item since 27 Oct. */
+  exposure: { light: '#ffd98a', middle: '#f0a020', dark: '#9a5806' },
   kit: { light: '#ffb496', middle: '#ee6b43', dark: '#9a3518' },
   saved: { light: '#ffb0cc', middle: '#e5559a', dark: '#8d1f5a' },
   viewfinder: { light: '#efb2f5', middle: '#b952d2', dark: '#5e1e79' },
@@ -59,6 +74,23 @@ export const DESIGN_TILES: Readonly<Record<IconId, TileStops>> = {
   app: { light: '#ffe58a', middle: '#f68b2e', dark: '#8d1f5a' },
   /* Works offline, on the home page: the Settings blue in the design. */
   offline: { light: '#a9bbff', middle: '#5270df', dark: '#1f2f86' },
+  /*
+   * THE LAYER TILES, in the same family. Most borrow a stop set already in
+   * the design so the sheet reads as part of the menu and the dock; the
+   * cone tile is the dock's lens, so the one layer has one colour. None is
+   * the hazard red: the hazards tile is the Sky orange, a warning sign and
+   * not a reading.
+   */
+  satellite: { light: '#9ad0ff', middle: '#2f86d6', dark: '#0f3f7a' },
+  terrain: { light: '#8cf0da', middle: '#17b59c', dark: '#06574a' },
+  sunArc: { light: '#ffe58a', middle: '#f5b021', dark: '#a86a05' },
+  shadows: { light: '#a9bbff', middle: '#5270df', dark: '#1f2f86' },
+  cloud: { light: '#c6d4e6', middle: '#6f86a6', dark: '#2c3c55' },
+  hazards: { light: '#ffcb8a', middle: '#f68b2e', dark: '#a9460c' },
+  buildings: { light: '#c9b5ff', middle: '#8063ee', dark: '#3b2399' },
+  labels: { light: '#ffb0cc', middle: '#e5559a', dark: '#8d1f5a' },
+  airspace: { light: '#efb2f5', middle: '#b952d2', dark: '#5e1e79' },
+  measure: { light: '#8fe6f4', middle: '#22aacb', dark: '#0a4c66' },
 }
 
 export const GLYPH_INK = '#ffffff'

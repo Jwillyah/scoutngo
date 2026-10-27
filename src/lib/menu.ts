@@ -2,10 +2,12 @@
  * WHERE THE MENU GOES. The list in one place, so the menu, App and the audits'
  * navigation helper (scripts/preflight.mjs) name the same items the same way.
  *
- * EIGHT ITEMS, gold to night blue. Shoot setup and Field are folded into Plan
- * as its two sub-doors, and Now lives on Sky's Tonight page. Their ids stay
- * in MenuItem, and the old paths still land on them (OLD_PATHS below): a
- * place that moved is still a place.
+ * NINE ITEMS, gold to night blue: Plan, Sky, Exposure, Kit, Saved spots,
+ * Viewfinder, Call sheet, Settings, About. Exposure has its own item since
+ * the field test of 27 Oct; it was a page of Sky nobody found. Field and the
+ * Shoot setup / Field buttons under Plan are gone from the menu: Shoot setup
+ * lives inside Plan. Their ids stay in MenuItem, and the old paths still land
+ * on them (OLD_PATHS below): a place that moved is still a place.
  */
 import type { GlyphId } from '../components/Icon.tsx'
 
@@ -14,6 +16,7 @@ export type MenuItem =
   | 'setup'
   | 'field'
   | 'sky'
+  | 'exposure'
   | 'kit'
   | 'saved'
   | 'now'
@@ -37,12 +40,9 @@ export const MENU_ITEMS: readonly MenuEntry[] = [
     label: 'Plan',
     note: 'Positions, light and conditions',
     icon: 'plan',
-    subs: [
-      { id: 'setup', label: 'Shoot setup' },
-      { id: 'field', label: 'Field' },
-    ],
   },
   { id: 'sky', label: 'Sky', note: 'Tonight, now, the moon, the next 30 nights', icon: 'sky' },
+  { id: 'exposure', label: 'Exposure', note: 'Shutter, aperture and ISO for the light', icon: 'exposure' },
   { id: 'kit', label: 'Kit', note: 'What is in the bag', icon: 'kit' },
   { id: 'saved', label: 'Saved spots', note: 'On this phone', icon: 'saved' },
   { id: 'viewfinder', label: 'Viewfinder', note: 'The camera with the sun and your frames on it', icon: 'viewfinder' },

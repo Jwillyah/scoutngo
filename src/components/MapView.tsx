@@ -70,6 +70,8 @@ import type { SiteMark } from '../core/siteMark.ts'
 import { readToken } from '../lib/tokens.ts'
 import type { AirspaceOverlay } from '../lib/airspaceOverlay.ts'
 import { ShooterFigure } from './ShooterFigure.tsx'
+import { CreditsSheet } from './MapCredits.tsx'
+import { creditLines } from '../lib/mapCredits.ts'
 
 /*
  * Point MapLibre at a worker the bundler actually emitted.
@@ -1160,6 +1162,8 @@ export function MapView({
   const showNumerals = useNumerals()
 
   const container = useRef<HTMLDivElement>(null)
+  /* The credits sheet, open with its lines, or null (MapCredits.tsx). */
+  const [credits, setCredits] = useState<string[] | null>(null)
   const map = useRef<maplibregl.Map | null>(null)
   const venueMarker = useRef<maplibregl.Marker | null>(null)
   const hintMarker = useRef<maplibregl.Marker | null>(null)
@@ -1348,32 +1352,33 @@ export function MapView({
       console.error('[maplibre error]', event.error?.message ?? '(no message)', event)
     })
 
-    const attribution = new maplibregl.AttributionControl({ compact: true })
-    instance.addControl(attribution, 'bottom-left')
-
     /*
-     * COLLAPSE THE ATTRIBUTION TO THE (i).
-     *
-     * `compact: true` is necessary but not sufficient. maplibre 6.8's
-     * _updateCompact() adds BOTH `maplibregl-compact` and
-     * `maplibregl-compact-show` on first render, so the control mounts expanded
-     * and only folds away the first time the map is dragged. On a phone that put
-     * a line of Esri credit across the bottom of the map until the user happened
-     * to pan.
-     *
-     * Stripping the show class and the `open` attribute once, after mount, leaves
-     * it collapsed. Clicking the (i) still expands it: maplibre's own
-     * _toggleAttribution handler is bound to that button and toggles the same
-     * class back on. The credit is legally required and is still one tap away; it
-     * is only being folded up, never removed.
+     * THE CREDITS, AS A SMALL "i" THAT OPENS A SHEET (MapCredits.tsx).
+     * MapLibre's own box opened itself whenever the sources changed and covered
+     * the dock. A control in the same corner, so it rides up with the sheet as
+     * the old one did; the sheet is the app's, and only a tap opens it.
      */
-    const collapseAttribution = () => {
-      const el = instance.getContainer().querySelector('.maplibregl-ctrl-attrib')
-      el?.classList.remove('maplibregl-compact-show')
-      el?.removeAttribute('open')
-    }
-    collapseAttribution()
-    instance.once('load', collapseAttribution)
+    instance.addControl(
+      {
+        onAdd: () => {
+          const wrap = document.createElement('div')
+          wrap.className = 'maplibregl-ctrl credits__ctrl'
+          const button = document.createElement('button')
+          button.type = 'button'
+          button.className = 'credits__i'
+          button.setAttribute('aria-label', 'Map credits')
+          button.textContent = 'i'
+          button.addEventListener('click', () => {
+            const sources = Object.values(instance.getStyle()?.sources ?? {}) as { attribution?: string }[]
+            setCredits(creditLines(sources.map((source) => source.attribution)))
+          })
+          wrap.appendChild(button)
+          return wrap
+        },
+        onRemove: () => {},
+      },
+      'bottom-left',
+    )
 
     instance.addControl(new maplibregl.ScaleControl({ unit: 'imperial' }), 'bottom-left')
 
@@ -3445,6 +3450,7 @@ export function MapView({
         * marker to. See src/core/sunSky.ts.
         */}
       <SunInSky frame={skyFrame} />
+      {credits === null ? null : <CreditsSheet lines={credits} onClose={() => setCredits(null)} />}
       {plan.map((planned, index) => {
         const host = figureEls[planned.position.id]
         if (host === undefined) return null

@@ -4,10 +4,10 @@ import { isOnline, onConnectivity } from './offlineCache.ts'
 /**
  * Whether there is a connection, as the venue bar's quiet mark shows it.
  *
- * NOT navigator.onLine ALONE, which is true on a mountain with the radio on
- * and no bars. It is also what the network has done lately: see isOnline in
- * src/lib/offlineCache.ts. A tile or a forecast that could not be reached
- * marks it, and the next one that arrives clears it.
+ * NOT navigator.onLine ALONE, and not the last request either: see
+ * src/lib/connectivity.ts. Offline is the app's own origin failing a check
+ * twice; one source refusing says nothing about the others, and the first
+ * success anywhere clears it.
  */
 export function useOnline(): boolean {
   const [online, setOnline] = useState(isOnline)

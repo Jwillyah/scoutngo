@@ -104,7 +104,10 @@ import { runSuggest } from './lib/suggestRun.ts'
 import { readShareHash, SHARE_PREFIX } from './lib/planShare.ts'
 import { Viewfinder, ViewfinderNeedsPlace } from './components/Viewfinder.tsx'
 import { SideMenu } from './components/SideMenu.tsx'
-import { backToNow } from './lib/backToNow.ts'
+import { backToNow, openingScrub } from './lib/backToNow.ts'
+import { retrying } from './lib/retrying.ts'
+import { planForNow } from './lib/planForNow.ts'
+import { useNow } from './lib/useNow.ts'
 import { clearPlace, loadPlace } from './lib/place.ts'
 import { pathToMenuItem, type MenuItem } from './lib/menu.ts'
 import {
@@ -597,6 +600,27 @@ function App() {
     void loadPlace(centre)
   }, [centre])
 
+  /*
+   * THE TIME BAR OPENS AT NOW on the shoot day, and in the middle of the
+   * window on any other (src/lib/backToNow.ts openingScrub). Again whenever
+   * the place, the day or the window changes.
+   */
+  useEffect(() => {
+    setScrub(openingScrub(venue, new Date()))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [venue.latitude, venue.longitude, venue.date, venue.startTime, venue.endTime])
+
+  /*
+   * "PLAN FOR NOW" when the saved window is over or in the other half of the
+   * day (src/lib/planForNow.ts). Offered, never applied without a tap.
+   */
+  const clockNow = useNow(60_000)
+  const planNowOffer = useMemo(() => planForNow(venue, clockNow), [venue, clockNow])
+  const onPlanForNow = useCallback(() => {
+    if (planNowOffer === null) return
+    setVenue((current) => ({ ...current, ...planNowOffer }))
+  }, [planNowOffer])
+
   /* The moment the scrubber is sitting on. */
   const scrubbedAt = useMemo(() => {
     if (venueWindow === null) return null
@@ -1071,6 +1095,33 @@ function App() {
     () => venueNameFor(venue.name, venue.latitude, venue.longitude, lookingUpName),
     [venue.name, venue.latitude, venue.longitude, lookingUpName],
   )
+  /*
+   * A NAME FOR EVERY PIN, ASKED UNTIL IT ARRIVES. The lookup used to run only
+   * when a pin was dropped, once: a search pick that came with no name, a
+   * shared plan, or one dropped request left "Name unknown" in the top bar
+   * (Virginia Beach, 27 Oct). Now any coordinate with no name of its own is
+   * looked up, and asked again after a failure (src/lib/retrying.ts).
+   */
+  const nameUnknown = venueNameState.kind === 'unknown' && venueLatLon(venue) !== null
+  useEffect(() => {
+    if (!nameUnknown) return
+    const at = venueLatLon(venue)
+    if (at === null) return
+    const key = placeKey(venue.latitude, venue.longitude)
+    return retrying(async () => {
+      await new Promise((resolve) => setTimeout(resolve, msUntilNominatim()))
+      const name = await reverseGeocode(at)
+      if (name === null) return false
+      setVenue((current) =>
+        placeKey(current.latitude, current.longitude) === key && venueNameFor(current.name, current.latitude, current.longitude, false).kind !== 'name'
+          ? { ...current, name: { key, name } }
+          : current,
+      )
+      return true
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nameUnknown, venue.latitude, venue.longitude])
+
   const venueNameLine = useMemo(
     () => venueLabel(venueNameState, venue.latitude, venue.longitude),
     [venueNameState, venue.latitude, venue.longitude],
@@ -1303,6 +1354,7 @@ function App() {
         setViewfinderOpen(true)
         return
       case 'sky':
+      case 'exposure':
       case 'settings':
       case 'about':
       case 'callsheet':
@@ -1337,10 +1389,16 @@ function App() {
     menuPickRef.current = onMenuPick
   })
   useEffect(() => {
-    const item = pathToMenuItem(window.location.pathname)
-    if (item === null) return
-    window.history.replaceState(null, '', '/' + window.location.search + window.location.hash)
-    menuPickRef.current(item)
+    const go = () => {
+      const item = pathToMenuItem(window.location.pathname)
+      if (item === null) return
+      window.history.replaceState(null, '', '/' + window.location.search + window.location.hash)
+      menuPickRef.current(item)
+    }
+    go()
+    /* And on back or forward to one: Field left the menu on 27 Oct, and /field is still its address. */
+    window.addEventListener('popstate', go)
+    return () => window.removeEventListener('popstate', go)
   }, [])
 
   /*
@@ -1435,8 +1493,6 @@ function App() {
 
   const cancelPin = useCallback(() => setPendingPin(null), [])
 
-  /* Long press drops the pin. With one pin there is nothing else it can mean. */
-  const onLongPress = useCallback((at: LatLon) => dropVenuePin(at), [dropVenuePin])
 
   const onSelectPosition = (id: string | null) => {
     setSelectedId(id)
@@ -1926,7 +1982,6 @@ function App() {
           mapHandle={mapHandle}
           venue={centre}
           onVenueChange={onVenueChange}
-          onLongPress={onLongPress}
           plan={plan}
           visiblePlan={visiblePlan}
           conePlan={conePlan}
@@ -2017,6 +2072,9 @@ function App() {
           scrubbedAt={scrubbedAt}
           scrub={scrub}
           onScrub={setScrub}
+          onResetTime={() => setScrub(openingScrub(venue, new Date()))}
+          planNow={planNowOffer}
+          onPlanForNow={onPlanForNow}
           tide={tide}
           tideNow={tideNow}
           tideExtremes={tideExtremes}

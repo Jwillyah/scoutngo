@@ -525,7 +525,16 @@ console.log('\n### every stage reaches every other stage, by pressing the nav')
  * menu behind the top bar's menu button, so pressing a stage is two gestures,
  * open and pick, and both are pressed here rather than assumed.
  */
-const STAGE_LABELS = ['Shoot setup', 'Plan', 'Field']
+/*
+ * SINCE 27 OCT THE MENU HOLDS PLAN, NOT ITS STAGES. Shoot setup lives inside
+ * Plan (its venue pill opens it) and Field is reached by its address, /field;
+ * the menu offering either is now the defect. Every stage still reaches every
+ * other, each by its own gesture (scripts/preflight.mjs goToStage), checked
+ * by where the shell lands.
+ */
+const IN_MENU = ['Plan']
+const NOT_IN_MENU = ['Shoot setup', 'Field']
+const STAGE_IDS = ['setup', 'plan', 'field']
 
 const openMenu = () =>
   ev(`(() => {
@@ -545,59 +554,30 @@ const STAGES = `(() => {
 const stageNow = () =>
   ev(`document.querySelector('.shell')?.className.match(/shell--([a-z]+)/)?.[1] ?? null`)
 
-const pressStage = async (label) => {
-  const opened = await openMenu()
-  if (opened !== 'open') return opened
-  await wait(300)
-  const result = await ev(`(() => {
-    const hit = [...document.querySelectorAll('nav[aria-label="Stage"] button')]
-      .find((b) => (b.querySelector('.sidemenu__label')?.textContent ?? '').trim() === ${JSON.stringify(label)})
-    if (!hit) return 'gone'
-    if (hit.disabled) return 'disabled'
-    hit.click()
-    return 'pressed'
-  })()`)
-  await wait(900)
-  return result
-}
-
 await openMenu()
 await wait(300)
 const offered = await ev(STAGES)
 await ev(`document.querySelector('.sidemenu__scrim')?.click()`)
 await wait(300)
-const stages = STAGE_LABELS.filter((l) => Array.isArray(offered) && offered.includes(l))
 if (!Array.isArray(offered) || offered.length === 0) {
   fail('no stage nav on screen: the menu opened nothing')
 } else {
   console.log(`  the menu offers: ${offered.join(' | ')}`)
-  /* EVERY STAGE IS IN THE MENU. A missing one is a screen nobody can reach. */
-  for (const label of STAGE_LABELS) {
-    if (!offered.includes(label)) fail(`the menu has no ${label}`)
-  }
+  for (const label of IN_MENU) if (!offered.includes(label)) fail(`the menu has no ${label}`)
+  for (const label of NOT_IN_MENU) if (offered.includes(label)) fail(`the menu still offers ${label}, which lives inside Plan now`)
 
-  for (const from of stages) {
-    for (const to of stages) {
+  for (const from of STAGE_IDS) {
+    for (const to of STAGE_IDS) {
       if (from === to) continue
-      const got = await pressStage(from)
-      if (got !== 'pressed') {
-        fail(`cannot start from ${from}: ${got}`)
-        continue
-      }
-      const start = await stageNow()
-      const went = await pressStage(to)
-      if (went !== 'pressed') {
-        fail(`from ${from}, the ${to} tab is ${went}`)
-        continue
-      }
-      const landed = await stageNow()
-      const moved = landed !== start
-      console.log(`  ${from.padEnd(5)} -> ${to.padEnd(5)} ${moved ? 'ok' : 'FAILED'} (${start} -> ${landed})`)
-      if (!moved) {
-        fail(
-          `pressed ${to} from ${from} and the shell stayed on "${landed}". ` +
-            'Any stage from any stage: a screen with nothing to show says so in its own content.',
-        )
+      try {
+        await goToStage(ev, wait, from)
+        const start = await stageNow()
+        await goToStage(ev, wait, to)
+        const landed = await stageNow()
+        console.log(`  ${from.padEnd(5)} -> ${to.padEnd(5)} ${landed === to ? 'ok' : 'FAILED'} (${start} -> ${landed})`)
+        if (landed !== to) fail(`went for ${to} from ${from} and the shell is on "${landed}"`)
+      } catch (error) {
+        fail(`from ${from} to ${to}: ${error instanceof Error ? error.message : String(error)}`)
       }
     }
   }

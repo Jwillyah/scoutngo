@@ -152,6 +152,12 @@ describe('reverse geocoding a dropped pin', () => {
     ).toBe('12 Dock St, Oxford')
   })
 
+  /* "First st jetty Virginia" on 27 Oct left "Name unknown": a spot with no name and no road is named by its area. */
+  it('names a spot with no name and no street by its area and town', () => {
+    expect(parseReverse({ name: '', address: { water: 'Rudee Inlet', city: 'Virginia Beach' } })).toBe('Rudee Inlet, Virginia Beach')
+    expect(parseReverse({ name: '', address: { neighbourhood: 'Croatan', city: 'Virginia Beach' } })).toBe('Croatan, Virginia Beach')
+  })
+
   it('returns null on nothing usable, so the placeholder stands', () => {
     expect(parseReverse(null)).toBeNull()
     expect(parseReverse({ error: 'Unable to geocode' })).toBeNull()

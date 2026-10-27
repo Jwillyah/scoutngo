@@ -1,3 +1,4 @@
+import { retrying } from './retrying.ts'
 import { useEffect, useState } from 'react'
 import type { LatLon } from '../core/geo.ts'
 import {
@@ -50,19 +51,20 @@ export function useTide(venue: LatLon | null, shootAt: Date | null): TideInfo {
     let live = true
     setInfo({ status: 'loading' })
 
-    void (async () => {
+    /* Asked again after a failure (src/lib/retrying.ts): true is finished, false is try again. */
+    const stop = retrying(async () => {
       const stations = await fetchStations()
-      if (!live) return
+      if (!live) return true
       if (stations.status !== 'ok') {
         setInfo({ status: 'unavailable', reason: stations.reason })
-        return
+        return false
       }
 
       const candidates = nearestStations({ lat, lon }, stations.stations, STATION_ATTEMPTS)
       const nearest = candidates[0]
       if (nearest === undefined) {
         setInfo({ status: 'unavailable', reason: 'NOAA listed no tide stations.' })
-        return
+        return true
       }
       if (nearest.proximity === 'none') {
         setInfo({
@@ -70,7 +72,7 @@ export function useTide(venue: LatLon | null, shootAt: Date | null): TideInfo {
           nearestKm: nearest.distanceKm,
           nearestName: nearest.station.name,
         })
-        return
+        return true
       }
 
       /*
@@ -81,10 +83,11 @@ export function useTide(venue: LatLon | null, shootAt: Date | null): TideInfo {
        * genuinely a venue without usable predictions.
        */
       let lastReason = 'No nearby station published predictions for this date.'
+      let unreachable = false
       for (const candidate of candidates) {
         if (candidate.proximity === 'none') break
         const predictions = await fetchPredictions(candidate.station.id, shootAt)
-        if (!live) return
+        if (!live) return true
         if (predictions.status === 'ok') {
           setInfo({
             status: 'ok',
@@ -93,15 +96,19 @@ export function useTide(venue: LatLon | null, shootAt: Date | null): TideInfo {
             distant: candidate.proximity === 'distant',
             predictions: predictions.predictions,
           })
-          return
+          return true
         }
         lastReason = predictions.reason
+        if (predictions.status === 'unavailable' && predictions.unreachable === true) unreachable = true
       }
       setInfo({ status: 'unavailable', reason: lastReason })
-    })()
+      /* A station that publishes nothing will publish nothing on a second ask; a dropped request might answer. */
+      return !unreachable
+    })
 
     return () => {
       live = false
+      stop()
     }
     /*
      * shootAt is intentionally not a dependency: only the DAY changes which

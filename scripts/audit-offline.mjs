@@ -77,7 +77,13 @@ ws.addEventListener('message', (event) => {
   const m = JSON.parse(event.data)
   if (m.method !== 'Fetch.requestPaused') return
   const url = new URL(m.params.request.url)
-  const local = url.hostname === '127.0.0.1' || url.hostname === 'localhost'
+  /*
+   * THE CONNECTIVITY CHECK IS CUT TOO. The origin stays up so the dev server
+   * can keep serving modules, but on a real dead cell the app's own HEAD /
+   * (src/lib/connectivity.ts) fails like everything else.
+   */
+  const check = m.params.request.method === 'HEAD' && url.pathname === '/'
+  const local = (url.hostname === '127.0.0.1' || url.hostname === 'localhost') && !check
   if (local || mode === 'online') {
     void send('Fetch.continueRequest', { requestId: m.params.requestId })
   } else if (mode === 'fail') {

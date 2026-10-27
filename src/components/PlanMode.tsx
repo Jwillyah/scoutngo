@@ -85,6 +85,10 @@ import { TimeBar } from './TimeBar.tsx'
 import { ToolDock } from './ToolDock.tsx'
 import { Clay3D } from './Clay3D.tsx'
 import { goldenChip } from '../lib/goldenChip.ts'
+import { LAYER_FAILED } from '../lib/layerFailed.ts'
+import type { PlanForNow } from '../lib/planForNow.ts'
+import { goldenNext } from '../core/goldenNext.ts'
+import { getPosition } from 'suncalc'
 import { hasWebGL2 } from '../lib/webgl.ts'
 import { standAtPosition, standForLineUp, type StandRequest } from '../lib/standRequest.ts'
 import { ExposurePlayground } from './ExposurePlayground.tsx'
@@ -124,7 +128,6 @@ interface PlanModeProps {
   mapHandle: React.Ref<MapHandle>
   venue: LatLon | null
   onVenueChange: (at: LatLon) => void
-  onLongPress: (at: LatLon) => void
   plan: PlannedPosition[]
   visiblePlan: PlannedPosition[]
   conePlan: PlannedPosition[]
@@ -193,6 +196,11 @@ interface PlanModeProps {
   scrubbedAt: Date | null
   scrub: number
   onScrub: (next: number) => void
+  /** The time bar's reset: now on the shoot day, the middle of the window otherwise. */
+  onResetTime: () => void
+  /** Today's window from now, when the saved one is not this one (src/lib/planForNow.ts). */
+  planNow: PlanForNow | null
+  onPlanForNow: () => void
   tide: TideInfo
   tideNow: TideState | null
   tideExtremes: TideExtreme[]
@@ -374,7 +382,6 @@ export function PlanMode({
   mapHandle,
   venue,
   onVenueChange,
-  onLongPress,
   plan,
   visiblePlan,
   conePlan,
@@ -417,6 +424,9 @@ export function PlanMode({
   scrubbedAt,
   scrub,
   onScrub,
+  onResetTime,
+  planNow,
+  onPlanForNow,
   tide,
   tideNow,
   tideExtremes,
@@ -542,6 +552,8 @@ export function PlanMode({
    */
   const [terrainPaused, setTerrainPaused] = useState(false)
   const [buildingsNote, setBuildingsNote] = useState<string | null>(null)
+  /* A Retry on the Buildings tile asks again. */
+  const [buildingsAttempt, setBuildingsAttempt] = useState(0)
   const [sheetHeight, setSheetHeight] = useState(108)
   const [, setPitch] = useState(0)
   /*
@@ -817,6 +829,16 @@ export function PlanMode({
     [],
   )
   /*
+   * LONG PRESS DROPS A MEASURE PIN. The ruler button left the main screen on
+   * 27 Oct: a long press starts a measure (and the next tap is its second
+   * point), and Measure is also under Tools in Layers. Moving the venue is
+   * Shoot setup's long press.
+   */
+  const onMeasurePress = useCallback(
+    (at: LatLon) => setMeasurePins((pins) => (pins === null || pins.length >= 2 ? [at] : [...pins, at])),
+    [],
+  )
+  /*
    * THE AIRSPACE OVERLAY. The data loads the first time it is switched on and
    * stays loaded; switching off only stops drawing it.
    */
@@ -825,7 +847,8 @@ export function PlanMode({
   const [airspaceDense, setAirspaceDense] = useState(false)
   const [airspaceFailed, setAirspaceFailed] = useState(false)
   useEffect(() => {
-    if (!airspaceOn || airspaceOverlay !== null) return
+    /* Failed, it waits for the tile's Retry, which clears the failure and asks again. */
+    if (!airspaceOn || airspaceOverlay !== null || airspaceFailed) return
     let live = true
     loadAirspaceOverlay().then(
       (overlay) => {
@@ -838,7 +861,7 @@ export function PlanMode({
     return () => {
       live = false
     }
-  }, [airspaceOn, airspaceOverlay])
+  }, [airspaceOn, airspaceOverlay, airspaceFailed])
   /* A refusal is said once, as a toast that goes by itself (Toast.tsx), never a box left over the map. */
   const [headingNote, setHeadingNote] = useState<string | null>(null)
   const dismissHeadingNote = useCallback(() => setHeadingNote(null), [])
@@ -909,7 +932,7 @@ export function PlanMode({
     }
     if (mapZoom < BUILDINGS_MIN_ZOOM) {
       setBuildingData(null)
-      setBuildingsNote('Zoom in to load buildings.')
+      setBuildingsNote('Zoom in')
       return
     }
     let live = true
@@ -926,20 +949,17 @@ export function PlanMode({
         if (result.status === 'ok') {
           setBuildingList(result.buildings)
           setBuildingData(buildingsToGeoJson(result.buildings) as GeoJSON.FeatureCollection)
-          setBuildingsNote(
-            result.buildings.length === 0
-              ? 'OpenStreetMap has no buildings mapped here. That is the map being empty, not the ground.'
-              : null,
-          )
+          /* None MAPPED: the map being empty, not the ground. Said in the Layers i. */
+          setBuildingsNote(result.buildings.length === 0 ? 'None mapped' : null)
         } else {
           setBuildingData(null)
-          setBuildingsNote(`Buildings could not be loaded: ${result.reason}`)
+          setBuildingsNote(LAYER_FAILED)
         }
       },
       () => {
         if (!live) return
         setBuildingData(null)
-        setBuildingsNote('Buildings could not be loaded.')
+        setBuildingsNote(LAYER_FAILED)
       },
     )
     return () => {
@@ -947,7 +967,7 @@ export function PlanMode({
     }
     /* mapZoom only matters for crossing the threshold, not every nudge. */
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wantBuildings, venue, mapZoom >= BUILDINGS_MIN_ZOOM])
+  }, [wantBuildings, venue, mapZoom >= BUILDINGS_MIN_ZOOM, buildingsAttempt])
 
   /*
    * THE SHADOW MAP, for the moment on the time bar. Footprint swept by
@@ -996,18 +1016,23 @@ export function PlanMode({
    * never stale -- see src/core/venueName.ts -- and the date is the shoot's,
    * short, because the bar is a glance not a form.
    */
+  /*
+   * ONE SOURCE FOR THE DATE: the moment on the time bar. The bar said Tue 27
+   * while this said MON 26 on 27 Oct, the saved shoot day against the day on
+   * the bar. Now both read the bar.
+   */
   const dateLabel = useMemo(
     () =>
       venueWindow === null
         ? '—'
-        : venueWindow.start
+        : (scrubbedAt ?? venueWindow.start)
             .toLocaleDateString('en-US', {
               timeZone: venueWindow.timeZone,
               weekday: 'short',
               day: 'numeric',
             })
             .toUpperCase(),
-    [venueWindow],
+    [venueWindow, scrubbedAt],
   )
 
   /*
@@ -1017,7 +1042,9 @@ export function PlanMode({
   const openCard = useCallback(
     (kind: CardKind) => {
       setCard((current) => (current.kind === kind ? HOME : ({ kind } as SheetCard)))
-      raiseToHalf()
+      /* Layers is a page of its own: full, and it fits with no scrolling (scripts/audit-overflow.mjs). */
+      if (kind === 'layers') setSheet('full')
+      else raiseToHalf()
     },
     [raiseToHalf],
   )
@@ -1052,10 +1079,11 @@ export function PlanMode({
    * dash rather than a zero.
    */
   const chips: Chip[] = useMemo(() => {
+    /* The next golden light from the time on the bar, morning or evening (src/core/goldenNext.ts). */
     const goldenLeft =
-      venueWindow === null || scrubbedAt === null
+      venue === null || scrubbedAt === null
         ? null
-        : Math.round((venueWindow.end.getTime() - scrubbedAt.getTime()) / 60_000)
+        : goldenNext((t) => getPosition(t, venue.lat, venue.lon).altitude, scrubbedAt)
     const groundWind = wind?.speedMps ?? null
     const overRated =
       ratedWindMps !== null && groundWind !== null && groundWind > ratedWindMps
@@ -1092,7 +1120,7 @@ export function PlanMode({
         ...(venueWindow === null || venueWindow.timeZoneShort === '' ? {} : { unit: venueWindow.timeZoneShort }),
       },
     ]
-  }, [venueWindow, scrubbedAt, wind, ratedWindMps, lowTide, venueCloud, forecast, units, clock])
+  }, [venue, venueWindow, scrubbedAt, wind, ratedWindMps, lowTide, venueCloud, forecast, units, clock])
 
   /*
    * WHICH GOES BAND THE SKY LAYER PAINTS, from the sun's altitude: visible
@@ -1141,6 +1169,15 @@ export function PlanMode({
           {` · ${plan.length} ${plan.length === 1 ? 'position' : 'positions'}`}
         </span>
       </div>
+      {/* The saved window is over, or for the other half of the day: one tap moves it to now. */}
+      {planNow === null ? null : (
+        <p className="shootc__now">
+          That window is not now.{' '}
+          <button type="button" className="btn btn--small" onClick={onPlanForNow}>
+            Plan for now
+          </button>
+        </p>
+      )}
 
       {selected !== null ? (
         <PositionCard
@@ -1373,7 +1410,8 @@ export function PlanMode({
           state: !showBuildings ? 'OFF' : (buildingsNote ?? 'ON'),
           on: showBuildings,
           art: TILE_ART.buildings,
-          onToggle: () => onShowBuildings(!showBuildings),
+          /* Failed, the tile is its own Retry. */
+          onToggle: () => (showBuildings && buildingsNote === LAYER_FAILED ? setBuildingsAttempt((n) => n + 1) : onShowBuildings(!showBuildings)),
         },
         { id: 'labels', label: 'Labels', state: showLabels ? 'ON' : 'OFF', on: showLabels, art: TILE_ART.labels, onToggle: () => onShowLabels(!showLabels) },
         {
@@ -1383,25 +1421,44 @@ export function PlanMode({
           state: !airspaceOn
             ? 'OFF'
             : airspaceFailed
-              ? 'DID NOT LOAD'
+              ? LAYER_FAILED
               : airspaceOverlay === null
-                ? 'LOADING'
+                ? 'Loading'
                 : airspaceDense
-                  ? 'ON · ZOOM IN FOR GRID'
+                  ? 'ON · zoom for grid'
                   : 'ON',
           on: airspaceOn,
           art: TILE_ART.airspace,
-          /* On also opens the card: the shapes on the map, the words for the venue. */
+          /* On also opens the card: the shapes on the map, the words for the venue. Failed, the tile is its own Retry. */
           onToggle: () => {
+            if (airspaceOn && airspaceFailed) {
+              setAirspaceFailed(false)
+              return
+            }
             if (!airspaceOn) setCard({ kind: 'airspace' })
             setAirspaceOn(!airspaceOn)
+          },
+        },
+      ]}
+      tools={[
+        {
+          id: 'measure',
+          label: 'Measure',
+          state: measurePins === null ? 'OFF' : 'ON',
+          on: measurePins !== null,
+          art: TILE_ART.measure,
+          onToggle: () => {
+            setMeasurePins((pins) => (pins === null ? [] : null))
+            setSheet('peek')
           },
         },
       ]}
       sourceLine={`Esri World Imagery · native to z${ESRI_NATIVE_MAX_ZOOM} · showing z${Math.round(mapZoom)}`}
       about={
         <p className="tiles__prose">
-          Cones are what each position can actually frame. The sun arc is where the sun rises and
+          Measure draws a line between two points you tap; a long press on the map starts one
+          too. Cones are what each position can actually frame. Buildings "None mapped" is the map
+          being empty, not the ground. The sun arc is where the sun rises and
           sets. Shadows are thrown from the marked heights. Cloud is GOES satellite imagery over the
           map. Hazards are what you marked plus what OpenStreetMap has. Labels are place names over
           the imagery, off while reading a venue and on while hunting for one. Airspace draws
@@ -1805,7 +1862,7 @@ export function PlanMode({
         onPilotMove={onPilotMove}
         onAimAt={onAimAt}
         onPositionMove={onPositionMove}
-        onLongPress={onLongPress}
+        onLongPress={onMeasurePress}
         sunAzimuth={sun === null ? null : sun.azimuth}
         sunAltitude={sun?.altitude ?? null}
         showSky={showSky}
@@ -1918,8 +1975,11 @@ export function PlanMode({
         </p>
       )}
       {measurePins === null ? null : (
-        <p className="tapnote num" role="status">
-          {measureWords(measurePins, units.distance)}
+        <p className="tapnote tapnote--measure num" role="status">
+          <span className="tapnote__text">{measureWords(measurePins, units.distance)}</span>
+          <button type="button" className="tapnote__close" onClick={() => setMeasurePins(null)} aria-label="Stop measuring">
+            ×
+          </button>
         </p>
       )}
 
@@ -2035,8 +2095,6 @@ export function PlanMode({
         bearing={mapBearing}
         heading={followHeading}
         onCompass={onCompass}
-        measuring={measurePins !== null}
-        onMeasure={() => setMeasurePins((pins) => (pins === null ? [] : null))}
       />
       )}
 
@@ -2114,7 +2172,7 @@ export function PlanMode({
                 timeZone={venueWindow.timeZone}
                 moon={moonOn}
                 onAt={scrubTo}
-                onReset={() => onScrub(0.5)}
+                onReset={onResetTime}
               />
             )}
           </div>

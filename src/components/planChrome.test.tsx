@@ -384,14 +384,17 @@ describe('a flagged position says what is wrong with it', () => {
     /* The disc itself stays its normal colour too. */
     expect(wide).not.toContain('shooter--warned')
 
-    for (const hazard of [
-      { warnings: ['in-water'] },
-      { framingWarnings: ['beyond-standoff'] },
-    ]) {
-      const html = flagged(hazard as never)
-      expect(html).toContain('shooter__flag--hazard')
-      expect(html).toContain('shooter--warned')
-    }
+    const html = flagged({ warnings: ['in-water'] } as never)
+    expect(html).toContain('shooter__flag--hazard')
+    expect(html).toContain('shooter--warned')
+  })
+
+  /* FAR WAS RED at Virginia Beach on 27 Oct. Red is hazards only: far is amber, and the disc stays its own colour. */
+  it('draws FAR amber, never the hazard red', () => {
+    const far = flagged({ framingWarnings: ['beyond-standoff'] } as never)
+    expect(far).toContain('shooter__flag--caution')
+    expect(far).not.toContain('shooter__flag--hazard')
+    expect(far).not.toContain('shooter--warned')
   })
 
   /*

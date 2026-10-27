@@ -38,9 +38,6 @@ interface MapRailProps {
   /** Whether the map is turning with the phone's heading. */
   heading: boolean
   onCompass: () => void
-  /** Two-pin measure: on while the next taps drop pins. */
-  measuring: boolean
-  onMeasure: () => void
 }
 
 export function MapRail({
@@ -50,8 +47,6 @@ export function MapRail({
   bearing,
   heading,
   onCompass,
-  measuring,
-  onMeasure,
 }: MapRailProps) {
   /** Which button is showing its text label, from a long press. */
   const [named, setNamed] = useState<string | null>(null)
@@ -156,24 +151,11 @@ export function MapRail({
       )}
       {threeDNote === null ? null : <p className="rail2__note">{threeDNote}</p>}
 
-      {/* Layers moved to the tool dock: one Layers button on screen, not two. */}
-      {button(
-        'measure',
-        measuring ? 'Stop measuring' : 'Measure between two points',
-        <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
-          <path
-            d="M3 13.5 13.5 3l3.5 3.5L6.5 17z M6 10.5l1.5 1.5 M8.5 8l2 2 M11 5.5l1.5 1.5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.4"
-            strokeLinejoin="round"
-            strokeLinecap="round"
-          />
-        </svg>,
-        onMeasure,
-        { on: measuring },
-      )}
-
+      {/*
+        * Layers moved to the tool dock: one Layers button on screen, not two.
+        * The ruler left on 27 Oct: a long press on the map measures, and so
+        * does Measure under Tools in Layers.
+        */}
     </nav>
   )
 }

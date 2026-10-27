@@ -260,7 +260,15 @@ export function parseReverse(payload: unknown): string | null {
       : {}
 
   const street = [text(address.house_number), text(address.road)].filter(Boolean).join(' ')
-  const head = text(row.name) || street
+  /* No feature name and no street (a jetty, open water): the area, "Rudee Inlet, Virginia Beach". */
+  const area =
+    text(address.water) ||
+    text(address.bay) ||
+    text(address.natural) ||
+    text(address.neighbourhood) ||
+    text(address.quarter) ||
+    text(address.suburb)
+  const head = text(row.name) || street || area
   const town =
     text(address.city) ||
     text(address.town) ||

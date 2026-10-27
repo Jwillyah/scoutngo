@@ -80,38 +80,60 @@ describe('loadTile never hangs', () => {
     resetConnectivity()
   })
 
-  it('refuses at once when the device says it is offline, without fetching', async () => {
+  /* Every request rejects: tiles and the check on the app's own origin alike. */
+  const hanging = ((_url: string, init: RequestInit) =>
+    new Promise((_resolve, reject) => {
+      /* Like the real fetch: an already-aborted signal rejects at once. */
+      if (init.signal?.aborted === true) reject(new DOMException('aborted', 'AbortError'))
+      init.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
+    })) as unknown as typeof fetch
+
+  it('once offline is confirmed, refuses at once without fetching', async () => {
     Object.defineProperty(Navigator.prototype, 'onLine', { get: () => false, configurable: true })
+    globalThis.fetch = vi.fn(() => Promise.reject(new TypeError('Load failed'))) as unknown as typeof fetch
+    await expect(loadTile({ url: 'scoutngo://example.com/1/2/3' }, new AbortController())).rejects.toThrow()
+    /* The failed tile asked the app's own origin; that failed too, and the device agrees. */
+    await vi.waitFor(() => expect(isOnline()).toBe(false))
     const fetchSpy = vi.fn()
     globalThis.fetch = fetchSpy as unknown as typeof fetch
-    await expect(
-      loadTile({ url: 'scoutngo://example.com/1/2/3' }, new AbortController()),
-    ).rejects.toThrow(/offline/)
+    await expect(loadTile({ url: 'scoutngo://example.com/1/2/4' }, new AbortController())).rejects.toThrow(/offline/)
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
   /*
-   * THE MOUNTAIN. The device says it is online and the request is never
-   * answered. The tile must fail, and the network be marked unreachable, in
-   * bounded time rather than the browser's own minutes.
+   * THE MOUNTAIN. The device says it is online and nothing is ever answered,
+   * the app's own origin included. The tile fails in bounded time, and the
+   * network is called gone once the check has failed twice.
    */
-  it('gives up on a request that is never answered, and says the network is gone', async () => {
+  it('gives up on a request that is never answered, and says the network is gone once the check fails twice', async () => {
     vi.useFakeTimers()
     Object.defineProperty(Navigator.prototype, 'onLine', { get: () => true, configurable: true })
-    globalThis.fetch = ((_url: string, init: RequestInit) =>
-      new Promise((_resolve, reject) => {
-        /* Like the real fetch: an already-aborted signal rejects at once. */
-        if (init.signal?.aborted === true) reject(new DOMException('aborted', 'AbortError'))
-        init.signal?.addEventListener('abort', () =>
-          reject(new DOMException('aborted', 'AbortError')),
-        )
-      })) as unknown as typeof fetch
+    globalThis.fetch = hanging
 
     const pending = loadTile({ url: 'scoutngo://example.com/1/2/3' }, new AbortController())
     const settled = expect(pending).rejects.toThrow()
     await vi.advanceTimersByTimeAsync(9000)
     await settled
+    expect(isOnline()).toBe(true)
+    await vi.advanceTimersByTimeAsync(6000 + 2500 + 6000)
     expect(isOnline()).toBe(false)
+  })
+
+  /*
+   * PRIVATE RELAY. One host refuses (Overpass, the map tiles) while the rest
+   * of the network works. That host's tiles fail; the app stays online.
+   */
+  it('one host refusing does not make the app offline', async () => {
+    Object.defineProperty(Navigator.prototype, 'onLine', { get: () => true, configurable: true })
+    globalThis.fetch = ((url: string) =>
+      url.startsWith('https://example.com/')
+        ? Promise.reject(new TypeError('Load failed'))
+        : Promise.resolve(new Response(null, { status: 200 }))) as unknown as typeof fetch
+    for (let i = 0; i < 5; i += 1) {
+      await expect(loadTile({ url: `scoutngo://example.com/1/2/${i}` }, new AbortController())).rejects.toThrow()
+    }
+    await new Promise((r) => setTimeout(r, 50))
+    expect(isOnline()).toBe(true)
   })
 
   it('a tile the map scrolled past does not count against the network', async () => {
@@ -131,9 +153,13 @@ describe('loadTile never hangs', () => {
     expect(isOnline()).toBe(true)
   })
 
-  it('one success clears an earlier failure', () => {
+  it('one success clears a confirmed offline, with no reload', async () => {
+    Object.defineProperty(Navigator.prototype, 'onLine', { get: () => false, configurable: true })
+    globalThis.fetch = vi.fn(() => Promise.reject(new TypeError('Load failed'))) as unknown as typeof fetch
     reportNetwork(false)
-    expect(isOnline()).toBe(false)
+    await vi.waitFor(() => expect(isOnline()).toBe(false))
+    /* The phone has its signal back, and the next request through says so. */
+    Object.defineProperty(Navigator.prototype, 'onLine', { get: () => true, configurable: true })
     reportNetwork(true)
     expect(isOnline()).toBe(true)
   })

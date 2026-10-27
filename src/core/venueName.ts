@@ -85,8 +85,6 @@ export function coordinateLabel(latitude: string, longitude: string): string {
   return `${lat.toFixed(4)}, ${lon.toFixed(4)}`
 }
 
-/** What the app says is unknown, as a constant so it reads the same everywhere. */
-export const NAME_UNKNOWN = 'Name unknown'
 
 /**
  * The line to put on screen.
@@ -101,8 +99,13 @@ export function venueLabel(
   longitude: string,
 ): string {
   if (state.kind === 'name') return state.name
-  if (state.kind === 'looking') return coordinateLabel(latitude, longitude)
-  return NAME_UNKNOWN
+  /*
+   * UNKNOWN IS THE COORDINATE TOO, never "Name unknown". On 27 Oct at Virginia
+   * Beach the top bar said "Name unknown" all morning; the coordinate is a true
+   * statement about where the pin is, and the name is asked for again until it
+   * arrives (App.tsx, the name lookup).
+   */
+  return coordinateLabel(latitude, longitude)
 }
 
 /** The short form for tight places: everything before the first comma. */

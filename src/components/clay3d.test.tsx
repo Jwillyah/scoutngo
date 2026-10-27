@@ -4,7 +4,9 @@ import { reviveAreas } from '../lib/offlineCache.ts'
 import { OVERVIEW_IMAGERY_ZOOMS, OVERVIEW_TERRAIN_ZOOMS } from '../lib/offline3d.ts'
 import { parseTrees, SPARSE_TREES } from '../lib/trees.ts'
 import { installAssets, isLazy3d, routeOf } from '../sw/shellRoutes.ts'
-import { Clay3D, CLAY_NOTE } from './Clay3D.tsx'
+import { Clay3D, CLAY_NOTE, ClayPill } from './Clay3D.tsx'
+import { clayStatus } from '../lib/clayStatus.ts'
+import type { PlaceState } from '../lib/place.ts'
 import { MapRail } from './MapRail.tsx'
 
 const ORIGIN = 'https://scoutngo.vercel.app'
@@ -53,7 +55,7 @@ describe('mapped trees', () => {
 describe('the 3D button', () => {
   const rail = (note: string | null, threeD = false) =>
     renderToStaticMarkup(
-      <MapRail threeD={threeD} onThreeD={() => {}} threeDNote={note} bearing={0} heading={false} onCompass={() => {}} measuring={false} onMeasure={() => {}} />,
+      <MapRail threeD={threeD} onThreeD={() => {}} threeDNote={note} bearing={0} heading={false} onCompass={() => {}} />,
     )
   it('opens the clay model, and says 2D when it is open', () => {
     expect(rail(null)).toContain('aria-label="Open the 3D clay model"')
@@ -66,11 +68,37 @@ describe('the 3D button', () => {
 })
 
 describe('the clay model says what it is', () => {
-  it('on screen, from the first frame', () => {
+  it('in its legend line, once loaded', () => {
+    expect(CLAY_NOTE).toBe('Clay model from map data; real buildings may differ')
+  })
+})
+
+/*
+ * ONE PILL, NEVER A STACK. On 27 Oct at Virginia Beach three messages stood
+ * one over another at the foot of the 3D view.
+ */
+describe('the 3D status', () => {
+  const place = (status: PlaceState['status']): PlaceState => ({ status, reason: null, buildings: null, trees: null })
+  it('is the most important one only', () => {
+    expect(clayStatus('no WebGL', false, place('failed'))).toEqual({ kind: 'broken', why: 'no WebGL' })
+    expect(clayStatus(null, false, place('failed'))).toEqual({ kind: 'map-failed' })
+    expect(clayStatus(null, false, place('loading'))).toEqual({ kind: 'view-loading' })
+    expect(clayStatus(null, true, place('loading'))).toEqual({ kind: 'map-loading' })
+    expect(clayStatus(null, true, place('ready'))).toBeNull()
+  })
+
+  it('while loading, the foot holds one pill and nothing else', () => {
     const html = renderToStaticMarkup(
       <Clay3D venue={{ lat: 38.36, lon: -75.6 }} venueLabel="Brew River" at={new Date()} timeZone="America/New_York" pins={[]} stand={null} onLeaveStand={() => {}} />,
     )
-    expect(CLAY_NOTE).toBe('Clay model from map data. Real buildings may differ; unknown heights shown lighter.')
-    expect(html).toContain(CLAY_NOTE)
+    const legend = html.slice(html.indexOf('clay__legend'))
+    expect(legend.match(/<p /g)).toHaveLength(1)
+    expect(legend).toContain('clay__pill')
+  })
+
+  it('a failed load is one line with Retry', () => {
+    const html = renderToStaticMarkup(<ClayPill status={{ kind: 'map-failed' }} reason={null} onRetry={() => {}} />)
+    expect(html).toContain("Map data didn&#x27;t load")
+    expect(html).toContain('Retry')
   })
 })

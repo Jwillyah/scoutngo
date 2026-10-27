@@ -138,7 +138,8 @@ export function ChipRow({ chips, active, onOpen, measureRef }: ChipRowProps) {
               </span>
             )}
           </span>
-          <span className={`chip2__value${chip.value === null ? '' : ' num'}`}>
+          {/* A value past seven characters ("38 m left") is set a size down rather than cut. */}
+          <span className={`chip2__value${chip.value === null ? '' : ' num'}${(chip.value?.length ?? 0) > 7 ? ' chip2__value--long' : ''}`}>
             {chip.value ?? NO_DATA}
             {chip.value === null || chip.unit === undefined ? null : (
               <span className="chip2__unit"> {chip.unit}</span>

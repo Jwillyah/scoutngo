@@ -39,28 +39,31 @@ describe('the golden bubble tiles', () => {
 })
 
 describe('the side menu', () => {
-  it('is eight items, gold to night blue, in the order asked for', () => {
-    expect(MENU_ITEMS.map((m) => m.label)).toEqual(['Plan', 'Sky', 'Kit', 'Saved spots', 'Viewfinder', 'Call sheet', 'Settings', 'About'])
-    expect(MENU_ITEMS.map((m) => m.icon)).toEqual(['plan', 'sky', 'kit', 'saved', 'viewfinder', 'callsheet', 'settings', 'about'])
+  /* The list asked for on 27 Oct, with Exposure its own item. */
+  it('is nine items, gold to night blue, in the order asked for', () => {
+    expect(MENU_ITEMS.map((m) => m.label)).toEqual(['Plan', 'Sky', 'Exposure', 'Kit', 'Saved spots', 'Viewfinder', 'Call sheet', 'Settings', 'About'])
+    expect(MENU_ITEMS.map((m) => m.icon)).toEqual(['plan', 'sky', 'exposure', 'kit', 'saved', 'viewfinder', 'callsheet', 'settings', 'about'])
   })
 
-  it('folds Shoot setup and Field into Plan, and still offers both', () => {
-    const plan = MENU_ITEMS.find((m) => m.id === 'plan')
-    expect(plan?.subs?.map((s) => s.label)).toEqual(['Shoot setup', 'Field'])
-    const html = renderToStaticMarkup(<SideMenu open current="field" onPick={() => {}} onClose={() => {}} />)
-    expect(html.match(/class="icon"/g)?.length).toBe(8)
-    expect(html).toContain('>Shoot setup<')
-    expect(html).toContain('>Field<')
-    /* Field is where you are, so Plan reads as the place you are in. */
+  it('has no Field and no Shoot setup / Field buttons under Plan: Shoot setup lives inside Plan', () => {
+    expect(MENU_ITEMS.some((m) => (m.subs ?? []).length > 0)).toBe(false)
+    const html = renderToStaticMarkup(<SideMenu open current="setup" onPick={() => {}} onClose={() => {}} />)
+    expect(html.match(/class="icon"/g)?.length).toBe(9)
+    expect(html).not.toContain('>Shoot setup<')
+    expect(html).not.toContain('>Field<')
+    /* Shoot setup is part of Plan, so Plan reads as the place you are in. */
     expect(html).toMatch(/sidemenu__item sidemenu__item--on[^]*?>Plan</)
   })
 
-  it('every place is reachable: an item, a folded door, or Now on Sky', () => {
-    const all: MenuItem[] = ['plan', 'setup', 'field', 'sky', 'kit', 'saved', 'now', 'viewfinder', 'callsheet', 'settings', 'about']
-    const offered = new Set(MENU_ITEMS.flatMap((m) => [m.id, ...(m.subs ?? []).map((s) => s.id)]))
+  it('every place is still reachable: an item, inside Plan, Now on Sky, or its own address', () => {
+    const all: MenuItem[] = ['plan', 'setup', 'field', 'sky', 'exposure', 'kit', 'saved', 'now', 'viewfinder', 'callsheet', 'settings', 'about']
+    const offered = new Set(MENU_ITEMS.map((m) => m.id))
     for (const item of all) {
       if (item === 'now') expect(menuHome(item)).toBe('sky')
-      else expect(offered.has(item), item).toBe(true)
+      else if (item === 'setup' || item === 'field') {
+        expect(menuHome(item)).toBe('plan')
+        expect(pathToMenuItem(`/${item}`)).toBe(item)
+      } else expect(offered.has(item), item).toBe(true)
     }
   })
 

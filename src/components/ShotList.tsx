@@ -36,9 +36,10 @@ const FRAMING_LABEL: Record<FramingWarning, string> = {
  * is for something being wrong; a wide frame is a choice. See the note in
  * src/core/fov.ts.
  */
-const FRAMING_SEVERITY: Record<FramingWarning, 'hazard' | 'note'> = {
+/* Too far is amber, a reason to think again; red is for hazards only. */
+const FRAMING_SEVERITY: Record<FramingWarning, 'caution' | 'note'> = {
   'frame-wider-than-subject': 'note',
-  'beyond-standoff': 'hazard',
+  'beyond-standoff': 'caution',
 }
 
 /**
@@ -125,7 +126,8 @@ export function ShotList({
                 {position.platform === 'air' ? (
                   <span className="shot__air num">{position.altitudeFeet}ft</span>
                 ) : null}
-                {position.moved ? <span className="shot__moved">moved</span> : null}
+                {/* Said in words: "2 MOVED" over the photo read as a count of something. */}
+                {position.moved ? <span className="shot__moved">you moved it</span> : null}
                 {warnings.map((warning) => (
                   <span className="shot__warn" key={warning}>
                     {WARNING_LABEL[warning]}
@@ -134,7 +136,7 @@ export function ShotList({
                 {framingWarnings.map((warning) => (
                   <span
                     className={
-                      FRAMING_SEVERITY[warning] === 'hazard' ? 'shot__warn' : 'shot__note'
+                      FRAMING_SEVERITY[warning] === 'caution' ? 'shot__caution' : 'shot__note'
                     }
                     key={warning}
                   >

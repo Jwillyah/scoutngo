@@ -663,11 +663,18 @@ both OpenStreetMap based, queried no more than once a second per their policy.
 The dropdown names whichever one answered, so you can always see where a result
 came from.
 
-**Naming a dropped pin.** Dropping or dragging the venue pin sends that one
-coordinate to Nominatim's reverse lookup, to fill the venue name with something
-readable. Only the coordinate is sent, at most once a second, and only while the
-name is still one the app filled in; once you type a name, moving the pin sends
-nothing. If the lookup fails the name reads "Dropped pin" and nothing waits on it.
+**Naming a pin.** A venue coordinate with no name of its own (a dropped or
+dragged pin, a search result that came back unnamed, a shared plan with no name)
+is sent to Nominatim's reverse lookup, to name it with something readable: the
+place, or failing that its area ("Rudee Inlet, Virginia Beach"). Only the
+coordinate is sent, at most once a second, and a failed lookup is asked again a
+few times (after 5, 20 and 60 seconds, and when the network comes back). Until
+a name arrives the top bar shows the coordinate. A named venue sends nothing.
+
+**Is there a network?** When a request fails, the app asks its own origin for a
+headers-only answer (`HEAD /`) before deciding anything. Offline is that check
+failing twice; one source refusing (Overpass, the map tiles) never makes the
+whole app say offline. Nothing about you or the venue is in that request.
 
 **Site geometry.** Pressing Generate also asks Overpass, at
 `overpass-api.de`, for the water, buildings, piers, roads, and parking inside the

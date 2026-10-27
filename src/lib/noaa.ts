@@ -156,7 +156,8 @@ export interface TidePredictions {
 
 export type PredictionsResult =
   | { status: 'ok'; predictions: TidePredictions }
-  | { status: 'unavailable'; reason: string }
+  /** `unreachable`: the request itself failed, so asking again may answer. */
+  | { status: 'unavailable'; reason: string; unreachable?: true }
 
 /** yyyymmdd in UTC, which is what the API's date range wants alongside gmt. */
 const stamp = (date: Date): string =>
@@ -367,6 +368,7 @@ export async function fetchPredictions(
     }
     return {
       status: 'unavailable',
+      unreachable: true,
       reason:
         error instanceof Error && error.name === 'AbortError'
           ? 'The tide prediction timed out, and none is saved for this date.'

@@ -22,7 +22,7 @@
  * uses, so the audit is about this square and not "some tag says something".
  */
 import { connect } from './cdp.mjs'
-import { goToStage, guardAudit, startWatchdog } from './preflight.mjs'
+import { goToStage, guardAudit, setSheet, startWatchdog } from './preflight.mjs'
 
 guardAudit('airspace')
 const watchdog = startWatchdog('airspace', 240_000)
@@ -114,13 +114,14 @@ watchdog.note('atlantic park')
 await settle(ATLANTIC_PARK, 10)
 const classLines = await rendered('airspace-class-line')
 check(classLines > 0, `controlled airspace outline rendered at the wide view: ${classLines} features`)
-/* The airspace card replaced the layers card when the tile was switched on. */
+/* The airspace card replaced the layers card when the tile was switched on. Layers opens full, where the dock is put away: down first. */
+await setSheet(ev, wait, 'peek')
 await ev(`document.querySelector('button[aria-label="Map and layers"]')?.click()`)
 await wait(800)
 const dense = await ev(`[...document.querySelectorAll('.tile')].find((t) => t.querySelector('.tile__label')?.textContent === 'Airspace')?.querySelector('.tile__state')?.textContent ?? null`)
 const denseTags = await ev(`document.querySelectorAll('.gridtag').length`)
 if (dense === null) abort('the Airspace tile was not on screen to read at the wide view; reopen layers')
-check(dense.includes('ZOOM IN'), `wide view tile state: "${dense}"`)
+check(/zoom/i.test(dense), `wide view tile state: "${dense}"`)
 check(denseTags === 0, `wide view grid tags: ${denseTags}`)
 
 /* 4. Shenandoah: a national park outline. */
@@ -133,8 +134,12 @@ watchdog.note('shenandoah')
 await settle(ATLANTIC_PARK, 15)
 await ev(`document.querySelector('.card__close, button[aria-label="Close"]')?.click()`)
 await wait(500)
-const armed = await ev(`(() => { const b = document.querySelector('button[aria-label="Measure between two points"]'); if (!b) return false; b.click(); return true })()`)
-if (!armed) abort('no measure button on the rail')
+/* The ruler left the rail on 27 Oct: Measure is under Tools in Layers (and on a long press). */
+await setSheet(ev, wait, 'peek').catch(() => null)
+await ev(`(() => { const b = document.querySelector('button[aria-label="Map and layers"]'); if (b && b.getAttribute('aria-pressed') !== 'true') b.click(); return 1 })()`)
+await wait(600)
+const armed = await ev(`(() => { const b = [...document.querySelectorAll('button.tile')].find((t) => t.querySelector('.tile__label')?.textContent === 'Measure'); if (!b) return false; b.click(); return true })()`)
+if (!armed) abort('no Measure tile under Tools in Layers')
 await wait(400)
 for (const [fx, fy] of [[0.3, 0.3], [0.7, 0.3]]) {
   await ev(`(() => {
@@ -146,12 +151,13 @@ for (const [fx, fy] of [[0.3, 0.3], [0.7, 0.3]]) {
   await wait(400)
 }
 await wait(800)
-const note = await ev(`[...document.querySelectorAll('.tapnote')].map((p) => p.textContent).find((t) => t.includes('heading')) ?? null`)
+const note = await ev(`[...document.querySelectorAll('.tapnote__text')].map((p) => p.textContent).find((t) => t.includes('°')) ?? null`)
 const measureLine = await rendered('measure-line')
-check(note !== null && /^[\d,.]+ (m|km|ft|mi), heading \d+° [a-z-]+\. Back: \d+° [a-z-]+\.$/.test(note), `measure says: "${note}"`)
+/* Short, one line: "1,456 ft · NNW 347°". */
+check(note !== null && /^[\d,.]+ (m|km|ft|mi) · [NESW]{1,3} \d+°$/.test(note), `measure says: "${note}"`)
 check(measureLine > 0, `measure line rendered: ${measureLine}`)
 /* Left to right across the screen with the map north up is a heading near due east. */
-const heading = note === null ? null : Number(/heading (\d+)°/.exec(note)?.[1])
+const heading = note === null ? null : Number(/(\d+)°$/.exec(note)?.[1])
 check(heading !== null && Math.abs(heading - 90) <= 2, `left-to-right heading ${heading}° (want 90° ±2)`)
 
 watchdog.stop()

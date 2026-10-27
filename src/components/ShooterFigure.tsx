@@ -95,9 +95,14 @@ const FRAMING_LABEL: Record<FramingWarning, string> = {
  * length, and the magenta is kept for the two things that genuinely are wrong:
  * standing in a river, and standing further out than the shot can carry.
  */
-const FRAMING_SEVERITY: Record<FramingWarning, 'hazard' | 'note'> = {
+/*
+ * FAR IS AMBER, NOT RED. On 27 Oct at Virginia Beach a "FAR" badge was red,
+ * and red is for hazards only: standing further out than the shot carries is
+ * a reason to think again, not a danger. Water, road and people stay red.
+ */
+const FRAMING_SEVERITY: Record<FramingWarning, 'hazard' | 'caution' | 'note'> = {
   'frame-wider-than-subject': 'note',
-  'beyond-standoff': 'hazard',
+  'beyond-standoff': 'caution',
 }
 
 /*

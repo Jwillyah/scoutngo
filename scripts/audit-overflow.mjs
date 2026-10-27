@@ -175,6 +175,36 @@ try {
     const label = await ev(`(() => { const c = document.querySelectorAll('.chips2 .chip2')[${i}]; c.click(); return c.querySelector('.chip2__label')?.textContent ?? 'chip' })()`)
     await check(`Plan, ${label} card`, '.sheet')
   }
+  /*
+   * LAYERS IS A PAGE: it opens full and fits 390 x 844 with no scrolling, the
+   * Tools row and the source line included (27 Oct: it scrolled, with a caps
+   * paragraph on a tile).
+   */
+  await ev(`(() => { const b = document.querySelector('button[aria-label="Map and layers"]'); if (b && b.getAttribute('aria-pressed') !== 'true') b.click(); return 1 })()`)
+  await wait(900)
+  await check('Plan, Layers', '.tiles')
+  const layers = JSON.parse(await ev(`JSON.stringify((() => {
+    const sheet = document.querySelector('.sheet')
+    const tiles = document.querySelector('.tiles')
+    if (!sheet || !tiles) return { missing: true }
+    const scrolls = [...sheet.querySelectorAll('*')].filter((e) => { const s = getComputedStyle(e); return /(auto|scroll)/.test(s.overflowY) && e.scrollHeight > e.clientHeight + 1 }).map((e) => e.className + ' ' + e.scrollHeight + '/' + e.clientHeight)
+    const foot = document.querySelector('.tiles__foot')?.getBoundingClientRect()
+    return { detent: sheet.dataset.detent, scrolls, footBottom: foot ? Math.round(foot.bottom) : null, vh: innerHeight, tools: [...document.querySelectorAll('.tile__label')].some((l) => l.textContent === 'Measure'), longest: Math.max(...[...document.querySelectorAll('.tile__state')].map((e) => e.textContent.length)) }
+  })())`))
+  if (layers.missing) fail('Layers did not open, so it was not checked')
+  else {
+    console.log(`  Layers: sheet ${layers.detent}, scrolling boxes ${layers.scrolls.length}, foot ends at ${layers.footBottom} of ${layers.vh} px, Measure under Tools ${layers.tools}, longest state ${layers.longest} characters`)
+    if (layers.detent !== 'full') fail(`Layers opened at ${layers.detent}, not full`)
+    for (const x of layers.scrolls) fail(`Layers scrolls: ${x}`)
+    if (layers.footBottom === null || layers.footBottom > layers.vh) fail('the foot of Layers is off the screen')
+    if (!layers.tools) fail('no Measure under Tools in Layers')
+    if (layers.longest > 24) fail(`a tile state runs to ${layers.longest} characters; a state is a few words`)
+  }
+  await ev(`document.querySelector('button[aria-label="Map and layers"]')?.click()`)
+  await wait(500)
+  /* Back down: at full the map's rail, the 3D button with it, is put away. */
+  await setSheet(ev, wait, 'peek')
+
   await ev(`document.querySelector('button[aria-label="Menu"]')?.click()`)
   await check('the menu', 'nav[aria-label="Stage"]')
   await ev(`document.querySelector('button[aria-label="Menu"]')?.click(); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`)

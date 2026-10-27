@@ -4,6 +4,7 @@ import type { Wind } from '../core/upwind.ts'
 import type { LevelWind } from '../core/windProfile.ts'
 import { fetchVenueDay, parseVenueCloud, parseWind, venueClock, type VenueCloud } from './forecast.ts'
 import { reportNetwork } from './offlineCache.ts'
+import { retrying } from './retrying.ts'
 import { readForecast, saveForecast, venueDayKey, type Provenance } from './savedForecast.ts'
 
 /**
@@ -103,16 +104,16 @@ export function useWind(
       setState(EMPTY)
       return
     }
-    let live = true
     /* The venue's own date: the same one the request asks for. */
     const key = venueDayKey(lat, lon, venueClock(at, timeZone).date, timeZone)
-    void fetchVenueDay({ lat, lon }, at, timeZone).then((result) => {
-      if (!live) return
+    /* Asked again after a failure that a second try could change (src/lib/retrying.ts). */
+    return retrying(async () => {
+      const result = await fetchVenueDay({ lat, lon }, at, timeZone)
       if (result.status === 'ok') {
         reportNetwork(true)
         saveForecast(key, result.payload)
         setState(fromPayload(result.payload, at, timeZone, { kind: 'live' }))
-        return
+        return true
       }
       if (result.unreachable === true) reportNetwork(false)
       const saved = readForecast(key)
@@ -124,10 +125,8 @@ export function useWind(
             }
           : fromPayload(saved.payload, at, timeZone, { kind: 'saved', fetchedAt: saved.fetchedAt }),
       )
+      return false
     })
-    return () => {
-      live = false
-    }
     /*
      * `at` is deliberately not a dependency: only the HOUR changes the answer,
      * and depending on the instant would refetch on every scrubber frame.

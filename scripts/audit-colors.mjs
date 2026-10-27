@@ -77,7 +77,7 @@ const ruleBody = (selector) => {
   const at = APP_CSS.indexOf(`\n${selector} {`)
   return at === -1 ? null : APP_CSS.slice(at, APP_CSS.indexOf('}', at))
 }
-for (const selector of ['.chip2--soon', '.chip2--soon .chip2__value']) {
+for (const selector of ['.chip2--soon', '.chip2--soon .chip2__value', '.shooter__flag--caution', '.shot__caution', '.card__caution']) {
   const body = ruleBody(selector)
   if (body === null) fail(`${selector} is not in app.css`)
   else if (/hazard|#ff3b30/i.test(body) || !body.includes('var(--sun)')) fail(`${selector} must be the sun's amber and never the hazard red`)

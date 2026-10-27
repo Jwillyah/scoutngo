@@ -42,34 +42,50 @@ export interface OverlayTile {
 interface LayerTilesProps {
   base: readonly BaseTile[]
   overlays: readonly OverlayTile[]
+  /** Things you do on the map rather than layers on it: the measure. */
+  tools: readonly OverlayTile[]
   /** One line, as now: the imagery source and whether this zoom is past it. */
   sourceLine: string
   /** The paragraphs that used to be on every row. */
   about: ReactNode
 }
 
-export function LayerTiles({ base, overlays, sourceLine, about }: LayerTilesProps) {
+export function LayerTiles({ base, overlays, tools, sourceLine, about }: LayerTilesProps) {
   const [showAbout, setShowAbout] = useState(false)
 
   return (
     <div className="tiles">
-      <p className="tiles__head">Base</p>
-      <div className="tiles__base">
-        {base.map((tile) => (
-          <button
-            type="button"
-            key={tile.id}
-            className="tile"
-            aria-pressed={tile.on}
-            onClick={tile.onToggle}
-          >
+      {/*
+        * BASE AND TOOLS SHARE THE TOP ROW: two base tiles and the measure,
+        * on the same four columns as the layers under them, so the whole page
+        * fits a 390 x 844 phone with no scrolling (scripts/audit-overflow.mjs).
+        * The measure lives here and on a long press, not on the map's edge.
+        */}
+      <div className="tiles__top">
+        <div className="tiles__group tiles__group--base">
+          <p className="tiles__head">Base</p>
+          {base.map((tile) => (
+          <button type="button" key={tile.id} className="tile" aria-pressed={tile.on} onClick={tile.onToggle}>
             <span className={`tile__art${tile.on ? ' tile__art--on' : ''}`} aria-hidden="true">
               {tile.art}
             </span>
             <span className="tile__label">{tile.label}</span>
             <span className={`tile__state${tile.on ? ' tile__state--on' : ''}`}>{tile.state}</span>
           </button>
-        ))}
+          ))}
+        </div>
+        <div className="tiles__group tiles__group--tools">
+          <p className="tiles__head">Tools</p>
+          {tools.map((tile) => (
+          <button type="button" key={tile.id} className="tile" aria-pressed={tile.on} onClick={tile.onToggle}>
+            <span className={`tile__art${tile.on ? ' tile__art--on' : ''}`} aria-hidden="true">
+              {tile.art}
+            </span>
+            <span className="tile__label">{tile.label}</span>
+            <span className={`tile__state${tile.on ? ' tile__state--on' : ''}`}>{tile.state}</span>
+          </button>
+          ))}
+        </div>
       </div>
 
       <p className="tiles__head">Over the map</p>

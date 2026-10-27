@@ -13,6 +13,7 @@ import type { FramingWarning } from '../core/fov.ts'
 import type { SiteWarning } from '../core/siting.ts'
 import { fetchSightlineCloud, type ForecastKind } from '../lib/forecast.ts'
 import { fetchGroundView, type GroundView } from '../lib/groundView.ts'
+import { groundLine } from '../lib/groundLine.ts'
 import type { KitProfile as KitProfileType } from '../core/kit.ts'
 import { MAX_ALTITUDE_FEET as FAA_CEILING_FEET } from '../core/air.ts'
 import type { LatLon } from '../core/geo.ts'
@@ -136,9 +137,10 @@ const WARNING_COPY: Record<SiteWarning, string> = {
 /**
  * TWO SEVERITIES, BECAUSE THEY ARE TWO DIFFERENT KINDS OF THING.
  *
- * beyond-standoff is a hazard and keeps the magenta: the shot will not work at
- * that distance, and on the air side the aircraft is at the edge of being seen.
- * It is also rare, firing past 450 m on the ground and 400 m in the air.
+ * beyond-standoff is a caution, in amber: the shot may not work at that
+ * distance, and on the air side the aircraft is at the edge of being seen. It
+ * was magenta until 27 Oct, when a red FAR at Virginia Beach read as a hazard;
+ * red is for hazards only. It fires past 450 m on the ground and 400 m in the air.
  *
  * A WIDE FRAME IS NOT A HAZARD, it is a choice, and on an aerial it is usually
  * the reason for flying. It used to be magenta on all three positions of a
@@ -146,9 +148,9 @@ const WARNING_COPY: Record<SiteWarning, string> = {
  * So it reads as a note, and the words are a measurement rather than a verdict:
  * see src/lib/framingCopy.ts.
  */
-const FRAMING_SEVERITY: Record<FramingWarning, 'hazard' | 'note'> = {
+const FRAMING_SEVERITY: Record<FramingWarning, 'caution' | 'note'> = {
   'frame-wider-than-subject': 'note',
-  'beyond-standoff': 'hazard',
+  'beyond-standoff': 'caution',
 }
 
 const FRAMING_COPY: Record<FramingWarning, string> = {
@@ -229,6 +231,8 @@ function PhotoSlot({
    * than being corrected by a second render.
    */
   const [view, setView] = useState<GroundView>({ status: 'loading' })
+  /* Retry asks again: a failed request is not kept (lib/groundView.ts). */
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     if (viewBearing === null) return
@@ -239,7 +243,7 @@ function PhotoSlot({
     return () => {
       live = false
     }
-  }, [viewFrom, viewBearing, hFOV])
+  }, [viewFrom, viewBearing, hFOV, attempt])
 
   /*
    * HOW OLD THE VIEW IS, AND HOW LOUDLY TO SAY SO.
@@ -256,14 +260,40 @@ function PhotoSlot({
 
   const line = lightLine(planned.read)
 
+  /*
+   * NO PICTURE, NO BIG EMPTY PANEL. On 27 Oct a failed ground view left the
+   * whole picture slot standing empty around one sentence. Without a picture
+   * the slot is one line, with Retry where asking again could help.
+   */
+  const slim = groundLine(view, air, borrowed)
+  if (slim !== null) {
+    return (
+      <div className="frame frame--line">
+        <span className="frame__num num">{planned.position.number}</span>
+        <p className="frame__none" title={view.status === 'error' ? view.message : undefined}>
+          {slim.text}
+          {slim.retry ? (
+            <>
+              {' · '}
+              <button
+                type="button"
+                className="frame__retry"
+                onClick={() => {
+                  setView({ status: 'loading' })
+                  setAttempt((n) => n + 1)
+                }}
+              >
+                Retry
+              </button>
+            </>
+          ) : null}
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className="frame">
-      {air && !borrowed ? (
-        <p className="frame__none">
-          Flown, not walked, and there is no venue pin to aim a ground view at.
-        </p>
-      ) : null}
-
       {viewBearing !== null && view.status === 'loading' ? (
         <p className="frame__none">Loading ground view…</p>
       ) : null}
@@ -276,30 +306,10 @@ function PhotoSlot({
         />
       ) : null}
 
-      {view.status === 'no-key' || view.status === 'no-coverage' || view.status === 'error' ? (
-        <p className="frame__none">
-          {view.message}
-          {/*
-            * WHERE "HERE" WAS. On a borrowed view the message is about the
-            * venue pin, not about the position, and "no imagery at this spot"
-            * would send somebody looking at the wrong coordinate.
-            */}
-          {/*
-            * WHERE "HERE" WAS, and no substitute. "If no usable imagery
-            * exists on that bearing, say so rather than showing me something
-            * pointing elsewhere." So there is no second attempt from a
-            * different spot: the absence is reported.
-            */}
-          {borrowed
-            ? ' That is street level near this position. Nothing is shown from another spot instead.'
-            : ''}
-        </p>
-      ) : null}
 
       {/* Quietly, in the corners, so neither competes with the picture. */}
       <span className="frame__num num">
         {planned.position.number}
-        {planned.position.moved ? <span className="frame__moved">moved</span> : null}
       </span>
       {year === null ? null : (
         <span className={`frame__year num frame__year--${age}`}>{year}</span>
@@ -770,9 +780,9 @@ export function PositionCard({
         * it is a measurement and not a problem.
         */}
       {framingWarnings
-        .filter((warning) => FRAMING_SEVERITY[warning] === 'hazard')
+        .filter((warning) => FRAMING_SEVERITY[warning] === 'caution')
         .map((warning) => (
-          <p className="card__warn" key={warning}>
+          <p className="card__caution" key={warning}>
             {FRAMING_COPY[warning]}
           </p>
         ))}

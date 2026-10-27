@@ -37,6 +37,7 @@ import {
   VECTOR_TEMPLATE,
   vectorZoomsFor,
 } from './offlineSources.ts'
+import { connectivity } from './connectivity.ts'
 import { cleanTerrainBytes } from './seaMask.ts'
 import { boxAround, tilesForRange, tileUrl, type Box } from './tileRange.ts'
 
@@ -108,53 +109,19 @@ export const realUrl = (url: string): string =>
 /* ------------------------------------------------------------- connectivity */
 
 /*
- * IS THERE A NETWORK? The venue bar's quiet mark reads this.
- *
- * navigator.onLine alone cannot answer it. It is false in airplane mode and
- * TRUE on a mountain with the radio on and no bars, which is the case that
- * actually happened. So the answer is also what the network has DONE lately:
- * a request that timed out or failed with the device claiming to be online
- * marks it unreachable, and the next one that succeeds clears that.
+ * IS THERE A NETWORK? Answered in src/lib/connectivity.ts: a failed request is
+ * a reason to check the app's own origin, never a verdict by itself. These are
+ * the names the rest of the app already calls.
  */
-type Listener = (online: boolean) => void
-const listeners = new Set<Listener>()
-let lastAttemptFailed = false
-
-const deviceOnline = (): boolean =>
-  typeof navigator === 'undefined' || navigator.onLine !== false
-
-export function isOnline(): boolean {
-  return deviceOnline() && !lastAttemptFailed
-}
+export const isOnline = (): boolean => connectivity.isOnline()
 
 /** Every network call that can tell success from failure reports it here. */
-export function reportNetwork(ok: boolean): void {
-  const before = isOnline()
-  lastAttemptFailed = !ok
-  const after = isOnline()
-  if (before !== after) for (const listener of listeners) listener(after)
-}
+export const reportNetwork = (ok: boolean): void => connectivity.report(ok)
 
-export function onConnectivity(listener: Listener): () => void {
-  listeners.add(listener)
-  const relay = () => listener(isOnline())
-  if (typeof window !== 'undefined') {
-    window.addEventListener('online', relay)
-    window.addEventListener('offline', relay)
-  }
-  return () => {
-    listeners.delete(listener)
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('online', relay)
-      window.removeEventListener('offline', relay)
-    }
-  }
-}
+export const onConnectivity = (listener: (online: boolean) => void): (() => void) => connectivity.onChange(listener)
 
 /** For tests: forget what the network did. */
-export function resetConnectivity(): void {
-  lastAttemptFailed = false
-}
+export const resetConnectivity = (): void => connectivity.reset()
 
 /* ------------------------------------------------------------------ storage */
 
@@ -243,7 +210,7 @@ export async function loadTile(
   /* Elevation tiles have the sea put at sea level first (src/lib/seaMask.ts), for 2D and 3D alike. */
   if (saved !== null) return { data: await cleanTerrainBytes(url, saved, loadRawTile) }
 
-  if (!deviceOnline()) throw new Error(`offline and not saved: ${url}`)
+  if (!isOnline()) throw new Error(`offline and not saved: ${url}`)
 
   let response: Response
   try {

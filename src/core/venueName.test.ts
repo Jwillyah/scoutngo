@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   coordinateLabel,
-  NAME_UNKNOWN,
   placeKey,
   shortVenueLabel,
   venueLabel,
@@ -43,7 +42,9 @@ describe('the name belongs to a coordinate', () => {
     /* Failure is modelled as "not looking and nothing cached for here". */
     const got = venueNameFor(CACHED, SHENANDOAH.lat, SHENANDOAH.lon, false)
     expect(got.kind).toBe('unknown')
-    expect(venueLabel(got, SHENANDOAH.lat, SHENANDOAH.lon)).toBe(NAME_UNKNOWN)
+    /* The coordinate, never the old name and never "Name unknown". */
+    expect(venueLabel(got, SHENANDOAH.lat, SHENANDOAH.lon)).toBe(coordinateLabel(SHENANDOAH.lat, SHENANDOAH.lon))
+    expect(venueLabel(got, SHENANDOAH.lat, SHENANDOAH.lon)).not.toBe(CACHED.name)
   })
 
   it('treats an empty cached name as nothing, not as a name', () => {

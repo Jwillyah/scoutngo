@@ -1,3 +1,4 @@
+import { clayStatus, type ClayStatus } from '../lib/clayStatus.ts'
 import { useEffect, useRef, useState } from 'react'
 import { SENSORS } from '../core/fov.ts'
 import type { LatLon } from '../core/geo.ts'
@@ -35,7 +36,7 @@ interface Clay3DProps {
   onLeaveStand: () => void
 }
 
-export const CLAY_NOTE = 'Clay model from map data. Real buildings may differ; unknown heights shown lighter.'
+export const CLAY_NOTE = 'Clay model from map data; real buildings may differ'
 
 export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveStand }: Clay3DProps) {
   const host = useRef<HTMLDivElement>(null)
@@ -144,6 +145,7 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
     })
   }, [ready, stand])
 
+  const pill = clayStatus(failed, shown, place)
   const unknown = place.buildings?.list.filter((b) => b.height.metres === null).length ?? 0
 
   const box =
@@ -157,32 +159,40 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
       {box === null ? null : (
         <div className="clay__frame" style={{ width: `${box.width}px`, height: `${box.height}px` }} aria-hidden="true" />
       )}
+      {/*
+        * ONE THING AT THE FOOT, NEVER A STACK. On 27 Oct three messages stood
+        * one over another here. Now the most important status is the one
+        * pill (claySatus below); with nothing to report, the one legend line.
+        */}
       <div className="clay__legend">
-        <p className="clay__note">{CLAY_NOTE}</p>
-        {failed !== null ? <p className="clay__line">3D could not start: {failed}</p> : null}
-        {!shown && failed === null ? <p className="clay__line">Loading the 3D view…</p> : null}
-        {place.buildings === null ? null : (
-          <p className="clay__line num">
-            {place.buildings.list.length} buildings
-            {place.buildings.savedAt === null ? '' : `, saved on this phone ${place.buildings.savedAt.slice(0, 10)}`}
-            {unknown > 0 ? (
+        {pill !== null ? (
+          <ClayPill status={pill} reason={place.reason} onRetry={() => void loadPlace(venue, { retry: true })} />
+        ) : (
+          <p className="clay__line">
+            <span className="clay__note">{CLAY_NOTE}</span>
+            {place.buildings === null ? null : (
               <>
-                {' · '}
-                <span className="clay__swatch clay__swatch--unknown" aria-hidden="true" />
-                {unknown} height unknown, drawn lighter, no shadow
+                {` · ${place.buildings.list.length} buildings`}
+                {place.buildings.savedAt === null ? '' : `, saved on this phone ${place.buildings.savedAt.slice(0, 10)}`}
+                {unknown > 0 ? (
+                  <>
+                    {' · '}
+                    <span className="clay__swatch clay__swatch--unknown" aria-hidden="true" />
+                    {unknown} heights unknown (lighter, no shadow)
+                  </>
+                ) : null}
+                {place.trees?.status === 'drawn'
+                  ? ` · ${place.trees.trees.length} mapped trees`
+                  : place.trees?.status === 'sparse'
+                    ? ` · no trees drawn, only ${place.trees.count} mapped here`
+                    : place.trees?.status === 'unavailable'
+                      ? " · trees didn't load"
+                      : ''}
               </>
-            ) : null}
-            {place.trees?.status === 'drawn'
-              ? ` · ${place.trees.trees.length} mapped trees`
-              : place.trees?.status === 'sparse'
-                ? ` · no trees drawn, only ${place.trees.count} mapped here`
-                : place.trees?.status === 'unavailable'
-                  ? " · trees didn't load"
-                  : ''}
+            )}
+            {flat > 0 ? ' · some ground flat (no saved elevation)' : ''}
           </p>
         )}
-        {flat > 0 ? <p className="clay__line">Some ground has no saved elevation and is drawn flat.</p> : null}
-        <PlacePill place={place} onRetry={() => void loadPlace(venue, { retry: true })} />
       </div>
       {stand === null || lensFocal === null ? null : (
         <div className="clay__stand">
@@ -217,16 +227,17 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
 
 
 /*
- * ONE STATUS FOR THE MAP DATA, as a small pill rather than a box per thing
- * that failed. It speaks for the buildings, which come from the map tiles;
- * the trees, from Overpass, never put it up. Only the Retry takes a touch;
- * the rest of the pill lets the map underneath have it.
+ * THE ONE STATUS, MOST IMPORTANT FIRST: 3D could not start, the map data
+ * did not load (with Retry), the view still loading, the map data still
+ * loading. The buildings come from the map tiles; the trees, from Overpass,
+ * never put it up. Only the Retry takes a touch; the rest lets the map have it.
  */
-export function PlacePill({ place, onRetry }: { place: PlaceState; onRetry: () => void }) {
-  if (place.status === 'loading') return <p className="clay__pill">Loading map data…</p>
-  if (place.status !== 'failed') return null
+export function ClayPill({ status, reason, onRetry }: { status: ClayStatus; reason: string | null; onRetry: () => void }) {
+  if (status.kind === 'broken') return <p className="clay__pill">3D could not start: {status.why}</p>
+  if (status.kind === 'view-loading') return <p className="clay__pill">Loading the 3D view…</p>
+  if (status.kind === 'map-loading') return <p className="clay__pill">Loading map data…</p>
   return (
-    <p className="clay__pill" title={place.reason ?? undefined}>
+    <p className="clay__pill" title={reason ?? undefined}>
       Map data didn't load ·{' '}
       <button type="button" className="clay__pillbtn" onClick={onRetry}>
         Retry
