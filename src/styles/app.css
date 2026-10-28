@@ -363,11 +363,6 @@
   color: var(--color-text-muted);
 }
 
-.setup__note--bad {
-  padding-left: var(--space-2);
-  border-left: var(--line-rule) solid var(--color-hazard);
-  color: var(--color-text);
-}
 
 .setup__choices {
   display: grid;
@@ -863,11 +858,6 @@
   color: var(--color-text-muted);
 }
 
-.describe__note--bad {
-  padding-left: var(--space-3);
-  border-left: var(--line-rule) solid var(--color-hazard);
-  color: var(--color-text);
-}
 
 .describe__raw pre {
   margin: var(--space-2) 0 0;
@@ -882,14 +872,6 @@
 }
 
 /* Several matches: the shooter picks, the app never guesses. */
-.describe__choices {
-  display: grid;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  background: var(--color-panel-2);
-  border-left: var(--line-rule) solid var(--color-hazard);
-  border-radius: var(--radius-panel);
-}
 
 .describe__choice {
   min-height: var(--control-height);
@@ -957,7 +939,7 @@
 
 /* An unclaimed shot is a gap in a list someone is expecting back. */
 .wanted__row--open {
-  border-left: var(--line-rule) solid var(--color-hazard);
+  border-left: var(--line-rule) solid var(--sun);
   padding-left: var(--space-2);
 }
 
@@ -973,7 +955,7 @@
 }
 
 .wanted__row--open .wanted__state {
-  color: var(--color-hazard);
+  color: var(--sun);
 }
 
 /* ------------------------------------------------------------- field pack */
@@ -993,7 +975,7 @@
 
 /* A pack for a different plan is the one state that must not read as fine. */
 .pack--stale {
-  border-left-color: var(--color-hazard);
+  border-left-color: var(--sun);
 }
 
 .pack__status {
@@ -2882,7 +2864,7 @@
 }
 
 .coverage--thin {
-  border-left-color: var(--color-hazard);
+  border-left-color: var(--sun);
 }
 
 .coverage__head {
@@ -2908,7 +2890,7 @@
 .coverage__warn {
   margin: 0;
   padding-left: var(--space-3);
-  border-left: var(--line-rule) solid var(--color-hazard);
+  border-left: var(--line-rule) solid var(--sun);
   color: var(--color-text);
 }
 
@@ -3196,18 +3178,7 @@
   color: var(--color-text-faint);
 }
 
-.input--invalid,
-.textarea--invalid {
-  border-color: var(--color-hazard);
-  border-width: var(--line-rule);
-  background: var(--color-hazard-bg);
-}
 
-.field__error {
-  font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
-  color: var(--color-hazard);
-}
 
 .row {
   display: grid;
@@ -3558,7 +3529,7 @@
 }
 
 .readout__night {
-  color: var(--color-hazard);
+  color: var(--sun);
   font-weight: var(--weight-medium);
 }
 
@@ -3668,7 +3639,7 @@
 .shot__risk {
   font-size: var(--text-xs);
   color: var(--color-text-muted);
-  border-left: var(--line-rule) solid var(--color-hazard);
+  border-left: var(--line-rule) solid var(--sun);
   padding-left: var(--space-2);
 }
 
@@ -3724,6 +3695,11 @@
 
 .notice--hazard {
   border-left-color: var(--color-hazard);
+}
+
+/* A caution, not a hazard: what loading a saved plan had to change. */
+.notice--warn {
+  border-left-color: var(--sun);
 }
 
 .empty {
@@ -4699,8 +4675,8 @@
 
 /* Red, because deleting a position is the one destructive thing on this card. */
 .cardacts__btn--danger {
-  color: var(--color-hazard);
-  border-color: color-mix(in srgb, var(--color-hazard) 45%, var(--color-line));
+  color: var(--color-text);
+  border-color: var(--color-line-strong);
 }
 
 /*
@@ -4786,7 +4762,7 @@
 }
 
 .kited__del:hover {
-  color: var(--color-hazard);
+  color: var(--color-text);
 }
 
 .kited__adds,
@@ -5987,7 +5963,7 @@
 }
 
 .hz__del {
-  background: var(--color-hazard-bg);
+  background: var(--color-panel-2);
   color: var(--white);
 }
 
@@ -6215,7 +6191,7 @@
 }
 
 .build__line--loss {
-  border-left: var(--line-rule) solid var(--color-hazard);
+  border-left: var(--line-rule) solid var(--sun);
   color: var(--color-text);
 }
 
@@ -8739,7 +8715,7 @@
 }
 
 .card2__note--warn {
-  color: var(--color-hazard);
+  color: var(--sun);
 }
 
 .card2__eyebrow {

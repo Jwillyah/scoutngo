@@ -151,7 +151,7 @@ export function PlanStatus({
       {generation.status === 'working' ? <GenerateProgress stage={generation.stage} /> : null}
 
       {positionNote === null ? null : (
-        <p className="notice notice--hazard">{positionNote}</p>
+        <p className="notice notice--warn">{positionNote}</p>
       )}
 
       {generation.status === 'error' ? (

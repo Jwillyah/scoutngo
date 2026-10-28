@@ -92,5 +92,56 @@ for (const selector of ['.frame__year--old', '.frame__age--old']) {
   else console.log(`  ${selector.padEnd(28)} not red  ok`)
 }
 
+/*
+ * EVERY RED RULE, NAMED, WITH ITS REASON (29 Oct: "keep red for real hazards
+ * and real errors only, a failed load the user must act on. Warnings,
+ * cautions, far, starting soon use amber").
+ *
+ * On that day 39 rules painted with the hazard red; the pass left the ones
+ * below and turned the rest amber or plain, or deleted them (five matched
+ * nothing in any component). A NEW rule in the red fails here until someone
+ * decides it is a hazard or an error and adds it with a reason, and a listed
+ * one that no longer paints red fails too, so the list only ever describes
+ * what is on the screen (shape B in docs/failure-modes.md).
+ */
+const RED_RULES = {
+  '.pack__error': 'the field pack failed to save: act on it',
+  '.fc__warn': "a site hazard on Field's card",
+  '.shooter--warned .shooter__disc': 'a position standing in a hazard',
+  '.shooter--warned .shooter__cam-lens': 'a position standing in a hazard',
+  '.raw': 'the plan could not be read back: a failed load',
+  '.raw__head': 'the plan could not be read back: a failed load',
+  '.notice--hazard': 'generating the plan failed',
+  '.shooter__flag--hazard': 'the hazard flag on a position',
+  '.shot__warn': 'in water, in a roadway, over people',
+  '.card__warn': 'in water, in a roadway, over people',
+  '.kitf__error': 'the kit form refused what was typed: act on it',
+  '.hz__kind--on.hz__kind--hazard': 'a hazard mark',
+  '.kitaudit__line--loss': 'stored kit lost: re-add it',
+  '.skykey__swatch--over': "wind over the aircraft's rated limit",
+  '.chip2--urgent': "wind over the aircraft's rated limit",
+  '.chip2--urgent .chip2__value': "wind over the aircraft's rated limit",
+  '.judge--warn .judge__bar': "hours over the aircraft's rated wind",
+  '.judge--warn .judge__rule': "hours over the aircraft's rated wind",
+  '.bars__fill--over': "wind over the aircraft's rated limit",
+  '.bars__value--over': "wind over the aircraft's rated limit",
+  '.air__line--hazard': 'airspace that forbids or restricts the flight',
+  '.fly__arc--hazard': 'an obstacle about to be hit',
+  '.cmp__line--error': 'the 3D view for a photo failed to build',
+}
+{
+  const red = new Set()
+  /* Comments out first: a comment's commas and braces are not selectors. */
+  const css = APP_CSS.replace(/\/\*[\s\S]*?\*\//g, '')
+  for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if (!/var\(--(color-)?hazard\)|#ff3b30/i.test(m[2])) continue
+    for (const sel of m[1].split(',')) red.add(sel.trim().replace(/\s+/g, ' '))
+  }
+  if (red.size === 0) fail('no rule in app.css paints with the hazard red, so the red rule check looked at nothing')
+  for (const sel of red) if (!(sel in RED_RULES)) fail(`${sel} paints with the hazard red and is not a named hazard or error (add it to RED_RULES with its reason, or use amber, var(--sun))`)
+  for (const sel of Object.keys(RED_RULES)) if (!red.has(sel)) fail(`${sel} is listed as red but no longer paints red: take it off the list`)
+  console.log(`  ${red.size} rules paint with the hazard red, each a named hazard or error`)
+}
+
 console.log(`\n=== COLOUR PROBLEMS: ${problems} ===`)
 process.exit(problems === 0 ? 0 : 1)
