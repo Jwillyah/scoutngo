@@ -12593,3 +12593,28 @@
 .cmp__again {
   justify-self: start;
 }
+
+/*
+ * OVER THE MAP, ONLY BUTTONS TAKE A FINGER (29 Oct: "overlays never steal the
+ * pinch"). A pinch that began on the shadow note, or between two chips, went
+ * to that box and not to the map. The boxes let touches through to the map;
+ * the controls in them still take taps. scripts/audit-gestures.mjs scans a
+ * grid over the map for anything else on top.
+ */
+.topbar,
+.chips2,
+.rail2,
+.tooldock,
+.shadowkey,
+.maplibregl-ctrl-bottom-left .maplibregl-ctrl {
+  pointer-events: none;
+}
+
+.topbar :is(button, a, input, select, label),
+.topbar__pill,
+.chips2 :is(button, a),
+.rail2 :is(button, a),
+.tooldock :is(button, a),
+.maplibregl-ctrl-bottom-left .maplibregl-ctrl :is(button, a) {
+  pointer-events: auto;
+}

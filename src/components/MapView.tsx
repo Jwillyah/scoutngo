@@ -144,6 +144,11 @@ function encodeCanvas(canvas: HTMLCanvasElement): string {
  */
 const ESRI_TILES = viaProtocol(IMAGERY_TEMPLATE)
 
+/* The coarse picture under the imagery (see the style below), and the two base layers app layers go above. */
+const UNDERLAY_LAYER = 'esri-underlay'
+const UNDERLAY_MAX_ZOOM = 10
+const BASE_LAYERS: ReadonlySet<string> = new Set(['esri', UNDERLAY_LAYER])
+
 /**
  * THE LAST ZOOM ESRI ACTUALLY HAS IMAGERY FOR, over rural ground.
  *
@@ -1282,6 +1287,30 @@ export function MapView({
   latestView.current = onViewChange
 
   const selfMoved = useRef(false)
+  /* Fingers on the map right now, and the one camera move waiting for them to lift. */
+  const fingers = useRef(0)
+  const waiting = useRef<(() => void) | null>(null)
+  /**
+   * Every camera move the app makes goes through here: now, or once no
+   * finger is down and the map has stopped coasting. Only the latest waits;
+   * an older one would be stale by the time it ran.
+   */
+  const moveCamera = useCallback((move: () => void) => {
+    if (fingers.current > 0) {
+      waiting.current = move
+      return
+    }
+    move()
+  }, [])
+  const releaseCamera = useCallback(() => {
+    const instance = map.current
+    const move = waiting.current
+    if (move === null) return
+    waiting.current = null
+    if (instance !== null && instance.isMoving()) {
+      instance.once('moveend', () => (fingers.current > 0 ? (waiting.current = move) : move()))
+    } else move()
+  }, [])
   const insetRef = useRef(bottomInset)
   insetRef.current = bottomInset
 
@@ -1304,6 +1333,12 @@ export function MapView({
             maxzoom: ESRI_NATIVE_MAX_ZOOM,
             attribution: ESRI_ATTRIBUTION,
           },
+          [UNDERLAY_LAYER]: {
+            type: 'raster',
+            tiles: [ESRI_TILES],
+            tileSize: 256,
+            maxzoom: UNDERLAY_MAX_ZOOM,
+          },
           /*
            * Declared at init and left EMPTY of layers until asked for, so
            * nothing is fetched for a shooter who never turns labels on. A
@@ -1324,7 +1359,17 @@ export function MapView({
             attribution: ESRI_REFERENCE_ATTRIBUTION,
           },
         },
-        layers: [{ id: 'esri', type: 'raster', source: 'esri' }],
+        /*
+         * A COARSE UNDERLAY, ALWAYS THERE (29 Oct: "the map sometimes goes
+         * fully black, the satellite disappears"). The same imagery, never
+         * finer than z10, under the real layer: a pinch outruns the tiles,
+         * and what shows through is a blurred picture of the place, never the
+         * black of an empty canvas. Its tiles are few and stay cached.
+         */
+        layers: [
+          { id: UNDERLAY_LAYER, type: 'raster', source: UNDERLAY_LAYER },
+          { id: 'esri', type: 'raster', source: 'esri', paint: { 'raster-fade-duration': 0 } },
+        ],
       },
       /*
        * NO PIN, NO PLACE. The map opens on a wide view that is asking rather
@@ -1347,6 +1392,12 @@ export function MapView({
       pitchWithRotate: false,
       touchPitch: false,
       /*
+       * KEEP LOADING THE TILES A PINCH IS PASSING THROUGH. The default cancels
+       * them while zooming, so a long pinch on a slow network could end with
+       * nothing at its level and nothing above it.
+       */
+      cancelPendingTileRequestsWhileZooming: false,
+      /*
        * 85, NOT 60, SO THERE IS A SKY TO PUT A SUN IN.
        *
        * At 60 degrees with MapLibre's 36.87 degree vertical field of view the
@@ -1367,9 +1418,42 @@ export function MapView({
       canvasContextAttributes: { preserveDrawingBuffer: true },
     })
 
-    instance.touchZoomRotate.enable({ around: 'center' })
-    instance.touchPitch.enable()
+    /*
+     * THE PINCH FOLLOWS THE FINGERS. It was `{ around: 'center' }`: the zoom
+     * went round the middle of the screen whatever was under the fingers, so
+     * a pinch on the pier slid the pier away. Rotation needs a deliberate
+     * twist (MapLibre's own threshold, 25 px round the circle of the two
+     * fingers); a double tap zooms in and a two-finger tap out (its tap zoom).
+     *
+     * NO TILT BY HAND IN 2D (29 Oct: "two-finger vertical drag tilts only in
+     * 3D"). touchPitch was switched off in the options and back on here.
+     */
+    instance.touchZoomRotate.enable()
+    /*
+     * AND FROM THE FIRST FEW PIXELS. MapLibre ignores the first 0.1 of a
+     * zoom level of a pinch, then starts from where the fingers have got to,
+     * so the map stayed up to 0.08 levels off them for the whole pinch and
+     * lurched when it began (measurements/2026-10-28-pinch-after.md, held).
+     * 0.02 is a couple of pixels of spread.
+     */
+    instance.touchZoomRotate.setZoomThreshold(0.02)
+    instance.touchPitch.disable()
     instance.dragRotate.enable()
+
+    /*
+     * NOTHING IN THE APP MOVES THE CAMERA WHILE A FINGER IS DOWN. Fingers are
+     * counted on the map's own element; a camera move the app asks for while
+     * any are down waits (the latest one only) until they lift and the
+     * map's own coasting has stopped. See moveCamera.
+     */
+    const el = instance.getContainer()
+    const countFingers = (event: TouchEvent) => {
+      fingers.current = event.touches.length
+      if (fingers.current === 0) releaseCamera()
+    }
+    el.addEventListener('touchstart', countFingers, { capture: true, passive: true })
+    el.addEventListener('touchend', countFingers, { capture: true, passive: true })
+    el.addEventListener('touchcancel', countFingers, { capture: true, passive: true })
 
     instance.on('error', (event) => {
       console.error('[maplibre error]', event.error?.message ?? '(no message)', event)
@@ -1483,10 +1567,23 @@ export function MapView({
      * warning should appear while a pinch is still happening, not a beat after
      * it stops.
      */
+    /*
+     * NOT EVERY FRAME. This set the plan's state on every move, so a pinch
+     * re-rendered the whole plan sixty times a second, and with it this map's
+     * props. Now on each whole zoom level crossed while moving (the warning
+     * still comes during the pinch) and exactly once when it stops.
+     */
+    let reportedLevel = Number.NaN
     const reportView = () => {
       latestView.current?.(instance.getZoom(), instance.getCanvas().clientWidth)
     }
-    instance.on('move', reportView)
+    instance.on('move', () => {
+      const level = Math.floor(instance.getZoom())
+      if (level === reportedLevel) return
+      reportedLevel = level
+      reportView()
+    })
+    instance.on('moveend', reportView)
     instance.once('load', reportView)
 
     /*
@@ -2327,11 +2424,13 @@ export function MapView({
       },
 
       flyTo(at, zoom) {
-        map.current?.flyTo({
-          center: [at.lon, at.lat],
-          zoom: zoom ?? Math.max(map.current.getZoom(), 17),
-          duration: 900,
-        })
+        moveCamera(() =>
+          map.current?.flyTo({
+            center: [at.lon, at.lat],
+            zoom: zoom ?? Math.max(map.current.getZoom(), 17),
+            duration: 900,
+          }),
+        )
       },
 
       fitAll(points, duration = 900, padding) {
@@ -2339,7 +2438,7 @@ export function MapView({
         if (instance === null || points.length === 0) return
         const bounds = new maplibregl.LngLatBounds()
         for (const p of points) bounds.extend([p.lon, p.lat])
-        instance.fitBounds(bounds, {
+        moveCamera(() => instance.fitBounds(bounds, {
           // Top clears the search field and the mode row; bottom clears the sheet.
           padding: padding ?? {
             top: 150,
@@ -2349,26 +2448,28 @@ export function MapView({
           },
           maxZoom: 18,
           duration,
-        })
+        }))
       },
 
       setBearing(bearing, instant) {
-        if (instant === true) map.current?.setBearing(bearing)
-        else map.current?.easeTo({ bearing, duration: 400 })
+        moveCamera(() => {
+          if (instant === true) map.current?.setBearing(bearing)
+          else map.current?.easeTo({ bearing, duration: 400 })
+        })
       },
       setPitch(pitch) {
-        map.current?.easeTo({ pitch, duration: 400 })
+        moveCamera(() => map.current?.easeTo({ pitch, duration: 400 }))
         latest.current.onPitchChange(pitch)
       },
 
       zoomTo(zoom) {
-        map.current?.easeTo({ zoom, duration: 400 })
+        moveCamera(() => map.current?.easeTo({ zoom, duration: 400 }))
       },
       zoomBy(delta) {
-        map.current?.easeTo({ zoom: (map.current.getZoom() ?? 16) + delta, duration: 250 })
+        moveCamera(() => map.current?.easeTo({ zoom: (map.current.getZoom() ?? 16) + delta, duration: 250 }))
       },
     }),
-    [probeHandle],
+    [probeHandle, moveCamera],
   )
 
   /* --------------------------------------------------------- venue marker */
@@ -2402,13 +2503,15 @@ export function MapView({
        * threshold the zoom is the user's and is left alone.
        */
       const tooWide = instance.getZoom() < FRAME_VENUE_BELOW_ZOOM
-      instance.easeTo({
-        center: [venue.lon, venue.lat],
-        ...(tooWide ? { zoom: VENUE_ZOOM } : {}),
-        duration: 600,
-      })
+      moveCamera(() =>
+        instance.easeTo({
+          center: [venue.lon, venue.lat],
+          ...(tooWide ? { zoom: VENUE_ZOOM } : {}),
+          duration: 600,
+        }),
+      )
     }
-  }, [venue])
+  }, [venue, moveCamera])
 
   /* ------------------------------------------------- the one sentence hint */
   /*
@@ -2711,7 +2814,7 @@ export function MapView({
        * would make the plan read as being inside the geometry rather than on
        * top of it; the first app layer is the insertion point.
        */
-      const first = instance.getStyle().layers.find((l) => l.id !== 'esri')?.id
+      const first = instance.getStyle().layers.find((l) => !BASE_LAYERS.has(l.id))?.id
       instance.addLayer(
         {
           id: BUILDING_LAYER,
@@ -2867,7 +2970,7 @@ export function MapView({
     const instance = map.current
     if (instance === null || !ready) return
 
-    const first = instance.getStyle().layers.find((l) => l.id !== 'esri')?.id
+    const first = instance.getStyle().layers.find((l) => !BASE_LAYERS.has(l.id))?.id
     for (const [source, layer] of [
       [LABEL_SOURCE_ROADS, LABEL_LAYER_ROADS],
       [LABEL_SOURCE_PLACES, LABEL_LAYER_PLACES],
@@ -3518,9 +3621,10 @@ export function MapView({
     }
   }, [])
 
+  /* Padding moves the camera's centre too, so it waits for the fingers like any other move. */
   useEffect(() => {
-    map.current?.setPadding({ top: 0, left: 0, right: 0, bottom: bottomInset })
-  }, [bottomInset])
+    moveCamera(() => map.current?.setPadding({ top: 0, left: 0, right: 0, bottom: bottomInset }))
+  }, [bottomInset, moveCamera])
 
   return (
     <div className={`map${mode === null ? '' : ' map--picking'}`}>

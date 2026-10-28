@@ -10,6 +10,16 @@ import './styles/base.css'
 import './styles/app.css'
 import App from './App.tsx'
 
+/*
+ * THE PAGE DOES NOT PINCH-ZOOM UNDER THE MAP. iOS Safari ignores
+ * user-scalable=no in the viewport tag, and a pinch that the page also takes
+ * is a page that scales round the map while the map scales too (29 Oct, the
+ * snapping). Its own `gesturestart` is the one hook it honours. MapLibre's
+ * pinch reads touch events, which this leaves alone. Chrome has no such event,
+ * so this is the one part of the pinch fix the emulation cannot exercise.
+ */
+document.addEventListener('gesturestart', (event) => event.preventDefault())
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />

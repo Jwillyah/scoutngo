@@ -17,14 +17,25 @@ export async function connect() {
   const app = await ensureApp()
   const browser = await ensureBrowser()
 
-  const response = await fetch('http://127.0.0.1:9222/json/list')
+  /*
+   * A TAB OF ITS OWN, EVERY TIME, closed by dispose.
+   *
+   * This attached to the first page in the browser's list, which is whatever
+   * tab the last script left behind. On 28 Oct a run of synthetic pinches
+   * wedged that tab's touch input (dispatches succeeded, no touch event ever
+   * arrived; mouse input still did, and a new tab took touches fine), and
+   * the gate's sheet audit, run next in the same browser, reported 13 of 20
+   * drags as moving the wrong thing in a build where none did. A check that
+   * inherits another script's tab is pointed at that script's leftovers
+   * (shape C in docs/failure-modes.md).
+   */
+  const response = await fetch('http://127.0.0.1:9222/json/new?about:blank', { method: 'PUT' })
   if (!response.ok) {
-    throw new PreflightError(`the browser's target list answered HTTP ${response.status}`)
+    throw new PreflightError(`the browser would not open a tab: HTTP ${response.status}`)
   }
-  const list = await response.json()
-  const target = list.find((x) => x.type === 'page')
-  if (target === undefined) {
-    throw new PreflightError('the browser has no page target to attach to')
+  const target = await response.json()
+  if (target === undefined || target.type !== 'page') {
+    throw new PreflightError('the browser opened no page target to attach to')
   }
   if (typeof target.webSocketDebuggerUrl !== 'string') {
     throw new PreflightError('the page target has no debugger URL')
@@ -63,6 +74,7 @@ export async function connect() {
    */
   const dispose = async () => {
     try { ws.close() } catch { /* already closed */ }
+    try { await fetch(`http://127.0.0.1:9222/json/close/${target.id}`) } catch { /* the browser is going anyway */ }
     await browser.stop()
     await app.stop()
   }
