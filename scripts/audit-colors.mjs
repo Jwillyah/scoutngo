@@ -84,5 +84,13 @@ for (const selector of ['.chip2--soon', '.chip2--soon .chip2__value', '.shooter_
   else console.log(`  ${selector.padEnd(28)} amber, not red  ok`)
 }
 
+/* Old imagery is a caution about the picture, not a hazard: never red (27 Oct, "2016" in red on the shoot card). */
+for (const selector of ['.frame__year--old', '.frame__age--old']) {
+  const body = ruleBody(selector)
+  if (body === null) fail(`${selector} is not in app.css`)
+  else if (/hazard|#ff3b30/i.test(body)) fail(`${selector} is in the hazard red; old imagery is not a hazard`)
+  else console.log(`  ${selector.padEnd(28)} not red  ok`)
+}
+
 console.log(`\n=== COLOUR PROBLEMS: ${problems} ===`)
 process.exit(problems === 0 ? 0 : 1)

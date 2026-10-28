@@ -705,6 +705,8 @@ interface MapViewProps {
   flight?: GeoJSON.FeatureCollection | null
   /* The waterline over the scanned patch, as an image (src/lib/waterline/useWaterline.ts). */
   waterline?: { url: string; coordinates: [[number, number], [number, number], [number, number], [number, number]] } | null
+  /* What the map is showing, in full, at the top of the "i" (MapCredits.tsx): the shadow legend's details. */
+  infoNotes?: readonly string[]
   /* The light map around the venue, as an image (src/lib/lightmap/lightMapFor.ts). */
   lightmap?: { url: string; coordinates: [[number, number], [number, number], [number, number], [number, number]] } | null
   /** PhotoPills style rays from the venue pin. All four bearings from core. */
@@ -1161,6 +1163,7 @@ export function MapView({
   onFlightAt,
   flight = null,
   waterline = null,
+  infoNotes = [],
   lightmap = null,
   pilotAt = null,
   onPilotMove,
@@ -3526,7 +3529,7 @@ export function MapView({
         * marker to. See src/core/sunSky.ts.
         */}
       <SunInSky frame={skyFrame} />
-      {credits === null ? null : <CreditsSheet lines={credits} onClose={() => setCredits(null)} />}
+      {credits === null ? null : <CreditsSheet lines={credits} notes={infoNotes} onClose={() => setCredits(null)} />}
       {plan.map((planned, index) => {
         const host = figureEls[planned.position.id]
         if (host === undefined) return null

@@ -128,6 +128,7 @@ import { LightNowBlock } from './LightNowBlock.tsx'
 import { getMoonArc } from '../core/moonArc.ts'
 import type { SkyTab } from '../lib/skyTab.ts'
 import { PhaseRule } from './PhaseRule.tsx'
+import { shadowKeyLine, shadowKeyNotes } from '../lib/shadowKey.ts'
 
 
 /*
@@ -274,11 +275,6 @@ interface PlanModeProps {
    */
   /** The resolved venue name, already keyed to the coordinate. */
   venueNameLine: string
-  /*
-   * The town, which the venue bar has no room for. Null where the venue line
-   * is one part -- "Big Meadow" -- or a coordinate.
-   */
-  venueTownLine: string | null
   units: Units
   onUnits: (next: Units) => void
   onHow: (section: HowSection) => void
@@ -484,7 +480,6 @@ export function PlanMode({
   onChangeMark,
   onDeleteMark,
   venueNameLine,
-  venueTownLine,
   units,
   onUnits,
   onHow,
@@ -1305,10 +1300,11 @@ export function PlanMode({
     <div className="shootc">
       <div className="shootc__head">
         {/*
-          * THE TOWN LIVES HERE, because the venue bar could not hold it. The
-          * bar names the venue; this says where in the world that is, once.
+          * THE SAME NAME AS THE TOP BAR. This carried the town, and at the
+          * pier it read "Virginia Beach, Vi..." under a bar that said the
+          * pier's name: two names for one place (27 Oct, from the phone).
           */}
-        <span className="shootc__title">{venueTownLine ?? 'The shoot'}</span>
+        <span className="shootc__title">{venueNameLine}</span>
         <span className="shootc__when num">
           {venueWindow === null
             ? '—'
@@ -2068,6 +2064,7 @@ export function PlanMode({
       }
     >
       <MapView
+        infoNotes={shadows === null || threeD ? [] : shadowKeyNotes(shadows, scanYearUsed)}
         airspace={airspaceOn ? airspaceOverlay : null}
         onAirspaceDense={setAirspaceDense}
         measurePins={measurePins ?? undefined}
@@ -2231,13 +2228,9 @@ export function PlanMode({
         * when it rode up the screen into the chip row.
         */}
       {shadows === null || threeD || sheet === 'full' ? null : (
-        <p className="shadowkey" role="status">
-          {shadows.status === 'no-sun'
-            ? 'No shadows: the sun is down.'
-            : `Shadows from ${shadows.shadows.length} ${shadows.shadows.length === 1 ? 'building' : 'buildings'} with a known height.`}
-          {shadows.skippedNoHeight === 0 ? '' : ` ${shadows.skippedNoHeight} more have no height and cast none here.`} Flat ground.
-          {/* The scan year wherever its heights are used. */}
-          {scanYearUsed === undefined ? '' : ` Heights from the ${scanYearUsed ?? 'public'} lidar scan; newer buildings may be missing.`}
+        /* ONE SHORT LINE over the map (27 Oct, from the phone: the sentence ran across it); the rest is in the "i". */
+        <p className="shadowkey num" role="status">
+          {shadowKeyLine(shadows)}
         </p>
       )}
       {!showWaterline || sheet === 'full' ? null : (

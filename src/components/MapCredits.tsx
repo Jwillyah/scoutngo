@@ -13,7 +13,12 @@
  */
 import { useEffect, useRef } from 'react'
 
-export function CreditsSheet({ lines, onClose }: { lines: readonly string[]; onClose: () => void }) {
+/*
+ * AND WHAT IS ON THE MAP, ABOVE THE CREDITS: the long lines that used to sit
+ * over the map itself (the shadow legend's "flat ground", the scan year),
+ * which now say one short line there and the rest here.
+ */
+export function CreditsSheet({ lines, notes = [], onClose }: { lines: readonly string[]; notes?: readonly string[]; onClose: () => void }) {
   const close = useRef<HTMLButtonElement>(null)
   useEffect(() => close.current?.focus(), [])
   return (
@@ -24,6 +29,13 @@ export function CreditsSheet({ lines, onClose }: { lines: readonly string[]; onC
           ×
         </button>
       </div>
+      {notes.length === 0 ? null : (
+        <ul className="credits__list credits__notes" aria-label="On the map">
+          {notes.map((note) => (
+            <li key={note}>{note}</li>
+          ))}
+        </ul>
+      )}
       <ul className="credits__list">
         {lines.map((line) => (
           <li key={line}>{line}</li>

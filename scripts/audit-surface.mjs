@@ -951,6 +951,13 @@ if (fifth !== 'added') {
  * if the venue name is rendered from two places, one of them will one day
  * show the cache while the other shows the geocode.
  *
+ * ONE EXCEPTION, ASKED FOR (27 Oct, from the phone at the pier): the shoot
+ * card's title names the venue as the bar does. It carried the town instead,
+ * and "Virginia Beach, Vi..." under a bar saying the pier's name read as two
+ * places. Both render one value (PlanMode's venueNameLine), and the check
+ * below holds them to the same text, which is how drift between them would
+ * show; anywhere else the name appears is still a repeat.
+ *
  * MECHANICAL, AND SCOPED TO THE ONE STRING IT CAN CHECK HONESTLY. It takes
  * the venue name from the venue bar -- the element whose job that is -- and
  * requires that no other visible element on the screen contains it. Map
@@ -967,8 +974,11 @@ if (await setDetent('half')) {
     if (name === '' || name === '—') return { error: 'the venue bar names no venue' }
     const canvas = document.querySelector('.map__canvas')
     const others = []
+    const title = document.querySelector('.shootc__title')
+    const titleText = title === null ? null : (title.textContent ?? '').trim()
     for (const el of document.querySelectorAll('body *')) {
       if (el === bar || el.contains(bar)) continue
+      if (title !== null && (el === title || el.contains(title))) continue
       if (canvas !== null && (canvas.contains(el) || el === canvas)) continue
       if (el.getBoundingClientRect().width === 0) continue
       /* The deepest element holding the text, so one line is not reported ten times. */
@@ -977,13 +987,16 @@ if (await setDetent('half')) {
         others.push(String(el.className || el.tagName).slice(0, 40))
       }
     }
-    return { name, others }
+    return { name, others, titleText }
   })()`)
 
   if (named.error !== undefined) {
     fail(named.error)
   } else {
-    console.log(`  "${named.name}" appears in the venue bar and ${named.others.length} other place(s)`)
+    console.log(`  "${named.name}" appears in the venue bar, the shoot card's title says "${named.titleText ?? 'nothing'}", and ${named.others.length} other place(s)`)
+    if (named.titleText !== null && named.titleText !== named.name) {
+      fail(`the shoot card names "${named.titleText}" and the venue bar "${named.name}": two names for one place`)
+    }
     if (named.others.length > 0) {
       fail(
         `the venue name is on the screen ${named.others.length + 1} times: the venue bar, and ` +

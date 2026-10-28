@@ -1584,6 +1584,13 @@
   font-size: var(--text-lg);
 }
 
+/* What is on the map, above the credits: no bullets, set apart by a rule. */
+.credits__notes {
+  list-style: none;
+  padding: 0 0 var(--space-2);
+  border-bottom: var(--line-hair) solid var(--color-line);
+}
+
 .credits__list {
   margin: var(--space-1) 0 0;
   padding-left: var(--space-4);
@@ -6060,8 +6067,16 @@
   opacity: 1;
 }
 
+/*
+ * OLD IMAGERY IS NOT A HAZARD, so not red (27 Oct, from the phone: "2016" in
+ * red on the shoot card's photo). Dark glass, white and heavy: louder than
+ * a current year, and the sentence under the photo says why.
+ */
 .frame__year--old {
-  background: var(--color-hazard);
+  background: color-mix(in srgb, var(--black) 62%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border: var(--line-hair) solid color-mix(in srgb, var(--white) 22%, transparent);
   color: var(--white);
   opacity: 1;
   font-weight: var(--weight-heavy);
@@ -6081,8 +6096,8 @@
 }
 
 .frame__age--old {
-  /* The reported case. A rule in the hazard colour, not a block of it. */
-  border-left: var(--line-rule) solid var(--color-hazard);
+  /* The reported case: a white rule. Old imagery is a caution about the picture, never red. */
+  border-left: var(--line-rule) solid var(--white);
 }
 
 .frame__age--ageing {
@@ -8854,19 +8869,19 @@
   font-size: var(--text-sm);
 }
 
+/* The name wraps above the window rather than losing its end to an ellipsis. */
 .shootc__head {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: var(--space-2);
+  column-gap: var(--space-2);
 }
 
 .shootc__title {
   flex: 1 1 auto;
   min-width: 0;
   margin: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
   font-size: var(--text-md);
   font-weight: var(--weight-heavy);
   color: var(--color-text);

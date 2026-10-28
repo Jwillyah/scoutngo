@@ -88,7 +88,6 @@ import { clampRadius, RADIUS_DEFAULT_METERS } from './core/radius.ts'
 import { formatSpan, formatWallTime, setClockHours, venueTimeZone } from './core/timezone.ts'
 import { msUntilNominatim, reverseGeocode } from './lib/search.ts'
 import { usePersistentState } from './lib/usePersistentState.ts'
-import { venueTown } from './lib/venueParts.ts'
 import { DEFAULT_UNITS, reviveUnits, type Units } from './lib/units.ts'
 import {
   placeKey,
@@ -1968,13 +1967,8 @@ function App() {
 
       {mode === 'plan' ? (
         <PlanMode
-          /*
-           * THE BAR GETS THE NAME, THE SHOOT CARD GETS THE TOWN. One line
-           * does not fit beside a date and an avatar at 390px. Both halves
-           * come from core's own boundary; see src/lib/venueParts.ts.
-           */
+          /* One name for the place, in the bar and on the shoot card alike. */
           venueNameLine={venueShort}
-          venueTownLine={venueTown(venueNameLine, venueShort)}
           units={settings.units ?? DEFAULT_UNITS}
           onUnits={(next) => setSettings({ ...settings, units: next })}
           /*
