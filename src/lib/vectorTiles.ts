@@ -103,6 +103,20 @@ export function oceanFeatures(tile: VectorTile): TilePoint[][][] {
   return out
 }
 
+/** The piers in one vector tile (OpenMapTiles transportation, class pier): decks as polygons, and those mapped as a line. */
+export function pierFeatures(tile: VectorTile): { polygons: TilePoint[][][]; lines: TilePoint[][] } {
+  const layer = tile.layers.transportation
+  const out: { polygons: TilePoint[][][]; lines: TilePoint[][] } = { polygons: [], lines: [] }
+  if (layer === undefined) return out
+  for (let i = 0; i < layer.length; i += 1) {
+    const f = layer.feature(i)
+    if (f.properties.class !== 'pier') continue
+    if (f.type === 3) out.polygons.push(f.loadGeometry().map(pointsOf))
+    else if (f.type === 2) for (const line of f.loadGeometry()) out.lines.push(pointsOf(line))
+  }
+  return out
+}
+
 export const vectorExtent = (tile: VectorTile): number => tile.layers.water?.extent ?? tile.layers.building?.extent ?? 4096
 
 /**

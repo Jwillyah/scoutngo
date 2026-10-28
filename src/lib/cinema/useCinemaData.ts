@@ -2,7 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import type { LatLon } from '../../core/geo.ts'
 import { levelAt } from '../../core/tide.ts'
 import { meanRange, waterNavd, type OffsetChoice } from '../../core/waterline.ts'
-import { seaTestAround } from '../coast.ts'
+import { COAST_ZOOM } from '../coast.ts'
+import { boxAround, tilesInBox } from '../tileRange.ts'
+import { loadVectorTile, oceanFeatures, pierFeatures, vectorExtent } from '../vectorTiles.ts'
+import type { TilePoint } from '../../core/oceanMask.ts'
 import { fetchMarine, fetchSkyHours, fetchWindMonth, hourlyAt, type Hourly } from '../tideSheetData.ts'
 import type { TideInfo } from '../useTide.ts'
 import { offsetFor } from '../waterline/datums.ts'
@@ -17,42 +20,95 @@ import type { CinemaInputs } from '../../three/cinema.ts'
  * with no known offset sits at 0 m and the preview says so.
  */
 export const SEA_MASK_HALF_M = 6000
-const MASK_PX = 256
+/* 1024 across 12 km: 11.7 m a pixel. It was 256 (47 m), and the shore drew in 47 m stairs and a pier 8 m wide could not be cut out of it. */
+const MASK_PX = 1024
+/* The sea grown by this many pixels (23 m) under the beach, so the ground against the water's height draws the shore. */
+const GROW_PX = 2
+/* Piers are looked for this far from the venue, from the zoom-14 tiles: the pier, and its neighbours along a beach. */
+const PIER_SEARCH_M = 2000
+const PIER_ZOOM = 14
+/* A pier mapped as a line, drawn this wide. */
+const PIER_LINE_M = 10
 
-/* Where the ocean is, as a mask image around the venue, grown by two pixels so the beach itself (the ground against the water's height) draws the shore. */
+/*
+ * WHERE THE OCEAN IS, as a mask image around the venue: the map's ocean
+ * (OpenMapTiles water, class ocean) drawn white on black, grown a little
+ * under the beach, with the piers (transportation, class pier) cut back out.
+ * The pier at Virginia Beach is only in the photograph, at the sea floor;
+ * drawn water over the map's ocean hid it (28 Oct).
+ */
 export async function seaMask(venue: LatLon): Promise<{ url: string; halfM: number } | null> {
-  const test = await seaTestAround(venue, SEA_MASK_HALF_M * Math.SQRT2)
-  if (test === null) return null
-  const sea = new Uint8Array(MASK_PX * MASK_PX)
-  let any = false
-  const mPerLat = 111_320
-  const mPerLon = 111_320 * Math.cos((venue.lat * Math.PI) / 180)
-  for (let j = 0; j < MASK_PX; j += 1) {
-    for (let i = 0; i < MASK_PX; i += 1) {
-      const east = ((i + 0.5) / MASK_PX - 0.5) * 2 * SEA_MASK_HALF_M
-      const north = (0.5 - (j + 0.5) / MASK_PX) * 2 * SEA_MASK_HALF_M
-      if (test({ lat: venue.lat + north / mPerLat, lon: venue.lon + east / mPerLon })) {
-        sea[j * MASK_PX + i] = 1
-        any = true
-      }
-    }
-  }
-  if (!any) return null
   const canvas = document.createElement('canvas')
   canvas.width = MASK_PX
   canvas.height = MASK_PX
   const ctx = canvas.getContext('2d')
   if (ctx === null) return null
-  const img = ctx.createImageData(MASK_PX, MASK_PX)
-  for (let j = 0; j < MASK_PX; j += 1) {
-    for (let i = 0; i < MASK_PX; i += 1) {
-      let on = false
-      for (let dj = -2; dj <= 2 && !on; dj += 1) for (let di = -2; di <= 2 && !on; di += 1) on = sea[Math.min(MASK_PX - 1, Math.max(0, j + dj)) * MASK_PX + Math.min(MASK_PX - 1, Math.max(0, i + di))] === 1
-      const v = on ? 255 : 0
-      img.data.set([v, v, v, 255], (j * MASK_PX + i) * 4)
+  const mPerLat = 111_320
+  const mPerLon = 111_320 * Math.cos((venue.lat * Math.PI) / 180)
+  const pxPerM = MASK_PX / (2 * SEA_MASK_HALF_M)
+  /* A tile's point to the mask's pixel. */
+  const toPx = (tx: number, ty: number, z: number, extent: number, p: TilePoint): [number, number] => {
+    const n = 2 ** z
+    const lon = ((tx + p.x / extent) / n) * 360 - 180
+    const lat = (Math.atan(Math.sinh(Math.PI * (1 - (2 * (ty + p.y / extent)) / n))) * 180) / Math.PI
+    return [MASK_PX / 2 + (lon - venue.lon) * mPerLon * pxPerM, MASK_PX / 2 - (lat - venue.lat) * mPerLat * pxPerM]
+  }
+  const trace = (tx: number, ty: number, z: number, extent: number, rings: TilePoint[][]) => {
+    for (const ring of rings) {
+      ring.forEach((p, i) => {
+        const [x, y] = toPx(tx, ty, z, extent, p)
+        if (i === 0) ctx.moveTo(x, y)
+        else ctx.lineTo(x, y)
+      })
+      ctx.closePath()
     }
   }
-  ctx.putImageData(img, 0, 0)
+  ctx.fillStyle = '#000'
+  ctx.fillRect(0, 0, MASK_PX, MASK_PX)
+  let any = false
+  for (const id of tilesInBox(boxAround(venue, SEA_MASK_HALF_M * Math.SQRT2), COAST_ZOOM)) {
+    const tile = await loadVectorTile({ z: COAST_ZOOM, x: id.x, y: id.y })
+    if (tile === null) return null
+    const extent = vectorExtent(tile)
+    for (const rings of oceanFeatures(tile)) {
+      any = true
+      ctx.beginPath()
+      trace(id.x, id.y, COAST_ZOOM, extent, rings)
+      ctx.fillStyle = '#fff'
+      ctx.fill('evenodd')
+      ctx.strokeStyle = '#fff'
+      ctx.lineWidth = GROW_PX * 2
+      ctx.stroke()
+    }
+  }
+  if (!any) return null
+  /* The piers, cut out: polygons filled, lines stroked PIER_LINE_M wide. */
+  for (const id of tilesInBox(boxAround(venue, PIER_SEARCH_M), PIER_ZOOM)) {
+    const tile = await loadVectorTile({ z: PIER_ZOOM, x: id.x, y: id.y })
+    if (tile === null) continue
+    const extent = vectorExtent(tile)
+    const piers = pierFeatures(tile)
+    ctx.fillStyle = '#000'
+    ctx.strokeStyle = '#000'
+    for (const rings of piers.polygons) {
+      ctx.beginPath()
+      trace(id.x, id.y, PIER_ZOOM, extent, rings)
+      ctx.fill('evenodd')
+      ctx.lineWidth = 2
+      ctx.stroke()
+    }
+    ctx.lineWidth = Math.max(2, PIER_LINE_M * pxPerM)
+    ctx.lineCap = 'round'
+    for (const line of piers.lines) {
+      ctx.beginPath()
+      line.forEach((p, i) => {
+        const [x, y] = toPx(id.x, id.y, PIER_ZOOM, extent, p)
+        if (i === 0) ctx.moveTo(x, y)
+        else ctx.lineTo(x, y)
+      })
+      ctx.stroke()
+    }
+  }
   return { url: canvas.toDataURL('image/png'), halfM: SEA_MASK_HALF_M }
 }
 

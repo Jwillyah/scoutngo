@@ -26,6 +26,8 @@ import {
   Color,
   EllipsoidSurfaceAppearance,
   GeometryInstance,
+  GroundPrimitive,
+  ClassificationType,
   Material,
   PostProcessStage,
   PostProcessStageLibrary,
@@ -33,7 +35,8 @@ import {
   Rectangle,
   RectangleGeometry,
   Sun,
-  type Cartesian3,
+  Cartesian3,
+  Matrix4,
   type CesiumWidget,
 } from '@cesium/engine'
 import { placeClouds, type Cloud, type Cover } from '../core/clouds.ts'
@@ -192,9 +195,94 @@ function cloudSprite(): HTMLCanvasElement {
   return c
 }
 
+/**
+ * THE SEA SURFACE: the water's height over the map's ocean, its waves from
+ * the marine forecast and the wind (src/core/seaSurface.ts), Real (the deep
+ * colour, the sky in it, a sharp glint) or painted. Built at 0 m and lifted
+ * to the water's height by its model matrix, so a new tide height moves it
+ * rather than rebuilding 57,000 vertices (setLevel). Used by the preview and,
+ * since 28 Oct, by the plain 3D view offshore.
+ */
+export function buildSea(
+  inputs: Pick<CinemaInputs, 'sea' | 'seaMask' | 'waterLevelM'>,
+  venue: LatLon,
+  painted: boolean,
+  /*
+   * DRAPED ON THE GROUND, for the plain view: the water follows the terrain
+   * and stops at the mask's coastline exactly. As a flat plane at the tide's
+   * height it cut through the coarse elevation's triangles between the
+   * lowered sea floor and the beach, and the shore drew in teeth tens of
+   * metres long (Ocean City, 28 Oct). The preview keeps the plane: its
+   * camera is low, where the water's height shows.
+   */
+  ground = false,
+): { primitive: Primitive | GroundPrimitive; material: Material; setLevel: (m: number | null) => void } {
+  const mask = inputs.seaMask as { url: string; halfM: number }
+  const waves = seaWaves(inputs.sea).slice(0, MAX_WAVES)
+  const half = mask.halfM
+  const dLat = (half / 6_371_000) * (180 / Math.PI)
+  const dLon = dLat / Math.cos((venue.lat * Math.PI) / 180)
+  const material = new Material({
+    fabric: {
+      type: 'ScoutSea',
+      uniforms: {
+        mask: mask.url,
+        time: 0,
+        halfM: half,
+        painted: painted ? 1 : 0,
+        deep: painted ? Color.fromCssColorString('#3f8fa6') : Color.fromCssColorString('#0b2a33'),
+        sky: painted ? Color.fromCssColorString('#bfe3ea') : Color.fromCssColorString('#8fb3c4'),
+        ...Object.fromEntries(
+          Array.from({ length: MAX_WAVES }, (_, i) => {
+            const w = waves[i]
+            return [
+              [`w${i}_a`, w === undefined ? new Cartesian4(0, 1, 0, 0) : new Cartesian4(w.dir[0], w.dir[1], w.k, w.a)],
+              [`w${i}_b`, w === undefined ? new Cartesian4(0, 0, 0, 0) : new Cartesian4(w.omega, w.phase, 0, 0)],
+            ]
+          }).flat(),
+        ),
+      },
+      source: SEA_GLSL,
+    },
+    translucent: false,
+  })
+  const geometryInstances = new GeometryInstance({
+      geometry: new RectangleGeometry({
+        rectangle: Rectangle.fromDegrees(venue.lon - dLon, venue.lat - dLat, venue.lon + dLon, venue.lat + dLat),
+        height: 0,
+        /*
+         * A vertex every SEA_GRANULARITY_M: at the default (one per degree)
+         * the 12 km square is two flat triangles, and a flat chord that
+         * long sags d^2 / 2R = 5.6 m below the Earth's curve at the middle,
+         * which put the water under the sea floor at the venue.
+         */
+        /* Draped, the ground gives the water its shape: the engine's coarse default, a few triangles, not 57,000. */
+        ...(ground ? {} : { granularity: SEA_GRANULARITY_M / 6_371_000 }),
+        vertexFormat: EllipsoidSurfaceAppearance.VERTEX_FORMAT,
+      }),
+    })
+  if (ground) {
+    const draped = new GroundPrimitive({ geometryInstances, appearance: new EllipsoidSurfaceAppearance({ material, aboveGround: false }), classificationType: ClassificationType.TERRAIN })
+    return { primitive: draped, material, setLevel: () => {} }
+  }
+  const primitive = new Primitive({
+    geometryInstances,
+    appearance: new EllipsoidSurfaceAppearance({ material, aboveGround: true }),
+    asynchronous: false,
+  })
+  /* Up at the venue: across 6 km the local up turns by 0.05 deg, a millimetre at a metre's lift. */
+  const base = Cartesian3.fromDegrees(venue.lon, venue.lat, 0)
+  const setLevel = (m: number | null) => {
+    const up = Cartesian3.subtract(Cartesian3.fromDegrees(venue.lon, venue.lat, m ?? 0), base, new Cartesian3())
+    primitive.modelMatrix = Matrix4.fromTranslation(up)
+  }
+  setLevel(inputs.waterLevelM)
+  return { primitive, material, setLevel }
+}
+
 export function createCinema(widget: CesiumWidget, venue: LatLon, enuToFixedPoint: (v: [number, number, number]) => InstanceType<typeof Cartesian3>): Cinema {
   const scene = widget.scene
-  let sea: Primitive | null = null
+  let sea: Primitive | GroundPrimitive | null = null
   let seaMaterial: Material | null = null
   let billboards: BillboardCollection | null = null
   let placed: Cloud[] = []
@@ -239,53 +327,9 @@ export function createCinema(widget: CesiumWidget, venue: LatLon, enuToFixedPoin
     scene.fog.density = fogDensity(inputs.visibilityKm)
 
     if (inputs.seaMask !== null) {
-      const waves = seaWaves(inputs.sea).slice(0, MAX_WAVES)
-      const half = inputs.seaMask.halfM
-      const dLat = (half / 6_371_000) * (180 / Math.PI)
-      const dLon = dLat / Math.cos((venue.lat * Math.PI) / 180)
-      const painted = look === 'animated'
-      seaMaterial = new Material({
-        fabric: {
-          type: 'ScoutSea',
-          uniforms: {
-            mask: inputs.seaMask.url,
-            time: 0,
-            halfM: half,
-            painted: painted ? 1 : 0,
-            deep: painted ? Color.fromCssColorString('#3f8fa6') : Color.fromCssColorString('#0b2a33'),
-            sky: painted ? Color.fromCssColorString('#bfe3ea') : Color.fromCssColorString('#8fb3c4'),
-            ...Object.fromEntries(
-              Array.from({ length: MAX_WAVES }, (_, i) => {
-                const w = waves[i]
-                return [
-                  [`w${i}_a`, w === undefined ? new Cartesian4(0, 1, 0, 0) : new Cartesian4(w.dir[0], w.dir[1], w.k, w.a)],
-                  [`w${i}_b`, w === undefined ? new Cartesian4(0, 0, 0, 0) : new Cartesian4(w.omega, w.phase, 0, 0)],
-                ]
-              }).flat(),
-            ),
-          },
-          source: SEA_GLSL,
-        },
-        translucent: false,
-      })
-      sea = new Primitive({
-        geometryInstances: new GeometryInstance({
-          geometry: new RectangleGeometry({
-            rectangle: Rectangle.fromDegrees(venue.lon - dLon, venue.lat - dLat, venue.lon + dLon, venue.lat + dLat),
-            height: inputs.waterLevelM ?? 0,
-            /*
-             * A vertex every SEA_GRANULARITY_M: at the default (one per degree)
-             * the 12 km square is two flat triangles, and a flat chord that
-             * long sags d^2 / 2R = 5.6 m below the Earth's curve at the middle,
-             * which put the water under the sea floor at the venue.
-             */
-            granularity: SEA_GRANULARITY_M / 6_371_000,
-            vertexFormat: EllipsoidSurfaceAppearance.VERTEX_FORMAT,
-          }),
-        }),
-        appearance: new EllipsoidSurfaceAppearance({ material: seaMaterial, aboveGround: true }),
-        asynchronous: false,
-      })
+      const built = buildSea(inputs, venue, look === 'animated')
+      sea = built.primitive
+      seaMaterial = built.material
       scene.primitives.add(sea)
     }
 
