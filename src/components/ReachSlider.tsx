@@ -6,10 +6,13 @@ import {
   snappedMetersAt,
   stopPositions,
 } from '../core/reachScale.ts'
+import type { DistanceUnit } from '../lib/units.ts'
 
 interface ReachSliderProps {
   meters: number
   onChange: (meters: number) => void
+  /** The shooter's own unit, and only that one: no metres and feet side by side (27 Oct). */
+  unit: DistanceUnit
 }
 
 /**
@@ -23,19 +26,19 @@ interface ReachSliderProps {
  * The ring on the map now only DISPLAYS this value. There is one way to change
  * it, it says what it is, and it reads out the answer in both units.
  */
-export function ReachSlider({ meters, onChange }: ReachSliderProps) {
+export function ReachSlider({ meters, onChange, unit }: ReachSliderProps) {
   const { metric, imperial } = formatReach(meters)
+  const said = unit === 'm' ? metric : imperial
   const position = Math.round(positionForMeters(meters) * SLIDER_MAX)
 
   return (
     <div className="reach">
       <div className="reach__head">
         <label className="reach__label" htmlFor="reach-slider">
-          How far can you get?
+          How far can you walk?
         </label>
         <output className="reach__out" htmlFor="reach-slider">
-          <span className="reach__metric num">{metric}</span>
-          <span className="reach__imperial num">{imperial}</span>
+          <span className="reach__metric num">{said}</span>
         </output>
       </div>
 
@@ -62,7 +65,7 @@ export function ReachSlider({ meters, onChange }: ReachSliderProps) {
           max={SLIDER_MAX}
           step={1}
           value={position}
-          aria-valuetext={`${metric}, ${imperial}`}
+          aria-valuetext={said}
           onChange={(event) => onChange(snappedMetersAt(Number(event.target.value) / SLIDER_MAX))}
         />
       </div>

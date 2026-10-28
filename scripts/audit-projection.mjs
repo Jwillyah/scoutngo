@@ -25,6 +25,7 @@
  *      bounds-based reasoning is precisely what breaks there.
  */
 
+import { regionView } from '../src/core/regionView.ts'
 import { RAY_SCREEN_FRACTION } from '../src/lib/rayLength.ts'
 import { goToStage, guardAudit, pressSuggest, setSheet, startWatchdog } from './preflight.mjs'
 
@@ -482,10 +483,23 @@ await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, devi
  * park on the Eastern Shore. Checked here because the camera is this file's
  * business and because a default like that comes back quietly.
  */
-await send('Page.navigate', { url: 'about:blank' })
+/*
+ * CLEARED ON THE APP'S OWN ORIGIN. This cleared localStorage on about:blank,
+ * which holds nothing of the app's, so it was never a cold start: once the
+ * app began remembering the last setup (src/lib/lastSetup.ts), the overflow
+ * audit's venue was still there and the map opened on it.
+ */
+await send('Page.navigate', { url: 'http://127.0.0.1:5173/?probe=1' })
+await wait(1500)
 await ev(`localStorage.clear()`)
+await send('Page.navigate', { url: 'about:blank' })
 await send('Page.navigate', { url: 'http://127.0.0.1:5173/?probe=1' })
 await wait(8000)
+if (await ev(`localStorage.getItem('scoutngo.lastSetup.v1')`) !== null) {
+  /* Written by this load would mean a venue appeared on its own. */
+  failures += 1
+  show('cold start  FAIL', { error: 'a last setup is stored after a cold start' })
+}
 {
   const cold = await ev(`(() => {
     const m = window.__probe?.map
@@ -499,15 +513,31 @@ await wait(8000)
     }
     return {
       zoom: Math.round(m.getZoom() * 100) / 100,
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      lat: c.lat,
+      lon: c.lng,
       kmFromCalibrationVenue: Math.round(away(38.364236, -75.605912) / 1000),
       /* The locate button is the top bar's arrow now. */
       offersUseMyLocation: document.querySelector('button[aria-label="Go to where I am"]') !== null,
     }
   })()`)
+  /*
+   * THE PHONE'S OWN REGION, NOT A PLACE (27 Oct: "never the whole
+   * Atlantic"). Asserted as the object, not a proxy: the view regionView
+   * gives for the zone this page itself reports, to within a kilometre, at
+   * region zoom. It used to require 1,000 km from the calibration venue,
+   * which only the Atlantic satisfied.
+   */
+  const want = cold.error === undefined ? regionView(cold.timeZone) : null
+  const offKm = want === null ? Infinity : Math.hypot((cold.lat - want.center[1]) * 111, (cold.lon - want.center[0]) * 111 * Math.cos((cold.lat * Math.PI) / 180))
+  cold.wantZoom = want?.zoom
+  cold.kmFromRegionView = Math.round(offKm)
   const bad =
     cold.error !== undefined ||
     cold.zoom > 5 ||
-    cold.kmFromCalibrationVenue < 1000 ||
+    Math.abs(cold.zoom - want.zoom) > 0.01 ||
+    offKm > 1 ||
+    cold.kmFromCalibrationVenue < 100 ||
     !cold.offersUseMyLocation
   if (bad) failures += 1
   show(`cold start  ${bad ? 'FAIL' : 'ok'}`, cold)

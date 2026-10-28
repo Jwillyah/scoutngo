@@ -1,3 +1,4 @@
+import type { BuildCheck } from '../lib/build.ts'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { LatLon } from '../core/geo.ts'
 import { loadAirspaceOverlay, type AirspaceOverlay } from '../lib/airspaceOverlay.ts'
@@ -317,6 +318,13 @@ interface PlanModeProps {
   packState: PackBuildState
   onPreparePack: () => void
   desiredShots: DesiredShot[]
+  /** The shot list as typed, one shot per line; it lives on the Call sheet. */
+  shotListText: string
+  onShotListText: (next: string) => void
+  /** Settings: the detail switch and the build stamp. */
+  showNumbers: boolean
+  onShowNumbers: (on: boolean) => void
+  newBuild: BuildCheck
   footer: React.ReactNode
   /* The shell's pieces, owned by App. */
   onMenu: () => void
@@ -506,6 +514,11 @@ export function PlanMode({
   packState,
   onPreparePack,
   desiredShots,
+  shotListText,
+  onShotListText,
+  showNumbers,
+  onShowNumbers,
+  newBuild,
   footer,
   onMenu,
   menuOpen,
@@ -1867,6 +1880,17 @@ export function PlanMode({
       case 'callsheet':
         return (
           <Card title="Call sheet" onClose={home}>
+            {/* The shot list moved here from Setup (27 Oct): it is the shoot's brief, not its place. */}
+            <label className="field shotbox">
+              <span className="field__label">Shot list{desiredShots.length === 0 ? '' : ` · ${desiredShots.length}`}</span>
+              <textarea
+                className="input shotbox__text"
+                rows={4}
+                value={shotListText}
+                placeholder="One shot per line. The plan has to cover these, and anything no position covers is marked."
+                onChange={(event) => onShotListText(event.target.value)}
+              />
+            </label>
             <CallSheetCard context={callSheetContext} onOpenKey={() => openCard('about')} />
           </Card>
         )
@@ -2020,7 +2044,7 @@ export function PlanMode({
       case 'settings':
         return (
           <Card title="Settings" onClose={home}>
-            <SettingsSheet units={units} onUnits={onUnits} />
+            <SettingsSheet units={units} onUnits={onUnits} showNumbers={showNumbers} onShowNumbers={onShowNumbers} onHow={() => onHow('computed')} newBuild={newBuild} />
           </Card>
         )
       case 'about':

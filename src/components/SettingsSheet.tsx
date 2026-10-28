@@ -1,5 +1,8 @@
 import { CLOCK_OPTIONS, DISTANCE_UNITS, WIND_UNITS, type Units } from '../lib/units.ts'
 import { SURF_OPTIONS, useSurfSetting } from '../lib/surfSetting.ts'
+import type { BuildCheck } from '../lib/build.ts'
+import { NUMERALS_LABEL, NUMERALS_NOTE } from '../core/numerals.ts'
+import { BuildStamp } from './BuildStamp.tsx'
 
 /*
  * SETTINGS: HOW THE APP READS TO YOU. The clock, the wind and the distance,
@@ -13,6 +16,15 @@ import { SURF_OPTIONS, useSurfSetting } from '../lib/surfSetting.ts'
 interface SettingsSheetProps {
   units: Units
   onUnits: (next: Units) => void
+  /*
+   * From the old Setup sheet's Settings drawer, which went with the three
+   * steps (27 Oct): the one detail switch, the way to /how, and which build
+   * this is.
+   */
+  showNumbers: boolean
+  onShowNumbers: (on: boolean) => void
+  onHow: () => void
+  newBuild: BuildCheck
 }
 
 function Choice<T extends string | number>({
@@ -46,7 +58,7 @@ function Choice<T extends string | number>({
   )
 }
 
-export function SettingsSheet({ units, onUnits }: SettingsSheetProps) {
+export function SettingsSheet({ units, onUnits, showNumbers, onShowNumbers, onHow, newBuild }: SettingsSheetProps) {
   const [surf, setSurf] = useSurfSetting()
   return (
     <div className="about settings">
@@ -58,6 +70,19 @@ export function SettingsSheet({ units, onUnits }: SettingsSheetProps) {
         <Choice label="Surf" options={SURF_OPTIONS} value={surf} onPick={setSurf} />
       </div>
       <p className="about__row-note">Kept on this phone, and in your backup file.</p>
+      <label className="toggle">
+        <input type="checkbox" className="toggle__box" checked={showNumbers} onChange={(event) => onShowNumbers(event.target.checked)} />
+        <span className="toggle__text">
+          <span className="toggle__label">{NUMERALS_LABEL}</span>
+          <span className="toggle__note">{NUMERALS_NOTE}</span>
+        </span>
+      </label>
+      <button type="button" className="settings__row" onClick={onHow}>
+        How it computes
+        <span className="settings__hint">The three stages, what is arithmetic, what leaves the device, and what this is not.</span>
+      </button>
+      {/* Which build is this: a stale bundle looks exactly like a fix that did not work. */}
+      <BuildStamp deployed={newBuild} />
     </div>
   )
 }

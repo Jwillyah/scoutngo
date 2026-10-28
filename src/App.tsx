@@ -24,7 +24,6 @@ import {
 import { DEFAULT_KIT, type KitProfile } from './core/kit.ts'
 import { defaultOpticFor } from './core/optics.ts'
 import { sharedOptic } from './core/mapLabel.ts'
-import { subjectSizeMatters } from './core/fov.ts'
 import { skyLayerOn, type MapPanel } from './core/mapPanel.ts'
 import {
   canPackAir,
@@ -111,8 +110,6 @@ import { clearPlace, loadPlace } from './lib/place.ts'
 import { pathToMenuItem, type MenuItem } from './lib/menu.ts'
 import {
   blockedReason,
-  FORWARD_LABEL,
-  nextMode,
   setupGap,
   type Mode,
   type ModeAvailability,
@@ -148,6 +145,7 @@ import { windHeightFor } from './core/windHeight.ts'
 import type { SkyLayerKind } from './core/skyLayer.ts'
 import { revivalNote, revivePositions } from './lib/revivePositions.ts'
 import { generateBlock } from './lib/generateGate.ts'
+import { readLastSetup, writeLastSetup, type LastSetup } from './lib/lastSetup.ts'
 
 /*
  * The calibration venue is a DEVELOPER SHORTCUT and means nothing to anyone
@@ -164,9 +162,21 @@ const wantsCalibration = (): boolean =>
   new URLSearchParams(window.location.search).get('calibration') === '1'
 
 function App() {
-  const [venue, setVenue] = useState<VenueDraft>(() =>
-    wantsCalibration() ? CALIBRATION_VENUE : defaultVenue(new Date()),
-  )
+  /*
+   * THE LAST SETUP, read once at launch: the app opens on the last venue,
+   * with last time's answers (src/lib/lastSetup.ts). Null on a first run and
+   * in calibration, which has its own venue.
+   */
+  const [lastSetup] = useState<LastSetup | null>(() => (wantsCalibration() ? null : readLastSetup()))
+  const [venue, setVenue] = useState<VenueDraft>(() => {
+    if (wantsCalibration()) return CALIBRATION_VENUE
+    const fresh = defaultVenue(new Date())
+    if (lastSetup === null) return fresh
+    const placed = withCoordinates(fresh, lastSetup.at)
+    /* The name only if it was resolved for exactly this coordinate. */
+    const named = lastSetup.name !== null && lastSetup.name.key === placeKey(placed.latitude, placed.longitude)
+    return { ...placed, name: named ? lastSetup.name : null }
+  })
   /*
    * Which of the date and window values are still the app's choice rather than
    * the shooter's. Shown on the pills so a default is never mistaken for a
@@ -415,7 +425,7 @@ function App() {
    * constraint, so it becomes a hard ceiling in the prompt and a check on every
    * returned position. See src/core/radius.ts.
    */
-  const [reachMeters, setReachMeters] = useState(RADIUS_DEFAULT_METERS)
+  const [reachMeters, setReachMeters] = useState(lastSetup?.reachMeters ?? RADIUS_DEFAULT_METERS)
   const onReach = (meters: number) => setReachMeters(clampRadius(meters))
 
   /*
@@ -780,7 +790,7 @@ function App() {
    * src/core/platformFilter.ts. Two copies of that rule drift, and the way it
    * shows up is a position in the plan that never appears on the map.
    */
-  const [platformFilter, setPlatformFilter] = useState<PlatformFilter>(DEFAULT_PLATFORM_FILTER)
+  const [platformFilter, setPlatformFilter] = useState<PlatformFilter>(lastSetup?.platform ?? DEFAULT_PLATFORM_FILTER)
 
   const visiblePlan = useMemo(() => {
     const byPlatform = plan.filter((p) => showsPlatform(platformFilter, p.position.platform))
@@ -887,7 +897,13 @@ function App() {
    * model call: see src/core/shootWindow.ts for the arithmetic and
    * src/lib/shootPreset.ts for the glue.
    */
-  const [shootKind, setShootKind] = useState<ShootKind | null>(null)
+  const [shootKind, setShootKind] = useState<ShootKind | null>(lastSetup?.shootKind ?? null)
+
+  /* Kept for next launch whenever an answer changes; only once there is a pin. */
+  useEffect(() => {
+    if (centre === null || wantsCalibration()) return
+    writeLastSetup({ at: centre, name: venue.name, shootKind, platform: platformFilter, reachMeters })
+  }, [centre, venue.name, shootKind, platformFilter, reachMeters])
 
   /*
    * THE CHIP SETS THE WINDOW IN EITHER ORDER.
@@ -1787,51 +1803,6 @@ function App() {
    */
   const goTo = (next: Mode) => setMode(next)
 
-  const forward = nextMode(mode)
-  const forwardLabel = FORWARD_LABEL[mode]
-  const forwardBlocked = forward === null ? null : blockedReason(forward, available)
-
-  /*
-   * The forward control. Large, singular, and at the bottom of whatever mode you
-   * are in, so moving on reads as finishing a step rather than changing channel.
-   * When the next step is not earned yet it says why instead of vanishing.
-   */
-  /*
-   * A BLOCKED BUTTON IS NOT A DISABLED BUTTON.
-   *
-   * It used to be `disabled`, which meant pressing it did nothing at all: no
-   * event, no feedback, and a one line reason printed above it that said "set a
-   * date" while the date field was off the bottom of the screen. Pressing it now
-   * scrolls the missing field into view and lights it up. It still refuses to
-   * move on, and it still says why, but it answers the question it raises.
-   */
-  const forwardBar =
-    forward === null || forwardLabel === null ? null : (
-      <div className="forward">
-        {forwardBlocked === null ? null : (
-          <p className="forward__why">
-            {mode === 'setup' && gap !== null ? gap.copy : forwardBlocked}
-          </p>
-        )}
-        <button
-          type="button"
-          className={`btn btn--primary forward__btn${
-            forwardBlocked === null ? '' : ' forward__btn--blocked'
-          }`}
-          aria-disabled={forwardBlocked !== null}
-          onClick={() => {
-            if (forwardBlocked === null) {
-              goTo(forward)
-              return
-            }
-            setPointAt((current) => ({ field: missing, tick: current.tick + 1 }))
-          }}
-        >
-          {forwardLabel}
-        </button>
-      </div>
-    )
-
   /*
    * THE PEEK LINE SAYS SOMETHING OR IT IS NOT THERE.
    *
@@ -1915,22 +1886,8 @@ function App() {
              * in src/core/kitPacking.ts.
              */
             airAvailable={canPackAir(kitProfile)}
-            subjectMatters={subjectSizeMatters(
-              visiblePlan.map((p) => ({
-                platform: p.position.platform,
-                shotType: p.position.shotType,
-              })),
-            )}
-            newBuild={newBuild}
             venueNameState={venueNameState}
-            onShowLanding={() => {
-              setAtHowPath(true)
-              window.history.pushState({}, '', '/how')
-            }}
             onUseMyLocation={onUseMyLocation}
-            shotListText={shotListText}
-            onShotListText={onShotListChange}
-            desiredShots={desiredShots}
             at={centre}
             onPinChange={onVenueChange}
             onSearchPick={onPick}
@@ -1944,13 +1901,13 @@ function App() {
             searchBias={centre}
             showPinHint={!pinHintDone}
             onPinDrag={() => setPinHintDone(true)}
-            defaults={defaults}
+            units={settings.units ?? DEFAULT_UNITS}
+            onDone={() => setMode('plan')}
             pointAt={pointAt}
-            settings={settings}
-            onSettings={setSettings}
+            doneBlocked={gap !== null ? gap.copy : null}
+            returning={lastSetup !== null}
             onMenu={() => setMenuOpen(true)}
             menuOpen={menuOpen}
-            forward={forwardBar}
             drawerRequest={drawerRequest}
             onOpenExposure={() => {
               setMode('plan')
@@ -1980,9 +1937,10 @@ function App() {
             setAtHowPath(true)
             window.history.pushState({}, '', '/how')
           }}
-          onEditKit={() => setMode('setup')}
-          onOpenSpots={() => setMode('setup')}
-          onOpenSettings={() => setMode('setup')}
+          onEditKit={() => onMenuPick('kit')}
+          onOpenSpots={() => onMenuPick('saved')}
+          /* The key field is on About itself, above the row that names it. */
+          onOpenSettings={() => document.querySelector('.apikey')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
           savedSpotCount={spots.length}
           mapHandle={mapHandle}
           venue={centre}
@@ -2140,6 +2098,11 @@ function App() {
           onGoToField={() => goTo('field')}
           goToFieldBlocked={blockedReason('field', available)}
           desiredShots={desiredShots}
+          shotListText={shotListText}
+          onShotListText={onShotListChange}
+          showNumbers={settings.showNumbers}
+          onShowNumbers={(on) => setSettings({ ...settings, showNumbers: on })}
+          newBuild={newBuild}
           summary={summary}
           peekStatus={peekStatus}
           fitTargets={fitTargets}

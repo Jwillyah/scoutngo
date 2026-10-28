@@ -13,7 +13,7 @@
  * audit names the venue with a long one, in the shared plan it opens and in
  * the answer to the name lookup should the app ask.
  *
- * ON EVERY SCREEN IT CAN REACH (Setup and its drawers, Plan with the sheet at
+ * ON EVERY SCREEN IT CAN REACH (Setup's three steps and its drawers, Plan with the sheet at
  * each height and each chip's card, Field, the menu, the 3D view):
  *
  *   page       the document is no wider than the screen
@@ -139,24 +139,50 @@ try {
     console.log(`  the long name: ${cut.cut ? 'cut short' : 'fits'}${cut.ellipsis ? ', with an ellipsis' : ', with NO ellipsis'}`)
     if (cut.cut && !cut.ellipsis) fail('the long venue name is cut off with no ellipsis')
   }
-  await check('Setup, sheet as it opens', '.pills')
-  for (const detent of ['full', 'half']) {
-    try {
-      await setSheet(ev, wait, detent)
-      await check(`Setup, sheet ${detent}`, '.setup__body')
-    } catch (error) {
-      fail(`Setup: ${error instanceof Error ? error.message : String(error)}`)
+  /*
+   * SETUP IS THREE STEPS (27 Oct): each one a compact card, at most about a
+   * third of the screen (35%, plus a pixel), and never scrolling or clipping:
+   * the card is overflow hidden, so content taller than the card would be
+   * cut off silently. Measured, not assumed: content height against the
+   * card's, and the card against the screen.
+   */
+  const CARD_MAX = Math.round(844 * 0.35) + 1
+  const STEP_WORD = { 1: 'Where', 2: 'When', 3: 'How' }
+  for (const step of [1, 2, 3]) {
+    const at = await ev(`document.querySelector('.wiz')?.dataset.step ?? null`)
+    if (at !== String(step)) {
+      fail(`Setup: expected step ${step} (${STEP_WORD[step]}), the card says ${at}`)
+      break
     }
+    await check(`Setup, step ${step} · ${STEP_WORD[step]}`, `.wiz[data-step="${step}"]`)
+    const fit = JSON.parse(await ev(`JSON.stringify((() => {
+      const c = document.querySelector('.wiz')
+      const r = c.getBoundingClientRect()
+      const inner = [...c.children].reduce((m, e) => Math.max(m, e.getBoundingClientRect().bottom), 0)
+      return { h: Math.round(r.height), top: Math.round(r.top), bottom: Math.round(r.bottom), scroll: c.scrollHeight, room: c.clientHeight, contentBottom: Math.round(inner), vh: innerHeight }
+    })())`))
+    console.log(`  step ${step}: card ${fit.h} px of ${fit.vh} (max ${CARD_MAX}), content ${fit.scroll} px in ${fit.room}`)
+    if (fit.h > CARD_MAX) fail(`Setup step ${step}: the card is ${fit.h} px, over a third of the screen (${CARD_MAX})`)
+    if (fit.scroll > fit.room + 1 || fit.contentBottom > fit.bottom + 1) fail(`Setup step ${step}: ${fit.scroll} px of content in a ${fit.room} px card, cut off`)
+    if (fit.bottom > fit.vh + 1 || fit.top < 0) fail(`Setup step ${step}: the card runs off the screen (${fit.top} to ${fit.bottom})`)
+    if (step === 3) break
+    await ev(`document.querySelector('.wiz__next')?.click()`)
+    await wait(500)
   }
-  /* Every drawer Setup opens, by its own link: none named here, so a new one is checked too. */
-  const links = JSON.parse(await ev(`JSON.stringify([...document.querySelectorAll('.setup__link')].map((b) => b.textContent.trim()))`))
-  if (links.length === 0) fail('no drawer links on Setup, so no drawer was checked')
-  for (const [i, text] of links.entries()) {
-    await ev(`document.querySelectorAll('.setup__link')[${i}]?.click()`)
-    await check(`Setup, ${text} drawer`, '.drawer .drawer__body')
+  /* The two drawers Setup still opens: Kit from step 3's Edit, Saved from the menu. */
+  for (const [label, open] of [
+    ['Kit', `document.querySelector('.wiz .kitrow__edit')?.click()`],
+    ['Saved', `(() => { document.querySelector('button[aria-label="Menu"]')?.click(); return 1 })()`],
+  ]) {
+    await ev(open)
+    if (label === 'Saved') {
+      await wait(500)
+      await ev(`[...document.querySelectorAll('.sidemenu__item')].find((b) => /Saved/.test(b.textContent))?.click()`)
+    }
+    await check(`Setup, ${label} drawer`, '.drawer .drawer__body')
     await ev(`document.querySelector('.drawer__close')?.click()`)
     await wait(500)
-    if (await ev(`!!document.querySelector('.drawer .drawer__body')`)) fail(`the ${text} drawer did not close, so the next one was not reached`)
+    if (await ev(`!!document.querySelector('.drawer .drawer__body')`)) fail(`the ${label} drawer did not close, so the next one was not reached`)
   }
 
   await goToStage(ev, wait, 'plan')

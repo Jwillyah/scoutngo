@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import App from '../App.tsx'
 import { CALIBRATION_VENUE, resolveWindow } from '../lib/venue.ts'
 import { SunReadout } from './SunReadout.tsx'
+import { ReachSlider } from './ReachSlider.tsx'
 
 /**
  * Render smoke tests. Not a substitute for looking at it on a phone, but they
@@ -81,17 +82,18 @@ describe('render smoke', () => {
   })
 
   /*
-   * ONE PIN, ONE SLIDER. The setup map used to carry three things that did not
-   * explain themselves: the venue pin, a white subject crosshair sitting on top
-   * of it, and an unlabelled dot on the reach ring that was the only way to
-   * change the reach.
+   * ONE PIN, ONE SLIDER, ONE UNIT. The reach is a labelled slider in step 3,
+   * in the shooter's own unit only (27 Oct: "no m and ft side by side").
    */
-  it('states the reach on a labelled slider, not an unlabelled dot on a ring', () => {
-    expect(html).toContain('How far can you get?')
-    expect(html).toContain('type="range"')
-    expect(html).toContain('400 m')
-    expect(html).toContain('1,312 ft')
-    // The handle is gone, and so is the reach readout that sat away from it.
+  it('states the reach on a labelled slider in one unit', () => {
+    const feet = renderToStaticMarkup(<ReachSlider meters={400} onChange={() => {}} unit="ft" />)
+    expect(feet).toContain('How far can you walk?')
+    expect(feet).toContain('type="range"')
+    expect(feet).toContain('1,312 ft')
+    expect(feet).not.toContain('400 m')
+    const metres = renderToStaticMarkup(<ReachSlider meters={400} onChange={() => {}} unit="m" />)
+    expect(metres).toContain('400 m')
+    expect(metres).not.toContain('1,312')
     expect(html).not.toContain('reach-handle')
     expect(html).not.toContain('plate__reach')
   })
@@ -110,66 +112,36 @@ describe('render smoke', () => {
   })
 
   /*
-   * NO BRIEF BOX. "Paste a client brief" is gone: the chips say what the shoot
-   * is, and Suggest is arithmetic that never read the brief.
+   * SETUP IS THREE SHORT STEPS (27 Oct): Where, When, How, one small card at
+   * a time over a full-screen map, progress dots, Back and Next. A cold
+   * start opens on step 1, and the brief box, the shot list, Saved and
+   * Settings are not in it (the menu and the Call sheet have them).
    */
-  it('offers the kit as chips and no brief box', () => {
-    expect(html).not.toContain('id="describe-shoot"')
+  it('opens on step 1 of 3, Where, over the map', () => {
+    expect(html).toContain('aria-label="Setup, step 1 of 3"')
+    expect(html).toContain('>Where<')
+    expect(html).toContain('Find the venue, or tap the map.')
+    expect(html).toContain('aria-label="Step 1 of 3"')
+  })
+
+  it('keeps the old long sheet out of it', () => {
     expect(html).not.toContain('Paste a client brief')
-    expect(html).toContain('class="kitrow__scroll"')
-    expect(html).toContain('kitchip')
-  })
-
-  it('shows date and window as compact pills, not four stacked fields', () => {
-    expect(html).toContain('class="pills"')
-    expect(html).toContain('type="date"')
-    expect(html).toContain('type="time"')
-  })
-
-  /*
-   * REQUIRED THINGS FIRST, and the reason is a bug that shipped.
-   *
-   * Every zero-scroll check was run at 390x844. On a real iPhone in Safari the
-   * bars leave about 390x660, and `overflow: hidden` silently ate the rest: the
-   * pills and the kit were off the screen with no way to scroll to them, so the
-   * date could not be set and the forward button stayed blocked on it.
-   */
-  it('puts the date and window above everything optional', () => {
-    const pills = html.indexOf('class="pills"')
-    expect(pills).toBeGreaterThan(-1)
-    expect(pills).toBeLessThan(html.indexOf('Paste a shot list'))
-    expect(pills).toBeLessThan(html.indexOf('class="kitrow'))
-  })
-
-  /* Nobody should meet a blocked button because of a field they cannot see. */
-  it('opens with a real date and window, marked as defaults', () => {
-    expect(html).toMatch(/type="date"[^>]*value="\d{4}-\d{2}-\d{2}"/)
-    expect(html).toContain('>default<')
-    expect(html.match(/>default</g)?.length).toBe(2)
-  })
-
-  /*
-   * BLOCKED IS NOT DISABLED. A disabled button swallows the press, which left
-   * the shooter with a dead control and a reason they could not act on. It is
-   * pressable, and pressing it points at what is missing.
-   */
-  it('leaves the forward button pressable while it is blocked', () => {
-    expect(html).toContain('forward__btn--blocked')
-    expect(html).toContain('aria-disabled="true"')
-    expect(html).not.toMatch(/forward__btn[^>]*\sdisabled[\s=>]/)
-  })
-
-  it('names the one thing that is missing, not three', () => {
-    expect(html).toContain('Drop a pin on the venue')
-    expect(html).not.toContain('Set a venue, a date and a window first.')
-  })
-
-  /* Reference, not setup: these open OVER the screen rather than on it. */
-  it('keeps kit detail, brief and saved setups behind affordances', () => {
-    expect(html).toContain('Edit kit')
-    expect(html).toContain('Paste a shot list')
-    expect(html).toContain('Saved')
+    expect(html).not.toContain('Paste a shot list')
+    expect(html).not.toContain('setup__link')
     expect(html).not.toContain('class="drawer"')
+    expect(html).not.toContain('class="pills"')
+  })
+
+  /*
+   * NEXT IS NOT A WAY PAST A MISSING PIN, and "Setup done · Plan" never
+   * shows before a venue is set (27 Oct). Blocked is still not disabled: a
+   * disabled button swallows the press.
+   */
+  it('holds Next until there is a pin, and never offers Plan before one', () => {
+    expect(html).toMatch(/aria-disabled="true"[^>]*>Next</)
+    expect(html).not.toMatch(/wiz__next[^>]*\sdisabled[\s=>]/)
+    expect(html).not.toContain('Setup done · Plan')
+    expect(html).not.toContain('Same as last time')
   })
 
   /*
@@ -178,7 +150,7 @@ describe('render smoke', () => {
    */
   it('hides the calibration shortcut and starts empty', () => {
     expect(html).not.toContain('Load calibration venue')
-    expect(html).toContain('Drop a pin or search for the venue')
+    expect(html).not.toContain('Salisbury')
   })
 
   /* Setup has its own sheet now; what it must not have is the plan's chips and rail. */
@@ -192,10 +164,6 @@ describe('render smoke', () => {
     expect(html).not.toContain('class="stale"')
   })
 
-  it('offers a single forward action out of setup', () => {
-    expect(html).toContain('forward__btn')
-    expect(html).toContain('Setup done · Plan')
-  })
 })
 
 describe('SunReadout', () => {

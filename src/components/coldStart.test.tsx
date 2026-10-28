@@ -20,7 +20,7 @@ describe('cold start', () => {
   it('asks where the shoot is rather than naming a place', () => {
     // The apostrophe is entity escaped in the rendered markup.
     expect(html).toContain('Where&#x27;s the shoot?')
-    expect(html).toContain('Drop a pin on the venue, or search for it.')
+    expect(html).toContain('Find the venue, or tap the map.')
   })
 
   it('names no venue and offers no coordinate', () => {
@@ -34,6 +34,6 @@ describe('cold start', () => {
    * start that pre-named the place would be the same wrong claim in text.
    */
   it('leaves the venue name empty', () => {
-    expect(html).toContain('Drop a pin or search for the venue')
+    expect(html).not.toContain('class="plate')
   })
 })

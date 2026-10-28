@@ -12164,3 +12164,250 @@
   stroke-width: 1.4;
   stroke-linecap: round;
 }
+
+/*
+ * SETUP'S THREE STEPS (SetupMode.tsx): one compact card over the map, never
+ * more than a third of the screen and never scrolling. The overflow audit
+ * walks all three at 390 x 844.
+ */
+.wiz {
+  position: absolute;
+  z-index: 5;
+  left: var(--space-2);
+  right: var(--space-2);
+  bottom: calc(var(--safe-bottom, 0px) + var(--space-2));
+  max-height: 35%;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-panel);
+  background: var(--panel-sheen);
+  border: var(--line-hair) solid var(--color-edge-top);
+  max-width: var(--page-max);
+  margin: 0 auto;
+}
+
+.wiz__title {
+  margin: 0;
+  font-size: var(--text-label);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.wiz__line {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-heavy);
+  color: var(--color-text);
+}
+
+.wiz__small {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.wiz__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.wiz__ghost {
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+/* Four big targets, two by two. */
+.wiz__kinds {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.wiz__big {
+  min-height: 48px;
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-panel);
+  background: var(--color-panel-2);
+  color: var(--color-text);
+  font-size: var(--text-base);
+  font-weight: 700;
+}
+
+.wiz__big--on {
+  background: var(--white);
+  color: var(--black);
+}
+
+.wiz__times {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.wiz__time {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-panel);
+  background: var(--color-panel-2);
+  color: var(--color-text);
+  font-size: var(--text-base);
+}
+
+/* The date as words, the real date input laid over them: one tap opens the picker. */
+.wiz__date {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-panel);
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+.wiz__change {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-decoration: underline;
+}
+
+.wiz__datein {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+}
+
+.wiz__seg {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.wiz__segbtn {
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.wiz__segbtn--on {
+  background: var(--white);
+  color: var(--black);
+}
+
+.wiz__segbtn[aria-disabled='true'] {
+  color: var(--color-text-muted);
+}
+
+/* In a step the kit row and the reach slider sit tight. */
+.wiz .kitrow,
+.wiz .reach {
+  margin: 0;
+  padding: 0;
+}
+
+.wiz .kitrow {
+  gap: var(--space-1);
+}
+
+.wiz__nav {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.wiz__back {
+  justify-self: start;
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.wiz__next {
+  justify-self: end;
+  min-width: 112px;
+}
+
+.wiz__next[aria-disabled='true'] {
+  opacity: 0.5;
+}
+
+.wiz__dots {
+  display: flex;
+  gap: 6px;
+}
+
+.wiz__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-line-strong);
+}
+
+.wiz__dot--on {
+  background: var(--white);
+}
+
+/* The shot list, on the Call sheet since the setup became three steps. */
+.shotbox {
+  margin-bottom: var(--space-3);
+}
+
+.shotbox__text {
+  min-height: 88px;
+  resize: vertical;
+}
+
+/* KitChips oneRow: as many chips as fit, "+N" for the rest (Setup step 3). */
+.kitrow__scroll--one {
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+.kitrow__scroll--one .kitchip {
+  flex: 0 0 auto;
+  max-width: none;
+  min-height: 44px;
+}
+
+.kitrow__spare {
+  order: 2;
+  visibility: hidden;
+  flex: 0 0 auto;
+  display: flex;
+}
+
+.kitchip--more {
+  order: 1;
+  color: var(--color-text);
+}

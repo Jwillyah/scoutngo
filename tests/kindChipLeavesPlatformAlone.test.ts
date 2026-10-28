@@ -141,13 +141,14 @@ describe('the kind chip sets the window, not the platform', () => {
 describe('the platform chip sets the platform filter', () => {
   it('wires the chip row to the filter state, through no handler of its own', () => {
     /*
-     * App hands setPlatformFilter down as onPlatformFilter and SetupMode hands
-     * that straight to the chip row. No wrapper in between, because a wrapper
-     * is where a line like the one this file exists to prevent gets written.
+     * App hands setPlatformFilter down as onPlatformFilter and step 3's
+     * Ground / Drone / Both buttons call it with their own value. No wrapper
+     * in between, because a wrapper is where a line like the one this file
+     * exists to prevent gets written.
      */
     expect(APP).toMatch(/onPlatformFilter=\{setPlatformFilter\}/)
     const setup = readFileSync(new URL('../src/components/SetupMode.tsx', import.meta.url), 'utf8')
-    expect(setup).toMatch(/onPlatform=\{onPlatformFilter\}/)
+    expect(setup).toMatch(/onPlatformFilter\(p\)/)
   })
 
   it('and the chip row calls it', () => {

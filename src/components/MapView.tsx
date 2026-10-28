@@ -22,7 +22,6 @@ import { GOES_ATTRIBUTION, goesBandFor, GOES_MAX_TILE_ZOOM } from '../core/goes.
 import { classificationOf } from '../core/lighting.ts'
 import { goesTileUrl } from '../lib/goesLayer.ts'
 import {
-  COLD_START_VIEW,
   labelDistances,
   FRAME_VENUE_BELOW_ZOOM,
   BEARING_LINE_MIN_METERS,
@@ -31,6 +30,7 @@ import {
   viewportSpanMeters,
   type ViewportBounds,
 } from '../core/viewport.ts'
+import { phoneTimeZone, regionView } from '../core/regionView.ts'
 import { fitLongEdge, resolveCaptureLongEdge } from '../core/capture.ts'
 import type { SunArc } from '../core/sun.ts'
 import type { MoonArc } from '../core/moonArc.ts'
@@ -1291,6 +1291,7 @@ export function MapView({
     // Captured for the cleanup below; the Map identity itself never changes.
     const figures = figureMarkers.current
 
+    const coldStart = regionView(phoneTimeZone())
     const instance = new maplibregl.Map({
       container: container.current,
       style: {
@@ -1331,8 +1332,12 @@ export function MapView({
        * the calibration venue in Salisbury Maryland, which told every new user
        * they were standing in a particular car park on the Eastern Shore.
        */
-      center: venue === null ? COLD_START_VIEW.center : [venue.lon, venue.lat],
-      zoom: venue === null ? COLD_START_VIEW.zoom : VENUE_ZOOM,
+      /*
+       * And not the whole Atlantic either (27 Oct): the region of the phone's
+       * own time zone, read on the phone, no lookup (src/core/regionView.ts).
+       */
+      center: venue === null ? coldStart.center : [venue.lon, venue.lat],
+      zoom: venue === null ? coldStart.zoom : VENUE_ZOOM,
       attributionControl: false,
       /*
        * ROTATE, NO TILT BY HAND. 2D is 2D: the 3D button opens the clay
