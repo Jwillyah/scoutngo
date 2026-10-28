@@ -35,6 +35,10 @@ tsc -b → oxlint --deny-warnings → viewport units → colour roles → clock
        → airspace → call sheet → clock screen → service worker
 ```
 
+`.githooks/pre-push` then builds the commit itself, not the working copy: a
+clean temporary worktree at the pushed sha, `npm ci`, `tsc -b`, build, tests.
+No `git stash` during a run; see failure-modes.md, "The gate built the disk".
+
 All of it must be clean before reporting. `SCOUTNGO_SKIP_AUDITS=1` exists and
 warns loudly; using it means saying so in the report.
 

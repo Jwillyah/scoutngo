@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+#
+# THE PUSH GATE: BUILD THE COMMIT, NOT THE WORKING COPY.
+#
+# WHY THIS EXISTS. The pre-commit gate runs in the working directory, so it
+# checks the files on disk, not the files in the commit. On 28 Oct e1f3959
+# went to origin without four files it imported: a stash taken mid-run came
+# back to the working tree but not to the index, every check passed against
+# the disk, and origin/main did not build for an hour (fixed by 052b5f2).
+#
+# That is shape C in docs/failure-modes.md: a check pointed at the wrong
+# object. The fix is to point it at the right one. For every commit being
+# pushed, this checks out exactly that commit into a clean temporary worktree,
+# installs from the lockfile, and type-checks, builds and runs the tests
+# THERE. An untracked file on this machine cannot help it pass, because the
+# worktree has never seen this machine's working directory.
+#
+# It refuses the push on any failure, says which commit and which step, and
+# prints the tail of what that step printed.
+#
+# Escape hatch, as loud as the other one:
+#   SCOUTNGO_SKIP_PUSH_GATE=1 git push ...
+set -uo pipefail
+
+RED=$'\033[31m'; GREEN=$'\033[32m'; YELLOW=$'\033[33m'; DIM=$'\033[2m'; OFF=$'\033[0m'
+
+if [ "${SCOUTNGO_SKIP_PUSH_GATE:-0}" = "1" ]; then
+  echo "${YELLOW}!  PUSH GATE SKIPPED by SCOUTNGO_SKIP_PUSH_GATE=1.${OFF}"
+  echo "${YELLOW}   Nobody checked that the pushed commit builds on its own.${OFF}"
+  exit 0
+fi
+
+ROOT="$(git rev-parse --show-toplevel)" || exit 1
+ZERO=0000000000000000000000000000000000000000
+
+# git hands the refs on stdin: <local ref> <local sha> <remote ref> <remote sha>
+SHAS=()
+while read -r _local_ref local_sha _remote_ref _remote_sha; do
+  [ "$local_sha" = "$ZERO" ] && continue # a delete has nothing to build
+  SHAS+=("$local_sha")
+done
+
+# Only the tip of each pushed ref is built: it is the commit origin ends on,
+# and the deploy builds exactly that one.
+if [ "${#SHAS[@]}" -eq 0 ]; then
+  echo "${DIM}· push gate: nothing to build (deletes only)${OFF}"
+  exit 0
+fi
+
+check_commit() {
+  local sha="$1" short
+  short="$(git rev-parse --short=7 "$sha")"
+  local tree
+  tree="$(mktemp -d "${TMPDIR:-/tmp}/scoutngo-push-XXXXXX")"
+  local log="$tree.log"
+
+  cleanup() {
+    git -C "$ROOT" worktree remove --force "$tree" >/dev/null 2>&1 || rm -rf "$tree"
+    git -C "$ROOT" worktree prune >/dev/null 2>&1 || true
+  }
+
+  refuse() {
+    echo "${RED}✗ push gate: $1 failed for $short, in a clean checkout of that commit${OFF}"
+    echo "${YELLOW}  --- last 30 lines ---${OFF}"
+    tail -30 "$log"
+    echo "${DIM}  push refused. Full log: $log${OFF}"
+    cleanup
+    exit 1
+  }
+
+  echo "${DIM}· push gate: checking out $short into a clean worktree${OFF}"
+  git -C "$ROOT" worktree add --detach "$tree" "$sha" > "$log" 2>&1 || refuse "checkout"
+
+  # Assert the object: the worktree is the pushed commit and nothing else.
+  # Not the working copy, and not a tree with stray files in it.
+  local got
+  got="$(git -C "$tree" rev-parse HEAD)"
+  [ "$got" = "$(git rev-parse "$sha")" ] || { echo "worktree is at $got, not $sha" >> "$log"; refuse "identity check"; }
+  [ -z "$(git -C "$tree" status --porcelain)" ] || { git -C "$tree" status --porcelain >> "$log"; refuse "clean-tree check"; }
+
+  ( cd "$tree" && npm ci --prefer-offline --no-audit --no-fund ) >> "$log" 2>&1 || refuse "npm ci"
+  echo "${GREEN}✓ installed from the lockfile${OFF}"
+  ( cd "$tree" && npx tsc -b ) >> "$log" 2>&1 || refuse "tsc -b"
+  echo "${GREEN}✓ tsc -b${OFF}"
+  ( cd "$tree" && npm run build ) >> "$log" 2>&1 || refuse "npm run build"
+  echo "${GREEN}✓ build${OFF}"
+  ( cd "$tree" && npm test ) >> "$log" 2>&1 || refuse "npm test"
+  echo "${GREEN}✓ $(grep -E '^ *Tests ' "$log" | tail -1 | tr -s ' ' | sed 's/^ //')${OFF}"
+
+  echo "${GREEN}✓ push gate: $short builds and passes on its own${OFF}"
+  cleanup
+  rm -f "$log"
+}
+
+for sha in "${SHAS[@]}"; do
+  check_commit "$sha"
+done
+exit 0

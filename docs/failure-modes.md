@@ -80,6 +80,7 @@ looks at the wrong thing and reports with full confidence.
 | the cover frame | the landing page, while every programmatic click landed correctly on the map underneath; the counts were right and the pixels were of a different screen |
 | the Shenandoah skyline | read from the probe, which takes an explicit coordinate, while the app sat on the calibration venue in coastal Maryland; the guard checked the probe's coordinate rather than the app's venue, so it passed while the chart drew Maryland |
 | the horizon profile | tiles that had not finished loading: `−0.73 to +1.18°` where the settled skyline is `−0.99 to +16.5°`. Nothing looked broken. The chart drew a plausible, flat, wrong horizon |
+| the commit gate, on e1f3959 | the files on disk, not the files in the commit. A `git stash` taken mid-run came back to the working tree but not to the index; every check passed against the disk, and origin/main did not build for an hour until 052b5f2 added the four missing files |
 
 **Fix.** A check asserts the **identity** of what it measured, not only the
 value.
@@ -94,6 +95,23 @@ value.
   coordinate the script happens to hold.
 - **Wait for the real signal.** `idle` means the tiles have arrived; a timer
   means a timer elapsed.
+
+### The gate built the disk, not the commit
+
+`.githooks/pre-commit` runs in the working directory. Everything it checks is
+whatever is on disk at that moment, which is the commit *plus* every untracked
+and unstaged file. A commit that leaves out a file it imports passes, because
+the file is right there beside it.
+
+**Fix: `.githooks/pre-push`.** For every ref being pushed it checks out exactly
+that commit into a new, empty worktree, asserts the worktree is at that sha and
+clean, installs from the lockfile, and runs `tsc -b`, the build and the tests
+there. It refuses the push otherwise. Replayed against e1f3959 it fails on
+`src/three/clayScene.ts: no exported member 'buildSea'`, which is the error
+origin had.
+
+And no `git stash` during a run. A stash is a second copy of the work with its
+own idea of what is staged, which is shape A as well as C.
 
 ### A guard that names what it does not want is disarmed by a rename
 

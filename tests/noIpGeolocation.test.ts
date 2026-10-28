@@ -117,7 +117,9 @@ describe('no IP geolocation anywhere', () => {
       }
     }
     expect(found).toEqual([])
-  })
+    // 3.4 s alone, past vitest's default 5 s when the whole suite runs in
+    // parallel; it timed out in a clean push-gate checkout on 28 Oct.
+  }, 30_000)
 
   /*
    * The check has to be able to fail, or it is decoration. These are the two
