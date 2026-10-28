@@ -2,8 +2,13 @@
  * THE CLAY MODEL: CesiumJS drawing the place from the map data this app
  * already has, and nothing else.
  *
- *   ground     Esri imagery draped on AWS Terrarium elevation, lit by the
- *              sun so ridgelines read
+ *   ground     aerial imagery draped on AWS Terrarium elevation, lit by the
+ *              sun so ridgelines read: the sharpest free source covering
+ *              the venue (src/data/imagerySources.ts), Esri's elsewhere and
+ *              for any tile it lacks; one zoom for everything within
+ *              NEAR_M of the view, so neighbouring tiles match
+ *   sea        offshore of the map's coastline, the animated water
+ *              (src/three/cinema.ts) instead of the photo's sea
  *   buildings  OpenStreetMap footprints, extruded in warm clay, each with
  *              its outline on the ground; a building with no recorded
  *              height is drawn a flat lighter tone at the nominal picture
@@ -49,6 +54,7 @@ import {
   JulianDate,
   LabelStyle,
   Math as CMath,
+  Rectangle,
   Matrix4,
   sampleTerrain,
   ShadowMode,
@@ -67,7 +73,7 @@ import { getSunPosition } from '../core/sun.ts'
 import { heightGrid, sourceFor } from '../core/terrarium.ts'
 import { lowerSea, overlayDtm } from '../lib/lidar/terrain.ts'
 import { horizontalFov, previewNote, WATERMARK, type FlightPlay } from '../lib/preflight/play.ts'
-import { createCinema, type Cinema } from './cinema.ts'
+import { buildSea, createCinema, type Cinema, type CinemaInputs } from './cinema.ts'
 import { drift, easedTime, FPS, frameTimes, subframeTimes } from '../core/gimbal.ts'
 import { clipEncoder, clipSize } from '../lib/cinema/encode.ts'
 import { bearingBetween, distanceMeters } from '../core/geo.ts'
@@ -75,15 +81,24 @@ import type { Rasters } from '../lib/lidar/raster.ts'
 import { formatHour } from '../core/timezone.ts'
 import type { Building } from '../lib/buildings.ts'
 import { loadTile } from '../lib/offlineCache.ts'
-import { IMAGERY_TEMPLATE, TERRAIN_TEMPLATE, VBMP_TEMPLATE, VIRGINIA_BOX } from '../lib/offlineSources.ts'
+import { IMAGERY_TEMPLATE, TERRAIN_TEMPLATE } from '../lib/offlineSources.ts'
+import { covers, pickImagery, sourceTileUrl, type ImagerySource } from '../data/imagerySources.ts'
 import { tileUrl } from '../lib/tileRange.ts'
 import { NOMINAL_TREE_HEIGHT, type MappedTree } from '../lib/trees.ts'
 
-export const CLAY = '#ede6da'
-/* Unknown height: lighter, hatched. */
-const CLAY_UNKNOWN = '#f7f3ec'
-/* The footprint drawn on the ground, so a block that leans in the photo still sits on its own outline. */
-const FOOTPRINT = '#f7f3ec'
+/*
+ * WARM CLAY, NOT WHITE (27 Oct, the pier: "pure white boxes glare"). The
+ * walls a sand clay, the roofs a step darker so a block reads as a block
+ * from above; the sun's light shades each face by its angle to the sun, and
+ * the engine's ambient occlusion darkens the ground at the walls' feet.
+ */
+export const CLAY = '#d8c3a5'
+export const CLAY_ROOF = '#bba68a'
+/* Unknown height: lighter. */
+const CLAY_UNKNOWN = '#ece2d2'
+const CLAY_UNKNOWN_ROOF = '#ddd1bf'
+/* The footprint drawn on the ground as the shade at a building's foot: a dark warm brown. */
+const FOOT_SHADE = '#3a2a1c'
 const TREE_GREEN = '#a9b694'
 const SKY_RADIUS = 1500
 /* The longest the canvas stays hidden waiting for its first tiles. */
@@ -91,7 +106,23 @@ export const SHOW_WITHIN_MS = 30_000
 /* 129 across a 256 px tile: every other pixel, close enough to read within a metre of the 2D map. */
 const HEIGHT_SAMPLES = 129
 const ESRI_CREDIT = 'Tiles by Esri. Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
-const VBMP_CREDIT = 'Imagery: Virginia Geographic Information Network'
+/*
+ * ONE ZOOM NEAR THE VIEW. Within NEAR_M of the view's centre every tile is
+ * drawn at NEAR_ZOOM, whatever the engine would pick for it, so neighbours
+ * match: at the pier on 27 Oct the photo was a patchwork of strips from
+ * different zooms, each flown on a different day. Beyond, FAR_ZOOM at most:
+ * the far layer is drawn under the near one too, so each zoom it may use is
+ * tiles fetched and hidden. At 1000 m and 17 the 3D network audit's globe
+ * had not settled in 60 s (598 imagery tiles); 800 m and 16 is about 200
+ * tiles of some 120 m at zoom 18 near, and the rest far.
+ */
+export const NEAR_M = 800
+/* Frames a second in the plain view (see the widget's targetFrameRate below). */
+const PLAIN_FPS = 20
+export const NEAR_ZOOM = 18
+/* Ground tiles at this level are about 1.2 km across: at most 64 near-zoom tiles each. */
+const NEAR_MIN_TERRAIN = 15
+const FAR_ZOOM = 16
 
 const token = (name: string, fallback: string) => {
   const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
@@ -115,29 +146,72 @@ async function tileBytes(url: string): Promise<ArrayBuffer> {
   return data
 }
 
-/** Esri imagery, read through the 2D map's tile cache. With `vbmp`, Virginia's own imagery first and Esri's where it has no tile. */
+const isPng = (b: ArrayBuffer) => {
+  const h = new Uint8Array(b, 0, Math.min(4, b.byteLength))
+  return h[0] === 0x89 && h[1] === 0x50 && h[2] === 0x4e && h[3] === 0x47
+}
+
+/** The centre of a Web Mercator tile, for asking whether a source covers it. */
+function tileCentre(x: number, y: number, z: number): LatLon {
+  const n = 2 ** z
+  const lon = ((x + 0.5) / n) * 360 - 180
+  const lat = (Math.atan(Math.sinh(Math.PI * (1 - (2 * (y + 0.5)) / n))) * 180) / Math.PI
+  return { lat, lon }
+}
+
+/*
+ * THE IMAGERY, read through the 2D map's tile cache: the venue's source
+ * where it covers the tile, Esri's where it does not or has no tile. A
+ * source that draws tiles on request answers a transparent PNG where part of
+ * the tile is outside its pictures; that is laid over Esri's tile, so the
+ * edge of its coverage has no holes.
+ */
 class CachedImagery extends UrlTemplateImageryProvider {
-  private readonly vbmp: boolean
-  constructor(maximumLevel = 19, vbmp = false) {
+  private readonly source: ImagerySource | null
+  constructor(opts: { maximumLevel: number; minimumLevel?: number; rectangle?: InstanceType<typeof Rectangle>; source: ImagerySource | null }) {
     super({
       url: IMAGERY_TEMPLATE,
       tilingScheme: new WebMercatorTilingScheme(),
-      maximumLevel,
-      credit: new Credit(vbmp ? `${VBMP_CREDIT}. ${ESRI_CREDIT}` : ESRI_CREDIT),
+      maximumLevel: opts.maximumLevel,
+      minimumLevel: opts.minimumLevel ?? 0,
+      rectangle: opts.rectangle,
+      credit: new Credit(opts.source === null ? ESRI_CREDIT : `${opts.source.attribution}. ${ESRI_CREDIT}`),
     })
-    this.vbmp = vbmp
+    this.source = opts.source
   }
   override requestImage(x: number, y: number, level: number): Promise<ImageryTypes> {
     const esri = () => tileBytes(tileUrl(IMAGERY_TEMPLATE, { x, y, z: level }))
-    const bytes = this.vbmp ? tileBytes(tileUrl(VBMP_TEMPLATE, { x, y, z: level })).catch(esri) : esri()
-    return bytes.then((b) => {
+    const src = this.source
+    const bitmap = (b: ArrayBuffer) => createImageBitmap(new Blob([b]))
+    const drawn =
+      src === null || level > src.maxZoom || !covers(src, tileCentre(x, y, level))
+        ? esri().then(bitmap)
+        : tileBytes(sourceTileUrl(src, x, y, level)).then(async (b) => {
+            if (!isPng(b)) return bitmap(b)
+            /* Part of the tile is outside the source's pictures: over Esri's. */
+            const [under, over] = await Promise.all([esri().then(bitmap), bitmap(b)])
+            const canvas = document.createElement('canvas')
+            canvas.width = under.width
+            canvas.height = under.height
+            const ctx = canvas.getContext('2d')
+            if (ctx === null) return over
+            ctx.drawImage(under, 0, 0)
+            ctx.drawImage(over, 0, 0, under.width, under.height)
+            return createImageBitmap(canvas)
+          }, () => esri().then(bitmap))
+    return drawn.then((image) => {
       tileCounts.imagery += 1
-      return createImageBitmap(new Blob([b]))
+      return image
     })
   }
 }
 
-const inVirginia = (at: LatLon) => at.lat >= VIRGINIA_BOX.south && at.lat <= VIRGINIA_BOX.north && at.lon >= VIRGINIA_BOX.west && at.lon <= VIRGINIA_BOX.east
+/** A square NEAR_M either side of a place, as the engine's rectangle. */
+function nearRectangle(at: LatLon): InstanceType<typeof Rectangle> {
+  const dLat = (NEAR_M / 6_371_000) * (180 / Math.PI)
+  const dLon = dLat / Math.cos((at.lat * Math.PI) / 180)
+  return Rectangle.fromDegrees(at.lon - dLon, at.lat - dLat, at.lon + dLon, at.lat + dLat)
+}
 
 /** Decoded terrarium tiles, a few kept so a level's children reuse their parent. */
 const decoded = new Map<string, Promise<Uint8ClampedArray>>()
@@ -239,6 +313,8 @@ export interface ClayScene {
   buildings(): readonly Building[]
   /** Tiles drawn from so far. */
   counts: typeof tileCounts
+  /** The water offshore (src/three/cinema.ts buildSea), from the preview's own inputs; null takes it away. */
+  setSea(inputs: CinemaInputs | null): void
   /** Screen x,y for a place, or null off screen: for checking what the camera is looking at. */
   project(at: LatLon, height?: number): { x: number; y: number } | null
   widget: CesiumWidget
@@ -271,9 +347,47 @@ export function createClayScene(
    * 27 Oct: a patchwork with dark green holes. The engine has no cross-fade
    * between imagery levels, so the change from coarse to sharp is a swap.
    */
-  widget.imageryLayers.add(new ImageryLayer(new CachedImagery(13)))
-  /* At a Virginia venue the sharp layer is the state's own imagery (VBMP), sharper than Esri's there; Esri's wherever it has none. */
-  widget.imageryLayers.add(new ImageryLayer(new CachedImagery(19, inVirginia(venue))))
+  widget.imageryLayers.add(new ImageryLayer(new CachedImagery({ maximumLevel: 13, source: null })))
+  /*
+   * FAR OFF, ESRI'S, to FAR_ZOOM. Near the view, the sharpest free source
+   * covering the venue (src/data/imagerySources.ts), Esri's where it has no
+   * tile. The source was the far layer too, and a state's drawn-on-request
+   * tiles that timed out fell back to Esri's one by one: a beach of light
+   * and grey triangles at Ocean City (28 Oct). One boundary, at NEAR_M,
+   * instead.
+   */
+  const source = pickImagery(venue)
+  widget.imageryLayers.add(new ImageryLayer(new CachedImagery({ maximumLevel: FAR_ZOOM, source: null })))
+  /*
+   * AND NEAR THE VIEW, ONE ZOOM: a layer whose provider answers only at
+   * NEAR_ZOOM, inside NEAR_M of the view's centre. It moves with the view
+   * when the view has gone more than half of NEAR_M from it.
+   */
+  let nearLayer: InstanceType<typeof ImageryLayer> | null = null
+  let nearAt: LatLon | null = null
+  const placeNear = (at: LatLon) => {
+    if (nearAt !== null && distanceMeters(nearAt, at) < NEAR_M / 2) return
+    if (nearLayer !== null) widget.imageryLayers.remove(nearLayer, true)
+    /*
+     * ONLY ON FINE GROUND TILES (NEAR_MIN_TERRAIN and deeper). The engine
+     * stitches every imagery tile a ground tile covers into its texture: a
+     * coarse ground tile over the whole square took about 170 of them, at
+     * every coarse level, and the 3D network audit's page never settled.
+     * Proved by turning this layer off: 260 tiles and loaded. Coarser
+     * ground, far off, wears the far layer.
+     */
+    nearLayer = new ImageryLayer(new CachedImagery({ maximumLevel: NEAR_ZOOM, minimumLevel: NEAR_ZOOM, rectangle: nearRectangle(at), source }), { minimumTerrainLevel: NEAR_MIN_TERRAIN })
+    widget.imageryLayers.add(nearLayer)
+    nearAt = at
+  }
+  placeNear(venue)
+  /* Where the camera looks (the ground at the middle of the screen, else under the camera), checked as it settles. */
+  widget.camera.moveEnd.addEventListener(() => {
+    const canvas = scene.canvas
+    const hit = widget.camera.pickEllipsoid(new Cartesian2(canvas.clientWidth / 2, canvas.clientHeight / 2))
+    const c = hit === undefined ? widget.camera.positionCartographic : Cartographic.fromCartesian(hit)
+    placeNear({ lat: CMath.toDegrees(c.latitude), lon: CMath.toDegrees(c.longitude) })
+  })
   /* Where a tile has not arrived yet: a dark ground, not the engine's bright blue. */
   scene.globe.baseColor = Color.fromCssColorString('#1d2124')
   scene.globe.enableLighting = true
@@ -317,6 +431,15 @@ export function createClayScene(
     }
   }
   widget.clock.shouldAnimate = false
+  /*
+   * PLAIN_FPS FRAMES A SECOND IN THE PLAIN VIEW, NOT 60. With the sea, the
+   * roofs and the shade at the walls' feet, 60 kept a software-drawn page so
+   * busy the 3D network audit could not get a word in (28 Oct), and on a
+   * phone it is battery for nothing. Drawing only on request starved the
+   * globe instead: it fetches tiles as it draws, and 96 arrived in a minute
+   * against 408. A move played or recorded, and flying, run at full rate.
+   */
+  widget.targetFrameRate = PLAIN_FPS
 
   const origin = Cartesian3.fromDegrees(venue.lon, venue.lat)
   /* At run time Transforms borrows this from FixedFrameTransforms; engine 26's typings leave it off. */
@@ -370,18 +493,35 @@ export function createClayScene(
           },
         }),
       )
+      /* The roof, a step darker, laid a few centimetres over the block's top. */
+      buildingEntities.push(
+        widget.entities.add({
+          polygon: {
+            hierarchy: Cartesian3.fromDegreesArray(flat),
+            heightReference: HeightReference.RELATIVE_TO_GROUND,
+            height: (known ? (b.height.metres as number) : NOMINAL_DRAW_HEIGHT) + 0.05,
+            material: new ColorMaterialProperty(Color.fromCssColorString(known ? CLAY_ROOF : CLAY_UNKNOWN_ROOF)),
+            shadows: ShadowMode.RECEIVE_ONLY,
+          },
+        }),
+      )
       /*
-       * ITS FOOTPRINT ON THE GROUND. Satellite photos lean: a tall block's
-       * roof sits off its base in the picture. A soft outline at the base lets
-       * the eye match block to photo (1st St jetty, 27 Oct).
+       * ITS FOOTPRINT ON THE GROUND, AS THE SOFT SHADE AT ITS FOOT. A dark
+       * warm band along the base, half see-through, reads as the shade where
+       * a wall meets the ground (one band: each is a line draped on the
+       * ground, and two a building doubled the cost of drawing them). The engine's own ambient
+       * occlusion was tried first: a full-screen pass every frame, and the 3D
+       * network audit's page never settled with it on (28 Oct). The band also
+       * keeps what the light outline did: satellite photos lean, and the
+       * footprint lets the eye match block to photo (1st St jetty, 27 Oct).
        */
       buildingEntities.push(
         widget.entities.add({
           polyline: {
             positions: Cartesian3.fromDegreesArray([...flat, flat[0], flat[1]]),
             clampToGround: true,
-            width: 1.5,
-            material: Color.fromCssColorString(FOOTPRINT).withAlpha(0.7),
+            width: 5,
+            material: Color.fromCssColorString(FOOT_SHADE).withAlpha(0.24),
           },
         }),
       )
@@ -649,6 +789,8 @@ export function createClayScene(
 
     if (play.cinema !== null) {
       cinema ??= createCinema(widget, venue, enuToFixedPoint)
+      /* The preview draws its own sea, in its own look. */
+      if (plainSea !== null) plainSea.primitive.show = false
       cinema.on(play.cinema, play.look, play.focal)
       cloudsDrawn = cinema.clouds()
       overlays(false)
@@ -656,6 +798,7 @@ export function createClayScene(
     onNote?.(previewNote(play.cinema, cloudsDrawn))
     const renderMode = scene.requestRenderMode
     scene.requestRenderMode = false
+    widget.targetFrameRate = 60
     let clip: Blob | null = null
     try {
       if (play.record) clip = await renderFrames(play, end, pose, onTime, onProgress)
@@ -681,7 +824,9 @@ export function createClayScene(
     } finally {
       playing = null
       scene.requestRenderMode = renderMode
+      widget.targetFrameRate = PLAIN_FPS
       cinema?.off()
+      if (plainSea !== null) plainSea.primitive.show = true
       cloudsDrawn = false
       overlays(true)
     }
@@ -808,7 +953,37 @@ export function createClayScene(
 
   orbit()
   ;(window as unknown as { __clayBuilds?: number }).__clayBuilds = ((window as unknown as { __clayBuilds?: number }).__clayBuilds ?? 0) + 1
+  /*
+   * THE SEA IN THE PLAIN VIEW (27 Oct, the pier: the satellite's sea was dark
+   * slabs from different zooms). Offshore of the map's coastline, the
+   * preview's water in its Real look, at the tide's height, its waves moving
+   * with the clock. Rebuilt only when the ocean's outline or the waves
+   * change; a new tide height lifts it.
+   */
+  let plainSea: ReturnType<typeof buildSea> | null = null
+  let seaKey = ''
+  const setSea = (inputs: CinemaInputs | null) => {
+    const key = inputs === null || inputs.seaMask === null ? '' : `${inputs.seaMask.url.length}:${inputs.seaMask.url.slice(-64)}:${JSON.stringify(inputs.sea)}`
+    if (key !== seaKey) {
+      if (plainSea !== null) scene.primitives.remove(plainSea.primitive)
+      plainSea = null
+      seaKey = key
+      if (inputs !== null && inputs.seaMask !== null) {
+        plainSea = buildSea(inputs, venue, false, true)
+        plainSea.primitive.show = playing === null
+        scene.primitives.add(plainSea.primitive)
+      }
+    }
+    if (plainSea !== null && inputs !== null) plainSea.setLevel(inputs.waterLevelM)
+    scene.requestRender()
+  }
+  const seaStart = performance.now()
+  scene.preRender.addEventListener(() => {
+    if (plainSea !== null) (plainSea.material.uniforms as Record<string, unknown>).time = (performance.now() - seaStart) / 1000
+  })
+
   return {
+    setSea,
     whenShown: () => shown,
     sunNow: () => sunNow,
     setTime,

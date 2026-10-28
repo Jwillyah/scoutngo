@@ -293,7 +293,15 @@ export default defineConfig({
    * "Network: use --host to expose", and `vercel dev` has nothing to proxy to
    * from another device.
    */
-  server: { host: true },
+  /*
+   * THE HOT-RELOAD SOCKET ON ITS OWN PORT, not through `vercel dev`'s proxy.
+   * The proxy has no handler for a socket the browser drops (a navigation, a
+   * closed tab, a test browser stopped): "read ECONNRESET" right after its
+   * "Detected upgrade event, proxying", and the whole dev server exits, taking
+   * the gate's browser audits down with it (28 Oct). Direct, there is no
+   * proxy to fall over.
+   */
+  server: { host: true, hmr: { port: 24680 } },
   // The maplibre worker is an ES module and imports a sibling chunk, so it has
   // to stay ESM after bundling.
   worker: { format: 'es' },

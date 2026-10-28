@@ -32,8 +32,18 @@ const ALLOWED = new Set([
   '127.0.0.1:5173',
   'localhost:5173',
   'server.arcgisonline.com',
-  /* The statewide imagery of Virginia (VBMP), the sharp layer of the 3D view at a Virginia venue. */
+  /* The free aerial imagery the 3D view picks from, one per region (src/data/imagerySources.ts). */
   'vginmaps.vdem.virginia.gov',
+  'services.nconemap.gov',
+  'mdgeodata.md.gov',
+  'enterprise.firstmap.delaware.gov',
+  'tiles.arcgis.com',
+  'imagery.nationalmap.gov',
+  /* The sea offshore moves with the swell and wind of the forecast (src/lib/cinema/useCinemaData.ts), as in the preview. */
+  'api.open-meteo.com',
+  'marine-api.open-meteo.com',
+  /* The water height offshore: the tide station datums (src/lib/waterline/datums.ts). */
+  'api.tidesandcurrents.noaa.gov',
   's3.amazonaws.com',
   'tiles.openfreemap.org',
   'overpass-api.de',
