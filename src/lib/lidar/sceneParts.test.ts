@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildRasters, KIND } from './raster.ts'
-import { overlayDtm } from './terrain.ts'
+import { lowerSea, overlayDtm, SEA_FLOOR_M } from './terrain.ts'
 import { canopyPeaks, footprintMask } from './canopy.ts'
 import { mercator, unmercator } from './grid.ts'
 
@@ -55,5 +55,15 @@ describe('the scan in the 3D scene', () => {
     const far = new Float32Array(9).fill(-99)
     expect(overlayDtm(far, 3, { x: tx + 1000, y: ty, z }, r)).toBe(0)
     expect(far[4]).toBe(-99)
+    /* Where the scan measured no ground (the sea, filled in), the tile's own height stands. */
+    const noGround = { ...r, ground: new Uint8Array(r.ground?.length ?? 0) }
+    const kept = new Float32Array(9).fill(-99)
+    expect(overlayDtm(kept, 3, { x: tx, y: ty, z }, noGround)).toBe(0)
+    expect(kept[4]).toBe(-99)
+  })
+  it('puts the tiles\' 0 m sea below any tide in 3D, and nothing else', () => {
+    const g = Float32Array.from([0, 0.0039, -0.5, 2, 0])
+    expect(lowerSea(g)).toBe(2)
+    expect([...g]).toEqual([SEA_FLOOR_M, Float32Array.from([0.0039])[0], -0.5, 2, SEA_FLOOR_M])
   })
 })

@@ -10,6 +10,19 @@
 export const IMAGERY_TEMPLATE =
   'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
 
+/**
+ * Virginia's statewide aerial imagery (VBMP, VGIN), the most recent year
+ * on top: 6 in to 1 ft a pixel, Web Mercator tiles of 256 px, no key, CORS
+ * open (checked 27 Oct 2026 at the Virginia Beach Fishing Pier: z19 served,
+ * z20 not). Public domain, cited "Virginia Geographic Information Network".
+ * The 3D view's sharp layer at a Virginia venue; any tile it lacks is Esri's.
+ */
+export const VBMP_TEMPLATE =
+  'https://vginmaps.vdem.virginia.gov/arcgis/rest/services/VBMP_Imagery/MostRecentImagery_WGS/MapServer/tile/{z}/{y}/{x}'
+
+/** Virginia's bounding box, generous: a tile VBMP does not have falls back to Esri. */
+export const VIRGINIA_BOX = { south: 36.54, north: 39.47, west: -83.68, east: -75.24 } as const
+
 /** AWS terrarium elevation. {z}/{x}/{y}: standard XYZ. */
 export const TERRAIN_TEMPLATE =
   'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'

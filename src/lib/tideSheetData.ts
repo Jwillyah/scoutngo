@@ -99,6 +99,14 @@ export async function fetchWindMonth(at: LatLon) {
   return liveOrSaved(`wind-month|${at.lat.toFixed(3)},${at.lon.toFixed(3)}`, `${WIND_URL}?${params}`, (p) => parseHourly(p, WIND_NAMES))
 }
 
+export const SKY_NAMES = ['cloud_cover_low', 'cloud_cover_mid', 'cloud_cover_high', 'visibility'] as const
+
+/** The sky by the hour for as far as Open-Meteo forecasts: the cover at three heights and the visibility (metres), for the 3D preview's clouds and haze. */
+export async function fetchSkyHours(at: LatLon) {
+  const params = new URLSearchParams({ latitude: at.lat.toFixed(4), longitude: at.lon.toFixed(4), hourly: SKY_NAMES.join(','), forecast_days: String(WIND_DAYS), timezone: 'GMT' })
+  return liveOrSaved(`sky-hours|${at.lat.toFixed(3)},${at.lon.toFixed(3)}`, `${WIND_URL}?${params}`, (p) => parseHourly(p, SKY_NAMES))
+}
+
 export const MARINE_NAMES = ['wave_height', 'wave_direction', 'wave_period', 'swell_wave_height', 'swell_wave_direction', 'swell_wave_period', 'wind_wave_height', 'sea_surface_temperature'] as const
 
 /** The sea for the next week. Inland, Open-Meteo answers with nothing in the series: null. */

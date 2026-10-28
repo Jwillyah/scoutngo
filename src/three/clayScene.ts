@@ -65,14 +65,17 @@ import type { LatLon } from '../core/geo.ts'
 import { CLAY_LIGHT_INTENSITY, clayLight, domePoint, skyArc, sunlightEnu, type SkyArc } from '../core/sky3d.ts'
 import { getSunPosition } from '../core/sun.ts'
 import { heightGrid, sourceFor } from '../core/terrarium.ts'
-import { overlayDtm } from '../lib/lidar/terrain.ts'
-import { horizontalFov, WATERMARK, type FlightPlay } from '../lib/preflight/play.ts'
+import { lowerSea, overlayDtm } from '../lib/lidar/terrain.ts'
+import { horizontalFov, previewNote, WATERMARK, type FlightPlay } from '../lib/preflight/play.ts'
+import { createCinema, type Cinema } from './cinema.ts'
+import { drift, easedTime, FPS, frameTimes, subframeTimes } from '../core/gimbal.ts'
+import { clipEncoder, clipSize } from '../lib/cinema/encode.ts'
 import { bearingBetween, distanceMeters } from '../core/geo.ts'
 import type { Rasters } from '../lib/lidar/raster.ts'
 import { formatHour } from '../core/timezone.ts'
 import type { Building } from '../lib/buildings.ts'
 import { loadTile } from '../lib/offlineCache.ts'
-import { IMAGERY_TEMPLATE, TERRAIN_TEMPLATE } from '../lib/offlineSources.ts'
+import { IMAGERY_TEMPLATE, TERRAIN_TEMPLATE, VBMP_TEMPLATE, VIRGINIA_BOX } from '../lib/offlineSources.ts'
 import { tileUrl } from '../lib/tileRange.ts'
 import { NOMINAL_TREE_HEIGHT, type MappedTree } from '../lib/trees.ts'
 
@@ -88,6 +91,7 @@ export const SHOW_WITHIN_MS = 30_000
 /* 129 across a 256 px tile: every other pixel, close enough to read within a metre of the 2D map. */
 const HEIGHT_SAMPLES = 129
 const ESRI_CREDIT = 'Tiles by Esri. Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
+const VBMP_CREDIT = 'Imagery: Virginia Geographic Information Network'
 
 const token = (name: string, fallback: string) => {
   const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
@@ -111,23 +115,29 @@ async function tileBytes(url: string): Promise<ArrayBuffer> {
   return data
 }
 
-/** Esri imagery, read through the 2D map's tile cache. */
+/** Esri imagery, read through the 2D map's tile cache. With `vbmp`, Virginia's own imagery first and Esri's where it has no tile. */
 class CachedImagery extends UrlTemplateImageryProvider {
-  constructor(maximumLevel = 19) {
+  private readonly vbmp: boolean
+  constructor(maximumLevel = 19, vbmp = false) {
     super({
       url: IMAGERY_TEMPLATE,
       tilingScheme: new WebMercatorTilingScheme(),
       maximumLevel,
-      credit: new Credit(ESRI_CREDIT),
+      credit: new Credit(vbmp ? `${VBMP_CREDIT}. ${ESRI_CREDIT}` : ESRI_CREDIT),
     })
+    this.vbmp = vbmp
   }
   override requestImage(x: number, y: number, level: number): Promise<ImageryTypes> {
-    return tileBytes(tileUrl(IMAGERY_TEMPLATE, { x, y, z: level })).then((bytes) => {
+    const esri = () => tileBytes(tileUrl(IMAGERY_TEMPLATE, { x, y, z: level }))
+    const bytes = this.vbmp ? tileBytes(tileUrl(VBMP_TEMPLATE, { x, y, z: level })).catch(esri) : esri()
+    return bytes.then((b) => {
       tileCounts.imagery += 1
-      return createImageBitmap(new Blob([bytes]))
+      return createImageBitmap(new Blob([b]))
     })
   }
 }
+
+const inVirginia = (at: LatLon) => at.lat >= VIRGINIA_BOX.south && at.lat <= VIRGINIA_BOX.north && at.lon >= VIRGINIA_BOX.west && at.lon <= VIRGINIA_BOX.east
 
 /** Decoded terrarium tiles, a few kept so a level's children reuse their parent. */
 const decoded = new Map<string, Promise<Uint8ClampedArray>>()
@@ -167,7 +177,8 @@ function terrarium(status: GroundStatus, onChange: () => void, scan: Rasters | n
         const px = await terrariumPixels(src.tile.x, src.tile.y, src.tile.z)
         tileCounts.terrain += 1
         const grid = heightGrid(px, Math.round(Math.sqrt(px.length / 4)), HEIGHT_SAMPLES, src.u0, src.v0, src.span)
-        /* Inside a kept scan's patch, the lidar ground (src/lib/lidar/terrain.ts). */
+        /* The sea floor below any tide, then inside a kept scan's patch the lidar ground (src/lib/lidar/terrain.ts). */
+        lowerSea(grid)
         if (scan !== null && level >= 13) overlayDtm(grid, HEIGHT_SAMPLES, { x, y, z: level }, scan)
         return grid
       } catch {
@@ -208,7 +219,8 @@ export interface ClayScene {
   setSkyDay(dayStart: Date): void
   orbit(): void
   /** Fly a Preflight move; with record, resolves to the watermarked clip. */
-  playPath(play: FlightPlay, onTime: (at: Date) => void): Promise<Blob | null>
+  /** onNote: what the preview says over itself, once it has started (src/lib/preflight/play.ts previewNote). */
+  playPath(play: FlightPlay, onTime: (at: Date) => void, onProgress?: (share: number) => void, onNote?: (note: string) => void): Promise<Blob | null>
   droneView(at: LatLon, altAbsM: number, yaw: number, gimbal: number, focal: number): void
   setCeiling(centre: LatLon | null, altAbsM: number, alpha: number): void
   startRecording(): { stop: () => Promise<Blob | null> } | null
@@ -260,7 +272,8 @@ export function createClayScene(
    * between imagery levels, so the change from coarse to sharp is a swap.
    */
   widget.imageryLayers.add(new ImageryLayer(new CachedImagery(13)))
-  widget.imageryLayers.add(new ImageryLayer(new CachedImagery()))
+  /* At a Virginia venue the sharp layer is the state's own imagery (VBMP), sharper than Esri's there; Esri's wherever it has none. */
+  widget.imageryLayers.add(new ImageryLayer(new CachedImagery(19, inVirginia(venue))))
   /* Where a tile has not arrived yet: a dark ground, not the engine's bright blue. */
   scene.globe.baseColor = Color.fromCssColorString('#1d2124')
   scene.globe.enableLighting = true
@@ -579,7 +592,18 @@ export function createClayScene(
       },
     })
   }
-  const playPath = async (play: FlightPlay, onTime: (at: Date) => void): Promise<Blob | null> => {
+  /*
+   * THE CINEMATIC LOOK (src/three/cinema.ts), made once and switched on only
+   * while a move plays or renders. The sky arcs and the numbered pins are a
+   * planning overlay, put away for the preview and back after it.
+   */
+  let cinema: Cinema | null = null
+  let cloudsDrawn = false
+  const overlays = (show: boolean) => {
+    for (const e of [...skyEntities, ...pinEntities]) e.show = show
+  }
+
+  const playPath = async (play: FlightPlay, onTime: (at: Date) => void, onProgress?: (share: number) => void, onNote?: (note: string) => void): Promise<Blob | null> => {
     playing?.stop()
     const [g] = await sampleTerrain(widget.terrainProvider, 15, [Cartographic.fromDegrees(play.takeoff.lon, play.takeoff.lat)])
     const base = g?.height ?? 0
@@ -598,35 +622,159 @@ export function createClayScene(
       const f = b.t === a.t ? 0 : Math.max(0, Math.min(1, (t - a.t) / (b.t - a.t)))
       return { lat: a.at.lat + (b.at.lat - a.at.lat) * f, lon: a.at.lon + (b.at.lon - a.at.lon) * f, ft: a.ft + (b.ft - a.ft) * f }
     }
-    const rec = play.record ? startRecording() : null
-    const started = performance.now()
-    let lastTime = -1
+    /*
+     * One instant of the move: the clock eased at both ends (src/core/gimbal.ts),
+     * the camera on the path looking at the subject with a gimbal's small
+     * drift, the light at that moment, and the sea and focus with it.
+     */
+    const pose = (t: number) => {
+      const shown = easedTime(t, end)
+      const p = at(shown)
+      const h = base + p.ft * 0.3048
+      const dist = Math.max(1, distanceMeters({ lat: p.lat, lon: p.lon }, play.subject))
+      const d = drift(t)
+      widget.camera.setView({
+        destination: Cartesian3.fromDegrees(p.lon, p.lat, h),
+        orientation: {
+          heading: CMath.toRadians(bearingBetween({ lat: p.lat, lon: p.lon }, play.subject) + d.yaw),
+          pitch: Math.atan2(subjectH - h, dist) + CMath.toRadians(d.pitch),
+          roll: 0,
+        },
+      })
+      const when = new Date(play.startAt.getTime() + shown * 1000)
+      if (play.record) setTime(when)
+      cinema?.frame(t, getSunPosition(when, venue.lat, venue.lon).altitude, Math.hypot(dist, h - subjectH))
+      return when
+    }
+
+    if (play.cinema !== null) {
+      cinema ??= createCinema(widget, venue, enuToFixedPoint)
+      cinema.on(play.cinema, play.look, play.focal)
+      cloudsDrawn = cinema.clouds()
+      overlays(false)
+    }
+    onNote?.(previewNote(play.cinema, cloudsDrawn))
     const renderMode = scene.requestRenderMode
     scene.requestRenderMode = false
-    await new Promise<void>((resolve) => {
-      let raf = 0
-      const frame = () => {
-        const t = Math.min(end, (performance.now() - started) / 1000)
-        const p = at(t)
-        const h = base + p.ft * 0.3048
-        const dist = Math.max(1, distanceMeters({ lat: p.lat, lon: p.lon }, play.subject))
-        widget.camera.setView({
-          destination: Cartesian3.fromDegrees(p.lon, p.lat, h),
-          orientation: { heading: CMath.toRadians(bearingBetween({ lat: p.lat, lon: p.lon }, play.subject)), pitch: Math.atan2(subjectH - h, dist), roll: 0 },
+    let clip: Blob | null = null
+    try {
+      if (play.record) clip = await renderFrames(play, end, pose, onTime, onProgress)
+      else {
+        const started = performance.now()
+        let lastTime = -1
+        await new Promise<void>((resolve) => {
+          let raf = 0
+          const frame = () => {
+            const t = Math.min(end, (performance.now() - started) / 1000)
+            const when = pose(t)
+            if (Math.floor(t * 2) !== lastTime) {
+              lastTime = Math.floor(t * 2)
+              onTime(when)
+            }
+            if (t >= end) return resolve()
+            raf = requestAnimationFrame(frame)
+          }
+          playing = { stop: () => { cancelAnimationFrame(raf); resolve() } }
+          raf = requestAnimationFrame(frame)
         })
-        if (Math.floor(t * 2) !== lastTime) {
-          lastTime = Math.floor(t * 2)
-          onTime(new Date(play.startAt.getTime() + t * 1000))
-        }
-        if (t >= end) return resolve()
-        raf = requestAnimationFrame(frame)
       }
-      playing = { stop: () => { cancelAnimationFrame(raf); resolve() } }
-      raf = requestAnimationFrame(frame)
-    })
-    playing = null
-    scene.requestRenderMode = renderMode
-    return rec === null ? null : rec.stop()
+    } finally {
+      playing = null
+      scene.requestRenderMode = renderMode
+      cinema?.off()
+      cloudsDrawn = false
+      overlays(true)
+    }
+    return clip
+  }
+
+  /*
+   * FRAME BY FRAME. The engine's own loop stops; each frame is posed, drawn
+   * until its tiles have arrived, averaged over SUBFRAMES instants for the
+   * motion blur, watermarked, and handed to the encoder with its number. So
+   * the clip runs at a steady 30 fps however long a frame took to draw.
+   */
+  const renderFrames = async (play: FlightPlay, end: number, pose: (t: number) => Date, onTime: (at: Date) => void, onProgress?: (share: number) => void): Promise<Blob | null> => {
+    /* The canvas is drawn at CSS pixels; for the clip, at the screen's own (a phone's 2 or 3), and back after. */
+    const scaleBefore = widget.resolutionScale
+    widget.resolutionScale = Math.max(1, Math.min(3, window.devicePixelRatio || 1))
+    widget.resize()
+    const size = clipSize(widget.canvas.width, widget.canvas.height)
+    const encoder = await clipEncoder(size.width, size.height, FPS)
+    if (encoder === null) return null
+    const out = document.createElement('canvas')
+    out.width = size.width
+    out.height = size.height
+    const ctx = out.getContext('2d')
+    if (ctx === null) return null
+    const note = previewNote(play.cinema, cloudsDrawn)
+    let stopped = false
+    playing = { stop: () => (stopped = true) }
+    widget.useDefaultRenderLoop = false
+    /*
+     * Drawn again until the tiles the view asked for have arrived (the
+     * engine's load queue empty twice running), or the wait runs out. Not
+     * globe.tilesLoaded: with the camera low over the water it never turned
+     * true, and every frame waited out its whole timeout.
+     */
+    let queued = 0
+    const onQueue = (n: number) => (queued = n)
+    scene.globe.tileLoadProgressEvent.addEventListener(onQueue)
+    const settle = async (maxMs: number) => {
+      const t0 = performance.now()
+      let empty = 0
+      widget.render()
+      while (empty < 2 && performance.now() - t0 < maxMs) {
+        /* Every 100 ms: often enough to take tiles as they land, not so often that a slow GPU stalls on a queue of frames. */
+        await new Promise((r) => setTimeout(r, 100))
+        widget.render()
+        empty = queued === 0 ? empty + 1 : 0
+      }
+    }
+    /*
+     * The frame copied while it is still on the canvas: inside the engine's
+     * postRender, as the recorder does. Read after render() returns, the
+     * canvas had already been handed to the page and came back black.
+     */
+    const drawn = () =>
+      new Promise<void>((resolve) => {
+        const copy = () => {
+          scene.postRender.removeEventListener(copy)
+          ctx.drawImage(widget.canvas, 0, 0, size.width, size.height)
+          resolve()
+        }
+        scene.postRender.addEventListener(copy)
+        widget.render()
+      })
+    try {
+      const frames = frameTimes(end)
+      for (let f = 0; f < frames.length && !stopped; f += 1) {
+        const subs = subframeTimes(frames[f], end)
+        let when = play.startAt
+        for (let k = 0; k < subs.length; k += 1) {
+          when = pose(subs[k])
+          /* The first instant of a frame waits for its tiles; the rest are a sixtieth of a second on and draw from them. */
+          if (k === 0) await settle(f === 0 ? 20_000 : 1_500)
+          /* A running mean: the k-th instant weighs 1 / (k + 1). */
+          ctx.globalAlpha = 1 / (k + 1)
+          await drawn()
+        }
+        ctx.globalAlpha = 1
+        ctx.font = `${Math.round(size.height / 40)}px system-ui, sans-serif`
+        ctx.fillStyle = 'rgba(255,255,255,0.85)'
+        ctx.fillText(note, Math.round(size.width / 30), size.height - Math.round(size.height / 30))
+        await encoder.add(out, f)
+        onProgress?.((0.9 * (f + 1)) / frames.length)
+        if (f % 15 === 0) onTime(when)
+      }
+    } finally {
+      widget.useDefaultRenderLoop = true
+      scene.globe.tileLoadProgressEvent.removeEventListener(onQueue)
+      widget.resolutionScale = scaleBefore
+      widget.resize()
+    }
+    if (stopped) return null
+    return encoder.finish((share) => onProgress?.(0.9 + 0.1 * share))
   }
 
   const project = (at: LatLon, height = 0) => {

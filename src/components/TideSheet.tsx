@@ -196,9 +196,9 @@ export function TideSheet({ tide, at, timeZone, venue, units, data, onAt, onJump
       </div>
       {ok === null ? null : (
         <p className="tides__small">
-          Feet above MLLW (the average lowest tide) · {ok.station.name},{' '}
+          Feet above MLLW, the average daily low · {ok.station.name},{' '}
           <span className="num">{formatRange(ok.distanceKm * 1000, units.distance)}</span>
-          {ok.predictions.curveSource === 'published' ? '' : ' · curve from NOAA’s turns'}
+          {ok.predictions.curveSource === 'published' ? '' : ' · curve from the turns'}
           {waterline === undefined || data.facing.value === 'inland' ? null : waterline.scanKept ? (
             <>
               {' · '}
@@ -207,7 +207,7 @@ export function TideSheet({ tide, at, timeZone, venue, units, data, onAt, onJump
               </button>
             </>
           ) : (
-            ' · the waterline needs the 3D scan (3D view, i)'
+            ' · waterline needs the 3D scan'
           )}
         </p>
       )}

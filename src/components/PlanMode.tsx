@@ -94,11 +94,15 @@ import type { ScanContext } from '../lib/lidar/applyScan.ts'
 import { usePreflight } from '../lib/preflight/usePreflight.ts'
 import { PreflightSheet } from './PreflightSheet.tsx'
 import type { FlightPlay } from '../lib/preflight/play.ts'
+import type { Look } from '../three/cinema.ts'
+import { useCinemaData } from '../lib/cinema/useCinemaData.ts'
 import type { FlySession } from '../lib/fly/session.ts'
 import { hiddenByMarch } from '../core/flight.ts'
 import { ndFor } from '../core/ndFilter.ts'
 import type { Building as PlanBuilding } from '../lib/buildings.ts'
 
+/* Before the time bar has a time: an instant the forecast says nothing about, so the preview draws nothing from it. */
+const NO_TIME = new Date(0)
 const NO_BUILDINGS: readonly PlanBuilding[] = []
 import { useSurfSetting } from '../lib/surfSetting.ts'
 import { LAYER_FAILED } from '../lib/layerFailed.ts'
@@ -1009,6 +1013,9 @@ export function PlanMode({
   const [flightPicking, setFlightPicking] = useState(false)
   const [flightPlay, setFlightPlay] = useState<FlightPlay | null>(null)
   const [recordNote, setRecordNote] = useState<string | null>(null)
+  /* The cinematic preview: its look, and the forecast its sky, sea and clouds are drawn from (asked while Preflight is open). */
+  const [look, setLook] = useState<Look>('real')
+  const [renderShare, setRenderShare] = useState<number | null>(null)
   /* The waterline on the 2D map, from the Tide sheet (src/lib/waterline/). */
   const [showWaterline, setShowWaterline] = useState(false)
   const waterline = useWaterline(showWaterline, venue, tide, venue === null ? null : scanCtx, scrubbedAt)
@@ -1051,9 +1058,10 @@ export function PlanMode({
       setThreeDNote('3D needs WebGL 2, which this browser does not have. The 2D map works as before.')
       return
     }
-    setRecordNote(record ? 'Recording in the 3D view…' : null)
+    setRecordNote(record ? 'Rendering frame by frame for a steady 30 fps…' : null)
+    setRenderShare(record ? 0 : null)
     setThreeD(true)
-    setFlightPlay((f: FlightPlay | null) => ({ path: pf.path, subject: venue, takeoff: pf.pilot ?? venue, focal: pf.focal, startAt: scrubbedAt, record, tick: (f?.tick ?? 0) + 1 }))
+    setFlightPlay((f: FlightPlay | null) => ({ path: pf.path, subject: venue, takeoff: pf.pilot ?? venue, focal: pf.focal, startAt: scrubbedAt, record, look, cinema, tick: (f?.tick ?? 0) + 1 }))
   }
 
   /* The year of the 3D scan whose heights the buildings carry, or undefined when none do. */
@@ -1103,6 +1111,7 @@ export function PlanMode({
   /* The Tide sheet's month, wind, sea and beach facing: asked only while it is open. */
   const [surfSetting] = useSurfSetting()
   const tideSheet = useTideSheet(card.kind === 'tide', venue, tide.status === 'ok' ? tide.station.id : null, surfSetting)
+  const cinema = useCinemaData(card.kind === 'preflight' || flightPlay !== null, venue, tide, scrubbedAt ?? NO_TIME)
 
   /*
    * WHAT THE VENUE BAR SAYS. The name is already resolved upstream and is
@@ -1651,6 +1660,9 @@ export function PlanMode({
             onFly={startFly}
             onRecord={() => playFlight(true)}
             recordNote={recordNote}
+            renderShare={renderShare}
+            look={look}
+            onLook={setLook}
             clip={recordedClip}
             onPlacePilot={() => onPlacingPilot(true)}
             pilotSet={pilotAt !== null}
@@ -2071,7 +2083,9 @@ export function PlanMode({
           onRecorded={(clip: Blob | null, note: string) => {
             setRecordNote(note)
             setRecordedClip(clip)
+            setRenderShare(null)
           }}
+          onRenderProgress={setRenderShare}
         />
       ) : null}
 

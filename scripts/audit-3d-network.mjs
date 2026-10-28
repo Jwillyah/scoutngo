@@ -32,6 +32,8 @@ const ALLOWED = new Set([
   '127.0.0.1:5173',
   'localhost:5173',
   'server.arcgisonline.com',
+  /* The statewide imagery of Virginia (VBMP), the sharp layer of the 3D view at a Virginia venue. */
+  'vginmaps.vdem.virginia.gov',
   's3.amazonaws.com',
   'tiles.openfreemap.org',
   'overpass-api.de',

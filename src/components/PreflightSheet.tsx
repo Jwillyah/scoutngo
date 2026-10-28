@@ -1,5 +1,6 @@
 import { FLIGHT_CARD_CLOSE, toGpx, toKml } from '../core/flight.ts'
 import { MOVE_LABEL, POINTS_NEEDED, type MoveKind, type Preflight } from '../lib/preflight/usePreflight.ts'
+import type { Look } from '../three/cinema.ts'
 
 /*
  * PREFLIGHT: DRAW A MOVE, READ ITS CARD, PLAY IT IN 3D.
@@ -25,6 +26,11 @@ interface PreflightSheetProps {
   onFly: (record: boolean) => void
   onRecord: () => void
   recordNote: string | null
+  /** How far a recording's frame-by-frame render has got, 0 to 1, or null when none is running. */
+  renderShare: number | null
+  /** The preview's look: Real (the imagery as it is) or Animated (painted). */
+  look: Look
+  onLook: (look: Look) => void
   /** The recorded preview, to hand to the share sheet. */
   clip: Blob | null
   /** Where the pilot stands: the plan's own pilot position. */
@@ -32,6 +38,12 @@ interface PreflightSheetProps {
   pilotSet: boolean
   onClose: () => void
 }
+
+/* Real: the imagery as it is. Animated: soft painted colours, often easier to read than blurry imagery when low and close. */
+const LOOKS: [Look, string][] = [
+  ['real', 'Real'],
+  ['animated', 'Animated'],
+]
 
 const KINDS: MoveKind[] = ['orbit', 'push-in', 'pull-back', 'rise', 'fly-along', 'waypoints']
 
@@ -56,7 +68,7 @@ async function share(name: string, text: string | Blob, type: string): Promise<s
   }
 }
 
-export function PreflightSheet({ pf, picking, onPick, onPlay, onFly, onRecord, recordNote, clip, onPlacePilot, pilotSet, onClose }: PreflightSheetProps) {
+export function PreflightSheet({ pf, picking, onPick, onPlay, onFly, onRecord, recordNote, renderShare, look, onLook, clip, onPlacePilot, pilotSet, onClose }: PreflightSheetProps) {
   const card = pf.card
   const need = POINTS_NEEDED[pf.kind]
   return (
@@ -153,12 +165,19 @@ export function PreflightSheet({ pf, picking, onPick, onPlay, onFly, onRecord, r
             {pf.heightsSource.kind === 'map' ? ' No 3D scan here: ground taken as flat, buildings as boxes of their known heights.' : ''}
           </p>
           <p className="pf__close">{FLIGHT_CARD_CLOSE}</p>
+          <div className="seg" role="group" aria-label="Look">
+            {LOOKS.map(([k, label]) => (
+              <button key={k} type="button" className={`seg__btn${look === k ? ' seg__btn--on' : ''}`} aria-pressed={look === k} onClick={() => onLook(k)}>
+                {label}
+              </button>
+            ))}
+          </div>
           <div className="pf__actions">
             <button type="button" className="btn btn--small" onClick={onPlay}>
               Play in 3D
             </button>
-            <button type="button" className="btn btn--small" onClick={onRecord}>
-              Record the preview
+            <button type="button" className="btn btn--small" onClick={onRecord} disabled={renderShare !== null}>
+              {renderShare === null ? 'Record the preview' : `Rendering ${Math.round(renderShare * 100)}%`}
             </button>
             <button type="button" className="clay__link" onClick={() => void share('scoutngo-move.gpx', toGpx(MOVE_LABEL[pf.kind], pf.path, 0, new Date()), 'application/gpx+xml')}>
               GPX

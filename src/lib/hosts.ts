@@ -13,6 +13,7 @@ export interface Host {
 
 export const HOSTS: readonly Host[] = [
   { host: 'server.arcgisonline.com', who: 'Esri', learns: 'which map tiles: a map cell, not a point', when: 'whenever the map shows' },
+  { host: 'vginmaps.vdem.virginia.gov', who: 'Virginia (VGIN) imagery', learns: 'which map tiles: a map cell', when: 'the 3D view at a Virginia venue' },
   { host: 's3.amazonaws.com', who: 'AWS Terrarium elevation', learns: 'which elevation tiles: a map cell', when: 'with terrain or 3D on' },
   { host: 'tiles.openfreemap.org', who: 'OpenFreeMap', learns: 'which map tiles: a map cell', when: 'buildings, the sea, the 3D view' },
   { host: 'api.open-meteo.com', who: 'Open-Meteo', learns: 'the venue coordinate and dates', when: 'wind, cloud, the Tide sheet' },

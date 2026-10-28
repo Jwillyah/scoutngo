@@ -15,7 +15,7 @@ import type { ScanContext } from '../lib/lidar/applyScan.ts'
 import { scanLabel } from '../lib/lidar/applyScan.ts'
 import { canopyPeaks, footprintMask } from '../lib/lidar/canopy.ts'
 import type { Building } from '../lib/buildings.ts'
-import type { FlightPlay } from '../lib/preflight/play.ts'
+import { WATERMARK, type FlightPlay } from '../lib/preflight/play.ts'
 import type { FlySession } from '../lib/fly/session.ts'
 import { NO_STICKS, useFly } from '../lib/fly/useFly.ts'
 import { obstacleBars, type FlyMode, type Sticks } from '../core/flyModel.ts'
@@ -55,6 +55,8 @@ interface Clay3DProps {
   onFlightTime?: (at: Date) => void
   /** A recorded preview, or null with why. */
   onRecorded?: (clip: Blob | null, note: string) => void
+  /** How far a recording's render has got, 0 to 1. */
+  onRenderProgress?: (share: number) => void
   /** Fly it yourself (Phase 3a), or null. */
   fly?: FlySession | null
   /** Landed: the track flown, and the recording if one was asked for. */
@@ -63,7 +65,7 @@ interface Clay3DProps {
 
 export const CLAY_NOTE = 'Clay model from map data; real buildings may differ'
 
-export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveStand, flight = null, onFlightTime, onRecorded, fly = null, onLanded }: Clay3DProps) {
+export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveStand, flight = null, onFlightTime, onRecorded, onRenderProgress, fly = null, onLanded }: Clay3DProps) {
   const host = useRef<HTMLDivElement>(null)
   const scene = useRef<ClayScene | null>(null)
   /* How many times the scene has been built: every build (a scan arriving rebuilds it) re-runs the effects that feed it. 0 is not built yet. */
@@ -176,12 +178,18 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
     if (ready) scene.current?.setTime(at)
   }, [ready, at])
 
-  /* Preflight: fly the move once the scene is up; a recorded clip goes back to the card. */
+  /* Preflight: fly the move once the scene is up; a recorded clip goes back to the card. The preview says over itself what is illustrative in it. */
+  const [previewing, setPreviewing] = useState<string | null>(null)
   useEffect(() => {
     if (!ready || !shown || flight === null) return
-    void scene.current?.playPath(flight, (t) => onFlightTime?.(t)).then((clip) => {
+    const s = scene.current
+    if (s === null) return
+    void s.playPath(flight, (t) => onFlightTime?.(t), (share) => onRenderProgress?.(share), setPreviewing).then((clip) => {
+      setPreviewing(null)
       if (!flight.record) return
-      onRecorded?.(clip, clip === null ? 'This browser cannot record the 3D view.' : `Recorded ${Math.round(clip.size / 1e5) / 10} MB, watermarked "Simulated from public map data".`)
+      /* For the checks (scripts/measure-cinema.mjs): the clip as made. */
+      ;(window as unknown as { __clip?: Blob | null }).__clip = clip
+      onRecorded?.(clip, clip === null ? 'This browser cannot record the 3D view.' : `Recorded ${Math.round(clip.size / 1e5) / 10} MB at a steady 30 fps, watermarked "${WATERMARK}".`)
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, shown, flight?.tick])
@@ -300,6 +308,11 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
       <div className="clay__legend">
         {pill !== null ? (
           <ClayPill status={pill} reason={place.reason} onRetry={() => void loadPlace(venue, { retry: true })} />
+        ) : previewing !== null ? (
+          /* While a move plays: what the preview is, and what in it is illustrative. */
+          <p className="clay__line clay__line--one" role="status">
+            {previewing}
+          </p>
         ) : (
           /*
             * ONE LINE (1st St jetty, 27 Oct: two boxes stacked again):
