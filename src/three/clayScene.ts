@@ -73,7 +73,7 @@ import { getSunPosition } from '../core/sun.ts'
 import { heightGrid, sourceFor } from '../core/terrarium.ts'
 import { lowerSea, overlayDtm } from '../lib/lidar/terrain.ts'
 import { horizontalFov, previewNote, WATERMARK, type FlightPlay } from '../lib/preflight/play.ts'
-import { buildSea, createCinema, type Cinema, type CinemaInputs } from './cinema.ts'
+import { buildSea, createCinema, type Cinema, type CinemaInputs, type Look } from './cinema.ts'
 import { drift, easedTime, FPS, frameTimes, subframeTimes } from '../core/gimbal.ts'
 import { clipEncoder, clipSize } from '../lib/cinema/encode.ts'
 import { bearingBetween, distanceMeters } from '../core/geo.ts'
@@ -315,6 +315,8 @@ export interface ClayScene {
   counts: typeof tileCounts
   /** The water offshore (src/three/cinema.ts buildSea), from the preview's own inputs; null takes it away. */
   setSea(inputs: CinemaInputs | null): void
+  /** While flying: the preview's look (Real or Animated) from these inputs, or null for the plain view. */
+  setFlyLook(look: Look | null, inputs: CinemaInputs | null): void
   /** Screen x,y for a place, or null off screen: for checking what the camera is looking at. */
   project(at: LatLon, height?: number): { x: number; y: number } | null
   widget: CesiumWidget
@@ -982,8 +984,33 @@ export function createClayScene(
     if (plainSea !== null) (plainSea.material.uniforms as Record<string, unknown>).time = (performance.now() - seaStart) / 1000
   })
 
+  /*
+   * THE LOOK WHILE FLYING (27 Oct: low and close, the photo stretched and
+   * soft): the preview's look, switched by Clay3D.tsx, Animated below 150 ft
+   * unless the pilot chose. Its waves and light follow the clock each frame.
+   */
+  let flyLook: Look | null = null
+  const setFlyLook = (look: Look | null, inputs: CinemaInputs | null) => {
+    if (look === flyLook) return
+    flyLook = look
+    /* Full rate while flying: the camera moves every frame. */
+    widget.targetFrameRate = look === null ? PLAIN_FPS : 60
+    if (look === null || inputs === null) {
+      cinema?.off()
+      if (plainSea !== null) plainSea.primitive.show = true
+      return
+    }
+    cinema ??= createCinema(widget, venue, enuToFixedPoint)
+    if (plainSea !== null) plainSea.primitive.show = false
+    cinema.on(inputs, look, 24)
+  }
+  scene.preRender.addEventListener(() => {
+    if (flyLook !== null) cinema?.frame((performance.now() - seaStart) / 1000, sunNow.altitude, 200)
+  })
+
   return {
     setSea,
+    setFlyLook,
     whenShown: () => shown,
     sunNow: () => sunNow,
     setTime,

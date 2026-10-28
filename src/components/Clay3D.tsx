@@ -22,6 +22,9 @@ import { obstacleBars, type FlyMode, type Sticks } from '../core/flyModel.ts'
 import { destinationPoint } from '../core/geo.ts'
 import type { PathPoint } from '../core/flight.ts'
 import { FlyControls } from './FlyControls.tsx'
+import { ANIMATED_BELOW_FT, flyUnits } from '../lib/fly/hudUnits.ts'
+import { imageryLine } from '../data/imagerySources.ts'
+import type { CinemaInputs, Look } from '../three/cinema.ts'
 
 const EMPTY: readonly Building[] = []
 
@@ -61,11 +64,13 @@ interface Clay3DProps {
   fly?: FlySession | null
   /** Landed: the track flown, and the recording if one was asked for. */
   onLanded?: (track: PathPoint[], clip: Blob | null) => void
+  /** The sea offshore, from the same inputs as the preview's (src/lib/cinema/useCinemaData.ts). */
+  sea?: CinemaInputs | null
 }
 
 export const CLAY_NOTE = 'Clay model from map data; real buildings may differ'
 
-export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveStand, flight = null, onFlightTime, onRecorded, onRenderProgress, fly = null, onLanded }: Clay3DProps) {
+export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveStand, flight = null, onFlightTime, onRecorded, onRenderProgress, fly = null, onLanded, sea = null }: Clay3DProps) {
   const host = useRef<HTMLDivElement>(null)
   const scene = useRef<ClayScene | null>(null)
   /* How many times the scene has been built: every build (a scan arriving rebuilds it) re-runs the effects that feed it. 0 is not built yet. */
@@ -178,6 +183,11 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
     if (ready) scene.current?.setTime(at)
   }, [ready, at])
 
+  /* The water offshore, at the tide's height for the bar's moment. */
+  useEffect(() => {
+    if (ready) scene.current?.setSea(sea)
+  }, [ready, sea])
+
   /* Preflight: fly the move once the scene is up; a recorded clip goes back to the card. The preview says over itself what is illustrative in it. */
   const [previewing, setPreviewing] = useState<string | null>(null)
   useEffect(() => {
@@ -227,6 +237,23 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
     mode: flyMode,
   })
   const nearCeiling = hud?.nearCeiling === true
+  /* While flying the app's chrome steps aside: the dock, the sheet, the time bar (app.css :root.is-flying). */
+  useEffect(() => {
+    if (!flying) return
+    document.documentElement.classList.add('is-flying')
+    return () => document.documentElement.classList.remove('is-flying')
+  }, [flying])
+  /* The look: Animated below ANIMATED_BELOW_FT unless the pilot chose one (src/lib/fly/hudUnits.ts). */
+  const [chosenLook, setChosenLook] = useState<Look | null>(null)
+  useEffect(() => {
+    if (!flying) setChosenLook(null)
+  }, [flying])
+  const low = hud !== null && hud.state.alt / 0.3048 < ANIMATED_BELOW_FT
+  const flyLook: Look = chosenLook ?? (low ? 'animated' : 'real')
+  useEffect(() => {
+    if (!ready) return
+    scene.current?.setFlyLook(flying ? flyLook : null, flying ? sea : null)
+  }, [ready, flying, flyLook, sea])
   useEffect(() => {
     if (!ready) return
     scene.current?.setCeiling(flying && fly !== null ? fly.takeoff : null, groundM + (fly?.ceilingFt ?? 400) * 0.3048, nearCeiling ? 0.18 : 0)
@@ -302,6 +329,8 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
         <div className="clay__info" role="dialog" aria-label="About this 3D model">
           <p className="clay__infoline">{CLAY_NOTE}. Lighter blocks have no known height and cast no shadow.</p>
           {place.buildings?.savedAt == null ? null : <p className="clay__infoline">Buildings saved on this phone {place.buildings.savedAt.slice(0, 10)}.</p>}
+          {/* Which pictures the ground wears, and when they were flown (src/data/imagerySources.ts). */}
+          <p className="clay__infoline">{imageryLine(venue)}</p>
           <ScanPanel flow={scanFlow} keptYear={scanYear} />
         </div>
       )}
@@ -353,6 +382,10 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
           wind={fly.wind}
           exposure={fly.exposure}
           bars={bars}
+          units={flyUnits(fly.units)}
+          look={flyLook}
+          lookAuto={chosenLook === null}
+          onLook={setChosenLook}
           onExit={() => {
             const rec = recording.current
             recording.current = null

@@ -11697,88 +11697,305 @@
 
 /* ------------------------------------------------- fly it yourself (3a) */
 
+/*
+ * THE FLY SCREEN, LAID OUT LIKE DJI FLY (FlyControls.tsx): the whole screen,
+ * the app's chrome hidden while flying (:root.is-flying, set by Clay3D.tsx),
+ * landscape first. Numbers along the bottom, status top right, the ring on
+ * the right, the sticks in the bottom corners.
+ */
+:root.is-flying .topbar,
+:root.is-flying .chips2,
+:root.is-flying .rail2,
+:root.is-flying .tooldock,
+:root.is-flying .sheet,
+:root.is-flying .dock,
+:root.is-flying .shadowkey,
+:root.is-flying .maplibregl-ctrl-bottom-left {
+  display: none;
+}
+
 .fly {
-  /* Over the app's own chrome while flying: the sticks must be what a thumb lands on. */
   position: fixed;
-  left: 0;
-  right: 0;
-  top: calc(env(safe-area-inset-top, 0px) + 112px);
-  /* Rendered on the page body (Clay3D's portal), so the sheet's own variables are not here: the peek's height, and the safe area. */
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 200px);
+  inset: 0;
   z-index: 40;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding: 0 var(--space-2);
   pointer-events: none;
+  color: var(--white);
+  text-shadow: 0 1px 3px rgb(0 0 0 / 0.6);
+  --fly-pad: max(12px, env(safe-area-inset-left, 0px));
 }
 
 .fly > * {
   pointer-events: auto;
 }
 
-.fly__hud,
-.fly__bars {
+.fly__top {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 10px);
+  left: var(--fly-pad);
+  right: max(12px, env(safe-area-inset-right, 0px));
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px var(--space-2);
-  padding: 4px var(--space-2);
-  border-radius: var(--radius-panel);
-  background: color-mix(in srgb, var(--surface-1) 70%, transparent);
-  color: var(--color-text);
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+  pointer-events: none;
+}
+
+.fly__top > * {
+  pointer-events: auto;
+}
+
+/* A small glass pill, the HUD's one button shape. */
+.fly__pill,
+.fly__seg,
+.fly__i {
+  min-height: 32px;
+  padding: 0 12px;
+  border: var(--line-hair) solid color-mix(in srgb, var(--white) 30%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--black) 45%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  color: var(--white);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.fly__pill--on {
+  background: var(--white);
+  color: var(--black);
+  text-shadow: none;
+}
+
+.fly__confirm {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px 4px 4px 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--black) 62%, transparent);
   font-size: var(--text-xs);
 }
 
-.fly--hidden .fly__hud {
-  box-shadow: 0 0 0 3px var(--sun);
-}
-
-.fly__los {
-  color: var(--sun);
-}
-
-.fly__arrow {
-  display: inline-block;
-}
-
-.fly__modes {
-  align-self: flex-start;
-}
-
-/* The sticks sit at the foot, above the sheet. */
-.fly__sticks {
-  margin-top: auto;
-}
-
-.fly .fly__small {
-  padding: 2px var(--space-2);
-  border-radius: var(--radius-panel);
-  background: color-mix(in srgb, var(--surface-1) 70%, transparent);
-}
-
-/* While flying, the 3D view's legend steps aside for the HUD. */
-.clay--flying .clay__legend {
-  display: none;
-}
-
-.fly__sticks {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+.fly__status {
+  display: flex;
   align-items: center;
   gap: var(--space-2);
+  font-size: var(--text-xs);
+}
+
+.fly__batt {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+}
+
+.fly__batt svg {
+  width: 22px;
+  height: 12px;
+}
+
+.fly__battcase {
+  fill: none;
+  stroke: var(--white);
+}
+
+.fly__battfill {
+  fill: var(--white);
+}
+
+/* Low battery is a caution, in the sun's amber: not the hazard red. */
+.fly__batt--low .fly__battfill {
+  fill: var(--sun);
+}
+
+/* One pill, its segments run together: C / N / S, and Real / Animated. */
+.fly__look,
+.fly__modes {
+  display: inline-flex;
+  border-radius: 999px;
+  overflow: hidden;
+  border: var(--line-hair) solid color-mix(in srgb, var(--white) 30%, transparent);
+  background: color-mix(in srgb, var(--black) 45%, transparent);
+}
+
+.fly__look .fly__seg,
+.fly__modes .fly__seg {
+  min-width: 34px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.fly__seg--on {
+  background: var(--white) !important;
+  color: var(--black);
+  text-shadow: none;
+}
+
+.fly__i {
+  width: 32px;
+  padding: 0;
+  font-family: Georgia, serif;
+  font-style: italic;
+}
+
+.fly__info {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 50px);
+  right: max(12px, env(safe-area-inset-right, 0px));
+  max-width: 300px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-panel);
+  background: color-mix(in srgb, var(--black) 78%, transparent);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  text-shadow: none;
+}
+
+.fly__info p {
+  margin: 0 0 var(--space-1);
+}
+
+.fly__rotate {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 52px);
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 280px;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-panel);
+  background: color-mix(in srgb, var(--black) 70%, transparent);
+  color: var(--white);
+  font-size: var(--text-xs);
+}
+
+.fly__alert {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 96px);
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--black) 62%, transparent);
+  color: var(--sun);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.fly--hidden .fly__readout {
+  box-shadow: 0 0 0 2px var(--sun);
+}
+
+/* The attitude ring, on the right, under the status. */
+.fly__ring {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 54px);
+  right: max(12px, env(safe-area-inset-right, 0px));
+  width: 108px;
+  height: 108px;
+  pointer-events: none;
+}
+
+.fly__ringface {
+  fill: color-mix(in srgb, var(--black) 40%, transparent);
+  stroke: color-mix(in srgb, var(--white) 45%, transparent);
+  stroke-width: 1;
+}
+
+.fly__tick {
+  stroke: var(--white);
+  stroke-width: 1;
+}
+
+.fly__cardinal {
+  fill: var(--white);
+  font-size: 9px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+
+.fly__cardinal--n {
+  fill: var(--sun);
+}
+
+.fly__drone {
+  fill: var(--white);
+}
+
+.fly__gimbal {
+  stroke: var(--white);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.fly__windarrow {
+  fill: #9ad7ff;
+}
+
+.fly__windtext {
+  fill: #9ad7ff;
+  font-size: 8px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+
+.fly__arc {
+  fill: none;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+/* Red is the hazard: something the scan measured within 5 m. Amber within 15. */
+.fly__arc--hazard {
+  stroke: var(--color-hazard);
+}
+
+.fly__arc--caution {
+  stroke: var(--sun);
+}
+
+.fly__arc--far {
+  stroke: color-mix(in srgb, var(--white) 70%, transparent);
+}
+
+.fly__arc--unknown {
+  stroke: color-mix(in srgb, var(--white) 22%, transparent);
+}
+
+/* The sticks in the bottom corners, the pill and the wheel between them. */
+.fly__sticks {
+  position: absolute;
+  left: var(--fly-pad);
+  right: max(12px, env(safe-area-inset-right, 0px));
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 34px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.fly__sticks > * {
+  pointer-events: auto;
 }
 
 .fly__stick {
   position: relative;
-  width: min(36dvw, 150px);
+  width: 120px;
   aspect-ratio: 1;
-  justify-self: center;
   border-radius: 50%;
-  border: 2px solid color-mix(in srgb, var(--white) 50%, transparent);
-  background: color-mix(in srgb, var(--surface-1) 45%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--white) 40%, transparent);
+  background: color-mix(in srgb, var(--black) 28%, transparent);
   touch-action: none;
 }
 
+/* The thumb: the golden bubble of the app's tiles. */
 .fly__knob {
   position: absolute;
   left: 50%;
@@ -11787,7 +12004,15 @@
   height: 44px;
   margin: -22px 0 0 -22px;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--white) 75%, transparent);
+  background: radial-gradient(circle at 35% 30%, #fff2b8 0%, #ffd98a 28%, #f0a020 64%, #9a5806 100%);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.35), inset 0 1px 1px rgb(255 255 255 / 0.6);
+  opacity: 0.92;
+}
+
+.fly__middle {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
 }
 
 .fly__wheel {
@@ -11797,19 +12022,45 @@
 }
 
 .fly__wheel input {
-  writing-mode: vertical-lr;
-  direction: rtl;
-  height: 110px;
+  width: 110px;
 }
 
-.fly__small {
-  margin: 0;
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
+.fly__label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.fly__exit {
-  align-self: center;
+/* The numbers along the bottom edge, small and labelled, as DJI Fly sets them. */
+.fly__readout {
+  position: absolute;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 6px);
+  transform: translateX(-50%);
+  display: flex;
+  gap: 14px;
+  padding: 2px 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--black) 40%, transparent);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.fly__readout b {
+  margin-right: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.75;
+}
+
+/* In portrait the ring moves under the top row's left, out of the status's way. */
+.fly--portrait .fly__ring {
+  top: calc(env(safe-area-inset-top, 0px) + 92px);
+}
+
+/* While flying, the 3D view's legend steps aside for the HUD. */
+.clay--flying .clay__legend {
+  display: none;
 }
 
 /*

@@ -1051,6 +1051,7 @@ export function PlanMode({
       /* Your ND table (src/core/ndFilter.ts), and the 180-degree shutter at 30 fps. */
       exposure: `${nd.nd ?? 'No ND'} · 1/60 s`,
       record,
+      units: units.distance,
       tick: (f?.tick ?? 0) + 1,
     }))
   }
@@ -1151,7 +1152,8 @@ export function PlanMode({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [card.kind, venue?.lat, venue?.lon, scanCtx, lightPreset, skyDay?.getTime(), venueWindow?.start.getTime(), venueWindow?.end.getTime()])
   const lightImage = card.kind === 'lightmap' && typeof lightState === 'object' && 'url' in lightState ? lightState : null
-  const cinema = useCinemaData(card.kind === 'preflight' || flightPlay !== null, venue, tide, scrubbedAt ?? NO_TIME)
+  /* Also in 3D: the plain view draws the same water offshore (src/three/clayScene.ts setSea). */
+  const cinema = useCinemaData(card.kind === 'preflight' || flightPlay !== null || threeD, venue, tide, scrubbedAt ?? NO_TIME)
 
   /*
    * WHAT THE VENUE BAR SAYS. The name is already resolved upstream and is
@@ -2151,6 +2153,7 @@ export function PlanMode({
           stand={stand}
           onLeaveStand={() => setStand(null)}
           flight={flightPlay}
+          sea={cinema}
           onFlightTime={scrubTo}
           fly={flySession}
           onLanded={(track, clip) => {

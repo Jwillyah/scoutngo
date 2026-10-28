@@ -1,16 +1,23 @@
-import { useRef, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { MODES, type FlyMode, type Sticks } from '../core/flyModel.ts'
-import { compass } from '../lib/tideWords.ts'
+import type { Look } from '../three/cinema.ts'
 import type { FlyHud } from '../lib/fly/useFly.ts'
+import { barRole, hudLength, hudSpeed, type FlyUnits } from '../lib/fly/hudUnits.ts'
 
 /*
- * THE SCREEN LIKE A DJI CONTROLLER (Mode 2): left stick climb and turn, right
- * stick forward, back and sideways, a gimbal wheel, Cine / Normal / Sport. A
- * Bluetooth game controller drives the same model when one is connected.
- * The HUD reads like DJI Fly's: height, distance, speed, battery, the wind at
- * height, the compass, the gimbal, the ceiling, the obstacle bars, and an
- * exposure hint from your ND table. It flashes amber and the phone buzzes
- * when the drone drops out of your line of sight.
+ * THE FLY SCREEN, LAID OUT LIKE DJI FLY (27 Oct, from the phone: "text
+ * blocks"). Landscape by default; portrait still works.
+ *
+ *   top left      Land, with a confirm; it keeps the flight
+ *   top right     battery minutes left, the look (Real / Animated), the "i"
+ *   right         the attitude ring: heading ticks, the gimbal's tilt, the
+ *                 wind as an arrow, and the obstacle arcs round the drone
+ *   bottom edge   small labelled numbers: H, D, H.S, V.S
+ *   corners       the sticks, 120 px, translucent, with gold thumbs
+ *   between them  C / N / S as one pill, and the gimbal wheel
+ *
+ * One system of units (src/lib/fly/hudUnits.ts). The app's dock, sheet and
+ * time bar are hidden while flying (:root.is-flying).
  */
 function Stick({ label, onMove }: { label: string; onMove: (x: number, y: number) => void }) {
   const knob = useRef<HTMLSpanElement>(null)
@@ -46,8 +53,60 @@ function Stick({ label, onMove }: { label: string; onMove: (x: number, y: number
   )
 }
 
+/*
+ * THE ATTITUDE RING: north up the screen turns with the drone, so the
+ * drone's nose is always up. The obstacle arcs sit round the drone icon in
+ * the middle, each coloured by how near the scan's nearest surface is that
+ * way: the hazard red only inside 5 m.
+ */
+function Ring({ yaw, gimbal, wind, bars }: { yaw: number; gimbal: number; wind: { fromDeg: number; text: string } | null; bars: Record<'front' | 'back' | 'left' | 'right', number | null> | null }) {
+  const R = 46
+  const arc = (from: number, to: number, r: number) => {
+    const p = (a: number) => [50 + r * Math.sin((a * Math.PI) / 180), 50 - r * Math.cos((a * Math.PI) / 180)]
+    const [x0, y0] = p(from)
+    const [x1, y1] = p(to)
+    return `M${x0.toFixed(1)} ${y0.toFixed(1)}A${r} ${r} 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`
+  }
+  const sides: ['front' | 'back' | 'left' | 'right', number][] = [
+    ['front', 0],
+    ['right', 90],
+    ['back', 180],
+    ['left', 270],
+  ]
+  return (
+    <svg className="fly__ring" viewBox="0 0 100 100" role="img" aria-label={`Heading ${Math.round(((yaw % 360) + 360) % 360)} degrees, gimbal ${Math.round(gimbal)} degrees`}>
+      <circle cx="50" cy="50" r={R} className="fly__ringface" />
+      <g transform={`rotate(${-yaw} 50 50)`}>
+        {Array.from({ length: 36 }, (_, i) => (
+          <line key={i} x1="50" y1={50 - R} x2="50" y2={50 - R + (i % 9 === 0 ? 7 : 3)} className="fly__tick" transform={`rotate(${i * 10} 50 50)`} />
+        ))}
+        {(['N', 'E', 'S', 'W'] as const).map((c, i) => (
+          <text key={c} x="50" y={50 - R + 15} className={`fly__cardinal${c === 'N' ? ' fly__cardinal--n' : ''}`} transform={`rotate(${i * 90} 50 50)`}>
+            {c}
+          </text>
+        ))}
+        {wind === null ? null : (
+          /* Where the wind goes: an arrow on the rim, pointing downwind. */
+          <path d="M50 8 l-4 7 h8 z" className="fly__windarrow" transform={`rotate(${wind.fromDeg + 180} 50 50)`} />
+        )}
+      </g>
+      {bars === null
+        ? null
+        : sides.map(([side, a]) => <path key={side} d={arc(a - 32, a + 32, 22)} className={`fly__arc fly__arc--${barRole(bars[side])}`} />)}
+      {/* The drone, nose up. */}
+      <path d="M50 41 l7 14 l-7 -4 l-7 4 z" className="fly__drone" />
+      {/* The gimbal's tilt: a short needle from level, down when it looks down. */}
+      <line x1="72" y1="50" x2={72 + 10 * Math.cos((gimbal * Math.PI) / 180)} y2={50 - 10 * Math.sin((gimbal * Math.PI) / 180)} className="fly__gimbal" />
+      {wind === null ? null : (
+        <text x="50" y="90" className="fly__windtext">
+          {wind.text}
+        </text>
+      )}
+    </svg>
+  )
+}
+
 interface FlyControlsProps {
-  /** Stick and wheel changes, merged into what the 3D view's loop reads. */
   onSticks: (part: Partial<Sticks>) => void
   mode: FlyMode
   onMode: (m: FlyMode) => void
@@ -55,66 +114,136 @@ interface FlyControlsProps {
   ceilingFt: number
   flightMinutes: number
   wind: { fromDeg: number; mps: number } | null
-  /** Your ND table's answer for this moment (src/core/ndFilter.ts), or null. */
   exposure: string | null
   bars: Record<'front' | 'back' | 'left' | 'right' | 'below', number | null> | null
+  units: FlyUnits
+  /** The look now, and whether it was chosen by hand or by height. */
+  look: Look
+  lookAuto: boolean
+  onLook: (look: Look) => void
   onExit: () => void
 }
 
-export function FlyControls({ onSticks, mode, onMode, hud, ceilingFt, flightMinutes, wind, exposure, bars, onExit }: FlyControlsProps) {
+export function FlyControls({ onSticks, mode, onMode, hud, ceilingFt, flightMinutes, wind, exposure, bars, units, look, lookAuto, onLook, onExit }: FlyControlsProps) {
   const s = hud?.state
   const used = hud === null ? 0 : hud.t / 60
-  const bar = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `${Math.round(v)} m`)
+  const [confirm, setConfirm] = useState(false)
+  const [info, setInfo] = useState(false)
+  /* Landscape is the way to hold it; say so once, in portrait, and let it go. */
+  const [portrait, setPortrait] = useState(() => typeof window !== 'undefined' && window.innerHeight > window.innerWidth)
+  const [hintGone, setHintGone] = useState(false)
+  useEffect(() => {
+    const on = () => setPortrait(window.innerHeight > window.innerWidth)
+    window.addEventListener('resize', on)
+    /* Where the browser lets a page do it (Android, full screen), turn to landscape; iOS does not. */
+    const o = (screen as unknown as { orientation?: { lock?: (o: string) => Promise<void> } }).orientation
+    void o?.lock?.('landscape').catch(() => {})
+    return () => window.removeEventListener('resize', on)
+  }, [])
+  const hs = hud === null ? null : hud.speedMps
+  const vs = s === undefined ? null : s.vz
+  const minutesLeft = Math.max(0, flightMinutes - used)
   return (
-    <div className={`fly${hud?.hidden === true ? ' fly--hidden' : ''}`}>
-      <div className="fly__hud num" role="status">
-        <span>H {s === undefined ? '—' : Math.round(s.alt / 0.3048)} ft{hud?.nearCeiling === true ? ` · ceiling ${ceilingFt}` : ''}</span>
-        <span>D {hud === null ? '—' : Math.round(hud.distanceM)} m</span>
-        <span>{hud === null ? '—' : hud.speedMps.toFixed(1)} m/s</span>
-        <span>Batt {Math.max(0, flightMinutes - used).toFixed(0)} min</span>
-        <span>{s === undefined ? '' : `${compass(s.yaw)} ${Math.round(s.yaw)}°`}</span>
-        <span>Gimbal {s === undefined ? '—' : Math.round(s.gimbal)}°</span>
-        {wind === null ? null : (
-          <span>
-            Wind <span className="fly__arrow" style={{ transform: `rotate(${wind.fromDeg + 180}deg)` }} aria-hidden="true">↑</span> {wind.mps.toFixed(0)} m/s
-          </span>
-        )}
-        {exposure === null ? null : <span>{exposure}</span>}
-        {hud?.hidden === true ? <strong className="fly__los">Out of your line of sight</strong> : null}
-        {s?.held === 'obstacle' ? <strong>Stopped: something in the scan is in the way</strong> : null}
-      </div>
-      {bars === null ? null : (
-        <div className="fly__bars num" aria-label="Distance to what the scan has around the drone">
-          <span>Front {bar(bars.front)}</span>
-          <span>Back {bar(bars.back)}</span>
-          <span>Left {bar(bars.left)}</span>
-          <span>Right {bar(bars.right)}</span>
-          <span>Below {bar(bars.below)}</span>
-        </div>
-      )}
-      <div className="fly__modes seg" role="group" aria-label="Flight mode">
-        {(['cine', 'normal', 'sport'] as const).map((m) => (
-          <button key={m} type="button" className={`seg__btn${mode === m ? ' seg__btn--on' : ''}`} aria-pressed={mode === m} onClick={() => onMode(m)}>
-            {m[0].toUpperCase() + m.slice(1)} {MODES[m].speedMps}
-            {MODES[m].published ? '' : '*'}
+    <div className={`fly${hud?.hidden === true ? ' fly--hidden' : ''}${portrait ? ' fly--portrait' : ''}`}>
+      <div className="fly__top">
+        {confirm ? (
+          <div className="fly__confirm" role="group" aria-label="Land and keep this flight?">
+            <span>Land and keep this flight?</span>
+            <button type="button" className="fly__pill fly__pill--on" onClick={onExit}>
+              Land
+            </button>
+            <button type="button" className="fly__pill" onClick={() => setConfirm(false)}>
+              Keep flying
+            </button>
+          </div>
+        ) : (
+          <button type="button" className="fly__pill fly__land" onClick={() => setConfirm(true)} aria-label="Land and keep this flight">
+            Land
           </button>
-        ))}
+        )}
+        <div className="fly__status num">
+          <span className={`fly__batt${minutesLeft < 5 ? ' fly__batt--low' : ''}`} aria-label={`About ${Math.round(minutesLeft)} minutes of flight left`}>
+            <svg viewBox="0 0 22 12" aria-hidden="true">
+              <rect x="0.5" y="0.5" width="18" height="11" rx="2" className="fly__battcase" />
+              <rect x="2" y="2" width={15 * Math.min(1, minutesLeft / flightMinutes)} height="8" rx="1" className="fly__battfill" />
+              <rect x="19.5" y="4" width="2" height="4" rx="0.5" className="fly__battcase" />
+            </svg>
+            {Math.round(minutesLeft)} min
+          </span>
+          <span className="seg fly__look" role="group" aria-label="Look">
+            {(['real', 'animated'] as const).map((l) => (
+              <button key={l} type="button" className={`fly__seg${look === l ? ' fly__seg--on' : ''}`} aria-pressed={look === l} onClick={() => onLook(l)}>
+                {l === 'real' ? 'Real' : 'Animated'}
+              </button>
+            ))}
+          </span>
+          <button type="button" className="fly__i" aria-expanded={info} aria-label="About this flight model" onClick={() => setInfo(!info)}>
+            i
+          </button>
+        </div>
       </div>
+      {info ? (
+        <div className="fly__info" role="dialog" aria-label="About this flight model">
+          <p>
+            Top speed by mode: Cine {hudSpeed(MODES.cine.speedMps, units)}, Normal {hudSpeed(MODES.normal.speedMps, units)}, Sport {hudSpeed(MODES.sport.speedMps, units)} {units.speed}. DJI publishes only
+            Sport's; the other two are assumed. A flight model, not a physics simulator.
+          </p>
+          <p>{lookAuto ? `The look turns Animated below 150 ft by itself, where the photo is stretched and soft; tap Real or Animated to choose.` : 'You chose the look; it stays until you land.'}</p>
+          {exposure === null ? null : <p>Exposure from your ND table: {exposure}.</p>}
+          <p>Ceiling {Math.round(units.length === 'ft' ? ceilingFt : ceilingFt * 0.3048)} {units.length} above takeoff.</p>
+        </div>
+      ) : null}
+      {portrait && !hintGone ? (
+        <button type="button" className="fly__rotate" onClick={() => setHintGone(true)}>
+          Turn your phone sideways to fly. Portrait works too: tap to hide this.
+        </button>
+      ) : null}
+      {hud?.hidden === true ? <p className="fly__alert">Out of your line of sight</p> : null}
+      {s?.held === 'obstacle' ? <p className="fly__alert">Stopped: something in the scan is in the way</p> : null}
+      {hud?.nearCeiling === true ? <p className="fly__alert">At the ceiling</p> : null}
+
+      <Ring
+        yaw={s?.yaw ?? 0}
+        gimbal={s?.gimbal ?? 0}
+        wind={wind === null ? null : { fromDeg: wind.fromDeg, text: `${hudSpeed(wind.mps, units)} ${units.speed}` }}
+        bars={bars}
+      />
+
       <div className="fly__sticks">
         <Stick label="Left stick: climb and turn" onMove={(x, y) => onSticks({ yaw: x, climb: y })} />
-        <label className="fly__wheel">
-          <span className="fly__small">Gimbal</span>
-          <input type="range" min={-60} max={60} step={1} defaultValue={0} onChange={(e) => onSticks({ tilt: Number(e.target.value) })} onPointerUp={(e) => {
-            ;(e.target as HTMLInputElement).value = '0'
-            onSticks({ tilt: 0 })
-          }} aria-label="Gimbal tilt, degrees a second" />
-        </label>
+        <div className="fly__middle">
+          <span className="fly__modes" role="group" aria-label="Flight mode">
+            {(['cine', 'normal', 'sport'] as const).map((m) => (
+              <button key={m} type="button" className={`fly__seg${mode === m ? ' fly__seg--on' : ''}`} aria-pressed={mode === m} aria-label={m[0].toUpperCase() + m.slice(1)} onClick={() => onMode(m)}>
+                {m[0].toUpperCase()}
+              </button>
+            ))}
+          </span>
+          <label className="fly__wheel">
+            <span className="fly__label">Gimbal</span>
+            <input type="range" min={-60} max={60} step={1} defaultValue={0} onChange={(e) => onSticks({ tilt: Number(e.target.value) })} onPointerUp={(e) => {
+              ;(e.target as HTMLInputElement).value = '0'
+              onSticks({ tilt: 0 })
+            }} aria-label="Gimbal tilt, degrees a second" />
+          </label>
+        </div>
         <Stick label="Right stick: forward, back and sideways" onMove={(x, y) => onSticks({ side: x, forward: y })} />
       </div>
-      <p className="fly__small">* speed assumed: DJI publishes only Sport's 21 m/s. A flight model, not a physics simulator.</p>
-      <button type="button" className="btn btn--small fly__exit" onClick={onExit}>
-        Land and keep this flight
-      </button>
+
+      <div className="fly__readout num" role="status">
+        <span>
+          <b>H</b> {hudLength(s?.alt, units)} {units.length}
+        </span>
+        <span>
+          <b>D</b> {hudLength(hud?.distanceM, units)} {units.length}
+        </span>
+        <span>
+          <b>H.S</b> {hudSpeed(hs, units)} {units.speed}
+        </span>
+        <span>
+          <b>V.S</b> {hudSpeed(vs, units)} {units.speed}
+        </span>
+      </div>
     </div>
   )
 }
