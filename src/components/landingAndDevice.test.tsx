@@ -35,12 +35,10 @@ describe('the cover carries five elements and stops', () => {
     expect(text).toContain('Free · open source · no account · How it works')
   })
 
-  it('puts the render behind everything, full bleed', () => {
-    /* One picture, inside the SVG that covers the screen, so the pins drawn on it stay on it. */
-    expect(html).toMatch(/<svg[^>]*class="cover__frame"[^>]*preserveAspectRatio="xMidYMid slice"/)
-    const images = [...html.matchAll(/<image[^>]*href="([^"]*)"/g)]
+  it('puts the photograph behind everything, full bleed', () => {
+    const images = [...html.matchAll(/<img[^>]*src="([^"]*)"/g)]
     expect(images).toHaveLength(1)
-    expect(images[0]?.[1]).toBe('/home-frame.jpg')
+    expect(images[0]?.[1]).toBe('/home-hero.webp')
   })
 
   it('carries no scrubbing control, because a still frame cannot have one', () => {
@@ -105,9 +103,8 @@ describe('the cover carries five elements and stops', () => {
     expect(text.toLowerCase()).not.toContain('trusted by')
   })
 
-  it('credits the imagery and says whose place it is', () => {
-    expect(text).toContain('An example venue, not your location')
-    expect(text).toContain('Esri')
+  it('credits the photographer', () => {
+    expect(text).toContain('Photo by Jwillyagaze')
   })
 
   /*
