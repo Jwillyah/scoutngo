@@ -8966,6 +8966,26 @@
   grid-column: 3 / span 2;
 }
 
+/*
+ * TOOLS ARE SMALL TILES, two by two beside the base layers. A row of their
+ * own pushed Layers past the screen (719 px of content in 649, 27 Oct); four
+ * tools at half height fit the height the two base tiles already take. Each
+ * keeps its symbol and its name; on and off is the frame, as on every tile,
+ * and the state's words stay for screen readers.
+ */
+.tile--mini {
+  gap: 2px;
+}
+
+.tile--mini .tile__art {
+  aspect-ratio: auto;
+  height: 30px;
+}
+
+.tile--mini .tile__bubble {
+  --icon-size: 24px !important;
+}
+
 .tiles__group .tiles__head {
   grid-column: 1 / -1;
 }
@@ -11737,4 +11757,57 @@
 
 .fly__exit {
   align-self: center;
+}
+
+/*
+ * THE SKYLINE (SkylineSheet.tsx): the world all the way round as a strip,
+ * the compass under it, the sun's path in its own gold, the moon's pale.
+ */
+.skyl__pic {
+  display: block;
+  width: 100%;
+  height: 120px;
+  margin-top: var(--space-2);
+  border-radius: var(--radius-panel);
+  background: var(--color-panel-2);
+}
+
+.skyl__ground {
+  fill: var(--color-line-strong);
+}
+
+.skyl__sun {
+  fill: none;
+  stroke: var(--sun);
+  stroke-width: 1.6;
+  vector-effect: non-scaling-stroke;
+}
+
+.skyl__moon {
+  fill: none;
+  stroke: var(--color-text-muted);
+  stroke-width: 1.2;
+  stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.skyl__dot--sun {
+  fill: var(--sun);
+}
+
+.skyl__dot--moon {
+  fill: var(--color-text-muted);
+}
+
+.skyl__axis {
+  display: flex;
+  justify-content: space-between;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.skyl__lead {
+  margin: var(--space-2) 0 var(--space-1);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
 }

@@ -1138,8 +1138,9 @@ const OPENERS = `(() => {
     const label = (b.getAttribute('aria-label') ?? '').toLowerCase()
     if (label.includes('layer')) add('.tooldock__btn', i, 'layers')
     if (label.includes('calendar')) add('.tooldock__btn', i, 'sky')
-    /* Behind Layers, under Tools: Preflight, a door two taps deep. */
+    /* Behind Layers, under Tools: Preflight and the skyline, doors two taps deep. */
     if (label.includes('layer')) add('layerstool', 'Preflight', 'preflight')
+    if (label.includes('layer')) add('layerstool', 'Skyline', 'skyline')
   })
   /*
    * THE MENU'S CARD DOORS. About and Sky open cards from the side menu now, so

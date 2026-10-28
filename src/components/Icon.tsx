@@ -203,6 +203,13 @@ const glyphs = (dark: string): Record<GlyphId, ReactNode> => ({
       <circle cx="4.6" cy="18" r="2" fill="#FFF" />
     </>
   ),
+  /* Skyline: a roofline with the sun about to drop behind it. */
+  skyline: (
+    <>
+      <circle cx="15.4" cy="8" r="3.4" fill="#FFF" fillOpacity="0.7" />
+      <path d="M2.6 20.4V13h3.6v-3.4h3.6V13h2.6V9.4l2.4-2 2.4 2v4.2h4.2v6.8z" fill="#FFF" />
+    </>
+  ),
   layers: (
     <>
       <path d="M12 13.4l-9-4.2 9-4.2 9 4.2z" fill="#FFF" />

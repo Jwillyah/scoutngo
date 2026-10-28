@@ -77,12 +77,13 @@ export function LayerTiles({ base, overlays, tools, sourceLine, about }: LayerTi
         <div className="tiles__group tiles__group--tools">
           <p className="tiles__head">Tools</p>
           {tools.map((tile) => (
-          <button type="button" key={tile.id} className="tile" aria-pressed={tile.on} onClick={tile.onToggle}>
+          <button type="button" key={tile.id} className="tile tile--mini" aria-pressed={tile.on} onClick={tile.onToggle}>
             <span className={`tile__art${tile.on ? ' tile__art--on' : ''}`} aria-hidden="true">
               {tile.art}
             </span>
             <span className="tile__label">{tile.label}</span>
-            <span className={`tile__state${tile.on ? ' tile__state--on' : ''}`}>{tile.state}</span>
+            {/* Small tiles: the frame shows on and off; the words are for screen readers. */}
+            <span className={`tile__state visually-hidden${tile.on ? ' tile__state--on' : ''}`}>{tile.state}</span>
           </button>
           ))}
         </div>

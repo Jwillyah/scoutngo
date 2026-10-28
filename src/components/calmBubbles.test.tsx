@@ -50,8 +50,8 @@ describe('the layer tiles are bubbles', () => {
   const ids = Object.keys(TILE_ART) as (keyof typeof TILE_ART)[]
 
   it('every tile, base and overlay, is a golden bubble with one white symbol', () => {
-    /* Ten layers, and under Tools the measure and Preflight. */
-    expect(ids.length).toBe(12)
+    /* Ten layers, and under Tools the measure, Preflight and the skyline. */
+    expect(ids.length).toBe(13)
     for (const id of ids) {
       const html = renderToStaticMarkup(<>{TILE_ART[id]}</>)
       expect(html, id).toMatch(/^<span class="icon tile__bubble"[^>]*--icon-middle:#[0-9a-f]{6}/)
@@ -63,11 +63,11 @@ describe('the layer tiles are bubbles', () => {
 
   it('renders one bubble per tile in the sheet, with the state on the tile frame and not the bubble', () => {
     const base = ids.slice(0, 2).map((id, i) => ({ id, label: id, state: i === 0 ? 'ON' : 'OFF', on: i === 0, art: TILE_ART[id], onToggle: () => {} }))
-    const overlays = ids.slice(2).filter((id) => id !== 'measure' && id !== 'preflight').map((id) => ({ id, label: id, state: 'OFF', on: false, art: TILE_ART[id], onToggle: () => {} }))
-    const tools = (['measure', 'preflight'] as const).map((id) => ({ id, label: id, state: 'OFF', on: false, art: TILE_ART[id], onToggle: () => {} }))
+    const overlays = ids.slice(2).filter((id) => id !== 'measure' && id !== 'preflight' && id !== 'skyline').map((id) => ({ id, label: id, state: 'OFF', on: false, art: TILE_ART[id], onToggle: () => {} }))
+    const tools = (['measure', 'preflight', 'skyline'] as const).map((id) => ({ id, label: id, state: 'OFF', on: false, art: TILE_ART[id], onToggle: () => {} }))
     const html = renderToStaticMarkup(<LayerTiles base={base} overlays={overlays} tools={tools} sourceLine="x" about={null} />)
-    /* Ten layers and two tools. */
-    expect(html.match(/class="icon tile__bubble"/g)?.length).toBe(12)
+    /* Ten layers and three tools. */
+    expect(html.match(/class="icon tile__bubble"/g)?.length).toBe(13)
     expect(html).toContain('>Tools<')
     expect(html.match(/tile__art tile__art--on/g)?.length).toBe(1)
   })

@@ -44,7 +44,12 @@ interface TideSheetProps {
   waterline?: { shown: boolean; scanKept: boolean; line: string; onShow: (on: boolean) => void }
 }
 
-const CURVE_H = 104
+/*
+ * The curve's height is what gives when the sheet runs long. On 27 Oct in the
+ * evening (a full-moon note, the surf row, a two-line forecast) the sheet ran
+ * 8 px past the screen at 104; at 92 it has room for a line more.
+ */
+const CURVE_H = 92
 const STRIP_DAYS = 30
 
 export function TideSheet({ tide, at, timeZone, venue, units, data, onAt, onJumpDay, onClose, waterline }: TideSheetProps) {

@@ -93,6 +93,10 @@ import { SCAN_EVENT, scanContextAt } from '../lib/lidar/useScan.ts'
 import type { ScanContext } from '../lib/lidar/applyScan.ts'
 import { usePreflight } from '../lib/preflight/usePreflight.ts'
 import { PreflightSheet } from './PreflightSheet.tsx'
+import { SkylineSheet, type SkylineState } from './SkylineSheet.tsx'
+import { EYE_M, skylineFor } from '../lib/skyline/skylineFor.ts'
+import { localDate } from '../core/moonTimes.ts'
+import { zonedTimeToUtc } from '../core/timezone.ts'
 import type { FlightPlay } from '../lib/preflight/play.ts'
 import type { Look } from '../three/cinema.ts'
 import { useCinemaData } from '../lib/cinema/useCinemaData.ts'
@@ -1019,6 +1023,8 @@ export function PlanMode({
   /* The waterline on the 2D map, from the Tide sheet (src/lib/waterline/). */
   const [showWaterline, setShowWaterline] = useState(false)
   const waterline = useWaterline(showWaterline, venue, tide, venue === null ? null : scanCtx, scrubbedAt)
+  /* The skyline from where you stand (or the venue pin), at eye height or the drone's (src/lib/skyline/). */
+  const [skyHeight, setSkyHeight] = useState<'eye' | 'drone'>('eye')
   const [flySession, setFlySession] = useState<FlySession | null>(null)
   const startFly = (record: boolean) => {
     if (venue === null || pf.pilot === null || scrubbedAt === null) return
@@ -1111,6 +1117,15 @@ export function PlanMode({
   /* The Tide sheet's month, wind, sea and beach facing: asked only while it is open. */
   const [surfSetting] = useSurfSetting()
   const tideSheet = useTideSheet(card.kind === 'tide', venue, tide.status === 'ok' ? tide.station.id : null, surfSetting)
+  const skyDay = scrubbedAt === null || venueWindow === null ? null : zonedTimeToUtc(localDate(scrubbedAt, venueWindow.timeZone), '00:00', venueWindow.timeZone)
+  const skyline = useMemo<SkylineState>(() => {
+    if (card.kind !== 'skyline') return 'loading'
+    if (venue === null || scanCtx === null) return 'no-scan'
+    if (skyDay === null) return 'loading'
+    const r = skylineFor(scanCtx.rasters, buildingList ?? NO_BUILDINGS, pilotAt ?? venue, skyHeight === 'eye' ? EYE_M : pf.heightFt * 0.3048, skyDay, skyHeight === 'eye')
+    return r ?? 'off-scan'
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [card.kind, venue?.lat, venue?.lon, scanCtx, buildingList, pilotAt?.lat, pilotAt?.lon, skyHeight, pf.heightFt, skyDay?.getTime()])
   const cinema = useCinemaData(card.kind === 'preflight' || flightPlay !== null, venue, tide, scrubbedAt ?? NO_TIME)
 
   /*
@@ -1552,6 +1567,14 @@ export function PlanMode({
           onToggle: () => openCard('preflight'),
         },
         {
+          id: 'skyline',
+          label: 'Skyline',
+          state: scanCtx === null ? 'Needs the scan' : 'From the scan',
+          on: card.kind === 'skyline',
+          art: TILE_ART.skyline,
+          onToggle: () => openCard('skyline'),
+        },
+        {
           id: 'measure',
           label: 'Measure',
           state: measurePins === null ? 'OFF' : 'ON',
@@ -1649,6 +1672,18 @@ export function PlanMode({
             {/* The cameras show the sky the forecast is modelling. */}
             <CardMore links={[{ label: 'Sky cameras near here', onOpen: () => openCard('cams') }]} />
           </Card>
+        )
+      case 'skyline':
+        return (
+          <SkylineSheet
+            state={skyline}
+            timeZone={venueWindow?.timeZone ?? 'UTC'}
+            from={pilotAt === null ? 'the venue pin' : 'where you stand'}
+            height={skyHeight}
+            droneFt={pf.heightFt}
+            onHeight={setSkyHeight}
+            onClose={home}
+          />
         )
       case 'preflight':
         return (

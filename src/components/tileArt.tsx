@@ -35,4 +35,5 @@ export const TILE_ART = {
   airspace: bubble('airspace'),
   measure: bubble('measure'),
   preflight: bubble('preflight'),
+  skyline: bubble('skyline'),
 }

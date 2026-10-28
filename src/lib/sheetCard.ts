@@ -48,6 +48,8 @@ export type SheetCard =
   | { kind: 'callsheet' }
   /* Preflight: draw a drone move, see its flight card, play it in 3D (PreflightSheet.tsx). */
   | { kind: 'preflight' }
+  /* The skyline from where you stand, under the sun's and moon's paths (SkylineSheet.tsx). */
+  | { kind: 'skyline' }
 
 export type CardKind = SheetCard['kind']
 
@@ -71,6 +73,7 @@ export const CARD_TITLE: Record<CardKind, string> = {
   about: 'About',
   callsheet: 'Call sheet',
   preflight: 'Preflight',
+  skyline: 'Skyline',
 }
 
 /**
@@ -143,4 +146,6 @@ export const TIME_MATTERS: Record<CardKind, boolean> = {
   callsheet: false,
   /* The move is flown at a time: the bar sets the light it is played in. */
   preflight: true,
+  /* The day's sun and moon paths: the time bar's day sets them. */
+  skyline: true,
 }

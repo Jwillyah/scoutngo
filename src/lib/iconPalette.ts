@@ -45,6 +45,7 @@ export type IconId =
   /* Tools in Layers: the two-pin measure, and Preflight. */
   | 'measure'
   | 'preflight'
+  | 'skyline'
 
 export interface TileStops {
   /** Top left, the light end. */
@@ -93,6 +94,8 @@ export const DESIGN_TILES: Readonly<Record<IconId, TileStops>> = {
   airspace: { light: '#efb2f5', middle: '#b952d2', dark: '#5e1e79' },
   measure: { light: '#8fe6f4', middle: '#22aacb', dark: '#0a4c66' },
   preflight: { light: '#b6aeff', middle: '#5e51dc', dark: '#231a7d' },
+  /* The Kit coral: warm, as the last light over a roofline. */
+  skyline: { light: '#ffb496', middle: '#ee6b43', dark: '#9a3518' },
 }
 
 export const GLYPH_INK = '#ffffff'
