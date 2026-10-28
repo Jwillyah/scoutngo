@@ -66,11 +66,13 @@ interface Clay3DProps {
   onLanded?: (track: PathPoint[], clip: Blob | null) => void
   /** The sea offshore, from the same inputs as the preview's (src/lib/cinema/useCinemaData.ts). */
   sea?: CinemaInputs | null
+  /** Compare a photo (src/components/ComparePhoto.tsx): your own frame against this view. */
+  onCompare?: () => void
 }
 
 export const CLAY_NOTE = 'Clay model from map data; real buildings may differ'
 
-export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveStand, flight = null, onFlightTime, onRecorded, onRenderProgress, fly = null, onLanded, sea = null }: Clay3DProps) {
+export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveStand, flight = null, onFlightTime, onRecorded, onRenderProgress, fly = null, onLanded, sea = null, onCompare }: Clay3DProps) {
   const host = useRef<HTMLDivElement>(null)
   const scene = useRef<ClayScene | null>(null)
   /* How many times the scene has been built: every build (a scan arriving rebuilds it) re-runs the effects that feed it. 0 is not built yet. */
@@ -331,6 +333,11 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
           {place.buildings?.savedAt == null ? null : <p className="clay__infoline">Buildings saved on this phone {place.buildings.savedAt.slice(0, 10)}.</p>}
           {/* Which pictures the ground wears, and when they were flown (src/data/imagerySources.ts). */}
           <p className="clay__infoline">{imageryLine(venue)}</p>
+          {onCompare === undefined ? null : (
+            <button type="button" className="clay__link" onClick={onCompare}>
+              Compare a photo of yours with this view
+            </button>
+          )}
           <ScanPanel flow={scanFlow} keptYear={scanYear} />
         </div>
       )}

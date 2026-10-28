@@ -296,6 +296,16 @@ export interface ClayScene {
   /** onNote: what the preview says over itself, once it has started (src/lib/preflight/play.ts previewNote). */
   playPath(play: FlightPlay, onTime: (at: Date) => void, onProgress?: (share: number) => void, onNote?: (note: string) => void): Promise<Blob | null>
   droneView(at: LatLon, altAbsM: number, yaw: number, gimbal: number, focal: number): void
+  /**
+   * Compare a photo: stand exactly where it was taken, with its roll, and the
+   * engine's angle along the canvas's longer side (fitPhotoFrame in
+   * src/core/photoCompare.ts). Nothing the finger does moves it.
+   */
+  photoView(at: LatLon, altAbsM: number, yaw: number, pitch: number, roll: number, engineFovDeg: number): void
+  /** Resolves once the globe says every tile in view is drawn, or after `maxMs`. */
+  settled(maxMs: number): Promise<boolean>
+  /** The next frame as drawn, copied onto a canvas of its own. */
+  snapshot(): Promise<HTMLCanvasElement>
   setCeiling(centre: LatLon | null, altAbsM: number, alpha: number): void
   startRecording(): { stop: () => Promise<Blob | null> } | null
   observe(view: ObserverView): Promise<void>
@@ -721,6 +731,45 @@ export function createClayScene(
     frustum.fov = canvas.clientWidth >= canvas.clientHeight ? horizontal : 2 * Math.atan(Math.tan(horizontal / 2) * (canvas.clientHeight / canvas.clientWidth))
     widget.camera.setView({ destination: Cartesian3.fromDegrees(at.lon, at.lat, altAbsM), orientation: { heading: CMath.toRadians(yaw), pitch: CMath.toRadians(gimbal), roll: 0 } })
   }
+  const photoView = (at: LatLon, altAbsM: number, yaw: number, pitch: number, roll: number, engineFovDeg: number) => {
+    const frustum = widget.camera.frustum as { fov?: number }
+    frustum.fov = CMath.toRadians(engineFovDeg)
+    widget.camera.setView({ destination: Cartesian3.fromDegrees(at.lon, at.lat, altAbsM), orientation: { heading: CMath.toRadians(yaw), pitch: CMath.toRadians(pitch), roll: CMath.toRadians(roll) } })
+    controller.enableInputs = false
+    scene.requestRender()
+  }
+  const settled = (maxMs: number) =>
+    new Promise<boolean>((resolve) => {
+      const start = performance.now()
+      let quiet = 0
+      const check = () => {
+        /* Three frames in a row with nothing left to load: one can be a gap between requests. */
+        quiet = scene.globe.tilesLoaded ? quiet + 1 : 0
+        if (quiet >= 3) return done(true)
+        if (performance.now() - start > maxMs) return done(false)
+        scene.requestRender()
+      }
+      const done = (ok: boolean) => {
+        scene.postRender.removeEventListener(check)
+        resolve(ok)
+      }
+      scene.postRender.addEventListener(check)
+      scene.requestRender()
+    })
+  const snapshot = () =>
+    new Promise<HTMLCanvasElement>((resolve) => {
+      const out = document.createElement('canvas')
+      out.width = widget.canvas.width
+      out.height = widget.canvas.height
+      /* Copied inside postRender, while the drawing buffer still holds the frame. */
+      const grab = () => {
+        scene.postRender.removeEventListener(grab)
+        out.getContext('2d')?.drawImage(widget.canvas, 0, 0)
+        resolve(out)
+      }
+      scene.postRender.addEventListener(grab)
+      scene.requestRender()
+    })
   const setCeiling = (centre: LatLon | null, altAbsM: number, alpha: number) => {
     if (ceilingPlane !== null) widget.entities.remove(ceilingPlane)
     ceilingPlane = null
@@ -1022,6 +1071,9 @@ export function createClayScene(
     observe,
     playPath,
     droneView,
+    photoView,
+    settled,
+    snapshot,
     setCeiling,
     startRecording,
     project,

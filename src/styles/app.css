@@ -12411,3 +12411,209 @@
   order: 1;
   color: var(--color-text);
 }
+
+/* ------------------------------------------------------- compare a photo */
+/*
+ * COMPARE A PHOTO (ComparePhoto.tsx): a page of its own over everything. The
+ * frame takes what is left after the head and the facts, at the photo's own
+ * shape; nothing scrolls at 390 x 844.
+ */
+.cmp {
+  position: fixed;
+  inset: 0;
+  /* Over the 3D view it is opened from, and the drawers. */
+  z-index: 75;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: calc(var(--safe-top) + var(--space-2)) var(--page-pad) calc(var(--safe-bottom, 0px) + var(--space-2));
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.cmp__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+}
+
+.cmp__title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-heavy);
+}
+
+.cmp__close,
+.cmp__again {
+  position: relative;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  display: inline-flex;
+  align-items: center;
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.cmp__empty {
+  display: grid;
+  gap: var(--space-3);
+  align-content: center;
+  flex: 1;
+}
+
+.cmp__say {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.cmp__pick {
+  position: relative;
+  justify-self: start;
+}
+
+/* The real input, over its label: one tap opens the phone's picker. */
+.cmp__file {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+}
+
+.cmp__stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+}
+
+.cmp__frame {
+  position: relative;
+  aspect-ratio: var(--cmp-aspect);
+  max-width: 100%;
+  max-height: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: var(--radius-panel);
+  background: var(--color-panel);
+}
+
+.cmp__stage--side .cmp__frame {
+  height: auto;
+  width: calc(50% - var(--space-1));
+}
+
+.cmp__photo,
+.cmp__render,
+.cmp__engine {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cmp__photo {
+  z-index: 2;
+}
+
+.cmp__engine {
+  z-index: 1;
+}
+
+.cmp__render--swipe {
+  z-index: 3;
+}
+
+.cmp__handle {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--white);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.4);
+  pointer-events: none;
+}
+
+.cmp__seg {
+  align-self: center;
+}
+
+.cmp__facts {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+}
+
+.cmp__line,
+.cmp__meta {
+  margin: 0;
+}
+
+.cmp__line--dim,
+.cmp__meta {
+  color: var(--color-text-muted);
+}
+
+.cmp__line--error {
+  padding-left: var(--space-2);
+  border-left: var(--line-rule) solid var(--color-hazard);
+}
+
+.cmp__missing {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+}
+
+.cmp__hand {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.cmp__num {
+  display: grid;
+  gap: 2px;
+  color: var(--color-text-muted);
+}
+
+.cmp__num input {
+  min-height: 44px;
+  min-width: 0;
+  padding: 0 var(--space-2);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-panel);
+  background: var(--color-panel-2);
+  color: var(--color-text);
+  font-size: var(--text-base);
+}
+
+.cmp__stitch {
+  display: grid;
+  gap: 2px;
+}
+
+.cmp__stitch input {
+  min-height: 44px;
+}
+
+.cmp__scores {
+  margin: 0;
+  padding-left: var(--space-3);
+  display: grid;
+  gap: 2px;
+}
+
+.cmp__again {
+  justify-self: start;
+}

@@ -1,3 +1,4 @@
+import { ComparePhoto } from './ComparePhoto.tsx'
 import type { BuildCheck } from '../lib/build.ts'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { LatLon } from '../core/geo.ts'
@@ -768,6 +769,8 @@ export function PlanMode({
    * because the threshold depends on how wide the screen actually is.
    */
   const [mapZoom, setMapZoom] = useState(16.5)
+  /* Compare a photo (src/components/ComparePhoto.tsx). ?compare=1 opens it, for scripts/measure-compare.mjs. */
+  const [compareOpen, setCompareOpen] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('compare') === '1')
 
   /*
    * LOCATE, FROM THE RAIL.
@@ -2167,6 +2170,8 @@ export function PlanMode({
         bottomInset={sheetHeight}
       />
 
+      {compareOpen ? <ComparePhoto fallbackAt={venue} distanceUnit={units.distance} onClose={() => setCompareOpen(false)} /> : null}
+
       {threeD && venue !== null && venueWindow !== null && scrubbedAt !== null ? (
         <Clay3D
           venue={venue}
@@ -2176,6 +2181,7 @@ export function PlanMode({
           pins={threeDPins}
           stand={stand}
           onLeaveStand={() => setStand(null)}
+          onCompare={() => setCompareOpen(true)}
           flight={flightPlay}
           sea={cinema}
           onFlightTime={scrubTo}
