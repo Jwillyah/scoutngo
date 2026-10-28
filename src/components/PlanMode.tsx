@@ -131,10 +131,11 @@ import { PhaseRule } from './PhaseRule.tsx'
 
 
 /*
- * Room for the time bar at peek, measured at 390 wide: the grabber row 21,
- * the bar 130 (date line and strip with its hour labels), and 13 to spare.
+ * Room for the time bar at peek, measured at 390 wide: the grab handle 44
+ * (a thumb's target, BottomSheet.tsx), the bar 130 (date line and strip with
+ * its hour labels), and 13 to spare.
  */
-const PLAN_PEEK_PX = 164
+const PLAN_PEEK_PX = 187
 
 /** What the one sheet is currently showing. Chosen by an explicit control. */
 /*

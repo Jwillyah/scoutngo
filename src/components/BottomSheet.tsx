@@ -45,7 +45,7 @@ const HALF_FRACTION = 0.45
 const HALF_BODY_MIN_PX = 200
 const FULL_FRACTION = 0.92
 
-/** How far a drag on an axis-locked region moves before its direction decides whose it is. */
+/** How far a touch on the handle or the date row moves before it is a drag and not a tap. */
 const AXIS_SLOP_PX = 8
 
 /** How far past a detent a drag may stretch before it stops following. */
@@ -177,58 +177,37 @@ export function BottomSheet({
   }, [height, onHeightChange])
 
   /*
-   * THE SHEET'S DRAG WINS, FROM ANYWHERE IN THE SHEET.
+   * THE SHEET MOVES ONLY FROM ITS HANDLE AND THE DATE ROW (27 Oct, from the
+   * phone at the pier).
    *
-   * WHAT HAPPENED. The elevation curve put a full-width range input across
-   * its plot. The sheet could only be dragged by its 12px grabber, so once
-   * the sheet was at HALF the chart swallowed every gesture on it and there
-   * was no way back: no controls on screen, no detent change, nothing. The
-   * surface audit passed that screen with zero failures, because it checked
-   * that a grabber EXISTS rather than that a drag CHANGES anything.
+   * WHAT IT WAS. A drag anywhere in the sheet moved it, a child had to claim
+   * its gesture to keep it, and the time bar's chart held each drag undecided
+   * until it had travelled: up or down made it the sheet's, sideways the
+   * chart's. A thumb does not swipe sideways in a straight line. It pivots
+   * from the wrist, so the first few pixels of a sideways swipe go up, and
+   * the chart handed the drag to the sheet before it ever went sideways. The
+   * shooter scrubbing the sun moved the sheet, at every time of day; and with
+   * the page's own scrolling also wanting the vertical drag, the sheet
+   * sometimes would not go down at all. 6 of 20 scripted thumb drags moved
+   * the wrong thing (measurements/2026-10-28-sheet-gestures-before.md).
    *
-   * SO THE RULE IS THE OTHER WAY ROUND NOW. A drag starting anywhere in the
-   * sheet moves the sheet, and a child has to claim the gesture explicitly to
-   * keep it. One thing does: the chart's thumb, marked data-scrub. Everything
-   * else -- the plot, the sections, the empty space -- drags the sheet.
-   *
-   * WHAT STILL DOES NOT DRAG IT:
-   *
-   *   a real control, because a drag that starts on a button or a select is
-   *   that control's gesture and always was
-   *
-   *   a scroller that is not at the top, because at FULL the body scrolls and
-   *   pulling the sheet down from halfway through a list is not what anyone
-   *   means
-   */
-  /*
-   * AN AXIS-LOCKED REGION: the time bar's strip, which scrubs sideways. A drag
-   * that starts there is held undecided until it has moved; up or down makes
-   * it the sheet's, sideways leaves it to the strip. Without this the strip
-   * covered most of the peek and the sheet could only be moved by its grabber.
+   * SO TWO PLACES MOVE IT, MARKED data-sheet-drag, AND NOTHING ELSE DOES: the
+   * grab handle along the sheet's top edge, 44 px tall, and the time bar's
+   * date row. A touch there is held for a few pixels, so a tap is still a tap
+   * (the handle steps up a detent; the date opens its picker), and becomes
+   * the sheet's once it has moved up or down. The chart scrubs, the body
+   * scrolls, and neither ever moves the sheet.
    */
   const pending = useRef<{ x: number; y: number; id: number; el: Element } | null>(null)
+  /* A drag that ended is not also a tap: the click it leaves behind is eaten (onClickCapture below). */
+  const dragged = useRef(false)
 
-  const onPointerDown = useCallback(
-    (event: React.PointerEvent) => {
-      const target = event.target as HTMLElement | null
-      if (target !== null && target.closest('[data-axis-lock]') !== null) {
-        pending.current = { x: event.clientX, y: event.clientY, id: event.pointerId, el: event.currentTarget }
-        return
-      }
-      if (target !== null) {
-        /* A child that claims the gesture keeps it. */
-        if (target.closest('[data-scrub]') !== null) return
-        /* A real control's own gesture. */
-        if (target.closest('input, select, textarea, a, [role="slider"]') !== null) return
-        /* Mid-scroll in the body: that is a scroll, not a sheet drag. */
-        const scroller = target.closest('.sheet__body')
-        if (scroller !== null && scroller.scrollTop > 0) return
-      }
-      drag.current = { startY: event.clientY, startHeight: heightFor(detent, viewport, peekPx) }
-      event.currentTarget.setPointerCapture(event.pointerId)
-    },
-    [detent, viewport, peekPx],
-  )
+  const onPointerDown = useCallback((event: React.PointerEvent) => {
+    dragged.current = false
+    const target = event.target as HTMLElement | null
+    if (target === null || target.closest('[data-sheet-drag]') === null) return
+    pending.current = { x: event.clientX, y: event.clientY, id: event.pointerId, el: event.currentTarget }
+  }, [])
 
   const onPointerMove = useCallback(
     (event: React.PointerEvent) => {
@@ -236,11 +215,11 @@ export function BottomSheet({
       if (waiting !== null && drag.current === null) {
         const dx = Math.abs(event.clientX - waiting.x)
         const dy = Math.abs(event.clientY - waiting.y)
-        if (dx > AXIS_SLOP_PX && dx >= dy) {
+        if (dx > AXIS_SLOP_PX * 2 && dx > dy * 2) {
           pending.current = null
           return
         }
-        if (dy > AXIS_SLOP_PX && dy > dx) {
+        if (dy > AXIS_SLOP_PX && dy >= dx) {
           pending.current = null
           drag.current = { startY: waiting.y, startHeight: heightFor(detent, viewport, peekPx) }
           try {
@@ -264,6 +243,7 @@ export function BottomSheet({
     if (drag.current === null) return
     const settled = dragHeightRef.current
     drag.current = null
+    dragged.current = true
     dragHeightRef.current = null
     setDragHeight(null)
     if (settled !== null) onDetentChange(nearestDetent(settled, viewport, peekPx))
@@ -285,8 +265,14 @@ export function BottomSheet({
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
+      onClickCapture={(event) => {
+        if (!dragged.current) return
+        dragged.current = false
+        event.preventDefault()
+        event.stopPropagation()
+      }}
     >
-      <div className="sheet__grab">
+      <div className="sheet__grab" data-sheet-drag>
         <button
           type="button"
           className="sheet__handle"

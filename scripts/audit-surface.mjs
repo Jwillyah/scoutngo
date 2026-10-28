@@ -57,6 +57,7 @@ import { goToStage, guardAudit, startWatchdog } from './preflight.mjs'
 guardAudit('surface')
 
 import { connect } from './cdp.mjs'
+import { describeDrag, DRAGS, runSheetGestures } from './sheetGestures.mjs'
 
 const OUT = process.env.SCOUTNGO_OUT ?? '.'
 const VIEWPORT = { width: 390, height: 844 }
@@ -345,156 +346,60 @@ if (await setDetent('half')) {
 /* --------------------------------------- every detent reaches every other */
 
 /*
- * A DRAG ON THE SHEET MUST CHANGE THE DETENT. ALL SIX WAYS.
+ * A DRAG ON THE HANDLE MUST CHANGE THE DETENT, ALL SIX WAYS; A DRAG ANYWHERE
+ * ELSE MUST NOT; AND THE CHART MUST SCRUB.
  *
- * WHY THIS EXISTS. The elevation curve put a full-width range input across
- * its plot. At HALF it swallowed every gesture on the sheet, the sheet could
- * not be moved, and the screen had no controls on it: a dead end with no way
- * out. THIS AUDIT PASSED THAT SCREEN WITH ZERO FAILURES, because it checked
- * that a grabber EXISTS rather than that a drag DOES anything.
+ * WHY THIS EXISTS. Twice now a sheet gesture has been lost: first the
+ * elevation curve's full-width input swallowed every drag at HALF and left no
+ * way back, and then (27 Oct, from the phone at the pier) the time bar's
+ * chart handed a thumb's sideways swipe to the sheet, because a thumb's swipe
+ * starts upward. Since then the sheet moves only from its grab handle and the
+ * date row (BottomSheet.tsx).
  *
- * So the assertion is the gesture, not the furniture. Six transitions, each
- * performed as a real pointer drag on the sheet body, each verified by
- * reading data-detent afterwards.
+ * THE CHECK IS THE GESTURE, AS A THUMB MAKES IT: real touch input through the
+ * browser (scripts/sheetGestures.mjs), with the detent and the time read back
+ * after each drag. The furniture is checked too, because a 20 px handle is a
+ * handle a thumb misses: 44 px tall, and the tool dock clear of it.
  */
-console.log('\n### every detent is reachable from every other, by drag')
+console.log('\n### the sheet moves from its handle, and only from there and the date row')
 
-const dragSheet = async (from, to) => {
-  if (!(await setDetent(from))) return `could not reach ${from} to start`
-  const result = await ev(`(() => {
-    const sheet = document.querySelector('.sheet')
-    if (!sheet) return 'no sheet'
-    const box = sheet.getBoundingClientRect()
-    const viewport = window.innerHeight
-    /* Where the sheet top must end up for the target detent. */
-    const wanted = { peek: 88, half: viewport * 0.45, full: viewport * 0.92 }['${to}']
-    const endY = viewport - wanted
-    /*
-     * GRAB SOMEWHERE IN THE SHEET THAT IS NOT THE GRABBER AND NOT A CONTROL,
-     * AND PROVE SUCH A PLACE EXISTS.
-     *
-     * This used to take box.top + 40 and drag from whatever was there,
-     * reporting the element's class afterwards. The comment said "not a
-     * control"; nothing checked, and when the time strip moved to the top of
-     * the sheet every one of the six drags landed on its range input, which
-     * owns horizontal gestures and swallowed all six.
-     *
-     * THE RULE THIS PROTECTS IS NOT "EVERY PIXEL DRAGS THE SHEET". A control
-     * inside the sheet keeps its own gesture, and must: that is what makes
-     * the rail scrub. The rule is that a shooter can always find somewhere to
-     * take hold of -- which is exactly what the elevation curve destroyed
-     * when its full-width input covered the whole of HALF, leaving no way
-     * back and no control on screen.
-     *
-     * SO IT IS A SHARE, NOT A REGION. Scan the whole sheet in 6px rows, count
-     * how many are body rather than control, and require that a fifth of it
-     * is grabbable. Then drag from the topmost such row.
-     *
-     * The first version of this scanned only the top half, which failed at
-     * PEEK for a true reason and the wrong one: the sheet there is 88px, so
-     * its top half is the grabber and the 34px time strip, and the 30px of
-     * body below the strip -- which is plenty to take hold of -- was outside
-     * the window being looked at. A share counts that 30px; a region did not.
-     *
-     * And it still catches what it was written for: the elevation curve
-     * covered essentially the whole sheet at HALF, so its body share was
-     * near zero from any starting row.
-     */
-    const x = box.left + box.width / 2
-    const CONTROLS = 'input, select, textarea, button, a, [role=slider], .sheet__grab'
-    let startY = null
-    let body = 0
-    let rows = 0
-    for (let y = box.top + 2; y < Math.min(box.bottom, viewport) - 2; y += 6) {
-      const el = document.elementFromPoint(x, y)
-      if (!el) continue
-      rows += 1
-      /* An axis-locked strip scrubs sideways and hands up-and-down drags to the sheet: it is grab area. */
-      if (el.closest(CONTROLS) && !el.closest('[data-axis-lock]')) continue
-      body += 1
-      if (startY === null) startY = y
-    }
-    const share = rows === 0 ? 0 : body / rows
-    if (startY === null || share < 0.2) {
-      return 'NO GRAB AREA: only ' + Math.round(share * 100) + '% of the sheet is not a control'
-    }
-    const target = document.elementFromPoint(x, startY) ?? sheet
-    const fire = (type, y) =>
-      target.dispatchEvent(new PointerEvent(type, {
-        clientX: x, clientY: y,
-        bubbles: true, cancelable: true, pointerId: 1, isPrimary: true, buttons: 1,
-      }))
-    fire('pointerdown', startY)
-    fire('pointermove', (startY + endY) / 2)
-    fire('pointermove', endY)
-    fire('pointerup', endY)
-    return 'dragged from ' + (target.className || target.tagName)
-  })()`)
-  if (typeof result === 'string' && result.startsWith('NO GRAB AREA')) {
-    return `${from} -> ${to}: ${result}`
-  }
-  await wait(700)
-  const landed = await ev(`document.querySelector('.sheet')?.getAttribute('data-detent')`)
-  return landed === to ? null : `${from} -> ${to}: landed on ${landed} (${result})`
+const handle = await ev(`(() => {
+  const g = document.querySelector('.sheet__grab')?.getBoundingClientRect()
+  const s = document.querySelector('.sheet')?.getBoundingClientRect()
+  const d = document.querySelector('.tooldock')?.getBoundingClientRect()
+  if (!g || !s) return null
+  return { h: g.height, w: g.width, sw: s.width, gap: d ? g.top - d.bottom : null }
+})()`)
+if (handle === null) fail('no grab handle on the sheet')
+else {
+  console.log(`  handle ${handle.w.toFixed(0)} x ${handle.h.toFixed(0)} px; the tool dock ${handle.gap === null ? 'not on screen' : handle.gap.toFixed(0) + ' px clear of it'}`)
+  if (handle.h < 44) fail(`the grab handle is ${handle.h.toFixed(0)} px tall; a thumb needs 44`)
+  if (handle.w < handle.sw - 2) fail(`the grab handle is ${handle.w.toFixed(0)} px of the sheet's ${handle.sw.toFixed(0)}`)
+  if (handle.gap !== null && handle.gap < 16) fail(`the tool dock is ${handle.gap.toFixed(0)} px from the sheet's handle; a thumb on it would grab the sheet`)
 }
 
-for (const from of ['peek', 'half', 'full']) {
-  for (const to of ['peek', 'half', 'full']) {
-    if (from === to) continue
-    const problem = await dragSheet(from, to)
-    console.log(`  ${from.padEnd(5)} -> ${to.padEnd(5)} ${problem === null ? 'ok' : 'FAILED'}`)
-    if (problem !== null) fail(problem)
-  }
+const gestures = await runSheetGestures({ send, ev, wait })
+for (const r of gestures) {
+  if (r.wrong) fail(`drag ${r.n} (${describeDrag(r)}) moved the wrong thing: ${r.got === null ? r.note : `time ${r.got.time ? 'moved' : 'not moved'}, sheet at ${r.got.sheet}`}`)
 }
+console.log(`  ${gestures.filter((r) => r.wrong).length} of ${gestures.length} thumb drags moved the wrong thing`)
 
-/* ----- and the grab-area rule is proven to fail, by covering the sheet in control */
+/* ----- and the rule is proven to fail, by making the card a drag region */
 
 /*
- * THE ELEVATION CURVE, RECONSTRUCTED. Its full-width range input covered the
- * whole of HALF and there was no way back: no controls on screen, no detent
- * change, nothing. The share check above exists for that, so it has to be
- * shown catching it rather than trusted to.
+ * THE OLD RULE, RECONSTRUCTED: the card's body marked as a place the sheet
+ * moves from, which is what "drag from anywhere" was, and its touches kept
+ * from the page's scrolling as the handle's are. The body drag in the twenty
+ * must then be counted wrong; if it is not, the twenty are not looking.
  */
-console.log('\n### and the grab-area rule is proven to fail')
-if (await setDetent('half')) {
-  const covered = await ev(`(() => {
-    /*
-     * THE WHOLE SHEET BELOW THE GRABBER, not only its body: the peek holds the
-     * time bar's strip, which is real grab area, so covering the body alone
-     * no longer covers the sheet.
-     */
-    const sheet = document.querySelector('.sheet')
-    const grab = document.querySelector('.sheet__grab')
-    if (!sheet || !grab) return 'no sheet'
-    const input = document.createElement('input')
-    input.type = 'range'
-    input.id = 'audit-swallower'
-    const top = Math.round(grab.getBoundingClientRect().bottom - sheet.getBoundingClientRect().top)
-    input.style.cssText = 'position:absolute;left:0;right:0;bottom:0;top:' + top + 'px;width:100%;z-index:99;opacity:0.01'
-    sheet.appendChild(input)
-    return 'covered'
-  })()`)
-  if (covered !== 'covered') {
-    fail(`could not cover the sheet to prove the grab-area rule fails: ${covered}`)
-  } else {
-    await wait(200)
-    const swallowed = await dragSheet('half', 'full')
-    await ev(`(() => {
-      document.getElementById('audit-swallower')?.remove()
-      return 'restored'
-    })()`)
-    await wait(300)
-    if (swallowed === null) {
-      fail('the sheet was covered in one range input and the drag rule passed anyway')
-    } else {
-      console.log(`  a sheet-sized range input was caught: ${swallowed}`)
-    }
-    await setDetent('half')
-    const after = await dragSheet('half', 'full')
-    if (after !== null) fail(`the sheet did not recover after the injection: ${after}`)
-    await setDetent('half')
-  }
-}
+console.log('\n### and the drag rule is proven to fail')
+await ev(`(() => { const c = document.querySelector('.sheet__card'); c?.setAttribute('data-sheet-drag', ''); if (c) c.style.touchAction = 'none'; return 1 })()`)
+const bodyDrag = DRAGS.findIndex((d) => d.on === 'card')
+const injected = await runSheetGestures({ send, ev, wait }, [bodyDrag])
+await ev(`(() => { const c = document.querySelector('.sheet__card'); c?.removeAttribute('data-sheet-drag'); if (c) c.style.touchAction = ''; return 1 })()`)
+if (injected[0]?.wrong !== true) fail('the card was made a drag region and the body drag still passed')
+else console.log(`  a body that drags the sheet was caught: sheet went to ${injected[0].got?.sheet}`)
+await setDetent('half')
 
 /* ----------------------------------- every stage reaches every other stage */
 

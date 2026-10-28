@@ -28,6 +28,8 @@ interface TimeBarProps {
 }
 
 const HEIGHT = 52
+/** How far sideways a drag on the chart goes before it scrubs. */
+const SCRUB_SLOP_PX = 8
 
 /* yyyy-mm-dd and HH:MM at the venue, for the jump field: the input's own format, always 24 hour. */
 function venueParts(at: Date, timeZone: string): { date: string; time: string } {
@@ -55,9 +57,12 @@ export function TimeBar({ at, lat, lon, timeZone, moon, onAt, onReset }: TimeBar
 
   /* The drag: each move shifts the needle's time by the pixels moved. */
   /*
-   * SIDEWAYS IS OURS, UP AND DOWN IS THE SHEET'S. The drag is held undecided
-   * for a few pixels; once it is clearly sideways the strip takes it and the
-   * sheet never sees it. See the axis lock in BottomSheet.tsx.
+   * THE CHART ONLY SCRUBS, AND ONLY SIDEWAYS. A drag here never moves the
+   * sheet (that is the handle's and the date row's, BottomSheet.tsx). It is
+   * the chart's once it has gone SCRUB_SLOP_PX sideways and more sideways
+   * than up or down overall, however it started: a thumb's swipe begins with
+   * a few pixels upward as it pivots, and deciding on those first pixels lost
+   * the scrub to the sheet. Up or down and nothing else does nothing.
    */
   const drag = useRef<{ x: number; y: number; at: number; mine: boolean } | null>(null)
   const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -66,14 +71,11 @@ export function TimeBar({ at, lat, lon, timeZone, moon, onAt, onReset }: TimeBar
   const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
     const d = drag.current
     if (d === null) return
+    event.stopPropagation()
     const dx = event.clientX - d.x
     if (!d.mine) {
       const dy = event.clientY - d.y
-      if (Math.abs(dy) > 8 && Math.abs(dy) > Math.abs(dx)) {
-        drag.current = null
-        return
-      }
-      if (Math.abs(dx) <= 8) return
+      if (Math.abs(dx) <= SCRUB_SLOP_PX || Math.abs(dx) < Math.abs(dy) * 0.6) return
       d.mine = true
       try {
         event.currentTarget.setPointerCapture(event.pointerId)
@@ -81,7 +83,6 @@ export function TimeBar({ at, lat, lon, timeZone, moon, onAt, onReset }: TimeBar
         /* Nothing to capture for a synthetic pointer. */
       }
     }
-    event.stopPropagation()
     const minutes = Math.round(minutesForDrag(dx, width))
     onAt(new Date(d.at + minutes * 60_000))
   }
@@ -95,7 +96,8 @@ export function TimeBar({ at, lat, lon, timeZone, moon, onAt, onReset }: TimeBar
   return (
     <div className="tbar">
       <div className="tbar__head">
-        <label className="tbar__when">
+        {/* The date row: a tap jumps to a moment, a drag up or down moves the sheet (BottomSheet.tsx). */}
+        <label className="tbar__when" data-sheet-drag>
           <span className="tbar__day">{day}</span>
           <span className="tbar__time num">
             {venueAndYours(at, timeZone)}
@@ -125,7 +127,6 @@ export function TimeBar({ at, lat, lon, timeZone, moon, onAt, onReset }: TimeBar
       <div
         ref={strip}
         className="tbar__strip"
-        data-axis-lock
         role="slider"
         aria-label="Time of day. Drag sideways to move through it."
         aria-valuetext={venueAndYours(at, timeZone)}

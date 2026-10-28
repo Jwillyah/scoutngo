@@ -334,8 +334,10 @@ export function SunCurve({
       {/*
         * THE THUMB IS THE ONLY THING HERE THAT CLAIMS A DRAG.
         *
-        * data-scrub tells BottomSheet to leave this gesture alone; everything
-        * else inside the sheet drags the sheet. The previous version put a
+        * Only the sheet's handle and the time bar's date row move the sheet
+        * now (BottomSheet.tsx), so nothing here can take the sheet's drag;
+        * data-scrub stays as the thumb's name for the audits. The version
+        * before put a
         * full-width range input across the plot, which swallowed every
         * gesture and left the sheet unmovable with no controls on screen.
         *

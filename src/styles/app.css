@@ -2556,10 +2556,15 @@
   transition: height var(--motion-base) var(--spring);
 }
 
+/*
+ * THE GRAB HANDLE: the whole width of the sheet's top edge, 44 px tall, the
+ * bar drawn in its middle. With the date row it is the only place the sheet
+ * moves from (BottomSheet.tsx).
+ */
 .sheet__grab {
   flex: 0 0 auto;
   display: flex;
-  justify-content: center;
+  height: 44px;
   touch-action: none;
   cursor: grab;
 }
@@ -2569,7 +2574,10 @@
 }
 
 .sheet__handle {
-  padding: var(--space-2) var(--space-5);
+  flex: 1 1 auto;
+  display: grid;
+  place-items: center;
+  padding: 0;
   background: transparent;
   border: 0;
   cursor: inherit;
@@ -10011,7 +10019,7 @@
   display: flex;
   gap: var(--space-1);
   padding: var(--space-1);
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--tooldock-clear);
   border-radius: 999px;
   background: color-mix(in srgb, var(--surface-1) 72%, transparent);
   backdrop-filter: blur(14px);
@@ -10056,6 +10064,9 @@
 /* The big date and time; the real control is the invisible input over it. */
 .tbar__when {
   position: relative;
+  /* A drag here moves the sheet; the page must not take it as a scroll. */
+  touch-action: none;
+  cursor: grab;
   display: flex;
   align-items: baseline;
   gap: var(--space-2);
@@ -10101,7 +10112,8 @@
 .tbar__strip {
   overflow: hidden;
   border-radius: var(--radius-flat);
-  touch-action: pan-y;
+  /* Every drag here is the chart's to decide: sideways scrubs, anything else does nothing. */
+  touch-action: none;
   cursor: grab;
 }
 
@@ -10488,8 +10500,13 @@
 }
 
 :root {
-  /* The tool dock's height with its margin: 44 px buttons, 4 px padding each side, 8 px clear above the sheet. */
-  --tooldock-height: 62px;
+  /*
+   * The tool dock's height with its clearance: 44 px buttons, 4 px padding
+   * each side, and --tooldock-clear above the sheet, so a thumb on the dock
+   * never lands on the sheet's handle (27 Oct, from the phone).
+   */
+  --tooldock-clear: 20px;
+  --tooldock-height: calc(54px + var(--tooldock-clear));
 }
 
 /* The shadow legend: a quiet line under the chips, saying what is missing from the shadows. */
