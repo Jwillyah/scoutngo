@@ -94,6 +94,8 @@ import type { ScanContext } from '../lib/lidar/applyScan.ts'
 import { usePreflight } from '../lib/preflight/usePreflight.ts'
 import { PreflightSheet } from './PreflightSheet.tsx'
 import { SkylineSheet, type SkylineState } from './SkylineSheet.tsx'
+import { LightMapSheet, type LightMapState } from './LightMapSheet.tsx'
+import { lightMapFor, presetWindow, type LightPreset } from '../lib/lightmap/lightMapFor.ts'
 import { EYE_M, skylineFor } from '../lib/skyline/skylineFor.ts'
 import { localDate } from '../core/moonTimes.ts'
 import { zonedTimeToUtc } from '../core/timezone.ts'
@@ -1126,6 +1128,33 @@ export function PlanMode({
     return r ?? 'off-scan'
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [card.kind, venue?.lat, venue?.lon, scanCtx, buildingList, pilotAt?.lat, pilotAt?.lon, skyHeight, pf.heightFt, skyDay?.getTime()])
+  /* The light map, worked out on the phone while its card is open, and drawn on the map under it. */
+  const [lightPreset, setLightPreset] = useState<LightPreset>('golden')
+  const [lightState, setLightState] = useState<LightMapState>({ loading: 0 })
+  useEffect(() => {
+    if (card.kind !== 'lightmap') return
+    if (venue === null || scanCtx === null) {
+      setLightState('no-scan')
+      return
+    }
+    const win = skyDay === null ? null : presetWindow(lightPreset, venue, skyDay, venueWindow === null ? null : { from: venueWindow.start, to: venueWindow.end })
+    if (win === null) {
+      setLightState('no-window')
+      return
+    }
+    let live = true
+    setLightState({ loading: 0 })
+    void lightMapFor(scanCtx.rasters, venue, lightPreset, win, (share) => {
+      if (live) setLightState({ loading: share })
+    }).then((m) => {
+      if (live) setLightState(m)
+    })
+    return () => {
+      live = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [card.kind, venue?.lat, venue?.lon, scanCtx, lightPreset, skyDay?.getTime(), venueWindow?.start.getTime(), venueWindow?.end.getTime()])
+  const lightImage = card.kind === 'lightmap' && typeof lightState === 'object' && 'url' in lightState ? lightState : null
   const cinema = useCinemaData(card.kind === 'preflight' || flightPlay !== null, venue, tide, scrubbedAt ?? NO_TIME)
 
   /*
@@ -1575,6 +1604,14 @@ export function PlanMode({
           onToggle: () => openCard('skyline'),
         },
         {
+          id: 'lightmap',
+          label: 'Light map',
+          state: scanCtx === null ? 'Needs the scan' : 'From the scan',
+          on: card.kind === 'lightmap',
+          art: TILE_ART.lightmap,
+          onToggle: () => openCard('lightmap'),
+        },
+        {
           id: 'measure',
           label: 'Measure',
           state: measurePins === null ? 'OFF' : 'ON',
@@ -1672,6 +1709,17 @@ export function PlanMode({
             {/* The cameras show the sky the forecast is modelling. */}
             <CardMore links={[{ label: 'Sky cameras near here', onOpen: () => openCard('cams') }]} />
           </Card>
+        )
+      case 'lightmap':
+        return (
+          <LightMapSheet
+            state={lightState}
+            preset={lightPreset}
+            onPreset={setLightPreset}
+            timeZone={venueWindow?.timeZone ?? 'UTC'}
+            scanYear={scanCtx?.scan.year ?? null}
+            onClose={home}
+          />
         )
       case 'skyline':
         return (
@@ -2026,6 +2074,7 @@ export function PlanMode({
         onFlightAt={pf.addPoint}
         flight={card.kind === 'preflight' ? pf.features : null}
         waterline={waterline !== null && waterline !== 'no-offset' ? { url: waterline.url, coordinates: waterline.coordinates } : null}
+        lightmap={lightImage === null ? null : { url: lightImage.url, coordinates: lightImage.coordinates }}
         onHorizon={setHorizonProfile}
         handle={mapHandle}
         venue={venue}

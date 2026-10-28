@@ -705,6 +705,8 @@ interface MapViewProps {
   flight?: GeoJSON.FeatureCollection | null
   /* The waterline over the scanned patch, as an image (src/lib/waterline/useWaterline.ts). */
   waterline?: { url: string; coordinates: [[number, number], [number, number], [number, number], [number, number]] } | null
+  /* The light map around the venue, as an image (src/lib/lightmap/lightMapFor.ts). */
+  lightmap?: { url: string; coordinates: [[number, number], [number, number], [number, number], [number, number]] } | null
   /** PhotoPills style rays from the venue pin. All four bearings from core. */
   sunOverlay: SunOverlay | null
   showSun: boolean
@@ -1159,6 +1161,7 @@ export function MapView({
   onFlightAt,
   flight = null,
   waterline = null,
+  lightmap = null,
   pilotAt = null,
   onPilotMove,
   onAimAt,
@@ -2580,6 +2583,24 @@ export function MapView({
       m.addLayer({ id: 'waterline', type: 'raster', source: 'waterline', paint: { 'raster-opacity': 1, 'raster-resampling': 'nearest' } }, m.getLayer('flight-edge') ? 'flight-edge' : undefined)
     }
   }, [waterline, ready])
+
+  /* The light map: the same kind of image, under the waterline. */
+  useEffect(() => {
+    const m = map.current
+    if (m === null || !ready) return
+    const src = m.getSource('lightmap') as maplibregl.ImageSource | undefined
+    if (lightmap === null) {
+      if (m.getLayer('lightmap')) m.removeLayer('lightmap')
+      if (src !== undefined) m.removeSource('lightmap')
+      return
+    }
+    if (src !== undefined) src.updateImage({ url: lightmap.url, coordinates: lightmap.coordinates })
+    else {
+      m.addSource('lightmap', { type: 'image', url: lightmap.url, coordinates: lightmap.coordinates })
+      const above = m.getLayer('waterline') ? 'waterline' : m.getLayer('flight-edge') ? 'flight-edge' : undefined
+      m.addLayer({ id: 'lightmap', type: 'raster', source: 'lightmap', paint: { 'raster-opacity': 0.85, 'raster-resampling': 'nearest' } }, above)
+    }
+  }, [lightmap, ready])
 
   /* Preflight's path (PlanMode builds the features). */
   useEffect(() => {

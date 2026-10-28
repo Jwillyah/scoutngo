@@ -46,6 +46,7 @@ export type IconId =
   | 'measure'
   | 'preflight'
   | 'skyline'
+  | 'lightmap'
 
 export interface TileStops {
   /** Top left, the light end. */
@@ -96,6 +97,8 @@ export const DESIGN_TILES: Readonly<Record<IconId, TileStops>> = {
   preflight: { light: '#b6aeff', middle: '#5e51dc', dark: '#231a7d' },
   /* The Kit coral: warm, as the last light over a roofline. */
   skyline: { light: '#ffb496', middle: '#ee6b43', dark: '#9a3518' },
+  /* The Exposure gold: light on the ground. */
+  lightmap: { light: '#ffd98a', middle: '#f0a020', dark: '#9a5806' },
 }
 
 export const GLYPH_INK = '#ffffff'

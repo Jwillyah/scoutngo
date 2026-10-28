@@ -11811,3 +11811,41 @@
   font-size: var(--text-md);
   font-weight: var(--weight-medium);
 }
+
+/*
+ * THE LIGHT MAP (LightMapSheet.tsx): three questions as three buttons, a
+ * row of little suns from none of the time to all of it.
+ */
+.lmap__presets {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+
+.lmap__legend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: var(--space-1) 0;
+}
+
+.lmap__sun {
+  width: 22px;
+  height: 22px;
+}
+
+.lmap__sunring {
+  fill: none;
+  stroke: var(--sun);
+  stroke-width: 1.2;
+}
+
+.lmap__sunfill {
+  fill: var(--sun);
+}
+
+.lmap__sunray {
+  stroke: var(--sun);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}

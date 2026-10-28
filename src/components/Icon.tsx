@@ -210,6 +210,14 @@ const glyphs = (dark: string): Record<GlyphId, ReactNode> => ({
       <path d="M2.6 20.4V13h3.6v-3.4h3.6V13h2.6V9.4l2.4-2 2.4 2v4.2h4.2v6.8z" fill="#FFF" />
     </>
   ),
+  /* Light map: a sun over ground cut into squares, some lit. */
+  lightmap: (
+    <>
+      <circle cx="12" cy="5.6" r="2.8" fill="#FFF" />
+      <path d="M3 13h5.4v3.4H3zM9.3 13h5.4v3.4H9.3zM15.6 13H21v3.4h-5.4zM3 17.3h5.4v3.4H3zM9.3 17.3h5.4v3.4H9.3zM15.6 17.3H21v3.4h-5.4z" fill="#FFF" fillOpacity="0.45" />
+      <path d="M9.3 13h5.4v3.4H9.3zM15.6 17.3H21v3.4h-5.4z" fill="#FFF" />
+    </>
+  ),
   layers: (
     <>
       <path d="M12 13.4l-9-4.2 9-4.2 9 4.2z" fill="#FFF" />

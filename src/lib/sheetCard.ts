@@ -50,6 +50,8 @@ export type SheetCard =
   | { kind: 'preflight' }
   /* The skyline from where you stand, under the sun's and moon's paths (SkylineSheet.tsx). */
   | { kind: 'skyline' }
+  /* Minutes of direct sun per metre of ground, for one question at a time (LightMapSheet.tsx). */
+  | { kind: 'lightmap' }
 
 export type CardKind = SheetCard['kind']
 
@@ -74,6 +76,7 @@ export const CARD_TITLE: Record<CardKind, string> = {
   callsheet: 'Call sheet',
   preflight: 'Preflight',
   skyline: 'Skyline',
+  lightmap: 'Light map',
 }
 
 /**
@@ -148,4 +151,6 @@ export const TIME_MATTERS: Record<CardKind, boolean> = {
   preflight: true,
   /* The day's sun and moon paths: the time bar's day sets them. */
   skyline: true,
+  /* The day's sun, and Even light's shoot window. */
+  lightmap: true,
 }

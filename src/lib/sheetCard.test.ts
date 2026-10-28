@@ -30,6 +30,7 @@ const EVERY_KIND: CardKind[] = [
   'callsheet',
   'preflight',
   'skyline',
+  'lightmap',
 ]
 
 describe('the sheet card union', () => {

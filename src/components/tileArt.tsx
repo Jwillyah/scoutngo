@@ -36,4 +36,5 @@ export const TILE_ART = {
   measure: bubble('measure'),
   preflight: bubble('preflight'),
   skyline: bubble('skyline'),
+  lightmap: bubble('lightmap'),
 }
