@@ -17,6 +17,8 @@ interface LightMapSheetProps {
   onPreset: (p: LightPreset) => void
   timeZone: string
   scanYear: number | null
+  /** A morning shoot: golden is the first minutes after sunrise (lightMapFor.ts presetWindow). */
+  morning: boolean
   onClose: () => void
 }
 
@@ -28,6 +30,7 @@ const PRESETS: [LightPreset, string][] = [
 
 const LEAD: Record<LightPreset, string> = {
   golden: `The brighter the gold, the more of the last ${GOLDEN_MIN} minutes before sunset that spot is in the sun.`,
+  /* Replaced for a morning shoot, below. */
   shade: 'Blue is ground the sun does not reach from noon to sunset, or barely: under a tenth of the time.',
   even: 'Gold stays in the sun the whole shoot window, blue stays in shade; unmarked ground changes from one to the other.',
 }
@@ -45,7 +48,9 @@ function Sun({ fill }: { fill: number }) {
   )
 }
 
-export function LightMapSheet({ state, preset, onPreset, timeZone, scanYear, onClose }: LightMapSheetProps) {
+const MORNING_LEAD = `The brighter the gold, the more of the first ${GOLDEN_MIN} minutes after sunrise that spot is in the sun.`
+
+export function LightMapSheet({ state, preset, onPreset, timeZone, scanYear, morning, onClose }: LightMapSheetProps) {
   const map = typeof state === 'object' && 'minutes' in state ? state : null
   return (
     <section className="tides lmap" aria-label="Light map">
@@ -70,7 +75,7 @@ export function LightMapSheet({ state, preset, onPreset, timeZone, scanYear, onC
         <p className="pf__prompt num">Working it out on this phone… {Math.round(Math.min(1, (state as { loading: number }).loading) * 100)}%</p>
       ) : (
         <>
-          <p className="skyl__lead">{LEAD[preset]}</p>
+          <p className="skyl__lead">{preset === 'golden' && morning ? MORNING_LEAD : LEAD[preset]}</p>
           {preset === 'golden' ? (
             <div className="lmap__legend" aria-label="Legend: time in the sun">
               <span className="pf__small">none</span>
@@ -80,6 +85,11 @@ export function LightMapSheet({ state, preset, onPreset, timeZone, scanYear, onC
               <span className="pf__small">all {GOLDEN_MIN} min</span>
             </div>
           ) : null}
+          {preset === 'shade' ? null : (
+            <p className="pf__small lmap__walls">
+              <span className="lmap__wallkey" aria-hidden="true" /> Bright edge: a wall in the sun, on the side facing it.
+            </p>
+          )}
           <p className="pf__small num">
             {formatClock(map.from, timeZone)} to {formatClock(map.to, timeZone)}, the sun every 5 min, each metre of ground 300 m around the venue. From the {scanYear ?? 'public'} lidar scan: roofs and trees as
             measured then, anything built or grown since is not in it.

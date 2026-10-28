@@ -11882,6 +11882,17 @@
   margin: var(--space-1) 0;
 }
 
+/* The wall key: a short bar in the walls' near white (lightMapFor.ts WALL). */
+.lmap__wallkey {
+  display: inline-block;
+  width: 14px;
+  height: 4px;
+  margin-right: 4px;
+  vertical-align: middle;
+  background: #fffae1;
+  border-radius: 2px;
+}
+
 .lmap__sun {
   width: 22px;
   height: 22px;

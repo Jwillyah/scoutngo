@@ -95,7 +95,7 @@ import { usePreflight } from '../lib/preflight/usePreflight.ts'
 import { PreflightSheet } from './PreflightSheet.tsx'
 import { SkylineSheet, type SkylineState } from './SkylineSheet.tsx'
 import { LightMapSheet, type LightMapState } from './LightMapSheet.tsx'
-import { lightMapFor, presetWindow, type LightPreset } from '../lib/lightmap/lightMapFor.ts'
+import { lightMapFor, morningShoot, presetWindow, type LightPreset } from '../lib/lightmap/lightMapFor.ts'
 import { EYE_M, skylineFor } from '../lib/skyline/skylineFor.ts'
 import { localDate } from '../core/moonTimes.ts'
 import { zonedTimeToUtc } from '../core/timezone.ts'
@@ -1715,6 +1715,7 @@ export function PlanMode({
             onPreset={setLightPreset}
             timeZone={venueWindow?.timeZone ?? 'UTC'}
             scanYear={scanCtx?.scan.year ?? null}
+            morning={venue !== null && skyDay !== null && venueWindow !== null && morningShoot(venue, skyDay, { from: venueWindow.start, to: venueWindow.end })}
             onClose={home}
           />
         )

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { litByRay, sunMinutesByRays, sunMinutesBySkyline, sunSteps } from './lightMap.ts'
+import { litByRay, sunMinutesByRays, sunMinutesBySkyline, sunSteps, wallSunMinutes } from './lightMap.ts'
 
 /* 200 m of flat ground at 0 m with a 20 m wall running north-south at x 100..104. */
 const N = 200
@@ -38,6 +38,35 @@ describe('the light map', () => {
   })
 })
 
+describe('the walls', () => {
+  /* The Oceanfront at sunrise, in small: a 20 m block, the sun just up in the east-southeast. */
+  const dtm = new Float32Array(N * N).fill(0)
+  const built = (i: number) => dsm[i] > 0
+  const gw = { ...g, dtm }
+  const sunrise = [{ at: new Date(0), azimuth: 107.7, altitude: 2.27, minutes: 10 }]
+  const w = { x0: 95, y0: 95, x1: 110, y1: 105 }
+  const walls = wallSunMinutes(gw, built, w, sunrise)
+  const at = (x: number, y: number) => walls[(y - w.y0) * (w.x1 - w.x0) + (x - w.x0)]
+
+  it('lights the wall facing the sun, the whole time', () => {
+    expect(at(104, 100)).toBe(10)
+  })
+  it('leaves the far wall dark, and the ground behind it in shade', () => {
+    expect(at(100, 100)).toBe(0)
+    expect(litByRay(g, 95, 100, 107.7, 2.27, 20)).toBe(false)
+  })
+  it('marks only cells with a wall: the middle of the roof and open ground have none', () => {
+    expect(Number.isNaN(at(102, 100))).toBe(true)
+    expect(Number.isNaN(at(97, 100))).toBe(true)
+  })
+  it('a wall shaded by a taller block in front of it is not lit', () => {
+    const d2 = dsm.slice()
+    for (let y = 0; y < N; y += 1) for (let x = 110; x < 115; x += 1) d2[y * N + x] = 60
+    const w2 = wallSunMinutes({ ...gw, dsm: d2 }, (i) => d2[i] > 0, w, sunrise)
+    expect(w2[(100 - w.y0) * (w.x1 - w.x0) + (104 - w.x0)]).toBe(0)
+  })
+})
+
 describe('the light map presets', () => {
   const pier = { lat: 36.8435575, lon: -75.9713104 }
   const day = new Date('2026-10-28T04:00:00Z')
@@ -51,6 +80,18 @@ describe('the light map presets', () => {
     expect(presetWindow('even', pier, day, null)).toBeNull()
     const shoot = { from: new Date('2026-10-28T20:30:00Z'), to: new Date('2026-10-28T21:30:00Z') }
     expect(presetWindow('even', pier, day, shoot)).toEqual(shoot)
+  })
+  it('golden is the first 45 min after sunrise for a morning shoot', async () => {
+    const { presetWindow, morningShoot, GOLDEN_MIN } = await import('../lib/lightmap/lightMapFor.ts')
+    const sunrise = { from: new Date('2026-10-28T11:10:00Z'), to: new Date('2026-10-28T12:30:00Z') }
+    expect(morningShoot(pier, day, sunrise)).toBe(true)
+    const g = presetWindow('golden', pier, day, sunrise)
+    expect(g !== null && (g.to.getTime() - g.from.getTime()) / 60_000).toBe(GOLDEN_MIN)
+    /* Sunrise at the pier on 28 Oct is a little after 11:20 UTC. */
+    expect(g !== null && g.from.getUTCHours()).toBe(11)
+    const evening = { from: new Date('2026-10-28T20:30:00Z'), to: new Date('2026-10-28T21:30:00Z') }
+    expect(morningShoot(pier, day, evening)).toBe(false)
+    expect(presetWindow('golden', pier, day, evening)?.to.getTime()).toBe(presetWindow('golden', pier, day, null)?.to.getTime())
   })
   it('paints sun gold and shade periwinkle, never red, and leaves what changes unmarked in Even light', async () => {
     const { cellColour } = await import('../lib/lightmap/lightMapFor.ts')
