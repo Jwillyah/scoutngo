@@ -69,6 +69,8 @@ export const AUDIT = `(() => {
      * it rather than a guess from z-index.
      */
     if (el.closest('[inert]') !== null) return false
+    /* The sheet's content below half: reached by pulling the sheet to full (see VIA THE SHEET). */
+    if (el.matches('.sheet:not(.sheet--full) .sheet__body')) return false
     return /hidden|clip/.test(cs.overflowY) && el.scrollHeight > el.clientHeight + 1
   }).map((el) => ({ el: name(el), lost: el.scrollHeight - el.clientHeight }))
 
@@ -97,10 +99,22 @@ export const AUDIT = `(() => {
       return true
     })
   const unreachable = []
+  /*
+   * VIA THE SHEET (29 Oct: "content inside the sheet scrolls only when the
+   * sheet is at full"). Below half, a control off the bottom of the sheet is
+   * reached by pulling the sheet to full, not by scrolling: counted here, and
+   * the driver then pulls the sheet to full and requires every one of them
+   * to be reachable there. A count, so it cannot quietly become an exemption.
+   */
+  let viaSheet = 0
   for (const el of controls) {
     const r = el.getBoundingClientRect()
     const onScreen = r.top >= -1 && r.bottom <= vp.h + 1 && r.left >= -1 && r.right <= vp.w + 1
     if (onScreen) continue
+    if (el.closest('.sheet:not(.sheet--full) .sheet__body') !== null) {
+      viaSheet += 1
+      continue
+    }
     const scrollers = scrollableAncestors(el)
     if (scrollers.length === 0) {
       unreachable.push({ el: name(el), text: el.textContent.trim().slice(0, 24), reason: 'no scrollable ancestor' })
@@ -191,7 +205,7 @@ export const AUDIT = `(() => {
   }).filter((row) => row !== null)
 
   return { viewport: vp.w + 'x' + vp.h, clipped, unreachable, nestedScrollers: nested,
-           canvasMismatch: canvases, controlsChecked: controls.length }
+           canvasMismatch: canvases, controlsChecked: controls.length, viaSheet }
 })()`
 
 /*
@@ -222,6 +236,20 @@ const check = async (label) => {
     r.canvasMismatch.length
   if (bad > 0) failures += bad
   show(label + (bad === 0 ? '  OK' : '  ' + bad + ' PROBLEM(S)'), r)
+  /* Some reached only by pulling the sheet to full: pull it, look again there, and put it back. */
+  if (r.viaSheet > 0) {
+    const was = await ev(`document.querySelector('.sheet')?.dataset.detent ?? null`)
+    await setSheet(ev, wait, 'full')
+    await wait(500)
+    const f = await ev(AUDIT)
+    const fbad = f.clipped.length + f.unreachable.length + f.nestedScrollers.length + f.canvasMismatch.length + f.viaSheet
+    if (fbad > 0) failures += fbad
+    show(`${label} · the ${r.viaSheet} below the sheet, with it pulled to full` + (fbad === 0 ? '  OK' : '  ' + fbad + ' PROBLEM(S)'), f)
+    if (was !== null && was !== 'full') {
+      await setSheet(ev, wait, was)
+      await wait(400)
+    }
+  }
 }
 
 for (const h of [844, 660]) {

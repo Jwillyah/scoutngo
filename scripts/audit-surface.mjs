@@ -361,7 +361,7 @@ if (await setDetent('half')) {
  * after each drag. The furniture is checked too, because a 20 px handle is a
  * handle a thumb misses: 44 px tall, and the tool dock clear of it.
  */
-console.log('\n### the sheet moves from its handle, and only from there and the date row')
+console.log('\n### the sheet: up and down anywhere in it, sideways on the ruler is the time')
 
 const handle = await ev(`(() => {
   const g = document.querySelector('.sheet__grab')?.getBoundingClientRect()
@@ -384,21 +384,23 @@ for (const r of gestures) {
 }
 console.log(`  ${gestures.filter((r) => r.wrong).length} of ${gestures.length} thumb drags moved the wrong thing`)
 
-/* ----- and the rule is proven to fail, by making the card a drag region */
+/* ----- and the rule is proven to fail, by taking the sheet's drag off the ruler */
 
 /*
- * THE OLD RULE, RECONSTRUCTED: the card's body marked as a place the sheet
- * moves from, which is what "drag from anywhere" was, and its touches kept
- * from the page's scrolling as the handle's are. The body drag in the twenty
- * must then be counted wrong; if it is not, the twenty are not looking.
+ * THE RULE MUST BE ABLE TO FAIL. The ruler is marked as a place the sheet
+ * does not move from (data-no-sheet-drag, which BottomSheet.tsx honours), and
+ * the drag straight up on it from peek must then be counted wrong: the time
+ * stays and the sheet does not move. If it is not counted wrong, the twenty
+ * are not looking at the sheet at all.
  */
 console.log('\n### and the drag rule is proven to fail')
-await ev(`(() => { const c = document.querySelector('.sheet__card'); c?.setAttribute('data-sheet-drag', ''); if (c) c.style.touchAction = 'none'; return 1 })()`)
-const bodyDrag = DRAGS.findIndex((d) => d.on === 'card')
-const injected = await runSheetGestures({ send, ev, wait }, [bodyDrag])
-await ev(`(() => { const c = document.querySelector('.sheet__card'); c?.removeAttribute('data-sheet-drag'); if (c) c.style.touchAction = ''; return 1 })()`)
-if (injected[0]?.wrong !== true) fail('the card was made a drag region and the body drag still passed')
-else console.log(`  a body that drags the sheet was caught: sheet went to ${injected[0].got?.sheet}`)
+await ev(`(() => { document.querySelector('.tbar__strip')?.setAttribute('data-no-sheet-drag', ''); return 1 })()`)
+const stripUp = DRAGS.findIndex((d) => d.on === 'strip' && d.dx === 0 && d.dy < 0)
+const injected = await runSheetGestures({ send, ev, wait }, [stripUp])
+await ev(`(() => { document.querySelector('.tbar__strip')?.removeAttribute('data-no-sheet-drag'); return 1 })()`)
+if (stripUp < 0) fail('no straight-up drag on the ruler in the twenty, so the rule was not tested to fail')
+else if (injected[0]?.wrong !== true) fail('the ruler was taken off the sheet and its drag up still passed')
+else console.log(`  a ruler that does not move the sheet was caught: sheet stayed at ${injected[0].got?.sheet}`)
 await setDetent('half')
 
 /* ----------------------------------- every stage reaches every other stage */

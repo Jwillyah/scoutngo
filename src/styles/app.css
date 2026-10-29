@@ -2597,6 +2597,23 @@
 }
 
 /*
+ * THE SHEET TAKES EVERY VERTICAL DRAG IN IT (29 Oct, BottomSheet.tsx): the
+ * page never scrolls it. At half and peek its content does not scroll either;
+ * at full it does, and the sheet takes the drag back at the content's top.
+ */
+.sheet {
+  touch-action: none;
+}
+
+.sheet:not(.sheet--full) .sheet__body {
+  overflow: hidden;
+}
+
+.sheet--full .sheet__body {
+  touch-action: pan-y;
+}
+
+/*
  * ONE LOUD ACTION AND TWO QUIET ONES.
  *
  * This was a two column row: a summary on the left and Generate on the right,

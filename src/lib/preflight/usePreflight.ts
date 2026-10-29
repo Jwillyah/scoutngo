@@ -43,9 +43,16 @@ export interface PreflightInput {
   buildings: readonly Building[]
   winds: readonly LevelWind[]
   scan: ScanContext | null
+  /*
+   * Whether Preflight's card is open. The flight card is worked out only
+   * then: it was worked out always, for the default orbit, and again every
+   * time the scrubbed hour changed the winds, which froze the time bar for
+   * 4.7 s on a step (29 Oct, scripts/measure-timebar.mjs).
+   */
+  open: boolean
 }
 
-export function usePreflight({ venue, pilotAt, buildings, winds, scan }: PreflightInput) {
+export function usePreflight({ venue, pilotAt, buildings, winds, scan, open }: PreflightInput) {
   const [kind, setKind] = useState<MoveKind>('orbit')
   const [points, setPoints] = useState<LatLon[]>([])
   const [heightFt, setHeightFt] = useState(150)
@@ -95,7 +102,7 @@ export function usePreflight({ venue, pilotAt, buildings, winds, scan }: Preflig
   const heights = useMemo(() => preflightHeights(scan, buildings), [scan, buildings])
   const path = useMemo(() => (flown !== null && flown.length > 1 ? flown : move === null ? [] : pathFor(move, { speedMps, capFt, stepS: 0.5 })), [move, speedMps, capFt, flown])
   const card = useMemo((): FlightCard | null => {
-    if (move === null || pilot === null || path.length < 2) return null
+    if (!open || move === null || pilot === null || path.length < 2) return null
     return flightCard({
       move,
       path,
@@ -108,7 +115,7 @@ export function usePreflight({ venue, pilotAt, buildings, winds, scan }: Preflig
       winds,
       flightMinutes: kept.flightMinutes,
     })
-  }, [move, path, capFt, pilot, heights, winds, kept.flightMinutes])
+  }, [open, move, path, capFt, pilot, heights, winds, kept.flightMinutes])
   const features = useMemo(() => flightFeatures(path, card?.hidden ?? [], points), [path, card, points])
 
   return {

@@ -1,3 +1,5 @@
+import { getSunPosition } from '../core/sun.ts'
+import { onLiveTime } from '../lib/liveTime.ts'
 import { ComparePhoto } from './ComparePhoto.tsx'
 import type { BuildCheck } from '../lib/build.ts'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -1027,7 +1029,9 @@ export function PlanMode({
       live = false
     }
   }, [venue, buildingsAttempt])
-  const pf = usePreflight({ venue, pilotAt, buildings: buildingList ?? NO_BUILDINGS, winds: windLevels, scan: venue === null ? null : scanCtx })
+  /* What the sheet shows: one subject at a time (see below). Here, above Preflight, which only works its card out while it is open. */
+  const [card, setCard] = useState<SheetCard>(HOME)
+  const pf = usePreflight({ venue, pilotAt, buildings: buildingList ?? NO_BUILDINGS, winds: windLevels, scan: venue === null ? null : scanCtx, open: card.kind === 'preflight' })
   const [flightPicking, setFlightPicking] = useState(false)
   const [flightPlay, setFlightPlay] = useState<FlightPlay | null>(null)
   const [recordNote, setRecordNote] = useState<string | null>(null)
@@ -1105,6 +1109,47 @@ export function PlanMode({
     const person = lightNow(scrubbedAt, venue.lat, venue.lon).personShadow
     return shadowCollection(shadows, person === null ? null : { at: venue, lengthMeters: person.lengthMeters, bearing: person.bearing })
   }, [showSun, venue, scrubbedAt, shadows])
+  /* Under ?probe=1, the minute the map's shadows were last handed over for (scripts/measure-timebar.mjs). */
+  const probing = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('probe') === '1'
+  useEffect(() => {
+    if (shadowFeatures === null || scrubbedAt === null || !probing) return
+    ;(window as unknown as { __shadowAt?: number }).__shadowAt = scrubbedAt.getTime()
+  }, [shadowFeatures, scrubbedAt, probing])
+  /*
+   * THE SHADOWS FOLLOW THE NEEDLE IN THE SAME FRAME (29 Oct: "the map shadows
+   * lag or jump"). While the ruler moves, each new minute's shadows are worked
+   * out here (about 2 ms for a thousand buildings: shadowMap is arithmetic on
+   * footprints) and drawn straight onto the map, without waiting for the plan
+   * to render the new time. The plan's render then hands the map the same
+   * shadows for the same minute.
+   */
+  useEffect(() => {
+    if (!showSun || venue === null || buildingList === null) return
+    const footprints = buildingList.map((b) => ({ id: b.id, ring: b.ring, heightMeters: b.height.metres }))
+    let frame = 0
+    let pending = 0
+    let drawnMinute = Number.NaN
+    const draw = () => {
+      frame = 0
+      const minute = Math.round(pending / 60_000)
+      if (minute === drawnMinute) return
+      drawnMinute = minute
+      const at = new Date(minute * 60_000)
+      const s = getSunPosition(at, venue.lat, venue.lon)
+      const person = lightNow(at, venue.lat, venue.lon).personShadow
+      const map = shadowMap(footprints, { azimuth: s.azimuth, altitude: s.altitude })
+      handle.current?.drawShadows(shadowCollection(map, person === null ? null : { at: venue, lengthMeters: person.lengthMeters, bearing: person.bearing }))
+      if (probing) (window as unknown as { __shadowAt?: number }).__shadowAt = at.getTime()
+    }
+    const off = onLiveTime((t) => {
+      pending = t
+      if (frame === 0) frame = requestAnimationFrame(draw)
+    })
+    return () => {
+      off()
+      if (frame !== 0) cancelAnimationFrame(frame)
+    }
+  }, [showSun, venue, buildingList, probing, handle])
 
   /* Whether anything is in the air, which is what the pilot control is for. */
   const airPositions = plan.filter((p) => p.position.platform === 'air').length
@@ -1118,7 +1163,6 @@ export function PlanMode({
    * Dismissing any card returns to the shoot, which is a member of the union
    * like the rest rather than a special case: "go back" is "show the shoot".
    */
-  const [card, setCard] = useState<SheetCard>(HOME)
   const camPins = useMemo(
     () =>
       card.kind !== 'cams'

@@ -12,9 +12,13 @@
  * what that drag should have moved:
  *
  *   the chart (the time bar's strip)   sideways moves the time, never the sheet;
- *                                       up or down moves nothing
+ *                                       up or down moves the sheet, never the time
+ *                                       (29 Oct: decided on the first 8 px, a
+ *                                       thumb's upward pivot still sideways)
  *   the grab handle and the date row    up or down moves the sheet, never the time
- *   the tool dock and the card's body   never the sheet
+ *   the card's body                     up or down moves the sheet (its empty
+ *                                       space drags it, 29 Oct)
+ *   the tool dock                       never the sheet
  *
  * A drag that moved the wrong thing, or failed to move the right one, is
  * counted wrong. The target is none.
@@ -71,14 +75,14 @@ export const DRAGS = [
   { at: '07:00', from: 'peek', on: 'strip', dx: -90, dy: 0, hook: true, want: { time: true, sheet: 'peek' } },
   { at: '12:30', from: 'peek', on: 'strip', dx: 110, dy: 6, want: { time: true, sheet: 'peek' } },
   { at: '17:45', from: 'peek', on: 'strip', dx: -70, dy: -10, hook: true, want: { time: true, sheet: 'peek' } },
-  { at: '07:00', from: 'peek', on: 'strip', dx: 0, dy: -160, want: { time: false, sheet: 'peek' } },
+  { at: '07:00', from: 'peek', on: 'strip', dx: 0, dy: -160, want: { time: false, sheet: 'half' } },
   { at: '17:45', from: 'peek', on: 'strip', dx: 4, dy: 60, want: { time: false, sheet: 'peek' } },
   { at: '12:30', from: 'peek', on: 'strip', dx: 80, dy: -45, want: { time: true, sheet: 'peek' } },
   { at: '07:00', from: 'half', on: 'strip', dx: 100, dy: 0, hook: true, want: { time: true, sheet: 'half' } },
-  { at: '12:30', from: 'half', on: 'strip', dx: 6, dy: -150, want: { time: false, sheet: 'half' } },
-  { at: '17:45', from: 'half', on: 'strip', dx: -5, dy: 150, want: { time: false, sheet: 'half' } },
+  { at: '12:30', from: 'half', on: 'strip', dx: 6, dy: -150, want: { time: false, sheet: 'full' } },
+  { at: '17:45', from: 'half', on: 'strip', dx: -5, dy: 150, want: { time: false, sheet: 'peek' } },
   { at: '17:45', from: 'full', on: 'strip', dx: -100, dy: 8, hook: true, want: { time: true, sheet: 'full' } },
-  { at: '07:00', from: 'full', on: 'strip', dx: 0, dy: 200, want: { time: false, sheet: 'full' } },
+  { at: '07:00', from: 'full', on: 'strip', dx: 0, dy: 200, want: { time: false, sheet: 'half' } },
   { at: '12:30', from: 'peek', on: 'grab', to: 'half', want: { time: false, sheet: 'half' } },
   { at: '17:45', from: 'half', on: 'grab', to: 'full', want: { time: false, sheet: 'full' } },
   { at: '07:00', from: 'full', on: 'grab', to: 'half', want: { time: false, sheet: 'half' } },
@@ -87,7 +91,7 @@ export const DRAGS = [
   { at: '07:00', from: 'half', on: 'day', to: 'peek', want: { time: false, sheet: 'peek' } },
   { at: '12:30', from: 'full', on: 'grab', to: 'peek', want: { time: false, sheet: 'peek' } },
   { at: '17:45', from: 'half', on: 'dock', dx: 0, dy: 120, want: { time: false, sheet: 'half' } },
-  { at: '12:30', from: 'half', on: 'card', dx: 0, dy: 140, want: { time: false, sheet: 'half' } },
+  { at: '12:30', from: 'half', on: 'card', dx: 0, dy: 140, want: { time: false, sheet: 'peek' } },
 ]
 
 const DETENT_SHARE = { peek: null, half: 0.45, full: 0.92 }

@@ -48,11 +48,35 @@ export function preflightHeights(scan: ScanContext | null, buildings: readonly B
     return { groundAt: ground, surfaceAt: sample(r.dsm), boxes, source: { kind: 'scan', year: scan.scan.year } }
   }
   const boxes = buildings.filter((b) => b.height.metres !== null).map((b) => ({ ring: b.ring, topM: b.height.metres as number }))
+  /*
+   * Each footprint's bounding box, once: a point outside it cannot be inside
+   * the footprint, and almost every point of a flight is outside almost every
+   * building. Testing every polygon for every point of the path was 4.3 s of
+   * a time step at the pier (29 Oct). The answer is the same.
+   */
+  const bounds = boxes.map((b) => {
+    let w = Infinity
+    let e = -Infinity
+    let s = Infinity
+    let n = -Infinity
+    for (const [x, y] of b.ring) {
+      if (x < w) w = x
+      if (x > e) e = x
+      if (y < s) s = y
+      if (y > n) n = y
+    }
+    return { w, e, s, n }
+  })
   return {
     groundAt: () => 0,
     surfaceAt: (at) => {
       let top = 0
-      for (const b of boxes) if (b.topM > top && inRing(b.ring, at)) top = b.topM
+      for (let i = 0; i < boxes.length; i += 1) {
+        const b = boxes[i]
+        const r = bounds[i]
+        if (b.topM <= top || at.lon < r.w || at.lon > r.e || at.lat < r.s || at.lat > r.n) continue
+        if (inRing(b.ring, at)) top = b.topM
+      }
       return top
     },
     boxes,

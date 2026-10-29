@@ -567,6 +567,8 @@ export interface MapHandle {
   zoomBy(delta: number): void
   /** Goes to an exact zoom, keeping the centre. Used by the sky layer nudge. */
   zoomTo(zoom: number): void
+  /** The shadows for the time under a moving needle, drawn now, ahead of the plan's own render. */
+  drawShadows(features: GeoJSON.FeatureCollection): void
 }
 
 export interface SunOverlay {
@@ -2464,6 +2466,10 @@ export function MapView({
 
       zoomTo(zoom) {
         moveCamera(() => map.current?.easeTo({ zoom, duration: 400 }))
+      },
+      drawShadows(features) {
+        const source = map.current?.getSource(SHADOW_SOURCE) as maplibregl.GeoJSONSource | undefined
+        source?.setData(features)
       },
       zoomBy(delta) {
         moveCamera(() => map.current?.easeTo({ zoom: (map.current.getZoom() ?? 16) + delta, duration: 250 }))
