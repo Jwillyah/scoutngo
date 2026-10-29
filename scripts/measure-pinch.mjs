@@ -18,7 +18,7 @@
 import { writeFileSync } from 'node:fs'
 import { connect } from './cdp.mjs'
 import { guardAudit, setSheet } from './preflight.mjs'
-import { MAP_AREA, PROBE, pinch, recordGesture } from './pinchGestures.mjs'
+import { HELD_DRIFT_PX, MAP_AREA, PROBE, pinch, recordGesture } from './pinchGestures.mjs'
 
 guardAudit('pinch')
 const label = process.argv[2] ?? ''
@@ -81,7 +81,7 @@ try {
   await wait(1200)
   await run('pinch with the sheet at half', (a) => pinch(send, a, [[60, 0, 0], [200, 0, 0]], { steps: 20 }))
 
-  /* Held still, the zoom within a hundredth of a level of the fingers and the place within 8 px of them. */
+  /* Held still, the zoom within a hundredth of a level of the fingers and the place within HELD_DRIFT_PX of them. */
   /*
    * THE OTHER GESTURES ON THE MAP (29 Oct): double tap zooms in, a two-finger
    * tap zooms out, one finger pans, a small twist does not rotate, and two
@@ -153,7 +153,7 @@ try {
     await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
   }, (a, b) => Math.abs(b.p - a.p) < 0.01)
 
-  const clean = checks.every((c) => c.pass) && rows.every((r) => !r.missing && r.jumps === 0 && r.appMoves === 0 && r.snaps === 0 && r.black === 0 && r.zoomSpan > 0.05 && (r.settledZoom ?? 1) < 0.01 && (r.settledDrift ?? 99) < 8)
+  const clean = checks.every((c) => c.pass) && rows.every((r) => !r.missing && r.jumps === 0 && r.appMoves === 0 && r.snaps === 0 && r.black === 0 && r.zoomSpan > 0.05 && (r.settledZoom ?? 1) < 0.01 && (r.settledDrift ?? 99) < HELD_DRIFT_PX)
   const commit = process.env.SCOUTNGO_COMMIT ?? 'working tree'
   const lines = [
     '# Pinch zoom on the plan map',

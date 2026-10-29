@@ -143,6 +143,11 @@ export function FlyControls({ onSticks, mode, onMode, hud, ceilingFt, flightMinu
   const hs = hud === null ? null : hud.speedMps
   const vs = s === undefined ? null : s.vz
   const minutesLeft = Math.max(0, flightMinutes - used)
+  /* The gimbal wheel is a rate: back to 0 when the finger lifts, or the touch is taken away. */
+  const springBack = (e: React.PointerEvent<HTMLInputElement>) => {
+    e.currentTarget.value = '0'
+    onSticks({ tilt: 0 })
+  }
   return (
     <div className={`fly${hud?.hidden === true ? ' fly--hidden' : ''}${portrait ? ' fly--portrait' : ''}`}>
       <div className="fly__top">
@@ -221,10 +226,7 @@ export function FlyControls({ onSticks, mode, onMode, hud, ceilingFt, flightMinu
           </span>
           <label className="fly__wheel">
             <span className="fly__label">Gimbal</span>
-            <input type="range" min={-60} max={60} step={1} defaultValue={0} onChange={(e) => onSticks({ tilt: Number(e.target.value) })} onPointerUp={(e) => {
-              ;(e.target as HTMLInputElement).value = '0'
-              onSticks({ tilt: 0 })
-            }} aria-label="Gimbal tilt, degrees a second" />
+            <input type="range" min={-60} max={60} step={1} defaultValue={0} onChange={(e) => onSticks({ tilt: Number(e.target.value) })} onPointerUp={springBack} onPointerCancel={springBack} aria-label="Gimbal tilt, degrees a second" />
           </label>
         </div>
         <Stick label="Right stick: forward, back and sideways" onMove={(x, y) => onSticks({ side: x, forward: y })} />

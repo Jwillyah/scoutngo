@@ -177,6 +177,11 @@ ok "$(grep -E 'TOTAL PROBLEMS' "$SCRATCH/reach.log" | tail -1 | tr -d '=' | sed 
 run_audit "label collision audit" scripts/audit-labels.mjs "$SCRATCH/labels.log" 'FAIL|LABEL PROBLEMS|over |ABORTED'
 ok "$(grep -E 'LABEL PROBLEMS' "$SCRATCH/labels.log" | tail -1)"
 
+# Every gesture in docs/gestures.md, with real touch input: pinches, flicks,
+# the ruler, the tide curve, targets of 44 px, nothing over the map but controls.
+run_audit "gesture audit" scripts/audit-gestures.mjs "$SCRATCH/gestures.log" 'PROBLEM|ABORTED'
+ok "$(grep -E 'GESTURE PROBLEMS' "$SCRATCH/gestures.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
+
 run_audit "one surface audit" scripts/audit-surface.mjs "$SCRATCH/surface.log" 'PROBLEM|FAIL|ABORTED'
 ok "$(grep -E 'SURFACE PROBLEMS' "$SCRATCH/surface.log" | tail -1)"
 

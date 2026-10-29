@@ -31,7 +31,7 @@ no database, no analytics, no telemetry.
 ```
 tsc -b → oxlint --deny-warnings → viewport units → colour roles → clock
        → measurements → tests → build → build stamp → reachability → labels
-       → surface → overflow → projection → offline → api urls → 3d network
+       → gestures → surface → overflow → projection → offline → api urls → 3d network
        → airspace → call sheet → clock screen → service worker
 ```
 

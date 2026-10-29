@@ -1,5 +1,6 @@
+import { useSidewaysScrub } from '../lib/useSidewaysScrub.ts'
 import { lightGoneLine } from '../core/lightGone.ts'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { TILE_TIMEOUT_MS } from '../lib/offlineCache.ts'
 import {
   altitudeRange,
@@ -143,7 +144,6 @@ export function SunCurve({
     })
   }, [dayPath, axisStart, span])
 
-  const scrubbing = useRef(false)
 
   /*
    * A TAP OR A THUMB DRAG MAPS THE PIXEL TO THE SHOOT WINDOW, not to the
@@ -166,6 +166,8 @@ export function SunCurve({
     },
     [start, end, axisStart, axisEnd, onChange],
   )
+  /* The grip scrubs sideways; up or down is the sheet's (src/lib/useSidewaysScrub.ts). */
+  const gripScrub = useSidewaysScrub((event) => seekTo(event.clientX, event.target.parentElement), false)
 
   const range = useMemo(
     () => altitudeRange(shown, 3, terrain.kind === 'terrain' ? terrain.angles : []),
@@ -355,20 +357,7 @@ export function SunCurve({
         aria-valuemax={100}
         aria-valuenow={Math.round(value * 100)}
         aria-valuetext={`${clock(at)} ${timeZoneAbbr}, sun ${current.sunAltitude.toFixed(1)} degrees up`}
-        onPointerDown={(event) => {
-          event.currentTarget.setPointerCapture(event.pointerId)
-          scrubbing.current = true
-        }}
-        onPointerMove={(event) => {
-          if (!scrubbing.current) return
-          seekTo(event.clientX, event.currentTarget.parentElement)
-        }}
-        onPointerUp={() => {
-          scrubbing.current = false
-        }}
-        onPointerCancel={() => {
-          scrubbing.current = false
-        }}
+        {...gripScrub}
         onKeyDown={(event) => {
           const step = event.key === 'ArrowLeft' ? -0.02 : event.key === 'ArrowRight' ? 0.02 : 0
           if (step === 0) return

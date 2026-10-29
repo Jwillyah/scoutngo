@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useSidewaysScrub } from '../lib/useSidewaysScrub.ts'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { LatLon } from '../core/geo.ts'
 import { glassMornings, type Morning } from '../core/glassMornings.ts'
 import { localDate } from '../core/moonTimes.ts'
@@ -50,7 +51,13 @@ interface TideSheetProps {
  * 8 px past the screen at 104; at 92 it has room for a line more.
  */
 const CURVE_H = 92
-const STRIP_DAYS = 30
+/*
+ * TWENTY DAYS, TWO ROWS OF TEN, each day a 44 px target (29 Oct,
+ * docs/gestures.md): thirty at 24 px were too small to tap, and thirty at
+ * 44 did not fit the card. Past twenty days the wind is not forecast anyway,
+ * so a day out there could only ever say "tide only".
+ */
+const STRIP_DAYS = 20
 
 export function TideSheet({ tide, at, timeZone, venue, units, data, onAt, onJumpDay, onClose, waterline }: TideSheetProps) {
   const box = useRef<HTMLDivElement>(null)
@@ -114,12 +121,12 @@ export function TideSheet({ tide, at, timeZone, venue, units, data, onAt, onJump
     return glassMornings(days, lows, windAt, facing, surfFtAt)
   }, [data.month.value, data.surf, marine, wind, facing, timeZone, venue.lat, venue.lon])
 
-  const drag = useRef(false)
-  const pick = (event: ReactPointerEvent<SVGSVGElement>) => {
+  /* Sideways scrubs and a tap sets the time; up or down is the sheet's (src/lib/useSidewaysScrub.ts). */
+  const curveScrub = useSidewaysScrub((event) => {
     if (model === null) return
-    const r = event.currentTarget.getBoundingClientRect()
+    const r = event.target.getBoundingClientRect()
     onAt(new Date(model.tOf(Math.max(0, Math.min(width, event.clientX - r.left)))))
-  }
+  }, true)
 
   return (
     <section className="tides" aria-label="Tide">
@@ -158,17 +165,7 @@ export function TideSheet({ tide, at, timeZone, venue, units, data, onAt, onJump
             aria-label="The tide through the day. Drag to move the time."
             aria-valuenow={at.getTime()}
             aria-valuetext={formatClock(at, timeZone)}
-            onPointerDown={(e) => {
-              drag.current = true
-              e.currentTarget.setPointerCapture(e.pointerId)
-              pick(e)
-            }}
-            onPointerMove={(e) => {
-              if (drag.current) pick(e)
-            }}
-            onPointerUp={() => {
-              drag.current = false
-            }}
+            {...curveScrub}
           >
             {model.bands.map((b) => (
               <rect key={`${b.band}-${b.x0}`} className={`curve__band curve__band--${b.band}`} x={b.x0} y={0} width={Math.max(0, b.x1 - b.x0)} height={CURVE_H} />

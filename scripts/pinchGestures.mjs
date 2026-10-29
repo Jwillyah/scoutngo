@@ -115,6 +115,18 @@ export const MAP_AREA = `JSON.stringify((() => {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
+/*
+ * HOW FAR THE PLACE UNDER THE FINGERS MAY SIT FROM THEM, HELD STILL. The bug
+ * this guards is a pinch round the screen centre: 58 to 64 px off at the pier
+ * (measurements/2026-10-28-pinch-before-around-centre.md). Following the
+ * fingers it is 0 to 0.4 px, except that one fast in-out-in in three near
+ * zoom 19.7 ended 9 to 12 px off with the zoom exact: MapLibre's midpoint
+ * over very quick moves. A fingertip is about 40 px across. 16 px is far
+ * below the bug and above that noise, so the gate fails on the one and not
+ * the other.
+ */
+export const HELD_DRIFT_PX = 16
+
 /**
  * One two-finger gesture. `path` is a list of [gap px, centre dx, centre dy]
  * keyframes; the fingers sit on a horizontal line through the centre.
@@ -163,8 +175,17 @@ export function summarise(frames, calls) {
     if (under > 3) offs.push(Math.abs(f.z - f.want))
   }
   offs.sort((a, b) => a - b)
-  /* The last frame with two fingers down: they have been still for the hold. */
-  const held = [...frames].reverse().find((f) => f.touches === 2 && f.want !== null)
+  /*
+   * HELD STILL: the frames of the closing hold, two fingers down and none
+   * moved for three frames, and the median of them. One frame alone was
+   * 9.2 px off once in three runs and 0.0 in the other two: a frame drawn
+   * between MapLibre taking the last move and applying it. An offset that is
+   * really there is there in every frame of the hold.
+   */
+  const still = frames.filter((f, i) => f.touches === 2 && f.want !== null && i >= 3 && !f.moved && !frames[i - 1].moved && !frames[i - 2].moved)
+  const tail = still.slice(-5)
+  const med = (xs) => (xs.length === 0 ? null : [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)])
+  const held = tail.length === 0 ? undefined : { z: 0, want: 0, zoomOff: med(tail.map((f) => Math.abs(f.z - f.want))), drift: med(tail.map((f) => f.drift).filter((d) => d !== null)) }
   /* Snap back: after release, the zoom moving against the pinch's own direction. */
   let snaps = 0
   const lift = frames.findIndex((f, i) => i > 0 && frames[i - 1].touches > 0 && f.touches === 0)
@@ -186,7 +207,7 @@ export function summarise(frames, calls) {
     worst: dts.length === 0 ? null : dts[dts.length - 1],
     over33: dts.filter((d) => d > 33.4).length,
     jumps,
-    settledZoom: held === undefined ? null : Math.abs(held.z - held.want),
+    settledZoom: held === undefined ? null : held.zoomOff,
     settledDrift: held === undefined || held.drift === null ? null : held.drift,
     followP95: offs.length === 0 ? null : offs[Math.min(offs.length - 1, Math.floor(0.95 * offs.length))],
     followWorst: offs.length === 0 ? null : offs[offs.length - 1],

@@ -12635,3 +12635,38 @@
 .maplibregl-ctrl-bottom-left .maplibregl-ctrl :is(button, a) {
   pointer-events: auto;
 }
+
+/*
+ * 44 PX OF TOUCH, HOWEVER SMALL IT IS DRAWN (29 Oct, docs/gestures.md). The
+ * hit area is an invisible box round the control, centred on it and never
+ * smaller than 44 x 44; the drawing stays the size the design wants.
+ * scripts/audit-gestures.mjs probes 21 px each way from every control's
+ * centre and fails the gate on a miss.
+ */
+:is(.credits__i, .chip2, .btn--small, .btn--quiet, .shootc__add, .shootc__gen, .card2__x, .clay__i, .tiles__i, .fly__i, .fly__pill, .fly__seg, .skykey__info, .tides__why, .tides__day, .credits__close, .skyc__tab, .skykey__pick-btn, .cardacts__btn, .hz__shape-btn, .seg__btn, .clay__link, .clay__pillbtn) {
+  position: relative;
+}
+
+:is(.credits__i, .chip2, .btn--small, .btn--quiet, .shootc__add, .shootc__gen, .card2__x, .clay__i, .tiles__i, .fly__i, .fly__pill, .fly__seg, .skykey__info, .tides__why, .tides__day, .credits__close, .skyc__tab, .skykey__pick-btn, .cardacts__btn, .hz__shape-btn, .seg__btn, .clay__link, .clay__pillbtn, .card__close)::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: max(100%, 44px);
+  height: max(100%, 44px);
+  transform: translate(-50%, -50%);
+}
+
+/* The kit chips clip their own long names, so their box is the touch: 44 tall. */
+.kitchip {
+  min-height: 44px;
+}
+
+/* Rows and day cells that are targets: 44 px tall (docs/gestures.md). */
+.more2__row {
+  min-height: 44px;
+}
+
+.tides__day {
+  min-height: 44px;
+}

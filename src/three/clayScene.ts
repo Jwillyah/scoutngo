@@ -647,6 +647,8 @@ export function createClayScene(
   const controller = scene.screenSpaceCameraController
   const defaults = { look: controller.lookEventTypes }
   const orbit = () => {
+    /* Compare a photo and flying both turn the finger off; the plain view turns it back on. */
+    controller.enableInputs = true
     controller.enableTranslate = true
     controller.enableZoom = true
     controller.enableTilt = true
@@ -671,6 +673,7 @@ export function createClayScene(
     const horizontal = CMath.toRadians(view.viewHorizontal)
     frustum.fov =
       canvas.clientWidth >= canvas.clientHeight ? horizontal : 2 * Math.atan(Math.tan(horizontal / 2) * (canvas.clientHeight / canvas.clientWidth))
+    controller.enableInputs = true
     /* Stand still and look around: drag turns the head, nothing moves the feet. */
     controller.enableTranslate = false
     controller.enableZoom = false
@@ -725,6 +728,8 @@ export function createClayScene(
   /* FLYING IT YOURSELF: the camera is the drone; a faint glass plane at the ceiling when near it. */
   let ceilingPlane: Entity | null = null
   const droneView = (at: LatLon, altAbsM: number, yaw: number, gimbal: number, focal: number) => {
+    /* Flying: the sticks fly it, the picture is the drone's camera, and a finger on it does nothing (docs/gestures.md). */
+    controller.enableInputs = false
     const canvas = widget.canvas
     const frustum = widget.camera.frustum as { fov?: number }
     const horizontal = CMath.toRadians(horizontalFov(focal))
