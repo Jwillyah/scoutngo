@@ -287,6 +287,23 @@ try {
     if (await ev(`!!document.querySelector('.tapnote__close')`)) fail('the note\'s × did not close it')
   }
 
+  /* SKY › CALENDAR: a page of its own, the whole month on one screen with nothing below it (29 Oct). */
+  await ev(`document.querySelector('button[aria-label="Calendar of the sky"]')?.click()`)
+  await wait(2500)
+  await check('Sky › Calendar', '.cal .cal__grid')
+  {
+    const fit = JSON.parse(await ev(`JSON.stringify((() => { const c = document.querySelector('.cal'); if (!c) return null; const last = [...c.children].reduce((m, e) => Math.max(m, e.getBoundingClientRect().bottom), 0); return { scroll: c.scrollHeight, room: c.clientHeight, last: Math.round(last), vh: innerHeight, days: c.querySelectorAll('.cal__day').length, chipsTop: [...c.querySelectorAll('.cal__chip')].map((x) => Math.round(x.getBoundingClientRect().top)) } })())`))
+    if (fit === null) fail('Sky › Calendar did not open from the dock')
+    else {
+      console.log(`  the calendar: ${fit.days} days, content to ${fit.last} of ${fit.vh} px`)
+      if (fit.days < 28) fail(`the calendar drew ${fit.days} days`)
+      if (fit.scroll > fit.room + 1 || fit.last > fit.vh + 1) fail(`the calendar runs ${fit.last - fit.vh} px below the screen`)
+      if (new Set(fit.chipsTop).size !== 1) fail('the calendar filters are not on one line')
+    }
+    await ev(`document.querySelector('.cal__close')?.click()`)
+    await wait(600)
+  }
+
   await ev(`document.querySelector('button[aria-label="Menu"]')?.click()`)
   await check('the menu', 'nav[aria-label="Stage"]')
   await ev(`document.querySelector('button[aria-label="Menu"]')?.click(); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`)

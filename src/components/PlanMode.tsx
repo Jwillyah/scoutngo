@@ -1,3 +1,4 @@
+import { CalendarPage } from './CalendarPage.tsx'
 import { ScanOffer } from './ScanOffer.tsx'
 import { nextSunrise } from '../core/sunrise.ts'
 import { nextTideTurn } from '../lib/lowTide.ts'
@@ -774,6 +775,8 @@ export function PlanMode({
    * because the threshold depends on how wide the screen actually is.
    */
   const [mapZoom, setMapZoom] = useState(16.5)
+  /* Sky › Calendar, a page of its own (CalendarPage.tsx). ?calendar=1 opens it, for the overflow audit. */
+  const [calendarOpen, setCalendarOpen] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('calendar') === '1')
   /* Compare a photo (src/components/ComparePhoto.tsx). ?compare=1 opens it, for scripts/measure-compare.mjs. */
   const [compareOpen, setCompareOpen] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('compare') === '1')
 
@@ -1186,7 +1189,7 @@ export function PlanMode({
   const home = useCallback(() => setCard(HOME), [])
   /* The Tide sheet's month, wind, sea and beach facing: asked only while it is open. */
   const [surfSetting] = useSurfSetting()
-  const tideSheet = useTideSheet(card.kind === 'tide', venue, tide.status === 'ok' ? tide.station.id : null, surfSetting)
+  const tideSheet = useTideSheet(card.kind === 'tide' || calendarOpen, venue, tide.status === 'ok' ? tide.station.id : null, surfSetting)
   const skyDay = scrubbedAt === null || venueWindow === null ? null : zonedTimeToUtc(localDate(scrubbedAt, venueWindow.timeZone), '00:00', venueWindow.timeZone)
   const skyline = useMemo<SkylineState>(() => {
     if (card.kind !== 'skyline') return 'loading'
@@ -1974,7 +1977,7 @@ export function PlanMode({
                 timeZoneAbbr={venueWindow.timeZoneShort}
                 at={scrubbedAt}
                 tab={skyTab}
-                onTab={setSkyTab}
+                onTab={(t: SkyTab) => (t === 'calendar' ? setCalendarOpen(true) : setSkyTab(t))}
                 onJump={scrubTo}
                 target={aimAt}
                 picking={placingAim}
@@ -2228,6 +2231,20 @@ export function PlanMode({
         bottomInset={sheetHeight}
       />
 
+      {calendarOpen && venue !== null && venueWindow !== null ? (
+        <CalendarPage
+          venue={venue}
+          timeZone={venueWindow.timeZone}
+          stationId={tide.status === 'ok' ? tide.station.id : null}
+          tideData={tideSheet}
+          windUnit={units.wind}
+          onPlan={(date, at) => {
+            setCalendarOpen(false)
+            onJumpDay(date, at)
+          }}
+          onClose={() => setCalendarOpen(false)}
+        />
+      ) : null}
       {compareOpen ? <ComparePhoto fallbackAt={venue} distanceUnit={units.distance} onClose={() => setCompareOpen(false)} /> : null}
 
       {threeD && venue !== null && venueWindow !== null && scrubbedAt !== null ? (
@@ -2461,10 +2478,7 @@ export function PlanMode({
         <ToolDock
           moon={moonOn}
           onMoon={() => setMoonOn(!moonOn)}
-          onCalendar={() => {
-            setSkyTab('calendar')
-            openCard('sky')
-          }}
+          onCalendar={() => setCalendarOpen(true)}
           lens={coneMode === 'all'}
           onLens={() => onConeMode(coneMode === 'all' ? 'none' : 'all')}
           layersOpen={card.kind === 'layers'}

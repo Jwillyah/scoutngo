@@ -542,11 +542,17 @@ export async function pressSuggest(ev, wait) {
     return 'pressed'
   })()`)
   if (pressed !== 'pressed') throw new PreflightError(pressed)
-  /* Suggest is arithmetic plus two Overpass reads; wait for it to say it is done. */
-  for (let i = 0; i < 40; i += 1) {
+  /*
+   * Suggest is arithmetic plus two Overpass reads; wait for it to say it is
+   * done. 75 s, not 40: on 29 Oct with Overpass down (its main server
+   * answering 406, both mirrors timing out) Suggest still finished, without
+   * the site's map data, in about 45 s, and the audits that press it could
+   * not look at all. The wait is how long to look, not what is acceptable.
+   */
+  for (let i = 0; i < 75; i += 1) {
     await wait(1000)
     const state = await ev(`document.querySelector('.suggested') ? 'done' : document.querySelector('.stages') ? 'working' : 'idle'`)
     if (state === 'done') return
   }
-  throw new PreflightError('pressed Suggest and it never reported a result in 40 s')
+  throw new PreflightError('pressed Suggest and it never reported a result in 75 s')
 }

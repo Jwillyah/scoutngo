@@ -98,6 +98,12 @@ export const COLOR_ROLES: readonly RoleAssignment[] = [
     means: 'A hazard. Nothing else in the app is ever red.',
   },
   {
+    token: 'moon',
+    role: 'data',
+    value: '#c4b5fd',
+    means: 'The moon and the night. Its lines on the map and the time bar, its phase, the calendar night marks.',
+  },
+  {
     token: 'light-front',
     role: 'data',
     value: '#5fb98a',

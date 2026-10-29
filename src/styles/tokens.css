@@ -149,6 +149,7 @@
   --sun: #ffd54a; /* current sun bearing */
   --tide: #6cc4ff; /* the water: the tide curve and the glass mornings (Tide sheet) */
   --sun-shadow: #9aa7ff; /* current shadow bearing */
+  --moon: #c4b5fd; /* the moon and the night: its lines, its phase, the calendar's night marks. Not the shadow's periwinkle */
   --sun-rise: #ffa04a; /* sunrise bearing */
   --sun-set: #ff5fa8; /* sunset bearing. NOT the magenta hazard token. */
   /*

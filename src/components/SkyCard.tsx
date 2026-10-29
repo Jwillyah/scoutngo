@@ -210,7 +210,7 @@ export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump,
     const when = tonightMoment(at, venue.lat, venue.lon)
     return { when, things: nightSky(when, venue.lat, venue.lon) }
   }, [at, venue])
-  const nights = useMemo<MilkyWayNight[]>(() => (tab === 'calendar' ? rankNights(venue.lat, venue.lon, at, 30, timeZone) : []), [tab, venue, at, timeZone])
+  const nights = useMemo<MilkyWayNight[]>(() => (tab === 'tonight' ? rankNights(venue.lat, venue.lon, at, 30, timeZone) : []), [tab, venue, at, timeZone])
   const seasons = useMemo<SeasonLine[]>(() => (tab === 'seasons' ? seasonLines(at.getUTCFullYear(), venue.lat, venue.lon, at) : []), [tab, venue, at])
 
   const where = (t: SkyThing) =>
@@ -220,6 +220,8 @@ export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump,
   if (tab === 'exposure') {
     body = exposure ?? null
   } else if (tab === 'tonight') {
+    const best = Math.max(1, ...nights.map((n) => n.score))
+    const byDate = [...nights].sort((a, b) => a.date.localeCompare(b.date))
     body = (
       <>
         {onOpenNow === undefined ? null : (
@@ -241,6 +243,37 @@ export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump,
             </li>
           ))}
         </ul>
+        <p className="skyc__head">Milky Way, the next 30 nights</p>
+        <ol className="skyc__bars" aria-label="Nights by date, the bar is the score">
+          {byDate.map((n) => (
+            <li key={n.date}>
+              <button
+                type="button"
+                className="skyc__bar"
+                disabled={n.window === null}
+                onClick={() => (n.window === null ? undefined : onJump(n.window.from))}
+                aria-label={`${n.date}: score ${n.score}. ${n.reason}`}
+              >
+                <span className="skyc__bardate num">{n.date.slice(5)}</span>
+                <span className="skyc__barfill" style={{ width: `${(n.score / best) * 100}%` }} />
+                <span className="skyc__barscore num">{n.score}</span>
+              </button>
+            </li>
+          ))}
+        </ol>
+        <p className="skyc__note">
+          Dark means the sun 18° or more down, the core at least 5° up, and the moon down or under half lit. Tap a night to put the time bar on its first good minute.
+        </p>
+        {nights[0] === undefined ? null : (
+          <p className="skyc__note">
+            Best: <span className="num">{nights[0].date}</span>. {nights[0].reason}
+          </p>
+        )}
+        {/* The showers and moons for 90 days, folded: the 30 bars are this page's picture. */}
+        <details className="skyc__more">
+          <summary className="skyc__head">Showers and moons, next 90 days</summary>
+          {events}
+        </details>
       </>
     )
   } else if (tab === 'sun') {
@@ -283,44 +316,6 @@ export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump,
           </button>
         )}
         <Finder body="moon" {...finderProps} />
-      </>
-    )
-  } else if (tab === 'calendar') {
-    const best = Math.max(1, ...nights.map((n) => n.score))
-    const byDate = [...nights].sort((a, b) => a.date.localeCompare(b.date))
-    body = (
-      <>
-        <p className="skyc__head">Milky Way, the next 30 nights</p>
-        <ol className="skyc__bars" aria-label="Nights by date, the bar is the score">
-          {byDate.map((n) => (
-            <li key={n.date}>
-              <button
-                type="button"
-                className="skyc__bar"
-                disabled={n.window === null}
-                onClick={() => (n.window === null ? undefined : onJump(n.window.from))}
-                aria-label={`${n.date}: score ${n.score}. ${n.reason}`}
-              >
-                <span className="skyc__bardate num">{n.date.slice(5)}</span>
-                <span className="skyc__barfill" style={{ width: `${(n.score / best) * 100}%` }} />
-                <span className="skyc__barscore num">{n.score}</span>
-              </button>
-            </li>
-          ))}
-        </ol>
-        <p className="skyc__note">
-          Dark means the sun 18° or more down, the core at least 5° up, and the moon down or under half lit. Tap a night to put the time bar on its first good minute.
-        </p>
-        {nights[0] === undefined ? null : (
-          <p className="skyc__note">
-            Best: <span className="num">{nights[0].date}</span>. {nights[0].reason}
-          </p>
-        )}
-        {/* The showers and moons for 90 days, folded: the 30 bars are this page's picture. */}
-        <details className="skyc__more">
-          <summary className="skyc__head">Showers and moons, next 90 days</summary>
-          {events}
-        </details>
       </>
     )
   } else {
