@@ -13585,3 +13585,146 @@
 .page__tabs .seg__btn {
   min-height: 44px;
 }
+
+/* ---------------------------------------------------------- sky fire (SkyFire.tsx) */
+
+.fire {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.fire__kinds {
+  justify-self: start;
+}
+
+.fire__verdict {
+  margin: 0;
+  font-size: var(--text-lg, 1.25rem);
+  font-weight: var(--weight-heavy);
+  color: var(--color-text);
+}
+
+.fire__verdict--likely,
+.fire__verdict--possible {
+  color: var(--sun);
+}
+
+.fire__verdict--unlikely {
+  color: var(--color-text-muted);
+}
+
+.fire__note {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
+.fire__head {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heavy);
+  color: var(--color-text);
+}
+
+.fire__checks {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.fire__checks th,
+.fire__checks td {
+  padding: 4px 6px 4px 0;
+  text-align: left;
+  vertical-align: top;
+}
+
+.fire__checks th {
+  white-space: nowrap;
+  font-weight: var(--weight-heavy);
+}
+
+.fire__mark--yes {
+  color: var(--color-text);
+}
+
+.fire__mark--no {
+  color: var(--color-text-muted);
+}
+
+.fire__agree {
+  white-space: nowrap;
+  color: var(--color-text-muted);
+}
+
+.fire__side {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+}
+
+.fire__ground {
+  stroke: var(--color-text-muted);
+  stroke-width: 1;
+}
+
+.fire__deck {
+  fill: var(--grey-1);
+}
+
+.fire__ray {
+  fill: none;
+  stroke: var(--sun);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+
+.fire__sun {
+  fill: var(--sun);
+}
+
+.fire__you {
+  fill: var(--white);
+}
+
+.fire__axis {
+  fill: var(--color-text-muted);
+  font-size: 8px;
+}
+
+.fire__differs {
+  color: var(--color-text);
+}
+
+.fire__models,
+.fire__entries {
+  margin: 0;
+  padding-left: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.fire__thumb {
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+  border-radius: 4px;
+  vertical-align: middle;
+  margin-right: var(--space-1);
+}
+
+.fire__photo {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+}
+
+.chip2__note {
+  font-size: 8px;
+  line-height: 1.1;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

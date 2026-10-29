@@ -137,6 +137,8 @@ import { classificationOf } from '../core/lighting.ts'
 import { LightNowBlock } from './LightNowBlock.tsx'
 import { getMoonArc } from '../core/moonArc.ts'
 import type { SkyTab } from '../lib/skyTab.ts'
+import { cloudTriple, layersLine, modelsSplit } from '../core/skyFire.ts'
+import { fetchModelLows, nearestHour } from '../lib/skyFireData.ts'
 import { PhaseRule } from './PhaseRule.tsx'
 import { shadowKeyLine, shadowKeyNotes } from '../lib/shadowKey.ts'
 
@@ -896,6 +898,19 @@ export function PlanMode({
   const [camKindShown, setCamKindShown] = useState<'coast' | 'road'>('coast')
 
   /* Which page of the Sky card is open. The dock's calendar opens it at the calendar. */
+  /* The five models' low cloud overhead for the bar's day, for the chip's "models split". */
+  const [modelLows, setModelLows] = useState<{ hours: string[]; lows: (number | null)[][] } | null>(null)
+  const modelDay = scrubbedAt === null ? null : scrubbedAt.toISOString().slice(0, 10)
+  useEffect(() => {
+    if (venue === null || modelDay === null) return
+    let live = true
+    void fetchModelLows(venue, modelDay).then((r) => {
+      if (live) setModelLows(r)
+    })
+    return () => {
+      live = false
+    }
+  }, [venue, modelDay])
   const [skyTab, setSkyTab] = useState<SkyTab>('tonight')
   /*
    * TWO-PIN MEASURE. Null is off; on, each tap drops a pin and a third tap
@@ -1335,6 +1350,10 @@ export function PlanMode({
       ratedWindMps !== null && groundWind !== null && groundWind > ratedWindMps
     /* LOW cloud: the layer that takes the sun away. The card shows all three. */
     const cloudPct = venueCloud?.low ?? null
+    /* All three on the chip now (29 Oct): low, mid, high, and whether the models are far apart on low. */
+    const layers = venueCloud === null ? null : { low: venueCloud.low, mid: venueCloud.mid, high: venueCloud.high }
+    const splitHour = scrubbedAt === null || modelLows === null ? -1 : modelLows.hours.indexOf(nearestHour(scrubbedAt))
+    const split = splitHour >= 0 && modelsSplit(modelLows?.lows[splitHour] ?? [])
     /* A saved forecast carries its age onto the chip; a live one carries nothing. */
     const age = forecast.kind === 'saved' ? forecastAge(forecast.fetchedAt, new Date()) : null
 
@@ -1354,8 +1373,10 @@ export function PlanMode({
       },
       {
         kind: 'cloud',
-        label: 'CLOUD',
-        value: cloudPct === null ? null : `${Math.round(cloudPct)}%`,
+        label: 'CLOUD L·M·H',
+        value: cloudPct === null || layers === null ? null : cloudTriple(layers),
+        spoken: layers === null ? undefined : `Cloud: ${layersLine(layers)}${split ? ', models split' : ''}`,
+        note: split ? 'models split' : undefined,
         age: cloudPct === null ? null : age,
       },
       {
@@ -1367,7 +1388,7 @@ export function PlanMode({
         ...(venueWindow === null || venueWindow.timeZoneShort === '' ? {} : { unit: venueWindow.timeZoneShort }),
       },
     ]
-  }, [venue, venueWindow, scrubbedAt, wind, ratedWindMps, nextTurn, venueCloud, forecast, units, clock])
+  }, [venue, venueWindow, scrubbedAt, wind, ratedWindMps, nextTurn, venueCloud, forecast, units, clock, modelLows])
 
   /*
    * WHICH GOES BAND THE SKY LAYER PAINTS, from the sun's altitude: visible
@@ -1991,6 +2012,7 @@ export function PlanMode({
                 onPickTarget={() => onPlacingAim(!placingAim)}
                 onPlanMoonrise={() => openCard('moonrise')}
                 onOpenNow={onOpenNow}
+                placeName={venueNameLine}
                 events={
                   <SkyPanel
                     venue={venue}

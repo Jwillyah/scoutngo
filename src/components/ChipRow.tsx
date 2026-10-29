@@ -73,6 +73,10 @@ export interface Chip {
    * rendered as current, which this app does not do.
    */
   age?: ForecastAge | null
+  /** The whole reading in words, for a value shortened to fit ("87·20·0" is "Low 87 · Mid 20 · High 0"). */
+  spoken?: string
+  /** A short second word under the value, small: "models split". */
+  note?: string
 }
 
 interface ChipRowProps {
@@ -128,6 +132,8 @@ export function ChipRow({ chips, active, onOpen, measureRef }: ChipRowProps) {
             .filter((c) => c !== '')
             .join(' ')}
           aria-pressed={active === chip.kind}
+          aria-label={chip.spoken}
+          title={chip.spoken}
           onClick={() => onOpen(chip.kind)}
         >
           <span className="chip2__label">
@@ -146,6 +152,7 @@ export function ChipRow({ chips, active, onOpen, measureRef }: ChipRowProps) {
               <span className="chip2__unit"> {chip.unit}</span>
             )}
           </span>
+          {chip.note === undefined ? null : <span className="chip2__note">{chip.note}</span>}
         </button>
       ))}
     </div>

@@ -10,6 +10,7 @@ import { SEASON_NAME, seasonLines, type SeasonLine } from '../core/seasons.ts'
 import { getSunArc, getSunPosition } from '../core/sun.ts'
 import { formatClock } from '../core/timezone.ts'
 import { SKY_TABS, type SkyTab } from '../lib/skyTab.ts'
+import { SkyFire } from './SkyFire.tsx'
 
 /*
  * THE SKY, FIVE WAYS, PICTURE FIRST.
@@ -44,6 +45,8 @@ interface SkyCardProps {
   onPlanMoonrise?: () => void
   /** The Now screen: what the sky is doing where you are standing. It used to be its own menu item. */
   onOpenNow?: () => void
+  /** The venue's name, for the sky fire log. */
+  placeName?: string
 }
 
 const DEG = Math.PI / 180
@@ -200,7 +203,7 @@ function Finder({
   )
 }
 
-export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump, target, picking, onPickTarget, events, onPlanMoonrise, onOpenNow }: SkyCardProps) {
+export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump, target, picking, onPickTarget, events, onPlanMoonrise, onOpenNow, placeName }: SkyCardProps) {
   const clock = (d: Date) => `${formatClock(d, timeZone)}`
   const finderProps = { venue, target, picking, onPickTarget, onJump, clock, timeZone }
 
@@ -294,6 +297,8 @@ export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump,
         <Finder body="sun" {...finderProps} />
       </>
     )
+  } else if (tab === 'fire') {
+    body = <SkyFire venue={venue} timeZone={timeZone} placeName={placeName ?? 'This place'} at={at} />
   } else if (tab === 'moon') {
     const ill = getMoonIllumination(at)
     const times = moonTimesOnLocalDay(at, venue.lat, venue.lon, timeZone)
