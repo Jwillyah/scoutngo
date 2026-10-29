@@ -111,6 +111,15 @@ done
 curl -s -o /dev/null -m 20 http://127.0.0.1:5173/ || true
 ok "app warm"
 
+# A FRESH BROWSER FOR EVERY GATE. A headless Chrome left running for hours
+# (3D scenes, a hundred tabs) hung the gesture audit mid-flick on 29 Oct and
+# dropped its connection on another run; a new one passed the same code
+# clean. Only a HEADLESS Chrome on :9222 is stopped: that is the audits'
+# browser, never a person's.
+if pkill -f 'remote-debugging-port=9222.*--headless' 2>/dev/null; then
+  step "stopped the headless Chrome already on :9222, for a fresh one"
+  for _ in $(seq 1 20); do up http://127.0.0.1:9222/json/version || break; sleep 0.5; done
+fi
 if ! up http://127.0.0.1:9222/json/version; then
   step "starting headless Chrome on :9222"
   CHROME="$HOME/Library/Caches/ms-playwright/chromium-1243/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"

@@ -17,7 +17,6 @@ const EVERY_KIND: CardKind[] = [
   'golden',
   'wind',
   'cloud',
-  'tide',
   'layers',
   'hazards',
   'airspace',
@@ -63,8 +62,9 @@ describe('the sheet card union', () => {
    * this is the same count asserted where it is cheap, so adding a fifth
    * entry here fails in milliseconds rather than in a browser run.
    */
-  it('maps exactly the four chips', () => {
-    expect(Object.keys(CHIP_FOR).sort()).toEqual(['cloud', 'golden', 'tide', 'wind'])
+  /* The tide chip opens the Tides page, not a card (29 Oct): three chips open cards. */
+  it('maps exactly the three chips that open cards', () => {
+    expect(Object.keys(CHIP_FOR).sort()).toEqual(['cloud', 'golden', 'wind'])
   })
 
   /*

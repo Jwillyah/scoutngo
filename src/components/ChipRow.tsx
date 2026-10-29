@@ -29,7 +29,8 @@ export const NO_DATA = 'no data'
 
 export interface Chip {
   /** Which card this opens. Also what marks it active. */
-  kind: CardKind
+  /* A card to open, or 'tide', which opens the Tides page (29 Oct): a page, not a card in the sheet. */
+  kind: CardKind | 'tide'
   /** 8px, uppercase. What the number is OF. */
   label: string
   /*
@@ -77,8 +78,8 @@ export interface Chip {
 interface ChipRowProps {
   chips: readonly Chip[]
   /** The card currently open, so its chip shows as active. */
-  active: CardKind | null
-  onOpen: (kind: CardKind) => void
+  active: CardKind | 'tide' | null
+  onOpen: (kind: CardKind | 'tide') => void
   /*
    * REPORTS THE ROW'S OWN BOTTOM EDGE, so the sheet knows how much chrome is
    * above it and does not grow up behind the chips at FULL. See reservedTop

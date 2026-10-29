@@ -43,6 +43,15 @@ interface TideSheetProps {
   onClose: () => void
   /** The waterline on the 2D map (Phase 4): only with a kept 3D scan. */
   waterline?: { shown: boolean; scanKept: boolean; line: string; onShow: (on: boolean) => void }
+  /*
+   * SIMPLE FIRST (29 Oct: "a wall of text"). Simple: one big sentence, the
+   * curve, one glass line, the glass mornings, the two explainers. Advanced:
+   * the rest: the height and the rate, the station and its datum, the wind,
+   * the waves and the water, the waterline. On the Tides page (TidesPage.tsx)
+   * the page's own tabs choose; the head is the page's.
+   */
+  view?: 'simple' | 'advanced'
+  bare?: boolean
 }
 
 /*
@@ -59,7 +68,8 @@ const CURVE_H = 92
  */
 const STRIP_DAYS = 20
 
-export function TideSheet({ tide, at, timeZone, venue, units, data, onAt, onJumpDay, onClose, waterline }: TideSheetProps) {
+export function TideSheet({ tide, at, timeZone, venue, units, data, onAt, onJumpDay, onClose, waterline, view = 'simple', bare = false }: TideSheetProps) {
+  const simple = view === 'simple'
   const box = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(340)
   const [explainer, setExplainer] = useState<'mirror' | 'spring' | null>(null)
@@ -129,13 +139,15 @@ export function TideSheet({ tide, at, timeZone, venue, units, data, onAt, onJump
   }, true)
 
   return (
-    <section className="tides" aria-label="Tide">
-      <div className="tides__head">
-        <p className="tides__title">Tide</p>
-        <button type="button" className="card2__x" onClick={onClose} aria-label="Back to the shoot">
-          ×
-        </button>
-      </div>
+    <section className={`tides${bare ? ' tides--page' : ''}`} aria-label="Tide">
+      {bare ? null : (
+        <div className="tides__head">
+          <p className="tides__title">Tide</p>
+          <button type="button" className="card2__x" onClick={onClose} aria-label="Back to the shoot">
+            ×
+          </button>
+        </div>
+      )}
 
       {ok === null ? (
         <p className="tides__lead">
@@ -147,12 +159,23 @@ export function TideSheet({ tide, at, timeZone, venue, units, data, onAt, onJump
         </p>
       ) : (
         <>
-          <p className="tides__lead">{motionWords(direction, rate)}</p>
-          <p className="tides__sub num">
-            {feet === null ? '—' : `${feet.toFixed(1)} ft now`}
-            {next === null ? '' : ` · ${next.kind} ${formatClock(next.at, timeZone)}, ${next.feet.toFixed(1)} ft`}
-            {week === null ? '' : ` · ${week.line}`}
-          </p>
+          {simple ? (
+            /* One sentence: which way the water goes, and the next turn. "Coming in · high 9:40 AM". */
+            <p className="tides__lead">
+              {motionWords(direction, rate).split(',')[0].replace(': hardly moving', '')}
+              {next === null ? '' : ` · ${next.kind} ${formatClock(next.at, timeZone)}`}
+            </p>
+          ) : (
+            <>
+              <p className="tides__lead">{motionWords(direction, rate)}</p>
+              <p className="tides__sub">
+                <span className="num">{feet === null ? '—' : `${feet.toFixed(1)} ft`}</span> now
+                {next === null ? '' : ` · ${next.kind} `}
+                {next === null ? null : <span className="num">{`${formatClock(next.at, timeZone)}, ${next.feet.toFixed(1)} ft`}</span>}
+                {week === null ? '' : ` · ${week.line}`}
+              </p>
+            </>
+          )}
         </>
       )}
 
@@ -196,7 +219,7 @@ export function TideSheet({ tide, at, timeZone, venue, units, data, onAt, onJump
           </svg>
         )}
       </div>
-      {ok === null ? null : (
+      {ok === null || simple ? null : (
         <p className="tides__small">
           Feet above MLLW, the average daily low · {ok.station.name},{' '}
           <span className="num">{formatRange(ok.distanceKm * 1000, units.distance)}</span>
@@ -220,7 +243,7 @@ export function TideSheet({ tide, at, timeZone, venue, units, data, onAt, onJump
           <p className="tides__glassline">
             {data.facing.value === 'inland' ? 'No beach within 1.5 km to read the water against.' : (glass?.line ?? (data.wind.status === 'failed' ? "The wind didn't load" : 'Waiting for the wind forecast'))}
           </p>
-          <p className="tides__small num">
+          <p className="tides__small" hidden={simple}>
             {windSpeed === null || windFrom === null ? '' : `Wind ${formatWind(windSpeed, units.wind)} from ${compass(windFrom)}`}
             {glass?.relation == null ? '' : ` · ${glass.relation}`}
             {facing === null ? '' : ` · beach faces ${compass(facing)}`}
@@ -232,7 +255,8 @@ export function TideSheet({ tide, at, timeZone, venue, units, data, onAt, onJump
         </div>
       </div>
 
-      {!data.surf ? null : <SurfRow now={surfNow} shape={surfShapeNow} buoy={data.buoy} venue={venue} units={units} timeZone={timeZone} />}
+      {/* The surf has its own page now (SurfPage.tsx); the sheet keeps the row only where it is still a card. */}
+      {!data.surf || bare ? null : <SurfRow now={surfNow} shape={surfShapeNow} buoy={data.buoy} venue={venue} units={units} timeZone={timeZone} />}
 
       <div className="tides__strip">
         <p className="tides__striphead">

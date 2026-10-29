@@ -18,6 +18,8 @@ import { contrastRatio, deepenFor } from '../core/contrast.ts'
 export type IconId =
   | 'plan'
   | 'sky'
+  | 'tides'
+  | 'surf'
   | 'exposure'
   | 'kit'
   | 'saved'
@@ -60,6 +62,9 @@ export interface TileStops {
 export const DESIGN_TILES: Readonly<Record<IconId, TileStops>> = {
   plan: { light: '#ffe58a', middle: '#f5b021', dark: '#a86a05' },
   sky: { light: '#ffcb8a', middle: '#f68b2e', dark: '#a9460c' },
+  /* Tides: the water's blue. Surf: a sea green. Their own items since 29 Oct. */
+  tides: { light: '#9ad0ff', middle: '#2f86d6', dark: '#0f3f7a' },
+  surf: { light: '#8cf0da', middle: '#17b59c', dark: '#06574a' },
   /* Golden, between Plan's gold and Sky's orange: its own item since 27 Oct. */
   exposure: { light: '#ffd98a', middle: '#f0a020', dark: '#9a5806' },
   kit: { light: '#ffb496', middle: '#ee6b43', dark: '#9a3518' },

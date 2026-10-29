@@ -16,11 +16,14 @@ export type MenuItem =
   | 'setup'
   | 'field'
   | 'sky'
+  | 'tides'
+  | 'surf'
   | 'exposure'
   | 'kit'
   | 'saved'
   | 'now'
   | 'viewfinder'
+  | 'preflight'
   | 'callsheet'
   | 'settings'
   | 'about'
@@ -41,11 +44,15 @@ export const MENU_ITEMS: readonly MenuEntry[] = [
     note: 'Positions, light and conditions',
     icon: 'plan',
   },
-  { id: 'sky', label: 'Sky', note: 'Tonight, now, the moon, the next 30 nights', icon: 'sky' },
+  { id: 'sky', label: 'Sky', note: 'Tonight, now, the moon, the calendar', icon: 'sky' },
+  /* Their own pages since 29 Oct; Surf only where there is surf (SideMenu's hidden). */
+  { id: 'tides', label: 'Tides', note: 'The curve, glass mornings, big tides', icon: 'tides' },
+  { id: 'surf', label: 'Surf', note: 'Rating, the best time to shoot, seven days', icon: 'surf' },
   { id: 'exposure', label: 'Exposure', note: 'Shutter, aperture and ISO for the light', icon: 'exposure' },
   { id: 'kit', label: 'Kit', note: 'What is in the bag', icon: 'kit' },
   { id: 'saved', label: 'Saved spots', note: 'On this phone', icon: 'saved' },
   { id: 'viewfinder', label: 'Viewfinder', note: 'The camera with the sun and your frames on it', icon: 'viewfinder' },
+  { id: 'preflight', label: 'Preflight', note: 'Draw or fly a drone move', icon: 'preflight' },
   { id: 'callsheet', label: 'Call sheet', note: 'Run of show and shot list, on your own key', icon: 'callsheet' },
   { id: 'settings', label: 'Settings', note: 'Clock, wind and distance', icon: 'settings' },
   { id: 'about', label: 'About', note: 'Backup, your key, what leaves your phone', icon: 'about' },

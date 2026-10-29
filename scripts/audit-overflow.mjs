@@ -201,35 +201,61 @@ try {
     const label = await ev(`(() => { const c = document.querySelectorAll('.chips2 .chip2')[${i}]; c.click(); return c.querySelector('.chip2__label')?.textContent ?? 'chip' })()`)
     await check(`Plan, ${label} card`, '.sheet')
   }
-  /* THE TIDE SHEET IS A PAGE TOO: opened from its chip, full, nothing scrolls, an explainer included. */
-  const noScroll = (selector) => `JSON.stringify((() => {
-    const sheet = document.querySelector('.sheet')
-    const page = document.querySelector('${selector}')
-    if (!sheet || !page) return { missing: true }
-    const scrolls = [...sheet.querySelectorAll('*')].filter((e) => { const s = getComputedStyle(e); return /(auto|scroll)/.test(s.overflowY) && e.scrollHeight > e.clientHeight + 1 }).map((e) => e.className + ' ' + e.scrollHeight + '/' + e.clientHeight)
-    const clipped = [...page.querySelectorAll('*')].filter((e) => e.getBoundingClientRect().bottom > innerHeight + 1 && e.getBoundingClientRect().height > 0).length
-    return { detent: sheet.dataset.detent, scrolls, clipped }
+  /*
+   * TIDES, SURF AND EXPOSURE ARE PAGES OF THEIR OWN (29 Oct): Tides from its
+   * chip, the others from the menu, each Simple and Advanced where it has
+   * them, and the tide explainer open. Each fits 390 x 844: nothing scrolls,
+   * nothing runs below the screen. Closed after, so the map is free again.
+   */
+  const pageFit = `JSON.stringify((() => {
+    const page = document.querySelector('.page')
+    if (!page) return { missing: true }
+    const scrolls = [...page.querySelectorAll('*')].filter((e) => { const s = getComputedStyle(e); return /(auto|scroll)/.test(s.overflowY) && e.scrollHeight > e.clientHeight + 1 }).map((e) => e.className + ' ' + e.scrollHeight + '/' + e.clientHeight)
+    const clipped = [...page.querySelectorAll('*')].filter((e) => { if (e.closest('svg, details:not([open])')) return false; const r = e.getBoundingClientRect(); return r.height > 0 && r.bottom > innerHeight + 1 }).map((e) => e.className)
+    return { title: page.querySelector('.page__title')?.textContent, scroll: page.scrollHeight > page.clientHeight + 1, scrolls, clipped }
   })())`
-  /* Opened, not toggled: the chip walk above may have left it open already. */
-  await ev(`document.querySelector('.tides') ? 1 : [...document.querySelectorAll('.chip2')].find((c) => /TIDE/.test(c.textContent))?.click()`)
-  await wait(1500)
-  for (const [label, open] of [['Tide sheet', null], ['Tide sheet, an explainer open', '.tides__why']]) {
-    if (open !== null) await ev(`document.querySelector('${open}')?.click()`)
-    await wait(600)
-    const t = JSON.parse(await ev(noScroll('.tides')))
+  const checkPage = async (label) => {
+    await wait(1500)
+    const t = JSON.parse(await ev(pageFit))
     if (t.missing) {
-      fail(`${label}: not on screen, so it was not checked`)
+      fail(`${label}: no page on screen, so it was not checked`)
+      return
+    }
+    await check(label, '.page')
+    console.log(`  ${label}: ${t.scroll ? 'SCROLLS' : 'no scroll'}, scrolling boxes ${t.scrolls.length}, parts below the screen ${t.clipped.length}`)
+    if (t.scroll) fail(`${label} scrolls`)
+    for (const x of t.scrolls) fail(`${label}: ${x} scrolls`)
+    if (t.clipped.length > 0) fail(`${label}: ${t.clipped.length} parts run below the screen (${t.clipped.slice(0, 3).join(', ')})`)
+  }
+  const tab = (name) => ev(`[...document.querySelectorAll('.page__tabs button')].find((b) => b.textContent === '${name}')?.click()`)
+  await ev(`[...document.querySelectorAll('.chip2')].find((c) => /TIDE/.test(c.textContent))?.click()`)
+  await checkPage('Tides, from its chip')
+  await tab('Advanced')
+  await checkPage('Tides, Advanced')
+  await tab('Simple')
+  await ev(`document.querySelector('.tides__why')?.click()`)
+  await checkPage('Tides, an explainer open')
+  await ev(`document.querySelector('.tides__explainer .card2__x')?.click()`)
+  await ev(`document.querySelector('.page__close')?.click()`)
+  await wait(500)
+  for (const item of ['Surf', 'Exposure']) {
+    await ev(`document.querySelector('button[aria-label="Menu"]')?.click()`)
+    await wait(600)
+    const found = await ev(`(() => { const b = [...document.querySelectorAll('.sidemenu__item')].find((x) => x.querySelector('.sidemenu__label')?.textContent === '${item}'); if (!b) return false; b.click(); return true })()`)
+    if (!found) {
+      /* Surf away from the sea on Auto is not in the menu, which is right, and is not this check. */
+      if (item !== 'Surf') fail(`no ${item} in the menu`)
+      await ev(`document.querySelector('.sidemenu__scrim')?.click()`)
       continue
     }
-    await check(`Plan, ${label}`, '.tides')
-    console.log(`  ${label}: sheet ${t.detent}, scrolling boxes ${t.scrolls.length}, parts below the screen ${t.clipped}`)
-    if (t.detent !== 'full') fail(`${label} opened at ${t.detent}, not full`)
-    for (const x of t.scrolls) fail(`${label} scrolls: ${x}`)
-    if (t.clipped > 0) fail(`${label}: ${t.clipped} parts run below the screen`)
+    await checkPage(item)
+    if (item === 'Surf') {
+      await tab('Advanced')
+      await checkPage('Surf, Advanced')
+    }
+    await ev(`document.querySelector('.page__close')?.click()`)
+    await wait(500)
   }
-  await ev(`document.querySelector('.tides__explainer .card__close')?.click()`)
-  await ev(`document.querySelector('.tides .card__close')?.click()`)
-  await wait(500)
   await setSheet(ev, wait, 'peek')
 
   /*

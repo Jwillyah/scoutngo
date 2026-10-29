@@ -218,6 +218,21 @@ const glyphs = (dark: string): Record<GlyphId, ReactNode> => ({
       <path d="M9.3 13h5.4v3.4H9.3zM15.6 17.3H21v3.4h-5.4z" fill="#FFF" />
     </>
   ),
+  /* A wave line over a level line. */
+  tides: (
+    <>
+      <path d="M3 10.5c2.2-2.6 4.4-2.6 6.6 0s4.4 2.6 6.6 0 3.6-2.4 4.8-1.2" fill="none" stroke="#FFF" strokeWidth="2" strokeLinecap="round" />
+      <path d="M3 16.5h18" stroke="#FFF" strokeWidth="2" strokeLinecap="round" />
+      <path d="M12 13v7" stroke="#FFF" strokeWidth="1.4" strokeLinecap="round" strokeOpacity="0.6" />
+    </>
+  ),
+  /* A breaking wave. */
+  surf: (
+    <>
+      <path d="M3 18c3.5 0 4.5-9 10.5-9.5 3.4-.3 5.6 2 5.6 4.3 0 1.8-1.6 2.7-3 2.2 1-1.6-.4-3.4-2.4-3-2.6.5-3.2 6-6.7 6" fill="#FFF" />
+      <path d="M3 20.5h18" stroke="#FFF" strokeWidth="1.8" strokeLinecap="round" />
+    </>
+  ),
   layers: (
     <>
       <path d="M12 13.4l-9-4.2 9-4.2 9 4.2z" fill="#FFF" />

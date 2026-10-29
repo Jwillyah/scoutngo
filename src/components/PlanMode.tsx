@@ -1,3 +1,7 @@
+import { SENSORS } from '../core/fov.ts'
+import { ExposurePage } from './ExposurePage.tsx'
+import { TidesPage } from './TidesPage.tsx'
+import { SurfPage } from './SurfPage.tsx'
 import { CalendarPage } from './CalendarPage.tsx'
 import { ScanOffer } from './ScanOffer.tsx'
 import { nextSunrise } from '../core/sunrise.ts'
@@ -93,7 +97,6 @@ import { TimeBar } from './TimeBar.tsx'
 import { ToolDock } from './ToolDock.tsx'
 import { Clay3D } from './Clay3D.tsx'
 import { goldenChip } from '../lib/goldenChip.ts'
-import { TideSheet } from './TideSheet.tsx'
 import { useTideSheet } from '../lib/useTideSheet.ts'
 import { useWaterline } from '../lib/waterline/useWaterline.ts'
 import { waterlineLine } from '../lib/waterline/words.ts'
@@ -125,7 +128,6 @@ import { goldenNext } from '../core/goldenNext.ts'
 import { getPosition, getTimes } from 'suncalc'
 import { hasWebGL2 } from '../lib/webgl.ts'
 import { standAtPosition, standForLineUp, type StandRequest } from '../lib/standRequest.ts'
-import { ExposurePlayground } from './ExposurePlayground.tsx'
 import { SkyCard } from './SkyCard.tsx'
 import { CAMS, camKind } from '../data/cams.ts'
 import { CallSheetCard } from './CallSheetCard.tsx'
@@ -337,7 +339,7 @@ interface PlanModeProps {
   onMenu: () => void
   menuOpen: boolean
   /** The menu asked for a card: Sky or About. The tick makes a repeat ask open it again. */
-  cardRequest: { kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure'; tick: number }
+  cardRequest: { kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'preflight'; tick: number }
   /** What is in the bag, for the call sheet's kit tool. */
   bag: KitSelection
   /** The search pill was tapped: go and search. */
@@ -779,6 +781,24 @@ export function PlanMode({
    */
   const [mapZoom, setMapZoom] = useState(16.5)
   const [moonHint, setMoonHint] = useState(false)
+  /* For the Surf page: each lens in the bag on the sensor it is used with, and the drone with its wind by height and the ceiling here. */
+  const surfLenses = useMemo(() => {
+    const body = kitProfile.bodies.find((b) => bag.bodyIds.includes(b.id) && b.role !== 'drone')
+    if (body === undefined) return []
+    return kitProfile.lenses
+      .filter((l) => bag.lensIds.includes(l.id))
+      .map((l) => ({ name: l.name.replace(/^(Sony|Sigma|DJI|Tamron) /, ''), focalMm: l.maxFocalLength, sensorShortMm: SENSORS[effectiveSensor(l, body)].h }))
+  }, [kitProfile, bag])
+  const surfDrone = useMemo(() => {
+    const d = kitProfile.drones.find((x) => bag.droneIds.includes(x.id))
+    if (d === undefined || venue === null) return null
+    return { levels: windLevels, ratedMps: d.maxWindMps, ceilingFt: facilityCellAt(venue.lat, venue.lon)?.ceilingFeet ?? null, name: d.name.replace(/^DJI /, '') }
+  }, [kitProfile, bag, venue, windLevels])
+  /* A page over everything: Exposure, Tides or Surf. ?page=tides opens one, for the overflow audit. */
+  const [page, setPage] = useState<'exposure' | 'tides' | 'surf' | null>(() => {
+    const p = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('page')
+    return p === 'exposure' || p === 'tides' || p === 'surf' ? p : null
+  })
   /* Sky › Calendar, a page of its own (CalendarPage.tsx). ?calendar=1 opens it, for the overflow audit. */
   const [calendarOpen, setCalendarOpen] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('calendar') === '1')
   /* Compare a photo (src/components/ComparePhoto.tsx). ?compare=1 opens it, for scripts/measure-compare.mjs. */
@@ -1193,7 +1213,7 @@ export function PlanMode({
   const home = useCallback(() => setCard(HOME), [])
   /* The Tide sheet's month, wind, sea and beach facing: asked only while it is open. */
   const [surfSetting] = useSurfSetting()
-  const tideSheet = useTideSheet(card.kind === 'tide' || calendarOpen, venue, tide.status === 'ok' ? tide.station.id : null, surfSetting)
+  const tideSheet = useTideSheet(calendarOpen || page === 'tides' || page === 'surf', venue, tide.status === 'ok' ? tide.station.id : null, surfSetting)
   const skyDay = scrubbedAt === null || venueWindow === null ? null : zonedTimeToUtc(localDate(scrubbedAt, venueWindow.timeZone), '00:00', venueWindow.timeZone)
   const skyline = useMemo<SkylineState>(() => {
     if (card.kind !== 'skyline') return 'loading'
@@ -1265,7 +1285,7 @@ export function PlanMode({
     (kind: CardKind) => {
       setCard((current) => (current.kind === kind ? HOME : ({ kind } as SheetCard)))
       /* Layers is a page of its own: full, and it fits with no scrolling (scripts/audit-overflow.mjs). */
-      if (kind === 'layers' || kind === 'tide') setSheet('full')
+      if (kind === 'layers') setSheet('full')
       else raiseToHalf()
     },
     [raiseToHalf],
@@ -1275,10 +1295,14 @@ export function PlanMode({
   useEffect(() => {
     if (cardRequest.tick === 0) return
     const timer = setTimeout(() => {
-      /* The exposure playground is a page of the Sky card. */
-      if (cardRequest.kind === 'exposure') {
-        setSkyTab('exposure')
-        setCard({ kind: 'sky' } as SheetCard)
+      /* Exposure, Tides and Surf are pages of their own (29 Oct); Preflight is its card. */
+      if (cardRequest.kind === 'exposure' || cardRequest.kind === 'tides' || cardRequest.kind === 'surf') {
+        setPage(cardRequest.kind)
+        return
+      } else if (cardRequest.kind === 'preflight') {
+        setCard({ kind: 'preflight' } as SheetCard)
+        setSheet('full')
+        return
       } else {
         setCard({ kind: cardRequest.kind } as SheetCard)
       }
@@ -1833,38 +1857,6 @@ export function PlanMode({
             onClose={home}
           />
         )
-      case 'tide':
-        /* A page of its own (TideSheet.tsx): the curve there is the time control, so the time bar steps aside. */
-        return venue === null || scrubbedAt === null || venueWindow === null ? (
-          <Card title="Tide" at={clock(scrubbedAt)} onClose={home}>
-            <WeatherPanel {...weatherCommon} show="tide" />
-          </Card>
-        ) : (
-          <TideSheet
-            tide={tide}
-            at={scrubbedAt}
-            timeZone={venueWindow.timeZone}
-            venue={venue}
-            units={units}
-            data={tideSheet}
-            onAt={scrubTo}
-            onJumpDay={onJumpDay}
-            onClose={home}
-            waterline={{
-              shown: showWaterline,
-              scanKept: scanCtx !== null,
-              line: waterlineLine(waterline, units),
-              onShow: (on: boolean) => {
-                setShowWaterline(on)
-                /* Off to the map, with the time bar, to see it and move the tide. */
-                if (on) {
-                  setCard(HOME)
-                  setSheet('peek')
-                }
-              },
-            }}
-          />
-        )
       case 'golden':
         return (
           <Card title="The light" at={clock(scrubbedAt)} onClose={home}>
@@ -1988,7 +1980,6 @@ export function PlanMode({
                 onPickTarget={() => onPlacingAim(!placingAim)}
                 onPlanMoonrise={() => openCard('moonrise')}
                 onOpenNow={onOpenNow}
-                exposure={<ExposurePlayground kit={kitProfile} bag={bag} />}
                 events={
                   <SkyPanel
                     venue={venue}
@@ -2249,6 +2240,41 @@ export function PlanMode({
           onClose={() => setCalendarOpen(false)}
         />
       ) : null}
+      {page === 'exposure' ? <ExposurePage kit={kitProfile} bag={bag} onClose={() => setPage(null)} /> : null}
+      {page === 'tides' && venue !== null && scrubbedAt !== null && venueWindow !== null ? (
+        <TidesPage
+          tide={tide}
+          at={scrubbedAt}
+          timeZone={venueWindow.timeZone}
+          venue={venue}
+          units={units}
+          data={tideSheet}
+          onAt={scrubTo}
+          onJumpDay={onJumpDay}
+          onClose={() => setPage(null)}
+          waterline={{
+            shown: showWaterline,
+            scanKept: scanCtx !== null,
+            line: waterlineLine(waterline, units),
+            onShow: (on: boolean) => {
+              setShowWaterline(on)
+              if (on) setPage(null)
+            },
+          }}
+        />
+      ) : null}
+      {page === 'surf' && venue !== null && scrubbedAt !== null && venueWindow !== null ? (
+        <SurfPage
+          venue={venue}
+          at={scrubbedAt}
+          timeZone={venueWindow.timeZone}
+          units={units}
+          data={tideSheet}
+          lenses={surfLenses}
+          drone={surfDrone}
+          onClose={() => setPage(null)}
+        />
+      ) : null}
       {compareOpen ? <ComparePhoto fallbackAt={venue} distanceUnit={units.distance} onClose={() => setCompareOpen(false)} /> : null}
 
       {threeD && venue !== null && venueWindow !== null && scrubbedAt !== null ? (
@@ -2466,7 +2492,7 @@ export function PlanMode({
         online={online}
       />
 
-      <ChipRow chips={chips} active={card.kind} onOpen={openCard} measureRef={measureChips} />
+      <ChipRow chips={chips} active={page === 'tides' ? 'tide' : card.kind} onOpen={(kind) => (kind === 'tide' ? setPage('tides') : openCard(kind))} measureRef={measureChips} />
 
       {sheet === 'full' ? null : (
       <MapRail

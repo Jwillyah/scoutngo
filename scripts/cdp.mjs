@@ -53,7 +53,31 @@ export async function connect() {
     if (m.method && listeners.has(m.method)) for (const fn of listeners.get(m.method)) fn(m.params)
     if (m.id && p.has(m.id)) { p.get(m.id)(m); p.delete(m.id) }
   }
-  const send = (m, q = {}) => new Promise((res) => { const i = ++id; p.set(i, res); ws.send(JSON.stringify({ id: i, method: m, params: q })) })
+  /*
+   * A DROPPED CONNECTION FAILS LOUDLY. It used to leave every pending send
+   * unanswered, so Node exited on an "unsettled top-level await" with no
+   * reason in the audit's output: the gate refused a commit and said nothing
+   * about why (29 Oct, the gesture audit, a tab that went away mid-run).
+   */
+  let closed = null
+  let disposing = false
+  const dropAll = (why) => {
+    if (disposing) return
+    closed = why
+    for (const [i, res] of p) {
+      p.delete(i)
+      res({ error: { message: why }, dropped: true })
+    }
+    console.log(`=== CDP CONNECTION LOST: ${why} ===`)
+  }
+  ws.onclose = (e) => dropAll(`the browser tab's connection closed (code ${e.code})`)
+  ws.onerror = () => dropAll("the browser tab's connection failed")
+  const send = (m, q = {}) => new Promise((res, rej) => {
+    if (closed !== null) return rej(new PreflightError(`no browser connection: ${closed}`))
+    const i = ++id
+    p.set(i, (msg) => (msg.dropped ? rej(new PreflightError(`no browser connection: ${closed}`)) : res(msg)))
+    ws.send(JSON.stringify({ id: i, method: m, params: q }))
+  })
   const ev = async (x) => {
     const r = await send('Runtime.evaluate', { expression: x, returnByValue: true, awaitPromise: true })
     if (r.result?.exceptionDetails) return { ERR: (r.result.exceptionDetails.exception?.description ?? r.result.exceptionDetails.text).split('\n')[0] }
@@ -73,6 +97,7 @@ export async function connect() {
    * own starts one and takes it away again.
    */
   const dispose = async () => {
+    disposing = true
     try { ws.close() } catch { /* already closed */ }
     try { await fetch(`http://127.0.0.1:9222/json/close/${target.id}`) } catch { /* the browser is going anyway */ }
     await browser.stop()

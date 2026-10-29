@@ -12981,3 +12981,355 @@
 .tooldock__btn {
   position: relative;
 }
+
+/* ------------------------------------------------------------ full pages */
+/* Exposure, Tides, Surf (Page.tsx): over everything, no map, no time bar, no dock. */
+.page {
+  position: fixed;
+  inset: 0;
+  z-index: 75;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: calc(var(--safe-top) + var(--space-2)) var(--page-pad) calc(var(--safe-bottom) + var(--space-2));
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.page__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+}
+
+.page__title {
+  margin: 0;
+  flex: 1 1 auto;
+  font-size: var(--text-md);
+  font-weight: var(--weight-heavy);
+}
+
+.page__tabs {
+  flex: 0 0 auto;
+}
+
+.page__close {
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.page__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* EXPOSURE: the photo as large as the page leaves it, the controls under it; in landscape, side by side. */
+.xpage .play {
+  flex: 1 1 auto;
+  min-height: 0;
+  /* The one-line intro, the photo with all the room left, the controls. */
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: var(--space-2);
+}
+
+.xpage .play__photo {
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr) auto;
+  justify-items: center;
+}
+
+.xpage .play__photo svg {
+  width: auto;
+  height: 100%;
+  max-height: 100%;
+}
+
+.xpage .play__controls {
+  display: grid;
+  gap: var(--space-1);
+}
+
+@media (orientation: landscape) {
+  .xpage .play {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .xpage .play__demo {
+    grid-column: 1 / -1;
+  }
+
+  .xpage .play__controls {
+    min-height: 0;
+    overflow: hidden;
+  }
+}
+
+/* SURF (SurfPage.tsx). Good green, ok amber, poor grey: never red. Body text in the sans; numbers mono. */
+.spage .page__body {
+  gap: var(--space-3);
+}
+
+.spage__src {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.spage__lead {
+  margin: 0;
+  font-size: var(--text-lg, 1.375rem);
+  font-weight: var(--weight-heavy);
+}
+
+.spage__head {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-label);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.spage__line {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+
+.spage__small,
+.spage__key {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
+.spage__hours {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 2px;
+}
+
+.spage__hour {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  padding: 4px 0 3px;
+  border-radius: 4px;
+}
+
+.spage__hour--now {
+  box-shadow: inset 0 0 0 2px var(--white);
+}
+
+.spage__hourlabel {
+  font-size: 9px;
+  color: var(--black);
+  font-weight: 700;
+}
+
+.spage__hour--good {
+  background: var(--light-front);
+}
+
+.spage__hour--ok {
+  background: var(--sun);
+}
+
+.spage__hour--poor {
+  background: var(--surface-3);
+}
+
+.spage__hour--poor .spage__hourlabel {
+  color: var(--color-text-muted);
+}
+
+/* The light on the face: a small sun mark, filled front, half side, ringed backlit. */
+.spage__light {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.spage__light--front {
+  background: var(--black);
+}
+
+.spage__light--side {
+  background: linear-gradient(90deg, var(--black) 50%, transparent 50%);
+  box-shadow: inset 0 0 0 1px var(--black);
+}
+
+.spage__light--back {
+  box-shadow: inset 0 0 0 1.5px var(--black);
+}
+
+.spage__light--dark {
+  opacity: 0;
+}
+
+.spage__key .spage__light {
+  background-color: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--color-text-muted);
+}
+
+.spage__key .spage__light--front {
+  background: var(--color-text-muted);
+}
+
+.spage__sw {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  vertical-align: middle;
+}
+
+.spage__week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.spage__day {
+  display: grid;
+  justify-items: center;
+  padding: 4px 0;
+  border-radius: 6px;
+  color: var(--black);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.spage__day.spage__hour--poor {
+  color: var(--color-text-muted);
+}
+
+.spage__cams {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.spage__winds {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  align-items: end;
+  gap: 2px;
+  height: 56px;
+}
+
+.spage__wind {
+  border-radius: 2px 2px 0 0;
+}
+
+.spage__wind--offshore {
+  background: var(--light-front);
+}
+
+.spage__wind--cross {
+  background: var(--sun);
+}
+
+.spage__wind--onshore,
+.spage__wind--unknown {
+  background: var(--surface-3);
+}
+
+/* EXPOSURE PAGE, compact controls so the photo keeps the room (29 Oct). */
+.xpage .play__controls {
+  gap: 6px;
+}
+
+.xpage .play__meter {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.xpage .play__meterwords {
+  display: none;
+}
+
+.xpage .play__reading {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.xpage .play__presets {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.xpage .play__preset {
+  min-height: 44px;
+  padding: 2px 4px;
+  font-size: var(--text-xs);
+  line-height: 1.15;
+}
+
+.xpage .play__slider {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-2);
+  row-gap: 0;
+}
+
+.xpage .play__slider .play__ends {
+  font-size: var(--text-xs);
+}
+
+.xpage .play__slider input {
+  grid-column: 1 / -1;
+  min-height: 32px;
+  margin: 0;
+}
+
+.xpage .play__slider .play__term {
+  grid-row: 1;
+  grid-column: 2;
+  font-size: var(--text-xs);
+}
+
+.xpage .play__kit {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.xpage .play__kit .field__label {
+  display: none;
+}
+
+.xpage .play__light {
+  min-height: 44px;
+}
+
+.play__how summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+/* The page's Simple / Advanced tabs: the segment clips a hit area, so the tabs themselves are 44 tall. */
+.page__tabs .seg__btn {
+  min-height: 44px;
+}

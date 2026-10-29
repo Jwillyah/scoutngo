@@ -105,10 +105,13 @@ try {
     await ev(`[...document.querySelectorAll('button')].find((x) => /Layers/i.test(x.getAttribute('aria-label') || ''))?.click()`)
     await wait(1500)
     await targets('Layers')
+    /* Layers is a page in the sheet with the time bar stepped aside: closed before going on. */
+    await ev(`document.querySelector('.card2__x')?.click()`)
+    await wait(600)
     await ev(`[...document.querySelectorAll('.chip2')].find((x) => /TIDE/.test(x.textContent))?.click()`)
     await wait(2500)
-    await targets('the Tide card')
-    await ev(`document.querySelector('.card2__x')?.click()`)
+    await targets('the Tides page')
+    await ev(`document.querySelector('.page__close')?.click()`)
     await wait(800)
     await ev(`document.querySelector('button[aria-label="Open the 3D clay model"]')?.click()`)
     await wait(6000)
@@ -116,8 +119,10 @@ try {
     await ev(`document.querySelector('.clay__i')?.click()`)
     await wait(800)
     await targets('the 3D view, its "i" open')
-    await ev(`document.querySelector('button[aria-label="Open the 3D clay model"], button[aria-label="Close the 3D view"], .clay__close')?.click()`)
+    await ev(`document.querySelector('.clay__i[aria-expanded="true"]')?.click()`)
+    await ev(`document.querySelector('button[aria-label="Back to the 2D map"]')?.click()`)
     await wait(1500)
+    if (!(await ev(`!!document.querySelector('.tbar__strip')`))) throw new Error('the 3D view did not close: no time bar to go on with')
 
     console.log('### nothing over the map takes a finger but a control')
     await setSheet(ev, wait, 'peek')
@@ -213,7 +218,8 @@ try {
       if (tb.sheet !== ta.sheet) fail(`a sideways drag on the tide curve moved the sheet (${ta.sheet} to ${tb.sheet})`)
       console.log(`  ${tb.at !== ta.at && tb.sheet === ta.sheet ? 'ok' : 'wrong'}`)
     }
-    await ev(`document.querySelector('.card2__x')?.click()`)
+    /* The tide chip opens the Tides page now (29 Oct): close it. */
+    await ev(`document.querySelector('.page__close')?.click()`)
     await wait(800)
     await dispose()
   }

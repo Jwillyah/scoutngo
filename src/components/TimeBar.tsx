@@ -147,6 +147,22 @@ export function TimeBar({ at, lat, lon, timeZone, moon, onAt, onReset }: TimeBar
     if (coast.current !== 0) cancelAnimationFrame(coast.current)
     coast.current = 0
   }
+  /*
+   * A TIME SET HERE BY HAND (the date field, the arrow back, the keys) WINS.
+   * The coast stops and its last frame's time, not yet sent, is dropped:
+   * otherwise it arrived after the picked time and replaced it (29 Oct, the
+   * gate's thumb drags, twice).
+   */
+  const takeOver = (next: Date) => {
+    stopCoast()
+    if (sent.current !== 0) cancelAnimationFrame(sent.current)
+    sent.current = 0
+    busy.current = false
+    drag.current = null
+    live.current = next.getTime()
+    sentAt.current = next.getTime()
+    onAt(next)
+  }
   useEffect(() => () => stopCoast(), [])
 
   const drag = useRef<{ x: number; y: number; t0: number; mine: boolean; samples: [number, number][] } | null>(null)
@@ -257,11 +273,20 @@ export function TimeBar({ at, lat, lon, timeZone, moon, onAt, onReset }: TimeBar
               const [date, time] = event.target.value.split('T')
               if (date === undefined || time === undefined) return
               const next = zonedTimeToUtc(date, time.slice(0, 5), timeZone)
-              if (next !== null) onAt(next)
+              if (next !== null) takeOver(next)
             }}
           />
         </label>
-        <button type="button" className="tbar__reset" onClick={onReset} aria-label="Back to the shoot window">
+        <button
+          type="button"
+          className="tbar__reset"
+          onClick={() => {
+            stopCoast()
+            busy.current = false
+            onReset()
+          }}
+          aria-label="Back to the shoot window"
+        >
           <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true">
             <path d="M4.5 9a6 6 0 1 1 1.6 5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
             <path d="M3.5 4.5v4.5H8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -279,8 +304,8 @@ export function TimeBar({ at, lat, lon, timeZone, moon, onAt, onReset }: TimeBar
         aria-valuenow={at.getTime()}
         tabIndex={0}
         onKeyDown={(event) => {
-          if (event.key === 'ArrowRight') onAt(new Date(at.getTime() + QUARTER))
-          if (event.key === 'ArrowLeft') onAt(new Date(at.getTime() - QUARTER))
+          if (event.key === 'ArrowRight') takeOver(new Date(live.current + QUARTER))
+          if (event.key === 'ArrowLeft') takeOver(new Date(live.current - QUARTER))
         }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}

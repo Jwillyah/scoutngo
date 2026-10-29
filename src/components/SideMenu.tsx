@@ -19,10 +19,12 @@ interface SideMenuProps {
   /** Which item is where you are now, so it reads as the current place. */
   current: MenuItem | null
   onPick: (item: MenuItem) => void
+  /** Items not offered here: Surf away from the sea (Settings › Surf on Auto). */
+  hidden?: ReadonlySet<MenuItem>
   onClose: () => void
 }
 
-export function SideMenu({ open, current, onPick, onClose }: SideMenuProps) {
+export function SideMenu({ open, current, onPick, onClose, hidden }: SideMenuProps) {
   const first = useRef<HTMLButtonElement>(null)
 
   /* Focus moves into the menu when it opens, and Escape closes it. */
@@ -42,7 +44,7 @@ export function SideMenu({ open, current, onPick, onClose }: SideMenuProps) {
       <button type="button" className="sidemenu__scrim" aria-label="Close the menu" onClick={onClose} />
       <nav className="sidemenu__panel" aria-label="Stage">
         <p className="sidemenu__brand">ScoutNGo</p>
-        {MENU_ITEMS.map((item, index) => {
+        {MENU_ITEMS.filter((item) => !(hidden?.has(item.id) ?? false)).map((item, index) => {
           const here = current !== null && menuHome(current) === item.id
           return (
             <div key={item.id} className="sidemenu__group">

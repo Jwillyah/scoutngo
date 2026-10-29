@@ -28,7 +28,6 @@ export type SheetCard =
   | { kind: 'golden' }
   | { kind: 'wind' }
   | { kind: 'cloud' }
-  | { kind: 'tide' }
   /** Opened from the rail. */
   | { kind: 'layers' }
   /** Opened from a layer tile. */
@@ -63,7 +62,6 @@ export const CARD_TITLE: Record<CardKind, string> = {
   golden: 'Golden hour',
   wind: 'Wind',
   cloud: 'Cloud',
-  tide: 'Tide',
   layers: 'Map & layers',
   hazards: 'Hazards',
   airspace: 'Airspace',
@@ -90,7 +88,6 @@ export const CHIP_FOR: Partial<Record<CardKind, CardKind>> = {
   golden: 'golden',
   wind: 'wind',
   cloud: 'cloud',
-  tide: 'tide',
 }
 
 /** Whether this card is the home card. */
@@ -127,8 +124,6 @@ export const TIME_MATTERS: Record<CardKind, boolean> = {
   golden: true,
   wind: true,
   cloud: true,
-  /* The Tide sheet's own curve moves the same moment as the bar (TideSheet.tsx), and the page needs the room. */
-  tide: false,
   sky: true,
   /*
    * A CAMERA IMAGE IS NOT SCRUBBED. The feeds are whatever each operator is

@@ -1,3 +1,5 @@
+import { metresToSea } from './lib/coast.ts'
+import { showSurf, SURF_COAST_M, useSurfSetting } from './lib/surfSetting.ts'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { type ConeMode } from './lib/coneMode.ts'
 import { type MapHandle } from './components/MapView.tsx'
@@ -160,6 +162,9 @@ import { readLastSetup, writeLastSetup, type LastSetup } from './lib/lastSetup.t
 const wantsCalibration = (): boolean =>
   typeof window !== 'undefined' &&
   new URLSearchParams(window.location.search).get('calibration') === '1'
+
+/* The menu without Surf, away from the sea. */
+const NO_SURF: ReadonlySet<MenuItem> = new Set<MenuItem>(['surf'])
 
 function App() {
   /*
@@ -1359,12 +1364,32 @@ function App() {
     drawer: 'kit',
     tick: 0,
   })
-  const [cardRequest, setCardRequest] = useState<{ kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure'; tick: number }>({
+  const [cardRequest, setCardRequest] = useState<{ kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'preflight'; tick: number }>({
     kind: 'sky',
     tick: 0,
   })
   /* The viewfinder: the camera with the plan over it. Opened from the menu, asks for its permissions on a tap. */
   const [viewfinderOpen, setViewfinderOpen] = useState(false)
+
+  /*
+   * SURF IN THE MENU: on Always; on Auto, only with the sea within reach of the
+   * venue (the Tide sheet's own test, src/lib/surfSetting.ts showSurf); never
+   * on Off. Asked once per venue; unknown is not shown.
+   */
+  const [surfSettingNow] = useSurfSetting()
+  const [seaM, setSeaM] = useState<{ key: string; m: number | null } | null>(null)
+  const seaKey = centre === null ? null : `${centre.lat.toFixed(4)},${centre.lon.toFixed(4)}`
+  useEffect(() => {
+    if (centre === null || seaKey === null || surfSettingNow !== 'auto') return
+    let live = true
+    void metresToSea(centre, SURF_COAST_M).then((m) => {
+      if (live) setSeaM({ key: seaKey, m })
+    })
+    return () => {
+      live = false
+    }
+  }, [seaKey, surfSettingNow]) // eslint-disable-line react-hooks/exhaustive-deps
+  const surfInMenu = showSurf(surfSettingNow, seaM !== null && seaM.key === seaKey ? seaM.m : null)
 
   const onMenuPick = (item: MenuItem) => {
     switch (item) {
@@ -1381,6 +1406,9 @@ function App() {
         return
       case 'sky':
       case 'exposure':
+      case 'tides':
+      case 'surf':
+      case 'preflight':
       case 'settings':
       case 'about':
       case 'callsheet':
@@ -2185,6 +2213,7 @@ function App() {
         open={menuOpen}
         current={nowOpen ? 'now' : menuCurrent}
         onPick={onMenuPick}
+        hidden={surfInMenu ? undefined : NO_SURF}
         onClose={() => setMenuOpen(false)}
       />
 

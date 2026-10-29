@@ -40,15 +40,21 @@ describe('the golden bubble tiles', () => {
 
 describe('the side menu', () => {
   /* The list asked for on 27 Oct, with Exposure its own item. */
-  it('is nine items, gold to night blue, in the order asked for', () => {
-    expect(MENU_ITEMS.map((m) => m.label)).toEqual(['Plan', 'Sky', 'Exposure', 'Kit', 'Saved spots', 'Viewfinder', 'Call sheet', 'Settings', 'About'])
-    expect(MENU_ITEMS.map((m) => m.icon)).toEqual(['plan', 'sky', 'exposure', 'kit', 'saved', 'viewfinder', 'callsheet', 'settings', 'about'])
+  /* 29 Oct: Tides and Surf after Sky, Preflight after Viewfinder. */
+  it('is twelve items in the order asked for', () => {
+    expect(MENU_ITEMS.map((m) => m.label)).toEqual(['Plan', 'Sky', 'Tides', 'Surf', 'Exposure', 'Kit', 'Saved spots', 'Viewfinder', 'Preflight', 'Call sheet', 'Settings', 'About'])
+    expect(MENU_ITEMS.map((m) => m.icon)).toEqual(['plan', 'sky', 'tides', 'surf', 'exposure', 'kit', 'saved', 'viewfinder', 'preflight', 'callsheet', 'settings', 'about'])
+  })
+  it('leaves Surf out where it is told to (inland on Auto)', () => {
+    const html = renderToStaticMarkup(<SideMenu open current="plan" onPick={() => {}} onClose={() => {}} hidden={new Set(['surf'])} />)
+    expect(html).not.toContain('>Surf<')
+    expect(html).toContain('>Tides<')
   })
 
   it('has no Field and no Shoot setup / Field buttons under Plan: Shoot setup lives inside Plan', () => {
     expect(MENU_ITEMS.some((m) => (m.subs ?? []).length > 0)).toBe(false)
     const html = renderToStaticMarkup(<SideMenu open current="setup" onPick={() => {}} onClose={() => {}} />)
-    expect(html.match(/class="icon"/g)?.length).toBe(9)
+    expect(html.match(/class="icon"/g)?.length).toBe(12)
     expect(html).not.toContain('>Shoot setup<')
     expect(html).not.toContain('>Field<')
     /* Shoot setup is part of Plan, so Plan reads as the place you are in. */

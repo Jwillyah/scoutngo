@@ -42,8 +42,6 @@ interface SkyCardProps {
   events: ReactNode
   /** Opens the moonrise shot list. */
   onPlanMoonrise?: () => void
-  /** The exposure playground, drawn on the Exposure page. */
-  exposure?: ReactNode
   /** The Now screen: what the sky is doing where you are standing. It used to be its own menu item. */
   onOpenNow?: () => void
 }
@@ -202,7 +200,7 @@ function Finder({
   )
 }
 
-export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump, target, picking, onPickTarget, events, onPlanMoonrise, onOpenNow, exposure }: SkyCardProps) {
+export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump, target, picking, onPickTarget, events, onPlanMoonrise, onOpenNow }: SkyCardProps) {
   const clock = (d: Date) => `${formatClock(d, timeZone)}`
   const finderProps = { venue, target, picking, onPickTarget, onJump, clock, timeZone }
 
@@ -217,9 +215,7 @@ export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump,
     t.altitude <= 0 ? 'below the horizon' : `${compassWord(t.azimuth)}, ${Math.round(t.altitude)}° up`
 
   let body: ReactNode = null
-  if (tab === 'exposure') {
-    body = exposure ?? null
-  } else if (tab === 'tonight') {
+  if (tab === 'tonight') {
     const best = Math.max(1, ...nights.map((n) => n.score))
     const byDate = [...nights].sort((a, b) => a.date.localeCompare(b.date))
     body = (

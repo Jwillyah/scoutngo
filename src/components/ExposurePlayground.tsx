@@ -109,6 +109,8 @@ export function ExposurePlayground({ kit, bag }: ExposurePlaygroundProps) {
         </svg>
         <figcaption className="play__credit">Photo by Jwillyagaze. Faces in the crowd are blurred.</figcaption>
       </figure>
+      {/* Everything under the photo, one block: on the Exposure page it sits under the photo, or beside it in landscape. */}
+      <div className="play__controls">
 
       <div className={`play__meter play__meter--${frame.reading.replace(' ', '-')}`} aria-label={`Light meter: ${frame.reading}`}>
         <div className="play__meterbar">
@@ -222,6 +224,9 @@ export function ExposurePlayground({ kit, bag }: ExposurePlaygroundProps) {
         </label>
       </div>
 
+      {/* The assumptions, a tap away: the photo and its controls come first (29 Oct). */}
+      <details className="play__how">
+        <summary>How it is worked out</summary>
       <p className="play__note num">
         {focal}mm on this {sensor === 'fullFrame' ? 'full frame' : 'APS-C'} body, focused on him at {Math.round(frame.subjectMeters)} m. Assumed: the crowd{' '}
         {SCENE.backgroundBehindMeters} m behind him, him moving at {SCENE.subjectSpeedMps} m/s, and a {SCENE.boardMeters} m board for the scale of the streak. The distance
@@ -229,6 +234,8 @@ export function ExposurePlayground({ kit, bag }: ExposurePlaygroundProps) {
         {shutterWords(REFERENCE.seconds)}, f/{REFERENCE.aperture}, ISO {REFERENCE.iso}).
       </p>
       <p className="play__note">Everything here runs on this phone. Nothing is uploaded.</p>
+      </details>
+      </div>
     </div>
   )
 }

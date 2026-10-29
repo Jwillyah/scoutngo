@@ -1,5 +1,5 @@
 /* The pages of the Sky card, in the order they are offered. */
-export type SkyTab = 'tonight' | 'sun' | 'moon' | 'calendar' | 'seasons' | 'exposure'
+export type SkyTab = 'tonight' | 'sun' | 'moon' | 'calendar' | 'seasons'
 
 export const SKY_TABS: readonly { id: SkyTab; label: string }[] = [
   /* The night: tonight's sky and, under it, the next thirty nights for the Milky Way (moved from Calendar, 29 Oct). */
@@ -9,6 +9,4 @@ export const SKY_TABS: readonly { id: SkyTab; label: string }[] = [
   /* Opens the month as a calendar, a page of its own (CalendarPage.tsx). */
   { id: 'calendar', label: 'Calendar' },
   { id: 'seasons', label: 'Seasons' },
-  /* The exposure playground: no venue in it, only a photo. Also opened from Kit. */
-  { id: 'exposure', label: 'Exposure' },
 ]
