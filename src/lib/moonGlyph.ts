@@ -28,6 +28,21 @@ export function moonGlyphSvg(phase: number, size: number): string {
   return `<svg class="calm" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true"><circle cx="${c}" cy="${c}" r="${c - 1}" class="calm__dark"/>${lit === null ? '' : `<path d="${lit}" class="calm__lit"/>`}</svg>`
 }
 
+/**
+ * The moon in one line, for under the time bar: "Waning gibbous · 96% lit ·
+ * rises 7:52 PM". Up, it says when it sets; down, when it rises; a time not
+ * on this local day is left out rather than guessed.
+ */
+export function moonLine(arc: { phase: number; lit: number; altitude: number; rise: { at: Date } | null; set: { at: Date } | null }, at: Date, clock: (t: Date) => string): string {
+  const parts = [moonPhaseName(arc.phase), `${Math.round(arc.lit * 100)}% lit`]
+  const next = (e: { at: Date } | null) => (e !== null && e.at.getTime() > at.getTime() ? e.at : null)
+  const set = next(arc.set)
+  const rise = next(arc.rise)
+  if (arc.altitude > 0 && set !== null) parts.push(`sets ${clock(set)}`)
+  else if (arc.altitude <= 0 && rise !== null) parts.push(`rises ${clock(rise)}`)
+  return parts.join(' · ')
+}
+
 /** The phase in words. */
 export function moonPhaseName(phase: number): string {
   if (phase < 0.03 || phase > 0.97) return 'New moon'

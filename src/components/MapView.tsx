@@ -1,3 +1,4 @@
+import { moonGlyphSvg } from '../lib/moonGlyph.ts'
 import { useNumerals } from '../lib/numeralsContext.ts'
 import * as maplibregl from 'maplibre-gl'
 import { loadTile, PROTOCOL, viaProtocol } from '../lib/offlineCache.ts'
@@ -1716,11 +1717,11 @@ export function MapView({
         'shadow',
         readToken('--sun-shadow'),
         'moonrise',
-        readToken('--grey-1'),
+        readToken('--moon'),
         'moonset',
-        readToken('--grey-1'),
+        readToken('--moon'),
         'moon',
-        readToken('--white'),
+        readToken('--moon'),
         readToken('--sun'),
       ] as unknown as maplibregl.DataDrivenPropertyValueSpecification<string>
 
@@ -1930,7 +1931,28 @@ export function MapView({
         id: 'ray-line',
         type: 'line',
         source: RAY_SOURCE,
+        filter: ['!', ['in', ['get', 'kind'], ['literal', ['moonrise', 'moonset', 'moon']]]],
         paint: { 'line-color': rayColor, 'line-width': 2, 'line-opacity': 0.35 },
+      })
+      /*
+       * THE MOON'S LINES, readable (29 Oct: "thin grey lines with time pills;
+       * nobody can tell what they mean"). In the moon's own colour: where it
+       * rises and sets dashed, where it is now solid (drawn only while it is
+       * up). Each ends in a pill with the moon at its phase and what it is.
+       */
+      instance.addLayer({
+        id: 'ray-moon-path',
+        type: 'line',
+        source: RAY_SOURCE,
+        filter: ['in', ['get', 'kind'], ['literal', ['moonrise', 'moonset']]],
+        paint: { 'line-color': rayColor, 'line-width': 2, 'line-opacity': 0.9, 'line-dasharray': [3, 2] },
+      })
+      instance.addLayer({
+        id: 'ray-moon-now',
+        type: 'line',
+        source: RAY_SOURCE,
+        filter: ['==', ['get', 'kind'], 'moon'],
+        paint: { 'line-color': rayColor, 'line-width': 2.5, 'line-opacity': 0.95 },
       })
 
       /*
@@ -3189,7 +3211,9 @@ export function MapView({
       const moon = overlay.moon ?? null
       if (moon?.rise) wanted.push({ kind: 'moonrise', at: moon.rise.at, bearing: moon.rise.azimuth })
       if (moon?.set) wanted.push({ kind: 'moonset', at: moon.set.at, bearing: moon.set.azimuth })
+      if (moon !== null && moon.altitude > 0) wanted.push({ kind: 'moon', at: new Date(Number.NaN), bearing: moon.azimuth })
     }
+    const phase = overlay?.moon?.phase ?? null
     while (layer.children.length > wanted.length) layer.lastElementChild?.remove()
     while (layer.children.length < wanted.length) {
       const el = document.createElement('span')
@@ -3200,17 +3224,48 @@ export function MapView({
     const below = (sel: string) => Math.max(0, ...[...document.querySelectorAll(sel)].map((n) => n.getBoundingClientRect().bottom - frame.top))
     const above = (sel: string) => Math.min(frame.height, ...[...document.querySelectorAll(sel)].map((n) => n.getBoundingClientRect().top - frame.top))
     const box = { left: 8, right: frame.width - 8, top: below('.topbar, .chips2') + 6, bottom: above('.sheet, .tooldock') - 6 }
+    /*
+     * CLEAR OF EVERY FLOATING CONTROL, AND OF EACH OTHER (29 Oct: the
+     * "7:52 PM" moonrise pill sat under the 3D button). The rects of the
+     * controls over the map (src/lib/floatingChrome.ts) and of the pills
+     * already placed are kept out: a pill that lands on one slides back along
+     * its own line toward the pin until it is clear, and is hidden if it
+     * never is. First come, first placed, in a fixed order.
+     */
+    const reserved = floatingChromeNodes(document, FLOATING_CHROME_SELECTORS)
+      .filter((n) => !n.matches('.sheet, .topbar, .chips2, .tooldock'))
+      .map((n) => n.getBoundingClientRect())
+      .filter((r) => r.width > 0 && r.height > 0)
+      .map((r) => ({ left: r.left - frame.left - 4, top: r.top - frame.top - 4, right: r.right - frame.left + 4, bottom: r.bottom - frame.top + 4 }))
+    const hits = (r: { left: number; top: number; right: number; bottom: number }) => reserved.some((q) => r.left < q.right && r.right > q.left && r.top < q.bottom && r.bottom > q.top)
     const origin = instance.project([pin.lon, pin.lat])
     wanted.forEach((pill, i) => {
       const el = layer.children[i] as HTMLElement
       el.className = `raypill raypill--${pill.kind} num`
-      el.textContent = clock?.(pill.at) ?? ''
+      const isMoon = pill.kind === 'moonrise' || pill.kind === 'moonset' || pill.kind === 'moon'
+      const words = pill.kind === 'moonrise' ? `Moonrise ${clock?.(pill.at) ?? ''}` : pill.kind === 'moonset' ? `Moonset ${clock?.(pill.at) ?? ''}` : pill.kind === 'moon' ? 'Moon now' : (clock?.(pill.at) ?? '')
+      el.innerHTML = `${isMoon && phase !== null ? moonGlyphSvg(phase, 12) : ''}<span>${words}</span>`
       const far = bearingLineEnd(pin, pill.bearing, 50_000)
       const end = instance.project([far.lon, far.lat])
       const size = el.getBoundingClientRect()
-      const at = edgePoint(origin, { x: end.x - origin.x, y: end.y - origin.y }, box, { w: size.width / 2 + 2, h: size.height / 2 + 2 })
-      el.hidden = at === null
-      if (at !== null) el.style.transform = `translate(${at.x - size.width / 2}px, ${at.y - size.height / 2}px)`
+      const dir = { x: end.x - origin.x, y: end.y - origin.y }
+      const at = edgePoint(origin, dir, box, { w: size.width / 2 + 2, h: size.height / 2 + 2 })
+      let placed: { x: number; y: number } | null = null
+      if (at !== null) {
+        const len = Math.hypot(at.x - origin.x, at.y - origin.y)
+        for (let back = 0; back < len - 40; back += 8) {
+          const f = (len - back) / len
+          const p = { x: origin.x + (at.x - origin.x) * f, y: origin.y + (at.y - origin.y) * f }
+          const r = { left: p.x - size.width / 2, top: p.y - size.height / 2, right: p.x + size.width / 2, bottom: p.y + size.height / 2 }
+          if (!hits(r)) {
+            placed = p
+            reserved.push({ left: r.left - 3, top: r.top - 3, right: r.right + 3, bottom: r.bottom + 3 })
+            break
+          }
+        }
+      }
+      el.hidden = placed === null
+      if (placed !== null) el.style.transform = `translate(${placed.x - size.width / 2}px, ${placed.y - size.height / 2}px)`
     })
   }, [])
   useEffect(() => {

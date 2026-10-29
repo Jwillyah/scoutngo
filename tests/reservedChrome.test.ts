@@ -111,8 +111,9 @@ describe('control corners are measured by their children', () => {
     expect(floatingChromeNodes(root, FLOATING_CHROME_SELECTORS)).toEqual([scale, credit, topbar])
   })
 
-  it('is what the ray labels, the grid tags and the label audit all use', () => {
-    expect(SOURCE.match(/floatingChromeNodes\(document/g)?.length).toBe(2)
+  it('is what the ray labels, the grid tags, the time pills and the label audit all use', () => {
+    /* The time pills joined on 29 Oct: the moonrise pill sat under the 3D button. */
+    expect(SOURCE.match(/floatingChromeNodes\(document/g)?.length).toBe(3)
     expect(SOURCE).not.toContain("includes('maplibregl-ctrl-')")
     expect(readFileSync('scripts/audit-labels.mjs', 'utf8')).toContain('floatingChromeNodes.toString()')
   })

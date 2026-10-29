@@ -1,6 +1,8 @@
 import { startTransition, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { dragAxis, releaseVelocity, VERTICAL_SLOP_ON_SIDEWAYS_PX } from '../core/sheetMotion.ts'
-import { MINUTES_ACROSS, minutesForDrag, timeBarModel } from '../core/timeBar.ts'
+import { ALTITUDE_RANGE, MINUTES_ACROSS, minutesForDrag, timeBarModel } from '../core/timeBar.ts'
+import { getMoonArc } from '../core/moonArc.ts'
+import { moonLine, moonLitPath } from '../lib/moonGlyph.ts'
 import { formatClock, venueAndYours, zonedTimeToUtc } from '../core/timezone.ts'
 import { claimGesture, gestureOwner } from '../lib/gestureOwner.ts'
 import { publishLiveTime } from '../lib/liveTime.ts'
@@ -227,6 +229,11 @@ export function TimeBar({ at, lat, lon, timeZone, moon, onAt, onReset }: TimeBar
     if (d?.mine) finish()
   }
 
+  /* With the moon on: where it is at the needle, drawn at its phase, and the moon in one line under the bar (29 Oct). */
+  const moonNow = useMemo(() => (moon ? getMoonArc(at, lat, lon) : null), [moon, at, lat, lon])
+  const moonY = moonNow === null ? null : HEIGHT - ((Math.max(ALTITUDE_RANGE[0], Math.min(ALTITUDE_RANGE[1], moonNow.altitude)) - ALTITUDE_RANGE[0]) / (ALTITUDE_RANGE[1] - ALTITUDE_RANGE[0])) * HEIGHT
+  const moonLit = moonNow === null ? null : moonLitPath(moonNow.phase, 14)
+
   const parts = venueParts(at, timeZone)
   const day = new Intl.DateTimeFormat('en-GB', { timeZone, weekday: 'short', day: 'numeric', month: 'short' }).format(at)
   const fullWidth = width * SPAN
@@ -306,8 +313,15 @@ export function TimeBar({ at, lat, lon, timeZone, moon, onAt, onReset }: TimeBar
             ))}
           </g>
           <line className="tbar__needle" x1={width / 2} x2={width / 2} y1={0} y2={HEIGHT + 8} />
+          {moonNow === null || moonY === null ? null : (
+            <g className="tbar__moonhere" transform={`translate(${width / 2 - 7} ${moonY - 7})`}>
+              <circle cx={7} cy={7} r={6} className="calm__dark" />
+              {moonLit === null ? null : <path d={moonLit} className="calm__lit" />}
+            </g>
+          )}
         </svg>
       </div>
+      {moonNow === null ? null : <p className="tbar__moonline num">{moonLine(moonNow, at, (t) => formatClock(t, timeZone))}</p>}
     </div>
   )
 }

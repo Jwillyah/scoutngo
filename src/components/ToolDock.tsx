@@ -27,14 +27,16 @@ interface ToolDockProps {
 }
 
 export function ToolDock({ moon, onMoon, onCalendar, lens, onLens, layersOpen, onLayers, onReset }: ToolDockProps) {
-  const button = (label: string, glyph: GlyphId, onClick: () => void, on?: boolean) => (
-    <button type="button" className={`tooldock__btn${on === true ? ' tooldock__btn--on' : ''}`} aria-label={label} aria-pressed={on} onClick={onClick}>
+  const button = (label: string, glyph: GlyphId, onClick: () => void, on?: boolean, cap?: string) => (
+    <button type="button" className={`tooldock__btn tooldock__btn--${glyph}${on === true ? ' tooldock__btn--on' : ''}`} aria-label={label} aria-pressed={on} onClick={onClick}>
       <Icon glyph={glyph} size={40} />
+      {cap === undefined ? null : <span className="tooldock__cap">{cap}</span>}
     </button>
   )
   return (
     <nav className="tooldock" aria-label="Tools">
-      {button(moon ? 'Sun and moon. Tap for sun only' : 'Sun only. Tap to add the moon', 'sunmoon', onMoon, moon)}
+      {/* Dim while off; lit and labelled "Moon on" while on (29 Oct: "nobody can tell"). */}
+      {button(moon ? 'Moon on. Tap to turn it off' : 'Moon off. Tap to show where it rises and sets', 'sunmoon', onMoon, moon, moon ? 'Moon on' : undefined)}
       {button('Calendar of the sky', 'calendar', onCalendar)}
       {button(lens ? 'What each lens sees, shown. Tap to hide' : 'Show what each lens sees', 'lens', onLens, lens)}
       {button('Map and layers', 'layers', onLayers, layersOpen)}

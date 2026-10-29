@@ -1,3 +1,4 @@
+import { getMoonIllumination } from 'suncalc'
 /*
  * MOONRISE AND MOONSET, AND WHERE ON THE HORIZON, for the map's moon rays.
  *
@@ -17,6 +18,9 @@ export interface MoonArc {
   /** Where the moon is at the instant asked, and how high. */
   azimuth: number
   altitude: number
+  /** suncalc's phase at the instant (0 new, 0.5 full) and the lit fraction: for the small moons drawn at its phase. */
+  phase: number
+  lit: number
 }
 
 const usable = (d: unknown): d is Date => d instanceof Date && !Number.isNaN(d.getTime())
@@ -27,5 +31,6 @@ export function getMoonArc(at: Date, lat: number, lon: number): MoonArc {
   const event = (when: unknown): SunEvent | null =>
     usable(when) ? { at: when, azimuth: normalizeBearing(getMoonPosition(when, lat, lon).azimuth) } : null
   const now = getMoonPosition(at, lat, lon)
-  return { rise: event(times.rise), set: event(times.set), azimuth: normalizeBearing(now.azimuth), altitude: now.altitude }
+  const illum = getMoonIllumination(at)
+  return { rise: event(times.rise), set: event(times.set), azimuth: normalizeBearing(now.azimuth), altitude: now.altitude, phase: illum.phase, lit: illum.fraction }
 }

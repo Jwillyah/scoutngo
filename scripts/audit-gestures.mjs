@@ -141,6 +141,29 @@ try {
     for (const [k, n] of Object.entries(over.out)) fail(`${k} sits over the map and takes a finger (${n} points)`)
     console.log(`  ${over.cells} points of the map, ${Object.keys(over.out).length} boxes in the way`)
 
+    /* ---------------------------------------- the time pills (section 7) */
+    console.log('### the time pills: clear of every control over the map, and of each other')
+    await ev(`(() => { const inp = document.querySelector('.tbar__jump'); const day = String(inp.value).slice(0, 10); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(inp, day + 'T19:30'); inp.dispatchEvent(new Event('input', { bubbles: true })); return 1 })()`)
+    await wait(800)
+    if (!(await ev(`document.querySelector('button.tooldock__btn--sunmoon')?.getAttribute('aria-pressed') === 'true'`))) await ev(`document.querySelector('button.tooldock__btn--sunmoon')?.click()`)
+    await wait(2000)
+    const pills = JSON.parse(await ev(`JSON.stringify((() => {
+      const ps = [...document.querySelectorAll('.raypill')].filter((p) => !p.hidden).map((p) => ({ t: p.textContent, r: p.getBoundingClientRect() }))
+      const chrome = [...document.querySelectorAll('.rail2 button, .mapctl button, .maplibregl-ctrl, .topbar, .chips2, .tooldock, .sheet, .shadowkey')].map((n) => ({ n: n.className?.baseVal ?? n.className, r: n.getBoundingClientRect() })).filter((c) => c.r.width > 0)
+      const hit = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
+      const out = []
+      for (const [i, p] of ps.entries()) {
+        for (const c of chrome) if (hit(p.r, c.r)) out.push(p.t + ' on ' + String(c.n).split(' ')[0])
+        for (const q of ps.slice(i + 1)) if (hit(p.r, q.r)) out.push(p.t + ' on ' + q.t)
+      }
+      return { n: ps.length, moon: ps.filter((p) => /Moon/.test(p.t)).length, out }
+    })())`))
+    if (pills.moon === 0) fail('the moon was on and no moon pill showed, so the pills were not checked')
+    for (const o of pills.out) fail(`a time pill sits on something: ${o}`)
+    console.log(`  ${pills.n} pills (${pills.moon} the moon's), ${pills.out.length} on a control or another pill`)
+    await ev(`document.querySelector('button.tooldock__btn--sunmoon')?.click()`)
+    await wait(500)
+
     /* ----------------------------------------------------------- ruler */
     console.log('### the ruler: sideways is the time, up is the sheet, a tap jumps')
     const state = `JSON.stringify({ sheet: document.querySelector('.sheet')?.dataset.detent, at: Number(document.querySelector('.tbar__strip')?.getAttribute('aria-valuenow')) })`

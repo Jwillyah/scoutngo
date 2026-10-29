@@ -418,6 +418,9 @@ interface PlanModeProps {
  * permanent lens chip row that is now one control. See the comments at each
  * site.
  */
+/* Set once the moon's one-time hint has been shown. */
+const MOON_HINT_KEY = 'scoutngo.moonHint.v1'
+
 export function PlanMode({
   mapHandle,
   venue,
@@ -775,6 +778,7 @@ export function PlanMode({
    * because the threshold depends on how wide the screen actually is.
    */
   const [mapZoom, setMapZoom] = useState(16.5)
+  const [moonHint, setMoonHint] = useState(false)
   /* Sky › Calendar, a page of its own (CalendarPage.tsx). ?calendar=1 opens it, for the overflow audit. */
   const [calendarOpen, setCalendarOpen] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('calendar') === '1')
   /* Compare a photo (src/components/ComparePhoto.tsx). ?compare=1 opens it, for scripts/measure-compare.mjs. */
@@ -2315,6 +2319,7 @@ export function PlanMode({
         />
       )}
       {headingNote === null ? null : <Toast message={headingNote} onDone={dismissHeadingNote} />}
+      {moonHint ? <Toast message="Moon: where it rises and sets today." onDone={() => setMoonHint(false)} /> : null}
       {!placing ? null : (
         <p className="tapnote">{placingHint('position', addsAir ? 'air' : 'ground')}</p>
       )}
@@ -2477,7 +2482,20 @@ export function PlanMode({
       {sheet === 'full' ? null : (
         <ToolDock
           moon={moonOn}
-          onMoon={() => setMoonOn(!moonOn)}
+          onMoon={() => {
+            if (!moonOn) {
+              /* The first time only: what the moon lines are. */
+              try {
+                if (localStorage.getItem(MOON_HINT_KEY) === null) {
+                  localStorage.setItem(MOON_HINT_KEY, '1')
+                  setMoonHint(true)
+                }
+              } catch {
+                /* No storage: no hint, the lines still say what they are. */
+              }
+            }
+            setMoonOn(!moonOn)
+          }}
           onCalendar={() => setCalendarOpen(true)}
           lens={coneMode === 'all'}
           onLens={() => onConeMode(coneMode === 'all' ? 'none' : 'all')}

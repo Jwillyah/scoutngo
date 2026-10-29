@@ -12926,3 +12926,58 @@
   align-items: center;
   gap: 6px;
 }
+
+
+/* The moon's pills: its colour, the moon at its phase, and what it is (29 Oct). */
+.raypill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.raypill--moonrise,
+.raypill--moonset,
+.raypill--moon {
+  border-color: var(--moon);
+  color: var(--moon);
+}
+
+/* The time bar's moon: its curve in its colour, the moon at the needle, a line in words under the bar. */
+.tbar__moon {
+  stroke: var(--moon) !important;
+}
+
+.tbar__moonline {
+  margin: 2px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs);
+  color: var(--moon);
+}
+
+/* The dock's moon: dim while off, lit and said when on. */
+.tooldock__btn--sunmoon:not(.tooldock__btn--on) .icon {
+  filter: grayscale(0.8);
+  opacity: 0.55;
+}
+
+.tooldock__cap {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 2px);
+  transform: translateX(-50%);
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--black);
+  border: 1px solid var(--moon);
+  color: var(--moon);
+  font-size: var(--text-label);
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.tooldock__btn {
+  position: relative;
+}
