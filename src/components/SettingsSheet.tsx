@@ -1,6 +1,6 @@
 import { CLOCK_OPTIONS, DISTANCE_UNITS, WIND_UNITS, type Units } from '../lib/units.ts'
 import { SURF_OPTIONS, useSurfSetting } from '../lib/surfSetting.ts'
-import type { BuildCheck } from '../lib/build.ts'
+import { buildLabelWithDate, type BuildCheck } from '../lib/build.ts'
 import { NUMERALS_LABEL, NUMERALS_NOTE } from '../core/numerals.ts'
 import { BuildStamp } from './BuildStamp.tsx'
 import { useTouchDebug } from '../lib/touchDebug.ts'
@@ -92,6 +92,7 @@ export function SettingsSheet({ units, onUnits, showNumbers, onShowNumbers, onHo
         <span className="toggle__text">
           <span className="toggle__label">Debug touch</span>
           <span className="toggle__note">A box over the map logging fingers, pinch scale, zoom and every camera move. Copy log puts it on your clipboard; nothing is sent.</span>
+          <span className="toggle__note num">Build {buildLabelWithDate()}</span>
         </span>
       </label>
       {/* Which build is this: a stale bundle looks exactly like a fix that did not work. */}

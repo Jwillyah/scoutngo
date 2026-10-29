@@ -1,4 +1,4 @@
-import { buildLabel } from '../lib/build.ts'
+import { buildLabelWithDate } from '../lib/build.ts'
 import type { ReadFile } from '../lib/scoutFile.ts'
 import { BackupFile } from './BackupFile.tsx'
 import { ApiKeyField } from './ApiKeyField.tsx'
@@ -113,7 +113,7 @@ export function AboutSheet({
 
       <p className="about__foot">
         <span>Free · open source · no account</span>
-        <span className="num">{buildLabel()}</span>
+        <span className="num">{buildLabelWithDate()}</span>
       </p>
     </div>
   )

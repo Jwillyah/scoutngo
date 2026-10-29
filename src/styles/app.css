@@ -5234,35 +5234,35 @@
 .newbuild {
   position: fixed;
   top: calc(var(--safe-top) + var(--space-1));
-  left: var(--space-2);
-  right: var(--space-2);
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 60;
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-2);
+  max-width: calc(100% - 2 * var(--space-2));
+  padding: 0 0 0 var(--space-3);
   background: var(--color-panel);
   border: var(--line-hair) solid var(--color-accent-2);
-  border-radius: var(--radius-panel);
+  border-radius: 999px;
   box-shadow: 0 2px 20px color-mix(in srgb, var(--black) 55%, transparent);
+  white-space: nowrap;
 }
 
 .newbuild__text {
-  flex: 1 1 auto;
-  margin: 0;
   color: var(--color-text);
-  font-size: var(--text-xs);
-  line-height: var(--leading-normal);
+  font-size: var(--text-sm);
 }
 
 .newbuild__btn {
   flex: 0 0 auto;
   min-height: var(--control-height);
+  min-width: var(--control-height);
   padding: 0 var(--space-3);
   background: var(--white);
   color: var(--black);
   border: 0;
-  border-radius: var(--radius-panel);
+  border-radius: 999px;
   font-size: var(--text-sm);
   font-weight: var(--weight-heavy);
 }

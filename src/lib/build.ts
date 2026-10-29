@@ -63,6 +63,18 @@ export function buildLabel(): string {
 }
 
 /**
+ * The hash and the day it was built, for About and Debug touch: "69a46dd · 2026-10-29".
+ *
+ * The day is the build's own, compiled in beside the hash, so a pasted debug
+ * log or a screenshot of About says which code it is and how old, without
+ * anybody looking the hash up.
+ */
+export function buildLabelWithDate(time: string = BUILD_TIME): string {
+  const day = /^\d{4}-\d{2}-\d{2}/.exec(time)?.[0]
+  return day === undefined ? buildLabel() : `${buildLabel()} · ${day}`
+}
+
+/**
  * The marker the check reads out of index.html.
  *
  * A meta tag rather than the asset filenames: those are hashed per chunk, so
@@ -123,6 +135,19 @@ export async function checkForNewBuild(
  * actually needs it.
  */
 export const BUILD_CHECK_INTERVAL_MS = 15 * 60 * 1000
+
+/**
+ * WHEN A CHECK COULD NOT ASK, ASK AGAIN SOON (29 Oct).
+ *
+ * The home-screen app is resumed far more often than it is launched, and on
+ * a resume the radio is often not up yet: the one check made on coming back
+ * failed, said 'unknown', and nothing asked again until the fifteen-minute
+ * timer, which iOS pauses in the background anyway. In WebKit, a resume
+ * whose first check failed was still on the old build thirty seconds after
+ * the signal came back. These are the waits before each retry, while the
+ * page is in front; after the last one the timer above takes over.
+ */
+export const BUILD_RETRY_MS: readonly number[] = [3_000, 10_000, 30_000]
 
 
 /**

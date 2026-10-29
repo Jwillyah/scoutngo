@@ -5,6 +5,7 @@ const deps = (over: Partial<AdoptDeps> = {}): AdoptDeps => {
   let stored: string | null = null
   return {
     sinceLoad: 500,
+    touched: false,
     read: () => stored,
     write: (id) => {
       stored = id
@@ -33,6 +34,21 @@ describe('adopting a newer build', () => {
       act: 'offer',
       why: 'not a cold load',
     })
+  })
+
+  /*
+   * NEVER ON ITS OWN MID-DRAG (29 Oct). A slow home-screen launch can put the
+   * answer a few seconds after somebody has started using the page; young
+   * but touched is in use, and gets the pill.
+   */
+  it('only offers once the page has been touched, however young', () => {
+    expect(adoptChoice('06206f1', deps({ sinceLoad: 4000, touched: true }))).toEqual({ act: 'offer', why: 'in use' })
+  })
+
+  it('records nothing when it only offers, so the pill\'s reload is not refused later', () => {
+    const d = deps({ touched: true })
+    adoptChoice('06206f1', d)
+    expect(d.read()).toBeNull()
   })
 
   it('treats the boundary itself as still cold', () => {
@@ -66,6 +82,7 @@ describe('adopting a newer build', () => {
   it('still decides when storage is unavailable', () => {
     const d: AdoptDeps = {
       sinceLoad: 100,
+      touched: false,
       read: () => null,
       write: () => {
         throw new Error('storage disabled')

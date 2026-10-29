@@ -48,6 +48,16 @@ const KEY = 'scoutngo.adopted.v1'
 export interface AdoptDeps {
   /** Milliseconds since this document started loading. */
   sinceLoad: number
+  /**
+   * Whether a finger or a pointer has touched the page since it loaded.
+   *
+   * TEN SECONDS IS NOT "NOTHING TO LOSE" ON ITS OWN (29 Oct). A home-screen
+   * launch on a slow signal opens the saved document in three seconds and
+   * the check answers a few seconds later, and by then somebody can be
+   * halfway through a drag or a pinch. A page that has been touched is in
+   * use, however young, and gets the pill instead.
+   */
+  touched: boolean
   /** Reads the id this tab has already reloaded for, or null. */
   read: () => string | null
   /** Records the id being reloaded for. */
@@ -56,7 +66,7 @@ export interface AdoptDeps {
 
 export type AdoptChoice =
   | { act: 'reload'; to: string }
-  | { act: 'offer'; why: 'not a cold load' | 'already tried' }
+  | { act: 'offer'; why: 'not a cold load' | 'already tried' | 'in use' }
 
 /**
  * Whether to adopt the deployed build now, or leave it to the notice.
@@ -69,6 +79,7 @@ export type AdoptChoice =
 export function adoptChoice(deployed: string, deps: AdoptDeps): AdoptChoice {
   if (deps.read() === deployed) return { act: 'offer', why: 'already tried' }
   if (deps.sinceLoad > COLD_LOAD_MS) return { act: 'offer', why: 'not a cold load' }
+  if (deps.touched) return { act: 'offer', why: 'in use' }
   deps.write(deployed)
   return { act: 'reload', to: deployed }
 }
@@ -88,10 +99,25 @@ export function adoptUrl(href: string, deployed: string): string {
   return url.toString()
 }
 
+/*
+ * THE FIRST TOUCH, noticed once, from the moment this module loads. Capture
+ * phase on the window so nothing the app does can hide it, passive so it
+ * costs a scroll nothing, and removed after the first one.
+ */
+let touchedSinceLoad = false
+if (typeof window !== 'undefined') {
+  const mark = () => {
+    touchedSinceLoad = true
+    for (const type of ['pointerdown', 'touchstart', 'keydown']) window.removeEventListener(type, mark, true)
+  }
+  for (const type of ['pointerdown', 'touchstart', 'keydown']) window.addEventListener(type, mark, { capture: true, passive: true })
+}
+
 /** The browser-facing wiring. Separated so the decision above stays testable. */
 export function browserAdoptDeps(): AdoptDeps {
   return {
     sinceLoad: typeof performance === 'undefined' ? 0 : performance.now(),
+    touched: touchedSinceLoad,
     read: () => {
       try {
         return window.sessionStorage.getItem(KEY)

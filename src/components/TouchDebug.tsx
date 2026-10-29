@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { buildLabelWithDate } from '../lib/build.ts'
 import { clearTouchLog, useTouchLog } from '../lib/touchDebug.ts'
 
 /*
@@ -12,7 +13,8 @@ export function TouchDebug() {
   const [copied, setCopied] = useState<string | null>(null)
 
   const copy = async () => {
-    const text = lines.join('\n')
+    /* The build first, so a pasted log says which code it came from. */
+    const text = [`build ${buildLabelWithDate()}`, ...lines].join('\n')
     try {
       await navigator.clipboard.writeText(text)
       setCopied(`Copied ${lines.length} lines`)
@@ -24,7 +26,7 @@ export function TouchDebug() {
   return (
     <div className="touchdbg" role="region" aria-label="Debug touch">
       <p className="touchdbg__now num">
-        fingers {fingers} · scale {scale === null ? '—' : scale.toFixed(3)} · zoom {zoom === null ? '—' : zoom.toFixed(3)}
+        {buildLabelWithDate()} · fingers {fingers} · scale {scale === null ? '—' : scale.toFixed(3)} · zoom {zoom === null ? '—' : zoom.toFixed(3)}
       </p>
       <pre className="touchdbg__log num">{lines.slice(-10).join('\n')}</pre>
       <div className="touchdbg__actions">
@@ -36,7 +38,7 @@ export function TouchDebug() {
         </button>
         {copied === null ? null : <span className="touchdbg__note">{copied}</span>}
       </div>
-      {copied?.startsWith('Could not') ? <textarea className="touchdbg__all num" readOnly value={lines.join('\n')} /> : null}
+      {copied?.startsWith('Could not') ? <textarea className="touchdbg__all num" readOnly value={[`build ${buildLabelWithDate()}`, ...lines].join('\n')} /> : null}
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { BUILD_ID, type BuildCheck } from '../lib/build.ts'
+import type { BuildCheck } from '../lib/build.ts'
 import { adoptUrl } from '../lib/adoptBuild.ts'
 
 interface NewBuildNoticeProps {
@@ -18,6 +18,10 @@ interface NewBuildNoticeProps {
  * would not help: a build deployed while the app has been open a while, and a
  * cold load whose automatic attempt did not take. See src/lib/adoptBuild.ts.
  *
+ * A PILL, NOT A PARAGRAPH (29 Oct): "New version ready · Reload", top
+ * centre, as small as a 44 px button allows. Which build is running and which
+ * is deployed is said in Settings, under Debug touch, and in About.
+ *
  * Not hazard red. A newer build is not a problem, and dressing it as one would
  * make every deploy look like an incident. Saved spots and offline field packs
  * are in localStorage and survive the reload regardless, which is why this can
@@ -28,11 +32,7 @@ export function NewBuildNotice({ check }: NewBuildNoticeProps) {
 
   return (
     <div className="newbuild" role="status">
-      <p className="newbuild__text">
-        A newer build is deployed. This one is{' '}
-        <span className="num">{BUILD_ID}</span>, the server has{' '}
-        <span className="num">{check.deployed}</span>.
-      </p>
+      <span className="newbuild__text">New version ready</span>
       <button
         type="button"
         className="newbuild__btn"
@@ -40,7 +40,8 @@ export function NewBuildNotice({ check }: NewBuildNoticeProps) {
          * location.reload() alone can be answered from the cache that caused
          * this, so the document is re-requested by URL with a cache-busting
          * parameter. index.html names the hashed bundles, so getting a fresh
-         * document is the whole fix.
+         * document is the whole fix. The worker took the new shell the moment
+         * it installed (src/sw/sw.ts), so there is nothing waiting to skip.
          *
          * THE SAME adoptUrl THE AUTOMATIC PATH USES. It was a second copy of
          * the same three lines here, which is two definitions of "the address
@@ -49,7 +50,7 @@ export function NewBuildNotice({ check }: NewBuildNoticeProps) {
          */
         onClick={() => window.location.replace(adoptUrl(window.location.href, check.deployed))}
       >
-        Load it
+        Reload
       </button>
     </div>
   )

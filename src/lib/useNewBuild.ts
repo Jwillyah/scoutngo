@@ -1,37 +1,40 @@
 import { useEffect, useState } from 'react'
-import { BUILD_CHECK_INTERVAL_MS, checkForNewBuild, type BuildCheck } from './build.ts'
+import { BUILD_CHECK_INTERVAL_MS, BUILD_RETRY_MS, checkForNewBuild, type BuildCheck } from './build.ts'
 import { adoptChoice, adoptUrl, browserAdoptDeps } from './adoptBuild.ts'
 
 /**
  * Watches for a newer build being deployed.
  *
- * ON A TIMER AND ON RETURN TO THE FOREGROUND. The timer catches a build pushed
- * while the app is open; the visibility change catches the far more common
- * case, a phone that has been in a pocket since yesterday and is now being
- * looked at again. iOS suspends timers in a backgrounded tab, so without the
- * second trigger the interval alone would fire late or not at all.
+ * ON LAUNCH, ON A TIMER, AND EVERY WAY A PAGE COMES BACK TO THE FRONT. The
+ * timer catches a build pushed while the app is open. Coming back is the far
+ * more common case, a phone that has been in a pocket since yesterday, and a
+ * home-screen app says so in more than one way: visibilitychange, pageshow
+ * from the back-forward cache, focus, and online when the signal returns.
+ * Each one looks; looking twice costs one small request.
  *
- * A COLD LOAD ADOPTS A NEWER BUILD; ANYTHING LATER IS AN OFFER.
+ * A CHECK THAT COULD NOT ASK IS RETRIED (BUILD_RETRY_MS), not left until the
+ * timer: on a resume the radio is often still waking, and one failed check
+ * used to mean the old build until the next quarter-hour (29 Oct).
  *
- * This used to only ever report. That was right about the dangerous case and
- * wrong about the common one: if nobody pressed the button, the next launch
- * loaded the same stale document and offered the same button again, and a
- * phone could sit a week behind while the server had the fix the whole time.
+ * Each look also asks the browser to fetch /sw.js again, so the new shell is
+ * cached for the next launch with no signal.
  *
- * Seconds after launch there is nothing on screen to lose, so it just takes
- * the new build. Twenty minutes in, somebody may be standing on a dock
- * halfway through setting up, and it goes back to offering. The decision is
- * in src/lib/adoptBuild.ts, on its own, because the way it can be wrong --
- * reloading mid-shoot, or reloading in a loop -- is not something a render
- * test would catch.
+ * A COLD, UNTOUCHED LOAD ADOPTS A NEWER BUILD; ANYTHING ELSE IS THE PILL.
+ * Seconds after launch, before anything is touched, there is nothing on
+ * screen to lose. Once a finger has been down, or the session is under way,
+ * it waits for "Reload". The decision is src/lib/adoptBuild.ts.
  */
 export function useNewBuild(): BuildCheck {
   const [state, setState] = useState<BuildCheck>({ status: 'unknown' })
 
   useEffect(() => {
     let live = true
+    let retry: number | undefined
+    let tries = 0
 
     const look = () => {
+      window.clearTimeout(retry)
+      void navigator.serviceWorker?.getRegistration().then((reg) => reg?.update()).catch(() => undefined)
       void checkForNewBuild().then((next) => {
         /*
          * Once stale, always stale. A later check that comes back 'unknown'
@@ -41,6 +44,13 @@ export function useNewBuild(): BuildCheck {
         if (!live) return
         setState((current) => (current.status === 'stale' ? current : next))
 
+        if (next.status === 'unknown') {
+          const wait = BUILD_RETRY_MS[tries]
+          tries += 1
+          if (wait !== undefined && document.visibilityState === 'visible') retry = window.setTimeout(look, wait)
+          return
+        }
+        tries = 0
         if (next.status !== 'stale') return
         const choice = adoptChoice(next.deployed, browserAdoptDeps())
         if (choice.act === 'reload') {
@@ -53,17 +63,28 @@ export function useNewBuild(): BuildCheck {
       })
     }
 
+    /* A fresh return gets a fresh set of retries. */
+    const back = () => {
+      if (document.visibilityState !== 'visible') return
+      tries = 0
+      look()
+    }
+
     look()
     const timer = window.setInterval(look, BUILD_CHECK_INTERVAL_MS)
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') look()
-    }
-    document.addEventListener('visibilitychange', onVisible)
+    document.addEventListener('visibilitychange', back)
+    window.addEventListener('pageshow', back)
+    window.addEventListener('focus', back)
+    window.addEventListener('online', back)
 
     return () => {
       live = false
       window.clearInterval(timer)
-      document.removeEventListener('visibilitychange', onVisible)
+      window.clearTimeout(retry)
+      document.removeEventListener('visibilitychange', back)
+      window.removeEventListener('pageshow', back)
+      window.removeEventListener('focus', back)
+      window.removeEventListener('online', back)
     }
   }, [])
 
