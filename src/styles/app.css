@@ -1434,6 +1434,67 @@
   inset: 0;
   width: 100%;
   height: 100%;
+  /*
+   * THE WHOLE MAP, NOT ONLY ITS CANVAS. maplibre-gl.css sets touch-action on
+   * the canvas container; the pin, the ray labels and the figures sit beside
+   * it in this element, and a pinch begun on one of them was Safari's to
+   * scale the page with (29 Oct).
+   */
+  touch-action: none;
+}
+
+/*
+ * DEBUG TOUCH (src/components/TouchDebug.tsx): a small box of text under the
+ * top bar. It takes no touch but its buttons, so a pinch through it is a
+ * pinch on the map.
+ */
+.touchdbg {
+  position: fixed;
+  top: calc(var(--safe-top) + 150px);
+  left: var(--space-2);
+  right: var(--space-2);
+  z-index: 90;
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  background: color-mix(in srgb, var(--black) 72%, transparent);
+  color: var(--color-text);
+  font-size: 11px;
+  line-height: 1.35;
+  pointer-events: none;
+}
+
+.touchdbg__now,
+.touchdbg__log {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.touchdbg__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.touchdbg__btn {
+  pointer-events: auto;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  background: var(--panel-sheen);
+  color: var(--color-text);
+  border: var(--line-hair) solid var(--color-line-strong);
+}
+
+.touchdbg__note {
+  color: var(--color-text-faint);
+}
+
+.touchdbg__all {
+  pointer-events: auto;
+  width: 100%;
+  min-height: 120px;
+  font-size: 11px;
 }
 
 .map--picking .map__canvas {

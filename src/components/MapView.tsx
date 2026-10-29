@@ -5,6 +5,8 @@ import { loadTile, PROTOCOL, viaProtocol } from '../lib/offlineCache.ts'
 import { RAY_SCREEN_FRACTION } from '../lib/rayLength.ts'
 import { FLOATING_CHROME_SELECTORS, floatingChromeNodes } from '../lib/floatingChrome.ts'
 import { belowStatusBar, safeInsetTop } from '../lib/safeArea.ts'
+import { asCaller, instrumentMap, logTouch, useTouchDebug } from '../lib/touchDebug.ts'
+import { TouchDebug } from './TouchDebug.tsx'
 import { IMAGERY_TEMPLATE, TERRAIN_TEMPLATE } from '../lib/offlineSources.ts'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
@@ -149,6 +151,10 @@ const ESRI_TILES = viaProtocol(IMAGERY_TEMPLATE)
 /* The coarse picture under the imagery (see the style below), and the two base layers app layers go above. */
 const UNDERLAY_LAYER = 'esri-underlay'
 const UNDERLAY_MAX_ZOOM = 10
+/* How long a finer imagery tile takes to fade over the coarser one (see the style). */
+export const IMAGERY_FADE_MS = 300
+/* 2D shadows start here: at 3 miles out a whole block of them is one dark smear by the pin. */
+export const SHADOWS_MIN_ZOOM = 14
 const BASE_LAYERS: ReadonlySet<string> = new Set(['esri', UNDERLAY_LAYER])
 
 /**
@@ -1294,20 +1300,29 @@ export function MapView({
   /* Fingers on the map right now, and the one camera move waiting for them to lift. */
   const fingers = useRef(0)
   const waiting = useRef<(() => void) | null>(null)
+  /* A resize asked for while a finger was down: run when they lift (see the resize effect). */
+  const resizeWaiting = useRef(false)
   /**
    * Every camera move the app makes goes through here: now, or once no
    * finger is down and the map has stopped coasting. Only the latest waits;
-   * an older one would be stale by the time it ran.
+   * an older one would be stale by the time it ran. The tag names who asked,
+   * for Debug touch (src/lib/touchDebug.ts).
    */
-  const moveCamera = useCallback((move: () => void) => {
+  const moveCamera = useCallback((tag: string, move: () => void) => {
+    const tagged = () => asCaller(tag, move)
     if (fingers.current > 0) {
-      waiting.current = move
+      waiting.current = tagged
+      logTouch(`held for the fingers: ${tag}`)
       return
     }
-    move()
+    tagged()
   }, [])
   const releaseCamera = useCallback(() => {
     const instance = map.current
+    if (resizeWaiting.current && instance !== null) {
+      resizeWaiting.current = false
+      asCaller('resize, after the fingers', () => instance.resize())
+    }
     const move = waiting.current
     if (move === null) return
     waiting.current = null
@@ -1372,7 +1387,15 @@ export function MapView({
          */
         layers: [
           { id: UNDERLAY_LAYER, type: 'raster', source: UNDERLAY_LAYER },
-          { id: 'esri', type: 'raster', source: 'esri', paint: { 'raster-fade-duration': 0 } },
+          /*
+           * A CROSSFADE, NOT A POP (29 Oct). At 0 every finer tile replaced the
+           * coarser one in a single frame as a pinch crossed a zoom level, and
+           * on a phone's network that lands late and reads as the picture
+           * jumping. 300 ms: MapLibre keeps the coarser tile drawn under the
+           * new one until the fade is done, and the underlay is under both,
+           * so the fade is never from black, which is why it was 0.
+           */
+          { id: 'esri', type: 'raster', source: 'esri', paint: { 'raster-fade-duration': IMAGERY_FADE_MS } },
         ],
       },
       /*
@@ -1796,6 +1819,7 @@ export function MapView({
         id: 'shadow-fill',
         type: 'fill',
         source: SHADOW_SOURCE,
+        minzoom: SHADOWS_MIN_ZOOM,
         filter: ['==', ['get', 'kind'], 'building'],
         paint: { 'fill-color': readToken('--black', '#0a090c', container.current), 'fill-opacity': 0.45 },
       })
@@ -1803,6 +1827,7 @@ export function MapView({
         id: 'shadow-subject',
         type: 'line',
         source: SHADOW_SOURCE,
+        minzoom: SHADOWS_MIN_ZOOM,
         filter: ['==', ['get', 'kind'], 'subject'],
         paint: { 'line-color': readToken('--black', '#0a090c', container.current), 'line-width': 6, 'line-opacity': 0.6 },
       })
@@ -2416,12 +2441,12 @@ export function MapView({
          * inverting against a different pitch.
          */
         const terrainNow = withTerrain(instance, capture.terrain)
-        instance.jumpTo(capture.camera)
+        asCaller('capture', () => instance.jumpTo(capture.camera))
         const out = points.map((p) => {
           const ll = instance.unproject([p.x * capture.width, p.y * capture.height])
           return { lat: ll.lat, lon: ll.lng }
         })
-        instance.jumpTo(restore)
+        asCaller('capture', () => instance.jumpTo(restore))
         terrainNow.restore()
         return out
       },
@@ -2438,18 +2463,18 @@ export function MapView({
         }
         // Same snap-there-and-back as unprojectFromCapture, for the same reason.
         const terrainNow = withTerrain(instance, capture.terrain)
-        instance.jumpTo(capture.camera)
+        asCaller('capture', () => instance.jumpTo(capture.camera))
         const out = points.map((point) => {
           const p = instance.project([point.lon, point.lat])
           return { x: p.x / capture.width, y: p.y / capture.height }
         })
-        instance.jumpTo(restore)
+        asCaller('capture', () => instance.jumpTo(restore))
         terrainNow.restore()
         return out
       },
 
       flyTo(at, zoom) {
-        moveCamera(() =>
+        moveCamera('flyTo', () =>
           map.current?.flyTo({
             center: [at.lon, at.lat],
             zoom: zoom ?? Math.max(map.current.getZoom(), 17),
@@ -2463,7 +2488,7 @@ export function MapView({
         if (instance === null || points.length === 0) return
         const bounds = new maplibregl.LngLatBounds()
         for (const p of points) bounds.extend([p.lon, p.lat])
-        moveCamera(() => instance.fitBounds(bounds, {
+        moveCamera('fitBounds', () => instance.fitBounds(bounds, {
           // Top clears the search field and the mode row; bottom clears the sheet.
           padding: padding ?? {
             top: 150,
@@ -2477,25 +2502,25 @@ export function MapView({
       },
 
       setBearing(bearing, instant) {
-        moveCamera(() => {
+        moveCamera(instant === true ? 'bearing, compass' : 'bearing', () => {
           if (instant === true) map.current?.setBearing(bearing)
           else map.current?.easeTo({ bearing, duration: 400 })
         })
       },
       setPitch(pitch) {
-        moveCamera(() => map.current?.easeTo({ pitch, duration: 400 }))
+        moveCamera('pitch', () => map.current?.easeTo({ pitch, duration: 400 }))
         latest.current.onPitchChange(pitch)
       },
 
       zoomTo(zoom) {
-        moveCamera(() => map.current?.easeTo({ zoom, duration: 400 }))
+        moveCamera('zoomTo', () => map.current?.easeTo({ zoom, duration: 400 }))
       },
       drawShadows(features) {
         const source = map.current?.getSource(SHADOW_SOURCE) as maplibregl.GeoJSONSource | undefined
         source?.setData(features)
       },
       zoomBy(delta) {
-        moveCamera(() => map.current?.easeTo({ zoom: (map.current.getZoom() ?? 16) + delta, duration: 250 }))
+        moveCamera('zoomBy', () => map.current?.easeTo({ zoom: (map.current.getZoom() ?? 16) + delta, duration: 250 }))
       },
     }),
     [probeHandle, moveCamera],
@@ -2532,7 +2557,7 @@ export function MapView({
        * threshold the zoom is the user's and is left alone.
        */
       const tooWide = instance.getZoom() < FRAME_VENUE_BELOW_ZOOM
-      moveCamera(() =>
+      moveCamera('venue', () =>
         instance.easeTo({
           center: [venue.lon, venue.lat],
           ...(tooWide ? { zoom: VENUE_ZOOM } : {}),
@@ -3559,10 +3584,27 @@ export function MapView({
     if (node === null) return
 
     let frame = 0
+    /*
+     * NOT WHILE A FINGER IS DOWN (29 Oct, pinch snapping on a real iPhone).
+     * MapLibre's resize() calls stop() when the camera is not mid-ease, and
+     * stop() ends the touch handlers: a pinch in progress is dropped and
+     * picks up again from wherever the fingers are, which is a jump. On iOS
+     * the visualViewport fires resize while a pinch is under way (Safari's
+     * bars, the page's own scale), which no desktop browser does, so every
+     * emulated pinch passed. A resize asked for with fingers down waits for
+     * them to lift, like every other camera write (releaseCamera).
+     */
     const resize = () => {
       cancelAnimationFrame(frame)
       // After layout, so the box being measured is the settled one.
-      frame = requestAnimationFrame(() => map.current?.resize())
+      frame = requestAnimationFrame(() => {
+        if (fingers.current > 0) {
+          resizeWaiting.current = true
+          logTouch('resize held for the fingers')
+          return
+        }
+        asCaller('resize', () => map.current?.resize())
+      })
     }
 
     const observer = new ResizeObserver(resize)
@@ -3693,15 +3735,24 @@ export function MapView({
     }
   }, [])
 
+  /* Debug touch: the map's camera writes, touches and Safari's gesture events, logged on the phone (src/lib/touchDebug.ts). */
+  const [debugTouch] = useTouchDebug()
+  useEffect(() => {
+    const instance = map.current
+    if (!debugTouch || !ready || instance === null) return
+    return instrumentMap(instance, instance.getContainer())
+  }, [debugTouch, ready])
+
   /* Padding moves the camera's centre too, so it waits for the fingers like any other move. */
   useEffect(() => {
-    moveCamera(() => map.current?.setPadding({ top: 0, left: 0, right: 0, bottom: bottomInset }))
+    moveCamera('sheet padding', () => map.current?.setPadding({ top: 0, left: 0, right: 0, bottom: bottomInset }))
   }, [bottomInset, moveCamera])
 
   return (
     <div className={`map${mode === null ? '' : ' map--picking'}`}>
       <div className="map__canvas" ref={container} />
       <div className="raypills" ref={pillLayer} aria-hidden="true" />
+      {debugTouch ? <TouchDebug /> : null}
       {/*
         * THE SUN, IN THE SKY, OVER THE CANVAS.
         *

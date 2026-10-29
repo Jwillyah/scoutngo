@@ -264,6 +264,42 @@ try {
       console.log(`  ${name}: ${wrong.length === 0 ? 'ok' : wrong.join(', ')}`)
       await wait(800)
     }
+    /*
+     * A VIEWPORT RESIZE HALFWAY THROUGH A PINCH (29 Oct, snapping on a real
+     * iPhone). iOS fires visualViewport resize while a pinch is under way and
+     * no desktop browser does. MapLibre's resize() stops the touch handlers,
+     * so the map froze for the rest of the pinch and jumped on the next touch:
+     * 0.585 levels behind the fingers here. Through the app's own path the
+     * resize waits for the fingers to lift. And the proof it can fail: the
+     * bare map.resize() the app used to make mid-pinch, which must be caught.
+     */
+    {
+      const pts = (gap) => [{ x: area.x - gap / 2, y: area.y, id: 0 }, { x: area.x + gap / 2, y: area.y, id: 1 }]
+      const resized = async (interrupt) => {
+        await ev(`(() => { const m = window.__probe.map; m.jumpTo({ center: m.getCenter(), zoom: 15 }); return 1 })()`)
+        await wait(1200)
+        const z0 = await ev(`window.__probe.map.getZoom()`)
+        await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pts(80) })
+        for (let s = 1; s <= 40; s += 1) {
+          await send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: pts(80 + (160 * s) / 40) })
+          await wait(16)
+          if (s === 20) {
+            await ev(interrupt)
+            await wait(50)
+          }
+        }
+        const held = await ev(`window.__probe.map.getZoom()`)
+        await wait(300)
+        await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+        await wait(1200)
+        return held - (z0 + Math.log2(240 / 80))
+      }
+      const app = await resized(`(() => { window.visualViewport.dispatchEvent(new Event('resize')); return 1 })()`)
+      const bare = await resized(`(() => { window.__probe.map.resize(); return 1 })()`)
+      if (Math.abs(app) >= 0.01) fail(`a viewport resize mid-pinch: the map ended ${app.toFixed(3)} levels off the fingers`)
+      if (Math.abs(bare) < 0.1) fail(`a bare map.resize() mid-pinch left the map only ${bare.toFixed(3)} levels off: the check cannot see a dropped pinch`)
+      console.log(`  a viewport resize mid-pinch: ${app.toFixed(3)} levels off the fingers (a bare resize: ${bare.toFixed(3)}, caught)`)
+    }
     const cam = async () => JSON.parse(await ev(`JSON.stringify((() => { const m = window.__probe.map; const c = m.getCenter(); return { z: m.getZoom(), lng: c.lng, lat: c.lat, b: m.getBearing(), p: m.getPitch() } })())`))
     const tap = async (pts) => {
       await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pts })

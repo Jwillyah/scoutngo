@@ -18,7 +18,14 @@ import App from './App.tsx'
  * pinch reads touch events, which this leaves alone. Chrome has no such event,
  * so this is the one part of the pinch fix the emulation cannot exercise.
  */
-document.addEventListener('gesturestart', (event) => event.preventDefault())
+/*
+ * ALL THREE, NOT ONE (29 Oct, still snapping on a real iPhone). Only
+ * gesturestart was stopped; Safari also scales the page from gesturechange
+ * and settles it on gestureend. Each is stopped, on the document, not passive.
+ */
+for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
+  document.addEventListener(type, (event) => event.preventDefault(), { passive: false })
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -3,6 +3,7 @@ import { SURF_OPTIONS, useSurfSetting } from '../lib/surfSetting.ts'
 import type { BuildCheck } from '../lib/build.ts'
 import { NUMERALS_LABEL, NUMERALS_NOTE } from '../core/numerals.ts'
 import { BuildStamp } from './BuildStamp.tsx'
+import { useTouchDebug } from '../lib/touchDebug.ts'
 
 /*
  * SETTINGS: HOW THE APP READS TO YOU. The clock, the wind and the distance,
@@ -60,6 +61,7 @@ function Choice<T extends string | number>({
 
 export function SettingsSheet({ units, onUnits, showNumbers, onShowNumbers, onHow, newBuild }: SettingsSheetProps) {
   const [surf, setSurf] = useSurfSetting()
+  const [debugTouch, setDebugTouch] = useTouchDebug()
   return (
     <div className="about settings">
       <div className="about__units">
@@ -81,6 +83,17 @@ export function SettingsSheet({ units, onUnits, showNumbers, onShowNumbers, onHo
         How it computes
         <span className="settings__hint">The three stages, what is arithmetic, what leaves the device, and what this is not.</span>
       </button>
+      {/*
+        * DEBUG TOUCH (src/lib/touchDebug.ts): reachable from the home-screen
+        * app, which has no address bar to type ?debug=touch into.
+        */}
+      <label className="toggle">
+        <input type="checkbox" className="toggle__box" checked={debugTouch} onChange={(event) => setDebugTouch(event.target.checked)} />
+        <span className="toggle__text">
+          <span className="toggle__label">Debug touch</span>
+          <span className="toggle__note">A box over the map logging fingers, pinch scale, zoom and every camera move. Copy log puts it on your clipboard; nothing is sent.</span>
+        </span>
+      </label>
       {/* Which build is this: a stale bundle looks exactly like a fix that did not work. */}
       <BuildStamp deployed={newBuild} />
     </div>
