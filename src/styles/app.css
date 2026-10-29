@@ -11944,7 +11944,7 @@
 
 .fly__top {
   position: absolute;
-  top: calc(env(safe-area-inset-top, 0px) + 10px);
+  top: calc(var(--safe-top) + 10px);
   left: var(--fly-pad);
   right: max(12px, env(safe-area-inset-right, 0px));
   display: flex;
@@ -12059,7 +12059,7 @@
 
 .fly__info {
   position: absolute;
-  top: calc(env(safe-area-inset-top, 0px) + 50px);
+  top: calc(var(--safe-top) + 50px);
   right: max(12px, env(safe-area-inset-right, 0px));
   max-width: 300px;
   padding: var(--space-2) var(--space-3);
@@ -12076,10 +12076,13 @@
 
 .fly__rotate {
   position: absolute;
-  top: calc(env(safe-area-inset-top, 0px) + 52px);
-  left: 50%;
-  transform: translateX(-50%);
-  max-width: 280px;
+  top: calc(var(--safe-top) + 96px);
+  /* Left of the ring (108 px at the right edge), so the compass is never under it. */
+  left: var(--space-3);
+  width: max-content;
+  max-width: min(280px, calc(100% - 108px - 12px - 3 * var(--space-3)));
+  white-space: normal;
+  text-align: left;
   padding: var(--space-2) var(--space-3);
   border: 0;
   border-radius: var(--radius-panel);
@@ -12090,9 +12093,11 @@
 
 .fly__alert {
   position: absolute;
-  top: calc(env(safe-area-inset-top, 0px) + 96px);
-  left: 50%;
-  transform: translateX(-50%);
+  top: calc(var(--safe-top) + 96px);
+  max-width: calc(100% - 108px - 12px - 3 * var(--space-3));
+  overflow-wrap: anywhere;
+  /* Left of the ring (108 px at the right edge), so the compass is never under it. */
+  left: var(--space-3);
   margin: 0;
   padding: 4px 12px;
   border-radius: 999px;
@@ -12100,7 +12105,8 @@
   color: var(--sun);
   font-size: var(--text-xs);
   font-weight: 700;
-  white-space: nowrap;
+  white-space: normal;
+  text-align: left;
 }
 
 .fly--hidden .fly__readout {
@@ -12110,7 +12116,7 @@
 /* The attitude ring, on the right, under the status. */
 .fly__ring {
   position: absolute;
-  top: calc(env(safe-area-inset-top, 0px) + 54px);
+  top: calc(var(--safe-top) + 54px);
   right: max(12px, env(safe-area-inset-right, 0px));
   width: 108px;
   height: 108px;
@@ -12153,11 +12159,32 @@
   fill: #9ad7ff;
 }
 
-.fly__windtext {
-  fill: #9ad7ff;
-  font-size: 8px;
+.fly__wind {
+  position: absolute;
+  top: calc(var(--safe-top) + 54px + 110px);
+  right: max(12px, env(safe-area-inset-right, 0px));
+  width: 108px;
+  margin: 0;
+  color: #9ad7ff;
+  font-size: var(--text-label);
   font-weight: 700;
-  text-anchor: middle;
+  text-align: center;
+  text-shadow: 0 1px 2px var(--black);
+  pointer-events: none;
+}
+
+.fly--portrait .fly__wind {
+  top: calc(var(--safe-top) + 92px + 110px);
+}
+
+.fly__credits {
+  font-size: var(--text-label);
+  opacity: 0.8;
+}
+
+/* The credits move into the fly screen's "i" while flying: nothing over the sticks. */
+:root.is-flying .clay__canvas .cesium-widget-credits {
+  display: none;
 }
 
 .fly__arc {
@@ -12269,7 +12296,7 @@
 
 /* In portrait the ring moves under the top row's left, out of the status's way. */
 .fly--portrait .fly__ring {
-  top: calc(env(safe-area-inset-top, 0px) + 92px);
+  top: calc(var(--safe-top) + 92px);
 }
 
 /* While flying, the 3D view's legend steps aside for the HUD. */

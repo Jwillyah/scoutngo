@@ -13,7 +13,8 @@
  *            reflection in it, so it lies where the sun puts it
  *   clouds   from the forecast's low, mid and high cover, placed generically
  *            and said so: "Clouds illustrative" (src/core/clouds.ts)
- *   camera   bloom, light grain, and depth of field at 70 mm
+ *   camera   bloom and depth of field at 70 mm. No grain: the per-pixel
+ *            noise drew as rainbow speckle on an iPhone's GPU (29 Oct)
  *   looks    Real (the imagery as it is) or Animated (soft painted colours,
  *            outlines, flat painted water)
  *
@@ -39,7 +40,7 @@ import {
   Matrix4,
   type CesiumWidget,
 } from '@cesium/engine'
-import { placeClouds, type Cloud, type Cover } from '../core/clouds.ts'
+import { placeCloudsForSky, type Cloud, type Cover } from '../core/clouds.ts'
 import type { LatLon } from '../core/geo.ts'
 import { seaWaves, type SeaInput } from '../core/seaSurface.ts'
 import { fogDensity, sunColour } from '../core/sunColour.ts'
@@ -115,20 +116,6 @@ ${Array.from({ length: MAX_WAVES }, (_, i) => waveTerm(i)).join('')}  vec3 nT = 
 }
 `
 
-const GRAIN_GLSL = `
-uniform sampler2D colorTexture;
-uniform float seed;
-uniform float amount;
-in vec2 v_textureCoordinates;
-float rand(vec2 co) { return fract(sin(dot(co, vec2(12.9898, 78.233)) + seed) * 43758.5453); }
-void main() {
-  vec4 c = texture(colorTexture, v_textureCoordinates);
-  float n = rand(floor(v_textureCoordinates * czm_viewport.zw)) - 0.5;
-  /* Grain shows most in the mid-tones, as on film. */
-  float l = dot(c.rgb, vec3(0.299, 0.587, 0.114));
-  out_FragColor = vec4(c.rgb + n * amount * (1.0 - abs(l - 0.5) * 1.4), c.a);
-}
-`
 
 /*
  * Animated: the ground posterised toward a soft palette, the sky left smooth
@@ -174,25 +161,19 @@ void main() {
 }
 `
 
-/* A soft cloud, drawn once: overlapping round puffs, white, fading at the edge. */
-function cloudSprite(): HTMLCanvasElement {
-  const c = document.createElement('canvas')
-  c.width = 256
-  c.height = 128
-  const ctx = c.getContext('2d')
-  if (ctx === null) return c
-  const puffs = [[70, 78, 46], [118, 60, 58], [170, 72, 48], [205, 86, 34], [40, 92, 30], [140, 92, 50]]
-  for (const [x, y, r] of puffs) {
-    const g = ctx.createRadialGradient(x, y, r * 0.2, x, y, r)
-    g.addColorStop(0, 'rgba(255,255,255,0.95)')
-    g.addColorStop(0.6, 'rgba(255,255,255,0.6)')
-    g.addColorStop(1, 'rgba(255,255,255,0)')
-    ctx.fillStyle = g
-    ctx.beginPath()
-    ctx.arc(x, y, r, 0, Math.PI * 2)
-    ctx.fill()
-  }
-  return c
+/*
+ * A SOFT CLOUD: overlapping round puffs, white, fading at the edge. AN SVG
+ * IMAGE, NOT A CANVAS (29 Oct: rainbow-speckled clouds on an iPhone, and in
+ * WebKit here). WebKit's fingerprinting protection adds noise to pixels read
+ * back from a 2D canvas, and a billboard reads its canvas back into the
+ * engine's texture: the noise was the speckle. An image decoded from SVG is
+ * not read from a canvas, so it arrives clean.
+ */
+export const CLOUD_PUFFS: readonly (readonly [number, number, number])[] = [[70, 78, 46], [118, 60, 58], [170, 72, 48], [205, 86, 34], [40, 92, 30], [140, 92, 50]]
+export function cloudSprite(): string {
+  const puffs = CLOUD_PUFFS.map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="url(#p)"/>`).join('')
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="128" viewBox="0 0 256 128"><defs><radialGradient id="p"><stop offset="0.2" stop-color="#fff" stop-opacity="0.95"/><stop offset="0.6" stop-color="#fff" stop-opacity="0.6"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>${puffs}</svg>`
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
 }
 
 /**
@@ -286,7 +267,6 @@ export function createCinema(widget: CesiumWidget, venue: LatLon, enuToFixedPoin
   let seaMaterial: Material | null = null
   let billboards: BillboardCollection | null = null
   let placed: Cloud[] = []
-  let grain: PostProcessStage | null = null
   let toon: PostProcessStage | null = null
   let dof: ReturnType<typeof PostProcessStageLibrary.createDepthOfFieldStage> | null = null
   let visibility: number | null = null
@@ -299,8 +279,7 @@ export function createCinema(widget: CesiumWidget, venue: LatLon, enuToFixedPoin
     if (billboards !== null) scene.primitives.remove(billboards)
     billboards = null
     placed = []
-    for (const s of [grain, toon, dof]) if (s !== null) scene.postProcessStages.remove(s)
-    grain = null
+    for (const s of [toon, dof]) if (s !== null) scene.postProcessStages.remove(s)
     toon = null
     dof = null
     scene.postProcessStages.bloom.enabled = false
@@ -334,7 +313,8 @@ export function createCinema(widget: CesiumWidget, venue: LatLon, enuToFixedPoin
     }
 
     if (inputs.cover !== null) {
-      placed = placeClouds(inputs.cover, inputs.seed)
+      /* Thinned to the share of the sky the forecast gives (src/core/clouds.ts, placeCloudsForSky). */
+      placed = placeCloudsForSky(inputs.cover, inputs.seed)
       if (placed.length > 0) {
         billboards = new BillboardCollection({ scene })
         const image = cloudSprite()
@@ -367,14 +347,11 @@ export function createCinema(widget: CesiumWidget, venue: LatLon, enuToFixedPoin
       toon = new PostProcessStage({ fragmentShader: TOON_GLSL })
       scene.postProcessStages.add(toon)
     }
-    grain = new PostProcessStage({ fragmentShader: GRAIN_GLSL, uniforms: { seed: 0, amount: look === 'animated' ? 0.02 : 0.035 } })
-    scene.postProcessStages.add(grain)
     scene.requestRender()
   }
 
   const frame = (seconds: number, sunAltitudeDeg: number, focusM: number) => {
     if (seaMaterial !== null) (seaMaterial.uniforms as Record<string, unknown>).time = seconds
-    if (grain !== null) (grain.uniforms as Record<string, unknown>).seed = (seconds * 97.13) % 1000
     if (dof !== null) dof.uniforms.focalDistance = Math.max(5, focusM)
     const sc = sunColour(sunAltitudeDeg, visibility)
     if (sc !== null) {

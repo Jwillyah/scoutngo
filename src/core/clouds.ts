@@ -106,3 +106,96 @@ export function coveredShareByRays(clouds: readonly Cloud[], layer: CloudLayer['
   }
   return inside === 0 ? 0 : hit / inside
 }
+
+/*
+ * THE SKY AS SEEN FROM THE VENUE (29 Oct: 37% low cover filled the whole sky
+ * in the fly view). The count above covers the layer's share of the GROUND
+ * under the field, but each cloud is drawn as an upright sprite facing the
+ * camera, and from the ground the far ones stand side by side along the
+ * horizon until the sky is a wall. What a forecast's per cent means to
+ * somebody standing there is the share of the sky, so the clouds are thinned
+ * until the share of the sky their sprites cover, seen from the venue, is at
+ * most the layer's cover, in the band a flying camera looks through: from
+ * just above the horizon to 45 degrees up. 37% placed by footprint covered
+ * 49% of that band.
+ */
+export const SKY_FROM_DEG = 3
+export const SKY_TO_DEG = 45
+/** A sprite's size against its footprint radius, as cinema.ts draws it. */
+export const SPRITE_W = 2.4
+export const SPRITE_H = 1.2
+
+const DEG = Math.PI / 180
+
+/** Directions spread evenly over the band, by solid angle. */
+function skyDirections(n: number): { az: number; alt: number }[] {
+  const out: { az: number; alt: number }[] = []
+  const zMin = Math.sin(SKY_FROM_DEG * DEG)
+  const zMax = Math.sin(SKY_TO_DEG * DEG)
+  const golden = Math.PI * (3 - Math.sqrt(5))
+  for (let i = 0; i < n; i += 1) {
+    const z = zMin + ((zMax - zMin) * (i + 0.5)) / n
+    out.push({ az: (i * golden) % (2 * Math.PI), alt: Math.asin(z) })
+  }
+  return out
+}
+const SKY = skyDirections(3000)
+
+/** One sprite as an ellipse on the sky: its centre and half-sizes, radians. */
+function spriteOnSky(c: Cloud): { az: number; alt: number; hw: number; hh: number } {
+  const ground = Math.hypot(c.east, c.north)
+  const range = Math.hypot(ground, c.up)
+  return {
+    az: Math.atan2(c.east, c.north),
+    alt: Math.atan2(c.up, ground),
+    hw: Math.atan((SPRITE_W * c.radiusM) / 2 / range),
+    hh: Math.atan((SPRITE_H * c.radiusM) / 2 / range),
+  }
+}
+
+/** The share of the band SKY_FROM_DEG..SKY_TO_DEG that one layer's sprites cover, seen from the venue. */
+export function skyShareSeen(clouds: readonly Cloud[], layer: CloudLayer['name']): number {
+  const sprites = clouds.filter((c) => c.layer === layer).map(spriteOnSky)
+  if (sprites.length === 0) return 0
+  let hit = 0
+  for (const d of SKY) {
+    for (const s of sprites) {
+      let da = Math.abs(d.az - s.az) % (2 * Math.PI)
+      if (da > Math.PI) da = 2 * Math.PI - da
+      const x = (da * Math.cos(d.alt)) / s.hw
+      const y = (d.alt - s.alt) / s.hh
+      if (x * x + y * y <= 1) {
+        hit += 1
+        break
+      }
+    }
+  }
+  return hit / SKY.length
+}
+
+/**
+ * placeClouds, thinned so that what is seen from the venue is at most each
+ * layer's cover of the sky. The ones dropped are the last placed, which the
+ * blue-noise placement put in the gaps, so the rest stay spread out.
+ */
+export function placeCloudsForSky(cover: Cover, seed: number): Cloud[] {
+  const all = placeClouds(cover, seed)
+  const out: Cloud[] = []
+  for (const layer of LAYERS) {
+    const pct = cover[layer.name]
+    let mine = all.filter((c) => c.layer === layer.name)
+    if (pct === null || mine.length === 0) continue
+    const target = pct / 100
+    /* Halve the step until the share fits: a handful of passes, not one per cloud. */
+    let hi = mine.length
+    let lo = 0
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2)
+      if (skyShareSeen(mine.slice(0, mid), layer.name) <= target) lo = mid
+      else hi = mid - 1
+    }
+    mine = mine.slice(0, lo)
+    out.push(...mine)
+  }
+  return out
+}

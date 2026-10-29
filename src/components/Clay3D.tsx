@@ -241,6 +241,9 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
   const nearCeiling = hud?.nearCeiling === true
   /* While flying the app's chrome steps aside: the dock, the sheet, the time bar (app.css :root.is-flying). */
   useEffect(() => {
+    if (ready) scene.current?.setSkyShown(!flying)
+  }, [ready, flying])
+  useEffect(() => {
     if (!flying) return
     document.documentElement.classList.add('is-flying')
     return () => document.documentElement.classList.remove('is-flying')
@@ -392,6 +395,7 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
           units={flyUnits(fly.units)}
           look={flyLook}
           lookAuto={chosenLook === null}
+          credits={scene.current?.credits() ?? []}
           onLook={setChosenLook}
           onExit={() => {
             const rec = recording.current

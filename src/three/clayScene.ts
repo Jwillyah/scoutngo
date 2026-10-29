@@ -291,6 +291,10 @@ export interface ClayScene {
   setTrees(trees: readonly MappedTree[]): void
   setPins(pins: readonly Pin[]): void
   setSkyDay(dayStart: Date): void
+  /** The sun and moon arcs and their hour pills, put away while flying. */
+  setSkyShown(show: boolean): void
+  /** The data credits the view carries, as plain text, for the fly screen's "i". */
+  credits(): string[]
   orbit(): void
   /** Fly a Preflight move; with record, resolves to the watermarked clip. */
   /** onNote: what the preview says over itself, once it has started (src/lib/preflight/play.ts previewNote). */
@@ -584,6 +588,18 @@ export function createClayScene(
 
   /* ---------------------------------------------------------- the sky arcs */
   let skyEntities: Entity[] = []
+  /*
+   * PUT AWAY WHILE FLYING (29 Oct): the arcs' hour pills drew over the
+   * Real / Animated switch, the hint and the compass, night hours ("1 AM")
+   * from the moon's arc among them. The flight has its own clock.
+   */
+  let skyShown = true
+  const setSkyShown = (show: boolean) => {
+    skyShown = show
+    for (const e of skyEntities) e.show = show
+    ;(window as unknown as { __skyShown?: boolean }).__skyShown = show
+    scene.requestRender()
+  }
   const setSkyDay = (dayStart: Date) => {
     for (const e of skyEntities) widget.entities.remove(e)
     skyEntities = []
@@ -637,6 +653,7 @@ export function createClayScene(
         },
       }),
     )
+    for (const e of skyEntities) e.show = skyShown
     const disc = skyEntities[skyEntities.length - 1]
     const follow = () => (disc.position = new ConstantPositionProperty(enuToFixedPoint(domePoint(sunNow, SKY_RADIUS))))
     scene.preRender.addEventListener(follow)
@@ -1062,9 +1079,24 @@ export function createClayScene(
     if (flyLook !== null) cinema?.frame((performance.now() - seaStart) / 1000, sunNow.altitude, 200)
   })
 
+  const credits = (): string[] => {
+    const out: string[] = []
+    for (let i = 0; i < widget.imageryLayers.length; i += 1) {
+      const credit = widget.imageryLayers.get(i).imageryProvider?.credit
+      if (credit !== undefined) out.push(credit.html)
+    }
+    const ground = widget.terrainProvider.credit
+    if (ground !== undefined) out.push(ground.html)
+    /* Sentence by sentence: the near layers repeat Esri's credit after their own. */
+    const sentences = out.flatMap((html) => html.replace(/<[^>]*>/g, '').split(/(?<=\.)\s+/)).map((t) => t.trim()).filter((t) => t !== '')
+    return [...new Set(sentences)]
+  }
+
   return {
     setSea,
     setFlyLook,
+    setSkyShown,
+    credits,
     whenShown: () => shown,
     sunNow: () => sunNow,
     setTime,
