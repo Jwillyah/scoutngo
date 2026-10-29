@@ -4,6 +4,7 @@ import * as maplibregl from 'maplibre-gl'
 import { loadTile, PROTOCOL, viaProtocol } from '../lib/offlineCache.ts'
 import { RAY_SCREEN_FRACTION } from '../lib/rayLength.ts'
 import { FLOATING_CHROME_SELECTORS, floatingChromeNodes } from '../lib/floatingChrome.ts'
+import { belowStatusBar, safeInsetTop } from '../lib/safeArea.ts'
 import { IMAGERY_TEMPLATE, TERRAIN_TEMPLATE } from '../lib/offlineSources.ts'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
@@ -2669,9 +2670,11 @@ export function MapView({
        * what is reserved here, not the empty box around them.
        */
       const chrome = floatingChromeNodes(document, FLOATING_CHROME_SELECTORS).map((n) => n.getBoundingClientRect())
+      /* And not under the status bar, from the home-screen icon (src/lib/safeArea.ts). */
+      const statusBar = safeInsetTop()
       for (const tag of tags) {
         const r = tag.getElement().getBoundingClientRect()
-        const under = chrome.some((c) => r.left < c.right && r.right > c.left && r.top < c.bottom && r.bottom > c.top)
+        const under = r.top < statusBar || chrome.some((c) => r.left < c.right && r.right > c.left && r.top < c.bottom && r.bottom > c.top)
         tag.getElement().style.visibility = under ? 'hidden' : ''
       }
     }
@@ -3407,12 +3410,20 @@ export function MapView({
      * label.
      */
     const canvas = instance.getContainer().getBoundingClientRect()
-    const viewport: Rect = {
-      left: canvas.left,
-      top: canvas.top,
-      right: canvas.right,
-      bottom: canvas.bottom,
-    }
+    /*
+     * NOT UNDER THE STATUS BAR. From the home-screen icon the map runs under
+     * the clock, and SHADOW and SUN were placed there (29 Oct). The usable
+     * top is the status bar's foot, src/lib/safeArea.ts.
+     */
+    const viewport: Rect = belowStatusBar(
+      {
+        left: canvas.left,
+        top: canvas.top,
+        right: canvas.right,
+        bottom: canvas.bottom,
+      },
+      safeInsetTop(),
+    )
     /*
      * THE PIN IS AN OBSTACLE TOO.
      *

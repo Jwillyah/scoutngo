@@ -35,6 +35,24 @@ describe('the push gate', () => {
     expect([...steps].sort((a, b) => a - b)).toEqual(steps)
   })
 
+  /*
+   * "✓ tests (N passed)", never a bare "✓". vitest colours its summary when
+   * the terminal forces colour, and the old grep for "^ *Tests" never matched
+   * past the escape code in front of it (29 Oct).
+   */
+  it('reads the test count through vitest colour, and refuses when there is none', () => {
+    const fn = source.match(/^test_count\(\) \{[\s\S]*?^\}/m)?.[0]
+    expect(fn).toBeDefined()
+    const coloured = ' \x1b[2m      Tests \x1b[22m \x1b[1m\x1b[32m2704 passed\x1b[39m\x1b[22m\x1b[90m (2704)\x1b[39m\n'
+    const count = (log: string) =>
+      spawnSync('bash', ['-c', `${fn}\ntest_count /dev/stdin`], { input: log, encoding: 'utf8' }).stdout.trim()
+    expect(count(coloured)).toBe('2704')
+    expect(count('      Tests  12 passed (12)\n')).toBe('12')
+    expect(count('no summary at all\n')).toBe('')
+    expect(source).toContain('echo "${GREEN}✓ tests ($passed passed)${OFF}"')
+    expect(source).toMatch(/\[ -n "\$passed" \] \|\| refuse/)
+  })
+
   it('runs, and lets a delete-only push through without building anything', () => {
     const zero = '0'.repeat(40)
     const run = spawnSync('bash', [HOOK], {

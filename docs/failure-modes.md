@@ -83,6 +83,7 @@ looks at the wrong thing and reports with full confidence.
 | the sheet audit, 28 Oct | the tab the previous script left behind. A long run of synthetic pinches had wedged that tab's touch input (every dispatch succeeded, no touch event arrived, a mouse click still did), so 13 of 20 drags "moved the wrong thing" in a build where a fresh tab showed none. `connect()` in `scripts/cdp.mjs` now opens a tab of its own and closes it |
 | the gesture audit, 29 Oct | a headless Chrome that had run for hours: it hung mid-flick on one run and dropped the connection on another, and Node exited on an unsettled await with no reason printed. A fresh browser passed the same code clean. The gate now starts its own headless Chrome every time, and `scripts/cdp.mjs` fails loudly when the connection drops |
 | the commit gate, on e1f3959 | the files on disk, not the files in the commit. A `git stash` taken mid-run came back to the working tree but not to the index; every check passed against the disk, and origin/main did not build for an hour until 052b5f2 added the four missing files |
+| every sheet audit, until 29 Oct | a browser tab, where both safe-area insets are zero. From the home-screen icon the iPhone gives 47 px at the top and 34 at the bottom, and there Layers had a band of sheet over the grid at half and nothing but black at the bottom detent, while every audit, Chromium with 0 px insets, passed. `scripts/audit-standalone.mjs` runs WebKit with the standalone insets |
 
 **Fix.** A check asserts the **identity** of what it measured, not only the
 value.

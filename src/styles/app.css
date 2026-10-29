@@ -2535,9 +2535,36 @@
   background: var(--panel-sheen);
   border-top: var(--line-hair) solid var(--color-edge-top);
   border-radius: var(--radius-panel) var(--radius-panel) 0 0;
-  padding-bottom: var(--safe-bottom);
   max-width: var(--page-max);
   margin: 0 auto;
+}
+
+/*
+ * THE HOME INDICATOR IS PAID INSIDE THE CONTENT, NOT BY THE SHEET.
+ *
+ * This was padding-bottom on .sheet. From the home-screen icon (standalone,
+ * an inset of 34 px) that padding was a solid band of sheet background across
+ * the foot of the screen, and at half, where the body does not scroll, it
+ * cut the layer grid off above it: the "black strip" (29 Oct). Now the body
+ * runs to the screen's edge, the sheet's background goes under the
+ * indicator, and the room is the last thing in the content, so it scrolls
+ * clear at full. At peek, where the body is hidden, the peek row keeps it.
+ */
+.sheet__content {
+  padding-bottom: var(--safe-bottom);
+}
+
+.sheet--peek {
+  padding-bottom: var(--safe-bottom);
+}
+
+/*
+ * AN EMPTY PEEK TAKES NO ROOM. Over a card with no time strip (Layers, About)
+ * the peek row is empty, and its padding put the card's header 12 px further
+ * from the grab handle for nothing.
+ */
+.sheet__peek:has(> .peek:empty) {
+  display: none;
 }
 
 /* Spring, so the sheet reads as attached to the thumb rather than animated. */
@@ -8649,6 +8676,10 @@
 .sheet__card {
   display: grid;
   gap: var(--space-3);
+  /*
+   * The top is the × button's: its 28 px circle has a 44 px touch area, and
+   * the 8 px above it is that area's top, which the scroll body would clip.
+   */
   padding: var(--space-2) var(--page-pad) var(--space-5);
 }
 

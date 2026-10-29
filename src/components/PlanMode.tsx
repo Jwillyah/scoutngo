@@ -1610,84 +1610,95 @@ export function PlanMode({
    * LAYERS AS TILES. Every tile is a drawing of what it does and carries its
    * own state; the paragraphs that used to be on every row are behind the i.
    */
+  /* The base and the overlays, named once: the tiles draw them and the peek line reads them. */
+  const layerBase = [
+    {
+      id: 'satellite',
+      label: 'Satellite',
+      state: `ON · z${Math.round(mapZoom)}`,
+      on: true,
+      art: TILE_ART.satellite,
+      onToggle: () => {},
+    },
+    {
+      id: 'terrain',
+      /* Elevation for the horizon and the sun curve. 2D no longer tilts; the 3D button is the clay model. */
+      label: 'Terrain',
+      /* The tile says what the layer is actually doing, suspension included. */
+      state: !showTerrain ? 'OFF' : terrainPaused ? 'PAUSED' : 'ON',
+      on: showTerrain,
+      art: TILE_ART.terrain,
+      onToggle: () => turnTerrain(!showTerrain),
+    },
+    /*
+     * NO CHART TILE. It toggled the same setting as Labels -- the Esri
+     * roads and place names -- under a drawing of a nautical chart the app
+     * does not have. Two tiles for one switch, one of them promising a
+     * layer that does not exist: merged into Labels.
+     */
+  ]
+  const layerOverlays = [
+    { id: 'cones', label: 'Cones', state: coneMode === 'all' ? 'ON' : 'OFF', on: coneMode === 'all', art: TILE_ART.cones, onToggle: () => onConeMode(coneMode === 'all' ? 'none' : 'all') },
+    { id: 'sun', label: 'Sun arc', state: showArc ? 'ON' : 'OFF', on: showArc, art: TILE_ART.sunArc, onToggle: () => onShowArc(!showArc) },
+    { id: 'shadows', label: 'Shadows', state: showSun ? 'ON' : 'OFF', on: showSun, art: TILE_ART.shadows, onToggle: () => onShowSun(!showSun) },
+    { id: 'cloud', label: 'Cloud', state: showSky ? 'ON' : 'OFF', on: showSky, art: TILE_ART.cloud, onToggle: () => onShowSky(!showSky) },
+    {
+      id: 'hazards',
+      label: 'Hazards',
+      state: marks.length === 0 ? 'NONE' : `${marks.length} MARKED`,
+      on: marks.length > 0,
+      art: TILE_ART.hazards,
+      onToggle: () => setCard({ kind: 'hazards' }),
+    },
+    {
+      id: 'buildings',
+      label: 'Buildings',
+      /* A note from the fetch -- "none mapped here" -- is the state. */
+      state: !showBuildings ? 'OFF' : (buildingsNote ?? 'ON'),
+      on: showBuildings,
+      art: TILE_ART.buildings,
+      /* Failed, the tile is its own Retry. */
+      onToggle: () => (showBuildings && buildingsNote === LAYER_FAILED ? setBuildingsAttempt((n) => n + 1) : onShowBuildings(!showBuildings)),
+    },
+    { id: 'labels', label: 'Labels', state: showLabels ? 'ON' : 'OFF', on: showLabels, art: TILE_ART.labels, onToggle: () => onShowLabels(!showLabels) },
+    {
+      id: 'airspace',
+      label: 'Airspace',
+      /* The state says what is on the map, including when the grid is left out. */
+      state: !airspaceOn
+        ? 'OFF'
+        : airspaceFailed
+          ? LAYER_FAILED
+          : airspaceOverlay === null
+            ? 'Loading'
+            : airspaceDense
+              ? 'ON · zoom for grid'
+              : 'ON',
+      on: airspaceOn,
+      art: TILE_ART.airspace,
+      /* On also opens the card: the shapes on the map, the words for the venue. Failed, the tile is its own Retry. */
+      onToggle: () => {
+        if (airspaceOn && airspaceFailed) {
+          setAirspaceFailed(false)
+          return
+        }
+        if (!airspaceOn) setCard({ kind: 'airspace' })
+        setAirspaceOn(!airspaceOn)
+      },
+    },
+  ]
+  /*
+   * LAYERS AT THE LOWEST DETENT: WHAT IS ON, IN ONE LINE. The peek is the time
+   * strip's room, and Layers has no time strip, so dragged to the bottom the
+   * sheet showed its grab handle over empty black (29 Oct, from the home-screen
+   * icon). Now it says which layers are drawn, e.g. "Satellite · Shadows".
+   */
+  const layersOn = [...layerBase, ...layerOverlays].filter((t) => t.on).map((t) => t.label).join(' · ')
+
   const layersCard = (
     <LayerTiles
-      base={[
-        {
-          id: 'satellite',
-          label: 'Satellite',
-          state: `ON · z${Math.round(mapZoom)}`,
-          on: true,
-          art: TILE_ART.satellite,
-          onToggle: () => {},
-        },
-        {
-          id: 'terrain',
-          /* Elevation for the horizon and the sun curve. 2D no longer tilts; the 3D button is the clay model. */
-          label: 'Terrain',
-          /* The tile says what the layer is actually doing, suspension included. */
-          state: !showTerrain ? 'OFF' : terrainPaused ? 'PAUSED' : 'ON',
-          on: showTerrain,
-          art: TILE_ART.terrain,
-          onToggle: () => turnTerrain(!showTerrain),
-        },
-        /*
-         * NO CHART TILE. It toggled the same setting as Labels -- the Esri
-         * roads and place names -- under a drawing of a nautical chart the app
-         * does not have. Two tiles for one switch, one of them promising a
-         * layer that does not exist: merged into Labels.
-         */
-      ]}
-      overlays={[
-        { id: 'cones', label: 'Cones', state: coneMode === 'all' ? 'ON' : 'OFF', on: coneMode === 'all', art: TILE_ART.cones, onToggle: () => onConeMode(coneMode === 'all' ? 'none' : 'all') },
-        { id: 'sun', label: 'Sun arc', state: showArc ? 'ON' : 'OFF', on: showArc, art: TILE_ART.sunArc, onToggle: () => onShowArc(!showArc) },
-        { id: 'shadows', label: 'Shadows', state: showSun ? 'ON' : 'OFF', on: showSun, art: TILE_ART.shadows, onToggle: () => onShowSun(!showSun) },
-        { id: 'cloud', label: 'Cloud', state: showSky ? 'ON' : 'OFF', on: showSky, art: TILE_ART.cloud, onToggle: () => onShowSky(!showSky) },
-        {
-          id: 'hazards',
-          label: 'Hazards',
-          state: marks.length === 0 ? 'NONE' : `${marks.length} MARKED`,
-          on: marks.length > 0,
-          art: TILE_ART.hazards,
-          onToggle: () => setCard({ kind: 'hazards' }),
-        },
-        {
-          id: 'buildings',
-          label: 'Buildings',
-          /* A note from the fetch -- "none mapped here" -- is the state. */
-          state: !showBuildings ? 'OFF' : (buildingsNote ?? 'ON'),
-          on: showBuildings,
-          art: TILE_ART.buildings,
-          /* Failed, the tile is its own Retry. */
-          onToggle: () => (showBuildings && buildingsNote === LAYER_FAILED ? setBuildingsAttempt((n) => n + 1) : onShowBuildings(!showBuildings)),
-        },
-        { id: 'labels', label: 'Labels', state: showLabels ? 'ON' : 'OFF', on: showLabels, art: TILE_ART.labels, onToggle: () => onShowLabels(!showLabels) },
-        {
-          id: 'airspace',
-          label: 'Airspace',
-          /* The state says what is on the map, including when the grid is left out. */
-          state: !airspaceOn
-            ? 'OFF'
-            : airspaceFailed
-              ? LAYER_FAILED
-              : airspaceOverlay === null
-                ? 'Loading'
-                : airspaceDense
-                  ? 'ON · zoom for grid'
-                  : 'ON',
-          on: airspaceOn,
-          art: TILE_ART.airspace,
-          /* On also opens the card: the shapes on the map, the words for the venue. Failed, the tile is its own Retry. */
-          onToggle: () => {
-            if (airspaceOn && airspaceFailed) {
-              setAirspaceFailed(false)
-              return
-            }
-            if (!airspaceOn) setCard({ kind: 'airspace' })
-            setAirspaceOn(!airspaceOn)
-          },
-        },
-      ]}
+      base={layerBase}
+      overlays={layerOverlays}
       tools={[
         {
           id: 'preflight',
@@ -2571,6 +2582,14 @@ export function PlanMode({
                 <span className="peek__value">{peekStatus.line}</span>
               </button>
             )}
+
+            {/* Layers dragged to the bottom: which layers are on, and a tap raises it again. */}
+            {card.kind === 'layers' && sheet === 'peek' ? (
+              <button type="button" className="peek__line peek__line--layers" onClick={() => setSheet('half')}>
+                <span className="peek__label">Layers</span>
+                <span className="peek__value">{layersOn}</span>
+              </button>
+            ) : null}
 
             {/*
               * THE TIME STRIP, ONLY WHERE TIME CHANGES THE READING.

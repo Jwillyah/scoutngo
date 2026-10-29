@@ -47,6 +47,14 @@ if [ "${#SHAS[@]}" -eq 0 ]; then
   exit 0
 fi
 
+# HOW MANY TESTS PASSED, from vitest's summary line. The line is coloured when
+# the push runs from a terminal that forces colour, and "^ *Tests" never matched
+# the escape code in front of it: the gate printed a bare "✓" for the tests.
+# The colour is stripped first, and no number is a refusal, not a blank.
+test_count() {
+  perl -pe 's/\e\[[0-9;]*m//g' "$1" | grep -E '^ *Tests ' | tail -1 | grep -oE '[0-9]+ passed' | grep -oE '[0-9]+'
+}
+
 check_commit() {
   local sha="$1" short
   short="$(git rev-parse --short=7 "$sha")"
@@ -85,7 +93,10 @@ check_commit() {
   ( cd "$tree" && npm run build ) >> "$log" 2>&1 || refuse "npm run build"
   echo "${GREEN}✓ build${OFF}"
   ( cd "$tree" && npm test ) >> "$log" 2>&1 || refuse "npm test"
-  echo "${GREEN}✓ $(grep -E '^ *Tests ' "$log" | tail -1 | tr -s ' ' | sed 's/^ //')${OFF}"
+  local passed
+  passed="$(test_count "$log")"
+  [ -n "$passed" ] || refuse "reading how many tests passed"
+  echo "${GREEN}✓ tests ($passed passed)${OFF}"
 
   echo "${GREEN}✓ push gate: $short builds and passes on its own${OFF}"
   cleanup

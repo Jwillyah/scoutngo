@@ -191,6 +191,12 @@ ok "$(grep -E 'LABEL PROBLEMS' "$SCRATCH/labels.log" | tail -1)"
 run_audit "gesture audit" scripts/audit-gestures.mjs "$SCRATCH/gestures.log" 'PROBLEM|ABORTED'
 ok "$(grep -E 'GESTURE PROBLEMS' "$SCRATCH/gestures.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
 
+# The home-screen app, in WebKit: the iPhone insets (47 top, 34 bottom) that
+# every Chromium audit sees as zero. Layers at each detent, the band over the
+# home indicator, and no map label under the status bar.
+run_audit "standalone audit" scripts/audit-standalone.mjs "$SCRATCH/standalone.log" 'PROBLEM|ABORTED'
+ok "$(grep -E 'STANDALONE PROBLEMS' "$SCRATCH/standalone.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
+
 run_audit "one surface audit" scripts/audit-surface.mjs "$SCRATCH/surface.log" 'PROBLEM|FAIL|ABORTED'
 ok "$(grep -E 'SURFACE PROBLEMS' "$SCRATCH/surface.log" | tail -1)"
 
