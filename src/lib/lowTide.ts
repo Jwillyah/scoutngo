@@ -16,6 +16,20 @@
 
 import type { TideExtreme } from '../core/tide.ts'
 
+/**
+ * THE NEXT TURN OF THE TIDE AFTER `at`, high or low (29 Oct: the chip said
+ * "Low tide 4:01 AM" at 7:13 AM; a turn that has passed is not one to plan
+ * round). Null when the predictions end before the next one.
+ */
+export function nextTideTurn(extremes: readonly TideExtreme[], at: Date): TideExtreme | null {
+  let best: TideExtreme | null = null
+  for (const e of extremes) {
+    if (e.at.getTime() <= at.getTime()) continue
+    if (best === null || e.at.getTime() < best.at.getTime()) best = e
+  }
+  return best
+}
+
 export function lowTideNearest(
   extremes: readonly TideExtreme[],
   start: Date,

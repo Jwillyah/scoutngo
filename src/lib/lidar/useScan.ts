@@ -40,6 +40,8 @@ export async function withScan(buildings: Building[], centre: { lat: number; lon
 
 export type ScanState =
   /* No lidar here: Overture's heights may be fetched instead (filled says how many, once fetched). */
+  /* Not looked yet: whether a scan is kept, or offered, is not known. Never said as "none". */
+  | { status: 'checking' }
   | { status: 'none'; overture: number | null }
   | { status: 'fetching-overture' }
   | { status: 'offered'; offer: LidarOffer; high: LidarOffer | null }
@@ -48,7 +50,7 @@ export type ScanState =
   | { status: 'failed'; offer: LidarOffer; reason: string }
 
 export function useScan(venue: { lat: number; lon: number } | null, buildings: readonly Building[]) {
-  const [state, setState] = useState<ScanState>({ status: 'none', overture: null })
+  const [state, setState] = useState<ScanState>({ status: 'checking' })
   const lat = venue?.lat ?? null
   const lon = venue?.lon ?? null
   useEffect(() => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { lowTideNearest } from './lowTide.ts'
+import { lowTideNearest, nextTideTurn } from './lowTide.ts'
 import type { TideExtreme } from '../core/tide.ts'
 
 /*
@@ -42,5 +42,21 @@ describe('the low water the chip shows', () => {
   it('looks after the window too', () => {
     const late = { at: new Date('2026-10-26T00:10Z'), feet: 0.3, kind: 'low' as const }
     expect(lowTideNearest([TURNS[1], late], START, END)).toBe(late)
+  })
+})
+
+describe('the next turn of the tide', () => {
+  /* 29 Oct at the pier: at 7:13 the chip said "Low tide 4:01 AM", a turn already past. */
+  const turns = [
+    { at: new Date('2026-10-29T08:01:00Z'), feet: 0.3, kind: 'low' as const },
+    { at: new Date('2026-10-29T14:14:00Z'), feet: 3.4, kind: 'high' as const },
+    { at: new Date('2026-10-29T20:20:00Z'), feet: 0.4, kind: 'low' as const },
+  ]
+  it('is the first high or low after the time, never one that has passed', () => {
+    expect(nextTideTurn(turns, new Date('2026-10-29T11:13:00Z'))).toEqual(turns[1])
+    expect(nextTideTurn(turns, new Date('2026-10-29T15:00:00Z'))).toEqual(turns[2])
+  })
+  it('is none after the last prediction', () => {
+    expect(nextTideTurn(turns, new Date('2026-10-30T00:00:00Z'))).toBeNull()
   })
 })

@@ -20,6 +20,8 @@ interface LightMapSheetProps {
   /** A morning shoot: golden is the first minutes after sunrise (lightMapFor.ts presetWindow). */
   morning: boolean
   onClose: () => void
+  /** The 3D scan's download, offered right here when there is none (ScanOffer.tsx). */
+  scanOffer: React.ReactNode
 }
 
 const PRESETS: [LightPreset, string][] = [
@@ -50,7 +52,7 @@ function Sun({ fill }: { fill: number }) {
 
 const MORNING_LEAD = `The brighter the gold, the more of the first ${GOLDEN_MIN} minutes after sunrise that spot is in the sun.`
 
-export function LightMapSheet({ state, preset, onPreset, timeZone, scanYear, morning, onClose }: LightMapSheetProps) {
+export function LightMapSheet({ state, preset, onPreset, timeZone, scanYear, morning, onClose, scanOffer }: LightMapSheetProps) {
   const map = typeof state === 'object' && 'minutes' in state ? state : null
   return (
     <section className="tides lmap" aria-label="Light map">
@@ -68,7 +70,7 @@ export function LightMapSheet({ state, preset, onPreset, timeZone, scanYear, mor
         ))}
       </div>
       {state === 'no-scan' ? (
-        <p className="pf__prompt">The light map is worked out from the 3D scan. Download it in the 3D view (the i), then come back here.</p>
+        scanOffer
       ) : state === 'no-window' ? (
         <p className="pf__prompt">{preset === 'even' ? 'Set a shoot window in Setup to see where the light holds through it.' : 'The sun does not set here that day.'}</p>
       ) : map === null ? (

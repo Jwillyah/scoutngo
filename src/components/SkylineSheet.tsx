@@ -24,6 +24,8 @@ interface SkylineSheetProps {
   droneFt: number
   onHeight: (h: 'eye' | 'drone') => void
   onClose: () => void
+  /** The 3D scan's download, offered right here when there is none (ScanOffer.tsx). */
+  scanOffer: React.ReactNode
 }
 
 const W = 360
@@ -48,7 +50,7 @@ function pathLine(points: { azimuth: number; altitude: number }[]): string {
   return d
 }
 
-export function SkylineSheet({ state, timeZone, from, height, droneFt, onHeight, onClose }: SkylineSheetProps) {
+export function SkylineSheet({ state, timeZone, from, height, droneFt, onHeight, onClose, scanOffer }: SkylineSheetProps) {
   const r = typeof state === 'string' ? null : state
   const lines = r === null ? [] : skylineLines(r.events, r.sunset, timeZone)
   const ground = r === null ? '' : `M0,${H} ` + Array.from({ length: W + 1 }, (_, x) => `L${x},${y(skylineAt(r.skyline, x)).toFixed(1)}`).join(' ') + ` L${W},${H} Z`
@@ -71,7 +73,7 @@ export function SkylineSheet({ state, timeZone, from, height, droneFt, onHeight,
       {state === 'loading' ? (
         <p className="pf__prompt">Working out the skyline…</p>
       ) : state === 'no-scan' ? (
-        <p className="pf__prompt">The skyline is drawn from the 3D scan. Download it in the 3D view (the i), then come back here.</p>
+        scanOffer
       ) : state === 'off-scan' ? (
         <p className="pf__prompt">This spot is outside the scanned patch, or the scan measured no ground there.</p>
       ) : r === null ? null : (

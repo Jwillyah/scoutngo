@@ -1,6 +1,6 @@
 import { getTimes } from 'suncalc'
 import { describe, expect, it } from 'vitest'
-import { sunriseOn, SUNRISE_AGREE_MIN } from './sunrise.ts'
+import { nextSunrise, sunriseOn, SUNRISE_AGREE_MIN } from './sunrise.ts'
 
 describe('sunrise, two ways', () => {
   it("our calibrated horizon crossing and suncalc's analytic sunrise agree, Virginia Beach, every day for a month", () => {
@@ -16,5 +16,15 @@ describe('sunrise, two ways', () => {
 
   it('a day with no sunrise (polar night) is null', () => {
     expect(sunriseOn('2026-12-21', 78.22, 15.65, 'Arctic/Longyearbyen')).toBeNull()
+  })
+})
+
+describe('the next sunrise', () => {
+  const VB = { lat: 36.8435575, lon: -75.9713104, tz: 'America/New_York' }
+  it("is today's when it is still to come, and tomorrow's once it has passed", () => {
+    const today = sunriseOn('2026-10-29', VB.lat, VB.lon, VB.tz)!
+    const tomorrow = sunriseOn('2026-10-30', VB.lat, VB.lon, VB.tz)!
+    expect(nextSunrise(new Date(today.getTime() - 3_600_000), VB.lat, VB.lon, VB.tz)?.getTime()).toBe(today.getTime())
+    expect(nextSunrise(new Date(today.getTime() + 60_000), VB.lat, VB.lon, VB.tz)?.getTime()).toBe(tomorrow.getTime())
   })
 })

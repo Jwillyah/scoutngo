@@ -14,6 +14,21 @@ import { zonedTimeToUtc } from './timezone.ts'
 
 export const SUNRISE_AGREE_MIN = 6
 
+/**
+ * The first sunrise after `at` at a place: today's if it is still to come,
+ * else tomorrow's (and the day after, past a polar night's edge). Null when
+ * there is none within three days.
+ */
+export function nextSunrise(at: Date, lat: number, lon: number, timeZone: string): Date | null {
+  for (let day = 0; day < 3; day += 1) {
+    const t = new Date(at.getTime() + day * 86_400_000)
+    const date = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(t)
+    const rise = sunriseOn(date, lat, lon, timeZone)
+    if (rise !== null && rise.getTime() > at.getTime()) return rise
+  }
+  return null
+}
+
 export function sunriseOn(date: string, lat: number, lon: number, timeZone: string): Date | null {
   const midnight = zonedTimeToUtc(date, '00:00', timeZone)
   if (midnight === null) return null

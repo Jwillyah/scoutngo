@@ -478,6 +478,7 @@ function ScanPanel({ flow, keptYear }: { flow: ReturnType<typeof useScan>; keptY
       </>
     )
   }
+  if (state.status === 'checking') return <p className="clay__infoline">Looking for a 3D scan of this place…</p>
   if (state.status === 'fetching-overture') return <p className="clay__infoline">Asking Overture Maps for heights…</p>
   if (state.status === 'none') {
     return (

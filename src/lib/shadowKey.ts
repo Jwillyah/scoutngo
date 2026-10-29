@@ -12,15 +12,21 @@ type ShadowCount = { status: 'no-sun'; skippedNoHeight: number } | { status: str
 const fmt = (x: number) => x.toLocaleString('en-US')
 
 /** "Shadows: 965 buildings · 349 no height". */
-export function shadowKeyLine(shadows: ShadowCount): string {
-  if (!('shadows' in shadows)) return 'No shadows: the sun is down.'
+/*
+ * WITH THE SUN DOWN, ONE THING TO SAY: WHEN THEY COME BACK (29 Oct, from the
+ * pier: "No shadows: the sun is down. 349 more have no height and cast none
+ * here. Flat ground." reads broken, "349 more" of what). `sunrise` is the
+ * next sunrise as a clock time, or null when there is none to say.
+ */
+export function shadowKeyLine(shadows: ShadowCount, sunrise: string | null = null): string {
+  if (!('shadows' in shadows)) return sunrise === null ? 'No shadows: the sun is down.' : `No shadows until sunrise at ${sunrise}`
   const n = shadows.shadows.length
   return `Shadows: ${fmt(n)} ${n === 1 ? 'building' : 'buildings'}${shadows.skippedNoHeight === 0 ? '' : ` · ${fmt(shadows.skippedNoHeight)} no height`}`
 }
 
 /** The shadow legend in full, for the map's "i". */
-export function shadowKeyNotes(shadows: ShadowCount, scanYearUsed: number | null | undefined): string[] {
-  if (!('shadows' in shadows)) return ['No shadows: the sun is down.']
+export function shadowKeyNotes(shadows: ShadowCount, scanYearUsed: number | null | undefined, sunrise: string | null = null): string[] {
+  if (!('shadows' in shadows)) return [shadowKeyLine(shadows, sunrise)]
   const n = shadows.shadows.length
   return [
     `Shadows from ${fmt(n)} ${n === 1 ? 'building' : 'buildings'} with a known height.`,

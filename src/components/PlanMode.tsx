@@ -1,3 +1,6 @@
+import { ScanOffer } from './ScanOffer.tsx'
+import { nextSunrise } from '../core/sunrise.ts'
+import { nextTideTurn } from '../lib/lowTide.ts'
 import { getSunPosition } from '../core/sun.ts'
 import { onLiveTime } from '../lib/liveTime.ts'
 import { ComparePhoto } from './ComparePhoto.tsx'
@@ -1109,6 +1112,14 @@ export function PlanMode({
     const person = lightNow(scrubbedAt, venue.lat, venue.lon).personShadow
     return shadowCollection(shadows, person === null ? null : { at: venue, lengthMeters: person.lengthMeters, bearing: person.bearing })
   }, [showSun, venue, scrubbedAt, shadows])
+  /* With the sun down, when the shadows come back: the next sunrise, as a clock time at the venue. */
+  const sunriseWords = useMemo(() => {
+    if (shadows === null || 'shadows' in shadows || venue === null || scrubbedAt === null || venueWindow === null) return null
+    const rise = nextSunrise(scrubbedAt, venue.lat, venue.lon, venueWindow.timeZone)
+    return rise === null ? null : formatClock(rise, venueWindow.timeZone)
+  }, [shadows, venue, scrubbedAt, venueWindow])
+  /* The tide chip's turn: the first high or low after the time on the bar. */
+  const nextTurn = useMemo(() => (tide.status !== 'ok' || scrubbedAt === null ? null : nextTideTurn(tide.predictions.extremes, scrubbedAt)), [tide, scrubbedAt])
   /* Under ?probe=1, the minute the map's shadows were last handed over for (scripts/measure-timebar.mjs). */
   const probing = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('probe') === '1'
   useEffect(() => {
@@ -1318,13 +1329,14 @@ export function PlanMode({
       },
       {
         kind: 'tide',
-        label: 'LOW TIDE',
-        value: lowTide === null ? null : clock(lowTide.at),
+        /* The next turn after the time on the bar, high or low: never one that has passed (29 Oct). */
+        label: nextTurn === null ? 'TIDE' : nextTurn.kind === 'high' ? 'HIGH TIDE' : 'LOW TIDE',
+        value: nextTurn === null ? null : clock(nextTurn.at),
         /* The zone is the unit of a clock time, said only away from the phone's own zone; see Chip.unit. */
         ...(venueWindow === null || venueWindow.timeZoneShort === '' ? {} : { unit: venueWindow.timeZoneShort }),
       },
     ]
-  }, [venue, venueWindow, scrubbedAt, wind, ratedWindMps, lowTide, venueCloud, forecast, units, clock])
+  }, [venue, venueWindow, scrubbedAt, wind, ratedWindMps, nextTurn, venueCloud, forecast, units, clock])
 
   /*
    * WHICH GOES BAND THE SKY LAYER PAINTS, from the sun's altitude: visible
@@ -1779,6 +1791,7 @@ export function PlanMode({
             scanYear={scanCtx?.scan.year ?? null}
             morning={venue !== null && skyDay !== null && venueWindow !== null && morningShoot(venue, skyDay, { from: venueWindow.start, to: venueWindow.end })}
             onClose={home}
+            scanOffer={<ScanOffer venue={venue} buildings={buildingList ?? NO_BUILDINGS} why="The light map is worked out from the 3D scan of this place, kept on this phone." />}
           />
         )
       case 'skyline':
@@ -1791,6 +1804,7 @@ export function PlanMode({
             droneFt={pf.heightFt}
             onHeight={setSkyHeight}
             onClose={home}
+            scanOffer={<ScanOffer venue={venue} buildings={buildingList ?? NO_BUILDINGS} why="The skyline is drawn from the 3D scan of this place, kept on this phone." />}
           />
         )
       case 'preflight':
@@ -2138,7 +2152,7 @@ export function PlanMode({
       }
     >
       <MapView
-        infoNotes={shadows === null || threeD ? [] : shadowKeyNotes(shadows, scanYearUsed)}
+        infoNotes={shadows === null || threeD ? [] : shadowKeyNotes(shadows, scanYearUsed, sunriseWords)}
         airspace={airspaceOn ? airspaceOverlay : null}
         onAirspaceDense={setAirspaceDense}
         measurePins={measurePins ?? undefined}
@@ -2308,7 +2322,7 @@ export function PlanMode({
       {shadows === null || threeD || sheet === 'full' ? null : (
         /* ONE SHORT LINE over the map (27 Oct, from the phone: the sentence ran across it); the rest is in the "i". */
         <p className="shadowkey num" role="status">
-          {shadowKeyLine(shadows)}
+          {shadowKeyLine(shadows, sunriseWords)}
         </p>
       )}
       {!showWaterline || sheet === 'full' ? null : (

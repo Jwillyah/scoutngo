@@ -79,8 +79,18 @@ export function TimeBar({ at, lat, lon, timeZone, moon, onAt, onReset }: TimeBar
   const [anchor, setAnchor] = useState(at)
   const busy = useRef(false)
   const live = useRef(at.getTime())
+  /* The last time this bar sent up: a different `at` coming down is someone else's (the date field, the arrow, a jump). */
+  const sentAt = useRef(at.getTime())
+  /* The coast after a flick: its animation frame, or 0. */
+  const coast = useRef(0)
   useEffect(() => {
-    if (busy.current) return
+    if (busy.current) {
+      if (Math.abs(at.getTime() - sentAt.current) < 60_000) return
+      /* Set from elsewhere mid-coast: the coast stops, the new time stands (29 Oct: a coast overwrote a picked time). */
+      if (coast.current !== 0) cancelAnimationFrame(coast.current)
+      coast.current = 0
+      busy.current = false
+    }
     live.current = at.getTime()
     setAnchor(at)
   }, [at])
@@ -123,6 +133,7 @@ export function TimeBar({ at, lat, lon, timeZone, moon, onAt, onReset }: TimeBar
       sent.current = requestAnimationFrame(() => {
         sent.current = 0
         const next = new Date(Math.round(live.current / MINUTE) * MINUTE)
+        sentAt.current = next.getTime()
         startTransition(() => onAt(next))
       })
     }
@@ -130,7 +141,6 @@ export function TimeBar({ at, lat, lon, timeZone, moon, onAt, onReset }: TimeBar
     if (Math.abs(t - anchorAt.current) * pxPerMs > width * 0.9) setAnchor(new Date(t))
   }
 
-  const coast = useRef(0)
   const stopCoast = () => {
     if (coast.current !== 0) cancelAnimationFrame(coast.current)
     coast.current = 0
@@ -142,6 +152,7 @@ export function TimeBar({ at, lat, lon, timeZone, moon, onAt, onReset }: TimeBar
   const finish = () => {
     busy.current = false
     const final = new Date(Math.round(live.current / MINUTE) * MINUTE)
+    sentAt.current = final.getTime()
     onAt(final)
     setAnchor(final)
   }
