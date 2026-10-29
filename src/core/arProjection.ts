@@ -148,11 +148,40 @@ export function frameBox(frame: CameraFov, phone: CameraFov): { w: number; h: nu
  * THE FIELD OF THE PICTURE AS SHOWN. The video fills the screen and is cropped
  * to do it, so the field across a tall phone screen is narrower than the
  * camera's own. The long side keeps the camera's long-side angle; the short
- * side is cut to the screen's shape. Measured: with 50 x 65 assumed, a 70 mm
+ * side is cut to the screen's shape. With 50 x 65 assumed, a 70 mm
  * full-frame box drew nearly square on a 390 x 844 screen, because it was
  * sized against 50 degrees across when about 33 were visible.
  */
-export const ASSUMED_PHONE_LONG_SIDE_DEG = 65
+/*
+ * THE PHONE'S MAIN CAMERA, about a 26 mm equivalent: 2·atan(18/26) = 69.4
+ * degrees along the long side. Settable in the viewfinder's "i"
+ * (src/lib/phoneCamera.ts), because a web page cannot read it.
+ */
+export const PHONE_MAIN_LONG_SIDE_DEG = 69
+/** The 0.5× ultra-wide, about a 13 mm equivalent: 2·atan(18/13) = 108 degrees. */
+export const PHONE_ULTRA_LONG_SIDE_DEG = 108
+export const ASSUMED_PHONE_LONG_SIDE_DEG = PHONE_MAIN_LONG_SIDE_DEG
+
+/**
+ * Whether a lens sees wider than the phone's camera, long side against long
+ * side. Not against the screen: the screen crops the camera, and a frame
+ * that only runs past the screen's edge is drawn running past it, not called
+ * wider.
+ */
+export function lensWiderThanPhone(lensLongSideDeg: number, phoneLongSideDeg: number): boolean {
+  return lensLongSideDeg > phoneLongSideDeg
+}
+
+/**
+ * What a tap can calibrate the compass on: the sun when it is up, the moon
+ * when the sun is down and the moon is up, nothing when both are down.
+ * Altitudes in degrees.
+ */
+export function calibrationTarget(sunAltitude: number, moonAltitude: number): 'sun' | 'moon' | null {
+  if (sunAltitude > 0) return 'sun'
+  if (moonAltitude > 0) return 'moon'
+  return null
+}
 
 export function visibleFov(widthPx: number, heightPx: number, longSideDeg: number = ASSUMED_PHONE_LONG_SIDE_DEG): CameraFov {
   const t = Math.tan((longSideDeg / 2) * DEG)

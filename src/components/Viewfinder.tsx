@@ -2,9 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { getMoonPosition, getPosition } from 'suncalc'
 import {
   alphaFromHeading,
-  ASSUMED_PHONE_LONG_SIDE_DEG,
   calibrationFromTap,
+  calibrationTarget,
   frameBox,
+  lensWiderThanPhone,
+  PHONE_ULTRA_LONG_SIDE_DEG,
   project,
   visibleFov,
   type Orientation,
@@ -17,6 +19,7 @@ import { formatHour } from '../core/timezone.ts'
 import type { KitSelection } from '../lib/kitSelection.ts'
 import { LOCATE_MESSAGE, locateOnce } from '../lib/locateOnce.ts'
 import { formatRange, type Units } from '../lib/units.ts'
+import { readPhoneFov, ultraWideOf, writePhoneFov } from '../lib/phoneCamera.ts'
 
 /*
  * THE VIEWFINDER: THE PHONE'S CAMERA, WITH THE PLAN DRAWN OVER IT.
@@ -31,9 +34,17 @@ import { formatRange, type Units } from '../lib/units.ts'
  * the element and is stopped when the viewfinder closes. A test reads this
  * file and fails if any of that is ever added (tests/viewfinderPrivacy.test.ts).
  *
- * WHAT IS ASSUMED IS SAID: the phone camera's field of view (a web page cannot
- * read it) and the compass, which is often several degrees off. Calibrate by
- * tapping the sun where it really is.
+ * WHAT IS ASSUMED IS SAID, in the "i": the phone camera's field of view (a
+ * web page cannot read it; 69 degrees along the long side unless set) and the
+ * compass offset. Calibrate by tapping the sun, or the moon when the sun is
+ * down, where it really is.
+ *
+ * NEVER A BLACK SCREEN (29 Oct: black on an iPhone with the green camera dot
+ * on). The stream was attached in a requestAnimationFrame that could run
+ * before React had put the <video> on the page, so srcObject was set on
+ * nothing. It is attached in an effect after the element exists, played
+ * again when its metadata arrives, and if no picture has come after
+ * PICTURE_WAIT_MS the screen says so in one line with Retry.
  *
  * Both permissions are asked from the tap that opens it, never on load, and a
  * refusal is one sentence.
@@ -69,7 +80,10 @@ export function ViewfinderNeedsPlace({ onSetup, onClose }: { onSetup: () => void
   )
 }
 
-type Phase = { kind: 'ask' } | { kind: 'refused'; why: string } | { kind: 'live' }
+type Phase =
+  | { kind: 'ask' }
+  | { kind: 'refused'; why: string }
+  | { kind: 'live' }
 
 interface OrientationEventLike {
   alpha: number | null
@@ -80,17 +94,62 @@ interface OrientationEventLike {
 }
 
 const PATH_STEP_MINUTES = 10
+/** How long a live stream may show no picture before the screen says so. */
+export const PICTURE_WAIT_MS = 4000
+
+const MOTION_REFUSED = 'Motion access was not allowed, so the viewfinder cannot tell where the phone is pointing.'
+const CAMERA_REFUSED = 'Camera access was not allowed, so there is no picture to draw on.'
+const NO_PICTURE = 'The camera is on but no picture arrived.'
+
+/* Small line icons for the three controls; white on the bar, no colour role. */
+const ICON = {
+  moon: <path d="M15.5 3.5a8.5 8.5 0 1 0 5 15.2A7 7 0 0 1 15.5 3.5z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />,
+  pins: (
+    <>
+      <path d="M12 21s-6-5.6-6-10.5a6 6 0 0 1 12 0C18 15.4 12 21 12 21z" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="12" cy="10.5" r="2.2" fill="currentColor" />
+    </>
+  ),
+  calibrate: (
+    <>
+      <circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M12 2v5M12 17v5M2 12h5M17 12h5" stroke="currentColor" strokeWidth="1.8" />
+    </>
+  ),
+  close: <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />,
+  info: (
+    <>
+      <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M12 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <circle cx="12" cy="7.6" r="1.2" fill="currentColor" />
+    </>
+  ),
+}
+const Glyph = ({ d }: { d: keyof typeof ICON }) => (
+  <svg className="vf__glyph" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+    {ICON[d]}
+  </svg>
+)
 
 export function Viewfinder({ venue, pins, profile, bag, timeZone, units, onClose }: ViewfinderProps) {
   const [phase, setPhase] = useState<Phase>({ kind: 'ask' })
   const video = useRef<HTMLVideoElement>(null)
-  const stream = useRef<MediaStream | null>(null)
+  const [stream, setStream] = useState<MediaStream | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const [noPicture, setNoPicture] = useState(false)
   const [orientation, setOrientation] = useState<Orientation | null>(null)
   const [offset, setOffset] = useState(0)
   const [calibrating, setCalibrating] = useState(false)
   const [moon, setMoon] = useState(false)
+  const [info, setInfo] = useState(false)
   const [me, setMe] = useState<LatLon | null>(null)
   const [now, setNow] = useState(() => new Date())
+  /* The phone camera: the main one at the field set in the "i", or the ultra-wide when switched to. */
+  const [mainFov, setMainFov] = useState(readPhoneFov)
+  const [cameras, setCameras] = useState<{ kind: string; deviceId: string; label: string }[]>([])
+  const [ultra, setUltra] = useState(false)
+  const ultraId = ultraWideOf(cameras)
+  const phoneFov = ultra ? PHONE_ULTRA_LONG_SIDE_DEG : mainFov
   /* The field of the picture as shown, from the overlay's own size. */
   const overlay = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ w: 390, h: 844 })
@@ -103,22 +162,54 @@ export function Viewfinder({ venue, pins, profile, bag, timeZone, units, onClose
     watch.observe(el)
     return () => watch.disconnect()
   }, [phase.kind])
-  const fov = visibleFov(size.w, size.h)
+  const fov = visibleFov(size.w, size.h, phoneFov)
 
   const lenses = profile.lenses.filter((l) => bag.lensIds.includes(l.id))
   const bodies = profile.bodies.filter((b) => bag.bodyIds.includes(b.id))
   const [lensId, setLensId] = useState<string | null>(lenses[0]?.id ?? null)
   const lens = lenses.find((l) => l.id === lensId) ?? null
+  const [bodyId, setBodyId] = useState<string | null>(bodies[0]?.id ?? null)
+  const body = bodies.find((b) => b.id === bodyId) ?? bodies[0] ?? null
   const [focal, setFocal] = useState<number>(lens?.minFocalLength ?? 50)
 
+  const stopCamera = () => {
+    streamRef.current?.getTracks().forEach((t) => t.stop())
+    streamRef.current = null
+  }
+
   /* Stop the camera however the viewfinder goes away. */
-  useEffect(
-    () => () => {
-      stream.current?.getTracks().forEach((t) => t.stop())
-      stream.current = null
-    },
-    [],
-  )
+  useEffect(() => () => stopCamera(), [])
+
+  /*
+   * THE STREAM GOES INTO THE <video> ONCE THE <video> EXISTS. Muted and
+   * inline set on the element itself (React writes `muted` as a property
+   * only, and iOS reads the attribute), play() with its promise handled, and
+   * again when the metadata arrives. No picture after PICTURE_WAIT_MS is said.
+   */
+  useEffect(() => {
+    const el = video.current
+    if (phase.kind !== 'live' || stream === null || el === null) return
+    el.muted = true
+    el.setAttribute('muted', '')
+    el.setAttribute('playsinline', '')
+    el.srcObject = stream
+    setNoPicture(false)
+    const start = () => {
+      void el.play().catch(() => undefined)
+    }
+    el.addEventListener('loadedmetadata', start)
+    start()
+    const wait = window.setTimeout(() => {
+      if (el.videoWidth === 0 || el.readyState < 2) setNoPicture(true)
+    }, PICTURE_WAIT_MS)
+    const arrived = () => setNoPicture(false)
+    el.addEventListener('playing', arrived)
+    return () => {
+      window.clearTimeout(wait)
+      el.removeEventListener('loadedmetadata', start)
+      el.removeEventListener('playing', arrived)
+    }
+  }, [phase.kind, stream])
 
   useEffect(() => {
     if (phase.kind !== 'live') return
@@ -140,37 +231,51 @@ export function Viewfinder({ venue, pins, profile, bag, timeZone, units, onClose
     }
   }, [phase.kind])
 
+  const startCamera = async (deviceId: string | null) => {
+    stopCamera()
+    try {
+      const media = await navigator.mediaDevices.getUserMedia({
+        video: deviceId === null ? { facingMode: 'environment' } : { deviceId: { exact: deviceId } },
+        audio: false,
+      })
+      streamRef.current = media
+      setStream(media)
+      setPhase({ kind: 'live' })
+      /* Labels are only given once the camera is allowed, so the cameras are listed now. */
+      void navigator.mediaDevices
+        .enumerateDevices()
+        .then((list) => setCameras(list.map((d) => ({ kind: d.kind, deviceId: d.deviceId, label: d.label }))))
+        .catch(() => undefined)
+      return true
+    } catch {
+      setPhase({ kind: 'refused', why: CAMERA_REFUSED })
+      return false
+    }
+  }
+
   const open = async () => {
     const ask = (DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> }).requestPermission
     if (typeof ask === 'function') {
       try {
         if ((await ask()) !== 'granted') {
-          setPhase({ kind: 'refused', why: 'Motion access was not allowed, so the viewfinder cannot tell where the phone is pointing.' })
+          setPhase({ kind: 'refused', why: MOTION_REFUSED })
           return
         }
       } catch {
-        setPhase({ kind: 'refused', why: 'Motion access was not allowed, so the viewfinder cannot tell where the phone is pointing.' })
+        setPhase({ kind: 'refused', why: MOTION_REFUSED })
         return
       }
     }
-    try {
-      const media = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
-      stream.current = media
-      setPhase({ kind: 'live' })
-      requestAnimationFrame(() => {
-        if (video.current !== null) {
-          video.current.srcObject = media
-          void video.current.play().catch(() => undefined)
-        }
-      })
-    } catch {
-      setPhase({ kind: 'refused', why: 'Camera access was not allowed, so there is no picture to draw on.' })
-    }
+    await startCamera(ultra ? ultraId : null)
+  }
+
+  const switchCamera = (toUltra: boolean) => {
+    setUltra(toUltra)
+    void startCamera(toUltra ? ultraId : null)
   }
 
   const close = () => {
-    stream.current?.getTracks().forEach((t) => t.stop())
-    stream.current = null
+    stopCamera()
     onClose()
   }
 
@@ -190,6 +295,8 @@ export function Viewfinder({ venue, pins, profile, bag, timeZone, units, onClose
   const from = me ?? venue
 
   const sunNow = getPosition(now, from.lat, from.lon)
+  const moonNow = getMoonPosition(now, from.lat, from.lon)
+  const target = calibrationTarget(sunNow.altitude, moonNow.altitude)
   const paths = useMemo(() => {
     const day = new Date(now)
     day.setHours(0, 0, 0, 0)
@@ -224,10 +331,11 @@ export function Viewfinder({ venue, pins, profile, bag, timeZone, units, onClose
   const horizon = polyline(Array.from({ length: 181 }, (_, i) => ({ az: i * 2, alt: 0 })))
 
   const onTap = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!calibrating || orientation === null) return
+    if (!calibrating || orientation === null || target === null) return
     const box = event.currentTarget.getBoundingClientRect()
     const tap = { x: (event.clientX - box.left) / box.width, y: (event.clientY - box.top) / box.height }
-    setOffset(calibrationFromTap(tap, { azimuth: normalizeBearing(sunNow.azimuth) }, orientation, fov))
+    const truth = target === 'sun' ? sunNow : moonNow
+    setOffset(calibrationFromTap(tap, { azimuth: normalizeBearing(truth.azimuth) }, orientation, fov))
     setCalibrating(false)
   }
 
@@ -236,13 +344,13 @@ export function Viewfinder({ venue, pins, profile, bag, timeZone, units, onClose
       <div className="vf vf--ask" role="dialog" aria-label="Viewfinder">
         <p className="vf__title">Viewfinder</p>
         <p className="vf__say">
-          The camera, with the sun's path, the horizon, your positions and each body's frame drawn over it. The picture stays in
+          The camera, with the sun's path, the horizon, your positions and your camera's frame drawn over it. The picture stays in
           this screen: it is not saved, recorded or sent.
         </p>
         {phase.kind === 'refused' ? <p className="vf__refused">{phase.why}</p> : null}
         <div className="btn-row">
           <button type="button" className="btn btn--primary" onClick={() => void open()}>
-            Open the camera
+            {phase.kind === 'refused' ? 'Retry' : 'Open the camera'}
           </button>
           <button type="button" className="btn" onClick={close}>
             Close
@@ -253,7 +361,20 @@ export function Viewfinder({ venue, pins, profile, bag, timeZone, units, onClose
   }
 
   const sunScreen = sunNow.altitude > -1 ? at(normalizeBearing(sunNow.azimuth), sunNow.altitude) : null
+  const moonScreen = (moon || (calibrating && target === 'moon')) && moonNow.altitude > -1 ? at(normalizeBearing(moonNow.azimuth), moonNow.altitude) : null
   const hourly = paths.sun.filter((p, i) => i % 6 === 0 && p.alt > 0)
+
+  /* The one frame: the picked body with the picked lens at the picked focal length. */
+  const frame = lens === null || body === null ? null : computeFOV(focal, SENSORS[resolveSensor(lens, [body])])
+  const box = frame === null ? null : frameBox({ h: frame.hFOV, v: frame.vFOV }, fov)
+  const wider = frame !== null && lensWiderThanPhone(frame.hFOV, phoneFov)
+
+  const note =
+    noPicture ? null
+    : orientation === null ? 'Waiting for the compass. Move the phone in a figure of eight if this stays.'
+    : calibrating ? `Tap the ${target ?? 'sun'} where you see it.`
+    : locateNote !== null ? locateNote
+    : null
 
   return (
     <div className="vf" role="dialog" aria-label="Viewfinder">
@@ -280,6 +401,7 @@ export function Viewfinder({ venue, pins, profile, bag, timeZone, units, onClose
           )
         })}
         {sunScreen === null ? null : <span className="vf__sun" style={{ left: `${sunScreen.x * 100}%`, top: `${sunScreen.y * 100}%` }} />}
+        {moonScreen === null ? null : <span className="vf__moon" style={{ left: `${moonScreen.x * 100}%`, top: `${moonScreen.y * 100}%` }} />}
         {pins.map((pin) => {
           const d = distanceMeters(from, pin.at)
           if (d < 3) return null
@@ -291,85 +413,150 @@ export function Viewfinder({ venue, pins, profile, bag, timeZone, units, onClose
             </span>
           )
         })}
-        {lens === null
-          ? null
-          : bodies.map((body) => {
-              const sensor = SENSORS[resolveSensor(lens, [body])]
-              const frame = computeFOV(focal, sensor)
-              const box = frameBox({ h: frame.hFOV, v: frame.vFOV }, fov)
-              /* Wider than the phone sees: said, not drawn off the edge or silently left out. */
-              if (box.w > 1 || box.h > 1) {
-                return (
-                  <span key={body.id} className="vf__wider">
-                    {body.name} at {focal} mm sees wider than this phone's camera
-                  </span>
-                )
-              }
-              return (
-                <span key={body.id} className="vf__frame" style={{ width: `${box.w * 100}%`, height: `${box.h * 100}%` }}>
-                  <span className="vf__framelabel">{body.name}</span>
-                </span>
-              )
-            })}
+        {box === null || body === null ? null : (
+          /* Drawn at its true size even past the edge of the picture: the edges that are on screen still say where the frame runs. */
+          <span className="vf__frame" style={{ width: `${box.w * 100}%`, height: `${box.h * 100}%` }}>
+            <span className="vf__framelabel">
+              {body.name} · <span className="num">{focal} mm</span>
+            </span>
+          </span>
+        )}
       </div>
 
+      <div className="vf__top">
+        <button type="button" className="vf__icon" onClick={() => setInfo(!info)} aria-pressed={info} aria-label="What the viewfinder assumes">
+          <Glyph d="info" />
+        </button>
+        <button type="button" className="vf__icon" onClick={close} aria-label="Close the viewfinder">
+          <Glyph d="close" />
+        </button>
+      </div>
+      {info ? (
+        <div className="vf__info">
+          <p className="vf__infoline">
+            {ultra
+              ? `On the ultra-wide camera, assumed about ${PHONE_ULTRA_LONG_SIDE_DEG}° along its long side.`
+              : `Assumes the phone camera sees about ${phoneFov}° along its long side. A web page cannot read it.`}
+          </p>
+          {ultra ? null : (
+            <label className="vf__infoline vf__fovset">
+              <span>Phone camera</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={40}
+                max={130}
+                value={mainFov}
+                onChange={(e) => setMainFov(writePhoneFov(Number(e.target.value)))}
+                aria-label="Phone camera field of view, degrees along the long side"
+              />
+              <span>°</span>
+            </label>
+          )}
+          <p className="vf__infoline num">
+            Compass offset {offset >= 0 ? '+' : ''}
+            {offset.toFixed(1)}°
+          </p>
+          <p className="vf__infoline">
+            {cameras.filter((c) => c.kind === 'videoinput').length === 0
+              ? 'This phone listed no cameras by name.'
+              : `Cameras this phone lists: ${cameras.filter((c) => c.kind === 'videoinput').map((c) => c.label || 'unnamed').join(', ')}.`}
+          </p>
+        </div>
+      ) : null}
+
       <div className="vf__bar">
-        <p className="vf__note">
-          {orientation === null
-            ? 'Waiting for the compass. Move the phone in a figure of eight if this stays.'
-            : calibrating
-              ? 'Tap the sun where you see it.'
-              : locateNote !== null
-                ? locateNote
-              : `Assumes the phone camera sees about ${ASSUMED_PHONE_LONG_SIDE_DEG}° along its long side. Compass offset ${offset >= 0 ? '+' : ''}${offset.toFixed(1)}°.`}
-        </p>
-        <div className="vf__controls">
-          {lenses.length === 0 ? null : (
-            <label className="vf__lens">
-              <span className="vf__lenslabel">Lens</span>
-              <select
-                value={lensId ?? ''}
-                onChange={(e) => {
-                  setLensId(e.target.value)
-                  const next = lenses.find((l) => l.id === e.target.value)
-                  if (next !== undefined) setFocal(next.minFocalLength)
-                }}
-              >
-                {lenses.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
+        {noPicture ? (
+          <p className="vf__note vf__note--act">
+            <span>{NO_PICTURE}</span>
+            <button type="button" className="vf__chip" onClick={() => void startCamera(ultra ? ultraId : null)}>
+              Retry
+            </button>
+          </p>
+        ) : null}
+        {wider ? (
+          <p className="vf__note vf__note--act">
+            <span>Wider than your phone's camera.</span>
+            {ultraId !== null && !ultra ? (
+              <button type="button" className="vf__chip" onClick={() => switchCamera(true)}>
+                Switch to 0.5×
+              </button>
+            ) : null}
+          </p>
+        ) : null}
+        {ultra && !wider ? (
+          <p className="vf__note vf__note--act">
+            <span>On the 0.5× camera.</span>
+            <button type="button" className="vf__chip" onClick={() => switchCamera(false)}>
+              Back to 1×
+            </button>
+          </p>
+        ) : null}
+        {note === null ? null : <p className="vf__note">{note}</p>}
+        {lenses.length === 0 ? null : (
+          <div className="vf__lensrow">
+            <select
+              className="vf__select"
+              value={lensId ?? ''}
+              aria-label="Lens"
+              onChange={(e) => {
+                setLensId(e.target.value)
+                const next = lenses.find((l) => l.id === e.target.value)
+                if (next !== undefined) setFocal(next.minFocalLength)
+              }}
+            >
+              {lenses.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+            {bodies.length > 1 ? (
+              <select className="vf__select" value={body?.id ?? ''} aria-label="Body" onChange={(e) => setBodyId(e.target.value)}>
+                {bodies.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
                   </option>
                 ))}
               </select>
-            </label>
+            ) : null}
+            {lens === null || lens.minFocalLength === lens.maxFocalLength ? (
+              <span className="vf__mm num">{focal} mm</span>
+            ) : (
+              <label className="vf__zoom">
+                <input
+                  type="range"
+                  min={lens.minFocalLength}
+                  max={lens.maxFocalLength}
+                  value={focal}
+                  onChange={(e) => setFocal(Number(e.target.value))}
+                  aria-label="Focal length"
+                />
+                <span className="vf__mm num">{focal} mm</span>
+              </label>
+            )}
+          </div>
+        )}
+        <div className="vf__actions">
+          <button type="button" className="vf__act" onClick={() => setMoon(!moon)} aria-pressed={moon}>
+            <Glyph d="moon" />
+            <span>Moon path</span>
+          </button>
+          <button type="button" className="vf__act" onClick={locate}>
+            <Glyph d="pins" />
+            <span>{me === null ? 'Pins from me' : 'Pins from here'}</span>
+          </button>
+          {target === null ? (
+            <span className="vf__act vf__act--off">
+              <Glyph d="calibrate" />
+              <span>Sun and moon down</span>
+            </span>
+          ) : (
+            <button type="button" className="vf__act" onClick={() => setCalibrating(true)} aria-pressed={calibrating}>
+              <Glyph d="calibrate" />
+              <span>{target === 'sun' ? 'Calibrate on sun' : 'Calibrate on moon'}</span>
+            </button>
           )}
-          {lens === null || lens.minFocalLength === lens.maxFocalLength ? null : (
-            <label className="vf__lens">
-              <span className="vf__lenslabel num">{focal} mm</span>
-              <input
-                type="range"
-                min={lens.minFocalLength}
-                max={lens.maxFocalLength}
-                value={focal}
-                onChange={(e) => setFocal(Number(e.target.value))}
-                aria-label="Focal length"
-              />
-            </label>
-          )}
-        </div>
-        <div className="btn-row">
-          <button type="button" className="btn btn--small" onClick={() => setCalibrating(true)} disabled={sunNow.altitude < 0}>
-            {sunNow.altitude < 0 ? 'Sun is down: cannot calibrate' : 'Calibrate on the sun'}
-          </button>
-          <button type="button" className="btn btn--small" onClick={() => setMoon(!moon)} aria-pressed={moon}>
-            Moon path
-          </button>
-          <button type="button" className="btn btn--small" onClick={locate}>
-            {me === null ? 'Pins from where I stand' : 'Pins from here'}
-          </button>
-          <button type="button" className="btn btn--small" onClick={close}>
-            Close
-          </button>
         </div>
       </div>
     </div>

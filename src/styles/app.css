@@ -10760,55 +10760,184 @@
 }
 
 .vf__framelabel {
+  /* Top centre, so it stays on screen when the frame runs past the sides. */
   position: absolute;
-  left: 4px;
+  left: 50%;
   top: 2px;
+  transform: translateX(-50%);
+  white-space: nowrap;
   font-size: var(--text-label);
   text-shadow: 0 1px 2px var(--black);
 }
 
+.vf__moon {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  transform: translate(-50%, -50%);
+  border: 2px dashed var(--grey-1);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* Close and "i", top right, clear of the status bar. */
+.vf__top {
+  position: absolute;
+  top: calc(var(--safe-top) + var(--space-1));
+  right: var(--space-1);
+  display: flex;
+  gap: var(--space-1);
+}
+
+.vf__icon {
+  display: grid;
+  place-items: center;
+  width: var(--control-height);
+  height: var(--control-height);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--black) 60%, transparent);
+  color: var(--white);
+}
+
+.vf__icon[aria-pressed='true'] {
+  background: var(--white);
+  color: var(--black);
+}
+
+.vf__info {
+  position: absolute;
+  top: calc(var(--safe-top) + var(--control-height) + var(--space-2));
+  right: var(--space-2);
+  left: var(--space-2);
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-panel);
+  background: color-mix(in srgb, var(--black) 82%, transparent);
+}
+
+.vf__infoline {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.35;
+}
+
+.vf__fovset {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.vf__fovset input {
+  width: 4.5em;
+  min-height: var(--control-height);
+  font-size: var(--text-base, 1rem);
+}
+
+/*
+ * THE CONTROLS, A QUARTER OF THE SCREEN AT MOST (29 Oct): the lens and its
+ * focal length on one row, three icon buttons with short labels under it.
+ */
 .vf__bar {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
   display: grid;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3) calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3) calc(var(--space-1) + var(--safe-bottom));
   background: color-mix(in srgb, var(--black) 75%, transparent);
 }
 
 .vf__note {
   margin: 0;
   font-size: var(--text-sm);
+  line-height: 1.3;
 }
 
-.vf__controls {
+.vf__note--act {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
 }
 
-.vf__lens {
+.vf__lensrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.vf__select {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 45%;
+  min-height: var(--control-height);
+  font-size: var(--text-sm);
+}
+
+.vf__zoom {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.vf__zoom input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--control-height);
+}
+
+.vf__mm {
+  flex: 0 0 auto;
+  font-size: var(--text-sm);
+}
+
+.vf__actions {
   display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-1);
+}
+
+.vf__act {
+  display: grid;
+  justify-items: center;
+  align-content: center;
   gap: 2px;
-}
-
-.vf__lenslabel {
+  min-height: var(--control-height);
+  padding: 2px 0;
+  border: 0;
+  border-radius: var(--radius-panel);
+  background: transparent;
+  color: var(--white);
   font-size: var(--text-label);
-  color: var(--color-text-muted);
+  line-height: 1.2;
+  text-align: center;
 }
 
-.vf__wider {
-  position: relative;
-  display: block;
-  margin: var(--space-2) auto 0;
-  width: fit-content;
-  top: calc(env(safe-area-inset-top, 0px) + var(--space-3));
-  padding: 2px 8px;
+.vf__act[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--white) 18%, transparent);
+}
+
+.vf__chip {
+  flex: 0 0 auto;
+  min-height: var(--control-height);
+  padding: 0 var(--space-3);
+  border: 0;
   border-radius: 999px;
-  background: var(--black);
-  font-size: var(--text-label);
+  background: var(--white);
+  color: var(--black);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heavy);
+}
+
+.vf__act--off {
+  color: var(--color-text-muted);
 }
 
 /* ----------------------------------------------------------- call sheet */

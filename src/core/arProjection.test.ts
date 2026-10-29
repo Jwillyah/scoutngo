@@ -64,9 +64,11 @@ describe('the viewfinder projection', () => {
 
 describe('the field of the picture as shown', () => {
   it('keeps the long side and cuts the short side to the screen', () => {
-    const f = visibleFov(390, 844)
+    /* 65 degrees given explicitly: the default is now the 69 of a 26 mm equivalent. */
+    const f = visibleFov(390, 844, 65)
     expect(f.v).toBe(65)
     expect(f.h).toBeCloseTo(32.8, 1)
+    expect(visibleFov(390, 844).v).toBe(69)
   })
 
   /* A 3:2 frame drawn on that screen has the shape of a 3:2 frame, measured in pixels. */

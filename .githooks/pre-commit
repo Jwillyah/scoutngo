@@ -197,6 +197,9 @@ ok "$(grep -E 'GESTURE PROBLEMS' "$SCRATCH/gestures.log" | tail -1 | tr -d '=' |
 run_audit "standalone audit" scripts/audit-standalone.mjs "$SCRATCH/standalone.log" 'PROBLEM|ABORTED'
 ok "$(grep -E 'STANDALONE PROBLEMS' "$SCRATCH/standalone.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
 
+run_audit "viewfinder audit" scripts/audit-viewfinder.mjs "$SCRATCH/viewfinder.log" 'PROBLEM|ABORTED'
+ok "$(grep -E 'VIEWFINDER PROBLEMS' "$SCRATCH/viewfinder.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
+
 run_audit "one surface audit" scripts/audit-surface.mjs "$SCRATCH/surface.log" 'PROBLEM|FAIL|ABORTED'
 ok "$(grep -E 'SURFACE PROBLEMS' "$SCRATCH/surface.log" | tail -1)"
 
