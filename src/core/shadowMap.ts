@@ -67,6 +67,8 @@ export interface BuildingShadow {
   /** One ring for drawing. Exact for a convex footprint, larger for a concave one. */
   hull: Position[]
   hullExact: boolean
+  /** The building's own footprint, closed: the lit roof, cut out of the drawn shadow. */
+  footprint: Position[]
   lengthMeters: number
   /** Compass degrees the shadow points along: away from the sun. */
   bearing: number
@@ -176,6 +178,7 @@ export function shadowMap(footprints: readonly FootprintIn[], sun: SunIn): Shado
       parts,
       hull: close(convexHull([...ring, ...moved])),
       hullExact: isConvex(ring),
+      footprint: close(ring),
       lengthMeters: length,
       bearing,
       capped,

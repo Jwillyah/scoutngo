@@ -10644,6 +10644,10 @@
   color: var(--color-text);
   font-size: var(--text-label);
   line-height: 1.35;
+  /* One line, always (29 Oct); the rest is in the "i". */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ---------------------------------------------------------- viewfinder */

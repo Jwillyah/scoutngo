@@ -265,6 +265,32 @@ export const TERRAIN_EXAGGERATION = 1
 
 export const BUILDING_SOURCE = 'osm-buildings'
 export const BUILDING_LAYER = 'osm-buildings-extrusion'
+/*
+ * FLAT, THE PHOTO SHOWS THROUGH (29 Oct: Hampton Coliseum at z17 a solid grey
+ * jagged slab over the satellite). Looked at from straight above, an
+ * extrusion is all roof, drawn at 0.8. So below BUILDINGS_FLAT_PITCH the
+ * boxes are put away and each building is its outline over a fill of at most
+ * BUILDING_TOP_OPACITY; tilted, the boxes come back, because then their
+ * sides are what says how tall they are. Only shadows are solid.
+ */
+export const BUILDING_TOP_LAYER = 'osm-buildings-top'
+export const BUILDING_EDGE_LAYER = 'osm-buildings-edge'
+export const BUILDING_TOP_OPACITY = 0.2
+export const BUILDINGS_FLAT_PITCH = 10
+
+/** Shows the boxes or the outlines, by the map's pitch. Does nothing while buildings are off. */
+function flatBuildings(instance: maplibregl.Map): void {
+  if (instance.getLayer(BUILDING_LAYER) === undefined) return
+  const flat = instance.getPitch() < BUILDINGS_FLAT_PITCH
+  const show = (id: string, on: boolean) => {
+    if (instance.getLayer(id) !== undefined && instance.getLayoutProperty(id, 'visibility') !== (on ? 'visible' : 'none')) {
+      instance.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none')
+    }
+  }
+  show(BUILDING_LAYER, !flat)
+  show(BUILDING_TOP_LAYER, flat)
+  show(BUILDING_EDGE_LAYER, flat)
+}
 
 /**
  * The zoom buildings start at.
@@ -2900,10 +2926,51 @@ export function MapView({
         },
         first,
       )
+      instance.addLayer(
+        {
+          id: BUILDING_TOP_LAYER,
+          type: 'fill',
+          source: BUILDING_SOURCE,
+          minzoom: BUILDINGS_MIN_ZOOM,
+          paint: {
+            'fill-color': ['case', ['get', 'measured'], '#8d8f98', '#4a4c55'],
+            'fill-opacity': BUILDING_TOP_OPACITY,
+          },
+        },
+        first,
+      )
+      instance.addLayer(
+        {
+          id: BUILDING_EDGE_LAYER,
+          type: 'line',
+          source: BUILDING_SOURCE,
+          minzoom: BUILDINGS_MIN_ZOOM,
+          paint: {
+            'line-color': readToken('--white', '#ffffff', container.current),
+            /* A nominal height's outline is fainter, as its box was darker. */
+            'line-opacity': ['case', ['get', 'measured'], 0.75, 0.45],
+            'line-width': 1.2,
+          },
+        },
+        first,
+      )
+      flatBuildings(instance)
     } else if (!showBuildings && present) {
-      instance.removeLayer(BUILDING_LAYER)
+      for (const id of [BUILDING_LAYER, BUILDING_TOP_LAYER, BUILDING_EDGE_LAYER]) if (instance.getLayer(id) !== undefined) instance.removeLayer(id)
     }
   }, [showBuildings, buildings, ready])
+
+  /* Boxes when tilted, outlines when flat: on every pitch change. */
+  useEffect(() => {
+    const instance = map.current
+    if (instance === null || !ready) return
+    const on = () => flatBuildings(instance)
+    instance.on('pitch', on)
+    on()
+    return () => {
+      instance.off('pitch', on)
+    }
+  }, [ready])
 
   /*
    * TERRAIN ON OR OFF, AND THE SKY THAT COMES WITH IT.
