@@ -4,33 +4,48 @@
  * hosts the network audits allow. Nothing about you is stored server-side:
  * this app's own functions log nothing and keep nothing.
  */
+/**
+ * When it is asked: ALWAYS (the map is up), ON PIN (a venue is set, without a
+ * tap), IF YOU TAP (only after you open or press the thing named). The
+ * privacy page (PrivacyPage.tsx) shows these words.
+ */
+export type HostTrigger = 'always' | 'on-pin' | 'if-you-tap'
+export const TRIGGER_WORD: Record<HostTrigger, string> = { always: 'ALWAYS', 'on-pin': 'ON PIN', 'if-you-tap': 'IF YOU TAP' }
+
 export interface Host {
   host: string
   who: string
   learns: string
   when: string
+  trigger: HostTrigger
 }
 
 export const HOSTS: readonly Host[] = [
-  { host: 'server.arcgisonline.com', who: 'Esri', learns: 'which map tiles: a map cell, not a point', when: 'whenever the map shows' },
+  { host: 'server.arcgisonline.com', who: 'Esri', learns: 'which map tiles: a map cell, not a point', when: 'whenever the map shows', trigger: 'always' },
   /* The free aerial imagery the 3D view picks from (src/data/imagerySources.ts): each only where it covers the venue. */
-  { host: 'vginmaps.vdem.virginia.gov', who: 'Virginia (VGIN) imagery', learns: 'which map tiles: a map cell', when: 'the 3D view at a Virginia venue' },
-  { host: 'services.nconemap.gov', who: 'NC OneMap imagery', learns: 'which map tiles: a map cell', when: 'the 3D view at a North Carolina venue' },
-  { host: 'mdgeodata.md.gov', who: 'Maryland (MD iMAP) imagery', learns: 'which map tiles: a map cell', when: 'the 3D view at a Maryland venue' },
-  { host: 'enterprise.firstmap.delaware.gov', who: 'Delaware (FirstMap) imagery', learns: 'which map tiles: a map cell', when: 'the 3D view at a Delaware venue' },
-  { host: 'tiles.arcgis.com', who: 'South Carolina imagery, hosted by Esri', learns: 'which map tiles: a map cell', when: 'the 3D view at a South Carolina venue' },
-  { host: 'imagery.nationalmap.gov', who: 'USDA NAIP imagery, from USGS', learns: 'which map tiles: a map cell', when: 'the 3D view in the lower 48 outside those states' },
-  { host: 's3.amazonaws.com', who: 'AWS Terrarium elevation', learns: 'which elevation tiles: a map cell', when: 'with terrain or 3D on' },
-  { host: 'tiles.openfreemap.org', who: 'OpenFreeMap', learns: 'which map tiles: a map cell', when: 'buildings, the sea, the 3D view' },
-  { host: 'api.open-meteo.com', who: 'Open-Meteo', learns: 'the venue coordinate and dates; for Sky fire, eight points toward the sun, and for Special light nine points round the venue, to 2 decimals', when: 'wind, cloud, Sky fire, Special light, the Tide sheet, the 3D sea' },
-  { host: 'air-quality-api.open-meteo.com', who: 'Open-Meteo air quality', learns: 'the venue to 2 decimals (about a kilometre) and a date', when: 'Sky › Preview, for how hazy the air is' },
-  { host: 'marine-api.open-meteo.com', who: 'Open-Meteo Marine', learns: 'the venue coordinate', when: 'the Tide sheet and the 3D sea, beaches only' },
-  { host: 'api.tidesandcurrents.noaa.gov', who: 'NOAA tides', learns: 'a station number and dates', when: 'tides, and the water height in 3D' },
-  { host: 'nominatim.openstreetmap.org', who: 'OpenStreetMap Nominatim', learns: 'what you search, or a pin to name', when: 'search and naming a pin' },
-  { host: 'overpass-api.de', who: 'Overpass (and two mirrors)', learns: 'a box around the venue', when: 'trees and hazards' },
-  { host: 's3-us-west-2.amazonaws.com', who: 'USGS 3DEP lidar', learns: 'which scan tiles: a map cell', when: 'only after you tap Download 3D scan' },
-  { host: 'overturemaps-extras-us-west-2.s3.amazonaws.com', who: 'Overture Maps', learns: 'which tiles: a map cell', when: 'only after you tap Fill in heights' },
-  { host: 'api.weather.gov', who: 'US National Weather Service', learns: 'the venue to 2 decimals (about a kilometre), then station ids', when: 'Sky fire, only in the two hours before a sunrise or sunset' },
-  { host: 'this app (/api/metar)', who: 'this app', learns: 'a station id, never the venue', when: 'Sky fire, when weather.gov has no METAR text; it reads aviationweather.gov' },
-  { host: 'this app (/api/buoy)', who: 'this app', learns: 'a buoy number, never the venue', when: 'the surf row; it reads NOAA NDBC' },
+  { host: 'vginmaps.vdem.virginia.gov', who: 'Virginia (VGIN) imagery', learns: 'which map tiles: a map cell', when: 'the 3D view at a Virginia venue', trigger: 'if-you-tap' },
+  { host: 'services.nconemap.gov', who: 'NC OneMap imagery', learns: 'which map tiles: a map cell', when: 'the 3D view at a North Carolina venue', trigger: 'if-you-tap' },
+  { host: 'mdgeodata.md.gov', who: 'Maryland (MD iMAP) imagery', learns: 'which map tiles: a map cell', when: 'the 3D view at a Maryland venue', trigger: 'if-you-tap' },
+  { host: 'enterprise.firstmap.delaware.gov', who: 'Delaware (FirstMap) imagery', learns: 'which map tiles: a map cell', when: 'the 3D view at a Delaware venue', trigger: 'if-you-tap' },
+  { host: 'tiles.arcgis.com', who: 'South Carolina imagery, hosted by Esri', learns: 'which map tiles: a map cell', when: 'the 3D view at a South Carolina venue', trigger: 'if-you-tap' },
+  { host: 'imagery.nationalmap.gov', who: 'USDA NAIP imagery, from USGS', learns: 'which map tiles: a map cell', when: 'the 3D view in the lower 48 outside those states', trigger: 'if-you-tap' },
+  { host: 's3.amazonaws.com', who: 'AWS Terrarium elevation', learns: 'which elevation tiles: a map cell', when: 'with terrain or 3D on', trigger: 'on-pin' },
+  { host: 'tiles.openfreemap.org', who: 'OpenFreeMap', learns: 'which map tiles: a map cell', when: 'buildings, the sea, the 3D view', trigger: 'on-pin' },
+  { host: 'api.open-meteo.com', who: 'Open-Meteo', learns: 'the venue to 2 decimals (about a kilometre) and dates; for Sky fire, eight points toward the sun, and for Special light nine points round the venue, to 2 decimals', when: 'wind, cloud, Sky fire, Special light, the Tide sheet, the 3D sea', trigger: 'on-pin' },
+  { host: 'air-quality-api.open-meteo.com', who: 'Open-Meteo air quality', learns: 'the venue to 2 decimals (about a kilometre) and a date', when: 'Sky › Preview, for how hazy the air is', trigger: 'if-you-tap' },
+  { host: 'marine-api.open-meteo.com', who: 'Open-Meteo Marine', learns: 'the venue to 2 decimals (about a kilometre)', when: 'the Tide sheet and the 3D sea, beaches only', trigger: 'on-pin' },
+  { host: 'api.tidesandcurrents.noaa.gov', who: 'NOAA tides', learns: 'a station number and dates', when: 'tides, and the water height in 3D', trigger: 'on-pin' },
+  { host: 'nominatim.openstreetmap.org', who: 'OpenStreetMap Nominatim', learns: 'what you search, or a pin to name', when: 'search and naming a pin', trigger: 'on-pin' },
+  { host: 'overpass-api.de', who: 'Overpass (and two mirrors)', learns: 'a box around the venue', when: 'trees and hazards', trigger: 'on-pin' },
+  { host: 's3-us-west-2.amazonaws.com', who: 'USGS 3DEP lidar', learns: 'which scan tiles: a map cell', when: 'only after you tap Download 3D scan', trigger: 'if-you-tap' },
+  { host: 'overturemaps-extras-us-west-2.s3.amazonaws.com', who: 'Overture Maps', learns: 'which tiles: a map cell', when: 'only after you tap Fill in heights', trigger: 'if-you-tap' },
+  { host: 'api.weather.gov', who: 'US National Weather Service', learns: 'the venue to 2 decimals (about a kilometre), then station ids', when: 'Sky fire, only in the two hours before a sunrise or sunset', trigger: 'if-you-tap' },
+  { host: 'this app (/api/metar)', who: 'this app', learns: 'a station id, never the venue', when: 'Sky fire, when weather.gov has no METAR text; it reads aviationweather.gov', trigger: 'if-you-tap' },
+  { host: 'this app (/api/buoy)', who: 'this app', learns: 'a buoy number, never the venue', when: 'the surf row; it reads NOAA NDBC', trigger: 'on-pin' },
+  /* Asked only when you open or press the thing named (29 Oct: these five were missing from this list). */
+  { host: 'gibs.earthdata.nasa.gov', who: 'NASA GIBS satellite imagery', learns: 'which satellite tiles: a map cell', when: 'only with the satellite cloud layer on', trigger: 'if-you-tap' },
+  { host: 'photon.komoot.io', who: 'Photon (komoot), a place search', learns: 'what you search', when: 'search, when OpenStreetMap finds nothing', trigger: 'if-you-tap' },
+  { host: 'this app (/api/search)', who: 'this app, asking Mapbox', learns: 'what you search, never who you are', when: 'search, as the last try', trigger: 'if-you-tap' },
+  { host: 'api.github.com', who: 'GitHub', learns: 'the app’s public repository name, nothing about you', when: 'Settings, to say whether a newer build exists', trigger: 'if-you-tap' },
+  { host: 'api.anthropic.com', who: 'Anthropic, with your own key', learns: 'what you ask it to write, sent with your key', when: 'only when you press Write on the call sheet', trigger: 'if-you-tap' },
 ]

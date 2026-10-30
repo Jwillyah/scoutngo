@@ -31,8 +31,9 @@ describe('the cover carries five elements and stops', () => {
   })
 
   it('carries the two quiet lines, in their places', () => {
-    expect(html.match(/class="cover__more"/g)).toHaveLength(1)
-    expect(text).toContain('Free · open source · no account · How it works')
+    /* How it works, and since 29 Oct Privacy (the brief: /privacy linked from the home footer). */
+    expect(html.match(/class="cover__more"/g)).toHaveLength(2)
+    expect(text).toContain('Free · open source · no account · How it works · Privacy')
   })
 
   it('puts the photograph behind everything, full bleed', () => {

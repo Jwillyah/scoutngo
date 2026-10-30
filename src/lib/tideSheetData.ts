@@ -110,7 +110,7 @@ export function hourlyAt(series: Hourly, name: string, at: Date): number | null 
 export const WIND_NAMES = ['wind_speed_10m', 'wind_direction_10m'] as const
 
 export async function fetchWindMonth(at: LatLon) {
-  const params = new URLSearchParams({ latitude: at.lat.toFixed(4), longitude: at.lon.toFixed(4), hourly: WIND_NAMES.join(','), wind_speed_unit: 'ms', forecast_days: String(WIND_DAYS), timezone: 'GMT' })
+  const params = new URLSearchParams({ latitude: at.lat.toFixed(2), longitude: at.lon.toFixed(2), hourly: WIND_NAMES.join(','), wind_speed_unit: 'ms', forecast_days: String(WIND_DAYS), timezone: 'GMT' })
   return liveOrSaved(`wind-month|${at.lat.toFixed(3)},${at.lon.toFixed(3)}`, `${WIND_URL}?${params}`, (p) => parseHourly(p, WIND_NAMES))
 }
 
@@ -118,7 +118,7 @@ export const SKY_NAMES = ['cloud_cover_low', 'cloud_cover_mid', 'cloud_cover_hig
 
 /** The sky by the hour for as far as Open-Meteo forecasts: the cover at three heights and the visibility (metres), for the 3D preview's clouds and haze. */
 export async function fetchSkyHours(at: LatLon) {
-  const params = new URLSearchParams({ latitude: at.lat.toFixed(4), longitude: at.lon.toFixed(4), hourly: SKY_NAMES.join(','), forecast_days: String(WIND_DAYS), timezone: 'GMT' })
+  const params = new URLSearchParams({ latitude: at.lat.toFixed(2), longitude: at.lon.toFixed(2), hourly: SKY_NAMES.join(','), forecast_days: String(WIND_DAYS), timezone: 'GMT' })
   return liveOrSaved(`sky-hours|${at.lat.toFixed(3)},${at.lon.toFixed(3)}`, `${WIND_URL}?${params}`, (p) => parseHourly(p, SKY_NAMES))
 }
 
@@ -126,7 +126,7 @@ export const MARINE_NAMES = ['wave_height', 'wave_direction', 'wave_period', 'sw
 
 /** The sea for the next week. Inland, Open-Meteo answers with nothing in the series: null. */
 export async function fetchMarine(at: LatLon) {
-  const params = new URLSearchParams({ latitude: at.lat.toFixed(4), longitude: at.lon.toFixed(4), hourly: MARINE_NAMES.join(','), forecast_days: '7', timezone: 'GMT' })
+  const params = new URLSearchParams({ latitude: at.lat.toFixed(2), longitude: at.lon.toFixed(2), hourly: MARINE_NAMES.join(','), forecast_days: '7', timezone: 'GMT' })
   return liveOrSaved(`marine|${at.lat.toFixed(3)},${at.lon.toFixed(3)}`, `${MARINE_URL}?${params}`, (p) => {
     const h = parseHourly(p, MARINE_NAMES)
     return h !== null && h.values.wave_height.some((v) => v !== null) ? h : null

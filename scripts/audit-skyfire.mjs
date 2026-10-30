@@ -46,7 +46,25 @@ const fail = (why) => {
 }
 const asked = { fire: 0, split: 0, nws: 0, aod: 0 }
 
+/*
+ * THE VENUE'S OWN FORECAST, ANSWERED TOO (30 Oct). It used to go to the real
+ * Open-Meteo, and the night the gate had asked it too often that day the
+ * service refused ("Daily API request limit exceeded") and the chip said no
+ * data: the audit measured the network. Every hourly variable asked, for the
+ * day asked, with 29 Oct's cover at the pier (best_match overhead: low 100,
+ * mid 5, high 0) and a light wind.
+ */
+function venueDay(u) {
+  const vars = (u.searchParams.get('hourly') ?? '').split(',').filter(Boolean)
+  const day = u.searchParams.get('start_date') ?? '2026-10-29'
+  const time = Array.from({ length: 24 }, (_, h) => `${day}T${String(h).padStart(2, '0')}:00`)
+  const value = (v) => (/cloud_cover_low/.test(v) ? 100 : /cloud_cover_mid/.test(v) ? 5 : /cloud_cover_high/.test(v) ? 0 : /cloud_cover/.test(v) ? 100 : /direction/.test(v) ? 20 : /gust/.test(v) ? 6 : /wind_speed/.test(v) ? 3 : /visibility/.test(v) ? 16000 : 0)
+  return { hourly: Object.fromEntries([['time', time], ...vars.map((v) => [v, time.map(() => value(v))])]) }
+}
+
 async function routes(ctx) {
+  /* First, so the routes below (which Playwright tries first) answer the multi-model requests. */
+  await ctx.route(/api\.open-meteo\.com\/v1\/forecast/, (route) => route.fulfill({ json: venueDay(new URL(route.request().url())) }))
   await ctx.route(/api\.open-meteo\.com\/v1\/forecast.*models=/, async (route) => {
     const u = new URL(route.request().url())
     if (u.searchParams.get('hourly') === 'cloud_cover_low') {

@@ -137,7 +137,8 @@ describe('fetching wind', () => {
     expect(url).toContain('wind_speed_10m')
     expect(url).toContain('wind_direction_10m')
     expect(url).toContain('wind_gusts_10m')
-    expect(url).toContain('latitude=36.9063')
+    /* Rounded to 2 decimals, about a kilometre: the venue is not sent to the metre (29 Oct). */
+    expect(url).toContain('latitude=36.91&')
     /* Keyless, like the cloud forecast it shares an endpoint with. */
     expect(url.toLowerCase()).not.toContain('key=')
   })

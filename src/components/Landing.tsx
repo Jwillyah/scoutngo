@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { openPrivacy } from '../lib/privacyRoute.ts'
 import type { IconId } from '../lib/iconPalette.ts'
 import { HowPage } from './HowPage.tsx'
 import { Icon, type GlyphId } from './Icon.tsx'
@@ -81,6 +82,10 @@ function Cover({ onDismiss, onHow }: { onDismiss: () => void; onHow: () => void 
           Free · open source · no account ·{' '}
           <button type="button" className="cover__more" onClick={onHow}>
             How it works
+          </button>
+          {' · '}
+          <button type="button" className="cover__more" onClick={openPrivacy}>
+            Privacy
           </button>
         </p>
         <p className="cover__attrib">{HERO_CREDIT}</p>

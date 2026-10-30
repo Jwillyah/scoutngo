@@ -99,6 +99,8 @@ import {
 import { useTide } from './lib/useTide.ts'
 import { lowTideNearest } from './lib/lowTide.ts'
 import { useVenueCache } from './lib/useVenueCache.ts'
+import { PrivacyPage } from './components/PrivacyPage.tsx'
+import { atPrivacy, closePrivacy } from './lib/privacyRoute.ts'
 import { buildScoutFile, saveScoutFile, scoutFilename, type ReadFile } from './lib/scoutFile.ts'
 import { runSuggest } from './lib/suggestRun.ts'
 import { readShareHash, SHARE_PREFIX } from './lib/planShare.ts'
@@ -864,6 +866,13 @@ function App() {
   const [atHowPath, setAtHowPath] = useState(
     () => typeof window !== 'undefined' && window.location.pathname === '/how',
   )
+  /* /privacy: the same way, a real address over whatever is under it (src/lib/privacyRoute.ts). */
+  const [privacyOpen, setPrivacyOpen] = useState(atPrivacy)
+  useEffect(() => {
+    const onPop = () => setPrivacyOpen(atPrivacy())
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
   useEffect(() => {
     const onPop = () => setAtHowPath(window.location.pathname === '/how')
     window.addEventListener('popstate', onPop)
@@ -1880,6 +1889,7 @@ function App() {
         <NowScreen onClose={() => setNowOpen(false)} onPlanHere={planFromNow} />
       )}
 
+      {privacyOpen ? <PrivacyPage onClose={closePrivacy} /> : null}
       <NewBuildNotice check={newBuild} />
       {mode === 'setup' ? (
         <div className="mode-setup">

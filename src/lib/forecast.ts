@@ -192,8 +192,8 @@ export async function fetchSightlineCloud(
   if (hit !== undefined) return hit
 
   const params = new URLSearchParams({
-    latitude: points.map((p) => p.at.lat.toFixed(4)).join(','),
-    longitude: points.map((p) => p.at.lon.toFixed(4)).join(','),
+    latitude: points.map((p) => p.at.lat.toFixed(2)).join(','),
+    longitude: points.map((p) => p.at.lon.toFixed(2)).join(','),
     /*
      * CLOUD AND WIND IN ONE REQUEST. The grid is 25 points and Open-Meteo is a
      * free service, so asking twice for the same 25 points because somebody
@@ -444,8 +444,8 @@ export async function fetchVenueDay(
   fetchImpl: typeof fetch = fetch,
 ): Promise<VenueDayResult> {
   const params = new URLSearchParams({
-    latitude: at.lat.toFixed(4),
-    longitude: at.lon.toFixed(4),
+    latitude: at.lat.toFixed(2),
+    longitude: at.lon.toFixed(2),
     /*
      * ALL FOUR HEIGHTS. 180m is about 590ft, which covers a whole Part 107
      * altitude range, so nothing has to be extrapolated upward. Gusts exist at
@@ -534,8 +534,8 @@ export async function fetchCloudGrid(
 
   const points = cloudGridPoints(centre)
   const params = new URLSearchParams({
-    latitude: points.map((p) => p.at.lat.toFixed(4)).join(','),
-    longitude: points.map((p) => p.at.lon.toFixed(4)).join(','),
+    latitude: points.map((p) => p.at.lat.toFixed(2)).join(','),
+    longitude: points.map((p) => p.at.lon.toFixed(2)).join(','),
     /*
      * CLOUD AND WIND IN ONE REQUEST. The grid is 25 points and Open-Meteo is a
      * free service, so asking twice for the same 25 points because somebody
@@ -659,8 +659,8 @@ export async function fetchNightCloud(
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
   const params = new URLSearchParams({
-    latitude: at.lat.toFixed(4),
-    longitude: at.lon.toFixed(4),
+    latitude: at.lat.toFixed(2),
+    longitude: at.lon.toFixed(2),
     hourly: 'cloud_cover',
     start_date: day(nightStart),
     end_date: day(nightEnd),

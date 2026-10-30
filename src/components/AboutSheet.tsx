@@ -1,4 +1,5 @@
 import { buildLabelWithDate } from '../lib/build.ts'
+import { openPrivacy } from '../lib/privacyRoute.ts'
 import type { ReadFile } from '../lib/scoutFile.ts'
 import { BackupFile } from './BackupFile.tsx'
 import { ApiKeyField } from './ApiKeyField.tsx'
@@ -68,11 +69,12 @@ export function AboutSheet({
       {(
         [
           ['computed', 'Every number is arithmetic', 'Sun, shadow, lens, distance. The model is never asked.'],
-          ['leaves', 'What leaves your device', 'No account, no database, no tracking.'],
+          ['leaves', 'Privacy: what leaves your device', 'No account, no database, no tracking.'],
           ['refuses', 'What it will not tell you', 'It never says an area is clear. Check the airspace yourself.'],
         ] as const
       ).map(([section, title, note]) => (
-        <button type="button" className="about__row" key={section} onClick={() => onHow(section)}>
+        /* What leaves the device has a page of its own now: /privacy, with the live check. */
+        <button type="button" className="about__row" key={section} onClick={() => (section === 'leaves' ? openPrivacy() : onHow(section))}>
           <span className="about__row-main">
             <span className="about__row-title">{title}</span>
             <span className="about__row-note">{note}</span>

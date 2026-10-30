@@ -9,6 +9,10 @@ import './styles/tokens.css'
 import './styles/base.css'
 import './styles/app.css'
 import App from './App.tsx'
+import { watchHosts } from './lib/privacy.ts'
+
+/* The privacy page's live check: which hosts this session asks, in memory only (src/lib/privacy.ts). */
+watchHosts()
 
 /*
  * THE PAGE DOES NOT PINCH-ZOOM UNDER THE MAP. iOS Safari ignores
