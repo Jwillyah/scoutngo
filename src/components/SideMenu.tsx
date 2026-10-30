@@ -66,7 +66,7 @@ export function SideMenu({ open, current, onPick, onClose, hidden }: SideMenuPro
               </button>
               {item.subs === undefined ? null : (
                 <div className="sidemenu__subs">
-                  {item.subs.map((sub) => (
+                  {item.subs.filter((sub) => !(hidden?.has(sub.id) ?? false)).map((sub) => (
                     <button
                       type="button"
                       key={sub.id}

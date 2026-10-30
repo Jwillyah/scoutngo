@@ -1373,7 +1373,7 @@ function App() {
     drawer: 'kit',
     tick: 0,
   })
-  const [cardRequest, setCardRequest] = useState<{ kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'preflight'; tick: number }>({
+  const [cardRequest, setCardRequest] = useState<{ kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'wind' | 'preflight'; tick: number }>({
     kind: 'sky',
     tick: 0,
   })
@@ -1413,10 +1413,16 @@ function App() {
       case 'viewfinder':
         setViewfinderOpen(true)
         return
+      /* Water opens its first page, the tides (docs/navigation.md). */
+      case 'water':
+        setMode('plan')
+        setCardRequest((r) => ({ kind: 'tides', tick: r.tick + 1 }))
+        return
       case 'sky':
       case 'exposure':
       case 'tides':
       case 'surf':
+      case 'wind':
       case 'preflight':
       case 'settings':
       case 'about':

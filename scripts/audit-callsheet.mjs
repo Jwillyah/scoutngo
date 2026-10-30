@@ -73,7 +73,7 @@ watchdog.note('plan')
 
 await ev(`document.querySelector('button[aria-label="Menu"]')?.click()`)
 await wait(400)
-const opened = await ev(`(() => { const b = [...document.querySelectorAll('.sidemenu__item')].find((x) => x.textContent.includes('Call sheet')); b?.click(); return !!b })()`)
+const opened = await ev(`(() => { const b = [...document.querySelectorAll('.sidemenu__item, .sidemenu__sub')].find((x) => x.textContent.includes('Call sheet')); b?.click(); return !!b })()`)
 if (!opened) {
   console.log('=== CALL SHEET AUDIT ABORTED: no Call sheet item in the menu ===')
   process.exit(2)

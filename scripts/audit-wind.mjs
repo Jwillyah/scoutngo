@@ -109,17 +109,8 @@ try {
     await wait(1500)
     await goToStage(ev, wait, 'plan')
     await wait(2500)
-    await ev(`[...document.querySelectorAll('.chip2')].find((b) => /WIND/.test(b.textContent))?.click()`)
-    await wait(1200)
-    const door = page.locator('.windc__models')
-    if ((await door.count()) === 0) {
-      fail(`${label}: no "Five models" on the wind card`)
-      await page.screenshot({ path: join(OUT, `wind-missing-${label}.png`) })
-      await ctx.close()
-      continue
-    }
-    await door.first().scrollIntoViewIfNeeded().catch(() => {})
-    await door.first().tap()
+    /* The Wind chip opens the Wind page itself since 30 Oct (docs/navigation.md). */
+    await page.locator('.chip2', { hasText: 'WIND' }).first().tap()
     let w = null
     for (let i = 0; i < 20; i += 1) {
       await wait(500)

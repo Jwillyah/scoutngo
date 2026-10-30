@@ -80,7 +80,7 @@ try {
     await wait(700)
     await page.getByText('Sky', { exact: true }).first().tap()
     await wait(1200)
-    await page.getByRole('tab', { name: 'Sun' }).tap()
+    await page.getByRole('tab', { name: 'Now' }).tap()
     await wait(800)
     const pick = page.getByRole('button', { name: /Pick it on the map/ })
     if ((await pick.count()) === 0) {
@@ -104,7 +104,7 @@ try {
       await wait(700)
       await page.getByText('Sky', { exact: true }).first().tap()
       await wait(1200)
-      await page.getByRole('tab', { name: 'Sun' }).tap()
+      await page.getByRole('tab', { name: 'Now' }).tap()
       await wait(800)
     }
     await page.locator('.lineup input').first().fill('the pier end')

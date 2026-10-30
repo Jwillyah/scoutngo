@@ -128,7 +128,8 @@ await step('Wind chip › Five models', async () => {
   await goToStage(ev, wait, 'plan')
   await ev(`[...document.querySelectorAll('.chip2')].find((b) => /WIND/.test(b.textContent))?.click()`)
   await wait(1200)
-  await page.locator('.windc__models').first().tap({ timeout: 4000 })
+  /* Before 30 Oct's Section 4 the chip opened a card with "Five models" on it; after, the page itself. */
+  if ((await page.locator('.windp').count()) === 0) await page.locator('.windc__models').first().tap({ timeout: 4000 })
 })
 const useMs = minutes * 60_000
 while (Date.now() - started < useMs) await wait(5000)

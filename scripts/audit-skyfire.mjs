@@ -184,7 +184,8 @@ try {
          * glow must start before 7:20 (it was seen about 7:15), the strips are
          * coloured minute cells, and pages 2 and 3 say they are coming.
          */
-        await page.getByRole('tab', { name: 'Preview' }).tap()
+        /* The colour clock is under the verdict on Sky fire since 30 Oct (docs/navigation.md). */
+        await ev(`document.querySelector('.prev')?.scrollIntoView({ block: 'start' })`)
         let prev = null
         for (let i = 0; i < 20; i += 1) {
           await wait(500)

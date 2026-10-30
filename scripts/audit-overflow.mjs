@@ -79,7 +79,9 @@ const LOOK = `(() => {
     const r = e.getBoundingClientRect()
     if (r.width === 0 || r.height === 0) continue
     const s = getComputedStyle(e)
-    if (/auto|scroll/.test(s.overflowX) && e.scrollWidth > e.clientWidth + 1 && shown(e)) out.sideways.push({ el: name(e), scroll: e.scrollWidth, room: e.clientWidth })
+    /* Swipe pages by design (Sky › Now, the colour clock): marked data-sideways, snapping a page at a time, with dots that name the pages. A row that merely scrolls is still a failure. */
+    const paged = e.hasAttribute('data-sideways') && /x/.test(s.scrollSnapType) && e.scrollWidth % Math.max(1, e.clientWidth) <= 2
+    if (/auto|scroll/.test(s.overflowX) && e.scrollWidth > e.clientWidth + 1 && shown(e) && !paged) out.sideways.push({ el: name(e), scroll: e.scrollWidth, room: e.clientWidth })
     if ((r.right > vw + 1 || r.left < -1) && shown(e) && !clipped(e)) out.past.push({ el: name(e), left: Math.round(r.left), right: Math.round(r.right), text: (e.textContent || '').trim().slice(0, 30) })
   }
   /* Report the outermost offender only: its children run past with it. */
@@ -241,7 +243,7 @@ try {
   for (const item of ['Surf', 'Exposure']) {
     await ev(`document.querySelector('button[aria-label="Menu"]')?.click()`)
     await wait(600)
-    const found = await ev(`(() => { const b = [...document.querySelectorAll('.sidemenu__item')].find((x) => x.querySelector('.sidemenu__label')?.textContent === '${item}'); if (!b) return false; b.click(); return true })()`)
+    const found = await ev(`(() => { const b = [...document.querySelectorAll('.sidemenu__item, .sidemenu__sub')].find((x) => x.querySelector('.sidemenu__label')?.textContent === '${item}'); if (!b) return false; b.click(); return true })()`)
     if (!found) {
       /* Surf away from the sea on Auto is not in the menu, which is right, and is not this check. */
       if (item !== 'Surf') fail(`no ${item} in the menu`)

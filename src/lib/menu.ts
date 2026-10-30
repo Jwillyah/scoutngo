@@ -2,12 +2,12 @@
  * WHERE THE MENU GOES. The list in one place, so the menu, App and the audits'
  * navigation helper (scripts/preflight.mjs) name the same items the same way.
  *
- * NINE ITEMS, gold to night blue: Plan, Sky, Exposure, Kit, Saved spots,
- * Viewfinder, Call sheet, Settings, About. Exposure has its own item since
- * the field test of 27 Oct; it was a page of Sky nobody found. Field and the
- * Shoot setup / Field buttons under Plan are gone from the menu: Shoot setup
- * lives inside Plan. Their ids stay in MenuItem, and the old paths still land
- * on them (OLD_PATHS below): a place that moved is still a place.
+ * SEVEN ITEMS, GROUPED BY JOB (field test, 30 Oct; docs/ux-rules.md rule 24;
+ * docs/navigation.md has the tree and the taps to each place). It was twelve
+ * flat items. Now: Plan · Sky · Water · Fly · Kit · Saved · Settings, with
+ * the places that belong to a job under it, each one tap from the menu.
+ * Field is still reached by its address, /field (OLD_PATHS below): a place
+ * that moved is still a place.
  */
 import type { GlyphId } from '../components/Icon.tsx'
 
@@ -16,8 +16,10 @@ export type MenuItem =
   | 'setup'
   | 'field'
   | 'sky'
+  | 'water'
   | 'tides'
   | 'surf'
+  | 'wind'
   | 'exposure'
   | 'kit'
   | 'saved'
@@ -33,7 +35,7 @@ export interface MenuEntry {
   label: string
   note: string
   icon: GlyphId
-  /** Doors folded into this item, shown under it. */
+  /** Places that belong to this job, shown under it. */
   subs?: readonly { id: MenuItem; label: string }[]
 }
 
@@ -43,25 +45,38 @@ export const MENU_ITEMS: readonly MenuEntry[] = [
     label: 'Plan',
     note: 'Positions, light and conditions',
     icon: 'plan',
+    subs: [
+      { id: 'now', label: 'Shoot now' },
+      { id: 'setup', label: 'Setup' },
+      { id: 'callsheet', label: 'Call sheet' },
+    ],
   },
-  { id: 'sky', label: 'Sky', note: 'Tonight, now, the moon, the calendar', icon: 'sky' },
-  /* Their own pages since 29 Oct; Surf only where there is surf (SideMenu's hidden). */
-  { id: 'tides', label: 'Tides', note: 'The curve, glass mornings, big tides', icon: 'tides' },
-  { id: 'surf', label: 'Surf', note: 'Rating, the best time to shoot, seven days', icon: 'surf' },
-  { id: 'exposure', label: 'Exposure', note: 'Shutter, aperture and ISO for the light', icon: 'exposure' },
-  { id: 'kit', label: 'Kit', note: 'What is in the bag', icon: 'kit' },
-  { id: 'saved', label: 'Saved spots', note: 'On this phone', icon: 'saved' },
-  { id: 'viewfinder', label: 'Viewfinder', note: 'The camera with the sun and your frames on it', icon: 'viewfinder' },
-  { id: 'preflight', label: 'Preflight', note: 'Draw or fly a drone move', icon: 'preflight' },
-  { id: 'callsheet', label: 'Call sheet', note: 'Run of show and shot list, on your own key', icon: 'callsheet' },
-  { id: 'settings', label: 'Settings', note: 'Clock, wind and distance', icon: 'settings' },
-  { id: 'about', label: 'About', note: 'Backup, your key, what leaves your phone', icon: 'about' },
+  { id: 'sky', label: 'Sky', note: 'Now, sky fire, special light, the calendar', icon: 'sky' },
+  /* Water at the coast; Section 5 of 30 Oct makes it Land inland. Surf only where there is surf (SideMenu's hidden). */
+  {
+    id: 'water',
+    label: 'Water',
+    note: 'Tides, surf and wind',
+    icon: 'tides',
+    subs: [
+      { id: 'tides', label: 'Tides' },
+      { id: 'surf', label: 'Surf' },
+      { id: 'wind', label: 'Wind' },
+    ],
+  },
+  { id: 'preflight', label: 'Fly', note: 'Draw or fly a drone move', icon: 'preflight', subs: [{ id: 'viewfinder', label: 'Viewfinder' }] },
+  { id: 'kit', label: 'Kit', note: 'What is in the bag', icon: 'kit', subs: [{ id: 'exposure', label: 'Exposure' }] },
+  { id: 'saved', label: 'Saved', note: 'Spots, offline packs, past shoots', icon: 'saved' },
+  { id: 'settings', label: 'Settings', note: 'Units, offline, privacy, about', icon: 'settings', subs: [{ id: 'about', label: 'About' }] },
 ]
 
 /** The top-level item a place lives under, for marking where you are. */
 export function menuHome(item: MenuItem): MenuItem {
-  if (item === 'setup' || item === 'field') return 'plan'
-  if (item === 'now') return 'sky'
+  if (item === 'setup' || item === 'field' || item === 'now' || item === 'callsheet') return 'plan'
+  if (item === 'tides' || item === 'surf' || item === 'wind') return 'water'
+  if (item === 'viewfinder') return 'preflight'
+  if (item === 'exposure') return 'kit'
+  if (item === 'about') return 'settings'
   return item
 }
 

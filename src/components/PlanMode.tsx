@@ -921,7 +921,7 @@ export function PlanMode({
       live = false
     }
   }, [venue, modelDay, weatherEpoch])
-  const [skyTab, setSkyTab] = useState<SkyTab>('tonight')
+  const [skyTab, setSkyTab] = useState<SkyTab>('now')
   /*
    * TWO-PIN MEASURE. Null is off; on, each tap drops a pin and a third tap
    * starts over. The pins are not a plan: they are not saved or sent.
@@ -1358,6 +1358,28 @@ export function PlanMode({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cardRequest])
 
+  /*
+   * EVERY CHIP OPENS ITS PAGE (field test, 30 Oct; docs/navigation.md): Wind
+   * the Wind page, Cloud Sky › Sky fire, Tide Water › Tides, Golden Sky ›
+   * Now. They opened small cards in the sheet, one tap short of the page.
+   */
+  const openChip = useCallback(
+    (kind: Chip['kind']) => {
+      if (kind === 'tide') setPage('tides')
+      else if (kind === 'wind') setPage('wind')
+      else if (kind === 'cloud' || kind === 'golden') {
+        const tab = kind === 'cloud' ? 'fire' : 'now'
+        /* A second tap on the same chip closes it; the other chip, with Sky open, turns to its own tab. */
+        if (card.kind === 'sky' && skyTab === tab) setCard(HOME)
+        else {
+          setSkyTab(tab)
+          setCard({ kind: 'sky' } as SheetCard)
+          raiseToHalf()
+        }
+      } else openCard(kind)
+    },
+    [openCard, card.kind, skyTab, raiseToHalf],
+  )
   const clock = useCallback(
     (at: Date | null) =>
       at === null || venueWindow === null ? null : formatClock(at, venueWindow.timeZone),
@@ -2047,7 +2069,8 @@ export function PlanMode({
                 timeZoneAbbr={venueWindow.timeZoneShort}
                 at={scrubbedAt}
                 tab={skyTab}
-                onTab={(t: SkyTab) => (t === 'calendar' ? setCalendarOpen(true) : setSkyTab(t))}
+                onTab={setSkyTab}
+                onOpenCalendar={() => setCalendarOpen(true)}
                 onJump={scrubTo}
                 target={aimAt}
                 picking={placingAim}
@@ -2088,7 +2111,17 @@ export function PlanMode({
               * "Sky cameras near here" and opened this card, which is mostly
               * meteor showers. Now it opens the cameras.
               */}
-            <CardMore links={[{ label: 'Sky cameras near here', onOpen: () => openCard('cams') }]} />
+            {/* The cards the chips opened before 30 Oct, each a tap from here so none loses its door (docs/navigation.md). */}
+            <CardMore
+              links={[
+                { label: 'The light through your window', onOpen: () => openCard('golden') },
+                { label: 'Cloud along each position’s view', onOpen: () => openCard('cloud') },
+                { label: 'Wind at your flight height', onOpen: () => openCard('wind') },
+                { label: 'The sun through the day', onOpen: () => openCard('suncurve') },
+                { label: 'Plan a moonrise', onOpen: () => openCard('moonrise') },
+                { label: 'Sky cameras near here', onOpen: () => openCard('cams') },
+              ]}
+            />
           </Card>
         )
       case 'cams':
@@ -2368,6 +2401,10 @@ export function PlanMode({
           drone={surfDrone === null ? null : { name: surfDrone.name, ratedMps: surfDrone.ratedMps }}
           facing={tideSheet.facing.status === 'ready' && tideSheet.facing.value !== null && tideSheet.facing.value !== 'inland' ? tideSheet.facing.value.facing : null}
           onClose={() => setPage(null)}
+          onWindCard={() => {
+            setPage(null)
+            openCard('wind')
+          }}
         />
       ) : null}
       {compareOpen ? <ComparePhoto fallbackAt={venue} distanceUnit={units.distance} onClose={() => setCompareOpen(false)} /> : null}
@@ -2588,7 +2625,7 @@ export function PlanMode({
         online={online || offlineStatus !== null}
       />
 
-      <ChipRow chips={chips} active={page === 'tides' ? 'tide' : card.kind} onOpen={(kind) => (kind === 'tide' ? setPage('tides') : openCard(kind))} measureRef={measureChips} status={locateNote ?? offlineStatus ?? weatherBusy ?? specialStatus} statusAction={locateNote === null ? undefined : { label: locating ? 'Finding you…' : 'Retry', onClick: onLocate }} onStatus={locateNote === null && offlineStatus === null && weatherBusy === null && specialStatus !== null ? () => { setSkyTab('special'); openCard('sky') } : undefined} />
+      <ChipRow chips={chips} active={page === 'tides' ? 'tide' : card.kind} onOpen={openChip} measureRef={measureChips} status={locateNote ?? offlineStatus ?? weatherBusy ?? specialStatus} statusAction={locateNote === null ? undefined : { label: locating ? 'Finding you…' : 'Retry', onClick: onLocate }} onStatus={locateNote === null && offlineStatus === null && weatherBusy === null && specialStatus !== null ? () => { setSkyTab('special'); openCard('sky') } : undefined} />
 
       {sheet === 'full' ? null : (
       <MapRail

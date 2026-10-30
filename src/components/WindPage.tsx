@@ -25,6 +25,8 @@ interface Props {
   /** The beach's facing, degrees, for offshore / cross / onshore; null inland. */
   facing: number | null
   onClose: () => void
+  /** The wind card, for the flight height and the cams: the chip opens this page now, so the card is a tap from here. */
+  onWindCard?: () => void
 }
 
 const STRIP_HOURS = 24
@@ -70,7 +72,7 @@ function Strip({ hours, rows, unit, ratedMps, timeZone, now }: { hours: Date[]; 
   )
 }
 
-export function WindPage({ venue, at, timeZone, unit, drone, facing, onClose }: Props) {
+export function WindPage({ venue, at, timeZone, unit, drone, facing, onClose, onWindCard }: Props) {
   const key = `${venue.lat},${venue.lon}`
   const [data, setData] = useState<{ key: string; models: WindModels | null; measured: Measured[] } | null>(null)
   useEffect(() => {
@@ -137,6 +139,11 @@ export function WindPage({ venue, at, timeZone, unit, drone, facing, onClose }: 
             </p>
           </details>
         </>
+      )}
+      {onWindCard === undefined ? null : (
+        <button type="button" className="btn btn--small windp__card" onClick={onWindCard}>
+          Wind at your flight height
+        </button>
       )}
     </Page>
   )

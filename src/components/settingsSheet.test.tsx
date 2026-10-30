@@ -11,10 +11,10 @@ const sheet = () => (
 )
 
 describe('Settings, in the menu', () => {
-  it('is a menu item of its own, beside About', () => {
+  it('is a menu item of its own, the last, with About under it', () => {
     const ids = MENU_ITEMS.map((m) => m.id)
-    expect(ids).toContain('settings')
-    expect(ids.indexOf('settings')).toBe(ids.indexOf('about') - 1)
+    expect(ids[ids.length - 1]).toBe('settings')
+    expect(MENU_ITEMS.find((m) => m.id === 'settings')?.subs?.map((s) => s.id)).toEqual(['about'])
   })
 
   it('holds the clock, the wind and the distance, 12 hour pressed by default', () => {

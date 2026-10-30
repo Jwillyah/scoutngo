@@ -39,11 +39,12 @@ describe('the golden bubble tiles', () => {
 })
 
 describe('the side menu', () => {
-  /* The list asked for on 27 Oct, with Exposure its own item. */
-  /* 29 Oct: Tides and Surf after Sky, Preflight after Viewfinder. */
-  it('is twelve items in the order asked for', () => {
-    expect(MENU_ITEMS.map((m) => m.label)).toEqual(['Plan', 'Sky', 'Tides', 'Surf', 'Exposure', 'Kit', 'Saved spots', 'Viewfinder', 'Preflight', 'Call sheet', 'Settings', 'About'])
-    expect(MENU_ITEMS.map((m) => m.icon)).toEqual(['plan', 'sky', 'tides', 'surf', 'exposure', 'kit', 'saved', 'viewfinder', 'preflight', 'callsheet', 'settings', 'about'])
+  /* 30 Oct: seven items grouped by job (docs/ux-rules.md rule 24, docs/navigation.md). */
+  it('is seven items, grouped by job, in the order asked for', () => {
+    expect(MENU_ITEMS.map((m) => m.label)).toEqual(['Plan', 'Sky', 'Water', 'Fly', 'Kit', 'Saved', 'Settings'])
+    expect(MENU_ITEMS.map((m) => m.icon)).toEqual(['plan', 'sky', 'tides', 'preflight', 'kit', 'saved', 'settings'])
+    const subs = Object.fromEntries(MENU_ITEMS.map((m) => [m.label, (m.subs ?? []).map((s) => s.label)]))
+    expect(subs).toEqual({ Plan: ['Shoot now', 'Setup', 'Call sheet'], Sky: [], Water: ['Tides', 'Surf', 'Wind'], Fly: ['Viewfinder'], Kit: ['Exposure'], Saved: [], Settings: ['About'] })
   })
   it('leaves Surf out where it is told to (inland on Auto)', () => {
     const html = renderToStaticMarkup(<SideMenu open current="plan" onPick={() => {}} onClose={() => {}} hidden={new Set(['surf'])} />)
@@ -51,25 +52,23 @@ describe('the side menu', () => {
     expect(html).toContain('>Tides<')
   })
 
-  it('has no Field and no Shoot setup / Field buttons under Plan: Shoot setup lives inside Plan', () => {
-    expect(MENU_ITEMS.some((m) => (m.subs ?? []).length > 0)).toBe(false)
+  it('marks the job you are in: Setup is part of Plan', () => {
     const html = renderToStaticMarkup(<SideMenu open current="setup" onPick={() => {}} onClose={() => {}} />)
-    expect(html.match(/class="icon"/g)?.length).toBe(12)
-    expect(html).not.toContain('>Shoot setup<')
+    expect(html.match(/class="icon"/g)?.length).toBe(7)
     expect(html).not.toContain('>Field<')
-    /* Shoot setup is part of Plan, so Plan reads as the place you are in. */
     expect(html).toMatch(/sidemenu__item sidemenu__item--on[^]*?>Plan</)
   })
 
-  it('every place is still reachable: an item, inside Plan, Now on Sky, or its own address', () => {
-    const all: MenuItem[] = ['plan', 'setup', 'field', 'sky', 'exposure', 'kit', 'saved', 'now', 'viewfinder', 'callsheet', 'settings', 'about']
-    const offered = new Set(MENU_ITEMS.map((m) => m.id))
+  it('every place is still reachable: an item, a place under one, or its own address', () => {
+    const all: MenuItem[] = ['plan', 'setup', 'field', 'sky', 'water', 'tides', 'surf', 'wind', 'exposure', 'kit', 'saved', 'now', 'viewfinder', 'preflight', 'callsheet', 'settings', 'about']
+    const offered = new Set(MENU_ITEMS.flatMap((m) => [m.id, ...(m.subs ?? []).map((s) => s.id)]))
     for (const item of all) {
-      if (item === 'now') expect(menuHome(item)).toBe('sky')
-      else if (item === 'setup' || item === 'field') {
+      if (item === 'field') {
         expect(menuHome(item)).toBe('plan')
         expect(pathToMenuItem(`/${item}`)).toBe(item)
       } else expect(offered.has(item), item).toBe(true)
+      /* Every place's home is a top item. */
+      expect(MENU_ITEMS.map((m) => m.id)).toContain(menuHome(item))
     }
   })
 

@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { getMoonIllumination, getTimes } from 'suncalc'
 import { moonTimesOnLocalDay } from '../core/moonTimes.ts'
 import { compassWord } from '../core/compassWords.ts'
@@ -55,9 +55,13 @@ interface SkyCardProps {
   onShowBow?: (s: Special | null) => void
   /** The visible horizon round the venue (the terrain's, or flat), for lining things up. */
   horizon?: HorizonInput
+  /** The month as a calendar page. */
+  onOpenCalendar?: () => void
 }
 
 const DEG = Math.PI / 180
+const NOW_PAGE = { sun: 'Sun', moon: 'Moon', tonight: 'Night' } as const
+const NOW_PAGES = ['sun', 'moon', 'tonight'] as const
 
 /* A compass rose of radius r at the centre, rays by bearing. */
 function Compass({ rays, marks }: { rays: { bearing: number; cls: string; label?: string }[]; marks?: { bearing: number; altitude: number; cls: string }[] }) {
@@ -130,20 +134,23 @@ function MoonDisc({ fraction, waxing }: { fraction: number; waxing: boolean }) {
 }
 
 
-export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump, target, picking, onPickTarget, events, onPlanMoonrise, onOpenNow, placeName, onShowBow, horizon }: SkyCardProps) {
+export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump, target, picking, onPickTarget, events, onPlanMoonrise, onOpenNow, placeName, onShowBow, horizon, onOpenCalendar }: SkyCardProps) {
   const clock = (d: Date) => `${formatClock(d, timeZone)}`
   const finderProps = { venue, target, picking, onPickTarget, onJump, clock, timeZone }
+  const [nowPage, setNowPage] = useState(0)
 
   const tonight = useMemo(() => {
     const when = tonightMoment(at, venue.lat, venue.lon)
     return { when, things: nightSky(when, venue.lat, venue.lon) }
   }, [at, venue])
-  const nights = useMemo<MilkyWayNight[]>(() => (tab === 'tonight' ? rankNights(venue.lat, venue.lon, at, 30, timeZone) : []), [tab, venue, at, timeZone])
-  const seasons = useMemo<SeasonLine[]>(() => (tab === 'seasons' ? seasonLines(at.getUTCFullYear(), venue.lat, venue.lon, at) : []), [tab, venue, at])
+  const nights = useMemo<MilkyWayNight[]>(() => (tab === 'now' ? rankNights(venue.lat, venue.lon, at, 30, timeZone) : []), [tab, venue, at, timeZone])
+  const seasons = useMemo<SeasonLine[]>(() => (tab === 'calendar' ? seasonLines(at.getUTCFullYear(), venue.lat, venue.lon, at) : []), [tab, venue, at])
 
   const where = (t: SkyThing) =>
     t.altitude <= 0 ? 'below the horizon' : `${compassWord(t.azimuth)}, ${Math.round(t.altitude)}° up`
 
+  /* One page's body: the eight pages of 29 Oct, now laid out four ways below. */
+  const bodyFor = (tab: 'tonight' | 'sun' | 'fire' | 'preview' | 'special' | 'moon' | 'seasons'): ReactNode => {
   let body: ReactNode = null
   if (tab === 'tonight') {
     const best = Math.max(1, ...nights.map((n) => n.score))
@@ -169,7 +176,9 @@ export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump,
             </li>
           ))}
         </ul>
-        <p className="skyc__head">Milky Way, the next 30 nights</p>
+        {/* Folded since 30 Oct: the card holds three pages side by side now, and the 30 bars made it the tallest in the app. */}
+        <details className="skyc__more">
+        <summary className="skyc__head">Milky Way, the next 30 nights</summary>
         <ol className="skyc__bars" aria-label="Nights by date, the bar is the score">
           {byDate.map((n) => (
             <li key={n.date}>
@@ -190,6 +199,7 @@ export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump,
         <p className="skyc__note">
           Dark means the sun 18° or more down, the core at least 5° up, and the moon down or under half lit. Tap a night to put the time bar on its first good minute.
         </p>
+        </details>
         {nights[0] === undefined ? null : (
           <p className="skyc__note">
             Best: <span className="num">{nights[0].date}</span>. {nights[0].reason}
@@ -272,6 +282,69 @@ export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump,
             </div>
           ))}
         </dl>
+      </>
+    )
+  }
+
+  return body
+  }
+
+  /*
+   * FOUR TABS (field test, 30 Oct; docs/navigation.md). Now is the sun, the
+   * moon and the night as swipe pages; Sky fire is the verdict with the
+   * colour clock under it on one page; Special light; Calendar, with the
+   * year's bearings (Seasons) under the door to the month.
+   */
+  let body: ReactNode
+  if (tab === 'now') {
+    body = (
+      <div className="skyc__swipe">
+        {/* The same swipe as Preview's pages, and its dots: sideways is the page, never the sheet (data-sideways). */}
+        <div className="prev__dots skyc__dots" role="img" aria-label={`Page ${nowPage + 1} of 3: ${NOW_PAGES.map((p) => NOW_PAGE[p])[nowPage]}. Swipe sideways for the others.`}>
+          {NOW_PAGES.map((p, i) => (
+            <span key={p} className={`skyc__dotword${i === nowPage ? ' skyc__dotword--on' : ''}`}>
+              {NOW_PAGE[p]}
+            </span>
+          ))}
+        </div>
+        <div
+          className="prev__pages"
+          data-sideways=""
+          onScroll={(e) => {
+            const el = e.currentTarget
+            setNowPage(Math.min(2, Math.round(el.scrollLeft / Math.max(1, el.clientWidth))))
+          }}
+        >
+          {NOW_PAGES.map((p) => (
+            <section key={p} className="prev__page" aria-label={NOW_PAGE[p]}>
+              {bodyFor(p)}
+            </section>
+          ))}
+        </div>
+      </div>
+    )
+  } else if (tab === 'fire') {
+    body = (
+      <>
+        {bodyFor('fire')}
+        <section className="skyc__more2" aria-label="Colour clock">
+          <p className="skyc__head">Colour clock</p>
+          {bodyFor('preview')}
+        </section>
+      </>
+    )
+  } else if (tab === 'special') {
+    body = bodyFor('special')
+  } else {
+    body = (
+      <>
+        {onOpenCalendar === undefined ? null : (
+          <button type="button" className="btn btn--small skyc__now" onClick={onOpenCalendar}>
+            Open the month
+          </button>
+        )}
+        <p className="skyc__head">The sun through the year</p>
+        {bodyFor('seasons')}
       </>
     )
   }

@@ -240,7 +240,10 @@ for (const run of MODES) {
   await shot(OUT, `offline-${run}-map`)
 
   /* THE LIGHT CARD: sun at start, mid, end. */
+  /* The Golden chip opens Sky › Now since 30 Oct; the light card is a tap from its Sun page. */
   await ev(`[...document.querySelectorAll('.chip2')].find((b) => /GOLDEN/.test(b.textContent))?.click()`)
+  await wait(900)
+  await ev(`[...document.querySelectorAll('button')].find((b) => /The light through your window/.test(b.textContent))?.click()`)
   await wait(900)
   const light = await ev(`document.querySelector('.readout')?.textContent ?? null`)
   /*
@@ -316,7 +319,10 @@ for (const run of MODES) {
   if (modal) problem(run, 'a dialog is open: no signal is not a reason to interrupt')
 
   if (run !== 'online') {
+    /* The Cloud chip opens Sky › Sky fire since 30 Oct; the cloud card is a tap from there. */
     await ev(`[...document.querySelectorAll('.chip2')].find((b) => /CLOUD/.test(b.textContent))?.click()`)
+    await wait(900)
+    await ev(`[...document.querySelectorAll('button')].find((b) => /Cloud along each position/.test(b.textContent))?.click()`)
     await wait(900)
     const cloud = await ev(`document.querySelector('.wx')?.textContent ?? ''`)
     const says = /Nothing is saved for this venue and day|Saved forecast|Old forecast/.test(cloud)
