@@ -233,6 +233,8 @@ run_audit "weather audit" scripts/audit-weather.mjs "$SCRATCH/weather.log" 'PROB
 ok "$(grep -E 'WEATHER PROBLEMS' "$SCRATCH/weather.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
 run_audit "locate audit" scripts/audit-locate.mjs "$SCRATCH/locate.log" 'PROBLEM|ABORTED'
 ok "$(grep -E 'LOCATE PROBLEMS' "$SCRATCH/locate.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
+run_audit "safari tab audit" scripts/audit-safari-tab.mjs "$SCRATCH/safari-tab.log" 'PROBLEM|ABORTED'
+ok "$(grep -E 'SAFARI TAB PROBLEMS' "$SCRATCH/safari-tab.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
 
 # Save for offline, then no network at all: the built app reloads from its
 # service worker and the map, chips, tide curve, sun line and shadows draw

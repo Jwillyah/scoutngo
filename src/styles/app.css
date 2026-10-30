@@ -12411,10 +12411,12 @@
   left: var(--space-2);
   right: var(--space-2);
   bottom: calc(var(--safe-bottom, 0px) + var(--space-2));
-  max-height: 35%;
+  /* Taller in a short window (a Safari tab), and the body scrolls inside it: Back and Done stay on the glass. */
+  max-height: max(35%, min(50%, 340px));
   overflow: hidden;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
   gap: var(--space-2);
   padding: var(--space-3);
   border-radius: var(--radius-panel);
@@ -12568,6 +12570,15 @@
 
 .wiz .kitrow {
   gap: var(--space-1);
+}
+
+.wiz__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .wiz__nav {

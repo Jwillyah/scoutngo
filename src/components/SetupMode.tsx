@@ -333,6 +333,13 @@ export function SetupMode({
 
         {pendingPin !== null ? null : (
           <section className="wiz" aria-label={`Setup, step ${step} of 3`} data-step={step}>
+            {/*
+              * THE BODY SCROLLS, THE ROW BELOW IT NEVER MOVES. In a Safari
+              * tab (664 px of page under the toolbars) step 3's kit and reach
+              * were taller than the card's 35% and its overflow cut Back and
+              * Done off (field test, 30 Oct).
+              */}
+            <div className="wiz__body">
             {step === 1 ? (
               <>
                 <p className="wiz__title">Where</p>
@@ -416,6 +423,7 @@ export function SetupMode({
               </>
             )}
             {step === 3 && doneBlocked !== null ? <p className="wiz__small wiz__why">{doneBlocked}</p> : null}
+            </div>
             <div className="wiz__nav">
               {step === 1 ? <span /> : (
                 <button type="button" className="wiz__back" onClick={next((step - 1) as Step)}>
