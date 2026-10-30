@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { getPosition } from 'suncalc'
 import type { LatLon } from '../core/geo.ts'
 import { disagreement, lowestDeck, skyWords } from '../core/metar.ts'
@@ -38,6 +38,8 @@ interface SkyFireProps {
   at: Date
   /** The real clock, injected for tests: "Sky right now" and the log are about now, not the bar. */
   now?: () => Date
+  /** The colour clock, drawn right under the verdict (field test, 30 Oct: one page, verdict first). */
+  clock?: ReactNode
 }
 
 type Kind = 'sunrise' | 'sunset'
@@ -98,7 +100,7 @@ function agreeOn(checks: readonly ModelChecks[], key: 'canvas' | 'gap' | 'notBlo
   return `${named.filter((c) => c[key].pass).length} of ${named.length}`
 }
 
-export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date() }: SkyFireProps) {
+export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date(), clock: colourClock }: SkyFireProps) {
   const events = useMemo(() => nextEvents(at, venue), [at, venue])
   const firstKind: Kind = events.sunrise !== null && (events.sunset === null || events.sunrise < events.sunset) ? 'sunrise' : 'sunset'
   const [kind, setKind] = useState<Kind>(firstKind)
@@ -210,21 +212,25 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
       ) : (
         <>
           {data !== null && data.stale === true && data.fetchedAt !== undefined ? (
-            <p className="fire__note num">From the forecast of {forecastAge(new Date(data.fetchedAt ?? 0).toISOString()).text.replace(' old', ' ago')}: {busy ?? 'a newer one could not be had'}.</p>
+            <p className="fire__note">From the forecast of {forecastAge(new Date(data.fetchedAt ?? 0).toISOString()).text.replace(' old', ' ago')}: {busy ?? 'a newer one could not be had'}.</p>
           ) : null}
           <p className={`fire__verdict fire__verdict--${verdict.word}`} role="status">
             {verdict.line}
           </p>
-          <p className="fire__note num">
+          <p className="fire__note">
             {verdict.agree} of {verdict.of} models agree{split ? ' · models split on low cloud' : ''}. A forecast places cloud on a grid kilometres across: it cannot promise a hole.
           </p>
           {watch === null || litDeck === null ? null : (
-            <p className="fire__note num">
+            <p className="fire__note">
               {kind === 'sunrise'
                 ? `Often before sunrise: look from ${clock(watch.from)}, when the sun is ${Math.abs(LIT_UNTIL_DEG[litDeck])}° below, until ${clock(watch.to)}.`
                 : `Look from ${clock(watch.from)} until ${clock(watch.to)}, when the sun is ${Math.abs(LIT_UNTIL_DEG[litDeck])}° below: the colour lasts after sunset.`}
             </p>
           )}
+          {colourClock}
+          {/* The method one tap deeper (ux-rules 19): the three checks, the side view, each model. */}
+          <details className="fire__why">
+          <summary className="fire__head">Why: the three checks</summary>
           <table className="fire__checks num">
             <tbody>
               {bestChecks === undefined
@@ -243,7 +249,7 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
                   ))}
             </tbody>
           </table>
-          {overhead === null ? null : <p className="fire__note num">Overhead: {layersLine(overhead)} (best match)</p>}
+          {overhead === null ? null : <p className="fire__note">Overhead: {layersLine(overhead)} (best match)</p>}
           {best === undefined ? null : <SideView verdict={verdict} path={best} kind={kind} />}
           <details className="fire__more">
             <summary>Each model</summary>
@@ -254,6 +260,7 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
                 </li>
               ))}
             </ul>
+          </details>
           </details>
         </>
       )}
@@ -269,7 +276,7 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
             stations.map((s) => {
               const differs = disagreement(s.sky, overhead?.low ?? null)
               return (
-                <p key={s.sky.station} className="fire__note num">
+                <p key={s.sky.station} className="fire__note">
                   {s.sky.station}: {skyWords(s.sky)}
                   {differs === null ? null : <span className="fire__differs"> · {differs}</span>}
                 </p>
@@ -300,11 +307,11 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
       )}
 
       <p className="fire__head">Your log</p>
-      <p className="fire__note num">
+      <p className="fire__note">
         {log.length} {log.length === 1 ? 'entry' : 'entries'}, kept on this phone only.
         {record.said === 0 ? '' : ` It fired ${record.fired} of ${record.said} times the forecast said possible or likely.`}
       </p>
-      <ul className="fire__entries num">
+      <ul className="fire__entries">
         {log.slice(0, 3).map((e) => (
           <li key={e.id}>
             {e.photo === null ? null : <img src={e.photo} alt="" className="fire__thumb" />}

@@ -14287,3 +14287,26 @@
   justify-self: start;
   margin-top: var(--space-2);
 }
+/*
+ * THE SKY CARD IN NORMAL CASE (field test, 30 Oct): its buttons read as
+ * letter-spaced caps and its sentences in the numbers' monospace. Sentences
+ * are prose; a button says what it does in plain words, 44 px tall.
+ */
+.skyc .btn {
+  min-height: 44px;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: var(--text-sm);
+}
+
+.fire__why > summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.fire__verdict {
+  text-transform: none;
+  letter-spacing: normal;
+}

@@ -156,7 +156,7 @@ try {
             ray: !!f.querySelector('.fire__ray'),
             now: f.querySelector('.fire__now')?.textContent ?? null,
             log: !!f.querySelector('.fire__log'),
-            wide: document.documentElement.scrollWidth > innerWidth + 1 || [...f.querySelectorAll('*')].some((e) => e.getBoundingClientRect().right > innerWidth + 1),
+            wide: document.documentElement.scrollWidth > innerWidth + 1 || [...f.querySelectorAll('*')].filter((e) => { const pg = e.closest('.prev__page'); return pg === null || pg === pg.parentElement?.firstElementChild }).some((e) => e.getBoundingClientRect().right > innerWidth + 1) /* the colour clock's later pages wait off to the right of its swipe, by design (30 Oct: the clock is under the verdict now); its first page is held to the screen like the rest */,
             text: f.textContent,
           }
         })()`)

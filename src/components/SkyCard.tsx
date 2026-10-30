@@ -235,7 +235,7 @@ export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump,
       </>
     )
   } else if (tab === 'fire') {
-    body = <SkyFire venue={venue} timeZone={timeZone} placeName={placeName ?? 'This place'} at={at} />
+    body = <SkyFire venue={venue} timeZone={timeZone} placeName={placeName ?? 'This place'} at={at} clock={bodyFor('preview')} />
   } else if (tab === 'special') {
     body = <SpecialLight venue={venue} timeZone={timeZone} at={at} onJump={onJump} onShowBow={onShowBow} />
   } else if (tab === 'preview') {
@@ -327,10 +327,6 @@ export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump,
     body = (
       <>
         {bodyFor('fire')}
-        <section className="skyc__more2" aria-label="Colour clock">
-          <p className="skyc__head">Colour clock</p>
-          {bodyFor('preview')}
-        </section>
       </>
     )
   } else if (tab === 'special') {
