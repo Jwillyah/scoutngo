@@ -19,6 +19,7 @@ import {
 } from '../core/skyFire.ts'
 import { formatClock } from '../core/timezone.ts'
 import { FIRST_ENTRY, OUTCOME_LABEL, readFireLog, trackRecord, withEntry, writeFireLog, type FireEntry, type FireOutcome } from '../lib/fireLog.ts'
+import { TruthLoop } from './TruthLoop.tsx'
 import { fetchFirePaths, fetchStationSkies, nearestHour, pathsAt, type FirePaths, type StationSky } from '../lib/skyFireData.ts'
 
 /*
@@ -304,6 +305,9 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
           </li>
         ))}
       </ul>
+
+      {/* The truth loop: your photos against what the app said, and your hit rate (TruthLoop.tsx). */}
+      <TruthLoop timeZone={timeZone} />
     </div>
   )
 }

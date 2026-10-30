@@ -24,6 +24,7 @@ import { ensureApp, goToStage, guardAudit, startWatchdog } from './preflight.mjs
 import { shareLink } from '../src/lib/planShare.ts'
 import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
 import { placeKey } from '../src/core/venueName.ts'
+import { testJpeg } from '../src/lib/compare/testJpeg.ts'
 
 guardAudit('sky fire')
 const watchdog = startWatchdog('sky fire', 420_000)
@@ -224,6 +225,27 @@ try {
           await ev(`document.querySelector('.fire__log')?.scrollIntoView({ block: 'center' })`)
           await wait(300)
           await page.screenshot({ path: join(OUT, `fire-log-${label}.png`) })
+
+          /*
+           * AFTER THE SHOOT: a drone frame from 7:40, facing the sunrise, picked
+           * from the phone. It is read on the phone and set against what the
+           * app said: backlit, golden hour, and Sky fire's word, as shown.
+           */
+          await page.locator('.truth__file').setInputFiles({ name: 'DJI_20261029074012_0001_D.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(testJpeg({ taken: '2026:10:29 07:40:12', lat: 36.8435575, lon: -75.9713104, yaw: 100, aboveTakeoffM: 60 })) })
+          await wait(800)
+          const row = await ev(`document.querySelector('.truth__list li')?.textContent ?? null`)
+          console.log(`  after the shoot: ${row}`)
+          if (row === null || !/min after sunrise/.test(row) || !/backlit/.test(row) || !/golden hour/.test(row) || !/it said Fire (likely|possible)/.test(row)) fail(`${label}: the photo's row reads ${JSON.stringify(row)}`)
+          await page.locator('.truth [role="group"] button', { hasText: 'It fired' }).tap()
+          await wait(300)
+          const rate = await ev(`[...document.querySelectorAll('.truth .fire__note')].map((p) => p.textContent).join(' | ')`)
+          console.log(`  hit rate: ${rate}`)
+          if (!/1 shoot logged\. When Sky fire said possible or likely it fired 1 of 1 times\./.test(rate)) fail(`${label}: the hit rate reads "${rate}"`)
+          const stored = await ev(`localStorage.getItem('scoutngo.truthLog.v1') ?? ''`)
+          if (/data:image|base64/.test(stored)) fail(`${label}: the log kept the picture, not only its numbers`)
+          await ev(`document.querySelector('.truth')?.scrollIntoView({ block: 'center' })`)
+          await wait(300)
+          await page.screenshot({ path: join(OUT, `truth-${label}.png`) })
         }
       }
       await ctx.close()
