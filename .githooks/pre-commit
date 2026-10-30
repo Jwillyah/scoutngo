@@ -229,6 +229,8 @@ ok "$(grep -E 'PRIVACY PROBLEMS' "$SCRATCH/privacy.log" | tail -1 | tr -d '=' | 
 # The Wind page in WebKit, tab and standalone: five models, FROM and TO, the rated line, measured now.
 run_audit "wind audit" scripts/audit-wind.mjs "$SCRATCH/wind.log" 'PROBLEM|ABORTED'
 ok "$(grep -E 'WIND PROBLEMS' "$SCRATCH/wind.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
+run_audit "weather audit" scripts/audit-weather.mjs "$SCRATCH/weather.log" 'PROBLEM|ABORTED'
+ok "$(grep -E 'WEATHER PROBLEMS' "$SCRATCH/weather.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
 
 # Save for offline, then no network at all: the built app reloads from its
 # service worker and the map, chips, tide curve, sun line and shadows draw

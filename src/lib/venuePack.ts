@@ -387,7 +387,7 @@ export function savedClock(iso: string, now: Date = new Date()): string {
 /** The one line over the map with no signal (docs/ux-rules.md, 2 and 13). */
 export function offlineLine(pack: VenuePack | null, now: Date = new Date()): string {
   return pack === null
-    ? 'Offline · nothing saved here · sun and shadows still work'
+    ? 'Offline · no offline pack here · sun and shadows still work'
     : `Offline · using saved data from ${savedClock(pack.savedAt, now)}`
 }
 

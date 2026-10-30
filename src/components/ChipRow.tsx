@@ -25,7 +25,8 @@ import type { ForecastAge } from '../lib/savedForecast.ts'
  */
 
 /** What a chip with nothing to report says. Never a dash: see below. */
-export const NO_DATA = 'no data'
+/* A dash, never a bare "no data": the status line under the chips says why (field test, 30 Oct). */
+export const NO_DATA = '—'
 
 export interface Chip {
   /** Which card this opens. Also what marks it active. */
@@ -34,7 +35,7 @@ export interface Chip {
   /** 8px, uppercase. What the number is OF. */
   label: string
   /**
-   * The label when its age rides beside it ("CLOUD · 3h"): "CLOUD L·M·H · 3h"
+   * The label when its age rides beside it ("CLOUD 3h ago"): "CLOUD L·M·H 3h ago"
    * did not fit and was cut (29 Oct, docs/ux-rules.md 4: shorten the words).
    */
   shortLabel?: string
@@ -154,7 +155,7 @@ export function ChipRow({ chips, active, onOpen, measureRef, status = null, onSt
             {chip.age === null || chip.age === undefined ? null : (
               <span className="chip2__age">
                 {/* The short form: an 8px label has no room for "3 h old". The card says it in full. */}
-                {chip.age.mark === 'dimmed' ? ` · old ${chip.age.short}` : ` · ${chip.age.short}`}
+                {chip.age.mark === 'dimmed' ? ` old ${chip.age.short}` : ` ${chip.age.short} ago`}
               </span>
             )}
           </span>

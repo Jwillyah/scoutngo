@@ -12,12 +12,16 @@ import { FIRE_MODELS, PATH_KM, pathPoints, roundCoord, type FireModel, type Laye
 import { parseMetarSky, type MetarSky } from '../core/metar.ts'
 import type { LatLon } from '../core/geo.ts'
 import { OPEN_METEO_URL, TIMEOUT_MS } from './forecast.ts'
+import { FORECAST_MAX_AGE_MS, SLOW_MAX_AGE_MS, weatherJson } from './weatherStore.ts'
 
 export interface FirePaths {
   /** ISO hours, UTC, "2026-10-29T11:00". */
   hours: string[]
   /** paths[model][hourIndex] */
   byModel: Partial<Record<FireModel, ModelPath[]>>
+  /** When the answer arrived, and whether it is the last good one because no new one could be had. */
+  fetchedAt?: number
+  stale?: boolean
 }
 
 export function firePathsUrl(from: LatLon, azimuthDeg: number, date: string): string {
@@ -75,14 +79,12 @@ export function nearestHour(t: Date): string {
   return d.toISOString().slice(0, 13) + ':00'
 }
 
+/** Through the shared store (src/lib/weatherStore.ts): Fire, Preview and Special ask this same question once between them. */
 export async function fetchFirePaths(from: LatLon, azimuthDeg: number, date: string, fetchImpl: typeof fetch = fetch): Promise<FirePaths | null> {
-  try {
-    const response = await fetchImpl(firePathsUrl(from, azimuthDeg, date), { signal: AbortSignal.timeout(TIMEOUT_MS) })
-    if (!response.ok) return null
-    return parseFirePaths(await response.json())
-  } catch {
-    return null
-  }
+  const got = await weatherJson(firePathsUrl(from, azimuthDeg, date), { maxAgeMs: FORECAST_MAX_AGE_MS, fetchImpl, timeoutMs: TIMEOUT_MS })
+  if (!got.ok) return null
+  const paths = parseFirePaths(got.payload)
+  return paths === null ? null : { ...paths, fetchedAt: got.fetchedAt, stale: got.stale }
 }
 
 /* ---------------------------------------------------------------- aerosol */
@@ -117,12 +119,8 @@ export function parseAerosol(payload: unknown, event: Date): number | null {
 }
 
 export async function fetchAerosol(at: LatLon, event: Date, fetchImpl: typeof fetch = fetch): Promise<number | null> {
-  try {
-    const response = await fetchImpl(aerosolUrl(at, event), { signal: AbortSignal.timeout(TIMEOUT_MS) })
-    return response.ok ? parseAerosol(await response.json(), event) : null
-  } catch {
-    return null
-  }
+  const got = await weatherJson(aerosolUrl(at, event), { maxAgeMs: SLOW_MAX_AGE_MS, fetchImpl, timeoutMs: TIMEOUT_MS })
+  return got.ok ? parseAerosol(got.payload, event) : null
 }
 
 /* --------------------------------------------------------------- stations */
@@ -200,9 +198,9 @@ export async function fetchModelLows(venue: LatLon, date: string, fetchImpl: typ
     timezone: 'GMT',
   })
   try {
-    const r = await fetchImpl(`${OPEN_METEO_URL}?${params.toString()}`, { signal: AbortSignal.timeout(TIMEOUT_MS) })
-    if (!r.ok) return null
-    const h = ((await r.json()) as { hourly?: Record<string, unknown> }).hourly
+    const got = await weatherJson(`${OPEN_METEO_URL}?${params.toString()}`, { maxAgeMs: FORECAST_MAX_AGE_MS, fetchImpl, timeoutMs: TIMEOUT_MS })
+    if (!got.ok) return null
+    const h = (got.payload as { hourly?: Record<string, unknown> }).hourly
     const hours = h?.time
     if (!Array.isArray(hours)) return null
     const lows = (hours as string[]).map((_, i) => models.map((m) => {

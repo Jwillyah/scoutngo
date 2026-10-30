@@ -20,6 +20,8 @@ import {
 import { formatClock } from '../core/timezone.ts'
 import { FIRST_ENTRY, OUTCOME_LABEL, readFireLog, trackRecord, withEntry, writeFireLog, type FireEntry, type FireOutcome } from '../lib/fireLog.ts'
 import { TruthLoop } from './TruthLoop.tsx'
+import { useWeatherBusy, useWeatherEpoch } from '../lib/useWeatherStatus.ts'
+import { forecastAge } from '../lib/savedForecast.ts'
 import { fetchFirePaths, fetchStationSkies, nearestHour, pathsAt, type FirePaths, type StationSky } from '../lib/skyFireData.ts'
 
 /*
@@ -107,6 +109,8 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
   /* Kept with the request it answers, so a new event reads as loading until its own answer comes. */
   const askKey = azimuth === null || date === null ? null : `${venue.lat},${venue.lon},${azimuth.toFixed(1)},${date}`
   const [answer, setAnswer] = useState<{ key: string; data: FirePaths | null } | null>(null)
+  /* Asked again when a back-off ends (src/lib/weatherStore.ts). */
+  const epoch = useWeatherEpoch()
   useEffect(() => {
     if (azimuth === null || date === null || askKey === null) return
     let live = true
@@ -116,7 +120,8 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
     return () => {
       live = false
     }
-  }, [venue, azimuth, date, askKey])
+  }, [venue, azimuth, date, askKey, epoch])
+  const busy = useWeatherBusy()
   const data: FirePaths | null | 'loading' = answer === null || answer.key !== askKey ? 'loading' : answer.data
 
   /* Sky right now: only in the two hours before the event, from the nearest stations. */
@@ -201,9 +206,12 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
       ) : data === 'loading' ? (
         <p className="fire__note">Asking six forecast models about the cloud toward the sun…</p>
       ) : verdict === null ? (
-        <p className="fire__note">The forecast did not say: no cloud figures came back for this hour.</p>
+        <p className="fire__note">{data === null ? (busy ?? 'No forecast for this hour yet: the weather service did not answer. It is asked again when you come back.') : 'The forecast did not say: no cloud figures came back for this hour.'}</p>
       ) : (
         <>
+          {data !== null && data.stale === true && data.fetchedAt !== undefined ? (
+            <p className="fire__note num">From the forecast of {forecastAge(new Date(data.fetchedAt ?? 0).toISOString()).text.replace(' old', ' ago')}: {busy ?? 'a newer one could not be had'}.</p>
+          ) : null}
           <p className={`fire__verdict fire__verdict--${verdict.word}`} role="status">
             {verdict.line}
           </p>

@@ -146,6 +146,7 @@ import { getMoonArc } from '../core/moonArc.ts'
 import type { SkyTab } from '../lib/skyTab.ts'
 import { cloudTriple, layersLine, modelsSplit } from '../core/skyFire.ts'
 import { fetchModelLows, nearestHour } from '../lib/skyFireData.ts'
+import { useWeatherBusy, useWeatherEpoch } from '../lib/useWeatherStatus.ts'
 import { PhaseRule } from './PhaseRule.tsx'
 import { shadowKeyLine, shadowKeyNotes } from '../lib/shadowKey.ts'
 
@@ -908,6 +909,8 @@ export function PlanMode({
   /* The five models' low cloud overhead for the bar's day, for the chip's "models split". */
   const [modelLows, setModelLows] = useState<{ hours: string[]; lows: (number | null)[][] } | null>(null)
   const modelDay = scrubbedAt === null ? null : scrubbedAt.toISOString().slice(0, 10)
+  /* Asked again when a back-off ends (src/lib/weatherStore.ts). */
+  const weatherEpoch = useWeatherEpoch()
   useEffect(() => {
     if (venue === null || modelDay === null) return
     let live = true
@@ -917,7 +920,7 @@ export function PlanMode({
     return () => {
       live = false
     }
-  }, [venue, modelDay])
+  }, [venue, modelDay, weatherEpoch])
   const [skyTab, setSkyTab] = useState<SkyTab>('tonight')
   /*
    * TWO-PIN MEASURE. Null is off; on, each tap drops a pin and a third tap
@@ -1236,6 +1239,8 @@ export function PlanMode({
   const [packTick, setPackTick] = useState(0)
   useEffect(() => onPacksChanged(() => setPackTick((n) => n + 1)), [])
   const offlineStatus = online ? null : offlineLine(packTick >= 0 ? packFor(venue) : null)
+  /* The weather service refusing (a 429): one line with when it will be asked again (src/lib/weatherStore.ts). */
+  const weatherBusy = useWeatherBusy()
   /* Special light on now (src/lib/useSpecialNow.ts): the status line when there is a signal, a tap to the list. */
   const specialNow = useSpecialNow(online ? venue : null, scrubbedAt)
   const specialStatus = specialNow === null ? null : `${SPECIAL_NAME[specialNow.kind]} ${specialNow.word} now · ${specialNow.agree} of ${specialNow.of} models`
@@ -2573,7 +2578,7 @@ export function PlanMode({
         online={online || offlineStatus !== null}
       />
 
-      <ChipRow chips={chips} active={page === 'tides' ? 'tide' : card.kind} onOpen={(kind) => (kind === 'tide' ? setPage('tides') : openCard(kind))} measureRef={measureChips} status={offlineStatus ?? specialStatus} onStatus={offlineStatus === null && specialStatus !== null ? () => { setSkyTab('special'); openCard('sky') } : undefined} />
+      <ChipRow chips={chips} active={page === 'tides' ? 'tide' : card.kind} onOpen={(kind) => (kind === 'tide' ? setPage('tides') : openCard(kind))} measureRef={measureChips} status={offlineStatus ?? weatherBusy ?? specialStatus} onStatus={offlineStatus === null && weatherBusy === null && specialStatus !== null ? () => { setSkyTab('special'); openCard('sky') } : undefined} />
 
       {sheet === 'full' ? null : (
       <MapRail

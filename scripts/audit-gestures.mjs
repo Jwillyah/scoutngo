@@ -45,8 +45,12 @@ async function plan() {
   await c.wait(2500)
   await c.ev(`localStorage.clear(); localStorage.setItem('scoutngo.landing.v1','true'); localStorage.setItem('scoutngo.lastSetup.v1', ${JSON.stringify(JSON.stringify(LAST))})`)
   await c.send('Page.navigate', { url: 'http://127.0.0.1:5173/?probe=1' })
-  await c.wait(5000)
-  const went = await c.ev(`(() => { const b = [...document.querySelectorAll('.wiz__ghost')].find((x) => /Same as last time/.test(x.textContent)); if (!b) return false; b.click(); return true })()`)
+  /* Waited for, not timed: under the gate's load a cold Setup took longer than a fixed 5 s (30 Oct). */
+  let went = false
+  for (let i = 0; i < 30 && !went; i += 1) {
+    await c.wait(500)
+    went = await c.ev(`(() => { const b = [...document.querySelectorAll('.wiz__ghost')].find((x) => /Same as last time/.test(x.textContent)); if (!b) return false; b.click(); return true })()`)
+  }
   if (!went) throw new Error('no "Same as last time" on Setup')
   await c.wait(7000)
   if (!(await c.ev(`document.querySelector('.shell')?.className.includes('shell--plan')`))) throw new Error('not in Plan')

@@ -3,8 +3,10 @@ import type { LatLon } from '../core/geo.ts'
 import type { Wind } from '../core/upwind.ts'
 import type { LevelWind } from '../core/windProfile.ts'
 import { fetchVenueDay, parseVenueCloud, parseWind, venueClock, type VenueCloud } from './forecast.ts'
-import { reportNetwork } from './offlineCache.ts'
+import { isOnline, reportNetwork } from './offlineCache.ts'
+import { useOnline } from './useOnline.ts'
 import { retrying } from './retrying.ts'
+import { useWeatherEpoch } from './useWeatherStatus.ts'
 import { readForecast, saveForecast, venueDayKey, type Provenance } from './savedForecast.ts'
 
 /**
@@ -92,6 +94,10 @@ export function useWind(
   timeZone: string | null,
 ): WindState {
   const [state, setState] = useState<WindState>(EMPTY)
+  /* Bumped when the weather service may be asked again after a 429: ask again then. */
+  const epoch = useWeatherEpoch()
+  /* Read again on going offline or back: the same kept answer, with or without its age. */
+  const online = useOnline()
 
   const lat = venue?.lat ?? null
   const lon = venue?.lon ?? null
@@ -109,10 +115,17 @@ export function useWind(
     /* Asked again after a failure that a second try could change (src/lib/retrying.ts). */
     return retrying(async () => {
       const result = await fetchVenueDay({ lat, lon }, at, timeZone)
-      if (result.status === 'ok') {
+      /* Kept and offline is not live: the chip says its age (ux-rules 13; the venue pack audit caught it, 30 Oct). */
+      const aged = result.status === 'ok' && (result.stale || (result.kept && !isOnline()))
+      if (result.status === 'ok' && !aged) {
         reportNetwork(true)
         saveForecast(key, result.payload)
         setState(fromPayload(result.payload, at, timeZone, { kind: 'live' }))
+        return true
+      }
+      /* The last good answer, because the service is busy or out of reach: shown with its age, asked again when the store says so. */
+      if (result.status === 'ok') {
+        setState(fromPayload(result.payload, at, timeZone, { kind: 'saved', fetchedAt: new Date(result.fetchedAt).toISOString() }))
         return true
       }
       if (result.unreachable === true) reportNetwork(false)
@@ -132,7 +145,7 @@ export function useWind(
      * and depending on the instant would refetch on every scrubber frame.
      */
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lat, lon, hourKey, timeZone])
+  }, [lat, lon, hourKey, timeZone, epoch, online])
 
   return state
 }

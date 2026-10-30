@@ -8670,6 +8670,8 @@
  */
 .chip2__age {
   text-transform: none;
+  /* "9h ago" beside CLOUD in an 8px label: the tracking is what pushed it past the chip (30 Oct). */
+  letter-spacing: 0;
 }
 
 /* A unit that does not fit at value size: smaller, same line, same colour role. */

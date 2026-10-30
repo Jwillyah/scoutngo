@@ -11,6 +11,7 @@ import { parseMetarWind } from '../core/metar.ts'
 import { summarise, type WindHour } from '../core/windModels.ts'
 import { BUOY_ENDPOINT, nearestBuoys } from './buoy.ts'
 import { OPEN_METEO_URL, TIMEOUT_MS } from './forecast.ts'
+import { FORECAST_MAX_AGE_MS, weatherJson } from './weatherStore.ts'
 import { fetchStationSkies } from './skyFireData.ts'
 
 export const WIND_MODELS = ['gfs_seamless', 'gfs_hrrr', 'ecmwf_ifs025', 'icon_seamless', 'gem_seamless'] as const
@@ -68,12 +69,8 @@ export function parseWindModels(payload: unknown): WindModels | null {
 }
 
 export async function fetchWindModels(at: LatLon, fetchImpl: typeof fetch = fetch): Promise<WindModels | null> {
-  try {
-    const r = await fetchImpl(windModelsUrl(at), { signal: AbortSignal.timeout(TIMEOUT_MS * 2) })
-    return r.ok ? parseWindModels(await r.json()) : null
-  } catch {
-    return null
-  }
+  const got = await weatherJson(windModelsUrl(at), { maxAgeMs: FORECAST_MAX_AGE_MS, fetchImpl, timeoutMs: TIMEOUT_MS * 2 })
+  return got.ok ? parseWindModels(got.payload) : null
 }
 
 export interface Measured {

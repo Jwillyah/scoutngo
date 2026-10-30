@@ -333,5 +333,7 @@ export default defineConfig({
      * against this checkout.
      */
     exclude: [...configDefaults.exclude, '.vercel/**', '.claude/**'],
+    /* Each test starts with an empty weather store (src/lib/weatherStore.ts). */
+    setupFiles: ['tests/setup.ts'],
   },
 })

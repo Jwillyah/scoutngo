@@ -1,3 +1,4 @@
+import { clearWeatherStore } from '../lib/weatherStore.ts'
 import { useEffect, useState } from 'react'
 import { HOSTS, TRIGGER_WORD } from '../lib/hosts.ts'
 import { CONTACT_EMAIL, CONTACT_IS_PLACEHOLDER, listed, onSeenHosts, seenHosts, watchHosts } from '../lib/privacy.ts'
@@ -58,6 +59,7 @@ export function PrivacyBody() {
       for (const k of Object.keys(localStorage)) if (k.startsWith('scoutngo.')) localStorage.removeItem(k)
       if (typeof caches !== 'undefined') for (const k of await caches.keys()) await caches.delete(k)
       if (typeof indexedDB !== 'undefined') indexedDB.deleteDatabase('scoutngo-lidar')
+      await clearWeatherStore()
       setNote('Cleared: spots, kit, settings, saved forecasts, map tiles and scans are gone from this phone.')
     } catch {
       setNote('Some of it could not be cleared: the browser refused.')

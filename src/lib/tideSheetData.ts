@@ -10,6 +10,7 @@ import type { TideExtreme } from '../core/tide.ts'
 import { parseExtremes, PREDICTIONS_URL, APPLICATION } from './noaa.ts'
 import { reportNetwork } from './offlineCache.ts'
 import { readForecast, saveForecast, savedKeys } from './savedForecast.ts'
+import { SLOW_MAX_AGE_MS, weatherJson } from './weatherStore.ts'
 
 export const MARINE_URL = 'https://marine-api.open-meteo.com/v1/marine'
 export const WIND_URL = 'https://api.open-meteo.com/v1/forecast'
@@ -33,10 +34,22 @@ async function getJson(url: string): Promise<unknown> {
   }
 }
 
+/** Open-Meteo through the shared store (src/lib/weatherStore.ts); a stale answer counts as no answer here, and the saved copy below says its age. */
+async function getWeather(url: string): Promise<unknown> {
+  const got = await weatherJson(url, { maxAgeMs: SLOW_MAX_AGE_MS, timeoutMs: TIMEOUT_MS })
+  if (!got.ok) {
+    if (got.unreachable) reportNetwork(false)
+    throw new Error(got.reason)
+  }
+  if (got.stale) throw new Error('stale')
+  reportNetwork(true)
+  return got.payload
+}
+
 /** Live, else the copy saved on the phone, else null. */
 async function liveOrSaved<T>(key: string, url: string, parse: (payload: unknown) => T | null): Promise<{ value: T; savedAt: string | null } | null> {
   try {
-    const payload = await getJson(url)
+    const payload = await (/open-meteo\.com\//.test(url) ? getWeather(url) : getJson(url))
     const value = parse(payload)
     if (value !== null) {
       saveForecast(key, payload)

@@ -13,6 +13,7 @@ import type { LatLon } from '../core/geo.ts'
 import { antisolar, bowHalfWidthDeg, fogRule, godRaysRule, rainbowRule, windows, fToC, type Special } from '../core/specialLight.ts'
 import { roundCoord } from '../core/skyFire.ts'
 import { OPEN_METEO_URL, TIMEOUT_MS } from './forecast.ts'
+import { FORECAST_MAX_AGE_MS, weatherJson } from './weatherStore.ts'
 import { fetchMarine, fetchMonthExtremes, fetchWindMonth, hourlyAt } from './tideSheetData.ts'
 import { fetchStations } from './noaa.ts'
 import { nearestStations } from '../core/tide.ts'
@@ -110,9 +111,10 @@ export function specialsFrom(week: SpecialWeek, venue: LatLon, seaCAt: (t: Date)
 
 export async function fetchSpecialWeek(venue: LatLon, fetchImpl: typeof fetch = fetch): Promise<{ week: SpecialWeek; seaCAt: (t: Date) => number | null } | null> {
   try {
-    const [response, sea] = await Promise.all([fetchImpl(specialUrl(venue), { signal: AbortSignal.timeout(TIMEOUT_MS * 2) }), fetchMarine(venue).catch(() => null)])
-    if (!response.ok) return null
-    const week = parseSpecial(await response.json())
+    /* Through the shared store: the status line and Sky › Special ask this once between them. */
+    const [got, sea] = await Promise.all([weatherJson(specialUrl(venue), { maxAgeMs: FORECAST_MAX_AGE_MS, fetchImpl, timeoutMs: TIMEOUT_MS * 2 }), fetchMarine(venue).catch(() => null)])
+    if (!got.ok) return null
+    const week = parseSpecial(got.payload)
     if (week === null) return null
     return { week, seaCAt: (t) => (sea === null ? null : hourlyAt(sea.value, 'sea_surface_temperature', t)) }
   } catch {

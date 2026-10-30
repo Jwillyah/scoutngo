@@ -857,7 +857,8 @@ console.log('\n### the chip row: exactly four chips, two lines, no horizontal sc
 const CHIPS = `(() => {
   const row = document.querySelector('.chips2')
   if (!row) return { error: 'no chip row on screen' }
-  const kids = [...row.children].filter((c) => c.getBoundingClientRect().width > 0)
+  /* The chips, not every child: the one status line under them lives in the row too (30 Oct: a real 429 put "Weather daily limit reached" there and it was counted as a fifth chip). */
+  const kids = [...row.querySelectorAll(':scope > .chip2')].filter((c) => c.getBoundingClientRect().width > 0)
   const widths = kids.map((k) => Math.round(k.getBoundingClientRect().width))
   return {
     count: kids.length,

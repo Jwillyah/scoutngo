@@ -107,7 +107,7 @@ describe('the words', () => {
     vi.stubEnv('TZ', 'America/New_York')
     const line = offlineLine(pack(), new Date('2026-10-30T15:00:00Z'))
     expect(line).toMatch(/^Offline · using saved data from \d{1,2}:\d{2} [AP]M$/)
-    expect(offlineLine(null)).toBe('Offline · nothing saved here · sun and shadows still work')
+    expect(offlineLine(null)).toBe('Offline · no offline pack here · sun and shadows still work')
     vi.unstubAllEnvs()
   })
 

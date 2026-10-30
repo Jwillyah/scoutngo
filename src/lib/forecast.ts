@@ -26,6 +26,7 @@ import type { LatLon } from '../core/geo.ts'
 import type { Wind } from '../core/upwind.ts'
 import { WIND_LEVELS_METERS, type LevelWind } from '../core/windProfile.ts'
 import { cellCover, cloudGridPoints } from '../core/cloudGrid.ts'
+import { FORECAST_MAX_AGE_MS, weatherJson } from './weatherStore.ts'
 
 export const OPEN_METEO_URL = 'https://api.open-meteo.com/v1/forecast'
 export const TIMEOUT_MS = 8000
@@ -212,17 +213,11 @@ export async function fetchSightlineCloud(
     timezone: timeZone,
   })
 
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
   try {
-    const response = await fetch(`${OPEN_METEO_URL}?${params.toString()}`, {
-      signal: controller.signal,
-    })
-    if (!response.ok) {
-      return { status: 'unavailable', reason: `Open-Meteo returned HTTP ${response.status}.` }
-    }
-
-    const payload = (await response.json()) as OpenMeteoPoint | OpenMeteoPoint[]
+    /* Through the shared store (src/lib/weatherStore.ts): one request per question, kept, quiet after a 429. */
+    const got = await weatherJson(`${OPEN_METEO_URL}?${params.toString()}`, { maxAgeMs: FORECAST_MAX_AGE_MS, timeoutMs: TIMEOUT_MS })
+    if (!got.ok) return { status: 'unavailable', reason: got.reason }
+    const payload = got.payload as OpenMeteoPoint | OpenMeteoPoint[]
     // One coordinate comes back as an object; several come back as an array.
     const list = Array.isArray(payload) ? payload : [payload]
     if (list.length !== points.length) {
@@ -259,18 +254,10 @@ export async function fetchSightlineCloud(
         cloud: summariseSightline(byId.get(line.id) ?? []),
       })),
     }
-    cache.set(key, result)
+    if (!got.stale) cache.set(key, result)
     return result
-  } catch (error) {
-    return {
-      status: 'unavailable',
-      reason:
-        error instanceof Error && error.name === 'AbortError'
-          ? 'The cloud forecast timed out.'
-          : 'Could not reach the cloud forecast.',
-    }
-  } finally {
-    clearTimeout(timer)
+  } catch {
+    return { status: 'unavailable', reason: 'The cloud forecast came back in a shape this app does not read.' }
   }
 }
 
@@ -419,7 +406,8 @@ export async function fetchWind(
 }
 
 export type VenueDayResult =
-  | { status: 'ok'; payload: unknown }
+  /** `stale` when this is the last good answer because a new one could not be had; `fetchedAt` is when it arrived. */
+  | { status: 'ok'; payload: unknown; fetchedAt: number; stale: boolean; kept: boolean }
   /** `unreachable` when no answer came back at all, as opposed to a refusal. */
   | { status: 'unavailable'; reason: string; unreachable?: boolean }
 
@@ -461,28 +449,11 @@ export async function fetchVenueDay(
     timezone: timeZone,
   })
 
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
-  try {
-    const response = await fetchImpl(`${OPEN_METEO_URL}?${params.toString()}`, {
-      signal: controller.signal,
-    })
-    if (!response.ok) {
-      return { status: 'unavailable', reason: `Open-Meteo returned HTTP ${response.status}.` }
-    }
-    return { status: 'ok', payload: await response.json() }
-  } catch (error) {
-    return {
-      status: 'unavailable',
-      unreachable: true,
-      reason:
-        error instanceof Error && error.name === 'AbortError'
-          ? 'The forecast timed out.'
-          : 'Could not reach Open-Meteo.',
-    }
-  } finally {
-    clearTimeout(timer)
-  }
+  /* Through the shared store: every hour of the same day is this same request, asked once. */
+  const got = await weatherJson(`${OPEN_METEO_URL}?${params.toString()}`, { maxAgeMs: FORECAST_MAX_AGE_MS, fetchImpl, timeoutMs: TIMEOUT_MS })
+  return got.ok
+    ? { status: 'ok', payload: got.payload, fetchedAt: got.fetchedAt, stale: got.stale, kept: got.kept }
+    : { status: 'unavailable', reason: got.reason, ...(got.unreachable ? { unreachable: true } : {}) }
 }
 
 /*
@@ -554,16 +525,11 @@ export async function fetchCloudGrid(
     timezone: timeZone,
   })
 
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
   try {
-    const response = await fetchImpl(`${OPEN_METEO_URL}?${params.toString()}`, {
-      signal: controller.signal,
-    })
-    if (!response.ok) {
-      return { status: 'unavailable', reason: `Open-Meteo returned HTTP ${response.status}.` }
-    }
-    const payload = await response.json()
+    /* Through the shared store: the whole day comes back, so every hour of it is this one request. */
+    const got = await weatherJson(`${OPEN_METEO_URL}?${params.toString()}`, { maxAgeMs: FORECAST_MAX_AGE_MS, fetchImpl, timeoutMs: TIMEOUT_MS })
+    if (!got.ok) return { status: 'unavailable', reason: got.reason }
+    const payload = got.payload as { hourly?: Record<string, unknown> } | { hourly?: Record<string, unknown> }[]
     /* A multi-point answer is an array; a single point is one object. */
     const list = Array.isArray(payload) ? payload : [payload]
     const times = (list[0]?.hourly?.time as string[] | undefined) ?? []
@@ -605,16 +571,8 @@ export async function fetchCloudGrid(
     })
 
     return { status: 'ok', cells, at: new Date(times[row]) }
-  } catch (error) {
-    return {
-      status: 'unavailable',
-      reason:
-        error instanceof Error && error.name === 'AbortError'
-          ? 'The cloud forecast timed out.'
-          : 'Could not reach Open-Meteo for the cloud forecast.',
-    }
-  } finally {
-    clearTimeout(timer)
+  } catch {
+    return { status: 'unavailable', reason: 'The cloud forecast came back in a shape this app does not read.' }
   }
 }
 
@@ -667,16 +625,10 @@ export async function fetchNightCloud(
     timezone: timeZone,
   })
 
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
   try {
-    const response = await fetch(`${OPEN_METEO_URL}?${params.toString()}`, {
-      signal: controller.signal,
-    })
-    if (!response.ok) {
-      return { status: 'unavailable', reason: `Open-Meteo returned HTTP ${response.status}` }
-    }
-    const payload = (await response.json()) as {
+    const got = await weatherJson(`${OPEN_METEO_URL}?${params.toString()}`, { maxAgeMs: FORECAST_MAX_AGE_MS, timeoutMs: TIMEOUT_MS })
+    if (!got.ok) return { status: 'unavailable', reason: got.reason.replace(/\.$/, '') }
+    const payload = got.payload as {
       hourly?: { time?: string[]; cloud_cover?: (number | null)[] }
     }
     const times = payload.hourly?.time ?? []
@@ -697,15 +649,7 @@ export async function fetchNightCloud(
       }
     })
     return { status: 'ok', hours }
-  } catch (error) {
-    return {
-      status: 'unavailable',
-      reason:
-        error instanceof Error && error.name === 'AbortError'
-          ? 'The cloud forecast timed out'
-          : 'The cloud forecast could not be reached',
-    }
-  } finally {
-    clearTimeout(timer)
+  } catch {
+    return { status: 'unavailable', reason: 'The cloud forecast came back in a shape this app does not read' }
   }
 }

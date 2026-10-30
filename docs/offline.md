@@ -48,7 +48,7 @@ screen says "terrain estimated".
 - **Computed on the device:** no qualifier. It is exact.
 - **A saved forecast:** its age beside the value, always. Over 12 h the age is
   marked. Over 36 h the value is dimmed and called an old forecast. On a chip the age
-  rides on the label ("WIND · 3h").
+  rides on the label ("WIND 3h ago").
 - **A saved tide table:** where it came from and when. Predicted turns are astronomy
   and do not go stale, so it is not dimmed.
 - **Nothing saved:** the card says so in words ("Could not reach Open-Meteo. Nothing
