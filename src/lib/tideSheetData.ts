@@ -9,7 +9,7 @@ import type { LatLon } from '../core/geo.ts'
 import type { TideExtreme } from '../core/tide.ts'
 import { parseExtremes, PREDICTIONS_URL, APPLICATION } from './noaa.ts'
 import { reportNetwork } from './offlineCache.ts'
-import { readForecast, saveForecast } from './savedForecast.ts'
+import { readForecast, saveForecast, savedKeys } from './savedForecast.ts'
 
 export const MARINE_URL = 'https://marine-api.open-meteo.com/v1/marine'
 export const WIND_URL = 'https://api.open-meteo.com/v1/forecast'
@@ -57,10 +57,25 @@ export async function fetchMonthExtremes(stationId: string, from: Date) {
   const begin = ymd(from)
   const end = ymd(new Date(from.getTime() + MONTH_DAYS * 86_400_000))
   const params = new URLSearchParams({ product: 'predictions', application: APPLICATION, begin_date: begin, end_date: end, datum: 'MLLW', station: stationId, time_zone: 'gmt', units: 'english', format: 'json', interval: 'hilo' })
-  return liveOrSaved<TideExtreme[]>(`tide-month|${stationId}|${begin}`, `${PREDICTIONS_URL}?${params}`, (p) => {
+  const parse = (p: unknown) => {
     const list = parseExtremes(p)
     return list.length === 0 ? null : list
-  })
+  }
+  const answer = await liveOrSaved<TideExtreme[]>(`tide-month|${stationId}|${begin}`, `${PREDICTIONS_URL}?${params}`, parse)
+  if (answer !== null) return answer
+  /*
+   * NO SIGNAL, AND NOTHING SAVED FROM THIS EXACT DAY: a month saved from
+   * another start (a venue saved for offline days ago) still holds these
+   * turns. Only its turns from `from` on are used; a table that has none is
+   * not one.
+   */
+  for (const key of savedKeys(`tide-month|${stationId}|`)) {
+    const saved = readForecast(key)
+    const list = saved === null ? null : parse(saved.payload)
+    const ahead = list?.filter((e) => e.at.getTime() >= from.getTime() - 86_400_000) ?? []
+    if (saved !== null && ahead.length > 0) return { value: ahead, savedAt: saved.fetchedAt }
+  }
+  return null
 }
 
 export interface Hourly {

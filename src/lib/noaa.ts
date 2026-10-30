@@ -233,6 +233,12 @@ async function getJson(params: URLSearchParams, signal: AbortSignal): Promise<un
  * window is venue local: without the padding a late afternoon shoot on the US
  * east coast can fall outside a single UTC day.
  */
+/** The key a day's table is kept under on the phone: the same padded range fetchPredictions asks for. */
+export function predictionsKey(stationId: string, at: Date): string {
+  const day = 86_400_000
+  return tideKey(stationId, stamp(new Date(at.getTime() - day)), stamp(new Date(at.getTime() + day)))
+}
+
 export async function fetchPredictions(
   stationId: string,
   at: Date,

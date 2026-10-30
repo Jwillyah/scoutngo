@@ -33,6 +33,11 @@ export interface Chip {
   kind: CardKind | 'tide'
   /** 8px, uppercase. What the number is OF. */
   label: string
+  /**
+   * The label when its age rides beside it ("CLOUD · 3h"): "CLOUD L·M·H · 3h"
+   * did not fit and was cut (29 Oct, docs/ux-rules.md 4: shorten the words).
+   */
+  shortLabel?: string
   /*
    * NULL WHERE THE READING DID NOT ARRIVE, and the chip says so in words.
    *
@@ -81,6 +86,12 @@ export interface Chip {
 
 interface ChipRowProps {
   chips: readonly Chip[]
+  /**
+   * THE ONE STATUS LINE OVER THE MAP (docs/ux-rules.md, 2 and 13): with no
+   * signal, "Offline · using saved data from 9:12 AM". A row of the chip grid,
+   * so the chrome the sheet and the labels keep clear of is measured with it.
+   */
+  status?: string | null
   /** The card currently open, so its chip shows as active. */
   active: CardKind | 'tide' | null
   onOpen: (kind: CardKind | 'tide') => void
@@ -110,7 +121,7 @@ interface ChipRowProps {
  * aria-pressed STAYS. A chip genuinely is pressed or not -- its card is open
  * or it is not -- and that is what the lit border means.
  */
-export function ChipRow({ chips, active, onOpen, measureRef }: ChipRowProps) {
+export function ChipRow({ chips, active, onOpen, measureRef, status = null }: ChipRowProps) {
   return (
     <div className="chips2" ref={measureRef} role="toolbar" aria-label="Conditions">
       {chips.map((chip) => (
@@ -137,7 +148,7 @@ export function ChipRow({ chips, active, onOpen, measureRef }: ChipRowProps) {
           onClick={() => onOpen(chip.kind)}
         >
           <span className="chip2__label">
-            {chip.label}
+            {chip.age === null || chip.age === undefined ? chip.label : (chip.shortLabel ?? chip.label)}
             {chip.age === null || chip.age === undefined ? null : (
               <span className="chip2__age">
                 {/* The short form: an 8px label has no room for "3 h old". The card says it in full. */}
@@ -155,6 +166,11 @@ export function ChipRow({ chips, active, onOpen, measureRef }: ChipRowProps) {
           {chip.note === undefined ? null : <span className="chip2__note">{chip.note}</span>}
         </button>
       ))}
+      {status === null ? null : (
+        <p className="offline-line" role="status">
+          {status}
+        </p>
+      )}
     </div>
   )
 }

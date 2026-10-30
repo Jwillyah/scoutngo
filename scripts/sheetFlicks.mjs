@@ -130,6 +130,14 @@ export async function runSheetFlicks({ send, ev, wait }, perDirection = 20) {
           rows.push({ from, kind: `flick ${dir}`, want: null, got: null, note: `could not settle at ${from}` })
           continue
         }
+        /*
+         * THE CONTENT AT ITS TOP, as docs/gestures.md has it: at full a pull
+         * down in scrolled content scrolls the content, by design. Once the
+         * shoot card grew taller than full (Save for offline, 29 Oct), the
+         * flicks up on blank card scrolled it, and every flick down after them
+         * was the content's, correctly, and read here as the sheet failing.
+         */
+        await ev(`(() => { const b = document.querySelector('.sheet__body:not([hidden])'); if (b) b.scrollTop = 0; return 1 })()`)
         await wait(350)
         const s = JSON.parse(await ev(STARTS))
         const where = ['handle', 'date', 'blank'][k % 3]

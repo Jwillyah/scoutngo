@@ -57,6 +57,45 @@ screen says "terrain estimated".
   retry loop. "No connection" means `navigator.onLine` is false **or** the last
   request failed, because `navigator.onLine` is true on a mountain.
 
+## Save for offline: the whole venue (29 Oct)
+
+At a real shoot on 29 Oct there was no service and the map would not load
+past the automatic ring. "Save for offline" on the shoot card takes the venue
+whole (`src/lib/venuePack.ts`), size first and with a second tap that names it:
+
+| what | how much |
+|---|---|
+| imagery and elevation | 1.5 km round the pin at z12–19 (elevation to its last zoom, 15), and 30 km round it at z8–11 |
+| buildings, their heights, the sea | the OpenFreeMap map tiles at z12–14 over the near ring |
+| forecast | the shoot day's wind at every height and cloud low/mid/high, the sky and wind by the hour, the sea |
+| tides | NOAA tables for each of 7 days from the shoot day, and the month's turns |
+| 3D scan | counted when one is already on the phone; never downloaded by the pack |
+
+The size is an estimate before anything downloads: 24 imagery tiles per zoom
+are HEAD-measured and their mean multiplied out, and the screen says so. What
+a pack really weighs is in `measurements/2026-10-30-venue-pack.md`.
+
+**Wi-Fi.** "Wi-Fi only" is on by default and a pack waits on cellular, where
+the phone says which network it is on. An iPhone never does (Safari has no
+`navigator.connection`), so there the button names the size and the card says
+it is best saved on Wi-Fi.
+
+**With no signal** one line sits under the chips: "Offline · using saved data
+from 9:12 AM", the time the pack was saved; each chip with a saved value
+carries its age; the Sun card says the sun, golden times and shadows are
+worked out on the phone. Saved spots show "Offline-ready · 48 MB" and delete
+the copy with two taps (the second names the size).
+
+**The map reads saved tiles through its tile protocol**, not through the
+service worker, as before: the worker keeps the app shell only (see above),
+and a tile protocol that answers from Cache Storage works even on a launch
+before the worker has installed.
+
+`scripts/audit-venue-pack.mjs` (in the gate) saves a pack in WebKit with every
+service answered by a fixture, takes the network away, reopens the venue and
+asserts the fixture's imagery colour on the glass, the chips with their age,
+the tide curve, the sun line and the fixture building's shadow.
+
 ## A cold launch with no signal
 
 The app is often swiped away before the shoot, and a cold launch on a ridge used

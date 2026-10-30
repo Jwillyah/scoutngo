@@ -1,3 +1,4 @@
+import { useOnline } from '../lib/useOnline.ts'
 import { Receipt } from '../lib/numerals.tsx'
 import { compassPoint } from '../core/field.ts'
 import { bandIntervals, peakIn } from '../core/shootWindow.ts'
@@ -35,6 +36,7 @@ function sample(key: string, label: string, at: Date, lat: number, lon: number):
 }
 
 export function SunReadout({ venueWindow }: SunReadoutProps) {
+  const online = useOnline()
   if (venueWindow === null) {
     return (
       <Panel index="03" title="Sun through the window">
@@ -104,6 +106,10 @@ export function SunReadout({ venueWindow }: SunReadoutProps) {
         Computed by the solar core, not asserted by anything else. This is the
         layer every later claim about light gets checked against.
       </p>
+      {/* With no signal, said: these keep working (docs/offline.md). */}
+      {online ? null : (
+        <p className="section__note sunr__offline">No signal: the sun, golden times and shadows are worked out on this phone and need none.</p>
+      )}
 
       <div className="readout">
         <div className="readout__grid">

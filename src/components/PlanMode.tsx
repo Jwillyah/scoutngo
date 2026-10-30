@@ -56,6 +56,8 @@ import { AirspacePanel } from './AirspacePanel.tsx'
 import type { ConeMode } from '../lib/coneMode.ts'
 import { FieldPackControl, type PackBuildState } from './FieldPackControl.tsx'
 import { OfflineAreas } from './OfflineAreas.tsx'
+import { VenuePackCard } from './VenuePackCard.tsx'
+import { offlineLine, onPacksChanged, packFor } from '../lib/venuePack.ts'
 import type { VenueCacheState } from '../lib/useVenueCache.ts'
 import type { Box } from '../lib/tileRange.ts'
 import type { ReadFile } from '../lib/scoutFile.ts'
@@ -1223,8 +1225,12 @@ export function PlanMode({
         : CAMS.filter((cam) => camKind(cam) === camKindShown).map((cam) => ({ id: cam.id, label: cam.name, at: cam.at, href: cam.url })),
     [card.kind, camKindShown],
   )
-  /* No connection: one quiet mark in the venue bar, and nothing else. */
+  /* No connection: one line under the chips, with the time the saved data is from, and nothing else. */
   const online = useOnline()
+  /* Read again whenever a pack is saved or deleted: the line names the saved data's time. */
+  const [packTick, setPackTick] = useState(0)
+  useEffect(() => onPacksChanged(() => setPackTick((n) => n + 1)), [])
+  const offlineStatus = online ? null : offlineLine(packTick >= 0 ? packFor(venue) : null)
   const home = useCallback(() => setCard(HOME), [])
   /* The Tide sheet's month, wind, sea and beach facing: asked only while it is open. */
   const [surfSetting] = useSurfSetting()
@@ -1374,6 +1380,7 @@ export function PlanMode({
       {
         kind: 'cloud',
         label: 'CLOUD L·M·H',
+        shortLabel: 'CLOUD',
         value: cloudPct === null || layers === null ? null : cloudTriple(layers),
         spoken: layers === null ? undefined : `Cloud: ${layersLine(layers)}${split ? ', models split' : ''}`,
         note: split ? 'models split' : undefined,
@@ -1616,7 +1623,16 @@ export function PlanMode({
             * THE MAP, OFFLINE. The venue saves itself; a trip is taken by
             * hand, size first. See OfflineAreas.tsx.
             */}
+          {/* SAVE FOR OFFLINE: the whole venue, size first, Wi-Fi first (src/lib/venuePack.ts). */}
+          <VenuePackCard
+            centre={venue}
+            name={venueNameLine}
+            shootAt={venueWindow?.start ?? null}
+            timeZone={venueWindow?.timeZone ?? null}
+            online={online}
+          />
           <OfflineAreas
+            packed={packTick >= 0 && packFor(venue) !== null}
             venueCache={venueCache}
             getView={getView}
             venueName={venueNameLine}
@@ -2522,10 +2538,11 @@ export function PlanMode({
         onLocate={onLocate}
         locating={locating}
         locateNote={null}
-        online={online}
+        /* On the map the line under the chips says it in words, with the saved data's time: the dot would say it twice. */
+        online={online || offlineStatus !== null}
       />
 
-      <ChipRow chips={chips} active={page === 'tides' ? 'tide' : card.kind} onOpen={(kind) => (kind === 'tide' ? setPage('tides') : openCard(kind))} measureRef={measureChips} />
+      <ChipRow chips={chips} active={page === 'tides' ? 'tide' : card.kind} onOpen={(kind) => (kind === 'tide' ? setPage('tides') : openCard(kind))} measureRef={measureChips} status={offlineStatus} />
 
       {sheet === 'full' ? null : (
       <MapRail

@@ -5,6 +5,9 @@ import { shareLink } from '../lib/planShare.ts'
 import {
   type Spot,
 } from '../lib/spots.ts'
+import { deletePack, onPacksChanged, packBytes, packFor } from '../lib/venuePack.ts'
+import { formatBytes } from '../lib/offlineCache.ts'
+import { useEffect } from 'react'
 
 interface SpotsPanelProps {
   spots: Spot[]
@@ -42,6 +45,16 @@ export function SpotsPanel({
   const [name, setName] = useState('')
   const [note, setNote] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
+  /* Offline-ready venues, read again whenever a pack is saved or deleted. */
+  const [, setPackTick] = useState(0)
+  /* Two taps, the second naming the size: a deleted pack comes back only by downloading it again. */
+  const [confirmPack, setConfirmPack] = useState<string | null>(null)
+  useEffect(() => onPacksChanged(() => setPackTick((n) => n + 1)), [])
+  const packOf = (spot: Spot) => {
+    const lat = Number(spot.venue.latitude)
+    const lon = Number(spot.venue.longitude)
+    return Number.isFinite(lat) && Number.isFinite(lon) ? packFor({ lat, lon }) : null
+  }
 
   const save = () => {
     const trimmed = name.trim() === '' ? suggestedName.trim() : name.trim()
@@ -200,7 +213,31 @@ export function SpotsPanel({
                 <span className="spot__meta num">
                   {shortDate(spot.savedAt)} · {spot.positions.length} positions
                 </span>
+                {(() => {
+                  const pack = packOf(spot)
+                  return pack === null ? null : (
+                    <span className="spot__offline num">Offline-ready · {formatBytes(packBytes(pack))}</span>
+                  )
+                })()}
               </button>
+              {packOf(spot) === null ? null : (
+                <button
+                  type="button"
+                  className={`btn btn--small spot__unpack${confirmPack === spot.id ? '' : ' btn--quiet'}`}
+                  onClick={() => {
+                    const pack = packOf(spot)
+                    if (pack === null) return
+                    if (confirmPack !== spot.id) {
+                      setConfirmPack(spot.id)
+                      return
+                    }
+                    setConfirmPack(null)
+                    void deletePack(pack.id).then(() => setNote(`Offline copy of "${spot.name}" deleted. The spot is kept.`))
+                  }}
+                >
+                  {confirmPack === spot.id ? `Delete ${formatBytes(packBytes(packOf(spot) as NonNullable<ReturnType<typeof packOf>>))}` : 'Delete offline copy'}
+                </button>
+              )}
               <button
                 type="button"
                 className="spot__del"

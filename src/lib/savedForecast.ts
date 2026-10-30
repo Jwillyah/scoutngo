@@ -16,8 +16,13 @@
 
 export const SAVED_FORECAST_KEY = 'scoutngo.forecast.v1'
 
-/** Entries kept before the oldest is dropped. A venue-day is a few kilobytes. */
-export const SAVED_FORECAST_LIMIT = 30
+/**
+ * Entries kept before the oldest is dropped. A venue-day is a few kilobytes.
+ * 80 since 29 Oct: a venue saved for offline holds about a dozen (a week of
+ * tide tables, the day, the sea, the sky), and two of them must not push each
+ * other out.
+ */
+export const SAVED_FORECAST_LIMIT = 80
 
 /** Older than this, the age is marked. */
 export const MARK_AFTER_HOURS = 12
@@ -53,22 +58,46 @@ function readAll(): StoredEntry[] {
   }
 }
 
-export function saveForecast(key: string, payload: unknown, now: Date = new Date()): void {
+/**
+ * Keeps one answer with the time it arrived. True when it is stored.
+ *
+ * OUT OF ROOM, THE OLDEST GO FIRST, never the newest: a full store used to
+ * throw the new entry away in silence, which is the one a shooter about to
+ * lose signal needs.
+ */
+export function saveForecast(key: string, payload: unknown, now: Date = new Date()): boolean {
   const others = readAll().filter((e) => e.key !== key)
   const next = [{ key, fetchedAt: now.toISOString(), payload }, ...others].slice(
     0,
     SAVED_FORECAST_LIMIT,
   )
-  try {
-    localStorage.setItem(SAVED_FORECAST_KEY, JSON.stringify(next))
-  } catch {
-    /* Out of room. The live value is still on screen; only the offline copy is lost. */
+  for (let keep = next.length; keep > 0; keep -= 1) {
+    try {
+      localStorage.setItem(SAVED_FORECAST_KEY, JSON.stringify(next.slice(0, keep)))
+      return true
+    } catch {
+      /* Out of room: one fewer old entry and try again. */
+    }
   }
+  return false
+}
+
+/** The stored size of one entry in bytes (its JSON), or 0 when it is not kept. */
+export function savedForecastBytes(key: string): number {
+  const hit = readAll().find((e) => e.key === key)
+  return hit === undefined ? 0 : JSON.stringify(hit).length
 }
 
 export function readForecast<T = unknown>(key: string): SavedForecast<T> | null {
   const hit = readAll().find((e) => e.key === key)
   return hit === undefined ? null : { payload: hit.payload as T, fetchedAt: hit.fetchedAt }
+}
+
+/** The keys saved under a prefix, newest first: for a table saved from another start date that still covers this one. */
+export function savedKeys(prefix: string): string[] {
+  return readAll()
+    .filter((e) => e.key.startsWith(prefix))
+    .map((e) => e.key)
 }
 
 /** Every saved entry, for the export file and for clearing. */

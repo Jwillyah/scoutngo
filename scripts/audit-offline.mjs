@@ -308,10 +308,10 @@ for (const run of MODES) {
    * no-signal modes; with the network up the mark must NOT be there, which is
    * what makes the check able to fail in both directions.
    */
-  const mark = await ev(`document.querySelector('.topbar__offline') !== null`)
-  console.log(`  offline mark in the venue bar: ${mark}`)
-  if (run === 'online' && mark) problem(run, 'the venue bar says offline with the network up')
-  if (run !== 'online' && !mark) problem(run, 'no offline mark in the venue bar')
+  const mark = await ev(`document.querySelector('.offline-line')?.textContent ?? null`)
+  console.log(`  offline line under the chips: ${JSON.stringify(mark)}`)
+  if (run === 'online' && mark !== null) problem(run, 'the offline line shows with the network up')
+  if (run !== 'online' && (mark === null || !/^Offline · /.test(mark))) problem(run, 'no offline line under the chips')
   const modal = await ev(`document.querySelector('[role="dialog"], [role="alertdialog"]') !== null`)
   if (modal) problem(run, 'a dialog is open: no signal is not a reason to interrupt')
 

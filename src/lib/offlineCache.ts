@@ -227,8 +227,19 @@ export async function loadTile(
 
 /* -------------------------------------------------------------------- areas */
 
-/** venue: the automatic ring. trip: taken by hand. 3d: the coarse tiles over a venue the 3D overview needs. */
-export type AreaKind = 'venue' | 'trip' | '3d'
+/**
+ * venue: the automatic ring. trip: taken by hand. 3d: the coarse tiles over a
+ * venue the 3D overview needs. pack: "Save for offline" on a venue, the near
+ * ring in detail and the wide context round it (src/lib/venuePack.ts).
+ */
+export type AreaKind = 'venue' | 'trip' | '3d' | 'pack'
+
+/** One box at one range of zooms. An area is its own box plus any extra parts. */
+export interface AreaPart {
+  box: Box
+  imageryZooms: [number, number]
+  terrainZooms: [number, number]
+}
 
 /** One saved area, as the list shows it and as deletion recomputes it. */
 export interface SavedArea {
@@ -247,6 +258,8 @@ export interface SavedArea {
   savedAt: string
   /** Set when the top zoom was left out to stay under the ceiling. */
   note?: string
+  /** More boxes held under the same name: a pack's wide, coarse context. */
+  extra?: AreaPart[]
 }
 
 /**
@@ -297,7 +310,9 @@ export function reviveAreas(raw: unknown): SavedArea[] {
     const area = a as Partial<SavedArea> | null
     return (
       typeof area?.id === 'string' &&
-      (area.kind === 'venue' || area.kind === 'trip' || area.kind === '3d') &&
+      (area.kind === 'venue' || area.kind === 'trip' || area.kind === '3d' || area.kind === 'pack') &&
+      (area.extra === undefined ||
+        (Array.isArray(area.extra) && area.extra.every((p) => isBox(p?.box) && isZooms(p?.imageryZooms) && isZooms(p?.terrainZooms)))) &&
       typeof area.label === 'string' &&
       isBox(area.box) &&
       isZooms(area.imageryZooms) &&
@@ -341,9 +356,15 @@ export const sameBox = (a: Box, b: Box): boolean =>
     (d) => Math.abs(d) < 1e-5,
   )
 
-const allUrls = (area: Pick<SavedArea, 'box' | 'imageryZooms' | 'terrainZooms'>): string[] => {
-  const urls = areaUrls(area.box, area.imageryZooms, area.terrainZooms)
-  return [...urls.imagery, ...urls.terrain, ...urls.vector]
+/** Every tile URL an area holds, its extra parts included, each once. */
+export const allUrls = (area: Pick<SavedArea, 'box' | 'imageryZooms' | 'terrainZooms' | 'extra'>): string[] => {
+  const parts: AreaPart[] = [area, ...(area.extra ?? [])]
+  const out = new Set<string>()
+  for (const part of parts) {
+    const urls = areaUrls(part.box, part.imageryZooms, part.terrainZooms)
+    for (const url of [...urls.imagery, ...urls.terrain, ...urls.vector]) out.add(url)
+  }
+  return [...out]
 }
 
 /**
@@ -472,6 +493,105 @@ export async function measureArea(
     alreadySaved: saved.size,
   }
 }
+
+/** Imagery tiles HEAD-measured at each zoom of a sampled measure: enough for a mean, few enough to answer in seconds. */
+export const SAMPLE_PER_ZOOM = 24
+
+export interface SampledSize {
+  /** Every tile the parts hold, and those already on the phone. */
+  tiles: number
+  alreadySaved: number
+  /** Imagery: the sampled mean at each zoom times that zoom's count. Null when no sample answered. */
+  imageryBytes: number | null
+  imageryTiles: number
+  /** How many imagery tiles were actually measured. */
+  measured: number
+  terrainBytesEstimate: number
+  vectorBytesEstimate: number
+}
+
+/** `n` items spread evenly through a list, first and last included. */
+export function spread<T>(list: readonly T[], n: number): T[] {
+  if (list.length <= n) return [...list]
+  return Array.from({ length: n }, (_, i) => list[Math.round((i * (list.length - 1)) / (n - 1))])
+}
+
+/**
+ * THE SIZE OF A BIG AREA BEFORE ANYTHING DOWNLOADS, in seconds rather than a
+ * minute: a venue pack is thousands of imagery tiles, and a HEAD for every one
+ * keeps the shooter waiting for a number. So each zoom is sampled
+ * (SAMPLE_PER_ZOOM tiles spread across it, HEAD, Content-Length) and its mean
+ * is multiplied by that zoom's count of tiles not already saved. The screen
+ * says "estimated from N tiles measured". Terrain and map data as in
+ * measureArea: a count times a measured mean.
+ */
+export async function measureSampled(parts: readonly AreaPart[], signal?: AbortSignal): Promise<SampledSize> {
+  const imageryByZoom = new Map<number, Set<string>>()
+  const terrain = new Set<string>()
+  const vector = new Set<string>()
+  for (const part of parts) {
+    for (let z = part.imageryZooms[0]; z <= part.imageryZooms[1]; z += 1) {
+      const set = imageryByZoom.get(z) ?? new Set<string>()
+      for (const t of tilesForRange(part.box, z, z)) set.add(tileUrl(IMAGERY_TEMPLATE, t))
+      imageryByZoom.set(z, set)
+    }
+    const urls = areaUrls(part.box, part.imageryZooms, part.terrainZooms)
+    for (const u of urls.terrain) terrain.add(u)
+    for (const u of urls.vector) vector.add(u)
+  }
+  const every = [...[...imageryByZoom.values()].flatMap((s) => [...s]), ...terrain, ...vector]
+  const saved = await savedSet(every)
+
+  let imageryBytes: number | null = 0
+  let imageryTiles = 0
+  let measured = 0
+  let answered = 0
+  for (const [, set] of [...imageryByZoom.entries()].sort((a, b) => a[0] - b[0])) {
+    const missing = [...set].filter((u) => !saved.has(u))
+    if (missing.length === 0) continue
+    imageryTiles += missing.length
+    const sample = spread(missing, SAMPLE_PER_ZOOM)
+    let sum = 0
+    let got = 0
+    await pool(
+      sample,
+      6,
+      async (url) => {
+        try {
+          const response = await fetchWithin(url, TILE_TIMEOUT_MS, signal, 'HEAD')
+          reportNetwork(true)
+          if (response.ok || response.status === 404) {
+            const length = Number(response.headers.get('content-length'))
+            sum += response.ok && Number.isFinite(length) ? length : 0
+            got += 1
+          }
+        } catch {
+          if (signal?.aborted !== true) reportNetwork(false)
+        }
+      },
+      signal,
+    )
+    measured += got
+    answered += got
+    if (got === 0) imageryBytes = null
+    else if (imageryBytes !== null) imageryBytes += (sum / got) * missing.length
+  }
+  const terrainMissing = [...terrain].filter((u) => !saved.has(u)).length
+  const vectorMissing = [...vector].filter((u) => !saved.has(u)).length
+  return {
+    tiles: every.length,
+    alreadySaved: saved.size,
+    imageryBytes: answered === 0 && imageryTiles > 0 ? null : imageryBytes === null ? null : Math.round(imageryBytes),
+    imageryTiles,
+    measured,
+    terrainBytesEstimate: terrainMissing * TERRAIN_TILE_MEAN_BYTES,
+    vectorBytesEstimate: vectorMissing * VECTOR_TILE_MEAN_BYTES,
+  }
+}
+
+/** The whole sampled size, or null when the imagery could not be measured. */
+export const sampledTotal = (size: SampledSize): number | null =>
+  size.imageryBytes === null ? null : size.imageryBytes + size.terrainBytesEstimate + size.vectorBytesEstimate
 
 /* ----------------------------------------------------------- downloading */
 

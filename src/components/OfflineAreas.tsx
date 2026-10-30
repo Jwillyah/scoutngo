@@ -53,6 +53,8 @@ interface OfflineAreasProps {
   /** What a trip area is named after. */
   venueName: string
   online: boolean
+  /** A "Save for offline" pack holds this venue: the ring's own line would be a second, smaller size for the same place. */
+  packed?: boolean
 }
 
 const day = (iso: string): string =>
@@ -67,7 +69,7 @@ function boxSize(box: Box): string {
   return `${km(across)} × ${km(up)}`
 }
 
-export function OfflineAreas({ venueCache, getView, venueName, online }: OfflineAreasProps) {
+export function OfflineAreas({ venueCache, getView, venueName, online, packed = false }: OfflineAreasProps) {
   const [areas, setAreas] = useState<SavedArea[]>(() => loadAreas())
   const [trip, setTrip] = useState<TripState>({ status: 'closed' })
   const [confirming, setConfirming] = useState<string | null>(null)
@@ -125,7 +127,7 @@ export function OfflineAreas({ venueCache, getView, venueName, online }: Offline
     setTrip({ status: 'closed' })
   }
 
-  const venueLine = (() => {
+  const venueLine = packed ? null : (() => {
     switch (venueCache.status) {
       case 'saving':
         return `Saving this venue for offline · ${venueCache.size} · ${venueCache.done} of ${venueCache.total}`
@@ -142,8 +144,9 @@ export function OfflineAreas({ venueCache, getView, venueName, online }: Offline
         return null
     }
   })()
-  const venueNote =
-    venueCache.status === 'saving'
+  const venueNote = packed
+    ? null
+    : venueCache.status === 'saving'
       ? venueCache.note
       : venueCache.status === 'saved'
         ? (venueCache.area.note ?? null)
