@@ -209,6 +209,11 @@ ok "$(grep -E 'BUILDINGS PROBLEMS' "$SCRATCH/buildings.log" | tail -1 | tr -d '=
 run_audit "sky fire audit" scripts/audit-skyfire.mjs "$SCRATCH/skyfire.log" 'PROBLEM|ABORTED'
 ok "$(grep -E 'SKY FIRE PROBLEMS' "$SCRATCH/skyfire.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
 
+# Elevation read from the PNG's bytes in WebKit, with its canvas noise on:
+# exact against the file, and the comparison shown failing on a noised canvas.
+run_audit "terrain decode audit" scripts/audit-terrain-decode.mjs "$SCRATCH/terraindecode.log" 'PROBLEM|ABORTED'
+ok "$(grep -E 'TERRAIN DECODE PROBLEMS' "$SCRATCH/terraindecode.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
+
 # Save for offline, then no network at all: the built app reloads from its
 # service worker and the map, chips, tide curve, sun line and shadows draw
 # from the pack, in WebKit as a tab and standalone (src/lib/venuePack.ts).

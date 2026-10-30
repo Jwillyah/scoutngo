@@ -34,6 +34,7 @@
  *
  * Loaded only when 3D is opened (src/components/Clay3D.tsx imports it).
  */
+import { decodePng } from '../lib/png.ts'
 import '@cesium/engine/Source/Widget/CesiumWidget.css'
 import {
   CallbackProperty,
@@ -219,14 +220,13 @@ async function terrariumPixels(x: number, y: number, z: number): Promise<Uint8Cl
   const key = `${z}/${x}/${y}`
   let hit = decoded.get(key)
   if (hit === undefined) {
-    hit = tileBytes(tileUrl(TERRAIN_TEMPLATE, { x, y, z })).then(async (bytes) => {
-      const bitmap = await createImageBitmap(new Blob([bytes]), { premultiplyAlpha: 'none', colorSpaceConversion: 'none' })
-      const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
-      const ctx = canvas.getContext('2d', { willReadFrequently: true })
-      if (ctx === null) throw new Error('no 2D context to read elevation')
-      ctx.drawImage(bitmap, 0, 0)
-      return ctx.getImageData(0, 0, bitmap.width, bitmap.height).data
-    })
+    /*
+     * THE PNG'S OWN BYTES, NO CANVAS (29 Oct): WebKit's fingerprinting noise
+     * lands on canvas readback, and a height is three bytes where one unit of
+     * red is 256 m. src/lib/png.ts; proved in WebKit by
+     * scripts/audit-terrain-decode.mjs.
+     */
+    hit = tileBytes(tileUrl(TERRAIN_TEMPLATE, { x, y, z })).then(async (bytes) => (await decodePng(bytes)).data)
     decoded.set(key, hit)
     if (decoded.size > 64) decoded.delete(decoded.keys().next().value as string)
     hit.catch(() => decoded.delete(key))

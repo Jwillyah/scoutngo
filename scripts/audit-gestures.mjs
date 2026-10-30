@@ -181,6 +181,17 @@ try {
     await wait(1600)
     let b = JSON.parse(await ev(state))
     if (b.at === a.at) fail('a sideways swipe on the ruler did not move the time')
+    /*
+     * THE SWIPE'S COAST ENDED FIRST. A sideways flick coasts and slows to a
+     * stop (docs/gestures.md); a slow machine still had it coasting when the
+     * drag up below began, and the time it moved read as the drag's (29 Oct).
+     */
+    for (let i = 0; i < 20; i += 1) {
+      await wait(250)
+      const c2 = JSON.parse(await ev(state))
+      if (c2.at === b.at) break
+      b = c2
+    }
     if (b.sheet !== a.sheet) fail(`a sideways swipe on the ruler moved the sheet (${a.sheet} to ${b.sheet})`)
     a = b
     await drag(c.send, Array.from({ length: 12 }, (_, i) => ({ x: x0, y: y0 - i * 14 })), wait)

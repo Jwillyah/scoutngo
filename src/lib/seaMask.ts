@@ -18,6 +18,7 @@
  * drawn at 0, the invented wedge off a beach drawn at sea level, isolated
  * spikes brought down.
  */
+import { decodePng as readPng, encodePng as writePng, type Pixels } from './png.ts'
 import type { Position } from '../core/geo.ts'
 import { metresPerPixel, SHORE_MAX_M } from '../core/coastArtefacts.ts'
 import { cleanAgainstOcean, oceanMask, shoreReach } from '../core/oceanMask.ts'
@@ -229,21 +230,19 @@ async function runCoastJob(job: CoastJob): Promise<{ heights: Float32Array; chan
 
 /* ------------------------------------------------------------- the PNGs */
 
-async function decodePng(bytes: ArrayBuffer): Promise<ImageData | null> {
-  const bitmap = await createImageBitmap(new Blob([bytes]), { premultiplyAlpha: 'none', colorSpaceConversion: 'none' })
-  const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
-  const ctx = canvas.getContext('2d', { willReadFrequently: true })
-  if (ctx === null) return null
-  ctx.drawImage(bitmap, 0, 0)
-  bitmap.close()
-  return ctx.getImageData(0, 0, canvas.width, canvas.height)
+/*
+ * READ FROM THE FILE'S BYTES, NOT A CANVAS (29 Oct). WebKit adds noise to
+ * pixels read back from a canvas when script drew them; an elevation tile is
+ * numbers, and one unit in its red byte is 256 m. Measured in WebKit the image
+ * path came back exact (scripts/audit-terrain-decode.mjs), but the heights no
+ * longer depend on that: src/lib/png.ts reads and writes the PNG itself.
+ */
+async function decodePng(bytes: ArrayBuffer): Promise<Pixels | null> {
+  try {
+    return await readPng(bytes)
+  } catch {
+    return null
+  }
 }
 
-async function encodePng(image: ImageData): Promise<ArrayBuffer> {
-  const canvas = new OffscreenCanvas(image.width, image.height)
-  const ctx = canvas.getContext('2d')
-  if (ctx === null) throw new Error('no 2d context')
-  ctx.putImageData(image, 0, 0)
-  const blob = await canvas.convertToBlob({ type: 'image/png' })
-  return blob.arrayBuffer()
-}
+const encodePng = (image: Pixels): Promise<ArrayBuffer> => writePng(image)
