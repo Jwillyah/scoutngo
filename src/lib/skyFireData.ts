@@ -134,6 +134,8 @@ const NWS_HEADERS = { accept: 'application/geo+json' }
 export interface StationSky {
   sky: MetarSky
   at: string
+  /** The METAR as the station sent it, for its other groups (the wind, on the Wind page). */
+  raw: string
 }
 
 /** The nearest stations' latest skies, nearest first: weather.gov's METAR text, else /api/metar's. */
@@ -166,14 +168,14 @@ async function stationSky(id: string, fetchImpl: typeof fetch): Promise<StationS
     if (r.ok) {
       const p = ((await r.json()) as { properties?: { rawMessage?: string; timestamp?: string } }).properties
       const sky = typeof p?.rawMessage === 'string' ? parseMetarSky(p.rawMessage) : null
-      if (sky !== null) return { sky, at: p?.timestamp ?? '' }
+      if (sky !== null) return { sky, at: p?.timestamp ?? '', raw: p?.rawMessage ?? '' }
     }
     /* weather.gov had no METAR text for it: ask this app's function, which reads aviationweather.gov. */
     const m = await fetchImpl(METAR_ENDPOINT, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ station: id }), signal: AbortSignal.timeout(TIMEOUT_MS) })
     if (!m.ok) return null
     const body = (await m.json()) as { metar?: string; at?: string }
     const sky = typeof body.metar === 'string' ? parseMetarSky(body.metar) : null
-    return sky === null ? null : { sky, at: body.at ?? '' }
+    return sky === null ? null : { sky, at: body.at ?? '', raw: body.metar ?? '' }
   } catch {
     return null
   }

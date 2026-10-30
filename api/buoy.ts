@@ -38,6 +38,24 @@ export function parseRealtime(text: string): { at: string; waveM: number; period
   return null
 }
 
+/** The newest line with a wind speed: m/s, the direction it blows FROM, the gust (Wind page check). */
+export function parseRealtimeWind(text: string): { at: string; mps: number; fromDeg: number | null; gustMps: number | null } | null {
+  const lines = text.split('\n')
+  const head = lines[0]?.replace(/^#/, '').trim().split(/\s+/) ?? []
+  const col = (name: string) => head.indexOf(name)
+  const iw = col('WSPD')
+  if (iw < 0) return null
+  for (const line of lines) {
+    if (line.startsWith('#') || line.trim() === '') continue
+    const f = line.trim().split(/\s+/)
+    const mps = value(f[iw])
+    if (mps === null) continue
+    const [yy, mm, dd, hh, mi] = f
+    return { at: `${yy}-${mm}-${dd}T${hh}:${mi}:00Z`, mps, fromDeg: value(f[col('WDIR')]), gustMps: value(f[col('GST')]) }
+  }
+  return null
+}
+
 export async function POST(request: Request): Promise<Response> {
   let body: { station?: unknown }
   try {
@@ -50,9 +68,11 @@ export async function POST(request: Request): Promise<Response> {
   try {
     const response = await fetch(`${REALTIME}/${station}.txt`)
     if (!response.ok) return Response.json({ status: 'unavailable', message: `NDBC answered HTTP ${response.status}.` })
-    const latest = parseRealtime(await response.text())
-    if (latest === null) return Response.json({ status: 'no-waves', message: 'This buoy reports no wave height lately.' })
-    return Response.json({ status: 'ok', station, ...latest })
+    const text = await response.text()
+    const latest = parseRealtime(text)
+    const wind = parseRealtimeWind(text)
+    if (latest === null) return Response.json({ status: 'no-waves', message: 'This buoy reports no wave height lately.', station, wind })
+    return Response.json({ status: 'ok', station, ...latest, wind })
   } catch {
     return Response.json({ status: 'unavailable', message: 'Could not reach NDBC.' })
   }

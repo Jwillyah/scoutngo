@@ -57,6 +57,7 @@ import type { ConeMode } from '../lib/coneMode.ts'
 import { FieldPackControl, type PackBuildState } from './FieldPackControl.tsx'
 import { OfflineAreas } from './OfflineAreas.tsx'
 import { VenuePackCard } from './VenuePackCard.tsx'
+import { WindPage } from './WindPage.tsx'
 import { offlineLine, onPacksChanged, packFor } from '../lib/venuePack.ts'
 import { bowOnMap } from '../lib/specialLightData.ts'
 import { useSpecialNow } from '../lib/useSpecialNow.ts'
@@ -347,7 +348,7 @@ interface PlanModeProps {
   onMenu: () => void
   menuOpen: boolean
   /** The menu asked for a card: Sky or About. The tick makes a repeat ask open it again. */
-  cardRequest: { kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'preflight'; tick: number }
+  cardRequest: { kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'wind' | 'preflight'; tick: number }
   /** What is in the bag, for the call sheet's kit tool. */
   bag: KitSelection
   /** The search pill was tapped: go and search. */
@@ -803,9 +804,9 @@ export function PlanMode({
     return { levels: windLevels, ratedMps: d.maxWindMps, ceilingFt: facilityCellAt(venue.lat, venue.lon)?.ceilingFeet ?? null, name: d.name.replace(/^DJI /, '') }
   }, [kitProfile, bag, venue, windLevels])
   /* A page over everything: Exposure, Tides or Surf. ?page=tides opens one, for the overflow audit. */
-  const [page, setPage] = useState<'exposure' | 'tides' | 'surf' | null>(() => {
+  const [page, setPage] = useState<'exposure' | 'tides' | 'surf' | 'wind' | null>(() => {
     const p = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('page')
-    return p === 'exposure' || p === 'tides' || p === 'surf' ? p : null
+    return p === 'exposure' || p === 'tides' || p === 'surf' || p === 'wind' ? p : null
   })
   /* Sky › Calendar, a page of its own (CalendarPage.tsx). ?calendar=1 opens it, for the overflow audit. */
   const [calendarOpen, setCalendarOpen] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('calendar') === '1')
@@ -1243,7 +1244,7 @@ export function PlanMode({
   const home = useCallback(() => setCard(HOME), [])
   /* The Tide sheet's month, wind, sea and beach facing: asked only while it is open. */
   const [surfSetting] = useSurfSetting()
-  const tideSheet = useTideSheet(calendarOpen || page === 'tides' || page === 'surf', venue, tide.status === 'ok' ? tide.station.id : null, surfSetting)
+  const tideSheet = useTideSheet(calendarOpen || page === 'tides' || page === 'surf' || page === 'wind', venue, tide.status === 'ok' ? tide.station.id : null, surfSetting)
   const skyDay = scrubbedAt === null || venueWindow === null ? null : zonedTimeToUtc(localDate(scrubbedAt, venueWindow.timeZone), '00:00', venueWindow.timeZone)
   const skyline = useMemo<SkylineState>(() => {
     if (card.kind !== 'skyline') return 'loading'
@@ -1326,7 +1327,7 @@ export function PlanMode({
     if (cardRequest.tick === 0) return
     const timer = setTimeout(() => {
       /* Exposure, Tides and Surf are pages of their own (29 Oct); Preflight is its card. */
-      if (cardRequest.kind === 'exposure' || cardRequest.kind === 'tides' || cardRequest.kind === 'surf') {
+      if (cardRequest.kind === 'exposure' || cardRequest.kind === 'tides' || cardRequest.kind === 'surf' || cardRequest.kind === 'wind') {
         setPage(cardRequest.kind)
         return
       } else if (cardRequest.kind === 'preflight') {
@@ -1818,6 +1819,7 @@ export function PlanMode({
             atLabel={clock(scrubbedAt)}
             units={units}
             onClose={home}
+            onModels={() => setPage('wind')}
           />
         )
       case 'cloud':
@@ -2339,6 +2341,17 @@ export function PlanMode({
           data={tideSheet}
           lenses={surfLenses}
           drone={surfDrone}
+          onClose={() => setPage(null)}
+        />
+      ) : null}
+      {page === 'wind' && venue !== null && scrubbedAt !== null && venueWindow !== null ? (
+        <WindPage
+          venue={venue}
+          at={scrubbedAt}
+          timeZone={venueWindow.timeZone}
+          unit={units.wind}
+          drone={surfDrone === null ? null : { name: surfDrone.name, ratedMps: surfDrone.ratedMps }}
+          facing={tideSheet.facing.status === 'ready' && tideSheet.facing.value !== null && tideSheet.facing.value !== 'inland' ? tideSheet.facing.value.facing : null}
           onClose={() => setPage(null)}
         />
       ) : null}

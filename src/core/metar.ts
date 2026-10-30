@@ -72,3 +72,10 @@ export function disagreement(sky: MetarSky, forecastLow: number | null): string 
   if (st === 'clear' && forecastLow >= 70) return `Station: ${skyWords(sky)} · forecast said a low deck (${Math.round(forecastLow)}%)`
   return null
 }
+
+/** A METAR's wind group: "02007KT", "VRB03KT", "27015G25KT". Knots, FROM. Null without one. */
+export function parseMetarWind(text: string): { fromDeg: number | null; kt: number; gustKt: number | null } | null {
+  const m = /\b(\d{3}|VRB)(\d{2,3})(?:G(\d{2,3}))?KT\b/.exec(text)
+  if (m === null) return null
+  return { fromDeg: m[1] === 'VRB' ? null : Number(m[1]), kt: Number(m[2]), gustKt: m[3] === undefined ? null : Number(m[3]) }
+}

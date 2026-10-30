@@ -32,6 +32,8 @@ interface WindCardProps {
   units: Units
   onClose: () => void
   onAbout?: () => void
+  /** Opens the Wind page: five models, three heights, the next 24 hours, measured now. */
+  onModels?: () => void
 }
 
 /** The three heights worth drawing: the ground, and the two a drone works at. */
@@ -53,6 +55,7 @@ export function WindCard({
   units,
   onClose,
   onAbout,
+  onModels,
 }: WindCardProps) {
   const ground = wind?.speedMps ?? null
 
@@ -142,6 +145,11 @@ export function WindCard({
           ? 'Open-Meteo, 10 m and 180 m levels, interpolated.'
           : `Open-Meteo, 10 m and 180 m levels, interpolated. Rating: ${ratedWindSource}.`}
       </CardSource>
+      {onModels === undefined ? null : (
+        <button type="button" className="btn btn--small windc__models" onClick={onModels}>
+          Five models, the next 24 hours
+        </button>
+      )}
     </Card>
   )
 }

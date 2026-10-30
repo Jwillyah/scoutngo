@@ -226,6 +226,10 @@ ok "$(grep -E 'LINE UP PROBLEMS' "$SCRATCH/lineup.log" | tail -1 | tr -d '=' | s
 run_audit "privacy audit" scripts/audit-privacy.mjs "$SCRATCH/privacy.log" 'PROBLEM|ABORTED'
 ok "$(grep -E 'PRIVACY PROBLEMS' "$SCRATCH/privacy.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
 
+# The Wind page in WebKit, tab and standalone: five models, FROM and TO, the rated line, measured now.
+run_audit "wind audit" scripts/audit-wind.mjs "$SCRATCH/wind.log" 'PROBLEM|ABORTED'
+ok "$(grep -E 'WIND PROBLEMS' "$SCRATCH/wind.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
+
 # Save for offline, then no network at all: the built app reloads from its
 # service worker and the map, chips, tide curve, sun line and shadows draw
 # from the pack, in WebKit as a tab and standalone (src/lib/venuePack.ts).

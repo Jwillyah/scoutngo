@@ -14182,3 +14182,101 @@
 .privacy__seen--off {
   color: var(--sun);
 }
+
+/* WIND (WindPage.tsx): words, the 24-hour strip, measured now. */
+.windp__levels {
+  justify-self: start;
+  /* In the page's column: its own width, not the column's. */
+  align-self: flex-start;
+}
+
+/* A time never breaks from its AM or PM (docs/ux-rules.md, 4). */
+.windp__t {
+  white-space: nowrap;
+}
+
+.windp__verdict {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-lg, 1.25rem);
+  font-weight: var(--weight-heavy);
+  color: var(--color-text);
+}
+
+/* Over the drone's rated wind: amber, the app's caution, never red. */
+.windp__verdict--over {
+  color: var(--sun);
+}
+
+.windp__note,
+.windp__how p {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+
+.windp__head {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-md, 1rem);
+  color: var(--color-text);
+}
+
+.windp__strip {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.windp__bar {
+  fill: var(--ocean);
+  opacity: 0.75;
+}
+
+.windp__hour--over .windp__bar {
+  fill: var(--sun);
+}
+
+.windp__whisker,
+.windp__gust {
+  stroke: var(--color-text);
+  stroke-width: 1;
+}
+
+.windp__arrow {
+  fill: var(--color-text);
+}
+
+.windp__rated {
+  stroke: var(--sun);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+
+.windp__axis {
+  fill: var(--color-text-muted);
+  font-size: 9px;
+}
+
+.windp__measured {
+  margin: 0;
+  padding-left: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.windp__how summary {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  cursor: pointer;
+  list-style: none;
+  font-style: italic;
+  font-weight: var(--weight-heavy);
+  color: var(--color-text-muted);
+}
+
+.windc__models {
+  justify-self: start;
+  margin-top: var(--space-2);
+}
