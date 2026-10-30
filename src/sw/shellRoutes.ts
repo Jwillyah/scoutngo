@@ -53,7 +53,6 @@ export const SHELL_PUBLIC: readonly string[] = [
   '/favicon.svg',
   '/icons.svg',
   '/manifest.json',
-  '/home-hero.webp',
   '/icons/apple-touch-icon.png',
   '/icons/icon-192.png',
 ]

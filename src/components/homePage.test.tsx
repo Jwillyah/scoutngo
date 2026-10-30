@@ -1,56 +1,34 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { HERO_CREDIT, Landing } from './Landing.tsx'
+import { Landing } from './Landing.tsx'
 
 /*
- * THE HOME PAGE IS THE SHOOTER'S PHOTOGRAPH (27 Oct 2026, Virginia Beach at
- * sunrise). Its type passing contrast on the pixels behind it is measured on
- * the real page (scripts/measure-home-contrast.mjs); here, the page's parts,
- * and the shipped file itself.
+ * THE HOME PAGE, SIMPLE (field test, 30 Oct): no photograph, no credit, the
+ * three lines on what is different, one gold button, the footer. Its fit at
+ * 390 x 664 is checked in WebKit by scripts/audit-home.mjs.
  */
 describe('the home page', () => {
   const html = renderToStaticMarkup(<Landing onDismiss={() => {}} />)
 
-  it('has the brand, the line, four features, one gold button and the footer in order', () => {
+  it('has the brand, the line, the three lines, one gold button and the footer, in order', () => {
     expect(html).toContain('>ScoutNGo<')
-    expect(html).toContain('Plan the shot before you get there. Where to stand, which lens, and when the light is right.')
-    for (const f of ['Where to stand', 'Which lens', 'When the light hits', 'Works offline']) expect(html).toContain(`>${f}<`)
+    const order = ['Plan the shot before you go.', 'Light, tide, surf and wind for the exact spot', 'Drone moves checked before you fly', 'Nothing about you leaves your phone', 'Open the map', 'Free · open source · no account ·', '>Privacy<', '>How it works<']
+    const at = order.map((t) => html.indexOf(t))
+    expect(at.every((i) => i >= 0)).toBe(true)
+    expect([...at].sort((a, b) => a - b)).toEqual(at)
     expect(html.match(/class="cover__go"/g)?.length).toBe(1)
-    expect(html).toMatch(/Free · open source · no account ·[^]*How it works/)
   })
 
-  it('shows the photograph, says what it is, and credits the photographer', () => {
-    expect(html).toMatch(/<img[^>]*class="cover__photo"[^>]*src="\/home-hero.webp"/)
-    expect(html).toMatch(/alt="[^"]*Virginia Beach[^"]*pier[^"]*"/)
-    expect(HERO_CREDIT).toBe('Photo by Jwillyagaze')
-    expect(html).toContain(`>${HERO_CREDIT}<`)
+  it('carries no photograph and no photographer’s credit', () => {
+    expect(html).not.toMatch(/<img/)
+    expect(html).not.toMatch(/Photo by|Jwilly|home-hero/)
   })
 })
 
-describe('the shipped photograph', async () => {
-  /* Read as a file: the app's types carry no Node, so the module is named at run time. */
-  const fs = (await import(/* @vite-ignore */ ['node', 'fs'].join(':'))) as { readFileSync: (p: string) => Uint8Array }
-  const bytes = fs.readFileSync('public/home-hero.webp')
-  const ascii = (from: number, to: number) => String.fromCharCode(...bytes.subarray(from, to))
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
-  /* The RIFF chunks in the file: a WebP carries metadata only in EXIF, XMP and ICCP chunks (and the VP8X header that announces them). */
-  const chunks: string[] = []
-  for (let at = 12; at + 8 <= bytes.length; ) {
-    chunks.push(ascii(at, at + 4))
-    const size = view.getUint32(at + 4, true)
-    at += 8 + size + (size % 2)
-  }
-
-  it('is a WebP under 300 KB, for phones', () => {
-    expect(ascii(0, 4)).toBe('RIFF')
-    expect(ascii(8, 12)).toBe('WEBP')
-    expect(bytes.length).toBeLessThan(300 * 1024)
-  })
-
-  it('carries no metadata: no position, no camera, no colour profile', () => {
-    expect(chunks.length).toBeGreaterThan(0)
-    for (const c of chunks) expect(['VP8 ', 'VP8L']).toContain(c)
-    const text = Array.from(bytes, (b) => String.fromCharCode(b)).join('')
-    for (const w of ['GPS', 'drone-dji', 'Exif', 'xmpmeta', 'DJI']) expect(text).not.toContain(w)
+describe('the build', async () => {
+  const fs = (await import(/* @vite-ignore */ ['node', 'fs'].join(':'))) as { existsSync: (p: string) => boolean; readFileSync: (p: string, e: string) => string }
+  it('ships no home photograph: the file is gone and nothing names it', () => {
+    expect(fs.existsSync('public/home-hero.webp')).toBe(false)
+    expect(fs.readFileSync('src/sw/shellRoutes.ts', 'utf8')).not.toContain('home-hero')
   })
 })

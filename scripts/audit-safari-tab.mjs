@@ -89,6 +89,30 @@ try {
       /* about:blank */
     }
   })
+  /* The home page first, in a context of its own that has not seen it: it must fit 390 x 664 with nothing to scroll (30 Oct). */
+  {
+    const hctx = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height: 664 }, serviceWorkers: 'block' })
+    const home = await hctx.newPage()
+    await home.goto('http://127.0.0.1:5173/')
+    await home.waitForTimeout(2500)
+    const fit = await home.evaluate(`(() => {
+      const c = document.querySelector('.cover')
+      if (!c) return null
+      const parts = [...c.querySelectorAll('.cover__name, .cover__head, .cover__line, .cover__go, .cover__licence, .cover__more')]
+      return { parts: parts.length, out: parts.filter((e) => { const r = e.getBoundingClientRect(); return r.top < 0 || r.bottom > innerHeight + 1 || r.right > innerWidth + 1 }).map((e) => e.className), scrolls: document.documentElement.scrollHeight > innerHeight + 1, img: c.querySelectorAll('img').length }
+    })()`)
+    console.log(`  home: ${JSON.stringify(fit)}`)
+    if (fit === null) fail('home: no cover on a first visit, so its fit was not looked at')
+    else {
+      surfaces += 1
+      if (fit.parts < 8) fail(`home: only ${fit.parts} of the cover's parts are there`)
+      if (fit.out.length > 0) fail(`home: off the 390 x 664 screen: ${fit.out.join(', ')}`)
+      if (fit.scrolls) fail('home: the page scrolls at 390 x 664')
+      if (fit.img > 0) fail('home: a photograph is back on the cover')
+    }
+    await home.screenshot({ path: join(OUT, 'tab-home.png') })
+    await hctx.close()
+  }
   const page = await ctx.newPage()
   await page.clock.install({ time: NOW })
   await page.clock.resume()

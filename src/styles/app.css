@@ -7877,116 +7877,81 @@
  */
 
 /*
- * THE COVER: the photograph full bleed, the type in its sky. The sky colour
- * is the photo's own top edge (sampled: 244, 208, 210), carried up
- * --hero-drop above the picture and blended into it, so the stack of type
- * has room and the hotels and the pier keep theirs below it.
+ * THE COVER, simple until the visual style is chosen (30 Oct): the app's own
+ * dark ground, the type in its own colours, centred. No photograph.
  */
 .cover {
-  --hero-sky: #f4d0d2;
-  /*
-   * HOW FAR THE PHOTO STARTS DOWN THE SCREEN. Its horizon is 38% down it, and
-   * the type needs the first 330 px (plus the notch): the drop is whatever
-   * puts the horizon below that, and never less than 56 px. Solved for the
-   * drop d on a screen H tall: d + 0.38 (H - d) = 330, so d = 532 - 0.613 H.
-   * As a share of .cover, which is the screen. On a 375 x 667 phone the
-   * horizon came up to 288 px and the credit sat on the land
-   * (measurements/2026-10-28-home-contrast.md).
-   */
-  --hero-drop: max(56px, calc(532px + 1.62 * env(safe-area-inset-top, 0px) - 61.3%));
-  --hero-ink: #2a1024;
   position: fixed;
   inset: 0;
   z-index: 60;
   overflow: hidden;
-  background: var(--hero-sky);
-  color: var(--hero-ink);
+  background: var(--color-bg);
+  color: var(--color-text);
 }
 
-.cover__photo {
-  position: absolute;
-  left: 0;
-  top: var(--hero-drop);
-  width: 100%;
-  height: calc(100% - var(--hero-drop));
-  max-width: none;
-  object-fit: cover;
-  /* The hotels run in from the left and the pier out to the right: the window that keeps both. */
-  object-position: 66% 100%;
-}
-
-.cover__blend {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: var(--hero-drop);
-  height: 48px;
-  background: linear-gradient(var(--hero-sky), rgb(244 208 210 / 0));
-}
-
+/* Centred in whatever height the page has: a Safari tab's 664 px, or the home-screen app's 844. */
 .cover__top {
   position: absolute;
   left: 20px;
   right: 20px;
-  top: max(12px, calc(env(safe-area-inset-top) + 6px));
+  top: calc(var(--safe-top, 0px) + 12px);
+  bottom: calc(var(--safe-bottom, 0px) + 12px);
+  max-width: 420px;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
+  gap: 14px;
   text-align: center;
 }
 
 .cover__brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .cover__name {
   margin: 0;
-  font-size: 30px;
+  font-size: 32px;
   font-weight: 800;
   letter-spacing: -0.01em;
-  color: var(--hero-ink);
+  color: var(--color-text);
 }
 
 .cover__head {
-  margin: 6px 0 0;
-  max-width: 330px;
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.4;
-  color: var(--hero-ink);
-}
-
-.cover__feats {
-  margin: 12px 0 0;
-  padding: 0;
-  width: 100%;
-  list-style: none;
-  display: flex;
-  gap: 6px;
-}
-
-.cover__feat {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-
-.cover__featlabel {
-  font-size: 11px;
+  margin: 0;
+  font-size: 18px;
   font-weight: 700;
-  line-height: 1.25;
-  color: var(--hero-ink);
+  line-height: 1.35;
+  color: var(--color-text);
+}
+
+.cover__lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+
+.cover__line {
+  padding: 10px 14px;
+  border-radius: var(--radius-panel);
+  background: var(--surface-raised);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--color-text);
 }
 
 .cover__licence {
-  margin: 2px 0 0;
-  font-size: 12px;
+  margin: 0;
+  font-size: 13px;
   font-weight: 600;
-  color: var(--hero-ink);
+  color: var(--color-text-muted);
   text-align: center;
 }
 
@@ -7995,22 +7960,12 @@
   padding: 0 2px;
   background: none;
   border: 0;
-  color: var(--hero-ink);
+  color: var(--color-text);
   font: inherit;
   font-weight: 800;
   text-decoration: underline;
   text-underline-offset: 3px;
   cursor: pointer;
-}
-
-/* The photographer's credit: the smallest type on the page, and last. */
-.cover__attrib {
-  margin: 0;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.3;
-  color: var(--hero-ink);
-  text-align: center;
 }
 
 /* THE MAIN ACTION: the glossy gold pill (tokens.css, --action-*). */

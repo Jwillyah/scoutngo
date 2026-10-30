@@ -22,7 +22,7 @@ const text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ')
 describe('the cover carries five elements and stops', () => {
   it('leads with the wordmark and the line', () => {
     expect(text).toContain('ScoutNGo')
-    expect(text).toContain('Plan the shot before you get there. Where to stand, which lens, and when the light is right.')
+    expect(text).toContain('Plan the shot before you go.')
   })
 
   it('has exactly one primary action and it says what it does', () => {
@@ -33,13 +33,11 @@ describe('the cover carries five elements and stops', () => {
   it('carries the two quiet lines, in their places', () => {
     /* How it works, and since 29 Oct Privacy (the brief: /privacy linked from the home footer). */
     expect(html.match(/class="cover__more"/g)).toHaveLength(2)
-    expect(text).toContain('Free · open source · no account · How it works · Privacy')
+    expect(text).toContain('Free · open source · no account · Privacy · How it works')
   })
 
-  it('puts the photograph behind everything, full bleed', () => {
-    const images = [...html.matchAll(/<img[^>]*src="([^"]*)"/g)]
-    expect(images).toHaveLength(1)
-    expect(images[0]?.[1]).toBe('/home-hero.webp')
+  it('carries no photograph (30 Oct): no personal photos anywhere public', () => {
+    expect([...html.matchAll(/<img[^>]*src="([^"]*)"/g)]).toHaveLength(0)
   })
 
   it('carries no scrubbing control, because a still frame cannot have one', () => {
@@ -66,20 +64,16 @@ describe('the cover carries five elements and stops', () => {
     expect(html).not.toMatch(/<input\b/)
   })
 
-  it('puts the attribution last, after the button and the licence line', () => {
-    /*
-     * It sat between the link and the button, so the path from reading what
-     * this is to doing something about it ran through a licensing credit.
-     */
-    expect(html.indexOf('cover__attrib')).toBeGreaterThan(html.indexOf('cover__go'))
-    expect(html.indexOf('cover__attrib')).toBeGreaterThan(html.indexOf('cover__licence'))
-  })
-
-  it('orders the copy: wordmark, line, features, button, footer with its link, attribution', () => {
-    const order = ['cover__name', 'cover__head', 'cover__feats', 'cover__go', 'cover__licence', 'cover__more', 'cover__attrib']
+  it('orders the copy: wordmark, line, the three lines, button, footer with its links', () => {
+    const order = ['cover__name', 'cover__head', 'cover__lines', 'cover__go', 'cover__licence', 'cover__more']
     const at = order.map((c) => html.indexOf(c))
     expect(at.every((i) => i >= 0)).toBe(true)
     for (let i = 1; i < at.length; i += 1) expect(at[i]).toBeGreaterThan(at[i - 1] ?? -1)
+  })
+
+  it('credits no photographer: there is no photograph', () => {
+    expect(html).not.toContain('cover__attrib')
+    expect(text).not.toMatch(/Photo by/)
   })
 
   /*
@@ -102,10 +96,6 @@ describe('the cover carries five elements and stops', () => {
     expect(text.toLowerCase()).not.toContain('get started')
     expect(text.toLowerCase()).not.toContain('sign up')
     expect(text.toLowerCase()).not.toContain('trusted by')
-  })
-
-  it('credits the photographer', () => {
-    expect(text).toContain('Photo by Jwillyagaze')
   })
 
   /*

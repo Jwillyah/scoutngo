@@ -1,23 +1,20 @@
 import { useState } from 'react'
 import { openPrivacy } from '../lib/privacyRoute.ts'
-import type { IconId } from '../lib/iconPalette.ts'
 import { HowPage } from './HowPage.tsx'
-import { Icon, type GlyphId } from './Icon.tsx'
+import { Icon } from './Icon.tsx'
 
 /**
- * THE HOME PAGE: the shooter's own photograph of a real shoot (27 Oct 2026,
- * Virginia Beach at sunrise: the oceanfront hotels and the fishing pier lit
- * pink, from the drone), and over its sky:
+ * THE HOME PAGE, simple until the visual style is chosen (field test, 30 Oct):
  *
- *   the brand        the app icon, the name, one line, four things it does
+ *   the brand        the app icon and the name
+ *   one line         Plan the shot before you go.
+ *   three lines      what is different about it
  *   one button       gold, Open the map
- *   one footer line  Free, open source, no account, How it works
- *   the credit       Photo by Jwillyagaze
+ *   one footer line  Free · open source · no account · Privacy · How it works
  *
- * all in the sky, so the hotels and the pier stay in view below. The type is
- * dark plum: the sky in this photo is pale pink and peach, and white on it
- * fails; scripts/measure-home-contrast.mjs reads the real pixels behind each
- * label. The shipped file (public/home-hero.webp) carries no metadata.
+ * No photograph: the shooter's own photo and its credit came off the page and
+ * out of the build (public/home-hero.webp is gone). No personal photos
+ * anywhere public. Fits a Safari tab, 390 x 664, with nothing to scroll.
  *
  * EVERYTHING ELSE IS ON /how AND NOTHING WAS DELETED.
  */
@@ -45,33 +42,21 @@ export function Landing({ onDismiss }: { onDismiss: () => void }) {
   return <Cover onDismiss={onDismiss} onHow={() => show('how')} />
 }
 
-/* The photographer's credit, as asked. */
-export const HERO_CREDIT = 'Photo by Jwillyagaze'
+const COVER_LINES = ['Light, tide, surf and wind for the exact spot', 'Drone moves checked before you fly', 'Nothing about you leaves your phone'] as const
 
 function Cover({ onDismiss, onHow }: { onDismiss: () => void; onHow: () => void }) {
   return (
     <div className="cover">
-      <img
-        className="cover__photo"
-        src="/home-hero.webp"
-        alt="Virginia Beach at sunrise from a drone: the oceanfront hotels and the fishing pier lit pink, the sea below"
-        width={1600}
-        height={2000}
-      />
-      {/* The photo's sky carried on above it, so the type has room and the hotels keep theirs. */}
-      <div className="cover__blend" aria-hidden="true" />
-
       <div className="cover__top">
         <div className="cover__brand">
-          <Icon glyph="app" size={44} />
+          <Icon glyph="app" size={56} />
           <h1 className="cover__name">ScoutNGo</h1>
         </div>
-        <p className="cover__head">Plan the shot before you get there. Where to stand, which lens, and when the light is right.</p>
-        <ul className="cover__feats">
-          {FEATURES.map((f) => (
-            <li key={f.label} className="cover__feat">
-              <Icon glyph={f.glyph} tile={f.tile} size={38} />
-              <span className="cover__featlabel">{f.label}</span>
+        <p className="cover__head">Plan the shot before you go.</p>
+        <ul className="cover__lines">
+          {COVER_LINES.map((line) => (
+            <li key={line} className="cover__line">
+              {line}
             </li>
           ))}
         </ul>
@@ -80,23 +65,15 @@ function Cover({ onDismiss, onHow }: { onDismiss: () => void; onHow: () => void 
         </button>
         <p className="cover__licence">
           Free · open source · no account ·{' '}
-          <button type="button" className="cover__more" onClick={onHow}>
-            How it works
-          </button>
-          {' · '}
           <button type="button" className="cover__more" onClick={openPrivacy}>
             Privacy
           </button>
+          {' · '}
+          <button type="button" className="cover__more" onClick={onHow}>
+            How it works
+          </button>
         </p>
-        <p className="cover__attrib">{HERO_CREDIT}</p>
       </div>
     </div>
   )
 }
-
-const FEATURES: readonly { label: string; glyph: GlyphId; tile: IconId }[] = [
-  { label: 'Where to stand', glyph: 'plan', tile: 'plan' },
-  { label: 'Which lens', glyph: 'kit', tile: 'kit' },
-  { label: 'When the light hits', glyph: 'sky', tile: 'viewfinder' },
-  { label: 'Works offline', glyph: 'layers', tile: 'offline' },
-]
