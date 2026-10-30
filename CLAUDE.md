@@ -5,6 +5,10 @@ Three shapes account for almost every real defect here, and the third one —
 a check pointed at the wrong object — passes while reporting something else
 entirely.
 
+**Check every screen change against [docs/ux-rules.md](docs/ux-rules.md)**, and
+end the run with a contact sheet of the touched screens at 390 × 844, browser
+tab and standalone (`node scripts/contact-sheet.mjs out.png label=shot.png …`).
+
 ## The rules this codebase is built on
 
 - **The model proposes, code computes.** Anything that is arithmetic lives in
