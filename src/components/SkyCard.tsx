@@ -11,6 +11,7 @@ import { getSunArc, getSunPosition } from '../core/sun.ts'
 import { formatClock } from '../core/timezone.ts'
 import { SKY_TABS, type SkyTab } from '../lib/skyTab.ts'
 import { SkyFire } from './SkyFire.tsx'
+import { SkyPreview } from './SkyPreview.tsx'
 
 /*
  * THE SKY, FIVE WAYS, PICTURE FIRST.
@@ -299,6 +300,8 @@ export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump,
     )
   } else if (tab === 'fire') {
     body = <SkyFire venue={venue} timeZone={timeZone} placeName={placeName ?? 'This place'} at={at} />
+  } else if (tab === 'preview') {
+    body = <SkyPreview venue={venue} timeZone={timeZone} at={at} />
   } else if (tab === 'moon') {
     const ill = getMoonIllumination(at)
     const times = moonTimesOnLocalDay(at, venue.lat, venue.lon, timeZone)

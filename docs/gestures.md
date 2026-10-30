@@ -89,6 +89,7 @@ sits clear of the sheet's handle.
 | sun curve plot | — | jumps to that time | the sheet's |
 | skyline chart (`SkylineSheet.tsx`) | — | — | the sheet's |
 | light map legend (`LightMapSheet.tsx`) | — | — (the presets above it are buttons) | the sheet's |
+| Sky › Preview pages (`SkyPreview.tsx`) | the next or last page (colour clock, four forecasts, week of skies); the dots follow | — | the sheet's |
 
 The curves are marked `data-sideways` and claim the drag as a scrub, the
 same as the ruler, so a scrub never moves the sheet and a vertical drag on

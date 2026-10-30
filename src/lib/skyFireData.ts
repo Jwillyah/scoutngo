@@ -85,6 +85,46 @@ export async function fetchFirePaths(from: LatLon, azimuthDeg: number, date: str
   }
 }
 
+/* ---------------------------------------------------------------- aerosol */
+
+/*
+ * HOW HAZY: the aerosol optical depth at 550 nm for the event's hour, from
+ * Open-Meteo's air-quality service (no key). The venue rounded to 2 decimals,
+ * as for the path. For the colour clock (src/core/skyColour.ts).
+ */
+export const AIR_QUALITY_URL = 'https://air-quality-api.open-meteo.com/v1/air-quality'
+
+export function aerosolUrl(at: LatLon, event: Date): string {
+  const date = event.toISOString().slice(0, 10)
+  const params = new URLSearchParams({
+    latitude: roundCoord(at.lat).toFixed(2),
+    longitude: roundCoord(at.lon).toFixed(2),
+    hourly: 'aerosol_optical_depth',
+    start_date: date,
+    end_date: date,
+    timezone: 'GMT',
+  })
+  return `${AIR_QUALITY_URL}?${params.toString()}`
+}
+
+/** The value for the hour nearest the event, or null. */
+export function parseAerosol(payload: unknown, event: Date): number | null {
+  const hourly = (payload as { hourly?: { time?: unknown; aerosol_optical_depth?: unknown } } | null)?.hourly
+  if (!Array.isArray(hourly?.time) || !Array.isArray(hourly?.aerosol_optical_depth)) return null
+  const i = (hourly.time as string[]).indexOf(nearestHour(event))
+  const v = i < 0 ? null : (hourly.aerosol_optical_depth as unknown[])[i]
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null
+}
+
+export async function fetchAerosol(at: LatLon, event: Date, fetchImpl: typeof fetch = fetch): Promise<number | null> {
+  try {
+    const response = await fetchImpl(aerosolUrl(at, event), { signal: AbortSignal.timeout(TIMEOUT_MS) })
+    return response.ok ? parseAerosol(await response.json(), event) : null
+  } catch {
+    return null
+  }
+}
+
 /* --------------------------------------------------------------- stations */
 
 export const METAR_ENDPOINT = '/api/metar'

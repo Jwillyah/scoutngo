@@ -43,7 +43,7 @@ const fail = (why) => {
   console.log('      PROBLEM: ' + why)
   problems += 1
 }
-const asked = { fire: 0, split: 0, nws: 0 }
+const asked = { fire: 0, split: 0, nws: 0, aod: 0 }
 
 async function routes(ctx) {
   await ctx.route(/api\.open-meteo\.com\/v1\/forecast.*models=/, async (route) => {
@@ -56,6 +56,12 @@ async function routes(ctx) {
     }
     asked.fire += 1
     return route.fulfill({ json: FIXTURE.payload })
+  })
+  /* Aerosol for the colour clock: 0.10 for that hour, as Open-Meteo gave it (measurements/2026-10-30-sky-colour.md). */
+  await ctx.route(/air-quality-api\.open-meteo\.com/, async (route) => {
+    asked.aod += 1
+    const times = Array.from({ length: 24 }, (_, h) => `2026-10-29T${String(h).padStart(2, '0')}:00`)
+    return route.fulfill({ json: { hourly: { time: times, aerosol_optical_depth: times.map(() => 0.1) } } })
   })
   await ctx.route(/api\.weather\.gov/, async (route) => {
     asked.nws += 1
@@ -153,6 +159,60 @@ try {
         await ev(`document.querySelector('.fire__side')?.scrollIntoView({ block: 'center' })`)
         await wait(300)
         await page.screenshot({ path: join(OUT, `fire-side-${label}.png`) })
+
+        /*
+         * SKY › PREVIEW, the colour clock, on the same morning: the low deck's
+         * glow must start before 7:20 (it was seen about 7:15), the strips are
+         * coloured minute cells, and pages 2 and 3 say they are coming.
+         */
+        await page.getByRole('tab', { name: 'Preview' }).tap()
+        let prev = null
+        for (let i = 0; i < 20; i += 1) {
+          await wait(500)
+          prev = await ev(`(() => {
+            const p = document.querySelector('.prev')
+            if (!p) return null
+            const strips = [...p.querySelectorAll('.prev__strip')]
+            return {
+              words: p.querySelector('.prev__words')?.textContent ?? null,
+              verdict: p.querySelector('.prev__verdict')?.textContent ?? null,
+              strips: strips.length,
+              coloured: strips.map((s) => [...s.querySelectorAll('rect')].filter((r) => r.getAttribute('fill')).length),
+              cells: strips.map((s) => s.querySelectorAll('rect').length),
+              soon: [...p.querySelectorAll('.prev__page--soon')].map((x) => x.textContent),
+              dots: p.querySelectorAll('.prev__dot').length,
+              wide: [...p.querySelectorAll('.prev__page:first-child *')].some((e) => e.getBoundingClientRect().right > innerWidth + 1),
+              wraps: [...p.querySelectorAll('.prev__layer, .prev__ticks span')].some((e) => e.getBoundingClientRect().height > 22),
+            }
+          })()`)
+          if (prev?.words) break
+        }
+        looked += 1
+        console.log(`  preview: ${JSON.stringify(prev)}`)
+        if (prev === null || prev.words === null) fail(`${label}: Sky › Preview drew no words`)
+        else {
+          const glow = /[Ll]ow deck glows (\d{1,2}):(\d{2})/.exec(prev.words)
+          if (glow === null) fail(`${label}: the words do not say when the low deck glows: "${prev.words}"`)
+          else if (Number(glow[1]) * 60 + Number(glow[2]) >= 7 * 60 + 20) fail(`${label}: the low deck glows from ${glow[1]}:${glow[2]}, and it was seen about 7:15`)
+          if (!/be set up by \d/.test(prev.words)) fail(`${label}: no "be set up by" in "${prev.words}"`)
+          if (prev.verdict === null || !/^Fire (possible|likely)/.test(prev.verdict)) fail(`${label}: Sky fire's verdict is not on top (${prev.verdict})`)
+          if (prev.strips < 1 || prev.cells.some((n) => n !== 91) || prev.coloured.some((n) => n < 10)) fail(`${label}: the strips are ${JSON.stringify({ cells: prev.cells, coloured: prev.coloured })}`)
+          if (prev.soon.length !== 2 || !prev.soon.every((t) => /Coming with the new 3D sky/.test(t))) fail(`${label}: pages 2 and 3 say ${JSON.stringify(prev.soon)}`)
+          if (prev.dots !== 3) fail(`${label}: ${prev.dots} page dots, not 3`)
+          if (prev.wide) fail(`${label}: something on the colour clock runs past 390 px`)
+          if (prev.wraps) fail(`${label}: a strip label or time wraps`)
+          if (/\bclear\b|\bsafe\b|\bcertain\b|\bwill\b/i.test(prev.words)) fail(`${label}: the words promise: "${prev.words}"`)
+        }
+        await ev(`document.querySelector('.prev')?.scrollIntoView({ block: 'start' })`)
+        await wait(300)
+        await page.screenshot({ path: join(OUT, `preview-${label}.png`) })
+        await ev(`(() => { const p = document.querySelector('.prev__pages'); p?.scrollTo({ left: p.clientWidth }) })()`)
+        await wait(600)
+        const second = await ev(`document.querySelector('.prev__dots')?.getAttribute('aria-label') ?? null`)
+        if (!/^Page 2 of 3/.test(second ?? '')) fail(`${label}: swiping to page 2 leaves the dots at ${JSON.stringify(second)}`)
+        await page.screenshot({ path: join(OUT, `preview-page2-${label}.png`) })
+        await page.getByRole('tab', { name: 'Fire' }).tap()
+        await wait(500)
       } else {
         if (!fire?.log) fail(`${label}: after sunrise there is no "How was it?"`)
         else {
@@ -174,7 +234,7 @@ try {
   await browser.close()
 }
 watchdog.stop()
-if (asked.fire === 0 || asked.split === 0 || asked.nws === 0) fail(`the app never asked for ${JSON.stringify(asked)}: the routes answered nothing, so this measured the network, not the fixture`)
+if (asked.fire === 0 || asked.split === 0 || asked.nws === 0 || asked.aod === 0) fail(`the app never asked for ${JSON.stringify(asked)}: the routes answered nothing, so this measured the network, not the fixture`)
 if (looked === 0) {
   console.log('=== SKY FIRE AUDIT ABORTED: nothing was looked at ===')
   process.exit(2)
