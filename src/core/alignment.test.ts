@@ -82,7 +82,8 @@ describe('the moon rising behind a target', () => {
     for (const a of found) {
       expect(a.direction).toBe('rising')
       expect(Math.abs(a.offsetDegrees)).toBeLessThanOrEqual(1.26)
-      expect(a.altitude).toBeCloseTo(HORIZON_ALTITUDE.moon, 2)
+      /* The edge follows the moon's distance (0.2725 of its parallax): within 0.02° of the mean. */
+      expect(Math.abs(a.altitude - HORIZON_ALTITUDE.moon)).toBeLessThan(0.02)
     }
   })
 })

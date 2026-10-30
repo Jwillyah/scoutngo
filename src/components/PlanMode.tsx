@@ -2038,6 +2038,7 @@ export function PlanMode({
                 onPlanMoonrise={() => openCard('moonrise')}
                 onOpenNow={onOpenNow}
                 placeName={venueNameLine}
+                horizon={horizonProfile}
                 onShowBow={(s) => {
                   if (s === null || venue === null) setBow(null)
                   else {

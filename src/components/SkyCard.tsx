@@ -1,7 +1,6 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { getMoonIllumination, getTimes } from 'suncalc'
 import { moonTimesOnLocalDay } from '../core/moonTimes.ts'
-import { findAlignments, targetAltitude, type AlignMode, type Body } from '../core/alignment.ts'
 import { compassWord } from '../core/compassWords.ts'
 import type { LatLon } from '../core/geo.ts'
 import { rankNights, type MilkyWayNight } from '../core/milkyWay.ts'
@@ -13,6 +12,8 @@ import { SKY_TABS, type SkyTab } from '../lib/skyTab.ts'
 import { SkyFire } from './SkyFire.tsx'
 import { SkyPreview } from './SkyPreview.tsx'
 import { SpecialLight } from './SpecialLight.tsx'
+import { LineUp } from './LineUp.tsx'
+import type { HorizonInput } from '../core/skyWindow.ts'
 import type { Special } from '../core/specialLight.ts'
 
 /*
@@ -52,6 +53,8 @@ interface SkyCardProps {
   placeName?: string
   /** Special light: draw a rainbow's bow on the map, or clear it. */
   onShowBow?: (s: Special | null) => void
+  /** The visible horizon round the venue (the terrain's, or flat), for lining things up. */
+  horizon?: HorizonInput
 }
 
 const DEG = Math.PI / 180
@@ -126,89 +129,8 @@ function MoonDisc({ fraction, waxing }: { fraction: number; waxing: boolean }) {
   )
 }
 
-function Finder({
-  body,
-  venue,
-  target,
-  picking,
-  onPickTarget,
-  onJump,
-  clock,
-  timeZone,
-}: {
-  body: Body
-  venue: LatLon
-  target: LatLon | null
-  picking: boolean
-  onPickTarget: () => void
-  onJump: (at: Date) => void
-  clock: (at: Date) => string
-  timeZone: string
-}) {
-  const [mode, setMode] = useState<AlignMode>('set')
-  const [heightText, setHeightText] = useState('')
-  const height = Number(heightText)
-  const results = useMemo(() => {
-    if (target === null) return null
-    if (mode === 'height' && !(height > 0)) return null
-    return findAlignments({
-      observer: venue,
-      target,
-      body,
-      mode,
-      ...(mode === 'height' ? { altitudeDeg: targetAltitude(venue, target, height) } : {}),
-      from: new Date(),
-      limit: 12,
-    })
-  }, [target, mode, height, body, venue])
-  const name = body === 'sun' ? 'sun' : 'moon'
-  return (
-    <div className="skyc__finder">
-      <p className="skyc__head">Find the {name} behind a pin</p>
-      <div className="btn-row">
-        <button type="button" className="btn btn--small" onClick={onPickTarget} aria-pressed={picking}>
-          {picking ? 'Tap the map for the pin' : target === null ? 'Pick the pin' : 'Move the pin'}
-        </button>
-      </div>
-      <div className="skyc__modes" role="group" aria-label="Which moment">
-        {(['rise', 'set', 'height'] as const).map((m) => (
-          <button key={m} type="button" className={`skyc__mode${mode === m ? ' skyc__mode--on' : ''}`} aria-pressed={mode === m} onClick={() => setMode(m)}>
-            {m === 'rise' ? 'Rising' : m === 'set' ? 'Setting' : 'On top of it'}
-          </button>
-        ))}
-      </div>
-      {mode === 'height' ? (
-        <label className="field">
-          <span className="field__label">How tall the thing at the pin is, in metres</span>
-          <input className="input" inputMode="decimal" value={heightText} onChange={(e) => setHeightText(e.target.value)} />
-        </label>
-      ) : null}
-      {results === null ? (
-        <p className="skyc__note">{target === null ? 'Pick a pin on the map first.' : 'Give its height to search.'}</p>
-      ) : results.length === 0 ? (
-        <p className="skyc__note">The {name} does not line up with that pin in the next twelve months.</p>
-      ) : (
-        <ul className="skyc__list">
-          {results.map((r) => (
-            <li key={r.at.getTime()}>
-              <button type="button" className="skyc__row" onClick={() => onJump(r.at)}>
-                <span className="num">
-                  {r.at.toLocaleDateString('en-GB', { timeZone, day: 'numeric', month: 'short', year: 'numeric' })} {clock(r.at)}
-                </span>
-                <span className="skyc__why num">
-                  {Math.round(r.altitude)}° up, {r.offsetDegrees >= 0 ? '+' : ''}
-                  {r.offsetDegrees.toFixed(1)}° off the pin
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  )
-}
 
-export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump, target, picking, onPickTarget, events, onPlanMoonrise, onOpenNow, placeName, onShowBow }: SkyCardProps) {
+export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump, target, picking, onPickTarget, events, onPlanMoonrise, onOpenNow, placeName, onShowBow, horizon }: SkyCardProps) {
   const clock = (d: Date) => `${formatClock(d, timeZone)}`
   const finderProps = { venue, target, picking, onPickTarget, onJump, clock, timeZone }
 
@@ -299,7 +221,7 @@ export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump,
           <div><dt>Sunset</dt><dd>{arc.sunset === null ? '—' : `${clock(arc.sunset.at)}, ${Math.round(arc.sunset.azimuth)}°`}</dd></div>
           <div><dt>Now on the bar</dt><dd>{now.altitude > 0 ? `${compassWord(now.azimuth)}, ${Math.round(now.altitude)}° up` : 'below the horizon'}</dd></div>
         </dl>
-        <Finder body="sun" {...finderProps} />
+        <LineUp {...finderProps} horizon={horizon} />
       </>
     )
   } else if (tab === 'fire') {
@@ -325,7 +247,7 @@ export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump,
             Plan this moonrise
           </button>
         )}
-        <Finder body="moon" {...finderProps} />
+        <LineUp {...finderProps} horizon={horizon} />
       </>
     )
   } else {

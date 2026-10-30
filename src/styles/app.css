@@ -14045,3 +14045,22 @@
   font-weight: var(--weight-heavy);
   color: var(--color-text-muted);
 }
+
+/* LINE IT UP (LineUp.tsx): the thing's bearing, distance and height, then the list. */
+.lineup__sight {
+  margin: 0;
+  color: var(--color-text);
+  font-weight: var(--weight-heavy);
+}
+
+.lineup__fields {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: var(--space-2);
+}
+
+.lineup__row {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+}

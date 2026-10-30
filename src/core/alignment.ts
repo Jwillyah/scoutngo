@@ -18,14 +18,24 @@
  * shared from it rather than written twice. If the aim panel ever wants the
  * moon, sunInverse can delegate here.
  *
- * RISE AND SET ARE THE TOP EDGE ON THE HORIZON, the convention almanacs use:
- * the sun's centre 0.833 degrees below (refraction plus its half-width), the
- * moon's 0.133 above (suncalc's own figure, parallax included).
+ * RISE AND SET ARE THE TOP EDGE ON THE HORIZON, the convention almanacs use,
+ * and AS SUNCALC SAYS IT. suncalc 2.0's altitude is apparent: refraction is
+ * already in it (Meeus 16.4, held at its horizon value below 0). So the sun's
+ * centre at sunrise is the geometric -0.833 lifted by that refraction, and
+ * the moon's top edge is on the horizon when suncalc's own moon-rise height
+ * crosses zero (its half-width, 0.2725 of the parallax, plus 0.09).
+ *
+ * 29 OCT: THESE WERE -0.833 AND +0.133, GEOMETRIC FIGURES compared against an
+ * apparent altitude. An alignment aimed at the sunrise point found it 2.5
+ * minutes before suncalc's sunrise and 0.38 degrees north of it; the moon 2.5
+ * minutes after its rise (tests/lineup.test.ts; docs/failure-modes.md, A).
  */
 import { getMoonPosition, getPosition } from 'suncalc'
 import { bearingBetween, distanceMeters, type LatLon } from './geo.ts'
 import { signedBearingDelta } from './sunInverse.ts'
 import { normalizeBearing } from './sun.ts'
+/* suncalc's refraction at the horizon, the one figure the bands use too (src/core/sunPath.ts). */
+import { SUNCALC_ALTITUDE_OFFSET_DEG } from './sunPath.ts'
 
 export type Body = 'sun' | 'moon'
 export type AlignMode = 'rise' | 'set' | 'height'
@@ -35,7 +45,14 @@ export const HALF_WIDTH: Record<Body, number> = { sun: 0.27, moon: 0.26 }
 /** Slack either side of the target's bearing, on top of the body's own half-width. */
 export const BEARING_SLACK_DEGREES = 1
 /** The altitude of the centre at rise and set. See the header. */
-export const HORIZON_ALTITUDE: Record<Body, number> = { sun: -0.833, moon: 0.133 }
+/** The moon's top edge on the horizon at its mean distance; findAlignments uses the exact distance. */
+const MOON_EDGE_MEAN = -(0.2725 * 0.9507 + 0.09)
+export const HORIZON_ALTITUDE: Record<Body, number> = { sun: -0.833 + SUNCALC_ALTITUDE_OFFSET_DEG, moon: MOON_EDGE_MEAN }
+
+/** The altitude the moon's centre has, now, with its top edge on the horizon: suncalc's moonHeight crossing zero. */
+function moonEdgeAt(distanceKm: number): number {
+  return -(0.2725 * (Math.asin(6378.14 / distanceKm) * 180) / Math.PI + 0.09)
+}
 
 const SEARCH_DAYS = 365
 const STEP_MS = 10 * 60_000
@@ -47,6 +64,11 @@ export interface AlignQuery {
   mode: AlignMode
   /** Height mode: the altitude to sit at, in degrees. See targetAltitude. */
   altitudeDeg?: number
+  /**
+   * Height mode: the top edge this far above the horizon line, degrees: a
+   * terrain horizon or a thing's top, in the rise and set convention.
+   */
+  edgeDeg?: number
   /** Degrees either side of the target's bearing. Default slack plus half-width. */
   toleranceDeg?: number
   from: Date
@@ -64,9 +86,13 @@ export interface Alignment {
   direction: 'rising' | 'setting'
 }
 
-function position(body: Body, at: Date, where: LatLon): { azimuth: number; altitude: number } {
-  const p = body === 'sun' ? getPosition(at, where.lat, where.lon) : getMoonPosition(at, where.lat, where.lon)
-  return { azimuth: normalizeBearing(p.azimuth), altitude: p.altitude }
+function position(body: Body, at: Date, where: LatLon): { azimuth: number; altitude: number; edge: number } {
+  if (body === 'sun') {
+    const p = getPosition(at, where.lat, where.lon)
+    return { azimuth: normalizeBearing(p.azimuth), altitude: p.altitude, edge: HORIZON_ALTITUDE.sun }
+  }
+  const p = getMoonPosition(at, where.lat, where.lon)
+  return { azimuth: normalizeBearing(p.azimuth), altitude: p.altitude, edge: moonEdgeAt(p.distance) }
 }
 
 /**
@@ -86,7 +112,7 @@ export function targetAltitude(
 
 export function findAlignments(query: AlignQuery): Alignment[] {
   const { observer, target, body, mode } = query
-  const want = mode === 'height' ? query.altitudeDeg : HORIZON_ALTITUDE[body]
+  const want = mode === 'height' ? (query.edgeDeg !== undefined ? 0 : query.altitudeDeg) : HORIZON_ALTITUDE[body]
   if (want === undefined || !Number.isFinite(want)) return []
   const bearing = bearingBetween(observer, target)
   const tolerance = query.toleranceDeg ?? BEARING_SLACK_DEGREES + HALF_WIDTH[body]
@@ -94,7 +120,16 @@ export function findAlignments(query: AlignQuery): Alignment[] {
   const last = (query.to ?? new Date(first + SEARCH_DAYS * 86_400_000)).getTime()
   const limit = query.limit ?? 100
 
-  const errorAt = (t: number) => position(body, new Date(t), observer).altitude - want
+  /*
+   * Rise and set: the body's top edge on the horizon, or `edgeDeg` above it,
+   * worked out at each instant (the moon's edge moves with its distance).
+   * Height mode with no edgeDeg: the centre at the altitude asked for.
+   */
+  const lifted = mode !== 'height' || query.edgeDeg !== undefined
+  const errorAt = (t: number) => {
+    const p = position(body, new Date(t), observer)
+    return lifted ? p.altitude - (p.edge + (query.edgeDeg ?? 0)) : p.altitude - (want as number)
+  }
   const out: Alignment[] = []
   let prevT = first
   let prevE = errorAt(first)

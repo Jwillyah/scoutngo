@@ -20,6 +20,7 @@ when they disagree nothing in the code can say which one is right.
 | the build stamp and git status | the app reported a build that was not deployed |
 | the ray's screen rule and its ground floor | `BEARING_LINE_MIN_METERS` overrode the screen cap at z19, fraction 0.92 against a wanted 0.28 |
 | the refraction convention on each side of one crossing | the flat horizon used the corrected −0.833, the ridge used a raw angle; a *perfectly flat* DEM disagreed with the flat line by two minutes |
+| suncalc's altitude and the alignment finder's rise and set, until 29 Oct | `HORIZON_ALTITUDE` was the geometric −0.833 (sun) and +0.133 (moon); suncalc 2.0 returns an apparent altitude with refraction already in it. An alignment aimed at the sunrise point came 2.5 minutes before suncalc's sunrise and 0.38° north of it, the moon 2.5 minutes late. Now derived from suncalc's own refraction and moon-rise height, and held to suncalc's times in tests/lineup.test.ts |
 | the venue's coordinates and its name | drag the pin to Shenandoah, header still reads "Brew River Dock Bar" |
 
 **Fix.** One source. The second value is derived from it, or it does not
