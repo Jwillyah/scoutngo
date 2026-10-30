@@ -18,7 +18,7 @@ import type { Units } from '../lib/units.ts'
 import { VenuePlate } from './VenuePlate.tsx'
 import { TopBar } from './TopBar.tsx'
 import { useOnline } from '../lib/useOnline.ts'
-import { locateOnce, LOCATE_MESSAGE } from '../lib/locateOnce.ts'
+import { locateOnce, locateWords } from '../lib/locateOnce.ts'
 import type { SetupTarget } from '../lib/mode.ts'
 
 /*
@@ -187,7 +187,7 @@ export function SetupMode({
     void locateOnce().then((result) => {
       setLocating(false)
       if (result.status === 'ok') onUseMyLocation(result.at)
-      else setLocateNote(result.status === 'error' ? result.message : LOCATE_MESSAGE[result.status])
+      else setLocateNote(locateWords(result))
     })
   }
   /*
@@ -326,7 +326,8 @@ export function SetupMode({
           adding={false}
           onLocate={locate}
           locating={locating}
-          locateNote={locateNote}
+          /* Said once, in step 1 under its button, while the card shows; the bar's note only when it does not (ux-rules 2). */
+          locateNote={pendingPin === null && step === 1 ? null : locateNote}
           online={online}
         />
 
@@ -342,7 +343,7 @@ export function SetupMode({
                 )}
                 <div className="wiz__row">
                   <button type="button" className="wiz__ghost" onClick={locate} disabled={locating}>
-                    {locating ? 'Finding you…' : 'Use my location'}
+                    {locating ? 'Finding you…' : locateNote !== null ? 'Retry' : 'Use my location'}
                   </button>
                   {returning && at !== null ? (
                     <button type="button" className="wiz__ghost" onClick={onDone}>

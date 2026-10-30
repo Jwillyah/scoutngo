@@ -17,7 +17,7 @@ import { resolveSensor, type KitProfile } from '../core/kit.ts'
 import { normalizeBearing } from '../core/sun.ts'
 import { formatHour } from '../core/timezone.ts'
 import type { KitSelection } from '../lib/kitSelection.ts'
-import { LOCATE_MESSAGE, locateOnce } from '../lib/locateOnce.ts'
+import { locateOnce, locateWords } from '../lib/locateOnce.ts'
 import { formatRange, type Units } from '../lib/units.ts'
 import { readPhoneFov, ultraWideOf, writePhoneFov } from '../lib/phoneCamera.ts'
 
@@ -288,7 +288,7 @@ export function Viewfinder({ venue, pins, profile, bag, timeZone, units, onClose
         setLocateNote(null)
       } else {
         setMe(null)
-        setLocateNote(LOCATE_MESSAGE[result.status])
+        setLocateNote(locateWords(result))
       }
     })
   }

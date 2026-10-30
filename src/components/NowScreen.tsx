@@ -18,7 +18,7 @@ import {
 import { skyLine } from '../core/skyLine.ts'
 import { formatClock, venueTimeZone } from '../core/timezone.ts'
 import { fetchSightlineCloud } from '../lib/forecast.ts'
-import { LOCATE_MESSAGE, locateOnce, type LocateResult } from '../lib/locateOnce.ts'
+import { locateOnce, locateWords, type LocateResult } from '../lib/locateOnce.ts'
 import { fetchOpenGround } from '../lib/openGroundQuery.ts'
 
 interface NowScreenProps {
@@ -90,7 +90,7 @@ export function NowScreen({ onClose, onPlanHere }: NowScreenProps) {
         setAsk({ state: 'located', at: result.at })
         setTick(new Date())
       } else {
-        setAsk({ state: 'refused', message: LOCATE_MESSAGE[result.status] })
+        setAsk({ state: 'refused', message: locateWords(result) })
       }
     })
   }, [])
@@ -207,7 +207,7 @@ export function NowScreen({ onClose, onPlanHere }: NowScreenProps) {
             onClick={locate}
             disabled={ask.state === 'asking'}
           >
-            {ask.state === 'asking' ? 'Asking…' : 'Use my location'}
+            {ask.state === 'asking' ? 'Asking…' : ask.state === 'refused' ? 'Retry' : 'Use my location'}
           </button>
           {ask.state === 'refused' ? <p className="now__refused">{ask.message}</p> : null}
         </div>

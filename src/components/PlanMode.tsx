@@ -40,7 +40,7 @@ import type { VenueWindow } from '../lib/venue.ts'
 import { effectiveSensor, type KitProfile as KitProfileType } from '../core/kit.ts'
 import type { OpticSelection } from '../core/optics.ts'
 import { placingHint } from '../core/platformFilter.ts'
-import { locateOnce } from '../lib/locateOnce.ts'
+import { locateOnce, locateWords } from '../lib/locateOnce.ts'
 import type { SetupTarget } from '../lib/mode.ts'
 import { GROUND_WIND_METERS, type WindHeight } from '../core/windHeight.ts'
 import type { SkyLayerKind } from '../core/skyLayer.ts'
@@ -998,11 +998,21 @@ export function PlanMode({
   const turnTerrain = useCallback((on: boolean) => onShowTerrain(on), [onShowTerrain])
 
   const [locating, setLocating] = useState(false)
+  /*
+   * WHY IT DID NOT MOVE, in one line under the top bar, with Retry. This was
+   * `if not ok, return` and the note was wired to null: on 30 Oct the arrow
+   * did nothing at all, with no word of why (src/lib/locateOnce.ts).
+   */
+  const [locateNote, setLocateNote] = useState<string | null>(null)
   const onLocate = useCallback(() => {
     setLocating(true)
+    setLocateNote(null)
     void locateOnce().then((result) => {
       setLocating(false)
-      if (result.status !== 'ok') return
+      if (result.status !== 'ok') {
+        setLocateNote(locateWords(result))
+        return
+      }
       handle.current?.flyTo(result.at, Math.max(mapZoom, 15))
     })
   }, [handle, mapZoom])
@@ -2578,7 +2588,7 @@ export function PlanMode({
         online={online || offlineStatus !== null}
       />
 
-      <ChipRow chips={chips} active={page === 'tides' ? 'tide' : card.kind} onOpen={(kind) => (kind === 'tide' ? setPage('tides') : openCard(kind))} measureRef={measureChips} status={offlineStatus ?? weatherBusy ?? specialStatus} onStatus={offlineStatus === null && weatherBusy === null && specialStatus !== null ? () => { setSkyTab('special'); openCard('sky') } : undefined} />
+      <ChipRow chips={chips} active={page === 'tides' ? 'tide' : card.kind} onOpen={(kind) => (kind === 'tide' ? setPage('tides') : openCard(kind))} measureRef={measureChips} status={locateNote ?? offlineStatus ?? weatherBusy ?? specialStatus} statusAction={locateNote === null ? undefined : { label: locating ? 'Finding you…' : 'Retry', onClick: onLocate }} onStatus={locateNote === null && offlineStatus === null && weatherBusy === null && specialStatus !== null ? () => { setSkyTab('special'); openCard('sky') } : undefined} />
 
       {sheet === 'full' ? null : (
       <MapRail

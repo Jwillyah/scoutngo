@@ -93,6 +93,8 @@ interface ChipRowProps {
    * so the chrome the sheet and the labels keep clear of is measured with it.
    */
   status?: string | null
+  /** A button at the end of the status line: Retry, after "Use my location" failed. */
+  statusAction?: { label: string; onClick: () => void }
   /** When set, the status line is a button: special light on now opens its list. */
   onStatus?: () => void
   /** The card currently open, so its chip shows as active. */
@@ -124,7 +126,7 @@ interface ChipRowProps {
  * aria-pressed STAYS. A chip genuinely is pressed or not -- its card is open
  * or it is not -- and that is what the lit border means.
  */
-export function ChipRow({ chips, active, onOpen, measureRef, status = null, onStatus }: ChipRowProps) {
+export function ChipRow({ chips, active, onOpen, measureRef, status = null, statusAction, onStatus }: ChipRowProps) {
   return (
     <div className="chips2" ref={measureRef} role="toolbar" aria-label="Conditions">
       {chips.map((chip) => (
@@ -169,7 +171,14 @@ export function ChipRow({ chips, active, onOpen, measureRef, status = null, onSt
           {chip.note === undefined ? null : <span className="chip2__note">{chip.note}</span>}
         </button>
       ))}
-      {status === null ? null : onStatus === undefined ? (
+      {status === null ? null : statusAction !== undefined ? (
+        <div className="offline-line offline-line--act" role="status">
+          <span>{status}</span>
+          <button type="button" className="offline-line__act" onClick={statusAction.onClick}>
+            {statusAction.label}
+          </button>
+        </div>
+      ) : onStatus === undefined ? (
         <p className="offline-line" role="status">
           {status}
         </p>

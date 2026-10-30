@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { locateOnce, LOCATE_MESSAGE, LOCATED_ZOOM } from './locateOnce.ts'
+import { locateOnce, locateWords, LOCATED_ZOOM, NO_PROMPT_MS } from './locateOnce.ts'
 
 /*
  * Node has a `navigator` with no `geolocation` on it, which is exactly the
@@ -71,15 +71,35 @@ describe('locateOnce', () => {
       fail(denial(1))
     })
     install({ getCurrentPosition })
-    expect(await locateOnce()).toEqual({ status: 'denied' })
+    expect(await locateOnce(15_000, () => 0)).toEqual({ status: 'denied', prompted: false })
     expect(getCurrentPosition).toHaveBeenCalledTimes(1)
   })
 
-  it('reports no fix separately from a refusal, because they are different', async () => {
-    install({
-      getCurrentPosition: (_ok: unknown, fail: (e: unknown) => void) => fail(denial(3)),
-    })
-    expect(await locateOnce()).toEqual({ status: 'error', message: LOCATE_MESSAGE.error })
+  /*
+   * THE THREE CODES, EACH ITS OWN REASON (field test, 30 Oct: "Use my
+   * location" did nothing). A refusal faster than anyone could answer a
+   * prompt means none was shown: Location Services is off for Safari.
+   */
+  it('tells a refusal with no prompt from one somebody answered', async () => {
+    let t = 0
+    const clock = () => t
+    install({ getCurrentPosition: (_ok: unknown, fail: (e: unknown) => void) => { t = 12; fail(denial(1)) } })
+    const quick = await locateOnce(15_000, clock)
+    expect(quick).toEqual({ status: 'denied', prompted: false })
+    expect(locateWords(quick as Exclude<typeof quick, { status: 'ok' }>)).toBe('Location is off for Safari: Settings › Privacy & Security › Location Services › Safari Websites')
+    t = 0
+    install({ getCurrentPosition: (_ok: unknown, fail: (e: unknown) => void) => { t = NO_PROMPT_MS + 2000; fail(denial(1)) } })
+    const answered = await locateOnce(15_000, clock)
+    expect(answered).toEqual({ status: 'denied', prompted: true })
+    expect(locateWords(answered as Exclude<typeof answered, { status: 'ok' }>)).toMatch(/^Location not shared with this site: Settings › Apps › Safari › Location/)
+  })
+
+  it('reports no position and a timeout apart from a refusal, because they are different', async () => {
+    install({ getCurrentPosition: (_ok: unknown, fail: (e: unknown) => void) => fail(denial(2)) })
+    expect(await locateOnce()).toEqual({ status: 'unavailable' })
+    install({ getCurrentPosition: (_ok: unknown, fail: (e: unknown) => void) => fail(denial(3)) })
+    expect(await locateOnce()).toEqual({ status: 'timeout' })
+    expect(locateWords({ status: 'timeout' })).toBe('No position within 15 s: Retry, or search for the place')
   })
 
   it('reports a browser without the API rather than throwing', async () => {
@@ -122,11 +142,13 @@ describe('locateOnce', () => {
     expect(LOCATED_ZOOM).toBeGreaterThan(9)
   })
 
-  it('says something for every outcome that is not a position', () => {
-    for (const status of ['denied', 'unsupported', 'error'] as const) {
-      expect(LOCATE_MESSAGE[status].length).toBeGreaterThan(10)
-      // Points at what to do instead rather than at a settings screen.
-      expect(LOCATE_MESSAGE[status]).toMatch(/search/i)
+  it('says what to do for every outcome that is not a position', () => {
+    const all = [{ status: 'denied', prompted: true }, { status: 'denied', prompted: false }, { status: 'unavailable' }, { status: 'timeout' }, { status: 'unsupported' }, { status: 'insecure' }] as const
+    for (const r of all) {
+      const words = locateWords(r)
+      // A setting to change, Retry, or the search instead: never a dead end.
+      expect(words).toMatch(/Settings ›|Retry|search/)
+      expect(words).not.toMatch(/\bsafe\b|clear/i)
     }
   })
 })
