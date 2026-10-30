@@ -22,7 +22,7 @@ export const HOSTS: readonly Host[] = [
   { host: 'imagery.nationalmap.gov', who: 'USDA NAIP imagery, from USGS', learns: 'which map tiles: a map cell', when: 'the 3D view in the lower 48 outside those states' },
   { host: 's3.amazonaws.com', who: 'AWS Terrarium elevation', learns: 'which elevation tiles: a map cell', when: 'with terrain or 3D on' },
   { host: 'tiles.openfreemap.org', who: 'OpenFreeMap', learns: 'which map tiles: a map cell', when: 'buildings, the sea, the 3D view' },
-  { host: 'api.open-meteo.com', who: 'Open-Meteo', learns: 'the venue coordinate and dates; for Sky fire, eight points toward the sun to 2 decimals', when: 'wind, cloud, Sky fire, the Tide sheet, the 3D sea' },
+  { host: 'api.open-meteo.com', who: 'Open-Meteo', learns: 'the venue coordinate and dates; for Sky fire, eight points toward the sun, and for Special light nine points round the venue, to 2 decimals', when: 'wind, cloud, Sky fire, Special light, the Tide sheet, the 3D sea' },
   { host: 'air-quality-api.open-meteo.com', who: 'Open-Meteo air quality', learns: 'the venue to 2 decimals (about a kilometre) and a date', when: 'Sky › Preview, for how hazy the air is' },
   { host: 'marine-api.open-meteo.com', who: 'Open-Meteo Marine', learns: 'the venue coordinate', when: 'the Tide sheet and the 3D sea, beaches only' },
   { host: 'api.tidesandcurrents.noaa.gov', who: 'NOAA tides', learns: 'a station number and dates', when: 'tides, and the water height in 3D' },

@@ -12,6 +12,8 @@ import { formatClock } from '../core/timezone.ts'
 import { SKY_TABS, type SkyTab } from '../lib/skyTab.ts'
 import { SkyFire } from './SkyFire.tsx'
 import { SkyPreview } from './SkyPreview.tsx'
+import { SpecialLight } from './SpecialLight.tsx'
+import type { Special } from '../core/specialLight.ts'
 
 /*
  * THE SKY, FIVE WAYS, PICTURE FIRST.
@@ -48,6 +50,8 @@ interface SkyCardProps {
   onOpenNow?: () => void
   /** The venue's name, for the sky fire log. */
   placeName?: string
+  /** Special light: draw a rainbow's bow on the map, or clear it. */
+  onShowBow?: (s: Special | null) => void
 }
 
 const DEG = Math.PI / 180
@@ -204,7 +208,7 @@ function Finder({
   )
 }
 
-export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump, target, picking, onPickTarget, events, onPlanMoonrise, onOpenNow, placeName }: SkyCardProps) {
+export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump, target, picking, onPickTarget, events, onPlanMoonrise, onOpenNow, placeName, onShowBow }: SkyCardProps) {
   const clock = (d: Date) => `${formatClock(d, timeZone)}`
   const finderProps = { venue, target, picking, onPickTarget, onJump, clock, timeZone }
 
@@ -300,6 +304,8 @@ export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump,
     )
   } else if (tab === 'fire') {
     body = <SkyFire venue={venue} timeZone={timeZone} placeName={placeName ?? 'This place'} at={at} />
+  } else if (tab === 'special') {
+    body = <SpecialLight venue={venue} timeZone={timeZone} at={at} onJump={onJump} onShowBow={onShowBow} />
   } else if (tab === 'preview') {
     body = <SkyPreview venue={venue} timeZone={timeZone} at={at} />
   } else if (tab === 'moon') {

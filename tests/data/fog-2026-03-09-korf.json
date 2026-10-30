@@ -1,0 +1,467 @@
+{
+ "about": "KORF (Norfolk International) hourly METARs, 8-10 Mar 2026, 03:51-09:51 local time (America/New_York; daylight time from 8 Mar), from the Iowa Environmental Mesonet ASOS archive. Sea temperature from NDBC buoy 44099 (Cape Henry), its March 2026 standard meteorological file, UTC. Fetched 29 Oct 2026. Fog (FG, visibility half a mile or less) was reported 05:51-07:51 on 9 Mar.",
+ "sources": [
+  "https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py?station=ORF",
+  "https://www.ndbc.noaa.gov/data/stdmet/Mar/4409932026.txt.gz"
+ ],
+ "korf": [
+  {
+   "local": "2026-03-08 03:51",
+   "tempF": 65.0,
+   "dewF": 61.0,
+   "windKt": 14.0,
+   "visMi": 10.0,
+   "wx": null
+  },
+  {
+   "local": "2026-03-08 04:51",
+   "tempF": 66.0,
+   "dewF": 61.0,
+   "windKt": 15.0,
+   "visMi": 10.0,
+   "wx": null
+  },
+  {
+   "local": "2026-03-08 05:51",
+   "tempF": 65.0,
+   "dewF": 61.0,
+   "windKt": 15.0,
+   "visMi": 10.0,
+   "wx": null
+  },
+  {
+   "local": "2026-03-08 06:51",
+   "tempF": 65.0,
+   "dewF": 62.0,
+   "windKt": 15.0,
+   "visMi": 10.0,
+   "wx": null
+  },
+  {
+   "local": "2026-03-08 07:51",
+   "tempF": 66.0,
+   "dewF": 62.0,
+   "windKt": 14.0,
+   "visMi": 10.0,
+   "wx": null
+  },
+  {
+   "local": "2026-03-08 08:51",
+   "tempF": 68.0,
+   "dewF": 62.0,
+   "windKt": 14.0,
+   "visMi": 10.0,
+   "wx": null
+  },
+  {
+   "local": "2026-03-08 09:51",
+   "tempF": 71.0,
+   "dewF": 62.0,
+   "windKt": 15.0,
+   "visMi": 10.0,
+   "wx": null
+  },
+  {
+   "local": "2026-03-09 03:51",
+   "tempF": 60.0,
+   "dewF": 60.0,
+   "windKt": 5.0,
+   "visMi": 10.0,
+   "wx": null
+  },
+  {
+   "local": "2026-03-09 04:51",
+   "tempF": 60.0,
+   "dewF": 60.0,
+   "windKt": 3.0,
+   "visMi": 10.0,
+   "wx": null
+  },
+  {
+   "local": "2026-03-09 05:51",
+   "tempF": 60.0,
+   "dewF": 60.0,
+   "windKt": 3.0,
+   "visMi": 0.5,
+   "wx": "FG"
+  },
+  {
+   "local": "2026-03-09 06:51",
+   "tempF": 61.0,
+   "dewF": 61.0,
+   "windKt": 5.0,
+   "visMi": 0.25,
+   "wx": "FG"
+  },
+  {
+   "local": "2026-03-09 07:51",
+   "tempF": 62.0,
+   "dewF": 62.0,
+   "windKt": 6.0,
+   "visMi": 0.5,
+   "wx": "FG"
+  },
+  {
+   "local": "2026-03-09 08:51",
+   "tempF": 62.0,
+   "dewF": 62.0,
+   "windKt": 7.0,
+   "visMi": 1.0,
+   "wx": "BR"
+  },
+  {
+   "local": "2026-03-09 09:51",
+   "tempF": 62.0,
+   "dewF": 62.0,
+   "windKt": 7.0,
+   "visMi": 6.0,
+   "wx": "BR"
+  },
+  {
+   "local": "2026-03-10 03:51",
+   "tempF": 58.0,
+   "dewF": 58.0,
+   "windKt": 4.0,
+   "visMi": 10.0,
+   "wx": null
+  },
+  {
+   "local": "2026-03-10 04:51",
+   "tempF": 58.0,
+   "dewF": 58.0,
+   "windKt": 3.0,
+   "visMi": 5.0,
+   "wx": "BR"
+  },
+  {
+   "local": "2026-03-10 05:51",
+   "tempF": 55.0,
+   "dewF": 55.0,
+   "windKt": 5.0,
+   "visMi": 8.0,
+   "wx": null
+  },
+  {
+   "local": "2026-03-10 06:51",
+   "tempF": 56.0,
+   "dewF": 56.0,
+   "windKt": 5.0,
+   "visMi": 10.0,
+   "wx": null
+  },
+  {
+   "local": "2026-03-10 07:51",
+   "tempF": 56.0,
+   "dewF": 55.0,
+   "windKt": 5.0,
+   "visMi": 10.0,
+   "wx": null
+  },
+  {
+   "local": "2026-03-10 08:51",
+   "tempF": 61.0,
+   "dewF": 57.0,
+   "windKt": 5.0,
+   "visMi": 10.0,
+   "wx": null
+  },
+  {
+   "local": "2026-03-10 09:51",
+   "tempF": 67.0,
+   "dewF": 56.0,
+   "windKt": 6.0,
+   "visMi": 10.0,
+   "wx": null
+  }
+ ],
+ "buoy44099": [
+  {
+   "utc": "2026-03-08T00:56Z",
+   "waterC": 4.2
+  },
+  {
+   "utc": "2026-03-08T01:56Z",
+   "waterC": 4.3
+  },
+  {
+   "utc": "2026-03-08T02:56Z",
+   "waterC": 4.3
+  },
+  {
+   "utc": "2026-03-08T03:56Z",
+   "waterC": 4.1
+  },
+  {
+   "utc": "2026-03-08T04:56Z",
+   "waterC": 4.1
+  },
+  {
+   "utc": "2026-03-08T05:56Z",
+   "waterC": 4.1
+  },
+  {
+   "utc": "2026-03-08T06:56Z",
+   "waterC": 4.0
+  },
+  {
+   "utc": "2026-03-08T07:56Z",
+   "waterC": 4.3
+  },
+  {
+   "utc": "2026-03-08T08:56Z",
+   "waterC": 4.2
+  },
+  {
+   "utc": "2026-03-08T09:56Z",
+   "waterC": 4.1
+  },
+  {
+   "utc": "2026-03-08T10:56Z",
+   "waterC": 4.1
+  },
+  {
+   "utc": "2026-03-08T11:56Z",
+   "waterC": 4.1
+  },
+  {
+   "utc": "2026-03-08T12:56Z",
+   "waterC": 5.5
+  },
+  {
+   "utc": "2026-03-08T13:56Z",
+   "waterC": 6.1
+  },
+  {
+   "utc": "2026-03-08T14:56Z",
+   "waterC": 6.8
+  },
+  {
+   "utc": "2026-03-08T15:56Z",
+   "waterC": 6.8
+  },
+  {
+   "utc": "2026-03-08T16:56Z",
+   "waterC": 6.8
+  },
+  {
+   "utc": "2026-03-08T17:56Z",
+   "waterC": 6.8
+  },
+  {
+   "utc": "2026-03-08T18:56Z",
+   "waterC": 6.8
+  },
+  {
+   "utc": "2026-03-08T19:56Z",
+   "waterC": 6.9
+  },
+  {
+   "utc": "2026-03-08T20:56Z",
+   "waterC": 6.9
+  },
+  {
+   "utc": "2026-03-08T21:56Z",
+   "waterC": 6.8
+  },
+  {
+   "utc": "2026-03-08T22:56Z",
+   "waterC": 7.0
+  },
+  {
+   "utc": "2026-03-08T23:56Z",
+   "waterC": 6.9
+  },
+  {
+   "utc": "2026-03-09T00:56Z",
+   "waterC": 6.7
+  },
+  {
+   "utc": "2026-03-09T01:56Z",
+   "waterC": 6.7
+  },
+  {
+   "utc": "2026-03-09T02:56Z",
+   "waterC": 6.8
+  },
+  {
+   "utc": "2026-03-09T03:56Z",
+   "waterC": 6.5
+  },
+  {
+   "utc": "2026-03-09T04:56Z",
+   "waterC": 6.0
+  },
+  {
+   "utc": "2026-03-09T05:56Z",
+   "waterC": 6.4
+  },
+  {
+   "utc": "2026-03-09T06:56Z",
+   "waterC": 6.6
+  },
+  {
+   "utc": "2026-03-09T07:56Z",
+   "waterC": 6.6
+  },
+  {
+   "utc": "2026-03-09T08:56Z",
+   "waterC": 6.8
+  },
+  {
+   "utc": "2026-03-09T09:56Z",
+   "waterC": 6.7
+  },
+  {
+   "utc": "2026-03-09T10:56Z",
+   "waterC": 6.7
+  },
+  {
+   "utc": "2026-03-09T11:56Z",
+   "waterC": 6.7
+  },
+  {
+   "utc": "2026-03-09T12:56Z",
+   "waterC": 6.7
+  },
+  {
+   "utc": "2026-03-09T13:56Z",
+   "waterC": 6.7
+  },
+  {
+   "utc": "2026-03-09T14:56Z",
+   "waterC": 7.1
+  },
+  {
+   "utc": "2026-03-09T15:56Z",
+   "waterC": 7.5
+  },
+  {
+   "utc": "2026-03-09T16:56Z",
+   "waterC": 7.6
+  },
+  {
+   "utc": "2026-03-09T17:56Z",
+   "waterC": 8.8
+  },
+  {
+   "utc": "2026-03-09T18:56Z",
+   "waterC": 10.1
+  },
+  {
+   "utc": "2026-03-09T19:56Z",
+   "waterC": 9.5
+  },
+  {
+   "utc": "2026-03-09T20:56Z",
+   "waterC": 9.4
+  },
+  {
+   "utc": "2026-03-09T21:56Z",
+   "waterC": 9.1
+  },
+  {
+   "utc": "2026-03-09T22:56Z",
+   "waterC": 8.9
+  },
+  {
+   "utc": "2026-03-09T23:56Z",
+   "waterC": 8.8
+  },
+  {
+   "utc": "2026-03-10T00:56Z",
+   "waterC": 8.4
+  },
+  {
+   "utc": "2026-03-10T01:56Z",
+   "waterC": 7.8
+  },
+  {
+   "utc": "2026-03-10T02:56Z",
+   "waterC": 7.7
+  },
+  {
+   "utc": "2026-03-10T03:56Z",
+   "waterC": 7.2
+  },
+  {
+   "utc": "2026-03-10T04:56Z",
+   "waterC": 7.3
+  },
+  {
+   "utc": "2026-03-10T05:56Z",
+   "waterC": 7.2
+  },
+  {
+   "utc": "2026-03-10T06:56Z",
+   "waterC": 7.3
+  },
+  {
+   "utc": "2026-03-10T07:56Z",
+   "waterC": 8.1
+  },
+  {
+   "utc": "2026-03-10T08:56Z",
+   "waterC": 7.8
+  },
+  {
+   "utc": "2026-03-10T09:56Z",
+   "waterC": 8.0
+  },
+  {
+   "utc": "2026-03-10T10:56Z",
+   "waterC": 7.8
+  },
+  {
+   "utc": "2026-03-10T11:56Z",
+   "waterC": 7.7
+  },
+  {
+   "utc": "2026-03-10T12:56Z",
+   "waterC": 7.6
+  },
+  {
+   "utc": "2026-03-10T13:56Z",
+   "waterC": 7.9
+  },
+  {
+   "utc": "2026-03-10T14:56Z",
+   "waterC": 8.3
+  },
+  {
+   "utc": "2026-03-10T15:56Z",
+   "waterC": 8.7
+  },
+  {
+   "utc": "2026-03-10T16:56Z",
+   "waterC": 9.5
+  },
+  {
+   "utc": "2026-03-10T17:56Z",
+   "waterC": 10.0
+  },
+  {
+   "utc": "2026-03-10T18:56Z",
+   "waterC": 10.0
+  },
+  {
+   "utc": "2026-03-10T19:56Z",
+   "waterC": 10.0
+  },
+  {
+   "utc": "2026-03-10T20:56Z",
+   "waterC": 10.0
+  },
+  {
+   "utc": "2026-03-10T21:56Z",
+   "waterC": 9.9
+  },
+  {
+   "utc": "2026-03-10T22:56Z",
+   "waterC": 10.0
+  },
+  {
+   "utc": "2026-03-10T23:56Z",
+   "waterC": 9.2
+  }
+ ]
+}

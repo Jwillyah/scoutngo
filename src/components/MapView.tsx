@@ -744,6 +744,8 @@ interface MapViewProps {
   onFlightAt?: (at: LatLon) => void
   /* The move's path: 'line', 'hidden' (amber: out of the pilot's sight) and 'vertex' features. */
   flight?: GeoJSON.FeatureCollection | null
+  /* A guide drawn on the ground: a rainbow's bow opposite the sun (src/core/specialLight.ts), labelled. */
+  guide?: GeoJSON.FeatureCollection | null
   /* The waterline over the scanned patch, as an image (src/lib/waterline/useWaterline.ts). */
   waterline?: { url: string; coordinates: [[number, number], [number, number], [number, number], [number, number]] } | null
   /* What the map is showing, in full, at the top of the "i" (MapCredits.tsx): the shadow legend's details. */
@@ -1203,6 +1205,7 @@ export function MapView({
   onMeasureAt,
   onFlightAt,
   flight = null,
+  guide = null,
   waterline = null,
   infoNotes = [],
   lightmap = null,
@@ -1873,6 +1876,11 @@ export function MapView({
         filter: ['==', ['get', 'kind'], 'vertex'],
         paint: { 'circle-radius': 5, 'circle-color': readToken('--white', '#ffffff', container.current), 'circle-stroke-color': readToken('--mark-edge', '#0a0b09', container.current), 'circle-stroke-width': 2 },
       })
+
+      /* A guide on the ground (a rainbow's bow): white, dashed, over a dark edge. Never red. */
+      instance.addSource('guide', { type: 'geojson', data: emptyCollection() })
+      instance.addLayer({ id: 'guide-edge', type: 'line', source: 'guide', paint: { 'line-color': readToken('--mark-edge', '#0a0b09', container.current), 'line-width': 5 } })
+      instance.addLayer({ id: 'guide-line', type: 'line', source: 'guide', paint: { 'line-color': readToken('--white', '#ffffff', container.current), 'line-width': 2.5, 'line-dasharray': [2, 1.5] } })
 
       /* The two-pin measure: a plain white line with a dark edge, readable on imagery. */
       instance.addLayer({
@@ -2794,6 +2802,13 @@ export function MapView({
       m.addLayer({ id: 'lightmap', type: 'raster', source: 'lightmap', paint: { 'raster-opacity': 0.85, 'raster-resampling': 'nearest' } }, above)
     }
   }, [lightmap, ready])
+
+  /* The guide on the ground. */
+  useEffect(() => {
+    if (map.current === null || !ready) return
+    const source = map.current.getSource('guide') as maplibregl.GeoJSONSource | undefined
+    source?.setData(guide ?? emptyCollection())
+  }, [guide, ready])
 
   /* Preflight's path (PlanMode builds the features). */
   useEffect(() => {

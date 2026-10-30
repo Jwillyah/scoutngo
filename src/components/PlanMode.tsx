@@ -58,6 +58,10 @@ import { FieldPackControl, type PackBuildState } from './FieldPackControl.tsx'
 import { OfflineAreas } from './OfflineAreas.tsx'
 import { VenuePackCard } from './VenuePackCard.tsx'
 import { offlineLine, onPacksChanged, packFor } from '../lib/venuePack.ts'
+import { bowOnMap } from '../lib/specialLightData.ts'
+import { useSpecialNow } from '../lib/useSpecialNow.ts'
+import { SPECIAL_NAME } from '../core/specialLight.ts'
+import { getPosition as sunPositionAt } from 'suncalc'
 import type { VenueCacheState } from '../lib/useVenueCache.ts'
 import type { Box } from '../lib/tileRange.ts'
 import type { ReadFile } from '../lib/scoutFile.ts'
@@ -1231,6 +1235,11 @@ export function PlanMode({
   const [packTick, setPackTick] = useState(0)
   useEffect(() => onPacksChanged(() => setPackTick((n) => n + 1)), [])
   const offlineStatus = online ? null : offlineLine(packTick >= 0 ? packFor(venue) : null)
+  /* Special light on now (src/lib/useSpecialNow.ts): the status line when there is a signal, a tap to the list. */
+  const specialNow = useSpecialNow(online ? venue : null, scrubbedAt)
+  const specialStatus = specialNow === null ? null : `${SPECIAL_NAME[specialNow.kind]} ${specialNow.word} now · ${specialNow.agree} of ${specialNow.of} models`
+  /* A rainbow's bow, drawn on the map from Sky › Special. */
+  const [bow, setBow] = useState<GeoJSON.FeatureCollection | null>(null)
   const home = useCallback(() => setCard(HOME), [])
   /* The Tide sheet's month, wind, sea and beach facing: asked only while it is open. */
   const [surfSetting] = useSurfSetting()
@@ -2029,6 +2038,13 @@ export function PlanMode({
                 onPlanMoonrise={() => openCard('moonrise')}
                 onOpenNow={onOpenNow}
                 placeName={venueNameLine}
+                onShowBow={(s) => {
+                  if (s === null || venue === null) setBow(null)
+                  else {
+                    const p = sunPositionAt(new Date((s.from.getTime() + s.to.getTime()) / 2), venue.lat, venue.lon)
+                    setBow(bowOnMap(venue, { azimuth: p.azimuth, altitude: p.altitude }))
+                  }
+                }}
                 events={
                   <SkyPanel
                     venue={venue}
@@ -2206,6 +2222,7 @@ export function PlanMode({
         onMeasureAt={onMeasureAt}
         onFlightAt={pf.addPoint}
         flight={card.kind === 'preflight' ? pf.features : null}
+        guide={bow}
         waterline={waterline !== null && waterline !== 'no-offset' ? { url: waterline.url, coordinates: waterline.coordinates } : null}
         lightmap={lightImage === null ? null : { url: lightImage.url, coordinates: lightImage.coordinates }}
         onHorizon={setHorizonProfile}
@@ -2542,7 +2559,7 @@ export function PlanMode({
         online={online || offlineStatus !== null}
       />
 
-      <ChipRow chips={chips} active={page === 'tides' ? 'tide' : card.kind} onOpen={(kind) => (kind === 'tide' ? setPage('tides') : openCard(kind))} measureRef={measureChips} status={offlineStatus} />
+      <ChipRow chips={chips} active={page === 'tides' ? 'tide' : card.kind} onOpen={(kind) => (kind === 'tide' ? setPage('tides') : openCard(kind))} measureRef={measureChips} status={offlineStatus ?? specialStatus} onStatus={offlineStatus === null && specialStatus !== null ? () => { setSkyTab('special'); openCard('sky') } : undefined} />
 
       {sheet === 'full' ? null : (
       <MapRail
