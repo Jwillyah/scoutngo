@@ -101,6 +101,8 @@ export interface ClayScene {
   project(at: LatLon, height?: number): { x: number; y: number } | null
   /** Nothing still in flight: what the audits wait on (the old globe.tilesLoaded). */
   loaded(): boolean
+  /** For checks: draw without the buildings, or without their roofs. */
+  setHidden(what: 'buildings' | 'roofs' | null): void
   /** For checks: the water drawn flat magenta (its geometry, nothing else changed). */
   setWaterMask(on: boolean): void
   /** For checks: over an n x n grid `halfM` either side of the venue, the points where water is drawn and some ground stands above it (a slab over the sea). */
@@ -190,6 +192,7 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
     hemi.groundColor.setRGB(c.ground[0] * 3, c.ground[1] * 3, c.ground[2] * 3, THREE.LinearSRGBColorSpace)
     hemi.intensity = c.ambientIntensity
     water.setSun(sunDir, c)
+    buildings.setSun(c)
     clouds.setSun(sunDir, c)
     look.setSun(sunDir, c)
     touch()
@@ -760,6 +763,13 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
     loaded: () => loaded(),
     frameTimes: () => [...times],
     setWaterMask: (on) => water.setMask(on),
+    setHidden: (what) => {
+      buildings.group.visible = what !== 'buildings'
+      buildings.group.traverse((o) => {
+        if (o.name === 'buildings roofs') o.visible = what !== 'roofs'
+      })
+      touch()
+    },
     slabPoints: (n, halfM) => {
       let wet = 0
       let slab = 0
