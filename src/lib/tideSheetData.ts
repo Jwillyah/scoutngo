@@ -135,7 +135,8 @@ export async function fetchSkyHours(at: LatLon) {
   return liveOrSaved(`sky-hours|${at.lat.toFixed(3)},${at.lon.toFixed(3)}`, `${WIND_URL}?${params}`, (p) => parseHourly(p, SKY_NAMES))
 }
 
-export const MARINE_NAMES = ['wave_height', 'wave_direction', 'wave_period', 'swell_wave_height', 'swell_wave_direction', 'swell_wave_period', 'wind_wave_height', 'wind_wave_period', 'wind_wave_direction', 'sea_surface_temperature'] as const
+/* Secondary and tertiary swell for the Surf page's three trains (30 Oct); Open-Meteo Marine answered all six on 30 Oct. */
+export const MARINE_NAMES = ['wave_height', 'wave_direction', 'wave_period', 'swell_wave_height', 'swell_wave_direction', 'swell_wave_period', 'secondary_swell_wave_height', 'secondary_swell_wave_period', 'secondary_swell_wave_direction', 'tertiary_swell_wave_height', 'tertiary_swell_wave_period', 'tertiary_swell_wave_direction', 'wind_wave_height', 'wind_wave_period', 'wind_wave_direction', 'sea_surface_temperature'] as const
 
 /** The sea for the next week. Inland, Open-Meteo answers with nothing in the series: null. */
 export async function fetchMarine(at: LatLon) {

@@ -1,4 +1,5 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { COAST_CAMS } from '../src/data/coastCams.ts'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { HOSTS } from '../src/lib/hosts.ts'
@@ -32,6 +33,8 @@ const LINK_ONLY: Readonly<Record<string, string>> = {
   'services6.arcgis.com': 'where baked airspace data came from, in a comment',
   'www.ndbc.noaa.gov': 'NOAA’s buoy pages, linked; the app reads buoys through /api/buoy',
   'example.com': 'the placeholder contact address',
+  /* The Surf page's cams (src/data/coastCams.ts, 30 Oct): each a page opened by you, never fetched. */
+  ...Object.fromEntries(COAST_CAMS.map((c) => [new URL(c.url).host, 'a surf cam page, opened by you'])),
 }
 
 function files(dir: string): string[] {

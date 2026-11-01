@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
-import { CAMS, camKind } from '../data/cams.ts'
 import { bearingBetween, distanceMeters, type LatLon } from '../core/geo.ts'
 import { localDate } from '../core/moonTimes.ts'
 import { getSunPosition } from '../core/sun.ts'
 import { surfShape, type SurfShape } from '../core/surf.ts'
 import { bestWindow, droneOverLineup, faceLight, hourQuality, lensDistance, LINEUP_FT, ratingWord, sizeWords, standToward, type FaceLight, type ShootHour } from '../core/surfShoot.ts'
-import { formatClock, formatHour, zonedTimeToUtc } from '../core/timezone.ts'
+import { formatClock, formatShortHour, zonedTimeToUtc } from '../core/timezone.ts'
+import { buoyWords, CAM_MI, cleanestRun, namedTrains, nearestWithin } from '../core/surfWords.ts'
+import { COAST_CAMS } from '../data/coastCams.ts'
 import { windToBeach } from '../core/coastFacing.ts'
 import { windAtHeight, type LevelWind } from '../core/windProfile.ts'
 import { surfAt } from '../lib/surfDay.ts'
@@ -46,6 +47,9 @@ interface SurfPageProps {
 
 const LIGHT_WORD: Record<FaceLight, string> = { front: 'front light', side: 'side light', back: 'backlit, the lip glows', dark: 'dark' }
 const SHAPE_WORD: Record<SurfShape, string> = { Clean: 'clean', Bumpy: 'bumpy', Messy: 'messy' }
+
+/* The light on the face as a mark of its own each (30 Oct: backlit looked like front-lit). */
+const LIGHT_MARK = { front: '●', side: '◐', back: '◎', dark: '' } as const
 
 export function SurfPage({ venue, at, timeZone, units, data, lenses, drone, onClose }: SurfPageProps) {
   const [view, setView] = useState<'simple' | 'advanced'>('simple')
@@ -117,21 +121,13 @@ export function SurfPage({ venue, at, timeZone, units, data, lenses, drone, onCl
     })
   }, [marine, wind, facing, date, timeZone])
 
-  const cams = CAMS.filter((c) => camKind(c) === 'coast')
-    .map((c) => ({ cam: c, m: distanceMeters(venue, c.at), bearing: bearingBetween(venue, c.at) }))
-    .sort((a, b) => a.m - b.m)
-    .slice(0, 3)
+  /* The three nearest public cams within 30 mi (src/data/coastCams.ts): Wrightsville showed Ocracoke, 120 mi off (30 Oct). */
+  const cams = nearestWithin(COAST_CAMS, (c) => distanceMeters(venue, c.at)).map(({ cam, m }) => ({ cam, m, bearing: bearingBetween(venue, cam.at) }))
 
-  /* The cleanest stretch of the day's wind, for Advanced. */
+  /* The cleanest stretch: offshore hours first, else cross-shore, never onshore (src/core/surfWords.ts). */
   const cleanest = (() => {
-    let run: typeof hours = []
-    let top: typeof hours = []
-    for (const h of hours) {
-      if (h.shape === 'Clean') run.push(h)
-      else run = []
-      if (run.length > top.length) top = [...run]
-    }
-    return top.length === 0 ? null : `${clock(top[0].at)}–${clock(new Date(top[top.length - 1].at.getTime() + 3_600_000))}`
+    const run = cleanestRun(hours.map((h) => ({ at: h.at, cls: h.windFrom === null || facing === null ? null : windToBeach(h.windFrom, facing) })))
+    return run === null ? null : `${clock(run.from)}–${clock(run.to)}, ${run.cls === 'offshore' ? 'offshore' : 'cross-shore'}`
   })()
 
   const lineupWind = drone === null ? null : windAtHeight(drone.levels, ((LINEUP_FT[0] + LINEUP_FT[1]) / 2) * 0.3048)
@@ -139,11 +135,23 @@ export function SurfPage({ venue, at, timeZone, units, data, lenses, drone, onCl
 
   const swellH = marine === null || now === null ? null : hourlyAt(marine, 'swell_wave_height', now.at)
   const swellT = marine === null || now === null ? null : hourlyAt(marine, 'swell_wave_period', now.at)
-  const swellD = marine === null || now === null ? null : hourlyAt(marine, 'swell_wave_direction', now.at)
   const windH = marine === null || now === null ? null : hourlyAt(marine, 'wind_wave_height', now.at)
   const windT = marine === null || now === null ? null : hourlyAt(marine, 'wind_wave_period', now.at)
   const windD = marine === null || now === null ? null : hourlyAt(marine, 'wind_wave_direction', now.at)
   const water = marine === null || now === null ? null : hourlyAt(marine, 'sea_surface_temperature', now.at)
+  /* The buoy measures the whole sea, so it is set against the whole sea's height, not the swell's alone. */
+  const waveH = marine === null || now === null ? null : hourlyAt(marine, 'wave_height', now.at)
+  const train = (h: string, p: string, d: string) => {
+    if (marine === null || now === null) return null
+    const height = hourlyAt(marine, h, now.at)
+    const period = hourlyAt(marine, p, now.at)
+    return height === null || period === null ? null : { heightM: height, periodS: period, fromDeg: hourlyAt(marine, d, now.at) }
+  }
+  const trains = namedTrains([
+    train('swell_wave_height', 'swell_wave_period', 'swell_wave_direction'),
+    train('secondary_swell_wave_height', 'secondary_swell_wave_period', 'secondary_swell_wave_direction'),
+    train('tertiary_swell_wave_height', 'tertiary_swell_wave_period', 'tertiary_swell_wave_direction'),
+  ])
   /* Deep-water wave power, kW per metre of crest: 0.49 H² T (H in m, T in s). */
   const power = swellH === null || swellT === null ? null : 0.49 * swellH * swellH * swellT
 
@@ -154,25 +162,35 @@ export function SurfPage({ venue, at, timeZone, units, data, lenses, drone, onCl
       ) : view === 'simple' ? (
         <>
           <section className="spage__src" aria-label="Forecast">
-            <p className="spage__lead">{now === null ? 'No forecast for this hour' : `${ratingWord(now.faceFt, now.shape)} · ${sizeWords(now.faceFt)}`}</p>
-            <p className="spage__line">{best === null ? 'Best to shoot: no clean, low-sun hour today.' : `Best to shoot: ${clock(best.from)}–${clock(best.to)} · ${LIGHT_WORD[best.light].split(',')[0]} · ${SHAPE_WORD[best.shape]} · ${sizeWords(best.faceFt)}`}</p>
+            {/* ONE SIZE SOURCE, ONE SET OF WORDS (30 Oct): both lines read the same hours through sizeWords, and each says which hours it is about. */}
+            <p className="spage__lead">{now === null ? 'No forecast for this hour' : `${ratingWord(now.faceFt, now.shape)} · ${sizeWords(now.faceFt)} at ${clock(now.at)}`}</p>
+            <p className="spage__line">{best === null ? 'Best to shoot: no clean, low-sun hour today.' : `Best to shoot: ${clock(best.from)}–${clock(best.to)} · ${LIGHT_WORD[best.light].split(',')[0]} · ${SHAPE_WORD[best.shape]} · ${sizeWords(best.faceFt)} at the biggest`}</p>
             <p className="spage__head">{dayWord}, hour by hour</p>
             <div className="spage__hours" role="img" aria-label="The day, hour by hour: green good, amber ok, grey poor; the light on the faces under each">
               {hours.map((h) => (
                 <span key={h.at.getTime()} className={`spage__hour spage__hour--${h.quality}${now !== null && h.at.getTime() === now.at.getTime() ? ' spage__hour--now' : ''}`}>
-                  <span className="spage__hourlabel num">{formatHour(h.at, timeZone)}</span>
-                  <i className={`spage__light spage__light--${h.light}`} title={LIGHT_WORD[h.light]} />
+                  <span className="spage__hourlabel num">{formatShortHour(h.at, timeZone)}</span>
+                  <i className={`spage__light spage__light--${h.light}`} title={LIGHT_WORD[h.light]} aria-hidden="true">
+                    {LIGHT_MARK[h.light]}
+                  </i>
                 </span>
               ))}
             </div>
             <p className="spage__key">
-              <i className="spage__hour--good spage__sw" /> good <i className="spage__hour--ok spage__sw" /> ok <i className="spage__hour--poor spage__sw" /> poor · light on the face: <i className="spage__light spage__light--front" /> front <i className="spage__light spage__light--side" /> side <i className="spage__light spage__light--back" /> backlit
+              <i className="spage__hour--good spage__sw" /> good <i className="spage__hour--ok spage__sw" /> ok <i className="spage__hour--poor spage__sw" /> poor · light on the face: <i className="spage__light spage__light--front">{LIGHT_MARK.front}</i> front <i className="spage__light spage__light--side">{LIGHT_MARK.side}</i> side <i className="spage__light spage__light--back">{LIGHT_MARK.back}</i> backlit
             </p>
             {best === null ? null : (
-              <p className="spage__line">
-                Where to stand: {toward === null ? 'either side of the peak, the sun is straight off the beach' : `on the ${compass(toward)} side of the peak, the sun over your shoulder`}.{' '}
-                {lenses.length === 0 ? '' : lenses.map((l) => { const d = lensDistance(l.focalMm, l.sensorShortMm); return `${l.name} ${formatRange(d.metres, units.distance)} (${d.from})` }).join(' · ')}
-              </p>
+              <>
+                <p className="spage__line">Where to stand: {toward === null ? 'either side of the peak, the sun straight off the beach' : `the ${compass(toward)} side of the peak, sun over your shoulder`}.</p>
+                {lenses.length === 0 ? null : (
+                  <ul className="spage__lenses num">
+                    {lenses.map((l) => {
+                      const d = lensDistance(l.focalMm, l.sensorShortMm)
+                      return <li key={l.name}>{l.name} {formatRange(d.metres, units.distance)} ({d.from})</li>
+                    })}
+                  </ul>
+                )}
+              </>
             )}
             {drone === null || lineup === null ? null : (
               <p className="spage__line">
@@ -192,33 +210,40 @@ export function SurfPage({ venue, at, timeZone, units, data, lenses, drone, onCl
             </div>
             <p className="spage__small">{SURF_LABEL} Open-Meteo Marine, seven days.</p>
           </section>
-          {cams.length === 0 ? null : (
-            <section className="spage__src" aria-label="Cams">
+          <section className="spage__src" aria-label="Cams">
+            {cams.length === 0 ? (
+              <p className="spage__small">No public cams within {CAM_MI} mi.</p>
+            ) : (
               <div className="spage__cams">
                 {cams.map(({ cam, m, bearing }) => (
                   <a key={cam.id} className="tides__cam" href={cam.url} target="_blank" rel="noreferrer noopener">
                     <span className="tides__camname">{cam.name}</span>
                     <span className="tides__small num">
                       {formatRange(m, units.distance)} {compass(bearing)}
+                      {cam.facing === null ? '' : ` · looks ${compass(cam.facing)}`}
                       {cam.access === 'paid' ? ' · paid' : ''}
                     </span>
                   </a>
                 ))}
               </div>
-            </section>
-          )}
+            )}
+          </section>
         </>
       ) : (
         <>
           <section className="spage__src" aria-label="Forecast, in detail">
             <p className="spage__head">The swell, now</p>
+            {trains.length === 0 ? <p className="spage__line">No swell in the forecast for this hour.</p> : null}
+            {trains.map((t) => (
+              <p key={t.rank} className="spage__line">
+                {t.rank}
+                {t.groundswell ? ' groundswell' : ''}: <span className="num">{metresToFeet(t.heightM).toFixed(1)} ft · {Math.round(t.periodS)} s · {t.fromDeg === null ? '—' : `from ${compass(t.fromDeg)}`}</span>
+              </p>
+            ))}
             <p className="spage__line">
-              Groundswell: <span className="num">{swellH === null ? '—' : `${metresToFeet(swellH).toFixed(1)} ft`} · {swellT === null ? '—' : `${Math.round(swellT)} s`} · {swellD === null ? '—' : `from ${compass(swellD)}`}</span>
+              Wind waves: <span className="num">{windH === null ? '—' : `${metresToFeet(windH).toFixed(1)} ft`} · {windT === null ? '—' : `${Math.round(windT)} s`} · {windD === null ? '—' : `from ${compass(windD)}`}</span>
             </p>
-            <p className="spage__line">
-              Windswell: <span className="num">{windH === null ? '—' : `${metresToFeet(windH).toFixed(1)} ft`} · {windT === null ? '—' : `${Math.round(windT)} s`} · {windD === null ? '—' : `from ${compass(windD)}`}</span>
-            </p>
-            <p className="spage__head">The wind by the hour{cleanest === null ? '' : `: cleanest ${cleanest}`}</p>
+            <p className="spage__head">The wind by the hour{cleanest === null ? (facing === null ? '' : ': no offshore or cross-shore hour today') : `: cleanest ${cleanest}`}</p>
             <div className="spage__winds" role="img" aria-label="Wind by the hour, its height the speed: green offshore, amber cross, grey onshore">
               {hours.map((h) => (
                 <span
@@ -243,7 +268,7 @@ export function SurfPage({ venue, at, timeZone, units, data, lenses, drone, onCl
               {data.buoy === null
                 ? 'Asking the nearest buoy…'
                 : data.buoy.status === 'ok'
-                  ? `Buoy ${data.buoy.buoy.id} at ${clock(data.buoy.at)}: ${metresToFeet(data.buoy.waveM).toFixed(1)} ft${data.buoy.periodS === null ? '' : `, ${Math.round(data.buoy.periodS)} s`}${data.buoy.fromDeg === null ? '' : ` from ${compass(data.buoy.fromDeg)}`}. Forecast for the hour: ${swellH === null ? '—' : `${metresToFeet(swellH).toFixed(1)} ft`}.`
+                  ? `${buoyWords(metresToFeet(data.buoy.waveM), waveH === null ? null : metresToFeet(waveH)) ?? 'No forecast for the hour to set it against'}. Buoy ${data.buoy.buoy.id} at ${clock(data.buoy.at)}${data.buoy.periodS === null ? '' : `, ${Math.round(data.buoy.periodS)} s`}${data.buoy.fromDeg === null ? '' : ` from ${compass(data.buoy.fromDeg)}`}.`
                   : data.buoy.reason}
             </p>
             <p className="spage__small">NDBC, the buoy's latest reading.</p>

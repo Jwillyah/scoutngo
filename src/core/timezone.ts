@@ -173,6 +173,14 @@ export function formatHour(at: Date, timeZone: string, hours: ClockHours = clock
   return `${wall.hour % 12 === 0 ? 12 : wall.hour % 12} ${wall.hour < 12 ? 'AM' : 'PM'}`
 }
 
+/** An hour on a narrow strip: "10a", "2p", or "14" (the Surf page's hours wrapped "10 / AM", 30 Oct). */
+export function formatShortHour(at: Date, timeZone: string, hours: ClockHours = clockHours): string {
+  const wall = wallClock(at, timeZone)
+  if (wall === null) return '--'
+  if (hours === 24) return String(wall.hour).padStart(2, '0')
+  return `${wall.hour % 12 === 0 ? 12 : wall.hour % 12}${wall.hour < 12 ? 'a' : 'p'}`
+}
+
 /** A time typed as "17:00" (an <input type="time"> value), written the shooter's way. Null when it is not one. */
 export function formatWallTime(typed: string, hours: ClockHours = clockHours): string | null {
   const match = /^(\d{1,2}):(\d{2})$/.exec(typed.trim())

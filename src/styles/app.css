@@ -13388,9 +13388,31 @@
 /* The light on the face: a small sun mark, filled front, half side, ringed backlit. */
 .spage__light {
   display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  font-style: normal;
+  font-size: 9px;
+  line-height: 1;
+  color: var(--black);
+}
+
+/* The marks are glyphs since 30 Oct, one per light, backlit its own: none of the old dots' fills. */
+.spage__hours .spage__light,
+.spage__key .spage__light {
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  background: none !important;
+  box-shadow: none !important;
+}
+
+.spage__key .spage__light {
+  color: var(--color-text-muted);
+}
+
+.spage__lenses {
+  margin: 0;
+  padding-left: var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
 }
 
 .spage__light--front {
