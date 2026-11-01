@@ -153,7 +153,9 @@ try {
     const on = await shot('coliseum')
     /* The bare photo: the building layers AND the shadows off, so a shadow drawn over the roof counts too. */
     await ev(`(() => { const m = window.__probe.map; for (const id of [...${JSON.stringify(LAYERS)}, 'shadow-fill']) if (m.getLayer(id)) m.setLayoutProperty(id, 'visibility', 'none'); m.triggerRepaint() })()`)
-    await wait(800)
+    /* Drawn, not timed (Batch D): until the map says it has finished rendering, at most 6 s. Under load 800 ms read the frame before the box was in it. */
+    await ev(`new Promise((r) => { const m = window.__probe.map; const t = setTimeout(r, 6000); m.once('idle', () => { clearTimeout(t); r() }); m.triggerRepaint() })`)
+    await wait(300)
     const off = await shot('bare')
     const share = await ev(kept(on, off, inside.points))
     looked += 1
@@ -163,7 +165,9 @@ try {
 
     /* It can fail: the old state put back, the 0.8 grey box drawn flat, as on 29 Oct. */
     await ev(`(() => { const m = window.__probe.map; m.setLayoutProperty('osm-buildings-extrusion', 'visibility', 'visible'); m.setLayoutProperty('shadow-fill', 'visibility', 'visible'); m.triggerRepaint() })()`)
-    await wait(800)
+    /* Drawn, not timed (Batch D): until the map says it has finished rendering, at most 6 s. Under load 800 ms read the frame before the box was in it. */
+    await ev(`new Promise((r) => { const m = window.__probe.map; const t = setTimeout(r, 6000); m.once('idle', () => { clearTimeout(t); r() }); m.triggerRepaint() })`)
+    await wait(300)
     const slab = await ev(kept(await shot('oldroof'), off, inside.points))
     console.log(`  with the old box drawn flat: ${(slab * 100).toFixed(0)}% kept`)
     if (!(slab < KEPT)) fail(`${label}: the old box still keeps ${(slab * 100).toFixed(0)}% of the detail, so the check cannot tell a slab from a photo`)
