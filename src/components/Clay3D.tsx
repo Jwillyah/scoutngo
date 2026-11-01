@@ -49,6 +49,8 @@ interface Clay3DProps {
   venueLabel: string
   at: Date
   timeZone: string
+  /** A sheet is up over the 3D view: the status line and the arcs' hour pills step aside (Batch E). */
+  sheetOpen?: boolean
   pins: readonly Pin[]
   stand: StandRequest | null
   onLeaveStand: () => void
@@ -72,7 +74,7 @@ interface Clay3DProps {
 
 export const CLAY_NOTE = 'Clay model from map data; real buildings may differ'
 
-export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveStand, flight = null, onFlightTime, onRecorded, onRenderProgress, fly = null, onLanded, sea = null, onCompare }: Clay3DProps) {
+export function Clay3D({ venue, venueLabel, at, timeZone, sheetOpen = false, pins, stand, onLeaveStand, flight = null, onFlightTime, onRecorded, onRenderProgress, fly = null, onLanded, sea = null, onCompare }: Clay3DProps) {
   const host = useRef<HTMLDivElement>(null)
   const scene = useRef<ClayScene | null>(null)
   /* How many times the scene has been built: every build (a scan arriving rebuilds it) re-runs the effects that feed it. 0 is not built yet. */
@@ -241,8 +243,9 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
   const nearCeiling = hud?.nearCeiling === true
   /* While flying the app's chrome steps aside: the dock, the sheet, the time bar (app.css :root.is-flying). */
   useEffect(() => {
-    if (ready) scene.current?.setSkyShown(!flying)
-  }, [ready, flying])
+    /* And while a sheet is open (Batch E): the arcs' hour pills ran into the chips and each other over the Sky and Day sheets. */
+    if (ready) scene.current?.setSkyShown(!flying && !sheetOpen)
+  }, [ready, flying, sheetOpen])
   useEffect(() => {
     if (!flying) return
     document.documentElement.classList.add('is-flying')
@@ -342,6 +345,21 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
             </button>
           )}
           <ScanPanel flow={scanFlow} keptYear={scanYear} />
+          {/* The trees and the flat ground, off the one-line status (Batch E). */}
+          <p className="clay__infoline">
+            {scanTrees !== null
+              ? `${scanTrees.length} trees from the scan.`
+              : place.trees?.status === 'drawn'
+                ? `${place.trees.trees.length} mapped trees.`
+                : place.trees?.status === 'sparse'
+                  ? `${place.trees.count} trees mapped, too few to draw.`
+                  : place.trees?.status === 'unavailable'
+                    ? "The trees didn't load."
+                    : ''}
+            {flat > 0 ? ' Some distant ground is drawn flat.' : ''}
+          </p>
+          {/* The data's credits, here rather than the engine's link over the map (Batch E). */}
+          <p className="clay__credits">Data: {(scene.current?.credits() ?? []).join(' · ') || 'Esri, USGS and AWS Terrarium, OpenStreetMap contributors via OpenFreeMap'}</p>
         </div>
       )}
       <div className="clay__legend">
@@ -359,20 +377,17 @@ export function Clay3D({ venue, venueLabel, at, timeZone, pins, stand, onLeaveSt
             * clay disclaimer, the scan and its download are behind the i.
             */
           <div className="clay__row">
-            <p className="clay__line clay__line--one num">
-              {place.buildings === null ? '' : `${place.buildings.list.length} buildings`}
-              {unknown > 0 ? ` · ${unknown} height unknown` : ''}
-              {scanTrees !== null
-                ? ` · ${scanTrees.length} trees from the scan`
-                : place.trees?.status === 'drawn'
-                  ? ` · ${place.trees.trees.length} mapped trees`
-                  : place.trees?.status === 'sparse'
-                    ? ` · ${place.trees.count} trees mapped`
-                    : place.trees?.status === 'unavailable'
-                      ? " · trees didn't load"
-                      : ''}
-              {flat > 0 ? ' · some ground flat' : ''}
-            </p>
+            {/*
+              * ONE SHORT LINE (Batch E, 1 Nov: "282 buildings · 95 height
+              * unknown · trees di…" was cut off). The buildings and how many
+              * have no height; the trees and the flat ground are in the i.
+              */}
+            {sheetOpen ? null : (
+              <p className="clay__line clay__line--one">
+                {place.buildings === null ? '' : `${place.buildings.list.length} buildings`}
+                {unknown > 0 ? ` · ${unknown} no height` : ''}
+              </p>
+            )}
             <button type="button" className="clay__i" aria-expanded={infoOpen} aria-label="About this 3D model and its scan" onClick={() => setInfoOpen(!infoOpen)}>
               i
             </button>

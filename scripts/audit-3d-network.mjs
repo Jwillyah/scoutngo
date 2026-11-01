@@ -24,7 +24,7 @@
  * elevation tiles, and the globe must say it finished loading.
  */
 import { connect } from './cdp.mjs'
-import { goToStage, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mjs'
+import { goToStage, guardAudit, setSheet, startWatchdog, APP_ORIGIN } from './preflight.mjs'
 
 guardAudit('3d network')
 const watchdog = startWatchdog('3d network', 240_000)
@@ -102,6 +102,29 @@ try {
   if (!state?.ready) fail('the 3D model never came up, so nothing was looked at')
   else if (!(state.imagery > 0 && state.terrain > 0)) fail('the model drew no imagery or no elevation: nothing was looked at')
   else if (!state.loaded) fail('the globe never finished loading in 60 s')
+
+  /*
+   * THE OVERLAYS (Batch E, 1 Nov): no engine "Data attribution" over the map
+   * (the credits are in the i); the status a short line, "N buildings · M no
+   * height"; and with a sheet up, the line and the arcs' hour pills put away.
+   */
+  const over = JSON.parse(await ev(`JSON.stringify({
+    attribution: /Data attribution/.test(document.body.innerText),
+    line: document.querySelector('.clay__line--one')?.textContent ?? null,
+    sky: window.__skyShown ?? null,
+  })`))
+  console.log(`### the overlays: ${JSON.stringify(over)}`)
+  if (over.attribution) fail('"Data attribution" is on the 3D view; the credits belong in its i')
+  if (over.line !== null && !/^\d+ buildings( · \d+ no height)?$/.test(over.line)) fail(`the 3D status is not one short line: "${over.line}"`)
+  if (over.sky !== true) fail(`the sun and moon arcs are not shown with the sheet down (${over.sky})`)
+  await setSheet(ev, wait, 'half').catch(() => {})
+  await wait(800)
+  const up = JSON.parse(await ev(`JSON.stringify({ line: document.querySelector('.clay__line--one')?.textContent ?? null, sky: window.__skyShown ?? null })`))
+  console.log(`  with a sheet up: ${JSON.stringify(up)}`)
+  if (up.line !== null) fail('with a sheet up the 3D status line is still drawn over the map')
+  if (up.sky !== false) fail('with a sheet up the arcs and their hour pills are still drawn')
+  await setSheet(ev, wait, 'peek').catch(() => {})
+  await wait(600)
 
   /*
    * OFFLINE. The same place with no signal: the overview area saved on the

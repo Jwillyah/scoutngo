@@ -2526,6 +2526,7 @@ export function PlanMode({
           venueLabel={venueNameLine}
           at={scrubbedAt}
           timeZone={venueWindow.timeZone}
+          sheetOpen={sheet !== 'peek'}
           pins={threeDPins}
           stand={stand}
           onLeaveStand={() => setStand(null)}

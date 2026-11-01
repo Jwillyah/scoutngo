@@ -11288,9 +11288,19 @@
   display: none !important;
 }
 
+/*
+ * THE CREDITS ARE IN THE "i" (Batch E, 1 Nov): the engine's "Data
+ * attribution" link sat mid-left over the map. The same names are listed in
+ * the 3D view's "i" (Clay3D.tsx, from the scene's credits()).
+ */
 .clay__canvas .cesium-widget-credits {
-  font-size: 9px;
-  bottom: calc(var(--dock-height) + var(--sheet-live-height) + var(--tooldock-height) + 4px) !important;
+  display: none !important;
+}
+
+.clay__credits {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
 }
 
 .clay__frame {
@@ -12143,10 +12153,6 @@
 }
 
 /* The credits move into the fly screen's "i" while flying: nothing over the sticks. */
-:root.is-flying .clay__canvas .cesium-widget-credits {
-  display: none;
-}
-
 .fly__arc {
   fill: none;
   stroke-width: 4;
