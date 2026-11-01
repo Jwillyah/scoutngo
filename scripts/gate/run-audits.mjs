@@ -89,8 +89,9 @@ function run(audit) {
      * failed the gesture audit; one at a time passed every run).
      */
     const node = [process.execPath, '--import', join(ROOT, 'scripts/gate/nodeGuard.mjs'), join(ROOT, 'scripts', audit.script)]
-    const [cmd, ...args] = audit.alone ? node : ['nice', '-n', '15', ...node]
-    const cdp = audit.alone && process.env.SCOUTNGO_CDP_TIMED ? { SCOUTNGO_CDP: process.env.SCOUTNGO_CDP_TIMED } : {}
+    const high = audit.alone === true
+    const [cmd, ...args] = high ? node : ['nice', '-n', '15', ...node]
+    const cdp = high && process.env.SCOUTNGO_CDP_TIMED ? { SCOUTNGO_CDP: process.env.SCOUTNGO_CDP_TIMED } : {}
     const child = spawn(cmd, args, {
       cwd: ROOT,
       env: { ...process.env, ...cdp, SCOUTNGO_OUT: OUT },

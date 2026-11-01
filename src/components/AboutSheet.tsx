@@ -9,7 +9,7 @@ import { StorageProbe } from './StorageProbe.tsx'
  * ABOUT: WHY THIS EXISTS, HOW IT WORKS, YOURS.
  *
  * FROM THE MENU. The units and the clock moved out to Settings, beside it in
- * the same menu (SettingsSheet.tsx), so this is the story, the key and the
+ * the same menu (SettingsPage.tsx), so this is the story, the key and the
  * backup.
  *
  * THE SAME CONTENT AS /how, NOT A SECOND COPY. The three HOW IT WORKS rows

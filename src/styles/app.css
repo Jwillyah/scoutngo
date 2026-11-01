@@ -14334,6 +14334,99 @@
   letter-spacing: normal;
 }
 
+/* ------------------------------------------------ Settings, a page (30 Oct)
+ *
+ * Short sections, plain labels on the left, the current value on the right.
+ */
+.setpage .page__body {
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.set__sec {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.set__title {
+  margin: 0;
+  font-size: var(--text-label);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.set__list {
+  display: grid;
+  border-radius: var(--radius-panel);
+  background: var(--surface-raised);
+  overflow: hidden;
+}
+
+.set__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: var(--space-1) var(--space-3);
+  border: 0;
+  border-bottom: var(--line-hair) solid var(--color-line);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+}
+
+.set__row:last-child {
+  border-bottom: 0;
+}
+
+.set__row--pick {
+  flex-wrap: wrap;
+}
+
+.set__label {
+  display: grid;
+  min-width: 0;
+}
+
+.set__value {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--color-text-muted);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.set__note {
+  margin: 0;
+  padding: 0 var(--space-3) var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.set__label .set__note {
+  padding: 0;
+}
+
+.set__debug {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.set__log {
+  margin: 0;
+  padding-left: var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
 /* ------------------------------------------- Terrain light, a page (30 Oct) */
 .tlpage .page__body {
   display: grid;

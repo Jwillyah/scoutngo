@@ -82,7 +82,6 @@ import { MoonriseCard } from './MoonriseCard.tsx'
 import { readCeilingFeet } from '../lib/venue.ts'
 import { MAX_ALTITUDE_FEET } from '../core/air.ts'
 import { facilityCellAt } from '../lib/uasfm.ts'
-import { SettingsSheet } from './SettingsSheet.tsx'
 import { AboutSheet, type HowSection } from './AboutSheet.tsx'
 import { LayerTiles } from './LayerTiles.tsx'
 import { TILE_ART } from './tileArt.tsx'
@@ -150,6 +149,7 @@ import { useWeatherBusy, useWeatherEpoch } from '../lib/useWeatherStatus.ts'
 import type { Place } from '../lib/placeGroups.ts'
 import { PageGroup, type PageGroupValue } from '../lib/pageGroup.ts'
 import { TerrainLightPage } from './TerrainLightPage.tsx'
+import { SettingsPage } from './SettingsPage.tsx'
 import { PhaseRule } from './PhaseRule.tsx'
 import { shadowKeyLine, shadowKeyNotes } from '../lib/shadowKey.ts'
 
@@ -813,9 +813,9 @@ export function PlanMode({
     return { levels: windLevels, ratedMps: d.maxWindMps, ceilingFt: facilityCellAt(venue.lat, venue.lon)?.ceilingFeet ?? null, name: d.name.replace(/^DJI /, '') }
   }, [kitProfile, bag, venue, windLevels])
   /* A page over everything: Exposure, Tides or Surf. ?page=tides opens one, for the overflow audit. */
-  const [page, setPage] = useState<'exposure' | 'tides' | 'surf' | 'wind' | 'terrain' | null>(() => {
+  const [page, setPage] = useState<'exposure' | 'tides' | 'surf' | 'wind' | 'terrain' | 'settings' | null>(() => {
     const p = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('page')
-    return p === 'exposure' || p === 'tides' || p === 'surf' || p === 'wind' || p === 'terrain' ? p : null
+    return p === 'exposure' || p === 'tides' || p === 'surf' || p === 'wind' || p === 'terrain' || p === 'settings' ? p : null
   })
   /* Sky › Calendar, a page of its own (CalendarPage.tsx). ?calendar=1 opens it, for the overflow audit. */
   const [calendarOpen, setCalendarOpen] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('calendar') === '1')
@@ -1359,7 +1359,8 @@ export function PlanMode({
     if (cardRequest.tick === 0) return
     const timer = setTimeout(() => {
       /* Exposure, Tides and Surf are pages of their own (29 Oct); Preflight is its card. */
-      if (cardRequest.kind === 'exposure' || cardRequest.kind === 'tides' || cardRequest.kind === 'surf' || cardRequest.kind === 'wind' || cardRequest.kind === 'terrain') {
+      /* Settings is a page of its own since 30 Oct (SettingsPage.tsx). */
+      if (cardRequest.kind === 'exposure' || cardRequest.kind === 'tides' || cardRequest.kind === 'surf' || cardRequest.kind === 'wind' || cardRequest.kind === 'terrain' || cardRequest.kind === 'settings') {
         setPage(cardRequest.kind)
         return
       } else if (cardRequest.kind === 'preflight') {
@@ -2235,12 +2236,6 @@ export function PlanMode({
             )}
           </Card>
         )
-      case 'settings':
-        return (
-          <Card title="Settings" onClose={home}>
-            <SettingsSheet units={units} onUnits={onUnits} showNumbers={showNumbers} onShowNumbers={onShowNumbers} onHow={() => onHow('computed')} newBuild={newBuild} />
-          </Card>
-        )
       case 'about':
         return (
           <Card title="About" onClose={home}>
@@ -2426,6 +2421,30 @@ export function PlanMode({
             setPage(null)
             openCard('wind')
           }}
+        />
+      ) : null}
+      {page === 'settings' ? (
+        <SettingsPage
+          units={units}
+          onUnits={onUnits}
+          showNumbers={showNumbers}
+          onShowNumbers={onShowNumbers}
+          venue={venue === null ? null : { lat: venue.lat, lon: venue.lon, name: venueNameLine }}
+          place={place}
+          drone={kitProfile.drones.find((x) => bag.droneIds.includes(x.id)) ?? null}
+          showTerrain={showTerrain}
+          onShowTerrain={onShowTerrain}
+          showLabels={showLabels}
+          onShowLabels={onShowLabels}
+          newBuild={newBuild}
+          onHow={() => onHow('computed')}
+          onAbout={() => {
+            setPage(null)
+            openCard('about')
+          }}
+          onKit={onEditKit}
+          onExport={onExport}
+          onClose={() => setPage(null)}
         />
       ) : null}
       {page === 'terrain' && venue !== null && scrubbedAt !== null && venueWindow !== null ? (

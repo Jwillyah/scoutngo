@@ -12,6 +12,7 @@ import {
   windUnitLabel,
   type DistanceUnit,
   type WindUnit,
+  formatTemperature,
 } from './units.ts'
 
 /*
@@ -139,8 +140,16 @@ describe('the defaults and the offered choices', () => {
    * KNOTS AND FEET, because the two things this app is for -- flying a drone
    * and reading a marine forecast -- are both quoted that way.
    */
-  it('defaults to knots, feet and a 12 hour clock', () => {
-    expect(DEFAULT_UNITS).toEqual({ wind: 'kt', distance: 'ft', clock: 12 })
+  it('defaults to knots, feet, a 12 hour clock and °F', () => {
+    expect(DEFAULT_UNITS).toEqual({ wind: 'kt', distance: 'ft', clock: 12, temperature: 'F' })
+  })
+
+  /* Settings › Units, 30 Oct: km/h, and °F or °C. 10 m/s is exactly 36 km/h; 16 °C is 61 °F. */
+  it('converts km/h and both temperatures', () => {
+    expect(formatWind(10, 'kmh')).toBe('36 km/h')
+    expect(formatTemperature(16, 'F')).toBe('61°F')
+    expect(formatTemperature(16, 'C')).toBe('16°C')
+    expect(formatTemperature(null, 'C')).toBe('—')
   })
 
   /*
@@ -151,7 +160,7 @@ describe('the defaults and the offered choices', () => {
    */
   it('converts every unit the About sheet offers', () => {
     const windIds: WindUnit[] = WIND_UNITS.map((u) => u.id)
-    expect(new Set(windIds)).toEqual(new Set<WindUnit>(['kt', 'mph', 'ms']))
+    expect(new Set(windIds)).toEqual(new Set<WindUnit>(['kt', 'mph', 'kmh', 'ms']))
     for (const unit of WIND_UNITS) {
       const formatted = formatWind(10, unit.id)
       expect(formatted).toContain(unit.label)
@@ -166,8 +175,8 @@ describe('the defaults and the offered choices', () => {
   })
 
   /* Each unit must give a DIFFERENT number, or one of them is not wired. */
-  it('gives three different answers for three wind units', () => {
+  it('gives four different answers for four wind units', () => {
     const answers = WIND_UNITS.map((u) => formatWind(10, u.id))
-    expect(new Set(answers).size).toBe(3)
+    expect(new Set(answers).size).toBe(4)
   })
 })

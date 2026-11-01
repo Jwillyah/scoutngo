@@ -50,10 +50,10 @@ describe('the build, with its day', () => {
     expect(buildLabelWithDate('')).toBe(buildLabel())
   })
 
-  it('is shown in About, beside Debug touch in Settings, and in the debug log', () => {
+  it('is shown in About, in Settings › About as the version, and in the debug log', () => {
     expect(readFileSync('src/components/AboutSheet.tsx', 'utf8')).toContain('{buildLabelWithDate()}')
-    const settings = readFileSync('src/components/SettingsSheet.tsx', 'utf8')
-    expect(settings.indexOf('Build {buildLabelWithDate()}')).toBeGreaterThan(settings.indexOf('Debug touch</span>'))
+    const settings = readFileSync('src/components/SettingsPage.tsx', 'utf8')
+    expect(settings).toContain('<Row label="Version" value={buildLabelWithDate()} />')
     expect(readFileSync('src/components/TouchDebug.tsx', 'utf8')).toMatch(/`build \$\{buildLabelWithDate\(\)\}`, \.\.\.lines/)
   })
 })

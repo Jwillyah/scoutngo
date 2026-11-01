@@ -10,9 +10,9 @@ import { windToBeach } from '../core/coastFacing.ts'
 import { windAtHeight, type LevelWind } from '../core/windProfile.ts'
 import { surfAt } from '../lib/surfDay.ts'
 import { hourlyAt } from '../lib/tideSheetData.ts'
-import { celsiusToF, compass, metresToFeet } from '../lib/tideWords.ts'
+import { compass, metresToFeet } from '../lib/tideWords.ts'
 import type { TideSheetData } from '../lib/useTideSheet.ts'
-import { formatRange, formatWind, type Units } from '../lib/units.ts'
+import { formatRange, formatWind, type Units, formatTemperature } from '../lib/units.ts'
 import { Page } from './Page.tsx'
 import { SURF_LABEL } from './SurfRow.tsx'
 
@@ -232,7 +232,7 @@ export function SurfPage({ venue, at, timeZone, units, data, lenses, drone, onCl
               <i className="spage__wind--offshore spage__sw" /> offshore <i className="spage__wind--cross spage__sw" /> cross <i className="spage__wind--onshore spage__sw" /> onshore, by the hour, 05 to 20
             </p>
             <p className="spage__small num">
-              {water === null ? '' : `Water ${Math.round(celsiusToF(water))}°F · `}
+              {water === null ? '' : `Water ${formatTemperature(water, units.temperature)} · `}
               {power === null ? '' : `swell energy ${power.toFixed(1)} kW per metre of wave · `}
               {facing === null ? '' : `beach faces ${compass(facing)}`}
             </p>

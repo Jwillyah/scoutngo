@@ -271,7 +271,7 @@ describe('tide, short', () => {
     expect(html).toContain('1,870 ft')
     expect(html).not.toContain('km')
 
-    const metric = render({ units: { wind: 'kt', distance: 'm', clock: 12 } })
+    const metric = render({ units: { wind: 'kt', distance: 'm', clock: 12, temperature: 'F' } })
     expect(metric).toContain('570 m')
     expect(metric).not.toContain('ft.')
   })

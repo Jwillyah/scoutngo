@@ -14,10 +14,10 @@ import { surfAt, surfDay } from '../lib/surfDay.ts'
 import { surfShape } from '../core/surf.ts'
 import { SurfRow } from './SurfRow.tsx'
 import { hourlyAt } from '../lib/tideSheetData.ts'
-import { celsiusToF, compass, glassRead, metresToFeet, motionWords } from '../lib/tideWords.ts'
+import { compass, glassRead, metresToFeet, motionWords } from '../lib/tideWords.ts'
 import type { TideInfo } from '../lib/useTide.ts'
 import type { TideSheetData } from '../lib/useTideSheet.ts'
-import { formatRange, formatWind, type Units } from '../lib/units.ts'
+import { formatRange, formatWind, type Units, formatTemperature } from '../lib/units.ts'
 
 /*
  * THE TIDE SHEET: A WHOLE PAGE, NO SCROLLING ON A 390 x 844 PHONE.
@@ -250,7 +250,7 @@ export function TideSheet({ tide, at, timeZone, venue, units, data, onAt, onJump
             {waveH === null ? '' : ` · waves ${metresToFeet(waveH).toFixed(1)} ft`}
             {waveT === null ? '' : ` every ${Math.round(waveT)} s`}
             {waveDir === null ? '' : ` from ${compass(waveDir)}`}
-            {water === null ? '' : ` · water ${Math.round(celsiusToF(water))}°F`}
+            {water === null ? '' : ` · water ${formatTemperature(water, units.temperature)}`}
           </p>
         </div>
       </div>

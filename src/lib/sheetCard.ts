@@ -40,7 +40,6 @@ export type SheetCard =
   /** From Sky › Moon: the moonrise shot list, worked out. */
   | { kind: 'moonrise' }
   /** From the menu: the clock and the units, stored on the phone. */
-  | { kind: 'settings' }
   /** From the menu: backup, the API key, what leaves the phone. */
   | { kind: 'about' }
   /** From the menu: the call sheet, written on the shooter's own key. */
@@ -69,7 +68,6 @@ export const CARD_TITLE: Record<CardKind, string> = {
   cams: 'Sky cameras',
   suncurve: 'The day',
   moonrise: 'Moonrise',
-  settings: 'Settings',
   about: 'About',
   callsheet: 'Call sheet',
   preflight: 'Preflight',
@@ -108,7 +106,6 @@ export function isHome(card: SheetCard): boolean {
  * THE FOUR THAT DO NOT GET IT, AND WHY:
  *
  *   layers    a tile grid. Nothing on it moves with the clock.
- *   settings  the clock and the units. Same.
  *   about     prose and the backup. Same.
  *   hazards   a mark on the ground is there at 6am and at 6pm.
  *   airspace  the FAA ceiling over a venue is not a function of the hour.
@@ -136,7 +133,6 @@ export const TIME_MATTERS: Record<CardKind, boolean> = {
   layers: false,
   /* A plan for a night, not a reading at the bar's moment. */
   moonrise: false,
-  settings: false,
   about: false,
   hazards: false,
   airspace: false,
