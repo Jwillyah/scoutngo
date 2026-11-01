@@ -32,6 +32,7 @@ const watchdog = startWatchdog('3d buildings', 300_000)
 const OUT = process.argv[2] ?? join(process.env.SCOUTNGO_OUT ?? tmpdir(), 'buildings-3d')
 mkdirSync(OUT, { recursive: true })
 export const ROOF_STD = 8
+export const CRISP_MIN = 0.44
 let problems = 0
 const fail = (why) => {
   console.log('      PROBLEM: ' + why)
@@ -78,7 +79,7 @@ try {
   }
   await wait(3000)
   const grab = async (hide) => {
-    await ev(`window.__clay.setHidden(${hide === null ? 'null' : `'${hide}'`})`)
+    if (hide !== 'animated') await ev(`window.__clay.setHidden(${hide === null ? 'null' : `'${hide}'`})`)
     await wait(600)
     const b64 = await ev(`(async () => (await window.__clay.snapshot()).toDataURL('image/png').split(',')[1])()`)
     const buf = Buffer.from(b64, 'base64')
@@ -113,6 +114,49 @@ try {
   else if (p99 >= sky) fail(`the walls are brighter than the sky at 8 AM (${p99.toFixed(0)} against ${sky.toFixed(0)})`)
   if (rLum.length < 200) fail(`only ${rLum.length} roof pixels in view`)
   else if (std < ROOF_STD) fail(`the roofs are flat (standard deviation ${std.toFixed(1)}, at least ${ROOF_STD}): no photo on them`)
+  /*
+   * THE ANIMATED LOOK (Section 6): drawn, not filtered. The same view in
+   * Animated has the blocks' crisp dark outlines (near-black, one or two
+   * pixels wide, where the Real picture has none) and keeps its edges crisp
+   * (crisp, below, at least CRISP_MIN).
+   */
+  /*
+   * HOW CRISP ITS EDGES ARE: at every place the brightness changes by more
+   * than 30 across four pixels, the share of that change made in the single
+   * steepest pixel. A blur spreads it. Measured on this view (1 Nov): the
+   * Animated frame as drawn 0.49, the same frame through a 3 x 3 box blur
+   * 0.46 and a 5 x 5 one 0.39; the Real photo 0.42, 0.34 and 0.30. At least
+   * CRISP_MIN: a 5 x 5 blur over the Animated picture fails; a 3 x 3 one
+   * would not, which is as fine as this measure can tell.
+   */
+  const crisp = (img) => {
+    const { width: W, height: H, data } = img
+    const L = (x, y) => { const i = (y * W + x) * 4; return 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2] }
+    let sum = 0
+    let n = 0
+    for (let y = 2; y < H - 2; y += 2) {
+      for (let x = 2; x < W - 2; x += 1) {
+        const span = Math.abs(L(x + 2, y) - L(x - 2, y))
+        if (span < 30) continue
+        const step = Math.max(Math.abs(L(x + 1, y) - L(x, y)), Math.abs(L(x, y) - L(x - 1, y)))
+        sum += Math.min(1, step / span)
+        n += 1
+      }
+    }
+    return n === 0 ? 0 : sum / n
+  }
+  const dark = (img) => {
+    let n = 0
+    for (let i = 0; i < img.data.length; i += 4) if (img.data[i] < 40 && img.data[i + 1] < 40 && img.data[i + 2] < 40) n += 1
+    return n
+  }
+  await ev(`window.__clay.setFlyLook('animated', null)`)
+  await wait(1500)
+  const anim = await grab('animated')
+  await ev(`window.__clay.setFlyLook(null, null)`)
+  console.log(`  animated: ${dark(anim)} near-black outline pixels (real ${dark(all)}); edges crisp ${crisp(anim).toFixed(2)} (real ${crisp(all).toFixed(2)})`)
+  if (dark(anim) < Math.max(300, dark(all) * 1.5)) fail(`the Animated look has no outlines round the blocks (${dark(anim)} near-black pixels)`)
+  if (crisp(anim) < CRISP_MIN) fail(`the Animated look is blurred: its edges are ${crisp(anim).toFixed(2)} crisp (at least ${CRISP_MIN}; a 5 x 5 blur over it measured 0.39)`)
   await ctx.close()
 } finally {
   await browser.close()

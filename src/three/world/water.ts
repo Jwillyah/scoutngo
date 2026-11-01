@@ -57,6 +57,7 @@ uniform vec3 deep;
 uniform float waveScale;
 uniform vec2 waveDir;
 uniform float mask;
+uniform float toon;
 varying vec3 vWorld;
 float lod;
 /* Each wave fades once a pixel covers more than a sixth of its wavelength: no moiré far off. */
@@ -85,6 +86,14 @@ void main() {
   vec3 col = mix(body, sky, fres);
   float glint = pow(max(dot(r, normalize(sunDir)), 0.0), 220.0) * step(0.0, sunDir.y);
   col += sunColour * glint * 6.0;
+  if (toon > 0.5) {
+    /* Painted (the Animated look): two flat tones by the angle, a clean glint band. */
+    float k = clamp(length(deep) * 9.0, 0.25, 1.0);
+    vec3 flatDeep = vec3(0.07, 0.25, 0.42) * k;
+    vec3 flatFar = vec3(0.16, 0.40, 0.58) * k;
+    col = mix(flatDeep, flatFar, smoothstep(0.45, 0.5, fres));
+    col += sunColour * step(0.92, pow(max(dot(r, normalize(sunDir)), 0.0), 40.0)) * 1.2;
+  }
   gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -143,6 +152,7 @@ export function createWater(frame: Frame, onChange: () => void) {
     waveScale: { value: 0.6 },
     waveDir: { value: new THREE.Vector2(0.6, 0.8) },
     mask: { value: 0 },
+    toon: { value: 0 },
     ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
   }
   const shoreUniforms = {
@@ -303,7 +313,10 @@ export function createWater(frame: Frame, onChange: () => void) {
       uniforms.mask.value = on ? 1 : 0
       onChange()
     },
-    setLook: (look: string) => void look,
+    setLook: (look: string) => {
+      uniforms.toon.value = look === 'animated' ? 1 : 0
+      onChange()
+    },
     shown: () => shown,
   }
 }

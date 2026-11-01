@@ -108,6 +108,10 @@ export function createBuildings(frame: Frame, ground: Ground, onChange: () => vo
   let list: readonly Building[] = []
   const cells = new Map<string, { group: THREE.Group; x: number; z: number }>()
   const walls = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 })
+  /* The Animated look: flat pale clay faces and a crisp dark outline round each block. */
+  const toonWalls = new THREE.MeshLambertMaterial({ color: new THREE.Color().setRGB(0.8, 0.74, 0.64, THREE.LinearSRGBColorSpace), emissive: new THREE.Color().setRGB(0.12, 0.11, 0.1, THREE.LinearSRGBColorSpace), flatShading: true })
+  const outline = new THREE.LineBasicMaterial({ color: 0x1d1a16 })
+  let look = 'real'
   const roofUniforms = {
     atlas: { value: null as THREE.Texture | null },
     box: { value: new THREE.Vector4(0, 1, 0, 1) },
@@ -125,7 +129,7 @@ export function createBuildings(frame: Frame, ground: Ground, onChange: () => vo
     atlasSeen = a.texture
     roofUniforms.atlas.value = a.texture
     roofUniforms.box.value.set(frame.x(a.west), frame.x(a.east), frame.z(a.north), frame.z(a.south))
-    roofUniforms.hasAtlas.value = 1
+    roofUniforms.hasAtlas.value = look === 'animated' ? 0 : 1
     onChange()
   }
 
@@ -196,7 +200,7 @@ export function createBuildings(frame: Frame, ground: Ground, onChange: () => vo
         wg.setAttribute('position', new THREE.Float32BufferAttribute(c.walls, 3))
         wg.setAttribute('color', new THREE.Float32BufferAttribute(c.colours, 3))
         wg.computeVertexNormals()
-        const wm = new THREE.Mesh(wg, walls)
+        const wm = new THREE.Mesh(wg, look === 'animated' ? toonWalls : walls)
         wm.name = 'buildings walls'
         wm.castShadow = c.shadow.some(Boolean)
         wm.receiveShadow = true
@@ -206,12 +210,19 @@ export function createBuildings(frame: Frame, ground: Ground, onChange: () => vo
         const rm = new THREE.Mesh(rg, roofs)
         rm.name = 'buildings roofs'
         g.add(wm, rm)
+        if (look === 'animated') addOutline(g, wm)
         group.add(g)
         cells.set(key, { group: g, x: (cx + 0.5) * CELL_M, z: -(cy + 0.5) * CELL_M })
       }
       syncAtlas()
       onChange()
     })()
+  }
+
+  const addOutline = (g: THREE.Group, wm: THREE.Mesh) => {
+    const e = new THREE.LineSegments(new THREE.EdgesGeometry(wm.geometry, 30), outline)
+    e.name = 'buildings outline'
+    g.add(e)
   }
 
   /* --------------------------------------------------------------- trees */
@@ -255,6 +266,24 @@ export function createBuildings(frame: Frame, ground: Ground, onChange: () => vo
     setSun: (c: SkyColours) => {
       roofUniforms.tint.value.copy(daylightTint(c))
     },
-    setLook: (look: string) => void look,
+    setLook: (next: string) => {
+      look = next
+      for (const c of cells.values()) {
+        for (const o of [...c.group.children]) {
+          if (o.name === 'buildings walls') (o as THREE.Mesh).material = next === 'animated' ? toonWalls : walls
+          if (o.name === 'buildings outline') {
+            c.group.remove(o)
+            ;(o as THREE.LineSegments).geometry.dispose()
+          }
+        }
+        if (next === 'animated') {
+          const wm = c.group.children.find((o) => o.name === 'buildings walls') as THREE.Mesh | undefined
+          if (wm !== undefined) addOutline(c.group, wm)
+        }
+      }
+      /* Flat roofs in the Animated look: the clay, not the photo. */
+      roofUniforms.hasAtlas.value = next === 'animated' ? 0 : atlasSeen === null ? 0 : 1
+      onChange()
+    },
   }
 }
