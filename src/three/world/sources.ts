@@ -59,8 +59,17 @@ export const latOf = (y: number, z: number) => (Math.atan(Math.sinh(Math.PI * (1
 
 /* ----------------------------------------------------- what is in flight */
 
-/** Requests not yet answered: the scene is settled when this is 0 (the audits' "loaded"). */
+/** Requests not yet answered, and pieces still being built from them: the scene is settled when this is 0 (the audits' "loaded"). */
 export const pending = { n: 0 }
+/** Count a piece of work (a ring tile, a water tile) as pending until it settles. */
+export async function working<T>(job: () => Promise<T>): Promise<T> {
+  pending.n += 1
+  try {
+    return await job()
+  } finally {
+    pending.n -= 1
+  }
+}
 /** How many tiles the scene has drawn from, for the network audit's "did it look at all". */
 export const tileCounts = { imagery: 0, terrain: 0 }
 

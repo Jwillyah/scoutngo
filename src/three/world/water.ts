@@ -25,7 +25,7 @@ import { seaWaves } from '../../core/seaSurface.ts'
 import type { SkyColours } from '../../core/skyLook.ts'
 import { loadVectorTile, vectorExtent } from '../../lib/vectorTiles.ts'
 import type { CinemaInputs } from '../cinema.ts'
-import { latOf, lonOf, tileX, tileY, type Frame } from './sources.ts'
+import { latOf, lonOf, tileX, tileY, working, type Frame } from './sources.ts'
 
 export const NEAR_Z = 14
 export const FAR_Z = 12
@@ -170,7 +170,7 @@ export function createWater(frame: Frame, onChange: () => void) {
     for (let y = y0; y <= y1; y += 1) {
       for (let x = x0; x <= x1; x += 1) {
         if (skip?.(x, y) === true) continue
-        void loadVectorTile({ z, x, y }).then((tile) => {
+        void working(() => loadVectorTile({ z, x, y })).then((tile) => {
           if (tile === null) return
           const layer = tile.layers.water
           if (layer === undefined) return

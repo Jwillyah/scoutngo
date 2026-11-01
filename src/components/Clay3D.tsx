@@ -83,6 +83,7 @@ export function Clay3D({ venue, venueLabel, at, timeZone, sheetOpen = false, pin
   const [failed, setFailed] = useState<string | null>(null)
   const [place, setPlace] = useState<PlaceState>(() => placeState())
   const [flat, setFlat] = useState(0)
+  const [cloudQuality, setCloudQuality] = useState<'high' | 'battery'>('high')
   /* The zoom belongs to one Stand here: a new one starts at its own focal length. */
   const [zoom, setZoom] = useState<{ tick: number; focal: number } | null>(null)
   const [width, setWidth] = useState(0)
@@ -356,6 +357,28 @@ export function Clay3D({ venue, venueLabel, at, timeZone, sheetOpen = false, pin
                     : ''}
             {flat > 0 ? ' Some distant ground is drawn flat.' : ''}
           </p>
+          {/* The clouds (Batch D): where they are is illustrative; how they are drawn is the phone's choice. */}
+          {sea?.cover == null ? null : (
+            <div className="clay__infoline clay__clouds">
+              <span>Clouds illustrative: the forecast's cover at its heights, not where the real ones are.</span>
+              <span className="seg" role="group" aria-label="Cloud quality">
+                {(['high', 'battery'] as const).map((q) => (
+                  <button
+                    key={q}
+                    type="button"
+                    className={`seg__btn${cloudQuality === q ? ' seg__btn--on' : ''}`}
+                    aria-pressed={cloudQuality === q}
+                    onClick={() => {
+                      setCloudQuality(q)
+                      scene.current?.setQuality(q)
+                    }}
+                  >
+                    {q === 'high' ? 'High' : 'Battery'}
+                  </button>
+                ))}
+              </span>
+            </div>
+          )}
           {/* The data's credits, here rather than the engine's link over the map (Batch E). */}
           <p className="clay__credits">Data: {(scene.current?.credits() ?? []).join(' · ') || 'Esri, USGS and AWS Terrarium, OpenStreetMap contributors via OpenFreeMap'}</p>
         </div>

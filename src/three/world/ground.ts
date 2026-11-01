@@ -24,7 +24,7 @@
 import * as THREE from 'three'
 import type { ImagerySource } from '../../data/imagerySources.ts'
 import { waterMaskFor } from './waterMask.ts'
-import { frameAt, heightAt, latOf, lonOf, pictureOnly, pictureOrParent, sampleTile, terrainTile, tileX, tileY, TERRAIN_MAX_Z, type Frame } from './sources.ts'
+import { working, frameAt, heightAt, latOf, lonOf, pictureOnly, pictureOrParent, sampleTile, terrainTile, tileX, tileY, TERRAIN_MAX_Z, type Frame } from './sources.ts'
 
 export const NEAR_Z = 18
 export const NEAR_TILES = 16
@@ -46,6 +46,8 @@ export interface GroundStatus {
 
 /** Below the lowest tide: the sea floor where the photo shows water, so the water surface covers it. */
 const seaFloor = (h: number) => (h < 0.3 ? Math.min(h, -1.5) : h)
+/* Under the map's water, below any tide the water level can reach (the fixture's low tide sat below -2.5 m). */
+export const CARVE_M = -6
 
 /**
  * A grid of (n+1)² vertices over a lat/lon box, heights from `height`, with
@@ -135,7 +137,7 @@ async function heightsFor(north: number, south: number, west: number, east: numb
      * (Wrightsville, 1 Nov). There the water's edge wins.
      */
     const wet = mask.inWater(lat, lon) || (reachDeg > 0 && [[reachDeg, 0], [-reachDeg, 0], [0, reachDeg], [0, -reachDeg]].some(([a, b]) => mask.inWater(lat + a, lon + b)))
-    return wet ? Math.min(h, -4) : h
+    return wet ? Math.min(h, CARVE_M) : h
   }
 }
 
@@ -183,7 +185,7 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
         const south = latOf(y + 1, z)
         const west = lonOf(x, z)
         const east = lonOf(x + 1, z)
-        void (async () => {
+        void working(async () => {
           const h = await heightsFor(north, south, west, east, terrainZ, status, onChange, 12, (north - south) / segments / 2)
           const pic = await pictureOrParent(x, y, z, z >= 14 ? source : null)
           const canvas = new OffscreenCanvas(256, 256)
@@ -199,7 +201,7 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
           wear(mesh, tex)
           group.add(mesh)
           onChange()
-        })()
+        })
       }
     }
   }

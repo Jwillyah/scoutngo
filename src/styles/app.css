@@ -14774,3 +14774,14 @@
 .offline-line__act--quiet {
   color: var(--color-text-muted);
 }
+
+/* The 3D view's clouds line in its "i": the note, and High / Battery (Batch D). */
+.clay__clouds {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.clay__clouds .seg__btn {
+  min-height: 44px;
+  padding: 0 var(--space-3);
+}

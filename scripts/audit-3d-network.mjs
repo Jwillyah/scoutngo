@@ -142,6 +142,35 @@ try {
     if (want === 'low' && !(lum > 60)) fail(`at ${alt}° the sky is dark (luminance ${Math.round(lum)}): never black with the sun up`)
     if (want === 'twilight' && !(lum > 3 && lum < 90 && px.b >= px.r)) fail(`at ${alt}° the sky is not a dark blue twilight (rgb ${Math.round(px.r)} ${Math.round(px.g)} ${Math.round(px.b)})`)
   }
+  /*
+   * THE CLOUDS ARE IN THE WORLD (Batch D, Section 5): looking up at the
+   * forecast's cloud, turning the camera moves them across the frame. A
+   * picture stuck to the screen would not move.
+   */
+  const skyStrip = (yaw) => ev(`(async () => {
+    const c = window.__clay
+    c.setTime(new Date('${whenAt(30, true).toISOString()}'))
+    const g = (await c.groundAt(${JSON.stringify(VENUE)})) ?? 0
+    c.droneView(${JSON.stringify(VENUE)}, g + 60, ${yaw}, 25, 24)
+    await new Promise((r) => setTimeout(r, 500))
+    const shot = await c.snapshot()
+    window.__lastSky = shot.toDataURL('image/png')
+    return Array.from(shot.getContext('2d').getImageData(0, Math.floor(shot.height * 0.45), shot.width, 1).data)
+  })()`)
+  /* The calibration venue's day is past the forecast's week: the cover is given (40·20·10, the fixture's). */
+  await ev(`window.__clay.setSea({ sea: { heightM: null, periodS: null, fromDeg: null, windMps: 4, windFromDeg: 200 }, waterLevelM: null, cover: { low: 40, mid: 20, high: 10 }, visibilityKm: 20, seaMask: null, seed: 1 })`)
+  const drawnClouds = await ev(`window.__clayDebug().names`)
+  const cloudMeshes = Object.keys(drawnClouds).filter((k) => k.startsWith('cloud')).length
+  const a = await skyStrip(0)
+  const b = await skyStrip(25)
+  if (process.env.SCOUTNGO_OUT) (await import('node:fs')).writeFileSync(`${process.env.SCOUTNGO_OUT}/clouds-25.png`, Buffer.from((await ev('window.__lastSky')).split(',')[1], 'base64'))
+  let moved = 0
+  for (let i = 0; i < a.length; i += 4) moved += Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2])
+  moved /= a.length / 4
+  console.log(`  clouds: ${cloudMeshes} cloud layers in the scene; turning 25° changes the sky row by ${moved.toFixed(1)} a pixel`)
+  if (cloudMeshes === 0) fail('no clouds in the scene under the forecast cover')
+  else if (!Number.isFinite(moved) || !Array.isArray(a) || a.length === 0) fail(`could not read the sky to see the clouds move (${JSON.stringify(a).slice(0, 80)})`)
+  else if (moved < 4) fail(`the clouds did not move when the camera turned (${moved.toFixed(1)}): stuck to the screen`)
   await ev(`window.__clay.orbit()`)
 
   /*
