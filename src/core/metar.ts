@@ -53,6 +53,26 @@ export function skyWords(sky: MetarSky): string {
   return `${WORD[g.amount].replace(/^an? /, '')} at ${ft(g.baseFt)} ft`
 }
 
+const LAYER: Record<Amount, string> = { FEW: 'few', SCT: 'scattered', BKN: 'broken', OVC: 'overcast', VV: 'sky hidden' }
+
+/**
+ * Every layer the station reports, low to high, in words: "scattered at
+ * 3,500 ft, broken at 25,000 ft". What the Cloud chip and Sky fire say first
+ * near now (Batch E, 1 Nov: the forecast said 0·1·3 under scattered cumulus).
+ */
+export function layersWords(sky: MetarSky): string {
+  if (sky.groups.length === 0) return sky.clear ? 'clear below 12,000 ft' : 'no cloud reported'
+  return sky.groups.map((g) => (g.amount === 'VV' ? `sky hidden, ceiling ${ft(g.baseFt)} ft` : `${LAYER[g.amount]} at ${ft(g.baseFt)} ft`)).join(', ')
+}
+
+/** The lowest layer, short enough for a chip: "SCT 3.5k", "BKN 25k", "CLR". */
+export function chipSky(sky: MetarSky): string {
+  const g = sky.groups[0]
+  if (g === undefined) return sky.clear ? 'CLR' : '—'
+  const k = g.baseFt / 1000
+  return `${g.amount} ${k >= 10 ? Math.round(k) : k.toFixed(1)}k`
+}
+
 /** Low cloud (under 6,500 ft) from the station, as the forecast's low layer would call it. */
 export function stationLow(sky: MetarSky): 'deck' | 'some' | 'clear' {
   const low = sky.groups.filter((g) => g.baseFt < 6500)

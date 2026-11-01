@@ -39,7 +39,7 @@ export const HOSTS: readonly Host[] = [
   { host: 'overpass-api.de', who: 'Overpass (and two mirrors)', learns: 'a box around the venue', when: 'trees and hazards', trigger: 'on-pin' },
   { host: 's3-us-west-2.amazonaws.com', who: 'USGS 3DEP lidar', learns: 'which scan tiles: a map cell', when: 'only after you tap Download 3D scan', trigger: 'if-you-tap' },
   { host: 'overturemaps-extras-us-west-2.s3.amazonaws.com', who: 'Overture Maps', learns: 'which tiles: a map cell', when: 'only after you tap Fill in heights', trigger: 'if-you-tap' },
-  { host: 'api.weather.gov', who: 'US National Weather Service', learns: 'the venue to 2 decimals (about a kilometre), then station ids', when: 'Sky fire, only in the two hours before a sunrise or sunset', trigger: 'if-you-tap' },
+  { host: 'api.weather.gov', who: 'US National Weather Service', learns: 'the venue to 2 decimals (about a kilometre), then station ids', when: 'the Cloud chip and Sky fire, when the time on the bar is within two hours of now; Sky fire in the two hours before a sunrise or sunset', trigger: 'on-pin' },
   { host: 'this app (/api/metar)', who: 'this app', learns: 'a station id, never the venue', when: 'Sky fire, when weather.gov has no METAR text; it reads aviationweather.gov', trigger: 'if-you-tap' },
   { host: 'this app (/api/buoy)', who: 'this app', learns: 'a buoy number, never the venue', when: 'the surf row; it reads NOAA NDBC', trigger: 'on-pin' },
   /* Asked only when you open or press the thing named (29 Oct: these five were missing from this list). */

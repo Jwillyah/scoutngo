@@ -13621,6 +13621,19 @@
   color: var(--color-text-muted);
 }
 
+.fire__station {
+  display: grid;
+  gap: 2px;
+}
+
+/* The station's sky near now, in sentence type: it leads the page (Batch E). */
+.fire__lead {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heavy);
+  color: var(--color-text);
+}
+
 .fire__head {
   margin: var(--space-2) 0 0;
   font-size: var(--text-sm);

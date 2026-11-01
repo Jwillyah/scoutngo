@@ -144,6 +144,8 @@ import { LightNowBlock } from './LightNowBlock.tsx'
 import { getMoonArc } from '../core/moonArc.ts'
 import type { SkyTab } from '../lib/skyTab.ts'
 import { cloudTriple, layersLine, modelsSplit } from '../core/skyFire.ts'
+import { chipSky, layersWords } from '../core/metar.ts'
+import { useStationNow } from '../lib/useStationNow.ts'
 import { fetchModelLows, nearestHour } from '../lib/skyFireData.ts'
 import { useWeatherBusy, useWeatherEpoch } from '../lib/useWeatherStatus.ts'
 import type { Place } from '../lib/placeGroups.ts'
@@ -1264,6 +1266,8 @@ export function PlanMode({
   const weatherBusy = useWeatherBusy()
   /* Special light on now (src/lib/useSpecialNow.ts): the status line when there is a signal, a tap to the list. */
   const specialNow = useSpecialNow(online ? venue : null, scrubbedAt)
+  /* Within two hours of now the station's sky leads the Cloud chip (src/lib/useStationNow.ts). */
+  const stationSkyNow = useStationNow(venue, scrubbedAt, online)
   const specialStatus = specialNow === null ? null : `${SPECIAL_NAME[specialNow.kind]} ${specialNow.word} now · ${specialNow.agree} of ${specialNow.of} models`
   /* A rainbow's bow, drawn on the map from Sky › Special. */
   const [bow, setBow] = useState<GeoJSON.FeatureCollection | null>(null)
@@ -1467,15 +1471,29 @@ export function PlanMode({
         urgent: overRated,
         age: groundWind === null ? null : age,
       },
-      {
-        kind: 'cloud',
-        label: 'CLOUD L·M·H',
-        shortLabel: 'CLOUD',
-        value: cloudPct === null || layers === null ? null : cloudTriple(layers),
-        spoken: layers === null ? undefined : `Cloud: ${layersLine(layers)}${split ? ', models split' : ''}`,
-        note: split ? 'models split' : undefined,
-        age: cloudPct === null ? null : age,
-      },
+      /*
+       * NEAR NOW THE STATION LEADS (Batch E, 1 Nov): its lowest layer on the
+       * chip, the forecast's low·mid·high under it; both in the spoken line.
+       */
+      stationSkyNow !== null
+        ? {
+            kind: 'cloud' as const,
+            label: `CLOUD · ${stationSkyNow.sky.station}`,
+            shortLabel: 'CLOUD',
+            value: chipSky(stationSkyNow.sky),
+            spoken: `Station ${stationSkyNow.sky.station}: ${layersWords(stationSkyNow.sky)}.${layers === null ? '' : ` Forecast: ${layersLine(layers)}${split ? ', models split' : ''}.`}`,
+            note: layers === null ? 'station' : `fcst ${cloudTriple(layers)}`,
+            age: null,
+          }
+        : {
+            kind: 'cloud' as const,
+            label: 'CLOUD L·M·H',
+            shortLabel: 'CLOUD',
+            value: cloudPct === null || layers === null ? null : cloudTriple(layers),
+            spoken: layers === null ? undefined : `Cloud: ${layersLine(layers)}${split ? ', models split' : ''}`,
+            note: split ? 'models split' : undefined,
+            age: cloudPct === null ? null : age,
+          },
       /* Inland, no tide anywhere (30 Oct): the chip goes with Water. */
       ...(!groups.water && place === 'inland' ? [] : [{
         kind: 'tide' as const,
@@ -1486,7 +1504,7 @@ export function PlanMode({
         ...(venueWindow === null || venueWindow.timeZoneShort === '' ? {} : { unit: venueWindow.timeZoneShort }),
       }]),
     ]
-  }, [venue, venueWindow, scrubbedAt, wind, ratedWindMps, nextTurn, venueCloud, forecast, units, clock, modelLows, groups.water, place])
+  }, [venue, venueWindow, scrubbedAt, wind, ratedWindMps, nextTurn, venueCloud, forecast, units, clock, modelLows, groups.water, place, stationSkyNow])
 
   /*
    * WHICH GOES BAND THE SKY LAYER PAINTS, from the sun's altitude: visible

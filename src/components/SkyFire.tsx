@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { getPosition } from 'suncalc'
 import type { LatLon } from '../core/geo.ts'
-import { disagreement, lowestDeck, skyWords } from '../core/metar.ts'
+import { disagreement, layersWords, lowestDeck, skyWords } from '../core/metar.ts'
 import {
   DECK_HEIGHT_M,
   fireVerdict,
@@ -20,6 +20,8 @@ import {
 import { formatClock } from '../core/timezone.ts'
 import { FIRST_ENTRY, OUTCOME_LABEL, readFireLog, trackRecord, withEntry, writeFireLog, type FireEntry, type FireOutcome } from '../lib/fireLog.ts'
 import { TruthLoop } from './TruthLoop.tsx'
+import { useOnline } from '../lib/useOnline.ts'
+import { useStationNow } from '../lib/useStationNow.ts'
 import { useWeatherBusy, useWeatherEpoch } from '../lib/useWeatherStatus.ts'
 import { forecastAge } from '../lib/savedForecast.ts'
 import { fetchFirePaths, fetchStationSkies, nearestHour, pathsAt, type FirePaths, type StationSky } from '../lib/skyFireData.ts'
@@ -191,6 +193,9 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
     }
   }
   const record = trackRecord(log)
+  /* Within two hours of now, what the station sees leads the page; the forecast is under it (Batch E, 1 Nov). */
+  const online = useOnline()
+  const stationNow = useStationNow(venue, at, online)
 
   return (
     <div className="fire">
@@ -202,6 +207,16 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
           </button>
         ))}
       </div>
+
+      {stationNow === null ? null : (
+        <div className="fire__station">
+          <p className="fire__lead">
+            Station {stationNow.sky.station}
+            {stationNow.at === '' ? '' : ` at ${clock(new Date(stationNow.at))}`}: {layersWords(stationNow.sky)}
+          </p>
+          {overhead === null ? null : <p className="fire__note">Forecast for this hour: {layersLine(overhead)}</p>}
+        </div>
+      )}
 
       {event === null ? (
         <p className="fire__note">No {kind} here in the next two days.</p>

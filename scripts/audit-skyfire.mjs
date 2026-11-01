@@ -130,11 +130,17 @@ try {
         console.log(`  chip: ${JSON.stringify(chip)}`)
         if (chip === null) fail(`${label}: no cloud chip`)
         else {
-          if (!/^CLOUD L·M·H/.test(chip.label)) fail(`${label}: the chip's label is "${chip.label}"`)
-          if (!/^(\d+|—)·(\d+|—)·(\d+|—)$/.test(chip.value)) fail(`${label}: the chip's value "${chip.value}" is not low·mid·high`)
+          /*
+           * NEAR NOW THE STATION LEADS (Batch E): the page clock is 10:15 UTC
+           * and the bar is within two hours of it, so the chip is KNTU's
+           * lowest layer with the forecast's low·mid·high under it, and the
+           * spoken line has both, and that the models split.
+           */
+          if (chip.label !== 'CLOUD · KNTU') fail(`${label}: near now the chip's label is "${chip.label}", not the station's`)
+          if (chip.value !== 'BKN 3.0k') fail(`${label}: near now the chip's value "${chip.value}" is not KNTU's lowest layer`)
           if (!chip.fits) fail(`${label}: the chip's value is cut off`)
-          if (chip.note !== 'models split') fail(`${label}: the five models are 100 points apart and the chip does not say "models split" (${chip.note})`)
-          if (!/Low \d+ · Mid \d+ · High \d+/.test(chip.spoken ?? '')) fail(`${label}: the chip does not say the layers in words (${chip.spoken})`)
+          if (!/^fcst (\d+|—)·(\d+|—)·(\d+|—)$/.test(chip.note ?? '')) fail(`${label}: the forecast is not under the station on the chip (${chip.note})`)
+          if (!/^Station KNTU: broken at 3,000 ft/.test(chip.spoken ?? '') || !/Forecast: Low \d+ · Mid \d+ · High \d+, models split/.test(chip.spoken ?? '')) fail(`${label}: the chip does not say the station and the forecast in words (${chip.spoken})`)
         }
       }
 
@@ -153,6 +159,8 @@ try {
             verdict: f.querySelector('.fire__verdict')?.textContent ?? null,
             checks: [...f.querySelectorAll('.fire__checks li')].map((r) => r.textContent.replace(/\\s+/g, ' ').trim()),
             switches: f.querySelectorAll('[aria-label="Which event"]').length,
+            station: f.querySelector('.fire__station .fire__lead')?.textContent ?? null,
+            stationFirst: !!f.querySelector('.fire__station') && !!f.querySelector('.fire__verdict') && (f.querySelector('.fire__station').compareDocumentPosition(f.querySelector('.fire__verdict')) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
             verdicts: f.querySelectorAll('.fire__verdict, .prev__verdict').length,
             decks: f.querySelectorAll('.fire__deck').length,
             ray: !!f.querySelector('.fire__ray'),
@@ -170,6 +178,7 @@ try {
       else {
         if (!/^Fire (possible|likely)$/.test(fire.verdict)) fail(`${label} ${phase}: 29 Oct reads "${fire.verdict}", and it fired`)
         /* Each once, at the top (Batch E, 1 Nov: the switch and "Fire possible" were there twice). */
+        if (fire.station === null || !/^Station KNTU at .*: broken at 3,000 ft/.test(fire.station) || !fire.stationFirst) fail(`${label} ${phase}: near now the station does not lead the Sky fire page (${fire.station}, first ${fire.stationFirst})`)
         if (fire.switches !== 1) fail(`${label} ${phase}: ${fire.switches} Sunrise / Sunset switches on the Sky fire page, not 1`)
         if (fire.verdicts !== 1) fail(`${label} ${phase}: ${fire.verdicts} verdicts on the Sky fire page, not 1`)
         if (fire.checks.length !== 3 || !fire.checks.every((c) => /\d/.test(c))) fail(`${label} ${phase}: the checks are ${JSON.stringify(fire.checks)}, not three with numbers`)
