@@ -34,7 +34,10 @@ import {
 import { EMPTY_LANDCOVER, type Landcover } from './core/siting.ts'
 import { getSunArc, getSunPosition } from './core/sun.ts'
 import { extremesAround, tideStateAt } from './core/tide.ts'
-import { LOCATED_ZOOM } from './lib/locateOnce.ts'
+import { LOCATED_ZOOM, locateOnce } from './lib/locateOnce.ts'
+import { markNearMeSeen, nearMeDue, nearMeItems, placesNear, snoozeNearMe, type NearItem } from './lib/nearMe.ts'
+import { readHome } from './lib/home.ts'
+import { NearYou } from './components/NearYou.tsx'
 import { useNewBuild } from './lib/useNewBuild.ts'
 import { useSkyFrames } from './lib/useSkyFrames.ts'
 import { useWind } from './lib/useWind.ts'
@@ -87,7 +90,7 @@ import {
 import type { PackBuildState } from './components/FieldPackControl.tsx'
 import { parseShotList, type DesiredShot } from './lib/shotList.ts'
 import { clampRadius, RADIUS_DEFAULT_METERS } from './core/radius.ts'
-import { formatSpan, formatWallTime, setClockHours, venueTimeZone } from './core/timezone.ts'
+import { formatClock, formatSpan, formatWallTime, setClockHours, venueTimeZone } from './core/timezone.ts'
 import { msUntilNominatim, reverseGeocode } from './lib/search.ts'
 import { usePersistentState } from './lib/usePersistentState.ts'
 import { DEFAULT_UNITS, reviveUnits, type Units } from './lib/units.ts'
@@ -1553,6 +1556,62 @@ function App() {
   }, [])
 
   /* A search result is a PROPOSAL. It is confirmed on the map, never taken. */
+  /*
+   * NEAR YOU IN THE NEXT 24 H, ON OPENING (src/lib/nearMe.ts): on the first
+   * open and on a return after six hours, from where the phone is (only if
+   * its location is already shared: never asked for here) or the home spot.
+   */
+  const [nearItems, setNearItems] = useState<NearItem[] | null>(null)
+  const nearInputs = useRef({ spots, place })
+  nearInputs.current = { spots, place }
+  useEffect(() => {
+    let live = true
+    let first = true
+    const look = async () => {
+      if (!nearMeDue(Date.now(), first)) return
+      first = false
+      markNearMeSeen()
+      let origin: { at: LatLon; name: string } | null = null
+      const perms = (navigator as Navigator & { permissions?: Permissions }).permissions
+      const state = await perms?.query({ name: 'geolocation' as PermissionName }).then((r) => r.state).catch(() => null)
+      if (state === 'granted') {
+        const here = await locateOnce()
+        if (here.status === 'ok') origin = { at: here.at, name: 'where you are' }
+      }
+      const home = readHome()
+      if (origin === null && home !== null) origin = { at: { lat: home.lat, lon: home.lon }, name: home.name }
+      if (origin === null) return
+      const { spots: list, place: here } = nearInputs.current
+      const places = placesNear(origin, list.map((sp) => ({ name: sp.name, at: { lat: Number(sp.venue.latitude), lon: Number(sp.venue.longitude) } })).filter((sp) => Number.isFinite(sp.at.lat) && Number.isFinite(sp.at.lon)))
+      const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
+      const items = await nearMeItems(places, Date.now(), (d) => formatClock(d, zone), here)
+      if (live && items.length > 0) setNearItems(items)
+    }
+    void look()
+    const onShow = () => {
+      if (document.visibilityState === 'visible') void look()
+    }
+    document.addEventListener('visibilitychange', onShow)
+    return () => {
+      live = false
+      document.removeEventListener('visibilitychange', onShow)
+    }
+  }, [])
+  const goNear = (item: NearItem) => {
+    setNearItems(null)
+    const spot = spots.find((sp) => Math.abs(Number(sp.venue.latitude) - item.place.at.lat) < 1e-6 && Math.abs(Number(sp.venue.longitude) - item.place.at.lon) < 1e-6)
+    /* The phone's own calendar day for the time: within 25 mi it is the venue's too. */
+    const date = item.at.toLocaleDateString('en-CA')
+    jumpTo.current = item.at.getTime()
+    if (spot !== undefined) {
+      loadSpot(spot)
+      setVenue((current) => ({ ...current, date }))
+    } else {
+      setVenue((current) => ({ ...withCoordinates(current, item.place.at), date }))
+    }
+    setMode('plan')
+  }
+
   const onPick = useCallback((at: LatLon, label: string) => {
     setPendingPin({ at, label })
   }, [])
@@ -1987,6 +2046,16 @@ function App() {
         </div>
       ) : null}
 
+      {mode === 'plan' && nearItems !== null ? (
+        <NearYou
+          items={nearItems}
+          onGo={goNear}
+          onNotNow={() => {
+            snoozeNearMe()
+            setNearItems(null)
+          }}
+        />
+      ) : null}
       {mode === 'plan' ? (
         <PlanMode
           place={place}

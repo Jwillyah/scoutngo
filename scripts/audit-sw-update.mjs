@@ -312,7 +312,13 @@ async function homeScreen(label, insets) {
     controlled: !!navigator.serviceWorker?.controller,
     url: location.href,
   }))
-  const kept = () => page.evaluate(() => Object.fromEntries(Object.keys(localStorage).filter((k) => k.startsWith('scoutngo.') && k !== 'scoutngo.adopted.v1' && k !== 'scoutngo.storageProbe.v1').sort().map((k) => [k, localStorage.getItem(k)])))
+  /*
+   * What is yours, not the app's own bookkeeping: which build it adopted, the
+   * storage probe, and when "Near you" was last looked for (src/lib/nearMe.ts,
+   * stamped on every open by design; Batch C2).
+   */
+  const BOOKKEEPING = ['scoutngo.adopted.v1', 'scoutngo.storageProbe.v1', 'scoutngo.nearMe.seen.v1']
+  const kept = () => page.evaluate((skip) => Object.fromEntries(Object.keys(localStorage).filter((k) => k.startsWith('scoutngo.') && !skip.includes(k)).sort().map((k) => [k, localStorage.getItem(k)])), BOOKKEEPING)
   const pill = () => page.evaluate(() => {
     const el = document.querySelector('.newbuild')
     if (!el) return null

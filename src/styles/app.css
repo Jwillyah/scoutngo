@@ -14477,3 +14477,55 @@
   font-size: var(--text-sm);
   text-align: left;
 }
+
+/* ------------------------------------------- Near you, on opening (30 Oct) */
+.nearyou {
+  position: fixed;
+  z-index: 40;
+  left: var(--space-2);
+  right: var(--space-2);
+  top: calc(var(--safe-top) + 150px);
+  max-width: var(--page-max);
+  margin: 0 auto;
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border-radius: var(--radius-panel);
+  background: var(--panel-sheen);
+  border: var(--line-hair) solid var(--color-edge-top);
+  color: var(--color-text);
+}
+
+.nearyou__title {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heavy);
+}
+
+.nearyou__list {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nearyou__item,
+.nearyou__not {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-panel);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+}
+
+.nearyou__not {
+  width: auto;
+  justify-self: end;
+  border-radius: 999px;
+}
