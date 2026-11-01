@@ -14704,3 +14704,52 @@
   font: inherit;
   font-size: var(--text-sm);
 }
+
+/* ---------------------------- Settings › Privacy & data: where things are (Batch E) */
+.kept {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+}
+
+.kept__line,
+.kept__note,
+.kept__plain {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--color-text);
+}
+
+.kept__plain {
+  color: var(--color-text-muted);
+}
+
+.kept__note {
+  font-weight: var(--weight-heavy);
+}
+
+.kept__ask {
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  border: 0;
+  background: none;
+  color: var(--color-accent);
+  font: inherit;
+  font-weight: 600;
+}
+
+.kept__restore {
+  position: relative;
+  overflow: hidden;
+}
+
+.kept__file {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+}
+
+.offline-line__act--quiet {
+  color: var(--color-text-muted);
+}

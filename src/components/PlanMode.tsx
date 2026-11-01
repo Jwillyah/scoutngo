@@ -357,6 +357,8 @@ interface PlanModeProps {
   menuOpen: boolean
   /** The menu asked for a card: Sky or About. The tick makes a repeat ask open it again. */
   cardRequest: { kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'wind' | 'terrain' | 'preflight'; tick: number }
+  /** The monthly backup reminder (src/lib/backup.ts): the status line says it, with Back up and Not now. */
+  backupReminder?: { onBackup: () => void; onDismiss: () => void } | null
   /** Coast or inland, and which of Water and Land are offered (src/lib/placeGroups.ts). */
   place?: Place
   groups?: { water: boolean; land: boolean; surf: boolean }
@@ -556,6 +558,7 @@ export function PlanMode({
   menuOpen,
   cardRequest,
   place = 'unknown',
+  backupReminder = null,
   groups = { water: true, land: false, surf: true },
   bag,
   onSearch,
@@ -2737,7 +2740,22 @@ export function PlanMode({
         online={online || offlineStatus !== null}
       />
 
-      <ChipRow chips={chips} active={page === 'tides' ? 'tide' : card.kind} onOpen={openChip} measureRef={measureChips} status={locateNote ?? offlineStatus ?? weatherBusy ?? specialStatus} statusAction={locateNote === null ? undefined : { label: locating ? 'Finding you…' : 'Retry', onClick: onLocate }} onStatus={locateNote === null && offlineStatus === null && weatherBusy === null && specialStatus !== null ? () => { setSkyTab('special'); openCard('sky') } : undefined} />
+      {/* The one status line: where you are, no signal, the weather service, the monthly backup reminder, special light on now; first that applies. */}
+      <ChipRow
+        chips={chips}
+        active={page === 'tides' ? 'tide' : card.kind}
+        onOpen={openChip}
+        measureRef={measureChips}
+        status={locateNote ?? offlineStatus ?? weatherBusy ?? (backupReminder == null ? null : 'No backup in 30 days: a file is the only copy off this phone') ?? specialStatus}
+        statusAction={
+          locateNote !== null
+            ? { label: locating ? 'Finding you…' : 'Retry', onClick: onLocate }
+            : offlineStatus === null && weatherBusy === null && backupReminder != null
+              ? { label: 'Back up', onClick: backupReminder.onBackup, dismiss: { label: 'Not now', onClick: backupReminder.onDismiss } }
+              : undefined
+        }
+        onStatus={locateNote === null && offlineStatus === null && weatherBusy === null && backupReminder == null && specialStatus !== null ? () => { setSkyTab('special'); openCard('sky') } : undefined}
+      />
 
       {sheet === 'full' ? null : (
       <MapRail

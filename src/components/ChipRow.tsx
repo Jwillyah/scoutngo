@@ -94,7 +94,7 @@ interface ChipRowProps {
    */
   status?: string | null
   /** A button at the end of the status line: Retry, after "Use my location" failed. */
-  statusAction?: { label: string; onClick: () => void }
+  statusAction?: { label: string; onClick: () => void; /** A second, quieter button: "Not now" (the backup reminder). */ dismiss?: { label: string; onClick: () => void } }
   /** When set, the status line is a button: special light on now opens its list. */
   onStatus?: () => void
   /** The card currently open, so its chip shows as active. */
@@ -177,6 +177,11 @@ export function ChipRow({ chips, active, onOpen, measureRef, status = null, stat
           <button type="button" className="offline-line__act" onClick={statusAction.onClick}>
             {statusAction.label}
           </button>
+          {statusAction.dismiss === undefined ? null : (
+            <button type="button" className="offline-line__act offline-line__act--quiet" onClick={statusAction.dismiss.onClick}>
+              {statusAction.dismiss.label}
+            </button>
+          )}
         </div>
       ) : onStatus === undefined ? (
         <p className="offline-line" role="status">

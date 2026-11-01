@@ -38,6 +38,7 @@ import { LOCATED_ZOOM, locateOnce } from './lib/locateOnce.ts'
 import { markNearMeSeen, nearMeDue, nearMeItems, placesNear, snoozeNearMe, type NearItem } from './lib/nearMe.ts'
 import { readHome } from './lib/home.ts'
 import { NearYou } from './components/NearYou.tsx'
+import { askToPersist, backupDue, backupNow, markReminded } from './lib/backup.ts'
 import { useNewBuild } from './lib/useNewBuild.ts'
 import { useSkyFrames } from './lib/useSkyFrames.ts'
 import { useWind } from './lib/useWind.ts'
@@ -1561,6 +1562,25 @@ function App() {
    * open and on a return after six hours, from where the phone is (only if
    * its location is already shared: never asked for here) or the home spot.
    */
+  /*
+   * KEEP WHAT IS YOURS (src/lib/backup.ts, Batch E): ask the browser once per
+   * open to keep this site's storage, and once a month, if there is
+   * something to lose and no backup newer than 30 days, say so in one line.
+   */
+  const [backupNag, setBackupNag] = useState(false)
+  useEffect(() => {
+    void askToPersist()
+    try {
+      if (backupDue(localStorage, Date.now())) {
+        markReminded(localStorage)
+        const t = setTimeout(() => setBackupNag(true), 0)
+        return () => clearTimeout(t)
+      }
+    } catch {
+      /* No storage to read: nothing to remind about. */
+    }
+    return undefined
+  }, [])
   const [nearItems, setNearItems] = useState<NearItem[] | null>(null)
   const nearInputs = useRef({ spots, place })
   nearInputs.current = { spots, place }
@@ -2058,6 +2078,7 @@ function App() {
       ) : null}
       {mode === 'plan' ? (
         <PlanMode
+          backupReminder={backupNag ? { onBackup: () => { backupNow(); setBackupNag(false) }, onDismiss: () => setBackupNag(false) } : null}
           place={place}
           groups={{ water: groups.water, land: groups.land, surf: surfInMenu }}
           /* One name for the place, in the bar and on the shoot card alike. */

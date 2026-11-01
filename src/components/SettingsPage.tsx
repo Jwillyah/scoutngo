@@ -17,6 +17,7 @@ import { weatherSent } from '../lib/weatherStore.ts'
 import { ApiKeyField } from './ApiKeyField.tsx'
 import { BuildStamp } from './BuildStamp.tsx'
 import { Page } from './Page.tsx'
+import { KeptSection } from './KeptSection.tsx'
 
 /*
  * SETTINGS, A PAGE OF ITS OWN (field test, 30 Oct). Ten short sections in the
@@ -196,6 +197,7 @@ export function SettingsPage(props: Props) {
       </Section>
 
       <Section title="Privacy & data">
+        <KeptSection />
         <Row label="What leaves your phone" value="/privacy" onClick={openPrivacy} />
         <Row label="Export everything" value="One file" onClick={props.onExport} />
         <Row label="Clear this phone" value="On the privacy page" onClick={openPrivacy} />
