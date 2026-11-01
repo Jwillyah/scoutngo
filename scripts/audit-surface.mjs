@@ -1084,12 +1084,11 @@ const OPENERS = `(() => {
     if (label.includes('layer')) add('layerstool', 'Light map', 'lightmap')
   })
   /*
-   * THE MENU'S CARD DOORS. About and Sky open cards from the side menu now, so
+   * THE MENU'S CARD DOORS. Sky and the call sheet open cards from the side menu (About is a page since Batch E), so
    * a door is "open the menu, pick this item"; the item's own words are its
    * index. Found by the menu button being there, not by a list of cards.
    */
   if (document.querySelector('button[aria-label="Menu"]')) {
-    add('menu', 'About', 'about')
     add('menu', 'Sky', 'sky')
     add('menu', 'Call sheet', 'callsheet')
     add('menu', 'Settings', 'settings')

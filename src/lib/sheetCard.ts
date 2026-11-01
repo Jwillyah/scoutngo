@@ -41,7 +41,6 @@ export type SheetCard =
   | { kind: 'moonrise' }
   /** From the menu: the clock and the units, stored on the phone. */
   /** From the menu: backup, the API key, what leaves the phone. */
-  | { kind: 'about' }
   /** From the menu: the call sheet, written on the shooter's own key. */
   | { kind: 'callsheet' }
   /* Preflight: draw a drone move, see its flight card, play it in 3D (PreflightSheet.tsx). */
@@ -68,7 +67,6 @@ export const CARD_TITLE: Record<CardKind, string> = {
   cams: 'Sky cameras',
   suncurve: 'The day',
   moonrise: 'Moonrise',
-  about: 'About',
   callsheet: 'Call sheet',
   preflight: 'Preflight',
   skyline: 'Skyline',
@@ -106,7 +104,6 @@ export function isHome(card: SheetCard): boolean {
  * THE FOUR THAT DO NOT GET IT, AND WHY:
  *
  *   layers    a tile grid. Nothing on it moves with the clock.
- *   about     prose and the backup. Same.
  *   hazards   a mark on the ground is there at 6am and at 6pm.
  *   airspace  the FAA ceiling over a venue is not a function of the hour.
  *
@@ -133,7 +130,6 @@ export const TIME_MATTERS: Record<CardKind, boolean> = {
   layers: false,
   /* A plan for a night, not a reading at the bar's moment. */
   moonrise: false,
-  about: false,
   hazards: false,
   airspace: false,
   /* Written for the whole window, not the moment on the bar. */

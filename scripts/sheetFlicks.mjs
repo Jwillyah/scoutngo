@@ -89,12 +89,28 @@ export const SPEED_PROBE = `(() => {
   return 'ok'
 })()`
 
+/*
+ * SETTLED, NOT TIMED (Batch E): until the sheet's height holds still for
+ * three reads 100 ms apart, at most 3 s. A fixed wait read a sheet still
+ * moving as one that landed wrong whenever the machine was busy.
+ */
+async function settled(ev, wait) {
+  let last = -1
+  let still = 0
+  for (let t = 0; t < 3000 && still < 3; t += 100) {
+    const h = await ev(`Math.round(document.querySelector('.sheet')?.getBoundingClientRect().height ?? -1)`)
+    still = h === last ? still + 1 : 0
+    last = h
+    await wait(100)
+  }
+}
+
 /** Puts the sheet at a detent by its own handle's tap (which steps peek, half, full, peek). */
 async function settleAt(ev, wait, want) {
   for (let i = 0; i < 4; i += 1) {
     if ((await detentNow(ev)) === want) return true
     await ev(`document.querySelector('.sheet__handle')?.click()`)
-    await wait(500)
+    await settled(ev, wait)
   }
   return (await detentNow(ev)) === want
 }
@@ -145,7 +161,7 @@ export async function runSheetFlicks({ send, ev, wait }, perDirection = 20) {
         const [len, speed] = FLICKS[k % FLICKS.length]
         await ev(SPEED_PROBE)
         await verticalDrag(send, at, dir === 'up' ? -len : len, speed)
-        await wait(650)
+        await settled(ev, wait)
         const got = await detentNow(ev)
         const seen = await ev(`window.__flick?.last ?? null`)
         const i = ORDER.indexOf(from)
@@ -175,7 +191,7 @@ export async function runSheetFlicks({ send, ev, wait }, perDirection = 20) {
     await wait(350)
     const s0 = JSON.parse(await ev(STARTS))
     await verticalDrag(send, s0.handle, -grow, 0.25, 160)
-    await wait(650)
+    await settled(ev, wait)
     const got = await detentNow(ev)
     const want = nearest(heights[from] + grow)
     rows.push({ from, kind: 'slow drag', on: 'handle', len: Math.abs(grow), speed: 0.25, want, got, wrong: got !== want })

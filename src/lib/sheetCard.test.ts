@@ -24,7 +24,6 @@ const EVERY_KIND: CardKind[] = [
   'cams',
   'suncurve',
   'moonrise',
-  'about',
   'callsheet',
   'preflight',
   'skyline',

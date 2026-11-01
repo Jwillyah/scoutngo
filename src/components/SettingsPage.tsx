@@ -120,7 +120,7 @@ export function SettingsPage(props: Props) {
   }
 
   return (
-    <Page title="Settings" className="setpage" onClose={props.onClose}>
+    <Page title="Settings" className="setpage" back onClose={props.onClose}>
       <Section title="Units">
         <Pick label="Time" options={CLOCK_OPTIONS} value={units.clock} onPick={(clock) => onUnits({ ...units, clock })} />
         <Pick label="Distance" options={DISTANCE_UNITS} value={units.distance} onPick={(distance) => onUnits({ ...units, distance })} />

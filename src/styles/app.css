@@ -13262,6 +13262,27 @@
   font-weight: 600;
 }
 
+/* Back, for the pages with routes of their own: Settings and About (Batch E). */
+.page__back {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--text-md);
+  line-height: 1;
+}
+
+/* About scrolls like a page, never drags like a sheet. */
+.aboutpage .page__body {
+  overflow-y: auto;
+}
+
 .page__body {
   flex: 1 1 auto;
   min-height: 0;

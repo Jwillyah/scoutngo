@@ -115,7 +115,7 @@ try {
     await ev(`[...document.querySelectorAll('.chip2')].find((x) => /TIDE/.test(x.textContent))?.click()`)
     await wait(2500)
     await targets('the Tides page')
-    await ev(`document.querySelector('.page__close')?.click()`)
+    await ev(`document.querySelector('.page__close, .page__back')?.click()`)
     await wait(800)
     await ev(`document.querySelector('button[aria-label="Open the 3D clay model"]')?.click()`)
     await wait(6000)
@@ -234,7 +234,7 @@ try {
       console.log(`  ${tb.at !== ta.at && tb.sheet === ta.sheet ? 'ok' : 'wrong'}`)
     }
     /* The tide chip opens the Tides page now (29 Oct): close it. */
-    await ev(`document.querySelector('.page__close')?.click()`)
+    await ev(`document.querySelector('.page__close, .page__back')?.click()`)
     await wait(800)
     await dispose()
   }

@@ -2097,7 +2097,6 @@ function App() {
           onEditKit={() => onMenuPick('kit')}
           onOpenSpots={() => onMenuPick('saved')}
           /* The key field is on About itself, above the row that names it. */
-          onOpenSettings={() => document.querySelector('.apikey')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
           savedSpotCount={spots.length}
           mapHandle={mapHandle}
           venue={centre}

@@ -81,7 +81,7 @@ const results = new Map()
  * ONE RE-RUN FOR A TIMING AUDIT, SAID OUT LOUD (Batch E). The audits that
  * time flicks, scrolls, sheets and a worker's takeover can fail on a busy
  * machine with nothing wrong in the code. Each waits on a settled state now;
- * if one still fails, it runs once more, on its own, and the gate prints that
+ * if one still fails, it runs once more, in the same slot, and the gate prints that
  * it did and keeps the first run's log beside the second. A second failure
  * fails the gate. Only these: an audit that does not time anything gets no
  * second chance, because a re-run there could only hide something.
@@ -92,7 +92,7 @@ async function run(audit) {
   const firstLog = first.log.replace(/\.log$/, '.first.log')
   writeFileSync(firstLog, first.text)
   const reasons = first.text.split('\n').filter((l) => /PROBLEM|ABORTED/.test(l)).slice(0, 3).map((l) => l.trim()).join(' | ')
-  console.log(`${YELLOW}↻ ${audit.name} failed its first run; running it once more, alone in its lane. First run: ${reasons || 'see ' + firstLog}${OFF}`)
+  console.log(`${YELLOW}↻ ${audit.name} failed its first run; running it once more. First run: ${reasons || 'see ' + firstLog}${OFF}`)
   retried.push({ name: audit.name, reasons, firstLog })
   return runOnce({ ...audit, retried: true })
 }

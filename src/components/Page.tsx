@@ -16,11 +16,13 @@ interface PageProps {
   tab?: string
   onTab?: (id: string) => void
   onClose: () => void
+  /** A back arrow at the start of the head instead of Close: Settings and About, which have routes of their own (Batch E). */
+  back?: boolean
   className?: string
   children: ReactNode
 }
 
-export function Page({ title, tabs, tab, onTab, onClose, className = '', children }: PageProps) {
+export function Page({ title, tabs, tab, onTab, onClose, back = false, className = '', children }: PageProps) {
   const group = useContext(PageGroup)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -41,6 +43,11 @@ export function Page({ title, tabs, tab, onTab, onClose, className = '', childre
         </div>
       )}
       <div className="page__head">
+        {back ? (
+          <button type="button" className="page__back" aria-label="Back" onClick={onClose}>
+            <span aria-hidden="true">‹</span>
+          </button>
+        ) : null}
         <p className="page__title">{title}</p>
         {tabs === undefined ? null : (
           <div className="seg page__tabs" role="tablist" aria-label={`${title} views`}>
@@ -51,9 +58,11 @@ export function Page({ title, tabs, tab, onTab, onClose, className = '', childre
             ))}
           </div>
         )}
-        <button type="button" className="page__close" onClick={onClose}>
-          Close
-        </button>
+        {back ? null : (
+          <button type="button" className="page__close" onClick={onClose}>
+            Close
+          </button>
+        )}
       </div>
       <div className="page__body">{children}</div>
     </div>,

@@ -89,6 +89,7 @@ import { WeatherPanel } from './WeatherPanel.tsx'
 import { SunReadout } from './SunReadout.tsx'
 import { CamList } from './CamList.tsx'
 import { SunCurve } from './SunCurve.tsx'
+import { Page } from './Page.tsx'
 import { BUILDINGS_MIN_ZOOM, ESRI_NATIVE_MAX_ZOOM, MapView, type MapHandle } from './MapView.tsx'
 import { buildingsToGeoJson, fetchBuildings, type Building } from '../lib/buildings.ts'
 import { shadowMap } from '../core/shadowMap.ts'
@@ -307,7 +308,6 @@ interface PlanModeProps {
   onHow: (section: HowSection) => void
   onEditKit: () => void
   onOpenSpots: () => void
-  onOpenSettings: () => void
   savedSpotCount: number
   /** The shoot date, yyyy-mm-dd, for the leaf answer on a deciduous mark. */
   shootDate: string
@@ -527,7 +527,6 @@ export function PlanMode({
   onHow,
   onEditKit,
   onOpenSpots,
-  onOpenSettings,
   savedSpotCount,
   shootDate,
   skyLayer,
@@ -820,10 +819,30 @@ export function PlanMode({
     return { levels: windLevels, ratedMps: d.maxWindMps, ceilingFt: facilityCellAt(venue.lat, venue.lon)?.ceilingFeet ?? null, name: d.name.replace(/^DJI /, '') }
   }, [kitProfile, bag, venue, windLevels])
   /* A page over everything: Exposure, Tides or Surf. ?page=tides opens one, for the overflow audit. */
-  const [page, setPage] = useState<'exposure' | 'tides' | 'surf' | 'wind' | 'terrain' | 'settings' | null>(() => {
+  const [page, setPage] = useState<'exposure' | 'tides' | 'surf' | 'wind' | 'terrain' | 'settings' | 'about' | null>(() => {
     const p = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('page')
-    return p === 'exposure' || p === 'tides' || p === 'surf' || p === 'wind' || p === 'terrain' || p === 'settings' ? p : null
+    return p === 'exposure' || p === 'tides' || p === 'surf' || p === 'wind' || p === 'terrain' || p === 'settings' || p === 'about' ? p : null
   })
+  /*
+   * SETTINGS AND ABOUT HAVE ROUTES OF THEIR OWN (Batch E, 1 Nov): /settings
+   * and /about, so the phone's back gesture closes them like any page and a
+   * link opens them. Opening pushes the route; Back (the gesture or the
+   * arrow) pops it and closes the page.
+   */
+  useEffect(() => {
+    if (page !== 'settings' && page !== 'about') return
+    const route = `/${page}`
+    if (window.location.pathname !== route) window.history.pushState({ page }, '', route + window.location.search + window.location.hash)
+    const onPop = () => {
+      if (window.location.pathname !== route) setPage(null)
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [page])
+  const closeRoutedPage = () => {
+    if (window.location.pathname === '/settings' || window.location.pathname === '/about') window.history.back()
+    else setPage(null)
+  }
   /* Sky › Calendar, a page of its own (CalendarPage.tsx). ?calendar=1 opens it, for the overflow audit. */
   const [calendarOpen, setCalendarOpen] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('calendar') === '1')
   /* Compare a photo (src/components/ComparePhoto.tsx). ?compare=1 opens it, for scripts/measure-compare.mjs. */
@@ -1370,7 +1389,7 @@ export function PlanMode({
     const timer = setTimeout(() => {
       /* Exposure, Tides and Surf are pages of their own (29 Oct); Preflight is its card. */
       /* Settings is a page of its own since 30 Oct (SettingsPage.tsx). */
-      if (cardRequest.kind === 'exposure' || cardRequest.kind === 'tides' || cardRequest.kind === 'surf' || cardRequest.kind === 'wind' || cardRequest.kind === 'terrain' || cardRequest.kind === 'settings') {
+      if (cardRequest.kind === 'exposure' || cardRequest.kind === 'tides' || cardRequest.kind === 'surf' || cardRequest.kind === 'wind' || cardRequest.kind === 'terrain' || cardRequest.kind === 'settings' || cardRequest.kind === 'about') {
         setPage(cardRequest.kind)
         return
       } else if (cardRequest.kind === 'preflight') {
@@ -2129,7 +2148,7 @@ export function PlanMode({
                 onChange={(event) => onShotListText(event.target.value)}
               />
             </label>
-            <CallSheetCard context={callSheetContext} onOpenKey={() => openCard('about')} />
+            <CallSheetCard context={callSheetContext} onOpenKey={() => setPage('settings')} />
           </Card>
         )
       case 'sky':
@@ -2286,7 +2305,7 @@ export function PlanMode({
                 onPickTarget={() => onPlacingAim(!placingAim)}
                 units={units}
                 context={callSheetContext}
-                onOpenKey={() => openCard('about')}
+                onOpenKey={() => setPage('settings')}
                 onLineUp={(first, lens) => {
                   if (aimAt === null) return
                   if (!hasWebGL2()) {
@@ -2303,22 +2322,6 @@ export function PlanMode({
                 }}
               />
             )}
-          </Card>
-        )
-      case 'about':
-        return (
-          <Card title="About" onClose={home}>
-            <AboutSheet
-              onHow={onHow}
-              onKit={onEditKit}
-              onSpots={onOpenSpots}
-              onApiKey={onOpenSettings}
-              kitLine={`${kitProfile.bodies.length} bodies · ${kitProfile.lenses.length} lenses`}
-              spotsLine={`${savedSpotCount} saved`}
-              apiKeyLine="bring your own"
-              onExport={onExport}
-              onImport={onImport}
-            />
           </Card>
         )
     }
@@ -2508,14 +2511,27 @@ export function PlanMode({
           onShowLabels={onShowLabels}
           newBuild={newBuild}
           onHow={() => onHow('computed')}
-          onAbout={() => {
-            setPage(null)
-            openCard('about')
-          }}
+          onAbout={() => setPage('about')}
           onKit={onEditKit}
           onExport={onExport}
-          onClose={() => setPage(null)}
+          onClose={closeRoutedPage}
         />
+      ) : null}
+      {/* About, a page of its own like Settings (Batch E): its own route, a back arrow, normal scroll. */}
+      {page === 'about' ? (
+        <Page title="About" className="aboutpage" back onClose={closeRoutedPage}>
+          <AboutSheet
+            onHow={onHow}
+            onKit={onEditKit}
+            onSpots={onOpenSpots}
+            onApiKey={() => setPage('settings')}
+            kitLine={`${kitProfile.bodies.length} bodies · ${kitProfile.lenses.length} lenses`}
+            spotsLine={`${savedSpotCount} saved`}
+            apiKeyLine="bring your own"
+            onExport={onExport}
+            onImport={onImport}
+          />
+        </Page>
       ) : null}
       {page === 'terrain' && venue !== null && scrubbedAt !== null && venueWindow !== null ? (
         <TerrainLightPage venue={venue} at={scrubbedAt} timeZone={venueWindow.timeZone} horizon={horizonProfile} onTerrain={() => onShowTerrain(true)} onJump={scrubTo} onClose={() => setPage(null)} />

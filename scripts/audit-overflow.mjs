@@ -238,7 +238,7 @@ try {
   await ev(`document.querySelector('.tides__why')?.click()`)
   await checkPage('Tides, an explainer open')
   await ev(`document.querySelector('.tides__explainer .card2__x')?.click()`)
-  await ev(`document.querySelector('.page__close')?.click()`)
+  await ev(`document.querySelector('.page__close, .page__back')?.click()`)
   await wait(500)
   for (const item of ['Surf', 'Exposure']) {
     await ev(`document.querySelector('button[aria-label="Menu"]')?.click()`)
@@ -255,7 +255,7 @@ try {
       await tab('Advanced')
       await checkPage('Surf, Advanced')
     }
-    await ev(`document.querySelector('.page__close')?.click()`)
+    await ev(`document.querySelector('.page__close, .page__back')?.click()`)
     await wait(500)
   }
   await setSheet(ev, wait, 'peek')
