@@ -9,9 +9,8 @@ import { describeMeta, photoInstant, poseFromMeta, type Pose } from '../lib/comp
 import { scoreCompare, type CompareScore } from '../lib/compare/score.ts'
 import { loadPlace } from '../lib/place.ts'
 import { formatDistance, type DistanceUnit } from '../lib/units.ts'
-import type { ClayScene, GroundStatus } from '../three/clayScene.ts'
+import type { ClayScene, GroundStatus } from '../three/world/scene.ts'
 
-declare const __CESIUM_BASE__: string
 
 /*
  * COMPARE A PHOTO: THE 3D VIEW AGAINST THE SHOOTER'S OWN FOOTAGE.
@@ -145,11 +144,10 @@ export function ComparePhoto({ fallbackAt, distanceUnit, onClose }: ComparePhoto
     setRender(null)
     setScore(null)
     setPhase({ kind: 'rendering', note: 'Building the view at that minute…' })
-    ;(window as unknown as { CESIUM_BASE_URL: string }).CESIUM_BASE_URL = __CESIUM_BASE__
     const status: GroundStatus = { flatTiles: 0 }
     void (async () => {
       try {
-        const { createClayScene } = await import('../three/clayScene.ts')
+        const { createClayScene } = await import('../three/world/scene.ts')
         if (cancelled || engine.current === null) return
         made = createClayScene(engine.current, pose.at, pose.timeZone, status, () => {}, null)
         made.setTime(pose.when)

@@ -9,7 +9,7 @@ import { localDate } from '../core/moonTimes.ts'
 import { ensure3dOverview } from '../lib/offline3d.ts'
 import { loadPlace, onPlace, placeState, type PlaceState } from '../lib/place.ts'
 import type { StandRequest } from '../lib/standRequest.ts'
-import type { ClayScene, GroundStatus, Pin } from '../three/clayScene.ts'
+import type { ClayScene, GroundStatus, Pin } from '../three/world/scene.ts'
 import { SCAN_EVENT, scanContextAt, useScan } from '../lib/lidar/useScan.ts'
 import type { ScanContext } from '../lib/lidar/applyScan.ts'
 import { scanLabel } from '../lib/lidar/applyScan.ts'
@@ -40,7 +40,6 @@ const EMPTY: readonly Building[] = []
  * screen and a zoom between the lens's two ends.
  */
 
-declare const __CESIUM_BASE__: string
 
 
 interface Clay3DProps {
@@ -120,8 +119,7 @@ export function Clay3D({ venue, venueLabel, at, timeZone, sheetOpen = false, pin
     if (scanCtx === 'loading') return
     let cancelled = false
     let made: ClayScene | null = null
-    ;(window as unknown as { CESIUM_BASE_URL: string }).CESIUM_BASE_URL = __CESIUM_BASE__
-    import('../three/clayScene.ts')
+    import('../three/world/scene.ts')
       .then(({ createClayScene }) => {
         if (cancelled || host.current === null) return
         made = createClayScene(host.current, venue, timeZone, status.current, () => setFlat(status.current.flatTiles), scanRasters)

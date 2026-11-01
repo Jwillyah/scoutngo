@@ -24,6 +24,7 @@
  * elevation tiles, and the globe must say it finished loading.
  */
 import { connect } from './cdp.mjs'
+import { getSunPosition } from '../src/core/sun.ts'
 import { goToStage, guardAudit, setSheet, startWatchdog, APP_ORIGIN } from './preflight.mjs'
 
 guardAudit('3d network')
@@ -92,7 +93,7 @@ try {
   let state = null
   for (let i = 0; i < 60; i += 1) {
     await wait(1000)
-    state = await ev(`JSON.stringify((() => { const c = window.__clay; if (!c) return { ready: false }; return { ready: true, loaded: c.widget.scene.globe.tilesLoaded, ...c.counts } })())`)
+    state = await ev(`JSON.stringify((() => { const c = window.__clay; if (!c) return { ready: false }; return { ready: true, loaded: c.loaded(), ...c.counts } })())`)
     state = JSON.parse(state)
     if (state.ready && state.loaded && state.imagery > 0 && state.terrain > 0) break
   }
@@ -102,6 +103,46 @@ try {
   if (!state?.ready) fail('the 3D model never came up, so nothing was looked at')
   else if (!(state.imagery > 0 && state.terrain > 0)) fail('the model drew no imagery or no elevation: nothing was looked at')
   else if (!state.loaded) fail('the globe never finished loading in 60 s')
+
+  /*
+   * THE SKY ON SCREEN AT THREE SUN HEIGHTS (Batch D, Section 1: black at 8 AM
+   * with the sun up, 1 Nov). The camera looks 40° up toward the north; the
+   * frame is read back from a copy of the drawn canvas and its middle
+   * averaged. Day blue at 30°, lit at 2°, a dark blue twilight at -6°.
+   */
+  const VENUE = { lat: 38.364236, lon: -75.605912 }
+  const whenAt = (alt, morning) => {
+    let best = null
+    for (let m = 0; m < 24 * 60; m += 1) {
+      const t = new Date(Date.UTC(2026, 9, 30, 0, 0) + m * 60_000)
+      const p = getSunPosition(t, VENUE.lat, VENUE.lon)
+      if (morning !== p.azimuth < 180) continue
+      if (best === null || Math.abs(p.altitude - alt) < Math.abs(best.p.altitude - alt)) best = { t, p }
+    }
+    return best.t
+  }
+  for (const [alt, want] of [[30, 'day'], [2, 'low'], [-6, 'twilight']]) {
+    const t = whenAt(alt, true)
+    const px = JSON.parse(await ev(`(async () => {
+      const c = window.__clay
+      c.setTime(new Date('${t.toISOString()}'))
+      const g = (await c.groundAt(${JSON.stringify(VENUE)})) ?? 0
+      c.droneView(${JSON.stringify(VENUE)}, g + 60, 0, 40, 24)
+      await new Promise((r) => setTimeout(r, 400))
+      const shot = await c.snapshot()
+      const d = shot.getContext('2d').getImageData(Math.floor(shot.width * 0.3), Math.floor(shot.height * 0.1), Math.floor(shot.width * 0.4), Math.floor(shot.height * 0.15)).data
+      let r = 0, gg = 0, b = 0
+      for (let i = 0; i < d.length; i += 4) { r += d[i]; gg += d[i + 1]; b += d[i + 2] }
+      const n = d.length / 4
+      return JSON.stringify({ r: r / n, g: gg / n, b: b / n })
+    })()`))
+    const lum = 0.2126 * px.r + 0.7152 * px.g + 0.0722 * px.b
+    console.log(`  sky at ${alt}° (${t.toISOString().slice(11, 16)} UTC): rgb ${Math.round(px.r)} ${Math.round(px.g)} ${Math.round(px.b)}, luminance ${Math.round(lum)}`)
+    if (want === 'day' && !(lum > 110 && px.b > px.r)) fail(`at ${alt}° the sky is not a blue day sky (luminance ${Math.round(lum)})`)
+    if (want === 'low' && !(lum > 60)) fail(`at ${alt}° the sky is dark (luminance ${Math.round(lum)}): never black with the sun up`)
+    if (want === 'twilight' && !(lum > 3 && lum < 90 && px.b >= px.r)) fail(`at ${alt}° the sky is not a dark blue twilight (rgb ${Math.round(px.r)} ${Math.round(px.g)} ${Math.round(px.b)})`)
+  }
+  await ev(`window.__clay.orbit()`)
 
   /*
    * THE OVERLAYS (Batch E, 1 Nov): no engine "Data attribution" over the map
@@ -148,7 +189,7 @@ try {
   let off = null
   for (let i = 0; i < 60; i += 1) {
     await wait(1000)
-    off = JSON.parse(await ev(`JSON.stringify((() => { const c = window.__clay; return c ? { loaded: c.widget.scene.globe.tilesLoaded, online: navigator.onLine } : null })())`))
+    off = JSON.parse(await ev(`JSON.stringify((() => { const c = window.__clay; return c ? { loaded: c.loaded(), online: navigator.onLine } : null })())`))
     if (off?.loaded) break
   }
   const offlineGround = await ev(`window.__clay.groundAt({ lat: 38.364236, lon: -75.605912 })`)
