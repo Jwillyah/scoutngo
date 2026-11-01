@@ -10,7 +10,7 @@
  * asserts that nothing on any of them is visible but unreachable.
  */
 
-import { goToStage, guardAudit, pressSuggest, setSheet, startWatchdog } from './preflight.mjs'
+import { goToStage, guardAudit, pressSuggest, setSheet, startWatchdog, APP_ORIGIN } from './preflight.mjs'
 
 /*
  * ARMED BEFORE ANYTHING ELSE CAN THROW.
@@ -255,7 +255,7 @@ const check = async (label) => {
 for (const h of [844, 660]) {
   await send('Emulation.setDeviceMetricsOverride',{width:390,height:h,deviceScaleFactor:3,mobile:true})
   await ev(`localStorage.clear()`)
-  await send('Page.navigate',{url:'http://127.0.0.1:5173/?calibration=1'})
+  await send('Page.navigate',{url:`${APP_ORIGIN}/?calibration=1`})
   await wait(8000)
   // Real iPhone insets, so anything pinned to an edge is audited under them.
   await ev(`document.documentElement.style.setProperty('--safe-top','47px')

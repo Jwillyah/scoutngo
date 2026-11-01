@@ -29,6 +29,7 @@
  * first and fails if any goes undetected, and fails on zero files read. The
  * screen half fails unless it read times on screen in both modes.
  */
+import { APP_ORIGIN } from './preflight.mjs'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 
@@ -124,11 +125,11 @@ async function screenHalf() {
   })()`
 
   const visit = async (clock) => {
-    await send('Page.navigate', { url: 'http://127.0.0.1:5173/' })
+    await send('Page.navigate', { url: `${APP_ORIGIN}/` })
     await wait(2500)
     await ev(`localStorage.clear(); localStorage.setItem('scoutngo.landing.v1','true');
       localStorage.setItem('scoutngo.settings', JSON.stringify({ showNumbers: true, showLabels: false, showTerrain: false, showBuildings: false, units: { wind: 'kt', distance: 'ft', clock: ${clock} } }))`)
-    await send('Page.navigate', { url: 'http://127.0.0.1:5173/?calibration=1&probe=1' })
+    await send('Page.navigate', { url: `${APP_ORIGIN}/?calibration=1&probe=1` })
     await wait(8000)
     await goToStage(ev, wait, 'plan')
     const pages = []

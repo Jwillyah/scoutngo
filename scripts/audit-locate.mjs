@@ -16,8 +16,8 @@
 import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { webkit, devices } from 'playwright'
-import { ensureApp, goToStage, guardAudit, startWatchdog } from './preflight.mjs'
+import { webkit, devices } from './gate/playwright.mjs'
+import { ensureApp, goToStage, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mjs'
 import { shareLink } from '../src/lib/planShare.ts'
 import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
 
@@ -26,7 +26,7 @@ const watchdog = startWatchdog('locate', 300_000)
 const OUT = process.argv[2] ?? join(process.env.SCOUTNGO_OUT ?? tmpdir(), 'locate')
 mkdirSync(OUT, { recursive: true })
 await ensureApp()
-const url = new URL(await shareLink('http://127.0.0.1:5173/', { id: 'loc', name: 'Locate check', savedAt: '2026-10-29T00:00:00Z', venue: { ...CALIBRATION_VENUE }, kit: { bodyIds: [], lensIds: [], droneIds: [], styleNotes: '' }, positions: [] }))
+const url = new URL(await shareLink(`${APP_ORIGIN}/`, { id: 'loc', name: 'Locate check', savedAt: '2026-10-29T00:00:00Z', venue: { ...CALIBRATION_VENUE }, kit: { bodyIds: [], lensIds: [], droneIds: [], styleNotes: '' }, positions: [] }))
 /* ?probe=1 puts the map on window.__probe, to read where it went. */
 url.searchParams.set('probe', '1')
 const HERE = { latitude: 34.2104, longitude: -77.7964 }
@@ -97,7 +97,7 @@ try {
         /* Retry asks again: the debug log has a second "locate: asked". */
         await page.locator('.offline-line button').first().tap()
         await wait(1500)
-        const asked = await ev(`(async () => { const m = await import('/src/lib/touchDebug.ts'); return m.touchLogLines().filter((l) => /locate: asked/.test(l)).length })()`)
+        const asked = await ev(`(window.__probe?.touchLog?.() ?? []).filter((l) => /locate: asked/.test(l)).length`)
         console.log(`  asked ${asked} times after Retry`)
         if (asked < 2) fail(`${label}: Retry did not ask again (${asked} asks in the log)`)
       }

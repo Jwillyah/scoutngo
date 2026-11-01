@@ -25,7 +25,7 @@
  * the whole point of it.
  */
 
-import { goToStage, guardAudit, setSheet, startWatchdog } from './preflight.mjs'
+import { goToStage, guardAudit, setSheet, startWatchdog, APP_ORIGIN } from './preflight.mjs'
 import { FLOATING_CHROME_SELECTORS, floatingChromeNodes } from '../src/lib/floatingChrome.ts'
 
 /*
@@ -197,7 +197,7 @@ const check = async (label) => {
 
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 3, mobile: true })
 await ev(`localStorage.clear()`)
-await send('Page.navigate', { url: 'http://127.0.0.1:5173/?calibration=1&probe=1' })
+await send('Page.navigate', { url: `${APP_ORIGIN}/?calibration=1&probe=1` })
 await wait(8000)
 
 await goToStage(ev, wait, 'plan')

@@ -34,17 +34,30 @@ no database, no analytics, no telemetry.
 
 ```
 tsc -b → oxlint --deny-warnings → viewport units → colour roles → clock
-       → measurements → tests → build → build stamp → reachability → labels
-       → gestures → standalone → viewfinder → fly → buildings → sky fire → terrain decode → special light → line up → privacy → wind → weather → locate → safari tab → venue pack → surface → overflow → projection → offline → api urls → 3d network
-       → airspace → call sheet → clock screen → service worker
+       → measurements → tests → build → build stamp
+       → browser audits (scripts/gate/browser-gate.sh), side by side:
+         reachability, labels, gestures (alone), standalone, viewfinder, fly,
+         buildings, sky fire, terrain decode, special light, line up, privacy,
+         wind, weather, locate, safari tab, venue pack, surface, overflow,
+         projection (alone), offline, api urls, 3d network, airspace,
+         call sheet, clock screen, service worker
+       → network guard
 ```
+
+**Nothing in the gate reaches a live host** (docs/gate.md). The browser audits
+run against one built server (`dist/` on :5180) with every browser behind a
+fixture proxy (:5181); the network guard fails the gate on any request no
+fixture answers and proves the browsers are behind the proxy. Unit tests
+refuse any non-local fetch (`tests/setup.ts`). A new host the app talks to
+needs a fixture in `scripts/gate/fixtures.mjs`, never a live call.
 
 `.githooks/pre-push` then builds the commit itself, not the working copy: a
 clean temporary worktree at the pushed sha, `npm ci`, `tsc -b`, build, tests.
 No `git stash` during a run; see failure-modes.md, "The gate built the disk".
 
-All of it must be clean before reporting. `SCOUTNGO_SKIP_AUDITS=1` exists and
-warns loudly; using it means saying so in the report.
+All of it must be clean before reporting. `SCOUTNGO_SKIP_AUDITS=1` is an
+emergency switch only: it skips every browser audit and the network guard,
+prints a loud warning, and using it means saying so in the report.
 
 ## Measurements
 

@@ -19,8 +19,8 @@
 import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { webkit, devices } from 'playwright'
-import { ensureApp, goToStage, guardAudit, startWatchdog } from './preflight.mjs'
+import { webkit, devices } from './gate/playwright.mjs'
+import { ensureApp, goToStage, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mjs'
 import { shareLink } from '../src/lib/planShare.ts'
 import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
 import { placeKey } from '../src/core/venueName.ts'
@@ -33,7 +33,7 @@ mkdirSync(OUT, { recursive: true })
 const PIER = { lat: 36.8435575, lon: -75.9713104 }
 await ensureApp()
 const venue = { ...CALIBRATION_VENUE, name: { key: placeKey(String(PIER.lat), String(PIER.lon)), name: 'Virginia Beach Fishing Pier' }, latitude: String(PIER.lat), longitude: String(PIER.lon), date: '2026-10-30', startTime: '06:00', endTime: '09:00' }
-const url = new URL(await shareLink('http://127.0.0.1:5173/', { id: 'special', name: 'Special check', savedAt: '2026-10-29T00:00:00Z', venue, kit: { bodyIds: [], lensIds: [], droneIds: [], styleNotes: '' }, positions: [] }))
+const url = new URL(await shareLink(`${APP_ORIGIN}/`, { id: 'special', name: 'Special check', savedAt: '2026-10-29T00:00:00Z', venue, kit: { bodyIds: [], lensIds: [], droneIds: [], styleNotes: '' }, positions: [] }))
 url.search = '?probe=1'
 
 let problems = 0

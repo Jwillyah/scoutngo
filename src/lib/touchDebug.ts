@@ -104,6 +104,16 @@ export function clearTouchLog(): void {
 /** The log as it stands, for the overlay's Copy and for tests. */
 export const touchLogLines = (): readonly string[] => state.lines
 
+/*
+ * With ?probe=1 the log is reachable as window.__probe.touchLog(), so an audit
+ * against the BUILT app can read it (the gate serves dist/, where there is no
+ * /src/ to import).
+ */
+if (typeof window !== 'undefined' && /[?&]probe=1/.test(window.location.search)) {
+  const w = window as unknown as { __probe?: Record<string, unknown> }
+  w.__probe = { ...(w.__probe ?? {}), touchLog: touchLogLines }
+}
+
 export function useTouchLog(): TouchDebugState {
   return useSyncExternalStore(
     (listener) => {

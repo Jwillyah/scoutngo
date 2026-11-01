@@ -1,7 +1,7 @@
 /*
  * THE 3D VIEW TALKS ONLY TO THE HOSTS THE APP ALREADY USES.
  *
- * Usage:  node scripts/audit-3d-network.mjs   (app on :5173, Chrome on :9222)
+ * Usage:  node scripts/audit-3d-network.mjs   (inside the gate: bash scripts/gate/browser-gate.sh "3d network")
  * Exits:  0 clean; 1 a request went somewhere else, or 3D failed offline; 2 could not look.
  *
  * Opens the 3D clay model at the calibration venue, waits for the globe to
@@ -24,13 +24,12 @@
  * elevation tiles, and the globe must say it finished loading.
  */
 import { connect } from './cdp.mjs'
-import { goToStage, guardAudit, startWatchdog } from './preflight.mjs'
+import { goToStage, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mjs'
 
 guardAudit('3d network')
 const watchdog = startWatchdog('3d network', 240_000)
 const ALLOWED = new Set([
-  '127.0.0.1:5173',
-  'localhost:5173',
+  new URL(APP_ORIGIN).host,
   'server.arcgisonline.com',
   /* The free aerial imagery the 3D view picks from, one per region (src/data/imagerySources.ts). */
   'vginmaps.vdem.virginia.gov',
@@ -78,10 +77,10 @@ try {
   if (typeof onEvent !== 'function') throw new Error('cdp.mjs gives no event hook; cannot watch requests')
   onEvent('Network.requestWillBeSent', (p) => record(p.request.url))
   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true })
-  await send('Page.navigate', { url: 'http://127.0.0.1:5173/' })
+  await send('Page.navigate', { url: `${APP_ORIGIN}/` })
   await wait(2500)
   await ev(`localStorage.setItem('scoutngo.landing.v1', 'true')`)
-  await send('Page.navigate', { url: 'http://127.0.0.1:5173/?calibration=1' })
+  await send('Page.navigate', { url: `${APP_ORIGIN}/?calibration=1` })
   await wait(8000)
   await goToStage(ev, wait, 'plan')
   await wait(1500)
@@ -175,7 +174,7 @@ try {
     }
     if (!seen.has(LIDAR)) fail('the tap asked nothing of the USGS lidar bucket')
     /* Leave nothing behind for the next audit. */
-    await send('Page.navigate', { url: 'http://127.0.0.1:5173/' })
+    await send('Page.navigate', { url: `${APP_ORIGIN}/` })
     await wait(1500)
     await ev(`indexedDB.deleteDatabase('scoutngo-lidar'), 1`)
   }

@@ -1,4 +1,4 @@
-import { ensureApp, ensureBrowser, PreflightError } from './preflight.mjs'
+import { ensureApp, ensureBrowser, PreflightError, APP_ORIGIN, CDP_ORIGIN } from './preflight.mjs'
 
 /*
  * ONE WAY IN FOR EVERY BROWSER AUDIT, AND IT CHECKS IT CAN LOOK FIRST.
@@ -29,17 +29,34 @@ export async function connect() {
    * inherits another script's tab is pointed at that script's leftovers
    * (shape C in docs/failure-modes.md).
    */
-  const response = await fetch('http://127.0.0.1:9222/json/new?about:blank', { method: 'PUT' })
-  if (!response.ok) {
-    throw new PreflightError(`the browser would not open a tab: HTTP ${response.status}`)
+  /*
+   * AND A PROFILE OF ITS OWN (29 Oct 2026, Batch C2). The gate now runs audits
+   * side by side in one Chrome, and tabs in one profile share localStorage:
+   * the clock audit's 24 hour setting would be read by whichever audit ran
+   * beside it. Each connection gets a fresh browser context, disposed with it.
+   */
+  const version = await fetch(`${CDP_ORIGIN}/json/version`).then((r) => r.json()).catch(() => null)
+  if (typeof version?.webSocketDebuggerUrl !== 'string') throw new PreflightError('the browser gave no browser-level debugger URL')
+  const bws = new WebSocket(version.webSocketDebuggerUrl)
+  await new Promise((r, j) => ((bws.onopen = r), (bws.onerror = () => j(new PreflightError('could not reach the browser target')))))
+  let bid = 0
+  const bp = new Map()
+  bws.onmessage = (e) => {
+    const m = JSON.parse(e.data)
+    if (m.id && bp.has(m.id)) {
+      bp.get(m.id)(m)
+      bp.delete(m.id)
+    }
   }
-  const target = await response.json()
-  if (target === undefined || target.type !== 'page') {
-    throw new PreflightError('the browser opened no page target to attach to')
+  const bsend = (method, params = {}) => new Promise((res) => { const i = ++bid; bp.set(i, res); bws.send(JSON.stringify({ id: i, method, params })) })
+  const browserContextId = (await bsend('Target.createBrowserContext', {})).result?.browserContextId
+  if (typeof browserContextId !== 'string') throw new PreflightError('the browser would not make a fresh context')
+  const created = await bsend('Target.createTarget', { url: 'about:blank', browserContextId })
+  const targetId = created.result?.targetId
+  if (typeof targetId !== 'string') {
+    throw new PreflightError(`the browser would not open a tab: ${created.error?.message ?? 'no target id'}`)
   }
-  if (typeof target.webSocketDebuggerUrl !== 'string') {
-    throw new PreflightError('the page target has no debugger URL')
-  }
+  const target = { id: targetId, type: 'page', webSocketDebuggerUrl: `${CDP_ORIGIN.replace(/^http/, 'ws')}/devtools/page/${targetId}` }
   const ws = new WebSocket(target.webSocketDebuggerUrl)
   await new Promise((r) => (ws.onopen = r))
   let id = 0; const p = new Map(); const errs = []
@@ -89,7 +106,7 @@ export async function connect() {
   await send('Network.enable'); await send('Network.setCacheDisabled', { cacheDisabled: true })
   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 3, mobile: true })
   await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 })
-  const load = async (url = 'http://127.0.0.1:5173/?calibration=1') => { await send('Page.navigate', { url }); await wait(7000) }
+  const load = async (url = `${APP_ORIGIN}/?calibration=1`) => { await send('Page.navigate', { url }); await wait(7000) }
 
   /*
    * Stop only what WE started. An audit run inside the commit hook finds the
@@ -99,7 +116,8 @@ export async function connect() {
   const dispose = async () => {
     disposing = true
     try { ws.close() } catch { /* already closed */ }
-    try { await fetch(`http://127.0.0.1:9222/json/close/${target.id}`) } catch { /* the browser is going anyway */ }
+    try { await bsend('Target.disposeBrowserContext', { browserContextId }) } catch { /* the browser is going anyway */ }
+    try { bws.close() } catch { /* already closed */ }
     await browser.stop()
     await app.stop()
   }

@@ -2280,8 +2280,19 @@
 }
 
 .frame--line .frame__num {
-  top: 50%;
+  top: 22px;
   transform: translateY(-50%);
+}
+
+/* The light row under the one line, full width (it is absolute over a picture). */
+.frame--line {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.frame--line .frame__light {
+  position: static;
+  margin-left: -44px;
 }
 
 .frame__retry {

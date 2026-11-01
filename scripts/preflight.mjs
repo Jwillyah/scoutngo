@@ -32,8 +32,52 @@ import { spawn } from 'node:child_process'
 import { existsSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
-export const APP_ORIGIN = 'http://127.0.0.1:5173'
-export const CDP_ORIGIN = 'http://127.0.0.1:9222'
+/*
+ * THE GATE SETS THESE. Run by hand, an audit uses the dev server on :5173 and
+ * Chrome on :9222 as it always did; inside the gate it is pointed at the one
+ * built server (scripts/gate/server.mjs) and every browser goes out through
+ * its fixture proxy, so no audit can reach a live host.
+ */
+export const APP_ORIGIN = process.env.SCOUTNGO_APP ?? 'http://127.0.0.1:5173'
+export const CDP_ORIGIN = process.env.SCOUTNGO_CDP ?? 'http://127.0.0.1:9222'
+/** The fixture proxy, e.g. http://127.0.0.1:5181, or null to use the real network. */
+export const FIXTURE_PROXY = process.env.SCOUTNGO_PROXY ?? null
+
+/**
+ * Chrome's flags for an audit browser. Behind the fixture proxy, HTTPS is
+ * answered with the gate's own throwaway certificate, so certificate errors
+ * are ignored, and only there. Loopback never goes through a proxy in Chrome.
+ */
+export function chromeArgs(port = Number(new URL(CDP_ORIGIN).port), dataDir = `${process.env.TMPDIR ?? '/tmp'}/scoutngo-audit-chrome`) {
+  const proxy = FIXTURE_PROXY === null ? [] : [`--proxy-server=${FIXTURE_PROXY}`, '--ignore-certificate-errors']
+  return [
+    `--remote-debugging-port=${port}`,
+    `--user-data-dir=${dataDir}`,
+    '--headless=new',
+    '--no-first-run',
+    '--hide-scrollbars',
+    '--use-gl=angle',
+    '--use-angle=swiftshader',
+    '--enable-unsafe-swiftshader',
+    /* Every tab drawn at full rate: audits run side by side in one browser. */
+    '--disable-background-timer-throttling',
+    '--disable-renderer-backgrounding',
+    '--disable-backgrounding-occluded-windows',
+    /*
+     * Chrome's own calls home (updates, accounts, autofill, safe browsing):
+     * not the app's, and the network guard counted them (1 Nov). Off.
+     */
+    '--disable-background-networking',
+    '--disable-component-update',
+    '--disable-sync',
+    '--disable-default-apps',
+    '--no-default-browser-check',
+    '--disable-client-side-phishing-detection',
+    '--disable-features=AutofillServerCommunication,OptimizationHints,MediaRouter,Translate',
+    ...proxy,
+    'about:blank',
+  ]
+}
 
 /** The app's own root element, so "something answers on 5173" is not enough. */
 const APP_MARKER = 'id="root"'
@@ -102,12 +146,12 @@ async function browserIsUp() {
   return { up: true }
 }
 
-const CHROME_CANDIDATES = [
+export const CHROME_CANDIDATES = [
   `${process.env.HOME}/Library/Caches/ms-playwright/chromium-1243/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing`,
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
 ]
 
-function findChrome() {
+export function findChrome() {
   for (const path of CHROME_CANDIDATES) if (existsSync(path)) return path
   return null
 }
@@ -266,21 +310,7 @@ export async function ensureBrowser({ start = true } = {}) {
   }
 
   process.stderr.write(`  no browser on ${CDP_ORIGIN}, launching one\n`)
-  const child = spawn(
-    chrome,
-    [
-      '--remote-debugging-port=9222',
-      `--user-data-dir=${process.env.TMPDIR ?? '/tmp'}/scoutngo-audit-chrome`,
-      '--headless=new',
-      '--no-first-run',
-      '--hide-scrollbars',
-      '--use-gl=angle',
-      '--use-angle=swiftshader',
-      '--enable-unsafe-swiftshader',
-      'about:blank',
-    ],
-    { stdio: 'ignore', detached: true },
-  )
+  const child = spawn(chrome, chromeArgs(), { stdio: 'ignore', detached: true })
   child.unref()
 
   for (let i = 0; i < 40; i += 1) {

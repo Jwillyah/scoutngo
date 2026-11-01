@@ -24,7 +24,7 @@
  */
 import { readFileSync } from 'node:fs'
 import ts from 'typescript'
-import { webkit } from 'playwright'
+import { webkit } from './gate/playwright.mjs'
 import { decodePng, terrariumMetres } from '../src/lib/png.ts'
 import { guardAudit, startWatchdog } from './preflight.mjs'
 

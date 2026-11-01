@@ -21,8 +21,9 @@
  * the square at the map centre, read in the page from the same lookup the card
  * uses, so the audit is about this square and not "some tag says something".
  */
+import { facilityCellAt } from '../src/lib/uasfm.ts'
 import { connect } from './cdp.mjs'
-import { goToStage, guardAudit, setSheet, startWatchdog } from './preflight.mjs'
+import { goToStage, guardAudit, setSheet, startWatchdog, APP_ORIGIN } from './preflight.mjs'
 
 guardAudit('airspace')
 const watchdog = startWatchdog('airspace', 240_000)
@@ -31,10 +32,10 @@ const { send, ev, wait, dispose } = await connect()
 const ATLANTIC_PARK = { lat: 36.84658, lon: -75.97666 }
 const SHENANDOAH = { lat: 38.5285, lon: -78.4383 }
 
-await send('Page.navigate', { url: 'http://127.0.0.1:5173/' })
+await send('Page.navigate', { url: `${APP_ORIGIN}/` })
 await wait(3000)
 await ev(`localStorage.clear(); localStorage.setItem('scoutngo.landing.v1','true')`)
-await send('Page.navigate', { url: 'http://127.0.0.1:5173/?calibration=1&probe=1' })
+await send('Page.navigate', { url: `${APP_ORIGIN}/?calibration=1&probe=1` })
 await wait(8000)
 await goToStage(ev, wait, 'plan')
 watchdog.note('plan')
@@ -94,8 +95,7 @@ check(cells > 0, `grid squares rendered: ${cells} features`)
 const tag = await ev(`(async () => {
   const map = window.__probe.map
   const c = map.getCenter()
-  const { facilityCellAt } = await import('/src/lib/uasfm.ts')
-  const want = facilityCellAt(c.lat, c.lng)?.ceilingFeet ?? null
+  const want = c
   const centre = map.project(c)
   const rect = map.getCanvas().getBoundingClientRect()
   let best = null
@@ -106,6 +106,7 @@ const tag = await ev(`(async () => {
   }
   return { want, got: best?.text ?? null, distance: best === null ? null : Math.round(best.d) }
 })()`)
+tag.want = facilityCellAt(tag.want.lat, tag.want.lng)?.ceilingFeet ?? null
 if (tag.want === null) abort('the grid holds no square at the Atlantic Park centre, so the tag could not be checked')
 check(tag.got === String(tag.want), `ceiling tag nearest the centre reads ${tag.got} ft; the grid holds ${tag.want} ft (tag ${tag.distance}px from centre)`)
 watchdog.note('atlantic park')

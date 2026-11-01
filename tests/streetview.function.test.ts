@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as streetview from '../api/streetview.ts'
 
 const original = process.env.GOOGLE_MAPS_API_KEY
@@ -47,7 +47,14 @@ describe('streetview function', () => {
 
   it('never leaks the key', async () => {
     process.env.GOOGLE_MAPS_API_KEY = 'AIza-secret-value'
+    /*
+     * A saved answer, not Google (this test reached the live API until the
+     * network guard in tests/setup.ts caught it, 1 Nov). The fixture echoes
+     * the URL it was asked, key and all, the worst case for a leak.
+     */
+    vi.stubGlobal('fetch', async (url: string) => new Response(JSON.stringify({ status: 'REQUEST_DENIED', error_message: `bad request ${url}` }), { status: 403 }))
     const response = await get({ lat: 38.36, lon: -75.6 })
+    vi.unstubAllGlobals()
     expect(await response.text()).not.toContain('AIza-secret-value')
   })
 

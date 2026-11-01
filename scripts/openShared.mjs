@@ -6,7 +6,7 @@
 import { shareLink } from '../src/lib/planShare.ts'
 import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
 import { placeKey } from '../src/core/venueName.ts'
-import { goToStage } from './preflight.mjs'
+import { goToStage, APP_ORIGIN } from './preflight.mjs'
 
 /** Opens `place` ({ lat, lon, name, date, start, end }) and lands in Plan. */
 export async function openShared({ send, ev, wait }, place) {
@@ -19,8 +19,8 @@ export async function openShared({ send, ev, wait }, place) {
     startTime: place.start,
     endTime: place.end,
   }
-  const link = await shareLink('http://127.0.0.1:5173/', { id: 'shared', name: place.name, savedAt: `${place.date}T00:00:00Z`, venue, kit: { bodyIds: [], lensIds: [], droneIds: [], styleNotes: '' }, positions: [] })
-  await send('Page.navigate', { url: 'http://127.0.0.1:5173/' })
+  const link = await shareLink(`${APP_ORIGIN}/`, { id: 'shared', name: place.name, savedAt: `${place.date}T00:00:00Z`, venue, kit: { bodyIds: [], lensIds: [], droneIds: [], styleNotes: '' }, positions: [] })
+  await send('Page.navigate', { url: `${APP_ORIGIN}/` })
   await wait(2500)
   await ev(`localStorage.clear(); localStorage.setItem('scoutngo.landing.v1','true')`)
   await send('Page.navigate', { url: 'about:blank' })

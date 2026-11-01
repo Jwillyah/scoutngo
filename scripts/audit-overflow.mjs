@@ -30,7 +30,7 @@
  * short, or the run fails rather than passing on a short one.
  */
 import { connect } from './cdp.mjs'
-import { goToStage, guardAudit, setSheet, startWatchdog } from './preflight.mjs'
+import { goToStage, guardAudit, setSheet, startWatchdog, APP_ORIGIN } from './preflight.mjs'
 import { shareLink } from '../src/lib/planShare.ts'
 import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
 import { placeKey } from '../src/core/venueName.ts'
@@ -42,7 +42,7 @@ const LONG_NAME = 'Virginia Beach Fishing Pier and Oceanfront Boardwalk at Fifte
 const PIER = { lat: 36.8435575, lon: -75.9713104 }
 
 const venue = { ...CALIBRATION_VENUE, name: { key: placeKey(String(PIER.lat), String(PIER.lon)), name: `${LONG_NAME}, Virginia Beach` }, latitude: String(PIER.lat), longitude: String(PIER.lon), date: '2026-10-27', startTime: '07:11', endTime: '08:30' }
-const link = await shareLink('http://127.0.0.1:5173/', { id: 'vb', name: 'Overflow check', savedAt: '2026-10-27T00:00:00Z', venue, kit: { bodyIds: [], lensIds: [], droneIds: [], styleNotes: '' }, positions: [] })
+const link = await shareLink(`${APP_ORIGIN}/`, { id: 'vb', name: 'Overflow check', savedAt: '2026-10-27T00:00:00Z', venue, kit: { bodyIds: [], lensIds: [], droneIds: [], styleNotes: '' }, positions: [] })
 
 const { send, ev, wait, dispose, onEvent } = await connect()
 let problems = 0
@@ -115,7 +115,7 @@ try {
     void send('Fetch.fulfillRequest', { requestId: p.requestId, responseCode: 200, responseHeaders: [{ name: 'Access-Control-Allow-Origin', value: '*' }, { name: 'Content-Type', value: 'application/json' }], body })
   })
   await send('Emulation.setDeviceMetricsOverride', { width: WIDTH, height: 844, deviceScaleFactor: 2, mobile: true })
-  await send('Page.navigate', { url: 'http://127.0.0.1:5173/' })
+  await send('Page.navigate', { url: `${APP_ORIGIN}/` })
   await wait(2500)
   await ev(`localStorage.clear(); localStorage.setItem('scoutngo.landing.v1','true')`)
   await send('Page.navigate', { url: 'about:blank' })

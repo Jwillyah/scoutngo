@@ -14,7 +14,11 @@
 # itself if they are not already up, because a gate you have to prepare for is
 # one you will eventually bypass.
 #
-# Escape hatch, for a genuine emergency only, and it says so loudly:
+# Nothing in it reaches a live host: the browser audits run against the built
+# app and a fixture proxy (scripts/gate/), side by side, in under ten minutes.
+#
+# Emergency switch only, and it says so loudly (docs/gate.md). No audit needs
+# it any more: the 3D audit that used to wait on live imagery uses fixtures.
 #   SCOUTNGO_SKIP_AUDITS=1 git commit ...
 set -uo pipefail
 
@@ -27,6 +31,8 @@ step() { echo "${DIM}· $1${OFF}"; }
 
 SCRATCH="$(mktemp -d)"
 trap 'rm -rf "$SCRATCH"' EXIT
+GATE_BEGAN=$(date +%s)
+took() { local s=$(( $(date +%s) - GATE_BEGAN )); printf '%dm%02ds' $((s / 60)) $((s % 60)); }
 
 # ---------------------------------------------------------------- fast gate
 step "typecheck"
@@ -70,219 +76,17 @@ ok "$(tail -1 "$SCRATCH/stamp.log" | sed 's/=== //;s/ ===//')"
 
 # ------------------------------------------------------------ browser gate
 if [ "${SCOUTNGO_SKIP_AUDITS:-0}" = "1" ]; then
-  echo "${YELLOW}!  BROWSER AUDITS SKIPPED by SCOUTNGO_SKIP_AUDITS=1.${OFF}"
-  echo "${YELLOW}   Reachability and projection were NOT checked for this commit.${OFF}"
+  echo "${YELLOW}!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!${OFF}"
+  echo "${YELLOW}!  EMERGENCY SWITCH: BROWSER AUDITS SKIPPED by SCOUTNGO_SKIP_AUDITS=1.${OFF}"
+  echo "${YELLOW}!  Nothing on screen was checked for this commit, and the network guard${OFF}"
+  echo "${YELLOW}!  did not run. Say so in the report (CLAUDE.md, docs/gate.md).${OFF}"
+  echo "${YELLOW}!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!${OFF}"
   exit 0
 fi
 
-up() { curl -s -o /dev/null -m 2 "$1" 2>/dev/null; }
+# One built server (dist/, just built above), one Chrome and every WebKit
+# behind the fixture proxy, the audits side by side, the network guard last.
+# See scripts/gate/browser-gate.sh and docs/gate.md.
+SCOUTNGO_OUT="$SCRATCH" bash scripts/gate/browser-gate.sh || fail "browser audits ($(took))"
 
-if ! up http://127.0.0.1:5173/; then
-  step "starting the app on :5173"
-  nohup npx vercel dev --listen 5173 > "$SCRATCH/dev.log" 2>&1 &
-  for _ in $(seq 1 90); do up http://127.0.0.1:5173/ && break; sleep 1; done
-  up http://127.0.0.1:5173/ || { tail -20 "$SCRATCH/dev.log"; fail "could not start the app"; }
-fi
-ok "app on :5173"
-
-# ------------------------------------------------------------------ warm up
-#
-# WHY A WARM-UP AND NOT JUST A PORT CHECK.
-#
-# `vercel dev` answers 200 on / the moment it is listening, which is BEFORE
-# Vite has compiled the module graph. The first real page load then takes
-# longer than the audits' seven second settle, and the probe clicks into a
-# half-rendered app: the reachability audit threw, printed no problems at all,
-# and the hook refused a commit whose code was fine.
-#
-# That is the worst failure a gate can have. A check that fails for reasons
-# unrelated to the change teaches you to re-run it until it passes, which is
-# the same habit as ignoring it. So the app is asked for the real page and
-# given until it serves the app shell before anything is audited.
-step "warming the app"
-WARM=0
-for _ in $(seq 1 60); do
-  if curl -s -m 5 http://127.0.0.1:5173/ | grep -q 'id="root"'; then WARM=1; break; fi
-  sleep 1
-done
-[ "$WARM" = "1" ] || fail "the app never served its shell on :5173"
-# One more fetch, so the first audit is not the request that triggers the
-# dependency pre-bundle.
-curl -s -o /dev/null -m 20 http://127.0.0.1:5173/ || true
-ok "app warm"
-
-# A FRESH BROWSER FOR EVERY GATE. A headless Chrome left running for hours
-# (3D scenes, a hundred tabs) hung the gesture audit mid-flick on 29 Oct and
-# dropped its connection on another run; a new one passed the same code
-# clean. Only a HEADLESS Chrome on :9222 is stopped: that is the audits'
-# browser, never a person's.
-if pkill -f 'remote-debugging-port=9222.*--headless' 2>/dev/null; then
-  step "stopped the headless Chrome already on :9222, for a fresh one"
-  for _ in $(seq 1 20); do up http://127.0.0.1:9222/json/version || break; sleep 0.5; done
-fi
-if ! up http://127.0.0.1:9222/json/version; then
-  step "starting headless Chrome on :9222"
-  CHROME="$HOME/Library/Caches/ms-playwright/chromium-1243/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
-  [ -x "$CHROME" ] || CHROME="$(command -v google-chrome-stable || command -v chromium || true)"
-  [ -n "${CHROME:-}" ] || fail "no Chrome found for the browser audits"
-  nohup "$CHROME" --remote-debugging-port=9222 --user-data-dir="$SCRATCH/chrome" \
-    --headless=new --no-first-run --hide-scrollbars \
-    --use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader \
-    about:blank > "$SCRATCH/chrome.log" 2>&1 &
-  for _ in $(seq 1 40); do up http://127.0.0.1:9222/json/version && break; sleep 1; done
-  up http://127.0.0.1:9222/json/version || fail "could not start Chrome"
-fi
-ok "chrome on :9222"
-
-# connect() in scripts/cdp.mjs picks the first target of type "page". A Chrome
-# that has only just started may not have one yet, and the audit throws on
-# `target.webSocketDebuggerUrl` of undefined.
-step "waiting for a page target"
-for _ in $(seq 1 30); do
-  curl -s -m 3 http://127.0.0.1:9222/json/list | grep -q '"type": *"page"' && break
-  sleep 1
-done
-curl -s -m 3 http://127.0.0.1:9222/json/list | grep -q '"type": *"page"' \
-  || fail "Chrome started but never opened a page target"
-ok "page target ready"
-
-
-# ---------------------------------------------------------------- audit runner
-#
-# WHY THIS IS A FUNCTION AND NOT FOUR GREPS.
-#
-# Each audit used to be run as:
-#
-#   node scripts/audit-x.mjs > log || { grep -E 'PROBLEM|TOTAL' log; fail "x"; }
-#
-# which prints a reason ONLY IF the audit happened to use one of the words in
-# that grep. The reachability audit's watchdog printed "TIMED OUT", which
-# matches none of them, so a slow run refused a commit with one red line and
-# no explanation. Twice.
-#
-# The lesson is not "add TIMED OUT to the grep". It is that a reporter which
-# can only report what it was told to expect will go silent the first time
-# something new goes wrong, which is the same shape as every blind check in
-# this repo. So on failure this prints the TAIL OF THE LOG unconditionally,
-# whatever is in it, and the grep is only there to put the interesting lines
-# first. There is no longer any way for an audit to fail without saying
-# something.
-run_audit() {
-  local name="$1" script="$2" log="$3" pattern="$4"
-  step "$name"
-  if SCOUTNGO_OUT="$SCRATCH" node "$script" > "$log" 2>&1; then
-    return 0
-  fi
-  echo "${YELLOW}  --- what $name actually printed (last 25 lines) ---${OFF}"
-  tail -25 "$log"
-  echo "${YELLOW}  --- lines matching $pattern ---${OFF}"
-  grep -E "$pattern" "$log" | tail -20 || echo "  (none: see the tail above)"
-  fail "$name"
-}
-
-run_audit "reachability audit" scripts/audit-reachability.mjs "$SCRATCH/reach.log" 'PROBLEM|TOTAL|ABORTED'
-ok "$(grep -E 'TOTAL PROBLEMS' "$SCRATCH/reach.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
-
-run_audit "label collision audit" scripts/audit-labels.mjs "$SCRATCH/labels.log" 'FAIL|LABEL PROBLEMS|over |ABORTED'
-ok "$(grep -E 'LABEL PROBLEMS' "$SCRATCH/labels.log" | tail -1)"
-
-# Every gesture in docs/gestures.md, with real touch input: pinches, flicks,
-# the ruler, the tide curve, targets of 44 px, nothing over the map but controls.
-run_audit "gesture audit" scripts/audit-gestures.mjs "$SCRATCH/gestures.log" 'PROBLEM|ABORTED'
-ok "$(grep -E 'GESTURE PROBLEMS' "$SCRATCH/gestures.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
-
-# The home-screen app, in WebKit: the iPhone insets (47 top, 34 bottom) that
-# every Chromium audit sees as zero. Layers at each detent, the band over the
-# home indicator, and no map label under the status bar.
-run_audit "standalone audit" scripts/audit-standalone.mjs "$SCRATCH/standalone.log" 'PROBLEM|ABORTED'
-ok "$(grep -E 'STANDALONE PROBLEMS' "$SCRATCH/standalone.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
-
-run_audit "viewfinder audit" scripts/audit-viewfinder.mjs "$SCRATCH/viewfinder.log" 'PROBLEM|ABORTED'
-ok "$(grep -E 'VIEWFINDER PROBLEMS' "$SCRATCH/viewfinder.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
-
-run_audit "fly audit" scripts/audit-fly.mjs "$SCRATCH/fly.log" 'PROBLEM|ABORTED'
-ok "$(grep -E 'FLY PROBLEMS' "$SCRATCH/fly.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
-
-run_audit "buildings audit" scripts/audit-buildings.mjs "$SCRATCH/buildings.log" 'PROBLEM|ABORTED'
-ok "$(grep -E 'BUILDINGS PROBLEMS' "$SCRATCH/buildings.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
-
-run_audit "sky fire audit" scripts/audit-skyfire.mjs "$SCRATCH/skyfire.log" 'PROBLEM|ABORTED'
-ok "$(grep -E 'SKY FIRE PROBLEMS' "$SCRATCH/skyfire.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
-
-# Elevation read from the PNG's bytes in WebKit, with its canvas noise on:
-# exact against the file, and the comparison shown failing on a noised canvas.
-run_audit "terrain decode audit" scripts/audit-terrain-decode.mjs "$SCRATCH/terraindecode.log" 'PROBLEM|ABORTED'
-ok "$(grep -E 'TERRAIN DECODE PROBLEMS' "$SCRATCH/terraindecode.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
-
-# Special light this week in WebKit, tab and standalone: the status line, the list, the bow on the map.
-run_audit "special light audit" scripts/audit-special.mjs "$SCRATCH/special.log" 'PROBLEM|ABORTED'
-ok "$(grep -E 'SPECIAL LIGHT PROBLEMS' "$SCRATCH/special.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
-
-# Line it up in WebKit, tab and standalone: pick the pier end, the list in words within half a degree, a tap jumps the time.
-run_audit "line up audit" scripts/audit-lineup.mjs "$SCRATCH/lineup.log" 'PROBLEM|ABORTED'
-ok "$(grep -E 'LINE UP PROBLEMS' "$SCRATCH/lineup.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
-
-# /privacy in WebKit, tab and standalone: the zeros, one row per allowlisted host, the live check, Vercel's logs, Export and Clear.
-run_audit "privacy audit" scripts/audit-privacy.mjs "$SCRATCH/privacy.log" 'PROBLEM|ABORTED'
-ok "$(grep -E 'PRIVACY PROBLEMS' "$SCRATCH/privacy.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
-
-# The Wind page in WebKit, tab and standalone: five models, FROM and TO, the rated line, measured now.
-run_audit "wind audit" scripts/audit-wind.mjs "$SCRATCH/wind.log" 'PROBLEM|ABORTED'
-ok "$(grep -E 'WIND PROBLEMS' "$SCRATCH/wind.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
-run_audit "weather audit" scripts/audit-weather.mjs "$SCRATCH/weather.log" 'PROBLEM|ABORTED'
-ok "$(grep -E 'WEATHER PROBLEMS' "$SCRATCH/weather.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
-run_audit "locate audit" scripts/audit-locate.mjs "$SCRATCH/locate.log" 'PROBLEM|ABORTED'
-ok "$(grep -E 'LOCATE PROBLEMS' "$SCRATCH/locate.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
-run_audit "safari tab audit" scripts/audit-safari-tab.mjs "$SCRATCH/safari-tab.log" 'PROBLEM|ABORTED'
-ok "$(grep -E 'SAFARI TAB PROBLEMS' "$SCRATCH/safari-tab.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
-
-# Save for offline, then no network at all: the built app reloads from its
-# service worker and the map, chips, tide curve, sun line and shadows draw
-# from the pack, in WebKit as a tab and standalone (src/lib/venuePack.ts).
-run_audit "venue pack audit" scripts/audit-venue-pack.mjs "$SCRATCH/venuepack.log" 'PROBLEM|ABORTED'
-ok "$(grep -E 'VENUE PACK PROBLEMS' "$SCRATCH/venuepack.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
-
-run_audit "one surface audit" scripts/audit-surface.mjs "$SCRATCH/surface.log" 'PROBLEM|FAIL|ABORTED'
-ok "$(grep -E 'SURFACE PROBLEMS' "$SCRATCH/surface.log" | tail -1)"
-
-# Nothing scrolls sideways: every screen at 390 px, with a long venue name,
-# which is what pushed the Setup sheet off an iPhone on 27 Oct.
-run_audit "overflow audit" scripts/audit-overflow.mjs "$SCRATCH/overflow.log" 'PROBLEM|ABORTED'
-ok "$(grep -E 'OVERFLOW PROBLEMS' "$SCRATCH/overflow.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
-
-run_audit "projection audit" scripts/audit-projection.mjs "$SCRATCH/proj.log" 'FAIL|ABORTED'
-ok "$(grep -E 'PROJECTION FAILURES' "$SCRATCH/proj.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
-
-# With every request off the app's origin cut, in airplane mode AND with
-# requests that hang: sun, moon, a position, its cone and the sun ray must be
-# on the glass with no error state. See docs/offline.md for why "hang" is the
-# case that broke in Shenandoah.
-run_audit "offline audit" scripts/audit-offline.mjs "$SCRATCH/offline.log" 'PROBLEM|ABORTED'
-ok "$(grep -E 'OFFLINE PROBLEMS' "$SCRATCH/offline.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
-
-# The service worker keeps the app shell for a cold launch with no signal. The
-# condition for having one at all: a new deploy is still adopted. Two real
-# builds, a real browser, every step named. See docs/deploys.md.
-# Vercel logs request paths. No coordinate, place or date may ride in an /api
-# URL: the running app's own calls are watched, and both endpoints must be seen.
-run_audit "api url audit" scripts/audit-api-urls.mjs "$SCRATCH/apiurl.log" 'PROBLEM|ABORTED'
-ok "$(grep -E 'API URL PROBLEMS' "$SCRATCH/apiurl.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
-
-# The 3D clay model: only the app's own hosts, and it opens with no signal.
-run_audit "3d network audit" scripts/audit-3d-network.mjs "$SCRATCH/3dnetwork.log" 'PROBLEM|ABORTED'
-ok "$(grep -E '3D NETWORK PROBLEMS' "$SCRATCH/3dnetwork.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
-
-run_audit "airspace audit" scripts/audit-airspace.mjs "$SCRATCH/airspace.log" 'PROBLEM|ABORTED'
-ok "$(grep -E 'AIRSPACE PROBLEMS' "$SCRATCH/airspace.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
-
-run_audit "call sheet audit" scripts/audit-callsheet.mjs "$SCRATCH/callsheet.log" 'PROBLEM|ABORTED'
-ok "$(grep -E 'CALL SHEET PROBLEMS' "$SCRATCH/callsheet.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
-
-# The times on the glass, at 12 hour and at 24: none that missed the formatter.
-run_audit "clock screen audit" scripts/audit-clock-screen.mjs "$SCRATCH/clockscreen.log" 'PROBLEM|ABORTED'
-ok "$(grep -E 'CLOCK SCREEN PROBLEMS' "$SCRATCH/clockscreen.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
-
-run_audit "service worker audit" scripts/audit-sw-update.mjs "$SCRATCH/sw.log" 'PROBLEM|ABORTED'
-ok "$(grep -E 'SERVICE WORKER PROBLEMS' "$SCRATCH/sw.log" | tail -1 | tr -d '=' | sed 's/^ *//')"
-
-echo "${GREEN}all gates passed${OFF}"
+echo "${GREEN}all gates passed in $(took)${OFF}"

@@ -17,8 +17,8 @@
 import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { webkit, devices } from 'playwright'
-import { ensureApp, goToStage, guardAudit, startWatchdog } from './preflight.mjs'
+import { webkit, devices } from './gate/playwright.mjs'
+import { ensureApp, goToStage, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mjs'
 import { shareLink } from '../src/lib/planShare.ts'
 import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
 import { OPEN_METEO, fakeAnswer } from './openMeteoFake.mjs'
@@ -30,7 +30,7 @@ mkdirSync(OUT, { recursive: true })
 await ensureApp()
 const NOW = new Date('2026-10-30T11:30:00Z')
 const venue = { ...CALIBRATION_VENUE, latitude: '36.8435575', longitude: '-75.9713104', date: '2026-10-30', startTime: '07:00', endTime: '08:00' }
-const url = new URL(await shareLink('http://127.0.0.1:5173/', { id: 'tab', name: 'Tab check', savedAt: '2026-10-29T00:00:00Z', venue, kit: { bodyIds: [], lensIds: [], droneIds: ['dji-air-3s'], styleNotes: '' }, positions: [] }))
+const url = new URL(await shareLink(`${APP_ORIGIN}/`, { id: 'tab', name: 'Tab check', savedAt: '2026-10-29T00:00:00Z', venue, kit: { bodyIds: [], lensIds: [], droneIds: ['dji-air-3s'], styleNotes: '' }, positions: [] }))
 
 let problems = 0
 let surfaces = 0
@@ -93,7 +93,7 @@ try {
   {
     const hctx = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height: 664 }, serviceWorkers: 'block' })
     const home = await hctx.newPage()
-    await home.goto('http://127.0.0.1:5173/')
+    await home.goto(`${APP_ORIGIN}/`)
     await home.waitForTimeout(2500)
     const fit = await home.evaluate(`(() => {
       const c = document.querySelector('.cover')

@@ -14,8 +14,8 @@
 import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { webkit, devices } from 'playwright'
-import { ensureApp, goToStage, guardAudit, startWatchdog } from './preflight.mjs'
+import { webkit, devices } from './gate/playwright.mjs'
+import { ensureApp, goToStage, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mjs'
 import { shareLink } from '../src/lib/planShare.ts'
 import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
 import { placeKey } from '../src/core/venueName.ts'
@@ -31,7 +31,7 @@ const END = { lat: 36.8432, lon: -75.9676 }
 const NOW = new Date('2026-10-30T14:00:00Z')
 await ensureApp()
 const venue = { ...CALIBRATION_VENUE, name: { key: placeKey(String(PIER.lat), String(PIER.lon)), name: 'Virginia Beach Fishing Pier' }, latitude: String(PIER.lat), longitude: String(PIER.lon), date: '2026-10-30', startTime: '09:00', endTime: '11:00' }
-const url = new URL(await shareLink('http://127.0.0.1:5173/', { id: 'lineup', name: 'Line up check', savedAt: '2026-10-29T00:00:00Z', venue, kit: { bodyIds: [], lensIds: [], droneIds: [], styleNotes: '' }, positions: [] }))
+const url = new URL(await shareLink(`${APP_ORIGIN}/`, { id: 'lineup', name: 'Line up check', savedAt: '2026-10-29T00:00:00Z', venue, kit: { bodyIds: [], lensIds: [], droneIds: [], styleNotes: '' }, positions: [] }))
 url.search = '?probe=1'
 
 let problems = 0
@@ -47,7 +47,7 @@ try {
     console.log(`\n### ${label}`)
     const ctx = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height: 844 } })
     /* Nothing outside: the finder is arithmetic, and the map's buildings are not needed for a pier. */
-    await ctx.route((u) => !u.href.startsWith('http://127.0.0.1:5173'), (r) => r.abort())
+    await ctx.route((u) => !u.href.startsWith(`${APP_ORIGIN}`), (r) => r.abort())
     await ctx.addInitScript(([top, bottom]) => {
       /* Past the cover: this is about the Sky card, and the cover over it took the taps on a cold dev server. */
       try {

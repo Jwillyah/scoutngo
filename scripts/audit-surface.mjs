@@ -52,7 +52,7 @@
  *      opening the sheet, which is one action with no nesting.
  */
 import { readFileSync } from 'node:fs'
-import { goToStage, guardAudit, startWatchdog } from './preflight.mjs'
+import { goToStage, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mjs'
 
 guardAudit('surface')
 
@@ -77,9 +77,9 @@ await send('Emulation.setDeviceMetricsOverride', {
   mobile: true,
 })
 await ev(`localStorage.clear()`)
-await load('http://127.0.0.1:5173/?calibration=1&probe=1')
+await load(`${APP_ORIGIN}/?calibration=1&probe=1`)
 await ev(`localStorage.setItem('scoutngo.landing.v1','true')`)
-await load('http://127.0.0.1:5173/?calibration=1&probe=1')
+await load(`${APP_ORIGIN}/?calibration=1&probe=1`)
 await wait(6000)
 await goToStage(ev, wait, 'plan')
 await wait(4500)

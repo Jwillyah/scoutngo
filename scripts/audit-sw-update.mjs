@@ -45,11 +45,11 @@ import { execSync } from 'node:child_process'
 import { mkdtempSync, mkdirSync, readFileSync, existsSync, statSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { join, extname } from 'node:path'
-import { webkit, devices } from 'playwright'
+import { webkit, devices } from './gate/playwright.mjs'
 import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
 import { COLD_LOAD_MS } from '../src/lib/adoptBuild.ts'
 import { tmpdir } from 'node:os'
-import { ensureBrowser, guardAudit, startWatchdog } from './preflight.mjs'
+import { ensureBrowser, guardAudit, startWatchdog, CDP_ORIGIN } from './preflight.mjs'
 
 guardAudit('service worker')
 const watchdog = startWatchdog('service worker', 900_000)
@@ -135,7 +135,7 @@ await new Promise((r) => server.listen(PORT, '127.0.0.1', r))
 /* ------------------------------------------------------------- the browser */
 
 const browser = await ensureBrowser()
-const version = await (await fetch('http://127.0.0.1:9222/json/version')).json()
+const version = await (await fetch(`${CDP_ORIGIN}/json/version`)).json()
 const ws = new WebSocket(version.webSocketDebuggerUrl)
 await new Promise((r) => (ws.onopen = r))
 let nextId = 0

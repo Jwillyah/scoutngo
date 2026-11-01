@@ -27,7 +27,7 @@
 
 import { regionView } from '../src/core/regionView.ts'
 import { RAY_SCREEN_FRACTION } from '../src/lib/rayLength.ts'
-import { goToStage, guardAudit, pressSuggest, setSheet, startWatchdog } from './preflight.mjs'
+import { goToStage, guardAudit, pressSuggest, setSheet, startWatchdog, APP_ORIGIN } from './preflight.mjs'
 
 /*
  * ARMED BEFORE ANYTHING ELSE CAN THROW.
@@ -489,11 +489,11 @@ await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, devi
  * app began remembering the last setup (src/lib/lastSetup.ts), the overflow
  * audit's venue was still there and the map opened on it.
  */
-await send('Page.navigate', { url: 'http://127.0.0.1:5173/?probe=1' })
+await send('Page.navigate', { url: `${APP_ORIGIN}/?probe=1` })
 await wait(1500)
 await ev(`localStorage.clear()`)
 await send('Page.navigate', { url: 'about:blank' })
-await send('Page.navigate', { url: 'http://127.0.0.1:5173/?probe=1' })
+await send('Page.navigate', { url: `${APP_ORIGIN}/?probe=1` })
 await wait(8000)
 if (await ev(`localStorage.getItem('scoutngo.lastSetup.v1')`) !== null) {
   /* Written by this load would mean a venue appeared on its own. */
@@ -544,7 +544,7 @@ if (await ev(`localStorage.getItem('scoutngo.lastSetup.v1')`) !== null) {
 }
 
 await ev(`localStorage.clear()`)
-await send('Page.navigate', { url: 'http://127.0.0.1:5173/?calibration=1&probe=1' })
+await send('Page.navigate', { url: `${APP_ORIGIN}/?calibration=1&probe=1` })
 await wait(8000)
 
 for (const [z, name] of [[13, 'wide'], [16, 'mid'], [19, 'tight']]) {

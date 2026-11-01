@@ -13,8 +13,8 @@
 import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { webkit, devices } from 'playwright'
-import { ensureApp, guardAudit, startWatchdog } from './preflight.mjs'
+import { webkit, devices } from './gate/playwright.mjs'
+import { ensureApp, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mjs'
 import { HOSTS } from '../src/lib/hosts.ts'
 
 guardAudit('privacy')
@@ -41,7 +41,7 @@ try {
      * would leave the live check nothing to see (checked 29 Oct). Everything
      * else outside is refused.
      */
-    await ctx.route((u) => !u.href.startsWith('http://127.0.0.1:5173') && !/api\.open-meteo\.com/.test(u.href), (r) => r.abort())
+    await ctx.route((u) => !u.href.startsWith(`${APP_ORIGIN}`) && !/api\.open-meteo\.com/.test(u.href), (r) => r.abort())
     await ctx.addInitScript(([top, bottom]) => {
       const add = () => {
         const s = document.createElement('style')
@@ -54,7 +54,7 @@ try {
     const page = await ctx.newPage()
     const wait = (ms) => page.waitForTimeout(ms)
     const ev = (x) => page.evaluate(x)
-    await page.goto('http://127.0.0.1:5173/')
+    await page.goto(`${APP_ORIGIN}/`)
     await wait(3000)
     /* One request off the phone, so the live check has something to name. */
     await ev(`fetch('https://api.open-meteo.com/v1/forecast?latitude=36.84&longitude=-75.97&hourly=wind_speed_10m&forecast_days=1').catch(() => null)`)

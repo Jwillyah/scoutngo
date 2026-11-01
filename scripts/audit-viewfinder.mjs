@@ -25,9 +25,9 @@
 import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { webkit, devices } from 'playwright'
+import { webkit, devices } from './gate/playwright.mjs'
 import { getPosition } from 'suncalc'
-import { ensureApp, goToStage, guardAudit, startWatchdog } from './preflight.mjs'
+import { ensureApp, goToStage, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mjs'
 import { shareLink } from '../src/lib/planShare.ts'
 import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
 import { placeKey } from '../src/core/venueName.ts'
@@ -47,7 +47,7 @@ const ULTRA_ID = 'ultra-wide-test-id'
 await ensureApp()
 const venue = { ...CALIBRATION_VENUE, name: { key: placeKey(String(PIER.lat), String(PIER.lon)), name: 'Virginia Beach Fishing Pier' }, latitude: String(PIER.lat), longitude: String(PIER.lon), date: '2026-10-29', startTime: '07:00', endTime: '08:30' }
 const kit = { bodyIds: ['a7iv', 'a7iii'], lensIds: ['sigma-28-75', 'sony-10-18'], droneIds: [], styleNotes: '' }
-const url = new URL(await shareLink('http://127.0.0.1:5173/', { id: 'vf', name: 'Viewfinder check', savedAt: '2026-10-29T00:00:00Z', venue, kit, positions: [] }))
+const url = new URL(await shareLink(`${APP_ORIGIN}/`, { id: 'vf', name: 'Viewfinder check', savedAt: '2026-10-29T00:00:00Z', venue, kit, positions: [] }))
 
 let problems = 0
 let looked = 0

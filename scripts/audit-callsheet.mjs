@@ -18,7 +18,7 @@
  * the card rendered a sheet.
  */
 import { connect } from './cdp.mjs'
-import { goToStage, guardAudit, startWatchdog } from './preflight.mjs'
+import { goToStage, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mjs'
 
 guardAudit('call sheet')
 const watchdog = startWatchdog('call sheet', 240_000)
@@ -62,10 +62,10 @@ ws.addEventListener('message', async (event) => {
   })
 })
 
-await send('Page.navigate', { url: 'http://127.0.0.1:5173/' })
+await send('Page.navigate', { url: `${APP_ORIGIN}/` })
 await wait(2500)
 await ev(`localStorage.clear(); localStorage.setItem('scoutngo.landing.v1','true'); localStorage.setItem('scoutngo.anthropicKey.v1','sk-ant-audit-key')`)
-await send('Page.navigate', { url: 'http://127.0.0.1:5173/?calibration=1&probe=1' })
+await send('Page.navigate', { url: `${APP_ORIGIN}/?calibration=1&probe=1` })
 await wait(8000)
 await goToStage(ev, wait, 'plan')
 const venue = await ev(`(() => { const c = window.__probe.map.getCenter(); return { lat: c.lat, lon: c.lng } })()`)

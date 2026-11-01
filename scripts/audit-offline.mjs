@@ -37,7 +37,7 @@
  */
 import { mkdirSync } from 'node:fs'
 import { connect } from './cdp.mjs'
-import { goToStage, guardAudit, startWatchdog } from './preflight.mjs'
+import { goToStage, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mjs'
 
 guardAudit('offline')
 const watchdog = startWatchdog('offline', 600_000)
@@ -102,7 +102,7 @@ for (const run of MODES) {
    * and not about:blank's. Then the landing is marked seen, as the surface
    * audit does, or every assertion below is made against the cover picture.
    */
-  await send('Page.navigate', { url: 'http://127.0.0.1:5173/' })
+  await send('Page.navigate', { url: `${APP_ORIGIN}/` })
   await wait(3000)
   await ev(`localStorage.clear()`)
   await ev(`localStorage.setItem('scoutngo.landing.v1','true')`)
@@ -115,7 +115,7 @@ for (const run of MODES) {
   })
   await send('Fetch.enable', { patterns: [{ urlPattern: '*' }] })
 
-  await send('Page.navigate', { url: 'http://127.0.0.1:5173/?calibration=1&probe=1' })
+  await send('Page.navigate', { url: `${APP_ORIGIN}/?calibration=1&probe=1` })
   await wait(8000)
   watchdog.note(`${run}: loaded`)
 

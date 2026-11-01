@@ -259,6 +259,22 @@ function PhotoSlot({
   const ageNote = imageryNote(age, yearsOld)
 
   const line = lightLine(planned.read)
+  /*
+   * THE LIGHT ROW STANDS WITH OR WITHOUT A PICTURE. It is the sun against the
+   * camera bearing, nothing to do with the ground view; with no Maps key, or
+   * a failed view, the slim branch below used to return before it, and the
+   * card lost its Backlit / Front-lit line (found by the offline audit
+   * against the built app, 1 Nov).
+   */
+  const lightRow = (
+    <p className={`frame__light frame__light--${line.tone}`}>
+      <span className="frame__light-icon" aria-hidden="true">
+        {line.icon}
+      </span>
+      <span className="frame__light-word">{line.word}</span>
+      <span className="frame__light-phrase">{line.phrase}</span>
+    </p>
+  )
 
   /*
    * NO PICTURE, NO BIG EMPTY PANEL. On 27 Oct a failed ground view left the
@@ -288,6 +304,7 @@ function PhotoSlot({
             </>
           ) : null}
         </p>
+        {lightRow}
       </div>
     )
   }
@@ -351,13 +368,7 @@ function PhotoSlot({
         * reads as a broken app rather than as a deliberate refusal. Worded in
         * src/lib/lightCopy.ts, computed in src/core/lighting.ts.
         */}
-      <p className={`frame__light frame__light--${line.tone}`}>
-        <span className="frame__light-icon" aria-hidden="true">
-          {line.icon}
-        </span>
-        <span className="frame__light-word">{line.word}</span>
-        <span className="frame__light-phrase">{line.phrase}</span>
-      </p>
+      {lightRow}
     </div>
   )
 }

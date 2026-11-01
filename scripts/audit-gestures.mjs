@@ -24,7 +24,7 @@
  *                on the fingers (scripts/pinchGestures.mjs)
  */
 import { connect } from './cdp.mjs'
-import { guardAudit, setSheet, startWatchdog } from './preflight.mjs'
+import { guardAudit, setSheet, startWatchdog, APP_ORIGIN } from './preflight.mjs'
 import { runSheetFlicks, MIN_REAL_FLICKS } from './sheetFlicks.mjs'
 import { HELD_DRIFT_PX, MAP_AREA, PROBE, pinch, recordGesture } from './pinchGestures.mjs'
 
@@ -41,10 +41,10 @@ const LAST = { at: PIER, name: null, shootKind: 'sunrise', platform: 'both', rea
 /** A tab of its own, on the plan at the pier (sunrise, sun and shadows on). */
 async function plan() {
   const c = await connect()
-  await c.send('Page.navigate', { url: 'http://127.0.0.1:5173/?probe=1' })
+  await c.send('Page.navigate', { url: `${APP_ORIGIN}/?probe=1` })
   await c.wait(2500)
   await c.ev(`localStorage.clear(); localStorage.setItem('scoutngo.landing.v1','true'); localStorage.setItem('scoutngo.lastSetup.v1', ${JSON.stringify(JSON.stringify(LAST))})`)
-  await c.send('Page.navigate', { url: 'http://127.0.0.1:5173/?probe=1' })
+  await c.send('Page.navigate', { url: `${APP_ORIGIN}/?probe=1` })
   /* Waited for, not timed: under the gate's load a cold Setup took longer than a fixed 5 s (30 Oct). */
   let went = false
   for (let i = 0; i < 30 && !went; i += 1) {

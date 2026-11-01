@@ -17,7 +17,9 @@
  * endpoints called.
  */
 import { connect } from './cdp.mjs'
-import { goToStage, guardAudit, startWatchdog } from './preflight.mjs'
+import { shareLink } from '../src/lib/planShare.ts'
+import { EMPTY_VENUE } from '../src/lib/venue.ts'
+import { goToStage, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mjs'
 
 guardAudit('api url')
 const watchdog = startWatchdog('api url', 300_000)
@@ -35,14 +37,14 @@ ws.addEventListener('message', (event) => {
    * THE APP'S OWN /api ONLY. NOAA and Photon have /api/ paths too, and the
    * first run flagged them: they are other services' URLs, never Vercel's logs.
    */
-  if (url.origin !== 'http://127.0.0.1:5173' || !url.pathname.startsWith('/api/')) return
+  if (url.origin !== `${APP_ORIGIN}` || !url.pathname.startsWith('/api/')) return
   seen.push({ path: url.pathname, query: url.search, method: m.params.request.method, hasBody: m.params.request.hasPostData === true })
 })
 
-await send('Page.navigate', { url: 'http://127.0.0.1:5173/' })
+await send('Page.navigate', { url: `${APP_ORIGIN}/` })
 await wait(3000)
 await ev(`localStorage.clear(); localStorage.setItem('scoutngo.landing.v1','true')`)
-await send('Page.navigate', { url: 'http://127.0.0.1:5173/?calibration=1&probe=1' })
+await send('Page.navigate', { url: `${APP_ORIGIN}/?calibration=1&probe=1` })
 await wait(8000)
 watchdog.note('loaded')
 
@@ -95,12 +97,7 @@ for (const path of ['/api/search', '/api/streetview']) {
  * be the bare app address, with the plan nowhere in it. Then the offer must
  * appear and open the same venue, or the link carried nothing worth checking.
  */
-const link = await ev(`(async () => {
-  const { shareLink } = await import('/src/lib/planShare.ts')
-  const { EMPTY_VENUE } = await import('/src/lib/venue.ts')
-  const venue = { ...EMPTY_VENUE, latitude: '36.846580', longitude: '-75.976660', date: '2026-10-25', startTime: '17:00', endTime: '18:30', eventDescription: 'share audit' }
-  return shareLink('http://127.0.0.1:5173/', { id: 'a', name: 'Share audit', savedAt: new Date().toISOString(), venue, kit: {}, positions: [], marks: [] })
-})()`)
+const link = await shareLink(`${APP_ORIGIN}/`, { id: 'a', name: 'Share audit', savedAt: new Date().toISOString(), venue: { ...EMPTY_VENUE, latitude: '36.846580', longitude: '-75.976660', date: '2026-10-25', startTime: '17:00', endTime: '18:30', eventDescription: 'share audit' }, kit: {}, positions: [], marks: [] })
 if (typeof link !== 'string' || !link.includes('#plan=')) {
   console.log(`=== API URL AUDIT ABORTED: no share link was built (${String(link).slice(0, 80)}) ===`)
   process.exit(2)
@@ -108,12 +105,12 @@ if (typeof link !== 'string' || !link.includes('#plan=')) {
 documents.length = 0
 await send('Page.navigate', { url: link })
 await wait(6000)
-const asked = documents.find((u) => u.startsWith('http://127.0.0.1:5173'))
+const asked = documents.find((u) => u.startsWith(`${APP_ORIGIN}`))
 if (asked === undefined) {
   console.log('=== API URL AUDIT ABORTED: the share link load sent no document request to watch ===')
   process.exit(2)
 }
-const bare = asked === 'http://127.0.0.1:5173/'
+const bare = asked === `${APP_ORIGIN}/`
 console.log(`  ${bare ? 'ok     ' : 'PROBLEM'} share link load asked the server for ${asked}`)
 if (!bare) problems += 1
 const offered = await ev(`document.querySelector('.confirm--shared .confirm__name')?.textContent ?? null`)
