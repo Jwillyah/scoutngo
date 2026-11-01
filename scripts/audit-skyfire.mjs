@@ -151,7 +151,9 @@ try {
           if (!f) return null
           return {
             verdict: f.querySelector('.fire__verdict')?.textContent ?? null,
-            checks: [...f.querySelectorAll('.fire__checks tr')].map((r) => r.textContent.replace(/\\s+/g, ' ').trim()),
+            checks: [...f.querySelectorAll('.fire__checks li')].map((r) => r.textContent.replace(/\\s+/g, ' ').trim()),
+            switches: f.querySelectorAll('[aria-label="Which event"]').length,
+            verdicts: f.querySelectorAll('.fire__verdict, .prev__verdict').length,
             decks: f.querySelectorAll('.fire__deck').length,
             ray: !!f.querySelector('.fire__ray'),
             now: f.querySelector('.fire__now')?.textContent ?? null,
@@ -167,6 +169,9 @@ try {
       if (fire === null || fire.verdict === null) fail(`${label} ${phase}: no verdict on the Fire tab`)
       else {
         if (!/^Fire (possible|likely)$/.test(fire.verdict)) fail(`${label} ${phase}: 29 Oct reads "${fire.verdict}", and it fired`)
+        /* Each once, at the top (Batch E, 1 Nov: the switch and "Fire possible" were there twice). */
+        if (fire.switches !== 1) fail(`${label} ${phase}: ${fire.switches} Sunrise / Sunset switches on the Sky fire page, not 1`)
+        if (fire.verdicts !== 1) fail(`${label} ${phase}: ${fire.verdicts} verdicts on the Sky fire page, not 1`)
         if (fire.checks.length !== 3 || !fire.checks.every((c) => /\d/.test(c))) fail(`${label} ${phase}: the checks are ${JSON.stringify(fire.checks)}, not three with numbers`)
         if (fire.decks === 0 || !fire.ray) fail(`${label} ${phase}: the side view has ${fire.decks} decks and ray ${fire.ray}`)
         if (fire.wide) fail(`${label} ${phase}: something in the card runs past 390 px`)
@@ -195,7 +200,7 @@ try {
             const strips = [...p.querySelectorAll('.prev__strip')]
             return {
               words: p.querySelector('.prev__words')?.textContent ?? null,
-              verdict: p.querySelector('.prev__verdict')?.textContent ?? null,
+              verdict: document.querySelector('.fire .fire__verdict')?.textContent ?? null,
               strips: strips.length,
               coloured: strips.map((s) => [...s.querySelectorAll('rect')].filter((r) => r.getAttribute('fill')).length),
               cells: strips.map((s) => s.querySelectorAll('rect').length),
@@ -217,8 +222,9 @@ try {
           if (!/be set up by \d/.test(prev.words)) fail(`${label}: no "be set up by" in "${prev.words}"`)
           if (prev.verdict === null || !/^Fire (possible|likely)/.test(prev.verdict)) fail(`${label}: Sky fire's verdict is not on top (${prev.verdict})`)
           if (prev.strips < 1 || prev.cells.some((n) => n !== 91) || prev.coloured.some((n) => n < 10)) fail(`${label}: the strips are ${JSON.stringify({ cells: prev.cells, coloured: prev.coloured })}`)
-          if (prev.soon.length !== 2 || !prev.soon.every((t) => /Coming with the new 3D sky/.test(t))) fail(`${label}: pages 2 and 3 say ${JSON.stringify(prev.soon)}`)
-          if (prev.dots !== 3) fail(`${label}: ${prev.dots} page dots, not 3`)
+          /* Pages that only said "coming" are gone until they exist (Batch E): no such page, no dots for one. */
+          if (prev.soon.length !== 0) fail(`${label}: pages that only say they are coming: ${JSON.stringify(prev.soon)}`)
+          if (prev.dots !== 0) fail(`${label}: ${prev.dots} page dots for one page`)
           if (prev.wide) fail(`${label}: something on the colour clock runs past 390 px`)
           if (prev.wraps) fail(`${label}: a strip label or time wraps`)
           if (/\bclear\b|\bsafe\b|\bcertain\b|\bwill\b/i.test(prev.words)) fail(`${label}: the words promise: "${prev.words}"`)
@@ -226,11 +232,6 @@ try {
         await ev(`document.querySelector('.prev')?.scrollIntoView({ block: 'start' })`)
         await wait(300)
         await page.screenshot({ path: join(OUT, `preview-${label}.png`) })
-        await ev(`(() => { const p = document.querySelector('.prev__pages'); p?.scrollTo({ left: p.clientWidth }) })()`)
-        await wait(600)
-        const second = await ev(`document.querySelector('.prev__dots')?.getAttribute('aria-label') ?? null`)
-        if (!/^Page 2 of 3/.test(second ?? '')) fail(`${label}: swiping to page 2 leaves the dots at ${JSON.stringify(second)}`)
-        await page.screenshot({ path: join(OUT, `preview-page2-${label}.png`) })
         await page.getByRole('tab', { name: 'Fire' }).tap()
         await wait(500)
       } else {

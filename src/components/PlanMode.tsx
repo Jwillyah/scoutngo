@@ -1731,6 +1731,13 @@ export function PlanMode({
           />
         </>
       )}
+      {/* The cloud along each position's sightline and the wind at the drone's height: a Plan thing, so their doors are here (Batch E). */}
+      <CardMore
+        links={[
+          { label: 'Cloud along each position’s view', onOpen: () => openCard('cloud') },
+          { label: 'Wind at your flight height', onOpen: () => openCard('wind') },
+        ]}
+      />
     </div>
   )
 
@@ -2160,17 +2167,23 @@ export function PlanMode({
               * "Sky cameras near here" and opened this card, which is mostly
               * meteor showers. Now it opens the cameras.
               */}
-            {/* The cards the chips opened before 30 Oct, each a tap from here so none loses its door (docs/navigation.md). */}
-            <CardMore
-              links={[
-                { label: 'The light through your window', onOpen: () => openCard('golden') },
-                { label: 'Cloud along each position’s view', onOpen: () => openCard('cloud') },
-                { label: 'Wind at your flight height', onOpen: () => openCard('wind') },
-                { label: 'The sun through the day', onOpen: () => openCard('suncurve') },
-                { label: 'Plan a moonrise', onOpen: () => openCard('moonrise') },
-                { label: 'Sky cameras near here', onOpen: () => openCard('cams') },
-              ]}
-            />
+            {/*
+              * THE OLD CARDS, AT HOME (Batch E, 1 Nov). They were a list under
+              * every Sky tab, Sky fire included, where none of them belonged.
+              * The light, the sun, the moon and the cameras are Sky › Now's;
+              * the cloud along each position's view is the shoot card's in
+              * Plan; the wind at flight height is the Wind page's button.
+              */}
+            {skyTab !== 'now' ? null : (
+              <CardMore
+                links={[
+                  { label: 'The light through your window', onOpen: () => openCard('golden') },
+                  { label: 'The sun through the day', onOpen: () => openCard('suncurve') },
+                  { label: 'Plan a moonrise', onOpen: () => openCard('moonrise') },
+                  { label: 'Sky cameras near here', onOpen: () => openCard('cams') },
+                ]}
+              />
+            )}
           </Card>
         )
       case 'cams':

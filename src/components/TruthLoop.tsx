@@ -66,7 +66,7 @@ export function TruthLoop({ timeZone }: Props) {
       </label>
       {shown.length === 0 ? null : (
         <>
-          <ul className="truth__list num">
+          <ul className="truth__list">
             {shown.map((e) => (
               <li key={e.id}>
                 {formatClock(new Date(e.at), timeZone)} · {e.said.minutesFromEvent >= 0 ? `${e.said.minutesFromEvent} min after` : `${-e.said.minutesFromEvent} min before`} {e.said.event} · sun {Math.round(e.said.sunAltitude)}° up
@@ -88,7 +88,7 @@ export function TruthLoop({ timeZone }: Props) {
       {note === null ? null : <p className="fire__note">{note}</p>}
 
       <p className="fire__head">Your hit rate</p>
-      <p className="fire__note num">
+      <p className="fire__note">
         {r.shoots === 0
           ? 'No shoots logged yet. Pick the photos after a sunrise or sunset to start.'
           : `${r.shoots} ${r.shoots === 1 ? 'shoot' : 'shoots'} logged. ${r.firesaid === 0 ? 'Sky fire was not shown for any of them.' : `When Sky fire said possible or likely it fired ${r.firedWhenSaid} of ${r.firesaid} times.`}${r.unlikelySaid === 0 ? '' : ` When it said unlikely it fired ${r.firedWhenUnlikely} of ${r.unlikelySaid}.`} ${r.golden} of ${r.photos} photos in golden hour.`}

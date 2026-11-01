@@ -319,10 +319,11 @@ for (const run of MODES) {
   if (modal) problem(run, 'a dialog is open: no signal is not a reason to interrupt')
 
   if (run !== 'online') {
-    /* The Cloud chip opens Sky › Sky fire since 30 Oct; the cloud card is a tap from there. */
-    await ev(`[...document.querySelectorAll('.chip2')].find((b) => /CLOUD/.test(b.textContent))?.click()`)
+    /* The cloud card's door is on the shoot card in Plan since Batch E (1 Nov): back to the shoot, then the row. */
+    await ev(`document.querySelector('button[aria-label="Back to the shoot"]')?.click()`)
     await wait(900)
-    await ev(`[...document.querySelectorAll('button')].find((b) => /Cloud along each position/.test(b.textContent))?.click()`)
+    const door = await ev(`(() => { const b = [...document.querySelectorAll('button')].find((x) => /Cloud along each position/.test(x.textContent)); b?.click(); return !!b })()`)
+    if (!door) problem(run, 'no "Cloud along each position’s view" row on the shoot card')
     await wait(900)
     const cloud = await ev(`document.querySelector('.wx')?.textContent ?? ''`)
     const says = /Nothing is saved for this venue and day|Saved forecast|Old forecast/.test(cloud)

@@ -38,8 +38,8 @@ interface SkyFireProps {
   at: Date
   /** The real clock, injected for tests: "Sky right now" and the log are about now, not the bar. */
   now?: () => Date
-  /** The colour clock, drawn right under the verdict (field test, 30 Oct: one page, verdict first). */
-  clock?: ReactNode
+  /** The colour clock for the event picked here, drawn right under the verdict (field test, 30 Oct: one page, verdict first). */
+  clock?: (kind: 'sunrise' | 'sunset') => ReactNode
 }
 
 type Kind = 'sunrise' | 'sunset'
@@ -227,41 +227,41 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
                 : `Look from ${clock(watch.from)} until ${clock(watch.to)}, when the sun is ${Math.abs(LIT_UNTIL_DEG[litDeck])}° below: the colour lasts after sunset.`}
             </p>
           )}
-          {colourClock}
-          {/* The method one tap deeper (ux-rules 19): the three checks, the side view, each model. */}
-          <details className="fire__why">
-          <summary className="fire__head">Why: the three checks</summary>
-          <table className="fire__checks num">
-            <tbody>
-              {bestChecks === undefined
-                ? null
-                : ([
-                    ['Canvas', 'canvas'],
-                    ['Gap toward the sun', 'gap'],
-                    ['Not blocked', 'notBlocked'],
-                  ] as const).map(([label, key]) => (
-                    <tr key={key}>
-                      <th scope="row">{label}</th>
-                      <td className={`fire__mark fire__mark--${yes(bestChecks[key].pass)}`}>{yes(bestChecks[key].pass)}</td>
-                      <td>{bestChecks[key].say}</td>
-                      <td className="fire__agree">{agreeOn(verdict.checks, key)}</td>
-                    </tr>
+          {colourClock?.(kind)}
+          {/*
+            * THE THREE CHECKS, SHOWN (Batch E, 1 Nov). The heading "Why: the
+            * three checks" sat over a fold that read as empty on the phone.
+            * The checks are open now, each with its numbers and how many
+            * models pass it; the side view and each model are one tap down.
+            */}
+          {bestChecks === undefined ? null : (
+            <section className="fire__why">
+              <p className="fire__head">Why: the three checks</p>
+              <ul className="fire__checks">
+                {([
+                  ['Canvas', 'canvas'],
+                  ['Gap toward the sun', 'gap'],
+                  ['Not blocked', 'notBlocked'],
+                ] as const).map(([label, key]) => (
+                  <li key={key} className="fire__check">
+                    <span className={`fire__mark fire__mark--${yes(bestChecks[key].pass)}`}>{label}: {yes(bestChecks[key].pass)}.</span> {bestChecks[key].say} <span className="fire__agree">({agreeOn(verdict.checks, key)})</span>
+                  </li>
+                ))}
+              </ul>
+              {overhead === null ? null : <p className="fire__note">Overhead: {layersLine(overhead)} (best match)</p>}
+              <details className="fire__more">
+                <summary>The side view and each model</summary>
+                {best === undefined ? null : <SideView verdict={verdict} path={best} kind={kind} />}
+                <ul className="fire__models">
+                  {verdict.checks.map((c) => (
+                    <li key={c.model}>
+                      {MODEL_LABEL[c.model]}: {c.fires ? 'fires' : 'does not'} · canvas {yes(c.canvas.pass)}, gap {yes(c.gap.pass)}, not blocked {yes(c.notBlocked.pass)}
+                    </li>
                   ))}
-            </tbody>
-          </table>
-          {overhead === null ? null : <p className="fire__note">Overhead: {layersLine(overhead)} (best match)</p>}
-          {best === undefined ? null : <SideView verdict={verdict} path={best} kind={kind} />}
-          <details className="fire__more">
-            <summary>Each model</summary>
-            <ul className="fire__models num">
-              {verdict.checks.map((c) => (
-                <li key={c.model}>
-                  {MODEL_LABEL[c.model]}: {c.fires ? 'fires' : 'does not'} · canvas {yes(c.canvas.pass)}, gap {yes(c.gap.pass)}, not blocked {yes(c.notBlocked.pass)}
-                </li>
-              ))}
-            </ul>
-          </details>
-          </details>
+                </ul>
+              </details>
+            </section>
+          )}
         </>
       )}
 

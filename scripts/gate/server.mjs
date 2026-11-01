@@ -34,7 +34,7 @@ import { answer } from './fixtures.mjs'
 export const GATE_APP_PORT = Number(process.env.SCOUTNGO_GATE_APP_PORT ?? 5180)
 export const GATE_PROXY_PORT = Number(process.env.SCOUTNGO_GATE_PROXY_PORT ?? 5181)
 const ROOT = new URL('../..', import.meta.url).pathname
-const DIST = join(ROOT, 'dist')
+const DIST = process.env.SCOUTNGO_GATE_DIST ?? join(ROOT, 'dist')
 
 const ledger = { started: new Date().toISOString(), hosts: {}, unanswered: [], direct: [] }
 const note = (href, fixture, via) => {

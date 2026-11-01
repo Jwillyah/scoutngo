@@ -34,11 +34,22 @@ interface Props {
   timeZone: string
   at: Date
   now?: () => Date
+  /**
+   * Inside Sky fire (Batch E, 1 Nov): the event Sky fire's own switch picked,
+   * and no second switch or verdict here; the page had both twice.
+   */
+  kind?: Kind
 }
 
 type Kind = 'sunrise' | 'sunset'
 const altitudeAt = (lat: number, lon: number) => (t: Date) => getPosition(t, lat, lon).altitude
-const PAGES = ['Colour clock', 'Four forecasts', 'Week of skies'] as const
+/*
+ * ONE PAGE UNTIL THE OTHERS EXIST (Batch E, 1 Nov). "Four forecasts" and
+ * "Week of skies" were swipe pages that said only "Coming with the new 3D
+ * sky", with dots for them. They come back with Batch D; no dots, no swipe,
+ * until then.
+ */
+const PAGES = ['Colour clock'] as const
 
 function StripRow({ s, clock }: { s: Strip; clock: (d: Date) => string }) {
   const n = s.minutes.length
@@ -59,10 +70,12 @@ function StripRow({ s, clock }: { s: Strip; clock: (d: Date) => string }) {
   )
 }
 
-export function SkyPreview({ venue, timeZone, at, now = () => new Date() }: Props) {
+export function SkyPreview({ venue, timeZone, at, now = () => new Date(), kind: given }: Props) {
   const events = useMemo(() => nextEvents(at, venue), [at, venue])
   const firstKind: Kind = events.sunrise !== null && (events.sunset === null || events.sunrise < events.sunset) ? 'sunrise' : 'sunset'
-  const [kind, setKind] = useState<Kind>(firstKind)
+  const [own, setKind] = useState<Kind>(firstKind)
+  const kind = given ?? own
+  const embedded = given !== undefined
   const event = events[kind]
   const azimuth = event === null ? null : getPosition(event, venue.lat, venue.lon).azimuth
   const date = event === null ? null : event.toISOString().slice(0, 10)
@@ -118,6 +131,7 @@ export function SkyPreview({ venue, timeZone, at, now = () => new Date() }: Prop
 
   return (
     <div className="prev">
+      {embedded ? null : (
       <div className="seg prev__kinds" role="group" aria-label="Which event">
         {(['sunrise', 'sunset'] as const).map((k) => (
           <button key={k} type="button" className={`seg__btn${kind === k ? ' seg__btn--on' : ''}`} aria-pressed={kind === k} disabled={events[k] === null} onClick={() => setKind(k)}>
@@ -126,6 +140,7 @@ export function SkyPreview({ venue, timeZone, at, now = () => new Date() }: Prop
           </button>
         ))}
       </div>
+      )}
 
       <div
         className="prev__pages"
@@ -145,7 +160,7 @@ export function SkyPreview({ venue, timeZone, at, now = () => new Date() }: Prop
             <p className="prev__note">The forecast for the sun’s line did not arrive, so there is no colour to work out.</p>
           ) : (
             <>
-              <p className={`prev__verdict fire__verdict--${verdict.word}`}>{verdict.line}</p>
+              {embedded ? null : <p className={`prev__verdict fire__verdict--${verdict.word}`}>{verdict.line}</p>}
               {strips.length === 0 ? (
                 <p className="prev__note">No cloud on the sun’s line in the forecast: nothing to light.</p>
               ) : (
@@ -172,18 +187,14 @@ export function SkyPreview({ venue, timeZone, at, now = () => new Date() }: Prop
             </>
           )}
         </section>
-        {PAGES.slice(1).map((title) => (
-          <section key={title} className="prev__page prev__page--soon" aria-label={title}>
-            <p className="prev__title">{title}</p>
-            <p className="prev__note">Coming with the new 3D sky.</p>
-          </section>
-        ))}
       </div>
-      <div className="prev__dots" role="img" aria-label={`Page ${page + 1} of ${PAGES.length}: ${PAGES[page]}`}>
-        {PAGES.map((p, i) => (
-          <span key={p} className={`prev__dot${i === page ? ' prev__dot--on' : ''}`} />
-        ))}
-      </div>
+      {PAGES.length < 2 ? null : (
+        <div className="prev__dots" role="img" aria-label={`Page ${page + 1} of ${PAGES.length}: ${PAGES[page]}`}>
+          {PAGES.map((p, i) => (
+            <span key={p} className={`prev__dot${i === page ? ' prev__dot--on' : ''}`} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

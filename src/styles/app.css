@@ -13629,9 +13629,17 @@
 }
 
 .fire__checks {
-  width: 100%;
-  border-collapse: collapse;
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
   font-size: var(--text-sm);
+  line-height: 1.4;
+}
+
+.fire__check .fire__mark {
+  font-weight: var(--weight-heavy);
 }
 
 .fire__checks th,
