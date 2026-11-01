@@ -956,6 +956,8 @@ export function PlanMode({
     }
   }, [venue, modelDay, weatherEpoch])
   const [skyTab, setSkyTab] = useState<SkyTab>('now')
+  /* The Moon page open: the 3D view draws the moon's arc only then (Batch D, Section 9). */
+  const [moonOpen, setMoonOpen] = useState(false)
   /*
    * TWO-PIN MEASURE. Null is off; on, each tap drops a pin and a third tap
    * starts over. The pins are not a plan: they are not saved or sent.
@@ -2171,6 +2173,7 @@ export function PlanMode({
                 at={scrubbedAt}
                 tab={skyTab}
                 onTab={setSkyTab}
+                onMoonOpen={setMoonOpen}
                 onOpenCalendar={() => setCalendarOpen(true)}
                 place={place}
                 onJump={scrubTo}
@@ -2546,6 +2549,7 @@ export function PlanMode({
           at={scrubbedAt}
           timeZone={venueWindow.timeZone}
           sheetOpen={sheet !== 'peek'}
+          moonShown={moonOpen && card.kind === 'sky'}
           pins={threeDPins}
           stand={stand}
           onLeaveStand={() => setStand(null)}

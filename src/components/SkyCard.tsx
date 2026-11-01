@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { getMoonIllumination, getTimes } from 'suncalc'
 import { moonTimesOnLocalDay } from '../core/moonTimes.ts'
 import { compassWord } from '../core/compassWords.ts'
@@ -33,6 +33,8 @@ import type { Place } from '../lib/placeGroups.ts'
  * tap on a result jumps the time bar there.
  */
 interface SkyCardProps {
+  /** Whether the Moon page is the one on screen: the 3D view shows the moon's arc only then (Batch D). */
+  onMoonOpen?: (open: boolean) => void
   venue: LatLon
   timeZone: string
   timeZoneAbbr: string
@@ -137,10 +139,15 @@ function MoonDisc({ fraction, waxing }: { fraction: number; waxing: boolean }) {
 }
 
 
-export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump, target, picking, onPickTarget, events, onPlanMoonrise, onOpenNow, placeName, onShowBow, horizon, onOpenCalendar, place }: SkyCardProps) {
+export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump, target, picking, onPickTarget, events, onPlanMoonrise, onOpenNow, placeName, onShowBow, horizon, onOpenCalendar, place, onMoonOpen }: SkyCardProps) {
   const clock = (d: Date) => `${formatClock(d, timeZone)}`
   const finderProps = { venue, target, picking, onPickTarget, onJump, clock, timeZone }
   const [nowPage, setNowPage] = useState(0)
+  const moonOpen = tab === 'now' && NOW_PAGES[nowPage] === 'moon'
+  useEffect(() => {
+    onMoonOpen?.(moonOpen)
+    return () => onMoonOpen?.(false)
+  }, [moonOpen, onMoonOpen])
 
   const tonight = useMemo(() => {
     const when = tonightMoment(at, venue.lat, venue.lon)

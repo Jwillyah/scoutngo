@@ -103,6 +103,8 @@ export interface ClayScene {
   project(at: LatLon, height?: number): { x: number; y: number } | null
   /** Nothing still in flight: what the audits wait on (the old globe.tilesLoaded). */
   loaded(): boolean
+  /** For checks: the hour pills drawn last frame, in page pixels. */
+  pills(): { text: string; l: number; t: number; r: number; b: number }[]
   /** For checks: draw without the buildings, or without their roofs. */
   setHidden(what: 'buildings' | 'roofs' | null): void
   /** For checks: the water drawn flat magenta (its geometry, nothing else changed). */
@@ -714,7 +716,8 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
       const r = new THREE.Raycaster(new THREE.Vector3(frame.x(lon), 2000, frame.z(lat)), new THREE.Vector3(0, -1, 0))
       return r.intersectObjects([ground.group, water.group], true).slice(0, 3).map((h) => `${h.object.name}@${h.point.y.toFixed(2)}`)
     }
-    return { names, water: w.filter((x) => x.name !== 'shore'), camera: camera.position.toArray().map((v) => Math.round(v)), sea: down(venue.lat + 0.004, venue.lon + 0.016), nearSea: down(venue.lat + 0.002, venue.lon + 0.006) }
+    const box = renderer.domElement.getBoundingClientRect()
+    return { arcs: arcs.debug(), box: [box.width, box.height], fov: camera.fov, names, water: w.filter((x) => x.name !== 'shore'), camera: camera.position.toArray().map((v) => Math.round(v)), sea: down(venue.lat + 0.004, venue.lon + 0.016), nearSea: down(venue.lat + 0.002, venue.lon + 0.006) }
   }
   orbit()
   ;(window as unknown as { __clayBuilds?: number }).__clayBuilds = ((window as unknown as { __clayBuilds?: number }).__clayBuilds ?? 0) + 1
@@ -777,6 +780,7 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
     loaded: () => loaded(),
     frameTimes: () => [...times],
     setWaterMask: (on) => water.setMask(on),
+    pills: () => arcs.pills(),
     setHidden: (what) => {
       buildings.group.visible = what !== 'buildings'
       buildings.group.traverse((o) => {

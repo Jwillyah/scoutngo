@@ -176,7 +176,7 @@ try {
   /*
    * THE OVERLAYS (Batch E, 1 Nov): no engine "Data attribution" over the map
    * (the credits are in the i); the status a short line, "N buildings · M no
-   * height"; and with a sheet up, the line and the arcs' hour pills put away.
+   * height"; and with a sheet up, the line put away.
    */
   const over = JSON.parse(await ev(`JSON.stringify({
     attribution: /Data attribution/.test(document.body.innerText),
@@ -185,14 +185,40 @@ try {
   })`))
   console.log(`### the overlays: ${JSON.stringify(over)}`)
   if (over.attribution) fail('"Data attribution" is on the 3D view; the credits belong in its i')
-  if (over.line !== null && !/^\d+ buildings( · \d+ no height)?$/.test(over.line)) fail(`the 3D status is not one short line: "${over.line}"`)
+  if (over.line !== null && !/^\d+ buildings?( · \d+ no height)?$/.test(over.line)) fail(`the 3D status is not one short line: "${over.line}"`)
   if (over.sky !== true) fail(`the sun and moon arcs are not shown with the sheet down (${over.sky})`)
   await setSheet(ev, wait, 'half').catch(() => {})
   await wait(800)
-  const up = JSON.parse(await ev(`JSON.stringify({ line: document.querySelector('.clay__line--one')?.textContent ?? null, sky: window.__skyShown ?? null })`))
+  /*
+   * WITH A SHEET UP (Batch D, Section 9): the status line goes; the hour
+   * pills stay, but none sits on the sheet, the chips, the top bar or another
+   * pill (each that would is dropped), and the moon's are not drawn unless
+   * the Moon page is open. Looked at from 60 m up, facing the southern sky.
+   */
+  await ev(`window.__clay.setSkyDay(new Date(Date.UTC(2026, 9, 30, 4)))`)
+  /* Looking up at the southern sky from 60 m, where the sun's arc and its hours are. */
+  await ev(`(async () => { const c = window.__clay; const g = (await c.groundAt(${JSON.stringify(VENUE)})) ?? 0; c.droneView(${JSON.stringify(VENUE)}, g + 60, 175, 8, 24) })()`)
+  await wait(1500)
+  const up = JSON.parse(await ev(`JSON.stringify((() => {
+    const rect = (sel) => [...document.querySelectorAll(sel)].map((n) => n.getBoundingClientRect()).filter((r) => r.width > 0 && r.height > 0)
+    const controls = [...rect('.sheet'), ...rect('.chips2'), ...rect('.topbar')]
+    const pills = window.__clay.pills()
+    const meets = (a, b) => a.l < b.right && a.r > b.left && a.t < b.bottom && a.b > b.top
+    const meetsPill = (a, b) => a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t
+    return {
+      line: document.querySelector('.clay__line--one')?.textContent ?? null,
+      pills: pills.length,
+      onControls: pills.filter((p) => controls.some((c) => meets(p, c))).map((p) => p.text),
+      onPills: pills.filter((p, i) => pills.some((q, j) => j !== i && meetsPill(p, q))).map((p) => p.text),
+      moon: pills.filter((p) => p.text.startsWith('moon')).length,
+    }
+  })())`))
   console.log(`  with a sheet up: ${JSON.stringify(up)}`)
   if (up.line !== null) fail('with a sheet up the 3D status line is still drawn over the map')
-  if (up.sky !== false) fail('with a sheet up the arcs and their hour pills are still drawn')
+  if (up.pills === 0) fail('no hour pills drawn facing the sun\'s arc, so their placing was not looked at')
+  if (up.onControls.length > 0) fail(`hour pills on the sheet or the chips: ${up.onControls.join(', ')}`)
+  if (up.onPills.length > 0) fail(`hour pills on each other: ${up.onPills.join(', ')}`)
+  if (up.moon > 0) fail(`${up.moon} moon pills drawn with the Moon page shut`)
   await setSheet(ev, wait, 'peek').catch(() => {})
   await wait(600)
 

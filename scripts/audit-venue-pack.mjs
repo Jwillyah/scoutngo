@@ -363,6 +363,27 @@ try {
     if (!tide.curve) fail(`${label}: no tide curve offline`)
     if (/didn.t load/.test(tide.text)) fail(`${label}: part of the Tides page did not load offline: "${tide.text.match(/[^.]*didn.t load[^.]*/)?.[0]}"`)
     await page.screenshot({ path: join(OUT, `offline-tides-${label}.png`) })
+
+    /*
+     * 3D WITH NO SIGNAL (Batch D, Section 9): the service worker installed
+     * the 3D scene with the app, and the pack holds the ground: 3D opens.
+     */
+    await page.keyboard.press('Escape')
+    await wait(600)
+    await ev(`document.querySelector('.page__close, .page__back')?.click()`)
+    await wait(600)
+    await ev(`document.querySelector('button[aria-label="Open the 3D clay model"]')?.click()`)
+    let up3d = null
+    for (let i = 0; i < 40; i += 1) {
+      await wait(1000)
+      up3d = await ev(`(() => { const c = window.__clay; return c ? { loaded: c.loaded(), imagery: c.counts.imagery } : null })()`).catch(() => null)
+      if (up3d?.loaded) break
+    }
+    const failedLine = await ev(`document.querySelector('.clay__fail, .clay [role="alert"]')?.textContent ?? null`).catch(() => null)
+    console.log(`  3D offline: ${JSON.stringify(up3d)}${failedLine ? ` · ${failedLine}` : ''}`)
+    if (up3d === null) fail(`${label}: 3D did not open offline${failedLine ? `: ${failedLine}` : ''}`)
+    else if (!up3d.loaded) fail(`${label}: 3D opened offline but its ground never finished`)
+    await page.screenshot({ path: join(OUT, `offline-3d-${label}.png`) })
     await ctx.close()
     watchdog.note(`${label}: offline checked`)
   }

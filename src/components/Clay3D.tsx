@@ -51,6 +51,8 @@ interface Clay3DProps {
   timeZone: string
   /** A sheet is up over the 3D view: the status line and the arcs' hour pills step aside (Batch E). */
   sheetOpen?: boolean
+  /** The moon's arc and its pills: only while Sky's Moon page is open (Batch D). */
+  moonShown?: boolean
   pins: readonly Pin[]
   stand: StandRequest | null
   onLeaveStand: () => void
@@ -74,7 +76,7 @@ interface Clay3DProps {
 
 export const CLAY_NOTE = 'Clay model from map data; real buildings may differ'
 
-export function Clay3D({ venue, venueLabel, at, timeZone, sheetOpen = false, pins, stand, onLeaveStand, flight = null, onFlightTime, onRecorded, onRenderProgress, fly = null, onLanded, sea = null, onCompare }: Clay3DProps) {
+export function Clay3D({ venue, venueLabel, at, timeZone, sheetOpen = false, moonShown = false, pins, stand, onLeaveStand, flight = null, onFlightTime, onRecorded, onRenderProgress, fly = null, onLanded, sea = null, onCompare }: Clay3DProps) {
   const host = useRef<HTMLDivElement>(null)
   const scene = useRef<ClayScene | null>(null)
   /* How many times the scene has been built: every build (a scan arriving rebuilds it) re-runs the effects that feed it. 0 is not built yet. */
@@ -244,9 +246,17 @@ export function Clay3D({ venue, venueLabel, at, timeZone, sheetOpen = false, pin
   const nearCeiling = hud?.nearCeiling === true
   /* While flying the app's chrome steps aside: the dock, the sheet, the time bar (app.css :root.is-flying). */
   useEffect(() => {
-    /* And while a sheet is open (Batch E): the arcs' hour pills ran into the chips and each other over the Sky and Day sheets. */
-    if (ready) scene.current?.setSkyShown(!flying && !sheetOpen)
-  }, [ready, flying, sheetOpen])
+    /*
+     * Put away while flying. Under a sheet they stay, and any hour pill that
+     * would land on the sheet, the chips or another pill is dropped (Batch D,
+     * src/three/world/arcs.ts): Batch E put them all away under a sheet, which
+     * also hid the moon's arc from the Moon page that asks for it.
+     */
+    if (ready) scene.current?.setSkyShown(!flying)
+  }, [ready, flying])
+  useEffect(() => {
+    if (ready) scene.current?.setMoonShown(moonShown)
+  }, [ready, moonShown])
   useEffect(() => {
     if (!flying) return
     document.documentElement.classList.add('is-flying')
@@ -407,7 +417,7 @@ export function Clay3D({ venue, venueLabel, at, timeZone, sheetOpen = false, pin
               */}
             {sheetOpen ? null : (
               <p className="clay__line clay__line--one">
-                {place.buildings === null ? '' : `${place.buildings.list.length} buildings`}
+                {place.buildings === null ? '' : `${place.buildings.list.length} ${place.buildings.list.length === 1 ? 'building' : 'buildings'}`}
                 {unknown > 0 ? ` · ${unknown} no height` : ''}
               </p>
             )}
