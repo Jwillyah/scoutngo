@@ -11,8 +11,21 @@
  *                       RAINBOW_DEG: the bow is a circle RAINBOW_DEG round the
  *                       point opposite the sun, so with the sun higher the
  *                       whole bow is below the horizon.
- *   GOD RAYS            broken low cloud, GOD_RAYS_LOW cover, with the sun
- *                       low (up to GOD_RAYS_SUN_MAX) behind it.
+ *   GOD RAYS            scattered to broken low cloud, GOD_RAYS_LOW cover,
+ *                       with the sun low (up to GOD_RAYS_SUN_MAX) behind it.
+ *                       The why line gives the cover of the models that said
+ *                       yes, worded by cloudWord: on 1 Nov it printed the
+ *                       median of all five, "Low cloud 0%, broken", for a
+ *                       window one model gave.
+ *   IRIDESCENCE         thin mid or high cloud (altocumulus, cirrocumulus),
+ *                       IRID_THIN cover, the low cloud under IRID_LOW_MAX so
+ *                       the sun shows, and the sun up IRID_SUN_MIN or more.
+ *                       The rainbow edges are within about 10° of the sun;
+ *                       the forecast cannot place a cloud that close, so the
+ *                       line says where to look rather than promising it.
+ *
+ * WHAT INTERRUPTS. A map chip only when at least MAP_SHARE of the models
+ * agree; the rest stay in the list, greyed, under Long shots.
  */
 import { normalizeBearing } from './sun.ts'
 
@@ -22,6 +35,13 @@ export const RAINBOW_DEG = 42
 export const SHOWERS_MM = 0.1
 export const GOD_RAYS_LOW: readonly [number, number] = [30, 80]
 export const GOD_RAYS_SUN_MAX = 25
+export const IRID_THIN: readonly [number, number] = [10, 60]
+export const IRID_LOW_MAX = 50
+export const IRID_SUN_MIN = 5
+/** Share of the models that must agree before special light interrupts on the map. */
+export const MAP_SHARE = 0.5
+/** At most this many a day in the list, the most likely first. */
+export const PER_DAY = 3
 /** Share of the models that must agree for "likely". */
 export const LIKELY_SHARE = 0.6
 
@@ -118,9 +138,26 @@ export const rainbowRule = (sunAltitude: number, showersNearMm: number | null): 
 export const godRaysRule = (sunAltitude: number, lowCover: number | null): boolean | null =>
   lowCover === null ? null : sunAltitude > 0 && sunAltitude <= GOD_RAYS_SUN_MAX && lowCover >= GOD_RAYS_LOW[0] && lowCover <= GOD_RAYS_LOW[1]
 
+/** Cloud cover in a word, by eighths of the sky as observers report it. */
+export function cloudWord(pct: number): 'clear' | 'few' | 'scattered' | 'broken' | 'overcast' {
+  if (pct < 6) return 'clear'
+  if (pct <= 25) return 'few'
+  if (pct <= 50) return 'scattered'
+  if (pct <= 87) return 'broken'
+  return 'overcast'
+}
+
+/* ---------------------------------------------------------- iridescence */
+
+export const iridescenceRule = (sunAltitude: number, low: number | null, mid: number | null, high: number | null): boolean | null => {
+  if (mid === null && high === null) return null
+  const thin = Math.max(mid ?? 0, high ?? 0)
+  return sunAltitude >= IRID_SUN_MIN && (low ?? 0) < IRID_LOW_MAX && thin >= IRID_THIN[0] && thin <= IRID_THIN[1]
+}
+
 /* ------------------------------------------------------------- the list */
 
-export type SpecialKind = 'fog' | 'rainbow' | 'rays' | 'glass' | 'fire'
+export type SpecialKind = 'fog' | 'rainbow' | 'rays' | 'glass' | 'fire' | 'iridescence'
 
 export interface Special {
   kind: SpecialKind
@@ -133,7 +170,7 @@ export interface Special {
   why: string
 }
 
-export const SPECIAL_NAME: Record<SpecialKind, string> = { fog: 'Fog', rainbow: 'Rainbow', rays: 'God rays', glass: 'Glassy water', fire: 'Sky fire' }
+export const SPECIAL_NAME: Record<SpecialKind, string> = { fog: 'Fog', rainbow: 'Rainbow', rays: 'God rays', glass: 'Glassy water', fire: 'Sky fire', iridescence: 'Iridescence' }
 
 /**
  * Hours where at least one model says yes, joined into windows. `byModel[m][h]`
@@ -168,4 +205,44 @@ export function windows(kind: SpecialKind, hours: readonly Date[], byModel: read
 /** "Fog possible 6–8 AM" from a window, with the span written by the caller's clock. */
 export function specialLine(s: Special, span: (from: Date, to: Date) => string): string {
   return `${SPECIAL_NAME[s.kind]} ${s.word} ${span(s.from, s.to)}`
+}
+
+/** Enough models agree to interrupt: a map chip, a Near you card. */
+export const strong = (s: Special): boolean => s.of > 0 && s.agree / s.of >= MAP_SHARE
+
+const share = (s: Special) => (s.of === 0 ? 0 : s.agree / s.of)
+
+/** Windows of the same kind that overlap or touch, joined; the join keeps the better agreement and its why. */
+export function mergeOverlaps(list: readonly Special[]): Special[] {
+  const out: Special[] = []
+  for (const s of [...list].sort((a, b) => a.kind.localeCompare(b.kind) || a.from.getTime() - b.from.getTime())) {
+    const last = out[out.length - 1]
+    if (last !== undefined && last.kind === s.kind && s.from.getTime() <= last.to.getTime()) {
+      const best = share(s) > share(last) ? s : last
+      out[out.length - 1] = { ...best, from: last.from, to: new Date(Math.max(last.to.getTime(), s.to.getTime())) }
+    } else out.push(s)
+  }
+  return out.sort((a, b) => a.from.getTime() - b.from.getTime())
+}
+
+export interface SpecialDay {
+  /** Venue-local YYYY-MM-DD. */
+  day: string
+  /** At least MAP_SHARE agree: most likely first, at most PER_DAY. */
+  items: Special[]
+  /** Fewer agree: greyed under Long shots, most likely first, at most PER_DAY. */
+  longShots: Special[]
+}
+
+/** The list by venue-local day, overlaps merged, most likely first, PER_DAY a day of each. */
+export function byDay(list: readonly Special[], dayOf: (d: Date) => string): SpecialDay[] {
+  const days = new Map<string, Special[]>()
+  for (const s of mergeOverlaps(list)) {
+    const d = dayOf(s.from)
+    days.set(d, [...(days.get(d) ?? []), s])
+  }
+  const rank = (a: Special, b: Special) => share(b) - share(a) || a.from.getTime() - b.from.getTime()
+  return [...days.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([day, xs]) => ({ day, items: xs.filter(strong).sort(rank).slice(0, PER_DAY), longShots: xs.filter((x) => !strong(x)).sort(rank).slice(0, PER_DAY) }))
 }

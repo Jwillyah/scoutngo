@@ -11,7 +11,8 @@
  *
  *   the map    the one status line reads "Fog likely now · 5 of 5 models"
  *              and a tap on it opens Sky › Special
- *   the list   fog, god rays and a rainbow, each with its models and why
+ *   the list   by day: fog Today, god rays Tomorrow, a rainbow Sunday, one
+ *              line each with its models; a 1-of-5 window greyed under Long shots
  *   the bow    "Show the bow on the map" puts an arc on the map's guide
  *              layer, opposite the sun
  *   no sideways scroll; never "safe", "clear", "certain"
@@ -60,7 +61,8 @@ function week(u) {
       series[`dew_point_2m_${m}`] = hs.map((t) => (inUtc(t, 0, 9, 13) ? 59.5 : 48))
       series[`wind_speed_10m_${m}`] = hs.map((t) => (inUtc(t, 0, 9, 13) ? 2 : 12))
       /* God rays: 31 Oct 12-14 UTC (8-10 AM EDT), broken low cloud with the sun 10-25° up. */
-      series[`cloud_cover_low_${m}`] = hs.map((t) => (inUtc(t, 1, 12, 14) ? 50 : 0))
+      /* And a long shot: 2 Nov 12-14 UTC, one model only (Batch E: greyed, never on the map). */
+      series[`cloud_cover_low_${m}`] = hs.map((t) => (inUtc(t, 1, 12, 14) || (m === models[0] && inUtc(t, 3, 12, 14)) ? 50 : 0))
       /* Showers round the venue (not at it): 1 Nov 19-21 UTC, 2-4 PM EST (the clocks went back that morning). */
       series[`showers_${m}`] = hs.map((t) => (p > 0 && inUtc(t, 2, 19, 21) ? 1.2 : 0))
     }
@@ -132,8 +134,11 @@ try {
       list = await ev(`(() => {
         const s = document.querySelector('.spec')
         if (!s || s.querySelectorAll('.spec__item').length === 0) return null
+        const item = (li) => ({ line: li.querySelector('.spec__line')?.textContent.replace(/\\s+/g, ' ').trim() ?? '', sure: li.querySelector('.spec__sure')?.textContent.replace(/\\s+/g, ' ').trim() ?? '', why: li.querySelector('.spec__open')?.title ?? '', bow: !!li.querySelector('.spec__bow'), long: li.classList.contains('spec__item--long'), oneLine: li.querySelector('.spec__open')?.getBoundingClientRect().height <= 50 })
         return {
-          items: [...s.querySelectorAll('.spec__item')].map((li) => ({ line: li.querySelector('.spec__line')?.textContent ?? '', sure: li.querySelector('.spec__sure')?.textContent ?? '', why: li.querySelector('.spec__why')?.textContent ?? '', bow: !!li.querySelector('.spec__bow') })),
+          days: [...s.querySelectorAll(':scope > .spec__day')].map((d) => ({ name: d.querySelector('.spec__dayname')?.textContent ?? '', items: [...d.querySelectorAll('.spec__item')].map(item) })),
+          items: [...s.querySelectorAll('.spec__item')].map(item),
+          longHead: s.querySelector('.spec__long .spec__dayname')?.textContent ?? null,
           now: s.querySelector('.spec__now')?.textContent ?? null,
           wide: [...s.querySelectorAll('*')].some((e) => e.getBoundingClientRect().right > innerWidth + 1),
           text: s.textContent,
@@ -145,14 +150,25 @@ try {
     console.log(`  list: ${JSON.stringify(list?.items.map((i) => `${i.line} | ${i.sure}`))}`)
     if (list === null) fail(`${label}: tapping the status line did not open Sky › Special with a list`)
     else {
-      const has = (re) => list.items.find((i) => re.test(i.line))
-      const fog = has(/^Fog (likely|possible) Fri /)
-      if (fog === undefined) fail(`${label}: no fog on Friday morning`)
+      /*
+       * BY DAY (Batch E): Today, Tomorrow, then weekdays; one line an item,
+       * "N of 5" at its end, the why in the row's title; a 1-of-5 window
+       * greyed under Long shots, never with the strong ones.
+       */
+      console.log(`  days: ${JSON.stringify(list.days.map((d) => `${d.name}: ${d.items.map((i) => i.line).join(' / ')}`))}`)
+      const day = (name) => list.days.find((d) => d.name === name)
+      const fog = day('Today')?.items.find((i) => /^Fog (likely|possible) /.test(i.line))
+      if (fog === undefined) fail(`${label}: no fog under Today (Friday morning)`)
       else if (!/Dew point 60°F against air 60°F, wind 2 kt, sea 57°F under the air/.test(fog.why)) fail(`${label}: the fog's why reads "${fog.why}"`)
-      if (has(/^God rays (likely|possible) Sat /) === undefined) fail(`${label}: no god rays on Saturday`)
-      const bow = has(/^Rainbow (likely|possible) Sun /)
+      if (day('Tomorrow')?.items.find((i) => /^God rays (likely|possible) /.test(i.line)) === undefined) fail(`${label}: no god rays under Tomorrow`)
+      const bow = day('Sun')?.items.find((i) => /^Rainbow (likely|possible) /.test(i.line))
       if (bow === undefined || !bow.bow) fail(`${label}: no rainbow on Sunday with a way to show it on the map`)
-      if (!list.items.every((i) => /^\d of \d models$/.test(i.sure))) fail(`${label}: an item does not say how many models agree`)
+      if (list.days.some((d) => d.items.length > 3)) fail(`${label}: more than three on a day`)
+      const long = list.items.filter((i) => i.long)
+      if (list.longHead === null || !long.some((i) => /^God rays possible/.test(i.line) && i.sure === '1 of 5')) fail(`${label}: the 1-of-5 god rays are not greyed under Long shots`)
+      if (list.days.some((d) => d.items.some((i) => i.sure === '1 of 5'))) fail(`${label}: a 1-of-5 window is listed with the strong ones`)
+      if (!list.items.every((i) => /^\d of \d$/.test(i.sure))) fail(`${label}: an item does not say how many models agree`)
+      if (!list.items.every((i) => i.oneLine)) fail(`${label}: an item takes more than one line`)
       if (list.wide) fail(`${label}: something in the list runs past 390 px`)
       if (/\bsafe\b|\bcertain\b|\bclear of\b|\bwill\b/i.test(list.text)) fail(`${label}: the list promises something`)
     }

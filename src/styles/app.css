@@ -14010,9 +14010,11 @@
 }
 
 /* The status line as a button: special light on now opens its list (ChipRow). */
+/* 44 px like every target (ux-rules): at 28 the gesture audit caught it on 1 Nov, when the fixture sky first put a special light on over the pier. */
 .offline-line--btn {
   border: 0;
-  min-height: 28px;
+  min-height: 44px;
+  padding-inline: var(--space-3);
   cursor: pointer;
   text-align: left;
   font: inherit;
@@ -14048,15 +14050,22 @@
 }
 
 .spec__item {
-  display: grid;
-  gap: var(--space-1);
-  padding: var(--space-2) 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  padding: 0;
   border-bottom: var(--line-hair) solid var(--color-line);
 }
 
+/* One line an item (1 Nov): what, when, and how many agree at the end. */
 .spec__open {
-  display: grid;
-  gap: 2px;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
   min-height: 44px;
   padding: 0;
   border: 0;
@@ -14067,8 +14076,43 @@
 }
 
 .spec__line {
+  min-width: 0;
   font-weight: var(--weight-heavy);
   color: var(--color-text);
+}
+
+.spec__day {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.spec__dayname,
+.spec__longday {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-label);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.spec__longday {
+  margin: var(--space-1) 0 0;
+  letter-spacing: normal;
+  text-transform: none;
+  font-weight: var(--weight-medium);
+}
+
+/* Long shots: in the list, greyed, never interrupting. */
+.spec__long {
+  display: grid;
+  gap: var(--space-1);
+  opacity: 0.62;
+}
+
+.spec__item--long .spec__line {
+  font-weight: var(--weight-medium);
+  color: var(--color-text-muted);
 }
 
 .spec__sure {

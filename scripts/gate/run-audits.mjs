@@ -38,9 +38,9 @@ const TIMES = join(tmpdir(), 'scoutngo-audit-times.json')
 
 /** In the gate's order. `summary` picks the line printed on a pass; `pattern` the lines shown first on a failure. */
 export const AUDITS = [
-  { name: 'reachability', script: 'audit-reachability.mjs', summary: /TOTAL PROBLEMS/, pattern: /PROBLEM|TOTAL|ABORTED/, alone: true },
+  { name: 'reachability', script: 'audit-reachability.mjs', summary: /TOTAL PROBLEMS/, pattern: /PROBLEM|TOTAL|ABORTED/, alone: true, timing: true },
   { name: 'label collision', script: 'audit-labels.mjs', summary: /LABEL PROBLEMS/, pattern: /FAIL|LABEL PROBLEMS|over |ABORTED/ },
-  { name: 'gesture', script: 'audit-gestures.mjs', summary: /GESTURE PROBLEMS/, alone: true, quiet: true },
+  { name: 'gesture', script: 'audit-gestures.mjs', summary: /GESTURE PROBLEMS/, alone: true, quiet: true, timing: true },
   { name: 'standalone', script: 'audit-standalone.mjs', summary: /STANDALONE PROBLEMS/ },
   { name: 'viewfinder', script: 'audit-viewfinder.mjs', summary: /VIEWFINDER PROBLEMS/ },
   { name: 'fly', script: 'audit-fly.mjs', summary: /FLY PROBLEMS/ },
@@ -55,16 +55,16 @@ export const AUDITS = [
   { name: 'locate', script: 'audit-locate.mjs', summary: /LOCATE PROBLEMS/ },
   { name: 'safari tab', script: 'audit-safari-tab.mjs', summary: /SAFARI TAB PROBLEMS/ },
   { name: 'venue pack', script: 'audit-venue-pack.mjs', summary: /VENUE PACK PROBLEMS/ },
-  { name: 'one surface', script: 'audit-surface.mjs', summary: /SURFACE PROBLEMS/, pattern: /PROBLEM|FAIL|ABORTED/ },
-  { name: 'overflow', script: 'audit-overflow.mjs', summary: /OVERFLOW PROBLEMS/ },
-  { name: 'projection', script: 'audit-projection.mjs', summary: /PROJECTION FAILURES/, pattern: /FAIL|ABORTED/, alone: true },
+  { name: 'one surface', script: 'audit-surface.mjs', summary: /SURFACE PROBLEMS/, pattern: /PROBLEM|FAIL|ABORTED/, timing: true },
+  { name: 'overflow', script: 'audit-overflow.mjs', summary: /OVERFLOW PROBLEMS/, timing: true },
+  { name: 'projection', script: 'audit-projection.mjs', summary: /PROJECTION FAILURES/, pattern: /FAIL|ABORTED/, alone: true, timing: true },
   { name: 'offline', script: 'audit-offline.mjs', summary: /OFFLINE PROBLEMS/ },
   { name: 'api url', script: 'audit-api-urls.mjs', summary: /API URL PROBLEMS/ },
   { name: '3d network', script: 'audit-3d-network.mjs', summary: /3D NETWORK PROBLEMS/ },
   { name: 'airspace', script: 'audit-airspace.mjs', summary: /AIRSPACE PROBLEMS/ },
   { name: 'call sheet', script: 'audit-callsheet.mjs', summary: /CALL SHEET PROBLEMS/ },
   { name: 'clock screen', script: 'audit-clock-screen.mjs', summary: /CLOCK SCREEN PROBLEMS/ },
-  { name: 'service worker', script: 'audit-sw-update.mjs', summary: /SERVICE WORKER PROBLEMS/, alone: true },
+  { name: 'service worker', script: 'audit-sw-update.mjs', summary: /SERVICE WORKER PROBLEMS/, alone: true, timing: true },
 ]
 
 const only = process.argv.slice(2)
@@ -77,7 +77,28 @@ if (todo.length === 0) {
 const ROOT = new URL('../..', import.meta.url).pathname
 const results = new Map()
 
-function run(audit) {
+/*
+ * ONE RE-RUN FOR A TIMING AUDIT, SAID OUT LOUD (Batch E). The audits that
+ * time flicks, scrolls, sheets and a worker's takeover can fail on a busy
+ * machine with nothing wrong in the code. Each waits on a settled state now;
+ * if one still fails, it runs once more, on its own, and the gate prints that
+ * it did and keeps the first run's log beside the second. A second failure
+ * fails the gate. Only these: an audit that does not time anything gets no
+ * second chance, because a re-run there could only hide something.
+ */
+async function run(audit) {
+  const first = await runOnce(audit)
+  if (first.code === 0 || audit.timing !== true) return first
+  const firstLog = first.log.replace(/\.log$/, '.first.log')
+  writeFileSync(firstLog, first.text)
+  const reasons = first.text.split('\n').filter((l) => /PROBLEM|ABORTED/.test(l)).slice(0, 3).map((l) => l.trim()).join(' | ')
+  console.log(`${YELLOW}↻ ${audit.name} failed its first run; running it once more, alone in its lane. First run: ${reasons || 'see ' + firstLog}${OFF}`)
+  retried.push({ name: audit.name, reasons, firstLog })
+  return runOnce({ ...audit, retried: true })
+}
+const retried = []
+
+function runOnce(audit) {
   const log = join(OUT, `${audit.script.replace(/^audit-|\.mjs$/g, '')}.log`)
   const began = Date.now()
   return new Promise((resolve) => {
@@ -105,9 +126,9 @@ function run(audit) {
       writeFileSync(log, text)
       const seconds = Math.round((Date.now() - began) / 1000)
       const line = text.split('\n').filter((l) => audit.summary.test(l)).pop()?.replace(/=+/g, '').trim() ?? '(no summary line)'
-      const r = { audit, code, seconds, text, log, line }
+      const r = { audit, code, seconds, text, log, line, retried: audit.retried === true }
       results.set(audit.name, r)
-      if (code === 0) console.log(`${GREEN}✓ ${line}${OFF} ${DIM}${audit.name}, ${seconds}s${OFF}`)
+      if (code === 0) console.log(`${GREEN}✓ ${line}${OFF} ${DIM}${audit.name}, ${seconds}s${r.retried ? ', on its second run' : ''}${OFF}`)
       else console.log(`${RED}✗ ${audit.name} (exit ${code}, ${seconds}s)${OFF} ${DIM}${log}${OFF}`)
       resolve(r)
     })
@@ -163,6 +184,9 @@ await Promise.all([
 /* Last, when the whole set ran: what reached the proxy, and proof the browsers were behind it. */
 if (only.length === 0) await run({ name: 'network guard', script: 'audit-network-guard.mjs', summary: /NETWORK GUARD PROBLEMS/ })
 
+if (retried.length > 0) {
+  console.log(`${YELLOW}↻ re-run once: ${retried.map((r) => `${r.name} (${results.get(r.name)?.code === 0 ? 'passed the second time' : 'failed again'})`).join(', ')}${OFF}`)
+}
 const failed = [...results.values()].filter((r) => r.code !== 0)
 for (const r of failed) {
   console.log(`${YELLOW}  --- what ${r.audit.name} actually printed (last 25 lines) ---${OFF}`)
@@ -178,6 +202,7 @@ const slowest = [...results.values()].sort((a, b) => b.seconds - a.seconds).slic
 console.log(`${DIM}· browser audits took ${Math.floor(total / 60)}m${String(total % 60).padStart(2, '0')}s; slowest: ${slowest}${OFF}`)
 const timesJson = JSON.stringify({ total, jobs: JOBS, audits: [...results.values()].map((r) => ({ name: r.audit.name, seconds: r.seconds, code: r.code })) }, null, 2)
 writeFileSync(join(OUT, 'audit-times.json'), timesJson)
+writeFileSync(join(OUT, 'audit-retries.json'), JSON.stringify(retried, null, 2))
 if (only.length === 0) writeFileSync(TIMES, timesJson)
 if (failed.length > 0) {
   console.log(`${RED}✗ ${failed.length} of ${results.size} audits failed: ${failed.map((r) => r.audit.name).join(', ')}${OFF}`)

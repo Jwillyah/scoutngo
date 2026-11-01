@@ -5,12 +5,13 @@
  * WHAT LEAVES THE PHONE. To Open-Meteo: nine points (the venue and eight
  * 25 km round it, for showers nearby), each rounded to 2 decimals, and five
  * model names, for the week. The sea temperature from Open-Meteo Marine for
- * the venue, as the Tide sheet already asks. No key.
+ * the venue, as the Tide sheet already asks. For iridescence, the venue's
+ * mid and high cloud from the same five models, one point (thinUrl). No key.
  */
 import destination from '@turf/destination'
 import { getPosition, getTimes } from 'suncalc'
 import type { LatLon } from '../core/geo.ts'
-import { antisolar, bowHalfWidthDeg, fogRule, godRaysRule, rainbowRule, windows, fToC, type Special } from '../core/specialLight.ts'
+import { antisolar, bowHalfWidthDeg, cloudWord, fogRule, godRaysRule, iridescenceRule, rainbowRule, windows, fToC, type Special } from '../core/specialLight.ts'
 import { roundCoord } from '../core/skyFire.ts'
 import { OPEN_METEO_URL, TIMEOUT_MS } from './forecast.ts'
 import { FORECAST_MAX_AGE_MS, weatherJson } from './weatherStore.ts'
@@ -53,6 +54,44 @@ export interface SpecialWeek {
   hours: Date[]
   /** series[model][point][var][hour] */
   series: Record<string, (Record<Var, (number | null)[]>)[]>
+  /** The venue's mid and high cloud by model, on the same hours, when that request answered. */
+  thin?: Record<string, { mid: (number | null)[]; high: (number | null)[] }>
+}
+
+/** The venue's mid and high cloud from the five models, for iridescence: one point, two variables. */
+export function thinUrl(at: LatLon): string {
+  const params = new URLSearchParams({
+    latitude: roundCoord(at.lat).toFixed(2),
+    longitude: roundCoord(at.lon).toFixed(2),
+    hourly: 'cloud_cover_mid,cloud_cover_high',
+    models: SPECIAL_MODELS.join(','),
+    forecast_days: String(SPECIAL_DAYS),
+    timezone: 'GMT',
+  })
+  return `${OPEN_METEO_URL}?${params.toString()}`
+}
+
+/** Mid and high cloud by model, lined up on `hours` by timestamp. */
+export function parseThin(payload: unknown, hours: readonly Date[]): SpecialWeek['thin'] | undefined {
+  const hourly = (Array.isArray(payload) ? payload[0] : payload) as { hourly?: Record<string, unknown> } | undefined
+  const time = hourly?.hourly?.time
+  if (!Array.isArray(time)) return undefined
+  const index = new Map((time as string[]).map((t, i) => [new Date(`${t}:00Z`).getTime(), i]))
+  const col = (name: string) => {
+    const list = hourly?.hourly?.[name]
+    return hours.map((t) => {
+      const i = index.get(t.getTime())
+      const x = Array.isArray(list) && i !== undefined ? list[i] : null
+      return typeof x === 'number' && Number.isFinite(x) ? x : null
+    })
+  }
+  const out: NonNullable<SpecialWeek['thin']> = {}
+  for (const m of SPECIAL_MODELS) {
+    const mid = col(`cloud_cover_mid_${m}`)
+    const high = col(`cloud_cover_high_${m}`)
+    if (mid.some((x) => x !== null) || high.some((x) => x !== null)) out[m] = { mid, high }
+  }
+  return Object.keys(out).length === 0 ? undefined : out
 }
 
 export function parseSpecial(payload: unknown): SpecialWeek | null {
@@ -93,6 +132,8 @@ export function specialsFrom(week: SpecialWeek, venue: LatLon, seaCAt: (t: Date)
   const fog = models.map((m) => week.hours.map((t, h) => fogRule({ tempF: at(m, 0, 'temperature_2m', h), dewF: at(m, 0, 'dew_point_2m', h), windKt: at(m, 0, 'wind_speed_10m', h), seaC: seaCAt(t) })))
   const rain = models.map((m) => week.hours.map((_, h) => rainbowRule(sun[h], showersNear(m, h))))
   const rays = models.map((m) => week.hours.map((_, h) => godRaysRule(sun[h], at(m, 0, 'cloud_cover_low', h))))
+  const thin = week.thin
+  const irid = thin === undefined ? [] : models.filter((m) => thin[m] !== undefined).map((m) => week.hours.map((_, h) => iridescenceRule(sun[h], at(m, 0, 'cloud_cover_low', h), thin[m].mid[h], thin[m].high[h])))
   const median = (v: Var, h: number, p = 0) => {
     const xs = models.map((m) => at(m, p, v, h)).filter((x): x is number => x !== null).sort((a, b) => a - b)
     return xs.length === 0 ? null : xs[Math.floor(xs.length / 2)]
@@ -104,18 +145,38 @@ export function specialsFrom(week: SpecialWeek, venue: LatLon, seaCAt: (t: Date)
     return `Dew point ${f0(d)}°F against air ${f0(t)}°F, wind ${f0(median('wind_speed_10m', h))} kt${sea === null ? ', inland: radiation fog' : `, sea ${f0((sea * 9) / 5 + 32)}°F under the air${t !== null && sea >= fToC(t) ? ' (not today)' : ''}`}.`
   }
   const rainWhy = (h: number) => `Showers within ${SHOWER_RING_KM} km and the sun ${Math.round(sun[h])}° up: the bow stands opposite the sun.`
-  const raysWhy = (h: number) => `Low cloud ${f0(median('cloud_cover_low', h))}%, broken, with the sun ${Math.round(sun[h])}° up behind it.`
+  /*
+   * THE COVER OF THE MODELS THAT SAID YES, worded by cloudWord. The median of
+   * all five read "Low cloud 0%, broken" for a window one model gave (1 Nov).
+   */
+  const raysWhy = (h: number) => {
+    const yes = models.filter((_m, i) => rays[i][h] === true).map((m) => at(m, 0, 'cloud_cover_low', h)).filter((x): x is number => x !== null).sort((a, b) => a - b)
+    const c = yes.length === 0 ? null : yes[Math.floor(yes.length / 2)]
+    return c === null ? `The sun ${Math.round(sun[h])}° up behind low cloud.` : `Low cloud ${Math.round(c)}%, ${cloudWord(c)}, in the ${yes.length === 1 ? 'model' : `${yes.length} models`} that say so, with the sun ${Math.round(sun[h])}° up behind it.`
+  }
+  const iridWhy = (h: number) => {
+    const ms = models.filter((m) => thin?.[m] !== undefined)
+    const yes = ms.filter((_m, i) => irid[i]?.[h] === true).map((m) => Math.max(thin?.[m].mid[h] ?? 0, thin?.[m].high[h] ?? 0)).sort((a, b) => a - b)
+    const c = yes.length === 0 ? null : yes[Math.floor(yes.length / 2)]
+    return `Thin mid or high cloud${c === null ? '' : ` ${Math.round(c)}%`} with the sun ${Math.round(sun[h])}° up: look within about 10° of the sun, shading it with a hand or a building.`
+  }
   const lit = (s: Special) => week.hours.some((t, h) => t >= s.from && t < s.to && sun[h] > -6)
-  return [...windows('fog', week.hours, fog, fogWhy), ...windows('rainbow', week.hours, rain, rainWhy), ...windows('rays', week.hours, rays, raysWhy)].filter(lit)
+  return [...windows('fog', week.hours, fog, fogWhy), ...windows('rainbow', week.hours, rain, rainWhy), ...windows('rays', week.hours, rays, raysWhy), ...(irid.length === 0 ? [] : windows('iridescence', week.hours, irid, iridWhy))].filter(lit)
 }
 
 export async function fetchSpecialWeek(venue: LatLon, fetchImpl: typeof fetch = fetch): Promise<{ week: SpecialWeek; seaCAt: (t: Date) => number | null } | null> {
   try {
     /* Through the shared store: the status line and Sky › Special ask this once between them. */
-    const [got, sea] = await Promise.all([weatherJson(specialUrl(venue), { maxAgeMs: FORECAST_MAX_AGE_MS, fetchImpl, timeoutMs: TIMEOUT_MS * 2 }), fetchMarine(venue).catch(() => null)])
+    const [got, sea, thin] = await Promise.all([
+      weatherJson(specialUrl(venue), { maxAgeMs: FORECAST_MAX_AGE_MS, fetchImpl, timeoutMs: TIMEOUT_MS * 2 }),
+      fetchMarine(venue).catch(() => null),
+      weatherJson(thinUrl(venue), { maxAgeMs: FORECAST_MAX_AGE_MS, fetchImpl, timeoutMs: TIMEOUT_MS }).catch(() => null),
+    ])
     if (!got.ok) return null
-    const week = parseSpecial(got.payload)
-    if (week === null) return null
+    const parsed = parseSpecial(got.payload)
+    if (parsed === null) return null
+    /* Iridescence only when its own small request answered; the rest stands without it. */
+    const week = thin !== null && thin.ok ? { ...parsed, thin: parseThin(thin.payload, parsed.hours) } : parsed
     return { week, seaCAt: (t) => (sea === null ? null : hourlyAt(sea.value, 'sea_surface_temperature', t)) }
   } catch {
     return null

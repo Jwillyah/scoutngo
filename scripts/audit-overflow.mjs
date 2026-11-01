@@ -273,9 +273,10 @@ try {
    * gate under load: 590 of 487 px; alone: none). Waits until the sheet's
    * height holds still for three reads, then measures.
    */
-  for (let i = 0, last = -1, still = 0; i < 40 && still < 3; i += 1) {
-    const h = await ev(`Math.round(document.querySelector('.sheet')?.getBoundingClientRect().height ?? -1)`)
-    still = h === last ? still + 1 : 0
+  for (let i = 0, last = -1, still = 0; i < 60 && still < 3; i += 1) {
+    /* At full AND still: a sheet can hold still at half for a moment before it rises (1 Nov). */
+    const h = await ev(`(() => { const s = document.querySelector('.sheet'); return s?.dataset.detent === 'full' ? Math.round(s.getBoundingClientRect().height) : -1 })()`)
+    still = h !== -1 && h === last ? still + 1 : 0
     last = h
     await wait(150)
   }

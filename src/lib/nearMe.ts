@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { distanceMeters, type LatLon } from '../core/geo.ts'
 import { fireVerdict, nextEvents } from '../core/skyFire.ts'
-import type { Special } from '../core/specialLight.ts'
+import { strong, type Special } from '../core/specialLight.ts'
 import { getSunPosition } from '../core/sun.ts'
 import { fetchFirePaths, nearestHour, pathsAt } from './skyFireData.ts'
 import { fetchSpecialWeek, specialsFrom } from './specialLightData.ts'
@@ -136,7 +136,7 @@ export async function nearMeItems(places: readonly NearPlace[], now: number, clo
   const found: { s: Special; place: NearPlace }[] = []
   for (const p of places) {
     const week = await fetchSpecialWeek(p.at)
-    if (week !== null) for (const s of specialsFrom(week.week, p.at, place === 'inland' ? () => null : week.seaCAt)) found.push({ s, place: p })
+    if (week !== null) for (const s of specialsFrom(week.week, p.at, place === 'inland' ? () => null : week.seaCAt)) if (strong(s)) found.push({ s, place: p })
   }
   const nearest = places[0]
   if (nearest !== undefined) {
