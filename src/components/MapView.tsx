@@ -681,6 +681,8 @@ interface MapViewProps {
   showLabels?: boolean
   /** Real elevation under the imagery, with a sky above the horizon. */
   showTerrain?: boolean
+  /** The 2D Terrain layer's 10 m contours (src/lib/terrainRelief.ts), drawn with a soft hillshade while terrain is on. */
+  contours?: GeoJSON.FeatureCollection | null
   /**
    * The venue's skyline, pushed up whenever the DEM has finished arriving.
    *
@@ -1188,6 +1190,7 @@ export function MapView({
   showSky = false,
   showLabels = false,
   showTerrain = false,
+  contours = null,
   onHorizon,
   onTerrainPaused,
   showBuildings = false,
@@ -3044,6 +3047,31 @@ export function MapView({
       instance.setSky({ 'atmosphere-blend': 0 })
     }
   }, [showTerrain, ready, gesturing])
+
+  /*
+   * TERRAIN YOU CAN SEE IN 2D (field test, 30 Oct): from straight above the
+   * elevation mesh shows nothing, so the tile looked dead. A soft hillshade
+   * from the same tiles, and the 10 m contours, while terrain is on and there
+   * is relief to show. Off: both go.
+   */
+  useEffect(() => {
+    const instance = map.current
+    if (instance === null || !ready) return
+    const on = showTerrain && contours !== null && instance.getSource(TERRAIN_SOURCE) !== undefined
+    if (on) {
+      if (instance.getLayer('terrain-hillshade') === undefined)
+        instance.addLayer({ id: 'terrain-hillshade', type: 'hillshade', source: TERRAIN_SOURCE, paint: { 'hillshade-exaggeration': 0.25, 'hillshade-shadow-color': '#000000', 'hillshade-highlight-color': '#ffffff' } })
+      const src = instance.getSource('terrain-contours') as maplibregl.GeoJSONSource | undefined
+      if (src === undefined) {
+        instance.addSource('terrain-contours', { type: 'geojson', data: contours })
+        instance.addLayer({ id: 'terrain-contours', type: 'line', source: 'terrain-contours', paint: { 'line-color': '#f4e7c5', 'line-opacity': ['case', ['get', 'major'], 0.7, 0.4], 'line-width': ['case', ['get', 'major'], 1.4, 0.8] } })
+      } else src.setData(contours)
+    } else {
+      if (instance.getLayer('terrain-contours') !== undefined) instance.removeLayer('terrain-contours')
+      if (instance.getSource('terrain-contours') !== undefined) instance.removeSource('terrain-contours')
+      if (instance.getLayer('terrain-hillshade') !== undefined) instance.removeLayer('terrain-hillshade')
+    }
+  }, [showTerrain, contours, ready, gesturing])
 
   /*
    * TERRAIN IS SUSPENDED DURING A GESTURE, NOT BY ZOOM.

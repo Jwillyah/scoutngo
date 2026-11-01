@@ -149,6 +149,8 @@ import { useWeatherBusy, useWeatherEpoch } from '../lib/useWeatherStatus.ts'
 import type { Place } from '../lib/placeGroups.ts'
 import { PageGroup, type PageGroupValue } from '../lib/pageGroup.ts'
 import { TerrainLightPage } from './TerrainLightPage.tsx'
+import { reliefAround, type Relief } from '../lib/terrainRelief.ts'
+import { FLAT_M } from '../core/contours.ts'
 import { SettingsPage } from './SettingsPage.tsx'
 import { PhaseRule } from './PhaseRule.tsx'
 import { shadowKeyLine, shadowKeyNotes } from '../lib/shadowKey.ts'
@@ -1005,6 +1007,7 @@ export function PlanMode({
    */
   const turnTerrain = useCallback((on: boolean) => onShowTerrain(on), [onShowTerrain])
 
+
   const [locating, setLocating] = useState(false)
   /*
    * WHY IT DID NOT MOVE, in one line under the top bar, with Retry. This was
@@ -1377,6 +1380,28 @@ export function PlanMode({
   }, [cardRequest])
 
   /*
+   * THE RELIEF ROUND THE VENUE, for the Terrain tile and its 2D contours
+   * (src/lib/terrainRelief.ts). Asked once per venue, when Layers is open or
+   * terrain is on: the same elevation tiles terrain already reads.
+   */
+  const [reliefFor, setReliefFor] = useState<{ key: string; relief: Relief | null } | null>(null)
+  const reliefKey = venue === null ? null : `${venue.lat.toFixed(3)},${venue.lon.toFixed(3)}`
+  const wantRelief = showTerrain || card.kind === 'layers'
+  useEffect(() => {
+    if (!wantRelief || venue === null || reliefKey === null || reliefFor?.key === reliefKey) return
+    let live = true
+    void reliefAround(venue).then((relief) => {
+      if (live) setReliefFor({ key: reliefKey, relief })
+    })
+    return () => {
+      live = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantRelief, reliefKey])
+  const relief = reliefFor !== null && reliefFor.key === reliefKey ? reliefFor.relief : null
+  const flatHere = relief !== null && relief.metres < FLAT_M
+
+  /*
    * EVERY CHIP OPENS ITS PAGE (field test, 30 Oct; docs/navigation.md): Wind
    * the Wind page, Cloud Sky › Sky fire, Tide Water › Tides, Golden Sky ›
    * Now. They opened small cards in the sheet, one tap short of the page.
@@ -1728,10 +1753,11 @@ export function PlanMode({
       /* Elevation for the horizon and the sun curve. 2D no longer tilts; the 3D button is the clay model. */
       label: 'Terrain',
       /* The tile says what the layer is actually doing, suspension included. */
-      state: !showTerrain ? 'OFF' : terrainPaused ? 'PAUSED' : 'ON',
-      on: showTerrain,
+      /* Under FLAT_M of relief round the venue there is nothing to draw: the tile says so and does nothing (30 Oct). */
+      state: flatHere ? 'FLAT HERE' : !showTerrain ? 'OFF' : terrainPaused ? 'PAUSED' : 'ON',
+      on: showTerrain && !flatHere,
       art: TILE_ART.terrain,
-      onToggle: () => turnTerrain(!showTerrain),
+      onToggle: () => (flatHere ? undefined : turnTerrain(!showTerrain)),
     },
     /*
      * NO CHART TILE. It toggled the same setting as Labels -- the Esri
@@ -1849,7 +1875,10 @@ export function PlanMode({
           map. Hazards are what you marked plus what OpenStreetMap has. Labels are place names over
           the imagery, off while reading a venue and on while hunting for one. Airspace draws
           controlled airspace as white dashes, the FAA grid squares with the most LAANC can
-          approve on each, and restricted areas and national parks in red.
+          approve on each, and restricted areas and national parks in red. Terrain shades the
+          slopes and draws a contour every 10 m (brighter every 50 m), and feeds the horizon and the
+          sun curve; where the ground round the venue rises less than 15 m it reads Flat here and
+          draws nothing.
         </p>
       }
     />
@@ -2327,6 +2356,7 @@ export function PlanMode({
         showSky={showSky}
         showLabels={showLabels}
         showTerrain={showTerrain}
+        contours={relief === null || flatHere ? null : relief.contours}
         onTerrainPaused={setTerrainPaused}
         showBuildings={showBuildings}
         buildings={buildingData}
