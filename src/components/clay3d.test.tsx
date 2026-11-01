@@ -13,12 +13,11 @@ const ORIGIN = 'https://scoutngo.vercel.app'
 const get = (path: string) => ({ url: ORIGIN + path, method: 'GET', mode: 'cors' })
 
 describe('the 3D view in the service worker', () => {
-  it('leaves Cesium out of the install, and caches it and its files on first use', () => {
-    expect(isLazy3d('/assets/cesium-j9LeNs8l.js')).toBe(true)
+  it('installs the 3D scene with the app, so it opens offline from the home-screen app (Batch D)', () => {
+    expect(isLazy3d('/assets/scene-j9LeNs8l.js')).toBe(false)
     expect(isLazy3d('/assets/index-gLcqEpxQ.js')).toBe(false)
-    expect(installAssets(['/assets/index-a.js', '/assets/cesium-b.js', '/assets/cesium-c.css'])).toEqual(['/assets/index-a.js'])
-    expect(routeOf(get('/assets/cesium-b.js'), ORIGIN)).toBe('asset')
-    expect(routeOf(get('/cesium/26.4.0/Workers/createVerticesFromHeightmap.js'), ORIGIN)).toBe('asset')
+    expect(installAssets(['/assets/index-a.js', '/assets/scene-b.js', '/assets/scene-c.css'])).toEqual(['/assets/index-a.js', '/assets/scene-b.js', '/assets/scene-c.css'])
+    expect(routeOf(get('/assets/scene-b.js'), ORIGIN)).toBe('asset')
   })
 })
 

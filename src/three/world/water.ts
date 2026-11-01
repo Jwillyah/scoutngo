@@ -24,7 +24,7 @@ import type { LatLon } from '../../core/geo.ts'
 import { seaWaves } from '../../core/seaSurface.ts'
 import type { SkyColours } from '../../core/skyLook.ts'
 import { loadVectorTile, vectorExtent } from '../../lib/vectorTiles.ts'
-import type { CinemaInputs } from '../cinema.ts'
+import type { CinemaInputs } from './inputs.ts'
 import { latOf, lonOf, tileX, tileY, working, type Frame } from './sources.ts'
 
 export const NEAR_Z = 14

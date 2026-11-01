@@ -13,7 +13,7 @@
  *            our sun's colour with self-shadowing toward the sun (bright
  *            edges toward it, dark bases) and a forward-scattering glow,
  *            drifting with the wind
- *   BATTERY  soft billboards where src/core/clouds.ts placeClouds puts them,
+ *   BATTERY  soft billboards where src/core/clouds.ts placeCloudsForSky puts them,
  *            tinted by the same light: far cheaper, for a phone on a long
  *            flight
  *
@@ -21,10 +21,10 @@
  * not positions. The 3D view's "i" says "Clouds illustrative".
  */
 import * as THREE from 'three'
-import { LAYERS, placeClouds, type Cover } from '../../core/clouds.ts'
+import { LAYERS, placeCloudsForSky, type Cover } from '../../core/clouds.ts'
 import { coverThreshold } from '../../core/cloudField.ts'
 import type { SkyColours } from '../../core/skyLook.ts'
-import type { CinemaInputs } from '../cinema.ts'
+import { cloudSprite, type CinemaInputs } from './inputs.ts'
 
 export const CLOUDS_NOTE = 'Clouds illustrative'
 const FIELD_HALF_M = 18_000
@@ -121,24 +121,9 @@ void main() {
   #include <colorspace_fragment>
 }`
 
+/* The billboards' picture: the SVG puff (inputs.ts), never a canvas WebKit adds noise to. */
 function puffTexture(): THREE.Texture {
-  const c = document.createElement('canvas')
-  c.width = 128
-  c.height = 128
-  const g = c.getContext('2d')
-  if (g !== null) {
-    for (let i = 0; i < 9; i += 1) {
-      const x = 40 + ((i * 37) % 48)
-      const y = 46 + ((i * 23) % 36)
-      const r = 26 + ((i * 11) % 18)
-      const grad = g.createRadialGradient(x, y, 0, x, y, r)
-      grad.addColorStop(0, 'rgba(255,255,255,0.55)')
-      grad.addColorStop(1, 'rgba(255,255,255,0)')
-      g.fillStyle = grad
-      g.fillRect(0, 0, 128, 128)
-    }
-  }
-  const t = new THREE.CanvasTexture(c)
+  const t = new THREE.TextureLoader().load(cloudSprite())
   t.colorSpace = THREE.SRGBColorSpace
   return t
 }
@@ -196,7 +181,8 @@ export function createClouds(onChange: () => void) {
         drawn = true
       }
     } else {
-      for (const c of placeClouds(cover, 7)) {
+      /* Thinned so the band a flying camera sees is at most the cover (src/core/clouds.ts). */
+      for (const c of placeCloudsForSky(cover, 7)) {
         const s = new THREE.Sprite(spriteMat)
         s.position.set(c.east, c.up, -c.north)
         s.scale.set(c.radiusM * 2.6, c.radiusM * 1.3, 1)

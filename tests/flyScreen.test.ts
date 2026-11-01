@@ -7,7 +7,7 @@ import { placeClouds, placeCloudsForSky, skyShareSeen } from '../src/core/clouds
  * scripts/audit-fly.mjs; the clouds are arithmetic, so they are here.
  */
 const strip = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
-const CINEMA = strip(readFileSync('src/three/cinema.ts', 'utf8'))
+const CINEMA = strip(readFileSync('src/three/world/clouds.ts', 'utf8'))
 const FLY = strip(readFileSync('src/components/FlyControls.tsx', 'utf8'))
 
 describe('clouds: the forecast\'s share of the sky, no more', () => {
@@ -33,14 +33,14 @@ describe('clouds: the forecast\'s share of the sky, no more', () => {
   })
 
   it('the cloud sprite is an SVG image, never a canvas WebKit adds noise to when it is read back', async () => {
-    const { cloudSprite } = await import('../src/three/cinema.ts')
+    const { cloudSprite } = await import('../src/three/world/inputs.ts')
     expect(cloudSprite()).toMatch(/^data:image\/svg\+xml/)
     expect(CINEMA).not.toMatch(/createElement\('canvas'\)|getContext\('2d'\)/)
   })
 
   it('no per-pixel noise: the grain stage is gone, and the clouds are the thinned ones', () => {
     expect(CINEMA).not.toMatch(/GRAIN_GLSL|grain/i)
-    expect(CINEMA).toContain('placeCloudsForSky(inputs.cover, inputs.seed)')
+    expect(CINEMA).toContain('placeCloudsForSky(cover, 7)')
   })
 })
 

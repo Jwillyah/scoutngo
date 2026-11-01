@@ -24,7 +24,7 @@ import type { PathPoint } from '../core/flight.ts'
 import { FlyControls } from './FlyControls.tsx'
 import { ANIMATED_BELOW_FT, flyUnits } from '../lib/fly/hudUnits.ts'
 import { imageryLine } from '../data/imagerySources.ts'
-import type { CinemaInputs, Look } from '../three/cinema.ts'
+import type { CinemaInputs, Look } from '../three/world/inputs.ts'
 
 const EMPTY: readonly Building[] = []
 
@@ -32,8 +32,9 @@ const EMPTY: readonly Building[] = []
  * THE 3D VIEW: a clay model of the place, at the time on the time bar.
  *
  * It sits where the map is, under the same top bar, sheet and time bar, so
- * the plan's controls keep working on it. CesiumJS is only fetched when this
- * opens (the import below), and its files come from this app's own origin.
+ * the plan's controls keep working on it. The scene (three.js, src/three/
+ * world/scene.ts) is loaded when this opens (the import below); the service
+ * worker installs it with the app, so it opens offline too.
  *
  * STAND HERE puts the eye at a position: 1.6 m up on foot, or the planned
  * height for a drone spot, facing the aim, with the lens's frame drawn on the
@@ -84,6 +85,7 @@ export function Clay3D({ venue, venueLabel, at, timeZone, sheetOpen = false, pin
   const [place, setPlace] = useState<PlaceState>(() => placeState())
   const [flat, setFlat] = useState(0)
   const [cloudQuality, setCloudQuality] = useState<'high' | 'battery'>('high')
+  const [chase, setChase] = useState(false)
   /* The zoom belongs to one Stand here: a new one starts at its own focal length. */
   const [zoom, setZoom] = useState<{ tick: number; focal: number } | null>(null)
   const [width, setWidth] = useState(0)
@@ -175,7 +177,7 @@ export function Clay3D({ venue, venueLabel, at, timeZone, sheetOpen = false, pin
     if (ready) scene.current?.setPins(pins)
   }, [ready, pins])
 
-  /* Cesium's clock and our light follow the time bar; the sky arcs are redrawn per day. */
+  /* The scene's light follows the time bar; the sky arcs are redrawn per day. */
   const day = localDate(at, timeZone)
   useEffect(() => {
     if (!ready) return
@@ -433,6 +435,11 @@ export function Clay3D({ venue, venueLabel, at, timeZone, sheetOpen = false, pin
           lookAuto={chosenLook === null}
           credits={scene.current?.credits() ?? []}
           onLook={setChosenLook}
+          chase={chase}
+          onChase={(on) => {
+            setChase(on)
+            scene.current?.setChase(on)
+          }}
           onExit={() => {
             const rec = recording.current
             recording.current = null

@@ -16,7 +16,6 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
-    "@cesium/engine": "26.4.0",
     "@mapbox/vector-tile": "3.0.0",
     "@turf/bearing": "^7.4.0",
     "@turf/boolean-point-in-polygon": "^7.4.0",

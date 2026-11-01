@@ -38,7 +38,7 @@ import type { Building } from '../../lib/buildings.ts'
 import type { Rasters } from '../../lib/lidar/raster.ts'
 import { horizontalFov, previewNote, WATERMARK, type FlightPlay } from '../../lib/preflight/play.ts'
 import { NOMINAL_TREE_HEIGHT, type MappedTree } from '../../lib/trees.ts'
-import type { CinemaInputs, Look } from '../cinema.ts'
+import type { CinemaInputs, Look } from './inputs.ts'
 import { createGround, type GroundStatus } from './ground.ts'
 import { createSky } from './sky.ts'
 import { ESRI_CREDIT, frameAt, heightAt, imagerySourceFor, OSM_CREDIT, pending, TERRAIN_CREDIT, tileCounts } from './sources.ts'
@@ -50,6 +50,8 @@ import { createArcs } from './arcs.ts'
 
 export type { GroundStatus }
 export const SHOW_WITHIN_MS = 30_000
+/* After this long with the camera still, the water and clouds animate at 10 frames a second. */
+export const IDLE_MS = 15_000
 
 export interface Pin {
   number: number
@@ -150,10 +152,16 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
   controls.maxDistance = 20_000
 
   let dirty = true
+  let lastMove = performance.now()
   const touch = () => {
     dirty = true
   }
-  controls.addEventListener('change', touch)
+  /* A finger or a pose moving the camera: the water and clouds run at full rate for a while after. */
+  const moved = () => {
+    lastMove = performance.now()
+    touch()
+  }
+  controls.addEventListener('change', moved)
 
   /* ------------------------------------------------------- sky and light */
   const sky = createSky()
@@ -312,6 +320,7 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
   }
   const point = (at: LatLon, h: number) => new THREE.Vector3(frame.x(at.lon), h, frame.z(at.lat))
   const pose = (pos: THREE.Vector3, heading: number, pitch: number, roll = 0) => {
+    lastMove = performance.now()
     mode = 'fixed'
     controls.enabled = false
     camera.up.set(0, 1, 0)
@@ -422,8 +431,13 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
     if (manual) return
     if (mode === 'orbit') controls.update()
     const animating = continuous > 0 || water.animating() || clouds.animating() || pending.n > 0
-    /* Moving: every frame. Still with water or clouds: 30 a second. Nothing: no frame at all. */
-    const minGap = dirty ? 0 : animating ? 33 : Infinity
+    /*
+     * Moving: every frame. Still with water or clouds: 30 a second, and after
+     * IDLE_MS untouched 10 a second (battery when nobody is looking hard).
+     * Nothing moving at all: no frame.
+     */
+    const idle = now - lastMove > IDLE_MS
+    const minGap = dirty ? 0 : animating ? (idle && continuous === 0 ? 100 : 33) : Infinity
     if (now - lastFrame < minGap) return
     lastFrame = now
     dirty = false

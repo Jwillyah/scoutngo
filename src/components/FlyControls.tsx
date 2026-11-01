@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { MODES, type FlyMode, type Sticks } from '../core/flyModel.ts'
-import type { Look } from '../three/cinema.ts'
+import type { Look } from '../three/world/inputs.ts'
 import type { FlyHud } from '../lib/fly/useFly.ts'
 import { barRole, hudLength, hudSpeed, type FlyUnits } from '../lib/fly/hudUnits.ts'
 
@@ -125,6 +125,9 @@ interface FlyControlsProps {
   look: Look
   lookAuto: boolean
   onLook: (look: Look) => void
+  /** Third person behind a generic quadcopter, or the gimbal camera (the default; Batch D). */
+  chase?: boolean
+  onChase?: (on: boolean) => void
   /** The map data's credits, said in the "i" while flying instead of over the sticks. */
   credits?: readonly string[]
   onExit: () => void
@@ -133,7 +136,7 @@ interface FlyControlsProps {
 /** How long the turn-sideways hint stays before it goes by itself. */
 export const HINT_MS = 4000
 
-export function FlyControls({ onSticks, mode, onMode, hud, ceilingFt, flightMinutes, wind, exposure, bars, units, look, lookAuto, onLook, credits = [], onExit }: FlyControlsProps) {
+export function FlyControls({ onSticks, mode, onMode, hud, ceilingFt, flightMinutes, wind, exposure, bars, units, look, lookAuto, onLook, chase = false, onChase, credits = [], onExit }: FlyControlsProps) {
   const s = hud?.state
   const used = hud === null ? 0 : hud.t / 60
   const [confirm, setConfirm] = useState(false)
@@ -217,6 +220,15 @@ export function FlyControls({ onSticks, mode, onMode, hud, ceilingFt, flightMinu
             Top speed by mode: Cine {hudSpeed(MODES.cine.speedMps, units)}, Normal {hudSpeed(MODES.normal.speedMps, units)}, Sport {hudSpeed(MODES.sport.speedMps, units)} {units.speed}. DJI publishes only
             Sport's; the other two are assumed. A flight model, not a physics simulator.
           </p>
+          {onChase === undefined ? null : (
+            <span className="seg fly__view" role="group" aria-label="View">
+              {([false, true] as const).map((c) => (
+                <button key={String(c)} type="button" className={`fly__seg${chase === c ? ' fly__seg--on' : ''}`} aria-pressed={chase === c} onClick={() => onChase(c)}>
+                  {c ? 'Chase' : 'Camera'}
+                </button>
+              ))}
+            </span>
+          )}
           <p>{lookAuto ? `The look turns Animated below 150 ft by itself, where the photo is stretched and soft; tap Real or Animated to choose.` : 'You chose the look; it stays until you land.'}</p>
           {exposure === null ? null : <p>Exposure from your ND table: {exposure}.</p>}
           <p>Ceiling {Math.round(units.length === 'ft' ? ceilingFt : ceilingFt * 0.3048)} {units.length} above takeoff.</p>

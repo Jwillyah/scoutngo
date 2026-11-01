@@ -81,8 +81,6 @@ export function routeOf(request: RequestLike, origin: string): Route {
   if (url.pathname === '/sw.js') return 'pass'
   if (request.mode === 'navigate') return 'navigate'
   if (url.pathname.startsWith('/assets/')) return 'asset'
-  /* Cesium's workers and data, versioned in the path: cached the first time 3D opens. */
-  if (url.pathname.startsWith('/cesium/')) return 'asset'
   if (SHELL_PUBLIC.includes(url.pathname)) return 'public'
   /* Including fetch('/', { cache: 'no-store' }): the build check must see the network. */
   return 'pass'
@@ -98,12 +96,12 @@ export function staleShellEntries(cachedPaths: readonly string[], current: reado
 }
 
 /**
- * THE 3D VIEW IS NOT PART OF THE INSTALL. Cesium is a few megabytes and most
- * visits never open 3D, so its chunk is left out of what the worker fetches
- * on install and is cached the first time 3D is opened instead (the asset
- * route is cache-first and stores what it fetches). It is still a current
- * asset, so staleShellEntries keeps it.
+ * THE 3D VIEW IS PART OF THE INSTALL (Batch D). It was left out while it was
+ * Cesium, a few megabytes most visits never used, and fetched on first open;
+ * so 3D from the home-screen app with no signal opened only if it had been
+ * opened online before. The three.js scene is a few hundred kilobytes and
+ * is installed with the rest, so a saved venue opens in 3D with no signal.
  */
-export const isLazy3d = (path: string): boolean => /^\/assets\/cesium-[^/]*\.(js|css)$/.test(path)
+export const isLazy3d = (_path: string): boolean => false
 
 export const installAssets = (assets: readonly string[]): string[] => assets.filter((path) => !isLazy3d(path))

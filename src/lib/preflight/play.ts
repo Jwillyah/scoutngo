@@ -1,6 +1,6 @@
 import type { PathPoint } from '../../core/flight.ts'
 import type { LatLon } from '../../core/geo.ts'
-import type { CinemaInputs, Look } from '../../three/cinema.ts'
+import type { CinemaInputs, Look } from '../../three/world/inputs.ts'
 
 /* Playing a Preflight move in the 3D view (Clay3D.tsx, clayScene.ts playPath). */
 export interface FlightPlay {

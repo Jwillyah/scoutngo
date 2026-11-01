@@ -11273,28 +11273,11 @@
   opacity: 1;
 }
 
-.clay__canvas .cesium-widget,
-.clay__canvas .cesium-widget canvas {
+/* The three.js canvas fills the frame (Batch D); the data credits are in the 3D view's "i". */
+.clay__canvas canvas {
   width: 100%;
   height: 100%;
-}
-
-/*
- * THE CREDITS STAY, small, above the sheet: Esri for the imagery, AWS for the
- * elevation. The engine's own logo does not: it advertises Cesium ion, and
- * nothing here comes from ion.
- */
-.clay__canvas .cesium-credit-logoContainer {
-  display: none !important;
-}
-
-/*
- * THE CREDITS ARE IN THE "i" (Batch E, 1 Nov): the engine's "Data
- * attribution" link sat mid-left over the map. The same names are listed in
- * the 3D view's "i" (Clay3D.tsx, from the scene's credits()).
- */
-.clay__canvas .cesium-widget-credits {
-  display: none !important;
+  display: block;
 }
 
 .clay__credits {
@@ -14782,6 +14765,17 @@
 }
 
 .clay__clouds .seg__btn {
+  min-height: 44px;
+  padding: 0 var(--space-3);
+}
+
+/* Camera or Chase, in the fly screen's "i" (Batch D, Section 5b). */
+.fly__view {
+  display: inline-flex;
+  margin-bottom: var(--space-2);
+}
+
+.fly__view .fly__seg {
   min-height: 44px;
   padding: 0 var(--space-3);
 }

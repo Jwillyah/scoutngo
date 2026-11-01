@@ -1,6 +1,6 @@
 import { FLIGHT_CARD_CLOSE, toGpx, toKml } from '../core/flight.ts'
 import { MOVE_LABEL, POINTS_NEEDED, type MoveKind, type Preflight } from '../lib/preflight/usePreflight.ts'
-import type { Look } from '../three/cinema.ts'
+import type { Look } from '../three/world/inputs.ts'
 
 /*
  * PREFLIGHT: DRAW A MOVE, READ ITS CARD, PLAY IT IN 3D.

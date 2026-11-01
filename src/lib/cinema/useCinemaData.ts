@@ -9,7 +9,7 @@ import type { TilePoint } from '../../core/oceanMask.ts'
 import { fetchMarine, fetchSkyHours, fetchWindMonth, hourlyAt, type Hourly } from '../tideSheetData.ts'
 import type { TideInfo } from '../useTide.ts'
 import { offsetFor } from '../waterline/datums.ts'
-import type { CinemaInputs } from '../../three/cinema.ts'
+import type { CinemaInputs } from '../../three/world/inputs.ts'
 
 /*
  * WHAT THE CINEMATIC PREVIEW DRAWS FROM, asked only while Preflight is open:
