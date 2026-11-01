@@ -54,13 +54,14 @@ const OVERLAY = Buffer.from(await encodePng({ width: 256, height: 256, data: new
 
 /*
  * ELEVATION, DRAWN. Terrarium encodes metres as R*256 + G + B/256 - 32768.
- * Zero at the sea, rising inland: a smooth swell of ground west of 76.0° W
- * reaching 120 m by 77° W, with a 60 m hill pattern on it, so a terrain check
- * at a coastal venue finds the ground flat and one inland finds relief. The
- * coast at Virginia Beach and Wrightsville stays at a metre or two.
+ * Zero at the sea, rising inland: a smooth swell of ground west of 78.0° W
+ * reaching 120 m by 78.5° W, with a 60 m hill pattern on it, so a terrain
+ * check at a coastal venue finds the ground flat and one inland (Big Meadows,
+ * 78.4° W) finds relief. Virginia Beach and Wrightsville stay at a metre.
  */
 export function fixtureElevation(lat, lon) {
-  const inland = Math.max(0, Math.min(1, (-76.0 - lon) / 1.0))
+  /* West of 78° W only: Wrightsville Beach (77.8° W) is a beach, not hills (Batch D: its sea stood 120 m up). */
+  const inland = Math.max(0, Math.min(1, (-78.0 - lon) / 0.5))
   const hills = 60 * inland * (0.5 + 0.5 * Math.sin(lat * 400) * Math.cos(lon * 400))
   return 1 + 120 * inland + hills
 }

@@ -23,6 +23,7 @@
  */
 import * as THREE from 'three'
 import type { ImagerySource } from '../../data/imagerySources.ts'
+import { waterMaskFor } from './waterMask.ts'
 import { frameAt, heightAt, latOf, lonOf, pictureOnly, pictureOrParent, sampleTile, terrainTile, tileX, tileY, TERRAIN_MAX_Z, type Frame } from './sources.ts'
 
 export const NEAR_Z = 18
@@ -100,7 +101,9 @@ export function gridGeometry(frame: Frame, north: number, south: number, west: n
 }
 
 /** A height function over the terrarium tiles at `z` covering a box, loaded first; flat (0) where a tile is missing. */
-async function heightsFor(north: number, south: number, west: number, east: number, z: number, status: GroundStatus, onFlat: () => void) {
+async function heightsFor(north: number, south: number, west: number, east: number, z: number, status: GroundStatus, onFlat: () => void, waterZ: number | null = null, reachDeg = 0) {
+  /* Under the map's water the ground goes below any tide, so the water surface covers the photo's sea (waterMask.ts). */
+  const mask = waterZ === null ? null : await waterMaskFor(north, south, west, east, waterZ)
   const x0 = Math.floor(tileX(west, z))
   const x1 = Math.floor(tileX(east, z))
   const y0 = Math.floor(tileY(north, z))
@@ -123,7 +126,16 @@ async function heightsFor(north: number, south: number, west: number, east: numb
     const x = Math.min(x1, Math.max(x0, Math.floor(tileX(lon, z))))
     const y = Math.min(y1, Math.max(y0, Math.floor(tileY(lat, z))))
     const t = tiles.get(`${x}/${y}`)
-    return t == null ? 0 : seaFloor(sampleTile(t, x, y, z, lat, lon))
+    const h = t == null ? 0 : seaFloor(sampleTile(t, x, y, z, lat, lon))
+    if (mask === null) return h
+    /*
+     * On the coarse rings a vertex goes under if water is within half a cell
+     * of it: between a sea vertex and a land one the ground ramps across the
+     * whole cell, and that ramp stood above the water for hundreds of metres
+     * (Wrightsville, 1 Nov). There the water's edge wins.
+     */
+    const wet = mask.inWater(lat, lon) || (reachDeg > 0 && [[reachDeg, 0], [-reachDeg, 0], [0, reachDeg], [0, -reachDeg]].some(([a, b]) => mask.inWater(lat + a, lon + b)))
+    return wet ? Math.min(h, -4) : h
   }
 }
 
@@ -172,7 +184,7 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
         const west = lonOf(x, z)
         const east = lonOf(x + 1, z)
         void (async () => {
-          const h = await heightsFor(north, south, west, east, terrainZ, status, onChange)
+          const h = await heightsFor(north, south, west, east, terrainZ, status, onChange, 12, (north - south) / segments / 2)
           const pic = await pictureOrParent(x, y, z, z >= 14 ? source : null)
           const canvas = new OffscreenCanvas(256, 256)
           const ctx = canvas.getContext('2d')
@@ -191,12 +203,14 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
       }
     }
   }
-  ring(FAR_Z, FAR_HALF_M, 8, FAR_DROP_M, Math.min(FAR_Z - 1, 11), -2)
-  ring(MID_Z, MID_HALF_M, 16, MID_DROP_M, 13, -1)
+  ring(FAR_Z, FAR_HALF_M, 32, FAR_DROP_M, Math.min(FAR_Z - 1, 11), -2)
+  ring(MID_Z, MID_HALF_M, 32, MID_DROP_M, 13, -1)
 
   /* ------------------------------------------------- the near square */
   let near: { mesh: THREE.Mesh; tex: THREE.CanvasTexture; cx: number; cz: number; box: { west: number; east: number; north: number; south: number }; born: number } | null = null
   let building: { cx: number; cz: number } | null = null
+  /* The sharp tiles of the current square still arriving: not "loaded" until they are. */
+  let refining = false
   const nearSquare = async (cx: number, cz: number) => {
     if (building !== null) return
     building = { cx, cz }
@@ -235,7 +249,7 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
         }),
       )
       void tilePx
-      const h = await heightsFor(box.north, box.south, box.west, box.east, TERRAIN_MAX_Z, status, onChange)
+      const h = await heightsFor(box.north, box.south, box.west, box.east, TERRAIN_MAX_Z, status, onChange, 14)
       const mesh = new THREE.Mesh(gridGeometry(frame, box.north, box.south, box.west, box.east, 128, h, 0))
       mesh.receiveShadow = true
       mesh.renderOrder = 0
@@ -265,6 +279,7 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
         }
       }, 250)
       const queue = [...order]
+      refining = true
       const worker = async () => {
         while (queue.length > 0) {
           const t = queue.shift()
@@ -277,6 +292,7 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
         }
       }
       await Promise.all(Array.from({ length: 6 }, worker))
+      refining = false
       clearInterval(flush)
       tex.needsUpdate = true
       onChange()
@@ -297,7 +313,7 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
     group,
     follow,
     atlas: () => (near === null ? null : { texture: near.tex, ...near.box }),
-    ready: () => near !== null,
+    ready: () => near !== null && !refining && building === null,
     setMaterial: (h) => {
       materialHook = h
       for (const t of textured) {

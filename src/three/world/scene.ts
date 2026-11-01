@@ -101,6 +101,10 @@ export interface ClayScene {
   project(at: LatLon, height?: number): { x: number; y: number } | null
   /** Nothing still in flight: what the audits wait on (the old globe.tilesLoaded). */
   loaded(): boolean
+  /** For checks: the water drawn flat magenta (its geometry, nothing else changed). */
+  setWaterMask(on: boolean): void
+  /** For checks: over an n x n grid `halfM` either side of the venue, the points where water is drawn and some ground stands above it (a slab over the sea). */
+  slabPoints(n: number, halfM: number): { water: number; slab: number; by: Record<string, number> }
   /** Frame times of the last frames drawn, milliseconds, for the report (Section 7). */
   frameTimes(): number[]
   renderer: THREE.WebGLRenderer
@@ -682,6 +686,19 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
   }
   setSkyShown(true)
 
+  /* For checks and debugging: what the scene holds, by name. */
+  ;(window as unknown as { __clayDebug?: () => unknown }).__clayDebug = () => {
+    const names: Record<string, number> = {}
+    scene.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh) names[o.name || o.parent?.name || '?'] = (names[o.name || o.parent?.name || '?'] ?? 0) + 1
+    })
+    const w = water.group.children.map((c) => { const b = new THREE.Box3().setFromObject(c); return { name: c.name, y: Math.round(c.position.y * 100) / 100, tris: ((c as THREE.Mesh).geometry.index?.count ?? 0) / 3, x: [Math.round(b.min.x), Math.round(b.max.x)], z: [Math.round(b.min.z), Math.round(b.max.z)] } })
+    const down = (lat: number, lon: number) => {
+      const r = new THREE.Raycaster(new THREE.Vector3(frame.x(lon), 2000, frame.z(lat)), new THREE.Vector3(0, -1, 0))
+      return r.intersectObjects([ground.group, water.group], true).slice(0, 3).map((h) => `${h.object.name}@${h.point.y.toFixed(2)}`)
+    }
+    return { names, water: w.filter((x) => x.name !== 'shore'), camera: camera.position.toArray().map((v) => Math.round(v)), sea: down(venue.lat + 0.004, venue.lon + 0.016), nearSea: down(venue.lat + 0.002, venue.lon + 0.006) }
+  }
   orbit()
   ;(window as unknown as { __clayBuilds?: number }).__clayBuilds = ((window as unknown as { __clayBuilds?: number }).__clayBuilds ?? 0) + 1
 
@@ -742,6 +759,31 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
     project,
     loaded: () => loaded(),
     frameTimes: () => [...times],
+    setWaterMask: (on) => water.setMask(on),
+    slabPoints: (n, halfM) => {
+      let wet = 0
+      let slab = 0
+      const by: Record<string, number> = {}
+      const r = new THREE.Raycaster()
+      for (let i = 0; i < n; i += 1) {
+        for (let j = 0; j < n; j += 1) {
+          const x = -halfM + ((i + 0.5) * 2 * halfM) / n
+          const z = -halfM + ((j + 0.5) * 2 * halfM) / n
+          r.set(new THREE.Vector3(x, 3000, z), new THREE.Vector3(0, -1, 0))
+          const hits = r.intersectObjects([ground.group, water.group], true)
+          const w = hits.findIndex((h) => h.object.name.startsWith('water'))
+          if (w < 0) continue
+          wet += 1
+          const over = hits.slice(0, w).find((h) => h.object.name.startsWith('ground'))
+          if (over !== undefined) {
+            slab += 1
+            const k = `${over.object.name}@${Math.round(over.point.y)}`
+            by[k] = (by[k] ?? 0) + 1
+          }
+        }
+      }
+      return { water: wet, slab, by }
+    },
     renderer,
     destroy: () => {
       cancelAnimationFrame(raf)

@@ -46,6 +46,7 @@ export const AUDITS = [
   { name: 'fly', script: 'audit-fly.mjs', summary: /FLY PROBLEMS/ },
   { name: 'buildings', script: 'audit-buildings.mjs', summary: /BUILDINGS PROBLEMS/, timing: true },
   { name: 'ground seams', script: 'audit-ground-seams.mjs', summary: /GROUND SEAMS PROBLEMS/ },
+  { name: 'water coast', script: 'audit-water-coast.mjs', summary: /WATER COAST PROBLEMS/ },
   { name: 'sky fire', script: 'audit-skyfire.mjs', summary: /SKY FIRE PROBLEMS/ },
   { name: 'terrain decode', script: 'audit-terrain-decode.mjs', summary: /TERRAIN DECODE PROBLEMS/ },
   { name: 'special light', script: 'audit-special.mjs', summary: /SPECIAL LIGHT PROBLEMS/ },
