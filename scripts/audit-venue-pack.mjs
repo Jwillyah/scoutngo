@@ -134,7 +134,14 @@ async function routes(ctx) {
     count('vector')
     const m = /\/(\d+)\/(\d+)\/(\d+)\.pbf/.exec(r.request().url())
     const hit = m !== null && +m[1] === 14 && +m[2] === BUILDING_TILE.x && +m[3] === BUILDING_TILE.y
-    return r.fulfill({ body: hit ? BUILDING : EMPTY, contentType: 'application/x-protobuf', headers: { 'access-control-allow-origin': '*' } })
+    /*
+     * The coast test's zoom 12 tiles are the recorded ones (scripts/gate/tiles),
+     * so the pier has a sea: coast or inland decides the Water menu and the
+     * tide chip (src/lib/placeGroups.ts), and that answer must hold offline.
+     */
+    const recorded = m !== null && +m[1] === 12 ? join('scripts/gate/tiles/openfreemap', m[1], m[2], `${m[3]}.pbf`) : null
+    const body = hit ? BUILDING : recorded !== null && existsSync(recorded) ? readFileSync(recorded) : EMPTY
+    return r.fulfill({ body, contentType: 'application/x-protobuf', headers: { 'access-control-allow-origin': '*' } })
   })
   await ctx.route(/open-meteo\.com/, (r) => (count('open-meteo'), r.fulfill({ json: openMeteo(new URL(r.request().url())), headers: { 'access-control-allow-origin': '*' } })))
   await ctx.route(/tidesandcurrents\.noaa\.gov/, (r) => (count('noaa'), r.fulfill({ json: noaa(new URL(r.request().url())), headers: { 'access-control-allow-origin': '*' } })))
@@ -333,6 +340,20 @@ try {
       if (!(drawn.sun > 0)) fail(`${label}: no sun line on the glass offline`)
       if (!(drawn.shadows > 0)) fail(`${label}: no shadow on the glass offline (the pack's building)`)
     }
+
+    /*
+     * STILL ON THE COAST WITH NO SIGNAL (Batch C2, Section 1). No tiles can be
+     * had offline, and "cannot say" used to read as "no sea": the Water menu
+     * and the tide went. The last answer for the venue must stand.
+     */
+    await page.locator('button[aria-label="Menu"]').first().click({ timeout: 3000 }).catch(() => {})
+    await wait(600)
+    const menu = await ev(`[...document.querySelectorAll('.sidemenu__panel button')].map((b) => b.textContent.trim().split(/\\s{2,}|\\n/)[0])`)
+    console.log(`  menu offline: ${JSON.stringify(menu)}`)
+    if (!Array.isArray(menu) || !menu.some((t) => /^Water/.test(t))) fail(`${label}: offline the pier lost its Water menu: the coast was forgotten`)
+    if (Array.isArray(menu) && menu.some((t) => /^Land/.test(t))) fail(`${label}: offline the pier shows Land, so it was taken for inland`)
+    await page.keyboard.press('Escape')
+    await wait(500)
 
     /* The tide curve. */
     await page.locator('.chip2', { hasText: 'TIDE' }).first().click({ timeout: 3000 }).catch(() => {})

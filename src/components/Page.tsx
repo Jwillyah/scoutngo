@@ -1,4 +1,5 @@
-import { useEffect, type ReactNode } from 'react'
+import { useContext, useEffect, type ReactNode } from 'react'
+import { PageGroup } from '../lib/pageGroup.ts'
 import { createPortal } from 'react-dom'
 
 /*
@@ -7,6 +8,7 @@ import { createPortal } from 'react-dom'
  * back to wherever it was opened from (nothing underneath moved), and the
  * page. Fits 390 x 844 with no scroll: the overflow audit opens each.
  */
+
 interface PageProps {
   title: string
   /** e.g. Simple / Advanced. */
@@ -19,6 +21,7 @@ interface PageProps {
 }
 
 export function Page({ title, tabs, tab, onTab, onClose, className = '', children }: PageProps) {
+  const group = useContext(PageGroup)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -28,6 +31,15 @@ export function Page({ title, tabs, tab, onTab, onClose, className = '', childre
   }, [onClose])
   return createPortal(
     <div className={`page ${className}`} role="dialog" aria-label={title}>
+      {group === null || !group.items.some((i) => i.id === group.current) ? null : (
+        <div className="seg page__group" role="tablist" aria-label={group.label}>
+          {group.items.map((i) => (
+            <button key={i.id} type="button" role="tab" className={`seg__btn${i.id === group.current ? ' seg__btn--on' : ''}`} aria-selected={i.id === group.current} onClick={() => group.onPick(i.id)}>
+              {i.label}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="page__head">
         <p className="page__title">{title}</p>
         {tabs === undefined ? null : (

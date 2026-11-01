@@ -13215,6 +13215,18 @@
   color: var(--color-text);
 }
 
+/* Water's or Land's pages as tabs, above the page's own head. */
+.page__group {
+  flex: none;
+  align-self: start;
+}
+
+/* 44 px, like every target (ux-rules 7): the gesture audit caught them at 23 (30 Oct). */
+.page__group .seg__btn {
+  min-height: 44px;
+  padding: 0 var(--space-3);
+}
+
 .page__head {
   display: flex;
   align-items: center;
@@ -14320,4 +14332,55 @@
 .fire__verdict {
   text-transform: none;
   letter-spacing: normal;
+}
+
+/* ------------------------------------------- Terrain light, a page (30 Oct) */
+.tlpage .page__body {
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+  overflow-y: auto;
+}
+
+.tlpage__verdict {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-heavy);
+}
+
+.tlpage__line,
+.tlpage__note {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.tlpage__head {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-label);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.tlpage__list {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tlpage__row {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-panel);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
 }

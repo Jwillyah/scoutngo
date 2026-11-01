@@ -40,7 +40,7 @@ const TIMES = join(tmpdir(), 'scoutngo-audit-times.json')
 export const AUDITS = [
   { name: 'reachability', script: 'audit-reachability.mjs', summary: /TOTAL PROBLEMS/, pattern: /PROBLEM|TOTAL|ABORTED/, alone: true },
   { name: 'label collision', script: 'audit-labels.mjs', summary: /LABEL PROBLEMS/, pattern: /FAIL|LABEL PROBLEMS|over |ABORTED/ },
-  { name: 'gesture', script: 'audit-gestures.mjs', summary: /GESTURE PROBLEMS/, alone: true },
+  { name: 'gesture', script: 'audit-gestures.mjs', summary: /GESTURE PROBLEMS/, alone: true, quiet: true },
   { name: 'standalone', script: 'audit-standalone.mjs', summary: /STANDALONE PROBLEMS/ },
   { name: 'viewfinder', script: 'audit-viewfinder.mjs', summary: /VIEWFINDER PROBLEMS/ },
   { name: 'fly', script: 'audit-fly.mjs', summary: /FLY PROBLEMS/ },
@@ -128,13 +128,30 @@ console.log(`${DIM}· ${todo.length} audits, ${JOBS} at a time; one at a time in
  * Two lanes at once: the timed audits one after another in a lane of their
  * own, never two of them together, and the rest JOBS - 1 at a time beside it.
  */
+/*
+ * QUIET WHILE THE FLICKS ARE TIMED: while a `quiet` audit runs (the gesture
+ * audit), only QUIET_JOBS of the rest run beside it. With five beside it, a
+ * pinch "held still" read undefined once in three runs (1 Nov); with one or
+ * two it has not failed.
+ */
+const QUIET_JOBS = 2
 let next = 0
+let quiet = false
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 await Promise.all([
   (async () => {
-    for (const a of alone) await run(a)
+    for (const a of alone) {
+      quiet = a.quiet === true
+      await run(a)
+      quiet = false
+    }
   })(),
-  ...Array.from({ length: Math.max(1, Math.min(JOBS - (alone.length > 0 ? 1 : 0), shared.length)) }, async () => {
+  ...Array.from({ length: Math.max(1, Math.min(JOBS - (alone.length > 0 ? 1 : 0), shared.length)) }, async (_, worker) => {
     while (next < shared.length) {
+      if (quiet && worker >= QUIET_JOBS) {
+        await sleep(500)
+        continue
+      }
       const a = shared[next]
       next += 1
       await run(a)

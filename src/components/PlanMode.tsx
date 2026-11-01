@@ -147,6 +147,9 @@ import type { SkyTab } from '../lib/skyTab.ts'
 import { cloudTriple, layersLine, modelsSplit } from '../core/skyFire.ts'
 import { fetchModelLows, nearestHour } from '../lib/skyFireData.ts'
 import { useWeatherBusy, useWeatherEpoch } from '../lib/useWeatherStatus.ts'
+import type { Place } from '../lib/placeGroups.ts'
+import { PageGroup, type PageGroupValue } from '../lib/pageGroup.ts'
+import { TerrainLightPage } from './TerrainLightPage.tsx'
 import { PhaseRule } from './PhaseRule.tsx'
 import { shadowKeyLine, shadowKeyNotes } from '../lib/shadowKey.ts'
 
@@ -349,7 +352,10 @@ interface PlanModeProps {
   onMenu: () => void
   menuOpen: boolean
   /** The menu asked for a card: Sky or About. The tick makes a repeat ask open it again. */
-  cardRequest: { kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'wind' | 'preflight'; tick: number }
+  cardRequest: { kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'wind' | 'terrain' | 'preflight'; tick: number }
+  /** Coast or inland, and which of Water and Land are offered (src/lib/placeGroups.ts). */
+  place?: Place
+  groups?: { water: boolean; land: boolean; surf: boolean }
   /** What is in the bag, for the call sheet's kit tool. */
   bag: KitSelection
   /** The search pill was tapped: go and search. */
@@ -545,6 +551,8 @@ export function PlanMode({
   onMenu,
   menuOpen,
   cardRequest,
+  place = 'unknown',
+  groups = { water: true, land: false, surf: true },
   bag,
   onSearch,
   onOpenNow,
@@ -805,9 +813,9 @@ export function PlanMode({
     return { levels: windLevels, ratedMps: d.maxWindMps, ceilingFt: facilityCellAt(venue.lat, venue.lon)?.ceilingFeet ?? null, name: d.name.replace(/^DJI /, '') }
   }, [kitProfile, bag, venue, windLevels])
   /* A page over everything: Exposure, Tides or Surf. ?page=tides opens one, for the overflow audit. */
-  const [page, setPage] = useState<'exposure' | 'tides' | 'surf' | 'wind' | null>(() => {
+  const [page, setPage] = useState<'exposure' | 'tides' | 'surf' | 'wind' | 'terrain' | null>(() => {
     const p = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('page')
-    return p === 'exposure' || p === 'tides' || p === 'surf' || p === 'wind' ? p : null
+    return p === 'exposure' || p === 'tides' || p === 'surf' || p === 'wind' || p === 'terrain' ? p : null
   })
   /* Sky › Calendar, a page of its own (CalendarPage.tsx). ?calendar=1 opens it, for the overflow audit. */
   const [calendarOpen, setCalendarOpen] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('calendar') === '1')
@@ -1257,6 +1265,15 @@ export function PlanMode({
   /* A rainbow's bow, drawn on the map from Sky › Special. */
   const [bow, setBow] = useState<GeoJSON.FeatureCollection | null>(null)
   const home = useCallback(() => setCard(HOME), [])
+  /* Which job's tabs sit over the page: Water at the coast, Land inland; Wind is in both, and Water wins when both are on. */
+  const pageGroup = useMemo<PageGroupValue | null>(() => {
+    if (page === null) return null
+    if (groups.water && (page === 'tides' || page === 'surf' || page === 'wind'))
+      return { label: 'Water', current: page, onPick: (id) => setPage(id as 'tides'), items: [...(groups.surf ? [{ id: 'surf', label: 'Surf' }] : []), { id: 'tides', label: 'Tides' }, { id: 'wind', label: 'Wind' }] }
+    if (groups.land && (page === 'wind' || page === 'terrain'))
+      return { label: 'Land', current: page, onPick: (id) => setPage(id as 'wind'), items: [{ id: 'wind', label: 'Wind' }, { id: 'terrain', label: 'Terrain light' }] }
+    return null
+  }, [page, groups.water, groups.land, groups.surf])
   /* The Tide sheet's month, wind, sea and beach facing: asked only while it is open. */
   const [surfSetting] = useSurfSetting()
   const tideSheet = useTideSheet(calendarOpen || page === 'tides' || page === 'surf' || page === 'wind', venue, tide.status === 'ok' ? tide.station.id : null, surfSetting)
@@ -1342,7 +1359,7 @@ export function PlanMode({
     if (cardRequest.tick === 0) return
     const timer = setTimeout(() => {
       /* Exposure, Tides and Surf are pages of their own (29 Oct); Preflight is its card. */
-      if (cardRequest.kind === 'exposure' || cardRequest.kind === 'tides' || cardRequest.kind === 'surf' || cardRequest.kind === 'wind') {
+      if (cardRequest.kind === 'exposure' || cardRequest.kind === 'tides' || cardRequest.kind === 'surf' || cardRequest.kind === 'wind' || cardRequest.kind === 'terrain') {
         setPage(cardRequest.kind)
         return
       } else if (cardRequest.kind === 'preflight') {
@@ -1433,16 +1450,17 @@ export function PlanMode({
         note: split ? 'models split' : undefined,
         age: cloudPct === null ? null : age,
       },
-      {
-        kind: 'tide',
+      /* Inland, no tide anywhere (30 Oct): the chip goes with Water. */
+      ...(!groups.water && place === 'inland' ? [] : [{
+        kind: 'tide' as const,
         /* The next turn after the time on the bar, high or low: never one that has passed (29 Oct). */
         label: nextTurn === null ? 'TIDE' : nextTurn.kind === 'high' ? 'HIGH TIDE' : 'LOW TIDE',
         value: nextTurn === null ? null : clock(nextTurn.at),
         /* The zone is the unit of a clock time, said only away from the phone's own zone; see Chip.unit. */
         ...(venueWindow === null || venueWindow.timeZoneShort === '' ? {} : { unit: venueWindow.timeZoneShort }),
-      },
+      }]),
     ]
-  }, [venue, venueWindow, scrubbedAt, wind, ratedWindMps, nextTurn, venueCloud, forecast, units, clock, modelLows])
+  }, [venue, venueWindow, scrubbedAt, wind, ratedWindMps, nextTurn, venueCloud, forecast, units, clock, modelLows, groups.water, place])
 
   /*
    * WHICH GOES BAND THE SKY LAYER PAINTS, from the sun's altitude: visible
@@ -2071,6 +2089,7 @@ export function PlanMode({
                 tab={skyTab}
                 onTab={setSkyTab}
                 onOpenCalendar={() => setCalendarOpen(true)}
+                place={place}
                 onJump={scrubTo}
                 target={aimAt}
                 picking={placingAim}
@@ -2358,6 +2377,8 @@ export function PlanMode({
         />
       ) : null}
       {page === 'exposure' ? <ExposurePage kit={kitProfile} bag={bag} onClose={() => setPage(null)} /> : null}
+      {/* Water's pages (Surf · Tides · Wind) or Land's (Wind · Terrain light) as tabs over each (docs/navigation.md). */}
+      <PageGroup.Provider value={pageGroup}>
       {page === 'tides' && venue !== null && scrubbedAt !== null && venueWindow !== null ? (
         <TidesPage
           tide={tide}
@@ -2407,6 +2428,10 @@ export function PlanMode({
           }}
         />
       ) : null}
+      {page === 'terrain' && venue !== null && scrubbedAt !== null && venueWindow !== null ? (
+        <TerrainLightPage venue={venue} at={scrubbedAt} timeZone={venueWindow.timeZone} horizon={horizonProfile} onTerrain={() => onShowTerrain(true)} onJump={scrubTo} onClose={() => setPage(null)} />
+      ) : null}
+      </PageGroup.Provider>
       {compareOpen ? <ComparePhoto fallbackAt={venue} distanceUnit={units.distance} onClose={() => setCompareOpen(false)} /> : null}
 
       {threeD && venue !== null && venueWindow !== null && scrubbedAt !== null ? (

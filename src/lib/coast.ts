@@ -77,8 +77,18 @@ export async function coastFacing(venue: LatLon): Promise<CoastFacing | 'inland'
 
 /** Metres from the venue to the nearest sea along any bearing, within `withinM`, or null. Phase 1b's coastal test. */
 export async function metresToSea(venue: LatLon, withinM: number): Promise<number | null> {
+  const m = await seaReach(venue, withinM)
+  return m === 'unavailable' ? null : m
+}
+
+/**
+ * The same, but saying so when the tiles could not be had: 'unavailable' is
+ * not "no sea". Offline, a pier is still on the coast (field test, 30 Oct;
+ * src/lib/placeMemory.ts keeps the last answer per venue for exactly this).
+ */
+export async function seaReach(venue: LatLon, withinM: number): Promise<number | null | 'unavailable'> {
   const sea = await seaTestAround(venue, withinM + 200)
-  if (sea === null) return null
+  if (sea === null) return 'unavailable'
   if (sea(venue)) return 0
   let best: number | null = null
   for (let b = 0; b < 360; b += 4) {

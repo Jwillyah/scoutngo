@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { LatLon } from '../core/geo.ts'
 import type { TideExtreme } from '../core/tide.ts'
-import { coastFacing, metresToSea, type CoastFacing } from './coast.ts'
+import { coastFacing, seaReach, type CoastFacing } from './coast.ts'
+import { placeKeyOf, resolveReach } from './placeMemory.ts'
 import { latestBuoyWaves, type BuoyReading } from './buoy.ts'
 import { showSurf, SURF_COAST_M, type SurfSetting } from './surfSetting.ts'
 import { retrying } from './retrying.ts'
@@ -75,8 +76,13 @@ export function useTideSheet(open: boolean, venue: LatLon | null, stationId: str
     )
     stops.push(
       retrying(async () => {
-        const m = await metresToSea(at, SURF_COAST_M)
+        /* Offline the tiles cannot say; the last answer here stands (src/lib/placeMemory.ts). */
+        const m = resolveReach(placeKeyOf(at.lat, at.lon), await seaReach(at, SURF_COAST_M))
         if (!live) return true
+        if (m === undefined) {
+          setSeaM({ value: null, savedAt: null, status: 'failed' })
+          return false
+        }
         setSeaM({ value: m, savedAt: null, status: 'ready' })
         return true
       }),

@@ -4,7 +4,8 @@
  *
  * SEVEN ITEMS, GROUPED BY JOB (field test, 30 Oct; docs/ux-rules.md rule 24;
  * docs/navigation.md has the tree and the taps to each place). It was twelve
- * flat items. Now: Plan · Sky · Water · Fly · Kit · Saved · Settings, with
+ * flat items. Now: Plan · Sky · Water (Land inland) · Fly · Kit · Saved ·
+ * Settings, with
  * the places that belong to a job under it, each one tap from the menu.
  * Field is still reached by its address, /field (OLD_PATHS below): a place
  * that moved is still a place.
@@ -17,6 +18,8 @@ export type MenuItem =
   | 'field'
   | 'sky'
   | 'water'
+  | 'land'
+  | 'terrain'
   | 'tides'
   | 'surf'
   | 'wind'
@@ -64,6 +67,17 @@ export const MENU_ITEMS: readonly MenuEntry[] = [
       { id: 'wind', label: 'Wind' },
     ],
   },
+  /* Land, inland: the same slot. Wind and the light on the ridges; no surf or tide. */
+  {
+    id: 'land',
+    label: 'Land',
+    note: 'Wind, light on the ridges, valley fog',
+    icon: 'terrain',
+    subs: [
+      { id: 'wind', label: 'Wind' },
+      { id: 'terrain', label: 'Terrain light' },
+    ],
+  },
   { id: 'preflight', label: 'Fly', note: 'Draw or fly a drone move', icon: 'preflight', subs: [{ id: 'viewfinder', label: 'Viewfinder' }] },
   { id: 'kit', label: 'Kit', note: 'What is in the bag', icon: 'kit', subs: [{ id: 'exposure', label: 'Exposure' }] },
   { id: 'saved', label: 'Saved', note: 'Spots, offline packs, past shoots', icon: 'saved' },
@@ -74,6 +88,7 @@ export const MENU_ITEMS: readonly MenuEntry[] = [
 export function menuHome(item: MenuItem): MenuItem {
   if (item === 'setup' || item === 'field' || item === 'now' || item === 'callsheet') return 'plan'
   if (item === 'tides' || item === 'surf' || item === 'wind') return 'water'
+  if (item === 'terrain') return 'land'
   if (item === 'viewfinder') return 'preflight'
   if (item === 'exposure') return 'kit'
   if (item === 'about') return 'settings'

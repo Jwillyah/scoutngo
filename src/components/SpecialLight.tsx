@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { getPosition } from 'suncalc'
 import type { LatLon } from '../core/geo.ts'
 import { fireVerdict, nextEvents } from '../core/skyFire.ts'
-import { SPECIAL_NAME, specialLine, type Special } from '../core/specialLight.ts'
+import { specialLine, type Special } from '../core/specialLight.ts'
 import { formatClock } from '../core/timezone.ts'
 import { fetchFirePaths, nearestHour, pathsAt } from '../lib/skyFireData.ts'
 import { fetchGlassWeek, fetchSpecialWeek, specialsFrom } from '../lib/specialLightData.ts'
+import { specialName, type Place } from '../lib/placeGroups.ts'
 
 /*
  * SPECIAL LIGHT THIS WEEK (Sky › Special): fog, rainbows, god rays from the
@@ -21,11 +22,13 @@ interface Props {
   onShowBow?: (s: Special | null) => void
   /** Jump the app to a time. */
   onJump?: (at: Date) => void
+  /** Coast or inland (src/lib/placeGroups.ts): glassy water only at the coast, fog is valley fog inland. */
+  place?: Place
 }
 
 const dayWord = (d: Date, timeZone: string) => new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'short' }).format(d)
 
-export function SpecialLight({ venue, timeZone, at, onShowBow, onJump }: Props) {
+export function SpecialLight({ venue, timeZone, at, onShowBow, onJump, place }: Props) {
   const key = `${venue.lat},${venue.lon}`
   const [answer, setAnswer] = useState<{ key: string; list: Special[] | null } | null>(null)
   useEffect(() => {
@@ -46,14 +49,15 @@ export function SpecialLight({ venue, timeZone, at, onShowBow, onJump }: Props) 
           fires.push({ kind: 'fire', from: new Date(event.getTime() - 20 * 60_000), to: new Date(event.getTime() + 15 * 60_000), agree: v.agree, of: v.of, word: v.word, why: `At ${kind}: cloud to light and a way in for the light, by Sky fire’s three checks.` })
         }
       }
-      const glass = await fetchGlassWeek(venue, new Date()).catch(() => [])
+      /* Glassy water is a coast thing: not asked inland. */
+      const glass = place === 'inland' ? [] : await fetchGlassWeek(venue, new Date()).catch(() => [])
       const extra = [...fires, ...glass]
       if (live) setAnswer({ key, list: list === null ? (extra.length === 0 ? null : extra) : [...list, ...extra].sort((a, b) => a.from.getTime() - b.from.getTime()) })
     })()
     return () => {
       live = false
     }
-  }, [venue, key])
+  }, [venue, key, place])
   const list = answer === null || answer.key !== key ? 'loading' : answer.list
   /* Both ends with AM or PM: a bare "5:00" is a time on the wrong clock to half the day (scripts/audit-clock.mjs). */
   const span = (a: Date, b: Date) => `${dayWord(a, timeZone)} ${formatClock(a, timeZone)}–${formatClock(b, timeZone)}`
@@ -70,12 +74,12 @@ export function SpecialLight({ venue, timeZone, at, onShowBow, onJump }: Props) 
         <p className="spec__note">Nothing special in the forecast this week: no fog, rainbow, god rays or sky fire by these rules. The rules are in the “i”.</p>
       ) : (
         <>
-          {now.length === 0 ? null : <p className="spec__now">On now: {now.map((s) => SPECIAL_NAME[s.kind]).join(', ')}</p>}
+          {now.length === 0 ? null : <p className="spec__now">On now: {now.map((s) => specialName(s.kind, place)).join(', ')}</p>}
           <ul className="spec__list">
             {list.map((s, i) => (
               <li key={`${s.kind}-${s.from.getTime()}`} className={`spec__item spec__item--${s.kind}`}>
                 <button type="button" className="spec__open" onClick={() => onJump?.(s.from)}>
-                  <span className="spec__line">{specialLine(s, span)}</span>
+                  <span className="spec__line">{specialLine(s, span).replace(/^Fog /, `${specialName('fog', place)} `)}</span>
                   <span className="spec__sure num">{s.agree} of {s.of} models</span>
                   <span className="spec__why">{s.why}</span>
                 </button>

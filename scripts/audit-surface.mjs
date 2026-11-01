@@ -852,7 +852,7 @@ for (const detent of ['peek', 'half', 'full']) {
  * check that cannot fail is not a check, and "exactly four" read off a row
  * that the audit never tried to break is a comment with a line number.
  */
-console.log('\n### the chip row: exactly four chips, two lines, no horizontal scroll')
+console.log('\n### the chip row: four chips at the coast, three inland, two lines, no horizontal scroll')
 
 const CHIPS = `(() => {
   const row = document.querySelector('.chips2')
@@ -878,10 +878,29 @@ const CHIPS = `(() => {
 
 /* The same judgement, applied to a measurement, so the injected fifth chip is
  * judged by the identical rule rather than by a second copy of it. */
+/*
+ * FOUR AT THE COAST, THREE INLAND (Batch C2, Section 1): inland there is no
+ * tide, and the tide chip goes with the Water menu (src/lib/placeGroups.ts).
+ * Which one this venue is comes from the app's own kept answer for it
+ * (src/lib/placeMemory.ts), and the tide chip must match it either way.
+ */
+const PLACE = await ev(`(() => {
+  try {
+    const all = JSON.parse(localStorage.getItem('scoutngo.seaReach.v1') ?? '{}')
+    const hit = all['38.3642,-75.6059']
+    return hit === undefined ? 'unknown' : typeof hit.m === 'number' && hit.m <= 2000 ? 'coast' : 'inland'
+  } catch { return 'unknown' }
+})()`)
+const WANT_CHIPS = PLACE === 'inland' ? 3 : 4
+console.log(`  the calibration venue is ${PLACE}: ${WANT_CHIPS} chips, ${PLACE === 'inland' ? 'no' : 'a'} tide chip`)
+if (PLACE === 'unknown') fail('the app never decided coast or inland at the calibration venue, so the chip row cannot be judged')
 const judgeChips = (m) => {
   const bad = []
   if (m.error !== undefined) return [m.error]
-  if (m.count !== 4) bad.push(`${m.count} chips, not 4`)
+  if (m.count !== WANT_CHIPS) bad.push(`${m.count} chips, not ${WANT_CHIPS}`)
+  const tide = m.chips.some((c) => /TIDE/i.test(c.label))
+  if (PLACE === 'inland' && tide) bad.push('a tide chip inland')
+  if (PLACE === 'coast' && !tide) bad.push('no tide chip at the coast')
   if (m.rows !== 1) bad.push(`the chips wrap onto ${m.rows} rows`)
   if (m.scrollWidth > m.clientWidth + 1) {
     bad.push(`the row scrolls horizontally (${m.scrollWidth}px of content in ${m.clientWidth}px)`)

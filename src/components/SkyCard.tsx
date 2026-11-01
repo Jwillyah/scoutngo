@@ -15,6 +15,7 @@ import { SpecialLight } from './SpecialLight.tsx'
 import { LineUp } from './LineUp.tsx'
 import type { HorizonInput } from '../core/skyWindow.ts'
 import type { Special } from '../core/specialLight.ts'
+import type { Place } from '../lib/placeGroups.ts'
 
 /*
  * THE SKY, FIVE WAYS, PICTURE FIRST.
@@ -57,6 +58,8 @@ interface SkyCardProps {
   horizon?: HorizonInput
   /** The month as a calendar page. */
   onOpenCalendar?: () => void
+  /** Coast or inland, for Special light's items (src/lib/placeGroups.ts). */
+  place?: Place
 }
 
 const DEG = Math.PI / 180
@@ -134,7 +137,7 @@ function MoonDisc({ fraction, waxing }: { fraction: number; waxing: boolean }) {
 }
 
 
-export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump, target, picking, onPickTarget, events, onPlanMoonrise, onOpenNow, placeName, onShowBow, horizon, onOpenCalendar }: SkyCardProps) {
+export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump, target, picking, onPickTarget, events, onPlanMoonrise, onOpenNow, placeName, onShowBow, horizon, onOpenCalendar, place }: SkyCardProps) {
   const clock = (d: Date) => `${formatClock(d, timeZone)}`
   const finderProps = { venue, target, picking, onPickTarget, onJump, clock, timeZone }
   const [nowPage, setNowPage] = useState(0)
@@ -237,7 +240,7 @@ export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump,
   } else if (tab === 'fire') {
     body = <SkyFire venue={venue} timeZone={timeZone} placeName={placeName ?? 'This place'} at={at} clock={bodyFor('preview')} />
   } else if (tab === 'special') {
-    body = <SpecialLight venue={venue} timeZone={timeZone} at={at} onJump={onJump} onShowBow={onShowBow} />
+    body = <SpecialLight venue={venue} timeZone={timeZone} at={at} onJump={onJump} onShowBow={onShowBow} place={place} />
   } else if (tab === 'preview') {
     body = <SkyPreview venue={venue} timeZone={timeZone} at={at} />
   } else if (tab === 'moon') {

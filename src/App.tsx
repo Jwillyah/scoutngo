@@ -1,4 +1,5 @@
-import { metresToSea } from './lib/coast.ts'
+import { seaReach } from './lib/coast.ts'
+import { placeKeyOf, resolveReach } from './lib/placeMemory.ts'
 import { showSurf, SURF_COAST_M, useSurfSetting } from './lib/surfSetting.ts'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { type ConeMode } from './lib/coneMode.ts'
@@ -112,6 +113,7 @@ import { planForNow } from './lib/planForNow.ts'
 import { useNow } from './lib/useNow.ts'
 import { clearPlace, loadPlace } from './lib/place.ts'
 import { pathToMenuItem, type MenuItem } from './lib/menu.ts'
+import { placeOf, shownGroups, usePlaceGroups } from './lib/placeGroups.ts'
 import {
   blockedReason,
   setupGap,
@@ -166,7 +168,6 @@ const wantsCalibration = (): boolean =>
   new URLSearchParams(window.location.search).get('calibration') === '1'
 
 /* The menu without Surf, away from the sea. */
-const NO_SURF: ReadonlySet<MenuItem> = new Set<MenuItem>(['surf'])
 
 function App() {
   /*
@@ -1373,7 +1374,7 @@ function App() {
     drawer: 'kit',
     tick: 0,
   })
-  const [cardRequest, setCardRequest] = useState<{ kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'wind' | 'preflight'; tick: number }>({
+  const [cardRequest, setCardRequest] = useState<{ kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'wind' | 'terrain' | 'preflight'; tick: number }>({
     kind: 'sky',
     tick: 0,
   })
@@ -1387,18 +1388,32 @@ function App() {
    */
   const [surfSettingNow] = useSurfSetting()
   const [seaM, setSeaM] = useState<{ key: string; m: number | null } | null>(null)
-  const seaKey = centre === null ? null : `${centre.lat.toFixed(4)},${centre.lon.toFixed(4)}`
+  const seaKey = centre === null ? null : placeKeyOf(centre.lat, centre.lon)
   useEffect(() => {
-    if (centre === null || seaKey === null || surfSettingNow !== 'auto') return
+    /* Asked whatever Surf is set to: coast or inland decides Water or Land too (src/lib/placeGroups.ts). */
+    if (centre === null || seaKey === null) return
     let live = true
-    void metresToSea(centre, SURF_COAST_M).then((m) => {
-      if (live) setSeaM({ key: seaKey, m })
+    /* No tiles (offline): the last answer for this venue, not "no sea" (src/lib/placeMemory.ts). */
+    void seaReach(centre, SURF_COAST_M).then((fresh) => {
+      const m = resolveReach(seaKey, fresh)
+      if (live && m !== undefined) setSeaM({ key: seaKey, m })
     })
     return () => {
       live = false
     }
   }, [seaKey, surfSettingNow]) // eslint-disable-line react-hooks/exhaustive-deps
   const surfInMenu = showSurf(surfSettingNow, seaM !== null && seaM.key === seaKey ? seaM.m : null)
+  const [placeGroups] = usePlaceGroups()
+  const place = placeOf(seaM !== null && seaM.key === seaKey ? seaM.m : undefined)
+  const groups = shownGroups(placeGroups, place)
+  /* What the menu leaves out here: Water inland, Land at the coast (each overridable in Settings), Surf where there is none. */
+  const menuHidden = useMemo(() => {
+    const out = new Set<MenuItem>()
+    if (!groups.water) for (const id of ['water', 'tides', 'surf'] as const) out.add(id)
+    if (!groups.land) out.add('land')
+    if (!surfInMenu) out.add('surf')
+    return out
+  }, [groups.water, groups.land, surfInMenu])
 
   const onMenuPick = (item: MenuItem) => {
     switch (item) {
@@ -1417,6 +1432,12 @@ function App() {
       case 'water':
         setMode('plan')
         setCardRequest((r) => ({ kind: 'tides', tick: r.tick + 1 }))
+        return
+      /* Land opens its first page, the wind (docs/navigation.md). */
+      case 'land':
+      case 'terrain':
+        setMode('plan')
+        setCardRequest((r) => ({ kind: item === 'land' ? 'wind' : 'terrain', tick: r.tick + 1 }))
         return
       case 'sky':
       case 'exposure':
@@ -1968,6 +1989,8 @@ function App() {
 
       {mode === 'plan' ? (
         <PlanMode
+          place={place}
+          groups={{ water: groups.water, land: groups.land, surf: surfInMenu }}
           /* One name for the place, in the bar and on the shoot card alike. */
           venueNameLine={venueShort}
           units={settings.units ?? DEFAULT_UNITS}
@@ -2229,7 +2252,7 @@ function App() {
         open={menuOpen}
         current={nowOpen ? 'now' : menuCurrent}
         onPick={onMenuPick}
-        hidden={surfInMenu ? undefined : NO_SURF}
+        hidden={menuHidden}
         onClose={() => setMenuOpen(false)}
       />
 
