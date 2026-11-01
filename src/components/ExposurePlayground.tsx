@@ -1,3 +1,4 @@
+import { SceneBackground, SceneFigure } from './PlaygroundScene.tsx'
 import { useId, useMemo, useState, type CSSProperties } from 'react'
 import { METER_RIGHT_STOPS } from '../core/exposure.ts'
 import { effectiveSensor, type KitProfile } from '../core/kit.ts'
@@ -82,7 +83,7 @@ export function ExposurePlayground({ kit, bag }: ExposurePlaygroundProps) {
       <p className="play__demo">A demo of how the settings change a photo. Not a measurement.</p>
 
       <figure className="play__photo">
-        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`The surfer photo at ${shutterWords(s.seconds)}, f/${s.aperture}, ISO ${s.iso}: ${frame.reading}`}>
+        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`The test scene at ${shutterWords(s.seconds)}, f/${s.aperture}, ISO ${s.iso}: ${frame.reading}`}>
           <defs>
             <filter id={`${uid}-bg`} filterUnits="userSpaceOnUse" primitiveUnits="userSpaceOnUse" x={0} y={0} width={W} height={H}>
               <feGaussianBlur stdDeviation={frame.backgroundSigmaPx} edgeMode="duplicate" />
@@ -103,11 +104,15 @@ export function ExposurePlayground({ kit, bag }: ExposurePlaygroundProps) {
             </filter>
           </defs>
           <g filter={`url(#${uid}-look)`}>
-            <image href="/playground/background.jpg" width={W} height={H} filter={`url(#${uid}-bg)`} />
-            <image href="/playground/surfer.webp" x={box.x} y={box.y} width={box.width} height={box.height} filter={`url(#${uid}-motion)`} />
+            <g filter={`url(#${uid}-bg)`}>
+              <SceneBackground W={W} H={H} id={uid} />
+            </g>
+            <g filter={`url(#${uid}-motion)`}>
+              <SceneFigure {...box} />
+            </g>
           </g>
         </svg>
-        <figcaption className="play__credit">Photo by Jwillyagaze. Faces in the crowd are blurred.</figcaption>
+        <figcaption className="play__credit">A drawn test scene.</figcaption>
       </figure>
       {/* Everything under the photo, one block: on the Exposure page it sits under the photo, or beside it in landscape. */}
       <div className="play__controls">

@@ -8,9 +8,10 @@ const html = renderToStaticMarkup(<ExposurePlayground kit={DEFAULT_KIT} bag={bag
 const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
 
 describe('the exposure playground', () => {
-  it('says what it is, and credits the photo', () => {
+  it('says what it is, and that the scene is drawn', () => {
     expect(text).toContain('A demo of how the settings change a photo. Not a measurement.')
-    expect(text).toContain('Photo by Jwillyagaze.')
+    expect(text).toContain('A drawn test scene.')
+    expect(text).not.toMatch(/Photo by|Jwilly/)
     expect(text).toContain('Nothing is uploaded.')
   })
 
@@ -27,9 +28,9 @@ describe('the exposure playground', () => {
     for (const w of ['Too dark', 'Right', 'Too bright']) expect(text).toContain(w)
   })
 
-  it('draws the cutout over the background from the phone, nothing remote', () => {
-    expect(html).toContain('href="/playground/background.jpg"')
-    expect(html).toContain('href="/playground/surfer.webp"')
+  it('draws the scene in code: no photograph, nothing remote (Batch C2)', () => {
+    expect(html).not.toMatch(/<image|\.jpe?g|\.webp|playground\//)
+    expect(html).toMatch(/<circle/)
     expect(html).not.toMatch(/https?:\/\//)
   })
 

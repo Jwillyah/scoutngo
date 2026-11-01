@@ -1,5 +1,42 @@
 import type { LatLon } from '../core/geo.ts'
+import { useSyncExternalStore } from 'react'
 import { logTouch } from './touchDebug.ts'
+
+/*
+ * EVERY LOCATION ATTEMPT, KEPT FOR SETTINGS › DEBUG (Batch C2). The touch log
+ * holds these too, but only while its overlay is on and among hundreds of
+ * finger lines; this keeps the last 20 asks and what came back, with the
+ * browser's error code, so the reason on a real phone can be read after the
+ * fact. In memory only, this session; never sent.
+ */
+export interface LocateAttempt {
+  /** Wall-clock ms when the answer came. */
+  at: number
+  /** The browser's error code (1 refused, 2 no position, 3 timed out), or null. */
+  code: number | null
+  /** In words: the outcome and how long it took. */
+  words: string
+}
+const MAX_ATTEMPTS = 20
+let attempts: readonly LocateAttempt[] = []
+const attemptListeners = new Set<() => void>()
+function record(code: number | null, words: string, line: string): void {
+  logTouch(line)
+  attempts = [...attempts.slice(-(MAX_ATTEMPTS - 1)), { at: Date.now(), code, words }]
+  for (const l of attemptListeners) l()
+}
+export const locateAttempts = (): readonly LocateAttempt[] => attempts
+export function useLocateAttempts(): readonly LocateAttempt[] {
+  return useSyncExternalStore(
+    (l) => {
+      attemptListeners.add(l)
+      return () => attemptListeners.delete(l)
+    },
+    () => attempts,
+    () => attempts,
+  )
+}
+const CODE_WORDS: Record<number, string> = { 1: 'refused', 2: 'no position', 3: 'timed out' }
 
 /**
  * Where the phone is, asked ONCE, because somebody tapped a button.
@@ -74,11 +111,11 @@ const supported = (): boolean =>
  */
 export function locateOnce(timeoutMs = LOCATE_TIMEOUT_MS, now: () => number = () => performance.now()): Promise<LocateResult> {
   if (typeof window !== 'undefined' && window.isSecureContext === false) {
-    logTouch('locate: not a secure page, not asked')
+    record(null, 'not asked: not a secure page', 'locate: not a secure page, not asked')
     return Promise.resolve({ status: 'insecure' })
   }
   if (!supported()) {
-    logTouch('locate: no navigator.geolocation')
+    record(null, 'not asked: this browser has no location', 'locate: no navigator.geolocation')
     return Promise.resolve({ status: 'unsupported' })
   }
   const started = now()
@@ -86,7 +123,8 @@ export function locateOnce(timeoutMs = LOCATE_TIMEOUT_MS, now: () => number = ()
   return new Promise<LocateResult>((resolve) => {
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        logTouch(`locate: fix ±${Math.round(position.coords.accuracy)} m after ${Math.round(now() - started)} ms`)
+        const ms = Math.round(now() - started)
+        record(null, `found, ±${Math.round(position.coords.accuracy)} m, after ${ms} ms`, `locate: fix ±${Math.round(position.coords.accuracy)} m after ${ms} ms`)
         resolve({
           status: 'ok',
           at: { lat: position.coords.latitude, lon: position.coords.longitude },
@@ -95,7 +133,8 @@ export function locateOnce(timeoutMs = LOCATE_TIMEOUT_MS, now: () => number = ()
       },
       (error) => {
         const ms = Math.round(now() - started)
-        logTouch(`locate: code ${error.code} (${error.message || 'no message'}) after ${ms} ms`)
+        const prompt = error.code === 1 && ms < NO_PROMPT_MS ? ', too fast for a prompt: off in Settings' : ''
+        record(error.code, `code ${error.code}, ${CODE_WORDS[error.code] ?? 'unknown'}${prompt}, after ${ms} ms (${error.message || 'no message'})`, `locate: code ${error.code} (${error.message || 'no message'}) after ${ms} ms`)
         resolve(
           error.code === 1
             ? { status: 'denied', prompted: ms >= NO_PROMPT_MS }

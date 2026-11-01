@@ -14551,3 +14551,85 @@
   justify-self: end;
   border-radius: 999px;
 }
+
+/*
+ * THE WIND PAGE'S WAY TO THE FLIGHT-HEIGHT CARD, IN NORMAL CASE (Batch C2):
+ * a button that says where it goes reads as a sentence, like the Sky card's
+ * (ux-rules: plain words). 44 px like every target.
+ */
+.windp__card {
+  min-height: 44px;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: var(--text-sm);
+}
+
+/* ------------------------------------------ Saved: packs and past shoots (Batch C2) */
+.saved {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) var(--space-4);
+}
+
+.saved__head {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-label);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.saved__none {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.saved__list {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.saved__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  min-width: 0;
+}
+
+.saved__what {
+  display: grid;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.saved__name {
+  overflow: hidden;
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saved__meta {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.saved__del {
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: var(--radius-panel);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-sm);
+}

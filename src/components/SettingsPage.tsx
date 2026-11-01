@@ -3,7 +3,7 @@ import { NUMERALS_LABEL, NUMERALS_NOTE } from '../core/numerals.ts'
 import type { Drone } from '../core/kit.ts'
 import { buildLabelWithDate, type BuildCheck } from '../lib/build.ts'
 import { readHome, writeHome, type Home } from '../lib/home.ts'
-import { locateOnce, locateWords } from '../lib/locateOnce.ts'
+import { locateOnce, locateWords, useLocateAttempts } from '../lib/locateOnce.ts'
 import { formatClock } from '../core/timezone.ts'
 import { GROUP_OPTIONS, usePlaceGroups, type Place } from '../lib/placeGroups.ts'
 import { openPrivacy } from '../lib/privacyRoute.ts'
@@ -105,6 +105,7 @@ export function SettingsPage(props: Props) {
   const [surf, setSurf] = useSurfSetting()
   const [nearMe, setNearMe] = useNearMeSetting()
   const [debugTouch, setDebugTouch] = useTouchDebug()
+  const attempts = useLocateAttempts()
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
   const [home, setHome] = useState<Home | null>(readHome)
   const [locateLine, setLocateLine] = useState<string | null>(null)
@@ -212,6 +213,15 @@ export function SettingsPage(props: Props) {
       <details className="set__debug">
         <summary className="set__title">Debug</summary>
         <Switch label="Touch log" note="A box over the map logging fingers, zoom and location asks. Copy puts it on your clipboard; nothing is sent." on={debugTouch} onChange={setDebugTouch} />
+        <p className="set__label">Location attempts</p>
+        <ul className="set__log set__locate num">
+          {attempts.length === 0 ? <li>None this session</li> : null}
+          {attempts.map((a, i) => (
+            <li key={i}>
+              {formatClock(new Date(a.at), zone)} {a.words}
+            </li>
+          ))}
+        </ul>
         <p className="set__label">Network log</p>
         <ul className="set__log num">
           {weatherSent().slice(-12).map((s, i) => (

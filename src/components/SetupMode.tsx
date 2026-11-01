@@ -1,3 +1,4 @@
+import { SavedLists } from './SavedLists.tsx'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { destinationPoint, type LatLon } from '../core/geo.ts'
@@ -239,7 +240,7 @@ export function SetupMode({
       : createPortal(
           <div className="drawer">
             <div className="drawer__head">
-              <span className="drawer__title">{drawer === 'kit' ? 'Kit and style' : 'Saved setups'}</span>
+              <span className="drawer__title">{drawer === 'kit' ? 'Kit and style' : 'Saved'}</span>
               <button type="button" className="drawer__close" onClick={() => setDrawer('none')}>
                 Done
               </button>
@@ -255,7 +256,10 @@ export function SetupMode({
                   <KitProfile value={kit} onChange={onKit} kit={kitProfile} onKitChange={onKitProfile} shelved={shelved} onShelve={onShelve} note={kitNote} />
                 </>
               ) : (
-                <SpotsPanel spots={spots} onSave={onSaveSpot} onLoad={onLoadSpot} onDelete={onDeleteSpot} onImport={onImportSpots} suggestedName={suggestedName} canSave={canSave} currentPlan={currentPlan} />
+                <>
+                  <SpotsPanel spots={spots} onSave={onSaveSpot} onLoad={onLoadSpot} onDelete={onDeleteSpot} onImport={onImportSpots} suggestedName={suggestedName} canSave={canSave} currentPlan={currentPlan} />
+                  <SavedLists />
+                </>
               )}
             </div>
           </div>,
