@@ -1,5 +1,7 @@
 import { useSidewaysScrub } from '../lib/useSidewaysScrub.ts'
-import { lightGoneLine } from '../core/lightGone.ts'
+import { lightGoneLine, sunriseLine } from '../core/lightGone.ts'
+import { blockerWords, nameBlocker, type Footprint, type TreePoint } from '../core/horizonBlocker.ts'
+import { getPosition } from 'suncalc'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { TILE_TIMEOUT_MS } from '../lib/offlineCache.ts'
 import {
@@ -12,7 +14,7 @@ import {
   sunCrossings,
   terrainHorizonCurve,
 } from '../core/sunPath.ts'
-import type { HorizonInput } from '../core/skyWindow.ts'
+import { horizonAngleAt, type HorizonInput } from '../core/skyWindow.ts'
 import { formatClock } from '../core/timezone.ts'
 
 /*
@@ -48,6 +50,8 @@ interface SunCurveProps {
   venue: { lat: number; lon: number }
   /** The real skyline, or flat with a reason. Never silently mixed. */
   horizon: HorizonInput
+  /** What stands round the venue, to name what the sun goes behind (src/core/horizonBlocker.ts). */
+  around?: { buildings: readonly Footprint[]; trees: readonly TreePoint[]; reliefM: number | null }
   timeZone: string
   timeZoneAbbr: string
   /*
@@ -81,6 +85,7 @@ export function SunCurve({
   at,
   venue,
   horizon,
+  around,
   timeZone,
   timeZoneAbbr,
   terrainOn,
@@ -122,6 +127,13 @@ export function SunCurve({
 
   const terrain = useMemo(() => terrainHorizonCurve(horizon, dayPath), [horizon, dayPath])
   const crossings = useMemo(() => sunCrossings(dayPath, terrain), [dayPath, terrain])
+  /* What the sun rises over and sets behind, named from what stands there (Batch E). */
+  const behind = (at: Date | null) => {
+    if (at === null || horizon.kind !== 'terrain') return undefined
+    const az = ((getPosition(at, venue.lat, venue.lon).azimuth * 180) / Math.PI + 180 + 360) % 360
+    const what = nameBlocker(venue, az, horizonAngleAt(horizon, az), around?.buildings ?? [], around?.trees ?? [], around?.reliefM ?? null)
+    return blockerWords(what, az)
+  }
 
   /*
    * THE AXIS IS THE DAY, THE SHOOT WINDOW IS A MARK ON IT.
@@ -414,15 +426,13 @@ export function SunCurve({
         </button>
       ) : showBoth ? (
         <p className="curve__note curve__note--both">
+          {/* Sentences in the text face (Batch E): the times read as part of them. Once when the skyline makes no difference. */}
           {crossings.terrainRise === null || crossings.flatRise === null ? null : (
-            <span className="curve__gap">
-              Sunrise <span className="num">{clock(crossings.terrainRise)}</span> over the ridge,{' '}
-              <span className="num">{clock(crossings.flatRise)}</span> flat
-            </span>
+            <span className="curve__gap">{sunriseLine(crossings.terrainRise, crossings.flatRise, clock, behind(crossings.terrainRise))}</span>
           )}
           {crossings.terrainSet === null || crossings.flatSet === null ? null : (
-            /* THE RIDGE GAP, said as what it costs. See src/core/lightGone.ts. */
-            <span className="curve__gap num">{lightGoneLine(crossings.terrainSet, crossings.flatSet, clock)}</span>
+            /* THE SKYLINE GAP, said as what it costs. See src/core/lightGone.ts. */
+            <span className="curve__gap">{lightGoneLine(crossings.terrainSet, crossings.flatSet, clock, behind(crossings.terrainSet))}</span>
           )}
         </p>
       ) : (

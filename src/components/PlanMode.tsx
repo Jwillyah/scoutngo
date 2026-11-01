@@ -1403,6 +1403,11 @@ export function PlanMode({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wantRelief, reliefKey])
   const relief = reliefFor !== null && reliefFor.key === reliefKey ? reliefFor.relief : null
+  /* What stands round the venue, for the Day sheet to name what the sun goes behind (src/core/horizonBlocker.ts). */
+  const dayAround = useMemo(
+    () => ({ buildings: (buildingList ?? []).map((b) => ({ ring: b.ring, heightM: b.height.metres })), trees: [], reliefM: relief?.metres ?? null }),
+    [buildingList, relief],
+  )
   const flatHere = relief !== null && relief.metres < FLAT_M
 
   /*
@@ -2099,6 +2104,7 @@ export function PlanMode({
               at={scrubbedAt ?? venueWindow.start}
               venue={venue}
               horizon={horizonProfile}
+              around={dayAround}
               timeZone={venueWindow.timeZone}
               timeZoneAbbr={venueWindow.timeZoneShort}
               terrainOn={showTerrain}
