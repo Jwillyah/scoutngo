@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { agreementLine, clockStrips, fireVerdict, lookWindow, readModel, stationRead, throughCloud, type FireContext } from '../src/core/fireOutlook.ts'
+import { agreementLine, clockStrips, fireVerdict, lookWindow, readModel, stationRead, throughCloud, verdictSentence, type FireContext } from '../src/core/fireOutlook.ts'
 import { parseMetarSky } from '../src/core/metar.ts'
 import { GAP_OPEN, GAP_PARTIAL, geometricFromApparent, stripTimes } from '../src/core/skyColour.ts'
 import { PATH_KM, type ModelPath } from '../src/core/skyFire.ts'
@@ -195,5 +195,12 @@ describe('item 7: the four forecasts drawn from the same read', () => {
       expect(b).toBeLessThan(g)
     }
     expect(s.find((m) => m.model === 'gem_seamless')?.lit).toBeNull()
+  })
+})
+
+describe('Section 4: the verdict in one sentence', () => {
+  it('says the word, the agreement and when, or the reason', () => {
+    expect(verdictSentence(replay('2026-11-02').verdict!, clock)).toBe('Fire likely: 4 of 5 models see lit high cirrus, 6:01 AM–6:11 AM.')
+    expect(verdictSentence(replay('2026-10-11').verdict!, clock)).toBe('Fire unlikely: a lid of cloud.')
   })
 })

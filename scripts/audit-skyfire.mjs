@@ -8,9 +8,12 @@
  * sun's line) and weather.gov from the KNTU METAR of that morning, so what is
  * drawn is checked against known numbers:
  *
- *   before sunrise  Sky › Fire says "Fire possible" or "Fire likely", the
- *                   three checks with their numbers, the side view with a
- *                   deck and the light's path; "Sky right now" names KNTU
+ *   before sunrise  Sky › Fire, in order (Batch G, Section 4): the switch,
+ *                   "Fire possible" or "Fire likely" in one sentence, the side
+ *                   view with a deck and the light's path, the colour strip,
+ *                   the three checks as icons with yes / no, "Why" folded
+ *                   with the numbers; "Sky right now" names KNTU in one line;
+ *                   no paragraph over two lines above the Why
  *   the chip        "CLOUD L·M·H", three numbers that fit the chip, and
  *                   "models split" when the five models are far apart
  *   after sunrise   "How was it?": It fired is kept in localStorage
@@ -157,10 +160,14 @@ try {
           if (!f) return null
           return {
             verdict: f.querySelector('.fire__verdict')?.textContent ?? null,
-            checks: [...f.querySelectorAll('.fire__checks li')].map((r) => r.textContent.replace(/\\s+/g, ' ').trim()),
+            checks: [...f.querySelectorAll('.fire__checks--icons li')].map((r) => r.textContent.replace(/\\s+/g, ' ').trim()),
+            why: [...f.querySelectorAll('.fire__whyfold .fire__checks li')].map((r) => r.textContent.replace(/\\s+/g, ' ').trim()),
+            whyOpen: f.querySelector('.fire__whyfold')?.open ?? null,
+            order: ['.fire__kinds', '.fire__verdict', '.fire__side', '.prev__strips', '.fire__checks--icons', '.fire__whyfold'].map((sel) => f.querySelector(sel)?.getBoundingClientRect().top ?? null),
+            /* Section 4: no paragraph over two lines on the first screen (above the Why). */
+            long: [...f.querySelectorAll('p')].filter((p) => !p.closest('details') && !p.closest('.prev__page:not(:first-child)')).filter((p) => { const r = p.getBoundingClientRect(); const lh = parseFloat(getComputedStyle(p).lineHeight) || parseFloat(getComputedStyle(p).fontSize) * 1.3; const why = f.querySelector('.fire__whyfold'); return why !== null && r.top < why.getBoundingClientRect().top && r.height > lh * 2 + 2 }).map((p) => p.textContent.slice(0, 60)),
             switches: f.querySelectorAll('[aria-label="Which event"]').length,
-            station: f.querySelector('.fire__station .fire__lead')?.textContent ?? null,
-            stationFirst: !!f.querySelector('.fire__station') && !!f.querySelector('.fire__verdict') && (f.querySelector('.fire__station').compareDocumentPosition(f.querySelector('.fire__verdict')) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+            station: f.querySelector('.fire__now')?.textContent ?? null,
             verdicts: f.querySelectorAll('.fire__verdict, .prev__verdict').length,
             decks: f.querySelectorAll('.fire__deck').length,
             ray: !!f.querySelector('.fire__ray'),
@@ -176,18 +183,24 @@ try {
       console.log(`  ${phase}: ${fire?.verdict} · ${fire?.checks.length} checks · ${fire?.decks} decks · ray ${fire?.ray} · now ${fire?.now === null ? 'none' : 'shown'}`)
       if (fire === null || fire.verdict === null) fail(`${label} ${phase}: no verdict on the Fire tab`)
       else {
-        if (!/^Fire (possible|likely)$/.test(fire.verdict)) fail(`${label} ${phase}: 29 Oct reads "${fire.verdict}", and it fired`)
-        /* Each once, at the top (Batch E, 1 Nov: the switch and "Fire possible" were there twice). */
-        if (fire.station === null || !/^Station KNTU at .*: broken at 3,000 ft/.test(fire.station) || !fire.stationFirst) fail(`${label} ${phase}: near now the station does not lead the Sky fire page (${fire.station}, first ${fire.stationFirst})`)
+        if (!/^Fire (possible|likely): \d of \d models see lit low deck/.test(fire.verdict)) fail(`${label} ${phase}: 29 Oct reads "${fire.verdict}", and it fired`)
+        /* Batch G, Section 4: the sky right now in one line, KNTU's deck. */
+        if (fire.station === null || !/^Sky right now · KNTU .*: broken at 3,000 ft/.test(fire.station)) fail(`${label} ${phase}: near now "Sky right now" does not say KNTU's deck in one line (${fire.station})`)
+        /* The order: switch, verdict, side view, colour strip, the three checks, Why (folded). */
+        const order = fire.order
+        if (order.some((t) => t === null) || order.some((t, i) => i > 0 && t < order[i - 1])) fail(`${label} ${phase}: the page is not switch → verdict → side view → strips → checks → Why (${JSON.stringify(order)})`)
+        if (fire.whyOpen !== false) fail(`${label} ${phase}: "Why" is not folded`)
+        if (fire.why.length !== 3 || !fire.why.every((c) => /\d/.test(c))) fail(`${label} ${phase}: Why's checks are ${JSON.stringify(fire.why)}, not three with numbers`)
+        if (fire.long.length > 0) fail(`${label} ${phase}: paragraphs over two lines on the first screen: ${JSON.stringify(fire.long)}`)
         if (fire.switches !== 1) fail(`${label} ${phase}: ${fire.switches} Sunrise / Sunset switches on the Sky fire page, not 1`)
         if (fire.verdicts !== 1) fail(`${label} ${phase}: ${fire.verdicts} verdicts on the Sky fire page, not 1`)
-        if (fire.checks.length !== 3 || !fire.checks.every((c) => /\d/.test(c))) fail(`${label} ${phase}: the checks are ${JSON.stringify(fire.checks)}, not three with numbers`)
+        if (fire.checks.length !== 3 || !fire.checks.every((c) => /^(Canvas|Gap|Not blocked) ?(yes|no|partly)$/.test(c))) fail(`${label} ${phase}: the checks are ${JSON.stringify(fire.checks)}, not three icons with yes or no`)
         if (fire.decks === 0 || !fire.ray) fail(`${label} ${phase}: the side view has ${fire.decks} decks and ray ${fire.ray}`)
         if (fire.wide) fail(`${label} ${phase}: something in the card runs past 390 px`)
         if (/\bclear of\b|\bsafe\b|\bcertain\b/i.test(fire.text)) fail(`${label} ${phase}: the card says something certain or safe`)
       }
       if (phase === 'before') {
-        if (fire?.now === null || !/KNTU/.test(fire?.now ?? '') || !/broken deck at 3,000 ft/.test(fire?.now ?? '')) fail(`${label}: an hour before sunrise "Sky right now" does not name KNTU's deck (${fire?.now})`)
+        if (fire?.now === null || !/KNTU/.test(fire?.now ?? '') || !/broken at 3,000 ft/.test(fire?.now ?? '')) fail(`${label}: an hour before sunrise "Sky right now" does not name KNTU's deck (${fire?.now})`)
         await page.screenshot({ path: join(OUT, `fire-${label}.png`), fullPage: false })
         await ev(`document.querySelector('.fire__side')?.scrollIntoView({ block: 'center' })`)
         await wait(300)

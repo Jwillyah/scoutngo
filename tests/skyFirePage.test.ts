@@ -6,11 +6,23 @@ describe('the Sky fire page', () => {
   const fire = readFileSync('src/components/SkyFire.tsx', 'utf8')
   const plan = readFileSync('src/components/PlanMode.tsx', 'utf8')
 
-  it('shows the three checks under their heading, not behind an empty fold', () => {
-    expect(fire).toMatch(/<p className="fire__head">Why: the three checks[^<]*<\/p>\s*<ul className="fire__checks">/)
-    expect(fire).not.toMatch(/<summary[^>]*>Why: the three checks/)
+  /*
+   * Batch G, Section 4, less text and more picture: the switch, the verdict
+   * in one sentence, the side view, the colour strip, the three checks as
+   * icons with yes / no, and "Why" folded with the numbers. (Batch E had the
+   * checks open with their numbers; the owner asked for the picture first.)
+   */
+  it('lays the page out picture first, the numbers folded under Why', () => {
+    const render = fire.slice(fire.indexOf('<div className="seg fire__kinds"'))
+    const at = (x: string) => render.indexOf(x)
+    const order = ['fire__kinds', 'verdictSentence(verdict, clock)', '<FireSideView', 'colourClock?.(kind)', 'fire__checks--icons', '<details className="fire__more fire__whyfold">'].map(at)
+    expect(order.every((i) => i >= 0)).toBe(true)
+    expect([...order].sort((a, b) => a - b)).toEqual(order)
+    const why = render.slice(at('fire__whyfold'), at('</details>'))
+    expect(why).toContain('checkWords(lead)[key]')
+    expect(why).toContain('<FireSideView read={m}')
+    expect(why).toContain('Stations:')
   })
-
   it('sets no sentence in the numbers font', () => {
     expect(fire).not.toMatch(/fire__(checks|models|note)[^"]* num/)
     expect(readFileSync('src/components/TruthLoop.tsx', 'utf8')).not.toMatch(/className="(fire__note|truth__list) num"/)

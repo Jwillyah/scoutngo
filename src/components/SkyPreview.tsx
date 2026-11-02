@@ -10,6 +10,7 @@ import {
   GAP_PARTIAL,
   LAYER_WORD,
   lightHex,
+  stripTimes,
   type Strip,
 } from '../core/skyColour.ts'
 import { formatClock } from '../core/timezone.ts'
@@ -232,7 +233,8 @@ export function SkyPreview({ venue, timeZone, at, now = () => new Date(), kind: 
                 <p className="prev__note">Nothing lit that you could see: {WHY_WORDS[verdict.why ?? 'none']}.</p>
               ) : (
                 <>
-                  <p className="prev__words">{clockWords(strips, kind, clock)}</p>
+                  {/* Nothing lit you could see: the verdict's reason, not "no cloud is lit" under a forecast full of it. */}
+                  <p className="prev__words">{strips.some((s) => stripTimes(s).glowFrom !== null) ? clockWords(strips, kind, clock) : `Nothing lit that you could see: ${WHY_WORDS[verdict.why ?? 'none']}.`}</p>
                   <div className="prev__strips">
                     {strips.map((s) => (
                       <StripRow key={s.layer} s={s} clock={clock} />

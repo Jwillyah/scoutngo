@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { getPosition } from 'suncalc'
 import type { LatLon } from '../core/geo.ts'
 import { disagreement, layersWords, skyWords } from '../core/metar.ts'
-import { DECK_HEIGHT_M, eventToLog, grazingKm, layersLine, MODEL_LABEL, modelsSplit, nextEvents, PATH_KM, type ModelPath } from '../core/skyFire.ts'
-import { agreementLine, checkWords, fireVerdict, leadLayer, lookWindow, WHY_WORDS, type FireVerdict } from '../core/fireOutlook.ts'
+import { cloudTriple, eventToLog, layersLine, MODEL_LABEL, modelsSplit, nextEvents } from '../core/skyFire.ts'
+import { agreementLine, checkWords, fireVerdict, leadLayer, lookWindow, meanPath, verdictSentence, WHY_WORDS } from '../core/fireOutlook.ts'
+import { FireSideView } from './FireSideView.tsx'
 import { LAYER_WORD } from '../core/skyColour.ts'
 import { formatClock } from '../core/timezone.ts'
 import { FIRST_ENTRY, OUTCOME_LABEL, readFireLog, trackRecord, withEntry, writeFireLog, type FireEntry, type FireOutcome } from '../lib/fireLog.ts'
@@ -38,56 +39,6 @@ interface SkyFireProps {
 
 type Kind = 'sunrise' | 'sunset'
 
-function SideView({ verdict, path, kind }: { verdict: FireVerdict; path: ModelPath; kind: Kind }) {
-  const W = 320
-  const H = 150
-  const ground = 112
-  const x = (km: number) => 34 + (km / 400) * (W - 58)
-  /* Height on a square-root scale, so a deck at 1 km stands clear of the ground and one at 8 km still fits. */
-  const y = (m: number) => ground - Math.sqrt(m / 9000) * (ground - 12)
-  const decks = (['low', 'mid', 'high'] as const).flatMap((layer) =>
-    PATH_KM.map((km, i) => ({ layer, km, cover: path.samples[i]?.[layer] ?? null }))
-      .filter((s) => s.cover !== null && s.cover >= 50)
-      .map((s) => ({ ...s, h: DECK_HEIGHT_M[s.layer] })),
-  )
-  const layersDrawn = [...new Set(decks.map((d) => d.layer))]
-  const lead = leadLayer(verdict)
-  const deck = lead.canvas ? lead.layer : null
-  const deckH = deck === null ? null : lead.heightM
-  const graze = deckH === null ? null : Math.min(400, grazingKm(deckH))
-  return (
-    <svg className="fire__side" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Side view toward the ${kind}: cloud decks from the forecast, and the light's path under them`}>
-      <line x1={0} x2={W} y1={ground} y2={ground} className="fire__ground" />
-      {layersDrawn.map((layer) => (
-        <text key={layer} x={2} y={y(DECK_HEIGHT_M[layer]) + 3} className="fire__axis">
-          {layer}
-        </text>
-      ))}
-      {decks.map((d) => (
-        <rect key={`${d.layer}-${d.km}`} x={x(d.km) - 11} y={y(d.h) - 4} width={22} height={8} rx={4} className={`fire__deck fire__deck--${d.layer}`} opacity={Math.min(1, 0.3 + (d.cover ?? 0) / 140)} />
-      ))}
-      {deckH === null || graze === null ? null : (
-        <>
-          {/* From the sun below the horizon, grazing the Earth, up under the deck overhead. */}
-          <polyline points={`${W - 8},${ground + 10} ${x(graze)},${ground - 1} ${x(0)},${y(deckH) + 4}`} className="fire__ray" />
-          <circle cx={W - 8} cy={ground + 10} r={6} className="fire__sun" />
-        </>
-      )}
-      <circle cx={x(0)} cy={ground - 3} r={3} className="fire__you" />
-      <text x={x(0)} y={ground + 13} className="fire__axis" textAnchor="middle">you</text>
-      {[100, 200, 300].map((km) => (
-        <text key={km} x={x(km)} y={ground + 13} className="fire__axis num" textAnchor="middle">
-          {km} km
-        </text>
-      ))}
-      <text x={W - 2} y={H - 3} className="fire__axis" textAnchor="end">
-        toward the sun, below the horizon →
-      </text>
-    </svg>
-  )
-}
-
-const yes = (pass: boolean) => (pass ? 'yes' : 'no')
 const dayMonth = (d: Date, timeZone: string) => new Intl.DateTimeFormat('en-GB', { timeZone, day: 'numeric', month: 'short' }).format(d)
 
 export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date(), clock: colourClock, target, onPickTarget }: SkyFireProps) {
@@ -189,29 +140,53 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
   const online = useOnline()
   const stationNow = useStationNow(venue, at, online)
 
+  /*
+   * THE LOG: at the top from the moment of sunrise or sunset to 3 h after,
+   * and the last one later that day (item 6); in the 50 minutes before it,
+   * below with the photos (Section 4), as the page is still the forecast's.
+   */
+  const logOnTop = toLog !== null && realNow.getTime() >= toLog.at.getTime()
+  const logBlock =
+    toLog === null ? null : (
+      <div className="fire__log" aria-label="How was it">
+        <p className="fire__head">
+          How was the {toLog.kind}, {dayMonth(toLog.at, timeZone)}?
+        </p>
+        <div className="btn-row">
+          {(['fired', 'meh', 'nothing'] as const).map((o) => (
+            <button key={o} type="button" className={`btn btn--small${outcome === o ? ' btn--on' : ''}`} aria-pressed={outcome === o} onClick={() => { setOutcome(o); logIt(o, null) }}>
+              {OUTCOME_LABEL[o]}
+            </button>
+          ))}
+        </div>
+        {kept === null ? null : <p className="fire__note fire__kept" role="status">{kept}</p>}
+        {outcome === null ? null : (
+          <label className="fire__photo">
+            Add a photo (stays on this phone)
+            <input type="file" accept="image/*" onChange={(e) => void addPhoto(e.target.files?.[0])} />
+          </label>
+        )}
+      </div>
+    )
+  const mean = meanPath(paths)
+  /* Sky right now, one line: the nearest station near now, else the stations asked in the two hours before. */
+  const nowLine =
+    stationNow !== null
+      ? `${stationNow.sky.station}${stationNow.at === '' ? '' : ` ${clock(new Date(stationNow.at))}`}: ${layersWords(stationNow.sky)}`
+      : stations !== null && stations[0] !== undefined
+        ? `${stations[0].sky.station}: ${skyWords(stations[0].sky)}`
+        : soon && stations === null
+          ? 'asking the nearest stations…'
+          : null
+  const checks = lead === null ? [] : ([
+    ['Canvas', 'canvas', lead.canvas ? 'yes' : 'no'],
+    ['Gap', 'gap', lead.gap === 'open' ? 'yes' : lead.gap === 'partial' ? 'partly' : 'no'],
+    ['Not blocked', 'notBlocked', lead.hiddenBy === null ? 'yes' : 'no'],
+  ] as const)
+
   return (
     <div className="fire">
-      {toLog === null ? null : (
-        <div className="fire__log" aria-label="How was it">
-          <p className="fire__head">
-            How was the {toLog.kind}, {dayMonth(toLog.at, timeZone)}?
-          </p>
-          <div className="btn-row">
-            {(['fired', 'meh', 'nothing'] as const).map((o) => (
-              <button key={o} type="button" className={`btn btn--small${outcome === o ? ' btn--on' : ''}`} aria-pressed={outcome === o} onClick={() => { setOutcome(o); logIt(o, null) }}>
-                {OUTCOME_LABEL[o]}
-              </button>
-            ))}
-          </div>
-          {kept === null ? null : <p className="fire__note fire__kept" role="status">{kept}</p>}
-          {outcome === null ? null : (
-            <label className="fire__photo">
-              Add a photo (stays on this phone)
-              <input type="file" accept="image/*" onChange={(e) => void addPhoto(e.target.files?.[0])} />
-            </label>
-          )}
-        </div>
-      )}
+      {logOnTop ? logBlock : null}
 
       <div className="seg fire__kinds" role="group" aria-label="Which event">
         {(['sunrise', 'sunset'] as const).map((k) => (
@@ -221,16 +196,6 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
           </button>
         ))}
       </div>
-
-      {stationNow === null ? null : (
-        <div className="fire__station">
-          <p className="fire__lead">
-            Station {stationNow.sky.station}
-            {stationNow.at === '' ? '' : ` at ${clock(new Date(stationNow.at))}`}: {layersWords(stationNow.sky)}
-          </p>
-          {overhead === null ? null : <p className="fire__note">Forecast for this hour: {layersLine(overhead)}</p>}
-        </div>
-      )}
 
       {event === null ? (
         <p className="fire__note">No {kind} here in the next two days.</p>
@@ -244,78 +209,73 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
             <p className="fire__note">From the forecast of {forecastAge(new Date(data.fetchedAt ?? 0).toISOString()).text.replace(' old', ' ago')}: {busy ?? 'a newer one could not be had'}.</p>
           ) : null}
           <p className={`fire__verdict fire__verdict--${verdict.word}`} role="status">
-            {verdict.line}
+            {verdictSentence(verdict, clock)}
           </p>
-          <p className="fire__note">
-            {agreementLine(verdict)}{split ? ' · models split on low cloud' : ''}. A forecast places cloud on a grid kilometres across: it cannot promise a hole.
-          </p>
-          {watch === null ? null : (
-            <p className="fire__note">
-              Look from {clock(watch.from)} until {clock(watch.to)}, when the {LAYER_WORD[watch.layer]} glows{kind === 'sunrise' && watch.to.getTime() <= (event?.getTime() ?? 0) ? ', before the sun is up' : ''}.
-            </p>
-          )}
+          {mean === null ? null : <FireSideView read={verdict.sky} path={mean} venue={venue} kind={kind} />}
           {colourClock?.(kind)}
-          {/*
-            * THE THREE CHECKS, SHOWN (Batch E, 1 Nov). The heading "Why: the
-            * three checks" sat over a fold that read as empty on the phone.
-            * The checks are open now, each with its numbers and how many
-            * models pass it; the side view and each model are one tap down.
-            */}
           {lead === null ? null : (
-            <section className="fire__why">
-              <p className="fire__head">Why: the three checks, {LAYER_WORD[lead.layer]}</p>
+            <ul className="fire__checks fire__checks--icons" aria-label={`The three checks, ${LAYER_WORD[lead.layer]}`}>
+              {checks.map(([label, key, said]) => (
+                <li key={key} className={`fire__check fire__check--${said === 'partly' ? 'part' : said}`}>
+                  <CheckIcon kind={key} />
+                  <span className="fire__check-name">{label}</span>
+                  <span className="fire__mark">{said}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {nowLine === null ? null : <p className="fire__now fire__note">Sky right now · {nowLine}</p>}
+          <details className="fire__more fire__whyfold">
+            <summary>Why</summary>
+            <p className="fire__note">
+              {agreementLine(verdict)}{split ? ' · models split on low cloud' : ''}. A forecast places cloud on a grid kilometres across: it cannot promise a hole.
+            </p>
+            {watch === null ? null : (
+              <p className="fire__note">
+                Look from {clock(watch.from)} until {clock(watch.to)}, when the {LAYER_WORD[watch.layer]} glows{kind === 'sunrise' && watch.to.getTime() <= event.getTime() ? ', before the sun is up' : ''}.
+              </p>
+            )}
+            {lead === null ? null : (
               <ul className="fire__checks">
-                {([
-                  ['Canvas', 'canvas', lead.canvas],
-                  ['Gap toward the sun', 'gap', lead.gap === 'open' || lead.gap === 'partial'],
-                  ['Not blocked', 'notBlocked', lead.hiddenBy === null],
-                ] as const).map(([label, key, pass]) => (
+                {checks.map(([label, key, said]) => (
                   <li key={key} className="fire__check">
-                    <span className={`fire__mark fire__mark--${yes(pass)}`}>{label}: {key === 'gap' && lead.gap === 'partial' ? 'partly' : yes(pass)}.</span> {checkWords(lead)[key]}
+                    <span className={`fire__mark fire__mark--${said === 'no' ? 'no' : 'yes'}`}>{label}: {said}.</span> {checkWords(lead)[key]}
                   </li>
                 ))}
               </ul>
-              {overhead === null ? null : <p className="fire__note">Overhead: {layersLine(overhead)} (best match)</p>}
-              <details className="fire__more">
-                <summary>The side view and each model</summary>
-                {best === undefined ? null : <SideView verdict={verdict} path={best} kind={kind} />}
-                <ul className="fire__models">
-                  {verdict.models.map((m) => {
-                    const lit = m.layers.filter((l) => l.fires).map((l) => LAYER_WORD[l.layer])
-                    const why = m.layers.find((l) => l.canvas)?.why ?? 'none'
-                    return (
-                      <li key={m.model}>
-                        {m.model === 'sky' ? 'Mean' : MODEL_LABEL[m.model]}: {lit.length > 0 ? `lit ${lit.join(', ')}` : `no fire, ${WHY_WORDS[why]}`}
-                      </li>
-                    )
-                  })}
-                </ul>
-              </details>
-            </section>
-          )}
+            )}
+            {overhead === null ? null : <p className="fire__note">Overhead: {layersLine(overhead)} (best match)</p>}
+            {stations === null || stations.length === 0 ? null : (
+              <p className="fire__note">
+                Stations:{' '}
+                {stations.map((s) => {
+                  const differs = disagreement(s.sky, overhead?.low ?? null)
+                  return `${s.sky.station} ${skyWords(s.sky)}${differs === null ? '' : ` (${differs})`}`
+                }).join(' · ')}
+              </p>
+            )}
+            <ul className="fire__models">
+              {verdict.models.map((m) => {
+                const lit = m.layers.filter((l) => l.fires).map((l) => LAYER_WORD[l.layer])
+                const why = m.layers.find((l) => l.canvas)?.why ?? 'none'
+                const p = paths.find((x) => x.model === m.model)
+                return (
+                  <li key={m.model}>
+                    {MODEL_LABEL[m.model as keyof typeof MODEL_LABEL]}: {lit.length > 0 ? `lit ${lit.join(', ')}` : `no fire, ${WHY_WORDS[why]}`}
+                    {p === undefined ? null : <span className="fire__nums num"> {cloudTriple(p.samples[0] ?? { low: null, mid: null, high: null })}</span>}
+                    {p === undefined ? null : <FireSideView read={m} path={p} venue={venue} kind={kind} label={`${MODEL_LABEL[m.model as keyof typeof MODEL_LABEL]}: side view`} />}
+                  </li>
+                )
+              })}
+            </ul>
+            <p className="fire__note">
+              How it is worked out: for each model and each cloud layer, the lit edge is where the deck over you ends toward the sun. The sun&rsquo;s ray from it is walked toward the sun each minute (its height with refraction, the Earth&rsquo;s curve), and cloud on the way counts only where the ray is inside that cloud&rsquo;s layer; thin high cirrus never blocks. A layer fires when it is over you, nothing thicker under it hides it, and some minute of its glow gets through. The colour strips are the same arithmetic for the models&rsquo; mean.
+            </p>
+          </details>
         </>
       )}
 
-      {!soon ? null : (
-        <div className="fire__now">
-          <p className="fire__head">Sky right now</p>
-          {stations === null ? (
-            <p className="fire__note">Asking the nearest stations…</p>
-          ) : stations.length === 0 ? (
-            <p className="fire__note">No station answered.</p>
-          ) : (
-            stations.map((s) => {
-              const differs = disagreement(s.sky, overhead?.low ?? null)
-              return (
-                <p key={s.sky.station} className="fire__note">
-                  {s.sky.station}: {skyWords(s.sky)}
-                  {differs === null ? null : <span className="fire__differs"> · {differs}</span>}
-                </p>
-              )
-            })
-          )}
-        </div>
-      )}
+      {logOnTop ? null : logBlock}
 
       <p className="fire__head">Your log</p>
       <p className="fire__note">
@@ -346,5 +306,26 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
         }}
       />
     </div>
+  )
+}
+
+/* The three checks as small pictures: a cloud, a ray through a gap, an eye. */
+function CheckIcon({ kind }: { kind: 'canvas' | 'gap' | 'notBlocked' }) {
+  return (
+    <svg className="fire__icon" viewBox="0 0 24 24" aria-hidden="true">
+      {kind === 'canvas' ? (
+        <path d="M7 18h10a4 4 0 0 0 .5-8 6 6 0 0 0-11.3 1.5A3.3 3.3 0 0 0 7 18z" />
+      ) : kind === 'gap' ? (
+        <>
+          <path d="M3 8h7M14 8h7M3 16h7M14 16h7" />
+          <path d="M20 21L5 4" />
+        </>
+      ) : (
+        <>
+          <path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12z" />
+          <circle cx="12" cy="12" r="2.6" />
+        </>
+      )}
+    </svg>
   )
 }

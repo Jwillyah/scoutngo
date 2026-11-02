@@ -13874,6 +13874,74 @@
   color: var(--color-text-muted);
 }
 
+/* The three checks as three small pictures with yes / no (Batch G, Section 4). No red: a no is muted, never alarming. */
+.fire__checks--icons {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+.fire__checks--icons .fire__check {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: var(--space-2) var(--space-1);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: 10px;
+  text-align: center;
+}
+.fire__icon {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.fire__check-name {
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.fire__check--yes,
+.fire__check--part {
+  color: var(--color-text);
+}
+.fire__check--yes .fire__icon {
+  color: var(--sun);
+}
+.fire__check--no {
+  color: var(--color-text-muted);
+}
+.fire__check--no .fire__icon {
+  opacity: 0.55;
+}
+
+/* Past the 400 km asked for: the ray goes on, the cloud is not known. */
+.fire__unasked {
+  fill: var(--color-line);
+  opacity: 0.25;
+}
+
+/* The lit edge in the side view: the colour clock's colour at the deepest glow. */
+.fire__lit {
+  fill: var(--sun);
+  stroke: var(--color-text);
+  stroke-width: 0.8;
+}
+
+.fire__whyfold > summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heavy);
+  color: var(--color-text);
+}
+.fire__whyfold .fire__models li {
+  display: grid;
+  gap: 2px;
+}
+
 .fire__side {
   width: 100%;
   max-width: 100%;
@@ -13898,6 +13966,11 @@
 
 .fire__sun {
   fill: var(--sun);
+}
+
+.fire__ray--off {
+  stroke: var(--color-text-muted);
+  opacity: 0.6;
 }
 
 .fire__you {

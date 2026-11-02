@@ -352,6 +352,19 @@ export function clockStrips(v: FireVerdict): Strip[] {
   return v.sky.layers.filter((l) => l.canvas && l.hiddenBy === null && l.strip !== null).map((l) => l.strip as Strip)
 }
 
+/**
+ * THE VERDICT IN ONE SENTENCE (Section 4: less text, more picture): "Fire
+ * likely: 4 of 5 models see lit high cirrus, 6:01–6:11 AM." or "Fire
+ * unlikely: a lid of cloud."
+ */
+export function verdictSentence(v: FireVerdict, clock: (d: Date) => string): string {
+  if (v.word === 'unlikely') return `${v.line}.`
+  const top = [...v.perLayer].sort((a, b) => b.agree - a.agree)[0]
+  const w = lookWindow(v)
+  const when = w === null ? '' : `, ${clock(w.from)}–${clock(w.to)}`
+  return top === undefined || top.agree === 0 ? `Fire ${v.word}${when}.` : `Fire ${v.word}: ${top.agree} of ${top.of} models see lit ${LAYER_WORD[top.layer]}${when}.`
+}
+
 /** The layer the page speaks for: the sky's first that fires, else its first canvas, else its first. */
 export function leadLayer(v: FireVerdict): LayerRead {
   return v.sky.layers.find((l) => l.fires) ?? v.sky.layers.find((l) => l.canvas) ?? v.sky.layers[0]
