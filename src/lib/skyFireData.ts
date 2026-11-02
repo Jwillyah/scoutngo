@@ -38,6 +38,26 @@ export function firePathsUrl(from: LatLon, azimuthDeg: number, date: string): st
   return `${OPEN_METEO_URL}?${params.toString()}`
 }
 
+/*
+ * A WEEK OF ONE EVENT IN ONE QUESTION (Batch H, the briefing's This week):
+ * the same eight points along the sun's line, for several days. The sun's
+ * bearing at an event moves about a degree a week in November, so the
+ * middle day's line stands for the run; Today and Tomorrow are asked the
+ * Sky fire page's own way (firePathsUrl), so they read the same verdict.
+ */
+export function firePathsRangeUrl(from: LatLon, azimuthDeg: number, startDate: string, endDate: string): string {
+  const u = new URL(firePathsUrl(from, azimuthDeg, startDate))
+  u.searchParams.set('end_date', endDate)
+  return u.toString()
+}
+
+export async function fetchFirePathsRange(from: LatLon, azimuthDeg: number, startDate: string, endDate: string, fetchImpl: typeof fetch = fetch): Promise<FirePaths | null> {
+  const got = await weatherJson(firePathsRangeUrl(from, azimuthDeg, startDate, endDate), { maxAgeMs: FORECAST_MAX_AGE_MS, fetchImpl, timeoutMs: TIMEOUT_MS * 2 })
+  if (!got.ok) return null
+  const paths = parseFirePaths(got.payload)
+  return paths === null ? null : { ...paths, fetchedAt: got.fetchedAt, stale: got.stale }
+}
+
 type Hourly = Record<string, (number | null)[] | string[] | undefined> & { time?: string[] }
 
 /** Open-Meteo's answer for many points and models, as one path per model per hour. Tolerant: a bad payload is null. */

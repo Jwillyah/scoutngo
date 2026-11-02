@@ -111,6 +111,8 @@ import { runSuggest } from './lib/suggestRun.ts'
 import { readShareHash, SHARE_PREFIX } from './lib/planShare.ts'
 import { Viewfinder, ViewfinderNeedsPlace } from './components/Viewfinder.tsx'
 import { SideMenu } from './components/SideMenu.tsx'
+import { Briefing } from './components/Briefing.tsx'
+import { shouldOpenBriefing } from './lib/briefingOpen.ts'
 import { backToNow, openingScrub } from './lib/backToNow.ts'
 import { retrying } from './lib/retrying.ts'
 import { planForNow } from './lib/planForNow.ts'
@@ -1050,6 +1052,14 @@ function App() {
     return { mps: lowest.maxWindMps, source: lowest.maxWindSource }
   }, [kit.droneIds, kitProfile])
 
+  /* The drone for the briefing: the most limiting one in the bag, as above; null with none. */
+  const briefDrone = useMemo(() => {
+    const drones = kitProfile.drones.filter((d) => kit.droneIds.includes(d.id))
+    if (drones.length === 0) return null
+    const d = drones.reduce((a, b) => ((a.maxWindMps ?? Infinity) <= (b.maxWindMps ?? Infinity) ? a : b))
+    return { name: d.name, maxWindMps: d.maxWindMps }
+  }, [kit.droneIds, kitProfile])
+
   const [placing, setPlacing] = useState(false)
 
   /*
@@ -1380,6 +1390,16 @@ function App() {
    * the side menu. A request carries a tick so asking twice opens twice.
    */
   const [menuOpen, setMenuOpen] = useState(false)
+  /* The Today briefing: on a plain launch (src/lib/briefingOpen.ts), and from Menu › Today. */
+  const [briefOpen, setBriefOpen] = useState(() => shouldOpenBriefing(typeof window === 'undefined' ? null : window, landingSeen))
+  /* Its clock, a minute at a time while it is open: the Now line and the calls move with it. */
+  const [briefNow, setBriefNow] = useState(() => new Date())
+  useEffect(() => {
+    if (!briefOpen) return
+    setBriefNow(new Date())
+    const t = setInterval(() => setBriefNow(new Date()), 60_000)
+    return () => clearInterval(t)
+  }, [briefOpen])
   const [drawerRequest, setDrawerRequest] = useState<{ drawer: 'kit' | 'saved'; tick: number }>({
     drawer: 'kit',
     tick: 0,
@@ -1427,6 +1447,9 @@ function App() {
 
   const onMenuPick = (item: MenuItem) => {
     switch (item) {
+      case 'today':
+        setBriefOpen(true)
+        return
       case 'plan':
       case 'setup':
       case 'field':
@@ -2361,6 +2384,22 @@ function App() {
           timeZone={venueWindow?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}
           units={settings.units}
           onClose={() => setViewfinderOpen(false)}
+        />
+      ) : null}
+
+      {briefOpen && centre !== null ? (
+        <Briefing
+          venue={centre}
+          placeName={venueShort}
+          timeZone={venueWindow?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}
+          units={settings.units}
+          drone={briefDrone}
+          now={briefNow}
+          onClose={() => setBriefOpen(false)}
+          onOpenMap={() => {
+            setBriefOpen(false)
+            setMode('plan')
+          }}
         />
       ) : null}
 

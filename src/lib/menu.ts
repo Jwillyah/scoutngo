@@ -13,6 +13,7 @@
 import type { GlyphId } from '../components/Icon.tsx'
 
 export type MenuItem =
+  | 'today'
   | 'plan'
   | 'setup'
   | 'field'
@@ -43,6 +44,8 @@ export interface MenuEntry {
 }
 
 export const MENU_ITEMS: readonly MenuEntry[] = [
+  /* Batch H: the Today briefing, what is worth shooting today, tomorrow and this week. */
+  { id: 'today', label: 'Today', note: 'Go, Maybe or Skip, and the week', icon: 'sky' },
   {
     id: 'plan',
     label: 'Plan',

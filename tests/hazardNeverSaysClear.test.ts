@@ -43,6 +43,9 @@ const HAZARD_FILES = [
   'core/airspaceCard.ts',
   'core/airspaceLookup.ts',
   'components/AirspacePanel.tsx',
+  /* Batch H: the briefing's drone line sits next to a wind verdict. */
+  'components/Briefing.tsx',
+  'core/briefing.ts',
 ]
 
 /**

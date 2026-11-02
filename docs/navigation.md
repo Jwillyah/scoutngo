@@ -11,6 +11,8 @@ is one tap, an item or a place under it is the second.
 
 ```
 Menu
+├── Today ────────── the briefing: Today · Tomorrow · This week (opens on a
+│                    plain launch too; src/lib/briefingOpen.ts)
 ├── Plan ─────────── the map, positions, light, the chips
 │   ├── Shoot now      what the sky is doing where you stand
 │   ├── Setup          where, when, how

@@ -127,6 +127,20 @@ export async function fetchWindMonth(at: LatLon) {
   return liveOrSaved(`wind-month|${at.lat.toFixed(3)},${at.lon.toFixed(3)}`, `${WIND_URL}?${params}`, (p) => parseHourly(p, WIND_NAMES))
 }
 
+/*
+ * THE BRIEFING'S WIND (Batch H): the week by the hour at 10 m with its gusts,
+ * and at 120 m (about 400 ft) for the drone. One question, kept for the hour.
+ */
+export const BRIEF_WIND_NAMES = ['wind_speed_10m', 'wind_direction_10m', 'wind_gusts_10m', 'wind_speed_120m'] as const
+export async function fetchBriefWind(at: LatLon): Promise<Hourly | null> {
+  const params = new URLSearchParams({ latitude: at.lat.toFixed(2), longitude: at.lon.toFixed(2), hourly: BRIEF_WIND_NAMES.join(','), wind_speed_unit: 'ms', forecast_days: '7', timezone: 'GMT' })
+  try {
+    return parseHourly(await getWeather(`${WIND_URL}?${params}`), BRIEF_WIND_NAMES)
+  } catch {
+    return null
+  }
+}
+
 export const SKY_NAMES = ['cloud_cover_low', 'cloud_cover_mid', 'cloud_cover_high', 'visibility'] as const
 
 /** The sky by the hour for as far as Open-Meteo forecasts: the cover at three heights and the visibility (metres), for the 3D preview's clouds and haze. */

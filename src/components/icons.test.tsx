@@ -41,13 +41,13 @@ describe('the golden bubble tiles', () => {
 describe('the side menu', () => {
   /* 30 Oct: seven items grouped by job (docs/ux-rules.md rule 24, docs/navigation.md). */
   it('is seven items, grouped by job, in the order asked for: Water at the coast, Land inland, in the same slot', () => {
-    expect(MENU_ITEMS.map((m) => m.label)).toEqual(['Plan', 'Sky', 'Water', 'Land', 'Fly', 'Kit', 'Saved', 'Settings'])
-    expect(MENU_ITEMS.map((m) => m.icon)).toEqual(['plan', 'sky', 'tides', 'terrain', 'preflight', 'kit', 'saved', 'settings'])
+    expect(MENU_ITEMS.map((m) => m.label)).toEqual(['Today', 'Plan', 'Sky', 'Water', 'Land', 'Fly', 'Kit', 'Saved', 'Settings'])
+    expect(MENU_ITEMS.map((m) => m.icon)).toEqual(['sky', 'plan', 'sky', 'tides', 'terrain', 'preflight', 'kit', 'saved', 'settings'])
     const subs = Object.fromEntries(MENU_ITEMS.map((m) => [m.label, (m.subs ?? []).map((s) => s.label)]))
-    expect(subs).toEqual({ Plan: ['Shoot now', 'Setup', 'Call sheet'], Sky: [], Water: ['Tides', 'Surf', 'Wind'], Land: ['Wind', 'Terrain light'], Fly: ['Viewfinder'], Kit: ['Exposure'], Saved: [], Settings: ['About'] })
+    expect(subs).toEqual({ Today: [], Plan: ['Shoot now', 'Setup', 'Call sheet'], Sky: [], Water: ['Tides', 'Surf', 'Wind'], Land: ['Wind', 'Terrain light'], Fly: ['Viewfinder'], Kit: ['Exposure'], Saved: [], Settings: ['About'] })
     for (const hidden of [['land'], ['water', 'tides', 'surf']] as MenuItem[][]) {
       const html = renderToStaticMarkup(<SideMenu open current="plan" onPick={() => {}} onClose={() => {}} hidden={new Set(hidden)} />)
-      expect(html.match(/class="icon"/g)?.length).toBe(7)
+      expect(html.match(/class="icon"/g)?.length).toBe(8)
     }
     /* Inland: no tide and no surf anywhere in the menu. */
     const inland = renderToStaticMarkup(<SideMenu open current="plan" onPick={() => {}} onClose={() => {}} hidden={new Set<MenuItem>(['water', 'tides', 'surf'])} />)
@@ -62,13 +62,13 @@ describe('the side menu', () => {
 
   it('marks the job you are in: Setup is part of Plan', () => {
     const html = renderToStaticMarkup(<SideMenu open current="setup" onPick={() => {}} onClose={() => {}} hidden={new Set<MenuItem>(['land'])} />)
-    expect(html.match(/class="icon"/g)?.length).toBe(7)
+    expect(html.match(/class="icon"/g)?.length).toBe(8)
     expect(html).not.toContain('>Field<')
     expect(html).toMatch(/sidemenu__item sidemenu__item--on[^]*?>Plan</)
   })
 
   it('every place is still reachable: an item, a place under one, or its own address', () => {
-    const all: MenuItem[] = ['plan', 'setup', 'field', 'sky', 'water', 'land', 'terrain', 'tides', 'surf', 'wind', 'exposure', 'kit', 'saved', 'now', 'viewfinder', 'preflight', 'callsheet', 'settings', 'about']
+    const all: MenuItem[] = ['today', 'plan', 'setup', 'field', 'sky', 'water', 'land', 'terrain', 'tides', 'surf', 'wind', 'exposure', 'kit', 'saved', 'now', 'viewfinder', 'preflight', 'callsheet', 'settings', 'about']
     const offered = new Set(MENU_ITEMS.flatMap((m) => [m.id, ...(m.subs ?? []).map((s) => s.id)]))
     for (const item of all) {
       if (item === 'field') {
