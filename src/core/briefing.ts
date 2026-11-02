@@ -230,8 +230,8 @@ export function droneTag(highMps: number | null, limitMps: number | null): Drone
 
 /** Which way to fly for the light: toward the sun's side of the sky at the event, in compass words. */
 export function sunSide(event: Date, lat: number, lon: number, compass: (deg: number) => string): string {
-  const az = (getPosition(event, lat, lon).azimuth * 180) / Math.PI
-  return compass((az + 360) % 360)
+  /* suncalc 2 gives degrees from north, clockwise (as the Sky fire page reads it). */
+  return compass((getPosition(event, lat, lon).azimuth + 360) % 360)
 }
 
 /* ------------------------------------------------------------------- week */

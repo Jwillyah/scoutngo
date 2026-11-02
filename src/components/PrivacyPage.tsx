@@ -121,7 +121,7 @@ export function PrivacyBody() {
 
       <h2 className="privacy__head">The host of this app</h2>
       <p className="privacy__note">
-        The app is served by Vercel. Its logs of requests to this app (the time, the page asked for, your browser and your IP address) are kept for 1 hour on Vercel’s Hobby plan and 1 day on Pro (Vercel’s documentation, Runtime Logs). Which plan this deployment is on is not set in the code; the owner confirms it in Vercel’s dashboard. The app’s own functions (station weather, buoys, search) log nothing.
+        The app is served by Vercel. Its logs of requests to this app (the time, the page asked for, your browser and your IP address) are kept for 1 hour on Vercel’s Hobby plan and 1 day on Pro (Vercel’s documentation, Runtime Logs). Which plan this deployment is on is not set in the code; the owner confirms it in Vercel’s dashboard. The app’s own functions (station weather, buoys, search) log nothing. One of them only runs if you ask: the calendar feed (Settings › Alerts, off unless you switch it on). Your calendar app then sends this spot rounded to 2 decimals, about a kilometre, in the address it refreshes, about hourly; the feed asks the forecast for that rounded spot and keeps nothing.
       </p>
 
       <h2 className="privacy__head">Your data</h2>

@@ -1,3 +1,5 @@
+import { useCalendarFeed } from '../lib/calendarFeedSetting.ts'
+import { feedPath } from '../core/calendarFeed.ts'
 import { useWindDraw, writeWindDraw } from '../lib/windDraw.ts'
 import { useEffect, useState, type ReactNode } from 'react'
 import { NUMERALS_LABEL, NUMERALS_NOTE } from '../core/numerals.ts'
@@ -32,6 +34,8 @@ import type { ReadFile } from '../lib/scoutFile.ts'
  * is kept on this phone; nothing here is sent anywhere.
  */
 interface Props {
+  /** Batch H: the venue for the opt-in calendar feed's address (rounded there to 2 decimals). */
+  feedPlace?: { lat: number; lon: number } | null
   units: Units
   onUnits: (next: Units) => void
   showNumbers: boolean
@@ -54,6 +58,12 @@ interface Props {
   /** An older "Export everything" file (kit, units, spots), read back by Restore (src/lib/scoutFile.ts). */
   onImport?: (file: ReadFile) => string
   onClose: () => void
+}
+
+/* The calendar feed's address: webcal, so the phone offers to subscribe (src/core/calendarFeed.ts). */
+function feedAddress(place: { lat: number; lon: number } | null | undefined): string | null {
+  if (place == null || typeof window === 'undefined') return null
+  return `webcal://${window.location.host}${feedPath(place.lat, place.lon)}`
 }
 
 function Section({ title, info, children }: { title: string; info?: ReactNode; children: ReactNode }) {
@@ -134,6 +144,8 @@ export function SettingsPage(props: Props) {
   const [groups, setGroups] = usePlaceGroups()
   const [surf, setSurf] = useSurfSetting()
   const [nearMe, setNearMe] = useNearMeSetting()
+  const [feed, setFeed] = useCalendarFeed()
+  const feedHref = feedAddress(props.feedPlace)
   const [debugTouch, setDebugTouch] = useTouchDebug()
   const attempts = useLocateAttempts()
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -206,6 +218,20 @@ export function SettingsPage(props: Props) {
       <Section title="Alerts" info={<p>Special light near me: on opening, fog, rainbows and sky fire within 25 mi in the next 24 h, worked out on this phone. Calendar alerts are a calendar file from Sky › Calendar, added to your own calendar.</p>}>
         <Switch label="Special light near me" on={nearMe} onChange={setNearMe} />
         <Row label="Calendar alerts" value="Sky › Calendar" />
+        <Switch label="Sky calls in your calendar" on={feed} onChange={setFeed} hint="Off unless you switch it on" />
+        {!feed || feedHref === null ? null : (
+          <>
+            <a className="set__row set__link" href={feedHref}>
+              <span className="set__label">Subscribe in Calendar</span>
+              <span className="set__value">
+                <span className="set__chev" aria-hidden="true">›</span>
+              </span>
+            </a>
+            <p className="set__note">
+              Your calendar app sends this spot, rounded to about a kilometre ({props.feedPlace?.lat.toFixed(2)}, {props.feedPlace?.lon.toFixed(2)}), to this app’s server each time it refreshes, about hourly. The server asks the forecast and logs nothing; Vercel’s own request logs keep the request line for an hour. Turn it off here and remove the calendar in your calendar app to stop it.
+            </p>
+          </>
+        )}
       </Section>
 
       <Section title="Drone">

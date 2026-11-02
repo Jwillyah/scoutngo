@@ -84,7 +84,6 @@ function eventsOn(iso: string, venue: LatLon, timeZone: string): Record<Kind, Da
   return { sunrise: ok(t.sunrise), sunset: ok(t.sunset) }
 }
 
-const azimuthDeg = (at: Date, venue: LatLon) => ((getPosition(at, venue.lat, venue.lon).azimuth * 180) / Math.PI + 540) % 360
 
 /*
  * SCOPE. 'week' is the briefing: today, tomorrow and the week. 'next' is the
@@ -271,4 +270,3 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
   }, [key, lat, lon, fire, sea, stations, tides, today, timeZone, now, scope])
 }
 
-export { azimuthDeg }

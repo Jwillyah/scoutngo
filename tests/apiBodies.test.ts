@@ -72,7 +72,19 @@ describe('the server side', () => {
     expect(ROUTES.length).toBeGreaterThan(0)
   })
 
-  for (const route of ROUTES) {
+  /*
+   * THE ONE EXCEPTION, BY NAME (Batch H): the opt-in calendar feed. A calendar
+   * app subscribes to a URL and cannot send a body, so the venue is in it,
+   * and only rounded to 2 decimals: the route refuses anything finer.
+   */
+  it('api/calendar.ts takes the place only at 2 decimals, and is the only GET', () => {
+    const source = withoutComments(readFileSync('api/calendar.ts', 'utf8'))
+    expect(source).toMatch(/export\s+async\s+function\s+GET\b/)
+    expect(source).toMatch(/feedCoords\(u\.searchParams\.get\('lat'\), u\.searchParams\.get\('lon'\)\)/)
+    expect(source).not.toMatch(/console\./)
+  })
+
+  for (const route of ROUTES.filter((r) => r !== 'calendar.ts')) {
     it(`api/${route} takes POST and nothing in its URL`, () => {
       const source = withoutComments(readFileSync(join('api', route), 'utf8'))
       expect(source).toMatch(/export\s+async\s+function\s+POST\b/)

@@ -2510,6 +2510,7 @@ export function PlanMode({
       ) : null}
       {page === 'settings' ? (
         <SettingsPage
+          feedPlace={venue}
           units={units}
           onUnits={onUnits}
           showNumbers={showNumbers}
