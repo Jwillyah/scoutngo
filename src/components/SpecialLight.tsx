@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { getPosition } from 'suncalc'
+import { getPosition, getTimes } from 'suncalc'
 import type { LatLon } from '../core/geo.ts'
 import { nextEvents } from '../core/skyFire.ts'
 import { fireVerdict, lookWindow } from '../core/fireOutlook.ts'
 import { byDay, SPECIAL_NAME, type Special } from '../core/specialLight.ts'
-import { formatClock } from '../core/timezone.ts'
+import { formatClock, writeClock, zoneOffsetMs } from '../core/timezone.ts'
 import { fetchFirePaths, nearestHour, pathsAt } from '../lib/skyFireData.ts'
 import { fetchGlassWeek, fetchSpecialWeek, specialsFrom } from '../lib/specialLightData.ts'
 import { specialName, type Place } from '../lib/placeGroups.ts'
@@ -35,7 +35,7 @@ interface Props {
 const isoDay = (d: Date, timeZone: string) => new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d)
 const weekday = (d: Date, timeZone: string) => new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'short' }).format(d)
 
-export function SpecialLight({ venue, timeZone, at, onShowBow, onJump, place }: Props) {
+export function SpecialLight({ venue, timeZone, onShowBow, onJump, place }: Props) {
   const key = `${venue.lat},${venue.lon}`
   const [answer, setAnswer] = useState<{ key: string; list: Special[] | null; asked: number } | null>(null)
   useEffect(() => {
@@ -71,45 +71,30 @@ export function SpecialLight({ venue, timeZone, at, onShowBow, onJump, place }: 
   /* Both ends with AM or PM: a bare "5:00" is a time on the wrong clock to half the day (scripts/audit-clock.mjs). */
   const span = (a: Date, b: Date) => `${formatClock(a, timeZone)}–${formatClock(b, timeZone)}`
   const name = (s: Special) => (s.kind === 'fog' ? specialName('fog', place) : SPECIAL_NAME[s.kind])
-  const now = useMemo(() => (list === 'loading' || list === null ? [] : list.filter((s) => s.from <= at && at < s.to)), [list, at])
   const days = useMemo(() => (list === 'loading' || list === null ? [] : byDay(list, (d) => isoDay(d, timeZone))), [list, timeZone])
   /* Today as of when the list was read, not as of each render. */
   const asked = answer?.asked ?? 0
   const today = isoDay(new Date(asked), timeZone)
   const tomorrow = isoDay(new Date(asked + 86_400_000), timeZone)
-  const dayName = (day: string, sample: Date) => (day === today ? 'Today' : day === tomorrow ? 'Tomorrow' : weekday(sample, timeZone))
+  const dayName = (day: string, sample: Date) => (day === today ? 'Today' : day === tomorrow ? 'Tmrw' : weekday(sample, timeZone))
   const [bow, setBow] = useState<string | null>(null)
-  const row = (s: Special, long: boolean) => {
-    const id = `${s.kind}-${s.from.getTime()}`
-    return (
-      <li key={id} className={`spec__item spec__item--${s.kind}${long ? ' spec__item--long' : ''}`}>
-        <button type="button" className="spec__open" onClick={() => onJump?.(s.from)} title={s.why}>
-          <span className="spec__line">
-            {name(s)} {s.word} {span(s.from, s.to)}
-          </span>
-          <span className="spec__sure num">
-            {s.agree} of {s.of}
-          </span>
-        </button>
-        {s.kind === 'rainbow' && onShowBow !== undefined ? (
-          <button
-            type="button"
-            className="btn btn--small btn--quiet spec__bow"
-            aria-pressed={bow === id}
-            onClick={() => {
-              const next = bow === id ? null : id
-              setBow(next)
-              onShowBow(next === null ? null : s)
-            }}
-          >
-            {bow === id ? 'Hide the bow' : 'Show the bow'}
-          </button>
-        ) : null}
-      </li>
-    )
-  }
-  const strongDays = days.filter((d) => d.items.length > 0)
-  const longDays = days.filter((d) => d.longShots.length > 0)
+  const [picked, setPicked] = useState<string | null>(null)
+  const idOf = (s: Special) => `${s.kind}-${s.from.getTime()}`
+  /* Seven rows from today, each with its own sunrise and sunset; the items on it, strong and long shots alike. */
+  const rows = useMemo(() => {
+    if (asked === 0) return []
+    return Array.from({ length: 7 }, (_, i) => {
+      const noon = new Date(asked + i * 86_400_000)
+      const day = isoDay(noon, timeZone)
+      const t = getTimes(noon, venue.lat, venue.lon)
+      const d = days.find((x) => x.day === day)
+      const items = [...(d?.items ?? []).map((s) => ({ s, long: false })), ...(d?.longShots ?? []).map((s) => ({ s, long: true }))].sort((a, b) => a.s.from.getTime() - b.s.from.getTime())
+      return { day, sample: noon, sunrise: t.sunrise, sunset: t.sunset, items: weekLanes(items.map((x) => ({ ...x, at: (localMinutes(x.s.from, timeZone) + localMinutes(x.s.to, timeZone, true)) / 2 }))) }
+    })
+  }, [asked, days, timeZone, venue])
+  const all = rows.flatMap((r) => r.items.map((x) => x.s))
+  const sel = all.find((s) => idOf(s) === picked) ?? null
+  const pct = (minutes: number) => `${(Math.max(0, Math.min(1440, minutes)) / 1440) * 100}%`
 
   return (
     <div className="spec">
@@ -117,41 +102,140 @@ export function SpecialLight({ venue, timeZone, at, onShowBow, onJump, place }: 
         <p className="spec__note">Reading five forecasts for the week…</p>
       ) : list === null ? (
         <p className="spec__note">The week’s forecast did not arrive, so there is nothing to look through.</p>
-      ) : list.length === 0 ? (
-        <p className="spec__note">Nothing special in the forecast this week: no fog, rainbow, god rays, iridescence or sky fire by these rules. The rules are in the “i”.</p>
       ) : (
         <>
-          {now.length === 0 ? null : (
-            <p className="spec__now">
-              On now: {now.map((s) => `${name(s)} (${s.agree} of ${s.of}). ${s.why}`).join(' ')}
-            </p>
-          )}
-          {strongDays.length === 0 ? <p className="spec__note">Nothing that half the models or more agree on this week.</p> : null}
-          {strongDays.map((d) => (
-            <section key={d.day} className="spec__day">
-              <h4 className="spec__dayname">{dayName(d.day, d.items[0].from)}</h4>
-              <ul className="spec__list">{d.items.map((s) => row(s, false))}</ul>
-            </section>
-          ))}
-          {longDays.length === 0 ? null : (
-            <section className="spec__long">
-              <h4 className="spec__dayname">Long shots · fewer than half the models</h4>
-              {longDays.map((d) => (
-                <div key={d.day} className="spec__day">
-                  <p className="spec__longday">{dayName(d.day, d.longShots[0].from)}</p>
-                  <ul className="spec__list">{d.longShots.map((s) => row(s, true))}</ul>
+          {/*
+            * THE WEEK AS A PICTURE (Batch G, Section 5): one row a day, a 24 h
+            * track with the night shaded and sunrise and sunset marked, and an
+            * icon on the hours each thing happens. Fewer than half the models:
+            * greyed. Tap one for one line, and Go there.
+            */}
+          <ol className="wk" aria-label="Special light this week, hour by hour">
+            {rows.map((r) => {
+              const lanes = Math.max(1, ...r.items.map((x) => x.lane + 1))
+              const rise = r.sunrise instanceof Date && !Number.isNaN(r.sunrise.getTime()) ? localMinutes(r.sunrise, timeZone) : null
+              const set = r.sunset instanceof Date && !Number.isNaN(r.sunset.getTime()) ? localMinutes(r.sunset, timeZone) : null
+              return (
+                <li key={r.day} className="wk__day">
+                  <span className="wk__name">{dayName(r.day, r.sample)}</span>
+                  <div className="wk__track" style={{ height: `${lanes * 44}px` }}>
+                    {rise === null ? null : <span className="wk__night" style={{ left: 0, width: pct(rise) }} />}
+                    {set === null ? null : <span className="wk__night" style={{ left: pct(set), right: 0 }} />}
+                    {rise === null ? null : <span className="wk__sun" style={{ left: pct(rise) }} aria-hidden="true" />}
+                    {set === null ? null : <span className="wk__sun" style={{ left: pct(set) }} aria-hidden="true" />}
+                    {r.items.map(({ s, long, at, lane }) => (
+                      <button
+                        key={idOf(s)}
+                        type="button"
+                        className={`wk__icon wk__icon--${s.kind}${long ? ' wk__icon--long' : ''}${picked === idOf(s) ? ' wk__icon--on' : ''}`}
+                        style={{ left: pct(at), top: `${lane * 44}px` }}
+                        aria-pressed={picked === idOf(s)}
+                        aria-label={`${name(s)} ${s.word}, ${dayName(r.day, r.sample)} ${span(s.from, s.to)}, ${s.agree} of ${s.of} models`}
+                        onClick={() => setPicked(picked === idOf(s) ? null : idOf(s))}
+                      >
+                        <SpecialIcon kind={s.kind} />
+                      </button>
+                    ))}
+                  </div>
+                  {sel === null || !r.items.some((x) => x.s === sel) ? null : (
+                    <div className="wk__detail" role="status">
+                  <p className="wk__line">
+                    <b>
+                      {name(sel)} {sel.word}
+                    </b>{' '}
+                    {weekday(sel.from, timeZone)} {span(sel.from, sel.to)} · {sel.agree} of {sel.of} models · {sel.why}
+                  </p>
+                  <div className="btn-row">
+                    <button type="button" className="btn btn--small" onClick={() => onJump?.(sel.from)}>
+                      Go there
+                    </button>
+                    {sel.kind === 'rainbow' && onShowBow !== undefined ? (
+                      <button
+                        type="button"
+                        className="btn btn--small btn--quiet"
+                        aria-pressed={bow === idOf(sel)}
+                        onClick={() => {
+                          const next = bow === idOf(sel) ? null : idOf(sel)
+                          setBow(next)
+                          onShowBow(next === null ? null : sel)
+                        }}
+                      >
+                        {bow === idOf(sel) ? 'Hide the bow' : 'Show the bow'}
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
-              ))}
-            </section>
-          )}
+                  )}
+                </li>
+              )
+            })}
+          </ol>
+          <p className="wk__axis num" aria-hidden="true">
+            {[0, 6, 12, 18, 0].map((h, i) => (
+              <span key={i}>{writeClock(h, 0)}</span>
+            ))}
+          </p>
+          {sel === null ? <p className="spec__note">{all.length === 0 ? 'Nothing special in the forecast this week by these rules.' : 'Tap an icon. Greyed: fewer than half the models.'}</p> : null}
         </>
       )}
       <details className="spec__how">
         <summary aria-label="How these are found">i</summary>
         <p>
-          Fog: dew point within 2°F of the air, wind under 6 kt, and the sea colder than the air (inland, radiation fog: no sea term). Rainbow: showers within 25 km and the sun up but under 42°; the bow is 42° round the point opposite the sun. God rays: low cloud 30–80% (scattered to broken) with the sun up to 25° behind it. Iridescence: thin mid or high cloud, 10–60%, with little low cloud and the sun up 5° or more; look within about 10° of the sun. Sky fire: its own three checks. Glassy water: a low tide within 90 minutes of sunrise and a light wind, as on the Tide sheet. Five models (GFS, ECMWF, ICON, GEM, HRRR); “likely” when 60% or more agree at the best hour; on the map only when half or more agree. A rule, not a promise: on 10 Mar 2026 the fog rule fired at Norfolk and no fog came.
+          Only windows you can shoot through, two hours at most, tied to their cause hour by hour. Fog: dew point within 2°F of the air, wind under 6 kt, and the sea colder than the air (inland, radiation fog: no sea term); said where it forms or lifts in the light, not the night it sits through. Rainbow: showers within 25 km on the side opposite the sun, the sun up but under 42° and not hidden by low cloud; the bow is 42° round the point opposite the sun. God rays: low cloud 30–80% (scattered to broken) with the sun up to 25° behind it. Iridescence: thin mid or high cloud, 10–60%, with little low cloud and the sun up 5° or more; look within about 10° of the sun. Sky fire: its own three checks, its glow. Glassy water: a low tide within 90 minutes of sunrise and a light wind, as on the Tide sheet. The rest: the best two hours of each run, the most models first, then the lower sun. Five models (GFS, ECMWF, ICON, GEM, HRRR); “likely” when 60% or more agree at the best hour; on the map only when half or more agree. A rule, not a promise: on 10 Mar 2026 the fog rule fired at Norfolk and no fog came.
         </p>
       </details>
     </div>
+  )
+}
+
+/* Minutes since local midnight in the venue's zone; `end` reads midnight as 1440, the end of the day. */
+function localMinutes(d: Date, timeZone: string, end = false): number {
+  const m = Math.floor((((d.getTime() + zoneOffsetMs(d, timeZone)) % 86_400_000) + 86_400_000) % 86_400_000 / 60_000)
+  return end && m === 0 ? 1440 : m
+}
+
+/* Icons closer than a 44 px target on a ~300 px track (about 3 h) go on the next lane down. */
+const LANE_MIN = 210
+function weekLanes<T extends { at: number }>(items: T[]): (T & { lane: number })[] {
+  const ends: number[] = []
+  return items.map((x) => {
+    let lane = ends.findIndex((e) => x.at - e >= LANE_MIN)
+    if (lane < 0) lane = ends.length
+    ends[lane] = x.at
+    return { ...x, lane }
+  })
+}
+
+/* The six things, as small pictures. */
+function SpecialIcon({ kind }: { kind: Special['kind'] }) {
+  return (
+    <svg viewBox="0 0 24 24" className="wk__glyph" aria-hidden="true">
+      {kind === 'fog' ? (
+        <path d="M3 9h18M5 13h14M3 17h18" />
+      ) : kind === 'rainbow' ? (
+        <>
+          <path d="M3 18a9 9 0 0 1 18 0" />
+          <path d="M7 18a5 5 0 0 1 10 0" />
+        </>
+      ) : kind === 'rays' ? (
+        <>
+          <path d="M5 7h14" />
+          <path d="M9 9l-4 11M12 9v11M15 9l4 11" />
+        </>
+      ) : kind === 'iridescence' ? (
+        <>
+          <circle cx="12" cy="12" r="3" />
+          <path d="M4 8c3-3 13-3 16 0M4 16c3 3 13 3 16 0" />
+        </>
+      ) : kind === 'fire' ? (
+        <>
+          <path d="M3 17h18" />
+          <path d="M7 17a5 5 0 0 1 10 0" />
+          <path d="M4 10c4-3 12-3 16 0" />
+        </>
+      ) : (
+        <path d="M3 10c3-2 6 2 9 0s6-2 9 0M3 15c3-2 6 2 9 0s6-2 9 0" />
+      )}
+    </svg>
   )
 }

@@ -26,6 +26,14 @@
  *
  * WHAT INTERRUPTS. A map chip only when at least MAP_SHARE of the models
  * agree; the rest stay in the list, greyed, under Long shots.
+ *
+ * ONLY SHOOTABLE WINDOWS (Batch G, Section 5: on the 2 Nov forecast an
+ * eleven-hour rainbow and fog "7 PM–9 AM"). A window is at most
+ * MAX_WINDOW_H, tied hour by hour to its cause (shootable): fog where it
+ * forms or lifts in the light, not the night it sits through; the rest the
+ * best two hours of their run, the low sun first. A rainbow needs the
+ * showers on the side opposite the sun, where the bow stands, and the sun
+ * not hidden by low cloud at the venue (src/lib/specialLightData.ts).
  */
 import { normalizeBearing } from './sun.ts'
 
@@ -44,6 +52,14 @@ export const MAP_SHARE = 0.5
 export const PER_DAY = 3
 /** Share of the models that must agree for "likely". */
 export const LIKELY_SHARE = 0.6
+/** The longest window said, hours: one you can stand and shoot through. */
+export const MAX_WINDOW_H = 2
+/** Light enough to see fog: the sun above civil twilight's end. */
+export const FOG_LIGHT_DEG = -6
+/** A rainbow's showers count within this of the bearing opposite the sun. */
+export const RAINBOW_SIDE_DEG = 67.5
+/** Low cloud at the venue at or over this hides the sun: no bow. */
+export const RAINBOW_SUN_HIDDEN = 80
 
 const DEG = Math.PI / 180
 
@@ -202,6 +218,79 @@ export function windows(kind: SpecialKind, hours: readonly Date[], byModel: read
   return out
 }
 
+/**
+ * SHOOTABLE WINDOWS, at most MAX_WINDOW_H each. The runs of hours where a
+ * model says yes are found as in `windows`; then from each run:
+ *
+ *   fog     where it FORMS (the run's first hours, if light) and where it
+ *           LIFTS (its last hours, if light); never the night between.
+ *   others  the best MAX_WINDOW_H of the run: the most models agreeing, and
+ *           of those the lowest sun (the long light the eye goes to).
+ *
+ * `sun` is the sun's altitude at each hour, degrees.
+ */
+export function shootable(kind: SpecialKind, hours: readonly Date[], byModel: readonly (readonly (boolean | null)[])[], sun: readonly number[], why: (h: number) => string): Special[] {
+  const yesAt = (h: number) => byModel.map((m) => m[h]).filter((v) => v === true).length
+  const saidAt = (h: number) => byModel.map((m) => m[h]).filter((v): v is boolean => v !== null && v !== undefined).length
+  const runs: [number, number][] = []
+  for (let h = 0; h < hours.length; h += 1) {
+    if (yesAt(h) === 0) continue
+    const last = runs[runs.length - 1]
+    if (last !== undefined && last[1] === h - 1) last[1] = h
+    else runs.push([h, h])
+  }
+  const make = (a: number, b: number): Special => {
+    let best = a
+    for (let h = a; h <= b; h += 1) if (yesAt(h) / Math.max(1, saidAt(h)) > yesAt(best) / Math.max(1, saidAt(best))) best = h
+    const agree = yesAt(best)
+    const of = saidAt(best)
+    return { kind, from: hours[a], to: new Date(hours[b].getTime() + 3_600_000), agree, of, word: of > 0 && agree / of >= LIKELY_SHARE ? 'likely' : 'possible', why: why(best) }
+  }
+  const n = MAX_WINDOW_H
+  const out: Special[] = []
+  for (const [a, b] of runs) {
+    if (kind === 'fog') {
+      const light = (h: number) => sun[h] > FOG_LIGHT_DEG
+      /* Forms in the light: its first hours, the light ones only. */
+      if (light(a)) {
+        let to = a
+        while (to < Math.min(b, a + n - 1) && light(to + 1)) to += 1
+        out.push(make(a, to))
+      }
+      /* Lifts in the light: its last hours, the light ones only. */
+      if (light(b) && b - (n - 1) > a) {
+        let from = Math.max(a, b - n + 1)
+        while (from < b && !light(from)) from += 1
+        out.push(make(from, b))
+      } else if (light(b) && !light(a)) {
+        let from = a
+        while (from < b && !light(from)) from += 1
+        out.push(make(from, b))
+      }
+      continue
+    }
+    let start = a
+    let score = -Infinity
+    for (let s = a; s <= Math.max(a, b - n + 1); s += 1) {
+      const e = Math.min(b, s + n - 1)
+      let agree = 0
+      let low = 0
+      for (let h = s; h <= e; h += 1) {
+        agree += yesAt(h) / Math.max(1, saidAt(h))
+        low += sun[h]
+      }
+      /* Agreement first; a lower sun breaks ties. */
+      const sc = agree * 1000 - low / (e - s + 1)
+      if (sc > score) {
+        score = sc
+        start = s
+      }
+    }
+    out.push(make(start, Math.min(b, start + n - 1)))
+  }
+  return out
+}
+
 /** "Fog possible 6–8 AM" from a window, with the span written by the caller's clock. */
 export function specialLine(s: Special, span: (from: Date, to: Date) => string): string {
   return `${SPECIAL_NAME[s.kind]} ${s.word} ${span(s.from, s.to)}`
@@ -212,14 +301,19 @@ export const strong = (s: Special): boolean => s.of > 0 && s.agree / s.of >= MAP
 
 const share = (s: Special) => (s.of === 0 ? 0 : s.agree / s.of)
 
-/** Windows of the same kind that overlap or touch, joined; the join keeps the better agreement and its why. */
+/**
+ * Windows of the same kind that overlap or touch, joined, the join keeping
+ * the better agreement and its why; when the join would run past
+ * MAX_WINDOW_H, only the better of the two is kept (Batch G).
+ */
 export function mergeOverlaps(list: readonly Special[]): Special[] {
   const out: Special[] = []
   for (const s of [...list].sort((a, b) => a.kind.localeCompare(b.kind) || a.from.getTime() - b.from.getTime())) {
     const last = out[out.length - 1]
     if (last !== undefined && last.kind === s.kind && s.from.getTime() <= last.to.getTime()) {
       const best = share(s) > share(last) ? s : last
-      out[out.length - 1] = { ...best, from: last.from, to: new Date(Math.max(last.to.getTime(), s.to.getTime())) }
+      const to = new Date(Math.max(last.to.getTime(), s.to.getTime()))
+      out[out.length - 1] = to.getTime() - last.from.getTime() <= MAX_WINDOW_H * 3_600_000 ? { ...best, from: last.from, to } : best
     } else out.push(s)
   }
   return out.sort((a, b) => a.from.getTime() - b.from.getTime())

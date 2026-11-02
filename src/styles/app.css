@@ -15263,3 +15263,122 @@
   text-align: left;
   cursor: pointer;
 }
+
+/*
+ * SPECIAL LIGHT, THE WEEK AS A PICTURE (Batch G, Section 5). A row a day:
+ * the name, then a 24 h track with the night shaded, sunrise and sunset as
+ * thin marks, and an icon (a 44 px target) on the hours each thing happens.
+ * Long shots greyed. No red: nothing here is a hazard.
+ */
+.wk {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.wk__day {
+  display: grid;
+  grid-template-columns: 2.6rem minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-1);
+}
+.wk__name {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heavy);
+  color: var(--color-text);
+}
+.wk__track {
+  position: relative;
+  min-height: 44px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--sun) 10%, transparent);
+  overflow: visible;
+}
+.wk__night {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--color-bg) 70%, transparent);
+  border-radius: 8px;
+  pointer-events: none;
+}
+.wk__sun {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--sun);
+  opacity: 0.7;
+  pointer-events: none;
+}
+.wk__icon {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  margin-left: -22px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text);
+}
+.wk__glyph {
+  width: 26px;
+  height: 26px;
+  padding: 3px;
+  border-radius: 50%;
+  background: var(--color-panel);
+  border: var(--line-hair) solid var(--color-line-strong);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.wk__icon--fire,
+.wk__icon--rays,
+.wk__icon--rainbow {
+  color: var(--sun);
+}
+.wk__icon--glass,
+.wk__icon--fog {
+  color: var(--color-accent);
+}
+.wk__icon--long .wk__glyph {
+  opacity: 0.42;
+}
+.wk__icon--on .wk__glyph {
+  border-color: var(--color-text);
+  border-width: 2px;
+}
+.wk__axis {
+  display: flex;
+  justify-content: space-between;
+  margin: 0 0 0 calc(2.6rem + var(--space-1));
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--color-text-muted);
+}
+.wk__detail {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: 10px;
+}
+.wk__line {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+.wk__line b {
+  color: var(--color-text);
+}

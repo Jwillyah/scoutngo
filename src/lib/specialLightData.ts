@@ -11,7 +11,7 @@
 import destination from '@turf/destination'
 import { getPosition, getTimes } from 'suncalc'
 import type { LatLon } from '../core/geo.ts'
-import { antisolar, bowHalfWidthDeg, cloudWord, fogRule, godRaysRule, iridescenceRule, rainbowRule, windows, fToC, type Special } from '../core/specialLight.ts'
+import { antisolar, bowHalfWidthDeg, cloudWord, fogRule, godRaysRule, iridescenceRule, rainbowRule, RAINBOW_SIDE_DEG, RAINBOW_SUN_HIDDEN, shootable, fToC, type Special } from '../core/specialLight.ts'
 import { roundCoord } from '../core/skyFire.ts'
 import { OPEN_METEO_URL, TIMEOUT_MS } from './forecast.ts'
 import { FORECAST_MAX_AGE_MS, weatherJson } from './weatherStore.ts'
@@ -123,10 +123,24 @@ const f0 = (x: number | null) => (x === null ? '–' : Math.round(x).toString())
  */
 export function specialsFrom(week: SpecialWeek, venue: LatLon, seaCAt: (t: Date) => number | null): Special[] {
   const models = Object.keys(week.series)
-  const sun = week.hours.map((t) => getPosition(t, venue.lat, venue.lon).altitude)
+  const pos = week.hours.map((t) => getPosition(t, venue.lat, venue.lon))
+  const sun = pos.map((p) => p.altitude)
   const at = (m: string, p: number, v: Var, h: number) => week.series[m][p][v][h] ?? null
+  /*
+   * THE SHOWERS WHERE THE BOW STANDS (Batch G): the ring points within
+   * RAINBOW_SIDE_DEG of the bearing opposite the sun (point i + 1 is at
+   * i × 45°), and only while the sun reaches the venue (low cloud there
+   * under RAINBOW_SUN_HIDDEN). Rain behind you or overhead makes no bow.
+   */
   const showersNear = (m: string, h: number) => {
-    const all = week.series[m].map((pt) => pt.showers[h]).filter((x): x is number => x !== null)
+    const low = at(m, 0, 'cloud_cover_low', h)
+    if (low !== null && low >= RAINBOW_SUN_HIDDEN) return 0
+    const opposite = antisolar(pos[h]).azimuth
+    const all = week.series[m]
+      .slice(1)
+      .filter((_pt, i) => Math.abs(((i * 45 - opposite + 540) % 360) - 180) <= RAINBOW_SIDE_DEG)
+      .map((pt) => pt.showers[h])
+      .filter((x): x is number => x !== null)
     return all.length === 0 ? null : Math.max(...all)
   }
   const fog = models.map((m) => week.hours.map((t, h) => fogRule({ tempF: at(m, 0, 'temperature_2m', h), dewF: at(m, 0, 'dew_point_2m', h), windKt: at(m, 0, 'wind_speed_10m', h), seaC: seaCAt(t) })))
@@ -144,7 +158,7 @@ export function specialsFrom(week: SpecialWeek, venue: LatLon, seaCAt: (t: Date)
     const sea = seaCAt(week.hours[h])
     return `Dew point ${f0(d)}°F against air ${f0(t)}°F, wind ${f0(median('wind_speed_10m', h))} kt${sea === null ? ', inland: radiation fog' : `, sea ${f0((sea * 9) / 5 + 32)}°F under the air${t !== null && sea >= fToC(t) ? ' (not today)' : ''}`}.`
   }
-  const rainWhy = (h: number) => `Showers within ${SHOWER_RING_KM} km and the sun ${Math.round(sun[h])}° up: the bow stands opposite the sun.`
+  const rainWhy = (h: number) => `Showers within ${SHOWER_RING_KM} km on the side opposite the sun, and the sun ${Math.round(sun[h])}° up: the bow stands there.`
   /*
    * THE COVER OF THE MODELS THAT SAID YES, worded by cloudWord. The median of
    * all five read "Low cloud 0%, broken" for a window one model gave (1 Nov).
@@ -161,7 +175,13 @@ export function specialsFrom(week: SpecialWeek, venue: LatLon, seaCAt: (t: Date)
     return `Thin mid or high cloud${c === null ? '' : ` ${Math.round(c)}%`} with the sun ${Math.round(sun[h])}° up: look within about 10° of the sun, shading it with a hand or a building.`
   }
   const lit = (s: Special) => week.hours.some((t, h) => t >= s.from && t < s.to && sun[h] > -6)
-  return [...windows('fog', week.hours, fog, fogWhy), ...windows('rainbow', week.hours, rain, rainWhy), ...windows('rays', week.hours, rays, raysWhy), ...(irid.length === 0 ? [] : windows('iridescence', week.hours, irid, iridWhy))].filter(lit)
+  /* Only shootable windows, at most two hours, tied to their cause hour by hour (src/core/specialLight.ts shootable). */
+  return [
+    ...shootable('fog', week.hours, fog, sun, fogWhy),
+    ...shootable('rainbow', week.hours, rain, sun, rainWhy),
+    ...shootable('rays', week.hours, rays, sun, raysWhy),
+    ...(irid.length === 0 ? [] : shootable('iridescence', week.hours, irid, sun, iridWhy)),
+  ].filter(lit)
 }
 
 export async function fetchSpecialWeek(venue: LatLon, fetchImpl: typeof fetch = fetch): Promise<{ week: SpecialWeek; seaCAt: (t: Date) => number | null } | null> {

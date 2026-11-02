@@ -3,7 +3,8 @@
  *
  * Usage:  node scripts/audit-special.mjs [screenshot-dir]
  *
- * The Virginia Beach pier, the clock at 6:00 AM EDT on 30 Oct, with
+ * The Virginia Beach pier, the clock at 7:30 AM EDT on 30 Oct (in the light:
+ * Batch G says fog only where it forms or lifts in the light), with
  * Open-Meteo answered by a week built for the check: all five models with
  * the dew point at the air and 2 kt from 5 to 9 AM that day over a sea
  * colder than the air (fog), broken low cloud on the 31st from 8 to 10 AM
@@ -11,8 +12,10 @@
  *
  *   the map    the one status line reads "Fog likely now · 5 of 5 models"
  *              and a tap on it opens Sky › Special
- *   the list   by day: fog Today, god rays Tomorrow, a rainbow Sunday, one
- *              line each with its models; a 1-of-5 window greyed under Long shots
+ *   the week   seven rows, a 24 h track each (Batch G): fog Today, god rays
+ *              Tomorrow, a rainbow Sunday, each an icon of 44 px on its hours,
+ *              no window over two hours, a 1-of-5 window greyed; a tap gives
+ *              one line with its models and why, and Go there
  *   the bow    "Show the bow on the map" puts an arc on the map's guide
  *              layer, opposite the sun
  *   no sideways scroll; never "safe", "clear", "certain"
@@ -104,7 +107,7 @@ try {
       else document.addEventListener('DOMContentLoaded', add)
     }, [insets.top, insets.bottom])
     const page = await ctx.newPage()
-    await page.clock.setFixedTime(new Date('2026-10-30T10:00:00Z'))
+    await page.clock.setFixedTime(new Date('2026-10-30T11:30:00Z'))
     const wait = (ms) => page.waitForTimeout(ms)
     const ev = (x) => page.evaluate(x)
     await page.goto(url.href)
@@ -133,13 +136,14 @@ try {
       await wait(500)
       list = await ev(`(() => {
         const s = document.querySelector('.spec')
-        if (!s || s.querySelectorAll('.spec__item').length === 0) return null
-        const item = (li) => ({ line: li.querySelector('.spec__line')?.textContent.replace(/\\s+/g, ' ').trim() ?? '', sure: li.querySelector('.spec__sure')?.textContent.replace(/\\s+/g, ' ').trim() ?? '', why: li.querySelector('.spec__open')?.title ?? '', bow: !!li.querySelector('.spec__bow'), long: li.classList.contains('spec__item--long'), oneLine: li.querySelector('.spec__open')?.getBoundingClientRect().height <= 50 })
+        if (!s || s.querySelectorAll('.wk__icon').length === 0) return null
         return {
-          days: [...s.querySelectorAll(':scope > .spec__day')].map((d) => ({ name: d.querySelector('.spec__dayname')?.textContent ?? '', items: [...d.querySelectorAll('.spec__item')].map(item) })),
-          items: [...s.querySelectorAll('.spec__item')].map(item),
-          longHead: s.querySelector('.spec__long .spec__dayname')?.textContent ?? null,
-          now: s.querySelector('.spec__now')?.textContent ?? null,
+          days: [...s.querySelectorAll('.wk__day')].map((d) => ({
+            name: d.querySelector('.wk__name')?.textContent ?? '',
+            icons: [...d.querySelectorAll('.wk__icon')].map((b) => { const r = b.getBoundingClientRect(); return { label: b.getAttribute('aria-label') ?? '', long: b.classList.contains('wk__icon--long'), w: r.width, h: r.height, kind: [...b.classList].find((c) => c.startsWith('wk__icon--') && !/--(long|on)$/.test(c))?.slice(10) ?? '' } }),
+            night: d.querySelectorAll('.wk__night').length,
+            sun: d.querySelectorAll('.wk__sun').length,
+          })),
           wide: [...s.querySelectorAll('*')].some((e) => e.getBoundingClientRect().right > innerWidth + 1),
           text: s.textContent,
         }
@@ -147,37 +151,50 @@ try {
       if (list !== null) break
     }
     looked += 1
-    console.log(`  list: ${JSON.stringify(list?.items.map((i) => `${i.line} | ${i.sure}`))}`)
-    if (list === null) fail(`${label}: tapping the status line did not open Sky › Special with a list`)
+    console.log(`  week: ${JSON.stringify(list?.days.map((d) => `${d.name}: ${d.icons.map((i) => i.label).join(' / ')}`))}`)
+    if (list === null) fail(`${label}: tapping the status line did not open Sky › Special with the week`)
     else {
       /*
-       * BY DAY (Batch E): Today, Tomorrow, then weekdays; one line an item,
-       * "N of 5" at its end, the why in the row's title; a 1-of-5 window
-       * greyed under Long shots, never with the strong ones.
+       * THE WEEK AS A PICTURE (Batch G, Section 5): seven rows, each a 24 h
+       * track with the night and sunrise and sunset marked, an icon (44 px)
+       * on the hours of each thing; at most two hours a window; a 1-of-5
+       * window greyed.
        */
-      console.log(`  days: ${JSON.stringify(list.days.map((d) => `${d.name}: ${d.items.map((i) => i.line).join(' / ')}`))}`)
       const day = (name) => list.days.find((d) => d.name === name)
-      const fog = day('Today')?.items.find((i) => /^Fog (likely|possible) /.test(i.line))
-      if (fog === undefined) fail(`${label}: no fog under Today (Friday morning)`)
-      else if (!/Dew point 60°F against air 60°F, wind 2 kt, sea 57°F under the air/.test(fog.why)) fail(`${label}: the fog's why reads "${fog.why}"`)
-      if (day('Tomorrow')?.items.find((i) => /^God rays (likely|possible) /.test(i.line)) === undefined) fail(`${label}: no god rays under Tomorrow`)
-      const bow = day('Sun')?.items.find((i) => /^Rainbow (likely|possible) /.test(i.line))
-      if (bow === undefined || !bow.bow) fail(`${label}: no rainbow on Sunday with a way to show it on the map`)
-      if (list.days.some((d) => d.items.length > 3)) fail(`${label}: more than three on a day`)
-      const long = list.items.filter((i) => i.long)
-      if (list.longHead === null || !long.some((i) => /^God rays possible/.test(i.line) && i.sure === '1 of 5')) fail(`${label}: the 1-of-5 god rays are not greyed under Long shots`)
-      if (list.days.some((d) => d.items.some((i) => i.sure === '1 of 5'))) fail(`${label}: a 1-of-5 window is listed with the strong ones`)
-      if (!list.items.every((i) => /^\d of \d$/.test(i.sure))) fail(`${label}: an item does not say how many models agree`)
-      if (!list.items.every((i) => i.oneLine)) fail(`${label}: an item takes more than one line`)
-      if (list.wide) fail(`${label}: something in the list runs past 390 px`)
-      if (/\bsafe\b|\bcertain\b|\bclear of\b|\bwill\b/i.test(list.text)) fail(`${label}: the list promises something`)
+      const icons = list.days.flatMap((d) => d.icons)
+      if (list.days.length !== 7) fail(`${label}: ${list.days.length} day rows, not 7`)
+      if (list.days.some((d) => d.night !== 2 || d.sun !== 2)) fail(`${label}: a day without its night shaded and sunrise and sunset marked`)
+      if (day('Today')?.icons.find((i) => /^Fog (likely|possible), Today/.test(i.label)) === undefined) fail(`${label}: no fog on Today (Friday morning)`)
+      if (day('Tmrw')?.icons.find((i) => /^God rays (likely|possible), Tmrw/.test(i.label)) === undefined) fail(`${label}: no god rays on Tomorrow`)
+      if (day('Sun')?.icons.find((i) => /^Rainbow (likely|possible), Sun/.test(i.label)) === undefined) fail(`${label}: no rainbow on Sunday`)
+      if (!icons.some((i) => i.long && /^God rays possible.* 1 of 5 models$/.test(i.label))) fail(`${label}: the 1-of-5 god rays are not greyed`)
+      if (icons.some((i) => !i.long && / 1 of 5 models$/.test(i.label))) fail(`${label}: a 1-of-5 window is drawn as a strong one`)
+      if (!icons.every((i) => /\d of \d models$/.test(i.label))) fail(`${label}: an icon does not say how many models agree`)
+      if (icons.some((i) => i.w < 44 || i.h < 44)) fail(`${label}: an icon is under 44 px to tap`)
+      /* At most two hours a window: the span in each icon's label. */
+      const mins = (t) => { const m = /(\d+):(\d+) (AM|PM)/.exec(t); return m === null ? null : ((Number(m[1]) % 12) + (m[3] === 'PM' ? 12 : 0)) * 60 + Number(m[2]) }
+      for (const i of icons) {
+        const m = /(\d+:\d+ [AP]M)–(\d+:\d+ [AP]M)/.exec(i.label)
+        const len = m === null ? null : (mins(m[2]) - mins(m[1]) + 1440) % 1440
+        if (len === null || len > 120) fail(`${label}: "${i.label}" is not a window of two hours or less`)
+      }
+      if (list.wide) fail(`${label}: something in the week runs past 390 px`)
+      if (/\bsafe\b|\bcertain\b|\bclear of\b|\bwill\b/i.test(list.text)) fail(`${label}: the week promises something`)
+      /* A tap: one line, what, when, how sure, why, and Go there. */
+      await page.locator('.wk__icon--fog').first().tap().catch(() => {})
+      await wait(400)
+      const line = await ev(`document.querySelector('.wk__detail')?.textContent ?? null`)
+      console.log(`  fog tapped: ${line}`)
+      if (line === null || !/^Fog (likely|possible)/.test(line) || !/5 of 5 models/.test(line) || !/Dew point 60°F against air 60°F, wind 2 kt, sea 57°F under the air/.test(line) || !/Go there/.test(line)) fail(`${label}: the fog's line reads ${JSON.stringify(line)}`)
     }
     await ev(`document.querySelector('.spec')?.scrollIntoView({ block: 'start' })`)
     await wait(300)
     await page.screenshot({ path: join(OUT, `special-list-${label}.png`) })
 
     /* The bow on the map. */
-    await page.locator('.spec__bow').first().tap().catch(() => {})
+    await page.locator('.wk__icon--rainbow').first().tap().catch(() => {})
+    await wait(400)
+    await page.getByRole('button', { name: 'Show the bow' }).first().tap().catch(() => {})
     await wait(1200)
     const guide = await ev(`(() => { const s = window.__probe?.map?.getSource('guide'); const d = s?.serialize?.().data; return d?.features?.[0]?.geometry?.coordinates?.length ?? null })()`)
     console.log(`  bow on the map: ${guide} points`)

@@ -90,7 +90,8 @@ describe('the list by day', () => {
 
   it('merges overlapping windows of a kind, keeping the better agreement', () => {
     const m = mergeOverlaps([s('rays', 11, 13, 2), s('rays', 12, 15, 4), s('fog', 12, 13, 5)])
-    expect(m.map((x) => `${x.kind} ${x.from.getUTCHours()}-${x.to.getUTCHours()} ${x.agree}`)).toEqual(['rays 11-15 4', 'fog 12-13 5'])
+    /* Batch G: a join longer than two hours keeps only the better window. */
+    expect(m.map((x) => `${x.kind} ${x.from.getUTCHours()}-${x.to.getUTCHours()} ${x.agree}`)).toEqual(['fog 12-13 5', 'rays 12-15 4'])
   })
 
   it('at most three a day, the most likely first', () => {
