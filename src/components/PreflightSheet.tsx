@@ -123,6 +123,11 @@ export function PreflightSheet({ pf, picking, onPick, onPlay, onFly, onRecord, r
             <input type="range" min={20} max={300} step={5} value={pf.radiusM} onChange={(e) => pf.setRadiusM(Number(e.target.value))} />
           </label>
         )}
+      </div>
+      {/* Batch I, Section 3: one screen, the rest a row away. */}
+      <details className="frow">
+        <summary>Camera, ceiling, flight time, where you stand</summary>
+        <div className="pf__controls">
         <div className="seg" role="group" aria-label="Camera">
           {([24, 70] as const).map((f) => (
             <button key={f} type="button" className={`seg__btn${pf.focal === f ? ' seg__btn--on' : ''}`} aria-pressed={pf.focal === f} onClick={() => pf.setFocal(f)}>
@@ -141,7 +146,8 @@ export function PreflightSheet({ pf, picking, onPick, onPlay, onFly, onRecord, r
         <button type="button" className="clay__link" onClick={onPlacePilot}>
           {pilotSet ? 'Move where you stand' : 'Tap where you will stand (else the venue pin)'}
         </button>
-      </div>
+        </div>
+      </details>
 
       <p className="pf__prompt">
         {pf.flown !== null ? 'This is the flight you flew by hand; pick a move to draw instead. ' : ''}
@@ -162,6 +168,13 @@ export function PreflightSheet({ pf, picking, onPick, onPlay, onFly, onRecord, r
               {l}
             </p>
           ))}
+          <div className="pf__actions">
+            <button type="button" className="btn btn--small" onClick={onPlay}>
+              Play in 3D
+            </button>
+          </div>
+          <details className="frow">
+            <summary>How it was checked, and the look</summary>
           <p className="pf__small num">
             Checked two ways: length {Math.round(card.lengthCheckM)} m by the move's own shape; hidden {Math.round(card.hiddenCheckS)} s by the horizon method
             {card.clearance?.checkMetres == null ? '' : `; clearance ${Math.round(card.clearance.checkMetres / 0.3048)} ft over the map's boxes`}.
@@ -175,10 +188,10 @@ export function PreflightSheet({ pf, picking, onPick, onPlay, onFly, onRecord, r
               </button>
             ))}
           </div>
+          </details>
+          <details className="frow">
+            <summary>Record and export</summary>
           <div className="pf__actions">
-            <button type="button" className="btn btn--small" onClick={onPlay}>
-              Play in 3D
-            </button>
             <button type="button" className="btn btn--small" onClick={onRecord} disabled={renderShare !== null}>
               {renderShare === null ? 'Record the preview' : `Rendering ${Math.round(renderShare * 100)}%`}
             </button>
@@ -195,6 +208,7 @@ export function PreflightSheet({ pf, picking, onPick, onPlay, onFly, onRecord, r
               Share the video
             </button>
           )}
+          </details>
         </div>
       )}
       {onViewfinder === undefined ? null : <CardMore links={[{ label: 'Viewfinder', onOpen: onViewfinder }]} />}

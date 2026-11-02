@@ -31,7 +31,7 @@ interface SkyFireProps {
   /** The real clock, injected for tests: "Sky right now" and the log are about now, not the bar. */
   now?: () => Date
   /** The colour clock for the event picked here, drawn right under the verdict (field test, 30 Oct: one page, verdict first). */
-  clock?: (kind: 'sunrise' | 'sunset') => ReactNode
+  clock?: (kind: 'sunrise' | 'sunset', show?: 'strip' | 'compare') => ReactNode
   /** The map pin, for "Pick on map" when a photo has no place in it (the truth loop). */
   target?: Pin | null
   onPickTarget?: () => void
@@ -208,11 +208,25 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
           {data !== null && data.stale === true && data.fetchedAt !== undefined ? (
             <p className="fire__note">From the forecast of {forecastAge(new Date(data.fetchedAt ?? 0).toISOString()).text.replace(' old', ' ago')}: {busy ?? 'a newer one could not be had'}.</p>
           ) : null}
-          <p className={`fire__verdict fire__verdict--${verdict.word}`} role="status">
-            {verdictSentence(verdict, clock)}
+          {/*
+            * ONE SCREEN (Batch I, Section 3; board "BATCH I · Sky fire on one
+            * screen"): the verdict big, its best and deepest time, how many
+            * models agree; the side view; the strip with the three checks.
+            * Everything else is a row away.
+            */}
+          <div className="fire__top">
+            <p className={`fire__big fire__verdict--${verdict.word}`} role="status">
+              {verdict.word === 'unlikely' ? 'Fire unlikely' : `Fire ${verdict.word}`}
+            </p>
+            <span className="fire__chip num">
+              {verdict.agree} of {verdict.of}
+            </span>
+          </div>
+          <p className="fire__when num">
+            {verdict.word === 'unlikely' ? verdictSentence(verdict, clock).replace(/^Fire unlikely: /, '').replace(/^./, (c) => c.toUpperCase()) : watch === null ? verdictSentence(verdict, clock) : `Best ${clock(watch.from)}–${clock(watch.to)}${lead?.times?.deepest == null ? '' : ` · deepest ${clock(lead.times.deepest)}`}`}
           </p>
           {mean === null ? null : <FireSideView read={verdict.sky} path={mean} venue={venue} kind={kind} />}
-          {colourClock?.(kind)}
+          {colourClock?.(kind, 'strip')}
           {lead === null ? null : (
             <ul className="fire__checks fire__checks--icons" aria-label={`The three checks, ${LAYER_WORD[lead.layer]}`}>
               {checks.map(([label, key, said]) => (
@@ -224,9 +238,13 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
               ))}
             </ul>
           )}
-          {nowLine === null ? null : <p className="fire__now fire__note">Sky right now · {nowLine}</p>}
-          <details className="fire__more fire__whyfold">
-            <summary>Why</summary>
+          <details className="frow">
+            <summary>Compare the 5 forecasts</summary>
+            {colourClock?.(kind, 'compare')}
+          </details>
+          <details className="frow fire__whyfold">
+            <summary>Why · numbers and stations</summary>
+            {nowLine === null ? null : <p className="fire__now fire__note">Sky right now · {nowLine}</p>}
             <p className="fire__note">
               {agreementLine(verdict)}{split ? ' · models split on low cloud' : ''}. A forecast places cloud on a grid kilometres across: it cannot promise a hole.
             </p>
@@ -275,6 +293,8 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
         </>
       )}
 
+      <details className="frow">
+      <summary>Log it · your log and photos</summary>
       {logOnTop ? null : logBlock}
 
       <p className="fire__head">Your log</p>
@@ -305,6 +325,7 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
           writeFireLog(next)
         }}
       />
+      </details>
     </div>
   )
 }

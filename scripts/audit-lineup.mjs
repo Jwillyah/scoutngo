@@ -82,6 +82,9 @@ try {
     await wait(1200)
     await page.getByRole('tab', { name: 'Now' }).tap()
     await wait(800)
+    /* Batch I: the line-up finder is a row away, "Line it up with a landmark". */
+    await ev(`[...document.querySelectorAll('.frow')].filter((d) => d.querySelector('summary')?.textContent.startsWith('Line it up')).forEach((d) => { d.open = true })`)
+    await wait(300)
     const pick = page.getByRole('button', { name: /Pick it on the map/ })
     if ((await pick.count()) === 0) {
       fail(`${label}: no "Pick it on the map" on Sky › Sun`)

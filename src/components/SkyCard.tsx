@@ -239,11 +239,14 @@ export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump,
           <div><dt>Sunset</dt><dd>{arc.sunset === null ? '—' : `${clock(arc.sunset.at)}, ${Math.round(arc.sunset.azimuth)}°`}</dd></div>
           <div><dt>Now on the bar</dt><dd>{now.altitude > 0 ? `${compassWord(now.azimuth)}, ${Math.round(now.altitude)}° up` : 'below the horizon'}</dd></div>
         </dl>
-        <LineUp {...finderProps} horizon={horizon} />
+        <details className="frow">
+          <summary>Line it up with a landmark</summary>
+          <LineUp {...finderProps} horizon={horizon} />
+        </details>
       </>
     )
   } else if (tab === 'fire') {
-    body = <SkyFire venue={venue} timeZone={timeZone} placeName={placeName ?? 'This place'} at={at} target={target} onPickTarget={onPickTarget} clock={(k) => <SkyPreview venue={venue} timeZone={timeZone} at={at} kind={k} onJump={onJump} />} />
+    body = <SkyFire venue={venue} timeZone={timeZone} placeName={placeName ?? 'This place'} at={at} target={target} onPickTarget={onPickTarget} clock={(k, show) => <SkyPreview venue={venue} timeZone={timeZone} at={at} kind={k} onJump={onJump} show={show} />} />
   } else if (tab === 'special') {
     body = <SpecialLight venue={venue} timeZone={timeZone} at={at} onJump={onJump} onShowBow={onShowBow} place={place} />
   } else if (tab === 'preview') {
@@ -265,7 +268,10 @@ export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump,
             Plan this moonrise
           </button>
         )}
-        <LineUp {...finderProps} horizon={horizon} />
+        <details className="frow">
+          <summary>Line it up with a landmark</summary>
+          <LineUp {...finderProps} horizon={horizon} />
+        </details>
       </>
     )
   }

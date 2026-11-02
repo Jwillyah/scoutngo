@@ -2231,15 +2231,19 @@ export function PlanMode({
               * the cloud along each position's view is the shoot card's in
               * Plan; the wind at flight height is the Wind page's button.
               */}
+            {/* Batch I: one row, not four, on the first screen. */}
             {skyTab !== 'now' ? null : (
-              <CardMore
-                links={[
-                  { label: 'The light through your window', onOpen: () => openCard('golden') },
-                  { label: 'The sun through the day', onOpen: () => openCard('suncurve') },
-                  { label: 'Plan a moonrise', onOpen: () => openCard('moonrise') },
-                  { label: 'Sky cameras near here', onOpen: () => openCard('cams') },
-                ]}
-              />
+              <details className="frow">
+                <summary>The light, the sun's day, a moonrise, cams</summary>
+                <CardMore
+                  links={[
+                    { label: 'The light through your window', onOpen: () => openCard('golden') },
+                    { label: 'The sun through the day', onOpen: () => openCard('suncurve') },
+                    { label: 'Plan a moonrise', onOpen: () => openCard('moonrise') },
+                    { label: 'Sky cameras near here', onOpen: () => openCard('cams') },
+                  ]}
+                />
+              </details>
             )}
             {/* Batch I: the Viewfinder, a front-row button on the Sky pages too. */}
             {onViewfinder === undefined ? null : (
@@ -2901,8 +2905,8 @@ export function PlanMode({
               * belongs on is one table in src/lib/sheetCard.ts rather than a
               * condition repeated at eleven call sites.
               */}
-            {/* In 3D the time bar always shows: the light, the shadows and the sky all run on it. */}
-            {(!TIME_MATTERS[card.kind] && !threeD) || venueWindow === null || scrubbedAt === null ? null : (
+            {/* In 3D the time bar always shows: the light, the shadows and the sky all run on it. Batch I: not over Sky fire, Special or Calendar, which read their own events. */}
+            {((!TIME_MATTERS[card.kind] || (card.kind === 'sky' && skyTab !== 'now')) && !threeD) || venueWindow === null || scrubbedAt === null ? null : (
               <TimeBar
                 at={scrubbedAt}
                 lat={venue?.lat ?? 0}

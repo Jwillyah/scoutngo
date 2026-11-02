@@ -40,6 +40,12 @@ import { fetchAerosol, fetchFirePaths, fetchStationSkies, nearestHour, pathsAt, 
  * Battery (the 3D view's setting) they are not drawn at all.
  */
 interface Props {
+  /**
+   * Batch I, Section 3: 'strip' is the colour strip alone (Sky fire's first
+   * screen); 'compare' the four forecasts and the week, behind "Compare the 5
+   * forecasts". Unset: all three pages, swiped.
+   */
+  show?: 'strip' | 'compare'
   /** Page 3's tap: put the app at that sunrise or sunset. */
   onJump?: (at: Date) => void
   venue: LatLon
@@ -114,7 +120,8 @@ function StripRow({ s, clock }: { s: Strip; clock: (d: Date) => string }) {
   )
 }
 
-export function SkyPreview({ venue, timeZone, at, now = () => new Date(), kind: given, onJump }: Props) {
+export function SkyPreview({ venue, timeZone, at, now = () => new Date(), kind: given, onJump, show }: Props) {
+  const wanted = show === 'strip' ? [0] : show === 'compare' ? [1, 2] : [0, 1, 2]
   const events = useMemo(() => nextEvents(at, venue), [at, venue])
   const firstKind: Kind = events.sunrise !== null && (events.sunset === null || events.sunrise < events.sunset) ? 'sunrise' : 'sunset'
   const [own, setKind] = useState<Kind>(firstKind)
@@ -219,6 +226,7 @@ export function SkyPreview({ venue, timeZone, at, now = () => new Date(), kind: 
           setPage(Math.round(el.scrollLeft / Math.max(1, el.clientWidth)))
         }}
       >
+        {!wanted.includes(0) ? null : (
         <section className="prev__page" aria-label={PAGES[0]}>
           {event === null ? (
             <p className="prev__note">No {kind} here in the next two days.</p>
@@ -234,7 +242,7 @@ export function SkyPreview({ venue, timeZone, at, now = () => new Date(), kind: 
               ) : (
                 <>
                   {/* Nothing lit you could see: the verdict's reason, not "no cloud is lit" under a forecast full of it. */}
-                  <p className="prev__words">{strips.some((s) => stripTimes(s).glowFrom !== null) ? clockWords(strips, kind, clock) : `Nothing lit that you could see: ${WHY_WORDS[verdict.why ?? 'none']}.`}</p>
+                  {show === 'strip' ? null : <p className="prev__words">{strips.some((s) => stripTimes(s).glowFrom !== null) ? clockWords(strips, kind, clock) : `Nothing lit that you could see: ${WHY_WORDS[verdict.why ?? 'none']}.`}</p>}
                   <div className="prev__strips">
                     {strips.map((s) => (
                       <StripRow key={s.layer} s={s} clock={clock} />
@@ -245,17 +253,19 @@ export function SkyPreview({ venue, timeZone, at, now = () => new Date(), kind: 
                       <span>{clock(new Date(event.getTime() + CLOCK_TO_MIN * 60_000))}</span>
                     </div>
                   </div>
-                  <details className="prev__how">
+                  {show === 'strip' ? null : <details className="prev__how">
                     <summary aria-label="How this is worked out">i</summary>
                     <p>
                       The colour of sunlight reaching each cloud’s base, each minute: the sun’s height with refraction, the cloud’s own horizon (it sees the sun sqrt(2h/R) below yours), the air along the light’s path, and how much blue that air and the haze take out. Haze: aerosol optical depth {aod === null ? '0.1, assumed (the air-quality forecast did not answer)' : `${aod.toFixed(2)} from Open-Meteo`}. Heights: {strips.map((s) => `${LAYER_WORD[s.layer]} ${Math.round(s.heightM)} m${s.layer === 'low' && lowBaseM !== null ? ` (${verdict.station?.station ?? 'station'})` : ' (typical)'}`).join(', ')}. The lit cloud is the sunward edge of the deck over you, still above your horizon: {strips.map((s) => `${LAYER_WORD[s.layer]} ${s.reachKm} km`).join(', ')}. The light’s own path is walked toward the sun, and cloud on it counts only where the ray is inside that cloud’s layer; a faded minute is one the cloud on the way blocks. The models’ mean cover is drawn, the same arithmetic as the verdict. Not counted: ozone, the cloud’s own thickness, light from the rest of the sky.
                     </p>
-                  </details>
+                  </details>}
                 </>
               )}
             </>
           )}
         </section>
+        )}
+        {!wanted.includes(1) ? null : (
         <section className="prev__page" aria-label={PAGES[1]}>
           <p className="prev__head">Four forecasts, one {kind}</p>
           {event === null || azimuth === null ? (
@@ -282,6 +292,8 @@ export function SkyPreview({ venue, timeZone, at, now = () => new Date(), kind: 
           )}
           <p className="prev__note">Clouds illustrative: how much and how high is each forecast’s; where they sit is drawn.</p>
         </section>
+        )}
+        {!wanted.includes(2) ? null : (
         <section className="prev__page" aria-label={PAGES[2]}>
           <p className="prev__head">Week of skies</p>
           {onBattery ? (
@@ -300,11 +312,12 @@ export function SkyPreview({ venue, timeZone, at, now = () => new Date(), kind: 
           )}
           <p className="prev__note">Clouds illustrative · the venue’s forecast cloud at each hour · tap one to go there.</p>
         </section>
+        )}
       </div>
-      {PAGES.length < 2 ? null : (
-        <div className="prev__dots" role="img" aria-label={`Page ${page + 1} of ${PAGES.length}: ${PAGES[page]}`}>
-          {PAGES.map((p, i) => (
-            <span key={p} className={`prev__dot${i === page ? ' prev__dot--on' : ''}`} />
+      {wanted.length < 2 ? null : (
+        <div className="prev__dots" role="img" aria-label={`Page ${page + 1} of ${wanted.length}: ${PAGES[wanted[page] ?? 0]}`}>
+          {wanted.map((w, i) => (
+            <span key={PAGES[w]} className={`prev__dot${i === page ? ' prev__dot--on' : ''}`} />
           ))}
         </div>
       )}

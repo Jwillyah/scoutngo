@@ -16578,3 +16578,76 @@ a.about__row * {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+
+/* Sky fire on one screen (Batch I, Section 3). */
+.fire__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.fire__big {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 300;
+  line-height: 1.1;
+}
+.fire__chip {
+  flex: none;
+  padding: 4px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--color-line-strong);
+  font-size: var(--text-sm);
+}
+.fire__when {
+  margin: 0;
+  font-size: var(--text-md);
+  color: var(--color-text-muted);
+}
+/* A row that opens what is one tap deeper: "Compare the 5 forecasts ›". */
+.frow {
+  border-top: 1px solid var(--color-line);
+}
+.frow > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  list-style: none;
+  cursor: pointer;
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+}
+.frow > summary::-webkit-details-marker {
+  display: none;
+}
+.frow > summary::after {
+  content: '›';
+  font-size: 1.25rem;
+  color: var(--color-text-muted);
+  transition: transform 0.15s;
+}
+.frow[open] > summary::after {
+  transform: rotate(90deg);
+}
+/* The side view on Sky fire's first screen: a picture, not a page (Batch I). */
+.fire > .fire__side {
+  max-height: 110px;
+}
+/* The three checks as compact pills on the one screen (Batch I): icon, name, answer on one line. */
+.fire__checks--icons .fire__check {
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  justify-items: start;
+  align-items: center;
+  column-gap: 6px;
+  row-gap: 0;
+  padding: 6px 8px;
+  text-align: left;
+}
+.fire__checks--icons .fire__icon {
+  grid-row: span 2;
+}
+.fire__checks--icons .fire__check-name {
+  font-size: var(--text-xs);
+}

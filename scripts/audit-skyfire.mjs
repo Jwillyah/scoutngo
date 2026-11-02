@@ -159,16 +159,19 @@ try {
           const f = document.querySelector('.fire')
           if (!f) return null
           return {
-            verdict: f.querySelector('.fire__verdict')?.textContent ?? null,
+            verdict: f.querySelector('.fire__big')?.textContent ?? null,
+            chip: f.querySelector('.fire__chip')?.textContent.trim() ?? null,
+            when: f.querySelector('.fire__when')?.textContent ?? null,
+            agreement: f.querySelector('.fire__whyfold')?.textContent ?? '',
             checks: [...f.querySelectorAll('.fire__checks--icons li')].map((r) => r.textContent.replace(/\\s+/g, ' ').trim()),
             why: [...f.querySelectorAll('.fire__whyfold .fire__checks li')].map((r) => r.textContent.replace(/\\s+/g, ' ').trim()),
             whyOpen: f.querySelector('.fire__whyfold')?.open ?? null,
-            order: ['.fire__kinds', '.fire__verdict', '.fire__side', '.prev__strips', '.fire__checks--icons', '.fire__whyfold'].map((sel) => f.querySelector(sel)?.getBoundingClientRect().top ?? null),
+            order: ['.fire__kinds', '.fire__big', '.fire__side', '.prev__strips', '.fire__checks--icons', '.fire__whyfold'].map((sel) => f.querySelector(sel)?.getBoundingClientRect().top ?? null),
             /* Section 4: no paragraph over two lines on the first screen (above the Why). */
             long: [...f.querySelectorAll('p')].filter((p) => !p.closest('details') && !p.closest('.prev__page:not(:first-child)')).filter((p) => { const r = p.getBoundingClientRect(); const lh = parseFloat(getComputedStyle(p).lineHeight) || parseFloat(getComputedStyle(p).fontSize) * 1.3; const why = f.querySelector('.fire__whyfold'); return why !== null && r.top < why.getBoundingClientRect().top && r.height > lh * 2 + 2 }).map((p) => p.textContent.slice(0, 60)),
             switches: f.querySelectorAll('[aria-label="Which event"]').length,
             station: f.querySelector('.fire__now')?.textContent ?? null,
-            verdicts: f.querySelectorAll('.fire__verdict, .prev__verdict').length,
+            verdicts: f.querySelectorAll('.fire__big, .fire__verdict, .prev__verdict').length,
             decks: f.querySelectorAll('.fire__deck').length,
             ray: !!f.querySelector('.fire__ray'),
             now: f.querySelector('.fire__now')?.textContent ?? null,
@@ -183,13 +186,17 @@ try {
       console.log(`  ${phase}: ${fire?.verdict} · ${fire?.checks.length} checks · ${fire?.decks} decks · ray ${fire?.ray} · now ${fire?.now === null ? 'none' : 'shown'}`)
       if (fire === null || fire.verdict === null) fail(`${label} ${phase}: no verdict on the Fire tab`)
       else {
-        if (!/^Fire (possible|likely): \d of \d models see lit low deck/.test(fire.verdict)) fail(`${label} ${phase}: 29 Oct reads "${fire.verdict}", and it fired`)
+        /* Batch I, one screen: the verdict big, "N of 5" beside it, the agreement by layer behind Why. */
+        if (!/^Fire (possible|likely)$/.test(fire.verdict)) fail(`${label} ${phase}: 29 Oct reads "${fire.verdict}", and it fired`)
+        if (!/^\d of \d$/.test(fire.chip ?? '')) fail(`${label} ${phase}: no agreement chip beside the verdict (${fire.chip})`)
+        if (!/\d of \d see lit low deck/.test(fire.agreement)) fail(`${label} ${phase}: Why does not say how many models see the low deck lit`)
         /* Batch G, Section 4: the sky right now in one line, KNTU's deck. */
         if (fire.station === null || !/^Sky right now · KNTU .*: broken at 3,000 ft/.test(fire.station)) fail(`${label} ${phase}: near now "Sky right now" does not say KNTU's deck in one line (${fire.station})`)
         /* The order: switch, verdict, side view, colour strip, the three checks, Why (folded). */
         const order = fire.order
         if (order.some((t) => t === null) || order.some((t, i) => i > 0 && t < order[i - 1])) fail(`${label} ${phase}: the page is not switch → verdict → side view → strips → checks → Why (${JSON.stringify(order)})`)
         if (fire.whyOpen !== false) fail(`${label} ${phase}: "Why" is not folded`)
+        if (!/^Best \d{1,2}:\d{2}/.test(fire.when ?? '')) fail(`${label} ${phase}: no best time under the verdict (${fire.when})`)
         if (fire.why.length !== 3 || !fire.why.every((c) => /\d/.test(c))) fail(`${label} ${phase}: Why's checks are ${JSON.stringify(fire.why)}, not three with numbers`)
         if (fire.long.length > 0) fail(`${label} ${phase}: paragraphs over two lines on the first screen: ${JSON.stringify(fire.long)}`)
         if (fire.switches !== 1) fail(`${label} ${phase}: ${fire.switches} Sunrise / Sunset switches on the Sky fire page, not 1`)
@@ -211,25 +218,27 @@ try {
          * glow must start before 7:20 (it was seen about 7:15), the strips are
          * coloured minute cells, and pages 2 and 3 say they are coming.
          */
-        /* The colour clock is under the verdict on Sky fire since 30 Oct (docs/navigation.md). */
+        /* The colour clock is under the verdict on Sky fire since 30 Oct; Batch I: its first page alone there, the four forecasts and the week behind "Compare the 5 forecasts". */
+        await ev(`[...document.querySelectorAll('.frow > summary')].find((x) => x.textContent.startsWith('Compare'))?.click()`)
         await ev(`document.querySelector('.prev')?.scrollIntoView({ block: 'start' })`)
         let prev = null
         for (let i = 0; i < 20; i += 1) {
           await wait(500)
           prev = await ev(`(() => {
             const p = document.querySelector('.prev')
-            if (!p) return null
+            const cmp = document.querySelectorAll('.prev')[1] ?? null
+            if (!p || !cmp) return null
             const strips = [...p.querySelectorAll('.prev__strip')]
             return {
-              words: p.querySelector('.prev__words')?.textContent ?? null,
-              verdict: document.querySelector('.fire .fire__verdict')?.textContent ?? null,
+              words: document.querySelector('.fire .fire__when')?.textContent ?? null,
+              verdict: document.querySelector('.fire .fire__big')?.textContent ?? null,
               strips: strips.length,
               coloured: strips.map((s) => [...s.querySelectorAll('rect')].filter((r) => r.getAttribute('fill')).length),
               cells: strips.map((s) => s.querySelectorAll('rect').length),
-              soon: [...p.querySelectorAll('.prev__page--soon')].map((x) => x.textContent),
-              dots: p.querySelectorAll('.prev__dot').length,
-              pages: [...p.querySelectorAll('.prev__page')].map((x) => x.getAttribute('aria-label')),
-              illustrative: [...p.querySelectorAll('.prev__page')].slice(1).map((x) => /Clouds illustrative/.test(x.textContent ?? '')),
+              soon: [...document.querySelectorAll('.prev__page--soon')].map((x) => x.textContent),
+              dots: cmp.querySelectorAll('.prev__dot').length,
+              pages: [...p.querySelectorAll('.prev__page'), ...cmp.querySelectorAll('.prev__page')].map((x) => x.getAttribute('aria-label')),
+              illustrative: [...cmp.querySelectorAll('.prev__page')].map((x) => /Clouds illustrative/.test(x.textContent ?? '')),
               wide: [...p.querySelectorAll('.prev__page:first-child *')].some((e) => e.getBoundingClientRect().right > innerWidth + 1),
               wraps: [...p.querySelectorAll('.prev__layer, .prev__ticks span')].some((e) => e.getBoundingClientRect().height > 22),
             }
@@ -240,16 +249,15 @@ try {
         console.log(`  preview: ${JSON.stringify(prev)}`)
         if (prev === null || prev.words === null) fail(`${label}: Sky › Preview drew no words`)
         else {
-          const glow = /[Ll]ow deck glows (\d{1,2}):(\d{2})/.exec(prev.words)
-          if (glow === null) fail(`${label}: the words do not say when the low deck glows: "${prev.words}"`)
+          const glow = /^Best (\d{1,2}):(\d{2})/.exec(prev.words)
+          if (glow === null) fail(`${label}: the page does not say when the glow starts: "${prev.words}"`)
           else if (Number(glow[1]) * 60 + Number(glow[2]) >= 7 * 60 + 20) fail(`${label}: the low deck glows from ${glow[1]}:${glow[2]}, and it was seen about 7:15`)
-          if (!/be set up by \d/.test(prev.words)) fail(`${label}: no "be set up by" in "${prev.words}"`)
           if (prev.verdict === null || !/^Fire (possible|likely)/.test(prev.verdict)) fail(`${label}: Sky fire's verdict is not on top (${prev.verdict})`)
           if (prev.strips < 1 || prev.cells.some((n) => n !== 91) || prev.coloured.some((n) => n < 10)) fail(`${label}: the strips are ${JSON.stringify({ cells: prev.cells, coloured: prev.coloured })}`)
           /* Pages that only said "coming" went in Batch E; pages 2 and 3 came back with pictures in Batch F: one dot a page, and each picture page says its clouds are illustrative. */
           if (prev.soon.length !== 0) fail(`${label}: pages that only say they are coming: ${JSON.stringify(prev.soon)}`)
           if (JSON.stringify(prev.pages) !== JSON.stringify(['Colour clock', 'Four forecasts', 'Week of skies'])) fail(`${label}: the preview's pages are ${JSON.stringify(prev.pages)}`)
-          if (prev.dots !== prev.pages.length) fail(`${label}: ${prev.dots} page dots for ${prev.pages.length} pages`)
+          if (prev.dots !== 2) fail(`${label}: ${prev.dots} page dots for the two compare pages`)
           if (prev.illustrative.some((x) => !x)) fail(`${label}: a picture page does not say its clouds are illustrative`)
           if (prev.wide) fail(`${label}: something on the colour clock runs past 390 px`)
           if (prev.wraps) fail(`${label}: a strip label or time wraps`)
@@ -277,6 +285,9 @@ try {
            * from the phone. It is read on the phone and set against what the
            * app said: backlit, golden hour, and Sky fire's word, as shown.
            */
+          /* Batch I: the truth loop is behind "Log it". */
+          await ev(`(() => { const d = [...document.querySelectorAll('.frow')].find((x) => x.querySelector('summary')?.textContent.startsWith('Log it')); if (d) d.open = true })()`)
+          await wait(300)
           await page.locator('.truth__file').setInputFiles({ name: 'DJI_20261029074012_0001_D.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(testJpeg({ taken: '2026:10:29 07:40:12', lat: 36.8435575, lon: -75.9713104, yaw: 100, aboveTakeoffM: 60 })) })
           await wait(800)
           const row = await ev(`document.querySelector('.truth__list li')?.textContent ?? null`)
