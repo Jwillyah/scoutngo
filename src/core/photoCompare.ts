@@ -26,6 +26,21 @@ export function horizonDipDeg(heightM: number): number {
 /** Pixels from the image's centre to its edge, as a focal length in pixels, for a field of view across that many pixels. */
 const focalPx = (fovDeg: number, px: number) => px / 2 / Math.tan((fovDeg * Math.PI) / 360)
 
+/*
+ * THE 70 MM FRAMES' HORIZON (Batch F, Section 2). In the 2 Nov comparison
+ * (measurements/2026-11-02-compare.md) the predicted row and the 3D render
+ * agreed within 3 rows at all three photos (234/231, 162/160, 238/235), so
+ * the scene's camera height, field of view and ground are not the cause.
+ * The photos' own horizon sat 25 and 26 rows higher at the pier and at
+ * Sandbridge, both from the 70 mm camera (FC9184), a month apart, which is
+ * 0.8 degrees at that lens; the 24 mm photo (FC9113, Rudee) agreed by eye
+ * within about 2 rows. A field of view error would scale with the distance
+ * from the centre and needs a lens 26% longer than the file says, while the
+ * Lightroom crops are full-height and centred vertically. What fits is the
+ * 70 mm camera pointing about 0.8 degrees above the gimbal tilt the file
+ * records. Left as recorded, not corrected: two photos are not a
+ * calibration, and the Compare screen's job is to show the gap.
+ */
 /** The row the sea horizon should cross the frame's centre at, from the top, for a camera tilted `pitchDeg` (negative down). */
 export function horizonRow(heightM: number, pitchDeg: number, verticalFovDeg: number, imageH: number): number {
   const angle = -horizonDipDeg(heightM) - pitchDeg

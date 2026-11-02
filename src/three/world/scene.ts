@@ -47,7 +47,7 @@ import { createBuildings } from './buildings.ts'
 import { createWater } from './water.ts'
 import { createClouds } from './clouds.ts'
 import { createWoods } from './woods.ts'
-import { hazeColour } from '../../core/skyLook.ts'
+import { hazeColour, ambientSky } from '../../core/skyLook.ts'
 import { createArcs } from './arcs.ts'
 
 export type { GroundStatus }
@@ -203,7 +203,8 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
     sun.color.setRGB(c.light[0], c.light[1], c.light[2], THREE.LinearSRGBColorSpace)
     sun.intensity = c.lightIntensity
     sun.castShadow = sunNow.altitude > 0
-    hemi.color.setRGB(c.zenith[0] * 3 + 0.1, c.zenith[1] * 3 + 0.1, c.zenith[2] * 3 + 0.1, THREE.LinearSRGBColorSpace)
+    const amb = ambientSky(c, sunNow.altitude)
+    hemi.color.setRGB(amb[0], amb[1], amb[2], THREE.LinearSRGBColorSpace)
     hemi.groundColor.setRGB(c.ground[0] * 3, c.ground[1] * 3, c.ground[2] * 3, THREE.LinearSRGBColorSpace)
     hemi.intensity = c.ambientIntensity
     water.setSun(sunDir, c)
@@ -409,6 +410,8 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
     water.frame(seconds, camera)
     clouds.frame(seconds, camera)
     water.setMirror(clouds.mirror())
+    /* Sun shafts through the cloud edges: High only (Battery skips the arc of looks per sky pixel). */
+    sky.setShafts(clouds.quality() === 'high' ? clouds.mirror() : null, camera.position)
     look.frame(seconds)
     arcs.frame(camera, renderer.domElement)
     /* Every few frames: where the camera looks, for the near ground, the shadow and the prefetch. */

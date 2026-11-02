@@ -90,10 +90,87 @@ export function skyColours(sunAltitudeDeg: number): SkyColours {
 
 export const luminance = (c: Rgb): number => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
 
-/** The sky's colour looking `elevationDeg` above the horizon (0 horizon, 90 zenith), without the sun's glow. */
+/** The sky's colour looking `elevationDeg` above the horizon (0 horizon, 90 zenith), without the sun's glow or the twilight band. */
 export function skyAt(colours: SkyColours, elevationDeg: number): Rgb {
   const t = Math.pow(Math.max(0, Math.min(1, elevationDeg / 90)), 0.45)
   return mix(colours.horizon, colours.zenith, t)
+}
+
+/*
+ * THE TWILIGHT BAND (Batch F, Section 2). The 2 Nov photo comparison: at the
+ * VB pier at 7:21 AM on 27 Oct, the sun a degree below the horizon, the DJI
+ * photo's sky looking north was peach and pink from the horizon up past the
+ * top of the frame; the 3D sky was a flat mauve. Two things were wrong:
+ *
+ *  - the horizon colour gave way to the blue zenith within a few degrees
+ *    (the blend's 0.45 power), so the blue mixed into the warm band and made
+ *    mauve. Real twilight keeps its horizon colours 10 to 15 degrees up: the
+ *    power rises toward 0.9 while the sun is within a few degrees of the
+ *    horizon, so the band is thicker.
+ *  - the warmth did not depend on where you look. Low sunlight scattered
+ *    near the horizon is warmest toward the sun and still peach to the side
+ *    (90° to 120° off, where the photo looked): a broad lobe, strongest
+ *    toward the sun, never below half of it, fading with height above the
+ *    horizon.
+ *
+ * Mirrored exactly by the sky shader (src/three/world/sky.ts).
+ */
+/** 0..1: how much the sky is in twilight: 1 with the sun from -4° to 3°, none below -9° or above 12°. */
+export function twilightShare(sunAltitudeDeg: number): number {
+  const h = sunAltitudeDeg
+  if (h <= -9 || h >= 12) return 0
+  if (h < -4) return (h + 9) / 5
+  if (h > 3) return (12 - h) / 9
+  return 1
+}
+
+/** The warm band's own colour at full strength, linear: peach. */
+export const TWILIGHT_WARM: Rgb = [0.42, 0.22, 0.1]
+
+/** The power the horizon-to-zenith blend uses: 0.45 by day and night, up to 0.9 in twilight. */
+export const bandPower = (tw: number): number => 0.45 + 0.45 * tw
+
+/** Toward the sun 1, at right angles about 0.55, away from it 0.45. `cosToSun` is the cosine of the angle between the view and the sun's azimuth. */
+export const warmLobe = (cosToSun: number): number => 0.45 + 0.55 * Math.pow((1 + cosToSun) / 2, 2)
+
+/** The twilight band's thickness: its strength falls to 1/e this far up (sine of the elevation). */
+export const WARM_HEIGHT = 0.22
+
+/** The sky's colour in a direction, with the twilight band; the sun's glow is added by the shader on top. */
+export function skyToward(colours: SkyColours, sunAltitudeDeg: number, elevationDeg: number, cosToSun: number): Rgb {
+  const tw = twilightShare(sunAltitudeDeg)
+  const el = Math.sin((Math.max(0, elevationDeg) * Math.PI) / 180)
+  const base = mix(colours.horizon, colours.zenith, Math.pow(el, bandPower(tw)))
+  const k = tw * warmLobe(cosToSun) * Math.exp(-el / WARM_HEIGHT)
+  return [base[0] + TWILIGHT_WARM[0] * k, base[1] + TWILIGHT_WARM[1] * k, base[2] + TWILIGHT_WARM[2] * k]
+}
+
+/*
+ * WHAT LIGHTS A WALL IN TWILIGHT. Before sunrise there is no sun on the
+ * walls, only the sky, and a wall sees the sky's lower half: the bright warm
+ * band, not the dark blue zenith. The hemisphere light took the zenith alone
+ * (x3), so the pier's hotels at 7:21 AM were dark brown where the photo has
+ * them pale and pink. In twilight its sky colour moves toward the band's
+ * average round the horizon (the lobe's mean is about 0.6); by day and at
+ * night it is the zenith as before.
+ */
+export function ambientSky(c: SkyColours, sunAltitudeDeg: number): Rgb {
+  const day: Rgb = [c.zenith[0] * 3 + 0.1, c.zenith[1] * 3 + 0.1, c.zenith[2] * 3 + 0.1]
+  /* Only while the sun is too low to light the walls itself: full at 0° and below, none from 4° up. */
+  const tw = twilightShare(sunAltitudeDeg) * Math.max(0, Math.min(1, (4 - sunAltitudeDeg) / 4))
+  const band: Rgb = [(c.horizon[0] + TWILIGHT_WARM[0] * 0.6) * 3, (c.horizon[1] + TWILIGHT_WARM[1] * 0.6) * 3, (c.horizon[2] + TWILIGHT_WARM[2] * 0.6) * 3]
+  return mix(day, band, tw)
+}
+
+/** Hue in degrees (0 red, 30 orange, 300 magenta) of a colour, for the tests. */
+export function hueDeg(c: Rgb): number {
+  const [r, g, b] = c
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  if (max - min < 1e-9) return 0
+  const d = max - min
+  const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4
+  return (h * 60 + 360) % 360
 }
 
 /** Blue over red: above 1 reads as blue sky. */

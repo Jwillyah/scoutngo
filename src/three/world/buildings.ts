@@ -47,6 +47,34 @@ export interface TreeIn {
 type P = { x: number; y: number }
 
 /** A ring moved `d` metres inward along each corner's bisector (a footprint drawn inside its own photo). */
+/*
+ * WALLS FACE OUT, WHICHEVER WAY THE RING RUNS (Batch F, Section 2). A wall's
+ * quad was wound in the ring's own order, so a ring running clockwise (x
+ * east, y north) gave walls whose fronts faced INTO the building: from
+ * outside, the near walls were culled and what showed were the far walls'
+ * insides, lit as if they faced the other way. The oceanfront hotels at the
+ * VB pier came out as dark boxes where the photo had them lit. Rings are put
+ * counter-clockwise first; each wall's normal then points away from the
+ * building (buildingWalls.test.ts holds it for both orders).
+ */
+export function counterClockwise<T extends P>(ring: readonly T[]): T[] {
+  let twiceArea = 0
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) twiceArea += ring[j].x * ring[i].y - ring[i].x * ring[j].y
+  return twiceArea < 0 ? [...ring].reverse() : [...ring]
+}
+
+/** One quad per edge of a counter-clockwise ring, two triangles, in scene coordinates (x east, y up, z = -north). */
+export function wallQuad(a: P, c: P, y0: number, y1: number): number[][] {
+  return [
+    [a.x, y0, -a.y],
+    [c.x, y0, -c.y],
+    [c.x, y1, -c.y],
+    [a.x, y0, -a.y],
+    [c.x, y1, -c.y],
+    [a.x, y1, -a.y],
+  ]
+}
+
 export function insetRing(ring: readonly P[], d: number): P[] {
   const n = ring.length
   let area = 0
@@ -156,7 +184,7 @@ export function createBuildings(frame: Frame, ground: Ground, onChange: () => vo
         const base = (await heightAt(frame.lat(-cy), frame.lon(cx))) ?? 0
         const known = b.height.metres !== null
         const h = known ? (b.height.metres as number) : UNKNOWN_M
-        const ring = insetRing(local.slice(0, local[0].x === local[local.length - 1].x && local[0].y === local[local.length - 1].y ? -1 : undefined), INSET_M)
+        const ring = counterClockwise(insetRing(local.slice(0, local[0].x === local[local.length - 1].x && local[0].y === local[local.length - 1].y ? -1 : undefined), INSET_M))
         if (ring.length < 3) continue
         const key = `${Math.floor(cx / CELL_M)},${Math.floor(cy / CELL_M)}`
         let cell = byCell.get(key)
@@ -172,14 +200,7 @@ export function createBuildings(frame: Frame, ground: Ground, onChange: () => vo
           const y0 = base - 0.5
           const y1 = base + h
           const ao = (y: number) => 0.55 + 0.45 * Math.min(1, (y - base) / 6)
-          const quad = [
-            [a.x, y0, -a.y],
-            [c.x, y0, -c.y],
-            [c.x, y1, -c.y],
-            [a.x, y0, -a.y],
-            [c.x, y1, -c.y],
-            [a.x, y1, -a.y],
-          ]
+          const quad = wallQuad(a, c, y0, y1)
           for (const q of quad) {
             cell.walls.push(q[0], q[1], q[2])
             const k = ao(q[1])
