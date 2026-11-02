@@ -5,7 +5,6 @@ import { compassWord } from '../core/compassWords.ts'
 import type { LatLon } from '../core/geo.ts'
 import { rankNights, type MilkyWayNight } from '../core/milkyWay.ts'
 import { nightSky, tonightMoment, type SkyThing } from '../core/nightSky.ts'
-import { SEASON_NAME, seasonLines, type SeasonLine } from '../core/seasons.ts'
 import { getSunArc, getSunPosition } from '../core/sun.ts'
 import { formatClock } from '../core/timezone.ts'
 import { SKY_TABS, type SkyTab } from '../lib/skyTab.ts'
@@ -154,13 +153,12 @@ export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump,
     return { when, things: nightSky(when, venue.lat, venue.lon) }
   }, [at, venue])
   const nights = useMemo<MilkyWayNight[]>(() => (tab === 'now' ? rankNights(venue.lat, venue.lon, at, 30, timeZone) : []), [tab, venue, at, timeZone])
-  const seasons = useMemo<SeasonLine[]>(() => (tab === 'calendar' ? seasonLines(at.getUTCFullYear(), venue.lat, venue.lon, at) : []), [tab, venue, at])
 
   const where = (t: SkyThing) =>
     t.altitude <= 0 ? 'below the horizon' : `${compassWord(t.azimuth)}, ${Math.round(t.altitude)}° up`
 
   /* One page's body: the eight pages of 29 Oct, now laid out four ways below. */
-  const bodyFor = (tab: 'tonight' | 'sun' | 'fire' | 'preview' | 'special' | 'moon' | 'seasons'): ReactNode => {
+  const bodyFor = (tab: 'tonight' | 'sun' | 'fire' | 'preview' | 'special' | 'moon'): ReactNode => {
   let body: ReactNode = null
   if (tab === 'tonight') {
     const best = Math.max(1, ...nights.map((n) => n.score))
@@ -270,30 +268,6 @@ export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump,
         <LineUp {...finderProps} horizon={horizon} />
       </>
     )
-  } else {
-    body = (
-      <>
-        <Compass
-          rays={seasons.flatMap((s) => [
-            ...(s.sunrise === null ? [] : [{ bearing: s.sunrise, cls: `skyc__ray skyc__ray--${s.day}` }]),
-            ...(s.sunset === null ? [] : [{ bearing: s.sunset, cls: `skyc__ray skyc__ray--${s.day}` }]),
-          ])}
-        />
-        <dl className="skyc__facts skyc__facts--pairs num">
-          {seasons.map((s) => (
-            <div key={s.day}>
-              <dt>
-                <span className={`skyc__key skyc__key--${s.day}`} aria-hidden="true" /> {SEASON_NAME[s.day]}
-                {s.day === 'today' ? null : `, ${s.date.toLocaleDateString('en-GB', { timeZone, day: 'numeric', month: 'short' })}`}
-              </dt>
-              <dd>
-                rises {s.sunrise === null ? '—' : `${Math.round(s.sunrise)}°`}, sets {s.sunset === null ? '—' : `${Math.round(s.sunset)}°`}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </>
-    )
   }
 
   return body
@@ -349,8 +323,16 @@ export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump,
             Open the month
           </button>
         )}
-        <p className="skyc__head">The sun through the year</p>
-        {bodyFor('seasons')}
+        {/*
+          * THE MONTH IS THE CALENDAR (Batch G, Section 6): the tab opens it
+          * straight away; this is what is under it when you come back. The
+          * year's sunrise and sunset compass went: its letters were clipped
+          * (W and S cut by the frame, read on the phone as N twice and no W),
+          * and the map already draws today's sun lines on the venue itself.
+          * The showers and moons, with their calendar alerts, stay.
+          */}
+        <p className="skyc__head">Showers and moons, next 90 days</p>
+        {events}
       </>
     )
   }
@@ -359,7 +341,18 @@ export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump,
     <div className="skyc">
       <div className="skyc__tabs" role="tablist" aria-label="Sky">
         {SKY_TABS.map((t) => (
-          <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className={`skyc__tab${tab === t.id ? ' skyc__tab--on' : ''}`} onClick={() => onTab(t.id)}>
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            className={`skyc__tab${tab === t.id ? ' skyc__tab--on' : ''}`}
+            onClick={() => {
+              onTab(t.id)
+              /* Calendar opens on the month (Batch G): the month view is the default. */
+              if (t.id === 'calendar') onOpenCalendar?.()
+            }}
+          >
             {t.label}
           </button>
         ))}

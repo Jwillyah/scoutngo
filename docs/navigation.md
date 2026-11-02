@@ -20,7 +20,7 @@ Menu
 │   ├── Sky fire       the verdict, the colour clock under it, "How was it?",
 │   │                  After the shoot (photos, hit rate)
 │   ├── Special        fog, rainbows, god rays, glassy water, sky fire
-│   └── Calendar       Open the month; the sun through the year (Seasons)
+│   └── Calendar       the month (opens on the tab); showers and moons with their alerts
 ├── Water ────────── (Land inland: Section 5)
 │   ├── Tides
 │   ├── Surf           only near surf (Settings › Surf)
@@ -56,8 +56,8 @@ Field has no menu place; it is reached by its address, `/field`.
 | Colour clock (Preview) | 3: menu, Sky, Preview tab | 1: Cloud chip, under the verdict |
 | After the shoot, hit rate | 3: menu, Sky, Fire tab | 1: Cloud chip, at the foot of Sky fire |
 | Special light | 3: menu, Sky, Special tab; 1 from the status line when on now | 3: menu, Sky, Special; 1 from the status line when on now |
-| Calendar, the month | 3: menu, Sky, Calendar tab | 4: menu, Sky, Calendar, Open the month |
-| Seasons | 3: menu, Sky, Seasons tab | 3: menu, Sky, Calendar |
+| Calendar, the month | 3: menu, Sky, Calendar tab | 3: menu, Sky, Calendar (opens on the month, Batch G) |
+| Seasons | 3: menu, Sky, Seasons tab | removed (Batch G: the year's compass was mislabelled; the map draws the sun lines) |
 | Tides | 1: Tide chip | 1: Tide chip |
 | Surf | 2: menu, Surf | 2: menu, Surf (under Water) |
 | Wind, five models | 2: Wind chip, Five models | 1: Wind chip |

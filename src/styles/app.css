@@ -10523,24 +10523,6 @@
   stroke: var(--sun-set);
 }
 
-.skyc__ray--june-solstice {
-  stroke: var(--sun);
-}
-
-.skyc__ray--december-solstice {
-  stroke: var(--sun-shadow);
-}
-
-.skyc__ray--march-equinox,
-.skyc__ray--september-equinox {
-  stroke: var(--grey-1);
-}
-
-.skyc__ray--today {
-  stroke: var(--white);
-  stroke-dasharray: 4 3;
-}
-
 .skyc__sun {
   fill: var(--sun);
 }
@@ -10591,19 +10573,6 @@
   height: 10px;
   border-radius: 50%;
   background: var(--white);
-}
-
-.skyc__key--june-solstice {
-  background: var(--sun);
-}
-
-.skyc__key--december-solstice {
-  background: var(--sun-shadow);
-}
-
-.skyc__key--march-equinox,
-.skyc__key--september-equinox {
-  background: var(--grey-1);
 }
 
 .skyc__head {
