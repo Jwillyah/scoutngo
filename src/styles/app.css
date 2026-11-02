@@ -14972,6 +14972,24 @@
   pointer-events: none;
 }
 
+/* The truth loop's sky reading (Batch F, Section 7). */
+.truth__thumb {
+  width: 48px;
+  height: auto;
+  border-radius: 4px;
+  vertical-align: middle;
+  margin-left: var(--space-1);
+}
+
+.truth__keep {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 44px;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
 /*
  * LANDSCAPE (Batch F, Section 4). On its side, at 844 x 390, the venue bar,
  * the chip row, the tool dock and the bottom sheet were laid out as in
@@ -15054,20 +15072,64 @@
   }
 }
 
-/* The truth loop's sky reading (Batch F, Section 7). */
-.truth__thumb {
-  width: 48px;
-  height: auto;
-  border-radius: 4px;
-  vertical-align: middle;
-  margin-left: var(--space-1);
+/* Sky fire's pages 2 and 3 (Batch F, Section 6): small skies, drawn on the phone. */
+.prev__head {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-md);
+  font-weight: 800;
 }
 
-.truth__keep {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  min-height: 44px;
-  font-size: var(--text-sm);
+.prev__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.prev__fig {
+  margin: 0;
+  min-width: 0;
+}
+
+.prev__pic {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  border: var(--line-hair) solid var(--color-line);
+  background: var(--surface-2);
+}
+
+.prev__pic--none {
+  aspect-ratio: 3 / 2;
+}
+
+.prev__cap {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
   color: var(--color-text-muted);
+}
+
+.prev__cap b {
+  color: var(--color-text);
+}
+
+.prev__nums {
+  display: block;
+}
+
+.prev__week {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+
+.prev__day {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
 }

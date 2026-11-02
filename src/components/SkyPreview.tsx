@@ -15,6 +15,10 @@ import {
   type Strip,
 } from '../core/skyColour.ts'
 import { formatClock } from '../core/timezone.ts'
+import type { Cover } from '../core/clouds.ts'
+import { fourSkies, weekOfSkies } from '../core/skyPages.ts'
+import { skyWords } from '../core/metar.ts'
+import { fetchSkyHours, hourlyAt, type Hourly } from '../lib/tideSheetData.ts'
 import { fetchAerosol, fetchFirePaths, fetchStationSkies, nearestHour, pathsAt, type FirePaths, type StationSky } from '../lib/skyFireData.ts'
 
 /*
@@ -26,10 +30,19 @@ import { fetchAerosol, fetchFirePaths, fetchStationSkies, nearestHour, pathsAt, 
  * computed from it. Sky fire's verdict sits on top: whether there is a canvas
  * at all is its question, what colour it goes is this one's.
  *
- * Pages 2 and 3 are waiting for the new 3D sky and say so. No picture is
- * drawn that the app cannot compute.
+ * Page 2, "Four forecasts" (Batch F, Section 6): the same event once per
+ * model, a small picture of each sky drawn on the phone by the 3D view's own
+ * sky and clouds (src/three/skyThumb.ts) from that model's cloud amounts at
+ * their heights and our sun, and, once the event is past, what the nearest
+ * stations reported. Page 3, "Week of skies": every sunrise and sunset for
+ * seven days, a picture each from the venue's forecast cloud; a tap moves
+ * the app to that time. Clouds illustrative: where they sit is drawn, how
+ * much and how high is the forecast. The pictures are cached; with clouds on
+ * Battery (the 3D view's setting) they are not drawn at all.
  */
 interface Props {
+  /** Page 3's tap: put the app at that sunrise or sunset. */
+  onJump?: (at: Date) => void
   venue: LatLon
   timeZone: string
   at: Date
@@ -49,7 +62,38 @@ const altitudeAt = (lat: number, lon: number) => (t: Date) => getPosition(t, lat
  * sky", with dots for them. They come back with Batch D; no dots, no swipe,
  * until then.
  */
-const PAGES = ['Colour clock'] as const
+const PAGES = ['Colour clock', 'Four forecasts', 'Week of skies'] as const
+
+/* The 3D view's cloud quality, kept on this phone (Clay3D.tsx): Battery draws no pictures here. */
+export const CLOUD_QUALITY_KEY = 'scoutngo.cloudQuality.v1'
+function battery(): boolean {
+  try {
+    return localStorage.getItem(CLOUD_QUALITY_KEY) === 'battery'
+  } catch {
+    return false
+  }
+}
+
+/* A picture of one sky, drawn on the phone after the page shows; a dash while it is drawn or when it cannot be. */
+function SkyPicture({ sunAzimuthDeg, sunAltitudeDeg, cover, width, height, label }: { sunAzimuthDeg: number; sunAltitudeDeg: number; cover: Cover; width: number; height: number; label: string }) {
+  const [url, setUrl] = useState<string | null>(null)
+  const { low, mid, high } = cover
+  useEffect(() => {
+    let live = true
+    if (battery()) return
+    void import('../three/skyThumb.ts')
+      .then((m) => {
+        if (live) setUrl(m.renderSkyThumb({ sunAzimuthDeg, sunAltitudeDeg, cover: { low, mid, high }, width, height }))
+      })
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [sunAzimuthDeg, sunAltitudeDeg, low, mid, high, width, height])
+  return url === null ? <span className="prev__pic prev__pic--none" style={{ aspectRatio: `${width} / ${height}` }} role="img" aria-label={label} /> : <img className="prev__pic" src={url} alt={label} width={width} height={height} />
+}
+
+const pct = (x: number | null) => (x === null ? '—' : `${Math.round(x)}%`)
 
 function StripRow({ s, clock }: { s: Strip; clock: (d: Date) => string }) {
   const n = s.minutes.length
@@ -70,7 +114,7 @@ function StripRow({ s, clock }: { s: Strip; clock: (d: Date) => string }) {
   )
 }
 
-export function SkyPreview({ venue, timeZone, at, now = () => new Date(), kind: given }: Props) {
+export function SkyPreview({ venue, timeZone, at, now = () => new Date(), kind: given, onJump }: Props) {
   const events = useMemo(() => nextEvents(at, venue), [at, venue])
   const firstKind: Kind = events.sunrise !== null && (events.sunset === null || events.sunrise < events.sunset) ? 'sunrise' : 'sunset'
   const [own, setKind] = useState<Kind>(firstKind)
@@ -109,23 +153,53 @@ export function SkyPreview({ venue, timeZone, at, now = () => new Date(), kind: 
       live = false
     }
   }, [soon, venue])
+  /* After the event: what the stations reported, for page 2. */
+  const past = event !== null && realNow.getTime() > event.getTime()
+  const [after, setAfter] = useState<StationSky[] | null>(null)
+  useEffect(() => {
+    if (!past) return
+    let live = true
+    void fetchStationSkies(venue).then((s) => {
+      if (live) setAfter(s)
+    })
+    return () => {
+      live = false
+    }
+  }, [past, venue])
+  /* Page 3's cloud: the venue's hourly forecast, one request for the fortnight. */
+  const [hours, setHours] = useState<Hourly | null>(null)
+  useEffect(() => {
+    let live = true
+    void fetchSkyHours(venue).then((h) => {
+      if (live && h !== null) setHours(h.value)
+    })
+    return () => {
+      live = false
+    }
+  }, [venue])
+  const week = weekOfSkies(venue, new Date(at.getTime() - 12 * 3_600_000), (t) => {
+        if (hours === null) return null
+        const c = { low: hourlyAt(hours, 'cloud_cover_low', t), mid: hourlyAt(hours, 'cloud_cover_mid', t), high: hourlyAt(hours, 'cloud_cover_high', t) }
+        return c.low === null && c.mid === null && c.high === null ? null : c
+      }).filter((e) => e.at.getTime() > at.getTime() - 12 * 3_600_000)
   const deck = soon && stations?.[0] !== undefined ? lowestDeck(stations[0].sky) : null
   const lowBaseM = deck === null || deck.baseFt >= 6500 ? null : deck.baseFt * 0.3048
 
   const paths = data === 'loading' || data.paths === null || event === null ? [] : pathsAt(data.paths, nearestHour(event))
   const verdict = paths.length === 0 ? null : fireVerdict(paths, lowBaseM)
   const best = paths.find((p) => p.model === 'best_match') ?? paths[0]
+  const four = fourSkies(paths)
   /* Aerosol from Open-Meteo; when it did not answer, a clean-air 0.1 and the "i" says so. */
   const aod = data === 'loading' ? null : (data.aod ?? null)
-  const strips = useMemo(() => {
-    if (event === null || best === undefined) return []
-    return (['high', 'mid', 'low'] as Layer[]).flatMap((layer) => {
+  /* Not memoised: three strips of ninety minutes are cheap, and the compiler keeps this component. */
+  const strips = event === null || best === undefined ? [] : (['high', 'mid', 'low'] as Layer[]).flatMap((layer) => {
       const heightM = layer === 'low' && lowBaseM !== null ? lowBaseM : DECK_HEIGHT_M[layer]
       const reach = reachKm(best, layer, heightM)
       return reach === null ? [] : [strip({ layer, heightM, reachKm: reach }, event, altitudeAt(venue.lat, venue.lon), aod ?? 0.1)]
     })
-  }, [event, best, lowBaseM, aod, venue])
 
+  const [onBattery] = useState(battery)
+  const sunAlt = event === null ? 0 : getPosition(event, venue.lat, venue.lon).altitude
   const pager = useRef<HTMLDivElement>(null)
   const [page, setPage] = useState(0)
 
@@ -186,6 +260,50 @@ export function SkyPreview({ venue, timeZone, at, now = () => new Date(), kind: 
               )}
             </>
           )}
+        </section>
+        <section className="prev__page" aria-label={PAGES[1]}>
+          <p className="prev__head">Four forecasts, one {kind}</p>
+          {event === null || azimuth === null ? (
+            <p className="prev__note">No {kind} here in the next two days.</p>
+          ) : onBattery ? (
+            <p className="prev__note">Clouds are on Battery in the 3D view, so these pictures are not drawn. The numbers: {four.map((m) => `${m.label} low ${pct(m.cover.low)} mid ${pct(m.cover.mid)}`).join(' · ') || 'not arrived'}.</p>
+          ) : four.length === 0 ? (
+            <p className="prev__note">{data === 'loading' ? 'Reading the forecasts…' : 'The models’ cloud for this event did not arrive.'}</p>
+          ) : (
+            <div className="prev__grid">
+              {four.map((m) => (
+                <figure key={m.model} className="prev__fig">
+                  <SkyPicture sunAzimuthDeg={azimuth} sunAltitudeDeg={sunAlt} cover={m.cover} width={168} height={126} label={`${m.label}: ${kind} sky, low ${pct(m.cover.low)}, mid ${pct(m.cover.mid)}, high ${pct(m.cover.high)}`} />
+                  <figcaption className="prev__cap">
+                    <span className="num">{m.label}</span> <b>{m.fires ? 'fires' : 'no fire'}</b>
+                    <span className="prev__nums num"> low {pct(m.cover.low)} · mid {pct(m.cover.mid)} · high {pct(m.cover.high)}</span>
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          )}
+          {!past || after === null || after.length === 0 ? null : (
+            <p className="prev__note">What the stations saw: {after.map((x) => `${x.sky.station} ${skyWords(x.sky)}`).join(' · ')}</p>
+          )}
+          <p className="prev__note">Clouds illustrative: how much and how high is each forecast’s; where they sit is drawn.</p>
+        </section>
+        <section className="prev__page" aria-label={PAGES[2]}>
+          <p className="prev__head">Week of skies</p>
+          {onBattery ? (
+            <p className="prev__note">Clouds are on Battery in the 3D view, so these pictures are not drawn.</p>
+          ) : (
+            <div className="prev__week">
+              {week.map((e) => (
+                <button key={e.at.toISOString()} type="button" className="prev__day" onClick={() => onJump?.(e.at)} aria-label={`${e.kind} ${new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'short' }).format(e.at)} ${clock(e.at)}: go there`}>
+                  {e.cover === null ? <span className="prev__pic prev__pic--none" /> : <SkyPicture sunAzimuthDeg={e.sunAzimuthDeg} sunAltitudeDeg={e.kind === 'sunrise' ? 1 : 1} cover={e.cover} width={96} height={64} label="" />}
+                  <span className="prev__cap num">
+                    {new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'short' }).format(e.at)} {e.kind === 'sunrise' ? '↑' : '↓'} {clock(e.at)}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+          <p className="prev__note">Clouds illustrative · the venue’s forecast cloud at each hour · tap one to go there.</p>
         </section>
       </div>
       {PAGES.length < 2 ? null : (

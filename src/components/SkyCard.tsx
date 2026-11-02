@@ -245,11 +245,11 @@ export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump,
       </>
     )
   } else if (tab === 'fire') {
-    body = <SkyFire venue={venue} timeZone={timeZone} placeName={placeName ?? 'This place'} at={at} clock={(k) => <SkyPreview venue={venue} timeZone={timeZone} at={at} kind={k} />} />
+    body = <SkyFire venue={venue} timeZone={timeZone} placeName={placeName ?? 'This place'} at={at} clock={(k) => <SkyPreview venue={venue} timeZone={timeZone} at={at} kind={k} onJump={onJump} />} />
   } else if (tab === 'special') {
     body = <SpecialLight venue={venue} timeZone={timeZone} at={at} onJump={onJump} onShowBow={onShowBow} place={place} />
   } else if (tab === 'preview') {
-    body = <SkyPreview venue={venue} timeZone={timeZone} at={at} />
+    body = <SkyPreview venue={venue} timeZone={timeZone} at={at} onJump={onJump} />
   } else if (tab === 'moon') {
     const ill = getMoonIllumination(at)
     const times = moonTimesOnLocalDay(at, venue.lat, venue.lon, timeZone)

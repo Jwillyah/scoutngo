@@ -18,9 +18,14 @@ describe('the colour clock inside Sky fire', () => {
     expect(html.match(/prev__kinds/g)?.length).toBe(1)
   })
 
-  it('no pages that only say "coming", and no dots for one page', () => {
+  it('three pages now the 3D sky exists (Batch F): the colour clock, four forecasts, a week of skies; nothing that says "coming"', () => {
     const html = renderToStaticMarkup(<SkyPreview venue={PIER} timeZone="America/New_York" at={AT} kind="sunrise" />)
-    expect(html).not.toMatch(/Coming with|Four forecasts|Week of skies/)
-    expect(html).not.toContain('prev__dot')
+    expect(html).not.toMatch(/Coming with/)
+    expect(html).toContain('aria-label="Four forecasts"')
+    expect(html).toContain('aria-label="Week of skies"')
+    expect(html.match(/class="prev__dot[ "]/g)?.length).toBe(3)
+    /* Both picture pages say the clouds are illustrative. */
+    expect(html.match(/Clouds illustrative/g)?.length).toBe(2)
+    expect(html).not.toMatch(/\bsafe\b|\bclear\b/i)
   })
 })

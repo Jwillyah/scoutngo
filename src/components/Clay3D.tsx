@@ -86,7 +86,22 @@ export function Clay3D({ venue, venueLabel, at, timeZone, sheetOpen = false, moo
   const [failed, setFailed] = useState<string | null>(null)
   const [place, setPlace] = useState<PlaceState>(() => placeState())
   const [flat, setFlat] = useState(0)
-  const [cloudQuality, setCloudQuality] = useState<'high' | 'battery'>('high')
+  const [cloudQuality, setCloudQualityState] = useState<'high' | 'battery'>(() => {
+    try {
+      return localStorage.getItem('scoutngo.cloudQuality.v1') === 'battery' ? 'battery' : 'high'
+    } catch {
+      return 'high'
+    }
+  })
+  /* Kept on this phone (Batch F): Sky fire's pictures follow it, and Battery draws none. */
+  const setCloudQuality = (q: 'high' | 'battery') => {
+    setCloudQualityState(q)
+    try {
+      localStorage.setItem('scoutngo.cloudQuality.v1', q)
+    } catch {
+      /* Not kept. */
+    }
+  }
   const [chase, setChase] = useState(false)
   /* The zoom belongs to one Stand here: a new one starts at its own focal length. */
   const [zoom, setZoom] = useState<{ tick: number; focal: number } | null>(null)
@@ -129,6 +144,12 @@ export function Clay3D({ venue, venueLabel, at, timeZone, sheetOpen = false, moo
         if (cancelled || host.current === null) return
         made = createClayScene(host.current, venue, timeZone, status.current, () => setFlat(status.current.flatTiles), scanRasters)
         scene.current = made
+        /* The cloud quality kept on this phone (Batch F): a scene opened on Battery starts on Battery. */
+        try {
+          if (localStorage.getItem('scoutngo.cloudQuality.v1') === 'battery') made.setQuality('battery')
+        } catch {
+          /* Storage blocked: High. */
+        }
         ;(window as unknown as { __clay?: ClayScene }).__clay = made
         setReady((n) => n + 1)
         void made.whenShown().then(() => {

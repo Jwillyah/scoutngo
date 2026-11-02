@@ -215,6 +215,8 @@ try {
               cells: strips.map((s) => s.querySelectorAll('rect').length),
               soon: [...p.querySelectorAll('.prev__page--soon')].map((x) => x.textContent),
               dots: p.querySelectorAll('.prev__dot').length,
+              pages: [...p.querySelectorAll('.prev__page')].map((x) => x.getAttribute('aria-label')),
+              illustrative: [...p.querySelectorAll('.prev__page')].slice(1).map((x) => /Clouds illustrative/.test(x.textContent ?? '')),
               wide: [...p.querySelectorAll('.prev__page:first-child *')].some((e) => e.getBoundingClientRect().right > innerWidth + 1),
               wraps: [...p.querySelectorAll('.prev__layer, .prev__ticks span')].some((e) => e.getBoundingClientRect().height > 22),
             }
@@ -231,9 +233,11 @@ try {
           if (!/be set up by \d/.test(prev.words)) fail(`${label}: no "be set up by" in "${prev.words}"`)
           if (prev.verdict === null || !/^Fire (possible|likely)/.test(prev.verdict)) fail(`${label}: Sky fire's verdict is not on top (${prev.verdict})`)
           if (prev.strips < 1 || prev.cells.some((n) => n !== 91) || prev.coloured.some((n) => n < 10)) fail(`${label}: the strips are ${JSON.stringify({ cells: prev.cells, coloured: prev.coloured })}`)
-          /* Pages that only said "coming" are gone until they exist (Batch E): no such page, no dots for one. */
+          /* Pages that only said "coming" went in Batch E; pages 2 and 3 came back with pictures in Batch F: one dot a page, and each picture page says its clouds are illustrative. */
           if (prev.soon.length !== 0) fail(`${label}: pages that only say they are coming: ${JSON.stringify(prev.soon)}`)
-          if (prev.dots !== 0) fail(`${label}: ${prev.dots} page dots for one page`)
+          if (JSON.stringify(prev.pages) !== JSON.stringify(['Colour clock', 'Four forecasts', 'Week of skies'])) fail(`${label}: the preview's pages are ${JSON.stringify(prev.pages)}`)
+          if (prev.dots !== prev.pages.length) fail(`${label}: ${prev.dots} page dots for ${prev.pages.length} pages`)
+          if (prev.illustrative.some((x) => !x)) fail(`${label}: a picture page does not say its clouds are illustrative`)
           if (prev.wide) fail(`${label}: something on the colour clock runs past 390 px`)
           if (prev.wraps) fail(`${label}: a strip label or time wraps`)
           if (/\bclear\b|\bsafe\b|\bcertain\b|\bwill\b/i.test(prev.words)) fail(`${label}: the words promise: "${prev.words}"`)
