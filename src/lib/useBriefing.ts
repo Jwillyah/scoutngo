@@ -11,6 +11,8 @@
  *   Wind       the week by the hour, gusts and 400 ft (fetchBriefWind)
  *   Tide       the nearest NOAA station's highs and lows
  *   Facing     which way the beach faces (the map's own sea polygons)
+ *   Satellite  GOES-East infrared along the sun's line, 3 h to 30 min
+ *              before the next event only (src/lib/goesNowcast.ts)
  *
  * WHAT LEAVES THE PHONE: what those screens already send, coordinates
  * rounded to 2 decimals (src/lib/weatherStore.ts). Every answer is kept on
@@ -30,6 +32,8 @@ import { fetchFirePaths, fetchFirePathsRange, fetchStationSkies, nearestHour, pa
 import { surfAt } from './surfDay.ts'
 import { fetchBriefWind, fetchMarine, fetchMonthExtremes, hourlyAt, type Hourly } from './tideSheetData.ts'
 import { useTide } from './useTide.ts'
+import { fetchSatRead } from './goesNowcast.ts'
+import { inNowcast, type SatRead } from '../core/goesNowcast.ts'
 import { useWeatherEpoch } from './useWeatherStatus.ts'
 
 export const WEEK_DAYS = 7
@@ -166,6 +170,31 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
     }
   }, [open, soon, key, lat, lon])
 
+  /*
+   * THE SATELLITE, in the nowcast window only (3 h to 30 min before the next
+   * event, src/core/goesNowcast.ts): its look toward the sun overrides the
+   * models where infrared can speak. Advected by the wind at 500 hPa; the
+   * ground reference is the forecast's air at 2 m.
+   */
+  const [sat, setSat] = useState<{ key: string; event: number; read: SatRead | null } | null>(null)
+  const satDue = nextEvent !== null && inNowcast(nextEvent, now)
+  const satEvent = satDue ? nextEvent.getTime() : null
+  const seaWind = sea?.key === key ? sea.wind : null
+  useEffect(() => {
+    if (!open || satEvent === null || key === null || lat === null || lon === null || seaWind === null) return
+    let live = true
+    const e = new Date(satEvent)
+    const mps = hourlyAt(seaWind, 'wind_speed_500hPa', e)
+    const from = hourlyAt(seaWind, 'wind_direction_500hPa', e)
+    const airC = hourlyAt(seaWind, 'temperature_2m', e)
+    void fetchSatRead({ lat, lon }, getPosition(e, lat, lon).azimuth, e, new Date(), mps === null || from === null ? null : { mps, fromDeg: from }, airC).then((read) => {
+      if (live) setSat({ key, event: satEvent, read })
+    })
+    return () => {
+      live = false
+    }
+  }, [open, satEvent, key, lat, lon, seaWind])
+
   /* The tide: the nearest station's month of highs and lows, from the start of today. */
   const tide = useTide(open ? venue : null, open ? now : null)
   const stationId = tide.status === 'ok' ? tide.station.id : null
@@ -205,7 +234,8 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
         const data = n <= 1 ? (f.near[`${n}-${kind}`] ?? null) : f.week[kind]
         const paths = data === null ? [] : pathsAt(data, nearestHour(e))
         verdicts[kind] = paths.length === 0 ? null : fireVerdict(paths, { event: e, kind, venue: at, station })
-        reads[kind] = eventCall(verdicts[kind], kind, e, now)
+        const satHere = sat !== null && sat.key === key && sat.event === e.getTime() ? sat.read : null
+        reads[kind] = eventCall(verdicts[kind], kind, e, now, satHere)
       }
       const left = KINDS.map((k) => reads[k]).filter((r): r is CallRead => r !== null && (n > 0 || r.event.getTime() > now.getTime() - 30 * 60_000))
       const call = dayCall(left)
@@ -267,6 +297,6 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
     const times = [f, s].filter((x) => x !== null)
     const fetched = f === null ? [] : [...Object.values(f.near), f.week.sunrise, f.week.sunset].map((x) => x?.fetchedAt).filter((t): t is number => typeof t === 'number')
     return { status: times.length === 2 ? 'ready' : 'loading', days, facing, checkedAt: fetched.length === 0 ? null : Math.max(...fetched) }
-  }, [key, lat, lon, fire, sea, stations, tides, today, timeZone, now, scope])
+  }, [key, lat, lon, fire, sea, stations, tides, sat, today, timeZone, now, scope])
 }
 

@@ -28,6 +28,7 @@
 import { getMoonIllumination, getPosition, getTimes } from 'suncalc'
 import { windToBeach, type WindToBeach } from './coastFacing.ts'
 import { lookWindow, type FireVerdict } from './fireOutlook.ts'
+import type { SatRead } from './goesNowcast.ts'
 import { LAYER_WORD } from './skyColour.ts'
 import { sizeWords } from './surfShoot.ts'
 import { curveFromExtremes, levelAt, type TideExtreme } from './tide.ts'
@@ -63,20 +64,36 @@ export interface CallRead {
 
 const firing = (v: FireVerdict) => [...v.perLayer].sort((a, b) => b.agree - a.agree)[0]
 
-/** The call for one sunrise or sunset. `now` decides whether the nowcast can count. */
-export function eventCall(v: FireVerdict | null, kind: Kind, event: Date, now: Date): CallRead {
+/**
+ * The call for one sunrise or sunset. `now` decides whether the nowcast can
+ * count; `sat` is the satellite's look toward the sun in the nowcast window
+ * (src/core/goesNowcast.ts), which overrides the models where infrared can
+ * speak: deep cloud all the way to the sun is a Skip; a high or mid canvas
+ * the satellite does not see is no Go; and a canvas the satellite sees, with
+ * a station clear underneath within the hour, is a Go even when the models
+ * had a lid (2 Nov). Low cloud is the stations' alone: infrared does not see
+ * it at night.
+ */
+export function eventCall(v: FireVerdict | null, kind: Kind, event: Date, now: Date, sat: SatRead | null = null): CallRead {
   const base = { kind, event, confirmed: false, colorFrom: null, colorTo: null, setUp: null, agree: 0, of: 0 }
+  const near = Math.abs(event.getTime() - now.getTime()) <= CONFIRM_WITHIN_MS
+  if (sat !== null && sat.blocked) return { ...base, agree: v?.agree ?? 0, of: v?.of ?? 0, call: 'Skip', why: `${sat.line}.` }
+  if (sat !== null && near && sat.canvas && v?.station?.lowClear === true && (v === null || v.word === 'unlikely')) {
+    return { ...base, agree: v?.agree ?? 0, of: v?.of ?? 0, confirmed: true, call: 'Go', why: `Nowcast over the models: ${sat.line.replace(/^The /, 'the ')}, and ${v.station.station} reports nothing under 6,500 ft.` }
+  }
   if (v === null) return { ...base, call: null, why: 'The forecast did not say.' }
   const w = lookWindow(v)
   const top = firing(v)
   const lit = top !== undefined && top.agree > 0 ? `${top.agree} of ${top.of} models see lit ${LAYER_WORD[top.layer]}` : null
   const timing = { colorFrom: w?.from ?? null, colorTo: w?.to ?? null, setUp: w === null ? null : new Date(w.from.getTime() - SET_UP_BEFORE_MS), agree: v.agree, of: v.of }
   if (v.word === 'unlikely') return { ...base, ...timing, call: 'Skip', why: `${v.line.replace(/^Fire unlikely: /, '').replace(/^./, (c) => c.toUpperCase())}.` }
-  const near = Math.abs(event.getTime() - now.getTime()) <= CONFIRM_WITHIN_MS
   const st = v.station
   const gapHolds = st === null ? false : w?.layer === 'low' ? st.lowBaseM === null || st.lowBaseM >= LOW_LID_M : st.lowOverhead < OVERCAST_PCT
-  const confirmed = near && w !== null && gapHolds
-  if (v.word === 'likely' && confirmed) return { ...base, ...timing, confirmed, call: 'Go', why: `${lit ?? 'The models see a lit layer'}; ${v.station?.station ?? 'the station'} shows nothing under the light.` }
+  /* A high or mid canvas the satellite does not see over you is not confirmed. */
+  const satAgrees = sat === null || w?.layer === 'low' || sat.canvas
+  const confirmed = near && w !== null && gapHolds && satAgrees
+  if (v.word === 'likely' && confirmed) return { ...base, ...timing, confirmed, call: 'Go', why: `${lit ?? 'The models see a lit layer'}; ${v.station?.station ?? 'the station'} shows nothing under the light${sat !== null && sat.canvas ? '; the satellite sees the high cloud' : ''}.` }
+  if (v.word === 'likely' && !satAgrees) return { ...base, ...timing, call: 'Maybe', why: `Likely by the models, but ${sat?.line.replace(/^The /, 'the ') ?? ''}.` }
   if (v.word === 'likely') return { ...base, ...timing, call: 'Maybe', why: `Likely: ${lit ?? 'the models see a lit layer'}. Final call within the hour, from the stations.` }
   return { ...base, ...timing, call: 'Maybe', why: `Possible: ${lit ?? 'some models see a lit layer'}.` }
 }
