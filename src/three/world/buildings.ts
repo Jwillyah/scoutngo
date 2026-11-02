@@ -20,6 +20,12 @@
  *               where the camera looks is not drawn
  *   trees       instanced simple canopies at their height (a scan's or the
  *               map's, else the nominal one)
+ *   at night    (Batch G, Section 9: the hotels drew as black slabs) the
+ *               walls glow with the sky's light and the moon's
+ *               (src/core/nightLight.ts), the moon itself lighting the faces
+ *               toward it (scene.ts); tall buildings show warm windows, a
+ *               share of them lit, illustrative. Animated: flat night clay,
+ *               and a pale outline you can read against the dark.
  */
 import * as THREE from 'three'
 import type { Building } from '../../lib/buildings.ts'
@@ -28,6 +34,7 @@ import type { SkyColours } from '../../core/skyLook.ts'
 import type { Ground } from './ground.ts'
 import { daylightTint } from './look.ts'
 import { heightAt, type Frame } from './sources.ts'
+import type { NightLight } from '../../core/nightLight.ts'
 
 export const INSET_M = 0.4
 export const UNKNOWN_M = 3
@@ -37,6 +44,51 @@ export const SHOW_M = 1500
 const WALL = new THREE.Color().setRGB(0.36, 0.32, 0.27, THREE.LinearSRGBColorSpace)
 const WALL_UNKNOWN = new THREE.Color().setRGB(0.2, 0.19, 0.17, THREE.LinearSRGBColorSpace)
 const ROOF_CLAY = new THREE.Color().setRGB(0.3, 0.27, 0.23, THREE.LinearSRGBColorSpace)
+/* Night: the walls' own glow from the sky and the moon, a cool clay; windows a warm lamp colour. */
+const NIGHT_WALL = new THREE.Color().setRGB(0.1, 0.105, 0.13, THREE.LinearSRGBColorSpace)
+const WINDOW = new THREE.Color().setRGB(1.0, 0.62, 0.3, THREE.LinearSRGBColorSpace)
+/* Windows only on buildings this tall, and only above the ground floor. */
+export const WINDOWS_FROM_M = 9
+export const FLOOR_M = 3.2
+export const BAY_M = 3.4
+/* Animated by night: flat clay and an outline that reads against the dark. */
+const TOON_DAY_EMISSIVE = new THREE.Color().setRGB(0.12, 0.11, 0.1, THREE.LinearSRGBColorSpace)
+const TOON_NIGHT_EMISSIVE = new THREE.Color().setRGB(0.1, 0.105, 0.135, THREE.LinearSRGBColorSpace)
+const OUTLINE_DAY = new THREE.Color(0x1d1a16)
+const OUTLINE_NIGHT = new THREE.Color().setRGB(0.62, 0.66, 0.76, THREE.LinearSRGBColorSpace)
+
+/*
+ * THE WINDOWS, worked out in the wall's shader from two numbers per vertex:
+ * how far above the building's foot it is (interpolated up the wall, so the
+ * floors fall where they would), and nothing when the building is under
+ * WINDOWS_FROM_M or has no height. Along the wall, bays every BAY_M by the
+ * world position; which are lit, by a hash of the pane, against the share.
+ */
+const WALL_PARS = /* glsl */ `
+attribute float above;
+varying float vAbove;
+varying vec3 vWallWorld;
+`
+const WALL_FRAG_PARS = /* glsl */ `
+uniform float nightWall;
+uniform float windowsLit;
+uniform vec3 nightWallCol;
+uniform vec3 windowCol;
+varying float vAbove;
+varying vec3 vWallWorld;
+float paneHash(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }
+`
+const WALL_FRAG = /* glsl */ `
+  totalEmissiveRadiance += nightWallCol * nightWall;
+  if (vAbove > 4.0 && windowsLit > 0.0) {
+    float f = fract(vAbove / ${FLOOR_M.toFixed(1)});
+    float b = fract((vWallWorld.x + vWallWorld.z) / ${BAY_M.toFixed(1)});
+    float pane = step(0.32, f) * step(f, 0.72) * step(0.22, b) * step(b, 0.78);
+    vec3 cell = floor(vec3(vWallWorld.x / ${BAY_M.toFixed(1)}, vAbove / ${FLOOR_M.toFixed(1)}, vWallWorld.z / ${BAY_M.toFixed(1)}));
+    float on = step(paneHash(cell), windowsLit);
+    totalEmissiveRadiance += windowCol * pane * on * 0.55;
+  }
+`
 
 export interface TreeIn {
   at: LatLon
@@ -116,11 +168,12 @@ uniform vec4 box; /* west x, east x, north z, south z */
 uniform float hasAtlas;
 uniform vec3 tint;
 uniform vec3 clay;
+uniform vec3 glow;
 varying vec3 vWorld;
 void main() {
   vec2 uv = vec2((vWorld.x - box.x) / (box.y - box.x), 1.0 - (vWorld.z - box.z) / (box.w - box.z));
   bool inside = hasAtlas > 0.5 && uv.x > 0.0 && uv.x < 1.0 && uv.y > 0.0 && uv.y < 1.0;
-  vec3 col = inside ? texture2D(atlas, uv).rgb * tint : clay * tint;
+  vec3 col = (inside ? texture2D(atlas, uv).rgb * tint : clay * tint) + glow;
   gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -136,6 +189,22 @@ export function createBuildings(frame: Frame, ground: Ground, onChange: () => vo
   let list: readonly Building[] = []
   const cells = new Map<string, { group: THREE.Group; x: number; z: number }>()
   const walls = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 })
+  const nightUniforms = {
+    nightWall: { value: 0 },
+    windowsLit: { value: 0 },
+    nightWallCol: { value: NIGHT_WALL.clone() },
+    windowCol: { value: WINDOW.clone() },
+  }
+  walls.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, nightUniforms)
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', `#include <common>\n${WALL_PARS}`)
+      .replace('#include <worldpos_vertex>', `#include <worldpos_vertex>\nvAbove = above;\nvWallWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;`)
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\n${WALL_FRAG_PARS}`)
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\n${WALL_FRAG}`)
+  }
+  walls.customProgramCacheKey = () => 'walls-night-v1'
   /* The Animated look: flat pale clay faces and a crisp dark outline round each block. */
   const toonWalls = new THREE.MeshLambertMaterial({ color: new THREE.Color().setRGB(0.8, 0.74, 0.64, THREE.LinearSRGBColorSpace), emissive: new THREE.Color().setRGB(0.12, 0.11, 0.1, THREE.LinearSRGBColorSpace), flatShading: true })
   const outline = new THREE.LineBasicMaterial({ color: 0x1d1a16 })
@@ -146,6 +215,8 @@ export function createBuildings(frame: Frame, ground: Ground, onChange: () => vo
     hasAtlas: { value: 0 },
     tint: { value: new THREE.Color(1, 1, 1) },
     clay: { value: ROOF_CLAY.clone() },
+    /* At night the roofs too take the sky's and the moon's light (setNight): a roof, not a hole. */
+    glow: { value: new THREE.Color(0, 0, 0) },
     ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
   }
   const roofs = new THREE.ShaderMaterial({ uniforms: roofUniforms, vertexShader: roofVertex, fragmentShader: roofFragment, fog: true })
@@ -173,7 +244,7 @@ export function createBuildings(frame: Frame, ground: Ground, onChange: () => vo
     cells.clear()
     void (async () => {
       /* Per cell: one merged wall geometry, one roof geometry, built as each cell's ground heights arrive. */
-      const byCell = new Map<string, { walls: number[]; colours: number[]; roofs: number[]; shadow: boolean[] }>()
+      const byCell = new Map<string, { walls: number[]; colours: number[]; above: number[]; roofs: number[]; shadow: boolean[] }>()
       for (const b of buildings) {
         if (mine !== generation) return
         if (b.ring.length < 4) continue
@@ -189,7 +260,7 @@ export function createBuildings(frame: Frame, ground: Ground, onChange: () => vo
         const key = `${Math.floor(cx / CELL_M)},${Math.floor(cy / CELL_M)}`
         let cell = byCell.get(key)
         if (cell === undefined) {
-          cell = { walls: [], colours: [], roofs: [], shadow: [] }
+          cell = { walls: [], colours: [], above: [], roofs: [], shadow: [] }
           byCell.set(key, cell)
         }
         const wall = known ? WALL : WALL_UNKNOWN
@@ -205,6 +276,8 @@ export function createBuildings(frame: Frame, ground: Ground, onChange: () => vo
             cell.walls.push(q[0], q[1], q[2])
             const k = ao(q[1])
             cell.colours.push(wall.r * k, wall.g * k, wall.b * k)
+            /* Height above the foot for the windows; -1 for buildings too low or of no known height. */
+            cell.above.push(known && h >= WINDOWS_FROM_M ? q[1] - base : -1)
           }
         }
         /* The roof: the footprint triangulated at the top. */
@@ -220,6 +293,7 @@ export function createBuildings(frame: Frame, ground: Ground, onChange: () => vo
         const wg = new THREE.BufferGeometry()
         wg.setAttribute('position', new THREE.Float32BufferAttribute(c.walls, 3))
         wg.setAttribute('color', new THREE.Float32BufferAttribute(c.colours, 3))
+        wg.setAttribute('above', new THREE.Float32BufferAttribute(c.above, 1))
         wg.computeVertexNormals()
         const wm = new THREE.Mesh(wg, look === 'animated' ? toonWalls : walls)
         wm.name = 'buildings walls'
@@ -286,6 +360,15 @@ export function createBuildings(frame: Frame, ground: Ground, onChange: () => vo
     },
     setSun: (c: SkyColours) => {
       roofUniforms.tint.value.copy(daylightTint(c))
+    },
+    /* The night's light on the walls, their windows, and the Animated look's night clay and outline. */
+    setNight: (n: NightLight) => {
+      nightUniforms.nightWall.value = n.wall
+      roofUniforms.glow.value.copy(NIGHT_WALL).multiplyScalar(n.wall * 0.6)
+      nightUniforms.windowsLit.value = n.windows
+      toonWalls.emissive.copy(TOON_DAY_EMISSIVE).lerp(TOON_NIGHT_EMISSIVE, n.night)
+      outline.color.copy(OUTLINE_DAY).lerp(OUTLINE_NIGHT, n.night)
+      onChange()
     },
     setLook: (next: string) => {
       look = next

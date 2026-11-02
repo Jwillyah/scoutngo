@@ -21,6 +21,7 @@
 import * as THREE from 'three'
 import type { SkyColours } from '../../core/skyLook.ts'
 import type { Ground, GroundMaterialHook } from './ground.ts'
+import type { NightLight } from '../../core/nightLight.ts'
 
 export type WorldLook = 'real' | 'animated'
 
@@ -32,6 +33,8 @@ export interface LookControl {
   groundHook(): GroundMaterialHook
   set(look: WorldLook, ground: Ground, ...styled: Restyle[]): void
   setSun(dir: THREE.Vector3, c: SkyColours): void
+  /** The night's share (src/core/nightLight.ts): the Animated ground goes to flat night colours. */
+  setNight(n: NightLight): void
   frame(seconds: number): void
   now(): WorldLook
 }
@@ -68,6 +71,7 @@ uniform sampler2D map;
 uniform vec3 sunDir;
 uniform vec3 light;
 uniform vec3 ambient;
+uniform float night;
 varying vec2 vUv;
 varying vec3 vWorld;
 void main() {
@@ -92,6 +96,19 @@ void main() {
   /* Two soft bands, not a smooth ramp: painted, not photographed. */
   float band = 0.55 + 0.25 * smoothstep(0.15, 0.35, lambert) + 0.2 * smoothstep(0.55, 0.75, lambert);
   vec3 col = tone * band * (ambient * 0.6 + light * 0.8);
+  /*
+   * BY NIGHT (Batch G, Section 9): the day's classes, sorted from a dark
+   * photo and lit by almost nothing, came out as speckle. At night the
+   * photo is read heavily smoothed and drawn in three flat night colours,
+   * no light bands: land, the brighter paving and sand, and vegetation.
+   */
+  if (night > 0.0) {
+    vec3 q = texture2D(map, vUv, 4.0).rgb;
+    float l = dot(q, vec3(0.299, 0.587, 0.114));
+    float s2 = max(q.r, max(q.g, q.b)) - min(q.r, min(q.g, q.b));
+    vec3 nt = (q.g > q.r * 1.04 && q.g > q.b * 1.04 && s2 > 0.04) ? vec3(0.026, 0.04, 0.038) : (l > 0.4 ? vec3(0.075, 0.08, 0.1) : vec3(0.045, 0.05, 0.068));
+    col = mix(col, nt, night);
+  }
   gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -106,6 +123,7 @@ export function createWorldLook(): LookControl {
     sunDir: { value: new THREE.Vector3(0, 1, 0) },
     light: { value: new THREE.Color(0.9, 0.9, 0.85) },
     ambient: { value: new THREE.Color(0.35, 0.37, 0.42) },
+    night: { value: 0 },
   }
   const real: GroundMaterialHook = {
     make: (map) => {
@@ -142,6 +160,9 @@ export function createWorldLook(): LookControl {
       const k = Math.min(1, 0.2 + 0.3 * c.lightIntensity)
       shared.light.value.setRGB(c.light[0] * k, c.light[1] * k, c.light[2] * k, THREE.LinearSRGBColorSpace)
       shared.ambient.value.setRGB(0.25 + c.zenith[0] * 0.8, 0.27 + c.zenith[1] * 0.8, 0.3 + c.zenith[2] * 0.8, THREE.LinearSRGBColorSpace).multiplyScalar(Math.min(1, 0.3 + 0.25 * c.ambientIntensity * 2))
+    },
+    setNight: (n) => {
+      shared.night.value = n.night
     },
     frame: () => {},
     now: () => current,

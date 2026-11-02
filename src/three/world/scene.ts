@@ -48,6 +48,8 @@ import { createWater } from './water.ts'
 import { createClouds } from './clouds.ts'
 import { createWoods } from './woods.ts'
 import { hazeColour, ambientSky } from '../../core/skyLook.ts'
+import { getMoonIllumination, getMoonPosition } from 'suncalc'
+import { nightLight } from '../../core/nightLight.ts'
 import { createArcs } from './arcs.ts'
 
 export type { GroundStatus }
@@ -190,8 +192,13 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
   scene.add(sun.target)
   const hemi = new THREE.HemisphereLight(0xbfd5ff, 0x40362c, 0.8)
   scene.add(hemi)
+  /* The moon (Batch G, Section 9): at night it lights the faces turned toward it, a cool white, no shadow. */
+  const moonLight = new THREE.DirectionalLight(0xc8d4ff, 0)
+  scene.add(moonLight)
+  scene.add(moonLight.target)
 
   let sunNow = { azimuth: 180, altitude: 45 }
+  let timeNow = new Date()
   let sunDir = new THREE.Vector3(0, 1, 0)
   const look = createWorldLook()
   const applySky = () => {
@@ -209,6 +216,16 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
     hemi.intensity = c.ambientIntensity
     water.setSun(sunDir, c)
     buildings.setSun(c)
+    /* The night's light: the sky's glow and the moon's, from the time on the bar (src/core/nightLight.ts). */
+    const mp = getMoonPosition(timeNow, venue.lat, venue.lon)
+    const moonAlt = mp.altitude
+    const moonAz = mp.azimuth
+    const localHour = (timeNow.getUTCHours() + timeNow.getUTCMinutes() / 60 + venue.lon / 15 + 24) % 24
+    const n = nightLight(sunNow.altitude, moonAlt, getMoonIllumination(timeNow).fraction, localHour)
+    moonLight.intensity = n.moon * 0.4
+    moonLight.position.copy(sunDirection(moonAz, Math.max(1, moonAlt))).multiplyScalar(1000)
+    buildings.setNight(n)
+    look.setNight(n)
     clouds.setSun(sunDir, c)
     look.setSun(sunDir, c)
     touch()
@@ -292,6 +309,7 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
   const setTime = (at: Date) => {
     const s = getSunPosition(at, venue.lat, venue.lon)
     sunNow = { azimuth: s.azimuth, altitude: s.altitude }
+    timeNow = at
     applySky()
   }
   setTime(new Date())
@@ -421,7 +439,8 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
         shadowAt = target
         placeShadow(target)
       }
-      ground.follow(target.x, target.z, velocity)
+      /* How high the camera is over where it looks: low, the ground under it is drawn at the imagery's own top zoom. */
+      ground.follow(target.x, target.z, velocity, camera.position.y - target.y)
       buildings.follow(target.x, target.z)
     }
     renderer.render(scene, camera)

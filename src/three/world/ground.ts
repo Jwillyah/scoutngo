@@ -20,6 +20,13 @@
  *
  * PREFETCH. Moving, the next square is built ahead of the camera along its
  * direction (prefetch), so it is there when the camera arrives.
+ *
+ *   FINE   (Batch G, Section 9: at 200 ft the ground under the drone was a
+ *          blur of zoom 18) when the camera is under FINE_BELOW_M above
+ *          where it looks, a small square FINE_TILES across at the
+ *          imagery's own top zoom (FINE_Z, at most 20), drawn just over the
+ *          near square, started from the near picture so it is never holed,
+ *          rebuilt when the camera has gone FINE_RECENTRE_M.
  */
 import * as THREE from 'three'
 import type { ImagerySource } from '../../data/imagerySources.ts'
@@ -34,6 +41,17 @@ export const FAR_Z = 12
 export const MID_HALF_M = 4500
 export const FAR_HALF_M = 24_000
 export const RECENTRE_M = 450
+export const FINE_Z = 20
+export const FINE_TILES = 8
+export const FINE_BELOW_M = 160
+export const FINE_RECENTRE_M = 70
+
+/** The fine square's tiles round a point: the first tile's x and y, and its box, at zoom z. */
+export function finePatch(lat: number, lon: number, z: number, n = FINE_TILES): { tx0: number; ty0: number; west: number; east: number; north: number; south: number } {
+  const tx0 = Math.round(tileX(lon, z) - n / 2)
+  const ty0 = Math.round(tileY(lat, z) - n / 2)
+  return { tx0, ty0, west: lonOf(tx0, z), east: lonOf(tx0 + n, z), north: latOf(ty0, z), south: latOf(ty0 + n, z) }
+}
 /* Under the near square and each other, so the finer level wins where they overlap. */
 const MID_DROP_M = 1.2
 const FAR_DROP_M = 3
@@ -149,7 +167,7 @@ export interface GroundMaterialHook {
 export interface Ground {
   group: THREE.Group
   /** Re-centre on the ground point under the camera; `ahead` (metres per second, x and z) prefetches along the flight. */
-  follow(x: number, z: number, ahead?: { vx: number; vz: number }): void
+  follow(x: number, z: number, ahead?: { vx: number; vz: number }, heightM?: number): void
   /** The near atlas's canvas texture and its box in the frame, for roofs (Section 4). */
   atlas(): { texture: THREE.Texture; west: number; east: number; north: number; south: number } | null
   /** The near square is drawn (its parent picture at least). */
@@ -304,11 +322,82 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
   }
   void nearSquare(0, 0)
 
-  const follow = (x: number, z: number, ahead?: { vx: number; vz: number }) => {
+  /* ------------------------------------------------- the fine square */
+  const fineZ = source === null ? null : Math.min(FINE_Z, source.maxZoom)
+  let fine: { mesh: THREE.Mesh; tex: THREE.CanvasTexture; cx: number; cz: number } | null = null
+  let fineBuilding = false
+  const dropFine = () => {
+    if (fine === null) return
+    group.remove(fine.mesh)
+    fine.mesh.geometry.dispose()
+    fine.tex.dispose()
+    const i = textured.findIndex((t) => t.mesh === fine?.mesh)
+    if (i >= 0) textured.splice(i, 1)
+    fine = null
+    onChange()
+  }
+  const fineSquare = async (cx: number, cz: number) => {
+    if (fineBuilding || fineZ === null || fineZ <= NEAR_Z || near === null) return
+    fineBuilding = true
+    try {
+      const p = finePatch(frame.lat(cz), frame.lon(cx), fineZ)
+      const px = FINE_TILES * 256
+      const canvas = document.createElement('canvas')
+      canvas.width = px
+      canvas.height = px
+      const ctx = canvas.getContext('2d')
+      /* First the near square's own picture of the same ground, so nothing is ever a hole. */
+      const nb = near.box
+      const nearCanvas = near.tex.image as HTMLCanvasElement
+      if (ctx !== null) {
+        const nx = (lon: number) => ((tileX(lon, NEAR_Z) - tileX(nb.west, NEAR_Z)) / NEAR_TILES) * ATLAS_PX
+        const ny = (lat: number) => ((tileY(lat, NEAR_Z) - tileY(nb.north, NEAR_Z)) / NEAR_TILES) * ATLAS_PX
+        ctx.drawImage(nearCanvas, nx(p.west), ny(p.north), nx(p.east) - nx(p.west), ny(p.south) - ny(p.north), 0, 0, px, px)
+      }
+      const tex = new THREE.CanvasTexture(canvas)
+      tex.colorSpace = THREE.SRGBColorSpace
+      tex.anisotropy = 8
+      const h = await heightsFor(p.north, p.south, p.west, p.east, TERRAIN_MAX_Z, status, onChange, 15)
+      /* A hair above the near square, drawn after it, so the sharper picture wins. */
+      const mesh = new THREE.Mesh(gridGeometry(frame, p.north, p.south, p.west, p.east, 48, h, -0.15))
+      mesh.receiveShadow = true
+      mesh.renderOrder = 1
+      mesh.name = 'ground fine'
+      dropFine()
+      wear(mesh, tex)
+      group.add(mesh)
+      fine = { mesh, tex, cx, cz }
+      onChange()
+      const order = Array.from({ length: FINE_TILES * FINE_TILES }, (_, k) => ({ i: k % FINE_TILES, j: Math.floor(k / FINE_TILES) })).sort(
+        (a, b) => Math.hypot(a.i - FINE_TILES / 2, a.j - FINE_TILES / 2) - Math.hypot(b.i - FINE_TILES / 2, b.j - FINE_TILES / 2),
+      )
+      await Promise.all(
+        Array.from({ length: 4 }, async () => {
+          while (order.length > 0) {
+            const t = order.shift()
+            if (t === undefined || fine?.tex !== tex) return
+            const img = await pictureOnly(p.tx0 + t.i, p.ty0 + t.j, fineZ, source)
+            if (img === null || ctx === null) continue
+            ctx.drawImage(img, t.i * 256, t.j * 256, 256, 256)
+            tex.needsUpdate = true
+            onChange()
+          }
+        }),
+      )
+    } finally {
+      fineBuilding = false
+    }
+  }
+
+  const follow = (x: number, z: number, ahead?: { vx: number; vz: number }, heightM?: number) => {
     const tx = x + (ahead?.vx ?? 0) * 6
     const tz = z + (ahead?.vz ?? 0) * 6
     if (near === null) return
     if (Math.hypot(tx - near.cx, tz - near.cz) > RECENTRE_M) void nearSquare(tx, tz)
+    /* Low over the ground: the fine square under it; high again, away with it. */
+    if (heightM !== undefined && heightM < FINE_BELOW_M) {
+      if (fine === null || Math.hypot(x - fine.cx, z - fine.cz) > FINE_RECENTRE_M) void fineSquare(x, z)
+    } else if (fine !== null) dropFine()
   }
 
   return {
