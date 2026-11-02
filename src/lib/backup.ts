@@ -17,9 +17,11 @@
  *     compressed: a zip any phone or computer opens, written here in a few
  *     dozen lines rather than a library;
  *   - "Restore from a file" reads that zip (or a bare backup.json) back;
- *   - once a month on opening, if there is something to lose and no backup
- *     newer than 30 days, the one status line under the chips says so, with
- *     Back up and Not now (never a box over the map).
+ *   - after a new log entry, a saved spot or a kit change (Batch G), if the
+ *     last backup is older than NUDGE_AFTER_MS (or there is none), the one
+ *     status line under the chips says "Back up? Last backup: never", with
+ *     Back up (the phone's share sheet: Files, iCloud Drive) and Not now,
+ *     which hides it for the same 7 days. Never a box over the map.
  *
  * NOT IN THE BACKUP: your Anthropic key (a secret does not belong in a file
  * that gets emailed), the map tiles of offline packs (save them again: they
@@ -32,7 +34,16 @@ export const BACKUP_FORMAT = 'scoutngo-backup'
 export const BACKUP_VERSION = 1
 const LAST_BACKUP = 'scoutngo.backup.last.v1'
 const LAST_REMIND = 'scoutngo.backup.reminded.v1'
-export const REMIND_AFTER_MS = 30 * 86_400_000
+export const NUDGE_AFTER_MS = 7 * 86_400_000
+/** Fired on window when you changed something worth keeping: a log entry, the truth loop, a saved spot, the kit ('kit'). */
+export const YOURS_CHANGED = 'scoutngo:yours-changed'
+export function yoursChanged(what = ''): void {
+  try {
+    window.dispatchEvent(new CustomEvent(YOURS_CHANGED, { detail: what }))
+  } catch {
+    /* No window (tests, the server): nothing to nudge. */
+  }
+}
 
 /** Keys that are not yours to carry: a secret, the app's bookkeeping, and caches it rebuilds. */
 const NOT_BACKED_UP = new Set([
@@ -51,9 +62,9 @@ const NOT_BACKED_UP = new Set([
   'scoutngo.nearMe.snooze.v1',
   LAST_REMIND,
 ])
-/** What counts as something to lose, for the monthly reminder. */
+/** What counts as something to lose, for the nudge. */
 /* Not the kit: the app writes its default kit on first open, and a default is nothing to lose. */
-const WORTH_KEEPING = ['scoutngo.spots.v1', 'scoutngo.fireLog.v1', 'scoutngo.truthLog.v1', 'scoutngo.marks.v1']
+const WORTH_KEEPING = ['scoutngo.spots.v1', 'scoutngo.fireLog.v1', 'scoutngo.truthLog.v1', 'scoutngo.marks.v1', 'scoutngo.kitAmendments.v1']
 
 type Store = Pick<Storage, 'getItem' | 'setItem' | 'removeItem' | 'key' | 'length'>
 
@@ -236,18 +247,28 @@ export const lastBackup = (store: Pick<Storage, 'getItem'>): Date | null => {
   return Number.isFinite(t) ? new Date(t) : null
 }
 
-/** The monthly line: something worth keeping, no backup in 30 days, not reminded in 30 days. */
-export function backupDue(store: Pick<Storage, 'getItem'>, now: number): boolean {
-  const worth = WORTH_KEEPING.some((k) => {
-    const v = store.getItem(k)
-    return v !== null && v !== '[]' && v !== '{}' && v.length > 2
-  })
+/** The nudge: something worth keeping, no backup in 7 days (or ever), not put off in the last 7. */
+export function backupDue(store: Pick<Storage, 'getItem'>, now: number, changedKit = false): boolean {
+  const worth =
+    changedKit ||
+    WORTH_KEEPING.some((k) => {
+      const v = store.getItem(k)
+      return v !== null && v !== '[]' && v !== '{}' && v.length > 2
+    })
   if (!worth) return false
   const last = lastBackup(store)
-  if (last !== null && now - last.getTime() < REMIND_AFTER_MS) return false
-  const reminded = Date.parse(store.getItem(LAST_REMIND) ?? '')
-  return !(Number.isFinite(reminded) && now - reminded < REMIND_AFTER_MS)
+  if (last !== null && now - last.getTime() < NUDGE_AFTER_MS) return false
+  const putOff = Date.parse(store.getItem(LAST_REMIND) ?? '')
+  return !(Number.isFinite(putOff) && now - putOff < NUDGE_AFTER_MS)
 }
+
+/** "Back up? Last backup: never", or the day of the last one. */
+export function backupLine(store: Pick<Storage, 'getItem'>, timeZone?: string): string {
+  const last = lastBackup(store)
+  return `Back up? Last backup: ${last === null ? 'never' : new Intl.DateTimeFormat('en-GB', { timeZone, day: 'numeric', month: 'short' }).format(last)}`
+}
+
+/** Not now: hidden for NUDGE_AFTER_MS. */
 export function markReminded(store: Pick<Storage, 'setItem'>, now: Date = new Date()): void {
   try {
     store.setItem(LAST_REMIND, now.toISOString())
@@ -311,4 +332,28 @@ export function backupNow(): string {
   saveBytes(zip(buildBackup(localStorage)), 'application/zip', file)
   markBackedUp(localStorage)
   return file
+}
+
+/*
+ * ONE TAP TO THE SHARE SHEET (Batch G): on the phone, "Save to Files" puts
+ * the backup in Files or iCloud Drive. Where the browser cannot share a file,
+ * it is downloaded as before. Remembered as backed up only when it went.
+ */
+export async function backupShare(): Promise<'shared' | 'saved' | 'cancelled'> {
+  const name = backupFilename()
+  const bytes = zip(buildBackup(localStorage))
+  const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean }
+  try {
+    const file = new File([bytes as BlobPart], name, { type: 'application/zip' })
+    if (typeof nav.share === 'function' && nav.canShare?.({ files: [file] }) === true) {
+      await nav.share({ files: [file], title: 'ScoutNGo backup' })
+      markBackedUp(localStorage)
+      return 'shared'
+    }
+  } catch (e) {
+    if ((e as Error)?.name === 'AbortError') return 'cancelled'
+  }
+  saveBytes(bytes, 'application/zip', name)
+  markBackedUp(localStorage)
+  return 'saved'
 }

@@ -3,7 +3,11 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { backupDue, buildBackup, crc32, isYours, markBackedUp, markReminded, restoreBackup, unzip, zip } from '../src/lib/backup.ts'
+import { backupDue, backupLine, buildBackup, crc32, isYours, markBackedUp, markReminded, restoreBackup, unzip, YOURS_CHANGED, zip } from '../src/lib/backup.ts'
+import { FIRST_ENTRY, readFireLog, withEntry, writeFireLog } from '../src/lib/fireLog.ts'
+import { entryFromPhoto, readTruthLog, writeTruthLog, type TruthEntry } from '../src/lib/truthLog.ts'
+import { SPOTS_STORAGE_KEY } from '../src/lib/spots.ts'
+import { KIT_STORAGE_KEY } from '../src/lib/kitSelection.ts'
 
 /* Batch E, Section 6: where your things are kept, and a copy you hold. */
 function memory(init: Record<string, string> = {}) {
@@ -79,21 +83,74 @@ describe('the backup', () => {
   })
 })
 
-describe('the monthly reminder', () => {
-  const now = Date.parse('2026-11-01T15:00:00Z')
-  it('only with something to lose', () => {
+describe('the nudge, after a change (Batch G)', () => {
+  const now = Date.parse('2026-11-02T15:00:00Z')
+  it('only with something to lose, or a kit change', () => {
     expect(backupDue(memory({}), now)).toBe(false)
     expect(backupDue(memory({ 'scoutngo.spots.v1': '[]' }), now)).toBe(false)
     expect(backupDue(memory({ 'scoutngo.spots.v1': '[{"a":1}]' }), now)).toBe(true)
+    expect(backupDue(memory({}), now, true)).toBe(true)
   })
-  it('not after a backup in the last 30 days, nor twice in 30 days', () => {
-    const s = memory({ 'scoutngo.spots.v1': '[{"a":1}]' })
-    markBackedUp(s, new Date(now - 10 * 86_400_000))
+  it('when the last backup is over 7 days old, and Not now hides it for 7 days', () => {
+    const s = memory({ 'scoutngo.fireLog.v1': '[{"a":1}]' })
+    markBackedUp(s, new Date(now - 3 * 86_400_000))
     expect(backupDue(s, now)).toBe(false)
-    markBackedUp(s, new Date(now - 40 * 86_400_000))
+    markBackedUp(s, new Date(now - 8 * 86_400_000))
     expect(backupDue(s, now)).toBe(true)
     markReminded(s, new Date(now))
-    expect(backupDue(s, now + 86_400_000)).toBe(false)
-    expect(backupDue(s, now + 31 * 86_400_000)).toBe(true)
+    expect(backupDue(s, now + 6 * 86_400_000)).toBe(false)
+    expect(backupDue(s, now + 8 * 86_400_000)).toBe(true)
+  })
+  it('says the last backup in one line: never, or its day', () => {
+    expect(backupLine(memory({}))).toBe('Back up? Last backup: never')
+    const s = memory({})
+    markBackedUp(s, new Date('2026-10-12T15:00:00Z'))
+    expect(backupLine(s, 'America/New_York')).toBe('Back up? Last backup: 12 Oct')
+  })
+  it('a new log entry or truth-loop result is a change the app hears', () => {
+    const heard: string[] = []
+    const target = new EventTarget()
+    const was = globalThis.window
+    ;(globalThis as { window?: unknown }).window = { dispatchEvent: (e: Event) => target.dispatchEvent(e) }
+    target.addEventListener(YOURS_CHANGED, () => heard.push('changed'))
+    try {
+      writeFireLog([FIRST_ENTRY], memory())
+      writeTruthLog([], memory())
+    } finally {
+      ;(globalThis as { window?: unknown }).window = was
+    }
+    expect(heard).toEqual(['changed', 'changed'])
+  })
+})
+
+describe('the round trip: everything that is yours comes back', () => {
+  it('the log, truth-loop results, spots, kit and settings', () => {
+    const phone = memory()
+    const fire = withEntry([FIRST_ENTRY], { id: 'b', date: '2026-11-02', event: 'sunrise', place: 'Virginia Beach Fishing Pier', outcome: 'fired', forecast: 'Fire likely', photo: JPEG })
+    writeFireLog(fire, phone)
+    const truth = entryFromPhoto(
+      { make: 'DJI', model: 'Air 3S', takenLocal: null, offset: null, focalMm: null, focal35: null, width: null, height: null, lat: null, lon: null, aboveTakeoffM: null, gimbalYaw: null, gimbalPitch: null, gimbalRoll: null, software: null, stitched: false, crop: null },
+      'America/New_York',
+      fire,
+      'IMG_2831.jpeg',
+      { place: { at: { lat: 36.8435575, lon: -75.9713104 }, from: 'venue' }, day: { date: '2026-11-02', event: 'sunrise' } },
+    ) as TruthEntry
+    writeTruthLog([{ ...truth, outcome: 'fired', sky: { cloud: 0.4, lit: 0.25, saturation: 0.5, hue: 20, suggest: 'fired' }, thumb: JPEG }], phone)
+    phone.setItem(SPOTS_STORAGE_KEY, JSON.stringify([{ id: 's1', name: 'Rudee Inlet', lat: 36.83, lon: -75.97 }]))
+    phone.setItem(KIT_STORAGE_KEY, JSON.stringify({ bodyIds: ['a7iv'], lensIds: ['24-70'], droneIds: ['dji-air-3s'] }))
+    phone.setItem('scoutngo.settings', JSON.stringify({ units: { wind: 'kt', height: 'ft' }, showLabels: true }))
+    phone.setItem('scoutngo.anthropicKey.v1', 'sk-ant-secret')
+    const before = new Map(phone.map)
+
+    const fresh = memory()
+    const got = restoreBackup(zip(buildBackup(phone)), fresh)
+    expect(got).toMatchObject({ ok: true, keys: 5, thumbs: 2 })
+    for (const k of ['scoutngo.fireLog.v1', 'scoutngo.truthLog.v1', SPOTS_STORAGE_KEY, KIT_STORAGE_KEY, 'scoutngo.settings']) expect(fresh.getItem(k)).toBe(before.get(k))
+    /* And read back by the app's own readers, not only as text. */
+    expect(readFireLog(fresh).map((e) => e.outcome)).toEqual(['fired', 'fired'])
+    const back = readTruthLog(fresh)[0]
+    expect(back).toMatchObject({ placeFrom: 'venue', timeFrom: 'asked', outcome: 'fired', thumb: JPEG })
+    expect(back.sky?.suggest).toBe('fired')
+    expect(fresh.getItem('scoutngo.anthropicKey.v1')).toBeNull()
   })
 })

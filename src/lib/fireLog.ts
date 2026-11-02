@@ -10,6 +10,8 @@
  * (measurements/2026-10-29-sunrise.md). It is put in the first time the log
  * is read on a phone with no log.
  */
+import { yoursChanged } from './backup.ts'
+
 export const FIRE_LOG_KEY = 'scoutngo.fireLog.v1'
 
 /* 'clear' (Batch F, Section 7): no cloud at all, so nothing to fire; not the same as cloud that stayed grey. */
@@ -80,6 +82,7 @@ export function withEntry(log: readonly FireEntry[], entry: FireEntry): FireEntr
 export function writeFireLog(log: readonly FireEntry[], storage: Pick<Storage, 'setItem'> = localStorage): boolean {
   try {
     storage.setItem(FIRE_LOG_KEY, JSON.stringify(log))
+    yoursChanged()
     return true
   } catch {
     /* Full, usually with photos: the caller says it was not kept. */

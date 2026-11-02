@@ -21,6 +21,7 @@ import { zonedTimeToUtc } from '../core/timezone.ts'
 import type { LatLon } from '../core/geo.ts'
 import { band } from '../core/sunPath.ts'
 import type { FireEntry, FireOutcome } from './fireLog.ts'
+import { yoursChanged } from './backup.ts'
 
 export const TRUTH_KEY = 'scoutngo.truthLog.v1'
 
@@ -167,6 +168,7 @@ export function readTruthLog(storage: Pick<Storage, 'getItem'> = localStorage): 
 export function writeTruthLog(log: readonly TruthEntry[], storage: Pick<Storage, 'setItem'> = localStorage): boolean {
   try {
     storage.setItem(TRUTH_KEY, JSON.stringify(log))
+    yoursChanged()
     return true
   } catch {
     return false

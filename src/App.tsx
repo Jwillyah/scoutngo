@@ -38,7 +38,7 @@ import { LOCATED_ZOOM, locateOnce } from './lib/locateOnce.ts'
 import { markNearMeSeen, nearMeDue, nearMeItems, placesNear, snoozeNearMe, type NearItem } from './lib/nearMe.ts'
 import { readHome } from './lib/home.ts'
 import { NearYou } from './components/NearYou.tsx'
-import { askToPersist, backupDue, backupNow, markReminded } from './lib/backup.ts'
+import { askToPersist, backupDue, backupLine, backupShare, markReminded, yoursChanged, YOURS_CHANGED } from './lib/backup.ts'
 import { useNewBuild } from './lib/useNewBuild.ts'
 import { useSkyFrames } from './lib/useSkyFrames.ts'
 import { useWind } from './lib/useWind.ts'
@@ -1190,7 +1190,13 @@ function App() {
    * record of what the shooter chose, and a second structure describing which
    * parts of it are "really" theirs is a second source for one fact.
    */
-  const onKitChange = useCallback((next: KitSelection) => setKit(next), [setKit])
+  const onKitChange = useCallback(
+    (next: KitSelection) => {
+      setKit(next)
+      yoursChanged('kit')
+    },
+    [setKit],
+  )
 
   /*
    * THE FILTER DOES NOT PACK THE BAG. IT NEVER DID, HONESTLY.
@@ -1563,24 +1569,26 @@ function App() {
    * its location is already shared: never asked for here) or the home spot.
    */
   /*
-   * KEEP WHAT IS YOURS (src/lib/backup.ts, Batch E): ask the browser once per
-   * open to keep this site's storage, and once a month, if there is
-   * something to lose and no backup newer than 30 days, say so in one line.
+   * KEEP WHAT IS YOURS (src/lib/backup.ts): ask the browser once per open to
+   * keep this site's storage. After a new log entry, a saved spot or a kit
+   * change (Batch G), if the last backup is over 7 days old, one line:
+   * "Back up? Last backup: never". Not now hides it for 7 days.
    */
-  const [backupNag, setBackupNag] = useState(false)
+  const [backupNag, setBackupNag] = useState<string | null>(null)
+  const nudgeBackup = useCallback((kit = false) => {
+    try {
+      if (backupDue(localStorage, Date.now(), kit)) setBackupNag(backupLine(localStorage))
+    } catch {
+      /* No storage to read: nothing to nudge about. */
+    }
+  }, [])
   useEffect(() => {
     void askToPersist()
-    try {
-      if (backupDue(localStorage, Date.now())) {
-        markReminded(localStorage)
-        const t = setTimeout(() => setBackupNag(true), 0)
-        return () => clearTimeout(t)
-      }
-    } catch {
-      /* No storage to read: nothing to remind about. */
-    }
-    return undefined
-  }, [])
+    /* Heard from the writers themselves, never from state settling on load: a shared plan's kit is not your change. */
+    const on = (e: Event) => nudgeBackup((e as CustomEvent<string>).detail === 'kit')
+    window.addEventListener(YOURS_CHANGED, on)
+    return () => window.removeEventListener(YOURS_CHANGED, on)
+  }, [nudgeBackup])
   const [nearItems, setNearItems] = useState<NearItem[] | null>(null)
   const nearInputs = useRef({ spots, place })
   nearInputs.current = { spots, place }
@@ -1699,7 +1707,10 @@ function App() {
     marks,
   })
 
-  const saveSpot = (name: string) => setSpots(mergeSpots(spots, [spotNamed(name)]))
+  const saveSpot = (name: string) => {
+    setSpots(mergeSpots(spots, [spotNamed(name)]))
+    yoursChanged('spot')
+  }
 
   /* The plan on screen, for Save plan and Share. Named for the venue, or its coordinate. */
   const currentPlan = (): Spot | null => {
@@ -2078,7 +2089,22 @@ function App() {
       ) : null}
       {mode === 'plan' ? (
         <PlanMode
-          backupReminder={backupNag ? { onBackup: () => { backupNow(); setBackupNag(false) }, onDismiss: () => setBackupNag(false) } : null}
+          backupReminder={
+            backupNag === null
+              ? null
+              : {
+                  line: backupNag,
+                  onBackup: () => {
+                    void backupShare().then((r) => {
+                      if (r !== 'cancelled') setBackupNag(null)
+                    })
+                  },
+                  onDismiss: () => {
+                    markReminded(localStorage)
+                    setBackupNag(null)
+                  },
+                }
+          }
           place={place}
           groups={{ water: groups.water, land: groups.land, surf: surfInMenu }}
           /* One name for the place, in the bar and on the shoot card alike. */

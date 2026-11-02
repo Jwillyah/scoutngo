@@ -14942,6 +14942,34 @@
   color: var(--color-text-muted);
 }
 
+/* The backup nudge (Batch G): the one line is its own button, "Not now" a ×. One line, never a box. */
+.offline-line--whole {
+  padding-block: 0;
+  gap: 0;
+}
+.offline-line__line {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.offline-line__act--mark {
+  width: 44px;
+  padding: 0;
+  border: 0;
+  font-size: var(--text-lg, 1.25rem);
+}
+
 /* The 3D view's clouds line in its "i": the note, and High / Battery (Batch D). */
 .clay__clouds {
   display: grid;

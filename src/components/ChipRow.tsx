@@ -94,7 +94,14 @@ interface ChipRowProps {
    */
   status?: string | null
   /** A button at the end of the status line: Retry, after "Use my location" failed. */
-  statusAction?: { label: string; onClick: () => void; /** A second, quieter button: "Not now" (the backup reminder). */ dismiss?: { label: string; onClick: () => void } }
+  statusAction?: {
+    label: string
+    onClick: () => void
+    /** A second, quieter button: "Not now" (the backup nudge); `mark` draws it as that one character, the label kept for screen readers. */
+    dismiss?: { label: string; onClick: () => void; mark?: string }
+    /** The line itself is the button (the backup nudge, Batch G: one line, one tap), `label` its spoken name. */
+    whole?: boolean
+  }
   /** When set, the status line is a button: special light on now opens its list. */
   onStatus?: () => void
   /** The card currently open, so its chip shows as active. */
@@ -172,14 +179,22 @@ export function ChipRow({ chips, active, onOpen, measureRef, status = null, stat
         </button>
       ))}
       {status === null ? null : statusAction !== undefined ? (
-        <div className="offline-line offline-line--act" role="status">
-          <span>{status}</span>
-          <button type="button" className="offline-line__act" onClick={statusAction.onClick}>
-            {statusAction.label}
-          </button>
+        <div className={`offline-line offline-line--act${statusAction.whole === true ? ' offline-line--whole' : ''}`} role="status">
+          {statusAction.whole === true ? (
+            <button type="button" className="offline-line__line" aria-label={`${statusAction.label}: ${status}`} onClick={statusAction.onClick}>
+              {status}
+            </button>
+          ) : (
+            <>
+              <span>{status}</span>
+              <button type="button" className="offline-line__act" onClick={statusAction.onClick}>
+                {statusAction.label}
+              </button>
+            </>
+          )}
           {statusAction.dismiss === undefined ? null : (
-            <button type="button" className="offline-line__act offline-line__act--quiet" onClick={statusAction.dismiss.onClick}>
-              {statusAction.dismiss.label}
+            <button type="button" className={`offline-line__act offline-line__act--quiet${statusAction.dismiss.mark === undefined ? '' : ' offline-line__act--mark'}`} aria-label={statusAction.dismiss.mark === undefined ? undefined : statusAction.dismiss.label} onClick={statusAction.dismiss.onClick}>
+              {statusAction.dismiss.mark ?? statusAction.dismiss.label}
             </button>
           )}
         </div>
