@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { LatLon } from '../core/geo.ts'
-import { fitPhotoFrame, horizonDipDeg } from '../core/photoCompare.ts'
+import { cropInSnapshot, fitPhotoFrame, horizonDipDeg } from '../core/photoCompare.ts'
 import { getSunPosition } from '../core/sun.ts'
 import { formatClock, venueTimeZone } from '../core/timezone.ts'
 import { isStitched, photoFov, placeable, readPhotoMeta, type PhotoMeta } from '../lib/compare/photoMeta.ts'
@@ -162,8 +162,20 @@ export function ComparePhoto({ fallbackAt, distanceUnit, onClose }: ComparePhoto
         setPhase({ kind: 'rendering', note: 'Waiting for the ground and the buildings…' })
         await made.settled(30_000)
         if (cancelled) return
-        const shot = await made.snapshot()
+        /* The box can have changed shape while the ground loaded: fit again to it as it is now. */
+        const now = engine.current.getBoundingClientRect()
+        const fitNow = fitPhotoFrame(now.width, now.height, pose.fov.horizontalDeg, pose.fov.verticalDeg)
+        made.photoView(pose.at, groundM + pose.aboveTakeoffM, pose.yaw, pose.pitch, pose.roll, fitNow.engineFovDeg)
+        await made.settled(5_000)
         if (cancelled) return
+        const whole = await made.snapshot()
+        if (cancelled) return
+        /* Only the photo's frame: the rest of the phone-shaped canvas is not in the photo. */
+        const cut = cropInSnapshot(whole.width, whole.height, now.width, now.height, fitNow.crop)
+        const shot = document.createElement('canvas')
+        shot.width = Math.max(1, Math.round(cut.w))
+        shot.height = Math.max(1, Math.round(cut.h))
+        shot.getContext('2d')?.drawImage(whole, cut.x, cut.y, cut.w, cut.h, 0, 0, shot.width, shot.height)
         setRender(shot.toDataURL('image/jpeg', 0.9))
         const sun = getSunPosition(pose.when, pose.at.lat, pose.at.lon)
         setFacts({ groundM, sun, pose })

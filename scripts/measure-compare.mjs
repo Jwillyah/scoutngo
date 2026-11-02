@@ -2,18 +2,21 @@
  * COMPARE A PHOTO, ON REAL FILES: WHAT EACH ONE HOLDS, AND HOW THE 3D VIEW SCORED.
  *
  * Usage:  node scripts/measure-compare.mjs <photo.jpg> [more.jpg ...]
- * Writes: measurements/<today>-compare.md
+ * Writes: measurements/<today>-compare.md, and each photo beside its 3D view
+ *         in measurements/<today>-compare/ (the photo scaled to 720 px wide)
  * Exits:  0 every file was read and either scored, or said why not; 2 could
  *         not look.
  *
  * Each file goes through the app's own Compare screen in the browser (the
  * file input is given the path, exactly as a phone's picker would hand it
  * over), so the numbers are the screen's numbers, not a second copy of its
- * arithmetic. The photos are not copied into the repository; positions are
- * written to four decimals (about 10 m).
+ * arithmetic. The original files are not copied into the repository: the
+ * side-by-side is drawn on a canvas at 720 px, so it carries no EXIF and no
+ * GPS (Batch D, Section 8 asked for the pictures in measurements/);
+ * positions are written to four decimals (about 10 m).
  */
-import { writeFileSync } from 'node:fs'
-import { basename, resolve } from 'node:path'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { basename, join, resolve } from 'node:path'
 import { connect } from './cdp.mjs'
 import { goToStage, guardAudit } from './preflight.mjs'
 
@@ -37,6 +40,7 @@ try {
   if (!(await ev(`!!document.querySelector('.cmp')`))) throw new Error('the Compare screen did not open (?compare=1)')
   await send('DOM.enable', {})
   const rows = []
+  const pairDir = `measurements/${new Date().toISOString().slice(0, 10)}-compare`
   for (const file of files) {
     const { root } = await send('DOM.getDocument', { depth: -1 }).then((r) => r.result)
     const { nodeId } = await send('DOM.querySelector', { nodeId: root.nodeId, selector: '.cmp input[type=file]' }).then((r) => r.result)
@@ -47,6 +51,30 @@ try {
       await wait(1000)
       state = JSON.parse(await ev(`JSON.stringify(window.__compare ?? null)`))
       if (state !== null && state.name === basename(file) && ['done', 'missing', 'failed'].includes(state.phase)) break
+    }
+    /* The photo and the 3D view side by side, each 720 px wide, for the eye (Batch D, Section 8). */
+    if (state?.phase === 'done') {
+      const pair = await ev(`(async () => {
+        const photo = document.querySelector('.cmp__photo')
+        const render = [...document.querySelectorAll('.cmp__render')].find((i) => !i.classList.contains('cmp__render--swipe')) ?? document.querySelector('.cmp__render')
+        if (!photo || !render) return null
+        await Promise.all([photo, render].map((i) => (i.complete ? null : new Promise((r) => (i.onload = r)))))
+        const W = 720
+        const h = Math.round((W * photo.naturalHeight) / photo.naturalWidth)
+        const c = document.createElement('canvas')
+        c.width = W * 2 + 12
+        c.height = h
+        const g = c.getContext('2d')
+        g.fillStyle = '#fff'
+        g.fillRect(0, 0, c.width, h)
+        g.drawImage(photo, 0, 0, W, h)
+        g.drawImage(render, W + 12, 0, W, h)
+        return c.toDataURL('image/jpeg', 0.85).split(',')[1]
+      })()`)
+      if (pair) {
+        mkdirSync(pairDir, { recursive: true })
+        writeFileSync(join(pairDir, basename(file).replace(/\.jpe?g$/i, '-pair.jpg')), Buffer.from(pair, 'base64'))
+      }
     }
     rows.push({ file: basename(file), state })
     const s = state?.score
@@ -82,6 +110,8 @@ try {
       const horizon = !s ? '—' : inFrame ? `${s.horizon.predicted.toFixed(0)} / ${s.horizon.photo ?? '—'} / ${s.horizon.render ?? '—'} of ${s.height}` : 'out of frame at this tilt'
       return `| ${file} | ${outcome} | ${horizon} | ${s ? s.sunNote : '—'} | ${s?.edges ? `${s.edges.medianPx.toFixed(1)} px, ${Math.round(s.edges.within * 100)}%` : '—'} |`
     }),
+    '',
+    `Side by side (the photo left, the 3D view right): ${pairDir}/<file>-pair.jpg.`,
     '',
   ]
   const file = `measurements/${new Date().toISOString().slice(0, 10)}-compare.md`

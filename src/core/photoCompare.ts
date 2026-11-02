@@ -215,3 +215,17 @@ export function fitPhotoFrame(canvasW: number, canvasH: number, horizontalDeg: n
   }
   return { engineFovDeg: deg(canvasW >= canvasH ? canvasTanH : canvasTanV), crop }
 }
+
+/*
+ * THE CUT, IN THE SNAPSHOT'S OWN PIXELS (Batch D, Section 8). `crop` is in
+ * the canvas's CSS pixels; the snapshot is the drawing buffer, a pixel ratio
+ * larger, and not always by the same factor both ways. Until 1 Nov the crop
+ * was worked out and never used: the whole canvas, phone-shaped, was
+ * stretched over a landscape photo and scored, so its horizon sat in the
+ * wrong row (Sandbridge: 290 against a predicted 238 of 658).
+ */
+export function cropInSnapshot(shotW: number, shotH: number, canvasW: number, canvasH: number, crop: { x: number; y: number; w: number; h: number }): { x: number; y: number; w: number; h: number } {
+  const kx = shotW / canvasW
+  const ky = shotH / canvasH
+  return { x: crop.x * kx, y: crop.y * ky, w: crop.w * kx, h: crop.h * ky }
+}

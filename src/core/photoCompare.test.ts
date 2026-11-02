@@ -124,4 +124,18 @@ describe("the photo's frame inside the 3D canvas", () => {
     expect(f.crop.h).toBe(600)
     expect(f.crop.w).toBeLessThan(1600)
   })
+  it('the cut is taken in the snapshot\'s pixels, a landscape photo in a portrait phone keeping its shape', async () => {
+    const { fitPhotoFrame, cropInSnapshot } = await import('./photoCompare.ts')
+    /* Sandbridge, 1 Nov: a 4:3 photo, about 29 x 22 deg, in a 358 x 521 box drawn at a 1.9 pixel ratio. */
+    const f = fitPhotoFrame(358, 521, 29, 22)
+    const c = cropInSnapshot(680, 990, 358, 521, f.crop)
+    const tanH = Math.tan((29 * Math.PI) / 360)
+    const tanV = Math.tan((22 * Math.PI) / 360)
+    expect(c.w / c.h).toBeCloseTo(tanH / tanV, 2)
+    expect(c.x).toBe(0)
+    expect(c.w).toBeCloseTo(680, 6)
+    expect(c.y + c.h / 2).toBeCloseTo(990 / 2, 6)
+    /* The whole canvas, as was scored before, is the wrong shape. */
+    expect(Math.abs(680 / 990 - tanH / tanV)).toBeGreaterThan(0.5)
+  })
 })
