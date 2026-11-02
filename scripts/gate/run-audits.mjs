@@ -57,6 +57,7 @@ export const AUDITS = [
   { name: 'weather', script: 'audit-weather.mjs', summary: /WEATHER PROBLEMS/ },
   { name: 'locate', script: 'audit-locate.mjs', summary: /LOCATE PROBLEMS/ },
   { name: 'safari tab', script: 'audit-safari-tab.mjs', summary: /SAFARI TAB PROBLEMS/ },
+  { name: 'landscape', script: 'audit-landscape.mjs', summary: /LANDSCAPE PROBLEMS/ },
   { name: 'venue pack', script: 'audit-venue-pack.mjs', summary: /VENUE PACK PROBLEMS/ },
   { name: 'one surface', script: 'audit-surface.mjs', summary: /SURFACE PROBLEMS/, pattern: /PROBLEM|FAIL|ABORTED/, timing: true },
   { name: 'overflow', script: 'audit-overflow.mjs', summary: /OVERFLOW PROBLEMS/, timing: true },

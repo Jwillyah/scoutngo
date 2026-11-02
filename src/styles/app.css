@@ -14971,3 +14971,85 @@
   z-index: 1;
   pointer-events: none;
 }
+
+/*
+ * LANDSCAPE (Batch F, Section 4). On its side, at 844 x 390, the venue bar,
+ * the chip row, the tool dock and the bottom sheet were laid out as in
+ * portrait, centred, and covered most of the map and the 3D view. On its
+ * side now: one column at the left, at most 40% of the width, holds the
+ * venue bar, the chips in one compact row and the sheet as a side panel
+ * under them; the tool dock is a vertical strip on the right edge with the
+ * map's rail beside it. The rest of the screen is the view.
+ * scripts/audit-landscape.mjs measures it at 844 x 390.
+ */
+@media (orientation: landscape) and (max-height: 540px) {
+  .mode-plan {
+    /* The sheet is beside the map, not under it: nothing rides up on its height. */
+    --sheet-live-height: 0px !important;
+    --land-col: min(40dvw, 22rem);
+    /* The venue bar and the chips are allowed a little more, so no chip label is cut. */
+    --land-bar: min(50dvw, 26rem);
+    --land-left: calc(env(safe-area-inset-left, 0px) + var(--space-2));
+    --land-right: calc(env(safe-area-inset-right, 0px) + var(--space-2));
+  }
+
+  .mode-plan .topbar,
+  .mode-plan .chips2 {
+    left: var(--land-left);
+    right: auto;
+    width: var(--land-bar);
+    max-width: none;
+    margin: 0;
+  }
+
+  .mode-plan .chips2 {
+    top: calc(var(--safe-top) + var(--space-1) + 44px + var(--space-1));
+  }
+
+  .mode-plan .topbar {
+    top: calc(var(--safe-top) + var(--space-1));
+  }
+
+  .mode-plan .sheet {
+    left: var(--land-left);
+    right: auto;
+    width: var(--land-col);
+    max-width: none;
+    margin: 0;
+    top: calc(var(--safe-top) + var(--space-1) + 44px + var(--space-1) + 46px + var(--space-2));
+    /* As tall as what it shows: a peek is a header, not an empty panel. */
+    bottom: auto;
+    max-height: calc(100% - var(--safe-top) - 44px - 46px - var(--space-1) * 2 - var(--space-2) - var(--dock-height, 0px) - var(--space-1));
+    height: auto !important;
+    border: var(--line-hair) solid var(--color-edge-top);
+    border-radius: var(--radius-panel);
+  }
+
+  .mode-plan .sheet__body {
+    overflow-y: auto !important;
+  }
+
+  .mode-plan .tooldock {
+    left: auto;
+    right: var(--land-right);
+    top: 50%;
+    bottom: auto;
+    transform: translateY(-50%);
+    flex-direction: column;
+    margin: 0;
+  }
+
+  .mode-plan .rail2 {
+    top: calc(var(--safe-top) + var(--space-2));
+    right: calc(var(--land-right) + 44px + var(--space-3));
+  }
+
+  .mode-plan .shadowkey {
+    left: auto;
+    right: calc(var(--land-right) + 44px + var(--space-3) + 48px + var(--space-3));
+    bottom: calc(var(--dock-height, 0px) + var(--space-2));
+    max-width: calc(100% - var(--land-col) - 220px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}

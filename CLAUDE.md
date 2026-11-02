@@ -37,6 +37,7 @@ tsc -b → oxlint --deny-warnings → viewport units → colour roles → clock
        → measurements → tests → build → build stamp
        → browser audits (scripts/gate/browser-gate.sh), side by side:
          reachability, labels, gestures (alone), standalone, viewfinder, fly,
+         landscape,
          buildings, sky fire, terrain decode, special light, line up, privacy,
          wind, weather, locate, safari tab, venue pack, surface, overflow,
          projection (alone), offline, api urls, 3d network, airspace,
