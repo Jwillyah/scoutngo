@@ -22,8 +22,19 @@ export interface WaterMask {
 
 const NONE: WaterMask = { inWater: () => false }
 
+/** Which polygons fill the mask: a layer of the tiles, and optionally only some classes in it. */
+export interface MaskOf {
+  layer: string
+  keep?: (props: Record<string, unknown>) => boolean
+}
+
 /** The water over a lat/lon box, from vector tiles at zoom `z`; nothing where they cannot be had. */
-export async function waterMaskFor(north: number, south: number, west: number, east: number, z: number): Promise<WaterMask> {
+export function waterMaskFor(north: number, south: number, west: number, east: number, z: number): Promise<WaterMask> {
+  return polygonMaskFor({ layer: 'water' }, north, south, west, east, z)
+}
+
+/** Any of the map's polygons over a box, the same way (woods.ts asks for the woodland). */
+export async function polygonMaskFor(of: MaskOf, north: number, south: number, west: number, east: number, z: number): Promise<WaterMask> {
   const x0 = Math.floor(tileX(west, z))
   const x1 = Math.floor(tileX(east, z))
   const y0 = Math.floor(tileY(north, z))
@@ -42,12 +53,13 @@ export async function waterMaskFor(north: number, south: number, west: number, e
       const x = x0 + (k % (x1 - x0 + 1))
       const y = y0 + Math.floor(k / (x1 - x0 + 1))
       const tile = await loadVectorTile({ z, x, y })
-      const layer = tile?.layers.water
+      const layer = tile?.layers[of.layer]
       if (tile == null || layer === undefined) return
-      const ext = vectorExtent(tile)
+      const ext = layer.extent || vectorExtent(tile)
       for (let i = 0; i < layer.length; i += 1) {
         const f = layer.feature(i)
         if (f.type !== 3) continue
+        if (of.keep !== undefined && !of.keep(f.properties)) continue
         ctx.beginPath()
         for (const ring of f.loadGeometry()) {
           ring.forEach((p, j) => {

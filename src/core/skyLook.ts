@@ -98,3 +98,16 @@ export function skyAt(colours: SkyColours, elevationDeg: number): Rgb {
 
 /** Blue over red: above 1 reads as blue sky. */
 export const blueness = (c: Rgb): number => c[2] / Math.max(1e-6, c[0])
+
+/*
+ * ATMOSPHERIC PERSPECTIVE (Batch D, Section 5b). Far land fades into the
+ * haze, and the haze by day is a touch bluer than the horizon band itself,
+ * so distant ground goes lighter and bluer the way it does from the air,
+ * rather than toward a flat white. A fifth of the way to the zenith, scaled
+ * by the light: none at night, when the haze is the horizon's own dark.
+ */
+export const HAZE_ZENITH_SHARE = 0.2
+export function hazeColour(c: SkyColours): Rgb {
+  const k = HAZE_ZENITH_SHARE * Math.min(1, Math.max(0, c.lightIntensity))
+  return [c.horizon[0] + (c.zenith[0] - c.horizon[0]) * k, c.horizon[1] + (c.zenith[1] - c.horizon[1]) * k, c.horizon[2] + (c.zenith[2] - c.horizon[2]) * k]
+}

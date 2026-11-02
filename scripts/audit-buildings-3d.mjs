@@ -33,6 +33,8 @@ const OUT = process.argv[2] ?? join(process.env.SCOUTNGO_OUT ?? tmpdir(), 'build
 mkdirSync(OUT, { recursive: true })
 export const ROOF_STD = 8
 export const CRISP_MIN = 0.44
+/* Near Hampton: woodland polygons in the recorded z14 tiles (scripts/gate/tiles/openfreemap/14/4715). */
+const WOODS = { lat: 37.04, lon: -76.388 }
 let problems = 0
 const fail = (why) => {
   console.log('      PROBLEM: ' + why)
@@ -43,17 +45,21 @@ const AT = '2026-11-01T13:07:00Z'
 
 const browser = await webkit.launch()
 try {
-  const ctx = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height: 844 }, serviceWorkers: 'block' })
-  await ctx.addInitScript(() => {
-    try {
-      localStorage.setItem('scoutngo.landing.v1', 'true')
-    } catch {
-      /* about:blank */
-    }
-  })
-  const page = await ctx.newPage()
-  await page.clock.install({ time: new Date(AT) })
-  await page.clock.resume()
+  const fresh = async () => {
+    const c = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height: 844 }, serviceWorkers: 'block' })
+    await c.addInitScript(() => {
+      try {
+        localStorage.setItem('scoutngo.landing.v1', 'true')
+      } catch {
+        /* about:blank */
+      }
+    })
+    const p = await c.newPage()
+    await p.clock.install({ time: new Date(AT) })
+    await p.clock.resume()
+    return [c, p]
+  }
+  let [ctx, page] = await fresh()
   const wait = (ms) => page.waitForTimeout(ms)
   const ev = (x) => page.evaluate(x)
   const venue = { ...CALIBRATION_VENUE, name: { key: placeKey(String(PIER.lat), String(PIER.lon)), name: 'Virginia Beach Fishing Pier' }, latitude: String(PIER.lat), longitude: String(PIER.lon), date: '2026-11-01', startTime: '07:00', endTime: '10:00' }
@@ -79,7 +85,7 @@ try {
   }
   await wait(3000)
   const grab = async (hide) => {
-    if (hide !== 'animated') await ev(`window.__clay.setHidden(${hide === null ? 'null' : `'${hide}'`})`)
+    if (hide === null || hide === 'buildings' || hide === 'roofs') await ev(`window.__clay.setHidden(${hide === null ? 'null' : `'${hide}'`})`)
     await wait(600)
     const b64 = await ev(`(async () => (await window.__clay.snapshot()).toDataURL('image/png').split(',')[1])()`)
     const buf = Buffer.from(b64, 'base64')
@@ -157,6 +163,45 @@ try {
   console.log(`  animated: ${dark(anim)} near-black outline pixels (real ${dark(all)}); edges crisp ${crisp(anim).toFixed(2)} (real ${crisp(all).toFixed(2)})`)
   if (dark(anim) < Math.max(300, dark(all) * 1.5)) fail(`the Animated look has no outlines round the blocks (${dark(anim)} near-black pixels)`)
   if (crisp(anim) < CRISP_MIN) fail(`the Animated look is blurred: its edges are ${crisp(anim).toFixed(2)} crisp (at least ${CRISP_MIN}; a 5 x 5 blur over it measured 0.39)`)
+
+  /*
+   * TREES OVER THE WOODS (Section 5b). The recorded tiles round the pier have
+   * no woodland, so none may be drawn there; near Hampton (WOODS) they have
+   * many polygons, so trees must be drawn, and seen: hiding them changes
+   * the picture.
+   */
+  const pierWoods = await ev('window.__clay.woods()')
+  console.log(`  woods at the pier (no woodland in its tiles): ${pierWoods} trees`)
+  if (pierWoods !== 0) fail(`${pierWoods} trees drawn over woods at the pier, whose tiles have none`)
+  await ctx.close()
+  ;[ctx, page] = await fresh()
+  const wv = { ...venue, name: { key: placeKey(String(WOODS.lat), String(WOODS.lon)), name: 'Woods' }, latitude: String(WOODS.lat), longitude: String(WOODS.lon) }
+  await page.goto(await shareLink(`${APP_ORIGIN}/`, { id: 'b3w', name: 'B3W', savedAt: '2026-10-31T00:00:00Z', venue: wv, kit: { bodyIds: [], lensIds: [], droneIds: [], styleNotes: '' }, positions: [] }))
+  await wait(3000)
+  await page.getByRole('button', { name: /^open$/i }).click({ timeout: 3000 }).catch(() => {})
+  await page.getByText('Open the map', { exact: true }).click({ timeout: 3000 }).catch(() => {})
+  await goToStage(ev, wait, 'plan')
+  await wait(1500)
+  await ev(`document.querySelector('button[aria-label="Open the 3D clay model"]')?.click()`)
+  for (let i = 0; i < 40 && !(await ev('!!window.__clay')); i += 1) await wait(1000)
+  let woods = 0
+  for (let i = 0; i < 40; i += 1) {
+    await wait(1000)
+    await ev(`(() => { const c = window.__clay; c.setSkyShown(false); c.setTime(new Date('${AT}')); c.droneView(${JSON.stringify(WOODS)}, 122, 200, -30, 24) })()`)
+    woods = await ev('window.__clay ? window.__clay.woods() : 0')
+    if (woods > 0 && (await ev('window.__clay.loaded()')) && i > 4) break
+  }
+  await wait(2000)
+  const wAll = await grab('woods-shown')
+  await ev(`window.__clay.setHidden('woods')`)
+  const wNone = await grab('woods-hidden-shot')
+  await ev('window.__clay.setHidden(null)')
+  let changed = 0
+  for (let i = 0; i < wAll.data.length; i += 4) if (diff(wAll.data, wNone.data, i)) changed += 1
+  const share = changed / (wAll.data.length / 4)
+  console.log(`  woods near Hampton: ${woods} trees; hiding them changes ${(share * 100).toFixed(1)}% of the picture`)
+  if (woods === 0) fail('no trees drawn over the woods near Hampton, whose tiles have woodland')
+  if (share < 0.01) fail(`the trees over the woods are not seen: hiding them changes ${(share * 100).toFixed(2)}% of the picture`)
   await ctx.close()
 } finally {
   await browser.close()

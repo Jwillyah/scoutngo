@@ -46,6 +46,8 @@ import { createWorldLook } from './look.ts'
 import { createBuildings } from './buildings.ts'
 import { createWater } from './water.ts'
 import { createClouds } from './clouds.ts'
+import { createWoods } from './woods.ts'
+import { hazeColour } from '../../core/skyLook.ts'
 import { createArcs } from './arcs.ts'
 
 export type { GroundStatus }
@@ -96,6 +98,8 @@ export interface ClayScene {
   lookDown(at: LatLon, height: number): void
   buildings(): readonly Building[]
   counts: typeof tileCounts
+  /** Trees drawn over the map's woods: illustrative, picture only (woods.ts). */
+  woods(): number
   setSea(inputs: CinemaInputs | null): void
   setFlyLook(look: Look | null, inputs: CinemaInputs | null): void
   /** Cloud quality: High (raymarched layer) or Battery (layered billboards). */
@@ -106,7 +110,7 @@ export interface ClayScene {
   /** For checks: the hour pills drawn last frame, in page pixels. */
   pills(): { text: string; l: number; t: number; r: number; b: number }[]
   /** For checks: draw without the buildings, or without their roofs. */
-  setHidden(what: 'buildings' | 'roofs' | null): void
+  setHidden(what: 'buildings' | 'roofs' | 'woods' | null): void
   /** For checks: the water drawn flat magenta (its geometry, nothing else changed). */
   setWaterMask(on: boolean): void
   /** For checks: over an n x n grid `halfM` either side of the venue, the points where water is drawn and some ground stands above it (a slab over the sea). */
@@ -194,7 +198,8 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
     sunDir = sunDirection(sunNow.azimuth, sunNow.altitude)
     sky.set(sunDir, sunNow.altitude)
     const c = sky.colours()
-    ;(scene.fog as THREE.FogExp2).color.setRGB(c.horizon[0], c.horizon[1], c.horizon[2], THREE.LinearSRGBColorSpace)
+    const haze = hazeColour(c)
+    ;(scene.fog as THREE.FogExp2).color.setRGB(haze[0], haze[1], haze[2], THREE.LinearSRGBColorSpace)
     sun.color.setRGB(c.light[0], c.light[1], c.light[2], THREE.LinearSRGBColorSpace)
     sun.intensity = c.lightIntensity
     sun.castShadow = sunNow.altitude > 0
@@ -227,6 +232,8 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
   scene.add(buildings.group)
   const clouds = createClouds(touch)
   scene.add(clouds.group)
+  const woods = createWoods(frame, venue, touch)
+  scene.add(woods.group)
   const arcs = createArcs(touch)
   scene.add(arcs.group)
 
@@ -401,6 +408,7 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
     const seconds = (t0 - started) / 1000
     water.frame(seconds, camera)
     clouds.frame(seconds, camera)
+    water.setMirror(clouds.mirror())
     look.frame(seconds)
     arcs.frame(camera, renderer.domElement)
     /* Every few frames: where the camera looks, for the near ground, the shadow and the prefetch. */
@@ -582,7 +590,7 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
       setSea(play.cinema)
       clouds.set(play.cinema)
     }
-    look.set(play.look === 'animated' ? 'animated' : 'real', ground, buildings, water)
+    look.set(play.look === 'animated' ? 'animated' : 'real', ground, buildings, water, woods)
     arcs.setShown(false)
     pinGroup.visible = false
     onNote?.(previewNote(play.cinema, clouds.drawn()))
@@ -617,7 +625,7 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
     } finally {
       playing = null
       continuous = Math.max(0, continuous - 1)
-      look.set(flyLook ?? 'real', ground, buildings, water)
+      look.set(flyLook ?? 'real', ground, buildings, water, woods)
       arcs.setShown(skyShown)
       pinGroup.visible = true
     }
@@ -691,7 +699,7 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
     if (l === flyLook) return
     flyLook = l
     if (inputs !== null) setSea(inputs)
-    look.set(l ?? 'real', ground, buildings, water)
+    look.set(l ?? 'real', ground, buildings, water, woods)
     continuous = l === null ? Math.max(0, continuous - 1) : continuous + 1
     touch()
   }
@@ -773,6 +781,7 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
     lookDown: (at, height) => pose(point(at, height), 0, -90),
     buildings: () => buildings.list(),
     counts: tileCounts,
+    woods: () => woods.count(),
     setSea,
     setFlyLook,
     setQuality: (q) => clouds.setQuality(q),
@@ -783,6 +792,7 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
     pills: () => arcs.pills(),
     setHidden: (what) => {
       buildings.group.visible = what !== 'buildings'
+      woods.group.visible = what !== 'woods'
       buildings.group.traverse((o) => {
         if (o.name === 'buildings roofs') o.visible = what !== 'roofs'
       })

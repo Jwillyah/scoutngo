@@ -368,6 +368,7 @@ export function Clay3D({ venue, venueLabel, at, timeZone, sheetOpen = false, moo
                     ? "The trees didn't load."
                     : ''}
             {flat > 0 ? ' Some distant ground is drawn flat.' : ''}
+            {(scene.current?.woods() ?? 0) > 0 ? ` Trees in woods illustrative: drawn where the map says woodland, at a nominal height, not where real ones stand.` : ''}
           </p>
           {/* The clouds (Batch D): where they are is illustrative; how they are drawn is the phone's choice. */}
           {sea?.cover == null ? null : (

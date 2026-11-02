@@ -13,8 +13,9 @@
  *              band (water.ts)
  *   buildings  flat walls in a pale clay, flat roofs a step darker, a crisp
  *              dark outline round each block (buildings.ts)
+ *   woods      flat-shaded faceted crowns (woods.ts)
  *
- * One switch for all three. Real is the default; Fly turns Animated on below
+ * One switch for all of them. Real is the default; Fly turns Animated on below
  * 150 ft unless the pilot chose (Clay3D.tsx).
  */
 import * as THREE from 'three'
@@ -29,7 +30,7 @@ interface Restyle {
 
 export interface LookControl {
   groundHook(): GroundMaterialHook
-  set(look: WorldLook, ground: Ground, buildings: Restyle, water: Restyle): void
+  set(look: WorldLook, ground: Ground, ...styled: Restyle[]): void
   setSun(dir: THREE.Vector3, c: SkyColours): void
   frame(seconds: number): void
   now(): WorldLook
@@ -127,13 +128,12 @@ export function createWorldLook(): LookControl {
   let hook = real
   return {
     groundHook: () => ({ make: (map) => hook.make(map) }),
-    set: (look, ground, buildings, water) => {
+    set: (look, ground, ...styled) => {
       if (look === current) return
       current = look
       hook = look === 'animated' ? animated : real
       ground.setMaterial(hook)
-      buildings.setLook(look)
-      water.setLook(look)
+      for (const s of styled) s.setLook(look)
     },
     setSun: (dir, c) => {
       tint.copy(daylightTint(c))

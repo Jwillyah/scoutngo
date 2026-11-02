@@ -44,6 +44,16 @@ float fbm(vec2 p) {
   return v / 0.96875;
 }`
 
+/** What the water needs to mirror a layer: the same field at the same place (water.ts). */
+export interface CloudMirror {
+  base: number
+  thresh: number
+  scale: number
+  stretch: number
+  drift: THREE.Vector2
+  colour: THREE.Color
+}
+
 const slabVertex = /* glsl */ `
 varying vec3 vWorld;
 void main() {
@@ -139,6 +149,7 @@ export function createClouds(onChange: () => void) {
   let sprites: THREE.Sprite[] = []
   const spriteMat = new THREE.SpriteMaterial({ map: puffTexture(), transparent: true, depthWrite: false, fog: true })
   let drawn = false
+  const mirrorColour = new THREE.Color()
 
   const build = () => {
     for (const s of slabs) {
@@ -223,6 +234,20 @@ export function createClouds(onChange: () => void) {
       for (const s of slabs) {
         s.mesh.position.set(camera.position.x, 0, camera.position.z)
         ;(s.uniforms.drift.value as THREE.Vector2).set(-wind.x * seconds, -wind.y * seconds)
+      }
+    },
+    /* The lowest slab drawn, for the water; Battery's billboards are not mirrored. */
+    mirror: (): CloudMirror | null => {
+      const s = slabs[0]
+      if (s === undefined) return null
+      const u = s.uniforms
+      return {
+        base: u.base.value as number,
+        thresh: u.thresh.value as number,
+        scale: u.scale.value as number,
+        stretch: u.stretch.value as number,
+        drift: u.drift.value as THREE.Vector2,
+        colour: mirrorColour.copy(sun.col).multiplyScalar(1.4).add(sun.ambient.clone().multiplyScalar(0.35)),
       }
     },
     animating: () => slabs.length > 0 && wind.lengthSq() > 0,

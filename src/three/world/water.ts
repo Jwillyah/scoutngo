@@ -23,6 +23,7 @@ import * as THREE from 'three'
 import type { LatLon } from '../../core/geo.ts'
 import { seaWaves } from '../../core/seaSurface.ts'
 import type { SkyColours } from '../../core/skyLook.ts'
+import { CLOUD_NOISE_GLSL, type CloudMirror } from './clouds.ts'
 import { loadVectorTile, vectorExtent } from '../../lib/vectorTiles.ts'
 import type { CinemaInputs } from './inputs.ts'
 import { latOf, lonOf, tileX, tileY, working, type Frame } from './sources.ts'
@@ -58,8 +59,16 @@ uniform float waveScale;
 uniform vec2 waveDir;
 uniform float mask;
 uniform float toon;
+uniform float cloudOn;
+uniform float cloudBase;
+uniform float cloudThresh;
+uniform float cloudScale;
+uniform float cloudStretch;
+uniform vec2 cloudDrift;
+uniform vec3 cloudCol;
 varying vec3 vWorld;
 float lod;
+${CLOUD_NOISE_GLSL}
 /* Each wave fades once a pixel covers more than a sixth of its wavelength: no moiré far off. */
 vec2 grad(vec2 p, vec2 d, float k, float w, float a) {
   float ph = dot(p, d) * k - time * w;
@@ -81,6 +90,22 @@ void main() {
   float fres = 0.02 + 0.98 * pow(1.0 - max(dot(n, v), 0.0), 5.0);
   vec3 r = reflect(-v, n);
   vec3 sky = mix(horizon, zenith, pow(clamp(r.y, 0.0, 1.0), 0.45));
+  /*
+   * The clouds in it: the reflected ray carried up to the lowest layer's
+   * base and the same field the slabs draw (clouds.ts) read there, so a
+   * cloud overhead is in the water under it (High only; Battery's
+   * billboards are not mirrored).
+   */
+  /* Along a near-flat mirror: through every wave's normal the field broke into ripples (1 Nov). */
+  vec3 rm = reflect(-v, normalize(mix(n, vec3(0.0, 1.0, 0.0), 0.85)));
+  if (cloudOn > 0.5 && rm.y > 0.03) {
+    float t = (cloudBase - vWorld.y) / rm.y;
+    vec2 q = (vWorld.xz + rm.xz * t + cloudDrift) / cloudScale;
+    q.x /= cloudStretch;
+    float far = 1.0 - smoothstep(6000.0, 30000.0, t);
+    float c = clamp((fbm(q) - cloudThresh) * 6.0, 0.0, 1.0) * far;
+    sky = mix(sky, cloudCol, c * 0.7);
+  }
   /* Deeper colour far off, a touch of green where the light goes into the water near the viewer. */
   vec3 body = mix(deep * 1.25, deep, clamp(length(cameraPosition.xz - vWorld.xz) / 4000.0, 0.0, 1.0));
   vec3 col = mix(body, sky, fres);
@@ -153,6 +178,13 @@ export function createWater(frame: Frame, onChange: () => void) {
     waveDir: { value: new THREE.Vector2(0.6, 0.8) },
     mask: { value: 0 },
     toon: { value: 0 },
+    cloudOn: { value: 0 },
+    cloudBase: { value: 1000 },
+    cloudThresh: { value: 1 },
+    cloudScale: { value: 1000 },
+    cloudStretch: { value: 1 },
+    cloudDrift: { value: new THREE.Vector2() },
+    cloudCol: { value: new THREE.Color(1, 1, 1) },
     ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
   }
   const shoreUniforms = {
@@ -312,6 +344,17 @@ export function createWater(frame: Frame, onChange: () => void) {
     setMask: (on: boolean) => {
       uniforms.mask.value = on ? 1 : 0
       onChange()
+    },
+    /** The cloud layer the water mirrors (clouds.ts mirror()), or none. */
+    setMirror: (m: CloudMirror | null) => {
+      uniforms.cloudOn.value = m === null ? 0 : 1
+      if (m === null) return
+      uniforms.cloudBase.value = m.base
+      uniforms.cloudThresh.value = m.thresh
+      uniforms.cloudScale.value = m.scale
+      uniforms.cloudStretch.value = m.stretch
+      uniforms.cloudDrift.value.copy(m.drift)
+      uniforms.cloudCol.value.copy(m.colour)
     },
     setLook: (look: string) => {
       uniforms.toon.value = look === 'animated' ? 1 : 0
