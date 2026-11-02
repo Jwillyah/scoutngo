@@ -15,7 +15,7 @@ import { compassWord } from './compassWords.ts'
 import type { GoldenNext } from './goldenNext.ts'
 import type { TideExtreme } from './tide.ts'
 import type { SurfEstimate } from './surf.ts'
-import type { FireWord } from './skyFire.ts'
+import type { FireWord } from './fireOutlook.ts'
 import type { Alignment } from './alignment.ts'
 
 export const SAMPLE_NAME = 'Virginia Beach Fishing Pier'

@@ -2,10 +2,9 @@ import { readFileSync } from 'node:fs'
 import { destination } from '@turf/destination'
 import { describe, expect, it } from 'vitest'
 import {
-  checkModel,
   cloudTriple,
+  eventToLog,
   EARTH_RADIUS_KM,
-  fireVerdict,
   grazingKm,
   grazingKmExact,
   layersLine,
@@ -14,6 +13,7 @@ import {
   pathPoints,
   type ModelPath,
 } from '../src/core/skyFire.ts'
+import { fireVerdict, readModel } from '../src/core/fireOutlook.ts'
 import { disagreement, parseMetarSky, skyWords } from '../src/core/metar.ts'
 import { FIRST_ENTRY, parseFireLog, readFireLog, trackRecord, withEntry } from '../src/lib/fireLog.ts'
 import { firePathsUrl, nearestHour, parseFirePaths, pathsAt } from '../src/lib/skyFireData.ts'
@@ -32,7 +32,9 @@ const FIXTURE = JSON.parse(readFileSync('tests/data/sky-fire-2026-10-29-sunrise.
   venue: { lat: number; lon: number }
   azimuth: number
   url: string
+  event: string
 }
+const CTX = { event: new Date(FIXTURE.event), kind: 'sunrise' as const, venue: FIXTURE.venue }
 
 describe('29 Oct, replayed', () => {
   const data = parseFirePaths(FIXTURE.payload)
@@ -44,16 +46,19 @@ describe('29 Oct, replayed', () => {
   })
 
   it('gives "Fire possible" or better: it fired', () => {
-    const v = fireVerdict(paths)
+    const v = fireVerdict(paths, CTX)
     expect(v).not.toBeNull()
     expect(['possible', 'likely']).toContain(v?.word)
     expect(v?.line).toMatch(/^Fire (possible|likely)$/)
   })
 
   it('reads it as the low deck lit from underneath, the deck ending toward the sun', () => {
-    const best = checkModel(paths.find((p) => p.model === 'best_match') as ModelPath)
-    expect(best.canvas.deck).toBe('low')
-    expect(best.gap.pass).toBe(true)
+    const best = readModel(paths.find((p) => p.model === 'best_match') as ModelPath, CTX)
+    const low = best.layers.find((l) => l.layer === 'low')
+    expect(low?.canvas).toBe(true)
+    expect(low?.reachKm).toBe(100)
+    expect(['open', 'partial']).toContain(low?.gap)
+    expect(low?.fires).toBe(true)
   })
 
   it('was asked for with every point rounded to 2 decimals', () => {
@@ -101,32 +106,33 @@ const path = (model: ModelPath['model'], f: (km: number) => [number, number, num
 })
 
 describe('the checks', () => {
+  const all = (f: (km: number) => [number, number, number]) => ['best_match', 'gfs_hrrr', 'gfs_seamless', 'ecmwf_ifs025', 'icon_seamless', 'gem_seamless'].map((m) => path(m as ModelPath['model'], f))
+  const ctx = { event: new Date('2026-11-02T11:28:51Z'), kind: 'sunrise' as const, venue: { lat: 36.8435575, lon: -75.9713104 } }
+
   it('a high deck with clear low cloud along its light path fires', () => {
-    expect(checkModel(path('gfs_hrrr', () => [5, 10, 60])).fires).toBe(true)
+    expect(readModel(path('gfs_hrrr', () => [5, 10, 60]), ctx).fires).toBe(true)
   })
 
-  it('no gap toward the sun: low cloud where the light comes in', () => {
-    const c = checkModel(path('gfs_hrrr', (km) => [km >= 200 ? 90 : 5, 10, 60]))
-    expect(c.gap.pass).toBe(false)
-    const v = fireVerdict(['best_match', 'gfs_hrrr', 'gfs_seamless', 'ecmwf_ifs025', 'icon_seamless', 'gem_seamless'].map((m) => path(m as ModelPath['model'], (km) => [km >= 200 ? 90 : 5, 10, 60])))
-    expect(v?.line).toBe('Fire unlikely: no gap toward the sun')
+  it('a low deck that runs on past the light\'s way in is a lid', () => {
+    expect(fireVerdict(all(() => [95, 0, 0]), ctx)?.line).toBe('Fire unlikely: a lid of cloud')
   })
 
-  it('a clear sky has nothing to light, and a thick low deck that runs on is no gap', () => {
-    expect(checkModel(path('gfs_hrrr', () => [0, 0, 0])).canvas.pass).toBe(false)
-    expect(checkModel(path('gfs_hrrr', () => [100, 0, 0])).fires).toBe(false)
+  it('a clear sky has nothing to light', () => {
+    expect(fireVerdict(all(() => [0, 0, 0]), ctx)?.line).toBe('Fire unlikely: no clouds to catch the light')
   })
 
-  it('a thick low deck right overhead blocks a high canvas', () => {
-    const c = checkModel(path('gfs_hrrr', (km) => [km === 0 ? 95 : 10, 10, 60]))
-    expect(c.canvas.deck).toBe('high')
-    expect(c.notBlocked.pass).toBe(false)
+  it('a thick low deck right overhead hides a high canvas', () => {
+    const r = readModel(path('gfs_hrrr', (km) => [km === 0 ? 95 : 10, 10, 60]), ctx)
+    const high = r.layers.find((l) => l.layer === 'high')
+    expect(high?.canvas).toBe(true)
+    expect(high?.hiddenBy?.layer).toBe('low')
+    expect(high?.fires).toBe(false)
   })
 
   it('says only possible, likely or unlikely: never certain', () => {
     /* What is said, not the comments about what is not said. */
     const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
-    const src = strip(readFileSync('src/core/skyFire.ts', 'utf8') + readFileSync('src/components/SkyFire.tsx', 'utf8'))
+    const src = strip(readFileSync('src/core/skyFire.ts', 'utf8') + readFileSync('src/core/fireOutlook.ts', 'utf8') + readFileSync('src/components/SkyFire.tsx', 'utf8'))
     expect(src).not.toMatch(/\b(certain|guaranteed|will fire|definitely)\b/i)
   })
 
@@ -191,5 +197,28 @@ describe('the log, on this phone', () => {
   it('drops anything malformed, and a photo that is not an image', () => {
     expect(parseFireLog('{bad')).toEqual([])
     expect(parseFireLog(JSON.stringify([{ ...FIRST_ENTRY, photo: 'https://example.com/x.jpg' }]))?.[0].photo).toBeNull()
+  })
+})
+
+/*
+ * Batch G, item 6: at 6:11 on 2 Nov, the glow over and sunrise at 6:28 still
+ * to come, there was no "It fired" button anywhere.
+ */
+describe('which event the log buttons are for', () => {
+  const PIER = { lat: 36.8435575, lon: -75.9713104 }
+  const at = (iso: string) => eventToLog(new Date(iso), PIER, 'America/New_York')
+  it('from 50 minutes before sunrise: 6:11 on 2 Nov logs that sunrise', () => {
+    expect(at('2026-11-02T11:11:00Z')).toMatchObject({ kind: 'sunrise' })
+    expect(at('2026-11-02T11:11:00Z')?.at.toISOString().slice(0, 16)).toBe('2026-11-02T11:28')
+  })
+  it('until 3 hours after, then the last one earlier the same day', () => {
+    expect(at('2026-11-02T14:20:00Z')?.kind).toBe('sunrise')
+    /* Noon: still this morning's sunrise. */
+    expect(at('2026-11-02T17:00:00Z')?.at.toISOString().slice(0, 16)).toBe('2026-11-02T11:28')
+    /* After sunset: the sunset. */
+    expect(at('2026-11-02T23:30:00Z')?.kind).toBe('sunset')
+  })
+  it('not before the first one of the day', () => {
+    expect(at('2026-11-02T08:00:00Z')).toBeNull()
   })
 })

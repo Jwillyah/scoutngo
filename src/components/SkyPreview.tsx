@@ -1,22 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getPosition } from 'suncalc'
 import type { LatLon } from '../core/geo.ts'
-import { lowestDeck } from '../core/metar.ts'
-import { DECK_HEIGHT_M, fireVerdict, nextEvents } from '../core/skyFire.ts'
+import { nextEvents } from '../core/skyFire.ts'
+import { clockStrips, fireVerdict, WHY_WORDS } from '../core/fireOutlook.ts'
 import {
   CLOCK_FROM_MIN,
   CLOCK_TO_MIN,
   clockWords,
+  GAP_PARTIAL,
   LAYER_WORD,
   lightHex,
-  reachKm,
-  strip,
-  type Layer,
   type Strip,
 } from '../core/skyColour.ts'
 import { formatClock } from '../core/timezone.ts'
 import type { Cover } from '../core/clouds.ts'
-import { fourSkies, weekOfSkies } from '../core/skyPages.ts'
+import { fourSkies, weekOfSkies, type ModelSky } from '../core/skyPages.ts'
 import { skyWords } from '../core/metar.ts'
 import { fetchSkyHours, hourlyAt, type Hourly } from '../lib/tideSheetData.ts'
 import { fetchAerosol, fetchFirePaths, fetchStationSkies, nearestHour, pathsAt, type FirePaths, type StationSky } from '../lib/skyFireData.ts'
@@ -55,7 +53,6 @@ interface Props {
 }
 
 type Kind = 'sunrise' | 'sunset'
-const altitudeAt = (lat: number, lon: number) => (t: Date) => getPosition(t, lat, lon).altitude
 /*
  * ONE PAGE UNTIL THE OTHERS EXIST (Batch E, 1 Nov). "Four forecasts" and
  * "Week of skies" were swipe pages that said only "Coming with the new 3D
@@ -75,21 +72,23 @@ function battery(): boolean {
 }
 
 /* A picture of one sky, drawn on the phone after the page shows; a dash while it is drawn or when it cannot be. */
-function SkyPicture({ sunAzimuthDeg, sunAltitudeDeg, cover, width, height, label }: { sunAzimuthDeg: number; sunAltitudeDeg: number; cover: Cover; width: number; height: number; label: string }) {
+function SkyPicture({ sunAzimuthDeg, sunAltitudeDeg, cover, width, height, label, glow }: { sunAzimuthDeg: number; sunAltitudeDeg: number; cover: Cover; width: number; height: number; label: string; glow?: ModelSky['glow'] }) {
   const [url, setUrl] = useState<string | null>(null)
   const { low, mid, high } = cover
+  /* Keyed by value: the same light is the same picture. */
+  const glowKey = JSON.stringify(glow ?? {})
   useEffect(() => {
     let live = true
     if (battery()) return
     void import('../three/skyThumb.ts')
       .then((m) => {
-        if (live) setUrl(m.renderSkyThumb({ sunAzimuthDeg, sunAltitudeDeg, cover: { low, mid, high }, width, height }))
+        if (live) setUrl(m.renderSkyThumb({ sunAzimuthDeg, sunAltitudeDeg, cover: { low, mid, high }, width, height, glow: JSON.parse(glowKey) as ModelSky['glow'] }))
       })
       .catch(() => {})
     return () => {
       live = false
     }
-  }, [sunAzimuthDeg, sunAltitudeDeg, low, mid, high, width, height])
+  }, [sunAzimuthDeg, sunAltitudeDeg, low, mid, high, width, height, glowKey])
   return url === null ? <span className="prev__pic prev__pic--none" style={{ aspectRatio: `${width} / ${height}` }} role="img" aria-label={label} /> : <img className="prev__pic" src={url} alt={label} width={width} height={height} />
 }
 
@@ -106,7 +105,7 @@ function StripRow({ s, clock }: { s: Strip; clock: (d: Date) => string }) {
       </span>
       <svg className="prev__strip" viewBox={`0 0 ${n} 10`} preserveAspectRatio="none" role="img" aria-label={`${LAYER_WORD[s.layer]}: the colour of its light from ${clock(s.minutes[0].at)} to ${clock(s.minutes[n - 1].at)}`}>
         {s.minutes.map((m, i) => (
-          <rect key={i} x={i} y={0} width={1.05} height={10} className={m.light === null ? 'prev__unlit' : undefined} fill={m.light === null ? undefined : lightHex(m.light)} />
+          <rect key={i} x={i} y={0} width={1.05} height={10} className={m.light === null ? 'prev__unlit' : undefined} fill={m.light === null ? undefined : lightHex(m.light)} opacity={m.open != null && m.open < GAP_PARTIAL ? 0.25 : undefined} />
         ))}
         <line x1={zero + 0.5} x2={zero + 0.5} y1={0} y2={10} className="prev__event" />
       </svg>
@@ -182,24 +181,18 @@ export function SkyPreview({ venue, timeZone, at, now = () => new Date(), kind: 
         const c = { low: hourlyAt(hours, 'cloud_cover_low', t), mid: hourlyAt(hours, 'cloud_cover_mid', t), high: hourlyAt(hours, 'cloud_cover_high', t) }
         return c.low === null && c.mid === null && c.high === null ? null : c
       }).filter((e) => e.at.getTime() > at.getTime() - 12 * 3_600_000)
-  const deck = soon && stations?.[0] !== undefined ? lowestDeck(stations[0].sky) : null
-  const lowBaseM = deck === null || deck.baseFt >= 6500 ? null : deck.baseFt * 0.3048
+  const station = soon && stations?.[0] !== undefined && stations[0].at !== '' ? { sky: stations[0].sky, at: new Date(stations[0].at) } : null
 
   const paths = data === 'loading' || data.paths === null || event === null ? [] : pathsAt(data.paths, nearestHour(event))
-  const verdict = paths.length === 0 ? null : fireVerdict(paths, lowBaseM)
-  const best = paths.find((p) => p.model === 'best_match') ?? paths[0]
-  const four = fourSkies(paths)
   /* Aerosol from Open-Meteo; when it did not answer, a clean-air 0.1 and the "i" says so. */
   const aod = data === 'loading' ? null : (data.aod ?? null)
-  /* Not memoised: three strips of ninety minutes are cheap, and the compiler keeps this component. */
-  const strips = event === null || best === undefined ? [] : (['high', 'mid', 'low'] as Layer[]).flatMap((layer) => {
-      const heightM = layer === 'low' && lowBaseM !== null ? lowBaseM : DECK_HEIGHT_M[layer]
-      const reach = reachKm(best, layer, heightM)
-      return reach === null ? [] : [strip({ layer, heightM, reachKm: reach }, event, altitudeAt(venue.lat, venue.lon), aod ?? 0.1)]
-    })
+  /* ONE SOURCE OF TRUTH (src/core/fireOutlook.ts): the verdict and these strips are the same walk of the light. */
+  const verdict = paths.length === 0 || event === null ? null : fireVerdict(paths, { event, kind, venue, aod, station })
+  const four = event === null ? [] : fourSkies(paths, verdict, event)
+  const strips = verdict === null ? [] : clockStrips(verdict)
+  const lowBaseM = verdict?.station?.lowBaseM ?? null
 
   const [onBattery] = useState(battery)
-  const sunAlt = event === null ? 0 : getPosition(event, venue.lat, venue.lon).altitude
   const pager = useRef<HTMLDivElement>(null)
   const [page, setPage] = useState(0)
 
@@ -236,7 +229,7 @@ export function SkyPreview({ venue, timeZone, at, now = () => new Date(), kind: 
             <>
               {embedded ? null : <p className={`prev__verdict fire__verdict--${verdict.word}`}>{verdict.line}</p>}
               {strips.length === 0 ? (
-                <p className="prev__note">No cloud on the sun’s line in the forecast: nothing to light.</p>
+                <p className="prev__note">Nothing lit that you could see: {WHY_WORDS[verdict.why ?? 'none']}.</p>
               ) : (
                 <>
                   <p className="prev__words">{clockWords(strips, kind, clock)}</p>
@@ -253,7 +246,7 @@ export function SkyPreview({ venue, timeZone, at, now = () => new Date(), kind: 
                   <details className="prev__how">
                     <summary aria-label="How this is worked out">i</summary>
                     <p>
-                      The colour of sunlight reaching each cloud’s base, each minute: the sun’s height with refraction, the cloud’s own horizon (it sees the sun sqrt(2h/R) below yours), the air along the light’s path, and how much blue that air and the haze take out. Haze: aerosol optical depth {aod === null ? '0.1, assumed (the air-quality forecast did not answer)' : `${aod.toFixed(2)} from Open-Meteo`}. Heights: {strips.map((s) => `${LAYER_WORD[s.layer]} ${Math.round(s.heightM)} m${s.layer === 'low' && lowBaseM !== null ? ` (${stations?.[0]?.sky.station ?? 'station'})` : ' (typical)'}`).join(', ')}. The lit cloud is the part toward the sun still above your horizon: {strips.map((s) => `${LAYER_WORD[s.layer]} ${s.reachKm} km`).join(', ')}. Not counted: ozone, the cloud’s own thickness, light from the rest of the sky.
+                      The colour of sunlight reaching each cloud’s base, each minute: the sun’s height with refraction, the cloud’s own horizon (it sees the sun sqrt(2h/R) below yours), the air along the light’s path, and how much blue that air and the haze take out. Haze: aerosol optical depth {aod === null ? '0.1, assumed (the air-quality forecast did not answer)' : `${aod.toFixed(2)} from Open-Meteo`}. Heights: {strips.map((s) => `${LAYER_WORD[s.layer]} ${Math.round(s.heightM)} m${s.layer === 'low' && lowBaseM !== null ? ` (${verdict.station?.station ?? 'station'})` : ' (typical)'}`).join(', ')}. The lit cloud is the sunward edge of the deck over you, still above your horizon: {strips.map((s) => `${LAYER_WORD[s.layer]} ${s.reachKm} km`).join(', ')}. The light’s own path is walked toward the sun, and cloud on it counts only where the ray is inside that cloud’s layer; a faded minute is one the cloud on the way blocks. The models’ mean cover is drawn, the same arithmetic as the verdict. Not counted: ozone, the cloud’s own thickness, light from the rest of the sky.
                     </p>
                   </details>
                 </>
@@ -273,9 +266,9 @@ export function SkyPreview({ venue, timeZone, at, now = () => new Date(), kind: 
             <div className="prev__grid">
               {four.map((m) => (
                 <figure key={m.model} className="prev__fig">
-                  <SkyPicture sunAzimuthDeg={azimuth} sunAltitudeDeg={sunAlt} cover={m.cover} width={168} height={126} label={`${m.label}: ${kind} sky, low ${pct(m.cover.low)}, mid ${pct(m.cover.mid)}, high ${pct(m.cover.high)}`} />
+                  <SkyPicture sunAzimuthDeg={azimuth} sunAltitudeDeg={getPosition(m.at, venue.lat, venue.lon).altitude} cover={m.cover} glow={m.glow} width={168} height={126} label={`${m.label}: ${kind} sky at ${clock(m.at)}, low ${pct(m.cover.low)}, mid ${pct(m.cover.mid)}, high ${pct(m.cover.high)}`} />
                   <figcaption className="prev__cap">
-                    <span className="num">{m.label}</span> <b>{m.fires ? 'fires' : 'no fire'}</b>
+                    <span className="num">{m.label}</span> <b>{m.lit === null ? 'no fire' : `lit ${LAYER_WORD[m.lit]}`}</b>{m.lit === null ? null : <span className="num"> {clock(m.at)}</span>}
                     <span className="prev__nums num"> low {pct(m.cover.low)} · mid {pct(m.cover.mid)} · high {pct(m.cover.high)}</span>
                   </figcaption>
                 </figure>

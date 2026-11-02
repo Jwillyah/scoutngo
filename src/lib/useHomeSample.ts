@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { getMoonIllumination, getPosition } from 'suncalc'
 import { findAlignments, type Alignment } from '../core/alignment.ts'
 import { goldenNext } from '../core/goldenNext.ts'
-import { fireVerdict, fireWindow, nextEvents } from '../core/skyFire.ts'
+import { nextEvents } from '../core/skyFire.ts'
+import { fireVerdict, lookWindow } from '../core/fireOutlook.ts'
 import { formatClock } from '../core/timezone.ts'
 import { DASH, SAMPLE_FACING_DEG, SAMPLE_PIER_END, SAMPLE_SPOT, SAMPLE_TZ, lightBand, moonLine, skyFireLine, surfBand, tideBand, windBand, type BandValue } from '../core/homeSample.ts'
 import { fetchFirePaths, nearestHour, pathsAt } from './skyFireData.ts'
@@ -68,11 +69,9 @@ export function useHomeSample(now: Date): HomeSample {
       .then((data) => {
         if (!live || data === null) return
         const paths = pathsAt(data, nearestHour(event))
-        const verdict = paths.length === 0 ? null : fireVerdict(paths)
+        const verdict = paths.length === 0 ? null : fireVerdict(paths, { event, kind, venue: SAMPLE_SPOT })
         if (verdict === null) return
-        const best = verdict.checks.find((c) => c.model === 'best_match') ?? verdict.checks[0]
-        const deck = best?.canvas.deck ?? null
-        const from = deck === null ? null : fireWindow(event, kind, deck, SAMPLE_SPOT.lat, SAMPLE_SPOT.lon, (t, la, lo) => getPosition(t, la, lo).altitude).from
+        const from = lookWindow(verdict)?.from ?? null
         setSkyFire(skyFireLine(kind, verdict.word, event, from, clock))
       })
       .catch(() => {})

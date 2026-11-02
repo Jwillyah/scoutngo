@@ -8,12 +8,12 @@ const path = (model: ModelPath['model'], low: number | null, mid: number | null)
 
 describe('four forecasts', () => {
   it('one sky per named model, in the board order, with its own cover over the venue', () => {
-    const s = fourSkies([path('gem_seamless', 0, 5), path('best_match', 50, 50), path('gfs_hrrr', 4, 10), path('ecmwf_ifs025', 21, 35), path('icon_seamless', 63, 30)])
+    const s = fourSkies([path('gem_seamless', 0, 5), path('best_match', 50, 50), path('gfs_hrrr', 4, 10), path('ecmwf_ifs025', 21, 35), path('icon_seamless', 63, 30)], null, new Date('2026-11-02T11:28:51Z'))
     expect(s.map((x) => x.model)).toEqual(['gfs_hrrr', 'ecmwf_ifs025', 'icon_seamless', 'gem_seamless'])
     expect(s[2].cover).toEqual({ low: 63, mid: 30, high: 5 })
   })
   it('a model that did not answer is left out, not drawn clear', () => {
-    expect(fourSkies([{ model: 'gfs_hrrr', samples: [{ low: null, mid: null, high: null }] }, path('ecmwf_ifs025', 20, 30)]).map((x) => x.model)).toEqual(['ecmwf_ifs025'])
+    expect(fourSkies([{ model: 'gfs_hrrr', samples: [{ low: null, mid: null, high: null }] }, path('ecmwf_ifs025', 20, 30)], null, new Date()).map((x) => x.model)).toEqual(['ecmwf_ifs025'])
   })
 })
 

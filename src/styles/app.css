@@ -14990,6 +14990,35 @@
   color: var(--color-text-muted);
 }
 
+/* The log at the top of Sky fire, by the real clock (Batch G, item 6). */
+.fire__log {
+  display: grid;
+  gap: var(--space-1);
+}
+
+/* "Logged: 2 Nov sunrise · It fired": said plainly, in the text colour. */
+.fire__kept {
+  color: var(--color-text);
+  font-weight: var(--weight-heavy);
+}
+
+/* A photo with no place or no time: the question, and its answers (item 8). */
+.truth__ask {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.truth__day {
+  min-height: 44px;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  background: var(--color-field);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  padding: 0 var(--space-2);
+}
+
 /*
  * LANDSCAPE (Batch F, Section 4). On its side, at 844 x 390, the venue bar,
  * the chip row, the tool dock and the bottom sheet were laid out as in

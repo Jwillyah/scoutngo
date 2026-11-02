@@ -98,6 +98,41 @@ export function airMass(elevationDeg: number, heightM: number): AirMass | null {
   return { rayleigh: rayleigh / RAYLEIGH_H_M, aerosol: aerosol / AEROSOL_H_M }
 }
 
+/** Above this nothing the forecast calls cloud is in the way: the top of the high layer. */
+export const CLOUD_TOP_M = 12_000
+
+export interface RayStep {
+  /** Along the ground from the cloud toward the sun, km. */
+  km: number
+  /** Height of the ray there, metres. */
+  z: number
+}
+
+/**
+ * THE RAY ITSELF, from a cloud h metres up toward the sun at this geometric
+ * elevation, refraction and the Earth's curve as in airMass: every stepM
+ * along it, how far along the ground from the cloud and how high. It goes
+ * DOWN first when the sun is below the cloud's horizontal, to its lowest
+ * point, then up. Ends at the ground (an unlit cloud: empty), above
+ * CLOUD_TOP_M, or 900 km out.
+ */
+export function rayWalk(elevationDeg: number, heightM: number, stepM = 2000): RayStep[] {
+  if (!lit(elevationDeg, heightM)) return []
+  const e = (elevationDeg + refractionDeg(elevationDeg)) * DEG
+  const r0 = EARTH_R_M + heightM
+  const out: RayStep[] = []
+  for (let s = stepM; s < 1_500_000; s += stepM) {
+    const x = s * Math.cos(e)
+    const y = r0 + s * Math.sin(e)
+    const z = Math.hypot(x, y) - EARTH_R_M
+    if (z < 0) return []
+    const km = (EARTH_R_M * Math.atan2(x, y)) / 1000
+    out.push({ km, z })
+    if (z > CLOUD_TOP_M || km > 900) break
+  }
+  return out
+}
+
 /* ----------------------------------------------------------- the spectrum */
 
 const WAVELENGTHS: readonly number[] = Array.from({ length: 35 }, (_, i) => 380 + i * 10)
@@ -209,7 +244,23 @@ export interface StripLayer {
 export interface Minute {
   at: Date
   light: Light | null
+  /**
+   * The share of that light the cloud along its way lets through, 0-1
+   * (src/core/fireOutlook.ts, the same ray walked below): 1 when nothing is
+   * in the way, null when it was not asked.
+   */
+  open?: number | null
 }
+
+/*
+ * HOW MUCH GETS THROUGH. A minute's light counts as reaching the cloud when
+ * at least GAP_PARTIAL of it gets past the cloud along its way; GAP_OPEN or
+ * more is an open gap, between the two a partial one (52% cover on the way is
+ * a partial gap, not a closed one).
+ */
+export const GAP_OPEN = 0.6
+export const GAP_PARTIAL = 0.3
+const through = (m: Minute): boolean => m.open == null || m.open >= GAP_PARTIAL
 
 export interface Strip extends StripLayer {
   minutes: Minute[]
@@ -227,34 +278,43 @@ export function strip(
   /** Suncalc's apparent altitude at the observer, degrees. */
   sunAltitudeDeg: (t: Date) => number,
   aod550: number,
+  /** The share of the light that gets through the cloud on its way, given the sun's geometric elevation at the cloud (fireOutlook.ts). */
+  openAt?: (elevationDeg: number) => number | null,
 ): Strip {
   const lift = ((layer.reachKm * 1000) / EARTH_R_M) / DEG
   const minutes: Minute[] = []
   for (let m = CLOCK_FROM_MIN; m <= CLOCK_TO_MIN; m += 1) {
     const at = new Date(event.getTime() + m * 60_000)
-    minutes.push({ at, light: cloudLight(geometricFromApparent(sunAltitudeDeg(at)) + lift, layer.heightM, aod550) })
+    const elevation = geometricFromApparent(sunAltitudeDeg(at)) + lift
+    const light = cloudLight(elevation, layer.heightM, aod550)
+    minutes.push(openAt === undefined ? { at, light } : { at, light, open: light === null ? null : openAt(elevation) })
   }
   return { ...layer, minutes }
 }
 
 /**
  * How far toward the sun a layer's lit cloud is, from the forecast along the
- * sun's line (src/core/skyFire.ts): the farthest sample with the layer there
- * (CANVAS_MIN or more) that is still above the observer's horizon,
- * sqrt(2Rh). Null when the forecast has no such layer on the line.
+ * sun's line (src/core/skyFire.ts): the deck has to be OVER you (CANVAS_MIN or
+ * more at 0, 25 or 50 km), and the lit edge is where it ends going toward the
+ * sun, the last sample it runs to unbroken, as long as that is still above
+ * your horizon, sqrt(2Rh). Cloud only out on the horizon (30 Oct: a low bank
+ * 100 km off, nothing overhead) is not a canvas: null.
  */
 export function reachKm(path: ModelPath | undefined, layer: Layer, heightM: number): number | null {
   if (path === undefined) return null
   const horizon = grazingKm(heightM)
-  let far: number | null = null
-  PATH_KM.forEach((km, i) => {
-    const cover = path.samples[i]?.[layer]
-    if (cover != null && cover >= CANVAS_MIN && km <= horizon) far = km
-  })
+  const has = (i: number) => {
+    const c = path.samples[i]?.[layer]
+    return c != null && c >= CANVAS_MIN
+  }
+  const start = [0, 1, 2].find((i) => PATH_KM[i] <= 50 && has(i))
+  if (start === undefined) return null
+  let far: number = PATH_KM[start]
+  for (let i = start + 1; i < PATH_KM.length && has(i) && PATH_KM[i] <= horizon; i += 1) far = PATH_KM[i]
   return far
 }
 
-const glows = (l: Light | null): boolean => l !== null && l.rgb[1] < GLOW_GREEN_BELOW * l.rgb[0]
+export const glows = (l: Light | null): boolean => l !== null && l.rgb[1] < GLOW_GREEN_BELOW * l.rgb[0]
 
 export interface StripTimes {
   firstLit: Date | null
@@ -266,8 +326,9 @@ export interface StripTimes {
 }
 
 export function stripTimes(s: Strip): StripTimes {
-  const lit = s.minutes.filter((m) => m.light !== null)
-  const glow = s.minutes.filter((m) => glows(m.light))
+  /* Light that does not get past the cloud on its way does not count (GAP_PARTIAL). */
+  const lit = s.minutes.filter((m) => m.light !== null && through(m))
+  const glow = s.minutes.filter((m) => glows(m.light) && through(m))
   /* The reddest light bright enough to be seen: the least green against red. */
   let deepest: Minute | null = null
   for (const m of glow) {

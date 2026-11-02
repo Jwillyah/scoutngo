@@ -30,11 +30,38 @@ describe('a photo against what the app said', () => {
   })
 
   it('says which part of the file is missing rather than guessing', () => {
-    expect(entryFromPhoto(meta({ lat: null, lon: null }), 'UTC', [])).toEqual({ missing: 'where it was taken (no GPS in the file)' })
-    expect(entryFromPhoto(meta({ takenLocal: null }), 'UTC', [])).toEqual({ missing: 'when it was taken (no date in the file)' })
+    expect(entryFromPhoto(meta({ lat: null, lon: null }), 'UTC', [])).toEqual({ missing: 'place', say: 'no place in the file' })
+    expect(entryFromPhoto(meta({ takenLocal: null }), 'UTC', [])).toEqual({ missing: 'time', say: 'no time in the file' })
     const noHeading = entryFromPhoto(meta({ gimbalYaw: null }), 'America/New_York', []) as TruthEntry
     expect(noHeading.said.light).toBeNull()
     expect(noHeading.said.fire).toBeNull()
+  })
+
+  /*
+   * Batch G, item 8: IMG_2831.jpeg and two screenshots were all turned away
+   * for having no GPS. Camera location stays off on the owner's phone.
+   */
+  it('a photo with no GPS is still read, at the venue you say yes to, or the pin you pick', () => {
+    const e = entryFromPhoto(meta({ lat: null, lon: null, gimbalYaw: null }), 'America/New_York', [], 'IMG_2831.jpeg', { place: { at: { lat: 36.8435575, lon: -75.9713104 }, from: 'venue' } }) as TruthEntry
+    expect(e.placeFrom).toBe('venue')
+    expect(e.lat).toBe(36.8435575)
+    expect(e.said.event).toBe('sunrise')
+    const pin = entryFromPhoto(meta({ lat: null, lon: null }), 'America/New_York', [], 'x.png', { place: { at: { lat: 36.9, lon: -76 }, from: 'map' } }) as TruthEntry
+    expect(pin.placeFrom).toBe('map')
+    expect(pin.lat).toBe(36.9)
+  })
+
+  it('a screenshot with no time either is the sunrise or sunset of the day you name', () => {
+    const fill = { place: { at: { lat: 36.8435575, lon: -75.9713104 }, from: 'venue' as const }, day: { date: '2026-11-02', event: 'sunrise' as const } }
+    const e = entryFromPhoto(meta({ lat: null, lon: null, takenLocal: null, offset: null }), 'America/New_York', [{ ...shown, date: '2026-11-02', event: 'sunrise', forecast: 'Fire unlikely: a lid of cloud' }], 'IMG_2829.png', fill) as TruthEntry
+    expect(e.timeFrom).toBe('asked')
+    expect(e.said.event).toBe('sunrise')
+    expect(e.said.minutesFromEvent).toBe(0)
+    /* 2 Nov sunrise at the pier, 6:28 EST. */
+    expect(e.at.slice(0, 16)).toBe('2026-11-02T11:28')
+    expect(e.said.fire).toBe('Fire unlikely: a lid of cloud')
+    /* Without the day it still asks. */
+    expect(entryFromPhoto(meta({ lat: null, lon: null, takenLocal: null }), 'America/New_York', [], '', { place: fill.place })).toEqual({ missing: 'time', say: 'no time in the file' })
   })
 
   it('keeps the numbers, never the picture', () => {

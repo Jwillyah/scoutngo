@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getPosition } from 'suncalc'
 import type { LatLon } from '../core/geo.ts'
-import { fireVerdict, nextEvents } from '../core/skyFire.ts'
+import { nextEvents } from '../core/skyFire.ts'
+import { fireVerdict, lookWindow } from '../core/fireOutlook.ts'
 import { byDay, SPECIAL_NAME, type Special } from '../core/specialLight.ts'
 import { formatClock } from '../core/timezone.ts'
 import { fetchFirePaths, nearestHour, pathsAt } from '../lib/skyFireData.ts'
@@ -50,9 +51,11 @@ export function SpecialLight({ venue, timeZone, at, onShowBow, onJump, place }: 
         if (event === null) continue
         const data = await fetchFirePaths(venue, getPosition(event, venue.lat, venue.lon).azimuth, event.toISOString().slice(0, 10))
         const paths = data === null ? [] : pathsAt(data, nearestHour(event))
-        const v = paths.length === 0 ? null : fireVerdict(paths)
-        if (v !== null && v.word !== 'unlikely') {
-          fires.push({ kind: 'fire', from: new Date(event.getTime() - 20 * 60_000), to: new Date(event.getTime() + 15 * 60_000), agree: v.agree, of: v.of, word: v.word, why: `At ${kind}: cloud to light and a way in for the light, by Sky fire’s three checks.` })
+        const v = paths.length === 0 ? null : fireVerdict(paths, { event, kind, venue })
+        /* The window is the colour clock's glow, the same arithmetic as the verdict (src/core/fireOutlook.ts). */
+        const w = v === null ? null : lookWindow(v)
+        if (v !== null && v.word !== 'unlikely' && w !== null) {
+          fires.push({ kind: 'fire', from: w.from, to: w.to, agree: v.agree, of: v.of, word: v.word, why: `At ${kind}: cloud to light and a way in for the light, by Sky fire’s three checks.` })
         }
       }
       /* Glassy water is a coast thing: not asked inland. */

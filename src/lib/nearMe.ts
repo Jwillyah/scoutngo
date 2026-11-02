@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { distanceMeters, type LatLon } from '../core/geo.ts'
-import { fireVerdict, nextEvents } from '../core/skyFire.ts'
+import { nextEvents } from '../core/skyFire.ts'
+import { fireVerdict } from '../core/fireOutlook.ts'
 import { strong, type Special } from '../core/specialLight.ts'
 import { getSunPosition } from '../core/sun.ts'
 import { fetchFirePaths, nearestHour, pathsAt } from './skyFireData.ts'
@@ -146,7 +147,7 @@ export async function nearMeItems(places: readonly NearPlace[], now: number, clo
       if (event === null || event.getTime() < now || event.getTime() > now + DAY_MS) continue
       const data = await fetchFirePaths(nearest.at, getSunPosition(event, nearest.at.lat, nearest.at.lon).azimuth, event.toISOString().slice(0, 10))
       const paths = data === null ? [] : pathsAt(data, nearestHour(event))
-      const v = paths.length === 0 ? null : fireVerdict(paths)
+      const v = paths.length === 0 ? null : fireVerdict(paths, { event, kind, venue: nearest.at })
       if (v !== null && v.word !== 'unlikely') found.push({ s: { kind: 'fire', from: event, to: event, agree: v.agree, of: v.of, word: v.word, why: '' }, place: nearest })
     }
   }

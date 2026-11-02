@@ -24,6 +24,8 @@ export interface SkyThumbInput {
   cover: Cover
   width: number
   height: number
+  /** The colour clock's light on each layer that fires, linear RGB (src/core/skyPages.ts fourSkies). */
+  glow?: Partial<Record<'low' | 'mid' | 'high', readonly [number, number, number]>>
 }
 
 let renderer: THREE.WebGLRenderer | null = null
@@ -31,7 +33,8 @@ const cache = new Map<string, string>()
 
 export function thumbKey(i: SkyThumbInput): string {
   const r = (x: number | null) => (x === null ? '-' : Math.round(x))
-  return [i.sunAzimuthDeg.toFixed(1), i.sunAltitudeDeg.toFixed(1), r(i.cover.low), r(i.cover.mid), r(i.cover.high), i.width, i.height].join('|')
+  const g = (['low', 'mid', 'high'] as const).map((l) => i.glow?.[l]?.map((v) => v.toFixed(2)).join(',') ?? '-').join(';')
+  return [i.sunAzimuthDeg.toFixed(1), i.sunAltitudeDeg.toFixed(1), r(i.cover.low), r(i.cover.mid), r(i.cover.high), i.width, i.height, g].join('|')
 }
 
 export function renderSkyThumb(i: SkyThumbInput): string | null {
@@ -56,6 +59,16 @@ export function renderSkyThumb(i: SkyThumbInput): string | null {
     const clouds = createClouds(() => {})
     clouds.set({ cover: i.cover, sea: { windMps: null, windFromDeg: null }, waterLevelM: null, visibilityKm: null, seaMask: null, seed: 1 } as unknown as Parameters<typeof clouds.set>[0])
     clouds.setSun(sunDir, c)
+    /*
+     * The layers that fire, in the colour clock's light. Below the horizon the
+     * slab shader's sun term looks along the ray to the sun; lit cloud is lit
+     * from under, so the direction is taken just above the horizon for them.
+     */
+    if (i.glow !== undefined && Object.keys(i.glow).length > 0 && i.sunAltitudeDeg < 1) clouds.setSun(sunDirection(i.sunAzimuthDeg, 1), c)
+    for (const layer of ['low', 'mid', 'high'] as const) {
+      const rgb = i.glow?.[layer]
+      if (rgb !== undefined) clouds.setLayerLight(layer, rgb)
+    }
     scene.add(clouds.group)
     /* A dark sea to the horizon, tinted by the sky above it. */
     const sea = new THREE.Mesh(new THREE.PlaneGeometry(400_000, 400_000), new THREE.MeshBasicMaterial({ color: new THREE.Color().setRGB(c.zenith[0] * 0.5 + c.horizon[0] * 0.08 + 0.004, c.zenith[1] * 0.5 + c.horizon[1] * 0.08 + 0.01, c.zenith[2] * 0.5 + c.horizon[2] * 0.08 + 0.02, THREE.LinearSRGBColorSpace) }))

@@ -229,6 +229,17 @@ export function createClouds(onChange: () => void) {
       const k = Math.min(1, 0.25 + 0.3 * c.lightIntensity)
       spriteMat.color.setRGB(k * (0.8 + 0.2 * c.light[0]), k * (0.8 + 0.2 * c.light[1]), k * (0.8 + 0.2 * c.light[2]), THREE.LinearSRGBColorSpace)
     },
+    /*
+     * One layer lit by a given light (Sky fire's pictures, Batch G): the
+     * colour clock's colour for that layer at that minute, linear RGB, in
+     * place of the sky's own sunlight. Null puts the sky's back.
+     */
+    setLayerLight: (layer: 'low' | 'mid' | 'high', rgb: readonly [number, number, number] | null, strength = 5) => {
+      for (const s of slabs) {
+        if (s.mesh.name !== `clouds ${layer}`) continue
+        s.uniforms.sunCol.value = rgb === null ? sun.col : new THREE.Color().setRGB(rgb[0] * strength, rgb[1] * strength, rgb[2] * strength, THREE.LinearSRGBColorSpace)
+      }
+    },
     frame: (seconds: number, camera: THREE.Camera) => {
       /* The slabs follow the camera across the ground; the pattern stays put in the world and drifts with the wind. */
       for (const s of slabs) {

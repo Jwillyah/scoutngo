@@ -7,7 +7,7 @@ describe('the Sky fire page', () => {
   const plan = readFileSync('src/components/PlanMode.tsx', 'utf8')
 
   it('shows the three checks under their heading, not behind an empty fold', () => {
-    expect(fire).toMatch(/<p className="fire__head">Why: the three checks<\/p>\s*<ul className="fire__checks">/)
+    expect(fire).toMatch(/<p className="fire__head">Why: the three checks[^<]*<\/p>\s*<ul className="fire__checks">/)
     expect(fire).not.toMatch(/<summary[^>]*>Why: the three checks/)
   })
 

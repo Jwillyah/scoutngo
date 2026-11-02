@@ -1,22 +1,10 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { getPosition } from 'suncalc'
 import type { LatLon } from '../core/geo.ts'
-import { disagreement, layersWords, lowestDeck, skyWords } from '../core/metar.ts'
-import {
-  DECK_HEIGHT_M,
-  fireVerdict,
-  fireWindow,
-  grazingKm,
-  layersLine,
-  LIT_UNTIL_DEG,
-  MODEL_LABEL,
-  modelsSplit,
-  nextEvents,
-  PATH_KM,
-  type FireVerdict,
-  type ModelChecks,
-  type ModelPath,
-} from '../core/skyFire.ts'
+import { disagreement, layersWords, skyWords } from '../core/metar.ts'
+import { DECK_HEIGHT_M, eventToLog, grazingKm, layersLine, MODEL_LABEL, modelsSplit, nextEvents, PATH_KM, type ModelPath } from '../core/skyFire.ts'
+import { agreementLine, checkWords, fireVerdict, leadLayer, lookWindow, WHY_WORDS, type FireVerdict } from '../core/fireOutlook.ts'
+import { LAYER_WORD } from '../core/skyColour.ts'
 import { formatClock } from '../core/timezone.ts'
 import { FIRST_ENTRY, OUTCOME_LABEL, readFireLog, trackRecord, withEntry, writeFireLog, type FireEntry, type FireOutcome } from '../lib/fireLog.ts'
 import { TruthLoop } from './TruthLoop.tsx'
@@ -24,7 +12,8 @@ import { useOnline } from '../lib/useOnline.ts'
 import { useStationNow } from '../lib/useStationNow.ts'
 import { useWeatherBusy, useWeatherEpoch } from '../lib/useWeatherStatus.ts'
 import { forecastAge } from '../lib/savedForecast.ts'
-import { fetchFirePaths, fetchStationSkies, nearestHour, pathsAt, type FirePaths, type StationSky } from '../lib/skyFireData.ts'
+import { fetchAerosol, fetchFirePaths, fetchStationSkies, nearestHour, pathsAt, type FirePaths, type StationSky } from '../lib/skyFireData.ts'
+import type { LatLon as Pin } from '../core/geo.ts'
 
 /*
  * SKY FIRE: will the clouds light up at this sunrise or sunset. Words, the
@@ -42,13 +31,14 @@ interface SkyFireProps {
   now?: () => Date
   /** The colour clock for the event picked here, drawn right under the verdict (field test, 30 Oct: one page, verdict first). */
   clock?: (kind: 'sunrise' | 'sunset') => ReactNode
+  /** The map pin, for "Pick on map" when a photo has no place in it (the truth loop). */
+  target?: Pin | null
+  onPickTarget?: () => void
 }
 
 type Kind = 'sunrise' | 'sunset'
-const altitudeAt = (t: Date, lat: number, lon: number) => getPosition(t, lat, lon).altitude
 
 function SideView({ verdict, path, kind }: { verdict: FireVerdict; path: ModelPath; kind: Kind }) {
-  const best = verdict.checks.find((c) => c.model === 'best_match') ?? verdict.checks[0]
   const W = 320
   const H = 150
   const ground = 112
@@ -61,8 +51,9 @@ function SideView({ verdict, path, kind }: { verdict: FireVerdict; path: ModelPa
       .map((s) => ({ ...s, h: DECK_HEIGHT_M[s.layer] })),
   )
   const layersDrawn = [...new Set(decks.map((d) => d.layer))]
-  const deck = best?.canvas.deck ?? null
-  const deckH = deck === null ? null : DECK_HEIGHT_M[deck]
+  const lead = leadLayer(verdict)
+  const deck = lead.canvas ? lead.layer : null
+  const deckH = deck === null ? null : lead.heightM
   const graze = deckH === null ? null : Math.min(400, grazingKm(deckH))
   return (
     <svg className="fire__side" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Side view toward the ${kind}: cloud decks from the forecast, and the light's path under them`}>
@@ -97,12 +88,9 @@ function SideView({ verdict, path, kind }: { verdict: FireVerdict; path: ModelPa
 }
 
 const yes = (pass: boolean) => (pass ? 'yes' : 'no')
-function agreeOn(checks: readonly ModelChecks[], key: 'canvas' | 'gap' | 'notBlocked'): string {
-  const named = checks.filter((c) => c.model !== 'best_match' && c.canvas.value !== null)
-  return `${named.filter((c) => c[key].pass).length} of ${named.length}`
-}
+const dayMonth = (d: Date, timeZone: string) => new Intl.DateTimeFormat('en-GB', { timeZone, day: 'numeric', month: 'short' }).format(d)
 
-export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date(), clock: colourClock }: SkyFireProps) {
+export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date(), clock: colourClock, target, onPickTarget }: SkyFireProps) {
   const events = useMemo(() => nextEvents(at, venue), [at, venue])
   const firstKind: Kind = events.sunrise !== null && (events.sunset === null || events.sunrise < events.sunset) ? 'sunrise' : 'sunset'
   const [kind, setKind] = useState<Kind>(firstKind)
@@ -112,19 +100,19 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
 
   /* Kept with the request it answers, so a new event reads as loading until its own answer comes. */
   const askKey = azimuth === null || date === null ? null : `${venue.lat},${venue.lon},${azimuth.toFixed(1)},${date}`
-  const [answer, setAnswer] = useState<{ key: string; data: FirePaths | null } | null>(null)
-  /* Asked again when a back-off ends (src/lib/weatherStore.ts). */
+  const [answer, setAnswer] = useState<{ key: string; data: FirePaths | null; aod: number | null } | null>(null)
+  /* Asked again when a back-off ends (src/lib/weatherStore.ts). The haze too: the colour clock's own question, asked once between them. */
   const epoch = useWeatherEpoch()
   useEffect(() => {
-    if (azimuth === null || date === null || askKey === null) return
+    if (azimuth === null || date === null || askKey === null || event === null) return
     let live = true
-    void fetchFirePaths(venue, azimuth, date).then((d) => {
-      if (live) setAnswer({ key: askKey, data: d })
+    void Promise.all([fetchFirePaths(venue, azimuth, date), fetchAerosol(venue, event)]).then(([d, aod]) => {
+      if (live) setAnswer({ key: askKey, data: d, aod })
     })
     return () => {
       live = false
     }
-  }, [venue, azimuth, date, askKey, epoch])
+  }, [venue, azimuth, date, askKey, epoch, event])
   const busy = useWeatherBusy()
   const data: FirePaths | null | 'loading' = answer === null || answer.key !== askKey ? 'loading' : answer.data
 
@@ -144,38 +132,42 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
   }, [soon, venue])
   const stations = soon ? stationAnswer : null
 
-  const deckBaseM = stations === null || stations[0] === undefined ? null : (() => {
-    const d = lowestDeck(stations[0].sky)
-    return d === null || d.baseFt >= 6500 ? null : d.baseFt * 0.3048
-  })()
+  /* The station's report within two hours of the event: its low deck over you, its base, or the low gap open (src/core/fireOutlook.ts). */
+  const station = stations?.[0] !== undefined && stations[0].at !== '' ? { sky: stations[0].sky, at: new Date(stations[0].at) } : null
   const paths = data === 'loading' || data === null || event === null ? [] : pathsAt(data, nearestHour(event))
-  const verdict = paths.length === 0 ? null : fireVerdict(paths, deckBaseM)
+  const aod = answer === null || answer.key !== askKey ? null : answer.aod
+  /* One source of truth: the same walk of the light as the colour clock under it. */
+  const verdict = paths.length === 0 || event === null ? null : fireVerdict(paths, { event, kind, venue, aod, station })
   const best = paths.find((p) => p.model === 'best_match') ?? paths[0]
   const overhead = best?.samples[0] ?? null
   const split = modelsSplit(paths.filter((p) => p.model !== 'best_match').map((p) => p.samples[0]?.low ?? null))
   const clock = (d: Date) => formatClock(d, timeZone)
-  const bestChecks = verdict?.checks.find((c) => c.model === 'best_match') ?? verdict?.checks[0]
-  const litDeck = bestChecks?.canvas.deck ?? null
-  const watch = event === null || litDeck === null ? null : fireWindow(event, kind, litDeck, venue.lat, venue.lon, altitudeAt)
+  const lead = verdict === null ? null : leadLayer(verdict)
+  const watch = verdict === null ? null : lookWindow(verdict)
 
-  /* The log: after the event, on its day, by the real clock. */
+  /*
+   * THE LOG, BY THE REAL CLOCK (item 6): from 50 minutes before a sunrise or
+   * sunset to 3 hours after, else the last one earlier today; one tap saves.
+   */
   const [log, setLog] = useState<FireEntry[]>(() => readFireLog())
   const [kept, setKept] = useState<string | null>(null)
-  const after = event !== null && realNow.getTime() >= event.getTime() && realNow.getTime() - event.getTime() <= 6 * 3_600_000
+  const toLog = eventToLog(realNow, venue, timeZone)
   const logIt = (outcome: FireOutcome, photo: string | null) => {
-    if (event === null) return
+    if (toLog === null) return
+    const day = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(toLog.at)
     const entry: FireEntry = {
-      id: `${event.toISOString().slice(0, 10)}-${kind}-${placeName}`,
-      date: new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(event),
-      event: kind,
+      id: `${day}-${toLog.kind}-${placeName}`,
+      date: day,
+      event: toLog.kind,
       place: placeName,
       outcome,
-      forecast: verdict?.line ?? null,
+      /* What the page said for that event, when it is the one on it. */
+      forecast: event !== null && Math.abs(event.getTime() - toLog.at.getTime()) < 60_000 ? (verdict?.line ?? null) : null,
       photo,
     }
     const next = withEntry(log, entry)
     setLog(next)
-    setKept(writeFireLog(next) ? `Kept on this phone: ${OUTCOME_LABEL[outcome]}.` : 'Not kept: this phone\'s storage is full.')
+    setKept(writeFireLog(next) ? `Logged: ${dayMonth(toLog.at, timeZone)} ${toLog.kind} · ${OUTCOME_LABEL[outcome]}` : 'Not kept: this phone\'s storage is full.')
   }
   const [outcome, setOutcome] = useState<FireOutcome | null>(null)
   const addPhoto = async (file: File | undefined) => {
@@ -199,6 +191,28 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
 
   return (
     <div className="fire">
+      {toLog === null ? null : (
+        <div className="fire__log" aria-label="How was it">
+          <p className="fire__head">
+            How was the {toLog.kind}, {dayMonth(toLog.at, timeZone)}?
+          </p>
+          <div className="btn-row">
+            {(['fired', 'meh', 'nothing'] as const).map((o) => (
+              <button key={o} type="button" className={`btn btn--small${outcome === o ? ' btn--on' : ''}`} aria-pressed={outcome === o} onClick={() => { setOutcome(o); logIt(o, null) }}>
+                {OUTCOME_LABEL[o]}
+              </button>
+            ))}
+          </div>
+          {kept === null ? null : <p className="fire__note fire__kept" role="status">{kept}</p>}
+          {outcome === null ? null : (
+            <label className="fire__photo">
+              Add a photo (stays on this phone)
+              <input type="file" accept="image/*" onChange={(e) => void addPhoto(e.target.files?.[0])} />
+            </label>
+          )}
+        </div>
+      )}
+
       <div className="seg fire__kinds" role="group" aria-label="Which event">
         {(['sunrise', 'sunset'] as const).map((k) => (
           <button key={k} type="button" className={`seg__btn${kind === k ? ' seg__btn--on' : ''}`} aria-pressed={kind === k} disabled={events[k] === null} onClick={() => setKind(k)}>
@@ -233,13 +247,11 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
             {verdict.line}
           </p>
           <p className="fire__note">
-            {verdict.agree} of {verdict.of} models agree{split ? ' · models split on low cloud' : ''}. A forecast places cloud on a grid kilometres across: it cannot promise a hole.
+            {agreementLine(verdict)}{split ? ' · models split on low cloud' : ''}. A forecast places cloud on a grid kilometres across: it cannot promise a hole.
           </p>
-          {watch === null || litDeck === null ? null : (
+          {watch === null ? null : (
             <p className="fire__note">
-              {kind === 'sunrise'
-                ? `Often before sunrise: look from ${clock(watch.from)}, when the sun is ${Math.abs(LIT_UNTIL_DEG[litDeck])}° below, until ${clock(watch.to)}.`
-                : `Look from ${clock(watch.from)} until ${clock(watch.to)}, when the sun is ${Math.abs(LIT_UNTIL_DEG[litDeck])}° below: the colour lasts after sunset.`}
+              Look from {clock(watch.from)} until {clock(watch.to)}, when the {LAYER_WORD[watch.layer]} glows{kind === 'sunrise' && watch.to.getTime() <= (event?.getTime() ?? 0) ? ', before the sun is up' : ''}.
             </p>
           )}
           {colourClock?.(kind)}
@@ -249,17 +261,17 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
             * The checks are open now, each with its numbers and how many
             * models pass it; the side view and each model are one tap down.
             */}
-          {bestChecks === undefined ? null : (
+          {lead === null ? null : (
             <section className="fire__why">
-              <p className="fire__head">Why: the three checks</p>
+              <p className="fire__head">Why: the three checks, {LAYER_WORD[lead.layer]}</p>
               <ul className="fire__checks">
                 {([
-                  ['Canvas', 'canvas'],
-                  ['Gap toward the sun', 'gap'],
-                  ['Not blocked', 'notBlocked'],
-                ] as const).map(([label, key]) => (
+                  ['Canvas', 'canvas', lead.canvas],
+                  ['Gap toward the sun', 'gap', lead.gap === 'open' || lead.gap === 'partial'],
+                  ['Not blocked', 'notBlocked', lead.hiddenBy === null],
+                ] as const).map(([label, key, pass]) => (
                   <li key={key} className="fire__check">
-                    <span className={`fire__mark fire__mark--${yes(bestChecks[key].pass)}`}>{label}: {yes(bestChecks[key].pass)}.</span> {bestChecks[key].say} <span className="fire__agree">({agreeOn(verdict.checks, key)})</span>
+                    <span className={`fire__mark fire__mark--${yes(pass)}`}>{label}: {key === 'gap' && lead.gap === 'partial' ? 'partly' : yes(pass)}.</span> {checkWords(lead)[key]}
                   </li>
                 ))}
               </ul>
@@ -268,11 +280,15 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
                 <summary>The side view and each model</summary>
                 {best === undefined ? null : <SideView verdict={verdict} path={best} kind={kind} />}
                 <ul className="fire__models">
-                  {verdict.checks.map((c) => (
-                    <li key={c.model}>
-                      {MODEL_LABEL[c.model]}: {c.fires ? 'fires' : 'does not'} · canvas {yes(c.canvas.pass)}, gap {yes(c.gap.pass)}, not blocked {yes(c.notBlocked.pass)}
-                    </li>
-                  ))}
+                  {verdict.models.map((m) => {
+                    const lit = m.layers.filter((l) => l.fires).map((l) => LAYER_WORD[l.layer])
+                    const why = m.layers.find((l) => l.canvas)?.why ?? 'none'
+                    return (
+                      <li key={m.model}>
+                        {m.model === 'sky' ? 'Mean' : MODEL_LABEL[m.model]}: {lit.length > 0 ? `lit ${lit.join(', ')}` : `no fire, ${WHY_WORDS[why]}`}
+                      </li>
+                    )
+                  })}
                 </ul>
               </details>
             </section>
@@ -301,26 +317,6 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
         </div>
       )}
 
-      {!after ? null : (
-        <div className="fire__log">
-          <p className="fire__head">How was it?</p>
-          <div className="btn-row">
-            {(['fired', 'meh', 'nothing', 'clear'] as const).map((o) => (
-              <button key={o} type="button" className={`btn btn--small${outcome === o ? ' btn--on' : ''}`} aria-pressed={outcome === o} onClick={() => { setOutcome(o); logIt(o, null) }}>
-                {OUTCOME_LABEL[o]}
-              </button>
-            ))}
-          </div>
-          {outcome === null ? null : (
-            <label className="fire__photo">
-              Add a photo (stays on this phone)
-              <input type="file" accept="image/*" onChange={(e) => void addPhoto(e.target.files?.[0])} />
-            </label>
-          )}
-          {kept === null ? null : <p className="fire__note">{kept}</p>}
-        </div>
-      )}
-
       <p className="fire__head">Your log</p>
       <p className="fire__note">
         {log.length} {log.length === 1 ? 'entry' : 'entries'}, kept on this phone only.
@@ -337,7 +333,18 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
       </ul>
 
       {/* The truth loop: your photos against what the app said, and your hit rate (TruthLoop.tsx). */}
-      <TruthLoop timeZone={timeZone} />
+      <TruthLoop
+        timeZone={timeZone}
+        venue={venue}
+        placeName={placeName}
+        target={target ?? null}
+        onPickTarget={onPickTarget}
+        onLogged={(e) => {
+          const next = withEntry(log, e)
+          setLog(next)
+          writeFireLog(next)
+        }}
+      />
     </div>
   )
 }

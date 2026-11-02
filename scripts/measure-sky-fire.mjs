@@ -14,7 +14,9 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { getPosition, getTimes } from 'suncalc'
 import { firePathsUrl, nearestHour, parseFirePaths, pathsAt } from '../src/lib/skyFireData.ts'
-import { checkModel, fireVerdict, layersLine, MODEL_LABEL, PATH_KM, pathPoints } from '../src/core/skyFire.ts'
+import { layersLine, MODEL_LABEL, PATH_KM, pathPoints } from '../src/core/skyFire.ts'
+import { agreementLine, checkWords, fireVerdict } from '../src/core/fireOutlook.ts'
+import { LAYER_WORD } from '../src/core/skyColour.ts'
 
 const [lat = '36.8435575', lon = '-75.9713104', date = '2026-10-29', kind = 'sunrise', ...rest] = process.argv.slice(2)
 const name = rest.join(' ') || 'Virginia Beach Fishing Pier'
@@ -36,7 +38,8 @@ if (paths.length === 0) {
   console.log(`could not look: no cloud figures for ${hour}`)
   process.exit(2)
 }
-const verdict = fireVerdict(paths)
+/* No station and the clean-air haze: the forecast's own read (tests/skyFireReplays.test.ts adds the station). */
+const verdict = fireVerdict(paths, { event, kind, venue, aod: null })
 mkdirSync('tests/data', { recursive: true })
 const fixture = `tests/data/sky-fire-${date}-${kind}.json`
 writeFileSync(fixture, JSON.stringify({ ran, url, venue, date, kind, event: event.toISOString(), azimuth, hour, payload }, null, 1) + '\n')
@@ -54,18 +57,20 @@ const rows = [
   `|---|${PATH_KM.map(() => '---').join('|')}|`,
   ...paths.map((p) => `| ${MODEL_LABEL[p.model]} | ${p.samples.map((s) => `${s.low ?? '—'} / ${s.mid ?? '—'} / ${s.high ?? '—'}`).join(' | ')} |`),
   '',
-  '## The three checks, per model',
+  '## The three checks, per model and layer (src/core/fireOutlook.ts)',
   '',
-  '| model | canvas | gap | not blocked | fires |',
-  '|---|---|---|---|---|',
-  ...paths.map((p) => {
-    const c = checkModel(p)
-    return `| ${MODEL_LABEL[p.model]} | ${c.canvas.pass ? 'yes' : 'no'}: ${c.canvas.say} | ${c.gap.pass ? 'yes' : 'no'}: ${c.gap.say} | ${c.notBlocked.pass ? 'yes' : 'no'}: ${c.notBlocked.say} | ${c.fires ? 'yes' : 'no'} |`
-  }),
+  '| model | layer | canvas | gap | not blocked | fires |',
+  '|---|---|---|---|---|---|',
+  ...[verdict?.sky, ...(verdict?.models ?? [])].filter(Boolean).flatMap((m) =>
+    m.layers.filter((l) => l.canvas).map((l) => {
+      const w = checkWords(l)
+      return `| ${m.model === 'sky' ? 'mean (the clock)' : MODEL_LABEL[m.model]} | ${LAYER_WORD[l.layer]} | ${w.canvas} | ${w.gap} | ${w.notBlocked} | ${l.fires ? 'yes' : 'no'} |`
+    }),
+  ),
   '',
   `Overhead, best match: ${layersLine(paths[0].samples[0])}`,
   '',
-  `## Verdict: ${verdict?.line ?? 'none'}, ${verdict?.agree} of ${verdict?.of} models`,
+  `## Verdict: ${verdict?.line ?? 'none'}, ${verdict?.agree} of ${verdict?.of} models · ${verdict === null ? '' : agreementLine(verdict)}`,
   '',
 ]
 writeFileSync(`measurements/${date}-sky-fire.md`, rows.join('\n'))

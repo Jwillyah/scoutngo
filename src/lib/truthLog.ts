@@ -17,6 +17,8 @@ import type { PhotoMeta } from './compare/photoMeta.ts'
 import { photoInstant } from './compare/pose.ts'
 import { classifyLighting, type Classification } from '../core/lighting.ts'
 import { getSunPosition } from '../core/sun.ts'
+import { zonedTimeToUtc } from '../core/timezone.ts'
+import type { LatLon } from '../core/geo.ts'
 import { band } from '../core/sunPath.ts'
 import type { FireEntry, FireOutcome } from './fireLog.ts'
 
@@ -56,6 +58,31 @@ export interface TruthEntry {
   timingNote?: string | null
   /** A tiny thumbnail (48 px), only when asked for; never the photo. */
   thumb?: string | null
+  /**
+   * Where the place came from (Batch G, item 8): the file's GPS, or, for a
+   * screenshot or a photo shared without location, the venue you said yes to
+   * or the point you picked on the map. Absent on older entries: the file.
+   */
+  placeFrom?: 'file' | 'venue' | 'map'
+  /** The time from the file, or the sunrise or sunset you named for a file with none. */
+  timeFrom?: 'file' | 'asked'
+}
+
+/** For a photo with no place or no time in it: the place to use, and the event it was taken at. */
+export interface PhotoFill {
+  place?: { at: LatLon; from: 'venue' | 'map' }
+  day?: { date: string; event: 'sunrise' | 'sunset' }
+}
+
+/** What a photo still needs before it can be read: a place, or which day's sunrise or sunset. */
+export type PhotoNeeds = { missing: 'place' | 'time'; say: string }
+
+/** The sunrise or sunset of a day, YYYY-MM-DD in the place's zone. */
+export function eventOn(date: string, event: 'sunrise' | 'sunset', at: LatLon, zone: string): Date | null {
+  const noon = zonedTimeToUtc(date, '12:00', zone)
+  if (noon === null) return null
+  const e = getTimes(noon, at.lat, at.lon)[event]
+  return e instanceof Date && !Number.isNaN(e.getTime()) ? e : null
 }
 
 const iso = (d: Date) => d.toISOString()
@@ -72,27 +99,37 @@ function nearestEvent(at: Date, lat: number, lon: number): { event: 'sunrise' | 
 }
 
 /**
- * One photo's entry, or the reason it cannot be one. `zone` is the place's
- * time zone, used when the file gives no offset.
+ * One photo's entry, or what it still needs. `zone` is the place's time zone,
+ * used when the file gives no offset.
+ *
+ * NO GPS IS NOT A REFUSAL (Batch G, item 8: screenshots and photos shared
+ * without location were all turned away, and camera location stays off on
+ * the owner's phone). With no place in the file, `fill.place` is used, the
+ * venue once you say it was taken there, or a point picked on the map; with
+ * no time either, the sunrise or sunset of the day you name.
  */
-export function entryFromPhoto(meta: PhotoMeta, zone: string, fireLog: readonly FireEntry[], name = ''): TruthEntry | { missing: string } {
-  if (meta.lat === null || meta.lon === null) return { missing: 'where it was taken (no GPS in the file)' }
-  const at = photoInstant(meta, zone)
-  if (at === null) return { missing: 'when it was taken (no date in the file)' }
-  const sun = getSunPosition(at, meta.lat, meta.lon)
+export function entryFromPhoto(meta: PhotoMeta, zone: string, fireLog: readonly FireEntry[], name = '', fill: PhotoFill = {}): TruthEntry | PhotoNeeds {
+  const fromFile = meta.lat !== null && meta.lon !== null
+  const place = fromFile ? { lat: meta.lat as number, lon: meta.lon as number } : (fill.place?.at ?? null)
+  if (place === null) return { missing: 'place', say: 'no place in the file' }
+  const fileAt = photoInstant(meta, zone)
+  const asked = fileAt === null && fill.day !== undefined ? eventOn(fill.day.date, fill.day.event, place, zone) : null
+  const at = fileAt ?? asked
+  if (at === null) return { missing: 'time', say: 'no time in the file' }
+  const sun = getSunPosition(at, place.lat, place.lon)
   const heading = meta.gimbalYaw === null ? null : ((meta.gimbalYaw % 360) + 360) % 360
   const light =
     heading === null || sun.altitude <= 0
       ? null
       : classifyLighting({ shotType: 'framed', cameraBearing: heading, positionBearing: (heading + 180) % 360 }, sun)
-  const ev = nearestEvent(at, meta.lat, meta.lon)
+  const ev = fileAt === null && fill.day !== undefined ? { event: fill.day.event, when: at } : nearestEvent(at, place.lat, place.lon)
   const day = new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(ev.when)
   const shown = fireLog.find((f) => f.date === day && f.event === ev.event && f.forecast !== null)
   return {
-    id: `${iso(at)}-${meta.lat.toFixed(4)},${meta.lon.toFixed(4)}${name === '' ? '' : `-${name}`}`,
+    id: `${iso(at)}-${place.lat.toFixed(4)},${place.lon.toFixed(4)}${name === '' ? '' : `-${name}`}`,
     at: iso(at),
-    lat: meta.lat,
-    lon: meta.lon,
+    lat: place.lat,
+    lon: place.lon,
     heading,
     focal35: meta.focal35,
     aboveTakeoffM: meta.aboveTakeoffM,
@@ -107,6 +144,8 @@ export function entryFromPhoto(meta: PhotoMeta, zone: string, fireLog: readonly 
       fire: shown?.forecast ?? null,
     },
     outcome: null,
+    placeFrom: fromFile ? 'file' : (fill.place?.from ?? 'venue'),
+    timeFrom: fileAt === null ? 'asked' : 'file',
   }
 }
 

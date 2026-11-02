@@ -94,118 +94,6 @@ export interface ModelPath {
   samples: Layers[]
 }
 
-export interface Check {
-  pass: boolean
-  /** The number behind it, per cent, said in the card. */
-  value: number | null
-  say: string
-}
-
-export interface ModelChecks {
-  model: FireModel
-  canvas: Check & { deck: 'low' | 'mid' | 'high' | null }
-  gap: Check
-  notBlocked: Check
-  fires: boolean
-}
-
-const mean = (xs: (number | null)[]): number | null => {
-  const v = xs.filter((x): x is number => x !== null)
-  return v.length === 0 ? null : v.reduce((a, b) => a + b, 0) / v.length
-}
-const at = (p: ModelPath, km: number): Layers | undefined => p.samples[PATH_KM.indexOf(km as (typeof PATH_KM)[number])]
-const upper = (l: Layers | undefined): number | null => {
-  if (l === undefined || (l.mid === null && l.high === null)) return null
-  return Math.max(l.mid ?? 0, l.high ?? 0)
-}
-const r0 = (x: number | null) => (x === null ? null : Math.round(x))
-
-/** The three checks for one model. lowBaseM: the low deck's base from a station, when there is one. */
-export function checkModel(p: ModelPath, lowBaseM: number | null = null): ModelChecks {
-  const canvasUpper = mean([0, 25, 50].map((k) => upper(at(p, k))))
-  const lowOver = mean([0, 25].map((k) => at(p, k)?.low ?? null))
-  const lowRight = at(p, 0)?.low ?? null
-
-  let deck: 'low' | 'mid' | 'high' | null = null
-  if (canvasUpper !== null && canvasUpper >= CANVAS_MIN && canvasUpper <= CANVAS_MAX) {
-    const over = at(p, 0)
-    deck = (over?.high ?? 0) >= (over?.mid ?? 0) ? 'high' : 'mid'
-  } else if (lowOver !== null && lowOver >= CANVAS_MIN) deck = 'low'
-
-  const canvas: ModelChecks['canvas'] =
-    deck === 'low'
-      ? { pass: true, deck, value: r0(lowOver), say: `low deck overhead ${r0(lowOver)}%` }
-      : deck !== null
-        ? { pass: true, deck, value: r0(canvasUpper), say: `${deck} cloud overhead and toward the sun ${r0(canvasUpper)}%` }
-        : {
-            pass: false,
-            deck: null,
-            value: r0(canvasUpper),
-            say: canvasUpper !== null && canvasUpper > CANVAS_MAX ? `mid and high cloud ${r0(canvasUpper)}%, a lid` : `mid and high cloud ${r0(canvasUpper) ?? '—'}%, nothing to light`,
-          }
-
-  /* The gap: for a low deck, where it ends; for a higher one, round where its light grazes the Earth. */
-  let gap: Check
-  if (deck === 'low') {
-    const reach = grazingKm(lowBaseM ?? DECK_HEIGHT_M.low) * 1.5
-    const ends = PATH_KM.find((k) => k > 0 && k <= reach && (at(p, k)?.low ?? 101) <= DECK_ENDS)
-    gap = ends === undefined
-      ? { pass: false, value: null, say: `the low deck runs on past ${Math.round(reach)} km toward the sun` }
-      : { pass: true, value: at(p, ends)?.low ?? null, say: `the low deck ends ${ends} km toward the sun (${at(p, ends)?.low}% beyond)` }
-  } else {
-    const g = grazingKm(deck === 'mid' ? DECK_HEIGHT_M.mid : DECK_HEIGHT_M.high)
-    const near = PATH_KM.filter((k) => k >= g * 0.6 && k <= g * 1.4)
-    const lowPath = mean(near.map((k) => at(p, k)?.low ?? null))
-    gap = lowPath === null
-      ? { pass: false, value: null, say: 'no low cloud figure along the light path' }
-      : { pass: lowPath <= GAP_MAX, value: r0(lowPath), say: `low cloud along the light path, ${near[0]}–${near[near.length - 1]} km, ${r0(lowPath)}%` }
-  }
-
-  const notBlocked: Check =
-    deck === 'low'
-      ? { pass: true, value: r0(lowRight), say: 'the low deck is the canvas' }
-      : lowRight === null
-        ? { pass: false, value: null, say: 'no low cloud figure overhead' }
-        : { pass: lowRight < BLOCKED_AT, value: lowRight, say: `low cloud right overhead ${lowRight}%` }
-
-  return { model: p.model, canvas, gap, notBlocked, fires: canvas.pass && gap.pass && notBlocked.pass }
-}
-
-export type FireWord = 'likely' | 'possible' | 'unlikely'
-
-export interface FireVerdict {
-  word: FireWord
-  /** "Fire possible", or "Fire unlikely: no gap toward the sun". */
-  line: string
-  /** Of the five named models with figures, how many fire. */
-  agree: number
-  of: number
-  checks: ModelChecks[]
-}
-
-/** The reason a forecast says no, from best_match's first failing check. */
-function why(c: ModelChecks): string {
-  if (!c.canvas.pass) return (c.canvas.value ?? 0) > CANVAS_MAX ? 'a lid of cloud' : 'nothing to light'
-  if (!c.gap.pass) return 'no gap toward the sun'
-  return 'a thick low deck overhead'
-}
-
-/**
- * The verdict across models: likely when at least 3 in 5 named models fire;
- * possible when 2 do, or best_match does; else unlikely, with the reason.
- */
-export function fireVerdict(paths: readonly ModelPath[], lowBaseM: number | null = null): FireVerdict | null {
-  const checks = paths.map((p) => checkModel(p, lowBaseM))
-  const named = checks.filter((c) => c.model !== 'best_match' && c.canvas.value !== null)
-  const best = checks.find((c) => c.model === 'best_match') ?? checks[0]
-  if (best === undefined || named.length === 0) return null
-  const agree = named.filter((c) => c.fires).length
-  const of = named.length
-  const word: FireWord = agree / of >= 0.6 ? 'likely' : agree >= 2 || best.fires ? 'possible' : 'unlikely'
-  const line = word === 'unlikely' ? `Fire unlikely: ${why(best)}` : `Fire ${word}`
-  return { word, line, agree, of, checks }
-}
-
 /** The spread of low cloud overhead across the five, for "models split" on the chip. */
 export const SPLIT_AT = 50
 export function modelsSplit(overhead: readonly (number | null)[]): boolean {
@@ -217,34 +105,6 @@ export function modelsSplit(overhead: readonly (number | null)[]): boolean {
 export function layersLine(l: Layers): string {
   const n = (x: number | null) => (x === null ? '—' : String(Math.round(x)))
   return `Low ${n(l.low)} · Mid ${n(l.mid)} · High ${n(l.high)}`
-}
-
-/*
- * WHEN TO LOOK. A high deck stays lit until the sun is about 3 degrees below
- * the horizon, a low one about 1 degree: so at sunrise the colour often
- * comes BEFORE the sun, and at sunset it lasts after it.
- */
-export const LIT_UNTIL_DEG = { low: -1, mid: -2, high: -3 } as const
-
-/** When the sun's altitude crosses `deg` near an event, by bisection: rising before a sunrise, setting after a sunset. */
-export function sunCrosses(event: Date, kind: 'sunrise' | 'sunset', deg: number, lat: number, lon: number, altitudeAt: (t: Date, lat: number, lon: number) => number): Date {
-  const span = 90 * 60_000
-  let a = kind === 'sunrise' ? event.getTime() - span : event.getTime()
-  let b = kind === 'sunrise' ? event.getTime() : event.getTime() + span
-  for (let i = 0; i < 40; i += 1) {
-    const m = (a + b) / 2
-    const above = altitudeAt(new Date(m), lat, lon) > deg
-    if (kind === 'sunrise' ? above : !above) b = m
-    else a = m
-  }
-  return new Date((a + b) / 2)
-}
-
-/** From when to when to watch, for the deck that would be lit. */
-export function fireWindow(event: Date, kind: 'sunrise' | 'sunset', deck: 'low' | 'mid' | 'high', lat: number, lon: number, altitudeAt: (t: Date, lat: number, lon: number) => number): { from: Date; to: Date } {
-  const lit = sunCrosses(event, kind, LIT_UNTIL_DEG[deck], lat, lon, altitudeAt)
-  const tenMin = 10 * 60_000
-  return kind === 'sunrise' ? { from: lit, to: new Date(event.getTime() + tenMin) } : { from: new Date(event.getTime() - tenMin), to: lit }
 }
 
 /** The chip's short form, low·mid·high: "87·20·0". */
@@ -265,4 +125,31 @@ export function nextEvents(at: Date, venue: LatLon): Record<'sunrise' | 'sunset'
     }
   }
   return out
+}
+
+/*
+ * WHICH EVENT THE LOG BUTTONS ARE FOR (Batch G, item 6: at 6:11 on 2 Nov there
+ * was no "It fired" button anywhere, the glow already over and sunrise still
+ * to come). From LOG_FROM_MIN before a sunrise or sunset, when the high cloud
+ * can already be lit, to LOG_FOR_H after it; past that, the last one earlier
+ * the same day where you are, so opening the app at noon still logs the
+ * morning.
+ */
+export const LOG_FROM_MIN = 50
+export const LOG_FOR_H = 3
+
+export function eventToLog(now: Date, venue: LatLon, timeZone: string): { kind: 'sunrise' | 'sunset'; at: Date } | null {
+  const valid = (d: Date | null | undefined): d is Date => d instanceof Date && !Number.isNaN(d.getTime())
+  const all: { kind: 'sunrise' | 'sunset'; at: Date }[] = []
+  for (const dayShift of [-1, 0, 1]) {
+    const t = getTimes(new Date(now.getTime() + dayShift * 86_400_000), venue.lat, venue.lon)
+    for (const kind of ['sunrise', 'sunset'] as const) if (valid(t[kind])) all.push({ kind, at: t[kind] as Date })
+  }
+  const seen = new Set<number>()
+  const events = all.filter((e) => (seen.has(e.at.getTime()) ? false : (seen.add(e.at.getTime()), true))).sort((a, b) => b.at.getTime() - a.at.getTime())
+  const t = now.getTime()
+  const open = events.find((e) => t >= e.at.getTime() - LOG_FROM_MIN * 60_000 && t <= e.at.getTime() + LOG_FOR_H * 3_600_000)
+  if (open !== undefined) return open
+  const day = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d)
+  return events.find((e) => e.at.getTime() < t && day(e.at) === day(now)) ?? null
 }
