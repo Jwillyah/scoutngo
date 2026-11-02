@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { askToPersist, backupNow, lastBackup, restoreBackup, whatIsKept, type Kept } from '../lib/backup.ts'
 import { formatBytes } from '../lib/offlineCache.ts'
 import { dayWords } from '../lib/savedWords.ts'
+import { readScoutFile, type ReadFile } from '../lib/scoutFile.ts'
 
 /*
  * SETTINGS › PRIVACY & DATA: WHERE YOUR THINGS ARE, AND A COPY YOU HOLD
@@ -9,7 +10,7 @@ import { dayWords } from '../lib/savedWords.ts'
  * the browser agreed to keep it, Back up to a file, Restore from a file, and
  * the plain words on what deletes it.
  */
-export function KeptSection() {
+export function KeptSection({ onImportScout }: { onImportScout?: (file: ReadFile) => string } = {}) {
   const [kept, setKept] = useState<Kept | null>(null)
   const [note, setNote] = useState<string | null>(null)
   const [last, setLast] = useState<Date | null>(() => {
@@ -24,8 +25,11 @@ export function KeptSection() {
 
   const restore = async (file: File | undefined) => {
     if (file === undefined) return
-    const got = restoreBackup(new Uint8Array(await file.arrayBuffer()), localStorage)
-    setNote(got.ok ? `Restored ${got.keys} items${got.thumbs > 0 ? ` and ${got.thumbs} thumbnails` : ''} from the backup of ${dayWords(got.savedAt)}. Reopen the app to see them.` : got.reason)
+    const bytes = new Uint8Array(await file.arrayBuffer())
+    const got = restoreBackup(bytes, localStorage)
+    /* Not a backup: perhaps an older "Export everything" file, read as About used to (Batch G: restore lives here only). */
+    const scout = got.ok || onImportScout === undefined ? null : readScoutFile(new TextDecoder().decode(bytes))
+    setNote(got.ok ? `Restored ${got.keys} items${got.thumbs > 0 ? ` and ${got.thumbs} thumbnails` : ''} from the backup of ${dayWords(got.savedAt)}. Reopen the app to see them.` : scout?.ok === true && onImportScout !== undefined ? onImportScout(scout.file) : got.reason)
     look()
   }
 

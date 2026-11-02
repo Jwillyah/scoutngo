@@ -308,8 +308,6 @@ interface PlanModeProps {
   onHow: (section: HowSection) => void
   onShowHome: () => void
   onEditKit: () => void
-  onOpenSpots: () => void
-  savedSpotCount: number
   /** The shoot date, yyyy-mm-dd, for the leaf answer on a deciduous mark. */
   shootDate: string
   /** Which brief a generate would send: the typed one, or the chips. */
@@ -528,8 +526,6 @@ export function PlanMode({
   onHow,
   onShowHome,
   onEditKit,
-  onOpenSpots,
-  savedSpotCount,
   shootDate,
   skyLayer,
   onSkyLayer,
@@ -2520,23 +2516,14 @@ export function PlanMode({
           onShowHome={onShowHome}
           onKit={onEditKit}
           onExport={onExport}
+          onImport={onImport}
           onClose={closeRoutedPage}
         />
       ) : null}
       {/* About, a page of its own like Settings (Batch E): its own route, a back arrow, normal scroll. */}
       {page === 'about' ? (
         <Page title="About" className="aboutpage" back onClose={closeRoutedPage}>
-          <AboutSheet
-            onHow={onHow}
-            onKit={onEditKit}
-            onSpots={onOpenSpots}
-            onApiKey={() => setPage('settings')}
-            kitLine={`${kitProfile.bodies.length} bodies · ${kitProfile.lenses.length} lenses`}
-            spotsLine={`${savedSpotCount} saved`}
-            apiKeyLine="bring your own"
-            onExport={onExport}
-            onImport={onImport}
-          />
+          <AboutSheet onHow={onHow} />
         </Page>
       ) : null}
       {page === 'terrain' && venue !== null && scrubbedAt !== null && venueWindow !== null ? (

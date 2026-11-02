@@ -1,26 +1,19 @@
-import { buildLabelWithDate } from '../lib/build.ts'
+import { REPO_SLUG, versionLine } from '../lib/build.ts'
 import { openPrivacy } from '../lib/privacyRoute.ts'
-import type { ReadFile } from '../lib/scoutFile.ts'
-import { BackupFile } from './BackupFile.tsx'
-import { ApiKeyField } from './ApiKeyField.tsx'
-import { StorageProbe } from './StorageProbe.tsx'
 
 /*
- * ABOUT: WHY THIS EXISTS, HOW IT WORKS, YOURS.
+ * ABOUT, SHORT (Batch G, Section 8): the story in two short paragraphs, How
+ * it works in three rows (every number is arithmetic, privacy, what it will
+ * not tell you), the version and the source. Nothing else: the API key,
+ * backup and restore, the old file import and the Safari-clearing check are
+ * in Settings (› AI key, › Privacy & data and its "i"), once.
  *
- * FROM THE MENU. The units and the clock moved out to Settings, beside it in
- * the same menu (SettingsPage.tsx), so this is the story, the key and the
- * backup.
+ * THE SAME CONTENT AS /how, NOT A SECOND COPY. The rows open the matching
+ * section of the /how page, or /privacy, rather than restating it here.
  *
- * THE SAME CONTENT AS /how, NOT A SECOND COPY. The three HOW IT WORKS rows
- * open the matching section of the /how page rather than restating it here.
- * Two pages saying the same thing is two pages to keep true, and the one
- * nobody opens is the one that goes stale.
- *
- * THE OPENING COPY IS A PLACEHOLDER. It is the shooter's own words from the
- * mockup and he has said he will rewrite it; it is reproduced here unpolished
- * and deliberately not improved, because editing somebody's account of why
- * they built their own tool is not a thing to do uninvited.
+ * THE OPENING COPY IS THE OWNER'S OWN WORDS, reproduced unpolished and
+ * deliberately not improved: editing somebody's account of why they built
+ * their own tool is not a thing to do uninvited.
  */
 
 export type HowSection = 'computed' | 'leaves' | 'refuses'
@@ -28,28 +21,9 @@ export type HowSection = 'computed' | 'leaves' | 'refuses'
 interface AboutSheetProps {
   /** Opens /how at the matching section. One content, two entry points. */
   onHow: (section: HowSection) => void
-  onKit: () => void
-  onSpots: () => void
-  onApiKey: () => void
-  kitLine: string
-  spotsLine: string
-  apiKeyLine: string
-  /** Export and import, one file. See BackupFile.tsx. */
-  onExport: () => void
-  onImport: (file: ReadFile) => string
 }
 
-export function AboutSheet({
-  onHow,
-  onKit,
-  onSpots,
-  onApiKey,
-  kitLine,
-  spotsLine,
-  apiKeyLine,
-  onExport,
-  onImport,
-}: AboutSheetProps) {
+export function AboutSheet({ onHow }: AboutSheetProps) {
   return (
     <div className="about">
       <p className="about__eyebrow">Why this exists</p>
@@ -85,37 +59,30 @@ export function AboutSheet({
         </button>
       ))}
 
-      <ApiKeyField />
+      <p className="about__eyebrow about__eyebrow--dim">Version</p>
+      <p className="about__row about__row--static">
+        <span className="about__row-title">{versionLine()}</span>
+      </p>
 
-      <p className="about__eyebrow about__eyebrow--dim">Yours</p>
-      {(
-        [
-          ['kit', 'Your kit', kitLine, onKit],
-          ['spots', 'Your spots', spotsLine, onSpots],
-          ['key', 'Your API key', apiKeyLine, onApiKey],
-        ] as const
-      ).map(([id, title, line, go]) => (
-        <button type="button" className="about__row" key={id} onClick={go}>
-          <span className="about__row-title">{title}</span>
-          <span className="about__row-note">
-            {line} <span aria-hidden="true">›</span>
+      <p className="about__eyebrow about__eyebrow--dim">Open source</p>
+      {REPO_SLUG === '' ? (
+        <p className="about__row about__row--static">
+          <span className="about__row-note">The source is public; this build does not know its repository.</span>
+        </p>
+      ) : (
+        <a className="about__row" href={`https://github.com/${REPO_SLUG}`} target="_blank" rel="noreferrer">
+          <span className="about__row-main">
+            <span className="about__row-title">github.com/{REPO_SLUG}</span>
+            <span className="about__row-note">Read the code; every number in the app is worked out there.</span>
           </span>
-        </button>
-      ))}
-
-      {/*
-        * THE BACKUP, beside the things it backs up. Clearing Safari's data
-        * wipes localStorage, and that was the only place the kit lived.
-        */}
-      <p className="about__eyebrow about__eyebrow--dim">Backup</p>
-      <BackupFile onExport={onExport} onImport={onImport} />
-
-      <p className="about__eyebrow about__eyebrow--dim">Does clearing Safari erase this?</p>
-      <StorageProbe />
+          <span className="about__chev" aria-hidden="true">
+            ›
+          </span>
+        </a>
+      )}
 
       <p className="about__foot">
         <span>Free · open source · no account</span>
-        <span className="num">{buildLabelWithDate()}</span>
       </p>
     </div>
   )

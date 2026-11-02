@@ -51,7 +51,8 @@ describe('the build, with its day', () => {
   })
 
   it('is shown in About, in Settings › About as the version, and in the debug log', () => {
-    expect(readFileSync('src/components/AboutSheet.tsx', 'utf8')).toContain('{buildLabelWithDate()}')
+    /* Batch G: About and Settings say it the same way, "Version <hash> · <day> <Mon>". */
+    expect(readFileSync('src/components/AboutSheet.tsx', 'utf8')).toContain('{versionLine()}')
     const settings = readFileSync('src/components/SettingsPage.tsx', 'utf8')
     /* Batch G: Settings' About is one row, carrying "Version <hash> · <day> <Mon>". */
     expect(settings).toContain('<Row label="About ScoutNGo" value={versionLine()} onClick={props.onAbout} />')

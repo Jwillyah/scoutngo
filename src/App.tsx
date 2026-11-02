@@ -2125,9 +2125,6 @@ function App() {
             window.history.pushState({}, '', '/')
           }}
           onEditKit={() => onMenuPick('kit')}
-          onOpenSpots={() => onMenuPick('saved')}
-          /* The key field is on About itself, above the row that names it. */
-          savedSpotCount={spots.length}
           mapHandle={mapHandle}
           venue={centre}
           onVenueChange={onVenueChange}

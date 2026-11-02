@@ -15496,3 +15496,15 @@
 .wk__line b {
   color: var(--color-text);
 }
+
+a.about__row,
+a.about__row * {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* About's static rows (Batch G): the version, the source when the build does not know its repository. */
+.about__row--static {
+  margin: 0;
+  cursor: default;
+}

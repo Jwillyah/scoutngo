@@ -19,6 +19,7 @@ import { API_KEY_SAY, ApiKeyField } from './ApiKeyField.tsx'
 import { BuildStamp } from './BuildStamp.tsx'
 import { Page } from './Page.tsx'
 import { KeptExplained, KeptSection } from './KeptSection.tsx'
+import type { ReadFile } from '../lib/scoutFile.ts'
 
 /*
  * SETTINGS, A PAGE OF ITS OWN (field test, 30 Oct), CLEAN AND iOS-STYLE
@@ -50,6 +51,8 @@ interface Props {
   onShowHome: () => void
   onKit: () => void
   onExport: () => void
+  /** An older "Export everything" file (kit, units, spots), read back by Restore (src/lib/scoutFile.ts). */
+  onImport?: (file: ReadFile) => string
   onClose: () => void
 }
 
@@ -221,7 +224,7 @@ export function SettingsPage(props: Props) {
       </Section>
 
       <Section title="Privacy & data" info={<KeptExplained />}>
-        <KeptSection />
+        <KeptSection onImportScout={props.onImport} />
         <Row label="What leaves your phone" value="" onClick={openPrivacy} />
         <Row label="Export everything" value="One file" onClick={props.onExport} />
         <Row label="Clear this phone" value="" onClick={openPrivacy} />

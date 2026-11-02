@@ -85,9 +85,29 @@ describe('Settings, a page of its own (30 Oct)', () => {
 
   it('and the units have left About', () => {
     const html = renderToStaticMarkup(
-      <AboutSheet onHow={() => {}} onKit={() => {}} onSpots={() => {}} onApiKey={() => {}} kitLine="" spotsLine="" apiKeyLine="" onExport={() => {}} onImport={() => ''} />,
+      <AboutSheet onHow={() => {}} />,
     )
     expect(html).not.toContain('Wind units')
     expect(html).not.toContain('Distance units')
+  })
+})
+
+/*
+ * ABOUT, SHORT (Batch G, Section 8): the story, How it works in three rows,
+ * Version and Open source; no API key, no backup or import, no raw file
+ * input, no Safari-clearing words (those are in Settings, once).
+ */
+describe('About, short', () => {
+  const html = renderToStaticMarkup(<AboutSheet onHow={() => {}} />)
+  const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
+  it('has only the story, How it works, Version and Open source', () => {
+    const eyebrows = [...html.matchAll(/class="about__eyebrow[^"]*">([^<]+)</g)].map((m) => m[1])
+    expect(eyebrows).toEqual(['Why this exists', 'How it works', 'Version', 'Open source'])
+    expect(html.match(/class="about__why"/g)?.length).toBe(2)
+    for (const row of ['Every number is arithmetic', 'Privacy: what leaves your device', 'What it will not tell you']) expect(text).toContain(row)
+  })
+  it('carries no key, no backup, no file input and no Safari-clearing check', () => {
+    expect(html).not.toMatch(/type="file"/)
+    expect(text).not.toMatch(/API key|Back ?up|Restore|Import|Choose File|clearing Safari|Safari erase/i)
   })
 })
