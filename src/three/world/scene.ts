@@ -27,6 +27,7 @@
  */
 import * as THREE from 'three'
 import { logTouch } from '../../lib/touchDebug.ts'
+import { createDecks } from './decks.ts'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { NOMINAL_DRAW_HEIGHT } from '../../core/buildingHeight.ts'
 import { bearingBetween, distanceMeters, type LatLon } from '../../core/geo.ts'
@@ -122,6 +123,8 @@ export interface ClayScene {
   frameTimes(): number[]
   /** Batch I: told when the GPU context is lost or restored, or a frame throws (Clay3D rebuilds or says why). */
   onTrouble(hooks: { lost?: () => void; restored?: () => void; error?: (message: string) => void }): void
+  /** Batch I: the bridges, piers and pilings drawn, for checks. */
+  decks(): { bridges: number; piers: number; pilings: number }
   /** Batch I: what is on the GPU, for Debug touch. */
   gpu(): { textures: number; geometries: number; calls: number; scale: number; lost: boolean }
   renderer: THREE.WebGLRenderer
@@ -263,6 +266,10 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
   const water = createWater(frame, touch)
   scene.add(water.group)
   const buildings = createBuildings(frame, ground, touch)
+  /* Bridges and piers as decks on pilings (Batch I, Section 6). */
+  const decks = createDecks(frame, touch)
+  scene.add(decks.group)
+  decks.follow(0, 0)
   scene.add(buildings.group)
   const clouds = createClouds(touch)
   scene.add(clouds.group)
@@ -463,6 +470,7 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
       /* How high the camera is over where it looks: low, the ground under it is drawn at the imagery's own top zoom. */
       ground.follow(target.x, target.z, velocity, camera.position.y - target.y)
       buildings.follow(target.x, target.z)
+      decks.follow(target.x, target.z)
     }
     renderer.render(scene, camera)
     for (const f of [...postRender]) f()
@@ -895,6 +903,7 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
     onTrouble: (hooks) => {
       Object.assign(trouble, hooks)
     },
+    decks: () => decks.counts(),
     gpu: () => ({ textures: renderer.info.memory.textures, geometries: renderer.info.memory.geometries, calls: renderer.info.render.calls, scale, lost }),
     destroy: () => {
       cancelAnimationFrame(raf)
@@ -903,6 +912,7 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
       observer.disconnect()
       controls.dispose()
       ground.dispose()
+      decks.dispose()
       renderer.dispose()
       renderer.domElement.remove()
     },

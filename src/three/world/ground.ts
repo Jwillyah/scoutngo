@@ -66,6 +66,17 @@ export interface GroundStatus {
 const seaFloor = (h: number) => (h < 0.3 ? Math.min(h, -1.5) : h)
 /* Under the map's water, below any tide the water level can reach (the fixture's low tide sat below -2.5 m). */
 export const CARVE_M = -6
+/* The beach: land within BEACH_M of water slopes to WATERLINE_M at the water (Batch I, Section 6). */
+export const BEACH_M = 40
+export const BEACH_STEP_M = 8
+export const WATERLINE_M = 0.3
+/** The ground at `d` metres from the water: the land's own height eased to the waterline, never raised. */
+export function beachHeight(h: number, d: number): number {
+  if (h <= WATERLINE_M) return h
+  const t = Math.min(1, Math.max(0, d / BEACH_M))
+  const s = t * t * (3 - 2 * t)
+  return WATERLINE_M + (h - WATERLINE_M) * s
+}
 
 /**
  * A grid of (n+1)² vertices over a lat/lon box, heights from `height`, with
@@ -155,8 +166,28 @@ async function heightsFor(north: number, south: number, west: number, east: numb
      * (Wrightsville, 1 Nov). There the water's edge wins.
      */
     const wet = mask.inWater(lat, lon) || (reachDeg > 0 && [[reachDeg, 0], [-reachDeg, 0], [0, reachDeg], [0, -reachDeg]].some(([a, b]) => mask.inWater(lat + a, lon + b)))
-    return wet ? Math.min(h, CARVE_M) : h
+    if (wet) return Math.min(h, CARVE_M)
+    /*
+     * THE BEACH (Batch I, Section 6): dry land within BEACH_M of the map's
+     * water eases down to the waterline, so a beach slopes from dry sand to
+     * the water instead of the land standing straight up out of the sea.
+     */
+    const d = shoreDistanceM(mask, lat, lon)
+    return d === null ? h : beachHeight(h, d)
   }
+}
+
+/** Metres to the nearest of the map's water within BEACH_M, looked for in eight directions; null when none is that near. */
+function shoreDistanceM(mask: { inWater(lat: number, lon: number): boolean }, lat: number, lon: number): number | null {
+  const mLat = 111_320
+  const mLon = 111_320 * Math.cos((lat * Math.PI) / 180)
+  for (let r = BEACH_STEP_M; r <= BEACH_M; r += BEACH_STEP_M) {
+    for (let k = 0; k < 8; k += 1) {
+      const a = (k * Math.PI) / 4
+      if (mask.inWater(lat + (Math.cos(a) * r) / mLat, lon + (Math.sin(a) * r) / mLon)) return r
+    }
+  }
+  return null
 }
 
 export interface GroundMaterialHook {

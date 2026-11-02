@@ -12,6 +12,8 @@
  *              it is not a black canvas
  *   restored   the context comes back: the scene is built again, the
  *              message goes, and the picture is not black
+ *   the pier   Batch I, Section 6: the Virginia Beach Fishing Pier is drawn
+ *              as a deck on pilings (OSM's pier, from the map's tiles)
  *   a throw    a frame that throws: the actual message, "Copy error" and
  *              "Try again"; Try again builds the view again
  */
@@ -78,6 +80,15 @@ try {
   }
   looked += 1
   await wait(2000)
+  /* Batch I, Section 6: the pier is a deck on pilings, from the map's own tiles. */
+  let decks = null
+  for (let i = 0; i < 15; i += 1) {
+    decks = await ev(`window.__clay.decks()`)
+    if (decks.piers > 0) break
+    await wait(1000)
+  }
+  console.log(`  decks at the pier: ${JSON.stringify(decks)}`)
+  if (decks === null || decks.piers === 0 || decks.pilings === 0) fail(`no pier deck on pilings at the Virginia Beach pier in 3D (${JSON.stringify(decks)})`)
   const before = await canvasLuma(page)
   console.log(`  up: canvas luminance ${before?.toFixed(1)}`)
 
