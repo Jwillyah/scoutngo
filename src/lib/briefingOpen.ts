@@ -1,8 +1,7 @@
 /*
  * WHEN THE TODAY BRIEFING OPENS BY ITSELF (Batch H, Section 2: "opens when
- * the app opens"). When the app is opened from the home screen
- * (display-mode standalone, or iOS's navigator.standalone): that is a launch.
- * A Safari tab is browsing, and there it is Menu › Today. And only on a plain
+ * the app opens"). Batch I: on every launch, the home-screen app and a
+ * Safari tab alike; the briefing is the app's front door. Only on a plain
  * launch: the address is the app's
  * own front door, with no shared plan in it and no deep path (a shared plan
  * or /field means you came for that), and the first-run landing has been
@@ -20,10 +19,8 @@ interface Where {
 export function shouldOpenBriefing(w: Where | null, landingSeen: boolean): boolean {
   if (w === null || !landingSeen) return false
   if (w.navigator.webdriver === true) return false
-  const homeScreen = w.navigator.standalone === true || w.matchMedia?.('(display-mode: standalone)').matches === true
-  if (!homeScreen) return false
   if (w.location.pathname !== '/' && w.location.pathname !== '') return false
   if (w.location.hash.length > 1) return false
-  const q = new URLSearchParams(w.location.search)
-  return !q.has('p') && q.get('brief') !== '0'
+  /* A bare front door only: any query (a shared link's, ?probe=1, ?calibration=1, ?brief=0) is someone asking for something else. */
+  return w.location.search.length <= 1
 }

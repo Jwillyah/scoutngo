@@ -40,9 +40,9 @@ const fail = (why) => {
 
 const browser = await webkit.launch()
 try {
-  for (const [label, insets] of [['browser', { top: 0, bottom: 0 }], ['standalone', { top: 47, bottom: 34 }]]) {
+  for (const [label, insets, height] of [['browser', { top: 0, bottom: 0 }, 844], ['standalone', { top: 47, bottom: 34 }, 844], ['short tab', { top: 0, bottom: 0 }, 664]]) {
     console.log(`\n### ${label}`)
-    const ctx = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height: 844 } })
+    const ctx = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height } })
     await ctx.addInitScript(([top, bottom]) => {
       try {
         localStorage.setItem('scoutngo.landing.v1', 'true')
@@ -89,7 +89,7 @@ try {
     const names = m.cards.map((c) => c.name)
     if (JSON.stringify(names) !== JSON.stringify(['Today', 'Sky', 'Water', 'Drone'])) fail(`${label}: the cards are ${JSON.stringify(names)}`)
     for (const c of m.cards) {
-      if (c.h < 80 || c.h > 112) fail(`${label}: the ${c.name} card is ${c.h} px, not about 88`)
+      if (c.h < 76 || c.h > 112) fail(`${label}: the ${c.name} card is ${c.h} px, not about 88`)
       if (!c.value) fail(`${label}: the ${c.name} card has no value`)
       if (/255,\s*59,\s*48/.test(c.bg)) fail(`${label}: the ${c.name} card is the hazard red`)
     }

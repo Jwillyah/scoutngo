@@ -114,6 +114,7 @@ import { Menu, type MenuRows, type MenuTarget } from './components/Menu.tsx'
 import { lastBackup } from './lib/backup.ts'
 import { PACK_STORAGE_KEY } from './lib/venuePack.ts'
 import { Briefing } from './components/Briefing.tsx'
+import { SpotPicker } from './components/SpotPicker.tsx'
 import { shouldOpenBriefing } from './lib/briefingOpen.ts'
 import { backToNow, openingScrub } from './lib/backToNow.ts'
 import { retrying } from './lib/retrying.ts'
@@ -1394,6 +1395,10 @@ function App() {
   const [menuOpen, setMenuOpen] = useState(false)
   /* The Today briefing: on a plain launch (src/lib/briefingOpen.ts), and from Menu › Today. */
   const [briefOpen, setBriefOpen] = useState(() => shouldOpenBriefing(typeof window === 'undefined' ? null : window, landingSeen))
+  /* The spot switcher over Today (Batch I, Section 1). */
+  const [spotPickOpen, setSpotPickOpen] = useState(false)
+  /* The first run asks only on a bare launch: a shared plan's link, or ?calibration=1, brings its own place. */
+  const [bareLaunch] = useState(() => typeof window === 'undefined' || (window.location.search.length <= 1 && window.location.hash.length <= 1))
   /* Its clock, a minute at a time while it is open: the Now line and the calls move with it. */
   const [briefNow, setBriefNow] = useState(() => new Date())
   useEffect(() => {
@@ -1707,6 +1712,25 @@ function App() {
 
   const onPick = useCallback((at: LatLon, label: string) => {
     setPendingPin({ at, label })
+  }, [])
+
+  /*
+   * A SPOT CHOSEN FROM "WHERE DO YOU SHOOT?" (Batch I, Section 1): the venue
+   * becomes it at once, no pin to confirm, and Today opens for it.
+   */
+  const chooseSpot = useCallback((at: LatLon, label: string) => {
+    setVenue((current) => {
+      const moved = withCoordinates(current, at)
+      return { ...moved, name: { key: placeKey(moved.latitude, moved.longitude), name: label } }
+    })
+    nameIsFilled.current = false
+    cancelNameLookup()
+    setDefaults((d) => ({ ...d, name: false }))
+    setPositions([])
+    setGeneration({ status: 'idle' })
+    setSpotPickOpen(false)
+    setBriefOpen(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const onPendingMove = useCallback((at: LatLon) => {
@@ -2434,8 +2458,22 @@ function App() {
         />
       ) : null}
 
-      {briefOpen && centre !== null ? (
+      {/* FIRST RUN, NO SETUP (Batch I, Section 1): no spot yet, so "Where do you shoot?", over everything. */}
+      {(landingSeen && centre === null && bareLaunch) || spotPickOpen ? (
+        <SpotPicker
+          title={centre === null ? 'Where do you shoot?' : 'Switch spot'}
+          saved={spots.flatMap((sp) => {
+            const at = venueLatLon(sp.venue)
+            return at === null ? [] : [{ id: sp.id, name: sp.name, at }]
+          })}
+          around={centre}
+          onPick={chooseSpot}
+          onClose={centre === null ? undefined : () => setSpotPickOpen(false)}
+        />
+      ) : null}
+      {briefOpen && centre !== null && !spotPickOpen ? (
         <Briefing
+          onSwitchSpot={() => setSpotPickOpen(true)}
           venue={centre}
           placeName={venueShort}
           timeZone={venueWindow?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}

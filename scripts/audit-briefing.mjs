@@ -13,6 +13,9 @@
  *              (a drone is in the kit), a Now line
  *   This week  seven days, the dashed line before the third
  *   words      never "safe", never "clear to", never a red ground
+ *   short tab  390 x 664 (a Safari tab): every page still fits (Batch I)
+ *   first run  a bare launch with no spot: "Where do you shoot?", spots
+ *              near the location once, one tap to Today (Batch I)
  */
 import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -51,9 +54,9 @@ const FIT = (i) => `JSON.stringify((() => {
 
 const browser = await webkit.launch()
 try {
-  for (const [label, insets] of [['browser', { top: 0, bottom: 0 }], ['standalone', { top: 47, bottom: 34 }]]) {
+  for (const [label, insets, height] of [['browser', { top: 0, bottom: 0 }, 844], ['standalone', { top: 47, bottom: 34 }, 844], ['short tab', { top: 0, bottom: 0 }, 664]]) {
     console.log(`\n### ${label}`)
-    const ctx = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height: 844 } })
+    const ctx = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height } })
     await ctx.addInitScript(([top, bottom]) => {
       try {
         localStorage.setItem('scoutngo.landing.v1', 'true')
@@ -125,6 +128,32 @@ try {
     await page.locator('.brief__x').click()
     await wait(500)
     if (await ev(`!!document.querySelector('.brief')`)) fail(`${label}: × did not close the briefing`)
+
+    /*
+     * FIRST RUN, NO SETUP (Batch I, Section 1): a bare launch with no spot
+     * asks "Where do you shoot?"; the location once offers known spots near
+     * it; one tap opens Today for that spot. No map, no pin.
+     */
+    if (label === 'short tab') {
+      await ctx.grantPermissions(['geolocation'])
+      await ctx.setGeolocation({ latitude: 36.8441, longitude: -75.9752 })
+      await ev(`(() => { localStorage.clear(); localStorage.setItem('scoutngo.landing.v1', 'true') })()`)
+      await page.goto(`${APP_ORIGIN}/`)
+      await wait(3500)
+      const asked = await ev(`document.querySelector('.spick__title')?.textContent ?? null`)
+      console.log(`  first run: ${asked}`)
+      if (asked !== 'Where do you shoot?') fail(`a bare first launch did not ask where you shoot (${JSON.stringify(asked)})`)
+      await page.getByRole('button', { name: 'Use my location once' }).click().catch(() => {})
+      await wait(2500)
+      const rows = await ev(`[...document.querySelectorAll('.spick__row .spick__name')].map((e) => e.textContent)`)
+      console.log(`  spots near: ${JSON.stringify(rows)}`)
+      if (!Array.isArray(rows) || rows.length === 0) fail('no known spots offered near the location')
+      await page.locator('.spick__row').first().click().catch(() => {})
+      await wait(5000)
+      const opened = await ev(`document.querySelector('.bcall__place')?.textContent ?? null`)
+      console.log(`  then Today: ${opened}`)
+      if (opened === null) fail('picking a spot did not open Today')
+    }
     await ctx.close()
     watchdog.note(label)
   }

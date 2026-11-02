@@ -9,6 +9,11 @@ is one tap, an item or a place under it is the second.
 
 ## The tree, after
 
+Batch I (2 Nov): the app opens on Today, every launch, in the home-screen
+app and a Safari tab (a shared plan's link still opens the plan). The first
+run asks "Where do you shoot?" (search, or the location once, rounded) and
+offers known spots near there; Today's place name switches spots.
+
 Batch H (2 Nov) replaced the side menu with a full-screen sheet: four live
 cards and four rows (src/components/Menu.tsx). Each card opens its group on
 its most useful page.

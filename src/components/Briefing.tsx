@@ -35,6 +35,8 @@ interface BriefingProps {
   now: Date
   onClose: () => void
   onOpenMap: () => void
+  /** Batch I: the place name at the top switches the spot. */
+  onSwitchSpot?: () => void
   /** Which page opens: Today unless asked. */
   start?: 0 | 1 | 2
 }
@@ -47,7 +49,7 @@ const AXIS_HOURS = 16
 
 const KIND_WORD: Record<Kind, string> = { sunrise: 'Sunrise', sunset: 'Sunset' }
 
-export function Briefing({ venue, placeName, timeZone, units, drone, now, onClose, onOpenMap, start = 0 }: BriefingProps) {
+export function Briefing({ venue, placeName, timeZone, units, drone, now, onClose, onOpenMap, onSwitchSpot, start = 0 }: BriefingProps) {
   const brief = useBriefing(venue, timeZone, now, true)
   const [page, setPage] = useState<Page>(start)
   const track = useRef<HTMLDivElement>(null)
@@ -95,10 +97,10 @@ export function Briefing({ venue, placeName, timeZone, units, drone, now, onClos
       </div>
       <div className="brief__track" ref={track}>
         <section className="brief__page" aria-label="Today">
-          <DayPage day={today} which="today" placeName={placeName} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} facing={brief.facing} checkedAt={brief.checkedAt} clock={clock} onOpenMap={onOpenMap} loading={brief.status === 'loading'} />
+          <DayPage day={today} which="today" placeName={placeName} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} facing={brief.facing} checkedAt={brief.checkedAt} clock={clock} onOpenMap={onOpenMap} onSwitchSpot={onSwitchSpot} loading={brief.status === 'loading'} />
         </section>
         <section className="brief__page" aria-label="Tomorrow">
-          <DayPage day={tomorrow} which="tomorrow" placeName={placeName} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} facing={brief.facing} checkedAt={brief.checkedAt} clock={clock} onOpenMap={onOpenMap} loading={brief.status === 'loading'} />
+          <DayPage day={tomorrow} which="tomorrow" placeName={placeName} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} facing={brief.facing} checkedAt={brief.checkedAt} clock={clock} onOpenMap={onOpenMap} onSwitchSpot={onSwitchSpot} loading={brief.status === 'loading'} />
         </section>
         <section className="brief__page" aria-label="This week">
           <WeekPage now={now} days={brief.days} timeZone={timeZone} units={units} clock={clock} placeName={placeName} loading={brief.status === 'loading'} />
@@ -214,10 +216,11 @@ interface DayPageProps {
   checkedAt: number | null
   clock: (d: Date | null) => string
   onOpenMap: () => void
+  onSwitchSpot?: () => void
   loading: boolean
 }
 
-function DayPage({ day, which, placeName, venue, timeZone, units, drone, now, checkedAt, clock, onOpenMap, loading }: DayPageProps) {
+function DayPage({ day, which, placeName, venue, timeZone, units, drone, now, checkedAt, clock, onOpenMap, onSwitchSpot, loading }: DayPageProps) {
   const read = day?.call ?? null
   const kind: Kind | null = read?.kind ?? null
   const verdict = day === null || kind === null ? null : day.verdicts[kind]
@@ -252,7 +255,9 @@ function DayPage({ day, which, placeName, venue, timeZone, units, drone, now, ch
     <div className="bday">
       <div className="bcall">
         <p className="bcall__place">
-          {placeName}
+          <button type="button" className="bcall__spot" onClick={onSwitchSpot} disabled={onSwitchSpot === undefined} aria-label={`${placeName}: switch spot`}>
+            {placeName} <span aria-hidden="true">▾</span>
+          </button>
           {read === null || kind === null ? '' : ` · ${KIND_WORD[kind].toLowerCase()} ${clock(read.event)}`}
         </p>
         <p className="bcall__word">{callWord}</p>
