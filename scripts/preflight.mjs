@@ -510,7 +510,7 @@ export async function goToStage(ev, wait, stage) {
   if (clicked !== 'ok') {
     throw new PreflightError(
       `could not navigate to ${label}: ${clicked}. ` +
-        'The stage nav is the side menu, src/components/SideMenu.tsx.',
+        'The stage nav is the side menu, src/components/Menu.tsx.',
     )
   }
 
@@ -527,7 +527,7 @@ export async function goToStage(ev, wait, stage) {
   if (arrived !== want) {
     throw new PreflightError(
       `clicked ${label} and the shell is still "${arrived}". ` +
-        'The menu is navigation, not a progress bar: see SideMenu.tsx.',
+        'The menu is navigation, not a progress bar: see Menu.tsx.',
     )
   }
   return arrived

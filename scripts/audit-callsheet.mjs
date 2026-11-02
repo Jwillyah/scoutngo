@@ -71,11 +71,10 @@ await goToStage(ev, wait, 'plan')
 const venue = await ev(`(() => { const c = window.__probe.map.getCenter(); return { lat: c.lat, lon: c.lng } })()`)
 watchdog.note('plan')
 
-await ev(`document.querySelector('button[aria-label="Menu"]')?.click()`)
-await wait(400)
-const opened = await ev(`(() => { const b = [...document.querySelectorAll('.sidemenu__item, .sidemenu__sub')].find((x) => x.textContent.includes('Call sheet')); b?.click(); return !!b })()`)
+/* Batch H: the call sheet's door is a row on Plan's shoot card, not the menu. */
+const opened = await ev(`(() => { const b = [...document.querySelectorAll('.more2__row')].find((x) => x.textContent.includes('Call sheet')); b?.click(); return !!b })()`)
 if (!opened) {
-  console.log('=== CALL SHEET AUDIT ABORTED: no Call sheet item in the menu ===')
+  console.log('=== CALL SHEET AUDIT ABORTED: no Call sheet row on the Plan sheet ===')
   process.exit(2)
 }
 await wait(1200)

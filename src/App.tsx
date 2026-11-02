@@ -110,7 +110,9 @@ import { buildScoutFile, saveScoutFile, scoutFilename, type ReadFile } from './l
 import { runSuggest } from './lib/suggestRun.ts'
 import { readShareHash, SHARE_PREFIX } from './lib/planShare.ts'
 import { Viewfinder, ViewfinderNeedsPlace } from './components/Viewfinder.tsx'
-import { SideMenu } from './components/SideMenu.tsx'
+import { Menu, type MenuRows, type MenuTarget } from './components/Menu.tsx'
+import { lastBackup } from './lib/backup.ts'
+import { PACK_STORAGE_KEY } from './lib/venuePack.ts'
 import { Briefing } from './components/Briefing.tsx'
 import { shouldOpenBriefing } from './lib/briefingOpen.ts'
 import { backToNow, openingScrub } from './lib/backToNow.ts'
@@ -1404,7 +1406,7 @@ function App() {
     drawer: 'kit',
     tick: 0,
   })
-  const [cardRequest, setCardRequest] = useState<{ kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'wind' | 'terrain' | 'preflight'; tick: number }>({
+  const [cardRequest, setCardRequest] = useState<{ kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'buoys' | 'wind' | 'terrain' | 'preflight'; skyTab?: 'now' | 'fire' | 'special' | 'calendar'; tick: number }>({
     kind: 'sky',
     tick: 0,
   })
@@ -1437,13 +1439,6 @@ function App() {
   const place = placeOf(seaM !== null && seaM.key === seaKey ? seaM.m : undefined)
   const groups = shownGroups(placeGroups, place)
   /* What the menu leaves out here: Water inland, Land at the coast (each overridable in Settings), Surf where there is none. */
-  const menuHidden = useMemo(() => {
-    const out = new Set<MenuItem>()
-    if (!groups.water) for (const id of ['water', 'tides', 'surf'] as const) out.add(id)
-    if (!groups.land) out.add('land')
-    if (!surfInMenu) out.add('surf')
-    return out
-  }, [groups.water, groups.land, surfInMenu])
 
   const onMenuPick = (item: MenuItem) => {
     switch (item) {
@@ -1491,7 +1486,54 @@ function App() {
         return
     }
   }
-  const menuCurrent: MenuItem = mode
+  /*
+   * THE MENU'S CARDS AND ROWS (Batch H, Section 3): each opens its group on
+   * its most useful page. Sky names its tab (src/core/menuCards.ts).
+   */
+  const onMenuTarget = (target: MenuTarget, opts?: { skyTab?: 'fire' | 'now' }) => {
+    switch (target) {
+      case 'today':
+        setBriefOpen(true)
+        return
+      case 'sky':
+        setMode('plan')
+        setCardRequest((r) => ({ kind: 'sky', skyTab: opts?.skyTab, tick: r.tick + 1 }))
+        return
+      case 'water':
+        onMenuPick(groups.water ? (surfInMenu ? 'surf' : 'tides') : 'land')
+        return
+      case 'drone':
+        onMenuPick('preflight')
+        return
+      default:
+        onMenuPick(target)
+    }
+  }
+  /* Its clock, read when it opens. */
+  const [menuNow, setMenuNow] = useState(() => new Date())
+  useEffect(() => {
+    if (menuOpen) setMenuNow(new Date())
+  }, [menuOpen])
+  const menuRows = useMemo<MenuRows>(() => {
+    const body = kitProfile.bodies.find((b) => kit.bodyIds.includes(b.id))?.name ?? null
+    const lens = kitProfile.lenses.find((l) => kit.lensIds.includes(l.id))?.name ?? null
+    let packs = 0
+    let backup: Date | null = null
+    try {
+      const raw = JSON.parse(localStorage.getItem(PACK_STORAGE_KEY) ?? '[]') as unknown
+      packs = Array.isArray(raw) ? raw.length : 0
+      backup = lastBackup(localStorage)
+    } catch {
+      /* Not readable here: said as none. */
+    }
+    const days = backup === null ? null : Math.floor((menuNow.getTime() - backup.getTime()) / 86_400_000)
+    return {
+      plan: 'Set up a shoot',
+      kit: [body, lens].filter((x) => x !== null).join(' · ') || 'Nothing in the bag',
+      saved: `${spots.length} ${spots.length === 1 ? 'spot' : 'spots'} · ${packs} offline`,
+      settings: days === null ? 'backup never' : days === 0 ? 'backup today' : `backup ${days} ${days === 1 ? 'day' : 'days'} ago`,
+    }
+  }, [kitProfile, kit.bodyIds, kit.lensIds, spots.length, menuNow])
 
   /* The dock's Back to now: this minute at the venue, moving the shoot day to today if it is not. See src/lib/backToNow.ts. */
   const onBackToNow = useCallback(() => {
@@ -2091,6 +2133,10 @@ function App() {
               setMode('plan')
               setCardRequest((r) => ({ kind: 'exposure', tick: r.tick + 1 }))
             }}
+            onOpenViewfinder={() => {
+              setMode('plan')
+              setViewfinderOpen(true)
+            }}
             onAddPosition={() => {
               /* There are no positions in setup: the + goes to the plan, armed. */
               setMode('plan')
@@ -2317,6 +2363,7 @@ function App() {
           onMenu={() => setMenuOpen(true)}
           menuOpen={menuOpen}
           cardRequest={cardRequest}
+          onViewfinder={() => setViewfinderOpen(true)}
           bag={kit}
           onSearch={() => setMode('setup')}
           onOpenNow={() => setNowOpen(true)}
@@ -2403,11 +2450,17 @@ function App() {
         />
       ) : null}
 
-      <SideMenu
+      <Menu
         open={menuOpen}
-        current={nowOpen ? 'now' : menuCurrent}
-        onPick={onMenuPick}
-        hidden={menuHidden}
+        venue={centre}
+        placeShort={venueShort}
+        timeZone={venueWindow?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}
+        units={settings.units}
+        drone={briefDrone}
+        inland={!groups.water && groups.land}
+        rows={menuRows}
+        now={menuNow}
+        onPick={onMenuTarget}
         onClose={() => setMenuOpen(false)}
       />
 

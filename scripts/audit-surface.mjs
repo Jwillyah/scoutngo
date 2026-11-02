@@ -1102,7 +1102,7 @@ const OPENERS = `(() => {
    */
   if (document.querySelector('button[aria-label="Menu"]')) {
     add('menu', 'Sky', 'sky')
-    add('menu', 'Call sheet', 'callsheet')
+    /* The call sheet's door is a row on Plan's shoot card since Batch H (walked with the .more2__row doors below). */
     add('menu', 'Settings', 'settings')
     /* Behind the Sky card's Moon page: a door two taps deep, walked the way a person walks it. */
     add('skymoon', 'Plan this moonrise', 'moonrise')

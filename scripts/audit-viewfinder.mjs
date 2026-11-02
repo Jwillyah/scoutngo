@@ -119,9 +119,12 @@ async function session(label, insets, when, camera) {
   await wait(1500)
   await goToStage(ev, wait, 'plan')
   await wait(2500)
+  /* Batch H: the menu is cards and rows; the Viewfinder's door is in Kit (and on Drone › Preflight). */
   await page.locator('button[aria-label="Menu"]').first().tap()
   await wait(800)
-  await page.getByText('Viewfinder', { exact: true }).first().tap()
+  await page.locator('.mrow', { hasText: 'Kit' }).first().tap()
+  await wait(1200)
+  await page.getByRole('button', { name: 'Viewfinder', exact: true }).first().tap()
   await wait(800)
   if ((await page.locator('.vf').count()) === 0) throw new Error(`${label}: the viewfinder did not open from the menu`)
   await page.getByRole('button', { name: /Open the camera/ }).tap()

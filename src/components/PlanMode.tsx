@@ -151,6 +151,7 @@ import { fetchModelLows, nearestHour } from '../lib/skyFireData.ts'
 import { useWeatherBusy, useWeatherEpoch } from '../lib/useWeatherStatus.ts'
 import type { Place } from '../lib/placeGroups.ts'
 import { PageGroup, type PageGroupValue } from '../lib/pageGroup.ts'
+import { BuoysPage } from './BuoysPage.tsx'
 import { TerrainLightPage } from './TerrainLightPage.tsx'
 import { reliefAround, type Relief } from '../lib/terrainRelief.ts'
 import { FLAT_M } from '../core/contours.ts'
@@ -356,7 +357,9 @@ interface PlanModeProps {
   onMenu: () => void
   menuOpen: boolean
   /** The menu asked for a card: Sky or About. The tick makes a repeat ask open it again. */
-  cardRequest: { kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'wind' | 'terrain' | 'preflight'; tick: number }
+  /** Batch H: opens the Viewfinder (App's), from the Preflight card. */
+  onViewfinder?: () => void
+  cardRequest: { kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'buoys' | 'wind' | 'terrain' | 'preflight'; skyTab?: SkyTab; tick: number }
   /** The backup nudge (src/lib/backup.ts): "Back up? Last backup: never" in the status line, with Back up and Not now. */
   backupReminder?: { line: string; onBackup: () => void; onDismiss: () => void } | null
   /** Coast or inland, and which of Water and Land are offered (src/lib/placeGroups.ts). */
@@ -555,6 +558,7 @@ export function PlanMode({
   onMenu,
   menuOpen,
   cardRequest,
+  onViewfinder,
   place = 'unknown',
   backupReminder = null,
   groups = { water: true, land: false, surf: true },
@@ -819,7 +823,7 @@ export function PlanMode({
     return { levels: windLevels, ratedMps: d.maxWindMps, ceilingFt: facilityCellAt(venue.lat, venue.lon)?.ceilingFeet ?? null, name: d.name.replace(/^DJI /, '') }
   }, [kitProfile, bag, venue, windLevels])
   /* A page over everything: Exposure, Tides or Surf. ?page=tides opens one, for the overflow audit. */
-  const [page, setPage] = useState<'exposure' | 'tides' | 'surf' | 'wind' | 'terrain' | 'settings' | 'about' | null>(() => {
+  const [page, setPage] = useState<'exposure' | 'tides' | 'surf' | 'buoys' | 'wind' | 'terrain' | 'settings' | 'about' | null>(() => {
     const p = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('page')
     return p === 'exposure' || p === 'tides' || p === 'surf' || p === 'wind' || p === 'terrain' || p === 'settings' || p === 'about' ? p : null
   })
@@ -1299,15 +1303,15 @@ export function PlanMode({
   /* Which job's tabs sit over the page: Water at the coast, Land inland; Wind is in both, and Water wins when both are on. */
   const pageGroup = useMemo<PageGroupValue | null>(() => {
     if (page === null) return null
-    if (groups.water && (page === 'tides' || page === 'surf' || page === 'wind'))
-      return { label: 'Water', current: page, onPick: (id) => setPage(id as 'tides'), items: [...(groups.surf ? [{ id: 'surf', label: 'Surf' }] : []), { id: 'tides', label: 'Tides' }, { id: 'wind', label: 'Wind' }] }
+    if (groups.water && (page === 'tides' || page === 'surf' || page === 'wind' || page === 'buoys'))
+      return { label: 'Water', current: page, onPick: (id) => setPage(id as 'tides'), items: [...(groups.surf ? [{ id: 'surf', label: 'Surf' }] : []), { id: 'tides', label: 'Tides' }, { id: 'wind', label: 'Wind' }, ...(groups.surf ? [{ id: 'buoys', label: 'Buoys' }] : [])] }
     if (groups.land && (page === 'wind' || page === 'terrain'))
       return { label: 'Land', current: page, onPick: (id) => setPage(id as 'wind'), items: [{ id: 'wind', label: 'Wind' }, { id: 'terrain', label: 'Terrain light' }] }
     return null
   }, [page, groups.water, groups.land, groups.surf])
   /* The Tide sheet's month, wind, sea and beach facing: asked only while it is open. */
   const [surfSetting] = useSurfSetting()
-  const tideSheet = useTideSheet(calendarOpen || page === 'tides' || page === 'surf' || page === 'wind', venue, tide.status === 'ok' ? tide.station.id : null, surfSetting)
+  const tideSheet = useTideSheet(calendarOpen || page === 'tides' || page === 'surf' || page === 'wind' || page === 'buoys', venue, tide.status === 'ok' ? tide.station.id : null, surfSetting)
   const skyDay = scrubbedAt === null || venueWindow === null ? null : zonedTimeToUtc(localDate(scrubbedAt, venueWindow.timeZone), '00:00', venueWindow.timeZone)
   const skyline = useMemo<SkylineState>(() => {
     if (card.kind !== 'skyline') return 'loading'
@@ -1391,7 +1395,7 @@ export function PlanMode({
     const timer = setTimeout(() => {
       /* Exposure, Tides and Surf are pages of their own (29 Oct); Preflight is its card. */
       /* Settings is a page of its own since 30 Oct (SettingsPage.tsx). */
-      if (cardRequest.kind === 'exposure' || cardRequest.kind === 'tides' || cardRequest.kind === 'surf' || cardRequest.kind === 'wind' || cardRequest.kind === 'terrain' || cardRequest.kind === 'settings' || cardRequest.kind === 'about') {
+      if (cardRequest.kind === 'exposure' || cardRequest.kind === 'tides' || cardRequest.kind === 'surf' || cardRequest.kind === 'buoys' || cardRequest.kind === 'wind' || cardRequest.kind === 'terrain' || cardRequest.kind === 'settings' || cardRequest.kind === 'about') {
         setPage(cardRequest.kind)
         return
       } else if (cardRequest.kind === 'preflight') {
@@ -1399,6 +1403,8 @@ export function PlanMode({
         setSheet('full')
         return
       } else {
+        /* Batch H: the menu's Sky card names its tab (Sky fire near a sunrise or sunset, else Now). */
+        if (cardRequest.kind === 'sky' && cardRequest.skyTab !== undefined) setSkyTab(cardRequest.skyTab)
         setCard({ kind: cardRequest.kind } as SheetCard)
       }
       raiseToHalf()
@@ -1783,6 +1789,8 @@ export function PlanMode({
         links={[
           { label: 'Cloud along each position’s view', onOpen: () => openCard('cloud') },
           { label: 'Wind at your flight height', onOpen: () => openCard('wind') },
+          /* Batch H: the call sheet's door, now the menu is cards and four rows. */
+          { label: 'Call sheet', onOpen: () => openCard('callsheet') },
         ]}
       />
     </div>
@@ -2051,6 +2059,7 @@ export function PlanMode({
             clip={recordedClip}
             onPlacePilot={() => onPlacingPilot(true)}
             pilotSet={pilotAt !== null}
+            onViewfinder={onViewfinder}
             onClose={home}
           />
         )
@@ -2483,6 +2492,7 @@ export function PlanMode({
           onClose={() => setPage(null)}
         />
       ) : null}
+      {page === 'buoys' && venueWindow !== null ? <BuoysPage data={tideSheet} timeZone={venueWindow.timeZone} onClose={() => setPage(null)} /> : null}
       {page === 'wind' && venue !== null && scrubbedAt !== null && venueWindow !== null ? (
         <WindPage
           venue={venue}

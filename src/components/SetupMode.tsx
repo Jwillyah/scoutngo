@@ -92,6 +92,8 @@ interface SetupModeProps {
   menuOpen: boolean
   drawerRequest: { drawer: 'kit' | 'saved'; tick: number }
   onOpenExposure: () => void
+  /** Batch H: the Viewfinder's door from Kit (it frames the bag's lenses). */
+  onOpenViewfinder?: () => void
   onAddPosition: () => void
   venueNameState: ResolvedName
 }
@@ -164,6 +166,7 @@ export function SetupMode({
   menuOpen,
   drawerRequest,
   onOpenExposure,
+  onOpenViewfinder,
   onAddPosition,
 }: SetupModeProps) {
   const [step, setStep] = useState<Step>(1)
@@ -252,6 +255,11 @@ export function SetupMode({
                     <button type="button" className="btn btn--small" onClick={onOpenExposure}>
                       Try your settings on a photo
                     </button>
+                    {onOpenViewfinder === undefined ? null : (
+                      <button type="button" className="btn btn--small" onClick={onOpenViewfinder}>
+                        Viewfinder
+                      </button>
+                    )}
                   </div>
                   <KitProfile value={kit} onChange={onKit} kit={kitProfile} onKitChange={onKitProfile} shelved={shelved} onShelve={onShelve} note={kitNote} />
                 </>

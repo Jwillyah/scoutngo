@@ -9,31 +9,25 @@ is one tap, an item or a place under it is the second.
 
 ## The tree, after
 
+Batch H (2 Nov) replaced the side menu with a full-screen sheet: four live
+cards and four rows (src/components/Menu.tsx). Each card opens its group on
+its most useful page.
+
 ```
 Menu
-├── Today ────────── the briefing: Today · Tomorrow · This week (opens on a
-│                    plain launch too; src/lib/briefingOpen.ts)
-├── Plan ─────────── the map, positions, light, the chips
-│   ├── Shoot now      what the sky is doing where you stand
-│   ├── Setup          where, when, how
-│   └── Call sheet     run of show and shot list (your own key)
-├── Sky ──────────── one page, four tabs
-│   ├── Now            Sun · Moon · Night, swipe pages
-│   ├── Sky fire       the verdict, the colour clock under it, "How was it?",
-│   │                  After the shoot (photos, hit rate)
-│   ├── Special        fog, rainbows, god rays, glassy water, sky fire
-│   └── Calendar       the month (opens on the tab); showers and moons with their alerts
-├── Water ────────── (Land inland: Section 5)
-│   ├── Tides
-│   ├── Surf           only near surf (Settings › Surf)
-│   └── Wind           five models, what is measured now
-├── Fly ──────────── Preflight: draw or fly a drone move
-│   └── Viewfinder
-├── Kit ──────────── what is in the bag
-│   └── Exposure
+├── Today (card) ──── the briefing: Today · Tomorrow · This week
+├── Sky (card) ────── Sky fire within 3 h of a sunrise or sunset, else Now
+│   └── Now · Sky fire · Special · Calendar (tabs)
+├── Water (card) ──── Surf (Land inland: Wind · Terrain light)
+│   └── Surf · Tides · Wind · Buoys (tabs)
+├── Drone (card) ──── Preflight, only with a drone in the kit
+│   └── Fly (in Preflight) · Viewfinder (a row on the Preflight card)
+├── Plan ─────────── the map; Setup from its venue pill; Call sheet is a
+│                    row on its shoot card
+├── Kit ──────────── what is in the bag; Exposure is its "Try your settings
+│                    on a photo"
 ├── Saved ────────── spots, offline packs, past shoots
-└── Settings
-    └── About
+└── Settings ─────── Privacy and About live inside
 ```
 
 Field has no menu place; it is reached by its address, `/field`.

@@ -4,7 +4,7 @@
  * Usage:  node scripts/audit-briefing.mjs [screenshot-dir]
  *
  * The Virginia Beach pier at 6:11 AM EST on 2 Nov, a drone in the kit, every
- * weather host answered by the gate's fixtures. Opened from Menu › Today.
+ * weather host answered by the gate's fixtures. Opened from the menu's Today card.
  *
  *   each page  Today, Tomorrow, This week: fits 390 x 844 with nothing
  *              scrolled, nothing below the screen, nothing off its side
@@ -82,7 +82,7 @@ try {
     if (auto) fail(`${label}: the briefing opened by itself on a shared plan's link`)
     await page.locator('button[aria-label="Menu"]').first().click()
     await wait(700)
-    await page.locator('.sidemenu__item', { hasText: 'Today' }).first().click()
+    await page.locator('.mcard--today').first().click()
     await wait(6000)
     if (!(await ev(`!!document.querySelector('.brief')`))) {
       fail(`${label}: Menu › Today opened no briefing`)

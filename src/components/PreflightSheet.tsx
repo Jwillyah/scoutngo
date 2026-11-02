@@ -1,3 +1,4 @@
+import { CardMore } from './Card.tsx'
 import { FLIGHT_CARD_CLOSE, toGpx, toKml } from '../core/flight.ts'
 import { MOVE_LABEL, POINTS_NEEDED, type MoveKind, type Preflight } from '../lib/preflight/usePreflight.ts'
 import type { Look } from '../three/world/inputs.ts'
@@ -36,6 +37,8 @@ interface PreflightSheetProps {
   /** Where the pilot stands: the plan's own pilot position. */
   onPlacePilot: () => void
   pilotSet: boolean
+  /** Batch H: the Viewfinder's door, now the menu is cards (Drone: Preflight · Fly · Viewfinder). */
+  onViewfinder?: () => void
   onClose: () => void
 }
 
@@ -68,7 +71,7 @@ async function share(name: string, text: string | Blob, type: string): Promise<s
   }
 }
 
-export function PreflightSheet({ pf, picking, onPick, onPlay, onFly, onRecord, recordNote, renderShare, look, onLook, clip, onPlacePilot, pilotSet, onClose }: PreflightSheetProps) {
+export function PreflightSheet({ pf, picking, onPick, onPlay, onFly, onRecord, recordNote, renderShare, look, onLook, clip, onPlacePilot, pilotSet, onViewfinder, onClose }: PreflightSheetProps) {
   const card = pf.card
   const need = POINTS_NEEDED[pf.kind]
   return (
@@ -194,6 +197,7 @@ export function PreflightSheet({ pf, picking, onPick, onPlay, onFly, onRecord, r
           )}
         </div>
       )}
+      {onViewfinder === undefined ? null : <CardMore links={[{ label: 'Viewfinder', onOpen: onViewfinder }]} />}
     </section>
   )
 }

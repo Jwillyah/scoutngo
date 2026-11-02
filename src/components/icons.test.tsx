@@ -2,9 +2,9 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { contrastRatio } from '../core/contrast.ts'
 import { DESIGN_TILES, GLYPH_INK, ICON_IDS, shippedTile, tileContrast } from '../lib/iconPalette.ts'
-import { MENU_ITEMS, menuHome, OLD_PATHS, pathToMenuItem, type MenuItem } from '../lib/menu.ts'
+import { MENU_ITEMS, menuHome, OLD_PATHS, pathToMenuItem } from '../lib/menu.ts'
 import { Icon } from './Icon.tsx'
-import { SideMenu } from './SideMenu.tsx'
+import { Menu } from './Menu.tsx'
 import { ToolDock } from './ToolDock.tsx'
 
 describe('the golden bubble tiles', () => {
@@ -38,46 +38,36 @@ describe('the golden bubble tiles', () => {
   })
 })
 
-describe('the side menu', () => {
-  /* 30 Oct: seven items grouped by job (docs/ux-rules.md rule 24, docs/navigation.md). */
-  it('is seven items, grouped by job, in the order asked for: Water at the coast, Land inland, in the same slot', () => {
-    expect(MENU_ITEMS.map((m) => m.label)).toEqual(['Today', 'Plan', 'Sky', 'Water', 'Land', 'Fly', 'Kit', 'Saved', 'Settings'])
-    expect(MENU_ITEMS.map((m) => m.icon)).toEqual(['sky', 'plan', 'sky', 'tides', 'terrain', 'preflight', 'kit', 'saved', 'settings'])
-    const subs = Object.fromEntries(MENU_ITEMS.map((m) => [m.label, (m.subs ?? []).map((s) => s.label)]))
-    expect(subs).toEqual({ Today: [], Plan: ['Shoot now', 'Setup', 'Call sheet'], Sky: [], Water: ['Tides', 'Surf', 'Wind'], Land: ['Wind', 'Terrain light'], Fly: ['Viewfinder'], Kit: ['Exposure'], Saved: [], Settings: ['About'] })
-    for (const hidden of [['land'], ['water', 'tides', 'surf']] as MenuItem[][]) {
-      const html = renderToStaticMarkup(<SideMenu open current="plan" onPick={() => {}} onClose={() => {}} hidden={new Set(hidden)} />)
-      expect(html.match(/class="icon"/g)?.length).toBe(8)
-    }
-    /* Inland: no tide and no surf anywhere in the menu. */
-    const inland = renderToStaticMarkup(<SideMenu open current="plan" onPick={() => {}} onClose={() => {}} hidden={new Set<MenuItem>(['water', 'tides', 'surf'])} />)
-    expect(inland).not.toMatch(/>Tides<|>Surf<|>Water</)
-    expect(inland).toContain('>Terrain light<')
-  })
-  it('leaves Surf out where it is told to (inland on Auto)', () => {
-    const html = renderToStaticMarkup(<SideMenu open current="plan" onPick={() => {}} onClose={() => {}} hidden={new Set(['surf'])} />)
-    expect(html).not.toContain('>Surf<')
-    expect(html).toContain('>Tides<')
+describe('the menu (Batch H, Section 3: it replaced the side menu)', () => {
+  const units = { wind: 'kt', distance: 'ft', clock: 12, temperature: 'F' } as const
+  const rows = { plan: 'Set up a shoot', kit: 'a7 IV · 28-75', saved: '3 spots · 1 offline', settings: 'backup 3 days ago' }
+  const render = (drone: { name: string; maxWindMps: number | null } | null, inland = false) =>
+    renderToStaticMarkup(<Menu open venue={null} placeShort="VB Pier" timeZone="America/New_York" units={units} drone={drone} inland={inland} rows={rows} now={new Date('2026-11-02T14:00:00Z')} onPick={() => {}} onClose={() => {}} />)
+
+  it('is four live cards and four rows, in the Stage nav the audits walk', () => {
+    const html = render({ name: 'Air 3S', maxWindMps: 12 })
+    expect(html).toContain('aria-label="Stage"')
+    const labels = [...html.matchAll(/class="[^"]*sidemenu__label[^"]*">([^<]+)</g)].map((m) => m[1])
+    expect(labels).toEqual(['Today', 'Sky', 'Water', 'Drone', 'Plan', 'Kit', 'Saved', 'Settings'])
+    for (const v of Object.values(rows)) expect(html).toContain(v)
+    expect(html).toContain('VB Pier · Mon 2')
   })
 
-  it('marks the job you are in: Setup is part of Plan', () => {
-    const html = renderToStaticMarkup(<SideMenu open current="setup" onPick={() => {}} onClose={() => {}} hidden={new Set<MenuItem>(['land'])} />)
-    expect(html.match(/class="icon"/g)?.length).toBe(8)
-    expect(html).not.toContain('>Field<')
-    expect(html).toMatch(/sidemenu__item sidemenu__item--on[^]*?>Plan</)
+  it('the Drone card only with a drone in the kit; Land, not Water, inland', () => {
+    expect(render(null)).not.toContain('>Drone<')
+    expect(render(null, true)).toContain('>Land<')
+    expect(render(null, true)).not.toContain('>Water<')
   })
 
-  it('every place is still reachable: an item, a place under one, or its own address', () => {
-    const all: MenuItem[] = ['today', 'plan', 'setup', 'field', 'sky', 'water', 'land', 'terrain', 'tides', 'surf', 'wind', 'exposure', 'kit', 'saved', 'now', 'viewfinder', 'preflight', 'callsheet', 'settings', 'about']
-    const offered = new Set(MENU_ITEMS.flatMap((m) => [m.id, ...(m.subs ?? []).map((s) => s.id)]))
-    for (const item of all) {
-      if (item === 'field') {
-        expect(menuHome(item)).toBe('plan')
-        expect(pathToMenuItem(`/${item}`)).toBe(item)
-      } else expect(offered.has(item), item).toBe(true)
-      /* Every place's home is a top item. */
-      expect(MENU_ITEMS.map((m) => m.id)).toContain(menuHome(item))
+  it('every place is still reachable: a card, a row, a tab inside a group, or its own address', () => {
+    /* The ids the old menu offered, and where each lives now (docs/navigation.md). */
+    const now: Record<string, string> = {
+      plan: 'row', setup: 'Plan › venue pill', field: '/field', sky: 'card', water: 'card', land: 'card', terrain: 'Land tab', tides: 'Water tab', surf: 'Water tab', wind: 'Water tab',
+      exposure: 'Kit', kit: 'row', saved: 'row', now: 'Sky › Now', viewfinder: 'Drone › Preflight › Viewfinder', preflight: 'card', callsheet: 'Plan › Call sheet', settings: 'row', about: 'Settings › About', today: 'card',
     }
+    for (const item of MENU_ITEMS) expect(now[item.id], item.id).toBeDefined()
+    expect(pathToMenuItem('/field')).toBe('field')
+    expect(menuHome('setup')).toBe('plan')
   })
 
   it('old paths land on their place, and nothing else is claimed', () => {

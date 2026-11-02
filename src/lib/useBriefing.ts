@@ -86,7 +86,13 @@ function eventsOn(iso: string, venue: LatLon, timeZone: string): Record<Kind, Da
 
 const azimuthDeg = (at: Date, venue: LatLon) => ((getPosition(at, venue.lat, venue.lon).azimuth * 180) / Math.PI + 540) % 360
 
-export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, open: boolean): Briefing {
+/*
+ * SCOPE. 'week' is the briefing: today, tomorrow and the week. 'next' is the
+ * menu's cards (Batch H, Section 3): only the next two sunrises or sunsets,
+ * the sea and the wind, so opening the menu costs a few questions, most of
+ * them the Sky fire page's own, kept for the hour.
+ */
+export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, open: boolean, scope: 'week' | 'next' = 'week'): Briefing {
   const today = venueToday(now, timeZone)
   const lat = venue?.lat ?? null
   const lon = venue?.lon ?? null
@@ -105,17 +111,16 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
     let live = true
     void (async () => {
       const near: Record<string, FirePaths | null> = {}
-      for (const n of [0, 1]) {
-        const ev = eventsOn(dayIso(today, n), at, timeZone)
-        for (const kind of KINDS) {
-          const e = ev[kind]
-          if (e === null) continue
-          near[`${n}-${kind}`] = await fetchFirePaths(at, getPosition(e, at.lat, at.lon).azimuth, e.toISOString().slice(0, 10))
-        }
+      const soonest = [0, 1]
+        .flatMap((n) => KINDS.map((kind) => ({ n, kind, e: eventsOn(dayIso(today, n), at, timeZone)[kind] })))
+        .filter((x): x is { n: number; kind: Kind; e: Date } => x.e !== null && (scope === 'week' || x.e.getTime() > Date.now() - 30 * 60_000))
+        .sort((a, b) => a.e.getTime() - b.e.getTime())
+      for (const { n, kind, e } of scope === 'week' ? soonest : soonest.slice(0, 2)) {
+        near[`${n}-${kind}`] = await fetchFirePaths(at, getPosition(e, at.lat, at.lon).azimuth, e.toISOString().slice(0, 10))
       }
       const week: Record<Kind, FirePaths | null> = { sunrise: null, sunset: null }
       const mid = eventsOn(dayIso(today, 4), at, timeZone)
-      for (const kind of KINDS) {
+      for (const kind of scope === 'week' ? KINDS : []) {
         const e = mid[kind]
         if (e === null) continue
         const first = eventsOn(dayIso(today, 2), at, timeZone)[kind]
@@ -128,7 +133,7 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
     return () => {
       live = false
     }
-  }, [open, key, lat, lon, today, timeZone, epoch])
+  }, [open, key, lat, lon, today, timeZone, epoch, scope])
 
   /* The sea, the wind, the beach's facing. */
   useEffect(() => {
@@ -188,7 +193,7 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
     const ext = tides?.key === key ? tides.list : null
     const facing = s?.facing ?? null
     const days: DayBrief[] = []
-    for (let n = 0; n < WEEK_DAYS; n += 1) {
+    for (let n = 0; n < (scope === 'week' ? WEEK_DAYS : 2); n += 1) {
       const iso = dayIso(today, n)
       const start = zonedTimeToUtc(iso, '00:00', timeZone) ?? new Date(`${iso}T00:00:00Z`)
       const end = new Date(start.getTime() + 86_400_000)
@@ -198,7 +203,7 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
       for (const kind of KINDS) {
         const e = events[kind]
         if (e === null || f === null) continue
-        const data = n <= 1 ? f.near[`${n}-${kind}`] ?? null : f.week[kind]
+        const data = n <= 1 ? (f.near[`${n}-${kind}`] ?? null) : f.week[kind]
         const paths = data === null ? [] : pathsAt(data, nearestHour(e))
         verdicts[kind] = paths.length === 0 ? null : fireVerdict(paths, { event: e, kind, venue: at, station })
         reads[kind] = eventCall(verdicts[kind], kind, e, now)
@@ -263,7 +268,7 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
     const times = [f, s].filter((x) => x !== null)
     const fetched = f === null ? [] : [...Object.values(f.near), f.week.sunrise, f.week.sunset].map((x) => x?.fetchedAt).filter((t): t is number => typeof t === 'number')
     return { status: times.length === 2 ? 'ready' : 'loading', days, facing, checkedAt: fetched.length === 0 ? null : Math.max(...fetched) }
-  }, [key, lat, lon, fire, sea, stations, tides, today, timeZone, now])
+  }, [key, lat, lon, fire, sea, stations, tides, today, timeZone, now, scope])
 }
 
 export { azimuthDeg }

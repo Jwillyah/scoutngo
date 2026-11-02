@@ -240,13 +240,21 @@ try {
   await ev(`document.querySelector('.tides__explainer .card2__x')?.click()`)
   await ev(`document.querySelector('.page__close, .page__back')?.click()`)
   await wait(500)
+  /*
+   * Batch H: the menu is four cards and four rows. Surf is the Water card's
+   * first page; Exposure is Kit's "Try your settings on a photo".
+   */
   for (const item of ['Surf', 'Exposure']) {
     await ev(`document.querySelector('button[aria-label="Menu"]')?.click()`)
     await wait(600)
-    const found = await ev(`(() => { const b = [...document.querySelectorAll('.sidemenu__item, .sidemenu__sub')].find((x) => x.querySelector('.sidemenu__label')?.textContent === '${item}'); if (!b) return false; b.click(); return true })()`)
+    const door = item === 'Surf' ? 'Water' : 'Kit'
+    const found = await ev(`(() => { const b = [...document.querySelectorAll('.sidemenu__item')].find((x) => x.querySelector('.sidemenu__label')?.textContent === '${door}'); if (!b) return false; b.click(); return true })()`)
+    if (found && item === 'Exposure') {
+      await wait(900)
+      await ev(`[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Try your settings on a photo')?.click()`)
+    }
     if (!found) {
-      /* Surf away from the sea on Auto is not in the menu, which is right, and is not this check. */
-      if (item !== 'Surf') fail(`no ${item} in the menu`)
+      fail(`no ${door} in the menu`)
       await ev(`document.querySelector('.sidemenu__scrim')?.click()`)
       continue
     }
