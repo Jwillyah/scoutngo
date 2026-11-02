@@ -75,6 +75,16 @@ export function buildLabelWithDate(time: string = BUILD_TIME): string {
 }
 
 /**
+ * SETTINGS' ONE LINE (Batch G): "Version c8786df · 2 Nov". The comparison
+ * with origin is in Debug, folded (BuildStamp.tsx), not on this line.
+ */
+export function versionLine(time: string = BUILD_TIME): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(time)
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  return m === null ? `Version ${buildLabel()}` : `Version ${buildLabel()} · ${Number(m[3])} ${months[Number(m[2]) - 1]}`
+}
+
+/**
  * The marker the check reads out of index.html.
  *
  * A meta tag rather than the asset filenames: those are hashed per chunk, so

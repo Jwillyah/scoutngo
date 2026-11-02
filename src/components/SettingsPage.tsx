@@ -2,7 +2,7 @@ import { useWindDraw, writeWindDraw } from '../lib/windDraw.ts'
 import { useEffect, useState, type ReactNode } from 'react'
 import { NUMERALS_LABEL, NUMERALS_NOTE } from '../core/numerals.ts'
 import type { Drone } from '../core/kit.ts'
-import { buildLabelWithDate, type BuildCheck } from '../lib/build.ts'
+import { versionLine, type BuildCheck } from '../lib/build.ts'
 import { readHome, writeHome, type Home } from '../lib/home.ts'
 import { locateOnce, locateWords, useLocateAttempts } from '../lib/locateOnce.ts'
 import { formatClock } from '../core/timezone.ts'
@@ -15,17 +15,20 @@ import { CLOCK_OPTIONS, DISTANCE_UNITS, formatWind, TEMPERATURE_UNITS, WIND_UNIT
 import { deletePack, loadPacks, onPacksChanged, packBytes, type VenuePack } from '../lib/venuePack.ts'
 import { useNearMeSetting } from '../lib/nearMe.ts'
 import { weatherSent } from '../lib/weatherStore.ts'
-import { ApiKeyField } from './ApiKeyField.tsx'
+import { API_KEY_SAY, ApiKeyField } from './ApiKeyField.tsx'
 import { BuildStamp } from './BuildStamp.tsx'
 import { Page } from './Page.tsx'
-import { KeptSection } from './KeptSection.tsx'
+import { KeptExplained, KeptSection } from './KeptSection.tsx'
 
 /*
- * SETTINGS, A PAGE OF ITS OWN (field test, 30 Oct). Ten short sections in the
- * order asked for, each a list of plain labels with the current value on the
- * right: Units, Location, Offline, Coast & inland, Alerts, Drone, Map,
- * Privacy & data, About, and Debug at the bottom, folded. Everything is kept
- * on this phone; nothing here is sent anywhere.
+ * SETTINGS, A PAGE OF ITS OWN (field test, 30 Oct), CLEAN AND iOS-STYLE
+ * (Batch G, Section 7): grouped rows, labels in normal case, real switches,
+ * values in the normal font, buttons in normal case; a one-line hint only
+ * where it is needed and anything longer behind an "i". Eleven sections:
+ * Units, Location, Offline, Coast & inland, Alerts, Drone, Map, Privacy &
+ * data (backup and restore here only), AI key (here only), About (one row,
+ * to /about, with the version), and Debug at the bottom, folded. Everything
+ * is kept on this phone; nothing here is sent anywhere.
  */
 interface Props {
   units: Units
@@ -50,23 +53,35 @@ interface Props {
   onClose: () => void
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({ title, info, children }: { title: string; info?: ReactNode; children: ReactNode }) {
   return (
     <section className="set__sec" aria-label={title}>
-      <p className="set__title">{title}</p>
+      <div className="set__head">
+        <p className="set__title">{title}</p>
+        {info === undefined ? null : <Info>{info}</Info>}
+      </div>
       <div className="set__list">{children}</div>
     </section>
   )
 }
 
-/* A label on the left and its value on the right: a button when tapping it does something. */
+/* The longer explanation, behind an "i". */
+function Info({ children }: { children: ReactNode }) {
+  return (
+    <details className="set__info">
+      <summary aria-label="More about this">i</summary>
+      <div className="set__infotext">{children}</div>
+    </details>
+  )
+}
+
 function Row({ label, value, onClick }: { label: string; value: ReactNode; onClick?: () => void }) {
   const inner = (
     <>
       <span className="set__label">{label}</span>
-      <span className="set__value num">
+      <span className="set__value">
         {value}
-        {onClick === undefined ? null : <span aria-hidden="true"> ›</span>}
+        {onClick === undefined ? null : <span className="set__chev" aria-hidden="true">›</span>}
       </span>
     </>
   )
@@ -88,14 +103,15 @@ function Pick<T extends string | number>({ label, options, value, onPick }: { la
   )
 }
 
-function Switch({ label, on, onChange, note }: { label: string; on: boolean; onChange: (on: boolean) => void; note?: string }) {
+/* A real switch: a checkbox drawn as a track and a knob, said as a switch. */
+function Switch({ label, on, onChange, hint }: { label: string; on: boolean; onChange: (on: boolean) => void; hint?: string }) {
   return (
     <label className="set__row set__row--switch">
       <span className="set__label">
         {label}
-        {note === undefined ? null : <span className="set__note">{note}</span>}
+        {hint === undefined ? null : <span className="set__hint">{hint}</span>}
       </span>
-      <input type="checkbox" className="toggle__box" checked={on} onChange={(e) => onChange(e.target.checked)} />
+      <input type="checkbox" role="switch" className="set__switch" aria-checked={on} checked={on} onChange={(e) => onChange(e.target.checked)} />
     </label>
   )
 }
@@ -138,7 +154,7 @@ export function SettingsPage(props: Props) {
         <Pick label="Temperature" options={TEMPERATURE_UNITS} value={units.temperature} onPick={(temperature) => onUnits({ ...units, temperature })} />
       </Section>
 
-      <Section title="Location">
+      <Section title="Location" info={<p>Your location is asked for one moment at a time and not kept. Tap Home spot to make the venue on screen your home; it is kept on this phone only.</p>}>
         <Row label="Use my location" value={locateLine ?? 'Ask'} onClick={locate} />
         <Row
           label="Home spot"
@@ -153,43 +169,40 @@ export function SettingsPage(props: Props) {
                 }
           }
         />
-        {venue === null ? null : <p className="set__note">Tap Home spot to make {venue.name} home. Kept on this phone.</p>}
         <Row label="Last venue" value={venue?.name ?? 'None yet'} />
       </Section>
 
-      <Section title="Offline">
-        {packs.length === 0 ? <Row label="Saved venue packs" value="None" /> : null}
+      <Section title="Offline" info={<p>Save a venue from Plan › Save for offline. Best saved on Wi-Fi: a pack is 30 to 50 MB.</p>}>
+        {packs.length === 0 ? <Row label="Saved venues" value="None" /> : null}
         {packs.map((p) => (
           <div key={p.id} className="set__row">
             <span className="set__label">{p.name}</span>
-            <span className="set__value num">
+            <span className="set__value">
               {mb(packBytes(p))}{' '}
               {deleting === p.id ? (
-                <button type="button" className="btn btn--small" onClick={() => void deletePack(p.id).then(() => setDeleting(null))}>
+                <button type="button" className="set__btn set__btn--strong" onClick={() => void deletePack(p.id).then(() => setDeleting(null))}>
                   Delete it
                 </button>
               ) : (
-                <button type="button" className="btn btn--small btn--quiet" onClick={() => setDeleting(p.id)}>
+                <button type="button" className="set__btn" onClick={() => setDeleting(p.id)}>
                   Delete
                 </button>
               )}
             </span>
           </div>
         ))}
-        <p className="set__note">Save a venue from Plan › Save for offline. Best saved on Wi-Fi: a pack is 30 to 50 MB.</p>
       </Section>
 
-      <Section title="Coast & inland">
+      <Section title="Coast & inland" info={<p>Auto: Water within 2 km of the sea or a big lake, Land anywhere else.</p>}>
         <Row label="Here" value={place === 'coast' ? 'Coast' : place === 'inland' ? 'Inland' : 'Not known yet'} />
         <Pick label="Water" options={GROUP_OPTIONS} value={groups.water} onPick={(water) => setGroups({ ...groups, water })} />
         <Pick label="Land" options={GROUP_OPTIONS} value={groups.land} onPick={(land) => setGroups({ ...groups, land })} />
         <Pick label="Surf" options={SURF_OPTIONS} value={surf} onPick={setSurf} />
-        <p className="set__note">Auto: Water within 2 km of the sea or a big lake, Land anywhere else.</p>
       </Section>
 
-      <Section title="Alerts">
-        <Switch label="Special light near me" note="On opening: fog, rainbows, sky fire within 25 mi in the next 24 h, worked out on this phone." on={nearMe} onChange={setNearMe} />
-        <Row label="Calendar alerts" value="From Sky › Calendar, as a calendar file" />
+      <Section title="Alerts" info={<p>Special light near me: on opening, fog, rainbows and sky fire within 25 mi in the next 24 h, worked out on this phone. Calendar alerts are a calendar file from Sky › Calendar, added to your own calendar.</p>}>
+        <Switch label="Special light near me" on={nearMe} onChange={setNearMe} />
+        <Row label="Calendar alerts" value="Sky › Calendar" />
       </Section>
 
       <Section title="Drone">
@@ -199,34 +212,37 @@ export function SettingsPage(props: Props) {
         <Row label="Battery" value="— (not recorded)" />
       </Section>
 
-      <Section title="Map">
-        <Row label="Imagery" value="Auto: the sharpest free source here" />
+      <Section title="Map" info={<p>Imagery is the sharpest free source for where you are. {NUMERALS_NOTE}</p>}>
+        <Row label="Imagery" value="Auto" />
         <Switch label="Terrain" on={props.showTerrain} onChange={props.onShowTerrain} />
         <Switch label="Labels" on={props.showLabels} onChange={props.onShowLabels} />
-        <Switch label={NUMERALS_LABEL} note={NUMERALS_NOTE} on={props.showNumbers} onChange={props.onShowNumbers} />
+        <Switch label={NUMERALS_LABEL} on={props.showNumbers} onChange={props.onShowNumbers} />
         <Pick label="Wind map" options={WIND_DRAW_OPTIONS} value={windDraw} onPick={writeWindDraw} />
       </Section>
 
-      <Section title="Privacy & data">
+      <Section title="Privacy & data" info={<KeptExplained />}>
         <KeptSection />
-        <Row label="What leaves your phone" value="/privacy" onClick={openPrivacy} />
+        <Row label="What leaves your phone" value="" onClick={openPrivacy} />
         <Row label="Export everything" value="One file" onClick={props.onExport} />
-        <Row label="Clear this phone" value="On the privacy page" onClick={openPrivacy} />
+        <Row label="Clear this phone" value="" onClick={openPrivacy} />
+      </Section>
+
+      <Section title="AI key" info={<p>{API_KEY_SAY}</p>}>
+        <ApiKeyField compact />
       </Section>
 
       <Section title="About">
-        <Row label="Version" value={buildLabelWithDate()} />
-        <Row label="How it works" value="" onClick={props.onHow} />
-        <Row label="Why this exists" value="" onClick={props.onAbout} />
-        <Row label="Show the home page" value="" onClick={props.onShowHome} />
-        <Row label="Open source" value="github.com" />
-        <ApiKeyField />
-        <BuildStamp deployed={props.newBuild} />
+        <Row label="About ScoutNGo" value={versionLine()} onClick={props.onAbout} />
       </Section>
 
       <details className="set__debug">
         <summary className="set__title">Debug</summary>
-        <Switch label="Touch log" note="A box over the map logging fingers, zoom and location asks. Copy puts it on your clipboard; nothing is sent." on={debugTouch} onChange={setDebugTouch} />
+        <div className="set__list">
+          <Switch label="Touch log" hint="A box over the map; nothing is sent." on={debugTouch} onChange={setDebugTouch} />
+          <Row label="Show the home page" value="" onClick={props.onShowHome} />
+          <Row label="How it works" value="" onClick={props.onHow} />
+        </div>
+        <BuildStamp deployed={props.newBuild} />
         <p className="set__label">Location attempts</p>
         <ul className="set__log set__locate num">
           {attempts.length === 0 ? <li>None this session</li> : null}

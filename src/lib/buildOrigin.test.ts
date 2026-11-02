@@ -177,3 +177,10 @@ describe('what the stamp says', () => {
     expect(said).toEqual(['fact|A dev build. There is no commit behind this one.'])
   })
 })
+
+describe('Settings’ one version line (Batch G)', () => {
+  it('reads "Version <hash> · <day> <Mon>", nothing else', async () => {
+    const { versionLine } = await import('./build.ts')
+    expect(versionLine('2026-11-02T14:00:00Z')).toMatch(/^Version [0-9a-f]{7}\+? · 2 Nov$/)
+  })
+})

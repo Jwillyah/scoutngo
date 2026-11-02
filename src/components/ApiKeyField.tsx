@@ -1,12 +1,15 @@
 import { useState } from 'react'
 import { deleteApiKey, readApiKey, readModelChoice, saveApiKey, saveModelChoice, type CallSheetModelChoice } from '../lib/apiKey.ts'
 
+/** What the key is for and where it goes: the field's own words, and Settings' "i" for the AI key. */
+export const API_KEY_SAY = 'For the call sheet. Your own Anthropic key, kept on this phone only, sent only to Anthropic when you press Write, and never put in a backup file.'
+
 /*
- * YOUR API KEY, in About. Stored on this phone and nowhere else, never in a
+ * YOUR API KEY, in Settings › AI key (Batch G: here only). Stored on this phone and nowhere else, never in a
  * backup file, sent only to Anthropic when a call sheet is written, and gone
  * with one tap. Shown only as its last four characters once saved.
  */
-export function ApiKeyField() {
+export function ApiKeyField({ compact = false }: { compact?: boolean } = {}) {
   const [stored, setStored] = useState(readApiKey)
   const [draft, setDraft] = useState('')
   const [note, setNote] = useState<string | null>(null)
@@ -17,11 +20,12 @@ export function ApiKeyField() {
   ]
   return (
     <div className="apikey">
-      <p className="about__eyebrow about__eyebrow--dim">Your API key</p>
-      <p className="apikey__say">
-        For the call sheet. Your own Anthropic key, kept on this phone only, sent only to Anthropic when you press Write, and never
-        put in a backup file.
-      </p>
+      {compact ? null : (
+        <>
+          <p className="about__eyebrow about__eyebrow--dim">Your API key</p>
+          <p className="apikey__say">{API_KEY_SAY}</p>
+        </>
+      )}
       {stored === null ? (
         <>
           <label className="field">

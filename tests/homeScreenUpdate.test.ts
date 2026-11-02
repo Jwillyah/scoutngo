@@ -53,7 +53,8 @@ describe('the build, with its day', () => {
   it('is shown in About, in Settings › About as the version, and in the debug log', () => {
     expect(readFileSync('src/components/AboutSheet.tsx', 'utf8')).toContain('{buildLabelWithDate()}')
     const settings = readFileSync('src/components/SettingsPage.tsx', 'utf8')
-    expect(settings).toContain('<Row label="Version" value={buildLabelWithDate()} />')
+    /* Batch G: Settings' About is one row, carrying "Version <hash> · <day> <Mon>". */
+    expect(settings).toContain('<Row label="About ScoutNGo" value={versionLine()} onClick={props.onAbout} />')
     expect(readFileSync('src/components/TouchDebug.tsx', 'utf8')).toMatch(/`build \$\{buildLabelWithDate\(\)\}`, \.\.\.lines/)
   })
 })

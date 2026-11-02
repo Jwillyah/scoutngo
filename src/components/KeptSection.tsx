@@ -29,50 +29,74 @@ export function KeptSection() {
     look()
   }
 
+  /* Rows, as the rest of Settings (Batch G): a label on the left, the value on the right; the long words are in the section's "i". */
   return (
-    <div className="kept">
-      <p className="kept__line">
-        On this phone: yours {kept === null ? '…' : formatBytes(kept.yoursBytes)}
-        {kept === null || kept.cacheBytes === 0 ? '' : `, caches ${formatBytes(kept.cacheBytes)}`}
-        {kept?.usage == null ? '' : `; everything this site keeps, map tiles and forecasts included, ${formatBytes(kept.usage)}${kept.quota == null ? '' : ` of the ${formatBytes(kept.quota)} the browser allows`}`}.
-      </p>
-      <p className="kept__line">
-        {kept?.persisted === true
-          ? 'The browser has agreed to keep this storage when space runs short.'
-          : kept?.persisted === false
-            ? 'The browser has not agreed to keep this storage; it may clear it when space runs short.'
-            : 'This browser does not say whether it will keep this storage.'}
-        {kept?.persisted === true ? null : (
-          <>
-            {' '}
-            <button type="button" className="kept__ask" onClick={() => void askToPersist().then(look)}>
-              Ask again
-            </button>
-          </>
-        )}
-      </p>
-      <div className="btn-row">
-        <button
-          type="button"
-          className="btn btn--small"
-          onClick={() => {
-            const name = backupNow()
-            setLast(new Date())
-            setNote(`Saved ${name}: your spots, kit, settings, logs and thumbnails. Keep it somewhere off this phone.`)
-          }}
-        >
-          Back up to a file
-        </button>
-        <label className="btn btn--small btn--quiet kept__restore">
-          Restore from a file
-          <input type="file" accept=".zip,.json,application/zip,application/json" className="kept__file" onChange={(e) => void restore(e.target.files?.[0])} />
-        </label>
+    <>
+      <div className="set__row">
+        <span className="set__label">On this phone</span>
+        <span className="set__value">
+          {kept === null ? '…' : `yours ${formatBytes(kept.yoursBytes)}${kept.usage == null ? '' : ` · ${formatBytes(kept.usage)} in all`}`}
+        </span>
       </div>
-      <p className="kept__line">Last backup: {last === null ? 'never' : dayWords(last.toISOString())}.</p>
-      {note === null ? null : <p className="kept__note" role="status">{note}</p>}
-      <p className="kept__plain">
-        Everything you save is in this phone’s browser storage, nowhere else: spots, kit, settings and logs in its local storage, saved forecasts in its database, offline maps in its cache. Photos are never kept, only the numbers read from them and a small thumbnail. The Safari tab and the home-screen app keep separate storage. Deleting the app, or clearing Safari’s website data, deletes it. A backup file is the only copy outside the phone. Not in it: your Anthropic key and the offline maps, which you save again.
+      <div className="set__row">
+        <span className="set__label">Kept when space runs short</span>
+        <span className="set__value">
+          {kept?.persisted === true ? 'Yes' : kept?.persisted === false ? 'Not agreed' : 'Not said'}
+          {kept?.persisted === true ? null : (
+            <>
+              {' '}
+              <button type="button" className="set__btn" onClick={() => void askToPersist().then(look)}>
+                Ask again
+              </button>
+            </>
+          )}
+        </span>
+      </div>
+      <button
+        type="button"
+        className="set__row"
+        onClick={() => {
+          const name = backupNow()
+          setLast(new Date())
+          setNote(`Saved ${name}. Keep it somewhere off this phone.`)
+        }}
+      >
+        <span className="set__label">Back up to a file</span>
+        <span className="set__value">
+          {last === null ? 'Never backed up' : `Last ${dayWords(last.toISOString())}`}
+          <span className="set__chev" aria-hidden="true">›</span>
+        </span>
+      </button>
+      <label className="set__row kept__restore">
+        <span className="set__label">Restore from a file</span>
+        <span className="set__value">
+          <span className="set__chev" aria-hidden="true">›</span>
+        </span>
+        <input type="file" accept=".zip,.json,application/zip,application/json" className="kept__file" onChange={(e) => void restore(e.target.files?.[0])} />
+      </label>
+      {note === null ? null : (
+        <p className="set__note" role="status">
+          {note}
+        </p>
+      )}
+    </>
+  )
+}
+
+/*
+ * WHERE IT IS, AND WHAT DELETES IT: Settings › Privacy & data's "i" (Batch
+ * G: the long words behind an "i"; About's Safari-clearing paragraph moved
+ * here).
+ */
+export function KeptExplained() {
+  return (
+    <>
+      <p>
+        Everything you save is in this phone’s browser storage, nowhere else: spots, kit, settings and logs in its local storage, saved forecasts in its database, offline maps in its cache. Photos are never kept, only the numbers read from them and a small thumbnail.
       </p>
-    </div>
+      <p>
+        The Safari tab and the home-screen app keep separate storage. Deleting the app, or clearing Safari’s website data (Settings › Safari › Advanced › Website Data), deletes it. A backup file is the only copy outside the phone. Not in it: your Anthropic key and the offline maps, which you save again.
+      </p>
+    </>
   )
 }

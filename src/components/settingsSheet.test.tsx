@@ -40,10 +40,10 @@ describe('Settings, a page of its own (30 Oct)', () => {
     expect(MENU_ITEMS.find((m) => m.id === 'settings')?.subs?.map((s) => s.id)).toEqual(['about'])
   })
 
-  it('has its ten sections in the order asked for, Debug last and folded', () => {
+  it('has its eleven sections in the order asked for (Batch G), Debug last and folded', () => {
     const html = page()
     const titles = [...html.matchAll(/class="set__title">([^<]+)</g)].map((m) => m[1])
-    expect(titles).toEqual(['Units', 'Location', 'Offline', 'Coast &amp; inland', 'Alerts', 'Drone', 'Map', 'Privacy &amp; data', 'About', 'Debug'])
+    expect(titles).toEqual(['Units', 'Location', 'Offline', 'Coast &amp; inland', 'Alerts', 'Drone', 'Map', 'Privacy &amp; data', 'AI key', 'About', 'Debug'])
     expect(html).toMatch(/<details class="set__debug"><summary/)
     expect(html).not.toMatch(/<details class="set__debug" open/)
   })
@@ -60,6 +60,27 @@ describe('Settings, a page of its own (30 Oct)', () => {
     expect(html).toContain('None in the kit')
     expect(html).toContain('— (not recorded)')
     expect(html).not.toMatch(/\bsafe\b/i)
+  })
+
+  /*
+   * iOS-STYLE (Batch G, Section 7): real switches, values in the normal
+   * font, About one row to /about carrying "Version <hash> · <day> <Mon>",
+   * the long words behind an "i", backup and the AI key here and only here.
+   */
+  it('is clean: real switches, no numbers font on values, About one row with the version', () => {
+    const html = page()
+    expect(html.match(/role="switch"/g)?.length).toBeGreaterThanOrEqual(4)
+    expect(html).not.toMatch(/class="toggle__box"/)
+    expect(html).not.toMatch(/class="set__value num"/)
+    const about = html.slice(html.indexOf('aria-label="About"'), html.indexOf('class="set__debug"'))
+    expect(about.match(/class="set__row"/g)?.length).toBe(1)
+    expect(about).toMatch(/About ScoutNGo<\/span><span class="set__value">Version [0-9a-f]{7}\+? · \d{1,2} [A-Z][a-z]{2}/)
+    expect(html).not.toContain('Could not check')
+    expect(html).toContain('Back up to a file')
+    expect(html).toContain('Anthropic API key')
+    /* Long explanations behind an "i", not on the page. */
+    expect(html.match(/<details class="set__info">/g)?.length).toBeGreaterThanOrEqual(5)
+    for (const para of html.match(/<p class="set__note"[^>]*>[^<]*<\/p>/g) ?? []) expect(para.length).toBeLessThan(160)
   })
 
   it('and the units have left About', () => {
