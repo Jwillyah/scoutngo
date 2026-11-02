@@ -1,3 +1,4 @@
+import { useWindDraw, writeWindDraw } from '../lib/windDraw.ts'
 import { useEffect, useState, type ReactNode } from 'react'
 import { NUMERALS_LABEL, NUMERALS_NOTE } from '../core/numerals.ts'
 import type { Drone } from '../core/kit.ts'
@@ -102,7 +103,14 @@ function Switch({ label, on, onChange, note }: { label: string; on: boolean; onC
 const mb = (bytes: number) => `${(bytes / 1_000_000).toFixed(1)} MB`
 const PART_107_FT = 400
 
+const WIND_DRAW_OPTIONS = [
+  { id: 'streaks', label: 'Streaks' },
+  { id: 'arrows', label: 'Arrows' },
+] as const
+
 export function SettingsPage(props: Props) {
+  /* Streaks move; Arrows draw once, for a slow phone (Batch F, Section 3). */
+  const windDraw = useWindDraw()
   const { units, onUnits, venue, place, drone } = props
   const [groups, setGroups] = usePlaceGroups()
   const [surf, setSurf] = useSurfSetting()
@@ -196,6 +204,7 @@ export function SettingsPage(props: Props) {
         <Switch label="Terrain" on={props.showTerrain} onChange={props.onShowTerrain} />
         <Switch label="Labels" on={props.showLabels} onChange={props.onShowLabels} />
         <Switch label={NUMERALS_LABEL} note={NUMERALS_NOTE} on={props.showNumbers} onChange={props.onShowNumbers} />
+        <Pick label="Wind map" options={WIND_DRAW_OPTIONS} value={windDraw} onPick={writeWindDraw} />
       </Section>
 
       <Section title="Privacy & data">

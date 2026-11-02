@@ -136,7 +136,7 @@ function Cover({ onDismiss, onHow }: { onDismiss: () => void; onHow: () => void 
             </li>
           ))}
         </ul>
-        <p className="cover__sample">At the {SAMPLE_NAME}, as an example</p>
+        <p className="cover__sample">At the {SAMPLE_NAME}, as an example · wind map imagery Esri</p>
         <ul className="cover__rows">
           <Row icon="fire" title="Sky fire" line="Reads the clouds 400 km toward the sun." live={sample.skyFire} />
           <Row icon="drone" title="Drone preflight" line="Fly it here first: line of sight, roofs, wind." />

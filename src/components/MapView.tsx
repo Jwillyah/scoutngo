@@ -1,6 +1,8 @@
 import { moonGlyphSvg } from '../lib/moonGlyph.ts'
 import { useNumerals } from '../lib/numeralsContext.ts'
 import * as maplibregl from 'maplibre-gl'
+import { WindStreaks } from './WindStreaks.tsx'
+import { useWindDraw } from '../lib/windDraw.ts'
 import { loadTile, PROTOCOL, viaProtocol } from '../lib/offlineCache.ts'
 import { RAY_SCREEN_FRACTION } from '../lib/rayLength.ts'
 import { FLOATING_CHROME_SELECTORS, floatingChromeNodes } from '../lib/floatingChrome.ts'
@@ -3858,9 +3860,12 @@ export function MapView({
     moveCamera('sheet padding', () => map.current?.setPadding({ top: 0, left: 0, right: 0, bottom: bottomInset }))
   }, [bottomInset, moveCamera])
 
+  const windDraw = useWindDraw()
   return (
     <div className={`map${mode === null ? '' : ' map--picking'}`}>
       <div className="map__canvas" ref={container} />
+      {/* The wind map overlay (Batch F, Section 3): streaks, or arrows on a slow phone, over the wind layer's own grid. */}
+      <WindStreaks map={ready ? map.current : null} cells={skyForecast} heightM={windMeters} ratedMps={ratedWindMps} draw={windDraw} visible={showSky && skyLayer === 'wind'} />
       <div className="raypills" ref={pillLayer} aria-hidden="true" />
       {debugTouch ? <TouchDebug /> : null}
       {/*
