@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { PresetEvent, ViewfinderPreset } from '../core/viewfinderPreset.ts'
 import { getMoonPosition, getPosition } from 'suncalc'
 import {
   alphaFromHeading,
@@ -15,7 +16,7 @@ import { computeFOV, SENSORS } from '../core/fov.ts'
 import { bearingBetween, distanceMeters, type LatLon } from '../core/geo.ts'
 import { resolveSensor, type KitProfile } from '../core/kit.ts'
 import { normalizeBearing } from '../core/sun.ts'
-import { formatHour } from '../core/timezone.ts'
+import { formatClock, formatHour } from '../core/timezone.ts'
 import type { KitSelection } from '../lib/kitSelection.ts'
 import { locateOnce, locateWords } from '../lib/locateOnce.ts'
 import { formatRange, type Units } from '../lib/units.ts'
@@ -56,6 +57,8 @@ interface ViewfinderProps {
   bag: KitSelection
   timeZone: string
   units: Units
+  /** Batch I: opens with the next event marked and its lens on (src/core/viewfinderPreset.ts). */
+  preset?: ViewfinderPreset | null
   onClose: () => void
 }
 
@@ -131,7 +134,9 @@ const Glyph = ({ d }: { d: keyof typeof ICON }) => (
   </svg>
 )
 
-export function Viewfinder({ venue, pins, profile, bag, timeZone, units, onClose }: ViewfinderProps) {
+const PRESET_WORD: Record<PresetEvent, string> = { sunrise: 'Sunrise', sunset: 'Sunset', moonrise: 'Moonrise' }
+
+export function Viewfinder({ venue, pins, profile, bag, timeZone, units, preset = null, onClose }: ViewfinderProps) {
   const [phase, setPhase] = useState<Phase>({ kind: 'ask' })
   const video = useRef<HTMLVideoElement>(null)
   const [stream, setStream] = useState<MediaStream | null>(null)
@@ -140,7 +145,7 @@ export function Viewfinder({ venue, pins, profile, bag, timeZone, units, onClose
   const [orientation, setOrientation] = useState<Orientation | null>(null)
   const [offset, setOffset] = useState(0)
   const [calibrating, setCalibrating] = useState(false)
-  const [moon, setMoon] = useState(false)
+  const [moon, setMoon] = useState(preset?.event === 'moonrise')
   const [info, setInfo] = useState(false)
   const [me, setMe] = useState<LatLon | null>(null)
   const [now, setNow] = useState(() => new Date())
@@ -166,11 +171,11 @@ export function Viewfinder({ venue, pins, profile, bag, timeZone, units, onClose
 
   const lenses = profile.lenses.filter((l) => bag.lensIds.includes(l.id))
   const bodies = profile.bodies.filter((b) => bag.bodyIds.includes(b.id))
-  const [lensId, setLensId] = useState<string | null>(lenses[0]?.id ?? null)
+  const [lensId, setLensId] = useState<string | null>(preset?.lensId ?? lenses[0]?.id ?? null)
   const lens = lenses.find((l) => l.id === lensId) ?? null
   const [bodyId, setBodyId] = useState<string | null>(bodies[0]?.id ?? null)
   const body = bodies.find((b) => b.id === bodyId) ?? bodies[0] ?? null
-  const [focal, setFocal] = useState<number>(lens?.minFocalLength ?? 50)
+  const [focal, setFocal] = useState<number>(preset?.focal ?? lens?.minFocalLength ?? 50)
 
   const stopCamera = () => {
     streamRef.current?.getTracks().forEach((t) => t.stop())
@@ -363,6 +368,9 @@ export function Viewfinder({ venue, pins, profile, bag, timeZone, units, onClose
   const sunScreen = sunNow.altitude > -1 ? at(normalizeBearing(sunNow.azimuth), sunNow.altitude) : null
   const moonScreen = (moon || (calibrating && target === 'moon')) && moonNow.altitude > -1 ? at(normalizeBearing(moonNow.azimuth), moonNow.altitude) : null
   const hourly = paths.sun.filter((p, i) => i % 6 === 0 && p.alt > 0)
+  /* The next event, marked where it happens: the sun or the moon at its time, on the horizon. */
+  const eventPos = preset === null ? null : preset.event === 'moonrise' ? getMoonPosition(preset.at, from.lat, from.lon) : getPosition(preset.at, from.lat, from.lon)
+  const eventScreen = eventPos === null ? null : at(normalizeBearing(eventPos.azimuth), Math.max(0, eventPos.altitude))
 
   /* The one frame: the picked body with the picked lens at the picked focal length. */
   const frame = lens === null || body === null ? null : computeFOV(focal, SENSORS[resolveSensor(lens, [body])])
@@ -400,6 +408,11 @@ export function Viewfinder({ venue, pins, profile, bag, timeZone, units, onClose
             </span>
           )
         })}
+        {eventScreen === null || preset === null || eventScreen.x < 0 || eventScreen.x > 1 ? null : (
+          <span className="vf__event num" style={{ left: `${eventScreen.x * 100}%`, top: `${eventScreen.y * 100}%` }}>
+            {PRESET_WORD[preset.event]} {formatClock(preset.at, timeZone)}
+          </span>
+        )}
         {sunScreen === null ? null : <span className="vf__sun" style={{ left: `${sunScreen.x * 100}%`, top: `${sunScreen.y * 100}%` }} />}
         {moonScreen === null ? null : <span className="vf__moon" style={{ left: `${moonScreen.x * 100}%`, top: `${moonScreen.y * 100}%` }} />}
         {pins.map((pin) => {

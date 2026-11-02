@@ -48,7 +48,7 @@ describe('the menu (Batch H, Section 3: it replaced the side menu)', () => {
     const html = render({ name: 'Air 3S', maxWindMps: 12 })
     expect(html).toContain('aria-label="Stage"')
     const labels = [...html.matchAll(/class="[^"]*sidemenu__label[^"]*">([^<]+)</g)].map((m) => m[1])
-    expect(labels).toEqual(['Today', 'Sky', 'Water', 'Drone', 'Plan', 'Kit', 'Saved', 'Settings'])
+    expect(labels).toEqual(['Today', 'Sky', 'Water', 'Drone', 'Viewfinder', 'Plan', 'Kit', 'Saved', 'Settings'])
     for (const v of Object.values(rows)) expect(html).toContain(v)
     expect(html).toContain('VB Pier · Mon 2')
   })
@@ -87,6 +87,12 @@ describe('the tool dock', () => {
     )
     const buttons = html.match(/<button[^>]*>/g) ?? []
     expect(buttons.length).toBe(5)
+    /* Batch I: with the Viewfinder's door, a camera makes six. */
+    const six = renderToStaticMarkup(
+      <ToolDock moon={false} onMoon={() => {}} onCalendar={() => {}} lens onLens={() => {}} layersOpen={false} onLayers={() => {}} onReset={() => {}} onViewfinder={() => {}} />,
+    )
+    expect(six.match(/<button[^>]*>/g)?.length).toBe(6)
+    expect(six).toContain('aria-label="Viewfinder: point your phone, see the shot"')
     for (const b of buttons) expect(b).toMatch(/aria-label="[^"]{4,}"/)
     expect([...html.matchAll(/data-icon="([a-z]+)"/g)].map((m) => m[1])).toEqual(['sunmoon', 'calendar', 'lens', 'layers', 'now'])
   })

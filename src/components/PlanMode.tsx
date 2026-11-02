@@ -2241,6 +2241,19 @@ export function PlanMode({
                 ]}
               />
             )}
+            {/* Batch I: the Viewfinder, a front-row button on the Sky pages too. */}
+            {onViewfinder === undefined ? null : (
+              <div className="skyfoot">
+                <button type="button" className="skyfoot__vf" onClick={onViewfinder}>
+                  <svg className="bbtn__glyph" viewBox="0 0 24 24" aria-hidden="true">
+                    <rect x="3" y="7" width="18" height="13" rx="2" />
+                    <circle cx="12" cy="13.5" r="3.5" />
+                    <path d="M8 7l1.5-2.5h5L16 7" />
+                  </svg>
+                  Viewfinder
+                </button>
+              </div>
+            )}
           </Card>
         )
       case 'cams':
@@ -2797,6 +2810,7 @@ export function PlanMode({
 
       {sheet === 'full' ? null : (
         <ToolDock
+          onViewfinder={onViewfinder}
           moon={moonOn}
           onMoon={() => {
             if (!moonOn) {

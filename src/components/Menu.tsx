@@ -28,7 +28,7 @@ import { windIn, windUnitLabel, type Units } from '../lib/units.ts'
 /** The menu reads the forecasts once it has been open this long (Batch H: not on a tap straight through). */
 export const LOOK_AFTER_MS = 800
 
-export type MenuTarget = 'today' | 'sky' | 'water' | 'drone' | 'plan' | 'kit' | 'saved' | 'settings'
+export type MenuTarget = 'today' | 'sky' | 'water' | 'drone' | 'viewfinder' | 'plan' | 'kit' | 'saved' | 'settings'
 
 export interface MenuRows {
   plan: string
@@ -124,6 +124,11 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, inland, rows, no
               <Bars bars={flight.bars.map((b) => ({ h: b.h, now: b.now, cls: b.over === 'over' ? 'over' : b.over === 'near' ? 'near' : 'ok' }))} limit={flight.limit} />
             </LiveCard>
           )}
+        </div>
+
+        {/* Batch I: the Viewfinder's own row, right under the cards. */}
+        <div className="menu__rows">
+          <Row label="Viewfinder" value="point your phone, see the shot" icon={<KitIcon />} onTap={() => pick('viewfinder')} />
         </div>
 
         <div className="menu__rows">

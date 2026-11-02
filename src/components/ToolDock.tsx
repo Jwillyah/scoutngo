@@ -24,9 +24,11 @@ interface ToolDockProps {
   layersOpen: boolean
   onLayers: () => void
   onReset: () => void
+  /** Batch I: the Viewfinder, a camera in the dock. */
+  onViewfinder?: () => void
 }
 
-export function ToolDock({ moon, onMoon, onCalendar, lens, onLens, layersOpen, onLayers, onReset }: ToolDockProps) {
+export function ToolDock({ moon, onMoon, onCalendar, lens, onLens, layersOpen, onLayers, onReset, onViewfinder }: ToolDockProps) {
   const button = (label: string, glyph: GlyphId, onClick: () => void, on?: boolean, cap?: string) => (
     <button type="button" className={`tooldock__btn tooldock__btn--${glyph}${on === true ? ' tooldock__btn--on' : ''}`} aria-label={label} aria-pressed={on} onClick={onClick}>
       <Icon glyph={glyph} size={40} />
@@ -39,6 +41,7 @@ export function ToolDock({ moon, onMoon, onCalendar, lens, onLens, layersOpen, o
       {button(moon ? 'Moon on. Tap to turn it off' : 'Moon off. Tap to show where it rises and sets', 'sunmoon', onMoon, moon, moon ? 'Moon on' : undefined)}
       {button('Calendar of the sky', 'calendar', onCalendar)}
       {button(lens ? 'What each lens sees, shown. Tap to hide' : 'Show what each lens sees', 'lens', onLens, lens)}
+      {onViewfinder === undefined ? null : button('Viewfinder: point your phone, see the shot', 'viewfinder', onViewfinder)}
       {button('Map and layers', 'layers', onLayers, layersOpen)}
       {button('Back to now: the venue, north up, the current time', 'now', onReset)}
     </nav>

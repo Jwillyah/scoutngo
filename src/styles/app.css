@@ -16353,10 +16353,6 @@ a.about__row * {
   color: inherit;
   font: inherit;
 }
-.bcall__spot span {
-  font-size: 0.75em;
-  opacity: 0.8;
-}
 
 /* "Where do you shoot?" (Batch I, Section 1): the first run and the spot switcher. */
 .spick {
@@ -16519,4 +16515,66 @@ a.about__row * {
   .menu__title {
     font-size: 1.375rem;
   }
+}
+/* The next event, marked where it happens (Batch I, Section 2). */
+.vf__event {
+  position: absolute;
+  transform: translate(-50%, -130%);
+  padding: 4px 8px;
+  border-radius: 10px;
+  background: rgb(0 0 0 / 0.55);
+  border: 1.5px solid var(--sun);
+  color: #fff;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.bbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.bbtn--round {
+  flex: none;
+  width: 44px;
+  padding: 0;
+  border-radius: 50%;
+}
+.bbtn__glyph {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.skyfoot {
+  display: flex;
+  padding-top: var(--space-2);
+}
+.skyfoot__vf {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 22px;
+  background: #fff;
+  color: #141821;
+  font: inherit;
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+}
+.bcall__chev {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }

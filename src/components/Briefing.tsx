@@ -37,6 +37,8 @@ interface BriefingProps {
   onOpenMap: () => void
   /** Batch I: the place name at the top switches the spot. */
   onSwitchSpot?: () => void
+  /** Batch I: the Viewfinder, a front-row button. */
+  onViewfinder?: () => void
   /** Which page opens: Today unless asked. */
   start?: 0 | 1 | 2
 }
@@ -49,7 +51,7 @@ const AXIS_HOURS = 16
 
 const KIND_WORD: Record<Kind, string> = { sunrise: 'Sunrise', sunset: 'Sunset' }
 
-export function Briefing({ venue, placeName, timeZone, units, drone, now, onClose, onOpenMap, onSwitchSpot, start = 0 }: BriefingProps) {
+export function Briefing({ venue, placeName, timeZone, units, drone, now, onClose, onOpenMap, onSwitchSpot, onViewfinder, start = 0 }: BriefingProps) {
   const brief = useBriefing(venue, timeZone, now, true)
   const [page, setPage] = useState<Page>(start)
   const track = useRef<HTMLDivElement>(null)
@@ -97,10 +99,10 @@ export function Briefing({ venue, placeName, timeZone, units, drone, now, onClos
       </div>
       <div className="brief__track" ref={track}>
         <section className="brief__page" aria-label="Today">
-          <DayPage day={today} which="today" placeName={placeName} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} facing={brief.facing} checkedAt={brief.checkedAt} clock={clock} onOpenMap={onOpenMap} onSwitchSpot={onSwitchSpot} loading={brief.status === 'loading'} />
+          <DayPage day={today} which="today" placeName={placeName} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} facing={brief.facing} checkedAt={brief.checkedAt} clock={clock} onOpenMap={onOpenMap} onSwitchSpot={onSwitchSpot} onViewfinder={onViewfinder} loading={brief.status === 'loading'} />
         </section>
         <section className="brief__page" aria-label="Tomorrow">
-          <DayPage day={tomorrow} which="tomorrow" placeName={placeName} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} facing={brief.facing} checkedAt={brief.checkedAt} clock={clock} onOpenMap={onOpenMap} onSwitchSpot={onSwitchSpot} loading={brief.status === 'loading'} />
+          <DayPage day={tomorrow} which="tomorrow" placeName={placeName} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} facing={brief.facing} checkedAt={brief.checkedAt} clock={clock} onOpenMap={onOpenMap} onSwitchSpot={onSwitchSpot} onViewfinder={onViewfinder} loading={brief.status === 'loading'} />
         </section>
         <section className="brief__page" aria-label="This week">
           <WeekPage now={now} days={brief.days} timeZone={timeZone} units={units} clock={clock} placeName={placeName} loading={brief.status === 'loading'} />
@@ -136,6 +138,19 @@ function Scale({ steps, on, label }: { steps: readonly string[]; on: string | nu
 }
 
 /* ------------------------------------------------------------------- glyphs */
+
+const CameraGlyph = () => (
+  <svg className="bbtn__glyph" viewBox="0 0 24 24" aria-hidden="true">
+    <rect x="3" y="7" width="18" height="13" rx="2" />
+    <circle cx="12" cy="13.5" r="3.5" />
+    <path d="M8 7l1.5-2.5h5L16 7" />
+  </svg>
+)
+const MapGlyph = () => (
+  <svg className="bbtn__glyph" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M9 4l-6 2.5v13L9 17l6 2.5 6-2.5v-13L15 6.5 9 4zM9 4v13M15 6.5v13" />
+  </svg>
+)
 
 const STEP_PATH: Record<StepName, ReactNode> = {
   Clear: (
@@ -217,10 +232,11 @@ interface DayPageProps {
   clock: (d: Date | null) => string
   onOpenMap: () => void
   onSwitchSpot?: () => void
+  onViewfinder?: () => void
   loading: boolean
 }
 
-function DayPage({ day, which, placeName, venue, timeZone, units, drone, now, checkedAt, clock, onOpenMap, onSwitchSpot, loading }: DayPageProps) {
+function DayPage({ day, which, placeName, venue, timeZone, units, drone, now, checkedAt, clock, onOpenMap, onSwitchSpot, onViewfinder, loading }: DayPageProps) {
   const read = day?.call ?? null
   const kind: Kind | null = read?.kind ?? null
   const verdict = day === null || kind === null ? null : day.verdicts[kind]
@@ -256,7 +272,10 @@ function DayPage({ day, which, placeName, venue, timeZone, units, drone, now, ch
       <div className="bcall">
         <p className="bcall__place">
           <button type="button" className="bcall__spot" onClick={onSwitchSpot} disabled={onSwitchSpot === undefined} aria-label={`${placeName}: switch spot`}>
-            {placeName} <span aria-hidden="true">▾</span>
+            {placeName}
+            <svg className="bcall__chev" viewBox="0 0 12 12" aria-hidden="true">
+              <path d="M2.5 4.5L6 8l3.5-3.5" />
+            </svg>
           </button>
           {read === null || kind === null ? '' : ` · ${KIND_WORD[kind].toLowerCase()} ${clock(read.event)}`}
         </p>
@@ -285,14 +304,20 @@ function DayPage({ day, which, placeName, venue, timeZone, units, drone, now, ch
 
       <div className="bfoot">
         <p className="bfoot__line num">{footer}</p>
+        {/* Batch I (board "BATCH I · Today + Viewfinder"): Remind me · Viewfinder (white) · a round map button. */}
         <div className="bfoot__buttons">
           {alarm === null ? null : (
             <button type="button" className="bbtn" onClick={save}>
               {alarm.word} {clock(alarm.at)}
             </button>
           )}
-          <button type="button" className="bbtn bbtn--main" onClick={onOpenMap}>
-            Open the map
+          {onViewfinder === undefined ? null : (
+            <button type="button" className="bbtn bbtn--main" onClick={onViewfinder}>
+              <CameraGlyph /> Viewfinder
+            </button>
+          )}
+          <button type="button" className="bbtn bbtn--round" onClick={onOpenMap} aria-label="Open the map">
+            <MapGlyph />
           </button>
         </div>
       </div>

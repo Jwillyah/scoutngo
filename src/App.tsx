@@ -115,6 +115,7 @@ import { lastBackup } from './lib/backup.ts'
 import { PACK_STORAGE_KEY } from './lib/venuePack.ts'
 import { Briefing } from './components/Briefing.tsx'
 import { SpotPicker } from './components/SpotPicker.tsx'
+import { viewfinderPreset } from './core/viewfinderPreset.ts'
 import { shouldOpenBriefing } from './lib/briefingOpen.ts'
 import { backToNow, openingScrub } from './lib/backToNow.ts'
 import { retrying } from './lib/retrying.ts'
@@ -1417,6 +1418,11 @@ function App() {
   })
   /* The viewfinder: the camera with the plan over it. Opened from the menu, asks for its permissions on a tap. */
   const [viewfinderOpen, setViewfinderOpen] = useState(false)
+  /* The Viewfinder opens ready: the next event and the lens for it (src/core/viewfinderPreset.ts). */
+  const viewfinderPresetNow = useMemo(
+    () => (!viewfinderOpen || centre === null ? null : viewfinderPreset(new Date(), centre, kitProfile.lenses.filter((l) => kit.lensIds.includes(l.id)))),
+    [viewfinderOpen, centre, kitProfile, kit.lensIds],
+  )
 
   /*
    * SURF IN THE MENU: on Always; on Auto, only with the sea within reach of the
@@ -1509,6 +1515,9 @@ function App() {
         return
       case 'drone':
         onMenuPick('preflight')
+        return
+      case 'viewfinder':
+        setViewfinderOpen(true)
         return
       default:
         onMenuPick(target)
@@ -2454,6 +2463,7 @@ function App() {
           bag={kit}
           timeZone={venueWindow?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}
           units={settings.units}
+          preset={viewfinderPresetNow}
           onClose={() => setViewfinderOpen(false)}
         />
       ) : null}
@@ -2474,6 +2484,7 @@ function App() {
       {briefOpen && centre !== null && !spotPickOpen ? (
         <Briefing
           onSwitchSpot={() => setSpotPickOpen(true)}
+          onViewfinder={() => setViewfinderOpen(true)}
           venue={centre}
           placeName={venueShort}
           timeZone={venueWindow?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}
