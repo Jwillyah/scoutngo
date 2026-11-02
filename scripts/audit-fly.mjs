@@ -50,14 +50,14 @@ const meets = (a, b) => a !== null && b !== null && a.left < b.right && b.left <
 const LOOK = `(() => {
   const box = (el) => { if (!el) return null; const r = el.getBoundingClientRect(); return r.width > 0 ? { left: r.left, right: r.right, top: r.top, bottom: r.bottom } : null }
   const msg = [...document.querySelectorAll('.fly__alert, .fly__rotate')].map((el) => ({ cls: el.className, text: el.textContent.trim(), box: box(el), clipped: el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1 }))
-  const credits = document.querySelector('.cesium-widget-credits')
   return {
     sky: window.__skyShown ?? null,
     msg,
     ring: box(document.querySelector('.fly__ring')),
     wind: box(document.querySelector('.fly__wind')),
     cardinals: [...document.querySelectorAll('.fly__cardinal')].map((t) => ({ c: t.textContent, rot: t.getAttribute('transform') ?? t.closest('[transform*="rotate"]')?.getAttribute('transform') ?? null, box: box(t) })),
-    creditsShown: !!credits && getComputedStyle(credits).display !== 'none' && credits.getBoundingClientRect().height > 0,
+    /* The new scene (Batch D) draws no credits of its own; the old check for Cesium's credit box could never fire. Any credit text over the flight is still caught here. */
+    creditsShown: /Tiles by Esri|OpenStreetMap contributors/.test([...document.querySelectorAll('.fly, .fly *')].filter((el) => !el.closest('.fly__credits') && el.children.length === 0).map((el) => el.textContent).join(' ')),
     attribution: /Data attribution/.test(document.body.innerText),
     info: document.querySelector('.fly__credits')?.textContent ?? null,
     vw: innerWidth,
