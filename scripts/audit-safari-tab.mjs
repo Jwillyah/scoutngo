@@ -95,20 +95,38 @@ try {
     const home = await hctx.newPage()
     await home.goto(`${APP_ORIGIN}/`)
     await home.waitForTimeout(2500)
+    /* Long enough for the sample beach's values to come back from the fixtures. */
+    await home.waitForTimeout(2500)
     const fit = await home.evaluate(`(() => {
       const c = document.querySelector('.cover')
       if (!c) return null
-      const parts = [...c.querySelectorAll('.cover__name, .cover__head, .cover__line, .cover__go, .cover__licence, .cover__more')]
-      return { parts: parts.length, out: parts.filter((e) => { const r = e.getBoundingClientRect(); return r.top < 0 || r.bottom > innerHeight + 1 || r.right > innerWidth + 1 }).map((e) => e.className), scrolls: document.documentElement.scrollHeight > innerHeight + 1, img: c.querySelectorAll('img').length }
+      const parts = [...c.querySelectorAll('.cover__name, .cover__head, .cover__band, .cover__row, .cover__go, .cover__licence, .cover__more')]
+      const bands = [...c.querySelectorAll('.cover__band')]
+      return {
+        parts: parts.length,
+        out: parts.filter((e) => { const r = e.getBoundingClientRect(); return r.top < 0 || r.bottom > innerHeight + 1 || r.right > innerWidth + 1 }).map((e) => e.className),
+        scrolls: document.documentElement.scrollHeight > innerHeight + 1,
+        img: c.querySelectorAll('img').length,
+        bandH: bands.map((b) => Math.round(b.getBoundingClientRect().height)),
+        bandPhoto: bands.filter((b) => getComputedStyle(b).backgroundImage.includes('/home/band-')).length,
+        values: [...c.querySelectorAll('.cover__bandnum')].map((e) => e.textContent),
+        live: [...c.querySelectorAll('.cover__rowlive')].map((e) => e.textContent),
+      }
     })()`)
     console.log(`  home: ${JSON.stringify(fit)}`)
     if (fit === null) fail('home: no cover on a first visit, so its fit was not looked at')
     else {
       surfaces += 1
-      if (fit.parts < 8) fail(`home: only ${fit.parts} of the cover's parts are there`)
+      if (fit.parts < 14) fail(`home: only ${fit.parts} of the cover's parts are there`)
       if (fit.out.length > 0) fail(`home: off the 390 x 664 screen: ${fit.out.join(', ')}`)
       if (fit.scrolls) fail('home: the page scrolls at 390 x 664')
-      if (fit.img > 0) fail('home: a photograph is back on the cover')
+      if (fit.img > 0) fail('home: an <img> is on the cover; the bands are backgrounds')
+      if (fit.bandPhoto !== 4) fail(`home: ${fit.bandPhoto} of 4 bands show their photo`)
+      if (fit.bandH.some((h) => h < 40)) fail(`home: a band shrank below 40 px: ${fit.bandH.join(', ')}`)
+      if (fit.values[0] === '—') fail('home: Light is a dash, and it is arithmetic on the sun')
+      /* Each photo must actually arrive: a 404 would still leave the CSS url in place. */
+      const sizes = await Promise.all(['light', 'tide', 'surf', 'wind'].map((b) => home.request.get(`${APP_ORIGIN}/home/band-${b}.webp`).then((r) => (r.ok() ? r.body().then((x) => x.length) : 0))))
+      if (sizes.some((n) => n === 0 || n >= 60 * 1024)) fail(`home: band photos not served under 60 KB: ${sizes.join(', ')}`)
     }
     await home.screenshot({ path: join(OUT, 'tab-home.png') })
     await hctx.close()

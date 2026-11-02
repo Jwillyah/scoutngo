@@ -13,16 +13,17 @@ const html = renderToStaticMarkup(<Landing onDismiss={() => {}} />)
 const text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ')
 
 /*
- * THE COVER IS FIVE ELEMENTS AND TWO QUIET LINES, AND NOTHING ELSE.
+ * THE COVER IS THE APPROVED BOARD AND NOTHING ELSE (Batch F: "HOME V · with
+ * real photos"; before that, five elements and two quiet lines).
  *
  * The list is the specification, so the test is a count as well as a content
  * check: a sixth element added in six months fails here rather than being
  * noticed on a phone.
  */
-describe('the cover carries five elements and stops', () => {
+describe('the cover carries the board\'s parts and stops', () => {
   it('leads with the wordmark and the line', () => {
     expect(text).toContain('ScoutNGo')
-    expect(text).toContain('Plan the shot before you go.')
+    expect(text).toContain('Four apps in one.')
   })
 
   it('has exactly one primary action and it says what it does', () => {
@@ -33,10 +34,10 @@ describe('the cover carries five elements and stops', () => {
   it('carries the two quiet lines, in their places', () => {
     /* How it works, and since 29 Oct Privacy (the brief: /privacy linked from the home footer). */
     expect(html.match(/class="cover__more"/g)).toHaveLength(2)
-    expect(text).toContain('Free · open source · no account · Privacy · How it works')
+    expect(text).toContain('Free · open source · works offline · How it works · Privacy')
   })
 
-  it('carries no photograph (30 Oct): no personal photos anywhere public', () => {
+  it('carries no <img>: the four band photos are CSS backgrounds, stripped of metadata (homeBands.test.ts)', () => {
     expect([...html.matchAll(/<img[^>]*src="([^"]*)"/g)]).toHaveLength(0)
   })
 
@@ -64,8 +65,8 @@ describe('the cover carries five elements and stops', () => {
     expect(html).not.toMatch(/<input\b/)
   })
 
-  it('orders the copy: wordmark, line, the three lines, button, footer with its links', () => {
-    const order = ['cover__name', 'cover__head', 'cover__lines', 'cover__go', 'cover__licence', 'cover__more']
+  it('orders the copy: wordmark, line, the bands, the rows, button, footer with its links', () => {
+    const order = ['cover__name', 'cover__head', 'cover__bands', 'cover__rows', 'cover__go', 'cover__licence', 'cover__more']
     const at = order.map((c) => html.indexOf(c))
     expect(at.every((i) => i >= 0)).toBe(true)
     for (let i = 1; i < at.length; i += 1) expect(at[i]).toBeGreaterThan(at[i - 1] ?? -1)

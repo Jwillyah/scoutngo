@@ -2094,6 +2094,10 @@ function App() {
             setAtHowPath(true)
             window.history.pushState({}, '', '/how')
           }}
+          onShowHome={() => {
+            setLandingSeen(false)
+            window.history.pushState({}, '', '/')
+          }}
           onEditKit={() => onMenuPick('kit')}
           onOpenSpots={() => onMenuPick('saved')}
           /* The key field is on About itself, above the row that names it. */

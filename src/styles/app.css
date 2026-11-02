@@ -7888,8 +7888,10 @@
  */
 
 /*
- * THE COVER, simple until the visual style is chosen (30 Oct): the app's own
- * dark ground, the type in its own colours, centred. No photograph.
+ * THE COVER (Batch F, Section 1; board "HOME V · with real photos"): the
+ * app's dark ground, four photo bands with the sample beach's live values,
+ * four feature rows, the gold button. In a Safari tab (390 x 664) the bands
+ * give up height first: they are the only part allowed to shrink.
  */
 .cover {
   position: fixed;
@@ -7900,67 +7902,249 @@
   color: var(--color-text);
 }
 
-/* Centred in whatever height the page has: a Safari tab's 664 px, or the home-screen app's 844. */
 .cover__top {
   position: absolute;
-  left: 20px;
-  right: 20px;
-  top: calc(var(--safe-top, 0px) + 12px);
-  bottom: calc(var(--safe-bottom, 0px) + 12px);
-  max-width: 420px;
+  left: 0;
+  right: 0;
+  top: calc(var(--safe-top, 0px) + 10px);
+  bottom: calc(var(--safe-bottom, 0px) + 6px);
+  max-width: 480px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  text-align: center;
+  gap: 8px;
+  /*
+   * A Safari tab (390 x 664) fits with nothing to scroll. Shorter than that,
+   * with the home-screen insets too (the reachability audit's 390 x 660 at
+   * 47/34), the bands stop at 40 px and the page scrolls rather than clips.
+   */
+  overflow-y: auto;
+}
+
+.cover__top > * {
+  flex: none;
 }
 
 .cover__brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+  padding: 0 20px;
+}
+
+.cover__pin {
+  color: var(--action-mid);
+}
+
+.cover__pinsun {
+  fill: var(--action-ink);
 }
 
 .cover__name {
   margin: 0;
-  font-size: 32px;
+  font-size: 16px;
   font-weight: 800;
-  letter-spacing: -0.01em;
   color: var(--color-text);
 }
 
 .cover__head {
   margin: 0;
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1.35;
+  padding: 0 20px;
+  font-size: 25px;
+  font-weight: 900;
+  line-height: 1.08;
+  letter-spacing: -0.01em;
   color: var(--color-text);
 }
 
-.cover__lines {
-  margin: 0;
+.cover__head2 {
+  color: var(--color-text-muted);
+  font-weight: 800;
+}
+
+/* The bands: the one part that shrinks, from 68 px each down to 40. */
+.cover__top > .cover__bands {
+  flex: 0 1 276px;
+  min-height: 164px;
+  margin: 2px 0 0;
   padding: 0;
   list-style: none;
-  display: grid;
-  gap: 8px;
-  width: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
-.cover__line {
-  padding: 10px 14px;
-  border-radius: var(--radius-panel);
-  background: var(--surface-raised);
-  font-size: 15px;
+.cover__band {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 40px;
+  max-height: 68px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 20px;
+  border-top: 1px solid rgb(255 255 255 / 0.08);
+  background-size: cover;
+  background-position: center;
+}
+
+/* The dark side for the words: strongest at the left, under the name. */
+.cover__band::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgb(8 12 18 / 0.78) 0%, rgb(8 12 18 / 0.32) 55%, rgb(8 12 18 / 0.6) 100%);
+}
+
+.cover__band > * {
+  position: relative;
+}
+
+.cover__band--light {
+  background-image: url('/home/band-light.webp');
+}
+
+.cover__band--tide {
+  background-image: url('/home/band-tide.webp');
+}
+
+.cover__band--surf {
+  background-image: url('/home/band-surf.webp');
+}
+
+.cover__band--wind {
+  background-image: url('/home/band-wind.webp');
+}
+
+.cover__bandname {
+  font-size: clamp(28px, 5.6dvh, 46px);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-stretch: 75%;
+  text-shadow: 0 2px 14px rgb(0 0 0 / 0.45);
+}
+
+.cover__band--light .cover__bandname {
+  color: var(--sun);
+}
+
+.cover__band--tide .cover__bandname {
+  color: var(--tide);
+}
+
+.cover__band--surf .cover__bandname {
+  color: var(--ocean);
+}
+
+.cover__band--wind .cover__bandname {
+  color: var(--white);
+}
+
+.cover__bandvalue {
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  text-shadow: 0 1px 8px rgb(0 0 0 / 0.6);
+}
+
+.cover__bandnum {
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.cover__bandword {
+  font-size: 12px;
+  line-height: 1.15;
   font-weight: 600;
-  line-height: 1.35;
-  color: var(--color-text);
+  color: var(--color-text-muted);
+}
+
+.cover__sample {
+  margin: -4px 0 0;
+  padding: 0 20px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-faint);
+}
+
+.cover__rows {
+  margin: 0;
+  padding: 0 20px;
+  list-style: none;
+  display: grid;
+}
+
+.cover__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 5px 0;
+  border-top: 1px solid rgb(255 255 255 / 0.08);
+}
+
+.cover__icon {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--row-tint);
+  background: color-mix(in srgb, var(--row-tint) 14%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--row-tint) 42%, transparent);
+}
+
+.cover__row--fire {
+  --row-tint: var(--action-mid);
+}
+
+.cover__row--drone {
+  --row-tint: var(--sun-rise);
+}
+
+.cover__row--moon {
+  --row-tint: var(--moon);
+}
+
+.cover__row--lock {
+  --row-tint: var(--ocean);
+}
+
+.cover__rowtext {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cover__rowtitle {
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.cover__rowline {
+  font-size: 12.5px;
+  line-height: 1.25;
+  color: var(--color-text-muted);
+}
+
+.cover__rowlive {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--row-tint);
 }
 
 .cover__licence {
-  margin: 0;
-  font-size: 13px;
+  margin: -6px 0 0;
+  padding: 0 12px;
+  font-size: 12px;
+  white-space: nowrap;
   font-weight: 600;
   color: var(--color-text-muted);
   text-align: center;
@@ -7982,9 +8166,9 @@
 /* THE MAIN ACTION: the glossy gold pill (tokens.css, --action-*). */
 .cover__go {
   position: relative;
-  width: 100%;
+  width: calc(100% - 40px);
   min-height: 50px;
-  margin-top: 12px;
+  margin: auto 20px 0;
   border: 0;
   border-radius: 25px;
   background: var(--action-sheen);

@@ -24,6 +24,33 @@
  * counted wrong. The target is none.
  */
 
+/*
+ * SETTLED, NOT TIMED (Batch F, Section 5). The audits waited a fixed 600 to
+ * 750 ms after moving the sheet and then measured. In the gate this audit
+ * shares a low-priority Chrome with five others, and the sheet's move and
+ * the chrome that rides on it (the tool dock, the rail, the shadow key, all
+ * placed from the sheet's live height) were still travelling when the
+ * rectangles were read: the dock "over" a peeking sheet that had not yet
+ * come down, a drag aimed at where the handle was a moment ago. Now every
+ * read waits until the sheet and its riders have held the same rectangles
+ * for three frames with no animation running (four seconds at most, and
+ * then it says so).
+ */
+export const SETTLE = `(async () => {
+  const sel = ['.sheet', '.tooldock', '.rail2', '.shadowkey']
+  const t0 = performance.now()
+  let last = null
+  let same = 0
+  while (performance.now() - t0 < 4000) {
+    await new Promise((r) => requestAnimationFrame(() => r(null)))
+    const key = sel.map((q) => { const e = document.querySelector(q); if (!e) return '-'; const b = e.getBoundingClientRect(); return [b.left, b.top, b.width, b.height].map((v) => v.toFixed(1)).join(',') }).join('|')
+    const moving = document.getAnimations().some((a) => a.playState === 'running' && a.effect && a.effect.target && sel.some((q) => a.effect.target.closest && a.effect.target.closest(q)))
+    if (key === last && !moving) { same += 1; if (same >= 3) return 'settled' } else same = 0
+    last = key
+  }
+  return 'still moving after 4 s'
+})()`
+
 /** Where things are, read fresh before each drag. */
 const GEOMETRY = `(() => {
   /* Clipped to the screen, and to the sheet's open body for what scrolls inside it: a touch lands only on what is shown. */
@@ -121,9 +148,13 @@ async function touchDrag(send, wait, x0, y0, x1, y1, hook = false) {
 
 async function setDetent(ev, wait, want) {
   for (let i = 0; i < 4; i += 1) {
-    if ((await ev(STATE)).detent === want) return true
+    if ((await ev(STATE)).detent === want) {
+      await ev(SETTLE)
+      return true
+    }
     await ev(`document.querySelector('.sheet__handle')?.click()`)
-    await wait(650)
+    await wait(300)
+    await ev(SETTLE)
   }
   return (await ev(STATE)).detent === want
 }
@@ -146,6 +177,7 @@ export async function runSheetGestures({ send, ev, wait }, only = null) {
       continue
     }
     await wait(350)
+    await ev(SETTLE)
     const g = await ev(GEOMETRY)
     const before = await ev(STATE)
     const box = g[d.on]
@@ -169,7 +201,8 @@ export async function runSheetGestures({ send, ev, wait }, only = null) {
       y1 = y0 + (top - g.sheet.top)
     }
     await touchDrag(send, wait, x0, y0, x1, y1, d.hook === true)
-    await wait(750)
+    await wait(300)
+    await ev(SETTLE)
     const after = await ev(STATE)
     const timeMoved = Number.isFinite(after.at) && Number.isFinite(before.at) && after.at !== before.at
     row.got = { time: timeMoved, sheet: after.detent }

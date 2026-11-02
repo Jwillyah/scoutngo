@@ -26,6 +26,7 @@ const page = () =>
       newBuild={{ status: 'unknown' } as BuildCheck}
       onHow={() => {}}
       onAbout={() => {}}
+      onShowHome={() => {}}
       onKit={() => {}}
       onExport={() => {}}
       onClose={() => {}}

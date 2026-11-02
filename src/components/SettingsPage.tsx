@@ -42,6 +42,8 @@ interface Props {
   newBuild: BuildCheck
   onHow: () => void
   onAbout: () => void
+  /** Settings › About › Show the home page (Batch F): the cover again, as on a first run. */
+  onShowHome: () => void
   onKit: () => void
   onExport: () => void
   onClose: () => void
@@ -207,6 +209,7 @@ export function SettingsPage(props: Props) {
         <Row label="Version" value={buildLabelWithDate()} />
         <Row label="How it works" value="" onClick={props.onHow} />
         <Row label="Why this exists" value="" onClick={props.onAbout} />
+        <Row label="Show the home page" value="" onClick={props.onShowHome} />
         <Row label="Open source" value="github.com" />
         <ApiKeyField />
         <BuildStamp deployed={props.newBuild} />

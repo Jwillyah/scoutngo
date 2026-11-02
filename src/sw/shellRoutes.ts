@@ -55,6 +55,11 @@ export const SHELL_PUBLIC: readonly string[] = [
   '/manifest.json',
   '/icons/apple-touch-icon.png',
   '/icons/icon-192.png',
+  /* The home page's four band photos (Batch F), so it opens whole offline. */
+  '/home/band-light.webp',
+  '/home/band-tide.webp',
+  '/home/band-surf.webp',
+  '/home/band-wind.webp',
 ]
 
 export type Route = 'navigate' | 'asset' | 'public' | 'pass'

@@ -306,6 +306,7 @@ interface PlanModeProps {
   units: Units
   onUnits: (next: Units) => void
   onHow: (section: HowSection) => void
+  onShowHome: () => void
   onEditKit: () => void
   onOpenSpots: () => void
   savedSpotCount: number
@@ -525,6 +526,7 @@ export function PlanMode({
   units,
   onUnits,
   onHow,
+  onShowHome,
   onEditKit,
   onOpenSpots,
   savedSpotCount,
@@ -2515,6 +2517,7 @@ export function PlanMode({
           newBuild={newBuild}
           onHow={() => onHow('computed')}
           onAbout={() => setPage('about')}
+          onShowHome={onShowHome}
           onKit={onEditKit}
           onExport={onExport}
           onClose={closeRoutedPage}

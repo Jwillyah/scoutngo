@@ -57,13 +57,19 @@ import { goToStage, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mj
 guardAudit('surface')
 
 import { connect } from './cdp.mjs'
-import { describeDrag, DRAGS, runSheetGestures } from './sheetGestures.mjs'
+import { describeDrag, DRAGS, runSheetGestures, SETTLE } from './sheetGestures.mjs'
 
 const OUT = process.env.SCOUTNGO_OUT ?? '.'
 const VIEWPORT = { width: 390, height: 844 }
 
 const watchdog = startWatchdog('surface')
 const { ev, wait, shot, send, load, errs, dispose } = await connect()
+/*
+ * A SLOW PHONE, ON PURPOSE (Batch F, Section 5): SCOUTNGO_THROTTLE=4 runs the
+ * whole audit with the CPU four times slower, which is how the gate's busy
+ * low-priority Chrome made this audit fail its first run and pass its second.
+ */
+if (process.env.SCOUTNGO_THROTTLE) await send('Emulation.setCPUThrottlingRate', { rate: Number(process.env.SCOUTNGO_THROTTLE) })
 
 let problems = 0
 const fail = (line) => {
@@ -194,9 +200,15 @@ const MAP_VISIBLE = `(() => {
 const detentOf = () => ev(`document.querySelector('.sheet')?.dataset.detent ?? null`)
 const setDetent = async (want) => {
   for (let i = 0; i < 4; i += 1) {
-    if ((await detentOf()) === want) return true
+    if ((await detentOf()) === want) {
+      await ev(SETTLE)
+      return true
+    }
     await ev(`document.querySelector('.sheet__handle')?.click()`)
-    await wait(600)
+    await wait(300)
+    /* Settled, not timed: see SETTLE in scripts/sheetGestures.mjs. */
+    const settled = await ev(SETTLE)
+    if (settled !== 'settled') console.log(`  (the sheet: ${settled})`)
   }
   return (await detentOf()) === want
 }
