@@ -60,3 +60,7 @@ overlap-*.png
 
 # Agent worktrees: separate checkouts, never part of this one.
 .claude/worktrees/
+
+# The owner's original drone photos for the compare scripts (docs/compare.md).
+# They carry GPS and the drone's serial: never committed, never published.
+compare-input/
