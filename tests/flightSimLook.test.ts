@@ -52,3 +52,17 @@ describe('water mirrors the clouds', () => {
     expect(water).toMatch(/fbm\(q\) - cloudThresh/)
   })
 })
+
+describe('sky arc pills', () => {
+  it('are the same size on screen at a narrow and a wide field of view', async () => {
+    const { PILL_PX, pillScale } = await import('../src/three/world/arcs.ts')
+    for (const fovDeg of [30, 60, 117]) {
+      const p11 = 1 / Math.tan((fovDeg * Math.PI) / 360)
+      const [, sy] = pillScale(844, p11)
+      /* What three.js draws for a sprite with sizeAttenuation false: scale x P[1][1], in clip units of half the view. */
+      expect((sy * p11 * 844) / 2).toBeCloseTo(PILL_PX.h, 6)
+    }
+    /* The old fixed scale, 0.034, at 117 degrees: under 10 px. */
+    expect((0.034 * (1 / Math.tan((117 * Math.PI) / 360)) * 844) / 2).toBeLessThan(10)
+  })
+})

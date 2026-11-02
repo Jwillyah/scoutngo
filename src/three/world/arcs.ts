@@ -13,6 +13,15 @@ import * as THREE from 'three'
 import { FLOATING_CHROME_SELECTORS, floatingChromeNodes } from '../../lib/floatingChrome.ts'
 import type { ArcSample, SkyArc } from '../../core/sky3d.ts'
 
+/** A pill's size on screen, CSS pixels: the hour readable, the shape of its 128 x 48 picture. */
+export const PILL_PX = { w: 64, h: 24 }
+
+/** A non-attenuated sprite's scale for PILL_PX, given the view's height in px and the projection's [1][1] (1 / tan(fov / 2)). */
+export function pillScale(viewH: number, p11: number): [number, number] {
+  const k = 2 / (viewH * Math.max(1e-6, p11))
+  return [PILL_PX.w * k, PILL_PX.h * k]
+}
+
 export function createArcs(onChange: () => void) {
   const group = new THREE.Group()
   group.name = 'arcs'
@@ -38,7 +47,7 @@ export function createArcs(onChange: () => void) {
     const tex = new THREE.CanvasTexture(c)
     tex.colorSpace = THREE.SRGBColorSpace
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, sizeAttenuation: false, toneMapped: false, fog: false }))
-    s.scale.set(0.09, 0.034, 1)
+    s.scale.set(0.09, 0.034, 1) /* until the first frame sizes it (frame, below) */
     s.renderOrder = 800
     return s
   }
@@ -117,9 +126,15 @@ export function createArcs(onChange: () => void) {
           l.sprite.visible = false
           continue
         }
-        /* The pill's size on screen: its scale is a share of the view's height. */
-        const h = l.sprite.scale.y * box.height
-        const w = l.sprite.scale.x * box.height
+        /*
+         * The same size on screen at any field of view. A sprite that does
+         * not shrink with distance is still sized in view units, so its
+         * pixels go with 1 / tan(fov / 2): at Wrightsville's 117 degrees a
+         * pill was 9 px tall and unreadable (1 Nov). Scaled here to PILL_PX.
+         */
+        l.sprite.scale.set(...pillScale(box.height, camera.projectionMatrix.elements[5]), 1)
+        const h = PILL_PX.h
+        const w = PILL_PX.w
         const r = { l: x - w / 2 - 2, t: y - h / 2 - 2, r: x + w / 2 + 2, b: y + h / 2 + 2 }
         const hit = (q: { l: number; t: number; r: number; b: number }) => r.l < q.r && r.r > q.l && r.t < q.b && r.b > q.t
         const ok = !placed.some(hit) && !blocked.some(hit)
