@@ -102,7 +102,7 @@ export function staleShellEntries(cachedPaths: readonly string[], current: reado
 
 /**
  * THE 3D VIEW IS PART OF THE INSTALL (Batch D). It was left out while it was
- * Cesium, a few megabytes most visits never used, and fetched on first open;
+ * the old globe library, a few megabytes most visits never used, and fetched on first open;
  * so 3D from the home-screen app with no signal opened only if it had been
  * opened online before. The three.js scene is a few hundred kilobytes and
  * is installed with the rest, so a saved venue opens in 3D with no signal.

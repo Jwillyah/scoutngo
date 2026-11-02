@@ -10,8 +10,8 @@
  * Terrarium elevation, OpenFreeMap's map tiles (the buildings and the sea,
  * src/lib/vectorTiles.ts) and Overpass, on any of the three servers the
  * app's one Overpass client asks in turn (src/lib/overpassClient.ts), for
- * the trees. Cesium ion, Bing, Google or anything else fails the gate, by
- * name.
+ * the trees. A globe service's tiles, Bing, Google or anything else fails
+ * the gate, by name.
  *
  * THEN OFFLINE: the network cut, 3D reopened, and it must load with the
  * venue's ground at the height it had online (src/lib/offline3d.ts).

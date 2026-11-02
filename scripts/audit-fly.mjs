@@ -56,7 +56,7 @@ const LOOK = `(() => {
     ring: box(document.querySelector('.fly__ring')),
     wind: box(document.querySelector('.fly__wind')),
     cardinals: [...document.querySelectorAll('.fly__cardinal')].map((t) => ({ c: t.textContent, rot: t.getAttribute('transform') ?? t.closest('[transform*="rotate"]')?.getAttribute('transform') ?? null, box: box(t) })),
-    /* The new scene (Batch D) draws no credits of its own; the old check for Cesium's credit box could never fire. Any credit text over the flight is still caught here. */
+    /* The new scene (Batch D) draws no credits of its own; the old check for the globe library's credit box could never fire. Any credit text over the flight is still caught here. */
     creditsShown: /Tiles by Esri|OpenStreetMap contributors/.test([...document.querySelectorAll('.fly, .fly *')].filter((el) => !el.closest('.fly__credits') && el.children.length === 0).map((el) => el.textContent).join(' ')),
     attribution: /Data attribution/.test(document.body.innerText),
     info: document.querySelector('.fly__credits')?.textContent ?? null,

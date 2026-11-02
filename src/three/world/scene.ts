@@ -1,7 +1,7 @@
 /*
  * THE 3D SCENE, IN THREE.JS (Batch D): one scene for the map's 3D button,
- * Fly and Preflight, so all three look the same. It replaces the Cesium
- * clay model (src/three/clayScene.ts) and keeps its contract (the ClayScene
+ * Fly and Preflight, so all three look the same. It replaces the old globe
+ * library's clay model (src/three/clayScene.ts) and keeps its contract (the ClayScene
  * interface below), so the components that drive it did not change shape.
  *
  *   sky        src/core/skyLook.ts's colours from our sun at the bar's time;

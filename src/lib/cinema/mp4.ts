@@ -9,9 +9,7 @@
  * Boxes (ISO/IEC 14496-12 and -15): ftyp, mdat (the frames, in order), moov
  * (mvhd, trak: tkhd, mdia: mdhd, hdlr, minf: vmhd, dinf, stbl: stsd with
  * avc1/avcC, stts, stss, stsc, stsz, stco). Every sample lasts the same
- * time, so stts is one entry. `readMp4` reads it back for the tests and
- * scripts/measure-cinema.mjs, which also lets Chrome's own decoder say how
- * long the file is.
+ * time, so stts is one entry. `readMp4` reads it back for the tests.
  *
  * Written here rather than taken from a package: mp4-muxer is deprecated,
  * and its successor is 11 MB.

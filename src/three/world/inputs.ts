@@ -1,8 +1,8 @@
 /*
  * WHAT THE 3D SCENE IS DRAWN FROM, BEYOND THE MAP: the look, and the forecast's
  * sea, water level, cloud cover and visibility (src/lib/cinema/useCinemaData.ts).
- * Moved here from the Cesium preview (Batch D) so nothing that drives the
- * scene imports Cesium.
+ * Moved here from the old globe preview (Batch D) so nothing that drives the
+ * scene imports the globe library.
  */
 import type { Cover } from '../../core/clouds.ts'
 import type { SeaInput } from '../../core/seaSurface.ts'

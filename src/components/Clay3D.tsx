@@ -204,7 +204,7 @@ export function Clay3D({ venue, venueLabel, at, timeZone, sheetOpen = false, moo
     void s.playPath(flight, (t) => onFlightTime?.(t), (share) => onRenderProgress?.(share), setPreviewing).then((clip) => {
       setPreviewing(null)
       if (!flight.record) return
-      /* For the checks (scripts/measure-cinema.mjs): the clip as made. */
+      /* For the checks: the clip as made. */
       ;(window as unknown as { __clip?: Blob | null }).__clip = clip
       onRecorded?.(clip, clip === null ? 'This browser cannot record the 3D view.' : `Recorded ${Math.round(clip.size / 1e5) / 10} MB at a steady 30 fps, watermarked "${WATERMARK}".`)
     })

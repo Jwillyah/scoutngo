@@ -12,8 +12,7 @@
  *   Kasten & Young (1989)  m = 1 / (sin h + 0.50572 (h + 6.07995)^-1.6364)
  *   Pickering (2002)       m = 1 / sin(h + 244 / (165 + 47 h^1.1))
  * They agree within a few per cent above the horizon; the colour is computed
- * with each and the two compared in the tests and in
- * scripts/measure-cinema.mjs.
+ * with each and the two compared in the tests.
  */
 
 const RAD = Math.PI / 180
@@ -71,8 +70,8 @@ export function sunColour(altitudeDeg: number, visibilityKm: number | null, airM
 }
 
 /**
- * How far the haze lets you see, as the 3D view's fog density: Cesium's fog
- * fades with exp(-(density x distance)^2), so it reaches the visibility's 2%
+ * How far the haze lets you see, as the 3D view's fog density: the old globe's fog
+ * faded with exp(-(density x distance)^2), so it reaches the visibility's 2%
  * contrast (Koschmieder) at density = sqrt(3.912) / V. Unknown visibility:
  * the engine's own default.
  */

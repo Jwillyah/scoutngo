@@ -12,7 +12,7 @@
  *
  * THE PIER. The 3 x 3 tiles around Virginia Beach Fishing Pier at zooms 15,
  * 14 and 13, cleaned tile by tile and stitched, then the same shoreline
- * check as scripts/measure-terrain-coast.mjs: along the OpenStreetMap
+ * check as the old terrain-coast measure (retired in Batch F): along the OpenStreetMap
  * coastline (scripts/fixtures/virginia-beach-coastline.json) and 15 m either
  * side every 5 m, and across it from 60 m out to 60 m in. Margins of 128 and
  * 64 pixels, so the margin the app uses is shown against one too small.

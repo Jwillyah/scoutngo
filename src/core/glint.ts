@@ -11,8 +11,8 @@
  *              between "toward the camera" and "toward the sun" stands
  *              straight up (the reflection law, without the formula)
  *
- * The ocean shader draws its glint with the scene's own light; this is what
- * scripts/measure-cinema.mjs checks the rendered frame against.
+ * The ocean shader draws its glint with the scene's own light; this is the
+ * reflection law it follows (checked by the tests).
  */
 export type Vec3 = [number, number, number]
 
