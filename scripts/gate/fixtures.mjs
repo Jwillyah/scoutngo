@@ -131,6 +131,8 @@ function noaa(u) {
 }
 
 /* --------------------------------------------------------------- the rest */
+/* 44099's spectral summary as published on 2 Nov 2026 (tests/data/ndbc-2026-11-02/44099.spec). */
+const NDBC_SPEC = readFileSync(new URL('../../tests/data/ndbc-2026-11-02/44099.spec', import.meta.url), 'utf8')
 const NDBC_TEXT = `#YY  MM DD hh mm WDIR WSPD GST  WVHT   DPD   APD MWD   PRES  ATMP  WTMP  DEWP  VIS PTDY  TIDE
 #yr  mo dy hr mn degT m/s  m/s     m   sec   sec degT   hPa  degC  degC  degC  nmi  hPa    ft
 2026 10 30 11 20 200  4.0  6.0   0.6     8   6.1  95 1016.2  15.0  18.0  12.0   MM   MM    MM
@@ -167,6 +169,7 @@ export async function answer(href) {
   }
   if (host === 'photon.komoot.io') return json({ type: 'FeatureCollection', features: [] }, 'Photon fixture')
   if (host === 'api.weather.gov') return { status: 503, type: 'application/json', body: Buffer.from('{}'), fixture: 'NWS unavailable' }
+  if (host === 'www.ndbc.noaa.gov' && u.pathname.endsWith('.spec')) return text(NDBC_SPEC, 'text/plain', 'NDBC spectral summary')
   if (host === 'www.ndbc.noaa.gov') return text(NDBC_TEXT, 'text/plain', 'NDBC buoy text')
   if (host === 'aviationweather.gov') return text(METAR, 'text/plain', 'METAR text')
   if (host === 'api.github.com') return json({ sha: '0000000000000000000000000000000000000000', commit: { committer: { date: '2026-10-30T00:00:00Z' } } }, 'GitHub fixture')

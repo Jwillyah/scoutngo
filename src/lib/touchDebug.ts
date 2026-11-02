@@ -156,6 +156,11 @@ export const CAMERA_METHODS = [
   'setPadding',
   'resize',
   'stop',
+  /* Batch H: these move the camera too (elevation, clamps), and were not logged. */
+  'setTerrain',
+  'setMaxZoom',
+  'setMinZoom',
+  'setMaxBounds',
 ] as const
 
 interface CameraLike {
@@ -216,6 +221,10 @@ export function instrumentMap(map: CameraLike, element: HTMLElement): () => void
   for (const type of ['touchstart', 'touchend', 'touchcancel'] as const) touchRoot?.addEventListener(type, onTouch, { capture: true, passive: true })
   for (const type of ['gesturestart', 'gesturechange', 'gestureend']) element.addEventListener(type, onGesture, { capture: true, passive: true })
   map.on('move', onMove)
+  /* Where MapLibre itself starts and ends a move, and whether a hand did it. */
+  const onEdge = (event: { type?: string; originalEvent?: unknown }) =>
+    logTouch(`${event.type ?? 'move?'} · ${event.originalEvent === undefined ? 'app' : 'user'} · zoom ${fmt(map.getZoom())}`)
+  for (const type of ['zoomstart', 'zoomend', 'movestart', 'moveend']) map.on(type, onEdge)
   viewport?.addEventListener('resize', onViewport)
   logTouch('debug touch on')
 
@@ -224,6 +233,7 @@ export function instrumentMap(map: CameraLike, element: HTMLElement): () => void
     for (const type of ['touchstart', 'touchend', 'touchcancel'] as const) touchRoot?.removeEventListener(type, onTouch, { capture: true })
     for (const type of ['gesturestart', 'gesturechange', 'gestureend']) element.removeEventListener(type, onGesture, { capture: true })
     map.off('move', onMove)
+    for (const type of ['zoomstart', 'zoomend', 'movestart', 'moveend']) map.off(type, onEdge)
     viewport?.removeEventListener('resize', onViewport)
   }
 }

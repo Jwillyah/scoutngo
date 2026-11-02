@@ -3,7 +3,7 @@ import type { LatLon } from '../core/geo.ts'
 import type { TideExtreme } from '../core/tide.ts'
 import { coastFacing, seaReach, type CoastFacing } from './coast.ts'
 import { placeKeyOf, resolveReach } from './placeMemory.ts'
-import { latestBuoyWaves, type BuoyReading } from './buoy.ts'
+import { latestBuoys, type BuoyReading } from './buoy.ts'
 import { showSurf, SURF_COAST_M, type SurfSetting } from './surfSetting.ts'
 import { retrying } from './retrying.ts'
 import { fetchMarine, fetchMonthExtremes, fetchWindMonth, type Hourly } from './tideSheetData.ts'
@@ -33,13 +33,15 @@ export interface TideSheetData {
   seaM: Loaded<number | null>
   /** The nearest buoy's latest waves, asked only when the surf row shows. */
   buoy: BuoyReading | null
+  /** The 2-3 nearest buoys on the water the beach faces (Batch H), each its own reading. */
+  buoys: BuoyReading[] | null
   /** Whether the surf row shows: the setting, and on Auto the sea within SURF_COAST_M. */
   surf: boolean
 }
 
 export function useTideSheet(open: boolean, venue: LatLon | null, stationId: string | null, surfSetting: SurfSetting = 'auto'): TideSheetData {
   const [seaM, setSeaM] = useState<Loaded<number | null>>(LOADING)
-  const [buoy, setBuoy] = useState<BuoyReading | null>(null)
+  const [buoys, setBuoys] = useState<BuoyReading[] | null>(null)
   const [facing, setFacing] = useState<Loaded<CoastFacing | 'inland'>>(LOADING)
   const [month, setMonth] = useState<Loaded<TideExtreme[]>>(LOADING)
   const [wind, setWind] = useState<Loaded<Hourly>>(LOADING)
@@ -114,16 +116,18 @@ export function useTideSheet(open: boolean, venue: LatLon | null, stationId: str
   }, [open, stationId])
 
   const surfWanted = showSurf(surfSetting, seaM.value)
+  /* The buoys wait for the facing: which water the beach faces chooses them. Failed facing: the nearest. */
+  const facingDeg = facing.status === 'loading' ? undefined : facing.value === null || facing.value === 'inland' ? null : Math.round(facing.value.facing)
   useEffect(() => {
-    if (!open || !surfWanted || lat === null || lon === null) return
+    if (!open || !surfWanted || lat === null || lon === null || facingDeg === undefined) return
     let live = true
     return retrying(async () => {
-      const b = await latestBuoyWaves({ lat, lon })
+      const b = await latestBuoys({ lat, lon }, facingDeg)
       if (!live) return true
-      setBuoy(b)
-      return b.status === 'ok' || b.reason !== "The buoy didn't load."
+      setBuoys(b)
+      return b.some((r) => r.status === 'ok') || (b[0]?.status === 'none' && b[0].reason !== "The buoy didn't load.")
     })
-  }, [open, surfWanted, lat, lon])
+  }, [open, surfWanted, lat, lon, facingDeg])
 
-  return { facing, month, wind, marine, seaM, buoy, surf: surfWanted }
+  return { facing, month, wind, marine, seaM, buoy: buoys?.[0] ?? null, buoys, surf: surfWanted }
 }

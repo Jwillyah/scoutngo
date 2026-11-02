@@ -1,0 +1,14 @@
+#YY  MM DD hh mm WVHT  SwH  SwP  WWH  WWP SwD WWD  STEEPNESS  APD MWD
+#yr  mo dy hr mn    m    m  sec    m  sec  -  degT     -      sec degT
+2026 11 02 17 00  0.8  0.2 10.0  0.8  8.0   E   E    AVERAGE  4.4  87
+2026 11 02 16 30  0.8  0.2 10.0  0.8  8.0   E   E    AVERAGE  4.2  94
+2026 11 02 16 00  0.9  0.2 10.0  0.9  9.1   E   E    AVERAGE  4.2  90
+2026 11 02 15 30  0.9  0.2 10.0  0.9  8.7 ENE   E    AVERAGE  4.1  81
+2026 11 02 15 00  0.9  0.2 10.0  0.9  8.7   E   E    AVERAGE  4.0  85
+2026 11 02 14 30  0.9  0.2 10.0  0.9  4.7 ENE ENE VERY_STEEP  4.0  66
+2026 11 02 14 00  0.9  0.2 10.0  0.9  4.2 ENE  NE VERY_STEEP  4.0  56
+2026 11 02 13 30  0.9  0.2 10.0  0.9  5.0   E   E VERY_STEEP  4.1  86
+2026 11 02 13 00  0.9  0.2 10.0  0.9  8.7   E   E    AVERAGE  4.0  85
+2026 11 02 12 30  0.9  0.2 10.0  0.9  9.1   E   E    AVERAGE  4.1  79
+2026 11 02 12 00  0.9  0.2 10.0  0.9  9.1   E   E    AVERAGE  4.0  89
+2026 11 02 11 30  0.9  0.2 10.0  0.9  8.7   E   E    AVERAGE  4.1  90

@@ -93,7 +93,7 @@ try {
     if (!s) return { error: 'no sheet' }
     const rect = (e) => { if (!e) return null; const r = e.getBoundingClientRect(); return r.height > 0 ? { top: r.top, bottom: r.bottom, left: r.left, right: r.right } : null }
     const sheet = rect(s), grab = rect(s.querySelector('.sheet__grab')), body = rect(s.querySelector('.sheet__body'))
-    const headEl = s.querySelector('.card2__head'), summaryEl = s.querySelector('.peek__line--layers')
+    const headEl = s.querySelector('.card2__head'), summaryEl = s.querySelector('.peeklayers')
     const shown = (el) => {
       const r = rect(el)
       if (!r) return false
@@ -106,7 +106,7 @@ try {
       const top = document.elementFromPoint(x, y)
       if (!top || !s.contains(top)) covers.push((top ? top.tagName.toLowerCase() + '.' + String(top.className).split(' ')[0] : 'nothing') + ' at ' + x + ',' + Math.round(y))
     }
-    return { detent: s.dataset.detent, vh, sheet, grab, body, head: rect(headEl), headShown: shown(headEl), summary: summaryEl ? summaryEl.textContent.trim() : null, summaryShown: shown(summaryEl), covers }
+    return { detent: s.dataset.detent, vh, sheet, grab, body, head: rect(headEl), headShown: shown(headEl), summary: summaryEl ? summaryEl.textContent.trim() : null, summaryShown: shown(summaryEl), toggles: summaryEl ? [...summaryEl.querySelectorAll('button[aria-pressed]')].filter((b) => { const r = b.getBoundingClientRect(); return r.height >= 44 && r.left < innerWidth && r.bottom <= vh - ${BOTTOM} }).length : 0, covers }
   })()`
 
   const check = async (name, want) => {
@@ -117,7 +117,9 @@ try {
     if (l.sheet.bottom < l.vh - 1) fail(`${name}: the sheet ends at ${l.sheet.bottom}, above the screen's foot (${l.vh})`)
     for (const c of l.covers.slice(0, 3)) fail(`${name}: over the sheet in the home-indicator band: ${c}`)
     if (want === 'peek') {
-      if (!l.summaryShown) fail(`peek: no one-line summary in the visible sheet (got ${JSON.stringify(l.summary)})`)
+      /* Batch H: at peek the sheet still holds the toggles themselves, not a summary of them. */
+      if (!l.summaryShown) fail(`peek: no row of layer toggles in the visible sheet (got ${JSON.stringify(l.summary)})`)
+      if (l.toggles < 3) fail(`peek: only ${l.toggles} layer toggles on screen`)
     } else {
       if (!l.headShown) fail(`${name}: the "Map & layers" header is not in the visible part of the sheet`)
       if (l.head && l.head.top - l.grab.bottom > 8) fail(`${name}: the header is ${Math.round(l.head.top - l.grab.bottom)} px under the grab handle, not right under it`)

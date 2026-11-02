@@ -28,11 +28,9 @@ const CSS = readFileSync('src/styles/app.css', 'utf8')
 describe('what only iOS Safari does to a pinch', () => {
   it('a resize waits for the fingers, like every other camera write', () => {
     const effect = MAP.slice(MAP.indexOf('const resize = () => {'), MAP.indexOf('const observer = new ResizeObserver(resize)'))
-    expect(effect).toMatch(/if \(fingers\.current > 0\) \{\s*resizeWaiting\.current = true/)
-    /* Every .resize() call in the file is the guarded one or the one run when the fingers lift. */
-    const calls = MAP.split('\n').filter((line) => /\.resize\(\)/.test(line))
-    expect(calls).toHaveLength(2)
-    expect(MAP).toMatch(/if \(resizeWaiting\.current && instance !== null\) \{[\s\S]{0,200}instance\.resize\(\)/)
+    expect(effect).toMatch(/moveCamera\('resize', \(\) => map\.current\?\.resize\(\)\)/)
+    /* The only .resize() call in the file is the held one. */
+    expect(MAP.split('\n').filter((line) => /\.resize\(\)/.test(line))).toHaveLength(1)
   })
 
   it('stops all three of Safari\'s gesture events, not passive', () => {

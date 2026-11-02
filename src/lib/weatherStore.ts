@@ -86,6 +86,31 @@ export function weatherKey(url: string): string {
   return `${u.origin}${u.pathname}?${new URLSearchParams(params).toString()}`
 }
 
+/*
+ * ROUNDED TO 2 DECIMALS BEFORE IT IS ASKED (Batch H, 2 Nov 9:36 AM: "Weather
+ * service busy, retrying in 2 min" on an ordinary session). Each nudge of the
+ * pin or switch between two spots a few hundred metres apart was a new
+ * question, because the key was the exact coordinate. 0.01 degrees is about
+ * 1.1 km north-south, finer than any model's grid (HRRR 3 km, the rest
+ * coarser), so the answer is the same forecast and the request is the same
+ * request: one key, kept for the hour (FORECAST_MAX_AGE_MS).
+ */
+export const COORD_DECIMALS = 2
+
+/** The request with every latitude and longitude rounded to COORD_DECIMALS. */
+export function roundedWeatherUrl(url: string): string {
+  const u = new URL(url)
+  for (const name of ['latitude', 'longitude']) {
+    const v = u.searchParams.get(name)
+    if (v === null) continue
+    u.searchParams.set(name, v.split(',').map((x) => {
+      const n = Number(x)
+      return Number.isFinite(n) && x.trim() !== '' ? n.toFixed(COORD_DECIMALS) : x
+    }).join(','))
+  }
+  return u.toString()
+}
+
 /** When to ask again after `n` refusals in a row (n >= 1). */
 export function backoffMs(n: number, daily: boolean): number {
   if (daily) return DAILY_BACKOFF_MS
@@ -201,7 +226,8 @@ function refused(daily: boolean, now: number) {
  * The answer to `url`: kept if it is younger than `maxAgeMs`, else asked
  * for, else the kept one at any age (stale), else why not.
  */
-export async function weatherJson(url: string, opts: { maxAgeMs: number; fetchImpl?: typeof fetch; timeoutMs?: number }): Promise<WeatherAnswer> {
+export async function weatherJson(asked: string, opts: { maxAgeMs: number; fetchImpl?: typeof fetch; timeoutMs?: number }): Promise<WeatherAnswer> {
+  const url = roundedWeatherUrl(asked)
   const key = weatherKey(url)
   const now = Date.now()
   const kept = await readKept(key)

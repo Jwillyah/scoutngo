@@ -5,6 +5,7 @@ import { getSunPosition } from '../core/sun.ts'
 import { surfShape, type SurfShape } from '../core/surf.ts'
 import { bestWindow, droneOverLineup, faceLight, hourQuality, lensDistance, LINEUP_FT, ratingWord, sizeWords, standToward, type FaceLight, type ShootHour } from '../core/surfShoot.ts'
 import { formatClock, formatShortHour, zonedTimeToUtc } from '../core/timezone.ts'
+import { buoyName, buoySea, buoySplit } from '../lib/buoyWords.ts'
 import { buoyWords, CAM_MI, cleanestRun, namedTrains, nearestWithin } from '../core/surfWords.ts'
 import { COAST_CAMS } from '../data/coastCams.ts'
 import { windToBeach } from '../core/coastFacing.ts'
@@ -155,6 +156,26 @@ export function SurfPage({ venue, at, timeZone, units, data, lenses, drone, onCl
   /* Deep-water wave power, kW per metre of crest: 0.49 H² T (H in m, T in s). */
   const power = swellH === null || swellT === null ? null : 0.49 * swellH * swellH * swellT
 
+  /* The buoys on the water this beach faces, each with its time and the swell and wind waves apart (Batch H); in Simple, which scrolls; Advanced is one screen (scripts/audit-overflow.mjs) and keeps its one buoy line. */
+  const buoysSection = data.buoys === null || !data.buoys.some((b) => b.status === 'ok') ? null : (
+            <section className="spage__src" aria-label="Buoys">
+              <p className="spage__head">Buoys</p>
+              <ul className="buoys">
+                {data.buoys.map((b) =>
+                  b.status !== 'ok' ? null : (
+                    <li key={b.buoy.id} className="buoys__row">
+                      <span className="buoys__name">{buoyName(b)}</span>
+                      <span className="buoys__sea num">
+                        {buoySea(b)} · {clock(b.at)}
+                      </span>
+                      {buoySplit(b) === null ? null : <span className="buoys__split num">{buoySplit(b)}</span>}
+                    </li>
+                  ),
+                )}
+              </ul>
+              <p className="spage__small">NDBC, each buoy's latest reading; the swell and wind waves from its spectral file.</p>
+            </section>
+          )
   return (
     <Page title="Surf" className="spage" tabs={[{ id: 'simple', label: 'Simple' }, { id: 'advanced', label: 'Advanced' }]} tab={view} onTab={(t) => setView(t as 'simple' | 'advanced')} onClose={onClose}>
       {marine === null ? (
@@ -210,6 +231,7 @@ export function SurfPage({ venue, at, timeZone, units, data, lenses, drone, onCl
             </div>
             <p className="spage__small">{SURF_LABEL} Open-Meteo Marine, seven days.</p>
           </section>
+          {buoysSection}
           <section className="spage__src" aria-label="Cams">
             {cams.length === 0 ? (
               <p className="spage__small">No public cams within {CAM_MI} mi.</p>

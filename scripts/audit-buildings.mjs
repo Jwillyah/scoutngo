@@ -184,6 +184,8 @@ try {
 
     const note = await ev(`(() => { const n = document.querySelector('.shadowkey'); if (!n) return null; const cs = getComputedStyle(n); return { h: n.getBoundingClientRect().height, line: parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.35, ws: cs.whiteSpace, text: n.textContent } })()`)
     console.log(`  shadow note: ${JSON.stringify(note)}`)
+    /* Batch H: the count is for Debug touch only; a normal session never shows it over the map. */
+    if (note !== null) fail(`${label}: the shadow count shows over the map without Debug touch (${JSON.stringify(note.text)})`)
     if (note !== null && (note.ws !== 'nowrap' || note.h > note.line * 1.5 + 2 * 4 + 2)) fail(`${label}: the shadow note is more than one line (${JSON.stringify(note)})`)
     await ctx.close()
     watchdog.note(label)

@@ -78,6 +78,7 @@ export function SpecialLight({ venue, timeZone, onShowBow, onJump, place }: Prop
   const tomorrow = isoDay(new Date(asked + 86_400_000), timeZone)
   const dayName = (day: string, sample: Date) => (day === today ? 'Today' : day === tomorrow ? 'Tmrw' : weekday(sample, timeZone))
   const [bow, setBow] = useState<string | null>(null)
+  const [how, setHow] = useState(false)
   const [picked, setPicked] = useState<string | null>(null)
   const idOf = (s: Special) => `${s.kind}-${s.from.getTime()}`
   /* Seven rows from today, each with its own sunrise and sunset; the items on it, strong and long shots alike. */
@@ -98,6 +99,17 @@ export function SpecialLight({ venue, timeZone, onShowBow, onJump, place }: Prop
 
   return (
     <div className="spec">
+      <div className="spec__top">
+        <h3 className="spec__title">This week</h3>
+        <button type="button" className="spec__i" aria-label="How these are found" aria-expanded={how} onClick={() => setHow((v) => !v)}>
+          i
+        </button>
+      </div>
+      {!how ? null : <div className="spec__how">{/* The "i" sits by the heading now (Batch H, 2 Nov: it floated alone under the list). */}
+        <p>
+          Only windows you can shoot through, two hours at most, tied to their cause hour by hour. Fog: dew point within 2°F of the air, wind under 6 kt, and the sea colder than the air (inland, radiation fog: no sea term); said where it forms or lifts in the light, not the night it sits through. Rainbow: showers within 25 km on the side opposite the sun, the sun up but under 42° and not hidden by low cloud; the bow is 42° round the point opposite the sun. God rays: low cloud 30–80% (scattered to broken) with the sun up to 25° behind it. Iridescence: thin mid or high cloud, 10–60%, with little low cloud and the sun up 5° or more; look within about 10° of the sun. Sky fire: its own three checks, its glow. Glassy water: a low tide within 90 minutes of sunrise and a light wind, as on the Tide sheet. The rest: the best two hours of each run, the most models first, then the lower sun. Five models (GFS, ECMWF, ICON, GEM, HRRR); “likely” when 60% or more agree at the best hour; on the map only when half or more agree. A rule, not a promise: on 10 Mar 2026 the fog rule fired at Norfolk and no fog came.
+        </p>
+      </div>}
       {list === 'loading' ? (
         <p className="spec__note">Reading five forecasts for the week…</p>
       ) : list === null ? (
@@ -178,12 +190,6 @@ export function SpecialLight({ venue, timeZone, onShowBow, onJump, place }: Prop
           {sel === null ? <p className="spec__note">{all.length === 0 ? 'Nothing special in the forecast this week by these rules.' : 'Tap an icon. Greyed: fewer than half the models.'}</p> : null}
         </>
       )}
-      <details className="spec__how">
-        <summary aria-label="How these are found">i</summary>
-        <p>
-          Only windows you can shoot through, two hours at most, tied to their cause hour by hour. Fog: dew point within 2°F of the air, wind under 6 kt, and the sea colder than the air (inland, radiation fog: no sea term); said where it forms or lifts in the light, not the night it sits through. Rainbow: showers within 25 km on the side opposite the sun, the sun up but under 42° and not hidden by low cloud; the bow is 42° round the point opposite the sun. God rays: low cloud 30–80% (scattered to broken) with the sun up to 25° behind it. Iridescence: thin mid or high cloud, 10–60%, with little low cloud and the sun up 5° or more; look within about 10° of the sun. Sky fire: its own three checks, its glow. Glassy water: a low tide within 90 minutes of sunrise and a light wind, as on the Tide sheet. The rest: the best two hours of each run, the most models first, then the lower sun. Five models (GFS, ECMWF, ICON, GEM, HRRR); “likely” when 60% or more agree at the best hour; on the map only when half or more agree. A rule, not a promise: on 10 Mar 2026 the fog rule fired at Norfolk and no fog came.
-        </p>
-      </details>
     </div>
   )
 }

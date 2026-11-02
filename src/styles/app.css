@@ -15508,3 +15508,93 @@ a.about__row * {
   margin: 0;
   cursor: default;
 }
+
+/* Layers at peek: one row of the real toggles (Batch H, Section 1.4). */
+.peeklayers {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-block: var(--space-1);
+}
+.peeklayers::-webkit-scrollbar {
+  display: none;
+}
+.peeklayers__chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-3) 0 var(--space-1);
+  border: 1px solid var(--color-line-strong);
+  border-radius: 22px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+.peeklayers__chip--on {
+  border-color: var(--ocean);
+  color: var(--color-text);
+}
+.peeklayers__art {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+}
+.peeklayers__art > * {
+  width: 100%;
+  height: 100%;
+}
+
+/* The buoys on the Surf page (Batch H, Section 1.6). */
+.buoys {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+.buoys__row {
+  display: grid;
+  gap: 2px;
+}
+.buoys__name {
+  font-weight: var(--weight-medium);
+}
+.buoys__sea,
+.buoys__split {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+/* The Special tab's heading, with its "i" beside it (Batch H, Section 1.7). */
+.spec__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.spec__title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+}
+.spec__i {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-right: -8px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-style: italic;
+  font-weight: var(--weight-heavy);
+}
+.spec__i[aria-expanded='true'] {
+  color: var(--color-text);
+}

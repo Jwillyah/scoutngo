@@ -8,6 +8,7 @@ import { RAY_SCREEN_FRACTION } from '../lib/rayLength.ts'
 import { FLOATING_CHROME_SELECTORS, floatingChromeNodes } from '../lib/floatingChrome.ts'
 import { belowStatusBar, safeInsetTop } from '../lib/safeArea.ts'
 import { asCaller, instrumentMap, logTouch, useTouchDebug } from '../lib/touchDebug.ts'
+import { CameraHold } from '../lib/cameraHold.ts'
 import { TouchDebug } from './TouchDebug.tsx'
 import { IMAGERY_TEMPLATE, TERRAIN_TEMPLATE } from '../lib/offlineSources.ts'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
@@ -1331,38 +1332,16 @@ export function MapView({
   latestView.current = onViewChange
 
   const selfMoved = useRef(false)
-  /* Fingers on the map right now, and the one camera move waiting for them to lift. */
-  const fingers = useRef(0)
-  const waiting = useRef<(() => void) | null>(null)
-  /* A resize asked for while a finger was down: run when they lift (see the resize effect). */
-  const resizeWaiting = useRef(false)
   /**
    * Every camera move the app makes goes through here: now, or once no
-   * finger is down and the map has stopped coasting. Only the latest waits;
-   * an older one would be stale by the time it ran. The tag names who asked,
-   * for Debug touch (src/lib/touchDebug.ts).
+   * finger is down, HOLD_AFTER_LIFT_MS has passed since the last lift and the
+   * map has stopped coasting (src/lib/cameraHold.ts). The latest per caller
+   * waits. The tag names who asked, for Debug touch (src/lib/touchDebug.ts).
    */
+  const hold = useRef<CameraHold | null>(null)
+  if (hold.current === null) hold.current = new CameraHold({ log: logTouch, busy: () => map.current?.isMoving() === true })
   const moveCamera = useCallback((tag: string, move: () => void) => {
-    const tagged = () => asCaller(tag, move)
-    if (fingers.current > 0) {
-      waiting.current = tagged
-      logTouch(`held for the fingers: ${tag}`)
-      return
-    }
-    tagged()
-  }, [])
-  const releaseCamera = useCallback(() => {
-    const instance = map.current
-    if (resizeWaiting.current && instance !== null) {
-      resizeWaiting.current = false
-      asCaller('resize, after the fingers', () => instance.resize())
-    }
-    const move = waiting.current
-    if (move === null) return
-    waiting.current = null
-    if (instance !== null && instance.isMoving()) {
-      instance.once('moveend', () => (fingers.current > 0 ? (waiting.current = move) : move()))
-    } else move()
+    hold.current?.move(tag, () => asCaller(tag, move))
   }, [])
   const insetRef = useRef(bottomInset)
   insetRef.current = bottomInset
@@ -1508,10 +1487,7 @@ export function MapView({
      * map's own coasting has stopped. See moveCamera.
      */
     const el = instance.getContainer()
-    const countFingers = (event: TouchEvent) => {
-      fingers.current = event.touches.length
-      if (fingers.current === 0) releaseCamera()
-    }
+    const countFingers = (event: TouchEvent) => hold.current?.setFingers(event.touches.length)
     el.addEventListener('touchstart', countFingers, { capture: true, passive: true })
     el.addEventListener('touchend', countFingers, { capture: true, passive: true })
     el.addEventListener('touchcancel', countFingers, { capture: true, passive: true })
@@ -3015,8 +2991,17 @@ export function MapView({
     const instance = map.current
     if (instance === null || !ready) return
 
-    /* Off for the duration of a gesture. See the note below. */
-    if (showTerrain && !gesturing) {
+    /*
+     * Off for the duration of a mouse or wheel gesture (see the note below),
+     * and a camera write like any other: setTerrain moves the camera's
+     * elevation, so it waits for the fingers and HOLD_AFTER_LIFT_MS
+     * (src/lib/cameraHold.ts). Under a pinch it is never flipped at all:
+     * a gesture under a finger never sets `gesturing` (below).
+     */
+    const on = showTerrain && !gesturing
+    moveCamera('terrain', () => {
+    logTouch(`terrain ${on ? 'on' : 'off'}`)
+    if (on) {
       if (instance.getSource(TERRAIN_SOURCE) === undefined) {
         instance.addSource(TERRAIN_SOURCE, {
           type: 'raster-dem',
@@ -3048,7 +3033,8 @@ export function MapView({
        */
       instance.setSky({ 'atmosphere-blend': 0 })
     }
-  }, [showTerrain, ready, gesturing])
+    })
+  }, [showTerrain, ready, gesturing, moveCamera])
 
   /*
    * TERRAIN YOU CAN SEE IN 2D (field test, 30 Oct): from straight above the
@@ -3099,7 +3085,10 @@ export function MapView({
   useEffect(() => {
     const instance = map.current
     if (instance === null || !ready) return
-    const start = () => setGesturing(true)
+    /* A finger's gesture keeps the terrain: flipping it under the pinch moved the camera. */
+    const start = () => {
+      if (hold.current?.held() !== true) setGesturing(true)
+    }
     const end = () => setGesturing(false)
     for (const event of ['dragstart', 'rotatestart', 'zoomstart', 'pitchstart'] as const) {
       instance.on(event, start)
@@ -3704,18 +3693,13 @@ export function MapView({
      * the visualViewport fires resize while a pinch is under way (Safari's
      * bars, the page's own scale), which no desktop browser does, so every
      * emulated pinch passed. A resize asked for with fingers down waits for
-     * them to lift, like every other camera write (releaseCamera).
+     * them to lift and 600 ms more, like every other camera write (CameraHold).
      */
     const resize = () => {
       cancelAnimationFrame(frame)
       // After layout, so the box being measured is the settled one.
       frame = requestAnimationFrame(() => {
-        if (fingers.current > 0) {
-          resizeWaiting.current = true
-          logTouch('resize held for the fingers')
-          return
-        }
-        asCaller('resize', () => map.current?.resize())
+        moveCamera('resize', () => map.current?.resize())
       })
     }
 
@@ -3732,7 +3716,7 @@ export function MapView({
       window.removeEventListener('orientationchange', resize)
       visual?.removeEventListener('resize', resize)
     }
-  }, [])
+  }, [moveCamera])
 
   /*
    * Watch for floating chrome appearing and disappearing.

@@ -1,0 +1,14 @@
+#YY  MM DD hh mm WVHT  SwH  SwP  WWH  WWP SwD WWD  STEEPNESS  APD MWD
+#yr  mo dy hr mn    m    m  sec    m  sec  -  degT     -      sec degT
+2026 11 02 14 10  0.9   MM   MM   MM   MM  MM  MM    AVERAGE  5.1  80
+2026 11 02 13 40  0.9   MM   MM   MM   MM  MM  MM    AVERAGE  4.8  75
+2026 11 02 13 10  0.9   MM   MM   MM   MM  MM  MM    AVERAGE  4.9  80
+2026 11 02 12 40  0.9   MM   MM   MM   MM  MM  MM        N/A  4.6 102
+2026 11 02 12 10  1.0   MM   MM   MM   MM  MM  MM        N/A  5.0  96
+2026 11 02 11 40  0.9   MM   MM   MM   MM  MM  MM        N/A  4.7  93
+2026 11 02 11 10  1.0   MM   MM   MM   MM  MM  MM        N/A  4.8  85
+2026 11 02 10 40  1.0   MM   MM   MM   MM  MM  MM    AVERAGE  5.0  80
+2026 11 02 10 10  1.0   MM   MM   MM   MM  MM  MM    AVERAGE  4.9  68
+2026 11 02 09 40  1.0   MM   MM   MM   MM  MM  MM        N/A  5.0  88
+2026 11 02 09 10  1.0   MM   MM   MM   MM  MM  MM        N/A  4.8  90
+2026 11 02 08 40  1.0   MM   MM   MM   MM  MM  MM        N/A  5.0  91

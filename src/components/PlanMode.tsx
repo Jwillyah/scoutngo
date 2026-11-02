@@ -157,6 +157,7 @@ import { FLAT_M } from '../core/contours.ts'
 import { SettingsPage } from './SettingsPage.tsx'
 import { PhaseRule } from './PhaseRule.tsx'
 import { shadowKeyLine, shadowKeyNotes } from '../lib/shadowKey.ts'
+import { useTouchDebug } from '../lib/touchDebug.ts'
 
 
 /*
@@ -587,6 +588,7 @@ export function PlanMode({
   onPlacingPilot,
   addsAir,
 }: PlanModeProps) {
+  const [debugTouch] = useTouchDebug()
   const [sheet, setSheet] = useState<SheetDetent>('peek')
 
   /*
@@ -1874,7 +1876,6 @@ export function PlanMode({
    * sheet showed its grab handle over empty black (29 Oct, from the home-screen
    * icon). Now it says which layers are drawn, e.g. "Satellite · Shadows".
    */
-  const layersOn = [...layerBase, ...layerOverlays].filter((t) => t.on).map((t) => t.label).join(' · ')
 
   const layersCard = (
     <LayerTiles
@@ -2624,8 +2625,13 @@ export function PlanMode({
         * of it; and, like the rail and the dock, not with the sheet at full,
         * when it rode up the screen into the chip row.
         */}
-      {shadows === null || threeD || sheet === 'full' ? null : (
-        /* ONE SHORT LINE over the map (27 Oct, from the phone: the sentence ran across it); the rest is in the "i". */
+      {shadows === null || threeD || sheet === 'full' || !debugTouch ? null : (
+        /*
+         * ONE SHORT LINE over the map (27 Oct), and now only with Debug touch
+         * on (Batch H, 2 Nov: "Shadows: 822 buildings · 305 no height" is a
+         * count for whoever is checking the data, not for a photographer).
+         * Everyone has the whole of it in the map's "i".
+         */
         <p className="shadowkey num" role="status">
           {shadowKeyLine(shadows, sunriseWords)}
         </p>
@@ -2845,12 +2851,21 @@ export function PlanMode({
               </button>
             )}
 
-            {/* Layers dragged to the bottom: which layers are on, and a tap raises it again. */}
+            {/*
+              * LAYERS AT THE BOTTOM STILL SWITCH LAYERS (Batch H, 2 Nov: the
+              * sheet at peek said only "LAYERS Satellite · Terrain · Cloud",
+              * an empty sheet to a thumb). One row of the real toggles, the
+              * same ones as the tiles above; the grabber raises the rest.
+              */}
             {card.kind === 'layers' && sheet === 'peek' ? (
-              <button type="button" className="peek__line peek__line--layers" onClick={() => setSheet('half')}>
-                <span className="peek__label">Layers</span>
-                <span className="peek__value">{layersOn}</span>
-              </button>
+              <div className="peeklayers" role="group" aria-label="Layers">
+                {[...layerBase, ...layerOverlays].map((t) => (
+                  <button key={t.id} type="button" className={`peeklayers__chip${t.on ? ' peeklayers__chip--on' : ''}`} aria-pressed={t.on} onClick={t.onToggle}>
+                    <span className="peeklayers__art" aria-hidden="true">{t.art}</span>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
             ) : null}
 
             {/*

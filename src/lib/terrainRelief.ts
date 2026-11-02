@@ -8,7 +8,7 @@
  * A 3 x 3 block of z14 tiles centred on the venue, about 7 km across at the
  * latitudes this is used at; GRID points a tile.
  */
-import { contourSegments, CONTOUR_M, relief } from '../core/contours.ts'
+import { contourSegments, CONTOUR_M, despike, relief } from '../core/contours.ts'
 import type { LatLon } from '../core/geo.ts'
 import { heightGrid } from '../core/terrarium.ts'
 import { TERRAIN_TEMPLATE } from './offlineSources.ts'
@@ -59,7 +59,9 @@ export async function reliefAround(venue: LatLon, fetchImpl: typeof fetch = fetc
   } catch {
     return null
   }
-  const metres = relief(grid)
+  /* Towers out first, so they are neither relief nor rings over the water (src/core/contours.ts). */
+  const land = despike(grid, side)
+  const metres = relief(land)
   if (metres === null) return null
   /* Grid point (i, j) of the stitched block, as a place: each tile's GRID points span it edge to edge. */
   const place = (gx: number, gy: number): [number, number] => {
@@ -67,7 +69,7 @@ export async function reliefAround(venue: LatLon, fetchImpl: typeof fetch = fetc
     const ty = cy - 1 + Math.floor(gy / GRID) + (gy % GRID) / (GRID - 1)
     return [lonOf(tx, z), latOf(ty, z)]
   }
-  const features: GeoJSON.Feature[] = contourSegments(grid, side, CONTOUR_M).map((s) => ({
+  const features: GeoJSON.Feature[] = contourSegments(land, side, CONTOUR_M).map((s) => ({
     type: 'Feature',
     properties: { level: s.level, major: s.level % 50 === 0 },
     geometry: { type: 'LineString', coordinates: [place(s.a[0], s.a[1]), place(s.b[0], s.b[1])] },

@@ -13,7 +13,9 @@
  * "Ordinary use" is: four pans of the map, the time bar moved through four
  * hours a quarter at a time, the Sky card's Fire, Preview and Special tabs,
  * the Wind chip and its Five models page, then the map left alone until the
- * minutes are up. Each request is counted, and weighed the way Open-Meteo
+ * minutes are up. Batch H adds the pin dragged 70 px away and back,
+ * twice.
+ * Each request is counted, and weighed the way Open-Meteo
  * bills it (requestShape in the fixture).
  */
 import { mkdirSync, writeFileSync } from 'node:fs'
@@ -97,6 +99,31 @@ const step = async (name, fn) => {
 }
 for (const [dx, dy] of [[120, 0], [-60, 90], [0, -150], [80, 40]]) {
   await step(`pan ${dx},${dy}`, () => ev(`window.__probe?.map?.panBy([${dx}, ${dy}], { duration: 0 })`))
+}
+/*
+ * Batch H: the pin dragged away and back, twice, as a hand does finding the
+ * spot. Each step checks the pin really moved.
+ */
+const pinAt = async () => {
+  const box = await page.locator('.pin--venue').first().boundingBox()
+  return box === null ? null : { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+}
+for (const [dx, dy] of [[70, 0], [-70, 0], [0, 70], [0, -70]]) {
+  await step(`pin dragged ${dx},${dy} px`, async () => {
+    const from = await pinAt()
+    if (from === null) throw new Error('no pin')
+    await page.mouse.move(from.x, from.y)
+    await page.mouse.down()
+    await wait(100)
+    for (let i = 1; i <= 7; i += 1) {
+      await page.mouse.move(from.x + (dx * i) / 7, from.y + (dy * i) / 7)
+      await wait(30)
+    }
+    await page.mouse.up()
+    await wait(600)
+    const to = await pinAt()
+    if (to === null || Math.hypot(to.x - from.x - dx, to.y - from.y - dy) > 12) throw new Error(`the pin is at ${JSON.stringify(to)}, not moved`)
+  })
 }
 await step('time bar +4 h, a quarter at a time', async () => {
   const bar = page.getByRole('slider', { name: /Time of day/ })
