@@ -46,6 +46,7 @@ const HAZARD_FILES = [
   /* Batch H: the briefing's drone line sits next to a wind verdict. */
   'components/Briefing.tsx',
   'core/briefing.ts',
+  'core/flightWarnings.ts',
 ]
 
 /**

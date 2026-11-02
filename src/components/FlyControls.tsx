@@ -110,12 +110,39 @@ function Ring({ yaw, gimbal, wind, bars }: { yaw: number; gimbal: number; wind: 
   )
 }
 
+/*
+ * THE ALTITUDE LADDER (Batch I, Section 5): the height above takeoff on a
+ * scale that always shows 400 ft and the grid ceiling, the drone's mark
+ * moving up it. Amber past 400 ft, never red.
+ */
+function Ladder({ altFt, marks, unit }: { altFt: number; marks: { ft: number; label: string }[]; unit: 'ft' | 'm' }) {
+  const top = Math.max(500, ...marks.map((m) => m.ft + 100), altFt + 60)
+  const y = (ft: number) => 100 - (Math.max(0, ft) / top) * 100
+  const said = unit === 'ft' ? `${Math.round(altFt)} ft` : `${Math.round(altFt * 0.3048)} m`
+  return (
+    <div className="fly__ladder" role="img" aria-label={`Height ${said} above takeoff; ${marks.map((m) => m.label).join(', ')}`}>
+      {marks.map((m) => (
+        <span key={m.label} className={`fly__rung${m.label.startsWith('grid') ? ' fly__rung--grid' : ''}`} style={{ top: `${y(m.ft)}%` }}>
+          {m.label}
+        </span>
+      ))}
+      <span className={`fly__alt num${altFt > 400 ? ' fly__alt--over' : ''}`} style={{ top: `${y(altFt)}%` }}>
+        {said}
+      </span>
+    </div>
+  )
+}
+
 interface FlyControlsProps {
   onSticks: (part: Partial<Sticks>) => void
   mode: FlyMode
   onMode: (m: FlyMode) => void
   hud: FlyHud | null
   ceilingFt: number
+  /** Batch I: the one warning (amber) or the reminder, from where the drone is (src/core/flightWarnings.ts). */
+  warning?: { line: string; warn: boolean } | null
+  /** Batch I: the altitude ladder: the height above takeoff and its marks (400 ft, the grid ceiling). */
+  ladder?: { altFt: number; marks: { ft: number; label: string }[] } | null
   flightMinutes: number
   wind: { fromDeg: number; mps: number } | null
   exposure: string | null
@@ -136,7 +163,7 @@ interface FlyControlsProps {
 /** How long the turn-sideways hint stays before it goes by itself. */
 export const HINT_MS = 4000
 
-export function FlyControls({ onSticks, mode, onMode, hud, ceilingFt, flightMinutes, wind, exposure, bars, units, look, lookAuto, onLook, chase = false, onChase, credits = [], onExit }: FlyControlsProps) {
+export function FlyControls({ onSticks, mode, onMode, hud, ceilingFt, warning = null, ladder = null, flightMinutes, wind, exposure, bars, units, look, lookAuto, onLook, chase = false, onChase, credits = [], onExit }: FlyControlsProps) {
   const s = hud?.state
   const used = hud === null ? 0 : hud.t / 60
   const [confirm, setConfirm] = useState(false)
@@ -165,7 +192,8 @@ export function FlyControls({ onSticks, mode, onMode, hud, ceilingFt, flightMinu
   const alert =
     s?.held === 'obstacle' ? 'Stopped: something in the scan is in the way'
     : hud?.hidden === true ? 'Out of your line of sight'
-    : hud?.nearCeiling === true ? 'At the ceiling'
+    /* The airspace and height warnings, after the turn-sideways hint's 4 s at take-off (Batch I). */
+    : warning?.warn === true && !(portrait && !hintGone) ? warning.line
     : null
   const hs = hud === null ? null : hud.speedMps
   const vs = s === undefined ? null : s.vz
@@ -231,7 +259,10 @@ export function FlyControls({ onSticks, mode, onMode, hud, ceilingFt, flightMinu
           )}
           <p>{lookAuto ? `The look turns Animated below 150 ft by itself, where the photo is stretched and soft; tap Real or Animated to choose.` : 'You chose the look; it stays until you land.'}</p>
           {exposure === null ? null : <p>Exposure from your ND table: {exposure}.</p>}
-          <p>Ceiling {Math.round(units.length === 'ft' ? ceilingFt : ceilingFt * 0.3048)} {units.length} above takeoff.</p>
+          <p>
+            No height cap in practice: the ladder marks 400 ft (Part 107) and the facility map's grid ceiling where you are; your approved ceiling is{' '}
+            {Math.round(units.length === 'ft' ? ceilingFt : ceilingFt * 0.3048)} {units.length}. Check airspace before you fly.
+          </p>
           {credits.length === 0 ? null : <p className="fly__credits">Data: {credits.map((c) => (c.endsWith('.') ? c : `${c}.`)).join(' ')}</p>}
         </div>
       ) : null}
@@ -243,7 +274,10 @@ export function FlyControls({ onSticks, mode, onMode, hud, ceilingFt, flightMinu
         <button type="button" className="fly__rotate" onClick={() => setHintGone(true)}>
           Turn sideways to fly. Portrait works too.
         </button>
+      ) : warning !== null ? (
+        <p className="fly__remind">{warning.line}</p>
       ) : null}
+      {ladder === null ? null : <Ladder altFt={ladder.altFt} marks={ladder.marks} unit={units.length} />}
 
       <Ring
         yaw={s?.yaw ?? 0}

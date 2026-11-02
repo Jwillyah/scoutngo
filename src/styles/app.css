@@ -16678,3 +16678,53 @@ a.about__row * {
   color: rgb(255 255 255 / 0.8);
   overflow-wrap: anywhere;
 }
+/* The practice flight's reminder and altitude ladder (Batch I, Section 5). */
+.fly__remind {
+  position: absolute;
+  top: calc(var(--safe-top) + 96px);
+  left: var(--space-3);
+  margin: 0;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--black) 50%, transparent);
+  color: rgb(255 255 255 / 0.8);
+  font-size: var(--text-xs);
+}
+.fly__ladder {
+  position: absolute;
+  right: 8px;
+  top: calc(var(--safe-top) + 230px);
+  height: 34%;
+  width: 64px;
+  border-right: 2px solid rgb(255 255 255 / 0.5);
+  pointer-events: none;
+}
+.fly__rung {
+  position: absolute;
+  right: 0;
+  transform: translateY(-50%);
+  padding-right: 6px;
+  border-bottom: 1.5px dashed rgb(255 255 255 / 0.8);
+  color: #fff;
+  font-size: 0.625rem;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.8);
+}
+.fly__rung--grid {
+  border-bottom-color: #f5b83d;
+  color: #f5b83d;
+}
+.fly__alt {
+  position: absolute;
+  right: -2px;
+  transform: translateY(-50%);
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: #fff;
+  color: #141821;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+}
+.fly__alt--over {
+  background: #f5b83d;
+}

@@ -1,6 +1,10 @@
 import { clayStatus, type ClayStatus } from '../lib/clayStatus.ts'
 import { Component, Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { logTouch, useTouchDebug } from '../lib/touchDebug.ts'
+import { airspaceAt, type AirspaceShape } from '../core/airspaceLookup.ts'
+import { ladderMarks, PART_107_FT, warningLine } from '../core/flightWarnings.ts'
+import { airspaceShapes } from '../lib/airspace.ts'
+import { facilityCellAt } from '../lib/uasfm.ts'
 import { createPortal } from 'react-dom'
 import { SENSORS } from '../core/fov.ts'
 import type { LatLon } from '../core/geo.ts'
@@ -348,13 +352,33 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
   const { hud, track } = useFly(flying, {
     takeoff: fly?.takeoff ?? venue,
     groundM,
-    env: { mode: flyMode, ceilingM: (fly?.ceilingFt ?? 400) * 0.3048, wind: fly?.wind ?? null, surfaceAbsAt },
+    /* No height cap in practice (Batch I, Section 5): it warns instead (src/core/flightWarnings.ts). */
+    env: { mode: flyMode, ceilingM: Number.POSITIVE_INFINITY, wind: fly?.wind ?? null, surfaceAbsAt },
     view: (p, alt, yaw, gimbal) => scene.current?.droneView(p, alt, yaw, gimbal, fly?.focal ?? 24),
     hiddenAt: (p, ft) => fly?.hiddenAt(p, ft) ?? false,
     sticks,
     mode: flyMode,
   })
-  const nearCeiling = hud?.nearCeiling === true
+  /* Each frame, from where the drone is: above 400 ft, inside Class B/C/D; the ladder's marks. */
+  const [shapes, setShapes] = useState<AirspaceShape[]>([])
+  useEffect(() => {
+    if (!flying) return
+    let live = true
+    void airspaceShapes()
+      .then((s) => {
+        if (live) setShapes(s)
+      })
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [flying])
+  const flightCell = hud === null ? null : facilityCellAt(hud.at.lat, hud.at.lon)
+  const altFt = hud === null ? 0 : hud.state.alt / 0.3048
+  const warning = hud === null ? null : warningLine({ altFt, cell: flightCell, shapes: airspaceAt(shapes, hud.at) })
+  const ladder = hud === null ? null : { altFt, marks: ladderMarks(flightCell) }
+  /* The 400 ft sheet shows as the drone nears it. */
+  const nearCeiling = hud !== null && altFt > PART_107_FT - 30
   /* While flying the app's chrome steps aside: the dock, the sheet, the time bar (app.css :root.is-flying). */
   useEffect(() => {
     /*
@@ -386,7 +410,7 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
   }, [ready, flying, flyLook, sea])
   useEffect(() => {
     if (!ready) return
-    scene.current?.setCeiling(flying && fly !== null ? fly.takeoff : null, groundM + (fly?.ceilingFt ?? 400) * 0.3048, nearCeiling ? 0.18 : 0)
+    scene.current?.setCeiling(flying && fly !== null ? fly.takeoff : null, groundM + PART_107_FT * 0.3048, nearCeiling ? 0.18 : 0)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, flying, nearCeiling])
   useEffect(() => {
@@ -399,7 +423,7 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
       ? null
       : obstacleBars(hud.state, {
           mode: flyMode,
-          ceilingM: fly.ceilingFt * 0.3048,
+          ceilingM: Number.POSITIVE_INFINITY,
           wind: fly.wind,
           surfaceAt: (x, y) => {
             const abs = surfaceAbsAt(destinationPoint(destinationPoint(fly.takeoff, 90, x), 0, y))
@@ -556,6 +580,8 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
           onMode={setFlyMode}
           hud={hud}
           ceilingFt={fly.ceilingFt}
+          warning={warning}
+          ladder={ladder}
           flightMinutes={fly.flightMinutes}
           wind={fly.wind}
           exposure={fly.exposure}

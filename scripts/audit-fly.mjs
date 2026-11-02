@@ -119,6 +119,19 @@ try {
         if (m.box !== null && (m.box.left < 0 || m.box.right > step.vw || m.box.top < insets.top)) fail(`${label}: "${m.text}" is off the screen or under the status bar (${JSON.stringify(m.box)})`)
       }
     }
+    /*
+     * Batch I, Section 5: no height cap, warnings instead. At the pier, inside
+     * Oceana's Class D: once the hint has gone, the amber line names it, its
+     * grid ceiling and LAANC; the ladder marks 400 ft. Never "safe" or "clear".
+     */
+    await wait(4200)
+    const warn = await ev(`JSON.stringify({ alert: document.querySelector('.fly__alert')?.textContent ?? null, rungs: [...document.querySelectorAll('.fly__rung')].map((r) => r.textContent), alt: document.querySelector('.fly__alt')?.textContent ?? null })`)
+    console.log(`  warnings: ${warn}`)
+    const w = JSON.parse(warn)
+    if (w.alert === null || !/^Inside Class [BCD] · .+ · grid ceiling here \d+ ft · needs LAANC$/.test(w.alert)) fail(`${label}: inside the Class D, the warning reads ${JSON.stringify(w.alert)}`)
+    if (!w.rungs.includes('400 ft')) fail(`${label}: the altitude ladder has no 400 ft rung (${JSON.stringify(w.rungs)})`)
+    if (w.alt === null) fail(`${label}: no height on the ladder`)
+    if (/\bsafe\b|\bclear\b/i.test(w.alert ?? '')) fail(`${label}: the warning says safe or clear`)
     if (look.creditsShown || look.attribution) fail(`${label}: the data credits are drawn over the flight`)
     if (look.cardinals.length !== 4) fail(`${label}: ${look.cardinals.length} compass letters, not 4`)
     for (const c of look.cardinals) if (c.rot !== null) fail(`${label}: ${c.c} is drawn turned (${c.rot})`)
