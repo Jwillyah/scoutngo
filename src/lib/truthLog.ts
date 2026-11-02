@@ -47,6 +47,15 @@ export interface TruthEntry {
     fire: string | null
   }
   outcome: FireOutcome | null
+  /**
+   * What the photo's own sky showed, measured on the phone (src/core/skyScore.ts,
+   * Batch F): the numbers only, never the picture. Absent on older entries.
+   */
+  sky?: { cloud: number; lit: number; saturation: number; hue: number | null; suggest: FireOutcome } | null
+  /** Said when the photo is far from sunrise or sunset, or side-on to the sun. */
+  timingNote?: string | null
+  /** A tiny thumbnail (48 px), only when asked for; never the photo. */
+  thumb?: string | null
 }
 
 const iso = (d: Date) => d.toISOString()

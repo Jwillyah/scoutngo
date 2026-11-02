@@ -15053,3 +15053,21 @@
     text-overflow: ellipsis;
   }
 }
+
+/* The truth loop's sky reading (Batch F, Section 7). */
+.truth__thumb {
+  width: 48px;
+  height: auto;
+  border-radius: 4px;
+  vertical-align: middle;
+  margin-left: var(--space-1);
+}
+
+.truth__keep {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 44px;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}

@@ -4,6 +4,36 @@ import { OUTCOME_LABEL, readFireLog, type FireOutcome } from '../lib/fireLog.ts'
 import { saveText } from '../lib/saveText.ts'
 import { entryFromPhoto, hitRate, readTruthLog, truthFile, withEntries, writeTruthLog, type TruthEntry } from '../lib/truthLog.ts'
 import { formatClock } from '../core/timezone.ts'
+import { photoTiming, scoreSky, SCORE_WIDTH } from '../core/skyScore.ts'
+
+/* The photo, read on the phone at 96 px wide for its sky, and a 48 px thumbnail if asked. Nothing else of it is kept. */
+async function readSky(file: File, wantThumb: boolean): Promise<{ sky: TruthEntry['sky']; thumb: string | null }> {
+  try {
+    const bmp = await createImageBitmap(file)
+    const h = Math.max(8, Math.round((SCORE_WIDTH * bmp.height) / bmp.width))
+    const c = document.createElement('canvas')
+    c.width = SCORE_WIDTH
+    c.height = h
+    const g = c.getContext('2d', { willReadFrequently: true })
+    if (g === null) return { sky: null, thumb: null }
+    g.drawImage(bmp, 0, 0, SCORE_WIDTH, h)
+    const s = scoreSky(g.getImageData(0, 0, SCORE_WIDTH, h).data, SCORE_WIDTH, h)
+    let thumb: string | null = null
+    if (wantThumb) {
+      const t = document.createElement('canvas')
+      t.width = 48
+      t.height = Math.max(8, Math.round((48 * bmp.height) / bmp.width))
+      t.getContext('2d')?.drawImage(bmp, 0, 0, t.width, t.height)
+      thumb = t.toDataURL('image/jpeg', 0.6)
+    }
+    bmp.close()
+    return { sky: { cloud: s.cloud, lit: s.lit, saturation: s.saturation, hue: s.hue, suggest: s.suggest }, thumb }
+  } catch {
+    return { sky: null, thumb: null }
+  }
+}
+
+const pct = (x: number) => `${Math.round(x * 100)}%`
 
 /*
  * AFTER THE SHOOT (src/lib/truthLog.ts): pick the photos, and each is read on
@@ -23,6 +53,7 @@ export function TruthLoop({ timeZone }: Props) {
   const [batch, setBatch] = useState<string[]>([])
   const [note, setNote] = useState<string | null>(null)
   const [undo, setUndo] = useState<TruthEntry[] | null>(null)
+  const [wantThumb, setWantThumb] = useState(false)
 
   const keep = (next: TruthEntry[]) => {
     setLog(next)
@@ -38,7 +69,12 @@ export function TruthLoop({ timeZone }: Props) {
       try {
         const e = entryFromPhoto(readPhotoMeta(await file.arrayBuffer()), timeZone, fires, file.name)
         if ('missing' in e) skipped.push(`${file.name}: no ${e.missing}`)
-        else added.push(e)
+        else {
+          /* The sky in the picture suggests the answer; the shooter can change it. */
+          const { sky, thumb } = await readSky(file, wantThumb)
+          const timing = photoTiming(e.said.minutesFromEvent, e.heading, e.said.sunAzimuth)
+          added.push({ ...e, sky, thumb, timingNote: timing.note, outcome: sky?.suggest ?? null })
+        }
       } catch {
         skipped.push(`${file.name}: could not be read`)
       }
@@ -64,6 +100,9 @@ export function TruthLoop({ timeZone }: Props) {
         Pick photos
         <input type="file" accept="image/*" multiple className="truth__file" onChange={(e) => void add(e.target.files)} />
       </label>
+      <label className="truth__keep">
+        <input type="checkbox" checked={wantThumb} onChange={(e) => setWantThumb(e.target.checked)} /> Keep a tiny thumbnail (48 px) with the numbers
+      </label>
       {shown.length === 0 ? null : (
         <>
           <ul className="truth__list">
@@ -73,12 +112,20 @@ export function TruthLoop({ timeZone }: Props) {
                 {e.said.light === null ? '' : `, ${LIGHT[e.said.light]}`}
                 {e.said.golden ? ', golden hour' : ''}
                 {e.said.fire === null ? ' · no Sky fire forecast shown' : ` · it said ${e.said.fire}`}
+                {e.thumb ? <img src={e.thumb} alt="" className="truth__thumb" /> : null}
+                {e.sky ? (
+                  <span className="truth__sky">
+                    {' '}· its sky: cloud {pct(e.sky.cloud)}, lit {pct(e.sky.lit)} · suggests <b>{OUTCOME_LABEL[e.sky.suggest]}</b>
+                    {e.outcome !== null && e.outcome !== e.sky.suggest ? ` (you said ${OUTCOME_LABEL[e.outcome]})` : ''}
+                  </span>
+                ) : null}
+                {e.timingNote ? <span className="truth__note"> · {e.timingNote}</span> : null}
               </li>
             ))}
           </ul>
           <div className="btn-row" role="group" aria-label="How it went">
-            {(['fired', 'meh', 'nothing'] as const).map((o) => (
-              <button key={o} type="button" className="btn btn--small" onClick={() => rate(o)}>
+            {(['fired', 'meh', 'nothing', 'clear'] as const).map((o) => (
+              <button key={o} type="button" className={`btn btn--small${shown.length > 0 && shown.every((e) => e.outcome === o) ? ' btn--on' : ''}`} aria-pressed={shown.length > 0 && shown.every((e) => e.outcome === o)} onClick={() => rate(o)}>
                 {OUTCOME_LABEL[o]}
               </button>
             ))}

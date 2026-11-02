@@ -12,8 +12,9 @@
  */
 export const FIRE_LOG_KEY = 'scoutngo.fireLog.v1'
 
-export type FireOutcome = 'fired' | 'meh' | 'nothing'
-export const OUTCOME_LABEL: Record<FireOutcome, string> = { fired: 'It fired', meh: 'Meh', nothing: 'Nothing' }
+/* 'clear' (Batch F, Section 7): no cloud at all, so nothing to fire; not the same as cloud that stayed grey. */
+export type FireOutcome = 'fired' | 'meh' | 'nothing' | 'clear'
+export const OUTCOME_LABEL: Record<FireOutcome, string> = { fired: 'It fired', meh: 'Meh', nothing: 'Nothing', clear: 'Clear sky' }
 
 export interface FireEntry {
   id: string
@@ -46,7 +47,7 @@ const valid = (e: unknown): e is FireEntry => {
     /^\d{4}-\d{2}-\d{2}$/.test(x.date) &&
     (x.event === 'sunrise' || x.event === 'sunset') &&
     typeof x.place === 'string' &&
-    (x.outcome === 'fired' || x.outcome === 'meh' || x.outcome === 'nothing')
+    (x.outcome === 'fired' || x.outcome === 'meh' || x.outcome === 'nothing' || x.outcome === 'clear')
   )
 }
 

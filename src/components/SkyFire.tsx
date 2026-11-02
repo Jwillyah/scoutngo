@@ -305,7 +305,7 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
         <div className="fire__log">
           <p className="fire__head">How was it?</p>
           <div className="btn-row">
-            {(['fired', 'meh', 'nothing'] as const).map((o) => (
+            {(['fired', 'meh', 'nothing', 'clear'] as const).map((o) => (
               <button key={o} type="button" className={`btn btn--small${outcome === o ? ' btn--on' : ''}`} aria-pressed={outcome === o} onClick={() => { setOutcome(o); logIt(o, null) }}>
                 {OUTCOME_LABEL[o]}
               </button>
