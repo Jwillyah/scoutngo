@@ -26,6 +26,7 @@
  * (adaptive resolution, Section 7).
  */
 import * as THREE from 'three'
+import { logTouch } from '../../lib/touchDebug.ts'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { NOMINAL_DRAW_HEIGHT } from '../../core/buildingHeight.ts'
 import { bearingBetween, distanceMeters, type LatLon } from '../../core/geo.ts'
@@ -119,6 +120,10 @@ export interface ClayScene {
   slabPoints(n: number, halfM: number): { water: number; slab: number; by: Record<string, number> }
   /** Frame times of the last frames drawn, milliseconds, for the report (Section 7). */
   frameTimes(): number[]
+  /** Batch I: told when the GPU context is lost or restored, or a frame throws (Clay3D rebuilds or says why). */
+  onTrouble(hooks: { lost?: () => void; restored?: () => void; error?: (message: string) => void }): void
+  /** Batch I: what is on the GPU, for Debug touch. */
+  gpu(): { textures: number; geometries: number; calls: number; scale: number; lost: boolean }
   renderer: THREE.WebGLRenderer
   destroy(): void
 }
@@ -141,8 +146,19 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
   renderer.outputColorSpace = THREE.SRGBColorSpace
   renderer.shadowMap.enabled = true
   renderer.shadowMap.type = THREE.PCFSoftShadowMap
+  /*
+   * THE BLACK FLASH (Batch I, Section 4: "works but flashes black and back").
+   * The adaptive resolution below changed the pixel ratio AFTER a frame was
+   * drawn. Changing it resizes the canvas, which clears it, and this scene
+   * draws on demand: the cleared, black canvas stayed on screen until the
+   * next frame was asked for. A slow frame (over 26 ms, every few seconds on
+   * a phone) did it. The new ratio now waits for the next frame and is set
+   * before it is drawn, and asks for that frame.
+   * Pixel ratio: never over 2 (a 3x iPhone would draw 2.25x the pixels).
+   */
   const maxScale = Math.min(2, window.devicePixelRatio || 1)
   let scale = maxScale
+  let wantScale = scale
   renderer.setPixelRatio(scale)
   container.appendChild(renderer.domElement)
   renderer.domElement.style.width = '100%'
@@ -423,6 +439,11 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
   let shadowAt = new THREE.Vector3()
   let followTick = 0
   const draw = () => {
+    if (wantScale !== scale) {
+      logTouch(`3D pixel ratio ${scale.toFixed(1)} → ${wantScale.toFixed(1)}`)
+      scale = wantScale
+      renderer.setPixelRatio(scale)
+    }
     const t0 = performance.now()
     const seconds = (t0 - started) / 1000
     water.frame(seconds, camera)
@@ -450,17 +471,37 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
     if (times.length > 240) times.shift()
     /* Adaptive resolution: a slow frame drops the scale, steady quick ones bring it back. */
     if (ms > 26 && scale > 0.6) {
-      scale = Math.max(0.6, scale - 0.1)
-      renderer.setPixelRatio(scale)
+      wantScale = Math.max(0.6, scale - 0.1)
+      touch()
     } else if (ms < 10 && scale < maxScale && times.length % 30 === 0) {
-      scale = Math.min(maxScale, scale + 0.1)
-      renderer.setPixelRatio(scale)
+      wantScale = Math.min(maxScale, scale + 0.1)
+      touch()
     }
   }
+  /*
+   * THE GPU TAKEN AWAY (Batch I, Section 4). iOS drops a page's WebGL context
+   * under memory pressure. Without this the canvas went black for good.
+   * Lost: drawing stops and Clay3D is told (it shows that it is rebuilding,
+   * never a black screen); restored: Clay3D builds the scene again. A frame
+   * that throws stops the loop and Clay3D shows the message.
+   */
+  let lost = false
+  const trouble: { lost?: () => void; restored?: () => void; error?: (message: string) => void } = {}
+  const onLost = (e: Event) => {
+    e.preventDefault()
+    lost = true
+    trouble.lost?.()
+  }
+  const onRestored = () => {
+    lost = false
+    trouble.restored?.()
+  }
+  renderer.domElement.addEventListener('webglcontextlost', onLost, false)
+  renderer.domElement.addEventListener('webglcontextrestored', onRestored, false)
   let manual = false
   const loop = (now: number) => {
     raf = requestAnimationFrame(loop)
-    if (manual) return
+    if (manual || lost) return
     if (mode === 'orbit') controls.update()
     const animating = continuous > 0 || water.animating() || clouds.animating() || pending.n > 0
     /*
@@ -473,7 +514,13 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
     if (now - lastFrame < minGap) return
     lastFrame = now
     dirty = false
-    draw()
+    try {
+      draw()
+    } catch (error) {
+      /* Stopped, and said: never a frozen or black canvas with nothing on it. */
+      cancelAnimationFrame(raf)
+      trouble.error?.(error instanceof Error ? `${error.name}: ${error.message}` : String(error))
+    }
   }
   raf = requestAnimationFrame(loop)
 
@@ -845,8 +892,14 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
       return { water: wet, slab, by }
     },
     renderer,
+    onTrouble: (hooks) => {
+      Object.assign(trouble, hooks)
+    },
+    gpu: () => ({ textures: renderer.info.memory.textures, geometries: renderer.info.memory.geometries, calls: renderer.info.render.calls, scale, lost }),
     destroy: () => {
       cancelAnimationFrame(raf)
+      renderer.domElement.removeEventListener('webglcontextlost', onLost, false)
+      renderer.domElement.removeEventListener('webglcontextrestored', onRestored, false)
       observer.disconnect()
       controls.dispose()
       ground.dispose()

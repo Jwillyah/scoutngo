@@ -1,5 +1,6 @@
 import { clayStatus, type ClayStatus } from '../lib/clayStatus.ts'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Component, Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { logTouch, useTouchDebug } from '../lib/touchDebug.ts'
 import { createPortal } from 'react-dom'
 import { SENSORS } from '../core/fov.ts'
 import type { LatLon } from '../core/geo.ts'
@@ -76,7 +77,59 @@ interface Clay3DProps {
 
 export const CLAY_NOTE = 'Clay model from map data; real buildings may differ'
 
-export function Clay3D({ venue, venueLabel, at, timeZone, sheetOpen = false, moonShown = false, pins, stand, onLeaveStand, flight = null, onFlightTime, onRecorded, onRenderProgress, fly = null, onLanded, sea = null, onCompare }: Clay3DProps) {
+/*
+ * NEVER A BLANK OR BLACK SCREEN (Batch I, Section 4). A throw anywhere in
+ * the 3D view's React tree lands here: the actual message, Copy error and
+ * Try again (a fresh build).
+ */
+/** Lost and not restored this long: build again anyway, on a new context. */
+export const REBUILD_AFTER_MS = 3000
+
+export class Clay3DBoundary extends Component<{ children: ReactNode }, { message: string | null; tick: number }> {
+  state = { message: null as string | null, tick: 0 }
+  static getDerivedStateFromError(error: unknown) {
+    return { message: error instanceof Error ? `${error.name}: ${error.message}` : String(error) }
+  }
+  render() {
+    if (this.state.message !== null) return <ClayError message={this.state.message} onRetry={() => this.setState((s) => ({ message: null, tick: s.tick + 1 }))} />
+    return <Fragment key={this.state.tick}>{this.props.children}</Fragment>
+  }
+}
+
+/** What went wrong, in its own words, and the two things to do about it. */
+export function ClayError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <div className="clay__error" role="alert">
+      <p className="clay__errtitle">The 3D view stopped</p>
+      <p className="clay__errmsg num">{message}</p>
+      <div className="btn-row">
+        <button
+          type="button"
+          className="btn"
+          onClick={() => {
+            void navigator.clipboard?.writeText(`ScoutNGo 3D: ${message} · ${navigator.userAgent}`).then(() => setCopied(true)).catch(() => setCopied(false))
+          }}
+        >
+          {copied ? 'Copied' : 'Copy error'}
+        </button>
+        <button type="button" className="btn btn--primary" onClick={onRetry}>
+          Try again
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export function Clay3D(props: Clay3DProps) {
+  return (
+    <Clay3DBoundary>
+      <Clay3DView {...props} />
+    </Clay3DBoundary>
+  )
+}
+
+function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonShown = false, pins, stand, onLeaveStand, flight = null, onFlightTime, onRecorded, onRenderProgress, fly = null, onLanded, sea = null, onCompare }: Clay3DProps) {
   const host = useRef<HTMLDivElement>(null)
   const scene = useRef<ClayScene | null>(null)
   /* How many times the scene has been built: every build (a scan arriving rebuilds it) re-runs the effects that feed it. 0 is not built yet. */
@@ -84,6 +137,9 @@ export function Clay3D({ venue, venueLabel, at, timeZone, sheetOpen = false, moo
   /* The first view's tiles have arrived: until then the canvas is hidden and the 2D map shows through. */
   const [shown, setShown] = useState(false)
   const [failed, setFailed] = useState<string | null>(null)
+  /* Batch I: the GPU lost (rebuilding), or a frame that threw (the message); a build count to rebuild on. */
+  const [trouble, setTrouble] = useState<{ kind: 'lost' } | { kind: 'error'; message: string } | null>(null)
+  const [build, setBuild] = useState(0)
   const [place, setPlace] = useState<PlaceState>(() => placeState())
   const [flat, setFlat] = useState(0)
   const [cloudQuality, setCloudQualityState] = useState<'high' | 'battery'>(() => {
@@ -151,6 +207,29 @@ export function Clay3D({ venue, venueLabel, at, timeZone, sheetOpen = false, moo
           /* Storage blocked: High. */
         }
         ;(window as unknown as { __clay?: ClayScene }).__clay = made
+        /*
+         * LOST, THEN RESTORED: the scene is built again from scratch (its
+         * textures went with the context). Lost and never restored within
+         * REBUILD_AFTER_MS: built again anyway, on a new context.
+         */
+        let rebuildTimer: ReturnType<typeof setTimeout> | null = null
+        made.onTrouble({
+          lost: () => {
+            logTouch('3D: WebGL context lost')
+            setTrouble({ kind: 'lost' })
+            rebuildTimer = setTimeout(() => setBuild((n) => n + 1), REBUILD_AFTER_MS)
+          },
+          restored: () => {
+            logTouch('3D: WebGL context restored')
+            if (rebuildTimer !== null) clearTimeout(rebuildTimer)
+            setBuild((n) => n + 1)
+          },
+          error: (message) => {
+            logTouch(`3D: a frame threw: ${message}`)
+            setTrouble({ kind: 'error', message })
+          },
+        })
+        setTrouble(null)
         setReady((n) => n + 1)
         void made.whenShown().then(() => {
           if (!cancelled) setShown(true)
@@ -164,7 +243,18 @@ export function Clay3D({ venue, venueLabel, at, timeZone, sheetOpen = false, moo
       setShown(false)
     }
     /* The coordinate, not the object: the same place must not rebuild the engine. */
-  }, [venue.lat, venue.lon, timeZone, scanCtx === 'loading' ? 'loading' : (scanCtx?.scan.savedAt ?? 'none')]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [venue.lat, venue.lon, timeZone, scanCtx === 'loading' ? 'loading' : (scanCtx?.scan.savedAt ?? 'none'), build]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* Debug touch: what is on the GPU, every 5 s while the 3D view is up. */
+  const [debugTouch] = useTouchDebug()
+  useEffect(() => {
+    if (!debugTouch || ready === 0) return
+    const t = setInterval(() => {
+      const g = scene.current?.gpu()
+      if (g !== undefined) logTouch(`3D gpu: textures ${g.textures}, geometries ${g.geometries}, draw calls ${g.calls}, pixel ratio ${g.scale.toFixed(1)}${g.lost ? ', CONTEXT LOST' : ''}`)
+    }, 5000)
+    return () => clearInterval(t)
+  }, [debugTouch, ready])
 
   /*
    * THE BUILDINGS AND TREES, from the place App loads when the venue is set
@@ -357,6 +447,14 @@ export function Clay3D({ venue, venueLabel, at, timeZone, sheetOpen = false, moo
   return (
     <div className={`${shown ? 'clay clay--shown' : 'clay clay--waiting'}${flying ? ' clay--flying' : ''}`}>
       <div ref={host} className="clay__canvas" />
+      {trouble === null ? null : trouble.kind === 'lost' ? (
+        <div className="clay__error" role="status">
+          <p className="clay__errtitle">Rebuilding the 3D view…</p>
+          <p className="clay__errmsg">The phone took back its graphics memory. Building it again.</p>
+        </div>
+      ) : (
+        <ClayError message={trouble.message} onRetry={() => setBuild((n) => n + 1)} />
+      )}
       {box === null ? null : (
         <div className="clay__frame" style={{ width: `${box.width}px`, height: `${box.height}px` }} aria-hidden="true" />
       )}

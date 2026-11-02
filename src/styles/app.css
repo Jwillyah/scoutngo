@@ -16651,3 +16651,30 @@ a.about__row * {
 .fire__checks--icons .fire__check-name {
   font-size: var(--text-xs);
 }
+/* The 3D view's trouble, said (Batch I, Section 4): never a blank or black screen. */
+.clay__error {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 24px;
+  background: #1b2233;
+  color: #fff;
+  text-align: center;
+}
+.clay__errtitle {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+}
+.clay__errmsg {
+  margin: 0;
+  max-width: 32ch;
+  font-size: var(--text-sm);
+  color: rgb(255 255 255 / 0.8);
+  overflow-wrap: anywhere;
+}
