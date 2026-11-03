@@ -10231,6 +10231,7 @@
 }
 
 .tbar__head {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -10287,12 +10288,19 @@
   color: var(--color-text);
 }
 
-/* The ↺'s one-time hint (Batch L): a hold is the shoot window. */
+/* The ↺'s one-time hint (Batch L): a hold is the shoot window. Floats above the ↺, so the time beside it keeps its line. */
 .tbar__hint {
-  margin-left: auto;
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 4px);
+  z-index: 3;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--surface-2);
   font-size: var(--text-xs);
-  color: var(--color-text-muted);
+  color: var(--color-text);
   white-space: nowrap;
+  pointer-events: none;
 }
 
 .tbar__strip {

@@ -312,7 +312,7 @@ export function TimeBar({ at, lat, lon, timeZone, moon, onAt, onReset, onHoldRes
         </label>
         {hint ? (
           <span className="tbar__hint" role="status">
-            Hold ↺ for the shoot window
+            Hold ↺: shoot window
           </span>
         ) : null}
         <button
