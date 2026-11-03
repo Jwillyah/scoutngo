@@ -6,6 +6,9 @@ import { formatClock, formatHour } from '../core/timezone.ts'
 import { overRated, windTo, type WindHour } from '../core/windModels.ts'
 import { formatWind, windIn, windUnitLabel, type WindUnit } from '../lib/units.ts'
 import { fetchMeasuredWind, fetchWindModels, LEVEL_LABEL, type Measured, type WindLevel, type WindModels } from '../lib/windModelsData.ts'
+import { seaBreeze, seaBreezeLine, STABILITY_WORD } from '../core/localWind.ts'
+import { localDate, localHour } from '../core/modelSkill.ts'
+import { fetchMarine, hourlyAt } from '../lib/tideSheetData.ts'
 import { Page } from './Page.tsx'
 
 /*
@@ -20,6 +23,8 @@ interface Props {
   at: Date
   timeZone: string
   unit: WindUnit
+  /** For the sea breeze's land-sea contrast. */
+  tempUnit?: 'C' | 'F'
   /** The drone in the bag, its rated wind (m/s) and name, from Kit. */
   drone: { name: string; ratedMps: number | null } | null
   /** The beach's facing, degrees, for offshore / cross / onshore; null inland. */
@@ -34,7 +39,7 @@ const W = 340
 const H = 120
 const COL = W / STRIP_HOURS
 
-function Strip({ hours, rows, unit, ratedMps, timeZone, now }: { hours: Date[]; rows: WindHour[]; unit: WindUnit; ratedMps: number | null; timeZone: string; now: number }) {
+function Strip({ hours, rows, unit, ratedMps, timeZone, now, mark }: { hours: Date[]; rows: WindHour[]; unit: WindUnit; ratedMps: number | null; timeZone: string; now: number; mark?: Date | null }) {
   const shown = rows.slice(now, now + STRIP_HOURS)
   const top = Math.max(1, ...shown.map((r) => Math.max(r.gust ?? 0, r.p90 ?? 0)), ratedMps ?? 0) * 1.1
   const y = (mps: number) => H - 22 - (mps / top) * (H - 40)
@@ -48,6 +53,19 @@ function Strip({ hours, rows, unit, ratedMps, timeZone, now }: { hours: Date[]; 
           </text>
         </>
       )}
+      {mark === null || mark === undefined
+        ? null
+        : (() => {
+            const i = hours.findIndex((h) => h.getTime() === mark.getTime()) - now
+            if (i < 0 || i >= STRIP_HOURS) return null
+            const x = i * COL + COL / 2
+            return (
+              <g className="windp__sb" data-sea-breeze={mark.toISOString()}>
+                <line x1={x} x2={x} y1={14} y2={H - 22} />
+                <text x={Math.min(W - 2, x + 3)} y={22} textAnchor={x > W - 60 ? 'end' : 'start'}>sea breeze</text>
+              </g>
+            )
+          })()}
       {shown.map((r, i) => {
         const x = i * COL + COL / 2
         const over = overRated(r.median, ratedMps) || overRated(r.gust, ratedMps)
@@ -72,18 +90,21 @@ function Strip({ hours, rows, unit, ratedMps, timeZone, now }: { hours: Date[]; 
   )
 }
 
-export function WindPage({ venue, at, timeZone, unit, drone, facing, onClose, onWindCard }: Props) {
+export function WindPage({ venue, at, timeZone, unit, tempUnit = 'F', drone, facing, onClose, onWindCard }: Props) {
   const key = `${venue.lat},${venue.lon}`
-  const [data, setData] = useState<{ key: string; models: WindModels | null; measured: Measured[] } | null>(null)
+  const [data, setData] = useState<{ key: string; models: WindModels | null; measured: Measured[]; seaC: number | null } | null>(null)
+  const coastal = facing !== null
   useEffect(() => {
     let live = true
-    void Promise.all([fetchWindModels(venue), fetchMeasuredWind(venue)]).then(([models, measured]) => {
-      if (live) setData({ key, models, measured })
+    void Promise.all([fetchWindModels(venue), fetchMeasuredWind(venue), coastal ? fetchMarine(venue).catch(() => null) : Promise.resolve(null)]).then(([models, measured, marine]) => {
+      /* The sea's temperature at midday: the sea barely moves through a day. */
+      const noon = new Date(Math.floor(Date.now() / 86_400_000) * 86_400_000 + 17 * 3_600_000)
+      if (live) setData({ key, models, measured, seaC: marine === null ? null : hourlyAt(marine.value, 'sea_surface_temperature', noon) })
     })
     return () => {
       live = false
     }
-  }, [venue, key])
+  }, [venue, key, coastal])
   const [level, setLevel] = useState<WindLevel>('ground')
   const loaded = data !== null && data.key === key ? data : null
   const models = loaded?.models ?? null
@@ -93,6 +114,15 @@ export function WindPage({ venue, at, timeZone, unit, drone, facing, onClose, on
   const relation = now?.from == null || facing === null ? null : windToBeach(now.from, facing)
   const say = (mps: number | null) => formatWind(mps, unit)
   const spread = now?.p10 == null || now.p90 == null ? null : (windIn(now.p90, unit) ?? 0) - (windIn(now.p10, unit) ?? 0)
+  /* The sea breeze for the day on the bar, from the models' ground wind and temperature against the sea (src/core/localWind.ts). */
+  const sb = (() => {
+    if (models === null || hourIndex < 0) return null
+    const day = localDate(models.hours[hourIndex], timeZone)
+    const hrs = models.hours.map((h, i) => ({ h, i })).filter(({ h }) => localDate(h, timeZone) === day)
+    return seaBreeze(hrs.map(({ h, i }) => ({ at: h, hour: localHour(h, timeZone), tempC: models.tempC[i], mps: models.byLevel.ground[i].median, fromDeg: models.byLevel.ground[i].from })), facing, loaded?.seaC ?? null)
+  })()
+  const sbLine = seaBreezeLine(sb, { speed: (mps) => `${Math.round(windIn(mps, unit) ?? 0)} ${windUnitLabel(unit)}`, hour: (d) => formatHour(d, timeZone), diff: (c) => `${Math.round(tempUnit === 'F' ? c * 1.8 : c)}°` })
+  const aloft = models === null || hourIndex < 0 ? null : models.aloft[hourIndex]
 
   return (
     <Page title="Wind" className="windp" onClose={onClose}>
@@ -118,7 +148,8 @@ export function WindPage({ venue, at, timeZone, unit, drone, facing, onClose, on
             {now.models} models{spread === null ? '' : `, ${Math.round(spread)} ${windUnitLabel(unit)} apart (10–90%)`}, at {formatClock(models.hours[hourIndex], timeZone)}.
             {rated === null || drone === null ? '' : overRated(now.median, rated) || overRated(now.gust, rated) ? ` Over the ${drone.name}’s rated ${say(rated)}.` : ` Under the ${drone.name}’s rated ${say(rated)}; that is a rating, not a promise.`}
           </p>
-          <Strip hours={models.hours} rows={models.byLevel[level]} unit={unit} ratedMps={rated} timeZone={timeZone} now={hourIndex} />
+          {sbLine === null ? null : <p className="windp__sbline num" data-sea-breeze-line={sb?.kind}>{sbLine}</p>}
+          <Strip hours={models.hours} rows={models.byLevel[level]} unit={unit} ratedMps={rated} timeZone={timeZone} now={hourIndex} mark={level === 'ground' && sb !== null && sb.kind !== 'held' ? sb.at : null} />
           <h3 className="windp__head">Measured now</h3>
           {loaded.measured.length === 0 ? (
             <p className="windp__note">No station or buoy nearby answered.</p>
@@ -137,6 +168,13 @@ export function WindPage({ venue, at, timeZone, unit, drone, facing, onClose, on
             <p>
               Speed: the median of GFS, HRRR, ECMWF, ICON and GEM (Open-Meteo), with the 10–90% range across them as the whisker. Direction: the circular mean of where the wind comes from; the arrows point where it goes. Gusts at the ground only, the highest any model gives. 80 m and 120 m are the models’ own heights. Measured: the nearest weather station’s METAR and the nearest NOAA buoy.
             </p>
+            {aloft === null ? null : (
+              <p className="num" data-aloft-factor={aloft.factor.toFixed(2)}>
+                400 ft at {formatClock(models.hours[hourIndex], timeZone)}: about {aloft.factor.toFixed(1)}× the ground wind ({STABILITY_WORD[aloft.cls]}, profile exponent {aloft.alpha.toFixed(2)}), from the sun’s height, the cloud and the wind. Sun-heated ground mixes the wind aloft down, so the step up is small; a clear, calm night sets an inversion and the wind above runs on without the ground.
+                {models.filled120.length === 0 ? '' : ` ${models.filled120.join(' and ')} ${models.filled120.length === 1 ? 'has' : 'have'} no 120 m level: ${models.filled120.length === 1 ? 'its' : 'their'} 120 m is ${models.filled120.length === 1 ? 'its' : 'their'} ground wind times that factor.`}
+              </p>
+            )}
+            {facing === null ? null : <p>Sea breeze: the land’s forecast temperature against the sea’s ({loaded.seaC === null ? 'not forecast here' : `${Math.round(loaded.seaC)}°C`}); it needs about 3°C more, and more again for each bit of wind off the land, which holds it back. The time and direction said are the models’ own turn onshore, when they show one.</p>}
           </details>
         </>
       )}

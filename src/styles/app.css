@@ -14561,6 +14561,21 @@
   stroke-width: 1;
   stroke-dasharray: 4 3;
 }
+/* Batch L: the sea breeze's turn, a dashed line on the strip and a line above it. */
+.windp__sb line {
+  stroke: var(--text-dim);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+.windp__sb text {
+  fill: var(--text-dim);
+  font-size: 9px;
+}
+.windp__sbline {
+  margin: 4px 0 2px;
+  font-size: 13px;
+  font-weight: 600;
+}
 
 .windp__axis {
   fill: var(--color-text-muted);

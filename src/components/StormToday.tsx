@@ -17,7 +17,7 @@ import { RadarStrip } from './RadarStrip.tsx'
  * under the departing anvil), WATER (the rip current risk and the marine
  * forecast at the coast). Facts, never advice (rule 28).
  */
-export function StormCards({ play, venue, timeZone, units, onRadar }: { play: StormPlay; venue: LatLon; timeZone: string; units: Units; onRadar: () => void }) {
+export function StormCards({ play, venue, timeZone, units, onRadar, beachWind = null }: { play: StormPlay; venue: LatLon; timeZone: string; units: Units; onRadar: () => void; beachWind?: string | null }) {
   const dist = units.distance === 'ft' ? 'mi' : 'km'
   const clock = (d: Date) => formatClock(d, timeZone)
   const scanAt = play.now?.radar?.scanAt ?? new Date()
@@ -45,13 +45,14 @@ export function StormCards({ play, venue, timeZone, units, onRadar }: { play: St
         {clearing === null ? <p className="bline">No clearing before sunset on the cells&rsquo; tracks.</p> : <p className="bline num">Clears by {clock(clearing.clears)} · sunset {clock(clearing.sunset)} under the departing anvil · fire possible toward the {clearing.look}</p>}
         {bow === null ? null : <p className="bline num">Rainbow possible {clock(bow.from)}–{clock(bow.to)}, toward the {bow.look}, sun {Math.round(sunAltitude(bow.from, venue))}° up</p>}
       </div>
-      {coast === null || (coast.rip === null && coast.marine === null) ? null : (
+      {(coast === null || (coast.rip === null && coast.marine === null)) && beachWind === null ? null : (
         <div className="bcard bwater">
           <div className="bcard__head">
             <span className="bcard__title">Water</span>
           </div>
-          {coast.rip === null ? null : <p className="bline">{coast.rip}{coast.surf === null ? '' : ` · surf ${coast.surf}`}</p>}
-          {coast.marine === null ? null : <p className="bline bline--sub">{coast.marine.text.split(/(?<=\.)\s/).slice(0, 2).join(' ')} (NWS, {coast.marine.zone})</p>}
+          {beachWind === null ? null : <p className="bline num" data-beach-wind>{beachWind}</p>}
+          {coast?.rip == null ? null : <p className="bline">{coast.rip}{coast.surf === null ? '' : ` · surf ${coast.surf}`}</p>}
+          {coast?.marine == null ? null : <p className="bline bline--sub">{coast.marine.text.split(/(?<=\.)\s/).slice(0, 2).join(' ')} (NWS, {coast.marine.zone})</p>}
         </div>
       )}
     </>

@@ -2591,6 +2591,7 @@ export function PlanMode({
           at={scrubbedAt}
           timeZone={venueWindow.timeZone}
           unit={units.wind}
+          tempUnit={units.temperature}
           drone={surfDrone === null ? null : { name: surfDrone.name, ratedMps: surfDrone.ratedMps }}
           facing={tideSheet.facing.status === 'ready' && tideSheet.facing.value !== null && tideSheet.facing.value !== 'inland' ? tideSheet.facing.value.facing : null}
           onClose={() => setPage(null)}

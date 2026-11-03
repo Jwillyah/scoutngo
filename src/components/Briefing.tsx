@@ -8,6 +8,7 @@ import { remember } from '../lib/callHistory.ts'
 import { showGuide, useBestView } from '../lib/useBestView.ts'
 import { StormBrief } from './StormBrief.tsx'
 import { StormCards } from './StormToday.tsx'
+import { beachWindLine } from '../core/localWind.ts'
 import { useStormPlay } from '../lib/useStormPlay.ts'
 import { OPEN_RADAR_EVENT } from './WeatherTab.tsx'
 import { bestViewOnMap } from '../core/bestView.ts'
@@ -255,7 +256,7 @@ interface DayPageProps {
   settling?: boolean
 }
 
-function DayPage({ onOpenWeather, day, which, placeName, venue, timeZone, units, drone, now, checkedAt, clock, onOpenMap, onSwitchSpot, onViewfinder, loading, settling = false }: DayPageProps) {
+function DayPage({ onOpenWeather, day, which, placeName, venue, timeZone, units, drone, now, facing, checkedAt, clock, onOpenMap, onSwitchSpot, onViewfinder, loading, settling = false }: DayPageProps) {
   const read = day?.call ?? null
   const kind: Kind | null = read?.kind ?? null
   const verdict = day === null || kind === null ? null : day.verdicts[kind]
@@ -287,6 +288,9 @@ function DayPage({ onOpenWeather, day, which, placeName, venue, timeZone, units,
     window.dispatchEvent(new CustomEvent(OPEN_RADAR_EVENT, { detail: play.now?.radar?.scanAt ?? null }))
     onOpenMap()
   }
+  /* Batch L, Section 2: the Water card's wind to the beach, by the same rule as the Surf page (src/core/localWind.ts). */
+  const windNow = day === null || day.wind.length === 0 ? null : day.wind.reduce((a, b) => (Math.abs(b.at.getTime() - now.getTime()) < Math.abs(a.at.getTime() - now.getTime()) ? b : a))
+  const beachWind = beachWindLine(windNow?.fromDeg ?? null, windNow?.mps ?? null, facing, (mps) => `${Math.round(windIn(mps, units.wind) ?? 0)} ${windUnitLabel(units.wind)}`)
   const why = read === null ? (loading ? 'Reading five forecasts…' : which === 'today' ? 'Both have passed today. Tomorrow’s sunrise is next.' : 'The forecast did not say.') : read.why
   const colour = read === null || read.colorFrom === null ? null : `Best color ${clock(read.colorFrom)} to ${clock(read.colorTo)} · be set up ${clock(read.setUp)}`
 
@@ -334,7 +338,7 @@ function DayPage({ onOpenWeather, day, which, placeName, venue, timeZone, units,
       </div>
 
       {play.inPlay ? (
-        <StormCards play={play} venue={venue} timeZone={timeZone} units={units} onRadar={openRadar} />
+        <StormCards play={play} venue={venue} timeZone={timeZone} units={units} onRadar={openRadar} beachWind={beachWind} />
       ) : (
         <>
       <div className="bcard">
