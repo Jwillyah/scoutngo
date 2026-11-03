@@ -31,6 +31,7 @@ import { lookWindow, type FireVerdict } from './fireOutlook.ts'
 import type { SatRead } from './goesNowcast.ts'
 import { layerWords, type DeckTruth } from './layerTruth.ts'
 import type { GapRead } from './gapWatch.ts'
+import { underLitWindow } from './underLight.ts'
 import { LAYER_WORD } from './skyColour.ts'
 import { sizeWords } from './surfShoot.ts'
 import { curveFromExtremes, levelAt, type TideExtreme } from './tide.ts'
@@ -59,6 +60,8 @@ export interface CallRead {
   colorFrom: Date | null
   colorTo: Date | null
   setUp: Date | null
+  /** The deepest colour, when the reported deck's under-lighting sets it (Batch J, Section 3). */
+  peak?: Date | null
   /** "Gap to the WSW: open · Henderson scattered, Roxboro clear", when the gap watch spoke (Batch J). */
   gapLine?: string | null
   /** Models agreeing that it fires, for the week's certainty dots. */
@@ -80,10 +83,14 @@ const firing = (v: FireVerdict) => [...v.perLayer].sort((a, b) => b.agree - a.ag
  */
 /** What was measured before the event (Batch J): the deck over you, named by its real height. */
 export interface CallObs {
+  /** Where the sun is worked out from. */
+  venue: { lat: number; lon: number }
   truth?: DeckTruth | null
   /** The gap toward the sun (src/core/gapWatch.ts). */
   gap?: GapRead | null
 }
+
+const venueOf = (o: CallObs | null) => o?.venue ?? { lat: 0, lon: 0 }
 
 export function eventCall(v: FireVerdict | null, kind: Kind, event: Date, now: Date, sat: SatRead | null = null, obs: CallObs | null = null): CallRead {
   const base = { kind, event, confirmed: false, colorFrom: null, colorTo: null, setUp: null, agree: 0, of: 0, gapLine: obs?.gap?.state == null ? null : obs.gap.line }
@@ -104,7 +111,10 @@ export function eventCall(v: FireVerdict | null, kind: Kind, event: Date, now: D
   const w0 = v === null ? null : lookWindow(v)
   const timing0 = { colorFrom: w0?.from ?? null, colorTo: w0?.to ?? null, setUp: w0 === null ? null : new Date(w0.from.getTime() - SET_UP_BEFORE_MS), agree: v?.agree ?? 0, of: v?.of ?? 0 }
   if (near && truth?.measured === true && gap?.state === 'open') {
-    return { ...base, ...timing0, confirmed: true, call: 'Go', why: `Stations see a ${truth.short} over you and the gap toward the sun open.` }
+    /* Section 3: lit from underneath through the gap, so earlier than the colour clock's glow. */
+    const u = truth.baseFt === null ? null : underLitWindow(kind, event, truth.baseFt * 0.3048, gap.slotEdgeKm, (t) => getPosition(t, venueOf(obs).lat, venueOf(obs).lon).altitude)
+    const timing = u === null ? timing0 : { ...timing0, colorFrom: u.from, colorTo: u.to, peak: u.peak, setUp: new Date(u.from.getTime() - SET_UP_BEFORE_MS) }
+    return { ...base, ...timing, confirmed: true, call: 'Go', why: `Stations see a ${truth.short} over you and the gap toward the sun open.` }
   }
   if (near && truth?.measured === true && gap?.state === 'shut' && v !== null && v.word !== 'unlikely') {
     return { ...base, ...timing0, call: 'Maybe', why: `A ${truth.words} over you, but the gap toward the sun is shut: the light may not get under it.` }
@@ -149,12 +159,13 @@ export type ColorTag = 'Flat' | 'Some color' | 'Big color'
  * glows), Glow (civil dusk, sun 6° down), Dark (nautical dusk, 12° down);
  * at sunrise the same six backwards in time.
  */
-export function lightSteps(kind: Kind, event: Date, lat: number, lon: number, v: FireVerdict | null): LightStep[] {
+export function lightSteps(kind: Kind, event: Date, lat: number, lon: number, v: FireVerdict | null, under: { from: Date; to: Date; peak: Date } | null = null): LightStep[] {
   const t = getTimes(event, lat, lon)
   const ok = (d: Date | null | undefined) => (d instanceof Date && !Number.isNaN(d.getTime()) ? d : null)
-  const w = v === null ? null : lookWindow(v)
+  /* A reported deck lit from under through the gap (Batch J) times the colour; else the colour clock's glow. */
+  const w = under ?? (v === null ? null : lookWindow(v))
   const lead = v?.sky.layers.find((l) => l.fires && l.times?.deepest != null)
-  const peak = lead?.times?.deepest ?? null
+  const peak = under?.peak ?? lead?.times?.deepest ?? null
   if (kind === 'sunset') {
     const golden = ok(t.goldenHour)
     return [

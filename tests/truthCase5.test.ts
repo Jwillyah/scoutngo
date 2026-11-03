@@ -208,7 +208,7 @@ describe('Section 2: the gap watch', async () => {
     const gap = gapFrom({ azimuthDeg: AZIMUTH, line, reports: reportsAt(T60), station: STATION!.sky, sat: SAT, echoesKm: echoes })
     /* Before: the models alone, "possible", a Maybe. */
     expect(eventCall(v, 'sunset', EVENT, T60).call).toBe('Maybe')
-    const c = eventCall(v, 'sunset', EVENT, T60, null, { truth, gap })
+    const c = eventCall(v, 'sunset', EVENT, T60, null, { venue: VENUE, truth, gap })
     expect(c.call).toBe('Go')
     expect(c.why).toBe('Stations see a mid deck ≥12k over you and the gap toward the sun open.')
     expect(c.gapLine).toBe('Gap to the WSW: open · Henderson scattered, Roxboro clear')
@@ -222,5 +222,52 @@ describe('Section 2: the gap watch', async () => {
     const wet = gapRead({ azimuthDeg: 250, line: [{ id: 'KBBB', name: 'B', alongKm: 200, offKm: 5 }], reports: new Map([['KBBB', parseMetarSky('KBBB 021955Z SCT100')!]]), deckFt: 10000, echoesKm: [240] })
     expect(wet.state).toBe('shut')
     expect(wet.line).toMatch(/showers in the gap/)
+  })
+})
+
+describe('Section 3: colour timing under a deck with an open gap', async () => {
+  const { stationsAlong } = await import('../src/core/gapWatch.ts')
+  const { gapFrom } = await import('../src/lib/skyObsData.ts')
+  const { ASOS_STATIONS } = await import('../src/data/asosStations.ts')
+  const { eventCall, lightSteps } = await import('../src/core/briefing.ts')
+  const { edgeElevationDeg, litUntilDeg, underLitWindow } = await import('../src/core/underLight.ts')
+  const { formatClock } = await import('../src/core/timezone.ts')
+  const { getPosition } = await import('suncalc')
+  const clock = (d: Date | null | undefined) => (d == null ? null : formatClock(d, 'America/New_York', 12))
+  const line = stationsAlong(VENUE, AZIMUTH, ASOS_STATIONS)
+  const reports = new Map(line.flatMap((s) => {
+    const r = latestBy(s.id.slice(1), T60)
+    return r === null ? [] : [[s.id, r.sky] as const]
+  }))
+
+  it('the arithmetic: a 12,000 ft deck stays lit to about 3 degrees below (dip 1.94 plus the grazing bend); its edge 130 km out stands about a degree up', () => {
+    expect(litUntilDeg(3658)).toBeCloseTo(3.04, 1)
+    expect(edgeElevationDeg(3658, 130)).toBeCloseTo(1.03, 1)
+    expect(edgeElevationDeg(3658, 400)).toBe(0)
+  })
+
+  it('2 Nov sunset: colour about 5:00-5:18, deepest about 5:06 (it ran 5:00-5:20; the app had said 5:11-5:21)', () => {
+    const v = verdictAtT60()!
+    const truth = truthFrom({ station: STATION!.sky, pireps: [], sounding: null, profile: PROFILE, sat: SAT, modelLayer: leadLayer(v).layer })
+    const gap = gapFrom({ azimuthDeg: AZIMUTH, line, reports, station: STATION!.sky, sat: SAT, echoesKm: [] })
+    const c = eventCall(v, 'sunset', EVENT, T60, null, { venue: VENUE, truth, gap })
+    const minutesFrom = (d: Date | null | undefined, hhmm: string) => Math.abs(((d?.getTime() ?? 0) - new Date(`2026-11-02T${hhmm}:00-05:00`).getTime()) / 60_000)
+    expect(minutesFrom(c.colorFrom, "17:00")).toBeLessThanOrEqual(2)
+    expect(minutesFrom(c.colorTo, '17:18')).toBeLessThanOrEqual(2)
+    expect(minutesFrom(c.peak, '17:06')).toBeLessThanOrEqual(1)
+    /* It starts before sunset. */
+    expect(c.colorFrom!.getTime()).toBeLessThan(EVENT.getTime())
+    /* The light steps carry it: Color and Peak. */
+    const steps = lightSteps('sunset', EVENT, VENUE.lat, VENUE.lon, v, { from: c.colorFrom!, to: c.colorTo!, peak: c.peak! })
+    expect(clock(steps.find((s) => s.name === 'Color')?.at)).toBe(clock(c.colorFrom))
+    expect(clock(steps.find((s) => s.name === 'Peak')?.at)).toBe(clock(c.peak))
+  })
+
+  it('at sunrise it runs the other way: lit from about 3 degrees below until the sun climbs out of the slot', () => {
+    const at = { lat: 36.92, lon: -76.1 }
+    const sunrise = new Date('2026-11-03T11:30:00Z')
+    const u = underLitWindow('sunrise', sunrise, 3658, null, (t) => getPosition(t, at.lat, at.lon).altitude)!
+    expect(u.from.getTime()).toBeLessThan(sunrise.getTime())
+    expect(u.to.getTime()).toBeGreaterThan(sunrise.getTime())
   })
 })

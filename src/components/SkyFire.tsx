@@ -8,6 +8,8 @@ import { FireSideView } from './FireSideView.tsx'
 import { LAYER_WORD, type Layer } from '../core/skyColour.ts'
 import { layerWords } from '../core/layerTruth.ts'
 import { useSkyObs } from '../lib/useSkyObs.ts'
+import { eventCall } from '../core/briefing.ts'
+import { litUntilDeg } from '../core/underLight.ts'
 import { formatClock } from '../core/timezone.ts'
 import { FIRST_ENTRY, OUTCOME_LABEL, readFireLog, trackRecord, withEntry, writeFireLog, type FireEntry, type FireOutcome } from '../lib/fireLog.ts'
 import { TruthLoop } from './TruthLoop.tsx'
@@ -100,6 +102,9 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
   /* Batch J: the observations before the event name the deck by its real height ("mid deck (12k or higher)", never the models' "cirrus" for it). */
   const obs = useSkyObs(venue, event, stations?.[0] === undefined ? null : { id: stations[0].sky.station, sky: stations[0].sky }, lead?.layer ?? null, realNow)
   const name = (l: Layer) => layerWords(l, obs?.truth ?? null, LAYER_WORD)
+  /* Within the hour, a reported deck and an open gap are the call, and time the colour from under (Batch J, Sections 2-3): the same as Today. */
+  const seen = obs === null || event === null || verdict === null ? null : eventCall(verdict, kind, event, realNow, null, { venue, truth: obs.truth, gap: obs.gap })
+  const byStations = seen !== null && seen.call === 'Go' && seen.peak != null
 
   /*
    * THE LOG, BY THE REAL CLOCK (item 6): from 50 minutes before a sunrise or
@@ -220,15 +225,17 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
             * Everything else is a row away.
             */}
           <div className="fire__top">
-            <p className={`fire__big fire__verdict--${verdict.word}`} role="status">
-              {verdict.word === 'unlikely' ? 'Fire unlikely' : `Fire ${verdict.word}`}
+            <p className={`fire__big fire__verdict--${byStations ? 'likely' : verdict.word}`} role="status">
+              {byStations ? 'Fire likely' : verdict.word === 'unlikely' ? 'Fire unlikely' : `Fire ${verdict.word}`}
             </p>
             <span className="fire__chip num">
-              {verdict.agree} of {verdict.of}
+              {byStations ? 'stations' : `${verdict.agree} of ${verdict.of}`}
             </span>
           </div>
           <p className="fire__when num">
-            {verdict.word === 'unlikely' ? verdictSentence(verdict, clock, name).replace(/^Fire unlikely: /, '').replace(/^./, (c) => c.toUpperCase()) : watch === null ? verdictSentence(verdict, clock, name) : `Best ${clock(watch.from)}–${clock(watch.to)}${lead?.times?.deepest == null ? '' : ` · deepest ${clock(lead.times.deepest)}`}`}
+            {byStations && seen?.colorFrom != null && seen.colorTo != null && seen.peak != null
+              ? `Best ${clock(seen.colorFrom)}–${clock(seen.colorTo)} · deepest ${clock(seen.peak)}`
+              : verdict.word === 'unlikely' ? verdictSentence(verdict, clock, name).replace(/^Fire unlikely: /, '').replace(/^./, (c) => c.toUpperCase()) : watch === null ? verdictSentence(verdict, clock, name) : `Best ${clock(watch.from)}–${clock(watch.to)}${lead?.times?.deepest == null ? '' : ` · deepest ${clock(lead.times.deepest)}`}`}
           </p>
           {obs?.gap.state == null ? null : <p className="fire__gap">{obs.gap.line}</p>}
           {mean === null ? null : <FireSideView read={verdict.sky} path={mean} venue={venue} kind={kind} />}
@@ -251,11 +258,12 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
           <details className="frow fire__whyfold">
             <summary>Why · numbers and stations</summary>
             {nowLine === null ? null : <p className="fire__now fire__note">Sky right now · {nowLine}</p>}
+            {byStations && obs?.truth != null ? <p className="fire__note">Lit from under through the gap: the deck you can see catches the sun before sunset, deepest as the sun sets, until the sun is {litUntilDeg((obs.truth.baseFt ?? 0) * 0.3048).toFixed(1)}° below (its height&rsquo;s dip, and the bend of a grazing ray).</p> : null}
             {obs?.truth == null ? null : <p className="fire__note fire__truth">The deck over you: {obs.truth.words}. {obs.truth.notes.join(' · ')}.</p>}
             <p className="fire__note">
               {agreementLine(verdict, name)}{split ? ' · models split on low cloud' : ''}. A forecast places cloud on a grid kilometres across: it cannot promise a hole.
             </p>
-            {watch === null ? null : (
+            {watch === null || byStations ? null : (
               <p className="fire__note">
                 Look from {clock(watch.from)} until {clock(watch.to)}, when the {name(watch.layer)} glows{kind === 'sunrise' && watch.to.getTime() <= event.getTime() ? ', before the sun is up' : ''}.
               </p>

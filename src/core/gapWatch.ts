@@ -99,6 +99,8 @@ export interface GapRead {
   state: GapState | null
   /** Where the deck ends toward the sun, km, when it does. */
   edgeKm: number | null
+  /** The edge the sun's slot is measured from: the satellite's (every 10 km) when it says open, else the stations'. */
+  slotEdgeKm: number | null
   /** "WSW". */
   toward: string
   stations: GapStation[]
@@ -167,5 +169,6 @@ export function gapRead(g: GapIn): GapRead {
   const satWord = sat.says === null ? null : sat.says === 'open' ? `satellite clear past ${Math.round(sat.edgeKm ?? 0)} km` : 'satellite cloud to the end'
   const evidence = [...names, ...(names.length === 0 && satWord !== null ? [satWord] : []), ...(showers ? ['showers in the gap'] : [])]
   const line = state === null ? `Gap to the ${toward}: no station or satellite can say` : `Gap to the ${toward}: ${state === 'partly' ? 'partly open' : state}${evidence.length === 0 ? '' : ` · ${evidence.join(', ')}`}`
-  return { state, edgeKm, toward, stations, stationsSay: st.says, satSays: sat.says, satEdgeKm: sat.edgeKm, showers, line }
+  const slotEdgeKm = sat.says === 'open' ? sat.edgeKm : edgeKm
+  return { state, edgeKm, slotEdgeKm, toward, stations, stationsSay: st.says, satSays: sat.says, satEdgeKm: sat.edgeKm, showers, line }
 }

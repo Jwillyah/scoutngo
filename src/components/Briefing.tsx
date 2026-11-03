@@ -240,7 +240,8 @@ function DayPage({ day, which, placeName, venue, timeZone, units, drone, now, ch
   const read = day?.call ?? null
   const kind: Kind | null = read?.kind ?? null
   const verdict = day === null || kind === null ? null : day.verdicts[kind]
-  const steps: LightStep[] = day === null || read === null || kind === null ? [] : lightSteps(kind, read.event, venue.lat, venue.lon, verdict)
+  const under = read?.peak != null && read.colorFrom !== null && read.colorTo !== null ? { from: read.colorFrom, to: read.colorTo, peak: read.peak } : null
+  const steps: LightStep[] = day === null || read === null || kind === null ? [] : lightSteps(kind, read.event, venue.lat, venue.lon, verdict, under)
   const tag = colorTag(verdict)
   const callWord = read === null ? (loading ? '…' : '—') : read.call ?? '—'
   const why = read === null ? (loading ? 'Reading five forecasts…' : which === 'today' ? 'Both have passed today. Tomorrow’s sunrise is next.' : 'The forecast did not say.') : read.why
