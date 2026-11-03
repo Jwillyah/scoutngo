@@ -15643,6 +15643,19 @@ a.about__row * {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+.bcall__gap,
+.fire__gap {
+  margin: 2px 0 0;
+  font-size: var(--text-sm);
+  color: rgb(255 255 255 / 0.9);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.fire__gap {
+  color: var(--color-text-muted);
+}
 .bcall__when {
   margin-top: 2px !important;
   font-size: var(--text-sm);

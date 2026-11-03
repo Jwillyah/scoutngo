@@ -12,9 +12,11 @@
  *   NASA GIBS         satellite tiles along the sun's line (src/lib/goesNowcast.ts)
  */
 import type { LatLon } from '../core/geo.ts'
-import { distanceMeters } from '../core/geo.ts'
+import { destinationPoint, distanceMeters } from '../core/geo.ts'
+import { gapRead, lineDeckFt, stationsAlong, type GapRead, type LineStation } from '../core/gapWatch.ts'
+import { decodePng } from './png.ts'
 import { deckTruth, MODEL_MOIST_PCT, moistLayers, parsePirepSky, PIREP_HOURS, rhFromDew, SOUNDING_HOURS, SOUNDING_KM, stationDeck, topFromTemperature, type DeckTruth, type Level } from '../core/layerTruth.ts'
-import type { MetarSky } from '../core/metar.ts'
+import { parseMetarSky, type MetarSky } from '../core/metar.ts'
 import type { SatRead } from '../core/goesNowcast.ts'
 import type { Layer } from '../core/skyColour.ts'
 import { roundCoord } from '../core/skyFire.ts'
@@ -188,5 +190,104 @@ export function truthFrom(o: ObsIn): DeckTruth | null {
     satTop,
     modelRh: o.profile === null ? null : moistLayers(o.profile.levels, MODEL_MOIST_PCT),
     modelLayer: o.modelLayer,
+  })
+}
+
+/* ---------------------------------------------------- the gap watch (Section 2) */
+
+export const METAR_ENDPOINT = '/api/metar'
+const NWS = 'https://api.weather.gov'
+
+/** The latest METAR of each station, by id: this app's function (one request), else weather.gov one by one. */
+export async function fetchLineSkies(ids: readonly string[], fetchImpl: typeof fetch = fetch): Promise<Map<string, MetarSky>> {
+  const out = new Map<string, MetarSky>()
+  if (ids.length === 0) return out
+  try {
+    const r = await fetchImpl(METAR_ENDPOINT, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ stations: ids }), signal: AbortSignal.timeout(TIMEOUT_MS) })
+    if (r.ok) {
+      const body = (await r.json()) as { metars?: unknown }
+      for (const m of Array.isArray(body.metars) ? body.metars : []) {
+        const sky = typeof m === 'string' ? parseMetarSky(m) : null
+        if (sky !== null) out.set(sky.station, sky)
+      }
+    }
+  } catch {
+    /* weather.gov below */
+  }
+  await Promise.all(
+    ids.filter((id) => !out.has(id)).map(async (id) => {
+      try {
+        const r = await fetchImpl(`${NWS}/stations/${id}/observations/latest`, { headers: { accept: 'application/geo+json' }, signal: AbortSignal.timeout(TIMEOUT_MS) })
+        if (!r.ok) return
+        const raw = ((await r.json()) as { properties?: { rawMessage?: unknown } }).properties?.rawMessage
+        const sky = typeof raw === 'string' ? parseMetarSky(raw) : null
+        if (sky !== null) out.set(id, sky)
+      } catch {
+        /* that station says nothing */
+      }
+    }),
+  )
+  return out
+}
+
+/*
+ * RADAR ALONG THE LINE: IEM's NEXRAD composite (base reflectivity, the
+ * current mosaic) as map tiles, read every 10 km. A pixel with any colour is
+ * an echo; the tiles are transparent where there is none.
+ */
+export const RADAR_TILE = 'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913'
+export const RADAR_ZOOM = 7
+
+export async function fetchEchoes(venue: LatLon, azimuthDeg: number, reachKm: number, fetchImpl: typeof fetch = fetch): Promise<number[] | null> {
+  const n = 2 ** RADAR_ZOOM
+  const tiles = new Map<string, Promise<{ data: Uint8Array | Uint8ClampedArray; width: number } | null>>()
+  const echoes: number[] = []
+  let read = 0
+  for (let km = 10; km <= reachKm; km += 10) {
+    const at = destinationPoint(venue, azimuthDeg, km * 1000)
+    const x = ((at.lon + 180) / 360) * n
+    const r = (at.lat * Math.PI) / 180
+    const y = ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * n
+    const key = `${Math.floor(x)}/${Math.floor(y)}`
+    let t = tiles.get(key)
+    if (t === undefined) {
+      t = (async () => {
+        try {
+          const res = await fetchImpl(`${RADAR_TILE}/${RADAR_ZOOM}/${key}.png`, { signal: AbortSignal.timeout(TIMEOUT_MS) })
+          if (!res.ok) return null
+          const px = await decodePng(new Uint8Array(await res.arrayBuffer()))
+          return { data: px.data, width: px.width }
+        } catch {
+          return null
+        }
+      })()
+      tiles.set(key, t)
+    }
+    const img = await t
+    if (img === null) continue
+    read += 1
+    const px = Math.min(img.width - 1, Math.floor((x - Math.floor(x)) * img.width))
+    const py = Math.min(img.width - 1, Math.floor((y - Math.floor(y)) * img.width))
+    if (img.data[(py * img.width + px) * 4 + 3] > 0) echoes.push(km)
+  }
+  return read === 0 ? null : echoes
+}
+
+/** Every station along the line, from the baked list (loaded only for this). */
+export async function lineStations(venue: LatLon, azimuthDeg: number): Promise<LineStation[]> {
+  const { ASOS_STATIONS } = await import('../data/asosStations.ts')
+  return stationsAlong(venue, azimuthDeg, ASOS_STATIONS)
+}
+
+/** The gap from what came back (src/core/gapWatch.ts). */
+export function gapFrom(o: { azimuthDeg: number; line: readonly LineStation[]; reports: ReadonlyMap<string, MetarSky>; station: MetarSky | null; sat: SatRead | null; echoesKm: number[] | null }): GapRead {
+  const over = o.station === null ? null : stationDeck(o.station)
+  return gapRead({
+    azimuthDeg: o.azimuthDeg,
+    line: o.line,
+    reports: o.reports,
+    deckFt: lineDeckFt(over?.baseFt ?? null, [...o.reports.values()]),
+    sat: o.sat === null ? null : { samples: o.sat.samples, groundC: o.sat.groundC },
+    echoesKm: o.echoesKm,
   })
 }

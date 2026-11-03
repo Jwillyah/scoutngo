@@ -52,7 +52,7 @@ writeFileSync(`tests/data/sky-fire-${DATE}-sunset.json`, JSON.stringify({ ran, u
 note(`forecast: ${Array.isArray(payload) ? payload.length : 1} points`)
 
 /* 2. METARs: the venue's two and every station within 60 km of the line out to 320 km. */
-const STATIONS = ['NTU', 'ORF', 'SFQ', 'FKN', 'EMV', 'RIC', 'AVC', 'ASJ', 'IXA', 'RWI', 'HNZ', 'LHZ', 'RDU', 'TDF', 'W63', 'DAN', 'BUY', 'TTA', 'HRJ', 'ECG', 'ONX', 'PHF', 'AKQ', 'JGG', 'GSO', 'INT', 'EXX', 'LKU', 'FYJ', 'FAY', 'GSB', 'PGV', 'MQI']
+const STATIONS = ['NTU', 'ORF', 'SFQ', 'FKN', 'EMV', 'RIC', 'AVC', 'ASJ', 'IXA', 'RWI', 'HNZ', 'LHZ', 'RDU', 'TDF', 'W63', 'DAN', 'BUY', 'TTA', 'HRJ', 'ECG', 'ONX', 'PHF', 'AKQ', 'JGG', 'GSO', 'INT', 'EXX', 'LKU', 'FYJ', 'FAY', 'GSB', 'PGV', 'MQI', 'CPK', 'PVG', 'TQV']
 const iem = `https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py?${STATIONS.map((s) => `station=${s}`).join('&')}&data=metar&year1=2026&month1=11&day1=2&hour1=18&minute1=0&year2=2026&month2=11&day2=2&hour2=23&minute2=30&tz=Etc/UTC&format=onlycomma&latlon=yes&report_type=3&report_type=4`
 const metars = await fetch(iem).then((r) => r.text())
 writeFileSync(`${DIR}/metars.csv`, `# IEM ASOS archive, fetched ${ran}\n# ${iem}\n${metars}`)

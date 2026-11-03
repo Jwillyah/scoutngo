@@ -189,6 +189,8 @@ export interface DeckTruth {
   topFt: number | null
   /** Where the height that names it came from. */
   source: HeightSource
+  /** A station reports the deck over you: measured, not forecast. */
+  measured: boolean
   /** "mid deck (12k or higher)", "low deck (3,400 ft)". */
   words: string
   /** For a narrow label: "mid deck ≥12k", "low deck 3k". */
@@ -243,7 +245,7 @@ export function deckTruth(t: TruthIn): DeckTruth | null {
     }
   }
   if (t.satTop != null) {
-    if (t.satTop.topM === null) notes.push(`satellite: top ${Math.round(t.satTop.btC)} °C, warmer than the air aloft (low cloud or none)`)
+    if (t.satTop.topM === null) notes.push(`satellite: top ${Math.round(t.satTop.btC)} °C, not placed on the forecast\u2019s temperatures`)
     else {
       const ft = t.satTop.topM / M_PER_FT
       const above = base !== null && ft - base.ft > 8000
@@ -264,12 +266,12 @@ export function deckTruth(t: TruthIn): DeckTruth | null {
 
   if (base === null) {
     if (t.modelLayer == null) return null
-    return { layer: t.modelLayer, baseFt: null, atLeast: false, topFt: top, source: 'model-split', words: NAME[t.modelLayer].replace('high cloud', 'high cirrus'), short: NAME[t.modelLayer].replace('high cloud', 'high cirrus'), notes: [...notes, 'the models’ own split'] }
+    return { layer: t.modelLayer, baseFt: null, atLeast: false, topFt: top, source: 'model-split', measured: false, words: NAME[t.modelLayer].replace('high cloud', 'high cirrus'), short: NAME[t.modelLayer].replace('high cloud', 'high cirrus'), notes: [...notes, 'the models’ own split'] }
   }
   const layer = layerOfFt(base.ft)
   const atLeast = st !== null && st.atLeast && (base.source === 'station' || base.source === 'model-rh' || base.source === 'sounding')
   const phrase = st !== null && st.atLeast && base.source !== 'pirep' ? `${k(st.baseFt)} or higher` : base.source === 'station' || base.source === 'pirep' ? thousands(base.ft) : `about ${thousands(base.ft)}`
-  return { layer, baseFt: base.ft, atLeast, topFt: top, source: base.source, words: `${NAME[layer]} (${phrase})`, short: `${NAME[layer]} ${st !== null && st.atLeast && base.source !== 'pirep' ? `≥${k(st.baseFt)}` : k(base.ft)}`, notes }
+  return { layer, baseFt: base.ft, atLeast, topFt: top, source: base.source, measured: st !== null, words: `${NAME[layer]} (${phrase})`, short: `${NAME[layer]} ${st !== null && st.atLeast && base.source !== 'pirep' ? `≥${k(st.baseFt)}` : k(base.ft)}`, notes }
 }
 
 /**

@@ -241,7 +241,7 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
         verdicts[kind] = paths.length === 0 ? null : fireVerdict(paths, { event: e, kind, venue: at, station })
         const satHere = sat !== null && sat.key === key && sat.event === e.getTime() ? sat.read : null
         const obsHere = nextEvent !== null && e.getTime() === nextEvent.getTime() ? obs : null
-        reads[kind] = eventCall(verdicts[kind], kind, e, now, satHere, obsHere === null ? null : { truth: obsHere.truth })
+        reads[kind] = eventCall(verdicts[kind], kind, e, now, satHere, obsHere === null ? null : { truth: obsHere.truth, gap: obsHere.gap })
       }
       const left = KINDS.map((k) => reads[k]).filter((r): r is CallRead => r !== null && (n > 0 || r.event.getTime() > now.getTime() - 30 * 60_000))
       const call = dayCall(left)

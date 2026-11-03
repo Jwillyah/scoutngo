@@ -164,3 +164,63 @@ describe('Section 1: the deck said once', () => {
     expect(truth?.short).toBe('mid deck ≥12k')
   })
 })
+
+describe('Section 2: the gap watch', async () => {
+  const { stationsAlong, stationGap, gapRead, fromSatellite } = await import('../src/core/gapWatch.ts')
+  const { gapFrom } = await import('../src/lib/skyObsData.ts')
+  const { ASOS_STATIONS } = await import('../src/data/asosStations.ts')
+  const { eventCall } = await import('../src/core/briefing.ts')
+  const line = stationsAlong(VENUE, AZIMUTH, ASOS_STATIONS)
+  const reportsAt = (t: Date) => new Map(line.flatMap((s) => {
+    const r = latestBy(s.id.slice(1), t)
+    return r === null ? [] : [[s.id, r.sky] as const]
+  }))
+  const NEXRAD = JSON.parse(readFileSync(`${DIR}/nexrad.json`, 'utf8')) as { frames: Record<string, { km: number; rgba?: number[] }[]> }
+  const echoes = NEXRAD.frames['202611022055'].filter((x) => (x.rgba?.[3] ?? 0) > 0).map((x) => x.km)
+
+  it('walks the sun\'s line WSW and finds the stations near it: Suffolk, Franklin, Emporia, out to Henderson and Roxboro', () => {
+    expect(line.map((s) => s.id)).toEqual(expect.arrayContaining(['KSFQ', 'KFKN', 'KEMV', 'KIXA', 'KHNZ', 'KTDF']))
+    expect(line.every((s) => s.offKm <= 25 && s.alongKm <= 300)).toBe(true)
+  })
+
+  it('a station is open with few or scattered under the deck, shut with broken or overcast, unknown with a CLR under a deck at 12k or higher', () => {
+    expect(stationGap(parseMetarSky('KHNZ 022055Z AUTO 00000KT 10SM SCT110 18/09 A3035')!, 10000)).toEqual({ state: 'open', word: 'scattered' })
+    expect(stationGap(parseMetarSky('KEMV 022055Z AUTO 06003KT 10SM OVC100 19/10 A3037')!, 10000).state).toBe('shut')
+    expect(stationGap(parseMetarSky('KTDF 022055Z AUTO 00000KT 10SM CLR 19/10 A3036')!, 10000)).toEqual({ state: 'open', word: 'clear' })
+    expect(stationGap(parseMetarSky('KTDF 022055Z AUTO 00000KT 10SM CLR 19/10 A3036')!, 12000).state).toBe('unknown')
+  })
+
+  it('2 Nov sunset at T-60: the gap to the WSW is open, by the stations and the satellite, no showers', () => {
+    const gap = gapFrom({ azimuthDeg: AZIMUTH, line, reports: reportsAt(T60), station: STATION!.sky, sat: SAT, echoesKm: echoes })
+    expect(gap.state).toBe('open')
+    expect(gap.stationsSay).toBe('open')
+    expect(gap.satSays).toBe('open')
+    expect(gap.showers).toBe(false)
+    expect(gap.line).toBe('Gap to the WSW: open · Henderson scattered, Roxboro clear')
+    /* The deck ends between Roanoke Rapids (broken, 151 km) and Henderson (225 km). */
+    expect(gap.edgeKm).toBeGreaterThan(150)
+    expect(gap.edgeKm).toBeLessThan(226)
+  })
+
+  it('2 Nov sunset: Go by T-60, measured over modelled', () => {
+    const v = verdictAtT60()!
+    const truth = truthFrom({ station: STATION!.sky, pireps: [], sounding: null, profile: PROFILE, sat: SAT, modelLayer: leadLayer(v).layer })
+    const gap = gapFrom({ azimuthDeg: AZIMUTH, line, reports: reportsAt(T60), station: STATION!.sky, sat: SAT, echoesKm: echoes })
+    /* Before: the models alone, "possible", a Maybe. */
+    expect(eventCall(v, 'sunset', EVENT, T60).call).toBe('Maybe')
+    const c = eventCall(v, 'sunset', EVENT, T60, null, { truth, gap })
+    expect(c.call).toBe('Go')
+    expect(c.why).toBe('Stations see a mid deck ≥12k over you and the gap toward the sun open.')
+    expect(c.gapLine).toBe('Gap to the WSW: open · Henderson scattered, Roxboro clear')
+  })
+
+  it('a shut gap: the far stations broken, the satellite cold to the end; showers past the edge shut an open one', () => {
+    const shut = gapRead({ azimuthDeg: 250, line: [{ id: 'KAAA', name: 'A', alongKm: 100, offKm: 5 }, { id: 'KBBB', name: 'B', alongKm: 200, offKm: 5 }], reports: new Map([['KAAA', parseMetarSky('KAAA 021955Z SCT100')!], ['KBBB', parseMetarSky('KBBB 021955Z OVC100')!]]), deckFt: 10000 })
+    expect(shut.state).toBe('shut')
+    expect(shut.line).toBe('Gap to the WSW: shut · B overcast')
+    expect(fromSatellite(Array.from({ length: 31 }, (_, i) => ({ km: i * 10, c: -30 })), 18).says).toBe('shut')
+    const wet = gapRead({ azimuthDeg: 250, line: [{ id: 'KBBB', name: 'B', alongKm: 200, offKm: 5 }], reports: new Map([['KBBB', parseMetarSky('KBBB 021955Z SCT100')!]]), deckFt: 10000, echoesKm: [240] })
+    expect(wet.state).toBe('shut')
+    expect(wet.line).toMatch(/showers in the gap/)
+  })
+})

@@ -281,6 +281,7 @@ function DayPage({ day, which, placeName, venue, timeZone, units, drone, now, ch
         </p>
         <p className="bcall__word">{callWord}</p>
         <p className="bcall__why">{why}</p>
+        {read?.gapLine == null ? null : <p className="bcall__gap">{read.gapLine}</p>}
         {colour === null ? null : <p className="bcall__when num">{colour}</p>}
       </div>
 

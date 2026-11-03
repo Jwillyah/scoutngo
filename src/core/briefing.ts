@@ -30,6 +30,7 @@ import { windToBeach, type WindToBeach } from './coastFacing.ts'
 import { lookWindow, type FireVerdict } from './fireOutlook.ts'
 import type { SatRead } from './goesNowcast.ts'
 import { layerWords, type DeckTruth } from './layerTruth.ts'
+import type { GapRead } from './gapWatch.ts'
 import { LAYER_WORD } from './skyColour.ts'
 import { sizeWords } from './surfShoot.ts'
 import { curveFromExtremes, levelAt, type TideExtreme } from './tide.ts'
@@ -58,6 +59,8 @@ export interface CallRead {
   colorFrom: Date | null
   colorTo: Date | null
   setUp: Date | null
+  /** "Gap to the WSW: open · Henderson scattered, Roxboro clear", when the gap watch spoke (Batch J). */
+  gapLine?: string | null
   /** Models agreeing that it fires, for the week's certainty dots. */
   agree: number
   of: number
@@ -78,14 +81,33 @@ const firing = (v: FireVerdict) => [...v.perLayer].sort((a, b) => b.agree - a.ag
 /** What was measured before the event (Batch J): the deck over you, named by its real height. */
 export interface CallObs {
   truth?: DeckTruth | null
+  /** The gap toward the sun (src/core/gapWatch.ts). */
+  gap?: GapRead | null
 }
 
 export function eventCall(v: FireVerdict | null, kind: Kind, event: Date, now: Date, sat: SatRead | null = null, obs: CallObs | null = null): CallRead {
-  const base = { kind, event, confirmed: false, colorFrom: null, colorTo: null, setUp: null, agree: 0, of: 0 }
+  const base = { kind, event, confirmed: false, colorFrom: null, colorTo: null, setUp: null, agree: 0, of: 0, gapLine: obs?.gap?.state == null ? null : obs.gap.line }
   const near = Math.abs(event.getTime() - now.getTime()) <= CONFIRM_WITHIN_MS
   if (sat !== null && sat.blocked) return { ...base, agree: v?.agree ?? 0, of: v?.of ?? 0, call: 'Skip', why: `${sat.line}.` }
   if (sat !== null && near && sat.canvas && v?.station?.lowClear === true && (v === null || v.word === 'unlikely')) {
     return { ...base, agree: v?.agree ?? 0, of: v?.of ?? 0, confirmed: true, call: 'Go', why: `Nowcast over the models: ${sat.line.replace(/^The /, 'the ')}, and ${v.station.station} reports nothing under 6,500 ft.` }
+  }
+  /*
+   * OBSERVED OVER MODELLED (Batch J, Section 2: 2 Nov sunset). Within the
+   * hour, a deck a station reports over you and the gap toward the sun open
+   * by the stations along the line (or the satellite) is a Go, whatever the
+   * models placed: the models had that deck wrong, the stations did not. A
+   * shut gap under a reported deck is no Go.
+   */
+  const gap = obs?.gap ?? null
+  const truth = obs?.truth ?? null
+  const w0 = v === null ? null : lookWindow(v)
+  const timing0 = { colorFrom: w0?.from ?? null, colorTo: w0?.to ?? null, setUp: w0 === null ? null : new Date(w0.from.getTime() - SET_UP_BEFORE_MS), agree: v?.agree ?? 0, of: v?.of ?? 0 }
+  if (near && truth?.measured === true && gap?.state === 'open') {
+    return { ...base, ...timing0, confirmed: true, call: 'Go', why: `Stations see a ${truth.short} over you and the gap toward the sun open.` }
+  }
+  if (near && truth?.measured === true && gap?.state === 'shut' && v !== null && v.word !== 'unlikely') {
+    return { ...base, ...timing0, call: 'Maybe', why: `A ${truth.words} over you, but the gap toward the sun is shut: the light may not get under it.` }
   }
   if (v === null) return { ...base, call: null, why: 'The forecast did not say.' }
   const w = lookWindow(v)

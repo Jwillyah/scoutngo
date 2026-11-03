@@ -6,7 +6,8 @@ import type { MetarSky } from '../core/metar.ts'
 import type { SatRead } from '../core/goesNowcast.ts'
 import type { Layer } from '../core/skyColour.ts'
 import { fetchSatRead } from './goesNowcast.ts'
-import { fetchPireps, fetchProfile, fetchSounding, truthFrom, type Profile } from './skyObsData.ts'
+import { fetchEchoes, fetchLineSkies, fetchPireps, fetchProfile, fetchSounding, gapFrom, lineStations, truthFrom, type Profile } from './skyObsData.ts'
+import { GAP_REACH_KM, type GapRead, type LineStation } from '../core/gapWatch.ts'
 
 /*
  * THE OBSERVATIONS BEFORE A SUNRISE OR SUNSET (Batch J), in one place for
@@ -22,6 +23,8 @@ export const obsDue = (event: Date | null, now: Date): boolean => event !== null
 
 export interface SkyObs {
   truth: DeckTruth | null
+  /** The gap toward the sun (src/core/gapWatch.ts). */
+  gap: GapRead
   sat: SatRead | null
   profile: Profile | null
 }
@@ -32,6 +35,10 @@ interface Got {
   sounding: Awaited<ReturnType<typeof fetchSounding>>
   pireps: string[]
   sat: SatRead | null
+  azimuthDeg: number
+  line: LineStation[]
+  reports: Map<string, MetarSky>
+  echoesKm: number[] | null
 }
 
 /* One fetch per venue and event, shared by every page that asks (Sky fire, its strips, Today). */
@@ -40,14 +47,17 @@ function ask(key: string, venue: LatLon, event: Date, station: string | null): P
   let p = asked.get(key)
   if (p === undefined) {
     p = (async () => {
-      const profile = await fetchProfile(venue, event)
+      const azimuthDeg = getPosition(event, venue.lat, venue.lon).azimuth
+      const [profile, line] = await Promise.all([fetchProfile(venue, event), lineStations(venue, azimuthDeg).catch(() => [])])
       const wind = profile?.wind700 ?? profile?.wind500 ?? null
-      const [sounding, pireps, sat] = await Promise.all([
+      const [sounding, pireps, sat, reports, echoesKm] = await Promise.all([
         fetchSounding(venue, event, new Date()),
         station === null ? Promise.resolve([]) : fetchPireps(station),
-        fetchSatRead(venue, getPosition(event, venue.lat, venue.lon).azimuth, event, new Date(), wind, profile?.airC ?? null).catch(() => null),
+        fetchSatRead(venue, azimuthDeg, event, new Date(), wind, profile?.airC ?? null).catch(() => null),
+        fetchLineSkies(line.slice(0, 12).map((s) => s.id)),
+        fetchEchoes(venue, azimuthDeg, GAP_REACH_KM).catch(() => null),
       ])
-      return { key, profile, sounding, pireps, sat }
+      return { key, profile, sounding, pireps, sat, azimuthDeg, line, reports, echoesKm }
     })()
     if (asked.size > 20) asked.clear()
     asked.set(key, p)
@@ -74,6 +84,7 @@ export function useSkyObs(venue: LatLon | null, event: Date | null, station: { i
   return useMemo(() => {
     if (key === null || got === null || got.key !== key) return null
     const truth = truthFrom({ station: station?.sky ?? null, pireps: got.pireps, sounding: got.sounding, profile: got.profile, sat: got.sat, modelLayer })
-    return { truth, sat: got.sat, profile: got.profile }
+    const gap = gapFrom({ azimuthDeg: got.azimuthDeg, line: got.line, reports: got.reports, station: station?.sky ?? null, sat: got.sat, echoesKm: got.echoesKm })
+    return { truth, gap, sat: got.sat, profile: got.profile }
   }, [key, got, station, modelLayer])
 }
