@@ -202,6 +202,42 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
     ['Not blocked', 'notBlocked', lead.hiddenBy === null ? 'yes' : 'no'],
   ] as const)
 
+  /* Batch K, Section 7: the log is the first row, so it is on screen in a 664 px Safari tab too. */
+  const logRow = (
+      <details className="frow">
+      <summary>Log it · your log and photos</summary>
+      {logOnTop ? null : logBlock}
+
+      <p className="fire__head">Your log</p>
+      <p className="fire__note">
+        {log.length} {log.length === 1 ? 'entry' : 'entries'}, kept on this phone only.
+        {record.said === 0 ? '' : ` It fired ${record.fired} of ${record.said} times the forecast said possible or likely.`}
+      </p>
+      <ul className="fire__entries">
+        {log.slice(0, 3).map((e) => (
+          <li key={e.id}>
+            {e.photo === null ? null : <img src={e.photo} alt="" className="fire__thumb" />}
+            {e.date} {e.event} · {e.place}: {OUTCOME_LABEL[e.outcome]}
+            {e.id === FIRST_ENTRY.id ? ' (entry #1)' : ''}
+          </li>
+        ))}
+      </ul>
+
+      {/* The truth loop: your photos against what the app said, and your hit rate (TruthLoop.tsx). */}
+      <TruthLoop
+        timeZone={timeZone}
+        venue={venue}
+        placeName={placeName}
+        target={target ?? null}
+        onPickTarget={onPickTarget}
+        onLogged={(e) => {
+          const next = withEntry(log, e)
+          setLog(next)
+          writeFireLog(next)
+        }}
+      />
+      </details>
+  )
   return (
     <div className="fire">
       {logOnTop ? logBlock : null}
@@ -263,6 +299,7 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
               ))}
             </ul>
           )}
+          {logRow}
           <details className="frow">
             <summary>Compare the 5 forecasts</summary>
             {colourClock?.(kind, 'compare')}
@@ -329,39 +366,7 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
         </>
       )}
 
-      <details className="frow">
-      <summary>Log it · your log and photos</summary>
-      {logOnTop ? null : logBlock}
-
-      <p className="fire__head">Your log</p>
-      <p className="fire__note">
-        {log.length} {log.length === 1 ? 'entry' : 'entries'}, kept on this phone only.
-        {record.said === 0 ? '' : ` It fired ${record.fired} of ${record.said} times the forecast said possible or likely.`}
-      </p>
-      <ul className="fire__entries">
-        {log.slice(0, 3).map((e) => (
-          <li key={e.id}>
-            {e.photo === null ? null : <img src={e.photo} alt="" className="fire__thumb" />}
-            {e.date} {e.event} · {e.place}: {OUTCOME_LABEL[e.outcome]}
-            {e.id === FIRST_ENTRY.id ? ' (entry #1)' : ''}
-          </li>
-        ))}
-      </ul>
-
-      {/* The truth loop: your photos against what the app said, and your hit rate (TruthLoop.tsx). */}
-      <TruthLoop
-        timeZone={timeZone}
-        venue={venue}
-        placeName={placeName}
-        target={target ?? null}
-        onPickTarget={onPickTarget}
-        onLogged={(e) => {
-          const next = withEntry(log, e)
-          setLog(next)
-          writeFireLog(next)
-        }}
-      />
-      </details>
+      {verdict === null || event === null || data === 'loading' ? logRow : null}
     </div>
   )
 }

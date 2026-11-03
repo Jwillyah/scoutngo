@@ -14,6 +14,11 @@
  * and its content's full height measured: the sheet's body for the Sky tabs
  * (at full) and Preflight, the page for Surf, Tides, Wind and Buoys. The
  * screen is the height the content has to fit in.
+ *
+ * NOT THE SWIPE (Batch K, 3 Nov): Sky › Now's pages sit in a box that
+ * scrolls sideways (data-sideways) and is as tall as the page on show; its
+ * scrollHeight counts the taller pages beside it, so it was measured instead
+ * of the sheet (482 of 166 px). Boxes marked data-sideways are skipped.
  */
 import { spawn } from 'node:child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -110,7 +115,7 @@ try {
     const m = await ev(`(() => {
       const root = document.querySelector('.page') ?? document.querySelector('.sheet')
       if (!root) return null
-      const boxes = [root, ...root.querySelectorAll('*')].filter((e) => { const s = getComputedStyle(e); return /(auto|scroll)/.test(s.overflowY) && e.clientHeight > 100 })
+      const boxes = [root, ...root.querySelectorAll('*')].filter((e) => { const s = getComputedStyle(e); return /(auto|scroll)/.test(s.overflowY) && e.clientHeight > 100 && !e.hasAttribute('data-sideways') })
       const el = boxes.sort((a, b) => b.scrollHeight - a.scrollHeight)[0] ?? root
       return { content: Math.round(el.scrollHeight), box: Math.round(el.clientHeight), detent: document.querySelector('.sheet')?.dataset.detent ?? null, cls: String(el.className).split(' ')[0] }
     })()`)

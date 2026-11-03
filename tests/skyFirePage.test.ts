@@ -17,7 +17,9 @@ describe('the Sky fire page', () => {
     const at = (x: string) => render.indexOf(x)
     /* Batch I, one screen: the verdict big, the side view, the strip and checks, then three rows: Compare, Why, Log it. */
     /* Batch J, Section 8: the side view went into Why, so the rows and the Viewfinder are on the first screen. */
-    const order = ['fire__kinds', 'fire__big', "colourClock?.(kind, 'strip')", 'fire__checks--icons', '<summary>Compare the 5 forecasts</summary>', "colourClock?.(kind, 'compare')", '<details className="frow fire__whyfold">', '<summary>Log it'].map(at)
+    /* Batch K, Section 7: Log it is the first row, above Compare, so a 664 px Safari tab shows it. */
+    const order = ['fire__kinds', 'fire__big', "colourClock?.(kind, 'strip')", 'fire__checks--icons', '{logRow}', '<summary>Compare the 5 forecasts</summary>', "colourClock?.(kind, 'compare')", '<details className="frow fire__whyfold">'].map(at)
+    expect(fire.slice(fire.indexOf('const logRow = ('), fire.indexOf('const logRow = (') + 200)).toContain('<summary>Log it')
     expect(order.every((i) => i >= 0)).toBe(true)
     expect([...order].sort((a, b) => a - b)).toEqual(order)
     const why = render.slice(at('fire__whyfold'), render.indexOf('</details>', at('fire__whyfold')))
@@ -32,10 +34,15 @@ describe('the Sky fire page', () => {
   })
 
   it('the old links are at their homes: Sky › Now only, and the cloud card from the shoot card', () => {
-    const sky = plan.slice(plan.indexOf("THE OLD CARDS, AT HOME"), plan.indexOf("THE OLD CARDS, AT HOME") + 1200)
-    expect(sky).toContain("skyTab !== 'now' ? null")
-    expect(sky).not.toContain('Wind at your flight height')
-    expect(sky).not.toContain('Cloud along each position')
+    /* Batch K, Section 7: the links are SkyCard's `more`, drawn in Sky › Now's one row with the line-up, and only there. */
+    const more = plan.slice(plan.indexOf('more={'), plan.indexOf('more={') + 600)
+    expect(more).toContain('The light through your window')
+    expect(more).not.toContain('Wind at your flight height')
+    expect(more).not.toContain('Cloud along each position')
+    const card = readFileSync('src/components/SkyCard.tsx', 'utf8')
+    const nowBranch = card.slice(card.indexOf("if (tab === 'now') {"), card.indexOf("} else if (tab === 'fire')", card.indexOf("if (tab === 'now') {")))
+    expect(nowBranch).toContain('{more}')
+    expect(card.split('{more}').length).toBe(2)
     expect(plan).toMatch(/a Plan thing, so their doors are here[\s\S]{0,200}Cloud along each position’s view[\s\S]{0,120}Wind at your flight height/)
   })
 })

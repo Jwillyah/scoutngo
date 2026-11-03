@@ -2191,6 +2191,16 @@ export function PlanMode({
             ) : (
               <SkyCard
                 units={units}
+                more={
+                  <CardMore
+                    links={[
+                      { label: 'The light through your window', onOpen: () => openCard('golden') },
+                      { label: 'The sun through the day', onOpen: () => openCard('suncurve') },
+                      { label: 'Plan a moonrise', onOpen: () => openCard('moonrise') },
+                      { label: 'Sky cameras near here', onOpen: () => openCard('cams') },
+                    ]}
+                  />
+                }
                 venue={venue}
                 timeZone={venueWindow.timeZone}
                 timeZoneAbbr={venueWindow.timeZoneShort}
@@ -2248,22 +2258,10 @@ export function PlanMode({
               * Plan; the wind at flight height is the Wind page's button.
               */}
             {/* Batch I: one row, not four, on the first screen. */}
-            {skyTab !== 'now' ? null : (
-              <details className="frow">
-                <summary>The light, the sun's day, a moonrise, cams</summary>
-                <CardMore
-                  links={[
-                    { label: 'The light through your window', onOpen: () => openCard('golden') },
-                    { label: 'The sun through the day', onOpen: () => openCard('suncurve') },
-                    { label: 'Plan a moonrise', onOpen: () => openCard('moonrise') },
-                    { label: 'Sky cameras near here', onOpen: () => openCard('cams') },
-                  ]}
-                />
-              </details>
-            )}
+            {/* Batch K, Section 7: the line-up and these links are one row inside Sky › Now (SkyCard's `more`), so the page fits. */}
             {/* Batch I: the Viewfinder, a front-row button on the Sky pages too. */}
             {onViewfinder === undefined ? null : (
-              <div className="skyfoot">
+              <div className={`skyfoot${skyTab === 'fire' ? ' skyfoot--stick' : ''}`}>
                 <button type="button" className="skyfoot__vf" onClick={onViewfinder}>
                   <svg className="bbtn__glyph" viewBox="0 0 24 24" aria-hidden="true">
                     <rect x="3" y="7" width="18" height="13" rx="2" />

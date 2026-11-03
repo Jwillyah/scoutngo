@@ -109,7 +109,7 @@ export function PreflightSheet({ pf, picking, onPick, onPlay, onFly, onRecord, r
       </p>
 
       <div className="pf__controls">
-        <label className="pf__ctl num">
+        <label className="pf__ctl pf__ctl--row num">
           Height {pf.heightFt} ft{pf.heightFt > pf.capFt ? ` (held at ${pf.capFt})` : ''}
           <input type="range" min={20} max={Math.max(pf.capFt, 400)} step={10} value={pf.heightFt} onChange={(e) => pf.setHeightFt(Number(e.target.value))} />
         </label>

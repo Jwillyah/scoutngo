@@ -34,6 +34,8 @@ import type { Place } from '../lib/placeGroups.ts'
  * tap on a result jumps the time bar there.
  */
 interface SkyCardProps {
+  /** Sky › Now's other doors (the light, the sun's day, a moonrise, cams), in one row with the line-up (Batch K, Section 7). */
+  more?: ReactNode
   /** For the Weather tab's numbers. */
   units: Units
   /** Whether the Moon page is the one on screen: the 3D view shows the moon's arc only then (Batch D). */
@@ -142,7 +144,7 @@ function MoonDisc({ fraction, waxing }: { fraction: number; waxing: boolean }) {
 }
 
 
-export function SkyCard({ units, venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump, target, picking, onPickTarget, events, onPlanMoonrise, onOpenNow, placeName, onShowBow, horizon, onOpenCalendar, place, onMoonOpen }: SkyCardProps) {
+export function SkyCard({ more, units, venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump, target, picking, onPickTarget, events, onPlanMoonrise, onOpenNow, placeName, onShowBow, horizon, onOpenCalendar, place, onMoonOpen }: SkyCardProps) {
   const clock = (d: Date) => `${formatClock(d, timeZone)}`
   const finderProps = { venue, target, picking, onPickTarget, onJump, clock, timeZone }
   const [nowPage, setNowPage] = useState(0)
@@ -259,10 +261,6 @@ export function SkyCard({ units, venue, timeZone, timeZoneAbbr, at, tab, onTab, 
           <div><dt>Sunset</dt><dd>{arc.sunset === null ? '—' : `${clock(arc.sunset.at)}, ${Math.round(arc.sunset.azimuth)}°`}</dd></div>
           <div><dt>Now on the bar</dt><dd>{now.altitude > 0 ? `${compassWord(now.azimuth)}, ${Math.round(now.altitude)}° up` : 'below the horizon'}</dd></div>
         </dl>
-        <details className="frow">
-          <summary>Line it up with a landmark</summary>
-          <LineUp {...finderProps} horizon={horizon} />
-        </details>
       </>
     )
   } else if (tab === 'fire') {
@@ -288,10 +286,6 @@ export function SkyCard({ units, venue, timeZone, timeZoneAbbr, at, tab, onTab, 
             Plan this moonrise
           </button>
         )}
-        <details className="frow">
-          <summary>Line it up with a landmark</summary>
-          <LineUp {...finderProps} horizon={horizon} />
-        </details>
       </>
     )
   }
@@ -333,6 +327,12 @@ export function SkyCard({ units, venue, timeZone, timeZoneAbbr, at, tab, onTab, 
             </section>
           ))}
         </div>
+        {/* Batch K, Section 7: one row for the line-up and the old cards, under the pages, not one on each. */}
+        <details className="frow">
+          <summary>Line it up, the light, the sun&rsquo;s day, a moonrise, cams</summary>
+          <LineUp {...finderProps} horizon={horizon} />
+          {more}
+        </details>
       </div>
     )
   } else if (tab === 'fire') {

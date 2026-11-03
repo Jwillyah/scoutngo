@@ -8,7 +8,7 @@ import { remember } from '../lib/callHistory.ts'
 import { showGuide, useBestView } from '../lib/useBestView.ts'
 import { StormBrief } from './StormBrief.tsx'
 import { bestViewOnMap } from '../core/bestView.ts'
-import { camsForEvent } from '../core/skyCams.ts'
+import { camsForEvent, type FacingCam } from '../core/skyCams.ts'
 import { COAST_CAMS } from '../data/coastCams.ts'
 import { beachName } from '../lib/surfBeach.ts'
 import { changeWords } from '../core/callChange.ts'
@@ -263,7 +263,17 @@ function DayPage({ onOpenWeather, day, which, placeName, venue, timeZone, units,
   /* Batch J, Section 6: the call this phone showed last for the event, and its change ("Upgraded to Go at 4:52 PM from KNTU"). */
   const callKey = read === null || which !== 'today' || settling ? null : `${venue.lat.toFixed(2)},${venue.lon.toFixed(2)}|${read.kind}|${read.event.toISOString()}`
   /* Batch J, Section 5: where the colour will be, and which spots see it; a tap draws it on the map. */
-  const skyCams = useMemo(() => (read === null || which !== 'today' ? { look: '', cams: [] } : camsForEvent(venue, read.event, COAST_CAMS)), [read, which, venue])
+  /* Batch K, Section 7: VDOT's coastal traffic cams beside the beach cams, loaded only for Today (src/data/vdotCams.ts). */
+  const [vdot, setVdot] = useState<readonly FacingCam[]>([])
+  useEffect(() => {
+    if (which !== 'today') return
+    let live = true
+    void import('../data/vdotCams.ts').then((m) => live && setVdot(m.VDOT_CAMS))
+    return () => {
+      live = false
+    }
+  }, [which])
+  const skyCams = useMemo(() => (read === null || which !== 'today' ? { look: '', cams: [] } : camsForEvent(venue, read.event, [...COAST_CAMS, ...vdot])), [read, which, venue, vdot])
   const best = useBestView(which === 'today' && read !== null && read.call !== 'Skip' ? venue : null, read?.event ?? null)
   const change = useMemo(() => (callKey === null || read === null ? null : remember(callKey, read.event, read.call, read.by ?? null, now)),
     // eslint-disable-next-line react-hooks/exhaustive-deps

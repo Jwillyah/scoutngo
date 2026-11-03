@@ -69,6 +69,17 @@ export function startsAtDeg(heightM: number, edgeKm: number): number {
 /** How far below the horizon (geometric) the sun can be and still light a deck h m up from under. */
 export const litUntilDeg = (heightM: number): number => dipDeg(heightM) + GRAZE_BEND_DEG
 
+/**
+ * TRUTH CASE #5 CALIBRATION (Batch K, Section 7): minutes added to the whole
+ * window, once Jwilly's photo timestamps of the 2 Nov sunset at Chix Beach
+ * say when the colour actually was. 0 until then: the observed window is
+ * 5:00-5:20 PM by eye, and the replay says 5:00-5:18
+ * (measurements/2026-11-02-truth-5-replay.md). Set it from the photos'
+ * first and last coloured frames; tests/underLightCalibration.test.ts holds
+ * that it moves the whole window and nothing else.
+ */
+export const CALIBRATION_MIN = 0
+
 export interface UnderLit {
   from: Date
   peak: Date
@@ -83,7 +94,7 @@ export interface UnderLit {
  * degrees). `event` is the sunrise or sunset; the search runs 60 minutes
  * either side of it.
  */
-export function underLitWindow(kind: 'sunrise' | 'sunset', event: Date, heightM: number, edgeKm: number | null, sunApparentDeg: (t: Date) => number): UnderLit | null {
+export function underLitWindow(kind: 'sunrise' | 'sunset', event: Date, heightM: number, edgeKm: number | null, sunApparentDeg: (t: Date) => number, shiftMin: number = CALIBRATION_MIN): UnderLit | null {
   /* Geometric, as the arithmetic is; the default slot is said in what you see (apparent). */
   const slotDeg = edgeKm === null ? null : startsAtDeg(heightM, edgeKm)
   const untilDeg = litUntilDeg(heightM)
@@ -93,5 +104,6 @@ export function underLitWindow(kind: 'sunrise' | 'sunset', event: Date, heightM:
   const gone = minutes.find((t) => geometricFromApparent(sunApparentDeg(t)) <= -untilDeg)
   if (inSlot === undefined || gone === undefined) return null
   const [from, to] = kind === 'sunset' ? [inSlot, gone] : [gone, inSlot]
-  return { from, peak: event, to, slotDeg: slotDeg ?? SLOT_DEG, untilDeg }
+  const shift = (d: Date) => new Date(d.getTime() + shiftMin * 60_000)
+  return { from: shift(from), peak: shift(event), to: shift(to), slotDeg: slotDeg ?? SLOT_DEG, untilDeg }
 }

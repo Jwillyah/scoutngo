@@ -25,6 +25,8 @@ const LINK_ONLY: Readonly<Record<string, string>> = {
   'deldot.gov': 'a traffic cam page, opened by you',
   'chart.maryland.gov': 'a traffic cam page, opened by you',
   '511.vdot.virginia.gov': 'a traffic cam page, opened by you',
+  /* Batch K, Section 7: VDOT's coastal cams (src/data/vdotCams.ts), each its own still, opened by you, never fetched. */
+  'snapshot.vdotcameras.com': 'a VDOT traffic cam still, opened by you',
   'tfr.faa.gov': 'the FAA’s TFR page, opened by you',
   'faadronezone.faa.gov': 'the FAA’s drone zone, opened by you',
   'github.com': 'the source code, opened by you',
