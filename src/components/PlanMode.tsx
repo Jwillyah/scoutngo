@@ -61,6 +61,7 @@ import { WindPage } from './WindPage.tsx'
 import { offlineLine, onPacksChanged, packFor } from '../lib/venuePack.ts'
 import { bowOnMap } from '../lib/specialLightData.ts'
 import { GUIDE_EVENT } from '../lib/useBestView.ts'
+import { RADAR_EVENT } from '../lib/radarLayer.ts'
 import { useSpecialNow } from '../lib/useSpecialNow.ts'
 import { SPECIAL_NAME } from '../core/specialLight.ts'
 import { getPosition as sunPositionAt } from 'suncalc'
@@ -1300,6 +1301,13 @@ export function PlanMode({
   const specialStatus = specialNow === null ? null : `${SPECIAL_NAME[specialNow.kind]} ${specialNow.word} now · ${specialNow.agree} of ${specialNow.of} models`
   /* A rainbow's bow, drawn on the map from Sky › Special. */
   const [bow, setBow] = useState<GeoJSON.FeatureCollection | null>(null)
+  /* Batch K, Section 6: the radar frame the Weather tab's slider is on. */
+  const [radarAt, setRadarAt] = useState<Date | null>(null)
+  useEffect(() => {
+    const on = (e: Event) => setRadarAt((e as CustomEvent<Date | null>).detail)
+    window.addEventListener(RADAR_EVENT, on)
+    return () => window.removeEventListener(RADAR_EVENT, on)
+  }, [])
   /* Batch J, Section 5: the best-view wedge and its ranked spots, from Today or Sky fire. */
   useEffect(() => {
     const on = (e: Event) => setBow((e as CustomEvent<GeoJSON.FeatureCollection>).detail)
@@ -2396,6 +2404,7 @@ export function PlanMode({
         onFlightAt={pf.addPoint}
         flight={card.kind === 'preflight' ? pf.features : null}
         guide={bow}
+        radarAt={radarAt}
         waterline={waterline !== null && waterline !== 'no-offset' ? { url: waterline.url, coordinates: waterline.coordinates } : null}
         lightmap={lightImage === null ? null : { url: lightImage.url, coordinates: lightImage.coordinates }}
         onHorizon={setHorizonProfile}

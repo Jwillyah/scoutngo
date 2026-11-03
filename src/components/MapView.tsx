@@ -28,6 +28,7 @@ import {
 import { GOES_ATTRIBUTION, goesBandFor, GOES_MAX_TILE_ZOOM } from '../core/goes.ts'
 import { classificationOf } from '../core/lighting.ts'
 import { goesTileUrl } from '../lib/goesLayer.ts'
+import { radarTemplate, RADAR_MAX_ZOOM } from '../lib/radarLayer.ts'
 import {
   labelDistances,
   FRAME_VENUE_BELOW_ZOOM,
@@ -751,6 +752,8 @@ interface MapViewProps {
   flight?: GeoJSON.FeatureCollection | null
   /* A guide drawn on the ground: a rainbow's bow opposite the sun (src/core/specialLight.ts), labelled. */
   guide?: GeoJSON.FeatureCollection | null
+  /** The radar frame to draw (Batch K, Section 6), or null for none. */
+  radarAt?: Date | null
   /* The waterline over the scanned patch, as an image (src/lib/waterline/useWaterline.ts). */
   waterline?: { url: string; coordinates: [[number, number], [number, number], [number, number], [number, number]] } | null
   /* What the map is showing, in full, at the top of the "i" (MapCredits.tsx): the shadow legend's details. */
@@ -1212,6 +1215,7 @@ export function MapView({
   onFlightAt,
   flight = null,
   guide = null,
+  radarAt = null,
   waterline = null,
   infoNotes = [],
   lightmap = null,
@@ -1858,6 +1862,9 @@ export function MapView({
         paint: { 'circle-radius': 5, 'circle-color': readToken('--white', '#ffffff', container.current), 'circle-stroke-color': readToken('--mark-edge', '#0a0b09', container.current), 'circle-stroke-width': 2 },
       })
 
+      /* The radar (Batch K, Section 6): Iowa State's composite at one time, under the guide's cells and strikes. Hidden until a frame is asked for. */
+      instance.addSource('radar', { type: 'raster', tiles: [radarTemplate(new Date(0))], tileSize: 256, maxzoom: RADAR_MAX_ZOOM, attribution: 'Radar: Iowa Environmental Mesonet' })
+      instance.addLayer({ id: 'radar', type: 'raster', source: 'radar', layout: { visibility: 'none' }, paint: { 'raster-opacity': 0.7 } })
       /* A guide on the ground (a rainbow's bow): white, dashed, over a dark edge. Never red. */
       instance.addSource('guide', { type: 'geojson', data: emptyCollection() })
       instance.addLayer({ id: 'guide-edge', type: 'line', source: 'guide', paint: { 'line-color': readToken('--mark-edge', '#0a0b09', container.current), 'line-width': 5 } })
@@ -2824,6 +2831,21 @@ export function MapView({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guide, ready])
+
+  /* The radar frame. */
+  const radarMs = radarAt?.getTime() ?? null
+  useEffect(() => {
+    if (map.current === null || !ready) return
+    const m = map.current
+    if (m.getLayer('radar') === undefined) return
+    if (radarMs === null) {
+      m.setLayoutProperty('radar', 'visibility', 'none')
+      return
+    }
+    const source = m.getSource('radar') as (maplibregl.RasterTileSource & { setTiles?: (tiles: string[]) => void }) | undefined
+    source?.setTiles?.([radarTemplate(new Date(radarMs))])
+    m.setLayoutProperty('radar', 'visibility', 'visible')
+  }, [radarMs, ready])
 
   /* Preflight's path (PlanMode builds the features). */
   useEffect(() => {

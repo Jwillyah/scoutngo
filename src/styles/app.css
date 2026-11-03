@@ -16856,9 +16856,10 @@ a.about__row * {
 }
 
 /* THE WEATHER TAB (Batch K): now, the week with its spread, rows one tap deeper. */
+/* Batch K, Section 6: one screen at 390 x 844, so the gaps are tight (measurements/2026-11-03-page-heights-batch-k-after.md). */
 .wx {
   display: grid;
-  gap: var(--space-2);
+  gap: 6px;
 }
 .wx__now {
   display: flex;
@@ -16882,31 +16883,40 @@ a.about__row * {
 }
 .wx__week {
   display: grid;
+  grid-template-columns: repeat(7, 1fr);
   margin: 0;
   padding: 0;
   list-style: none;
+  border-top: 1px solid var(--color-line);
+  border-bottom: 1px solid var(--color-line);
 }
 .wx__day {
   display: grid;
-  grid-template-columns: 2.6em 5.2em 4.8em 1fr 3.6em;
-  align-items: baseline;
-  gap: var(--space-1);
+  justify-items: center;
+  gap: 0;
   padding: 3px 0;
   font-size: var(--text-sm);
-  border-top: 1px solid var(--color-line);
+  line-height: 1.25;
 }
 .wx__dname {
   font-weight: var(--weight-medium);
 }
+.wx__hilo {
+  white-space: nowrap;
+}
+.wx__hilo .wx__lo {
+  margin-left: 3px;
+  font-size: 0.75rem;
+}
 .wx__lo,
-.wx__spread,
-.wx__wind {
+.wx__spread {
   color: var(--color-text-muted);
 }
-.wx__wind {
-  text-align: right;
+.wx__spread {
+  font-size: 0.6875rem;
 }
 .wx__rain {
+  min-height: 1.25em;
   color: var(--tide);
 }
 .wx__scroll {
@@ -17005,4 +17015,77 @@ a.about__row * {
 .coastf__marine > summary {
   font-weight: var(--weight-regular, 400);
   font-size: var(--text-sm);
+}
+/* The radar map's slider (Batch K, Section 6): the past is radar; ahead is a projection, said in amber. */
+.rslide {
+  display: grid;
+  gap: 2px;
+}
+.rslide__when {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.rslide__when--proj {
+  color: var(--sun);
+}
+.rslide__range {
+  width: 100%;
+  min-height: 44px;
+  accent-color: var(--white);
+}
+.rslide__ends {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--color-text-muted);
+}
+/* Now sits 60 of 150 minutes along the bar. */
+.rslide__ends span:nth-child(2) {
+  position: absolute;
+  left: 40%;
+  transform: translateX(-50%);
+}
+/* The next 3 hours as one bar (Batch K, Section 6). */
+.wx__nchead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.nstrip {
+  position: relative;
+  height: 26px;
+  border-radius: 6px;
+  background: var(--surface-2, rgba(255, 255, 255, 0.06));
+  overflow: hidden;
+}
+.nstrip__cell {
+  position: absolute;
+  top: 0;
+  height: 16px;
+  border-radius: 4px;
+  background: var(--tide);
+}
+.nstrip__cell--about {
+  opacity: 0.7;
+}
+.nstrip__cell--rough {
+  opacity: 0.45;
+}
+/* Lightning near: a hazard, the one red. */
+.nstrip__bolt {
+  position: absolute;
+  top: 0;
+  width: 4px;
+  height: 16px;
+  background: var(--hazard);
+}
+.nstrip__t {
+  position: absolute;
+  bottom: 1px;
+  padding-left: 3px;
+  font-size: 0.6875rem;
+  color: var(--color-text-muted);
 }

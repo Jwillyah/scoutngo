@@ -38,6 +38,7 @@ const browser = await webkit.launch({ proxy: { server: `http://127.0.0.1:${PORT 
 const rows = []
 const PAGES = [
   ['Sky › Now', 'sky', 'Now'],
+  ['Sky › Weather', 'sky', 'Weather'],
   ['Sky › Sky fire', 'sky', 'Sky fire'],
   ['Sky › Special', 'sky', 'Special'],
   ['Water › Surf', 'water', 'Surf'],

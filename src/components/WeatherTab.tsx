@@ -5,7 +5,8 @@ import { BLEND_MODELS, cloudWords, hourAt, MODEL_LABEL, skillOverall, type Blend
 import { formatShortHour } from '../core/timezone.ts'
 import { useBlend } from '../lib/blendData.ts'
 import { Nowcast } from './Nowcast.tsx'
-import { StormOutlook } from './StormOutlook.tsx'
+import { StormOutlook, StormWhy } from './StormOutlook.tsx'
+import { useStormRisk } from '../lib/stormRiskData.ts'
 import { forecastAge } from '../lib/savedForecast.ts'
 import { formatTemperature, formatWind, type Units } from '../lib/units.ts'
 
@@ -32,6 +33,7 @@ interface WeatherTabProps {
 
 export function WeatherTab({ venue, timeZone, units, at, children }: WeatherTabProps) {
   const { state, reason } = useBlend(venue, timeZone, true)
+  const risk = useStormRisk(venue, timeZone, true)
   const t = (c: number | null) => formatTemperature(c, units.temperature)
   const deg = (c: number | null) => t(c).replace(/°[FC]$/, '°')
   if (state === null) return <div className="wx"><p className="fire__note">{reason === null ? 'Asking six forecast models about here…' : `No forecast: ${reason}.`}</p></div>
@@ -54,18 +56,15 @@ export function WeatherTab({ venue, timeZone, units, at, children }: WeatherTabP
       )}
       {state.stale ? <p className="fire__note">From the forecast of {forecastAge(new Date(state.fetchedAt).toISOString()).text.replace(' old', ' ago')}: a newer one could not be had.</p> : null}
       <Nowcast venue={venue} timeZone={timeZone} units={units} />
-      <StormOutlook venue={venue} timeZone={timeZone} />
+      <StormOutlook risk={risk} timeZone={timeZone} />
       {children}
-      <ol className="wx__week" aria-label="The next seven days">
+      <ol className="wx__week" aria-label="The next seven days: high, low, the models\u2019 highs, rain">
         {state.days.map((d) => (
           <li key={d.date} className="wx__day">
             <span className="wx__dname">{new Date(`${d.date}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' })}</span>
-            <span className="wx__hilo num">
-              {deg(d.hi)}<span className="wx__lo"> {deg(d.lo)}</span>
-            </span>
-            <span className="wx__spread num" aria-label="the models' highs">{deg(d.hiLo)}–{deg(d.hiHi)}</span>
-            <span className="wx__rain num">{d.rainChance === null || d.rainChance < 0.1 ? '' : `rain ${pct(d.rainChance)}`}</span>
-            <span className="wx__wind num">{d.windMax === null ? '' : formatWind(d.windMax, units.wind)}</span>
+            <span className="wx__hilo num">{deg(d.hi)}<span className="wx__lo">{deg(d.lo)}</span></span>
+            <span className="wx__spread num" title="the models\u2019 highs, after correction">{d.hiLo === null || d.hiHi === null ? '—' : `±${Math.max(1, Math.round(((d.hiHi - d.hiLo) * (units.temperature === 'F' ? 1.8 : 1)) / 2))}`}</span>
+            <span className="wx__rain num">{d.rainChance === null || d.rainChance < 0.1 ? '' : pct(d.rainChance)}</span>
           </li>
         ))}
       </ol>
@@ -132,6 +131,7 @@ export function WeatherTab({ venue, timeZone, units, at, children }: WeatherTabP
       <details className="frow">
         <summary>Why</summary>
         <p className="fire__note">Six models: {state.models.map((m) => MODEL_LABEL[m]).join(', ')} (Open-Meteo). Each is corrected for how it has been wrong here at that hour of the day over the last 30 days, then blended, weighted by how close it has come since. A model with no record yet weighs the same as the rest. The spread is the lowest and highest model after correction.</p>
+        <StormWhy risk={risk} />
         <p className="fire__note">Scored on this phone only, kept in its storage and in your backup file. Cloud is scored only when the station reports a layer: it sees nothing above 12,000 ft.</p>
       </details>
     </div>
