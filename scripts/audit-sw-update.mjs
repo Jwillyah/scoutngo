@@ -379,7 +379,23 @@ async function homeScreen(label, insets) {
     now = await seen()
     expectBuild(`W3 ${label}, after Reload`, now, 'B')
     const after = await kept()
-    for (const [key, value] of Object.entries(before)) if (after[key] !== value) problem(`W3 ${label}: ${key} changed across the update`)
+    /*
+     * THE SAVED FORECASTS ARE A CACHE THE APP REFRESHES (Batch K, 3 Nov):
+     * a tide answer that lands after the snapshot is saved again with a new
+     * time, which is the app working, not the update losing anything; on
+     * the gate's loaded lane that happened twice while the audit alone
+     * passed. For that key every entry kept before must still be there
+     * after; every other key must be exactly as it was.
+     */
+    const entries = (v) => { try { return (JSON.parse(v ?? '[]') ?? []).map((e) => e.key) } catch { return null } }
+    for (const [key, value] of Object.entries(before)) {
+      if (key === 'scoutngo.forecast.v1') {
+        const was = entries(value)
+        const now = entries(after[key])
+        if (was === null || now === null) problem(`W3 ${label}: ${key} is not readable across the update`)
+        else for (const k of was) if (!now.includes(k)) problem(`W3 ${label}: ${key} lost its saved "${k}" across the update`)
+      } else if (after[key] !== value) problem(`W3 ${label}: ${key} changed across the update`)
+    }
     console.log(`  W3 ${label}: ${Object.keys(before).length} scoutngo keys kept`)
     await page.screenshot({ path: join(SHOTS, `reloaded-${label}.png`) })
   }

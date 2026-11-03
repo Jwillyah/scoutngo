@@ -16967,3 +16967,16 @@ a.about__row * {
 .wx__map {
   justify-self: start;
 }
+/* Storms later (Batch K, Section 3). */
+.wx__storm,
+.wx__stormday {
+  display: grid;
+  gap: 2px;
+}
+.wx__stormline {
+  font-weight: var(--weight-medium);
+  color: var(--sun);
+}
+.wx__watch {
+  font-weight: var(--weight-medium);
+}

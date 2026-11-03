@@ -5,6 +5,7 @@ import { BLEND_MODELS, cloudWords, hourAt, MODEL_LABEL, skillOverall, type Blend
 import { formatShortHour } from '../core/timezone.ts'
 import { useBlend } from '../lib/blendData.ts'
 import { Nowcast } from './Nowcast.tsx'
+import { StormOutlook } from './StormOutlook.tsx'
 import { forecastAge } from '../lib/savedForecast.ts'
 import { formatTemperature, formatWind, type Units } from '../lib/units.ts'
 
@@ -53,6 +54,7 @@ export function WeatherTab({ venue, timeZone, units, at, children }: WeatherTabP
       )}
       {state.stale ? <p className="fire__note">From the forecast of {forecastAge(new Date(state.fetchedAt).toISOString()).text.replace(' old', ' ago')}: a newer one could not be had.</p> : null}
       <Nowcast venue={venue} timeZone={timeZone} units={units} />
+      <StormOutlook venue={venue} timeZone={timeZone} />
       {children}
       <ol className="wx__week" aria-label="The next seven days">
         {state.days.map((d) => (

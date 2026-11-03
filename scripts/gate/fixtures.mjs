@@ -191,6 +191,8 @@ export async function answer(href) {
   /* Soundings: none launched in the fixture's world; radar: no echoes (a clear tile). */
   if (host === 'mesonet.agron.iastate.edu' && u.pathname.startsWith('/json/raob')) return json({ profiles: [] }, 'no sounding')
   if (host === 'mesonet.agron.iastate.edu' && u.pathname.startsWith('/cgi-bin/request/asos.py')) return text(asosCsv(u), 'text/plain', 'station reports')
+  /* The SPC outlooks, watches and discussions: none over anywhere in the fixture's world. */
+  if (host === 'www.spc.noaa.gov' || (host === 'mesonet.agron.iastate.edu' && u.pathname.startsWith('/api/1/'))) return json({ type: 'FeatureCollection', features: [] }, 'no SPC risk')
   if (host === 'mesonet.agron.iastate.edu' && u.pathname.endsWith('/USCOMP/n0q_0.json')) return json({ meta: { product: 'N0Q', site: 'USCOMP', valid: new Date(Math.floor(FIXTURE_NOW.getTime() / 300_000) * 300_000).toISOString().replace('.000', '') } }, 'radar composite time')
   /* Lightning: no strikes in the fixture's world (a clear map). */
   if (host === 'nowcoast.noaa.gov') return { status: 200, type: 'image/png', body: OVERLAY, fixture: 'no lightning' }
