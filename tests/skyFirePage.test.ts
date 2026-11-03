@@ -20,7 +20,7 @@ describe('the Sky fire page', () => {
     expect(order.every((i) => i >= 0)).toBe(true)
     expect([...order].sort((a, b) => a - b)).toEqual(order)
     const why = render.slice(at('fire__whyfold'), render.indexOf('</details>', at('fire__whyfold')))
-    expect(why).toContain('checkWords(lead)[key]')
+    expect(why).toContain('checkWords(lead, name)[key]')
     expect(why).toContain('<FireSideView read={m}')
     expect(why).toContain('Stations:')
   })

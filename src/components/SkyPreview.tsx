@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { getPosition } from 'suncalc'
 import type { LatLon } from '../core/geo.ts'
 import { nextEvents } from '../core/skyFire.ts'
-import { clockStrips, fireVerdict, WHY_WORDS } from '../core/fireOutlook.ts'
+import { clockStrips, fireVerdict, leadLayer, WHY_WORDS } from '../core/fireOutlook.ts'
+import { layerWords } from '../core/layerTruth.ts'
+import { useSkyObs } from '../lib/useSkyObs.ts'
 import {
   CLOCK_FROM_MIN,
   CLOCK_TO_MIN,
@@ -11,6 +13,7 @@ import {
   LAYER_WORD,
   lightHex,
   stripTimes,
+  type Layer,
   type Strip,
 } from '../core/skyColour.ts'
 import { formatClock } from '../core/timezone.ts'
@@ -101,16 +104,19 @@ function SkyPicture({ sunAzimuthDeg, sunAltitudeDeg, cover, width, height, label
 
 const pct = (x: number | null) => (x === null ? '—' : `${Math.round(x)}%`)
 
-function StripRow({ s, clock }: { s: Strip; clock: (d: Date) => string }) {
+function StripRow({ s, clock, name }: { s: Strip; clock: (d: Date) => string; name?: (l: Layer) => string }) {
+  const word = name?.(s.layer) ?? LAYER_WORD[s.layer]
+  /* A measured deck's words carry its height (Batch J); the models' typical height is said only for theirs. */
+  const measured = word !== LAYER_WORD[s.layer]
   const n = s.minutes.length
   const zero = -CLOCK_FROM_MIN
   return (
     <div className="prev__row">
       <span className="prev__layer">
-        {LAYER_WORD[s.layer]}
-        <span className="prev__h num"> {Math.round(s.heightM / 100) / 10} km</span>
+        {word}
+        {measured ? null : <span className="prev__h num"> {Math.round(s.heightM / 100) / 10} km</span>}
       </span>
-      <svg className="prev__strip" viewBox={`0 0 ${n} 10`} preserveAspectRatio="none" role="img" aria-label={`${LAYER_WORD[s.layer]}: the colour of its light from ${clock(s.minutes[0].at)} to ${clock(s.minutes[n - 1].at)}`}>
+      <svg className="prev__strip" viewBox={`0 0 ${n} 10`} preserveAspectRatio="none" role="img" aria-label={`${word}: the colour of its light from ${clock(s.minutes[0].at)} to ${clock(s.minutes[n - 1].at)}`}>
         {s.minutes.map((m, i) => (
           <rect key={i} x={i} y={0} width={1.05} height={10} className={m.light === null ? 'prev__unlit' : undefined} fill={m.light === null ? undefined : lightHex(m.light)} opacity={m.open != null && m.open < GAP_PARTIAL ? 0.25 : undefined} />
         ))}
@@ -199,6 +205,8 @@ export function SkyPreview({ venue, timeZone, at, now = () => new Date(), kind: 
   const four = event === null ? [] : fourSkies(paths, verdict, event)
   const strips = verdict === null ? [] : clockStrips(verdict)
   const lowBaseM = verdict?.station?.lowBaseM ?? null
+  const obs = useSkyObs(venue, event, stations?.[0] === undefined ? null : { id: stations[0].sky.station, sky: stations[0].sky }, verdict === null ? null : leadLayer(verdict).layer, realNow)
+  const name = (l: Layer) => layerWords(l, obs?.truth ?? null, LAYER_WORD, true)
 
   const [onBattery] = useState(battery)
   const pager = useRef<HTMLDivElement>(null)
@@ -245,7 +253,7 @@ export function SkyPreview({ venue, timeZone, at, now = () => new Date(), kind: 
                   {show === 'strip' ? null : <p className="prev__words">{strips.some((s) => stripTimes(s).glowFrom !== null) ? clockWords(strips, kind, clock) : `Nothing lit that you could see: ${WHY_WORDS[verdict.why ?? 'none']}.`}</p>}
                   <div className="prev__strips">
                     {strips.map((s) => (
-                      <StripRow key={s.layer} s={s} clock={clock} />
+                      <StripRow key={s.layer} s={s} clock={clock} name={name} />
                     ))}
                     <div className="prev__ticks num" aria-hidden="true">
                       <span>{clock(new Date(event.getTime() + CLOCK_FROM_MIN * 60_000))}</span>

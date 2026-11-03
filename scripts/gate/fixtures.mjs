@@ -172,6 +172,9 @@ export async function answer(href) {
   if (host === 'www.ndbc.noaa.gov' && u.pathname.endsWith('.spec')) return text(NDBC_SPEC, 'text/plain', 'NDBC spectral summary')
   if (host === 'www.ndbc.noaa.gov') return text(NDBC_TEXT, 'text/plain', 'NDBC buoy text')
   if (host === 'aviationweather.gov') return text(METAR, 'text/plain', 'METAR text')
+  /* Soundings: none launched in the fixture's world; radar: no echoes (a clear tile). */
+  if (host === 'mesonet.agron.iastate.edu' && u.pathname.startsWith('/json/raob')) return json({ profiles: [] }, 'no sounding')
+  if (host === 'mesonet.agron.iastate.edu' && u.pathname.startsWith('/cache/tile.py')) return { status: 200, type: 'image/png', body: OVERLAY, fixture: 'no radar echoes' }
   if (host === 'api.github.com') return json({ sha: '0000000000000000000000000000000000000000', commit: { committer: { date: '2026-10-30T00:00:00Z' } } }, 'GitHub fixture')
   if (host === 'api.anthropic.com') return { status: 401, type: 'application/json', body: Buffer.from('{"type":"error"}'), fixture: 'Anthropic refused' }
   if (/s3[.-]us-west-2\.amazonaws\.com$|overturemaps/.test(host)) return { status: 404, type: 'text/plain', body: Buffer.from(''), fixture: 'scan not in fixtures' }

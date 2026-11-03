@@ -41,9 +41,11 @@ export const HOSTS: readonly Host[] = [
   { host: 'overturemaps-extras-us-west-2.s3.amazonaws.com', who: 'Overture Maps', learns: 'which tiles: a map cell', when: 'only after you tap Fill in heights', trigger: 'if-you-tap' },
   { host: 'api.weather.gov', who: 'US National Weather Service', learns: 'the venue to 2 decimals (about a kilometre), then station ids', when: 'the Cloud chip and Sky fire, when the time on the bar is within two hours of now; Sky fire in the two hours before a sunrise or sunset', trigger: 'on-pin' },
   { host: 'this app (/api/metar)', who: 'this app', learns: 'a station id, never the venue', when: 'Sky fire, when weather.gov has no METAR text; it reads aviationweather.gov', trigger: 'if-you-tap' },
+  { host: 'this app (/api/pirep)', who: 'this app', learns: 'a station id, never the venue', when: 'Sky fire and Today, in the three hours before a sunrise or sunset: pilots\u2019 reports of cloud bases and tops; it reads aviationweather.gov', trigger: 'on-pin' },
+  { host: 'mesonet.agron.iastate.edu', who: 'Iowa Environmental Mesonet (Iowa State)', learns: 'a sounding site\u2019s id and a launch time; radar tiles along the sun\u2019s line, a map cell', when: 'Sky fire and Today, in the three hours before a sunrise or sunset', trigger: 'on-pin' },
   { host: 'this app (/api/buoy)', who: 'this app', learns: 'a buoy number, never the venue', when: 'the surf row; it reads NOAA NDBC', trigger: 'on-pin' },
   /* Asked only when you open or press the thing named (29 Oct: these five were missing from this list). */
-  { host: 'gibs.earthdata.nasa.gov', who: 'NASA GIBS satellite imagery', learns: 'which satellite tiles: a map cell', when: 'only with the satellite cloud layer on', trigger: 'if-you-tap' },
+  { host: 'gibs.earthdata.nasa.gov', who: 'NASA GIBS satellite imagery', learns: 'which satellite tiles: a map cell', when: 'the satellite cloud layer; and Sky fire and Today in the three hours before a sunrise or sunset, along the sun\u2019s line', trigger: 'on-pin' },
   { host: 'photon.komoot.io', who: 'Photon (komoot), a place search', learns: 'what you search', when: 'search, when OpenStreetMap finds nothing', trigger: 'if-you-tap' },
   { host: 'this app (/api/search)', who: 'this app, asking Mapbox', learns: 'what you search, never who you are', when: 'search, as the last try', trigger: 'if-you-tap' },
   { host: 'api.github.com', who: 'GitHub', learns: 'the app’s public repository name, nothing about you', when: 'Settings, to say whether a newer build exists', trigger: 'if-you-tap' },

@@ -341,10 +341,24 @@ export function fireVerdict(paths: readonly ModelPath[], ctx: FireContext): Fire
 }
 
 /** "4 of 5 see lit high cirrus · 1 of 5 lit low deck": the layers any model sees lit. */
-export function agreementLine(v: FireVerdict): string {
+/** A layer's name: the models' split by default, the measured deck's when one is known (src/core/layerTruth.ts). */
+export type LayerName = (l: Layer) => string
+const SPLIT_NAME: LayerName = (l) => LAYER_WORD[l]
+
+export function agreementLine(v: FireVerdict, name: LayerName = SPLIT_NAME): string {
   const lit = v.perLayer.filter((x) => x.agree > 0)
   if (lit.length === 0) return `None of ${v.of} models see a lit layer`
-  return lit.map((x, i) => `${x.agree} of ${x.of} ${i === 0 ? 'see ' : ''}lit ${LAYER_WORD[x.layer]}`).join(' · ')
+  /* Layers said by one name (the models' mid and high, both the measured deck): a model counts once. */
+  const named = v.models.filter((m) => m.model !== 'best_match' && m.model !== 'sky')
+  const groups: { word: string; agree: number }[] = []
+  for (const x of lit) {
+    const word = name(x.layer)
+    if (groups.some((g) => g.word === word)) continue
+    const same = LAYERS.filter((l) => name(l) === word)
+    const agree = same.length === 1 ? x.agree : named.filter((m) => m.layers.some((l) => same.includes(l.layer) && l.fires)).length
+    groups.push({ word, agree })
+  }
+  return groups.map((g, i) => `${g.agree} of ${v.of} ${i === 0 ? 'see ' : ''}lit ${g.word}`).join(' · ')
 }
 
 /** The strips the colour clock draws: the sky read's canvas layers you can see. */
@@ -357,12 +371,12 @@ export function clockStrips(v: FireVerdict): Strip[] {
  * likely: 4 of 5 models see lit high cirrus, 6:01–6:11 AM." or "Fire
  * unlikely: a lid of cloud."
  */
-export function verdictSentence(v: FireVerdict, clock: (d: Date) => string): string {
+export function verdictSentence(v: FireVerdict, clock: (d: Date) => string, name: LayerName = SPLIT_NAME): string {
   if (v.word === 'unlikely') return `${v.line}.`
   const top = [...v.perLayer].sort((a, b) => b.agree - a.agree)[0]
   const w = lookWindow(v)
   const when = w === null ? '' : `, ${clock(w.from)}–${clock(w.to)}`
-  return top === undefined || top.agree === 0 ? `Fire ${v.word}${when}.` : `Fire ${v.word}: ${top.agree} of ${top.of} models see lit ${LAYER_WORD[top.layer]}${when}.`
+  return top === undefined || top.agree === 0 ? `Fire ${v.word}${when}.` : `Fire ${v.word}: ${top.agree} of ${top.of} models see lit ${name(top.layer)}${when}.`
 }
 
 /** The layer the page speaks for: the sky's first that fires, else its first canvas, else its first. */
@@ -381,20 +395,20 @@ export function lookWindow(v: FireVerdict): { from: Date; to: Date; layer: Layer
 }
 
 /** The check, said: three short lines for one layer read. */
-export function checkWords(l: LayerRead): { canvas: string; gap: string; notBlocked: string } {
+export function checkWords(l: LayerRead, name: LayerName = SPLIT_NAME): { canvas: string; gap: string; notBlocked: string } {
   const pct = (x: number | null) => (x === null ? '—' : `${Math.round(x)}%`)
   return {
-    canvas: l.canvas ? `${LAYER_WORD[l.layer]} ${pct(l.cover)} over you, lit edge ${l.reachKm} km toward the sun` : `${LAYER_WORD[l.layer]} ${pct(l.cover)} over you: nothing to light`,
+    canvas: l.canvas ? `${name(l.layer)} ${pct(l.cover)} over you, lit edge ${l.reachKm} km toward the sun` : `${name(l.layer)} ${pct(l.cover)} over you: nothing to light`,
     gap:
       l.gap === null
         ? 'no glow in this hour'
-        : `${l.gap}: ${Math.round((l.open ?? 0) * 100)}% of the light gets through${l.gapBy === null ? '' : `, ${LAYER_WORD[l.gapBy.layer]} ${Math.round(l.gapBy.cover)}% where the ray crosses it, ${Math.round(l.gapBy.fromKm)}–${Math.round(l.gapBy.toKm)} km`}${l.pastPath ? ' (past 400 km not asked)' : ''}${l.openBy === null ? '' : `; ${l.openBy} reports no low cloud: the low gap is open`}`,
+        : `${l.gap}: ${Math.round((l.open ?? 0) * 100)}% of the light gets through${l.gapBy === null ? '' : `, ${name(l.gapBy.layer)} ${Math.round(l.gapBy.cover)}% where the ray crosses it, ${Math.round(l.gapBy.fromKm)}–${Math.round(l.gapBy.toKm)} km`}${l.pastPath ? ' (past 400 km not asked)' : ''}${l.openBy === null ? '' : `; ${l.openBy} reports no low cloud: the low gap is open`}`,
     notBlocked:
       l.hiddenBy !== null
-        ? `hidden by the ${LAYER_WORD[l.hiddenBy.layer]} over you, ${Math.round(l.hiddenBy.cover)}%`
+        ? `hidden by the ${name(l.hiddenBy.layer)} over you, ${Math.round(l.hiddenBy.cover)}%`
         : l.under.length === 0
           ? `the lowest deck, ${pct(l.cover)} over you: nothing under it`
-          : `${l.under.map((u) => `${LAYER_WORD[u.layer]} ${pct(u.cover)}`).join(', ')} over you, under ${BLOCKED_AT}%`,
+          : `${l.under.map((u) => `${name(u.layer)} ${pct(u.cover)}`).join(', ')} over you, under ${BLOCKED_AT}%`,
   }
 }
 

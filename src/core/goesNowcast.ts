@@ -58,9 +58,11 @@ export interface SatRead {
   farDeep: number
   /** In words, for the Why. */
   line: string
+  /** The samples read, for the cloud top over you and the gap toward the sun (Batch J). */
+  samples: readonly SatSample[]
 }
 
-const share = (xs: SatSample[], cold: (c: number) => boolean) => {
+const share = (xs: readonly SatSample[], cold: (c: number) => boolean) => {
   const known = xs.filter((s) => s.c !== null)
   return known.length === 0 ? null : known.filter((s) => cold(s.c as number)).length / known.length
 }
@@ -81,7 +83,7 @@ export function satRead(samples: readonly SatSample[], at: Date, airC: number | 
     : canvas
       ? `The satellite sees high or mid cloud over you, and the way to the sun ${Math.round(farCold * 100)}% cold`
       : 'The satellite sees no high or mid cloud over you'
-  return { at, groundC, canvas, blocked, farCold, overCold, farDeep, line }
+  return { at, groundC, canvas, blocked, farCold, overCold, farDeep, line, samples }
 }
 
 /** Kilometres along the sun's line the satellite is read at. */

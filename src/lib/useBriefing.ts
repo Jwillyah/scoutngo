@@ -35,6 +35,7 @@ import { useTide } from './useTide.ts'
 import { fetchSatRead } from './goesNowcast.ts'
 import { inNowcast, type SatRead } from '../core/goesNowcast.ts'
 import { useWeatherEpoch } from './useWeatherStatus.ts'
+import { useSkyObs } from './useSkyObs.ts'
 
 export const WEEK_DAYS = 7
 const KINDS: Kind[] = ['sunrise', 'sunset']
@@ -195,6 +196,10 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
     }
   }, [open, satEvent, key, lat, lon, seaWind])
 
+  /* The observations before the next event (Batch J): the deck over you by its real height. */
+  const st0 = stations?.key === key ? (stations.list[0] ?? null) : null
+  const obs = useSkyObs(lat === null || lon === null ? null : { lat, lon }, nextEvent, st0 === null ? null : { id: st0.sky.station, sky: st0.sky }, null, now)
+
   /* The tide: the nearest station's month of highs and lows, from the start of today. */
   const tide = useTide(open ? venue : null, open ? now : null)
   const stationId = tide.status === 'ok' ? tide.station.id : null
@@ -235,7 +240,8 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
         const paths = data === null ? [] : pathsAt(data, nearestHour(e))
         verdicts[kind] = paths.length === 0 ? null : fireVerdict(paths, { event: e, kind, venue: at, station })
         const satHere = sat !== null && sat.key === key && sat.event === e.getTime() ? sat.read : null
-        reads[kind] = eventCall(verdicts[kind], kind, e, now, satHere)
+        const obsHere = nextEvent !== null && e.getTime() === nextEvent.getTime() ? obs : null
+        reads[kind] = eventCall(verdicts[kind], kind, e, now, satHere, obsHere === null ? null : { truth: obsHere.truth })
       }
       const left = KINDS.map((k) => reads[k]).filter((r): r is CallRead => r !== null && (n > 0 || r.event.getTime() > now.getTime() - 30 * 60_000))
       const call = dayCall(left)
@@ -297,6 +303,6 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
     const times = [f, s].filter((x) => x !== null)
     const fetched = f === null ? [] : [...Object.values(f.near), f.week.sunrise, f.week.sunset].map((x) => x?.fetchedAt).filter((t): t is number => typeof t === 'number')
     return { status: times.length === 2 ? 'ready' : 'loading', days, facing, checkedAt: fetched.length === 0 ? null : Math.max(...fetched) }
-  }, [key, lat, lon, fire, sea, stations, tides, sat, today, timeZone, now, scope])
+  }, [key, lat, lon, fire, sea, stations, tides, sat, obs, nextEvent, today, timeZone, now, scope])
 }
 

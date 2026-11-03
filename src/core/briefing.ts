@@ -29,6 +29,7 @@ import { getMoonIllumination, getPosition, getTimes } from 'suncalc'
 import { windToBeach, type WindToBeach } from './coastFacing.ts'
 import { lookWindow, type FireVerdict } from './fireOutlook.ts'
 import type { SatRead } from './goesNowcast.ts'
+import { layerWords, type DeckTruth } from './layerTruth.ts'
 import { LAYER_WORD } from './skyColour.ts'
 import { sizeWords } from './surfShoot.ts'
 import { curveFromExtremes, levelAt, type TideExtreme } from './tide.ts'
@@ -74,7 +75,12 @@ const firing = (v: FireVerdict) => [...v.perLayer].sort((a, b) => b.agree - a.ag
  * had a lid (2 Nov). Low cloud is the stations' alone: infrared does not see
  * it at night.
  */
-export function eventCall(v: FireVerdict | null, kind: Kind, event: Date, now: Date, sat: SatRead | null = null): CallRead {
+/** What was measured before the event (Batch J): the deck over you, named by its real height. */
+export interface CallObs {
+  truth?: DeckTruth | null
+}
+
+export function eventCall(v: FireVerdict | null, kind: Kind, event: Date, now: Date, sat: SatRead | null = null, obs: CallObs | null = null): CallRead {
   const base = { kind, event, confirmed: false, colorFrom: null, colorTo: null, setUp: null, agree: 0, of: 0 }
   const near = Math.abs(event.getTime() - now.getTime()) <= CONFIRM_WITHIN_MS
   if (sat !== null && sat.blocked) return { ...base, agree: v?.agree ?? 0, of: v?.of ?? 0, call: 'Skip', why: `${sat.line}.` }
@@ -84,7 +90,7 @@ export function eventCall(v: FireVerdict | null, kind: Kind, event: Date, now: D
   if (v === null) return { ...base, call: null, why: 'The forecast did not say.' }
   const w = lookWindow(v)
   const top = firing(v)
-  const lit = top !== undefined && top.agree > 0 ? `${top.agree} of ${top.of} models see lit ${LAYER_WORD[top.layer]}` : null
+  const lit = top !== undefined && top.agree > 0 ? `${top.agree} of ${top.of} models see lit ${layerWords(top.layer, obs?.truth ?? null, LAYER_WORD)}` : null
   const timing = { colorFrom: w?.from ?? null, colorTo: w?.to ?? null, setUp: w === null ? null : new Date(w.from.getTime() - SET_UP_BEFORE_MS), agree: v.agree, of: v.of }
   if (v.word === 'unlikely') return { ...base, ...timing, call: 'Skip', why: `${v.line.replace(/^Fire unlikely: /, '').replace(/^./, (c) => c.toUpperCase())}.` }
   const st = v.station

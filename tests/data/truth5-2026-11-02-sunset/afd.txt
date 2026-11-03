@@ -1,0 +1,630 @@
+
+722 
+FXUS61 KAKQ 022336
+AFDAKQ
+
+AREA FORECAST DISCUSSION
+National Weather Service Wakefield VA
+636 PM EST Mon Nov 2 2026
+
+.WHAT HAS CHANGED...
+
+00Z aviation update
+
+Updated full discussion. Slightly higher confidence in rainfall
+(potentially locally heavy) later Thursday and especially 
+Friday.
+
+&&
+
+.KEY MESSAGES...
+1) Dry weather continues into the middle of this week with above 
+average temperatures.
+
+2) Rain chances increase Thursday into Friday, with the greatest 
+chances likely Friday. Locally heavy rainfall is possible, although 
+uncertainty remains regarding rainfall amounts and placement.
+
+&&
+
+.DISCUSSION...
+As of 230 PM EST Monday...
+
+KEY MESSAGE 1...Dry weather continues into the middle of this week 
+with above average temperatures.
+
+High pressure gradually shifts offshore Tuesday as upper-level 
+ridging builds across the eastern US. This will result in dry 
+conditions and a warming trend through midweek. Mostly sunny skies 
+are expected for Tuesday with highs ranging from the lower to mid 
+70s. Temperatures warm further Wednesday as low level flow becomes 
+takes on a southerly component, with highs reaching the mid to upper 
+70s across much of the area. A few locations across interior 
+southern VA and northeast NC could approach 80 degrees. Temperatures 
+will likely be somewhat cooler along the immediate coastline due to 
+an onshore wind. 
+
+Skies gradually clear out this evening into tonight, though some 
+patchy fog cannot be ruled out as we approach sunrise Tuesday AM. 
+Temperatures drop back into the 40s for most areas tonight. Mostly 
+clear skies and light winds are expected Tuesday night with lows 
+generally in the 40s to lower 50s. Increasing moisture and clouds 
+ahead of the next system should result in a milder Wednesday night, 
+with lows mainly in the 50s to around 60.
+
+
+KEY MESSAGE 2...Rain chances increase Thursday into Friday, with the 
+greatest chances likely Friday. Locally heavy rainfall is possible, 
+although uncertainty remains regarding rainfall amounts and 
+placement.
+
+The primary forecast challenge for later this week continues to 
+revolve around the timing of an approaching upper trough and 
+associated cold front. Latest 12z deterministic guidance has come 
+into slightly better agreement, with both the GFS and ECMWF starting 
+to favor Friday as the primary period for precipitation. Of note, 
+the GFS has now trended a bit slower with the upper trough compared 
+to previous runs. 
+
+While some showers still look possible on Thursday into Thursday 
+night, the more widespread precipitation appears increasingly likely 
+to occur Friday as the front slowly progresses across the area. Both 
+the 12z GFS and ECMWF depict a more substantial rainfall signal 
+Friday, particularly across eastern and central portions of the 
+area. The ECMWF even depicts localized QPF maxima exceeding 2 
+inches. However, considerable uncertainties remains regarding the 
+exact placement and magnitude of the heavier precipitation, 
+especially given the potentially convective nature of the rainfall. 
+
+Although confidence is increasing Friday being the primary 
+precipitation period, ensemble guidance has been less aggressive 
+with rainfall amounts compared to some of the deterministic 
+solutions. Thus, would be hesitant to place too much emphasis on 
+the localized QPF maximum at this time. Still, the potentially for 
+locally heavy rainfall will at least need to monitored, particularly 
+for E/SE portions of the area. In addition, a few thunderstorms will 
+be possible Thursday night into Friday, although the degree of 
+instability remains uncertain. 
+
+Temperatures will remain above normal ahead of the front, with only 
+modest cooling expected behind it. Generally drier conditions are 
+expected for the weekend, although some uncertainty remains 
+regarding the progression of the front/potential lingering rain 
+along the immediate coast.
+
+&&
+
+.AVIATION /00Z TUESDAY THROUGH SATURDAY/...
+As of 635 PM EST Monday...
+
+VFR conditions should prevail for the next few hours. Later
+tonight into Tuesday morning, there is an increasing signal for
+fog and low CIGs as winds turn calm and mid-level clouds depart.
+The fog could be dense at times and have introduced mention of 
+1/2 SM VSBYs to all terminals with this update. Flight 
+restrictions could last until ~14z, before skies quickly clear 
+by the late morning and afternoon. VFR is then expected for the 
+rest of the day with light E winds at ORF, PHF, and ECG and 
+light S/SSE winds at RIC and SBY. 
+
+Outlook: Dry weather and mostly VFR conditions are expected through
+at least Wednesday. However, there is some potential for
+additional fog Tuesday night/early Wednesday. The next chance 
+for rain comes Thursday into Friday, but confidence remains low 
+on coverage and any potential restrictions.
+
+&&
+
+.MARINE...
+As of 230 PM EST Monday...
+
+Key Messages:
+
+- Sub-SCA conditions prevails through mid-week before a potential 
+weather system approaches. 
+
+Afternoon weather analysis shows broad high pressure centered over 
+the area. Winds are currently light ~10kt out of the NE and seas are 
+between 1-2ft across the bay and 2-3 ft across the ocean. Through 
+the rest of the afternoon and into Wednesday these benign marine 
+conditions are forecasted to persist. Only major change is winds 
+will shift out of the east on Tuesday, however, they stay around 5-
+10kt with an occasional gust upwards of 15kt. By Wednesday, high 
+pressure will be offshore as low pressure and its cold front 
+approaches from the west. Ahead of the cold front winds are 
+forecasted to be out of the SSE beginning Thursday. Winds are likely 
+to remain sub-SCA as SST have cooled off and less mixing is likely 
+to occur. The main threat for any SCA will likely come from wave 
+heights, as sells approach from the SE. However, confidence is low 
+due to the nature of the coastline likely protecting the area from 
+the swells and the direction of the wind.
+
+&&
+
+.AKQ WATCHES/WARNINGS/ADVISORIES...
+MD...None.
+NC...None.
+VA...None.
+MARINE...None.
+
+&&
+
+$$
+
+DISCUSSION...AJB
+AVIATION...SW
+MARINE...HET
+
+
+
+187 
+FXUS61 KAKQ 021931
+AFDAKQ
+
+AREA FORECAST DISCUSSION
+National Weather Service Wakefield VA
+231 PM EST Mon Nov 2 2026
+
+.WHAT HAS CHANGED...
+Updated full discussion. Slightly higher confidence in rainfall
+(potentially locally heavy) later Thursday and especially 
+Friday.
+
+&&
+
+.KEY MESSAGES...
+1) Dry weather continues into the middle of this week with above 
+average temperatures.
+
+2) Rain chances increase Thursday into Friday, with the greatest 
+chances likely Friday. Locally heavy rainfall is possible, although 
+uncertainty remains regarding rainfall amounts and placement.
+
+&&
+
+.DISCUSSION...
+As of 230 PM EST Monday...
+
+KEY MESSAGE 1...Dry weather continues into the middle of this week 
+with above average temperatures.
+
+High pressure gradually shifts offshore Tuesday as upper-level 
+ridging builds across the eastern US. This will result in dry 
+conditions and a warming trend through midweek. Mostly sunny skies 
+are expected for Tuesday with highs ranging from the lower to mid 
+70s. Temperatures warm further Wednesday as low level flow becomes 
+takes on a southerly component, with highs reaching the mid to upper 
+70s across much of the area. A few locations across interior 
+southern VA and northeast NC could approach 80 degrees. Temperatures 
+will likely be somewhat cooler along the immediate coastline due to 
+an onshore wind. 
+
+Skies gradually clear out this evening into tonight, though some 
+patchy fog cannot be ruled out as we approach sunrise Tuesday AM. 
+Temperatures drop back into the 40s for most areas tonight. Mostly 
+clear skies and light winds are expected Tuesday night with lows 
+generally in the 40s to lower 50s. Increasing moisture and clouds 
+ahead of the next system should result in a milder Wednesday night, 
+with lows mainly in the 50s to around 60.
+
+
+KEY MESSAGE 2...Rain chances increase Thursday into Friday, with the 
+greatest chances likely Friday. Locally heavy rainfall is possible, 
+although uncertainty remains regarding rainfall amounts and 
+placement.
+
+The primary forecast challenge for later this week continues to 
+revolve around the timing of an approaching upper trough and 
+associated cold front. Latest 12z deterministic guidance has come 
+into slightly better agreement, with both the GFS and ECMWF starting 
+to favor Friday as the primary period for precipitation. Of note, 
+the GFS has now trended a bit slower with the upper trough compared 
+to previous runs. 
+
+While some showers still look possible on Thursday into Thursday 
+night, the more widespread precipitation appears increasingly likely 
+to occur Friday as the front slowly progresses across the area. Both 
+the 12z GFS and ECMWF depict a more substantial rainfall signal 
+Friday, particularly across eastern and central portions of the 
+area. The ECMWF even depicts localized QPF maxima exceeding 2 
+inches. However, considerable uncertainties remains regarding the 
+exact placement and magnitude of the heavier precipitation, 
+especially given the potentially convective nature of the rainfall. 
+
+Although confidence is increasing Friday being the primary 
+precipitation period, ensemble guidance has been less aggressive 
+with rainfall amounts compared to some of the deterministic 
+solutions. Thus, would be hesitant to place too much emphasis on 
+the localized QPF maximum at this time. Still, the potentially for 
+locally heavy rainfall will at least need to monitored, particularly 
+for E/SE portions of the area. In addition, a few thunderstorms will 
+be possible Thursday night into Friday, although the degree of 
+instability remains uncertain. 
+
+Temperatures will remain above normal ahead of the front, with only 
+modest cooling expected behind it. Generally drier conditions are 
+expected for the weekend, although some uncertainty remains 
+regarding the progression of the front/potential lingering rain 
+along the immediate coast.
+
+&&
+
+.AVIATION /19Z MONDAY THROUGH SATURDAY/...
+As of 100 PM EST Monday...
+
+VFR conditions prevail throughout this afternoon and into the
+first part of the night. Mainly SCT to BKN clouds this afternoon
+~10 to 15kft AGL, with gradual clearing anticipated from W to E
+later this afternoon into this evening. Winds are generally 
+light (~5 knots) with an easterly component. There is a bit of 
+an increasing signal for fog and/or stratus late tonight into 
+Tuesday morning, but confidence is not high enough to include 
+IFR in the forecast at this time. 
+
+Outlook: Dry weather and prevailing VFR conditions are expected
+through at least Wednesday. The next chance for rain comes
+Thursday into Friday, but confidence remains low on coverage 
+and any potential restrictions.
+
+&&
+
+.MARINE...
+As of 230 PM EST Monday...
+
+Key Messages:
+
+- Sub-SCA conditions prevails through mid-week before a potential 
+weather system approaches. 
+
+Afternoon weather analysis shows broad high pressure centered over 
+the area. Winds are currently light ~10kt out of the NE and seas are 
+between 1-2ft across the bay and 2-3 ft across the ocean. Through 
+the rest of the afternoon and into Wednesday these benign marine 
+conditions are forecasted to persist. Only major change is winds 
+will shift out of the east on Tuesday, however, they stay around 5-
+10kt with an occasional gust upwards of 15kt. By Wednesday, high 
+pressure will be offshore as low pressure and its cold front 
+approaches from the west. Ahead of the cold front winds are 
+forecasted to be out of the SSE beginning Thursday. Winds are likely 
+to remain sub-SCA as SST have cooled off and less mixing is likely 
+to occur. The main threat for any SCA will likely come from wave 
+heights, as sells approach from the SE. However, confidence is low 
+due to the nature of the coastline likely protecting the area from 
+the swells and the direction of the wind.
+
+&&
+
+.AKQ WATCHES/WARNINGS/ADVISORIES...
+MD...None.
+NC...None.
+VA...None.
+MARINE...None.
+
+&&
+
+$$
+
+DISCUSSION...AJB
+AVIATION...AJB
+MARINE...HET
+
+
+
+620 
+FXUS61 KAKQ 021758
+AFDAKQ
+
+AREA FORECAST DISCUSSION
+National Weather Service Wakefield VA
+1258 PM EST Mon Nov 2 2026
+
+.WHAT HAS CHANGED...
+Updated discussion.
+
+Updated aviation forecast for the 18z TAFs.
+
+&&
+
+.KEY MESSAGES...
+1) Dry weather continues into the middle of this week with a gradual 
+warming trend.
+
+2) A chance for showers returns Thursday and Friday, but confidence 
+in widespread beneficial rainfall remains low, though most areas 
+likely see at least 0.10" of rain. Above average temperatures are 
+also expected to continue through at least the end of the week.
+
+&&
+
+.DISCUSSION...
+As of 225 AM EST Monday...
+
+KEY MESSAGE 1...Dry weather continues into the middle of this week 
+with a gradual warming trend. 
+
+A well-defined area of high pressure is still just off the NJ coast 
+early this morning, with sfc ridging extending SSW into the
+local area. As a result, there is a very weak pressure gradient
+and light/calm winds at this hour. A weak shortwave aloft over 
+the central Appalachians continues to slowly move toward the 
+local area. High clouds have overspread much of VA/NC in advance
+of this feature. Temperatures are in the upper 30s-40s and will
+not fall much more overnight due to the cloud cover. Radar 
+mosaic shows some light echoes over SE WV and SW VA, with some 
+sites in SW VA reporting light rain at this hour. Clouds 
+increase today as that shortwave weakens as it approaches and 
+crosses the area. Highs will be only in the mid to upper 60s due
+to the clouds. There is a very low but nonzero chance of light 
+rain in the Piedmont later this morning- midday but rain amounts
+would only be a few hundredths of an inch at best. Temps may 
+struggle to get out of the lower 60s across western portions of 
+the FA if we manage to see some very light rain. 
+
+A pronounced warming trend takes place on Tuesday/Wednesday as a 
+building ridge aloft moves over the area while the surface high 
+moves farther offshore. With the low-level flow becoming SE, lower 
+to mid 70s are expected on Tuesday with mid to upper 70s on 
+Wednesday.  Depending on cloud cover, 80F readings are across 
+portions of interior srn VA and NE NC Wednesday. Overnight lows also 
+gradually moderate from the 40s tonight to around 60F Wednesday 
+night. 
+
+
+KEY MESSAGE 2...A chance for showers returns Thursday and Friday, 
+but confidence in widespread beneficial rainfall remains low, though 
+most areas likely see at least 0.10" of rain. Above average 
+temperatures are also expected to continue through at least the 
+end of the week.
+
+A strong low pressure system at the surface and aloft will initially 
+move from the Rockies into the northern Plains and Midwest early in 
+the week, while a trailing cold front eventually tries to advance 
+toward the area in the Thursday-Friday timeframe. Shower chances 
+return on Thursday as the trailing cold front gets close to the 
+area. Showers could begin by late morning west of I-95, with 
+precipitation chances expanding to cover the entire area by the end 
+of the day. However, most of the models show a weakening trend in 
+the showers as they approach the area as the best upper forcing 
+misses us to the north. Despite this, most areas will likely see at 
+least 0.10" of rain from Thursday-Thursday night. Shower chances 
+likely end across the Piedmont by Friday morning following the FROPA 
+but continue during the day/evening on Friday across the eastern 2/3 
+of the FA (especially near the coast) as some redevelopment is 
+possible before the weak cold front crosses the rest of the area. 
+Again, expect more in the way of scattered showers versus widespread 
+rain from Thu-Fri. Most areas will see measurable rain but ensemble 
+probabilities for >0.5" are only 10-30% on the EPS and 30-60% on the 
+GEFS/CMCE. Highs remain at least in the low-mid 70s through the end 
+of the week, with dew points potentially rising well into the 60s by 
+late week. Mainly dry weather likely returns on Saturday. Another 
+shortwave may move across the area late Sunday-Monday, but this 
+system will likely be moisture starved as the deeper moisture likely 
+gets shunted offshore after Friday's FROPA.
+
+There won't be much in the way of appreciable CAA behind the front, 
+and above average temperatures may continue through next weekend. 
+There remain no potential freezes in the forecast as the more 
+substantial cold air remains in the northern half of Canada for the 
+foreseeable future.
+
+&&
+
+.AVIATION /18Z MONDAY THROUGH SATURDAY/...
+As of 100 PM EST Monday...
+
+VFR conditions prevail throughout this afternoon and into the
+first part of the night. Mainly SCT to BKN clouds this afternoon
+~10 to 15kft AGL, with gradual clearing anticipated from W to E
+later this afternoon into this evening. Winds are generally 
+light (~5 knots) with an easterly component. There is a bit of 
+an increasing signal for fog and/or stratus late tonight into 
+Tuesday morning, but confidence is not high enough to include 
+IFR in the forecast at this time. 
+
+Outlook: Dry weather and prevailing VFR conditions are expected
+through at least Wednesday. The next chance for rain comes
+Thursday into Friday, but confidence remains low on coverage 
+and any potential restrictions. 
+
+&&
+
+.MARINE...
+As of 225 AM EST Monday...
+
+Key Messages:
+
+- Sub-SCA conditions persist through mid-week before a potential 
+  weather system approaches. 
+
+A broad area of high pressure remains centered over the region early 
+this morning. NE winds are currently 10 knots or less and will 
+remain so throughout the day today. Seas are 3-4 ft across the NC 
+coastal waters, with 2-3 ft seas to the north. Waves in the Bay are 
+around 1 foot. Expect these benign marine conditions to persist 
+through Wednesday. Winds will become more easterly on Tuesday, but 
+stay ~5-10kt with occasional gusts to 15 kt.  
+
+High pressure will slide offshore on Wednesday as an area of low 
+pressure and its associated cold front approach from the west. This 
+will shift winds southeasterly beginning Thursday, but still remain 
+below SCA thresholds. Confidence is currently lower, but this could 
+potentially bring our first brief rain chances in weeks. 
+Additionally, a building swell from the southeast could raise seas 
+into SCA range nearshore late this week into next week.
+
+&&
+
+.AKQ WATCHES/WARNINGS/ADVISORIES...
+MD...None.
+NC...None.
+VA...None.
+MARINE...None.
+
+&&
+
+$$
+
+DISCUSSION...ERI/SW
+AVIATION...AJB
+MARINE...JKP
+
+
+
+504 
+FXUS61 KAKQ 021140
+AFDAKQ
+
+AREA FORECAST DISCUSSION
+National Weather Service Wakefield VA
+640 AM EST Mon Nov 2 2026
+
+.WHAT HAS CHANGED...
+Updated discussion.
+
+No significant changes.
+
+&&
+
+.KEY MESSAGES...
+1) Dry weather continues into the middle of this week with a gradual 
+warming trend.
+
+2) A chance for showers returns Thursday and Friday, but confidence 
+in widespread beneficial rainfall remains low, though most areas 
+likely see at least 0.10" of rain. Above average temperatures are 
+also expected to continue through at least the end of the week.
+
+&&
+
+.DISCUSSION...
+As of 225 AM EST Monday...
+
+KEY MESSAGE 1...Dry weather continues into the middle of this week 
+with a gradual warming trend. 
+
+A well-defined area of high pressure is still just off the NJ coast 
+early this morning, with sfc ridging extending SSW into the
+local area. As a result, there is a very weak pressure gradient
+and light/calm winds at this hour. A weak shortwave aloft over 
+the central Appalachians continues to slowly move toward the 
+local area. High clouds have overspread much of VA/NC in advance
+of this feature. Temperatures are in the upper 30s-40s and will
+not fall much more overnight due to the cloud cover. Radar 
+mosaic shows some light echoes over SE WV and SW VA, with some 
+sites in SW VA reporting light rain at this hour. Clouds 
+increase today as that shortwave weakens as it approaches and 
+crosses the area. Highs will be only in the mid to upper 60s due
+to the clouds. There is a very low but nonzero chance of light 
+rain in the Piedmont later this morning- midday but rain amounts
+would only be a few hundredths of an inch at best. Temps may 
+struggle to get out of the lower 60s across western portions of 
+the FA if we manage to see some very light rain. 
+
+A pronounced warming trend takes place on Tuesday/Wednesday as a 
+building ridge aloft moves over the area while the surface high 
+moves farther offshore. With the low-level flow becoming SE, lower 
+to mid 70s are expected on Tuesday with mid to upper 70s on 
+Wednesday.  Depending on cloud cover, 80F readings are across 
+portions of interior srn VA and NE NC Wednesday. Overnight lows also 
+gradually moderate from the 40s tonight to around 60F Wednesday 
+night. 
+
+
+KEY MESSAGE 2...A chance for showers returns Thursday and Friday, 
+but confidence in widespread beneficial rainfall remains low, though 
+most areas likely see at least 0.10" of rain. Above average 
+temperatures are also expected to continue through at least the 
+end of the week.
+
+A strong low pressure system at the surface and aloft will initially 
+move from the Rockies into the northern Plains and Midwest early in 
+the week, while a trailing cold front eventually tries to advance 
+toward the area in the Thursday-Friday timeframe. Shower chances 
+return on Thursday as the trailing cold front gets close to the 
+area. Showers could begin by late morning west of I-95, with 
+precipitation chances expanding to cover the entire area by the end 
+of the day. However, most of the models show a weakening trend in 
+the showers as they approach the area as the best upper forcing 
+misses us to the north. Despite this, most areas will likely see at 
+least 0.10" of rain from Thursday-Thursday night. Shower chances 
+likely end across the Piedmont by Friday morning following the FROPA 
+but continue during the day/evening on Friday across the eastern 2/3 
+of the FA (especially near the coast) as some redevelopment is 
+possible before the weak cold front crosses the rest of the area. 
+Again, expect more in the way of scattered showers versus widespread 
+rain from Thu-Fri. Most areas will see measurable rain but ensemble 
+probabilities for >0.5" are only 10-30% on the EPS and 30-60% on the 
+GEFS/CMCE. Highs remain at least in the low-mid 70s through the end 
+of the week, with dew points potentially rising well into the 60s by 
+late week. Mainly dry weather likely returns on Saturday. Another 
+shortwave may move across the area late Sunday-Monday, but this 
+system will likely be moisture starved as the deeper moisture likely 
+gets shunted offshore after Friday's FROPA.
+
+There won't be much in the way of appreciable CAA behind the front, 
+and above average temperatures may continue through next weekend. 
+There remain no potential freezes in the forecast as the more 
+substantial cold air remains in the northern half of Canada for the 
+foreseeable future.
+
+&&
+
+.AVIATION /12Z MONDAY THROUGH FRIDAY/...
+As of 640 AM EST Monday...
+
+VFR conditions are expected to prevail through the 12z TAF
+period. The wind will become E to NE 5-10kt during the day 
+today at ORF, ECG, and PHF, with a light SE wind at RIC and SBY.
+Clear outside of SCT- BKN clouds aoa 10000 ft AGL. There is a 
+low probability of fog at RIC/SBY/PHF late tonight. For now, did
+not add any TEMPO groups to the TAFs but will continue to
+monitor.
+
+Outlook: Dry weather and prevailing VFR conditions are expected
+through at least Wednesday. The next chance for rain comes late
+next week, but confidence remains low on coverage and any 
+potential restrictions.
+
+&&
+
+.MARINE...
+As of 225 AM EST Monday...
+
+Key Messages:
+
+- Sub-SCA conditions persist through mid-week before a potential 
+  weather system approaches. 
+
+A broad area of high pressure remains centered over the region early 
+this morning. NE winds are currently 10 knots or less and will 
+remain so throughout the day today. Seas are 3-4 ft across the NC 
+coastal waters, with 2-3 ft seas to the north. Waves in the Bay are 
+around 1 foot. Expect these benign marine conditions to persist 
+through Wednesday. Winds will become more easterly on Tuesday, but 
+stay ~5-10kt with occasional gusts to 15 kt.  
+
+High pressure will slide offshore on Wednesday as an area of low 
+pressure and its associated cold front approach from the west. This 
+will shift winds southeasterly beginning Thursday, but still remain 
+below SCA thresholds. Confidence is currently lower, but this could 
+potentially bring our first brief rain chances in weeks. 
+Additionally, a building swell from the southeast could raise seas 
+into SCA range nearshore late this week into next week.
+
+&&
+
+.AKQ WATCHES/WARNINGS/ADVISORIES...
+MD...None.
+NC...None.
+VA...None.
+MARINE...None.
+
+&&
+
+$$
+
+DISCUSSION...ERI/SW
+AVIATION...ERI
+MARINE...JKP
+
+
