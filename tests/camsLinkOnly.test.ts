@@ -138,3 +138,13 @@ describe('the app only ever links out', () => {
     expect(strip('const y = <iframe src={cam.url} />')).toContain('<iframe')
   })
 })
+
+describe('the VDOT cams’ terms are on record (Batch L, Section 5)', () => {
+  it('docs/cams.md says when they were checked, where, and what is still open', () => {
+    const doc = readFileSync(new URL('../docs/cams.md', import.meta.url), 'utf8')
+    expect(doc).toMatch(/### Terms checked \(Batch L, 3 Nov 2026\)/)
+    expect(doc).toMatch(/Checked 2026-11-03/)
+    for (const u of ['https://511.vdot.virginia.gov/', 'https://www.vdot.virginia.gov/policies/privacy-security/', 'https://www.vdotcameras.com/']) expect(doc).toContain(u)
+    expect(doc).toMatch(/link out\s+only/)
+  })
+})

@@ -79,3 +79,28 @@ nothing are kept with facing null and never offered for "Look west". Links
 open the cam's own still on vdotcameras.com on a tap; the app fetches
 nothing. North Carolina's DriveNC API needs a developer key: no NC traffic
 cams. Refresh: `node scripts/bake-vdot-cams.mjs`.
+
+### Terms checked (Batch L, 3 Nov 2026)
+
+Checked 2026-11-03 for whether linking to VDOT's camera pages is allowed.
+Nothing found forbids a link; nothing grants one either. Kept: **link out
+only**, the app fetches, frames and embeds no camera image
+(`tests/camsLinkOnly.test.ts`).
+
+| Where | What it says |
+|---|---|
+| https://511.vdot.virginia.gov/ footer, "Info · Website Link Information" | "This website includes links to sites neither controlled nor sponsored by VDOT or the Commonwealth of Virginia." (about links out of 511; nothing on links in) |
+| https://511.vdot.virginia.gov/ footer, "Privacy and Disclaimer Policy" | a dropdown item that opened nothing in a headless browser: **not read** |
+| https://www.vdot.virginia.gov/policies/privacy-security/ (updated 10 Mar 2025) | links out are not endorsements; "© Copyright 2026, VDOT. All rights reserved"; no linking or camera-use terms |
+| https://www.vdot.virginia.gov/policies/ | Accessibility, Civil Rights, FOIA, Privacy and Security, Procurement, Tort Claims: no terms-of-use or linking policy |
+| https://www.vdotcameras.com/ | the camera site is an app shell with no terms text |
+
+**The open question, for the owner.** VDOT's official channel for camera
+data is SmarterRoads (smarterroads.org), behind a usage agreement and an
+account. The 491 cams here were read from the public map's own request
+instead, and each link goes straight to a cam's still on
+snapshot.vdotcameras.com (now a 301 to `/<name>.png`), not to a 511 page.
+Linking to a public image is not copying it, and the © notice is about
+copying; but if VDOT's answer is that the list should come through
+SmarterRoads, the bake script should switch to it or the cams come out.
+Nobody at VDOT has been asked.
