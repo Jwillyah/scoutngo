@@ -61,6 +61,8 @@ interface SkyCardProps {
   placeName?: string
   /** Special light: draw a rainbow's bow on the map, or clear it. */
   onShowBow?: (s: Special | null) => void
+  /** Sky fire's Viewfinder, beside Sunrise and Sunset (Batch L: a sticky footer covered the page's foot in a short Safari tab). */
+  onViewfinder?: () => void
   /** The visible horizon round the venue (the terrain's, or flat), for lining things up. */
   horizon?: HorizonInput
   /** The month as a calendar page. */
@@ -144,7 +146,7 @@ function MoonDisc({ fraction, waxing }: { fraction: number; waxing: boolean }) {
 }
 
 
-export function SkyCard({ more, units, venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump, target, picking, onPickTarget, events, onPlanMoonrise, onOpenNow, placeName, onShowBow, horizon, onOpenCalendar, place, onMoonOpen }: SkyCardProps) {
+export function SkyCard({ more, units, venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump, target, picking, onPickTarget, events, onPlanMoonrise, onOpenNow, placeName, onShowBow, horizon, onOpenCalendar, place, onMoonOpen, onViewfinder }: SkyCardProps) {
   const clock = (d: Date) => `${formatClock(d, timeZone)}`
   const finderProps = { venue, target, picking, onPickTarget, onJump, clock, timeZone }
   const [nowPage, setNowPage] = useState(0)
@@ -264,7 +266,7 @@ export function SkyCard({ more, units, venue, timeZone, timeZoneAbbr, at, tab, o
       </>
     )
   } else if (tab === 'fire') {
-    body = <SkyFire venue={venue} timeZone={timeZone} placeName={placeName ?? 'This place'} at={at} target={target} onPickTarget={onPickTarget} clock={(k, show) => <SkyPreview venue={venue} timeZone={timeZone} at={at} kind={k} onJump={onJump} show={show} />} />
+    body = <SkyFire venue={venue} timeZone={timeZone} placeName={placeName ?? 'This place'} at={at} target={target} onPickTarget={onPickTarget} onViewfinder={onViewfinder} clock={(k, show) => <SkyPreview venue={venue} timeZone={timeZone} at={at} kind={k} onJump={onJump} show={show} />} />
   } else if (tab === 'special') {
     body = <SpecialLight venue={venue} timeZone={timeZone} at={at} onJump={onJump} onShowBow={onShowBow} place={place} />
   } else if (tab === 'preview') {

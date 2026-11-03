@@ -4,6 +4,8 @@ import { formatClock } from '../core/timezone.ts'
 import type { CellCall } from '../core/stormCells.ts'
 import type { Strike } from '../core/lightning.ts'
 import type { Alert } from '../lib/stormData.ts'
+import type { Upstream } from '../core/warnUpstream.ts'
+import { compassPoint } from '../core/field.ts'
 import { sliderSteps } from '../lib/radarLayer.ts'
 import { RadarSlider } from './RadarSlider.tsx'
 import type { WeatherLayer } from './FeaturesSheet.tsx'
@@ -15,11 +17,18 @@ import type { WeatherLayer } from './FeaturesSheet.tsx'
  * height and the time bar (now to +24 h). An amber card when the venue sits
  * inside an NWS warning's polygon. Facts, never advice.
  */
+/** "Severe Thunderstorm Warning 18 mi W · moving E 25 mph toward you (NWS)": a fact, never advice. */
+function upstreamLine(event: string, up: Upstream, dist: 'mi' | 'km'): string {
+  const d = Math.max(1, Math.round(dist === 'mi' ? up.km / 1.609344 : up.km))
+  const sp = Math.round(dist === 'mi' ? up.kt * 1.15078 : up.kt * 1.852)
+  return `${event} ${d} ${dist} ${compassPoint(up.bearingDeg)} · moving ${compassPoint(up.towardDeg)} ${sp} ${dist === 'mi' ? 'mph' : 'km/h'} toward you (${up.motionFrom === 'nws' ? 'NWS' : 'NWS polygon, radar motion'})`
+}
+
 const DBZ = [20, 30, 40, 50, 60, 65]
 const WORD: Record<number, string> = { 20: 'light rain', 30: 'rain', 40: 'heavy rain', 50: 'very heavy, storms', 60: 'hail likely in it', 65: 'large hail possible' }
 const colour = (dbz: number) => `#${N0Q_PALETTE[Math.round((dbz + 32.5) * 2)].toString(16).padStart(6, '0')}`
 
-export function WeatherLayerCard({ layer, scanAt, calls, strikes, alerts, timeZone, windFt, onWindFt }: { layer: WeatherLayer; scanAt: Date | null; calls: readonly CellCall[]; strikes: readonly Strike[]; alerts: readonly Alert[]; timeZone: string; windFt: 0 | 400; onWindFt: (ft: 0 | 400) => void }) {
+export function WeatherLayerCard({ layer, scanAt, calls, strikes, alerts, upstream = [], dist = 'mi', timeZone, windFt, onWindFt }: { layer: WeatherLayer; scanAt: Date | null; calls: readonly CellCall[]; strikes: readonly Strike[]; alerts: readonly Alert[]; upstream?: readonly { alert: Alert; up: Upstream }[]; dist?: 'mi' | 'km'; timeZone: string; windFt: 0 | 400; onWindFt: (ft: 0 | 400) => void }) {
   const [tapped, setTapped] = useState<number | null>(null)
   const [play, setPlay] = useState(false)
   const [step, setStep] = useState(sliderSteps().indexOf(0))
@@ -34,13 +43,19 @@ export function WeatherLayerCard({ layer, scanAt, calls, strikes, alerts, timeZo
       {warnings.map((a) => (
         <p key={a.event + a.headline} className="wlay__warn">{a.event}{a.ends === null ? '' : ` until ${formatClock(a.ends, timeZone)}`}: the venue is inside its polygon (NWS)</p>
       ))}
+      {upstream.slice(0, 2).map(({ alert: a, up }) => (
+        <p key={`up${a.event}${a.headline}`} className="wlay__warn wlay__warn--up num" data-upstream>
+          {upstreamLine(a.event, up, dist)}
+          {a.ends === null ? '' : ` · until ${formatClock(a.ends, timeZone)}`}
+        </p>
+      ))}
       {layer === 'radar' ? (
         <>
           <div className="wlay__legend" role="group" aria-label="Radar colours">
             {DBZ.map((d) => (
               <button key={d} type="button" className="wlay__sw" style={{ background: colour(d) }} aria-label={`${d} dBZ: ${WORD[d]}`} onClick={() => setTapped(d)} />
             ))}
-            <span className="wlay__val">{tapped === null ? 'Tap a colour' : `${tapped} dBZ · ${WORD[tapped]}`}</span>
+            <span className="wlay__val">{tapped === null ? 'Tap a colour · cloud under it: GOES infrared' : `${tapped} dBZ · ${WORD[tapped]}`}</span>
           </div>
           {scanAt === null ? (
             <p className="wlay__note">Reading the radar…</p>

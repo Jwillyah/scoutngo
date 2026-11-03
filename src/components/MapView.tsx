@@ -1863,6 +1863,9 @@ export function MapView({
       })
 
       /* The radar (Batch K, Section 6): Iowa State's composite at one time, under the guide's cells and strikes. Hidden until a frame is asked for. */
+      /* Batch L: the satellite's cloud under the radar, its infrared band (day and night alike), at the radar frame's time. */
+      instance.addSource('radar-sat', { type: 'raster', tiles: [goesTileUrl('infrared')], tileSize: 256, maxzoom: GOES_MAX_TILE_ZOOM.infrared, attribution: GOES_ATTRIBUTION })
+      instance.addLayer({ id: 'radar-sat', type: 'raster', source: 'radar-sat', layout: { visibility: 'none' }, paint: { 'raster-opacity': 0.45 } })
       instance.addSource('radar', { type: 'raster', tiles: [radarTemplate(new Date(0))], tileSize: 256, maxzoom: RADAR_MAX_ZOOM, attribution: 'Radar: Iowa Environmental Mesonet' })
       instance.addLayer({ id: 'radar', type: 'raster', source: 'radar', layout: { visibility: 'none' }, paint: { 'raster-opacity': 0.7 } })
       /* A guide on the ground (a rainbow's bow): white, dashed, over a dark edge. Never red. */
@@ -2841,13 +2844,21 @@ export function MapView({
     if (map.current === null || !ready) return
     const m = map.current
     if (m.getLayer('radar') === undefined) return
+    const sat = m.getLayer('radar-sat') === undefined ? null : m
     if (radarMs === null) {
       m.setLayoutProperty('radar', 'visibility', 'none')
+      sat?.setLayoutProperty('radar-sat', 'visibility', 'none')
       return
     }
     const source = m.getSource('radar') as (maplibregl.RasterTileSource & { setTiles?: (tiles: string[]) => void }) | undefined
     source?.setTiles?.([radarTemplate(new Date(radarMs))])
     m.setLayoutProperty('radar', 'visibility', 'visible')
+    if (sat !== null) {
+      /* No satellite frame of the future: a projected radar frame has the newest cloud under it. */
+      const satSource = m.getSource('radar-sat') as (maplibregl.RasterTileSource & { setTiles?: (tiles: string[]) => void }) | undefined
+      satSource?.setTiles?.([goesTileUrl('infrared', new Date(Math.min(radarMs, Date.now())))])
+      sat.setLayoutProperty('radar-sat', 'visibility', 'visible')
+    }
   }, [radarMs, ready])
 
   /* Preflight's path (PlanMode builds the features). */

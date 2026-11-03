@@ -16,18 +16,21 @@ const Z = 6
 const IMAGERY = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile'
 export const STRIP_W = 358
 export const STRIP_H = 76
+/** On a storm day the strip gives up height to the storm line (Batch L): the Weather tab is one screen. */
+export const STRIP_H_SHORT = 52
 
-export function RadarStrip({ venue, radar, timeZone, dist, onOpen }: { venue: LatLon; radar: Radar | null; timeZone: string; dist: 'mi' | 'km'; onOpen: () => void }) {
+export function RadarStrip({ venue, radar, timeZone, dist, onOpen, short = false }: { venue: LatLon; radar: Radar | null; timeZone: string; dist: 'mi' | 'km'; onOpen: () => void; short?: boolean }) {
+  const H = short ? STRIP_H_SHORT : STRIP_H
   const v = latLonPixel(Z, venue)
   /* The strip's top-left in global pixels, the venue in its middle. */
   const x0 = v.gx - STRIP_W / 2
-  const y0 = v.gy - STRIP_H / 2
+  const y0 = v.gy - H / 2
   const tiles: { x: number; y: number }[] = []
-  for (let ty = Math.floor(y0 / 256); ty <= Math.floor((y0 + STRIP_H) / 256); ty += 1) for (let tx = Math.floor(x0 / 256); tx <= Math.floor((x0 + STRIP_W) / 256); tx += 1) tiles.push({ x: tx, y: ty })
+  for (let ty = Math.floor(y0 / 256); ty <= Math.floor((y0 + H) / 256); ty += 1) for (let tx = Math.floor(x0 / 256); tx <= Math.floor((x0 + STRIP_W) / 256); tx += 1) tiles.push({ x: tx, y: ty })
   const radarUrl = radar === null ? null : radarTemplate(radar.scanAt)
   const line = radar === null ? 'Radar did not answer.' : rainNearLine(radar.nearRain, radar.flowToDeg, dist) ?? `no rain within ${dist === 'mi' ? '450 mi' : '700 km'}`
   return (
-    <button type="button" className="rstrip" onClick={onOpen} aria-label={`Radar: ${line}. Open on the map`}>
+    <button type="button" className={`rstrip${short ? ' rstrip--short' : ''}`} onClick={onOpen} aria-label={`Radar: ${line}. Open on the map`}>
       <span className="rstrip__map" aria-hidden="true">
         {tiles.map((t) => (
           <span key={`${t.x}/${t.y}`} className="rstrip__tile" style={{ left: t.x * 256 - x0, top: t.y * 256 - y0 }}>

@@ -28,9 +28,14 @@ interface TimeBarProps {
   timeZone: string
   moon: boolean
   onAt: (next: Date) => void
-  /** Back to the middle of the shoot window. */
+  /** Tap the ↺: back to now (Batch K addendum, D). */
   onReset: () => void
+  /** Hold the ↺: the start of the shoot window (Batch L), with a one-time hint after the first tap. */
+  onHoldReset?: () => void
 }
+
+const HOLD_MS = 550
+const HINT_KEY = 'scoutngo.hint.holdReset.v1'
 
 const HEIGHT = 52
 const MINUTE = 60_000
@@ -62,7 +67,35 @@ function venueParts(at: Date, timeZone: string): { date: string; time: string } 
   return { date, time: formatClock(at, timeZone, 24) }
 }
 
-export function TimeBar({ at, lat, lon, timeZone, moon, onAt, onReset }: TimeBarProps) {
+export function TimeBar({ at, lat, lon, timeZone, moon, onAt, onReset, onHoldReset }: TimeBarProps) {
+  /* The ↺: a tap is Back to now, a hold the shoot window; the first tap shows that once. */
+  const holdTimer = useRef<number | null>(null)
+  const held = useRef(false)
+  const [hint, setHint] = useState(false)
+  const holdStart = () => {
+    if (onHoldReset === undefined) return
+    held.current = false
+    holdTimer.current = window.setTimeout(() => {
+      held.current = true
+      holdTimer.current = null
+      onHoldReset()
+    }, HOLD_MS)
+  }
+  const holdEnd = () => {
+    if (holdTimer.current !== null) window.clearTimeout(holdTimer.current)
+    holdTimer.current = null
+  }
+  const showHintOnce = () => {
+    if (onHoldReset === undefined) return
+    try {
+      if (localStorage.getItem(HINT_KEY) !== null) return
+      localStorage.setItem(HINT_KEY, '1')
+    } catch {
+      return
+    }
+    setHint(true)
+    window.setTimeout(() => setHint(false), 4000)
+  }
   const strip = useRef<HTMLDivElement>(null)
   const drawing = useRef<SVGGElement>(null)
   const label = useRef<HTMLSpanElement>(null)
@@ -277,15 +310,30 @@ export function TimeBar({ at, lat, lon, timeZone, moon, onAt, onReset }: TimeBar
             }}
           />
         </label>
+        {hint ? (
+          <span className="tbar__hint" role="status">
+            Hold ↺ for the shoot window
+          </span>
+        ) : null}
         <button
           type="button"
           className="tbar__reset"
+          onPointerDown={holdStart}
+          onPointerUp={holdEnd}
+          onPointerLeave={holdEnd}
+          onPointerCancel={holdEnd}
+          onContextMenu={(e) => e.preventDefault()}
           onClick={() => {
             stopCoast()
             busy.current = false
+            if (held.current) {
+              held.current = false
+              return
+            }
             onReset()
+            showHintOnce()
           }}
-          aria-label="Back to now: the venue, north up, the current time"
+          aria-label={onHoldReset === undefined ? 'Back to now: the venue, north up, the current time' : 'Back to now: the venue, north up, the current time. Hold for the shoot window'}
         >
           <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true">
             <path d="M4.5 9a6 6 0 1 1 1.6 5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />

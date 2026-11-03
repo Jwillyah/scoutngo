@@ -10275,6 +10275,8 @@
 }
 
 .tbar__reset {
+  -webkit-touch-callout: none;
+  user-select: none;
   width: 44px;
   height: 44px;
   display: grid;
@@ -10283,6 +10285,14 @@
   border-radius: 50%;
   background: transparent;
   color: var(--color-text);
+}
+
+/* The ↺'s one-time hint (Batch L): a hold is the shoot window. */
+.tbar__hint {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
 }
 
 .tbar__strip {
@@ -13715,6 +13725,17 @@
 
 .fire__kinds {
   justify-self: start;
+}
+/* Sunrise, Sunset and the Viewfinder in one row (Batch L). */
+.fire__top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fire__vf {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--text-sm);
 }
 
 .fire__verdict {
@@ -17336,6 +17357,61 @@ a.about__row * {
 .wxl__storm {
   border-color: color-mix(in srgb, var(--sun) 60%, transparent);
 }
+/* The storm line in the top block (Batch L): a gold rule, no card round it. */
+.wxl__stormline {
+  display: grid;
+  gap: 1px;
+  margin: 0 2px;
+  padding: 0 0 0 8px;
+  border-left: 3px solid var(--sun);
+}
+.wxl__stormline .wxl__line {
+  margin: 0;
+  line-height: 1.25;
+}
+.wxl__stormhead {
+  font-size: 0.625rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sun);
+}
+.rstrip--short {
+  height: 52px;
+}
+/* On a storm day the alert is the storm block's first line, not a box (Batch L). */
+.wxl__alert--inline {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--action-mid);
+}
+.wxl__alert--inline[open] {
+  color: inherit;
+}
+.wxl__alert--inline > summary {
+  min-height: 44px;
+  margin: -10px 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 4px;
+}
+.wxl__line--door {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.wxl__models--inline {
+  flex: none;
+  /* 44 px to the thumb, without making the line 44 px tall. */
+  min-height: 44px;
+  margin: -12px 0;
+  padding: 0;
+  border: 0;
+  background: none;
+}
 /* The gold "Shoot it:" line. */
 .wxl__shoot {
   font-size: var(--text-sm);
@@ -17529,6 +17605,16 @@ a.about__row * {
   display: grid;
   gap: 1px;
 }
+/* The quick buttons and the Weather row stay put while the rest scrolls under them (Batch L). */
+.feat__pin {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  gap: 1px;
+  padding-bottom: 4px;
+  background: var(--surface-1);
+}
 .feat__head--inline {
   margin-right: 8px;
 }
@@ -17538,7 +17624,7 @@ a.about__row * {
   gap: 6px;
 }
 .feat__qbtn {
-  min-height: 38px;
+  min-height: 44px;
   border-radius: 12px;
   border: 1px solid var(--color-line-strong);
   background: var(--surface-2, transparent);
@@ -17582,8 +17668,8 @@ a.about__row * {
   grid-template-columns: 26px minmax(0, 1fr) 30px;
   align-items: center;
   gap: 6px;
-  /* 38 px tall and over 160 px wide, so the sheet is one screen (Batch K addendum E); under the 44 px rule in height, said in the report. */
-  min-height: 38px;
+  /* 44 px, the touch rule (Batch L); the sheet scrolls under the pinned quick buttons and Weather row when it runs past one screen. */
+  min-height: 44px;
   padding: 0 6px;
   border-radius: 10px;
   border: 1px solid var(--color-line);
@@ -17647,7 +17733,7 @@ a.about__row * {
   display: grid;
   gap: 2px;
   justify-items: center;
-  min-height: 36px;
+  min-height: 44px;
   padding: 2px;
   border-radius: 10px;
   border: 1px solid var(--color-line);

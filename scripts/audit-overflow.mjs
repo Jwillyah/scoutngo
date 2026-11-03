@@ -289,21 +289,41 @@ try {
     await wait(150)
   }
   await check('Plan, Features', '.feat')
+  /*
+   * FEATURES AT 44 PX (Batch L): every switch, quick button and weather tile
+   * at least 44 px tall. Past one screen, only the sheet's own body scrolls,
+   * and the quick buttons and the Weather row stay pinned where they were
+   * while the foot is scrolled into view.
+   */
   const layers = JSON.parse(await ev(`JSON.stringify((() => {
     const sheet = document.querySelector('.sheet')
     const tiles = document.querySelector('.feat')
     if (!sheet || !tiles) return { missing: true }
-    const scrolls = [...sheet.querySelectorAll('*')].filter((e) => { const s = getComputedStyle(e); return /(auto|scroll)/.test(s.overflowY) && e.scrollHeight > e.clientHeight + 1 }).map((e) => e.className + ' ' + e.scrollHeight + '/' + e.clientHeight)
+    const scrolls = [...sheet.querySelectorAll('*')].filter((e) => { const s = getComputedStyle(e); return /(auto|scroll)/.test(s.overflowY) && e.scrollHeight > e.clientHeight + 1 }).map((e) => ({ name: e.className, h: e.scrollHeight + '/' + e.clientHeight, body: e.classList.contains('sheet__body') }))
+    const short = [...document.querySelectorAll('.feat__sw, .feat__qbtn, .feat__wtile')].filter((b) => b.getBoundingClientRect().height < 43.5).map((b) => (b.textContent || '').trim().slice(0, 16) + ' ' + Math.round(b.getBoundingClientRect().height))
+    const tallest = Math.round(Math.max(0, ...[...document.querySelectorAll('.feat__sw')].map((b) => b.getBoundingClientRect().height)))
+    const lowest = Math.round(Math.min(999, ...[...document.querySelectorAll('.feat__sw')].map((b) => b.getBoundingClientRect().height)))
+    const pinTop = () => Math.round(document.querySelector('.feat__pin')?.getBoundingClientRect().top ?? -1)
+    const wxTop = () => Math.round(document.querySelector('.feat__weather')?.getBoundingClientRect().top ?? -1)
+    const before = { pin: pinTop(), wx: wxTop() }
+    const body = sheet.querySelector('.sheet__body')
+    const content = tiles.scrollHeight
+    if (body) body.scrollTop = body.scrollHeight
     const foot = document.querySelector('.feat__foot')?.getBoundingClientRect()
-    return { detent: sheet.dataset.detent, scrolls, footBottom: foot ? Math.round(foot.bottom) : null, vh: innerHeight, tools: [...document.querySelectorAll('.feat__qbtn')].some((l) => l.textContent === 'Measure'), longest: Math.max(0, ...[...document.querySelectorAll('.feat__note')].map((e) => e.textContent.length)) }
+    const after = { pin: pinTop(), wx: wxTop() }
+    const out = { detent: sheet.dataset.detent, scrolls, short, tallest, lowest, content, box: body ? body.clientHeight : null, before, after, footBottom: foot ? Math.round(foot.bottom) : null, vh: innerHeight, tools: [...document.querySelectorAll('.feat__qbtn')].some((l) => l.textContent === 'Measure'), longest: Math.max(0, ...[...document.querySelectorAll('.feat__note')].map((e) => e.textContent.length)) }
+    if (body) body.scrollTop = 0
+    return out
   })())`))
-  if (layers.missing) fail('Layers did not open, so it was not checked')
+  if (layers.missing) fail('Features did not open, so it was not checked')
   else {
-    console.log(`  Layers: sheet ${layers.detent}, scrolling boxes ${layers.scrolls.length}, foot ends at ${layers.footBottom} of ${layers.vh} px, Measure under Tools ${layers.tools}, longest state ${layers.longest} characters`)
-    if (layers.detent !== 'full') fail(`Layers opened at ${layers.detent}, not full`)
-    for (const x of layers.scrolls) fail(`Layers scrolls: ${x}`)
-    if (layers.footBottom === null || layers.footBottom > layers.vh) fail('the foot of Layers is off the screen')
-    if (!layers.tools) fail('no Measure under Tools in Layers')
+    console.log(`  Features: sheet ${layers.detent}, content ${layers.content} px in a ${layers.box} px box, switches ${layers.lowest}-${layers.tallest} px tall, scrolling boxes ${layers.scrolls.map((x) => x.name.split(' ')[0] + ' ' + x.h).join(', ') || 'none'}, pinned top ${layers.before.pin} -> ${layers.after.pin} and Weather row ${layers.before.wx} -> ${layers.after.wx} after scrolling to the foot, foot ends at ${layers.footBottom} of ${layers.vh} px`)
+    if (layers.detent !== 'full') fail(`Features opened at ${layers.detent}, not full`)
+    for (const x of layers.scrolls) if (!x.body) fail(`Features scrolls inside the sheet, not the sheet itself: ${x.name} ${x.h}`)
+    for (const x of layers.short) fail(`a Features control is under 44 px tall: ${x}`)
+    if (layers.scrolls.length > 0 && (Math.abs(layers.before.pin - layers.after.pin) > 1 || Math.abs(layers.before.wx - layers.after.wx) > 1)) fail(`the quick buttons and Weather row moved when the sheet scrolled: ${layers.before.pin} -> ${layers.after.pin}, ${layers.before.wx} -> ${layers.after.wx}`)
+    if (layers.footBottom === null || layers.footBottom > layers.vh) fail('the foot of Features is off the screen even scrolled to it')
+    if (!layers.tools) fail('no Measure under Tools in Features')
     if (layers.longest > 32) fail(`a switch's note runs to ${layers.longest} characters; a state is a few words`)
   }
   /*

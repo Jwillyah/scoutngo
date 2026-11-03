@@ -30,6 +30,8 @@ import type { LatLon as Pin } from '../core/geo.ts'
  * src/core/skyFire.ts; this only draws it. Never certain, never a promise.
  */
 interface SkyFireProps {
+  /** The Viewfinder, in the Sunrise/Sunset row: on the first screen, over nothing (Batch L). */
+  onViewfinder?: () => void
   venue: LatLon
   timeZone: string
   placeName: string
@@ -48,7 +50,7 @@ type Kind = 'sunrise' | 'sunset'
 
 const dayMonth = (d: Date, timeZone: string) => new Intl.DateTimeFormat('en-GB', { timeZone, day: 'numeric', month: 'short' }).format(d)
 
-export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date(), clock: colourClock, target, onPickTarget }: SkyFireProps) {
+export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date(), clock: colourClock, target, onPickTarget, onViewfinder }: SkyFireProps) {
   const events = useMemo(() => nextEvents(at, venue), [at, venue])
   const firstKind: Kind = events.sunrise !== null && (events.sunset === null || events.sunrise < events.sunset) ? 'sunrise' : 'sunset'
   const [kind, setKind] = useState<Kind>(firstKind)
@@ -242,13 +244,25 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
     <div className="fire">
       {logOnTop ? logBlock : null}
 
-      <div className="seg fire__kinds" role="group" aria-label="Which event">
-        {(['sunrise', 'sunset'] as const).map((k) => (
-          <button key={k} type="button" className={`seg__btn${kind === k ? ' seg__btn--on' : ''}`} aria-pressed={kind === k} disabled={events[k] === null} onClick={() => setKind(k)}>
-            {k === 'sunrise' ? 'Sunrise' : 'Sunset'}
-            {events[k] === null ? null : <span className="num"> {clock(events[k] as Date)}</span>}
+      <div className="fire__top">
+        <div className="seg fire__kinds" role="group" aria-label="Which event">
+          {(['sunrise', 'sunset'] as const).map((k) => (
+            <button key={k} type="button" className={`seg__btn${kind === k ? ' seg__btn--on' : ''}`} aria-pressed={kind === k} disabled={events[k] === null} onClick={() => setKind(k)}>
+              {k === 'sunrise' ? 'Sunrise' : 'Sunset'}
+              {events[k] === null ? null : <span className="num"> {clock(events[k] as Date)}</span>}
+            </button>
+          ))}
+        </div>
+        {onViewfinder === undefined ? null : (
+          <button type="button" className="skyfoot__vf fire__vf" onClick={onViewfinder}>
+            <svg className="bbtn__glyph" viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3" y="7" width="18" height="13" rx="2" />
+              <circle cx="12" cy="13.5" r="3.5" />
+              <path d="M8 7l1.5-2.5h5L16 7" />
+            </svg>
+            Viewfinder
           </button>
-        ))}
+        )}
       </div>
 
       {event === null ? (

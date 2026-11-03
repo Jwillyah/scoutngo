@@ -125,7 +125,7 @@ export function WeatherTab({ venue, timeZone, units, at, placeName }: WeatherTab
       </div>
       {state.stale ? <p className="wxl__note">From the forecast of {forecastAge(new Date(state.fetchedAt).toISOString()).text.replace(' old', ' ago')}: a newer one could not be had.</p> : null}
 
-      {alerts.map((a) => (
+      {(stormDay ? [] : alerts).map((a) => (
         <details key={a.event + a.headline} className="wxl__alert">
           <summary>
             <span className="wxl__alert-ev">{a.event}</span>
@@ -138,9 +138,21 @@ export function WeatherTab({ venue, timeZone, units, at, placeName }: WeatherTab
       ))}
 
       {stormDay ? (
-        <section className="wxl__card wxl__storm" aria-label="Storms">
-          <p className="wxl__cardhead">STORMS{spc === null ? '' : ` · SPC ${spc.word}`}</p>
+        /* Batch L: the storm line is part of the top block, not a card of its own: on a storm day the tab is still one screen. */
+        <section className="wxl__stormline" aria-label="Storms">
+          {alerts.map((a) => (
+            <details key={a.event + a.headline} className="wxl__alert wxl__alert--inline">
+              <summary>
+                <span className="wxl__alert-ev">{a.event}</span>
+                {a.ends === null ? null : <span className="num"> · until {clock(a.ends)}</span>} ›
+              </summary>
+              <p>{a.headline}</p>
+              <p className="wxl__alert-text">{a.description}</p>
+              <p>{a.sender}, as issued.</p>
+            </details>
+          ))}
           <p className="wxl__line">
+            <span className="wxl__stormhead">Storms{spc === null ? '' : ` · SPC ${spc.word}`}</span>{' '}
             {coming !== null ? cellLine(coming, { dist, clock }) : form !== null ? formingLine(form, dist) : storm ?? ''}
             <span className="wxl__sub num">
               {' · '}{bolt === null ? 'no lightning in the last hour' : bolt.replace(/^Lightning /, 'lightning ')}
@@ -152,7 +164,19 @@ export function WeatherTab({ venue, timeZone, units, at, placeName }: WeatherTab
       ) : null}
 
       <section className="wxl__card" aria-label="The next 6 hours">
-        <p className="wxl__line">{rainLine6h(state.hours, at, hour)}</p>
+        {stormDay ? (
+          <p className="wxl__line wxl__line--door">
+            <span>{rainLine6h(state.hours, at, hour)}</span>
+            <button type="button" className="wxl__models wxl__models--inline" onClick={() => setView('models')}>
+              <span className="wxl__dots" aria-hidden="true">
+                {state.models.map((m) => <i key={m} style={{ background: MODEL_COLOR[m] }} />)}
+              </span>
+              <span className="wxl__more">Models ›</span>
+            </button>
+          </p>
+        ) : (
+          <p className="wxl__line">{rainLine6h(state.hours, at, hour)}</p>
+        )}
         <ol className="wxl__hours">
           {strip.map((c) => (
             <li key={`${c.kind}${c.at.getTime()}`} className={`wxl__hour${c.kind === 'sun' ? ' wxl__hour--sun' : ''}`}>
@@ -183,6 +207,7 @@ export function WeatherTab({ venue, timeZone, units, at, placeName }: WeatherTab
         ))}
       </button>
 
+      {stormDay ? null : (
       <button type="button" className="wxl__models" onClick={() => setView('models')}>
         <span className="wxl__dots" aria-hidden="true">
           {state.models.map((m) => <i key={m} style={{ background: MODEL_COLOR[m] }} />)}
@@ -193,8 +218,9 @@ export function WeatherTab({ venue, timeZone, units, at, placeName }: WeatherTab
         </span>
         <span className="wxl__more">Models ›</span>
       </button>
+      )}
 
-      <RadarStrip venue={venue} radar={nowcast?.radar ?? null} timeZone={timeZone} dist={dist} onOpen={openRadar} />
+      <RadarStrip venue={venue} radar={nowcast?.radar ?? null} timeZone={timeZone} dist={dist} onOpen={openRadar} short={stormDay} />
     </div>
   )
 }

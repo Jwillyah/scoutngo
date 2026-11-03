@@ -29,6 +29,7 @@ import { N0Q_PALETTE, n0qDbz } from '../data/n0qPalette.ts'
 import { findCells, flowToward, latLonPixel, nearestEcho, trackCells, type Cell, type Grid, type Scan, type Track } from '../core/stormCells.ts'
 import type { LatLon } from '../core/geo.ts'
 import type { Strike } from '../core/lightning.ts'
+import { parseMotion, upstream, type Motion, type Upstream } from '../core/warnUpstream.ts'
 import { TIMEOUT_MS } from './forecast.ts'
 
 export const RADAR_VALID_URL = 'https://mesonet.agron.iastate.edu/data/gis/images/4326/USCOMP/n0q_0.json'
@@ -225,6 +226,8 @@ export interface Alert {
   url: string | null
   /** Its polygon, when the NWS drew one (warnings usually do): the Warnings layer. */
   polygon: GeoJSON.Polygon | null
+  /** The storm's motion as the warning gives it (Batch L): for upstream. */
+  motion: Motion | null
 }
 
 export function parseAlerts(payload: unknown): Alert[] {
@@ -235,7 +238,7 @@ export function parseAlerts(payload: unknown): Alert[] {
     const p = f.properties ?? {}
     if (s(p.event) === '') return []
     const end = s(p.ends) || s(p.expires)
-    return [{ event: s(p.event), headline: s(p.headline), description: s(p.description).trim(), severity: s(p.severity), ends: end === '' ? null : new Date(end), sender: s(p.senderName), url: typeof f.id === 'string' && /^https:\/\/api\.weather\.gov\/alerts\//.test(f.id) ? f.id : null, polygon: (f.geometry as { type?: unknown } | null)?.type === 'Polygon' ? (f.geometry as GeoJSON.Polygon) : null }]
+    return [{ event: s(p.event), headline: s(p.headline), description: s(p.description).trim(), severity: s(p.severity), ends: end === '' ? null : new Date(end), sender: s(p.senderName), url: typeof f.id === 'string' && /^https:\/\/api\.weather\.gov\/alerts\//.test(f.id) ? f.id : null, polygon: (f.geometry as { type?: unknown } | null)?.type === 'Polygon' ? (f.geometry as GeoJSON.Polygon) : null, motion: parseMotion(((p.parameters as Record<string, unknown> | undefined)?.eventMotionDescription as unknown[] | undefined)?.[0] as string | undefined) }]
   })
 }
 
@@ -249,6 +252,41 @@ export async function fetchAlerts(venue: LatLon, fetchImpl: typeof fetch = fetch
   }
 }
 
+/*
+ * WARNINGS ANYWHERE (Batch L, Section 4): every severe thunderstorm and
+ * tornado warning in force in the country, asked with no place at all;
+ * which are upstream of the venue is worked out on the phone
+ * (src/core/warnUpstream.ts).
+ */
+export const WARNINGS_URL = `${ALERTS_URL}?event=${encodeURIComponent('Severe Thunderstorm Warning,Tornado Warning')}`
+export async function fetchWarnings(fetchImpl: typeof fetch = fetch): Promise<Alert[] | null> {
+  try {
+    const r = await fetchImpl(WARNINGS_URL, { headers: { accept: 'application/geo+json' }, signal: AbortSignal.timeout(TIMEOUT_MS) })
+    if (!r.ok) return null
+    return parseAlerts(await r.json())
+  } catch {
+    return null
+  }
+}
+
+/** The warnings upstream of the venue, nearest first: near, not over it, heading at it. */
+export function upstreamWarnings(venue: LatLon, warnings: readonly Alert[] | null, radar: Radar | null): { alert: Alert; up: Upstream }[] {
+  if (warnings === null) return []
+  const flowKmh = radar === null ? null : (() => {
+    const moving = radar.tracks.filter((t) => t.v !== null)
+    if (moving.length === 0 || radar.flowToDeg === null) return null
+    const sp = moving.map((t) => Math.hypot((t.v as { e: number }).e, (t.v as { n: number }).n)).sort((a, b) => a - b)
+    return sp[Math.floor(sp.length / 2)]
+  })()
+  const flow = radar?.flowToDeg == null || flowKmh === null ? null : { towardDeg: radar.flowToDeg, kt: flowKmh / 1.852 }
+  return warnings
+    .flatMap((a) => {
+      const up = upstream(venue, a.polygon, a.motion, flow)
+      return up === null ? [] : [{ alert: a, up }]
+    })
+    .sort((a, b) => a.up.km - b.up.km)
+}
+
 /* ----------------------------------------------------------------- hook */
 
 export interface Nowcast {
@@ -257,6 +295,8 @@ export interface Nowcast {
   hrrr: { cells: Cell[]; validAt: Date } | null
   strikes: Strike[] | null
   alerts: Alert[] | null
+  /** Severe thunderstorm and tornado warnings nationally, for upstream ones (Batch L). */
+  warnings: Alert[] | null
   /** When it was asked. */
   at: Date
 }
@@ -271,8 +311,8 @@ export function useNowcast(venue: LatLon | null, on: boolean): Nowcast | null {
     const at = { lat, lon }
     const ask = async () => {
       const now = new Date()
-      const [radar, strikes, alerts, hrrr] = await Promise.all([fetchRadar(at).catch(() => null), fetchStrikes(at, now).catch(() => null), fetchAlerts(at), fetchHrrr(at, now)])
-      if (live) setGot({ radar, hrrr, strikes, alerts, at: now })
+      const [radar, strikes, alerts, hrrr, warnings] = await Promise.all([fetchRadar(at).catch(() => null), fetchStrikes(at, now).catch(() => null), fetchAlerts(at), fetchHrrr(at, now), fetchWarnings()])
+      if (live) setGot({ radar, hrrr, strikes, alerts, warnings, at: now })
     }
     void ask()
     const t = setInterval(() => void ask(), REFRESH_MS)

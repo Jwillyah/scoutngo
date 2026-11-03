@@ -62,7 +62,7 @@ import { offlineLine, onPacksChanged, packFor } from '../lib/venuePack.ts'
 import { bowOnMap } from '../lib/specialLightData.ts'
 import { GUIDE_EVENT } from '../lib/useBestView.ts'
 import { RADAR_EVENT } from '../lib/radarLayer.ts'
-import { radarValid, useNowcast } from '../lib/stormData.ts'
+import { radarValid, upstreamWarnings, useNowcast } from '../lib/stormData.ts'
 import { cellCalls } from '../core/stormCells.ts'
 import { stormOnMap } from '../core/lightning.ts'
 import { FeaturesSheet, type WeatherLayer } from './FeaturesSheet.tsx'
@@ -263,6 +263,8 @@ interface PlanModeProps {
   onScrub: (next: number) => void
   /** The time bar's reset: now on the shoot day, the middle of the window otherwise. */
   onResetTime: () => void
+  /** The ↺ held (Batch L): the start of the shoot window. */
+  onShootWindow?: () => void
   /** Move the shoot day to `date`, the time to `at` (the Tide sheet's glass mornings). */
   onJumpDay: (date: string, at: Date) => void
   /** Today's window from now, when the saved one is not this one (src/lib/planForNow.ts). */
@@ -572,6 +574,7 @@ export function PlanMode({
   onSearch,
   onOpenNow,
   onBackToNow,
+  onShootWindow,
   platformFilter,
   showLabels,
   onShowLabels,
@@ -1333,12 +1336,14 @@ export function PlanMode({
   const stormLayersOn = lightningOn || warningsOn || tracksOn
   const layerNow = useNowcast(venue, stormLayersOn || weatherLayer === 'radar')
   const layerCalls = useMemo(() => (layerNow?.radar == null || venue === null ? [] : cellCalls(venue, layerNow.radar.tracks, layerNow.radar.scanAt)), [layerNow, venue])
+  const layerUpstream = useMemo(() => (layerNow === null || venue === null ? [] : upstreamWarnings(venue, layerNow.warnings, layerNow.radar)), [layerNow, venue])
   const layerFC = useMemo<GeoJSON.FeatureCollection | null>(() => {
     if (!stormLayersOn || layerNow === null) return null
     const fc = stormOnMap(lightningOn ? (layerNow.strikes ?? []).filter((x) => layerNow.at.getTime() - x.frame.getTime() <= 45 * 60_000) : [], tracksOn ? layerCalls : [], layerNow.at)
-    const warn = warningsOn ? (layerNow.alerts ?? []).flatMap((a) => (a.polygon === null ? [] : [{ type: 'Feature' as const, properties: { kind: 'warn' }, geometry: a.polygon }])) : []
+    /* The venue's own warnings and the ones upstream of it (Batch L). */
+    const warn = warningsOn ? [...(layerNow.alerts ?? []), ...layerUpstream.map((u) => u.alert)].flatMap((a) => (a.polygon === null ? [] : [{ type: 'Feature' as const, properties: { kind: 'warn' }, geometry: a.polygon }])) : []
     return { type: 'FeatureCollection', features: [...fc.features, ...warn].map((f) => ({ ...f, properties: { ...f.properties, layer: true } })) }
-  }, [stormLayersOn, layerNow, layerCalls, lightningOn, tracksOn, warningsOn])
+  }, [stormLayersOn, layerNow, layerCalls, layerUpstream, lightningOn, tracksOn, warningsOn])
   const layerWords = [weatherLayer === 'off' ? null : weatherLayer[0].toUpperCase() + weatherLayer.slice(1), lightningOn ? 'Lightning' : null, warningsOn ? 'Warnings' : null, tracksOn ? 'Storm tracks' : null].filter((x): x is string => x !== null)
   const allLayersOff = () => {
     pickWeather('off')
@@ -2255,6 +2260,7 @@ export function PlanMode({
               />
             ) : (
               <SkyCard
+                onViewfinder={onViewfinder}
                 units={units}
                 more={
                   <CardMore
@@ -2326,8 +2332,9 @@ export function PlanMode({
             {/* Batch K, Section 7: the line-up and these links are one row inside Sky › Now (SkyCard's `more`), so the page fits. */}
             {/* Batch I: the Viewfinder, a front-row button on the Sky pages too. */}
             {/* Not on Weather: its one screen has no room, and the design has none there (Batch K addendum A). */}
-            {onViewfinder === undefined || skyTab === 'weather' ? null : (
-              <div className={`skyfoot${skyTab === 'fire' ? ' skyfoot--stick' : ''}`}>
+            {/* Batch L: not on Sky fire either: its Viewfinder is beside Sunrise and Sunset, where a sticky footer cannot cover the page's foot. */}
+            {onViewfinder === undefined || skyTab === 'weather' || skyTab === 'fire' ? null : (
+              <div className="skyfoot">
                 <button type="button" className="skyfoot__vf" onClick={onViewfinder}>
                   <svg className="bbtn__glyph" viewBox="0 0 24 24" aria-hidden="true">
                     <rect x="3" y="7" width="18" height="13" rx="2" />
@@ -2391,7 +2398,7 @@ export function PlanMode({
       case 'wxlayer':
         return (
           <Card title={layerWords.join(' · ') || 'Weather'} onClose={home}>
-            <WeatherLayerCard layer={weatherLayer} scanAt={radarAt === null ? null : (layerNow?.radar?.scanAt ?? radarAt)} calls={layerCalls} strikes={layerNow?.strikes ?? []} alerts={layerNow?.alerts ?? []} timeZone={venueWindow?.timeZone ?? 'UTC'} windFt={windLayerFt} onWindFt={setWindLayerFt} />
+            <WeatherLayerCard layer={weatherLayer} scanAt={radarAt === null ? null : (layerNow?.radar?.scanAt ?? radarAt)} calls={layerCalls} strikes={layerNow?.strikes ?? []} alerts={layerNow?.alerts ?? []} upstream={layerUpstream} dist={units.distance === 'ft' ? 'mi' : 'km'} timeZone={venueWindow?.timeZone ?? 'UTC'} windFt={windLayerFt} onWindFt={setWindLayerFt} />
           </Card>
         )
       case 'moonrise':
@@ -2977,6 +2984,7 @@ export function PlanMode({
                   if (venue !== null) handle.current?.flyTo(venue)
                   onBackToNow()
                 }}
+                onHoldReset={onShootWindow}
               />
             )}
           </div>

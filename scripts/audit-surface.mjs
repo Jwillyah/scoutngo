@@ -415,6 +415,95 @@ else if (injected[0]?.wrong !== true) fail('the ruler was taken off the sheet an
 else console.log(`  a ruler that does not move the sheet was caught: sheet stayed at ${injected[0].got?.sheet}`)
 await setDetent('half')
 
+/* ----- the ↺: a tap is Back to now, a hold the shoot window, the first tap says so once (Batch L) */
+
+console.log('\n### the ↺: tap is now, hold is the shoot window')
+{
+  const at = () => ev(`Number(document.querySelector('.tbar__strip')?.getAttribute('aria-valuenow'))`)
+  const setTime = (hhmm) => ev(`(() => { const inp = document.querySelector('.tbar__jump'); if (!inp) return 0; const day = String(inp.value).slice(0, 10); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(inp, day + 'T' + '${hhmm}'); inp.dispatchEvent(new Event('input', { bubbles: true })); return 1 })()`)
+  const box = JSON.parse(await ev(`JSON.stringify(document.querySelector('.tbar__reset')?.getBoundingClientRect() ?? null)`))
+  /* The day and time as found: a tap on ↺ moves the shoot to today, and the checks below were written for the shoot day. */
+  const was = await ev(`document.querySelector('.tbar__jump')?.value ?? null`)
+  if (box === null) fail('no ↺ on the time bar')
+  else {
+    const x = box.x + box.width / 2
+    const y = box.y + box.height / 2
+    const press = async (ms) => {
+      await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y })
+      await send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 })
+      await wait(ms)
+      await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 })
+      await wait(900)
+    }
+    await ev(`(() => { try { localStorage.removeItem('scoutngo.hint.holdReset.v1') } catch {} return 1 })()`)
+    await setTime('04:10')
+    await wait(600)
+    const set = await at()
+    await press(80)
+    const tapped = await at()
+    const hinted = await ev(`!!document.querySelector('.tbar__hint')`)
+    const pageNow = await ev('Date.now()')
+    await setTime('04:10')
+    await wait(600)
+    await press(900)
+    const held = await at()
+    await setTime('04:10')
+    await wait(600)
+    await press(900)
+    const heldAgain = await at()
+    await press(80)
+    const hintedAgain = await ev(`!!document.querySelector('.tbar__hint')`)
+    const hm = (t) => new Date(t).toISOString().slice(11, 16) + 'Z'
+    console.log(`  set ${hm(set)} -> tap ${hm(tapped)} (now ${hm(pageNow)}) · hold ${hm(held)}, again ${hm(heldAgain)} · hint after the first tap ${hinted ? 'shown' : 'not shown'}, after the next ${hintedAgain ? 'shown' : 'not shown'}`)
+    if (Math.abs(tapped - pageNow) > 3 * 60_000) fail(`a tap on ↺ did not come back to now: ${hm(tapped)} against ${hm(pageNow)}`)
+    if (Math.abs(held - set) < 60_000 || Math.abs(held - pageNow) < 3 * 60_000) fail(`a hold on ↺ did not go to the shoot window: ${hm(held)}`)
+    if (held !== heldAgain) fail(`a hold on ↺ went to two different times: ${hm(held)} and ${hm(heldAgain)}`)
+    if (!hinted) fail('the first tap on ↺ did not say a hold is the shoot window')
+    if (hintedAgain) fail('the ↺ hint showed a second time')
+    if (was !== null) {
+      await ev(`(() => { const inp = document.querySelector('.tbar__jump'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(inp, ${JSON.stringify(was)}); inp.dispatchEvent(new Event('input', { bubbles: true })); return 1 })()`)
+      await wait(900)
+      console.log(`  put back to ${was}: ${await ev(`document.querySelector('.tbar__jump')?.value`)}`)
+    }
+  }
+}
+
+/* ----- radar on: the satellite's cloud under it (Batch L) */
+
+console.log('\n### radar on: the satellite cloud under it')
+{
+  await ev(`(() => { const b = document.querySelector('button[aria-label="Features"]'); if (b && b.getAttribute('aria-pressed') !== 'true') b.click(); return 1 })()`)
+  await wait(700)
+  await ev(`document.querySelector('.feat__wtile--radar')?.click()`)
+  await wait(3000)
+  const layers = JSON.parse(await ev(`JSON.stringify((() => {
+    const m = window.__probe?.map
+    if (!m) return null
+    const ids = m.getStyle().layers.map((l) => l.id)
+    const vis = (id) => (m.getLayer(id) === undefined ? 'missing' : m.getLayoutProperty(id, 'visibility') ?? 'visible')
+    return { radar: vis('radar'), sat: vis('radar-sat'), under: ids.indexOf('radar-sat') >= 0 && ids.indexOf('radar-sat') < ids.indexOf('radar') }
+  })())`))
+  await ev(`(() => { const b = document.querySelector('button[aria-label="Features"]'); if (b && b.getAttribute('aria-pressed') !== 'true') b.click(); return 1 })()`)
+  await wait(500)
+  await ev(`document.querySelector('.feat__wtile--off')?.click()`)
+  await wait(800)
+  const after = await ev(`(() => { const m = window.__probe?.map; return m?.getLayer('radar-sat') ? m.getLayoutProperty('radar-sat', 'visibility') : 'missing' })()`)
+  console.log(`  radar ${layers?.radar}, satellite under it ${layers?.sat} (drawn under: ${layers?.under}); weather off: satellite ${after}`)
+  if (layers === null) fail('no map probe to read the layers from')
+  else {
+    if (layers.radar !== 'visible') fail(`Radar on, but the radar layer is ${layers.radar}`)
+    if (layers.sat !== 'visible') fail(`Radar on, but the satellite cloud under it is ${layers.sat}`)
+    if (!layers.under) fail('the satellite cloud is not drawn under the radar')
+    if (after !== 'none') fail(`weather off, but the satellite cloud under the radar is ${after}`)
+  }
+  /* Back to the shoot card, as the checks below expect to find the map. */
+  for (let k = 0; k < 2 && (await ev(`!!document.querySelector('.card2__x')`)); k += 1) {
+    await ev(`document.querySelector('.card2__x')?.click()`)
+    await wait(500)
+  }
+  await setDetent('half')
+}
+
 /* ----------------------------------- every stage reaches every other stage */
 
 /*

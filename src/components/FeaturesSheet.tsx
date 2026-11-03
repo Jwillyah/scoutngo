@@ -2,8 +2,10 @@ import { useState, type ReactNode } from 'react'
 
 /*
  * FEATURES (Batch K addendum, E): everything drawn on the map, one home per
- * item, replacing "Map & layers" and the dock. Two columns of compact
- * switches, each with a coloured icon square; fits 390 x 844.
+ * item, replacing "Map & layers" and the dock. Two columns of switches,
+ * each with a coloured icon square, 44 px tall (Batch L: the touch rule);
+ * the quick buttons and the Weather row are pinned and the rest scrolls
+ * under them when it runs past one screen.
  *
  *   quick      Viewfinder · Measure · Skyline
  *   WEATHER    pick one: Off · Radar · Wind · Clouds (the old Cloud tile
@@ -79,6 +81,7 @@ export function FeaturesSheet(p: FeaturesProps) {
   const [about, setAbout] = useState(false)
   return (
     <div className="feat">
+      <div className="feat__pin" data-feat-pin>
       <div className="feat__quick">
         {p.quick.map((q) => (
           <button key={q.label} type="button" className={`feat__qbtn${q.on === true ? ' feat__qbtn--on' : ''}`} aria-pressed={q.on} onClick={q.onClick}>
@@ -95,6 +98,7 @@ export function FeaturesSheet(p: FeaturesProps) {
             <span>{w.label}</span>
           </button>
         ))}
+      </div>
       </div>
 
       <p className="feat__head">Storms</p>

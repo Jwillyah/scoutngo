@@ -2322,6 +2322,7 @@ function App() {
           scrub={scrub}
           onScrub={setScrub}
           onResetTime={() => setScrub(openingScrub(venue, new Date()))}
+          onShootWindow={() => setScrub(0)}
           onJumpDay={(date: string, at: Date) => {
             jumpTo.current = at.getTime()
             if (date === venue.date) {
