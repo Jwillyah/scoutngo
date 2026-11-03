@@ -2,6 +2,7 @@ import { beachName, sameBeach, useSurfBeach } from '../lib/surfBeach.ts'
 import { SpotPicker } from './SpotPicker.tsx'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { stormNote } from '../lib/stormRiskData.ts'
+import { useCoast } from '../lib/coastData.ts'
 import { droneCard, skyCard, skyTabFor, todayCard, waterCard, type CardDay, type Tone } from '../core/menuCards.ts'
 import { formatClock } from '../core/timezone.ts'
 import { useBriefing } from '../lib/useBriefing.ts'
@@ -91,6 +92,8 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, now, onPic
   const beachBrief = useBriefing(here || beach === null ? null : beach.at, timeZone, now, looking && !here, 'sea')
   const waterDay = here ? (days[0] ?? null) : ((beachBrief.days[0] as unknown as CardDay | undefined) ?? null)
   const water = useMemo(() => waterCard(waterDay, now, clock, beach?.name ?? null), [waterDay, now, beach?.name]) // eslint-disable-line react-hooks/exhaustive-deps
+  /* Batch K, Section 5: the NWS's rip current risk for the beach, as a fact under the card when the surf zone forecast gives one. */
+  const rip = useCoast(beach?.at ?? null, null, 'mi', looking).coast?.rip ?? null
   const flight = useMemo(() => droneCard(days[0] ?? null, drone?.maxWindMps ?? null, now, (mps) => `${Math.round(windIn(mps, units.wind) ?? 0)} ${windUnitLabel(units.wind)}`), [days, drone, now, units.wind])
   const loading = brief.status === 'loading' && days.length === 0
   const date = `${new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone }).format(now)} ${new Intl.DateTimeFormat('en-US', { day: 'numeric', timeZone }).format(now)}`
@@ -126,7 +129,7 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, now, onPic
             </div>
           </LiveCard>
           <div className="mcard-wrap">
-            <LiveCard kind="water" title="Water" icon={<WaterIcon />} value={loading ? '…' : water.value} sub={loading ? '' : water.sub} tone={wait(water.tone)} onTap={() => pick('water')}>
+            <LiveCard kind="water" title="Water" icon={<WaterIcon />} value={loading ? '…' : water.value} sub={loading ? '' : (rip?.replace(/ \(NWS .*\)$/, '') ?? water.sub)} tone={wait(water.tone)} onTap={() => pick('water')}>
               <Bars bars={water.bars.map((b) => ({ h: b.h, now: b.now, cls: b.clean ? 'clean' : 'messy' }))} />
             </LiveCard>
             {beach === null ? null : (

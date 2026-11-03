@@ -16990,3 +16990,19 @@ a.about__row * {
 .bstorm__line {
   display: block;
 }
+/* The NWS on the water (Batch K, Section 5). */
+.coastf {
+  display: grid;
+  gap: 2px;
+}
+.coastf__rip,
+.coastf__tropics {
+  font-weight: var(--weight-medium);
+}
+.coastf__none {
+  color: var(--color-text-muted);
+}
+.coastf__marine > summary {
+  font-weight: var(--weight-regular, 400);
+  font-size: var(--text-sm);
+}

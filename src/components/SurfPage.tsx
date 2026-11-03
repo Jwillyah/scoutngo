@@ -1,3 +1,4 @@
+import { CoastFacts } from './CoastFacts.tsx'
 import { useMemo, useState } from 'react'
 import { bearingBetween, distanceMeters, type LatLon } from '../core/geo.ts'
 import { localDate } from '../core/moonTimes.ts'
@@ -186,6 +187,7 @@ export function SurfPage({ venue, at, timeZone, units, data, lenses, drone, onCl
             {/* ONE SIZE SOURCE, ONE SET OF WORDS (30 Oct): both lines read the same hours through sizeWords, and each says which hours it is about. */}
             <p className="spage__lead">{now === null ? 'No forecast for this hour' : `${ratingWord(now.faceFt, now.shape)} · ${sizeWords(now.faceFt)} at ${clock(now.at)}`}</p>
             <p className="spage__line">{best === null ? 'Best to shoot: no clean, low-sun hour today.' : `Best to shoot: ${clock(best.from)}–${clock(best.to)} · ${LIGHT_WORD[best.light].split(',')[0]} · ${SHAPE_WORD[best.shape]} · ${sizeWords(best.faceFt)} at the biggest`}</p>
+            <CoastFacts beach={venue} venue={venue} units={units} />
             <p className="spage__head">{dayWord}, hour by hour</p>
             <div className="spage__hours" role="img" aria-label="The day, hour by hour: green good, amber ok, grey poor; the light on the faces under each">
               {hours.map((h) => (

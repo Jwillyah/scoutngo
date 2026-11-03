@@ -197,6 +197,8 @@ export async function answer(href) {
   /* Lightning: no strikes in the fixture's world (a clear map). */
   if (host === 'nowcoast.noaa.gov') return { status: 200, type: 'image/png', body: OVERLAY, fixture: 'no lightning' }
   if (host === 'mesonet.agron.iastate.edu' && u.pathname.startsWith('/cache/tile.py')) return { status: 200, type: 'image/png', body: OVERLAY, fixture: 'no radar echoes' }
+  /* The hurricane centre: no active storms in the fixture's world. */
+  if (host === 'www.nhc.noaa.gov') return json({ activeStorms: [] }, 'no active storms')
   if (host === 'api.github.com') return json({ sha: '0000000000000000000000000000000000000000', commit: { committer: { date: '2026-10-30T00:00:00Z' } } }, 'GitHub fixture')
   if (host === 'api.anthropic.com') return { status: 401, type: 'application/json', body: Buffer.from('{"type":"error"}'), fixture: 'Anthropic refused' }
   if (/s3[.-]us-west-2\.amazonaws\.com$|overturemaps/.test(host)) return { status: 404, type: 'text/plain', body: Buffer.from(''), fixture: 'scan not in fixtures' }
