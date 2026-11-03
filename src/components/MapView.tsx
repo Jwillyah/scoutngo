@@ -1867,8 +1867,24 @@ export function MapView({
         id: 'guide-spot',
         type: 'circle',
         source: 'guide',
-        filter: ['==', ['geometry-type'], 'Point'],
+        filter: ['all', ['==', ['geometry-type'], 'Point'], ['==', ['get', 'kind'], 'spot']],
         paint: { 'circle-radius': ['case', ['==', ['get', 'rank'], 1], 9, 6], 'circle-color': readToken('--white', '#ffffff', container.current), 'circle-stroke-color': readToken('--mark-edge', '#0a0b09', container.current), 'circle-stroke-width': 2 },
+      })
+
+      /* Storms on it (Batch K, Section 2): each storm cell a white ring, its 90-minute path the dashed guide line; lightning a red dot, a hazard, fading with its age. */
+      instance.addLayer({
+        id: 'guide-cell',
+        type: 'circle',
+        source: 'guide',
+        filter: ['==', ['get', 'kind'], 'cell'],
+        paint: { 'circle-radius': 7, 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-color': readToken('--white', '#ffffff', container.current), 'circle-stroke-width': 2.5 },
+      })
+      instance.addLayer({
+        id: 'guide-strike',
+        type: 'circle',
+        source: 'guide',
+        filter: ['==', ['get', 'kind'], 'strike'],
+        paint: { 'circle-radius': 4, 'circle-color': readToken('--hazard', '#ff3b30', container.current), 'circle-opacity': ['get', 'fade'], 'circle-stroke-color': readToken('--mark-edge', '#0a0b09', container.current), 'circle-stroke-width': 1, 'circle-stroke-opacity': ['get', 'fade'] },
       })
 
       /* The two-pin measure: a plain white line with a dark edge, readable on imagery. */
@@ -2797,6 +2813,16 @@ export function MapView({
     if (map.current === null || !ready) return
     const source = map.current.getSource('guide') as maplibregl.GeoJSONSource | undefined
     source?.setData(guide ?? emptyCollection())
+    /* Storms (Batch K): cells and lightning are often beyond the screen, so the map widens to them and the venue. The map already keeps padding for the sheet; this adds to it. */
+    const far = (guide?.features ?? []).filter((f) => f.properties?.kind === 'cell' || f.properties?.kind === 'strike' || f.properties?.kind === 'track')
+    if (far.length > 0 && venue !== null) {
+      const pts = far.flatMap((f) => (f.geometry.type === 'Point' ? [f.geometry.coordinates] : f.geometry.type === 'LineString' ? f.geometry.coordinates : []))
+      const lons = [venue.lon, ...pts.map((p) => p[0])]
+      const lats = [venue.lat, ...pts.map((p) => p[1])]
+      const m = map.current
+      moveCamera('storms', () => m.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: 24, maxZoom: 11, duration: 0 }))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guide, ready])
 
   /* Preflight's path (PlanMode builds the features). */

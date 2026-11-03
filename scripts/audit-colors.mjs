@@ -117,6 +117,7 @@ const RED_RULES = {
   '.card__warn': 'in water, in a roadway, over people',
   '.kitf__error': 'the kit form refused what was typed: act on it',
   '.hz__kind--on.hz__kind--hazard': 'a hazard mark',
+  '.wx__alert-ev--warn': 'an NWS warning in force at the venue (Batch K): a hazard',
   '.kitaudit__line--loss': 'stored kit lost: re-add it',
   '.skykey__swatch--over': "wind over the aircraft's rated limit",
   '.chip2--urgent': "wind over the aircraft's rated limit",

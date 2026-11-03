@@ -16932,3 +16932,38 @@ a.about__row * {
 .wx__raw {
   color: var(--color-text-muted);
 }
+/* The next 3 hours (Batch K, Section 2). */
+.wx__nowcast {
+  display: grid;
+  gap: 4px;
+}
+.wx__head {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-muted);
+}
+.wx__cells,
+.wx__alerts {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.wx__cells .wx__line {
+  font-size: var(--text-sm);
+}
+.wx__alert-ev {
+  font-weight: var(--weight-medium);
+}
+/* A warning is a hazard: the one red. */
+.wx__alert-ev--warn {
+  color: var(--hazard);
+}
+.wx__alert-text {
+  white-space: pre-line;
+}
+.wx__map {
+  justify-self: start;
+}

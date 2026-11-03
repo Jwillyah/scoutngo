@@ -326,7 +326,19 @@ for (const run of MODES) {
    * no-signal modes; with the network up the mark must NOT be there, which is
    * what makes the check able to fail in both directions.
    */
-  const mark = await ev(`document.querySelector('.offline-line')?.textContent ?? null`)
+  /*
+   * POLLED TOO (Batch K, 3 Nov): with requests hanging, the app says offline
+   * only once its probe has timed out (6 s) and failed again 2.5 s later, up
+   * to 10 s after the last one; on the gate's loaded lane the single read
+   * came first and failed while the audit alone passed (68 s, 0 problems).
+   * Read every half second up to MARK_BY_MS from here; never showing still fails.
+   */
+  const MARK_BY_MS = 30_000
+  let mark = await ev(`document.querySelector('.offline-line')?.textContent ?? null`)
+  for (let t = 0; run !== 'online' && t < MARK_BY_MS && !(mark !== null && /^Offline · /.test(mark)); t += 500) {
+    await wait(500)
+    mark = await ev(`document.querySelector('.offline-line')?.textContent ?? null`)
+  }
   console.log(`  offline line under the chips: ${JSON.stringify(mark)}`)
   if (run === 'online' && mark !== null) problem(run, 'the offline line shows with the network up')
   if (run !== 'online' && (mark === null || !/^Offline · /.test(mark))) problem(run, 'no offline line under the chips')

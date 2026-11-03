@@ -4,6 +4,7 @@ import { compassPoint } from '../core/field.ts'
 import { BLEND_MODELS, cloudWords, hourAt, MODEL_LABEL, skillOverall, type BlendedHour } from '../core/modelSkill.ts'
 import { formatShortHour } from '../core/timezone.ts'
 import { useBlend } from '../lib/blendData.ts'
+import { Nowcast } from './Nowcast.tsx'
 import { forecastAge } from '../lib/savedForecast.ts'
 import { formatTemperature, formatWind, type Units } from '../lib/units.ts'
 
@@ -51,6 +52,7 @@ export function WeatherTab({ venue, timeZone, units, at, children }: WeatherTabP
         </div>
       )}
       {state.stale ? <p className="fire__note">From the forecast of {forecastAge(new Date(state.fetchedAt).toISOString()).text.replace(' old', ' ago')}: a newer one could not be had.</p> : null}
+      <Nowcast venue={venue} timeZone={timeZone} units={units} />
       {children}
       <ol className="wx__week" aria-label="The next seven days">
         {state.days.map((d) => (
