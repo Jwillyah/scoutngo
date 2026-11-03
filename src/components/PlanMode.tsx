@@ -62,6 +62,7 @@ import { offlineLine, onPacksChanged, packFor } from '../lib/venuePack.ts'
 import { bowOnMap } from '../lib/specialLightData.ts'
 import { GUIDE_EVENT } from '../lib/useBestView.ts'
 import { RADAR_EVENT } from '../lib/radarLayer.ts'
+import { OPEN_RADAR_EVENT } from './WeatherTab.tsx'
 import { useSpecialNow } from '../lib/useSpecialNow.ts'
 import { SPECIAL_NAME } from '../core/specialLight.ts'
 import { getPosition as sunPositionAt } from 'suncalc'
@@ -961,7 +962,8 @@ export function PlanMode({
       live = false
     }
   }, [venue, modelDay, weatherEpoch])
-  const [skyTab, setSkyTab] = useState<SkyTab>('now')
+  /* Batch K addendum: Sky opens on the weather first. */
+  const [skyTab, setSkyTab] = useState<SkyTab>('weather')
   /* The Moon page open: the 3D view draws the moon's arc only then (Batch D, Section 9). */
   const [moonOpen, setMoonOpen] = useState(false)
   /*
@@ -1306,7 +1308,16 @@ export function PlanMode({
   useEffect(() => {
     const on = (e: Event) => setRadarAt((e as CustomEvent<Date | null>).detail)
     window.addEventListener(RADAR_EVENT, on)
-    return () => window.removeEventListener(RADAR_EVENT, on)
+    /* The Weather tab's radar strip: "Open on the map" lowers the sheet with the radar on. */
+    const open = (e: Event) => {
+      setRadarAt((e as CustomEvent<Date | null>).detail ?? new Date(Math.floor(Date.now() / 300_000) * 300_000 - 300_000))
+      setSheet('peek')
+    }
+    window.addEventListener(OPEN_RADAR_EVENT, open)
+    return () => {
+      window.removeEventListener(RADAR_EVENT, on)
+      window.removeEventListener(OPEN_RADAR_EVENT, open)
+    }
   }, [])
   /* Batch J, Section 5: the best-view wedge and its ranked spots, from Today or Sky fire. */
   useEffect(() => {
@@ -2260,7 +2271,8 @@ export function PlanMode({
             {/* Batch I: one row, not four, on the first screen. */}
             {/* Batch K, Section 7: the line-up and these links are one row inside Sky › Now (SkyCard's `more`), so the page fits. */}
             {/* Batch I: the Viewfinder, a front-row button on the Sky pages too. */}
-            {onViewfinder === undefined ? null : (
+            {/* Not on Weather: its one screen has no room, and the design has none there (Batch K addendum A). */}
+            {onViewfinder === undefined || skyTab === 'weather' ? null : (
               <div className={`skyfoot${skyTab === 'fire' ? ' skyfoot--stick' : ''}`}>
                 <button type="button" className="skyfoot__vf" onClick={onViewfinder}>
                   <svg className="bbtn__glyph" viewBox="0 0 24 24" aria-hidden="true">

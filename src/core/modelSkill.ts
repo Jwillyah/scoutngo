@@ -162,12 +162,12 @@ export function blendHour(h: SkillHistory | null, v: NumVar, hour: number, value
 }
 
 /** Rain at one hour: the weighted share of models with RAIN_MM or more, 0-1. */
-export function rainChance(h: SkillHistory | null, hour: number, mm: Partial<Record<ModelId, number | null>>): { chance: number | null; wet: number; of: number } {
+export function rainChance(h: SkillHistory | null, hour: number, mm: Partial<Record<ModelId, number | null>>): { chance: number | null; wet: number; of: number; models: { model: ModelId; mm: number }[] } {
   const have = BLEND_MODELS.filter((m) => typeof mm[m] === 'number' && Number.isFinite(mm[m]))
-  if (have.length === 0) return { chance: null, wet: 0, of: 0 }
+  if (have.length === 0) return { chance: null, wet: 0, of: 0, models: [] }
   const w = weights(h, have, 'rain', hour)
   const wet = have.filter((m) => (mm[m] as number) >= RAIN_MM)
-  return { chance: wet.reduce((a, m) => a + (w.get(m) ?? 0), 0), wet: wet.length, of: have.length }
+  return { chance: wet.reduce((a, m) => a + (w.get(m) ?? 0), 0), wet: wet.length, of: have.length, models: have.map((m) => ({ model: m, mm: mm[m] as number })) }
 }
 
 /* ------------------------------------------------------------- scoring */
@@ -279,7 +279,7 @@ export interface BlendedHour {
   wind: Blended
   gust: Blended
   cloud: Blended
-  rain: { chance: number | null; wet: number; of: number }
+  rain: { chance: number | null; wet: number; of: number; models: { model: ModelId; mm: number }[] }
   /** Where the wind comes from, the weighted circular mean of the models, degrees; null with none. */
   fromDeg: number | null
 }

@@ -342,7 +342,7 @@ export function SkyCard({ more, units, venue, timeZone, timeZoneAbbr, at, tab, o
       </>
     )
   } else if (tab === 'weather') {
-    body = <WeatherTab venue={venue} timeZone={timeZone} units={units} at={at} />
+    body = <WeatherTab venue={venue} timeZone={timeZone} units={units} at={at} placeName={placeName ?? undefined} />
   } else if (tab === 'special') {
     body = bodyFor('special')
   } else {

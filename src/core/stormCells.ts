@@ -309,3 +309,39 @@ export function cellLine(c: CellCall, w: Words): string {
   if (c.beyond) parts.push('reaches you later than 90 min: not said')
   return parts.join(' · ')
 }
+
+/** Rain on radar: RAIN_DBZ or more. */
+export const RAIN_DBZ = 20
+
+/** The nearest echo of minDbz or more to the venue on a grid, km and bearing; null when none. */
+export function nearestEcho(g: Grid, venue: LatLon, minDbz = RAIN_DBZ): { km: number; bearingDeg: number } | null {
+  const v = latLonPixel(g.zoom, venue)
+  const vx = v.gx - g.px0
+  const vy = v.gy - g.py0
+  let best = Infinity
+  let bx = -1
+  let by = -1
+  for (let y = 0; y < g.h; y += 1) {
+    for (let x = 0; x < g.w; x += 1) {
+      if (!(g.dbz[y * g.w + x] >= minDbz)) continue
+      const d = (x + 0.5 - vx) ** 2 + (y + 0.5 - vy) ** 2
+      if (d < best) {
+        best = d
+        bx = x
+        by = y
+      }
+    }
+  }
+  if (bx < 0) return null
+  const p = pixelLatLon(g.zoom, g.px0 + bx + 0.5, g.py0 + by + 0.5)
+  return { km: distanceMeters(venue, p) / 1000, bearingDeg: bearingBetween(venue, p) }
+}
+
+/** Where the cells as a whole are heading, degrees, from the tracks' median motion; null when still or unknown. */
+export function flowToward(tracks: readonly Track[]): number | null {
+  const v = tracks.filter((t) => t.v !== null && !t.borrowed).map((t) => t.v as { e: number; n: number })
+  if (v.length === 0) return null
+  const e = median(v.map((x) => x.e))
+  const n = median(v.map((x) => x.n))
+  return Math.hypot(e, n) < STILL_KMH ? null : ((Math.atan2(e, n) * 180) / Math.PI + 360) % 360
+}

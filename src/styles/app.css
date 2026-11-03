@@ -10358,7 +10358,8 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1);
-  margin-bottom: var(--space-3);
+  /* Batch K addendum: 12 to 6 px, for the Weather tab's one screen. */
+  margin-bottom: 6px;
 }
 
 .skyc__tab {
@@ -17108,4 +17109,297 @@ a.about__row * {
   grid-template-columns: auto minmax(0, 1fr);
   column-gap: var(--space-2);
   min-height: 40px;
+}
+
+/*
+ * THE WEATHER TAB, VERSION L (Batch K addendum, A): a sky gradient, glass
+ * cards, big light numbers, as Today. One screen at 390 x 844.
+ */
+.wxl {
+  display: grid;
+  min-width: 0;
+  overflow: hidden;
+  gap: 3px;
+  padding: 6px 8px;
+  border-radius: 18px;
+  color: #fff;
+  background: linear-gradient(180deg, #23314f 0%, #3c4a66 60%, #56627a 100%);
+}
+.wxl p {
+  margin: 0;
+}
+.wxl__note {
+  font-size: var(--text-sm);
+  color: rgb(255 255 255 / 0.75);
+}
+.wxl__top {
+  display: flex;
+  min-width: 0;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+}
+.wxl__left {
+  min-width: 0;
+}
+.wxl__place {
+  display: flex;
+  font-size: var(--text-sm);
+  color: rgb(255 255 255 / 0.8);
+  white-space: nowrap;
+  max-width: 13rem;
+}
+.wxl__placename {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wxl__date {
+  flex: none;
+}
+.wxl__temp {
+  font-size: 2.5rem;
+  font-weight: 200;
+  line-height: 1;
+}
+.wxl__right {
+  display: grid;
+  flex: none;
+  gap: 1px;
+  text-align: right;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  color: rgb(255 255 255 / 0.9);
+}
+.wxl__card {
+  display: grid;
+  gap: 3px;
+  border-radius: 14px;
+  padding: 6px 10px;
+  background: rgb(255 255 255 / 0.12);
+  border: 1px solid rgb(255 255 255 / 0.16);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.wxl__cardhead {
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  color: rgb(255 255 255 / 0.75);
+}
+.wxl__line {
+  font-size: var(--text-sm);
+}
+.wxl__sub {
+  font-size: var(--text-xs, 0.75rem);
+  color: rgb(255 255 255 / 0.8);
+}
+.wxl__hours {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.wxl__hour {
+  display: grid;
+  justify-items: center;
+  gap: 0;
+  line-height: 1.2;
+  font-size: var(--text-xs, 0.75rem);
+}
+.wxl__hour--sun {
+  color: var(--sun);
+}
+.wxl__hourrow {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.wxl__glyph {
+  display: block;
+}
+.wxl__week {
+  gap: 0;
+}
+.wxl__day {
+  display: grid;
+  grid-template-columns: 2.6rem 20px 2.4rem 2rem minmax(0, 1fr) 2rem;
+  align-items: center;
+  gap: 6px;
+  min-height: 18px;
+  font-size: var(--text-sm);
+}
+.wxl__rain {
+  color: var(--tide);
+  font-size: var(--text-xs, 0.75rem);
+}
+.wxl__lo {
+  color: rgb(255 255 255 / 0.7);
+  text-align: right;
+}
+.wxl__bar {
+  position: relative;
+  height: 5px;
+  border-radius: 3px;
+  background: rgb(255 255 255 / 0.12);
+}
+.wxl__barfill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #7dd3fc, var(--sun));
+}
+/* The lighter band: where the models' highs disagree. */
+.wxl__barspread {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  border-radius: 4px;
+  background: rgb(255 255 255 / 0.35);
+}
+.wxl__models {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+}
+.wxl__dots {
+  display: flex;
+  gap: 3px;
+}
+.wxl__dots i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.wxl__modelswords {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.wxl__more {
+  color: rgb(255 255 255 / 0.8);
+}
+/* An NWS statement or warning in force: amber, the official words a tap away. */
+.wxl__alert {
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--action-mid) 30%, transparent);
+  border: 1px solid var(--action-mid);
+  font-size: var(--text-sm);
+}
+.wxl__alert > summary {
+  list-style: none;
+  min-height: 28px;
+  cursor: pointer;
+}
+.wxl__alert-ev {
+  font-weight: var(--weight-heavy);
+}
+.wxl__alert-text {
+  white-space: pre-line;
+}
+.wxl__storm {
+  border-color: color-mix(in srgb, var(--sun) 60%, transparent);
+}
+/* The gold "Shoot it:" line. */
+.wxl__shoot {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--sun);
+}
+.wxl__back {
+  justify-self: start;
+  min-height: 44px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+.wxl__dayslist {
+  margin: 0;
+  list-style: none;
+}
+/* The live radar strip: the real map, the composite over it, the venue marked. */
+.rstrip {
+  position: relative;
+  display: block;
+  height: 76px;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 14px;
+  border: 1px solid rgb(255 255 255 / 0.16);
+  background: #0a0b09;
+  color: #fff;
+  font: inherit;
+  text-align: left;
+}
+.rstrip__map {
+  position: absolute;
+  inset: 0;
+}
+.rstrip__tile {
+  position: absolute;
+  width: 256px;
+  height: 256px;
+}
+.rstrip__tile img {
+  position: absolute;
+  inset: 0;
+  width: 256px;
+  height: 256px;
+  max-width: none;
+}
+.rstrip__radar {
+  opacity: 0.85;
+}
+.rstrip__you {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 2px #0a0b09;
+}
+.rstrip__text {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: end;
+  gap: 8px;
+  padding: 6px 10px;
+  background: linear-gradient(to top, rgb(0 0 0 / 0.7), transparent);
+  font-size: var(--text-xs, 0.75rem);
+}
+.rstrip__live {
+  color: rgb(255 255 255 / 0.85);
+}
+.rstrip__line {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: var(--weight-medium);
+}
+.rstrip__open {
+  white-space: nowrap;
 }

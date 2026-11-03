@@ -26,7 +26,7 @@
 import { useEffect, useState } from 'react'
 import { decodePng } from './png.ts'
 import { N0Q_PALETTE, n0qDbz } from '../data/n0qPalette.ts'
-import { findCells, latLonPixel, trackCells, type Grid, type Scan, type Track } from '../core/stormCells.ts'
+import { findCells, flowToward, latLonPixel, nearestEcho, trackCells, type Grid, type Scan, type Track } from '../core/stormCells.ts'
 import type { LatLon } from '../core/geo.ts'
 import type { Strike } from '../core/lightning.ts'
 import { TIMEOUT_MS } from './forecast.ts'
@@ -96,6 +96,9 @@ export async function fetchGrid(venue: LatLon, at: Date, fetchImpl: typeof fetch
 export interface Radar {
   scanAt: Date
   tracks: Track[]
+  /** The nearest rain (20 dBZ or more) on the newest scan, and where the cells are heading. */
+  nearRain: { km: number; bearingDeg: number } | null
+  flowToDeg: number | null
   /** Tiles read in the newest scan's grid, for "could not look". */
   scans: number
 }
@@ -104,14 +107,17 @@ export interface Radar {
 export async function fetchRadar(venue: LatLon, fetchImpl: typeof fetch = fetch, asOf: Date | null = null): Promise<Radar | null> {
   const valid = asOf ?? (await radarValid(fetchImpl))
   if (valid === null) return null
+  let newest: Grid | null = null
   const grids = await Promise.all(SCAN_AGO_MIN.map(async (ago) => {
     const at = new Date(valid.getTime() - ago * 60_000)
     const g = await fetchGrid(venue, at, fetchImpl)
+    if (ago === 0) newest = g
     return g === null ? null : ({ at, cells: findCells(g) } satisfies Scan)
   }))
   const scans = grids.filter((s): s is Scan => s !== null)
-  if (scans.length === 0 || scans[scans.length - 1].at.getTime() !== valid.getTime()) return null
-  return { scanAt: valid, tracks: trackCells(scans), scans: scans.length }
+  if (newest === null || scans.length === 0 || scans[scans.length - 1].at.getTime() !== valid.getTime()) return null
+  const tracks = trackCells(scans)
+  return { scanAt: valid, tracks, scans: scans.length, nearRain: nearestEcho(newest, venue), flowToDeg: flowToward(tracks) }
 }
 
 /* ------------------------------------------------------------ lightning */

@@ -1508,7 +1508,8 @@ function App() {
         return
       case 'sky':
         setMode('plan')
-        setCardRequest((r) => ({ kind: 'sky', skyTab: opts?.skyTab, tick: r.tick + 1 }))
+        /* Batch K addendum: Sky opens on the weather unless Sky fire leads. */
+        setCardRequest((r) => ({ kind: 'sky', skyTab: opts?.skyTab === 'fire' ? 'fire' : 'weather', tick: r.tick + 1 }))
         return
       case 'water':
         onMenuPick(groups.water ? (surfInMenu ? 'surf' : 'tides') : 'land')
