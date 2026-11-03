@@ -6,6 +6,7 @@ import { useBriefing, type DayBrief } from '../lib/useBriefing.ts'
 import { saveIcs } from '../lib/saveIcs.ts'
 import { remember } from '../lib/callHistory.ts'
 import { showGuide, useBestView } from '../lib/useBestView.ts'
+import { StormBrief } from './StormBrief.tsx'
 import { bestViewOnMap } from '../core/bestView.ts'
 import { camsForEvent } from '../core/skyCams.ts'
 import { COAST_CAMS } from '../data/coastCams.ts'
@@ -34,6 +35,8 @@ export interface BriefingDrone {
 }
 
 interface BriefingProps {
+  /** Opens Sky › Weather: the storms one tap deeper (Batch K). */
+  onOpenWeather?: () => void
   venue: { lat: number; lon: number }
   placeName: string
   timeZone: string
@@ -58,7 +61,7 @@ const AXIS_HOURS = 16
 
 const KIND_WORD: Record<Kind, string> = { sunrise: 'Sunrise', sunset: 'Sunset' }
 
-export function Briefing({ venue, placeName, timeZone, units, drone, now, onClose, onOpenMap, onSwitchSpot, onViewfinder, start = 0 }: BriefingProps) {
+export function Briefing({ onOpenWeather, venue, placeName, timeZone, units, drone, now, onClose, onOpenMap, onSwitchSpot, onViewfinder, start = 0 }: BriefingProps) {
   const brief = useBriefing(venue, timeZone, now, true)
   const [page, setPage] = useState<Page>(start)
   const track = useRef<HTMLDivElement>(null)
@@ -106,10 +109,10 @@ export function Briefing({ venue, placeName, timeZone, units, drone, now, onClos
       </div>
       <div className="brief__track" ref={track}>
         <section className="brief__page" aria-label="Today">
-          <DayPage day={today} which="today" placeName={placeName} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} facing={brief.facing} checkedAt={brief.checkedAt} clock={clock} onOpenMap={onOpenMap} onSwitchSpot={onSwitchSpot} onViewfinder={onViewfinder} loading={brief.status === 'loading'} settling={brief.status === 'loading' || brief.obsPending === true} />
+          <DayPage day={today} which="today" placeName={placeName} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} facing={brief.facing} checkedAt={brief.checkedAt} clock={clock} onOpenMap={onOpenMap} onSwitchSpot={onSwitchSpot} onViewfinder={onViewfinder} onOpenWeather={onOpenWeather} loading={brief.status === 'loading'} settling={brief.status === 'loading' || brief.obsPending === true} />
         </section>
         <section className="brief__page" aria-label="Tomorrow">
-          <DayPage day={tomorrow} which="tomorrow" placeName={placeName} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} facing={brief.facing} checkedAt={brief.checkedAt} clock={clock} onOpenMap={onOpenMap} onSwitchSpot={onSwitchSpot} onViewfinder={onViewfinder} loading={brief.status === 'loading'} />
+          <DayPage day={tomorrow} which="tomorrow" placeName={placeName} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} facing={brief.facing} checkedAt={brief.checkedAt} clock={clock} onOpenMap={onOpenMap} onSwitchSpot={onSwitchSpot} onViewfinder={onViewfinder} onOpenWeather={onOpenWeather} loading={brief.status === 'loading'} />
         </section>
         <section className="brief__page" aria-label="This week">
           <WeekPage now={now} days={brief.days} timeZone={timeZone} units={units} clock={clock} placeName={placeName} loading={brief.status === 'loading'} />
@@ -229,6 +232,7 @@ function RowIcon({ kind }: { kind: keyof typeof ROW_PATH }) {
 /* ---------------------------------------------------------------- a day page */
 
 interface DayPageProps {
+  onOpenWeather?: () => void
   day: DayBrief | null
   which: 'today' | 'tomorrow'
   placeName: string
@@ -248,7 +252,7 @@ interface DayPageProps {
   settling?: boolean
 }
 
-function DayPage({ day, which, placeName, venue, timeZone, units, drone, now, checkedAt, clock, onOpenMap, onSwitchSpot, onViewfinder, loading, settling = false }: DayPageProps) {
+function DayPage({ onOpenWeather, day, which, placeName, venue, timeZone, units, drone, now, checkedAt, clock, onOpenMap, onSwitchSpot, onViewfinder, loading, settling = false }: DayPageProps) {
   const read = day?.call ?? null
   const kind: Kind | null = read?.kind ?? null
   const verdict = day === null || kind === null ? null : day.verdicts[kind]
@@ -342,6 +346,7 @@ function DayPage({ day, which, placeName, venue, timeZone, units, drone, now, ch
             {best.line}
           </button>
         )}
+        <StormBrief venue={venue} timeZone={timeZone} units={units} which={which} onOpen={onOpenWeather} />
       </div>
 
       {day === null ? null : <Conditions day={day} which={which} units={units} drone={drone} now={now} venue={venue} timeZone={timeZone} clock={clock} />}

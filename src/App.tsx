@@ -1412,7 +1412,7 @@ function App() {
     drawer: 'kit',
     tick: 0,
   })
-  const [cardRequest, setCardRequest] = useState<{ kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'buoys' | 'wind' | 'terrain' | 'preflight'; skyTab?: 'now' | 'fire' | 'special' | 'calendar'; tick: number }>({
+  const [cardRequest, setCardRequest] = useState<{ kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'buoys' | 'wind' | 'terrain' | 'preflight'; skyTab?: 'now' | 'weather' | 'fire' | 'special' | 'calendar'; tick: number }>({
     kind: 'sky',
     tick: 0,
   })
@@ -2483,6 +2483,11 @@ function App() {
       ) : null}
       {briefOpen && centre !== null && !spotPickOpen ? (
         <Briefing
+          onOpenWeather={() => {
+            setBriefOpen(false)
+            setMode('plan')
+            setCardRequest((r) => ({ kind: 'sky', skyTab: 'weather', tick: r.tick + 1 }))
+          }}
           onSwitchSpot={() => setSpotPickOpen(true)}
           onViewfinder={() => setViewfinderOpen(true)}
           venue={centre}

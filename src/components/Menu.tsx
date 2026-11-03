@@ -1,6 +1,7 @@
 import { beachName, sameBeach, useSurfBeach } from '../lib/surfBeach.ts'
 import { SpotPicker } from './SpotPicker.tsx'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { stormNote } from '../lib/stormRiskData.ts'
 import { droneCard, skyCard, skyTabFor, todayCard, waterCard, type CardDay, type Tone } from '../core/menuCards.ts'
 import { formatClock } from '../core/timezone.ts'
 import { useBriefing } from '../lib/useBriefing.ts'
@@ -118,7 +119,7 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, now, onPic
           <LiveCard refTo={first} kind="today" title="Today" icon={<TodayIcon />} value={loading ? '…' : today.value} sub={loading ? 'reading the forecasts' : today.sub} tone={wait(today.tone)} onTap={() => pick('today')}>
             <p className="mcard__line">{today.line ?? ''}</p>
           </LiveCard>
-          <LiveCard kind="sky" title="Sky" icon={<SkyIcon />} value={loading ? '…' : sky.value} sub={loading ? '' : sky.sub} tone={wait(sky.tone)} onTap={() => pick('sky', { skyTab: skyTabFor(days, now) })}>
+          <LiveCard kind="sky" title="Sky" icon={<SkyIcon />} value={loading ? '…' : sky.value} sub={loading ? '' : (stormNote() ?? sky.sub)} tone={wait(sky.tone)} onTap={() => pick('sky', { skyTab: skyTabFor(days, now) })}>
             <div className={`mcard__strip${sky.lowDeck ? ' mcard__strip--deck' : ''}`} aria-hidden="true">
               {sky.lowDeck || sky.strip.length === 0 ? null : <i className="mcard__clock" style={{ background: stripGradient(sky.strip) }} />}
               {sky.peak === null ? null : <i className="mcard__peak" style={{ left: `${Math.max(0, Math.min(100, sky.peak * 100))}%` }} />}

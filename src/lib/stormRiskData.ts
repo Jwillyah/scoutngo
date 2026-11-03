@@ -148,3 +148,17 @@ export function useStormRisk(venue: LatLon | null, timeZone: string | null, on: 
   }, [on, lat, lon, timeZone])
   return got
 }
+
+/*
+ * Today's first storm line, kept in memory for the menu's Sky card: the
+ * card says it when Today or Weather has already read it, and asks nothing
+ * itself.
+ */
+let todayNote: { line: string; at: number } | null = null
+export function noteStorm(line: string | null): void {
+  todayNote = line === null ? null : { line, at: Date.now() }
+}
+/** The note, if it is under an hour old. */
+export function stormNote(now = Date.now()): string | null {
+  return todayNote !== null && now - todayNote.at < 3_600_000 ? todayNote.line : null
+}

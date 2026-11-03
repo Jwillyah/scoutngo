@@ -16980,3 +16980,13 @@ a.about__row * {
 .wx__watch {
   font-weight: var(--weight-medium);
 }
+/* Storms on Today and Tomorrow (Batch K, Section 4): the row opens Sky › Weather. */
+.bstorm {
+  white-space: normal;
+  display: grid;
+  gap: 2px;
+  text-align: left;
+}
+.bstorm__line {
+  display: block;
+}
