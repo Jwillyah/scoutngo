@@ -104,8 +104,10 @@ export interface WaterCardRead extends CardRead {
   bars: { h: number; now: boolean; clean: boolean }[]
 }
 
-export function waterCard(day: CardDay | null, now: Date, clock: (d: Date) => string): WaterCardRead {
-  if (day === null || day.surf.length === 0) return { value: '—', sub: 'no sea forecast', line: null, tone: 'bad', bars: [] }
+/** `beach` names the surf beach the card reads (Batch J, Section 7: "Surf · Virginia Beach"). */
+export function waterCard(day: CardDay | null, now: Date, clock: (d: Date) => string, beach: string | null = null): WaterCardRead {
+  const named = beach === null ? [] : [`Surf · ${beach}`]
+  if (day === null || day.surf.length === 0) return { value: '—', sub: [...named, 'no sea forecast'].join(' · '), line: null, tone: 'bad', bars: [] }
   const fts = day.surf.map((b) => b.faceFt)
   const lo = Math.round(Math.min(...fts))
   const hi = Math.round(Math.max(...fts))
@@ -114,7 +116,7 @@ export function waterCard(day: CardDay | null, now: Date, clock: (d: Date) => st
   const wind = day.windTag === 'Offshore' ? 'offshore' : day.windTag === 'Onshore' ? 'onshore' : day.windTag === 'Cross' ? 'cross-shore' : null
   const low = day.tide?.marks.find((m) => m.kind === 'low' && m.at > now) ?? null
   const words = day.windTag === 'Onshore' ? ['messy', wind] : [size, wind]
-  const sub = [...words.filter((w): w is string => w !== null), ...(low === null ? [] : [`low ${clock(low.at)}`])].join(' · ')
+  const sub = [...named, ...words.filter((w): w is string => w !== null).slice(0, named.length === 0 ? 2 : 1), ...(low === null ? [] : [`low ${clock(low.at)}`])].join(' · ')
   const max = Math.max(1, ...fts)
   const bars = day.surf.map((b) => ({ h: b.faceFt / max, now: Math.abs(b.at.getTime() - now.getTime()) < 1_800_000, clean: b.clean }))
   const tone: Tone = day.windTag === 'Onshore' || day.surfTag === 'Flat' ? 'bad' : day.surfClean ? 'good' : 'maybe'

@@ -1,3 +1,5 @@
+import { beachName, sameBeach, useSurfBeach } from '../lib/surfBeach.ts'
+import { SpotPicker } from './SpotPicker.tsx'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { droneCard, skyCard, skyTabFor, todayCard, waterCard, type CardDay, type Tone } from '../core/menuCards.ts'
 import { formatClock } from '../core/timezone.ts'
@@ -69,7 +71,7 @@ export function Menu(props: MenuProps) {
   return <MenuSheet {...props} first={first} />
 }
 
-function MenuSheet({ venue, placeShort, timeZone, units, drone, inland, rows, now, onPick, onClose, first }: MenuProps & { first: React.RefObject<HTMLButtonElement | null> }) {
+function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, now, onPick, onClose, first }: MenuProps & { first: React.RefObject<HTMLButtonElement | null> }) {
   /* Asked only once the menu has been open a moment: a tap straight through it to a place asks nothing. */
   const [looking, setLooking] = useState(false)
   useEffect(() => {
@@ -81,7 +83,13 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, inland, rows, no
   const clock = (d: Date) => formatClock(d, timeZone)
   const today = useMemo(() => todayCard(days, clock, timeZone), [days, timeZone]) // eslint-disable-line react-hooks/exhaustive-deps
   const sky = useMemo(() => skyCard(days, now, clock), [days, now]) // eslint-disable-line react-hooks/exhaustive-deps
-  const water = useMemo(() => waterCard(days[0] ?? null, now, clock), [days, now]) // eslint-disable-line react-hooks/exhaustive-deps
+  /* Batch J, Section 7: the Water card everywhere, inland too, for a named surf beach: the nearest, or the one picked; its own sea and tide when it is not here. */
+  const [beach, setBeach] = useSurfBeach(venue)
+  const [pickingBeach, setPickingBeach] = useState(false)
+  const here = sameBeach(venue, beach)
+  const beachBrief = useBriefing(here || beach === null ? null : beach.at, timeZone, now, looking && !here, 'sea')
+  const waterDay = here ? (days[0] ?? null) : ((beachBrief.days[0] as unknown as CardDay | undefined) ?? null)
+  const water = useMemo(() => waterCard(waterDay, now, clock, beach?.name ?? null), [waterDay, now, beach?.name]) // eslint-disable-line react-hooks/exhaustive-deps
   const flight = useMemo(() => droneCard(days[0] ?? null, drone?.maxWindMps ?? null, now, (mps) => `${Math.round(windIn(mps, units.wind) ?? 0)} ${windUnitLabel(units.wind)}`), [days, drone, now, units.wind])
   const loading = brief.status === 'loading' && days.length === 0
   const date = `${new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone }).format(now)} ${new Intl.DateTimeFormat('en-US', { day: 'numeric', timeZone }).format(now)}`
@@ -116,15 +124,38 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, inland, rows, no
               {sky.peak === null ? null : <i className="mcard__peak" style={{ left: `${Math.max(0, Math.min(100, sky.peak * 100))}%` }} />}
             </div>
           </LiveCard>
-          <LiveCard kind="water" title={inland ? 'Land' : 'Water'} icon={<WaterIcon />} value={loading ? '…' : water.value} sub={loading ? '' : water.sub} tone={wait(water.tone)} onTap={() => pick('water')}>
-            <Bars bars={water.bars.map((b) => ({ h: b.h, now: b.now, cls: b.clean ? 'clean' : 'messy' }))} />
-          </LiveCard>
+          <div className="mcard-wrap">
+            <LiveCard kind="water" title="Water" icon={<WaterIcon />} value={loading ? '…' : water.value} sub={loading ? '' : water.sub} tone={wait(water.tone)} onTap={() => pick('water')}>
+              <Bars bars={water.bars.map((b) => ({ h: b.h, now: b.now, cls: b.clean ? 'clean' : 'messy' }))} />
+            </LiveCard>
+            {beach === null ? null : (
+              <button type="button" className="mcard__beach" aria-label={`Surf beach: ${beach.name}. Pick another`} onClick={() => setPickingBeach(true)}>
+                {beach.name}
+                <svg viewBox="0 0 12 12" aria-hidden="true">
+                  <path d="M2.5 4.5L6 8l3.5-3.5" />
+                </svg>
+              </button>
+            )}
+          </div>
           {drone === null ? null : (
             <LiveCard kind="drone" title="Drone" icon={<DroneIcon />} value={loading ? '…' : flight.value} sub={loading ? '' : flight.sub} tone={wait(flight.tone)} onTap={() => pick('drone')}>
               <Bars bars={flight.bars.map((b) => ({ h: b.h, now: b.now, cls: b.over === 'over' ? 'over' : b.over === 'near' ? 'near' : 'ok' }))} limit={flight.limit} />
             </LiveCard>
           )}
         </div>
+
+        {!pickingBeach ? null : (
+          <SpotPicker
+            title="Surf beach"
+            saved={[]}
+            around={beach?.at ?? venue}
+            onPick={(at, label) => {
+              setBeach({ name: beachName(label), at })
+              setPickingBeach(false)
+            }}
+            onClose={() => setPickingBeach(false)}
+          />
+        )}
 
         {/* Batch I: the Viewfinder's own row, right under the cards. */}
         <div className="menu__rows">

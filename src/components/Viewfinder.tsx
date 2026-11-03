@@ -1,3 +1,5 @@
+import { readBand } from '../lib/skyCheckRead.ts'
+import { skyCheckWords } from '../core/skyCheck.ts'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PresetEvent, ViewfinderPreset } from '../core/viewfinderPreset.ts'
 import { getMoonPosition, getPosition } from 'suncalc'
@@ -147,6 +149,8 @@ export function Viewfinder({ venue, pins, profile, bag, timeZone, units, preset 
   const [calibrating, setCalibrating] = useState(false)
   const [moon, setMoon] = useState(preset?.event === 'moonrise')
   const [info, setInfo] = useState(false)
+  /* Batch J, Section 7: the sky check's words, after a tap; the picture itself is never kept (src/lib/skyCheckRead.ts). */
+  const [checked, setChecked] = useState<string | null>(null)
   const [me, setMe] = useState<LatLon | null>(null)
   const [now, setNow] = useState(() => new Date())
   /* The phone camera: the main one at the field set in the "i", or the ultra-wide when switched to. */
@@ -436,7 +440,22 @@ export function Viewfinder({ venue, pins, profile, bag, timeZone, units, preset 
         )}
       </div>
 
+      {/* Batch J, Section 7: the sky check, up here so the controls below keep their height. Point at the horizon under the sun's line. */}
+      {checked === null ? null : <p className="vf__checked" role="status">{checked}</p>}
       <div className="vf__top">
+        <button
+          type="button"
+          className="vf__chip vf__checkbtn"
+          onClick={() => {
+            const v = video.current
+            const e = eventScreen !== null && eventScreen.x >= 0 && eventScreen.x <= 1 && eventScreen.y >= 0 && eventScreen.y <= 1 ? eventScreen : null
+            const band = e === null ? { x0: 0.35, x1: 0.65, y0: 0.35, y1: 0.5 } : { x0: e.x - 0.12, x1: e.x + 0.12, y0: e.y - 0.14, y1: e.y }
+            const stats = v === null ? null : readBand(v, band)
+            setChecked(stats === null ? 'No picture to check yet.' : `${skyCheckWords(stats)}.`)
+          }}
+        >
+          Check the gap
+        </button>
         <button type="button" className="vf__icon" onClick={() => setInfo(!info)} aria-pressed={info} aria-label="What the viewfinder assumes">
           <Glyph d="info" />
         </button>

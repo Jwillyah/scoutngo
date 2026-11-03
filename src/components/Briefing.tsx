@@ -7,6 +7,9 @@ import { saveIcs } from '../lib/saveIcs.ts'
 import { remember } from '../lib/callHistory.ts'
 import { showGuide, useBestView } from '../lib/useBestView.ts'
 import { bestViewOnMap } from '../core/bestView.ts'
+import { camsForEvent } from '../core/skyCams.ts'
+import { COAST_CAMS } from '../data/coastCams.ts'
+import { beachName } from '../lib/surfBeach.ts'
 import { changeWords } from '../core/callChange.ts'
 import { compass } from '../lib/tideWords.ts'
 import { windIn, windUnitLabel, type Units } from '../lib/units.ts'
@@ -254,6 +257,7 @@ function DayPage({ day, which, placeName, venue, timeZone, units, drone, now, ch
   /* Batch J, Section 6: the call this phone showed last for the event, and its change ("Upgraded to Go at 4:52 PM from KNTU"). */
   const callKey = read === null || which !== 'today' || settling ? null : `${venue.lat.toFixed(2)},${venue.lon.toFixed(2)}|${read.kind}|${read.event.toISOString()}`
   /* Batch J, Section 5: where the colour will be, and which spots see it; a tap draws it on the map. */
+  const skyCams = useMemo(() => (read === null || which !== 'today' ? { look: '', cams: [] } : camsForEvent(venue, read.event, COAST_CAMS)), [read, which, venue])
   const best = useBestView(which === 'today' && read !== null && read.call !== 'Skip' ? venue : null, read?.event ?? null)
   const change = useMemo(() => (callKey === null || read === null ? null : remember(callKey, read.event, read.call, read.by ?? null, now)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -317,6 +321,20 @@ function DayPage({ day, which, placeName, venue, timeZone, units, drone, now, ch
             </li>
           ))}
         </ol>
+        {skyCams.cams.length === 0 ? null : (
+          /* Batch J, Section 7: the nearest public cams looking toward the sun. LINK OUT ONLY: a link, nothing fetched. */
+          <p className="bcams">
+            {skyCams.look}:{' '}
+            {skyCams.cams.map((c, i) => (
+              <span key={c.cam.id}>
+                {i === 0 ? '' : ' · '}
+                <a href={c.cam.url} target="_blank" rel="noopener noreferrer">
+                  {beachName(c.cam.name)} {c.where}
+                </a>
+              </span>
+            ))}
+          </p>
+        )}
         {best === null ? null : (
           <button type="button" className="bview" onClick={() => { showGuide(bestViewOnMap(venue, best)); onOpenMap() }}>
             {best.line}

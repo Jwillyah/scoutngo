@@ -53,10 +53,11 @@ describe('the menu (Batch H, Section 3: it replaced the side menu)', () => {
     expect(html).toContain('VB Pier · Mon 2')
   })
 
-  it('the Drone card only with a drone in the kit; Land, not Water, inland', () => {
+  /* Batch J, Section 7: the Water card everywhere, inland too, for a named surf beach. */
+  it('the Drone card only with a drone in the kit; Water inland too', () => {
     expect(render(null)).not.toContain('>Drone<')
-    expect(render(null, true)).toContain('>Land<')
-    expect(render(null, true)).not.toContain('>Water<')
+    expect(render(null, true)).toContain('>Water<')
+    expect(render(null, true)).not.toContain('>Land<')
   })
 
   it('every place is still reachable: a card, a row, a tab inside a group, or its own address', () => {

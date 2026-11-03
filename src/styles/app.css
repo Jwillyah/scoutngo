@@ -10817,6 +10817,22 @@
   gap: var(--space-1);
 }
 
+.vf__checkbtn {
+  align-self: center;
+}
+.vf__checked {
+  position: absolute;
+  top: calc(var(--safe-top) + var(--space-1) + 52px);
+  right: var(--space-1);
+  left: var(--space-1);
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgb(0 0 0 / 0.55);
+  color: #fff;
+  font-size: var(--text-sm);
+  text-align: right;
+}
 .vf__icon {
   display: grid;
   place-items: center;
@@ -15634,6 +15650,46 @@ a.about__row * {
   font-weight: 300;
   line-height: 1.05;
   letter-spacing: -0.02em;
+}
+.bcams {
+  margin: 4px 0 0;
+  font-size: var(--text-sm);
+}
+.bcams a {
+  color: inherit;
+  text-underline-offset: 3px;
+}
+.mcard-wrap {
+  position: relative;
+  display: grid;
+  width: 100%;
+}
+.mcard-wrap > .mcard {
+  width: 100%;
+}
+.mcard__beach {
+  position: absolute;
+  left: 10px;
+  top: 8px;
+  margin-left: 72px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid rgb(255 255 255 / 0.35);
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.35);
+  color: #fff;
+  font: inherit;
+  font-size: var(--text-xs, 0.75rem);
+}
+.mcard__beach svg {
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
 }
 .bview {
   display: block;

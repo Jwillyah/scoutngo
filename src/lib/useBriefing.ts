@@ -98,7 +98,9 @@ function eventsOn(iso: string, venue: LatLon, timeZone: string): Record<Kind, Da
  * the sea and the wind, so opening the menu costs a few questions, most of
  * them the Sky fire page's own, kept for the hour.
  */
-export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, open: boolean, scope: 'week' | 'next' = 'week'): Briefing {
+export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, open: boolean, scope: 'week' | 'next' | 'sea' = 'week'): Briefing {
+  /* 'sea' (Batch J, Section 7): the Water card's own beach, when it is not the venue: the sea, the wind and the tide only. */
+  const sky = scope !== 'sea'
   const today = venueToday(now, timeZone)
   const lat = venue?.lat ?? null
   const lon = venue?.lon ?? null
@@ -112,7 +114,7 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
 
   /* Sky fire: today and tomorrow event by event, the rest of the week in two questions. */
   useEffect(() => {
-    if (!open || key === null || lat === null || lon === null) return
+    if (!open || !sky || key === null || lat === null || lon === null) return
     const at = { lat, lon }
     let live = true
     void (async () => {
@@ -139,7 +141,7 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
     return () => {
       live = false
     }
-  }, [open, key, lat, lon, today, timeZone, epoch, scope])
+  }, [open, key, lat, lon, today, timeZone, epoch, scope, sky])
 
   /* The sea, the wind, the beach's facing. */
   useEffect(() => {
@@ -163,7 +165,7 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
   }, [lat, lon, today, timeZone, now])
   const soon = nextEvent !== null && nextEvent.getTime() - now.getTime() <= 2 * 3_600_000
   useEffect(() => {
-    if (!open || !soon || key === null || lat === null || lon === null) return
+    if (!open || !sky || !soon || key === null || lat === null || lon === null) return
     let live = true
     void fetchStationSkies({ lat, lon }).then((list) => {
       if (live) setStations({ key, list })
@@ -171,7 +173,7 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
     return () => {
       live = false
     }
-  }, [open, soon, key, lat, lon])
+  }, [open, sky, soon, key, lat, lon])
 
   /*
    * THE SATELLITE, in the nowcast window only (3 h to 30 min before the next
@@ -184,7 +186,7 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
   const satEvent = satDue ? nextEvent.getTime() : null
   const seaWind = sea?.key === key ? sea.wind : null
   useEffect(() => {
-    if (!open || satEvent === null || key === null || lat === null || lon === null || seaWind === null) return
+    if (!open || !sky || satEvent === null || key === null || lat === null || lon === null || seaWind === null) return
     let live = true
     const e = new Date(satEvent)
     const mps = hourlyAt(seaWind, 'wind_speed_500hPa', e)
@@ -196,11 +198,11 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
     return () => {
       live = false
     }
-  }, [open, satEvent, key, lat, lon, seaWind])
+  }, [open, sky, satEvent, key, lat, lon, seaWind])
 
   /* The observations before the next event (Batch J): the deck over you by its real height. */
   const st0 = stations?.key === key ? (stations.list[0] ?? null) : null
-  const obs = useSkyObs(lat === null || lon === null ? null : { lat, lon }, nextEvent, st0 === null ? null : { id: st0.sky.station, sky: st0.sky }, null, now)
+  const obs = useSkyObs(!sky || lat === null || lon === null ? null : { lat, lon }, nextEvent, st0 === null ? null : { id: st0.sky.station, sky: st0.sky }, null, now)
 
   /* The tide: the nearest station's month of highs and lows, from the start of today. */
   const tide = useTide(open ? venue : null, open ? now : null)
@@ -305,7 +307,7 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
     const times = [f, s].filter((x) => x !== null)
     const fetched = f === null ? [] : [...Object.values(f.near), f.week.sunrise, f.week.sunset].map((x) => x?.fetchedAt).filter((t): t is number => typeof t === 'number')
     const obsPending = obsDue(nextEvent, now) && (obs === null || (soon && stations?.key !== key))
-    return { status: times.length === 2 ? 'ready' : 'loading', days, facing, checkedAt: fetched.length === 0 ? null : Math.max(...fetched), obsPending }
-  }, [key, lat, lon, fire, sea, stations, tides, sat, obs, nextEvent, soon, today, timeZone, now, scope])
+    return { status: times.length === (sky ? 2 : 1) ? 'ready' : 'loading', days, facing, checkedAt: fetched.length === 0 ? null : Math.max(...fetched), obsPending }
+  }, [key, lat, lon, fire, sea, stations, tides, sat, obs, nextEvent, soon, sky, today, timeZone, now, scope])
 }
 
