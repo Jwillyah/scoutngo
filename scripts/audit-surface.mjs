@@ -378,7 +378,7 @@ console.log('\n### the sheet: up and down anywhere in it, sideways on the ruler 
 const handle = await ev(`(() => {
   const g = document.querySelector('.sheet__grab')?.getBoundingClientRect()
   const s = document.querySelector('.sheet')?.getBoundingClientRect()
-  const d = document.querySelector('.tooldock')?.getBoundingClientRect()
+  const d = null /* the tool dock is gone (Batch K addendum) */
   if (!g || !s) return null
   return { h: g.height, w: g.width, sw: s.width, gap: d ? g.top - d.bottom : null }
 })()`)
@@ -1082,18 +1082,18 @@ const OPENERS = `(() => {
   const add = (sel, i, name) => out.push({ sel, i, name })
   document.querySelectorAll('.chip2').forEach((b, i) =>
     add('.chip2', i, (b.querySelector('.chip2__label')?.textContent ?? '').trim()))
+  /* Batch K addendum: the dock is gone; Features is in the rail, and behind it Skyline and the light map, doors two taps deep (Preflight is the menu's Drone card, Calendar is Sky's tab). */
   document.querySelectorAll('.rail2__btn').forEach((b, i) => {
-    if ((b.getAttribute('aria-label') ?? '').toLowerCase().includes('layer')) add('.rail2__btn', i, 'layers')
-  })
-  /* The tool dock: Layers moved here from the rail, and the calendar opens the Sky card. */
-  document.querySelectorAll('.tooldock__btn').forEach((b, i) => {
     const label = (b.getAttribute('aria-label') ?? '').toLowerCase()
-    if (label.includes('layer')) add('.tooldock__btn', i, 'layers')
-    if (label.includes('calendar')) add('.tooldock__btn', i, 'sky')
-    /* Behind Layers, under Tools: Preflight, the skyline and the light map, doors two taps deep. */
-    if (label.includes('layer')) add('layerstool', 'Preflight', 'preflight')
-    if (label.includes('layer')) add('layerstool', 'Skyline', 'skyline')
-    if (label.includes('layer')) add('layerstool', 'Light map', 'lightmap')
+    if (label.includes('layer') || label === 'features') {
+      add('.rail2__btn', i, 'layers')
+      add('layerstool', 'Skyline', 'skyline')
+      add('layerstool', 'Light map', 'lightmap')
+      add('layerstool', 'Hazards', 'hazards')
+      add('layerstool', 'What is mapped here ›', 'hazards')
+      add('layerstool', 'Airspace over this venue ›', 'airspace')
+      add('layerstool', 'Radar', 'wxlayer')
+    }
   })
   /*
    * THE MENU'S CARD DOORS. Sky and the call sheet open cards from the side menu (About is a page since Batch E), so
@@ -1104,6 +1104,8 @@ const OPENERS = `(() => {
     add('menu', 'Sky', 'sky')
     /* The call sheet's door is a row on Plan's shoot card since Batch H (walked with the .more2__row doors below). */
     add('menu', 'Settings', 'settings')
+    /* Preflight is the Drone card's since Batch K addendum E. */
+    add('menu', 'Drone', 'preflight')
     /* Behind the Sky card's Moon page: a door two taps deep, walked the way a person walks it. */
     add('skymoon', 'Plan this moonrise', 'moonrise')
   }
@@ -1114,9 +1116,9 @@ const OPENERS = `(() => {
 
 const click = async (sel, i) => {
   if (sel === 'layerstool') {
-    await ev(`(() => { const b = document.querySelector('button[aria-label="Map and layers"]'); if (b && b.getAttribute('aria-pressed') !== 'true') b.click(); return 1 })()`)
+    await ev(`(() => { const b = document.querySelector('button[aria-label="Features"]'); if (b && b.getAttribute('aria-pressed') !== 'true') b.click(); return 1 })()`)
     await wait(600)
-    await ev(`[...document.querySelectorAll('button.tile')].find((t) => t.querySelector('.tile__label')?.textContent === ${JSON.stringify(i)})?.click()`)
+    await ev(`[...document.querySelectorAll('.feat__qbtn, .feat__sw, .feat__link, .feat__wtile')].find((t) => (t.querySelector('.feat__label')?.firstChild?.textContent ?? t.textContent).trim() === ${JSON.stringify(i)})?.click()`)
     await wait(600)
     return
   }

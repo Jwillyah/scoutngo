@@ -60,9 +60,10 @@ try {
   for (const [label, size] of [['landscape', { width: 844, height: 390 }], ['portrait', { width: 390, height: 844 }]]) {
     await send('Emulation.setDeviceMetricsOverride', { ...size, deviceScaleFactor: 2, mobile: true })
     await openShared(c, { lat: 36.8435575, lon: -75.9713104, name: 'Virginia Beach Fishing Pier', date: '2026-10-28', start: '16:30', end: '17:30' })
-    await ev(`document.querySelector('button[aria-label="Map and layers"]')?.click()`)
+    /* Batch K addendum: Preflight moved from the layers sheet to the menu's Drone card. */
+    await ev(`document.querySelector('button[aria-label="Menu"]')?.click()`)
     await wait(900)
-    await ev(`[...document.querySelectorAll('button.tile')].find(t => t.querySelector('.tile__label')?.textContent === 'Preflight')?.click()`)
+    await ev(`document.querySelector('.mcard--drone')?.click()`)
     await wait(1500)
     await ev(`[...document.querySelectorAll('.pf button')].find(b => b.textContent === 'Fly it yourself')?.click()`)
     let up = false

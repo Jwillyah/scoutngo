@@ -144,7 +144,12 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, now, onPic
               </button>
             )}
           </div>
-          {drone === null ? null : (
+          {/* Batch K addendum, E: Preflight lives here now (the layers sheet's tile went), so the card is there with no drone in the kit too. */}
+          {drone === null ? (
+            <LiveCard kind="drone" title="Drone" icon={<DroneIcon />} value="Preflight" sub="draw a move" tone="maybe" onTap={() => pick('drone')}>
+              {null}
+            </LiveCard>
+          ) : (
             <LiveCard kind="drone" title="Drone" icon={<DroneIcon />} value={loading ? '…' : flight.value} sub={loading ? '' : flight.sub} tone={wait(flight.tone)} onTap={() => pick('drone')}>
               <Bars bars={flight.bars.map((b) => ({ h: b.h, now: b.now, cls: b.over === 'over' ? 'over' : b.over === 'near' ? 'near' : 'ok' }))} limit={flight.limit} />
             </LiveCard>

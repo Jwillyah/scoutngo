@@ -94,11 +94,9 @@ for (const detent of ['peek', 'half']) {
   }
   if (chips === null) fail(`${detent}: no chips`)
   else if (m.chipRows !== 1) fail(`${detent}: the chips take ${m.chipRows} rows, not one`)
-  if (dock === null) fail(`${detent}: no tool dock`)
-  else {
-    if (dock.height <= dock.width) fail(`${detent}: the tool dock is not a vertical strip (${Math.round(dock.width)} x ${Math.round(dock.height)})`)
-    if (m.vw - dock.right > 60) fail(`${detent}: the tool dock is ${Math.round(m.vw - dock.right)} px from the right edge`)
-  }
+  /* Batch K addendum: the tool dock is gone (Features is in the rail); one on screen is a regression. */
+  if (dock !== null) fail(`${detent}: a tool dock is on screen; it was removed`)
+  if (m.parts.rail === null) fail(`${detent}: no map rail (compass, Features, 3D)`)
   const named = Object.entries(m.parts).filter(([, b]) => b !== null)
   for (let i = 0; i < named.length; i += 1)
     for (let j = i + 1; j < named.length; j += 1) {

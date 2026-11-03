@@ -18,6 +18,7 @@ const EVERY_KIND: CardKind[] = [
   'wind',
   'cloud',
   'layers',
+  'wxlayer',
   'hazards',
   'airspace',
   'sky',

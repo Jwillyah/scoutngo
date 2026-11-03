@@ -14,9 +14,15 @@ import { showGuide } from '../lib/useBestView.ts'
  * their straight-line motion puts them, labelled so. It never looks like
  * radar it is not.
  */
-export function RadarSlider({ scanAt, calls, strikes, timeZone }: { scanAt: Date; calls: readonly CellCall[]; strikes: readonly Strike[]; timeZone: string }) {
+/* The slider's drawing is a layer: the map is not jumped to it on every step. */
+const layered = (fc: GeoJSON.FeatureCollection): GeoJSON.FeatureCollection => ({ ...fc, features: fc.features.map((f) => ({ ...f, properties: { ...f.properties, layer: true } })) })
+
+export function RadarSlider({ scanAt, calls, strikes, timeZone, step, onStep }: { scanAt: Date; calls: readonly CellCall[]; strikes: readonly Strike[]; timeZone: string; step?: number; onStep?: (i: number) => void }) {
   const steps = sliderSteps()
-  const [i, setI] = useState(steps.indexOf(0))
+  const [own, setOwn] = useState(steps.indexOf(0))
+  /* Controlled when the card plays it (WeatherLayerCard), its own otherwise. */
+  const i = step ?? own
+  const setI = onStep ?? setOwn
   const m = steps[i]
   const at = new Date(scanAt.getTime() + m * 60_000)
   const scan = scanAt.getTime()
@@ -24,15 +30,14 @@ export function RadarSlider({ scanAt, calls, strikes, timeZone }: { scanAt: Date
     const t = new Date(scan + m * 60_000)
     if (m <= 0) {
       showRadar(t)
-      showGuide(stormOnMap(strikes.filter((s) => s.frame.getTime() <= t.getTime() + 15 * 60_000), m === 0 ? calls : [], t))
+      showGuide(layered(stormOnMap(strikes.filter((s) => s.frame.getTime() <= t.getTime() + 15 * 60_000), m === 0 ? calls : [], t)))
     } else {
       showRadar(null)
       const moved = calls.filter((c) => c.towardDeg !== null || c.over).map((c) => ({ ...c, at: carried(c, m) }))
-      showGuide(stormOnMap([], moved, t))
+      showGuide(layered(stormOnMap([], moved, t)))
     }
   }, [m, scan]) // eslint-disable-line react-hooks/exhaustive-deps
-  /* Off the map when the slider goes. */
-  useEffect(() => () => showRadar(null), [])
+  /* The radar stays on when the card goes: the layer is the Features sheet's to turn off (Batch K addendum, D). */
   return (
     <div className="rslide">
       <p className={`rslide__when num${m > 0 ? ' rslide__when--proj' : ''}`}>

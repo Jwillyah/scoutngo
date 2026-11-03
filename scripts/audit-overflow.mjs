@@ -273,7 +273,7 @@ try {
    * Tools row and the source line included (27 Oct: it scrolled, with a caps
    * paragraph on a tile).
    */
-  await ev(`(() => { const b = document.querySelector('button[aria-label="Map and layers"]'); if (b && b.getAttribute('aria-pressed') !== 'true') b.click(); return 1 })()`)
+  await ev(`(() => { const b = document.querySelector('button[aria-label="Features"]'); if (b && b.getAttribute('aria-pressed') !== 'true') b.click(); return 1 })()`)
   await wait(900)
   /*
    * SETTLED FIRST. Under load the sheet was still rising to full when this
@@ -288,14 +288,14 @@ try {
     last = h
     await wait(150)
   }
-  await check('Plan, Layers', '.tiles')
+  await check('Plan, Features', '.feat')
   const layers = JSON.parse(await ev(`JSON.stringify((() => {
     const sheet = document.querySelector('.sheet')
-    const tiles = document.querySelector('.tiles')
+    const tiles = document.querySelector('.feat')
     if (!sheet || !tiles) return { missing: true }
     const scrolls = [...sheet.querySelectorAll('*')].filter((e) => { const s = getComputedStyle(e); return /(auto|scroll)/.test(s.overflowY) && e.scrollHeight > e.clientHeight + 1 }).map((e) => e.className + ' ' + e.scrollHeight + '/' + e.clientHeight)
-    const foot = document.querySelector('.tiles__foot')?.getBoundingClientRect()
-    return { detent: sheet.dataset.detent, scrolls, footBottom: foot ? Math.round(foot.bottom) : null, vh: innerHeight, tools: [...document.querySelectorAll('.tile__label')].some((l) => l.textContent === 'Measure'), longest: Math.max(...[...document.querySelectorAll('.tile__state')].map((e) => e.textContent.length)) }
+    const foot = document.querySelector('.feat__foot')?.getBoundingClientRect()
+    return { detent: sheet.dataset.detent, scrolls, footBottom: foot ? Math.round(foot.bottom) : null, vh: innerHeight, tools: [...document.querySelectorAll('.feat__qbtn')].some((l) => l.textContent === 'Measure'), longest: Math.max(0, ...[...document.querySelectorAll('.feat__note')].map((e) => e.textContent.length)) }
   })())`))
   if (layers.missing) fail('Layers did not open, so it was not checked')
   else {
@@ -304,17 +304,17 @@ try {
     for (const x of layers.scrolls) fail(`Layers scrolls: ${x}`)
     if (layers.footBottom === null || layers.footBottom > layers.vh) fail('the foot of Layers is off the screen')
     if (!layers.tools) fail('no Measure under Tools in Layers')
-    if (layers.longest > 24) fail(`a tile state runs to ${layers.longest} characters; a state is a few words`)
+    if (layers.longest > 32) fail(`a switch's note runs to ${layers.longest} characters; a state is a few words`)
   }
   /*
    * A NOTE WITH A CLOSE (measuring here; the waterline's is the same note):
    * inside the screen, and its × is what a tap there lands on. 27 Oct: the ×
    * sat at x 1224 on a 390 px screen and let taps through to the map.
    */
-  await ev(`[...document.querySelectorAll('.tile')].find((t) => t.querySelector('.tile__label')?.textContent === 'Measure')?.click()`)
+  await ev(`[...document.querySelectorAll('.feat__qbtn')].find((t) => t.textContent === 'Measure')?.click()`)
   await wait(700)
-  if (await ev(`document.querySelector('button[aria-label="Map and layers"]')?.getAttribute('aria-pressed') === 'true'`)) {
-    await ev(`document.querySelector('button[aria-label="Map and layers"]')?.click()`)
+  if (await ev(`document.querySelector('button[aria-label="Features"]')?.getAttribute('aria-pressed') === 'true'`)) {
+    await ev(`document.querySelector('button[aria-label="Features"]')?.click()`)
     await wait(500)
   }
   await setSheet(ev, wait, 'peek')
@@ -337,12 +337,17 @@ try {
   }
 
   /* SKY › CALENDAR: a page of its own, the whole month on one screen with nothing below it (29 Oct). */
-  await ev(`document.querySelector('button[aria-label="Calendar of the sky"]')?.click()`)
+  /* Batch K addendum: the dock is gone; the calendar is Sky › Calendar. */
+  await ev(`document.querySelector('button[aria-label="Menu"]')?.click()`)
+  await wait(900)
+  await ev(`document.querySelector('.mcard--sky')?.click()`)
+  await wait(1500)
+  await ev(`[...document.querySelectorAll('[role=tab]')].find((b) => b.textContent.trim() === 'Calendar')?.click()`)
   await wait(2500)
   await check('Sky › Calendar', '.cal .cal__grid')
   {
     const fit = JSON.parse(await ev(`JSON.stringify((() => { const c = document.querySelector('.cal'); if (!c) return null; const last = [...c.children].reduce((m, e) => Math.max(m, e.getBoundingClientRect().bottom), 0); return { scroll: c.scrollHeight, room: c.clientHeight, last: Math.round(last), vh: innerHeight, days: c.querySelectorAll('.cal__day').length, chipsTop: [...c.querySelectorAll('.cal__chip')].map((x) => Math.round(x.getBoundingClientRect().top)) } })())`))
-    if (fit === null) fail('Sky › Calendar did not open from the dock')
+    if (fit === null) fail('Sky › Calendar did not open from the Sky card')
     else {
       console.log(`  the calendar: ${fit.days} days, content to ${fit.last} of ${fit.vh} px`)
       if (fit.days < 28) fail(`the calendar drew ${fit.days} days`)

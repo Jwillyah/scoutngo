@@ -154,11 +154,24 @@ try {
     console.log('### the time pills: clear of every control over the map, and of each other')
     await ev(`(() => { const inp = document.querySelector('.tbar__jump'); const day = String(inp.value).slice(0, 10); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(inp, day + 'T19:30'); inp.dispatchEvent(new Event('input', { bubbles: true })); return 1 })()`)
     await wait(800)
-    if (!(await ev(`document.querySelector('button.tooldock__btn--sunmoon')?.getAttribute('aria-pressed') === 'true'`))) await ev(`document.querySelector('button.tooldock__btn--sunmoon')?.click()`)
+    /* Batch K addendum: the moon is Features › Moon path now (the dock is gone). */
+    const moon = async (want) => {
+      const was = await ev(`document.querySelector('.sheet')?.dataset.detent ?? 'peek'`)
+      await ev(`document.querySelector('button[aria-label="Features"]')?.click()`)
+      await wait(700)
+      await ev(`(() => { const b = document.querySelector('[data-feature="moon"]'); if (b && (b.getAttribute('aria-checked') === 'true') !== ${want}) b.click() })()`)
+      await wait(300)
+      /* Closed by its own ×: the rail is put away while the sheet is full. */
+      await ev(`document.querySelector('.sheet .card2__x')?.click()`)
+      await wait(700)
+      /* Features opens full; the sheet goes back where it was, so the time strip and the pills are as before. */
+      await setSheet(ev, wait, was)
+    }
+    await moon(true)
     await wait(2000)
     const pills = JSON.parse(await ev(`JSON.stringify((() => {
       const ps = [...document.querySelectorAll('.raypill')].filter((p) => !p.hidden).map((p) => ({ t: p.textContent, r: p.getBoundingClientRect() }))
-      const chrome = [...document.querySelectorAll('.rail2 button, .mapctl button, .maplibregl-ctrl, .topbar, .chips2, .tooldock, .sheet, .shadowkey')].map((n) => ({ n: n.className?.baseVal ?? n.className, r: n.getBoundingClientRect() })).filter((c) => c.r.width > 0)
+      const chrome = [...document.querySelectorAll('.rail2 button, .mapctl button, .maplibregl-ctrl, .topbar, .chips2, .sheet, .shadowkey')].map((n) => ({ n: n.className?.baseVal ?? n.className, r: n.getBoundingClientRect() })).filter((c) => c.r.width > 0)
       const hit = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
       const out = []
       for (const [i, p] of ps.entries()) {
@@ -170,8 +183,7 @@ try {
     if (pills.moon === 0) fail('the moon was on and no moon pill showed, so the pills were not checked')
     for (const o of pills.out) fail(`a time pill sits on something: ${o}`)
     console.log(`  ${pills.n} pills (${pills.moon} the moon's), ${pills.out.length} on a control or another pill`)
-    await ev(`document.querySelector('button.tooldock__btn--sunmoon')?.click()`)
-    await wait(500)
+    await moon(false)
 
     /* ----------------------------------------------------------- ruler */
     console.log('### the ruler: sideways is the time, up is the sheet, a tap jumps')

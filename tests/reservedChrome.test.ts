@@ -52,7 +52,7 @@ describe('the reserved list', () => {
     '.topbar',
     '.chips2',
     '.rail2',
-    '.tooldock',
+    '.wxchip',
     '.hud',
     '.mapctl',
     '.sheet',

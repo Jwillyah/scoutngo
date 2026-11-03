@@ -38,6 +38,9 @@ interface MapRailProps {
   /** Whether the map is turning with the phone's heading. */
   heading: boolean
   onCompass: () => void
+  /** Batch K addendum, D: the Features sheet (the map and everything on it), between the compass and 3D. */
+  onFeatures?: () => void
+  featuresOpen?: boolean
 }
 
 export function MapRail({
@@ -47,6 +50,8 @@ export function MapRail({
   bearing,
   heading,
   onCompass,
+  onFeatures,
+  featuresOpen = false,
 }: MapRailProps) {
   /** Which button is showing its text label, from a long press. */
   const [named, setNamed] = useState<string | null>(null)
@@ -67,12 +72,12 @@ export function MapRail({
     label: string,
     glyph: ReactNode,
     onClick: () => void,
-    opts: { on?: boolean; disabled?: boolean; face?: string } = {},
+    opts: { on?: boolean; disabled?: boolean; face?: string; tone?: string } = {},
   ) => (
     <div className="rail2__slot">
       <button
         type="button"
-        className={`rail2__btn${opts.on === true ? ' rail2__btn--on' : ''}`}
+        className={`rail2__btn${opts.tone === undefined ? '' : ` rail2__btn--${opts.tone}`}${opts.on === true ? ' rail2__btn--on' : ''}`}
         aria-label={label}
         aria-pressed={opts.on}
         disabled={opts.disabled === true}
@@ -139,6 +144,18 @@ export function MapRail({
         </svg>,
         onCompass,
         { on: heading },
+      )}
+
+      {/* FEATURES: blue, the layers glyph; everything drawn on the map (FeaturesSheet.tsx). The dock is gone (Batch K addendum). */}
+      {onFeatures === undefined ? null : button(
+        'features',
+        'Features',
+        <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+          <path d="M10 3 18 7.5 10 12 2 7.5z" fill="currentColor" />
+          <path d="M3.5 10.6 10 14.3l6.5-3.7M3.5 13.6 10 17.3l6.5-3.7" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+        </svg>,
+        onFeatures,
+        { on: featuresOpen, tone: 'features' },
       )}
 
       {/* 2D OR 3D, said on the face. 3D is the clay model of the same place at the same time. */}

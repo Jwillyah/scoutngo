@@ -192,17 +192,19 @@ export interface Alert {
   sender: string
   /** The alert on weather.gov, for its full text. */
   url: string | null
+  /** Its polygon, when the NWS drew one (warnings usually do): the Warnings layer. */
+  polygon: GeoJSON.Polygon | null
 }
 
 export function parseAlerts(payload: unknown): Alert[] {
-  const fs = (payload as { features?: { id?: unknown; properties?: Record<string, unknown> }[] } | null)?.features
+  const fs = (payload as { features?: { id?: unknown; properties?: Record<string, unknown>; geometry?: unknown }[] } | null)?.features
   if (!Array.isArray(fs)) return []
   const s = (x: unknown) => (typeof x === 'string' ? x : '')
   return fs.flatMap((f) => {
     const p = f.properties ?? {}
     if (s(p.event) === '') return []
     const end = s(p.ends) || s(p.expires)
-    return [{ event: s(p.event), headline: s(p.headline), description: s(p.description).trim(), severity: s(p.severity), ends: end === '' ? null : new Date(end), sender: s(p.senderName), url: typeof f.id === 'string' && /^https:\/\/api\.weather\.gov\/alerts\//.test(f.id) ? f.id : null }]
+    return [{ event: s(p.event), headline: s(p.headline), description: s(p.description).trim(), severity: s(p.severity), ends: end === '' ? null : new Date(end), sender: s(p.senderName), url: typeof f.id === 'string' && /^https:\/\/api\.weather\.gov\/alerts\//.test(f.id) ? f.id : null, polygon: (f.geometry as { type?: unknown } | null)?.type === 'Polygon' ? (f.geometry as GeoJSON.Polygon) : null }]
   })
 }
 

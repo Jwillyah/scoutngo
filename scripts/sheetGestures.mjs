@@ -117,7 +117,7 @@ export const DRAGS = [
   { at: '17:45', from: 'peek', on: 'day', to: 'half', want: { time: false, sheet: 'half' } },
   { at: '07:00', from: 'half', on: 'day', to: 'peek', want: { time: false, sheet: 'peek' } },
   { at: '12:30', from: 'full', on: 'grab', to: 'peek', want: { time: false, sheet: 'peek' } },
-  { at: '17:45', from: 'half', on: 'dock', dx: 0, dy: 120, want: { time: false, sheet: 'half' } },
+  /* The tool dock's lower edge went with the dock (Batch K addendum). */
   { at: '12:30', from: 'half', on: 'card', dx: 0, dy: 140, want: { time: false, sheet: 'peek' } },
 ]
 

@@ -156,23 +156,20 @@ for (const run of MODES) {
   }
 
   /*
-   * CONES ON. They are off by default and the control is the Cones tile in
-   * the layers card; asserting coverage with them off would be asserting
+   * CONES ON. They are off by default and the control is the Cones switch in
+   * Features (Batch K addendum); asserting coverage with them off would be asserting
    * nothing. Fails if the tile is not there or does not turn on.
    */
-  await ev(`document.querySelector('nav[aria-label="Tools"] button[aria-label="Map and layers"]')?.click()`)
+  await ev(`document.querySelector('nav[aria-label="Map controls"] button[aria-label="Features"]')?.click()`)
   await wait(700)
   const cones = await ev(`(() => {
-    const tile = [...document.querySelectorAll('.tile')]
-      .find((t) => /^cones/i.test((t.querySelector('.tile__label')?.textContent ?? '').trim()))
-    if (!tile) return 'no Cones tile in the layers card'
-    if (/^off$/i.test((tile.querySelector('.tile__state')?.textContent ?? '').trim())) tile.click()
+    const sw = document.querySelector('[data-feature="cones"]')
+    if (!sw) return 'no Cones switch in Features'
+    if (sw.getAttribute('aria-checked') !== 'true') sw.click()
     return 'ok'
   })()`)
   await wait(500)
-  const conesState = await ev(`[...document.querySelectorAll('.tile')]
-    .find((t) => /^cones/i.test((t.querySelector('.tile__label')?.textContent ?? '').trim()))
-    ?.querySelector('.tile__state')?.textContent?.trim() ?? 'gone'`)
+  const conesState = await ev(`(() => { const sw = document.querySelector('[data-feature="cones"]'); return sw === null ? 'gone' : sw.getAttribute('aria-checked') === 'true' ? 'ON' : 'OFF' })()`)
   if (cones !== 'ok' || conesState !== 'ON') problem(run, `could not turn cones on: ${cones}, state ${conesState}`)
   await ev(`document.querySelector('button[aria-label="Back to the shoot"]')?.click()`)
   await wait(600)

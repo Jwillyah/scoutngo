@@ -285,7 +285,7 @@ export function TimeBar({ at, lat, lon, timeZone, moon, onAt, onReset }: TimeBar
             busy.current = false
             onReset()
           }}
-          aria-label="Back to the shoot window"
+          aria-label="Back to now: the venue, north up, the current time"
         >
           <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true">
             <path d="M4.5 9a6 6 0 1 1 1.6 5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />

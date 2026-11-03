@@ -17502,3 +17502,248 @@ a.about__row * {
   font-size: var(--text-xs, 0.75rem);
   color: rgb(255 255 255 / 0.8);
 }
+
+/* FEATURES (Batch K addendum, E): two columns of compact switches, coloured icon squares. */
+.feat {
+  display: grid;
+  gap: 1px;
+}
+.feat__head--inline {
+  margin-right: 8px;
+}
+.feat__quick {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.feat__qbtn {
+  min-height: 38px;
+  border-radius: 12px;
+  border: 1px solid var(--color-line-strong);
+  background: var(--surface-2, transparent);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+.feat__qbtn--on {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.feat__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0;
+  min-height: 15px;
+  font-size: 0.625rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+.feat__link {
+  min-height: 20px;
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-xs, 0.75rem);
+  letter-spacing: 0;
+  text-transform: none;
+  text-decoration: underline;
+}
+.feat__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px;
+}
+.feat__sw {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) 30px;
+  align-items: center;
+  gap: 6px;
+  /* 38 px tall and over 160 px wide, so the sheet is one screen (Batch K addendum E); under the 44 px rule in height, said in the report. */
+  min-height: 38px;
+  padding: 0 6px;
+  border-radius: 10px;
+  border: 1px solid var(--color-line);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+}
+.feat__icon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+}
+.feat__label {
+  display: grid;
+  min-width: 0;
+  line-height: 1.15;
+}
+.feat__note {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 0.6875rem;
+  color: var(--color-text-muted);
+}
+/* The switch: a track, its knob right and filled when on. */
+.feat__toggle {
+  position: relative;
+  width: 30px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--surface-3, #333);
+}
+.feat__toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--grey-1, #aaa);
+  transition: left 0.15s;
+}
+.feat__sw--on .feat__toggle {
+  background: var(--white);
+}
+.feat__sw--on .feat__toggle::after {
+  left: 14px;
+  background: var(--black);
+}
+.feat__weather {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.feat__wtile {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  min-height: 36px;
+  padding: 2px;
+  border-radius: 10px;
+  border: 1px solid var(--color-line);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-xs, 0.75rem);
+}
+.feat__wtile--on {
+  border-color: var(--white);
+  box-shadow: 0 0 0 1px var(--white);
+}
+/* Preview tiles: a picture of each layer, not a symbol. */
+.feat__wart {
+  width: 100%;
+  height: 14px;
+  border-radius: 6px;
+  background: var(--surface-2, #222);
+}
+.feat__wtile--radar .feat__wart {
+  background: radial-gradient(circle at 35% 55%, #e6c200 0 12%, #2fb34a 13% 35%, transparent 36%), radial-gradient(circle at 70% 40%, #2fb34a 0 18%, transparent 19%), #2b3a4a;
+}
+.feat__wtile--wind .feat__wart {
+  background: repeating-linear-gradient(170deg, transparent 0 5px, rgb(255 255 255 / 0.55) 5px 6px), #2b3a4a;
+}
+.feat__wtile--clouds .feat__wart {
+  background: radial-gradient(ellipse at 30% 50%, #fff 0 25%, transparent 50%), radial-gradient(ellipse at 75% 40%, #dfe6ee 0 20%, transparent 45%), #2b3a4a;
+}
+.feat__base {
+  justify-self: start;
+  align-items: center;
+}
+.feat__foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 0;
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--color-text-muted);
+}
+/* The rail's Features button: blue. */
+.rail2__btn--features {
+  background: #2f6fd6;
+  color: #fff;
+}
+/* What weather is on the map: one chip under the top bar. */
+.wxchip {
+  position: fixed;
+  z-index: 30;
+  top: calc(var(--top-chrome, 120px) + 6px);
+  left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 999px;
+  background: rgb(10 11 9 / 0.82);
+  color: #fff;
+  font-size: var(--text-sm);
+}
+.wxchip__name,
+.wxchip__off {
+  min-height: 36px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+.wxchip__name {
+  padding: 0 4px 0 12px;
+}
+.wxchip__off {
+  min-width: 36px;
+}
+/* The weather layer's card: legend, play, timeline; amber when the venue is inside a warning. */
+.wlay {
+  display: grid;
+  gap: 6px;
+}
+.wlay__warn {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--action-mid) 30%, transparent);
+  border: 1px solid var(--action-mid);
+  font-size: var(--text-sm);
+}
+.wlay__legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.wlay__sw {
+  width: 30px;
+  min-height: 30px;
+  border: 1px solid rgb(0 0 0 / 0.4);
+  border-radius: 6px;
+}
+.wlay__val {
+  margin-left: 6px;
+  font-size: var(--text-sm);
+}
+.wlay__time {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+.wlay__play {
+  min-height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--color-line-strong);
+  background: transparent;
+  color: var(--color-text);
+}
+.wlay__note {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}

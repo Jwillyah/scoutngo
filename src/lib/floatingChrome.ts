@@ -16,7 +16,8 @@ export const FLOATING_CHROME_SELECTORS: readonly string[] = [
   '.topbar',
   '.chips2',
   '.rail2',
-  '.tooldock',
+  /* Batch K addendum: the dock is gone; the weather layer's chip floats under the top bar. */
+  '.wxchip',
   '.hud',
   '.mapctl',
   '.sheet',

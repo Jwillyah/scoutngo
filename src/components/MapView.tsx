@@ -1868,7 +1868,9 @@ export function MapView({
       /* A guide on the ground (a rainbow's bow): white, dashed, over a dark edge. Never red. */
       instance.addSource('guide', { type: 'geojson', data: emptyCollection() })
       instance.addLayer({ id: 'guide-edge', type: 'line', source: 'guide', paint: { 'line-color': readToken('--mark-edge', '#0a0b09', container.current), 'line-width': 5 } })
-      instance.addLayer({ id: 'guide-line', type: 'line', source: 'guide', paint: { 'line-color': readToken('--white', '#ffffff', container.current), 'line-width': 2.5, 'line-dasharray': [2, 1.5] } })
+      instance.addLayer({ id: 'guide-line', type: 'line', source: 'guide', filter: ['!=', ['get', 'kind'], 'warn'], paint: { 'line-color': readToken('--white', '#ffffff', container.current), 'line-width': 2.5, 'line-dasharray': [2, 1.5] } })
+      /* An NWS warning's polygon (Batch K addendum, Features › Warnings): a hazard, the one red, solid. */
+      instance.addLayer({ id: 'guide-warn', type: 'line', source: 'guide', filter: ['==', ['get', 'kind'], 'warn'], paint: { 'line-color': readToken('--hazard', '#ff3b30', container.current), 'line-width': 2.5 } })
       /* The best-view spots on it (Batch J, Section 5): white, the first larger. */
       instance.addLayer({
         id: 'guide-spot',
@@ -2821,7 +2823,8 @@ export function MapView({
     const source = map.current.getSource('guide') as maplibregl.GeoJSONSource | undefined
     source?.setData(guide ?? emptyCollection())
     /* Storms (Batch K): cells and lightning are often beyond the screen, so the map widens to them and the venue. The map already keeps padding for the sheet; this adds to it. */
-    const far = (guide?.features ?? []).filter((f) => f.properties?.kind === 'cell' || f.properties?.kind === 'strike' || f.properties?.kind === 'track')
+    /* A layer the Features sheet keeps on (properties.layer) is not jumped to on every refresh. */
+    const far = (guide?.features ?? []).filter((f) => f.properties?.layer !== true && (f.properties?.kind === 'cell' || f.properties?.kind === 'strike' || f.properties?.kind === 'track'))
     if (far.length > 0 && venue !== null) {
       const pts = far.flatMap((f) => (f.geometry.type === 'Point' ? [f.geometry.coordinates] : f.geometry.type === 'LineString' ? f.geometry.coordinates : []))
       const lons = [venue.lon, ...pts.map((p) => p[0])]
@@ -3462,7 +3465,9 @@ export function MapView({
     return () => {
       instance.off('move', onMove)
     }
-  }, [ready, drawPills, venue, sunOverlay, showSun, showArc, rayClock])
+    /* The sheet and the chrome too (Batch K addendum): a pill hidden behind a full sheet comes back when the sheet comes down, not on the next pan. */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, drawPills, venue, sunOverlay, showSun, showArc, rayClock, bottomInset, chromeTick])
 
   /* The inputs changed, so redraw whatever the camera happens to be showing. */
   useEffect(() => {

@@ -60,12 +60,12 @@ const rendered = (layer) =>
 
 /* 1. The tile, and the card it opens. */
 const opened = await ev(`(() => {
-  document.querySelector('button[aria-label="Map and layers"]')?.click()
+  document.querySelector('button[aria-label="Features"]')?.click()
   return true
 })()`)
 await wait(800)
 const toggled = await ev(`(() => {
-  const tile = [...document.querySelectorAll('.tile')].find((t) => t.querySelector('.tile__label')?.textContent === 'Airspace')
+  const tile = document.querySelector('[data-feature="airspace"]')
   if (!tile) return 'no Airspace tile'
   tile.click()
   return 'clicked'
@@ -117,9 +117,9 @@ const classLines = await rendered('airspace-class-line')
 check(classLines > 0, `controlled airspace outline rendered at the wide view: ${classLines} features`)
 /* The airspace card replaced the layers card when the tile was switched on. Layers opens full, where the dock is put away: down first. */
 await setSheet(ev, wait, 'peek')
-await ev(`document.querySelector('button[aria-label="Map and layers"]')?.click()`)
+await ev(`document.querySelector('button[aria-label="Features"]')?.click()`)
 await wait(800)
-const dense = await ev(`[...document.querySelectorAll('.tile')].find((t) => t.querySelector('.tile__label')?.textContent === 'Airspace')?.querySelector('.tile__state')?.textContent ?? null`)
+const dense = await ev(`document.querySelector('[data-feature="airspace"] .feat__note')?.textContent ?? null`)
 const denseTags = await ev(`document.querySelectorAll('.gridtag').length`)
 if (dense === null) abort('the Airspace tile was not on screen to read at the wide view; reopen layers')
 check(/zoom/i.test(dense), `wide view tile state: "${dense}"`)
@@ -137,9 +137,9 @@ await ev(`document.querySelector('.card__close, button[aria-label="Close"]')?.cl
 await wait(500)
 /* The ruler left the rail on 27 Oct: Measure is under Tools in Layers (and on a long press). */
 await setSheet(ev, wait, 'peek').catch(() => null)
-await ev(`(() => { const b = document.querySelector('button[aria-label="Map and layers"]'); if (b && b.getAttribute('aria-pressed') !== 'true') b.click(); return 1 })()`)
+await ev(`(() => { const b = document.querySelector('button[aria-label="Features"]'); if (b && b.getAttribute('aria-pressed') !== 'true') b.click(); return 1 })()`)
 await wait(600)
-const armed = await ev(`(() => { const b = [...document.querySelectorAll('button.tile')].find((t) => t.querySelector('.tile__label')?.textContent === 'Measure'); if (!b) return false; b.click(); return true })()`)
+const armed = await ev(`(() => { const b = [...document.querySelectorAll('.feat__qbtn')].find((t) => t.textContent === 'Measure'); if (!b) return false; b.click(); return true })()`)
 if (!armed) abort('no Measure tile under Tools in Layers')
 await wait(400)
 for (const [fx, fy] of [[0.3, 0.3], [0.7, 0.3]]) {

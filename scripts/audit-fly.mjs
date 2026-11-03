@@ -89,9 +89,10 @@ try {
     await wait(1500)
     await goToStage(ev, wait, 'plan')
     await wait(3000)
-    await page.locator('button[aria-label="Map and layers"]').tap()
+    /* Batch K addendum: Preflight moved from the layers sheet to the menu's Drone card. */
+    await page.locator('button[aria-label="Menu"]').first().tap()
     await wait(900)
-    await ev(`[...document.querySelectorAll('button.tile')].find(t => t.querySelector('.tile__label')?.textContent === 'Preflight')?.click()`)
+    await page.locator('.mcard--drone').first().tap()
     await wait(1500)
     await ev(`[...document.querySelectorAll('.pf button')].find(b => b.textContent === 'Fly it yourself')?.click()`)
     let up = false

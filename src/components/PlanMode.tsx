@@ -62,6 +62,12 @@ import { offlineLine, onPacksChanged, packFor } from '../lib/venuePack.ts'
 import { bowOnMap } from '../lib/specialLightData.ts'
 import { GUIDE_EVENT } from '../lib/useBestView.ts'
 import { RADAR_EVENT } from '../lib/radarLayer.ts'
+import { radarValid, useNowcast } from '../lib/stormData.ts'
+import { cellCalls } from '../core/stormCells.ts'
+import { stormOnMap } from '../core/lightning.ts'
+import { FeaturesSheet, type WeatherLayer } from './FeaturesSheet.tsx'
+import { FEAT_PATH, featIcon } from './featIcons.tsx'
+import { WeatherLayerCard } from './WeatherLayerCard.tsx'
 import { OPEN_RADAR_EVENT } from './WeatherTab.tsx'
 import { useSpecialNow } from '../lib/useSpecialNow.ts'
 import { SPECIAL_NAME } from '../core/specialLight.ts'
@@ -86,7 +92,6 @@ import { readCeilingFeet } from '../lib/venue.ts'
 import { MAX_ALTITUDE_FEET } from '../core/air.ts'
 import { facilityCellAt } from '../lib/uasfm.ts'
 import { AboutSheet, type HowSection } from './AboutSheet.tsx'
-import { LayerTiles } from './LayerTiles.tsx'
 import { TILE_ART } from './tileArt.tsx'
 import { WeatherPanel } from './WeatherPanel.tsx'
 import { SunReadout } from './SunReadout.tsx'
@@ -104,7 +109,6 @@ import { PositionCard } from './PositionCard.tsx'
 import { ShotList } from './ShotList.tsx'
 import { SunSearchPanel } from './SunSearchPanel.tsx'
 import { TimeBar } from './TimeBar.tsx'
-import { ToolDock } from './ToolDock.tsx'
 import { Clay3D } from './Clay3D.tsx'
 import { goldenChip } from '../lib/goldenChip.ts'
 import { useTideSheet } from '../lib/useTideSheet.ts'
@@ -497,7 +501,6 @@ export function PlanMode({
   scrubbedAt,
   scrub,
   onScrub,
-  onResetTime,
   onJumpDay,
   planNow,
   onPlanForNow,
@@ -1305,6 +1308,44 @@ export function PlanMode({
   const [bow, setBow] = useState<GeoJSON.FeatureCollection | null>(null)
   /* Batch K, Section 6: the radar frame the Weather tab's slider is on. */
   const [radarAt, setRadarAt] = useState<Date | null>(null)
+  /*
+   * Batch K addendum, D: the weather layer on the main map, one at a time
+   * (Off · Radar · Wind · Clouds), and the storm layers beside it.
+   */
+  const weatherLayer: WeatherLayer = radarAt !== null ? 'radar' : showSky ? (skyLayer === 'wind' ? 'wind' : 'clouds') : 'off'
+  const [lightningOn, setLightningOn] = useState(false)
+  const [warningsOn, setWarningsOn] = useState(false)
+  const [tracksOn, setTracksOn] = useState(false)
+  const [windLayerFt, setWindLayerFt] = useState<0 | 400>(0)
+  const pickWeather = (w: WeatherLayer) => {
+    if (w === 'radar') {
+      onShowSky(false)
+      void radarValid().then((v) => setRadarAt(v ?? new Date(Math.floor(Date.now() / 300_000) * 300_000 - 600_000)))
+    } else {
+      setRadarAt(null)
+      if (w === 'off') onShowSky(false)
+      else {
+        onSkyLayer(w === 'wind' ? 'wind' : 'cloud')
+        onShowSky(true)
+      }
+    }
+  }
+  const stormLayersOn = lightningOn || warningsOn || tracksOn
+  const layerNow = useNowcast(venue, stormLayersOn || weatherLayer === 'radar')
+  const layerCalls = useMemo(() => (layerNow?.radar == null || venue === null ? [] : cellCalls(venue, layerNow.radar.tracks, layerNow.radar.scanAt)), [layerNow, venue])
+  const layerFC = useMemo<GeoJSON.FeatureCollection | null>(() => {
+    if (!stormLayersOn || layerNow === null) return null
+    const fc = stormOnMap(lightningOn ? (layerNow.strikes ?? []).filter((x) => layerNow.at.getTime() - x.frame.getTime() <= 45 * 60_000) : [], tracksOn ? layerCalls : [], layerNow.at)
+    const warn = warningsOn ? (layerNow.alerts ?? []).flatMap((a) => (a.polygon === null ? [] : [{ type: 'Feature' as const, properties: { kind: 'warn' }, geometry: a.polygon }])) : []
+    return { type: 'FeatureCollection', features: [...fc.features, ...warn].map((f) => ({ ...f, properties: { ...f.properties, layer: true } })) }
+  }, [stormLayersOn, layerNow, layerCalls, lightningOn, tracksOn, warningsOn])
+  const layerWords = [weatherLayer === 'off' ? null : weatherLayer[0].toUpperCase() + weatherLayer.slice(1), lightningOn ? 'Lightning' : null, warningsOn ? 'Warnings' : null, tracksOn ? 'Storm tracks' : null].filter((x): x is string => x !== null)
+  const allLayersOff = () => {
+    pickWeather('off')
+    setLightningOn(false)
+    setWarningsOn(false)
+    setTracksOn(false)
+  }
   useEffect(() => {
     const on = (e: Event) => setRadarAt((e as CustomEvent<Date | null>).detail)
     window.addEventListener(RADAR_EVENT, on)
@@ -1858,7 +1899,8 @@ export function PlanMode({
     { id: 'cones', label: 'Cones', state: coneMode === 'all' ? 'ON' : 'OFF', on: coneMode === 'all', art: TILE_ART.cones, onToggle: () => onConeMode(coneMode === 'all' ? 'none' : 'all') },
     { id: 'sun', label: 'Sun arc', state: showArc ? 'ON' : 'OFF', on: showArc, art: TILE_ART.sunArc, onToggle: () => onShowArc(!showArc) },
     { id: 'shadows', label: 'Shadows', state: showSun ? 'ON' : 'OFF', on: showSun, art: TILE_ART.shadows, onToggle: () => onShowSun(!showSun) },
-    { id: 'cloud', label: 'Cloud', state: showSky ? 'ON' : 'OFF', on: showSky, art: TILE_ART.cloud, onToggle: () => onShowSky(!showSky) },
+    /* Addendum E: the old Cloud tile is Features › Weather › Clouds. */
+    { id: 'cloud', label: 'Clouds', state: weatherLayer === 'clouds' ? 'ON' : 'OFF', on: weatherLayer === 'clouds', art: TILE_ART.cloud, onToggle: () => pickWeather(weatherLayer === 'clouds' ? 'off' : 'clouds') },
     {
       id: 'hazards',
       label: 'Hazards',
@@ -1911,61 +1953,73 @@ export function PlanMode({
    * icon). Now it says which layers are drawn, e.g. "Satellite · Shadows".
    */
 
-  const layersCard = (
-    <LayerTiles
-      base={layerBase}
-      overlays={layerOverlays}
-      tools={[
-        {
-          id: 'preflight',
-          label: 'Preflight',
-          state: 'Draw a move',
-          on: false,
-          art: TILE_ART.preflight,
-          onToggle: () => openCard('preflight'),
-        },
-        {
-          id: 'skyline',
-          label: 'Skyline',
-          state: scanCtx === null ? 'Needs the scan' : 'From the scan',
-          on: card.kind === 'skyline',
-          art: TILE_ART.skyline,
-          onToggle: () => openCard('skyline'),
-        },
-        {
-          id: 'lightmap',
-          label: 'Light map',
-          state: scanCtx === null ? 'Needs the scan' : 'From the scan',
-          on: card.kind === 'lightmap',
-          art: TILE_ART.lightmap,
-          onToggle: () => openCard('lightmap'),
-        },
-        {
-          id: 'measure',
-          label: 'Measure',
-          state: measurePins === null ? 'OFF' : 'ON',
-          on: measurePins !== null,
-          art: TILE_ART.measure,
-          onToggle: () => {
-            setMeasurePins((pins) => (pins === null ? [] : null))
-            setSheet('peek')
-          },
-        },
+
+  /*
+   * FEATURES (Batch K addendum, E): one home per item. Every tile of the old
+   * Map & layers sheet and every dock button is here, in the menu, or on the
+   * time sheet (Back to now is its ↺); see FeaturesSheet.tsx.
+   */
+  const COLOR = { storm: '#e0567a', shoot: '#e8a33a', drone: '#3fa0d8', map: '#5b7f9e' }
+  const featuresCard = (
+    <FeaturesSheet
+      quick={[
+        ...(onViewfinder === undefined ? [] : [{ label: 'Viewfinder', onClick: onViewfinder }]),
+        { label: 'Measure', on: measurePins !== null, onClick: () => { setMeasurePins((pins) => (pins === null ? [] : null)); setSheet('peek') } },
+        { label: 'Skyline', on: card.kind === 'skyline', onClick: () => openCard('skyline') },
       ]}
-      sourceLine={`Esri World Imagery · native to z${ESRI_NATIVE_MAX_ZOOM} · showing z${Math.round(mapZoom)}`}
+      weather={weatherLayer}
+      onWeather={(w) => {
+        pickWeather(w)
+        if (w !== 'off') { setCard({ kind: 'wxlayer' }); setSheet('half') }
+      }}
+      storms={[
+        { id: 'lightning', label: 'Lightning', on: lightningOn, color: COLOR.storm, icon: featIcon(FEAT_PATH.bolt), note: 'last 45 min', onToggle: () => { setLightningOn(!lightningOn); if (!lightningOn) { setCard({ kind: 'wxlayer' }); setSheet('half') } } },
+        { id: 'warnings', label: 'Warnings', on: warningsOn, color: COLOR.storm, icon: featIcon(FEAT_PATH.warn), onToggle: () => { setWarningsOn(!warningsOn); if (!warningsOn) { setCard({ kind: 'wxlayer' }); setSheet('half') } } },
+        { id: 'tracks', label: 'Storm tracks', on: tracksOn, color: COLOR.storm, icon: featIcon(FEAT_PATH.track), onToggle: () => { setTracksOn(!tracksOn); if (!tracksOn) { setCard({ kind: 'wxlayer' }); setSheet('half') } } },
+      ]}
+      shooting={[
+        { id: 'shadows', label: 'Shadows', on: showSun, color: COLOR.shoot, icon: featIcon(FEAT_PATH.shadow), onToggle: () => onShowSun(!showSun) },
+        { id: 'sun', label: 'Sun arc', on: showArc, color: COLOR.shoot, icon: featIcon(FEAT_PATH.arc), onToggle: () => onShowArc(!showArc) },
+        { id: 'moon', label: 'Moon path', on: moonOn, color: COLOR.shoot, icon: featIcon(FEAT_PATH.moon), onToggle: () => {
+          if (!moonOn) {
+            /* The first time only: what the moon lines are. */
+            try {
+              if (localStorage.getItem(MOON_HINT_KEY) === null) {
+                localStorage.setItem(MOON_HINT_KEY, '1')
+                setMoonHint(true)
+              }
+            } catch {
+              /* No storage: no hint, the lines still say what they are. */
+            }
+          }
+          setMoonOn(!moonOn)
+        } },
+        { id: 'cones', label: 'Cones', on: coneMode === 'all', color: COLOR.shoot, icon: featIcon(FEAT_PATH.cone), onToggle: () => onConeMode(coneMode === 'all' ? 'none' : 'all') },
+        { id: 'lightmap', label: 'Light map', on: card.kind === 'lightmap', color: COLOR.shoot, icon: featIcon(FEAT_PATH.light), note: scanCtx === null ? 'needs the scan' : undefined, onToggle: () => openCard('lightmap') },
+      ]}
+      drone={[
+        /* As the old tile: the state says what is on the map; on also opens the card; failed, it is its own Retry. */
+        { id: 'airspace', label: 'Airspace', on: airspaceOn, color: COLOR.drone, icon: featIcon(FEAT_PATH.air), note: !airspaceOn ? undefined : airspaceFailed ? LAYER_FAILED : airspaceOverlay === null ? 'Loading' : airspaceDense ? 'zoom for grid' : undefined, onToggle: () => { if (airspaceOn && airspaceFailed) { setAirspaceFailed(false); return } if (!airspaceOn) setCard({ kind: 'airspace' }); setAirspaceOn(!airspaceOn) } },
+        { id: 'hazards', label: 'Hazards', on: marks.length > 0, color: COLOR.drone, icon: featIcon(FEAT_PATH.hazard), note: marks.length === 0 ? 'none marked' : `${marks.length} marked`, onToggle: () => setCard({ kind: 'hazards' }) },
+      ]}
+      onAirspaceVenue={() => openCard('airspace')}
+      base={threeD ? '3d' : showTerrain && !flatHere ? 'terrain' : 'satellite'}
+      onBase={(b) => {
+        if (b === '3d') { if (!threeD) toggleThreeD(); return }
+        if (threeD) toggleThreeD()
+        if (b === 'terrain' && !flatHere) turnTerrain(true)
+        if (b === 'satellite') turnTerrain(false)
+      }}
+      baseNote={flatHere ? 'Flat here' : threeDNote}
+      map={[
+        { id: 'labels', label: 'Labels', on: showLabels, color: COLOR.map, icon: featIcon(FEAT_PATH.label), onToggle: () => onShowLabels(!showLabels) },
+        { id: 'buildings', label: 'Buildings', on: showBuildings, color: COLOR.map, icon: featIcon(FEAT_PATH.building), note: showBuildings && buildingsNote !== null ? buildingsNote : undefined, onToggle: () => (showBuildings && buildingsNote === LAYER_FAILED ? setBuildingsAttempt((n) => n + 1) : onShowBuildings(!showBuildings)) },
+      ]}
+      sourceLine={`Esri World Imagery · z${Math.round(mapZoom)} (native to z${ESRI_NATIVE_MAX_ZOOM})`}
+      onWhatMapped={() => openCard('hazards')}
       about={
         <p className="tiles__prose">
-          Measure draws a line between two points you tap; a long press on the map starts one
-          too. Cones are what each position can actually frame. Buildings "None mapped" is the map
-          being empty, not the ground. The sun arc is where the sun rises and
-          sets. Shadows are thrown from the marked heights. Cloud is GOES satellite imagery over the
-          map. Hazards are what you marked plus what OpenStreetMap has. Labels are place names over
-          the imagery, off while reading a venue and on while hunting for one. Airspace draws
-          controlled airspace as white dashes, the FAA grid squares with the most LAANC can
-          approve on each, and restricted areas and national parks in red. Terrain shades the
-          slopes and draws a contour every 10 m (brighter every 50 m), and feeds the horizon and the
-          sun curve; where the ground round the venue rises less than 15 m it reads Flat here and
-          draws nothing.
+          Measure draws a line between two points you tap; a long press on the map starts one too. Cones are what each position can actually frame. Buildings &ldquo;None mapped&rdquo; is the map being empty, not the ground. The sun arc is where the sun rises and sets. Shadows are thrown from the marked heights. Radar is Iowa State&rsquo;s national composite; Wind the forecast&rsquo;s wind as streaks; Clouds the GOES satellite and the forecast&rsquo;s low, mid and high cloud. Lightning is NOAA&rsquo;s 15-minute strike maps; Warnings the NWS&rsquo;s polygons. Hazards are what you marked plus what OpenStreetMap has. Labels are place names over the imagery. Airspace draws controlled airspace as white dashes, the FAA grid squares with the most LAANC can approve on each, and restricted areas and national parks in red. Terrain shades the slopes and draws a contour every 10 m (brighter every 50 m), and feeds the horizon and the sun curve; where the ground round the venue rises less than 15 m it reads Flat here and draws nothing.
         </p>
       }
     />
@@ -2330,20 +2384,14 @@ export function PlanMode({
         )
       case 'layers':
         return (
-          <Card title="Map & layers" onClose={home}>
-            {layersCard}
-            {/*
-              * THE TILE TURNS THE LAYER ON; THE ROW OPENS WHAT IT DREW. Two
-              * different questions -- "is it on" and "what is actually here"
-              * -- and putting the second on the tile is what made the old
-              * layer list a page of prose.
-              */}
-            <CardMore
-              links={[
-                { label: 'What is mapped here', onOpen: () => openCard('hazards') },
-                { label: 'Airspace over this venue', onOpen: () => openCard('airspace') },
-              ]}
-            />
+          <Card title="Features" onClose={home}>
+            {featuresCard}
+          </Card>
+        )
+      case 'wxlayer':
+        return (
+          <Card title={layerWords.join(' · ') || 'Weather'} onClose={home}>
+            <WeatherLayerCard layer={weatherLayer} scanAt={radarAt === null ? null : (layerNow?.radar?.scanAt ?? radarAt)} calls={layerCalls} strikes={layerNow?.strikes ?? []} alerts={layerNow?.alerts ?? []} timeZone={venueWindow?.timeZone ?? 'UTC'} windFt={windLayerFt} onWindFt={setWindLayerFt} />
           </Card>
         )
       case 'moonrise':
@@ -2413,7 +2461,7 @@ export function PlanMode({
         onMeasureAt={onMeasureAt}
         onFlightAt={pf.addPoint}
         flight={card.kind === 'preflight' ? pf.features : null}
-        guide={bow}
+        guide={layerFC === null ? bow : { type: 'FeatureCollection', features: [...(bow?.features ?? []), ...layerFC.features] }}
         radarAt={radarAt}
         waterline={waterline !== null && waterline !== 'no-offset' ? { url: waterline.url, coordinates: waterline.coordinates } : null}
         lightmap={lightImage === null ? null : { url: lightImage.url, coordinates: lightImage.coordinates }}
@@ -2461,7 +2509,7 @@ export function PlanMode({
         skyFrameAt={sky.frameAt}
         skyForecast={sky.cells}
         skyLayer={skyLayer}
-        windMeters={windHeight.feet === null ? GROUND_WIND_METERS : windHeight.feet * 0.3048}
+        windMeters={weatherLayer === 'wind' ? (windLayerFt === 0 ? GROUND_WIND_METERS : windLayerFt * 0.3048) : windHeight.feet === null ? GROUND_WIND_METERS : windHeight.feet * 0.3048}
         ratedWindMps={ratedWindMps}
         skyForecastOpacity={sky.opacity}
         sunOverlay={
@@ -2836,41 +2884,20 @@ export function PlanMode({
         bearing={mapBearing}
         heading={followHeading}
         onCompass={onCompass}
+        onFeatures={() => (card.kind === 'layers' ? home() : openCard('layers'))}
+        featuresOpen={card.kind === 'layers'}
       />
       )}
 
-      {sheet === 'full' ? null : (
-        <ToolDock
-          onViewfinder={onViewfinder}
-          moon={moonOn}
-          onMoon={() => {
-            if (!moonOn) {
-              /* The first time only: what the moon lines are. */
-              try {
-                if (localStorage.getItem(MOON_HINT_KEY) === null) {
-                  localStorage.setItem(MOON_HINT_KEY, '1')
-                  setMoonHint(true)
-                }
-              } catch {
-                /* No storage: no hint, the lines still say what they are. */
-              }
-            }
-            setMoonOn(!moonOn)
-          }}
-          onCalendar={() => setCalendarOpen(true)}
-          lens={coneMode === 'all'}
-          onLens={() => onConeMode(coneMode === 'all' ? 'none' : 'all')}
-          layersOpen={card.kind === 'layers'}
-          onLayers={() => openCard('layers')}
-          onReset={() => {
-            if (followHeading) onCompass()
-            handle.current?.setBearing(0)
-            handle.current?.setPitch(0)
-            if (venue !== null) handle.current?.flyTo(venue)
-            onBackToNow()
-          }}
-        />
+      {/* Batch K addendum, D: what weather is on the map, one chip under the top bar; ✕ turns it all off. */}
+      {layerWords.length === 0 || sheet === 'full' ? null : (
+        <div className="wxchip" role="status">
+          <button type="button" className="wxchip__name" onClick={() => setCard({ kind: 'wxlayer' })}>{layerWords.join(' · ')}</button>
+          <button type="button" className="wxchip__off" aria-label="Turn the weather layers off" onClick={allLayersOff}>✕</button>
+        </div>
       )}
+
+      {/* The dock is gone (Batch K addendum, D): Moon path and Cones are in Features, Calendar is Sky › Calendar, Viewfinder is in Features and the menu, Back to now is the ↺ on the time sheet. */}
 
       <BottomSheet
         /* Room for the time bar: its date line and its strip, measured, not the old one-line scrubber. */
@@ -2941,7 +2968,14 @@ export function PlanMode({
                 timeZone={venueWindow.timeZone}
                 moon={moonOn}
                 onAt={scrubTo}
-                onReset={onResetTime}
+                /* Batch K addendum, D: the ↺ is Back to now (the dock's job): the venue, north up, flat, the current time. */
+                onReset={() => {
+                  if (followHeading) onCompass()
+                  handle.current?.setBearing(0)
+                  handle.current?.setPitch(0)
+                  if (venue !== null) handle.current?.flyTo(venue)
+                  onBackToNow()
+                }}
               />
             )}
           </div>

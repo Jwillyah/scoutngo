@@ -28,8 +28,10 @@ export type SheetCard =
   | { kind: 'golden' }
   | { kind: 'wind' }
   | { kind: 'cloud' }
-  /** Opened from the rail. */
+  /** Opened from the rail: Features (Batch K addendum, E). */
   | { kind: 'layers' }
+  /** A weather or storm layer on the map: its legend, play and timeline (addendum D). */
+  | { kind: 'wxlayer' }
   /** Opened from a layer tile. */
   | { kind: 'hazards' }
   | { kind: 'airspace' }
@@ -60,7 +62,8 @@ export const CARD_TITLE: Record<CardKind, string> = {
   golden: 'Golden hour',
   wind: 'Wind',
   cloud: 'Cloud',
-  layers: 'Map & layers',
+  layers: 'Features',
+  wxlayer: 'Weather layer',
   hazards: 'Hazards',
   airspace: 'Airspace',
   sky: 'Sky',
@@ -115,6 +118,8 @@ export function isHome(card: SheetCard): boolean {
  */
 export const TIME_MATTERS: Record<CardKind, boolean> = {
   shoot: true,
+  /* Wind and clouds move with the time bar; radar has its own timeline. */
+  wxlayer: true,
   golden: true,
   wind: true,
   cloud: true,

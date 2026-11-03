@@ -116,9 +116,9 @@ try {
     await wait(1500)
     await goToStage(ev, wait, 'plan')
     await wait(3000)
-    await page.locator('button[aria-label="Map and layers"]').tap()
+    await page.locator('button[aria-label="Features"]').tap()
     await wait(900)
-    await ev(`[...document.querySelectorAll('button.tile')].find(t => t.querySelector('.tile__label')?.textContent === 'Buildings')?.click()`)
+    await ev(`document.querySelector('[data-feature="buildings"]')?.click()`)
     await wait(600)
     /* The sheet down to its lowest detent, the way a thumb does it, so the map is open. */
     for (let k = 0; k < 3; k += 1) {

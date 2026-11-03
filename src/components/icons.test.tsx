@@ -54,8 +54,9 @@ describe('the menu (Batch H, Section 3: it replaced the side menu)', () => {
   })
 
   /* Batch J, Section 7: the Water card everywhere, inland too, for a named surf beach. */
-  it('the Drone card only with a drone in the kit; Water inland too', () => {
-    expect(render(null)).not.toContain('>Drone<')
+  it('the Drone card always, as Preflight\u2019s home (Batch K addendum E: the layers tile went); Water inland too', () => {
+    expect(render(null)).toContain('>Drone<')
+    expect(render(null)).toContain('Preflight')
     expect(render(null, true)).toContain('>Water<')
     expect(render(null, true)).not.toContain('>Land<')
   })

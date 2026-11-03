@@ -85,7 +85,7 @@ try {
   const insets = await ev(`(() => { const p = document.createElement('div'); p.style.cssText = 'position:fixed;top:0;height:var(--safe-top);'; document.body.appendChild(p); const h = p.getBoundingClientRect().height; p.remove(); return h })()`)
   if (insets !== TOP) throw new Error(`the emulated status bar is ${insets} px, not ${TOP}: the insets did not apply`)
 
-  await page.locator('button[aria-label="Map and layers"]').tap()
+  await page.locator('button[aria-label="Features"]').tap()
   await wait(1500)
 
   const LOOK = `(() => {
