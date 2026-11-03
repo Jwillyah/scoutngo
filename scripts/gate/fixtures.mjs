@@ -198,6 +198,8 @@ export async function answer(href) {
   if (host === 'nowcoast.noaa.gov') return { status: 200, type: 'image/png', body: OVERLAY, fixture: 'no lightning' }
   if (host === 'mesonet.agron.iastate.edu' && u.pathname.startsWith('/cache/tile.py')) return { status: 200, type: 'image/png', body: OVERLAY, fixture: 'no radar echoes' }
   /* The hurricane centre: no active storms in the fixture's world. */
+  /* The shared model-accuracy file (docs/model-skill.md): not published yet, as on the real site; the phone's own scores are used. */
+  if (host === 'jwillyah.github.io') return { status: 404, type: 'text/plain', body: Buffer.from('not found'), fixture: 'no shared skill file' }
   if (host === 'www.nhc.noaa.gov') return json({ activeStorms: [] }, 'no active storms')
   if (host === 'api.github.com') return json({ sha: '0000000000000000000000000000000000000000', commit: { committer: { date: '2026-10-30T00:00:00Z' } } }, 'GitHub fixture')
   if (host === 'api.anthropic.com') return { status: 401, type: 'application/json', body: Buffer.from('{"type":"error"}'), fixture: 'Anthropic refused' }

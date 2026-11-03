@@ -8,8 +8,12 @@
  *                            the venue) and how many days back
  *   Iowa State (IEM)         two station ids and a date range: their hourly
  *                            reports
+ *   GitHub Pages             nothing: the region's public model-accuracy
+ *                            file, whole (src/lib/sharedSkillData.ts)
  * The scores stay on this phone (localStorage, in the backup file). Asked
- * when the Weather tab is open, and the scoring at most once a day.
+ * when the Weather tab is open, and the scoring at most once a day. When the
+ * shared file is fresh and has a station near, it corrects the blend and the
+ * phone's own scores wait (Batch L); offline or stale, the phone's.
  */
 import { useEffect, useState } from 'react'
 import { ASOS_STATIONS } from '../data/asosStations.ts'
@@ -19,26 +23,28 @@ import {
   BLEND_MODELS,
   blendDays,
   blendRun,
-  coverFromLayers,
   localDate,
   scoreDay,
   SKILL_DAYS,
-  wetFromCodes,
   type BlendedDay,
   type BlendedHour,
   type ModelId,
   type ModelRun,
   type ModelSeries,
+  type Scores,
   type SkillHistory,
   type SkillVar,
-  type StationObs,
 } from '../core/modelSkill.ts'
 import { zonedTimeToUtc } from '../core/timezone.ts'
+import { asosUrl, parseAsos } from '../core/asos.ts'
+
+export { asosUrl, IEM_ASOS_URL, parseAsos } from '../core/asos.ts'
 import { OPEN_METEO_URL, TIMEOUT_MS } from './forecast.ts'
 import { FORECAST_MAX_AGE_MS, weatherJson } from './weatherStore.ts'
+import { pickScores, type SharedFile } from '../core/sharedSkill.ts'
+import { sharedFor } from './sharedSkillData.ts'
 
 export const PREVIOUS_RUNS_URL = 'https://previous-runs-api.open-meteo.com/v1/forecast'
-export const IEM_ASOS_URL = 'https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py'
 export const BLEND_DAYS = 7
 /** Stations within this of the venue are the ones scored against. */
 export const SKILL_STATION_KM = 60
@@ -95,66 +101,6 @@ export function skillStations(venue: LatLon, n = 2): Station[] {
     .filter((s) => s.km <= SKILL_STATION_KM)
     .sort((a, b) => a.km - b.km)
     .slice(0, n)
-}
-
-/** IEM names US stations without their K. */
-const iemId = (id: string) => (/^K[A-Z0-9]{3}$/.test(id) ? id.slice(1) : id)
-
-export function asosUrl(ids: readonly string[], from: Date, to: Date): string {
-  const p = new URLSearchParams()
-  for (const id of ids) p.append('station', iemId(id))
-  for (const d of ['tmpf', 'sknt', 'gust', 'skyc1', 'skyc2', 'skyc3', 'skyc4', 'p01i', 'wxcodes']) p.append('data', d)
-  p.set('sts', from.toISOString().slice(0, 16) + 'Z')
-  p.set('ets', to.toISOString().slice(0, 16) + 'Z')
-  p.set('tz', 'Etc/UTC')
-  p.set('format', 'onlycomma')
-  p.set('latlon', 'no')
-  p.set('missing', 'null')
-  p.set('trace', '0.0001')
-  p.set('report_type', '3')
-  return `${IEM_ASOS_URL}?${p.toString()}`
-}
-
-const KT = 0.514444
-
-/** IEM's CSV, one row per routine report, in SI units. */
-export function parseAsos(csv: string, ids: readonly string[]): StationObs[] {
-  const lines = csv.trim().split('\n')
-  const head = lines[0]?.split(',') ?? []
-  const col = (name: string) => head.indexOf(name)
-  if (col('station') < 0 || col('valid') < 0) return []
-  const back = new Map(ids.map((id) => [iemId(id), id]))
-  const out: StationObs[] = []
-  for (const line of lines.slice(1)) {
-    const c = line.split(',')
-    const v = (name: string) => {
-      const x = c[col(name)]
-      return x === undefined || x === 'null' || x === 'M' || x === '' ? null : x
-    }
-    const n = (name: string) => {
-      const x = v(name)
-      const f = x === null ? NaN : Number(x)
-      return Number.isFinite(f) ? f : null
-    }
-    const id = back.get(v('station') ?? '')
-    const valid = v('valid')
-    if (id === undefined || valid === null) continue
-    const tf = n('tmpf')
-    const kt = n('sknt')
-    const g = n('gust')
-    const p = n('p01i')
-    const codes = v('wxcodes')
-    out.push({
-      station: id,
-      at: new Date(`${valid.replace(' ', 'T')}:00Z`),
-      tempC: tf === null ? null : ((tf - 32) * 5) / 9,
-      windMps: kt === null ? null : kt * KT,
-      gustMps: g === null ? null : g * KT,
-      cloudPct: coverFromLayers(['skyc1', 'skyc2', 'skyc3', 'skyc4'].map(v)),
-      wet: p === null && codes === null ? null : (p ?? 0) > 0 || wetFromCodes(codes),
-    })
-  }
-  return out
 }
 
 export function previousRunsUrl(points: readonly LatLon[], pastDays: number): string {
@@ -270,10 +216,17 @@ export async function updateSkill(venue: LatLon, timeZone: string, now: Date, fe
 
 /* ---------------------------------------------------------------- hook */
 
+/** Where the corrections came from: the shared file's station, or this phone's own scoring. */
+export type ScoreSource = { kind: 'shared'; date: string; station: { id: string; name: string; km: number }; days: number } | { kind: 'phone' }
+
 export interface BlendState {
   hours: BlendedHour[]
   days: BlendedDay[]
-  history: SkillHistory | null
+  /** The scores the blend was corrected with. */
+  history: Scores
+  source: ScoreSource
+  /** The phone's own scores, kept whichever source is used. */
+  phone: SkillHistory | null
   stations: Station[]
   /** When the forecast arrived, ms; stale when served old. */
   fetchedAt: number
@@ -306,12 +259,19 @@ export function useBlend(venue: LatLon | null, timeZone: string | null, on: bool
         setReason('the models sent nothing for here')
         return
       }
-      const show = (history: SkillHistory | null) => {
-        const hours = blendRun(run, history, timeZone)
-        setState({ hours, days: blendDays(hours, timeZone, BLEND_DAYS), history, stations, fetchedAt: got.fetchedAt, stale: got.stale, models: BLEND_MODELS.filter((m) => run.series[m] !== undefined) })
+      let shared: SharedFile | null = null
+      const show = (phone: SkillHistory | null) => {
+        const pick = pickScores(shared, at, new Date(), phone)
+        const source: ScoreSource = pick.station === null ? { kind: 'phone' } : { kind: 'shared', date: shared?.date ?? '', station: { id: pick.station.id, name: pick.station.name, km: pick.station.km }, days: shared?.window.days ?? 0 }
+        const hours = blendRun(run, pick.scores, timeZone, new Date(got.fetchedAt))
+        setState({ hours, days: blendDays(hours, timeZone, BLEND_DAYS), history: pick.scores, source, phone, stations, fetchedAt: got.fetchedAt, stale: got.stale, models: BLEND_MODELS.filter((m) => run.series[m] !== undefined) })
         setReason(null)
       }
       show(kept)
+      shared = await sharedFor(at, new Date())
+      if (!live) return
+      if (shared !== null) show(kept)
+      /* The phone keeps scoring either way: it is the fallback the day the shared file is stale. */
       const scored = await updateSkill(at, timeZone, new Date())
       if (live && scored !== null && scored.days.length !== (kept?.days.length ?? 0)) show(scored)
     })()

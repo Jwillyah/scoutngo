@@ -4,7 +4,7 @@
  * nothing here fetches. Never "clear" or "safe" (ux-rules 12), never advice
  * (rule 28).
  */
-import { BLEND_MODELS, MODEL_LABEL, RAIN_MM, skillOverall, type BlendedDay, type BlendedHour, type ModelId, type SkillHistory } from './modelSkill.ts'
+import { BLEND_MODELS, MODEL_LABEL, RAIN_MM, skillOverall, type BlendedDay, type BlendedHour, type ModelId, type Scores } from './modelSkill.ts'
 import { compassPoint } from './field.ts'
 
 /** One colour per model, the same on every screen (dots, chart lines, card edges). */
@@ -104,7 +104,7 @@ export function cloudAgreement(h: BlendedHour | null): Agreement {
 }
 
 /** The model with the smallest temperature error here, and how many models answered. */
-export function leading(h: SkillHistory | null, models: readonly ModelId[]): ModelId | null {
+export function leading(h: Scores, models: readonly ModelId[]): ModelId | null {
   let best: { m: ModelId; mae: number } | null = null
   for (const m of models) {
     const s = skillOverall(h, m, 'temp')
@@ -115,7 +115,7 @@ export function leading(h: SkillHistory | null, models: readonly ModelId[]): Mod
 }
 
 /** One word for a model's habit here: "runs warm", "runs cool", "steady", "wet-biased"… */
-export function habitWord(h: SkillHistory | null, m: ModelId): string {
+export function habitWord(h: Scores, m: ModelId): string {
   const t = skillOverall(h, m, 'temp')
   const r = skillOverall(h, m, 'rain')
   if (t.days < 3) return 'new here'

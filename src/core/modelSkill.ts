@@ -88,8 +88,37 @@ export interface Skill {
 
 const NONE: Skill = { n: 0, bias: null, rmse: null, mae: null, hit: null }
 
-export function skillAt(h: SkillHistory | null, model: ModelId, v: SkillVar, hour: number): Skill {
+export interface Overall {
+  n: number
+  mae: number | null
+  bias: number | null
+  hit: number | null
+  days: number
+}
+
+/**
+ * The shared file's scores at one station (Batch L, src/core/sharedSkill.ts):
+ * the same questions, answered from the region's nightly file instead of
+ * this phone's own history, and by lead time as well as hour.
+ */
+export interface SharedScores {
+  kind: 'shared'
+  station: string
+  /** The local date the file was made for. */
+  date: string
+  at: (model: ModelId, v: SkillVar, hour: number, leadH: number) => Skill
+  overall: (model: ModelId, v: SkillVar) => Overall
+}
+
+/** What the blend is corrected with: this phone's history, the shared file's station, or nothing yet. */
+export type Scores = SkillHistory | SharedScores | null
+
+const isShared = (h: Scores): h is SharedScores => h !== null && 'kind' in h
+
+/** `leadH`, hours ahead of the run, is read by the shared scores only: the phone scores the day-old run. */
+export function skillAt(h: Scores, model: ModelId, v: SkillVar, hour: number, leadH = 0): Skill {
   if (h === null) return NONE
+  if (isShared(h)) return h.at(model, v, hour, leadH)
   const xs = h.days.map((d) => d.err[model]?.[v]?.[hour]).filter((x): x is number => typeof x === 'number' && Number.isFinite(x))
   const n = xs.length
   if (n === 0) return NONE
@@ -102,8 +131,9 @@ export function skillAt(h: SkillHistory | null, model: ModelId, v: SkillVar, hou
 }
 
 /** Over every hour: the table's row for one model and variable. */
-export function skillOverall(h: SkillHistory | null, model: ModelId, v: SkillVar): { n: number; mae: number | null; bias: number | null; hit: number | null; days: number } {
+export function skillOverall(h: Scores, model: ModelId, v: SkillVar): Overall {
   if (h === null) return { n: 0, mae: null, bias: null, hit: null, days: 0 }
+  if (isShared(h)) return h.overall(model, v)
   const xs: number[] = []
   let days = 0
   for (const d of h.days) {
@@ -120,8 +150,8 @@ export function skillOverall(h: SkillHistory | null, model: ModelId, v: SkillVar
 const clampVar = (v: NumVar, x: number): number => (v === 'cloud' ? Math.min(100, Math.max(0, x)) : v === 'temp' ? x : Math.max(0, x))
 
 /** One model's forecast for one hour, with its local bias taken out. */
-export function corrected(h: SkillHistory | null, model: ModelId, v: NumVar, hour: number, value: number): number {
-  const s = skillAt(h, model, v, hour)
+export function corrected(h: Scores, model: ModelId, v: NumVar, hour: number, value: number, leadH = 0): number {
+  const s = skillAt(h, model, v, hour, leadH)
   return s.bias === null ? value : clampVar(v, value - s.bias)
 }
 
@@ -135,10 +165,10 @@ export interface Blended {
 }
 
 /** The weights for one variable at one hour, normalised; models with no history get the mean of the others. */
-export function weights(h: SkillHistory | null, models: readonly ModelId[], v: SkillVar, hour: number): Map<ModelId, number> {
+export function weights(h: Scores, models: readonly ModelId[], v: SkillVar, hour: number, leadH = 0): Map<ModelId, number> {
   const raw = new Map<ModelId, number | null>()
   for (const m of models) {
-    const s = skillAt(h, m, v, hour)
+    const s = skillAt(h, m, v, hour, leadH)
     if (v === 'rain') raw.set(m, s.hit === null || s.n < MIN_DAYS ? null : Math.max(0.05, s.hit))
     else raw.set(m, s.rmse === null ? null : 1 / Math.max(FLOOR[v], s.rmse) ** 2)
   }
@@ -149,23 +179,23 @@ export function weights(h: SkillHistory | null, models: readonly ModelId[], v: S
 }
 
 /** One variable at one hour: every model that has a value, corrected and weighed. */
-export function blendHour(h: SkillHistory | null, v: NumVar, hour: number, values: Partial<Record<ModelId, number | null>>): Blended {
+export function blendHour(h: Scores, v: NumVar, hour: number, values: Partial<Record<ModelId, number | null>>, leadH = 0): Blended {
   const have = BLEND_MODELS.filter((m) => typeof values[m] === 'number' && Number.isFinite(values[m]))
   if (have.length === 0) return { value: null, lo: null, hi: null, models: [] }
-  const w = weights(h, have, v, hour)
+  const w = weights(h, have, v, hour, leadH)
   const models = have.map((m) => {
     const raw = values[m] as number
-    return { model: m, raw, value: corrected(h, m, v, hour, raw), weight: w.get(m) ?? 0 }
+    return { model: m, raw, value: corrected(h, m, v, hour, raw, leadH), weight: w.get(m) ?? 0 }
   })
   const value = models.reduce((a, x) => a + x.value * x.weight, 0)
   return { value, lo: Math.min(...models.map((x) => x.value)), hi: Math.max(...models.map((x) => x.value)), models }
 }
 
 /** Rain at one hour: the weighted share of models with RAIN_MM or more, 0-1. */
-export function rainChance(h: SkillHistory | null, hour: number, mm: Partial<Record<ModelId, number | null>>): { chance: number | null; wet: number; of: number; models: { model: ModelId; mm: number }[] } {
+export function rainChance(h: Scores, hour: number, mm: Partial<Record<ModelId, number | null>>, leadH = 0): { chance: number | null; wet: number; of: number; models: { model: ModelId; mm: number }[] } {
   const have = BLEND_MODELS.filter((m) => typeof mm[m] === 'number' && Number.isFinite(mm[m]))
   if (have.length === 0) return { chance: null, wet: 0, of: 0, models: [] }
-  const w = weights(h, have, 'rain', hour)
+  const w = weights(h, have, 'rain', hour, leadH)
   const wet = have.filter((m) => (mm[m] as number) >= RAIN_MM)
   return { chance: wet.reduce((a, m) => a + (w.get(m) ?? 0), 0), wet: wet.length, of: have.length, models: have.map((m) => ({ model: m, mm: mm[m] as number })) }
 }
@@ -177,6 +207,9 @@ export interface StationObs {
   station: string
   at: Date
   tempC: number | null
+  /** Dew point and where the wind is from: read for the shared file (Batch L); the phone's scoring does not use them. */
+  dewC?: number | null
+  dirDeg?: number | null
   windMps: number | null
   gustMps: number | null
   /** Cover from the reported layers, %; null when the station reports none (CLR: it sees only below 12,000 ft). */
@@ -295,12 +328,18 @@ export function localDate(at: Date, timeZone: string): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(at)
 }
 
-export function blendRun(run: ModelRun, h: SkillHistory | null, timeZone: string): BlendedHour[] {
+/**
+ * `issued` is when the run was fetched: the shared scores are by how far
+ * ahead an hour is (0-24 h, 24-48 h, 48 h on). Defaults to the run's first hour.
+ */
+export function blendRun(run: ModelRun, h: Scores, timeZone: string, issued?: Date): BlendedHour[] {
+  const t0 = issued?.getTime() ?? (run.times.length === 0 ? 0 : Date.parse(`${run.times[0]}:00Z`))
   return run.times.map((t, i) => {
     const at = new Date(`${t}:00Z`)
     const hour = localHour(at, timeZone)
+    const leadH = Math.max(0, (at.getTime() - t0) / 3_600_000)
     const pick = (v: SkillVar | 'dir') => Object.fromEntries(BLEND_MODELS.map((m) => [m, run.series[m]?.[v]?.[i] ?? null])) as Partial<Record<ModelId, number | null>>
-    const wind = blendHour(h, 'wind', hour, pick('wind'))
+    const wind = blendHour(h, 'wind', hour, pick('wind'), leadH)
     const dirs = pick('dir')
     let x = 0
     let y = 0
@@ -312,9 +351,9 @@ export function blendRun(run: ModelRun, h: SkillHistory | null, timeZone: string
     }
     const fromDeg = x === 0 && y === 0 ? null : ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360
     /* A gust is never less than the wind it gusts over: corrected separately, the two can cross. */
-    const g = blendHour(h, 'gust', hour, pick('gust'))
+    const g = blendHour(h, 'gust', hour, pick('gust'), leadH)
     const gust = g.value !== null && wind.value !== null && g.value < wind.value ? { ...g, value: wind.value } : g
-    return { at, temp: blendHour(h, 'temp', hour, pick('temp')), wind, gust, cloud: blendHour(h, 'cloud', hour, pick('cloud')), rain: rainChance(h, hour, pick('rain')), fromDeg }
+    return { at, temp: blendHour(h, 'temp', hour, pick('temp'), leadH), wind, gust, cloud: blendHour(h, 'cloud', hour, pick('cloud'), leadH), rain: rainChance(h, hour, pick('rain'), leadH), fromDeg }
   })
 }
 

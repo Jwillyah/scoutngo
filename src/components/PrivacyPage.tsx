@@ -104,6 +104,7 @@ export function PrivacyBody() {
       </table>
       </div>
       <p className="privacy__note">Weather, sea and sky lookups send the place rounded to 2 decimals, about a kilometre. Tides are asked by station number.</p>
+      <p className="privacy__note" data-privacy="shared-skill">Downloads a public model-accuracy file; sends nothing.</p>
 
       <h2 className="privacy__head">Live check: this session</h2>
       <p className="privacy__note">The hosts this browser has asked since the app opened, read from the browser itself and kept nowhere.</p>

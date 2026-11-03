@@ -14,7 +14,9 @@ const pct = (x: number | null) => (x === null ? '\u2014' : `${Math.round(x * 100
 
 export function WeatherDetails({ state, now, units, timeZone, risk }: { state: BlendState; now: BlendedHour | null; units: Units; timeZone: string; risk: StormRisk | null }) {
   const deg = (c: number | null) => formatTemperature(c, units.temperature).replace(/°[FC]$/, '°')
-  const scored = state.history?.days.length ?? 0
+  const src = state.source
+  const scored = src.kind === 'shared' ? src.days : (state.phone?.days.length ?? 0)
+  const day = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-US', { day: 'numeric', month: 'short', timeZone: 'UTC' })
   return (
     <>
       <details className="frow">
@@ -46,7 +48,9 @@ export function WeatherDetails({ state, now, units, timeZone, risk }: { state: B
         )}
       </details>
       <details className="frow">
-        <summary>How well each model did here</summary>
+        <summary>
+          How well each model did here <span className="wx__src num" data-skill-source={src.kind}>{src.kind === 'shared' ? `shared · updated ${day(src.date)}` : 'this phone'}</span>
+        </summary>
         {scored === 0 ? (
           <p className="fire__note">{state.stations.length === 0 ? 'No weather station within 60 km to score the models against.' : 'Not scored yet: the stations’ reports did not come back. Asked again next time.'}</p>
         ) : (
@@ -73,7 +77,11 @@ export function WeatherDetails({ state, now, units, timeZone, risk }: { state: B
                 })}
               </tbody>
             </table>
-            <p className="fire__note">The last {scored} days against {state.stations.map((s) => `${s.id} (${Math.round(s.km)} km)`).join(' and ')}: each model&rsquo;s forecast made the day before, hour by hour, against what the station measured.</p>
+            {src.kind === 'shared' ? (
+              <p className="fire__note">The last {scored} days against {src.station.id} {src.station.name} ({Math.round(src.station.km)} km), from the shared file: every model&rsquo;s forecast 0&ndash;72 hours ahead, hour by hour, against what the station measured, scored each night for the whole coast. Older than 3 days or offline, this phone&rsquo;s own scores are used.</p>
+            ) : (
+              <p className="fire__note">The last {scored} days against {state.stations.map((s) => `${s.id} (${Math.round(s.km)} km)`).join(' and ')}: each model&rsquo;s forecast made the day before, hour by hour, against what the station measured.</p>
+            )}
           </div>
         )}
       </details>
@@ -81,7 +89,7 @@ export function WeatherDetails({ state, now, units, timeZone, risk }: { state: B
         <summary>Why</summary>
         <p className="fire__note">Six models: {state.models.map((m) => MODEL_LABEL[m]).join(', ')} (Open-Meteo). Each is corrected for how it has been wrong here at that hour of the day over the last 30 days, then blended, weighted by how close it has come since. A model with no record yet weighs the same as the rest. The spread is the lowest and highest model after correction.</p>
         <StormWhy risk={risk} />
-        <p className="fire__note">Scored on this phone only, kept in its storage and in your backup file. Cloud is scored only when the station reports a layer: it sees nothing above 12,000 ft.</p>
+        <p className="fire__note">{src.kind === 'shared' ? 'Scored for everyone each night from public station reports and downloaded as one file for the whole region: nothing about this phone is sent.' : 'Scored on this phone only, kept in its storage and in your backup file.'} Cloud is scored only when the station reports a layer: it sees nothing above 12,000 ft.</p>
       </details>
     </>
   )
