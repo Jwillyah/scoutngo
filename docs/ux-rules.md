@@ -22,6 +22,7 @@ Why: most fixes so far were UI/UX, found on the phone after the code passed. The
 10. Plain words first, numbers second, method in the "i". No ALL-CAPS sentences; caps only for short labels.
 11. One name for one thing everywhere (venue name, lens name, size words). One source for each fact.
 12. Never "safe", "clear", "legal". Never a score that sounds certain.
+28. Show conditions, never instruct: no "get off the beach", "land the drone", "stay inside". Storms, lightning and rip currents are said as facts with their source; what to do about them is yours.
 13. Data age shown when old or offline ("from 9:12 AM").
 
 ## Look

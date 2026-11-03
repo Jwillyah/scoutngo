@@ -139,6 +139,22 @@ const NDBC_TEXT = `#YY  MM DD hh mm WDIR WSPD GST  WVHT   DPD   APD MWD   PRES  
 `
 const METAR = 'KORF 301051Z 20008KT 10SM FEW040 SCT120 BKN250 15/12 A3001 RMK AO2 SLP162'
 
+/*
+ * IEM's hourly reports for the stations asked, every hour of the range at :51:
+ * 57 °F, 8 kt, a broken deck, dry. The fake models say 15 °C (59 °F), so
+ * every model scores about +1.1 °C warm, the same every run.
+ */
+function asosCsv(u) {
+  const ids = u.searchParams.getAll('station')
+  const t0 = Date.parse(u.searchParams.get('sts') ?? FIXTURE_NOW.toISOString())
+  const t1 = Math.min(Date.parse(u.searchParams.get('ets') ?? FIXTURE_NOW.toISOString()), t0 + 40 * 86_400_000)
+  const rows = ['station,valid,tmpf,sknt,gust,skyc1,skyc2,skyc3,skyc4,p01i,wxcodes']
+  for (let t = Math.floor(t0 / 3_600_000) * 3_600_000 + 51 * 60_000; t <= t1; t += 3_600_000) {
+    for (const id of ids) rows.push(`${id},${new Date(t).toISOString().slice(0, 16).replace('T', ' ')},57.00,8.00,null,BKN,null,null,null,0.00,null`)
+  }
+  return rows.join('\n')
+}
+
 const json = (value, fixture) => ({ status: 200, type: 'application/json', body: Buffer.from(JSON.stringify(value)), fixture })
 const text = (value, type, fixture) => ({ status: 200, type, body: Buffer.from(value), fixture })
 
@@ -174,6 +190,7 @@ export async function answer(href) {
   if (host === 'aviationweather.gov') return text(METAR, 'text/plain', 'METAR text')
   /* Soundings: none launched in the fixture's world; radar: no echoes (a clear tile). */
   if (host === 'mesonet.agron.iastate.edu' && u.pathname.startsWith('/json/raob')) return json({ profiles: [] }, 'no sounding')
+  if (host === 'mesonet.agron.iastate.edu' && u.pathname.startsWith('/cgi-bin/request/asos.py')) return text(asosCsv(u), 'text/plain', 'station reports')
   if (host === 'mesonet.agron.iastate.edu' && u.pathname.startsWith('/cache/tile.py')) return { status: 200, type: 'image/png', body: OVERLAY, fixture: 'no radar echoes' }
   if (host === 'api.github.com') return json({ sha: '0000000000000000000000000000000000000000', commit: { committer: { date: '2026-10-30T00:00:00Z' } } }, 'GitHub fixture')
   if (host === 'api.anthropic.com') return { status: 401, type: 'application/json', body: Buffer.from('{"type":"error"}'), fixture: 'Anthropic refused' }

@@ -16854,3 +16854,81 @@ a.about__row * {
 .fly__alt--over {
   background: #f5b83d;
 }
+
+/* THE WEATHER TAB (Batch K): now, the week with its spread, rows one tap deeper. */
+.wx {
+  display: grid;
+  gap: var(--space-2);
+}
+.wx__now {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.wx__temp {
+  margin: 0;
+  font-size: 2.25rem;
+  font-weight: 300;
+  line-height: 1;
+}
+.wx__nowfacts {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.wx__line {
+  margin: 0;
+  font-size: var(--text-md);
+}
+.wx__week {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.wx__day {
+  display: grid;
+  grid-template-columns: 2.6em 5.2em 4.8em 1fr 3.6em;
+  align-items: baseline;
+  gap: var(--space-1);
+  padding: 3px 0;
+  font-size: var(--text-sm);
+  border-top: 1px solid var(--color-line);
+}
+.wx__dname {
+  font-weight: var(--weight-medium);
+}
+.wx__lo,
+.wx__spread,
+.wx__wind {
+  color: var(--color-text-muted);
+}
+.wx__wind {
+  text-align: right;
+}
+.wx__rain {
+  color: var(--tide);
+}
+.wx__scroll {
+  overflow-x: auto;
+  display: grid;
+  gap: var(--space-1);
+  padding-bottom: var(--space-2);
+}
+.wx__table {
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.wx__table th,
+.wx__table td {
+  padding: 3px 8px 3px 0;
+  text-align: left;
+  white-space: nowrap;
+}
+.wx__table th {
+  font-weight: var(--weight-medium);
+  color: var(--color-text-muted);
+}
+.wx__raw {
+  color: var(--color-text-muted);
+}

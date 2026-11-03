@@ -11,6 +11,8 @@ import { SKY_TABS, type SkyTab } from '../lib/skyTab.ts'
 import { SkyFire } from './SkyFire.tsx'
 import { SkyPreview } from './SkyPreview.tsx'
 import { SpecialLight } from './SpecialLight.tsx'
+import { WeatherTab } from './WeatherTab.tsx'
+import type { Units } from '../lib/units.ts'
 import { LineUp } from './LineUp.tsx'
 import type { HorizonInput } from '../core/skyWindow.ts'
 import type { Special } from '../core/specialLight.ts'
@@ -32,6 +34,8 @@ import type { Place } from '../lib/placeGroups.ts'
  * tap on a result jumps the time bar there.
  */
 interface SkyCardProps {
+  /** For the Weather tab's numbers. */
+  units: Units
   /** Whether the Moon page is the one on screen: the 3D view shows the moon's arc only then (Batch D). */
   onMoonOpen?: (open: boolean) => void
   venue: LatLon
@@ -138,7 +142,7 @@ function MoonDisc({ fraction, waxing }: { fraction: number; waxing: boolean }) {
 }
 
 
-export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump, target, picking, onPickTarget, events, onPlanMoonrise, onOpenNow, placeName, onShowBow, horizon, onOpenCalendar, place, onMoonOpen }: SkyCardProps) {
+export function SkyCard({ units, venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump, target, picking, onPickTarget, events, onPlanMoonrise, onOpenNow, placeName, onShowBow, horizon, onOpenCalendar, place, onMoonOpen }: SkyCardProps) {
   const clock = (d: Date) => `${formatClock(d, timeZone)}`
   const finderProps = { venue, target, picking, onPickTarget, onJump, clock, timeZone }
   const [nowPage, setNowPage] = useState(0)
@@ -337,6 +341,8 @@ export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump,
         {bodyFor('fire')}
       </>
     )
+  } else if (tab === 'weather') {
+    body = <WeatherTab venue={venue} timeZone={timeZone} units={units} at={at} />
   } else if (tab === 'special') {
     body = bodyFor('special')
   } else {

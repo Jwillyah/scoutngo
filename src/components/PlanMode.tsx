@@ -2182,6 +2182,7 @@ export function PlanMode({
               />
             ) : (
               <SkyCard
+                units={units}
                 venue={venue}
                 timeZone={venueWindow.timeZone}
                 timeZoneAbbr={venueWindow.timeZoneShort}
