@@ -228,7 +228,7 @@ export function SettingsPage(props: Props) {
               </span>
             </a>
             <p className="set__note">
-              Your calendar app sends this spot, rounded to about a kilometre ({props.feedPlace?.lat.toFixed(2)}, {props.feedPlace?.lon.toFixed(2)}), to this app’s server each time it refreshes, about hourly. The server asks the forecast and logs nothing; Vercel’s own request logs keep the request line for an hour. Turn it off here and remove the calendar in your calendar app to stop it.
+              Your calendar app sends this spot, rounded to about a kilometre ({props.feedPlace?.lat.toFixed(2)}, {props.feedPlace?.lon.toFixed(2)}), to this app’s server each time it refreshes, about hourly. The server asks the forecast, and in the hour before a sunrise or sunset the weather stations by their ids, so a call that changes to Go or Skip changes in your calendar too; it logs nothing. Vercel’s own request logs keep the request line for an hour. Turn it off here and remove the calendar in your calendar app to stop it.
             </p>
           </>
         )}

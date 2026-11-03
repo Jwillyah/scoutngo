@@ -191,6 +191,8 @@ export interface DeckTruth {
   source: HeightSource
   /** A station reports the deck over you: measured, not forecast. */
   measured: boolean
+  /** That station's id, when one does. */
+  station: string | null
   /** "mid deck (12k or higher)", "low deck (3,400 ft)". */
   words: string
   /** For a narrow label: "mid deck ≥12k", "low deck 3k". */
@@ -266,12 +268,12 @@ export function deckTruth(t: TruthIn): DeckTruth | null {
 
   if (base === null) {
     if (t.modelLayer == null) return null
-    return { layer: t.modelLayer, baseFt: null, atLeast: false, topFt: top, source: 'model-split', measured: false, words: NAME[t.modelLayer].replace('high cloud', 'high cirrus'), short: NAME[t.modelLayer].replace('high cloud', 'high cirrus'), notes: [...notes, 'the models’ own split'] }
+    return { layer: t.modelLayer, baseFt: null, atLeast: false, topFt: top, source: 'model-split', measured: false, station: null, words: NAME[t.modelLayer].replace('high cloud', 'high cirrus'), short: NAME[t.modelLayer].replace('high cloud', 'high cirrus'), notes: [...notes, 'the models’ own split'] }
   }
   const layer = layerOfFt(base.ft)
   const atLeast = st !== null && st.atLeast && (base.source === 'station' || base.source === 'model-rh' || base.source === 'sounding')
   const phrase = st !== null && st.atLeast && base.source !== 'pirep' ? `${k(st.baseFt)} or higher` : base.source === 'station' || base.source === 'pirep' ? thousands(base.ft) : `about ${thousands(base.ft)}`
-  return { layer, baseFt: base.ft, atLeast, topFt: top, source: base.source, measured: st !== null, words: `${NAME[layer]} (${phrase})`, short: `${NAME[layer]} ${st !== null && st.atLeast && base.source !== 'pirep' ? `≥${k(st.baseFt)}` : k(base.ft)}`, notes }
+  return { layer, baseFt: base.ft, atLeast, topFt: top, source: base.source, measured: st !== null, station: st?.station ?? null, words: `${NAME[layer]} (${phrase})`, short: `${NAME[layer]} ${st !== null && st.atLeast && base.source !== 'pirep' ? `≥${k(st.baseFt)}` : k(base.ft)}`, notes }
 }
 
 /**

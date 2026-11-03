@@ -4,6 +4,8 @@ import { alertIcs, remindAt, wakeAt } from '../core/alertIcs.ts'
 import { formatClock, formatShortHour } from '../core/timezone.ts'
 import { useBriefing, type DayBrief } from '../lib/useBriefing.ts'
 import { saveIcs } from '../lib/saveIcs.ts'
+import { remember } from '../lib/callHistory.ts'
+import { changeWords } from '../core/callChange.ts'
 import { compass } from '../lib/tideWords.ts'
 import { windIn, windUnitLabel, type Units } from '../lib/units.ts'
 import { MoonGlyph } from './MoonGlyph.tsx'
@@ -244,6 +246,11 @@ function DayPage({ day, which, placeName, venue, timeZone, units, drone, now, ch
   const steps: LightStep[] = day === null || read === null || kind === null ? [] : lightSteps(kind, read.event, venue.lat, venue.lon, verdict, under)
   const tag = colorTag(verdict)
   const callWord = read === null ? (loading ? '…' : '—') : read.call ?? '—'
+  /* Batch J, Section 6: the call this phone showed last for the event, and its change ("Upgraded to Go at 4:52 PM from KNTU"). */
+  const callKey = read === null || which !== 'today' ? null : `${venue.lat.toFixed(2)},${venue.lon.toFixed(2)}|${read.kind}|${read.event.toISOString()}`
+  const change = useMemo(() => (callKey === null || read === null ? null : remember(callKey, read.event, read.call, read.by ?? null, now)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [callKey, read?.call, read?.by])
   const why = read === null ? (loading ? 'Reading five forecasts…' : which === 'today' ? 'Both have passed today. Tomorrow’s sunrise is next.' : 'The forecast did not say.') : read.why
   const colour = read === null || read.colorFrom === null ? null : `Best color ${clock(read.colorFrom)} to ${clock(read.colorTo)} · be set up ${clock(read.setUp)}`
 
@@ -280,7 +287,10 @@ function DayPage({ day, which, placeName, venue, timeZone, units, drone, now, ch
           </button>
           {read === null || kind === null ? '' : ` · ${KIND_WORD[kind].toLowerCase()} ${clock(read.event)}`}
         </p>
-        <p className="bcall__word">{callWord}</p>
+        <p className="bcall__word">
+          {callWord}
+          {change === null ? null : <span className="bcall__changed">{changeWords(change, clock)}</span>}
+        </p>
         <p className="bcall__why">{why}</p>
         {read?.gapLine == null ? null : <p className="bcall__gap">{read.gapLine}</p>}
         {colour === null ? null : <p className="bcall__when num">{colour}</p>}

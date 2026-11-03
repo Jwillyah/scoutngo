@@ -14,14 +14,31 @@
  * WHAT IT DOES: for the next FEED_DAYS sunrises and sunsets, the same Sky
  * fire read the app makes (src/core/fireOutlook.ts, src/core/briefing.ts)
  * from Open-Meteo's models, asked with the same rounded points; Go or Maybe
- * become events with an alarm. No station is read here, so it never says Go.
+ * become events with an alarm. In the hour before an event it also reads
+ * the stations by id (src/lib/feedObs.ts, Batch J, Section 6), as the phone
+ * does: a call that moves to Go, or to Skip, moves in the calendar.
  * ===========================================================================
  */
 import { getPosition, getTimes } from 'suncalc'
-import { eventCall, type CallRead } from '../src/core/briefing.ts'
+import { CONFIRM_WITHIN_MS, eventCall, type CallObs, type CallRead } from '../src/core/briefing.ts'
+import { feedIds, feedObsFrom, latestSkies } from '../src/lib/feedObs.ts'
 import { feedCoords, feedIcs, FEED_DAYS } from '../src/core/calendarFeed.ts'
 import { fireVerdict } from '../src/core/fireOutlook.ts'
 import { firePathsRangeUrl, nearestHour, parseFirePaths, pathsAt } from '../src/lib/skyFireData.ts'
+
+const AVWX_METAR = 'https://aviationweather.gov/api/data/metar'
+
+/** The stations' read for one event, by ids only (src/lib/feedObs.ts); null when the service does not answer. */
+async function stationsFor(at: { lat: number; lon: number }, event: Date): Promise<CallObs | null> {
+  const { own, ids } = feedIds(at, event)
+  if (ids.length === 0) return null
+  try {
+    const r = await fetch(`${AVWX_METAR}?ids=${ids.join(',')}&format=raw&hours=2`, { signal: AbortSignal.timeout(8000) })
+    return r.ok ? feedObsFrom(at, event, latestSkies(await r.text()), own) : null
+  } catch {
+    return null
+  }
+}
 
 export async function GET(request: Request): Promise<Response> {
   const u = new URL(request.url)
@@ -46,7 +63,9 @@ export async function GET(request: Request): Promise<Response> {
       const data = r.ok ? parseFirePaths(await r.json()) : null
       for (const e of mine) {
         const paths = data === null ? [] : pathsAt(data, nearestHour(e.at))
-        reads.push(eventCall(paths.length === 0 ? null : fireVerdict(paths, { event: e.at, kind, venue: at }), kind, e.at, now))
+        const near = Math.abs(e.at.getTime() - now.getTime()) <= CONFIRM_WITHIN_MS
+        const obs = near ? await stationsFor(at, e.at) : null
+        reads.push(eventCall(paths.length === 0 ? null : fireVerdict(paths, { event: e.at, kind, venue: at }), kind, e.at, now, null, obs))
       }
     } catch {
       /* No answer: no events for this kind; the calendar keeps asking. */

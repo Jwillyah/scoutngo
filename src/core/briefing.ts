@@ -60,6 +60,8 @@ export interface CallRead {
   colorFrom: Date | null
   colorTo: Date | null
   setUp: Date | null
+  /** The station whose report made the call, when the stations made it (Batch J, Section 6). */
+  by?: string | null
   /** The deepest colour, when the reported deck's under-lighting sets it (Batch J, Section 3). */
   peak?: Date | null
   /** "Gap to the WSW: open · Henderson scattered, Roxboro clear", when the gap watch spoke (Batch J). */
@@ -104,7 +106,7 @@ export function eventCall(v: FireVerdict | null, kind: Kind, event: Date, now: D
    * hour, a deck a station reports over you and the gap toward the sun open
    * by the stations along the line (or the satellite) is a Go, whatever the
    * models placed: the models had that deck wrong, the stations did not. A
-   * shut gap under a reported deck is no Go.
+   * shut gap under a reported deck is a Skip: nothing gets under it.
    */
   const gap = obs?.gap ?? null
   const truth = obs?.truth ?? null
@@ -114,10 +116,10 @@ export function eventCall(v: FireVerdict | null, kind: Kind, event: Date, now: D
     /* Section 3: lit from underneath through the gap, so earlier than the colour clock's glow. */
     const u = truth.baseFt === null ? null : underLitWindow(kind, event, truth.baseFt * 0.3048, gap.slotEdgeKm, (t) => getPosition(t, venueOf(obs).lat, venueOf(obs).lon).altitude)
     const timing = u === null ? timing0 : { ...timing0, colorFrom: u.from, colorTo: u.to, peak: u.peak, setUp: new Date(u.from.getTime() - SET_UP_BEFORE_MS) }
-    return { ...base, ...timing, confirmed: true, call: 'Go', why: `Stations see a ${truth.short} over you and the gap toward the sun open.` }
+    return { ...base, ...timing, by: truth.station, confirmed: true, call: 'Go', why: `Stations see a ${truth.short} over you and the gap toward the sun open.` }
   }
-  if (near && truth?.measured === true && gap?.state === 'shut' && v !== null && v.word !== 'unlikely') {
-    return { ...base, ...timing0, call: 'Maybe', why: `A ${truth.words} over you, but the gap toward the sun is shut: the light may not get under it.` }
+  if (near && truth?.measured === true && gap?.state === 'shut') {
+    return { ...base, ...timing0, by: truth.station, call: 'Skip', why: `A ${truth.words} over you, and the gap toward the sun shut: the light cannot get under it.` }
   }
   if (v === null) return { ...base, call: null, why: 'The forecast did not say.' }
   const w = lookWindow(v)
@@ -130,7 +132,7 @@ export function eventCall(v: FireVerdict | null, kind: Kind, event: Date, now: D
   /* A high or mid canvas the satellite does not see over you is not confirmed. */
   const satAgrees = sat === null || w?.layer === 'low' || sat.canvas
   const confirmed = near && w !== null && gapHolds && satAgrees
-  if (v.word === 'likely' && confirmed) return { ...base, ...timing, confirmed, call: 'Go', why: `${lit ?? 'The models see a lit layer'}; ${v.station?.station ?? 'the station'} shows nothing under the light${sat !== null && sat.canvas ? '; the satellite sees the high cloud' : ''}.` }
+  if (v.word === 'likely' && confirmed) return { ...base, ...timing, by: v.station?.station ?? null, confirmed, call: 'Go', why: `${lit ?? 'The models see a lit layer'}; ${v.station?.station ?? 'the station'} shows nothing under the light${sat !== null && sat.canvas ? '; the satellite sees the high cloud' : ''}.` }
   if (v.word === 'likely' && !satAgrees) return { ...base, ...timing, call: 'Maybe', why: `Likely by the models, but ${sat?.line.replace(/^The /, 'the ') ?? ''}.` }
   if (v.word === 'likely') return { ...base, ...timing, call: 'Maybe', why: `Likely: ${lit ?? 'the models see a lit layer'}. Final call within the hour, from the stations.` }
   return { ...base, ...timing, call: 'Maybe', why: `Possible: ${lit ?? 'some models see a lit layer'}.` }
