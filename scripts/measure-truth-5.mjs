@@ -23,6 +23,8 @@ import { formatClock } from '../src/core/timezone.ts'
 import { ASOS_STATIONS } from '../src/data/asosStations.ts'
 import { parseFirePaths, pathsAt } from '../src/lib/skyFireData.ts'
 import { gapFrom, parseProfile, truthFrom } from '../src/lib/skyObsData.ts'
+import { afdSkyLine, airRead, contrailsLikely, runsLine } from '../src/core/vivid.ts'
+import { parseAir, parseRuns } from '../src/lib/vividData.ts'
 
 const DIR = 'tests/data/truth5-2026-11-02-sunset'
 const fx = JSON.parse(readFileSync('tests/data/sky-fire-2026-11-02-sunset.json', 'utf8'))
@@ -69,6 +71,17 @@ for (const lead of [90, 60, 30]) {
   )
 }
 
+/* Section 4, how vivid, for the event's hour. */
+const air = parseAir(JSON.parse(readFileSync(`${DIR}/air.json`, 'utf8')).payload, EVENT)
+const runs = parseRuns(JSON.parse(readFileSync(`${DIR}/ensemble.json`, 'utf8')).payload, EVENT)
+const afdText = readFileSync(`${DIR}/afd.txt`, 'utf8')
+const afd231 = afdText.slice(afdText.indexOf('FXUS61 KAKQ 021931'), afdText.indexOf('FXUS61 KAKQ 021758'))
+const vivid = [
+  `Air: ${air === null ? '—' : `${airRead(air.aod, air.dust, air.pm25, 0)?.line} (AOD ${air.aod}, dust ${air.dust}, PM2.5 ${air.pm25})`}`,
+  `GFS ensemble: ${runs === null ? '—' : runsLine(runs)?.line}`,
+  `Contrails: ${profile !== null && contrailsLikely(profile.levels) ? 'may streak the sky' : 'no ice supersaturation at 300 or 250 hPa'}`,
+  `AFD (NWS Wakefield, 2:31 PM; context only): "${afdSkyLine(afd231)}"`,
+]
 const ran = new Date().toISOString()
 const out = [
   '# Truth case #5 replayed: 2 Nov 2026 sunset, Chix Beach, before and after Batch J',
@@ -80,6 +93,10 @@ const out = [
   '| when | | layer | gap | colour | call |',
   '|---|---|---|---|---|---|',
   ...rows,
+  '',
+  '## How vivid (Section 4)',
+  '',
+  ...vivid.map((v) => `- ${v}`),
   '',
   `Line stations (within 25 km of the line, out to 300 km): ${line.map((s) => `${s.id} ${s.name} ${Math.round(s.alongKm)} km`).join(', ')}.`,
   '',

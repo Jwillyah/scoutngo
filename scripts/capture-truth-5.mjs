@@ -138,7 +138,7 @@ note(`nexrad: ${Object.entries(nexrad).map(([s, xs]) => `${s} ${xs.filter((x) =>
 
 /* 8. The GFS ensemble along the line. */
 const pts = pathPoints(VENUE, azimuth)
-const ensUrl = `https://ensemble-api.open-meteo.com/v1/ensemble?latitude=${pts.map((p) => p.at.lat.toFixed(2)).join(',')}&longitude=${pts.map((p) => p.at.lon.toFixed(2)).join(',')}&hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high&models=gfs025&start_date=${DATE}&end_date=${DATE}&timezone=GMT`
+const ensUrl = `https://ensemble-api.open-meteo.com/v1/ensemble?latitude=${pts.map((p) => p.at.lat.toFixed(2)).join(',')}&longitude=${pts.map((p) => p.at.lon.toFixed(2)).join(',')}&hourly=cloud_cover&models=gfs025&start_date=${DATE}&end_date=${DATE}&timezone=GMT`
 const ens = await fetch(ensUrl).then((r) => r.json()).catch(() => null)
 writeFileSync(`${DIR}/ensemble.json`, JSON.stringify({ ran, url: ensUrl, payload: ens }, null, 1) + '\n')
 note(`ensemble: ${Array.isArray(ens) ? ens.length : ens === null ? 0 : 1} points`)

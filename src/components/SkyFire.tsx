@@ -105,6 +105,8 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
   /* Within the hour, a reported deck and an open gap are the call, and time the colour from under (Batch J, Sections 2-3): the same as Today. */
   const seen = obs === null || event === null || verdict === null ? null : eventCall(verdict, kind, event, realNow, null, { venue, truth: obs.truth, gap: obs.gap })
   const byStations = seen !== null && seen.call === 'Go' && seen.peak != null
+  /* How vivid (Batch J, Section 4): the air, the 31 runs, contrails. */
+  const vividLine = obs === null ? '' : [obs.vivid.air === null ? null : `Air: ${obs.vivid.air.line}`, obs.vivid.runs?.line ?? null, obs.vivid.contrails ? 'contrails may streak the sky' : null].filter((x) => x !== null).join(' · ')
 
   /*
    * THE LOG, BY THE REAL CLOCK (item 6): from 50 minutes before a sunrise or
@@ -238,6 +240,7 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
               : verdict.word === 'unlikely' ? verdictSentence(verdict, clock, name).replace(/^Fire unlikely: /, '').replace(/^./, (c) => c.toUpperCase()) : watch === null ? verdictSentence(verdict, clock, name) : `Best ${clock(watch.from)}–${clock(watch.to)}${lead?.times?.deepest == null ? '' : ` · deepest ${clock(lead.times.deepest)}`}`}
           </p>
           {obs?.gap.state == null ? null : <p className="fire__gap">{obs.gap.line}</p>}
+          {vividLine === '' ? null : <p className="fire__gap fire__vivid">{vividLine}</p>}
           {mean === null ? null : <FireSideView read={verdict.sky} path={mean} venue={venue} kind={kind} />}
           {colourClock?.(kind, 'strip')}
           {lead === null ? null : (
@@ -259,6 +262,11 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
             <summary>Why · numbers and stations</summary>
             {nowLine === null ? null : <p className="fire__now fire__note">Sky right now · {nowLine}</p>}
             {byStations && obs?.truth != null ? <p className="fire__note">Lit from under through the gap: the deck you can see catches the sun before sunset, deepest as the sun sets, until the sun is {litUntilDeg((obs.truth.baseFt ?? 0) * 0.3048).toFixed(1)}° below (its height&rsquo;s dip, and the bend of a grazing ray).</p> : null}
+            {obs?.vivid.afd?.line == null ? null : (
+              <p className="fire__note fire__afd">
+                NWS {obs.vivid.afd.office}{obs.vivid.afd.issued === '' ? '' : `, ${clock(new Date(obs.vivid.afd.issued))}`}, in its own words (context only, never part of the call): &ldquo;{obs.vivid.afd.line}&rdquo;
+              </p>
+            )}
             {obs?.truth == null ? null : <p className="fire__note fire__truth">The deck over you: {obs.truth.words}. {obs.truth.notes.join(' · ')}.</p>}
             <p className="fire__note">
               {agreementLine(verdict, name)}{split ? ' · models split on low cloud' : ''}. A forecast places cloud on a grid kilometres across: it cannot promise a hole.

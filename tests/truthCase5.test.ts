@@ -271,3 +271,50 @@ describe('Section 3: colour timing under a deck with an open gap', async () => {
     expect(u.to.getTime()).toBeGreaterThan(sunrise.getTime())
   })
 })
+
+describe('Section 4: how vivid', async () => {
+  const { airRead, runsLine, runKeepsGap, contrailsLikely, afdSkyLine } = await import('../src/core/vivid.ts')
+  const { parseAir, parseRuns } = await import('../src/lib/vividData.ts')
+
+  it('air: clean is vivid, haze or dust or smoke muted, rain lifts normal to vivid', () => {
+    expect(airRead(0.05, 0, 5, 0)?.line).toBe('vivid')
+    expect(airRead(0.12, 0, 8, 0)?.line).toBe('normal')
+    expect(airRead(0.12, 0, 8, 4)?.line).toBe('vivid · clean air after rain')
+    expect(airRead(0.4, 0, 8, 0)?.line).toBe('muted (haze)')
+    expect(airRead(0.2, 80, 8, 0)?.line).toBe('muted (dust)')
+    expect(airRead(0.2, 0, 50, 0)?.line).toBe('muted (smoke or haze)')
+    expect(airRead(null, null, null, 3)).toBeNull()
+  })
+
+  it('2 Nov sunset: the air normal (AOD 0.11, no dust)', () => {
+    const a = parseAir(JSON.parse(readFileSync(`${DIR}/air.json`, 'utf8')).payload, EVENT)!
+    expect(a.aod).toBe(0.11)
+    expect(airRead(a.aod, a.dust, a.pm25, 0)?.word).toBe('normal')
+  })
+
+  it('2 Nov sunset: the 31 GFS runs, each its own gap', () => {
+    const runs = parseRuns(JSON.parse(readFileSync(`${DIR}/ensemble.json`, 'utf8')).payload, EVENT)!
+    expect(runs).toHaveLength(31)
+    const r = runsLine(runs)!
+    expect(r.of).toBe(31)
+    expect(r.line).toBe(`${r.open} of 31 runs keep the gap open`)
+    /* The control run: 87% over you, clearing to 9% at 400 km. */
+    expect(runs[0][0]).toBe(87)
+    expect(runKeepsGap(runs[0])).toBe(true)
+    expect(runKeepsGap([10, 0, 0, 0, 0, 0, 0, 0])).toBe(false)
+    expect(runKeepsGap([90, 90, 90, 90, 90, 90, 90, 90])).toBe(false)
+  })
+
+  it('contrails only with ice supersaturation aloft: none on 2 Nov', () => {
+    expect(contrailsLikely(PROFILE!.levels)).toBe(false)
+    expect(contrailsLikely([{ heightM: 9500, tempC: -45, rhPct: 80 }])).toBe(true)
+  })
+
+  it('the AFD gives one line about the sky, as written; the call never reads it', () => {
+    const text = readFileSync(`${DIR}/afd.txt`, 'utf8')
+    const at231 = text.slice(text.indexOf('FXUS61 KAKQ 021931'), text.indexOf('FXUS61 KAKQ 021758'))
+    expect(afdSkyLine(at231)).toMatch(/^[A-Z].*(sky|skies|cloud|clear)/i)
+    expect(readFileSync('src/core/briefing.ts', 'utf8')).not.toMatch(/afd/i)
+    expect(readFileSync('src/core/fireOutlook.ts', 'utf8')).not.toMatch(/afd/i)
+  })
+})
