@@ -17403,3 +17403,77 @@ a.about__row * {
 .rstrip__open {
   white-space: nowrap;
 }
+/* The Weather tab's pages (Batch K addendum, C): 7 days and Models. */
+.wxl__daylist {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.wxl__dayrow {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  border-top: 1px solid rgb(255 255 255 / 0.12);
+}
+.wxl__daytext {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+}
+.wxl__dayhead {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-sm);
+}
+.wxl__dayline,
+.wxl__daysub {
+  font-size: var(--text-xs, 0.75rem);
+  color: rgb(255 255 255 / 0.85);
+}
+.wxl__daysub {
+  color: rgb(255 255 255 / 0.7);
+}
+.wxl__headline {
+  font-size: 1.25rem;
+  font-weight: 300;
+}
+.wxl__qtabs {
+  justify-self: start;
+}
+.wxl__chart {
+  margin: 0;
+}
+.wxl__chartset {
+  fill: color-mix(in srgb, var(--sun-set) 25%, transparent);
+}
+.wxl__mcards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.wxl__mhead {
+  display: flex;
+  justify-content: space-between;
+}
+.wxl__mcard {
+  display: grid;
+  gap: 0;
+  padding: 3px 6px;
+  border-radius: 8px;
+  border-top: 3px solid;
+  background: rgb(255 255 255 / 0.08);
+  font-size: var(--text-xs, 0.75rem);
+}
+.wxl__tile {
+  padding: 4px 10px;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 0.1);
+  font-size: var(--text-sm);
+}

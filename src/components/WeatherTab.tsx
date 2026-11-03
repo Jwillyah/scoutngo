@@ -1,21 +1,22 @@
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import { getTimes } from 'suncalc'
 import type { LatLon } from '../core/geo.ts'
 import { compassPoint } from '../core/field.ts'
 import { lightningLine } from '../core/lightning.ts'
-import { cloudWords, hourAt, localDate, type BlendedDay } from '../core/modelSkill.ts'
+import { cloudWords, hourAt, localDate } from '../core/modelSkill.ts'
 import { shooterLines } from '../core/shooterStorm.ts'
 import { cellCalls, cellLine } from '../core/stormCells.ts'
 import { stormLine } from '../core/stormRisk.ts'
 import { formatClock, formatShortHour } from '../core/timezone.ts'
-import { dayAgreement, dayIcon, hourlyStrip, leading, MODEL_COLOR, modelName, rainLine6h, type SkyIcon } from '../core/weatherWords.ts'
+import { dayAgreement, dayIcon, hourlyStrip, leading, MODEL_COLOR, modelName, rainLine6h } from '../core/weatherWords.ts'
 import { useBlend } from '../lib/blendData.ts'
 import { useNowcast } from '../lib/stormData.ts'
 import { useStormRisk } from '../lib/stormRiskData.ts'
 import { forecastAge } from '../lib/savedForecast.ts'
 import { formatTemperature, formatWind, type Units } from '../lib/units.ts'
 import { RadarStrip } from './RadarStrip.tsx'
-import { WeatherDetails } from './WeatherDetails.tsx'
+import { SkyGlyph } from './SkyGlyph.tsx'
+import { DaysPage, ModelsPage } from './WeatherPages.tsx'
 
 /*
  * THE WEATHER TAB (Batch K addendum, A): the forecast for this spot, from six
@@ -41,21 +42,6 @@ import { WeatherDetails } from './WeatherDetails.tsx'
 export const OPEN_RADAR_EVENT = 'scoutngo:open-radar'
 
 const pct = (x: number | null) => (x === null ? '—' : `${Math.round(x * 100)}%`)
-
-export function SkyGlyph({ icon, size = 20 }: { icon: SkyIcon | 'sunset' | 'sunrise'; size?: number }) {
-  const p = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.6, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
-  const cloud = <path {...p} d="M7 17h10a3.5 3.5 0 0 0 0-7 5 5 0 0 0-9.6 1.4A3 3 0 0 0 7 17z" />
-  const body: Record<string, ReactNode> = {
-    sun: <><circle {...p} cx="12" cy="12" r="4" /><path {...p} d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4" /></>,
-    part: <><circle {...p} cx="8.5" cy="8.5" r="3" /><path {...p} d="M8.5 3v1.2M3 8.5h1.2M4.6 4.6l.9.9" />{cloud}</>,
-    cloud,
-    rain: <>{cloud}<path {...p} d="M9 19.5l-1 2M13 19.5l-1 2M17 19.5l-1 2" /></>,
-    storm: <>{cloud}<path {...p} d="M12.5 17.5 10.5 21h3l-2 3" /></>,
-    sunset: <><path {...p} d="M4 18h16M7 18a5 5 0 0 1 10 0M12 6v4M9.5 8.5 12 11l2.5-2.5" /></>,
-    sunrise: <><path {...p} d="M4 18h16M7 18a5 5 0 0 1 10 0M12 11V7M9.5 8.5 12 6l2.5 2.5" /></>,
-  }
-  return <svg className="wxl__glyph" width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">{body[icon]}</svg>
-}
 
 interface WeatherTabProps {
   venue: LatLon
@@ -83,7 +69,7 @@ export function WeatherTab({ venue, timeZone, units, at, placeName }: WeatherTab
     return (
       <div className="wxl">
         <button type="button" className="wxl__back" onClick={() => setView('main')}>‹ Weather</button>
-        {view === 'models' ? <WeatherDetails state={state} now={now} units={units} timeZone={timeZone} risk={risk} /> : <DaysList days={state.days} deg={deg} />}
+        {view === 'models' ? <ModelsPage state={state} venue={venue} timeZone={timeZone} units={units} at={at} risk={risk} /> : <DaysPage state={state} venue={venue} timeZone={timeZone} units={units} risk={risk} />}
       </div>
     )
   }
@@ -206,18 +192,5 @@ export function WeatherTab({ venue, timeZone, units, at, placeName }: WeatherTab
 
       <RadarStrip venue={venue} radar={nowcast?.radar ?? null} timeZone={timeZone} dist={dist} onOpen={openRadar} />
     </div>
-  )
-}
-
-/** Interim list of the seven days (Batch K addendum A); the full page is C. */
-function DaysList({ days, deg }: { days: readonly BlendedDay[]; deg: (c: number | null) => string }) {
-  return (
-    <ol className="wxl__card wxl__dayslist">
-      {days.map((d) => (
-        <li key={d.date} className="wxl__line num">
-          {new Date(`${d.date}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' })}: {deg(d.lo)} to {deg(d.hi)} · rain {pct(d.rainChance)}
-        </li>
-      ))}
-    </ol>
   )
 }
