@@ -7,6 +7,9 @@ import { saveIcs } from '../lib/saveIcs.ts'
 import { remember } from '../lib/callHistory.ts'
 import { showGuide, useBestView } from '../lib/useBestView.ts'
 import { StormBrief } from './StormBrief.tsx'
+import { StormCards } from './StormToday.tsx'
+import { useStormPlay } from '../lib/useStormPlay.ts'
+import { OPEN_RADAR_EVENT } from './WeatherTab.tsx'
 import { bestViewOnMap } from '../core/bestView.ts'
 import { camsForEvent, type FacingCam } from '../core/skyCams.ts'
 import { COAST_CAMS } from '../data/coastCams.ts'
@@ -278,6 +281,12 @@ function DayPage({ onOpenWeather, day, which, placeName, venue, timeZone, units,
   const change = useMemo(() => (callKey === null || read === null ? null : remember(callKey, read.event, read.call, read.by ?? null, now)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [callKey, read?.call, read?.by])
+  /* Batch K addendum B: storms in play take Today over (StormToday.tsx). */
+  const play = useStormPlay(venue, timeZone, units, which === 'today')
+  const openRadar = () => {
+    window.dispatchEvent(new CustomEvent(OPEN_RADAR_EVENT, { detail: play.now?.radar?.scanAt ?? null }))
+    onOpenMap()
+  }
   const why = read === null ? (loading ? 'Reading five forecasts…' : which === 'today' ? 'Both have passed today. Tomorrow’s sunrise is next.' : 'The forecast did not say.') : read.why
   const colour = read === null || read.colorFrom === null ? null : `Best color ${clock(read.colorFrom)} to ${clock(read.colorTo)} · be set up ${clock(read.setUp)}`
 
@@ -319,10 +328,15 @@ function DayPage({ onOpenWeather, day, which, placeName, venue, timeZone, units,
           {change === null ? null : <span className="bcall__changed">{changeWords(change, clock)}</span>}
         </p>
         <p className="bcall__why">{why}</p>
+        {play.inPlay && play.headline !== null ? <p className="bcall__storm num">{play.coming === null ? '' : 'Storms: '}{play.headline}</p> : null}
         {read?.gapLine == null ? null : <p className="bcall__gap">{read.gapLine}</p>}
         {colour === null ? null : <p className="bcall__when num">{colour}</p>}
       </div>
 
+      {play.inPlay ? (
+        <StormCards play={play} venue={venue} timeZone={timeZone} units={units} onRadar={openRadar} />
+      ) : (
+        <>
       <div className="bcard">
         <div className="bcard__head">
           <span className="bcard__title">Light</span>
@@ -356,10 +370,12 @@ function DayPage({ onOpenWeather, day, which, placeName, venue, timeZone, units,
             {best.line}
           </button>
         )}
-        <StormBrief venue={venue} timeZone={timeZone} units={units} which={which} onOpen={onOpenWeather} />
+        {which === 'today' ? null : <StormBrief venue={venue} timeZone={timeZone} units={units} which={which} onOpen={onOpenWeather} />}
       </div>
 
       {day === null ? null : <Conditions day={day} which={which} units={units} drone={drone} now={now} venue={venue} timeZone={timeZone} clock={clock} />}
+        </>
+      )}
 
       <div className="bfoot">
         <p className="bfoot__line num">{footer}</p>
@@ -370,7 +386,11 @@ function DayPage({ onOpenWeather, day, which, placeName, venue, timeZone, units,
               {alarm.word} {clock(alarm.at)}
             </button>
           )}
-          {onViewfinder === undefined ? null : (
+          {play.inPlay ? (
+            <button type="button" className="bbtn bbtn--main" onClick={openRadar}>
+              Radar
+            </button>
+          ) : onViewfinder === undefined ? null : (
             <button type="button" className="bbtn bbtn--main" onClick={onViewfinder}>
               <CameraGlyph /> Viewfinder
             </button>

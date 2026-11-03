@@ -17477,3 +17477,28 @@ a.about__row * {
   background: rgb(255 255 255 / 0.1);
   font-size: var(--text-sm);
 }
+/* Storms on Today (Batch K addendum, B). */
+.bcall__storm {
+  margin: 2px 0 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--sun);
+}
+.bstorms,
+.bafter,
+.bwater {
+  display: grid;
+  gap: 4px;
+}
+.bstorms__spc {
+  font-size: var(--text-xs, 0.75rem);
+  color: rgb(255 255 255 / 0.85);
+}
+.bline {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.bline--sub {
+  font-size: var(--text-xs, 0.75rem);
+  color: rgb(255 255 255 / 0.8);
+}

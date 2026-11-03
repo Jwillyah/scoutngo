@@ -85,6 +85,9 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, now, onPic
   const clock = (d: Date) => formatClock(d, timeZone)
   const today = useMemo(() => todayCard(days, clock, timeZone), [days, timeZone]) // eslint-disable-line react-hooks/exhaustive-deps
   const sky = useMemo(() => skyCard(days, now, clock), [days, now]) // eslint-disable-line react-hooks/exhaustive-deps
+  /* Batch K addendum B: when storms lead, the Sky card says so, with when they arrive (noted by Today; the card asks nothing itself). */
+  const note = stormNote()
+  const storms = note !== null && note.startsWith('Storms · ') ? note.slice('Storms · '.length) : null
   /* Batch J, Section 7: the Water card everywhere, inland too, for a named surf beach: the nearest, or the one picked; its own sea and tide when it is not here. */
   const [beach, setBeach] = useSurfBeach(venue)
   const [pickingBeach, setPickingBeach] = useState(false)
@@ -122,7 +125,7 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, now, onPic
           <LiveCard refTo={first} kind="today" title="Today" icon={<TodayIcon />} value={loading ? '…' : today.value} sub={loading ? 'reading the forecasts' : today.sub} tone={wait(today.tone)} onTap={() => pick('today')}>
             <p className="mcard__line">{today.line ?? ''}</p>
           </LiveCard>
-          <LiveCard kind="sky" title="Sky" icon={<SkyIcon />} value={loading ? '…' : sky.value} sub={loading ? '' : (stormNote() ?? sky.sub)} tone={wait(sky.tone)} onTap={() => pick('sky', { skyTab: skyTabFor(days, now) })}>
+          <LiveCard kind="sky" title="Sky" icon={<SkyIcon />} value={loading ? '…' : storms !== null ? 'Storms' : sky.value} sub={loading ? '' : (storms ?? sky.sub)} tone={wait(sky.tone)} onTap={() => pick('sky', { skyTab: skyTabFor(days, now) })}>
             <div className={`mcard__strip${sky.lowDeck ? ' mcard__strip--deck' : ''}`} aria-hidden="true">
               {sky.lowDeck || sky.strip.length === 0 ? null : <i className="mcard__clock" style={{ background: stripGradient(sky.strip) }} />}
               {sky.peak === null ? null : <i className="mcard__peak" style={{ left: `${Math.max(0, Math.min(100, sky.peak * 100))}%` }} />}
