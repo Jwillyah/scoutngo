@@ -5,6 +5,8 @@ import { formatClock, formatShortHour } from '../core/timezone.ts'
 import { useBriefing, type DayBrief } from '../lib/useBriefing.ts'
 import { saveIcs } from '../lib/saveIcs.ts'
 import { remember } from '../lib/callHistory.ts'
+import { showGuide, useBestView } from '../lib/useBestView.ts'
+import { bestViewOnMap } from '../core/bestView.ts'
 import { changeWords } from '../core/callChange.ts'
 import { compass } from '../lib/tideWords.ts'
 import { windIn, windUnitLabel, type Units } from '../lib/units.ts'
@@ -101,7 +103,7 @@ export function Briefing({ venue, placeName, timeZone, units, drone, now, onClos
       </div>
       <div className="brief__track" ref={track}>
         <section className="brief__page" aria-label="Today">
-          <DayPage day={today} which="today" placeName={placeName} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} facing={brief.facing} checkedAt={brief.checkedAt} clock={clock} onOpenMap={onOpenMap} onSwitchSpot={onSwitchSpot} onViewfinder={onViewfinder} loading={brief.status === 'loading'} />
+          <DayPage day={today} which="today" placeName={placeName} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} facing={brief.facing} checkedAt={brief.checkedAt} clock={clock} onOpenMap={onOpenMap} onSwitchSpot={onSwitchSpot} onViewfinder={onViewfinder} loading={brief.status === 'loading'} settling={brief.status === 'loading' || brief.obsPending === true} />
         </section>
         <section className="brief__page" aria-label="Tomorrow">
           <DayPage day={tomorrow} which="tomorrow" placeName={placeName} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} facing={brief.facing} checkedAt={brief.checkedAt} clock={clock} onOpenMap={onOpenMap} onSwitchSpot={onSwitchSpot} onViewfinder={onViewfinder} loading={brief.status === 'loading'} />
@@ -185,6 +187,7 @@ const STEP_PATH: Record<StepName, ReactNode> = {
       <path d="M4 15c5-3 11-3 16 0" />
     </>
   ),
+
   Dark: <path d="M15 4a8 8 0 1 0 5 14A7 7 0 0 1 15 4z" />,
 }
 
@@ -236,9 +239,11 @@ interface DayPageProps {
   onSwitchSpot?: () => void
   onViewfinder?: () => void
   loading: boolean
+  /** The next event's call waits on the observations: do not note it yet. */
+  settling?: boolean
 }
 
-function DayPage({ day, which, placeName, venue, timeZone, units, drone, now, checkedAt, clock, onOpenMap, onSwitchSpot, onViewfinder, loading }: DayPageProps) {
+function DayPage({ day, which, placeName, venue, timeZone, units, drone, now, checkedAt, clock, onOpenMap, onSwitchSpot, onViewfinder, loading, settling = false }: DayPageProps) {
   const read = day?.call ?? null
   const kind: Kind | null = read?.kind ?? null
   const verdict = day === null || kind === null ? null : day.verdicts[kind]
@@ -247,7 +252,9 @@ function DayPage({ day, which, placeName, venue, timeZone, units, drone, now, ch
   const tag = colorTag(verdict)
   const callWord = read === null ? (loading ? '…' : '—') : read.call ?? '—'
   /* Batch J, Section 6: the call this phone showed last for the event, and its change ("Upgraded to Go at 4:52 PM from KNTU"). */
-  const callKey = read === null || which !== 'today' ? null : `${venue.lat.toFixed(2)},${venue.lon.toFixed(2)}|${read.kind}|${read.event.toISOString()}`
+  const callKey = read === null || which !== 'today' || settling ? null : `${venue.lat.toFixed(2)},${venue.lon.toFixed(2)}|${read.kind}|${read.event.toISOString()}`
+  /* Batch J, Section 5: where the colour will be, and which spots see it; a tap draws it on the map. */
+  const best = useBestView(which === 'today' && read !== null && read.call !== 'Skip' ? venue : null, read?.event ?? null)
   const change = useMemo(() => (callKey === null || read === null ? null : remember(callKey, read.event, read.call, read.by ?? null, now)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [callKey, read?.call, read?.by])
@@ -310,6 +317,11 @@ function DayPage({ day, which, placeName, venue, timeZone, units, drone, now, ch
             </li>
           ))}
         </ol>
+        {best === null ? null : (
+          <button type="button" className="bview" onClick={() => { showGuide(bestViewOnMap(venue, best)); onOpenMap() }}>
+            {best.line}
+          </button>
+        )}
       </div>
 
       {day === null ? null : <Conditions day={day} which={which} units={units} drone={drone} now={now} venue={venue} timeZone={timeZone} clock={clock} />}

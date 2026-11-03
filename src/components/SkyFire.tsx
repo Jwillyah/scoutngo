@@ -10,6 +10,8 @@ import { layerWords } from '../core/layerTruth.ts'
 import { useSkyObs } from '../lib/useSkyObs.ts'
 import { eventCall } from '../core/briefing.ts'
 import { litUntilDeg } from '../core/underLight.ts'
+import { showGuide, useBestView } from '../lib/useBestView.ts'
+import { bestViewOnMap } from '../core/bestView.ts'
 import { formatClock } from '../core/timezone.ts'
 import { FIRST_ENTRY, OUTCOME_LABEL, readFireLog, trackRecord, withEntry, writeFireLog, type FireEntry, type FireOutcome } from '../lib/fireLog.ts'
 import { TruthLoop } from './TruthLoop.tsx'
@@ -105,6 +107,8 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
   /* Within the hour, a reported deck and an open gap are the call, and time the colour from under (Batch J, Sections 2-3): the same as Today. */
   const seen = obs === null || event === null || verdict === null ? null : eventCall(verdict, kind, event, realNow, null, { venue, truth: obs.truth, gap: obs.gap })
   const byStations = seen !== null && seen.call === 'Go' && seen.peak != null
+  /* Batch J, Section 5: the best view tonight, a tap draws the wedge and the spots on the map. */
+  const view = useBestView(event === null ? null : venue, event)
   /* How vivid (Batch J, Section 4): the air, the 31 runs, contrails. */
   const vividLine = obs === null ? '' : [obs.vivid.air === null ? null : `Air: ${obs.vivid.air.line}`, obs.vivid.runs?.line ?? null, obs.vivid.contrails ? 'contrails may streak the sky' : null].filter((x) => x !== null).join(' · ')
 
@@ -241,6 +245,11 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
           </p>
           {obs?.gap.state == null ? null : <p className="fire__gap">{obs.gap.line}</p>}
           {vividLine === '' ? null : <p className="fire__gap fire__vivid">{vividLine}</p>}
+          {view === null || verdict.word === 'unlikely' ? null : (
+            <button type="button" className="bview bview--fire" onClick={() => showGuide(bestViewOnMap(venue, view))}>
+              {view.line}
+            </button>
+          )}
           {mean === null ? null : <FireSideView read={verdict.sky} path={mean} venue={venue} kind={kind} />}
           {colourClock?.(kind, 'strip')}
           {lead === null ? null : (
@@ -260,6 +269,7 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
           </details>
           <details className="frow fire__whyfold">
             <summary>Why · numbers and stations</summary>
+
             {nowLine === null ? null : <p className="fire__now fire__note">Sky right now · {nowLine}</p>}
             {byStations && obs?.truth != null ? <p className="fire__note">Lit from under through the gap: the deck you can see catches the sun before sunset, deepest as the sun sets, until the sun is {litUntilDeg((obs.truth.baseFt ?? 0) * 0.3048).toFixed(1)}° below (its height&rsquo;s dip, and the bend of a grazing ray).</p> : null}
             {obs?.vivid.afd?.line == null ? null : (

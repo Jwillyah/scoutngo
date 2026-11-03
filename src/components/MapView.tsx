@@ -1862,6 +1862,14 @@ export function MapView({
       instance.addSource('guide', { type: 'geojson', data: emptyCollection() })
       instance.addLayer({ id: 'guide-edge', type: 'line', source: 'guide', paint: { 'line-color': readToken('--mark-edge', '#0a0b09', container.current), 'line-width': 5 } })
       instance.addLayer({ id: 'guide-line', type: 'line', source: 'guide', paint: { 'line-color': readToken('--white', '#ffffff', container.current), 'line-width': 2.5, 'line-dasharray': [2, 1.5] } })
+      /* The best-view spots on it (Batch J, Section 5): white, the first larger. */
+      instance.addLayer({
+        id: 'guide-spot',
+        type: 'circle',
+        source: 'guide',
+        filter: ['==', ['geometry-type'], 'Point'],
+        paint: { 'circle-radius': ['case', ['==', ['get', 'rank'], 1], 9, 6], 'circle-color': readToken('--white', '#ffffff', container.current), 'circle-stroke-color': readToken('--mark-edge', '#0a0b09', container.current), 'circle-stroke-width': 2 },
+      })
 
       /* The two-pin measure: a plain white line with a dark edge, readable on imagery. */
       instance.addLayer({

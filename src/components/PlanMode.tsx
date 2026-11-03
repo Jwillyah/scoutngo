@@ -60,6 +60,7 @@ import { VenuePackCard } from './VenuePackCard.tsx'
 import { WindPage } from './WindPage.tsx'
 import { offlineLine, onPacksChanged, packFor } from '../lib/venuePack.ts'
 import { bowOnMap } from '../lib/specialLightData.ts'
+import { GUIDE_EVENT } from '../lib/useBestView.ts'
 import { useSpecialNow } from '../lib/useSpecialNow.ts'
 import { SPECIAL_NAME } from '../core/specialLight.ts'
 import { getPosition as sunPositionAt } from 'suncalc'
@@ -1299,6 +1300,12 @@ export function PlanMode({
   const specialStatus = specialNow === null ? null : `${SPECIAL_NAME[specialNow.kind]} ${specialNow.word} now · ${specialNow.agree} of ${specialNow.of} models`
   /* A rainbow's bow, drawn on the map from Sky › Special. */
   const [bow, setBow] = useState<GeoJSON.FeatureCollection | null>(null)
+  /* Batch J, Section 5: the best-view wedge and its ranked spots, from Today or Sky fire. */
+  useEffect(() => {
+    const on = (e: Event) => setBow((e as CustomEvent<GeoJSON.FeatureCollection>).detail)
+    window.addEventListener(GUIDE_EVENT, on)
+    return () => window.removeEventListener(GUIDE_EVENT, on)
+  }, [])
   const home = useCallback(() => setCard(HOME), [])
   /* Which job's tabs sit over the page: Water at the coast, Land inland; Wind is in both, and Water wins when both are on. */
   const pageGroup = useMemo<PageGroupValue | null>(() => {

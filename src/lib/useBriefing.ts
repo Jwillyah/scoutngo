@@ -35,7 +35,7 @@ import { useTide } from './useTide.ts'
 import { fetchSatRead } from './goesNowcast.ts'
 import { inNowcast, type SatRead } from '../core/goesNowcast.ts'
 import { useWeatherEpoch } from './useWeatherStatus.ts'
-import { useSkyObs } from './useSkyObs.ts'
+import { obsDue, useSkyObs } from './useSkyObs.ts'
 
 export const WEEK_DAYS = 7
 const KINDS: Kind[] = ['sunrise', 'sunset']
@@ -74,6 +74,8 @@ export interface Briefing {
   facing: number | null
   /** When the newest forecast in it arrived, ms; null before any did. */
   checkedAt: number | null
+  /** The next event's observations are due and not in yet: its call is not settled (Batch J, Section 6). */
+  obsPending?: boolean
 }
 
 const dayIso = (start: string, n: number) => {
@@ -302,7 +304,8 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
     }
     const times = [f, s].filter((x) => x !== null)
     const fetched = f === null ? [] : [...Object.values(f.near), f.week.sunrise, f.week.sunset].map((x) => x?.fetchedAt).filter((t): t is number => typeof t === 'number')
-    return { status: times.length === 2 ? 'ready' : 'loading', days, facing, checkedAt: fetched.length === 0 ? null : Math.max(...fetched) }
-  }, [key, lat, lon, fire, sea, stations, tides, sat, obs, nextEvent, today, timeZone, now, scope])
+    const obsPending = obsDue(nextEvent, now) && (obs === null || (soon && stations?.key !== key))
+    return { status: times.length === 2 ? 'ready' : 'loading', days, facing, checkedAt: fetched.length === 0 ? null : Math.max(...fetched), obsPending }
+  }, [key, lat, lon, fire, sea, stations, tides, sat, obs, nextEvent, soon, today, timeZone, now, scope])
 }
 

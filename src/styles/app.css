@@ -15635,6 +15635,30 @@ a.about__row * {
   line-height: 1.05;
   letter-spacing: -0.02em;
 }
+.bview {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-decoration: underline;
+  text-decoration-color: rgb(255 255 255 / 0.4);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.bview--fire {
+  margin: 4px 0;
+  color: var(--color-text-muted);
+  white-space: normal;
+}
 .bcall__changed {
   margin-left: 12px;
   font-size: var(--text-sm);
