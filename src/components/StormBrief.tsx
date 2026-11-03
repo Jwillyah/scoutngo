@@ -1,5 +1,7 @@
 import type { LatLon } from '../core/geo.ts'
 import { cellCalls, cellLine } from '../core/stormCells.ts'
+import { formingLine } from '../core/stormForming.ts'
+import { nowForming } from '../lib/useStormPlay.ts'
 import { shooterLines } from '../core/shooterStorm.ts'
 import { stormLine } from '../core/stormRisk.ts'
 import { formatClock, formatShortHour } from '../core/timezone.ts'
@@ -28,6 +30,10 @@ export function StormBrief({ venue, timeZone, units, which, onOpen }: { venue: L
     lines.push(...shooterLines(venue, calls, now.strikes ?? [], now.radar.scanAt, clock, dist))
     const coming = calls.find((c) => c.over || c.arrives !== null)
     if (coming !== undefined) lines.push(cellLine(coming, { dist, clock }))
+    else {
+      const form = nowForming(venue, now, risk)
+      if (form !== null) lines.push(formingLine(form, dist))
+    }
   }
   const storm = day === null ? null : stormLine(day.storm, hour, which)
   if (storm !== null) lines.push(storm)

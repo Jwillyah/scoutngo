@@ -6,6 +6,8 @@ import { lightningLine } from '../core/lightning.ts'
 import { cloudWords, hourAt, localDate } from '../core/modelSkill.ts'
 import { shooterLines } from '../core/shooterStorm.ts'
 import { cellCalls, cellLine } from '../core/stormCells.ts'
+import { formingLine } from '../core/stormForming.ts'
+import { nowForming } from '../lib/useStormPlay.ts'
 import { stormLine } from '../core/stormRisk.ts'
 import { formatClock, formatShortHour } from '../core/timezone.ts'
 import { dayAgreement, dayIcon, hourlyStrip, leading, MODEL_COLOR, modelName, rainLine6h } from '../core/weatherWords.ts'
@@ -88,7 +90,9 @@ export function WeatherTab({ venue, timeZone, units, at, placeName }: WeatherTab
   const storm = todayRisk === null ? null : stormLine(todayRisk.storm, hour, 'today')
   const spc = risk?.spc.outlook?.[0] ?? null
   const alerts = nowcast?.alerts ?? []
-  const stormDay = coming !== null || storm !== null || (spc !== null && spc.label !== 'TSTM') || alerts.some((a) => /thunder|tornado/i.test(a.event))
+  /* Batch L, Section 3: cells growing in place, which no track can carry here. */
+  const form = coming === null ? nowForming(venue, nowcast, risk) : null
+  const stormDay = coming !== null || form !== null || storm !== null || (spc !== null && spc.label !== 'TSTM') || alerts.some((a) => /thunder|tornado/i.test(a.event))
   const shoot = nowcast?.radar == null ? [] : shooterLines(venue, calls, nowcast.strikes ?? [], nowcast.radar.scanAt, clock, dist)
   const bolt = nowcast?.strikes == null ? null : lightningLine(venue, nowcast.strikes, dist, clock)
 
@@ -137,7 +141,7 @@ export function WeatherTab({ venue, timeZone, units, at, placeName }: WeatherTab
         <section className="wxl__card wxl__storm" aria-label="Storms">
           <p className="wxl__cardhead">STORMS{spc === null ? '' : ` · SPC ${spc.word}`}</p>
           <p className="wxl__line">
-            {coming !== null ? cellLine(coming, { dist, clock }) : storm ?? ''}
+            {coming !== null ? cellLine(coming, { dist, clock }) : form !== null ? formingLine(form, dist) : storm ?? ''}
             <span className="wxl__sub num">
               {' · '}{bolt === null ? 'no lightning in the last hour' : bolt.replace(/^Lightning /, 'lightning ')}
               {today?.gustMax == null ? '' : ` · gusts ${formatWind(today.gustMax, units.wind)}`}

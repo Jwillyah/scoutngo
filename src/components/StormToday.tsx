@@ -2,6 +2,7 @@ import type { LatLon } from '../core/geo.ts'
 import { lightningLine } from '../core/lightning.ts'
 import { clearingLight, rainbowWindow, shelfLikely, sunAltitude } from '../core/shooterStorm.ts'
 import { cellLine } from '../core/stormCells.ts'
+import { formingLine, formingWhy } from '../core/stormForming.ts'
 import { formatClock } from '../core/timezone.ts'
 import { useCoast } from '../lib/coastData.ts'
 import type { StormPlay } from '../lib/useStormPlay.ts'
@@ -34,7 +35,16 @@ export function StormCards({ play, venue, timeZone, units, onRadar, beachWind = 
           <span className="bcard__title">Storms</span>
           {spc === null ? null : <span className="bstorms__spc">SPC {spc.word}</span>}
         </div>
-        {play.coming !== null ? <p className="bline num">{cellLine(play.coming, { dist, clock })}</p> : play.storm === null ? null : <p className="bline">{play.storm}</p>}
+        {play.coming !== null ? (
+          <p className="bline num">{cellLine(play.coming, { dist, clock })}</p>
+        ) : play.forming !== null ? (
+          <p className="bline num" data-forming>
+            {formingLine(play.forming, dist)}
+            {formingWhy(play.forming, dist, clock) === null ? null : <span className="bline--sub"> · {formingWhy(play.forming, dist, clock)}</span>}
+          </p>
+        ) : play.storm === null ? null : (
+          <p className="bline">{play.storm}</p>
+        )}
         <p className="bline bline--sub num">{bolt ?? 'No lightning in the last hour'}{shelf === null ? '' : ` · shelf cloud possible, from the ${shelf.look}`}</p>
         <RadarStrip venue={venue} radar={play.now?.radar ?? null} timeZone={timeZone} dist={dist} onOpen={onRadar} />
       </div>
