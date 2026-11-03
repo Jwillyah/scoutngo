@@ -172,22 +172,24 @@ const STEP_PATH: Record<StepName, ReactNode> = {
       <path d="M3 19h18M12 6v3M5.6 9.6l1.8 1.8M18.4 9.6l-1.8 1.8" />
     </>
   ),
+  /* Batch J, Section 8: the three colour steps as a cloud and the sun under it: lit as the sun nears the horizon, deepest as it sets, the glow after it is gone. */
   Color: (
     <>
-      <path d="M6 18a6 6 0 0 1 12 0" />
-      <path d="M2 18h20M4 14.5c2-1 4-1 6 0s4 1 6 0 4-1 6 0" />
+      <path d="M6.5 10.5h10a3 3 0 0 0 .4-6 4.5 4.5 0 0 0-8.7 1.1A2.5 2.5 0 0 0 6.5 10.5z" />
+      <path d="M2 19h20M7 19a5 5 0 0 1 10 0M12 12.5v1.5" />
     </>
   ),
   Peak: (
     <>
-      <path d="M2 18h20" />
-      <path d="M3 13c3-2 6-2 9 0s6 2 9 0M5 9c2.5-1.5 5-1.5 7 0s4.5 1.5 7 0" />
+      <path d="M6.5 10.5h10a3 3 0 0 0 .4-6 4.5 4.5 0 0 0-8.7 1.1A2.5 2.5 0 0 0 6.5 10.5z" />
+      <path d="M2 19h20M9.5 19a2.5 2.5 0 0 1 5 0M8 15.5l-1.2-2.4M12 15v-2.6M16 15.5l1.2-2.4" />
     </>
   ),
   Glow: (
     <>
-      <path d="M2 18h20" />
-      <path d="M4 15c5-3 11-3 16 0" />
+      <path d="M6.5 10.5h10a3 3 0 0 0 .4-6 4.5 4.5 0 0 0-8.7 1.1A2.5 2.5 0 0 0 6.5 10.5z" />
+      <path d="M2 16h20M5 13.5h14" strokeDasharray="1.5 2" />
+      <path d="M9 19.5h6" />
     </>
   ),
 
@@ -482,7 +484,8 @@ function Conditions({ day, which, units, drone, now, venue, timeZone, clock }: {
             : tide.marks
                 .filter((m) => m.at.getTime() >= from && m.at.getTime() <= from + span)
                 .map((m) => (
-                  <span key={m.at.getTime()} className={`btide__mark btide__mark--${m.kind} num`} style={{ left: `${x(m.at.getTime())}%` }}>
+                  /* Batch J, Section 8: a label on the now line moves off it, to the side it is on. */
+                  <span key={m.at.getTime()} className={`btide__mark btide__mark--${m.kind} num`} style={{ left: `${x(m.at.getTime())}%`, ...(nowX !== null && Math.abs(x(m.at.getTime()) - nowX) < 9 ? { transform: x(m.at.getTime()) < nowX ? 'translateX(calc(-100% - 4px))' : 'translateX(4px)' } : {}) }}>
                     {m.kind === 'low' ? 'L' : 'H'} {formatClock(m.at, timeZone).replace(/ [AP]M$/, '')}
                   </span>
                 ))}
@@ -494,7 +497,7 @@ function Conditions({ day, which, units, drone, now, venue, timeZone, clock }: {
           <div className="brow__head">
             <RowIcon kind="drone" />
             <span className="brow__name">Drone</span>
-            <span className="brow__words">{launch === null || atCall === null ? 'No light to fly for' : `Launch ${clock(launch).replace(/ [AP]M$/, '')}, ${sunSide(atCall, venue.lat, venue.lon, compass)} toward the light`}</span>
+            <span className="brow__words">{launch === null || atCall === null ? 'No light to fly for' : `Launch ${clock(launch).replace(/ [AP]M$/, '')} · fly ${sunSide(atCall, venue.lat, venue.lon, compass)}`}</span>
             <Scale steps={['Light wind', 'Breezy', 'Too windy']} on={dTag} label={`Wind for the ${drone.name}`} />
           </div>
           <p className="brow__small num">{callWind?.highMps == null ? 'Wind at 400 ft not forecast' : `${Math.round(windIn(callWind.highMps, units.wind) ?? 0)} ${wunit} at 400 ft`} · check airspace</p>

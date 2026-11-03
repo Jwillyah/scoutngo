@@ -83,7 +83,7 @@ export function PreflightSheet({ pf, picking, onPick, onPlay, onFly, onRecord, r
         </button>
       </div>
 
-      <div className="pf__kinds" role="group" aria-label="The move">
+      <div className="pf__kinds pf__kinds--row" role="group" aria-label="The move" data-sideways="">
         {KINDS.map((k) => (
           <button key={k} type="button" className={`seg__btn${pf.kind === k ? ' seg__btn--on' : ''}`} aria-pressed={pf.kind === k} onClick={() => pf.setKind(k)}>
             {MOVE_LABEL[k]}
@@ -113,6 +113,12 @@ export function PreflightSheet({ pf, picking, onPick, onPlay, onFly, onRecord, r
           Height {pf.heightFt} ft{pf.heightFt > pf.capFt ? ` (held at ${pf.capFt})` : ''}
           <input type="range" min={20} max={Math.max(pf.capFt, 400)} step={10} value={pf.heightFt} onChange={(e) => pf.setHeightFt(Number(e.target.value))} />
         </label>
+      </div>
+      {/* Batch I, Section 3: one screen, the rest a row away. */}
+      <details className="frow">
+        {/* Batch J, Section 8: speed and radius here too, so the page is one screen. */}
+        <summary>Speed{pf.kind === 'orbit' ? ', radius' : ''}, camera, ceiling, where you stand</summary>
+        <div className="pf__controls">
         <label className="pf__ctl num">
           Speed {pf.speedMps} m/s
           <input type="range" min={1} max={15} step={1} value={pf.speedMps} onChange={(e) => pf.setSpeedMps(Number(e.target.value))} />
@@ -123,11 +129,6 @@ export function PreflightSheet({ pf, picking, onPick, onPlay, onFly, onRecord, r
             <input type="range" min={20} max={300} step={5} value={pf.radiusM} onChange={(e) => pf.setRadiusM(Number(e.target.value))} />
           </label>
         )}
-      </div>
-      {/* Batch I, Section 3: one screen, the rest a row away. */}
-      <details className="frow">
-        <summary>Camera, ceiling, flight time, where you stand</summary>
-        <div className="pf__controls">
         <div className="seg" role="group" aria-label="Camera">
           {([24, 70] as const).map((f) => (
             <button key={f} type="button" className={`seg__btn${pf.focal === f ? ' seg__btn--on' : ''}`} aria-pressed={pf.focal === f} onClick={() => pf.setFocal(f)}>
@@ -149,7 +150,9 @@ export function PreflightSheet({ pf, picking, onPick, onPlay, onFly, onRecord, r
         </div>
       </details>
 
-      <p className="pf__prompt">
+      {/* Batch J, Section 8: flying it sits with Play in 3D, below, when there is a move. */}
+      {card !== null ? null : (
+        <p className="pf__prompt">
         {pf.flown !== null ? 'This is the flight you flew by hand; pick a move to draw instead. ' : ''}
         <button type="button" className="btn btn--small" onClick={() => onFly(false)}>
           Fly it yourself
@@ -157,13 +160,15 @@ export function PreflightSheet({ pf, picking, onPick, onPlay, onFly, onRecord, r
         <button type="button" className="clay__link" onClick={() => onFly(true)}>
           Fly and record
         </button>
-      </p>
+        </p>
+      )}
 
       {card === null ? (
         <p className="pf__prompt">{need === 0 ? 'Set a venue to draw the move.' : 'Tap the map to draw the move.'}</p>
       ) : (
         <div className="pf__card">
-          {card.lines.slice(0, -1).map((l) => (
+          {/* Batch J, Section 8: the first line on the screen, the rest of the checks a row away (named, so nothing is hidden by surprise). */}
+          {card.lines.slice(0, 1).map((l) => (
             <p key={l} className="pf__line">
               {l}
             </p>
@@ -172,9 +177,20 @@ export function PreflightSheet({ pf, picking, onPick, onPlay, onFly, onRecord, r
             <button type="button" className="btn btn--small" onClick={onPlay}>
               Play in 3D
             </button>
+            <button type="button" className="btn btn--small" onClick={() => onFly(false)}>
+              Fly it yourself
+            </button>
+            <button type="button" className="clay__link" onClick={() => onFly(true)}>
+              Fly and record
+            </button>
           </div>
           <details className="frow">
-            <summary>How it was checked, and the look</summary>
+            <summary>Clearance, airspace, wind, battery</summary>
+            {card.lines.slice(1, -1).map((l) => (
+              <p key={l} className="pf__line">
+                {l}
+              </p>
+            ))}
           <p className="pf__small num">
             Checked two ways: length {Math.round(card.lengthCheckM)} m by the move's own shape; hidden {Math.round(card.hiddenCheckS)} s by the horizon method
             {card.clearance?.checkMetres == null ? '' : `; clearance ${Math.round(card.clearance.checkMetres / 0.3048)} ft over the map's boxes`}.

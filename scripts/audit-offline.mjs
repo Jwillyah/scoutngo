@@ -298,11 +298,26 @@ for (const run of MODES) {
     if (turned !== 'ok') problem(run, turned)
     await wait(1500)
     const early = await ev(`document.querySelector('.curve__fix')?.textContent ?? ''`)
-    await wait(9000)
-    const late = await ev(`document.querySelector('.curve__fix')?.textContent ?? ''`)
+    /*
+     * POLLED, NOT ONE READ AT 10.5 s (Batch J, 2 Nov night): the app gives up
+     * at TILE_TIMEOUT_MS (8 s); on the gate's niced Chrome lane, with 34 other
+     * audits running, the page's timers ran late and a single read at 10.5 s
+     * failed on the commit before Batch J too, while the audit alone passed.
+     * Read every half second to GIVE_UP_BY_MS; a page that never gives up
+     * still fails.
+     */
+    const GIVE_UP_BY_MS = 16_000
+    let late = ''
+    let waited = 1500
+    while (waited < GIVE_UP_BY_MS) {
+      await wait(500)
+      waited += 500
+      late = await ev(`document.querySelector('.curve__fix')?.textContent ?? ''`)
+      if (/no elevation arrived/.test(late)) break
+    }
     console.log(`  terrain on, after 1.5 s: ${/waiting/.test(early) ? 'waiting' : JSON.stringify(early.slice(0, 60))}`)
-    console.log(`  terrain on, after 10.5 s: ${/no elevation arrived/.test(late) ? 'gave up, flat horizon' : JSON.stringify(late.slice(0, 80))}`)
-    if (/waiting/.test(late)) problem(run, 'terrain is still "waiting for the elevation data" after 10 s')
+    console.log(`  terrain on, after ${(waited / 1000).toFixed(1)} s: ${/no elevation arrived/.test(late) ? 'gave up, flat horizon' : JSON.stringify(late.slice(0, 80))}`)
+    if (/waiting/.test(late)) problem(run, `terrain is still "waiting for the elevation data" after ${GIVE_UP_BY_MS / 1000} s`)
     if (!/no elevation arrived/.test(late)) problem(run, `the day card does not say elevation never came: "${late.slice(0, 80)}"`)
   }
 

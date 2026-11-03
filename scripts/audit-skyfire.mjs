@@ -166,7 +166,7 @@ try {
             checks: [...f.querySelectorAll('.fire__checks--icons li')].map((r) => r.textContent.replace(/\\s+/g, ' ').trim()),
             why: [...f.querySelectorAll('.fire__whyfold .fire__checks li')].map((r) => r.textContent.replace(/\\s+/g, ' ').trim()),
             whyOpen: f.querySelector('.fire__whyfold')?.open ?? null,
-            order: ['.fire__kinds', '.fire__big', '.fire__side', '.prev__strips', '.fire__checks--icons', '.fire__whyfold'].map((sel) => f.querySelector(sel)?.getBoundingClientRect().top ?? null),
+            order: ['.fire__kinds', '.fire__big', '.prev__strips', '.fire__checks--icons', '.fire__whyfold'].map((sel) => f.querySelector(sel)?.getBoundingClientRect().top ?? null),
             /* Section 4: no paragraph over two lines on the first screen (above the Why). */
             long: [...f.querySelectorAll('p')].filter((p) => !p.closest('details') && !p.closest('.prev__page:not(:first-child)')).filter((p) => { const r = p.getBoundingClientRect(); const lh = parseFloat(getComputedStyle(p).lineHeight) || parseFloat(getComputedStyle(p).fontSize) * 1.3; const why = f.querySelector('.fire__whyfold'); return why !== null && r.top < why.getBoundingClientRect().top && r.height > lh * 2 + 2 }).map((p) => p.textContent.slice(0, 60)),
             switches: f.querySelectorAll('[aria-label="Which event"]').length,
@@ -192,9 +192,9 @@ try {
         if (!/\d of \d see lit low deck/.test(fire.agreement)) fail(`${label} ${phase}: Why does not say how many models see the low deck lit`)
         /* Batch G, Section 4: the sky right now in one line, KNTU's deck. */
         if (fire.station === null || !/^Sky right now · KNTU .*: broken at 3,000 ft/.test(fire.station)) fail(`${label} ${phase}: near now "Sky right now" does not say KNTU's deck in one line (${fire.station})`)
-        /* The order: switch, verdict, side view, colour strip, the three checks, Why (folded). */
+        /* The order: switch, verdict, colour strip, the three checks, Why (folded; Batch J, Section 8: the side view is in it). */
         const order = fire.order
-        if (order.some((t) => t === null) || order.some((t, i) => i > 0 && t < order[i - 1])) fail(`${label} ${phase}: the page is not switch → verdict → side view → strips → checks → Why (${JSON.stringify(order)})`)
+        if (order.some((t) => t === null) || order.some((t, i) => i > 0 && t < order[i - 1])) fail(`${label} ${phase}: the page is not switch → verdict → strips → checks → Why (${JSON.stringify(order)})`)
         if (fire.whyOpen !== false) fail(`${label} ${phase}: "Why" is not folded`)
         if (!/^Best \d{1,2}:\d{2}/.test(fire.when ?? '')) fail(`${label} ${phase}: no best time under the verdict (${fire.when})`)
         if (fire.why.length !== 3 || !fire.why.every((c) => /\d/.test(c))) fail(`${label} ${phase}: Why's checks are ${JSON.stringify(fire.why)}, not three with numbers`)
@@ -209,7 +209,9 @@ try {
       if (phase === 'before') {
         if (fire?.now === null || !/KNTU/.test(fire?.now ?? '') || !/broken at 3,000 ft/.test(fire?.now ?? '')) fail(`${label}: an hour before sunrise "Sky right now" does not name KNTU's deck (${fire?.now})`)
         await page.screenshot({ path: join(OUT, `fire-${label}.png`), fullPage: false })
-        await ev(`document.querySelector('.fire__side')?.scrollIntoView({ block: 'center' })`)
+        await ev(`[...document.querySelectorAll('.frow > summary')].find((x) => x.textContent.startsWith('Why'))?.click()`)
+        await wait(300)
+        await ev(`document.querySelector('.fire__whyfold .fire__side')?.scrollIntoView({ block: 'center' })`)
         await wait(300)
         await page.screenshot({ path: join(OUT, `fire-side-${label}.png`) })
 

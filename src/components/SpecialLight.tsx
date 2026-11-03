@@ -1,3 +1,4 @@
+import { packRow } from '../core/weekRow.ts'
 import { useEffect, useMemo, useState } from 'react'
 import { getPosition, getTimes } from 'suncalc'
 import type { LatLon } from '../core/geo.ts'
@@ -124,7 +125,9 @@ export function SpecialLight({ venue, timeZone, onShowBow, onJump, place }: Prop
             */}
           <ol className="wk" aria-label="Special light this week, hour by hour">
             {rows.map((r) => {
-              const lanes = Math.max(1, ...r.items.map((x) => x.lane + 1))
+              /* Batch J, Section 8: one row a day, icons only; a thing at the same hour as another sits beside it, not under. */
+              const lanes = 1
+              const placed = packRow(r.items.map((x) => x.at / 14.4))
               const rise = r.sunrise instanceof Date && !Number.isNaN(r.sunrise.getTime()) ? localMinutes(r.sunrise, timeZone) : null
               const set = r.sunset instanceof Date && !Number.isNaN(r.sunset.getTime()) ? localMinutes(r.sunset, timeZone) : null
               return (
@@ -135,12 +138,12 @@ export function SpecialLight({ venue, timeZone, onShowBow, onJump, place }: Prop
                     {set === null ? null : <span className="wk__night" style={{ left: pct(set), right: 0 }} />}
                     {rise === null ? null : <span className="wk__sun" style={{ left: pct(rise) }} aria-hidden="true" />}
                     {set === null ? null : <span className="wk__sun" style={{ left: pct(set) }} aria-hidden="true" />}
-                    {r.items.map(({ s, long, at, lane }) => (
+                    {r.items.map(({ s, long }, k) => (
                       <button
                         key={idOf(s)}
                         type="button"
                         className={`wk__icon wk__icon--${s.kind}${long ? ' wk__icon--long' : ''}${picked === idOf(s) ? ' wk__icon--on' : ''}`}
-                        style={{ left: pct(at), top: `${lane * 44}px` }}
+                        style={{ left: `${placed[k]}%`, top: 0 }}
                         aria-pressed={picked === idOf(s)}
                         aria-label={`${name(s)} ${s.word}, ${dayName(r.day, r.sample)} ${span(s.from, s.to)}, ${s.agree} of ${s.of} models`}
                         onClick={() => setPicked(picked === idOf(s) ? null : idOf(s))}
@@ -187,7 +190,7 @@ export function SpecialLight({ venue, timeZone, onShowBow, onJump, place }: Prop
               <span key={i}>{writeClock(h, 0)}</span>
             ))}
           </p>
-          {sel === null ? <p className="spec__note">{all.length === 0 ? 'Nothing special in the forecast this week by these rules.' : 'Tap an icon. Greyed: fewer than half the models.'}</p> : null}
+          {sel === null ? <p className="spec__note">{all.length === 0 ? 'Nothing special in the forecast this week by these rules.' : 'Tap an icon. Greyed: under half the models.'}</p> : null}
         </>
       )}
     </div>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { getMoonIllumination, getTimes } from 'suncalc'
 import { moonTimesOnLocalDay } from '../core/moonTimes.ts'
 import { compassWord } from '../core/compassWords.ts'
@@ -142,6 +142,22 @@ export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump,
   const clock = (d: Date) => `${formatClock(d, timeZone)}`
   const finderProps = { venue, target, picking, onPickTarget, onJump, clock, timeZone }
   const [nowPage, setNowPage] = useState(0)
+  /*
+   * Batch J, Section 8: the swipe as tall as the page shown, not the tallest
+   * of the three (the Sun page stood over 100 px of empty space for the Night
+   * page's sake).
+   */
+  const nowPages = useRef<HTMLDivElement>(null)
+  const [nowPageH, setNowPageH] = useState<number | null>(null)
+  useLayoutEffect(() => {
+    const page = nowPages.current?.children[nowPage] as HTMLElement | undefined
+    if (page === undefined) return
+    const fit = () => setNowPageH(page.scrollHeight)
+    fit()
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(fit)
+    ro?.observe(page)
+    return () => ro?.disconnect()
+  }, [nowPage, tab])
   const moonOpen = tab === 'now' && NOW_PAGES[nowPage] === 'moon'
   useEffect(() => {
     onMoonOpen?.(moonOpen)
@@ -298,8 +314,10 @@ export function SkyCard({ venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump,
           ))}
         </div>
         <div
-          className="prev__pages"
+          className="prev__pages skyc__pages"
           data-sideways=""
+          ref={nowPages}
+          style={nowPageH === null ? undefined : { height: nowPageH }}
           onScroll={(e) => {
             const el = e.currentTarget
             setNowPage(Math.min(2, Math.round(el.scrollLeft / Math.max(1, el.clientWidth))))

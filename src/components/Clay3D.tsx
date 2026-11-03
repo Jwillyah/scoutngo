@@ -558,8 +558,10 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
               * ONE SHORT LINE (Batch E, 1 Nov: "282 buildings · 95 height
               * unknown · trees di…" was cut off). The buildings and how many
               * have no height; the trees and the flat ground are in the i.
+              * Batch J, Section 8: a count is a debugging aid, not a picture:
+              * shown only with Debug touch on (Settings › Debug).
               */}
-            {sheetOpen ? null : (
+            {sheetOpen || !debugTouch ? null : (
               <p className="clay__line clay__line--one">
                 {place.buildings === null ? '' : `${place.buildings.list.length} ${place.buildings.list.length === 1 ? 'building' : 'buildings'}`}
                 {unknown > 0 ? ` · ${unknown} no height` : ''}

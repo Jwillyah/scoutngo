@@ -16,12 +16,14 @@ describe('the Sky fire page', () => {
     const render = fire.slice(fire.indexOf('<div className="seg fire__kinds"'))
     const at = (x: string) => render.indexOf(x)
     /* Batch I, one screen: the verdict big, the side view, the strip and checks, then three rows: Compare, Why, Log it. */
-    const order = ['fire__kinds', 'fire__big', '<FireSideView', "colourClock?.(kind, 'strip')", 'fire__checks--icons', '<summary>Compare the 5 forecasts</summary>', "colourClock?.(kind, 'compare')", '<details className="frow fire__whyfold">', '<summary>Log it'].map(at)
+    /* Batch J, Section 8: the side view went into Why, so the rows and the Viewfinder are on the first screen. */
+    const order = ['fire__kinds', 'fire__big', "colourClock?.(kind, 'strip')", 'fire__checks--icons', '<summary>Compare the 5 forecasts</summary>', "colourClock?.(kind, 'compare')", '<details className="frow fire__whyfold">', '<summary>Log it'].map(at)
     expect(order.every((i) => i >= 0)).toBe(true)
     expect([...order].sort((a, b) => a - b)).toEqual(order)
     const why = render.slice(at('fire__whyfold'), render.indexOf('</details>', at('fire__whyfold')))
     expect(why).toContain('checkWords(lead, name)[key]')
     expect(why).toContain('<FireSideView read={m}')
+    expect(why).toContain('<FireSideView read={verdict.sky}')
     expect(why).toContain('Stations:')
   })
   it('sets no sentence in the numbers font', () => {

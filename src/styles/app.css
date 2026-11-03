@@ -10388,6 +10388,18 @@
 .skyc__pic--wide {
   max-width: 100%;
 }
+/* Batch J, Section 8: the Now pages on one screen: the dial smaller, each page its own height. */
+.skyc__pages {
+  align-items: flex-start;
+  transition: height 0.2s ease;
+}
+.skyc__pages .skyc__pic:not(.skyc__pic--wide) {
+  max-width: 140px;
+}
+.skyc__pages .skyc__facts--pairs {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: var(--space-2);
+}
 
 .skyc__ring {
   fill: none;
@@ -11889,6 +11901,14 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 4px;
+}
+/* Batch J, Section 8: the six moves in one row that scrolls sideways. */
+.pf__kinds--row {
+  grid-auto-flow: column;
+  grid-template-columns: none;
+  grid-auto-columns: max-content;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
 .pf__prompt {
@@ -15317,7 +15337,8 @@
  */
 .wk {
   display: grid;
-  gap: 6px;
+  /* Batch J, Section 8: seven rows, no gaps between them. */
+  gap: 0;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -15709,6 +15730,10 @@ a.about__row * {
   text-decoration-color: rgb(255 255 255 / 0.4);
   text-underline-offset: 3px;
   cursor: pointer;
+}
+.bview--fire-one {
+  margin: 4px 0;
+  color: var(--color-text-muted);
 }
 .bview--fire {
   margin: 4px 0;

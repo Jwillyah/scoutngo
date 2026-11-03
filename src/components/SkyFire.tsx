@@ -6,6 +6,7 @@ import { cloudTriple, eventToLog, layersLine, MODEL_LABEL, modelsSplit, nextEven
 import { agreementLine, checkWords, fireVerdict, leadLayer, lookWindow, meanPath, verdictSentence, WHY_WORDS } from '../core/fireOutlook.ts'
 import { FireSideView } from './FireSideView.tsx'
 import { LAYER_WORD, type Layer } from '../core/skyColour.ts'
+import { LOG_FOR_H } from '../core/skyFire.ts'
 import { layerWords } from '../core/layerTruth.ts'
 import { useSkyObs } from '../lib/useSkyObs.ts'
 import { eventCall } from '../core/briefing.ts'
@@ -161,7 +162,8 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
    * and the last one later that day (item 6); in the 50 minutes before it,
    * below with the photos (Section 4), as the page is still the forecast's.
    */
-  const logOnTop = toLog !== null && realNow.getTime() >= toLog.at.getTime()
+  /* Batch J, Section 8: on top only in the 3 h after its event; later in the day it is a row away, so the rows and the Viewfinder stay on the first screen. */
+  const logOnTop = toLog !== null && realNow.getTime() >= toLog.at.getTime() && realNow.getTime() - toLog.at.getTime() <= LOG_FOR_H * 3_600_000
   const logBlock =
     toLog === null ? null : (
       <div className="fire__log" aria-label="How was it">
@@ -244,13 +246,11 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
               : verdict.word === 'unlikely' ? verdictSentence(verdict, clock, name).replace(/^Fire unlikely: /, '').replace(/^./, (c) => c.toUpperCase()) : watch === null ? verdictSentence(verdict, clock, name) : `Best ${clock(watch.from)}–${clock(watch.to)}${lead?.times?.deepest == null ? '' : ` · deepest ${clock(lead.times.deepest)}`}`}
           </p>
           {obs?.gap.state == null ? null : <p className="fire__gap">{obs.gap.line}</p>}
-          {vividLine === '' ? null : <p className="fire__gap fire__vivid">{vividLine}</p>}
           {view === null || verdict.word === 'unlikely' ? null : (
-            <button type="button" className="bview bview--fire" onClick={() => showGuide(bestViewOnMap(venue, view))}>
+            <button type="button" className="bview bview--fire-one" onClick={() => showGuide(bestViewOnMap(venue, view))}>
               {view.line}
             </button>
           )}
-          {mean === null ? null : <FireSideView read={verdict.sky} path={mean} venue={venue} kind={kind} />}
           {colourClock?.(kind, 'strip')}
           {lead === null ? null : (
             <ul className="fire__checks fire__checks--icons" aria-label={`The three checks, ${name(lead.layer)}`}>
@@ -269,6 +269,9 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
           </details>
           <details className="frow fire__whyfold">
             <summary>Why · numbers and stations</summary>
+            {/* Batch J, Section 8: the side view and how vivid, a row away, so the rows and the Viewfinder are on the first screen. */}
+            {mean === null ? null : <FireSideView read={verdict.sky} path={mean} venue={venue} kind={kind} />}
+            {vividLine === '' ? null : <p className="fire__note fire__vivid">{vividLine}</p>}
 
             {nowLine === null ? null : <p className="fire__now fire__note">Sky right now · {nowLine}</p>}
             {byStations && obs?.truth != null ? <p className="fire__note">Lit from under through the gap: the deck you can see catches the sun before sunset, deepest as the sun sets, until the sun is {litUntilDeg((obs.truth.baseFt ?? 0) * 0.3048).toFixed(1)}° below (its height&rsquo;s dip, and the bend of a grazing ray).</p> : null}
