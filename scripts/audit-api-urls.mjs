@@ -77,10 +77,24 @@ await ev(`(() => {
 await wait(5000)
 watchdog.note('position placed')
 
+/*
+ * THE ONE EXCEPTION THE APP ITSELF SENDS (Batch M, Section 1): the forecast
+ * cache, api/forecast.ts. A CDN keeps answers by their URL, so the Open-Meteo
+ * request is in it: a GET, with every latitude and longitude at 2 decimals
+ * or fewer (about a kilometre), as the phone sent it to Open-Meteo before,
+ * and nothing else about the user. The Privacy page says Vercel's request
+ * log holds it. Anything finer, or any other GET, is still a problem.
+ */
+const coarseForecast = (r) => {
+  if (r.path !== '/api/forecast' || r.method !== 'GET' || r.hasBody) return false
+  const q = new URLSearchParams(r.query)
+  const coords = [...(q.get('latitude') ?? '').split(','), ...(q.get('longitude') ?? '').split(',')]
+  return coords.length >= 2 && coords.every((v) => /^-?\d{1,3}(\.\d{1,2})?$/.test(v))
+}
 let problems = 0
 for (const request of seen) {
   const line = `${request.method} ${request.path}${request.query}`
-  const ok = request.method === 'POST' && request.query === '' && request.hasBody
+  const ok = (request.method === 'POST' && request.query === '' && request.hasBody) || coarseForecast(request)
   console.log(`  ${ok ? 'ok     ' : 'PROBLEM'} ${line}${request.hasBody ? '  (body)' : ''}`)
   if (!ok) problems += 1
 }

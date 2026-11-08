@@ -44,7 +44,7 @@ try {
     for (const allowed of [false, true]) {
       console.log(`\n### ${label}, location ${allowed ? 'allowed' : 'not allowed'}`)
       const ctx = await browser.newContext({ ...devices['iPhone 13'], viewport, serviceWorkers: 'block', ...(allowed ? { geolocation: HERE, permissions: ['geolocation'] } : {}) })
-      await ctx.route(/^https:\/\/[^/]*(open-meteo|weather\.gov|tidesandcurrents)/, (r) => r.fulfill({ status: 503, body: 'not in this audit' }))
+      await ctx.route(/^https:\/\/[^/]*(open-meteo|weather\.gov|tidesandcurrents)|\/api\/forecast\?/, (r) => r.fulfill({ status: 503, body: 'not in this audit' }))
       await ctx.addInitScript(([top, bottom]) => {
         try {
           localStorage.setItem('scoutngo.landing.v1', 'true')

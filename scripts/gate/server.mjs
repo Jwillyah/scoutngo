@@ -63,7 +63,7 @@ globalThis.fetch = async (input) => {
   return new Response(a.body, { status: a.status, headers: { 'content-type': a.type } })
 }
 const API = {}
-for (const name of ['buoy', 'metar', 'pirep', 'search', 'streetview', 'calendar', 'nhc']) {
+for (const name of ['buoy', 'metar', 'pirep', 'search', 'streetview', 'calendar', 'nhc', 'forecast']) {
   if (existsSync(join(ROOT, 'api', `${name}.ts`))) API[name] = await import(join(ROOT, 'api', `${name}.ts`))
 }
 

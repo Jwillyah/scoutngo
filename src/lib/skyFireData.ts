@@ -58,6 +58,38 @@ export async function fetchFirePathsRange(from: LatLon, azimuthDeg: number, star
   return paths === null ? null : { ...paths, fetchedAt: got.fetchedAt, stale: got.stale }
 }
 
+/*
+ * SUNRISE AND SUNSET, THE WEEK, IN ONE QUESTION (Batch M, Section 1). The
+ * home asked six: each event for today, for tomorrow and for the rest of the
+ * week, each on its own day's line, so each was a new 8-point request (14.4
+ * of Open-Meteo's calls apiece, about 86 an open; measurements/
+ * 2026-11-08-cellular.md). Now one 16-point request: the sunrise line's
+ * eight points then the sunset line's, each on tomorrow's bearing (it moves
+ * about a degree in two days in November), the week's dates.
+ */
+export function firePathsBothUrl(from: LatLon, riseAzDeg: number, setAzDeg: number, startDate: string, endDate: string): string {
+  const pts = [...pathPoints(from, riseAzDeg), ...pathPoints(from, setAzDeg)]
+  const u = new URL(firePathsUrl(from, riseAzDeg, startDate))
+  u.searchParams.set('latitude', pts.map((p) => p.at.lat.toFixed(2)).join(','))
+  u.searchParams.set('longitude', pts.map((p) => p.at.lon.toFixed(2)).join(','))
+  u.searchParams.set('end_date', endDate)
+  return u.toString()
+}
+
+/** The two halves of the 16-point answer, each parsed as its own path. */
+export function splitBoth(payload: unknown): { sunrise: FirePaths | null; sunset: FirePaths | null } {
+  if (!Array.isArray(payload) || payload.length !== 2 * PATH_KM.length) return { sunrise: null, sunset: null }
+  return { sunrise: parseFirePaths(payload.slice(0, PATH_KM.length)), sunset: parseFirePaths(payload.slice(PATH_KM.length)) }
+}
+
+export async function fetchFirePathsBoth(from: LatLon, riseAzDeg: number, setAzDeg: number, startDate: string, endDate: string): Promise<{ sunrise: FirePaths | null; sunset: FirePaths | null }> {
+  const got = await weatherJson(firePathsBothUrl(from, riseAzDeg, setAzDeg, startDate, endDate), { maxAgeMs: FORECAST_MAX_AGE_MS, timeoutMs: TIMEOUT_MS * 2 })
+  if (!got.ok) return { sunrise: null, sunset: null }
+  const both = splitBoth(got.payload)
+  const stamp = (p: FirePaths | null) => (p === null ? null : { ...p, fetchedAt: got.fetchedAt, stale: got.stale })
+  return { sunrise: stamp(both.sunrise), sunset: stamp(both.sunset) }
+}
+
 type Hourly = Record<string, (number | null)[] | string[] | undefined> & { time?: string[] }
 
 /** Open-Meteo's answer for many points and models, as one path per model per hour. Tolerant: a bad payload is null. */

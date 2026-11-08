@@ -146,7 +146,8 @@ try {
       else if (!/9h ago/.test(c.label)) fail(`${label}: the ${name} chip does not say its value is 9h old ("${c.label}")`)
       if (c !== null && c.cut) fail(`${label}: the ${name} chip's label is cut off ("${c.label}", ux-rules 4)`)
     }
-    if (busy.line === null || !/^Weather daily limit reached, retrying in (59|60) min$/.test(busy.line)) fail(`${label}: the line under the chips reads ${JSON.stringify(busy.line)}, not the service at its limit and when it is asked again`)
+    /* Batch M: the back-off is jittered 0.8 to 1.2 times (weatherStore JITTER), so the hour reads 48 to 72 min. */
+    if (busy.line === null || !/^Weather daily limit reached, retrying in (4[89]|[56]\d|7[0-2]) min$/.test(busy.line)) fail(`${label}: the line under the chips reads ${JSON.stringify(busy.line)}, not the service at its limit and when it is asked again`)
     if (busy.lineCut) fail(`${label}: the status line is cut off ("${busy.line}", ux-rules 4)`)
     await page.screenshot({ path: join(OUT, `weather-429-${label}.png`) })
 
@@ -168,8 +169,8 @@ try {
     if (/no data/.test(fireNote)) fail(`${label}: Sky fire says no data`)
     await page.screenshot({ path: join(OUT, `weather-fire-429-${label}.png`) })
 
-    /* The back-off ends: asked again, by itself. */
-    await page.clock.fastForward('01:01:00')
+    /* The back-off ends: asked again, by itself (past the longest jittered hour, 72 min). */
+    await page.clock.fastForward('01:13:00')
     await wait(3000)
     console.log(`  an hour on: ${asked.length - quiet} requests`)
     if (asked.length === quiet) fail(`${label}: nothing was asked again after the hour's back-off`)

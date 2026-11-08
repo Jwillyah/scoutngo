@@ -104,6 +104,7 @@ export function PrivacyBody() {
       </table>
       </div>
       <p className="privacy__note">Weather, sea and sky lookups send the place rounded to 2 decimals, about a kilometre. Tides are asked by station number.</p>
+      <p className="privacy__note" data-privacy="forecast-cache">Forecasts go through this app’s forecast cache: it receives the spot rounded to 2 decimals and the hour, keeps Open-Meteo’s answer in the CDN’s cache for that hour, and logs nothing. Vercel’s own request log (below) holds that address, rounded spot included, for its usual time.</p>
       <p className="privacy__note" data-privacy="shared-skill">Downloads a public model-accuracy file; sends nothing.</p>
 
       <h2 className="privacy__head">Live check: this session</h2>

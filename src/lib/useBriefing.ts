@@ -2,10 +2,10 @@
  * WHAT THE TODAY BRIEFING READS (Batch H, Section 2). Arithmetic is
  * src/core/briefing.ts; this fetches and assembles.
  *
- *   Sky fire   today's and tomorrow's sunrise and sunset asked exactly as the
- *              Sky fire page asks them (fetchFirePaths), so the briefing and
- *              the page read one verdict from one answer; days 3-7 in two
- *              week-long questions (fetchFirePathsRange). The nearest
+ *   Sky colour sunrise and sunset for the week in one 16-point question
+ *              (fetchFirePathsBoth, Batch M), each line on tomorrow's
+ *              bearing; the Sky color page asks its own day's line, so the
+ *              two can differ by a degree of bearing. The nearest
  *              stations only in the two hours before an event, as the page.
  *   Sea        Open-Meteo Marine, the week (the Surf page's question)
  *   Wind       the week by the hour, gusts and 400 ft (fetchBriefWind)
@@ -28,7 +28,7 @@ import type { TideExtreme } from '../core/tide.ts'
 import { venueToday } from '../core/eventDay.ts'
 import { zonedTimeToUtc } from '../core/timezone.ts'
 import { coastFacing } from './coast.ts'
-import { fetchFirePaths, fetchFirePathsRange, fetchStationSkies, nearestHour, pathsAt, type FirePaths, type StationSky } from './skyFireData.ts'
+import { fetchFirePathsBoth, fetchStationSkies, nearestHour, pathsAt, type FirePaths, type StationSky } from './skyFireData.ts'
 import { surfAt } from './surfDay.ts'
 import { fetchBriefWind, fetchMarine, fetchMonthExtremes, hourlyAt, type Hourly } from './tideSheetData.ts'
 import { useTide } from './useTide.ts'
@@ -112,36 +112,31 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
   const [stations, setStations] = useState<{ key: string; list: StationSky[] } | null>(null)
   const [tides, setTides] = useState<{ key: string; list: TideExtreme[] } | null>(null)
 
-  /* Sky fire: today and tomorrow event by event, the rest of the week in two questions. */
+  /*
+   * Sky colour: sunrise and sunset, the whole week, in ONE request (Batch M,
+   * Section 1: fetchFirePathsBoth). Each line on tomorrow's bearing; the menu
+   * ('next') asks the same question, so it is the same kept answer.
+   */
   useEffect(() => {
     if (!open || !sky || key === null || lat === null || lon === null) return
     const at = { lat, lon }
     let live = true
     void (async () => {
-      const near: Record<string, FirePaths | null> = {}
-      const soonest = [0, 1]
-        .flatMap((n) => KINDS.map((kind) => ({ n, kind, e: eventsOn(dayIso(today, n), at, timeZone)[kind] })))
-        .filter((x): x is { n: number; kind: Kind; e: Date } => x.e !== null && (scope === 'week' || x.e.getTime() > Date.now() - 30 * 60_000))
-        .sort((a, b) => a.e.getTime() - b.e.getTime())
-      for (const { n, kind, e } of scope === 'week' ? soonest : soonest.slice(0, 2)) {
-        near[`${n}-${kind}`] = await fetchFirePaths(at, getPosition(e, at.lat, at.lon).azimuth, e.toISOString().slice(0, 10))
+      const mid = eventsOn(dayIso(today, 1), at, timeZone)
+      const first = eventsOn(dayIso(today, 0), at, timeZone)
+      const last = eventsOn(dayIso(today, WEEK_DAYS - 1), at, timeZone)
+      const both = { sunrise: null as FirePaths | null, sunset: null as FirePaths | null }
+      if (mid.sunrise !== null && mid.sunset !== null) {
+        const startIso = (first.sunrise ?? first.sunset ?? new Date(`${today}T12:00:00Z`)).toISOString().slice(0, 10)
+        const endIso = (last.sunset ?? last.sunrise ?? new Date(`${dayIso(today, WEEK_DAYS - 1)}T12:00:00Z`)).toISOString().slice(0, 10)
+        Object.assign(both, await fetchFirePathsBoth(at, getPosition(mid.sunrise, lat, lon).azimuth, getPosition(mid.sunset, lat, lon).azimuth, startIso, endIso))
       }
-      const week: Record<Kind, FirePaths | null> = { sunrise: null, sunset: null }
-      const mid = eventsOn(dayIso(today, 4), at, timeZone)
-      for (const kind of scope === 'week' ? KINDS : []) {
-        const e = mid[kind]
-        if (e === null) continue
-        const first = eventsOn(dayIso(today, 2), at, timeZone)[kind]
-        const last = eventsOn(dayIso(today, WEEK_DAYS - 1), at, timeZone)[kind]
-        if (first === null || last === null) continue
-        week[kind] = await fetchFirePathsRange(at, getPosition(e, at.lat, at.lon).azimuth, first.toISOString().slice(0, 10), last.toISOString().slice(0, 10))
-      }
-      if (live) setFire({ key, near, week })
+      if (live) setFire({ key, near: {}, week: both })
     })()
     return () => {
       live = false
     }
-  }, [open, key, lat, lon, today, timeZone, epoch, scope, sky])
+  }, [open, key, lat, lon, today, timeZone, epoch, sky])
 
   /* The sea, the wind, the beach's facing. */
   useEffect(() => {
@@ -240,7 +235,7 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
       for (const kind of KINDS) {
         const e = events[kind]
         if (e === null || f === null) continue
-        const data = n <= 1 ? (f.near[`${n}-${kind}`] ?? null) : f.week[kind]
+        const data = f.week[kind]
         const paths = data === null ? [] : pathsAt(data, nearestHour(e))
         verdicts[kind] = paths.length === 0 ? null : fireVerdict(paths, { event: e, kind, venue: at, station })
         const satHere = sat !== null && sat.key === key && sat.event === e.getTime() ? sat.read : null

@@ -36,6 +36,8 @@ export interface WeatherHit {
   stale: boolean
   /** Served from what was kept, with no request this time. Offline, its age is said (ux-rules 13). */
   kept: boolean
+  /** Batch M: the kept answer, shown at once while a new one is being fetched ("updated 7:52 · refreshing"). */
+  refreshing?: boolean
 }
 export interface WeatherMiss {
   ok: false
@@ -115,6 +117,48 @@ export function roundedWeatherUrl(url: string): string {
 export function backoffMs(n: number, daily: boolean): number {
   if (daily) return DAILY_BACKOFF_MS
   return Math.min(MAX_BACKOFF_MS, FIRST_BACKOFF_MS * 2 ** Math.max(0, n - 1))
+}
+
+/*
+ * JITTER (Batch M, Section 1). Phones behind one carrier address that were
+ * refused together would all ask again on the same second and be refused
+ * together again; each waits its back-off times 0.8 to 1.2 instead.
+ */
+export const JITTER = 0.2
+let random: () => number = Math.random
+/** For tests: a fixed draw (0.5 is no jitter). */
+export function setBackoffRandom(f: () => number): void {
+  random = f
+}
+export function jittered(ms: number, r: number = random()): number {
+  return Math.round(ms * (1 - JITTER + 2 * JITTER * Math.min(1, Math.max(0, r))))
+}
+
+/*
+ * THE FORECAST CACHE (Batch M, Section 1; api/forecast.ts). Set at start-up
+ * by the app (src/main.tsx) to '/api/forecast'; null (tests, scripts) asks
+ * Open-Meteo directly. The request is the same, rounded, with its host and
+ * path in `om` and the UTC hour in `hr`, so the CDN keeps one answer per
+ * spot, model set and hour for every phone. The key in this store stays the
+ * Open-Meteo request, so nothing kept changes meaning.
+ *
+ * When our function is not there (404, 405: a dev server) the phone asks
+ * Open-Meteo directly for the rest of the session; when it fails (502-504,
+ * no answer) that one request is asked directly. A 429 from it is a 429.
+ */
+let edge: string | null = null
+let edgeMissing = false
+export function setForecastEdge(path: string | null): void {
+  edge = path
+  edgeMissing = false
+}
+
+/** The request through the cache: `${edge}?om=<host><path>&<params>&hr=<UTC hour>`. */
+export function edgeUrl(url: string, at: Date, base: string): string {
+  const u = new URL(url)
+  const hr = at.toISOString().slice(0, 13)
+  const q = u.search.length > 1 ? `&${u.search.slice(1)}` : ''
+  return `${base}?om=${u.host}${u.pathname}${q}&hr=${hr}`
 }
 
 export function weatherBusy(now: number = Date.now()): Busy | null {
@@ -212,7 +256,7 @@ async function writeKept(key: string, kept: Kept): Promise<void> {
 
 function refused(daily: boolean, now: number) {
   refusals += 1
-  busy = { until: now + backoffMs(refusals, daily), why: daily ? 'daily' : 'busy' }
+  busy = { until: now + jittered(backoffMs(refusals, daily)), why: daily ? 'daily' : 'busy' }
   if (wake !== null) clearTimeout(wake)
   wake = setTimeout(() => {
     wake = null
@@ -222,9 +266,34 @@ function refused(daily: boolean, now: number) {
   tell()
 }
 
+/** Answers fetched behind a kept one, for the "refreshing" line: how many are on their way. */
+export function weatherRefreshing(): number {
+  return inFlight.size
+}
+
+/** Sends one request: through the forecast cache when it is set, else (or when it is missing or failing) to Open-Meteo. */
+async function send(url: string, fetchImpl: typeof fetch, timeoutMs: number): Promise<Response> {
+  const direct = () => fetchImpl(url, { signal: AbortSignal.timeout(timeoutMs) })
+  if (edge === null || edgeMissing) return direct()
+  let r: Response
+  try {
+    r = await fetchImpl(edgeUrl(url, new Date(), edge), { signal: AbortSignal.timeout(timeoutMs) })
+  } catch {
+    return direct()
+  }
+  if (r.status === 404 || r.status === 405) {
+    edgeMissing = true
+    return direct()
+  }
+  return r.status >= 502 && r.status <= 504 ? direct() : r
+}
+
 /**
- * The answer to `url`: kept if it is younger than `maxAgeMs`, else asked
- * for, else the kept one at any age (stale), else why not.
+ * The answer to `url`: kept if it is younger than `maxAgeMs`; else, when an
+ * older one is kept (up to KEEP_MS), that one at once, marked stale and
+ * refreshing, while a new one is fetched behind it (screens ask again when
+ * it lands: weatherEpoch); else asked for and waited on; else why not.
+ * Batch M: never a blank screen while a refresh is on its way.
  */
 export async function weatherJson(asked: string, opts: { maxAgeMs: number; fetchImpl?: typeof fetch; timeoutMs?: number }): Promise<WeatherAnswer> {
   const url = roundedWeatherUrl(asked)
@@ -232,16 +301,16 @@ export async function weatherJson(asked: string, opts: { maxAgeMs: number; fetch
   const now = Date.now()
   const kept = await readKept(key)
   if (kept !== null && now - kept.fetchedAt <= opts.maxAgeMs) return { ok: true, payload: kept.payload, fetchedAt: kept.fetchedAt, stale: false, kept: true }
-  const fallback = (miss: WeatherMiss): WeatherAnswer =>
-    kept !== null && now - kept.fetchedAt <= KEEP_MS ? { ok: true, payload: kept.payload, fetchedAt: kept.fetchedAt, stale: true, kept: true } : miss
+  const usable = kept !== null && now - kept.fetchedAt <= KEEP_MS ? kept : null
+  const fallback = (miss: WeatherMiss): WeatherAnswer => (usable !== null ? { ok: true, payload: usable.payload, fetchedAt: usable.fetchedAt, stale: true, kept: true } : miss)
   const b = weatherBusy(now)
   if (b !== null) return fallback({ ok: false, unreachable: false, reason: busyWords(b, now) })
   const waiting = inFlight.get(key)
-  if (waiting !== undefined) return waiting
+  if (waiting !== undefined) return usable !== null ? { ok: true, payload: usable.payload, fetchedAt: usable.fetchedAt, stale: true, kept: true, refreshing: true } : waiting
   const go = (async (): Promise<WeatherAnswer> => {
     const host = new URL(url).host
     try {
-      const r = await (opts.fetchImpl ?? fetch)(url, { signal: AbortSignal.timeout(opts.timeoutMs ?? TIMEOUT_MS) })
+      const r = await send(url, opts.fetchImpl ?? fetch, opts.timeoutMs ?? TIMEOUT_MS)
       sent.push({ at: Date.now(), host, status: r.status })
       if (r.status === 429) {
         const body = await r.text().catch(() => '')
@@ -254,7 +323,8 @@ export async function weatherJson(asked: string, opts: { maxAgeMs: number; fetch
       busy = null
       const fresh = { payload, fetchedAt: Date.now() }
       await writeKept(key, fresh)
-      tell()
+      /* A refresh behind a kept answer: the screens showing the old one ask again. */
+      if (usable !== null) epoch += 1
       return { ok: true, payload, fetchedAt: fresh.fetchedAt, stale: false, kept: false }
     } catch (error) {
       sent.push({ at: Date.now(), host, status: 'failed' })
@@ -262,9 +332,12 @@ export async function weatherJson(asked: string, opts: { maxAgeMs: number; fetch
       return fallback({ ok: false, unreachable: true, reason: timedOut ? 'The weather service timed out.' : 'Could not reach the weather service.' })
     } finally {
       inFlight.delete(key)
+      tell()
     }
   })()
   inFlight.set(key, go)
+  tell()
+  if (usable !== null) return { ok: true, payload: usable.payload, fetchedAt: usable.fetchedAt, stale: true, kept: true, refreshing: true }
   return go
 }
 

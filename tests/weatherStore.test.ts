@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { backoffMs, busyWords, clearWeatherStore, DAILY_BACKOFF_MS, FIRST_BACKOFF_MS, MAX_BACKOFF_MS, weatherBusy, weatherJson, weatherKey, weatherSent } from '../src/lib/weatherStore.ts'
+import { backoffMs, busyWords, clearWeatherStore, DAILY_BACKOFF_MS, edgeUrl, FIRST_BACKOFF_MS, jittered, MAX_BACKOFF_MS, setBackoffRandom, setForecastEdge, weatherBusy, weatherEpoch, weatherJson, weatherKey, weatherSent } from '../src/lib/weatherStore.ts'
 
 /*
  * THE SHARED WEATHER STORE (src/lib/weatherStore.ts): one request per
@@ -15,6 +15,8 @@ const HOUR = 3_600_000
 
 beforeEach(async () => {
   await clearWeatherStore()
+  setBackoffRandom(() => 0.5)
+  setForecastEdge(null)
   vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
   vi.setSystemTime(new Date('2026-10-30T11:30:00Z'))
 })
@@ -104,5 +106,72 @@ describe('no answer at all', () => {
     const r = await weatherJson(URL_A, { maxAgeMs: HOUR, fetchImpl: vi.fn(async () => Promise.reject(new TypeError('Load failed'))) })
     expect(r).toEqual({ ok: false, unreachable: true, reason: 'Could not reach the weather service.' })
     expect(weatherBusy()).toBeNull()
+  })
+})
+
+describe('Batch M: on a phone network', () => {
+  it('a kept answer older than wanted is shown at once, marked refreshing, and the new one lands behind it', async () => {
+    await weatherJson(URL_A, { maxAgeMs: HOUR, fetchImpl: ok() })
+    const kept = Date.now()
+    vi.setSystemTime(kept + 2 * HOUR)
+    let release: (r: Response) => void = () => {}
+    const slow = vi.fn(() => new Promise<Response>((r) => (release = r)))
+    const before = weatherEpoch()
+    const r = await weatherJson(URL_A, { maxAgeMs: HOUR, fetchImpl: slow })
+    expect(r).toMatchObject({ ok: true, stale: true, kept: true, refreshing: true, fetchedAt: kept })
+    expect(slow).toHaveBeenCalledTimes(1)
+    release(new Response(JSON.stringify(PAYLOAD), { status: 200 }))
+    await vi.waitFor(() => expect(weatherEpoch()).toBe(before + 1))
+    const again = await weatherJson(URL_A, { maxAgeMs: HOUR, fetchImpl: slow })
+    expect(again).toMatchObject({ ok: true, stale: false })
+    expect(slow).toHaveBeenCalledTimes(1)
+  })
+
+  it('a 429 back-off is jittered 0.8 to 1.2 times, so phones behind one address do not ask again on the same second', () => {
+    expect(jittered(120_000, 0)).toBe(96_000)
+    expect(jittered(120_000, 0.5)).toBe(120_000)
+    expect(jittered(120_000, 1)).toBe(144_000)
+  })
+
+  it('goes through the forecast cache: host and path in om, the UTC hour in hr, coordinates as rounded', async () => {
+    expect(edgeUrl('https://marine-api.open-meteo.com/v1/marine?latitude=36.84&longitude=-75.97&hourly=wave_height', new Date('2026-11-08T13:42:00Z'), '/api/forecast')).toBe(
+      '/api/forecast?om=marine-api.open-meteo.com/v1/marine&latitude=36.84&longitude=-75.97&hourly=wave_height&hr=2026-11-08T13',
+    )
+    setForecastEdge('http://127.0.0.1/api/forecast')
+    const f = ok()
+    await weatherJson('https://api.open-meteo.com/v1/forecast?latitude=36.84356&longitude=-75.97131&hourly=wind_speed_10m', { maxAgeMs: HOUR, fetchImpl: f })
+    const asked = String((f.mock.calls[0] as unknown[])[0])
+    expect(asked).toContain('/api/forecast?om=api.open-meteo.com/v1/forecast&latitude=36.84&longitude=-75.97')
+    expect(asked).not.toMatch(/36\.843|75\.971/)
+  })
+
+  it('our function missing (a dev server, 404) asks Open-Meteo directly, and stops trying the cache', async () => {
+    setForecastEdge('http://127.0.0.1/api/forecast')
+    const f = vi.fn(async (u: string) => (u.includes('/api/forecast') ? new Response('', { status: 404 }) : new Response(JSON.stringify(PAYLOAD), { status: 200 })))
+    const r = await weatherJson(URL_A, { maxAgeMs: HOUR, fetchImpl: f as unknown as typeof fetch })
+    expect(r.ok).toBe(true)
+    await weatherJson(URL_A.replace('wind_speed_10m', 'cloud_cover'), { maxAgeMs: HOUR, fetchImpl: f as unknown as typeof fetch })
+    expect(f.mock.calls.map((c) => String(c[0]).includes('/api/forecast'))).toEqual([true, false, false])
+  })
+
+  it('our function failing (502) asks that one directly; a 429 from it is a 429', async () => {
+    setForecastEdge('http://127.0.0.1/api/forecast')
+    const bad = vi.fn(async (u: string) => (u.includes('/api/forecast') ? new Response('', { status: 502 }) : new Response(JSON.stringify(PAYLOAD), { status: 200 })))
+    expect((await weatherJson(URL_A, { maxAgeMs: HOUR, fetchImpl: bad as unknown as typeof fetch })).ok).toBe(true)
+    expect(bad).toHaveBeenCalledTimes(2)
+    const refused = vi.fn(async () => new Response('{"reason":"Minutely API request limit exceeded"}', { status: 429 }))
+    await weatherJson(URL_A.replace('wind_speed_10m', 'gusts'), { maxAgeMs: HOUR, fetchImpl: refused })
+    expect(refused).toHaveBeenCalledTimes(1)
+    expect(weatherBusy()?.why).toBe('busy')
+  })
+})
+
+describe('the refreshing line', () => {
+  it('"Updated 7:52 · refreshing" only while a new answer is on its way behind a kept one', async () => {
+    const { refreshLine } = await import('../src/lib/useWeatherStatus.ts')
+    const clock = () => '7:52'
+    expect(refreshLine(Date.now(), true, clock)).toBe('Updated 7:52 · refreshing')
+    expect(refreshLine(Date.now(), false, clock)).toBeNull()
+    expect(refreshLine(null, true, clock)).toBeNull()
   })
 })

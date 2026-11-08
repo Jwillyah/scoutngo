@@ -10,6 +10,10 @@ import './styles/base.css'
 import './styles/app.css'
 import App from './App.tsx'
 import { watchHosts } from './lib/privacy.ts'
+import { setForecastEdge } from './lib/weatherStore.ts'
+
+/* Open-Meteo through this app's forecast cache (api/forecast.ts, Batch M): on a phone network many phones share one address. */
+setForecastEdge('/api/forecast')
 
 /* The privacy page's live check: which hosts this session asks, in memory only (src/lib/privacy.ts). */
 watchHosts()

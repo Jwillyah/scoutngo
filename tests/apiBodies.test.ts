@@ -84,7 +84,20 @@ describe('the server side', () => {
     expect(source).not.toMatch(/console\./)
   })
 
-  for (const route of ROUTES.filter((r) => r !== 'calendar.ts')) {
+  /*
+   * THE SECOND EXCEPTION, BY NAME (Batch M, Section 1): the forecast cache.
+   * A CDN keeps GET answers by their URL, so the Open-Meteo request is in
+   * it, as the phone sent it to Open-Meteo before: coordinates at 2
+   * decimals only (the route refuses anything finer), the UTC hour, no id.
+   */
+  it('api/forecast.ts is GET, takes coordinates only at 2 decimals, and logs nothing', () => {
+    const source = withoutComments(readFileSync('api/forecast.ts', 'utf8'))
+    expect(source).toMatch(/export\s+async\s+function\s+GET\b/)
+    expect(source).toMatch(/const COORD = \/\^-\?\\d\{1,3\}\(\\\.\\d\{1,2\}\)\?\$\//)
+    expect(source).not.toMatch(/console\./)
+  })
+
+  for (const route of ROUTES.filter((r) => r !== 'calendar.ts' && r !== 'forecast.ts')) {
     it(`api/${route} takes POST and nothing in its URL`, () => {
       const source = withoutComments(readFileSync(join('api', route), 'utf8'))
       expect(source).toMatch(/export\s+async\s+function\s+POST\b/)

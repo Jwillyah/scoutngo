@@ -11,10 +11,19 @@
  * (the multi-point form is one request per point to the service) and every
  * model multiplies the variables.
  */
-export const OPEN_METEO = /^https:\/\/(api|marine-api|air-quality-api)\.open-meteo\.com\//
+export const OPEN_METEO = /^https:\/\/(api|marine-api|air-quality-api)\.open-meteo\.com\/|\/api\/forecast\?om=(api|marine-api|air-quality-api)\.open-meteo\.com\//
+
+/** The Open-Meteo request inside one sent through the app's forecast cache (api/forecast.ts), or the request itself. */
+export function unwrapForecast(href) {
+  const u = new URL(href)
+  const om = u.pathname.endsWith('/api/forecast') ? u.searchParams.get('om') : null
+  if (om === null) return href
+  const q = new URLSearchParams([...u.searchParams].filter(([k]) => k !== 'om' && k !== 'hr'))
+  return `https://${om}?${q.toString()}`
+}
 
 export function requestShape(href) {
-  const u = new URL(href)
+  const u = new URL(unwrapForecast(href))
   const points = (u.searchParams.get('latitude') ?? '').split(',').filter(Boolean).length || 1
   const vars = (u.searchParams.get('hourly') ?? '').split(',').filter(Boolean)
   const models = (u.searchParams.get('models') ?? '').split(',').filter(Boolean)

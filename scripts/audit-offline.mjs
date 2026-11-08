@@ -83,7 +83,9 @@ ws.addEventListener('message', (event) => {
    * (src/lib/connectivity.ts) fails like everything else.
    */
   const check = m.params.request.method === 'HEAD' && url.pathname === '/'
-  const local = (url.hostname === '127.0.0.1' || url.hostname === 'localhost') && !check
+  /* So are the app's own functions (Batch M: forecasts go through /api/forecast): on a dead cell they are as far away as Open-Meteo. */
+  const fn = url.pathname.startsWith('/api/')
+  const local = (url.hostname === '127.0.0.1' || url.hostname === 'localhost') && !check && !fn
   if (local || mode === 'online') {
     void send('Fetch.continueRequest', { requestId: m.params.requestId })
   } else if (mode === 'fail') {

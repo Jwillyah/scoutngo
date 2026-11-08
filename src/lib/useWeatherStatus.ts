@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { busyWords, onWeatherChange, weatherBusy, weatherEpoch } from './weatherStore.ts'
+import { busyWords, onWeatherChange, weatherBusy, weatherEpoch, weatherRefreshing } from './weatherStore.ts'
 
 /*
  * THE WEATHER STORE, FOR SCREENS (src/lib/weatherStore.ts).
@@ -25,4 +25,14 @@ export function useWeatherBusy(): string | null {
   }, [busy])
   const b = weatherBusy()
   return b === null ? null : busyWords(b)
+}
+
+/** Batch M: forecasts on their way behind the kept ones, for "updated 7:52 · refreshing". */
+export function useWeatherRefreshing(): boolean {
+  return useSyncExternalStore(onWeatherChange, () => weatherRefreshing() > 0, () => false)
+}
+
+/** "Updated 7:52 · refreshing" while new answers are on their way behind a kept one; null otherwise. */
+export function refreshLine(checkedAt: number | null, refreshing: boolean, clock: (d: Date) => string): string | null {
+  return refreshing && checkedAt !== null ? `Updated ${clock(new Date(checkedAt))} · refreshing` : null
 }

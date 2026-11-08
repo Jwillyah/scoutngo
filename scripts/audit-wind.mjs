@@ -62,7 +62,7 @@ try {
     console.log(`\n### ${label}`)
     const ctx = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height: 844 } })
     /* Registered first, so the routes after it (which Playwright tries first) answer before it. Outside hosts only: a bare word would match the dev server's own modules (/src/lib/overpass.ts). */
-    await ctx.route(/^https:\/\/[^/]*(open-meteo|tidesandcurrents|arcgisonline|openfreemap|amazonaws|nominatim|overpass)/, (r) => r.fulfill({ status: 503, body: 'not in this audit' }))
+    await ctx.route(/^https:\/\/[^/]*(open-meteo|tidesandcurrents|arcgisonline|openfreemap|amazonaws|nominatim|overpass)|\/api\/forecast\?/, (r) => r.fulfill({ status: 503, body: 'not in this audit' }))
     await ctx.route(/api\.open-meteo\.com\/v1\/forecast/, (r) => {
       const u = new URL(r.request().url())
       if ((u.searchParams.get('hourly') ?? '').includes('wind_speed_120m') && u.searchParams.has('models')) {

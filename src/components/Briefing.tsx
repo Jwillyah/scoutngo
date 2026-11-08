@@ -19,6 +19,7 @@ import { changeWords } from '../core/callChange.ts'
 import { compass } from '../lib/tideWords.ts'
 import { windIn, windUnitLabel, type Units } from '../lib/units.ts'
 import { MoonGlyph } from './MoonGlyph.tsx'
+import { refreshLine, useWeatherRefreshing } from '../lib/useWeatherStatus.ts'
 
 /*
  * THE TODAY BRIEFING (Batch H, Section 2). Open the app and know in three
@@ -296,8 +297,11 @@ function DayPage({ onOpenWeather, day, which, placeName, venue, timeZone, units,
 
   /* The footer: when it was checked and when it looks again; tomorrow, the final call. */
   const sunrise = day?.events.sunrise ?? null
+  const refreshing = refreshLine(checkedAt, useWeatherRefreshing(), clock)
   const footer =
-    which === 'today'
+    which === 'today' && refreshing !== null
+      ? refreshing
+      : which === 'today'
       ? `Checked ${checkedAt === null ? '—' : clock(new Date(checkedAt))} · next check ${read === null ? '—' : clock(nextCheck(read.event, now))}`
       : sunrise === null
         ? 'Final call an hour before, from the stations'
