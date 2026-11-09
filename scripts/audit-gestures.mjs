@@ -159,6 +159,9 @@ try {
       const was = await ev(`document.querySelector('.sheet')?.dataset.detent ?? 'peek'`)
       await ev(`document.querySelector('button[aria-label="Features"]')?.click()`)
       await wait(700)
+      /* Batch Map, Section 4: Moon path is under the Map sheet's More ›. */
+      await ev(`document.querySelector('[data-feature="moon"]') ?? document.querySelector('.feat3__row--more')?.click()`)
+      await wait(500)
       await ev(`(() => { const b = document.querySelector('[data-feature="moon"]'); if (b && (b.getAttribute('aria-checked') === 'true') !== ${want}) b.click() })()`)
       await wait(300)
       /* Closed by its own ×: the rail is put away while the sheet is full. */

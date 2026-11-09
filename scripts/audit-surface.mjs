@@ -474,7 +474,7 @@ console.log('\n### radar on: the satellite cloud under it')
 {
   await ev(`(() => { const b = document.querySelector('button[aria-label="Features"]'); if (b && b.getAttribute('aria-pressed') !== 'true') b.click(); return 1 })()`)
   await wait(700)
-  await ev(`document.querySelector('.feat__wtile--radar')?.click()`)
+  await ev(`document.querySelector('[data-weather="radar"]')?.click()`)
   await wait(3000)
   const layers = JSON.parse(await ev(`JSON.stringify((() => {
     const m = window.__probe?.map
@@ -489,12 +489,12 @@ console.log('\n### radar on: the satellite cloud under it')
    * Off tile: press until the tile is there, then check radar really is off
    * (its legend stands in the time bar's place while it is on).
    */
-  for (let k = 0; k < 3 && !(await ev(`!!document.querySelector('.feat__wtile--off')`)); k += 1) {
+  for (let k = 0; k < 3 && !(await ev(`!!document.querySelector('[data-weather="off"]')`)); k += 1) {
     await ev(`document.querySelector('button[aria-label="Features"]')?.click()`)
     await wait(600)
   }
-  const offThere = await ev(`!!document.querySelector('.feat__wtile--off')`)
-  await ev(`document.querySelector('.feat__wtile--off')?.click()`)
+  const offThere = await ev(`!!document.querySelector('[data-weather="off"]')`)
+  await ev(`document.querySelector('[data-weather="off"]')?.click()`)
   await wait(800)
   const legendAfter = await ev(`!!document.querySelector('.wlay--peek, .sheet__peek .wlay')`)
   console.log(`  weather off: the Off tile ${offThere ? 'found' : 'NOT FOUND'}; radar legend still up: ${legendAfter}`)
@@ -1194,9 +1194,9 @@ const OPENERS = `(() => {
       add('layerstool', 'Skyline', 'skyline')
       add('layerstool', 'Light map', 'lightmap')
       add('layerstool', 'Hazards', 'hazards')
-      add('layerstool', 'What is mapped here ›', 'hazards')
-      add('layerstool', 'Airspace over this venue ›', 'airspace')
-      add('layerstool', 'Radar', 'wxlayer')
+      add('layerstool', 'What is mapped here', 'hazards')
+      add('layerstool', 'Airspace over this venue', 'airspace')
+      add('layerstool', 'Rain', 'wxlayer')
     }
   })
   /*
@@ -1222,7 +1222,13 @@ const click = async (sel, i) => {
   if (sel === 'layerstool') {
     await ev(`(() => { const b = document.querySelector('button[aria-label="Features"]'); if (b && b.getAttribute('aria-pressed') !== 'true') b.click(); return 1 })()`)
     await wait(600)
-    await ev(`[...document.querySelectorAll('.feat__qbtn, .feat__sw, .feat__link, .feat__wtile')].find((t) => (t.querySelector('.feat__label')?.firstChild?.textContent ?? t.textContent).trim() === ${JSON.stringify(i)})?.click()`)
+    /* Batch Map, Section 4: the Map sheet v3: tools, weather tiles, rows (their switch), and under More › the rest and the links. */
+    const find = `[...document.querySelectorAll('.feat3__tool, .feat3__wtile, .feat3__row, .feat3__link')].find((t) => (t.querySelector('.feat3__tlabel, .feat3__rlabel')?.firstChild?.textContent ?? t.textContent).replace(/ ›$/, '').trim() === ${JSON.stringify(i)})`
+    if (!(await ev(`!!${find}`))) {
+      await ev(`document.querySelector('.feat3__row--more')?.click()`)
+      await wait(400)
+    }
+    await ev(`(() => { const t = ${find}; if (!t) return; (t.querySelector('[role="switch"]') ?? t).click() })()`)
     await wait(600)
     return
   }

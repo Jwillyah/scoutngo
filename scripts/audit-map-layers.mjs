@@ -180,12 +180,12 @@ try {
       await features.click({ timeout: 5000 })
       await wait(900)
       const s = JSON.parse(await ev(SHEET))
-      if (!s.cards.includes('Features')) throw new Error(`${label}: the Features button opened ${JSON.stringify(s.cards)}, not Features`)
+      if (!s.cards.includes('Map')) throw new Error(`${label}: the Features button opened ${JSON.stringify(s.cards)}, not the Map sheet`)
     }
 
     /* FEATURES: closing it is back to the map. */
     await openFeatures()
-    await page.locator('.card2[aria-label="Features"] .card2__x').click()
+    await page.locator('.card2[aria-label="Map"] .card2__x').click()
     await wait(1200)
     const closed = JSON.parse(await ev(SHEET))
     looked.features += 1

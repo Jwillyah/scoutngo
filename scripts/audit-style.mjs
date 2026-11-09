@@ -79,8 +79,8 @@ const READ = (tokens) => `JSON.stringify((() => {
     if (isButton && b.width < innerWidth * 0.6) {
       const filled = (bg !== null && bg.a >= 0.05) || st.backgroundImage !== 'none' || parseFloat(st.borderTopWidth) > 0
       const r = parseFloat(st.borderTopLeftRadius)
-      /* A tappable card (60 px and taller) is glass with round corners, 14 px at least; anything smaller is a circle or a pill. */
-      const card = b.height >= 60
+      /* A tappable card or tile (50 px and taller: the Map sheet's weather tiles) is glass with round corners, 14 px at least; anything smaller is a circle or a pill. */
+      const card = b.height >= 50
       if (filled && b.height >= 24 && (card ? r < 14 : r < Math.min(b.width, b.height) / 2 - 2)) out.square.add(name(e) + ' ' + Math.round(b.width) + 'x' + Math.round(b.height) + ' r' + Math.round(r))
     }
     const sheet = e.getAttribute('role') === 'dialog' || /(^|[ _-])(sheet|page|dialog)( |$|__body$)/.test(e.getAttribute('class') ?? '')

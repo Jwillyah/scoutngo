@@ -109,7 +109,7 @@ import { SunReadout } from './SunReadout.tsx'
 import { CamList } from './CamList.tsx'
 import { SunCurve } from './SunCurve.tsx'
 import { Page } from './Page.tsx'
-import { BUILDINGS_MIN_ZOOM, ESRI_NATIVE_MAX_ZOOM, MapView, type MapHandle } from './MapView.tsx'
+import { BUILDINGS_MIN_ZOOM, MapView, type MapHandle } from './MapView.tsx'
 import { buildingsToGeoJson, fetchBuildings, type Building } from '../lib/buildings.ts'
 import { shadowMap } from '../core/shadowMap.ts'
 import { shadowCollection } from '../lib/shadowLayer.ts'
@@ -2013,26 +2013,13 @@ export function PlanMode({
   /* Batch N C1: the photo layers only when Shoot is picked, or nothing is yet (src/lib/activities.ts). */
   const [picked] = useActivities()
   const photoTools = showsPhotoTools(picked)
-  const featuresCard = (
-    <FeaturesSheet
-      quick={[
-        ...(onViewfinder === undefined ? [] : [{ label: 'Viewfinder', onClick: onViewfinder }]),
-        { label: 'Measure', on: measurePins !== null, onClick: () => { setMeasurePins((pins) => (pins === null ? [] : null)); setSheet('peek') } },
-        { label: 'Skyline', on: card.kind === 'skyline', onClick: () => openCard('skyline') },
-      ]}
-      weather={weatherLayer}
-      onWeather={(w) => {
-        pickWeather(w)
-        /* Radar (8 Nov): down to the map, its legend in the time sheet's place at the foot (RadarLegend). */
-        if (w === 'radar') { setCard({ kind: 'wxlayer' }); setSheet('peek') }
-        else if (w !== 'off') { setCard({ kind: 'wxlayer' }); setSheet('half') }
-      }}
-      storms={[
+  /* Batch Map, Section 4: every switch the old sheet had, by id; Features v3 picks its rows from them. */
+  const featureSwitches = [
+
         { id: 'lightning', label: 'Lightning', on: lightningOn, color: COLOR.storm, icon: featIcon(FEAT_PATH.bolt), note: 'last 45 min', onToggle: () => { setLightningOn(!lightningOn); if (!lightningOn) { setCard({ kind: 'wxlayer' }); setSheet('half') } } },
         { id: 'warnings', label: 'Warnings', on: warningsOn, color: COLOR.storm, icon: featIcon(FEAT_PATH.warn), onToggle: () => { setWarningsOn(!warningsOn); if (!warningsOn) { setCard({ kind: 'wxlayer' }); setSheet('half') } } },
         { id: 'tracks', label: 'Storm tracks', on: tracksOn, color: COLOR.storm, icon: featIcon(FEAT_PATH.track), onToggle: () => { setTracksOn(!tracksOn); if (!tracksOn) { setCard({ kind: 'wxlayer' }); setSheet('half') } } },
-      ]}
-      shooting={[
+
         { id: 'shadows', label: 'Shadows', on: showSun, color: COLOR.shoot, icon: featIcon(FEAT_PATH.shadow), onToggle: () => onShowSun(!showSun) },
         { id: 'sun', label: 'Sun arc', on: showArc, color: COLOR.shoot, icon: featIcon(FEAT_PATH.arc), onToggle: () => onShowArc(!showArc) },
         { id: 'moon', label: 'Moon path', on: moonOn, color: COLOR.shoot, icon: featIcon(FEAT_PATH.moon), onToggle: () => {
@@ -2051,13 +2038,36 @@ export function PlanMode({
         } },
         { id: 'cones', label: 'Cones', on: coneMode === 'all', color: COLOR.shoot, icon: featIcon(FEAT_PATH.cone), onToggle: () => onConeMode(coneMode === 'all' ? 'none' : 'all') },
         { id: 'lightmap', label: 'Light map', on: card.kind === 'lightmap', color: COLOR.shoot, icon: featIcon(FEAT_PATH.light), note: scanCtx === null ? 'needs the scan' : undefined, onToggle: () => openCard('lightmap') },
-      ].filter((r) => photoTools || !PHOTO_LAYERS.includes(r.id))}
-      drone={[
+
         /* As the old tile: the state says what is on the map; on also opens the card; failed, it is its own Retry. */
         { id: 'airspace', label: 'Airspace', on: airspaceOn, color: COLOR.drone, icon: featIcon(FEAT_PATH.air), note: !airspaceOn ? undefined : airspaceFailed ? LAYER_FAILED : airspaceOverlay === null ? 'Loading' : airspaceDense ? 'zoom for grid' : undefined, onToggle: () => { if (airspaceOn && airspaceFailed) { setAirspaceFailed(false); return } if (!airspaceOn) setCard({ kind: 'airspace' }); setAirspaceOn(!airspaceOn) } },
         { id: 'hazards', label: 'Hazards', on: marks.length > 0, color: COLOR.drone, icon: featIcon(FEAT_PATH.hazard), note: marks.length === 0 ? 'none marked' : `${marks.length} marked`, onToggle: () => setCard({ kind: 'hazards' }) },
+
+        { id: 'labels', label: 'Labels', on: showLabels, color: COLOR.map, icon: featIcon(FEAT_PATH.label), onToggle: () => onShowLabels(!showLabels) },
+        { id: 'buildings', label: 'Buildings', on: showBuildings, color: COLOR.map, icon: featIcon(FEAT_PATH.building), note: showBuildings && buildingsNote !== null ? buildingsNote : undefined, onToggle: () => (showBuildings && buildingsNote === LAYER_FAILED ? setBuildingsAttempt((n) => n + 1) : onShowBuildings(!showBuildings)) }
+  ]
+  const featureById = (id: string) => featureSwitches.find((f) => f.id === id) ?? null
+  const featuresCard = (
+    <FeaturesSheet
+      weather={weatherLayer}
+      onWeather={(w) => {
+        pickWeather(w)
+        /* Radar (8 Nov): down to the map, its legend in the time sheet's place at the foot (RadarLegend). */
+        if (w === 'radar') { setCard({ kind: 'wxlayer' }); setSheet('peek') }
+        else if (w !== 'off') { setCard({ kind: 'wxlayer' }); setSheet('half') }
+      }}
+      rows={[
+        featureById('lightning'),
+        featureById('warnings'),
+        /* "Sun and moon lines" (board FeaturesV3): the sun's lines and arc and the moon's path, one switch. Shown when Shoot is picked or nothing is (Batch M). */
+        photoTools ? { id: 'sunmoon', label: 'Sun and moon lines', on: showSun || showArc || moonOn, icon: featIcon(FEAT_PATH.arc), onToggle: () => { const next = !(showSun || showArc || moonOn); onShowSun(next); onShowArc(next); setMoonOn(next) } } : null,
+        featureById('airspace'),
+      ].filter((x): x is NonNullable<typeof x> => x !== null)}
+      moreRows={['tracks', 'hazards', 'buildings', 'labels', 'cones', 'lightmap', 'shadows', 'sun', 'moon'].map(featureById).filter((x): x is NonNullable<typeof x> => x !== null && (photoTools || !PHOTO_LAYERS.includes(x.id)))}
+      links={[
+        { label: 'Airspace over this venue', onClick: () => openCard('airspace') },
+        { label: 'What is mapped here', onClick: () => openCard('hazards') },
       ]}
-      onAirspaceVenue={() => openCard('airspace')}
       base={threeD ? '3d' : showTerrain && !flatHere ? 'terrain' : 'satellite'}
       onBase={(b) => {
         if (b === '3d') { if (!threeD) toggleThreeD(); return }
@@ -2066,12 +2076,12 @@ export function PlanMode({
         if (b === 'satellite') turnTerrain(false)
       }}
       baseNote={flatHere ? 'Flat here' : threeDNote}
-      map={[
-        { id: 'labels', label: 'Labels', on: showLabels, color: COLOR.map, icon: featIcon(FEAT_PATH.label), onToggle: () => onShowLabels(!showLabels) },
-        { id: 'buildings', label: 'Buildings', on: showBuildings, color: COLOR.map, icon: featIcon(FEAT_PATH.building), note: showBuildings && buildingsNote !== null ? buildingsNote : undefined, onToggle: () => (showBuildings && buildingsNote === LAYER_FAILED ? setBuildingsAttempt((n) => n + 1) : onShowBuildings(!showBuildings)) },
+      tools={[
+        ...(onViewfinder === undefined ? [] : [{ label: 'Viewfinder', icon: featIcon('M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8zM8 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z'), onClick: onViewfinder }]),
+        { label: 'Measure', icon: featIcon('M2 12 12 2l2 2L4 14zM5 9l1 1M7 7l1 1M9 5l1 1'), on: measurePins !== null, onClick: () => { setMeasurePins((pins) => (pins === null ? [] : null)); setSheet('peek') } },
+        { label: 'Skyline', icon: featIcon('M2 14V8h3v6M6 14V4h4v10M11 14V7h3v7'), on: card.kind === 'skyline', onClick: () => openCard('skyline') },
       ]}
-      sourceLine={`Esri World Imagery · z${Math.round(mapZoom)} (native to z${ESRI_NATIVE_MAX_ZOOM})`}
-      onWhatMapped={() => openCard('hazards')}
+      credit="Imagery Esri · labels OpenFreeMap"
       about={
         <p className="tiles__prose">
           Measure draws a line between two points you tap; a long press on the map starts one too. Cones are what each position can actually frame. Buildings &ldquo;None mapped&rdquo; is the map being empty, not the ground. The sun arc is where the sun rises and sets. Shadows are thrown from the marked heights. Radar is Iowa State&rsquo;s national composite; Wind the forecast&rsquo;s wind as streaks; Clouds the GOES satellite and the forecast&rsquo;s low, mid and high cloud. Lightning is NOAA&rsquo;s 15-minute strike maps; Warnings the NWS&rsquo;s polygons. Hazards are what you marked plus what OpenStreetMap has. Labels are place names over the imagery. Airspace draws controlled airspace as white dashes, the FAA grid squares with the most LAANC can approve on each, and restricted areas and national parks in red. Terrain shades the slopes and draws a contour every 10 m (brighter every 50 m), and feeds the horizon and the sun curve; where the ground round the venue rises less than 15 m it reads Flat here and draws nothing.
@@ -2441,7 +2451,7 @@ export function PlanMode({
         )
       case 'layers':
         return (
-          <Card title="Features" onClose={closeFeatures}>
+          <Card title="Map" onClose={closeFeatures}>
             {featuresCard}
           </Card>
         )

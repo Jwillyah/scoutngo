@@ -118,6 +118,9 @@ try {
     await wait(3000)
     await page.locator('button[aria-label="Features"]').tap()
     await wait(900)
+    /* Batch Map, Section 4: Buildings is under the Map sheet's More ›. */
+    await ev(`document.querySelector('[data-feature="buildings"]') ?? document.querySelector('.feat3__row--more')?.click()`)
+    await wait(500)
     await ev(`document.querySelector('[data-feature="buildings"]')?.click()`)
     await wait(600)
     /* The sheet down to its lowest detent, the way a thumb does it, so the map is open. */

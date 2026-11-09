@@ -1,0 +1,182 @@
+/*
+ * THE MAP SHEET, FEATURES v3 (Batch Map, Section 4; board
+ * docs/mockups/FeaturesV3.png). Even spacing: every section label 14 px
+ * above its group and 22 px below the last; 50 px rows; nothing monospace.
+ */
+.feat3 {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
+  color: var(--white);
+}
+.feat3__head {
+  margin: 10px 4px 8px;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--glass-ink-2);
+}
+.feat3__head:first-child {
+  margin-top: 0;
+}
+.feat3__weather {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.feat3__wtile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 52px;
+  padding: 4px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 18px;
+  background: var(--glass);
+  color: var(--white);
+  font: inherit;
+  font-weight: var(--weight-medium);
+}
+.feat3__wtile--on {
+  background: var(--white);
+  border-color: var(--white);
+  color: var(--sky-ink);
+}
+.feat3__wicon,
+.feat3__glyph {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.feat3__card {
+  overflow: hidden;
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--radius-glass);
+  background: var(--glass);
+}
+.feat3__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 46px;
+  margin: 0;
+  padding: 0 14px;
+  border: 0;
+  border-top: 1px solid var(--glass-edge);
+  border-radius: 0;
+  background: transparent;
+  color: var(--white);
+  font: inherit;
+  text-align: left;
+}
+.feat3__card > .feat3__row:first-child {
+  border-top: 0;
+}
+.feat3__ricon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  color: var(--white);
+}
+.feat3__ricon svg {
+  width: 22px;
+  height: 22px;
+}
+.feat3__rlabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 17px;
+  font-weight: var(--weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.feat3__rnote {
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--glass-ink-2);
+}
+.feat3__chev {
+  color: var(--glass-ink-2);
+  font-size: 22px;
+}
+.feat3__note {
+  margin: 6px 4px 0;
+  font-size: var(--text-sm);
+  color: var(--glass-ink-2);
+}
+.feat3__tools {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 12px;
+}
+.feat3__tool {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--white);
+  font: inherit;
+}
+.feat3__tcircle {
+  width: 48px;
+  height: 48px;
+}
+.feat3__tool--on .feat3__tcircle {
+  background: var(--white);
+  color: var(--sky-ink);
+}
+.feat3__tlabel {
+  font-weight: var(--weight-medium);
+}
+.feat3__credit {
+  margin: 4px 4px 0;
+  font-size: var(--text-xs);
+  color: var(--glass-ink-2);
+}
+.feat3__back {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  background: var(--glass);
+  color: var(--white);
+  font: inherit;
+  font-weight: var(--weight-medium);
+}
+.feat3__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.feat3__link {
+  min-height: 44px;
+}
+.feat3__about {
+  margin-top: 12px;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--glass-ink-2);
+}
+
+/* The style options: a finger's 44 px. */
+.feat3 .ui-seg__opt {
+  min-height: 44px;
+}
+.feat3__tool {
+  gap: 4px;
+}

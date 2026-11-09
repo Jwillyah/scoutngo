@@ -51,9 +51,9 @@ export function Chip({ on, children, onClick }: { on: boolean; children: ReactNo
   )
 }
 
-export function Toggle({ on, label, onChange }: { on: boolean; label: string; onChange: (on: boolean) => void }) {
+export function Toggle({ on, label, onChange, feature }: { on: boolean; label: string; onChange: (on: boolean) => void; feature?: string }) {
   return (
-    <button type="button" role="switch" aria-checked={on} aria-label={label} className={`ui-toggle${on ? ' ui-toggle--on' : ''}`} onClick={() => onChange(!on)}>
+    <button type="button" role="switch" aria-checked={on} aria-label={label} data-feature={feature} className={`ui-toggle${on ? ' ui-toggle--on' : ''}`} onClick={() => onChange(!on)}>
       <span className="ui-toggle__knob" />
     </button>
   )

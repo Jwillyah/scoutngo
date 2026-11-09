@@ -165,6 +165,9 @@ for (const run of MODES) {
    */
   await ev(`document.querySelector('nav[aria-label="Map controls"] button[aria-label="Features"]')?.click()`)
   await wait(700)
+  /* Batch Map, Section 4: Cones is under the Map sheet's More ›. */
+  await ev(`document.querySelector('[data-feature="cones"]') ?? document.querySelector('.feat3__row--more')?.click()`)
+  await wait(500)
   const cones = await ev(`(() => {
     const sw = document.querySelector('[data-feature="cones"]')
     if (!sw) return 'no Cones switch in Features'

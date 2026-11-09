@@ -289,50 +289,44 @@ try {
     last = h
     await wait(150)
   }
-  await check('Plan, Features', '.feat')
+  await check('Plan, Features', '.feat3')
   /*
-   * FEATURES AT 44 PX (Batch L): every switch, quick button and weather tile
-   * at least 44 px tall. Past one screen, only the sheet's own body scrolls,
-   * and the quick buttons and the Weather row stay pinned where they were
-   * while the foot is scrolled into view.
+   * THE MAP SHEET, FEATURES v3 (Batch Map, Section 4): it fits one screen at
+   * its top height with nothing scrolling; every control (weather tile, row,
+   * tool, style option) at least 44 px tall; each section's label clear of
+   * the group under it (6 px or more); no monospace and no debug words (a
+   * zoom level, "native").
    */
   const layers = JSON.parse(await ev(`JSON.stringify((() => {
     const sheet = document.querySelector('.sheet')
-    const tiles = document.querySelector('.feat')
-    if (!sheet || !tiles) return { missing: true }
-    const scrolls = [...sheet.querySelectorAll('*')].filter((e) => { const s = getComputedStyle(e); return /(auto|scroll)/.test(s.overflowY) && e.scrollHeight > e.clientHeight + 1 }).map((e) => ({ name: e.className, h: e.scrollHeight + '/' + e.clientHeight, body: e.classList.contains('sheet__body') }))
-    const short = [...document.querySelectorAll('.feat__sw, .feat__qbtn, .feat__wtile')].filter((b) => b.getBoundingClientRect().height < 43.5).map((b) => (b.textContent || '').trim().slice(0, 16) + ' ' + Math.round(b.getBoundingClientRect().height))
-    const tallest = Math.round(Math.max(0, ...[...document.querySelectorAll('.feat__sw')].map((b) => b.getBoundingClientRect().height)))
-    const lowest = Math.round(Math.min(999, ...[...document.querySelectorAll('.feat__sw')].map((b) => b.getBoundingClientRect().height)))
-    const pinTop = () => Math.round(document.querySelector('.feat__pin')?.getBoundingClientRect().top ?? -1)
-    const wxTop = () => Math.round(document.querySelector('.feat__weather')?.getBoundingClientRect().top ?? -1)
-    const before = { pin: pinTop(), wx: wxTop() }
-    const body = sheet.querySelector('.sheet__body')
-    const content = tiles.scrollHeight
-    if (body) body.scrollTop = body.scrollHeight
-    const foot = document.querySelector('.feat__foot')?.getBoundingClientRect()
-    const after = { pin: pinTop(), wx: wxTop() }
-    const out = { detent: sheet.dataset.detent, scrolls, short, tallest, lowest, content, box: body ? body.clientHeight : null, before, after, footBottom: foot ? Math.round(foot.bottom) : null, vh: innerHeight, tools: [...document.querySelectorAll('.feat__qbtn')].some((l) => l.textContent === 'Measure'), longest: Math.max(0, ...[...document.querySelectorAll('.feat__note')].map((e) => e.textContent.length)) }
-    if (body) body.scrollTop = 0
-    return out
+    const f = document.querySelector('.feat3')
+    if (!sheet || !f) return { missing: true }
+    const scrolls = [...sheet.querySelectorAll('*')].filter((e) => { const s = getComputedStyle(e); return /(auto|scroll)/.test(s.overflowY) && e.scrollHeight > e.clientHeight + 1 }).map((e) => ({ name: e.className, h: e.scrollHeight + '/' + e.clientHeight }))
+    const short = [...f.querySelectorAll('.feat3__wtile, .feat3__row, .feat3__tcircle, .ui-seg__opt')].filter((b) => b.getBoundingClientRect().height < 43.5).map((b) => (b.textContent || '').trim().slice(0, 16) + ' ' + Math.round(b.getBoundingClientRect().height))
+    const heads = [...f.querySelectorAll('.feat3__head')].map((h) => { const n = h.nextElementSibling; return n === null ? 99 : Math.round(n.getBoundingClientRect().top - h.getBoundingClientRect().bottom) })
+    const mono = [...f.querySelectorAll('*')].filter((e) => /monospace|menlo|sf ?mono/i.test(getComputedStyle(e).fontFamily)).length
+    const bottom = Math.max(...[...f.querySelectorAll('*')].map((e) => e.getBoundingClientRect().bottom))
+    return { detent: sheet.dataset.detent, scrolls, short, heads, mono, debug: /\\bz\\d{1,2}\\b|native to/.test(f.textContent), bottom: Math.round(bottom), vh: innerHeight, tools: [...f.querySelectorAll('.feat3__tool')].some((t) => t.textContent.includes('Measure')), weather: [...f.querySelectorAll('[data-weather]')].map((w) => w.textContent.trim()) }
   })())`))
   if (layers.missing) fail('Features did not open, so it was not checked')
   else {
-    console.log(`  Features: sheet ${layers.detent}, content ${layers.content} px in a ${layers.box} px box, switches ${layers.lowest}-${layers.tallest} px tall, scrolling boxes ${layers.scrolls.map((x) => x.name.split(' ')[0] + ' ' + x.h).join(', ') || 'none'}, pinned top ${layers.before.pin} -> ${layers.after.pin} and Weather row ${layers.before.wx} -> ${layers.after.wx} after scrolling to the foot, foot ends at ${layers.footBottom} of ${layers.vh} px`)
-    if (layers.detent !== 'full') fail(`Features opened at ${layers.detent}, not full`)
-    for (const x of layers.scrolls) if (!x.body) fail(`Features scrolls inside the sheet, not the sheet itself: ${x.name} ${x.h}`)
-    for (const x of layers.short) fail(`a Features control is under 44 px tall: ${x}`)
-    if (layers.scrolls.length > 0 && (Math.abs(layers.before.pin - layers.after.pin) > 1 || Math.abs(layers.before.wx - layers.after.wx) > 1)) fail(`the quick buttons and Weather row moved when the sheet scrolled: ${layers.before.pin} -> ${layers.after.pin}, ${layers.before.wx} -> ${layers.after.wx}`)
-    if (layers.footBottom === null || layers.footBottom > layers.vh) fail('the foot of Features is off the screen even scrolled to it')
-    if (!layers.tools) fail('no Measure under Tools in Features')
-    if (layers.longest > 32) fail(`a switch's note runs to ${layers.longest} characters; a state is a few words`)
+    console.log(`  Map sheet: ${layers.detent}, bottom ${layers.bottom} of ${layers.vh} px, label gaps ${layers.heads.join('/')} px, weather ${layers.weather.join(' · ')}, scrolling ${layers.scrolls.map((x) => x.name.split(' ')[0] + ' ' + x.h).join(', ') || 'none'}`)
+    if (layers.detent !== 'full') fail(`the Map sheet opened at ${layers.detent}, not full`)
+    for (const x of layers.scrolls) fail(`the Map sheet scrolls (it fits one screen): ${x.name} ${x.h}`)
+    if (layers.bottom > layers.vh) fail(`the Map sheet runs off the screen: ${layers.bottom} of ${layers.vh} px`)
+    for (const x of layers.short) fail(`a Map sheet control is under 44 px tall: ${x}`)
+    for (const g of layers.heads) if (g < 6) fail(`a section label sits ${g} px from the group under it (6 or more)`)
+    if (layers.mono > 0) fail(`${layers.mono} monospace elements in the Map sheet`)
+    if (layers.debug) fail('debug words (a zoom level) in the Map sheet')
+    if (!layers.tools) fail('no Measure in the Map sheet')
+    if (JSON.stringify(layers.weather) !== JSON.stringify(['Off', 'Rain', 'Wind', 'Clouds'])) fail(`the weather tiles read ${JSON.stringify(layers.weather)}`)
   }
   /*
    * A NOTE WITH A CLOSE (measuring here; the waterline's is the same note):
    * inside the screen, and its × is what a tap there lands on. 27 Oct: the ×
    * sat at x 1224 on a 390 px screen and let taps through to the map.
    */
-  await ev(`[...document.querySelectorAll('.feat__qbtn')].find((t) => t.textContent === 'Measure')?.click()`)
+  await ev(`[...document.querySelectorAll('.feat3__tool')].find((t) => t.textContent.includes('Measure'))?.click()`)
   await wait(700)
   if (await ev(`document.querySelector('button[aria-label="Features"]')?.getAttribute('aria-pressed') === 'true'`)) {
     await ev(`document.querySelector('button[aria-label="Features"]')?.click()`)
