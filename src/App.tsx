@@ -113,7 +113,8 @@ import { Viewfinder, ViewfinderNeedsPlace } from './components/Viewfinder.tsx'
 import { Menu, type MenuRows, type MenuTarget } from './components/Menu.tsx'
 import { lastBackup } from './lib/backup.ts'
 import { PACK_STORAGE_KEY } from './lib/venuePack.ts'
-import { Briefing } from './components/Briefing.tsx'
+import { Home, type HomeTarget } from './components/Home.tsx'
+import { showsPhotoTools, useActivities } from './lib/activities.ts'
 import { SpotPicker } from './components/SpotPicker.tsx'
 import { viewfinderPreset } from './core/viewfinderPreset.ts'
 import { shouldOpenBriefing } from './lib/briefingOpen.ts'
@@ -1394,6 +1395,7 @@ function App() {
    * the side menu. A request carries a tick so asking twice opens twice.
    */
   const [menuOpen, setMenuOpen] = useState(false)
+  const [activities] = useActivities()
   /* The Today briefing: on a plain launch (src/lib/briefingOpen.ts), and from Menu › Today. */
   const [briefOpen, setBriefOpen] = useState(() => shouldOpenBriefing(typeof window === 'undefined' ? null : window, landingSeen))
   /* The spot switcher over Today (Batch I, Section 1). */
@@ -1502,6 +1504,8 @@ function App() {
    * its most useful page. Sky names its tab (src/core/menuCards.ts).
    */
   const onMenuTarget = (target: MenuTarget, opts?: { skyTab?: 'fire' | 'now' }) => {
+    /* The menu opened over the home: what it opens is under the home, so the home steps aside. */
+    if (target !== 'today') setBriefOpen(false)
     switch (target) {
       case 'today':
         setBriefOpen(true)
@@ -1522,6 +1526,25 @@ function App() {
         return
       default:
         onMenuPick(target)
+    }
+  }
+  /* The home's cards open their pages (Batch M, Section 3). */
+  const homeOpen = (t: HomeTarget) => {
+    switch (t) {
+      case 'surf':
+      case 'wind':
+      case 'tides':
+      case 'preflight':
+        onMenuPick(t)
+        return
+      case 'fire':
+        onMenuTarget('sky', { skyTab: 'fire' })
+        return
+      case 'moon':
+      case 'weather':
+        setMode('plan')
+        setCardRequest((r) => ({ kind: 'sky', skyTab: t === 'moon' ? 'now' : 'weather', tick: r.tick + 1 }))
+        return
     }
   }
   /* Its clock, read when it opens. */
@@ -2484,14 +2507,8 @@ function App() {
         />
       ) : null}
       {briefOpen && centre !== null && !spotPickOpen ? (
-        <Briefing
-          onOpenWeather={() => {
-            setBriefOpen(false)
-            setMode('plan')
-            setCardRequest((r) => ({ kind: 'sky', skyTab: 'weather', tick: r.tick + 1 }))
-          }}
-          onSwitchSpot={() => setSpotPickOpen(true)}
-          onViewfinder={() => setViewfinderOpen(true)}
+        /* THE HOME (Batch M, Section 3): the front door, weather first, ordered by what you do. */
+        <Home
           venue={centre}
           placeName={venueShort}
           timeZone={venueWindow?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}
@@ -2502,6 +2519,13 @@ function App() {
           onOpenMap={() => {
             setBriefOpen(false)
             setMode('plan')
+          }}
+          onMenu={() => setMenuOpen(true)}
+          onSwitchSpot={() => setSpotPickOpen(true)}
+          onViewfinder={showsPhotoTools(activities) ? () => setViewfinderOpen(true) : undefined}
+          onOpen={(t) => {
+            setBriefOpen(false)
+            homeOpen(t)
           }}
         />
       ) : null}

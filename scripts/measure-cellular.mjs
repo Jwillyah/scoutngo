@@ -33,7 +33,8 @@ if (pairs.length === 0) {
   console.log('usage: node scripts/measure-cellular.mjs <label> <dist> [<label> <dist> ...]')
   process.exit(1)
 }
-const NOW = new Date('2026-11-08T13:30:00Z')
+/* Inside the gate fixtures' week (30 Oct to 5 Nov) unless asked: outside it every forecast is a dash, answered or not. */
+const NOW = new Date(process.env.NOW ?? '2026-11-08T13:30:00Z')
 const SPOT = { at: { lat: 36.8435575, lon: -75.9713104 }, name: { key: 'x', name: 'Virginia Beach Fishing Pier' }, shootKind: 'sunset', platform: 'both', reachMeters: 2000 }
 const isOm = (href) => /open-meteo\.com\//.test(href) || /\/api\/forecast\?om=/.test(href)
 const PORT = 5196
@@ -78,7 +79,7 @@ async function run(dist, mode) {
       await page.waitForTimeout(1000)
       quiet = log.length === n ? quiet + 1 : 0
     }
-    const text = await page.evaluate(() => document.querySelector('.brief, .home')?.innerText ?? '')
+    const text = await page.evaluate(() => document.querySelector('.home, .brief')?.innerText ?? '')
     if (mode !== 'second') return { log, text }
     /* Two hours on, a slow link: how long until a wind number is on the home. */
     await page.close()
@@ -93,7 +94,7 @@ async function run(dist, mode) {
     const t0 = Date.now()
     let ms = null
     for (let i = 0; i < 240; i += 1) {
-      const has = await page.evaluate(() => /\d+\s*(kt|mph|km\/h|m\/s)/.test(document.querySelector('.brief, .home')?.innerText ?? '')).catch(() => false)
+      const has = await page.evaluate(() => /\d+\s*(kt|mph|km\/h|m\/s)/.test(document.querySelector('.home, .brief')?.innerText ?? '')).catch(() => false)
       if (has) {
         ms = Date.now() - t0
         break
@@ -101,8 +102,8 @@ async function run(dist, mode) {
       await page.waitForTimeout(250)
     }
     await page.waitForTimeout(1500)
-    const early = await page.evaluate(() => document.querySelector('.brief, .home')?.innerText ?? '').catch(() => '')
-    const line = await page.evaluate(() => (document.querySelector('.brief, .home')?.innerText ?? '').split('\n').find((l) => /refreshing|Checked|Updated/.test(l)) ?? null).catch(() => null)
+    const early = await page.evaluate(() => document.querySelector('.home, .brief')?.innerText ?? '').catch(() => '')
+    const line = await page.evaluate(() => (document.querySelector('.home, .brief')?.innerText ?? '').split('\n').find((l) => /refreshing|Checked|Updated/.test(l)) ?? null).catch(() => null)
     return { log, text, ms, line, early }
   } finally {
     await browser.close()
@@ -142,7 +143,7 @@ for (const [label, dist] of pairs) {
   console.log(label, shapes.length, weight.toFixed(1), dashes(shared.text), second.ms)
 }
 mkdirSync('measurements', { recursive: true })
-const file = `measurements/${new Date().toISOString().slice(0, 10)}-cellular.md`
+const file = `measurements/${new Date().toISOString().slice(0, 10)}-${process.env.NAME ?? 'cellular'}.md`
 writeFileSync(file, out.join('\n'))
 console.log(`wrote ${file}`)
 process.exit(0)

@@ -76,6 +76,8 @@ export interface Briefing {
   checkedAt: number | null
   /** The next event's observations are due and not in yet: its call is not settled (Batch J, Section 6). */
   obsPending?: boolean
+  /** The week by the hour (wind, air, the sky's code, rain): the home's weather block (Batch M). */
+  wx: Hourly | null
 }
 
 const dayIso = (start: string, n: number) => {
@@ -143,9 +145,17 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
     if (!open || key === null || lat === null || lon === null) return
     const at = { lat, lon }
     let live = true
+    /*
+     * The forecasts first, the beach's facing after (Batch M, Section 1): the
+     * facing asks the map's sea polygons, which on a slow link took 8 s and
+     * held the kept forecast off the home with it.
+     */
     void (async () => {
-      const [m, w, f] = await Promise.all([fetchMarine(at).catch(() => null), fetchBriefWind(at), coastFacing(at).catch(() => 'unavailable' as const)])
-      if (live) setSea({ key, marine: m?.value ?? null, wind: w, facing: f === 'inland' || f === 'unavailable' ? null : Math.round(f.facing) })
+      const [m, w] = await Promise.all([fetchMarine(at).catch(() => null), fetchBriefWind(at)])
+      if (!live) return
+      setSea((prev) => ({ key, marine: m?.value ?? null, wind: w, facing: prev?.key === key ? prev.facing : null }))
+      const f = await coastFacing(at).catch(() => 'unavailable' as const)
+      if (live) setSea((prev) => (prev === null || prev.key !== key ? prev : { ...prev, facing: f === 'inland' || f === 'unavailable' ? null : Math.round(f.facing) }))
     })()
     return () => {
       live = false
@@ -216,7 +226,7 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
   }, [open, key, stationId])
 
   return useMemo((): Briefing => {
-    if (key === null || lat === null || lon === null) return { status: 'loading', days: [], facing: null, checkedAt: null }
+    if (key === null || lat === null || lon === null) return { status: 'loading', days: [], facing: null, checkedAt: null, wx: null }
     const at = { lat, lon }
     const f = fire?.key === key ? fire : null
     const s = sea?.key === key ? sea : null
@@ -303,7 +313,7 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
     const times = [f, s].filter((x) => x !== null)
     const fetched = f === null ? [] : [...Object.values(f.near), f.week.sunrise, f.week.sunset].map((x) => x?.fetchedAt).filter((t): t is number => typeof t === 'number')
     const obsPending = obsDue(nextEvent, now) && (obs === null || (soon && stations?.key !== key))
-    return { status: times.length === (sky ? 2 : 1) ? 'ready' : 'loading', days, facing, checkedAt: fetched.length === 0 ? null : Math.max(...fetched), obsPending }
+    return { status: times.length === (sky ? 2 : 1) ? 'ready' : 'loading', days, facing, checkedAt: fetched.length === 0 ? null : Math.max(...fetched), obsPending, wx: s?.wind ?? null }
   }, [key, lat, lon, fire, sea, stations, tides, sat, obs, nextEvent, soon, sky, today, timeZone, now, scope])
 }
 

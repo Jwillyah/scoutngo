@@ -99,8 +99,9 @@ try {
 
     await page.locator('.mcard--today').click()
     await wait(1500)
-    if (!(await ev(`!!document.querySelector('.brief')`))) fail(`${label}: the Today card opened no briefing`)
-    await ev(`document.querySelector('.brief__x')?.click()`)
+    if (!(await ev(`!!document.querySelector('.home')`))) fail(`${label}: the Today card opened no home`)
+    /* Batch M: the home has no ×; its round Map button goes to the map. */
+    await ev(`document.querySelector('.home .hbtn--round[aria-label="Open the map"]')?.click()`)
     await wait(500)
     await page.locator('button[aria-label="Menu"]').first().click()
     await wait(800)

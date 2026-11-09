@@ -1,33 +1,42 @@
 /*
- * THE TODAY BRIEFING, IN WEBKIT, AS A TAB AND STANDALONE (Batch H, Section 2).
+ * THE HOME (Batch M, Section 3; it replaced the Today briefing), ON AN
+ * IPHONE AND AN ANDROID PHONE, AS A BROWSER TAB AND FROM THE HOME SCREEN.
  *
  * Usage:  node scripts/audit-briefing.mjs [screenshot-dir]
  *
  * The Virginia Beach pier at 6:11 AM EST on 2 Nov, a drone in the kit, every
- * weather host answered by the gate's fixtures. Opened from the menu's Today card.
+ * weather host answered by the gate's fixtures (a calm day). Opened from the
+ * menu's Today card.
  *
- *   each page  Today, Tomorrow, This week: fits 390 x 844 with nothing
- *              scrolled, nothing below the screen, nothing off its side
- *   Today      a call word (Go, Maybe, Skip, or a dash), the six steps of
- *              the light, Surf, Wind and Tide on one axis, the drone line
- *              (a drone is in the kit), a Now line
- *   This week  seven days, the dashed line before the third
- *   words      never "safe", never "clear to", never a red ground
- *   short tab  390 x 664 (a Safari tab): every page still fits (Batch I)
- *   first run  a bare launch with no spot: "Where do you shoot?", spots
- *              near the location once, one tap to Today (Batch I)
+ *   each page   Today, Tomorrow, Week: fits 390 x 844 (WebKit, tab and
+ *               home screen) and 412 x 915 (Chromium, tab and installed)
+ *               with nothing scrolled, nothing below the screen, nothing off
+ *               its side
+ *   Today       the weather first: a temperature, the sky in a word, H and
+ *               L, wind, a rain line; six hourly steps; the best windows
+ *               (rows, or the honest "Nothing standout" line); the cards in
+ *               a grid, the drone's among them (a drone is in the kit);
+ *               one primary button, a round Map and a round Menu
+ *   Tomorrow    the same, and no large empty gap under its cards (8 Nov:
+ *               the old Today had one under the conditions card)
+ *   Week        a headline, seven days, days 4-7 marked as guesses
+ *   words       never "safe", never "clear to", never a red ground
+ *   Menu        the round Menu opens the menu over the home
+ *   short tab   390 x 664 (a Safari tab): nothing off the side; it may scroll
+ *   first run   a bare launch with no spot: "Where do you shoot?", spots
+ *               near the location once, one tap to the home (Batch I)
  */
 import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { webkit, devices } from './gate/playwright.mjs'
-import { ensureApp, goToStage, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mjs'
+import { chromium, webkit, devices } from './gate/playwright.mjs'
+import { ensureApp, findChrome, goToStage, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mjs'
 import { shareLink } from '../src/lib/planShare.ts'
 import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
 import { placeKey } from '../src/core/venueName.ts'
 
 guardAudit('briefing')
-const watchdog = startWatchdog('briefing', 300_000)
+const watchdog = startWatchdog('briefing', 420_000)
 const OUT = process.argv[2] ?? join(process.env.SCOUTNGO_OUT ?? tmpdir(), 'briefing')
 mkdirSync(OUT, { recursive: true })
 
@@ -43,20 +52,32 @@ const fail = (why) => {
   problems += 1
 }
 
+/** One page of the home: what runs off the screen or its side, whether it scrolls, its text, and the gap under its last element. */
 const FIT = (i) => `JSON.stringify((() => {
-  const pg = document.querySelectorAll('.brief__page')[${i}]
+  const pg = document.querySelectorAll('.home__page')[${i}]
   if (!pg) return { missing: true }
   const r = pg.getBoundingClientRect()
   const out = [...pg.querySelectorAll('*')].filter((e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0 && (b.bottom > innerHeight + 1 || b.right > r.right + 1 || b.left < r.left - 1) }).map((e) => (e.getAttribute('class') ?? e.tagName) + ' ' + Math.round(e.getBoundingClientRect().bottom)).slice(0, 4)
-  const scrolls = pg.scrollHeight > pg.clientHeight + 1
-  return { out, scrolls, text: pg.innerText }
+  const side = [...pg.querySelectorAll('*')].filter((e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0 && (b.right > r.right + 1 || b.left < r.left - 1) }).map((e) => e.getAttribute('class') ?? e.tagName).slice(0, 4)
+  const foot = document.querySelector('.home__foot')?.getBoundingClientRect().top ?? innerHeight
+  const kids = [...(pg.firstElementChild?.children ?? [])].filter((e) => e.getBoundingClientRect().height > 0)
+  const last = kids.length === 0 ? r.top : Math.max(...kids.map((e) => e.getBoundingClientRect().bottom))
+  return { out, side, scrolls: pg.scrollHeight > pg.clientHeight + 1, text: pg.innerText, gap: Math.round(foot - last), content: Math.round(pg.scrollHeight), box: Math.round(pg.clientHeight) }
 })())`
 
-const browser = await webkit.launch()
+const LOOKS = [
+  ['iPhone tab', 'webkit', { width: 390, height: 844 }, { top: 0, bottom: 0 }, true],
+  ['iPhone home screen', 'webkit', { width: 390, height: 844 }, { top: 47, bottom: 34 }, true],
+  ['Android tab', 'chromium', { width: 412, height: 915 }, { top: 0, bottom: 0 }, true],
+  ['Android installed', 'chromium', { width: 412, height: 915 }, { top: 24, bottom: 0 }, true],
+  ['short tab', 'webkit', { width: 390, height: 664 }, { top: 0, bottom: 0 }, false],
+]
+const browsers = {}
 try {
-  for (const [label, insets, height] of [['browser', { top: 0, bottom: 0 }, 844], ['standalone', { top: 47, bottom: 34 }, 844], ['short tab', { top: 0, bottom: 0 }, 664]]) {
+  for (const [label, engine, viewport, insets, mustFit] of LOOKS) {
     console.log(`\n### ${label}`)
-    const ctx = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height } })
+    browsers[engine] ??= engine === 'webkit' ? await webkit.launch() : await chromium.launch({ executablePath: findChrome() })
+    const ctx = await browsers[engine].newContext({ ...(engine === 'webkit' ? devices['iPhone 13'] : devices['Pixel 7']), viewport })
     await ctx.addInitScript(([top, bottom]) => {
       try {
         localStorage.setItem('scoutngo.landing.v1', 'true')
@@ -81,58 +102,68 @@ try {
     await page.getByRole('button', { name: /^open$/i }).click({ timeout: 4000 }).catch(() => {})
     await goToStage(ev, wait, 'plan')
     await wait(2500)
-    const auto = await ev(`!!document.querySelector('.brief')`)
-    if (auto) fail(`${label}: the briefing opened by itself on a shared plan's link`)
+    if (await ev(`!!document.querySelector('.home')`)) fail(`${label}: the home opened by itself on a shared plan's link`)
     await page.locator('button[aria-label="Menu"]').first().click()
     await wait(700)
     await page.locator('.mcard--today').first().click()
     await wait(6000)
-    if (!(await ev(`!!document.querySelector('.brief')`))) {
-      fail(`${label}: Menu › Today opened no briefing`)
+    if (!(await ev(`!!document.querySelector('.home')`))) {
+      fail(`${label}: Menu › Today opened no home`)
       await ctx.close()
       continue
     }
     looked += 1
-    for (const [i, name] of ['Today', 'Tomorrow', 'This week'].entries()) {
-      await page.getByRole('tab', { name }).click()
+    for (const [i, name] of ['Today', 'Tomorrow', 'Week'].entries()) {
+      await page.getByRole('tab', { name, exact: true }).click()
       await wait(1200)
       const t = JSON.parse(await ev(FIT(i)))
       if (t.missing) {
         fail(`${label}: no ${name} page`)
         continue
       }
-      console.log(`  ${name}: ${t.out.length === 0 && !t.scrolls ? 'fits' : `DOES NOT FIT ${JSON.stringify(t.out)}`}`)
-      if (t.scrolls) fail(`${label}, ${name}: the page scrolls`)
-      for (const o of t.out) fail(`${label}, ${name}: ${o} runs off the screen`)
+      console.log(`  ${name}: ${t.content}/${t.box} px, gap under it ${t.gap} px, ${t.out.length === 0 && !t.scrolls ? 'fits' : `DOES NOT FIT ${JSON.stringify(t.out)}${t.scrolls ? ' (scrolls)' : ''}`}`)
+      if (mustFit && t.scrolls) fail(`${label}, ${name}: the page scrolls (${t.content} of ${t.box} px)`)
+      if (mustFit) for (const o of t.out) fail(`${label}, ${name}: ${o} runs off the screen`)
+      for (const o of t.side) fail(`${label}, ${name}: ${o} runs off the side`)
       if (/\bsafe\b|clear to fly|all clear/i.test(t.text)) fail(`${label}, ${name}: says safe or clear: ${JSON.stringify(t.text.slice(0, 120))}`)
-      await page.screenshot({ path: join(OUT, `briefing-${name.replace(/\s/g, '-').toLowerCase()}-${label}.png`) })
-      if (i === 0) {
-        const today = await ev(`JSON.stringify({ word: document.querySelector('.bcall__word')?.textContent, steps: document.querySelectorAll('.brief__page .bstep').length, rows: [...document.querySelectorAll('.brief__page')[0].querySelectorAll('.brow__name')].map((e) => e.textContent), now: !!document.querySelectorAll('.brief__page')[0].querySelector('.bnow') })`)
-        console.log(`  today: ${today}`)
-        const d = JSON.parse(today)
-        if (!/^(Go|Maybe|Skip|—)$/.test(d.word ?? '')) fail(`${label}: the call reads ${JSON.stringify(d.word)}`)
-        if (d.steps < 6) fail(`${label}: ${d.steps} steps of the light, not 6`)
-        for (const row of ['Surf', 'Wind', 'Tide', 'Drone']) if (!d.rows.includes(row)) fail(`${label}: no ${row} row`)
-        if (!d.now) fail(`${label}: no Now line on Today`)
-      }
-      if (i === 2) {
-        const wk = await ev(`JSON.stringify({ days: document.querySelectorAll('.bwk__day').length, cut: document.querySelectorAll('.bwk__day--cut').length })`)
-        console.log(`  week: ${wk}`)
-        const w = JSON.parse(wk)
+      if (mustFit && name === 'Tomorrow' && t.gap > 200) fail(`${label}: a ${t.gap} px empty gap under Tomorrow's cards`)
+      await page.screenshot({ path: join(OUT, `home-${name.toLowerCase()}-${label.replace(/\s/g, '-').toLowerCase()}.png`) })
+      if (i <= 1) {
+        const d = JSON.parse(await ev(`JSON.stringify((() => { const pg = document.querySelectorAll('.home__page')[${i}]; return { temp: pg.querySelector('.hwx__temp')?.textContent ?? '', cond: pg.querySelector('.hwx__cond')?.textContent ?? '', lines: [...pg.querySelectorAll('.hwx__line')].map((e) => e.textContent), steps: pg.querySelectorAll('.hstrip__step').length, best: pg.querySelector('.hbest')?.innerText ?? null, cards: [...pg.querySelectorAll('.hcard__title')].map((e) => e.textContent) } })())`))
+        console.log(`  ${name}: ${JSON.stringify(d).slice(0, 300)}`)
+        if (!/^-?\d+°$/.test(d.temp)) fail(`${label}, ${name}: the big temperature reads ${JSON.stringify(d.temp)}`)
+        if (d.cond.trim() === '' || d.cond.trim() === '—') fail(`${label}, ${name}: no sky word`)
+        if (!d.lines.some((l) => /^H .* · L /.test(l))) fail(`${label}, ${name}: no high and low`)
+        if (!d.lines.some((l) => /^Wind /.test(l))) fail(`${label}, ${name}: no wind`)
+        if (!d.lines.some((l) => /rain/i.test(l))) fail(`${label}, ${name}: no rain line`)
+        if (d.steps !== 6) fail(`${label}, ${name}: ${d.steps} hourly steps, not 6`)
+        if (d.best === null || !/Best windows/i.test(d.best) || d.best.split('\n').length < 2) fail(`${label}, ${name}: no best windows card, or an empty one`)
+        for (const c of ['Surf', 'Wind', 'Tide', 'Sunset', 'Drone', 'Moon']) if (!d.cards.includes(c)) fail(`${label}, ${name}: no ${c} card`)
+      } else {
+        const w = JSON.parse(await ev(`JSON.stringify({ head: document.querySelector('.hweek__head')?.textContent ?? null, days: document.querySelectorAll('.hweek__row').length, guesses: document.querySelectorAll('.hweek__row--guess').length })`))
+        console.log(`  week: ${JSON.stringify(w)}`)
+        if (w.head === null || w.head === '') fail(`${label}: no week headline`)
         if (w.days !== 7) fail(`${label}: ${w.days} days in the week`)
-        if (w.cut !== 1) fail(`${label}: no dashed line before the third day`)
+        if (w.guesses !== 4) fail(`${label}: ${w.guesses} days marked as guesses, not days 4-7`)
       }
     }
-    const ground = await ev(`getComputedStyle(document.querySelector('.brief')).backgroundImage`)
+    const buttons = JSON.parse(await ev(`JSON.stringify({ main: document.querySelector('.home .hbtn--main')?.textContent ?? null, round: [...document.querySelectorAll('.home .hbtn--round')].map((b) => b.getAttribute('aria-label')) })`))
+    console.log(`  buttons: ${JSON.stringify(buttons)}`)
+    if (!/^(Radar|Viewfinder|Preflight)$/.test(buttons.main ?? '')) fail(`${label}: the primary button reads ${JSON.stringify(buttons.main)}`)
+    if (buttons.round.join('|') !== 'Open the map|Menu') fail(`${label}: the round buttons are ${JSON.stringify(buttons.round)}`)
+    const ground = await ev(`getComputedStyle(document.querySelector('.home')).backgroundImage`)
     if (/255,\s*59,\s*48|#ff3b30/i.test(ground)) fail(`${label}: the ground is the hazard red`)
-    await page.locator('.brief__x').click()
+    await page.locator('.home .hbtn--round[aria-label="Menu"]').click()
+    await wait(700)
+    const menu = await ev(`(() => { const m = document.querySelector('.menu'); return m !== null && getComputedStyle(m).visibility !== 'hidden' && m.getBoundingClientRect().width > 0 })()`)
+    if (!menu) fail(`${label}: the round Menu opened no menu`)
+    await page.keyboard.press('Escape')
     await wait(500)
-    if (await ev(`!!document.querySelector('.brief')`)) fail(`${label}: × did not close the briefing`)
 
     /*
      * FIRST RUN, NO SETUP (Batch I, Section 1): a bare launch with no spot
-     * asks "Where do you shoot?"; the location once offers known spots near
-     * it; one tap opens Today for that spot. No map, no pin.
+     * asks where; the location once offers known spots near it; one tap
+     * opens the home for that spot. No map, no pin.
      */
     if (label === 'short tab') {
       await ctx.grantPermissions(['geolocation'])
@@ -142,7 +173,7 @@ try {
       await wait(3500)
       const asked = await ev(`document.querySelector('.spick__title')?.textContent ?? null`)
       console.log(`  first run: ${asked}`)
-      if (asked !== 'Where do you shoot?') fail(`a bare first launch did not ask where you shoot (${JSON.stringify(asked)})`)
+      if (asked !== 'Where do you shoot?') fail(`a bare first launch did not ask where (${JSON.stringify(asked)})`)
       await page.getByRole('button', { name: 'Use my location once' }).click().catch(() => {})
       await wait(2500)
       const rows = await ev(`[...document.querySelectorAll('.spick__row .spick__name')].map((e) => e.textContent)`)
@@ -150,15 +181,15 @@ try {
       if (!Array.isArray(rows) || rows.length === 0) fail('no known spots offered near the location')
       await page.locator('.spick__row').first().click().catch(() => {})
       await wait(5000)
-      const opened = await ev(`document.querySelector('.bcall__place')?.textContent ?? null`)
-      console.log(`  then Today: ${opened}`)
-      if (opened === null) fail('picking a spot did not open Today')
+      const opened = await ev(`document.querySelector('.home__spotname')?.textContent ?? null`)
+      console.log(`  then the home: ${opened}`)
+      if (opened === null) fail('picking a spot did not open the home')
     }
     await ctx.close()
     watchdog.note(label)
   }
 } finally {
-  await browser.close()
+  for (const b of Object.values(browsers)) await b.close()
 }
 watchdog.stop()
 if (looked === 0) {

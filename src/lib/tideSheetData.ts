@@ -132,14 +132,13 @@ export async function fetchWindMonth(at: LatLon) {
  * and at 120 m (about 400 ft) for the drone. One question, kept for the hour.
  */
 /* And for the satellite nowcast: the air at 2 m (its ground reference) and the wind at 500 hPa (to advect the cloud). */
-export const BRIEF_WIND_NAMES = ['wind_speed_10m', 'wind_direction_10m', 'wind_gusts_10m', 'wind_speed_120m', 'temperature_2m', 'wind_speed_500hPa', 'wind_direction_500hPa'] as const
+/* Batch M: and the home's weather block (the sky's WMO code, the rain), in the same one question: 10 variables, one call. */
+export const BRIEF_WIND_NAMES = ['wind_speed_10m', 'wind_direction_10m', 'wind_gusts_10m', 'wind_speed_120m', 'temperature_2m', 'wind_speed_500hPa', 'wind_direction_500hPa', 'weather_code', 'precipitation', 'cloud_cover'] as const
 export async function fetchBriefWind(at: LatLon): Promise<Hourly | null> {
   const params = new URLSearchParams({ latitude: at.lat.toFixed(2), longitude: at.lon.toFixed(2), hourly: BRIEF_WIND_NAMES.join(','), wind_speed_unit: 'ms', forecast_days: '7', timezone: 'GMT' })
-  try {
-    return parseHourly(await getWeather(`${WIND_URL}?${params}`), BRIEF_WIND_NAMES)
-  } catch {
-    return null
-  }
+  /* A kept answer, stale or not, is shown while a new one is fetched behind it (Batch M: never a blank home while refreshing). */
+  const got = await weatherJson(`${WIND_URL}?${params}`, { maxAgeMs: SLOW_MAX_AGE_MS, timeoutMs: TIMEOUT_MS })
+  return got.ok ? parseHourly(got.payload, BRIEF_WIND_NAMES) : null
 }
 
 export const SKY_NAMES = ['cloud_cover_low', 'cloud_cover_mid', 'cloud_cover_high', 'visibility'] as const
