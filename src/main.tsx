@@ -11,6 +11,10 @@ import './styles/app.css'
 import App from './App.tsx'
 import { watchHosts } from './lib/privacy.ts'
 import { setForecastEdge } from './lib/weatherStore.ts'
+import { watchNet } from './lib/netLog.ts'
+
+/* Batch N E1: what each request did, in memory, for the home's hidden debug line. */
+watchNet()
 
 /* Open-Meteo through this app's forecast cache (api/forecast.ts, Batch M): on a phone network many phones share one address. */
 setForecastEdge('/api/forecast')

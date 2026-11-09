@@ -1,25 +1,29 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+/* suncalc 2.0.2 (this repo's): altitude and azimuth in DEGREES, azimuth from north, clockwise (Batch N E10: the moon read "S" when it was treated as radians from south). */
 import { getMoonPosition, getPosition } from 'suncalc'
 import { moonTimesOnLocalDay } from '../core/moonTimes.ts'
 import { droneTag, kt, surfTag, windTag, type CallRead } from '../core/briefing.ts'
 import { droneWindow } from '../core/droneWindow.ts'
-import { bestRun, bestWindows, cardList, conditionOf, nothingLine, rainLine, spanWords, stripSteps, weekHeadline, type Activity, type CardKind, type SkyIcon, type WindowRow } from '../core/homeDay.ts'
+import { bestRun, bestWindows, cardList, conditionOf, groundOf, nothingLine, rainLine, spanWords, stripSteps, weekHeadline, type Activity, type CardKind, type SkyIcon, type WindowRow } from '../core/homeDay.ts'
 import { camsFacingWaterOrSun } from '../core/skyCams.ts'
 import { wakeAt } from '../core/alertIcs.ts'
 import { formatClock } from '../core/timezone.ts'
 import { COAST_CAMS } from '../data/coastCams.ts'
 import { homeOrder, primaryFor, useActivities } from '../lib/activities.ts'
-import { beachName } from '../lib/surfBeach.ts'
+import { beachName, nearestBeach, sameBeach } from '../lib/surfBeach.ts'
+import { distanceMeters } from '../core/geo.ts'
 import { hourlyAt } from '../lib/tideSheetData.ts'
 import { compass } from '../lib/tideWords.ts'
 import { formatTemperature, windIn, windUnitLabel, type Units } from '../lib/units.ts'
-import { useBriefing, type Briefing, type DayBrief } from '../lib/useBriefing.ts'
+import { useBriefing, type Briefing, type BriefingDrone, type DayBrief } from '../lib/useBriefing.ts'
 import { useStormPlay } from '../lib/useStormPlay.ts'
-import { useCoast } from '../lib/coastData.ts'
+import { useCoast, useMarineAlerts } from '../lib/coastData.ts'
+import { connectivity } from '../lib/connectivity.ts'
+import { netLines } from '../lib/netLog.ts'
 import { refreshLine, useWeatherRefreshing } from '../lib/useWeatherStatus.ts'
-import type { BriefingDrone } from './Briefing.tsx'
 import { ActivityIcon } from './ActivityIcon.tsx'
 import { MoonGlyph } from './MoonGlyph.tsx'
+import { CamsSheet } from './CamsSheet.tsx'
 import { OPEN_RADAR_EVENT } from './WeatherTab.tsx'
 
 /*
@@ -66,12 +70,34 @@ interface HomeProps {
 
 type Page = 0 | 1 | 2
 const PAGES = ['Today', 'Tomorrow', 'Week'] as const
+const TAB_KEY = 'scoutngo.homeTab.v1'
+function readHomeTab(): Page | null {
+  try {
+    const v = Number(localStorage.getItem(TAB_KEY))
+    return v === 0 || v === 1 || v === 2 ? v : null
+  } catch {
+    return null
+  }
+}
+function writeHomeTab(p: Page): void {
+  try {
+    localStorage.setItem(TAB_KEY, String(p))
+  } catch {
+    /* Private browsing: this session still has it. */
+  }
+}
 
 export function Home({ venue, placeName, timeZone, units, drone, now, onClose, onOpenMap, onMenu, onSwitchSpot, onViewfinder, onOpen, start = 0 }: HomeProps) {
   const brief = useBriefing(venue, timeZone, now, true)
   const [picked] = useActivities()
   const order = homeOrder(picked, drone !== null)
-  const [page, setPage] = useState<Page>(start)
+  /* Batch N A2: reopening lands on the tab last used (kept on this phone). */
+  const [page, setPageRaw] = useState<Page>(() => readHomeTab() ?? start)
+  const setPage = (p: Page) => {
+    setPageRaw(p)
+    writeHomeTab(p)
+  }
+  const [debug, setDebug] = useState(false)
   const track = useRef<HTMLDivElement>(null)
   const go = (p: Page) => {
     setPage(p)
@@ -81,7 +107,7 @@ export function Home({ venue, placeName, timeZone, units, drone, now, onClose, o
   useEffect(() => {
     const el = track.current
     if (el === null) return
-    el.scrollLeft = start * el.clientWidth
+    el.scrollLeft = (readHomeTab() ?? start) * el.clientWidth
     const onScroll = () => setPage(Math.round(el.scrollLeft / Math.max(1, el.clientWidth)) as Page)
     el.addEventListener('scroll', onScroll, { passive: true })
     return () => el.removeEventListener('scroll', onScroll)
@@ -95,13 +121,23 @@ export function Home({ venue, placeName, timeZone, units, drone, now, onClose, o
   }, [onClose])
 
   const play = useStormPlay(venue, timeZone, units, true)
-  const alert = play.now?.alerts?.[0] ?? null
+  /*
+   * The banner: the NWS alerts at the spot, and at a beach the marine zone's
+   * too (Batch N E5: a Small Craft Advisory showed nowhere). Fish or boat
+   * picked: the marine ones first. As the NWS names them, with when they end.
+   */
+  const marineAlerts = useMarineAlerts(brief.facing !== null ? venue : null)
+  const until = (d: Date | null) => (d === null ? '' : ` until ${formatClock(d, timeZone).replace(/:00 /, ' ')} ${new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone }).format(d)}`)
+  const land = (play.now?.alerts ?? []).map((a) => `${a.event}${until(a.ends)}`)
+  const sea = (marineAlerts ?? []).map((a) => `${a.event}${until(a.ends)}`)
+  const banner = [...new Set(order.includes('fish') ? [...sea, ...land] : [...land, ...sea])].slice(0, 2)
+  const alert = banner.length === 0 ? null : { event: banner.join(' · ') }
   const openRadar = () => {
     window.dispatchEvent(new CustomEvent(OPEN_RADAR_EVENT, { detail: play.now?.radar?.scanAt ?? null }))
     onOpenMap()
   }
   const primary = play.inPlay ? 'radar' : primaryFor(order)
-  const sky = skyOf(brief, now, venue)
+  const sky = skyOf(brief, now, venue, play.inPlay)
   const refreshing = refreshLine(brief.checkedAt, useWeatherRefreshing(), (d) => formatClock(d, timeZone))
 
   return (
@@ -123,29 +159,30 @@ export function Home({ venue, placeName, timeZone, units, drone, now, onClose, o
       </div>
       <div className="home__track" ref={track}>
         <section className="home__page" aria-label="Today">
-          <DayView which="today" brief={brief} day={brief.days[0] ?? null} order={order} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} alert={alert === null ? null : alert.event} stormLine={play.inPlay ? play.headline : null} onOpen={onOpen} />
+          <DayView placeName={placeName} which="today" brief={brief} day={brief.days[0] ?? null} order={order} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} alert={alert === null ? null : alert.event} stormLine={play.inPlay ? play.headline : null} onOpen={onOpen} onDebug={() => setDebug((d) => !d)} />
         </section>
         <section className="home__page" aria-label="Tomorrow">
-          <DayView which="tomorrow" brief={brief} day={brief.days[1] ?? null} order={order} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} alert={null} stormLine={null} onOpen={onOpen} />
+          <DayView placeName={placeName} which="tomorrow" brief={brief} day={brief.days[1] ?? null} order={order} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} alert={null} stormLine={null} onOpen={onOpen} />
         </section>
         <section className="home__page" aria-label="Week">
           <WeekView brief={brief} order={order} timeZone={timeZone} units={units} now={now} venue={venue} />
         </section>
       </div>
+      {debug ? <NetDebug onClose={() => setDebug(false)} /> : null}
       <div className="home__foot">
         {refreshing === null ? null : <p className="home__fresh">{refreshing}</p>}
         <div className="home__buttons">
           {primary === 'viewfinder' && onViewfinder !== undefined ? (
             <button type="button" className="hbtn hbtn--main" onClick={onViewfinder}>
-              Viewfinder
+              <CamGlyph /> Viewfinder
             </button>
           ) : primary === 'preflight' ? (
             <button type="button" className="hbtn hbtn--main" onClick={() => onOpen('preflight')}>
-              Preflight
+              <DroneGlyph /> Preflight
             </button>
           ) : (
             <button type="button" className="hbtn hbtn--main" onClick={openRadar}>
-              Radar
+              <RadarGlyph /> Radar
             </button>
           )}
           <button type="button" className="hbtn hbtn--round" onClick={onOpenMap} aria-label="Open the map">
@@ -166,15 +203,11 @@ export function Home({ venue, placeName, timeZone, units, drone, now, onClose, o
 
 /* ------------------------------------------------------------- the ground */
 
-/** The ground's sky: night, golden near the sun's event, rain, cloud, or a day sky; from the forecast at now. */
-function skyOf(brief: Briefing, now: Date, venue: { lat: number; lon: number }): 'night' | 'golden' | 'rain' | 'cloud' | 'day' {
-  const elev = (getPosition(now, venue.lat, venue.lon).altitude * 180) / Math.PI
-  if (elev < -4) return 'night'
+/** The ground's sky now (Batch N A1): from the forecast's WMO code and the sun's height; night is the sun below -6° (civil dusk), not the clock. */
+function skyOf(brief: Briefing, now: Date, venue: { lat: number; lon: number }, storms: boolean) {
+  const elev = getPosition(now, venue.lat, venue.lon).altitude
   const code = brief.wx === null ? null : hourlyAt(brief.wx, 'weather_code', now)
-  if (code !== null && (code >= 51 || code === 45 || code === 48)) return 'rain'
-  if (elev < 8) return 'golden'
-  if (code === 3) return 'cloud'
-  return 'day'
+  return groundOf(elev, code, storms)
 }
 
 /* ------------------------------------------------------------- a day view */
@@ -192,6 +225,9 @@ interface DayViewProps {
   alert: string | null
   stormLine: string | null
   onOpen: (target: HomeTarget) => void
+  /** A triple tap on the date: the network debug lines (Batch N E1). */
+  onDebug?: () => void
+  placeName: string
 }
 
 const ICON: Record<SkyIcon, ReactNode> = {
@@ -251,7 +287,7 @@ function SkyIconSvg({ icon, className }: { icon: SkyIcon; className: string }) {
   )
 }
 
-function DayView({ which, brief, day, order, venue, timeZone, units, drone, now, alert, stormLine, onOpen }: DayViewProps) {
+function DayView({ which, brief, day, order, venue, timeZone, units, drone, now, alert, stormLine, onOpen, onDebug, placeName }: DayViewProps) {
   const clock = (d: Date | null) => (d === null ? '—' : formatClock(d, timeZone))
   const wx = brief.wx
   const at = (name: string, t: Date) => (wx === null ? null : hourlyAt(wx, name, t))
@@ -265,7 +301,7 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
   const temps = dayHours.map((h) => at('temperature_2m', h)).filter((t): t is number => t !== null)
   const hi = temps.length === 0 ? null : Math.max(...temps)
   const lo = temps.length === 0 ? null : Math.min(...temps)
-  const sunUp = (getPosition(when, venue.lat, venue.lon).altitude * 180) / Math.PI > -0.8
+  const sunUp = getPosition(when, venue.lat, venue.lon).altitude > -0.8
   const cond = conditionOf(at('weather_code', when), sunUp)
   const bigTemp = which === 'today' ? at('temperature_2m', now) : hi
   const windMps = at('wind_speed_10m', when)
@@ -275,11 +311,28 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
   const steps = which === 'today' ? stripSteps(now, venue.lat, venue.lon, timeZone) : day === null ? [] : stripSteps(new Date(day.start.getTime() + 7 * 3_600_000), venue.lat, venue.lon, timeZone).map((s, i) => (i === 0 && s.kind === 'hour' ? { ...s, label: formatClock(s.at, timeZone).replace(/:00 /, ' ').replace(/ [AP]M$/, (m) => m.trim().toLowerCase().slice(0, 1)).replace(' ', '') } : s))
   const dateWords = which === 'today' ? `${new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone }).format(now)} · ${clock(now)}` : day === null ? 'Tomorrow' : `Tomorrow · ${new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone }).format(day.start)}`
 
-  const rows = useMemo(() => (day === null ? [] : windowRows(which, day, order, units, drone, now, venue, timeZone, brief.facing)), [which, day, order, units, drone, now, venue, timeZone, brief.facing])
+  const rows = useMemo(() => {
+    if (day === null) return []
+    const own = windowRows(which, day, order, units, drone, now, venue, timeZone, brief.facing)
+    /* Batch N E3: after dark, nothing is left today: tomorrow's first windows, said as tomorrow's. */
+    const next = brief.days[1] ?? null
+    const dark = which === 'today' && day.events.sunset !== null && now.getTime() > day.events.sunset.getTime()
+    if (own.length > 0 || !dark || next === null) return own
+    return windowRows('tomorrow', next, order, units, drone, now, venue, timeZone, brief.facing).map((r) => ({ ...r, head: `Tomorrow: ${r.head}` }))
+  }, [which, day, order, units, drone, now, venue, timeZone, brief.facing, brief.days])
+  /* Batch N E2: no forecast is not "nothing standout": it says so, and that it is asking again. */
+  const noForecast = !loading && (wx === null || day === null || day.wind.every((w) => w.mps === null))
   const nextGood = useMemo(() => nextGoodDay(brief.days, which === 'today' ? 1 : 2, timeZone), [brief.days, which, timeZone])
   const cards = cardList(order, drone !== null || order.includes('drone'))
-  const sunAz = day?.events.sunset === null || day === null ? null : (getPosition(day.events.sunset, venue.lat, venue.lon).azimuth * 180) / Math.PI + 180
+  /* Batch N E8: the nearest surf beach when the spot is not on it (a bay, a marsh, inland). */
+  const beach = nearestBeach(venue)
+  const away = beach !== null && !sameBeach(venue, beach)
+  const beachBrief = useBriefing(away ? beach.at : null, timeZone, now, away, 'sea')
+  const awayKm = away ? distanceMeters(venue, beach.at) / 1000 : 0
+  const surfAway = away ? { day: beachBrief.days[which === 'today' ? 0 : 1] ?? null, name: beachName(beach.name), far: units.distance === 'ft' ? `${Math.max(1, Math.round(awayKm / 1.609))} mi` : `${Math.max(1, Math.round(awayKm))} km` } : null
+  const sunAz = day?.events.sunset === null || day === null ? null : getPosition(day.events.sunset, venue.lat, venue.lon).azimuth
   const cams = which === 'today' ? camsFacingWaterOrSun(venue, sunAz, brief.facing, COAST_CAMS) : []
+  const [camsOpen, setCamsOpen] = useState(false)
   /* Fish or boat (Batch M, Section 2): the NWS marine forecast for the zone, first period, as written; asked only when picked, at a beach. */
   const fish = order.includes('fish') && brief.facing !== null
   const marine = useCoast(fish && which === 'today' ? venue : null, null, units.distance === 'ft' ? 'mi' : 'km', fish && which === 'today').coast?.marine ?? null
@@ -293,7 +346,9 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
       )}
       <div className="hwx">
         <div className="hwx__main">
-          <p className="hwx__date">{dateWords}</p>
+          <p className="hwx__date" onClick={(e) => (e.detail >= 3 ? onDebug?.() : undefined)}>
+            {dateWords}
+          </p>
           <p className="hwx__temp num">{bigTemp === null ? (loading ? '…' : '—') : temp(bigTemp)}</p>
         </div>
         <div className="hwx__side">
@@ -302,10 +357,7 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
             <span>{cond?.word ?? '—'}</span>
           </p>
           <p className="hwx__line">
-            H {temp(hi)} · L {temp(lo)}
-          </p>
-          <p className="hwx__line">
-            Wind {windFrom === null ? '' : `${compass(windFrom)} `}
+            H {temp(hi)} · L {temp(lo)} · {windFrom === null ? '' : `${compass(windFrom)} `}
             {speed(windMps)}
           </p>
           <p className="hwx__line hwx__rain">{rain ?? '—'}</p>
@@ -315,7 +367,7 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
       <ol className="hstrip">
         {steps.map((s) => {
           const t = at('temperature_2m', s.at)
-          const c = conditionOf(at('weather_code', s.at), s.kind === 'sunrise' || (getPosition(s.at, venue.lat, venue.lon).altitude * 180) / Math.PI > -0.8)
+          const c = conditionOf(at('weather_code', s.at), s.kind === 'sunrise' || getPosition(s.at, venue.lat, venue.lon).altitude > -0.8)
           return (
             <li key={s.at.getTime()} className={`hstrip__step${s.kind === 'hour' ? '' : ' hstrip__step--sun'}`}>
               <span className="hstrip__at">{s.kind === 'hour' ? s.label : `${s.kind === 'sunrise' ? 'Rise' : 'Set'} ${s.label}`}</span>
@@ -329,14 +381,16 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
       <div className="hbest">
         <p className="hbest__title">Best windows {which}</p>
         {rows.length === 0 ? (
-          <p className="hbest__none">{loading ? 'Reading the forecast…' : nothingLine(which, nextGood)}</p>
+          <p className="hbest__none">{loading ? 'Reading the forecast…' : noForecast ? 'No forecast yet · retrying' : nothingLine(which, nextGood)}</p>
         ) : (
           <ul className="hbest__rows">
             {rows.map((r) => (
               <li key={r.activity} className="hbest__row">
-                <ActivityIcon activity={r.activity} />
+                <span className={`hbest__tile hbest__tile--${r.activity}`}>
+                  <ActivityIcon activity={r.activity} />
+                </span>
                 <b>{r.head}</b>
-                <span className="hbest__why">· {r.reason}</span>
+                <span className="hbest__why">{r.reason}</span>
               </li>
             ))}
           </ul>
@@ -351,24 +405,19 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
 
       <div className="hcards">
         {cards.map((c) => (
-          <Card key={c} kind={c} which={which} day={day} brief={brief} units={units} drone={drone} now={now} venue={venue} timeZone={timeZone} onOpen={onOpen} />
+          <Card key={c} kind={c} which={which} day={day} brief={brief} units={units} drone={drone} now={now} venue={venue} timeZone={timeZone} onOpen={onOpen} surfAway={surfAway} />
         ))}
       </div>
 
       {cams.length === 0 ? null : (
-        /* LINK OUT ONLY (docs/cams.md): a link, nothing fetched. */
-        <p className="hcams">
-          Cams:{' '}
-          {cams.map((c, i) => (
-            <span key={c.cam.id}>
-              {i === 0 ? '' : ' · '}
-              <a href={c.cam.url} target="_blank" rel="noopener noreferrer">
-                {beachName(c.cam.name)}
-              </a>
-            </span>
-          ))}
-        </p>
+        /* Batch N A4: the row opens "Cams near <spot>"; the cams themselves are links out (docs/cams.md). */
+        <button type="button" className="hcams" onClick={() => setCamsOpen(true)}>
+          <CamGlyph />
+          <span className="hcams__words">Cams · {cams.map((c) => beachName(c.cam.name)).join(', ')}</span>
+          <span aria-hidden="true">›</span>
+        </button>
       )}
+      {camsOpen ? <CamsSheet spot={placeName} venue={venue} sunsetAzDeg={sunAz} seaFacingDeg={brief.facing} onClose={() => setCamsOpen(false)} /> : null}
     </div>
   )
 }
@@ -383,13 +432,17 @@ function rainDay(hours: readonly { at: Date; mm: number | null }[], timeZone: st
 /* ---------------------------------------------------------- the windows */
 
 function windowRows(which: 'today' | 'tomorrow', day: DayBrief, order: readonly Activity[], units: Units, drone: BriefingDrone | null, now: Date, venue: { lat: number; lon: number }, timeZone: string, facing: number | null): WindowRow[] {
-  const after = which === 'today' ? now.getTime() - 3_600_000 : 0
+  /* Batch N E3: in the future (8:11 PM offered "Surf 7-9 PM"), and in daylight for surf, the drone and the light. */
+  const after = which === 'today' ? now.getTime() : 0
+  const rise = day.events.sunrise?.getTime() ?? null
+  const set = day.events.sunset?.getTime() ?? null
+  const daylight = (t: number) => rise !== null && set !== null && t >= rise && t <= set
   const speed = (mps: number) => `${Math.round(windIn(mps, units.wind) ?? 0)} ${windUnitLabel(units.wind)}`
   const rows: Partial<Record<Activity, WindowRow | null>> = {}
 
   /* Surf: the longest run of Fun or Firing hours still to come. */
   const surfRun = bestRun(
-    day.surf.filter((b) => b.at.getTime() > after).map((b) => ({ at: new Date(b.at.getTime() - 1_800_000), value: b })),
+    day.surf.filter((b) => b.at.getTime() > after && daylight(b.at.getTime())).map((b) => ({ at: new Date(b.at.getTime() - 1_800_000), value: b })),
     (b) => surfTag(b.faceFt, b.shape) !== 'Flat',
   )
   if (surfRun !== null) {
@@ -466,9 +519,11 @@ interface CardProps {
   venue: { lat: number; lon: number }
   timeZone: string
   onOpen: (t: HomeTarget) => void
+  /** Batch N E8: the spot is not on open ocean; the nearest surf beach's day, its name and how far. */
+  surfAway: { day: DayBrief | null; name: string; far: string } | null
 }
 
-function Card({ kind, which, day, brief, units, drone, now, venue, timeZone, onOpen }: CardProps) {
+function Card({ kind, which, day, brief, units, drone, now, venue, timeZone, onOpen, surfAway }: CardProps) {
   const clock = (d: Date) => formatClock(d, timeZone)
   const speed = (mps: number | null) => (mps === null ? '—' : `${Math.round(windIn(mps, units.wind) ?? 0)}`)
   const unit = windUnitLabel(units.wind)
@@ -482,14 +537,17 @@ function Card({ kind, which, day, brief, units, drone, now, venue, timeZone, onO
   if (kind === 'surf') {
     title = 'Surf'
     target = 'surf'
-    const bars = day?.surf ?? []
+    const sday = surfAway === null ? day : surfAway.day
+    const bars = sday?.surf ?? []
     if (bars.length > 0) {
       const lo = Math.round(Math.min(...bars.map((b) => b.faceFt)))
       const hi = Math.round(Math.max(...bars.map((b) => b.faceFt)))
       big = lo === hi ? `${hi} ft` : `${lo}–${hi} ft`
-      line = (day?.surfWords ?? '').replace(/^[^,]*,\s*/, '')
-      tag = day?.surfTag ?? null
+      line = (sday?.surfWords ?? '').replace(/^[^,]*,\s*/, '')
+      tag = sday?.surfTag ?? null
     }
+    /* Not on open ocean (Batch N E8: a bay point read "0-1 ft · flat, 3 s"): the nearest surf beach, said as that. */
+    if (surfAway !== null) line = `Nearest surf: ${surfAway.name} · ${surfAway.far}`
   } else if (kind === 'wind') {
     title = 'Wind'
     target = 'wind'
@@ -501,17 +559,32 @@ function Card({ kind, which, day, brief, units, drone, now, venue, timeZone, onO
   } else if (kind === 'tide') {
     title = 'Tide'
     target = 'tides'
-    const next = day?.tide?.next ?? null
+    /* Batch N E6: the next turn from the station's whole list (the map's source), past midnight too; the height now on Today. */
+    const from = which === 'today' ? now.getTime() : (day?.start.getTime() ?? now.getTime())
+    const next = brief.turns.find((x) => x.at.getTime() > from) ?? null
     big = next === null ? '—' : `${next.kind === 'high' ? 'High' : 'Low'} ${clock(next.at)}`
-    line = day?.tide?.rising == null ? null : day.tide.rising ? 'rising' : 'falling'
+    const feet = which === 'today' ? (day?.tide?.nowFeet ?? null) : null
+    const going = next === null ? null : next.kind === 'high' ? 'rising' : 'falling'
+    line = going === null ? null : feet === null ? going : `${feet.toFixed(1)} ft now · ${going}`
   } else if (kind === 'sunset') {
-    const read = day?.reads.sunset ?? null
-    title = 'Sunset'
     target = 'fire'
-    big = day?.events.sunset == null ? '—' : clock(day.events.sunset)
-    /* Tomorrow: when the call is settled, an hour before, from the stations (the briefing's own rule). */
-    line = which === 'tomorrow' && day?.events.sunset != null ? `final call ${clock(new Date(day.events.sunset.getTime() - 3_600_000))}` : read === null ? null : shortWhy(read.why)
-    tag = read?.call ?? null
+    /* Batch N E4: after tonight's sunset, the next event: tomorrow's sunrise color. */
+    const past = which === 'today' && day?.events.sunset != null && now.getTime() > day.events.sunset.getTime()
+    const next = past ? (brief.days[1] ?? null) : null
+    if (past) {
+      const read = next?.reads.sunrise ?? null
+      title = 'Sunrise'
+      big = next?.events.sunrise == null ? '—' : clock(next.events.sunrise)
+      line = read === null ? null : `tomorrow · ${shortWhy(read.why)}`
+      tag = read?.call ?? null
+    } else {
+      const read = day?.reads.sunset ?? null
+      title = 'Sunset'
+      big = day?.events.sunset == null ? '—' : clock(day.events.sunset)
+      /* Tomorrow: when the call is settled, an hour before, from the stations (the briefing's own rule). */
+      line = which === 'tomorrow' && day?.events.sunset != null ? `final call ${clock(new Date(day.events.sunset.getTime() - 3_600_000))}` : read === null ? null : shortWhy(read.why)
+      tag = read?.call ?? null
+    }
   } else if (kind === 'drone') {
     title = 'Drone'
     target = 'preflight'
@@ -525,7 +598,7 @@ function Card({ kind, which, day, brief, units, drone, now, venue, timeZone, onO
     const base = day?.start ?? now
     /* The venue's own day, not suncalc's UTC one (src/core/moonTimes.ts). */
     const rise = moonTimesOnLocalDay(new Date(base.getTime() + 12 * 3_600_000), venue.lat, venue.lon, timeZone).rise
-    const az = rise === null ? null : (getMoonPosition(rise, venue.lat, venue.lon).azimuth * 180) / Math.PI + 180
+    const az = rise === null ? null : getMoonPosition(rise, venue.lat, venue.lon).azimuth
     const moon = day?.moon ?? null
     big = rise === null ? 'No rise' : `Rise ${clock(rise)}`
     line = (
@@ -576,7 +649,7 @@ function WeekView({ brief, order, timeZone, units, now, venue }: { brief: Briefi
   void venue
   return (
     <div className="hweek">
-      <p className="hweek__head">{head ?? (brief.status === 'loading' ? 'Reading the forecast…' : 'Nothing standout this week')}</p>
+      <p className="hweek__head">{head ?? (brief.status === 'loading' ? 'Reading the forecast…' : wx === null || brief.days.every((d) => d.wind.every((w) => w.mps === null)) ? 'No forecast yet · retrying' : 'Nothing standout this week')}</p>
       <ol className="hweek__rows">
         {rows.map((r) => (
           <li key={r.d.iso} className={`hweek__row${r.guess ? ' hweek__row--guess' : ''}`}>
@@ -604,4 +677,54 @@ function worthOf(d: DayBrief, order: readonly Activity[]): Activity | null {
     if (a === 'drone' && d.windMaxKt !== null && d.windMaxKt < 8) return a
   }
   return null
+}
+
+/* ------------------------------------------------------------- the debug lines */
+
+/** Batch N E1: the network as this phone saw it, for a screenshot on cellular. Hidden: a triple tap on the date. */
+function NetDebug({ onClose }: { onClose: () => void }) {
+  const [at, setAt] = useState(() => Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setAt(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [])
+  const conn = (navigator as Navigator & { connection?: { effectiveType?: string; type?: string } }).connection
+  const lines = netLines(at, navigator.onLine !== false, connectivity.isOnline(), navigator.serviceWorker?.controller != null, conn === undefined ? null : `${conn.type ?? ''} ${conn.effectiveType ?? ''}`.trim() || null)
+  return (
+    <button type="button" className="home__debug" onClick={onClose} aria-label="Network debug lines; tap to close">
+      {lines.map((l, i) => (
+        <span key={i}>{l}</span>
+      ))}
+    </button>
+  )
+}
+
+/* ------------------------------------------------------------- button glyphs */
+
+function CamGlyph() {
+  return (
+    <svg className="hbtn__icon" viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="3" y="7" width="18" height="13" rx="2" />
+      <circle cx="12" cy="13.5" r="3.5" />
+      <path d="M8 7l1.5-2.5h5L16 7" />
+    </svg>
+  )
+}
+function RadarGlyph() {
+  return (
+    <svg className="hbtn__icon" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="8.5" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="12" cy="12" r="0.8" />
+    </svg>
+  )
+}
+function DroneGlyph() {
+  return (
+    <svg className="hbtn__icon" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="5" cy="6" r="2.5" />
+      <circle cx="19" cy="6" r="2.5" />
+      <path d="M7 7.5l3 3h4l3-3M10 10.5v3h4v-3M12 13.5v4" />
+    </svg>
+  )
 }

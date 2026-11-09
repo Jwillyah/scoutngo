@@ -97,3 +97,25 @@ export function camsForEvent(venue: LatLon, event: Date, cams: readonly FacingCa
   const az = getPosition(event, venue.lat, venue.lon).azimuth
   return { look: lookWords(az), cams: camsTowardSun(venue, az, cams) }
 }
+
+/*
+ * THE CAMS SHEET (Batch N A4): "Cams near <spot>", with chips.
+ *   all      every cam within CAM_MAX_KM, nearest first
+ *   surf     a recorded lens facing within CAM_FACING_DEG of the beach's seaward facing
+ *   sunset   a recorded lens facing within CAM_FACING_DEG of the sunset's azimuth;
+ *            unknown facing (VDOT's lanes) never
+ *   roads    the road cams (VDOT), whose facing is the lanes', under Roads and All only
+ */
+export type CamChip = 'all' | 'surf' | 'sunset' | 'roads'
+export function camsNear(venue: LatLon, chip: CamChip, cams: readonly FacingCam[], sunsetAzDeg: number | null, seaFacingDeg: number | null): SkyCam[] {
+  const MANY = 40
+  if (chip === 'surf') return seaFacingDeg === null ? [] : camsAlong(venue, [seaFacingDeg], cams.filter((c) => c.facingIs !== 'lanes'), MANY)
+  if (chip === 'sunset') return sunsetAzDeg === null ? [] : camsAlong(venue, [sunsetAzDeg], cams, MANY)
+  const pool = chip === 'roads' ? cams.filter((c) => c.facingIs === 'lanes') : cams
+  return pool
+    .map((cam) => ({ cam, km: distanceMeters(venue, cam.at) / 1000 }))
+    .filter((x) => x.km <= CAM_MAX_KM)
+    .sort((a, b) => a.km - b.km)
+    .slice(0, MANY)
+    .map((x) => ({ ...x, where: x.km < 1 ? 'here' : `${Math.round(x.km)} km ${compassPoint(bearingBetween(venue, x.cam.at))}` }))
+}

@@ -210,11 +210,12 @@ try {
    * nothing runs below the screen. Closed after, so the map is free again.
    */
   const pageFit = `JSON.stringify((() => {
-    const page = document.querySelector('.page')
+    /* Batch N: the detail pages v2 (.dpage) as well as the pages of their own (.page). */
+    const page = document.querySelector('.page') ?? document.querySelector('.dpage')
     if (!page) return { missing: true }
     const scrolls = [...page.querySelectorAll('*')].filter((e) => { const s = getComputedStyle(e); return /(auto|scroll)/.test(s.overflowY) && e.scrollHeight > e.clientHeight + 1 }).map((e) => e.className + ' ' + e.scrollHeight + '/' + e.clientHeight)
     const clipped = [...page.querySelectorAll('*')].filter((e) => { if (e.closest('svg, details:not([open])')) return false; const r = e.getBoundingClientRect(); return r.height > 0 && r.bottom > innerHeight + 1 }).map((e) => e.className)
-    return { title: page.querySelector('.page__title')?.textContent, scroll: page.scrollHeight > page.clientHeight + 1, scrolls, clipped }
+    return { title: page.querySelector('.page__title, .dpage__tab--on')?.textContent, scroll: page.scrollHeight > page.clientHeight + 1, scrolls, clipped }
   })())`
   const checkPage = async (label) => {
     await wait(1500)
@@ -223,7 +224,7 @@ try {
       fail(`${label}: no page on screen, so it was not checked`)
       return
     }
-    await check(label, '.page')
+    await check(label, '.page, .dpage')
     console.log(`  ${label}: ${t.scroll ? 'SCROLLS' : 'no scroll'}, scrolling boxes ${t.scrolls.length}, parts below the screen ${t.clipped.length}`)
     if (t.scroll) fail(`${label} scrolls`)
     for (const x of t.scrolls) fail(`${label}: ${x} scrolls`)
@@ -238,7 +239,7 @@ try {
   await ev(`document.querySelector('.tides__why')?.click()`)
   await checkPage('Tides, an explainer open')
   await ev(`document.querySelector('.tides__explainer .card2__x')?.click()`)
-  await ev(`document.querySelector('.page__close, .page__back')?.click()`)
+  await ev(`document.querySelector('.page__close, .page__back, .dpage__back')?.click()`)
   await wait(500)
   /*
    * Batch H: the menu is four cards and four rows. Surf is the Water card's
@@ -263,7 +264,7 @@ try {
       await tab('Advanced')
       await checkPage('Surf, Advanced')
     }
-    await ev(`document.querySelector('.page__close, .page__back')?.click()`)
+    await ev(`document.querySelector('.page__close, .page__back, .dpage__back')?.click()`)
     await wait(500)
   }
   await setSheet(ev, wait, 'peek')

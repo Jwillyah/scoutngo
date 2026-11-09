@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { nearSpots, roundToKm, type KnownSpot } from '../core/knownSpots.ts'
+import { mergeSameSpots, nearSpots, roundToKm, sameSpot, searchKnownSpots, spotKind, type KnownSpot } from '../core/knownSpots.ts'
 import type { LatLon } from '../core/geo.ts'
 import { COAST_CAMS } from '../data/coastCams.ts'
 import { locateOnce, locateWords } from '../lib/locateOnce.ts'
-import { searchVenues, type SearchHit } from '../lib/search.ts'
+import { searchPlacesUs, type PlaceSearch } from '../lib/search.ts'
 
 /*
  * WHERE DO YOU SHOOT? (Batch I, Section 1; board "BATCH I · first run").
@@ -14,7 +14,7 @@ import { searchVenues, type SearchHit } from '../lib/search.ts'
  * the spots the app knows near there, each with the way it faces. One tap
  * and Today is that spot's.
  */
-const KNOWN: KnownSpot[] = COAST_CAMS.map((c) => ({ id: c.id, name: c.name, at: c.at, facing: c.facing }))
+const KNOWN: KnownSpot[] = COAST_CAMS.map((c) => ({ id: c.id, name: c.name, at: c.at, facing: c.facing, state: c.state }))
 
 interface SpotPickerProps {
   title: string
@@ -28,20 +28,27 @@ interface SpotPickerProps {
 
 export function SpotPicker({ title, saved, around, onPick, onClose }: SpotPickerProps) {
   const [query, setQuery] = useState('')
-  const [hits, setHits] = useState<SearchHit[] | 'searching' | null>(null)
+  /* The geocoder's answer, kept with the query it answers: an answer to an older query is not shown (E7). */
+  const [online, setOnline] = useState<{ query: string; result: PlaceSearch | 'searching' } | null>(null)
   const [centre, setCentre] = useState<{ at: LatLon; label: string } | null>(around === null ? null : { at: around, label: 'here' })
   const [locating, setLocating] = useState<string | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   /* Under three letters there is nothing to search: no list, derived rather than kept. */
   const searching = query.trim().length >= 3
+  /* E7: the spots this app knows, by name, first: on the phone, instant, offline. */
+  const known = searching ? searchKnownSpots(query, KNOWN, 4) : []
   useEffect(() => {
     if (timer.current !== null) clearTimeout(timer.current)
     if (!searching) return
+    const q = query.trim()
     const ctl = new AbortController()
     timer.current = setTimeout(() => {
-      setHits('searching')
-      void searchVenues(query.trim(), ctl.signal).then((h) => setHits(h)).catch(() => setHits([]))
+      setOnline({ query: q, result: 'searching' })
+      /* Then any named place in the US, by the typed text alone: no location goes with it (src/lib/search.ts). */
+      void searchPlacesUs(q, ctl.signal).then((result) => {
+        if (result.status !== 'aborted') setOnline({ query: q, result })
+      })
     }, 450)
     return () => ctl.abort()
   }, [query, searching])
@@ -58,7 +65,13 @@ export function SpotPicker({ title, saved, around, onPick, onClose }: SpotPicker
   }
 
   const near = centre === null ? [] : nearSpots(centre.at, KNOWN)
-  const shown = searching ? hits : null
+  const answer = searching && online !== null && online.query === query.trim() ? online.result : null
+  /* A place the geocoder found that is one of the known spots above is not a second row. */
+  const places =
+    answer !== null && answer !== 'searching' && answer.status === 'ok'
+      ? mergeSameSpots(answer.hits.map((h) => ({ ...h, name: h.label.split(',')[0], at: { lat: h.lat, lon: h.lon } }))).filter((h) => !known.some((k) => sameSpot(k, h)))
+      : []
+  const stillLooking = searching && (answer === null || answer === 'searching')
 
   return (
     <div className="spick" role="dialog" aria-label={title}>
@@ -76,11 +89,31 @@ export function SpotPicker({ title, saved, around, onPick, onClose }: SpotPicker
       </button>
       {locating === null ? null : <p className="spick__note">{locating}</p>}
 
-      {shown === 'searching' ? <p className="spick__note">Searching…</p> : null}
-      {Array.isArray(shown) && shown.length === 0 ? <p className="spick__note">Nothing found by that name.</p> : null}
-      {Array.isArray(shown) && shown.length > 0 ? (
+      {known.length === 0 ? null : (
+        <ul className="spick__list" aria-label="Known spots">
+          {known.map((s) => (
+            <li key={s.id}>
+              <button type="button" className="spick__row" onClick={() => onPick(s.at, s.name)}>
+                <span className="spick__name">{s.name}</span>
+                <span className="spick__sub">
+                  {spotKind(s.name)}
+                  {s.state === undefined ? '' : ` · ${s.state}`}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {stillLooking && known.length === 0 ? <p className="spick__note">Searching…</p> : null}
+      {answer !== null && answer !== 'searching' && answer.status === 'failed' && known.length === 0 ? (
+        <p className="spick__note">The place search did not answer: no signal, or the service is busy.</p>
+      ) : null}
+      {answer !== null && answer !== 'searching' && answer.status === 'ok' && places.length === 0 && known.length === 0 ? (
+        <p className="spick__note">Nothing found by that name.</p>
+      ) : null}
+      {places.length > 0 ? (
         <ul className="spick__list" aria-label="Places">
-          {shown.slice(0, 4).map((h) => (
+          {places.slice(0, 4).map((h) => (
             <li key={h.id}>
               <button type="button" className="spick__row" onClick={() => setCentre({ at: { lat: h.lat, lon: h.lon }, label: h.label.split(',')[0] })}>
                 <span className="spick__name">{h.label.split(',')[0]}</span>

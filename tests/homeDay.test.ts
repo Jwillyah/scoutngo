@@ -96,8 +96,11 @@ describe('what you do orders the home, and hides only tools', () => {
     expect(primaryFor(['weather'])).toBe('radar')
   })
   it('cards: the picked ones first, every card still there (the drone only with a drone)', () => {
-    expect(cardList(['fish'], false)).toEqual(['wind', 'tide', 'surf', 'sunset', 'moon'])
-    expect(cardList(['shoot', 'surf'], true)).toEqual(['sunset', 'moon', 'surf', 'wind', 'tide', 'drone'])
+    expect(cardList(['fish'], false, 99)).toEqual(['wind', 'tide', 'surf', 'sunset', 'moon'])
+    expect(cardList(['shoot', 'surf'], true, 99)).toEqual(['sunset', 'moon', 'surf', 'wind', 'tide', 'drone'])
+    /* Batch N: four on the home, as the boards (Home8S surfer: Surf, Wind, Tide, Sunset). */
+    expect(cardList(['surf', 'weather'], false)).toEqual(['surf', 'wind', 'tide', 'sunset'])
+    expect(cardList(['fish'], false)).toEqual(['wind', 'tide', 'surf', 'sunset'])
   })
   it('a stored list is read tolerantly', () => {
     expect(reviveActivities('["surf","nonsense","surf","fish"]')).toEqual(['surf', 'fish'])

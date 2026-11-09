@@ -7,6 +7,7 @@
 import { getPosition } from 'suncalc'
 import { band, BAND_THRESHOLDS, type SunBand } from '../core/sunPath.ts'
 import { levelAt, type TideExtreme, type TideSample } from '../core/tide.ts'
+import { horizonCrossing } from '../core/sunrise.ts'
 import { zonedTimeToUtc } from '../core/timezone.ts'
 
 export interface TideDayModel {
@@ -69,7 +70,11 @@ export function tideDayModel(input: {
   let up = getPosition(new Date(from), input.lat, input.lon).altitude > BAND_THRESHOLDS.horizon
   for (let t = from + 60_000; t <= to; t += 60_000) {
     const now = getPosition(new Date(t), input.lat, input.lon).altitude > BAND_THRESHOLDS.horizon
-    if (now !== up) sun.push({ x: xOf(t), at: new Date(t), kind: now ? 'rise' : 'set' })
+    if (now !== up) {
+      /* The moment, not the minute after it: the same instant sunriseOn gives (src/core/sunrise.ts horizonCrossing). */
+      const at = horizonCrossing(t - 60_000, t, input.lat, input.lon)
+      sun.push({ x: xOf(at.getTime()), at, kind: now ? 'rise' : 'set' })
+    }
     up = now
   }
   return { from, to, path, marks, bands, sun, lowFeet, highFeet, xOf, tOf, yOf }

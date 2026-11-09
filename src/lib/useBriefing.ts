@@ -37,6 +37,12 @@ import { inNowcast, type SatRead } from '../core/goesNowcast.ts'
 import { useWeatherEpoch } from './useWeatherStatus.ts'
 import { obsDue, useSkyObs } from './useSkyObs.ts'
 
+/** The drone the home and the menu read the wind against: the kit's, the lowest wind rating. */
+export interface BriefingDrone {
+  name: string
+  maxWindMps: number | null
+}
+
 export const WEEK_DAYS = 7
 const KINDS: Kind[] = ['sunrise', 'sunset']
 
@@ -78,6 +84,8 @@ export interface Briefing {
   obsPending?: boolean
   /** The week by the hour (wind, air, the sky's code, rain): the home's weather block (Batch M). */
   wx: Hourly | null
+  /** The station's highs and lows from the start of today on (the map's tide source, useTide's station): the home's next turn after midnight too (Batch N E6). */
+  turns: TideExtreme[]
 }
 
 const dayIso = (start: string, n: number) => {
@@ -226,7 +234,7 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
   }, [open, key, stationId])
 
   return useMemo((): Briefing => {
-    if (key === null || lat === null || lon === null) return { status: 'loading', days: [], facing: null, checkedAt: null, wx: null }
+    if (key === null || lat === null || lon === null) return { status: 'loading', days: [], facing: null, checkedAt: null, wx: null, turns: [] }
     const at = { lat, lon }
     const f = fire?.key === key ? fire : null
     const s = sea?.key === key ? sea : null
@@ -313,7 +321,7 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
     const times = [f, s].filter((x) => x !== null)
     const fetched = f === null ? [] : [...Object.values(f.near), f.week.sunrise, f.week.sunset].map((x) => x?.fetchedAt).filter((t): t is number => typeof t === 'number')
     const obsPending = obsDue(nextEvent, now) && (obs === null || (soon && stations?.key !== key))
-    return { status: times.length === (sky ? 2 : 1) ? 'ready' : 'loading', days, facing, checkedAt: fetched.length === 0 ? null : Math.max(...fetched), obsPending, wx: s?.wind ?? null }
+    return { status: times.length === (sky ? 2 : 1) ? 'ready' : 'loading', days, facing, checkedAt: fetched.length === 0 ? null : Math.max(...fetched), obsPending, wx: s?.wind ?? null, turns: ext ?? [] }
   }, [key, lat, lon, fire, sea, stations, tides, sat, obs, nextEvent, soon, sky, today, timeZone, now, scope])
 }
 

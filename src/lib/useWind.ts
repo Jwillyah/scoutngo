@@ -118,7 +118,8 @@ export function useWind(
       /* Kept and offline is not live: the chip says its age (ux-rules 13; the venue pack audit caught it, 30 Oct). */
       const aged = result.status === 'ok' && (result.stale || (result.kept && !isOnline()))
       if (result.status === 'ok' && !aged) {
-        reportNetwork(true)
+        /* Only an answer that came over the network says the network works (Batch N: kept answers reset the 30 s offline count). */
+        if (!result.kept) reportNetwork(true)
         saveForecast(key, result.payload)
         setState(fromPayload(result.payload, at, timeZone, { kind: 'live' }))
         return true

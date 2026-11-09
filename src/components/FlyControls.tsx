@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 import { MODES, type FlyMode, type Sticks } from '../core/flyModel.ts'
 import type { Look } from '../three/world/inputs.ts'
 import type { FlyHud } from '../lib/fly/useFly.ts'
-import { barRole, hudLength, hudSpeed, type FlyUnits } from '../lib/fly/hudUnits.ts'
+import { barRole, hudLength, hudSpeed, hudWind, type FlyUnits } from '../lib/fly/hudUnits.ts'
 
 /*
  * THE FLY SCREEN, LAID OUT LIKE DJI FLY (27 Oct, from the phone: "text
@@ -287,7 +287,7 @@ export function FlyControls({ onSticks, mode, onMode, hud, ceilingFt, warning = 
       />
       {wind === null ? null : (
         <p className="fly__wind num">
-          Wind {hudSpeed(wind.mps, units)} {units.speed}
+          {hudWind(wind.mps, units)}
         </p>
       )}
 

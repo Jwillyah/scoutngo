@@ -13,12 +13,11 @@
  * NOW A FAILED REQUEST IS ONLY A REASON TO LOOK. It asks the app's own origin
  * for a tiny answer (HEAD /, no-store: no body, never the HTTP cache, and the
  * service worker passes it straight through, src/sw/shellRoutes.ts). Offline
- * is that check failing, and failing again PROBE_CONFIRM_MS later. One
+ * is that check failing three times over 30 s (Batch N, below). One
  * source's failure says nothing about the others: each one fails on its own.
  *
- * navigator.onLine IS ONE HINT, NOT THE ANSWER. It is true on a mountain with
- * the radio on and no bars, so "true" proves nothing. "False" is taken with
- * one failed check, no second look: two witnesses agree.
+ * navigator.onLine IS A HINT, NEVER THE ANSWER. It is true on a mountain with
+ * the radio on and no bars, and on 8 Nov it was false on working 5G.
  *
  * RECOVERY NEEDS NO RELOAD. While offline the check is repeated every
  * PROBE_EVERY_MS, and at once when the phone says it is back, when the app
@@ -28,8 +27,20 @@
 export const PROBE_URL = '/'
 /** Long enough for a HEAD on a slow 4G link (562 ms round trip) many times over. */
 export const PROBE_TIMEOUT_MS = 6000
-/** The second look before saying offline. */
-export const PROBE_CONFIRM_MS = 2500
+/*
+ * A FLAKY LINK IS NOT NO LINK (8 Nov, 9:20 PM, iPhone on 5G: the app's own
+ * function answered, and a minute later Safari said the iPhone was not
+ * connected, on the same 5G). Offline is OFFLINE_FAILURES failed checks
+ * spanning at least OFFLINE_SPAN_MS; between them the check is retried after
+ * RETRY_MS, then twice that. One failure, or navigator.onLine saying false,
+ * is never enough on its own, and any success starts the count again. The
+ * screens keep the last good forecast all the while (src/lib/weatherStore.ts).
+ */
+export const OFFLINE_FAILURES = 3
+export const OFFLINE_SPAN_MS = 30_000
+export const RETRY_MS = 10_000
+/** The first retry after a failed check (kept for the measuring script). */
+export const PROBE_CONFIRM_MS = RETRY_MS
 /** While offline, how often to look again. */
 export const PROBE_EVERY_MS = 10_000
 /**
@@ -73,8 +84,8 @@ export interface Connectivity {
 
 export function createConnectivity(deps: ConnectivityDeps = browserDeps()): Connectivity {
   let offline = false
-  /* A first failed check waiting for its second look. */
-  let suspect = false
+  /* When each failed check since the last success came back. */
+  let fails: number[] = []
   let lastOkAt = -Infinity
   let inFlight = false
   let timer: unknown = null
@@ -93,15 +104,23 @@ export function createConnectivity(deps: ConnectivityDeps = browserDeps()): Conn
       probe()
     }, ms)
   }
+  /* A retry in the offline chain (see the failure branch below). */
+  const scheduleRetry = (ms: number) => {
+    if (timer !== null) deps.clearTimeout(timer)
+    timer = deps.setTimeout(() => {
+      timer = null
+      probe(true)
+    }, ms)
+  }
   const passed = () => {
     lastOkAt = deps.now()
-    suspect = false
+    fails = []
     if (timer !== null) deps.clearTimeout(timer)
     timer = null
     set(false)
   }
 
-  const probe = () => {
+  const probe = (fromChain = false) => {
     if (inFlight) return
     inFlight = true
     sent += 1
@@ -119,13 +138,22 @@ export function createConnectivity(deps: ConnectivityDeps = browserDeps()): Conn
         inFlight = false
         if (ok) return passed()
         if (offline) return schedule(PROBE_EVERY_MS)
-        if (suspect || !deps.deviceOnline()) {
-          suspect = false
+        /*
+         * Counted by the retry chain itself, not the wall clock (a frozen page
+         * clock never "spans" 30 s): the first failure, then the retry
+         * RETRY_MS later, then the one 2 x RETRY_MS after that, all failing:
+         * OFFLINE_FAILURES failures over OFFLINE_SPAN_MS. A check some other
+         * failure asked for in between does not move the chain on.
+         */
+        if (fails.length === 0 || fromChain) fails.push(deps.now())
+        if (fails.length >= OFFLINE_FAILURES) {
+          fails = []
           set(true)
           return schedule(PROBE_EVERY_MS)
         }
-        suspect = true
-        schedule(PROBE_CONFIRM_MS)
+        /* An off-chain failure leaves a pending retry where it is: frequent reports must not postpone it for ever. */
+        if (!fromChain && timer !== null) return
+        scheduleRetry(RETRY_MS * 2 ** (fails.length - 1))
       })
   }
 
@@ -157,7 +185,7 @@ export function createConnectivity(deps: ConnectivityDeps = browserDeps()): Conn
     probes: () => sent,
     reset() {
       offline = false
-      suspect = false
+      fails = []
       lastOkAt = -Infinity
       inFlight = false
       if (timer !== null) deps.clearTimeout(timer)

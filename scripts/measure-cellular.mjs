@@ -64,7 +64,12 @@ async function run(dist, mode) {
       await ctx.route(/^https:\/\/[a-z-]*api\.open-meteo\.com\//, (r) => r.fulfill({ status: 429, contentType: 'application/json', body: '{"error":true,"reason":"Minutely API request limit exceeded. Please try again in one minute."}' }))
     }
     const log = []
+    /* Batch N C4: every satellite imagery tile asked for during the open (server.arcgisonline.com). */
+    const tiles = { n: 0 }
     let page = await ctx.newPage()
+    page.on('request', (rq) => {
+      if (/server\.arcgisonline\.com\//.test(rq.url())) tiles.n += 1
+    })
     const watch = (p) => p.on('requestfinished', async (rq) => {
       if (!isOm(rq.url())) return
       const rs = await rq.response()
@@ -80,7 +85,7 @@ async function run(dist, mode) {
       quiet = log.length === n ? quiet + 1 : 0
     }
     const text = await page.evaluate(() => document.querySelector('.home, .brief')?.innerText ?? '')
-    if (mode !== 'second') return { log, text }
+    if (mode !== 'second') return { log, text, tiles: tiles.n }
     /* Two hours on, a slow link: how long until a wind number is on the home. */
     await page.close()
     page = await ctx.newPage()
@@ -134,13 +139,13 @@ for (const [label, dist] of pairs) {
     byKind[k].w += s.weight
   }
   const dashes = (t) => (t.match(/(^|\s)—(\s|$)/gm) ?? []).length
-  out.push(`## ${label} (${dist})`, '', `- one open: ${shapes.length} Open-Meteo requests, weight ${weight.toFixed(1)}, ${shapes.filter((s) => s.via === 'cache').length} through the forecast cache, ${shapes.filter((s) => s.via === 'direct').length} direct`)
+  out.push(`## ${label} (${dist})`, '', `- one open: ${shapes.length} Open-Meteo requests, weight ${weight.toFixed(1)}, ${shapes.filter((s) => s.via === 'cache').length} through the forecast cache, ${shapes.filter((s) => s.via === 'direct').length} direct; ${open.tiles} satellite tile requests`)
   out.push(`- Open-Meteo refusing the phone's address (429): the home showed ${dashes(shared.text)} dashes (${dashes(open.text)} when answered); ${shared.log.filter((l) => l.status === 429).length} requests refused`)
   out.push(`- second open, 2 h later, 3 s latency: a wind number on the home ${second.ms === null ? 'never (in 60 s)' : `${(second.ms / 1000).toFixed(1)} s after the page loaded`}; ${dashes(second.early)} dashes 1.5 s after that; its status line: ${JSON.stringify(second.line)}`)
   out.push('', '| request | count | weight | via |', '|---|---|---|---|')
   for (const [k, v] of Object.entries(byKind).sort((a, b) => b[1].w - a[1].w)) out.push(`| ${k} | ${v.n} | ${v.w.toFixed(1)} | ${v.via} |`)
   out.push('')
-  console.log(label, shapes.length, weight.toFixed(1), dashes(shared.text), second.ms)
+  console.log(label, shapes.length, weight.toFixed(1), dashes(shared.text), second.ms, 'tiles', open.tiles)
 }
 mkdirSync('measurements', { recursive: true })
 const file = `measurements/${new Date().toISOString().slice(0, 10)}-${process.env.NAME ?? 'cellular'}.md`

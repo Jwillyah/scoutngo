@@ -43,7 +43,10 @@ worker.addEventListener('install', (event) => {
     (async () => {
       const cache = await caches.open(SHELL_CACHE)
       /* The document fresh from the network, never from the HTTP cache. */
-      await cache.put(SHELL_DOCUMENT, await fetch(new Request(SHELL_DOCUMENT, { cache: 'reload' })))
+      /* Only a good answer is kept (8 Nov, flaky 5G): a failed or refused one never becomes the saved document. */
+      const doc = await fetch(new Request(SHELL_DOCUMENT, { cache: 'reload' }))
+      if (!doc.ok) throw new Error(`the document answered ${doc.status}: not installing over a good shell`)
+      await cache.put(SHELL_DOCUMENT, doc)
       await cache.addAll(installAssets(SHELL_ASSETS))
       /* Public files are a nicety: one missing must not stop the shell installing. */
       await Promise.all(SHELL_PUBLIC.map((path) => cache.add(path).catch(() => undefined)))

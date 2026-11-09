@@ -161,8 +161,8 @@ export async function mapboxSuggest(
 ): Promise<MapboxState> {
   const params: Record<string, string | number> = { action: 'suggest', q: query, session }
   if (bias !== null) {
-    params.lat = Number(bias.lat.toFixed(6))
-    params.lon = Number(bias.lon.toFixed(6))
+    params.lat = Number(bias.lat.toFixed(2))
+    params.lon = Number(bias.lon.toFixed(2))
   }
   const body = (await call(params, signal)) as {
     status?: unknown

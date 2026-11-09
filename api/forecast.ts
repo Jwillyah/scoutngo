@@ -13,9 +13,9 @@
  * reaches Open-Meteo. measurements/2026-11-08-cellular.md has the diagnosis.
  *
  * WHAT IT RECEIVES: an Open-Meteo request, its host and path in `om` and its
- * parameters as they are, every latitude and longitude already rounded to 2
- * decimals by the phone (about a kilometre; anything finer is refused here,
- * so a precise coordinate can never be cached or passed on), and `hr`, the
+ * parameters as they are, every latitude and longitude already snapped by
+ * the phone to a 0.05° grid (about 5 km, Batch N; anything off it is refused
+ * here, so a precise coordinate can never be cached or passed on), and `hr`, the
  * UTC hour, so each hour is a new cache entry. Nothing about the user.
  *
  * KEY. OPEN_METEO_API_KEY (Vercel environment, not set): with it, the
@@ -33,14 +33,22 @@ export const ALLOWED: Record<string, string> = {
   'ensemble-api.open-meteo.com/v1/ensemble': 'ensemble-api.open-meteo.com',
   'previous-runs-api.open-meteo.com/v1/forecast': 'previous-runs-api.open-meteo.com',
 }
-/** The colour path for sunrise and sunset in one question: 16 points. */
-export const MAX_POINTS = 16
+/*
+ * The most points one question may carry: the wind and cloud map grid, 5 by 5
+ * (GRID_CELLS in src/core/cloudGrid.ts), is the largest the app asks. This was
+ * 16 (the sunrise and sunset colour path) until 8 Nov, which refused the grid
+ * with a 400, and the Wind map layer drew nothing on any phone.
+ * tests/forecastEdge.test.ts sends the grid's own request through here.
+ */
+export const MAX_POINTS = 25
 /** The hour the phone names may differ from the server's by this much (clocks, a slow request). */
 export const HOUR_SLACK_H = 2
 /** Kept at the CDN for the hour; a stale copy may be served while the next is fetched. */
 export const S_MAXAGE = 3600
 export const SWR = 600
 const COORD = /^-?\d{1,3}(\.\d{1,2})?$/
+/** On the 0.05° grid (about 5 km, Batch N): 36.85, -75.95, 36.80; never 36.84. */
+export const onGrid = (v: string) => COORD.test(v) && Math.abs(Number(v) * 20 - Math.round(Number(v) * 20)) < 1e-6
 
 export type Checked = { ok: true; upstream: string; cacheable: boolean } | { ok: false; status: number; message: string }
 
@@ -53,13 +61,15 @@ export function upstreamFor(href: string, now: Date, key: string | null = null):
   if (host === undefined) return { ok: false, status: 400, message: 'Not a forecast this app asks for.' }
   const hr = u.searchParams.get('hr') ?? ''
   const hrAt = /^\d{4}-\d{2}-\d{2}T\d{2}$/.test(hr) ? Date.parse(`${hr}:00:00Z`) : Number.NaN
-  /* A phone whose clock is off still gets its forecast, only not from or into the cache: no stray hour becomes a cache entry. */
-  const cacheable = Number.isFinite(hrAt) && Math.abs(hrAt - now.getTime()) <= HOUR_SLACK_H * 3_600_000
   const lat = (u.searchParams.get('latitude') ?? '').split(',')
   const lon = (u.searchParams.get('longitude') ?? '').split(',')
   if (lat.length !== lon.length || lat.length > MAX_POINTS || ![...lat, ...lon].every((v) => COORD.test(v))) {
-    return { ok: false, status: 400, message: 'Expected up to 16 points, each rounded to 2 decimals.' }
+    return { ok: false, status: 400, message: `Expected up to ${MAX_POINTS} points, each rounded to 2 decimals or coarser.` }
   }
+  /* A phone on the build before Batch N sends 2 decimals: answered so it keeps working until it updates, never cached. */
+  const gridded = [...lat, ...lon].every(onGrid)
+  /* A phone whose clock is off still gets its forecast, only not from or into the cache: no stray hour becomes a cache entry. */
+  const cacheable = gridded && Number.isFinite(hrAt) && Math.abs(hrAt - now.getTime()) <= HOUR_SLACK_H * 3_600_000
   const out = new URLSearchParams()
   for (const [k, v] of u.searchParams) if (k !== 'om' && k !== 'hr' && k !== 'apikey') out.append(k, v)
   if (key !== null && key !== '') out.set('apikey', key)

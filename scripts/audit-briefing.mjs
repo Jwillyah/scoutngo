@@ -14,20 +14,20 @@
  *               its side
  *   Today       the weather first: a temperature, the sky in a word, H and
  *               L, wind, a rain line; six hourly steps; the best windows
- *               (rows, or the honest "Nothing standout" line); the cards in
- *               a grid, the drone's among them (a drone is in the kit);
+ *               (rows, or the honest "Nothing standout" line); four cards
+ *               in a grid (boards Home8S / Home8J);
  *               one primary button, a round Map and a round Menu
  *   Tomorrow    the same, and no large empty gap under its cards (8 Nov:
  *               the old Today had one under the conditions card)
  *   Week        a headline, seven days, days 4-7 marked as guesses
  *   words       never "safe", never "clear to", never a red ground
  *   Menu        the round Menu opens the menu over the home
- *   short tab   390 x 664 (a Safari tab): nothing off the side; it may scroll
+ *   short tab   390 x 664 (a Safari tab): fits too (Batch N C5)
  *   first run   a bare launch with no spot: "Where do you go?", spots
  *               near the location once, one tap to the home (Batch I);
  *               then "What do you do outside?" (Batch M): Fish or boat
  *               puts Wind and Tide first and takes the Viewfinder off the
- *               menu, and every card is still there
+ *               menu
  */
 import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -73,7 +73,8 @@ const LOOKS = [
   ['iPhone home screen', 'webkit', { width: 390, height: 844 }, { top: 47, bottom: 34 }, true],
   ['Android tab', 'chromium', { width: 412, height: 915 }, { top: 0, bottom: 0 }, true],
   ['Android installed', 'chromium', { width: 412, height: 915 }, { top: 24, bottom: 0 }, true],
-  ['short tab', 'webkit', { width: 390, height: 664 }, { top: 0, bottom: 0 }, false],
+  /* Batch N C5: the short Safari tab must fit too. */
+  ['short tab', 'webkit', { width: 390, height: 664 }, { top: 0, bottom: 0 }, true],
 ]
 const browsers = {}
 try {
@@ -136,12 +137,14 @@ try {
         console.log(`  ${name}: ${JSON.stringify(d).slice(0, 300)}`)
         if (!/^-?\d+°$/.test(d.temp)) fail(`${label}, ${name}: the big temperature reads ${JSON.stringify(d.temp)}`)
         if (d.cond.trim() === '' || d.cond.trim() === '—') fail(`${label}, ${name}: no sky word`)
-        if (!d.lines.some((l) => /^H .* · L /.test(l))) fail(`${label}, ${name}: no high and low`)
-        if (!d.lines.some((l) => /^Wind /.test(l))) fail(`${label}, ${name}: no wind`)
+        /* Board Home8S: "H 66° · L 50° · NW 5 kt" on one line. */
+        if (!d.lines.some((l) => /^H .* · L .* · .*(kt|mph|km\/h|m\/s)$/.test(l))) fail(`${label}, ${name}: no high, low and wind line (${JSON.stringify(d.lines)})`)
         if (!d.lines.some((l) => /rain/i.test(l))) fail(`${label}, ${name}: no rain line`)
         if (d.steps !== 6) fail(`${label}, ${name}: ${d.steps} hourly steps, not 6`)
         if (d.best === null || !/Best windows/i.test(d.best) || d.best.split('\n').length < 2) fail(`${label}, ${name}: no best windows card, or an empty one`)
-        for (const c of ['Surf', 'Wind', 'Tide', 'Sunset', 'Drone', 'Moon']) if (!d.cards.includes(c)) fail(`${label}, ${name}: no ${c} card`)
+        /* Four cards (boards Home8S / Home8J); nothing picked yet: Surf, Wind, Tide, Sunset; after sunset Sunset reads Sunrise. */
+        if (d.cards.length !== 4) fail(`${label}, ${name}: ${d.cards.length} cards, not 4`)
+        if (d.cards.slice(0, 2).join('|') !== 'Surf|Wind') fail(`${label}, ${name}: the cards lead with ${JSON.stringify(d.cards.slice(0, 2))}`)
       } else {
         const w = JSON.parse(await ev(`JSON.stringify({ head: document.querySelector('.hweek__head')?.textContent ?? null, days: document.querySelectorAll('.hweek__row').length, guesses: document.querySelectorAll('.hweek__row--guess').length })`))
         console.log(`  week: ${JSON.stringify(w)}`)
@@ -150,7 +153,7 @@ try {
         if (w.guesses !== 4) fail(`${label}: ${w.guesses} days marked as guesses, not days 4-7`)
       }
     }
-    const buttons = JSON.parse(await ev(`JSON.stringify({ main: document.querySelector('.home .hbtn--main')?.textContent ?? null, round: [...document.querySelectorAll('.home .hbtn--round')].map((b) => b.getAttribute('aria-label')) })`))
+    const buttons = JSON.parse(await ev(`JSON.stringify({ main: document.querySelector('.home .hbtn--main')?.textContent?.trim() ?? null, round: [...document.querySelectorAll('.home .hbtn--round')].map((b) => b.getAttribute('aria-label')) })`))
     console.log(`  buttons: ${JSON.stringify(buttons)}`)
     if (!/^(Radar|Viewfinder|Preflight)$/.test(buttons.main ?? '')) fail(`${label}: the primary button reads ${JSON.stringify(buttons.main)}`)
     if (buttons.round.join('|') !== 'Open the map|Menu') fail(`${label}: the round buttons are ${JSON.stringify(buttons.round)}`)
@@ -197,15 +200,15 @@ try {
       console.log(`  then: ${question}`)
       if (question !== 'What do you do outside?') fail(`no "What do you do outside?" after the first spot (${JSON.stringify(question)})`)
       await page.getByRole('button', { name: /Fish or boat/ }).click().catch(() => fail('no Fish or boat choice'))
-      await page.getByRole('button', { name: 'Done', exact: true }).click().catch(() => fail('no Done'))
+      await page.getByRole('button', { name: 'Continue', exact: true }).click().catch(() => fail('no Continue'))
       await wait(1200)
       const kept = await ev(`localStorage.getItem('scoutngo.activities.v1')`)
-      const after = JSON.parse(await ev(`JSON.stringify({ cards: [...document.querySelectorAll('.home__page')[0]?.querySelectorAll('.hcard__title') ?? []].map((e) => e.textContent), main: document.querySelector('.home .hbtn--main')?.textContent ?? null, open: !!document.querySelector('.actpick--sheet') })`))
+      const after = JSON.parse(await ev(`JSON.stringify({ cards: [...document.querySelectorAll('.home__page')[0]?.querySelectorAll('.hcard__title') ?? []].map((e) => e.textContent), main: document.querySelector('.home .hbtn--main')?.textContent?.trim() ?? null, open: !!document.querySelector('.actpick--sheet') })`))
       console.log(`  picked Fish or boat: kept ${kept}, ${JSON.stringify(after)}`)
       if (kept !== '["fish"]') fail(`the pick was kept as ${JSON.stringify(kept)}`)
       if (after.open) fail('the picker stayed open after Done')
       if (after.cards.slice(0, 2).join('|') !== 'Wind|Tide') fail(`Fish or boat: the cards lead with ${JSON.stringify(after.cards.slice(0, 2))}, not Wind and Tide`)
-      for (const c of ['Surf', 'Sunset', 'Moon']) if (!after.cards.includes(c)) fail(`Fish or boat: the ${c} card is gone (the picker only reorders)`)
+      if (after.cards.length !== 4) fail(`Fish or boat: ${after.cards.length} cards, not 4 (the rest one tap deeper)`)
       if (after.main !== 'Radar') fail(`Fish or boat: the primary button is ${JSON.stringify(after.main)}`)
       await page.locator('.home .hbtn--round[aria-label="Menu"]').click()
       await wait(800)

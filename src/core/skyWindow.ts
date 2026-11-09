@@ -28,6 +28,7 @@
  */
 
 import { getPosition, getTimes, getMoonPosition } from 'suncalc'
+import { bodyPosition } from './sun.ts'
 import { equatorialToHorizontal, GALACTIC_CORE, showerById, type ShowerId } from './celestial.ts'
 
 /** What is being shot. The union is the whole vocabulary. */
@@ -95,14 +96,8 @@ function targetPosition(
   lon: number,
 ): { altitude: number; azimuth: number } | null {
   if (target.kind === 'moon') {
-    const moon = getMoonPosition(at, lat, lon)
-    /*
-     * This suncalc build reports altitude in DEGREES, not radians, and the
-     * same is true of getPosition. Pinned by a test, because a build that
-     * changed the convention would silently turn every altitude into a number
-     * about 57 times too small and every window into nothing at all.
-     */
-    return { altitude: moon.altitude, azimuth: ((moon.azimuth * 180) / Math.PI + 180) % 360 }
+    /* Through the one suncalc-to-compass conversion (src/core/sun.ts bodyPosition). */
+    return bodyPosition('moon', at, lat, lon)
   }
   const point =
     target.kind === 'milkyway'

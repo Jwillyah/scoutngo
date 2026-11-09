@@ -96,7 +96,7 @@ try {
       }
       if (!p.seen.some((s) => /^(api\.open-meteo\.com|this app \(\/api\/forecast\)) · on the list$/.test(s))) fail(`${label}: the live check does not name the weather request it just saw: ${JSON.stringify(p.seen)}`)
       if (!/1 hour on Vercel’s Hobby plan and 1 day on Pro/.test(p.text)) fail(`${label}: no word on Vercel's request logs`)
-      if (!/forecast cache: it receives the spot rounded to 2 decimals and the hour[^.]*logs nothing/.test(p.text)) fail(`${label}: no line on the forecast cache`)
+      if (!/forecast cache: it receives the spot rounded to 0\.05°, about 5 km, and the hour[^]*?logs nothing/.test(p.text)) fail(`${label}: no line on the forecast cache`)
       if (!/Export my spots/.test(p.text) || !/Clear this phone/.test(p.text)) fail(`${label}: Export or Clear is missing`)
       if (p.pageWide || p.outside) fail(`${label}: something outside the table runs past 390 px`)
       if (p.clipped) fail(`${label}: the hosts table is cut off: its box is shorter than the table`)

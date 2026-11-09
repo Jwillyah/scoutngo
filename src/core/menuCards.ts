@@ -5,8 +5,8 @@
  *
  *   Today   Go / Maybe / Skip and its event; "Be set up 4:40 · color 4:50
  *           to 5:20", or on a Skip the next chance in the week
- *   Sky     Fire / Maybe / No for the next sunrise or sunset, "likely 5:04",
- *           "2 of 5 models" or the reason; its colour-clock strip with the
+ *   Sky     Color / Maybe / No for the next sunrise or sunset, "Sunset color
+ *           likely 5:04", "Sunset color possible, 2 of 5" or "... unlikely"; its colour-clock strip with the
  *           peak marked; a low deck is a grey bar (no rain streaks: the
  *           forecast it reads has no rain in it, so none are drawn)
  *   Water   the day's surf, "fun · offshore · low 5:05", hourly bars, the
@@ -45,6 +45,7 @@ export interface CardRead {
 }
 
 const KIND = { sunrise: 'sunrise', sunset: 'sunset' } as const
+const COLOR = { sunrise: 'Sunrise', sunset: 'Sunset' } as const
 const weekday = (d: Date, timeZone: string) => new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone }).format(d)
 
 export function todayCard(days: readonly CardDay[], clock: (d: Date) => string, timeZone: string): CardRead {
@@ -89,9 +90,11 @@ export function skyCard(days: readonly CardDay[], now: Date, clock: (d: Date) =>
   const deepest = lead?.times?.deepest ?? null
   const peak = deepest === null || minutes.length < 2 ? null : (deepest.getTime() - minutes[0].at.getTime()) / (minutes[minutes.length - 1].at.getTime() - minutes[0].at.getTime())
   const lowDeck = v.word === 'unlikely' && v.why === 'lid'
-  if (v.word === 'likely') return { value: 'Fire', sub: `likely ${clock(deepest ?? next.at)}`, line: `${KIND[next.kind]} ${clock(next.at)}`, tone: 'good', strip, peak, lowDeck }
-  if (v.word === 'possible') return { value: 'Maybe', sub: `${v.agree} of ${v.of} models`, line: `${KIND[next.kind]} ${clock(next.at)}`, tone: 'maybe', strip, peak, lowDeck }
-  return { value: 'No', sub: lowDeck ? 'low deck' : v.why === 'none' ? 'no clouds to light' : v.why === 'no-gap' ? 'no gap for the light' : 'nothing lit', line: `${KIND[next.kind]} ${clock(next.at)}`, tone: 'bad', strip, peak, lowDeck }
+  /* "Sunset color likely", not the old fire wording: Batch M renamed Sky fire to Sky color (C2, 8 Nov). */
+  const color = `${COLOR[next.kind]} color`
+  if (v.word === 'likely') return { value: 'Color', sub: `${color} likely ${clock(deepest ?? next.at)}`, line: `${KIND[next.kind]} ${clock(next.at)}`, tone: 'good', strip, peak, lowDeck }
+  if (v.word === 'possible') return { value: 'Maybe', sub: `${color} possible, ${v.agree} of ${v.of}`, line: `${KIND[next.kind]} ${clock(next.at)}`, tone: 'maybe', strip, peak, lowDeck }
+  return { value: 'No', sub: `${color} unlikely`, line: `${KIND[next.kind]} ${clock(next.at)}`, tone: 'bad', strip, peak, lowDeck }
 }
 
 /** Sky fire's tab within 3 h of a sunrise or sunset, else Now. */

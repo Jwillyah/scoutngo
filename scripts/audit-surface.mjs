@@ -483,10 +483,25 @@ console.log('\n### radar on: the satellite cloud under it')
     const vis = (id) => (m.getLayer(id) === undefined ? 'missing' : m.getLayoutProperty(id, 'visibility') ?? 'visible')
     return { radar: vis('radar'), sat: vis('radar-sat'), under: ids.indexOf('radar-sat') >= 0 && ids.indexOf('radar-sat') < ids.indexOf('radar') }
   })())`))
-  await ev(`(() => { const b = document.querySelector('button[aria-label="Features"]'); if (b && b.getAttribute('aria-pressed') !== 'true') b.click(); return 1 })()`)
-  await wait(500)
+  /*
+   * Weather off again. Batch N: picking Radar lowers the sheet to the map with
+   * Features still marked open, so a press may close it rather than show the
+   * Off tile: press until the tile is there, then check radar really is off
+   * (its legend stands in the time bar's place while it is on).
+   */
+  for (let k = 0; k < 3 && !(await ev(`!!document.querySelector('.feat__wtile--off')`)); k += 1) {
+    await ev(`document.querySelector('button[aria-label="Features"]')?.click()`)
+    await wait(600)
+  }
+  const offThere = await ev(`!!document.querySelector('.feat__wtile--off')`)
   await ev(`document.querySelector('.feat__wtile--off')?.click()`)
   await wait(800)
+  const legendAfter = await ev(`!!document.querySelector('.wlay--peek, .sheet__peek .wlay')`)
+  console.log(`  weather off: the Off tile ${offThere ? 'found' : 'NOT FOUND'}; radar legend still up: ${legendAfter}`)
+  if (!offThere) fail('the Features sheet showed no Off tile to turn the weather off')
+  if (legendAfter) fail('weather off was pressed, but the radar legend still stands in for the time bar')
+  const radarAfter = await ev(`(() => { const m = window.__probe?.map; return m?.getLayer('radar') ? m.getLayoutProperty('radar', 'visibility') ?? 'visible' : 'missing' })()`)
+  if (radarAfter === 'visible') fail('weather off was pressed, but the radar layer is still on')
   const after = await ev(`(() => { const m = window.__probe?.map; return m?.getLayer('radar-sat') ? m.getLayoutProperty('radar-sat', 'visibility') : 'missing' })()`)
   console.log(`  radar ${layers?.radar}, satellite under it ${layers?.sat} (drawn under: ${layers?.under}); weather off: satellite ${after}`)
   if (layers === null) fail('no map probe to read the layers from')
@@ -1264,7 +1279,8 @@ const CARD_HEIGHT = `(() => {
    * The heights this run produced are in
    * measurements/2026-10-19-shell-polish.md.
    */
-  const strip = document.querySelector('.tstrip, .tbar')
+  /* Batch N B2: with radar on, on the map's own view, the radar's legend and timeline stand in the time bar's place: its slider is the time control there. */
+  const strip = document.querySelector('.tstrip, .tbar') ?? document.querySelector('.sheet__peek .wlay')
   /* The Tide sheet's curve is its time control (TideSheet.tsx): dragging it moves the same moment as the bar. */
   const curve = document.querySelector('.tides__curve [role="slider"]')
   return {

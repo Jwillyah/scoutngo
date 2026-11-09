@@ -108,10 +108,14 @@ export interface SearchBias {
   halfSpanMeters: number
 }
 
-export function searchUrl(query: string, bias?: SearchBias): string {
+const roundCentre = (c: LatLon): LatLon => ({ lat: Math.round(c.lat * 100) / 100, lon: Math.round(c.lon * 100) / 100 })
+
+export function searchUrl(query: string, bias?: SearchBias, usOnly = false): string {
   const params = new URLSearchParams({ format: 'json', q: query, limit: '6' })
+  if (usOnly) params.set('countrycodes', 'us')
   if (bias !== undefined) {
-    const [west, south, east, north] = biasBox(bias.centre, bias.halfSpanMeters)
+    /* The box around the map centre rounded to 2 decimals (about a kilometre): nothing finer leaves the phone. */
+    const [west, south, east, north] = biasBox(roundCentre(bias.centre), bias.halfSpanMeters).map((v) => Number(v.toFixed(2)))
     params.set('viewbox', `${west},${south},${east},${north}`)
     // 0 means prefer, not restrict: a venue outside the box is still findable.
     params.set('bounded', '0')
@@ -122,8 +126,8 @@ export function searchUrl(query: string, bias?: SearchBias): string {
 export function photonUrl(query: string, bias?: SearchBias): string {
   const params = new URLSearchParams({ q: query, limit: '6' })
   if (bias !== undefined) {
-    params.set('lat', bias.centre.lat.toFixed(5))
-    params.set('lon', bias.centre.lon.toFixed(5))
+    params.set('lat', bias.centre.lat.toFixed(2))
+    params.set('lon', bias.centre.lon.toFixed(2))
   }
   return `${PHOTON_URL}?${params.toString()}`
 }
@@ -134,7 +138,7 @@ interface PhotonFeature {
 }
 
 /** Photon answers GeoJSON, so the label has to be assembled from its parts. */
-export function parsePhotonFeatures(payload: unknown): SearchHit[] {
+export function parsePhotonFeatures(payload: unknown, usOnly = false): SearchHit[] {
   const features = (payload as { features?: unknown })?.features
   if (!Array.isArray(features)) return []
 
@@ -149,6 +153,8 @@ export function parsePhotonFeatures(payload: unknown): SearchHit[] {
     const p = feature.properties ?? {}
     const text = (key: string): string =>
       typeof p[key] === 'string' ? (p[key] as string) : ''
+    /* The spot search is for the US: "Sandbridge" also names a place in British Columbia. */
+    if (usOnly && text('countrycode') !== '' && text('countrycode').toUpperCase() !== 'US') continue
     const label = [text('name'), text('street'), text('city'), text('state'), text('country')]
       .filter((part) => part !== '')
       .join(', ')
@@ -232,11 +238,17 @@ export const NOMINATIM_REVERSE_URL = 'https://nominatim.openstreetmap.org/revers
 export const PINNED_PLACEHOLDER = 'Dropped pin'
 
 export function reverseUrl(at: LatLon): string {
+  /*
+   * TWO DECIMALS, about a kilometre, and nothing finer (E9, 8 Nov): the pin
+   * is where the user stands or will. Asked at zoom 14, the neighbourhood or
+   * town, because a building's name for a point rounded a kilometre away
+   * would be the name of somewhere else.
+   */
   const params = new URLSearchParams({
     format: 'jsonv2',
-    lat: at.lat.toFixed(6),
-    lon: at.lon.toFixed(6),
-    zoom: '18',
+    lat: at.lat.toFixed(2),
+    lon: at.lon.toFixed(2),
+    zoom: '14',
     addressdetails: '1',
   })
   return `${NOMINATIM_REVERSE_URL}?${params.toString()}`
@@ -310,4 +322,46 @@ export async function reverseGeocode(
     clearTimeout(timer)
     signal?.removeEventListener('abort', abort)
   }
+}
+
+/*
+ * THE SPOT SEARCH'S GEOCODER (E7, 8 Nov). "Wrightsville beach" said "Nothing
+ * found by that name." Both gazetteers answer it (Photon's answer is a
+ * fixture in tests/spotSearch.test.ts), but searchVenues turns every failure
+ * -- a refused request, a dropped connection, a search cancelled by the next
+ * keystroke -- into an empty list, and an empty list was printed as "nothing
+ * by that name": the could-not-look state and the looked-and-found-nothing
+ * state were one state (docs/failure-modes.md, B).
+ *
+ * So this says which it was. Only the typed text is sent: no map centre, no
+ * bias, restricted to the US. Nominatim waits out its one-a-second clock.
+ */
+export type PlaceSearch =
+  | { status: 'ok'; hits: SearchHit[] }
+  /** Neither gazetteer answered: offline, refused, or timed out. Not "nothing found". */
+  | { status: 'failed' }
+  /** Cancelled by a newer search. Say nothing. */
+  | { status: 'aborted' }
+
+export async function searchPlacesUs(query: string, signal?: AbortSignal): Promise<PlaceSearch> {
+  const ask = async (url: string, parse: (body: unknown) => SearchHit[]): Promise<SearchHit[] | null> => {
+    try {
+      const response = await fetch(url, { signal, headers: { Accept: 'application/json' } })
+      if (!response.ok) return null
+      return parse(await response.json())
+    } catch {
+      return null
+    }
+  }
+  const nominatim = async () => {
+    const gap = msUntilNominatim()
+    if (gap > 0) await new Promise((r) => setTimeout(r, gap))
+    if (signal?.aborted === true) return null
+    markNominatim()
+    return ask(searchUrl(query, undefined, true), parseSearchRows)
+  }
+  const [osm, photon] = await Promise.all([nominatim(), ask(photonUrl(query), (b) => parsePhotonFeatures(b, true))])
+  if (signal?.aborted === true) return { status: 'aborted' }
+  if (osm === null && photon === null) return { status: 'failed' }
+  return { status: 'ok', hits: rankForShoot(dedupeNearby([...(osm ?? []), ...(photon ?? [])]), query).slice(0, 8) }
 }

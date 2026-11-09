@@ -19,10 +19,12 @@ interface PageProps {
   /** A back arrow at the start of the head instead of Close: Settings and About, which have routes of their own (Batch E). */
   back?: boolean
   className?: string
+  /** Batch N A3: "See on map ›" at the bottom; the map is under the page, one tap deeper. */
+  seeOnMap?: boolean
   children: ReactNode
 }
 
-export function Page({ title, tabs, tab, onTab, onClose, back = false, className = '', children }: PageProps) {
+export function Page({ title, tabs, tab, onTab, onClose, back = false, className = '', seeOnMap = false, children }: PageProps) {
   const group = useContext(PageGroup)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -65,6 +67,11 @@ export function Page({ title, tabs, tab, onTab, onClose, back = false, className
         )}
       </div>
       <div className="page__body">{children}</div>
+      {seeOnMap ? (
+        <button type="button" className="page__map" onClick={onClose}>
+          See on map ›
+        </button>
+      ) : null}
     </div>,
     document.body,
   )

@@ -23,15 +23,14 @@
  * no forecast (moon, tide, Milky Way, meteors) and says so (`forecast`); a
  * mark that needs one is never guessed for it.
  */
-import { getMoonIllumination, getMoonPosition, getPosition } from 'suncalc'
+import { getMoonIllumination, getMoonPosition } from 'suncalc'
 import { colorChance } from './colorChance.ts'
 import { LOW_CLOUD_BROKEN } from './cloud.ts'
 import { isGlassy, windToBeach } from './coastFacing.ts'
 import { LOW_NEAR_SUNRISE_MIN } from './glassMornings.ts'
 import { moonTimesOnLocalDay } from './moonTimes.ts'
 import { showerEventsBetween } from './skyEvents.ts'
-import { BAND_THRESHOLDS } from './sunPath.ts'
-import { sunriseOn } from './sunrise.ts'
+import { horizonCrossing, sunAboveHorizon, sunriseOn } from './sunrise.ts'
 import { surfSize } from './surf.ts'
 import { zonedTimeToUtc } from './timezone.ts'
 
@@ -115,12 +114,12 @@ const weekday = (date: string) => new Date(`${date}T12:00:00Z`).getUTCDay()
 export function sunsetOn(date: string, lat: number, lon: number, timeZone: string): Date | null {
   const noon = zonedTimeToUtc(date, '12:00', timeZone)
   if (noon === null) return null
-  const above = (t: number) => getPosition(new Date(t), lat, lon).altitude > BAND_THRESHOLDS.horizon
+  const above = (t: number) => sunAboveHorizon(t, lat, lon)
   let was = above(noon.getTime())
   for (let m = 1; m <= 12 * 60; m += 1) {
     const t = noon.getTime() + m * 60_000
     const now = above(t)
-    if (was && !now) return new Date(t)
+    if (was && !now) return horizonCrossing(t - 60_000, t, lat, lon)
     was = now
   }
   return null

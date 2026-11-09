@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createConnectivity, PROBE_CONFIRM_MS, PROBE_EVERY_MS, PROBE_TIMEOUT_MS, type ConnectivityDeps } from './connectivity.ts'
+import { createConnectivity, OFFLINE_SPAN_MS, PROBE_EVERY_MS, PROBE_TIMEOUT_MS, RETRY_MS, type ConnectivityDeps } from './connectivity.ts'
 
 /*
  * WHAT DECIDES "OFFLINE". At Virginia Beach on 27 Oct a phone on five bars of
@@ -66,29 +66,65 @@ describe('connectivity', () => {
     expect(c.isOnline()).toBe(true)
   })
 
-  it('the origin failing once is not enough; failing again is offline', async () => {
-    const { c, advance } = harness('down')
+  it('Batch N: one failure is not offline, nor two; three spanning 30 s are', async () => {
+    const { c, state, advance } = harness('down')
     c.report(false)
-    await advance(PROBE_CONFIRM_MS - 1)
+    await advance(RETRY_MS)
+    expect(state.asked).toBe(2)
+    expect(c.isOnline()).toBe(true)
+    await advance(OFFLINE_SPAN_MS - RETRY_MS - 1)
     expect(c.isOnline()).toBe(true)
     await advance(1)
+    expect(state.asked).toBe(3)
     expect(c.isOnline()).toBe(false)
   })
 
-  it('a hanging origin is offline after two timed-out checks', async () => {
+  it('the chain, not the wall clock: offline after the first failure and its two retries (the venue pack audit froze the page clock)', async () => {
+    const { c, state, advance } = harness('down')
+    c.report(false)
+    await advance(RETRY_MS + 2 * RETRY_MS)
+    expect(state.asked).toBe(3)
+    expect(c.isOnline()).toBe(false)
+  })
+
+  it('checks asked for by other reports in between do not postpone the chain', async () => {
+    const { c, advance } = harness('down', false)
+    c.report(false)
+    for (let k = 0; k < 6; k += 1) {
+      await advance(5000)
+      c.report(true)
+    }
+    await advance(1000)
+    expect(c.isOnline()).toBe(false)
+  })
+
+  it('a hanging origin is offline only after three timed-out checks over 30 s', async () => {
     const { c, advance } = harness('hang')
     c.report(false)
-    await advance(PROBE_TIMEOUT_MS)
+    await advance(PROBE_TIMEOUT_MS + RETRY_MS + PROBE_TIMEOUT_MS)
     expect(c.isOnline()).toBe(true)
-    await advance(PROBE_CONFIRM_MS + PROBE_TIMEOUT_MS)
+    await advance(2 * RETRY_MS + PROBE_TIMEOUT_MS)
     expect(c.isOnline()).toBe(false)
   })
 
-  it('the device saying offline and one failed check agree at once', async () => {
+  it('the device saying offline is not enough: one failed check with it is still online', async () => {
     const { c, advance } = harness('down', false)
     c.check()
     await advance(0)
-    expect(c.isOnline()).toBe(false)
+    expect(c.isOnline()).toBe(true)
+  })
+
+  it('a success between failures starts the count again', async () => {
+    const { c, state, advance } = harness('down')
+    c.report(false)
+    await advance(RETRY_MS)
+    state.origin = 'up'
+    await advance(2 * RETRY_MS)
+    expect(c.isOnline()).toBe(true)
+    state.origin = 'down'
+    c.report(false)
+    await advance(RETRY_MS)
+    expect(c.isOnline()).toBe(true)
   })
 
   it('navigator.onLine false alone, with the origin answering, is online', async () => {
@@ -103,7 +139,7 @@ describe('connectivity', () => {
     const seen: boolean[] = []
     c.onChange((o) => seen.push(o))
     c.report(false)
-    await advance(PROBE_CONFIRM_MS)
+    await advance(OFFLINE_SPAN_MS)
     expect(c.isOnline()).toBe(false)
     state.origin = 'up'
     await advance(PROBE_EVERY_MS)
@@ -115,7 +151,7 @@ describe('connectivity', () => {
   it('a success landing while the phone says offline does not clear it; it checks instead', async () => {
     const { c, state, advance } = harness('down', false)
     c.check()
-    await advance(0)
+    await advance(OFFLINE_SPAN_MS)
     expect(c.isOnline()).toBe(false)
     const asked = state.asked
     c.report(true)
@@ -127,7 +163,7 @@ describe('connectivity', () => {
   it('recovers at once on any success', async () => {
     const { c, advance } = harness('down')
     c.report(false)
-    await advance(PROBE_CONFIRM_MS)
+    await advance(OFFLINE_SPAN_MS)
     expect(c.isOnline()).toBe(false)
     c.report(true)
     expect(c.isOnline()).toBe(true)

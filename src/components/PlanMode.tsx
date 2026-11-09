@@ -1,7 +1,9 @@
+import { BuoysPage } from './BuoysPage.tsx'
+import { WindPage } from './WindPage.tsx'
+import { SurfPage } from './SurfPage.tsx'
+import { TidesPage } from './TidesPage.tsx'
 import { SENSORS } from '../core/fov.ts'
 import { ExposurePage } from './ExposurePage.tsx'
-import { TidesPage } from './TidesPage.tsx'
-import { SurfPage } from './SurfPage.tsx'
 import { CalendarPage } from './CalendarPage.tsx'
 import { ScanOffer } from './ScanOffer.tsx'
 import { nextSunrise } from '../core/sunrise.ts'
@@ -57,7 +59,6 @@ import type { ConeMode } from '../lib/coneMode.ts'
 import { FieldPackControl, type PackBuildState } from './FieldPackControl.tsx'
 import { OfflineAreas } from './OfflineAreas.tsx'
 import { VenuePackCard } from './VenuePackCard.tsx'
-import { WindPage } from './WindPage.tsx'
 import { offlineLine, onPacksChanged, packFor } from '../lib/venuePack.ts'
 import { bowOnMap } from '../lib/specialLightData.ts'
 import { GUIDE_EVENT } from '../lib/useBestView.ts'
@@ -67,7 +68,7 @@ import { cellCalls } from '../core/stormCells.ts'
 import { stormOnMap } from '../core/lightning.ts'
 import { FeaturesSheet, type WeatherLayer } from './FeaturesSheet.tsx'
 import { FEAT_PATH, featIcon } from './featIcons.tsx'
-import { WeatherLayerCard } from './WeatherLayerCard.tsx'
+import { RadarLegend, WeatherLayerCard } from './WeatherLayerCard.tsx'
 import { OPEN_RADAR_EVENT } from './WeatherTab.tsx'
 import { useSpecialNow } from '../lib/useSpecialNow.ts'
 import { specialNameOf } from '../core/specialLight.ts'
@@ -76,6 +77,10 @@ import type { VenueCacheState } from '../lib/useVenueCache.ts'
 import type { Box } from '../lib/tileRange.ts'
 import type { ReadFile } from '../lib/scoutFile.ts'
 import { useOnline } from '../lib/useOnline.ts'
+import { showsPhotoTools, useActivities } from '../lib/activities.ts'
+
+
+const PHOTO_LAYERS: readonly string[] = ['shadows', 'cones', 'lightmap']
 import { MapRail } from './MapRail.tsx'
 import { SkyPanel } from './SkyPanel.tsx'
 import { HOME, TIME_MATTERS, type CardKind, type SheetCard } from '../lib/sheetCard.ts'
@@ -158,7 +163,6 @@ import { fetchModelLows, nearestHour } from '../lib/skyFireData.ts'
 import { useWeatherBusy, useWeatherEpoch } from '../lib/useWeatherStatus.ts'
 import type { Place } from '../lib/placeGroups.ts'
 import { PageGroup, type PageGroupValue } from '../lib/pageGroup.ts'
-import { BuoysPage } from './BuoysPage.tsx'
 import { TerrainLightPage } from './TerrainLightPage.tsx'
 import { reliefAround, type Relief } from '../lib/terrainRelief.ts'
 import { FLAT_M } from '../core/contours.ts'
@@ -1188,6 +1192,7 @@ export function PlanMode({
       exposure: `${nd.nd ?? 'No ND'} · 1/60 s`,
       record,
       units: units.distance,
+      windUnit: units.wind,
       tick: (f?.tick ?? 0) + 1,
     }))
   }
@@ -1320,10 +1325,15 @@ export function PlanMode({
   const [warningsOn, setWarningsOn] = useState(false)
   const [tracksOn, setTracksOn] = useState(false)
   const [windLayerFt, setWindLayerFt] = useState<0 | 400>(0)
+  /* The layer last picked: a radar time that arrives after the shooter picked something else is dropped (Batch N: Off, then the late answer turned radar back on). */
+  const pickedWeather = useRef<WeatherLayer>('off')
   const pickWeather = (w: WeatherLayer) => {
+    pickedWeather.current = w
     if (w === 'radar') {
       onShowSky(false)
-      void radarValid().then((v) => setRadarAt(v ?? new Date(Math.floor(Date.now() / 300_000) * 300_000 - 600_000)))
+      void radarValid().then((v) => {
+        if (pickedWeather.current === 'radar') setRadarAt(v ?? new Date(Math.floor(Date.now() / 300_000) * 300_000 - 600_000))
+      })
     } else {
       setRadarAt(null)
       if (w === 'off') onShowSky(false)
@@ -1352,10 +1362,14 @@ export function PlanMode({
     setTracksOn(false)
   }
   useEffect(() => {
-    const on = (e: Event) => setRadarAt((e as CustomEvent<Date | null>).detail)
+    /* The slider's time, only while radar is the layer picked: a late tick after Off must not turn it back on (Batch N). */
+    const on = (e: Event) => {
+      if (pickedWeather.current === 'radar') setRadarAt((e as CustomEvent<Date | null>).detail)
+    }
     window.addEventListener(RADAR_EVENT, on)
     /* The Weather tab's radar strip: "Open on the map" lowers the sheet with the radar on. */
     const open = (e: Event) => {
+      pickedWeather.current = 'radar'
       setRadarAt((e as CustomEvent<Date | null>).detail ?? new Date(Math.floor(Date.now() / 300_000) * 300_000 - 300_000))
       setSheet('peek')
     }
@@ -1372,6 +1386,16 @@ export function PlanMode({
     return () => window.removeEventListener(GUIDE_EVENT, on)
   }, [])
   const home = useCallback(() => setCard(HOME), [])
+  /*
+   * CLOSING FEATURES IS BACK TO THE MAP (8 Nov). Features opens the sheet to
+   * full; closing it only changed the card, so the shoot card came up at full
+   * height in its place, which read as the old Plan sheet opening. The sheet
+   * goes down with it: the map, the time sheet, nothing else.
+   */
+  const closeFeatures = useCallback(() => {
+    setCard(HOME)
+    setSheet('peek')
+  }, [])
   /* Which job's tabs sit over the page: Water at the coast, Land inland; Wind is in both, and Water wins when both are on. */
   const pageGroup = useMemo<PageGroupValue | null>(() => {
     if (page === null) return null
@@ -1965,6 +1989,9 @@ export function PlanMode({
    * time sheet (Back to now is its ↺); see FeaturesSheet.tsx.
    */
   const COLOR = { storm: '#e0567a', shoot: '#e8a33a', drone: '#3fa0d8', map: '#5b7f9e' }
+  /* Batch N C1: the photo layers only when Shoot is picked, or nothing is yet (src/lib/activities.ts). */
+  const [picked] = useActivities()
+  const photoTools = showsPhotoTools(picked)
   const featuresCard = (
     <FeaturesSheet
       quick={[
@@ -1975,7 +2002,9 @@ export function PlanMode({
       weather={weatherLayer}
       onWeather={(w) => {
         pickWeather(w)
-        if (w !== 'off') { setCard({ kind: 'wxlayer' }); setSheet('half') }
+        /* Radar (8 Nov): down to the map, its legend in the time sheet's place at the foot (RadarLegend). */
+        if (w === 'radar') { setCard({ kind: 'wxlayer' }); setSheet('peek') }
+        else if (w !== 'off') { setCard({ kind: 'wxlayer' }); setSheet('half') }
       }}
       storms={[
         { id: 'lightning', label: 'Lightning', on: lightningOn, color: COLOR.storm, icon: featIcon(FEAT_PATH.bolt), note: 'last 45 min', onToggle: () => { setLightningOn(!lightningOn); if (!lightningOn) { setCard({ kind: 'wxlayer' }); setSheet('half') } } },
@@ -2001,7 +2030,7 @@ export function PlanMode({
         } },
         { id: 'cones', label: 'Cones', on: coneMode === 'all', color: COLOR.shoot, icon: featIcon(FEAT_PATH.cone), onToggle: () => onConeMode(coneMode === 'all' ? 'none' : 'all') },
         { id: 'lightmap', label: 'Light map', on: card.kind === 'lightmap', color: COLOR.shoot, icon: featIcon(FEAT_PATH.light), note: scanCtx === null ? 'needs the scan' : undefined, onToggle: () => openCard('lightmap') },
-      ]}
+      ].filter((r) => photoTools || !PHOTO_LAYERS.includes(r.id))}
       drone={[
         /* As the old tile: the state says what is on the map; on also opens the card; failed, it is its own Retry. */
         { id: 'airspace', label: 'Airspace', on: airspaceOn, color: COLOR.drone, icon: featIcon(FEAT_PATH.air), note: !airspaceOn ? undefined : airspaceFailed ? LAYER_FAILED : airspaceOverlay === null ? 'Loading' : airspaceDense ? 'zoom for grid' : undefined, onToggle: () => { if (airspaceOn && airspaceFailed) { setAirspaceFailed(false); return } if (!airspaceOn) setCard({ kind: 'airspace' }); setAirspaceOn(!airspaceOn) } },
@@ -2391,14 +2420,14 @@ export function PlanMode({
         )
       case 'layers':
         return (
-          <Card title="Features" onClose={home}>
+          <Card title="Features" onClose={closeFeatures}>
             {featuresCard}
           </Card>
         )
       case 'wxlayer':
         return (
           <Card title={layerWords.join(' · ') || 'Weather'} onClose={home}>
-            <WeatherLayerCard layer={weatherLayer} scanAt={radarAt === null ? null : (layerNow?.radar?.scanAt ?? radarAt)} calls={layerCalls} strikes={layerNow?.strikes ?? []} alerts={layerNow?.alerts ?? []} upstream={layerUpstream} dist={units.distance === 'ft' ? 'mi' : 'km'} timeZone={venueWindow?.timeZone ?? 'UTC'} windFt={windLayerFt} onWindFt={setWindLayerFt} />
+            <WeatherLayerCard layer={weatherLayer} alerts={layerNow?.alerts ?? []} upstream={layerUpstream} dist={units.distance === 'ft' ? 'mi' : 'km'} timeZone={venueWindow?.timeZone ?? 'UTC'} windFt={windLayerFt} onWindFt={setWindLayerFt} />
           </Card>
         )
       case 'moonrise':
@@ -2892,7 +2921,7 @@ export function PlanMode({
         bearing={mapBearing}
         heading={followHeading}
         onCompass={onCompass}
-        onFeatures={() => (card.kind === 'layers' ? home() : openCard('layers'))}
+        onFeatures={() => (card.kind === 'layers' ? closeFeatures() : openCard('layers'))}
         featuresOpen={card.kind === 'layers'}
       />
       )}
@@ -2968,7 +2997,11 @@ export function PlanMode({
               * condition repeated at eleven call sites.
               */}
             {/* In 3D the time bar always shows: the light, the shadows and the sky all run on it. Batch I: not over Sky fire, Special or Calendar, which read their own events. */}
-            {((!TIME_MATTERS[card.kind] || (card.kind === 'sky' && skyTab !== 'now')) && !threeD) || venueWindow === null || scrubbedAt === null ? null : (
+            {/* Radar on (8 Nov): its legend and timeline take the time bar's place here, up at every height of the sheet. */}
+            {/* Only on the map's own view (the home card, the radar card): a card that reads a moment keeps its time strip (Batch N; the surface audit). */}
+            {weatherLayer === 'radar' && !threeD && (card.kind === HOME.kind || card.kind === 'wxlayer') ? (
+              <RadarLegend scanAt={radarAt === null ? null : (layerNow?.radar?.scanAt ?? radarAt)} calls={layerCalls} strikes={layerNow?.strikes ?? []} timeZone={venueWindow?.timeZone ?? 'UTC'} />
+            ) : ((!TIME_MATTERS[card.kind] || (card.kind === 'sky' && skyTab !== 'now')) && !threeD) || venueWindow === null || scrubbedAt === null ? null : (
               <TimeBar
                 at={scrubbedAt}
                 lat={venue?.lat ?? 0}

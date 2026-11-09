@@ -137,6 +137,60 @@ export async function fetchTropics(venue: LatLon, dist: 'mi' | 'km', fetchImpl: 
   }
 }
 
+/*
+ * THE MARINE ZONE'S ALERTS (Batch N E5: a Small Craft Advisory was in force
+ * on 8 Nov and the home showed no banner; the point alerts are the land
+ * zone's). Two questions to weather.gov: which marine zone is off this beach
+ * (the beach to 2 decimals), and that zone's alerts in force. Kept 30 min.
+ */
+export interface MarineAlert {
+  event: string
+  ends: Date | null
+  zone: string
+}
+const keptAlerts = new Map<string, { at: number; list: Promise<MarineAlert[] | null> }>()
+export function marineAlertsFor(beach: LatLon, fetchImpl: typeof fetch = fetch, now = Date.now()): Promise<MarineAlert[] | null> {
+  const key = `${r2(beach.lat)},${r2(beach.lon)}`
+  const k = keptAlerts.get(key)
+  if (k !== undefined && now - k.at < 30 * 60_000) return k.list
+  const list = (async () => {
+    const mar = await nws<Zones>(`/zones?type=marine&point=${key}`, fetchImpl)
+    if (mar === null) return null
+    const zone = mar.features?.[0]?.properties?.id ?? null
+    if (zone === null || !/^[A-Z]{3}\d{3}$/.test(zone)) return []
+    const got = await nws<{ features?: { properties?: { event?: string; ends?: string | null; expires?: string | null } }[] }>(`/alerts/active/zone/${zone}`, fetchImpl)
+    if (got === null) return null
+    return parseMarineAlerts(got, zone)
+  })()
+  keptAlerts.set(key, { at: now, list })
+  return list
+}
+
+export function parseMarineAlerts(got: { features?: { properties?: { event?: string; ends?: string | null; expires?: string | null } }[] }, zone: string): MarineAlert[] {
+  return (got.features ?? []).flatMap((f) => {
+    const p = f.properties
+    if (typeof p?.event !== 'string' || p.event === '') return []
+    const end = p.ends ?? p.expires ?? null
+    const ends = end === null ? null : new Date(end)
+    return [{ event: p.event, ends: ends !== null && Number.isFinite(ends.getTime()) ? ends : null, zone }]
+  })
+}
+
+export function useMarineAlerts(beach: LatLon | null): MarineAlert[] | null {
+  const [list, setList] = useState<MarineAlert[] | null>(null)
+  const lat = beach?.lat
+  const lon = beach?.lon
+  useEffect(() => {
+    if (lat === undefined || lon === undefined) return
+    let live = true
+    void marineAlertsFor({ lat, lon }).then((l) => live && setList(l))
+    return () => {
+      live = false
+    }
+  }, [lat, lon])
+  return list
+}
+
 export function useCoast(beach: LatLon | null, venue: LatLon | null, dist: 'mi' | 'km', on: boolean): { coast: Coast | null; tropics: Tropics | null } {
   const [coast, setCoast] = useState<Coast | null>(null)
   const [tropics, setTropics] = useState<Tropics | null>(null)

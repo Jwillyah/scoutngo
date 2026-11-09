@@ -146,6 +146,7 @@ export function jittered(ms: number, r: number = random()): number {
  * Open-Meteo directly for the rest of the session; when it fails (502-504,
  * no answer) that one request is asked directly. A 429 from it is a 429.
  */
+export const EDGE_TIMEOUT_MS = 4000
 let edge: string | null = null
 let edgeMissing = false
 export function setForecastEdge(path: string | null): void {
@@ -153,9 +154,26 @@ export function setForecastEdge(path: string | null): void {
   edgeMissing = false
 }
 
-/** The request through the cache: `${edge}?om=<host><path>&<params>&hr=<UTC hour>`. */
+/*
+ * COARSER FOR THE CACHE (Batch N, Section 0 D): the spot sent to this app's
+ * function is snapped to a 0.05° grid, about 5 km, not 2 decimals. More
+ * phones share each cached answer, and Vercel's request log holds a 5 km
+ * square, not a 1 km one. Open-Meteo's own grids are 3 km (HRRR) and coarser,
+ * so the forecast is the same one a few kilometres over. The direct ask
+ * (when the cache is not there) stays at 2 decimals, as before.
+ */
+export const EDGE_GRID_DEG = 0.05
+export function snapEdge(v: number): string {
+  return (Math.round(v / EDGE_GRID_DEG) * EDGE_GRID_DEG).toFixed(2)
+}
+
+/** The request through the cache: `${edge}?om=<host><path>&<params>&hr=<UTC hour>`, every coordinate on the 0.05° grid. */
 export function edgeUrl(url: string, at: Date, base: string): string {
   const u = new URL(url)
+  for (const name of ['latitude', 'longitude']) {
+    const v = u.searchParams.get(name)
+    if (v !== null) u.searchParams.set(name, v.split(',').map((x) => (Number.isFinite(Number(x)) && x.trim() !== '' ? snapEdge(Number(x)) : x)).join(','))
+  }
   const hr = at.toISOString().slice(0, 13)
   const q = u.search.length > 1 ? `&${u.search.slice(1)}` : ''
   return `${base}?om=${u.host}${u.pathname}${q}&hr=${hr}`
@@ -277,7 +295,8 @@ async function send(url: string, fetchImpl: typeof fetch, timeoutMs: number): Pr
   if (edge === null || edgeMissing) return direct()
   let r: Response
   try {
-    r = await fetchImpl(edgeUrl(url, new Date(), edge), { signal: AbortSignal.timeout(timeoutMs) })
+    /* Batch N E1: a cache that hangs (8 Nov, LTE: requests to this app's own address never answered) costs 4 s, not the whole timeout, before the direct ask. */
+    r = await fetchImpl(edgeUrl(url, new Date(), edge), { signal: AbortSignal.timeout(Math.min(EDGE_TIMEOUT_MS, timeoutMs)) })
   } catch {
     return direct()
   }
@@ -285,7 +304,8 @@ async function send(url: string, fetchImpl: typeof fetch, timeoutMs: number): Pr
     edgeMissing = true
     return direct()
   }
-  return r.status >= 502 && r.status <= 504 ? direct() : r
+  /* Batch N: a request the cache refuses (400, 414: more points than it takes, the sightline's many positions) is asked directly, at 2 decimals, as before the cache. */
+  return (r.status >= 502 && r.status <= 504) || r.status === 400 || r.status === 414 ? direct() : r
 }
 
 /**

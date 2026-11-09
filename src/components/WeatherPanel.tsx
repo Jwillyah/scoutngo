@@ -1,6 +1,6 @@
 import { colorChance, COLOR_WORDS } from '../core/colorChance.ts'
 import { feetToMeters } from '../core/reachScale.ts'
-import { compareToRating, knots, windAtHeight, type LevelWind } from '../core/windProfile.ts'
+import { compareToRating, windAtHeight, type LevelWind } from '../core/windProfile.ts'
 import type { VenueCloud } from '../lib/forecast.ts'
 import { forecastAge, type Provenance } from '../lib/savedForecast.ts'
 import type { TideState } from '../core/tide.ts'
@@ -12,7 +12,7 @@ import {
 } from '../core/windHeight.ts'
 import { formatClock } from '../core/timezone.ts'
 import type { TideInfo } from '../lib/useTide.ts'
-import { formatRange, type Units } from '../lib/units.ts'
+import { formatRange, windIn, windUnitLabel, type Units } from '../lib/units.ts'
 
 interface WeatherPanelProps {
   /** The instant the time bar is on. Everything here is for that moment. */
@@ -141,7 +141,7 @@ export function WeatherPanel({
   const speedLine =
     aloft.speedMps === null
       ? DASH
-      : `${Math.round(knots(aloft.speedMps))} kts`
+      : `${Math.round(windIn(aloft.speedMps, units.wind) ?? 0)} ${windUnitLabel(units.wind)}`
   const heightLine = windHeightLabel(windHeight)
   /*
    * AN ASSUMED HEIGHT SAYS SO. Reading at 200 ft because the Drone chip is on
@@ -204,7 +204,7 @@ export function WeatherPanel({
               <p className="wx__note">No gust reported for this hour.</p>
             ) : (
               <p className="wx__gust num">
-                Gusting {Math.round(knots(gustMps))} kts at the surface
+                Gusting {Math.round(windIn(gustMps, units.wind) ?? 0)} {windUnitLabel(units.wind)} at the surface
               </p>
             )}
 
@@ -218,7 +218,7 @@ export function WeatherPanel({
             {against === null ? null : (
               <p className={`wx__rated${against.over ? ' wx__rated--over' : ''}`}>
                 The aircraft is rated to{' '}
-                <span className="num">{Math.round(knots(against.ratedMps))} kts</span> (
+                <span className="num">{Math.round(windIn(against.ratedMps, units.wind) ?? 0)} {windUnitLabel(units.wind)}</span> (
                 <span className="num">{against.ratedMps} m/s</span>). {ratedWindSource}. Yours
                 is the judgement.
               </p>

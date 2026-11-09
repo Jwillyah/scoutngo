@@ -12,11 +12,12 @@ nearest station itself, and corrects the blend with it. Batch L, Section 1.
 - Read by `src/lib/sharedSkillData.ts`. Used when it is at most **3 days**
   old and has a station within **60 km** of the venue; otherwise the phone's
   own scoring (Batch K, `src/lib/blendData.ts`) is used. Never a mix.
-- **Publishing is not switched on yet.** The nightly GitHub Action that would
-  run the script and deploy `out/` to GitHub Pages needs the repository owner
-  to add it and turn Pages on (Settings › Pages › Source: GitHub Actions).
-  Until then the phone's own scoring is used everywhere, and the script runs
-  by hand.
+- **Published nightly from the repository itself (Batch N, Section 0 F).**
+  `.github/workflows/model-skill.yml` runs the script at 07:30 UTC into
+  `public/skill/v1/<region>/` and commits that folder only; the next deploy
+  serves it from the app's own host (`/skill/v1/...`), so the phone asks
+  nobody else. Two days are kept (today and yesterday). GitHub Pages is not
+  used.
 
 ## Sources
 

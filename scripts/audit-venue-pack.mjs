@@ -294,7 +294,12 @@ try {
     const { page, ev, wait, ctx } = b
     looked += 1
 
-    const line = await ev(`document.querySelector('.offline-line')?.textContent ?? null`)
+    /* Batch N (8 Nov, flaky 5G): offline is three failed checks over 30 s, so the line comes up to about 35 s in. */
+    let line = await ev(`document.querySelector('.offline-line')?.textContent ?? null`)
+    for (let t = 0; t < 60_000 && !(line !== null && /^Offline · /.test(line)); t += 1000) {
+      await wait(1000)
+      line = await ev(`document.querySelector('.offline-line')?.textContent ?? null`)
+    }
     console.log(`  offline line: ${line}`)
     if (line === null || !/^Offline · using saved data from \d{1,2}:\d{2}/.test(line)) fail(`${label}: the offline line reads ${JSON.stringify(line)}`)
     const lineBox = await ev(`(() => { const e = document.querySelector('.offline-line'); if (!e) return null; const r = e.getBoundingClientRect(); return { top: r.top, h: r.height, wraps: e.scrollWidth > e.clientWidth + 1 } })()`)

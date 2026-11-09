@@ -131,8 +131,11 @@ describe('reverse geocoding a dropped pin', () => {
   it('asks Nominatim for one point, with address detail', () => {
     const url = reverseUrl({ lat: 38.364236, lon: -75.605912 })
     expect(url).toContain('https://nominatim.openstreetmap.org/reverse')
-    expect(url).toContain('lat=38.364236')
-    expect(url).toContain('lon=-75.605912')
+    /* Rounded to 2 decimals before it leaves the phone (CLAUDE.md, privacy). */
+    expect(url).toContain('lat=38.36&')
+    expect(url).toContain('lon=-75.61&')
+    expect(url).not.toContain('38.364')
+    expect(url).toContain('zoom=14')
     expect(url).toContain('addressdetails=1')
   })
 

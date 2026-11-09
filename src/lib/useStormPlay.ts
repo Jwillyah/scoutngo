@@ -7,7 +7,7 @@ import { useNowcast, type Nowcast } from './stormData.ts'
 import { noteStorm, useStormRisk, type StormRisk } from './stormRiskData.ts'
 import type { Units } from './units.ts'
 
-/* Whether storms are in play today, for Today (StormToday.tsx) and the menu's Sky card (Batch K addendum, B). */
+/* Whether storms are in play today, for the home's storm line (Home.tsx) and the menu's Sky card (Batch K addendum, B). */
 export interface StormPlay {
   inPlay: boolean
   calls: CellCall[]

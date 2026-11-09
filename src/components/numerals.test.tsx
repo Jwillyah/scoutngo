@@ -230,7 +230,8 @@ describe('turning the numbers off does remove the numbers', () => {
 
   it('keeps the wind speed, which is a number you act on', () => {
     const { off } = both(SUBJECTS[2].node)
-    expect(text(off)).toContain('m/s')
+    /* In Settings' wind unit (kt by default), like every wind in the app (E11). */
+    expect(text(off)).toContain('12 kt')
     expect(text(off)).toMatch(/\d/)
   })
 })

@@ -89,11 +89,14 @@ describe('loadTile never hangs', () => {
     })) as unknown as typeof fetch
 
   it('once offline is confirmed, refuses at once without fetching', async () => {
+    vi.useFakeTimers()
     Object.defineProperty(Navigator.prototype, 'onLine', { get: () => false, configurable: true })
     globalThis.fetch = vi.fn(() => Promise.reject(new TypeError('Load failed'))) as unknown as typeof fetch
     await expect(loadTile({ url: 'scoutngo://example.com/1/2/3' }, new AbortController())).rejects.toThrow()
-    /* The failed tile asked the app's own origin; that failed too, and the device agrees. */
-    await vi.waitFor(() => expect(isOnline()).toBe(false))
+    /* The failed tile asked the app's own origin; that failed too, and twice more over 30 s (Batch N: three failures, never the device's word alone). */
+    await vi.advanceTimersByTimeAsync(31_000)
+    expect(isOnline()).toBe(false)
+    vi.useRealTimers()
     const fetchSpy = vi.fn()
     globalThis.fetch = fetchSpy as unknown as typeof fetch
     await expect(loadTile({ url: 'scoutngo://example.com/1/2/4' }, new AbortController())).rejects.toThrow(/offline/)
@@ -103,9 +106,9 @@ describe('loadTile never hangs', () => {
   /*
    * THE MOUNTAIN. The device says it is online and nothing is ever answered,
    * the app's own origin included. The tile fails in bounded time, and the
-   * network is called gone once the check has failed twice.
+   * network is called gone once the check has failed three times over 30 s.
    */
-  it('gives up on a request that is never answered, and says the network is gone once the check fails twice', async () => {
+  it('gives up on a request that is never answered, and says the network is gone once the check fails three times over 30 s', async () => {
     vi.useFakeTimers()
     Object.defineProperty(Navigator.prototype, 'onLine', { get: () => true, configurable: true })
     globalThis.fetch = hanging
@@ -115,7 +118,10 @@ describe('loadTile never hangs', () => {
     await vi.advanceTimersByTimeAsync(9000)
     await settled
     expect(isOnline()).toBe(true)
-    await vi.advanceTimersByTimeAsync(6000 + 2500 + 6000)
+    /* Each check times out at 6 s; retried 10 s, then 20 s, later. */
+    await vi.advanceTimersByTimeAsync(6000 + 10_000 + 6000)
+    expect(isOnline()).toBe(true)
+    await vi.advanceTimersByTimeAsync(20_000 + 6000)
     expect(isOnline()).toBe(false)
   })
 
@@ -156,8 +162,11 @@ describe('loadTile never hangs', () => {
   it('one success clears a confirmed offline, with no reload', async () => {
     Object.defineProperty(Navigator.prototype, 'onLine', { get: () => false, configurable: true })
     globalThis.fetch = vi.fn(() => Promise.reject(new TypeError('Load failed'))) as unknown as typeof fetch
+    vi.useFakeTimers()
     reportNetwork(false)
-    await vi.waitFor(() => expect(isOnline()).toBe(false))
+    await vi.advanceTimersByTimeAsync(31_000)
+    expect(isOnline()).toBe(false)
+    vi.useRealTimers()
     /* The phone has its signal back, and the next request through says so. */
     Object.defineProperty(Navigator.prototype, 'onLine', { get: () => true, configurable: true })
     reportNetwork(true)

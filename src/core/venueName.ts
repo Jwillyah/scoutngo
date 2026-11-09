@@ -97,8 +97,16 @@ export function venueLabel(
   state: ResolvedName,
   latitude: string,
   longitude: string,
+  /** A name from bundled data for this coordinate (src/core/nearestPlace.ts), or null. */
+  nearby: string | null = null,
 ): string {
   if (state.kind === 'name') return state.name
+  /*
+   * BEFORE THE COORDINATE, A NAME FROM THE PHONE (E9, 8 Nov): the map's title
+   * read "36.6623" while the lookup was out or refused. A spot or town in the
+   * bundled data, said as "near" when it is not on the spot, is still true.
+   */
+  if (nearby !== null && nearby.trim() !== '') return nearby
   /*
    * UNKNOWN IS THE COORDINATE TOO, never "Name unknown". On 27 Oct at Virginia
    * Beach the top bar said "Name unknown" all morning; the coordinate is a true
@@ -113,7 +121,10 @@ export function shortVenueLabel(
   state: ResolvedName,
   latitude: string,
   longitude: string,
+  nearby: string | null = null,
 ): string {
-  const full = venueLabel(state, latitude, longitude)
+  const full = venueLabel(state, latitude, longitude, nearby)
+  /* A coordinate is never cut at its comma: "36.6623" alone is half a place. */
+  if (state.kind !== 'name' && full === coordinateLabel(latitude, longitude)) return full
   return full.split(',')[0]?.trim() || full
 }

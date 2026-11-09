@@ -28,7 +28,14 @@ const DBZ = [20, 30, 40, 50, 60, 65]
 const WORD: Record<number, string> = { 20: 'light rain', 30: 'rain', 40: 'heavy rain', 50: 'very heavy, storms', 60: 'hail likely in it', 65: 'large hail possible' }
 const colour = (dbz: number) => `#${N0Q_PALETTE[Math.round((dbz + 32.5) * 2)].toString(16).padStart(6, '0')}`
 
-export function WeatherLayerCard({ layer, scanAt, calls, strikes, alerts, upstream = [], dist = 'mi', timeZone, windFt, onWindFt }: { layer: WeatherLayer; scanAt: Date | null; calls: readonly CellCall[]; strikes: readonly Strike[]; alerts: readonly Alert[]; upstream?: readonly { alert: Alert; up: Upstream }[]; dist?: 'mi' | 'km'; timeZone: string; windFt: 0 | 400; onWindFt: (ft: 0 | 400) => void }) {
+/*
+ * THE RADAR LEGEND (8 Nov). While radar is on it takes the time sheet's place
+ * at the foot of the screen, the one strip that stays up at every height of
+ * the sheet: in the card it sat under the time bar, at half height it ran
+ * toward the bottom edge, and lowering the sheet to see the map hid it. The
+ * time bar has nothing to say to radar, which has its own timeline here.
+ */
+export function RadarLegend({ scanAt, calls, strikes, timeZone }: { scanAt: Date | null; calls: readonly CellCall[]; strikes: readonly Strike[]; timeZone: string }) {
   const [tapped, setTapped] = useState<number | null>(null)
   const [play, setPlay] = useState(false)
   const [step, setStep] = useState(sliderSteps().indexOf(0))
@@ -37,6 +44,27 @@ export function WeatherLayerCard({ layer, scanAt, calls, strikes, alerts, upstre
     const t = setInterval(() => setStep((s) => (s + 1) % sliderSteps().length), 700)
     return () => clearInterval(t)
   }, [play])
+  return (
+    <div className="wlay wlay--peek" data-radar-legend>
+      <div className="wlay__legend" role="group" aria-label="Radar colours">
+        {DBZ.map((d) => (
+          <button key={d} type="button" className="wlay__sw" style={{ background: colour(d) }} aria-label={`${d} dBZ: ${WORD[d]}`} onClick={() => setTapped(d)} />
+        ))}
+        <span className="wlay__val">{tapped === null ? 'Tap a colour' : `${tapped} dBZ · ${WORD[tapped]}`}</span>
+      </div>
+      {scanAt === null ? (
+        <p className="wlay__note">Reading the radar…</p>
+      ) : (
+        <div className="wlay__time">
+          <button type="button" className="wlay__play" aria-label={play ? 'Pause' : 'Play the radar'} aria-pressed={play} onClick={() => setPlay(!play)}>{play ? '❚❚' : '▶'}</button>
+          <RadarSlider scanAt={scanAt} calls={calls} strikes={strikes} timeZone={timeZone} step={step} onStep={(i) => { setPlay(false); setStep(i) }} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function WeatherLayerCard({ layer, alerts, upstream = [], dist = 'mi', timeZone, windFt, onWindFt }: { layer: WeatherLayer; alerts: readonly Alert[]; upstream?: readonly { alert: Alert; up: Upstream }[]; dist?: 'mi' | 'km'; timeZone: string; windFt: 0 | 400; onWindFt: (ft: 0 | 400) => void }) {
   const warnings = alerts.filter((a) => /warning/i.test(a.event))
   return (
     <div className="wlay">
@@ -50,22 +78,7 @@ export function WeatherLayerCard({ layer, scanAt, calls, strikes, alerts, upstre
         </p>
       ))}
       {layer === 'radar' ? (
-        <>
-          <div className="wlay__legend" role="group" aria-label="Radar colours">
-            {DBZ.map((d) => (
-              <button key={d} type="button" className="wlay__sw" style={{ background: colour(d) }} aria-label={`${d} dBZ: ${WORD[d]}`} onClick={() => setTapped(d)} />
-            ))}
-            <span className="wlay__val">{tapped === null ? 'Tap a colour · cloud under it: GOES infrared' : `${tapped} dBZ · ${WORD[tapped]}`}</span>
-          </div>
-          {scanAt === null ? (
-            <p className="wlay__note">Reading the radar…</p>
-          ) : (
-            <div className="wlay__time">
-              <button type="button" className="wlay__play" aria-label={play ? 'Pause' : 'Play the radar'} aria-pressed={play} onClick={() => setPlay(!play)}>{play ? '❚❚' : '▶'}</button>
-              <RadarSlider scanAt={scanAt} calls={calls} strikes={strikes} timeZone={timeZone} step={step} onStep={(i) => { setPlay(false); setStep(i) }} />
-            </div>
-          )}
-        </>
+        <p className="wlay__note">While radar is on, its colours and its timeline take the time bar&rsquo;s place. The cloud under the radar is GOES infrared.</p>
       ) : layer === 'wind' ? (
         <>
           <div className="seg" role="group" aria-label="Wind height">

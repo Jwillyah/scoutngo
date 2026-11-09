@@ -32,13 +32,37 @@ export function nextSunrise(at: Date, lat: number, lon: number, timeZone: string
 export function sunriseOn(date: string, lat: number, lon: number, timeZone: string): Date | null {
   const midnight = zonedTimeToUtc(date, '00:00', timeZone)
   if (midnight === null) return null
-  const above = (t: number) => getPosition(new Date(t), lat, lon).altitude > BAND_THRESHOLDS.horizon
+  const above = (t: number) => sunAboveHorizon(t, lat, lon)
   let was = above(midnight.getTime())
   for (let m = 1; m <= 24 * 60; m += 1) {
     const t = midnight.getTime() + m * 60_000
     const now = above(t)
-    if (now && !was) return new Date(t)
+    if (now && !was) return horizonCrossing(t - 60_000, t, lat, lon)
     was = now
   }
   return null
+}
+
+/** Whether the sun stands above the calibrated horizon (sunPath.ts BAND_THRESHOLDS.horizon) at an instant. */
+export const sunAboveHorizon = (t: number, lat: number, lon: number): boolean => getPosition(new Date(t), lat, lon).altitude > BAND_THRESHOLDS.horizon
+
+/**
+ * THE INSTANT THE SUN CROSSES THE HORIZON, to the second, between two instants
+ * a scan found on either side of it (B4, 8 Nov 2026). The minute scans used
+ * to return the first whole minute past the crossing, which is the crossing
+ * rounded UP; every clock in the app writes a time rounded DOWN
+ * (src/core/timezone.ts clockMinute). So a sunset at 4:59:55 PM read "5:00"
+ * on the Calendar and the Tide sheet and "4:59" on the home. A scan finds the
+ * minute; this finds the moment, and the one rounding is the clock's.
+ */
+export function horizonCrossing(beforeMs: number, afterMs: number, lat: number, lon: number): Date {
+  const start = sunAboveHorizon(beforeMs, lat, lon)
+  let lo = beforeMs
+  let hi = afterMs
+  while (hi - lo > 500) {
+    const mid = (lo + hi) / 2
+    if (sunAboveHorizon(mid, lat, lon) === start) lo = mid
+    else hi = mid
+  }
+  return new Date(Math.round(hi))
 }

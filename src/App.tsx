@@ -1,3 +1,4 @@
+import { useBundledPlaceName } from './lib/useBundledPlaceName.ts'
 import { seaReach } from './lib/coast.ts'
 import { placeKeyOf, resolveReach } from './lib/placeMemory.ts'
 import { showSurf, SURF_COAST_M, useSurfSetting } from './lib/surfSetting.ts'
@@ -1183,9 +1184,11 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nameUnknown, venue.latitude, venue.longitude])
 
+  /* A name from bundled data while the lookup is out or refused (E9): never the bare coordinate when a spot or town is near. */
+  const nearbyName = useBundledPlaceName(centre)
   const venueNameLine = useMemo(
-    () => venueLabel(venueNameState, venue.latitude, venue.longitude),
-    [venueNameState, venue.latitude, venue.longitude],
+    () => venueLabel(venueNameState, venue.latitude, venue.longitude, nearbyName),
+    [venueNameState, venue.latitude, venue.longitude, nearbyName],
   )
 
   /*
@@ -1194,7 +1197,6 @@ function App() {
    * shown first. No button, because the button was forgotten and the trip
    * failed. See src/lib/useVenueCache.ts.
    */
-  const venueCache = useVenueCache(centre, reachMeters, venueNameLine)
 
 
   /*
@@ -1401,6 +1403,16 @@ function App() {
   const [askWhat, setAskWhat] = useState(false)
   /* The Today briefing: on a plain launch (src/lib/briefingOpen.ts), and from Menu › Today. */
   const [briefOpen, setBriefOpen] = useState(() => shouldOpenBriefing(typeof window === 'undefined' ? null : window, landingSeen))
+  /* Latched: once the home has been left for the map (or never opened), the map and the venue save run. */
+  const [mapSeen, setMapSeen] = useState(() => !briefOpen)
+  if (!briefOpen && !mapSeen) setMapSeen(true)
+  /*
+   * NOT BEHIND THE HOME (Batch N C4: on a slow link the map under the home
+   * asked for about 1,600 imagery tiles, this save and the map's own view,
+   * while the home needed the bandwidth for its forecasts). The map mounts,
+   * and the venue saves itself, once the map has been opened this session.
+   */
+  const venueCache = useVenueCache(mapSeen ? centre : null, reachMeters, venueNameLine)
   /* The spot switcher over Today (Batch I, Section 1). */
   const [spotPickOpen, setSpotPickOpen] = useState(false)
   /* The first run asks only on a bare launch: a shared plan's link, or ?calibration=1, brings its own place. */
@@ -2002,7 +2014,7 @@ function App() {
    */
   const zoneSuffix = venueWindow === null || venueWindow.timeZoneShort === '' ? '' : ` ${venueWindow.timeZoneShort}`
   const windowSpan = formatSpan(formatWallTime(venue.startTime) ?? venue.startTime, formatWallTime(venue.endTime) ?? venue.endTime)
-  const venueShort = shortVenueLabel(venueNameState, venue.latitude, venue.longitude)
+  const venueShort = shortVenueLabel(venueNameState, venue.latitude, venue.longitude, nearbyName)
   /*
    * THE OPTIC, SAID ONCE, when every position shares it.
    *
@@ -2153,7 +2165,7 @@ function App() {
             onDeleteSpot={(id) => setSpots(spots.filter((spot) => spot.id !== id))}
             onImportSpots={(incoming) => setSpots(mergeSpots(spots, incoming))}
             currentPlan={currentPlan}
-            suggestedName={shortVenueLabel(venueNameState, venue.latitude, venue.longitude)}
+            suggestedName={shortVenueLabel(venueNameState, venue.latitude, venue.longitude, nearbyName)}
             canSave={centre !== null}
             shootKind={shootKind}
             onShootKind={onShootKind}
@@ -2217,7 +2229,7 @@ function App() {
           }}
         />
       ) : null}
-      {mode === 'plan' ? (
+      {mode === 'plan' && mapSeen ? (
         <PlanMode
           backupReminder={
             backupNag === null

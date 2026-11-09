@@ -1,5 +1,5 @@
 import type { LatLon } from '../../core/geo.ts'
-import type { DistanceUnit } from '../units.ts'
+import type { DistanceUnit, WindUnit } from '../units.ts'
 
 /* A fly-it-yourself session, handed from Preflight to the 3D view (Clay3D.tsx). */
 export interface FlySession {
@@ -18,5 +18,7 @@ export interface FlySession {
   record: boolean
   /** Settings' distance unit: the fly screen's numbers follow it (src/lib/fly/hudUnits.ts). */
   units: DistanceUnit
+  /** Settings' wind unit: the fly screen's wind reads in it, as every wind in the app does. */
+  windUnit: WindUnit
   tick: number
 }

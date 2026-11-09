@@ -1,0 +1,233 @@
+/*
+ * THE MAP'S WEATHER LAYERS AND THE FEATURES SHEET, ON A PHONE.
+ *
+ * Usage:  node scripts/audit-map-layers.mjs [screenshot-dir]
+ * Exits:  0 clean; 1 a problem; 2 could not look.
+ *
+ * Three bugs from the iPhone on 8 Nov, each held here:
+ *
+ *   wind      Features › Weather › Wind drew nothing. The grid it draws is 25
+ *             points and the forecast cache (api/forecast.ts) refused more
+ *             than 16 with a 400, so the overlay had no cells and hid its
+ *             canvas. Here the wind canvas must be on show, the size of the
+ *             map, and have drawn pixels: its own pixels are read back and
+ *             counted, not a data attribute (failure-modes.md, C: counts are
+ *             not pictures).
+ *   radar     The radar legend sat in the card under the time bar: it ran
+ *             toward the bottom edge and went with the card when the sheet was
+ *             lowered to see the map. While radar is on it is in the time
+ *             sheet's place: inside the sheet's peek, no time bar beside it,
+ *             fully on screen (above the home indicator standalone), and
+ *             still there 5 s later and with the sheet raised.
+ *   features  Closing Features opened the shoot card at full height (the old
+ *             Plan sheet). Closing it must leave the map: the sheet at peek,
+ *             no card on show, the map canvas over most of the screen.
+ *
+ * At 390 x 844 (WebKit, tab and home-screen insets) and 412 x 915 (Chromium).
+ * Facts only: nothing on the legend says safe or clear (ux rule 28).
+ */
+import { mkdirSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { chromium, webkit, devices } from './gate/playwright.mjs'
+import { ensureApp, findChrome, goToStage, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mjs'
+import { shareLink } from '../src/lib/planShare.ts'
+import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
+import { placeKey } from '../src/core/venueName.ts'
+
+guardAudit('map layers')
+const watchdog = startWatchdog('map layers', 420_000)
+const OUT = process.argv[2] ?? join(process.env.SCOUTNGO_OUT ?? tmpdir(), 'map-layers')
+mkdirSync(OUT, { recursive: true })
+
+const PIER = { lat: 36.8435575, lon: -75.9713104 }
+await ensureApp()
+const venue = { ...CALIBRATION_VENUE, name: { key: placeKey(String(PIER.lat), String(PIER.lon)), name: 'Virginia Beach Fishing Pier' }, latitude: String(PIER.lat), longitude: String(PIER.lon), date: '2026-11-02', startTime: '14:00', endTime: '16:00' }
+const url = await shareLink(`${APP_ORIGIN}/`, { id: 'layers', name: 'Map layers check', savedAt: '2026-10-29T00:00:00Z', venue, kit: { bodyIds: [], lensIds: [], droneIds: ['dji-air-3s'], styleNotes: '' }, positions: [] })
+
+let problems = 0
+const looked = { wind: 0, radar: 0, features: 0 }
+const fail = (why) => {
+  console.log('      PROBLEM: ' + why)
+  problems += 1
+}
+
+const LOOKS = [
+  ['iPhone tab', 'webkit', { width: 390, height: 844 }, { top: 0, bottom: 0 }],
+  ['iPhone home screen', 'webkit', { width: 390, height: 844 }, { top: 47, bottom: 34 }],
+  ['Android tab', 'chromium', { width: 412, height: 915 }, { top: 0, bottom: 0 }],
+]
+
+/* The sheet, the card on show, the map's canvas and the time bar, as they are now. */
+const SHEET = `JSON.stringify((() => {
+  const s = document.querySelector('.sheet')
+  const body = s?.querySelector('.sheet__body')
+  const cards = [...document.querySelectorAll('.sheet .card2')].filter((c) => !c.closest('[hidden]') && c.getBoundingClientRect().height > 0).map((c) => c.getAttribute('aria-label'))
+  const m = document.querySelector('.map canvas.maplibregl-canvas')
+  const mr = m?.getBoundingClientRect()
+  const top = s ? s.getBoundingClientRect().top : innerHeight
+  return {
+    detent: s?.dataset.detent ?? null,
+    bodyShown: !!body && !body.hidden,
+    cards,
+    timebar: !!document.querySelector('.sheet__peek .tbar'),
+    mapShare: mr ? Math.max(0, Math.min(top, mr.bottom) - Math.max(0, mr.top)) * Math.max(0, Math.min(innerWidth, mr.right) - Math.max(0, mr.left)) / (innerWidth * innerHeight) : 0,
+  }
+})())`
+
+/* The wind canvas, and the number of its pixels that are not transparent, read from the canvas itself. */
+const WIND = `JSON.stringify((() => {
+  const c = document.querySelector('canvas.windstreaks')
+  if (!c) return { present: false }
+  const r = c.getBoundingClientRect()
+  let painted = 0
+  if (c.width > 0 && c.height > 0) {
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data
+    for (let i = 3; i < d.length; i += 4) if (d[i] > 0) painted += 1
+  }
+  return { present: true, hidden: c.hidden || getComputedStyle(c).display === 'none', w: Math.round(r.width), h: Math.round(r.height), px: [c.width, c.height], painted }
+})())`
+
+/* The radar legend: where it is, whether it is in the peek, and the slider's box. */
+const RADAR = `JSON.stringify((() => {
+  const l = document.querySelector('.wlay__legend[aria-label="Radar colours"]')
+  if (!l) return { present: false }
+  const shown = (e) => !!e && !e.closest('[hidden]') && e.getBoundingClientRect().height > 0 && getComputedStyle(e).visibility !== 'hidden'
+  const box = (e) => { const r = e.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.right), Math.round(r.bottom)] }
+  const wrap = l.closest('.wlay')
+  const range = wrap?.querySelector('.rslide__range') ?? null
+  return {
+    present: true,
+    shown: shown(l),
+    inPeek: !!l.closest('.sheet__peek'),
+    legend: box(l),
+    whole: wrap ? box(wrap) : null,
+    range: range && shown(range) ? box(range) : null,
+    text: wrap?.innerText ?? '',
+    swatches: l.querySelectorAll('.wlay__sw').length,
+  }
+})())`
+
+const browsers = {}
+try {
+  for (const [label, engine, viewport, insets] of LOOKS) {
+    console.log(`\n### ${label}`)
+    browsers[engine] ??= engine === 'webkit' ? await webkit.launch() : await chromium.launch({ executablePath: findChrome() })
+    const ctx = await browsers[engine].newContext({ ...(engine === 'webkit' ? devices['iPhone 13'] : devices['Pixel 7']), viewport })
+    await ctx.addInitScript(([top, bottom]) => {
+      try {
+        localStorage.setItem('scoutngo.landing.v1', 'true')
+      } catch {
+        /* about:blank */
+      }
+      const add = () => {
+        const s = document.createElement('style')
+        s.textContent = `:root{--safe-top:${top}px!important;--safe-bottom:${bottom}px!important}`
+        document.head.appendChild(s)
+      }
+      if (document.head) add()
+      else document.addEventListener('DOMContentLoaded', add)
+    }, [insets.top, insets.bottom])
+    const page = await ctx.newPage()
+    await page.clock.install({ time: new Date('2026-11-02T15:00:00Z') })
+    await page.clock.resume()
+    const wait = (ms) => page.waitForTimeout(ms)
+    const ev = (x) => page.evaluate(x)
+    const shot = (name) => page.screenshot({ path: join(OUT, `${name}-${label.replace(/\s/g, '-').toLowerCase()}.png`) })
+    await page.goto(url)
+    await wait(3500)
+    await page.getByRole('button', { name: /^open$/i }).click({ timeout: 4000 }).catch(() => {})
+    await goToStage(ev, wait, 'plan')
+    await wait(2500)
+    const features = page.locator('.rail2__btn[aria-label="Features"]').first()
+    const openFeatures = async () => {
+      /* The rail is not drawn over a full sheet: lowered first (the handle steps full → peek), so one failure here does not hide the next check. */
+      if (JSON.parse(await ev(SHEET)).detent === 'full') {
+        await page.locator('.sheet__handle').click()
+        await wait(900)
+      }
+      await features.click({ timeout: 5000 })
+      await wait(900)
+      const s = JSON.parse(await ev(SHEET))
+      if (!s.cards.includes('Features')) throw new Error(`${label}: the Features button opened ${JSON.stringify(s.cards)}, not Features`)
+    }
+
+    /* FEATURES: closing it is back to the map. */
+    await openFeatures()
+    await page.locator('.card2[aria-label="Features"] .card2__x').click()
+    await wait(1200)
+    const closed = JSON.parse(await ev(SHEET))
+    looked.features += 1
+    console.log(`  features closed: ${JSON.stringify(closed)}`)
+    if (closed.detent !== 'peek') fail(`${label}: closing Features left the sheet at ${closed.detent}, not peek`)
+    if (closed.cards.length > 0) fail(`${label}: closing Features opened ${JSON.stringify(closed.cards)}`)
+    if (closed.mapShare < 0.6) fail(`${label}: after closing Features the map shows over ${Math.round(closed.mapShare * 100)}% of the screen, not most of it`)
+    await shot('features-closed')
+    watchdog.note(`${label} features`)
+
+    /* WIND: the canvas has drawn pixels. */
+    await openFeatures()
+    await page.locator('[data-weather="wind"]').click()
+    let w = null
+    for (let i = 0; i < 24; i += 1) {
+      await wait(500)
+      w = JSON.parse(await ev(WIND))
+      if (w.present && !w.hidden && w.painted > 0) break
+    }
+    looked.wind += 1
+    console.log(`  wind canvas: ${JSON.stringify(w)}`)
+    if (!w.present) fail(`${label}: no wind canvas on the page`)
+    else {
+      if (w.hidden) fail(`${label}: the wind canvas is hidden with the Wind layer on (no forecast cells reached it)`)
+      if (w.w < viewport.width * 0.9 || w.h < viewport.height * 0.6) fail(`${label}: the wind canvas is ${w.w} x ${w.h}, not the map's size`)
+      if (w.painted === 0) fail(`${label}: the wind canvas drew zero pixels`)
+    }
+    await shot('wind')
+    watchdog.note(`${label} wind`)
+
+    /* RADAR: the legend in the time sheet's place, on screen, and staying. */
+    await openFeatures()
+    await page.locator('[data-weather="radar"]').click()
+    await wait(800)
+    const checkRadar = async (when) => {
+      const r = JSON.parse(await ev(RADAR))
+      const s = JSON.parse(await ev(SHEET))
+      console.log(`  radar ${when}: ${JSON.stringify({ ...r, text: r.text?.slice(0, 60) })} sheet ${s.detent}${s.timebar ? ' with the time bar' : ''}`)
+      if (!r.present || !r.shown) return fail(`${label}, radar ${when}: the radar legend is not on show`)
+      if (!r.inPeek) fail(`${label}, radar ${when}: the legend is not in the time sheet's place (it is in the card)`)
+      if (s.timebar) fail(`${label}, radar ${when}: the time bar is still in the peek beside the legend`)
+      if (r.swatches < 6) fail(`${label}, radar ${when}: ${r.swatches} colours in the legend`)
+      const floor = viewport.height - insets.bottom
+      for (const [name, b] of [['legend', r.legend], ['legend and timeline', r.whole], ['radar slider', r.range]]) {
+        if (b === null) {
+          if (name === 'radar slider') fail(`${label}, radar ${when}: no radar slider on show`)
+          continue
+        }
+        if (b[0] < 0 || b[1] < 0 || b[2] > viewport.width || b[3] > floor) fail(`${label}, radar ${when}: the ${name} runs off the screen: ${JSON.stringify(b)} in ${viewport.width} x ${floor}`)
+      }
+      if (/\bsafe\b|\ball clear\b|\bclear to\b|\bclear of\b/i.test(r.text)) fail(`${label}, radar ${when}: the legend says safe or clear: ${JSON.stringify(r.text)}`)
+    }
+    await checkRadar('on')
+    looked.radar += 1
+    await shot('radar')
+    await wait(5000)
+    await checkRadar('after 5 s')
+    /* Raised: the legend is the peek's, so it stays at every height. */
+    await page.locator('.sheet__handle').click()
+    await wait(900)
+    await checkRadar('with the sheet raised')
+    await shot('radar-raised')
+    watchdog.note(`${label} radar`)
+    await ctx.close()
+  }
+} finally {
+  for (const b of Object.values(browsers)) await b.close()
+}
+watchdog.stop()
+if (looked.wind === 0 || looked.radar === 0 || looked.features === 0) {
+  console.log(`=== MAP LAYERS AUDIT ABORTED: nothing was looked at ${JSON.stringify(looked)} ===`)
+  process.exit(2)
+}
+console.log(`  screenshots: ${OUT}`)
+console.log(`\n=== MAP LAYERS PROBLEMS: ${problems} ===`)
+process.exit(problems === 0 ? 0 : 1)

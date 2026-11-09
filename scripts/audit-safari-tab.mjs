@@ -182,7 +182,7 @@ try {
   /* The Tides page, from its chip. */
   await page.locator('.chip2', { hasText: 'TIDE' }).first().tap()
   await wait(1500)
-  await check('Tides page', '.page', 'tab-tides')
+  await check('Tides page', '.page, .dpage', 'tab-tides')
   await page.keyboard.press('Escape')
   await goToStage(ev, wait, 'plan')
   await wait(800)
@@ -199,7 +199,7 @@ try {
   }
   await page.locator('.chip2', { hasText: 'WIND' }).first().tap()
   await wait(1500)
-  await check('Wind page', '.windp', 'tab-wind-page')
+  await check('Wind page', '.windp, .dpage--wind', 'tab-wind-page')
   await page.keyboard.press('Escape')
   await goToStage(ev, wait, 'plan')
   await wait(800)

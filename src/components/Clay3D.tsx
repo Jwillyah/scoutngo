@@ -588,7 +588,7 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
           wind={fly.wind}
           exposure={fly.exposure}
           bars={bars}
-          units={flyUnits(fly.units)}
+          units={flyUnits(fly.units, fly.windUnit)}
           look={flyLook}
           lookAuto={chosenLook === null}
           credits={scene.current?.credits() ?? []}

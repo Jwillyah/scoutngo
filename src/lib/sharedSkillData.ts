@@ -18,7 +18,8 @@ import { nearestShared, SHARED_STATION_KM, validateShared, type SharedFile } fro
 import { distanceMeters } from '../core/geo.ts'
 import MIDATL from '../../skill/midatl.json' with { type: 'json' }
 
-export const SHARED_BASE = 'https://jwillyah.github.io/scoutngo/skill/v1'
+/* Batch N, Section 0 F: committed nightly to public/skill/ and served by this app's own host; nothing is asked of anyone else. */
+export const SHARED_BASE = '/skill/v1'
 const KEY = 'scoutngo.sharedSkill.v1'
 const CHECK_MS = 6 * 3_600_000
 const KEEP = 4

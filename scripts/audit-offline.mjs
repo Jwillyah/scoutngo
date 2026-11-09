@@ -331,8 +331,11 @@ for (const run of MODES) {
    * to 10 s after the last one; on the gate's loaded lane the single read
    * came first and failed while the audit alone passed (68 s, 0 problems).
    * Read every half second up to MARK_BY_MS from here; never showing still fails.
+   * Batch N (8 Nov, flaky 5G): offline is now three failed checks over 30 s,
+   * retried 10 s then 20 s apart; hanging, each takes its 6 s timeout too, so
+   * the mark can take about 50 s from the first failure.
    */
-  const MARK_BY_MS = 30_000
+  const MARK_BY_MS = 75_000
   let mark = await ev(`document.querySelector('.offline-line')?.textContent ?? null`)
   for (let t = 0; run !== 'online' && t < MARK_BY_MS && !(mark !== null && /^Offline · /.test(mark)); t += 500) {
     await wait(500)

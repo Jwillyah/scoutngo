@@ -1,4 +1,4 @@
-import { getPosition, getTimes } from 'suncalc'
+import { getMoonPosition, getPosition, getTimes } from 'suncalc'
 
 const RAD_TO_DEG = 180 / Math.PI
 
@@ -45,6 +45,28 @@ export function getSunPosition(date: Date, lat: number, lon: number): SunPositio
     altitude,
     shadowBearing: normalizeBearing(compass + 180),
   }
+}
+
+/** Where a body stands in the sky, as a person standing there would say it. */
+export interface BodyPosition {
+  /** Compass bearing: 0 = north, 90 = east, increasing clockwise, in [0, 360). */
+  azimuth: number
+  /** Apparent degrees above the horizon (refraction included). Negative when down. */
+  altitude: number
+}
+
+/**
+ * THE ONE CONVERSION from suncalc to a compass bearing, for the sun and the
+ * moon alike. suncalc 2.0.2 (installed here) returns both getPosition and
+ * getMoonPosition in north-based clockwise DEGREES (its index.js: "north-based
+ * clockwise azimuth in degrees"), altitude in degrees too. The classic
+ * radians-from-south conversion (`az * 180 / PI + 180`) applied on top of
+ * that turned an ESE moonrise (113 degrees, 8 Nov 2026 at Virginia Beach) into
+ * 6651, which the compass read as "S". So: normalise, nothing else.
+ */
+export function bodyPosition(body: 'sun' | 'moon', at: Date, lat: number, lon: number): BodyPosition {
+  const p = body === 'sun' ? getPosition(at, lat, lon) : getMoonPosition(at, lat, lon)
+  return { azimuth: normalizeBearing(p.azimuth), altitude: p.altitude }
 }
 
 export interface SunEvent {

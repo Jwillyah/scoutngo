@@ -42,7 +42,8 @@ async function getWeather(url: string): Promise<unknown> {
     throw new Error(got.reason)
   }
   if (got.stale) throw new Error('stale')
-  reportNetwork(true)
+  /* A kept answer is not the network answering (Batch N). */
+  if (!got.kept) reportNetwork(true)
   return got.payload
 }
 

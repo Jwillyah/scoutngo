@@ -31,11 +31,10 @@ describe('Look west now', () => {
     expect(camsTowardSun(PIER, 252, cams).map((c) => c.cam.id)).toEqual(['b'])
   })
 
-  it('is a link and nothing else on Today', () => {
-    const src = readFileSync('src/components/Briefing.tsx', 'utf8')
-    const row = src.slice(src.indexOf('className="bcams"'), src.indexOf('</p>', src.indexOf('className="bcams"')))
-    expect(row).toContain('target="_blank" rel="noopener noreferrer"')
-    expect(row).not.toMatch(/<img|<iframe|<video|fetch\(/)
+  it('is a link and nothing else in the home\'s cams sheet (Batch N A4)', () => {
+    const src = readFileSync('src/components/CamsSheet.tsx', 'utf8')
+    expect(src).toContain('target="_blank" rel="noopener noreferrer"')
+    expect(src).not.toMatch(/<img|<iframe|<video|fetch\(/)
   })
 })
 

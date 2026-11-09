@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ACTIVITIES, type Activity } from '../core/homeDay.ts'
-import { ACTIVITY_WORDS } from '../lib/activities.ts'
+import { ACTIVITY_LINES, ACTIVITY_WORDS } from '../lib/activities.ts'
 import { ActivityIcon } from './ActivityIcon.tsx'
 
 /*
@@ -34,9 +34,14 @@ export function ActivityPicker({ variant, value, onDone, onLater }: ActivityPick
         return (
           <li key={a}>
             <button type="button" className={`actpick__opt${on ? ' actpick__opt--on' : ''}`} aria-pressed={on} onClick={() => toggle(a)}>
-              <ActivityIcon activity={a} className="actpick__icon" />
-              <span className="actpick__word">{ACTIVITY_WORDS[a]}</span>
-              <span className="actpick__tick" aria-hidden="true">
+              <span className={`actpick__tile actpick__tile--${a}`}>
+                <ActivityIcon activity={a} className="actpick__icon" />
+              </span>
+              <span className="actpick__text">
+                <span className="actpick__word">{ACTIVITY_WORDS[a]}</span>
+                <span className="actpick__line">{ACTIVITY_LINES[a]}</span>
+              </span>
+              <span className={`actpick__tick${on ? ' actpick__tick--on' : ''}`} aria-hidden="true">
                 {on ? '✓' : ''}
               </span>
             </button>
@@ -53,21 +58,24 @@ export function ActivityPicker({ variant, value, onDone, onLater }: ActivityPick
       </div>
     )
   }
+  /* Board Home8P: a page of its own over the home, the sky's ground, Continue at the bottom. */
   return (
     <div className="actpick actpick--sheet" role="dialog" aria-label="What do you do outside?">
       <div className="actpick__panel">
+        <p className="actpick__brand">ScoutNGo</p>
         <h2 className="actpick__title">What do you do outside?</h2>
-        <p className="actpick__sub">Pick any. The home puts them first.</p>
+        <p className="actpick__sub">Pick any. Your home screen shows these first. Change anytime.</p>
         {list}
-        <button type="button" className="actpick__done" disabled={picked.length === 0} onClick={() => onDone(picked)}>
-          Done
-        </button>
-        {onLater === undefined ? null : (
-          <button type="button" className="actpick__later" onClick={onLater}>
-            Not now
+        <div className="actpick__end">
+          <button type="button" className="actpick__done" disabled={picked.length === 0} onClick={() => onDone(picked)}>
+            Continue
           </button>
-        )}
-        <p className="actpick__note">Kept on this phone only. Change it in Settings › What I do.</p>
+          {onLater === undefined ? null : (
+            <button type="button" className="actpick__later" onClick={onLater}>
+              Not now
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )

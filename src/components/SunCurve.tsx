@@ -1,7 +1,7 @@
 import { useSidewaysScrub } from '../lib/useSidewaysScrub.ts'
 import { lightGoneLine, sunriseLine } from '../core/lightGone.ts'
 import { blockerWords, nameBlocker, type Footprint, type TreePoint } from '../core/horizonBlocker.ts'
-import { getPosition } from 'suncalc'
+import { bodyPosition } from '../core/sun.ts'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { TILE_TIMEOUT_MS } from '../lib/offlineCache.ts'
 import {
@@ -130,7 +130,7 @@ export function SunCurve({
   /* What the sun rises over and sets behind, named from what stands there (Batch E). */
   const behind = (at: Date | null) => {
     if (at === null || horizon.kind !== 'terrain') return undefined
-    const az = ((getPosition(at, venue.lat, venue.lon).azimuth * 180) / Math.PI + 180 + 360) % 360
+    const az = bodyPosition('sun', at, venue.lat, venue.lon).azimuth
     const what = nameBlocker(venue, az, horizonAngleAt(horizon, az), around?.buildings ?? [], around?.trees ?? [], around?.reliefM ?? null)
     return blockerWords(what, az)
   }

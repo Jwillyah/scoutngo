@@ -160,11 +160,33 @@ export function weekHeadline(best: readonly { day: string; what: string }[]): st
 
 export type CardKind = 'surf' | 'wind' | 'tide' | 'sunset' | 'drone' | 'moon'
 
-/** The cards in the picker's order: each activity's own first, then the rest; the drone only when picked or in the kit. Every other card stays. */
-export function cardList(order: readonly Activity[], drone: boolean): CardKind[] {
-  const own: Record<Activity, CardKind[]> = { surf: ['surf', 'wind'], shoot: ['sunset', 'moon'], drone: ['drone', 'wind'], fish: ['wind', 'tide'], weather: ['wind'] }
+/** Four on the home (boards Home8S / Home8J); the rest are one tap deeper (their pages, the menu). */
+export const HOME_CARDS = 4
+
+/** The cards in the picker's order: each activity's own first, then the rest; the drone only when picked or in the kit; the first HOME_CARDS shown. */
+export function cardList(order: readonly Activity[], drone: boolean, max = HOME_CARDS): CardKind[] {
+  const own: Record<Activity, CardKind[]> = { surf: ['surf', 'wind', 'tide'], shoot: ['sunset', 'moon'], drone: ['drone', 'wind'], fish: ['wind', 'tide'], weather: ['wind', 'tide'] }
   const list: CardKind[] = []
   for (const a of order) for (const c of own[a]) if (!list.includes(c)) list.push(c)
   for (const c of ['surf', 'wind', 'tide', 'sunset', 'drone', 'moon'] as const) if (!list.includes(c)) list.push(c)
-  return list.filter((c) => c !== 'drone' || drone)
+  return list.filter((c) => c !== 'drone' || drone).slice(0, max)
+}
+
+/* ------------------------------------------------------------- the ground */
+
+export type Ground = 'night' | 'storm' | 'fog' | 'rain' | 'golden' | 'cloud' | 'day'
+/** Night below this sun height: civil dusk (Batch N A1: by the sun, not the clock). */
+export const NIGHT_SUN_DEG = -6
+/** Sunrise and sunset colours while the sun is lower than this. */
+export const GOLDEN_SUN_DEG = 8
+
+/** The home's background: night by the sun; then storms, fog, rain; then sunrise or sunset; then overcast or a day sky. */
+export function groundOf(sunDeg: number, code: number | null, storms: boolean): Ground {
+  if (sunDeg < NIGHT_SUN_DEG) return 'night'
+  if (storms || (code !== null && code >= 95)) return 'storm'
+  if (code === 45 || code === 48) return 'fog'
+  if (code !== null && code >= 51) return 'rain'
+  if (sunDeg < GOLDEN_SUN_DEG) return 'golden'
+  if (code === 3) return 'cloud'
+  return 'day'
 }

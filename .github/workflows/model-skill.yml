@@ -1,0 +1,47 @@
+# THE NIGHTLY MODEL-ACCURACY FILE (Batch L, Section 1; switched on in Batch N, Section 0 F).
+#
+# Scores the six forecast models against the Mid-Atlantic coast's airport
+# stations and buoys (scripts/skill/build-shared.ts, docs/model-skill.md) and
+# commits the file to public/skill/v1/, where the app's own host serves it.
+#
+# PUBLIC DATA ONLY: public observations (Iowa State's ASOS archive, NOAA NDBC)
+# and public archived forecasts (Open-Meteo previous runs). Nothing about any
+# user is read, and nothing is sent anywhere but those public services.
+#
+# It commits ONLY public/skill/. A failed source stops the run with nothing
+# written (the script is never partial), and yesterday's file stays.
+name: model-skill
+
+on:
+  schedule:
+    - cron: '30 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: model-skill
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build the file into public/
+        run: node scripts/skill/build-shared.ts skill/midatl.json public
+      - name: Commit public/skill only
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/skill
+          if git diff --cached --quiet; then echo "nothing new"; exit 0; fi
+          git commit -m "Model skill file $(date -u +%F)"
+          git push

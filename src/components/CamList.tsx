@@ -3,7 +3,7 @@ import { Receipt } from '../lib/numerals.tsx'
 import { compassPoint } from '../core/field.ts'
 import type { LatLon } from '../core/geo.ts'
 import { rankUpwind, UPWIND_CONE_DEGREES, type Wind } from '../core/upwind.ts'
-import { formatRange, type Units } from '../lib/units.ts'
+import { formatRange, formatWind, type Units } from '../lib/units.ts'
 import { CAMS, camKind } from '../data/cams.ts'
 
 /*
@@ -128,7 +128,7 @@ export function CamList({ venue, wind, units, kind, onKind }: CamListProps) {
           ? 'Nearest first. The wind has not come back yet, so nothing here is ranked by what is upwind.'
           : `Upwind first, then soonest. Wind from ${compassPoint(
               wind.fromDegrees,
-            )} at ${Math.round(wind.speedMps)} m/s.`}
+            )} at ${formatWind(wind.speedMps, units.wind)}.`}
       </p>
 
       <ul className="cams__list">

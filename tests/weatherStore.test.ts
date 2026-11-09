@@ -135,14 +135,14 @@ describe('Batch M: on a phone network', () => {
 
   it('goes through the forecast cache: host and path in om, the UTC hour in hr, coordinates as rounded', async () => {
     expect(edgeUrl('https://marine-api.open-meteo.com/v1/marine?latitude=36.84&longitude=-75.97&hourly=wave_height', new Date('2026-11-08T13:42:00Z'), '/api/forecast')).toBe(
-      '/api/forecast?om=marine-api.open-meteo.com/v1/marine&latitude=36.84&longitude=-75.97&hourly=wave_height&hr=2026-11-08T13',
+      '/api/forecast?om=marine-api.open-meteo.com/v1/marine&latitude=36.85&longitude=-75.95&hourly=wave_height&hr=2026-11-08T13',
     )
     setForecastEdge('http://127.0.0.1/api/forecast')
     const f = ok()
     await weatherJson('https://api.open-meteo.com/v1/forecast?latitude=36.84356&longitude=-75.97131&hourly=wind_speed_10m', { maxAgeMs: HOUR, fetchImpl: f })
     const asked = String((f.mock.calls[0] as unknown[])[0])
-    expect(asked).toContain('/api/forecast?om=api.open-meteo.com/v1/forecast&latitude=36.84&longitude=-75.97')
-    expect(asked).not.toMatch(/36\.843|75\.971/)
+    expect(asked).toContain('/api/forecast?om=api.open-meteo.com/v1/forecast&latitude=36.85&longitude=-75.95')
+    expect(asked).not.toMatch(/36\.84|75\.97/)
   })
 
   it('our function missing (a dev server, 404) asks Open-Meteo directly, and stops trying the cache', async () => {
@@ -152,6 +152,13 @@ describe('Batch M: on a phone network', () => {
     expect(r.ok).toBe(true)
     await weatherJson(URL_A.replace('wind_speed_10m', 'cloud_cover'), { maxAgeMs: HOUR, fetchImpl: f as unknown as typeof fetch })
     expect(f.mock.calls.map((c) => String(c[0]).includes('/api/forecast'))).toEqual([true, false, false])
+  })
+
+  it('a request the cache refuses (400: too many points) is asked directly', async () => {
+    setForecastEdge('http://127.0.0.1/api/forecast')
+    const f = vi.fn(async (u: string) => (u.includes('/api/forecast') ? new Response('{"error":true}', { status: 400 }) : new Response(JSON.stringify(PAYLOAD), { status: 200 })))
+    expect((await weatherJson(URL_A, { maxAgeMs: HOUR, fetchImpl: f as unknown as typeof fetch })).ok).toBe(true)
+    expect(f).toHaveBeenCalledTimes(2)
   })
 
   it('our function failing (502) asks that one directly; a 429 from it is a 429', async () => {

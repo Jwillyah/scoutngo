@@ -144,9 +144,29 @@ export function currentClockHours(): ClockHours {
   return clockHours
 }
 
-/** Hour 0-23 and minute 0-59 on the zone's wall clock at an instant. */
+/**
+ * THE ONE ROUNDING OF A DISPLAYED TIME: DOWN TO THE MINUTE (B4, 8 Nov 2026).
+ *
+ * Every time the app prints goes through formatClock and its siblings, and
+ * they all call this. Floor, not nearest, because the phone's own clock floors:
+ * a sunset at 4:59:55 PM is written "4:59", and when the status bar reads
+ * 4:59 the sun goes down within that minute. Rounded to nearest it would read
+ * "5:00" while the phone still says 4:59 and the sun is already gone. The
+ * "now" line beside it is floored by the phone too, so one rule keeps both.
+ *
+ * Code that finds an event by stepping a minute at a time must hand over the
+ * moment it found (src/core/sunrise.ts horizonCrossing), not the minute after
+ * it: that was rounding up behind this function's back, and a sunset read
+ * 5:00 on the Calendar and 4:59 on the home.
+ */
+export function clockMinute(at: Date): Date {
+  return new Date(Math.floor(at.getTime() / 60_000) * 60_000)
+}
+
+/** Hour 0-23 and minute 0-59 on the zone's wall clock at an instant, floored by clockMinute. */
 function wallClock(at: Date, timeZone: string): { hour: number; minute: number } | null {
-  const parts = partFormatter(timeZone).formatToParts(at)
+  if (Number.isNaN(at.getTime())) return null
+  const parts = partFormatter(timeZone).formatToParts(clockMinute(at))
   const hour = Number(parts.find((p) => p.type === 'hour')?.value)
   const minute = Number(parts.find((p) => p.type === 'minute')?.value)
   return Number.isFinite(hour) && Number.isFinite(minute) ? { hour, minute } : null

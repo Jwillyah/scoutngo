@@ -90,3 +90,12 @@ export const ACTIVITY_WORDS: Record<Activity, string> = {
   fish: 'Fish or boat',
   weather: 'Just weather',
 }
+
+/** The line under each choice (board Home8P). */
+export const ACTIVITY_LINES: Record<Activity, string> = {
+  surf: 'waves, wind, tide, cams',
+  shoot: 'light, sunset color, viewfinder',
+  drone: 'wind up high, airspace',
+  fish: 'marine forecast, wind, tide',
+  weather: 'today, radar, the week',
+}

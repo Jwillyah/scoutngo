@@ -3,14 +3,19 @@
  * the lot: feet with miles an hour, or metres with metres a second. The HUD
  * read "H 230 ft · D 120 m · 4.2 m/s" on 27 Oct: three units on one screen.
  */
-import type { DistanceUnit } from '../units.ts'
+import { formatWind, type DistanceUnit, type WindUnit } from '../units.ts'
 
 export interface FlyUnits {
   length: 'ft' | 'm'
   speed: 'mph' | 'm/s'
+  /** The WIND, in Settings' wind unit like every other wind in the app (kt by default). The drone's own speed stays in `speed`. */
+  wind: WindUnit
 }
 
-export const flyUnits = (distance: DistanceUnit): FlyUnits => (distance === 'm' ? { length: 'm', speed: 'm/s' } : { length: 'ft', speed: 'mph' })
+export const flyUnits = (distance: DistanceUnit, wind: WindUnit): FlyUnits => (distance === 'm' ? { length: 'm', speed: 'm/s', wind } : { length: 'ft', speed: 'mph', wind })
+
+/** The wind on the fly screen, "Wind 17 kt": Settings' wind unit, never the HUD's speed unit (it read "Wind 19 mph" beside a home in kt, 8 Nov). */
+export const hudWind = (mps: number | null, u: FlyUnits): string => `Wind ${formatWind(mps, u.wind)}`
 
 const FT = 0.3048
 const MPH = 0.44704

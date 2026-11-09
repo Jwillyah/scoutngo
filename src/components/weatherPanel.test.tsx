@@ -73,9 +73,9 @@ describe('wind at the height being flown', () => {
 
   it('reads at the flight altitude, not at the ground', () => {
     expect(html).toContain('at 400 ft')
-    // 400ft is 122m: about 6.2 m/s, which is 12 kts, not the ground's 4.
-    expect(html).toContain('12 kts')
-    expect(html).not.toContain('>4 kts<')
+    // 400ft is 122m: about 6.2 m/s, which is 12 kt, not the ground's 4.
+    expect(html).toContain('12 kt')
+    expect(html).not.toContain('>4 kt<')
   })
 
   it('always says which height the number is for', () => {
@@ -111,7 +111,7 @@ describe('wind at the height being flown', () => {
    * rather than a number.
    */
   it('labels the gust as a surface figure', () => {
-    expect(html).toContain('Gusting 23 kts at the surface')
+    expect(html).toContain('Gusting 23 kt at the surface')
   })
 
   /*
@@ -119,7 +119,7 @@ describe('wind at the height being flown', () => {
    */
   it('states the rating and hands the judgement over', () => {
     expect(html).toContain('rated to')
-    expect(html).toContain('23 kts')
+    expect(html).toContain('23 kt')
     expect(html).toContain('12 m/s')
     expect(html).toContain('dji.com/air-3s/specs')
     expect(html).toContain('Yours is the judgement')
@@ -134,7 +134,7 @@ describe('wind at the height being flown', () => {
     const unrated = render({ ratedWindMps: null, ratedWindSource: '' })
     expect(unrated).not.toContain('rated to')
     // The gust itself is still shown: that part is measured.
-    expect(unrated).toContain('Gusting 23 kts')
+    expect(unrated).toContain('Gusting 23 kt')
   })
 })
 
@@ -146,7 +146,7 @@ describe('a reading that did not arrive', () => {
     const html = render({ levels: [], gustMps: null })
     expect(html).toContain('–')
     expect(html).toContain('The forecast did not say')
-    expect(html).not.toContain('0 kts')
+    expect(html).not.toContain('0 kt')
   })
 
   it('prints a dash for a missing tide, not a height of nought', () => {

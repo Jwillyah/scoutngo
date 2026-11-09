@@ -13,7 +13,7 @@
  *   out/skill/v1/<region>/<date>.json.gz   the file, gzipped
  *   out/skill/v1/<region>/latest.json      which file is newest, its size and rows
  *
- * and keeps the previous days' files the site already has (up to KEEP_DAYS).
+ * and keeps yesterday's file from the folder (KEEP_DAYS, today included).
  *
  * NEVER PARTIAL. Any source that does not answer, a station or buoy with no
  * reports, or a model with no forecast at a station stops the run with a
@@ -21,7 +21,7 @@
  * which the phone stops using after 3 days.
  */
 import { createHash } from 'node:crypto'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { gzipSync } from 'node:zlib'
 import { asosUrl, parseAsos } from '../../src/core/asos.ts'
@@ -29,9 +29,8 @@ import { BLEND_MODELS, type ModelId } from '../../src/core/modelSkill.ts'
 import { buildShared, LEADS, parseNdbcMet, rowCount, SHARED_VARS, validateShared, type Lead, type LeadSeries, type Obs, type SharedVar } from '../../src/core/sharedSkill.ts'
 
 const [configPath = 'skill/midatl.json', outDir = 'out'] = process.argv.slice(2)
-const PAGES = process.env.SKILL_PAGES_BASE ?? 'https://jwillyah.github.io/scoutngo/skill/v1'
 const PREVIOUS = 'https://previous-runs-api.open-meteo.com/v1/forecast'
-const KEEP_DAYS = 7
+const KEEP_DAYS = 2
 const PER_REQUEST = 5
 
 interface Config {
@@ -158,18 +157,16 @@ mkdirSync(dir, { recursive: true })
 const name = `${date}.json.gz`
 writeFileSync(join(dir, name), gz)
 
-/* The days before, as the site has them now: so a phone mid-download never finds its file gone. */
+/*
+ * THE DAYS BEFORE, FROM THE FOLDER ITSELF (Batch N, Section 0 F): the file
+ * is committed to public/skill/ and served by the app's own host, so the
+ * history is what the folder already holds. Kept: KEEP_DAYS, today included;
+ * older ones are deleted, so the repository grows by one file a day, not 7.
+ */
 const history: string[] = [name]
-try {
-  const prev = (await (await fetch(`${PAGES}/${cfg.region}/latest.json`, { signal: AbortSignal.timeout(30_000) })).json()) as { history?: string[] }
-  for (const f of (prev.history ?? []).filter((x) => /^\d{4}-\d{2}-\d{2}\.json\.gz$/.test(x) && x !== name).slice(0, KEEP_DAYS - 1)) {
-    const r = await fetch(`${PAGES}/${cfg.region}/${f}`, { signal: AbortSignal.timeout(60_000) })
-    if (!r.ok) continue
-    writeFileSync(join(dir, f), Buffer.from(await r.arrayBuffer()))
-    history.push(f)
-  }
-} catch {
-  console.log('no earlier files on the site (first run)')
+for (const f of readdirSync(dir).filter((x) => /^\d{4}-\d{2}-\d{2}\.json\.gz$/.test(x) && x !== name).sort().reverse()) {
+  if (history.length < KEEP_DAYS) history.push(f)
+  else rmSync(join(dir, f))
 }
 
 const manifest = {
