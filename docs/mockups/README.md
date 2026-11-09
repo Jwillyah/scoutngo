@@ -6,3 +6,8 @@ Numbers in them are samples; build to the layout, compute the real values.
 - Detail2S / T / W / B: Surf, Tide, Wind, Buoys pages (Batch N)
 - FeatFF: Features sheet (Batch K, built)
 - IdeaA / IdeaB / IdeaC: later ideas (Batch O, not to build yet)
+- WindV3 / SearchV2 / FeaturesV2: map polish (batch-map.md)
+- VizSurf / VizTide / VizBuoys / VizWind / VizDrone: 10 graphic looks each (not picked yet)
+- O1 / O2 / O3: Batch O deeper screens (not picked yet)
+- StyleGuide / MapChrome / FeaturesV3: one style everywhere, world rain layer, Features v3 (batch-map.md; FeaturesV3 replaces FeaturesV2)
+- SettingsV2: Settings cleanup (batch-map.md Section 6)

@@ -88,14 +88,14 @@ describe('onshore or offshore, one way everywhere', () => {
     expect(beachWindLine(90, 5, null, String)).toBeNull()
   })
 
-  it('the Surf page, the Water card and the home all reach it through coastFacing’s windToBeach', () => {
+  it('the Wind page, the Water card and the home all reach it through coastFacing’s windToBeach', () => {
     const src = (p: string) => readFileSync(new URL(`../src/${p}`, import.meta.url), 'utf8')
-    expect(src('components/SurfPage.tsx')).toMatch(/windToBeach\(/)
+    expect(src('components/WindPageV2.tsx')).toMatch(/windToBeach\(/)
     /* Batch N: the home (Home.tsx) replaced Today (Briefing.tsx, StormToday.tsx); its Wind card's side is windTag's. */
     expect(src('components/Home.tsx')).toMatch(/windTag\(/)
     expect(src('lib/useBriefing.ts')).toMatch(/windTag\(|windToBeach\(/)
     expect(src('core/briefing.ts')).toMatch(/windToBeach\(fromDeg, facing\)/)
     /* Nobody else classifies by their own angle arithmetic. */
-    for (const p of ['components/SurfPage.tsx', 'components/Home.tsx']) expect(src(p)).not.toMatch(/['"]onshore['"]\s*:\s*['"]?\w+['"]?\s*\?|angleApart\([^)]*facing/)
+    for (const p of ['components/WindPageV2.tsx', 'components/SurfPageV2.tsx', 'components/Home.tsx']) expect(src(p)).not.toMatch(/['"]onshore['"]\s*:\s*['"]?\w+['"]?\s*\?|angleApart\([^)]*facing/)
   })
 })

@@ -40,7 +40,7 @@ tsc -b → oxlint --deny-warnings → viewport units → colour roles → clock
          landscape,
          buildings, sky fire, terrain decode, special light, line up, privacy,
          wind, map layers, weather, locate, safari tab, venue pack, surface,
-         overflow,
+         overflow, one number,
          projection (alone), offline, api urls, 3d network, airspace,
          call sheet, clock screen, service worker
        → network guard
@@ -75,6 +75,10 @@ formatting problem.
 
 ## Pushing
 
-Pushing stays a thing the user asks for. Never add an auto-push. Every report
+Pushing stays a thing the user asks for. Never add an auto-push. One exception,
+decided 9 Nov: the nightly model-skill workflow
+(`.github/workflows/model-skill.yml`) may commit and push `public/skill/` and
+nothing else. It is the only workflow with `contents: write`; the repo's
+default workflow permission stays read-only. Nothing else auto-pushes. Every report
 ends with the push state, and if anything is unpushed that goes in the first
 line.

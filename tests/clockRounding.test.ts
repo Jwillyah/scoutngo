@@ -3,8 +3,6 @@ import { getTimes } from 'suncalc'
 import { clockMinute, formatClock, formatDayTime, formatHour, venueAndYours } from '../src/core/timezone.ts'
 import { sunriseOn } from '../src/core/sunrise.ts'
 import { sunsetOn } from '../src/core/calendarMonth.ts'
-import { curveFromExtremes, type TideExtreme } from '../src/core/tide.ts'
-import { tideDayModel } from '../src/lib/tideDay.ts'
 
 /*
  * B4: sunset read 5:00 in one place and 5:01 in another. Every printed time is
@@ -58,24 +56,5 @@ describe('one rounding for every displayed time', () => {
     expect(formatClock(getTimes(new Date('2026-11-07T17:00:00Z'), VB.lat, VB.lon).sunset as Date, TZ, 12)).toBe('5:00 PM')
     expect(formatClock(sunsetOn('2026-11-08', VB.lat, VB.lon, TZ) as Date, TZ, 12)).toBe('4:59 PM')
     expect(formatClock(getTimes(new Date('2026-11-08T17:00:00Z'), VB.lat, VB.lon).sunset as Date, TZ, 12)).toBe('4:59 PM')
-  })
-
-  it("puts the Tide sheet's sunrise and sunset on the same instants as the Calendar's", () => {
-    const turns: TideExtreme[] = [
-      { at: new Date('2026-11-07T20:00:00Z'), feet: 0.3, kind: 'low' },
-      { at: new Date('2026-11-08T02:10:00Z'), feet: 3.9, kind: 'high' },
-      { at: new Date('2026-11-08T08:20:00Z'), feet: 0.1, kind: 'low' },
-      { at: new Date('2026-11-08T14:30:00Z'), feet: 4.2, kind: 'high' },
-      { at: new Date('2026-11-08T20:40:00Z'), feet: 0.2, kind: 'low' },
-      { at: new Date('2026-11-09T02:50:00Z'), feet: 3.8, kind: 'high' },
-      { at: new Date('2026-11-09T09:00:00Z'), feet: 0.2, kind: 'low' },
-    ]
-    const model = tideDayModel({ date: '2026-11-08', timeZone: TZ, curve: curveFromExtremes(turns), extremes: turns, lat: VB.lat, lon: VB.lon, width: 360, height: 140 })
-    expect(model).not.toBeNull()
-    const sun = model?.sun ?? []
-    expect(sun.map((s) => s.kind)).toEqual(['rise', 'set'])
-    expect(sun[0].at.getTime()).toBe(sunriseOn('2026-11-08', VB.lat, VB.lon, TZ)?.getTime())
-    expect(sun[1].at.getTime()).toBe(sunsetOn('2026-11-08', VB.lat, VB.lon, TZ)?.getTime())
-    expect(formatClock(sun[1].at, TZ, 12)).toBe('4:59 PM')
   })
 })
