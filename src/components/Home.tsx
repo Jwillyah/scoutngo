@@ -15,6 +15,7 @@ import { compass } from '../lib/tideWords.ts'
 import { formatTemperature, windIn, windUnitLabel, type Units } from '../lib/units.ts'
 import { useBriefing, type Briefing, type DayBrief } from '../lib/useBriefing.ts'
 import { useStormPlay } from '../lib/useStormPlay.ts'
+import { useCoast } from '../lib/coastData.ts'
 import { refreshLine, useWeatherRefreshing } from '../lib/useWeatherStatus.ts'
 import type { BriefingDrone } from './Briefing.tsx'
 import { ActivityIcon } from './ActivityIcon.tsx'
@@ -279,6 +280,9 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
   const cards = cardList(order, drone !== null || order.includes('drone'))
   const sunAz = day?.events.sunset === null || day === null ? null : (getPosition(day.events.sunset, venue.lat, venue.lon).azimuth * 180) / Math.PI + 180
   const cams = which === 'today' ? camsFacingWaterOrSun(venue, sunAz, brief.facing, COAST_CAMS) : []
+  /* Fish or boat (Batch M, Section 2): the NWS marine forecast for the zone, first period, as written; asked only when picked, at a beach. */
+  const fish = order.includes('fish') && brief.facing !== null
+  const marine = useCoast(fish && which === 'today' ? venue : null, null, units.distance === 'ft' ? 'mi' : 'km', fish && which === 'today').coast?.marine ?? null
 
   return (
     <div className="hday">
@@ -338,6 +342,12 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
           </ul>
         )}
       </div>
+
+      {marine === null ? null : (
+        <button type="button" className="hmarine" onClick={() => onOpen('tides')}>
+          <b>NWS marine · {marine.period}:</b> {marine.text}
+        </button>
+      )}
 
       <div className="hcards">
         {cards.map((c) => (

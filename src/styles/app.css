@@ -18334,3 +18334,129 @@ a.about__row * {
   font-size: var(--text-xs);
   color: rgb(255 255 255 / 0.75);
 }
+
+/* ------------------------------------------------- WHAT DO YOU DO OUTSIDE? (Batch M, Section 2) */
+.actpick--sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 75;
+  display: flex;
+  align-items: flex-end;
+  background: rgb(8 12 18 / 0.55);
+}
+.actpick__panel {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 18px 16px calc(var(--safe-bottom, 0px) + 16px);
+  border-radius: 20px 20px 0 0;
+  background: #fff;
+  color: #141821;
+}
+.actpick__title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+}
+.actpick__sub,
+.actpick__note {
+  margin: 4px 0 10px;
+  font-size: var(--text-sm);
+  color: #5b6472;
+}
+.actpick__note {
+  margin: 10px 0 0;
+  font-size: var(--text-xs);
+}
+.actpick__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.actpick__opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid #d5dae2;
+  background: #f6f7f9;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.actpick__opt--on {
+  border-color: #2f6fb4;
+  background: #e8f1fb;
+}
+.actpick__icon {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  fill: none;
+  stroke: #2f6fb4;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.actpick__word {
+  flex: 1;
+}
+.actpick__tick {
+  width: 1.2em;
+  color: #2f6fb4;
+  font-weight: var(--weight-medium);
+}
+.actpick__done {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 12px;
+  border: 0;
+  border-radius: 999px;
+  background: #141821;
+  color: #fff;
+  font: inherit;
+  font-weight: var(--weight-medium);
+}
+.actpick__done:disabled {
+  opacity: 0.4;
+}
+.actpick__later {
+  width: 100%;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: #3d4654;
+  font: inherit;
+}
+.actpick--inline .actpick__opt {
+  background: transparent;
+  color: inherit;
+  border-color: rgb(127 127 127 / 0.35);
+}
+.actpick--inline .actpick__opt--on {
+  border-color: var(--accent);
+}
+/* Fish or boat: the NWS marine forecast's first period, two lines at most; a tap opens the tides. */
+.hmarine {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid rgb(255 255 255 / 0.16);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.12);
+  color: #fff;
+  font: inherit;
+  font-size: var(--text-xs);
+  text-align: left;
+}
+.hmarine b {
+  font-weight: var(--weight-medium);
+}

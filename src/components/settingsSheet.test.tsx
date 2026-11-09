@@ -40,10 +40,10 @@ describe('Settings, a page of its own (30 Oct)', () => {
     expect(MENU_ITEMS.find((m) => m.id === 'settings')?.subs?.map((s) => s.id)).toEqual(['about'])
   })
 
-  it('has its eleven sections in the order asked for (Batch G), Debug last and folded', () => {
+  it('has its twelve sections in the order asked for (Batch G; What I do first, Batch M), Debug last and folded', () => {
     const html = page()
     const titles = [...html.matchAll(/class="set__title">([^<]+)</g)].map((m) => m[1])
-    expect(titles).toEqual(['Units', 'Location', 'Offline', 'Coast &amp; inland', 'Alerts', 'Drone', 'Map', 'Privacy &amp; data', 'AI key', 'About', 'Debug'])
+    expect(titles).toEqual(['What I do', 'Units', 'Location', 'Offline', 'Coast &amp; inland', 'Alerts', 'Drone', 'Map', 'Privacy &amp; data', 'AI key', 'About', 'Debug'])
     expect(html).toMatch(/<details class="set__debug"><summary/)
     expect(html).not.toMatch(/<details class="set__debug" open/)
   })

@@ -52,6 +52,10 @@ interface MenuProps {
   /** Inland the Water card is Land: the wind and the light on the ridges. */
   inland: boolean
   rows: MenuRows
+  /** Batch M, Section 2: photo tools (the Viewfinder row, Sky opening on Sky color) only when Shoot is picked or nothing is. */
+  photoTools?: boolean
+  /** The drone card only when Fly a drone is picked or a drone is in the kit. */
+  droneTools?: boolean
   now: Date
   onPick: (target: MenuTarget, opts?: { skyTab?: 'fire' | 'now' }) => void
   onClose: () => void
@@ -73,7 +77,7 @@ export function Menu(props: MenuProps) {
   return <MenuSheet {...props} first={first} />
 }
 
-function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, now, onPick, onClose, first }: MenuProps & { first: React.RefObject<HTMLButtonElement | null> }) {
+function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools = true, droneTools = true, now, onPick, onClose, first }: MenuProps & { first: React.RefObject<HTMLButtonElement | null> }) {
   /* Asked only once the menu has been open a moment: a tap straight through it to a place asks nothing. */
   const [looking, setLooking] = useState(false)
   useEffect(() => {
@@ -125,7 +129,7 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, now, onPic
           <LiveCard refTo={first} kind="today" title="Today" icon={<TodayIcon />} value={loading ? '…' : today.value} sub={loading ? 'reading the forecasts' : today.sub} tone={wait(today.tone)} onTap={() => pick('today')}>
             <p className="mcard__line">{today.line ?? ''}</p>
           </LiveCard>
-          <LiveCard kind="sky" title="Sky" icon={<SkyIcon />} value={loading ? '…' : storms !== null ? 'Storms' : sky.value} sub={loading ? '' : (storms ?? sky.sub)} tone={wait(sky.tone)} onTap={() => pick('sky', { skyTab: skyTabFor(days, now) })}>
+          <LiveCard kind="sky" title="Sky" icon={<SkyIcon />} value={loading ? '…' : storms !== null ? 'Storms' : sky.value} sub={loading ? '' : (storms ?? sky.sub)} tone={wait(sky.tone)} onTap={() => pick('sky', photoTools ? { skyTab: skyTabFor(days, now) } : undefined)}>
             <div className={`mcard__strip${sky.lowDeck ? ' mcard__strip--deck' : ''}`} aria-hidden="true">
               {sky.lowDeck || sky.strip.length === 0 ? null : <i className="mcard__clock" style={{ background: stripGradient(sky.strip) }} />}
               {sky.peak === null ? null : <i className="mcard__peak" style={{ left: `${Math.max(0, Math.min(100, sky.peak * 100))}%` }} />}
@@ -145,7 +149,7 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, now, onPic
             )}
           </div>
           {/* Batch K addendum, E: Preflight lives here now (the layers sheet's tile went), so the card is there with no drone in the kit too. */}
-          {drone === null ? (
+          {!droneTools ? null : drone === null ? (
             <LiveCard kind="drone" title="Drone" icon={<DroneIcon />} value="Preflight" sub="draw a move" tone="maybe" onTap={() => pick('drone')}>
               {null}
             </LiveCard>
@@ -170,9 +174,11 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, now, onPic
         )}
 
         {/* Batch I: the Viewfinder's own row, right under the cards. */}
-        <div className="menu__rows">
-          <Row label="Viewfinder" value="point your phone, see the shot" icon={<KitIcon />} onTap={() => pick('viewfinder')} />
-        </div>
+        {!photoTools ? null : (
+          <div className="menu__rows">
+            <Row label="Viewfinder" value="point your phone, see the shot" icon={<KitIcon />} onTap={() => pick('viewfinder')} />
+          </div>
+        )}
 
         <div className="menu__rows">
           <Row label="Plan" value={rows.plan} icon={<PlanIcon />} onTap={() => pick('plan')} />

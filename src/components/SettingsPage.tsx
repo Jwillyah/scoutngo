@@ -1,3 +1,5 @@
+import { ActivityPicker } from './ActivityPicker.tsx'
+import { useActivities } from '../lib/activities.ts'
 import { useCalendarFeed } from '../lib/calendarFeedSetting.ts'
 import { feedPath } from '../core/calendarFeed.ts'
 import { useWindDraw, writeWindDraw } from '../lib/windDraw.ts'
@@ -137,6 +139,11 @@ const WIND_DRAW_OPTIONS = [
   { id: 'arrows', label: 'Arrows' },
 ] as const
 
+function WhatIDo() {
+  const [picked, setPicked] = useActivities()
+  return <ActivityPicker variant="inline" value={picked} onDone={setPicked} />
+}
+
 export function SettingsPage(props: Props) {
   /* Streaks move; Arrows draw once, for a slow phone (Batch F, Section 3). */
   const windDraw = useWindDraw()
@@ -162,6 +169,10 @@ export function SettingsPage(props: Props) {
 
   return (
     <Page title="Settings" className="setpage" back onClose={props.onClose}>
+      {/* Batch M, Section 2: what you do outside, the picker's own choices; kept on this phone. */}
+      <Section title="What I do">
+        <WhatIDo />
+      </Section>
       <Section title="Units">
         <Pick label="Time" options={CLOCK_OPTIONS} value={units.clock} onPick={(clock) => onUnits({ ...units, clock })} />
         <Pick label="Distance" options={DISTANCE_UNITS} value={units.distance} onPick={(distance) => onUnits({ ...units, distance })} />

@@ -79,6 +79,7 @@ describe('what you do orders the home, and hides only tools', () => {
     expect(homeOrder(null, false)).toEqual(['surf', 'shoot', 'fish', 'weather'])
     expect(homeOrder(null, true)).toContain('drone')
     expect(showsPhotoTools(null)).toBe(true)
+    expect(showsDrone(null, false)).toBe(true)
   })
   it('picked: that order; photo tools only with Shoot; the drone with Fly or a drone in the kit', () => {
     expect(homeOrder(['fish', 'weather'], false)).toEqual(['fish', 'weather'])

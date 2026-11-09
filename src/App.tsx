@@ -114,7 +114,8 @@ import { Menu, type MenuRows, type MenuTarget } from './components/Menu.tsx'
 import { lastBackup } from './lib/backup.ts'
 import { PACK_STORAGE_KEY } from './lib/venuePack.ts'
 import { Home, type HomeTarget } from './components/Home.tsx'
-import { showsPhotoTools, useActivities } from './lib/activities.ts'
+import { readActivities, showsDrone, showsPhotoTools, useActivities } from './lib/activities.ts'
+import { ActivityPicker } from './components/ActivityPicker.tsx'
 import { SpotPicker } from './components/SpotPicker.tsx'
 import { viewfinderPreset } from './core/viewfinderPreset.ts'
 import { shouldOpenBriefing } from './lib/briefingOpen.ts'
@@ -1395,7 +1396,9 @@ function App() {
    * the side menu. A request carries a tick so asking twice opens twice.
    */
   const [menuOpen, setMenuOpen] = useState(false)
-  const [activities] = useActivities()
+  const [activities, setActivities] = useActivities()
+  /* Batch M, Section 2: "What do you do outside?", once, after the first spot is picked. */
+  const [askWhat, setAskWhat] = useState(false)
   /* The Today briefing: on a plain launch (src/lib/briefingOpen.ts), and from Menu › Today. */
   const [briefOpen, setBriefOpen] = useState(() => shouldOpenBriefing(typeof window === 'undefined' ? null : window, landingSeen))
   /* The spot switcher over Today (Batch I, Section 1). */
@@ -1763,6 +1766,7 @@ function App() {
     setGeneration({ status: 'idle' })
     setSpotPickOpen(false)
     setBriefOpen(true)
+    if (readActivities() === null) setAskWhat(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -2493,10 +2497,10 @@ function App() {
         />
       ) : null}
 
-      {/* FIRST RUN, NO SETUP (Batch I, Section 1): no spot yet, so "Where do you shoot?", over everything. */}
+      {/* FIRST RUN, NO SETUP (Batch I, Section 1): no spot yet, so "Where do you go?" (Batch M), over everything. */}
       {(landingSeen && centre === null && bareLaunch) || spotPickOpen ? (
         <SpotPicker
-          title={centre === null ? 'Where do you shoot?' : 'Switch spot'}
+          title={centre === null ? 'Where do you go?' : 'Switch spot'}
           saved={spots.flatMap((sp) => {
             const at = venueLatLon(sp.venue)
             return at === null ? [] : [{ id: sp.id, name: sp.name, at }]
@@ -2530,6 +2534,18 @@ function App() {
         />
       ) : null}
 
+      {askWhat ? (
+        <ActivityPicker
+          variant="sheet"
+          value={activities}
+          onDone={(picked) => {
+            setActivities(picked)
+            setAskWhat(false)
+          }}
+          onLater={() => setAskWhat(false)}
+        />
+      ) : null}
+
       <Menu
         open={menuOpen}
         venue={centre}
@@ -2539,6 +2555,8 @@ function App() {
         drone={briefDrone}
         inland={!groups.water && groups.land}
         rows={menuRows}
+        photoTools={showsPhotoTools(activities)}
+        droneTools={showsDrone(activities, briefDrone !== null)}
         now={menuNow}
         onPick={onMenuTarget}
         onClose={() => setMenuOpen(false)}

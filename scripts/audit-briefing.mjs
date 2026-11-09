@@ -23,8 +23,11 @@
  *   words       never "safe", never "clear to", never a red ground
  *   Menu        the round Menu opens the menu over the home
  *   short tab   390 x 664 (a Safari tab): nothing off the side; it may scroll
- *   first run   a bare launch with no spot: "Where do you shoot?", spots
- *               near the location once, one tap to the home (Batch I)
+ *   first run   a bare launch with no spot: "Where do you go?", spots
+ *               near the location once, one tap to the home (Batch I);
+ *               then "What do you do outside?" (Batch M): Fish or boat
+ *               puts Wind and Tide first and takes the Viewfinder off the
+ *               menu, and every card is still there
  */
 import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -173,7 +176,7 @@ try {
       await wait(3500)
       const asked = await ev(`document.querySelector('.spick__title')?.textContent ?? null`)
       console.log(`  first run: ${asked}`)
-      if (asked !== 'Where do you shoot?') fail(`a bare first launch did not ask where (${JSON.stringify(asked)})`)
+      if (asked !== 'Where do you go?') fail(`a bare first launch did not ask where you go (${JSON.stringify(asked)})`)
       await page.getByRole('button', { name: 'Use my location once' }).click().catch(() => {})
       await wait(2500)
       const rows = await ev(`[...document.querySelectorAll('.spick__row .spick__name')].map((e) => e.textContent)`)
@@ -184,6 +187,31 @@ try {
       const opened = await ev(`document.querySelector('.home__spotname')?.textContent ?? null`)
       console.log(`  then the home: ${opened}`)
       if (opened === null) fail('picking a spot did not open the home')
+      /*
+       * WHAT DO YOU DO OUTSIDE? (Batch M, Section 2): asked once after the
+       * spot. Fish or boat alone: the wind and the tide lead the cards, the
+       * primary button is Radar, and the menu has no Viewfinder row; no card's
+       * data is gone (all five still there, the drone with none in the kit).
+       */
+      const question = await ev(`document.querySelector('.actpick__title')?.textContent ?? null`)
+      console.log(`  then: ${question}`)
+      if (question !== 'What do you do outside?') fail(`no "What do you do outside?" after the first spot (${JSON.stringify(question)})`)
+      await page.getByRole('button', { name: /Fish or boat/ }).click().catch(() => fail('no Fish or boat choice'))
+      await page.getByRole('button', { name: 'Done', exact: true }).click().catch(() => fail('no Done'))
+      await wait(1200)
+      const kept = await ev(`localStorage.getItem('scoutngo.activities.v1')`)
+      const after = JSON.parse(await ev(`JSON.stringify({ cards: [...document.querySelectorAll('.home__page')[0]?.querySelectorAll('.hcard__title') ?? []].map((e) => e.textContent), main: document.querySelector('.home .hbtn--main')?.textContent ?? null, open: !!document.querySelector('.actpick--sheet') })`))
+      console.log(`  picked Fish or boat: kept ${kept}, ${JSON.stringify(after)}`)
+      if (kept !== '["fish"]') fail(`the pick was kept as ${JSON.stringify(kept)}`)
+      if (after.open) fail('the picker stayed open after Done')
+      if (after.cards.slice(0, 2).join('|') !== 'Wind|Tide') fail(`Fish or boat: the cards lead with ${JSON.stringify(after.cards.slice(0, 2))}, not Wind and Tide`)
+      for (const c of ['Surf', 'Sunset', 'Moon']) if (!after.cards.includes(c)) fail(`Fish or boat: the ${c} card is gone (the picker only reorders)`)
+      if (after.main !== 'Radar') fail(`Fish or boat: the primary button is ${JSON.stringify(after.main)}`)
+      await page.locator('.home .hbtn--round[aria-label="Menu"]').click()
+      await wait(800)
+      const vf = await ev(`[...document.querySelectorAll('.menu .menu__rows')].some((r) => /Viewfinder/.test(r.textContent))`)
+      if (vf) fail('Fish or boat: the menu still offers the Viewfinder (a photo tool)')
+      await page.keyboard.press('Escape')
     }
     await ctx.close()
     watchdog.note(label)
