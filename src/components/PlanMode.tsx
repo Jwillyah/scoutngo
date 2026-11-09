@@ -1,4 +1,3 @@
-import { BuoysPage } from './BuoysPage.tsx'
 import { ExposurePage } from './ExposurePage.tsx'
 import { CalendarPage } from './CalendarPage.tsx'
 import { ScanOffer } from './ScanOffer.tsx'
@@ -77,6 +76,7 @@ import { showsPhotoTools, useActivities } from '../lib/activities.ts'
 import { SurfPageV2 } from './SurfPageV2.tsx'
 import { TidePageV2 } from './TidePageV2.tsx'
 import { WindPageV2 } from './WindPageV2.tsx'
+import { BuoysPageV2 } from './BuoysPageV2.tsx'
 import { groundOf } from '../core/homeDay.ts'
 import type { DetailId } from '../lib/detailTabs.ts'
 
@@ -2584,7 +2584,7 @@ export function PlanMode({
        * Surf · Tide · Wind · Buoys in the home's look, a back button and the four
        * as tabs; "How we got this ›" and "See on map ›" at the foot.
        */}
-      {(page === 'surf' || page === 'wind' || page === 'tides') && venue !== null && venueWindow !== null ? (() => {
+      {(page === 'surf' || page === 'tides' || page === 'wind' || page === 'buoys') && venue !== null && venueWindow !== null ? (() => {
         const props = {
           venue: { lat: venue.lat, lon: venue.lon },
           placeName: venueNameLine,
@@ -2596,9 +2596,8 @@ export function PlanMode({
           onMap: () => setPage(null),
           drone: surfDrone !== null ? { name: surfDrone.name, maxWindMps: surfDrone.ratedMps } : picked !== null && picked.includes('drone') ? { name: 'drone', maxWindMps: null } : null,
         }
-        return page === 'surf' ? <SurfPageV2 {...props} /> : page === 'wind' ? <WindPageV2 {...props} /> : <TidePageV2 {...props} />
+        return page === 'surf' ? <SurfPageV2 {...props} /> : page === 'tides' ? <TidePageV2 {...props} /> : page === 'wind' ? <WindPageV2 {...props} /> : <BuoysPageV2 {...props} />
       })() : null}
-      {page === 'buoys' && venueWindow !== null ? <BuoysPage data={tideSheet} timeZone={venueWindow.timeZone} onClose={() => setPage(null)} /> : null}
       {page === 'settings' ? (
         <SettingsPage
           feedPlace={venue}
