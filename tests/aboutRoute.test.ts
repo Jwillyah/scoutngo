@@ -12,6 +12,6 @@ describe('About', () => {
   it('is a page with a back arrow, and Settings and About push /settings and /about', () => {
     expect(plan).toMatch(/<Page title="About" className="aboutpage" back/)
     expect(plan).toMatch(/window\.history\.pushState\(\{ page \}, '', route/)
-    expect(readFileSync('src/components/SettingsPage.tsx', 'utf8')).toMatch(/<Page title="Settings" className="setpage" back/)
+    expect(readFileSync('src/components/SettingsPage.tsx', 'utf8')).toMatch(/<Page title="Settings" className="setpage set2" back/)
   })
 })

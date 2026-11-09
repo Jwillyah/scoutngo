@@ -1,3 +1,4 @@
+import '../styles/menu.css'
 import { beachName, sameBeach, useSurfBeach } from '../lib/surfBeach.ts'
 import { useSurfNow } from '../lib/useSurfNow.ts'
 import { SpotPicker } from './SpotPicker.tsx'

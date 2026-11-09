@@ -54,8 +54,8 @@ describe('the build, with its day', () => {
     /* Batch G: About and Settings say it the same way, "Version <hash> · <day> <Mon>". */
     expect(readFileSync('src/components/AboutSheet.tsx', 'utf8')).toContain('{versionLine()}')
     const settings = readFileSync('src/components/SettingsPage.tsx', 'utf8')
-    /* Batch G: Settings' About is one row, carrying "Version <hash> · <day> <Mon>". */
-    expect(settings).toContain('<Row label="About ScoutNGo" value={versionLine()} onClick={props.onAbout} />')
+    /* Batch Map, Section 6: the version line at the foot of Settings opens About (a long press shows Debug). */
+    expect(settings).toMatch(/className="set2__version"[\s\S]*?onClick=\{props\.onAbout\}>\s*\{versionLine\(\)\}/)
     expect(readFileSync('src/components/TouchDebug.tsx', 'utf8')).toMatch(/`build \$\{buildLabelWithDate\(\)\}`, \.\.\.lines/)
   })
 })

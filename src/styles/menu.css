@@ -1,0 +1,54 @@
+/*
+ * THE MENU IN THE ONE STYLE (Batch Map, Section 6): glass cards on the sky,
+ * 22 px corners. A good call is a teal edge on the left, a maybe amber, a
+ * drone over its rating orange; the call itself is the card's words. The
+ * rows below are one glass card of 56 px rows.
+ */
+.menu .mcard,
+.menu .mcard--good,
+.menu .mcard--maybe,
+.menu .mcard--bad,
+.menu .mcard--rust,
+.menu .mcard--today.mcard--good,
+.menu .mcard--sky.mcard--good,
+.menu .mcard--water.mcard--good,
+.menu .mcard--drone.mcard--good {
+  /* Edges as inset shadows: the cards keep their size (the menu fits a short Safari tab, scripts/audit-menu.mjs). */
+  border: 0;
+  border-radius: var(--radius-glass);
+  background: var(--glass);
+  box-shadow: inset 0 0 0 1px var(--glass-edge);
+}
+.menu .mcard--good {
+  box-shadow: inset 4px 0 0 var(--good), inset 0 0 0 1px var(--glass-edge);
+}
+.menu .mcard--maybe {
+  box-shadow: inset 4px 0 0 var(--caution), inset 0 0 0 1px var(--glass-edge);
+}
+.menu .mcard--rust {
+  box-shadow: inset 4px 0 0 var(--strong), inset 0 0 0 1px var(--glass-edge);
+}
+.menu .mcard__value {
+  font-weight: 300;
+}
+.menu .mcard__beach {
+  border-color: var(--glass-edge);
+  background: var(--glass);
+}
+.menu .mrow {
+  background: var(--glass);
+  border-bottom-color: var(--glass-edge);
+}
+.menu .mrow:first-child {
+  border-radius: var(--radius-glass) var(--radius-glass) 0 0;
+}
+.menu .mrow:last-child {
+  border-radius: 0 0 var(--radius-glass) var(--radius-glass);
+}
+.menu .mrow:only-child {
+  border-radius: var(--radius-glass);
+}
+.menu__x {
+  border: 1px solid var(--glass-edge);
+  background: var(--glass);
+}

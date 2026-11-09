@@ -40,47 +40,39 @@ describe('Settings, a page of its own (30 Oct)', () => {
     expect(MENU_ITEMS.find((m) => m.id === 'settings')?.subs?.map((s) => s.id)).toEqual(['about'])
   })
 
-  it('has its twelve sections in the order asked for (Batch G; What I do first, Batch M), Debug last and folded', () => {
+  /* Batch Map, Section 6 (board SettingsV2): seven groups in this order, the version at the foot, Debug behind a long press. */
+  it('has its groups in the board\'s order, and nothing it moved out', () => {
     const html = page()
-    const titles = [...html.matchAll(/class="set__title">([^<]+)</g)].map((m) => m[1])
-    expect(titles).toEqual(['What I do', 'Units', 'Location', 'Offline', 'Coast &amp; inland', 'Alerts', 'Drone', 'Map', 'Privacy &amp; data', 'AI key', 'About', 'Debug'])
-    expect(html).toMatch(/<details class="set__debug"><summary/)
-    expect(html).not.toMatch(/<details class="set__debug" open/)
+    const titles = [...html.matchAll(/class="set2__title">([^<]+)</g)].map((m) => m[1])
+    expect(titles).toEqual(['What I do', 'My spot', 'Units', 'My gear', 'Alerts', 'My data · on this phone only'])
+    for (const gone of ['Last venue', 'Coast &amp; inland', 'Kept when space runs short', 'Imagery', 'Terrain', 'Wind map', 'Debug', 'Show the numbers']) expect(html).not.toContain(`>${gone}<`)
+    expect(html).toMatch(/class="set2__version"/)
   })
 
-  it('units: time 12/24, distance ft/m, wind kt/mph/km/h, temperature °F/°C, 12 hour pressed by default', () => {
+  it('what I do: the five activities, each a coloured tile and a real switch, no emoji', () => {
     const html = page()
-    for (const label of ['12 hour', '24 hour', '>ft<', '>m<', '>kt<', '>mph<', '>km/h<', '°F', '°C']) expect(html).toContain(label)
-    expect(html).toMatch(/aria-pressed="true"[^>]*>12 hour</)
+    for (const a of ['surf', 'shoot', 'drone', 'fish', 'weather']) expect(html).toContain(`set2__tile--${a}`)
+    expect(html.match(/role="switch"/g)?.length).toBeGreaterThanOrEqual(7)
+    expect(html).not.toMatch(/\p{Extended_Pictographic}/u)
   })
 
-  it('every row has its current value on the right, and a drone not recorded is a dash, not a guess', () => {
+  it('units: wind kt / mph / km/h (m/s under More), height ft / m, temp °F / °C, time 12 h / 24 h', () => {
     const html = page()
-    expect(html).toContain('Wrightsville Beach')
-    expect(html).toContain('None in the kit')
-    expect(html).toContain('— (not recorded)')
-    expect(html).not.toMatch(/\bsafe\b/i)
+    for (const label of ['>kt<', '>mph<', '>km/h<', '>ft<', '>m<', '°F', '°C', '>12 h<', '>24 h<']) expect(html).toContain(label)
+    expect(html).not.toContain('>m/s<')
+    expect(html).toMatch(/aria-checked="true"[^>]*>12 h</)
   })
 
-  /*
-   * iOS-STYLE (Batch G, Section 7): real switches, values in the normal
-   * font, About one row to /about carrying "Version <hash> · <day> <Mon>",
-   * the long words behind an "i", backup and the AI key here and only here.
-   */
-  it('is clean: real switches, no numbers font on values, About one row with the version', () => {
+  it('my spot, my gear and my data say what they are; no "safe" anywhere', () => {
     const html = page()
-    expect(html.match(/role="switch"/g)?.length).toBeGreaterThanOrEqual(4)
-    expect(html).not.toMatch(/class="toggle__box"/)
-    expect(html).not.toMatch(/class="set__value num"/)
-    const about = html.slice(html.indexOf('aria-label="About"'), html.indexOf('class="set__debug"'))
-    expect(about.match(/class="set__row"/g)?.length).toBe(1)
-    expect(about).toMatch(/About ScoutNGo<\/span><span class="set__value">Version [0-9a-f]{7}\+? · \d{1,2} [A-Z][a-z]{2}/)
-    expect(html).not.toContain('Could not check')
+    expect(html).toContain('Home spot')
+    expect(html).toContain('Use my location')
+    expect(html).toContain('Camera + lenses')
+    expect(html).toMatch(/Drone<\/span><\/span><span class="set2__value">None</)
     expect(html).toContain('Back up to a file')
-    expect(html).toContain('Anthropic API key')
-    /* Long explanations behind an "i", not on the page. */
-    expect(html.match(/<details class="set__info">/g)?.length).toBeGreaterThanOrEqual(5)
-    for (const para of html.match(/<p class="set__note"[^>]*>[^<]*<\/p>/g) ?? []) expect(para.length).toBeLessThan(160)
+    expect(html).toContain('What leaves my phone')
+    expect(html).toMatch(/>More<\/span><span class="set2__sub">restore, export, clear, storage, AI key/)
+    expect(html).not.toMatch(/\bsafe\b/i)
   })
 
   it('and the units have left About', () => {

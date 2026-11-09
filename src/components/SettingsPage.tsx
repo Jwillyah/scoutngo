@@ -1,11 +1,10 @@
-import { ActivityPicker } from './ActivityPicker.tsx'
-import { useActivities } from '../lib/activities.ts'
 import { useCalendarFeed } from '../lib/calendarFeedSetting.ts'
 import { feedPath } from '../core/calendarFeed.ts'
-import { useWindDraw, writeWindDraw } from '../lib/windDraw.ts'
-import { useEffect, useState, type ReactNode } from 'react'
-import { NUMERALS_LABEL, NUMERALS_NOTE } from '../core/numerals.ts'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { NUMERALS_NOTE } from '../core/numerals.ts'
 import type { Drone } from '../core/kit.ts'
+import { ACTIVITIES, type Activity } from '../core/homeDay.ts'
+import { ACTIVITY_LINES, ACTIVITY_WORDS, useActivities } from '../lib/activities.ts'
 import { versionLine, type BuildCheck } from '../lib/build.ts'
 import { readHome, writeHome, type Home } from '../lib/home.ts'
 import { locateOnce, locateWords, useLocateAttempts } from '../lib/locateOnce.ts'
@@ -15,25 +14,38 @@ import { openPrivacy } from '../lib/privacyRoute.ts'
 import { seenHosts } from '../lib/privacy.ts'
 import { SURF_OPTIONS, useSurfSetting } from '../lib/surfSetting.ts'
 import { useTouchDebug } from '../lib/touchDebug.ts'
-import { CLOCK_OPTIONS, DISTANCE_UNITS, formatWind, TEMPERATURE_UNITS, WIND_UNITS, type Units } from '../lib/units.ts'
+import { formatWind, type Units } from '../lib/units.ts'
 import { deletePack, loadPacks, onPacksChanged, packBytes, type VenuePack } from '../lib/venuePack.ts'
 import { useNearMeSetting } from '../lib/nearMe.ts'
 import { weatherSent } from '../lib/weatherStore.ts'
 import { API_KEY_SAY, ApiKeyField } from './ApiKeyField.tsx'
+import { ActivityIcon } from './ActivityIcon.tsx'
 import { BuildStamp } from './BuildStamp.tsx'
 import { Page } from './Page.tsx'
 import { KeptExplained, KeptSection } from './KeptSection.tsx'
+import { Segmented, Toggle } from './ui.tsx'
 import type { ReadFile } from '../lib/scoutFile.ts'
+import '../styles/settings.css'
 
 /*
- * SETTINGS, A PAGE OF ITS OWN (field test, 30 Oct), CLEAN AND iOS-STYLE
- * (Batch G, Section 7): grouped rows, labels in normal case, real switches,
- * values in the normal font, buttons in normal case; a one-line hint only
- * where it is needed and anything longer behind an "i". Eleven sections:
- * Units, Location, Offline, Coast & inland, Alerts, Drone, Map, Privacy &
- * data (backup and restore here only), AI key (here only), About (one row,
- * to /about, with the version), and Debug at the bottom, folded. Everything
- * is kept on this phone; nothing here is sent anywhere.
+ * SETTINGS v2 (Batch Map, Section 6; board docs/mockups/SettingsV2.png), in
+ * the one style (src/components/ui.tsx): glass groups on the sky, coloured
+ * icon tiles, real toggles, segmented units. In this order:
+ *
+ *   What I do        the five activities, each a tile and a toggle
+ *   My spot          Home spot, Use my location
+ *   Units            Wind kt / mph / km/h, Height ft / m, Temp, Time
+ *   My gear          Camera + lenses, the drone with its rated wind
+ *   Alerts           Sky calls in my calendar, Special light near me
+ *   My data · on this phone only
+ *                    Back up to a file, What leaves my phone, More ›
+ *   the version      a long press shows Debug
+ *
+ * More › holds what left the main list: restore, export, clear, storage and
+ * what is kept when space runs short, the AI key, wind in m/s, the coast and
+ * inland overrides (Auto stays the behaviour), the numbers on the map and
+ * the saved venues. The map's own rows (imagery, terrain, labels, the wind
+ * drawing) are in the map's sheet. Everything is kept on this phone.
  */
 interface Props {
   /** Batch H: the venue for the opt-in calendar feed's address (rounded there to 2 decimals). */
@@ -42,7 +54,7 @@ interface Props {
   onUnits: (next: Units) => void
   showNumbers: boolean
   onShowNumbers: (on: boolean) => void
-  /** The venue as it stands, for "Make this home" and the last venue's row. */
+  /** The venue as it stands, for "Make this home". */
   venue: { lat: number; lon: number; name: string } | null
   place: Place
   drone: Drone | null
@@ -68,123 +80,115 @@ function feedAddress(place: { lat: number; lon: number } | null | undefined): st
   return `webcal://${window.location.host}${feedPath(place.lat, place.lon)}`
 }
 
-function Section({ title, info, children }: { title: string; info?: ReactNode; children: ReactNode }) {
+function Group({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="set__sec" aria-label={title}>
-      <div className="set__head">
-        <p className="set__title">{title}</p>
-        {info === undefined ? null : <Info>{info}</Info>}
-      </div>
-      <div className="set__list">{children}</div>
+    <section className="set2__sec" aria-label={title}>
+      <p className="set2__title">{title}</p>
+      <div className="set2__card">{children}</div>
     </section>
   )
 }
 
-/* The longer explanation, behind an "i". */
-function Info({ children }: { children: ReactNode }) {
-  return (
-    <details className="set__info">
-      <summary aria-label="More about this">i</summary>
-      <div className="set__infotext">{children}</div>
-    </details>
-  )
-}
-
-function Row({ label, value, onClick }: { label: string; value: ReactNode; onClick?: () => void }) {
+function Row({ label, sub, value, onClick, lead, end }: { label: string; sub?: string; value?: ReactNode; onClick?: () => void; lead?: ReactNode; end?: ReactNode }) {
   const inner = (
     <>
-      <span className="set__label">{label}</span>
-      <span className="set__value">
-        {value}
-        {onClick === undefined ? null : <span className="set__chev" aria-hidden="true">›</span>}
+      {lead}
+      <span className="set2__text">
+        <span className="set2__label">{label}</span>
+        {sub === undefined ? null : <span className="set2__sub">{sub}</span>}
       </span>
+      {value === undefined ? null : <span className="set2__value">{value}</span>}
+      {onClick === undefined ? null : <span className="set2__chev" aria-hidden="true">›</span>}
+      {end}
     </>
   )
-  return onClick === undefined ? <div className="set__row">{inner}</div> : <button type="button" className="set__row" onClick={onClick}>{inner}</button>
-}
-
-function Pick<T extends string | number>({ label, options, value, onPick }: { label: string; options: readonly { id: T; label: string }[]; value: T; onPick: (id: T) => void }) {
-  return (
-    <div className="set__row set__row--pick">
-      <span className="set__label">{label}</span>
-      <div className="seg set__seg" role="group" aria-label={label}>
-        {options.map((o) => (
-          <button type="button" key={o.id} className={`seg__btn${o.id === value ? ' seg__btn--on' : ''}`} aria-pressed={o.id === value} onClick={() => onPick(o.id)}>
-            {o.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-/* A real switch: a checkbox drawn as a track and a knob, said as a switch. */
-function Switch({ label, on, onChange, hint }: { label: string; on: boolean; onChange: (on: boolean) => void; hint?: string }) {
-  return (
-    <label className="set__row set__row--switch">
-      <span className="set__label">
-        {label}
-        {hint === undefined ? null : <span className="set__hint">{hint}</span>}
-      </span>
-      <input type="checkbox" role="switch" className="set__switch" aria-checked={on} checked={on} onChange={(e) => onChange(e.target.checked)} />
-    </label>
-  )
+  return onClick === undefined ? <div className="set2__row">{inner}</div> : <button type="button" className="set2__row set2__row--tap" onClick={onClick}>{inner}</button>
 }
 
 const mb = (bytes: number) => `${(bytes / 1_000_000).toFixed(1)} MB`
-const PART_107_FT = 400
 
-const WIND_DRAW_OPTIONS = [
-  { id: 'streaks', label: 'Streaks' },
-  { id: 'arrows', label: 'Arrows' },
+/** The board's units: wind without m/s (that is under More). */
+const MAIN_WIND = [
+  { id: 'kt', label: 'kt' },
+  { id: 'mph', label: 'mph' },
+  { id: 'kmh', label: 'km/h' },
+] as const
+const HEIGHT = [
+  { id: 'ft', label: 'ft' },
+  { id: 'm', label: 'm' },
+] as const
+const TEMP = [
+  { id: 'F', label: '°F' },
+  { id: 'C', label: '°C' },
+] as const
+const CLOCK = [
+  { id: '12', label: '12 h' },
+  { id: '24', label: '24 h' },
 ] as const
 
 function WhatIDo() {
   const [picked, setPicked] = useActivities()
-  return <ActivityPicker variant="inline" value={picked} onDone={setPicked} />
+  const on = (a: Activity) => picked === null || picked.includes(a)
+  const toggle = (a: Activity, next: boolean) => {
+    const now = picked ?? [...ACTIVITIES]
+    const list = next ? [...now.filter((x) => x !== a), a] : now.filter((x) => x !== a)
+    /* At least one stays: nothing picked is everything shown, which a last toggle off would not say. */
+    if (list.length > 0) setPicked(list)
+  }
+  return (
+    <>
+      {ACTIVITIES.map((a) => (
+        <Row
+          key={a}
+          label={ACTIVITY_WORDS[a]}
+          sub={ACTIVITY_LINES[a]}
+          lead={
+            <span className={`set2__tile set2__tile--${a}`}>
+              <ActivityIcon activity={a} className="set2__icon" />
+            </span>
+          }
+          end={<Toggle on={on(a)} label={ACTIVITY_WORDS[a]} onChange={(n) => toggle(a, n)} />}
+        />
+      ))}
+    </>
+  )
 }
 
 export function SettingsPage(props: Props) {
-  /* Streaks move; Arrows draw once, for a slow phone (Batch F, Section 3). */
-  const windDraw = useWindDraw()
-  const { units, onUnits, venue, place, drone } = props
-  const [groups, setGroups] = usePlaceGroups()
-  const [surf, setSurf] = useSurfSetting()
+  const { units, onUnits, venue, drone } = props
+  const [more, setMore] = useState(false)
+  const [debug, setDebug] = useState(false)
   const [nearMe, setNearMe] = useNearMeSetting()
   const [feed, setFeed] = useCalendarFeed()
   const feedHref = feedAddress(props.feedPlace)
-  const [debugTouch, setDebugTouch] = useTouchDebug()
-  const attempts = useLocateAttempts()
-  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
   const [home, setHome] = useState<Home | null>(readHome)
   const [locateLine, setLocateLine] = useState<string | null>(null)
-  const [packs, setPacks] = useState<VenuePack[]>(loadPacks)
-  useEffect(() => onPacksChanged(() => setPacks(loadPacks())), [])
-  const [deleting, setDeleting] = useState<string | null>(null)
-
   const locate = () => {
     setLocateLine('Finding you…')
-    void locateOnce().then((r) => setLocateLine(r.status === 'ok' ? `Found, ±${Math.round(r.accuracyMeters)} m. Used for this moment only, not kept.` : locateWords(r)))
+    void locateOnce().then((r) => setLocateLine(r.status === 'ok' ? `Found, ±${Math.round(r.accuracyMeters)} m, not kept` : locateWords(r)))
+  }
+  /* The version line: a long press (600 ms) shows Debug. */
+  const press = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const down = () => {
+    press.current = setTimeout(() => setDebug((d) => !d), 600)
+  }
+  const up = () => {
+    if (press.current !== null) clearTimeout(press.current)
+    press.current = null
   }
 
-  return (
-    <Page title="Settings" className="setpage" back onClose={props.onClose}>
-      {/* Batch M, Section 2: what you do outside, the picker's own choices; kept on this phone. */}
-      <Section title="What I do">
-        <WhatIDo />
-      </Section>
-      <Section title="Units">
-        <Pick label="Time" options={CLOCK_OPTIONS} value={units.clock} onPick={(clock) => onUnits({ ...units, clock })} />
-        <Pick label="Distance" options={DISTANCE_UNITS} value={units.distance} onPick={(distance) => onUnits({ ...units, distance })} />
-        <Pick label="Wind" options={WIND_UNITS} value={units.wind} onPick={(wind) => onUnits({ ...units, wind })} />
-        <Pick label="Temperature" options={TEMPERATURE_UNITS} value={units.temperature} onPick={(temperature) => onUnits({ ...units, temperature })} />
-      </Section>
+  if (more) return <MorePage {...props} onBack={() => setMore(false)} />
 
-      <Section title="Location" info={<p>Your location is asked for one moment at a time and not kept. Tap Home spot to make the venue on screen your home; it is kept on this phone only.</p>}>
-        <Row label="Use my location" value={locateLine ?? 'Ask'} onClick={locate} />
+  return (
+    <Page title="Settings" className="setpage set2" back onClose={props.onClose}>
+      <Group title="What I do">
+        <WhatIDo />
+      </Group>
+
+      <Group title="My spot">
         <Row
           label="Home spot"
-          value={home === null ? 'Not set' : home.name}
+          value={home === null ? (venue === null ? 'Not set' : `Make ${venue.name} home`) : home.name}
           onClick={
             venue === null
               ? undefined
@@ -195,113 +199,150 @@ export function SettingsPage(props: Props) {
                 }
           }
         />
-        <Row label="Last venue" value={venue?.name ?? 'None yet'} />
-      </Section>
+        <Row label="Use my location" value={locateLine ?? 'Ask each time'} onClick={locate} />
+      </Group>
 
-      <Section title="Offline" info={<p>Save a venue from Plan › Save for offline. Best saved on Wi-Fi: a pack is 30 to 50 MB.</p>}>
-        {packs.length === 0 ? <Row label="Saved venues" value="None" /> : null}
-        {packs.map((p) => (
-          <div key={p.id} className="set__row">
-            <span className="set__label">{p.name}</span>
-            <span className="set__value">
-              {mb(packBytes(p))}{' '}
-              {deleting === p.id ? (
-                <button type="button" className="set__btn set__btn--strong" onClick={() => void deletePack(p.id).then(() => setDeleting(null))}>
-                  Delete it
-                </button>
-              ) : (
-                <button type="button" className="set__btn" onClick={() => setDeleting(p.id)}>
-                  Delete
-                </button>
-              )}
-            </span>
-          </div>
-        ))}
-      </Section>
+      <Group title="Units">
+        <Row label="Wind" end={<Segmented label="Wind" value={units.wind === 'ms' ? 'kt' : units.wind} options={MAIN_WIND} onChange={(wind) => onUnits({ ...units, wind })} />} />
+        <Row label="Height" end={<Segmented label="Height" value={units.distance} options={HEIGHT} onChange={(distance) => onUnits({ ...units, distance })} />} />
+        <Row label="Temp" end={<Segmented label="Temp" value={units.temperature} options={TEMP} onChange={(temperature) => onUnits({ ...units, temperature })} />} />
+        <Row label="Time" end={<Segmented label="Time" value={units.clock === 24 ? '24' : '12'} options={CLOCK} onChange={(c) => onUnits({ ...units, clock: c === '24' ? 24 : 12 })} />} />
+        {units.wind === 'ms' ? <p className="set2__note">Wind is in m/s (More ›).</p> : null}
+      </Group>
 
-      <Section title="Coast & inland" info={<p>Auto: Water within 2 km of the sea or a big lake, Land anywhere else.</p>}>
-        <Row label="Here" value={place === 'coast' ? 'Coast' : place === 'inland' ? 'Inland' : 'Not known yet'} />
-        <Pick label="Water" options={GROUP_OPTIONS} value={groups.water} onPick={(water) => setGroups({ ...groups, water })} />
-        <Pick label="Land" options={GROUP_OPTIONS} value={groups.land} onPick={(land) => setGroups({ ...groups, land })} />
-        <Pick label="Surf" options={SURF_OPTIONS} value={surf} onPick={setSurf} />
-      </Section>
+      <Group title="My gear">
+        <Row label="Camera + lenses" value="Kit" onClick={props.onKit} />
+        <Row label="Drone" value={drone === null ? 'None' : `${drone.name}${drone.maxWindMps === null ? '' : ` · rated ${formatWind(drone.maxWindMps, units.wind)}`}`} onClick={props.onKit} />
+      </Group>
 
-      <Section title="Alerts" info={<p>Special light near me: on opening, fog, rainbows and sunrise or sunset color within 25 mi in the next 24 h, worked out on this phone. Calendar alerts are a calendar file from Sky › Calendar, added to your own calendar.</p>}>
-        <Switch label="Special light near me" on={nearMe} onChange={setNearMe} />
-        <Row label="Calendar alerts" value="Sky › Calendar" />
-        <Switch label="Sky calls in your calendar" on={feed} onChange={setFeed} hint="Off unless you switch it on" />
+      <Group title="Alerts">
+        <Row label="Sky calls in my calendar" sub="Off unless you switch it on" end={<Toggle on={feed} label="Sky calls in my calendar" onChange={setFeed} />} />
         {!feed || feedHref === null ? null : (
           <>
-            <a className="set__row set__link" href={feedHref}>
-              <span className="set__label">Subscribe in Calendar</span>
-              <span className="set__value">
-                <span className="set__chev" aria-hidden="true">›</span>
+            <a className="set2__row set2__row--tap" href={feedHref}>
+              <span className="set2__text">
+                <span className="set2__label">Subscribe in Calendar</span>
               </span>
+              <span className="set2__chev" aria-hidden="true">›</span>
             </a>
-            <p className="set__note">
+            <p className="set2__note">
               Your calendar app sends this spot, rounded to about a kilometre ({props.feedPlace?.lat.toFixed(2)}, {props.feedPlace?.lon.toFixed(2)}), to this app’s server each time it refreshes, about hourly. The server asks the forecast, and in the hour before a sunrise or sunset the weather stations by their ids, so a call that changes to Go or Skip changes in your calendar too; it logs nothing. Vercel’s own request logs keep the request line for an hour. Turn it off here and remove the calendar in your calendar app to stop it.
             </p>
           </>
         )}
-      </Section>
+        <Row label="Special light near me" sub="fog, rainbows, color within 25 mi" end={<Toggle on={nearMe} label="Special light near me" onChange={setNearMe} />} />
+      </Group>
 
-      <Section title="Drone">
-        <Row label="Model" value={drone?.name ?? 'None in the kit'} onClick={props.onKit} />
-        <Row label="Rated wind" value={drone === null || drone.maxWindMps === null ? '—' : formatWind(drone.maxWindMps, units.wind)} />
-        <Row label="Ceiling" value={`${PART_107_FT} ft (Part 107)`} />
-        <Row label="Battery" value="— (not recorded)" />
-      </Section>
+      <Group title="My data · on this phone only">
+        <Row label="Back up to a file" value="One file" onClick={props.onExport} />
+        <Row label="What leaves my phone" onClick={openPrivacy} />
+        <Row label="More" sub="restore, export, clear, storage, AI key" onClick={() => setMore(true)} />
+      </Group>
 
-      <Section title="Map" info={<p>Imagery is the sharpest free source for where you are. {NUMERALS_NOTE}</p>}>
-        <Row label="Imagery" value="Auto" />
-        <Switch label="Terrain" on={props.showTerrain} onChange={props.onShowTerrain} />
-        <Switch label="Labels" on={props.showLabels} onChange={props.onShowLabels} />
-        <Switch label={NUMERALS_LABEL} on={props.showNumbers} onChange={props.onShowNumbers} />
-        <Pick label="Wind map" options={WIND_DRAW_OPTIONS} value={windDraw} onPick={writeWindDraw} />
-      </Section>
+      <button type="button" className="set2__version" onPointerDown={down} onPointerUp={up} onPointerLeave={up} onContextMenu={(e) => e.preventDefault()} onClick={props.onAbout}>
+        {versionLine()}
+      </button>
+      {debug ? <Debug {...props} /> : null}
+    </Page>
+  )
+}
 
-      <Section title="Privacy & data" info={<KeptExplained />}>
+/* ------------------------------------------------------------- More › */
+
+function MorePage(props: Props & { onBack: () => void }) {
+  const { units, onUnits, place } = props
+  const [groups, setGroups] = usePlaceGroups()
+  const [surf, setSurf] = useSurfSetting()
+  const [packs, setPacks] = useState<VenuePack[]>(loadPacks)
+  useEffect(() => onPacksChanged(() => setPacks(loadPacks())), [])
+  const [deleting, setDeleting] = useState<string | null>(null)
+  return (
+    <Page title="More" className="setpage set2" back onClose={props.onBack}>
+      <Group title="Back up and restore">
         <KeptSection onImportScout={props.onImport} />
-        <Row label="What leaves your phone" value="" onClick={openPrivacy} />
         <Row label="Export everything" value="One file" onClick={props.onExport} />
-        <Row label="Clear this phone" value="" onClick={openPrivacy} />
-      </Section>
-
-      <Section title="AI key" info={<p>{API_KEY_SAY}</p>}>
-        <ApiKeyField compact />
-      </Section>
-
-      <Section title="About">
-        <Row label="About ScoutNGo" value={versionLine()} onClick={props.onAbout} />
-      </Section>
-
-      <details className="set__debug">
-        <summary className="set__title">Debug</summary>
-        <div className="set__list">
-          <Switch label="Touch log" hint="A box over the map; nothing is sent." on={debugTouch} onChange={setDebugTouch} />
-          <Row label="Show the home page" value="" onClick={props.onShowHome} />
-          <Row label="How it works" value="" onClick={props.onHow} />
+        <Row label="Clear this phone" onClick={openPrivacy} />
+      </Group>
+      <Group title="Storage">
+        <div className="set2__note">
+          <KeptExplained />
         </div>
-        <BuildStamp deployed={props.newBuild} />
-        <p className="set__label">Location attempts</p>
-        <ul className="set__log set__locate num">
-          {attempts.length === 0 ? <li>None this session</li> : null}
-          {attempts.map((a, i) => (
-            <li key={i}>
-              {formatClock(new Date(a.at), zone)} {a.words}
-            </li>
-          ))}
-        </ul>
-        <p className="set__label">Network log</p>
-        <ul className="set__log num">
-          {weatherSent().slice(-12).map((s, i) => (
+        {packs.length === 0 ? <Row label="Saved venues" value="None" /> : null}
+        {packs.map((p) => (
+          <Row
+            key={p.id}
+            label={p.name}
+            value={mb(packBytes(p))}
+            end={
+              deleting === p.id ? (
+                <button type="button" className="ui-round ui-round--words set2__del" onClick={() => void deletePack(p.id).then(() => setDeleting(null))}>
+                  Delete it
+                </button>
+              ) : (
+                <button type="button" className="ui-round ui-round--words set2__del" onClick={() => setDeleting(p.id)}>
+                  Delete
+                </button>
+              )
+            }
+          />
+        ))}
+      </Group>
+      <Group title="AI key and model">
+        <p className="set2__note">{API_KEY_SAY}</p>
+        <ApiKeyField compact />
+      </Group>
+      <Group title="Units, more">
+        <Row label="Wind in m/s" end={<Toggle on={units.wind === 'ms'} label="Wind in m/s" onChange={(on) => onUnits({ ...units, wind: on ? 'ms' : 'kt' })} />} />
+      </Group>
+      <Group title="Coast and inland">
+        <Row label="Here" value={place === 'coast' ? 'Coast' : place === 'inland' ? 'Inland' : 'Not known yet'} />
+        <Row label="Water cards" end={<Segmented label="Water cards" value={groups.water} options={GROUP_OPTIONS} onChange={(water) => setGroups({ ...groups, water })} />} />
+        <Row label="Land cards" end={<Segmented label="Land cards" value={groups.land} options={GROUP_OPTIONS} onChange={(land) => setGroups({ ...groups, land })} />} />
+        <Row label="Surf" end={<Segmented label="Surf" value={surf} options={SURF_OPTIONS} onChange={setSurf} />} />
+        <p className="set2__note">Auto: Water within 2 km of the sea or a big lake, Land anywhere else.</p>
+      </Group>
+      <Group title="On the map">
+        <Row label="Numbers on the map" sub={NUMERALS_NOTE} end={<Toggle on={props.showNumbers} label="Numbers on the map" onChange={props.onShowNumbers} />} />
+      </Group>
+    </Page>
+  )
+}
+
+/* ------------------------------------------------------------- Debug */
+
+function Debug(props: Props) {
+  const [debugTouch, setDebugTouch] = useTouchDebug()
+  const attempts = useLocateAttempts()
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  return (
+    <section className="set2__sec set__debug" aria-label="Debug">
+      <p className="set2__title">Debug</p>
+      <div className="set2__card">
+        <Row label="Touch log" sub="A box over the map; nothing is sent." end={<Toggle on={debugTouch} label="Touch log" onChange={setDebugTouch} />} />
+        <Row label="Show the home page" onClick={props.onShowHome} />
+        <Row label="How it works" onClick={props.onHow} />
+      </div>
+      <BuildStamp deployed={props.newBuild} />
+      <p className="set2__note">Location attempts</p>
+      <ul className="set2__log">
+        {attempts.length === 0 ? <li>None this session</li> : null}
+        {attempts.map((a, i) => (
+          <li key={i}>
+            {formatClock(new Date(a.at), zone)} {a.words}
+          </li>
+        ))}
+      </ul>
+      <p className="set2__note">Network log</p>
+      <ul className="set2__log">
+        {weatherSent()
+          .slice(-12)
+          .map((s, i) => (
             <li key={i}>
               {formatClock(new Date(s.at), zone)} {s.host} {s.status}
             </li>
           ))}
-          <li>Hosts this session: {seenHosts().join(', ') || 'none yet'}</li>
-        </ul>
-      </details>
-    </Page>
+        <li>Hosts this session: {seenHosts().join(', ') || 'none yet'}</li>
+      </ul>
+    </section>
   )
 }
