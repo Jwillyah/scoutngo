@@ -153,8 +153,17 @@ export function useWindViewport(map: maplibregl.Map | null, on: boolean, model: 
     }
   }, [on, key, plan, model, days, level])
 
-  if (!on) return { series: [], step: 0.25, status: 'off', asked: 0 }
-  /* A new view keeps drawing the last one's wind until its own arrives. */
-  if (got === null) return { series: [], step: plan?.step ?? 0.25, status: 'loading', asked: 0 }
-  return got.key === key ? got.v : { ...got.v, status: 'loading' }
+  /*
+   * ONE OBJECT PER STATE, NOT PER RENDER (Batch MAP2: switching to 400 ft
+   * returned a fresh "loading" copy on every render, the map handed the time
+   * bar a fresh strip for it, and the two re-rendered each other until React
+   * stopped: a blank screen). A new view keeps drawing the last one's wind
+   * until its own arrives.
+   */
+  const step = plan?.step ?? 0.25
+  return useMemo<WindViewport>(() => {
+    if (!on) return { series: [], step: 0.25, status: 'off', asked: 0 }
+    if (got === null) return { series: [], step, status: 'loading', asked: 0 }
+    return got.key === key ? got.v : { ...got.v, status: 'loading' }
+  }, [on, got, key, step])
 }

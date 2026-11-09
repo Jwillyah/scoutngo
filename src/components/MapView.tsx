@@ -4017,7 +4017,7 @@ export function MapView({
     return () => {
       m.off('moveend', read)
     }
-  }, [windOn, windView, onWindStrip])
+  }, [windOn, windView.series, onWindStrip]) // eslint-disable-line react-hooks/exhaustive-deps
   const keepLabelsClear = useCallback(() => (venue === null ? [] : [{ lat: venue.lat, lon: venue.lon }]), [venue])
   return (
     <div className={`map${mode === null ? '' : ' map--picking'}`}>

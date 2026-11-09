@@ -231,6 +231,25 @@ try {
       if (gridAsks === 0 || gridAsks > 9) fail(`${label}: ${gridAsks} wind grid requests for one view (1 to 9)`)
     }
     await shot('wind')
+    /*
+     * Batch MAP2: the drone's 400 ft in the same look. Switching to it once
+     * blanked the app (an update loop); here the layer must still draw, with
+     * its readout, after the switch.
+     */
+    const crashed = []
+    page.on('pageerror', (e) => crashed.push(String(e).slice(0, 120)))
+    await page.locator('.seg__btn', { hasText: '400 ft' }).first().click({ timeout: 4000 }).catch(() => fail(`${label}: no 400 ft choice on the wind card`))
+    let w4 = null
+    for (let i = 0; i < 20; i += 1) {
+      await wait(500)
+      w4 = JSON.parse(await ev(WIND))
+      if (w4.present && w4.painted >= 36 && /from/.test(w4.readout ?? '')) break
+    }
+    console.log(`  wind at 400 ft: ${JSON.stringify({ painted: w4?.painted, particles: w4?.particles, readout: w4?.readout })}`)
+    if (crashed.length > 0) fail(`${label}: the page crashed at 400 ft: ${crashed[0]}`)
+    else if (!w4?.present || w4.painted < 36 || !/from/.test(w4.readout ?? '')) fail(`${label}: the wind layer did not draw at 400 ft`)
+    await page.locator('.seg__btn', { hasText: 'Surface' }).first().click({ timeout: 4000 }).catch(() => {})
+    await wait(800)
     watchdog.note(`${label} wind`)
 
     /* RADAR: the legend in the time sheet's place, on screen, and staying. */

@@ -33,7 +33,9 @@ export function noteNet(e: NetEntry): void {
 export function wherePart(url: string, origin: string): { host: string; path: string } {
   try {
     const u = new URL(url, origin)
-    return { host: u.origin === origin ? 'this app' : u.host, path: u.pathname.length > 28 ? `${u.pathname.slice(0, 27)}…` : u.pathname }
+    /* Batch MAP2, Section 4: a path can hold a place (weather.gov's /points/36.84,-75.97); its decimals are masked, so a screenshot of these lines says nothing about where. */
+    const path = u.pathname.replace(/-?\d+\.\d+/g, '#')
+    return { host: u.origin === origin ? 'this app' : u.host, path: path.length > 28 ? `${path.slice(0, 27)}…` : path }
   } catch {
     return { host: '?', path: '' }
   }

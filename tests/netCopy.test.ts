@@ -14,3 +14,10 @@ describe('copy debug', () => {
     expect(text).not.toMatch(/\/14\/|\.pbf|latitude|longitude|\d+\.\d{2,}/)
   })
 })
+
+describe('the debug lines on screen', () => {
+  it('mask a place in a path: weather.gov\'s /points/lat,lon shows no coordinates', async () => {
+    const { wherePart } = await import('../src/lib/netLog.ts')
+    expect(wherePart('https://api.weather.gov/points/36.84,-75.97', 'https://scoutngo.vercel.app')).toEqual({ host: 'api.weather.gov', path: '/points/#,#' })
+  })
+})
