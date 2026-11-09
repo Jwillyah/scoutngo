@@ -1,8 +1,6 @@
 import { BuoysPage } from './BuoysPage.tsx'
 import { WindPage } from './WindPage.tsx'
-import { SurfPage } from './SurfPage.tsx'
 import { TidesPage } from './TidesPage.tsx'
-import { SENSORS } from '../core/fov.ts'
 import { ExposurePage } from './ExposurePage.tsx'
 import { CalendarPage } from './CalendarPage.tsx'
 import { ScanOffer } from './ScanOffer.tsx'
@@ -78,7 +76,9 @@ import type { Box } from '../lib/tileRange.ts'
 import type { ReadFile } from '../lib/scoutFile.ts'
 import { useOnline } from '../lib/useOnline.ts'
 import { showsPhotoTools, useActivities } from '../lib/activities.ts'
-
+import { SurfPageV2 } from './SurfPageV2.tsx'
+import { groundOf } from '../core/homeDay.ts'
+import type { DetailId } from '../lib/detailTabs.ts'
 
 const PHOTO_LAYERS: readonly string[] = ['shadows', 'cones', 'lightmap']
 import { MapRail } from './MapRail.tsx'
@@ -822,14 +822,7 @@ export function PlanMode({
    */
   const [mapZoom, setMapZoom] = useState(16.5)
   const [moonHint, setMoonHint] = useState(false)
-  /* For the Surf page: each lens in the bag on the sensor it is used with, and the drone with its wind by height and the ceiling here. */
-  const surfLenses = useMemo(() => {
-    const body = kitProfile.bodies.find((b) => bag.bodyIds.includes(b.id) && b.role !== 'drone')
-    if (body === undefined) return []
-    return kitProfile.lenses
-      .filter((l) => bag.lensIds.includes(l.id))
-      .map((l) => ({ name: l.name.replace(/^(Sony|Sigma|DJI|Tamron) /, ''), focalMm: l.maxFocalLength, sensorShortMm: SENSORS[effectiveSensor(l, body)].h }))
-  }, [kitProfile, bag])
+  /* For the detail pages: the drone with its wind by height and the ceiling here. */
   const surfDrone = useMemo(() => {
     const d = kitProfile.drones.find((x) => bag.droneIds.includes(x.id))
     if (d === undefined || venue === null) return null
@@ -2586,6 +2579,25 @@ export function PlanMode({
       {page === 'exposure' ? <ExposurePage kit={kitProfile} bag={bag} onClose={() => setPage(null)} /> : null}
       {/* Water's pages (Surf · Tides · Wind) or Land's (Wind · Terrain light) as tabs over each (docs/navigation.md). */}
       <PageGroup.Provider value={pageGroup}>
+      {/*
+       * THE DETAIL PAGES v2 (Batch N, Sections 1-4; boards docs/mockups/Detail2*):
+       * Surf · Tide · Wind · Buoys in the home's look, a back button and the four
+       * as tabs; "How we got this ›" and "See on map ›" at the foot.
+       */}
+      {(page === 'surf') && venue !== null && venueWindow !== null ? (() => {
+        const props = {
+          venue: { lat: venue.lat, lon: venue.lon },
+          placeName: venueNameLine,
+          timeZone: venueWindow.timeZone,
+          units,
+          ground: groundOf(getPosition(new Date(), venue.lat, venue.lon).altitude, null, false),
+          onBack: () => setPage(null),
+          onSwitch: (id: DetailId) => setPage(id === 'tide' ? 'tides' : id),
+          onMap: () => setPage(null),
+          drone: surfDrone !== null ? { name: surfDrone.name, maxWindMps: surfDrone.ratedMps } : picked !== null && picked.includes('drone') ? { name: 'drone', maxWindMps: null } : null,
+        }
+        return <SurfPageV2 {...props} />
+      })() : null}
       {page === 'tides' && venue !== null && scrubbedAt !== null && venueWindow !== null ? (
         <TidesPage
           tide={tide}
@@ -2606,18 +2618,6 @@ export function PlanMode({
               if (on) setPage(null)
             },
           }}
-        />
-      ) : null}
-      {page === 'surf' && venue !== null && scrubbedAt !== null && venueWindow !== null ? (
-        <SurfPage
-          venue={venue}
-          at={scrubbedAt}
-          timeZone={venueWindow.timeZone}
-          units={units}
-          data={tideSheet}
-          lenses={surfLenses}
-          drone={surfDrone}
-          onClose={() => setPage(null)}
         />
       ) : null}
       {page === 'buoys' && venueWindow !== null ? <BuoysPage data={tideSheet} timeZone={venueWindow.timeZone} onClose={() => setPage(null)} /> : null}
