@@ -212,7 +212,7 @@ export async function fetchStationSkies(venue: LatLon, fetchImpl: typeof fetch =
   }
 }
 
-async function stationSky(id: string, fetchImpl: typeof fetch): Promise<StationSky | null> {
+export async function stationSky(id: string, fetchImpl: typeof fetch = fetch): Promise<StationSky | null> {
   try {
     const r = await fetchImpl(`${NWS}/stations/${id}/observations/latest`, { headers: NWS_HEADERS, signal: AbortSignal.timeout(TIMEOUT_MS) })
     if (r.ok) {

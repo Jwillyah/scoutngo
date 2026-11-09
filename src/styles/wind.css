@@ -1,0 +1,203 @@
+/*
+ * THE WIND LAYER v3 AND ITS TIME BAR (Batch Map, Section 1; board
+ * docs/mockups/WindV3.png). The field and the particles are canvases over
+ * the map; the crosshair sits in the middle; the readout under the top bar;
+ * the legend above the sheet.
+ */
+.windv3__field,
+.windv3__trails {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+.windv3__field {
+  opacity: 0.78;
+}
+.windv3__cross {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  top: 50%;
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
+  pointer-events: none;
+  background:
+    radial-gradient(circle, transparent 6px, var(--white) 6.5px, var(--white) 8px, transparent 8.5px),
+    linear-gradient(var(--white), var(--white)) center top / 2px 12px no-repeat,
+    linear-gradient(var(--white), var(--white)) center bottom / 2px 12px no-repeat,
+    linear-gradient(var(--white), var(--white)) left center / 12px 2px no-repeat,
+    linear-gradient(var(--white), var(--white)) right center / 12px 2px no-repeat;
+  filter: drop-shadow(0 0 2px rgb(0 0 0 / 0.6));
+}
+.windv3__read {
+  position: absolute;
+  z-index: 7;
+  top: calc(var(--safe-top) + var(--space-2) + 52px + var(--space-2));
+  left: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 76px;
+  padding: 10px 16px;
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--radius-glass);
+  background: var(--map-glass);
+  color: var(--white);
+  pointer-events: none;
+}
+.windv3__arrow {
+  flex: none;
+  width: 40px;
+  height: 40px;
+}
+.windv3__arrow circle {
+  fill: none;
+  stroke: var(--glass-edge);
+  stroke-width: 1.2;
+}
+.windv3__arrow path {
+  fill: none;
+  stroke: var(--good);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.windv3__words {
+  flex: 1;
+  min-width: 0;
+}
+.windv3__big {
+  margin: 0;
+  font-size: 18px;
+  font-weight: var(--weight-medium);
+}
+.windv3__num {
+  font-size: 34px;
+  font-weight: 300;
+}
+.windv3__line {
+  margin: 2px 0 0;
+  font-size: var(--text-sm);
+  color: var(--glass-ink-2);
+}
+.windv3__station {
+  flex: none;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: var(--text-sm);
+  color: var(--glass-ink-2);
+}
+.windv3__station b {
+  color: var(--white);
+  font-size: 15px;
+}
+.windv3__legend {
+  margin: 0 0 10px;
+}
+/* While the wind layer is on, its readout takes the stat pills' place (board WindV3); the layer chip and the rail sit under it. */
+body:has(.windv3__read) .chips2 {
+  display: none;
+}
+body:has(.windv3__read) .wxchip {
+  top: calc(var(--safe-top) + 160px);
+}
+body:has(.windv3__read) .rail2 {
+  top: calc(var(--safe-top) + 160px);
+}
+.windv3__legendname {
+  margin: 0 0 4px 4px;
+  font-size: 10px;
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.14em;
+  color: var(--glass-ink-2);
+}
+.windv3__bar {
+  display: flex;
+  justify-content: space-between;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 999px;
+  color: var(--white);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 22px;
+  text-shadow: 0 0 2px rgb(0 0 0 / 0.5);
+}
+.wbar {
+  padding: 4px 0 6px;
+  color: var(--white);
+}
+.wbar__top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.wbar__play {
+  flex: none;
+  font-size: 16px;
+}
+.wbar__when {
+  flex: 1;
+  min-width: 0;
+}
+.wbar__time {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 300;
+  white-space: nowrap;
+}
+.wbar__day {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--glass-ink-2);
+}
+.wbar__models {
+  display: flex;
+  gap: 4px;
+}
+.wbar__chip {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: var(--text-sm);
+}
+.wbar__track {
+  position: relative;
+  height: 28px;
+  margin-top: 10px;
+  touch-action: none;
+  cursor: pointer;
+}
+.wbar__strip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 11px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--glass);
+}
+.wbar__needle {
+  position: absolute;
+  top: 2px;
+  width: 3px;
+  height: 24px;
+  margin-left: -1.5px;
+  border-radius: 2px;
+  background: var(--white);
+}
+.wbar__ticks {
+  position: relative;
+  height: 16px;
+  font-size: var(--text-xs);
+  color: var(--glass-ink-2);
+}
+.wbar__ticks span {
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}

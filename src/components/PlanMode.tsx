@@ -1,4 +1,7 @@
 import { NetDebug } from './NetDebug.tsx'
+import { WindTimeBar } from './WindTimeBar.tsx'
+import { coastFacing } from '../lib/coast.ts'
+import type { WindModelChip } from '../lib/useWindViewport.ts'
 import { cloudWord, stationCloudWord } from '../core/cloudWords.ts'
 import { compass } from '../lib/tideWords.ts'
 import { ExposurePage } from './ExposurePage.tsx'
@@ -1322,6 +1325,23 @@ export function PlanMode({
   const [warningsOn, setWarningsOn] = useState(false)
   const [tracksOn, setTracksOn] = useState(false)
   const [windLayerFt, setWindLayerFt] = useState<0 | 400>(0)
+  /* Batch Map, Section 1: the wind layer v3's model (Blend first), the strip at its crosshair, and the spot's beach for "offshore here". */
+  const [windModel, setWindModel] = useState<WindModelChip>('blend')
+  const [windStrip, setWindStrip] = useState<{ from: number; mps: (number | null)[] } | null>(null)
+  const [windFacing, setWindFacing] = useState<{ key: string; deg: number | null } | null>(null)
+  const windSpotKey = venue === null ? null : `${venue.lat.toFixed(3)},${venue.lon.toFixed(3)}`
+  useEffect(() => {
+    if (!showSky || skyLayer !== 'wind' || venue === null || windSpotKey === null || windFacing?.key === windSpotKey) return
+    let live = true
+    void coastFacing({ lat: venue.lat, lon: venue.lon })
+      .then((f) => {
+        if (live) setWindFacing({ key: windSpotKey, deg: f === 'inland' || f === 'unavailable' ? null : f.facing })
+      })
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [showSky, skyLayer, venue, windSpotKey, windFacing?.key])
   /* The layer last picked: a radar time that arrives after the shooter picked something else is dropped (Batch N: Off, then the late answer turned radar back on). */
   const pickedWeather = useRef<WeatherLayer>('off')
   const pickWeather = (w: WeatherLayer) => {
@@ -2557,8 +2577,15 @@ export function PlanMode({
         shadowFeatures={shadowFeatures}
         linkPins={camPins}
         rayClock={venueWindow === null ? undefined : (at: Date) => formatClock(at, venueWindow.timeZone)}
-        showSun={showSun}
-        showArc={showArc}
+        /* Batch Map, Section 1: the sun and moon lines step aside while a weather layer is on, and come back when it is off. */
+        showSun={showSun && weatherLayer === 'off'}
+        showArc={showArc && weatherLayer === 'off'}
+        windModel={windModel}
+        windAt={scrubbedAt}
+        windUnit={units.wind}
+        windSpot={venue}
+        windFacing={windFacing !== null && windFacing.key === windSpotKey ? windFacing.deg : null}
+        onWindStrip={setWindStrip}
         selectedId={selectedId}
         onSelect={onSelectAndRaise}
         onPitchChange={setPitch}
@@ -2974,6 +3001,19 @@ export function PlanMode({
             {/* Only on the map's own view (the home card, the radar card): a card that reads a moment keeps its time strip (Batch N; the surface audit). */}
             {weatherLayer === 'radar' && !threeD && (card.kind === HOME.kind || card.kind === 'wxlayer') ? (
               <RadarLegend scanAt={radarAt === null ? null : (layerNow?.radar?.scanAt ?? radarAt)} calls={layerCalls} strikes={layerNow?.strikes ?? []} timeZone={venueWindow?.timeZone ?? 'UTC'} />
+            ) : weatherLayer === 'wind' && windLayerFt === 0 && !threeD && (card.kind === HOME.kind || card.kind === 'wxlayer') && venueWindow !== null && scrubbedAt !== null ? (
+              /* Batch Map, Section 1: the wind's own time bar (play, the models, the strip at the crosshair) in the time sheet's place. */
+              <WindTimeBar
+                at={scrubbedAt}
+                from={new Date(windStrip?.from ?? Math.floor(Date.now() / 3_600_000) * 3_600_000)}
+                hours={Math.max(24, windStrip?.mps.length ?? 72)}
+                timeZone={venueWindow.timeZone}
+                onAt={scrubTo}
+                model={windModel}
+                onModel={setWindModel}
+                strip={windStrip?.mps ?? []}
+                unit={units.wind}
+              />
             ) : ((!TIME_MATTERS[card.kind] || (card.kind === 'sky' && skyTab !== 'now')) && !threeD) || venueWindow === null || scrubbedAt === null ? null : (
               <TimeBar
                 at={scrubbedAt}

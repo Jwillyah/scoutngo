@@ -44,7 +44,8 @@ export function fakeAnswer(href, now = new Date()) {
   const first = s.start ?? now.toISOString().slice(0, 10)
   const t0 = Date.parse(`${first}T00:00:00Z`)
   const time = Array.from({ length: s.days * 24 }, (_, i) => new Date(t0 + i * 3_600_000).toISOString().slice(0, 16))
-  const names = s.models.length === 0 ? s.vars : s.vars.flatMap((v) => s.models.map((m) => `${v}_${m}`))
+  /* One model named: Open-Meteo answers plain names (checked 9 Nov, models=gfs_hrrr); two or more: suffixed by model. */
+  const names = s.models.length <= 1 ? s.vars : s.vars.flatMap((v) => s.models.map((m) => `${v}_${m}`))
   const one = { hourly: Object.fromEntries([['time', time], ...names.map((n) => [n, time.map(() => value(n))])]) }
   return s.points === 1 ? one : Array.from({ length: s.points }, () => one)
 }

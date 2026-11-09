@@ -2,6 +2,8 @@ import { moonGlyphSvg } from '../lib/moonGlyph.ts'
 import { useNumerals } from '../lib/numeralsContext.ts'
 import * as maplibregl from 'maplibre-gl'
 import { WindStreaks } from './WindStreaks.tsx'
+import { WindLayerV3 } from './WindLayerV3.tsx'
+import { fieldAt, useWindViewport, type WindModelChip } from '../lib/useWindViewport.ts'
 import { useWindDraw } from '../lib/windDraw.ts'
 import { loadTile, PROTOCOL, viaProtocol } from '../lib/offlineCache.ts'
 import { RAY_SCREEN_FRACTION } from '../lib/rayLength.ts'
@@ -12,7 +14,8 @@ import { CameraHold } from '../lib/cameraHold.ts'
 import { TouchDebug } from './TouchDebug.tsx'
 import { IMAGERY_TEMPLATE, TERRAIN_TEMPLATE } from '../lib/offlineSources.ts'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
-import { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import type { WindUnit } from '../lib/units.ts'
 import { createPortal } from 'react-dom'
 import { SunInSky } from './SunInSky.tsx'
 import { readSkyFrame, type SkyFrame } from '../lib/skyFrame.ts'
@@ -660,6 +663,17 @@ interface MapViewProps {
   windMeters?: number
   /** The aircraft's published wind rating, or null when none is known. */
   ratedWindMps?: number | null
+  /*
+   * Batch Map, Section 1: the wind layer v3 (src/components/WindLayerV3.tsx)
+   * over the whole screen, at `windAt`, from the chosen model; `onWindStrip`
+   * hands the time bar the wind at the crosshair by the hour.
+   */
+  windModel?: WindModelChip
+  windAt?: Date | null
+  windUnit?: WindUnit
+  windSpot?: LatLon | null
+  windFacing?: number | null
+  onWindStrip?: (strip: { from: number; mps: (number | null)[] } | null) => void
   markDraft?: readonly LatLon[]
   /** A tap while marking: adds a point, or a vertex to the line being drawn. */
   onMarkAt?: (at: LatLon) => void
@@ -1176,6 +1190,12 @@ export function MapView({
   skyLayer = 'cloud',
   windMeters = 10,
   ratedWindMps = null,
+  windModel = 'blend',
+  windAt = null,
+  windUnit = 'kt',
+  windSpot = null,
+  windFacing = null,
+  onWindStrip,
   markDraft,
   onMarkAt,
   onSelectMark,
@@ -3268,7 +3288,8 @@ export function MapView({
     instance.setLayoutProperty(
       'cloud-forecast-fill',
       'visibility',
-      showSky && data.features.length > 0 ? 'visible' : 'none',
+      /* Batch Map, Section 1: the wind is the v3 layer's smooth field now, never the grid's squares. */
+      showSky && skyLayer !== 'wind' && data.features.length > 0 ? 'visible' : 'none',
     )
     instance.setPaintProperty(
       'cloud-forecast-fill',
@@ -3916,12 +3937,38 @@ export function MapView({
     moveCamera('sheet padding', () => map.current?.setPadding({ top: 0, left: 0, right: 0, bottom: bottomInset }))
   }, [bottomInset, moveCamera])
 
+  /* Batch Map, Section 1: the wind over the screen, for the hour on the time bar. */
+  const windOn = showSky && skyLayer === 'wind'
+  const windHour = windAt === null ? null : Math.floor(windAt.getTime() / 3_600_000)
+  const windView = useWindViewport(ready ? map.current : null, windOn && windMeters <= 10, windModel, windHour === null ? null : new Date(windHour * 3_600_000))
+  const windField = useMemo(() => (windHour === null || windView.series.length === 0 ? null : fieldAt(windView.series, windView.step, new Date(windHour * 3_600_000))), [windView, windHour])
+  /* The time bar's strip: the grid point nearest the crosshair, hour by hour; read again when the map stops. */
+  useEffect(() => {
+    if (onWindStrip === undefined) return
+    const m = map.current
+    if (!windOn || m === null || windView.series.length === 0) {
+      onWindStrip(null)
+      return
+    }
+    const read = () => {
+      const c = m.getCenter()
+      let best = windView.series[0]
+      for (const s of windView.series) if (Math.hypot(s.lat - c.lat, s.lon - c.lng) < Math.hypot(best.lat - c.lat, best.lon - c.lng)) best = s
+      onWindStrip({ from: best.times[0], mps: best.speed })
+    }
+    read()
+    m.on('moveend', read)
+    return () => {
+      m.off('moveend', read)
+    }
+  }, [windOn, windView, onWindStrip])
   const windDraw = useWindDraw()
   return (
     <div className={`map${mode === null ? '' : ' map--picking'}`}>
       <div className="map__canvas" ref={container} />
-      {/* The wind map overlay (Batch F, Section 3): streaks, or arrows on a slow phone, over the wind layer's own grid. */}
-      <WindStreaks map={ready ? map.current : null} cells={skyForecast} heightM={windMeters} ratedMps={ratedWindMps} draw={windDraw} visible={showSky && skyLayer === 'wind'} />
+      {/* Batch Map, Section 1: the wind layer v3 over the whole screen (the old grid streaks only at a height above the ground). */}
+      {windOn && windMeters <= 10 ? <WindLayerV3 map={ready ? map.current : null} field={windField} unit={windUnit} spot={windSpot} facing={windFacing} status={windView.status} /> : null}
+      <WindStreaks map={ready ? map.current : null} cells={skyForecast} heightM={windMeters} ratedMps={ratedWindMps} draw={windDraw} visible={windOn && windMeters > 10} />
       <div className="raypills" ref={pillLayer} aria-hidden="true" />
       {debugTouch ? <TouchDebug /> : null}
       {/*

@@ -76,16 +76,46 @@ const SHEET = `JSON.stringify((() => {
 })())`
 
 /* The wind canvas, and the number of its pixels that are not transparent, read from the canvas itself. */
+/*
+ * Batch Map, Section 1: the wind layer v3. Its colour canvas must cover the
+ * WHOLE map: read back in a 6 x 6 grid of spots, every spot painted (the old
+ * layer covered a 5 x 5 block of squares around the spot). Its particles
+ * move (a count and the frame rate the layer itself counts), the crosshair's
+ * readout says a speed and where from, the legend has its seven stops, the
+ * wind's time bar is in the time sheet's place with Blend chosen, and the
+ * sun's lines are off while it is on.
+ */
 const WIND = `JSON.stringify((() => {
-  const c = document.querySelector('canvas.windstreaks')
+  const c = document.querySelector('canvas.windv3__field')
   if (!c) return { present: false }
   const r = c.getBoundingClientRect()
   let painted = 0
+  const spots = []
   if (c.width > 0 && c.height > 0) {
-    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data
-    for (let i = 3; i < d.length; i += 4) if (d[i] > 0) painted += 1
+    const g = c.getContext('2d')
+    for (let i = 0; i < 6; i += 1) for (let j = 0; j < 6; j += 1) {
+      const a = g.getImageData(Math.floor(((i + 0.5) / 6) * c.width), Math.floor(((j + 0.5) / 6) * c.height), 1, 1).data[3]
+      spots.push(a)
+      if (a > 0) painted += 1
+    }
   }
-  return { present: true, hidden: c.hidden || getComputedStyle(c).display === 'none', w: Math.round(r.width), h: Math.round(r.height), px: [c.width, c.height], painted }
+  const t = document.querySelector('canvas.windv3__trails')
+  const read = document.querySelector('[data-wind-readout]')
+  const bar = document.querySelector('[data-wind-timebar]')
+  return {
+    present: true,
+    hidden: c.hidden || getComputedStyle(c).display === 'none',
+    w: Math.round(r.width),
+    h: Math.round(r.height),
+    painted,
+    particles: Number(t?.dataset.particles ?? 0),
+    fps: Number(t?.dataset.fps ?? 0),
+    readout: read?.textContent ?? null,
+    legend: document.querySelectorAll('.windv3__bar span').length,
+    bar: bar === null ? null : { inPeek: !!bar.closest('.sheet__peek'), models: [...bar.querySelectorAll('[role=radio]')].map((b) => b.textContent + (b.getAttribute('aria-checked') === 'true' ? '*' : '')) },
+    pills: document.querySelectorAll('.raypills > *').length,
+    cross: !!document.querySelector('.windv3__cross'),
+  }
 })())`
 
 /* The radar legend: where it is, whether it is in the peek, and the slider's box. */
@@ -129,7 +159,8 @@ try {
       else document.addEventListener('DOMContentLoaded', add)
     }, [insets.top, insets.bottom])
     const page = await ctx.newPage()
-    await page.clock.install({ time: new Date('2026-11-02T15:00:00Z') })
+    /* Inside the fixtures' week (scripts/gate/fixtures.mjs FIXTURE_NOW, 30 Oct): the wind grid's three days start there. */
+    await page.clock.install({ time: new Date('2026-10-30T15:00:00Z') })
     await page.clock.resume()
     const wait = (ms) => page.waitForTimeout(ms)
     const ev = (x) => page.evaluate(x)
@@ -166,21 +197,38 @@ try {
     watchdog.note(`${label} features`)
 
     /* WIND: the canvas has drawn pixels. */
+    /* The wind's grid requests for this one view: no more than MAX_BLOCKS (src/core/windViewport.ts). */
+    let gridAsks = 0
+    page.on('request', (rq) => {
+      if (/wind_speed_10m%2Cwind_direction_10m%2Cwind_gusts_10m|wind_speed_10m,wind_direction_10m,wind_gusts_10m/.test(rq.url())) gridAsks += 1
+    })
     await openFeatures()
     await page.locator('[data-weather="wind"]').click()
     let w = null
     for (let i = 0; i < 24; i += 1) {
       await wait(500)
       w = JSON.parse(await ev(WIND))
-      if (w.present && !w.hidden && w.painted > 0) break
+      if (w.present && !w.hidden && w.painted >= 36 && w.particles > 0 && /from/.test(w.readout ?? '')) break
     }
     looked.wind += 1
-    console.log(`  wind canvas: ${JSON.stringify(w)}`)
-    if (!w.present) fail(`${label}: no wind canvas on the page`)
+    console.log(`  wind layer: ${JSON.stringify(w)}`)
+    if (!w.present) fail(`${label}: no wind layer canvas on the page`)
     else {
-      if (w.hidden) fail(`${label}: the wind canvas is hidden with the Wind layer on (no forecast cells reached it)`)
+      if (w.hidden) fail(`${label}: the wind canvas is hidden with the Wind layer on`)
       if (w.w < viewport.width * 0.9 || w.h < viewport.height * 0.6) fail(`${label}: the wind canvas is ${w.w} x ${w.h}, not the map's size`)
-      if (w.painted === 0) fail(`${label}: the wind canvas drew zero pixels`)
+      if (w.painted < 36) fail(`${label}: the wind colour covers ${w.painted} of 36 spots across the screen, not all of it`)
+      if (w.particles === 0) fail(`${label}: no particles`)
+      if (!/\d+ (kt|mph|km\/h|m\/s) from [NESW]/.test(w.readout ?? '')) fail(`${label}: the crosshair's readout says "${w.readout}"`)
+      if (!w.cross) fail(`${label}: no crosshair`)
+      if (w.legend !== 7) fail(`${label}: the legend has ${w.legend} stops, not 7`)
+      if (w.bar === null) fail(`${label}: no wind time bar`)
+      else {
+        if (!w.bar.inPeek) fail(`${label}: the wind time bar is not in the time sheet's place`)
+        if (JSON.stringify(w.bar.models) !== JSON.stringify(['HRRR', 'Blend*', 'ECMWF'])) fail(`${label}: the models read ${JSON.stringify(w.bar.models)}, not HRRR · Blend (chosen) · ECMWF`)
+      }
+      if (w.pills > 0) fail(`${label}: the sun's line labels are on the map with the wind layer on`)
+      console.log(`  wind grid requests for this view: ${gridAsks}; frame rate ${w.fps} fps`)
+      if (gridAsks === 0 || gridAsks > 9) fail(`${label}: ${gridAsks} wind grid requests for one view (1 to 9)`)
     }
     await shot('wind')
     watchdog.note(`${label} wind`)
