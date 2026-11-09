@@ -1,0 +1,75 @@
+/*
+ * SEARCH v2 (Batch Map, Section 2; board docs/mockups/SearchV2.png): the
+ * picker on the sky, a glass field, chips All · Surf spots · Beaches ·
+ * Towns, the results in glass groups with a tile, the place and how far.
+ */
+.spick {
+  background: var(--sky-sheet);
+}
+.spick__search {
+  min-height: 56px;
+  border: 2px solid var(--good);
+  border-radius: var(--radius-glass);
+  background: var(--glass);
+  font-size: 18px;
+}
+.spick__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.spick__group .spick__list {
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--radius-glass);
+  background: var(--glass);
+}
+.spick__group .spick__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  text-align: left;
+}
+.spick__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.spick__tile {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+}
+.spick__tile--spot {
+  background: var(--good);
+}
+.spick__tile--beach {
+  background: var(--caution);
+}
+.spick__tile--town,
+.spick__tile--business {
+  background: var(--surface-3);
+}
+.spick__glyph {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: var(--white);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.spick__far {
+  flex: none;
+  font-weight: 700;
+  color: var(--glass-ink-2);
+}
+.spick__group .spick__label {
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
