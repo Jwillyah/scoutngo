@@ -9,7 +9,8 @@
 import { RADAR_TILES, RADAR_Z } from './stormData.ts'
 
 export const RADAR_EVENT = 'scoutngo:radar'
-export const PAST_MIN = 60
+/* Batch Map, Section 5: the past two hours (board MapChrome), then the projection. */
+export const PAST_MIN = 120
 export const AHEAD_MIN = 90
 export const FRAME_MIN = 10
 

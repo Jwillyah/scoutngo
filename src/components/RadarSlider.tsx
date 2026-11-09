@@ -43,11 +43,14 @@ export function RadarSlider({ scanAt, calls, strikes, timeZone, step, onStep }: 
       <p className={`rslide__when num${m > 0 ? ' rslide__when--proj' : ''}`}>
         {formatClock(at, timeZone)} · {m <= 0 ? (m === 0 ? 'radar now' : `radar, ${-m} min ago`) : `projection, ${m} min ahead: cells carried straight`}
       </p>
-      <input className="rslide__range" type="range" min={0} max={steps.length - 1} step={1} value={i} aria-label="Radar time: the past hour, then a projection 90 minutes ahead" onChange={(e) => setI(Number(e.target.value))} />
-      <p className="rslide__ends num" aria-hidden="true">
-        <span>−1 h</span>
-        <span>now</span>
-        <span>+90 min</span>
+      <input className="rslide__range" type="range" min={0} max={steps.length - 1} step={1} value={i} aria-label="Rain time: the past two hours, then a projection 90 minutes ahead" onChange={(e) => setI(Number(e.target.value))} />
+      {/* Each label where its moment is on the bar (Batch Map, Section 5: −2 h · −1 h · now · +90 min). */}
+      <p className="rslide__ends rslide__ends--placed" aria-hidden="true">
+        {[[-120, '−2 h'], [-60, '−1 h'], [0, 'now'], [90, '+90 min']].map(([min, word]) => (
+          <span key={word} style={{ left: `${((Number(min) - steps[0]) / (steps[steps.length - 1] - steps[0])) * 100}%` }}>
+            {word}
+          </span>
+        ))}
       </p>
     </div>
   )

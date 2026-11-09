@@ -196,6 +196,13 @@ export async function answer(href) {
   if (host === 'mesonet.agron.iastate.edu' && u.pathname.endsWith('/USCOMP/n0q_0.json')) return json({ meta: { product: 'N0Q', site: 'USCOMP', valid: new Date(Math.floor(FIXTURE_NOW.getTime() / 300_000) * 300_000).toISOString().replace('.000', '') } }, 'radar composite time')
   /* Lightning: no strikes in the fixture's world (a clear map). */
   if (host === 'nowcoast.noaa.gov') return { status: 200, type: 'image/png', body: OVERLAY, fixture: 'no lightning' }
+  /* Batch Map, Section 5: the world's rain (LibreWXR, RainViewer v2 API): frames every 10 minutes to the fixture's now, and clear tiles. */
+  if (host === 'api.librewxr.net' && u.pathname === '/public/weather-maps.json') {
+    const now = Math.floor(FIXTURE_NOW.getTime() / 600_000) * 600
+    const past = Array.from({ length: 13 }, (_, i) => ({ time: now - (12 - i) * 600, path: `/v2/radar/${now - (12 - i) * 600}` }))
+    return json({ version: '2.0', generated: now, host: 'https://api.librewxr.net', radar: { past, nowcast: [] }, satellite: { infrared: [] } }, 'world rain frames')
+  }
+  if (host === 'api.librewxr.net') return { status: 200, type: 'image/png', body: OVERLAY, fixture: 'no rain' }
   if (host === 'mesonet.agron.iastate.edu' && u.pathname.startsWith('/cache/tile.py')) return { status: 200, type: 'image/png', body: OVERLAY, fixture: 'no radar echoes' }
   /* The hurricane centre: no active storms in the fixture's world. */
   /* The shared model-accuracy file (docs/model-skill.md): not published yet, as on the real site; the phone's own scores are used. */

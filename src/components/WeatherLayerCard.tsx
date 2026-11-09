@@ -1,3 +1,4 @@
+import '../styles/wind.css'
 import { useEffect, useState } from 'react'
 import { N0Q_PALETTE } from '../data/n0qPalette.ts'
 import { formatClock } from '../core/timezone.ts'
@@ -50,7 +51,16 @@ export function RadarLegend({ scanAt, calls, strikes, timeZone }: { scanAt: Date
         {DBZ.map((d) => (
           <button key={d} type="button" className="wlay__sw" style={{ background: colour(d) }} aria-label={`${d} dBZ: ${WORD[d]}`} onClick={() => setTapped(d)} />
         ))}
-        <span className="wlay__val">{tapped === null ? 'Tap a colour' : `${tapped} dBZ · ${WORD[tapped]}`}</span>
+        {/* Batch Map, Section 5 (board MapChrome): until a colour is tapped, what the layer is: radar where it exists, the hatched satellite estimate elsewhere. */}
+        <span className="wlay__val">
+          {tapped === null ? (
+            <span className="rain__title">
+              <b>Rain</b> <i className="rain__hatch" aria-hidden="true" /> = satellite estimate
+            </span>
+          ) : (
+            `${tapped} dBZ · ${WORD[tapped]}`
+          )}
+        </span>
       </div>
       {scanAt === null ? (
         <p className="wlay__note">Reading the radar…</p>

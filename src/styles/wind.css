@@ -201,3 +201,44 @@ body:has(.windv3__read) .rail2 {
   transform: translateX(-50%);
   white-space: nowrap;
 }
+
+/* Batch Map, Section 5: the rain legend's one line (board MapChrome), and the time labels where their moments are. */
+.rain__title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px 5px;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.2;
+  color: var(--glass-ink-2);
+}
+.rain__title b {
+  font-size: var(--text-sm);
+  color: var(--white);
+}
+.rain__hatch {
+  display: inline-block;
+  width: 20px;
+  height: 11px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 3px;
+  background: repeating-linear-gradient(135deg, transparent 0 3px, rgb(255 255 255 / 0.75) 3px 4px);
+}
+.rslide__ends--placed {
+  position: relative;
+  height: 16px;
+  margin: 2px 0 0;
+}
+.rslide__ends--placed span {
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.rslide__ends--placed span:first-child {
+  transform: none;
+}
+.rslide__ends--placed span:last-child {
+  transform: translateX(-100%);
+}
