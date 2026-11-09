@@ -92,10 +92,12 @@ const coarseForecast = (r) => {
   /* Batch N: on the 0.05° grid (about 5 km), not merely 2 decimals. */
   return coords.length >= 2 && coords.every((v) => /^-?\d{1,3}(\.\d{1,2})?$/.test(v) && Math.abs(Number(v) * 20 - Math.round(Number(v) * 20)) < 1e-6)
 }
+/* Batch Map A3: the connectivity check (src/lib/connectivity.ts), the bare /api/forecast, GET, nothing in the URL, no body. */
+const connectivityCheck = (r) => r.path === '/api/forecast' && r.method === 'GET' && r.query === '' && !r.hasBody
 let problems = 0
 for (const request of seen) {
   const line = `${request.method} ${request.path}${request.query}`
-  const ok = (request.method === 'POST' && request.query === '' && request.hasBody) || coarseForecast(request)
+  const ok = (request.method === 'POST' && request.query === '' && request.hasBody) || coarseForecast(request) || connectivityCheck(request)
   console.log(`  ${ok ? 'ok     ' : 'PROBLEM'} ${line}${request.hasBody ? '  (body)' : ''}`)
   if (!ok) problems += 1
 }

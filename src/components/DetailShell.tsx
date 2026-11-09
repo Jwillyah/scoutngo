@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { DETAIL_TABS, type DetailId } from '../lib/detailTabs.ts'
+import { NetDebug } from './NetDebug.tsx'
 
 /*
  * THE DETAIL PAGES' SHELL (Batch N, Sections 1-4; boards "DETAIL v2 ·").
@@ -30,6 +31,8 @@ interface DetailShellProps {
 
 export function DetailShell({ id, ground, onBack, onSwitch, onMap, how, children }: DetailShellProps) {
   const [howOpen, setHowOpen] = useState(false)
+  /* Batch Map A3: a triple tap on any plain words (the place line, a number) shows the network debug lines, as the home's date does. */
+  const [debug, setDebug] = useState(false)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
@@ -56,7 +59,15 @@ export function DetailShell({ id, ground, onBack, onSwitch, onMap, how, children
           ))}
         </div>
       </div>
-      <div className="dpage__body">{children}</div>
+      <div
+        className="dpage__body"
+        onClick={(e) => {
+          if (e.detail >= 3 && !(e.target as Element).closest('button, a, input')) setDebug(true)
+        }}
+      >
+        {children}
+      </div>
+      {debug ? <NetDebug onClose={() => setDebug(false)} /> : null}
       <div className="dpage__foot">
         <button type="button" className="dpage__link" onClick={() => setHowOpen(true)}>
           How we got this ›

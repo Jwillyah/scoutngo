@@ -71,6 +71,19 @@ export function writeSkillBook(book: SkillBook, store: Store | null = local()): 
   } catch {
     /* Storage full or refused: this hour's sample is lost, nothing else. */
   }
+  bookVersion += 1
+  for (const f of bookListeners) f()
+}
+
+/* Batch Map A2: the screens reading the stats (src/lib/useSurfNow.ts) read them again when a check lands. */
+let bookVersion = 0
+const bookListeners = new Set<() => void>()
+export const skillBookVersion = (): number => bookVersion
+export function onSkillBook(f: () => void): () => void {
+  bookListeners.add(f)
+  return () => {
+    bookListeners.delete(f)
+  }
 }
 
 const lastAt = (e: SpotEntry) => Math.max(e.triedAt, e.samples.at(-1)?.at ?? 0)

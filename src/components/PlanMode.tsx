@@ -1,3 +1,4 @@
+import { NetDebug } from './NetDebug.tsx'
 import { ExposurePage } from './ExposurePage.tsx'
 import { CalendarPage } from './CalendarPage.tsx'
 import { ScanOffer } from './ScanOffer.tsx'
@@ -1298,6 +1299,7 @@ export function PlanMode({
   const [packTick, setPackTick] = useState(0)
   useEffect(() => onPacksChanged(() => setPackTick((n) => n + 1)), [])
   const offlineStatus = online ? null : offlineLine(packTick >= 0 ? packFor(venue) : null)
+  const [netDebug, setNetDebug] = useState(false)
   /* The weather service refusing (a 429): one line with when it will be asked again (src/lib/weatherStore.ts). */
   const weatherBusy = useWeatherBusy()
   /* Special light on now (src/lib/useSpecialNow.ts): the status line when there is a signal, a tap to the list. */
@@ -2858,6 +2860,8 @@ export function PlanMode({
       />
 
       {/* The one status line: where you are, no signal, the weather service, the backup nudge, special light on now; first that applies. */}
+      {/* Batch Map A3: a triple tap on the status line or the chips' words shows the network debug lines (the home's, src/components/NetDebug.tsx). */}
+      <div className="netdebug__tap" onClick={(e) => (e.detail >= 3 && !(e.target as Element).closest('button, a') ? setNetDebug(true) : undefined)}>
       <ChipRow
         chips={chips}
         active={page === 'tides' ? 'tide' : card.kind}
@@ -2873,6 +2877,8 @@ export function PlanMode({
         }
         onStatus={locateNote === null && offlineStatus === null && weatherBusy === null && backupReminder == null && specialStatus !== null ? () => { setSkyTab('special'); openCard('sky') } : undefined}
       />
+      </div>
+      {netDebug ? <NetDebug onClose={() => setNetDebug(false)} /> : null}
 
       {sheet === 'full' ? null : (
       <MapRail

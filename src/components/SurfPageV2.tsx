@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { venueToday } from '../core/eventDay.ts'
-import { distanceMeters, type LatLon } from '../core/geo.ts'
+import { type LatLon } from '../core/geo.ts'
 import { camsNear, type SkyCam } from '../core/skyCams.ts'
 import { BAND_FLOOR_FT, skillLine, UNTESTED_ERROR_FT, type SkillSample, type SpotStats } from '../core/spotSkill.ts'
 import { BUOY_MATCH_FT, buoyVsForecast, camDistance, chartTopFt, cleanRuns, rangeWords, SURF_SPREAD_SOURCE } from '../core/surfRange.ts'
@@ -13,13 +13,14 @@ import { buoyFaceFt } from '../core/spotSkill.ts'
 import type { BuoyReading } from '../lib/buoy.ts'
 import type { DetailId } from '../lib/detailTabs.ts'
 import { readSkillBook } from '../lib/spotSkillStore.ts'
-import { beachName, nearestBeach, sameBeach } from '../lib/surfBeach.ts'
+import { surfNowFrom, surfWords, useSurfNow } from '../lib/useSurfNow.ts'
+import { spotKey } from '../core/spotSkill.ts'
 import { buoyDots, FIRST_HOUR, LAST_HOUR, dayHours, rangeHourAt, weekPeaks, type BuoyDot, type RangeHour } from '../lib/surfPageData.ts'
 import { compass, metresToFeet } from '../lib/tideWords.ts'
 import { getSunPosition } from '../core/sun.ts'
 import type { Units } from '../lib/units.ts'
 import { useSpotSkill } from '../lib/useSpotSkill.ts'
-import { useSurfSea, type SurfSea } from '../lib/useSurfSea.ts'
+import type { SurfSea } from '../lib/useSurfSea.ts'
 import { DCard, DetailShell } from './DetailShell.tsx'
 
 /*
@@ -72,25 +73,18 @@ export function SurfPageV2({ venue, placeName, timeZone, units, ground, onBack, 
     const t = setInterval(() => setNow(new Date()), 60_000)
     return () => clearInterval(t)
   }, [])
-  /* Batch N E8, as the home: the nearest surf beach when the venue is not on it. */
-  const beach = nearestBeach(venue)
-  const away = beach !== null && !sameBeach(venue, beach)
-  const spot = away ? beach.at : venue
-  const awayKm = away ? distanceMeters(venue, beach.at) / 1000 : 0
-  const awayWords = away
-    ? {
-        name: beachName(beach.name),
-        far: units.distance === 'ft' ? `${Math.max(1, Math.round(awayKm / 1.609))} mi` : `${Math.max(1, Math.round(awayKm))} km`,
-      }
-    : null
-
-  const sea = useSurfSea(spot)
+  /* Batch Map A1/A2: the spot's surf beach and this hour's band, from the one hook the home and the menu read too. */
+  const surf = useSurfNow(venue, now, timeZone, units.distance === 'ft')
+  const spot = surf.spot ?? venue
+  const { sea, away: awayWords } = surf
   const ready = sea.marine !== null && sea.facingState !== 'loading' && sea.buoy !== null
-  const skill = useSpotSkill(ready ? spot : null, {
+  /* The check against the buoy (it writes the book; surf.stats reads it back). */
+  useSpotSkill(ready ? spot : null, {
     marine: sea.marine,
     facingDeg: sea.facing,
     buoy: sea.buoy,
   })
+  const skill = { key: spotKey(spot), stats: surf.stats }
   /* Read again on each render: a new sample re-renders through skill.stats. */
   const kept = skill.key === null ? [] : (readSkillBook()[skill.key]?.samples ?? [])
   const [picked] = useActivities()
@@ -127,7 +121,7 @@ export function SurfBody({ now, timeZone, spot, spotName, away, sea, stats, kept
   const today = venueToday(now, timeZone)
   const hours = useMemo(() => (marine === null ? [] : dayHours(marine, wind, today, timeZone, facing, stats)), [marine, wind, today, timeZone, facing, stats])
   const week = useMemo(() => (marine === null ? [] : weekPeaks(marine, wind, today, timeZone, facing, stats)), [marine, wind, today, timeZone, facing, stats])
-  const head = marine === null ? null : rangeHourAt(marine, wind, now, facing, stats)
+  const head = useMemo(() => surfNowFrom(sea, stats, now, timeZone).now, [sea, stats, now, timeZone])
   const place = (
     <p className="dsurf__place">
       {spotName}
@@ -136,7 +130,7 @@ export function SurfBody({ now, timeZone, spot, spotName, away, sea, stats, kept
   )
 
   if (marine === null) {
-    const why = sea.status === 'loading' ? 'Asking for the sea forecast…' : sea.facingState === 'inland' ? 'No sea here: no surf to forecast.' : "The sea forecast didn't load."
+    const why = sea.status === 'loading' ? 'Asking for the sea forecast…' : sea.facingState === 'inland' ? 'No sea here: no surf to forecast.' : "The sea forecast didn't load · retrying"
     return (
       <>
         {place}
@@ -166,7 +160,7 @@ export function SurfBody({ now, timeZone, spot, spotName, away, sea, stats, kept
       <div className="dsurf__head">
         {place}
         <div className="dsurf__bigrow">
-          <p className="dhead__big">{head === null ? '—' : rangeWords(head.range)}</p>
+          <p className="dhead__big" data-shared="surf">{surfWords(head) ?? '—'}</p>
           {head === null ? null : <span className={`dsurf__tag dsurf__tag--${head.tag.toLowerCase()}`}>{head.tag}</span>}
         </div>
         <p className="dhead__line">
@@ -298,7 +292,7 @@ function BuoyCard({ buoy, facing, marine, wind, stats, clock }: { buoy: BuoyRead
   if (buoy.status !== 'ok')
     return (
       <DCard label="Nearest buoy">
-        <p className="dsurf__line">{buoy.reason}</p>
+        <p className="dsurf__line">{buoy.reason === "The buoy didn't load." ? "The buoy didn't load · retrying" : buoy.reason}</p>
       </DCard>
     )
   const face = buoyFaceFt({ waveM: buoy.waveM, periodS: buoy.periodS, fromDeg: buoy.fromDeg }, facing)

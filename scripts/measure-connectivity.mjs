@@ -77,7 +77,7 @@ try {
   await send('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] })
   onEvent('Fetch.requestPaused', (p) => {
     const host = hostOf(p.request.url)
-    if (host === '127.0.0.1:5173' && p.request.method === 'HEAD') probes += 1
+    if (host === '127.0.0.1:5173' && new URL(p.request.url).pathname === '/api/forecast' && !new URL(p.request.url).search) probes += 1
     if (fault.refuse.includes(host)) return void send('Fetch.failRequest', { requestId: p.requestId, errorReason: 'ConnectionRefused' })
     if (fault.hang.includes(host)) return
     void send('Fetch.continueRequest', { requestId: p.requestId })

@@ -201,7 +201,9 @@ export function TideContent({ now, tide, data, venue, placeName, timeZone, units
                 ? 'no open sea here'
                 : data.marine.status === 'loading'
                   ? 'waiting for the sea forecast'
-                  : 'the sea forecast did not say'
+                  : data.marine.status === 'failed'
+                    ? 'sea forecast didn’t load · retrying'
+                    : 'the sea forecast did not say'
               : `${suit.suit} typical`}
           </p>
         </DCard>

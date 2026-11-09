@@ -1,4 +1,5 @@
 import { beachName, sameBeach, useSurfBeach } from '../lib/surfBeach.ts'
+import { useSurfNow } from '../lib/useSurfNow.ts'
 import { SpotPicker } from './SpotPicker.tsx'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { stormNote } from '../lib/stormRiskData.ts'
@@ -99,6 +100,8 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
   const beachBrief = useBriefing(here || beach === null ? null : beach.at, timeZone, now, looking && !here, 'sea')
   const waterDay = here ? (days[0] ?? null) : ((beachBrief.days[0] as unknown as CardDay | undefined) ?? null)
   const water = useMemo(() => waterCard(waterDay, now, clock, beach?.name ?? null), [waterDay, now, beach?.name]) // eslint-disable-line react-hooks/exhaustive-deps
+  /* Batch Map A2: the value is the one surf number (src/lib/useSurfNow.ts), the home's and the Surf page's, not the day's extremes. */
+  const surf = useSurfNow(looking ? venue : null, now, timeZone, units.distance === 'ft')
   /* Batch K, Section 5: the NWS's rip current risk for the beach, as a fact under the card when the surf zone forecast gives one. */
   const rip = useCoast(beach?.at ?? null, null, 'mi', looking).coast?.rip ?? null
   const flight = useMemo(() => droneCard(days[0] ?? null, drone?.maxWindMps ?? null, now, (mps) => `${Math.round(windIn(mps, units.wind) ?? 0)} ${windUnitLabel(units.wind)}`), [days, drone, now, units.wind])
@@ -136,7 +139,7 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
             </div>
           </LiveCard>
           <div className="mcard-wrap">
-            <LiveCard kind="water" title="Water" icon={<WaterIcon />} value={loading ? '…' : water.value} sub={loading ? '' : (rip?.replace(/ \(NWS .*\)$/, '') ?? water.sub)} tone={wait(water.tone)} onTap={() => pick('water')}>
+            <LiveCard kind="water" title="Water" icon={<WaterIcon />} value={loading || surf.sea.status === 'loading' ? '…' : <span data-shared="surf">{surf.nowWords ?? '—'}</span>} sub={loading ? '' : (rip?.replace(/ \(NWS .*\)$/, '') ?? water.sub)} tone={wait(water.tone)} onTap={() => pick('water')}>
               <Bars bars={water.bars.map((b) => ({ h: b.h, now: b.now, cls: b.clean ? 'clean' : 'messy' }))} />
             </LiveCard>
             {beach === null ? null : (
@@ -198,7 +201,7 @@ function stripGradient(strip: (string | null)[]): string {
   return `linear-gradient(90deg, ${stops.join(', ')})`
 }
 
-function LiveCard({ kind, title, icon, value, sub, tone, onTap, children, refTo }: { kind: string; title: string; icon: ReactNode; value: string; sub: string; tone: Tone; onTap: () => void; children: ReactNode; refTo?: React.RefObject<HTMLButtonElement | null> }) {
+function LiveCard({ kind, title, icon, value, sub, tone, onTap, children, refTo }: { kind: string; title: string; icon: ReactNode; value: ReactNode; sub: string; tone: Tone; onTap: () => void; children: ReactNode; refTo?: React.RefObject<HTMLButtonElement | null> }) {
   return (
     <button type="button" ref={refTo} className={`mcard mcard--${kind} mcard--${tone} sidemenu__item`} onClick={onTap}>
       <span className="mcard__top">

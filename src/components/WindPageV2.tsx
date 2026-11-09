@@ -7,6 +7,10 @@ import { formatClock, formatHour, formatShortHour } from '../core/timezone.ts'
 import { overRated, windTo } from '../core/windModels.ts'
 import { AGREE_MPS, beachLine, hourIndexOf, cardinalBoxes, DIAL_C, DIAL_SIZE, dialLabels, dialSectors, modelsAgreeing, RING_R, sectorPath, windFlip } from '../core/windDial.ts'
 import { coastFacing } from '../lib/coast.ts'
+import { retrying } from '../lib/retrying.ts'
+import { fetchBriefWind, type Hourly } from '../lib/tideSheetData.ts'
+import { useWeatherEpoch } from '../lib/useWeatherStatus.ts'
+import { windAt, windWords, type WindNow } from '../lib/windNow.ts'
 import type { DetailId } from '../lib/detailTabs.ts'
 import { formatRange, formatWind, windIn, windUnitLabel, type Units } from '../lib/units.ts'
 import { fetchMeasuredWind, fetchWindModels, MODEL_NAME, WIND_MODELS, type Measured, type WindModels } from '../lib/windModelsData.ts'
@@ -60,11 +64,16 @@ export function WindPageV2({ venue, placeName, timeZone, units, ground, onBack, 
   const key = `${venue.lat},${venue.lon}`
   const [data, setData] = useState<{ key: string; value: WindData } | null>(null)
   const [facing, setFacing] = useState<{ key: string; value: FacingState } | null>(null)
+  const [wx, setWx] = useState<{ key: string; value: Hourly | null } | null>(null)
+  const epoch = useWeatherEpoch()
   useEffect(() => {
     let live = true
     const at = { lat: venue.lat, lon: venue.lon }
-    void Promise.all([fetchWindModels(at).catch(() => null), fetchMeasuredWind(at).catch(() => [])]).then(([models, measured]) => {
+    /* Batch Map A3/A4: the models are asked again (5 s, 20 s, 60 s, and when the network comes back) until they arrive; the page shows the one wind now meanwhile. */
+    const stop = retrying(async () => {
+      const [models, measured] = await Promise.all([fetchWindModels(at).catch(() => null), fetchMeasuredWind(at).catch(() => [])])
       if (live) setData({ key, value: { models, measured } })
+      return models !== null
     })
     void coastFacing(at)
       .then((f) => {
@@ -75,13 +84,27 @@ export function WindPageV2({ venue, placeName, timeZone, units, ground, onBack, 
       })
     return () => {
       live = false
+      stop()
     }
   }, [key, venue.lat, venue.lon])
+  /* The one wind now (src/lib/windNow.ts): the briefing's wind through the forecast cache, as the home reads it. */
+  useEffect(() => {
+    let live = true
+    void fetchBriefWind({ lat: venue.lat, lon: venue.lon })
+      .catch(() => null)
+      .then((h) => {
+        if (live) setWx((prev) => (h === null && prev !== null && prev.key === key ? prev : { key, value: h }))
+      })
+    return () => {
+      live = false
+    }
+  }, [key, venue.lat, venue.lon, epoch])
   const loaded = data !== null && data.key === key ? data.value : null
   const face = facing !== null && facing.key === key ? facing.value : null
+  const shared = windAt(wx !== null && wx.key === key ? wx.value : null, now)
   return (
     <DetailShell id="wind" ground={ground} onBack={onBack} onSwitch={onSwitch} onMap={onMap} how={<WindHow now={now} data={loaded} facing={face} unit={units.wind} />}>
-      <WindContent now={now} data={loaded} facing={face} placeName={placeName} timeZone={timeZone} units={units} drone={drone} />
+      <WindContent now={now} data={loaded} facing={face} placeName={placeName} timeZone={timeZone} units={units} drone={drone} shared={shared} />
     </DetailShell>
   )
 }
@@ -91,7 +114,7 @@ const STRIP_HOURS = 12
 /** One arrow every this many hours across the twelve: six, as on the board. */
 const STRIP_STEP = 2
 
-export function WindContent({ now, data, facing, placeName, timeZone, units, drone }: { now: Date; data: WindData | null; facing: FacingState; placeName: string; timeZone: string; units: Units; drone: { name: string; maxWindMps: number | null } | null }) {
+export function WindContent({ now, data, facing, placeName, timeZone, units, drone, shared = null }: { now: Date; data: WindData | null; facing: FacingState; placeName: string; timeZone: string; units: Units; drone: { name: string; maxWindMps: number | null } | null; shared?: WindNow | null }) {
   const unit = units.wind
   const say = (mps: number | null) => {
     const v = windIn(mps, unit)
@@ -104,16 +127,36 @@ export function WindContent({ now, data, facing, placeName, timeZone, units, dro
   const kicker = <p className="dwind__kick">{placeName === '' ? 'Now' : `${placeName} · now`}</p>
 
   if (data === null || models === null || hour === null) {
+    /* Batch Map A4: never a dash and a blank page. The one wind now (the home's) when it is here, the beach on the dial, and that the models are still being asked. */
+    const sKind = shared === null || shared.fromDeg === null || face === null ? null : windToBeach(shared.fromDeg, face)
     return (
-      <div className="dhead">
-        {kicker}
-        <p className="dhead__big">—</p>
-        <p className="dhead__line">{data === null ? 'Reading five forecasts…' : 'The models’ wind did not arrive.'}</p>
-      </div>
+      <>
+        <div className="dhead">
+          {kicker}
+          <p className="dhead__big" data-shared="wind" data-value={windWords(shared, unit) ?? ''}>
+            {shared === null ? '—' : say(shared.mps)}
+          </p>
+          <p className="dhead__line" data-wind-headline>
+            {shared === null ? '' : `${shared.fromDeg === null ? 'No one direction' : `from the ${compassPoint(shared.fromDeg)}`}${sKind === null ? '' : ` · ${KIND_WORD[sKind].toLowerCase()}`}${shared.gustMps === null ? '' : ` · gusts ${say(shared.gustMps)}`}`}
+          </p>
+          <p className="dhead__line dwind__wait" role="status">
+            {data === null ? 'Reading five forecasts…' : 'Models still loading · retrying'}
+          </p>
+        </div>
+        {shared === null ? null : (
+          <div className="dwind__dialbox">
+            <Dial facing={face} fromDeg={shared.fromDeg} />
+          </div>
+        )}
+      </>
     )
   }
 
   const kind = hour.from === null || face === null ? null : windToBeach(hour.from, face)
+  /* Batch Map A2: the headline is the one wind now (the home's); the models draw the rest. */
+  const headFrom = shared === null ? hour.from : shared.fromDeg
+  const headGust = shared === null ? hour.gust : shared.gustMps
+  const headKind = headFrom === null || face === null ? null : windToBeach(headFrom, face)
   const hours = models.byLevel.ground.slice(i, i + STRIP_HOURS).map((r, k) => ({ at: models.hours[i + k], r, kind: r.from === null || face === null ? null : windToBeach(r.from, face) }))
   const flip = windFlip(hours)
   const shown = hours.filter((_, k) => k % STRIP_STEP === 0)
@@ -129,19 +172,19 @@ export function WindContent({ now, data, facing, placeName, timeZone, units, dro
     <>
       <div className="dhead">
         {kicker}
-        <p className="dhead__big">
-          {say(hour.median)}
+        <p className="dhead__big" data-shared="wind" data-value={windWords(shared ?? { mps: hour.median ?? 0, fromDeg: hour.from, gustMps: hour.gust }, unit) ?? ''}>
+          {say(shared?.mps ?? hour.median)}
           {kind === null ? null : <span className={`dwind__tag dwind__tag--${kind}`}>{KIND_WORD[kind]}</span>}
         </p>
         <p className="dhead__line" data-wind-headline>
-          {hour.from === null ? 'No one direction' : `from the ${compassPoint(hour.from)}`}
-          {kind === null ? '' : ` · ${KIND_WORD[kind].toLowerCase()}`}
-          {hour.gust === null ? '' : ` · gusts ${say(hour.gust)}`}
+          {headFrom === null ? 'No one direction' : `from the ${compassPoint(headFrom)}`}
+          {headKind === null ? '' : ` · ${KIND_WORD[headKind].toLowerCase()}`}
+          {headGust === null ? '' : ` · gusts ${say(headGust)}`}
         </p>
       </div>
 
       <div className="dwind__dialbox">
-        <Dial facing={face} fromDeg={hour.from} />
+        <Dial facing={face} fromDeg={headFrom} />
         <p className="dwind__note">
           {face === null
             ? facing === 'inland'

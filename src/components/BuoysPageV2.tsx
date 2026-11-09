@@ -130,7 +130,7 @@ export function BuoysBody({ venue, placeName, timeZone, units, buoys, marine, ma
 function ForecastLine({ nearest, marine, marineFailed, timeZone, units }: { nearest: OkBuoy; marine: Hourly | 'inland' | null; marineFailed: boolean; timeZone: string; units: Units }) {
   let line: string
   if (marine === 'inland') line = 'No sea forecast here to compare'
-  else if (marine === null) line = marineFailed ? 'The sea forecast didn’t load' : 'Asking the sea forecast…'
+  else if (marine === null) line = marineFailed ? 'The sea forecast didn’t load · retrying' : 'Asking the sea forecast…'
   else {
     const f = hourlyAt(marine, 'wave_height', nearest.at)
     const v = versusForecast(nearest.waveM, f)

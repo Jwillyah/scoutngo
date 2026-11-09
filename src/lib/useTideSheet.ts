@@ -54,25 +54,35 @@ export function useTideSheet(open: boolean, venue: LatLon | null, stationId: str
     let live = true
     const at = { lat, lon }
     const stops: (() => void)[] = []
+    let askedSea = false
     stops.push(
       retrying(async () => {
         const f = await coastFacing(at)
         if (!live) return true
+        /*
+         * Batch Map A3 (9 Nov, LTE: the Tide page's water said "waiting for
+         * the sea forecast" for good): the sea was asked only once the
+         * beach's facing had come from the map's tiles, and on that link the
+         * tiles did not. The sea's temperature does not need the facing: it
+         * is asked at once unless the map has said there is no sea here.
+         */
+        if (f !== 'inland' && !askedSea) {
+          askedSea = true
+          stops.push(
+            retrying(async () => {
+              const m = await fetchMarine(at)
+              if (!live) return true
+              setMarine((prev) => (m === null ? (prev.value !== null ? prev : { value: null, savedAt: null, status: 'failed' }) : { value: m.value, savedAt: m.savedAt, status: 'ready' }))
+              return m !== null
+            }),
+          )
+        }
         if (f === 'unavailable') {
           setFacing({ value: null, savedAt: null, status: 'failed' })
           return false
         }
         setFacing({ value: f, savedAt: null, status: 'ready' })
         if (f === 'inland') setMarine({ value: 'inland', savedAt: null, status: 'ready' })
-        else
-          stops.push(
-            retrying(async () => {
-              const m = await fetchMarine(at)
-              if (!live) return true
-              setMarine(m === null ? { value: null, savedAt: null, status: 'failed' } : { value: m.value, savedAt: m.savedAt, status: 'ready' })
-              return m !== null
-            }),
-          )
         return true
       }),
     )

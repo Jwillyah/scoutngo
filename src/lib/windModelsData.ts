@@ -11,7 +11,7 @@ import { parseMetarWind } from '../core/metar.ts'
 import { summarise, type WindHour } from '../core/windModels.ts'
 import { aloftFactor, type Stability } from '../core/localWind.ts'
 import { sunAltitude } from '../core/shooterStorm.ts'
-import { BUOY_ENDPOINT, nearestBuoys } from './buoy.ts'
+import { nearestBuoys, postBuoy } from './buoy.ts'
 import { OPEN_METEO_URL, TIMEOUT_MS } from './forecast.ts'
 import { FORECAST_MAX_AGE_MS, weatherJson } from './weatherStore.ts'
 import { fetchStationSkies } from './skyFireData.ts'
@@ -121,7 +121,7 @@ export async function fetchMeasuredWind(venue: LatLon): Promise<Measured[]> {
       const b = nearestBuoys(venue, 1)[0]
       if (b === undefined) return null
       try {
-        const r = await fetch(BUOY_ENDPOINT, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ station: b.id }) })
+        const r = await postBuoy(b.id)
         const body = (await r.json()) as { wind?: { at: string; mps: number; fromDeg: number | null; gustMps: number | null } | null }
         return body.wind == null ? null : { source: `buoy ${b.id}`, at: new Date(body.wind.at), mps: body.wind.mps, fromDeg: body.wind.fromDeg, gustMps: body.wind.gustMps }
       } catch {

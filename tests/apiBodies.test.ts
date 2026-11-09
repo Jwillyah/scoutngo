@@ -114,9 +114,22 @@ describe('the client side', () => {
     expect(API_CALLS.length).toBeGreaterThanOrEqual(2)
   })
 
+  /*
+   * THE CONNECTIVITY CHECK, BY NAME (Batch Map A3): GET /api/forecast with
+   * nothing at all in the URL and no body; the route answers 400 at once,
+   * and any answer is the network working. Nothing about the spot.
+   */
+  it('the connectivity check asks the bare /api/forecast, GET, nothing in its URL', () => {
+    const src = readFileSync('src/lib/connectivity.ts', 'utf8')
+    expect(src).toMatch(/export const PROBE_URL = '\/api\/forecast'\n/)
+    expect(src).toMatch(/export const PROBE_METHOD = 'GET'\n/)
+    expect(src).not.toMatch(/PROBE_URL\s*\+|`\$\{PROBE_URL\}/)
+  })
+
   it('posts every /api call to the bare endpoint, data in the body', () => {
     const bad: string[] = []
     for (const [file, call] of API_CALLS) {
+      if (file.endsWith('connectivity.ts') && /^fetch\(PROBE_URL, \{ method: PROBE_METHOD,/.test(call)) continue
       const first = call.slice('fetch('.length).split(',')[0].trim()
       const bare = ENDPOINTS.has(first) || /^['"]\/api\/[a-z-]+['"]$/.test(first)
       if (!bare) bad.push(`${file}: ${first} is not a bare endpoint`)

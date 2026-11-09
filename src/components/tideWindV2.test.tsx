@@ -89,9 +89,9 @@ describe('TideContent', () => {
     expect(none).toContain('>—<')
     expect(none).toContain('Far Point')
   })
-  it('says the water is not known when the sea forecast did not say', () => {
+  it('says the water is not known, and that it is asking again, when the sea forecast did not load (Batch Map A4)', () => {
     const dry = renderToStaticMarkup(<TideContent now={NOW} tide={TIDE} data={{ ...DATA, marine: { value: null, savedAt: null, status: 'failed' } }} venue={VB} placeName="Sandbridge" timeZone={NY} units={DEFAULT_UNITS} />)
-    expect(dry).toContain('the sea forecast did not say')
+    expect(dry).toContain('sea forecast didn’t load · retrying')
   })
   it('instructs nothing and promises nothing', () => {
     expect(html.replace(/<[^>]+>/g, ' ')).not.toMatch(BANNED)
@@ -170,7 +170,7 @@ describe('WindContent', () => {
   it('says a dash while nothing has arrived', () => {
     const empty = renderToStaticMarkup(<WindContent now={W_NOW} data={{ models: null, measured: [] }} facing={null} placeName="" timeZone={NY} units={DEFAULT_UNITS} drone={null} />)
     expect(empty).toContain('>—<')
-    expect(empty).toContain('did not arrive')
+    expect(empty).toContain('Models still loading · retrying')
   })
   it('instructs nothing and promises nothing', () => {
     expect(html.replace(/<[^>]+>/g, ' ')).not.toMatch(BANNED)

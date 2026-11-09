@@ -26,6 +26,7 @@
  * The kept answers are forecasts for a place, on this phone only, cleared
  * by Privacy › Clear this phone.
  */
+import { connectivity } from './connectivity.ts'
 
 export interface WeatherHit {
   ok: true
@@ -289,9 +290,9 @@ export function weatherRefreshing(): number {
   return inFlight.size
 }
 
-/** Sends one request: through the forecast cache when it is set, else (or when it is missing or failing) to Open-Meteo. */
-async function send(url: string, fetchImpl: typeof fetch, timeoutMs: number): Promise<Response> {
-  const direct = () => fetchImpl(url, { signal: AbortSignal.timeout(timeoutMs) })
+/** Sends one request: through the forecast cache when it is set, else (or when it is missing or failing) to Open-Meteo. `via` says which answered. */
+async function send(url: string, fetchImpl: typeof fetch, timeoutMs: number): Promise<{ r: Response; via: 'edge' | 'direct' }> {
+  const direct = async () => ({ r: await fetchImpl(url, { signal: AbortSignal.timeout(timeoutMs) }), via: 'direct' as const })
   if (edge === null || edgeMissing) return direct()
   let r: Response
   try {
@@ -305,7 +306,7 @@ async function send(url: string, fetchImpl: typeof fetch, timeoutMs: number): Pr
     return direct()
   }
   /* Batch N: a request the cache refuses (400, 414: more points than it takes, the sightline's many positions) is asked directly, at 2 decimals, as before the cache. */
-  return (r.status >= 502 && r.status <= 504) || r.status === 400 || r.status === 414 ? direct() : r
+  return (r.status >= 502 && r.status <= 504) || r.status === 400 || r.status === 414 ? direct() : { r, via: 'edge' }
 }
 
 /**
@@ -330,10 +331,21 @@ export async function weatherJson(asked: string, opts: { maxAgeMs: number; fetch
   const go = (async (): Promise<WeatherAnswer> => {
     const host = new URL(url).host
     try {
-      const r = await send(url, opts.fetchImpl ?? fetch, opts.timeoutMs ?? TIMEOUT_MS)
+      const { r, via } = await send(url, opts.fetchImpl ?? fetch, opts.timeoutMs ?? TIMEOUT_MS)
       sent.push({ at: Date.now(), host, status: r.status })
+      /* Any answer is the network working (src/lib/connectivity.ts). */
+      connectivity.report(true)
       if (r.status === 429) {
         const body = await r.text().catch(() => '')
+        /*
+         * Batch Map A3: a refusal Open-Meteo gives THIS PHONE (a direct ask: a
+         * carrier's shared address over its limit) says nothing about the
+         * cache, which asks from its own address. It is this request's
+         * refusal only; the next asks go through the cache as usual. Only the
+         * cache passing on a refusal (its address over the limit) holds
+         * every request back.
+         */
+        if (via === 'direct' && edge !== null && !edgeMissing) return fallback({ ok: false, unreachable: false, reason: 'Open-Meteo refused this phone; asking through the cache next.' })
         refused(/daily/i.test(body), Date.now())
         return fallback({ ok: false, unreachable: false, reason: busyWords(busy as Busy, Date.now()) })
       }
@@ -348,6 +360,7 @@ export async function weatherJson(asked: string, opts: { maxAgeMs: number; fetch
       return { ok: true, payload, fetchedAt: fresh.fetchedAt, stale: false, kept: false }
     } catch (error) {
       sent.push({ at: Date.now(), host, status: 'failed' })
+      connectivity.report(false)
       const timedOut = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')
       return fallback({ ok: false, unreachable: true, reason: timedOut ? 'The weather service timed out.' : 'Could not reach the weather service.' })
     } finally {

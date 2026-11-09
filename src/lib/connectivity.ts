@@ -11,8 +11,9 @@
  * and measurements/2026-10-27-connectivity-after.md.
  *
  * NOW A FAILED REQUEST IS ONLY A REASON TO LOOK. It asks the app's own origin
- * for a tiny answer (HEAD /, no-store: no body, never the HTTP cache, and the
- * service worker passes it straight through, src/sw/shellRoutes.ts). Offline
+ * for a tiny answer (GET /api/forecast with no parameters, no-store, never the
+ * HTTP cache; the service worker passes /api/ straight through,
+ * src/sw/shellRoutes.ts). Offline
  * is that check failing three times over 30 s (Batch N, below). One
  * source's failure says nothing about the others: each one fails on its own.
  *
@@ -24,7 +25,16 @@
  * comes to the front, and when any request anywhere succeeds.
  */
 
-export const PROBE_URL = '/'
+/*
+ * Batch Map A3 (9 Nov, LTE): the home loaded through /api/forecast while the
+ * map said "Offline · no offline pack here", which needs this check to fail
+ * three times running. The check now asks the path the field proved on
+ * cellular (8 Nov, 9:20 PM: GET /api/forecast with no parameters answered
+ * from 5G): the same function, a GET, answered at once with a 400 and a
+ * tiny body, no-store. Any answer at all is the network working.
+ */
+export const PROBE_URL = '/api/forecast'
+export const PROBE_METHOD = 'GET'
 /** Long enough for a HEAD on a slow 4G link (562 ms round trip) many times over. */
 export const PROBE_TIMEOUT_MS = 6000
 /*
@@ -127,7 +137,7 @@ export function createConnectivity(deps: ConnectivityDeps = browserDeps()): Conn
     const controller = new AbortController()
     const stop = deps.setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS)
     void deps
-      .fetch(PROBE_URL, { method: 'HEAD', cache: 'no-store', signal: controller.signal })
+      .fetch(PROBE_URL, { method: PROBE_METHOD, cache: 'no-store', signal: controller.signal })
       /* Any answer at all is the network working: a 404 came back over it. */
       .then(
         () => true,

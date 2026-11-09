@@ -10,7 +10,7 @@ function harness(origin: 'up' | 'down' | 'hang', device = true) {
   let t = 0
   let timers: { at: number; fn: () => void; id: number }[] = []
   let next = 1
-  const state = { origin, device, asked: 0 }
+  const state = { origin, device, asked: 0, urls: [] as string[], methods: [] as string[] }
   const deps: ConnectivityDeps = {
     now: () => t,
     setTimeout: (fn, ms) => {
@@ -22,9 +22,12 @@ function harness(origin: 'up' | 'down' | 'hang', device = true) {
       timers = timers.filter((x) => x.id !== id)
     },
     deviceOnline: () => state.device,
-    fetch: (_url, init) => {
+    fetch: (url, init) => {
       state.asked += 1
-      if (state.origin === 'up') return Promise.resolve(new Response(null, { status: 200 }))
+      state.urls.push(url)
+      state.methods.push(String(init.method))
+      /* /api/forecast with no parameters answers 400: an answer, so the network works. */
+      if (state.origin === 'up') return Promise.resolve(new Response('{}', { status: 400 }))
       if (state.origin === 'down') return Promise.reject(new TypeError('Load failed'))
       return new Promise((_r, reject) => init.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))))
     },
@@ -48,6 +51,15 @@ function harness(origin: 'up' | 'down' | 'hang', device = true) {
 }
 
 describe('connectivity', () => {
+  it('asks the path proven on cellular: GET /api/forecast, and a 400 is the network working (Batch Map A3)', async () => {
+    const { c, state, advance } = harness('up')
+    c.report(false)
+    await advance(1000)
+    expect(state.urls).toEqual(['/api/forecast'])
+    expect(state.methods).toEqual(['GET'])
+    expect(c.isOnline()).toBe(true)
+  })
+
   it('one failed request with the origin answering stays online', async () => {
     const { c, state, advance } = harness('up')
     c.report(false)

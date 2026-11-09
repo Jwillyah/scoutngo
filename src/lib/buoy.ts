@@ -68,9 +68,31 @@ interface BuoyBody {
   spec?: (BuoySplit & { at?: string }) | null
 }
 
+/*
+ * Batch Map A3 (9 Nov, LTE: "The buoy didn't load"): the buoy was asked once,
+ * with no time limit, so a request lost on a flaky link waited for the
+ * browser's own minute and then gave up. Now each try has BUOY_TIMEOUT_MS,
+ * and a try that gets no answer is made again after BUOY_RETRY_MS, twice.
+ */
+export const BUOY_TIMEOUT_MS = 8000
+export const BUOY_RETRY_MS = [2000, 6000] as const
+
+/** POST to /api/buoy with a time limit, again on no answer (an HTTP answer is not retried). */
+export async function postBuoy(station: string, wait: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms)), fetchImpl: typeof fetch = fetch): Promise<Response> {
+  for (let i = 0; ; i += 1) {
+    try {
+      return await fetchImpl(BUOY_ENDPOINT, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ station }), signal: AbortSignal.timeout(BUOY_TIMEOUT_MS) })
+    } catch (error) {
+      const after = BUOY_RETRY_MS[i]
+      if (after === undefined) throw error
+      await wait(after)
+    }
+  }
+}
+
 async function askBuoy(buoy: BuoyPick): Promise<BuoyReading | 'unreachable'> {
   try {
-    const response = await fetch(BUOY_ENDPOINT, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ station: buoy.id }) })
+    const response = await postBuoy(buoy.id)
     reportNetwork(true)
     const body = (await response.json()) as BuoyBody
     if (body.status === 'ok' && typeof body.waveM === 'number' && typeof body.at === 'string') {

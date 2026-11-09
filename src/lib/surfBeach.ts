@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { distanceMeters, type LatLon } from '../core/geo.ts'
 import { COAST_CAMS } from '../data/coastCams.ts'
 
@@ -11,6 +11,14 @@ import { COAST_CAMS } from '../data/coastCams.ts'
 const KEY = 'scoutngo.surfBeach.v1'
 /** A picked beach within this of the venue is the venue's own sea. */
 export const SAME_BEACH_KM = 2
+/*
+ * Batch Map A1 (9 Nov: spot Kill Devil Hills, the menu's Water card said
+ * "Virginia Beach"): a pick was kept for good, whatever the spot. A picked
+ * beach now holds only while the spot is within this of it; past that the
+ * spot's own nearest beach is the Water card's, the home's and the Surf
+ * page's, the same one on every screen.
+ */
+export const PICK_HOLDS_KM = 30
 
 export interface Beach {
   name: string
@@ -48,15 +56,31 @@ export function writeBeach(b: Beach): void {
   }
 }
 
-/** The beach for the Water card: the one picked, else the nearest to the venue. */
+/** The spot's surf beach: the one picked when it is near this spot, else the nearest to it. Every screen asks this. */
+export function beachFor(venue: LatLon | null, picked: Beach | null): Beach | null {
+  if (venue === null) return null
+  if (picked !== null && distanceMeters(venue, picked.at) <= PICK_HOLDS_KM * 1000) return picked
+  return nearestBeach(venue)
+}
+
+const told = new Set<() => void>()
+
+/** The spot's surf beach (beachFor), and the pick; a pick on one screen reaches every screen showing one. */
 export function useSurfBeach(venue: LatLon | null): [Beach | null, (b: Beach) => void] {
   const [picked, setPicked] = useState<Beach | null>(() => readBeach())
-  const beach = picked ?? (venue === null ? null : nearestBeach(venue))
+  useEffect(() => {
+    const f = () => setPicked(readBeach())
+    told.add(f)
+    return () => {
+      told.delete(f)
+    }
+  }, [])
   return [
-    beach,
+    beachFor(venue, picked),
     (b) => {
       writeBeach(b)
       setPicked(b)
+      for (const f of told) f()
     },
   ]
 }

@@ -16,6 +16,7 @@ import type { LatLon } from '../core/geo.ts'
 import { latestBuoyWaves, type BuoyReading } from './buoy.ts'
 import { coastFacing } from './coast.ts'
 import { fetchBriefWind, fetchMarine, type Hourly } from './tideSheetData.ts'
+import { retrying } from './retrying.ts'
 import { useWeatherEpoch } from './useWeatherStatus.ts'
 
 export interface SurfSea {
@@ -57,20 +58,34 @@ export function useSurfSea(spot: LatLon | null): SurfSea {
           v: { ...(prev?.key === key ? prev.v : EMPTY), ...patch },
         }))
     }
-    void (async () => {
+    /*
+     * Batch Map A3/A4: asked again (5 s, 20 s, 60 s, and when the network
+     * comes back: src/lib/retrying.ts) until the sea, the wind and the buoy
+     * have all answered. What arrived stays on screen; a later try never
+     * puts an empty answer over a good one.
+     */
+    let facing: number | null | undefined
+    let gotBuoy = false
+    const stop = retrying(async () => {
       const [m, w] = await Promise.all([fetchMarine(at).catch(() => null), fetchBriefWind(at).catch(() => null)])
-      put({ status: 'ready', marine: m?.value ?? null, wind: w })
-      const f = await coastFacing(at).catch(() => 'unavailable' as const)
-      const facing = f === 'inland' || f === 'unavailable' ? null : Math.round(f.facing)
-      put({
-        facing,
-        facingState: f === 'inland' ? 'inland' : f === 'unavailable' ? 'unavailable' : 'ok',
-      })
-      const buoy = await latestBuoyWaves(at, facing).catch(() => null)
-      put({ buoy })
-    })()
+      put({ status: 'ready', ...(m === null ? {} : { marine: m.value }), ...(w === null ? {} : { wind: w }) })
+      if (facing === undefined) {
+        const f = await coastFacing(at).catch(() => 'unavailable' as const)
+        if (f !== 'unavailable') facing = f === 'inland' ? null : Math.round(f.facing)
+        put({
+          facing: facing ?? null,
+          facingState: f === 'inland' ? 'inland' : f === 'unavailable' ? 'unavailable' : 'ok',
+        })
+      }
+      const buoy = await latestBuoyWaves(at, facing ?? null).catch(() => null)
+      const buoyLost = buoy === null || (buoy.status === 'none' && buoy.reason === "The buoy didn't load.")
+      if (!buoyLost) gotBuoy = true
+      if (!buoyLost || !gotBuoy) put({ buoy })
+      return m !== null && w !== null && facing !== undefined && !buoyLost
+    })
     return () => {
       live = false
+      stop()
     }
   }, [key, lat, lon, epoch])
 

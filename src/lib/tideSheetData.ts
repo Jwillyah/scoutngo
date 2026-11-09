@@ -41,10 +41,26 @@ async function getWeather(url: string): Promise<unknown> {
     if (got.unreachable) reportNetwork(false)
     throw new Error(got.reason)
   }
-  if (got.stale) throw new Error('stale')
   /* A kept answer is not the network answering (Batch N). */
   if (!got.kept) reportNetwork(true)
+  /*
+   * Batch Map A3 (9 Nov, LTE: Tide "waiting for the sea forecast"): an older
+   * answer while the new one is on its way used to count as none, so a page
+   * with no copy saved below showed nothing. It is the last good forecast:
+   * shown, said with its age, and replaced when the new one lands.
+   */
+  if (got.stale) throw new StaleAnswer(got.payload, got.fetchedAt)
   return got.payload
+}
+
+class StaleAnswer extends Error {
+  readonly payload: unknown
+  readonly fetchedAt: number
+  constructor(payload: unknown, fetchedAt: number) {
+    super('stale')
+    this.payload = payload
+    this.fetchedAt = fetchedAt
+  }
 }
 
 /** Live, else the copy saved on the phone, else null. */
@@ -56,7 +72,12 @@ async function liveOrSaved<T>(key: string, url: string, parse: (payload: unknown
       saveForecast(key, payload)
       return { value, savedAt: null }
     }
-  } catch {
+  } catch (error) {
+    /* An older answer from the weather store: shown with its age (savedAt) while the new one comes. */
+    if (error instanceof StaleAnswer) {
+      const value = parse(error.payload)
+      if (value !== null) return { value, savedAt: new Date(error.fetchedAt).toISOString() }
+    }
     /* Read the saved copy below. */
   }
   const saved = readForecast(key)

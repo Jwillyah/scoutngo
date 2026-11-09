@@ -79,10 +79,11 @@ ws.addEventListener('message', (event) => {
   const url = new URL(m.params.request.url)
   /*
    * THE CONNECTIVITY CHECK IS CUT TOO. The origin stays up so the dev server
-   * can keep serving modules, but on a real dead cell the app's own HEAD /
-   * (src/lib/connectivity.ts) fails like everything else.
+   * can keep serving modules, but on a real dead cell the app's own check
+   * (src/lib/connectivity.ts: GET /api/forecast since Batch Map, HEAD / before)
+   * fails like everything else.
    */
-  const check = m.params.request.method === 'HEAD' && url.pathname === '/'
+  const check = (m.params.request.method === 'HEAD' && url.pathname === '/') || url.pathname === '/api/forecast'
   /* So are the app's own functions (Batch M: forecasts go through /api/forecast): on a dead cell they are as far away as Open-Meteo. */
   const fn = url.pathname.startsWith('/api/')
   const local = (url.hostname === '127.0.0.1' || url.hostname === 'localhost') && !check && !fn

@@ -108,7 +108,7 @@ describe('Surf page v2 (Batch N, Section 1)', () => {
     const wholeFace = surfEstimate(WAVE_M, WAVE_S, 100, FACING).faceFt
     const want = rangeWords(correctedRange(swellFace, Math.abs(swellFace - wholeFace), NONE))
     const html = render()
-    const big = /<p class="dhead__big">([^<]*)<\/p>/.exec(html)?.[1]
+    const big = /<p class="dhead__big" data-shared="surf">([^<]*)<\/p>/.exec(html)?.[1]
     expect(big).toBe(want)
     expect(big).toMatch(/^\d+–\d+ ft$/)
     expect(text(html)).toMatch(/Virginia Beach · now .*clean, offshore · 8 s/)
@@ -163,7 +163,7 @@ describe('Surf page v2 (Batch N, Section 1)', () => {
   it('a dash and the fact, never a number, with no forecast', () => {
     const t = text(render({ sea: { ...sea, status: 'ready', marine: null } }))
     expect(t).toContain('—')
-    expect(t).toContain("The sea forecast didn't load.")
+    expect(t).toContain("The sea forecast didn't load · retrying")
     expect(t).not.toMatch(/\d+–\d+ ft/)
   })
 

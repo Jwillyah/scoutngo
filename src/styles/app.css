@@ -17949,12 +17949,13 @@ a.about__row * {
   font-weight: var(--weight-medium);
 }
 /* Batch N E1: the hidden network lines (a triple tap on the home's date). */
-.home__debug {
-  position: absolute;
+.home__debug,
+.netdebug {
+  position: fixed;
   left: 16px;
   right: 16px;
   bottom: calc(var(--safe-bottom, 0px) + 64px);
-  z-index: 5;
+  z-index: 60;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -17972,7 +17973,11 @@ a.about__row * {
   max-height: 40%;
   overflow: hidden;
 }
-.home__debug span {
+.netdebug__tap {
+  display: contents;
+}
+.home__debug span,
+.netdebug span {
   max-width: 100%;
   white-space: nowrap;
   overflow: hidden;

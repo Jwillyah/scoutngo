@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { camsForEvent, camsTowardSun, lookWords } from '../src/core/skyCams.ts'
 import { waterCard, type CardDay } from '../src/core/menuCards.ts'
 import { COAST_CAMS } from '../src/data/coastCams.ts'
-import { beachName, nearestBeach } from '../src/lib/surfBeach.ts'
+import { beachFor, beachName, nearestBeach, PICK_HOLDS_KM } from '../src/lib/surfBeach.ts'
+import { distanceMeters } from '../src/core/geo.ts'
 
 /* Batch J, Section 7: sky cams toward the sun, link out only; the Water card names its beach. */
 const PIER = { lat: 36.8435575, lon: -75.9713104 }
@@ -51,5 +52,22 @@ describe('the Water card names its beach', () => {
     const w = waterCard(day, new Date('2026-11-02T16:00:00Z'), () => '5:09 PM', 'Sandbridge')
     expect(w.sub).toBe('Surf · Sandbridge · small · low 5:09 PM')
     expect(waterCard(null, new Date(), () => '', 'Sandbridge').sub).toBe('Surf · Sandbridge · no sea forecast')
+  })
+})
+
+describe('one spot drives the beach (Batch Map A1)', () => {
+  const KDH = { lat: 36.0307, lon: -75.6763 }
+  const VB_PICK = { name: 'Virginia Beach', at: { lat: 36.8529, lon: -75.978 } }
+  it('a beach picked at Virginia Beach does not follow the spot to Kill Devil Hills (9 Nov, the menu said "Virginia Beach")', () => {
+    expect(distanceMeters(KDH, VB_PICK.at)).toBeGreaterThan(PICK_HOLDS_KM * 1000)
+    const b = beachFor(KDH, VB_PICK)
+    expect(b).toEqual(nearestBeach(KDH))
+    expect(b?.name).not.toMatch(/Virginia Beach/)
+  })
+  it('a pick near the spot holds; no pick is the nearest beach', () => {
+    const SANDBRIDGE = { name: 'Sandbridge', at: { lat: 36.722, lon: -75.927 } }
+    expect(beachFor({ lat: 36.85, lon: -75.98 }, SANDBRIDGE)).toBe(SANDBRIDGE)
+    expect(beachFor(KDH, null)).toEqual(nearestBeach(KDH))
+    expect(beachFor(null, SANDBRIDGE)).toBeNull()
   })
 })
