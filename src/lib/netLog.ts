@@ -69,3 +69,18 @@ export function netLines(now: number, deviceOnline: boolean, appOnline: boolean,
     .map((e) => `${Math.round((now - e.at) / 1000)}s ago ${e.host}${e.path} → ${e.status} ${e.ms}ms`)
   return [head, ...rows]
 }
+
+/*
+ * BATCH MAP2, SECTION 4: "COPY DEBUG". The last COPY_N requests as plain
+ * text to paste into a message: how long ago, the host, the status and how
+ * long it took. Not the path (a map tile's path is a map cell) and never the
+ * query: nothing about where the phone or the spot is.
+ */
+export const COPY_N = 30
+export function netCopyText(now: number, head: string, n = COPY_N): string {
+  const rows = [...entries]
+    .reverse()
+    .slice(0, n)
+    .map((e) => `${Math.round((now - e.at) / 1000)}s ago · ${e.host} · ${e.status} · ${e.ms} ms`)
+  return [head, ...rows].join('\n')
+}

@@ -482,3 +482,37 @@ input[type='radio'] {
 .fly__modes .fly__seg {
   border-radius: 999px;
 }
+
+/* Batch MAP2, Section 4: the debug lines with their Copy debug button. */
+.netdebug--box {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  max-height: 60%;
+}
+.netdebug__lines {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.netdebug__copy {
+  align-self: flex-start;
+  min-height: 44px;
+}
+.netdebug__note {
+  font-size: var(--text-xs);
+}
+.netdebug__text {
+  width: 100%;
+  min-height: 120px;
+  font: inherit;
+  font-size: var(--text-xs);
+}
