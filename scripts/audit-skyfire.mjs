@@ -139,10 +139,11 @@ try {
            * lowest layer with the forecast's low·mid·high under it, and the
            * spoken line has both, and that the models split.
            */
-          if (chip.label !== 'CLOUD · KNTU') fail(`${label}: near now the chip's label is "${chip.label}", not the station's`)
-          if (chip.value !== 'BKN 3.0k') fail(`${label}: near now the chip's value "${chip.value}" is not KNTU's lowest layer`)
+          /* Batch Map, Section 0: the pill in plain words, "CLOUD Overcast at KNTU": the most cover of KNTU's groups (BKN 3,000 ft under an OVC deck), src/core/cloudWords.ts. */
+          if (chip.label !== 'CLOUD') fail(`${label}: near now the chip's label is "${chip.label}", not CLOUD`)
+          if (chip.value !== 'Overcast') fail(`${label}: near now the chip's value "${chip.value}" is not KNTU's sky in words (Overcast)`)
           if (!chip.fits) fail(`${label}: the chip's value is cut off`)
-          if (!/^fcst (\d+|—)·(\d+|—)·(\d+|—)$/.test(chip.note ?? '')) fail(`${label}: the forecast is not under the station on the chip (${chip.note})`)
+          if (chip.note !== 'at KNTU') fail(`${label}: the station is not named under the value (${chip.note})`)
           if (!/^Station KNTU: broken at 3,000 ft/.test(chip.spoken ?? '') || !/Forecast: Low \d+ · Mid \d+ · High \d+, models split/.test(chip.spoken ?? '')) fail(`${label}: the chip does not say the station and the forecast in words (${chip.spoken})`)
         }
       }

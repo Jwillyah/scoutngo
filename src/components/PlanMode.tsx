@@ -1,4 +1,6 @@
 import { NetDebug } from './NetDebug.tsx'
+import { cloudWord, stationCloudWord } from '../core/cloudWords.ts'
+import { compass } from '../lib/tideWords.ts'
 import { ExposurePage } from './ExposurePage.tsx'
 import { CalendarPage } from './CalendarPage.tsx'
 import { ScanOffer } from './ScanOffer.tsx'
@@ -157,8 +159,8 @@ import { classificationOf } from '../core/lighting.ts'
 import { LightNowBlock } from './LightNowBlock.tsx'
 import { getMoonArc } from '../core/moonArc.ts'
 import type { SkyTab } from '../lib/skyTab.ts'
-import { cloudTriple, layersLine, modelsSplit } from '../core/skyFire.ts'
-import { chipSky, layersWords } from '../core/metar.ts'
+import { layersLine, modelsSplit } from '../core/skyFire.ts'
+import { layersWords } from '../core/metar.ts'
 import { useStationNow } from '../lib/useStationNow.ts'
 import { fetchModelLows, nearestHour } from '../lib/skyFireData.ts'
 import { useWeatherBusy, useWeatherEpoch } from '../lib/useWeatherStatus.ts'
@@ -1593,7 +1595,8 @@ export function PlanMode({
          * reading, which is right in a sentence and wrong on a chip -- see
          * the note on Chip.value in ChipRow.tsx.
          */
-        value: groundWind === null ? null : formatWind(groundWind, units.wind),
+        /* Batch Map, Section 0: "9 kt W", the speed and where it is from (board MapChrome). */
+        value: groundWind === null ? null : `${formatWind(groundWind, units.wind)}${wind === null ? '' : ` ${compass(wind.fromDegrees)}`}`,
         urgent: overRated,
         age: groundWind === null ? null : age,
       },
@@ -1604,18 +1607,19 @@ export function PlanMode({
       stationSkyNow !== null
         ? {
             kind: 'cloud' as const,
-            label: `CLOUD · ${stationSkyNow.sky.station}`,
+            /* Batch Map, Section 0: plain words ("Cloud: None"), not METAR groups; the card has the layers. */
+            label: 'CLOUD',
             shortLabel: 'CLOUD',
-            value: chipSky(stationSkyNow.sky),
+            value: stationCloudWord(stationSkyNow.sky),
             spoken: `Station ${stationSkyNow.sky.station}: ${layersWords(stationSkyNow.sky)}.${layers === null ? '' : ` Forecast: ${layersLine(layers)}${split ? ', models split' : ''}.`}`,
-            note: layers === null ? 'station' : `fcst ${cloudTriple(layers)}`,
+            note: `at ${stationSkyNow.sky.station}`,
             age: null,
           }
         : {
             kind: 'cloud' as const,
-            label: 'CLOUD L·M·H',
+            label: 'CLOUD',
             shortLabel: 'CLOUD',
-            value: cloudPct === null || layers === null ? null : cloudTriple(layers),
+            value: cloudPct === null || layers === null ? null : cloudWord(layers),
             spoken: layers === null ? undefined : `Cloud: ${layersLine(layers)}${split ? ', models split' : ''}`,
             note: split ? 'models split' : undefined,
             age: cloudPct === null ? null : age,
@@ -1624,8 +1628,9 @@ export function PlanMode({
       ...(!groups.water && place === 'inland' ? [] : [{
         kind: 'tide' as const,
         /* The next turn after the time on the bar, high or low: never one that has passed (29 Oct). */
-        label: nextTurn === null ? 'TIDE' : nextTurn.kind === 'high' ? 'HIGH TIDE' : 'LOW TIDE',
-        value: nextTurn === null ? null : clock(nextTurn.at),
+        /* Batch Map, Section 0: "TIDE · Low 1:33" (board MapChrome). */
+        label: 'TIDE',
+        value: nextTurn === null ? null : `${nextTurn.kind === 'high' ? 'High' : 'Low'} ${clock(nextTurn.at)}`,
         /* The zone is the unit of a clock time, said only away from the phone's own zone; see Chip.unit. */
         ...(venueWindow === null || venueWindow.timeZoneShort === '' ? {} : { unit: venueWindow.timeZoneShort }),
       }]),
@@ -1983,7 +1988,8 @@ export function PlanMode({
    * Map & layers sheet and every dock button is here, in the menu, or on the
    * time sheet (Back to now is its ↺); see FeaturesSheet.tsx.
    */
-  const COLOR = { storm: '#e0567a', shoot: '#e8a33a', drone: '#3fa0d8', map: '#5b7f9e' }
+  /* Batch Map, Section 0: the icon tiles in the token roles, not their own hexes. */
+  const COLOR = { storm: 'var(--tile-shoot)', shoot: 'var(--caution)', drone: 'var(--tile-fish)', map: 'var(--surface-3)' }
   /* Batch N C1: the photo layers only when Shoot is picked, or nothing is yet (src/lib/activities.ts). */
   const [picked] = useActivities()
   const photoTools = showsPhotoTools(picked)

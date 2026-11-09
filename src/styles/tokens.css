@@ -427,3 +427,45 @@
     --motion-slow: 0ms;
   }
 }
+
+/*
+ * ONE SCOUTNGO STYLE (Batch Map, Section 0; board docs/mockups/StyleGuide.png).
+ * The home's sky is the whole app's ground: the near-black surfaces above
+ * become the sky's own blues, so every sheet, panel and page that read them
+ * is on the sky now, not black. Glass is white at 15% with a 22% edge and
+ * 22 px corners; over the map it is the sky's top at 72%. The board's
+ * meaning colours: good / offshore teal, light / caution amber, onshore /
+ * strong orange; red stays the hazard and nothing else (--hazard above).
+ */
+:root {
+  --sky-top: #1d3b6c;
+  --sky-mid: #2f5a92;
+  --sky-low: #5c8cc0;
+  --sky-ink: #141821; /* dark type on white: an active chip, a primary button */
+  --ink-2: #5b6472; /* the quieter type on a white card (the home's best windows) */
+  --sky-sheet: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 55%, var(--sky-low) 100%);
+  --glass: rgb(255 255 255 / 0.15);
+  --glass-strong: rgb(255 255 255 / 0.28);
+  --glass-edge: rgb(255 255 255 / 0.22);
+  --glass-ink-2: rgb(255 255 255 / 0.72);
+  --map-glass: rgb(29 59 108 / 0.72); /* --sky-top, over imagery */
+  --radius-glass: 22px;
+  --good: #2bb3a0;
+  --caution: #e8b04a;
+  --strong: #ef8a4a;
+  /* The activity tiles (What I do): surf --good, drone --strong, weather --caution, and these two. */
+  --tile-shoot: #b155d6;
+  --tile-fish: #2f74c8;
+  --tile-surf: #17a38b;
+  --tile-drone: #df7a2c;
+  --tile-weather: #e9a92a;
+
+  --surface-1: #24477c;
+  --surface-2: #2f5a92;
+  --surface-3: #4a72a6;
+  --surface-raised: #24477c;
+  --edge-top: #6f95c4;
+  --color-bg: var(--sky-top);
+  --panel-sheen: var(--sky-sheet);
+  --panel-sheen-2: linear-gradient(180deg, var(--sky-mid) 0%, var(--surface-1) 100%);
+}
