@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bestRun, bestWindows, cardList, conditionOf, nothingLine, rainLine, spanWords, stripSteps, weekHeadline } from '../src/core/homeDay.ts'
+import { bestRun, bestWindows, cardList, colorWords, conditionOf, sideWords, nothingLine, rainLine, spanWords, stripSteps, weekHeadline } from '../src/core/homeDay.ts'
 import { homeOrder, primaryFor, reviveActivities, showsDrone, showsPhotoTools } from '../src/lib/activities.ts'
 
 /*
@@ -96,11 +96,21 @@ describe('what you do orders the home, and hides only tools', () => {
     expect(primaryFor(['weather'])).toBe('radar')
   })
   it('cards: the picked ones first, every card still there (the drone only with a drone)', () => {
-    expect(cardList(['fish'], false, 99)).toEqual(['wind', 'tide', 'surf', 'sunset', 'moon'])
-    expect(cardList(['shoot', 'surf'], true, 99)).toEqual(['sunset', 'moon', 'surf', 'wind', 'tide', 'drone'])
-    /* Batch N: four on the home, as the boards (Home8S surfer: Surf, Wind, Tide, Sunset). */
-    expect(cardList(['surf', 'weather'], false)).toEqual(['surf', 'wind', 'tide', 'sunset'])
-    expect(cardList(['fish'], false)).toEqual(['wind', 'tide', 'surf', 'sunset'])
+    expect(cardList(['fish'], false, 99)).toEqual(['wind', 'tide', 'surf', 'sky', 'moon'])
+    expect(cardList(['shoot', 'surf'], true, 99)).toEqual(['sky', 'moon', 'surf', 'wind', 'tide', 'drone'])
+    /* Batch Pages, Section 1: all six on the home (board HomeV9: Surf, Wind, Tide, Sky, Drone, Moon), in the picker's order. */
+    expect(cardList(['surf', 'drone'], true)).toEqual(['surf', 'wind', 'tide', 'drone', 'sky', 'moon'])
+    expect(cardList(['surf', 'weather'], false)).toEqual(['surf', 'wind', 'tide', 'sky', 'moon'])
+    expect(cardList(['fish'], false)).toEqual(['wind', 'tide', 'surf', 'sky', 'moon'])
+  })
+  it('the colour call and the wind to the beach in words', () => {
+    expect(colorWords('Go')).toBe('color likely')
+    expect(colorWords('Maybe')).toBe('color possible')
+    expect(colorWords('Skip')).toBe('color unlikely')
+    expect(colorWords(null)).toBeNull()
+    expect(sideWords('Cross')).toBe('cross-shore')
+    expect(sideWords('Offshore')).toBe('offshore')
+    expect(sideWords('Onshore')).toBe('onshore')
   })
   it('a stored list is read tolerantly', () => {
     expect(reviveActivities('["surf","nonsense","surf","fish"]')).toEqual(['surf', 'fish'])

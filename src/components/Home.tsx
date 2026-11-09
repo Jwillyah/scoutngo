@@ -4,7 +4,7 @@ import { getMoonPosition, getPosition } from 'suncalc'
 import { moonTimesOnLocalDay } from '../core/moonTimes.ts'
 import { droneTag, kt, surfTag, windTag, type CallRead } from '../core/briefing.ts'
 import { droneWindow } from '../core/droneWindow.ts'
-import { bestRun, bestWindows, cardList, conditionOf, groundOf, nothingLine, rainLine, spanWords, stripSteps, weekHeadline, type Activity, type CardKind, type SkyIcon, type WindowRow } from '../core/homeDay.ts'
+import { bestRun, bestWindows, cardList, colorWords, conditionOf, groundOf, sideWords, nothingLine, rainLine, spanWords, stripSteps, weekHeadline, type Activity, type CardKind, type WindowRow } from '../core/homeDay.ts'
 import { camsFacingWaterOrSun } from '../core/skyCams.ts'
 import { wakeAt } from '../core/alertIcs.ts'
 import { formatClock } from '../core/timezone.ts'
@@ -28,6 +28,7 @@ import { ActivityIcon } from './ActivityIcon.tsx'
 import { MoonGlyph } from './MoonGlyph.tsx'
 import { CamsSheet } from './CamsSheet.tsx'
 import { OPEN_RADAR_EVENT } from './WeatherTab.tsx'
+import { SkyIconSvg } from './SkyIconSvg.tsx'
 
 /*
  * THE HOME (Batch M, Section 3; boards "HOME 8 Nov · surfer / shooter").
@@ -53,7 +54,7 @@ import { OPEN_RADAR_EVENT } from './WeatherTab.tsx'
  * never instructions (rule 28). It fits 390 x 844 and 412 x 915 on a calm
  * day with nothing scrolled (scripts/audit-briefing.mjs).
  */
-export type HomeTarget = 'surf' | 'wind' | 'tides' | 'fire' | 'preflight' | 'moon' | 'weather'
+export type HomeTarget = 'surf' | 'wind' | 'tides' | 'sky' | 'preflight' | 'moon' | 'weather'
 
 interface HomeProps {
   venue: { lat: number; lon: number }
@@ -239,63 +240,6 @@ interface DayViewProps {
   obs: StationObs | null
 }
 
-const ICON: Record<SkyIcon, ReactNode> = {
-  sun: (
-    <>
-      <circle cx="12" cy="12" r="4.5" />
-      <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" />
-    </>
-  ),
-  moon: <path d="M15 4a8 8 0 1 0 5 14A7 7 0 0 1 15 4z" />,
-  partly: (
-    <>
-      <circle cx="9" cy="9" r="3.5" />
-      <path d="M9 2.5v1.5M2.5 9H4M4.4 4.4l1 1M13.6 4.4l-1 1" />
-      <path d="M8 19h9.5a3.5 3.5 0 0 0 .3-7A5 5 0 0 0 8.5 13 3 3 0 0 0 8 19z" />
-    </>
-  ),
-  'partly-night': (
-    <>
-      <path d="M11 3.5a5 5 0 0 0 4 7.8 5 5 0 0 1-4-7.8z" />
-      <path d="M7 19h9.5a3.5 3.5 0 0 0 .3-7A5 5 0 0 0 7.5 13 3 3 0 0 0 7 19z" />
-    </>
-  ),
-  cloud: <path d="M6.5 18h11a4 4 0 0 0 .4-8 5.5 5.5 0 0 0-10.6 1.3A3.4 3.4 0 0 0 6.5 18z" />,
-  fog: <path d="M4 9h16M3 13h18M5 17h14" />,
-  drizzle: (
-    <>
-      <path d="M6.5 14h11a4 4 0 0 0 .4-8 5.5 5.5 0 0 0-10.6 1.3A3.4 3.4 0 0 0 6.5 14z" />
-      <path d="M9 17.5v1M13 17.5v1M17 17.5v1" />
-    </>
-  ),
-  rain: (
-    <>
-      <path d="M6.5 14h11a4 4 0 0 0 .4-8 5.5 5.5 0 0 0-10.6 1.3A3.4 3.4 0 0 0 6.5 14z" />
-      <path d="M8.5 16.5l-1 3M12.5 16.5l-1 3M16.5 16.5l-1 3" />
-    </>
-  ),
-  snow: (
-    <>
-      <path d="M6.5 14h11a4 4 0 0 0 .4-8 5.5 5.5 0 0 0-10.6 1.3A3.4 3.4 0 0 0 6.5 14z" />
-      <path d="M9 18h.01M13 18h.01M17 18h.01M11 21h.01M15 21h.01" />
-    </>
-  ),
-  storm: (
-    <>
-      <path d="M6.5 13h11a4 4 0 0 0 .4-8 5.5 5.5 0 0 0-10.6 1.3A3.4 3.4 0 0 0 6.5 13z" />
-      <path d="M12.5 14l-2.5 4h3l-2 4" />
-    </>
-  ),
-}
-
-function SkyIconSvg({ icon, className }: { icon: SkyIcon; className: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
-      {ICON[icon]}
-    </svg>
-  )
-}
-
 function DayView({ which, brief, day, order, venue, timeZone, units, drone, now, alert, stormLine, onOpen, onDebug, placeName, surf, obs }: DayViewProps) {
   const clock = (d: Date | null) => (d === null ? '—' : formatClock(d, timeZone))
   const wx = brief.wx
@@ -354,7 +298,10 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
           <p className="hwx__date" onClick={(e) => (e.detail >= 3 ? onDebug?.() : undefined)}>
             {dateWords}
           </p>
-          <p className="hwx__temp num">{bigTemp === null ? (loading ? '…' : '—') : temp(bigTemp)}</p>
+          {/* Batch Pages, Section 1: the temperature, the hourly strip and "Weather ›" open the Weather page. */}
+          <button type="button" className="hwx__temp num" onClick={() => onOpen('weather')} aria-label={`${bigTemp === null ? 'No temperature' : temp(bigTemp)}: the weather`}>
+            {bigTemp === null ? (loading ? '…' : '—') : temp(bigTemp)}
+          </button>
         </div>
         <div className="hwx__side">
           <p className="hwx__cond">
@@ -366,10 +313,13 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
             {speed(windMps)}
           </p>
           <p className="hwx__line hwx__rain">{rain ?? '—'}</p>
+          <button type="button" className="hwx__more" onClick={() => onOpen('weather')}>
+            Weather ›
+          </button>
         </div>
       </div>
       {stormLine === null ? null : <p className="hday__storm">{stormLine}</p>}
-      <ol className="hstrip">
+      <ol className="hstrip" onClick={() => onOpen('weather')}>
         {steps.map((s) => {
           const t = at('temperature_2m', s.at)
           const c = conditionOf(at('weather_code', s.at), s.kind === 'sunrise' || getPosition(s.at, venue.lat, venue.lon).altitude > -0.8)
@@ -455,7 +405,7 @@ function windowRows(which: 'today' | 'tomorrow', day: DayBrief, order: readonly 
     const mid = surfRun.values[Math.floor(surfRun.values.length / 2)].at
     const w = day.wind.reduce((a, b) => (Math.abs(b.at.getTime() - mid.getTime()) < Math.abs(a.at.getTime() - mid.getTime()) ? b : a), day.wind[0])
     const side = windTag(w?.fromDeg ?? null, facing)
-    rows.surf = { activity: 'surf', head: `Surf ${spanWords(surfRun.from, surfRun.to, timeZone)}`, reason: `${ft} ft${side === null ? '' : `, ${side.toLowerCase()}`}` }
+    rows.surf = { activity: 'surf', head: `Surf ${spanWords(surfRun.from, surfRun.to, timeZone)}`, reason: `${ft} ft${side === null ? '' : `, ${sideWords(side)}`}` }
   }
 
   /* Shoot: the day's colour call still to come, Go or Maybe. */
@@ -574,25 +524,19 @@ function Card({ kind, which, day, brief, units, drone, now, venue, timeZone, onO
     const feet = which === 'today' ? (day?.tide?.nowFeet ?? null) : null
     const going = next === null ? null : next.kind === 'high' ? 'rising' : 'falling'
     line = going === null ? null : feet === null ? going : `${feet.toFixed(1)} ft now · ${going}`
-  } else if (kind === 'sunset') {
-    target = 'fire'
-    /* Batch N E4: after tonight's sunset, the next event: tomorrow's sunrise color. */
+  } else if (kind === 'sky') {
+    /* Batch Pages, Section 1 (board HomeV9): the Sky card is the sunset (or, after it, tomorrow's sunrise), the colour call in words and one reason; a tap opens the Sky page. */
+    title = 'Sky'
+    target = 'sky'
     const past = which === 'today' && day?.events.sunset != null && now.getTime() > day.events.sunset.getTime()
     const next = past ? (brief.days[1] ?? null) : null
-    if (past) {
-      const read = next?.reads.sunrise ?? null
-      title = 'Sunrise'
-      big = next?.events.sunrise == null ? '—' : clock(next.events.sunrise)
-      line = read === null ? null : `tomorrow · ${shortWhy(read.why)}`
-      tag = read?.call ?? null
-    } else {
-      const read = day?.reads.sunset ?? null
-      title = 'Sunset'
-      big = day?.events.sunset == null ? '—' : clock(day.events.sunset)
-      /* Tomorrow: when the call is settled, an hour before, from the stations (the briefing's own rule). */
-      line = which === 'tomorrow' && day?.events.sunset != null ? `final call ${clock(new Date(day.events.sunset.getTime() - 3_600_000))}` : read === null ? null : shortWhy(read.why)
-      tag = read?.call ?? null
-    }
+    const read = past ? (next?.reads.sunrise ?? null) : (day?.reads.sunset ?? null)
+    const at = past ? (next?.events.sunrise ?? null) : (day?.events.sunset ?? null)
+    big = at == null ? '—' : `${past ? 'Sunrise' : 'Sunset'} ${clock(at).replace(/ [AP]M$/, '')}`
+    const said = colorWords(read?.call ?? null)
+    /* Tomorrow: when the call is settled, an hour before, from the stations (the briefing's own rule). */
+    line = which === 'tomorrow' && at != null ? `${said ?? 'no call yet'} · final call ${clock(new Date(at.getTime() - 3_600_000))}` : read === null ? null : [said, shortWhy(read.why)].filter((x) => x !== null && x !== '').join(' · ')
+    tag = read?.call ?? null
   } else if (kind === 'drone') {
     title = 'Drone'
     target = 'preflight'
@@ -637,7 +581,7 @@ function windSideSpan(day: DayBrief | null, facing: number | null, now: Date | n
   if (first === undefined || first.side === null) return null
   const change = sides.find((s) => s.side !== first.side && s.side !== null)
   const hour = (d: Date) => formatClock(new Date(d.getTime() - 1_800_000), timeZone).replace(/:00 /, ' ')
-  return change === undefined ? `${first.side} all day` : `${first.side} until ${hour(change.at)}`
+  return change === undefined ? `${sideWords(first.side)} all day` : `${sideWords(first.side)} until ${hour(change.at)}`
 }
 
 /* ------------------------------------------------------------- the week */

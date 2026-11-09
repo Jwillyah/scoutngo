@@ -450,6 +450,13 @@
   --map-light-casing: #c9d3df;
   --map-light-building: #dde3ea; /* the quieter type on a white card (the home's best windows) */
   --sky-sheet: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 55%, var(--sky-low) 100%);
+  /*
+   * A map sheet stands half off the screen: in percentages its gradient was
+   * all navy where it shows (Batch Pages, Section 1: the Sky sheet read
+   * #1f3f70 at the top and much the same at the foot). The same three
+   * stops in pixels, so the part on screen carries the whole sky.
+   */
+  --sky-sheet-map: linear-gradient(180deg, var(--sky-top) 0, var(--sky-mid) 220px, var(--sky-low) 460px, var(--sky-low) 100%);
   --glass: rgb(255 255 255 / 0.15);
   --glass-strong: rgb(255 255 255 / 0.28);
   --glass-edge: rgb(255 255 255 / 0.22);

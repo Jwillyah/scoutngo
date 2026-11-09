@@ -33,7 +33,8 @@ import { layerWords, type DeckTruth } from './layerTruth.ts'
 import type { GapRead } from './gapWatch.ts'
 import { underLitWindow } from './underLight.ts'
 import { LAYER_WORD } from './skyColour.ts'
-import { sizeWords } from './surfShoot.ts'
+import { rangeSizeWords } from './surfReads.ts'
+import { rangeEnds } from './surfRange.ts'
 import type { SurfShape } from './surf.ts'
 import { curveFromExtremes, levelAt, type TideExtreme } from './tide.ts'
 
@@ -231,13 +232,18 @@ export function surfTag(faceFt: number, shape: SurfShape | null): SurfTag {
   return (['Flat', 'Fun', 'Firing'] as const)[step]
 }
 
-/** "2-3 ft, waist to chest, 9 s": the day's faces low to high, in words by the biggest, its period. */
+/**
+ * "2–3 ft, knee to waist, 9 s": the day's faces low to high, the size words
+ * from the same two ends (Batch Pages, Section 1: one size function, Batch
+ * MAP2's rangeSizeWords; the old one said "waist to chest" from the biggest
+ * face alone, so "1–4 ft" read "waist to chest").
+ */
 export function surfLine(bars: readonly SurfBar[], periodAtMax: number | null): string | null {
   if (bars.length === 0) return null
   const lo = Math.min(...bars.map((b) => b.faceFt))
   const hi = Math.max(...bars.map((b) => b.faceFt))
-  const range = Math.round(lo) === Math.round(hi) ? `${Math.round(hi)} ft` : `${Math.round(lo)}-${Math.round(hi)} ft`
-  return `${range}, ${sizeWords(hi)}${periodAtMax === null ? '' : `, ${Math.round(periodAtMax)} s`}`
+  const [a, b] = rangeEnds(lo, hi)
+  return `${a}–${b} ft, ${rangeSizeWords(lo, hi)}${periodAtMax === null ? '' : `, ${Math.round(periodAtMax)} s`}`
 }
 
 /* ------------------------------------------------------------------- wind */

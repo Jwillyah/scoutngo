@@ -104,7 +104,9 @@ describe('the parts', () => {
 
   it('surf in words from the bars', () => {
     const at = new Date('2026-11-02T15:00:00Z')
-    expect(surfLine([{ at, faceFt: 2.2, clean: true, shape: 'Clean' }, { at, faceFt: 3.1, clean: false, shape: 'Bumpy' }], 9.2)).toBe('2-3 ft, waist to chest, 9 s')
+    expect(surfLine([{ at, faceFt: 2.2, clean: true, shape: 'Clean' }, { at, faceFt: 3.1, clean: false, shape: 'Bumpy' }], 9.2)).toBe('2–3 ft, knee to waist, 9 s')
+    /* Batch Pages, Section 1: "1–4 ft" is "ankle to chest", from both ends, never "waist to chest" from the biggest alone. */
+    expect(surfLine([{ at, faceFt: 1.2, clean: true, shape: 'Clean' }, { at, faceFt: 3.8, clean: true, shape: 'Clean' }], null)).toBe('1–4 ft, ankle to chest')
     expect(surfLine([], null)).toBeNull()
   })
 

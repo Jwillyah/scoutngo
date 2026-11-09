@@ -158,18 +158,32 @@ export function weekHeadline(best: readonly { day: string; what: string }[]): st
 
 /* ------------------------------------------------------------- the cards */
 
-export type CardKind = 'surf' | 'wind' | 'tide' | 'sunset' | 'drone' | 'moon'
+export type CardKind = 'surf' | 'wind' | 'tide' | 'sky' | 'drone' | 'moon'
 
-/** Four on the home (boards Home8S / Home8J); the rest are one tap deeper (their pages, the menu). */
-export const HOME_CARDS = 4
+/**
+ * Six on the home (Batch Pages, Section 1; board HomeV9): Surf · Wind · Tide
+ * · Sky · Drone · Moon. The tall phone's spare height goes to them, never to
+ * gaps. Sky is the old Sunset card: the time, the colour call and one reason.
+ */
+export const HOME_CARDS = 6
 
 /** The cards in the picker's order: each activity's own first, then the rest; the drone only when picked or in the kit; the first HOME_CARDS shown. */
 export function cardList(order: readonly Activity[], drone: boolean, max = HOME_CARDS): CardKind[] {
-  const own: Record<Activity, CardKind[]> = { surf: ['surf', 'wind', 'tide'], shoot: ['sunset', 'moon'], drone: ['drone', 'wind'], fish: ['wind', 'tide'], weather: ['wind', 'tide'] }
+  const own: Record<Activity, CardKind[]> = { surf: ['surf', 'wind', 'tide'], shoot: ['sky', 'moon'], drone: ['drone', 'wind'], fish: ['wind', 'tide'], weather: ['wind', 'tide'] }
   const list: CardKind[] = []
   for (const a of order) for (const c of own[a]) if (!list.includes(c)) list.push(c)
-  for (const c of ['surf', 'wind', 'tide', 'sunset', 'drone', 'moon'] as const) if (!list.includes(c)) list.push(c)
+  for (const c of ['surf', 'wind', 'tide', 'sky', 'drone', 'moon'] as const) if (!list.includes(c)) list.push(c)
   return list.filter((c) => c !== 'drone' || drone).slice(0, max)
+}
+
+/** The colour call in words (board HomeV9 / SkyPage): Go is likely, Maybe possible, Skip unlikely; no call, null. */
+export function colorWords(call: 'Go' | 'Maybe' | 'Skip' | null): string | null {
+  return call === 'Go' ? 'color likely' : call === 'Maybe' ? 'color possible' : call === 'Skip' ? 'color unlikely' : null
+}
+
+/** The wind to the beach in words: "cross-shore", never the bare "cross" (Batch Pages, Section 1). */
+export function sideWords(tag: 'Offshore' | 'Cross' | 'Onshore'): string {
+  return tag === 'Cross' ? 'cross-shore' : tag.toLowerCase()
 }
 
 /* ------------------------------------------------------------- the ground */

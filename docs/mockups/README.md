@@ -11,3 +11,4 @@ Numbers in them are samples; build to the layout, compute the real values.
 - O1 / O2 / O3: Batch O deeper screens (not picked yet)
 - StyleGuide / MapChrome / FeaturesV3: one style everywhere, world rain layer, Features v3 (batch-map.md; FeaturesV3 replaces FeaturesV2)
 - SettingsV2: Settings cleanup (batch-map.md Section 6)
+- HomeV9 / WeatherPage / SkyPage / CalendarV2: batch-pages.md

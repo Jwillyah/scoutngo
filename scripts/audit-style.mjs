@@ -14,6 +14,9 @@
  *            buttons, and are not counted)
  *   black    a sheet, page or dialog on a near-black ground (the board: the
  *            sky gradient, never black)
+ *   flat     a sheet, page or dialog on one flat navy fill (Batch Pages,
+ *            Section 1: the map sheets, the menu and the calendar read
+ *            #1d3b6c flat; the board: the sky gradient, top to low)
  *   colour   a text, fill or edge colour that is not in the token set
  *            (src/styles/tokens.css, every hex in it, and white or black at
  *            any opacity)
@@ -30,6 +33,10 @@ import { ensureApp, findChrome, goToStage, guardAudit, startWatchdog, APP_ORIGIN
 import { shareLink } from '../src/lib/planShare.ts'
 import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
 import { placeKey } from '../src/core/venueName.ts'
+import { decodePng } from '../src/lib/png.ts'
+
+/* The sky gradient's top-to-foot change on screen is far more than this, per channel (#1d3b6c to #5c8cc0 is 63, 81, 84). */
+const FLAT_STEP = 30
 
 guardAudit('style')
 const watchdog = startWatchdog('style', 600_000)
@@ -58,12 +65,12 @@ const READ = (tokens) => `JSON.stringify((() => {
   const hex = (c) => [c.r, c.g, c.b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')
   const lum = (c) => (0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b) / 255
   const vis = (e, b, st) => b.width > 0 && b.height > 0 && st.visibility !== 'hidden' && st.display !== 'none' && b.bottom > 0 && b.top < innerHeight && b.right > 0 && b.left < innerWidth && Number(st.opacity) > 0.05
-  const out = { mono: new Set(), square: new Set(), black: new Set(), colour: {} }
+  const out = { mono: new Set(), square: new Set(), black: new Set(), flat: new Set(), colour: {} }
   const off = (where, c) => { if (c === null || c.a < 0.05) return; const h = hex(c); if (TOKENS.has(h)) return; if ((c.r === c.g && c.g === c.b) && (c.r === 255 || c.r === 0)) return; (out.colour[h] ??= new Set()).add(where) }
   /* The screen on top: the last open page, sheet or dialog that covers half the screen; else everything. */
   const tops = [...document.querySelectorAll('[role="dialog"]')].filter((d) => { const b = d.getBoundingClientRect(); return b.height > innerHeight * 0.5 && getComputedStyle(d).display !== 'none' })
   const root = tops.at(-1) ?? document.body
-  for (const e of root.querySelectorAll('*')) {
+  for (const e of [root, ...root.querySelectorAll('*')]) {
     if (e.closest('canvas, .maplibregl-canvas-container, .maplibregl-marker, svg:not(:root) *, [data-map-art], .netdebug')) continue
     if (e.tagName === 'svg' || e.tagName === 'CANVAS' || e.tagName === 'IMG' || e.tagName === 'VIDEO') continue
     const b = e.getBoundingClientRect()
@@ -86,12 +93,18 @@ const READ = (tokens) => `JSON.stringify((() => {
     /* Batch MAP2, Section 3: any surface covering most of the screen, not only a dialog or a sheet (the Viewfinder's start was black and passed). */
     const sheet = e.getAttribute('role') === 'dialog' || /(^|[ _-])(sheet|page|dialog)( |$|__body$)/.test(e.getAttribute('class') ?? '') || (b.width > innerWidth * 0.8 && b.height > innerHeight * 0.5)
     if (sheet && b.height > innerHeight * 0.25 && st.backgroundImage === 'none' && bg !== null && bg.a > 0.6 && lum(bg) < 0.12) out.black.add(name(e) + ' ' + hex(bg))
+    /* Batch Pages, Section 1: the big surfaces, where they are on screen; their pixels are read below (a gradient taller than the screen shows only its navy top). Not a see-through overlay that takes no taps (the map's sun tint): its pixels are the map's. */
+    if (sheet && b.height > innerHeight * 0.25 && e !== document.body && e.id !== 'root' && e.querySelector('canvas') === null && st.pointerEvents !== 'none' && (st.backgroundImage !== 'none' || (bg !== null && bg.a > 0.6))) {
+      const top = Math.max(0, b.top)
+      const bottom = Math.min(innerHeight, b.bottom)
+      if (bottom - top > innerHeight * 0.3) out.flat.add(JSON.stringify({ n: name(e), x: Math.max(0, b.left) + 3, top: top + 30, bottom: bottom - 30 }))
+    }
   }
-  return { mono: [...out.mono], square: [...out.square], black: [...out.black], colour: Object.fromEntries(Object.entries(out.colour).map(([k, v]) => [k, [...v].slice(0, 3)])) }
+  return { mono: [...out.mono], square: [...out.square], black: [...out.black], flat: [...out.flat], colour: Object.fromEntries(Object.entries(out.colour).map(([k, v]) => [k, [...v].slice(0, 3)])) }
 })())`
 
 let problems = 0
-const totals = { mono: 0, square: 0, black: 0, colour: 0 }
+const totals = { mono: 0, square: 0, black: 0, flat: 0, colour: 0 }
 const report = []
 const browser = await webkit.launch()
 try {
@@ -139,18 +152,41 @@ try {
   const look = async (screen) => {
     await wait(800)
     const r = JSON.parse(await ev(READ([...TOKENS])))
-    await page.screenshot({ path: join(OUT, `${screen.replace(/\W+/g, '-')}.png`) })
+    const png = await page.screenshot({ path: join(OUT, `${screen.replace(/\W+/g, '-')}.png`) })
+    /*
+     * FLAT NAVY (Batch Pages, Section 1): a big surface whose pixels are the
+     * same blue at the top and the bottom of what is on screen. The sky
+     * gradient changes by far more than FLAT_STEP from top to bottom.
+     */
+    const px = await decodePng(png)
+    const k = px.width / (await ev('innerWidth'))
+    const at = (x, y) => {
+      const i = (Math.round(y * k) * px.width + Math.round(x * k)) * 4
+      return [px.data[i], px.data[i + 1], px.data[i + 2]]
+    }
+    r.flat = r.flat
+      .map((j) => JSON.parse(j))
+      .filter((f) => {
+        const a = at(f.x, f.top)
+        const z = at(f.x, f.bottom)
+        f.top = a
+        f.bottom = z
+        return Math.max(...a.map((v, i) => Math.abs(v - z[i]))) < FLAT_STEP && a[2] > a[0] + 20
+      })
+      .map((f) => `${f.n} #${f.top.map((v) => v.toString(16).padStart(2, '0')).join('')} top, #${f.bottom.map((v) => v.toString(16).padStart(2, '0')).join('')} at the foot`)
     const colours = Object.keys(r.colour).length
-    console.log(`\n### ${screen}: mono ${r.mono.length} · square ${r.square.length} · black ${r.black.length} · colours outside the set ${colours}`)
+    console.log(`\n### ${screen}: mono ${r.mono.length} · square ${r.square.length} · black ${r.black.length} · flat ${r.flat.length} · colours outside the set ${colours}`)
     for (const m of r.mono.slice(0, 6)) console.log(`      PROBLEM mono: ${m}`)
     for (const s of r.square.slice(0, 6)) console.log(`      PROBLEM square: ${s}`)
     for (const s of r.black) console.log(`      PROBLEM black: ${s}`)
+    for (const s of r.flat) console.log(`      PROBLEM flat navy: ${s}`)
     for (const [h, w] of Object.entries(r.colour).slice(0, 8)) console.log(`      PROBLEM colour #${h}: ${w.join(', ')}`)
     totals.mono += r.mono.length
     totals.square += r.square.length
     totals.black += r.black.length
+    totals.flat += r.flat.length
     totals.colour += colours
-    report.push({ screen, mono: r.mono.length, square: r.square.length, black: r.black.length, colour: colours })
+    report.push({ screen, mono: r.mono.length, square: r.square.length, black: r.black.length, flat: r.flat.length, colour: colours })
   }
 
   const closeAll = async () => {
@@ -174,7 +210,14 @@ try {
   await wait(3000)
   await look('menu')
   for (const [what, screen] of [['.mcard--sky', 'sky color'], ['.mcard--drone', 'preflight']]) {
-    if (await tap(`nav[aria-label="Stage"] ${what}`, screen)) await look(screen)
+    if (await tap(`nav[aria-label="Stage"] ${what}`, screen)) {
+      await look(screen)
+      /* Batch Pages, Section 1: the month too (the calendar was flat navy). */
+      if (what === '.mcard--sky' && (await tap('.skyc__tab:has-text("Calendar")', 'calendar'))) {
+        await look('calendar')
+        await tap('.cal__close', 'close the calendar')
+      }
+    }
     await closeAll()
     await tap('button[aria-label="Menu"]', 'menu')
   }
@@ -273,7 +316,7 @@ try {
   watchdog.stop()
 }
 
-problems += totals.mono + totals.square + totals.black + totals.colour
-console.log(`\n${report.map((r) => `${r.screen}: ${r.mono}/${r.square}/${r.black}/${r.colour}`).join('\n')}`)
-console.log(`\n=== STYLE PROBLEMS: ${problems} (mono ${totals.mono}, square ${totals.square}, black ${totals.black}, colours ${totals.colour}) ===`)
+problems += totals.mono + totals.square + totals.black + totals.flat + totals.colour
+console.log(`\n${report.map((r) => `${r.screen}: ${r.mono}/${r.square}/${r.black}/${r.flat}/${r.colour}`).join('\n')}`)
+console.log(`\n=== STYLE PROBLEMS: ${problems} (mono ${totals.mono}, square ${totals.square}, black ${totals.black}, flat navy ${totals.flat}, colours ${totals.colour}) ===`)
 process.exit(problems === 0 ? 0 : 1)

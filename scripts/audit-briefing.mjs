@@ -68,6 +68,9 @@ const FIT = (i) => `JSON.stringify((() => {
   return { out, side, scrolls: pg.scrollHeight > pg.clientHeight + 1, text: pg.innerText, gap: Math.round(foot - last), content: Math.round(pg.scrollHeight), box: Math.round(pg.clientHeight) }
 })())`
 
+/** The most space between two of the home's blocks (board HomeV9: about 16 px). */
+const MAX_GAP = 24
+
 const LOOKS = [
   ['iPhone tab', 'webkit', { width: 390, height: 844 }, { top: 0, bottom: 0 }, true],
   ['iPhone home screen', 'webkit', { width: 390, height: 844 }, { top: 47, bottom: 34 }, true],
@@ -133,7 +136,7 @@ try {
       if (mustFit && name === 'Tomorrow' && t.gap > 200) fail(`${label}: a ${t.gap} px empty gap under Tomorrow's cards`)
       await page.screenshot({ path: join(OUT, `home-${name.toLowerCase()}-${label.replace(/\s/g, '-').toLowerCase()}.png`) })
       if (i <= 1) {
-        const d = JSON.parse(await ev(`JSON.stringify((() => { const pg = document.querySelectorAll('.home__page')[${i}]; return { temp: pg.querySelector('.hwx__temp')?.textContent ?? '', cond: pg.querySelector('.hwx__cond')?.textContent ?? '', lines: [...pg.querySelectorAll('.hwx__line')].map((e) => e.textContent), steps: pg.querySelectorAll('.hstrip__step').length, best: pg.querySelector('.hbest')?.innerText ?? null, cards: [...pg.querySelectorAll('.hcard__title')].map((e) => e.textContent) } })())`))
+        const d = JSON.parse(await ev(`JSON.stringify((() => { const pg = document.querySelectorAll('.home__page')[${i}]; return { temp: pg.querySelector('.hwx__temp')?.textContent ?? '', cond: pg.querySelector('.hwx__cond')?.textContent ?? '', lines: [...pg.querySelectorAll('.hwx__line')].map((e) => e.textContent), steps: pg.querySelectorAll('.hstrip__step').length, best: pg.querySelector('.hbest')?.innerText ?? null, cards: [...pg.querySelectorAll('.hcard__title')].map((e) => e.textContent), weather: pg.querySelector('.hwx__more')?.textContent ?? null, gaps: (() => { const els = ['.hwx', '.hstrip', '.hbest', '.hcards'].map((q) => pg.querySelector(q)).filter((e) => e !== null); return els.slice(1).map((e, k) => ({ between: 'between ' + els[k].className.split(' ')[0] + ' and ' + e.className.split(' ')[0], px: Math.round(e.getBoundingClientRect().top - els[k].getBoundingClientRect().bottom) })) })() } })())`))
         console.log(`  ${name}: ${JSON.stringify(d).slice(0, 300)}`)
         if (!/^-?\d+°$/.test(d.temp)) fail(`${label}, ${name}: the big temperature reads ${JSON.stringify(d.temp)}`)
         if (d.cond.trim() === '' || d.cond.trim() === '—') fail(`${label}, ${name}: no sky word`)
@@ -142,9 +145,13 @@ try {
         if (!d.lines.some((l) => /rain/i.test(l))) fail(`${label}, ${name}: no rain line`)
         if (d.steps !== 6) fail(`${label}, ${name}: ${d.steps} hourly steps, not 6`)
         if (d.best === null || !/Best windows/i.test(d.best) || d.best.split('\n').length < 2) fail(`${label}, ${name}: no best windows card, or an empty one`)
-        /* Four cards (boards Home8S / Home8J); nothing picked yet: Surf, Wind, Tide, Sunset; after sunset Sunset reads Sunrise. */
-        if (d.cards.length !== 4) fail(`${label}, ${name}: ${d.cards.length} cards, not 4`)
+        /* Batch Pages, Section 1 (board HomeV9): all the cards, Surf · Wind · Tide · Sky · Moon with nothing picked (the Drone too with a drone in the kit). */
+        if (d.cards.length < 5) fail(`${label}, ${name}: ${d.cards.length} cards, not 5 or 6`)
         if (d.cards.slice(0, 2).join('|') !== 'Surf|Wind') fail(`${label}, ${name}: the cards lead with ${JSON.stringify(d.cards.slice(0, 2))}`)
+        if (!d.cards.includes('Sky')) fail(`${label}, ${name}: no Sky card (${JSON.stringify(d.cards)})`)
+        /* No big empty gaps between the blocks (9 Nov 3:52 PM: under the temperature, under the hourly, under Best windows): spare height goes to the cards. */
+        for (const g of d.gaps) if (g.px > MAX_GAP) fail(`${label}, ${name}: a ${g.px} px gap ${g.between}`)
+        if (i === 0 && d.weather !== 'Weather ›') fail(`${label}, ${name}: no "Weather ›" under the conditions (${JSON.stringify(d.weather)})`)
       } else {
         const w = JSON.parse(await ev(`JSON.stringify({ head: document.querySelector('.hweek__head')?.textContent ?? null, days: document.querySelectorAll('.hweek__row').length, guesses: document.querySelectorAll('.hweek__row--guess').length })`))
         console.log(`  week: ${JSON.stringify(w)}`)
@@ -208,7 +215,7 @@ try {
       if (kept !== '["fish"]') fail(`the pick was kept as ${JSON.stringify(kept)}`)
       if (after.open) fail('the picker stayed open after Done')
       if (after.cards.slice(0, 2).join('|') !== 'Wind|Tide') fail(`Fish or boat: the cards lead with ${JSON.stringify(after.cards.slice(0, 2))}, not Wind and Tide`)
-      if (after.cards.length !== 4) fail(`Fish or boat: ${after.cards.length} cards, not 4 (the rest one tap deeper)`)
+      if (after.cards.length < 5) fail(`Fish or boat: ${after.cards.length} cards, not 5 or 6 (Batch Pages: every card on the home, the picker's first)`)
       if (after.main !== 'Radar') fail(`Fish or boat: the primary button is ${JSON.stringify(after.main)}`)
       await page.locator('.home .hbtn--round[aria-label="Menu"]').click()
       await wait(800)

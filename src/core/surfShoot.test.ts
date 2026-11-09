@@ -1,12 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { bestWindow, droneOverLineup, faceLight, hourQuality, lensDistance, ratingWord, sizeWords, standToward, type ShootHour } from './surfShoot.ts'
+import { bestWindow, droneOverLineup, faceLight, hourQuality, lensDistance, ratingWord, standToward, type ShootHour } from './surfShoot.ts'
 
 describe('the surf in words', () => {
-  it('says sizes the way surfers do', () => {
-    expect(sizeWords(0.5)).toBe('flat')
-    expect(sizeWords(3.4)).toBe('waist to chest')
-    expect(sizeWords(7)).toBe('overhead')
-  })
   it('rates: Fun needs clean water; messy is poor; no wind forecast is never good', () => {
     expect(ratingWord(3, 'Clean')).toBe('Fun')
     expect(ratingWord(5, 'Clean')).toBe('Good')

@@ -280,6 +280,16 @@ samp {
 .sidemenu__panel {
   background: var(--sky-sheet);
 }
+/* The map's sheets, half on the screen: the gradient in pixels (tokens.css, --sky-sheet-map). */
+.sheet,
+.card2,
+.feat {
+  background: var(--sky-sheet-map);
+}
+/* A card in a sheet is on the sheet's sky: it does not start the gradient again from its own top. */
+.sheet .card2 {
+  background: transparent;
+}
 /* Buttons: pills, never squares. */
 .btn,
 .btn--small,

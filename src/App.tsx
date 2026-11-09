@@ -1552,7 +1552,7 @@ function App() {
       case 'preflight':
         onMenuPick(t)
         return
-      case 'fire':
+      case 'sky':
         onMenuTarget('sky', { skyTab: 'fire' })
         return
       case 'moon':

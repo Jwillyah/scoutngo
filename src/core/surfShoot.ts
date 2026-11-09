@@ -18,18 +18,6 @@
 import { angleApart } from './coastFacing.ts'
 import type { SurfShape } from './surf.ts'
 
-/** Plain sizes for a face height, the way surfers say it. */
-export function sizeWords(faceFt: number): string {
-  if (faceFt < 1) return 'flat'
-  if (faceFt < 2) return 'ankle to knee'
-  if (faceFt < 3) return 'knee to waist'
-  if (faceFt < 4) return 'waist to chest'
-  if (faceFt < 5) return 'chest to shoulder'
-  if (faceFt < 6.5) return 'head high'
-  if (faceFt < 8) return 'overhead'
-  return 'well overhead'
-}
-
 export type HourQuality = 'good' | 'ok' | 'poor'
 
 /**
