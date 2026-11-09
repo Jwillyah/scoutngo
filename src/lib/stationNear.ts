@@ -7,7 +7,7 @@
  */
 import { distanceMeters, type LatLon } from '../core/geo.ts'
 import { parseMetarWind } from '../core/metar.ts'
-import { stationSky } from './skyFireData.ts'
+import { stationSky, type StationSky } from './skyFireData.ts'
 
 export const STATION_KM = 15
 
@@ -33,14 +33,19 @@ export interface StationWind {
   at: string
 }
 
-const cache = new Map<string, { t: number; v: StationWind | null }>()
-/** A station's latest METAR wind, asked at most every 10 minutes. */
-export async function stationWind(id: string): Promise<StationWind | null> {
+const cache = new Map<string, { t: number; v: StationSky | null }>()
+/** A station's latest report (its sky, its raw METAR, when), asked at most every 10 minutes; the Weather page's Cloud tile and the wind nowcast share it. */
+export async function stationReport(id: string): Promise<StationSky | null> {
   const kept = cache.get(id)
   if (kept !== undefined && Date.now() - kept.t < 10 * 60_000) return kept.v
-  const s = await stationSky(id)
-  const w = s === null ? null : parseMetarWind(s.raw)
-  const v = w === null || s === null ? null : { id, kt: w.kt, fromDeg: w.fromDeg, gustKt: w.gustKt, at: s.at }
+  const v = await stationSky(id)
   cache.set(id, { t: Date.now(), v })
   return v
+}
+
+/** A station's latest METAR wind. */
+export async function stationWind(id: string): Promise<StationWind | null> {
+  const s = await stationReport(id)
+  const w = s === null ? null : parseMetarWind(s.raw)
+  return w === null || s === null ? null : { id, kt: w.kt, fromDeg: w.fromDeg, gustKt: w.gustKt, at: s.at }
 }

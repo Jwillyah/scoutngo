@@ -42,6 +42,8 @@ import { DaysPage, ModelsPage } from './WeatherPages.tsx'
  */
 
 export const OPEN_RADAR_EVENT = 'scoutngo:open-radar'
+/** Batch Pages, Section 2: the Weather page is its own page; the map's Sky sheet asks App to open it. */
+export const OPEN_WEATHER_EVENT = 'scoutngo:open-weather'
 
 const pct = (x: number | null) => (x === null ? '—' : `${Math.round(x * 100)}%`)
 

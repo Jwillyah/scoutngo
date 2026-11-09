@@ -52,6 +52,7 @@ export const AUDITS = [
   { name: 'terrain decode', script: 'audit-terrain-decode.mjs', summary: /TERRAIN DECODE PROBLEMS/ },
   { name: 'special light', script: 'audit-special.mjs', summary: /SPECIAL LIGHT PROBLEMS/ },
   { name: 'briefing', script: 'audit-briefing.mjs', summary: /BRIEFING PROBLEMS/ },
+  { name: 'pages', script: 'audit-pages.mjs', summary: /PAGES PROBLEMS/ },
   { name: 'menu', script: 'audit-menu.mjs', summary: /MENU PROBLEMS/ },
   { name: 'one number', script: 'audit-one-number.mjs', summary: /ONE NUMBER PROBLEMS/ },
   { name: 'style', script: 'audit-style.mjs', summary: /STYLE PROBLEMS/ },

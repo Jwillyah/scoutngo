@@ -29,20 +29,22 @@ export function requestShape(href) {
   const models = (u.searchParams.get('models') ?? '').split(',').filter(Boolean)
   const start = u.searchParams.get('start_date')
   const end = u.searchParams.get('end_date')
-  const days = start && end ? Math.round((Date.parse(end) - Date.parse(start)) / 86_400_000) + 1 : Number(u.searchParams.get('forecast_days') ?? 7)
+  /* past_days: the series starts that many days back and runs that much longer, as Open-Meteo's does (Batch Pages, Section 2). */
+  const past = Number(u.searchParams.get('past_days') ?? 0)
+  const days = start && end ? Math.round((Date.parse(end) - Date.parse(start)) / 86_400_000) + 1 : Number(u.searchParams.get('forecast_days') ?? 7) + past
   const weight = points * Math.max(1, (vars.length * Math.max(1, models.length)) / 10) * Math.max(1, days / 14)
-  return { host: u.host, points, vars, models, days, start, weight }
+  return { host: u.host, points, vars, models, days, start, past, weight }
 }
 
 const value = (v) =>
   /cloud_cover_low/.test(v) ? 40 : /cloud_cover_mid/.test(v) ? 20 : /cloud_cover_high/.test(v) ? 10 : /cloud_cover/.test(v) ? 50
   : /direction/.test(v) ? 20 : /gust/.test(v) ? 6 : /wind_speed/.test(v) ? 4 : /visibility/.test(v) ? 16000
-  : /temperature|dew/.test(v) ? 15 : /wave_height/.test(v) ? 1 : /period/.test(v) ? 8 : /aerosol/.test(v) ? 0.1 : 0
+  : /temperature|dew/.test(v) ? 15 : /pressure_msl/.test(v) ? 1019.8 : /humidity/.test(v) ? 70 : /uv_index/.test(v) ? 3 : /wave_height/.test(v) ? 1 : /period/.test(v) ? 8 : /aerosol/.test(v) ? 0.1 : 0
 
 export function fakeAnswer(href, now = new Date()) {
   const s = requestShape(href)
   const first = s.start ?? now.toISOString().slice(0, 10)
-  const t0 = Date.parse(`${first}T00:00:00Z`)
+  const t0 = Date.parse(`${first}T00:00:00Z`) - (s.start ? 0 : s.past * 86_400_000)
   const time = Array.from({ length: s.days * 24 }, (_, i) => new Date(t0 + i * 3_600_000).toISOString().slice(0, 16))
   /* One model named: Open-Meteo answers plain names (checked 9 Nov, models=gfs_hrrr); two or more: suffixed by model. */
   const names = s.models.length <= 1 ? s.vars : s.vars.flatMap((v) => s.models.map((m) => `${v}_${m}`))

@@ -115,6 +115,8 @@ import { Menu, type MenuRows, type MenuTarget } from './components/Menu.tsx'
 import { lastBackup } from './lib/backup.ts'
 import { PACK_STORAGE_KEY } from './lib/venuePack.ts'
 import { Home, type HomeTarget } from './components/Home.tsx'
+import { WeatherPage } from './components/WeatherPage.tsx'
+import { OPEN_RADAR_EVENT, OPEN_WEATHER_EVENT } from './components/WeatherTab.tsx'
 import { readActivities, showsDrone, showsPhotoTools, useActivities } from './lib/activities.ts'
 import { ActivityPicker } from './components/ActivityPicker.tsx'
 import { SpotPicker } from './components/SpotPicker.tsx'
@@ -1403,6 +1405,13 @@ function App() {
   const [askWhat, setAskWhat] = useState(false)
   /* The Today briefing: on a plain launch (src/lib/briefingOpen.ts), and from Menu › Today. */
   const [briefOpen, setBriefOpen] = useState(() => shouldOpenBriefing(typeof window === 'undefined' ? null : window, landingSeen))
+  /* The Weather page (Batch Pages, Section 2): over the home or the map, from the home's "Weather ›" or the map's Sky sheet. */
+  const [weatherOpen, setWeatherOpen] = useState(false)
+  useEffect(() => {
+    const open = () => setWeatherOpen(true)
+    window.addEventListener(OPEN_WEATHER_EVENT, open)
+    return () => window.removeEventListener(OPEN_WEATHER_EVENT, open)
+  }, [])
   /* Latched: once the home has been left for the map (or never opened), the map and the venue save run. */
   const [mapSeen, setMapSeen] = useState(() => !briefOpen)
   if (!briefOpen && !mapSeen) setMapSeen(true)
@@ -1420,11 +1429,11 @@ function App() {
   /* Its clock, a minute at a time while it is open: the Now line and the calls move with it. */
   const [briefNow, setBriefNow] = useState(() => new Date())
   useEffect(() => {
-    if (!briefOpen) return
+    if (!briefOpen && !weatherOpen) return
     setBriefNow(new Date())
     const t = setInterval(() => setBriefNow(new Date()), 60_000)
     return () => clearInterval(t)
-  }, [briefOpen])
+  }, [briefOpen, weatherOpen])
   const [drawerRequest, setDrawerRequest] = useState<{ drawer: 'kit' | 'saved'; tick: number }>({
     drawer: 'kit',
     tick: 0,
@@ -2542,8 +2551,29 @@ function App() {
           onSwitchSpot={() => setSpotPickOpen(true)}
           onViewfinder={showsPhotoTools(activities) ? () => setViewfinderOpen(true) : undefined}
           onOpen={(t) => {
+            /* The Weather page opens over the home: Back is the home again. */
+            if (t === 'weather') {
+              setWeatherOpen(true)
+              return
+            }
             setBriefOpen(false)
             homeOpen(t)
+          }}
+        />
+      ) : null}
+      {weatherOpen && centre !== null ? (
+        <WeatherPage
+          venue={centre}
+          placeName={venueShort}
+          timeZone={venueWindow?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}
+          units={settings.units}
+          now={briefNow}
+          onBack={() => setWeatherOpen(false)}
+          onRadar={(scanAt) => {
+            window.dispatchEvent(new CustomEvent(OPEN_RADAR_EVENT, { detail: scanAt }))
+            setWeatherOpen(false)
+            setBriefOpen(false)
+            setMode('plan')
           }}
         />
       ) : null}

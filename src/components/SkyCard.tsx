@@ -11,7 +11,7 @@ import { SKY_TABS, type SkyTab } from '../lib/skyTab.ts'
 import { SkyFire } from './SkyFire.tsx'
 import { SkyPreview } from './SkyPreview.tsx'
 import { SpecialLight } from './SpecialLight.tsx'
-import { WeatherTab } from './WeatherTab.tsx'
+import { OPEN_WEATHER_EVENT } from './WeatherTab.tsx'
 import type { Units } from '../lib/units.ts'
 import { LineUp } from './LineUp.tsx'
 import type { HorizonInput } from '../core/skyWindow.ts'
@@ -146,7 +146,7 @@ function MoonDisc({ fraction, waxing }: { fraction: number; waxing: boolean }) {
 }
 
 
-export function SkyCard({ more, units, venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump, target, picking, onPickTarget, events, onPlanMoonrise, onOpenNow, placeName, onShowBow, horizon, onOpenCalendar, place, onMoonOpen, onViewfinder }: SkyCardProps) {
+export function SkyCard({ more, venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump, target, picking, onPickTarget, events, onPlanMoonrise, onOpenNow, placeName, onShowBow, horizon, onOpenCalendar, place, onMoonOpen, onViewfinder }: SkyCardProps) {
   const clock = (d: Date) => `${formatClock(d, timeZone)}`
   const finderProps = { venue, target, picking, onPickTarget, onJump, clock, timeZone }
   const [nowPage, setNowPage] = useState(0)
@@ -344,7 +344,12 @@ export function SkyCard({ more, units, venue, timeZone, timeZoneAbbr, at, tab, o
       </>
     )
   } else if (tab === 'weather') {
-    body = <WeatherTab venue={venue} timeZone={timeZone} units={units} at={at} placeName={placeName ?? undefined} />
+    /* Batch Pages, Section 2: the weather is its own page now; this tab is the door to it. */
+    body = (
+      <button type="button" className="btn skyc__weather" onClick={() => window.dispatchEvent(new CustomEvent(OPEN_WEATHER_EVENT))}>
+        Open the Weather page ›
+      </button>
+    )
   } else if (tab === 'special') {
     body = bodyFor('special')
   } else {

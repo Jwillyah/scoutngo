@@ -163,6 +163,19 @@ export async function fetchBriefWind(at: LatLon): Promise<Hourly | null> {
   return got.ok ? parseHourly(got.payload, BRIEF_WIND_NAMES) : null
 }
 
+/*
+ * THE WEATHER PAGE'S OWN NUMBERS (Batch Pages, Section 2): feels-like, UV,
+ * humidity, dew point and pressure, by the hour, from yesterday for the week
+ * (the pressure's trend reads three hours back; seven days bill as one call). Asked only while the Weather
+ * page is open, through the same forecast cache as the briefing's.
+ */
+export const WEATHER_EXTRA_NAMES = ['apparent_temperature', 'uv_index', 'relative_humidity_2m', 'dew_point_2m', 'pressure_msl'] as const
+export async function fetchWeatherExtras(at: LatLon): Promise<Hourly | null> {
+  const params = new URLSearchParams({ latitude: at.lat.toFixed(2), longitude: at.lon.toFixed(2), hourly: WEATHER_EXTRA_NAMES.join(','), past_days: '1', forecast_days: '7', timezone: 'GMT' })
+  const got = await weatherJson(`${WIND_URL}?${params}`, { maxAgeMs: SLOW_MAX_AGE_MS, timeoutMs: TIMEOUT_MS })
+  return got.ok ? parseHourly(got.payload, WEATHER_EXTRA_NAMES) : null
+}
+
 export const SKY_NAMES = ['cloud_cover_low', 'cloud_cover_mid', 'cloud_cover_high', 'visibility'] as const
 
 /** The sky by the hour for as far as Open-Meteo forecasts: the cover at three heights and the visibility (metres), for the 3D preview's clouds and haze. */
