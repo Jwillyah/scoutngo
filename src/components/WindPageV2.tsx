@@ -11,6 +11,7 @@ import { retrying } from '../lib/retrying.ts'
 import { fetchBriefWind, type Hourly } from '../lib/tideSheetData.ts'
 import { useWeatherEpoch } from '../lib/useWeatherStatus.ts'
 import { windAt, windWords, type WindNow } from '../lib/windNow.ts'
+import { useStationObs, type StationNow } from '../lib/useStationObs.ts'
 import type { DetailId } from '../lib/detailTabs.ts'
 import { formatRange, formatWind, windIn, windUnitLabel, type Units } from '../lib/units.ts'
 import { fetchMeasuredWind, fetchWindModels, MODEL_NAME, WIND_MODELS, type Measured, type WindModels } from '../lib/windModelsData.ts'
@@ -101,9 +102,11 @@ export function WindPageV2({ venue, placeName, timeZone, units, ground, onBack, 
   }, [key, venue.lat, venue.lon, epoch])
   const loaded = data !== null && data.key === key ? data.value : null
   const face = facing !== null && facing.key === key ? facing.value : null
-  const shared = windAt(wx !== null && wx.key === key ? wx.value : null, now)
+  /* Batch MAP2, Section 2: leaned toward a station within 15 km that reported in the last hour, as the home. */
+  const stationObs = useStationObs(venue)
+  const shared = windAt(wx !== null && wx.key === key ? wx.value : null, now, stationObs)
   return (
-    <DetailShell id="wind" ground={ground} onBack={onBack} onSwitch={onSwitch} onMap={onMap} how={<WindHow now={now} data={loaded} facing={face} unit={units.wind} />}>
+    <DetailShell id="wind" ground={ground} onBack={onBack} onSwitch={onSwitch} onMap={onMap} how={<WindHow now={now} data={loaded} facing={face} unit={units.wind} lean={stationObs} timeZone={timeZone} />}>
       <WindContent now={now} data={loaded} facing={face} placeName={placeName} timeZone={timeZone} units={units} drone={drone} shared={shared} />
     </DetailShell>
   )
@@ -275,14 +278,18 @@ export function Dial({ facing, fromDeg }: { facing: number | null; fromDeg: numb
 }
 
 /** "How we got this": the models, 400 ft and the air's state, the station, the beach. */
-export function WindHow({ now, data, facing, unit }: { now: Date; data: WindData | null; facing: FacingState; unit: Units['wind'] }) {
+export function WindHow({ now, data, facing, unit, lean = null, timeZone = 'UTC' }: { now: Date; data: WindData | null; facing: FacingState; unit: Units['wind']; lean?: StationNow | null; timeZone?: string }) {
   const models = data?.models ?? null
   const i = models === null ? -1 : hourIndexOf(models.hours, now)
   const aloft = models === null || i < 0 ? null : models.aloft[i]
   const stations = data?.measured ?? []
   return (
     <>
-      <p>Models: {WIND_MODELS.map((m) => MODEL_NAME[m]).join(', ')}, through Open-Meteo. The speed is their median. “Agree”: a model’s ground speed within {formatWind(AGREE_MPS, unit)} of that median.</p>
+      {/* Batch MAP2, Section 2. */}
+      <p>
+        Now: the forecast's wind{lean === null ? ', no station within 15 km reported in the last hour.' : `, leaned toward ${lean.id}'s report at ${formatClock(lean.at, timeZone)} (${formatWind(lean.mps, unit)}); the lean fades back to the forecast over three hours.`}
+      </p>
+      <p>Models: {WIND_MODELS.map((m) => MODEL_NAME[m]).join(', ')}, through Open-Meteo: the next 12 hours and the spread are their median (the big number is the wind now, above). “Agree”: a model’s ground speed within {formatWind(AGREE_MPS, unit)} of that median.</p>
       <p>Direction: the circular mean of where the models say it comes from. Arrows point where it goes. Gusts: the highest any model gives.</p>
       <p>
         400 ft: the models’ 120 m level.

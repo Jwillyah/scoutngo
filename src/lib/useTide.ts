@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import type { LatLon } from '../core/geo.ts'
 import {
   nearestStations,
+  openCoastFirst,
   STATION_USABLE_KM,
   type TideStation,
 } from '../core/tide.ts'
@@ -60,7 +61,8 @@ export function useTide(venue: LatLon | null, shootAt: Date | null): TideInfo {
         return false
       }
 
-      const candidates = nearestStations({ lat, lon }, stations.stations, STATION_ATTEMPTS)
+      /* Batch MAP2, Section 2: the open coast first among the nearest (a spot on the beach, not up a creek). */
+      const candidates = openCoastFirst(nearestStations({ lat, lon }, stations.stations, STATION_ATTEMPTS + 3)).slice(0, STATION_ATTEMPTS)
       const nearest = candidates[0]
       if (nearest === undefined) {
         setInfo({ status: 'unavailable', reason: 'NOAA listed no tide stations.' })

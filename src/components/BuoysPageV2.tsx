@@ -1,6 +1,7 @@
 import '../styles/surf.css'
 import type { LatLon } from '../core/geo.ts'
 import { buoyParts, partWords } from '../core/surfReads.ts'
+import { placePills } from '../core/pillPlace.ts'
 import { AIMED_TOLERANCE_DEG, FORECAST_TOLERANCE_FRACTION, FORECAST_TOLERANCE_M, G, versusForecast } from '../core/swellTravel.ts'
 import { fitView, inView, viewTiles } from '../core/tileView.ts'
 import { formatClock } from '../core/timezone.ts'
@@ -180,17 +181,17 @@ function BuoyMap({ venue, rows, units }: { venue: LatLon; rows: BuoyRow[]; units
   if (view === null) return null
   const tiles = viewTiles(view).slice(0, MAP_TILE_CAP)
   const spot = inView(view, venue)
-  /* Each pill above its pin (below when the pin is near the top), kept in the box, and moved off any pill already placed. */
-  const pills: Pill[] = []
-  for (const r of rows) {
+  /* Batch MAP2, Section 2: each pill placed clear of every other pill and pin (src/core/pillPlace.ts); one that cannot be is left off. */
+  const drafts = rows.map((r) => {
     const p = inView(view, r.b.buoy.at)
     const text = [r.b.buoy.id, waveHeight(r.b.waveM, units), r.b.periodS === null ? null : `${Math.round(r.b.periodS)} s`].filter((x) => x !== null).join(' · ')
-    const w = text.length * PILL_CHAR + 16
-    const x = Math.max(4, Math.min(MAP_W - 4 - w, p.x - w / 2))
-    let y = p.y - 14 - PILL_H < 4 ? p.y + 14 : p.y - 14 - PILL_H
-    for (const q of pills) if (Math.abs(q.y - y) < PILL_H + 2 && x < q.x + q.w && q.x < x + w) y = y > q.y ? q.y + PILL_H + 4 : q.y - PILL_H - 4
-    pills.push({ r, p, x, y: Math.max(2, Math.min(MAP_H - PILL_H - 2, y)), w, text })
-  }
+    return { r, p, text, w: text.length * PILL_CHAR + 16 }
+  })
+  const spots = placePills([...drafts.map((d) => ({ x: d.p.x, y: d.p.y, w: d.w, h: PILL_H }))], MAP_W, MAP_H)
+  const pills: Pill[] = drafts.flatMap((d, i) => {
+    const at = spots[i]
+    return at === null ? [] : [{ r: d.r, p: d.p, x: at.x, y: at.y, w: d.w, text: d.text }]
+  })
   return (
     <svg className="dbuoy__map" viewBox={`0 0 ${MAP_W} ${MAP_H}`} preserveAspectRatio="xMidYMid slice" role="img" aria-label="Map of the buoys and the spot">
       {tiles.map((t) => (

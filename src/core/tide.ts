@@ -99,6 +99,27 @@ export function nearestStations(
     .slice(0, Math.max(0, count))
 }
 
+/*
+ * THE OPEN COAST FIRST (Batch MAP2, Section 2). A spot on the beach is
+ * described by the station on the same open water, not one up a creek, a
+ * lake or an inlet's interior channel 1 km away, where the tide comes later
+ * and stands differently (Virginia Beach: 8639168 on the coast, 8639207 Rudee
+ * Inlet interior channel 1.3 km off). Among the stations within
+ * OPEN_COAST_SLACK_KM of the nearest, the ones whose names say inland water
+ * go after the others; a station further than that is never preferred.
+ */
+export const OPEN_COAST_SLACK_KM = 3
+const INLAND_WATER = /\b(interior|creek|canal|cove|lake|river|channel|basin|marsh|pond|lagoon|bayou|landing)\b/i
+export const inlandWaterName = (name: string): boolean => INLAND_WATER.test(name)
+
+export function openCoastFirst(candidates: readonly NearestStation[]): NearestStation[] {
+  const first = candidates[0]
+  if (first === undefined) return []
+  const close = candidates.filter((c) => c.distanceKm <= first.distanceKm + OPEN_COAST_SLACK_KM)
+  const rest = candidates.filter((c) => c.distanceKm > first.distanceKm + OPEN_COAST_SLACK_KM)
+  return [...close.filter((c) => !inlandWaterName(c.station.name)), ...close.filter((c) => inlandWaterName(c.station.name)), ...rest]
+}
+
 /** One published high or low water. */
 export interface TideExtreme {
   at: Date

@@ -14,6 +14,8 @@ import { surfLine, useSurfNow, type SurfNow } from '../lib/useSurfNow.ts'
 import { rangeSizeWords } from '../core/surfReads.ts'
 import { beachName } from '../lib/surfBeach.ts'
 import { gustWords, windAt, windWords } from '../lib/windNow.ts'
+import { useStationObs } from '../lib/useStationObs.ts'
+import type { StationObs } from '../core/nowcast.ts'
 import { hourlyAt } from '../lib/tideSheetData.ts'
 import { compass } from '../lib/tideWords.ts'
 import { formatTemperature, windIn, windUnitLabel, type Units } from '../lib/units.ts'
@@ -92,6 +94,8 @@ export function Home({ venue, placeName, timeZone, units, drone, now, onClose, o
   const brief = useBriefing(venue, timeZone, now, true)
   /* Batch Map A1/A2: the spot's surf beach and its band, the same hook the menu and the Surf page read. */
   const surf = useSurfNow(venue, now, timeZone, units.distance === 'ft')
+  /* Batch MAP2, Section 2: a station within 15 km that reported in the last hour; the wind now leans to it (the Wind page reads the same). */
+  const stationObs = useStationObs(venue)
   const [picked] = useActivities()
   const order = homeOrder(picked, drone !== null)
   /* Batch N A2: reopening lands on the tab last used (kept on this phone). */
@@ -162,10 +166,10 @@ export function Home({ venue, placeName, timeZone, units, drone, now, onClose, o
       </div>
       <div className="home__track" ref={track}>
         <section className="home__page" aria-label="Today">
-          <DayView placeName={placeName} which="today" brief={brief} day={brief.days[0] ?? null} order={order} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} alert={alert === null ? null : alert.event} stormLine={play.inPlay ? play.headline : null} onOpen={onOpen} onDebug={() => setDebug((d) => !d)} surf={surf} />
+          <DayView placeName={placeName} which="today" brief={brief} day={brief.days[0] ?? null} order={order} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} alert={alert === null ? null : alert.event} stormLine={play.inPlay ? play.headline : null} onOpen={onOpen} onDebug={() => setDebug((d) => !d)} surf={surf} obs={stationObs} />
         </section>
         <section className="home__page" aria-label="Tomorrow">
-          <DayView placeName={placeName} which="tomorrow" brief={brief} day={brief.days[1] ?? null} order={order} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} alert={null} stormLine={null} onOpen={onOpen} surf={surf} />
+          <DayView placeName={placeName} which="tomorrow" brief={brief} day={brief.days[1] ?? null} order={order} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} alert={null} stormLine={null} onOpen={onOpen} surf={surf} obs={stationObs} />
         </section>
         <section className="home__page" aria-label="Week">
           <WeekView brief={brief} order={order} timeZone={timeZone} units={units} now={now} venue={venue} />
@@ -232,6 +236,7 @@ interface DayViewProps {
   onDebug?: () => void
   placeName: string
   surf: SurfNow
+  obs: StationObs | null
 }
 
 const ICON: Record<SkyIcon, ReactNode> = {
@@ -291,7 +296,7 @@ function SkyIconSvg({ icon, className }: { icon: SkyIcon; className: string }) {
   )
 }
 
-function DayView({ which, brief, day, order, venue, timeZone, units, drone, now, alert, stormLine, onOpen, onDebug, placeName, surf }: DayViewProps) {
+function DayView({ which, brief, day, order, venue, timeZone, units, drone, now, alert, stormLine, onOpen, onDebug, placeName, surf, obs }: DayViewProps) {
   const clock = (d: Date | null) => (d === null ? '—' : formatClock(d, timeZone))
   const wx = brief.wx
   const at = (name: string, t: Date) => (wx === null ? null : hourlyAt(wx, name, t))
@@ -309,7 +314,7 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
   const cond = conditionOf(at('weather_code', when), sunUp)
   const bigTemp = which === 'today' ? at('temperature_2m', now) : hi
   /* The one wind now (src/lib/windNow.ts), as the wind card and the Wind page read it. */
-  const heroWind = windAt(wx, when)
+  const heroWind = windAt(wx, when, obs)
   const windMps = heroWind?.mps ?? null
   const windFrom = heroWind?.fromDeg ?? null
   const rainHours = (from: Date, n: number) => Array.from({ length: n }, (_, i) => ({ at: new Date(Math.floor(from.getTime() / 3_600_000) * 3_600_000 + i * 3_600_000), mm: at('precipitation', new Date(Math.floor(from.getTime() / 3_600_000) * 3_600_000 + i * 3_600_000)) }))
@@ -405,7 +410,7 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
 
       <div className="hcards">
         {cards.map((c) => (
-          <Card key={c} kind={c} which={which} day={day} brief={brief} units={units} drone={drone} now={now} venue={venue} timeZone={timeZone} onOpen={onOpen} surf={surf} />
+          <Card key={c} kind={c} which={which} day={day} brief={brief} units={units} drone={drone} now={now} venue={venue} timeZone={timeZone} onOpen={onOpen} surf={surf} obs={obs} />
         ))}
       </div>
 
@@ -521,9 +526,10 @@ interface CardProps {
   onOpen: (t: HomeTarget) => void
   /** Batch Map A2: the spot's surf (src/lib/useSurfNow.ts); when away, the nearest surf beach's name and how far. */
   surf: SurfNow
+  obs: StationObs | null
 }
 
-function Card({ kind, which, day, brief, units, drone, now, venue, timeZone, onOpen, surf }: CardProps) {
+function Card({ kind, which, day, brief, units, drone, now, venue, timeZone, onOpen, surf, obs }: CardProps) {
   const clock = (d: Date) => formatClock(d, timeZone)
   const speed = (mps: number | null) => (mps === null ? '—' : `${Math.round(windIn(mps, units.wind) ?? 0)}`)
   const unit = windUnitLabel(units.wind)
@@ -552,7 +558,7 @@ function Card({ kind, which, day, brief, units, drone, now, venue, timeZone, onO
     target = 'wind'
     /* Batch Map A2: today's is the one wind now (src/lib/windNow.ts), the Wind page's headline too; tomorrow's, the day's strongest hour. */
     const strong = day === null ? null : day.wind.reduce<(typeof day.wind)[number] | null>((a, b) => (a === null || (b.mps ?? 0) > (a.mps ?? 0) ? b : a), null)
-    const w = which === 'today' ? windAt(brief.wx, now) : strong?.mps == null ? null : { mps: strong.mps, fromDeg: strong.fromDeg, gustMps: strong.gustMps }
+    const w = which === 'today' ? windAt(brief.wx, now, obs) : strong?.mps == null ? null : { mps: strong.mps, fromDeg: strong.fromDeg, gustMps: strong.gustMps }
     const said = windWords(w, units.wind)
     big = said === null ? '—' : which === 'today' ? <span data-shared="wind">{said}</span> : said
     const side = windSideSpan(day, brief.facing, which === 'today' ? now : null, timeZone)
