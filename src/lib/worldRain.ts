@@ -49,7 +49,8 @@ export function frameFor(maps: RainMaps, at: Date): RainFrame {
   return all.reduce((a, b) => (Math.abs(b.time - t) < Math.abs(a.time - t) ? b : a))
 }
 
-export const rainTileUrl = (maps: RainMaps, frame: RainFrame): string => `${maps.host}${frame.path}/256/{z}/{x}/{y}/${RAIN_COLOUR}/${RAIN_OPTIONS}.png`
+/** The tile URL the map asks: through the phone's mask (rainMaskProtocol), which fetches it from LibreWXR. */
+export const rainTileUrl = (maps: RainMaps, frame: RainFrame): string => `${maps.host.replace(/^https:\/\//, `${RAIN_PROTOCOL}://`)}${frame.path}/256/{z}/{x}/{y}/${RAIN_COLOUR}/${RAIN_OPTIONS}.png`
 
 let cached: { at: number; maps: RainMaps | null } | null = null
 /** The frame list, asked at most every 5 minutes. */
@@ -82,9 +83,62 @@ export const RADAR_COVER: readonly { name: string; west: number; south: number; 
   { name: 'Europe (OPERA)', west: -11, south: 35, east: 32, north: 71 },
   { name: 'Japan (JMA)', west: 127, south: 24, east: 146, north: 46 },
   { name: 'Taiwan (CWA)', west: 119, south: 21.5, east: 122.5, north: 25.5 },
-  { name: 'Malaysia', west: 99.5, south: 0.8, east: 116.5, north: 7.5 },
-  { name: 'Philippines', west: 116.5, south: 4.5, east: 127, north: 19.5 },
 ]
+
+/*
+ * DROPPED, BY THEIR OWN TERMS (Batch MAP2, Section 3, checked 9 Nov):
+ * MetMalaysia's open data page does not list its radar among its open
+ * datasets, and PAGASA marks its radar "All Rights Reserved" with no public
+ * redistribution. LibreWXR merges every source into one tile, so these
+ * boxes are cleared from the tiles on the phone (rainMaskProtocol below):
+ * no rain is drawn there at all, and they are hatched with the rest of
+ * the world without radar.
+ */
+export const DROPPED: readonly { name: string; west: number; south: number; east: number; north: number }[] = [
+  { name: 'Malaysia (MetMalaysia)', west: 99.5, south: 0.8, east: 116.5, north: 7.5 },
+  { name: 'the Philippines (PAGASA)', west: 116.5, south: 4.5, east: 127, north: 19.5 },
+]
+
+/* The tile's corners, degrees. */
+function tileBounds(z: number, x: number, y: number) {
+  const n = 2 ** z
+  const lon = (i: number) => (i / n) * 360 - 180
+  const lat = (j: number) => (Math.atan(Math.sinh(Math.PI * (1 - (2 * j) / n))) * 180) / Math.PI
+  return { west: lon(x), east: lon(x + 1), north: lat(y), south: lat(y + 1) }
+}
+
+/** The dropped boxes a tile touches, as pixel rectangles in the tile (256 px). */
+export function droppedPixels(z: number, x: number, y: number, size = 256): { x0: number; y0: number; x1: number; y1: number }[] {
+  const b = tileBounds(z, x, y)
+  const n = 2 ** z
+  const px = (lon: number) => (((lon + 180) / 360) * n - x) * size
+  const py = (lat: number) => (((1 - Math.asinh(Math.tan((lat * Math.PI) / 180)) / Math.PI) / 2) * n - y) * size
+  return DROPPED.filter((d) => d.west < b.east && d.east > b.west && d.south < b.north && d.north > b.south).map((d) => ({
+    x0: Math.max(0, Math.floor(px(d.west))),
+    x1: Math.min(size, Math.ceil(px(d.east))),
+    y0: Math.max(0, Math.floor(py(d.north))),
+    y1: Math.min(size, Math.ceil(py(d.south))),
+  }))
+}
+
+export const RAIN_PROTOCOL = 'rainw'
+/** The rain tile through the phone: as LibreWXR serves it, the dropped boxes cleared. */
+export async function rainMaskProtocol(params: { url: string }, abort: AbortController): Promise<{ data: ArrayBuffer }> {
+  const real = params.url.replace(`${RAIN_PROTOCOL}://`, 'https://')
+  const r = await fetch(real, { signal: abort.signal })
+  if (!r.ok) throw new Error(`rain tile ${r.status}`)
+  const m = /\/(\d+)\/(\d+)\/(\d+)\/\d+\/[\d_]+\.png$/.exec(real)
+  const cuts = m === null ? [] : droppedPixels(Number(m[1]), Number(m[2]), Number(m[3]))
+  if (cuts.length === 0 || typeof OffscreenCanvas === 'undefined') return { data: await r.arrayBuffer() }
+  const img = await createImageBitmap(await r.blob())
+  const c = new OffscreenCanvas(img.width, img.height)
+  const g = c.getContext('2d')
+  if (g === null) return { data: await r.arrayBuffer() }
+  g.drawImage(img, 0, 0)
+  const k = img.width / 256
+  for (const q of cuts) g.clearRect(q.x0 * k, q.y0 * k, (q.x1 - q.x0) * k, (q.y1 - q.y0) * k)
+  return { data: await (await c.convertToBlob({ type: 'image/png' })).arrayBuffer() }
+}
 
 /** The world without the radar boxes, as one polygon with holes: where the map hatches. */
 export function estimateArea(): GeoJSON.FeatureCollection {

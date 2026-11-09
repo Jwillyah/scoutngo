@@ -15,10 +15,10 @@ server or a copy this app runs work alike (`RAIN_HOST`).
 | NOAA MRMS (via LibreWXR; the US layer on top stays Iowa State's N0Q composite) | US, Alaska, Hawaii, Puerto Rico | US Government work, public domain | NOAA |
 | Environment and Climate Change Canada, MSC GeoMet | Canada | Open Government Licence – Canada | ECCC |
 | EUMETNET OPERA composite | Europe, about 155 radars in 24 countries | CC BY 4.0 | EUMETNET OPERA |
-| JMA | Japan | JMA's terms: reuse with credit | Japan Meteorological Agency |
-| CWA | Taiwan | Taiwan Government Open Data Licence 1.0 | Central Weather Administration |
-| MetMalaysia | Malaysia | as LibreWXR publishes it; not checked against MetMalaysia's own terms | MetMalaysia |
-| PAGASA | the Philippines | as LibreWXR publishes it; not checked against PAGASA's own terms | PAGASA |
+| JMA | Japan | Public Data License 1.0, compatible with CC BY 4.0, commercial use allowed (jma.go.jp/jma/en/copyright.html, checked 9 Nov); forecasting services and warnings are separately regulated, and this is neither | Source: Japan Meteorological Agency |
+| CWA | Taiwan | Open Government Data License, Taiwan, 1.0: reuse including commercial, attribution required (cwa.gov.tw/V8/E/information.html, checked 9 Nov) | Central Weather Administration |
+| MetMalaysia | Malaysia | DROPPED (9 Nov): its open data page (met.gov.my/en/info/data-terbuka) lists forecasts, warnings and climate, not radar | none: cleared from the tiles on the phone |
+| PAGASA | the Philippines | DROPPED (9 Nov): its radar is marked "All Rights Reserved" and its data terms forbid public redistribution | none: cleared from the tiles on the phone |
 | NOAA RRQPE (GOES / Himawari / Meteosat) | the gaps, 60°S to 70°N | US Government work, public domain | NOAA NESDIS |
 
 Not used: RainViewer's own free API (personal and educational use only since
@@ -31,3 +31,8 @@ Docker Compose (`ghcr.io/joshuakimsey/librewxr`): one or two render workers
 on a small server, about 16 GB of memory at production size, and we would
 owe AGPL source to its users. Decision for Jwilly; the public server is wired
 in now.
+
+In Malaysia and the Philippines the map draws no rain at all now: LibreWXR
+merges radar and the satellite estimate into one tile, so clearing the
+radar clears the estimate there too (src/lib/worldRain.ts DROPPED). Both
+are hatched with the rest of the world that has no radar.

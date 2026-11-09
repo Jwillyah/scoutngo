@@ -12,7 +12,7 @@ import '../styles/features.css'
  *                 Lightning (last 45 min), Warnings, Sun and moon lines,
  *                 Airspace, and More › (storm tracks, hazards, buildings and
  *                 the rest, one tap deeper)
- *   MAP STYLE     Satellite · Plain · 3D
+ *   MAP STYLE     Satellite · Map · 3D (Batch MAP2: Map is the plain vector map)
  *   tools         round Viewfinder · Measure · Skyline with their names
  *   foot          the credit in small words; no zoom, no debug
  *
@@ -41,8 +41,8 @@ interface FeaturesProps {
   /** What More › holds: switches, then links. */
   moreRows: Switch[]
   links: { label: string; onClick: () => void }[]
-  base: 'satellite' | 'terrain' | '3d'
-  onBase: (b: 'satellite' | 'terrain' | '3d') => void
+  base: 'satellite' | 'map' | '3d'
+  onBase: (b: 'satellite' | 'map' | '3d') => void
   /** "Flat here" when the terrain round the venue is too flat to draw; null otherwise. */
   baseNote: string | null
   tools: { label: string; icon: ReactNode; onClick: () => void; on?: boolean }[]
@@ -140,7 +140,7 @@ export function FeaturesSheet(p: FeaturesProps) {
         value={p.base}
         options={[
           { id: 'satellite', label: 'Satellite' },
-          { id: 'terrain', label: 'Plain' },
+          { id: 'map', label: 'Map' },
           { id: '3d', label: '3D' },
         ]}
         onChange={p.onBase}

@@ -31,11 +31,15 @@ export function gridDays(at: Date | null, now: number = Date.now()): number {
 }
 const URL_BASE = 'https://api.open-meteo.com/v1/forecast'
 
-export function blockUrl(points: readonly { lat: number; lon: number }[], model: WindModelChip, days: number = WIND_GRID_DAYS): string {
+/** The height the layer reads: the ground's 10 m, or 120 m for the drone's 400 ft (Batch MAP2, Section 3). */
+export type WindLevel = '10m' | '120m'
+
+export function blockUrl(points: readonly { lat: number; lon: number }[], model: WindModelChip, days: number = WIND_GRID_DAYS, level: WindLevel = '10m'): string {
   const p = new URLSearchParams({
     latitude: points.map((x) => x.lat.toFixed(2)).join(','),
     longitude: points.map((x) => x.lon.toFixed(2)).join(','),
-    hourly: 'wind_speed_10m,wind_direction_10m,wind_gusts_10m',
+    /* Gusts are served at 10 m only. */
+    hourly: level === '10m' ? 'wind_speed_10m,wind_direction_10m,wind_gusts_10m' : 'wind_speed_120m,wind_direction_120m',
     wind_speed_unit: 'ms',
     forecast_days: String(days),
     timezone: 'GMT',
@@ -55,7 +59,7 @@ export interface PointSeries {
   gust: (number | null)[]
 }
 
-export function parseBlock(payload: unknown, points: readonly { lat: number; lon: number }[]): PointSeries[] {
+export function parseBlock(payload: unknown, points: readonly { lat: number; lon: number }[], level: WindLevel = '10m'): PointSeries[] {
   const list = Array.isArray(payload) ? payload : [payload]
   const num = (a: unknown, i: number) => (Array.isArray(a) && typeof a[i] === 'number' ? (a[i] as number) : null)
   return points.flatMap((pt, k) => {
@@ -67,9 +71,9 @@ export function parseBlock(payload: unknown, points: readonly { lat: number; lon
         lat: pt.lat,
         lon: pt.lon,
         times: time.map((t) => Date.parse(`${t}:00Z`)),
-        speed: time.map((_, i) => num(h?.wind_speed_10m, i)),
-        from: time.map((_, i) => num(h?.wind_direction_10m, i)),
-        gust: time.map((_, i) => num(h?.wind_gusts_10m, i)),
+        speed: time.map((_, i) => num(h?.[`wind_speed_${level}`], i)),
+        from: time.map((_, i) => num(h?.[`wind_direction_${level}`], i)),
+        gust: time.map((_, i) => (level === '10m' ? num(h?.wind_gusts_10m, i) : null)),
       },
     ]
   })
@@ -104,7 +108,7 @@ const boundsOf = (m: maplibregl.Map): Bounds => {
   return { south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast() }
 }
 
-export function useWindViewport(map: maplibregl.Map | null, on: boolean, model: WindModelChip, at: Date | null = null): WindViewport {
+export function useWindViewport(map: maplibregl.Map | null, on: boolean, model: WindModelChip, at: Date | null = null, level: WindLevel = '10m'): WindViewport {
   const days = gridDays(at)
   const [view, setView] = useState<{ bounds: Bounds; zoom: number } | null>(null)
   const [got, setGot] = useState<{ key: string; v: WindViewport } | null>(null)
@@ -129,15 +133,15 @@ export function useWindViewport(map: maplibregl.Map | null, on: boolean, model: 
     const step = gridStep(view.bounds, view.zoom)
     return { step, blocks: blocksFor(view.bounds, step) }
   }, [view])
-  const key = plan === null ? null : `${model}|${days}|${plan.step}|${plan.blocks.map((b) => `${b.south},${b.west}`).join(';')}`
+  const key = plan === null ? null : `${model}|${level}|${days}|${plan.step}|${plan.blocks.map((b) => `${b.south},${b.west}`).join(';')}`
 
   useEffect(() => {
     if (!on || plan === null || key === null) return
     let live = true
     void Promise.all(
       plan.blocks.map(async (b) => {
-        const r = await weatherJson(blockUrl(b.points, model, days), { maxAgeMs: FORECAST_MAX_AGE_MS })
-        return r.ok ? parseBlock(r.payload, b.points) : null
+        const r = await weatherJson(blockUrl(b.points, model, days, level), { maxAgeMs: FORECAST_MAX_AGE_MS })
+        return r.ok ? parseBlock(r.payload, b.points, level) : null
       }),
     ).then((parts) => {
       if (!live) return
@@ -147,7 +151,7 @@ export function useWindViewport(map: maplibregl.Map | null, on: boolean, model: 
     return () => {
       live = false
     }
-  }, [on, key, plan, model, days])
+  }, [on, key, plan, model, days, level])
 
   if (!on) return { series: [], step: 0.25, status: 'off', asked: 0 }
   /* A new view keeps drawing the last one's wind until its own arrives. */

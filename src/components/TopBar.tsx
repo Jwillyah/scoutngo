@@ -20,6 +20,8 @@ interface TopBarProps {
   onAdd: (() => void) | null
   /** Whether the next map tap places a position. */
   adding: boolean
+  /** What the + says to a screen reader (Batch MAP2, Section 3: it opens Shoot setup now). */
+  addLabel?: string
   /** Null where there is no map to move. */
   onLocate: (() => void) | null
   locating: boolean
@@ -41,6 +43,7 @@ export function TopBar({
   pill,
   onAdd,
   adding,
+  addLabel,
   onLocate,
   locating,
   locateNote,
@@ -77,7 +80,7 @@ export function TopBar({
         onClick={onAdd ?? undefined}
         disabled={onAdd === null}
         aria-pressed={adding}
-        aria-label={adding ? 'Tap the map to place it' : 'Add a position'}
+        aria-label={addLabel ?? (adding ? 'Tap the map to place it' : 'Add a position')}
       >
         {icon(<path d="M10 4v12M4 10h12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />)}
       </button>

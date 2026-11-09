@@ -2439,7 +2439,9 @@ function App() {
           cardRequest={cardRequest}
           onViewfinder={() => setViewfinderOpen(true)}
           bag={kit}
-          onSearch={() => setMode('setup')}
+          /* Batch MAP2, Section 3: the place pill finds a spot (search v2); the + is Shoot setup. */
+          onSearch={() => setSpotPickOpen(true)}
+          onShootSetup={() => setMode('setup')}
           onOpenNow={() => setNowOpen(true)}
           onBackToNow={onBackToNow}
         />
@@ -2512,7 +2514,7 @@ function App() {
       {/* FIRST RUN, NO SETUP (Batch I, Section 1): no spot yet, so "Where do you go?" (Batch M), over everything. */}
       {(landingSeen && centre === null && bareLaunch) || spotPickOpen ? (
         <SpotPicker
-          title={centre === null ? 'Where do you go?' : 'Switch spot'}
+          title={centre === null ? 'Where do you go?' : 'Find a spot'}
           saved={spots.flatMap((sp) => {
             const at = venueLatLon(sp.venue)
             return at === null ? [] : [{ id: sp.id, name: sp.name, at }]

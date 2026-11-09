@@ -388,6 +388,8 @@ interface PlanModeProps {
   bag: KitSelection
   /** The search pill was tapped: go and search. */
   onSearch: () => void
+  /** Batch MAP2, Section 3: the + in the top bar opens Shoot setup. */
+  onShootSetup?: () => void
   /** The Now screen, from Sky's Tonight page. */
   onOpenNow: () => void
   /** The dock's Back to now: the current time at the venue, today if the shoot day is not today. */
@@ -582,6 +584,7 @@ export function PlanMode({
   groups = { water: true, land: false, surf: true },
   bag,
   onSearch,
+  onShootSetup,
   onOpenNow,
   onBackToNow,
   onShootWindow,
@@ -1327,6 +1330,8 @@ export function PlanMode({
   const [windLayerFt, setWindLayerFt] = useState<0 | 400>(0)
   /* Batch Map, Section 1: the wind layer v3's model (Blend first), the strip at its crosshair, and the spot's beach for "offshore here". */
   const [windModel, setWindModel] = useState<WindModelChip>('blend')
+  /* Batch MAP2, Section 3: the plain vector map in place of the satellite. */
+  const [vectorMap, setVectorMap] = useState(false)
   const [windStrip, setWindStrip] = useState<{ from: number; mps: (number | null)[] } | null>(null)
   const [windFacing, setWindFacing] = useState<{ key: string; deg: number | null } | null>(null)
   const windSpotKey = venue === null ? null : `${venue.lat.toFixed(3)},${venue.lon.toFixed(3)}`
@@ -2063,19 +2068,19 @@ export function PlanMode({
         photoTools ? { id: 'sunmoon', label: 'Sun and moon lines', on: showSun || showArc || moonOn, icon: featIcon(FEAT_PATH.arc), onToggle: () => { const next = !(showSun || showArc || moonOn); onShowSun(next); onShowArc(next); setMoonOn(next) } } : null,
         featureById('airspace'),
       ].filter((x): x is NonNullable<typeof x> => x !== null)}
-      moreRows={['tracks', 'hazards', 'buildings', 'labels', 'cones', 'lightmap', 'shadows', 'sun', 'moon'].map(featureById).filter((x): x is NonNullable<typeof x> => x !== null && (photoTools || !PHOTO_LAYERS.includes(x.id)))}
+      moreRows={[...['tracks', 'hazards', 'buildings', 'labels'].map(featureById), { id: 'terrain', label: 'Terrain shading', on: showTerrain && !flatHere, icon: featIcon('M1 13l4-6 3 4 2-3 5 5z'), note: flatHere ? 'flat here' : undefined, onToggle: () => turnTerrain(!showTerrain) }, ...['cones', 'lightmap', 'shadows', 'sun', 'moon'].map(featureById)].filter((x): x is NonNullable<typeof x> => x !== null && (photoTools || !PHOTO_LAYERS.includes(x.id)))}
       links={[
         { label: 'Airspace over this venue', onClick: () => openCard('airspace') },
         { label: 'What is mapped here', onClick: () => openCard('hazards') },
       ]}
-      base={threeD ? '3d' : showTerrain && !flatHere ? 'terrain' : 'satellite'}
+      /* Batch MAP2, Section 3: Satellite · Map · 3D, Map the plain vector map in the app's colours; the old terrain shading is a switch under More. */
+      base={threeD ? '3d' : vectorMap ? 'map' : 'satellite'}
       onBase={(b) => {
         if (b === '3d') { if (!threeD) toggleThreeD(); return }
         if (threeD) toggleThreeD()
-        if (b === 'terrain' && !flatHere) turnTerrain(true)
-        if (b === 'satellite') turnTerrain(false)
+        setVectorMap(b === 'map')
       }}
-      baseNote={flatHere ? 'Flat here' : threeDNote}
+      baseNote={threeDNote}
       tools={[
         ...(onViewfinder === undefined ? [] : [{ label: 'Viewfinder', icon: featIcon('M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8zM8 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z'), onClick: onViewfinder }]),
         { label: 'Measure', icon: featIcon('M2 12 12 2l2 2L4 14zM5 9l1 1M7 7l1 1M9 5l1 1'), on: measurePins !== null, onClick: () => { setMeasurePins((pins) => (pins === null ? [] : null)); setSheet('peek') } },
@@ -2596,6 +2601,7 @@ export function PlanMode({
         windSpot={venue}
         windFacing={windFacing !== null && windFacing.key === windSpotKey ? windFacing.deg : null}
         onWindStrip={setWindStrip}
+        vectorBase={vectorMap && !threeD}
         selectedId={selectedId}
         onSelect={onSelectAndRaise}
         onPitchChange={setPitch}
@@ -2888,13 +2894,15 @@ export function PlanMode({
            * which is what a search pill is for. The venue bar this replaced
            * carried the same two facts in a row of its own.
            */
-          <button type="button" className="pill-venue" onClick={onSearch} aria-label="Search for a venue">
+          /* Batch MAP2, Section 3: the place pill opens the spot search (search v2); Shoot setup is the +. */
+          <button type="button" className="pill-venue" onClick={onSearch} aria-label="Find a spot">
             <span className="pill-venue__name">{venueNameLine}</span>
             <span className="pill-venue__date num">{dateLabel}</span>
           </button>
         }
-        onAdd={() => onPlacing(!placing)}
-        adding={placing}
+        onAdd={onShootSetup ?? (() => onPlacing(!placing))}
+        adding={onShootSetup === undefined ? placing : false}
+        addLabel={onShootSetup === undefined ? undefined : 'Shoot setup'}
         onLocate={onLocate}
         locating={locating}
         locateNote={null}

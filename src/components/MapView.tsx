@@ -1,12 +1,10 @@
 import { moonGlyphSvg } from '../lib/moonGlyph.ts'
 import { useNumerals } from '../lib/numeralsContext.ts'
 import * as maplibregl from 'maplibre-gl'
-import { WindStreaks } from './WindStreaks.tsx'
 import { WindLayerV3 } from './WindLayerV3.tsx'
 import { MapLabels } from './MapLabels.tsx'
-import { estimateArea, fetchRainMaps, frameFor, RAIN_HOST, RAIN_MAX_ZOOM, rainTileUrl } from '../lib/worldRain.ts'
+import { estimateArea, fetchRainMaps, frameFor, RAIN_HOST, RAIN_MAX_ZOOM, RAIN_PROTOCOL, rainMaskProtocol, rainTileUrl } from '../lib/worldRain.ts'
 import { fieldAt, useWindViewport, type WindModelChip } from '../lib/useWindViewport.ts'
-import { useWindDraw } from '../lib/windDraw.ts'
 import { loadTile, PROTOCOL, viaProtocol } from '../lib/offlineCache.ts'
 import { RAY_SCREEN_FRACTION } from '../lib/rayLength.ts'
 import { FLOATING_CHROME_SELECTORS, floatingChromeNodes } from '../lib/floatingChrome.ts'
@@ -14,7 +12,7 @@ import { belowStatusBar, safeInsetTop } from '../lib/safeArea.ts'
 import { asCaller, instrumentMap, logTouch, useTouchDebug } from '../lib/touchDebug.ts'
 import { CameraHold } from '../lib/cameraHold.ts'
 import { TouchDebug } from './TouchDebug.tsx'
-import { IMAGERY_TEMPLATE, TERRAIN_TEMPLATE } from '../lib/offlineSources.ts'
+import { IMAGERY_TEMPLATE, TERRAIN_TEMPLATE, VECTOR_TEMPLATE } from '../lib/offlineSources.ts'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import type { WindUnit } from '../lib/units.ts'
@@ -110,6 +108,8 @@ maplibregl.setWorkerUrl(maplibreWorkerUrl)
  * src/lib/offlineCache.ts.
  */
 maplibregl.addProtocol(PROTOCOL, loadTile)
+/* Batch MAP2, Section 3: the world's rain through the phone, with the sources whose terms do not allow reuse cleared (src/lib/worldRain.ts). */
+maplibregl.addProtocol(RAIN_PROTOCOL, rainMaskProtocol)
 
 /**
  * The map canvas as a JPEG data URL, downscaled if it is over the configured
@@ -164,7 +164,20 @@ const UNDERLAY_MAX_ZOOM = 10
 export const IMAGERY_FADE_MS = 300
 /* 2D shadows start here: at 3 miles out a whole block of them is one dark smear by the pin. */
 export const SHADOWS_MIN_ZOOM = 14
-const BASE_LAYERS: ReadonlySet<string> = new Set(['esri', UNDERLAY_LAYER])
+/* Batch MAP2, Section 3: the plain vector map ("Map" in the Map sheet) is a base layer too. */
+const VECTOR_BASE_LAYERS = ['ofm-bg', 'ofm-landuse', 'ofm-water', 'ofm-roads-casing', 'ofm-roads', 'ofm-buildings'] as const
+const BASE_LAYERS: ReadonlySet<string> = new Set(['esri', UNDERLAY_LAYER, ...VECTOR_BASE_LAYERS])
+
+/*
+ * THE PLAIN MAP'S COLOURS (Batch MAP2, Section 3): OpenFreeMap's vector
+ * tiles in the app's own sky palette, dark, or light when the phone is in
+ * light mode. No labels here: the map's labels are the app's (MapLabels).
+ */
+function vectorBasePalette(dark: boolean) {
+  return dark
+    ? { land: readToken('--sky-top'), park: readToken('--surface-1'), water: readToken('--sky-mid'), road: readToken('--edge-top'), casing: readToken('--sky-top'), building: readToken('--surface-1') }
+    : { land: readToken('--map-light-land'), park: readToken('--map-light-park'), water: readToken('--map-light-water'), road: readToken('--white'), casing: readToken('--map-light-casing'), building: readToken('--map-light-building') }
+}
 
 /**
  * THE LAST ZOOM ESRI ACTUALLY HAS IMAGERY FOR, over rural ground.
@@ -676,6 +689,8 @@ interface MapViewProps {
   windSpot?: LatLon | null
   windFacing?: number | null
   onWindStrip?: (strip: { from: number; mps: (number | null)[] } | null) => void
+  /** Batch MAP2, Section 3: the plain vector map instead of the satellite ("Map" in the Map sheet). */
+  vectorBase?: boolean
   markDraft?: readonly LatLon[]
   /** A tap while marking: adds a point, or a vertex to the line being drawn. */
   onMarkAt?: (at: LatLon) => void
@@ -1206,6 +1221,7 @@ export function MapView({
   windSpot = null,
   windFacing = null,
   onWindStrip,
+  vectorBase = false,
   markDraft,
   onMarkAt,
   onSelectMark,
@@ -1901,7 +1917,7 @@ export function MapView({
        * (src/lib/worldRain.ts, LibreWXR), and the hatching where it is the
        * satellite estimate, no radar there.
        */
-      instance.addSource('rain-world', { type: 'raster', tiles: [`${RAIN_HOST}/none/{z}/{x}/{y}.png`], tileSize: 256, maxzoom: RAIN_MAX_ZOOM, attribution: 'Rain: LibreWXR (CC BY 4.0)' })
+      instance.addSource('rain-world', { type: 'raster', tiles: [`${RAIN_HOST}/none/{z}/{x}/{y}.png`], tileSize: 256, maxzoom: RAIN_MAX_ZOOM, attribution: 'Rain: LibreWXR · CC BY 4.0' })
       instance.addLayer({ id: 'rain-world', type: 'raster', source: 'rain-world', layout: { visibility: 'none' }, paint: { 'raster-opacity': 0.7 } })
       instance.addImage('rain-hatch', hatchImage())
       instance.addSource('rain-estimate', { type: 'geojson', data: estimateArea() })
@@ -3957,10 +3973,30 @@ export function MapView({
     moveCamera('sheet padding', () => map.current?.setPadding({ top: 0, left: 0, right: 0, bottom: bottomInset }))
   }, [bottomInset, moveCamera])
 
+  /* Batch MAP2, Section 3: the plain vector map, added the first time it is asked for, shown or hidden with the satellite the other way. */
+  useEffect(() => {
+    const m = map.current
+    if (m === null || !ready) return
+    if (vectorBase && m.getSource('ofm-base') === undefined) {
+      const dark = typeof window === 'undefined' || window.matchMedia?.('(prefers-color-scheme: dark)').matches !== false
+      const c = vectorBasePalette(dark)
+      const before = m.getStyle().layers.find((l) => !BASE_LAYERS.has(l.id))?.id
+      m.addSource('ofm-base', { type: 'vector', tiles: [viaProtocol(VECTOR_TEMPLATE)], maxzoom: 14, attribution: 'Map: OpenFreeMap, OpenMapTiles, OpenStreetMap contributors' })
+      m.addLayer({ id: 'ofm-bg', type: 'background', paint: { 'background-color': c.land } }, before)
+      m.addLayer({ id: 'ofm-landuse', type: 'fill', source: 'ofm-base', 'source-layer': 'park', paint: { 'fill-color': c.park } }, before)
+      m.addLayer({ id: 'ofm-water', type: 'fill', source: 'ofm-base', 'source-layer': 'water', paint: { 'fill-color': c.water } }, before)
+      m.addLayer({ id: 'ofm-roads-casing', type: 'line', source: 'ofm-base', 'source-layer': 'transportation', filter: ['in', ['get', 'class'], ['literal', ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'minor', 'service']]], paint: { 'line-color': c.casing, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1, 16, 7] } }, before)
+      m.addLayer({ id: 'ofm-roads', type: 'line', source: 'ofm-base', 'source-layer': 'transportation', filter: ['in', ['get', 'class'], ['literal', ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'minor', 'service']]], paint: { 'line-color': c.road, 'line-opacity': 0.75, 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 0.5, 16, 4] } }, before)
+      m.addLayer({ id: 'ofm-buildings', type: 'fill', source: 'ofm-base', 'source-layer': 'building', minzoom: 14, paint: { 'fill-color': c.building } }, before)
+    }
+    for (const id of VECTOR_BASE_LAYERS) if (m.getLayer(id) !== undefined) m.setLayoutProperty(id, 'visibility', vectorBase ? 'visible' : 'none')
+    for (const id of ['esri', UNDERLAY_LAYER]) if (m.getLayer(id) !== undefined) m.setLayoutProperty(id, 'visibility', vectorBase ? 'none' : 'visible')
+  }, [vectorBase, ready])
+
   /* Batch Map, Section 1: the wind over the screen, for the hour on the time bar. */
   const windOn = showSky && skyLayer === 'wind'
   const windHour = windAt === null ? null : Math.floor(windAt.getTime() / 3_600_000)
-  const windView = useWindViewport(ready ? map.current : null, windOn && windMeters <= 10, windModel, windHour === null ? null : new Date(windHour * 3_600_000))
+  const windView = useWindViewport(ready ? map.current : null, windOn, windModel, windHour === null ? null : new Date(windHour * 3_600_000), windMeters > 10 ? '120m' : '10m')
   const windField = useMemo(() => (windHour === null || windView.series.length === 0 ? null : fieldAt(windView.series, windView.step, new Date(windHour * 3_600_000))), [windView, windHour])
   /* The time bar's strip: the grid point nearest the crosshair, hour by hour; read again when the map stops. */
   useEffect(() => {
@@ -3983,13 +4019,12 @@ export function MapView({
     }
   }, [windOn, windView, onWindStrip])
   const keepLabelsClear = useCallback(() => (venue === null ? [] : [{ lat: venue.lat, lon: venue.lon }]), [venue])
-  const windDraw = useWindDraw()
   return (
     <div className={`map${mode === null ? '' : ' map--picking'}`}>
       <div className="map__canvas" ref={container} />
       {/* Batch Map, Section 1: the wind layer v3 over the whole screen (the old grid streaks only at a height above the ground). */}
-      {windOn && windMeters <= 10 ? <WindLayerV3 map={ready ? map.current : null} field={windField} unit={windUnit} spot={windSpot} facing={windFacing} status={windView.status} /> : null}
-      <WindStreaks map={ready ? map.current : null} cells={skyForecast} heightM={windMeters} ratedMps={ratedWindMps} draw={windDraw} visible={windOn && windMeters > 10} />
+      {/* Batch MAP2, Section 3: the drone's 400 ft in the same look (120 m level), not the old streaks. */}
+      {windOn ? <WindLayerV3 map={ready ? map.current : null} field={windField} unit={windUnit} spot={windSpot} facing={windFacing} status={windView.status} /> : null}
       {/* Batch Map, Section 3: the map's own labels, in the app's font, never under the crosshair or the pin. */}
       <MapLabels map={ready ? map.current : null} on={showLabels} keepClear={keepLabelsClear} crosshair={showSky && skyLayer === 'wind'} />
       <div className="raypills" ref={pillLayer} aria-hidden="true" />

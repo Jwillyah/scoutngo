@@ -442,7 +442,13 @@
   --sky-mid: #2f5a92;
   --sky-low: #5c8cc0;
   --sky-ink: #141821; /* dark type on white: an active chip, a primary button */
-  --ink-2: #5b6472; /* the quieter type on a white card (the home's best windows) */
+  --ink-2: #5b6472;
+  /* The plain map in light mode (Batch MAP2, Section 3; dark mode is the sky's own blues). */
+  --map-light-land: #eef2f6;
+  --map-light-park: #dcebdc;
+  --map-light-water: #b9d3ea;
+  --map-light-casing: #c9d3df;
+  --map-light-building: #dde3ea; /* the quieter type on a white card (the home's best windows) */
   --sky-sheet: linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 55%, var(--sky-low) 100%);
   --glass: rgb(255 255 255 / 0.15);
   --glass-strong: rgb(255 255 255 / 0.28);

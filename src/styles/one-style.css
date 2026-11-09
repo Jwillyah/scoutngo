@@ -444,3 +444,41 @@ input[type='radio'] {
     max-height: calc(100% - var(--safe-top) - 52px - 46px - var(--space-1) * 2 - var(--space-2) - var(--dock-height, 0px) - var(--space-1));
   }
 }
+
+/* Batch MAP2, Section 3: the board's primary button is a white pill (StyleGuide: "Primary"), not the gold one; words in normal case. */
+.btn {
+  text-transform: none;
+  letter-spacing: 0;
+  border-color: var(--glass-edge);
+  background: var(--glass);
+}
+.btn--primary {
+  background: var(--white);
+  border-color: var(--white);
+  color: var(--sky-ink);
+  box-shadow: none;
+}
+/* The Viewfinder: the sky until the camera's picture covers it. */
+.vf,
+.vf--ask {
+  background: var(--sky-sheet);
+}
+
+/* Batch MAP2, Section 3: the drone view's HUD in the one style (the style audit now reads it). */
+.clay {
+  background: var(--sky-top);
+}
+.fly__seg,
+.fly__seg button {
+  border-radius: 999px;
+}
+.fly__rung {
+  color: var(--caution);
+}
+.fly__wind {
+  color: var(--white);
+}
+.fly__look .fly__seg,
+.fly__modes .fly__seg {
+  border-radius: 999px;
+}
