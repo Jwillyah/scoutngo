@@ -3,6 +3,7 @@ import { useNumerals } from '../lib/numeralsContext.ts'
 import * as maplibregl from 'maplibre-gl'
 import { WindStreaks } from './WindStreaks.tsx'
 import { WindLayerV3 } from './WindLayerV3.tsx'
+import { MapLabels } from './MapLabels.tsx'
 import { estimateArea, fetchRainMaps, frameFor, RAIN_HOST, RAIN_MAX_ZOOM, rainTileUrl } from '../lib/worldRain.ts'
 import { fieldAt, useWindViewport, type WindModelChip } from '../lib/useWindViewport.ts'
 import { useWindDraw } from '../lib/windDraw.ts'
@@ -3246,18 +3247,8 @@ export function MapView({
     const instance = map.current
     if (instance === null || !ready) return
 
-    const first = instance.getStyle().layers.find((l) => !BASE_LAYERS.has(l.id))?.id
-    for (const [source, layer] of [
-      [LABEL_SOURCE_ROADS, LABEL_LAYER_ROADS],
-      [LABEL_SOURCE_PLACES, LABEL_LAYER_PLACES],
-    ] as const) {
-      const present = instance.getLayer(layer) !== undefined
-      if (showLabels && !present) {
-        instance.addLayer({ id: layer, type: 'raster', source }, first)
-      } else if (!showLabels && present) {
-        instance.removeLayer(layer)
-      }
-    }
+    /* Batch Map, Section 3: Esri's reference overlay is gone (mixed fonts, blue italics, route shields); the labels are the app's own (MapLabels, below). A style that still has its layers loses them. */
+    for (const layer of [LABEL_LAYER_ROADS, LABEL_LAYER_PLACES]) if (instance.getLayer(layer) !== undefined) instance.removeLayer(layer)
   }, [showLabels, ready])
 
   useEffect(() => {
@@ -3991,6 +3982,7 @@ export function MapView({
       m.off('moveend', read)
     }
   }, [windOn, windView, onWindStrip])
+  const keepLabelsClear = useCallback(() => (venue === null ? [] : [{ lat: venue.lat, lon: venue.lon }]), [venue])
   const windDraw = useWindDraw()
   return (
     <div className={`map${mode === null ? '' : ' map--picking'}`}>
@@ -3998,6 +3990,8 @@ export function MapView({
       {/* Batch Map, Section 1: the wind layer v3 over the whole screen (the old grid streaks only at a height above the ground). */}
       {windOn && windMeters <= 10 ? <WindLayerV3 map={ready ? map.current : null} field={windField} unit={windUnit} spot={windSpot} facing={windFacing} status={windView.status} /> : null}
       <WindStreaks map={ready ? map.current : null} cells={skyForecast} heightM={windMeters} ratedMps={ratedWindMps} draw={windDraw} visible={windOn && windMeters > 10} />
+      {/* Batch Map, Section 3: the map's own labels, in the app's font, never under the crosshair or the pin. */}
+      <MapLabels map={ready ? map.current : null} on={showLabels} keepClear={keepLabelsClear} crosshair={showSky && skyLayer === 'wind'} />
       <div className="raypills" ref={pillLayer} aria-hidden="true" />
       {debugTouch ? <TouchDebug /> : null}
       {/*

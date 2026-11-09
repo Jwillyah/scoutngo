@@ -55,6 +55,7 @@ export const AUDITS = [
   { name: 'menu', script: 'audit-menu.mjs', summary: /MENU PROBLEMS/ },
   { name: 'one number', script: 'audit-one-number.mjs', summary: /ONE NUMBER PROBLEMS/ },
   { name: 'style', script: 'audit-style.mjs', summary: /STYLE PROBLEMS/ },
+  { name: 'map labels', script: 'audit-map-labels.mjs', summary: /MAP LABELS PROBLEMS/ },
   { name: 'line up', script: 'audit-lineup.mjs', summary: /LINE UP PROBLEMS/ },
   { name: 'privacy', script: 'audit-privacy.mjs', summary: /PRIVACY PROBLEMS/ },
   { name: 'wind', script: 'audit-wind.mjs', summary: /WIND PROBLEMS/ },

@@ -2,7 +2,7 @@
 
 /** Credited whenever the map is up: drawn by the app, not through a map source. */
 export const APP_CREDITS: readonly string[] = [
-  'Buildings and the sea: OpenFreeMap, OpenMapTiles, OpenStreetMap contributors',
+  'Labels, buildings and the sea: OpenFreeMap, OpenMapTiles, OpenStreetMap contributors',
   'Trees: OpenStreetMap contributors, through Overpass',
 ]
 

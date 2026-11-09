@@ -1,0 +1,34 @@
+/* Batch Map, Section 3: the map's labels, Archivo, white with a soft dark halo (board StyleGuide). */
+.mlabels {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  pointer-events: none;
+}
+.mlabel {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  color: var(--white);
+  font-family: var(--font-sans);
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-shadow:
+    0 0 3px rgb(0 0 0 / 0.75),
+    0 1px 2px rgb(0 0 0 / 0.6);
+}
+.mlabel--village,
+.mlabel--small {
+  font-weight: 600;
+}
+.mlabel--water {
+  font-weight: 500;
+  font-style: italic;
+  color: rgb(255 255 255 / 0.85);
+  letter-spacing: 0.02em;
+}
+.mlabel--road {
+  font-weight: 500;
+  color: rgb(255 255 255 / 0.9);
+}
