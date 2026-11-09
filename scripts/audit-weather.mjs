@@ -161,7 +161,8 @@ try {
     await wait(500)
     await page.getByText('Sky', { exact: true }).first().tap()
     await wait(800)
-    await page.getByRole('tab', { name: 'Sky color' }).tap({ timeout: 4000 }).catch(() => fail(`${label}: no Sky color tab to open`))
+    /* Batch Pages, Section 3: Menu › Sky is the Sky page; the Sky color page in full is its "Color detail ›". */
+    await page.locator('.spage .ppage__foot button:has-text("Color detail")').tap({ timeout: 4000 }).catch(() => fail(`${label}: no Color detail on the Sky page`))
     await wait(2500)
     const fireNote = await ev(`[...document.querySelectorAll('.fire .fire__note')].map((p) => p.textContent).join(' | ')`)
     console.log(`  while refusing: ${asked.length - quiet} more requests · fire: ${fireNote.slice(0, 120)}`)

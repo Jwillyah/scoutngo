@@ -152,7 +152,8 @@ try {
       await wait(700)
       await page.getByText('Sky', { exact: true }).first().tap()
       await wait(1200)
-      await page.getByRole('tab', { name: 'Sky color' }).tap()
+      /* Batch Pages, Section 3: Menu › Sky is the Sky page; the Sky color page in full is its "Color detail ›". */
+      await page.locator('.spage .ppage__foot button:has-text("Color detail")').tap()
       let fire = null
       for (let i = 0; i < 20; i += 1) {
         await wait(500)
@@ -269,7 +270,6 @@ try {
         await ev(`document.querySelector('.prev')?.scrollIntoView({ block: 'start' })`)
         await wait(300)
         await page.screenshot({ path: join(OUT, `preview-${label}.png`) })
-        await page.getByRole('tab', { name: 'Sky color' }).tap()
         await wait(500)
       } else {
         if (!fire?.log) fail(`${label}: after sunrise there is no "How was it?"`)

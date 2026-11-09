@@ -1,0 +1,133 @@
+/* THE SKY PAGE (Batch Pages, Section 3; board SkyPage): the page's own pieces; the shell is .ppage (one-style.css). */
+.spage__seg {
+  align-self: flex-start;
+}
+.spage__seg .ui-seg__opt {
+  white-space: nowrap;
+  padding-inline: 14px;
+}
+.spage__head {
+  margin: 4px 0 0;
+  font-size: 44px;
+  line-height: 1.05;
+  font-weight: 300;
+}
+.spage__why {
+  margin: 0;
+  font-size: var(--text-md);
+  color: var(--glass-ink-2);
+}
+.spage__checks {
+  margin: 0;
+  padding: 0 12px;
+  list-style: none;
+  border-radius: 22px;
+  background: var(--glass);
+  border: 1px solid var(--glass-edge);
+}
+.spage__check {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  font-size: var(--text-md);
+}
+.spage__check + .spage__check {
+  border-top: 1px solid var(--glass-edge);
+}
+.spage__check b {
+  font-weight: var(--weight-medium);
+  text-align: right;
+}
+.spage__bar {
+  display: flex;
+  height: 12px;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.spage__bar i {
+  flex-grow: 0;
+  flex-shrink: 1;
+}
+.spage__bar--sunset i:nth-child(1),
+.spage__bar--sunrise i:nth-child(4) {
+  background: var(--caution);
+}
+.spage__bar--sunset i:nth-child(2),
+.spage__bar--sunrise i:nth-child(3) {
+  background: var(--strong);
+}
+.spage__bar--sunset i:nth-child(3),
+.spage__bar--sunrise i:nth-child(2) {
+  background: var(--tile-shoot);
+}
+.spage__bar--sunset i:nth-child(4),
+.spage__bar--sunrise i:nth-child(1) {
+  background: var(--sky-top);
+}
+.spage__marks {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  margin: 6px 0 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+.spage__mark {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.spage__mark span {
+  font-size: var(--text-xs);
+  color: var(--glass-ink-2);
+}
+.spage__mark:last-child {
+  text-align: right;
+}
+.spage__none {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.spage__rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.spage__row {
+  display: grid;
+  grid-template-columns: 7.5em 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 0;
+}
+.spage__row + .spage__row {
+  border-top: 1px solid var(--glass-edge);
+}
+.spage__when {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+.spage__what {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.spage__what b {
+  font-weight: var(--weight-medium);
+}
+.spage__what span {
+  font-size: var(--text-xs);
+  color: var(--glass-ink-2);
+}
+.spage__buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+  padding-bottom: 4px;
+}
+.spage__btn {
+  flex: 1;
+  min-height: 48px;
+}

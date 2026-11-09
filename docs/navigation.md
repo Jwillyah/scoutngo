@@ -21,8 +21,10 @@ its most useful page.
 ```
 Menu
 ├── Today (card) ──── the briefing: Today · Tomorrow · This week
-├── Sky (card) ────── Sky color within 3 h of a sunrise or sunset, else Now
-│   └── Now · Sky color · Special · Calendar (tabs)
+├── Sky (card) ────── the Sky page (Batch Pages, 9 Nov): the call, three
+│   │                 checks, tonight's light, rare light this week
+│   ├── Viewfinder · Calendar (buttons)
+│   └── Color detail › (the Sky color page in full, on the map's sheet)
 ├── Water (card) ──── Surf (Land inland: Wind · Terrain light)
 │   └── Surf · Tides · Wind · Buoys (tabs)
 ├── Drone (card) ──── Preflight, only with a drone in the kit
@@ -41,12 +43,23 @@ Field has no menu place; it is reached by its address, `/field`.
 
 | chip | opens | before 30 Oct |
 |---|---|---|
-| Golden | Sky › Now | the golden card in the sheet |
+| Golden | the Sky sheet's sun, moon and night (Batch Pages, 9 Nov: no tabs) | the golden card in the sheet |
 | Wind | Water › Wind (the Wind page) | the wind card; the page was one tap more ("Five models") |
-| Cloud | Sky › Sky color | the cloud card in the sheet |
+| Cloud | the Sky page (Batch Pages, 9 Nov; before: Sky › Sky color) | the cloud card in the sheet |
 | Tide | Water › Tides | Tides page (unchanged) |
 
-## Taps from the map, before and after
+## The Sky sheet's tabs are gone (Batch Pages, 9 Nov)
+
+Weather and Sky are pages of their own: the home's "Weather ›" (and its
+temperature and hourly strip) opens the Weather page; the home's Sky card,
+the menu's Sky card and the map's Cloud chip open the Sky page.
+Special light is the Sky page's "Rare light this week"; the calendar opens
+from the Sky page's Calendar button. The map's Sky sheet stays for two doors
+only, with no tabs: the Sky page's "Color detail ›" (the colour clock, the
+log), and the sun, the moon and the night from the Sky page's "Sun, moon,
+night ›", the map's Golden chip and the home's Moon card.
+
+## Taps from the map, before and after (30 Oct)
 
 | feature | before | after |
 |---|---|---|

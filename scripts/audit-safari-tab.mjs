@@ -186,12 +186,12 @@ try {
   await page.keyboard.press('Escape')
   await goToStage(ev, wait, 'plan')
   await wait(800)
-  /* Every chip opens its page (30 Oct, docs/navigation.md): Golden is Sky › Now, Cloud Sky › Sky color (the old Sky fire, Batch M), Wind the Wind page. */
-  for (const [chip, sel, shot, tab] of [['GOLDEN', '.sheet', 'tab-golden', 'Now'], ['CLOUD', '.sheet', 'tab-cloud', 'Sky color']]) {
+  /* Every chip opens its page (30 Oct, docs/navigation.md): Golden the sun, moon and night (the Sky sheet, no tabs), Cloud the Sky page (Batch Pages, Section 3), Wind the Wind page. */
+  for (const [chip, sel, shot] of [['GOLDEN', '.sheet', 'tab-golden'], ['CLOUD', '.spage', 'tab-cloud']]) {
     await page.locator('.chip2', { hasText: chip }).first().tap()
     await wait(1500)
-    const on = await ev(`document.querySelector('.skyc__tab--on')?.textContent ?? null`)
-    if (on !== tab) fail(`the ${chip} chip opened ${JSON.stringify(on)}, not Sky › ${tab}`)
+    if (chip === 'CLOUD' && !(await ev(`!!document.querySelector('.spage')`))) fail(`the ${chip} chip opened no Sky page`)
+    if (chip === 'GOLDEN' && !(await ev(`!!document.querySelector('.skyc .skyc__swipe')`))) fail(`the ${chip} chip opened no sun, moon and night`)
     await check(`${chip} chip`, sel, shot)
     await page.keyboard.press('Escape')
     await goToStage(ev, wait, 'plan')
@@ -209,7 +209,8 @@ try {
   await check('Menu', '.sidemenu__panel', 'tab-menu')
   await page.locator('.sidemenu__panel .sidemenu__item', { hasText: /^Sky/ }).first().tap()
   await wait(1200)
-  await check('Sky card', '.sheet', 'tab-sky')
+  /* Batch Pages, Section 3: the menu's Sky card is the Sky page; every button on it within reach in a short tab. */
+  await check('Sky page', '.spage', 'tab-sky')
   watchdog.note('done')
   await ctx.close()
 } finally {

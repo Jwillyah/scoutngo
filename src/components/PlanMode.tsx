@@ -61,7 +61,6 @@ import { FieldPackControl, type PackBuildState } from './FieldPackControl.tsx'
 import { OfflineAreas } from './OfflineAreas.tsx'
 import { VenuePackCard } from './VenuePackCard.tsx'
 import { offlineLine, onPacksChanged, packFor } from '../lib/venuePack.ts'
-import { bowOnMap } from '../lib/specialLightData.ts'
 import { GUIDE_EVENT } from '../lib/useBestView.ts'
 import { RADAR_EVENT } from '../lib/radarLayer.ts'
 import { radarValid, upstreamWarnings, useNowcast } from '../lib/stormData.ts'
@@ -70,10 +69,9 @@ import { stormOnMap } from '../core/lightning.ts'
 import { FeaturesSheet, type WeatherLayer } from './FeaturesSheet.tsx'
 import { FEAT_PATH, featIcon } from './featIcons.tsx'
 import { RadarLegend, WeatherLayerCard } from './WeatherLayerCard.tsx'
-import { OPEN_RADAR_EVENT } from './WeatherTab.tsx'
+import { OPEN_RADAR_EVENT, OPEN_SKY_EVENT } from '../lib/pageEvents.ts'
 import { useSpecialNow } from '../lib/useSpecialNow.ts'
 import { specialNameOf } from '../core/specialLight.ts'
-import { getPosition as sunPositionAt } from 'suncalc'
 import type { VenueCacheState } from '../lib/useVenueCache.ts'
 import type { Box } from '../lib/tileRange.ts'
 import type { ReadFile } from '../lib/scoutFile.ts'
@@ -378,7 +376,7 @@ interface PlanModeProps {
   /** The menu asked for a card: Sky or About. The tick makes a repeat ask open it again. */
   /** Batch H: opens the Viewfinder (App's), from the Preflight card. */
   onViewfinder?: () => void
-  cardRequest: { kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'buoys' | 'wind' | 'terrain' | 'preflight'; skyTab?: SkyTab; tick: number }
+  cardRequest: { kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'buoys' | 'wind' | 'terrain' | 'preflight' | 'calendar'; skyTab?: SkyTab; tick: number }
   /** The backup nudge (src/lib/backup.ts): "Back up? Last backup: never" in the status line, with Back up and Not now. */
   backupReminder?: { line: string; onBackup: () => void; onDismiss: () => void } | null
   /** Coast or inland, and which of Water and Land are offered (src/lib/placeGroups.ts). */
@@ -975,7 +973,7 @@ export function PlanMode({
     }
   }, [venue, modelDay, weatherEpoch])
   /* Batch K addendum: Sky opens on the weather first. */
-  const [skyTab, setSkyTab] = useState<SkyTab>('weather')
+  const [skyTab, setSkyTab] = useState<SkyTab>('fire')
   /* The Moon page open: the 3D view draws the moon's arc only then (Batch D, Section 9). */
   const [moonOpen, setMoonOpen] = useState(false)
   /*
@@ -1516,6 +1514,10 @@ export function PlanMode({
       if (cardRequest.kind === 'exposure' || cardRequest.kind === 'tides' || cardRequest.kind === 'surf' || cardRequest.kind === 'buoys' || cardRequest.kind === 'wind' || cardRequest.kind === 'terrain' || cardRequest.kind === 'settings' || cardRequest.kind === 'about') {
         setPage(cardRequest.kind)
         return
+      } else if (cardRequest.kind === 'calendar') {
+        /* Batch Pages, Section 3: the Sky page's Calendar button. */
+        setCalendarOpen(true)
+        return
       } else if (cardRequest.kind === 'preflight') {
         setCard({ kind: 'preflight' } as SheetCard)
         setSheet('full')
@@ -1567,12 +1569,12 @@ export function PlanMode({
     (kind: Chip['kind']) => {
       if (kind === 'tide') setPage('tides')
       else if (kind === 'wind') setPage('wind')
-      else if (kind === 'cloud' || kind === 'golden') {
-        const tab = kind === 'cloud' ? 'fire' : 'now'
-        /* A second tap on the same chip closes it; the other chip, with Sky open, turns to its own tab. */
-        if (card.kind === 'sky' && skyTab === tab) setCard(HOME)
+      /* Batch Pages, Section 3: the Cloud chip opens the Sky page (src/components/SkyPage.tsx); Golden the sheet's sun, moon and night (no tabs any more). */
+      else if (kind === 'cloud') window.dispatchEvent(new CustomEvent(OPEN_SKY_EVENT))
+      else if (kind === 'golden') {
+        if (card.kind === 'sky' && skyTab === 'now') setCard(HOME)
         else {
-          setSkyTab(tab)
+          setSkyTab('now')
           setCard({ kind: 'sky' } as SheetCard)
           raiseToHalf()
         }
@@ -2342,10 +2344,7 @@ export function PlanMode({
                 timeZoneAbbr={venueWindow.timeZoneShort}
                 at={scrubbedAt}
                 tab={skyTab}
-                onTab={setSkyTab}
                 onMoonOpen={setMoonOpen}
-                onOpenCalendar={() => setCalendarOpen(true)}
-                place={place}
                 onJump={scrubTo}
                 target={aimAt}
                 picking={placingAim}
@@ -2354,13 +2353,6 @@ export function PlanMode({
                 onOpenNow={onOpenNow}
                 placeName={venueNameLine}
                 horizon={horizonProfile}
-                onShowBow={(s) => {
-                  if (s === null || venue === null) setBow(null)
-                  else {
-                    const p = sunPositionAt(new Date((s.from.getTime() + s.to.getTime()) / 2), venue.lat, venue.lon)
-                    setBow(bowOnMap(venue, { azimuth: p.azimuth, altitude: p.altitude }))
-                  }
-                }}
                 events={
                   <SkyPanel
                     venue={venue}
@@ -2398,7 +2390,7 @@ export function PlanMode({
             {/* Batch I: the Viewfinder, a front-row button on the Sky pages too. */}
             {/* Not on Weather: its one screen has no room, and the design has none there (Batch K addendum A). */}
             {/* Batch L: not on Sky fire either: its Viewfinder is beside Sunrise and Sunset, where a sticky footer cannot cover the page's foot. */}
-            {onViewfinder === undefined || skyTab === 'weather' || skyTab === 'fire' ? null : (
+            {onViewfinder === undefined || skyTab === 'fire' ? null : (
               <div className="skyfoot">
                 <button type="button" className="skyfoot__vf" onClick={onViewfinder}>
                   <svg className="bbtn__glyph" viewBox="0 0 24 24" aria-hidden="true">
@@ -2926,7 +2918,7 @@ export function PlanMode({
               ? { label: 'Back up', whole: true, onClick: backupReminder.onBackup, dismiss: { label: 'Not now', mark: '×', onClick: backupReminder.onDismiss } }
               : undefined
         }
-        onStatus={locateNote === null && offlineStatus === null && weatherBusy === null && backupReminder == null && specialStatus !== null ? () => { setSkyTab('special'); openCard('sky') } : undefined}
+        onStatus={locateNote === null && offlineStatus === null && weatherBusy === null && backupReminder == null && specialStatus !== null ? () => window.dispatchEvent(new CustomEvent(OPEN_SKY_EVENT)) : undefined}
       />
       </div>
       {netDebug ? <NetDebug onClose={() => setNetDebug(false)} /> : null}

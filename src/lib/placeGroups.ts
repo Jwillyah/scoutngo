@@ -12,7 +12,7 @@ import { SURF_COAST_M } from './surfSetting.ts'
  * decides), Always, or Off. Kept on this phone.
  *
  * Special light follows the same rule: glassy water only at the coast,
- * valley fog only inland (src/components/SpecialLight.tsx).
+ * valley fog only inland.
  */
 export type GroupSetting = 'auto' | 'always' | 'off'
 export interface PlaceGroups {

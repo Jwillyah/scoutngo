@@ -351,18 +351,19 @@ try {
     if (await ev(`!!document.querySelector('.tapnote__close')`)) fail('the note\'s × did not close it')
   }
 
-  /* SKY › CALENDAR: a page of its own, the whole month on one screen with nothing below it (29 Oct). */
+  /* THE CALENDAR: a page of its own, the whole month on one screen with nothing below it (29 Oct). */
   /* Batch K addendum: the dock is gone; the calendar is Sky › Calendar. */
   await ev(`document.querySelector('button[aria-label="Menu"]')?.click()`)
   await wait(900)
   await ev(`document.querySelector('.mcard--sky')?.click()`)
   await wait(1500)
-  await ev(`[...document.querySelectorAll('[role=tab]')].find((b) => b.textContent.trim() === 'Calendar')?.click()`)
+  /* Batch Pages, Section 3: Menu › Sky is the Sky page; its Calendar button opens the month. */
+  await ev(`[...document.querySelectorAll('.spage__buttons button')].find((b) => b.textContent.includes('Calendar'))?.click()`)
   await wait(2500)
   await check('Sky › Calendar', '.cal .cal__grid')
   {
     const fit = JSON.parse(await ev(`JSON.stringify((() => { const c = document.querySelector('.cal'); if (!c) return null; const last = [...c.children].reduce((m, e) => Math.max(m, e.getBoundingClientRect().bottom), 0); return { scroll: c.scrollHeight, room: c.clientHeight, last: Math.round(last), vh: innerHeight, days: c.querySelectorAll('.cal__day').length, chipsTop: [...c.querySelectorAll('.cal__chip')].map((x) => Math.round(x.getBoundingClientRect().top)) } })())`))
-    if (fit === null) fail('Sky › Calendar did not open from the Sky card')
+    if (fit === null) fail('the calendar did not open from the Sky page')
     else {
       console.log(`  the calendar: ${fit.days} days, content to ${fit.last} of ${fit.vh} px`)
       if (fit.days < 28) fail(`the calendar drew ${fit.days} days`)

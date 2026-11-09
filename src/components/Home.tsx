@@ -27,7 +27,7 @@ import { refreshLine, useWeatherRefreshing } from '../lib/useWeatherStatus.ts'
 import { ActivityIcon } from './ActivityIcon.tsx'
 import { MoonGlyph } from './MoonGlyph.tsx'
 import { CamsSheet } from './CamsSheet.tsx'
-import { OPEN_RADAR_EVENT } from './WeatherTab.tsx'
+import { OPEN_RADAR_EVENT } from '../lib/pageEvents.ts'
 import { SkyIconSvg } from './SkyIconSvg.tsx'
 
 /*
@@ -532,7 +532,7 @@ function Card({ kind, which, day, brief, units, drone, now, venue, timeZone, onO
     const next = past ? (brief.days[1] ?? null) : null
     const read = past ? (next?.reads.sunrise ?? null) : (day?.reads.sunset ?? null)
     const at = past ? (next?.events.sunrise ?? null) : (day?.events.sunset ?? null)
-    big = at == null ? '—' : `${past ? 'Sunrise' : 'Sunset'} ${clock(at).replace(/ [AP]M$/, '')}`
+    big = at == null ? '—' : `${past ? 'Sunrise' : 'Sunset'} ${clock(at)}`
     const said = colorWords(read?.call ?? null)
     /* Tomorrow: when the call is settled, an hour before, from the stations (the briefing's own rule). */
     line = which === 'tomorrow' && at != null ? `${said ?? 'no call yet'} · final call ${clock(new Date(at.getTime() - 3_600_000))}` : read === null ? null : [said, shortWhy(read.why)].filter((x) => x !== null && x !== '').join(' · ')

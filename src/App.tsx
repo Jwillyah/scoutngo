@@ -116,7 +116,8 @@ import { lastBackup } from './lib/backup.ts'
 import { PACK_STORAGE_KEY } from './lib/venuePack.ts'
 import { Home, type HomeTarget } from './components/Home.tsx'
 import { WeatherPage } from './components/WeatherPage.tsx'
-import { OPEN_RADAR_EVENT, OPEN_WEATHER_EVENT } from './components/WeatherTab.tsx'
+import { OPEN_RADAR_EVENT, OPEN_SKY_EVENT, OPEN_WEATHER_EVENT } from './lib/pageEvents.ts'
+import { SkyPage } from './components/SkyPage.tsx'
 import { readActivities, showsDrone, showsPhotoTools, useActivities } from './lib/activities.ts'
 import { ActivityPicker } from './components/ActivityPicker.tsx'
 import { SpotPicker } from './components/SpotPicker.tsx'
@@ -1412,6 +1413,13 @@ function App() {
     window.addEventListener(OPEN_WEATHER_EVENT, open)
     return () => window.removeEventListener(OPEN_WEATHER_EVENT, open)
   }, [])
+  /* The Sky page (Batch Pages, Section 3): from the home's Sky card, the menu's, and the map's sky chips. */
+  const [skyOpen, setSkyOpen] = useState(false)
+  useEffect(() => {
+    const open = () => setSkyOpen(true)
+    window.addEventListener(OPEN_SKY_EVENT, open)
+    return () => window.removeEventListener(OPEN_SKY_EVENT, open)
+  }, [])
   /* Latched: once the home has been left for the map (or never opened), the map and the venue save run. */
   const [mapSeen, setMapSeen] = useState(() => !briefOpen)
   if (!briefOpen && !mapSeen) setMapSeen(true)
@@ -1429,16 +1437,16 @@ function App() {
   /* Its clock, a minute at a time while it is open: the Now line and the calls move with it. */
   const [briefNow, setBriefNow] = useState(() => new Date())
   useEffect(() => {
-    if (!briefOpen && !weatherOpen) return
+    if (!briefOpen && !weatherOpen && !skyOpen) return
     setBriefNow(new Date())
     const t = setInterval(() => setBriefNow(new Date()), 60_000)
     return () => clearInterval(t)
-  }, [briefOpen, weatherOpen])
+  }, [briefOpen, weatherOpen, skyOpen])
   const [drawerRequest, setDrawerRequest] = useState<{ drawer: 'kit' | 'saved'; tick: number }>({
     drawer: 'kit',
     tick: 0,
   })
-  const [cardRequest, setCardRequest] = useState<{ kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'buoys' | 'wind' | 'terrain' | 'preflight'; skyTab?: 'now' | 'weather' | 'fire' | 'special' | 'calendar'; tick: number }>({
+  const [cardRequest, setCardRequest] = useState<{ kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'buoys' | 'wind' | 'terrain' | 'preflight' | 'calendar'; skyTab?: 'now' | 'fire'; tick: number }>({
     kind: 'sky',
     tick: 0,
   })
@@ -1527,17 +1535,17 @@ function App() {
    * THE MENU'S CARDS AND ROWS (Batch H, Section 3): each opens its group on
    * its most useful page. Sky names its tab (src/core/menuCards.ts).
    */
-  const onMenuTarget = (target: MenuTarget, opts?: { skyTab?: 'fire' | 'now' }) => {
+  const onMenuTarget = (target: MenuTarget) => {
+    /* Batch Pages, Section 3: the Sky page opens over whatever is there, the home included. */
+    if (target === 'sky') {
+      setSkyOpen(true)
+      return
+    }
     /* The menu opened over the home: what it opens is under the home, so the home steps aside. */
     if (target !== 'today') setBriefOpen(false)
     switch (target) {
       case 'today':
         setBriefOpen(true)
-        return
-      case 'sky':
-        setMode('plan')
-        /* Batch K addendum: Sky opens on the weather unless Sky fire leads. */
-        setCardRequest((r) => ({ kind: 'sky', skyTab: opts?.skyTab === 'fire' ? 'fire' : 'weather', tick: r.tick + 1 }))
         return
       case 'water':
         onMenuPick(groups.water ? (surfInMenu ? 'surf' : 'tides') : 'land')
@@ -1562,12 +1570,15 @@ function App() {
         onMenuPick(t)
         return
       case 'sky':
-        onMenuTarget('sky', { skyTab: 'fire' })
+        setSkyOpen(true)
+        return
+      case 'weather':
+        setWeatherOpen(true)
         return
       case 'moon':
-      case 'weather':
+        /* The sun, the moon and the night as swipe pages: the Sky sheet's one other view. */
         setMode('plan')
-        setCardRequest((r) => ({ kind: 'sky', skyTab: t === 'moon' ? 'now' : 'weather', tick: r.tick + 1 }))
+        setCardRequest((r) => ({ kind: 'sky', skyTab: 'now', tick: r.tick + 1 }))
         return
     }
   }
@@ -2551,13 +2562,35 @@ function App() {
           onSwitchSpot={() => setSpotPickOpen(true)}
           onViewfinder={showsPhotoTools(activities) ? () => setViewfinderOpen(true) : undefined}
           onOpen={(t) => {
-            /* The Weather page opens over the home: Back is the home again. */
-            if (t === 'weather') {
-              setWeatherOpen(true)
+            /* The Weather and Sky pages open over the home: Back is the home again. */
+            if (t === 'weather' || t === 'sky') {
+              homeOpen(t)
               return
             }
             setBriefOpen(false)
             homeOpen(t)
+          }}
+        />
+      ) : null}
+      {skyOpen && centre !== null ? (
+        <SkyPage
+          venue={centre}
+          placeName={venueShort}
+          timeZone={venueWindow?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}
+          now={briefNow}
+          onBack={() => setSkyOpen(false)}
+          onViewfinder={showsPhotoTools(activities) ? () => setViewfinderOpen(true) : undefined}
+          onCalendar={() => {
+            setSkyOpen(false)
+            setBriefOpen(false)
+            setMode('plan')
+            setCardRequest((r) => ({ kind: 'calendar', tick: r.tick + 1 }))
+          }}
+          onDetail={(view) => {
+            setSkyOpen(false)
+            setBriefOpen(false)
+            setMode('plan')
+            setCardRequest((r) => ({ kind: 'sky', skyTab: view, tick: r.tick + 1 }))
           }}
         />
       ) : null}

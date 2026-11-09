@@ -148,12 +148,14 @@ async function screenHalf() {
     await wait(400)
     await ev(`[...document.querySelectorAll('.sidemenu__item')].find((x) => x.textContent.includes('Sky'))?.click()`)
     await wait(1500)
-    const tabs = await ev(`[...document.querySelectorAll('.skyc__tabs button, [role="tab"]')].map((b) => b.textContent.trim())`)
-    for (const [i, tab] of (tabs ?? []).entries()) {
-      await ev(`[...document.querySelectorAll('.skyc__tabs button, [role="tab"]')][${i}]?.click()`)
-      await wait(900)
-      await read(`sky: ${tab}`)
-    }
+    /* Batch Pages, Section 3: Menu › Sky is the Sky page (Sunset, then Sunrise), and its "Color detail ›" the Sky color page; the Weather page from the home's "Weather ›" is read by the pages audit. */
+    await read('sky page: sunset')
+    await ev(`[...document.querySelectorAll('.spage__seg button')][1]?.click()`)
+    await wait(900)
+    await read('sky page: sunrise')
+    await ev(`[...document.querySelectorAll('.spage .ppage__foot button')].find((b) => b.textContent.includes('Color detail'))?.click()`)
+    await wait(1500)
+    await read('sky: color detail')
     watchdog.note(`clock ${clock}`)
     return pages
   }

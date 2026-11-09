@@ -11,13 +11,11 @@
  * (god rays), and showers round the venue on 1 Nov at 2-4 PM EST (a rainbow).
  *
  *   the map    the one status line reads "Fog likely now · 5 of 5 models"
- *              and a tap on it opens Sky › Special
- *   the week   seven rows, a 24 h track each (Batch G): fog Today, god rays
- *              Tomorrow, a rainbow Sunday, each an icon of 44 px on its hours,
- *              no window over two hours, a 1-of-5 window greyed; a tap gives
- *              one line with its models and why, and Go there
- *   the bow    "Show the bow on the map" puts an arc on the map's guide
- *              layer, opposite the sun
+ *              and a tap on it opens the Sky page (Batch Pages, Section 3)
+ *   the week   RARE LIGHT THIS WEEK: Fog Today, Light rays tomorrow, a
+ *              Rainbow chance Sunday, each a row with its day and time and
+ *              one line from the numbers that found it; the icon-only week
+ *              grid, and with it "Show the bow on the map", are gone
  *   no sideways scroll; never "safe", "clear", "certain"
  */
 import { mkdirSync } from 'node:fs'
@@ -131,19 +129,20 @@ try {
     if (box !== null && (box.top < insets.top || box.cut || box.h < 24)) fail(`${label}: the status line is under the status bar, cut or too small to tap ${JSON.stringify(box)}`)
     await page.screenshot({ path: join(OUT, `special-map-${label}.png`) })
     await page.locator('.offline-line--btn').first().tap().catch(() => {})
+    /*
+     * RARE LIGHT THIS WEEK (Batch Pages, Section 3): the status line opens the
+     * Sky page, where the week is rows in words: when, what, one line why from
+     * the numbers that found it. The icon-only week grid is gone.
+     */
     let list = null
     for (let i = 0; i < 20; i += 1) {
       await wait(500)
       list = await ev(`(() => {
-        const s = document.querySelector('.spec')
-        if (!s || s.querySelectorAll('.wk__icon').length === 0) return null
+        const s = document.querySelector('.spage__rare')
+        if (!s || s.querySelectorAll('.spage__row').length === 0) return null
         return {
-          days: [...s.querySelectorAll('.wk__day')].map((d) => ({
-            name: d.querySelector('.wk__name')?.textContent ?? '',
-            icons: [...d.querySelectorAll('.wk__icon')].map((b) => { const r = b.getBoundingClientRect(); return { label: b.getAttribute('aria-label') ?? '', long: b.classList.contains('wk__icon--long'), w: r.width, h: r.height, kind: [...b.classList].find((c) => c.startsWith('wk__icon--') && !/--(long|on)$/.test(c))?.slice(10) ?? '' } }),
-            night: d.querySelectorAll('.wk__night').length,
-            sun: d.querySelectorAll('.wk__sun').length,
-          })),
+          rows: [...s.querySelectorAll('.spage__row')].map((r) => ({ when: r.querySelector('.spage__when')?.textContent ?? '', what: r.querySelector('.spage__what b')?.textContent ?? '', why: r.querySelector('.spage__what span')?.textContent ?? '' })),
+          grid: !!document.querySelector('.spec, .wk__icon'),
           wide: [...s.querySelectorAll('*')].some((e) => e.getBoundingClientRect().right > innerWidth + 1),
           text: s.textContent,
         }
@@ -151,54 +150,26 @@ try {
       if (list !== null) break
     }
     looked += 1
-    console.log(`  week: ${JSON.stringify(list?.days.map((d) => `${d.name}: ${d.icons.map((i) => i.label).join(' / ')}`))}`)
-    if (list === null) fail(`${label}: tapping the status line did not open Sky › Special with the week`)
+    console.log(`  rare light: ${JSON.stringify(list?.rows)}`)
+    if (list === null) fail(`${label}: tapping the status line did not open the Sky page with the week's rare light`)
     else {
-      /*
-       * THE WEEK AS A PICTURE (Batch G, Section 5): seven rows, each a 24 h
-       * track with the night and sunrise and sunset marked, an icon (44 px)
-       * on the hours of each thing; at most two hours a window; a 1-of-5
-       * window greyed.
-       */
-      const day = (name) => list.days.find((d) => d.name === name)
-      const icons = list.days.flatMap((d) => d.icons)
-      if (list.days.length !== 7) fail(`${label}: ${list.days.length} day rows, not 7`)
-      if (list.days.some((d) => d.night !== 2 || d.sun !== 2)) fail(`${label}: a day without its night shaded and sunrise and sunset marked`)
-      if (day('Today')?.icons.find((i) => /^Fog (likely|possible), Today/.test(i.label)) === undefined) fail(`${label}: no fog on Today (Friday morning)`)
-      if (day('Tmrw')?.icons.find((i) => /^God rays (likely|possible), Tmrw/.test(i.label)) === undefined) fail(`${label}: no god rays on Tomorrow`)
-      if (day('Sun')?.icons.find((i) => /^Rainbow (likely|possible), Sun/.test(i.label)) === undefined) fail(`${label}: no rainbow on Sunday`)
-      if (!icons.some((i) => i.long && /^God rays possible.* 1 of 5 models$/.test(i.label))) fail(`${label}: the 1-of-5 god rays are not greyed`)
-      if (icons.some((i) => !i.long && / 1 of 5 models$/.test(i.label))) fail(`${label}: a 1-of-5 window is drawn as a strong one`)
-      if (!icons.every((i) => /\d of \d models$/.test(i.label))) fail(`${label}: an icon does not say how many models agree`)
-      if (icons.some((i) => i.w < 44 || i.h < 44)) fail(`${label}: an icon is under 44 px to tap`)
-      /* At most two hours a window: the span in each icon's label. */
-      const mins = (t) => { const m = /(\d+):(\d+) (AM|PM)/.exec(t); return m === null ? null : ((Number(m[1]) % 12) + (m[3] === 'PM' ? 12 : 0)) * 60 + Number(m[2]) }
-      for (const i of icons) {
-        const m = /(\d+:\d+ [AP]M)–(\d+:\d+ [AP]M)/.exec(i.label)
-        const len = m === null ? null : (mins(m[2]) - mins(m[1]) + 1440) % 1440
-        if (len === null || len > 120) fail(`${label}: "${i.label}" is not a window of two hours or less`)
-      }
-      if (list.wide) fail(`${label}: something in the week runs past 390 px`)
-      if (/\bsafe\b|\bcertain\b|\bclear of\b|\bwill\b/i.test(list.text)) fail(`${label}: the week promises something`)
-      /* A tap: one line, what, when, how sure, why, and Go there. */
-      await page.locator('.wk__icon--fog').first().tap().catch(() => {})
-      await wait(400)
-      const line = await ev(`document.querySelector('.wk__detail')?.textContent ?? null`)
-      console.log(`  fog tapped: ${line}`)
-      if (line === null || !/^Fog (likely|possible)/.test(line) || !/5 of 5 models/.test(line) || !/Dew point 60°F against air 60°F, wind 2 kt, sea 57°F under the air/.test(line) || !/Go there/.test(line)) fail(`${label}: the fog's line reads ${JSON.stringify(line)}`)
+      const row = (what, day) => list.rows.find((r) => r.what === what && r.when.startsWith(day))
+      const fog = row('Fog', 'Today')
+      if (fog === undefined) fail(`${label}: no Fog row on Today (Friday morning)`)
+      else if (!/^dew point 60°F, air 60°F, wind 2 kt, sea 57°F$/.test(fog.why)) fail(`${label}: the fog's line reads ${JSON.stringify(fog.why)}`)
+      const rays = row('Light rays', 'Sat')
+      if (rays === undefined) fail(`${label}: no Light rays on Saturday (tomorrow)`)
+      else if (!/^(scattered|broken) low cloud, sun \d+° up$/.test(rays.why)) fail(`${label}: the rays' line reads ${JSON.stringify(rays.why)}`)
+      const bow = row('Rainbow chance', 'Sun')
+      if (bow === undefined) fail(`${label}: no Rainbow chance on Sunday`)
+      else if (!/^showers to the [a-z-]+, sun \d+° up in the [a-z-]+$/.test(bow.why)) fail(`${label}: the rainbow's line reads ${JSON.stringify(bow.why)}`)
+      if (list.rows.some((r) => !/^(Today|Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{1,2}:\d\d [AP]M$/.test(r.when))) fail(`${label}: a row's day and time read ${JSON.stringify(list.rows.map((r) => r.when))}`)
+      if (list.rows.some((r) => r.why.trim() === '')) fail(`${label}: a row without its one line`)
+      if (list.grid) fail(`${label}: the icon-only week grid is still there`)
+      if (list.wide) fail(`${label}: something in the rare light runs past the screen`)
+      if (/\bsafe\b|\bcertain\b|\bclear of\b|\bwill\b/i.test(list.text)) fail(`${label}: the rare light promises something`)
     }
-    await ev(`document.querySelector('.spec')?.scrollIntoView({ block: 'start' })`)
-    await wait(300)
     await page.screenshot({ path: join(OUT, `special-list-${label}.png`) })
-
-    /* The bow on the map. */
-    await page.locator('.wk__icon--rainbow').first().tap().catch(() => {})
-    await wait(400)
-    await page.getByRole('button', { name: 'Show the bow' }).first().tap().catch(() => {})
-    await wait(1200)
-    const guide = await ev(`(() => { const s = window.__probe?.map?.getSource('guide'); const d = s?.serialize?.().data; return d?.features?.[0]?.geometry?.coordinates?.length ?? null })()`)
-    console.log(`  bow on the map: ${guide} points`)
-    if (!(guide > 5)) fail(`${label}: "Show the bow on the map" drew no arc (${guide})`)
     await ctx.close()
     watchdog.note(label)
   }

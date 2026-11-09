@@ -186,6 +186,8 @@ export interface Special {
   why: string
   /** A 'fire' window's event, when it is known: it names the window "Sunrise color" or "Sunset color". */
   event?: 'sunrise' | 'sunset'
+  /** One short line from the numbers that found it, for the Sky page's rare light (Batch Pages, Section 3): "broken low cloud, sun 8° up". */
+  brief?: string
 }
 
 /*

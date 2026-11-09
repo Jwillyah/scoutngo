@@ -76,12 +76,9 @@ try {
     await goToStage(ev, wait, 'plan')
     await wait(3000)
 
-    await page.locator('button[aria-label="Menu"]').first().tap()
-    await wait(700)
-    await page.getByText('Sky', { exact: true }).first().tap()
-    await wait(1200)
-    await page.getByRole('tab', { name: 'Now' }).tap()
-    await wait(800)
+    /* Batch Pages, Section 3: the sun, the moon and the night are the Golden chip's (the Sky sheet has no tabs). */
+    await page.locator('.chip2', { hasText: 'GOLDEN' }).first().tap()
+    await wait(1500)
     /* Batch I: the line-up finder is a row away, "Line it up with a landmark". */
     await ev(`[...document.querySelectorAll('.frow')].filter((d) => d.querySelector('summary')?.textContent.startsWith('Line it up')).forEach((d) => { d.open = true })`)
     await wait(300)
@@ -103,12 +100,8 @@ try {
     await wait(1500)
     /* Back to the card if the pick closed it. */
     if ((await page.locator('.lineup').count()) === 0) {
-      await page.locator('button[aria-label="Menu"]').first().tap()
-      await wait(700)
-      await page.getByText('Sky', { exact: true }).first().tap()
-      await wait(1200)
-      await page.getByRole('tab', { name: 'Now' }).tap()
-      await wait(800)
+      await page.locator('.chip2', { hasText: 'GOLDEN' }).first().tap()
+      await wait(1500)
     }
     await page.locator('.lineup input').first().fill('the pier end')
     await page.locator('.lineup input').nth(1).fill('4')

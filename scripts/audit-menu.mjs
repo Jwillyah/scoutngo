@@ -107,9 +107,10 @@ try {
     await wait(800)
     await page.locator('.mcard--sky').click()
     await wait(1500)
-    const tab = await ev(`[...document.querySelectorAll('[role="tab"][aria-selected="true"]')].map((t) => t.textContent.trim()).join(',')`)
-    console.log(`  Sky card opened on: ${tab}`)
-    if (!/sky color|fire|now/i.test(tab)) fail(`${label}: the Sky card opened no Sky tab (${JSON.stringify(tab)})`)
+    /* Batch Pages, Section 3: the Sky card opens the Sky page, as the home's Sky card does. */
+    const sky = await ev(`document.querySelector('.spage .ppage__title')?.textContent ?? null`)
+    console.log(`  Sky card opened: ${sky}`)
+    if (sky !== 'Sky') fail(`${label}: the Sky card opened no Sky page (${JSON.stringify(sky)})`)
     await ctx.close()
     watchdog.note(label)
   }

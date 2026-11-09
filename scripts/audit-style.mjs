@@ -209,11 +209,11 @@ try {
   await tap('button[aria-label="Menu"]', 'menu')
   await wait(3000)
   await look('menu')
-  for (const [what, screen] of [['.mcard--sky', 'sky color'], ['.mcard--drone', 'preflight']]) {
+  for (const [what, screen] of [['.mcard--sky', 'sky page'], ['.mcard--drone', 'preflight']]) {
     if (await tap(`nav[aria-label="Stage"] ${what}`, screen)) {
       await look(screen)
-      /* Batch Pages, Section 1: the month too (the calendar was flat navy). */
-      if (what === '.mcard--sky' && (await tap('.skyc__tab:has-text("Calendar")', 'calendar'))) {
+      /* Batch Pages: the month too (the calendar was flat navy), from the Sky page's Calendar button (Section 3). */
+      if (what === '.mcard--sky' && (await tap('.spage__buttons button:has-text("Calendar")', 'calendar'))) {
         await look('calendar')
         await tap('.cal__close', 'close the calendar')
       }
@@ -246,6 +246,12 @@ try {
   if (await tap('nav[aria-label="Stage"] .mcard--today', 'home')) {
     await wait(2500)
     await look('home')
+    /* Batch Pages, Section 2: the Weather page, from the home's "Weather ›". */
+    if (await tap('.home__page[aria-label="Today"] .hwx__more', 'weather page')) {
+      await wait(2500)
+      await look('weather page')
+      await tap('.wpage .ppage__back', 'back to the home')
+    }
     if (await tap('.home__page[aria-label="Today"] .hcard--surf', 'surf page')) {
       await wait(2500)
       await look('surf page')

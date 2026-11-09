@@ -12,6 +12,13 @@
  *             line; 7 days; the radar strip; "… models … ›" and "How we got
  *             this ›" at the foot; Back is the home again
  *
+ *   Sky       the home's Sky card opens it; Sunset · Sunrise; "Color
+ *             likely / possible / unlikely" and a reason; the three plain
+ *             checks by name; Golden · Set · Blue · Dark with times; RARE
+ *             LIGHT THIS WEEK (rows or its own "nothing" line), never the
+ *             icon-only week grid; Viewfinder and Calendar ›; the map's
+ *             Cloud chip opens it too, and the map has no Sky sheet tabs
+ *
  * Nothing on a page says safe or clear (rule 28; ux-rules 12), except the
  * station's own "below 12,000 ft" cloud report, which is about cloud.
  */
@@ -125,6 +132,40 @@ try {
       if (await ev(`!!document.querySelector('.wpage')`)) fail(`${label}: Back left the Weather page open`)
       if (!(await ev(`!!document.querySelector('.home')`))) fail(`${label}: Back from the Weather page is not the home`)
     }
+
+    /* -------------------------------------------------------------- Sky */
+    const skyCard = await page.locator('.home__page[aria-label="Today"] .hcard--sky').first().click({ timeout: 4000 }).then(() => true, () => false)
+    if (!skyCard) fail(`${label}: no Sky card on the home`)
+    await wait(5000)
+    const k = JSON.parse(await ev(FIT('.spage')))
+    if (k.missing) fail(`${label}: the Sky card opened no Sky page`)
+    else {
+      looked += 1
+      console.log(`  Sky: ${k.content}/${k.box} px, ${k.out.length === 0 && !k.scrolls ? 'fits' : `scrolls or runs off ${JSON.stringify(k.out)}`}`)
+      const d = JSON.parse(await ev(`JSON.stringify({ seg: [...document.querySelectorAll('.spage__seg button')].map((b) => b.textContent), head: document.querySelector('.spage__head')?.textContent ?? null, why: document.querySelector('.spage__why')?.textContent ?? null, checks: [...document.querySelectorAll('.spage__check span')].map((e) => e.textContent), marks: document.querySelector('.spage__marks')?.textContent ?? null, rare: document.querySelector('.spage__rare')?.innerText ?? null, grid: !!document.querySelector('.spage .spec__week, .spage .spec__grid, .spage .spec__lane'), buttons: [...document.querySelectorAll('.spage__buttons button')].map((b) => b.textContent) })`))
+      console.log(`  ${JSON.stringify(d).slice(0, 500)}`)
+      if (!/^Sunset /.test(d.seg[0] ?? '') || !/^Sunrise /.test(d.seg[1] ?? '')) fail(`${label}: the toggle reads ${JSON.stringify(d.seg)}`)
+      if (!/^(Color (likely|possible|unlikely)|No call yet)$/.test(d.head ?? '')) fail(`${label}: the headline reads ${JSON.stringify(d.head)}`)
+      if (!d.why || d.why === '…') fail(`${label}: no reason under the headline`)
+      if (d.checks.join('|') !== 'Clouds to light up|Gap at the horizon (' + (d.checks[1]?.match(/\((.*)\)/)?.[1] ?? '') + ')|Anything blocking the sun') fail(`${label}: the checks are ${JSON.stringify(d.checks)}`)
+      if (!/Golden ?\d+:\d\d [AP]M.*Set ?\d+:\d\d [AP]M.*Blue ?\d+:\d\d [AP]M.*Dark ?\d+:\d\d [AP]M|Blue ?\d+:\d\d [AP]M.*Glow ?\d+:\d\d [AP]M.*Rise ?\d+:\d\d [AP]M.*Day ?\d+:\d\d [AP]M/.test(d.marks ?? '')) fail(`${label}: the light bar reads ${JSON.stringify(d.marks)}`)
+      if (!/RARE LIGHT THIS WEEK/i.test(d.rare ?? '')) fail(`${label}: no RARE LIGHT THIS WEEK`)
+      if (d.grid) fail(`${label}: the icon-only week grid is still there`)
+      if (!d.buttons.some((b) => /Calendar/.test(b))) fail(`${label}: no Calendar button`)
+      if (/\bsafe\b|all clear|clear to/i.test(k.text)) fail(`${label}: the Sky page says safe or clear`)
+      await page.screenshot({ path: join(OUT, `sky-${label.replace(/\s/g, '-').toLowerCase()}.png`) })
+      await page.locator('.spage .ppage__back').click()
+      await wait(800)
+      if (await ev(`!!document.querySelector('.spage')`)) fail(`${label}: Back left the Sky page open`)
+    }
+    /* The map: its Cloud chip opens the Sky page; no Sky sheet with tabs. */
+    await page.locator('.home .hbtn--round[aria-label="Open the map"]').click().catch(() => fail(`${label}: no map button on the home`))
+    await wait(2500)
+    const chip = await page.locator('.chips2 button:has-text("Cloud"), .chip2:has-text("Cloud")').first().click({ timeout: 4000 }).then(() => true, () => false)
+    if (!chip) fail(`${label}: no Cloud chip on the map`)
+    await wait(3000)
+    if (!(await ev(`!!document.querySelector('.spage')`))) fail(`${label}: the map's Cloud chip opened no Sky page`)
+    if (await ev(`!!document.querySelector('.skyc__tabs')`)) fail(`${label}: the Sky sheet's tabs are still on the map`)
     await ctx.close()
     watchdog.note(label)
   }

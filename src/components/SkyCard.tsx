@@ -7,16 +7,12 @@ import { rankNights, type MilkyWayNight } from '../core/milkyWay.ts'
 import { nightSky, tonightMoment, type SkyThing } from '../core/nightSky.ts'
 import { getSunArc, getSunPosition } from '../core/sun.ts'
 import { formatClock } from '../core/timezone.ts'
-import { SKY_TABS, type SkyTab } from '../lib/skyTab.ts'
+import type { SkyTab } from '../lib/skyTab.ts'
 import { SkyFire } from './SkyFire.tsx'
 import { SkyPreview } from './SkyPreview.tsx'
-import { SpecialLight } from './SpecialLight.tsx'
-import { OPEN_WEATHER_EVENT } from './WeatherTab.tsx'
 import type { Units } from '../lib/units.ts'
 import { LineUp } from './LineUp.tsx'
 import type { HorizonInput } from '../core/skyWindow.ts'
-import type { Special } from '../core/specialLight.ts'
-import type { Place } from '../lib/placeGroups.ts'
 
 /*
  * THE SKY, FIVE WAYS, PICTURE FIRST.
@@ -45,7 +41,6 @@ interface SkyCardProps {
   timeZoneAbbr: string
   at: Date
   tab: SkyTab
-  onTab: (tab: SkyTab) => void
   onJump: (at: Date) => void
   /** The pin to align with. Shared with the sun search. */
   target: LatLon | null
@@ -59,16 +54,10 @@ interface SkyCardProps {
   onOpenNow?: () => void
   /** The venue's name, for the sky fire log. */
   placeName?: string
-  /** Special light: draw a rainbow's bow on the map, or clear it. */
-  onShowBow?: (s: Special | null) => void
   /** Sky fire's Viewfinder, beside Sunrise and Sunset (Batch L: a sticky footer covered the page's foot in a short Safari tab). */
   onViewfinder?: () => void
   /** The visible horizon round the venue (the terrain's, or flat), for lining things up. */
   horizon?: HorizonInput
-  /** The month as a calendar page. */
-  onOpenCalendar?: () => void
-  /** Coast or inland, for Special light's items (src/lib/placeGroups.ts). */
-  place?: Place
 }
 
 const DEG = Math.PI / 180
@@ -146,7 +135,7 @@ function MoonDisc({ fraction, waxing }: { fraction: number; waxing: boolean }) {
 }
 
 
-export function SkyCard({ more, venue, timeZone, timeZoneAbbr, at, tab, onTab, onJump, target, picking, onPickTarget, events, onPlanMoonrise, onOpenNow, placeName, onShowBow, horizon, onOpenCalendar, place, onMoonOpen, onViewfinder }: SkyCardProps) {
+export function SkyCard({ more, venue, timeZone, timeZoneAbbr, at, tab, onJump, target, picking, onPickTarget, events, onPlanMoonrise, onOpenNow, placeName, horizon, onMoonOpen, onViewfinder }: SkyCardProps) {
   const clock = (d: Date) => `${formatClock(d, timeZone)}`
   const finderProps = { venue, target, picking, onPickTarget, onJump, clock, timeZone }
   const [nowPage, setNowPage] = useState(0)
@@ -182,7 +171,7 @@ export function SkyCard({ more, venue, timeZone, timeZoneAbbr, at, tab, onTab, o
     t.altitude <= 0 ? 'below the horizon' : `${compassWord(t.azimuth)}, ${Math.round(t.altitude)}° up`
 
   /* One page's body: the eight pages of 29 Oct, now laid out four ways below. */
-  const bodyFor = (tab: 'tonight' | 'sun' | 'fire' | 'preview' | 'special' | 'moon'): ReactNode => {
+  const bodyFor = (tab: 'tonight' | 'sun' | 'fire' | 'preview' | 'moon'): ReactNode => {
   let body: ReactNode = null
   if (tab === 'tonight') {
     const best = Math.max(1, ...nights.map((n) => n.score))
@@ -267,8 +256,6 @@ export function SkyCard({ more, venue, timeZone, timeZoneAbbr, at, tab, onTab, o
     )
   } else if (tab === 'fire') {
     body = <SkyFire venue={venue} timeZone={timeZone} placeName={placeName ?? 'This place'} at={at} target={target} onPickTarget={onPickTarget} onViewfinder={onViewfinder} clock={(k, show) => <SkyPreview venue={venue} timeZone={timeZone} at={at} kind={k} onJump={onJump} show={show} />} />
-  } else if (tab === 'special') {
-    body = <SpecialLight venue={venue} timeZone={timeZone} at={at} onJump={onJump} onShowBow={onShowBow} place={place} />
   } else if (tab === 'preview') {
     body = <SkyPreview venue={venue} timeZone={timeZone} at={at} onJump={onJump} />
   } else if (tab === 'moon') {
@@ -343,58 +330,14 @@ export function SkyCard({ more, venue, timeZone, timeZoneAbbr, at, tab, onTab, o
         {bodyFor('fire')}
       </>
     )
-  } else if (tab === 'weather') {
-    /* Batch Pages, Section 2: the weather is its own page now; this tab is the door to it. */
-    body = (
-      <button type="button" className="btn skyc__weather" onClick={() => window.dispatchEvent(new CustomEvent(OPEN_WEATHER_EVENT))}>
-        Open the Weather page ›
-      </button>
-    )
-  } else if (tab === 'special') {
-    body = bodyFor('special')
   } else {
-    body = (
-      <>
-        {onOpenCalendar === undefined ? null : (
-          <button type="button" className="btn btn--small skyc__now" onClick={onOpenCalendar}>
-            Open the month
-          </button>
-        )}
-        {/*
-          * THE MONTH IS THE CALENDAR (Batch G, Section 6): the tab opens it
-          * straight away; this is what is under it when you come back. The
-          * year's sunrise and sunset compass went: its letters were clipped
-          * (W and S cut by the frame, read on the phone as N twice and no W),
-          * and the map already draws today's sun lines on the venue itself.
-          * The showers and moons, with their calendar alerts, stay.
-          */}
-        <p className="skyc__head">Showers and moons, next 90 days</p>
-        {events}
-      </>
-    )
+    body = null
   }
 
   return (
     <div className="skyc">
-      <div className="skyc__tabs" role="tablist" aria-label="Sky">
-        {SKY_TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            aria-selected={tab === t.id}
-            className={`skyc__tab${tab === t.id ? ' skyc__tab--on' : ''}`}
-            onClick={() => {
-              onTab(t.id)
-              /* Calendar opens on the month (Batch G): the month view is the default. */
-              if (t.id === 'calendar') onOpenCalendar?.()
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-      <div role="tabpanel">{body}</div>
+      {/* Batch Pages, Section 3: no tabs; the Sky page and the Weather page are their own pages. */}
+      <div>{body}</div>
     </div>
   )
 }

@@ -19,6 +19,8 @@ import { fetchMarine, fetchMonthExtremes, fetchWindMonth, hourlyAt } from './tid
 import { fetchStations } from './noaa.ts'
 import { nearestStations } from '../core/tide.ts'
 import { glassMornings } from '../core/glassMornings.ts'
+import { compassWord } from '../core/compassWords.ts'
+import { rainbowBrief } from '../core/skyPage.ts'
 
 export const SPECIAL_MODELS = ['gfs_seamless', 'ecmwf_ifs025', 'icon_seamless', 'gem_seamless', 'gfs_hrrr'] as const
 export const SHOWER_RING_KM = 25
@@ -175,13 +177,36 @@ export function specialsFrom(week: SpecialWeek, venue: LatLon, seaCAt: (t: Date)
     return `Thin mid or high cloud${c === null ? '' : ` ${Math.round(c)}%`} with the sun ${Math.round(sun[h])}° up: look within about 10° of the sun, shading it with a hand or a building.`
   }
   const lit = (s: Special) => week.hours.some((t, h) => t >= s.from && t < s.to && sun[h] > -6)
+  /*
+   * THE ONE LINE (Batch Pages, Section 3): the same numbers as the why, at the
+   * window's first hour, short enough for a row.
+   */
+  const point = (deg: number) => compassWord(deg).toLowerCase()
+  const brief = (s: Special): string => {
+    const h = Math.max(0, week.hours.findIndex((t) => t.getTime() >= s.from.getTime()))
+    if (s.kind === 'fog') {
+      const t = median('temperature_2m', h)
+      const d = median('dew_point_2m', h)
+      const sea = seaCAt(week.hours[h])
+      return `dew point ${f0(d)}°F, air ${f0(t)}°F, wind ${f0(median('wind_speed_10m', h))} kt${sea === null ? '' : `, sea ${f0((sea * 9) / 5 + 32)}°F`}`
+    }
+    if (s.kind === 'rainbow') return rainbowBrief(point(antisolar(pos[h]).azimuth), point(pos[h].azimuth), sun[h])
+    if (s.kind === 'rays') {
+      const yes = models.filter((_m, i) => rays[i][h] === true).map((m) => at(m, 0, 'cloud_cover_low', h)).filter((x): x is number => x !== null).sort((a, b) => a - b)
+      const c = yes.length === 0 ? null : yes[Math.floor(yes.length / 2)]
+      return `${c === null ? 'low cloud' : `${cloudWord(c)} low cloud`}, sun ${Math.round(sun[h])}° up`
+    }
+    return ''
+  }
   /* Only shootable windows, at most two hours, tied to their cause hour by hour (src/core/specialLight.ts shootable). */
   return [
     ...shootable('fog', week.hours, fog, sun, fogWhy),
     ...shootable('rainbow', week.hours, rain, sun, rainWhy),
     ...shootable('rays', week.hours, rays, sun, raysWhy),
     ...(irid.length === 0 ? [] : shootable('iridescence', week.hours, irid, sun, iridWhy)),
-  ].filter(lit)
+  ]
+    .filter(lit)
+    .map((x) => ({ ...x, brief: brief(x) }))
 }
 
 export async function fetchSpecialWeek(venue: LatLon, fetchImpl: typeof fetch = fetch): Promise<{ week: SpecialWeek; seaCAt: (t: Date) => number | null } | null> {
@@ -256,5 +281,6 @@ export async function fetchGlassWeek(venue: LatLon, from: Date): Promise<Special
       of: 1,
       word: 'possible' as const,
       why: `Low tide ${Math.abs(m.minutesFromSunrise ?? 0)} min ${(m.minutesFromSunrise ?? 0) < 0 ? 'before' : 'after'} sunrise at ${near.station.name}, and a light wind in Open-Meteo’s forecast.`,
+      brief: `low tide ${Math.abs(m.minutesFromSunrise ?? 0)} min ${(m.minutesFromSunrise ?? 0) < 0 ? 'before' : 'after'} sunrise, light wind`,
     }))
 }
