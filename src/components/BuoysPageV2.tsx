@@ -1,4 +1,6 @@
+import '../styles/surf.css'
 import type { LatLon } from '../core/geo.ts'
+import { buoyParts, partWords } from '../core/surfReads.ts'
 import { AIMED_TOLERANCE_DEG, FORECAST_TOLERANCE_FRACTION, FORECAST_TOLERANCE_M, G, versusForecast } from '../core/swellTravel.ts'
 import { fitView, inView, viewTiles } from '../core/tileView.ts'
 import { formatClock } from '../core/timezone.ts'
@@ -110,6 +112,14 @@ export function BuoysBody({ venue, placeName, timeZone, units, buoys, marine, ma
                 <span className="dbuoy__read">
                   {[waveHeight(b.waveM, units), b.periodS === null ? null : `${Math.round(b.periodS)} s`, b.fromDeg === null ? null : `from ${compass(b.fromDeg)}`, formatClock(b.at, timeZone, units.clock)].filter((x) => x !== null).join(' · ')}
                 </span>
+                {/* Batch MAP2, Section 1: the parts its .spec file reports (swell, wind waves), never invented. */}
+                {buoyParts(b.split).length === 0 ? null : (
+                  <span className="dbuoy__parts" data-buoy-parts>
+                    {buoyParts(b.split)
+                      .map((p) => `${p.name.toLowerCase()} ${partWords(p)}${p.fromDeg === null ? '' : ` ${compass(p.fromDeg)}`}`)
+                      .join(' · ')}
+                  </span>
+                )}
               </span>
               {leg.minutes === null ? null : (
                 <span className="dbuoy__eta">

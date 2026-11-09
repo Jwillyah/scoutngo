@@ -1,10 +1,14 @@
+import '../styles/surf.css'
 import { useEffect, useMemo, useState } from 'react'
 import { venueToday } from '../core/eventDay.ts'
 import { type LatLon } from '../core/geo.ts'
 import { camsNear, type SkyCam } from '../core/skyCams.ts'
 import { BAND_FLOOR_FT, skillLine, UNTESTED_ERROR_FT, type SkillSample, type SpotStats } from '../core/spotSkill.ts'
 import { BUOY_MATCH_FT, buoyVsForecast, camDistance, chartTopFt, cleanRuns, rangeWords, SURF_SPREAD_SOURCE } from '../core/surfRange.ts'
-import { bestWindow, faceLight, sizeWords, type FaceLight } from '../core/surfShoot.ts'
+import { bestWindow, faceLight, type FaceLight } from '../core/surfShoot.ts'
+import { buoyParts, forecastParts, partWords, periodRead, rangeSizeWords } from '../core/surfReads.ts'
+import { halfHour } from '../lib/windNow.ts'
+import { hourlyAt } from '../lib/tideSheetData.ts'
 import { SURF_FIRING_FT, SURF_FUN_FT } from '../core/briefing.ts'
 import { formatClock, formatShortHour, zonedTimeToUtc } from '../core/timezone.ts'
 import { COAST_CAMS } from '../data/coastCams.ts'
@@ -122,6 +126,12 @@ export function SurfBody({ now, timeZone, spot, spotName, away, sea, stats, kept
   const hours = useMemo(() => (marine === null ? [] : dayHours(marine, wind, today, timeZone, facing, stats)), [marine, wind, today, timeZone, facing, stats])
   const week = useMemo(() => (marine === null ? [] : weekPeaks(marine, wind, today, timeZone, facing, stats)), [marine, wind, today, timeZone, facing, stats])
   const head = useMemo(() => surfNowFrom(sea, stats, now, timeZone).now, [sea, stats, now, timeZone])
+  /* Batch MAP2, Section 1: the dominant period (the buoy's when fresh), and the sea in its parts at this hour. */
+  const half = halfHour(now)
+  const fresh = sea.buoy !== null && sea.buoy.status === 'ok' && Math.abs(now.getTime() - sea.buoy.at.getTime()) <= 2 * 3_600_000
+  const period = head === null ? null : periodRead(sea.buoy?.status === 'ok' ? sea.buoy.periodS : null, fresh, marine === null ? null : hourlyAt(marine, 'swell_wave_peak_period', half), head.periodS, sea.buoy?.status === 'ok' ? sea.buoy.buoy.id : null)
+  const parts = marine === null ? [] : forecastParts((n) => hourlyAt(marine, n, half))
+  const partTop = Math.max(1, ...parts.slice(0, 2).map((p) => p.ft))
   const place = (
     <p className="dsurf__place">
       {spotName}
@@ -166,8 +176,25 @@ export function SurfBody({ now, timeZone, spot, spotName, away, sea, stats, kept
         <p className="dhead__line">
           {head === null
             ? 'The forecast did not say for this hour'
-            : [sizeWords(head.centerFt), [head.shape === null ? 'wind not forecast' : SHAPE_WORDS[head.shape], head.side === null ? null : SIDE_WORDS[head.side]].filter((x) => x !== null).join(', '), `${Math.round(head.periodS)} s`].join(' · ')}
+            : [rangeSizeWords(head.range.lowFt, head.range.highFt), [head.shape === null ? 'wind not forecast' : SHAPE_WORDS[head.shape], head.side === null ? null : SIDE_WORDS[head.side]].filter((x) => x !== null).join(', '), period?.words ?? null].filter((x) => x !== null).join(' · ')}
         </p>
+        {/* Batch MAP2, Section 1 (board LOOKS · Surf, S7): the top two parts of the sea, each its own bar, height · period, and an arrow the way it goes. */}
+        {parts.length === 0 ? null : (
+          <div className="dsurf__parts" data-swell-parts>
+            {parts.slice(0, 2).map((p) => (
+              <div key={p.name} className="dsurf__part">
+                <span className="dsurf__pname">{p.name}</span>
+                <span className="dsurf__pbar" style={{ width: `${Math.max(12, Math.min(100, (p.ft / partTop) * 100)).toFixed(0)}%` }} />
+                <span className="dsurf__pval">{partWords(p)}</span>
+                {p.fromDeg === null ? null : (
+                  <svg className="dsurf__parrow" viewBox="-8 -8 16 16" aria-label={`from ${compass(p.fromDeg)}`}>
+                    <path d="M0 -6 L0 6 M-3.5 2.5 L0 6 L3.5 2.5" transform={`rotate(${(p.fromDeg + 180) % 360})`} />
+                  </svg>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
         {shoot && head !== null && lightNow !== null ? (
           <p className="dhead__line">
             Light on the face: {LIGHT_WORDS[lightNow]}
@@ -274,7 +301,7 @@ function TodayChart({ hours, kept, buoy, facing, now, today, timeZone }: { hours
         ))}
       </svg>
       <p className="dsurf__legend">
-        <i className="dsurf__key dsurf__key--line" /> forecast <i className="dsurf__key dsurf__key--band" /> likely range <i className="dsurf__key dsurf__key--dot" /> buoy readings · ft
+        <i className="dsurf__key dsurf__key--line" /> forecast <i className="dsurf__key dsurf__key--band" /> likely range <i className="dsurf__key dsurf__key--dot" /> buoy, as beach faces · ft
       </p>
     </>
   )
@@ -302,16 +329,25 @@ function BuoyCard({ buoy, facing, marine, wind, stats, clock }: { buoy: BuoyRead
     .replace(/,\s*[A-Z]{2}$/, '')
     .trim()
   const period = buoy.periodS === null ? null : `${Math.round(buoy.periodS)} s`
+  const split = buoyParts(buoy.split)
   return (
     <DCard className="dsurf__buoy">
       <span className="dsurf__buoyicon" aria-hidden="true" />
       <div className="dsurf__buoytext">
         <p className="dsurf__line">
-          <b className="dsurf__val">{face === null ? `Buoy sea ${metresToFeet(buoy.waveM).toFixed(1)} ft` : `Buoy reads ${face.toFixed(1)} ft`}</b>
+          {/* Batch MAP2, Section 1 (9 Nov: "Buoy reads 5.5 ft" for a buoy reading 3.3 ft): what the buoy reads, raw; the beach's faces worked from it have their own line. */}
+          <b className="dsurf__val" data-buoy-raw>Buoy reads {metresToFeet(buoy.waveM).toFixed(1)} ft</b>
           {period === null ? '' : ` · ${period}`}
         </p>
+        {face === null ? null : (
+          <p className="dsurf__small" data-buoy-faces>
+            As faces at this beach ≈ {face.toFixed(1)} ft · {there === null ? 'the forecast did not say for that hour' : `${buoyVsForecast(face, there.centerFt)} forecast`}
+          </p>
+        )}
+        {split.length === 0 ? null : <p className="dsurf__small">{split.map((p) => `${p.name.toLowerCase()} ${partWords(p)}${p.fromDeg === null ? '' : ` ${compass(p.fromDeg)}`}`).join(' · ')}</p>}
         <p className="dsurf__small">
-          {name} {buoy.buoy.id} · {clock(buoy.at)} · {face === null ? 'no period or direction: not set against the forecast' : there === null ? 'the forecast did not say for that hour' : `${buoyVsForecast(face, there.centerFt)} forecast`}
+          {name} {buoy.buoy.id} · {clock(buoy.at)}
+          {face === null ? ' · no period or direction: not set against the forecast' : ''}
         </p>
       </div>
     </DCard>

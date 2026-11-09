@@ -9,6 +9,9 @@ import type { Hourly } from '../lib/tideSheetData.ts'
 import type { SurfSea } from '../lib/useSurfSea.ts'
 import { SurfBody, SurfHow, type SurfBodyProps } from './SurfPageV2.tsx'
 
+/* 44099's significant height in the fixture, metres (2.3 ft raw). */
+const BUOY_WAVE_M = 0.7
+
 /*
  * A FIXTURE SEA, NOT AN OBSERVATION: a steady east swell on an east-facing
  * beach (Virginia Beach's facing, about 100°) with a light west (offshore)
@@ -49,7 +52,7 @@ const buoy: BuoyReading = {
     km: 24,
   },
   at: new Date('2026-11-02T14:56:00Z'),
-  waveM: 0.7,
+  waveM: BUOY_WAVE_M,
   periodS: 8,
   fromDeg: 100,
   split: null,
@@ -122,13 +125,22 @@ describe('Surf page v2 (Batch N, Section 1)', () => {
     expect(html).toContain('class="dsurf__now"')
     /* The kept 7 AM check and the live 9:56 AM reading. */
     expect(html.match(/class="dsurf__dot"/g)?.length).toBe(2)
-    expect(text(html)).toContain('forecast likely range buoy readings')
+    expect(text(html)).toContain('forecast likely range buoy, as beach faces')
   })
 
   it('says the buoy against the forecast, its name, number and time', () => {
     const t = text(render())
     expect(t).toMatch(/Buoy reads \d+\.\d ft · 8 s/)
-    expect(t).toMatch(/Cape Henry 44099 · 9:56 AM · (in line with|bigger than|smaller than) forecast/)
+    expect(t).toMatch(/As faces at this beach ≈ \d+\.\d ft · (in line with|bigger than|smaller than) forecast/)
+    expect(t).toContain('Cape Henry 44099 · 9:56 AM')
+  })
+
+  /* Batch MAP2, Section 1 (9 Nov 12:46 PM: "Buoy reads 5.5 ft" for 44099 reading 3.3 ft): "Buoy reads" is the buoy's own height, raw. */
+  it('"Buoy reads" is the raw significant height; the beach-converted number has its own label', () => {
+    const html = render()
+    const raw = /data-buoy-raw="true">Buoy reads (\d+\.\d) ft/.exec(html)?.[1]
+    expect(raw).toBe((BUOY_WAVE_M * 3.28084).toFixed(1))
+    expect(/data-buoy-faces="true">As faces at this beach ≈ (\d+\.\d) ft/.exec(html)?.[1]).not.toBe(raw)
   })
 
   it('shows the cam as a link out, and no card without one', () => {

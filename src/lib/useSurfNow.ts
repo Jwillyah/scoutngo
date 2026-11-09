@@ -13,6 +13,8 @@ import { useMemo, useSyncExternalStore } from 'react'
 import { distanceMeters, type LatLon } from '../core/geo.ts'
 import { spotKey, spotStats, type SpotStats } from '../core/spotSkill.ts'
 import { rangeWords } from '../core/surfRange.ts'
+import { periodRead, rangeSizeWords } from '../core/surfReads.ts'
+import { hourlyAt } from './tideSheetData.ts'
 import { venueToday } from '../core/eventDay.ts'
 import { addDays, rangeHourAt, weekPeaks, type RangeHour } from './surfPageData.ts'
 import { onSkillBook, readSkillBook, skillBookVersion } from './spotSkillStore.ts'
@@ -34,6 +36,17 @@ export interface SurfNow {
   /** Tomorrow's biggest hour, and in words. */
   tomorrow: RangeHour | null
   tomorrowWords: string | null
+}
+
+/** "knee to chest · 13 s at 44099": the size from the band's own ends and the dominant period (Batch MAP2, Section 1), the home's and the Surf page's. */
+export function surfLine(sea: SurfSea, h: RangeHour | null, now: Date): string | null {
+  if (h === null) return null
+  const b = sea.buoy
+  const fresh = b !== null && b.status === 'ok' && Math.abs(now.getTime() - b.at.getTime()) <= 2 * 3_600_000
+  const half = new Date(Math.floor(now.getTime() / 3_600_000) * 3_600_000 + 1_800_000)
+  const peak = sea.marine === null ? null : hourlyAt(sea.marine, 'swell_wave_peak_period', half)
+  const p = periodRead(b?.status === 'ok' ? b.periodS : null, fresh, peak, h.periodS, b?.status === 'ok' ? b.buoy.id : null)
+  return [rangeSizeWords(h.range.lowFt, h.range.highFt), p?.words ?? null].filter((x) => x !== null).join(' · ')
 }
 
 /** The words for a band, the one way every screen says it. */

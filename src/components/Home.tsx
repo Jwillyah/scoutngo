@@ -10,7 +10,8 @@ import { wakeAt } from '../core/alertIcs.ts'
 import { formatClock } from '../core/timezone.ts'
 import { COAST_CAMS } from '../data/coastCams.ts'
 import { homeOrder, primaryFor, useActivities } from '../lib/activities.ts'
-import { useSurfNow, type SurfNow } from '../lib/useSurfNow.ts'
+import { surfLine, useSurfNow, type SurfNow } from '../lib/useSurfNow.ts'
+import { rangeSizeWords } from '../core/surfReads.ts'
 import { beachName } from '../lib/surfBeach.ts'
 import { gustWords, windAt, windWords } from '../lib/windNow.ts'
 import { hourlyAt } from '../lib/tideSheetData.ts'
@@ -540,7 +541,8 @@ function Card({ kind, which, day, brief, units, drone, now, venue, timeZone, onO
     const words = which === 'today' ? surf.nowWords : surf.tomorrowWords
     if (words !== null) {
       big = <span data-shared={which === 'today' ? 'surf' : 'surf-tomorrow'}>{words}</span>
-      line = surf.away === null ? (day?.surfWords ?? '').replace(/^[^,]*,\s*/, '') : null
+      /* Batch MAP2, Section 1: today's line is the Surf page's own (size from the band's ends, the dominant period); tomorrow's, its size. */
+      line = surf.away !== null ? null : which === 'today' ? surfLine(surf.sea, band, now) : band === null ? null : rangeSizeWords(band.range.lowFt, band.range.highFt)
       tag = band?.tag ?? null
     }
     /* Not on open ocean (Batch N E8: a bay point read "0-1 ft · flat, 3 s"): the nearest surf beach, said as that. */
