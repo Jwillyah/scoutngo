@@ -1,0 +1,15 @@
+{
+  "schema": "scoutngo.model-skill/1",
+  "region": "midatl",
+  "date": "2026-11-09",
+  "generated": "2026-11-09T15:31:03.108Z",
+  "file": "2026-11-09.json.gz",
+  "bytes": 523640,
+  "rawBytes": 2683682,
+  "sha256": "0877de304e094a269c4c85d283ec13c5cea712ccdaf039b7052268db5c44e416",
+  "stations": 48,
+  "rows": 119769,
+  "history": [
+    "2026-11-09.json.gz"
+  ]
+}
