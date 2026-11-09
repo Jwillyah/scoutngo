@@ -6,11 +6,11 @@
  * The Virginia Beach pier with the Air 3S in the bag (rated 12 m/s, 27 mph).
  * Open-Meteo answers five models with the wind FROM the north (0°) at
  * 10-15 m/s at the ground and stronger aloft; KNTU's METAR says 02007KT; the
- * buoy says 6 m/s from 350°. The WIND chip, then "Five models": the words say
- * "from the N", over the rating and in amber, with no "safe" anywhere; every
- * arrow points south (TO = FROM + 180); the rated line is drawn; the 80 m and
- * 120 m tabs read higher; the station and the buoy are listed. Nothing past
- * 390 px.
+ * buoy says 6 m/s from 350°. The WIND chip opens the Wind page v2 (Batch N,
+ * Section 3): the words say "from the N", with no "safe" anywhere; the dial's
+ * arrow and every arrow of the next 12 hours point south (TO = FROM + 180);
+ * the 400 ft tile is over the Air 3S's rating; the station tile is KNTU from
+ * the NNE; a models tile. Nothing past 390 px, nothing scrolls.
  */
 import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -115,46 +115,40 @@ try {
     for (let i = 0; i < 20; i += 1) {
       await wait(500)
       w = await ev(`(() => {
-        const p = document.querySelector('.windp')
-        if (!p || !p.querySelector('.windp__verdict')) return null
+        /* Batch N, Section 3: the Wind page v2 (src/components/WindPageV2.tsx). */
+        const p = document.querySelector('.dpage--wind')
+        const head = p?.querySelector('[data-wind-headline]')
+        if (!p || !head) return null
+        const tiles = [...p.querySelectorAll('.dwind__tile')].map((t) => t.textContent)
         return {
-          verdict: p.querySelector('.windp__verdict').textContent,
-          over: p.querySelector('.windp__verdict').classList.contains('windp__verdict--over'),
-          note: p.querySelector('.windp__note')?.textContent ?? '',
-          arrows: [...p.querySelectorAll('.windp__arrow')].map((a) => a.getAttribute('transform')),
-          rated: !!p.querySelector('.windp__rated'),
-          measured: [...p.querySelectorAll('.windp__measured li')].map((l) => l.textContent),
+          verdict: head.textContent,
+          big: p.querySelector('.dhead__big')?.textContent ?? '',
+          dial: p.querySelector('.dwind__arrow')?.getAttribute('data-to') ?? null,
+          arrows: [...p.querySelectorAll('.dwind__ha path')].map((a) => a.getAttribute('transform')),
+          tiles,
           text: p.textContent,
-          /* A time split from its AM or PM across lines: "8:40 / AM" (ux-rules 4). */
-          split: [...p.querySelectorAll('.windp__t')].some((t) => t.getClientRects().length > 1),
+          scrolls: [...p.querySelectorAll('*')].some((e) => { const st = getComputedStyle(e); return /(auto|scroll)/.test(st.overflowY) && e.scrollHeight > e.clientHeight + 1 }),
           wide: document.documentElement.scrollWidth > innerWidth + 1 || [...p.querySelectorAll('*')].some((e) => e.getBoundingClientRect().right > innerWidth + 1),
         }
       })()`)
       if (w !== null) break
     }
     looked += 1
-    console.log(`  ground: ${w?.verdict} | ${w?.note}`)
-    console.log(`  measured: ${JSON.stringify(w?.measured)}`)
+    console.log(`  headline: ${w?.big} | ${w?.verdict}`)
+    console.log(`  tiles: ${JSON.stringify(w?.tiles)}`)
     if (w === null) fail(`${label}: the Wind page did not open with a reading`)
     else {
       if (!/from the N\b/.test(w.verdict)) fail(`${label}: a north wind reads "${w.verdict}"`)
-      if (!w.over) fail(`${label}: a 13 m/s median over the Air 3S's 12 m/s rating is not marked`)
-      if (!/5 models/.test(w.note) || !/Over the Air 3S’s rated/.test(w.note)) fail(`${label}: the line under the words reads "${w.note}"`)
-      if (w.arrows.length < 20 || !w.arrows.every((t) => /rotate\((17[5-9]|18[0-5])(\.\d+)?\)/.test(t ?? ''))) fail(`${label}: the arrows do not all point south for a north wind: ${JSON.stringify(w.arrows.slice(0, 3))}`)
-      if (!w.rated) fail(`${label}: no rated-wind line on the strip`)
-      if (!w.measured.some((m) => /^KNTU: .* from the NNE/.test(m))) fail(`${label}: the station's 02007KT is not listed as from the NNE: ${JSON.stringify(w.measured)}`)
-      if (!w.measured.some((m) => /^buoy 44099: .* from the N/.test(m))) fail(`${label}: the buoy is not listed`)
-      if (/\bsafe\b/i.test(w.text.replace(/not a promise/g, ''))) fail(`${label}: the page says safe`)
+      if (w.dial === null || Math.abs(Number(w.dial) - 180) > 5) fail(`${label}: the dial's arrow does not point south for a north wind (to ${w.dial})`)
+      if (w.arrows.length < 6 || !w.arrows.every((t) => /rotate\((17[5-9]|18[0-5])(\.\d+)?\)/.test(t ?? ''))) fail(`${label}: the 12 hours' arrows do not all point south: ${JSON.stringify(w.arrows.slice(0, 3))}`)
+      if (!w.tiles.some((t) => /At 400 ft.*over rated/.test(t))) fail(`${label}: the 400 ft tile does not say it is over the Air 3S's rating: ${JSON.stringify(w.tiles)}`)
+      if (!w.tiles.some((t) => /Station KNTU.*NNE/.test(t))) fail(`${label}: the station's 02007KT is not shown as KNTU from the NNE: ${JSON.stringify(w.tiles)}`)
+      if (!w.tiles.some((t) => /Models/.test(t))) fail(`${label}: no models tile`)
+      if (/\bsafe\b/i.test(w.text)) fail(`${label}: the page says safe`)
       if (w.wide) fail(`${label}: something runs past 390 px`)
-      if (w.split) fail(`${label}: a measured time is split from its AM or PM`)
+      if (w.scrolls) fail(`${label}: the page scrolls at 390 x 844`)
     }
     await page.screenshot({ path: join(OUT, `wind-${label}.png`) })
-    await page.getByRole('button', { name: '120 m', exact: true }).tap().catch(() => {})
-    await wait(500)
-    const high = await ev(`document.querySelector('.windp__verdict')?.textContent ?? ''`)
-    console.log(`  120 m: ${high}`)
-    if (high === w?.verdict) fail(`${label}: the 120 m tab reads the same as the ground`)
-    await page.screenshot({ path: join(OUT, `wind-120-${label}.png`) })
     await ctx.close()
     watchdog.note(label)
   }
@@ -162,7 +156,7 @@ try {
   await browser.close()
 }
 watchdog.stop()
-if (asked.models === 0 || asked.nws === 0 || asked.buoy === 0) fail(`the app never asked for ${JSON.stringify(asked)}`)
+if (asked.models === 0 || asked.nws === 0) fail(`the app never asked for ${JSON.stringify(asked)}`)
 if (looked === 0) {
   console.log('=== WIND AUDIT ABORTED: nothing was looked at ===')
   process.exit(2)

@@ -19330,3 +19330,169 @@ a.about__row * {
     height: 28px;
   }
 }
+/* ---- WIND PAGE v2 (Batch N, Section 3) ---- */
+.dpage--wind {
+  /* Offshore and onshore on this page: teal and orange, the board's two; cross-shore stays plain. */
+  --dwind-off: #2dd4bf;
+  --dwind-on: #ff9f6b;
+}
+.dwind__kick {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: rgb(255 255 255 / 0.8);
+}
+.dwind__tag {
+  display: inline-block;
+  margin-left: 12px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  vertical-align: middle;
+  background: rgb(255 255 255 / 0.2);
+  color: #fff;
+}
+.dwind__tag--offshore {
+  background: rgb(20 60 70 / 0.55);
+  color: var(--dwind-off);
+}
+.dwind__tag--onshore {
+  background: rgb(80 40 20 / 0.45);
+  color: var(--dwind-on);
+}
+.dwind__dialbox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.dwind__dial {
+  display: block;
+  width: min(100%, 200px);
+  height: auto;
+}
+.dwind__face {
+  fill: rgb(255 255 255 / 0.08);
+}
+.dwind__sector--offshore {
+  fill: var(--dwind-off);
+  fill-opacity: 0.38;
+}
+.dwind__sector--onshore {
+  fill: var(--dwind-on);
+  fill-opacity: 0.32;
+}
+.dwind__sector--cross {
+  fill: transparent;
+}
+.dwind__ring {
+  fill: none;
+  stroke: rgb(255 255 255 / 0.45);
+  stroke-width: 1;
+}
+.dwind__beach {
+  stroke: #f3e2b5;
+  stroke-width: 2.5;
+  stroke-dasharray: 5 4;
+}
+.dwind__card {
+  fill: rgb(255 255 255 / 0.85);
+  font-size: 12px;
+  font-weight: var(--weight-medium);
+}
+.dwind__lab {
+  font-size: 11px;
+  font-weight: var(--weight-medium);
+}
+.dwind__lab--offshore {
+  fill: var(--dwind-off);
+}
+.dwind__lab--onshore {
+  fill: var(--dwind-on);
+}
+.dwind__arrow line {
+  stroke: #fff;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+}
+.dwind__arrow path,
+.dwind__arrow circle {
+  fill: #fff;
+}
+.dwind__note {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: rgb(255 255 255 / 0.85);
+  text-align: center;
+}
+.dwind__strip {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+}
+.dwind__h {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  gap: 2px;
+}
+.dwind__ht {
+  font-size: var(--text-xs);
+  color: rgb(255 255 255 / 0.8);
+}
+.dwind__ha {
+  width: 22px;
+  height: 22px;
+  fill: #fff;
+}
+.dwind__h--offshore .dwind__ha {
+  fill: var(--dwind-off);
+}
+.dwind__h--onshore .dwind__ha {
+  fill: var(--dwind-on);
+}
+.dwind__hs {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+.dwind__flip {
+  margin: 4px 0 0;
+  font-size: var(--text-sm);
+  color: rgb(255 255 255 / 0.9);
+}
+.dwind__tiles {
+  display: flex;
+  gap: 14px;
+}
+.dwind__tile {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.dwind__tile .dcard__label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dwind__big {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.15;
+  font-weight: 300;
+  white-space: nowrap;
+}
+.dwind__line {
+  margin: 1px 0 0;
+  font-size: var(--text-xs);
+  color: rgb(255 255 255 / 0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-height: 700px) {
+  .dwind__dial {
+    width: min(100%, 150px);
+  }
+}

@@ -1,5 +1,4 @@
 import { BuoysPage } from './BuoysPage.tsx'
-import { WindPage } from './WindPage.tsx'
 import { TidesPage } from './TidesPage.tsx'
 import { ExposurePage } from './ExposurePage.tsx'
 import { CalendarPage } from './CalendarPage.tsx'
@@ -77,6 +76,7 @@ import type { ReadFile } from '../lib/scoutFile.ts'
 import { useOnline } from '../lib/useOnline.ts'
 import { showsPhotoTools, useActivities } from '../lib/activities.ts'
 import { SurfPageV2 } from './SurfPageV2.tsx'
+import { WindPageV2 } from './WindPageV2.tsx'
 import { groundOf } from '../core/homeDay.ts'
 import type { DetailId } from '../lib/detailTabs.ts'
 
@@ -2584,7 +2584,7 @@ export function PlanMode({
        * Surf · Tide · Wind · Buoys in the home's look, a back button and the four
        * as tabs; "How we got this ›" and "See on map ›" at the foot.
        */}
-      {(page === 'surf') && venue !== null && venueWindow !== null ? (() => {
+      {(page === 'surf' || page === 'wind') && venue !== null && venueWindow !== null ? (() => {
         const props = {
           venue: { lat: venue.lat, lon: venue.lon },
           placeName: venueNameLine,
@@ -2596,7 +2596,7 @@ export function PlanMode({
           onMap: () => setPage(null),
           drone: surfDrone !== null ? { name: surfDrone.name, maxWindMps: surfDrone.ratedMps } : picked !== null && picked.includes('drone') ? { name: 'drone', maxWindMps: null } : null,
         }
-        return <SurfPageV2 {...props} />
+        return page === 'surf' ? <SurfPageV2 {...props} /> : <WindPageV2 {...props} />
       })() : null}
       {page === 'tides' && venue !== null && scrubbedAt !== null && venueWindow !== null ? (
         <TidesPage
@@ -2621,22 +2621,6 @@ export function PlanMode({
         />
       ) : null}
       {page === 'buoys' && venueWindow !== null ? <BuoysPage data={tideSheet} timeZone={venueWindow.timeZone} onClose={() => setPage(null)} /> : null}
-      {page === 'wind' && venue !== null && scrubbedAt !== null && venueWindow !== null ? (
-        <WindPage
-          venue={venue}
-          at={scrubbedAt}
-          timeZone={venueWindow.timeZone}
-          unit={units.wind}
-          tempUnit={units.temperature}
-          drone={surfDrone === null ? null : { name: surfDrone.name, ratedMps: surfDrone.ratedMps }}
-          facing={tideSheet.facing.status === 'ready' && tideSheet.facing.value !== null && tideSheet.facing.value !== 'inland' ? tideSheet.facing.value.facing : null}
-          onClose={() => setPage(null)}
-          onWindCard={() => {
-            setPage(null)
-            openCard('wind')
-          }}
-        />
-      ) : null}
       {page === 'settings' ? (
         <SettingsPage
           feedPlace={venue}
