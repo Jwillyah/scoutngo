@@ -19007,7 +19007,8 @@ a.about__row * {
 }
 .dpage__tab {
   flex: 1;
-  min-height: 36px;
+  /* A finger's 44 px (the gesture audit, Batch N). */
+  min-height: 44px;
   border: 0;
   border-radius: 999px;
   background: transparent;
@@ -19330,6 +19331,130 @@ a.about__row * {
     height: 28px;
   }
 }
+/* ---- TIDE PAGE v2 (Batch N, Section 2) ---- */
+.dtide__kick {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: rgb(255 255 255 / 0.8);
+}
+.dtide__curvecard {
+  padding: 8px 12px 6px;
+}
+.dtide__curve {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.dtide__night {
+  fill: rgb(8 14 40 / 0.22);
+}
+.dtide__area {
+  fill: rgb(147 210 255 / 0.18);
+}
+.dtide__line {
+  fill: none;
+  stroke: #9dd6ff;
+  stroke-width: 3;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.dtide__mark circle {
+  fill: #fff;
+}
+.dtide__t {
+  fill: #fff;
+  font-size: 10px;
+  font-weight: var(--weight-medium);
+}
+.dtide__h {
+  fill: rgb(255 255 255 / 0.8);
+  font-size: 9.5px;
+}
+.dtide__now {
+  fill: #fff;
+}
+.dtide__nowt {
+  fill: #fff;
+  font-size: 11px;
+  font-weight: var(--weight-medium);
+}
+.dtide__tick {
+  fill: rgb(255 255 255 / 0.75);
+  font-size: 10px;
+}
+.dtide__none {
+  margin: 8px 0;
+  font-size: var(--text-sm);
+}
+.dtide__tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.dtide__tile {
+  min-width: 0;
+}
+.dtide__big {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.1;
+  font-weight: 300;
+  white-space: nowrap;
+}
+.dtide__line {
+  margin: 2px 0 0;
+  font-size: var(--text-xs);
+  color: rgb(255 255 255 / 0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dtide__mirror {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  width: 100%;
+  color: #fff;
+  font: inherit;
+  text-align: left;
+}
+.dtide__sunicon {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  fill: none;
+  stroke: var(--sun);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.dtide__mirrortext {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.dtide__mirrorhead {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+.dtide__mirrorline {
+  font-size: var(--text-xs);
+  color: rgb(255 255 255 / 0.85);
+}
+.dtide__list {
+  margin: 0 0 8px;
+  padding-left: 18px;
+}
+.dtide__list li {
+  margin: 0 0 4px;
+}
+@media (max-height: 700px) {
+  .dtide__big {
+    font-size: 24px;
+  }
+}
+
 /* ---- WIND PAGE v2 (Batch N, Section 3) ---- */
 .dpage--wind {
   /* Offshore and onshore on this page: teal and orange, the board's two; cross-shore stays plain. */

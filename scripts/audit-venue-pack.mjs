@@ -363,7 +363,7 @@ try {
     /* The tide curve. */
     await page.locator('.chip2', { hasText: 'TIDE' }).first().click({ timeout: 3000 }).catch(() => {})
     await wait(2500)
-    const tide = await ev(`(() => { const p = document.querySelector('.tpage'); const path = document.querySelector('.tpage .tides__line'); return { page: !!p, curve: !!path && (path.getAttribute('d') ?? '').length > 20, text: p?.textContent ?? '' } })()`)
+    const tide = await ev(`(() => { const p = document.querySelector('.tpage, .dpage--tide'); const path = document.querySelector('.tpage .tides__line, .dpage--tide .dtide__line'); return { page: !!p, curve: !!path && (path.getAttribute('d') ?? '').length > 20, text: p?.textContent ?? '' } })()`)
     console.log(`  tides offline: ${JSON.stringify({ page: tide.page, curve: tide.curve })}`)
     if (!tide.curve) fail(`${label}: no tide curve offline`)
     if (/didn.t load/.test(tide.text)) fail(`${label}: part of the Tides page did not load offline: "${tide.text.match(/[^.]*didn.t load[^.]*/)?.[0]}"`)
@@ -375,7 +375,7 @@ try {
      */
     await page.keyboard.press('Escape')
     await wait(600)
-    await ev(`document.querySelector('.page__close, .page__back')?.click()`)
+    await ev(`document.querySelector('.page__close, .page__back, .dpage__back')?.click()`)
     await wait(600)
     await ev(`document.querySelector('button[aria-label="Open the 3D clay model"]')?.click()`)
     let up3d = null

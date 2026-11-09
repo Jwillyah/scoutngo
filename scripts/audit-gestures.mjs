@@ -115,7 +115,7 @@ try {
     await ev(`[...document.querySelectorAll('.chip2')].find((x) => /TIDE/.test(x.textContent))?.click()`)
     await wait(2500)
     await targets('the Tides page')
-    await ev(`document.querySelector('.page__close, .page__back')?.click()`)
+    await ev(`document.querySelector('.page__close, .page__back, .dpage__back')?.click()`)
     await wait(800)
     await ev(`document.querySelector('button[aria-label="Open the 3D clay model"]')?.click()`)
     await wait(6000)
@@ -232,7 +232,10 @@ try {
     await ev(`[...document.querySelectorAll('.chip2')].find((x) => /TIDE/.test(x.textContent))?.click()`)
     await wait(2500)
     const curve = JSON.parse(await ev(`JSON.stringify(document.querySelector('[data-sideways][aria-label^="The tide"]')?.getBoundingClientRect() ?? null)`))
-    if (curve === null) fail('no tide curve on the Tide card, so it was not checked')
+    /* Batch N, Section 2: the Tide page v2 draws today's curve as a picture (board Detail2T), not a time control: there is nothing to scrub, only that it is there. */
+    const v2 = await ev(`!!document.querySelector('.dpage--tide .dtide__curve')`)
+    if (curve === null && v2) console.log('  the Tide page v2: today\'s curve is a picture, not a time control (nothing to scrub)')
+    else if (curve === null) fail('no tide curve on the Tide card, so it was not checked')
     else {
       const tideState = `JSON.stringify({ sheet: document.querySelector('.sheet')?.dataset.detent, at: Number(document.querySelector('[data-sideways][aria-label^="The tide"]')?.getAttribute('aria-valuenow')) })`
       const ta = JSON.parse(await ev(tideState))
@@ -246,7 +249,7 @@ try {
       console.log(`  ${tb.at !== ta.at && tb.sheet === ta.sheet ? 'ok' : 'wrong'}`)
     }
     /* The tide chip opens the Tides page now (29 Oct): close it. */
-    await ev(`document.querySelector('.page__close, .page__back')?.click()`)
+    await ev(`document.querySelector('.page__close, .page__back, .dpage__back')?.click()`)
     await wait(800)
     await dispose()
   }
