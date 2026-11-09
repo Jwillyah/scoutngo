@@ -184,9 +184,20 @@ export interface Special {
   of: number
   word: 'possible' | 'likely'
   why: string
+  /** A 'fire' window's event, when it is known: it names the window "Sunrise color" or "Sunset color". */
+  event?: 'sunrise' | 'sunset'
 }
 
-export const SPECIAL_NAME: Record<SpecialKind, string> = { fog: 'Fog', rainbow: 'Rainbow', rays: 'God rays', glass: 'Glassy water', fire: 'Sky fire', iridescence: 'Iridescence' }
+/*
+ * NAMES. The colour in the clouds at a sunrise or sunset is "Sunrise color" or
+ * "Sunset color", and "Sky color" where no one event is meant (Batch M,
+ * Section 4: the old name is The Photographer's Ephemeris's trademark).
+ */
+export const SPECIAL_NAME: Record<SpecialKind, string> = { fog: 'Fog', rainbow: 'Rainbow', rays: 'God rays', glass: 'Glassy water', fire: 'Sky color', iridescence: 'Iridescence' }
+export const COLOR_NAME: Record<'sunrise' | 'sunset', string> = { sunrise: 'Sunrise color', sunset: 'Sunset color' }
+
+/** One window's name: a colour window says its event when it knows it. */
+export const specialNameOf = (s: Pick<Special, 'kind' | 'event'>): string => (s.kind === 'fire' && s.event !== undefined ? COLOR_NAME[s.event] : SPECIAL_NAME[s.kind])
 
 /**
  * Hours where at least one model says yes, joined into windows. `byModel[m][h]`
@@ -293,7 +304,7 @@ export function shootable(kind: SpecialKind, hours: readonly Date[], byModel: re
 
 /** "Fog possible 6–8 AM" from a window, with the span written by the caller's clock. */
 export function specialLine(s: Special, span: (from: Date, to: Date) => string): string {
-  return `${SPECIAL_NAME[s.kind]} ${s.word} ${span(s.from, s.to)}`
+  return `${specialNameOf(s)} ${s.word} ${span(s.from, s.to)}`
 }
 
 /** Enough models agree to interrupt: a map chip, a Near you card. */

@@ -12,7 +12,8 @@ import { beachWindLine } from '../core/localWind.ts'
 import { useStormPlay } from '../lib/useStormPlay.ts'
 import { OPEN_RADAR_EVENT } from './WeatherTab.tsx'
 import { bestViewOnMap } from '../core/bestView.ts'
-import { camsForEvent, type FacingCam } from '../core/skyCams.ts'
+import { camsForEvent } from '../core/skyCams.ts'
+import { droneWindow, droneWindowLine } from '../core/droneWindow.ts'
 import { COAST_CAMS } from '../data/coastCams.ts'
 import { beachName } from '../lib/surfBeach.ts'
 import { changeWords } from '../core/callChange.ts'
@@ -268,17 +269,11 @@ function DayPage({ onOpenWeather, day, which, placeName, venue, timeZone, units,
   /* Batch J, Section 6: the call this phone showed last for the event, and its change ("Upgraded to Go at 4:52 PM from KNTU"). */
   const callKey = read === null || which !== 'today' || settling ? null : `${venue.lat.toFixed(2)},${venue.lon.toFixed(2)}|${read.kind}|${read.event.toISOString()}`
   /* Batch J, Section 5: where the colour will be, and which spots see it; a tap draws it on the map. */
-  /* Batch K, Section 7: VDOT's coastal traffic cams beside the beach cams, loaded only for Today (src/data/vdotCams.ts). */
-  const [vdot, setVdot] = useState<readonly FacingCam[]>([])
-  useEffect(() => {
-    if (which !== 'today') return
-    let live = true
-    void import('../data/vdotCams.ts').then((m) => live && setVdot(m.VDOT_CAMS))
-    return () => {
-      live = false
-    }
-  }, [which])
-  const skyCams = useMemo(() => (read === null || which !== 'today' ? { look: '', cams: [] } : camsForEvent(venue, read.event, [...COAST_CAMS, ...vdot])), [read, which, venue, vdot])
+  /*
+   * Batch M, Section 4: one rule for "Look <dir> now" (src/core/skyCams.ts): a recorded facing within 45° of the sun, within 15 km.
+   * VDOT's road cams record the lanes they watch, not where they look, so they are not offered here (8 Nov: I-264 cams the wrong way).
+   */
+  const skyCams = useMemo(() => (read === null || which !== 'today' ? { look: '', cams: [] } : camsForEvent(venue, read.event, COAST_CAMS)), [read, which, venue])
   const best = useBestView(which === 'today' && read !== null && read.call !== 'Skip' ? venue : null, read?.event ?? null)
   const change = useMemo(() => (callKey === null || read === null ? null : remember(callKey, read.event, read.call, read.by ?? null, now)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -540,7 +535,8 @@ function Conditions({ day, which, units, drone, now, venue, timeZone, clock }: {
           <div className="brow__head">
             <RowIcon kind="drone" />
             <span className="brow__name">Drone</span>
-            <span className="brow__words">{launch === null || atCall === null ? 'No light to fly for' : `Launch ${clock(launch).replace(/ [AP]M$/, '')} · fly ${sunSide(atCall, venue.lat, venue.lon, compass)}`}</span>
+            {/* Batch M, Section 4: with no call to launch for, the next calm window and golden light (src/core/droneWindow.ts), not "No light to fly for". */}
+            <span className="brow__words">{launch === null || atCall === null ? droneWindowLine(droneWindow(day.wind, drone.maxWindMps, day.start, venue.lat, venue.lon, now), timeZone, (mps) => `${Math.floor(windIn(mps, units.wind) ?? 0)} ${wunit}`) : `Launch ${clock(launch).replace(/ [AP]M$/, '')} · fly ${sunSide(atCall, venue.lat, venue.lon, compass)}`}</span>
             <Scale steps={['Light wind', 'Breezy', 'Too windy']} on={dTag} label={`Wind for the ${drone.name}`} />
           </div>
           <p className="brow__small num">{callWind?.highMps == null ? 'Wind at 400 ft not forecast' : `${Math.round(windIn(callWind.highMps, units.wind) ?? 0)} ${wunit} at 400 ft`} · check airspace</p>

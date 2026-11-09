@@ -24,7 +24,7 @@ describe('Saved', () => {
   it('lists the past shoots from the truth loop, in words', () => {
     expect(text).toContain('Past shoots')
     expect(text).toContain('DJI Air 3S')
-    expect(shootLine(SHOOT as never)).toBe('30 Oct 2026 · 12 min after sunrise · sky fire said likely · you said fired')
+    expect(shootLine(SHOOT as never)).toBe('30 Oct 2026 · 12 min after sunrise · sunrise color said likely · you said fired')
   })
 
   it('a day is a day, never a time', () => {

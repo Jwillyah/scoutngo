@@ -151,7 +151,7 @@ try {
       await wait(700)
       await page.getByText('Sky', { exact: true }).first().tap()
       await wait(1200)
-      await page.getByRole('tab', { name: 'Fire' }).tap()
+      await page.getByRole('tab', { name: 'Sky color' }).tap()
       let fire = null
       for (let i = 0; i < 20; i += 1) {
         await wait(500)
@@ -184,7 +184,7 @@ try {
       }
       looked += 1
       console.log(`  ${phase}: ${fire?.verdict} · ${fire?.checks.length} checks · ${fire?.decks} decks · ray ${fire?.ray} · now ${fire?.now === null ? 'none' : 'shown'}`)
-      if (fire === null || fire.verdict === null) fail(`${label} ${phase}: no verdict on the Fire tab`)
+      if (fire === null || fire.verdict === null) fail(`${label} ${phase}: no verdict on the Sky color tab`)
       else {
         /* Batch I, one screen: the verdict big, "N of 5" beside it, the agreement by layer behind Why. */
         if (!/^Fire (possible|likely)$/.test(fire.verdict)) fail(`${label} ${phase}: 29 Oct reads "${fire.verdict}", and it fired`)
@@ -199,8 +199,8 @@ try {
         if (!/^Best \d{1,2}:\d{2}/.test(fire.when ?? '')) fail(`${label} ${phase}: no best time under the verdict (${fire.when})`)
         if (fire.why.length !== 3 || !fire.why.every((c) => /\d/.test(c))) fail(`${label} ${phase}: Why's checks are ${JSON.stringify(fire.why)}, not three with numbers`)
         if (fire.long.length > 0) fail(`${label} ${phase}: paragraphs over two lines on the first screen: ${JSON.stringify(fire.long)}`)
-        if (fire.switches !== 1) fail(`${label} ${phase}: ${fire.switches} Sunrise / Sunset switches on the Sky fire page, not 1`)
-        if (fire.verdicts !== 1) fail(`${label} ${phase}: ${fire.verdicts} verdicts on the Sky fire page, not 1`)
+        if (fire.switches !== 1) fail(`${label} ${phase}: ${fire.switches} Sunrise / Sunset switches on the Sky color page, not 1`)
+        if (fire.verdicts !== 1) fail(`${label} ${phase}: ${fire.verdicts} verdicts on the Sky color page, not 1`)
         if (fire.checks.length !== 3 || !fire.checks.every((c) => /^(Canvas|Gap|Not blocked) ?(yes|no|partly)$/.test(c))) fail(`${label} ${phase}: the checks are ${JSON.stringify(fire.checks)}, not three icons with yes or no`)
         if (fire.decks === 0 || !fire.ray) fail(`${label} ${phase}: the side view has ${fire.decks} decks and ray ${fire.ray}`)
         if (fire.wide) fail(`${label} ${phase}: something in the card runs past 390 px`)
@@ -254,7 +254,7 @@ try {
           const glow = /^Best (\d{1,2}):(\d{2})/.exec(prev.words)
           if (glow === null) fail(`${label}: the page does not say when the glow starts: "${prev.words}"`)
           else if (Number(glow[1]) * 60 + Number(glow[2]) >= 7 * 60 + 20) fail(`${label}: the low deck glows from ${glow[1]}:${glow[2]}, and it was seen about 7:15`)
-          if (prev.verdict === null || !/^Fire (possible|likely)/.test(prev.verdict)) fail(`${label}: Sky fire's verdict is not on top (${prev.verdict})`)
+          if (prev.verdict === null || !/^Fire (possible|likely)/.test(prev.verdict)) fail(`${label}: Sky color's verdict is not on top (${prev.verdict})`)
           if (prev.strips < 1 || prev.cells.some((n) => n !== 91) || prev.coloured.some((n) => n < 10)) fail(`${label}: the strips are ${JSON.stringify({ cells: prev.cells, coloured: prev.coloured })}`)
           /* Pages that only said "coming" went in Batch E; pages 2 and 3 came back with pictures in Batch F: one dot a page, and each picture page says its clouds are illustrative. */
           if (prev.soon.length !== 0) fail(`${label}: pages that only say they are coming: ${JSON.stringify(prev.soon)}`)
@@ -268,7 +268,7 @@ try {
         await ev(`document.querySelector('.prev')?.scrollIntoView({ block: 'start' })`)
         await wait(300)
         await page.screenshot({ path: join(OUT, `preview-${label}.png`) })
-        await page.getByRole('tab', { name: 'Fire' }).tap()
+        await page.getByRole('tab', { name: 'Sky color' }).tap()
         await wait(500)
       } else {
         if (!fire?.log) fail(`${label}: after sunrise there is no "How was it?"`)
@@ -299,7 +299,7 @@ try {
           await wait(300)
           const rate = await ev(`[...document.querySelectorAll('.truth .fire__note')].map((p) => p.textContent).join(' | ')`)
           console.log(`  hit rate: ${rate}`)
-          if (!/1 shoot logged\. When Sky fire said possible or likely it fired 1 of 1 times\./.test(rate)) fail(`${label}: the hit rate reads "${rate}"`)
+          if (!/1 shoot logged\. When Sky color said possible or likely it fired 1 of 1 times\./.test(rate)) fail(`${label}: the hit rate reads "${rate}"`)
           const stored = await ev(`localStorage.getItem('scoutngo.truthLog.v1') ?? ''`)
           if (/data:image|base64/.test(stored)) fail(`${label}: the log kept the picture, not only its numbers`)
           await ev(`document.querySelector('.truth')?.scrollIntoView({ block: 'center' })`)

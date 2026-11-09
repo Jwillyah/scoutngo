@@ -59,11 +59,14 @@ export function surfSize(faceFt: number): SurfSize {
   return 'Big'
 }
 
-/** Clean when glassy (light, or offshore); messy when onshore and 10 kt or more; bumpy between. */
+/** Onshore at this or more blows the faces apart: 5.1 m/s, 10 kt. */
+export const MESSY_ONSHORE_MPS = 5.1
+
+/** Clean when glassy (light under GLASSY_MPS, 5 kt, or offshore); messy when onshore and MESSY_ONSHORE_MPS (10 kt) or more; bumpy between. */
 export function surfShape(windMps: number, windFromDeg: number, facingDeg: number | null): SurfShape {
   const relation = facingDeg === null ? null : windToBeach(windFromDeg, facingDeg)
   if (isGlassy(windMps, relation)) return 'Clean'
-  if (relation === 'onshore' && windMps >= 5.1) return 'Messy'
+  if (relation === 'onshore' && windMps >= MESSY_ONSHORE_MPS) return 'Messy'
   return 'Bumpy'
 }
 

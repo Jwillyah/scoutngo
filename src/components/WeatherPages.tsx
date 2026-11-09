@@ -98,7 +98,7 @@ export function ModelsPage({ state, venue, timeZone, units, at, risk }: { state:
         ))}
       </ul>
       <p className="wxl__note">% = how much each model counts, from how it has done here</p>
-      <p className="wxl__tile num">{record.said === 0 ? 'No Sky fire calls logged yet' : `${record.fired}/${record.said} Sky fire calls right · from your log`}</p>
+      <p className="wxl__tile num">{record.said === 0 ? 'No Sky color calls logged yet' : `${record.fired}/${record.said} Sky color calls right · from your log`}</p>
       <details className="frow">
         <summary>The numbers</summary>
         <WeatherDetails state={state} now={now} units={units} timeZone={timeZone} risk={risk} />

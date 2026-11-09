@@ -229,7 +229,7 @@ export function TruthLoop({ timeZone, venue, placeName, target, onPickTarget, on
                 {e.timeFrom === 'asked' ? ' (no time in the file)' : ` · ${e.said.minutesFromEvent >= 0 ? `${e.said.minutesFromEvent} min after` : `${-e.said.minutesFromEvent} min before`} ${e.said.event} · sun ${Math.round(e.said.sunAltitude)}° up`}
                 {e.said.light === null ? '' : `, ${LIGHT[e.said.light]}`}
                 {e.said.golden ? ', golden hour' : ''}
-                {e.said.fire === null ? ' · no Sky fire forecast shown' : ` · it said ${e.said.fire}`}
+                {e.said.fire === null ? ` · no ${e.said.event} color forecast shown` : ` · it said ${e.said.fire}`}
                 {e.thumb ? <img src={e.thumb} alt="" className="truth__thumb" /> : null}
                 {e.sky ? (
                   <span className="truth__sky">
@@ -256,7 +256,7 @@ export function TruthLoop({ timeZone, venue, placeName, target, onPickTarget, on
       <p className="fire__note">
         {r.shoots === 0
           ? 'No shoots logged yet. Pick the photos after a sunrise or sunset to start.'
-          : `${r.shoots} ${r.shoots === 1 ? 'shoot' : 'shoots'} logged. ${r.firesaid === 0 ? 'Sky fire was not shown for any of them.' : `When Sky fire said possible or likely it fired ${r.firedWhenSaid} of ${r.firesaid} times.`}${r.unlikelySaid === 0 ? '' : ` When it said unlikely it fired ${r.firedWhenUnlikely} of ${r.unlikelySaid}.`} ${r.golden} of ${r.photos} photos in golden hour.`}
+          : `${r.shoots} ${r.shoots === 1 ? 'shoot' : 'shoots'} logged. ${r.firesaid === 0 ? 'Sky color was not shown for any of them.' : `When Sky color said possible or likely it fired ${r.firedWhenSaid} of ${r.firesaid} times.`}${r.unlikelySaid === 0 ? '' : ` When it said unlikely it fired ${r.firedWhenUnlikely} of ${r.unlikelySaid}.`} ${r.golden} of ${r.photos} photos in golden hour.`}
       </p>
       {log.length === 0 && undo === null ? null : (
         <div className="btn-row">

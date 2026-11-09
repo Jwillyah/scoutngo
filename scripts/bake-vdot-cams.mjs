@@ -11,9 +11,11 @@
  * Kept: active cams in coastal Virginia (36.5-38.1 N, 75.2-77.1 W: Hampton
  * Roads, the Eastern Shore, the Middle Peninsula and the Northern Neck).
  * FACING: VDOT labels each cam with the lanes it watches (NB, SB, EB, WB, or
- * a compass point), not a measured aim; that label is taken as where it
- * looks, and a cam labelled "Median", "HB" or nothing has facing null and is
- * never offered for "Look west". The link is the cam's own still on
+ * a compass point), not a measured aim. Since Batch M it is kept as the
+ * lanes it watches (facingIs: "lanes"), not where the cam looks: on 8 Nov
+ * WB-labelled I-264 cams were offered for "Look WSW now" and looked the wrong
+ * way. No VDOT cam is offered for "Look west" (src/core/skyCams.ts); a cam
+ * labelled "Median", "HB" or nothing has facing null. The link is the cam's own still on
  * vdotcameras.com, opened by the user's tap: nothing is fetched by the app.
  */
 import { writeFileSync } from 'node:fs'
@@ -33,7 +35,7 @@ const rows = keep.map((f) => {
   const dir = String(p.direction ?? '').trim()
   const facing = FACING[dir] ?? null
   const name = String(p.description || p.name || p.route || 'VDOT cam').replace(/\s+/g, ' ').trim()
-  return `  { id: ${JSON.stringify(`vdot-${p.id}`)}, name: ${JSON.stringify(name)}, operator: "VDOT", at: { lat: ${lat.toFixed(4)}, lon: ${lon.toFixed(4)} }, facing: ${facing}, label: ${JSON.stringify(dir)}, url: ${JSON.stringify(p.image_url)}, access: "free" },`
+  return `  { id: ${JSON.stringify(`vdot-${p.id}`)}, name: ${JSON.stringify(name)}, operator: "VDOT", at: { lat: ${lat.toFixed(4)}, lon: ${lon.toFixed(4)} }, facing: ${facing}, facingIs: "lanes", label: ${JSON.stringify(dir)}, url: ${JSON.stringify(p.image_url)}, access: "free" },`
 })
 const withFacing = keep.filter((f) => FACING[String(f.properties.direction ?? '').trim()] !== undefined).length
 const today = new Date().toISOString().slice(0, 10)
@@ -42,9 +44,10 @@ const out = `/*
  * ${today} by scripts/bake-vdot-cams.mjs from VDOT 511's public camera map
  * (${URL_}).
  *
- * \`facing\` is VDOT's lane label (WB = 270) taken as where the cam looks;
- * null where VDOT gives none ("Median", blank), and those are never offered
- * for "Look west". LINK OUT ONLY (tests/camsLinkOnly.test.ts).
+ * \`facing\` is VDOT's lane label (WB = 270): the lanes the cam watches, not
+ * where its lens points (\`facingIs: 'lanes'\`), so none is offered for "Look
+ * west" (src/core/skyCams.ts). Null where VDOT gives none ("Median", blank).
+ * LINK OUT ONLY (tests/camsLinkOnly.test.ts).
  */
 import type { LatLon } from '../core/geo.ts'
 
@@ -54,6 +57,8 @@ export interface VdotCam {
   operator: string
   at: LatLon
   facing: number | null
+  /** The lanes it watches, not where the lens points: never offered as looking toward the sun (src/core/skyCams.ts). */
+  facingIs: 'lanes'
   /** VDOT's own direction label, as published. */
   label: string
   url: string

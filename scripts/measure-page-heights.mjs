@@ -44,7 +44,7 @@ const rows = []
 const PAGES = [
   ['Sky › Now', 'sky', 'Now'],
   ['Sky › Weather', 'sky', 'Weather'],
-  ['Sky › Sky fire', 'sky', 'Sky fire'],
+  ['Sky › Sky color', 'sky', 'Sky color'],
   ['Sky › Special', 'sky', 'Special'],
   ['Water › Surf', 'water', 'Surf'],
   ['Water › Tides', 'water', 'Tides'],

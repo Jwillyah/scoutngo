@@ -161,12 +161,12 @@ try {
     await wait(500)
     await page.getByText('Sky', { exact: true }).first().tap()
     await wait(800)
-    await page.getByRole('tab', { name: 'Fire' }).tap({ timeout: 4000 }).catch(() => fail(`${label}: no Fire tab to open`))
+    await page.getByRole('tab', { name: 'Sky color' }).tap({ timeout: 4000 }).catch(() => fail(`${label}: no Sky color tab to open`))
     await wait(2500)
     const fireNote = await ev(`[...document.querySelectorAll('.fire .fire__note')].map((p) => p.textContent).join(' | ')`)
     console.log(`  while refusing: ${asked.length - quiet} more requests · fire: ${fireNote.slice(0, 120)}`)
     if (asked.length !== quiet) fail(`${label}: ${asked.length - quiet} requests sent during the back-off`)
-    if (/no data/.test(fireNote)) fail(`${label}: Sky fire says no data`)
+    if (/no data/.test(fireNote)) fail(`${label}: Sky color says no data`)
     await page.screenshot({ path: join(OUT, `weather-fire-429-${label}.png`) })
 
     /* The back-off ends: asked again, by itself (past the longest jittered hour, 72 min). */

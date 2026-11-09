@@ -86,10 +86,10 @@ describe('the parts', () => {
   })
 
   it('3-step scales, less to more', () => {
-    expect(surfTag(0.6, true)).toBe('Flat')
-    expect(surfTag(2.5, false)).toBe('Fun')
-    expect(surfTag(4.2, true)).toBe('Firing')
-    expect(surfTag(4.2, false)).toBe('Fun')
+    expect(surfTag(0.6, 'Clean')).toBe('Flat')
+    expect(surfTag(2.5, 'Bumpy')).toBe('Fun')
+    expect(surfTag(4.2, 'Clean')).toBe('Firing')
+    expect(surfTag(4.2, 'Bumpy')).toBe('Fun')
     expect(windTag(270, 90)).toBe('Offshore')
     expect(windTag(0, 90)).toBe('Cross')
     expect(windTag(80, 90)).toBe('Onshore')
@@ -104,7 +104,7 @@ describe('the parts', () => {
 
   it('surf in words from the bars', () => {
     const at = new Date('2026-11-02T15:00:00Z')
-    expect(surfLine([{ at, faceFt: 2.2, clean: true }, { at, faceFt: 3.1, clean: false }], 9.2)).toBe('2-3 ft, waist to chest, 9 s')
+    expect(surfLine([{ at, faceFt: 2.2, clean: true, shape: 'Clean' }, { at, faceFt: 3.1, clean: false, shape: 'Bumpy' }], 9.2)).toBe('2-3 ft, waist to chest, 9 s')
     expect(surfLine([], null)).toBeNull()
   })
 

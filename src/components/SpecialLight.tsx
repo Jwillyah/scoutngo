@@ -4,7 +4,7 @@ import { getPosition, getTimes } from 'suncalc'
 import type { LatLon } from '../core/geo.ts'
 import { nextEvents } from '../core/skyFire.ts'
 import { fireVerdict, lookWindow } from '../core/fireOutlook.ts'
-import { byDay, SPECIAL_NAME, type Special } from '../core/specialLight.ts'
+import { byDay, specialNameOf, type Special } from '../core/specialLight.ts'
 import { formatClock, writeClock, zoneOffsetMs } from '../core/timezone.ts'
 import { fetchFirePaths, nearestHour, pathsAt } from '../lib/skyFireData.ts'
 import { fetchGlassWeek, fetchSpecialWeek, specialsFrom } from '../lib/specialLightData.ts'
@@ -56,7 +56,7 @@ export function SpecialLight({ venue, timeZone, onShowBow, onJump, place }: Prop
         /* The window is the colour clock's glow, the same arithmetic as the verdict (src/core/fireOutlook.ts). */
         const w = v === null ? null : lookWindow(v)
         if (v !== null && v.word !== 'unlikely' && w !== null) {
-          fires.push({ kind: 'fire', from: w.from, to: w.to, agree: v.agree, of: v.of, word: v.word, why: `At ${kind}: cloud to light and a way in for the light, by Sky fire’s three checks.` })
+          fires.push({ kind: 'fire', event: kind, from: w.from, to: w.to, agree: v.agree, of: v.of, word: v.word, why: `At ${kind}: cloud to light and a way in for the light, by the Sky color page’s three checks.` })
         }
       }
       /* Glassy water is a coast thing: not asked inland. */
@@ -71,7 +71,7 @@ export function SpecialLight({ venue, timeZone, onShowBow, onJump, place }: Prop
   const list = answer === null || answer.key !== key ? 'loading' : answer.list
   /* Both ends with AM or PM: a bare "5:00" is a time on the wrong clock to half the day (scripts/audit-clock.mjs). */
   const span = (a: Date, b: Date) => `${formatClock(a, timeZone)}–${formatClock(b, timeZone)}`
-  const name = (s: Special) => (s.kind === 'fog' ? specialName('fog', place) : SPECIAL_NAME[s.kind])
+  const name = (s: Special) => (s.kind === 'fog' ? specialName('fog', place) : specialNameOf(s))
   const days = useMemo(() => (list === 'loading' || list === null ? [] : byDay(list, (d) => isoDay(d, timeZone))), [list, timeZone])
   /* Today as of when the list was read, not as of each render. */
   const asked = answer?.asked ?? 0
@@ -109,7 +109,7 @@ export function SpecialLight({ venue, timeZone, onShowBow, onJump, place }: Prop
       {!how ? null : <div className="spec__how">{/* The "i" sits by the heading now (Batch H, 2 Nov: it floated alone under the list). */}
         <p>Tap an icon for its window. Greyed: under half the models.</p>
         <p>
-          Only windows you can shoot through, two hours at most, tied to their cause hour by hour. Fog: dew point within 2°F of the air, wind under 6 kt, and the sea colder than the air (inland, radiation fog: no sea term); said where it forms or lifts in the light, not the night it sits through. Rainbow: showers within 25 km on the side opposite the sun, the sun up but under 42° and not hidden by low cloud; the bow is 42° round the point opposite the sun. God rays: low cloud 30–80% (scattered to broken) with the sun up to 25° behind it. Iridescence: thin mid or high cloud, 10–60%, with little low cloud and the sun up 5° or more; look within about 10° of the sun. Sky fire: its own three checks, its glow. Glassy water: a low tide within 90 minutes of sunrise and a light wind, as on the Tide sheet. The rest: the best two hours of each run, the most models first, then the lower sun. Five models (GFS, ECMWF, ICON, GEM, HRRR); “likely” when 60% or more agree at the best hour; on the map only when half or more agree. A rule, not a promise: on 10 Mar 2026 the fog rule fired at Norfolk and no fog came.
+          Only windows you can shoot through, two hours at most, tied to their cause hour by hour. Fog: dew point within 2°F of the air, wind under 6 kt, and the sea colder than the air (inland, radiation fog: no sea term); said where it forms or lifts in the light, not the night it sits through. Rainbow: showers within 25 km on the side opposite the sun, the sun up but under 42° and not hidden by low cloud; the bow is 42° round the point opposite the sun. God rays: low cloud 30–80% (scattered to broken) with the sun up to 25° behind it. Iridescence: thin mid or high cloud, 10–60%, with little low cloud and the sun up 5° or more; look within about 10° of the sun. Sunrise and sunset color: the Sky color page’s three checks, its glow. Glassy water: a low tide within 90 minutes of sunrise and a light wind, as on the Tide sheet. The rest: the best two hours of each run, the most models first, then the lower sun. Five models (GFS, ECMWF, ICON, GEM, HRRR); “likely” when 60% or more agree at the best hour; on the map only when half or more agree. A rule, not a promise: on 10 Mar 2026 the fog rule fired at Norfolk and no fog came.
         </p>
       </div>}
       {list === 'loading' ? (

@@ -12,7 +12,7 @@ describe('the home page', () => {
 
   it('has the brand, the line, four bands, four rows, one gold button and the footer, in order (board HOME V)', () => {
     expect(html).toContain('>ScoutNGo<')
-    const order = ['Four apps in one.', 'Private, and yours.', '>Light<', '>Tide<', '>Surf<', '>Wind<', 'Sky fire', 'Drone preflight', 'Fly it here first: line of sight, roofs, wind.', 'Moon line-ups', 'No account, no tracking', 'Open source. Your spots never leave your phone.', 'Open the map', 'Free · open source · works offline ·', '>How it works<', '>Privacy<']
+    const order = ['Four apps in one.', 'Private, and yours.', '>Light<', '>Tide<', '>Surf<', '>Wind<', 'Sky color', 'Drone preflight', 'Fly it here first: line of sight, roofs, wind.', 'Moon line-ups', 'No account, no tracking', 'Open source. Your spots never leave your phone.', 'Open the map', 'Free · open source · works offline ·', '>How it works<', '>Privacy<']
     const at = order.map((t) => html.indexOf(t))
     expect(at.every((i) => i >= 0), JSON.stringify(order.filter((_, i) => at[i] < 0))).toBe(true)
     expect([...at].sort((a, b) => a - b)).toEqual(at)

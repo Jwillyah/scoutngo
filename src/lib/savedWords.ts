@@ -15,7 +15,7 @@ export function shootLine(e: TruthEntry): string {
   const mins = Math.round(e.said.minutesFromEvent)
   const when = mins === 0 ? `at ${e.said.event}` : `${Math.abs(mins)} min ${mins < 0 ? 'before' : 'after'} ${e.said.event}`
   const parts = [dayWords(e.at), when]
-  if (e.said.fire !== null) parts.push(`sky fire said ${e.said.fire}`)
+  if (e.said.fire !== null) parts.push(`${e.said.event} color said ${e.said.fire}`)
   if (e.outcome !== null) parts.push(`you said ${String(e.outcome)}`)
   return parts.join(' · ')
 }

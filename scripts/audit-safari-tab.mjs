@@ -186,8 +186,8 @@ try {
   await page.keyboard.press('Escape')
   await goToStage(ev, wait, 'plan')
   await wait(800)
-  /* Every chip opens its page (30 Oct, docs/navigation.md): Golden is Sky › Now, Cloud Sky › Sky fire, Wind the Wind page. */
-  for (const [chip, sel, shot, tab] of [['GOLDEN', '.sheet', 'tab-golden', 'Now'], ['CLOUD', '.sheet', 'tab-cloud', 'Sky fire']]) {
+  /* Every chip opens its page (30 Oct, docs/navigation.md): Golden is Sky › Now, Cloud Sky › Sky color (the old Sky fire, Batch M), Wind the Wind page. */
+  for (const [chip, sel, shot, tab] of [['GOLDEN', '.sheet', 'tab-golden', 'Now'], ['CLOUD', '.sheet', 'tab-cloud', 'Sky color']]) {
     await page.locator('.chip2', { hasText: chip }).first().tap()
     await wait(1500)
     const on = await ev(`document.querySelector('.skyc__tab--on')?.textContent ?? null`)

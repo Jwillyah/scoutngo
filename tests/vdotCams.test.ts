@@ -17,10 +17,10 @@ describe('VDOT coastal cams (Batch K, Section 7)', () => {
     for (const c of VDOT_CAMS) expect(c.url, c.id).toMatch(/^https:\/\/[a-z0-9.-]*vdotcameras\.com\//)
     expect(new Set(VDOT_CAMS.map((c) => c.id)).size).toBe(VDOT_CAMS.length)
   })
-  it('a cam with no direction is never offered for "Look west"', () => {
+  it('a lane label is not where the lens looks: no VDOT cam is offered for "Look west" (Batch M)', () => {
     const venue = { lat: 36.85, lon: -76.1 }
-    const got = camsTowardSun(venue, 260, VDOT_CAMS, 50)
-    expect(got.length).toBeGreaterThan(0)
-    for (const g of got) expect(g.cam.facing).not.toBeNull()
+    for (const c of VDOT_CAMS) expect(c.facingIs, c.id).toBe('lanes')
+    expect(camsTowardSun(venue, 260, VDOT_CAMS, 50)).toEqual([])
+    expect(camsTowardSun(venue, 90, VDOT_CAMS, 50)).toEqual([])
   })
 })

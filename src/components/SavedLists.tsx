@@ -59,7 +59,7 @@ export function SavedLists() {
 
       <h3 className="saved__head">Past shoots</h3>
       {shoots.length === 0 ? (
-        <p className="saved__none">None yet. Pick photos under Sky › Sky fire › After the shoot, and each is listed here.</p>
+        <p className="saved__none">None yet. Pick photos under Sky › Sky color › After the shoot, and each is listed here.</p>
       ) : (
         <ul className="saved__list">
           {shoots.slice(0, 50).map((e) => (

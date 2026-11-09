@@ -80,6 +80,15 @@ open the cam's own still on vdotcameras.com on a tap; the app fetches
 nothing. North Carolina's DriveNC API needs a developer key: no NC traffic
 cams. Refresh: `node scripts/bake-vdot-cams.mjs`.
 
+**Batch M, 8 Nov 2026: no longer offered for "Look west".** "Look WSW now"
+offered I-264 cams labelled WB, 9 to 15 km inland, that looked the wrong
+way: a lane label is the traffic a cam watches, not where its lens points.
+Each VDOT cam now carries `facingIs: "lanes"`, which `src/core/skyCams.ts`
+treats as an unknown facing, and an unknown facing is never offered. The one
+rule for any row of cams toward the sun or the water lives there: a recorded
+facing within 45° of the line (`CAM_FACING_DEG`) and within 15 km
+(`CAM_MAX_KM`), else no row (`tests/camsTowardSun.test.ts`).
+
 ### Terms checked (Batch L, 3 Nov 2026)
 
 Checked 2026-11-03 for whether linking to VDOT's camera pages is allowed.

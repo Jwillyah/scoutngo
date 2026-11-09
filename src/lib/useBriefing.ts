@@ -23,7 +23,7 @@ import { getPosition, getTimes } from 'suncalc'
 import { certainty, dayCall, eventCall, kt, moonOn, surfLine, surfTag, tideDay, windLevel, windTag, type CallRead, type Kind, type MoonDay, type SurfBar, type TideDay, type WindHourIn } from '../core/briefing.ts'
 import { fireVerdict, type FireVerdict } from '../core/fireOutlook.ts'
 import type { LatLon } from '../core/geo.ts'
-import { windToBeach } from '../core/coastFacing.ts'
+import { surfShape } from '../core/surf.ts'
 import type { TideExtreme } from '../core/tide.ts'
 import { venueToday } from '../core/eventDay.ts'
 import { zonedTimeToUtc } from '../core/timezone.ts'
@@ -262,8 +262,9 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
           const sh = surfAt(s.marine, h, facing)
           if (sh === null) continue
           const wh = wind[i]
-          const clean = wh.mps !== null && (wh.mps < 2.6 || (facing !== null && wh.fromDeg !== null && windToBeach(wh.fromDeg, facing) === 'offshore'))
-          surf.push({ at: h, faceFt: sh.estimate.faceFt, clean })
+          /* The Surf page's shape (src/core/surf.ts): Clean is light or offshore; with no direction, never Messy. */
+          const shape = wh.mps === null ? null : surfShape(wh.mps, wh.fromDeg ?? 0, wh.fromDeg === null ? null : facing)
+          surf.push({ at: h, faceFt: sh.estimate.faceFt, clean: shape === 'Clean', shape })
           if (periodAtMax === null || sh.estimate.faceFt >= Math.max(...surf.map((b) => b.faceFt))) periodAtMax = sh.periodS
         }
       }
@@ -285,7 +286,7 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
         call,
         surf,
         surfWords: surfLine(surf, periodAtMax),
-        surfTag: maxBar === null ? null : surfTag(maxBar.faceFt, maxBar.clean),
+        surfTag: maxBar === null ? null : surfTag(maxBar.faceFt, maxBar.shape),
         surfClean: maxBar?.clean ?? false,
         wind,
         windTag: tag,

@@ -70,7 +70,7 @@ import { FEAT_PATH, featIcon } from './featIcons.tsx'
 import { WeatherLayerCard } from './WeatherLayerCard.tsx'
 import { OPEN_RADAR_EVENT } from './WeatherTab.tsx'
 import { useSpecialNow } from '../lib/useSpecialNow.ts'
-import { SPECIAL_NAME } from '../core/specialLight.ts'
+import { specialNameOf } from '../core/specialLight.ts'
 import { getPosition as sunPositionAt } from 'suncalc'
 import type { VenueCacheState } from '../lib/useVenueCache.ts'
 import type { Box } from '../lib/tileRange.ts'
@@ -1306,7 +1306,7 @@ export function PlanMode({
   const specialNow = useSpecialNow(online ? venue : null, scrubbedAt)
   /* Within two hours of now the station's sky leads the Cloud chip (src/lib/useStationNow.ts). */
   const stationSkyNow = useStationNow(venue, scrubbedAt, online)
-  const specialStatus = specialNow === null ? null : `${SPECIAL_NAME[specialNow.kind]} ${specialNow.word} now · ${specialNow.agree} of ${specialNow.of} models`
+  const specialStatus = specialNow === null ? null : `${specialNameOf(specialNow)} ${specialNow.word} now · ${specialNow.agree} of ${specialNow.of} models`
   /* A rainbow's bow, drawn on the map from Sky › Special. */
   const [bow, setBow] = useState<GeoJSON.FeatureCollection | null>(null)
   /* Batch K, Section 6: the radar frame the Weather tab's slider is on. */

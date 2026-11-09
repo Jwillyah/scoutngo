@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { distanceMeters, type LatLon } from '../core/geo.ts'
 import { nextEvents } from '../core/skyFire.ts'
 import { fireVerdict } from '../core/fireOutlook.ts'
-import { strong, type Special } from '../core/specialLight.ts'
+import { specialNameOf, strong, type Special } from '../core/specialLight.ts'
 import { getSunPosition } from '../core/sun.ts'
 import { fetchFirePaths, nearestHour, pathsAt } from './skyFireData.ts'
 import { fetchSpecialWeek, specialsFrom } from './specialLightData.ts'
@@ -128,7 +128,7 @@ export function pickNear(found: readonly { s: Special; place: NearPlace }[], now
     .map(({ s, place: p }) => {
       const from = new Date(Math.max(s.from.getTime(), now))
       const when = s.kind === 'fire' ? clock(new Date((s.from.getTime() + s.to.getTime()) / 2)) : `${clock(from)}–${clock(s.to)}`
-      return { line: `${specialName(s.kind, place)} ${s.word} ${when} · ${p.name}`, place: p, at: from }
+      return { line: `${s.kind === 'fire' ? specialNameOf(s) : specialName(s.kind, place)} ${s.word} ${when} · ${p.name}`, place: p, at: from }
     })
 }
 
@@ -148,7 +148,7 @@ export async function nearMeItems(places: readonly NearPlace[], now: number, clo
       const data = await fetchFirePaths(nearest.at, getSunPosition(event, nearest.at.lat, nearest.at.lon).azimuth, event.toISOString().slice(0, 10))
       const paths = data === null ? [] : pathsAt(data, nearestHour(event))
       const v = paths.length === 0 ? null : fireVerdict(paths, { event, kind, venue: nearest.at })
-      if (v !== null && v.word !== 'unlikely') found.push({ s: { kind: 'fire', from: event, to: event, agree: v.agree, of: v.of, word: v.word, why: '' }, place: nearest })
+      if (v !== null && v.word !== 'unlikely') found.push({ s: { kind: 'fire', event: kind, from: event, to: event, agree: v.agree, of: v.of, word: v.word, why: '' }, place: nearest })
     }
   }
   return pickNear(found, now, clock, place)

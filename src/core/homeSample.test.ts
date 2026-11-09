@@ -52,7 +52,7 @@ describe('the home page sample', () => {
     expect(moonLine(null, null, clock, clock)).toBeNull()
   })
 
-  it('Sky fire says the real verdict and when to look', () => {
+  it('Sky color says the real verdict and when to look', () => {
     const ev = new Date('2026-10-30T22:07:00Z')
     expect(skyFireLine('sunset', 'possible', ev, new Date('2026-10-30T21:50:00Z'), clock)).toBe('Tonight: possible from 21:50')
     /* Unlikely gets no "from": there is nothing to wait for, only the time of the event. */

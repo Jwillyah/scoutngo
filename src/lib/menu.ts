@@ -57,7 +57,7 @@ export const MENU_ITEMS: readonly MenuEntry[] = [
       { id: 'callsheet', label: 'Call sheet' },
     ],
   },
-  { id: 'sky', label: 'Sky', note: 'Now, sky fire, special light, the calendar', icon: 'sky' },
+  { id: 'sky', label: 'Sky', note: 'Now, sky color, special light, the calendar', icon: 'sky' },
   /* Water at the coast; Section 5 of 30 Oct makes it Land inland. Surf only where there is surf. */
   {
     id: 'water',

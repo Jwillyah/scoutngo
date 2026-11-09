@@ -215,7 +215,7 @@ export function SettingsPage(props: Props) {
         <Pick label="Surf" options={SURF_OPTIONS} value={surf} onPick={setSurf} />
       </Section>
 
-      <Section title="Alerts" info={<p>Special light near me: on opening, fog, rainbows and sky fire within 25 mi in the next 24 h, worked out on this phone. Calendar alerts are a calendar file from Sky › Calendar, added to your own calendar.</p>}>
+      <Section title="Alerts" info={<p>Special light near me: on opening, fog, rainbows and sunrise or sunset color within 25 mi in the next 24 h, worked out on this phone. Calendar alerts are a calendar file from Sky › Calendar, added to your own calendar.</p>}>
         <Switch label="Special light near me" on={nearMe} onChange={setNearMe} />
         <Row label="Calendar alerts" value="Sky › Calendar" />
         <Switch label="Sky calls in your calendar" on={feed} onChange={setFeed} hint="Off unless you switch it on" />

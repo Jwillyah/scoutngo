@@ -34,6 +34,7 @@ import type { GapRead } from './gapWatch.ts'
 import { underLitWindow } from './underLight.ts'
 import { LAYER_WORD } from './skyColour.ts'
 import { sizeWords } from './surfShoot.ts'
+import type { SurfShape } from './surf.ts'
 import { curveFromExtremes, levelAt, type TideExtreme } from './tide.ts'
 
 export type Call = 'Go' | 'Maybe' | 'Skip'
@@ -201,14 +202,33 @@ export type SurfTag = 'Flat' | 'Fun' | 'Firing'
 export interface SurfBar {
   at: Date
   faceFt: number
-  /** Offshore or light wind at that hour: drawn bright. */
+  /** Offshore or light wind at that hour (shape 'Clean'): drawn bright. */
   clean: boolean
+  /** The wind's shape on the water at that hour (src/core/surf.ts surfShape); null with no wind forecast. */
+  shape: SurfShape | null
 }
 
-/** Flat under 1 ft faces; Firing at 4 ft and up and clean; Fun between. */
-export function surfTag(maxFaceFt: number, clean: boolean): SurfTag {
-  if (maxFaceFt < 1) return 'Flat'
-  return maxFaceFt >= 4 && clean ? 'Firing' : 'Fun'
+/*
+ * THE SURF TAG SCALE, the one place it is decided (Batch M, Section 4: 0-1 ft,
+ * ankle to knee, was tagged Fun on 8 Nov).
+ *
+ *   Flat     faces under SURF_FUN_FT, 1.5 ft: under knee high.
+ *   Fun      SURF_FUN_FT to SURF_FIRING_FT (1.5 to 4 ft), clean or light wind.
+ *   Firing   SURF_FIRING_FT, 4 ft, and up, and clean.
+ *   Messy onshore drops one step: Firing to Fun, Fun to Flat.
+ *
+ * Clean and messy are surfShape's (src/core/surf.ts), the Surf page's own:
+ * Clean is light wind under GLASSY_MPS (5 kt) or offshore; Messy is onshore at
+ * MESSY_ONSHORE_MPS (10 kt) or more. Between (Bumpy), or with no wind
+ * forecast, the size stands but is never called Firing on a guess.
+ */
+export const SURF_FUN_FT = 1.5
+export const SURF_FIRING_FT = 4
+
+export function surfTag(faceFt: number, shape: SurfShape | null): SurfTag {
+  const size = faceFt < SURF_FUN_FT ? 0 : faceFt < SURF_FIRING_FT ? 1 : 2
+  const step = shape === 'Messy' ? Math.max(0, size - 1) : shape === 'Clean' ? size : Math.min(size, 1)
+  return (['Flat', 'Fun', 'Firing'] as const)[step]
 }
 
 /** "2-3 ft, waist to chest, 9 s": the day's faces low to high, in words by the biggest, its period. */
@@ -280,10 +300,12 @@ export function tideDay(extremes: readonly TideExtreme[], from: Date, to: Date, 
 
 export type DroneTag = 'Light wind' | 'Breezy' | 'Too windy'
 /** Against the aircraft's own rating: under half is light, under 85% breezy, past that too windy. */
+export const DRONE_LIGHT_RATIO = 0.5
+export const DRONE_BREEZY_RATIO = 0.85
 export function droneTag(highMps: number | null, limitMps: number | null): DroneTag | null {
   if (highMps === null || limitMps === null || limitMps <= 0) return null
   const r = highMps / limitMps
-  return r < 0.5 ? 'Light wind' : r < 0.85 ? 'Breezy' : 'Too windy'
+  return r < DRONE_LIGHT_RATIO ? 'Light wind' : r < DRONE_BREEZY_RATIO ? 'Breezy' : 'Too windy'
 }
 
 /** Which way to fly for the light: toward the sun's side of the sky at the event, in compass words. */

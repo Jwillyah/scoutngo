@@ -139,7 +139,7 @@ await step('time bar back 2 h', async () => {
     await wait(250)
   }
 })
-for (const tab of ['Fire', 'Preview', 'Special']) {
+for (const tab of ['Sky color', 'Preview', 'Special']) {
   await step(`Sky › ${tab}`, async () => {
     if ((await page.getByRole('tab', { name: tab }).count()) === 0) {
       await page.locator('button[aria-label="Menu"]').first().tap()

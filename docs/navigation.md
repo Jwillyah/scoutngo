@@ -21,8 +21,8 @@ its most useful page.
 ```
 Menu
 ├── Today (card) ──── the briefing: Today · Tomorrow · This week
-├── Sky (card) ────── Sky fire within 3 h of a sunrise or sunset, else Now
-│   └── Now · Sky fire · Special · Calendar (tabs)
+├── Sky (card) ────── Sky color within 3 h of a sunrise or sunset, else Now
+│   └── Now · Sky color · Special · Calendar (tabs)
 ├── Water (card) ──── Surf (Land inland: Wind · Terrain light)
 │   └── Surf · Tides · Wind · Buoys (tabs)
 ├── Drone (card) ──── Preflight, only with a drone in the kit
@@ -43,7 +43,7 @@ Field has no menu place; it is reached by its address, `/field`.
 |---|---|---|
 | Golden | Sky › Now | the golden card in the sheet |
 | Wind | Water › Wind (the Wind page) | the wind card; the page was one tap more ("Five models") |
-| Cloud | Sky › Sky fire | the cloud card in the sheet |
+| Cloud | Sky › Sky color | the cloud card in the sheet |
 | Tide | Water › Tides | Tides page (unchanged) |
 
 ## Taps from the map, before and after
@@ -53,9 +53,9 @@ Field has no menu place; it is reached by its address, `/field`.
 | Sun (rise, set, line it up) | 3: menu, Sky, Sun tab | 1: Golden chip (Now, Sun page) |
 | Moon | 3: menu, Sky, Moon tab | 2 + swipe: menu, Sky, swipe to Moon |
 | Night / Milky Way | 2: menu, Sky (Night first) | 2 + swipe: menu, Sky, swipe twice |
-| Sky fire | 3: menu, Sky, Fire tab | 1: Cloud chip |
+| Sky color | 3: menu, Sky, Sky color tab | 1: Cloud chip |
 | Colour clock (Preview) | 3: menu, Sky, Preview tab | 1: Cloud chip, under the verdict |
-| After the shoot, hit rate | 3: menu, Sky, Fire tab | 1: Cloud chip, at the foot of Sky fire |
+| After the shoot, hit rate | 3: menu, Sky, Sky color tab | 1: Cloud chip, at the foot of Sky color |
 | Special light | 3: menu, Sky, Special tab; 1 from the status line when on now | 3: menu, Sky, Special; 1 from the status line when on now |
 | Calendar, the month | 3: menu, Sky, Calendar tab | 3: menu, Sky, Calendar (opens on the month, Batch G) |
 | Seasons | 3: menu, Sky, Seasons tab | removed (Batch G: the year's compass was mislabelled; the map draws the sun lines) |
