@@ -118,7 +118,8 @@ import { Home, type HomeTarget } from './components/Home.tsx'
 import { WeatherPage } from './components/WeatherPage.tsx'
 import { OPEN_RADAR_EVENT, OPEN_SKY_EVENT, OPEN_WEATHER_EVENT } from './lib/pageEvents.ts'
 import { SkyPage } from './components/SkyPage.tsx'
-import { readActivities, showsDrone, showsPhotoTools, useActivities } from './lib/activities.ts'
+import { homeOrder, readActivities, showsDrone, showsPhotoTools, useActivities } from './lib/activities.ts'
+import { cardList } from './core/homeDay.ts'
 import { ActivityPicker } from './components/ActivityPicker.tsx'
 import { SpotPicker } from './components/SpotPicker.tsx'
 import { viewfinderPreset } from './core/viewfinderPreset.ts'
@@ -1582,6 +1583,11 @@ function App() {
         return
     }
   }
+  /* Batch Pages, Section 5: the menu's cards in the home's order (the home's own cardList). */
+  const menuCardOrder = useMemo(() => {
+    const order = homeOrder(activities, briefDrone !== null)
+    return cardList(order, briefDrone !== null || order.includes('drone'))
+  }, [activities, briefDrone])
   /* Its clock, read when it opens. */
   const [menuNow, setMenuNow] = useState(() => new Date())
   useEffect(() => {
@@ -2634,6 +2640,7 @@ function App() {
         rows={menuRows}
         photoTools={showsPhotoTools(activities)}
         droneTools={showsDrone(activities, briefDrone !== null)}
+        order={menuCardOrder}
         now={menuNow}
         onPick={onMenuTarget}
         onClose={() => setMenuOpen(false)}

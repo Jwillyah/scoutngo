@@ -2,10 +2,11 @@ import '../styles/menu.css'
 import { beachName, sameBeach, useSurfBeach } from '../lib/surfBeach.ts'
 import { useSurfNow } from '../lib/useSurfNow.ts'
 import { SpotPicker } from './SpotPicker.tsx'
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { stormNote } from '../lib/stormRiskData.ts'
 import { useCoast } from '../lib/coastData.ts'
-import { droneCard, skyCard, skyTabFor, todayCard, waterCard, type CardDay, type Tone } from '../core/menuCards.ts'
+import { droneCard, menuOrder, skyCard, todayCard, waterCard, type CardDay, type Tone } from '../core/menuCards.ts'
+import type { CardKind } from '../core/homeDay.ts'
 import { formatClock } from '../core/timezone.ts'
 import { useBriefing } from '../lib/useBriefing.ts'
 import { windIn, windUnitLabel, type Units } from '../lib/units.ts'
@@ -58,6 +59,8 @@ interface MenuProps {
   photoTools?: boolean
   /** The drone card only when Fly a drone is picked or a drone is in the kit. */
   droneTools?: boolean
+  /** Batch Pages, Section 5: the home's card order (src/core/homeDay.ts cardList); the Sky, Water and Drone cards follow it, under Today. */
+  order?: readonly CardKind[]
   now: Date
   onPick: (target: MenuTarget, opts?: { skyTab?: 'fire' | 'now' }) => void
   onClose: () => void
@@ -79,7 +82,7 @@ export function Menu(props: MenuProps) {
   return <MenuSheet {...props} first={first} />
 }
 
-function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools = true, droneTools = true, now, onPick, onClose, first }: MenuProps & { first: React.RefObject<HTMLButtonElement | null> }) {
+function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools = true, droneTools = true, order = [], now, onPick, onClose, first }: MenuProps & { first: React.RefObject<HTMLButtonElement | null> }) {
   /* Asked only once the menu has been open a moment: a tap straight through it to a place asks nothing. */
   const [looking, setLooking] = useState(false)
   useEffect(() => {
@@ -100,7 +103,9 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
   const here = sameBeach(venue, beach)
   const beachBrief = useBriefing(here || beach === null ? null : beach.at, timeZone, now, looking && !here, 'sea')
   const waterDay = here ? (days[0] ?? null) : ((beachBrief.days[0] as unknown as CardDay | undefined) ?? null)
-  const water = useMemo(() => waterCard(waterDay, now, clock, beach?.name ?? null), [waterDay, now, beach?.name]) // eslint-disable-line react-hooks/exhaustive-deps
+  /* Batch Pages, Section 5: the spot is said once, in the header; the beach only when it is not the spot ("Virginia Beach" twice, 9 Nov). */
+  const otherBeach = beach !== null && !here ? beach.name : null
+  const water = useMemo(() => waterCard(waterDay, now, clock, otherBeach), [waterDay, now, otherBeach]) // eslint-disable-line react-hooks/exhaustive-deps
   /* Batch Map A2: the value is the one surf number (src/lib/useSurfNow.ts), the home's and the Surf page's, not the day's extremes. */
   const surf = useSurfNow(looking ? venue : null, now, timeZone, units.distance === 'ft')
   /* Batch K, Section 5: the NWS's rip current risk for the beach, as a fact under the card when the surf zone forecast gives one. */
@@ -133,17 +138,23 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
           <LiveCard refTo={first} kind="today" title="Today" icon={<TodayIcon />} value={loading ? '…' : today.value} sub={loading ? 'reading the forecasts' : today.sub} tone={wait(today.tone)} onTap={() => pick('today')}>
             <p className="mcard__line">{today.line ?? ''}</p>
           </LiveCard>
-          <LiveCard kind="sky" title="Sky" icon={<SkyIcon />} value={loading ? '…' : storms !== null ? 'Storms' : sky.value} sub={loading ? '' : (storms ?? sky.sub)} tone={wait(sky.tone)} onTap={() => pick('sky', photoTools ? { skyTab: skyTabFor(days, now) } : undefined)}>
+          {menuOrder(order).map((kind) =>
+            kind === 'sky' ? (
+              <Fragment key={kind}>
+          <LiveCard kind="sky" title="Sky" icon={<SkyIcon />} value={loading ? '…' : storms !== null ? 'Storms' : sky.value} sub={loading ? '' : (storms ?? sky.sub)} tone={wait(sky.tone)} onTap={() => pick('sky')}>
             <div className={`mcard__strip${sky.lowDeck ? ' mcard__strip--deck' : ''}`} aria-hidden="true">
               {sky.lowDeck || sky.strip.length === 0 ? null : <i className="mcard__clock" style={{ background: stripGradient(sky.strip) }} />}
               {sky.peak === null ? null : <i className="mcard__peak" style={{ left: `${Math.max(0, Math.min(100, sky.peak * 100))}%` }} />}
             </div>
           </LiveCard>
+              </Fragment>
+            ) : kind === 'water' ? (
+              <Fragment key={kind}>
           <div className="mcard-wrap">
             <LiveCard kind="water" title="Water" icon={<WaterIcon />} value={loading || surf.sea.status === 'loading' ? '…' : <span data-shared="surf">{surf.nowWords ?? '—'}</span>} sub={loading ? '' : (rip?.replace(/ \(NWS .*\)$/, '') ?? water.sub)} tone={wait(water.tone)} onTap={() => pick('water')}>
               <Bars bars={water.bars.map((b) => ({ h: b.h, now: b.now, cls: b.clean ? 'clean' : 'messy' }))} />
             </LiveCard>
-            {beach === null ? null : (
+            {otherBeach === null || beach === null ? null : (
               <button type="button" className="mcard__beach" aria-label={`Surf beach: ${beach.name}. Pick another`} onClick={() => setPickingBeach(true)}>
                 {beach.name}
                 <svg viewBox="0 0 12 12" aria-hidden="true">
@@ -152,6 +163,9 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
               </button>
             )}
           </div>
+              </Fragment>
+            ) : (
+              <Fragment key={kind}>
           {/* Batch K addendum, E: Preflight lives here now (the layers sheet's tile went), so the card is there with no drone in the kit too. */}
           {!droneTools ? null : drone === null ? (
             <LiveCard kind="drone" title="Drone" icon={<DroneIcon />} value="Preflight" sub="draw a move" tone="maybe" onTap={() => pick('drone')}>
@@ -161,6 +175,9 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
             <LiveCard kind="drone" title="Drone" icon={<DroneIcon />} value={loading ? '…' : flight.value} sub={loading ? '' : flight.sub} tone={wait(flight.tone)} onTap={() => pick('drone')}>
               <Bars bars={flight.bars.map((b) => ({ h: b.h, now: b.now, cls: b.over === 'over' ? 'over' : b.over === 'near' ? 'near' : 'ok' }))} limit={flight.limit} />
             </LiveCard>
+          )}
+              </Fragment>
+            ),
           )}
         </div>
 

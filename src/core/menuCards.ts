@@ -147,3 +147,20 @@ export function droneCard(day: CardDay | null, limitMps: number | null, now: Dat
 }
 
 export { kt }
+
+/*
+ * THE MENU'S CARDS IN THE HOME'S ORDER (Batch Pages, Section 5): Today
+ * first (it is the home), then Sky, Water and Drone as the home's own cards
+ * come (src/core/homeDay.ts cardList: the picker's order). Water stands for
+ * the Surf, Tide and Wind cards, at the first of them.
+ */
+export type MenuCardKind = 'sky' | 'water' | 'drone'
+export function menuOrder(home: readonly string[]): MenuCardKind[] {
+  const out: MenuCardKind[] = []
+  for (const c of home) {
+    const k: MenuCardKind | null = c === 'sky' ? 'sky' : c === 'drone' ? 'drone' : c === 'surf' || c === 'tide' || c === 'wind' ? 'water' : null
+    if (k !== null && !out.includes(k)) out.push(k)
+  }
+  for (const k of ['sky', 'water', 'drone'] as const) if (!out.includes(k)) out.push(k)
+  return out
+}

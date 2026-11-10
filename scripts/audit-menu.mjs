@@ -75,7 +75,7 @@ try {
       const out = [...nav.querySelectorAll('*')].filter((e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0 && (b.bottom > innerHeight + 1 || b.right > innerWidth + 1 || b.left < -1) }).map((e) => (e.getAttribute('class') ?? e.tagName) + ' ' + Math.round(e.getBoundingClientRect().bottom)).slice(0, 4)
       const cards = [...nav.querySelectorAll('.mcard')].map((c) => ({ name: c.querySelector('.sidemenu__label')?.textContent, h: Math.round(c.getBoundingClientRect().height), value: c.querySelector('.mcard__value')?.textContent, bg: getComputedStyle(c).backgroundImage }))
       const rows = [...nav.querySelectorAll('.mrow')].map((r) => ({ name: r.querySelector('.sidemenu__label')?.textContent, value: r.querySelector('.mrow__value')?.textContent, h: Math.round(r.getBoundingClientRect().height) }))
-      return { out, scrolls: nav.scrollHeight > nav.clientHeight + 1, cards, rows, where: document.querySelector('.menu__where')?.textContent }
+      return { out, scrolls: nav.scrollHeight > nav.clientHeight + 1, cards, rows, where: document.querySelector('.menu__where')?.textContent, chip: nav.querySelector('.mcard__beach')?.textContent ?? null, text: nav.innerText }
     })())`))
     if (m.missing) {
       fail(`${label}: the menu opened no Stage nav`)
@@ -87,7 +87,14 @@ try {
     if (m.scrolls) fail(`${label}: the menu scrolls`)
     for (const o of m.out) fail(`${label}: ${o} runs off the screen`)
     const names = m.cards.map((c) => c.name)
-    if (JSON.stringify(names) !== JSON.stringify(['Today', 'Sky', 'Water', 'Drone'])) fail(`${label}: the cards are ${JSON.stringify(names)}`)
+    /* Batch Pages, Section 5: Today, then the home's order (nothing picked, a drone in the kit: Surf, Wind, Tide, Sky, Moon, Drone, so Water, Sky, Drone). */
+    if (JSON.stringify(names) !== JSON.stringify(['Today', 'Water', 'Sky', 'Drone'])) fail(`${label}: the cards are ${JSON.stringify(names)}, not the home's order`)
+    /* The spot once (9 Nov: "Virginia Beach" in the header and on the Water card's chip): the beach chip only when it is another place. */
+    const spot = (m.where ?? '').split(' · ')[0]
+    if (m.chip !== null && spot !== '' && m.chip.trim() === spot) fail(`${label}: the Water card's chip repeats the spot (${JSON.stringify(m.chip)})`)
+    const times = spot === '' ? 0 : m.text.split(spot).length - 1
+    console.log(`  the spot ${JSON.stringify(spot)} said ${times} times; chip ${JSON.stringify(m.chip)}`)
+    if (times > 1) fail(`${label}: the menu says ${JSON.stringify(spot)} ${times} times`)
     for (const c of m.cards) {
       if (c.h < 76 || c.h > 112) fail(`${label}: the ${c.name} card is ${c.h} px, not about 88`)
       if (!c.value) fail(`${label}: the ${c.name} card has no value`)
