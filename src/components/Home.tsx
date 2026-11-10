@@ -1,3 +1,4 @@
+import '../styles/home-d.css'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 /* suncalc 2.0.2 (this repo's): altitude and azimuth in DEGREES, azimuth from north, clockwise (Batch N E10: the moon read "S" when it was treated as radians from south). */
 import { getMoonPosition, getPosition } from 'suncalc'
@@ -11,12 +12,13 @@ import { formatClock } from '../core/timezone.ts'
 import { COAST_CAMS } from '../data/coastCams.ts'
 import { homeOrder, primaryFor, useActivities } from '../lib/activities.ts'
 import { surfLine, useSurfNow, type SurfNow } from '../lib/useSurfNow.ts'
-import { rangeSizeWords } from '../core/surfReads.ts'
+import { forecastParts, rangeSizeWords } from '../core/surfReads.ts'
+import { droneLadder, fewCards, firstFun, homeLayout, nextLine, nightSpans, surfPath, tideAt, tideCurve, type HomeLayout } from '../core/homeCards.ts'
 import { beachName } from '../lib/surfBeach.ts'
 import { gustWords, windAt, windWords } from '../lib/windNow.ts'
 import { useStationObs } from '../lib/useStationObs.ts'
 import type { StationObs } from '../core/nowcast.ts'
-import { hourlyAt } from '../lib/tideSheetData.ts'
+import { hourlyAt, type Hourly } from '../lib/tideSheetData.ts'
 import { compass } from '../lib/tideWords.ts'
 import { formatTemperature, windIn, windUnitLabel, type Units } from '../lib/units.ts'
 import { useBriefing, type Briefing, type BriefingDrone, type DayBrief } from '../lib/useBriefing.ts'
@@ -94,11 +96,13 @@ function writeHomeTab(p: Page): void {
 export function Home({ venue, placeName, timeZone, units, drone, now, onClose, onOpenMap, onMenu, onSwitchSpot, onViewfinder, onOpen, start = 0 }: HomeProps) {
   const brief = useBriefing(venue, timeZone, now, true)
   /* Batch Map A1/A2: the spot's surf beach and its band, the same hook the menu and the Surf page read. */
-  const surf = useSurfNow(venue, now, timeZone, units.distance === 'ft')
+  const surf = useSurfNow(venue, now, timeZone, units.distance === 'ft', placeName)
   /* Batch MAP2, Section 2: a station within 15 km that reported in the last hour; the wind now leans to it (the Wind page reads the same). */
   const stationObs = useStationObs(venue)
   const [picked] = useActivities()
   const order = homeOrder(picked, drone !== null)
+  /* Batch Flow, Section 3: 1-3 activities picked, big full-width cards; else the six (boards D_Home2, D_Home6). */
+  const layout = homeLayout(picked)
   /* Batch N A2: reopening lands on the tab last used (kept on this phone). */
   const [page, setPageRaw] = useState<Page>(() => readHomeTab() ?? start)
   const setPage = (p: Page) => {
@@ -150,27 +154,26 @@ export function Home({ venue, placeName, timeZone, units, drone, now, onClose, o
 
   return (
     <div className={`home home--${sky}`} role="dialog" aria-label="Home">
-      <div className="home__top">
-        <div className="home__seg" role="tablist">
-          {PAGES.map((p, i) => (
-            <button key={p} type="button" role="tab" aria-selected={page === i} className={`home__tab${page === i ? ' home__tab--on' : ''}`} onClick={() => go(i as Page)}>
-              {p}
-            </button>
-          ))}
-        </div>
+      {/* Batch Flow, Section 3 (boards D_Home6, D_Home2): the spot ⌄ centred; Today · Tomorrow · Week are swiped, three dots under it. */}
+      <div className="home__top home__top--d">
         <button type="button" className="home__spot" onClick={onSwitchSpot} disabled={onSwitchSpot === undefined} aria-label={`${placeName}: switch spot`}>
           <span className="home__spotname">{placeName}</span>
           <svg className="home__chev" viewBox="0 0 12 12" aria-hidden="true">
             <path d="M2.5 4.5L6 8l3.5-3.5" />
           </svg>
         </button>
+        <div className="home__dots" role="tablist">
+          {PAGES.map((p, i) => (
+            <button key={p} type="button" role="tab" aria-label={p} aria-selected={page === i} className={`home__dot${page === i ? ' home__dot--on' : ''}`} onClick={() => go(i as Page)} />
+          ))}
+        </div>
       </div>
       <div className="home__track" ref={track}>
         <section className="home__page" aria-label="Today">
-          <DayView placeName={placeName} which="today" brief={brief} day={brief.days[0] ?? null} order={order} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} alert={alert === null ? null : alert.event} stormLine={play.inPlay ? play.headline : null} onOpen={onOpen} onDebug={() => setDebug((d) => !d)} surf={surf} obs={stationObs} />
+          <DayView placeName={placeName} which="today" brief={brief} day={brief.days[0] ?? null} order={order} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} alert={alert === null ? null : alert.event} stormLine={play.inPlay ? play.headline : null} onOpen={onOpen} onDebug={() => setDebug((d) => !d)} surf={surf} obs={stationObs} layout={layout} />
         </section>
         <section className="home__page" aria-label="Tomorrow">
-          <DayView placeName={placeName} which="tomorrow" brief={brief} day={brief.days[1] ?? null} order={order} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} alert={null} stormLine={null} onOpen={onOpen} surf={surf} obs={stationObs} />
+          <DayView placeName={placeName} which="tomorrow" brief={brief} day={brief.days[1] ?? null} order={order} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} alert={null} stormLine={null} onOpen={onOpen} surf={surf} obs={stationObs} layout={layout} />
         </section>
         <section className="home__page" aria-label="Week">
           <WeekView brief={brief} order={order} timeZone={timeZone} units={units} now={now} venue={venue} />
@@ -239,9 +242,11 @@ interface DayViewProps {
   placeName: string
   surf: SurfNow
   obs: StationObs | null
+  /** Batch Flow, Section 3: few (1-3 activities picked) or many cards. */
+  layout: HomeLayout
 }
 
-function DayView({ which, brief, day, order, venue, timeZone, units, drone, now, alert, stormLine, onOpen, onDebug, placeName, surf, obs }: DayViewProps) {
+function DayView({ which, brief, day, order, venue, timeZone, units, drone, now, alert, stormLine, onOpen, onDebug, placeName, surf, obs, layout }: DayViewProps) {
   const clock = (d: Date | null) => (d === null ? '—' : formatClock(d, timeZone))
   const wx = brief.wx
   const at = (name: string, t: Date) => (wx === null ? null : hourlyAt(wx, name, t))
@@ -287,71 +292,40 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
   const fish = order.includes('fish') && brief.facing !== null
   const marine = useCoast(fish && which === 'today' ? venue : null, null, units.distance === 'ft' ? 'mi' : 'km', fish && which === 'today').coast?.marine ?? null
 
+  /* Batch Flow, Section 3: within 3 h of a sunrise or sunset, it is said up top. */
+  const soon = which !== 'today' ? null : [day?.events.sunrise ?? null, day?.events.sunset ?? null, brief.days[1]?.events.sunrise ?? null].find((t): t is Date => t !== null && t.getTime() > now.getTime() && t.getTime() - now.getTime() <= 3 * 3_600_000) ?? null
+  const soonWord = soon === null ? null : `${soon === day?.events.sunset ? 'sunset' : 'sunrise'} ${clock(soon)}`
+  const nextWords = nextLine(rows.filter((r) => r.from !== undefined).map((r) => ({ what: NEXT_WORD[r.activity], from: r.from as Date })), now, (d) => clock(d))
+  const shown = layout === 'few' ? fewCards(order, drone !== null || order.includes('drone')) : cards
+  void rain
+  void steps
+  void speed
+  void windMps
+  void windFrom
+  void noForecast
+  void nextGood
+
   return (
-    <div className="hday">
+    <div className={`hday hday--d hday--${layout}`}>
       {alert === null ? null : (
         <p className="hday__alert" role="status">
           {alert}
         </p>
       )}
-      <div className="hwx">
-        <div className="hwx__main">
-          <p className="hwx__date" onClick={(e) => (e.detail >= 3 ? onDebug?.() : undefined)}>
-            {dateWords}
-          </p>
-          {/* Batch Pages, Section 1: the temperature, the hourly strip and "Weather ›" open the Weather page. */}
-          <button type="button" className="hwx__temp num" onClick={() => onOpen('weather')} aria-label={`${bigTemp === null ? 'No temperature' : temp(bigTemp)}: the weather`}>
-            {bigTemp === null ? (loading ? '…' : '—') : temp(bigTemp)}
-          </button>
-        </div>
-        <div className="hwx__side">
-          <p className="hwx__cond">
-            {cond === null ? null : <SkyIconSvg icon={cond.icon} className="hwx__icon" />}
-            <span>{cond?.word ?? '—'}</span>
-          </p>
-          <p className="hwx__line">
-            H {temp(hi)} · L {temp(lo)} · {windFrom === null ? '' : `${compass(windFrom)} `}
-            {speed(windMps)}
-          </p>
-          <p className="hwx__line hwx__rain">{rain ?? '—'}</p>
-          <button type="button" className="hwx__more" onClick={() => onOpen('weather')}>
-            Weather ›
-          </button>
-        </div>
+      <div className="hwx hwx--d">
+        <p className="hwx__date" onClick={(e) => (e.detail >= 3 ? onDebug?.() : undefined)}>
+          {dateWords}
+        </p>
+        {/* Batch Pages / Flow: the temperature opens the Weather page. */}
+        <button type="button" className="hwx__temp num" onClick={() => onOpen('weather')} aria-label={`${bigTemp === null ? 'No temperature' : temp(bigTemp)}: the weather`}>
+          {bigTemp === null ? (loading ? '…' : '—') : temp(bigTemp)}
+        </button>
+        <p className="hwx__cond">
+          {cond?.word ?? '—'} · H {temp(hi)} L {temp(lo)}
+          {soonWord === null ? '' : ` · ${soonWord}`}
+        </p>
       </div>
       {stormLine === null ? null : <p className="hday__storm">{stormLine}</p>}
-      <ol className="hstrip" onClick={() => onOpen('weather')}>
-        {steps.map((s) => {
-          const t = at('temperature_2m', s.at)
-          const c = conditionOf(at('weather_code', s.at), s.kind === 'sunrise' || getPosition(s.at, venue.lat, venue.lon).altitude > -0.8)
-          return (
-            <li key={s.at.getTime()} className={`hstrip__step${s.kind === 'hour' ? '' : ' hstrip__step--sun'}`}>
-              <span className="hstrip__at">{s.kind === 'hour' ? s.label : `${s.kind === 'sunrise' ? 'Rise' : 'Set'} ${s.label}`}</span>
-              {c === null ? <span className="hstrip__icon">—</span> : <SkyIconSvg icon={c.icon} className="hstrip__icon" />}
-              <span className="hstrip__t">{temp(t)}</span>
-            </li>
-          )
-        })}
-      </ol>
-
-      <div className="hbest">
-        <p className="hbest__title">Best windows {which}</p>
-        {rows.length === 0 ? (
-          <p className="hbest__none">{loading ? 'Reading the forecast…' : noForecast ? 'No forecast yet · retrying' : nothingLine(which, nextGood)}</p>
-        ) : (
-          <ul className="hbest__rows">
-            {rows.map((r) => (
-              <li key={r.activity} className="hbest__row">
-                <span className={`hbest__tile hbest__tile--${r.activity}`}>
-                  <ActivityIcon activity={r.activity} />
-                </span>
-                <b>{r.head}</b>
-                <span className="hbest__why">{r.reason}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
 
       {marine === null ? null : (
         <button type="button" className="hmarine" onClick={() => onOpen('tides')}>
@@ -359,11 +333,12 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
         </button>
       )}
 
-      <div className="hcards">
-        {cards.map((c) => (
-          <Card key={c} kind={c} which={which} day={day} brief={brief} units={units} drone={drone} now={now} venue={venue} timeZone={timeZone} onOpen={onOpen} surf={surf} obs={obs} />
+      <div className={`hcards hcards--${layout}`}>
+        {shown.map((c) => (
+          <Card key={c} kind={c} layout={layout} which={which} day={day} brief={brief} units={units} drone={drone} now={now} venue={venue} timeZone={timeZone} onOpen={onOpen} surf={surf} obs={obs} />
         ))}
       </div>
+      <p className="hnext">{nextWords === null ? (loading ? 'Reading the forecast…' : noForecast ? 'No forecast yet · retrying' : nothingLine(which, nextGood)) : <>Next: {nextWords}</>}</p>
 
       {cams.length === 0 ? null : (
         /* Batch N A4: the row opens "Cams near <spot>"; the cams themselves are links out (docs/cams.md). */
@@ -377,6 +352,9 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
     </div>
   )
 }
+
+/** The "Next:" line's words for each window (Batch Flow, Section 3). */
+const NEXT_WORD: Record<Activity, string> = { surf: 'surf on', shoot: 'sky color', drone: 'drone calm', fish: 'calm water', weather: 'dry' }
 
 /** Tomorrow's rain: "Rain from 3 PM", "No rain 6 AM–9 PM", or null. */
 function rainDay(hours: readonly { at: Date; mm: number | null }[], timeZone: string): string | null {
@@ -406,7 +384,7 @@ function windowRows(which: 'today' | 'tomorrow', day: DayBrief, order: readonly 
     const mid = surfRun.values[Math.floor(surfRun.values.length / 2)].at
     const w = day.wind.reduce((a, b) => (Math.abs(b.at.getTime() - mid.getTime()) < Math.abs(a.at.getTime() - mid.getTime()) ? b : a), day.wind[0])
     const side = windTag(w?.fromDeg ?? null, facing)
-    rows.surf = { activity: 'surf', head: `Surf ${spanWords(surfRun.from, surfRun.to, timeZone)}`, reason: `${ft} ft${side === null ? '' : `, ${sideWords(side)}`}` }
+    rows.surf = { activity: 'surf', head: `Surf ${spanWords(surfRun.from, surfRun.to, timeZone)}`, reason: `${ft} ft${side === null ? '' : `, ${sideWords(side)}`}`, from: surfRun.from }
   }
 
   /* Shoot: the day's colour call still to come, Go or Maybe. */
@@ -417,7 +395,7 @@ function windowRows(which: 'today' | 'tomorrow', day: DayBrief, order: readonly 
     const to = read.colorTo ?? new Date(read.event.getTime() + 20 * 60_000)
     /* Tomorrow: when the call is settled (sunrise: the wake-up time; sunset: an hour before, from the stations). */
     const settled = read.kind === 'sunrise' ? wakeAt(read.event) : new Date(read.event.getTime() - 3_600_000)
-    rows.shoot = { activity: 'shoot', head: `${read.kind === 'sunset' ? 'Sunset' : 'Sunrise'} color ${spanWords(from, to, timeZone)}`, reason: which === 'tomorrow' ? `${read.call}, final call ${formatClock(settled, timeZone)}` : `${read.call}, ${shortWhy(read.why)}` }
+    rows.shoot = { activity: 'shoot', head: `${read.kind === 'sunset' ? 'Sunset' : 'Sunrise'} color ${spanWords(from, to, timeZone)}`, reason: which === 'tomorrow' ? `${read.call}, final call ${formatClock(settled, timeZone)}` : `${read.call}, ${shortWhy(read.why)}`, from }
   }
 
   /* Drone: the next calm daylight run at 400 ft against the aircraft's rating. */
@@ -427,7 +405,7 @@ function windowRows(which: 'today' | 'tomorrow', day: DayBrief, order: readonly 
       const span = w.calm.span
       const inside = day.wind.filter((h) => h.at.getTime() >= span.from.getTime() && h.at.getTime() < span.to.getTime() && h.highMps !== null)
       const top = inside.length === 0 ? null : Math.max(...inside.map((h) => h.highMps as number))
-      rows.drone = { activity: 'drone', head: `Drone calm ${spanWords(span.from, span.to, timeZone)}`, reason: top === null ? 'at 400 ft' : `${speed(top)} at 400 ft` }
+      rows.drone = { activity: 'drone', head: `Drone calm ${spanWords(span.from, span.to, timeZone)}`, reason: top === null ? 'at 400 ft' : `${speed(top)} at 400 ft`, from: span.from }
     }
   }
 
@@ -440,7 +418,7 @@ function windowRows(which: 'today' | 'tomorrow', day: DayBrief, order: readonly 
   if (calmWater !== null) {
     const top = Math.max(...calmWater.values.map((h) => h.mps ?? 0))
     const turn = day.tide?.next ?? null
-    rows.fish = { activity: 'fish', head: `Calm water ${spanWords(calmWater.from, calmWater.to, timeZone)}`, reason: `${speed(top)}${turn === null ? '' : `, ${turn.kind} ${formatClock(turn.at, timeZone)}`}` }
+    rows.fish = { activity: 'fish', head: `Calm water ${spanWords(calmWater.from, calmWater.to, timeZone)}`, reason: `${speed(top)}${turn === null ? '' : `, ${turn.kind} ${formatClock(turn.at, timeZone)}`}`, from: calmWater.from }
   }
   return bestWindows(order, rows)
 }
@@ -466,6 +444,7 @@ function nextGoodDay(days: readonly DayBrief[], from: number, timeZone: string):
 
 interface CardProps {
   kind: CardKind
+  layout: HomeLayout
   which: 'today' | 'tomorrow'
   day: DayBrief | null
   brief: Briefing
@@ -480,96 +459,210 @@ interface CardProps {
   obs: StationObs | null
 }
 
-function Card({ kind, which, day, brief, units, drone, now, venue, timeZone, onOpen, surf, obs }: CardProps) {
+const CHART = { w: 300, h: 70 }
+
+/*
+ * THE CARDS, LOOK D (Batch Flow, Section 3; boards D_Home6, D_Home2). Each
+ * with its own live graphic: the surf's 24 hours with the night shaded, the
+ * wind's dial (the offshore half teal, the arrow where it goes), the tide's
+ * curve with its turns, the sky's light strip, the drone's height ladder,
+ * the moon's phase. Every number is the code's (src/core/homeCards.ts).
+ */
+function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZone, onOpen, surf, obs }: CardProps) {
   const clock = (d: Date) => formatClock(d, timeZone)
+  const short = (d: Date) => clock(d).replace(/:00 /, ' ')
   const speed = (mps: number | null) => (mps === null ? '—' : `${Math.round(windIn(mps, units.wind) ?? 0)}`)
   const unit = windUnitLabel(units.wind)
   const nearest = <T extends { at: Date }>(list: readonly T[], t: Date): T | null => (list.length === 0 ? null : list.reduce((a, b) => (Math.abs(b.at.getTime() - t.getTime()) < Math.abs(a.at.getTime() - t.getTime()) ? b : a)))
   const t = which === 'today' ? now : day === null ? now : new Date(day.start.getTime() + 13 * 3_600_000)
+  const wide = layout === 'few' || kind === 'surf'
+  const small = layout === 'many' && (kind === 'sky' || kind === 'drone' || kind === 'moon')
   let title = ''
   let big: ReactNode = '—'
   let line: ReactNode = null
   let tag: string | null = null
+  let tagGood = false
+  let pic: ReactNode = null
   let target: HomeTarget = 'weather'
   if (kind === 'surf') {
-    title = 'Surf'
+    title = 'Surf · next 24 hours'
     target = 'surf'
     const band = which === 'today' ? surf.now : surf.tomorrow
     const words = which === 'today' ? surf.nowWords : surf.tomorrowWords
     if (words !== null) {
       big = <span data-shared={which === 'today' ? 'surf' : 'surf-tomorrow'}>{words}</span>
-      /* Batch MAP2, Section 1: today's line is the Surf page's own (size from the band's ends, the dominant period); tomorrow's, its size. */
       line = surf.away !== null ? null : which === 'today' ? surfLine(surf.sea, band, now) : band === null ? null : rangeSizeWords(band.range.lowFt, band.range.highFt)
-      tag = band?.tag ?? null
     }
-    /* Not on open ocean (Batch N E8: a bay point read "0-1 ft · flat, 3 s"): the nearest surf beach, said as that. */
     if (surf.away !== null) line = `Nearest surf: ${surf.away.name} · ${surf.away.far}`
+    /* The next 24 hours of faces, from the briefing's hours, today's and tomorrow's. */
+    const from = which === 'today' ? now : (day?.start ?? now)
+    const pts = brief.days.flatMap((d) => d.surf).map((b) => ({ at: b.at, ft: b.faceFt, fun: surfTag(b.faceFt, b.shape) !== 'Flat' }))
+    const fun = firstFun(pts, from)
+    tag = fun === null ? (band?.tag ?? null) : fun === 'now' ? `${band?.tag === 'Firing' ? 'Firing' : 'Fun'} now` : `Fun ${short(fun)}`
+    tagGood = fun !== null
+    const path = surfPath(pts, from, 24, CHART)
+    const nights = nightSpans(from, 24, brief.days.map((d) => d.events.sunset).filter((x): x is Date => x !== null), brief.days.map((d) => d.events.sunrise).filter((x): x is Date => x !== null))
+    /* The parts, at the hour (S7 look), in the few-cards layout. */
+    const half = new Date(Math.floor(now.getTime() / 3_600_000) * 3_600_000 + 1_800_000)
+    const parts = layout === 'few' && which === 'today' && surf.sea.marine !== null ? forecastParts((n) => hourlyAt(surf.sea.marine as Hourly, n, half)).slice(0, 2) : []
+    pic = (
+      <>
+        {parts.length === 0 ? null : (
+          <span className="hcard__parts">
+            {parts.map((p) => (
+              <span key={p.name}>
+                <b>{p.name}</b> {p.ft.toFixed(1)} ft{p.periodS === null ? '' : ` ${Math.round(p.periodS)} s`}{p.fromDeg === null ? '' : ` ${compass(p.fromDeg)}`}
+              </span>
+            ))}
+          </span>
+        )}
+        {path === null ? null : (
+          <svg className="hcard__chart hcard__chart--surf" viewBox={`0 0 ${CHART.w} ${CHART.h}`} preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="surfFill" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0" stopColor="var(--d-surf)" stopOpacity="0.55" />
+                <stop offset="1" stopColor="var(--d-surf)" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            {nights.map((n) => (
+              <rect key={n.a} x={n.a * CHART.w} y="0" width={(n.b - n.a) * CHART.w} height={CHART.h} className="hcard__night" />
+            ))}
+            <path d={path.fill} fill="url(#surfFill)" />
+            <path d={path.line} className="hcard__line hcard__line--surf" />
+            <line x1="1" x2="1" y1="0" y2={CHART.h} className="hcard__now" />
+          </svg>
+        )}
+      </>
+    )
   } else if (kind === 'wind') {
     title = 'Wind'
     target = 'wind'
-    /* Batch Map A2: today's is the one wind now (src/lib/windNow.ts), the Wind page's headline too; tomorrow's, the day's strongest hour. */
     const strong = day === null ? null : day.wind.reduce<(typeof day.wind)[number] | null>((a, b) => (a === null || (b.mps ?? 0) > (a.mps ?? 0) ? b : a), null)
     const w = which === 'today' ? windAt(brief.wx, now, obs) : strong?.mps == null ? null : { mps: strong.mps, fromDeg: strong.fromDeg, gustMps: strong.gustMps }
     const said = windWords(w, units.wind)
     big = said === null ? '—' : which === 'today' ? <span data-shared="wind">{said}</span> : said
-    const side = windSideSpan(day, brief.facing, which === 'today' ? now : null, timeZone)
-    line = side ?? gustWords(w, units.wind)
-    tag = day?.windTag ?? null
+    /* Batch Flow, Section 3: one function decides the side, for the tag and the line alike (it read "Offshore" over "cross-shore"). */
+    const sideNow = w?.fromDeg == null ? null : windTag(w.fromDeg, brief.facing)
+    tag = sideNow === null ? null : sideWords(sideNow).replace(/^./, (c) => c.toUpperCase())
+    tagGood = sideNow === 'Offshore'
+    const span = windSideSpan(day, brief.facing, which === 'today' ? now : null, timeZone)
+    const gusts = gustWords(w, units.wind)
+    line = [gusts, span !== null && !span.endsWith('all day') ? span.replace(/^\w+ until/, (m) => m) : null].filter((x) => x !== null).join(' · ') || null
+    pic = <WindDial fromDeg={w?.fromDeg ?? null} facing={brief.facing} />
   } else if (kind === 'tide') {
-    title = 'Tide'
+    title = layout === 'few' ? 'Tide · today' : 'Tide'
     target = 'tides'
-    /* Batch N E6: the next turn from the station's whole list (the map's source), past midnight too; the height now on Today. */
     const from = which === 'today' ? now.getTime() : (day?.start.getTime() ?? now.getTime())
     const next = brief.turns.find((x) => x.at.getTime() > from) ?? null
-    big = next === null ? '—' : `${next.kind === 'high' ? 'High' : 'Low'} ${clock(next.at)}`
+    const going = next === null ? null : next.kind === 'high' ? 'Rising' : 'Falling'
+    big = going ?? '—'
     const feet = which === 'today' ? (day?.tide?.nowFeet ?? null) : null
-    const going = next === null ? null : next.kind === 'high' ? 'rising' : 'falling'
-    line = going === null ? null : feet === null ? going : `${feet.toFixed(1)} ft now · ${going}`
+    line = next === null ? null : `${next.kind} ${clock(next.at)}${layout === 'few' ? ` · ${next.feet.toFixed(1)} ft${feet === null ? '' : ` · now ${feet.toFixed(1)} ft`}` : ''}`
+    tag = next === null ? null : `${next.kind === 'high' ? 'High' : 'Low'} ${clock(next.at)}`
+    const curve = tideCurve(brief.turns, new Date(from - 3 * 3_600_000), 24, CHART)
+    pic = curve === null ? null : (
+      <svg className="hcard__chart hcard__chart--tide" viewBox={`0 0 ${CHART.w} ${CHART.h + 22}`} preserveAspectRatio="none" aria-hidden="true">
+        <g transform="translate(0 11)">
+          <path d={curve.line} className="hcard__line hcard__line--tide" />
+          <circle cx={(3 / 24) * CHART.w} cy={curve.scale(tideAt(brief.turns, new Date(from)) ?? 0)} r="4" className="hcard__dot" />
+          {curve.turns.map((p) => (
+            <text key={p.turn.at.getTime()} x={Math.min(CHART.w - 40, Math.max(2, p.x - 24))} y={p.turn.kind === 'high' ? p.y - 4 : p.y + 11} className="hcard__turn">
+              {p.turn.kind === 'high' ? 'H' : 'L'} {p.turn.feet.toFixed(1)} · {clock(p.turn.at).replace(/:00 /, ' ').replace(/ ([AP])M$/, (_m, a: string) => a.toLowerCase())}
+            </text>
+          ))}
+        </g>
+      </svg>
+    )
   } else if (kind === 'sky') {
-    /* Batch Pages, Section 1 (board HomeV9): the Sky card is the sunset (or, after it, tomorrow's sunrise), the colour call in words and one reason; a tap opens the Sky page. */
+    /* The sunset still to come, or after it tomorrow's sunrise: never an event that has passed (Batch Flow, Section 4). */
     title = 'Sky'
     target = 'sky'
     const past = which === 'today' && day?.events.sunset != null && now.getTime() > day.events.sunset.getTime()
     const next = past ? (brief.days[1] ?? null) : null
     const read = past ? (next?.reads.sunrise ?? null) : (day?.reads.sunset ?? null)
     const at = past ? (next?.events.sunrise ?? null) : (day?.events.sunset ?? null)
-    big = at == null ? '—' : `${past ? 'Sunrise' : 'Sunset'} ${clock(at)}`
     const said = colorWords(read?.call ?? null)
-    /* Tomorrow: when the call is settled, an hour before, from the stations (the briefing's own rule). */
-    line = which === 'tomorrow' && at != null ? `${said ?? 'no call yet'} · final call ${clock(new Date(at.getTime() - 3_600_000))}` : read === null ? null : [said, shortWhy(read.why)].filter((x) => x !== null && x !== '').join(' · ')
+    big = said === null ? '—' : said.replace(/^color /, '').replace(/^./, (c) => c.toUpperCase())
+    line = at == null ? null : `${past ? 'rise' : 'set'} ${clock(at)}`
     tag = read?.call ?? null
+    tagGood = read?.call === 'Go'
+    pic = <span className={`hcard__strip hcard__strip--${past ? 'rise' : 'set'}`} aria-hidden="true" />
   } else if (kind === 'drone') {
-    title = 'Drone'
+    title = small ? 'Drone' : 'Drone · 400 ft'
     target = 'preflight'
     const w = day === null ? null : nearest(day.wind, t)
     big = w?.highMps == null ? '—' : `${speed(w.highMps)} ${unit}`
-    line = 'at 400 ft · check airspace'
     tag = drone === null || w === null ? null : droneTag(w.highMps, drone.maxWindMps)
+    const ladder = droneLadder(w?.mps ?? null, w?.highMps ?? null)
+    const top = Math.max(10, ...ladder.map((r) => r.mps ?? 0))
+    pic = (
+      <span className="hcard__ladder" aria-hidden="true">
+        {ladder.map((r) => (
+          <span key={r.label} className="hcard__rung">
+            <span className="hcard__rungk">{r.label}</span>
+            <span className="hcard__rungbar">
+              <i style={{ width: `${r.mps === null ? 0 : Math.max(6, (r.mps / top) * 100)}%` }} className={r.label === '400' ? 'hcard__rungfill hcard__rungfill--top' : 'hcard__rungfill'} />
+            </span>
+            <span className="hcard__rungv num">{speed(r.mps)}</span>
+          </span>
+        ))}
+      </span>
+    )
   } else {
     title = 'Moon'
     target = 'moon'
     const base = day?.start ?? now
-    /* The venue's own day, not suncalc's UTC one (src/core/moonTimes.ts). */
     const rise = moonTimesOnLocalDay(new Date(base.getTime() + 12 * 3_600_000), venue.lat, venue.lon, timeZone).rise
     const az = rise === null ? null : getMoonPosition(rise, venue.lat, venue.lon).azimuth
     const moon = day?.moon ?? null
-    big = rise === null ? 'No rise' : `Rise ${clock(rise)}`
-    line = (
-      <>
-        {moon === null ? null : <MoonGlyph phase={moon.phase} size={14} />} {moon === null ? '—' : `${Math.round(moon.fraction * 100)}%`}
-        {az === null ? '' : ` · ${compass(az)}`}
-      </>
-    )
+    big = moon === null ? '—' : moon.fraction < 0.03 ? 'New' : moon.fraction > 0.97 ? 'Full' : `${Math.round(moon.fraction * 100)}%`
+    line = `${rise === null ? 'no rise' : `rise ${clock(rise)}`}${az === null ? '' : ` · ${compass(az)}`}`
+    pic = moon === null ? null : <MoonGlyph phase={moon.phase} size={layout === 'few' ? 56 : 40} />
   }
   return (
-    <button type="button" className={`hcard hcard--${kind}`} onClick={() => onOpen(target)}>
+    <button type="button" className={`hcard hcard--${kind}${wide ? ' hcard--wide' : ''}${small ? ' hcard--small' : ''}`} onClick={() => onOpen(target)}>
       <span className="hcard__head">
         <span className="hcard__title">{title}</span>
-        {tag === null ? null : <span className={`hcard__tag hcard__tag--${tag.toLowerCase().replace(/\s+/g, '-')}`}>{tag}</span>}
+        {/* A small card has no room for a pill: its tag is said under its number. */}
+        {tag === null || small ? null : <span className={`hcard__tag hcard__tag--${tag.toLowerCase().replace(/\s+/g, '-')}${tagGood ? ' hcard__tag--good' : ''}`}>{tag}</span>}
       </span>
-      <span className="hcard__big">{big}</span>
-      <span className="hcard__line">{line ?? '—'}</span>
+      <span className="hcard__body">
+        <span className="hcard__words">
+          <span className="hcard__big">{big}</span>
+          <span className="hcard__line">{small && tag !== null && kind !== 'sky' ? tag : (line ?? '—')}</span>
+        </span>
+        {kind === 'wind' || kind === 'moon' ? pic : null}
+      </span>
+      {kind === 'wind' || kind === 'moon' ? null : pic}
     </button>
+  )
+}
+
+/** The wind's dial: where it comes from the offshore half is teal, onshore orange; the arrow points where it goes (board D_Home6). */
+function WindDial({ fromDeg, facing }: { fromDeg: number | null; facing: number | null }) {
+  const r = 26
+  const wedge = (centre: number, half: number) => {
+    const p = (a: number) => [30 + r * Math.sin((a * Math.PI) / 180), 30 - r * Math.cos((a * Math.PI) / 180)]
+    const [x0, y0] = p(centre - half)
+    const [x1, y1] = p(centre + half)
+    return `M30 30 L${x0.toFixed(1)} ${y0.toFixed(1)} A${r} ${r} 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)} Z`
+  }
+  return (
+    <svg className="hcard__dial" viewBox="0 0 60 60" aria-hidden="true">
+      <circle cx="30" cy="30" r={r} className="hcard__dialface" />
+      {facing === null ? null : (
+        <>
+          {/* Wind FROM the land side (opposite the way the beach faces) is offshore; from the sea side, onshore (src/core/coastFacing.ts, 45° each way). */}
+          <path d={wedge(facing + 180, 45)} className="hcard__dial--off" />
+          <path d={wedge(facing, 45)} className="hcard__dial--on" />
+        </>
+      )}
+      {fromDeg === null ? null : (
+        <g transform={`rotate(${fromDeg + 180} 30 30)`}>
+          <path d="M30 50 V12 M24 18 L30 10 L36 18" className="hcard__arrow" />
+        </g>
+      )}
+    </svg>
   )
 }
 

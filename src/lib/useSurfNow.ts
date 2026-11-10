@@ -68,8 +68,9 @@ export function storedStats(spot: LatLon, now: number): SpotStats {
 }
 
 /** `venue` null asks nothing (the menu before it has been open a moment). */
-export function useSurfNow(venue: LatLon | null, now: Date, timeZone: string, miles: boolean): SurfNow {
-  const [beach] = useSurfBeach(venue)
+export function useSurfNow(venue: LatLon | null, now: Date, timeZone: string, miles: boolean, spotName: string | null = null): SurfNow {
+  /* Batch Flow, Section 3: a spot named for a beach is on that beach (src/lib/surfBeach.ts namedBeach). */
+  const [beach] = useSurfBeach(venue, spotName)
   const away = venue !== null && beach !== null && !sameBeach(venue, beach)
   const spot = away && beach !== null ? beach.at : venue
   const sea = useSurfSea(spot)

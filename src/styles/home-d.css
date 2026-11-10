@@ -1,0 +1,334 @@
+/*
+ * THE HOME, LOOK D (Batch Flow, Section 3; boards D_Home6, D_Home2). The
+ * spot ⌄ centred, a big light temperature, the condition and high and low
+ * under it; the cards adapt to what was picked; "Next:" under them.
+ */
+.home__top--d {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 16px 0;
+}
+.home__top--d .home__spot {
+  margin: 0;
+  align-self: center;
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+.home__dots {
+  display: flex;
+  gap: 2px;
+}
+.home__dot {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  position: relative;
+}
+.home__dot::after {
+  content: '';
+  position: absolute;
+  inset: 9px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.35);
+}
+.home__dot--on::after {
+  background: var(--white);
+}
+.hday--d {
+  gap: 10px;
+}
+.hwx--d {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0;
+}
+.hwx--d .hwx__date {
+  font-size: var(--text-xs);
+  color: rgb(255 255 255 / 0.6);
+}
+.hwx--d .hwx__temp {
+  text-align: center;
+  font-size: 84px;
+  line-height: 1;
+  font-weight: 300;
+  letter-spacing: -0.03em;
+}
+.hwx--d .hwx__cond {
+  margin: 2px 0 0;
+  font-size: var(--text-md);
+  color: rgb(255 255 255 / 0.85);
+}
+.hcards--many,
+.hcards--few {
+  display: grid;
+  gap: 10px;
+  grid-auto-rows: auto;
+  align-content: start;
+}
+.hcards--many {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+.hcards--many .hcard {
+  grid-column: span 3;
+}
+.hcards--many .hcard--wide {
+  grid-column: span 6;
+}
+.hcards--many .hcard--small {
+  grid-column: span 2;
+}
+.hcards--few {
+  grid-template-columns: minmax(0, 1fr);
+}
+.hday--d .hcard {
+  justify-content: flex-start;
+  gap: 4px;
+  min-height: 0;
+  padding: 12px 14px;
+}
+.hday--d .hcard__title {
+  font-size: var(--text-xs);
+  letter-spacing: 0.12em;
+}
+.hday--d .hcard__tag {
+  padding: 2px 10px;
+  font-weight: 700;
+  background: rgb(255 255 255 / 0.16);
+}
+.hday--d .hcard__tag--good {
+  background: var(--good);
+  color: var(--white);
+}
+.hcard__body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+.hcard__words {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.hday--d .hcard__big {
+  font-size: var(--text-xl);
+  font-weight: 400;
+}
+.hcards--few .hcard__big,
+.hcards--many .hcard--wide .hcard__big {
+  font-size: 30px;
+  font-weight: 300;
+}
+.hcard--small .hcard__big {
+  font-size: var(--text-lg);
+}
+.hcard__parts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: var(--text-sm);
+  color: rgb(255 255 255 / 0.85);
+}
+.hcard__parts b {
+  color: var(--white);
+}
+.hcard__chart {
+  display: block;
+  width: 100%;
+  height: 56px;
+  overflow: visible;
+}
+.hcards--few .hcard__chart {
+  height: 72px;
+}
+.hcard__chart--tide {
+  height: 66px;
+}
+.hcard__night {
+  fill: rgb(6 10 30 / 0.45);
+}
+.hcard__line {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.hcard__line--surf {
+  stroke: var(--d-surf);
+}
+.hcard__line--tide {
+  stroke: var(--d-tide);
+}
+.hcard__now {
+  stroke: var(--white);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.hcard__dot {
+  fill: var(--white);
+}
+.hcard__turn {
+  fill: var(--white);
+  font-size: 10px;
+  font-weight: 700;
+}
+.hcard__dial {
+  width: 64px;
+  height: 64px;
+  flex: none;
+}
+.hcards--few .hcard__dial {
+  width: 84px;
+  height: 84px;
+}
+.hcard__dialface {
+  fill: rgb(255 255 255 / 0.04);
+  stroke: rgb(255 255 255 / 0.35);
+  stroke-width: 1;
+}
+.hcard__dial--off {
+  fill: rgb(43 179 160 / 0.45);
+}
+.hcard__dial--on {
+  fill: rgb(239 138 74 / 0.3);
+}
+.hcard__arrow {
+  fill: none;
+  stroke: var(--white);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.hcard__strip {
+  display: block;
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--d-night-top), var(--d-glow-violet), var(--d-glow), var(--caution));
+}
+.hcard__strip--rise {
+  background: linear-gradient(90deg, var(--d-night-top), var(--d-glow-violet), var(--d-glow), var(--caution));
+}
+.hcard__strip--set {
+  background: linear-gradient(90deg, var(--caution), var(--d-glow), var(--d-glow-violet), var(--d-night-top));
+}
+.hcard__ladder {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+}
+.hcard__rung {
+  display: grid;
+  grid-template-columns: 2.2em 1fr 1.6em;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-xs);
+}
+.hcard__rungk {
+  color: rgb(255 255 255 / 0.65);
+}
+.hcard__rungbar {
+  height: 6px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.12);
+  overflow: hidden;
+}
+.hcard__rungfill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--d-surf);
+}
+.hcard__rungfill--top {
+  background: var(--d-drone);
+}
+.hcard__rungv {
+  text-align: right;
+}
+.hnext {
+  margin: 0;
+  text-align: center;
+  font-size: var(--text-sm);
+  color: rgb(255 255 255 / 0.8);
+}
+@media (max-height: 700px) {
+  .hwx--d .hwx__temp {
+    font-size: 64px;
+  }
+  .hday--d .hcard {
+    padding: 8px 12px;
+  }
+  .hcard__chart {
+    height: 40px;
+  }
+  .hcards--few .hcard__chart {
+    height: 48px;
+  }
+}
+
+/* The six: the pair and the small row kept to their room (390 x 844 with nothing scrolled). */
+.hcards--many .hcard:not(.hcard--wide):not(.hcard--small) .hcard__big {
+  font-size: var(--text-lg);
+}
+.hcards--many .hcard__dial {
+  width: 52px;
+  height: 52px;
+}
+.hcards--many .hcard__chart--tide {
+  height: 44px;
+}
+.hcards--many .hcard--wide .hcard__chart {
+  height: 46px;
+}
+.hcard--small {
+  padding: 10px 10px;
+}
+.hcard--small .hcard__ladder {
+  display: none;
+}
+.hcard--small .hcard__words {
+  width: 100%;
+}
+.hday--d .hwx__date {
+  margin: 0;
+  line-height: 1.2;
+}
+@media (max-height: 760px) {
+  .hwx--d .hwx__temp {
+    font-size: 60px;
+  }
+  .hday--d {
+    gap: 6px;
+  }
+  .hcards--many {
+    gap: 6px;
+  }
+  .hcards--many .hcard__chart--tide,
+  .hcards--many .hcard__dial,
+  .hcard--small .hcard__strip,
+  .hcard--small svg {
+    display: none;
+  }
+  .hcards--many .hcard--wide .hcard__chart {
+    height: 30px;
+  }
+  .hcards--few .hcard__chart {
+    height: 40px;
+  }
+  .hcards--few .hcard__dial {
+    width: 60px;
+    height: 60px;
+  }
+  .hday--d .hcard {
+    padding: 7px 12px;
+    gap: 2px;
+  }
+}

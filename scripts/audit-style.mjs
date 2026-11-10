@@ -258,7 +258,7 @@ try {
     await wait(2500)
     await look('home')
     /* Batch Pages, Section 2: the Weather page, from the home's "Weather ›". */
-    if (await tap('.home__page[aria-label="Today"] .hwx__more', 'weather page')) {
+    if (await tap('.home__page[aria-label="Today"] .hwx__temp', 'weather page')) {
       await wait(2500)
       await look('weather page')
       await tap('.wpage .ppage__back', 'back to the home')

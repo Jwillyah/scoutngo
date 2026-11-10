@@ -98,7 +98,7 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
   const note = stormNote()
   const storms = note !== null && note.startsWith('Storms · ') ? note.slice('Storms · '.length) : null
   /* Batch J, Section 7: the Water card everywhere, inland too, for a named surf beach: the nearest, or the one picked; its own sea and tide when it is not here. */
-  const [beach, setBeach] = useSurfBeach(venue)
+  const [beach, setBeach] = useSurfBeach(venue, placeShort)
   const [pickingBeach, setPickingBeach] = useState(false)
   const here = sameBeach(venue, beach)
   const beachBrief = useBriefing(here || beach === null ? null : beach.at, timeZone, now, looking && !here, 'sea')
@@ -107,7 +107,7 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
   const otherBeach = beach !== null && !here ? beach.name : null
   const water = useMemo(() => waterCard(waterDay, now, clock, otherBeach), [waterDay, now, otherBeach]) // eslint-disable-line react-hooks/exhaustive-deps
   /* Batch Map A2: the value is the one surf number (src/lib/useSurfNow.ts), the home's and the Surf page's, not the day's extremes. */
-  const surf = useSurfNow(looking ? venue : null, now, timeZone, units.distance === 'ft')
+  const surf = useSurfNow(looking ? venue : null, now, timeZone, units.distance === 'ft', placeShort)
   /* Batch K, Section 5: the NWS's rip current risk for the beach, as a fact under the card when the surf zone forecast gives one. */
   const rip = useCoast(beach?.at ?? null, null, 'mi', looking).coast?.rip ?? null
   const flight = useMemo(() => droneCard(days[0] ?? null, drone?.maxWindMps ?? null, now, (mps) => `${Math.round(windIn(mps, units.wind) ?? 0)} ${windUnitLabel(units.wind)}`), [days, drone, now, units.wind])

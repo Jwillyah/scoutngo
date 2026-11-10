@@ -138,6 +138,8 @@ export interface WindowRow {
   head: string
   /** "2 ft, offshore". */
   reason: string
+  /** Batch Flow, Section 3: when it starts, for the home's "Next:" line. */
+  from?: Date
 }
 
 /** Up to three rows, in the order the user's activities were picked; the first that qualify. */

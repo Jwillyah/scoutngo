@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { venueToday } from '../core/eventDay.ts'
 import { type LatLon } from '../core/geo.ts'
 import { camsNear, type SkyCam } from '../core/skyCams.ts'
+import { distanceMeters } from '../core/geo.ts'
 import { BAND_FLOOR_FT, skillLine, UNTESTED_ERROR_FT, type SkillSample, type SpotStats } from '../core/spotSkill.ts'
 import { BUOY_MATCH_FT, buoyVsForecast, camDistance, chartTopFt, cleanRuns, rangeWords, SURF_SPREAD_SOURCE } from '../core/surfRange.ts'
 import { bestWindow, faceLight, type FaceLight } from '../core/surfShoot.ts'
@@ -78,7 +79,7 @@ export function SurfPageV2({ venue, placeName, timeZone, units, ground, onBack, 
     return () => clearInterval(t)
   }, [])
   /* Batch Map A1/A2: the spot's surf beach and this hour's band, from the one hook the home and the menu read too. */
-  const surf = useSurfNow(venue, now, timeZone, units.distance === 'ft')
+  const surf = useSurfNow(venue, now, timeZone, units.distance === 'ft', placeName)
   const spot = surf.spot ?? venue
   const { sea, away: awayWords } = surf
   const ready = sea.marine !== null && sea.facingState !== 'loading' && sea.buoy !== null
@@ -92,7 +93,9 @@ export function SurfPageV2({ venue, placeName, timeZone, units, ground, onBack, 
   /* Read again on each render: a new sample re-renders through skill.stats. */
   const kept = skill.key === null ? [] : (readSkillBook()[skill.key]?.samples ?? [])
   const [picked] = useActivities()
-  const cam = sea.facing === null ? null : (camsNear(spot, 'surf', COAST_CAMS, null, sea.facing)[0] ?? null)
+  /* Batch Flow, Section 3: the spot's own beach's cam, and how far it is from the spot itself (it read "0.0 mi" measured from the beach). */
+  const camNear = sea.facing === null ? null : (camsNear(spot, 'surf', COAST_CAMS, null, sea.facing)[0] ?? null)
+  const cam = camNear === null ? null : { ...camNear, km: distanceMeters(venue, camNear.cam.at) / 1000 }
 
   return (
     <DetailShell id="surf" ground={ground} onBack={onBack} onSwitch={onSwitch} onMap={onMap} how={<SurfHow sea={sea} stats={skill.stats} away={awayWords} placeName={placeName} />}>
