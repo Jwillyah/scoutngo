@@ -394,6 +394,8 @@ interface PlanModeProps {
   planShoot?: boolean
   /** Batch Flow, Section 2: the map's own back, to the home. */
   onHome?: () => void
+  /** A detail page's back: the map, or the home when the home opened it (App decides; Batch QA, Section 1). */
+  onPageBack?: () => void
   /** The Now screen, from Sky's Tonight page. */
   onOpenNow: () => void
   /** The dock's Back to now: the current time at the venue, today if the shoot day is not today. */
@@ -591,6 +593,7 @@ export function PlanMode({
   onShootSetup,
   planShoot,
   onHome,
+  onPageBack,
   onOpenNow,
   onBackToNow,
   onShootWindow,
@@ -2647,7 +2650,10 @@ export function PlanMode({
           timeZone: venueWindow.timeZone,
           units,
           ground: groundOf(getPosition(new Date(), venue.lat, venue.lon).altitude, null, false),
-          onBack: () => setPage(null),
+          onBack: () => {
+            setPage(null)
+            onPageBack?.()
+          },
           onSwitch: (id: DetailId) => setPage(id === 'tide' ? 'tides' : id),
           onMap: () => setPage(null),
           /* Batch Flow, Section 6: the Wind page's Map: the map's moving wind, at the spot. */

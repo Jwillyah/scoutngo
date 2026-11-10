@@ -193,7 +193,7 @@ samp {
   border-color: var(--white);
 }
 .ui-stat__label {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: var(--weight-medium);
   letter-spacing: 0.12em;
   text-transform: uppercase;

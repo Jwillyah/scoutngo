@@ -237,6 +237,8 @@ export function SettingsPage(props: Props) {
         <Row label="Back up to a file" value="One file" onClick={props.onExport} />
         <Row label="What leaves my phone" onClick={openPrivacy} />
         <Row label="More" sub="restore, export, clear, storage, AI key" onClick={() => setMore(true)} />
+        {/* Batch QA, Section 1: About was a tap on the version line only; it is a row. */}
+        <Row label="About" value={versionLine()} onClick={props.onAbout} />
       </Group>
 
       <button type="button" className="set2__version" onPointerDown={down} onPointerUp={up} onPointerLeave={up} onContextMenu={(e) => e.preventDefault()} onClick={props.onAbout}>

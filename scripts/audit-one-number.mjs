@@ -116,7 +116,11 @@ try {
   await page.screenshot({ path: join(OUT, 'wind.png') })
 
   /* The Sky page from the menu's Sky card, then its "Color detail ›". */
-  await page.locator('.dpage__back').first().click({ timeout: 4000 }).catch(() => {})
+  /* Back from a page the home opened is the home now (Batch QA, Section 1): open the map again for the menu (about:blank first: the same address with a hash is not a reload). */
+  await page.goto('about:blank')
+  await page.goto(url)
+  await wait(3000)
+  await goToStage(ev, wait, 'plan')
   await wait(800)
   await page.locator('button[aria-label="Menu"]:visible').first().click({ timeout: 4000 }).catch(() => fail('no menu button after the Wind page'))
   await wait(800)

@@ -1556,6 +1556,7 @@ function App() {
    * its most useful page. Sky names its tab (src/core/menuCards.ts).
    */
   const onMenuTarget = (target: MenuTarget) => {
+    setPageFromHome(false)
     /* Batch Pages, Section 3: the Sky page opens over whatever is there, the home included. */
     if (target === 'sky') {
       setSkyOpen(true)
@@ -1594,12 +1595,17 @@ function App() {
         onMenuPick(target)
     }
   }
+  /* Batch QA, Section 1: a page the home opened goes back to the home, not to the map (the walk-through found Surf › back on the map). */
+  const [pageFromHome, setPageFromHome] = useState(false)
   /* The home's cards open their pages (Batch M, Section 3). */
   const homeOpen = (t: HomeTarget) => {
     switch (t) {
       case 'surf':
       case 'wind':
       case 'tides':
+        setPageFromHome(true)
+        onMenuPick(t)
+        return
       case 'preflight':
         onMenuPick(t)
         return
@@ -2503,6 +2509,11 @@ function App() {
           onShootSetup={() => setMode('setup')}
           planShoot={showsPhotoTools(activities)}
           onHome={() => setBriefOpen(true)}
+          onPageBack={() => {
+            if (!pageFromHome) return
+            setPageFromHome(false)
+            setBriefOpen(true)
+          }}
           onOpenNow={() => setNowOpen(true)}
           onBackToNow={onBackToNow}
         />

@@ -312,7 +312,7 @@
     "Liberation Mono", monospace;
 
   /* Tightened scale, heavier headers. */
-  --text-xs: 0.6875rem; /* 11 */
+  --text-xs: 0.75rem; /* 12: nothing smaller is shown (Batch QA, Section 1) */
   --text-sm: 0.75rem; /* 12 */
   --text-md: 0.875rem; /* 14 */
   --text-base: 1rem; /* 16, form controls. Below this iOS zooms on focus. */
@@ -339,7 +339,7 @@
   --field-stat: 1.25rem; /* 20 */
   --field-label: 0.8125rem; /* 13, larger than the desk label scale */
 
-  --text-label: 0.625rem; /* 10, uppercase, widely tracked */
+  --text-label: 0.75rem; /* 12, uppercase, widely tracked; nothing smaller is shown (Batch QA, Section 1) */
   --text-num-sm: 0.9375rem; /* 15, inline with prose */
   --text-num: 1.125rem; /* 18, the standard readout */
   --text-num-lg: 1.5rem; /* 24, the headline number on a card */

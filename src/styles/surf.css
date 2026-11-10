@@ -33,9 +33,8 @@
   stroke-linejoin: round;
 }
 .dbuoy__parts {
-  overflow: hidden;
   font-size: var(--text-xs);
   color: var(--glass-ink-2);
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  /* Wraps, never cut (Batch QA, Section 1). */
+  overflow-wrap: anywhere;
 }

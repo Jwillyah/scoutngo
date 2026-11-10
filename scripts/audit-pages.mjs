@@ -137,6 +137,16 @@ try {
       if (!(await ev(`!!document.querySelector('.home')`))) fail(`${label}: Back from the Weather page is not the home`)
     }
 
+    /* --------------------------------------- back goes where you came from (Batch QA, Section 1) */
+    if (await page.locator('.home__page[aria-label="Today"] .hcard--surf').first().click({ timeout: 4000, noWaitAfter: true }).then(() => true, () => false)) {
+      await wait(2500)
+      await page.locator('.dpage--surf .dpage__back').first().click({ timeout: 4000, noWaitAfter: true }).catch(() => {})
+      await wait(1500)
+      const home = await ev(`!!document.querySelector('.home')`)
+      console.log(`  Surf from the home, then back: ${home ? 'the home' : 'not the home'}`)
+      if (!home) fail(`${label}: back from the Surf page the home opened is not the home`)
+    }
+
     /* -------------------------------------------------------------- Sky */
     /*
      * noWaitAfter (Batch QA, Section 0): on the busy gate's Android Chrome a

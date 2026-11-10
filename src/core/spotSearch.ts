@@ -119,7 +119,7 @@ export function ownSpots(q: Query, from: LatLon | null, spots: readonly SurfSpot
   if (q.words.length === 0) return []
   return spots
     .filter((s) => (q.region === null || inBox(s.at, q.region.box)) && [s.name, ...s.aliases].some((n) => missing(q.words, n) === 0))
-    .map((s) => ({ id: s.id, name: s.name, where: `${s.town}, ${s.state}`, at: s.at, group: 'spot' as const, note: s.kind === 'pier' ? 'pier' : faces(s.facing), km: from === null ? null : distanceMeters(from, s.at) / 1000 }))
+    .map((s) => ({ id: s.id, name: s.name, where: [s.town, s.state].filter((x) => x !== '').join(', '), at: s.at, group: 'spot' as const, note: s.kind === 'pier' ? 'pier' : faces(s.facing), km: from === null ? null : distanceMeters(from, s.at) / 1000 }))
 }
 
 /** A geocoder's row, with OpenStreetMap's own class and type. */

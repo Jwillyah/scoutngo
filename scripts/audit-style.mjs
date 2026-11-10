@@ -113,7 +113,7 @@ const READ = (tokens) => `JSON.stringify((() => {
 })())`
 
 let problems = 0
-const totals = { mono: 0, square: 0, black: 0, flat: 0, lookd: 0, colour: 0, cut: 0 }
+const totals = { mono: 0, square: 0, black: 0, flat: 0, lookd: 0, colour: 0, cut: 0, tiny: 0 }
 const report = []
 const browser = await webkit.launch()
 try {
@@ -199,9 +199,28 @@ try {
       if (top === null || (top !== e && !e.contains(top))) return false
       return e.scrollWidth > e.clientWidth + 1 || ((st.webkitLineClamp ?? 'none') !== 'none' && e.scrollHeight > e.clientHeight + 1)
     }).map((e) => String(e.className?.baseVal ?? e.className).split(' ')[0] + ': ' + (e.textContent ?? '').trim().slice(0, 48)))`))
-    console.log(`\n### ${screen}: mono ${r.mono.length} · square ${r.square.length} · black ${r.black.length} · flat ${r.flat.length} · colours outside the set ${colours} · cut ${cut.length}`)
+    /* TEXT UNDER 12 PX (Batch QA, Section 1): visible words, on top, smaller than 12 px. SVG chart labels drawn in a scaled viewBox are measured as drawn. */
+    const tiny = JSON.parse(await ev(`JSON.stringify((() => {
+      const out = new Map()
+      for (const e of document.querySelectorAll('body *')) {
+        const own = [...e.childNodes].some((n) => n.nodeType === 3 && (n.textContent ?? '').trim() !== '')
+        if (!own) continue
+        const b = e.getBoundingClientRect()
+        const st = getComputedStyle(e)
+        if (b.width === 0 || b.height === 0 || st.visibility === 'hidden' || Number(st.opacity) === 0 || b.bottom < 0 || b.top > innerHeight) continue
+        const top = document.elementFromPoint(Math.min(innerWidth - 1, Math.max(0, b.left + b.width / 2)), Math.min(innerHeight - 1, Math.max(0, b.top + b.height / 2)))
+        if (top === null || (top !== e && !e.contains(top) && !top.contains(e))) continue
+        let px = parseFloat(st.fontSize)
+        if (e instanceof SVGElement && e.ownerSVGElement) { const m = e.getScreenCTM(); if (m) px = px * Math.hypot(m.a, m.b) }
+        if (px < 11.5) { const k = String(e.className?.baseVal ?? e.className).split(' ')[0] || e.tagName; out.set(k, (out.get(k) ?? '') || ((e.textContent ?? '').trim().slice(0, 24) + ' ' + px.toFixed(1) + 'px')) }
+      }
+      return [...out.entries()].map(([k, v]) => k + ': ' + v)
+    })())`))
+    console.log(`\n### ${screen}: mono ${r.mono.length} · square ${r.square.length} · black ${r.black.length} · flat ${r.flat.length} · colours outside the set ${colours} · cut ${cut.length} · under 12 px ${tiny.length}`)
     for (const c of cut.slice(0, 8)) console.log(`      PROBLEM cut: ${c}`)
+    for (const t of tiny.slice(0, 10)) console.log(`      PROBLEM under 12 px: ${t}`)
     totals.cut += cut.length
+    totals.tiny += tiny.length
     for (const m of r.mono.slice(0, 6)) console.log(`      PROBLEM mono: ${m}`)
     for (const s of r.square.slice(0, 6)) console.log(`      PROBLEM square: ${s}`)
     for (const s of r.black) console.log(`      PROBLEM black: ${s}`)
@@ -244,6 +263,15 @@ try {
       if (what === '.mcard--sky' && (await tap('.spage__buttons button:has-text("Calendar")', 'calendar'))) {
         await look('calendar')
         await tap('.cal__close', 'close the calendar')
+      }
+      /* Batch QA, Section 1: Color detail, which no screen here reached (its best-view line was cut). */
+      if (what === '.mcard--sky') {
+        await closeAll()
+        await tap('button[aria-label="Menu"]', 'menu')
+        if ((await tap(`nav[aria-label="Stage"] ${what}`, screen)) && (await tap('.spage button:has-text("Color detail")', 'color detail'))) {
+          await wait(3000)
+          await look('color detail')
+        }
       }
     }
     await closeAll()
@@ -356,7 +384,7 @@ try {
   watchdog.stop()
 }
 
-problems += totals.mono + totals.square + totals.black + totals.flat + totals.lookd + totals.colour + totals.cut
+problems += totals.mono + totals.square + totals.black + totals.flat + totals.lookd + totals.colour + totals.cut + totals.tiny
 console.log(`\n${report.map((r) => `${r.screen}: ${r.mono}/${r.square}/${r.black}/${r.flat}/${r.colour}`).join('\n')}`)
-console.log(`\n=== STYLE PROBLEMS: ${problems} (mono ${totals.mono}, square ${totals.square}, black ${totals.black}, flat navy ${totals.flat}, not look D ${totals.lookd}, colours ${totals.colour}, cut ${totals.cut}) ===`)
+console.log(`\n=== STYLE PROBLEMS: ${problems} (mono ${totals.mono}, square ${totals.square}, black ${totals.black}, flat navy ${totals.flat}, not look D ${totals.lookd}, colours ${totals.colour}, cut ${totals.cut}, under 12 px ${totals.tiny}) ===`)
 process.exit(problems === 0 ? 0 : 1)

@@ -18,7 +18,8 @@ import { Chip } from './ui.tsx'
  * the spots the app knows near there, each with the way it faces. One tap
  * and Today is that spot's.
  */
-const KNOWN: KnownSpot[] = COAST_CAMS.map((c) => ({ id: c.id, name: c.name, at: c.at, facing: c.facing, state: c.state }))
+/* One row a place: two cams at the same pier under one name were two rows (Batch QA, Section 1). */
+const KNOWN: KnownSpot[] = COAST_CAMS.filter((c, i) => COAST_CAMS.findIndex((d) => d.name === c.name && Math.abs(d.at.lat - c.at.lat) < 0.003 && Math.abs(d.at.lon - c.at.lon) < 0.003) === i).map((c) => ({ id: c.id, name: c.name, at: c.at, facing: c.facing, state: c.state }))
 /* Batch Map, Section 2: our own spots to search, the surf spots with their aliases first, then the cams' beaches and piers. */
 const OWN: SurfSpot[] = [
   ...SURF_SPOTS,

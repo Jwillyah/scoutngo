@@ -111,7 +111,7 @@ body:has(.windv3__read) .rail2 {
 }
 .windv3__legendname {
   margin: 0 0 4px 4px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: var(--weight-medium);
   letter-spacing: 0.14em;
   color: var(--glass-ink-2);
@@ -123,7 +123,7 @@ body:has(.windv3__read) .rail2 {
   padding: 0 10px;
   border-radius: 999px;
   color: var(--white);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 22px;
   text-shadow: 0 0 2px rgb(0 0 0 / 0.5);

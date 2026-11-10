@@ -54,11 +54,11 @@
 }
 .drp__rowk {
   fill: rgb(255 255 255 / 0.75);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
 }
 .drp__rowv {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
 }
 .drp__arrow {
@@ -94,8 +94,13 @@
 }
 .drp__ceilingk {
   fill: var(--d-drone);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
+  /* A dark edge under the letters: the label sat on the 200 ft row's arrows (Batch QA, Section 1). */
+  paint-order: stroke;
+  stroke: rgb(20 24 60 / 0.85);
+  stroke-width: 4px;
+  stroke-linejoin: round;
 }
 .drp__plumb {
   stroke: rgb(255 255 255 / 0.5);
@@ -111,7 +116,7 @@
 }
 .drp__you {
   fill: var(--white);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
 }
 .drp__bar {

@@ -177,7 +177,7 @@
 }
 .hcard__turn {
   fill: var(--white);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
 }
 .hcard__dial {
@@ -331,4 +331,8 @@
     padding: 7px 12px;
     gap: 2px;
   }
+}
+/* The six's half-width tide chart is drawn under half size: its turn labels came out 5.8 px (Batch QA, Section 1). The card's tag and line say the next turn there; the big chart keeps them. */
+.hday--many .hcard__turn {
+  display: none;
 }
