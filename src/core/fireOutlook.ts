@@ -333,10 +333,10 @@ export function fireVerdict(paths: readonly ModelPath[], ctx: FireContext): Fire
   const why: FireWhy | null = word !== 'unlikely' ? null : skyLayer !== undefined ? null : reason(sky)
   const line =
     word !== 'unlikely'
-      ? `Fire ${word}`
+      ? `Color ${word}`
       : skyLayer !== undefined
-        ? `Fire unlikely: only ${perLayer.find((x) => x.layer === skyLayer.layer)?.agree ?? 0} of ${of} models see lit ${LAYER_WORD[skyLayer.layer]}`
-        : `Fire unlikely: ${WHY_WORDS[why ?? 'none']}`
+        ? `Color unlikely: only ${perLayer.find((x) => x.layer === skyLayer.layer)?.agree ?? 0} of ${of} models see lit ${LAYER_WORD[skyLayer.layer]}`
+        : `Color unlikely: ${WHY_WORDS[why ?? 'none']}`
   return { word, line, agree, of, perLayer, models, sky, why, station: stationRead(ctx.station, ctx.event) }
 }
 
@@ -376,7 +376,8 @@ export function verdictSentence(v: FireVerdict, clock: (d: Date) => string, name
   const top = [...v.perLayer].sort((a, b) => b.agree - a.agree)[0]
   const w = lookWindow(v)
   const when = w === null ? '' : `, ${clock(w.from)}–${clock(w.to)}`
-  return top === undefined || top.agree === 0 ? `Fire ${v.word}${when}.` : `Fire ${v.word}: ${top.agree} of ${top.of} models see lit ${name(top.layer)}${when}.`
+  /* Batch QA, Section 2: what the models see, never their own word: the call above it is the word (src/core/briefing.ts eventCall). */
+  return top === undefined || top.agree === 0 ? `No model sees a lit layer${when}.` : `${top.agree} of ${top.of} models see lit ${name(top.layer)}${when}.`
 }
 
 /** The layer the page speaks for: the sky's first that fires, else its first canvas, else its first. */

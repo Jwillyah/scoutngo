@@ -212,7 +212,7 @@ export function WindContent({ now, data, facing, placeName, timeZone, units, dro
             ? facing === 'inland'
               ? `No beach within ${formatRange(CIRCLE_M, units.distance)} to draw · arrow points where the wind goes`
               : facing === 'unavailable'
-                ? 'The map tiles for the beach did not load · arrow points where the wind goes'
+                ? 'The map tiles for the beach didn\'t load · arrow points where the wind goes'
                 : 'Finding the beach… · arrow points where the wind goes'
             : 'dashed line = the beach · arrow points where the wind goes'}
         </p>

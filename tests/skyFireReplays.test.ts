@@ -17,7 +17,7 @@ import { fourSkies } from '../src/core/skyPages.ts'
  *
  *   29 Oct  a low deck at ~3,400 ft lit from under: it fired
  *   2 Nov   high cirrus over a clear low horizon (KORF CLR): it fired, the
- *           second miss ("Fire unlikely: a lid of cloud")
+ *           second miss ("Color unlikely: a lid of cloud")
  *   30 Oct  clear: nothing to light (Batch F's "Clear" case)
  *   11 Oct  overcast at 800 ft with rain, every model's low deck running on
  */
@@ -66,13 +66,13 @@ describe('the four replays', () => {
   })
 
   it('30 Oct, a clear sky: unlikely, no clouds to catch the light', () => {
-    expect(replay('2026-10-30').verdict?.line).toBe('Fire unlikely: no clouds to catch the light')
+    expect(replay('2026-10-30').verdict?.line).toBe('Color unlikely: no clouds to catch the light')
   })
 
   it('11 Oct, overcast at 800 ft (KORF) and every model\'s low deck running on: unlikely, a lid of cloud', () => {
     const { verdict, ctx } = replay('2026-10-11')
     expect(stationRead(ctx.station, ctx.event)?.lowOverhead).toBe(100)
-    expect(verdict?.line).toBe('Fire unlikely: a lid of cloud')
+    expect(verdict?.line).toBe('Color unlikely: a lid of cloud')
   })
 })
 
@@ -97,7 +97,7 @@ describe('bug 1: high cirrus is the canvas, not a lid', () => {
   })
 
   it('a lid is a thick LOW or MID deck: low 95% running on is one', () => {
-    expect(fireVerdict(ALL.map((m) => path(m, () => [95, 0, 84])), NOV2)?.line).toBe('Fire unlikely: a lid of cloud')
+    expect(fireVerdict(ALL.map((m) => path(m, () => [95, 0, 84])), NOV2)?.line).toBe('Color unlikely: a lid of cloud')
   })
 })
 
@@ -138,7 +138,7 @@ describe('bug 3: the verdict and the colour clock are one arithmetic', () => {
     for (const d of ['2026-10-29', '2026-11-02', '2026-10-30', '2026-10-11']) {
       const { verdict } = replay(d)
       const lit = clockStrips(verdict!).some((s) => stripTimes(s).glowFrom !== null)
-      if (lit) expect(verdict?.line).not.toMatch(/^Fire unlikely: (a lid|no clouds|no gap)/)
+      if (lit) expect(verdict?.line).not.toMatch(/^Color unlikely: (a lid|no clouds|no gap)/)
     }
   })
 
@@ -146,7 +146,7 @@ describe('bug 3: the verdict and the colour clock are one arithmetic', () => {
     /* The models' mean has cirrus over you; only one model does. */
     const paths = ALL.map((m) => path(m, () => [0, 0, m === 'ecmwf_ifs025' ? 100 : 20]))
     const v = fireVerdict(paths, NOV2)
-    if (v?.word === 'unlikely' && v.sky.fires) expect(v.line).toMatch(/^Fire unlikely: only \d of 5 models see lit high cirrus$/)
+    if (v?.word === 'unlikely' && v.sky.fires) expect(v.line).toMatch(/^Color unlikely: only \d of 5 models see lit high cirrus$/)
     expect(v?.word).toBe('unlikely')
   })
 })
@@ -200,7 +200,7 @@ describe('item 7: the four forecasts drawn from the same read', () => {
 
 describe('Section 4: the verdict in one sentence', () => {
   it('says the word, the agreement and when, or the reason', () => {
-    expect(verdictSentence(replay('2026-11-02').verdict!, clock)).toBe('Fire likely: 4 of 5 models see lit high cirrus, 6:01 AM–6:11 AM.')
-    expect(verdictSentence(replay('2026-10-11').verdict!, clock)).toBe('Fire unlikely: a lid of cloud.')
+    expect(verdictSentence(replay('2026-11-02').verdict!, clock)).toBe('4 of 5 models see lit high cirrus, 6:01 AM–6:11 AM.')
+    expect(verdictSentence(replay('2026-10-11').verdict!, clock)).toBe('Color unlikely: a lid of cloud.')
   })
 })

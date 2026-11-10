@@ -298,7 +298,7 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
           <p className="fire__when num">
             {byStations && seen?.colorFrom != null && seen.colorTo != null && seen.peak != null
               ? `Best ${clock(seen.colorFrom)}–${clock(seen.colorTo)} · deepest ${clock(seen.peak)}`
-              : verdict.word === 'unlikely' ? verdictSentence(verdict, clock, name).replace(/^Fire unlikely: /, '').replace(/^./, (c) => c.toUpperCase()) : watch === null ? verdictSentence(verdict, clock, name) : `Best ${clock(watch.from)}–${clock(watch.to)}${lead?.times?.deepest == null ? '' : ` · deepest ${clock(lead.times.deepest)}`}`}
+              : verdict.word === 'unlikely' ? verdictSentence(verdict, clock, name).replace(/^Color unlikely: /, '').replace(/^./, (c) => c.toUpperCase()) : watch === null ? verdictSentence(verdict, clock, name) : `Best ${clock(watch.from)}–${clock(watch.to)}${lead?.times?.deepest == null ? '' : ` · deepest ${clock(lead.times.deepest)}`}`}
           </p>
           {obs?.gap.state == null ? null : <p className="fire__gap">{obs.gap.line}</p>}
           {view === null || verdict.word === 'unlikely' ? null : (

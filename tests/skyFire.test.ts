@@ -45,11 +45,11 @@ describe('29 Oct, replayed', () => {
     expect(FIXTURE.hour).toBe('2026-10-29T11:00')
   })
 
-  it('gives "Fire possible" or better: it fired', () => {
+  it('gives "Color possible" or better: it fired', () => {
     const v = fireVerdict(paths, CTX)
     expect(v).not.toBeNull()
     expect(['possible', 'likely']).toContain(v?.word)
-    expect(v?.line).toMatch(/^Fire (possible|likely)$/)
+    expect(v?.line).toMatch(/^Color (possible|likely)$/)
   })
 
   it('reads it as the low deck lit from underneath, the deck ending toward the sun', () => {
@@ -114,11 +114,11 @@ describe('the checks', () => {
   })
 
   it('a low deck that runs on past the light\'s way in is a lid', () => {
-    expect(fireVerdict(all(() => [95, 0, 0]), ctx)?.line).toBe('Fire unlikely: a lid of cloud')
+    expect(fireVerdict(all(() => [95, 0, 0]), ctx)?.line).toBe('Color unlikely: a lid of cloud')
   })
 
   it('a clear sky has nothing to light', () => {
-    expect(fireVerdict(all(() => [0, 0, 0]), ctx)?.line).toBe('Fire unlikely: no clouds to catch the light')
+    expect(fireVerdict(all(() => [0, 0, 0]), ctx)?.line).toBe('Color unlikely: no clouds to catch the light')
   })
 
   it('a thick low deck right overhead hides a high canvas', () => {
@@ -188,7 +188,7 @@ describe('the log, on this phone', () => {
   })
 
   it('one entry per day, event and place, newest first', () => {
-    const a = { ...FIRST_ENTRY, id: 'b', date: '2026-10-30', outcome: 'meh' as const, forecast: 'Fire possible' }
+    const a = { ...FIRST_ENTRY, id: 'b', date: '2026-10-30', outcome: 'meh' as const, forecast: 'Color possible' }
     const log = withEntry(withEntry([FIRST_ENTRY], a), { ...a, outcome: 'fired' })
     expect(log.map((e) => [e.date, e.outcome])).toEqual([['2026-10-30', 'fired'], ['2026-10-29', 'fired']])
     expect(trackRecord(log)).toEqual({ said: 1, fired: 1 })

@@ -280,7 +280,7 @@ export function AirspacePanel({ venue, altitudeFeet, laanc, onLaanc, approvedCei
       <Group title="Authorization">
         {failed ? (
           <p className="air__none">
-            The airspace extract did not load, so this says nothing about the airspace here.
+            The airspace extract didn't load, so this says nothing about the airspace here.
           </p>
         ) : answer === null ? (
           <p className="air__none">Reading the airspace extract…</p>

@@ -263,7 +263,7 @@ export function WindLayerV3({ map, field, unit, spot, facing, status }: Props) {
         </svg>
         <div className="windv3__words">
           <p className="windv3__big">
-            {here === null ? (status === 'loading' ? 'Reading the wind…' : status === 'failed' ? 'The wind did not load · retrying' : 'No wind here') : (
+            {here === null ? (status === 'loading' ? 'Reading the wind…' : status === 'failed' ? 'The wind didn\'t load · retrying' : 'No wind here') : (
               <>
                 <span className="windv3__num">{say(here.speedMps)}</span> {windUnitLabel(unit)} <b>from {compass(here.fromDeg)}</b>
               </>

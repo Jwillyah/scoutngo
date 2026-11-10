@@ -93,6 +93,7 @@
 /* Round glass icon buttons. */
 .hbtn--round,
 .dpage__back,
+.page__back,
 .cal2__nav,
 .menu__x,
 .ppage__map {
@@ -272,4 +273,17 @@
 /* A chip whose value wraps is taller: still a pill. */
 .chip2 {
   border-radius: 999px;
+}
+
+/* The older page header (Settings, More, About, Privacy, Exposure, Terrain) in look D: the round back and the page's own title size (Batch QA, Section 2). */
+.page__back {
+  width: 44px;
+  height: 44px;
+  color: var(--white);
+  font-size: 26px;
+  line-height: 1;
+}
+.page__title {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-medium);
 }

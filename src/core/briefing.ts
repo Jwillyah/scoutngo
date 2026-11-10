@@ -128,7 +128,7 @@ export function eventCall(v: FireVerdict | null, kind: Kind, event: Date, now: D
   const top = firing(v)
   const lit = top !== undefined && top.agree > 0 ? `${top.agree} of ${top.of} models see lit ${layerWords(top.layer, obs?.truth ?? null, LAYER_WORD)}` : null
   const timing = { colorFrom: w?.from ?? null, colorTo: w?.to ?? null, setUp: w === null ? null : new Date(w.from.getTime() - SET_UP_BEFORE_MS), agree: v.agree, of: v.of }
-  if (v.word === 'unlikely') return { ...base, ...timing, call: 'Skip', why: `${v.line.replace(/^Fire unlikely: /, '').replace(/^./, (c) => c.toUpperCase())}.` }
+  if (v.word === 'unlikely') return { ...base, ...timing, call: 'Skip', why: `${v.line.replace(/^Color unlikely: /, '').replace(/^./, (c) => c.toUpperCase())}.` }
   const st = v.station
   const gapHolds = st === null ? false : w?.layer === 'low' ? st.lowBaseM === null || st.lowBaseM >= LOW_LID_M : st.lowOverhead < OVERCAST_PCT
   /* A high or mid canvas the satellite does not see over you is not confirmed. */

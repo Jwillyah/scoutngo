@@ -296,7 +296,7 @@ try {
           await wait(800)
           const row = await ev(`document.querySelector('.truth__list li')?.textContent ?? null`)
           console.log(`  after the shoot: ${row}`)
-          if (row === null || !/min after sunrise/.test(row) || !/backlit/.test(row) || !/golden hour/.test(row) || !/it said Fire (likely|possible)/.test(row)) fail(`${label}: the photo's row reads ${JSON.stringify(row)}`)
+          if (row === null || !/min after sunrise/.test(row) || !/backlit/.test(row) || !/golden hour/.test(row) || !/it said Color (likely|possible)/.test(row)) fail(`${label}: the photo's row reads ${JSON.stringify(row)}`)
           await page.locator('.truth [role="group"] button', { hasText: 'It fired' }).tap()
           await wait(300)
           const rate = await ev(`[...document.querySelectorAll('.truth .fire__note')].map((p) => p.textContent).join(' | ')`)

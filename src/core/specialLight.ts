@@ -196,7 +196,7 @@ export interface Special {
  * Section 4: the old name is The Photographer's Ephemeris's trademark).
  */
 export const SPECIAL_NAME: Record<SpecialKind, string> = { fog: 'Fog', rainbow: 'Rainbow', rays: 'God rays', glass: 'Glassy water', fire: 'Sky color', iridescence: 'Iridescence' }
-export const COLOR_NAME: Record<'sunrise' | 'sunset', string> = { sunrise: 'Sunrise color', sunset: 'Sunset color' }
+export const COLOR_NAME: Record<'sunrise' | 'sunset', string> = { sunrise: 'Sky color at sunrise', sunset: 'Sky color at sunset' }
 
 /** One window's name: a colour window says its event when it knows it. */
 export const specialNameOf = (s: Pick<Special, 'kind' | 'event'>): string => (s.kind === 'fire' && s.event !== undefined ? COLOR_NAME[s.event] : SPECIAL_NAME[s.kind])

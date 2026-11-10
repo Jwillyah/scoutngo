@@ -26,7 +26,8 @@ export interface HomeSample {
   moon: string | null
 }
 
-const clock = (d: Date) => formatClock(d, SAMPLE_TZ).toLowerCase()
+/* AM and PM as everywhere (docs/words.md; Batch QA, Section 2: the cover said "5:31 pm"). */
+const clock = (d: Date) => formatClock(d, SAMPLE_TZ)
 const day = (d: Date) => new Intl.DateTimeFormat('en-US', { timeZone: SAMPLE_TZ, weekday: 'short' }).format(d)
 
 export function useHomeSample(now: Date): HomeSample {
