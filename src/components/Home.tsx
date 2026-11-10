@@ -324,7 +324,7 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
           {dateWords}
         </p>
         {/* Batch Pages / Flow: the temperature opens the Weather page. */}
-        <button type="button" className="hwx__temp num" onClick={() => onOpen('weather')} aria-label={`${bigTemp === null ? 'No temperature' : temp(bigTemp)}: the weather`}>
+        <button type="button" className="hwx__temp num" data-shared="temp" data-value={bigTemp === null ? '' : temp(bigTemp)} onClick={() => onOpen('weather')} aria-label={`${bigTemp === null ? 'No temperature' : temp(bigTemp)}: the weather`}>
           {bigTemp === null ? (loading ? '…' : '—') : temp(bigTemp)}
         </button>
         <p className="hwx__cond">
@@ -486,6 +486,8 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
   const small = layout === 'many' && (kind === 'sky' || kind === 'drone' || kind === 'moon')
   let title = ''
   let big: ReactNode = '—'
+  /* A value this card says that other screens say too (Batch QA, Section 3: scripts/audit-one-number.mjs). */
+  let shared: { key: string; value: string } | null = null
   let line: ReactNode = null
   let tag: string | null = null
   let tagGood = false
@@ -589,6 +591,8 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
     const said = colorWords(read?.call ?? null)
     big = said === null ? '—' : <span data-shared={which === 'today' ? 'skycall' : 'skycall-tomorrow'} data-value={said}>{said.replace(/^color /, '').replace(/^./, (c) => c.toUpperCase())}</span>
     line = at == null ? null : `${past ? 'rise' : 'set'} ${clock(at)}`
+    /* Batch QA, Section 3: the sunset the card says, compared with every screen that says it. */
+    if (which === 'today' && !past && at != null) shared = { key: 'sunset', value: `sunset ${clock(at)}`.toLowerCase() }
     tag = read?.call ?? null
     tagGood = read?.call === 'Go'
     pic = <span className={`hcard__strip hcard__strip--${past ? 'rise' : 'set'}`} aria-hidden="true" />
@@ -631,7 +635,7 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
       <span className="hcard__head">
         <span className="hcard__title">{title}</span>
         {/* A small card has no room for a pill: its tag is said under its number. */}
-        {tag === null || small ? null : <span className={`hcard__tag hcard__tag--${tag.toLowerCase().replace(/\s+/g, '-')}${tagGood ? ' hcard__tag--good' : ''}`}>{tag}</span>}
+        {tag === null || small ? null : <span className={`hcard__tag hcard__tag--${tag.toLowerCase().replace(/\s+/g, '-')}${tagGood ? ' hcard__tag--good' : ''}`} {...(kind === 'tide' && which === 'today' ? { 'data-shared': 'tide', 'data-value': tag.toLowerCase() } : {})}>{tag}</span>}
       </span>
       <span className="hcard__body">
         <span className="hcard__words">
@@ -639,7 +643,7 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
           {/* No line, no placeholder (Batch QA, Section 0B: a stray "—" under the Drone card's number). */}
           {(() => {
             const said = small && tag !== null && kind !== 'sky' ? tag : line
-            return said === null || said === '' ? null : <span className="hcard__line">{said}</span>
+            return said === null || said === '' ? null : <span className="hcard__line" {...(shared === null ? {} : { 'data-shared': shared.key, 'data-value': shared.value })}>{said}</span>
           })()}
         </span>
         {kind === 'wind' || kind === 'moon' ? pic : null}

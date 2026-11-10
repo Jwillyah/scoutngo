@@ -179,7 +179,7 @@ export function WeatherPage({ venue, placeName, timeZone, units, now, onBack, on
             </details>
           ))}
           <div className="wpage__top">
-            <p className="wpage__temp num" role="status">
+            <p className="wpage__temp num" role="status" data-shared="temp" data-value={temp === null ? '' : deg(temp)}>
               {temp === null ? (wx === null ? '…' : '—') : deg(temp)}
             </p>
             <div className="wpage__side">

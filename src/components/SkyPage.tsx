@@ -139,7 +139,7 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
           </button>
         ))}
       </div>
-      <p className="spage__event num">
+      <p className="spage__event num" {...(event !== null && kind === 'sunset' && picked === null ? { 'data-shared': 'sunset', 'data-value': `sunset ${clock(event)}`.toLowerCase() } : {})}>
         {event === null ? '—' : `${kind === 'sunset' ? 'Sunset' : 'Sunrise'} ${clock(event)}`}
         {az === null ? '' : ` · looking ${compassPoint(az)}`}
       </p>

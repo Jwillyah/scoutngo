@@ -163,7 +163,7 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
               <button key={k} type="button" className={`mcard mcard--${k === 'surf' ? 'water' : k} mcard--d sidemenu__item`} onClick={() => pick(c.target)}>
                 <span className="mcard__name sidemenu__label">{c.title}</span>
                 <span className="mcard__value">{loading ? '…' : k === 'surf' ? <span data-shared="surf">{c.big}</span> : k === 'sky' && c.big !== '—' ? <span data-shared="skycall" data-value={c.big.toLowerCase()}>{c.big}</span> : c.big}</span>
-                <span className="mcard__sub">{loading ? '' : c.line}</span>
+                <span className="mcard__sub" {...(!loading && ((k === 'tide' && /^(high|low) /.test(c.line)) || (k === 'sky' && /^sunset /.test(c.line))) ? { 'data-shared': k === 'tide' ? 'tide' : 'sunset', 'data-value': c.line.toLowerCase() } : {})}>{loading ? '' : c.line}</span>
               </button>
             )
           })}

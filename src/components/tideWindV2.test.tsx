@@ -55,7 +55,7 @@ describe('TideContent', () => {
     expect(html).toContain('Sandbridge · now')
     /* 10:00 AM: the high at 1 Nov 00:30 UTC + 6 x 6 h 12 min = 2 Nov 13:42 UTC, 8:42 AM local; the next low is 2:54 PM local. */
     expect(html).toContain('>Falling<')
-    expect(html).toMatch(/data-tide-headline="true">\d\.\d ft · low 2:54 PM · 4 h 54 min</)
+    expect(html).toMatch(/data-tide-headline="true"[^>]*>\d\.\d ft · low 2:54 PM · 4 h 54 min</)
   })
   it('draws the day with night shaded, now, and the turns labelled', () => {
     expect(html).toContain('class="dtide__night"')

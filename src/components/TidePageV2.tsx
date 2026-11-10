@@ -157,7 +157,7 @@ export function TideContent({ now, tide, data, venue, placeName, timeZone, units
       <div className="dhead">
         {kicker}
         <p className="dhead__big">{DIRECTION_WORD[direction]}</p>
-        <p className="dhead__line" data-tide-headline>
+        <p className="dhead__line" data-tide-headline {...(scrub === null && next !== null ? { 'data-shared': 'tide', 'data-value': `${next.kind} ${formatClock(next.at, timeZone)}`.toLowerCase() } : {})}>
           {tideHeight(feet, units.distance)}
           {scrub !== null ? ` at ${formatClock(scrub, timeZone)}` : next === null ? '' : ` · ${next.kind} ${formatClock(next.at, timeZone)}${until === null ? '' : ` · ${until}`}`}
         </p>

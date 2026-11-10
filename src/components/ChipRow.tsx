@@ -169,7 +169,7 @@ export function ChipRow({ chips, active, onOpen, measureRef, status = null, stat
             )}
           </span>
           {/* A value past seven characters ("38 m left") is set a size down rather than cut. */}
-          <span className={`chip2__value${chip.value === null ? '' : ' num'}${(chip.value?.length ?? 0) > 7 ? ' chip2__value--long' : ''}`}>
+          <span className={`chip2__value${chip.value === null ? '' : ' num'}${(chip.value?.length ?? 0) > 7 ? ' chip2__value--long' : ''}`} {...(chip.kind === 'tide' && chip.value !== null && /^(High|Low) /.test(chip.value) ? { 'data-shared': 'tide', 'data-value': chip.value.toLowerCase() } : {})}>
             {chip.value ?? NO_DATA}
             {chip.value === null || chip.unit === undefined ? null : (
               <span className="chip2__unit"> {chip.unit}</span>
