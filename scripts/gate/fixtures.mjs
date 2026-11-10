@@ -164,6 +164,8 @@ export async function answer(href) {
   const host = u.hostname
   if (/(^|\.)open-meteo\.com$/.test(host)) return json(fakeAnswer(href, FIXTURE_NOW), 'Open-Meteo fake')
   if (host === 'api.tidesandcurrents.noaa.gov') return json(noaa(u), 'tide curve')
+  /* Batch Flow, Section 5: NOAA SWPC's planetary K index, the shape it answers (a header row, then time, Kp, a-running, station count). */
+  if (host === 'services.swpc.noaa.gov') return json([['time_tag', 'Kp', 'a_running', 'station_count'], ['2026-10-30 06:00:00.000', '2.00', '7', '8'], ['2026-10-30 09:00:00.000', '2.33', '9', '8']], 'planetary K index')
   if (host === 'server.arcgisonline.com' && /World_Imagery/.test(u.pathname)) return { status: 200, type: 'image/png', body: IMAGERY, fixture: 'flat imagery' }
   if (host === 'server.arcgisonline.com') return { status: 200, type: 'image/png', body: OVERLAY, fixture: 'clear overlay' }
   if (/vdem\.virginia\.gov|nconemap\.gov|mdgeodata\.md\.gov|firstmap\.delaware\.gov|tiles\.arcgis\.com|nationalmap\.gov|gibs\.earthdata\.nasa\.gov/.test(host)) return { status: 200, type: 'image/png', body: IMAGERY, fixture: 'flat imagery' }

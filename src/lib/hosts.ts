@@ -37,6 +37,8 @@ export const HOSTS: readonly Host[] = [
   { host: 'previous-runs-api.open-meteo.com', who: 'Open-Meteo previous runs', learns: 'the two nearest weather stations\u2019 own positions (not the venue) and how many days back', when: 'Sky › Weather, at most once a day: what each model forecast the day before, to score it against the stations', trigger: 'if-you-tap' },
   { host: 'marine-api.open-meteo.com', who: 'Open-Meteo Marine', learns: 'the venue to 2 decimals (about a kilometre)', when: 'the Tide sheet and the 3D sea, beaches only', trigger: 'on-pin' },
   { host: 'api.tidesandcurrents.noaa.gov', who: 'NOAA tides', learns: 'a station number and dates', when: 'tides, and the water height in 3D', trigger: 'on-pin' },
+  /* Batch Flow, Section 5: the Drone page's GPS tile. The same file for everyone: nothing about you or the spot is sent. */
+  { host: 'services.swpc.noaa.gov', who: 'NOAA Space Weather Prediction Center', learns: 'nothing about you or the spot: the planetary K index, the same for everyone', when: 'the Drone page\u2019s GPS tile', trigger: 'if-you-tap' },
   { host: 'nominatim.openstreetmap.org', who: 'OpenStreetMap Nominatim', learns: 'what you search, or a pin to name', when: 'search and naming a pin', trigger: 'on-pin' },
   { host: 'overpass-api.de', who: 'Overpass (and two mirrors)', learns: 'a box around the venue', when: 'trees and hazards', trigger: 'on-pin' },
   { host: 's3-us-west-2.amazonaws.com', who: 'USGS 3DEP lidar', learns: 'which scan tiles: a map cell', when: 'only after you tap Download 3D scan', trigger: 'if-you-tap' },

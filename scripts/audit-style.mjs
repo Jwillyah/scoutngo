@@ -220,7 +220,7 @@ try {
   await tap('button[aria-label="Menu"]', 'menu')
   await wait(3000)
   await look('menu')
-  for (const [what, screen] of [['.mcard--sky', 'sky page'], ['.mcard--drone', 'preflight']]) {
+  for (const [what, screen] of [['.mcard--sky', 'sky page'], ['.mcard--drone', 'drone page']]) {
     if (await tap(`nav[aria-label="Stage"] ${what}`, screen)) {
       await look(screen)
       /* Batch Pages: the month too (the calendar was flat navy), from the Sky page's Calendar button (Section 3). */
@@ -278,9 +278,9 @@ try {
   await tap('.dpage__back', 'back')
   await tap('.home .hbtn--round[aria-label="Open the map"]', 'the map')
   await tap('button[aria-label="Menu"]:visible', 'menu')
-  /* The drone view's HUD: Preflight › Fly it yourself. */
-  if (await tap('nav[aria-label="Stage"] .mcard--drone', 'preflight')) {
-    if (await tap('.pf button:has-text("Fly it yourself")', 'drone view')) {
+  /* The drone view's HUD: the Drone page › Fly it yourself (Batch Flow, Section 5). */
+  if (await tap('nav[aria-label="Stage"] .mcard--drone', 'drone page')) {
+    if (await tap('.drp__buttons button:has-text("Fly it yourself")', 'drone view')) {
       await wait(3000)
       await look('drone view hud')
     }
@@ -314,7 +314,13 @@ try {
     await cp.waitForTimeout(1500)
     const page0 = page
     page = cp
-    if (await tap('nav[aria-label="Stage"] .mrow:has-text("Viewfinder")', 'viewfinder')) {
+    /* Batch Flow, Section 8: the menu has no Viewfinder row; the Viewfinder is the Sky page's button. A route that does not open is a problem, never a pass. */
+    const opened = (await tap('nav[aria-label="Stage"] .mcard--sky', 'the Sky page from the menu')) && (await tap('.spage .spage__btn:has-text("Viewfinder")', 'viewfinder'))
+    if (!opened) {
+      console.log('      PROBLEM: the Viewfinder could not be reached (menu › Sky › Viewfinder), so its style was not looked at')
+      problems += 1
+    }
+    if (opened) {
       await look('viewfinder start')
       await cp.getByRole('button', { name: /open the camera/i }).first().click({ timeout: 4000 }).catch(() => console.log('  (no Open the camera button)'))
       await cp.waitForTimeout(3500)

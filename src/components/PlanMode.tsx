@@ -378,7 +378,7 @@ interface PlanModeProps {
   /** The menu asked for a card: Sky or About. The tick makes a repeat ask open it again. */
   /** Batch H: opens the Viewfinder (App's), from the Preflight card. */
   onViewfinder?: () => void
-  cardRequest: { kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'buoys' | 'wind' | 'terrain' | 'preflight' | 'calendar'; skyTab?: SkyTab; tick: number }
+  cardRequest: { kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'buoys' | 'wind' | 'terrain' | 'preflight' | 'calendar' | 'fly'; skyTab?: SkyTab; tick: number }
   /** The backup nudge (src/lib/backup.ts): "Back up? Last backup: never" in the status line, with Back up and Not now. */
   backupReminder?: { line: string; onBackup: () => void; onDismiss: () => void } | null
   /** Coast or inland, and which of Water and Land are offered (src/lib/placeGroups.ts). */
@@ -1174,6 +1174,7 @@ export function PlanMode({
   /* The skyline from where you stand (or the venue pin), at eye height or the drone's (src/lib/skyline/). */
   const [skyHeight, setSkyHeight] = useState<'eye' | 'drone'>('eye')
   const [flySession, setFlySession] = useState<FlySession | null>(null)
+  const [pendingFly, setPendingFly] = useState(false)
   const startFly = (record: boolean) => {
     if (venue === null || pf.pilot === null || scrubbedAt === null) return
     if (!hasWebGL2()) {
@@ -1205,7 +1206,14 @@ export function PlanMode({
       windUnit: units.wind,
       tick: (f?.tick ?? 0) + 1,
     }))
-  }
+  }  /* Batch Flow, Section 5: "Fly it yourself" from the Drone page, once the drone card is up. */
+  useEffect(() => {
+    if (!pendingFly || card.kind !== 'preflight') return
+    setPendingFly(false)
+    startFly(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingFly, card.kind])
+
   /* The last recorded preview, shared from the card by a fresh tap (the share sheet needs one). */
   const [recordedClip, setRecordedClip] = useState<Blob | null>(null)
   const playFlight = (record: boolean) => {
@@ -1514,6 +1522,12 @@ export function PlanMode({
       } else if (cardRequest.kind === 'calendar') {
         /* Batch Pages, Section 3: the Sky page's Calendar button. */
         setCalendarOpen(true)
+        return
+      } else if (cardRequest.kind === 'fly') {
+        /* Batch Flow, Section 5: the Drone page's "Fly it yourself": the drone card, then the 3D view. */
+        setCard({ kind: 'preflight' } as SheetCard)
+        setSheet('full')
+        setPendingFly(true)
         return
       } else if (cardRequest.kind === 'preflight') {
         setCard({ kind: 'preflight' } as SheetCard)

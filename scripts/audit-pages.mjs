@@ -12,6 +12,10 @@
  *             line; 7 days; the radar strip; "… models … ›" and "How we got
  *             this ›" at the foot; Back is the home again
  *
+ *   Drone     the home's Drone card opens it (Batch Flow, Section 5): the
+ *             wind at 400 ft and the drone's limit, the air from the
+ *             ground to 400 ft, the best time to fly, Airspace · Battery ·
+ *             GPS, Preflight and Fly it yourself
  *   Sky       the home's Sky card opens it; Sunset · Sunrise; "Color
  *             likely / possible / unlikely" and a reason; the three plain
  *             checks by name; Golden · Set · Blue · Dark with times; RARE
@@ -162,6 +166,25 @@ try {
       await page.locator('.spage .ppage__back').click()
       await wait(800)
       if (await ev(`!!document.querySelector('.spage')`)) fail(`${label}: Back left the Sky page open`)
+    }
+    /* -------------------------------------------------------------- Drone (Batch Flow, Section 5; board D_Drone) */
+    const droneCard = await page.locator('.home__page[aria-label="Today"] .hcard--drone').first().click({ timeout: 4000 }).then(() => true, () => false)
+    if (!droneCard) fail(`${label}: no Drone card on the home (a drone is in this kit)`)
+    await wait(4000)
+    const dr = JSON.parse(await ev(`JSON.stringify((() => { const p = document.querySelector('.drpage'); if (!p) return null; return { big: p.querySelector('.drp__big')?.textContent ?? null, limit: p.querySelector('.drp__limit')?.textContent ?? null, rows: p.querySelectorAll('.drp__rowk').length, segs: p.querySelectorAll('.drp__seg').length, tiles: [...p.querySelectorAll('.wtile__label')].map((e) => e.textContent), buttons: [...p.querySelectorAll('.drp__buttons button')].map((b) => b.textContent), text: p.innerText } })())`))
+    console.log(`  Drone: ${JSON.stringify(dr === null ? null : { ...dr, text: undefined })}`)
+    if (dr === null) fail(`${label}: the home's Drone card opened no Drone page`)
+    else {
+      if (!/^\d+ (kt|mph|km\/h|m\/s)$/.test(dr.big ?? '')) fail(`${label}: the Drone page's headline reads ${JSON.stringify(dr.big)}`)
+      if (!/limit|My gear/.test(dr.limit ?? '')) fail(`${label}: no drone limit line (${JSON.stringify(dr.limit)})`)
+      if (dr.rows !== 5) fail(`${label}: ${dr.rows} heights in the air above the beach, not gnd to 400 ft`)
+      if (dr.segs < 1) fail(`${label}: no best-time-to-fly bar`)
+      if (dr.tiles.join('|') !== 'Airspace|Battery|GPS') fail(`${label}: the tiles are ${JSON.stringify(dr.tiles)}`)
+      if (dr.buttons.join('|') !== 'Preflight|Fly it yourself') fail(`${label}: the buttons are ${JSON.stringify(dr.buttons)}`)
+      if (/\bsafe\b|all clear|clear to fly/i.test(dr.text)) fail(`${label}: the Drone page says safe or clear`)
+      await page.screenshot({ path: join(OUT, `drone-${label.replace(/\s/g, '-').toLowerCase()}.png`) })
+      await page.locator('.drpage .ppage__back').click()
+      await wait(800)
     }
     /* The map: its Cloud chip opens the Sky page; no Sky sheet with tabs. */
     await page.locator('.home .hbtn--round[aria-label="Open the map"]').click().catch(() => fail(`${label}: no map button on the home`))

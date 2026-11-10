@@ -91,12 +91,13 @@ try {
     await wait(1500)
     await goToStage(ev, wait, 'plan')
     await wait(3000)
-    /* Batch K addendum: Preflight moved from the layers sheet to the menu's Drone card. */
+    /* Batch K addendum: Preflight moved from the layers sheet to the menu's Drone card; Batch Flow: the Drone page first. */
     await page.locator('button[aria-label="Menu"]').first().tap()
     await wait(900)
     await page.locator('.mcard--drone').first().tap()
     await wait(1500)
-    await ev(`[...document.querySelectorAll('.pf button')].find(b => b.textContent === 'Fly it yourself')?.click()`)
+    /* Batch Flow, Section 5: the menu's Drone card is the Drone page; its "Fly it yourself" opens the 3D view (the drone card under it). */
+    await ev(`[...document.querySelectorAll('.drp__buttons button, .pf button')].find(b => b.textContent === 'Fly it yourself')?.click()`)
     let up = false
     for (let i = 0; i < 120 && !up; i += 1) {
       await wait(1000)

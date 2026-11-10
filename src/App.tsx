@@ -118,6 +118,7 @@ import { Home, type HomeTarget } from './components/Home.tsx'
 import { WeatherPage } from './components/WeatherPage.tsx'
 import { OPEN_RADAR_EVENT, OPEN_SKY_EVENT, OPEN_WEATHER_EVENT } from './lib/pageEvents.ts'
 import { SkyPage } from './components/SkyPage.tsx'
+import { DronePage } from './components/DronePage.tsx'
 import { homeOrder, readActivities, showsDrone, showsPhotoTools, useActivities } from './lib/activities.ts'
 import { cardList } from './core/homeDay.ts'
 import { ActivityPicker } from './components/ActivityPicker.tsx'
@@ -1416,6 +1417,8 @@ function App() {
   }, [])
   /* The Sky page (Batch Pages, Section 3): from the home's Sky card, the menu's, and the map's sky chips. */
   const [skyOpen, setSkyOpen] = useState(false)
+  /* Batch Flow, Section 5: the Drone page, first from the home's Drone card and the menu's. */
+  const [droneOpen, setDroneOpen] = useState(false)
   useEffect(() => {
     const open = () => setSkyOpen(true)
     window.addEventListener(OPEN_SKY_EVENT, open)
@@ -1438,7 +1441,7 @@ function App() {
   /* Its clock, a minute at a time while it is open: the Now line and the calls move with it. */
   const [briefNow, setBriefNow] = useState(() => new Date())
   useEffect(() => {
-    if (!briefOpen && !weatherOpen && !skyOpen) return
+    if (!briefOpen && !weatherOpen && !skyOpen && !droneOpen) return
     setBriefNow(new Date())
     const t = setInterval(() => setBriefNow(new Date()), 60_000)
     /*
@@ -1458,12 +1461,12 @@ function App() {
       window.removeEventListener('focus', wake)
       window.removeEventListener('pageshow', wake)
     }
-  }, [briefOpen, weatherOpen, skyOpen])
+  }, [briefOpen, weatherOpen, skyOpen, droneOpen])
   const [drawerRequest, setDrawerRequest] = useState<{ drawer: 'kit' | 'saved'; tick: number }>({
     drawer: 'kit',
     tick: 0,
   })
-  const [cardRequest, setCardRequest] = useState<{ kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'buoys' | 'wind' | 'terrain' | 'preflight' | 'calendar'; skyTab?: 'now' | 'fire'; tick: number }>({
+  const [cardRequest, setCardRequest] = useState<{ kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'buoys' | 'wind' | 'terrain' | 'preflight' | 'calendar' | 'fly'; skyTab?: 'now' | 'fire'; tick: number }>({
     kind: 'sky',
     tick: 0,
   })
@@ -1568,7 +1571,8 @@ function App() {
         onMenuPick(groups.water ? (surfInMenu ? 'surf' : 'tides') : 'land')
         return
       case 'drone':
-        onMenuPick('preflight')
+        /* Batch Flow, Section 5: the Drone page first, not the Preflight card. */
+        setDroneOpen(true)
         return
       case 'viewfinder':
         setViewfinderOpen(true)
@@ -1591,6 +1595,9 @@ function App() {
         return
       case 'weather':
         setWeatherOpen(true)
+        return
+      case 'drone':
+        setDroneOpen(true)
         return
       case 'moon':
         /* The sun, the moon and the night as swipe pages: the Sky sheet's one other view. */
@@ -2587,12 +2594,39 @@ function App() {
           onViewfinder={showsPhotoTools(activities) ? () => setViewfinderOpen(true) : undefined}
           onOpen={(t) => {
             /* The Weather and Sky pages open over the home: Back is the home again. */
-            if (t === 'weather' || t === 'sky') {
+            if (t === 'weather' || t === 'sky' || t === 'drone') {
               homeOpen(t)
               return
             }
             setBriefOpen(false)
             homeOpen(t)
+          }}
+        />
+      ) : null}
+      {droneOpen && centre !== null ? (
+        <DronePage
+          venue={centre}
+          placeName={venueShort}
+          timeZone={venueWindow?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}
+          units={settings.units}
+          now={briefNow}
+          drone={briefDrone}
+          onBack={() => setDroneOpen(false)}
+          onMap={() => {
+            setDroneOpen(false)
+            setBriefOpen(false)
+            setMode('plan')
+          }}
+          onPreflight={() => {
+            setDroneOpen(false)
+            setBriefOpen(false)
+            onMenuPick('preflight')
+          }}
+          onFly={() => {
+            setDroneOpen(false)
+            setBriefOpen(false)
+            setMode('plan')
+            setCardRequest((r) => ({ kind: 'fly', tick: r.tick + 1 }))
           }}
         />
       ) : null}

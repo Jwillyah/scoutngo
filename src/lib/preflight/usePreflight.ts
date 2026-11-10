@@ -28,6 +28,11 @@ export const POINTS_NEEDED: Record<MoveKind, number> = { orbit: 0, 'push-in': 1,
 
 const KEY = 'scoutngo.preflight.v1'
 const PART_107_FT = 400
+/** Batch Flow, Section 5: the Drone page's Battery tile: the flight minutes kept for Preflight, else the Air 3S's. */
+export function keptFlightMinutes(): number {
+  return readKept().flightMinutes
+}
+
 const readKept = (): { approvedFt: number; flightMinutes: number } => {
   try {
     const v = JSON.parse(localStorage.getItem(KEY) ?? '{}') as { approvedFt?: number; flightMinutes?: number }

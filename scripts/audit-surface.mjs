@@ -63,7 +63,16 @@ const OUT = process.env.SCOUTNGO_OUT ?? '.'
 const VIEWPORT = { width: 390, height: 844 }
 
 const watchdog = startWatchdog('surface')
+/* A timeout names the last line this audit printed, not "nothing yet". */
+const say = console.log
+console.log = (...a) => {
+  const line = a.join(' ').trim()
+  if (line !== '') watchdog.note(line.slice(0, 120))
+  say(...a)
+}
+watchdog.note('starting: connecting to the browser')
 const { ev, wait, shot, send, load, errs, dispose } = await connect()
+watchdog.note('connected to the browser')
 /*
  * A SLOW PHONE, ON PURPOSE (Batch F, Section 5): SCOUTNGO_THROTTLE=4 runs the
  * whole audit with the CPU four times slower, which is how the gate's busy
@@ -1208,8 +1217,8 @@ const OPENERS = `(() => {
     add('menu', 'Sky', 'sky')
     /* The call sheet's door is a row on Plan's shoot card since Batch H (walked with the .more2__row doors below). */
     add('menu', 'Settings', 'settings')
-    /* Preflight is the Drone card's since Batch K addendum E. */
-    add('menu', 'Drone', 'preflight')
+    /* Preflight is the Drone card's since Batch K addendum E; Batch Flow, Section 5: the Drone page first, Preflight its button. */
+    add('dronepage', 'Preflight', 'preflight')
     /* Behind the Sky card's Moon page: a door two taps deep, walked the way a person walks it. */
     add('skymoon', 'Plan this moonrise', 'moonrise')
   }
@@ -1238,6 +1247,15 @@ const click = async (sel, i) => {
     await wait(500)
     await ev(`[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === ${JSON.stringify(i)})?.click()`)
     await wait(600)
+    return
+  }
+  if (sel === 'dronepage') {
+    await ev(`document.querySelector('button[aria-label="Menu"]')?.click()`)
+    await wait(400)
+    await ev(`[...document.querySelectorAll('nav[aria-label="Stage"] button')].find((b) => (b.querySelector('.sidemenu__label')?.textContent ?? '').trim() === 'Drone')?.click()`)
+    for (let k = 0; k < 10 && !(await ev(`!!document.querySelector('.drpage')`)); k += 1) await wait(200)
+    await ev(`[...document.querySelectorAll('.drpage .drp__buttons button')].find((b) => b.textContent.trim() === ${JSON.stringify(i)})?.click()`)
+    await wait(700)
     return
   }
   if (sel === 'menu') {

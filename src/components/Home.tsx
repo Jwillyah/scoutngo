@@ -56,7 +56,7 @@ import { SkyIconSvg } from './SkyIconSvg.tsx'
  * never instructions (rule 28). It fits 390 x 844 and 412 x 915 on a calm
  * day with nothing scrolled (scripts/audit-briefing.mjs).
  */
-export type HomeTarget = 'surf' | 'wind' | 'tides' | 'sky' | 'preflight' | 'moon' | 'weather'
+export type HomeTarget = 'surf' | 'wind' | 'tides' | 'sky' | 'preflight' | 'moon' | 'weather' | 'drone'
 
 interface HomeProps {
   venue: { lat: number; lon: number }
@@ -589,7 +589,8 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
     pic = <span className={`hcard__strip hcard__strip--${past ? 'rise' : 'set'}`} aria-hidden="true" />
   } else if (kind === 'drone') {
     title = small ? 'Drone' : 'Drone · 400 ft'
-    target = 'preflight'
+    /* Batch Flow, Section 5: the Drone page first. */
+    target = 'drone'
     const w = day === null ? null : nearest(day.wind, t)
     big = w?.highMps == null ? '—' : `${speed(w.highMps)} ${unit}`
     tag = drone === null || w === null ? null : droneTag(w.highMps, drone.maxWindMps)
