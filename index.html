@@ -43,7 +43,8 @@
     <meta name="scoutngo-build" content="__BUILD_ID__" />
   </head>
   <body>
-    <div id="root"></div>
+    <!-- Batch QA, Section 5: on a slow first open (no cache, 3G) the page was blank for 15 s and more while the app came down. This line says what is happening until the app draws over it. -->
+    <div id="root"><p style="position: fixed; inset: 0; margin: 0; padding: 60% 24px 0; background: rgb(28 42 94); text-align: center; font: 600 17px/1.4 -apple-system, system-ui, sans-serif; color: rgb(255 255 255 / 0.9)">Opening ScoutNGo…<br /><span style="font-weight: 400; font-size: 14px">A slow connection: the app is still coming down.</span></p></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
