@@ -101,7 +101,7 @@ export function SpotPicker({ title, saved, around, onPick, onClose }: SpotPicker
           </button>
         )}
       </div>
-      <input className="spick__search" type="search" inputMode="search" placeholder="Town, beach or zip" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Town, beach or zip" />
+      <input className="spick__search" type="search" inputMode="search" placeholder="Search a beach, town or spot" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search a beach, town or spot" />
       <button type="button" className="spick__locate" onClick={() => void askLocation()}>
         Use my location once
       </button>

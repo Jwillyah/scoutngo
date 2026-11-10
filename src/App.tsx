@@ -2468,6 +2468,8 @@ function App() {
           /* Batch MAP2, Section 3: the place pill finds a spot (search v2); the + is Shoot setup. */
           onSearch={() => setSpotPickOpen(true)}
           onShootSetup={() => setMode('setup')}
+          planShoot={showsPhotoTools(activities)}
+          onHome={() => setBriefOpen(true)}
           onOpenNow={() => setNowOpen(true)}
           onBackToNow={onBackToNow}
         />
@@ -2585,6 +2587,11 @@ function App() {
           timeZone={venueWindow?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}
           now={briefNow}
           onBack={() => setSkyOpen(false)}
+          onMap={() => {
+            setSkyOpen(false)
+            setBriefOpen(false)
+            setMode('plan')
+          }}
           onViewfinder={showsPhotoTools(activities) ? () => setViewfinderOpen(true) : undefined}
           onCalendar={() => {
             setSkyOpen(false)
@@ -2608,6 +2615,11 @@ function App() {
           units={settings.units}
           now={briefNow}
           onBack={() => setWeatherOpen(false)}
+          onMap={() => {
+            setWeatherOpen(false)
+            setBriefOpen(false)
+            setMode('plan')
+          }}
           onRadar={(scanAt) => {
             window.dispatchEvent(new CustomEvent(OPEN_RADAR_EVENT, { detail: scanAt }))
             setWeatherOpen(false)

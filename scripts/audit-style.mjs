@@ -17,6 +17,9 @@
  *   flat     a sheet, page or dialog on one flat navy fill (Batch Pages,
  *            Section 1: the map sheets, the menu and the calendar read
  *            #1d3b6c flat; the board: the sky gradient, top to low)
+ *   look D   a card (the home's, a page's, a tile, a menu card) that is not
+ *            the board's frosted dark glass: rgb(20 24 60 / 0.28) with
+ *            corners of 16 px or more (Batch Flow, Section 2; board Bold2D)
  *   colour   a text, fill or edge colour that is not in the token set
  *            (src/styles/tokens.css, every hex in it, and white or black at
  *            any opacity)
@@ -65,7 +68,8 @@ const READ = (tokens) => `JSON.stringify((() => {
   const hex = (c) => [c.r, c.g, c.b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')
   const lum = (c) => (0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b) / 255
   const vis = (e, b, st) => b.width > 0 && b.height > 0 && st.visibility !== 'hidden' && st.display !== 'none' && b.bottom > 0 && b.top < innerHeight && b.right > 0 && b.left < innerWidth && Number(st.opacity) > 0.05
-  const out = { mono: new Set(), square: new Set(), black: new Set(), flat: new Set(), colour: {} }
+  const out = { mono: new Set(), square: new Set(), black: new Set(), flat: new Set(), lookd: new Set(), colour: {} }
+  const CARDS = '.hcard, .dcard, .wtile, .wweek, .mcard, .spage__checks, .cal2__card'
   const off = (where, c) => { if (c === null || c.a < 0.05) return; const h = hex(c); if (TOKENS.has(h)) return; if ((c.r === c.g && c.g === c.b) && (c.r === 255 || c.r === 0)) return; (out.colour[h] ??= new Set()).add(where) }
   /* The screen on top: the last open page, sheet or dialog that covers half the screen; else everything. */
   const tops = [...document.querySelectorAll('[role="dialog"]')].filter((d) => { const b = d.getBoundingClientRect(); return b.height > innerHeight * 0.5 && getComputedStyle(d).display !== 'none' })
@@ -93,6 +97,11 @@ const READ = (tokens) => `JSON.stringify((() => {
     /* Batch MAP2, Section 3: any surface covering most of the screen, not only a dialog or a sheet (the Viewfinder's start was black and passed). */
     const sheet = e.getAttribute('role') === 'dialog' || /(^|[ _-])(sheet|page|dialog)( |$|__body$)/.test(e.getAttribute('class') ?? '') || (b.width > innerWidth * 0.8 && b.height > innerHeight * 0.5)
     if (sheet && b.height > innerHeight * 0.25 && st.backgroundImage === 'none' && bg !== null && bg.a > 0.6 && lum(bg) < 0.12) out.black.add(name(e) + ' ' + hex(bg))
+    /* Batch Flow, Section 2: every card is look D's frosted glass. */
+    if (e.matches(CARDS)) {
+      const ok = bg !== null && Math.round(bg.r) === 20 && Math.round(bg.g) === 24 && Math.round(bg.b) === 60 && Math.abs(bg.a - 0.28) < 0.03 && parseFloat(st.borderTopLeftRadius) >= 16
+      if (!ok) out.lookd.add(name(e) + ' ' + st.backgroundColor + ' r' + Math.round(parseFloat(st.borderTopLeftRadius)))
+    }
     /* Batch Pages, Section 1: the big surfaces, where they are on screen; their pixels are read below (a gradient taller than the screen shows only its navy top). Not a see-through overlay that takes no taps (the map's sun tint): its pixels are the map's. */
     if (sheet && b.height > innerHeight * 0.25 && e !== document.body && e.id !== 'root' && e.querySelector('canvas') === null && st.pointerEvents !== 'none' && (st.backgroundImage !== 'none' || (bg !== null && bg.a > 0.6))) {
       const top = Math.max(0, b.top)
@@ -100,11 +109,11 @@ const READ = (tokens) => `JSON.stringify((() => {
       if (bottom - top > innerHeight * 0.3) out.flat.add(JSON.stringify({ n: name(e), x: Math.max(0, b.left) + 3, top: top + 30, bottom: bottom - 30 }))
     }
   }
-  return { mono: [...out.mono], square: [...out.square], black: [...out.black], flat: [...out.flat], colour: Object.fromEntries(Object.entries(out.colour).map(([k, v]) => [k, [...v].slice(0, 3)])) }
+  return { mono: [...out.mono], square: [...out.square], black: [...out.black], flat: [...out.flat], lookd: [...out.lookd], colour: Object.fromEntries(Object.entries(out.colour).map(([k, v]) => [k, [...v].slice(0, 3)])) }
 })())`
 
 let problems = 0
-const totals = { mono: 0, square: 0, black: 0, flat: 0, colour: 0 }
+const totals = { mono: 0, square: 0, black: 0, flat: 0, lookd: 0, colour: 0 }
 const report = []
 const browser = await webkit.launch()
 try {
@@ -180,11 +189,13 @@ try {
     for (const s of r.square.slice(0, 6)) console.log(`      PROBLEM square: ${s}`)
     for (const s of r.black) console.log(`      PROBLEM black: ${s}`)
     for (const s of r.flat) console.log(`      PROBLEM flat navy: ${s}`)
+    for (const s of r.lookd.slice(0, 6)) console.log(`      PROBLEM not look D: ${s}`)
     for (const [h, w] of Object.entries(r.colour).slice(0, 8)) console.log(`      PROBLEM colour #${h}: ${w.join(', ')}`)
     totals.mono += r.mono.length
     totals.square += r.square.length
     totals.black += r.black.length
     totals.flat += r.flat.length
+    totals.lookd += r.lookd.length
     totals.colour += colours
     report.push({ screen, mono: r.mono.length, square: r.square.length, black: r.black.length, flat: r.flat.length, colour: colours })
   }
@@ -322,7 +333,7 @@ try {
   watchdog.stop()
 }
 
-problems += totals.mono + totals.square + totals.black + totals.flat + totals.colour
+problems += totals.mono + totals.square + totals.black + totals.flat + totals.lookd + totals.colour
 console.log(`\n${report.map((r) => `${r.screen}: ${r.mono}/${r.square}/${r.black}/${r.flat}/${r.colour}`).join('\n')}`)
-console.log(`\n=== STYLE PROBLEMS: ${problems} (mono ${totals.mono}, square ${totals.square}, black ${totals.black}, flat navy ${totals.flat}, colours ${totals.colour}) ===`)
+console.log(`\n=== STYLE PROBLEMS: ${problems} (mono ${totals.mono}, square ${totals.square}, black ${totals.black}, flat navy ${totals.flat}, not look D ${totals.lookd}, colours ${totals.colour}) ===`)
 process.exit(problems === 0 ? 0 : 1)

@@ -6,12 +6,13 @@ import { blockUrl, parseBlock } from '../src/lib/useWindViewport.ts'
 const src = (p: string) => readFileSync(p, 'utf8')
 
 describe('Batch MAP leftovers', () => {
-  it('the place pill opens the spot search; the + opens Shoot setup', () => {
+  it('the place pill opens the spot search; the + is "Plan a shoot", there only when Shoot is picked (Batch Flow)', () => {
     expect(src('src/components/PlanMode.tsx')).toMatch(/className="pill-venue" onClick=\{onSearch\} aria-label="Find a spot"/)
     const app = src('src/App.tsx')
     expect(app).toMatch(/onSearch=\{\(\) => setSpotPickOpen\(true\)\}/)
     expect(app).toMatch(/onShootSetup=\{\(\) => setMode\('setup'\)\}/)
-    expect(src('src/components/PlanMode.tsx')).toMatch(/addLabel=\{onShootSetup === undefined \? undefined : 'Shoot setup'\}/)
+    expect(src('src/components/PlanMode.tsx')).toMatch(/addLabel=\{onShootSetup === undefined \? undefined : 'Plan a shoot'\}/)
+    expect(src('src/components/PlanMode.tsx')).toMatch(/addHidden=\{planShoot === false\}/)
   })
 
   it('Map style is Satellite · Map · 3D, Map the plain vector map that hides the satellite', () => {

@@ -38,6 +38,8 @@ interface SkyPageProps {
   timeZone: string
   now: Date
   onBack: () => void
+  /** The round Map button (Batch Flow, Section 2). */
+  onMap?: () => void
   onViewfinder?: () => void
   onCalendar: () => void
   /** On the map's sheet: the Sky color page in full (the colour clock, your log), or the sun, the moon and the night. */
@@ -46,7 +48,7 @@ interface SkyPageProps {
 
 type Kind = 'sunset' | 'sunrise'
 
-export function SkyPage({ venue, placeName, timeZone, now, onBack, onViewfinder, onCalendar, onDetail }: SkyPageProps) {
+export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onViewfinder, onCalendar, onDetail }: SkyPageProps) {
   const brief = useBriefing(venue, timeZone, now, true)
   const clock = (d: Date | null) => (d === null ? '—' : formatClock(d, timeZone))
   /* The next of each: the first day whose event is still to come. */
@@ -103,6 +105,7 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onViewfinder,
       sub={`${placeName} · now`}
       ground={ground}
       onBack={onBack}
+      onMap={onMap}
       how={how}
       foot={
         <>

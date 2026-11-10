@@ -1263,7 +1263,8 @@ const click = async (sel, i) => {
 const homeCard = async () => {
   for (let i = 0; i < 4; i += 1) {
     if ((await cardNow()) === 'shoot') return true
-    await ev(`document.querySelector('.card2__x')?.click()`)
+    /* Batch Flow, Section 2: the Sky card is a page now; its back is the way home. */
+    await ev(`(document.querySelector('.mpage .ppage__back') ?? document.querySelector('.card2__x'))?.click()`)
     await wait(350)
   }
   return (await cardNow()) === 'shoot'
@@ -1365,6 +1366,7 @@ if (await homeCard()) {
     await setDetent('half')
     await click(first.sel, first.i)
     const doors = await ev(`(() => [...document.querySelectorAll('.more2__row')].map((b, i) => ({ sel: '.more2__row', i, name: (b.textContent ?? '').trim() })))()`)
+    console.log(`  inside ${first.name || first.sel}: ${(doors ?? []).length} doors (card ${await cardNow()}${await ev(`document.querySelector('.dpage:not(.ppage)') ? ', a page open: ' + document.querySelector('.dpage:not(.ppage)').getAttribute('aria-label') : ''`)}${await ev(`document.querySelector('.mpage') ? ', the sky page' : ''`)})`)
     for (const door of doors ?? []) {
       if (!(await homeCard())) break
       await setDetent('half')

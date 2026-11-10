@@ -193,14 +193,15 @@ export function Home({ venue, placeName, timeZone, units, drone, now, onClose, o
               <RadarGlyph /> Radar
             </button>
           )}
-          <button type="button" className="hbtn hbtn--round" onClick={onOpenMap} aria-label="Open the map">
-            <svg className="hbtn__glyph" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M9 4l-6 2.5v13L9 17l6 2.5 6-2.5v-13L15 6.5 9 4zM9 4v13M15 6.5v13" />
-            </svg>
-          </button>
+          {/* Batch Flow, Section 2: the map is a destination, bottom right (boards D_Home6, D_Home2). */}
           <button type="button" className="hbtn hbtn--round" onClick={onMenu} aria-label="Menu">
             <svg className="hbtn__glyph" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M4 7h16M4 12h16M4 17h16" />
+            </svg>
+          </button>
+          <button type="button" className="hbtn hbtn--round" onClick={onOpenMap} aria-label="Open the map">
+            <svg className="hbtn__glyph" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M9 4l-6 2.5v13L9 17l6 2.5 6-2.5v-13L15 6.5 9 4zM9 4v13M15 6.5v13" />
             </svg>
           </button>
         </div>

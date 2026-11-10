@@ -474,8 +474,8 @@ export async function goToStage(ev, wait, stage) {
     const now = await ev(`document.querySelector('.shell')?.className.match(/shell--([a-z]+)/)?.[1] ?? null`)
     if (now === 'setup') return now
     if (now !== 'plan') await goToStage(ev, wait, 'plan')
-    const tapped = await ev(`(() => { const b = document.querySelector('button.topbar__btn--add[aria-label="Shoot setup"]') ?? document.querySelector('button.pill-venue'); if (!b) return false; b.click(); return true })()`)
-    if (!tapped) throw new PreflightError("no Shoot setup button (the +) in Plan's top bar (src/components/PlanMode.tsx)")
+    const tapped = await ev(`(() => { const b = document.querySelector('button.topbar__btn--add[aria-label="Plan a shoot"]') ?? document.querySelector('button.pill-venue'); if (!b) return false; b.click(); return true })()`)
+    if (!tapped) throw new PreflightError("no Plan a shoot button (the +) in Plan's top bar (src/components/PlanMode.tsx)")
     await wait(600)
     return arrivedAt(ev, want, "tapped Plan's Shoot setup (+)")
   }

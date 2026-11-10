@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { DETAIL_TABS, type DetailId } from '../lib/detailTabs.ts'
 import { NetDebug } from './NetDebug.tsx'
+import { MapButton } from './PageShell.tsx'
 
 /*
  * THE DETAIL PAGES' SHELL (Batch N, Sections 1-4; boards "DETAIL v2 ·").
@@ -58,6 +59,7 @@ export function DetailShell({ id, ground, onBack, onSwitch, onMap, how, children
             </button>
           ))}
         </div>
+        <MapButton onMap={onMap} />
       </div>
       <div
         className="dpage__body"
@@ -71,9 +73,6 @@ export function DetailShell({ id, ground, onBack, onSwitch, onMap, how, children
       <div className="dpage__foot">
         <button type="button" className="dpage__link" onClick={() => setHowOpen(true)}>
           How we got this ›
-        </button>
-        <button type="button" className="dpage__link" onClick={onMap}>
-          See on map ›
         </button>
       </div>
       {howOpen ? (

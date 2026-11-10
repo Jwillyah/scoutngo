@@ -12,6 +12,8 @@ import './styles/app.css'
 import '@fontsource-variable/archivo/wght.css'
 import './styles/one-style.css'
 import App from './App.tsx'
+/* Batch Flow, Section 2: look D over everything, after every component's own sheet. */
+import './styles/look-d.css'
 import { watchHosts } from './lib/privacy.ts'
 import { setForecastEdge } from './lib/weatherStore.ts'
 import { watchNet } from './lib/netLog.ts'

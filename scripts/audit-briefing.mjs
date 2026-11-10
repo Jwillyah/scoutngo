@@ -163,7 +163,7 @@ try {
     const buttons = JSON.parse(await ev(`JSON.stringify({ main: document.querySelector('.home .hbtn--main')?.textContent?.trim() ?? null, round: [...document.querySelectorAll('.home .hbtn--round')].map((b) => b.getAttribute('aria-label')) })`))
     console.log(`  buttons: ${JSON.stringify(buttons)}`)
     if (!/^(Radar|Viewfinder|Preflight)$/.test(buttons.main ?? '')) fail(`${label}: the primary button reads ${JSON.stringify(buttons.main)}`)
-    if (buttons.round.join('|') !== 'Open the map|Menu') fail(`${label}: the round buttons are ${JSON.stringify(buttons.round)}`)
+    if (buttons.round.join('|') !== 'Menu|Open the map') fail(`${label}: the round buttons are ${JSON.stringify(buttons.round)}`)
     const ground = await ev(`getComputedStyle(document.querySelector('.home')).backgroundImage`)
     if (/255,\s*59,\s*48|#ff3b30/i.test(ground)) fail(`${label}: the ground is the hazard red`)
     await page.locator('.home .hbtn--round[aria-label="Menu"]').click()

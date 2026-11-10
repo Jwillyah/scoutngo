@@ -1,0 +1,116 @@
+/*
+ * LOOK D · LIVE SKY, EVERYWHERE (Batch Flow, Section 2; board Bold2D and the
+ * D_ boards). Loaded last: the grounds follow the conditions (the home's
+ * groundOf: night, golden, day, cloud, rain, fog, storm) on the home and
+ * every page; every card is the same frosted dark glass; labels small caps.
+ */
+
+/* ------------------------------------------------------------ the grounds */
+.home,
+.dpage,
+.home--night,
+.dpage.home--night {
+  background:
+    radial-gradient(90% 40% at 70% 0%, rgb(80 100 190 / 0.35) 0%, transparent 70%),
+    linear-gradient(180deg, var(--d-night-top) 0%, var(--d-night-mid) 50%, var(--d-night-low) 100%);
+}
+.home--day,
+.dpage.home--day {
+  background: linear-gradient(180deg, var(--d-day-top) 0%, var(--d-day-mid) 55%, var(--d-day-low) 100%);
+}
+.home--golden,
+.dpage.home--golden {
+  background:
+    radial-gradient(120% 55% at 15% 100%, var(--d-glow) 0%, var(--d-glow-violet) 40%, transparent 72%),
+    linear-gradient(180deg, var(--d-night-top) 0%, #2a3474 60%, #3b3f86 100%);
+}
+.home--cloud,
+.dpage.home--cloud {
+  background: linear-gradient(180deg, var(--d-cloud-top) 0%, #4a5366 55%, var(--d-cloud-low) 100%);
+}
+.home--rain,
+.home--storm,
+.dpage.home--rain,
+.dpage.home--storm {
+  background: linear-gradient(180deg, var(--d-rain-top) 0%, #2d3544 55%, var(--d-rain-low) 100%);
+}
+.home--fog,
+.dpage.home--fog {
+  background: linear-gradient(180deg, var(--d-fog-top) 0%, #5f6875 55%, var(--d-fog-low) 100%);
+}
+
+/* ------------------------------------------------------------ the cards */
+.hcard,
+.hstrip,
+.hcams,
+.dcard,
+.wtile,
+.wweek,
+.spage__checks,
+.cal2__day,
+.cal2__card,
+.cal2__chip,
+.mcard,
+.menu__rows,
+.set2__group,
+.ui-card,
+.card2__body > .card,
+.rstrip {
+  background: var(--d-card);
+  border: 1px solid var(--d-edge);
+  border-radius: 24px;
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+.hcard,
+.dcard,
+.wtile,
+.wweek {
+  border-radius: 24px;
+}
+.cal2__day {
+  border-radius: 16px;
+}
+.cal2__chip {
+  border-radius: 999px;
+}
+.cal2__day--on,
+.cal2__chip--on {
+  background: var(--white);
+  color: var(--sky-ink);
+}
+
+/* Small caps for every card label. */
+.hcard__title,
+.dcard__label,
+.wtile__label,
+.wweek__head,
+.hbest__title,
+.ppage__sub {
+  letter-spacing: 0.12em;
+}
+
+/* Round glass icon buttons. */
+.hbtn--round,
+.dpage__back,
+.cal2__nav,
+.menu__x,
+.ppage__map {
+  background: rgb(255 255 255 / 0.12);
+  border: 1px solid var(--d-edge);
+  border-radius: 999px;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+/* The top bar: round back · title and subtitle · round Map (Batch Flow, Section 2). */
+.ppage__top .ppage__titles {
+  flex: 1;
+}
+.ppage__map {
+  margin-left: auto;
+  flex: none;
+}
+.dpage__top .ppage__map {
+  margin-left: 4px;
+}

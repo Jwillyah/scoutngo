@@ -23,10 +23,12 @@ interface PageShellProps {
   foot?: ReactNode
   /** A view inside the page (Models, 7 days): Back closes it first. */
   inner?: { open: boolean; close: () => void }
+  /** Batch Flow, Section 2: the round Map button top right; the map is its own destination. */
+  onMap?: () => void
   children: ReactNode
 }
 
-export function PageShell({ kind, title, sub, ground, onBack, how, foot, inner, children }: PageShellProps) {
+export function PageShell({ kind, title, sub, ground, onBack, how, foot, inner, onMap, children }: PageShellProps) {
   const [howOpen, setHowOpen] = useState(false)
   const [debug, setDebug] = useState(false)
   const back = () => {
@@ -53,6 +55,7 @@ export function PageShell({ kind, title, sub, ground, onBack, how, foot, inner, 
           <p className="ppage__title">{title}</p>
           <p className="ppage__sub">{sub}</p>
         </div>
+        {onMap === undefined ? null : <MapButton onMap={onMap} />}
       </div>
       <div
         className="dpage__body ppage__body"
@@ -89,5 +92,16 @@ export function PageShell({ kind, title, sub, ground, onBack, how, foot, inner, 
       ) : null}
     </div>,
     document.body,
+  )
+}
+
+/** The round Map button, top right on every page (Batch Flow, Section 2; boards D_Sky, D_Drone, D_Wind). */
+export function MapButton({ onMap }: { onMap: () => void }) {
+  return (
+    <button type="button" className="dpage__back ppage__map" aria-label="Open the map" onClick={onMap}>
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M9 4l-6 2.5v13L9 17l6 2.5 6-2.5v-13L15 6.5 9 4zM9 4v13M15 6.5v13" />
+      </svg>
+    </button>
   )
 }

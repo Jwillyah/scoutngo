@@ -96,6 +96,7 @@ import { ChipRow, type Chip } from './ChipRow.tsx'
 import { TopBar } from './TopBar.tsx'
 import { startHeading } from '../lib/heading.ts'
 import { Toast } from './Toast.tsx'
+import { PageShell } from './PageShell.tsx'
 import { logTouch } from '../lib/touchDebug.ts'
 import { MoonriseCard } from './MoonriseCard.tsx'
 import { readCeilingFeet } from '../lib/venue.ts'
@@ -389,6 +390,10 @@ interface PlanModeProps {
   onSearch: () => void
   /** Batch MAP2, Section 3: the + in the top bar opens Shoot setup. */
   onShootSetup?: () => void
+  /** Batch Flow, Section 2: Shoot is picked (or nothing yet): the + is there as "Plan a shoot". */
+  planShoot?: boolean
+  /** Batch Flow, Section 2: the map's own back, to the home. */
+  onHome?: () => void
   /** The Now screen, from Sky's Tonight page. */
   onOpenNow: () => void
   /** The dock's Back to now: the current time at the venue, today if the shoot day is not today. */
@@ -584,6 +589,8 @@ export function PlanMode({
   bag,
   onSearch,
   onShootSetup,
+  planShoot,
+  onHome,
   onOpenNow,
   onBackToNow,
   onShootWindow,
@@ -1475,24 +1482,6 @@ export function PlanMode({
    * never stale -- see src/core/venueName.ts -- and the date is the shoot's,
    * short, because the bar is a glance not a form.
    */
-  /*
-   * ONE SOURCE FOR THE DATE: the moment on the time bar. The bar said Tue 27
-   * while this said MON 26 on 27 Oct, the saved shoot day against the day on
-   * the bar. Now both read the bar.
-   */
-  const dateLabel = useMemo(
-    () =>
-      venueWindow === null
-        ? '—'
-        : (scrubbedAt ?? venueWindow.start)
-            .toLocaleDateString('en-US', {
-              timeZone: venueWindow.timeZone,
-              weekday: 'short',
-              day: 'numeric',
-            })
-            .toUpperCase(),
-    [venueWindow, scrubbedAt],
-  )
 
   /*
    * OPENING A CARD RAISES THE SHEET, by the same rule a position tap does:
@@ -1508,6 +1497,11 @@ export function PlanMode({
     [raiseToHalf],
   )
 
+  /* Batch Flow, Section 2: the Sky card is a page now; another page opening over it (Tides, Wind…) closes it, so one page is up at a time. */
+  useEffect(() => {
+    if (page !== null) setCard((c) => (c.kind === 'sky' ? HOME : c))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page])
   /* The menu's Sky and About open here, on the card they name, half up. */
   useEffect(() => {
     if (cardRequest.tick === 0) return
@@ -2318,7 +2312,8 @@ export function PlanMode({
         )
       case 'sky':
         return (
-          <Card title="Sky" onClose={home}>
+          /* Batch Flow, Section 2: not a sheet over the map any more: a page of its own, Sky color in full or the sun, moon and night. */
+          <PageShell kind="mpage" title={skyTab === 'fire' ? 'Sky color' : 'Sun, moon, night'} sub={`${venueNameLine} · now`} ground="night" onBack={home} onMap={home} how={null}>
             {venue === null || venueWindow === null || scrubbedAt === null ? (
               <SkyPanel
                 venue={venue}
@@ -2405,7 +2400,7 @@ export function PlanMode({
                 </button>
               </div>
             )}
-          </Card>
+          </PageShell>
         )
       case 'cams':
         return (
@@ -2900,13 +2895,16 @@ export function PlanMode({
            */
           /* Batch MAP2, Section 3: the place pill opens the spot search (search v2); Shoot setup is the +. */
           <button type="button" className="pill-venue" onClick={onSearch} aria-label="Find a spot">
+            {/* Batch Flow, Section 2: the spot's name, the whole pill (the day is on the time bar). */}
             <span className="pill-venue__name">{venueNameLine}</span>
-            <span className="pill-venue__date num">{dateLabel}</span>
           </button>
         }
         onAdd={onShootSetup ?? (() => onPlacing(!placing))}
         adding={onShootSetup === undefined ? placing : false}
-        addLabel={onShootSetup === undefined ? undefined : 'Shoot setup'}
+        /* Batch Flow, Section 2: the + is "Plan a shoot" (where's the shoot, the next setup), there only when Shoot is picked. */
+        addLabel={onShootSetup === undefined ? undefined : 'Plan a shoot'}
+        addHidden={planShoot === false}
+        onBack={onHome}
         onLocate={onLocate}
         locating={locating}
         locateNote={null}

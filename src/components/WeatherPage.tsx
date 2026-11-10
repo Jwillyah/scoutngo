@@ -45,11 +45,13 @@ interface WeatherPageProps {
   units: Units
   now: Date
   onBack: () => void
+  /** The round Map button (Batch Flow, Section 2). */
+  onMap?: () => void
   /** The radar on the map. */
   onRadar: (scanAt: Date | null) => void
 }
 
-export function WeatherPage({ venue, placeName, timeZone, units, now, onBack, onRadar }: WeatherPageProps) {
+export function WeatherPage({ venue, placeName, timeZone, units, now, onBack, onMap, onRadar }: WeatherPageProps) {
   const { state, reason } = useBlend(venue, timeZone, true)
   const nowcast = useNowcast(venue, true)
   const obs = useStationObs(venue)
@@ -151,6 +153,7 @@ export function WeatherPage({ venue, placeName, timeZone, units, now, onBack, on
       sub={`${placeName} · now`}
       ground={ground}
       onBack={onBack}
+      onMap={onMap}
       inner={{ open: view !== 'main', close: () => setView('main') }}
       how={how}
       foot={

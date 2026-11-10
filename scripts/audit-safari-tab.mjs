@@ -187,11 +187,11 @@ try {
   await goToStage(ev, wait, 'plan')
   await wait(800)
   /* Every chip opens its page (30 Oct, docs/navigation.md): Golden the sun, moon and night (the Sky sheet, no tabs), Cloud the Sky page (Batch Pages, Section 3), Wind the Wind page. */
-  for (const [chip, sel, shot] of [['GOLDEN', '.sheet', 'tab-golden'], ['CLOUD', '.spage', 'tab-cloud']]) {
+  for (const [chip, sel, shot] of [['GOLDEN', '.mpage', 'tab-golden'], ['CLOUD', '.spage', 'tab-cloud']]) {
     await page.locator('.chip2', { hasText: chip }).first().tap()
     await wait(1500)
     if (chip === 'CLOUD' && !(await ev(`!!document.querySelector('.spage')`))) fail(`the ${chip} chip opened no Sky page`)
-    if (chip === 'GOLDEN' && !(await ev(`!!document.querySelector('.skyc .skyc__swipe')`))) fail(`the ${chip} chip opened no sun, moon and night`)
+    if (chip === 'GOLDEN' && !(await ev(`!!document.querySelector('.mpage .skyc__swipe')`))) fail(`the ${chip} chip opened no sun, moon and night page`)
     await check(`${chip} chip`, sel, shot)
     await page.keyboard.press('Escape')
     await goToStage(ev, wait, 'plan')

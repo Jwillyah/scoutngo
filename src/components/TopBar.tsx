@@ -29,6 +29,10 @@ interface TopBarProps {
   locateNote: string | null
   /** One quiet word when there is no connection. See src/lib/useOnline.ts. */
   online: boolean
+  /** Batch Flow, Section 2: the map is a destination with its own back (to the home). */
+  onBack?: () => void
+  /** Batch Flow, Section 2: no + at all (it is "Plan a shoot", only when Shoot is picked). */
+  addHidden?: boolean
 }
 
 const icon = (path: ReactNode) => (
@@ -48,9 +52,16 @@ export function TopBar({
   locating,
   locateNote,
   online,
+  onBack,
+  addHidden = false,
 }: TopBarProps) {
   return (
     <header className="topbar">
+      {onBack === undefined ? null : (
+        <button type="button" className="topbar__btn topbar__back" onClick={onBack} aria-label="Back to the home">
+          {icon(<path d="M12.5 4.5 7 10l5.5 5.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />)}
+        </button>
+      )}
       <button
         type="button"
         className="topbar__btn"
@@ -74,6 +85,7 @@ export function TopBar({
         )}
       </div>
 
+      {addHidden ? null : (
       <button
         type="button"
         className={`topbar__btn topbar__btn--add${adding ? ' topbar__btn--on' : ''}`}
@@ -84,6 +96,7 @@ export function TopBar({
       >
         {icon(<path d="M10 4v12M4 10h12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />)}
       </button>
+      )}
       {onLocate === null ? null : (
       <button
         type="button"

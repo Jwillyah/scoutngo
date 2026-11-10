@@ -482,3 +482,48 @@
   --panel-sheen: var(--sky-sheet);
   --panel-sheen-2: linear-gradient(180deg, var(--sky-mid) 0%, var(--surface-1) 100%);
 }
+
+/*
+ * LOOK D · LIVE SKY (Batch Flow, Section 2; board docs/mockups/Bold2D.png):
+ * the app's only look. A full-bleed ground that follows the conditions,
+ * frosted dark cards, small-caps labels, large light numbers, white primary
+ * pills, round glass buttons, Archivo only. These replace the StyleGuide's
+ * sky blues; src/styles/look-d.css applies them everywhere.
+ */
+:root {
+  --d-night-top: #1c2a5e;
+  --d-night-mid: #131c46;
+  --d-night-low: #0c1230;
+  --d-day-top: #1f4c94;
+  --d-day-mid: #2b62ad;
+  --d-day-low: #3a78c0;
+  --d-glow: #e8876a;
+  --d-glow-violet: #6c5aa8;
+  --d-cloud-top: #3a4458;
+  --d-cloud-low: #5f6878;
+  --d-rain-top: #222a38;
+  --d-rain-low: #3a4352;
+  --d-fog-top: #4e5865;
+  --d-fog-low: #707884;
+  --d-card: rgb(20 24 60 / 0.28); /* #14183c */
+  --d-card-solid: #14183c;
+  --d-edge: rgb(255 255 255 / 0.14);
+  --d-surf: #5fe0c8;
+  --d-tide: #9ec9ff;
+  --d-drone: #f4b259;
+  --sky-top: var(--d-night-top);
+  --sky-mid: var(--d-night-mid);
+  --sky-low: var(--d-night-low);
+  --sky-sheet: linear-gradient(180deg, var(--d-night-top) 0%, var(--d-night-mid) 50%, var(--d-night-low) 100%);
+  --sky-sheet-map: linear-gradient(180deg, var(--d-night-top) 0, var(--d-night-mid) 260px, var(--d-night-low) 520px, var(--d-night-low) 100%);
+  --glass: var(--d-card);
+  --glass-edge: var(--d-edge);
+  --glass-strong: rgb(255 255 255 / 0.2);
+  --map-glass: rgb(20 24 60 / 0.72);
+  --radius-glass: 24px;
+  --surface-1: #1a2350;
+  --surface-2: #232d5e;
+  --surface-3: #2e3a72;
+  --surface-raised: #1a2350;
+  --edge-top: #3d4a86;
+}
