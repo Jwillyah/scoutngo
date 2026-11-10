@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { EYE_M, FT, type PathPoint } from '../../core/flight.ts'
-import { destinationPoint, distanceMeters, type LatLon } from '../../core/geo.ts'
+import { bearingBetween, destinationPoint, distanceMeters, type LatLon } from '../../core/geo.ts'
 import { START, step, type FlyEnv, type FlyMode, type FlyState, type Sticks } from '../../core/flyModel.ts'
 
 /*
@@ -23,6 +23,8 @@ export interface FlyHud {
   t: number
   hidden: boolean
   nearCeiling: boolean
+  /** Batch Flow, Section 1: the bearing from the drone back to the home point (you), degrees from north; null when on it. */
+  homeDeg: number | null
 }
 
 export interface FlyOptions {
@@ -90,7 +92,8 @@ export function useFly(active: boolean, opts: FlyOptions) {
       if (t >= nextRec) {
         nextRec = t + 0.5
         track.current.push({ t, at, ft: s.alt / FT, askedFt: s.alt / FT })
-        setHud({ state: s, at, distanceM: distanceMeters(o.takeoff, at), speedMps: Math.hypot(s.vx, s.vy), t, hidden, nearCeiling: o.env.ceilingM - s.alt < 10 })
+        const far = distanceMeters(o.takeoff, at)
+        setHud({ state: s, at, distanceM: far, speedMps: Math.hypot(s.vx, s.vy), t, hidden, nearCeiling: o.env.ceilingM - s.alt < 10, homeDeg: far < 1 ? null : bearingBetween(at, o.takeoff) })
       }
       raf = requestAnimationFrame(frame)
     }

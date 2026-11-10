@@ -96,6 +96,7 @@ import { ChipRow, type Chip } from './ChipRow.tsx'
 import { TopBar } from './TopBar.tsx'
 import { startHeading } from '../lib/heading.ts'
 import { Toast } from './Toast.tsx'
+import { logTouch } from '../lib/touchDebug.ts'
 import { MoonriseCard } from './MoonriseCard.tsx'
 import { readCeilingFeet } from '../lib/venue.ts'
 import { MAX_ALTITUDE_FEET } from '../core/air.ts'
@@ -1021,6 +1022,8 @@ export function PlanMode({
   }, [airspaceOn, airspaceOverlay, airspaceFailed])
   /* A refusal is said once, as a toast that goes by itself (Toast.tsx), never a box left over the map. */
   const [headingNote, setHeadingNote] = useState<string | null>(null)
+  /* Batch Flow, Section 1: "3D view restarted", after the view crashed and closed. */
+  const [crashNote, setCrashNote] = useState<string | null>(null)
   const dismissHeadingNote = useCallback(() => setHeadingNote(null), [])
   const stopHeading = useRef<(() => void) | null>(null)
   const onCompass = useCallback(() => {
@@ -2693,6 +2696,14 @@ export function PlanMode({
           sea={cinema}
           onFlightTime={scrubTo}
           fly={flySession}
+          onCrash={(message) => {
+            /* Batch Flow, Section 1: back to the drone card, with one line; never a blank screen. */
+            logTouch(`3D crashed: ${message}`)
+            setFlySession(null)
+            setThreeD(false)
+            setCard({ kind: 'preflight' } as SheetCard)
+            setCrashNote('3D view restarted')
+          }}
           onLanded={(track, clip) => {
             setFlySession(null)
             if (track.length > 1) pf.setFlown(track)
@@ -2747,6 +2758,7 @@ export function PlanMode({
         />
       )}
       {headingNote === null ? null : <Toast message={headingNote} onDone={dismissHeadingNote} />}
+      {crashNote === null ? null : <Toast message={crashNote} onDone={() => setCrashNote(null)} />}
       {moonHint ? <Toast message="Moon: where it rises and sets today." onDone={() => setMoonHint(false)} /> : null}
       {!placing ? null : (
         <p className="tapnote">{placingHint('position', addsAir ? 'air' : 'ground')}</p>

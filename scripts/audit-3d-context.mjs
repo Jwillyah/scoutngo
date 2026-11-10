@@ -14,8 +14,8 @@
  *              message goes, and the picture is not black
  *   the pier   Batch I, Section 6: the Virginia Beach Fishing Pier is drawn
  *              as a deck on pilings (OSM's pier, from the map's tiles)
- *   a throw    a frame that throws: the actual message, "Copy error" and
- *              "Try again"; Try again builds the view again
+ *   a throw    a frame that throws: the view closes to the map with "3D
+ *              view restarted" (Batch Flow); the 3D button builds it again
  */
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
@@ -120,23 +120,29 @@ try {
   if (after === null || after < 12) fail(`after the context came back the picture is black (luminance ${after})`)
   await page.screenshot({ path: join(OUT, 'restored.png') })
 
-  /* A frame that throws: said, with Copy error and Try again. */
+  /*
+   * A FRAME THAT THROWS (Batch Flow, Section 2's rule for every crash, Section
+   * 1): the 3D view closes, the map is back under it, and one line says "3D
+   * view restarted"; never a blank or black screen. The 3D button builds it
+   * again.
+   */
   await ev(`(() => { const s = window.__clay; window.__clayBefore = s; s.renderer.render = () => { throw new Error('test: a frame threw') }; s.setTime(new Date('${AT}')) })()`)
   await wait(1500)
-  const err = await ev(`JSON.stringify({ text: document.querySelector('.clay__error')?.textContent ?? null, buttons: [...document.querySelectorAll('.clay__error button')].map((b) => b.textContent) })`)
+  const err = await ev(`JSON.stringify({ toast: document.querySelector('.toast')?.textContent ?? null, clay: !!document.querySelector('.clay__canvas'), map: !!document.querySelector('.maplibregl-canvas'), words: document.body.innerText.trim().length })`)
   console.log(`  a throw: ${err}`)
   const e = JSON.parse(err)
-  if (e.text === null || !/The 3D view stopped/.test(e.text) || !/test: a frame threw/.test(e.text)) fail(`a frame threw and the message was not shown (${JSON.stringify(e.text)})`)
-  if (JSON.stringify(e.buttons) !== JSON.stringify(['Copy error', 'Try again'])) fail(`the error screen's buttons are ${JSON.stringify(e.buttons)}`)
+  if (e.toast === null || !/3D view restarted/.test(e.toast)) fail(`a frame threw and nothing said so (${JSON.stringify(e.toast)})`)
+  if (e.clay) fail('a frame threw and the broken 3D view is still up')
+  if (!e.map || e.words < 20) fail('a frame threw and the screen behind it is blank')
   await page.screenshot({ path: join(OUT, 'error.png') })
-  await page.getByRole('button', { name: 'Try again' }).click().catch(() => {})
+  await ev(`document.querySelector('button[aria-label="Open the 3D clay model"]')?.click()`)
   let again = false
   for (let i = 0; i < 30 && !again; i += 1) {
     await wait(1000)
-    again = await ev(`window.__clay !== window.__clayBefore && !document.querySelector('.clay__error')`)
+    again = await ev(`!!window.__clay && window.__clay !== window.__clayBefore && !document.querySelector('.clay__error')`)
   }
-  console.log(`  try again: built ${again}`)
-  if (!again) fail('Try again did not build the view again')
+  console.log(`  built again: ${again}`)
+  if (!again) fail('the 3D button did not build the view again after the crash')
   await ctx.close()
   watchdog.note('done')
 } finally {

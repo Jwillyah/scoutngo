@@ -1,24 +1,26 @@
 /*
  * THE FLY SCREEN'S NUMBERS, IN ONE SYSTEM. Settings' distance unit decides
- * the lot: feet with miles an hour, or metres with metres a second. The HUD
- * read "H 230 ft · D 120 m · 4.2 m/s" on 27 Oct: three units on one screen.
+ * heights and distances; Settings' speed unit (the wind unit, kt by default)
+ * decides every speed on the screen, the drone's and the wind's (Batch Flow,
+ * Section 1: the HUD said mph beside a home in kt). The HUD read "H 230 ft ·
+ * D 120 m · 4.2 m/s" on 27 Oct: three units on one screen.
  */
-import { formatWind, type DistanceUnit, type WindUnit } from '../units.ts'
+import { formatWind, windIn, windUnitLabel, type DistanceUnit, type WindUnit } from '../units.ts'
 
 export interface FlyUnits {
   length: 'ft' | 'm'
-  speed: 'mph' | 'm/s'
+  /** The label of Settings' speed unit: "kt", "mph", "km/h", "m/s". */
+  speed: string
   /** The WIND, in Settings' wind unit like every other wind in the app (kt by default). The drone's own speed stays in `speed`. */
   wind: WindUnit
 }
 
-export const flyUnits = (distance: DistanceUnit, wind: WindUnit): FlyUnits => (distance === 'm' ? { length: 'm', speed: 'm/s', wind } : { length: 'ft', speed: 'mph', wind })
+export const flyUnits = (distance: DistanceUnit, wind: WindUnit): FlyUnits => ({ length: distance === 'm' ? 'm' : 'ft', speed: windUnitLabel(wind), wind })
 
 /** The wind on the fly screen, "Wind 17 kt": Settings' wind unit, never the HUD's speed unit (it read "Wind 19 mph" beside a home in kt, 8 Nov). */
 export const hudWind = (mps: number | null, u: FlyUnits): string => `Wind ${formatWind(mps, u.wind)}`
 
 const FT = 0.3048
-const MPH = 0.44704
 
 /** A length in the screen's unit, whole numbers; a dash for nothing known. */
 export function hudLength(m: number | null | undefined, u: FlyUnits): string {
@@ -29,7 +31,7 @@ export function hudLength(m: number | null | undefined, u: FlyUnits): string {
 /** A speed in the screen's unit, one decimal under 10. */
 export function hudSpeed(mps: number | null | undefined, u: FlyUnits): string {
   if (mps === null || mps === undefined || !Number.isFinite(mps)) return '—'
-  const v = u.speed === 'mph' ? mps / MPH : mps
+  const v = windIn(mps, u.wind) ?? mps
   return Math.abs(v) < 10 ? v.toFixed(1) : String(Math.round(v))
 }
 

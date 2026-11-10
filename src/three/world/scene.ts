@@ -95,6 +95,8 @@ export interface ClayScene {
   settled(maxMs: number): Promise<boolean>
   snapshot(): Promise<HTMLCanvasElement>
   setCeiling(centre: LatLon | null, altAbsM: number, alpha: number): void
+  /** Batch Flow, Section 1: "you" at the home point (a 6 ft figure, a soft beacon kept a minimum size on screen), or null to take it away. */
+  setPilot(at: LatLon | null, groundAbsM: number): void
   startRecording(): { stop: () => Promise<Blob | null> } | null
   observe(view: ObserverView): Promise<void>
   pickAt(x: number, y: number): LatLon | null
@@ -126,7 +128,7 @@ export interface ClayScene {
   /** Batch I: the bridges, piers and pilings drawn, for checks. */
   decks(): { bridges: number; piers: number; pilings: number }
   /** Batch I: what is on the GPU, for Debug touch. */
-  gpu(): { textures: number; geometries: number; calls: number; scale: number; lost: boolean }
+  gpu(): { textures: number; geometries: number; calls: number; scale: number; lost: boolean; groundPieces: number; groundCanvasMB: number }
   renderer: THREE.WebGLRenderer
   destroy(): void
 }
@@ -523,6 +525,12 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
     lastFrame = now
     dirty = false
     try {
+      /* Batch Flow, Section 1: the fly audit's way to make one frame throw, so the way back from a crash is tested, not assumed. */
+      const probe = window as unknown as { __clayThrowNext?: boolean }
+      if (probe.__clayThrowNext === true) {
+        probe.__clayThrowNext = false
+        throw new Error('test crash from the fly audit')
+      }
       draw()
     } catch (error) {
       /* Stopped, and said: never a frozen or black canvas with nothing on it. */
@@ -599,6 +607,62 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
       ceiling.position.copy(point(centre, altAbsM))
       ceiling.renderOrder = 500
       scene.add(ceiling)
+    }
+    touch()
+  }
+
+  /* ------------------------------------------------------------ you */
+  /*
+   * THE PILOT AT THE HOME POINT (Batch Flow, Section 1, field 9 Nov: no way
+   * to find home far out). A figure 6 ft tall (1.83 m) standing on the
+   * ground there, and over it a soft glowing beacon drawn at a fixed size on
+   * the screen (sizeAttenuation off), so it is still a dot 2,000 ft away.
+   */
+  let pilot: THREE.Group | null = null
+  const PILOT_M = 1.83
+  const setPilot = (at: LatLon | null, groundAbsM: number) => {
+    if (pilot !== null) {
+      scene.remove(pilot)
+      pilot.traverse((o) => {
+        const m = o as THREE.Mesh
+        m.geometry?.dispose()
+        const mat = m.material as THREE.Material | undefined
+        if (mat !== undefined) {
+          ;(mat as THREE.SpriteMaterial).map?.dispose()
+          mat.dispose()
+        }
+      })
+      pilot = null
+    }
+    if (at !== null) {
+      const g = new THREE.Group()
+      g.name = 'pilot'
+      const skin = new THREE.MeshBasicMaterial({ color: 0xffffff })
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, PILOT_M - 0.3, 10), skin)
+      body.position.y = (PILOT_M - 0.3) / 2
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 8), skin.clone())
+      head.position.y = PILOT_M - 0.14
+      const c = document.createElement('canvas')
+      c.width = 64
+      c.height = 64
+      const ctx = c.getContext('2d')
+      if (ctx !== null) {
+        const grd = ctx.createRadialGradient(32, 32, 0, 32, 32, 32)
+        grd.addColorStop(0, 'rgba(255,255,255,1)')
+        grd.addColorStop(0.25, 'rgba(255,214,120,0.9)')
+        grd.addColorStop(1, 'rgba(255,214,120,0)')
+        ctx.fillStyle = grd
+        ctx.fillRect(0, 0, 64, 64)
+      }
+      const beacon = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), sizeAttenuation: false, transparent: true, depthWrite: false, depthTest: false }))
+      /* About 22 px on a phone at any distance: a fraction of the view's height. */
+      beacon.scale.set(0.05, 0.05, 1)
+      beacon.position.y = PILOT_M + 1.2
+      beacon.renderOrder = 600
+      g.add(body, head, beacon)
+      g.position.copy(point(at, groundAbsM))
+      pilot = g
+      scene.add(g)
     }
     touch()
   }
@@ -843,6 +907,7 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
     settled,
     snapshot,
     setCeiling,
+    setPilot,
     startRecording,
     observe,
     pickAt: (x, y) => {
@@ -904,7 +969,7 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
       Object.assign(trouble, hooks)
     },
     decks: () => decks.counts(),
-    gpu: () => ({ textures: renderer.info.memory.textures, geometries: renderer.info.memory.geometries, calls: renderer.info.render.calls, scale, lost }),
+    gpu: () => ({ textures: renderer.info.memory.textures, geometries: renderer.info.memory.geometries, calls: renderer.info.render.calls, scale, lost, groundPieces: ground.kept().pieces, groundCanvasMB: ground.kept().canvasMB }),
     destroy: () => {
       cancelAnimationFrame(raf)
       renderer.domElement.removeEventListener('webglcontextlost', onLost, false)

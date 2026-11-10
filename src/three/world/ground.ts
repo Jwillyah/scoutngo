@@ -207,6 +207,8 @@ export interface Ground {
   setMaterial(hook: GroundMaterialHook): void
   /** Hide the picture's water under the sea (the coarse rings' sea floor is already low). */
   dispose(): void
+  /** Batch Flow, Section 1: the textured pieces this ground still holds, and their pictures' canvas memory (MB, 4 bytes a pixel). */
+  kept(): { pieces: number; canvasMB: number }
 }
 
 export function createGround(venue: { lat: number; lon: number }, source: ImagerySource | null, status: GroundStatus, onChange: () => void, hook: GroundMaterialHook): Ground {
@@ -218,6 +220,32 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
   const wear = (mesh: THREE.Mesh, map: THREE.Texture) => {
     mesh.material = materialHook.make(map)
     textured.push({ mesh, map })
+  }
+  /*
+   * LET A PIECE GO, ALL OF IT (Batch Flow, Section 1; field 9 Nov at
+   * Sandbridge: the drone view closed itself). The near square was taken off
+   * the scene and its GPU texture freed, but it stayed in `textured`, so its
+   * 4096 px canvas (67 MB) and its material lived on: one more every 450 m
+   * of flight, until iOS's canvas memory ran out and Safari killed the tab.
+   * Now: out of the scene and the list, material and texture freed, and the
+   * canvas shrunk to nothing, which is what makes iOS hand its memory back
+   * at once rather than at some later collection.
+   */
+  const release = (mesh: THREE.Mesh) => {
+    group.remove(mesh)
+    const i = textured.findIndex((t) => t.mesh === mesh)
+    const map = i >= 0 ? textured[i].map : null
+    if (i >= 0) textured.splice(i, 1)
+    mesh.geometry.dispose()
+    ;(mesh.material as THREE.Material).dispose()
+    if (map !== null) {
+      map.dispose()
+      const img = map.image as { width: number; height: number } | null
+      if (img !== null && typeof img.width === 'number') {
+        img.width = 0
+        img.height = 0
+      }
+    }
   }
 
   /* -------------------------------------------- far and mid, tile by tile */
@@ -310,11 +338,7 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
       near = { mesh, tex, cx, cz, box, born: performance.now() }
       group.add(mesh)
       /* The old square goes once the new one is in: the parent picture already covers every hole. */
-      if (old !== null) {
-        group.remove(old.mesh)
-        old.mesh.geometry.dispose()
-        old.tex.dispose()
-      }
+      if (old !== null) release(old.mesh)
       tex.needsUpdate = true
       onChange()
       /* Then the sharp tiles, nearest the centre first, each over its parent as it arrives. */
@@ -359,11 +383,7 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
   let fineBuilding = false
   const dropFine = () => {
     if (fine === null) return
-    group.remove(fine.mesh)
-    fine.mesh.geometry.dispose()
-    fine.tex.dispose()
-    const i = textured.findIndex((t) => t.mesh === fine?.mesh)
-    if (i >= 0) textured.splice(i, 1)
+    release(fine.mesh)
     fine = null
     onChange()
   }
@@ -444,6 +464,13 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
       }
       onChange()
     },
+    kept: () => ({
+      pieces: textured.length,
+      canvasMB: Math.round(textured.reduce((sum, t) => {
+        const img = t.map.image as { width?: number; height?: number } | null
+        return sum + (img?.width ?? 0) * (img?.height ?? 0) * 4
+      }, 0) / 1e6),
+    }),
     dispose: () => {
       for (const t of textured) {
         t.mesh.geometry.dispose()

@@ -33,7 +33,14 @@ describe('context lost, and a frame that throws', () => {
   })
 
   it('a throw in the frame loop is caught and said', () => {
-    expect(SCENE).toMatch(/try \{\s*draw\(\)\s*\} catch \(error\) \{[\s\S]{0,200}trouble\.error\?\./)
+    expect(SCENE).toMatch(/try \{[\s\S]{0,400}draw\(\)\s*\} catch \(error\) \{[\s\S]{0,200}trouble\.error\?\./)
+  })
+
+  it('Batch Flow: a crash closes the view and goes back to the drone card with one line, never a blank screen', () => {
+    expect(CLAY).toMatch(/componentDidCatch\(error: unknown\) \{\s*this\.props\.onCrash\?\./)
+    expect(CLAY).toMatch(/if \(crashRef\.current !== undefined\) crashRef\.current\(message\)/)
+    const plan = readFileSync('src/components/PlanMode.tsx', 'utf8')
+    expect(plan).toMatch(/onCrash=\{\(message\) => \{[\s\S]{0,300}setThreeD\(false\)[\s\S]{0,120}kind: 'preflight'[\s\S]{0,80}setCrashNote\('3D view restarted'\)/)
   })
 
   it('Clay3D rebuilds on restore, or after REBUILD_AFTER_MS, and has an error boundary with Copy error and Try again', () => {

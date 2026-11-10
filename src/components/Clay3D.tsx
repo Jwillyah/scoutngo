@@ -77,6 +77,12 @@ interface Clay3DProps {
   sea?: CinemaInputs | null
   /** Compare a photo (src/components/ComparePhoto.tsx): your own frame against this view. */
   onCompare?: () => void
+  /**
+   * Batch Flow, Section 1: the view crashed (a throw in its tree, or a frame
+   * that threw): the caller closes it and goes back to where it came from,
+   * with one line. Without it the view says why in place (Batch I).
+   */
+  onCrash?: (message: string) => void
 }
 
 export const CLAY_NOTE = 'Clay model from map data; real buildings may differ'
@@ -89,12 +95,17 @@ export const CLAY_NOTE = 'Clay model from map data; real buildings may differ'
 /** Lost and not restored this long: build again anyway, on a new context. */
 export const REBUILD_AFTER_MS = 3000
 
-export class Clay3DBoundary extends Component<{ children: ReactNode }, { message: string | null; tick: number }> {
+export class Clay3DBoundary extends Component<{ children: ReactNode; onCrash?: (message: string) => void }, { message: string | null; tick: number }> {
   state = { message: null as string | null, tick: 0 }
   static getDerivedStateFromError(error: unknown) {
     return { message: error instanceof Error ? `${error.name}: ${error.message}` : String(error) }
   }
+  componentDidCatch(error: unknown) {
+    this.props.onCrash?.(error instanceof Error ? `${error.name}: ${error.message}` : String(error))
+  }
   render() {
+    /* Batch Flow, Section 1: with a way back, nothing here; the caller has closed the view. */
+    if (this.state.message !== null && this.props.onCrash !== undefined) return null
     if (this.state.message !== null) return <ClayError message={this.state.message} onRetry={() => this.setState((s) => ({ message: null, tick: s.tick + 1 }))} />
     return <Fragment key={this.state.tick}>{this.props.children}</Fragment>
   }
@@ -127,13 +138,13 @@ export function ClayError({ message, onRetry }: { message: string; onRetry: () =
 
 export function Clay3D(props: Clay3DProps) {
   return (
-    <Clay3DBoundary>
+    <Clay3DBoundary onCrash={props.onCrash}>
       <Clay3DView {...props} />
     </Clay3DBoundary>
   )
 }
 
-function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonShown = false, pins, stand, onLeaveStand, flight = null, onFlightTime, onRecorded, onRenderProgress, fly = null, onLanded, sea = null, onCompare }: Clay3DProps) {
+function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonShown = false, pins, stand, onLeaveStand, flight = null, onFlightTime, onRecorded, onRenderProgress, fly = null, onLanded, sea = null, onCompare, onCrash }: Clay3DProps) {
   const host = useRef<HTMLDivElement>(null)
   const scene = useRef<ClayScene | null>(null)
   /* How many times the scene has been built: every build (a scan arriving rebuilds it) re-runs the effects that feed it. 0 is not built yet. */
@@ -144,6 +155,11 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
   /* Batch I: the GPU lost (rebuilding), or a frame that threw (the message); a build count to rebuild on. */
   const [trouble, setTrouble] = useState<{ kind: 'lost' } | { kind: 'error'; message: string } | null>(null)
   const [build, setBuild] = useState(0)
+  /* The caller's way back, read when a frame throws (the build effect does not re-run for it). */
+  const crashRef = useRef(onCrash)
+  useEffect(() => {
+    crashRef.current = onCrash
+  })
   const [place, setPlace] = useState<PlaceState>(() => placeState())
   const [flat, setFlat] = useState(0)
   const [cloudQuality, setCloudQualityState] = useState<'high' | 'battery'>(() => {
@@ -230,7 +246,8 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
           },
           error: (message) => {
             logTouch(`3D: a frame threw: ${message}`)
-            setTrouble({ kind: 'error', message })
+            if (crashRef.current !== undefined) crashRef.current(message)
+            else setTrouble({ kind: 'error', message })
           },
         })
         setTrouble(null)
@@ -413,6 +430,13 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
     scene.current?.setCeiling(flying && fly !== null ? fly.takeoff : null, groundM + PART_107_FT * 0.3048, nearCeiling ? 0.18 : 0)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, flying, nearCeiling])
+  /* Batch Flow, Section 1: you, at the home point, while flying. */
+  useEffect(() => {
+    if (!ready) return
+    scene.current?.setPilot(flying && fly !== null ? fly.takeoff : null, groundM)
+    return () => scene.current?.setPilot(null, 0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, flying, groundM])
   useEffect(() => {
     if (!flying || fly === null || !fly.record) return
     recording.current = scene.current?.startRecording() ?? null

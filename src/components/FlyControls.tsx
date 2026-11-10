@@ -64,7 +64,7 @@ function Stick({ label, onMove }: { label: string; onMove: (x: number, y: number
  * down). Each is placed where the turning ring puts it and drawn level. The
  * wind's speed is under the ring, not in it, where it sat on the S.
  */
-function Ring({ yaw, gimbal, wind, bars }: { yaw: number; gimbal: number; wind: { fromDeg: number } | null; bars: Record<'front' | 'back' | 'left' | 'right', number | null> | null }) {
+function Ring({ yaw, gimbal, wind, bars, homeDeg = null }: { yaw: number; gimbal: number; wind: { fromDeg: number } | null; bars: Record<'front' | 'back' | 'left' | 'right', number | null> | null; homeDeg?: number | null }) {
   const R = 46
   const arc = (from: number, to: number, r: number) => {
     const p = (a: number) => [50 + r * Math.sin((a * Math.PI) / 180), 50 - r * Math.cos((a * Math.PI) / 180)]
@@ -102,6 +102,12 @@ function Ring({ yaw, gimbal, wind, bars }: { yaw: number; gimbal: number; wind: 
       {bars === null
         ? null
         : sides.map(([side, a]) => <path key={side} d={arc(a - 32, a + 32, 22)} className={`fly__arc fly__arc--${barRole(bars[side])}`} />)}
+      {homeDeg === null ? null : (
+        /* Batch Flow, Section 1: the way back to you, a white dot on the rim where home is. */
+        <g className="fly__home" transform={`rotate(${homeDeg - yaw} 50 50)`}>
+          <circle cx="50" cy={50 - R - 1} r="3.5" />
+        </g>
+      )}
       {/* The drone, nose up. */}
       <path d="M50 41 l7 14 l-7 -4 l-7 4 z" className="fly__drone" />
       {/* The gimbal's tilt: a short needle from level, down when it looks down. */}
@@ -284,6 +290,7 @@ export function FlyControls({ onSticks, mode, onMode, hud, ceilingFt, warning = 
         gimbal={s?.gimbal ?? 0}
         wind={wind === null ? null : { fromDeg: wind.fromDeg }}
         bars={bars}
+        homeDeg={hud?.homeDeg ?? null}
       />
       {wind === null ? null : (
         <p className="fly__wind num">
@@ -314,7 +321,7 @@ export function FlyControls({ onSticks, mode, onMode, hud, ceilingFt, warning = 
           <b>H</b> {hudLength(s?.alt, units)} {units.length}
         </span>
         <span>
-          <b>D</b> {hudLength(hud?.distanceM, units)} {units.length}
+          <b>Home</b> {hudLength(hud?.distanceM, units)} {units.length}
         </span>
         <span>
           <b>H.S</b> {hudSpeed(hs, units)} {units.speed}

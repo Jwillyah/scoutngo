@@ -14,6 +14,8 @@
  *             HINT_MS; neither over the ring, neither clipped
  *   credits   not drawn over the flight; said in the "i" instead
  *   compass   the letters drawn level; the wind's line clear of all four
+ *   a crash   one frame made to throw: back to the drone card with "3D
+ *             view restarted", never a blank screen (Batch Flow)
  *
  * The clouds are checked in tests/flyScreen.test.ts: what they cover of the
  * sky is arithmetic, and the grain is gone from the source.
@@ -28,7 +30,7 @@ import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
 import { placeKey } from '../src/core/venueName.ts'
 
 guardAudit('fly')
-const watchdog = startWatchdog('fly', 480_000)
+const watchdog = startWatchdog('fly', 600_000)
 const OUT = process.argv[2] ?? join(process.env.SCOUTNGO_OUT ?? tmpdir(), 'fly')
 mkdirSync(OUT, { recursive: true })
 const HINT_MS = 4000
@@ -152,6 +154,48 @@ try {
     console.log(`  the "i": ${look.info}`)
     if (look.info === null || !/Esri/.test(look.info)) fail(`${label}: the "i" does not carry the data credits (${look.info})`)
     await page.screenshot({ path: join(OUT, `fly-info-${label}.png`) })
+
+    /*
+     * THE GROUND LETS GO OF WHAT IS BEHIND YOU (Batch Flow, Section 1; field
+     * 9 Nov: the view closed itself after a long flight). Straight out for
+     * 45 s on a stubbed gamepad (about 1,700 ft in Normal): the near square
+     * is rebuilt at least once, and the ground's canvas memory must not grow
+     * by a whole atlas (67 MB) each time, as it did.
+     */
+    await ev(`(() => { window.__pad = { axes: [0, -1, 0, 0], buttons: [] }; navigator.getGamepads = () => [window.__pad] })()`)
+    await wait(8000)
+    const mb0 = await ev('window.__clay?.gpu?.().groundCanvasMB ?? null')
+    await ev(`window.__pad.axes = [0, 0, 0, -1]`)
+    await wait(45000)
+    await ev(`window.__pad.axes = [0, 0, 0, 0]`)
+    const after = JSON.parse(await ev(`JSON.stringify({ mb: window.__clay?.gpu?.().groundCanvasMB ?? null, home: [...document.querySelectorAll('.fly__readout span')].map((x) => x.textContent).join(' ') })`))
+    console.log(`  a straight 45 s: ground canvas ${mb0} MB to ${after.mb} MB; ${after.home}`)
+    if (mb0 === null || after.mb === null) fail(`${label}: the 3D view does not report its ground's canvas memory`)
+    else if (after.mb - mb0 > 20) fail(`${label}: the ground kept ${after.mb - mb0} MB of canvases it flew away from`)
+    if (!/Home \d+ ft/.test(after.home)) fail(`${label}: no distance back home in the readout (${after.home})`)
+    if (!/H\.S [\d.]+ kt/.test(after.home)) fail(`${label}: the drone's speed is not in the speed setting (kt): ${after.home}`)
+
+    /*
+     * A CRASH IS NEVER A BLANK SCREEN (Batch Flow, Section 1; field 9 Nov at
+     * Sandbridge: the drone view closed itself on a grey screen). One frame
+     * made to throw: the view closes, the drone card is back, and one line
+     * says so.
+     */
+    await ev('window.__clayThrowNext = true')
+    let back = null
+    for (let i = 0; i < 12 && back === null; i += 1) {
+      await wait(500)
+      back = JSON.parse(await ev(`JSON.stringify((() => { const t = document.querySelector('.toast')?.textContent ?? null; return t === null ? null : { toast: t, fly: !!document.querySelector('.fly'), card: !!document.querySelector('.pf'), words: document.body.innerText.trim().length } })())`))
+    }
+    console.log(`  after a frame threw: ${JSON.stringify(back)}`)
+    if (back === null) fail(`${label}: a crash in the 3D view said nothing (no "3D view restarted")`)
+    else {
+      if (!/3D view restarted/.test(back.toast)) fail(`${label}: after a crash the line reads ${JSON.stringify(back.toast)}`)
+      if (back.fly) fail(`${label}: after a crash the fly screen is still up`)
+      if (!back.card) fail(`${label}: after a crash the drone card is not back`)
+      if (back.words < 20) fail(`${label}: after a crash the screen is blank`)
+    }
+    await page.screenshot({ path: join(OUT, `fly-crash-${label}.png`) })
     await ctx.close()
     watchdog.note(label)
   }
