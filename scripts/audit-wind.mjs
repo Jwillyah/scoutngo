@@ -16,6 +16,7 @@ import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { webkit, devices } from './gate/playwright.mjs'
+import { answer } from './gate/fixtures.mjs'
 import { ensureApp, goToStage, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mjs'
 import { shareLink } from '../src/lib/planShare.ts'
 import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
@@ -63,6 +64,11 @@ try {
     const ctx = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height: 844 } })
     /* Registered first, so the routes after it (which Playwright tries first) answer before it. Outside hosts only: a bare word would match the dev server's own modules (/src/lib/overpass.ts). */
     await ctx.route(/^https:\/\/[^/]*(open-meteo|tidesandcurrents|arcgisonline|openfreemap|amazonaws|nominatim|overpass)|\/api\/forecast\?/, (r) => r.fulfill({ status: 503, body: 'not in this audit' }))
+    /* Batch Flow, Section 6: the dial's picture. The tab is answered (the gate's flat imagery fixture) and must show it; standalone is refused and must draw nothing, never a broken-image mark. */
+    if (label === 'browser') await ctx.route(/World_Imagery\/MapServer\/export/, async (r) => {
+      const f = await answer(r.request().url())
+      return r.fulfill({ status: f.status, contentType: f.type, body: f.body })
+    })
     await ctx.route(/api\.open-meteo\.com\/v1\/forecast/, (r) => {
       const u = new URL(r.request().url())
       if ((u.searchParams.get('hourly') ?? '').includes('wind_speed_120m') && u.searchParams.has('models')) {
@@ -149,6 +155,31 @@ try {
       if (w.scrolls) fail(`${label}: the page scrolls at 390 x 844`)
     }
     await page.screenshot({ path: join(OUT, `wind-${label}.png`) })
+    /*
+     * Batch Flow, Section 6 (boards D_Wind, D_WindMap): Data | Map at the top,
+     * Data on; the spot from above, faded, inside the dial; Map closes the
+     * page onto the map with its moving wind layer on, no Sky page over it.
+     */
+    const mode = await ev(`(() => {
+      const p = document.querySelector('.dpage--wind')
+      const tabs = [...(p?.querySelectorAll('.dwind__mode [role="tab"]') ?? [])].map((t) => ({ text: t.textContent.trim(), on: t.getAttribute('aria-selected') === 'true' }))
+      const img = p?.querySelector('.dwind__dial image.dwind__photo')
+      return { tabs, photo: img?.getAttribute('href') ?? null, clipped: !!img?.getAttribute('clip-path'), shown: !!img && img.classList.contains('dwind__photo--on') && getComputedStyle(img).opacity !== '0' }
+    })()`)
+    console.log(`  data | map: ${JSON.stringify(mode.tabs)}; dial photo ${mode.photo === null ? 'not drawn' : mode.shown ? 'shown' : 'drawn but not shown'}${mode.clipped ? ', clipped to the ring' : ''}`)
+    if (mode.tabs.map((t) => t.text).join('|') !== 'Data|Map' || !mode.tabs[0].on || mode.tabs[1].on) fail(`${label}: the Wind page has no Data | Map toggle with Data on: ${JSON.stringify(mode.tabs)}`)
+    if (label === 'browser' && (mode.photo === null || !/World_Imagery\/MapServer\/export/.test(mode.photo) || !mode.clipped || !mode.shown)) fail(`${label}: the dial shows no satellite picture clipped to its ring (${JSON.stringify(mode)})`)
+    if (label !== 'browser' && mode.photo !== null) fail(`${label}: the picture did not load and is still drawn in the dial (${mode.photo})`)
+    await page.locator('.dwind__mode [role="tab"]', { hasText: 'Map' }).tap().catch(() => {})
+    let onMap = null
+    for (let i = 0; i < 10; i += 1) {
+      await wait(400)
+      onMap = await ev(`({ page: !!document.querySelector('.dpage--wind'), sky: !!document.querySelector('.mpage'), layer: document.querySelector('.mode-plan')?.getAttribute('data-weather-layer') ?? null })`)
+      if (!onMap.page && onMap.layer === 'wind') break
+    }
+    console.log(`  after Map: wind page ${onMap.page ? 'still open' : 'closed'}, the map's layer ${onMap.layer}, sky page ${onMap.sky ? 'open' : 'not open'}`)
+    if (onMap.page || onMap.layer !== 'wind' || onMap.sky) fail(`${label}: Map did not land on the map's moving wind: ${JSON.stringify(onMap)}`)
+    await page.screenshot({ path: join(OUT, `wind-map-${label}.png`) })
     await ctx.close()
     watchdog.note(label)
   }

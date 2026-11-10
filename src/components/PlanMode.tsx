@@ -2508,6 +2508,7 @@ export function PlanMode({
   return (
     <div
       className="mode-plan"
+      data-weather-layer={weatherLayer}
       style={
         {
           ['--sheet-live-height' as string]: `${sheetHeight}px`,
@@ -2649,6 +2650,13 @@ export function PlanMode({
           onBack: () => setPage(null),
           onSwitch: (id: DetailId) => setPage(id === 'tide' ? 'tides' : id),
           onMap: () => setPage(null),
+          /* Batch Flow, Section 6: the Wind page's Map: the map's moving wind, at the spot. */
+          onWindMap: () => {
+            setPage(null)
+            setRadarAt(null)
+            onSkyLayer('wind')
+            onShowSky(true)
+          },
           drone: surfDrone !== null ? { name: surfDrone.name, maxWindMps: surfDrone.ratedMps } : picked !== null && picked.includes('drone') ? { name: 'drone', maxWindMps: null } : null,
         }
         return page === 'surf' ? <SurfPageV2 {...props} /> : page === 'tides' ? <TidePageV2 {...props} /> : page === 'wind' ? <WindPageV2 {...props} /> : <BuoysPageV2 {...props} />

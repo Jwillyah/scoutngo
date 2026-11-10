@@ -242,3 +242,15 @@ body:has(.windv3__read) .rail2 {
 .rslide__ends--placed span:last-child {
   transform: translateX(-100%);
 }
+
+/* Batch Flow, Section 6 (board D_Wind): Data | Map, and the spot from above under the dial. */
+.dwind__mode {
+  align-self: center;
+  margin-bottom: 4px;
+}
+.dwind__photo {
+  opacity: 0;
+}
+.dwind__photo--on {
+  opacity: 0.45;
+}

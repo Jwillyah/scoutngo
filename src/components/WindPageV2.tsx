@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { LatLon } from '../core/geo.ts'
+import { squareThumbUrl } from '../lib/thumb.ts'
 import { CIRCLE_M, windToBeach, type WindToBeach } from '../core/coastFacing.ts'
 import { compassPoint } from '../core/field.ts'
 import { STABILITY_WORD } from '../core/localWind.ts'
@@ -41,6 +42,8 @@ export interface WindPageV2Props {
   onMap: () => void
   /** Shown as the 400 ft tile only when given: the lead passes it when showsDrone (src/lib/activities.ts) holds. */
   drone?: { name: string; maxWindMps: number | null } | null
+  /** Batch Flow, Section 6: Map, the map's moving wind at the spot. */
+  onWindMap?: () => void
 }
 
 /** null while asking; 'inland' with no sea in reach; 'unavailable' when the tiles did not load. */
@@ -60,7 +63,7 @@ function useMinute(): Date {
   return now
 }
 
-export function WindPageV2({ venue, placeName, timeZone, units, ground, onBack, onSwitch, onMap, drone = null }: WindPageV2Props) {
+export function WindPageV2({ venue, placeName, timeZone, units, ground, onBack, onSwitch, onMap, drone = null, onWindMap }: WindPageV2Props) {
   const now = useMinute()
   const key = `${venue.lat},${venue.lon}`
   const [data, setData] = useState<{ key: string; value: WindData } | null>(null)
@@ -107,7 +110,18 @@ export function WindPageV2({ venue, placeName, timeZone, units, ground, onBack, 
   const shared = windAt(wx !== null && wx.key === key ? wx.value : null, now, stationObs)
   return (
     <DetailShell id="wind" ground={ground} onBack={onBack} onSwitch={onSwitch} onMap={onMap} how={<WindHow now={now} data={loaded} facing={face} unit={units.wind} lean={stationObs} timeZone={timeZone} />}>
-      <WindContent now={now} data={loaded} facing={face} placeName={placeName} timeZone={timeZone} units={units} drone={drone} shared={shared} />
+      {onWindMap === undefined ? null : (
+        /* Batch Flow, Section 6 (boards D_Wind, D_WindMap): Data here; Map is the map's moving wind at the spot. */
+        <div className="ui-seg dwind__mode" role="tablist" aria-label="Data or map">
+          <button type="button" role="tab" aria-selected className="ui-seg__opt ui-seg__opt--on">
+            Data
+          </button>
+          <button type="button" role="tab" aria-selected={false} className="ui-seg__opt" onClick={onWindMap}>
+            Map
+          </button>
+        </div>
+      )}
+      <WindContent now={now} data={loaded} facing={face} placeName={placeName} timeZone={timeZone} units={units} drone={drone} shared={shared} photo={squareThumbUrl(venue)} />
     </DetailShell>
   )
 }
@@ -117,7 +131,7 @@ const STRIP_HOURS = 12
 /** One arrow every this many hours across the twelve: six, as on the board. */
 const STRIP_STEP = 2
 
-export function WindContent({ now, data, facing, placeName, timeZone, units, drone, shared = null }: { now: Date; data: WindData | null; facing: FacingState; placeName: string; timeZone: string; units: Units; drone: { name: string; maxWindMps: number | null } | null; shared?: WindNow | null }) {
+export function WindContent({ now, data, facing, placeName, timeZone, units, drone, shared = null, photo = null }: { now: Date; data: WindData | null; facing: FacingState; placeName: string; timeZone: string; units: Units; drone: { name: string; maxWindMps: number | null } | null; shared?: WindNow | null; photo?: string | null }) {
   const unit = units.wind
   const say = (mps: number | null) => {
     const v = windIn(mps, unit)
@@ -187,7 +201,7 @@ export function WindContent({ now, data, facing, placeName, timeZone, units, dro
       </div>
 
       <div className="dwind__dialbox">
-        <Dial facing={face} fromDeg={headFrom} />
+        <Dial facing={face} fromDeg={headFrom} photo={photo} />
         <p className="dwind__note">
           {face === null
             ? facing === 'inland'
@@ -242,12 +256,24 @@ export function WindContent({ now, data, facing, placeName, timeZone, units, dro
 }
 
 /** The compass: the tint from windToBeach, the letters, the beach (dashed), offshore and onshore, and the arrow where the wind goes. */
-export function Dial({ facing, fromDeg }: { facing: number | null; fromDeg: number | null }) {
+export function Dial({ facing, fromDeg, photo = null }: { facing: number | null; fromDeg: number | null; photo?: string | null }) {
   const labels = facing === null ? [] : dialLabels(facing)
   const line = facing === null ? null : beachLine(facing)
+  /* The picture shows once it has loaded; a failed one is never drawn (WebKit draws a broken-image mark in its place). */
+  const [shown, setShown] = useState<{ url: string; ok: boolean } | null>(null)
+  const state = shown !== null && shown.url === photo ? shown.ok : null
   return (
     <svg className="dwind__dial" viewBox={`0 0 ${DIAL_SIZE} ${DIAL_SIZE}`} role="img" aria-label={fromDeg === null ? 'Compass' : `Compass: the wind comes from the ${compassPoint(fromDeg)} and goes toward the ${compassPoint(windTo(fromDeg))}`}>
       <circle className="dwind__face" cx={DIAL_C} cy={DIAL_C} r={RING_R} />
+      {photo === null || state === false ? null : (
+        /* Batch Flow, Section 6 (board D_Wind): the spot from above, faded, under the dial: the real coastline under the beach line. */
+        <>
+          <clipPath id="dialClip">
+            <circle cx={DIAL_C} cy={DIAL_C} r={RING_R} />
+          </clipPath>
+          <image href={photo} x={DIAL_C - RING_R} y={DIAL_C - RING_R} width={RING_R * 2} height={RING_R * 2} clipPath="url(#dialClip)" className={`dwind__photo${state === true ? ' dwind__photo--on' : ''}`} preserveAspectRatio="xMidYMid slice" onLoad={() => setShown({ url: photo, ok: true })} onError={() => setShown({ url: photo, ok: false })} />
+        </>
+      )}
       {facing === null
         ? null
         : dialSectors(facing).map((s) => (
