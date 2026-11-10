@@ -1,7 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { Icon } from './Icon.tsx'
-import { LayerTiles } from './LayerTiles.tsx'
 import { TILE_ART } from './tileArt.tsx'
 import { TopBar } from './TopBar.tsx'
 
@@ -59,17 +58,6 @@ describe('the layer tiles are bubbles', () => {
       /* No role colour on a tile: neither the chrome teal nor the hazard red. */
       expect(html.toLowerCase(), id).not.toMatch(/#2dd4bf|#ff3b30/)
     }
-  })
-
-  it('renders one bubble per tile in the sheet, with the state on the tile frame and not the bubble', () => {
-    const base = ids.slice(0, 2).map((id, i) => ({ id, label: id, state: i === 0 ? 'ON' : 'OFF', on: i === 0, art: TILE_ART[id], onToggle: () => {} }))
-    const overlays = ids.slice(2).filter((id) => id !== 'measure' && id !== 'preflight' && id !== 'skyline' && id !== 'lightmap').map((id) => ({ id, label: id, state: 'OFF', on: false, art: TILE_ART[id], onToggle: () => {} }))
-    const tools = (['measure', 'preflight', 'skyline', 'lightmap'] as const).map((id) => ({ id, label: id, state: 'OFF', on: false, art: TILE_ART[id], onToggle: () => {} }))
-    const html = renderToStaticMarkup(<LayerTiles base={base} overlays={overlays} tools={tools} sourceLine="x" about={null} />)
-    /* Ten layers and four tools. */
-    expect(html.match(/class="icon tile__bubble"/g)?.length).toBe(14)
-    expect(html).toContain('>Tools<')
-    expect(html.match(/tile__art tile__art--on/g)?.length).toBe(1)
   })
 })
 

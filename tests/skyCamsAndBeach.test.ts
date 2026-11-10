@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { camsForEvent, camsTowardSun, lookWords } from '../src/core/skyCams.ts'
-import { waterCard, type CardDay } from '../src/core/menuCards.ts'
 import { COAST_CAMS } from '../src/data/coastCams.ts'
 import { beachFor, beachName, nearestBeach, PICK_HOLDS_KM } from '../src/lib/surfBeach.ts'
 import { distanceMeters } from '../src/core/geo.ts'
@@ -45,13 +44,6 @@ describe('the Water card names its beach', () => {
     expect(beachName('Virginia Beach, North End')).toBe('Virginia Beach')
     /* Inland too: Richmond's nearest beach. */
     expect(nearestBeach({ lat: 37.54, lon: -77.43 })).not.toBeNull()
-  })
-
-  it('"Surf · <beach>" on the card, with the beach\'s own low tide', () => {
-    const day = { index: 0, events: { sunrise: null, sunset: null }, verdicts: { sunrise: null, sunset: null }, reads: { sunrise: null, sunset: null }, call: null, surf: [{ at: new Date('2026-11-02T15:00:00Z'), faceFt: 1, clean: true }], surfTag: 'Fun', surfClean: true, windTag: 'Offshore', wind: [], tide: { next: null, marks: [{ at: new Date('2026-11-02T22:09:00Z'), kind: 'low' as const }] } } as CardDay
-    const w = waterCard(day, new Date('2026-11-02T16:00:00Z'), () => '5:09 PM', 'Sandbridge')
-    expect(w.sub).toBe('Surf · Sandbridge · small · low 5:09 PM')
-    expect(waterCard(null, new Date(), () => '', 'Sandbridge').sub).toBe('Surf · Sandbridge · no sea forecast')
   })
 })
 

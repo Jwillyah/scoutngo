@@ -1,17 +1,9 @@
 /*
- * WHERE THE MENU GOES. The list in one place, so the menu, App and the audits'
- * navigation helper (scripts/preflight.mjs) name the same items the same way.
- *
- * SEVEN ITEMS, GROUPED BY JOB (field test, 30 Oct; docs/ux-rules.md rule 24;
- * docs/navigation.md has the tree and the taps to each place). It was twelve
- * flat items. Now: Plan · Sky · Water (Land inland) · Fly · Kit · Saved ·
- * Settings, with
- * the places that belong to a job under it, each one tap from the menu.
- * Field is still reached by its address, /field (OLD_PATHS below): a place
- * that moved is still a place.
+ * THE NAMES OF THE PLACES, and the old paths that still land on them. The
+ * menu itself is src/components/Menu.tsx; docs/navigation.md has the tree and
+ * the taps to each place. Field is still reached by its address, /field
+ * (OLD_PATHS below): a place that moved is still a place.
  */
-import type { GlyphId } from '../components/Icon.tsx'
-
 export type MenuItem =
   | 'today'
   | 'plan'
@@ -33,70 +25,6 @@ export type MenuItem =
   | 'callsheet'
   | 'settings'
   | 'about'
-
-export interface MenuEntry {
-  id: MenuItem
-  label: string
-  note: string
-  icon: GlyphId
-  /** Places that belong to this job, shown under it. */
-  subs?: readonly { id: MenuItem; label: string }[]
-}
-
-export const MENU_ITEMS: readonly MenuEntry[] = [
-  /* Batch H: the Today briefing, what is worth shooting today, tomorrow and this week. */
-  { id: 'today', label: 'Today', note: 'Go, Maybe or Skip, and the week', icon: 'sky' },
-  {
-    id: 'plan',
-    label: 'Plan',
-    note: 'Positions, light and conditions',
-    icon: 'plan',
-    subs: [
-      { id: 'now', label: 'Shoot now' },
-      { id: 'setup', label: 'Setup' },
-      { id: 'callsheet', label: 'Call sheet' },
-    ],
-  },
-  { id: 'sky', label: 'Sky', note: 'Now, sky color, special light, the calendar', icon: 'sky' },
-  /* Water at the coast; Section 5 of 30 Oct makes it Land inland. Surf only where there is surf. */
-  {
-    id: 'water',
-    label: 'Water',
-    note: 'Tides, surf and wind',
-    icon: 'tides',
-    subs: [
-      { id: 'tides', label: 'Tides' },
-      { id: 'surf', label: 'Surf' },
-      { id: 'wind', label: 'Wind' },
-    ],
-  },
-  /* Land, inland: the same slot. Wind and the light on the ridges; no surf or tide. */
-  {
-    id: 'land',
-    label: 'Land',
-    note: 'Wind, light on the ridges, valley fog',
-    icon: 'terrain',
-    subs: [
-      { id: 'wind', label: 'Wind' },
-      { id: 'terrain', label: 'Terrain light' },
-    ],
-  },
-  { id: 'preflight', label: 'Fly', note: 'Draw or fly a drone move', icon: 'preflight', subs: [{ id: 'viewfinder', label: 'Viewfinder' }] },
-  { id: 'kit', label: 'Kit', note: 'What is in the bag', icon: 'kit', subs: [{ id: 'exposure', label: 'Exposure' }] },
-  { id: 'saved', label: 'Saved', note: 'Spots, offline packs, past shoots', icon: 'saved' },
-  { id: 'settings', label: 'Settings', note: 'Units, offline, privacy, about', icon: 'settings', subs: [{ id: 'about', label: 'About' }] },
-]
-
-/** The top-level item a place lives under, for marking where you are. */
-export function menuHome(item: MenuItem): MenuItem {
-  if (item === 'setup' || item === 'field' || item === 'now' || item === 'callsheet') return 'plan'
-  if (item === 'tides' || item === 'surf' || item === 'wind') return 'water'
-  if (item === 'terrain') return 'land'
-  if (item === 'viewfinder') return 'preflight'
-  if (item === 'exposure') return 'kit'
-  if (item === 'about') return 'settings'
-  return item
-}
 
 /**
  * PATHS THAT STILL LAND. The app has one real page path, /how; these are the

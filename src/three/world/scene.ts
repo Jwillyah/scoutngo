@@ -150,7 +150,8 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
   renderer.toneMappingExposure = 1
   renderer.outputColorSpace = THREE.SRGBColorSpace
   renderer.shadowMap.enabled = true
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap
+  /* PCFSoftShadowMap is gone from three.js (it warned and fell back to this): asked for by name (Batch QA, Section 7, console clean-up). */
+  renderer.shadowMap.type = THREE.PCFShadowMap
   /*
    * THE BLACK FLASH (Batch I, Section 4: "works but flashes black and back").
    * The adaptive resolution below changed the pixel ratio AFTER a frame was

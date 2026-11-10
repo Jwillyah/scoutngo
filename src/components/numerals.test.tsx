@@ -9,7 +9,6 @@ import { CamList } from './CamList.tsx'
 import { DEFAULT_UNITS } from '../lib/units.ts'
 import { CoverageNotice } from './CoverageNotice.tsx'
 import { SunReadout } from './SunReadout.tsx'
-import { TimeStrip } from './TimeStrip.tsx'
 import { PhaseRule } from './PhaseRule.tsx'
 import { VenuePlate } from './VenuePlate.tsx'
 
@@ -44,21 +43,6 @@ const WINDOW = resolveWindow({
 })
 
 const SUBJECTS: { label: string; node: ReactElement }[] = [
-  {
-    label: 'the time bar',
-    node: (
-      <TimeStrip
-        start={new Date('2026-10-15T21:00:00Z')}
-        end={new Date('2026-10-15T23:30:00Z')}
-        value={0.5}
-        onChange={() => {}}
-        at={new Date('2026-10-15T22:00:00Z')}
-        timeZone="America/New_York"
-        timeZoneAbbr="EDT"
-        phases={[]}
-      />
-    ),
-  },
   { label: 'the coverage notice', node: <CoverageNotice planCoverage={CLUSTERED} /> },
   {
     label: 'the camera list',
@@ -191,27 +175,8 @@ describe('turning the numbers off removes no warning and no honesty line', () =>
 
 describe('turning the numbers off does remove the numbers', () => {
   /* The switch has to actually do something, or the test above passes forever. */
-  /*
-   * THE TIME BAR HAS NO RECEIPTS LEFT TO DROP.
-   *
-   * This asserted that turning numbers off removed "255.5°" from the bar.
-   * The bar carried Az and Alt in degrees; it is a 34px control now and
-   * carries neither, because the light card already printed both from the
-   * same core call -- two sources for one fact, to different precisions.
-   *
-   * SO THE ASSERTION IS THE OTHER HALF OF THE OLD ONE: the clock survives
-   * the switch, because a clock is not a receipt. The degrees are still
-   * tested where they still exist, on the sun readout, below.
-   */
-  it('keeps the clock on the time bar with numbers off, and shows no degrees either way', () => {
-    const { on, off } = both(SUBJECTS[0].node)
-    expect(on).not.toMatch(/\d+\.\d°/)
-    expect(off).not.toMatch(/\d+\.\d°/)
-    expect(text(off)).toMatch(/\d{1,2}:\d{2}/)
-  })
-
   it('drops the coordinates from the venue plate', () => {
-    const { on, off } = both(SUBJECTS[4].node)
+    const { on, off } = both(SUBJECTS[3].node)
     expect(on).toContain('36.72600')
     expect(off).not.toContain('36.72600')
     /*
@@ -223,13 +188,13 @@ describe('turning the numbers off does remove the numbers', () => {
   })
 
   it('drops the solar degrees from the sun readout', () => {
-    const { on, off } = both(SUBJECTS[3].node)
+    const { on, off } = both(SUBJECTS[2].node)
     expect(on).toMatch(/\d+\.\d°/)
     expect(off).not.toMatch(/\d+\.\d°/)
   })
 
   it('keeps the wind speed, which is a number you act on', () => {
-    const { off } = both(SUBJECTS[2].node)
+    const { off } = both(SUBJECTS[1].node)
     /* In Settings' wind unit (kt by default), like every wind in the app (E11). */
     expect(text(off)).toContain('12 kt')
     expect(text(off)).toMatch(/\d/)

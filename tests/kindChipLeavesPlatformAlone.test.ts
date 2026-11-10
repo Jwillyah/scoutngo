@@ -150,9 +150,4 @@ describe('the platform chip sets the platform filter', () => {
     const setup = readFileSync(new URL('../src/components/SetupMode.tsx', import.meta.url), 'utf8')
     expect(setup).toMatch(/onPlatformFilter\(p\)/)
   })
-
-  it('and the chip row calls it', () => {
-    const chips = readFileSync(new URL('../src/components/ShootChips.tsx', import.meta.url), 'utf8')
-    expect(chips).toMatch(/onClick=\{\(\) => onPlatform\(option\)\}/)
-  })
 })

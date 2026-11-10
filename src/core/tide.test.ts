@@ -7,7 +7,6 @@ import {
   levelAt,
   nearestStation,
   nearestStations,
-  positionInWindow,
   STATION_LOCAL_KM,
   STATION_USABLE_KM,
   stationProximity,
@@ -202,25 +201,6 @@ describe('extremesAround and straddlesTurn', () => {
   })
 })
 
-describe('positionInWindow', () => {
-  const start = new Date('2026-09-20T11:00:00Z')
-  const end = new Date('2026-09-20T15:00:00Z')
-
-  it('places a turn along the scrubber', () => {
-    expect(positionInWindow(new Date('2026-09-20T13:00:00Z'), start, end)).toBeCloseTo(0.5, 6)
-    expect(positionInWindow(start, start, end)).toBe(0)
-    expect(positionInWindow(end, start, end)).toBe(1)
-  })
-
-  it('is null outside the window, so nothing is drawn off the ends', () => {
-    expect(positionInWindow(new Date('2026-09-20T09:00:00Z'), start, end)).toBeNull()
-    expect(positionInWindow(new Date('2026-09-20T17:00:00Z'), start, end)).toBeNull()
-  })
-
-  it('is null for a zero length window rather than dividing by zero', () => {
-    expect(positionInWindow(start, start, start)).toBeNull()
-  })
-})
 
 describe('tidalRangeFeet', () => {
   it('measures the day, which is what says whether tide matters here', () => {

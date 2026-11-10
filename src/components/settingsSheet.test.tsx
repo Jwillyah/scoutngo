@@ -1,6 +1,5 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
-import { MENU_ITEMS } from '../lib/menu.ts'
 import { DEFAULT_UNITS } from '../lib/units.ts'
 import { AboutSheet } from './AboutSheet.tsx'
 import type { BuildCheck } from '../lib/build.ts'
@@ -34,12 +33,6 @@ const page = () =>
   )
 
 describe('Settings, a page of its own (30 Oct)', () => {
-  it('is the last menu item, with About under it', () => {
-    const ids = MENU_ITEMS.map((m) => m.id)
-    expect(ids[ids.length - 1]).toBe('settings')
-    expect(MENU_ITEMS.find((m) => m.id === 'settings')?.subs?.map((s) => s.id)).toEqual(['about'])
-  })
-
   /* Batch Map, Section 6 (board SettingsV2): seven groups in this order, the version at the foot, Debug behind a long press. */
   it('has its groups in the board\'s order, and nothing it moved out', () => {
     const html = page()

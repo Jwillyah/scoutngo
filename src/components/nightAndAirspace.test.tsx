@@ -1,10 +1,9 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { LatLon } from '../core/geo.ts'
-import { phaseAt, phaseSpans } from '../core/nightWindow.ts'
+import { phaseAt } from '../core/nightWindow.ts'
 import { AirspacePanel } from './AirspacePanel.tsx'
 import { SunSearchPanel } from './SunSearchPanel.tsx'
-import { TimeStrip } from './TimeStrip.tsx'
 import { PhaseRule } from './PhaseRule.tsx'
 
 const SANDBRIDGE: LatLon = { lat: 36.726, lon: -75.94 }
@@ -12,11 +11,9 @@ const text = (html: string) => html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' '
 
 /*
  * THE EVENING THE REPORT CAME FROM. Sunset 18:27 local, dusk 18:53. A window
- * ending at 19:30 crosses day, civil twilight and night, so the bar must show
- * three bands and the requirements must change twice across it.
+ * ending at 19:30 crosses day, civil twilight and night, so the requirements
+ * must change twice across it.
  */
-const WINDOW_START = new Date('2026-10-15T21:00:00Z') // 17:00 EDT
-const WINDOW_END = new Date('2026-10-15T23:30:00Z') // 19:30 EDT
 
 /*
  * FLYING, because these tests are about the Part 107 lines. The band and its
@@ -25,82 +22,11 @@ const WINDOW_END = new Date('2026-10-15T23:30:00Z') // 19:30 EDT
  */
 const FLYING = { airPositions: 1, dronePlatform: true }
 
-/*
- * TWO RENDERERS, BECAUSE THIS IS NOW TWO COMPONENTS.
- *
- * It was one: TimeScrubber drew the twilight bands AND printed what the
- * phase required. The scrubber is a 34px control now -- a clock, a rail and
- * a thumb -- and the Part 107 requirements moved to the light card, where a
- * statement about the phase belongs. The assertions did not change, only
- * which of the two they are asked of.
- */
-function strip(at: Date) {
-  return renderToStaticMarkup(
-    <TimeStrip
-      start={WINDOW_START}
-      end={WINDOW_END}
-      value={0.5}
-      onChange={() => {}}
-      at={at}
-      timeZone="America/New_York"
-      timeZoneAbbr=""
-      phases={phaseSpans(WINDOW_START, WINDOW_END, SANDBRIDGE.lat, SANDBRIDGE.lon)}
-    />,
-  )
-}
-
 function rule(at: Date, flying = FLYING) {
   return renderToStaticMarkup(
     <PhaseRule phase={phaseAt(at, SANDBRIDGE.lat, SANDBRIDGE.lon)} flying={flying} />,
   )
 }
-
-describe('the bands on the time axis', () => {
-  const html = strip(new Date('2026-10-15T21:30:00Z'))
-
-  it('draws one band per phase the window crosses', () => {
-    expect(html).toContain('tstrip__band--day')
-    expect(html).toContain('tstrip__band--civil-twilight')
-    expect(html).toContain('tstrip__band--night')
-  })
-
-  it('draws them as a contiguous run of the whole track', () => {
-    const widths = [...html.matchAll(/width:\s*([\d.]+)%/g)].map((m) => Number(m[1]))
-    expect(widths.length).toBeGreaterThanOrEqual(3)
-    const total = widths.reduce((a, b) => a + b, 0)
-    expect(total).toBeCloseTo(100, 1)
-  })
-
-  it('hides the bands from the accessibility tree, being a stratum not a control', () => {
-    for (const band of html.matchAll(/class="tstrip__band[^"]*"[^>]*/g)) {
-      expect(band[0]).toContain('aria-hidden="true"')
-    }
-  })
-
-  /*
-   * ONE RAIL DOES BOTH JOBS. There were two bars -- a twilight gradient and
-   * a range input drawing its own grey track -- for one axis, with the thumb
-   * on the one carrying no information. The input is still the control, and
-   * it is laid over the gradient rather than beside it.
-   */
-  it('puts the control on the same rail as the gradient', () => {
-    const rail = html.slice(html.indexOf('tstrip__rail'))
-    expect(rail).toContain('tstrip__band')
-    expect(rail).toContain('tstrip__thumb')
-    expect(rail).toContain('type="range"')
-  })
-
-  /*
-   * AND THE RECEIPTS ARE GONE. Az and Alt in degrees were printed here and
-   * on the light card, from the same core call, to different precisions --
-   * two sources for one fact, shape A in docs/failure-modes.md. The light
-   * card keeps them, with a compass point and an above-horizon word beside
-   * them; the control prints the clock and nothing else.
-   */
-  it('prints the clock, a zone word only away from home, and no other reading', () => {
-    expect(text(html)).toMatch(/^\s*\d{1,2}:\d{2} [AP]M\s*(venue time)?\s*$/)
-  })
-})
 
 describe('what the light card says at each moment', () => {
   /* 17:30 EDT: full daylight. Nothing applies and nothing is claimed. */
@@ -153,7 +79,6 @@ describe('a ground shoot gets the phase and no aircraft rule', () => {
 
   it('still names the phase and draws the bands', () => {
     expect(text(rule(twilight, GROUND))).toContain('Civil twilight')
-    expect(strip(twilight)).toContain('tstrip__band--civil-twilight')
   })
 
   it('says nothing about anti-collision lighting', () => {

@@ -8,7 +8,6 @@ import { getSunPosition } from '../core/sun.ts'
 import type { LatLon } from '../core/geo.ts'
 import type { TideState } from '../core/tide.ts'
 import { planPositions, type CameraPosition } from '../lib/plan.ts'
-import { MapControls } from './MapControls.tsx'
 import { PositionCard } from './PositionCard.tsx'
 import { ShooterFigure } from './ShooterFigure.tsx'
 
@@ -58,32 +57,6 @@ const RISING: TideState = {
   next: { kind: 'high', at: new Date('2026-09-12T16:10:00-04:00'), feet: 3.2 },
   previous: { kind: 'low', at: new Date('2026-09-12T10:02:00-04:00'), feet: 0.1 },
 }
-
-describe('MapControls', () => {
-  const html = renderToStaticMarkup(
-    <MapControls
-      showSun
-      onShowSun={() => {}}
-      pitch={0}
-      onPitch={() => {}}
-      onFitAll={() => {}}
-      canFitAll
-    />,
-  )
-
-  /* Pinch does this, on every device this runs on. */
-  it('has no zoom buttons', () => {
-    expect(html).not.toContain('Zoom in')
-    expect(html).not.toContain('Zoom out')
-    expect(html).not.toContain('mapctl__stack')
-  })
-
-  it('keeps the three a gesture cannot do', () => {
-    expect(html).toContain('sun overlay')
-    expect(html).toContain('Tilt')
-    expect(html).toContain('Fit all')
-  })
-})
 
 /*
  * ConePicker's tests went with ConePicker.

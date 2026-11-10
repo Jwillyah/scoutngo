@@ -37,7 +37,8 @@ import { gustWords, windAt, windWords } from '../lib/windNow.ts'
 /** The menu reads the forecasts once it has been open this long (Batch H: not on a tap straight through). */
 export const LOOK_AFTER_MS = 800
 
-export type MenuTarget = 'today' | 'sky' | 'water' | 'drone' | 'viewfinder' | 'plan' | 'kit' | 'saved' | 'settings' | 'weather' | 'surf' | 'wind' | 'tides' | 'setup' | 'calendar'
+/* What the menu sends (Batch QA, Section 7: 'water', 'viewfinder' and 'plan' were never sent and went). */
+export type MenuTarget = 'today' | 'sky' | 'drone' | 'kit' | 'saved' | 'settings' | 'weather' | 'surf' | 'wind' | 'tides' | 'setup' | 'calendar'
 
 export interface MenuRows {
   plan: string

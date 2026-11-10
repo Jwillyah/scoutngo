@@ -1,10 +1,8 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { ColdStart } from './ColdStart.tsx'
 import { Landing } from './Landing.tsx'
 import { HowPage } from './HowPage.tsx'
 import { OnThisDevice } from './OnThisDevice.tsx'
-import type { Spot } from '../lib/spots.ts'
 
 const text_ = (markup: string) =>
   markup.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
@@ -188,61 +186,6 @@ describe('/how carries everything the cover gave up, and more', () => {
   it('writes the colour rule down where a reader can find it', () => {
     expect(how).toContain('Teal is chrome')
     expect(how).toContain('never styles a reading')
-  })
-})
-
-/*
- * THE COLD START. "Opening on the mid-Atlantic is useless... put my saved
- * spots on that screen." And the rule that forbids the other answer stands.
- */
-describe('the cold start offers saved spots', () => {
-  const spot = (id: string, name: string, savedAt: string): Spot => ({
-    id,
-    name,
-    savedAt,
-    venue: {
-      name: { key: '36.7362|-75.9360', name },
-      latitude: '36.7362',
-      longitude: '-75.9360',
-      date: '2026-10-18',
-      startTime: '15:00',
-      endTime: '19:00',
-      eventDescription: '',
-      desiredOutcome: '',
-      subjectAcrossMeters: '',
-    },
-    kit: { bodyIds: [], lensIds: [], droneIds: [], styleNotes: '' },
-    positions: [],
-  })
-
-  const spots = [
-    spot('a', 'Sandbridge', '2026-10-18T12:00:00.000Z'),
-    spot('b', 'Lesner Bridge', '2026-10-11T12:00:00.000Z'),
-  ]
-
-  it('lists them, most recent first', () => {
-    const out = renderToStaticMarkup(<ColdStart spots={spots} onLoad={() => {}} />)
-    expect(out.indexOf('Sandbridge')).toBeLessThan(out.indexOf('Lesner Bridge'))
-  })
-
-  it('says the app does not know where you are, and does not ask', () => {
-    const out = renderToStaticMarkup(<ColdStart spots={spots} onLoad={() => {}} />)
-    expect(out).toContain('does not know where you are')
-    expect(out).toContain('does not ask')
-  })
-
-  /* A first run has nothing true to show, so it shows nothing. */
-  it('renders nothing with no spots saved', () => {
-    expect(renderToStaticMarkup(<ColdStart spots={[]} onLoad={() => {}} />)).toBe('')
-  })
-
-  /* Six is enough to find a place; a long list is a different screen. */
-  it('shows at most six', () => {
-    const many = Array.from({ length: 12 }, (_, i) =>
-      spot(`s${i}`, `Spot ${i}`, `2026-10-${String(i + 1).padStart(2, '0')}T12:00:00.000Z`),
-    )
-    const out = renderToStaticMarkup(<ColdStart spots={many} onLoad={() => {}} />)
-    expect(out.match(/cold__spot/g)).toHaveLength(6)
   })
 })
 

@@ -329,13 +329,6 @@ export function straddlesTurn(extremes: TideExtreme[], start: Date, end: Date): 
   return extremesAround(extremes, start, end).inWindow.length > 0
 }
 
-/** Where an extreme falls across the scrubber, 0 at the start, 1 at the end. */
-export function positionInWindow(at: Date, start: Date, end: Date): number | null {
-  const span = end.getTime() - start.getTime()
-  if (span <= 0) return null
-  const share = (at.getTime() - start.getTime()) / span
-  return share < 0 || share > 1 ? null : share
-}
 
 /** The range of the day, which is what says whether the tide matters here. */
 export function tidalRangeFeet(extremes: TideExtreme[]): number {

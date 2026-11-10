@@ -1553,7 +1553,7 @@ function App() {
   }
   /*
    * THE MENU'S CARDS AND ROWS (Batch H, Section 3): each opens its group on
-   * its most useful page. Sky names its tab (src/core/menuCards.ts).
+   * its most useful page.
    */
   const onMenuTarget = (target: MenuTarget) => {
     setPageFromHome(false)
@@ -1567,9 +1567,6 @@ function App() {
     switch (target) {
       case 'today':
         setBriefOpen(true)
-        return
-      case 'water':
-        onMenuPick(groups.water ? (surfInMenu ? 'surf' : 'tides') : 'land')
         return
       case 'drone':
         /* Batch Flow, Section 5: the Drone page first, not the Preflight card. */
@@ -1587,9 +1584,6 @@ function App() {
       case 'calendar':
         setMode('plan')
         setCardRequest((r) => ({ kind: 'calendar', tick: r.tick + 1 }))
-        return
-      case 'viewfinder':
-        setViewfinderOpen(true)
         return
       default:
         onMenuPick(target)
