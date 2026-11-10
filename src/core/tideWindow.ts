@@ -155,3 +155,18 @@ export function tideHeight(feet: number | null, unit: 'ft' | 'm'): string {
   if (feet === null || !Number.isFinite(feet)) return '—'
   return unit === 'ft' ? `${feet.toFixed(1)} ft` : `${feetToMetres(feet).toFixed(2)} m`
 }
+
+/**
+ * The time under a finger on today's curve (Batch Flow, Section 7): a share
+ * of the way across, 0 to 1, from the venue's midnight to the next.
+ */
+export function timeAtShare(date: string, timeZone: string, share: number): Date | null {
+  const start = zonedTimeToUtc(date, '00:00', timeZone)
+  const end = zonedTimeToUtc(nextDate(date), '00:00', timeZone)
+  if (start === null || end === null) return null
+  const s = Math.max(0, Math.min(1, share))
+  return new Date(start.getTime() + s * (end.getTime() - start.getTime()))
+}
+
+/** After the finger lifts, the curve goes back to now this long after (Batch Flow, Section 7). */
+export const SCRUB_RETURN_MS = 3000

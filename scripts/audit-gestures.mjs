@@ -235,10 +235,28 @@ try {
     await ev(`[...document.querySelectorAll('.chip2')].find((x) => /TIDE/.test(x.textContent))?.click()`)
     await wait(2500)
     const curve = JSON.parse(await ev(`JSON.stringify(document.querySelector('[data-sideways][aria-label^="The tide"]')?.getBoundingClientRect() ?? null)`))
-    /* Batch N, Section 2: the Tide page v2 draws today's curve as a picture (board Detail2T), not a time control: there is nothing to scrub, only that it is there. */
-    const v2 = await ev(`!!document.querySelector('.dpage--tide .dtide__curve')`)
-    if (curve === null && v2) console.log('  the Tide page v2: today\'s curve is a picture, not a time control (nothing to scrub)')
-    else if (curve === null) fail('no tide curve on the Tide card, so it was not checked')
+    /*
+     * Batch Flow, Section 7: the Tide page's curve scrubs. A sideways drag
+     * moves the headline to the time under the finger and draws the line
+     * there; never the sheet; back to now SCRUB_RETURN_MS (3 s) after letting go.
+     */
+    const v2box = JSON.parse(await ev(`JSON.stringify(document.querySelector('.dpage--tide .dtide__curve')?.getBoundingClientRect() ?? null)`))
+    if (curve === null && v2box !== null) {
+      const read = `JSON.stringify({ head: document.querySelector('.dpage--tide [data-tide-headline]')?.textContent ?? null, line: document.querySelector('.dpage--tide [data-scrub]')?.getAttribute('x1') ?? null, sheet: document.querySelector('.sheet')?.dataset.detent ?? null })`
+      const before = JSON.parse(await ev(read))
+      const cy = v2box.top + v2box.height / 2
+      const x0 = v2box.left + v2box.width * 0.2
+      await drag(c.send, Array.from({ length: 14 }, (_, i) => ({ x: x0 + i * v2box.width * 0.04, y: cy })), wait)
+      await wait(300)
+      const during = JSON.parse(await ev(read))
+      await wait(3700)
+      const after = JSON.parse(await ev(read))
+      console.log(`  the Tide page's curve: ${JSON.stringify(before.head)} -> dragged ${JSON.stringify(during.head)} (line at ${during.line}) -> 4 s later ${JSON.stringify(after.head)}`)
+      if (during.line === null) fail('a drag on the Tide page curve drew no line where the finger is')
+      if (!/ at \d{1,2}:\d{2}\s?[AP]M/.test(during.head ?? '')) fail(`the tide headline did not follow the finger: ${JSON.stringify(during.head)}`)
+      if (during.sheet !== before.sheet) fail(`a drag on the Tide page curve moved the sheet (${before.sheet} to ${during.sheet})`)
+      if (after.line !== null || after.head !== before.head) fail(`the tide curve was not back to now 3 s after letting go: ${JSON.stringify(after)}`)
+    } else if (curve === null) fail('no tide curve on the Tide card, so it was not checked')
     else {
       const tideState = `JSON.stringify({ sheet: document.querySelector('.sheet')?.dataset.detent, at: Number(document.querySelector('[data-sideways][aria-label^="The tide"]')?.getAttribute('aria-valuenow')) })`
       const ta = JSON.parse(await ev(tideState))

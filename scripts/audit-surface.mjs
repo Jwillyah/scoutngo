@@ -424,17 +424,21 @@ else if (injected[0]?.wrong !== true) fail('the ruler was taken off the sheet an
 else console.log(`  a ruler that does not move the sheet was caught: sheet stayed at ${injected[0].got?.sheet}`)
 await setDetent('half')
 
-/* ----- the ↺: a tap is Back to now, a hold the shoot window, the first tap says so once (Batch L) */
+/* ----- the Now pill: a tap is Back to now, a hold the shoot window, the first tap says so once (Batch L; the ↺ became a "Now" pill in Batch Flow, Section 7) */
 
-console.log('\n### the ↺: tap is now, hold is the shoot window')
+console.log('\n### the Now pill: tap is now, hold is the shoot window')
 {
   const at = () => ev(`Number(document.querySelector('.tbar__strip')?.getAttribute('aria-valuenow'))`)
   const setTime = (hhmm) => ev(`(() => { const inp = document.querySelector('.tbar__jump'); if (!inp) return 0; const day = String(inp.value).slice(0, 10); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(inp, day + 'T' + '${hhmm}'); inp.dispatchEvent(new Event('input', { bubbles: true })); return 1 })()`)
   const box = JSON.parse(await ev(`JSON.stringify(document.querySelector('.tbar__reset')?.getBoundingClientRect() ?? null)`))
-  /* The day and time as found: a tap on ↺ moves the shoot to today, and the checks below were written for the shoot day. */
+  /* The day and time as found: a tap on Now moves the shoot to today, and the checks below were written for the shoot day. */
   const was = await ev(`document.querySelector('.tbar__jump')?.value ?? null`)
-  if (box === null) fail('no ↺ on the time bar')
-  else {
+  const pill = await ev(`(() => { const r = document.querySelector('.tbar__reset'); const bar = document.querySelector('.tbar'); return { text: r?.textContent.trim() ?? null, glyph: (bar?.textContent ?? '').includes('\u21ba') } })()`)
+  console.log(`  the pill says ${JSON.stringify(pill.text)}; a ↺ on the bar: ${pill.glyph ? 'yes' : 'no'}`)
+  if (box === null) fail('no Now pill on the time bar')
+  else if (pill.text !== 'Now') fail(`the time bar's back-to-now button says ${JSON.stringify(pill.text)}, not "Now"`)
+  if (pill.glyph) fail('a ↺ is still on the time bar beside the Now pill')
+  if (box !== null) {
     const x = box.x + box.width / 2
     const y = box.y + box.height / 2
     const press = async (ms) => {
@@ -464,11 +468,11 @@ console.log('\n### the ↺: tap is now, hold is the shoot window')
     const hintedAgain = await ev(`!!document.querySelector('.tbar__hint')`)
     const hm = (t) => new Date(t).toISOString().slice(11, 16) + 'Z'
     console.log(`  set ${hm(set)} -> tap ${hm(tapped)} (now ${hm(pageNow)}) · hold ${hm(held)}, again ${hm(heldAgain)} · hint after the first tap ${hinted ? 'shown' : 'not shown'}, after the next ${hintedAgain ? 'shown' : 'not shown'}`)
-    if (Math.abs(tapped - pageNow) > 3 * 60_000) fail(`a tap on ↺ did not come back to now: ${hm(tapped)} against ${hm(pageNow)}`)
-    if (Math.abs(held - set) < 60_000 || Math.abs(held - pageNow) < 3 * 60_000) fail(`a hold on ↺ did not go to the shoot window: ${hm(held)}`)
-    if (held !== heldAgain) fail(`a hold on ↺ went to two different times: ${hm(held)} and ${hm(heldAgain)}`)
-    if (!hinted) fail('the first tap on ↺ did not say a hold is the shoot window')
-    if (hintedAgain) fail('the ↺ hint showed a second time')
+    if (Math.abs(tapped - pageNow) > 3 * 60_000) fail(`a tap on Now did not come back to now: ${hm(tapped)} against ${hm(pageNow)}`)
+    if (Math.abs(held - set) < 60_000 || Math.abs(held - pageNow) < 3 * 60_000) fail(`a hold on Now did not go to the shoot window: ${hm(held)}`)
+    if (held !== heldAgain) fail(`a hold on Now went to two different times: ${hm(held)} and ${hm(heldAgain)}`)
+    if (!hinted) fail('the first tap on Now did not say a hold is the shoot window')
+    if (hintedAgain) fail('the Now hint showed a second time')
     if (was !== null) {
       await ev(`(() => { const inp = document.querySelector('.tbar__jump'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(inp, ${JSON.stringify(was)}); inp.dispatchEvent(new Event('input', { bubbles: true })); return 1 })()`)
       await wait(900)
@@ -1314,6 +1318,8 @@ const CARD_HEIGHT = `(() => {
     content: Math.round(card.scrollHeight + parseFloat(cs.marginTop || '0') + parseFloat(cs.marginBottom || '0')),
     visible: body === null ? null : Math.round(body.clientHeight),
     strip: strip === null ? null : Math.round(strip.getBoundingClientRect().height),
+    /* What the strip is made of, so an over-limit strip says which part grew. */
+    parts: strip === null ? null : [...strip.children].map((c) => (String(c.className?.baseVal ?? c.className).split(' ')[0] || c.tagName) + ' ' + Math.round(c.getBoundingClientRect().height)).join(', ') + ' · ' + getComputedStyle(strip).padding,
   }
 })()`
 
@@ -1475,7 +1481,7 @@ for (const [name, heights] of [...walked.entries()].sort()) {
   )
 
   if (strip !== null && strip > STRIP_MAX) {
-    fail(`the time strip is ${strip}px on the ${name} card, over the ${STRIP_MAX}px limit`)
+    fail(`the time strip is ${strip}px on the ${name} card, over the ${STRIP_MAX}px limit (${heights.half?.parts ?? heights.full?.parts})`)
   }
   if (STRIP_FORBIDDEN.includes(name) && strip !== null) {
     fail(

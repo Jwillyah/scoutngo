@@ -511,6 +511,9 @@
   --d-surf: #5fe0c8;
   --d-tide: #9ec9ff;
   --d-drone: #f4b259;
+  --d-day-bar: #8ec1f0;
+  --d-nautical: #3b4088;
+  --d-astro: #283070;
   --sky-top: var(--d-night-top);
   --sky-mid: var(--d-night-mid);
   --sky-low: var(--d-night-low);

@@ -2,6 +2,7 @@ import { startTransition, useEffect, useLayoutEffect, useMemo, useRef, useState 
 import { dragAxis, releaseVelocity, VERTICAL_SLOP_ON_SIDEWAYS_PX } from '../core/sheetMotion.ts'
 import { ALTITUDE_RANGE, MINUTES_ACROSS, minutesForDrag, timeBarModel } from '../core/timeBar.ts'
 import { getMoonArc } from '../core/moonArc.ts'
+import { getPosition } from 'suncalc'
 import { moonLine, moonLitPath } from '../lib/moonGlyph.ts'
 import { formatClock, venueAndYours, zonedTimeToUtc } from '../core/timezone.ts'
 import { claimGesture, gestureOwner } from '../lib/gestureOwner.ts'
@@ -38,6 +39,9 @@ const HOLD_MS = 550
 const HINT_KEY = 'scoutngo.hint.holdReset.v1'
 
 const HEIGHT = 52
+/* The light's bar within the strip (Batch Flow, Section 7). */
+const BAR_Y = 14
+const BAR_H = 24
 const MINUTE = 60_000
 /** A quarter hour: the light tick under a thumb, where the phone can give one. */
 const QUARTER = 15 * MINUTE
@@ -285,6 +289,8 @@ export function TimeBar({ at, lat, lon, timeZone, moon, onAt, onReset, onHoldRes
 
   const parts = venueParts(at, timeZone)
   const day = new Intl.DateTimeFormat('en-GB', { timeZone, weekday: 'short', day: 'numeric', month: 'short' }).format(at)
+  /* Batch Flow, Section 7 (board D_TimeBar): the light at the moment, in a word, after the day. */
+  const light = lightWord(getPosition(at, lat, lon).altitude, getPosition(at, lat, lon).azimuth)
   const fullWidth = width * SPAN
 
   return (
@@ -292,7 +298,9 @@ export function TimeBar({ at, lat, lon, timeZone, moon, onAt, onReset, onHoldRes
       <div className="tbar__head">
         {/* The date row: a tap jumps to a moment, a drag up or down moves the sheet (BottomSheet.tsx). */}
         <label className="tbar__when" data-sheet-drag>
-          <span className="tbar__day">{day}</span>
+          <span className="tbar__day">
+            {day} · {light}
+          </span>
           <span ref={label} className="tbar__time num">
             {venueAndYours(at, timeZone)}
           </span>
@@ -312,7 +320,7 @@ export function TimeBar({ at, lat, lon, timeZone, moon, onAt, onReset, onHoldRes
         </label>
         {hint ? (
           <span className="tbar__hint" role="status">
-            Hold ↺: shoot window
+            Hold Now: the shoot window
           </span>
         ) : null}
         <button
@@ -335,10 +343,8 @@ export function TimeBar({ at, lat, lon, timeZone, moon, onAt, onReset, onHoldRes
           }}
           aria-label={onHoldReset === undefined ? 'Back to now: the venue, north up, the current time' : 'Back to now: the venue, north up, the current time. Hold for the shoot window'}
         >
-          <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true">
-            <path d="M4.5 9a6 6 0 1 1 1.6 5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            <path d="M3.5 4.5v4.5H8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          {/* Batch Flow, Section 7: a white "Now" pill; no ↺ beside it. */}
+          Now
         </button>
       </div>
 
@@ -362,8 +368,12 @@ export function TimeBar({ at, lat, lon, timeZone, moon, onAt, onReset, onHoldRes
       >
         <svg width={width} height={HEIGHT + 18} aria-hidden="true">
           <g ref={drawing} transform={slideFrom(anchor.getTime(), at.getTime())}>
+            {/* Batch Flow, Section 7: one rounded bar coloured by the light, day blue to night navy, never black. */}
+            <clipPath id="tbarRound">
+              <rect x={model.bands[0]?.x0 ?? 0} y={BAR_Y} width={Math.max(1, (model.bands[model.bands.length - 1]?.x1 ?? fullWidth) - (model.bands[0]?.x0 ?? 0))} height={BAR_H} rx={BAR_H / 2} />
+            </clipPath>
             {model.bands.map((b) => (
-              <rect key={`${b.band}-${b.x0}`} className={`curve__band curve__band--${b.band}`} x={b.x0} y={0} width={Math.max(0, b.x1 - b.x0)} height={HEIGHT} />
+              <rect key={`${b.band}-${b.x0}`} className={`curve__band curve__band--${b.band}`} x={b.x0} y={BAR_Y} width={Math.max(0, b.x1 - b.x0)} height={BAR_H} clipPath="url(#tbarRound)" />
             ))}
             <line className="tbar__horizon" x1={0} x2={fullWidth} y1={model.horizonY} y2={model.horizonY} />
             {model.moonPath === null ? null : <path className="tbar__moon" d={model.moonPath} />}
@@ -385,7 +395,8 @@ export function TimeBar({ at, lat, lon, timeZone, moon, onAt, onReset, onHoldRes
               </g>
             ))}
           </g>
-          <line className="tbar__needle" x1={width / 2} x2={width / 2} y1={0} y2={HEIGHT + 8} />
+          {/* Batch Flow, Section 7: a white thumb on the bar. */}
+          <rect className="tbar__needle tbar__thumb" x={width / 2 - 5} y={BAR_Y - 6} width={10} height={BAR_H + 12} rx={5} />
           {moonNow === null || moonY === null ? null : (
             <g className="tbar__moonhere" transform={`translate(${width / 2 - 7} ${moonY - 7})`}>
               <circle cx={7} cy={7} r={6} className="calm__dark" />
@@ -397,4 +408,14 @@ export function TimeBar({ at, lat, lon, timeZone, moon, onAt, onReset, onHoldRes
       {moonNow === null ? null : <p className="tbar__moonline num">{moonLine(moonNow, at, (t) => formatClock(t, timeZone))}</p>}
     </div>
   )
+}
+
+/** The light in a word (board D_TimeBar): day, golden hour, sunset or sunrise glow, blue hour, night. */
+function lightWord(altDeg: number, azDeg: number): string {
+  const evening = azDeg > 180
+  if (altDeg >= 6) return 'day'
+  if (altDeg >= 0) return 'golden hour'
+  if (altDeg >= -4) return evening ? 'sunset glow' : 'dawn glow'
+  if (altDeg >= -6) return 'blue hour'
+  return 'night'
 }

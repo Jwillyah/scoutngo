@@ -114,3 +114,77 @@
 .dpage__top .ppage__map {
   margin-left: 4px;
 }
+
+/* ------------------------------------------------ the time bar (Batch Flow, Section 7; board D_TimeBar) */
+.tbar {
+  /* Inside the time strip's 140 px (scripts/audit-surface.mjs): a thin frame, not a second card's padding. */
+  padding: 6px 12px 2px;
+  border-radius: 24px;
+  background: var(--d-card);
+  border: 1px solid var(--d-edge);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+/* The day and its light above the time, each a full line: side by side they wrapped in a card's narrower strip (67 px of head, the strip 151 px against its 140). */
+.tbar__when {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0;
+  min-width: 0;
+}
+.tbar__day {
+  color: rgb(255 255 255 / 0.8);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.tbar__when .tbar__time {
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.tbar__reset {
+  width: auto;
+  min-width: 64px;
+  /* 44 px of touch; the row stays 36 px tall (the pill reaches 4 px into the frame above and the bar below, which carry no target). */
+  height: 44px;
+  margin-block: -4px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--white);
+  color: var(--sky-ink);
+  font-weight: 700;
+}
+.curve__band--day {
+  fill: var(--d-day-bar);
+}
+.curve__band--golden {
+  fill: var(--caution);
+}
+.curve__band--blue {
+  fill: var(--d-glow-violet);
+}
+.curve__band--nautical {
+  fill: var(--d-nautical);
+}
+.curve__band--astronomical {
+  fill: var(--d-astro);
+}
+.curve__band--night {
+  fill: var(--d-night-top);
+}
+.tbar__sun {
+  stroke: var(--white);
+}
+.tbar__thumb {
+  fill: var(--white);
+  stroke: none;
+}
+.tbar__horizon {
+  stroke: rgb(255 255 255 / 0.25);
+}
+/* The tide curve's finger (Batch Flow, Section 7). */
+.dtide__scrub {
+  stroke: var(--white);
+  stroke-width: 2;
+}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { phaseBySynodic } from '../src/core/moonTides.ts'
 import { curveFromExtremes, type TideExtreme } from '../src/core/tide.ts'
-import { CURVE_PAD_PX, dayRangeFeet, LABEL_H, LABEL_HALF_W, moonLitPercent, NOW_LABEL, nextTurns, tideDayWindow, tideHeight, untilWords } from '../src/core/tideWindow.ts'
+import { CURVE_PAD_PX, dayRangeFeet, LABEL_H, LABEL_HALF_W, moonLitPercent, NOW_LABEL, nextTurns, SCRUB_RETURN_MS, tideDayWindow, tideHeight, timeAtShare, untilWords } from '../src/core/tideWindow.ts'
 import { cToF, WETSUIT_BANDS, wetsuitFor } from '../src/core/wetsuit.ts'
 
 /*
@@ -159,5 +159,26 @@ describe('wetsuitFor: the convention, as data', () => {
   it('says nothing for no temperature', () => {
     expect(wetsuitFor(null)).toBeNull()
     expect(cToF(100)).toBe(212)
+  })
+})
+
+describe('drag along the curve (Batch Flow, Section 7)', () => {
+  const NY = 'America/New_York'
+  it('a share of the way across is that share of the venue\'s day, midnight to midnight', () => {
+    expect(timeAtShare('2026-11-02', NY, 0)?.toISOString()).toBe('2026-11-02T05:00:00.000Z')
+    expect(timeAtShare('2026-11-02', NY, 0.5)?.toISOString()).toBe('2026-11-02T17:00:00.000Z')
+    expect(timeAtShare('2026-11-02', NY, 1)?.toISOString()).toBe('2026-11-03T05:00:00.000Z')
+  })
+  it('a finger past either end is held at the end', () => {
+    expect(timeAtShare('2026-11-02', NY, -0.3)?.toISOString()).toBe('2026-11-02T05:00:00.000Z')
+    expect(timeAtShare('2026-11-02', NY, 1.4)?.toISOString()).toBe('2026-11-03T05:00:00.000Z')
+  })
+  it('the day the clocks go back is 25 hours wide', () => {
+    const a = timeAtShare('2026-11-01', NY, 0) as Date
+    const b = timeAtShare('2026-11-01', NY, 1) as Date
+    expect((b.getTime() - a.getTime()) / 3_600_000).toBe(25)
+  })
+  it('back to now three seconds after the finger lifts', () => {
+    expect(SCRUB_RETURN_MS).toBe(3000)
   })
 })

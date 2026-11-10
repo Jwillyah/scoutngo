@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { LatLon } from '../core/geo.ts'
 import { GLASSY_MPS } from '../core/coastFacing.ts'
 import { glassMornings, LOW_NEAR_SUNRISE_MIN, type Morning } from '../core/glassMornings.ts'
@@ -8,7 +8,7 @@ import { sunriseOn } from '../core/sunrise.ts'
 import { directionAt, levelAt, STATION_LOCAL_KM } from '../core/tide.ts'
 import { formatClock, formatShortHour } from '../core/timezone.ts'
 import { wetsuitFor } from '../core/wetsuit.ts'
-import { dayRangeFeet, moonLitPercent, nextTurns, tideDayWindow, tideHeight, untilWords } from '../core/tideWindow.ts'
+import { dayRangeFeet, moonLitPercent, nextTurns, SCRUB_RETURN_MS, tideDayWindow, tideHeight, timeAtShare, untilWords } from '../core/tideWindow.ts'
 import type { DetailId } from '../lib/detailTabs.ts'
 import { hourlyAt } from '../lib/tideSheetData.ts'
 import { useTide, type TideInfo } from '../lib/useTide.ts'
@@ -74,6 +74,13 @@ const weekdayWord = (date: string) => new Intl.DateTimeFormat('en-US', { weekday
 
 export function TideContent({ now, tide, data, venue, placeName, timeZone, units }: { now: Date; tide: TideInfo; data: TideSheetData; venue: LatLon; placeName: string; timeZone: string; units: Units }) {
   const [listOpen, setListOpen] = useState(false)
+  /*
+   * DRAG ALONG THE CURVE (Batch Flow, Section 7): the headline follows the
+   * finger; let go and it is back to now SCRUB_RETURN_MS later.
+   */
+  const [scrub, setScrub] = useState<Date | null>(null)
+  const back = useRef<number | null>(null)
+  useEffect(() => () => (back.current === null ? undefined : window.clearTimeout(back.current)), [])
   const ok = tide.status === 'ok' ? tide : null
   const today = localDate(now, timeZone)
   const model = useMemo(
@@ -115,8 +122,21 @@ export function TideContent({ now, tide, data, venue, placeName, timeZone, units
   }
 
   const { extremes, curve } = ok.predictions
-  const feet = levelAt(curve, now)
-  const direction = directionAt(extremes, now)
+  const at = scrub ?? now
+  const feet = levelAt(curve, at)
+  const direction = directionAt(extremes, at)
+  const scrubTo = (e: React.PointerEvent<SVGSVGElement>) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    const t = timeAtShare(today, timeZone, (e.clientX - r.left) / Math.max(1, r.width))
+    if (t !== null) setScrub(t)
+  }
+  const dayFrom = timeAtShare(today, timeZone, 0)
+  const dayTo = timeAtShare(today, timeZone, 1)
+  const scrubX = scrub === null || dayFrom === null || dayTo === null ? null : ((scrub.getTime() - dayFrom.getTime()) / Math.max(1, dayTo.getTime() - dayFrom.getTime())) * CURVE_W
+  const letGo = () => {
+    if (back.current !== null) window.clearTimeout(back.current)
+    back.current = window.setTimeout(() => setScrub(null), SCRUB_RETURN_MS)
+  }
   /* The month's turns reach further than the day's table: the next high or low is read from both. */
   const turns = nextTurns([...extremes, ...(data.month.value ?? [])], now)
   const range = dayRangeFeet(extremes, today, timeZone)
@@ -136,7 +156,7 @@ export function TideContent({ now, tide, data, venue, placeName, timeZone, units
         <p className="dhead__big">{DIRECTION_WORD[direction]}</p>
         <p className="dhead__line" data-tide-headline>
           {tideHeight(feet, units.distance)}
-          {next === null ? '' : ` · ${next.kind} ${formatClock(next.at, timeZone)}${until === null ? '' : ` · ${until}`}`}
+          {scrub !== null ? ` at ${formatClock(scrub, timeZone)}` : next === null ? '' : ` · ${next.kind} ${formatClock(next.at, timeZone)}${until === null ? '' : ` · ${until}`}`}
         </p>
       </div>
 
@@ -144,7 +164,24 @@ export function TideContent({ now, tide, data, venue, placeName, timeZone, units
         {model === null ? (
           <p className="dtide__none">NOAA’s curve does not reach today.</p>
         ) : (
-          <svg className="dtide__curve" viewBox={`0 0 ${CURVE_W} ${CURVE_H}`} role="img" aria-label="Today’s water level, night shaded, with each high and low and now">
+          <svg
+            className="dtide__curve"
+            viewBox={`0 0 ${CURVE_W} ${CURVE_H}`}
+            role="img"
+            aria-label="Today’s water level, night shaded, with each high and low and now. Drag along it to read any time."
+            data-sideways
+            style={{ touchAction: 'pan-y' }}
+            onPointerDown={(e) => {
+              e.currentTarget.setPointerCapture(e.pointerId)
+              if (back.current !== null) window.clearTimeout(back.current)
+              scrubTo(e)
+            }}
+            onPointerMove={(e) => {
+              if (e.buttons > 0 || e.pointerType === 'touch') scrubTo(e)
+            }}
+            onPointerUp={letGo}
+            onPointerCancel={letGo}
+          >
             {model.nights.map((n) => (
               <rect key={n.x0} className="dtide__night" x={n.x0} y={0} width={Math.max(0, n.x1 - n.x0)} height={CURVE_H - 14} />
             ))}
@@ -169,6 +206,7 @@ export function TideContent({ now, tide, data, venue, placeName, timeZone, units
                 </text>
               </g>
             )}
+            {scrubX === null ? null : <line className="dtide__scrub" x1={scrubX} x2={scrubX} y1={0} y2={CURVE_H - 14} data-scrub />}
             {model.ticks.map((t, k) => (
               <text key={t.at.getTime()} className="dtide__tick" x={t.x} y={CURVE_H - 2} textAnchor={k === 0 ? 'start' : k === model.ticks.length - 1 ? 'end' : 'middle'}>
                 {formatShortHour(t.at, timeZone)}
