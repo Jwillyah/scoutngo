@@ -14,6 +14,7 @@
  *            a buoy's own parts are what its .spec file has, never invented.
  */
 import { rangeEnds } from './surfRange.ts'
+import { saneAzimuth, sanePeriod } from './sanity.ts'
 
 /** The body ruler, by whole feet of face (board LOOKS · Surf, S6). */
 const PART = ['flat', 'ankle', 'knee', 'waist', 'chest', 'shoulder', 'head', 'head', 'overhead'] as const
@@ -36,7 +37,11 @@ export interface PeriodRead {
 }
 
 /** The period to show: the buoy's dominant period when fresh, else the forecast's peak, else its mean, said as such. */
-export function periodRead(buoyDominantS: number | null, buoyFresh: boolean, forecastPeakS: number | null, forecastMeanS: number | null, buoyId: string | null = null): PeriodRead | null {
+export function periodRead(buoyDominantS0: number | null, buoyFresh: boolean, forecastPeakS0: number | null, forecastMeanS0: number | null, buoyId: string | null = null): PeriodRead | null {
+  /* Sanity (Batch QA, Section 4): a period outside 2-25 s is not said. */
+  const buoyDominantS = sanePeriod(buoyDominantS0)
+  const forecastPeakS = sanePeriod(forecastPeakS0)
+  const forecastMeanS = sanePeriod(forecastMeanS0)
   if (buoyFresh && buoyDominantS !== null && buoyDominantS > 0) return { s: Math.round(buoyDominantS), words: `${Math.round(buoyDominantS)} s${buoyId === null ? '' : ` at ${buoyId}`}`, from: 'buoy' }
   if (forecastPeakS !== null && forecastPeakS > 0) return { s: Math.round(forecastPeakS), words: `${Math.round(forecastPeakS)} s peak`, from: 'forecast-peak' }
   if (forecastMeanS !== null && forecastMeanS > 0) return { s: Math.round(forecastMeanS), words: `${Math.round(forecastMeanS)} s mean`, from: 'forecast-mean' }
@@ -59,7 +64,7 @@ export function forecastParts(read: (name: string) => number | null): SwellPart[
   const part = (name: string, h: string, t: string, d: string): SwellPart | null => {
     const m = read(h)
     if (m === null || !(m > 0.03)) return null
-    return { name, ft: m * FT, periodS: read(t), fromDeg: read(d) }
+    return { name, ft: m * FT, periodS: sanePeriod(read(t)), fromDeg: saneAzimuth(read(d)) }
   }
   return [
     part('Swell', 'swell_wave_height', 'swell_wave_period', 'swell_wave_direction'),
@@ -77,8 +82,8 @@ const POINTS: Record<string, number> = { N: 0, NNE: 22.5, NE: 45, ENE: 67.5, E: 
 export function buoyParts(split: { swellM: number | null; swellS: number | null; swellFrom: string | null; windWaveM: number | null; windWaveS: number | null; windWaveFrom: string | null } | null): SwellPart[] {
   if (split === null) return []
   const out: SwellPart[] = []
-  if (split.swellM !== null && split.swellM > 0) out.push({ name: 'Swell', ft: split.swellM * FT, periodS: split.swellS, fromDeg: split.swellFrom === null ? null : (POINTS[split.swellFrom] ?? null) })
-  if (split.windWaveM !== null && split.windWaveM > 0) out.push({ name: 'Wind waves', ft: split.windWaveM * FT, periodS: split.windWaveS, fromDeg: split.windWaveFrom === null ? null : (POINTS[split.windWaveFrom] ?? null) })
+  if (split.swellM !== null && split.swellM > 0) out.push({ name: 'Swell', ft: split.swellM * FT, periodS: sanePeriod(split.swellS), fromDeg: split.swellFrom === null ? null : (POINTS[split.swellFrom] ?? null) })
+  if (split.windWaveM !== null && split.windWaveM > 0) out.push({ name: 'Wind waves', ft: split.windWaveM * FT, periodS: sanePeriod(split.windWaveS), fromDeg: split.windWaveFrom === null ? null : (POINTS[split.windWaveFrom] ?? null) })
   return out
 }
 

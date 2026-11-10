@@ -102,9 +102,14 @@ const cam = (id) => {
   return c
 }
 const chix = JSON.parse(readFileSync('tests/data/sky-fire-2026-11-02-sunset.json', 'utf8')).venue
+const { SURF_SPOTS } = await import('../src/data/surfSpots.ts')
+const kdh = SURF_SPOTS.find((s) => s.id === 'kdh-1st-street')
+if (kdh === undefined) throw new Error("surf spot kdh-1st-street is not in src/data/surfSpots.ts")
 const SPOTS = [
   { key: 'vb', name: 'VB Pier', at: cam('va-virginia-beach-pier').at, facing: cam('va-virginia-beach-pier').facing, from: "src/data/coastCams.ts 'va-virginia-beach-pier'" },
   { key: 'sb', name: 'Sandbridge', at: cam('va-sandbridge').at, facing: cam('va-sandbridge').facing, from: "src/data/coastCams.ts 'va-sandbridge'" },
+  /* Batch QA, Section 4: Kill Devil Hills, the surf spot's own record (src/data/surfSpots.ts 'kdh-1st-street'); KFFA and 44100 (Duck) are its station and buoy. */
+  { key: 'kdh', name: 'KDH', at: kdh.at, facing: kdh.facing, from: "src/data/surfSpots.ts 'kdh-1st-street'" },
   { key: 'chix', name: 'Chix', at: { lat: chix.lat, lon: chix.lon }, facing: null, from: 'tests/data/sky-fire-2026-11-02-sunset.json (truth case #5 venue)',
     /* Chick's Beach faces the bay. Both buoys are on the ocean: scoring the bay's waves against them would measure the wrong water (failure-modes C). */
     noBuoy: 'Chix is on the Chesapeake Bay; 44099 and 44100 are both on the ocean side, so neither measures its water' },
@@ -133,7 +138,7 @@ const rows = []
 /* `pool`: rows with one pool key are the same pairs (three spots, one gauge) and count once in the summary. */
 const addRow = (spot, item, lead, unit, s, tolWords, source, pool = `${spot.name}|${item}|${lead}`) => rows.push({ spot: spot.name, item, lead, unit, score: s, tolWords, source, pool, label: `${spot.name} · ${item}${lead === '' ? '' : ` (${lead})`}` })
 
-const asosIds = ['KNTU', 'KORF']
+const asosIds = ['KNTU', 'KORF', 'KFFA']
 let asos = []
 try {
   const csv = await getText(asosUrl(asosIds, new Date(windowStart.getTime() - 3_600_000), new Date(windowEnd.getTime() + 3_600_000)))

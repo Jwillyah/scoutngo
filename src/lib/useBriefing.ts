@@ -22,6 +22,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { getPosition, getTimes } from 'suncalc'
 import { certainty, dayCall, eventCall, kt, moonOn, surfLine, surfTag, tideDay, windLevel, windTag, type CallRead, type Kind, type MoonDay, type SurfBar, type TideDay, type WindHourIn } from '../core/briefing.ts'
 import { calmDirection } from './windNow.ts'
+import { saneGust, saneSunsetHour, saneWind } from '../core/sanity.ts'
+import { wallClock } from '../core/timezone.ts'
 import { fireVerdict, type FireVerdict } from '../core/fireOutlook.ts'
 import type { LatLon } from '../core/geo.ts'
 import { surfShape } from '../core/surf.ts'
@@ -99,7 +101,10 @@ function eventsOn(iso: string, venue: LatLon, timeZone: string): Record<Kind, Da
   const noon = zonedTimeToUtc(iso, '12:00', timeZone) ?? new Date(`${iso}T17:00:00Z`)
   const t = getTimes(noon, venue.lat, venue.lon)
   const ok = (d: Date | null | undefined) => (d instanceof Date && !Number.isNaN(d.getTime()) ? d : null)
-  return { sunrise: ok(t.sunrise), sunset: ok(t.sunset) }
+  /* Batch QA, Section 4: a sunset outside 4 to 9 PM at the spot is not believed (src/core/sanity.ts): "—", never a wrong time. */
+  const set = ok(t.sunset)
+  const w = set === null ? null : wallClock(set, timeZone)
+  return { sunrise: ok(t.sunrise), sunset: set !== null && w !== null && saneSunsetHour(w.hour + w.minute / 60) ? set : null }
 }
 
 
@@ -269,8 +274,9 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
       const w = s?.wind ?? null
       const wind: WindHourIn[] = hours.map((h) => ({
         at: h,
-        mps: w === null ? null : hourlyAt(w, 'wind_speed_10m', h),
-        gustMps: w === null ? null : hourlyAt(w, 'wind_gusts_10m', h),
+        /* Sanity (Batch QA, Section 4): no negative wind, no gust under it. */
+        mps: w === null ? null : saneWind(hourlyAt(w, 'wind_speed_10m', h)),
+        gustMps: w === null ? null : saneGust(hourlyAt(w, 'wind_gusts_10m', h), hourlyAt(w, 'wind_speed_10m', h)),
         /* Calm has no direction (src/lib/windNow.ts calmDirection, Batch QA, Section 0B). */
         fromDeg: w === null ? null : calmDirection(hourlyAt(w, 'wind_speed_10m', h), hourlyAt(w, 'wind_direction_10m', h)),
         highMps: w === null ? null : hourlyAt(w, 'wind_speed_120m', h),

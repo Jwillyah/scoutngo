@@ -15,6 +15,7 @@ import { useTide, type TideInfo } from '../lib/useTide.ts'
 import { useTideSheet, type TideSheetData } from '../lib/useTideSheet.ts'
 import { formatRange, formatTemperature, formatWind, type Units } from '../lib/units.ts'
 import { DCard, DetailShell } from './DetailShell.tsx'
+import { saneTide } from '../core/sanity.ts'
 
 /*
  * TIDE, v2 (Batch N, Section 2; board docs/mockups/Detail2T.png). The new
@@ -123,7 +124,9 @@ export function TideContent({ now, tide, data, venue, placeName, timeZone, units
 
   const { extremes, curve } = ok.predictions
   const at = scrub ?? now
-  const feet = levelAt(curve, at)
+  /* Sanity (Batch QA, Section 4): a level outside the station's own predicted lows and highs is "—" (src/core/sanity.ts saneTide). */
+  const feet0 = levelAt(curve, at)
+  const feet = feet0 === null || extremes.length === 0 ? feet0 : saneTide(feet0, Math.min(...extremes.map((e) => e.feet)), Math.max(...extremes.map((e) => e.feet)))
   const direction = directionAt(extremes, at)
   const scrubTo = (e: React.PointerEvent<SVGSVGElement>) => {
     const r = e.currentTarget.getBoundingClientRect()

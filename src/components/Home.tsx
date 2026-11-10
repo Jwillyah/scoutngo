@@ -2,6 +2,7 @@ import '../styles/home-d.css'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 /* suncalc 2.0.2 (this repo's): altitude and azimuth in DEGREES, azimuth from north, clockwise (Batch N E10: the moon read "S" when it was treated as radians from south). */
 import { getMoonPosition, getPosition } from 'suncalc'
+import { saneAzimuth } from '../core/sanity.ts'
 import { moonTimesOnLocalDay } from '../core/moonTimes.ts'
 import { droneTag, kt, surfOn, surfTag, windTag, type CallRead } from '../core/briefing.ts'
 import { droneWindow } from '../core/droneWindow.ts'
@@ -618,7 +619,7 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
     target = 'moon'
     const base = day?.start ?? now
     const rise = moonTimesOnLocalDay(new Date(base.getTime() + 12 * 3_600_000), venue.lat, venue.lon, timeZone).rise
-    const az = rise === null ? null : getMoonPosition(rise, venue.lat, venue.lon).azimuth
+    const az = rise === null ? null : saneAzimuth(getMoonPosition(rise, venue.lat, venue.lon).azimuth)
     const moon = day?.moon ?? null
     big = moon === null ? '—' : moon.fraction < 0.03 ? 'New' : moon.fraction > 0.97 ? 'Full' : `${Math.round(moon.fraction * 100)}%`
     /* The small card has room for the time alone (Batch QA, Section 0B: "rise 10:05 PM · ENE" was cut, then wrapped to four lines); its bearing is the Sky page's. */

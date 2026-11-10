@@ -10,6 +10,7 @@
 import type { Hourly } from './tideSheetData.ts'
 import { nowcastAt, obsFresh, type StationObs } from '../core/nowcast.ts'
 import { hourlyAt } from './tideSheetData.ts'
+import { saneAzimuth, saneGust, saneWind } from '../core/sanity.ts'
 import { compass } from './tideWords.ts'
 import { windIn, windUnitLabel, type WindUnit } from './units.ts'
 
@@ -37,9 +38,10 @@ export const halfHour = (t: Date): Date => new Date(Math.floor(t.getTime() / 3_6
 export function modelWindAt(wx: Hourly | null, t: Date): WindNow | null {
   if (wx === null) return null
   const at = halfHour(t)
-  const mps = hourlyAt(wx, 'wind_speed_10m', at)
+  /* Sanity (Batch QA, Section 4, src/core/sanity.ts): no negative wind, no gust under it, a bearing 0-360. */
+  const mps = saneWind(hourlyAt(wx, 'wind_speed_10m', at))
   if (mps === null) return null
-  return { mps, fromDeg: calmDirection(mps, hourlyAt(wx, 'wind_direction_10m', at)), gustMps: hourlyAt(wx, 'wind_gusts_10m', at) }
+  return { mps, fromDeg: calmDirection(mps, saneAzimuth(hourlyAt(wx, 'wind_direction_10m', at))), gustMps: saneGust(hourlyAt(wx, 'wind_gusts_10m', at), mps) }
 }
 
 /*

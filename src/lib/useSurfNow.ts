@@ -15,6 +15,7 @@ import { spotKey, spotStats, type SpotStats } from '../core/spotSkill.ts'
 import { rangeWords } from '../core/surfRange.ts'
 import { buoyParts, forecastParts, periodRead, rangeSizeWords, type PeriodRead, type SwellPart } from '../core/surfReads.ts'
 import { hourlyAt } from './tideSheetData.ts'
+import { saneRange } from '../core/sanity.ts'
 import { venueToday } from '../core/eventDay.ts'
 import { addDays, rangeHourAt, weekPeaks, type RangeHour } from './surfPageData.ts'
 import { onSkillBook, readSkillBook, skillBookVersion } from './spotSkillStore.ts'
@@ -75,7 +76,7 @@ export function surfLine(sea: SurfSea, h: RangeHour | null, now: Date): string |
 }
 
 /** The words for a band, the one way every screen says it. */
-export const surfWords = (h: RangeHour | null): string | null => (h === null ? null : rangeWords(h.range))
+export const surfWords = (h: RangeHour | null): string | null => (h === null || saneRange(h.range.lowFt, h.range.highFt) === null ? null : rangeWords(h.range))
 
 export function surfNowFrom(sea: SurfSea, stats: SpotStats, now: Date, timeZone: string): { now: RangeHour | null; tomorrow: RangeHour | null } {
   if (sea.marine === null) return { now: null, tomorrow: null }
