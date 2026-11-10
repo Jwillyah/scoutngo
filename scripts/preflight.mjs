@@ -480,6 +480,34 @@ export async function goToStage(ev, wait, stage) {
     return arrivedAt(ev, want, "tapped Plan's Shoot setup (+)")
   }
 
+  /*
+   * Batch Flow, Section 8: the menu has no Plan row. A person goes the
+   * header › the home › Map, but the home asks for a forecast, and an audit
+   * counting requests would count the route. On the map already with
+   * nothing over it, this is nothing; with the home open, its own Map
+   * button; anywhere else, the map's address.
+   */
+  if (want === 'plan') {
+    for (let i = 0; i < 30; i += 1) {
+      if (await ev(`!!document.querySelector('.shell, nav[aria-label="Stage"], button[aria-label="Menu"]')`)) break
+      await wait(500)
+    }
+    const here = await ev(`(() => {
+      const shell = document.querySelector('.shell')?.className.match(/shell--([a-z]+)/)?.[1] ?? null
+      const home = document.querySelector('.home .hbtn--round[aria-label="Open the map"]')
+      if (home) { home.click(); return 'home' }
+      return shell === 'plan' && !document.querySelector('nav[aria-label="Stage"]') ? 'there' : 'menu'
+    })()`)
+    /* Anywhere else (Shoot setup on a shared link): /plan, the map's own address (src/lib/menu.ts OLD_PATHS), which does what the Plan row did. */
+    if (here === 'menu') {
+      await ev(`(() => { document.querySelector('.sidemenu__scrim')?.click(); history.pushState(null, '', '/plan' + location.search + location.hash); dispatchEvent(new PopStateEvent('popstate')); return 1 })()`)
+    }
+    await wait(600)
+    const arrived = await ev(`document.querySelector('.shell')?.className.match(/shell--([a-z]+)/)?.[1] ?? null`)
+    if (arrived !== 'plan') throw new PreflightError(`${here === 'home' ? "tapped the home's Map" : here === 'there' ? 'on the map' : 'went to /plan'} and the shell is "${arrived}" (src/App.tsx follows /plan; src/components/Home.tsx has the Map button)`)
+    return arrived
+  }
+
   /* A first load on a cold dev server can take a while: wait for the top bar, up to 15 s. */
   for (let i = 0; i < 30; i += 1) {
     if (await ev(`!!document.querySelector('nav[aria-label="Stage"], button[aria-label="Menu"]')`)) break

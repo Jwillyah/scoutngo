@@ -568,8 +568,9 @@ console.log('\n### every stage reaches every other stage, by pressing the nav')
  * other, each by its own gesture (scripts/preflight.mjs goToStage), checked
  * by where the shell lands.
  */
-const IN_MENU = ['Plan']
-const NOT_IN_MENU = ['Shoot setup', 'Field']
+/* Batch Flow, Section 8 (board D_Menu): no Plan row (the map is the home's Map button, goToStage follows it); Plan a shoot is the Shoot setup's door (Shoot picked, or nothing yet); the Viewfinder is the Sky page's. */
+const IN_MENU = ['Plan a shoot', 'Calendar', 'Kit', 'Saved', 'Settings']
+const NOT_IN_MENU = ['Shoot setup', 'Field', 'Plan', 'Viewfinder']
 const STAGE_IDS = ['setup', 'plan', 'field']
 
 const openMenu = () =>
@@ -600,7 +601,7 @@ if (!Array.isArray(offered) || offered.length === 0) {
 } else {
   console.log(`  the menu offers: ${offered.join(' | ')}`)
   for (const label of IN_MENU) if (!offered.includes(label)) fail(`the menu has no ${label}`)
-  for (const label of NOT_IN_MENU) if (offered.includes(label)) fail(`the menu still offers ${label}, which lives inside Plan now`)
+  for (const label of NOT_IN_MENU) if (offered.includes(label)) fail(`the menu still offers ${label}, which lives elsewhere now`)
 
   for (const from of STAGE_IDS) {
     for (const to of STAGE_IDS) {

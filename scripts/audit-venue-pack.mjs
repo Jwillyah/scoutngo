@@ -351,15 +351,15 @@ try {
      * had offline, and "cannot say" used to read as "no sea": the Water menu
      * and the tide went. The last answer for the venue must stand.
      */
-    await page.locator('button[aria-label="Menu"]').first().click({ timeout: 3000 }).catch(() => {})
-    await wait(600)
-    const menu = await ev(`[...document.querySelectorAll('.sidemenu__panel button')].map((b) => b.textContent.trim().split(/\\s{2,}|\\n/)[0])`)
-    console.log(`  menu offline: ${JSON.stringify(menu)}`)
-    if (!Array.isArray(menu) || !menu.some((t) => /^Water/.test(t))) fail(`${label}: offline the pier lost its Water menu: the coast was forgotten`)
-    if (Array.isArray(menu) && menu.some((t) => /^Land/.test(t))) fail(`${label}: offline the pier shows Land, so it was taken for inland`)
-    await page.keyboard.press('Escape')
-    await wait(500)
-
+    /*
+     * Batch Flow, Section 8: the menu lists the home's cards, the same at the
+     * coast and inland, so it no longer says which this is. The map's TIDE
+     * chip does: it goes only when the place is taken for inland
+     * (src/components/PlanMode.tsx, !groups.water && place === 'inland').
+     */
+    const coastChips = await ev(`[...document.querySelectorAll('.chip2')].map((c) => c.textContent.trim())`)
+    console.log(`  chips offline: ${JSON.stringify(coastChips)}`)
+    if (!Array.isArray(coastChips) || !coastChips.some((t) => /^TIDE/.test(t))) fail(`${label}: offline the pier lost its TIDE chip: the coast was forgotten`)
     /* The tide curve. */
     await page.locator('.chip2', { hasText: 'TIDE' }).first().click({ timeout: 3000 }).catch(() => {})
     await wait(2500)

@@ -188,3 +188,61 @@
   stroke: var(--white);
   stroke-width: 2;
 }
+
+/* ------------------------------------------------ the menu (Batch Flow, Section 8; board D_Menu) */
+.menu--d .menu__spot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--white);
+  font: inherit;
+  text-align: left;
+}
+.menu--d .menu__title {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.menu--d .menu__where {
+  font-size: var(--text-md);
+  color: rgb(255 255 255 / 0.8);
+}
+.menu__cards--d {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.mcard--d {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 0;
+  padding: 14px 16px;
+  color: var(--white);
+  font: inherit;
+  text-align: left;
+}
+.mcard--d .mcard__name {
+  font-size: var(--text-xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgb(255 255 255 / 0.7);
+}
+.mcard--d .mcard__value {
+  font-size: var(--text-xl);
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.mcard--d .mcard__sub {
+  font-size: var(--text-sm);
+  color: rgb(255 255 255 / 0.8);
+}

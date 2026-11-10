@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { contrastRatio } from '../core/contrast.ts'
+import type { CardKind } from '../core/homeDay.ts'
 import { DESIGN_TILES, GLYPH_INK, ICON_IDS, shippedTile, tileContrast } from '../lib/iconPalette.ts'
 import { MENU_ITEMS, menuHome, OLD_PATHS, pathToMenuItem } from '../lib/menu.ts'
 import { Icon } from './Icon.tsx'
@@ -41,31 +42,33 @@ describe('the golden bubble tiles', () => {
 describe('the menu (Batch H, Section 3: it replaced the side menu)', () => {
   const units = { wind: 'kt', distance: 'ft', clock: 12, temperature: 'F' } as const
   const rows = { plan: 'Set up a shoot', kit: 'a7 IV · 28-75', saved: '3 spots · 1 offline', settings: 'backup 3 days ago' }
-  const render = (drone: { name: string; maxWindMps: number | null } | null, inland = false) =>
-    renderToStaticMarkup(<Menu open venue={null} placeShort="VB Pier" timeZone="America/New_York" units={units} drone={drone} inland={inland} rows={rows} now={new Date('2026-11-02T14:00:00Z')} onPick={() => {}} onClose={() => {}} />)
+  const HOME: CardKind[] = ['surf', 'wind', 'tide', 'sky', 'moon', 'drone']
+  const render = (drone: { name: string; maxWindMps: number | null } | null, inland = false, more: { order?: CardKind[]; photoTools?: boolean; droneTools?: boolean } = {}) =>
+    renderToStaticMarkup(<Menu open venue={null} placeShort="VB Pier" timeZone="America/New_York" units={units} drone={drone} inland={inland} rows={rows} order={more.order ?? HOME} photoTools={more.photoTools ?? true} droneTools={more.droneTools ?? true} now={new Date('2026-11-02T14:00:00Z')} onPick={() => {}} onClose={() => {}} />)
+  const labelsOf = (html: string) => [...html.matchAll(/class="[^"]*sidemenu__label[^"]*">([^<]+)</g)].map((m) => m[1])
 
-  it('is four live cards and four rows, in the Stage nav the audits walk', () => {
+  /* Batch Flow, Section 8 (board D_Menu): the spot once; Weather, then the home's cards in its order (no Moon); five rows. */
+  it('the spot once, Weather then the home in its order, and the rows, in the Stage nav the audits walk', () => {
     const html = render({ name: 'Air 3S', maxWindMps: 12 })
     expect(html).toContain('aria-label="Stage"')
-    const labels = [...html.matchAll(/class="[^"]*sidemenu__label[^"]*">([^<]+)</g)].map((m) => m[1])
-    expect(labels).toEqual(['Today', 'Sky', 'Water', 'Drone', 'Viewfinder', 'Plan', 'Kit', 'Saved', 'Settings'])
-    for (const v of Object.values(rows)) expect(html).toContain(v)
-    expect(html).toContain('VB Pier · Mon 2')
+    expect(labelsOf(html)).toEqual(['VB Pier', 'Weather', 'Surf', 'Wind', 'Tide', 'Sky', 'Drone', 'Plan a shoot', 'Calendar', 'Kit', 'Saved', 'Settings'])
+    for (const v of [rows.kit, rows.saved, rows.settings]) expect(html).toContain(v)
+    expect(html.split('VB Pier').length - 1).toBe(2) /* the title, and the header's own label for a screen reader */
   })
 
   /* Batch J, Section 7: the Water card everywhere, inland too, for a named surf beach. */
-  it('the Drone card always, as Preflight\u2019s home (Batch K addendum E: the layers tile went); Water inland too', () => {
-    expect(render(null)).toContain('>Drone<')
-    expect(render(null)).toContain('Preflight')
-    expect(render(null, true)).toContain('>Water<')
-    expect(render(null, true)).not.toContain('>Land<')
+  it('the Drone card only with drone tools; Plan a shoot only with Shoot; Sky always', () => {
+    expect(labelsOf(render(null))).toContain('Drone')
+    expect(labelsOf(render(null, false, { droneTools: false }))).not.toContain('Drone')
+    expect(labelsOf(render(null, false, { photoTools: false }))).not.toContain('Plan a shoot')
+    expect(labelsOf(render(null, false, { order: ['surf', 'wind', 'tide'] })).slice(1, 3)).toEqual(['Weather', 'Sky'])
   })
 
   it('every place is still reachable: a card, a row, a tab inside a group, or its own address', () => {
     /* The ids the old menu offered, and where each lives now (docs/navigation.md). */
     const now: Record<string, string> = {
-      plan: 'row', setup: 'Plan › venue pill', field: '/field', sky: 'card', water: 'card', land: 'card', terrain: 'Land tab', tides: 'Water tab', surf: 'Water tab', wind: 'Water tab',
-      exposure: 'Kit', kit: 'row', saved: 'row', now: 'Sky › Now', viewfinder: 'Drone › Preflight › Viewfinder', preflight: 'card', callsheet: 'Plan › Call sheet', settings: 'row', about: 'Settings › About', today: 'card',
+      plan: 'the home › Map', setup: 'Plan a shoot', field: '/field', sky: 'card', water: 'card', land: 'card', terrain: 'Land tab', tides: 'Water tab', surf: 'Water tab', wind: 'Water tab',
+      exposure: 'Kit', kit: 'row', saved: 'row', now: 'Sky › Now', viewfinder: 'Sky › Viewfinder', preflight: 'card', callsheet: 'Plan › Call sheet', settings: 'row', about: 'Settings › About', today: 'card',
     }
     for (const item of MENU_ITEMS) expect(now[item.id], item.id).toBeDefined()
     expect(pathToMenuItem('/field')).toBe('field')

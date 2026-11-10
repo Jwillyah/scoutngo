@@ -120,7 +120,7 @@ import { OPEN_RADAR_EVENT, OPEN_SKY_EVENT, OPEN_WEATHER_EVENT } from './lib/page
 import { SkyPage } from './components/SkyPage.tsx'
 import { DronePage } from './components/DronePage.tsx'
 import { homeOrder, readActivities, showsDrone, showsPhotoTools, useActivities } from './lib/activities.ts'
-import { cardList } from './core/homeDay.ts'
+import { homeCardsShown, homeLayout } from './core/homeCards.ts'
 import { ActivityPicker } from './components/ActivityPicker.tsx'
 import { SpotPicker } from './components/SpotPicker.tsx'
 import { viewfinderPreset } from './core/viewfinderPreset.ts'
@@ -1574,6 +1574,19 @@ function App() {
         /* Batch Flow, Section 5: the Drone page first, not the Preflight card. */
         setDroneOpen(true)
         return
+      /* Batch Flow, Section 8: the menu's cards open the home's pages. */
+      case 'weather':
+        setWeatherOpen(true)
+        return
+      case 'surf':
+      case 'wind':
+      case 'tides':
+        onMenuPick(target)
+        return
+      case 'calendar':
+        setMode('plan')
+        setCardRequest((r) => ({ kind: 'calendar', tick: r.tick + 1 }))
+        return
       case 'viewfinder':
         setViewfinderOpen(true)
         return
@@ -1606,11 +1619,8 @@ function App() {
         return
     }
   }
-  /* Batch Pages, Section 5: the menu's cards in the home's order (the home's own cardList). */
-  const menuCardOrder = useMemo(() => {
-    const order = homeOrder(activities, briefDrone !== null)
-    return cardList(order, briefDrone !== null || order.includes('drone'))
-  }, [activities, briefDrone])
+  /* Batch Flow, Section 8: the menu's cards are the ones the home shows, in its order (few or many: src/core/homeCards.ts homeCardsShown). */
+  const menuCardOrder = useMemo(() => homeCardsShown(homeLayout(activities), homeOrder(activities, briefDrone !== null), briefDrone !== null), [activities, briefDrone])
   /* Its clock, read when it opens. */
   const [menuNow, setMenuNow] = useState(() => new Date())
   useEffect(() => {

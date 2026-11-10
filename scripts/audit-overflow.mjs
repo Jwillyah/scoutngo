@@ -242,13 +242,13 @@ try {
   await ev(`document.querySelector('.page__close, .page__back, .dpage__back')?.click()`)
   await wait(500)
   /*
-   * Batch H: the menu is four cards and four rows. Surf is the Water card's
-   * first page; Exposure is Kit's "Try your settings on a photo".
+   * Batch H: the menu is four cards and four rows; Exposure is Kit's "Try
+   * your settings on a photo". Batch Flow, Section 8: Surf is its own card.
    */
   for (const item of ['Surf', 'Exposure']) {
     await ev(`document.querySelector('button[aria-label="Menu"]')?.click()`)
     await wait(600)
-    const door = item === 'Surf' ? 'Water' : 'Kit'
+    const door = item === 'Surf' ? 'Surf' : 'Kit'
     const found = await ev(`(() => { const b = [...document.querySelectorAll('.sidemenu__item')].find((x) => x.querySelector('.sidemenu__label')?.textContent === '${door}'); if (!b) return false; b.click(); return true })()`)
     if (found && item === 'Exposure') {
       await wait(900)

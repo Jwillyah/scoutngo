@@ -1,15 +1,17 @@
 import '../styles/menu.css'
-import { beachName, sameBeach, useSurfBeach } from '../lib/surfBeach.ts'
-import { useSurfNow } from '../lib/useSurfNow.ts'
-import { SpotPicker } from './SpotPicker.tsx'
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { stormNote } from '../lib/stormRiskData.ts'
-import { useCoast } from '../lib/coastData.ts'
-import { droneCard, menuOrder, skyCard, todayCard, waterCard, type CardDay, type Tone } from '../core/menuCards.ts'
-import type { CardKind } from '../core/homeDay.ts'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { getPosition } from 'suncalc'
+import { droneTag, windTag } from '../core/briefing.ts'
+import { colorWords, conditionOf, rainLine, sideWords, type CardKind } from '../core/homeDay.ts'
+import { menuCardList, type MenuCard } from '../core/menuCards.ts'
 import { formatClock } from '../core/timezone.ts'
+import { hourlyAt } from '../lib/tideSheetData.ts'
+import { compass } from '../lib/tideWords.ts'
 import { useBriefing } from '../lib/useBriefing.ts'
-import { windIn, windUnitLabel, type Units } from '../lib/units.ts'
+import { useStationObs } from '../lib/useStationObs.ts'
+import { useSurfNow } from '../lib/useSurfNow.ts'
+import { formatTemperature, windIn, windUnitLabel, type Units } from '../lib/units.ts'
+import { gustWords, windAt, windWords } from '../lib/windNow.ts'
 
 /*
  * THE MENU (Batch H, Section 3; it replaced the side menu entirely).
@@ -35,7 +37,7 @@ import { windIn, windUnitLabel, type Units } from '../lib/units.ts'
 /** The menu reads the forecasts once it has been open this long (Batch H: not on a tap straight through). */
 export const LOOK_AFTER_MS = 800
 
-export type MenuTarget = 'today' | 'sky' | 'water' | 'drone' | 'viewfinder' | 'plan' | 'kit' | 'saved' | 'settings'
+export type MenuTarget = 'today' | 'sky' | 'water' | 'drone' | 'viewfinder' | 'plan' | 'kit' | 'saved' | 'settings' | 'weather' | 'surf' | 'wind' | 'tides' | 'setup' | 'calendar'
 
 export interface MenuRows {
   plan: string
@@ -90,119 +92,86 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
     return () => clearTimeout(t)
   }, [])
   const brief = useBriefing(venue, timeZone, now, venue !== null && looking, 'next')
-  const days = brief.days as unknown as CardDay[]
   const clock = (d: Date) => formatClock(d, timeZone)
-  const today = useMemo(() => todayCard(days, clock, timeZone), [days, timeZone]) // eslint-disable-line react-hooks/exhaustive-deps
-  const sky = useMemo(() => skyCard(days, now, clock), [days, now]) // eslint-disable-line react-hooks/exhaustive-deps
-  /* Batch K addendum B: when storms lead, the Sky card says so, with when they arrive (noted by Today; the card asks nothing itself). */
-  const note = stormNote()
-  const storms = note !== null && note.startsWith('Storms · ') ? note.slice('Storms · '.length) : null
-  /* Batch J, Section 7: the Water card everywhere, inland too, for a named surf beach: the nearest, or the one picked; its own sea and tide when it is not here. */
-  const [beach, setBeach] = useSurfBeach(venue, placeShort)
-  const [pickingBeach, setPickingBeach] = useState(false)
-  const here = sameBeach(venue, beach)
-  const beachBrief = useBriefing(here || beach === null ? null : beach.at, timeZone, now, looking && !here, 'sea')
-  const waterDay = here ? (days[0] ?? null) : ((beachBrief.days[0] as unknown as CardDay | undefined) ?? null)
-  /* Batch Pages, Section 5: the spot is said once, in the header; the beach only when it is not the spot ("Virginia Beach" twice, 9 Nov). */
-  const otherBeach = beach !== null && !here ? beach.name : null
-  const water = useMemo(() => waterCard(waterDay, now, clock, otherBeach), [waterDay, now, otherBeach]) // eslint-disable-line react-hooks/exhaustive-deps
-  /* Batch Map A2: the value is the one surf number (src/lib/useSurfNow.ts), the home's and the Surf page's, not the day's extremes. */
+  const obs = useStationObs(looking ? venue : null)
+  /* Batch Map A2: the value is the one surf number (src/lib/useSurfNow.ts), the home's and the Surf page's. */
   const surf = useSurfNow(looking ? venue : null, now, timeZone, units.distance === 'ft', placeShort)
-  /* Batch K, Section 5: the NWS's rip current risk for the beach, as a fact under the card when the surf zone forecast gives one. */
-  const rip = useCoast(beach?.at ?? null, null, 'mi', looking).coast?.rip ?? null
-  const flight = useMemo(() => droneCard(days[0] ?? null, drone?.maxWindMps ?? null, now, (mps) => `${Math.round(windIn(mps, units.wind) ?? 0)} ${windUnitLabel(units.wind)}`), [days, drone, now, units.wind])
-  const loading = brief.status === 'loading' && days.length === 0
-  const date = `${new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone }).format(now)} ${new Intl.DateTimeFormat('en-US', { day: 'numeric', timeZone }).format(now)}`
-  const pick = (t: MenuTarget, opts?: { skyTab?: 'fire' | 'now' }) => {
-    onPick(t, opts)
+  const pick = (t: MenuTarget) => {
+    onPick(t)
     onClose()
   }
-  const wait = (tone: Tone) => (loading ? 'bad' : tone)
+  const loading = brief.status === 'loading' && brief.days.length === 0
+  const wx = brief.wx
+  const at = (name: string, t: Date) => (wx === null || venue === null ? null : hourlyAt(wx, name, t))
+  const temp = (c: number | null) => formatTemperature(c, units.temperature).replace(/°[FC]$/, '°')
+  const sunUp = venue !== null && getPosition(now, venue.lat, venue.lon).altitude > -0.8
+  const cond = conditionOf(at('weather_code', now), sunUp)
+  const wind = windAt(wx, now, obs)
+  const day = brief.days[0] ?? null
+  const dayTemps = day === null ? [] : Array.from({ length: 24 }, (_, k) => at('temperature_2m', new Date(day.start.getTime() + k * 3_600_000 + 1_800_000))).filter((t): t is number => t !== null)
+  const rainHours = Array.from({ length: 8 }, (_, k) => {
+    const h = new Date(Math.floor(now.getTime() / 3_600_000) * 3_600_000 + k * 3_600_000)
+    return { at: h, mm: at('precipitation', h) }
+  })
+  const rain = rainLine(rainHours, now, timeZone)
+  /* Batch Flow, Section 8 (board D_Menu): Weather, then the home's own cards in its order (no Moon), Sky always there. */
+  const kinds = menuCardList(order, droneTools)
+  const card = (k: MenuCard): { title: string; big: string; line: string; target: MenuTarget } => {
+    if (k === 'weather') {
+      return { title: 'Weather', big: `${temp(at('temperature_2m', now))} ${cond?.word ?? ''}`.trim(), line: `H ${temp(dayTemps.length === 0 ? null : Math.max(...dayTemps))} L ${temp(dayTemps.length === 0 ? null : Math.min(...dayTemps))}${rain === null ? '' : ` · ${rain.replace(/^No rain next/, 'dry')}`}`, target: 'weather' }
+    }
+    if (k === 'sky') {
+      const past = day?.events.sunset != null && now.getTime() > day.events.sunset.getTime()
+      const d = past ? (brief.days[1] ?? null) : day
+      const read = past ? (d?.reads.sunrise ?? null) : (d?.reads.sunset ?? null)
+      const ev = past ? (d?.events.sunrise ?? null) : (d?.events.sunset ?? null)
+      const said = colorWords(read?.call ?? null)
+      return { title: 'Sky', big: said === null ? '—' : said.replace(/^./, (c) => c.toUpperCase()), line: ev == null ? '' : `${past ? 'sunrise' : 'sunset'} ${clock(ev)}`, target: 'sky' }
+    }
+    if (k === 'surf') return { title: 'Surf', big: surf.nowWords ?? '—', line: surf.away !== null ? `nearest: ${surf.away.name}` : surf.now === null ? '' : `${surf.now.tag.toLowerCase()} now`, target: 'surf' }
+    if (k === 'wind') {
+      const side = wind?.fromDeg == null ? null : windTag(wind.fromDeg, brief.facing)
+      return { title: 'Wind', big: windWords(wind, units.wind) ?? '—', line: [side === null ? null : sideWords(side), gustWords(wind, units.wind)].filter((x) => x !== null).join(' · '), target: 'wind' }
+    }
+    if (k === 'tide') {
+      const next = brief.turns.find((x) => x.at.getTime() > now.getTime()) ?? null
+      return { title: 'Tide', big: next === null ? '—' : next.kind === 'high' ? 'Rising' : 'Falling', line: next === null ? '' : `${next.kind} ${clock(next.at)}`, target: 'tides' }
+    }
+    const w = day === null ? null : day.wind.reduce<(typeof day.wind)[number] | null>((a, b) => (a === null || Math.abs(b.at.getTime() - now.getTime()) < Math.abs(a.at.getTime() - now.getTime()) ? b : a), null)
+    const tag = drone === null || w === null ? null : droneTag(w.highMps, drone.maxWindMps)
+    return { title: 'Drone', big: w?.highMps == null ? '—' : `${Math.round(windIn(w.highMps, units.wind) ?? 0)} ${windUnitLabel(units.wind)}`, line: tag === null ? 'at 400 ft' : `${tag.toLowerCase()} at 400 ft`, target: 'drone' }
+  }
 
   return (
-    <div className="menu" role="presentation">
+    <div className="menu menu--d" role="presentation">
       <nav className="menu__panel sidemenu__panel" aria-label="Stage">
         <div className="menu__head">
-          <div>
-            <p className="menu__title">Menu</p>
-            <p className="menu__where">
-              {placeShort} · {date}
-            </p>
-          </div>
+          {/* Batch Flow, Section 8: the spot once, with the weather now; a tap is the home. */}
+          <button type="button" ref={first} className="menu__spot mcard--today sidemenu__item" onClick={() => pick('today')} aria-label={`${placeShort}: the home`}>
+            <span className="menu__title sidemenu__label">{placeShort}</span>
+            <span className="menu__where num">{loading ? 'reading the forecast…' : [temp(at('temperature_2m', now)), cond?.word.toLowerCase() ?? null, wind === null ? null : `${wind.fromDeg === null ? '' : `${compass(wind.fromDeg)} `}${Math.round(windIn(wind.mps, units.wind) ?? 0)} ${windUnitLabel(units.wind)}`].filter((x) => x !== null && x !== '—').join(' · ')}</span>
+          </button>
           <button type="button" className="menu__x sidemenu__scrim" aria-label="Close the menu" onClick={onClose}>
             ×
           </button>
         </div>
 
-        <div className="menu__cards">
-          <LiveCard refTo={first} kind="today" title="Today" icon={<TodayIcon />} value={loading ? '…' : today.value} sub={loading ? 'reading the forecasts' : today.sub} tone={wait(today.tone)} onTap={() => pick('today')}>
-            <p className="mcard__line">{today.line ?? ''}</p>
-          </LiveCard>
-          {menuOrder(order).map((kind) =>
-            kind === 'sky' ? (
-              <Fragment key={kind}>
-          <LiveCard kind="sky" title="Sky" icon={<SkyIcon />} value={loading ? '…' : storms !== null ? 'Storms' : sky.value} sub={loading ? '' : (storms ?? sky.sub)} tone={wait(sky.tone)} onTap={() => pick('sky')}>
-            <div className={`mcard__strip${sky.lowDeck ? ' mcard__strip--deck' : ''}`} aria-hidden="true">
-              {sky.lowDeck || sky.strip.length === 0 ? null : <i className="mcard__clock" style={{ background: stripGradient(sky.strip) }} />}
-              {sky.peak === null ? null : <i className="mcard__peak" style={{ left: `${Math.max(0, Math.min(100, sky.peak * 100))}%` }} />}
-            </div>
-          </LiveCard>
-              </Fragment>
-            ) : kind === 'water' ? (
-              <Fragment key={kind}>
-          <div className="mcard-wrap">
-            <LiveCard kind="water" title="Water" icon={<WaterIcon />} value={loading || surf.sea.status === 'loading' ? '…' : <span data-shared="surf">{surf.nowWords ?? '—'}</span>} sub={loading ? '' : (rip?.replace(/ \(NWS .*\)$/, '') ?? water.sub)} tone={wait(water.tone)} onTap={() => pick('water')}>
-              <Bars bars={water.bars.map((b) => ({ h: b.h, now: b.now, cls: b.clean ? 'clean' : 'messy' }))} />
-            </LiveCard>
-            {otherBeach === null || beach === null ? null : (
-              <button type="button" className="mcard__beach" aria-label={`Surf beach: ${beach.name}. Pick another`} onClick={() => setPickingBeach(true)}>
-                {beach.name}
-                <svg viewBox="0 0 12 12" aria-hidden="true">
-                  <path d="M2.5 4.5L6 8l3.5-3.5" />
-                </svg>
+        <div className="menu__cards menu__cards--d">
+          {kinds.map((k) => {
+            const c = card(k)
+            return (
+              <button key={k} type="button" className={`mcard mcard--${k === 'surf' ? 'water' : k} mcard--d sidemenu__item`} onClick={() => pick(c.target)}>
+                <span className="mcard__name sidemenu__label">{c.title}</span>
+                <span className="mcard__value">{loading ? '…' : k === 'surf' ? <span data-shared="surf">{c.big}</span> : c.big}</span>
+                <span className="mcard__sub">{loading ? '' : c.line}</span>
               </button>
-            )}
-          </div>
-              </Fragment>
-            ) : (
-              <Fragment key={kind}>
-          {/* Batch K addendum, E: Preflight lives here now (the layers sheet's tile went), so the card is there with no drone in the kit too. */}
-          {!droneTools ? null : drone === null ? (
-            <LiveCard kind="drone" title="Drone" icon={<DroneIcon />} value="Preflight" sub="draw a move" tone="maybe" onTap={() => pick('drone')}>
-              {null}
-            </LiveCard>
-          ) : (
-            <LiveCard kind="drone" title="Drone" icon={<DroneIcon />} value={loading ? '…' : flight.value} sub={loading ? '' : flight.sub} tone={wait(flight.tone)} onTap={() => pick('drone')}>
-              <Bars bars={flight.bars.map((b) => ({ h: b.h, now: b.now, cls: b.over === 'over' ? 'over' : b.over === 'near' ? 'near' : 'ok' }))} limit={flight.limit} />
-            </LiveCard>
-          )}
-              </Fragment>
-            ),
-          )}
+            )
+          })}
         </div>
 
-        {!pickingBeach ? null : (
-          <SpotPicker
-            title="Surf beach"
-            saved={[]}
-            around={beach?.at ?? venue}
-            onPick={(at, label) => {
-              setBeach({ name: beachName(label), at })
-              setPickingBeach(false)
-            }}
-            onClose={() => setPickingBeach(false)}
-          />
-        )}
-
-        {/* Batch I: the Viewfinder's own row, right under the cards. */}
-        {!photoTools ? null : (
-          <div className="menu__rows">
-            <Row label="Viewfinder" value="point your phone, see the shot" icon={<KitIcon />} onTap={() => pick('viewfinder')} />
-          </div>
-        )}
-
         <div className="menu__rows">
-          <Row label="Plan" value={rows.plan} icon={<PlanIcon />} onTap={() => pick('plan')} />
+          {!photoTools ? null : <Row label="Plan a shoot" value="Shoot" icon={<PlanIcon />} onTap={() => pick('setup')} />}
+          <Row label="Calendar" value="the month" icon={<SavedIcon />} onTap={() => pick('calendar')} />
           <Row label="Kit" value={rows.kit} icon={<KitIcon />} onTap={() => pick('kit')} />
           <Row label="Saved" value={rows.saved} icon={<SavedIcon />} onTap={() => pick('saved')} />
           <Row label="Settings" value={rows.settings} icon={<GearIcon />} onTap={() => pick('settings')} />
@@ -212,41 +181,8 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
   )
 }
 
-/** The colour clock as a gradient: each minute's own colour, the unlit ones dark. */
-function stripGradient(strip: (string | null)[]): string {
-  const n = strip.length
-  const stops = strip.map((c, i) => `${c ?? 'rgb(20 24 40 / 0.6)'} ${((i / Math.max(1, n - 1)) * 100).toFixed(1)}%`)
-  return `linear-gradient(90deg, ${stops.join(', ')})`
-}
 
-function LiveCard({ kind, title, icon, value, sub, tone, onTap, children, refTo }: { kind: string; title: string; icon: ReactNode; value: ReactNode; sub: string; tone: Tone; onTap: () => void; children: ReactNode; refTo?: React.RefObject<HTMLButtonElement | null> }) {
-  return (
-    <button type="button" ref={refTo} className={`mcard mcard--${kind} mcard--${tone} sidemenu__item`} onClick={onTap}>
-      <span className="mcard__top">
-        <span className="mcard__name">
-          {icon}
-          <span className="sidemenu__label">{title}</span>
-        </span>
-        <span className="mcard__read">
-          <span className="mcard__value">{value}</span>
-          <span className="mcard__sub">{sub}</span>
-        </span>
-      </span>
-      <span className="mcard__chart">{children}</span>
-    </button>
-  )
-}
 
-function Bars({ bars, limit = null }: { bars: { h: number; now: boolean; cls: string }[]; limit?: number | null }) {
-  return (
-    <span className="mbars" aria-hidden="true">
-      {bars.map((b, i) => (
-        <i key={i} className={`mbars__bar mbars__bar--${b.cls}${b.now ? ' mbars__bar--now' : ''}`} style={{ height: `${Math.max(6, b.h * 100)}%` }} />
-      ))}
-      {limit === null ? null : <i className="mbars__limit" style={{ bottom: `${Math.min(100, limit * 100)}%` }} />}
-    </span>
-  )
-}
 
 function Row({ label, value, icon, onTap }: { label: string; value: string; icon: ReactNode; onTap: () => void }) {
   return (
@@ -267,10 +203,6 @@ const svg = (d: ReactNode) => (
     {d}
   </svg>
 )
-const TodayIcon = () => svg(<><path d="M4 18h16M7 18a5 5 0 0 1 10 0" /><path d="M12 6v3M5.6 9.6l1.8 1.8M18.4 9.6l-1.8 1.8" /></>)
-const SkyIcon = () => svg(<path d="M7 18h10a4 4 0 0 0 .4-8 6 6 0 0 0-11.6 1.5A3.3 3.3 0 0 0 7 18z" />)
-const WaterIcon = () => svg(<path d="M2 17c2.5 0 3.5-1.5 4.5-4C8 9 10.5 6 15 6c3 0 5 1.6 5 4-1.2-1-2.6-1.2-3.8-.6-1.6.8-1.7 3-.2 4.3 1.2 1 3 1.2 5 .3-1 2-3.3 3-6 3H2" />)
-const DroneIcon = () => svg(<><circle cx="5" cy="6" r="2.5" /><circle cx="19" cy="6" r="2.5" /><path d="M7 7.5l3 3h4l3-3M10 10.5v3h4v-3M12 13.5v4" /></>)
 const PlanIcon = () => svg(<><path d="M12 21s-6-5.6-6-11a6 6 0 0 1 12 0c0 5.4-6 11-6 11z" /><circle cx="12" cy="10" r="2.2" /></>)
 const KitIcon = () => svg(<><rect x="3" y="7" width="18" height="13" rx="2" /><circle cx="12" cy="13.5" r="3.5" /><path d="M8 7l1.5-2.5h5L16 7" /></>)
 const SavedIcon = () => svg(<path d="M6 3h12v18l-6-4-6 4z" />)

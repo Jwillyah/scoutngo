@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { droneLadder, fewCards, firstFun, homeLayout, nextLine, nightSpans, surfPath, tideAt, tideCurve, windAtFeet } from '../src/core/homeCards.ts'
+import { droneLadder, fewCards, firstFun, homeCardsShown, homeLayout, nextLine, nightSpans, surfPath, tideAt, tideCurve, windAtFeet } from '../src/core/homeCards.ts'
 import { beachFor, namedBeach } from '../src/lib/surfBeach.ts'
 
 /* The home in look D (Batch Flow, Section 3; boards D_Home6, D_Home2). */
@@ -92,5 +92,12 @@ describe('a named beach is its own beach (field 9 Nov: "Sandbridge" said "Neares
   it('a name far from that beach, or no name, is the nearest beach as before', () => {
     expect(namedBeach({ lat: 38.3, lon: -75.1 }, 'Sandbridge')).toBeNull()
     expect(namedBeach({ lat: 36.705, lon: -75.985 }, null)).toBeNull()
+  })
+})
+
+describe('the cards the home shows, which the menu lists (Batch Flow, Section 8)', () => {
+  it('few: surf alone is surf, wind, tide; many: the six', () => {
+    expect(homeCardsShown('few', ['surf'], true)).toEqual(['surf', 'wind', 'tide'])
+    expect(homeCardsShown('many', ['surf', 'shoot', 'drone', 'fish'], true)).toContain('drone')
   })
 })

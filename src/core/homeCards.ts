@@ -15,7 +15,7 @@
  *   next     one line under the cards: "surf from 7 AM · drone calm from
  *            6:30 AM"
  */
-import type { Activity, CardKind } from './homeDay.ts'
+import { cardList, type Activity, type CardKind } from './homeDay.ts'
 
 export type HomeLayout = 'few' | 'many'
 
@@ -34,6 +34,12 @@ export function fewCards(order: readonly Activity[], drone: boolean): CardKind[]
   for (const a of order) add(own[a][0])
   for (const a of order) for (const c of own[a].slice(1)) add(c)
   return list.slice(0, 3)
+}
+
+/** The cards the home shows, in its order: few (fewCards) or many (cardList). The menu lists the same (Batch Flow, Section 8). `order` is the activities in the home's order (src/lib/activities.ts homeOrder). */
+export function homeCardsShown(layout: HomeLayout, order: readonly Activity[], droneInKit: boolean): CardKind[] {
+  const drone = droneInKit || order.includes('drone')
+  return layout === 'few' ? fewCards(order, drone) : cardList(order, drone)
 }
 
 /* ---------------------------------------------------------------- surf */

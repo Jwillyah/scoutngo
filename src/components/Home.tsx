@@ -5,7 +5,7 @@ import { getMoonPosition, getPosition } from 'suncalc'
 import { moonTimesOnLocalDay } from '../core/moonTimes.ts'
 import { droneTag, kt, surfTag, windTag, type CallRead } from '../core/briefing.ts'
 import { droneWindow } from '../core/droneWindow.ts'
-import { bestRun, bestWindows, cardList, colorWords, conditionOf, groundOf, sideWords, nothingLine, rainLine, spanWords, stripSteps, weekHeadline, type Activity, type CardKind, type WindowRow } from '../core/homeDay.ts'
+import { bestRun, bestWindows, colorWords, conditionOf, groundOf, sideWords, nothingLine, rainLine, spanWords, stripSteps, weekHeadline, type Activity, type CardKind, type WindowRow } from '../core/homeDay.ts'
 import { camsFacingWaterOrSun } from '../core/skyCams.ts'
 import { wakeAt } from '../core/alertIcs.ts'
 import { formatClock } from '../core/timezone.ts'
@@ -13,7 +13,7 @@ import { COAST_CAMS } from '../data/coastCams.ts'
 import { homeOrder, primaryFor, useActivities } from '../lib/activities.ts'
 import { surfLine, useSurfNow, type SurfNow } from '../lib/useSurfNow.ts'
 import { forecastParts, rangeSizeWords } from '../core/surfReads.ts'
-import { droneLadder, fewCards, firstFun, homeLayout, nextLine, nightSpans, surfPath, tideAt, tideCurve, type HomeLayout } from '../core/homeCards.ts'
+import { droneLadder, firstFun, homeCardsShown, homeLayout, nextLine, nightSpans, surfPath, tideAt, tideCurve, type HomeLayout } from '../core/homeCards.ts'
 import { beachName } from '../lib/surfBeach.ts'
 import { gustWords, windAt, windWords } from '../lib/windNow.ts'
 import { useStationObs } from '../lib/useStationObs.ts'
@@ -284,7 +284,6 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
   /* Batch N E2: no forecast is not "nothing standout": it says so, and that it is asking again. */
   const noForecast = !loading && (wx === null || day === null || day.wind.every((w) => w.mps === null))
   const nextGood = useMemo(() => nextGoodDay(brief.days, which === 'today' ? 1 : 2, timeZone), [brief.days, which, timeZone])
-  const cards = cardList(order, drone !== null || order.includes('drone'))
   const sunAz = day?.events.sunset === null || day === null ? null : getPosition(day.events.sunset, venue.lat, venue.lon).azimuth
   const cams = which === 'today' ? camsFacingWaterOrSun(venue, sunAz, brief.facing, COAST_CAMS) : []
   const [camsOpen, setCamsOpen] = useState(false)
@@ -296,7 +295,7 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
   const soon = which !== 'today' ? null : [day?.events.sunrise ?? null, day?.events.sunset ?? null, brief.days[1]?.events.sunrise ?? null].find((t): t is Date => t !== null && t.getTime() > now.getTime() && t.getTime() - now.getTime() <= 3 * 3_600_000) ?? null
   const soonWord = soon === null ? null : `${soon === day?.events.sunset ? 'sunset' : 'sunrise'} ${clock(soon)}`
   const nextWords = nextLine(rows.filter((r) => r.from !== undefined).map((r) => ({ what: NEXT_WORD[r.activity], from: r.from as Date })), now, (d) => clock(d))
-  const shown = layout === 'few' ? fewCards(order, drone !== null || order.includes('drone')) : cards
+  const shown = homeCardsShown(layout, order, drone !== null)
   void rain
   void steps
   void speed

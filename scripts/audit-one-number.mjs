@@ -11,7 +11,7 @@
  * for the same thing, or when a screen that should show one shows none (no
  * comparison is not a pass).
  *
- *   surf   home Today card · menu Water card · Surf page headline
+ *   surf   home Today card · menu Surf card · Surf page headline
  *   wind   home Today card · Wind page headline
  */
 import { mkdirSync } from 'node:fs'

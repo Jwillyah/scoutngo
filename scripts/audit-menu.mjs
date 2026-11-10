@@ -7,9 +7,16 @@
  * weather host answered by the gate's fixtures.
  *
  *   fits       390 x 844, nothing scrolled, nothing below or off the side
- *   cards      Today, Sky, Water, Drone (a drone is in the kit), each about
- *              88 px, a value and a line; rows Plan, Kit, Saved, Settings
- *   doors      Today opens the briefing; Sky opens the Sky card
+ *   header     the spot once, then temperature · condition · wind (Batch
+ *              Flow, Section 8; board D_Menu); a tap is the home
+ *   cards      Weather, then the home's cards in its order, Sky always
+ *              (nothing picked, a drone in the kit: Weather, Surf, Wind,
+ *              Tide, Sky, Drone), each a value; rows Plan a shoot (only with
+ *              Shoot picked), Calendar, Kit, Saved, Settings
+ *   surf only  a fourth pass with Surf alone picked (the drone still in
+ *              the kit): the home's three, Surf, Drone, Wind, after Weather
+ *              and Sky, and no Plan a shoot
+ *   doors      the header opens the home; Sky opens the Sky page
  *   colour     never the hazard red
  */
 import { mkdirSync } from 'node:fs'
@@ -40,12 +47,13 @@ const fail = (why) => {
 
 const browser = await webkit.launch()
 try {
-  for (const [label, insets, height] of [['browser', { top: 0, bottom: 0 }, 844], ['standalone', { top: 47, bottom: 34 }, 844], ['short tab', { top: 0, bottom: 0 }, 664]]) {
+  for (const [label, insets, height, picked] of [['browser', { top: 0, bottom: 0 }, 844, null], ['standalone', { top: 47, bottom: 34 }, 844, null], ['short tab', { top: 0, bottom: 0 }, 664, null], ['surf only', { top: 0, bottom: 0 }, 844, ['surf']]]) {
     console.log(`\n### ${label}`)
     const ctx = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height } })
-    await ctx.addInitScript(([top, bottom]) => {
+    await ctx.addInitScript(([top, bottom, picked]) => {
       try {
         localStorage.setItem('scoutngo.landing.v1', 'true')
+        if (picked !== null) localStorage.setItem('scoutngo.activities.v1', JSON.stringify(picked))
       } catch {
         /* about:blank */
       }
@@ -56,7 +64,7 @@ try {
       }
       if (document.head) add()
       else document.addEventListener('DOMContentLoaded', add)
-    }, [insets.top, insets.bottom])
+    }, [insets.top, insets.bottom, picked])
     const page = await ctx.newPage()
     await page.clock.install({ time: new Date('2026-11-02T11:11:00Z') })
     await page.clock.resume()
@@ -73,9 +81,9 @@ try {
       const nav = document.querySelector('nav[aria-label="Stage"]')
       if (!nav) return { missing: true }
       const out = [...nav.querySelectorAll('*')].filter((e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0 && (b.bottom > innerHeight + 1 || b.right > innerWidth + 1 || b.left < -1) }).map((e) => (e.getAttribute('class') ?? e.tagName) + ' ' + Math.round(e.getBoundingClientRect().bottom)).slice(0, 4)
-      const cards = [...nav.querySelectorAll('.mcard')].map((c) => ({ name: c.querySelector('.sidemenu__label')?.textContent, h: Math.round(c.getBoundingClientRect().height), value: c.querySelector('.mcard__value')?.textContent, bg: getComputedStyle(c).backgroundImage }))
+      const cards = [...nav.querySelectorAll('.mcard:not(.menu__spot)')].map((c) => ({ name: c.querySelector('.sidemenu__label')?.textContent, h: Math.round(c.getBoundingClientRect().height), value: c.querySelector('.mcard__value')?.textContent, bg: getComputedStyle(c).backgroundImage }))
       const rows = [...nav.querySelectorAll('.mrow')].map((r) => ({ name: r.querySelector('.sidemenu__label')?.textContent, value: r.querySelector('.mrow__value')?.textContent, h: Math.round(r.getBoundingClientRect().height) }))
-      return { out, scrolls: nav.scrollHeight > nav.clientHeight + 1, cards, rows, where: document.querySelector('.menu__where')?.textContent, chip: nav.querySelector('.mcard__beach')?.textContent ?? null, text: nav.innerText }
+      return { out, scrolls: nav.scrollHeight > nav.clientHeight + 1, cards, rows, where: document.querySelector('.menu__where')?.textContent, spot: document.querySelector('.menu__spot .menu__title')?.textContent ?? '', chip: nav.querySelector('.mcard__beach')?.textContent ?? null, text: nav.innerText }
     })())`))
     if (m.missing) {
       fail(`${label}: the menu opened no Stage nav`)
@@ -87,26 +95,33 @@ try {
     if (m.scrolls) fail(`${label}: the menu scrolls`)
     for (const o of m.out) fail(`${label}: ${o} runs off the screen`)
     const names = m.cards.map((c) => c.name)
-    /* Batch Pages, Section 5: Today, then the home's order (nothing picked, a drone in the kit: Surf, Wind, Tide, Sky, Moon, Drone, so Water, Sky, Drone). */
-    if (JSON.stringify(names) !== JSON.stringify(['Today', 'Water', 'Sky', 'Drone'])) fail(`${label}: the cards are ${JSON.stringify(names)}, not the home's order`)
+    /* Batch Flow, Section 8: Weather, then the home's order (nothing picked, a drone in the kit: Surf, Wind, Tide, Sky, Moon, Drone; no Moon here); Sky always. */
+    /* Surf picked, the Air 3S in the kit: the home shows Surf, Drone, Wind (src/core/homeCards.ts homeCardsShown), so the menu does, with Weather and Sky. */
+    const wantCards = picked === null ? ['Weather', 'Surf', 'Wind', 'Tide', 'Sky', 'Drone'] : ['Weather', 'Sky', 'Surf', 'Drone', 'Wind']
+    if (JSON.stringify(names) !== JSON.stringify(wantCards)) fail(`${label}: the cards are ${JSON.stringify(names)}, not ${JSON.stringify(wantCards)}`)
+    /* The header: the spot, then temperature · condition · wind. */
+    console.log(`  header: ${JSON.stringify(m.spot)} / ${JSON.stringify(m.where)}`)
+    if (!m.spot) fail(`${label}: the header has no spot`)
+    if (!/^-?\d+° · [a-z][a-z ]* · ([NESW]{1,3} )?\d+ (kt|mph|km\/h|m\/s)$/.test(m.where ?? '')) fail(`${label}: the header reads ${JSON.stringify(m.where)}, not temperature · condition · wind`)
     /* The spot once (9 Nov: "Virginia Beach" in the header and on the Water card's chip): the beach chip only when it is another place. */
-    const spot = (m.where ?? '').split(' · ')[0]
+    const spot = (m.spot ?? '').trim()
     if (m.chip !== null && spot !== '' && m.chip.trim() === spot) fail(`${label}: the Water card's chip repeats the spot (${JSON.stringify(m.chip)})`)
     const times = spot === '' ? 0 : m.text.split(spot).length - 1
     console.log(`  the spot ${JSON.stringify(spot)} said ${times} times; chip ${JSON.stringify(m.chip)}`)
     if (times > 1) fail(`${label}: the menu says ${JSON.stringify(spot)} ${times} times`)
     for (const c of m.cards) {
-      if (c.h < 76 || c.h > 112) fail(`${label}: the ${c.name} card is ${c.h} px, not about 88`)
+      if (c.h < 44) fail(`${label}: the ${c.name} card is ${c.h} px, under a 44 px target`)
       if (!c.value) fail(`${label}: the ${c.name} card has no value`)
       if (/255,\s*59,\s*48/.test(c.bg)) fail(`${label}: the ${c.name} card is the hazard red`)
     }
-    if (JSON.stringify(m.rows.map((r) => r.name)) !== JSON.stringify(['Viewfinder', 'Plan', 'Kit', 'Saved', 'Settings'])) fail(`${label}: the rows are ${JSON.stringify(m.rows.map((r) => r.name))}`)
+    const wantRows = picked === null ? ['Plan a shoot', 'Calendar', 'Kit', 'Saved', 'Settings'] : ['Calendar', 'Kit', 'Saved', 'Settings']
+    if (JSON.stringify(m.rows.map((r) => r.name)) !== JSON.stringify(wantRows)) fail(`${label}: the rows are ${JSON.stringify(m.rows.map((r) => r.name))}`)
     for (const r of m.rows) if (r.h < 44) fail(`${label}: the ${r.name} row is ${r.h} px, under a 44 px target`)
     await page.screenshot({ path: join(OUT, `menu-${label}.png`) })
 
-    await page.locator('.mcard--today').click()
+    await page.locator('.menu__spot').click()
     await wait(1500)
-    if (!(await ev(`!!document.querySelector('.home')`))) fail(`${label}: the Today card opened no home`)
+    if (!(await ev(`!!document.querySelector('.home')`))) fail(`${label}: the header opened no home`)
     /* Batch M: the home has no ×; its round Map button goes to the map. */
     await ev(`document.querySelector('.home .hbtn--round[aria-label="Open the map"]')?.click()`)
     await wait(500)

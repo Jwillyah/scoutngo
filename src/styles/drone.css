@@ -139,7 +139,7 @@
   background: var(--d-surf);
 }
 .drp__seg--day {
-  background: #8ec1f0;
+  background: var(--d-day-bar);
 }
 .drp__thumb {
   position: absolute;
