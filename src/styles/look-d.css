@@ -287,3 +287,28 @@
   font-size: var(--text-xl);
   font-weight: var(--weight-medium);
 }
+
+/* Words on the open sky at full white: at 80-85% the date and the "Next:" line were 3.5-3.9:1 on the day and fog skies (Batch QA, Section 6; scripts/audit-a11y.mjs). */
+.home .hwx--d .hwx__date,
+.home .hday--d .hwx__date,
+.home .hnext {
+  color: var(--white);
+}
+/* A good tag (Fun now, Go): white on the teal was 2.6:1; the ink of the night sky is 7:1 and more on it (Batch QA, Section 6). */
+.hday--d .hcard__tag--good {
+  color: var(--d-night-top);
+}
+/* At the largest text a tag wraps inside its card rather than running off the screen (Batch QA, Section 6). */
+.hday--d .hcard__tag {
+  white-space: normal;
+  max-width: 100%;
+}
+/* The "Next:" line on the glass of a card: over the golden sky's glow it was 4.5:1 to the hundredth (Batch QA, Section 6). */
+.home .hnext {
+  background: var(--d-card);
+  border-radius: 999px;
+  padding: 4px 12px;
+  justify-self: center;
+  width: fit-content;
+  margin-inline: auto;
+}

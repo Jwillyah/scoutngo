@@ -504,7 +504,7 @@
   --d-rain-top: #222a38;
   --d-rain-low: #3a4352;
   --d-fog-top: #4e5865;
-  --d-fog-low: #707884;
+  --d-fog-low: #6b7480; /* 4.7:1 under white (Batch QA, Section 6: was #707884, 4.3:1) */
   --d-card: rgb(20 24 60 / 0.28); /* #14183c */
   --d-card-solid: #14183c;
   --d-edge: rgb(255 255 255 / 0.14);

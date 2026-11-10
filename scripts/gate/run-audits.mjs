@@ -59,6 +59,8 @@ export const AUDITS = [
   { name: 'map labels', script: 'audit-map-labels.mjs', summary: /MAP LABELS PROBLEMS/ },
   { name: 'line up', script: 'audit-lineup.mjs', summary: /LINE UP PROBLEMS/ },
   { name: 'privacy', script: 'audit-privacy.mjs', summary: /PRIVACY PROBLEMS/ },
+  { name: 'what leaves', script: 'audit-leaves.mjs', summary: /LEAVES PROBLEMS/ },
+  { name: 'a11y', script: 'audit-a11y.mjs', summary: /A11Y PROBLEMS/ },
   { name: 'wind', script: 'audit-wind.mjs', summary: /WIND PROBLEMS/ },
   { name: 'map layers', script: 'audit-map-layers.mjs', summary: /MAP LAYERS PROBLEMS/ },
   { name: 'weather', script: 'audit-weather.mjs', summary: /WEATHER PROBLEMS/ },
