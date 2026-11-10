@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { droneLadder, fewCards, firstFun, homeCardsShown, homeLayout, nextLine, nightSpans, surfPath, tideAt, tideCurve, windAtFeet } from '../src/core/homeCards.ts'
-import { beachFor, namedBeach } from '../src/lib/surfBeach.ts'
+import { awayFrom, beachFor, namedBeach } from '../src/lib/surfBeach.ts'
 
 /* The home in look D (Batch Flow, Section 3; boards D_Home6, D_Home2). */
 const T0 = new Date('2026-11-09T23:00:00Z')
@@ -97,11 +97,42 @@ describe('a named beach is its own beach (field 9 Nov: "Sandbridge" said "Neares
 
 describe('the cards the home shows, which the menu lists (Batch Flow, Section 8)', () => {
   it('few: surf alone is surf, wind, tide; many: the six', () => {
-    expect(homeCardsShown(['surf'], ['surf', 'drone'], true)).toEqual(['surf', 'drone', 'wind'])
+    /* Batch QA, Section 0B: a drone in the kit is not Drone picked. */
+    expect(homeCardsShown(['surf'], ['surf', 'drone'], true)).toEqual(['surf', 'wind', 'tide'])
     expect(homeCardsShown(['surf', 'shoot', 'drone', 'fish'], ['surf', 'shoot', 'drone', 'fish'], true)).toContain('drone')
+  })
+  it('picked: no Drone unless Drone is, no Tide unless Surf or Fish is (Batch QA, Section 0B, "Just weather")', () => {
+    expect(homeCardsShown(['weather'], ['weather', 'drone'], true)).toEqual(['wind'])
+    expect(homeCardsShown(['weather', 'drone'], ['weather', 'drone'], true)).toEqual(['wind', 'drone'])
+    expect(homeCardsShown(['fish'], ['fish'], false)).toEqual(['wind', 'tide'])
+    expect(homeCardsShown(['shoot', 'weather', 'surf', 'fish'], ['shoot', 'weather', 'surf', 'fish', 'drone'], true)).not.toContain('drone')
   })
   it('nothing picked: Surf, Wind, Tide, Sky, Drone, Moon, the Moon last (Batch QA, Section 0)', () => {
     expect(homeCardsShown(null, ['surf', 'shoot', 'fish', 'weather', 'drone'], true)).toEqual(['surf', 'wind', 'tide', 'sky', 'drone', 'moon'])
     expect(homeCardsShown([], ['surf', 'shoot', 'fish', 'weather'], false)).toEqual(['surf', 'wind', 'tide', 'sky', 'moon'])
+  })
+})
+
+describe('a spot on a beach is on that beach (Batch QA, Section 0B, field 10 Nov)', () => {
+  const pier = { lat: 36.8435575, lon: -75.9713104 }
+  const northEnd = { name: 'Virginia Beach', at: { lat: 36.88, lon: -75.981 } }
+  it('the pier, with North End picked elsewhere: the pier’s own beach, never "Nearest surf"', () => {
+    const b = beachFor(pier, northEnd, 'Virginia Beach Fishing Pier')
+    expect(b?.name).toBe('Virginia Beach Pier')
+    expect(awayFrom(pier, b, 'Virginia Beach Fishing Pier')).toBe(false)
+  })
+  it('inland, a pick still holds, and is away', () => {
+    const inland = { lat: 36.78, lon: -76.1 }
+    expect(beachFor(inland, northEnd, null)?.name).toBe('Virginia Beach')
+    expect(awayFrom(inland, northEnd, null)).toBe(true)
+  })
+})
+
+describe('a drone in the kit is not Drone picked (Batch QA, Section 0B)', () => {
+  it('nothing picked: the kit drone joins; picked: only when Drone was', async () => {
+    const { homeOrder } = await import('../src/lib/activities.ts')
+    expect(homeOrder(null, true)).toContain('drone')
+    expect(homeOrder(['weather'], true)).toEqual(['weather'])
+    expect(homeOrder(['weather', 'drone'], true)).toEqual(['weather', 'drone'])
   })
 })

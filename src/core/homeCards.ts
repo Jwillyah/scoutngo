@@ -45,7 +45,17 @@ export function fewCards(order: readonly Activity[], drone: boolean): CardKind[]
 export function homeCardsShown(picked: readonly Activity[] | null, order: readonly Activity[], droneInKit: boolean): CardKind[] {
   const drone = droneInKit || order.includes('drone')
   if (picked === null || picked.length === 0) return cardList(['surf'], drone)
-  return homeLayout(picked) === 'few' ? fewCards(order, drone) : cardList(order, drone)
+  /*
+   * Picked (Batch QA, Section 0B; field 10 Nov: "Just weather" showed Wind,
+   * Drone and Tide): the Drone card only with Drone picked, the Tide card only
+   * with Surf or Fish. The rest of the six fill in only past what was picked
+   * when the layout is the six.
+   */
+  const flies = picked.includes('drone')
+  const own = order.filter((a) => a !== 'drone' || flies)
+  const keep = (c: CardKind) => c !== 'tide' || picked.includes('surf') || picked.includes('fish')
+  void drone
+  return (homeLayout(picked) === 'few' ? fewCards(own, flies) : cardList(own, flies)).filter(keep)
 }
 
 /* ---------------------------------------------------------------- surf */

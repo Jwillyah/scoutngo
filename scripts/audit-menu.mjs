@@ -96,8 +96,8 @@ try {
     for (const o of m.out) fail(`${label}: ${o} runs off the screen`)
     const names = m.cards.map((c) => c.name)
     /* Batch Flow, Section 8: Weather, then the home's order (nothing picked, a drone in the kit: Surf, Wind, Tide, Sky, Moon, Drone; no Moon here); Sky always. */
-    /* Surf picked, the Air 3S in the kit: the home shows Surf, Drone, Wind (src/core/homeCards.ts homeCardsShown), so the menu does, with Weather and Sky. */
-    const wantCards = picked === null ? ['Weather', 'Surf', 'Wind', 'Tide', 'Sky', 'Drone'] : ['Weather', 'Sky', 'Surf', 'Drone', 'Wind']
+    /* Surf picked, the Air 3S in the kit: the home shows Surf, Wind, Tide (a kit drone is not Drone picked: Batch QA, Section 0B), so the menu does, with Weather and Sky, and the Drone card last (drone tools on: the kit's drone). */
+    const wantCards = picked === null ? ['Weather', 'Surf', 'Wind', 'Tide', 'Sky', 'Drone'] : ['Weather', 'Sky', 'Surf', 'Wind', 'Tide', 'Drone']
     if (JSON.stringify(names) !== JSON.stringify(wantCards)) fail(`${label}: the cards are ${JSON.stringify(names)}, not ${JSON.stringify(wantCards)}`)
     /* The header: the spot, then temperature · condition · wind. */
     console.log(`  header: ${JSON.stringify(m.spot)} / ${JSON.stringify(m.where)}`)

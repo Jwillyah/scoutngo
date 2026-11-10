@@ -7,9 +7,7 @@ import { distanceMeters } from '../core/geo.ts'
 import { BAND_FLOOR_FT, skillLine, UNTESTED_ERROR_FT, type SkillSample, type SpotStats } from '../core/spotSkill.ts'
 import { BUOY_MATCH_FT, buoyVsForecast, camDistance, chartTopFt, cleanRuns, rangeWords, SURF_SPREAD_SOURCE } from '../core/surfRange.ts'
 import { bestWindow, faceLight, type FaceLight } from '../core/surfShoot.ts'
-import { buoyParts, forecastParts, partWords, periodRead, rangeSizeWords } from '../core/surfReads.ts'
-import { halfHour } from '../lib/windNow.ts'
-import { hourlyAt } from '../lib/tideSheetData.ts'
+import { buoyParts, partWords, rangeSizeWords } from '../core/surfReads.ts'
 import { SURF_FIRING_FT, SURF_FUN_FT } from '../core/briefing.ts'
 import { formatClock, formatShortHour, zonedTimeToUtc } from '../core/timezone.ts'
 import { COAST_CAMS } from '../data/coastCams.ts'
@@ -18,7 +16,7 @@ import { buoyFaceFt } from '../core/spotSkill.ts'
 import type { BuoyReading } from '../lib/buoy.ts'
 import type { DetailId } from '../lib/detailTabs.ts'
 import { readSkillBook } from '../lib/spotSkillStore.ts'
-import { surfNowFrom, surfWords, useSurfNow } from '../lib/useSurfNow.ts'
+import { seaNow, surfNowFrom, surfWords, useSurfNow } from '../lib/useSurfNow.ts'
 import { spotKey } from '../core/spotSkill.ts'
 import { buoyDots, FIRST_HOUR, LAST_HOUR, dayHours, rangeHourAt, weekPeaks, type BuoyDot, type RangeHour } from '../lib/surfPageData.ts'
 import { compass, metresToFeet } from '../lib/tideWords.ts'
@@ -129,11 +127,10 @@ export function SurfBody({ now, timeZone, spot, spotName, away, sea, stats, kept
   const hours = useMemo(() => (marine === null ? [] : dayHours(marine, wind, today, timeZone, facing, stats)), [marine, wind, today, timeZone, facing, stats])
   const week = useMemo(() => (marine === null ? [] : weekPeaks(marine, wind, today, timeZone, facing, stats)), [marine, wind, today, timeZone, facing, stats])
   const head = useMemo(() => surfNowFrom(sea, stats, now, timeZone).now, [sea, stats, now, timeZone])
-  /* Batch MAP2, Section 1: the dominant period (the buoy's when fresh), and the sea in its parts at this hour. */
-  const half = halfHour(now)
-  const fresh = sea.buoy !== null && sea.buoy.status === 'ok' && Math.abs(now.getTime() - sea.buoy.at.getTime()) <= 2 * 3_600_000
-  const period = head === null ? null : periodRead(sea.buoy?.status === 'ok' ? sea.buoy.periodS : null, fresh, marine === null ? null : hourlyAt(marine, 'swell_wave_peak_period', half), head.periodS, sea.buoy?.status === 'ok' ? sea.buoy.buoy.id : null)
-  const parts = marine === null ? [] : forecastParts((n) => hourlyAt(marine, n, half))
+  /* Batch QA, Section 0B: the period and the parts from one source (src/lib/useSurfNow.ts seaNow), the buoy card's own when the buoy is fresh. */
+  const now0 = seaNow(sea, now, head?.periodS ?? null)
+  const period = head === null ? null : now0.period
+  const parts = now0.parts
   const partTop = Math.max(1, ...parts.slice(0, 2).map((p) => p.ft))
   const place = (
     <p className="dsurf__place">

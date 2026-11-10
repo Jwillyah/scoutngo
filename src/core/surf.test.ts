@@ -39,6 +39,7 @@ describe('swell at an angle, and the words', () => {
     expect(surfShape(7, 270, 78)).toBe('Clean')
     expect(surfShape(7, 90, 78)).toBe('Messy')
     expect(surfShape(7, 0, 78)).toBe('Bumpy')
-    expect(surfEstimate(0.6, 11.8, 90, 78).size).toBe('Fun')
+    /* 0.6 m (2 ft) at 11.8 s: Komar says 3.3 ft; capped at the 2 ft it came from (Batch QA, Section 0B), Small. */
+    expect(surfEstimate(0.6, 11.8, 90, 78).size).toBe('Small')
   })
 })

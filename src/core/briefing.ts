@@ -199,7 +199,7 @@ export function colorTag(v: FireVerdict | null): ColorTag | null {
 
 /* ------------------------------------------------------------------- surf */
 
-export type SurfTag = 'Flat' | 'Fun' | 'Firing'
+export { surfTag, surfOn, SURF_TAGS, SURF_SMALL_FT, SURF_FUN_FT, SURF_FIRING_FT, type SurfTag } from './surf.ts'
 export interface SurfBar {
   at: Date
   faceFt: number
@@ -209,28 +209,6 @@ export interface SurfBar {
   shape: SurfShape | null
 }
 
-/*
- * THE SURF TAG SCALE, the one place it is decided (Batch M, Section 4: 0-1 ft,
- * ankle to knee, was tagged Fun on 8 Nov).
- *
- *   Flat     faces under SURF_FUN_FT, 1.5 ft: under knee high.
- *   Fun      SURF_FUN_FT to SURF_FIRING_FT (1.5 to 4 ft), clean or light wind.
- *   Firing   SURF_FIRING_FT, 4 ft, and up, and clean.
- *   Messy onshore drops one step: Firing to Fun, Fun to Flat.
- *
- * Clean and messy are surfShape's (src/core/surf.ts), the Surf page's own:
- * Clean is light wind under GLASSY_MPS (5 kt) or offshore; Messy is onshore at
- * MESSY_ONSHORE_MPS (10 kt) or more. Between (Bumpy), or with no wind
- * forecast, the size stands but is never called Firing on a guess.
- */
-export const SURF_FUN_FT = 1.5
-export const SURF_FIRING_FT = 4
-
-export function surfTag(faceFt: number, shape: SurfShape | null): SurfTag {
-  const size = faceFt < SURF_FUN_FT ? 0 : faceFt < SURF_FIRING_FT ? 1 : 2
-  const step = shape === 'Messy' ? Math.max(0, size - 1) : shape === 'Clean' ? size : Math.min(size, 1)
-  return (['Flat', 'Fun', 'Firing'] as const)[step]
-}
 
 /**
  * "2–3 ft, knee to waist, 9 s": the day's faces low to high, the size words

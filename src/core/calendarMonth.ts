@@ -31,7 +31,7 @@ import { LOW_NEAR_SUNRISE_MIN } from './glassMornings.ts'
 import { moonTimesOnLocalDay } from './moonTimes.ts'
 import { showerEventsBetween } from './skyEvents.ts'
 import { horizonCrossing, sunAboveHorizon, sunriseOn } from './sunrise.ts'
-import { surfSize } from './surf.ts'
+import { surfOn, surfShape, surfTag } from './surf.ts'
 import { zonedTimeToUtc } from './timezone.ts'
 
 export const MOON_NEAR_SUN_MIN = 45
@@ -195,7 +195,8 @@ export function calendarMonth(input: CalendarInput): CalendarDay[] {
     if (lowNearSunrise !== null) marks.push('tide-rise')
     if (lowNearSunset !== null) marks.push('tide-set')
     const surfFt = forecast && sunrise !== null && input.facing !== null ? input.surfFtAt(sunrise) : null
-    if (surfFt !== null && ['Fun', 'Solid', 'Big'].includes(surfSize(surfFt))) marks.push('surf')
+    /* The one scale (src/core/surf.ts surfTag): Fun or better at sunrise, with the wind then (Batch QA, Section 0B). */
+    if (surfFt !== null && surfOn(surfTag(surfFt, windRise === null ? null : surfShape(windRise.speedMps, windRise.fromDeg, input.facing)))) marks.push('surf')
     if (input.milkyDates.has(date)) marks.push('milky')
     const shower = showers.find((s) => {
       const e = s.eveningOf

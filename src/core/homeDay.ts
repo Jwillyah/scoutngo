@@ -9,6 +9,8 @@
  */
 import { getTimes } from 'suncalc'
 import { formatClock, formatShortHour } from './timezone.ts'
+import { surfOn, surfTag, type SurfShape } from './surf.ts'
+import { rangeEnds } from './surfRange.ts'
 
 const HOUR = 3_600_000
 
@@ -150,6 +152,29 @@ export function bestWindows(picked: readonly Activity[], rows: Partial<Record<Ac
 /** When nothing qualifies: "Nothing standout today · Tue sunset looks good", or the first half alone. */
 export function nothingLine(day: 'today' | 'tomorrow', nextGood: { day: string; what: string } | null): string {
   return `Nothing standout ${day}${nextGood === null ? '' : ` · ${nextGood.day} ${nextGood.what} looks good`}`
+}
+
+/*
+ * A WEEK DAY'S SURF (Batch QA, Section 0B; field 10 Nov: "Best this week: Wed
+ * surf · Fri surf" and "Surf" on every day while the swell faded). Days 1-3
+ * say "Surf" only when the day's peak hour is Fun or Firing on the one scale
+ * (src/core/surf.ts surfTag), else the day's range; days 4-7 (index 3 and
+ * on) never say Fun: the range and the odds, the share of the day's hours the
+ * scale calls Fun or better. Facts, never a promise.
+ */
+export const WEEK_SURE_DAYS = 3
+export type SurfOdds = 'good odds' | 'some odds' | 'low odds'
+export function weekSurf(bars: readonly { faceFt: number; shape: SurfShape | null }[], dayIndex: number): { on: boolean; words: string | null } {
+  if (bars.length === 0) return { on: false, words: null }
+  const lo = Math.min(...bars.map((b) => b.faceFt))
+  const hi = Math.max(...bars.map((b) => b.faceFt))
+  const [a, b] = rangeEnds(lo, hi)
+  const range = `${a}–${b} ft`
+  const onShare = bars.filter((x) => surfOn(surfTag(x.faceFt, x.shape))).length / bars.length
+  if (dayIndex >= WEEK_SURE_DAYS) return { on: false, words: `${range} · ${onShare >= 0.5 ? 'good odds' : onShare > 0 ? 'some odds' : 'low odds'}` }
+  const peak = bars.reduce((m, x) => (x.faceFt > m.faceFt ? x : m))
+  const on = surfOn(surfTag(peak.faceFt, peak.shape))
+  return { on, words: on ? null : range }
 }
 
 /** "Best this week: Mon sunset · Thu surf", or null when nothing in the week stands out. */

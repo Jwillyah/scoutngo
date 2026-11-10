@@ -59,6 +59,46 @@ export function surfSize(faceFt: number): SurfSize {
   return 'Big'
 }
 
+/*
+ * THE SURF TAG SCALE, the one place it is decided (Batch QA, Section 0B;
+ * field 10 Nov 6:52 AM, VB Pier: "2–4 ft · FUN · bumpy, onshore" while the cam
+ * showed thigh to waist with onshore texture). Size first, from the faces:
+ *
+ *   Flat      under SURF_SMALL_FT, 1.5 ft: under knee high
+ *   Small     SURF_SMALL_FT to SURF_FUN_FT, 1.5 to 2.5 ft: knee to thigh
+ *   Fun       SURF_FUN_FT to SURF_FIRING_FT, 2.5 to 4 ft: waist and up
+ *   Firing    SURF_FIRING_FT, 4 ft, and up
+ *
+ * Then the wind on the water (surfShape): Fun and Firing need it Clean (light
+ * or offshore). Bumpy, or no wind forecast, drops one step; Messy drops two:
+ *
+ *   Firing   Clean Firing · Bumpy Fun · Messy Rideable
+ *   Fun      Clean Fun · Bumpy Rideable · Messy Small
+ *   Small    Clean or Bumpy Small · Messy Flat
+ *   Flat     Flat
+ *
+ * Rideable is only ever a surfable size the wind has spoiled. The tag reads
+ * the same shape as the line beside it ("bumpy, onshore"), so it can never
+ * contradict it.
+ */
+export type SurfTag = 'Flat' | 'Small' | 'Rideable' | 'Fun' | 'Firing'
+export const SURF_TAGS: readonly SurfTag[] = ['Flat', 'Small', 'Rideable', 'Fun', 'Firing']
+export const SURF_SMALL_FT = 1.5
+export const SURF_FUN_FT = 2.5
+export const SURF_FIRING_FT = 4
+
+export function surfTag(faceFt: number, shape: SurfShape | null): SurfTag {
+  const size: SurfTag = faceFt < SURF_SMALL_FT ? 'Flat' : faceFt < SURF_FUN_FT ? 'Small' : faceFt < SURF_FIRING_FT ? 'Fun' : 'Firing'
+  const at = SURF_TAGS.indexOf(size)
+  const drop = shape === 'Clean' ? 0 : shape === 'Messy' ? 2 : 1
+  if (size === 'Flat') return 'Flat'
+  if (size === 'Small') return shape === 'Messy' ? 'Flat' : 'Small'
+  return SURF_TAGS[Math.max(1, at - drop)]
+}
+
+/** Worth going for: Fun or Firing on the one scale. A day or an hour is "surf" only then. */
+export const surfOn = (tag: SurfTag | null): boolean => tag === 'Fun' || tag === 'Firing'
+
 /** Onshore at this or more blows the faces apart: 5.1 m/s, 10 kt. */
 export const MESSY_ONSHORE_MPS = 5.1
 
@@ -78,9 +118,21 @@ export interface SurfEstimate {
   size: SurfSize
 }
 
+/*
+ * THE BEACH CAP (Batch QA, Section 0B; field 10 Nov 6:52-7:05 AM, VB Pier,
+ * src/data/beachObservations.ts). Komar's breaker height runs 1.3 to 1.8
+ * times the deep-water height at 8 to 14 s: buoy 44099 at 3.0 ft and 12 s
+ * came out "≈ 4.8 ft" at the beach while the cam showed 2-3 ft, thigh to
+ * waist. The face is never taken above the height it was worked from, times
+ * BEACH_CAP; a spot gets more only with a documented observation that says
+ * so, and none has one yet.
+ */
+export const BEACH_CAP = 1
+
 export function surfEstimate(swellM: number, period: number, swellFromDeg: number, facingDeg: number | null): SurfEstimate {
   const h = angledHeight(swellM, swellFromDeg, facingDeg)
-  const k = breakKomar(h, period) * 3.28084
-  const l = breakLeMehaute(h, period) * 3.28084
+  const cap = Math.max(0, swellM) * 3.28084 * BEACH_CAP
+  const k = Math.min(breakKomar(h, period) * 3.28084, cap)
+  const l = Math.min(breakLeMehaute(h, period) * 3.28084, cap)
   return { faceFt: k, faceFtLeMehaute: l, size: surfSize(k) }
 }

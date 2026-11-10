@@ -11,7 +11,7 @@ import { coastFacing } from '../lib/coast.ts'
 import { retrying } from '../lib/retrying.ts'
 import { fetchBriefWind, type Hourly } from '../lib/tideSheetData.ts'
 import { useWeatherEpoch } from '../lib/useWeatherStatus.ts'
-import { windAt, windWords, type WindNow } from '../lib/windNow.ts'
+import { calmDirection, isCalm, windAt, windWords, type WindNow } from '../lib/windNow.ts'
 import { useStationObs, type StationNow } from '../lib/useStationObs.ts'
 import type { DetailId } from '../lib/detailTabs.ts'
 import { formatRange, formatWind, windIn, windUnitLabel, type Units } from '../lib/units.ts'
@@ -140,7 +140,9 @@ export function WindContent({ now, data, facing, placeName, timeZone, units, dro
   const face = typeof facing === 'number' ? facing : null
   const models = data?.models ?? null
   const i = models === null ? -1 : hourIndexOf(models.hours, now)
-  const hour = models === null || i < 0 ? null : models.byLevel.ground[i]
+  /* Calm has no direction (src/lib/windNow.ts calmDirection; Batch QA, Section 0B): no arrow, no side, under 3 kt. */
+  const hour0 = models === null || i < 0 ? null : models.byLevel.ground[i]
+  const hour = hour0 === null || hour0 === undefined ? hour0 : { ...hour0, from: calmDirection(hour0.median, hour0.from) }
   const kicker = <p className="dwind__kick">{placeName === '' ? 'Now' : `${placeName} · now`}</p>
 
   if (data === null || models === null || hour === null) {
@@ -154,7 +156,7 @@ export function WindContent({ now, data, facing, placeName, timeZone, units, dro
             {shared === null ? '—' : say(shared.mps)}
           </p>
           <p className="dhead__line" data-wind-headline>
-            {shared === null ? '' : `${shared.fromDeg === null ? 'No one direction' : `from the ${compassPoint(shared.fromDeg)}`}${sKind === null ? '' : ` · ${KIND_WORD[sKind].toLowerCase()}`}${shared.gustMps === null ? '' : ` · gusts ${say(shared.gustMps)}`}`}
+            {shared === null ? '' : `${shared.fromDeg === null ? (isCalm(shared.mps) ? 'Light and variable' : 'No one direction') : `from the ${compassPoint(shared.fromDeg)}`}${sKind === null ? '' : ` · ${KIND_WORD[sKind].toLowerCase()}`}${shared.gustMps === null ? '' : ` · gusts ${say(shared.gustMps)}`}`}
           </p>
           <p className="dhead__line dwind__wait" role="status">
             {data === null ? 'Reading five forecasts…' : 'Models still loading · retrying'}
@@ -174,7 +176,10 @@ export function WindContent({ now, data, facing, placeName, timeZone, units, dro
   const headFrom = shared === null ? hour.from : shared.fromDeg
   const headGust = shared === null ? hour.gust : shared.gustMps
   const headKind = headFrom === null || face === null ? null : windToBeach(headFrom, face)
-  const hours = models.byLevel.ground.slice(i, i + STRIP_HOURS).map((r, k) => ({ at: models.hours[i + k], r, kind: r.from === null || face === null ? null : windToBeach(r.from, face) }))
+  const hours = models.byLevel.ground.slice(i, i + STRIP_HOURS).map((r0, k) => {
+    const r = { ...r0, from: calmDirection(r0.median, r0.from) }
+    return { at: models.hours[i + k], r, kind: r.from === null || face === null ? null : windToBeach(r.from, face) }
+  })
   const flip = windFlip(hours)
   const shown = hours.filter((_, k) => k % STRIP_STEP === 0)
   const at400 = models.byLevel['120m'][i]
@@ -194,7 +199,7 @@ export function WindContent({ now, data, facing, placeName, timeZone, units, dro
           {kind === null ? null : <span className={`dwind__tag dwind__tag--${kind}`}>{KIND_WORD[kind]}</span>}
         </p>
         <p className="dhead__line" data-wind-headline>
-          {headFrom === null ? 'No one direction' : `from the ${compassPoint(headFrom)}`}
+          {headFrom === null ? (isCalm(shared?.mps ?? hour.median) ? 'Light and variable' : 'No one direction') : `from the ${compassPoint(headFrom)}`}
           {headKind === null ? '' : ` · ${KIND_WORD[headKind].toLowerCase()}`}
           {headGust === null ? '' : ` · gusts ${say(headGust)}`}
         </p>

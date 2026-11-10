@@ -164,7 +164,7 @@ export function clockMinute(at: Date): Date {
 }
 
 /** Hour 0-23 and minute 0-59 on the zone's wall clock at an instant, floored by clockMinute. */
-function wallClock(at: Date, timeZone: string): { hour: number; minute: number } | null {
+export function wallClock(at: Date, timeZone: string): { hour: number; minute: number } | null {
   if (Number.isNaN(at.getTime())) return null
   const parts = partFormatter(timeZone).formatToParts(clockMinute(at))
   const hour = Number(parts.find((p) => p.type === 'hour')?.value)

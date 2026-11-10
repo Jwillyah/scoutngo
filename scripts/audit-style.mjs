@@ -113,7 +113,7 @@ const READ = (tokens) => `JSON.stringify((() => {
 })())`
 
 let problems = 0
-const totals = { mono: 0, square: 0, black: 0, flat: 0, lookd: 0, colour: 0 }
+const totals = { mono: 0, square: 0, black: 0, flat: 0, lookd: 0, colour: 0, cut: 0 }
 const report = []
 const browser = await webkit.launch()
 try {
@@ -184,7 +184,24 @@ try {
       })
       .map((f) => `${f.n} #${f.top.map((v) => v.toString(16).padStart(2, '0')).join('')} top, #${f.bottom.map((v) => v.toString(16).padStart(2, '0')).join('')} at the foot`)
     const colours = Object.keys(r.colour).length
-    console.log(`\n### ${screen}: mono ${r.mono.length} · square ${r.square.length} · black ${r.black.length} · flat ${r.flat.length} · colours outside the set ${colours}`)
+    /*
+     * NOTHING TRUNCATES (Batch QA, Section 0B; field 10 Nov: "gusts 4 kt ·
+     * offsho…", "rise 8:05 …"): a visible box that cuts its own text with an
+     * ellipsis or a line clamp is a problem; the words get shorter or wrap.
+     */
+    const cut = JSON.parse(await ev(`JSON.stringify([...document.querySelectorAll('body *')].filter((e) => {
+      const st = getComputedStyle(e)
+      if (st.textOverflow !== 'ellipsis' && (st.webkitLineClamp ?? 'none') === 'none') return false
+      const b = e.getBoundingClientRect()
+      if (b.width === 0 || b.height === 0 || st.visibility === 'hidden' || b.bottom < 0 || b.top > innerHeight) return false
+      /* Only what is on top: a pill under a page is not on screen to read. */
+      const top = document.elementFromPoint(Math.min(innerWidth - 1, Math.max(0, b.left + b.width / 2)), Math.min(innerHeight - 1, Math.max(0, b.top + b.height / 2)))
+      if (top === null || (top !== e && !e.contains(top))) return false
+      return e.scrollWidth > e.clientWidth + 1 || ((st.webkitLineClamp ?? 'none') !== 'none' && e.scrollHeight > e.clientHeight + 1)
+    }).map((e) => String(e.className?.baseVal ?? e.className).split(' ')[0] + ': ' + (e.textContent ?? '').trim().slice(0, 48)))`))
+    console.log(`\n### ${screen}: mono ${r.mono.length} · square ${r.square.length} · black ${r.black.length} · flat ${r.flat.length} · colours outside the set ${colours} · cut ${cut.length}`)
+    for (const c of cut.slice(0, 8)) console.log(`      PROBLEM cut: ${c}`)
+    totals.cut += cut.length
     for (const m of r.mono.slice(0, 6)) console.log(`      PROBLEM mono: ${m}`)
     for (const s of r.square.slice(0, 6)) console.log(`      PROBLEM square: ${s}`)
     for (const s of r.black) console.log(`      PROBLEM black: ${s}`)
@@ -339,7 +356,7 @@ try {
   watchdog.stop()
 }
 
-problems += totals.mono + totals.square + totals.black + totals.flat + totals.lookd + totals.colour
+problems += totals.mono + totals.square + totals.black + totals.flat + totals.lookd + totals.colour + totals.cut
 console.log(`\n${report.map((r) => `${r.screen}: ${r.mono}/${r.square}/${r.black}/${r.flat}/${r.colour}`).join('\n')}`)
-console.log(`\n=== STYLE PROBLEMS: ${problems} (mono ${totals.mono}, square ${totals.square}, black ${totals.black}, flat navy ${totals.flat}, not look D ${totals.lookd}, colours ${totals.colour}) ===`)
+console.log(`\n=== STYLE PROBLEMS: ${problems} (mono ${totals.mono}, square ${totals.square}, black ${totals.black}, flat navy ${totals.flat}, not look D ${totals.lookd}, colours ${totals.colour}, cut ${totals.cut}) ===`)
 process.exit(problems === 0 ? 0 : 1)

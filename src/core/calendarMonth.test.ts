@@ -99,10 +99,13 @@ describe('marks', () => {
     expect(calendarMonth({ ...base, forecastUntil: null, extremes: at(60) }).find((x) => x.date === d.date)!.marks).toContain('tide-rise')
     expect(calendarMonth({ ...base, forecastUntil: null, extremes: at(120) }).find((x) => x.date === d.date)!.marks).not.toContain('tide-rise')
   })
-  it('surf only where there is a beach, and only Fun or bigger', () => {
-    const fun = calendarMonth({ ...base, surfFtAt: () => 3 }).find((x) => x.date === '2026-11-05')!
+  it('surf only where there is a beach, and only Fun or bigger on the one scale (size and the wind at sunrise)', () => {
+    const light = { windAt: () => ({ speedMps: 1, fromDeg: 280 }) }
+    const fun = calendarMonth({ ...base, ...light, surfFtAt: () => 3 }).find((x) => x.date === '2026-11-05')!
     expect(fun.marks).toContain('surf')
-    expect(calendarMonth({ ...base, surfFtAt: () => 1.5 }).find((x) => x.date === '2026-11-05')!.marks).not.toContain('surf')
+    expect(calendarMonth({ ...base, ...light, surfFtAt: () => 2 }).find((x) => x.date === '2026-11-05')!.marks).not.toContain('surf')
+    /* Batch QA, Section 0B: 3 ft in a 7 m/s onshore is Rideable at best, not a surf day. */
+    expect(calendarMonth({ ...base, windAt: () => ({ speedMps: 7, fromDeg: 90 }), surfFtAt: () => 3 }).find((x) => x.date === '2026-11-05')!.marks).not.toContain('surf')
     expect(calendarMonth({ ...base, facing: null, surfFtAt: () => 3 }).find((x) => x.date === '2026-11-05')!.marks).not.toContain('surf')
   })
   it('the Leonids peak night is a meteor night', () => {

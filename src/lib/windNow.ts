@@ -19,6 +19,17 @@ export interface WindNow {
   gustMps: number | null
 }
 
+/*
+ * CALM HAS NO DIRECTION (Batch QA, Section 0B; field 10 Nov: "1 kt NNE
+ * cross-shore" became "2 kt SW offshore" nine minutes later). Under CALM_KT,
+ * 3 kt, the vane says nothing the beach can use: the wind is "Calm", with no
+ * side to the beach and no arrow. Every wind now passes through here.
+ */
+export const CALM_KT = 3
+export const CALM_MPS = CALM_KT / 1.943844
+export const calmDirection = (mps: number | null, fromDeg: number | null): number | null => (mps === null || mps < CALM_MPS ? null : fromDeg)
+export const isCalm = (mps: number | null): boolean => mps !== null && mps < CALM_MPS
+
 /** The hour's half past: two screens a few seconds apart read the same hour. */
 export const halfHour = (t: Date): Date => new Date(Math.floor(t.getTime() / 3_600_000) * 3_600_000 + 1_800_000)
 
@@ -28,7 +39,7 @@ export function modelWindAt(wx: Hourly | null, t: Date): WindNow | null {
   const at = halfHour(t)
   const mps = hourlyAt(wx, 'wind_speed_10m', at)
   if (mps === null) return null
-  return { mps, fromDeg: hourlyAt(wx, 'wind_direction_10m', at), gustMps: hourlyAt(wx, 'wind_gusts_10m', at) }
+  return { mps, fromDeg: calmDirection(mps, hourlyAt(wx, 'wind_direction_10m', at)), gustMps: hourlyAt(wx, 'wind_gusts_10m', at) }
 }
 
 /*
@@ -39,7 +50,8 @@ export function modelWindAt(wx: Hourly | null, t: Date): WindNow | null {
 export function windAt(wx: Hourly | null, t: Date, obs: StationObs | null = null): WindNow | null {
   const now = new Date()
   const lean = obsFresh(obs, now) ? obs : null
-  return nowcastAt((tt) => modelWindAt(wx, tt), lean, halfHour(t)) as WindNow | null
+  const w = nowcastAt((tt) => modelWindAt(wx, tt), lean, halfHour(t)) as WindNow | null
+  return w === null ? null : { ...w, fromDeg: calmDirection(w.mps, w.fromDeg) }
 }
 
 /** "9 kt WNW": the speed in the user's unit, and where it is from. */
@@ -47,6 +59,7 @@ export function windWords(w: WindNow | null, unit: WindUnit): string | null {
   if (w === null) return null
   const v = windIn(w.mps, unit)
   if (v === null) return null
+  if (isCalm(w.mps)) return 'Calm'
   return `${Math.round(v)} ${windUnitLabel(unit)}${w.fromDeg === null ? '' : ` ${compass(w.fromDeg)}`}`
 }
 

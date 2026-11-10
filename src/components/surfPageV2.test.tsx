@@ -140,7 +140,10 @@ describe('Surf page v2 (Batch N, Section 1)', () => {
     const html = render()
     const raw = /data-buoy-raw="true">Buoy reads (\d+\.\d) ft/.exec(html)?.[1]
     expect(raw).toBe((BUOY_WAVE_M * 3.28084).toFixed(1))
-    expect(/data-buoy-faces="true">As faces at this beach ≈ (\d+\.\d) ft/.exec(html)?.[1]).not.toBe(raw)
+    /* Batch QA, Section 0B: the faces are worked from it and never above it (src/core/surf.ts BEACH_CAP). */
+    const faces = /data-buoy-faces="true">As faces at this beach ≈ (\d+\.\d) ft/.exec(html)?.[1]
+    expect(faces).toBeDefined()
+    expect(Number(faces)).toBeLessThanOrEqual(Number(raw))
   })
 
   it('shows the cam as a link out, and no card without one', () => {

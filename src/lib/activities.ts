@@ -61,10 +61,16 @@ export function useActivities(): [Activity[] | null, (next: readonly Activity[])
   return [value, useCallback((next: readonly Activity[]) => writeActivities(next), [])]
 }
 
-/** The order the home uses: what was picked, else everything; a drone in the kit brings the drone in. */
+/**
+ * The order the home uses: what was picked, else everything. A drone in the
+ * kit brings the drone in only while nothing is picked: once the picker is
+ * answered, Drone is in when Drone was picked (Batch QA, Section 0B: "Just
+ * weather" said "Next: drone calm now" and marked days "Drone").
+ */
 export function homeOrder(picked: readonly Activity[] | null, droneInKit: boolean): Activity[] {
-  const base: Activity[] = picked === null || picked.length === 0 ? ['surf', 'shoot', 'fish', 'weather'] : [...picked]
-  return droneInKit && !base.includes('drone') ? [...base, 'drone'] : base
+  const none = picked === null || picked.length === 0
+  const base: Activity[] = none ? ['surf', 'shoot', 'fish', 'weather'] : [...picked]
+  return none && droneInKit && !base.includes('drone') ? [...base, 'drone'] : base
 }
 
 /** Photo tools (Viewfinder, Cones, Shadows, Sky color detail, Light map) in the home and the menu: when Shoot is picked, or nothing has been picked yet. */

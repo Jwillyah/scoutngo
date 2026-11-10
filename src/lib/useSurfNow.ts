@@ -13,12 +13,12 @@ import { useMemo, useSyncExternalStore } from 'react'
 import { distanceMeters, type LatLon } from '../core/geo.ts'
 import { spotKey, spotStats, type SpotStats } from '../core/spotSkill.ts'
 import { rangeWords } from '../core/surfRange.ts'
-import { periodRead, rangeSizeWords } from '../core/surfReads.ts'
+import { buoyParts, forecastParts, periodRead, rangeSizeWords, type PeriodRead, type SwellPart } from '../core/surfReads.ts'
 import { hourlyAt } from './tideSheetData.ts'
 import { venueToday } from '../core/eventDay.ts'
 import { addDays, rangeHourAt, weekPeaks, type RangeHour } from './surfPageData.ts'
 import { onSkillBook, readSkillBook, skillBookVersion } from './spotSkillStore.ts'
-import { beachName, sameBeach, useSurfBeach, type Beach } from './surfBeach.ts'
+import { awayFrom, beachName, sameBeach, useSurfBeach, type Beach } from './surfBeach.ts'
 import { useSurfSea, type SurfSea } from './useSurfSea.ts'
 
 export interface SurfNow {
@@ -38,14 +38,39 @@ export interface SurfNow {
   tomorrowWords: string | null
 }
 
-/** "knee to chest · 13 s at 44099": the size from the band's own ends and the dominant period (Batch MAP2, Section 1), the home's and the Surf page's. */
-export function surfLine(sea: SurfSea, h: RangeHour | null, now: Date): string | null {
-  if (h === null) return null
+/**
+ * THE SEA NOW, ONE SOURCE (Batch QA, Section 0B; field 10 Nov: one Surf page
+ * said "12 s at 44099" up top, "1.7 ft · 9 s" on the swell bar and "swell
+ * 2.0 ft · 12 s" on the buoy card). The buoy's own parts when it reported in
+ * the last 2 hours with its spectral split, else the forecast's at the hour;
+ * the period every screen says is the swell part's, from the same source.
+ */
+export interface SeaNow {
+  parts: SwellPart[]
+  period: PeriodRead | null
+  from: 'buoy' | 'forecast' | null
+}
+export function seaNow(sea: SurfSea, now: Date, meanS: number | null = null): SeaNow {
   const b = sea.buoy
   const fresh = b !== null && b.status === 'ok' && Math.abs(now.getTime() - b.at.getTime()) <= 2 * 3_600_000
+  const own = fresh && b !== null && b.status === 'ok' ? buoyParts(b.split) : []
+  const swellOf = (parts: SwellPart[]) => parts.find((p) => p.name === 'Swell')?.periodS ?? null
+  if (own.length > 0 && b !== null && b.status === 'ok') {
+    const s = swellOf(own) ?? b.periodS
+    return { parts: own, period: s === null || !(s > 0) ? null : { s: Math.round(s), words: `${Math.round(s)} s at ${b.buoy.id}`, from: 'buoy' }, from: 'buoy' }
+  }
   const half = new Date(Math.floor(now.getTime() / 3_600_000) * 3_600_000 + 1_800_000)
-  const peak = sea.marine === null ? null : hourlyAt(sea.marine, 'swell_wave_peak_period', half)
-  const p = periodRead(b?.status === 'ok' ? b.periodS : null, fresh, peak, h.periodS, b?.status === 'ok' ? b.buoy.id : null)
+  const marine = sea.marine
+  const parts = marine === null ? [] : forecastParts((n) => hourlyAt(marine, n, half))
+  const s = swellOf(parts)
+  const period = s !== null && s > 0 ? { s: Math.round(s), words: `${Math.round(s)} s`, from: 'forecast-peak' as const } : periodRead(null, false, marine === null ? null : hourlyAt(marine, 'swell_wave_peak_period', half), meanS)
+  return { parts, period, from: marine === null ? null : 'forecast' }
+}
+
+/** "knee to chest · 13 s at 44099": the size from the band's own ends and the swell's period (seaNow), the home's and the Surf page's. */
+export function surfLine(sea: SurfSea, h: RangeHour | null, now: Date): string | null {
+  if (h === null) return null
+  const p = seaNow(sea, now, h.periodS).period
   return [rangeSizeWords(h.range.lowFt, h.range.highFt), p?.words ?? null].filter((x) => x !== null).join(' · ')
 }
 
@@ -71,8 +96,9 @@ export function storedStats(spot: LatLon, now: number): SpotStats {
 export function useSurfNow(venue: LatLon | null, now: Date, timeZone: string, miles: boolean, spotName: string | null = null): SurfNow {
   /* Batch Flow, Section 3: a spot named for a beach is on that beach (src/lib/surfBeach.ts namedBeach). */
   const [beach] = useSurfBeach(venue, spotName)
-  const away = venue !== null && beach !== null && !sameBeach(venue, beach)
-  const spot = away && beach !== null ? beach.at : venue
+  /* Read where the beach's surf is; said to be elsewhere only when it is (a spot named for the beach is on it). */
+  const away = awayFrom(venue, beach, spotName)
+  const spot = venue !== null && beach !== null && !sameBeach(venue, beach) ? beach.at : venue
   const sea = useSurfSea(spot)
   /* The hour, not the minute: the stats move when a check lands (the Surf page's sampling) or the hour turns, not each render. */
   const hour = Math.floor(now.getTime() / 3_600_000)

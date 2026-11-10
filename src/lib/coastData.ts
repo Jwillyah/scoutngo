@@ -10,6 +10,7 @@
  *                    wind-probability text by the NHC's own URL
  * Which storm is within 1000 km is worked out on the phone.
  */
+import { livePeriod, type MarinePeriodIn } from '../core/marinePeriod.ts'
 import { useEffect, useState } from 'react'
 import { ASOS_STATIONS } from '../data/asosStations.ts'
 import { destinationPoint, distanceMeters, type LatLon } from '../core/geo.ts'
@@ -58,7 +59,7 @@ export function coastFor(beach: LatLon, now = Date.now()): Promise<Coast> {
   return coast
 }
 
-export async function fetchCoast(beach: LatLon, fetchImpl: typeof fetch = fetch): Promise<Coast> {
+export async function fetchCoast(beach: LatLon, fetchImpl: typeof fetch = fetch, timeZone: string = Intl.DateTimeFormat().resolvedOptions().timeZone): Promise<Coast> {
   const at = `${r2(beach.lat)},${r2(beach.lon)}`
   const mar = await nws<Zones>(`/zones?type=marine&point=${at}`, fetchImpl)
   let zone: string | null = null
@@ -96,9 +97,10 @@ export async function fetchCoast(beach: LatLon, fetchImpl: typeof fetch = fetch)
   }
   let marine: Coast['marine'] = null
   if (marineZone !== null && /^[A-Z]{3}\d{3}$/.test(marineZone)) {
-    const f = await nws<{ properties?: { periods?: { name?: string; detailedForecast?: string }[] } }>(`/zones/marine/${marineZone}/forecast`, fetchImpl)
-    const p = f?.properties?.periods?.[0]
-    if (p?.detailedForecast !== undefined) marine = { period: p.name ?? '', text: p.detailedForecast, zone: marineZone }
+    const f = await nws<{ properties?: { periods?: MarinePeriodIn[] } }>(`/zones/marine/${marineZone}/forecast`, fetchImpl)
+    /* The period still running at the spot, never one that has ended (src/core/marinePeriod.ts; Batch QA, Section 0B). */
+    const p = livePeriod(f?.properties?.periods ?? [], new Date(), timeZone)
+    if (p !== null) marine = { ...p, zone: marineZone }
   }
   return { rip, surf, ripWhy, marine }
 }

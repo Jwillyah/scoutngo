@@ -77,11 +77,25 @@ export function namedBeach(venue: LatLon, name: string | null): Beach | null {
   return null
 }
 
-/** The spot's surf beach: the one picked when it is near this spot, else the beach the spot is named for, else the nearest. Every screen asks this. */
+/**
+ * The spot's surf beach. Every screen asks this.
+ *
+ *   1. the beach the spot is named for (namedBeach)
+ *   2. the beach the spot is on: the nearest within SAME_BEACH_KM (Batch QA,
+ *      Section 0B, field 10 Nov: the spot Virginia Beach Fishing Pier, on the
+ *      pier's own beach, said "Nearest surf: Virginia Beach · 3 mi", a pick
+ *      of North End made elsewhere holding over it)
+ *   3. the one picked, when it is within PICK_HOLDS_KM
+ *   4. the nearest
+ */
 export function beachFor(venue: LatLon | null, picked: Beach | null, name: string | null = null): Beach | null {
   if (venue === null) return null
+  const named = namedBeach(venue, name)
+  if (named !== null) return named
+  const near = nearestBeach(venue)
+  if (near !== null && sameBeach(venue, near)) return near
   if (picked !== null && distanceMeters(venue, picked.at) <= PICK_HOLDS_KM * 1000) return picked
-  return namedBeach(venue, name) ?? nearestBeach(venue)
+  return near
 }
 
 const told = new Set<() => void>()
@@ -107,3 +121,14 @@ export function useSurfBeach(venue: LatLon | null, name: string | null = null): 
 }
 
 export const sameBeach = (venue: LatLon | null, b: Beach | null): boolean => venue !== null && b !== null && distanceMeters(venue, b.at) <= SAME_BEACH_KM * 1000
+
+/**
+ * Whether the spot's surf beach is somewhere else, for "Nearest surf: …".
+ * A spot named for the beach is on it, however far its pin is from the
+ * beach's own point (Batch QA, Section 0B, field 10 Nov: the spot "Virginia
+ * Beach Fishing Pier" said "Nearest surf: Virginia Beach · 3 mi").
+ */
+export function awayFrom(venue: LatLon | null, beach: Beach | null, spotName: string | null): boolean {
+  if (venue === null || beach === null || sameBeach(venue, beach)) return false
+  return namedBeach(venue, spotName)?.name !== beach.name
+}

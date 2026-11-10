@@ -155,15 +155,28 @@ try {
     await ev(`(() => { const inp = document.querySelector('.tbar__jump'); const day = String(inp.value).slice(0, 10); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(inp, day + 'T19:30'); inp.dispatchEvent(new Event('input', { bubbles: true })); return 1 })()`)
     await wait(800)
     /* Batch K addendum: the moon is Features › Moon path now (the dock is gone). */
+    /*
+     * DETERMINISTIC (Batch QA, Section 0B: this failed on first runs and passed
+     * on the retry). Each step waits for what it needs rather than a fixed
+     * time, and the switch is read back: a cold first run opened Features
+     * late, found no Moon path, and checked pills the moon never drew.
+     */
+    const until = async (expr, ms = 6000) => {
+      for (let t = 0; t < ms; t += 150) {
+        if (await ev(expr)) return true
+        await wait(150)
+      }
+      return false
+    }
     const moon = async (want) => {
       const was = await ev(`document.querySelector('.sheet')?.dataset.detent ?? 'peek'`)
       await ev(`document.querySelector('button[aria-label="Features"]')?.click()`)
-      await wait(700)
       /* Batch Map, Section 4: Moon path is under the Map sheet's More ›. */
+      if (!(await until(`!!document.querySelector('[data-feature="moon"], .feat3__row--more')`))) fail('Features opened no Map sheet, so the moon could not be set')
       await ev(`document.querySelector('[data-feature="moon"]') ?? document.querySelector('.feat3__row--more')?.click()`)
-      await wait(500)
+      if (!(await until(`!!document.querySelector('[data-feature="moon"]')`))) fail('no Moon path under the Map sheet\'s More ›')
       await ev(`(() => { const b = document.querySelector('[data-feature="moon"]'); if (b && (b.getAttribute('aria-checked') === 'true') !== ${want}) b.click() })()`)
-      await wait(300)
+      if (!(await until(`document.querySelector('[data-feature="moon"]')?.getAttribute('aria-checked') === '${want}'`))) fail(`the Moon path switch did not turn ${want ? 'on' : 'off'}`)
       /* Closed by its own ×: the rail is put away while the sheet is full. */
       await ev(`document.querySelector('.sheet .card2__x')?.click()`)
       await wait(700)
@@ -171,7 +184,8 @@ try {
       await setSheet(ev, wait, was)
     }
     await moon(true)
-    await wait(2000)
+    /* The pills come with the moon's path: wait for one (up to 10 s), not a fixed 2 s. */
+    await until(`[...document.querySelectorAll('.raypill')].some((p) => !p.hidden && /Moon/.test(p.textContent))`, 10_000)
     const pills = JSON.parse(await ev(`JSON.stringify((() => {
       const ps = [...document.querySelectorAll('.raypill')].filter((p) => !p.hidden).map((p) => ({ t: p.textContent, r: p.getBoundingClientRect() }))
       const chrome = [...document.querySelectorAll('.rail2 button, .mapctl button, .maplibregl-ctrl, .topbar, .chips2, .sheet, .shadowkey')].map((n) => ({ n: n.className?.baseVal ?? n.className, r: n.getBoundingClientRect() })).filter((c) => c.r.width > 0)

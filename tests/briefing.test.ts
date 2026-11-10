@@ -87,7 +87,7 @@ describe('the parts', () => {
 
   it('3-step scales, less to more', () => {
     expect(surfTag(0.6, 'Clean')).toBe('Flat')
-    expect(surfTag(2.5, 'Bumpy')).toBe('Fun')
+    expect(surfTag(2.5, 'Bumpy')).toBe('Rideable')
     expect(surfTag(4.2, 'Clean')).toBe('Firing')
     expect(surfTag(4.2, 'Bumpy')).toBe('Fun')
     expect(windTag(270, 90)).toBe('Offshore')

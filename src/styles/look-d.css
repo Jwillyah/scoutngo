@@ -246,3 +246,30 @@
   font-size: var(--text-sm);
   color: rgb(255 255 255 / 0.8);
 }
+
+/* ------------------------------------------------ nothing truncates (Batch QA, Section 0B; field 10 Nov: "gusts 4 kt · offsho…", "rise 8:05 …") */
+/* The words wrap instead of losing their end (scripts/audit-style.mjs "cut"). */
+.pill-venue__name {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+.chip2__value--long {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.05;
+}
+.ppage__sub,
+.hcard__line {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.25;
+}
+/* A chip whose value wraps is taller: still a pill. */
+.chip2 {
+  border-radius: 999px;
+}

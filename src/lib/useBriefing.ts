@@ -21,6 +21,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getPosition, getTimes } from 'suncalc'
 import { certainty, dayCall, eventCall, kt, moonOn, surfLine, surfTag, tideDay, windLevel, windTag, type CallRead, type Kind, type MoonDay, type SurfBar, type TideDay, type WindHourIn } from '../core/briefing.ts'
+import { calmDirection } from './windNow.ts'
 import { fireVerdict, type FireVerdict } from '../core/fireOutlook.ts'
 import type { LatLon } from '../core/geo.ts'
 import { surfShape } from '../core/surf.ts'
@@ -270,7 +271,8 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
         at: h,
         mps: w === null ? null : hourlyAt(w, 'wind_speed_10m', h),
         gustMps: w === null ? null : hourlyAt(w, 'wind_gusts_10m', h),
-        fromDeg: w === null ? null : hourlyAt(w, 'wind_direction_10m', h),
+        /* Calm has no direction (src/lib/windNow.ts calmDirection, Batch QA, Section 0B). */
+        fromDeg: w === null ? null : calmDirection(hourlyAt(w, 'wind_speed_10m', h), hourlyAt(w, 'wind_direction_10m', h)),
         highMps: w === null ? null : hourlyAt(w, 'wind_speed_120m', h),
       }))
       const surf: SurfBar[] = []
