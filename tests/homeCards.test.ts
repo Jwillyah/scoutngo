@@ -97,7 +97,11 @@ describe('a named beach is its own beach (field 9 Nov: "Sandbridge" said "Neares
 
 describe('the cards the home shows, which the menu lists (Batch Flow, Section 8)', () => {
   it('few: surf alone is surf, wind, tide; many: the six', () => {
-    expect(homeCardsShown('few', ['surf'], true)).toEqual(['surf', 'wind', 'tide'])
-    expect(homeCardsShown('many', ['surf', 'shoot', 'drone', 'fish'], true)).toContain('drone')
+    expect(homeCardsShown(['surf'], ['surf', 'drone'], true)).toEqual(['surf', 'drone', 'wind'])
+    expect(homeCardsShown(['surf', 'shoot', 'drone', 'fish'], ['surf', 'shoot', 'drone', 'fish'], true)).toContain('drone')
+  })
+  it('nothing picked: Surf, Wind, Tide, Sky, Drone, Moon, the Moon last (Batch QA, Section 0)', () => {
+    expect(homeCardsShown(null, ['surf', 'shoot', 'fish', 'weather', 'drone'], true)).toEqual(['surf', 'wind', 'tide', 'sky', 'drone', 'moon'])
+    expect(homeCardsShown([], ['surf', 'shoot', 'fish', 'weather'], false)).toEqual(['surf', 'wind', 'tide', 'sky', 'moon'])
   })
 })

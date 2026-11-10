@@ -13,6 +13,9 @@
  *
  *   surf   home Today card · menu Surf card · Surf page headline
  *   wind   home Today card · Wind page headline
+ *   sky    the colour call (Batch QA, Section 0: the home said "possible"
+ *          and Color detail "likely"): home Sky card · menu Sky card · Sky
+ *          page headline · Color detail headline, one word set (colorWords)
  */
 import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -53,7 +56,7 @@ const READ = (root) => `JSON.stringify((() => {
 })())`
 
 /* What each screen must show, so a screen that lost its value fails rather than drops out of the comparison. */
-const EXPECT = { home: ['surf', 'wind'], surf: ['surf'], wind: ['wind'], menu: ['surf'] }
+const EXPECT = { home: ['surf', 'wind', 'skycall'], surf: ['surf'], wind: ['wind'], menu: ['surf', 'skycall'], sky: ['skycall'], detail: ['skycall'] }
 
 const browser = await webkit.launch()
 try {
@@ -111,6 +114,18 @@ try {
   await page.locator('.dpage__tab', { hasText: 'Wind' }).first().click({ timeout: 4000 }).catch(() => fail('no Wind tab on the detail page'))
   take('wind', await read('wind', '.dpage--wind'))
   await page.screenshot({ path: join(OUT, 'wind.png') })
+
+  /* The Sky page from the menu's Sky card, then its "Color detail ›". */
+  await page.locator('.dpage__back').first().click({ timeout: 4000 }).catch(() => {})
+  await wait(800)
+  await page.locator('button[aria-label="Menu"]:visible').first().click({ timeout: 4000 }).catch(() => fail('no menu button after the Wind page'))
+  await wait(800)
+  await page.locator('nav[aria-label="Stage"] .mcard--sky').first().click({ timeout: 4000 }).catch(() => fail('no Sky card in the menu'))
+  take('sky', await read('sky', '.spage'))
+  await page.screenshot({ path: join(OUT, 'sky.png') })
+  await page.getByRole('button', { name: /Color detail/ }).first().click({ timeout: 4000 }).catch(() => fail('no Color detail on the Sky page'))
+  take('detail', await read('detail', '.fire'))
+  await page.screenshot({ path: join(OUT, 'detail.png') })
 
   /* Each shared value: one answer across every screen that shows it. */
   const keys = new Set(Object.values(seen).flatMap((v) => Object.keys(v)))

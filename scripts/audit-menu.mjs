@@ -133,6 +133,16 @@ try {
     const sky = await ev(`document.querySelector('.spage .ppage__title')?.textContent ?? null`)
     console.log(`  Sky card opened: ${sky}`)
     if (sky !== 'Sky') fail(`${label}: the Sky card opened no Sky page (${JSON.stringify(sky)})`)
+    /* Batch QA, Section 0: the Weather card opens the Weather page. */
+    await ev(`document.querySelector('.spage .ppage__back')?.click()`)
+    await wait(800)
+    await page.locator('button[aria-label="Menu"]:visible').first().click()
+    await wait(800)
+    await page.locator('.mcard--weather').click()
+    await wait(1500)
+    const wx = await ev(`!!document.querySelector('.wpage')`)
+    console.log(`  Weather card opened: ${wx ? 'the Weather page' : 'nothing'}`)
+    if (!wx) fail(`${label}: the Weather card opened no Weather page`)
     await ctx.close()
     watchdog.note(label)
   }

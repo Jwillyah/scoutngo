@@ -76,6 +76,27 @@ describe('rare light this week', () => {
   })
 })
 
+describe('rare light never repeats itself (Batch QA, Section 0: four identical "Light rays" rows)', () => {
+  const now = new Date('2026-11-09T15:00:00Z')
+  const sp = (kind: Special['kind'], hours: number, brief: string): Special => ({ kind, from: new Date(now.getTime() + hours * 3_600_000), to: new Date(now.getTime() + (hours + 2) * 3_600_000), agree: 3, of: 5, word: 'possible', why: 'long why', brief })
+  it('the same kind for the same reason is said once, at its first time', () => {
+    const rows = rareRows([sp('rays', 30, 'broken low cloud, sun 8° up'), sp('rays', 6, 'broken low cloud, sun 8° up'), sp('rays', 54, 'broken low cloud, sun 8° up'), sp('rays', 78, 'broken low cloud, sun 8° up')], now)
+    expect(rows).toHaveLength(1)
+    expect(rows[0].at.getTime()).toBe(now.getTime() + 6 * 3_600_000)
+  })
+  it('no two consecutive rows are the same item: a repeated name always carries a different reason and a different time', () => {
+    const rows = rareRows([sp('rays', 6, 'a'), sp('rays', 30, 'a'), sp('rays', 30, 'b'), sp('fog', 40, 'c'), sp('fog', 64, 'c'), sp('glass', 70, 'd')], now)
+    for (let i = 1; i < rows.length; i += 1) {
+      const [p, r] = [rows[i - 1], rows[i]]
+      if (p.name === r.name) {
+        expect(r.why).not.toBe(p.why)
+        expect(r.at.getTime()).not.toBe(p.at.getTime())
+      }
+    }
+    expect(rows.map((r) => r.why)).toEqual(['a', 'b', 'c', 'd'])
+  })
+})
+
 describe('never an event that has passed (Batch Flow, Section 4; field 9 Nov 8:31 PM)', () => {
   const TZ = 'America/New_York'
   const days = [

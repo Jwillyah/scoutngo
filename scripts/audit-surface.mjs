@@ -1260,7 +1260,9 @@ const click = async (sel, i) => {
     await ev(`[...document.querySelectorAll('nav[aria-label="Stage"] button')].find((b) => (b.querySelector('.sidemenu__label')?.textContent ?? '').trim() === 'Drone')?.click()`)
     for (let k = 0; k < 10 && !(await ev(`!!document.querySelector('.drpage')`)); k += 1) await wait(200)
     await ev(`[...document.querySelectorAll('.drpage .drp__buttons button')].find((b) => b.textContent.trim() === ${JSON.stringify(i)})?.click()`)
-    await wait(700)
+    /* The Preflight card arrives after the page closes, sometimes past 700 ms (Batch QA, Section 0: a run read the shoot card still there): wait for it, up to 4 s. */
+    for (let k = 0; k < 20 && !(await ev(`!!document.querySelector('.pf, .sheet [data-card="preflight"]')`)); k += 1) await wait(200)
+    await wait(300)
     return
   }
   if (sel === 'menu') {

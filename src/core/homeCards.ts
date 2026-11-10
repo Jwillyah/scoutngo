@@ -36,10 +36,16 @@ export function fewCards(order: readonly Activity[], drone: boolean): CardKind[]
   return list.slice(0, 3)
 }
 
-/** The cards the home shows, in its order: few (fewCards) or many (cardList). The menu lists the same (Batch Flow, Section 8). `order` is the activities in the home's order (src/lib/activities.ts homeOrder). */
-export function homeCardsShown(layout: HomeLayout, order: readonly Activity[], droneInKit: boolean): CardKind[] {
+/**
+ * The cards the home shows, in its order: few (fewCards) or many (cardList).
+ * The menu lists the same (Batch Flow, Section 8). `order` is the activities
+ * in the home's order (src/lib/activities.ts homeOrder). Nothing picked yet:
+ * Surf, Wind, Tide, Sky, Drone, Moon, the Moon last (Batch QA, Section 0).
+ */
+export function homeCardsShown(picked: readonly Activity[] | null, order: readonly Activity[], droneInKit: boolean): CardKind[] {
   const drone = droneInKit || order.includes('drone')
-  return layout === 'few' ? fewCards(order, drone) : cardList(order, drone)
+  if (picked === null || picked.length === 0) return cardList(['surf'], drone)
+  return homeLayout(picked) === 'few' ? fewCards(order, drone) : cardList(order, drone)
 }
 
 /* ---------------------------------------------------------------- surf */

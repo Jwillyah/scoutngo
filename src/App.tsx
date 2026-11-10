@@ -120,7 +120,7 @@ import { OPEN_RADAR_EVENT, OPEN_SKY_EVENT, OPEN_WEATHER_EVENT } from './lib/page
 import { SkyPage } from './components/SkyPage.tsx'
 import { DronePage } from './components/DronePage.tsx'
 import { homeOrder, readActivities, showsDrone, showsPhotoTools, useActivities } from './lib/activities.ts'
-import { homeCardsShown, homeLayout } from './core/homeCards.ts'
+import { homeCardsShown } from './core/homeCards.ts'
 import { ActivityPicker } from './components/ActivityPicker.tsx'
 import { SpotPicker } from './components/SpotPicker.tsx'
 import { viewfinderPreset } from './core/viewfinderPreset.ts'
@@ -1620,7 +1620,7 @@ function App() {
     }
   }
   /* Batch Flow, Section 8: the menu's cards are the ones the home shows, in its order (few or many: src/core/homeCards.ts homeCardsShown). */
-  const menuCardOrder = useMemo(() => homeCardsShown(homeLayout(activities), homeOrder(activities, briefDrone !== null), briefDrone !== null), [activities, briefDrone])
+  const menuCardOrder = useMemo(() => homeCardsShown(activities, homeOrder(activities, briefDrone !== null), briefDrone !== null), [activities, briefDrone])
   /* Its clock, read when it opens. */
   const [menuNow, setMenuNow] = useState(() => new Date())
   useEffect(() => {

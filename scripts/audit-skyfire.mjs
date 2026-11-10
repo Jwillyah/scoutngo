@@ -189,7 +189,8 @@ try {
       if (fire === null || fire.verdict === null) fail(`${label} ${phase}: no verdict on the Sky color tab`)
       else {
         /* Batch I, one screen: the verdict big, "N of 5" beside it, the agreement by layer behind Why. */
-        if (!/^Fire (possible|likely)$/.test(fire.verdict)) fail(`${label} ${phase}: 29 Oct reads "${fire.verdict}", and it fired`)
+        /* Batch QA, Section 0: the call in the one word set, "Color possible" or "Color likely" (src/core/skyPage.ts colorHeadline). */
+        if (!/^Color (possible|likely)$/.test(fire.verdict)) fail(`${label} ${phase}: 29 Oct reads "${fire.verdict}", and it fired`)
         if (!/^\d of \d$/.test(fire.chip ?? '')) fail(`${label} ${phase}: no agreement chip beside the verdict (${fire.chip})`)
         if (!/\d of \d see lit low deck/.test(fire.agreement)) fail(`${label} ${phase}: Why does not say how many models see the low deck lit`)
         /* Batch G, Section 4: the sky right now in one line, KNTU's deck. */
@@ -256,7 +257,7 @@ try {
           const glow = /^Best (\d{1,2}):(\d{2})/.exec(prev.words)
           if (glow === null) fail(`${label}: the page does not say when the glow starts: "${prev.words}"`)
           else if (Number(glow[1]) * 60 + Number(glow[2]) >= 7 * 60 + 20) fail(`${label}: the low deck glows from ${glow[1]}:${glow[2]}, and it was seen about 7:15`)
-          if (prev.verdict === null || !/^Fire (possible|likely)/.test(prev.verdict)) fail(`${label}: Sky color's verdict is not on top (${prev.verdict})`)
+          if (prev.verdict === null || !/^Color (possible|likely)/.test(prev.verdict)) fail(`${label}: Sky color's verdict is not on top (${prev.verdict})`)
           if (prev.strips < 1 || prev.cells.some((n) => n !== 91) || prev.coloured.some((n) => n < 10)) fail(`${label}: the strips are ${JSON.stringify({ cells: prev.cells, coloured: prev.coloured })}`)
           /* Pages that only said "coming" went in Batch E; pages 2 and 3 came back with pictures in Batch F: one dot a page, and each picture page says its clouds are illustrative. */
           if (prev.soon.length !== 0) fail(`${label}: pages that only say they are coming: ${JSON.stringify(prev.soon)}`)

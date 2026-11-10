@@ -103,6 +103,8 @@ export function Home({ venue, placeName, timeZone, units, drone, now, onClose, o
   const order = homeOrder(picked, drone !== null)
   /* Batch Flow, Section 3: 1-3 activities picked, big full-width cards; else the six (boards D_Home2, D_Home6). */
   const layout = homeLayout(picked)
+  /* The cards, the menu's too (src/core/homeCards.ts homeCardsShown). */
+  const shown = homeCardsShown(picked, order, drone !== null)
   /* Batch N A2: reopening lands on the tab last used (kept on this phone). */
   const [page, setPageRaw] = useState<Page>(() => readHomeTab() ?? start)
   const setPage = (p: Page) => {
@@ -170,10 +172,10 @@ export function Home({ venue, placeName, timeZone, units, drone, now, onClose, o
       </div>
       <div className="home__track" ref={track}>
         <section className="home__page" aria-label="Today">
-          <DayView placeName={placeName} which="today" brief={brief} day={brief.days[0] ?? null} order={order} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} alert={alert === null ? null : alert.event} stormLine={play.inPlay ? play.headline : null} onOpen={onOpen} onDebug={() => setDebug((d) => !d)} surf={surf} obs={stationObs} layout={layout} />
+          <DayView placeName={placeName} which="today" brief={brief} day={brief.days[0] ?? null} order={order} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} alert={alert === null ? null : alert.event} stormLine={play.inPlay ? play.headline : null} onOpen={onOpen} onDebug={() => setDebug((d) => !d)} surf={surf} obs={stationObs} layout={layout} shown={shown} />
         </section>
         <section className="home__page" aria-label="Tomorrow">
-          <DayView placeName={placeName} which="tomorrow" brief={brief} day={brief.days[1] ?? null} order={order} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} alert={null} stormLine={null} onOpen={onOpen} surf={surf} obs={stationObs} layout={layout} />
+          <DayView placeName={placeName} which="tomorrow" brief={brief} day={brief.days[1] ?? null} order={order} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} alert={null} stormLine={null} onOpen={onOpen} surf={surf} obs={stationObs} layout={layout} shown={shown} />
         </section>
         <section className="home__page" aria-label="Week">
           <WeekView brief={brief} order={order} timeZone={timeZone} units={units} now={now} venue={venue} />
@@ -226,6 +228,8 @@ function skyOf(brief: Briefing, now: Date, venue: { lat: number; lon: number }, 
 
 interface DayViewProps {
   which: 'today' | 'tomorrow'
+  /** The cards shown, in order (src/core/homeCards.ts homeCardsShown). */
+  shown: CardKind[]
   brief: Briefing
   day: DayBrief | null
   order: readonly Activity[]
@@ -246,7 +250,7 @@ interface DayViewProps {
   layout: HomeLayout
 }
 
-function DayView({ which, brief, day, order, venue, timeZone, units, drone, now, alert, stormLine, onOpen, onDebug, placeName, surf, obs, layout }: DayViewProps) {
+function DayView({ which, brief, day, order, venue, timeZone, units, drone, now, alert, stormLine, onOpen, onDebug, placeName, surf, obs, layout, shown }: DayViewProps) {
   const clock = (d: Date | null) => (d === null ? '—' : formatClock(d, timeZone))
   const wx = brief.wx
   const at = (name: string, t: Date) => (wx === null ? null : hourlyAt(wx, name, t))
@@ -295,7 +299,6 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
   const soon = which !== 'today' ? null : [day?.events.sunrise ?? null, day?.events.sunset ?? null, brief.days[1]?.events.sunrise ?? null].find((t): t is Date => t !== null && t.getTime() > now.getTime() && t.getTime() - now.getTime() <= 3 * 3_600_000) ?? null
   const soonWord = soon === null ? null : `${soon === day?.events.sunset ? 'sunset' : 'sunrise'} ${clock(soon)}`
   const nextWords = nextLine(rows.filter((r) => r.from !== undefined).map((r) => ({ what: NEXT_WORD[r.activity], from: r.from as Date })), now, (d) => clock(d))
-  const shown = homeCardsShown(layout, order, drone !== null)
   void rain
   void steps
   void speed
@@ -581,7 +584,7 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
     const read = past ? (next?.reads.sunrise ?? null) : (day?.reads.sunset ?? null)
     const at = past ? (next?.events.sunrise ?? null) : (day?.events.sunset ?? null)
     const said = colorWords(read?.call ?? null)
-    big = said === null ? '—' : said.replace(/^color /, '').replace(/^./, (c) => c.toUpperCase())
+    big = said === null ? '—' : <span data-shared={which === 'today' ? 'skycall' : 'skycall-tomorrow'} data-value={said}>{said.replace(/^color /, '').replace(/^./, (c) => c.toUpperCase())}</span>
     line = at == null ? null : `${past ? 'rise' : 'set'} ${clock(at)}`
     tag = read?.call ?? null
     tagGood = read?.call === 'Go'

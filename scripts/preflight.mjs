@@ -488,8 +488,9 @@ export async function goToStage(ev, wait, stage) {
    * button; anywhere else, the map's address.
    */
   if (want === 'plan') {
+    /* The shell itself, up to 15 s: a cold load showed the Menu button before the shell, and the route was chosen on nothing (Batch QA, Section 0). */
     for (let i = 0; i < 30; i += 1) {
-      if (await ev(`!!document.querySelector('.shell, nav[aria-label="Stage"], button[aria-label="Menu"]')`)) break
+      if (await ev(`!!document.querySelector('.shell')`)) break
       await wait(500)
     }
     const here = await ev(`(() => {
@@ -502,8 +503,12 @@ export async function goToStage(ev, wait, stage) {
     if (here === 'menu') {
       await ev(`(() => { document.querySelector('.sidemenu__scrim')?.click(); history.pushState(null, '', '/plan' + location.search + location.hash); dispatchEvent(new PopStateEvent('popstate')); return 1 })()`)
     }
-    await wait(600)
-    const arrived = await ev(`document.querySelector('.shell')?.className.match(/shell--([a-z]+)/)?.[1] ?? null`)
+    let arrived = null
+    for (let i = 0; i < 25; i += 1) {
+      await wait(200)
+      arrived = await ev(`document.querySelector('.shell')?.className.match(/shell--([a-z]+)/)?.[1] ?? null`)
+      if (arrived === 'plan') break
+    }
     if (arrived !== 'plan') throw new PreflightError(`${here === 'home' ? "tapped the home's Map" : here === 'there' ? 'on the map' : 'went to /plan'} and the shell is "${arrived}" (src/App.tsx follows /plan; src/components/Home.tsx has the Map button)`)
     return arrived
   }

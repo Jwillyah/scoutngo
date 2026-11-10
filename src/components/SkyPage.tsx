@@ -4,7 +4,7 @@ import { getPosition } from 'suncalc'
 import { compassPoint } from '../core/field.ts'
 import type { LatLon } from '../core/geo.ts'
 import { leadLayer } from '../core/fireOutlook.ts'
-import { groundOf } from '../core/homeDay.ts'
+import { colorWords, groundOf } from '../core/homeDay.ts'
 import { colorHeadline, eventDayWord, lightMarks, lightTimeline, nextEvent, nowShare, plainChecks, plainReason, rareRows, sideView, type RareRow } from '../core/skyPage.ts'
 import type { Special } from '../core/specialLight.ts'
 import { formatClock } from '../core/timezone.ts'
@@ -143,7 +143,7 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
         {event === null ? '—' : `${kind === 'sunset' ? 'Sunset' : 'Sunrise'} ${clock(event)}`}
         {az === null ? '' : ` · looking ${compassPoint(az)}`}
       </p>
-      <p className="spage__head">{brief.status === 'loading' && read === null ? '…' : colorHeadline(read?.call ?? null)}</p>
+      <p className="spage__head" data-shared={picked === null ? 'skycall' : 'skycall-picked'} data-value={colorWords(read?.call ?? null) ?? ''}>{brief.status === 'loading' && read === null ? '…' : colorHeadline(read?.call ?? null)}</p>
       <p className="spage__why">{plainReason(read?.why ?? null) ?? (brief.status === 'loading' ? 'Reading the forecast…' : 'The forecast did not say.')}</p>
 
       <section className="dcard spage__side" aria-label="The sky toward the sun">

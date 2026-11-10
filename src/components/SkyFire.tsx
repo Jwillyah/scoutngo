@@ -10,6 +10,8 @@ import { LOG_FOR_H } from '../core/skyFire.ts'
 import { layerWords } from '../core/layerTruth.ts'
 import { useSkyObs } from '../lib/useSkyObs.ts'
 import { eventCall } from '../core/briefing.ts'
+import { colorWords } from '../core/homeDay.ts'
+import { colorHeadline } from '../core/skyPage.ts'
 import { litUntilDeg } from '../core/underLight.ts'
 import { showGuide, useBestView } from '../lib/useBestView.ts'
 import { bestViewOnMap } from '../core/bestView.ts'
@@ -110,6 +112,9 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
   /* Within the hour, a reported deck and an open gap are the call, and time the colour from under (Batch J, Sections 2-3): the same as Today. */
   const seen = obs === null || event === null || verdict === null ? null : eventCall(verdict, kind, event, realNow, null, { venue, truth: obs.truth, gap: obs.gap })
   const byStations = seen !== null && seen.call === 'Go' && seen.peak != null
+  /* Batch QA, Section 0: the call, as the home, the menu and the Sky page say it (src/core/briefing.ts eventCall, the words colorWords'), never the models' own word beside it. */
+  const call = seen?.call ?? (verdict === null || event === null ? null : eventCall(verdict, kind, event, realNow).call)
+  const said = colorWords(call)
   /* Batch J, Section 5: the best view tonight, a tap draws the wedge and the spots on the map. */
   const view = useBestView(event === null ? null : venue, event)
   /* How vivid (Batch J, Section 4): the air, the 31 runs, contrails. */
@@ -283,8 +288,8 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
             * Everything else is a row away.
             */}
           <div className="fire__top">
-            <p className={`fire__big fire__verdict--${byStations ? 'likely' : verdict.word}`} role="status">
-              {byStations ? 'Fire likely' : verdict.word === 'unlikely' ? 'Fire unlikely' : `Fire ${verdict.word}`}
+            <p className={`fire__big fire__verdict--${said === null ? 'unlikely' : said.replace(/^color /, '')}`} role="status" data-shared="skycall" data-value={said ?? ''}>
+              {colorHeadline(call)}
             </p>
             <span className="fire__chip num">
               {byStations ? 'stations' : `${verdict.agree} of ${verdict.of}`}

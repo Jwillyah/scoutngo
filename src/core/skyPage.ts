@@ -6,6 +6,7 @@
  * (rule 28); nothing here says the sky or the area is "clear" of anything.
  */
 import type { LayerRead } from './fireOutlook.ts'
+import { colorWords } from './homeDay.ts'
 import type { Special, SpecialKind } from './specialLight.ts'
 
 /* ------------------------------------------------------------ the checks */
@@ -34,9 +35,10 @@ export function plainChecks(l: LayerRead | null, toward: string): PlainCheck[] {
   ]
 }
 
-/** "Color likely" from the call; the page's headline. */
+/** "Color likely" from the call; the page's headline. The words are colorWords' (src/core/homeDay.ts), the one set every screen uses (Batch QA, Section 0). */
 export function colorHeadline(call: 'Go' | 'Maybe' | 'Skip' | null): string {
-  return call === 'Go' ? 'Color likely' : call === 'Maybe' ? 'Color possible' : call === 'Skip' ? 'Color unlikely' : 'No call yet'
+  const said = colorWords(call)
+  return said === null ? 'No call yet' : said.charAt(0).toUpperCase() + said.slice(1)
 }
 
 /** The call's own why, its first sentence, without the verdict word in front: "5 of 5 models see lit low deck." */
@@ -128,10 +130,23 @@ export interface RareRow {
   word: 'possible' | 'likely'
 }
 
-/** The week's rare light, kept kinds only, each with its one line; the likeliest first, then by time, RARE_MAX of them. */
+/**
+ * The week's rare light, kept kinds only, each with its one line; the
+ * likeliest first, then by time, RARE_MAX of them. The same kind for the same
+ * reason is said once, at its first time (Batch QA, Section 0: four "Light
+ * rays" rows, one reason, said four days running).
+ */
 export function rareRows(list: readonly Special[], now: Date): RareRow[] {
+  const seen = new Set<string>()
   return list
     .filter((s) => RARE_KEPT.includes(s.kind) && s.to.getTime() > now.getTime() && s.brief !== undefined && s.brief !== '')
+    .sort((a, b) => a.from.getTime() - b.from.getTime())
+    .filter((s) => {
+      const key = `${s.kind}|${s.brief}`
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
     .map((s) => ({ kind: s.kind, at: s.from, name: RARE_NAME[s.kind] ?? s.kind, why: s.brief as string, word: s.word, share: s.of === 0 ? 0 : s.agree / s.of }))
     .sort((a, b) => b.share - a.share || a.at.getTime() - b.at.getTime())
     .slice(0, RARE_MAX)

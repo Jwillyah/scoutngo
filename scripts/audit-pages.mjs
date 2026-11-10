@@ -138,8 +138,14 @@ try {
     }
 
     /* -------------------------------------------------------------- Sky */
-    const skyCard = await page.locator('.home__page[aria-label="Today"] .hcard--sky').first().click({ timeout: 4000 }).then(() => true, () => false)
-    if (!skyCard) fail(`${label}: no Sky card on the home`)
+    /*
+     * noWaitAfter (Batch QA, Section 0): on the busy gate's Android Chrome a
+     * card's tap was done and Playwright then waited past 4 s for "scheduled
+     * navigations" (the shared plan's link tidies the address bar once it has
+     * read it). Whether the page opened is checked by itself below.
+     */
+    const skyCard = await page.locator('.home__page[aria-label="Today"] .hcard--sky').first().click({ timeout: 4000, noWaitAfter: true }).then(() => true, (e) => String(e?.message ?? e).split('\n').slice(0, 14).join(' | '))
+    if (skyCard !== true) fail(`${label}: no Sky card on the home (${skyCard})`)
     await wait(5000)
     const k = JSON.parse(await ev(FIT('.spage')))
     if (k.missing) fail(`${label}: the Sky card opened no Sky page`)
@@ -168,8 +174,8 @@ try {
       if (await ev(`!!document.querySelector('.spage')`)) fail(`${label}: Back left the Sky page open`)
     }
     /* -------------------------------------------------------------- Drone (Batch Flow, Section 5; board D_Drone) */
-    const droneCard = await page.locator('.home__page[aria-label="Today"] .hcard--drone').first().click({ timeout: 4000 }).then(() => true, () => false)
-    if (!droneCard) fail(`${label}: no Drone card on the home (a drone is in this kit)`)
+    const droneCard = await page.locator('.home__page[aria-label="Today"] .hcard--drone').first().click({ timeout: 4000, noWaitAfter: true }).then(() => true, (e) => String(e?.message ?? e).split('\n').slice(0, 14).join(' | '))
+    if (droneCard !== true) fail(`${label}: no Drone card on the home (a drone is in this kit) (${droneCard})`)
     await wait(4000)
     const dr = JSON.parse(await ev(`JSON.stringify((() => { const p = document.querySelector('.drpage'); if (!p) return null; return { big: p.querySelector('.drp__big')?.textContent ?? null, limit: p.querySelector('.drp__limit')?.textContent ?? null, rows: p.querySelectorAll('.drp__rowk').length, segs: p.querySelectorAll('.drp__seg').length, tiles: [...p.querySelectorAll('.wtile__label')].map((e) => e.textContent), buttons: [...p.querySelectorAll('.drp__buttons button')].map((b) => b.textContent), text: p.innerText } })())`))
     console.log(`  Drone: ${JSON.stringify(dr === null ? null : { ...dr, text: undefined })}`)
