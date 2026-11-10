@@ -360,15 +360,16 @@ try {
   /* Batch Pages, Section 3: Menu › Sky is the Sky page; its Calendar button opens the month. */
   await ev(`[...document.querySelectorAll('.spage__buttons button')].find((b) => b.textContent.includes('Calendar'))?.click()`)
   await wait(2500)
-  await check('Sky › Calendar', '.cal .cal__grid')
+  await check('Calendar', '.cal .cal2__grid')
   {
-    const fit = JSON.parse(await ev(`JSON.stringify((() => { const c = document.querySelector('.cal'); if (!c) return null; const last = [...c.children].reduce((m, e) => Math.max(m, e.getBoundingClientRect().bottom), 0); return { scroll: c.scrollHeight, room: c.clientHeight, last: Math.round(last), vh: innerHeight, days: c.querySelectorAll('.cal__day').length, chipsTop: [...c.querySelectorAll('.cal__chip')].map((x) => Math.round(x.getBoundingClientRect().top)) } })())`))
+    /* Batch Pages, Section 4 (board CalendarV2): the five legend chips are the filters, all on screen (two lines on a phone, as the board). */
+    const fit = JSON.parse(await ev(`JSON.stringify((() => { const c = document.querySelector('.cal'); if (!c) return null; const last = [...c.children].reduce((m, e) => Math.max(m, e.getBoundingClientRect().bottom), 0); return { scroll: c.scrollHeight, room: c.clientHeight, last: Math.round(last), vh: innerHeight, days: c.querySelectorAll('.cal2__day').length, chips: [...c.querySelectorAll('.cal2__chip')].map((x) => { const b = x.getBoundingClientRect(); return b.top >= 0 && b.bottom <= innerHeight && b.right <= innerWidth + 1 }) } })())`))
     if (fit === null) fail('the calendar did not open from the Sky page')
     else {
       console.log(`  the calendar: ${fit.days} days, content to ${fit.last} of ${fit.vh} px`)
       if (fit.days < 28) fail(`the calendar drew ${fit.days} days`)
       if (fit.scroll > fit.room + 1 || fit.last > fit.vh + 1) fail(`the calendar runs ${fit.last - fit.vh} px below the screen`)
-      if (new Set(fit.chipsTop).size !== 1) fail('the calendar filters are not on one line')
+      if (fit.chips.length !== 5 || fit.chips.some((x) => !x)) fail(`the calendar's five legend chips are not all on screen (${JSON.stringify(fit.chips)})`)
     }
     await ev(`document.querySelector('.cal__close')?.click()`)
     await wait(600)

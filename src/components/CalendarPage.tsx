@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import '../styles/calendar.css'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { bestTime, calendarMonth, FILTERS, type CalendarDay, type CalendarFilter, type DayMark } from '../core/calendarMonth.ts'
+import { bestTime, calendarMonth, type CalendarDay } from '../core/calendarMonth.ts'
+import { CAT_LABEL, CAT_ORDER, dayCats, dayLines, shownCats, type CalCat } from '../core/calendarV2.ts'
 import type { LatLon } from '../core/geo.ts'
 import { rankNights } from '../core/milkyWay.ts'
 import { localDate } from '../core/moonTimes.ts'
@@ -8,12 +10,17 @@ import { formatClock, zonedTimeToUtc } from '../core/timezone.ts'
 import { surfAt } from '../lib/surfDay.ts'
 import { fetchMonthExtremes, fetchSkyHours, hourlyAt, type Hourly } from '../lib/tideSheetData.ts'
 import type { TideSheetData } from '../lib/useTideSheet.ts'
-import { MoonGlyph } from './MoonGlyph.tsx'
-import { dayWords } from '../lib/calendarWords.ts'
-import type { WindUnit } from '../lib/units.ts'
+import { formatWind, type WindUnit } from '../lib/units.ts'
 
 /*
- * SKY › CALENDAR: THE MONTH, AS A CALENDAR (29 Oct).
+ * THE CALENDAR v2 (Batch Pages, Section 4; board CalendarV2): the sky
+ * gradient, round month buttons, the legend's chips as filters, each mark a
+ * coloured circle with a white icon, two a day at most
+ * (src/core/calendarV2.ts); the selected day a white tile and, under the
+ * grid, its list in words with the same icons; "Plan this day" white. Days
+ * past the forecast are faded and carry no marks.
+ *
+ * Before (29 Oct): THE MONTH, AS A CALENDAR.
  *
  * A month grid, Sunday to Saturday, today ringed, swiped for the next or the
  * last. Each day carries small symbols for what is good there that day, all
@@ -41,46 +48,13 @@ const WEEK = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 /* A Milky Way night worth a symbol: the ranking's own 0 to 100. */
 const MILKY_SCORE = 60
 
-const MARK_GLYPH: Record<DayMark, { cls: string; label: string }> = {
-  'glass-rise': { cls: 'glass', label: 'Glassy sunrise' },
-  'glass-set': { cls: 'glass', label: 'Glassy sunset' },
-  'colour-rise': { cls: 'colour', label: 'Colourful sunrise' },
-  'colour-set': { cls: 'colour', label: 'Colourful sunset' },
-  'tide-rise': { cls: 'tide', label: 'Low tide near sunrise' },
-  'tide-set': { cls: 'tide', label: 'Low tide near sunset' },
-  surf: { cls: 'surf', label: 'Good surf' },
-  milky: { cls: 'milky', label: 'Milky Way night' },
-  meteor: { cls: 'meteor', label: 'Meteor shower peak' },
-  supermoon: { cls: 'super', label: 'Supermoon' },
-  'moon-by-sun': { cls: 'moonsun', label: 'Moon rises or sets by the sun' },
-}
-
-/** One symbol: a small shape per kind, its data colour from the CSS (gold sun, periwinkle moon; never red). */
-function Mark({ kind }: { kind: DayMark }) {
-  const g = MARK_GLYPH[kind]
-  const half = kind.endsWith('-set') ? 'set' : kind.endsWith('-rise') ? 'rise' : ''
-  return <i className={`calk calk--${g.cls}${half ? ` calk--${half}` : ''}`} aria-hidden="true" />
-}
-
-/* The key: each symbol once, in plain words. Left half of a symbol is the morning, right half the evening. */
-const KEY: [DayMark, string][] = [
-  ['glass-rise', 'glassy water'],
-  ['colour-rise', 'colourful sky'],
-  ['tide-rise', 'low tide by the sun'],
-  ['surf', 'good surf'],
-  ['milky', 'Milky Way night'],
-  ['meteor', 'meteor peak'],
-  ['supermoon', 'supermoon'],
-  ['moon-by-sun', 'moon by the sun'],
-]
-
 const MONTH_NAME = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })
 
 export function CalendarPage({ venue, timeZone, stationId, tideData, windUnit, onPlan, onClose }: CalendarPageProps) {
   const today = localDate(new Date(), timeZone)
   const [ym, setYm] = useState(() => ({ y: Number(today.slice(0, 4)), m: Number(today.slice(5, 7)) }))
   const [picked, setPicked] = useState<string | null>(today)
-  const [filters, setFilters] = useState<ReadonlySet<CalendarFilter>>(new Set())
+  const [filters, setFilters] = useState<ReadonlySet<CalCat>>(new Set())
   const [sky, setSky] = useState<Hourly | null>(null)
   const [tides, setTides] = useState<{ key: string; list: { at: Date; kind: 'high' | 'low' }[] | null } | null>(null)
 
@@ -146,55 +120,54 @@ export function CalendarPage({ venue, timeZone, stationId, tideData, windUnit, o
     [ym, venue, timeZone, today, forecastUntil, tides, tideKey, wind, sky, facing, marine, milky],
   )
 
-  const shown = (d: CalendarDay): DayMark[] => {
-    if (filters.size === 0) return d.marks
-    const keep = new Set<DayMark>([...filters].flatMap((f) => FILTERS[f]))
-    return d.marks.filter((m) => keep.has(m))
-  }
   const step = (n: number) => setYm(({ y, m }) => ({ y: m + n > 12 ? y + 1 : m + n < 1 ? y - 1 : y, m: ((m + n + 11) % 12) + 1 }))
   const swipe = useRef<{ x: number; y: number } | null>(null)
   const pickedDay = days.find((d) => d.date === picked) ?? null
   const clock = (t: Date | null) => (t === null ? '—' : formatClock(t, timeZone))
+  const speed = (mps: number) => formatWind(mps, windUnit)
+  const dayTitle = (d: CalendarDay) => `${d.today ? 'Today, ' : ''}${new Date(`${d.date}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })}`
 
   return createPortal(
-    <div className="cal" role="dialog" aria-label="Calendar">
-      <div className="cal__head">
-        <button type="button" className="cal__nav" aria-label="The month before" onClick={() => step(-1)}>
+    <div className="cal cal2" role="dialog" aria-label="Calendar">
+      <div className="cal2__head">
+        <button type="button" className="cal2__nav" aria-label="The month before" onClick={() => step(-1)}>
           ‹
         </button>
-        <p className="cal__month">{MONTH_NAME.format(new Date(Date.UTC(ym.y, ym.m - 1, 15)))}</p>
-        <button type="button" className="cal__nav" aria-label="The month after" onClick={() => step(1)}>
+        <p className="cal2__month">{MONTH_NAME.format(new Date(Date.UTC(ym.y, ym.m - 1, 15)))}</p>
+        <button type="button" className="cal2__nav" aria-label="The month after" onClick={() => step(1)}>
           ›
         </button>
-        <button type="button" className="cal__close" onClick={onClose}>
-          Close
+        <button type="button" className="cal2__nav cal__close" aria-label="Close" onClick={onClose}>
+          ×
         </button>
       </div>
 
-      <div className="cal__filters" role="group" aria-label="Show only">
-        {(Object.keys(FILTERS) as CalendarFilter[]).map((f) => {
-          const on = filters.has(f)
+      {/* The legend is the filter (Batch Pages, Section 4): a chip on shows only its kind. */}
+      <div className="cal2__legend" role="group" aria-label="Show only">
+        {CAT_ORDER.map((c) => {
+          const on = filters.has(c)
           return (
             <button
-              key={f}
+              key={c}
               type="button"
-              className={`cal__chip${on ? ' cal__chip--on' : ''}`}
+              className={`cal2__chip${on ? ' cal2__chip--on' : ''}`}
               aria-pressed={on}
               onClick={() => {
                 const next = new Set(filters)
-                if (on) next.delete(f)
-                else next.add(f)
+                if (on) next.delete(c)
+                else next.add(c)
                 setFilters(next)
               }}
             >
-              {f}
+              <CalIcon cat={c} />
+              {CAT_LABEL[c]}
             </button>
           )
         })}
       </div>
 
       <div
-        className="cal__grid"
+        className="cal2__grid"
         data-sideways
         onPointerDown={(e) => {
           swipe.current = { x: e.clientX, y: e.clientY }
@@ -208,26 +181,26 @@ export function CalendarPage({ venue, timeZone, stationId, tideData, windUnit, o
         }}
       >
         {WEEK.map((w, i) => (
-          <span key={i} className="cal__dow" aria-hidden="true">
+          <span key={i} className="cal2__dow" aria-hidden="true">
             {w}
           </span>
         ))}
         {days.map((d) => {
-          const marks = shown(d)
+          const marks = shownCats(d, filters)
+          const faded = !d.inMonth || (!d.forecast && !d.past)
           return (
             <button
               key={d.date}
               type="button"
-              className={`cal__day${d.inMonth ? '' : ' cal__day--out'}${d.today ? ' cal__day--today' : ''}${d.date === picked ? ' cal__day--on' : ''}${d.forecast || d.past ? '' : ' cal__day--nofc'}`}
+              className={`cal2__day${faded ? ' cal2__day--faded' : ''}${d.date === picked ? ' cal2__day--on' : ''}`}
               aria-pressed={d.date === picked}
-              aria-label={`${d.date}${d.moon.named === null ? '' : `, ${d.moon.named} moon`}${marks.length === 0 ? '' : `: ${marks.map((m) => MARK_GLYPH[m].label).join(', ')}`}${d.forecast || d.past ? '' : ', no forecast yet'}`}
+              aria-label={`${d.date}${marks.length === 0 ? '' : `: ${dayCats(d).map((c) => CAT_LABEL[c]).join(', ')}`}${d.forecast || d.past ? '' : ', past the forecast'}`}
               onClick={() => setPicked(d.date)}
             >
-              <span className="cal__num num">{Number(d.date.slice(8))}</span>
-              <MoonGlyph phase={d.moon.phase} strong={d.moon.named !== null} />
-              <span className="cal__marks">
-                {marks.slice(0, 6).map((m) => (
-                  <Mark key={m} kind={m} />
+              <span className="cal2__num num">{Number(d.date.slice(8))}</span>
+              <span className="cal2__marks">
+                {marks.map((c) => (
+                  <CalIcon key={c} cat={c} />
                 ))}
               </span>
             </button>
@@ -235,42 +208,57 @@ export function CalendarPage({ venue, timeZone, stationId, tideData, windUnit, o
         })}
       </div>
 
-      <div className="cal__card" aria-live="polite">
+      <div className="cal2__card" aria-live="polite">
         {pickedDay === null ? (
-          <p className="cal__words">Tap a day.</p>
+          <p className="cal2__title">Tap a day.</p>
         ) : (
           <>
-            <p className="cal__words num">{dayWords(pickedDay, clock, windUnit)}</p>
-            <button
-              type="button"
-              className="btn btn--primary cal__plan"
-              disabled={bestTime(pickedDay) === null}
-              onClick={() => {
-                const at = bestTime(pickedDay)
-                if (at !== null) onPlan(pickedDay.date, at)
-              }}
-            >
-              Plan this day
-            </button>
+            <p className="cal2__title">{dayTitle(pickedDay)}</p>
+            <ul className="cal2__lines">
+              {dayLines(pickedDay, clock, speed).map((l) => (
+                <li key={l.text} className="cal2__line">
+                  {l.cat === null ? <span className="cal2__dot" aria-hidden="true" /> : <CalIcon cat={l.cat} />}
+                  <span>{l.text}</span>
+                </li>
+              ))}
+            </ul>
           </>
         )}
       </div>
-
-      <div className="cal__key" aria-label="What the symbols mean">
-        <span className="cal__keyrow">
-          <MoonGlyph phase={0.5} strong /> full or new moon
-        </span>
-        {KEY.map(([m, words]) => (
-          <span key={m} className="cal__keyrow">
-            <Mark kind={m} /> {words}
-          </span>
-        ))}
-        <span className="cal__keyrow">
-          <i className="calk calk--nofc" aria-hidden="true" /> no forecast yet
-        </span>
-      </div>
+      <button
+        type="button"
+        className="btn btn--primary cal2__plan"
+        disabled={pickedDay === null || bestTime(pickedDay) === null}
+        onClick={() => {
+          const at = pickedDay === null ? null : bestTime(pickedDay)
+          if (pickedDay !== null && at !== null) onPlan(pickedDay.date, at)
+        }}
+      >
+        Plan this day
+      </button>
     </div>,
     document.body,
   )
 }
 
+/* The five marks: a coloured circle with a white icon (board CalendarV2): a wave, a sunset arc, glassy lines, a tide arch, a moon. */
+const CAT_PATH: Record<CalCat, ReactNode> = {
+  surf: <path d="M4 13c2-3 4-3 6 0s4 3 6 0 3-2 4-1" />,
+  sky: (
+    <>
+      <path d="M7 15a5 5 0 0 1 10 0" />
+      <path d="M4 15h16" />
+    </>
+  ),
+  glassy: <path d="M6 9h12M5 12h14M7 15h10" />,
+  tide: <path d="M7 15a5 5 0 0 1 10 0" />,
+  moon: <circle cx="12" cy="12" r="4" />,
+}
+function CalIcon({ cat }: { cat: CalCat }) {
+  return (
+    <svg className={`cal2__icon cal2__icon--${cat}`} viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="12" className="cal2__disc" />
+      <g className={`cal2__glyph${cat === 'moon' ? ' cal2__glyph--fill' : ''}`}>{CAT_PATH[cat]}</g>
+    </svg>
+  )
+}
