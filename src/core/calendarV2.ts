@@ -59,9 +59,14 @@ export interface DayLine {
  * "Glassy at sunrise 6:36 AM (wind 4 kt, offshore)". `clock` words a time,
  * `speed` a wind in the user's unit.
  */
-export function dayLines(d: CalendarDay, clock: (t: Date | null) => string, speed: (mps: number) => string): DayLine[] {
+export function dayLines(d: CalendarDay, clock: (t: Date | null) => string, speed: (mps: number) => string, now: Date | null = null): DayLine[] {
   const out: DayLine[] = []
+  /* Batch Flow, Section 4: never an event that has passed (today after sunrise, its sunrise lines go). */
+  const gone = (t: Date | null) => now !== null && t !== null && t.getTime() < now.getTime()
   for (const c of dayCats(d)) {
+    if ((c === 'surf' || c === 'glassy') && gone(d.sunrise)) continue
+    if (c === 'sky' && gone(d.marks.includes('colour-set') ? d.sunset : d.sunrise)) continue
+    if (c === 'tide' && gone(d.facts.lowNearSunrise ?? d.facts.lowNearSunset)) continue
     if (c === 'surf') out.push({ cat: c, text: `Surf ${d.facts.surfFt === null ? '' : `${Math.round(d.facts.surfFt)} ft `}at sunrise ${clock(d.sunrise)}` })
     if (c === 'sky') {
       const at = d.marks.includes('colour-set') ? 'sunset' : 'sunrise'

@@ -131,3 +131,103 @@
   flex: 1;
   min-height: 48px;
 }
+
+/* Batch Flow, Section 4 (board D_Sky): the event, the side view toward the sun, the light as one bar with a now thumb. */
+.spage__event {
+  margin: 4px 0 0;
+  text-align: center;
+  font-size: var(--text-md);
+  color: rgb(255 255 255 / 0.85);
+}
+.spage__head {
+  text-align: center;
+}
+.spage__why {
+  text-align: center;
+}
+.spage__sidepic {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.04), rgb(232 135 106 / 0.18));
+}
+.spage__lvl {
+  stroke: rgb(255 255 255 / 0.18);
+  stroke-width: 1;
+}
+.spage__lvlk {
+  fill: rgb(255 255 255 / 0.6);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.spage__deck {
+  fill: rgb(255 255 255 / 0.28);
+}
+.spage__deck--lit {
+  fill: var(--d-glow);
+  opacity: 0.85;
+}
+.spage__horizon {
+  stroke: rgb(255 255 255 / 0.45);
+  stroke-width: 1;
+}
+.spage__ray {
+  stroke: var(--caution);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+}
+.spage__sun {
+  fill: var(--caution);
+}
+.spage__sunk {
+  fill: var(--white);
+  font-size: 10px;
+  font-weight: 700;
+}
+.spage__gap {
+  margin: 6px 0 0;
+  font-size: var(--text-sm);
+  color: rgb(255 255 255 / 0.85);
+}
+.spage__bar {
+  position: relative;
+  overflow: visible;
+}
+.spage__seg2 {
+  flex-grow: 0;
+  flex-shrink: 1;
+  height: 12px;
+}
+.spage__seg2:first-child {
+  border-radius: 999px 0 0 999px;
+}
+.spage__seg2:last-of-type {
+  border-radius: 0 999px 999px 0;
+}
+.spage__seg2--golden {
+  background: var(--caution);
+}
+.spage__seg2--color {
+  background: var(--d-glow);
+}
+.spage__seg2--blue {
+  background: var(--d-glow-violet);
+}
+.spage__seg2--dark {
+  background: var(--d-night-top);
+}
+.spage__thumb {
+  position: absolute;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border-radius: 999px;
+  background: var(--white);
+  box-shadow: 0 0 12px rgb(255 255 255 / 0.6);
+}
+.spage__light .spage__marks {
+  margin: 0 0 8px;
+}

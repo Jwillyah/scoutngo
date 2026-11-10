@@ -51,7 +51,9 @@ const MILKY_SCORE = 60
 const MONTH_NAME = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })
 
 export function CalendarPage({ venue, timeZone, stationId, tideData, windUnit, onPlan, onClose }: CalendarPageProps) {
-  const today = localDate(new Date(), timeZone)
+  /* Read once when the page opens: what has passed is left out of the day's list. */
+  const [nowMs] = useState(() => Date.now())
+  const today = localDate(new Date(nowMs), timeZone)
   const [ym, setYm] = useState(() => ({ y: Number(today.slice(0, 4)), m: Number(today.slice(5, 7)) }))
   const [picked, setPicked] = useState<string | null>(today)
   const [filters, setFilters] = useState<ReadonlySet<CalCat>>(new Set())
@@ -215,7 +217,7 @@ export function CalendarPage({ venue, timeZone, stationId, tideData, windUnit, o
           <>
             <p className="cal2__title">{dayTitle(pickedDay)}</p>
             <ul className="cal2__lines">
-              {dayLines(pickedDay, clock, speed).map((l) => (
+              {dayLines(pickedDay, clock, speed, new Date(nowMs)).map((l) => (
                 <li key={l.text} className="cal2__line">
                   {l.cat === null ? <span className="cal2__dot" aria-hidden="true" /> : <CalIcon cat={l.cat} />}
                   <span>{l.text}</span>

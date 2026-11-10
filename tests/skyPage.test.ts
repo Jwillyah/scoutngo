@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getPosition } from 'suncalc'
-import { colorHeadline, lightMarks, plainChecks, plainReason, rareRows, RARE_KEPT, sunCrosses } from '../src/core/skyPage.ts'
+import { colorHeadline, eventDayWord, lightMarks, lightTimeline, nextEvent, nowShare, plainChecks, plainReason, rareRows, RARE_KEPT, sideView, sunCrosses } from '../src/core/skyPage.ts'
 import type { LayerRead } from '../src/core/fireOutlook.ts'
 import type { Special } from '../src/core/specialLight.ts'
 
@@ -73,5 +73,50 @@ describe('rare light this week', () => {
   it('the likeliest four, then said in time order; nothing already over', () => {
     const rows = rareRows([sp('rays', 10, 'a', 1), sp('rays', 20, 'b', 5), sp('fog', 30, 'c', 4), sp('glass', 40, 'd', 4), sp('rainbow', 50, 'e', 3), sp('fog', -5, 'gone', 5)], now)
     expect(rows.map((r) => r.why)).toEqual(['b', 'c', 'd', 'e'])
+  })
+})
+
+describe('never an event that has passed (Batch Flow, Section 4; field 9 Nov 8:31 PM)', () => {
+  const TZ = 'America/New_York'
+  const days = [
+    { events: { sunrise: new Date('2026-11-09T11:36:00Z'), sunset: new Date('2026-11-09T21:59:00Z') } },
+    { events: { sunrise: new Date('2026-11-10T11:37:00Z'), sunset: new Date('2026-11-10T21:58:00Z') } },
+  ]
+  const at831 = new Date('2026-11-10T01:31:00Z')
+  it("at 8:31 PM: tomorrow's sunrise and tomorrow's sunset, said as tomorrow", () => {
+    expect(nextEvent(days, 'sunset', at831)?.events.sunset?.toISOString()).toBe('2026-11-10T21:58:00.000Z')
+    expect(nextEvent(days, 'sunrise', at831)?.events.sunrise?.toISOString()).toBe('2026-11-10T11:37:00.000Z')
+    expect(eventDayWord(days[1].events.sunrise, 'sunrise', at831, TZ)).toBe('Tomorrow morning')
+    expect(eventDayWord(days[1].events.sunset, 'sunset', at831, TZ)).toBe('Tomorrow evening')
+  })
+  it('before sunset: tonight', () => {
+    const at3 = new Date('2026-11-09T20:00:00Z')
+    expect(nextEvent(days, 'sunset', at3)).toBe(days[0])
+    expect(eventDayWord(days[0].events.sunset, 'sunset', at3, TZ)).toBe('Tonight')
+  })
+})
+
+describe('the light as one bar, and the side view', () => {
+  const VB = { lat: 36.84, lon: -75.97 }
+  const alt = (t: Date) => getPosition(t, VB.lat, VB.lon).altitude
+  it("sunset: golden, color, blue, dark in order, the colour window the call's own; now on it or null", () => {
+    const set = new Date('2026-11-09T21:57:00Z')
+    const segs = lightTimeline('sunset', set, lightMarks('sunset', set, alt), new Date(set.getTime() - 60_000), new Date(set.getTime() + 17 * 60_000))
+    expect(segs.map((g) => g.key)).toEqual(['golden', 'color', 'blue', 'dark'])
+    expect(segs[1].to.getTime() - segs[1].from.getTime()).toBe(18 * 60_000)
+    expect(nowShare(segs, new Date(set.getTime()))).toBeGreaterThan(0)
+    expect(nowShare(segs, new Date(set.getTime() - 5 * 3_600_000))).toBeNull()
+  })
+  it('the decks at their heights, the low under the mid under the high; the light path to the deck spoken for', () => {
+    const v = sideView([
+      { layer: 'high', heightM: 9000, cover: 20, canvas: false, fires: false },
+      { layer: 'mid', heightM: 4000, cover: 50, canvas: true, fires: true },
+      { layer: 'low', heightM: 1000, cover: 5, canvas: false, fires: false },
+    ], 0, 'mid')
+    const y = Object.fromEntries(v.layers.map((l) => [l.layer, l.y]))
+    expect(y.low).toBeGreaterThan(y.mid)
+    expect(y.mid).toBeGreaterThan(y.high)
+    expect(v.path?.to.y).toBe(y.mid)
+    expect(sideView([{ layer: 'low', heightM: 1000, cover: 5, canvas: false, fires: false }], 0, 'low').path).toBeNull()
   })
 })

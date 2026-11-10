@@ -1441,7 +1441,23 @@ function App() {
     if (!briefOpen && !weatherOpen && !skyOpen) return
     setBriefNow(new Date())
     const t = setInterval(() => setBriefNow(new Date()), 60_000)
-    return () => clearInterval(t)
+    /*
+     * Batch Flow, Section 4 (field 9 Nov 8:31 PM: the Sky page showed the
+     * sunset that had passed): a phone in the background pauses the minute
+     * timer; back in front, the clock is put right at once.
+     */
+    const wake = () => {
+      if (document.visibilityState === 'visible') setBriefNow(new Date())
+    }
+    document.addEventListener('visibilitychange', wake)
+    window.addEventListener('focus', wake)
+    window.addEventListener('pageshow', wake)
+    return () => {
+      clearInterval(t)
+      document.removeEventListener('visibilitychange', wake)
+      window.removeEventListener('focus', wake)
+      window.removeEventListener('pageshow', wake)
+    }
   }, [briefOpen, weatherOpen, skyOpen])
   const [drawerRequest, setDrawerRequest] = useState<{ drawer: 'kit' | 'saved'; tick: number }>({
     drawer: 'kit',

@@ -142,13 +142,18 @@ try {
     else {
       looked += 1
       console.log(`  Sky: ${k.content}/${k.box} px, ${k.out.length === 0 && !k.scrolls ? 'fits' : `scrolls or runs off ${JSON.stringify(k.out)}`}`)
-      const d = JSON.parse(await ev(`JSON.stringify({ seg: [...document.querySelectorAll('.spage__seg button')].map((b) => b.textContent), head: document.querySelector('.spage__head')?.textContent ?? null, why: document.querySelector('.spage__why')?.textContent ?? null, checks: [...document.querySelectorAll('.spage__check span')].map((e) => e.textContent), marks: document.querySelector('.spage__marks')?.textContent ?? null, rare: document.querySelector('.spage__rare')?.innerText ?? null, grid: !!document.querySelector('.spage .spec__week, .spage .spec__grid, .spage .spec__lane'), buttons: [...document.querySelectorAll('.spage__buttons button')].map((b) => b.textContent) })`))
+      const d = JSON.parse(await ev(`JSON.stringify({ seg: [...document.querySelectorAll('.spage__seg button')].map((b) => b.textContent), head: document.querySelector('.spage__head')?.textContent ?? null, why: document.querySelector('.spage__why')?.textContent ?? null, event: document.querySelector('.spage__event')?.textContent ?? null, side: !!document.querySelector('.spage__side svg, .spage__side .spage__none'), gap: document.querySelector('.spage__gap')?.textContent ?? null, marks: document.querySelector('.spage__marks')?.textContent ?? null, rare: document.querySelector('.spage__rare')?.innerText ?? null, grid: !!document.querySelector('.spage .spec__week, .spage .spec__grid, .spage .spec__lane'), buttons: [...document.querySelectorAll('.spage__buttons button')].map((b) => b.textContent) })`))
       console.log(`  ${JSON.stringify(d).slice(0, 500)}`)
-      if (!/^Sunset /.test(d.seg[0] ?? '') || !/^Sunrise /.test(d.seg[1] ?? '')) fail(`${label}: the toggle reads ${JSON.stringify(d.seg)}`)
+      /* Batch Flow, Section 4 (board D_Sky): the toggle names the day of each event, never one that has passed. */
+      const evening = d.seg.find((x) => /evening$|^Tonight$/.test(x))
+      const morning = d.seg.find((x) => /morning$/.test(x))
+      if (d.seg.length !== 2 || evening === undefined || morning === undefined) fail(`${label}: the toggle reads ${JSON.stringify(d.seg)}`)
+      if (!/^(Sunset|Sunrise) \d+:\d\d [AP]M · looking [NESW]+$/.test(d.event ?? '')) fail(`${label}: the event line reads ${JSON.stringify(d.event)}`)
+      if (!d.side) fail(`${label}: no side view toward the sun`)
+      if (d.gap === null || d.gap.trim() === '') fail(`${label}: no gap line under the side view`)
       if (!/^(Color (likely|possible|unlikely)|No call yet)$/.test(d.head ?? '')) fail(`${label}: the headline reads ${JSON.stringify(d.head)}`)
       if (!d.why || d.why === '…') fail(`${label}: no reason under the headline`)
-      if (d.checks.join('|') !== 'Clouds to light up|Gap at the horizon (' + (d.checks[1]?.match(/\((.*)\)/)?.[1] ?? '') + ')|Anything blocking the sun') fail(`${label}: the checks are ${JSON.stringify(d.checks)}`)
-      if (!/Golden ?\d+:\d\d [AP]M.*Set ?\d+:\d\d [AP]M.*Blue ?\d+:\d\d [AP]M.*Dark ?\d+:\d\d [AP]M|Blue ?\d+:\d\d [AP]M.*Glow ?\d+:\d\d [AP]M.*Rise ?\d+:\d\d [AP]M.*Day ?\d+:\d\d [AP]M/.test(d.marks ?? '')) fail(`${label}: the light bar reads ${JSON.stringify(d.marks)}`)
+      if (!/golden ?\d+:\d\d [AP]M.*color ?\d+:\d\d [AP]M–\d+:\d\d [AP]M.*blue ?\d+:\d\d [AP]M.*dark ?\d+:\d\d [AP]M|dark ?\d+:\d\d [AP]M.*blue ?\d+:\d\d [AP]M.*color ?\d+:\d\d [AP]M–\d+:\d\d [AP]M.*golden ?\d+:\d\d [AP]M/.test(d.marks ?? '')) fail(`${label}: the light bar reads ${JSON.stringify(d.marks)}`)
       if (!/RARE LIGHT THIS WEEK/i.test(d.rare ?? '')) fail(`${label}: no RARE LIGHT THIS WEEK`)
       if (d.grid) fail(`${label}: the icon-only week grid is still there`)
       if (!d.buttons.some((b) => /Calendar/.test(b))) fail(`${label}: no Calendar button`)

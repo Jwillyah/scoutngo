@@ -5,7 +5,7 @@ import { compassPoint } from '../core/field.ts'
 import type { LatLon } from '../core/geo.ts'
 import { leadLayer } from '../core/fireOutlook.ts'
 import { groundOf } from '../core/homeDay.ts'
-import { colorHeadline, lightMarks, plainChecks, plainReason, rareRows, type RareRow } from '../core/skyPage.ts'
+import { colorHeadline, eventDayWord, lightMarks, lightTimeline, nextEvent, nowShare, plainChecks, plainReason, rareRows, sideView, type RareRow } from '../core/skyPage.ts'
 import type { Special } from '../core/specialLight.ts'
 import { formatClock } from '../core/timezone.ts'
 import { fetchGlassWeek, fetchSpecialWeek, specialsFrom } from '../lib/specialLightData.ts'
@@ -51,9 +51,14 @@ type Kind = 'sunset' | 'sunrise'
 export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onViewfinder, onCalendar, onDetail }: SkyPageProps) {
   const brief = useBriefing(venue, timeZone, now, true)
   const clock = (d: Date | null) => (d === null ? '—' : formatClock(d, timeZone))
-  /* The next of each: the first day whose event is still to come. */
-  const next = (k: Kind) => brief.days.find((d) => d.events[k] !== null && (d.events[k] as Date).getTime() > now.getTime() - 20 * 60_000) ?? null
-  const days = { sunset: next('sunset'), sunrise: next('sunrise') }
+  /*
+   * THE NEXT OF EACH, NEVER ONE THAT HAS PASSED (Batch Flow, Section 4;
+   * field 9 Nov 8:31 PM: tonight's sunset, gone, and "This morning's light").
+   * The clock is App's, put right whenever the app comes back to the front
+   * (a phone that slept left it hours behind).
+   */
+  const realNow = now
+  const days = { sunset: nextEvent(brief.days, 'sunset', realNow), sunrise: nextEvent(brief.days, 'sunrise', realNow) }
   const soonest: Kind = days.sunrise?.events.sunrise != null && days.sunset?.events.sunset != null && days.sunrise.events.sunrise < days.sunset.events.sunset ? 'sunrise' : 'sunset'
   const [picked, setPicked] = useState<Kind | null>(null)
   const kind = picked ?? soonest
@@ -62,10 +67,17 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
   const read = day?.reads[kind] ?? null
   const verdict = day?.verdicts[kind] ?? null
   const az = event === null ? null : getPosition(event, venue.lat, venue.lon).azimuth
-  const checks = plainChecks(verdict === null ? null : leadLayer(verdict), az === null ? '—' : compassPoint(az))
+  const lead = verdict === null ? null : leadLayer(verdict)
+  const checks = plainChecks(lead, az === null ? '—' : compassPoint(az))
   const marks = event === null ? [] : lightMarks(kind, event, (t) => getPosition(t, venue.lat, venue.lon).altitude)
-  const span = marks.length === 4 && marks[0].at !== null && marks[3].at !== null ? marks[3].at.getTime() - marks[0].at.getTime() : null
-  const share = (a: Date | null, b: Date | null) => (span === null || a === null || b === null || span <= 0 ? 25 : Math.max(8, ((b.getTime() - a.getTime()) / span) * 100))
+  const segs = event === null ? [] : lightTimeline(kind, event, marks, read?.colorFrom ?? null, read?.colorTo ?? null)
+  const thumb = nowShare(segs, realNow)
+  const side = verdict === null ? null : sideView(verdict.sky.layers, event === null ? 0 : getPosition(event, venue.lat, venue.lon).altitude, lead?.layer ?? null)
+  const dayWordOf = (k: Kind) => {
+    const e = days[k]?.events[k] ?? null
+    return e === null ? (k === 'sunset' ? 'Sunset' : 'Sunrise') : eventDayWord(e, k, realNow, timeZone)
+  }
+  const segSpan = segs.length === 0 ? 1 : segs[segs.length - 1].to.getTime() - segs[0].from.getTime()
 
   /* The week's rare light: five models' rules and the glassy mornings (at a coast). */
   const [rare, setRare] = useState<{ key: string; rows: RareRow[] | null } | null>(null)
@@ -93,7 +105,7 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
     <>
       <p>The call: the same read as the home's Sky card, from six weather models along the line toward the sun, and from the stations in the hours before.</p>
       <p>Clouds to light up: cloud 30–90% over you and toward the sun, at the height the light reaches. Gap at the horizon: whether the light gets through to it, along 400 km toward the {kind}. Anything blocking: a thicker deck under it, over you, at 70% or more.</p>
-      <p>Tonight's light: the sun's height, Golden from +6°, Blue from −4°, Dark from −6° (civil dusk).</p>
+      <p>The light: the sun's height, golden from +6°, blue from −4°, dark from −6° (civil dusk); the colour window is the call's own, else the 20 minutes round the event. The side view draws each deck at its height and how much of the sky it covers toward the sun; a lit deck is warm.</p>
       <p>Rare light: five models' hours, by written rules. Fog: dew point within 2°F of the air and wind under 6 kt. Rainbow: showers within 25 km opposite the sun, the sun under 42°. Light rays: low cloud 30–80% with the sun under 25°. Mirror water: a low tide within 90 minutes of sunrise and a light wind. A rule, not a promise.</p>
     </>
   )
@@ -102,7 +114,7 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
     <PageShell
       kind="spage"
       title="Sky"
-      sub={`${placeName} · now`}
+      sub={`${placeName} · ${event === null ? 'now' : dayWordOf(kind).toLowerCase()}`}
       ground={ground}
       onBack={onBack}
       onMap={onMap}
@@ -118,41 +130,65 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
         </>
       }
     >
+      {/* Batch Flow, Section 4 (board D_Sky): Tonight · Tomorrow, the next sunset and sunrise, each by its own day. */}
       <div className="ui-seg spage__seg" role="tablist" aria-label="Sunset or sunrise">
-        {(['sunset', 'sunrise'] as const).map((k) => (
+        {/* In the order they come: at night the morning is first. */}
+        {(soonest === 'sunrise' ? (['sunrise', 'sunset'] as const) : (['sunset', 'sunrise'] as const)).map((k) => (
           <button key={k} type="button" role="tab" aria-selected={kind === k} className={`ui-seg__opt${kind === k ? ' ui-seg__opt--on' : ''}`} onClick={() => setPicked(k)}>
-            {k === 'sunset' ? 'Sunset' : 'Sunrise'} {clock(days[k]?.events[k] ?? null)}
+            {dayWordOf(k)}
           </button>
         ))}
       </div>
+      <p className="spage__event num">
+        {event === null ? '—' : `${kind === 'sunset' ? 'Sunset' : 'Sunrise'} ${clock(event)}`}
+        {az === null ? '' : ` · looking ${compassPoint(az)}`}
+      </p>
       <p className="spage__head">{brief.status === 'loading' && read === null ? '…' : colorHeadline(read?.call ?? null)}</p>
       <p className="spage__why">{plainReason(read?.why ?? null) ?? (brief.status === 'loading' ? 'Reading the forecast…' : 'The forecast did not say.')}</p>
 
-      <ul className="spage__checks">
-        {checks.map((c) => (
-          <li key={c.label} className="spage__check">
-            <span>{c.label}</span>
-            <b>{c.value}</b>
-          </li>
-        ))}
-      </ul>
+      <section className="dcard spage__side" aria-label="The sky toward the sun">
+        <p className="dcard__label">The sky toward the sun</p>
+        {side === null ? (
+          <p className="spage__none">The models along the line toward the sun have not answered.</p>
+        ) : (
+          <svg className="spage__sidepic" viewBox="0 0 300 150" role="img" aria-label={checks.map((c) => `${c.label}: ${c.value}`).join('. ')}>
+            {side.layers.map((l) => (
+              <g key={l.layer}>
+                <line x1="0" x2="300" y1={l.y * 150} y2={l.y * 150} className="spage__lvl" />
+                <text x="4" y={l.y * 150 - 4} className="spage__lvlk">
+                  {l.layer.toUpperCase()} {Math.round((l.heightM * 3.28084) / 1000)}K{l.cover === null ? '' : ` · ${Math.round(l.cover)}%`}
+                </text>
+                {l.canvas ? <ellipse cx="200" cy={l.y * 150} rx="95" ry="9" className={`spage__deck${l.lit ? ' spage__deck--lit' : ''}`} /> : null}
+              </g>
+            ))}
+            <line x1="0" x2="300" y1={0.92 * 150} y2={0.92 * 150} className="spage__horizon" />
+            {side.path === null ? null : <line x1={side.path.from.x * 300} y1={side.path.from.y * 150} x2={side.path.to.x * 300} y2={side.path.to.y * 150} className="spage__ray" />}
+            <circle cx={side.sun.x * 300} cy={side.sun.y * 150} r="10" className="spage__sun" />
+            {event === null ? null : (
+              <text x={side.sun.x * 300 + 16} y={side.sun.y * 150 - 6} className="spage__sunk">
+                sun {clock(event)}{az === null ? '' : ` · ${Math.round(az)}°`}
+              </text>
+            )}
+          </svg>
+        )}
+        <p className="spage__gap">{read?.gapLine ?? checks.map((c) => `${c.label.replace(/ \(.*\)$/, '')}: ${c.value}`).join(' · ')}</p>
+      </section>
 
-      <section className="dcard spage__light" aria-label={kind === 'sunset' ? "Tonight's light" : "This morning's light"}>
-        <p className="dcard__label">{kind === 'sunset' ? "Tonight's light" : "This morning's light"}</p>
-        <div className={`spage__bar spage__bar--${kind}`} aria-hidden="true">
-          {marks.slice(0, 3).map((m, i) => (
-            <i key={m.label} style={{ flexBasis: `${share(m.at, marks[i + 1].at)}%` }} />
-          ))}
-          <i style={{ flexBasis: '14%' }} />
-        </div>
+      <section className="dcard spage__light" aria-label={`${dayWordOf(kind)}'s light`}>
         <p className="spage__marks num">
-          {marks.map((m) => (
-            <span key={m.label} className="spage__mark">
-              <span>{m.label}</span>
-              <b>{clock(m.at)}</b>
+          {segs.map((g) => (
+            <span key={g.key} className="spage__mark">
+              <span>{g.label}</span>
+              <b>{g.key === 'color' ? `${clock(g.from)}–${clock(g.to)}` : clock(g.from)}</b>
             </span>
           ))}
         </p>
+        <div className="spage__bar" aria-hidden="true">
+          {segs.map((g) => (
+            <i key={g.key} className={`spage__seg2 spage__seg2--${g.key}`} style={{ flexBasis: `${((g.to.getTime() - g.from.getTime()) / segSpan) * 100}%` }} />
+          ))}
+          {thumb === null ? null : <span className="spage__thumb" style={{ left: `${thumb * 100}%` }} />}
+        </div>
       </section>
 
       <section className="dcard spage__rare" aria-label="Rare light this week">

@@ -61,3 +61,12 @@ describe('the day in words', () => {
     expect(dayLines(day({ forecast: false }), clock, speed)[0].text).toMatch(/^Past the forecast/)
   })
 })
+
+describe('never an event that has passed (Batch Flow, Section 4)', () => {
+  it('today after sunrise, its sunrise lines go; the sunset ones stay', () => {
+    const d = day({ marks: ['surf', 'colour-set'], facts: { windAtSunrise: { speedMps: 1, relation: 'offshore' }, lowNearSunset: new Date(SET.getTime() + 30 * 60_000) } })
+    const after = new Date(RISE.getTime() + 3 * 3_600_000)
+    expect(dayLines(d, clock, speed, after).map((l) => l.cat)).toEqual(['sky', 'tide'])
+    expect(dayLines(d, clock, speed).map((l) => l.cat)).toEqual(['surf', 'sky', 'glassy', 'tide'])
+  })
+})

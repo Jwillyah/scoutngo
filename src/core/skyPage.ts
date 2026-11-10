@@ -143,3 +143,106 @@ export function rareRows(list: readonly Special[], now: Date): RareRow[] {
 export function rainbowBrief(showersPoint: string, sunPoint: string, sunDeg: number): string {
   return `showers to the ${showersPoint}, sun ${Math.round(sunDeg)}° up in the ${sunPoint}`
 }
+
+/* ------------------------------------------- the sky toward the sun (D_Sky) */
+
+/** The heights the side view draws the decks at: the forecast's own layer bands' middles (src/core/fireOutlook.ts LAYER_BAND_M), in metres. */
+export const SIDE_TOP_M = 12_000
+
+export interface SideLayer {
+  layer: 'low' | 'mid' | 'high'
+  /** Metres up, and as a share of the view's height from the foot. */
+  heightM: number
+  y: number
+  cover: number | null
+  /** Enough cloud to light (30-90%). */
+  canvas: boolean
+  /** Lit at the event, by the models' mean. */
+  lit: boolean
+}
+
+/**
+ * The side view toward the sun: each deck at its real height (a square root
+ * of the height, so the low deck is not squashed against the sea), the sun
+ * at its height above the horizon, and the light's path from it to the deck
+ * the page speaks for.
+ */
+export function sideView(layers: readonly { layer: 'low' | 'mid' | 'high'; heightM: number; cover: number | null; canvas: boolean; fires: boolean }[], sunAltDeg: number, leadLayer: 'low' | 'mid' | 'high' | null): { layers: SideLayer[]; sun: { x: number; y: number }; path: { from: { x: number; y: number }; to: { x: number; y: number } } | null } {
+  const y = (m: number) => 0.92 - 0.82 * Math.sqrt(Math.max(0, Math.min(SIDE_TOP_M, m)) / SIDE_TOP_M)
+  const out = layers.map((l) => ({ layer: l.layer, heightM: l.heightM, y: y(l.heightM), cover: l.cover, canvas: l.canvas, lit: l.fires }))
+  /* The sun near the horizon on the left, a little above or below it by its height (a degree is a few per cent of the view). */
+  const sun = { x: 0.12, y: Math.max(0.6, Math.min(1.02, 0.92 - sunAltDeg * 0.03)) }
+  const lead = out.find((l) => l.layer === leadLayer && l.canvas) ?? null
+  return { layers: out, sun, path: lead === null ? null : { from: sun, to: { x: 0.9, y: lead.y } } }
+}
+
+/* ------------------------------------------------- the light, as a bar */
+
+export interface LightSegment {
+  key: 'golden' | 'color' | 'blue' | 'dark'
+  label: string
+  from: Date
+  to: Date
+}
+
+/**
+ * Golden · color · blue · dark, in the order they come (sunset), or dark ·
+ * blue · color · golden (sunrise): golden from the sun at +6°, the colour
+ * window from the call when it has one (else the 20 minutes round the
+ * event), blue from −4°, dark from −6°. A segment with no time is left out.
+ */
+export function lightTimeline(kind: 'sunrise' | 'sunset', event: Date, marks: readonly LightMark[], colorFrom: Date | null, colorTo: Date | null): LightSegment[] {
+  const at = (label: string) => marks.find((m) => m.label === label)?.at ?? null
+  const cf = colorFrom ?? new Date(event.getTime() - 10 * 60_000)
+  const ct = colorTo ?? new Date(event.getTime() + 10 * 60_000)
+  if (kind === 'sunset') {
+    const golden = at('Golden')
+    const blue = at('Blue')
+    const dark = at('Dark')
+    const segs: (LightSegment | null)[] = [
+      golden === null ? null : { key: 'golden', label: 'golden', from: golden, to: cf },
+      { key: 'color', label: 'color', from: cf, to: ct },
+      blue === null ? null : { key: 'blue', label: 'blue', from: blue, to: dark ?? new Date(blue.getTime() + 15 * 60_000) },
+      dark === null ? null : { key: 'dark', label: 'dark', from: dark, to: new Date(dark.getTime() + 30 * 60_000) },
+    ]
+    return segs.filter((x): x is LightSegment => x !== null && x.to.getTime() > x.from.getTime())
+  }
+  const blue = at('Blue')
+  const glow = at('Glow')
+  const day = at('Day')
+  const segs: (LightSegment | null)[] = [
+    blue === null ? null : { key: 'dark', label: 'dark', from: new Date(blue.getTime() - 30 * 60_000), to: blue },
+    blue === null ? null : { key: 'blue', label: 'blue', from: blue, to: glow ?? cf },
+    { key: 'color', label: 'color', from: cf, to: ct },
+    day === null ? null : { key: 'golden', label: 'golden', from: ct, to: day },
+  ]
+  return segs.filter((x): x is LightSegment => x !== null && x.to.getTime() > x.from.getTime())
+}
+
+/** Where now sits along the bar, 0 to 1, or null when it is outside it. */
+export function nowShare(segs: readonly LightSegment[], now: Date): number | null {
+  if (segs.length === 0) return null
+  const a = segs[0].from.getTime()
+  const b = segs[segs.length - 1].to.getTime()
+  const t = now.getTime()
+  return t < a || t > b ? null : (t - a) / (b - a)
+}
+
+/* ------------------------------------------------ which events, which day */
+
+/** "Tonight", "Tomorrow morning", "Tomorrow evening", "Thu morning": the day word for an event, from now, in the spot's zone. */
+export function eventDayWord(event: Date, kind: 'sunrise' | 'sunset', now: Date, timeZone: string): string {
+  const iso = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d)
+  const today = iso(now)
+  const tomorrow = iso(new Date(now.getTime() + 86_400_000))
+  const d = iso(event)
+  const part = kind === 'sunset' ? 'evening' : 'morning'
+  if (d === today) return kind === 'sunset' ? 'Tonight' : 'This morning'
+  if (d === tomorrow) return `Tomorrow ${part}`
+  return `${new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'short' }).format(event)} ${part}`
+}
+
+/** The next event of a kind still to come: never one that has passed (Batch Flow, Section 4; field 9 Nov 8:31 PM: tonight's past sunset was shown). */
+export function nextEvent<T extends { events: Record<'sunrise' | 'sunset', Date | null> }>(days: readonly T[], kind: 'sunrise' | 'sunset', now: Date): T | null {
+  return days.find((d) => d.events[kind] !== null && (d.events[kind] as Date).getTime() > now.getTime()) ?? null
+}
