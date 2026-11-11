@@ -29,6 +29,14 @@ describe('the field report card', () => {
     expect(text(html([r(1)]))).toContain('1 report here · 1 with a buoy; 3 calibrate this spot')
     expect(text(html([r(1), r(2, '2-3'), r(3, '4-6')]))).toContain('this spot breaks 1.17× the buoy, from yours')
   })
+  /* Batch Polish, Section 6: a photo prefills the time and the spot; the recent list is every spot's, newest first. */
+  it('offers Add a photo (not kept, not sent) and lists the recent reports of every spot', () => {
+    const page = renderToStaticMarkup(<FieldReportCard spot="k" name="S-Turns" at={{ lat: 35.6085, lon: -75.4655 }} timeZone="America/New_York" buoyFt={3} now={() => Date.UTC(2026, 10, 10, 12)} initial={[r(1), { ...r(2), spot: 'm', name: 'Mirlo Beach' }]} startOpen />)
+    const t = text(page)
+    expect(page).toContain('type="file"')
+    expect(t).toContain('the photo is not kept or sent')
+    expect(t.indexOf('Mirlo Beach ·')).toBeLessThan(t.indexOf('S-Turns · 3–4 ft'))
+  })
   it('never says safe or clear', () => {
     expect(text(html([r(1)]))).not.toMatch(/\b(safe|clear|all clear|no hazard)/i)
   })

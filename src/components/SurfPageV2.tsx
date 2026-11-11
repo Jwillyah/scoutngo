@@ -248,6 +248,7 @@ export function SurfBody({ now, timeZone, spot, spotName, away, sea, stats, kept
       {/* Batch Beach, Section 3: one tap after a session or a look; kept on this phone, calibrating this spot. */}
       <FieldReportCard
         spot={spotKey(spot)}
+        at={spot}
         name={spotName}
         timeZone={timeZone}
         buoyFt={sea.buoy?.status === 'ok' && now.getTime() - sea.buoy.at.getTime() <= LEAN_BUOY_MAX_AGE_MS ? buoyFaceFt({ waveM: sea.buoy.waveM, periodS: sea.buoy.periodS, fromDeg: sea.buoy.fromDeg }, facing, BEACH_CAP) : null}

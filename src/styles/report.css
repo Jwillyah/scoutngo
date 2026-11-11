@@ -108,3 +108,32 @@
   color: var(--color-text-muted);
   font-size: var(--text-md);
 }
+
+/* Batch Polish, Section 6: Add a photo, a 44 px row like the share switch; the file input itself is the tap target. */
+.drep__photo {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+.drep__photo {
+  position: relative;
+}
+/* The file input sits over the whole row, invisible: the row is the tap target, the pill is what shows. */
+.drep__photo input[type='file'] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.drep__photobtn {
+  flex: none;
+  padding: 10px 14px;
+  border: var(--line-hair) solid var(--color-line-strong);
+  border-radius: 999px;
+  color: var(--color-text);
+  font-weight: 700;
+}

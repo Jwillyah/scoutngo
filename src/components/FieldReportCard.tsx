@@ -1,7 +1,13 @@
 import '../styles/report.css'
 import { useState } from 'react'
 import { REPORT_RATINGS, REPORT_SIZES, shareText, sizeOf, spotFactor, SPOT_FACTOR_MIN_REPORTS, type FieldReport, type ReportRating, type ReportSize } from '../core/fieldReports.ts'
+import { readPhotoFacts } from '../core/exif.ts'
+import type { LatLon } from '../core/geo.ts'
 import { formatClock } from '../core/timezone.ts'
+import { SURF_SPOTS } from '../data/surfSpots.ts'
+import { BUOY_WITHIN_MS, choice, photoPrefill, type PhotoPrefill, type SpotChoice } from '../lib/photoReport.ts'
+import { reviveSpots, SPOTS_STORAGE_KEY } from '../lib/spots.ts'
+import { venueLatLon } from '../lib/venue.ts'
 import { addReport, readReports, removeReport } from '../lib/fieldReportStore.ts'
 import { DCard } from './DetailShell.tsx'
 import { PageGroup } from '../lib/pageGroup.ts'
@@ -21,6 +27,8 @@ export interface FieldReportCardProps {
   startOpen?: boolean
   spot: string
   name: string
+  /** Batch Polish, Section 6: the spot's own point, for a photo's position to be matched against (never stored). */
+  at?: LatLon
   timeZone: string
   /** The live buoy as faces here with the factor at 1; null when there is none. */
   buoyFt: number | null
@@ -29,7 +37,7 @@ export interface FieldReportCardProps {
   initial?: FieldReport[]
 }
 
-export function FieldReportCard({ spot, name, timeZone, buoyFt, now, initial, startOpen = false }: FieldReportCardProps) {
+export function FieldReportCard({ spot, name, at: spotAt, timeZone, buoyFt, now, initial, startOpen = false }: FieldReportCardProps) {
   const [reports, setReports] = useState<FieldReport[]>(() => initial ?? readReports())
   const [size, setSize] = useState<ReportSize | null>(null)
   const [rating, setRating] = useState<ReportRating | null>(null)
@@ -41,13 +49,25 @@ export function FieldReportCard({ spot, name, timeZone, buoyFt, now, initial, st
   const withBuoy = here.filter((r) => r.buoyFt !== null).length
   const factor = spotFactor(reports, spot)
 
+  /* Batch Polish, Section 6: a photo prefills the time and the spot; the photo itself is read here and dropped. */
+  const [photo, setPhoto] = useState<PhotoPrefill | null>(null)
+  const pickPhoto = async (file: File | undefined) => {
+    if (file === undefined || spotAt === undefined) return
+    const facts = readPhotoFacts(await file.slice(0, 256 * 1024).arrayBuffer())
+    setPhoto(photoPrefill(facts, choice(name, spotAt), spotChoices(), timeZone))
+  }
   const save = () => {
     if (size === null || rating === null) return
-    const r: FieldReport = { spot, name, at: now(), size, rating, buoyFt }
+    const at = photo?.at ?? now()
+    const target = photo?.spot ?? { key: spot, name }
+    /* The live buoy stands beside a report about now, here; a photo from earlier, or of another spot, has none. */
+    const buoy = target.key === spot && Math.abs(at - now()) <= BUOY_WITHIN_MS ? buoyFt : null
+    const r: FieldReport = { spot: target.key, name: target.name, at, size, rating, buoyFt: buoy }
     setReports(addReport(r))
     setSaved(r)
     setSize(null)
     setRating(null)
+    setPhoto(null)
   }
 
   const count =
@@ -94,6 +114,23 @@ export function FieldReportCard({ spot, name, timeZone, buoyFt, now, initial, st
           </button>
         ))}
       </div>
+      {spotAt === undefined ? null : (
+        <label className="drep__photo">
+          <input type="file" accept="image/*" onChange={(e) => {
+            void pickPhoto(e.target.files?.[0])
+            e.target.value = ''
+          }} />
+          <span className="drep__photobtn">Add a photo</span>
+          <span>its time and place fill this in; the photo is not kept or sent</span>
+        </label>
+      )}
+      {photo === null ? null : (
+        <p className="drep__small" data-report-photo>
+          {photo.note}
+          {photo.at === null ? '' : ` ${formatClock(new Date(photo.at), timeZone)}`}
+          {photo.spot === null ? '' : ` · ${photo.spot.name}`}
+        </p>
+      )}
       <label className="drep__share">
         <input type="checkbox" checked={share} onChange={(e) => setShare(e.target.checked)} />
         <span>Also share publicly: the spot’s name, the hour, the size and the rating, nothing else. Off unless you tick it; you post it yourself.</span>
@@ -116,15 +153,16 @@ export function FieldReportCard({ spot, name, timeZone, buoyFt, now, initial, st
         </p>
       )}
       <p className="drep__small">{count}</p>
-      {here.length === 0 ? null : (
-        <ul className="drep__list">
-          {here
-            .slice(-3)
+      {/* Batch Polish, Section 6: this phone's recent reports, every spot, newest first. */}
+      {reports.length === 0 ? null : (
+        <ul className="drep__list" aria-label="Your recent reports">
+          {reports
+            .slice(-8)
             .reverse()
             .map((r) => (
-              <li key={r.at}>
+              <li key={`${r.spot}-${r.at}`}>
                 <span>
-                  {sizeOf(r.size).words} · {r.rating} · {formatClock(new Date(r.at), timeZone)}
+                  {r.name} · {sizeOf(r.size).words} · {r.rating} · {formatClock(new Date(r.at), timeZone)}
                 </span>
                 <button type="button" className="drep__del" aria-label="Delete this report" onClick={() => setReports(removeReport(r.at, r.spot))}>
                   ×
@@ -138,4 +176,18 @@ export function FieldReportCard({ spot, name, timeZone, buoyFt, now, initial, st
       </PageGroup.Provider>
     </>
   )
+}
+
+/** The spots a photo can be matched to: the surf spots and your saved ones (read here, never sent). */
+function spotChoices(): SpotChoice[] {
+  const out: SpotChoice[] = SURF_SPOTS.map((s) => choice(s.name, s.at))
+  try {
+    for (const sp of reviveSpots(JSON.parse(localStorage.getItem(SPOTS_STORAGE_KEY) ?? '[]'))) {
+      const at = venueLatLon(sp.venue)
+      if (at !== null) out.push(choice(sp.name, at))
+    }
+  } catch {
+    /* No saved spots readable: the surf spots alone. */
+  }
+  return out
 }
