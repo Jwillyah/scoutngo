@@ -8,6 +8,7 @@ import {
   type TideStation,
 } from '../core/tide.ts'
 import { fetchPredictions, fetchStations, type TidePredictions } from './noaa.ts'
+import { coastFacing } from './coast.ts'
 
 /**
  * Tide for the venue, or a plain statement of why there is none.
@@ -43,8 +44,33 @@ export function useTide(venue: LatLon | null, shootAt: Date | null): TideInfo {
   const lon = venue?.lon ?? null
   const dayKey = shootAt === null ? null : shootAt.toISOString().slice(0, 10)
 
+  /*
+   * Batch Beach, Section 1: a pin on a barrier island's sound side takes its
+   * tide from the ocean beach (src/lib/coast.ts). Asked beside the tide, never
+   * before it: offline the coast's open-sea tiles may not be in the pack, and
+   * the tide must not wait on them. The pin's own station first; the ocean
+   * beach's once the coast has answered "island".
+   */
+  const key = lat === null || lon === null ? null : `${lat},${lon}`
+  const [island, setIsland] = useState<{ key: string; at: LatLon } | null>(null)
   useEffect(() => {
-    if (lat === null || lon === null || dayKey === null || shootAt === null) {
+    if (key === null || lat === null || lon === null) return
+    let live = true
+    void coastFacing({ lat, lon })
+      .then((c) => {
+        if (live && typeof c === 'object' && c.side === 'island' && c.beachAt !== undefined) setIsland({ key, at: c.beachAt })
+      })
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [key, lat, lon])
+  const beach = island !== null && island.key === key ? island.at : null
+  const fromLat = beach?.lat ?? lat
+  const fromLon = beach?.lon ?? lon
+
+  useEffect(() => {
+    if (lat === null || lon === null || fromLat === null || fromLon === null || dayKey === null || shootAt === null) {
       setInfo({ status: 'idle' })
       return
     }
@@ -61,8 +87,11 @@ export function useTide(venue: LatLon | null, shootAt: Date | null): TideInfo {
         return false
       }
 
-      /* Batch MAP2, Section 2: the open coast first among the nearest (a spot on the beach, not up a creek). */
-      const candidates = openCoastFirst(nearestStations({ lat, lon }, stations.stations, STATION_ATTEMPTS + 3)).slice(0, STATION_ATTEMPTS)
+      /*
+       * Batch MAP2, Section 2: the open coast first among the nearest (a spot on the beach, not up a creek).
+       * Batch Beach, Section 1: from the ocean beach, when the spot is on a barrier island's sound side (above).
+       */
+      const candidates = openCoastFirst(nearestStations({ lat: fromLat, lon: fromLon }, stations.stations, STATION_ATTEMPTS + 3)).slice(0, STATION_ATTEMPTS)
       const nearest = candidates[0]
       if (nearest === undefined) {
         setInfo({ status: 'unavailable', reason: 'NOAA listed no tide stations.' })
@@ -118,7 +147,7 @@ export function useTide(venue: LatLon | null, shootAt: Date | null): TideInfo {
      * every drag of the time scrubber.
      */
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lat, lon, dayKey])
+  }, [lat, lon, fromLat, fromLon, dayKey])
 
   return info
 }

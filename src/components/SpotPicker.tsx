@@ -8,6 +8,7 @@ import { SURF_SPOTS, type SurfSpot } from '../data/surfSpots.ts'
 import { locateOnce, locateWords } from '../lib/locateOnce.ts'
 import { geocodeWords, type GeoAnswer } from '../lib/spotSearchData.ts'
 import { Chip } from './ui.tsx'
+import { distanceMeters } from '../core/geo.ts'
 
 /*
  * WHERE DO YOU SHOOT? (Batch I, Section 1; board "BATCH I · first run").
@@ -23,7 +24,8 @@ const KNOWN: KnownSpot[] = COAST_CAMS.filter((c, i) => COAST_CAMS.findIndex((d) 
 /* Batch Map, Section 2: our own spots to search, the surf spots with their aliases first, then the cams' beaches and piers. */
 const OWN: SurfSpot[] = [
   ...SURF_SPOTS,
-  ...KNOWN.filter((k) => !SURF_SPOTS.some((s) => Math.abs(s.at.lat - k.at.lat) < 0.003 && Math.abs(s.at.lon - k.at.lon) < 0.003)).map((k) => ({ id: k.id, name: k.name.split(',')[0].trim(), aliases: [k.name], town: k.name.split(',')[1]?.trim() ?? '', state: k.state ?? '', at: k.at, facing: k.facing ?? 90, kind: spotKind(k.name) === 'pier' ? ('pier' as const) : ('surf' as const) })),
+  /* A cam within 500 m of one of our spots is that spot (Batch Beach, Section 1: "Rodanthe, S-Turns" and "S-Turns" were two rows). */
+  ...KNOWN.filter((k) => !SURF_SPOTS.some((s) => distanceMeters(s.at, k.at) <= 500)).map((k) => ({ id: k.id, name: k.name.split(',')[0].trim(), aliases: [k.name], town: k.name.split(',')[1]?.trim() ?? '', state: k.state ?? '', at: k.at, facing: k.facing ?? 90, kind: spotKind(k.name) === 'pier' ? ('pier' as const) : ('surf' as const) })),
 ]
 const CHIPS: readonly { id: 'all' | Group; label: string }[] = [
   { id: 'all', label: 'All' },

@@ -29,7 +29,8 @@ describe('search v2', () => {
     const got = search('first st outer banks', [IDAHO, RESTAURANT, HOSPITAL, ACCESS, KH_ACCESS])
     expect(got[0].name).toBe('1st Street')
     expect(got[0].where).toBe('Kill Devil Hills, NC')
-    expect(got[0].note).toBe('faces ESE')
+    /* Batch Beach, Section 1: the coastline's own facing, 61° (measurements/2026-11-10-spot-facing.md); the hand-set 110 read ESE. */
+    expect(got[0].note).toBe('faces ENE')
     expect(got.map((r) => r.name)).not.toContain('Outer Banks')
     expect(got.map((r) => r.name)).not.toContain('First Street Grill')
     expect(got.map((r) => r.name)).not.toContain('Outer Banks Hospital')

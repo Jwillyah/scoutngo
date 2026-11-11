@@ -26,6 +26,46 @@ export const GLASSY_MPS = 2.6
 
 export type SeaAt = (at: LatLon) => boolean
 
+/*
+ * THE OCEAN SIDE OF A BARRIER ISLAND (Batch Beach, Section 1; Rodanthe, 10
+ * Nov: the pin sat on the Pamlico Sound side, the beach "faced" west, the
+ * east swell was blocked, a SW wind read cross-shore and the tide was the
+ * sound's). The map's ocean polygons are cut from the coastline, so a sound
+ * or a bay is "ocean" too. A facing is OPEN when the sea goes on along it:
+ * every point OPEN_SEA_KM out is sea. A facing that is not open is a sound,
+ * a bay or a lagoon; across the island, within ISLAND_CROSS_M, the open
+ * ocean is the beach.
+ */
+export const OPEN_SEA_KM = [20, 60, 120] as const
+export const ISLAND_CROSS_M = 3000
+const SIDE_TRIES = [0, -15, 15, -30, 30, -45, 45] as const
+
+export const opensOnSea = (venue: LatLon, facing: number, farSea: SeaAt): boolean => OPEN_SEA_KM.every((km) => farSea(destinationPoint(venue, facing, km * 1000)))
+
+/** The ocean beach across the island from a venue whose facing is not open: the last land point before the open sea, and the bearing walked. Null with no open sea within ISLAND_CROSS_M. */
+export function oceanSide(venue: LatLon, facing: number, nearSea: SeaAt, farSea: SeaAt): { beachAt: LatLon; bearing: number } | null {
+  let best: { beachAt: LatLon; bearing: number; m: number } | null = null
+  for (const d of SIDE_TRIES) {
+    const b = norm(facing + 180 + d)
+    if (!opensOnSea(venue, b, farSea)) continue
+    /* Off the water first (a pin in the sound), then on to the next water: the ocean. */
+    let land = !nearSea(venue)
+    let last = venue
+    for (let m = WALK_STEP_M; m <= ISLAND_CROSS_M; m += WALK_STEP_M) {
+      const p = destinationPoint(venue, b, m)
+      const wet = nearSea(p)
+      if (!land) {
+        if (!wet) land = true
+      } else if (wet) {
+        if (best === null || m < best.m) best = { beachAt: last, bearing: b, m }
+        break
+      }
+      if (!wet) last = p
+    }
+  }
+  return best === null ? null : { beachAt: best.beachAt, bearing: best.bearing }
+}
+
 const norm = (d: number) => ((d % 360) + 360) % 360
 export const angleApart = (a: number, b: number): number => {
   const d = Math.abs(norm(a) - norm(b))

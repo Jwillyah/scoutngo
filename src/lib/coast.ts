@@ -7,8 +7,9 @@
  * cached on the phone). Zoom 12 tiles: about 8 km across here, so a 1.5 km
  * circle touches at most four.
  */
-import { CIRCLE_M, facingByCircle, facingByNearest } from '../core/coastFacing.ts'
-import { destinationPoint, type LatLon } from '../core/geo.ts'
+import { CIRCLE_M, facingByCircle, facingByNearest, oceanSide, opensOnSea, OPEN_SEA_KM } from '../core/coastFacing.ts'
+import { destinationPoint, distanceMeters, type LatLon } from '../core/geo.ts'
+import { SURF_SPOTS } from '../data/surfSpots.ts'
 import type { TilePoint } from '../core/oceanMask.ts'
 import { boxAround, tileAt, tilesInBox } from './tileRange.ts'
 import { loadVectorTile, oceanFeatures, vectorExtent } from './vectorTiles.ts'
@@ -20,7 +21,19 @@ export interface CoastFacing {
   facing: number
   byCircle: number | null
   byNearest: number | null
+  /**
+   * Batch Beach, Section 1: 'open' when the facing goes on to open sea;
+   * 'island' when the venue was on a barrier island's sound side and the
+   * facing is its ocean side's, read at `beachAt`; 'enclosed' when the water
+   * is a sound or bay with no open ocean across from it.
+   */
+  side?: 'open' | 'island' | 'enclosed'
+  /** The ocean beach the facing is read at: the venue, or across the island. */
+  beachAt?: LatLon
 }
+
+/** Far out, the coarse tiles: zoom 7, about 250 km across here: Pamlico Sound runs 70 km and more from the barrier islands, the open sea does not end. */
+export const OPEN_ZOOM = 7
 
 interface Loaded {
   x: number
@@ -42,19 +55,19 @@ function inRings(rings: TilePoint[][], px: number, py: number): boolean {
 }
 
 /** A sea test over the tiles around `venue`, or null when the tiles cannot be had. */
-export async function seaTestAround(venue: LatLon, radiusM = CIRCLE_M + 200): Promise<((at: LatLon) => boolean) | null> {
-  const ids = tilesInBox(boxAround(venue, radiusM), COAST_ZOOM)
+export async function seaTestAround(venue: LatLon, radiusM = CIRCLE_M + 200, zoom = COAST_ZOOM): Promise<((at: LatLon) => boolean) | null> {
+  const ids = tilesInBox(boxAround(venue, radiusM), zoom)
   const loaded: Loaded[] = []
   for (const id of ids) {
-    const tile = await loadVectorTile({ z: COAST_ZOOM, x: id.x, y: id.y })
+    const tile = await loadVectorTile({ z: zoom, x: id.x, y: id.y })
     if (tile === null) return null
     /* Each feature's rings by the even-odd rule: a hole is a hole. A tile with no ocean adds nothing: all land. */
     const extent = vectorExtent(tile)
     for (const rings of oceanFeatures(tile)) loaded.push({ x: id.x, y: id.y, extent, rings })
   }
-  const n = 2 ** COAST_ZOOM
+  const n = 2 ** zoom
   return (at: LatLon) => {
-    const t = tileAt(at, COAST_ZOOM)
+    const t = tileAt(at, zoom)
     const s = Math.sin((at.lat * Math.PI) / 180)
     const fx = ((at.lon + 180) / 360) * n - t.x
     const fy = (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * n - t.y
@@ -66,13 +79,27 @@ export async function seaTestAround(venue: LatLon, radiusM = CIRCLE_M + 200): Pr
  * Which way the beach faces; 'inland' when no sea is within CIRCLE_M; 'unavailable'
  * when the tiles cannot be had, which is not the same as no sea.
  */
+/** A point this close to one of our surf spots is that spot: its own ocean beach and facing (Batch Beach, Section 1). */
+export const SPOT_SNAP_M = 500
+
 export async function coastFacing(venue: LatLon): Promise<CoastFacing | 'inland' | 'unavailable'> {
+  const spot = SURF_SPOTS.find((s) => distanceMeters(venue, s.at) <= SPOT_SNAP_M)
+  if (spot !== undefined) return { facing: spot.facing, byCircle: null, byNearest: null, side: 'open', beachAt: spot.at }
   const sea = await seaTestAround(venue)
   if (sea === null) return 'unavailable'
   const byCircle = facingByCircle(venue, sea)
   const byNearest = facingByNearest(venue, sea)
   const facing = byCircle ?? byNearest
-  return facing === null ? 'inland' : { facing, byCircle, byNearest }
+  if (facing === null) return 'inland'
+  /* Batch Beach, Section 1: is it the open sea, or a sound? The far tiles, once; without them the facing stands as read. */
+  const far = await seaTestAround(venue, (OPEN_SEA_KM[OPEN_SEA_KM.length - 1] + 5) * 1000, OPEN_ZOOM)
+  if (far === null || opensOnSea(venue, facing, far)) return { facing, byCircle, byNearest, side: 'open', beachAt: venue }
+  const across = oceanSide(venue, facing, sea, far)
+  if (across === null) return { facing, byCircle, byNearest, side: 'enclosed', beachAt: venue }
+  /* At the ocean beach, the nearest water is the ocean: its facing, by the same walk. */
+  const there = await seaTestAround(across.beachAt)
+  const oceanFacing = (there === null ? null : facingByNearest(across.beachAt, there)) ?? across.bearing
+  return { facing: oceanFacing, byCircle: null, byNearest: oceanFacing, side: 'island', beachAt: across.beachAt }
 }
 
 /** Metres from the venue to the nearest sea along any bearing, within `withinM`, or null. Phase 1b's coastal test. */

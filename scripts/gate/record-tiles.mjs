@@ -23,8 +23,12 @@ export const PLACES = [
   { name: 'Brew River, the calibration venue', lat: 38.364236, lon: -75.605912 },
   { name: 'Hampton Coliseum (the buildings audit)', lat: 37.0347, lon: -76.3814 },
   { name: 'Big Meadows, Shenandoah (inland)', lat: 38.5285, lon: -78.4383 },
+  /* Batch Beach, Section 1: the 10 Nov Rodanthe pin, on the sound side of a barrier island. */
+  { name: 'Rodanthe, the 10 Nov pin', lat: 35.5935, lon: -75.4679 },
 ]
 const RINGS = [
+  /* Batch Beach, Section 1: the open-sea test reads zoom 7 out to 120 km (src/lib/coast.ts OPEN_ZOOM). */
+  { z: 7, radiusM: 130_000 },
   { z: 12, radiusM: 3000 },
   { z: 13, radiusM: 1500 },
   { z: 14, radiusM: 1200 },

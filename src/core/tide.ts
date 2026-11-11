@@ -109,7 +109,8 @@ export function nearestStations(
  * go after the others; a station further than that is never preferred.
  */
 export const OPEN_COAST_SLACK_KM = 3
-const INLAND_WATER = /\b(interior|creek|canal|cove|lake|river|channel|basin|marsh|pond|lagoon|bayou|landing)\b/i
+/* Batch Beach, Section 1: a sound and a marina are inland water to a beach on the ocean (Rodanthe, 10 Nov: the sound's 0.4 ft range for a 3.4 ft ocean tide). */
+const INLAND_WATER = /\b(interior|creek|canal|cove|lake|river|channel|basin|marsh|pond|lagoon|bayou|landing|sound|marina)\b/i
 export const inlandWaterName = (name: string): boolean => INLAND_WATER.test(name)
 
 export function openCoastFirst(candidates: readonly NearestStation[]): NearestStation[] {
