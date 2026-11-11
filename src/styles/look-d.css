@@ -350,3 +350,8 @@
   color: var(--color-text);
   font-weight: var(--weight-medium);
 }
+
+/* Batch Polish, Section 2: the scale bar hides while a sheet is open (half or full); at peek it stays. */
+.mode-plan:has(.sheet[data-detent='half'], .sheet[data-detent='full']) .maplibregl-ctrl-scale {
+  display: none;
+}
