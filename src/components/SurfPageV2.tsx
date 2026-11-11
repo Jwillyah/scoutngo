@@ -1,7 +1,7 @@
 import '../styles/surf.css'
 import { useEffect, useMemo, useState } from 'react'
 import { venueToday } from '../core/eventDay.ts'
-import { regionOf } from '../core/beachFactor.ts'
+import { PROVISIONAL_BELOW, regionEvidence, regionOf } from '../core/beachFactor.ts'
 import { BEACH_CAP } from '../core/surf.ts'
 import { SURF_FADE_MS } from '../core/surfNowcast.ts'
 import { type LatLon } from '../core/geo.ts'
@@ -414,6 +414,7 @@ function WeekBars({ week }: { week: { date: string; peak: RangeHour | null }[] }
 
 export function SurfHow({ sea, stats, away, placeName, spot }: { sea: SurfSea; stats: SpotStats; away: { name: string; far: string } | null; placeName: string; spot?: LatLon }) {
   const region = spot === undefined ? null : regionOf(spot)
+  const evidence = regionEvidence(region)
   const b = sea.buoy?.status === 'ok' ? sea.buoy : null
   return (
     <>
@@ -425,8 +426,8 @@ export function SurfHow({ sea, stats, away, placeName, spot }: { sea: SurfSea; s
       <p>Forecast: Open-Meteo Marine, one model. The swell (height, period, direction), the whole sea (wave height, period, direction), by the hour.</p>
       <p>Wind: Open-Meteo, 10 m, by the hour.</p>
       <p>
-        Faces: the swell broken at a 1:50 beach
-        {sea.facing === null ? '' : ` facing ${compass(sea.facing)}`}, angled by its direction (Komar and Gaillard), never above the height they came from times {(sea.factor ?? BEACH_CAP).toFixed(2)}: {region === null ? 'no region with a look at the beach yet' : `${region.name}, from looks at the beach set against the buoy`}.
+        Faces: the whole sea's height, with the swell's period and direction, broken at a 1:50 beach
+        {sea.facing === null ? '' : ` facing ${compass(sea.facing)}`}, angled by its direction (Komar and Gaillard), never above the height they came from times {(sea.factor ?? BEACH_CAP).toFixed(2)}: {region === null ? 'no region with a look at the beach yet' : `${region.name}, from ${evidence.looks} ${evidence.looks === 1 ? 'look' : 'looks'} at the beach set against the buoy${evidence.provisional ? `, provisional until ${PROVISIONAL_BELOW}` : ''}`}.
       </p>
       <p>Now and the next {SURF_FADE_MS / 3_600_000} h: the forecast leans to the buoy's face here, all the way at the reading and back to the forecast {SURF_FADE_MS / 3_600_000} h after it. The tag reads the leaned number.</p>
       <p>

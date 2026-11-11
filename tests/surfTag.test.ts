@@ -96,6 +96,13 @@ describe('the beach factor per region (Batch Beach, Section 2: the Outer Banks b
     }
     expect(beachFactorAt(at('wrightsville-beach'))).toBe(BEACH_CAP)
   })
+  it('provisional until three looks (Batch Polish, Section 0): both regions rest on one look each', async () => {
+    const { regionEvidence, regionOf, PROVISIONAL_BELOW } = await import('../src/core/beachFactor.ts')
+    expect(PROVISIONAL_BELOW).toBe(3)
+    expect(regionEvidence(regionOf({ lat: 35.6085, lon: -75.4655 }))).toEqual({ looks: 1, provisional: true })
+    expect(regionEvidence(regionOf({ lat: 36.8436, lon: -75.9713 }))).toEqual({ looks: 1, provisional: true })
+    expect(regionEvidence(null)).toEqual({ looks: 0, provisional: true })
+  })
   it('every observation, worked through the transform at its own spot with its region’s factor, lands inside what was seen', async () => {
     const { surfEstimate } = await import('../src/core/surf.ts')
     const { beachFactorAt } = await import('../src/core/beachFactor.ts')

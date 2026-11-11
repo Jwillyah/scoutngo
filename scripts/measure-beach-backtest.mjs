@@ -1,7 +1,7 @@
 /*
  * THE RIGHT BEACH, 30 DAYS BACK (Batch Beach, Section 1).
  *
- * Usage:  node scripts/measure-beach-backtest.mjs [--days 30] [--out measurements/<file>.md]
+ * Usage:  node scripts/measure-beach-backtest.mjs [--days 30] [--end YYYY-MM-DD] [--out measurements/<file>.md]
  * Reads:  live, public, keyless: NDBC realtime2 (44095 Oregon Inlet, 44099
  *         Cape Henry), Open-Meteo Marine with past_days, OpenFreeMap's
  *         vector tiles (the map's own) for the facing the app read at the
@@ -32,6 +32,7 @@ const { seaTestAround } = await import('../src/lib/coast.ts')
 const { facingByCircle } = await import('../src/core/coastFacing.ts')
 const { parseNdbcWaves } = await import('../src/core/accuracy.ts')
 const { surfEstimate } = await import('../src/core/surf.ts')
+const { beachFactorAt, regionEvidence, regionOf } = await import('../src/core/beachFactor.ts')
 const { SURF_SPOTS } = await import('../src/data/surfSpots.ts')
 setVectorLoader(async (url) => {
   const r = await fetch(url).catch(() => null)
@@ -40,6 +41,7 @@ setVectorLoader(async (url) => {
 
 const args = process.argv.slice(2)
 const DAYS = Number(args.includes('--days') ? args[args.indexOf('--days') + 1] : 30)
+const END = args.includes('--end') ? Date.parse(`${args[args.indexOf('--end') + 1]}T00:38:08Z`) : Date.now()
 const OUT = args.includes('--out') ? args[args.indexOf('--out') + 1] : `measurements/${new Date().toISOString().slice(0, 10)}-beach-backtest.md`
 const FT = 3.28084
 const PIN_10_NOV = { lat: 35.5935, lon: -75.4679 }
@@ -51,8 +53,8 @@ const text = async (u) => {
   if (!r.ok) throw new Error(`${u}: ${r.status}`)
   return r.text()
 }
-const since = Date.now() - DAYS * 86_400_000
-const buoy = async (id) => parseNdbcWaves(await text(`https://www.ndbc.noaa.gov/data/realtime2/${id}.txt`)).filter((o) => o.at.getTime() >= since && o.periodS !== null && o.fromDeg !== null)
+const since = END - DAYS * 86_400_000
+const buoy = async (id) => parseNdbcWaves(await text(`https://www.ndbc.noaa.gov/data/realtime2/${id}.txt`)).filter((o) => o.at.getTime() >= since && o.at.getTime() <= END && o.periodS !== null && o.fromDeg !== null)
 
 const L = []
 const say = (s) => {
@@ -68,7 +70,7 @@ const before = near === null ? null : facingByCircle(PIN_10_NOV, near)
 
 say('# The right beach, 30 days back: S-Turns and Mirlo against 44095')
 say('')
-say(`Run ${new Date().toISOString()} · \`node scripts/measure-beach-backtest.mjs --days ${DAYS}\` · NDBC realtime2 44095 and 44099, the last ${DAYS} days; Open-Meteo Marine (past_days ${DAYS}); OpenFreeMap tiles for the facing at the 10 Nov pin (${PIN_10_NOV.lat}, ${PIN_10_NOV.lon}).`)
+say(`Run ${new Date().toISOString()} · \`node scripts/measure-beach-backtest.mjs --days ${DAYS}${args.includes('--end') ? ` --end ${args[args.indexOf('--end') + 1]}` : ''}\` · NDBC realtime2 44095 and 44099, the ${DAYS} days to ${new Date(END).toISOString()}; Open-Meteo Marine (past_days ${DAYS}); OpenFreeMap tiles for the facing at the 10 Nov pin (${PIN_10_NOV.lat}, ${PIN_10_NOV.lon}).`)
 say('')
 say(`- the facing the app read at the 10 Nov pin: ${before === null ? 'the tiles did not answer' : `${Math.round(before)}°`} (the sound side)`)
 say('')
@@ -86,6 +88,32 @@ for (const s of [spot('s-turns'), spot('mirlo-beach')]) {
   const mb = before === null ? null : mean(b95.map((o) => face(o, before)))
   const ma = mean(b95.map((o) => face(o, s.facing)))
   say(`| ${s.name} | ${before === null ? '—' : `${Math.round(before)}°`} | ${s.facing}° | ${b95.length} | ${big.length} | ${before === null ? '—' : `${under(before)} (${pct(under(before), big.length)})`} | ${under(s.facing)} (${pct(under(s.facing), big.length)}) | ${mb === null ? '—' : `${mb.toFixed(1)} ft`} | ${ma === null ? '—' : `${ma.toFixed(1)} ft`} |`)
+}
+
+say('')
+/*
+ * Batch Polish, Section 0: the mean face above (6.1 ft on 10 Nov) was the
+ * month's, a nor'easter in it; it read as an overshoot. By the buoy's
+ * height, the median face at today's factor (src/core/beachFactor.ts), so a
+ * 2-4 ft buoy can be read against what a beach of 2-4 ft looks like.
+ */
+const FACTOR = beachFactorAt(spot('s-turns').at)
+const ev = regionEvidence(regionOf(spot('s-turns').at))
+const sortedHs = b95.map((o) => o.waveM * FT).sort((a, b) => a - b)
+say('## By the buoy\'s height, at today\'s factor')
+say('')
+say(`The buoy's height over these days: mean ${mean(sortedHs).toFixed(1)} ft, median ${sortedHs[Math.floor(sortedHs.length / 2)].toFixed(1)} ft, the highest ${sortedHs.at(-1).toFixed(1)} ft. The face is worked from the buoy's whole-sea height once (src/core/surf.ts surfEstimate), never above it times the region's factor, here ${FACTOR.toFixed(2)} (${ev.looks} ${ev.looks === 1 ? 'look' : 'looks'} at the beach${ev.provisional ? ', provisional' : ''}).`)
+say('')
+say('| spot | buoy | hours | median face | 10th-90th percentile |')
+say('|---|---|---|---|---|')
+for (const s of [spot('s-turns'), spot('mirlo-beach')]) {
+  for (const [lo, hi] of [[2, 3], [3, 4], [4, 6], [6, 10], [10, 99]]) {
+    const sel = b95.filter((o) => o.waveM * FT >= lo && o.waveM * FT < hi)
+    if (sel.length === 0) continue
+    const faces = sel.map((o) => surfEstimate(o.waveM, o.periodS, o.fromDeg, s.facing, FACTOR).faceFt).sort((a, b) => a - b)
+    const q = (p) => faces[Math.min(faces.length - 1, Math.floor(faces.length * p))].toFixed(1)
+    say(`| ${s.name} | ${hi === 99 ? `${lo} ft and up` : `${lo}-${hi} ft`} | ${sel.length} | ${q(0.5)} ft | ${q(0.1)}-${q(0.9)} ft |`)
+  }
 }
 
 say('')

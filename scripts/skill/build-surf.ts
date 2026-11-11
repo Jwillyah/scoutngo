@@ -26,7 +26,7 @@
 import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseNdbcWaves } from '../../src/core/accuracy.ts'
-import { beachFactorAt, regionOf } from '../../src/core/beachFactor.ts'
+import { beachFactorAt, regionEvidence, regionOf } from '../../src/core/beachFactor.ts'
 import { buoyFaceFt } from '../../src/core/spotSkill.ts'
 import { zonedTimeToUtc } from '../../src/core/timezone.ts'
 import { SURF_SPOTS } from '../../src/data/surfSpots.ts'
@@ -118,7 +118,7 @@ for (const s of SURF_SPOTS) {
       if (faces.length > 0) seen = { date: yesterday, buoy: pick.id, readings: faces.length, maxFt: r1(faces[faces.length - 1]), medianFt: r1(faces[Math.floor(faces.length / 2)]) }
     }
   }
-  spots.push({ id: s.id, name: s.name, facing: s.facing, region: regionOf(s.at)?.id ?? null, factor: Math.round(factor * 1000) / 1000, leads, buoy, yesterday: seen })
+  spots.push({ id: s.id, name: s.name, facing: s.facing, region: regionOf(s.at)?.id ?? null, factor: Math.round(factor * 1000) / 1000, provisional: regionEvidence(regionOf(s.at)).provisional, leads, buoy, yesterday: seen })
 }
 
 const file = { v: 1, date: today, made: new Date(now).toISOString(), timeZone: TZ, spots }

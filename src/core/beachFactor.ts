@@ -26,5 +26,18 @@ export function regionFactor(region: BeachRegion | null): number {
   return rows.length === 0 ? BEACH_CAP : median(rows.map((o) => (o.seenFt[0] + o.seenFt[1]) / 2 / o.buoyFt))
 }
 
+/*
+ * PROVISIONAL (Batch Polish, Section 0): a region's factor is provisional
+ * until it rests on PROVISIONAL_BELOW looks at the beach (or the Duck
+ * backfill, not built yet). Both regions have one look each today.
+ */
+export const PROVISIONAL_BELOW = 3
+
+/** How many looks a region's factor rests on, and whether it is still provisional. */
+export function regionEvidence(region: BeachRegion | null): { looks: number; provisional: boolean } {
+  const looks = region === null ? 0 : BEACH_OBSERVATIONS.filter((o) => o.region === region.id && o.buoyFt > 0).length
+  return { looks, provisional: looks < PROVISIONAL_BELOW }
+}
+
 /** The factor at a place: its region's, else BEACH_CAP. */
 export const beachFactorAt = (at: { lat: number; lon: number }): number => regionFactor(regionOf(at))

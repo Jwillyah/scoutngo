@@ -204,7 +204,7 @@ describe('Surf page v2 (Batch N, Section 1)', () => {
 
   it('how we got this names the region’s factor and the 6 h lean to the buoy (Batch Beach, Section 2)', () => {
     const t = text(renderToStaticMarkup(<SurfHow sea={{ ...sea, factor: 2.5 / 3 }} stats={NONE} away={null} placeName="Here" spot={SPOT} />))
-    expect(t).toContain('times 0.83: Virginia Beach, from looks at the beach set against the buoy')
+    expect(t).toContain('times 0.83: Virginia Beach, from 1 look at the beach set against the buoy, provisional until 3')
     expect(t).toContain('the forecast leans to the buoy')
     expect(t).toContain('6 h after it')
   })
