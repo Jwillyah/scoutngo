@@ -126,7 +126,7 @@ export const MIN_REAL_FLICKS = 12
  * Runs the flicks and slow drags; returns one row per drag with what it should
  * have done and what it did. `perDirection` flicks each way from each detent.
  */
-export async function runSheetFlicks({ send, ev, wait }, perDirection = 20) {
+export async function runSheetFlicks({ send, ev, wait }, perDirection = 20, flow = null) {
   const rows = []
   /* The detents' heights first: a drag that arrived slow is judged against them. */
   const heights = {}
@@ -160,6 +160,8 @@ export async function runSheetFlicks({ send, ev, wait }, perDirection = 20) {
         const at = s[where] ?? s.handle
         const [len, speed] = FLICKS[k % FLICKS.length]
         await ev(SPEED_PROBE)
+        /* Batch Polish 2, Section 0: a flick timed only while frames are drawn (scripts/preflight.mjs framesFlowing). */
+        if (flow !== null) await flow()
         await verticalDrag(send, at, dir === 'up' ? -len : len, speed)
         await settled(ev, wait)
         const got = await detentNow(ev)

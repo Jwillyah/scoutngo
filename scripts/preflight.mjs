@@ -579,7 +579,55 @@ export async function goToStage(ev, wait, stage) {
  * check pointed at the wrong object. This reads `data-detent` back, which is
  * the sheet's own word for where it is.
  */
-export async function setSheet(ev, wait, want) {
+/*
+ * FRAMES FLOWING, BEFORE ANYTHING TIMED (Batch Polish 2, Section 0).
+ *
+ * THE GESTURE AUDIT'S FIRST-RUN FAILURES (9 of 45 gates since 10 Nov, before
+ * lazy loading as well as after) were one thing: under the gate's load the
+ * headless tab stopped drawing frames. Caught on 11 Nov with a recorder in
+ * the audit: 21 s after the sheet was set to peek its rect still had its top
+ * at 183 px (the full height) with nothing running on the page, and the
+ * screenshot taken next forced one frame and showed it settled at peek, the
+ * moon pills placed. A CSS transition, rAF and touch delivery all move with
+ * frames, so with none: the sheet "sits over the map" mid-move, the pills
+ * are placed against a sheet still up and hide, and a flick's moves arrive
+ * together with no speed ("the page saw 0.00 px/ms").
+ *
+ * So a timed step first counts frames for 300 ms. Under MIN_FRAMES, `nudge`
+ * (a 1 px screenshot, which makes the browser draw) and count again, up to
+ * 10 s; still none, it is the machine, said so, never a gesture failure.
+ */
+export const MIN_FRAMES = 5
+export class NoFramesError extends PreflightError {}
+export async function framesFlowing(ev, wait, nudge = null) {
+  const count = `new Promise((r) => { let n = 0; const f = () => { n += 1; requestAnimationFrame(f) }; requestAnimationFrame(f); setTimeout(() => r(n), 300) })`
+  for (let i = 0; i < 20; i += 1) {
+    if ((await ev(count)) >= MIN_FRAMES) return i
+    if (nudge !== null) await nudge()
+    await wait(200)
+  }
+  throw new NoFramesError('the browser drew no frames for 10 s (the machine, not the app): nothing timed was judged')
+}
+
+/** A frame drawn on demand through the protocol: a 1 px screenshot. For framesFlowing's `nudge`. */
+export const frameNudge = (send) => () => send('Page.captureScreenshot', { format: 'png', clip: { x: 0, y: 0, width: 1, height: 1, scale: 1 } })
+
+/*
+ * AND THE SHEET ARRIVED, not only its detent attribute: the attribute flips
+ * at once and the height follows over the transition (Batch Polish 2,
+ * Section 0). Waited for its animations to end, up to 6 s.
+ */
+export async function sheetArrived(ev, wait, nudge = null) {
+  for (let i = 0; i < 30; i += 1) {
+    const moving = await ev(`(document.querySelector('.sheet')?.getAnimations({ subtree: false }) ?? []).some((a) => a.playState === 'running')`)
+    if (!moving) return true
+    if (nudge !== null && i % 3 === 2) await nudge()
+    await wait(200)
+  }
+  return false
+}
+
+export async function setSheet(ev, wait, want, nudge = null) {
   /* Batch Polish, Section 1: a sheet still being drawn (its screen a download of its own) is waited for, up to 5 s, before "no sheet". */
   for (let i = 0; i < 25; i += 1) {
     if (await ev(`!!document.querySelector('.sheet')`)) break
@@ -587,7 +635,10 @@ export async function setSheet(ev, wait, want) {
   }
   for (let i = 0; i < 4; i += 1) {
     const now = await ev(`document.querySelector('.sheet')?.dataset.detent ?? null`)
-    if (now === want) return want
+    if (now === want) {
+      await sheetArrived(ev, wait, nudge)
+      return want
+    }
     if (now === null) throw new PreflightError('no sheet on screen to move')
     await ev(`document.querySelector('.sheet__handle')?.click()`)
     await wait(600)

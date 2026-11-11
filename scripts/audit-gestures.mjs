@@ -24,7 +24,7 @@
  *                on the fingers (scripts/pinchGestures.mjs)
  */
 import { connect } from './cdp.mjs'
-import { guardAudit, setSheet, startWatchdog, APP_ORIGIN } from './preflight.mjs'
+import { frameNudge, framesFlowing, guardAudit, setSheet, startWatchdog, APP_ORIGIN } from './preflight.mjs'
 import { runSheetFlicks, MIN_REAL_FLICKS } from './sheetFlicks.mjs'
 import { HELD_DRIFT_PX, MAP_AREA, PROBE, pinch, recordGesture } from './pinchGestures.mjs'
 
@@ -59,7 +59,44 @@ async function plan() {
   }
   await c.wait(7000)
   if (!(await c.ev(`document.querySelector('.shell')?.className.includes('shell--plan')`))) throw new Error('not in Plan')
+  await c.ev(RECORDER)
+  /* Batch Polish 2, Section 0: every timed step waits for frames to be drawn (scripts/preflight.mjs framesFlowing). */
+  c.nudge = frameNudge(c.send)
+  c.flow = () => framesFlowing(c.ev, c.wait, c.nudge)
   return c
+}
+
+/*
+ * WHAT THE PAGE DID, FOR A FAILURE TO SAY WHY: every move of the sheet,
+ * every touch that reached the page, long frames, read back by `story`.
+ */
+const RECORDER = `(() => {
+  const t0 = performance.now()
+  const log = (window.__story = [])
+  const at = () => Math.round(performance.now() - t0)
+  let last = document.querySelector('.sheet')?.dataset.detent
+  new MutationObserver(() => {
+    const now = document.querySelector('.sheet')?.dataset.detent
+    if (now !== last) { log.push(at() + ' sheet ' + last + ' -> ' + now); last = now }
+  }).observe(document.body, { attributes: true, subtree: true, childList: true, attributeFilter: ['data-detent'] })
+  for (const k of ['touchstart', 'touchend']) addEventListener(k, (e) => log.push(at() + ' ' + k + ' on ' + String(e.target?.className?.baseVal ?? e.target?.className ?? e.target?.tagName).split(' ')[0]), { capture: true, passive: true })
+  try { new PerformanceObserver((l) => { for (const e of l.getEntries()) if (e.duration > 250) log.push(Math.round(e.startTime - t0) + ' long task ' + Math.round(e.duration) + ' ms') }).observe({ type: 'longtask' }) } catch {}
+  return 1
+})()`
+const story = async (c, why) => {
+  const lines = JSON.parse(await c.ev(`JSON.stringify((window.__story ?? []).slice(-40))`))
+  console.log(`      what the page did before "${why}" (ms since the plan was up):`)
+  for (const l of lines) console.log('        ' + l)
+  console.log('        frames in the next second: ' + (await c.ev(`new Promise((r) => { let n = 0; const f = () => { n += 1; requestAnimationFrame(f) }; requestAnimationFrame(f); setTimeout(() => r(JSON.stringify({ frames: n, visibility: document.visibilityState, focus: document.hasFocus(), sheetAnimations: document.querySelector('.sheet')?.getAnimations().map((a) => a.playState + ' ' + Math.round(a.currentTime ?? -1)) ?? [] })), 1000) })`)))
+  console.log('        now: ' + (await c.ev(`JSON.stringify({ t: Math.round(performance.now()), sheet: document.querySelector('.sheet')?.dataset.detent, sheetTop: Math.round(document.querySelector('.sheet')?.getBoundingClientRect().top ?? -1), pills: [...document.querySelectorAll('.raypill')].map((p) => (p.hidden ? 'hidden ' : '') + p.textContent), moon: document.querySelector('[data-feature="moon"]')?.getAttribute('aria-checked') ?? null, strip: !!document.querySelector('.tbar__strip') })`)))
+  const shot = await c.send('Page.captureScreenshot', { format: 'png' })
+  if (shot.result?.data) {
+    const { writeFileSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const f = join(process.env.SCOUTNGO_OUT ?? '/tmp', `gestures-${why.replace(/[^a-z]+/gi, '-').slice(0, 40)}.png`)
+    writeFileSync(f, Buffer.from(shot.result.data, 'base64'))
+    console.log('        screen: ' + f)
+  }
 }
 
 const drag = async (send, pts, wait) => {
@@ -77,7 +114,7 @@ try {
   {
     const c = await plan()
     const { ev, wait, dispose } = c
-    await setSheet(ev, wait, 'half')
+    await setSheet(ev, wait, 'half', c.nudge)
     await wait(800)
     console.log('### every control takes 44 px of touch, on each screen')
     const TARGETS = `JSON.stringify((() => {
@@ -134,8 +171,9 @@ try {
     if (!(await ev(`!!document.querySelector('.tbar__strip')`))) throw new Error('the 3D view did not close: no time bar to go on with')
 
     console.log('### nothing over the map takes a finger but a control')
-    await setSheet(ev, wait, 'peek')
+    await setSheet(ev, wait, 'peek', c.nudge)
     await wait(800)
+    await c.flow()
     const over = JSON.parse(await ev(`JSON.stringify((() => {
       const c = document.querySelector('.maplibregl-canvas').getBoundingClientRect()
       const sheet = document.querySelector('.sheet')?.getBoundingClientRect()
@@ -153,6 +191,7 @@ try {
     })())`))
     if (over.cells < 100) fail(`only ${over.cells} points of the map were tried`)
     for (const [k, n] of Object.entries(over.out)) fail(`${k} sits over the map and takes a finger (${n} points)`)
+    if (Object.keys(over.out).length > 0) await story(c, 'over the map')
     console.log(`  ${over.cells} points of the map, ${Object.keys(over.out).length} boxes in the way`)
 
     /* ---------------------------------------- the time pills (section 7) */
@@ -186,9 +225,10 @@ try {
       await ev(`document.querySelector('.sheet .card2__x')?.click()`)
       await wait(700)
       /* Features opens full; the sheet goes back where it was, so the time strip and the pills are as before. */
-      await setSheet(ev, wait, was)
+      await setSheet(ev, wait, was, c.nudge)
     }
     await moon(true)
+    await c.flow()
     /* The pills come with the moon's path: wait for one (up to 10 s), not a fixed 2 s. */
     await until(`[...document.querySelectorAll('.raypill')].some((p) => !p.hidden && /Moon/.test(p.textContent))`, 10_000)
     const pills = JSON.parse(await ev(`JSON.stringify((() => {
@@ -202,7 +242,10 @@ try {
       }
       return { n: ps.length, moon: ps.filter((p) => /Moon/.test(p.t)).length, out }
     })())`))
-    if (pills.moon === 0) fail('the moon was on and no moon pill showed, so the pills were not checked')
+    if (pills.moon === 0) {
+      fail('the moon was on and no moon pill showed, so the pills were not checked')
+      await story(c, 'no moon pill')
+    }
     for (const o of pills.out) fail(`a time pill sits on something: ${o}`)
     console.log(`  ${pills.n} pills (${pills.moon} the moon's), ${pills.out.length} on a control or another pill`)
     await moon(false)
@@ -213,12 +256,16 @@ try {
     const box = JSON.parse(await ev(`JSON.stringify(document.querySelector('.tbar__strip').getBoundingClientRect())`))
     const x0 = box.left + box.width / 2
     const y0 = box.top + box.height / 2
+    await c.flow()
     let a = JSON.parse(await ev(state))
     /* A thumb's sideways swipe: hooks up 12 px, then across. */
     await drag(c.send, [{ x: x0, y: y0 }, { x: x0 + 1, y: y0 - 4 }, { x: x0 + 2, y: y0 - 8 }, { x: x0 + 3, y: y0 - 12 }, ...Array.from({ length: 10 }, (_, i) => ({ x: x0 + 3 - (i + 1) * 9, y: y0 - 12 }))], wait)
     await wait(1600)
     let b = JSON.parse(await ev(state))
-    if (b.at === a.at) fail('a sideways swipe on the ruler did not move the time')
+    if (b.at === a.at) {
+      fail('a sideways swipe on the ruler did not move the time')
+      await story(c, 'ruler swipe')
+    }
     /*
      * THE SWIPE'S COAST ENDED FIRST. A sideways flick coasts and slows to a
      * stop (docs/gestures.md); a slow machine still had it coasting when the
@@ -232,13 +279,18 @@ try {
     }
     if (b.sheet !== a.sheet) fail(`a sideways swipe on the ruler moved the sheet (${a.sheet} to ${b.sheet})`)
     a = b
+    await c.flow()
     await drag(c.send, Array.from({ length: 12 }, (_, i) => ({ x: x0, y: y0 - i * 14 })), wait)
     await wait(1200)
     b = JSON.parse(await ev(state))
-    if (b.sheet === a.sheet) fail('dragging up on the ruler did not move the sheet')
+    if (b.sheet === a.sheet) {
+      fail('dragging up on the ruler did not move the sheet')
+      await story(c, 'ruler up')
+    }
     if (b.at !== a.at) fail('dragging up on the ruler moved the time')
-    await setSheet(ev, wait, 'peek')
+    await setSheet(ev, wait, 'peek', c.nudge)
     await wait(800)
+    await c.flow()
     a = JSON.parse(await ev(state))
     const tapBox = JSON.parse(await ev(`JSON.stringify(document.querySelector('.tbar__strip').getBoundingClientRect())`))
     await drag(c.send, [{ x: tapBox.left + tapBox.width * 0.75, y: tapBox.top + tapBox.height / 2 }], wait)
@@ -298,7 +350,7 @@ try {
   {
     const c = await plan()
     console.log('### the sheet: flicks one detent on, slow drags to the nearest')
-    const rows = await runSheetFlicks(c, 6)
+    const rows = await runSheetFlicks(c, 6, c.flow)
     const done = rows.filter((r) => r.want !== null)
     for (const r of done.filter((x) => x.wrong).slice(0, 8)) fail(`${r.kind} from ${r.from} (${r.len} px, the page saw ${typeof r.seen === 'number' ? Math.abs(r.seen).toFixed(2) : '?'} px/ms) landed ${r.got}, not ${r.want}`)
     if (done.length < rows.length) fail(`${rows.length - done.length} sheet drags could not be set up`)
@@ -312,7 +364,7 @@ try {
   {
     const c = await plan()
     const { send, ev, wait, dispose } = c
-    await setSheet(ev, wait, 'peek')
+    await setSheet(ev, wait, 'peek', c.nudge)
     await wait(1200)
     if ((await ev(PROBE)) !== 'ok') throw new Error('the pinch probe did not install')
     const area = JSON.parse(await ev(MAP_AREA))
@@ -321,6 +373,7 @@ try {
       ['pinch in', [[80, 0, 0], [240, 0, 0]], { steps: 20 }],
       ['in-out-in, fast', [[80, 0, 0], [240, 0, 0], [90, 0, 0], [240, 0, 0]], { steps: 6, stepMs: 8 }],
     ]) {
+      await c.flow()
       const r = await recordGesture(c, () => pinch(send, area, path, opts))
       const wrong = []
       if (r.zoomSpan < 0.05) wrong.push('it did not reach the map')
@@ -385,6 +438,7 @@ try {
       }
       await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
     }
+    await c.flow()
     for (const [name, run, ok] of [
       ['double tap zooms in', async () => { await tap([{ x: at.x, y: at.y, id: 0 }]); await wait(120); await tap([{ x: at.x, y: at.y, id: 0 }]) }, (a, b) => b.z - a.z > 0.9],
       ['two-finger tap zooms out', () => tap([{ x: at.x - 40, y: at.y, id: 0 }, { x: at.x + 40, y: at.y, id: 1 }]), (a, b) => a.z - b.z > 0.9],
