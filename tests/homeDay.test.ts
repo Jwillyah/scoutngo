@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { bestRun, bestWindows, cardList, colorWords, conditionOf, sideWords, nothingLine, rainLine, spanWords, stripSteps, weekHeadline } from '../src/core/homeDay.ts'
-import { homeOrder, primaryFor, reviveActivities, showsDrone, showsPhotoTools } from '../src/lib/activities.ts'
+import { homeOrder, primaryFor, reviveActivities, shootPicked, showsDrone, showsPhotoTools } from '../src/lib/activities.ts'
 
 /*
  * THE NEW HOME (Batch M, Section 3): the words it says are the code's, from
@@ -85,6 +85,11 @@ describe('what you do orders the home, and hides only tools', () => {
     expect(homeOrder(['fish', 'weather'], false)).toEqual(['fish', 'weather'])
     expect(showsPhotoTools(['surf'])).toBe(false)
     expect(showsPhotoTools(['surf', 'shoot'])).toBe(true)
+    /* Batch Beach, Section 2: the Surf page's "Light on the face" only with Shoot picked, not before the picker is answered. */
+    expect(shootPicked(null)).toBe(false)
+    expect(shootPicked([])).toBe(false)
+    expect(shootPicked(['surf'])).toBe(false)
+    expect(shootPicked(['surf', 'shoot'])).toBe(true)
     expect(showsDrone(['surf'], false)).toBe(false)
     expect(showsDrone(['surf'], true)).toBe(true)
     expect(showsDrone(['drone'], false)).toBe(true)

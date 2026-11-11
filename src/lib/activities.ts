@@ -78,6 +78,9 @@ export function showsPhotoTools(picked: readonly Activity[] | null): boolean {
   return picked === null || picked.length === 0 || picked.includes('shoot')
 }
 
+/** Batch Beach, Section 2: the Surf page's light on the face, only when Shoot is picked (not before the picker is answered). */
+export const shootPicked = (picked: readonly Activity[] | null): boolean => picked !== null && picked.includes('shoot')
+
 /** The menu's drone card and drone tools: Fly a drone picked, or a drone in My kit; and, before the picker is answered, as before (always). */
 export function showsDrone(picked: readonly Activity[] | null, droneInKit: boolean): boolean {
   return droneInKit || picked === null || picked.length === 0 || picked.includes('drone')

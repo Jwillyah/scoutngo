@@ -36,7 +36,7 @@
  * wider one. Never under BAND_FLOOR_FT.
  */
 import type { LatLon } from './geo.ts'
-import { surfEstimate } from './surf.ts'
+import { BEACH_CAP, surfEstimate } from './surf.ts'
 
 /** A slot for the surfer's own word on a session; no session log feeds it yet. */
 export type SessionRating = 'Fun' | 'Meh' | 'Bad'
@@ -139,10 +139,10 @@ export interface BuoySea {
 }
 
 /** The buoy's breaking face height by the forecast's own function, or null when it cannot be worked out. */
-export function buoyFaceFt(sea: BuoySea, facingDeg: number | null): number | null {
+export function buoyFaceFt(sea: BuoySea, facingDeg: number | null, factor: number = BEACH_CAP): number | null {
   if (sea.periodS === null || sea.periodS <= 0 || !Number.isFinite(sea.waveM)) return null
   if (sea.fromDeg === null && facingDeg !== null) return null
-  return surfEstimate(sea.waveM, sea.periodS, sea.fromDeg ?? 0, facingDeg).faceFt
+  return surfEstimate(sea.waveM, sea.periodS, sea.fromDeg ?? 0, facingDeg, factor).faceFt
 }
 
 /** "last 30 days (240 hours): forecast ran 0.6 ft high here against the buoy, corrected". Facts only. */

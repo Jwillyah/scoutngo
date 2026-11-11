@@ -12,12 +12,13 @@
 import { useMemo, useSyncExternalStore } from 'react'
 import { distanceMeters, type LatLon } from '../core/geo.ts'
 import { spotKey, spotStats, type SpotStats } from '../core/spotSkill.ts'
+import { BEACH_CAP } from '../core/surf.ts'
 import { rangeWords } from '../core/surfRange.ts'
 import { buoyParts, forecastParts, periodRead, rangeSizeWords, type PeriodRead, type SwellPart } from '../core/surfReads.ts'
 import { hourlyAt } from './tideSheetData.ts'
 import { saneRange } from '../core/sanity.ts'
 import { venueToday } from '../core/eventDay.ts'
-import { addDays, rangeHourAt, weekPeaks, type RangeHour } from './surfPageData.ts'
+import { addDays, buoyLean, rangeHourAt, weekPeaks, type RangeHour } from './surfPageData.ts'
 import { onSkillBook, readSkillBook, skillBookVersion } from './spotSkillStore.ts'
 import { awayFrom, beachName, sameBeach, useSurfBeach, type Beach } from './surfBeach.ts'
 import { useSurfSea, type SurfSea } from './useSurfSea.ts'
@@ -81,11 +82,13 @@ export const surfWords = (h: RangeHour | null): string | null => (h === null || 
 export function surfNowFrom(sea: SurfSea, stats: SpotStats, now: Date, timeZone: string): { now: RangeHour | null; tomorrow: RangeHour | null } {
   if (sea.marine === null) return { now: null, tomorrow: null }
   const today = venueToday(now, timeZone)
-  const week = weekPeaks(sea.marine, sea.wind, today, timeZone, sea.facing, stats)
+  /* Batch Beach, Section 2: the next 6 h lean to the live buoy, and the tag reads the leaned centre. */
+  const lean = buoyLean(sea.marine, sea.wind, sea.buoy, sea.facing, stats, sea.factor ?? BEACH_CAP, now.getTime())
+  const week = weekPeaks(sea.marine, sea.wind, today, timeZone, sea.facing, stats, sea.factor, lean)
   const tomorrow = week.find((d) => d.date === addDays(today, 1))?.peak ?? null
   /* Read at the hour's half past, as the day's bars are: two screens a few seconds apart read the same hour. */
   const half = new Date(Math.floor(now.getTime() / 3_600_000) * 3_600_000 + 1_800_000)
-  return { now: rangeHourAt(sea.marine, sea.wind, half, sea.facing, stats), tomorrow }
+  return { now: rangeHourAt(sea.marine, sea.wind, half, sea.facing, stats, sea.factor, lean), tomorrow }
 }
 
 /** This phone's per-spot stats, read from the book (src/lib/spotSkillStore.ts); the Surf page's sampling writes it. */

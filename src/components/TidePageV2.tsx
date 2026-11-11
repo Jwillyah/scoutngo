@@ -8,7 +8,7 @@ import { sunriseOn } from '../core/sunrise.ts'
 import { directionAt, levelAt, STATION_LOCAL_KM } from '../core/tide.ts'
 import { formatClock, formatShortHour } from '../core/timezone.ts'
 import { wetsuitFor } from '../core/wetsuit.ts'
-import { dayRangeFeet, moonLitPercent, nextTurns, SCRUB_RETURN_MS, tideDayWindow, tideHeight, timeAtShare, untilWords } from '../core/tideWindow.ts'
+import { dayRangeFeet, moonLitPercent, nextTurns, SCRUB_RETURN_MS, springOrNeap, SPRING_OVER, typicalRangeFeet, tideDayWindow, tideHeight, timeAtShare, untilWords } from '../core/tideWindow.ts'
 import type { DetailId } from '../lib/detailTabs.ts'
 import { hourlyAt } from '../lib/tideSheetData.ts'
 import { useTide, type TideInfo } from '../lib/useTide.ts'
@@ -144,6 +144,9 @@ export function TideContent({ now, tide, data, venue, placeName, timeZone, units
   const turns = nextTurns([...extremes, ...(data.month.value ?? [])], now)
   const range = dayRangeFeet(extremes, today, timeZone)
   const week = tideWeek(now)
+  /* Batch Beach, Section 2: spring or neap from the moon AND this station's own typical day. */
+  const typical = typicalRangeFeet([...extremes, ...(data.month.value ?? [])], timeZone)
+  const kind = springOrNeap(week?.kind ?? null, range, typical)
   const marine = data.marine.value !== null && data.marine.value !== 'inland' ? data.marine.value : null
   const waterC = marine === null ? null : hourlyAt(marine, 'sea_surface_temperature', now)
   const suit = wetsuitFor(waterC)
@@ -230,8 +233,8 @@ export function TideContent({ now, tide, data, venue, placeName, timeZone, units
         </DCard>
         <DCard label="Range today" className="dtide__tile">
           <p className="dtide__big">{tideHeight(range, units.distance)}</p>
-          <p className="dtide__line" data-spring={week?.kind ?? 'between'}>
-            moon {moonLitPercent(now)}%{week === null ? '' : week.kind === 'spring' ? ' · spring tides' : ' · neap tides'}
+          <p className="dtide__line" data-spring={kind ?? 'between'}>
+            moon {moonLitPercent(now)}%{kind === null ? '' : kind === 'spring' ? ' · spring tides' : ' · neap tides'}
           </p>
         </DCard>
         <DCard label="Water" className="dtide__tile">
@@ -322,7 +325,7 @@ export function TideHow({ tide, data, units }: { tide: TideInfo; data: TideSheet
           {ok.predictions.provenance.kind === 'live' ? null : <p>Saved on this phone; no signal for a fresh table.</p>}
         </>
       )}
-      <p>Spring or neap: from the moon’s phase (suncalc). Within {SPRING_WITHIN} of a cycle (about 3 days) of a new or full moon is spring, of a half moon neap.</p>
+      <p>Spring or neap: from the moon’s phase (suncalc) and this station’s own table. Within {SPRING_WITHIN} of a cycle (about 3 days) of a new or full moon, and today’s range at least {SPRING_OVER} times the station’s typical day (the median day over NOAA’s month), is spring; a half moon and a smaller day than typical, neap. Without a month of the station’s turns, neither is said.</p>
       <p>Water temperature: Open-Meteo Marine’s sea-surface forecast for this hour, a model, not a buoy.{data.marine.savedAt === null ? '' : ' Saved copy.'}</p>
       <p>Wetsuit: the thickness chart wetsuit makers print. A convention; brands differ by a few degrees.</p>
       <p>

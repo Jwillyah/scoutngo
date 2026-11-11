@@ -12,6 +12,8 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import type { LatLon } from '../core/geo.ts'
+import { beachFactorAt } from '../core/beachFactor.ts'
+import { BEACH_CAP } from '../core/surf.ts'
 import { buoyFaceFt, hourOf, HOUR_MS, spotKey, spotStats, type SkillSample, type SpotStats } from '../core/spotSkill.ts'
 import { latestBuoyWaves, type BuoyReading } from './buoy.ts'
 import { coastFacing } from './coast.ts'
@@ -25,13 +27,13 @@ export const BUOY_FRESH_MS = 2 * HOUR_MS
 export const CHECK_EVERY_MS = 5 * 60_000
 
 /** One hour's pair from what is in hand, or null when either side cannot be worked out. */
-export function sampleFrom(marine: Hourly, buoy: BuoyReading, facingDeg: number | null, now: number): SkillSample | null {
+export function sampleFrom(marine: Hourly, buoy: BuoyReading, facingDeg: number | null, now: number, factor: number = BEACH_CAP): SkillSample | null {
   if (buoy.status !== 'ok') return null
   const at = buoy.at.getTime()
   if (!Number.isFinite(at) || now - at > BUOY_FRESH_MS || at > now + HOUR_MS) return null
-  const buoyFt = buoyFaceFt({ waveM: buoy.waveM, periodS: buoy.periodS, fromDeg: buoy.fromDeg }, facingDeg)
+  const buoyFt = buoyFaceFt({ waveM: buoy.waveM, periodS: buoy.periodS, fromDeg: buoy.fromDeg }, facingDeg, factor)
   if (buoyFt === null) return null
-  const forecast = surfAt(marine, buoy.at, facingDeg)
+  const forecast = surfAt(marine, buoy.at, facingDeg, factor)
   if (forecast === null) return null
   return { at: hourOf(at), forecastFt: forecast.estimate.faceFt, buoyFt, rating: null }
 }
@@ -85,7 +87,7 @@ export function useSpotSkill(spot: LatLon | null, given: SpotSkillGiven = {}): S
         if (marine === null) return
         if (buoy.status === 'none' && buoy.reason === "The buoy didn't load.") return
         const now = Date.now()
-        const book = withSample(readSkillBook(), key, sampleFrom(marine, buoy, facing, now), now)
+        const book = withSample(readSkillBook(), key, sampleFrom(marine, buoy, facing, now, beachFactorAt(at)), now)
         writeSkillBook(book)
         if (live) setTaken(now)
       } catch {

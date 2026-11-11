@@ -116,6 +116,7 @@ const SPOTS = [
 ]
 
 const notes = []
+const wordTables = []
 const couldNot = []
 const say = (s) => console.log(s)
 
@@ -271,7 +272,8 @@ for (const spot of SPOTS) {
     continue
   }
   const obs = buoyObs.get(buoy.id)
-  const err = { wave: [], waveD1: [], period: [], face: [] }
+  const err = { wave: [], waveD1: [], period: [], face: [], faceWhole: [] }
+  const wordsWhole = []
   const words = []
   for (const date of DATES) {
     for (const h of HOURS) {
@@ -289,6 +291,13 @@ for (const spot of SPOTS) {
         const seen = surfEstimate(o.waveM, o.periodS, o.fromDeg, spot.facing)
         err.face.push(app.estimate.faceFt - seen.faceFt)
         words.push([app.estimate.size, surfSize(seen.faceFt)])
+        /* Batch Beach, Section 2: the candidate, the whole sea's height (what the buoy measures) with the swell's period and direction. */
+        const wh = hourlyAt(marine, 'wave_height', at)
+        if (wh !== null) {
+          const whole = surfEstimate(wh, app.periodS, app.fromDeg, spot.facing)
+          err.faceWhole.push(whole.faceFt - seen.faceFt)
+          wordsWhole.push([whole.size, surfSize(seen.faceFt)])
+        }
       }
     }
   }
@@ -298,6 +307,10 @@ for (const spot of SPOTS) {
   addRow(spot, 'wave period', 'd0', 's', score(err.period, HIT.periodS), `±${HIT.periodS} s`, src)
   addRow(spot, 'surf face', 'd0', 'ft', score(err.face, HIT.faceFt), `±${HIT.faceFt} ft`, src)
   addRow(spot, 'surf size word', 'd0', '', agreement(words), 'same word', src)
+  addRow(spot, 'surf face, whole-sea height', 'd0', 'ft', score(err.faceWhole, HIT.faceFt), `±${HIT.faceFt} ft`, src)
+  addRow(spot, 'surf size word, whole-sea height', 'd0', '', agreement(wordsWhole), 'same word', src)
+  /* Batch Beach, Section 2: which words were said against which the buoy gave, so a fall in the hit rate can be read. */
+  wordTables.push({ spot: spot.name, words })
 }
 notes.push("The surf face is the app's number (surfDay.surfAt): the swell's height and period when Open-Meteo gives them, else the whole sea's. The buoy's WVHT and DPD are the whole sea, wind waves included, put through the same formula (surf.surfEstimate). Part of a low face bias can be that choice; the wave height (Hs) row compares the whole sea with the whole sea.")
 notes.push("The wave height is scored at d0 and d1 (Open-Meteo Marine's wave_height_previous_day1). The period, the surf face and its word are scored at d0 only: the day-before run of the swell they are made from was not asked for.")
@@ -522,6 +535,19 @@ L.push('|---|---|---|---|---|')
 L.push(...sunsetLines)
 L.push('')
 if (needLog.length > 0) L.push(`Needs Jwilly's log (${needLog.length} sunsets): ${needLog.join(', ')}. The app keeps the log on the phone (src/lib/truthLog.ts, src/lib/fireLog.ts); export it and run again with \`--sunset-log <file>\`. No outcome is filled in without it.`, '')
+L.push('## Surf size words, said against the buoy')
+L.push('')
+L.push('Rows: the word the app said (its face from the forecast); columns: the word the buoy gave through the same transform. The diagonal is a hit.')
+for (const t of wordTables) {
+  const W = ['Flat', 'Small', 'Fun', 'Solid', 'Big']
+  L.push('')
+  L.push(`**${t.spot}** (${t.words.length} hours)`)
+  L.push('')
+  L.push(`| said \\ buoy | ${W.join(' | ')} |`)
+  L.push(`|---|${W.map(() => '---').join('|')}|`)
+  for (const a of W) L.push(`| ${a} | ${W.map((b) => t.words.filter(([x, y]) => x === a && y === b).length).join(' | ')} |`)
+}
+L.push('')
 L.push('## Notes')
 L.push('')
 for (const n of notes) L.push(`- ${n}`)

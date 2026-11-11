@@ -82,6 +82,52 @@ describe('the beach cap (Batch QA, Section 0B)', () => {
   })
 })
 
+describe('the beach factor per region (Batch Beach, Section 2: the Outer Banks break bigger than Virginia Beach for the same buoy)', () => {
+  it('each region’s factor is its observations’ middle over the buoy: VB 2.5/3.0, OBX 3.5/3.0; elsewhere BEACH_CAP', async () => {
+    const { beachFactorAt, regionOf } = await import('../src/core/beachFactor.ts')
+    const { BEACH_CAP } = await import('../src/core/surf.ts')
+    const { SURF_SPOTS } = await import('../src/data/surfSpots.ts')
+    const at = (id: string) => (SURF_SPOTS.find((s) => s.id === id) as { at: { lat: number; lon: number } }).at
+    expect(beachFactorAt({ lat: 36.8436, lon: -75.9713 })).toBeCloseTo(2.5 / 3, 6)
+    expect(beachFactorAt(at('sandbridge'))).toBeCloseTo(2.5 / 3, 6)
+    for (const id of ['s-turns', 'mirlo-beach', 'kdh-1st-street', 'kitty-hawk-pier', 'cape-point', 'frisco-pier']) {
+      expect(regionOf(at(id))?.id).toBe('obx')
+      expect(beachFactorAt(at(id))).toBeCloseTo(3.5 / 3, 6)
+    }
+    expect(beachFactorAt(at('wrightsville-beach'))).toBe(BEACH_CAP)
+  })
+  it('every observation, worked through the transform at its own spot with its region’s factor, lands inside what was seen', async () => {
+    const { surfEstimate } = await import('../src/core/surf.ts')
+    const { beachFactorAt } = await import('../src/core/beachFactor.ts')
+    const { BEACH_OBSERVATIONS } = await import('../src/data/beachObservations.ts')
+    const { SURF_SPOTS } = await import('../src/data/surfSpots.ts')
+    const where: Record<string, { at: { lat: number; lon: number }; facing: number; fromDeg: number }> = {
+      vb: { at: { lat: 36.8436, lon: -75.9713 }, facing: 100, fromDeg: 100 },
+      obx: { ...(SURF_SPOTS.find((s) => s.id === 's-turns') as { at: { lat: number; lon: number }; facing: number }), fromDeg: 90 },
+    }
+    for (const o of BEACH_OBSERVATIONS) {
+      const w = where[o.region]
+      const face = surfEstimate(o.buoyFt / 3.28084, o.buoyPeriodS, w.fromDeg, w.facing, beachFactorAt(w.at)).faceFt
+      expect(face, o.spot).toBeGreaterThanOrEqual(o.seenFt[0])
+      expect(face, o.spot).toBeLessThanOrEqual(o.seenFt[1])
+    }
+  })
+})
+
+describe('the forecast face is worked from the whole sea (Batch Beach, Section 2: Sandbridge, 4% of size words right with swell-only)', () => {
+  it('the height is wave_height, the period and direction the swell’s; the swell’s height only where the whole sea’s is missing', async () => {
+    const { surfAt } = await import('../src/lib/surfDay.ts')
+    const { surfEstimate } = await import('../src/core/surf.ts')
+    const t = Date.UTC(2026, 10, 5, 15)
+    const m = (wave: number | null) => ({ times: [t], values: { wave_height: [wave], wave_period: [6], wave_direction: [60], swell_wave_height: [0.4], swell_wave_period: [11], swell_wave_direction: [95] } })
+    const s = surfAt(m(0.9), new Date(t), 100)
+    expect(s?.estimate.faceFt).toBeCloseTo(surfEstimate(0.9, 11, 95, 100).faceFt, 9)
+    expect(s?.periodS).toBe(11)
+    expect(s?.swellFt).toBeCloseTo(0.4 * 3.28084, 9)
+    expect(surfAt(m(null), new Date(t), 100)?.estimate.faceFt).toBeCloseTo(surfEstimate(0.4, 11, 95, 100).faceFt, 9)
+  })
+})
+
 describe('a week day’s surf (Batch QA, Section 0B: "Surf" on every day while the swell faded)', () => {
   it('days 1-3: Surf only when the peak hour is Fun or better on the scale, else the range', async () => {
     const { weekSurf } = await import('../src/core/homeDay.ts')

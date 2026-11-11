@@ -170,3 +170,34 @@ export function timeAtShare(date: string, timeZone: string, share: number): Date
 
 /** After the finger lifts, the curve goes back to now this long after (Batch Flow, Section 7). */
 export const SCRUB_RETURN_MS = 3000
+
+/*
+ * SPRING OR NEAP, FROM THE MOON AND THE STATION (Batch Beach, Section 2).
+ * The moon says when the big tides are due (src/core/moonTides.ts tideWeek);
+ * the station's own table says whether today's are big here. "Spring tides"
+ * only when both do: the moon within a few days of new or full, and today's
+ * range at least SPRING_OVER times the station's typical day (the median
+ * day's range over the turns in hand, a month from NOAA, at least
+ * TYPICAL_MIN_DAYS days of them). Neap the same way the other side. Without
+ * a typical day, the station has not said, and neither do we.
+ */
+export const SPRING_OVER = 1.1
+export const NEAP_UNDER = 0.9
+export const TYPICAL_MIN_DAYS = 14
+
+/** The station's typical day: the median of its daily ranges, or null with fewer than TYPICAL_MIN_DAYS whole days. */
+export function typicalRangeFeet(extremes: readonly TideExtreme[], timeZone: string): number | null {
+  const days = [...new Set(extremes.map((e) => localDate(e.at, timeZone)))]
+  const ranges = days.map((d) => dayRangeFeet(extremes, d, timeZone)).filter((r): r is number => r !== null)
+  if (ranges.length < TYPICAL_MIN_DAYS) return null
+  const s = ranges.sort((a, b) => a - b)
+  const m = Math.floor(s.length / 2)
+  return s.length % 2 === 1 ? s[m] : (s[m - 1] + s[m]) / 2
+}
+
+export function springOrNeap(moon: 'spring' | 'neap' | null, todayFeet: number | null, typicalFeet: number | null): 'spring' | 'neap' | null {
+  if (moon === null || todayFeet === null || typicalFeet === null || typicalFeet <= 0) return null
+  if (moon === 'spring' && todayFeet >= SPRING_OVER * typicalFeet) return 'spring'
+  if (moon === 'neap' && todayFeet <= NEAP_UNDER * typicalFeet) return 'neap'
+  return null
+}

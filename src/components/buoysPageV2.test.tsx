@@ -1,5 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
+import { beachFactorAt } from '../core/beachFactor.ts'
+import { buoyFaceFt } from '../core/spotSkill.ts'
 import { nearestBuoys, type BuoyReading } from '../lib/buoy.ts'
 import { travelWords } from '../lib/buoyPageWords.ts'
 import type { Hourly } from '../lib/tideSheetData.ts'
@@ -68,13 +70,23 @@ describe('the Buoys page v2', () => {
   })
 
   it('against the forecast: as forecast, smaller, bigger, and what it says when it cannot compare', () => {
-    expect(render()).toContain('Running about as forecast · 44099 2.3 ft, beach 2.3 ft')
-    expect(render({ marine: marine(1.2) })).toContain('Running smaller than forecast · 44099 2.3 ft, beach 3.9 ft')
+    expect(render()).toContain('Running about as forecast · 44099 2.3 ft, forecast 2.3 ft')
+    expect(render({ marine: marine(1.2) })).toContain('Running smaller than forecast · 44099 2.3 ft, forecast 3.9 ft')
     expect(render({ marine: marine(0.3) })).toContain('Running bigger than forecast')
     expect(render({ marine: 'inland' })).toContain('No sea forecast here to compare')
     expect(render({ marine: null, marineFailed: true })).toContain('The sea forecast didn’t load')
     const outside = { times: [Date.parse('2026-11-05T00:00:00Z')], values: { wave_height: [1] } }
     expect(render({ marine: outside })).toContain('The forecast did not say for 11:56 AM')
+  })
+
+  it('one buoy→beach number: the faces line is buoyFaceFt at the beach facing, the Surf page’s own function', () => {
+    const b = readings[0] as Extract<BuoyReading, { status: 'ok' }>
+    const ft = buoyFaceFt({ waveM: b.waveM, periodS: b.periodS, fromDeg: b.fromDeg }, 80, beachFactorAt(PIER))
+    expect(ft).not.toBeNull()
+    expect(render({ facing: 80 })).toContain(`${b.buoy.id} as faces at this beach ≈ ${(ft as number).toFixed(1)} ft`)
+    /* No facing yet: no faces number, and the model's height is never called "beach". */
+    expect(render()).not.toContain('as faces at this beach')
+    expect(render({ facing: 80 })).not.toMatch(/, beach \d/)
   })
 
   it('no buoy: a dash and the reason, no number', () => {

@@ -1,7 +1,10 @@
 import '../styles/surf.css'
 import type { LatLon } from '../core/geo.ts'
+import { beachFactorAt } from '../core/beachFactor.ts'
+import { buoyFaceFt } from '../core/spotSkill.ts'
 import { buoyParts, partWords } from '../core/surfReads.ts'
 import { placePills } from '../core/pillPlace.ts'
+import { feetToMeters } from '../core/reachScale.ts'
 import { AIMED_TOLERANCE_DEG, FORECAST_TOLERANCE_FRACTION, FORECAST_TOLERANCE_M, G, versusForecast } from '../core/swellTravel.ts'
 import { fitView, inView, viewTiles } from '../core/tileView.ts'
 import { formatClock } from '../core/timezone.ts'
@@ -50,7 +53,7 @@ export function BuoysPageV2({ venue, placeName, timeZone, units, ground, onBack,
   const data = useBuoyPage(venue)
   return (
     <DetailShell id="buoys" ground={ground} onBack={onBack} onSwitch={onSwitch} onMap={onMap} how={<BuoysHow venue={venue} buoys={data.buoys} units={units} />}>
-      <BuoysBody venue={venue} placeName={placeName} timeZone={timeZone} units={units} buoys={data.buoys} marine={data.marine} marineFailed={data.marineFailed} />
+      <BuoysBody venue={venue} placeName={placeName} timeZone={timeZone} units={units} buoys={data.buoys} marine={data.marine} marineFailed={data.marineFailed} facing={data.facing} />
     </DetailShell>
   )
 }
@@ -65,9 +68,11 @@ interface BodyProps {
   buoys: BuoyReading[] | null
   marine: Hourly | 'inland' | null
   marineFailed: boolean
+  /** The beach's facing (src/lib/useBuoyPage.ts); null while asking or not known. */
+  facing?: number | null
 }
 
-export function BuoysBody({ venue, placeName, timeZone, units, buoys, marine, marineFailed }: BodyProps) {
+export function BuoysBody({ venue, placeName, timeZone, units, buoys, marine, marineFailed, facing = null }: BodyProps) {
   const rows = buoyRows(buoys, venue)
   const near = <p className="dhead__line dbuoy__near">{placeName === '' ? 'Near the spot' : `Near ${placeName}`}</p>
   if (buoys === null) {
@@ -97,6 +102,7 @@ export function BuoysBody({ venue, placeName, timeZone, units, buoys, marine, ma
         <p className="dhead__big">{waveHeight(top.b.waveM, units)}</p>
         <p className="dhead__line">{how === '' ? 'biggest reading' : `biggest reading · ${how}`}</p>
         <ForecastLine nearest={rows[0].b} marine={marine} marineFailed={marineFailed} timeZone={timeZone} units={units} />
+        <FacesLine venue={venue} nearest={rows[0].b} facing={facing} units={units} />
       </div>
       <section className="dbuoy__mapcard" aria-label="Where the buoys are">
         <BuoyMap venue={venue} rows={rows} units={units} />
@@ -148,9 +154,25 @@ function ForecastLine({ nearest, marine, marineFailed, timeZone, units }: { near
     line =
       v === null
         ? `The forecast did not say for ${formatClock(nearest.at, timeZone, units.clock)}`
-        : `${v === 'smaller' ? 'Running smaller than forecast' : v === 'bigger' ? 'Running bigger than forecast' : 'Running about as forecast'} · ${nearest.buoy.id} ${waveHeight(nearest.waveM, units)}, beach ${waveHeight(f, units)}`
+        : `${v === 'smaller' ? 'Running smaller than forecast' : v === 'bigger' ? 'Running bigger than forecast' : 'Running about as forecast'} · ${nearest.buoy.id} ${waveHeight(nearest.waveM, units)}, forecast ${waveHeight(f, units)}`
   }
   return <p className="dhead__line dbuoy__vs">{line}</p>
+}
+
+/*
+ * Batch Beach, Section 2 (10 Nov: the Surf page said "≈ 3.0 ft" and this page
+ * "beach 2.0 ft" for the same buoy; "beach" was the model's open-water
+ * height). The beach's faces from the nearest buoy, by the Surf page's own
+ * function and facing: one buoy→beach number in the app.
+ */
+function FacesLine({ venue, nearest, facing, units }: { venue: LatLon; nearest: OkBuoy; facing: number | null; units: Units }) {
+  const ft = facing === null ? null : buoyFaceFt({ waveM: nearest.waveM, periodS: nearest.periodS, fromDeg: nearest.fromDeg }, facing, beachFactorAt(venue))
+  if (ft === null) return null
+  return (
+    <p className="dhead__line dbuoy__vs" data-buoy-faces>
+      {nearest.buoy.id} as faces at this beach ≈ {waveHeight(feetToMeters(ft), units)}
+    </p>
+  )
 }
 
 /* ------------------------------------------------------------------ map */

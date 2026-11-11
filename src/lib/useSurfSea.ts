@@ -5,6 +5,7 @@
  *   marine   Open-Meteo Marine, the week (fetchMarine, the weather store)
  *   wind     the briefing's wind, the week (fetchBriefWind, the same store)
  *   facing   which way the beach faces (the map's sea polygons)
+ *   factor   the region's beach factor (src/core/beachFactor.ts), from the spot itself
  *   buoy     the nearest NDBC buoy on that water, its latest reading
  *            (/api/buoy, sent only a station number)
  *
@@ -12,6 +13,7 @@
  * on the phone. Nothing about the user leaves it.
  */
 import { useEffect, useState } from 'react'
+import { beachFactorAt } from '../core/beachFactor.ts'
 import type { LatLon } from '../core/geo.ts'
 import { latestBuoyWaves, type BuoyReading } from './buoy.ts'
 import { coastFacing } from './coast.ts'
@@ -29,6 +31,8 @@ export interface SurfSea {
   /** 'inland': the map has no sea here. */
   facingState: 'loading' | 'ok' | 'inland' | 'unavailable'
   buoy: BuoyReading | null
+  /** The region's beach factor (src/core/beachFactor.ts); absent: BEACH_CAP. */
+  factor?: number
 }
 
 const EMPTY: SurfSea = {
@@ -89,5 +93,6 @@ export function useSurfSea(spot: LatLon | null): SurfSea {
     }
   }, [key, lat, lon, epoch])
 
-  return sea !== null && sea.key === key ? sea.v : EMPTY
+  const v = sea !== null && sea.key === key ? sea.v : EMPTY
+  return lat === null || lon === null ? v : { ...v, factor: beachFactorAt({ lat, lon }) }
 }

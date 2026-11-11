@@ -129,9 +129,10 @@ export interface SurfEstimate {
  */
 export const BEACH_CAP = 1
 
-export function surfEstimate(swellM: number, period: number, swellFromDeg: number, facingDeg: number | null): SurfEstimate {
+/** `factor`: the region's (src/core/beachFactor.ts beachFactorAt), BEACH_CAP where none is known. */
+export function surfEstimate(swellM: number, period: number, swellFromDeg: number, facingDeg: number | null, factor: number = BEACH_CAP): SurfEstimate {
   const h = angledHeight(swellM, swellFromDeg, facingDeg)
-  const cap = Math.max(0, swellM) * 3.28084 * BEACH_CAP
+  const cap = Math.max(0, swellM) * 3.28084 * factor
   const k = Math.min(breakKomar(h, period) * 3.28084, cap)
   const l = Math.min(breakLeMehaute(h, period) * 3.28084, cap)
   return { faceFt: k, faceFtLeMehaute: l, size: surfSize(k) }

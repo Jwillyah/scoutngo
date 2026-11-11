@@ -128,6 +128,13 @@ describe('Surf page v2 (Batch N, Section 1)', () => {
     expect(text(html)).toContain('forecast likely range buoy, as beach faces')
   })
 
+  /* Batch Beach, Section 2: a reading outside the likely range is never shown without saying so. */
+  it('a buoy reading outside the likely range is named, with why; one inside says nothing', () => {
+    expect(render()).not.toContain('data-surf-outside')
+    const big = text(render({ kept: [{ at: Date.UTC(2026, 10, 2, 12), forecastFt: 2, buoyFt: 7.5, rating: null }] }))
+    expect(big).toMatch(/Buoy at 7:30 AM, 7\.5 ft, above the likely range \(\d+\.\d–\d+\.\d ft\)\. The range is the forecast’s; the buoy is what the sea did, and the forecast missed that hour\./)
+  })
+
   it('says the buoy against the forecast, its name, number and time', () => {
     const t = text(render())
     expect(t).toMatch(/Buoy reads \d+\.\d ft · 8 s/)
@@ -193,5 +200,12 @@ describe('Surf page v2 (Batch N, Section 1)', () => {
     expect(t).toContain('NDBC 44099')
     expect(t).toContain(SURF_SPREAD_SOURCE)
     expect(t).toContain('This spot: no history here yet')
+  })
+
+  it('how we got this names the region’s factor and the 6 h lean to the buoy (Batch Beach, Section 2)', () => {
+    const t = text(renderToStaticMarkup(<SurfHow sea={{ ...sea, factor: 2.5 / 3 }} stats={NONE} away={null} placeName="Here" spot={SPOT} />))
+    expect(t).toContain('times 0.83: Virginia Beach, from looks at the beach set against the buoy')
+    expect(t).toContain('the forecast leans to the buoy')
+    expect(t).toContain('6 h after it')
   })
 })

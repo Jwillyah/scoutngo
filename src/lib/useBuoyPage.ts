@@ -18,6 +18,8 @@ export interface BuoyPageData {
   /** The spot's marine forecast; 'inland' where there is no sea; null while asking or when it failed. */
   marine: Hourly | 'inland' | null
   marineFailed: boolean
+  /** The beach's facing, the same one the Surf page reads (src/lib/coast.ts); null while asking, inland or when it failed. */
+  facing: number | null
 }
 
 export function useBuoyPage(venue: LatLon): BuoyPageData {
@@ -26,6 +28,7 @@ export function useBuoyPage(venue: LatLon): BuoyPageData {
   const key = `${lat},${lon}`
   const [buoysFor, setBuoys] = useState<{ key: string; value: BuoyReading[] } | null>(null)
   const [marineFor, setMarine] = useState<{ key: string; value: Hourly | 'inland' | null } | null>(null)
+  const [facingFor, setFacing] = useState<{ key: string; value: number | null } | null>(null)
 
   useEffect(() => {
     let live = true
@@ -38,6 +41,7 @@ export function useBuoyPage(venue: LatLon): BuoyPageData {
         if (!live) return true
         /* Failed facing: the nearest buoys, whichever water (as the Tide sheet does). */
         const facingDeg = f === 'unavailable' || f === 'inland' ? null : Math.round(f.facing)
+        setFacing({ key: k, value: facingDeg })
         if (f === 'inland') setMarine({ key: k, value: 'inland' })
         else
           stops.push(
@@ -66,5 +70,5 @@ export function useBuoyPage(venue: LatLon): BuoyPageData {
   }, [lat, lon])
 
   const marine = marineFor?.key === key ? marineFor : null
-  return { buoys: buoysFor?.key === key ? buoysFor.value : null, marine: marine === null ? null : marine.value, marineFailed: marine !== null && marine.value === null }
+  return { buoys: buoysFor?.key === key ? buoysFor.value : null, marine: marine === null ? null : marine.value, marineFailed: marine !== null && marine.value === null, facing: facingFor?.key === key ? facingFor.value : null }
 }

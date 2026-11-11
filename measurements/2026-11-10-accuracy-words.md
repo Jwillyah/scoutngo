@@ -1,0 +1,225 @@
+# Accuracy: the home screen against what happened, 2026-11-03 to 2026-11-09
+
+Run 2026-11-11T01:04:16.068Z at 075f992 · `node scripts/measure-accuracy.mjs --end 2026-11-09 --days 7 --out measurements/2026-11-10-accuracy-words.md`
+
+## Run parameters
+
+- days: 7, 2026-11-03 to 2026-11-09 (America/New_York), ending yesterday at the venue
+- hours scored: 5:00 to 20:00 local, the briefing's hours; an observation counts within 30 min of the hour
+- VB Pier: 36.844, -75.971, faces 100° — src/data/coastCams.ts 'va-virginia-beach-pier'
+- Sandbridge: 36.727, -75.94, faces 100° — src/data/coastCams.ts 'va-sandbridge'
+- KDH: 36.0294, -75.6642, faces 61° — src/data/surfSpots.ts 'kdh-1st-street'
+- Chix: 36.92, -76.1 — tests/data/sky-fire-2026-11-02-sunset.json (truth case #5 venue)
+- weather: Open-Meteo previous runs, the briefing's variables (temperature_2m, wind_speed_10m, wind_gusts_10m), default model, coordinates to 2 decimals as the app asks; d0 the newest run before the hour, d1 the run a day earlier
+- weather observed: Iowa State ASOS archive, routine reports, KNTU and KORF and KFFA; the nearer to each spot (VB Pier KNTU, Sandbridge KNTU, KDH KFFA, Chix KORF)
+- sea: Open-Meteo Marine (the Surf page's variables) vs NDBC realtime2 44099 and 44100, the nearer to each spot
+- tide: NOAA CO-OPS predictions (hilo, MLLW) at the station the app picks, vs the nearest water-level gauge with observed turns
+- hit: air within 2 °C (3.6 °F), wind and gust within 5 kt, wave height and surf face within 1 ft, period within 2 s, surf size the same word (Flat, Small, Fun, Solid, Big), tide turn within 15 min and 0.5 ft
+- errors are forecast minus observed: a positive bias is a forecast too high, or a tide turn said later than it came
+
+## Summary
+
+All spots together, the newest forecast (d0) and the tide predictions. Hit rate pooled over every pair; a pair two spots share (one tide gauge) is counted once.
+
+| item | pairs | MAE | bias | hit rate | hit is |
+|---|---|---|---|---|---|
+| air temperature | 448 | 1.6 °F | -0.1 °F | 90% | ±2 °C (3.6 °F) |
+| wind, hourly | 443 | 2.2 kt | 0.3 kt | 93% | ±5 kt |
+| gust, hourly | 443 | 5.4 kt | 4.4 kt | 53% | ±5 kt |
+| day's strongest wind | 28 | 2.2 kt | -0.5 kt | 89% | ±5 kt |
+| day's strongest gust | 28 | 3.9 kt | 1.5 kt | 68% | ±5 kt |
+| wave height (Hs) | 336 | 1.1 ft | -1.1 ft | 45% | ±1 ft |
+| wave period | 336 | 2.4 s | -1.8 s | 28% | ±2 s |
+| surf face | 336 | 1.5 ft | -1.4 ft | 27% | ±1 ft |
+| surf size word | 336 | — | — | 27% | same word |
+| surf face, whole-sea height | 336 | 1.1 ft | -1.0 ft | 48% | ±1 ft |
+| surf size word, whole-sea height | 336 | — | — | 53% | same word |
+| tide turn time | 81 | 9.8 min | -0.3 min | 80% | ±15 min |
+| tide turn height | 81 | 0.4 ft | -0.3 ft | 69% | ±0.5 ft |
+
+## Per spot, per item
+
+| spot | item | lead | pairs | MAE | bias | hit rate | hit is |
+|---|---|---|---|---|---|---|---|
+| VB Pier | air temperature | d0 | 112 | 1.5 °F | -0.1 °F | 89% | ±2 °C (3.6 °F) |
+| VB Pier | wind, hourly | d0 | 112 | 1.9 kt | -0.7 kt | 96% | ±5 kt |
+| VB Pier | gust, hourly | d0 | 112 | 4.9 kt | 3.5 kt | 56% | ±5 kt |
+| VB Pier | day's strongest wind | d0 | 7 | 2.2 kt | -2.2 kt | 86% | ±5 kt |
+| VB Pier | day's strongest gust | d0 | 7 | 2.7 kt | -0.3 kt | 71% | ±5 kt |
+| VB Pier | air temperature | d1 | 112 | 2.6 °F | -1.0 °F | 79% | ±2 °C (3.6 °F) |
+| VB Pier | wind, hourly | d1 | 112 | 2.1 kt | 0.8 kt | 93% | ±5 kt |
+| VB Pier | gust, hourly | d1 | 112 | 7.2 kt | 6.4 kt | 36% | ±5 kt |
+| VB Pier | day's strongest wind | d1 | 7 | 1.7 kt | -1.1 kt | 100% | ±5 kt |
+| VB Pier | day's strongest gust | d1 | 7 | 3.3 kt | 2.9 kt | 86% | ±5 kt |
+| Sandbridge | air temperature | d0 | 112 | 1.9 °F | -0.4 °F | 87% | ±2 °C (3.6 °F) |
+| Sandbridge | wind, hourly | d0 | 112 | 2.1 kt | -0.3 kt | 91% | ±5 kt |
+| Sandbridge | gust, hourly | d0 | 112 | 5.0 kt | 3.6 kt | 57% | ±5 kt |
+| Sandbridge | day's strongest wind | d0 | 7 | 1.9 kt | -1.9 kt | 86% | ±5 kt |
+| Sandbridge | day's strongest gust | d0 | 7 | 2.5 kt | -0.0 kt | 71% | ±5 kt |
+| Sandbridge | air temperature | d1 | 112 | 2.7 °F | -1.0 °F | 75% | ±2 °C (3.6 °F) |
+| Sandbridge | wind, hourly | d1 | 112 | 2.6 kt | 1.1 kt | 87% | ±5 kt |
+| Sandbridge | gust, hourly | d1 | 112 | 7.2 kt | 6.4 kt | 36% | ±5 kt |
+| Sandbridge | day's strongest wind | d1 | 7 | 1.5 kt | -0.9 kt | 100% | ±5 kt |
+| Sandbridge | day's strongest gust | d1 | 7 | 3.4 kt | 3.0 kt | 86% | ±5 kt |
+| KDH | air temperature | d0 | 112 | 1.6 °F | 0.6 °F | 95% | ±2 °C (3.6 °F) |
+| KDH | wind, hourly | d0 | 112 | 2.5 kt | 2.4 kt | 91% | ±5 kt |
+| KDH | gust, hourly | d0 | 112 | 7.0 kt | 7.0 kt | 38% | ±5 kt |
+| KDH | day's strongest wind | d0 | 7 | 2.9 kt | 2.9 kt | 86% | ±5 kt |
+| KDH | day's strongest gust | d0 | 7 | 7.7 kt | 7.7 kt | 43% | ±5 kt |
+| KDH | air temperature | d1 | 112 | 1.3 °F | 0.2 °F | 98% | ±2 °C (3.6 °F) |
+| KDH | wind, hourly | d1 | 112 | 4.6 kt | 4.5 kt | 60% | ±5 kt |
+| KDH | gust, hourly | d1 | 112 | 10.0 kt | 10.0 kt | 12% | ±5 kt |
+| KDH | day's strongest wind | d1 | 7 | 4.4 kt | 4.4 kt | 57% | ±5 kt |
+| KDH | day's strongest gust | d1 | 7 | 10.0 kt | 10.0 kt | 0% | ±5 kt |
+| Chix | air temperature | d0 | 112 | 1.5 °F | -0.6 °F | 91% | ±2 °C (3.6 °F) |
+| Chix | wind, hourly | d0 | 107 | 2.3 kt | -0.2 kt | 93% | ±5 kt |
+| Chix | gust, hourly | d0 | 107 | 4.7 kt | 3.3 kt | 59% | ±5 kt |
+| Chix | day's strongest wind | d0 | 7 | 1.8 kt | -0.9 kt | 100% | ±5 kt |
+| Chix | day's strongest gust | d0 | 7 | 2.6 kt | -1.4 kt | 86% | ±5 kt |
+| Chix | air temperature | d1 | 112 | 2.4 °F | -1.6 °F | 75% | ±2 °C (3.6 °F) |
+| Chix | wind, hourly | d1 | 107 | 2.8 kt | 1.4 kt | 82% | ±5 kt |
+| Chix | gust, hourly | d1 | 107 | 7.1 kt | 6.4 kt | 36% | ±5 kt |
+| Chix | day's strongest wind | d1 | 7 | 1.8 kt | 0.1 kt | 100% | ±5 kt |
+| Chix | day's strongest gust | d1 | 7 | 3.5 kt | 1.5 kt | 57% | ±5 kt |
+| VB Pier | wave height (Hs) | d0 | 112 | 0.9 ft | -0.9 ft | 58% | ±1 ft |
+| VB Pier | wave height (Hs) | d1 | 112 | 0.8 ft | -0.8 ft | 68% | ±1 ft |
+| VB Pier | wave period | d0 | 112 | 2.5 s | -2.2 s | 20% | ±2 s |
+| VB Pier | surf face | d0 | 112 | 1.3 ft | -1.2 ft | 43% | ±1 ft |
+| VB Pier | surf size word | d0 | 112 | — | — | 27% | same word |
+| VB Pier | surf face, whole-sea height | d0 | 112 | 0.9 ft | -0.7 ft | 63% | ±1 ft |
+| VB Pier | surf size word, whole-sea height | d0 | 112 | — | — | 70% | same word |
+| Sandbridge | wave height (Hs) | d0 | 112 | 1.4 ft | -1.4 ft | 26% | ±1 ft |
+| Sandbridge | wave height (Hs) | d1 | 112 | 1.3 ft | -1.3 ft | 27% | ±1 ft |
+| Sandbridge | wave period | d0 | 112 | 2.5 s | -2.1 s | 25% | ±2 s |
+| Sandbridge | surf face | d0 | 112 | 1.6 ft | -1.5 ft | 20% | ±1 ft |
+| Sandbridge | surf size word | d0 | 112 | — | — | 4% | same word |
+| Sandbridge | surf face, whole-sea height | d0 | 112 | 1.3 ft | -1.2 ft | 29% | ±1 ft |
+| Sandbridge | surf size word, whole-sea height | d0 | 112 | — | — | 25% | same word |
+| KDH | wave height (Hs) | d0 | 112 | 1.1 ft | -1.1 ft | 50% | ±1 ft |
+| KDH | wave height (Hs) | d1 | 112 | 1.1 ft | -1.1 ft | 54% | ±1 ft |
+| KDH | wave period | d0 | 112 | 2.2 s | -1.2 s | 39% | ±2 s |
+| KDH | surf face | d0 | 112 | 1.5 ft | -1.5 ft | 19% | ±1 ft |
+| KDH | surf size word | d0 | 112 | — | — | 51% | same word |
+| KDH | surf face, whole-sea height | d0 | 112 | 1.0 ft | -1.0 ft | 51% | ±1 ft |
+| KDH | surf size word, whole-sea height | d0 | 112 | — | — | 63% | same word |
+| VB Pier | tide turn time | NOAA | 27 | 8.1 min | -2.4 min | 85% | ±15 min |
+| VB Pier | tide turn height | NOAA | 27 | 0.4 ft | -0.3 ft | 70% | ±0.5 ft |
+| Sandbridge | tide turn time | NOAA | 27 | 9.0 min | -5.3 min | 85% | ±15 min |
+| Sandbridge | tide turn height | NOAA | 27 | 0.4 ft | -0.4 ft | 63% | ±0.5 ft |
+| KDH | tide turn time | NOAA | 27 | 12.3 min | 6.7 min | 70% | ±15 min |
+| KDH | tide turn height | NOAA | 27 | 0.3 ft | -0.3 ft | 74% | ±0.5 ft |
+| Chix | tide turn time | NOAA | 27 | 8.1 min | -2.4 min | 85% | ±15 min |
+| Chix | tide turn height | NOAA | 27 | 0.4 ft | -0.3 ft | 70% | ±0.5 ft |
+
+Sources per row:
+
+- VB Pier: Open-Meteo default model vs KNTU (6.1 km)
+- Sandbridge: Open-Meteo default model vs KNTU (13.3 km)
+- KDH: Open-Meteo default model vs KFFA (1.2 km)
+- Chix: Open-Meteo default model vs KORF (8.4 km)
+- VB Pier: Open-Meteo Marine vs NDBC 44099 (24 km)
+- Sandbridge: Open-Meteo Marine vs NDBC 44099 (29 km)
+- KDH: Open-Meteo Marine vs NDBC 44100 (26 km)
+- VB Pier: NOAA prediction at gauge 8638901 CBBT, Chesapeake Channel (23.3 km) vs its observed turns
+- Sandbridge: NOAA prediction at gauge 8639348 Money Point (32.7 km) vs its observed turns
+- KDH: NOAA prediction at gauge 8651370 Duck (18.6 km) vs its observed turns
+- Chix: NOAA prediction at gauge 8638901 CBBT, Chesapeake Channel (12.6 km) vs its observed turns
+
+## Worst 3 items
+
+Lowest hit rate among the d0 and tide rows at the three spots (ties: the larger mean error).
+
+1. Sandbridge · surf size word (d0): hit 4% of 112 (Open-Meteo Marine vs NDBC 44099 (29 km))
+2. KDH · surf face (d0): hit 19% of 112, MAE 1.5 ft, bias -1.5 ft (Open-Meteo Marine vs NDBC 44100 (26 km))
+3. VB Pier · wave period (d0): hit 20% of 112, MAE 2.5 s, bias -2.2 s (Open-Meteo Marine vs NDBC 44099 (24 km))
+
+## Sunset call against the log
+
+| spot | date | what the app said | what happened | from |
+|---|---|---|---|---|
+| VB Pier | 2026-11-03 | — | no log supplied | — |
+| VB Pier | 2026-11-04 | — | no log supplied | — |
+| VB Pier | 2026-11-05 | — | no log supplied | — |
+| VB Pier | 2026-11-06 | — | no log supplied | — |
+| VB Pier | 2026-11-07 | — | no log supplied | — |
+| VB Pier | 2026-11-08 | — | no log supplied | — |
+| VB Pier | 2026-11-09 | — | no log supplied | — |
+| Sandbridge | 2026-11-03 | — | no log supplied | — |
+| Sandbridge | 2026-11-04 | — | no log supplied | — |
+| Sandbridge | 2026-11-05 | — | no log supplied | — |
+| Sandbridge | 2026-11-06 | — | no log supplied | — |
+| Sandbridge | 2026-11-07 | — | no log supplied | — |
+| Sandbridge | 2026-11-08 | — | no log supplied | — |
+| Sandbridge | 2026-11-09 | — | no log supplied | — |
+| KDH | 2026-11-03 | — | no log supplied | — |
+| KDH | 2026-11-04 | — | no log supplied | — |
+| KDH | 2026-11-05 | — | no log supplied | — |
+| KDH | 2026-11-06 | — | no log supplied | — |
+| KDH | 2026-11-07 | — | no log supplied | — |
+| KDH | 2026-11-08 | — | no log supplied | — |
+| KDH | 2026-11-09 | — | no log supplied | — |
+| Chix | 2026-11-03 | — | no log supplied | — |
+| Chix | 2026-11-04 | — | no log supplied | — |
+| Chix | 2026-11-05 | — | no log supplied | — |
+| Chix | 2026-11-06 | — | no log supplied | — |
+| Chix | 2026-11-07 | — | no log supplied | — |
+| Chix | 2026-11-08 | — | no log supplied | — |
+| Chix | 2026-11-09 | — | no log supplied | — |
+
+Needs Jwilly's log (28 sunsets): VB Pier 2026-11-03, VB Pier 2026-11-04, VB Pier 2026-11-05, VB Pier 2026-11-06, VB Pier 2026-11-07, VB Pier 2026-11-08, VB Pier 2026-11-09, Sandbridge 2026-11-03, Sandbridge 2026-11-04, Sandbridge 2026-11-05, Sandbridge 2026-11-06, Sandbridge 2026-11-07, Sandbridge 2026-11-08, Sandbridge 2026-11-09, KDH 2026-11-03, KDH 2026-11-04, KDH 2026-11-05, KDH 2026-11-06, KDH 2026-11-07, KDH 2026-11-08, KDH 2026-11-09, Chix 2026-11-03, Chix 2026-11-04, Chix 2026-11-05, Chix 2026-11-06, Chix 2026-11-07, Chix 2026-11-08, Chix 2026-11-09. The app keeps the log on the phone (src/lib/truthLog.ts, src/lib/fireLog.ts); export it and run again with `--sunset-log <file>`. No outcome is filled in without it.
+
+## Surf size words, said against the buoy
+
+Rows: the word the app said (its face from the forecast); columns: the word the buoy gave through the same transform. The diagonal is a hit.
+
+**VB Pier** (112 hours)
+
+| said \ buoy | Flat | Small | Fun | Solid | Big |
+|---|---|---|---|---|---|
+| Flat | 0 | 0 | 0 | 0 | 0 |
+| Small | 2 | 12 | 77 | 1 | 0 |
+| Fun | 0 | 0 | 18 | 2 | 0 |
+| Solid | 0 | 0 | 0 | 0 | 0 |
+| Big | 0 | 0 | 0 | 0 | 0 |
+
+**Sandbridge** (112 hours)
+
+| said \ buoy | Flat | Small | Fun | Solid | Big |
+|---|---|---|---|---|---|
+| Flat | 0 | 7 | 1 | 0 | 0 |
+| Small | 2 | 5 | 94 | 3 | 0 |
+| Fun | 0 | 0 | 0 | 0 | 0 |
+| Solid | 0 | 0 | 0 | 0 | 0 |
+| Big | 0 | 0 | 0 | 0 | 0 |
+
+**KDH** (112 hours)
+
+| said \ buoy | Flat | Small | Fun | Solid | Big |
+|---|---|---|---|---|---|
+| Flat | 0 | 0 | 12 | 0 | 0 |
+| Small | 0 | 1 | 20 | 5 | 0 |
+| Fun | 0 | 0 | 56 | 18 | 0 |
+| Solid | 0 | 0 | 0 | 0 | 0 |
+| Big | 0 | 0 | 0 | 0 | 0 |
+
+## Notes
+
+- VB Pier: Open-Meteo answered for its grid cell at 36.817, -75.988, 3.4 km from the spot.
+- Sandbridge: Open-Meteo answered for its grid cell at 36.726, -75.946, 0.6 km from the spot.
+- KDH: Open-Meteo answered for its grid cell at 36.009, -75.678, 2.6 km from the spot.
+- Chix: Open-Meteo answered for its grid cell at 36.894, -76.104, 2.9 km from the spot.
+- VB Pier: Open-Meteo Marine answered for its cell at 36.958, -75.875, 15.3 km from the spot; buoy 44099 Cape Henry, VA (147), 24 km.
+- Sandbridge: Open-Meteo Marine answered for its cell at 36.708, -75.875, 6.2 km from the spot; buoy 44099 Cape Henry, VA (147), 29 km.
+- KDH: Open-Meteo Marine answered for its cell at 36.042, -75.625, 3.8 km from the spot; buoy 44100 Duck FRF 26m, NC (430), 26 km.
+- The surf face is the app's number (surfDay.surfAt): the swell's height and period when Open-Meteo gives them, else the whole sea's. The buoy's WVHT and DPD are the whole sea, wind waves included, put through the same formula (surf.surfEstimate). Part of a low face bias can be that choice; the wave height (Hs) row compares the whole sea with the whole sea.
+- The wave height is scored at d0 and d1 (Open-Meteo Marine's wave_height_previous_day1). The period, the surf face and its word are scored at d0 only: the day-before run of the swell they are made from was not asked for.
+- VB Pier tide: the app's station is 8639168 Virginia Beach, 0.1 km (27 predicted turns in the week). Nearest gauge with observed turns: 8638901 CBBT, Chesapeake Channel, 23.3 km, from turns in NOAA's preliminary 6-minute water levels (2160 samples; verified highs and lows not yet published); 27 of its own predicted turns paired. Not scored, for information: the app's Virginia Beach turns against that gauge's observed ones differ by 38.3 min on average (bias -38.3 min) and 0.44 ft, over 27 pairs: the water between them, not only the prediction.
+- Sandbridge tide: the app's station is 8639428 Sandbridge, 4.3 km (27 predicted turns in the week). Nearest gauge with observed turns: 8639348 Money Point, 32.7 km, from turns in NOAA's preliminary 6-minute water levels (2159 samples; verified highs and lows not yet published); 27 of its own predicted turns paired. Not scored, for information: the app's Sandbridge turns against that gauge's observed ones differ by 110.3 min on average (bias -110.3 min) and 0.32 ft, over 27 pairs: the water between them, not only the prediction.
+- KDH tide: the app's station is 8651605 Kitty Hawk (ocean), 9.0 km (27 predicted turns in the week). Nearest gauge with observed turns: 8651370 Duck, 18.6 km, from turns in NOAA's preliminary 6-minute water levels (2159 samples; verified highs and lows not yet published); 27 of its own predicted turns paired. Not scored, for information: the app's Kitty Hawk (ocean) turns against that gauge's observed ones differ by 12.8 min on average (bias 7.1 min) and 0.29 ft, over 27 pairs: the water between them, not only the prediction.
+- Chix tide: the app's station is 8638888 Lynnhaven Inlet, Virginia Pilots Dock, 1.7 km (27 predicted turns in the week). Nearest gauge with observed turns: 8638901 CBBT, Chesapeake Channel, 12.6 km, from turns in NOAA's preliminary 6-minute water levels (2160 samples; verified highs and lows not yet published); 27 of its own predicted turns paired. Not scored, for information: the app's Lynnhaven Inlet, Virginia Pilots Dock turns against that gauge's observed ones differ by 31.7 min on average (bias 31.7 min) and 0.53 ft, over 27 pairs: the water between them, not only the prediction.
+
+## Could not measure
+
+- Chix sea: Chix is on the Chesapeake Bay; 44099 and 44100 are both on the ocean side, so neither measures its water
+
+Times are America/New_York. The first observed turn found at gauge 8638901: high at 3:00 AM on 2026-11-03, 2.92 ft MLLW.

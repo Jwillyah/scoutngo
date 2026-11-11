@@ -1,6 +1,9 @@
 import '../styles/surf.css'
 import { useEffect, useMemo, useState } from 'react'
 import { venueToday } from '../core/eventDay.ts'
+import { regionOf } from '../core/beachFactor.ts'
+import { BEACH_CAP } from '../core/surf.ts'
+import { SURF_FADE_MS } from '../core/surfNowcast.ts'
 import { type LatLon } from '../core/geo.ts'
 import { camsNear, type SkyCam } from '../core/skyCams.ts'
 import { distanceMeters } from '../core/geo.ts'
@@ -11,14 +14,14 @@ import { buoyParts, partWords, rangeSizeWords } from '../core/surfReads.ts'
 import { SURF_FIRING_FT, SURF_FUN_FT } from '../core/briefing.ts'
 import { formatClock, formatShortHour, zonedTimeToUtc } from '../core/timezone.ts'
 import { COAST_CAMS } from '../data/coastCams.ts'
-import { showsPhotoTools, useActivities } from '../lib/activities.ts'
+import { shootPicked, useActivities } from '../lib/activities.ts'
 import { buoyFaceFt } from '../core/spotSkill.ts'
 import type { BuoyReading } from '../lib/buoy.ts'
 import type { DetailId } from '../lib/detailTabs.ts'
 import { readSkillBook } from '../lib/spotSkillStore.ts'
 import { seaNow, surfNowFrom, surfWords, useSurfNow } from '../lib/useSurfNow.ts'
 import { spotKey } from '../core/spotSkill.ts'
-import { buoyDots, FIRST_HOUR, LAST_HOUR, dayHours, rangeHourAt, weekPeaks, type BuoyDot, type RangeHour } from '../lib/surfPageData.ts'
+import { buoyDots, buoyLean, dotsOutside, FIRST_HOUR, LAST_HOUR, dayHours, rangeHourAt, weekPeaks, type BuoyDot, type RangeHour } from '../lib/surfPageData.ts'
 import { compass, metresToFeet } from '../lib/tideWords.ts'
 import { getSunPosition } from '../core/sun.ts'
 import type { Units } from '../lib/units.ts'
@@ -96,8 +99,8 @@ export function SurfPageV2({ venue, placeName, timeZone, units, ground, onBack, 
   const cam = camNear === null ? null : { ...camNear, km: distanceMeters(venue, camNear.cam.at) / 1000 }
 
   return (
-    <DetailShell id="surf" ground={ground} onBack={onBack} onSwitch={onSwitch} onMap={onMap} how={<SurfHow sea={sea} stats={skill.stats} away={awayWords} placeName={placeName} />}>
-      <SurfBody now={now} timeZone={timeZone} spot={spot} spotName={awayWords?.name ?? placeName} away={awayWords} sea={sea} stats={skill.stats} kept={kept} shoot={showsPhotoTools(picked)} cam={cam} miles={units.distance === 'ft'} />
+    <DetailShell id="surf" ground={ground} onBack={onBack} onSwitch={onSwitch} onMap={onMap} how={<SurfHow sea={sea} stats={skill.stats} away={awayWords} placeName={placeName} spot={spot} />}>
+      <SurfBody now={now} timeZone={timeZone} spot={spot} spotName={awayWords?.name ?? placeName} away={awayWords} sea={sea} stats={skill.stats} kept={kept} shoot={shootPicked(picked)} cam={cam} miles={units.distance === 'ft'} />
     </DetailShell>
   )
 }
@@ -122,10 +125,13 @@ export interface SurfBodyProps {
 /** The page's body, from data in hand (rendered on its own in tests). */
 export function SurfBody({ now, timeZone, spot, spotName, away, sea, stats, kept, shoot, cam, miles }: SurfBodyProps) {
   const clock = (t: Date) => formatClock(t, timeZone)
-  const { marine, wind, facing } = sea
+  const { marine, wind, facing, factor } = sea
   const today = venueToday(now, timeZone)
-  const hours = useMemo(() => (marine === null ? [] : dayHours(marine, wind, today, timeZone, facing, stats)), [marine, wind, today, timeZone, facing, stats])
-  const week = useMemo(() => (marine === null ? [] : weekPeaks(marine, wind, today, timeZone, facing, stats)), [marine, wind, today, timeZone, facing, stats])
+  /* Batch Beach, Section 2: the next 6 h lean to the live buoy (src/core/surfNowcast.ts), as the head does (surfNowFrom). */
+  const nowMs = now.getTime()
+  const lean = useMemo(() => (marine === null ? null : buoyLean(marine, wind, sea.buoy, facing, stats, factor ?? BEACH_CAP, nowMs)), [marine, wind, sea.buoy, facing, stats, factor, nowMs])
+  const hours = useMemo(() => (marine === null ? [] : dayHours(marine, wind, today, timeZone, facing, stats, factor, lean)), [marine, wind, today, timeZone, facing, stats, factor, lean])
+  const week = useMemo(() => (marine === null ? [] : weekPeaks(marine, wind, today, timeZone, facing, stats, factor, lean)), [marine, wind, today, timeZone, facing, stats, factor, lean])
   const head = useMemo(() => surfNowFrom(sea, stats, now, timeZone).now, [sea, stats, now, timeZone])
   /* Batch QA, Section 0B: the period and the parts from one source (src/lib/useSurfNow.ts seaNow), the buoy card's own when the buoy is fresh. */
   const now0 = seaNow(sea, now, head?.periodS ?? null)
@@ -211,10 +217,10 @@ export function SurfBody({ now, timeZone, spot, spotName, away, sea, stats, kept
       </div>
 
       <DCard label="Today · range, not a promise">
-        <TodayChart hours={hours} kept={kept} buoy={sea.buoy} facing={facing} now={now} today={today} timeZone={timeZone} />
+        <TodayChart hours={hours} kept={kept} buoy={sea.buoy} facing={facing} factor={factor} now={now} today={today} timeZone={timeZone} />
       </DCard>
 
-      <BuoyCard buoy={sea.buoy} facing={facing} marine={marine} stats={stats} clock={clock} wind={wind} />
+      <BuoyCard buoy={sea.buoy} facing={facing} factor={factor} marine={marine} stats={stats} clock={clock} wind={wind} />
 
       {cam === null ? null : (
         <DCard>
@@ -247,11 +253,12 @@ const W = 340
 const H = 118
 const PAD = { l: 22, r: 6, t: 6, b: 16 }
 
-function TodayChart({ hours, kept, buoy, facing, now, today, timeZone }: { hours: RangeHour[]; kept: readonly SkillSample[]; buoy: BuoyReading | null; facing: number | null; now: Date; today: string; timeZone: string }) {
+function TodayChart({ hours, kept, buoy, facing, factor, now, today, timeZone }: { hours: RangeHour[]; kept: readonly SkillSample[]; buoy: BuoyReading | null; facing: number | null; factor?: number; now: Date; today: string; timeZone: string }) {
   const from = zonedTimeToUtc(today, `${String(FIRST_HOUR).padStart(2, '0')}:00`, timeZone)?.getTime() ?? null
   const to = zonedTimeToUtc(today, `${String(LAST_HOUR + 1).padStart(2, '0')}:00`, timeZone)?.getTime() ?? null
   if (hours.length === 0 || from === null || to === null) return <p className="dsurf__small">The forecast did not say for today's hours.</p>
-  const inDay: BuoyDot[] = buoyDots(kept, buoy, facing, from, to)
+  const inDay: BuoyDot[] = buoyDots(kept, buoy, facing, from, to, factor)
+  const outside = dotsOutside(hours, inDay)
   const top = chartTopFt([...hours.map((h) => h.range.highFt), ...inDay.map((d) => d.faceFt)])
   const x = (t: number) => PAD.l + ((t - from) / (to - from)) * (W - PAD.l - PAD.r)
   const y = (ft: number) => PAD.t + (1 - Math.min(ft, top) / top) * (H - PAD.t - PAD.b)
@@ -300,6 +307,14 @@ function TodayChart({ hours, kept, buoy, facing, now, today, timeZone }: { hours
           </circle>
         ))}
       </svg>
+      {outside.length === 0 ? null : (
+        <p className="dsurf__small" data-surf-outside>
+          {outside
+            .map((o) => `Buoy at ${formatClock(o.dot.at, timeZone)}, ${o.dot.faceFt.toFixed(1)} ft, ${o.side} the likely range (${o.lowFt.toFixed(1)}–${o.highFt.toFixed(1)} ft)`)
+            .join(' · ')}
+          . The range is the forecast’s; the buoy is what the sea did, and the forecast missed {outside.length === 1 ? 'that hour' : 'those hours'}.
+        </p>
+      )}
       <p className="dsurf__legend">
         <i className="dsurf__key dsurf__key--line" /> forecast <i className="dsurf__key dsurf__key--band" /> likely range <i className="dsurf__key dsurf__key--dot" /> buoy, as beach faces · ft
       </p>
@@ -309,7 +324,7 @@ function TodayChart({ hours, kept, buoy, facing, now, today, timeZone }: { hours
 
 /* ------------------------------------------------------------ the buoy */
 
-function BuoyCard({ buoy, facing, marine, wind, stats, clock }: { buoy: BuoyReading | null; facing: number | null; marine: SurfSea['marine']; wind: SurfSea['wind']; stats: SpotStats; clock: (t: Date) => string }) {
+function BuoyCard({ buoy, facing, factor, marine, wind, stats, clock }: { buoy: BuoyReading | null; facing: number | null; factor?: number; marine: SurfSea['marine']; wind: SurfSea['wind']; stats: SpotStats; clock: (t: Date) => string }) {
   if (buoy === null)
     return (
       <DCard label="Nearest buoy">
@@ -322,8 +337,8 @@ function BuoyCard({ buoy, facing, marine, wind, stats, clock }: { buoy: BuoyRead
         <p className="dsurf__line">{buoy.reason === "The buoy didn't load." ? "The buoy didn't load · retrying" : buoy.reason}</p>
       </DCard>
     )
-  const face = buoyFaceFt({ waveM: buoy.waveM, periodS: buoy.periodS, fromDeg: buoy.fromDeg }, facing)
-  const there = marine === null ? null : rangeHourAt(marine, wind, buoy.at, facing, stats)
+  const face = buoyFaceFt({ waveM: buoy.waveM, periodS: buoy.periodS, fromDeg: buoy.fromDeg }, facing, factor)
+  const there = marine === null ? null : rangeHourAt(marine, wind, buoy.at, facing, stats, factor)
   const name = buoy.buoy.name
     .replace(/\s*\(\d+\)\s*$/, '')
     .replace(/,\s*[A-Z]{2}$/, '')
@@ -387,7 +402,8 @@ function WeekBars({ week }: { week: { date: string; peak: RangeHour | null }[] }
 
 /* ------------------------------------------------------------ how we got this */
 
-export function SurfHow({ sea, stats, away, placeName }: { sea: SurfSea; stats: SpotStats; away: { name: string; far: string } | null; placeName: string }) {
+export function SurfHow({ sea, stats, away, placeName, spot }: { sea: SurfSea; stats: SpotStats; away: { name: string; far: string } | null; placeName: string; spot?: LatLon }) {
+  const region = spot === undefined ? null : regionOf(spot)
   const b = sea.buoy?.status === 'ok' ? sea.buoy : null
   return (
     <>
@@ -400,8 +416,9 @@ export function SurfHow({ sea, stats, away, placeName }: { sea: SurfSea; stats: 
       <p>Wind: Open-Meteo, 10 m, by the hour.</p>
       <p>
         Faces: the swell broken at a 1:50 beach
-        {sea.facing === null ? '' : ` facing ${compass(sea.facing)}`}, angled by its direction (Komar and Gaillard).
+        {sea.facing === null ? '' : ` facing ${compass(sea.facing)}`}, angled by its direction (Komar and Gaillard), never above the height they came from times {(sea.factor ?? BEACH_CAP).toFixed(2)}: {region === null ? 'no region with a look at the beach yet' : `${region.name}, from looks at the beach set against the buoy`}.
       </p>
+      <p>Now and the next {SURF_FADE_MS / 3_600_000} h: the forecast leans to the buoy's face here, all the way at the reading and back to the forecast {SURF_FADE_MS / 3_600_000} h after it. The tag reads the leaned number.</p>
       <p>
         Likely range: the spread is {SURF_SPREAD_SOURCE}, with this spot's error against the buoy ({UNTESTED_ERROR_FT} ft assumed until it has a record). At least {BAND_FLOOR_FT} ft each way.
       </p>
