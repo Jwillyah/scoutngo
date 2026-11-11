@@ -532,11 +532,83 @@
   position: absolute;
   transform: translateX(-50%);
 }
-.hcard__ticks > span:first-child {
+.hcard__ticks > .hcard__tick--edge {
   transform: none;
 }
 /* In the six-card and the tight home the chart is short: the middle gridline's label goes (1 and 3 stay); the lines stay. */
 .hcards--many .hcard__gl--mid,
 .hday--tight .hcard__gl--mid {
+  display: none;
+}
+
+/* The weather-only home (Batch Polish 2, Section 2; src/components/WeatherHome.tsx): the hours, four tiles, the 7 days, on the card glass. */
+.hwh {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 0;
+}
+.hwh__hours {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  padding: var(--space-2) var(--space-1);
+  border: 1px solid var(--glass-edge);
+  border-radius: 22px;
+  background: var(--glass);
+  color: var(--white);
+}
+.hwh__hours .hstrip__step {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+}
+.hwh__tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+.hwh__tile {
+  text-align: left;
+  color: var(--white);
+}
+.hwh__week {
+  width: 100%;
+  text-align: left;
+  color: var(--white);
+}
+.hwh__note {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--white);
+}
+.hday--snug .hwh__tile .wtile__big {
+  font-size: 22px;
+}
+.hday--tight .hwh__tile .wtile__line {
+  display: none;
+}
+.hday--tight .hwh__hours {
+  padding-block: var(--space-1);
+}
+
+/* Batch Polish 2, Section 2: the tide's and the drone's charts in the surf chart's treatment. */
+.hcard__line--drone {
+  fill: none;
+  stroke: var(--white);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.hcard__rated {
+  stroke: var(--strong);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+  vector-effect: non-scaling-stroke;
+}
+.hcard--drone .hcard__chartbox,
+.hcard--tide .hcard__chartbox {
+  min-width: 0;
+}
+/* A small card's chart is too short for gridline labels beside its peak: the lines stay, the numbers go. */
+.hcard--small .hcard__gl {
   display: none;
 }

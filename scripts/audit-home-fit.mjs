@@ -13,7 +13,8 @@
  *   412 x 915 · iPhone tab at the largest text (the root font at 125%, the
  *   browser's stand-in for the phone's text size setting)
  *
- * each with 1, 3 and all 5 activities picked (the six-card layout). Checked:
+ * each with 1, 3 and all 5 activities picked (the six-card layout), and
+ * Weather alone (the weather-only home). Checked:
  * the home's own box and every box in it that scrolls up and down
  * (scrollHeight against clientHeight); nothing drawn below the screen's
  * foot. The day pager scrolls sideways by design and is not counted.
@@ -42,6 +43,8 @@ const PICKS = [
   ['1 activity', ['surf']],
   ['3 activities', ['surf', 'shoot', 'drone']],
   ['all 5', ['surf', 'shoot', 'drone', 'fish', 'weather']],
+  /* Batch Polish 2, Section 2: the weather-only home (src/components/WeatherHome.tsx). */
+  ['weather only', ['weather']],
 ]
 
 let problems = 0
@@ -61,7 +64,7 @@ const MEASURE = `JSON.stringify((() => {
   if (page && page.scrollHeight > page.clientHeight + 1) scrolls.push('the page ' + page.scrollHeight + '/' + page.clientHeight)
   const today = home.querySelector('.home__page[aria-label="Today"]') ?? home
   const below = [...today.querySelectorAll('button, a, .hcard, p, span')].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.bottom > innerHeight + 1 }).map((e) => (e.getAttribute('class') ?? e.tagName).split(' ')[0] + ' ' + Math.round(e.getBoundingClientRect().bottom)).slice(0, 4)
-  return { scrolls, below, cards: today.querySelectorAll('.hcard').length, vh: innerHeight }
+  return { scrolls, below, cards: today.querySelectorAll('.hcard, .hwh__tile').length, vh: innerHeight }
 })())`
 
 const browsers = {}

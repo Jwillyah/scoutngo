@@ -261,3 +261,19 @@ export function eventDayWord(event: Date, kind: 'sunrise' | 'sunset', now: Date,
 export function nextEvent<T extends { events: Record<'sunrise' | 'sunset', Date | null> }>(days: readonly T[], kind: 'sunrise' | 'sunset', now: Date): T | null {
   return days.find((d) => d.events[kind] !== null && (d.events[kind] as Date).getTime() > now.getTime()) ?? null
 }
+
+/** What the menu's Calendar row calls each mark: short, lower case after the day. */
+export const MARK_WORD: Partial<Record<SpecialKind, string>> = { rainbow: 'rainbow', rays: 'light rays', fog: 'fog', glass: 'mirror water' }
+
+/**
+ * THE NEXT MARKED DAY, FOR THE MENU'S CALENDAR ROW (Batch Polish 2, Section
+ * 2): "Thu · rainbow", "Today · fog". The soonest of the week's rare light
+ * still to come; null when the week found none.
+ */
+export function nextMarkWord(rows: readonly RareRow[], now: Date, timeZone: string): string | null {
+  const next = rows.filter((r) => r.at.getTime() > now.getTime() - 3_600_000).sort((a, b) => a.at.getTime() - b.at.getTime())[0]
+  if (next === undefined) return null
+  const day = (d: Date) => new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d)
+  const word = day(next.at) === day(now) ? 'Today' : new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'short' }).format(next.at)
+  return `${word} · ${MARK_WORD[next.kind] ?? next.name.toLowerCase()}`
+}

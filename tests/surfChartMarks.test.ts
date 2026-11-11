@@ -28,3 +28,26 @@ describe('the surf chart marks', () => {
     expect(m?.peak).toBeNull()
   })
 })
+
+describe('the tide and drone charts get the same marks (Batch Polish 2, Section 2)', () => {
+  it('the tide: "now" 3 h in, gridlines inside its own range, the highest water labelled', async () => {
+    const { chartMarks } = await import('../src/core/homeCards.ts')
+    const from = new Date('2026-11-11T12:00:00Z')
+    const pts = Array.from({ length: 25 }, (_, i) => ({ at: new Date(from.getTime() + i * 3_600_000), v: 1.5 + 1.5 * Math.cos((i / 12.4) * 2 * Math.PI) }))
+    const m = chartMarks(pts, from, 24, 'America/New_York', { floor: 0, steady: 0.3, steps: [-1, 0, 1, 2, 3, 4], low: -0.3, high: 3.3, nowAt: 3 / 24 })
+    expect(m).not.toBeNull()
+    expect(m?.ticks.find((t) => t.label === 'now')?.x).toBeCloseTo(0.125)
+    expect(m?.grid.map((g) => g.ft)).toEqual([0, 1, 2])
+    expect(m?.peak?.ft).toBeCloseTo(3, 1)
+    expect(m?.steady).toBe(false)
+  })
+  it('the drone: in the wind unit, and "steady" when it moves under 3', async () => {
+    const { chartMarks } = await import('../src/core/homeCards.ts')
+    const from = new Date('2026-11-11T12:00:00Z')
+    const calm = Array.from({ length: 25 }, (_, i) => ({ at: new Date(from.getTime() + i * 3_600_000), v: 8 + (i % 2) }))
+    const m = chartMarks(calm, from, 24, 'America/New_York', { floor: 10, steady: 3, steps: [5, 10, 15, 20] })
+    expect(m?.steady).toBe(true)
+    expect(m?.peak).toBeNull()
+    expect(m?.grid.map((g) => g.ft)).toEqual([5, 10])
+  })
+})

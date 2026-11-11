@@ -1,5 +1,7 @@
 import '../styles/menu.css'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { nextMarkWord, rareRows } from '../core/skyPage.ts'
+import { fetchSpecialWeek, specialsFrom } from '../lib/specialLightData.ts'
 import { getPosition } from 'suncalc'
 import { droneTag, windTag } from '../core/briefing.ts'
 import { colorWords, conditionOf, groundOf, rainLine, sideWords, type CardKind } from '../core/homeDay.ts'
@@ -96,6 +98,24 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
   const obs = useStationObs(looking ? venue : null)
   /* Batch Map A2: the value is the one surf number (src/lib/useSurfNow.ts), the home's and the Surf page's. */
   const surf = useSurfNow(looking ? venue : null, now, timeZone, units.distance === 'ft', placeShort)
+  /* Batch Polish 2, Section 2: the Calendar row says the next marked day ("Thu · rainbow"), from the week's rare light (the Sky page's, src/core/skyPage.ts). */
+  const [mark, setMark] = useState<string | null>(null)
+  const lat = venue?.lat ?? null
+  const lon = venue?.lon ?? null
+  useEffect(() => {
+    if (!looking || lat === null || lon === null) return
+    let live = true
+    const here = { lat, lon }
+    void fetchSpecialWeek(here)
+      .then((week) => {
+        if (!live || week === null) return
+        setMark(nextMarkWord(rareRows(specialsFrom(week.week, here, week.seaCAt), new Date()), new Date(), timeZone))
+      })
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [looking, lat, lon, timeZone])
   const pick = (t: MenuTarget) => {
     onPick(t)
     onClose()
@@ -173,7 +193,7 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
         <div className="menu__rows">
           {/* Batch Polish, Section 4: Plan a shoot and Settings, just the arrow; Kit its counts, Saved its spots. */}
           {!photoTools ? null : <Row label="Plan a shoot" value="" icon={<PlanIcon />} onTap={() => pick('setup')} />}
-          <Row label="Calendar" value="the month" icon={<SavedIcon />} onTap={() => pick('calendar')} />
+          <Row label="Calendar" value={mark ?? 'the month'} icon={<SavedIcon />} onTap={() => pick('calendar')} />
           <Row label="Kit" value={rows.kit} icon={<KitIcon />} onTap={() => pick('kit')} />
           <Row label="Saved" value={rows.saved} icon={<SavedIcon />} onTap={() => pick('saved')} />
           <Row label="Settings" value={rows.settings} icon={<GearIcon />} onTap={() => pick('settings')} />

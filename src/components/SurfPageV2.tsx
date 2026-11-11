@@ -1,3 +1,4 @@
+import { MarineLine } from './MarineLine.tsx'
 import '../styles/surf.css'
 import { useEffect, useMemo, useState } from 'react'
 import { venueToday } from '../core/eventDay.ts'
@@ -216,6 +217,8 @@ export function SurfBody({ now, timeZone, spot, spotName, away, sea, stats, kept
           </p>
         ) : null}
       </div>
+
+      <MarineLine venue={spot} />
 
       <DCard label="Today · range, not a promise">
         <TodayChart hours={hours} kept={kept} buoy={sea.buoy} facing={facing} factor={factor} now={now} today={today} timeZone={timeZone} />

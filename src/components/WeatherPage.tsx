@@ -15,6 +15,7 @@ import { formatTemperature, type Units } from '../lib/units.ts'
 import { useStationObs } from '../lib/useStationObs.ts'
 import { gustWords, windAt, windWords } from '../lib/windNow.ts'
 import { PageShell } from './PageShell.tsx'
+import { MarineLine } from './MarineLine.tsx'
 import { RadarStrip } from './RadarStrip.tsx'
 import { SkyGlyph } from './SkyGlyph.tsx'
 import { SkyIconSvg } from './SkyIconSvg.tsx'
@@ -244,6 +245,7 @@ export function WeatherPage({ venue, placeName, timeZone, units, now, onBack, on
           )}
 
           <RadarStrip venue={venue} radar={nowcast?.radar ?? null} timeZone={timeZone} dist={dist} onOpen={() => onRadar(nowcast?.radar?.scanAt ?? null)} short />
+          <MarineLine venue={venue} />
         </>
       )}
     </PageShell>

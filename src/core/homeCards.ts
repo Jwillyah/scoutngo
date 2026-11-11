@@ -81,12 +81,12 @@ export interface ChartBox {
 }
 
 /** An area chart's line and fill, the hours across, the feet up (a floor of 4 ft so a flat day reads flat). */
-export function surfPath(points: readonly SurfPoint[], from: Date, hours: number, box: ChartBox): { line: string; fill: string } | null {
+export function surfPath(points: readonly SurfPoint[], from: Date, hours: number, box: ChartBox, fixedTop?: number): { line: string; fill: string } | null {
   const t0 = from.getTime()
   const span = hours * 3_600_000
   const inside = points.filter((p) => p.at.getTime() >= t0 - 3_600_000 && p.at.getTime() <= t0 + span + 3_600_000)
   if (inside.length < 2) return null
-  const top = Math.max(4, ...inside.map((p) => p.ft)) * 1.15
+  const top = fixedTop ?? Math.max(4, ...inside.map((p) => p.ft)) * 1.15
   const xy = inside.map((p) => [Math.max(0, Math.min(box.w, ((p.at.getTime() - t0) / span) * box.w)), box.h - (p.ft / top) * box.h] as const)
   const line = xy.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)} ${y.toFixed(1)}`).join(' ')
   return { line, fill: `${line} L${xy[xy.length - 1][0].toFixed(1)} ${box.h} L${xy[0][0].toFixed(1)} ${box.h} Z` }
@@ -110,26 +110,42 @@ export interface SurfChartMarks {
 }
 
 export function surfChartMarks(points: readonly SurfPoint[], from: Date, hours: number, timeZone: string): SurfChartMarks | null {
+  return chartMarks(points.map((p) => ({ at: p.at, v: p.ft })), from, hours, timeZone, { floor: 4, steady: STEADY_FT, steps: [1, 2, 3, 4, 6, 8, 10, 12] })
+}
+
+/*
+ * THE SAME TREATMENT FOR EVERY MINI CHART (Batch Polish 2, Section 2): the
+ * surf's, the tide's and the drone's. Values `v` in the chart's own unit
+ * (feet, the wind unit), the scale from 0 (or `low`) to the larger of
+ * `floor` and the highest value, plus 15%; gridlines at `steps` under the
+ * top, the time ticks, the peak, and "steady" when the values move less
+ * than `steady`. `nowAt` puts the "now" tick where the window starts after
+ * now (the tide's starts 3 h back).
+ */
+export function chartMarks(points: readonly { at: Date; v: number }[], from: Date, hours: number, timeZone: string, opts: { floor: number; steady: number; steps: readonly number[]; low?: number; high?: number; nowAt?: number }): SurfChartMarks | null {
   const t0 = from.getTime()
   const span = hours * 3_600_000
   const inside = points.filter((p) => p.at.getTime() >= t0 - 3_600_000 && p.at.getTime() <= t0 + span + 3_600_000)
   if (inside.length < 2) return null
-  const top = Math.max(4, ...inside.map((p) => p.ft)) * 1.15
-  const grid = [1, 2, 3, 4, 6, 8, 10, 12].filter((ft) => ft < top * 0.92).slice(0, 3).map((ft) => ({ ft, y: 1 - ft / top }))
+  const low = opts.low ?? 0
+  const top = opts.high ?? Math.max(opts.floor, ...inside.map((p) => p.v)) * 1.15
+  const yOf = (v: number) => 1 - (v - low) / Math.max(1e-6, top - low)
+  const grid = opts.steps.filter((ft) => ft > low && ft < top - (top - low) * 0.08).slice(0, 3).map((ft) => ({ ft, y: yOf(ft) }))
+  const nowX = opts.nowAt ?? 0
   const hourAt = (t: number) => wallClock(new Date(t), timeZone)?.hour ?? -1
-  const ticks: SurfChartMarks['ticks'] = [{ label: 'now', x: 0 }]
+  const ticks: SurfChartMarks['ticks'] = [{ label: 'now', x: nowX }]
   for (let t = Math.ceil(t0 / 3_600_000) * 3_600_000; t <= t0 + span; t += 3_600_000) {
     const h = hourAt(t)
     const label = h === 6 ? '6a' : h === 12 ? 'noon' : h === 18 ? '6p' : null
     const x = (t - t0) / span
-    /* Clear of "now" and of the right edge: 12 px words at a card's width. */
-    if (label !== null && x > 0.12 && x < 0.92) ticks.push({ label, x })
+    /* Clear of "now" and of the edges: 12 px words at a card's width. */
+    if (label !== null && Math.abs(x - nowX) > 0.12 && x > 0.06 && x < 0.92) ticks.push({ label, x })
   }
   const inWindow = inside.filter((p) => p.at.getTime() >= t0 && p.at.getTime() <= t0 + span)
-  const best = inWindow.length === 0 ? null : inWindow.reduce((m, p) => (p.ft > m.ft ? p : m))
-  const fts = inWindow.map((p) => p.ft)
-  const steady = fts.length > 1 && Math.max(...fts) - Math.min(...fts) < STEADY_FT
-  return { grid, ticks, peak: best === null || steady ? null : { x: (best.at.getTime() - t0) / span, y: 1 - best.ft / top, ft: best.ft }, steady }
+  const best = inWindow.length === 0 ? null : inWindow.reduce((m, p) => (p.v > m.v ? p : m))
+  const vs = inWindow.map((p) => p.v)
+  const steady = vs.length > 1 && Math.max(...vs) - Math.min(...vs) < opts.steady
+  return { grid, ticks: ticks.sort((a, b) => a.x - b.x), peak: best === null || steady ? null : { x: (best.at.getTime() - t0) / span, y: yOf(best.v), ft: best.v }, steady }
 }
 
 /** The night inside the window, as shares of its width: from sunset (or the start) to sunrise (or the end). */
@@ -177,7 +193,7 @@ export function tideAt(turns: readonly Turn[], t: Date): number | null {
 }
 
 /** The curve over a window, sampled every `stepMin` minutes, with the turns inside it placed. */
-export function tideCurve(turns: readonly Turn[], from: Date, hours: number, box: ChartBox, stepMin = 20): { line: string; turns: { x: number; y: number; turn: Turn }[]; scale: (ft: number) => number } | null {
+export function tideCurve(turns: readonly Turn[], from: Date, hours: number, box: ChartBox, stepMin = 20): { line: string; turns: { x: number; y: number; turn: Turn }[]; scale: (ft: number) => number; range: { lo: number; hi: number } } | null {
   const t0 = from.getTime()
   const span = hours * 3_600_000
   const near = turns.filter((t) => t.at.getTime() >= t0 - 12 * 3_600_000 && t.at.getTime() <= t0 + span + 12 * 3_600_000)
@@ -196,6 +212,7 @@ export function tideCurve(turns: readonly Turn[], from: Date, hours: number, box
     line: pts.join(' '),
     turns: near.filter((t) => t.at.getTime() >= t0 && t.at.getTime() <= t0 + span).map((t) => ({ x: ((t.at.getTime() - t0) / span) * box.w, y: y(t.feet), turn: t })),
     scale: y,
+    range: { lo: lo - pad, hi: hi + pad },
   }
 }
 
