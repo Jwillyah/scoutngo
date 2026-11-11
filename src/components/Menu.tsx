@@ -2,7 +2,7 @@ import '../styles/menu.css'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { getPosition } from 'suncalc'
 import { droneTag, windTag } from '../core/briefing.ts'
-import { colorWords, conditionOf, rainLine, sideWords, type CardKind } from '../core/homeDay.ts'
+import { colorWords, conditionOf, groundOf, rainLine, sideWords, type CardKind } from '../core/homeDay.ts'
 import { menuCardList, type MenuCard } from '../core/menuCards.ts'
 import { formatClock } from '../core/timezone.ts'
 import { hourlyAt } from '../lib/tideSheetData.ts'
@@ -106,6 +106,8 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
   const temp = (c: number | null) => formatTemperature(c, units.temperature).replace(/°[FC]$/, '°')
   const sunUp = venue !== null && getPosition(now, venue.lat, venue.lon).altitude > -0.8
   const cond = conditionOf(at('weather_code', now), sunUp)
+  /* Batch Polish, Section 4: the home's live sky behind the menu (night, golden, day, cloud, rain, fog), by the home's own groundOf. */
+  const ground = venue === null ? 'night' : groundOf(getPosition(now, venue.lat, venue.lon).altitude, at('weather_code', now), false)
   const wind = windAt(wx, now, obs)
   const day = brief.days[0] ?? null
   const dayTemps = day === null ? [] : Array.from({ length: 24 }, (_, k) => at('temperature_2m', new Date(day.start.getTime() + k * 3_600_000 + 1_800_000))).filter((t): t is number => t !== null)
@@ -144,7 +146,7 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
 
   return (
     <div className="menu menu--d" role="presentation">
-      <nav className="menu__panel sidemenu__panel" aria-label="Stage">
+      <nav className={`menu__panel sidemenu__panel home--${ground}`} aria-label="Stage">
         <div className="menu__head">
           {/* Batch Flow, Section 8: the spot once; a tap is the home. Batch Polish, Section 4: no weather line under it (the Weather card says it). */}
           <button type="button" ref={first} className="menu__spot mcard--today sidemenu__item" onClick={() => pick('today')} aria-label={`${placeShort}: the home`}>
