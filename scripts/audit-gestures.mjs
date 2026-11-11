@@ -52,6 +52,11 @@ async function plan() {
     went = await c.ev(`(() => { const b = [...document.querySelectorAll('.wiz__ghost')].find((x) => /Same as last time/.test(x.textContent)); if (!b) return false; b.click(); return true })()`)
   }
   if (!went) throw new Error('no "Same as last time" on Setup')
+  /* Batch Polish, Section 1: the plan screen and the map are downloads of their own; waited for drawn (up to 20 s), then as long as before for the pills to settle. */
+  for (let i = 0; i < 40; i += 1) {
+    if (await c.ev(`!!document.querySelector('.mode-plan .sheet') && !!document.querySelector('.mode-plan .maplibregl-canvas')`)) break
+    await c.wait(500)
+  }
   await c.wait(7000)
   if (!(await c.ev(`document.querySelector('.shell')?.className.includes('shell--plan')`))) throw new Error('not in Plan')
   return c

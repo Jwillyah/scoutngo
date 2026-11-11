@@ -1,5 +1,5 @@
 import { SavedLists } from './SavedLists.tsx'
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { destinationPoint, type LatLon } from '../core/geo.ts'
 import type { KitProfile as KitProfileType } from '../core/kit.ts'
@@ -10,7 +10,10 @@ import type { Spot } from '../lib/spots.ts'
 import type { VenueDraft, VenueErrors } from '../lib/venue.ts'
 import { KitChips } from './KitChips.tsx'
 import { KitProfile } from './KitProfile.tsx'
-import { MapView, type MapHandle } from './MapView.tsx'
+import type { MapHandle } from './MapView.tsx'
+
+/* Batch Polish, Section 1, step 3: MapLibre is its own download, asked for when the map first mounts. */
+const MapView = lazy(() => import('./MapView.tsx').then((m) => ({ default: m.MapView })))
 import { ReachSlider } from './ReachSlider.tsx'
 import { SearchField } from './SearchField.tsx'
 import { SpotsPanel } from './SpotsPanel.tsx'
@@ -287,29 +290,31 @@ export function SetupMode({
     <>
       <div className="setup" inert={drawer !== 'none'}>
         <div className={`setup__map${pendingPin === null ? '' : ' setup__map--pending'}`}>
-          <MapView
-            handle={mapHandle}
-            venue={pendingPin?.at ?? at}
-            onVenueChange={pendingPin === null ? onPinChange : onPendingMove}
-            mode={null}
-            plan={[]}
-            conePlan={[]}
-            isolatedId={null}
-            onPositionMove={() => {}}
-            onLongPress={pendingPin === null ? onPinChange : onPendingMove}
-            sunAzimuth={null}
-            sunOverlay={null}
-            showSun={false}
-            showArc={false}
-            selectedId={null}
-            onSelect={() => {}}
-            onPitchChange={() => {}}
-            bottomInset={0}
-            radiusMeters={reachMeters}
-            pinHint={showPinHint && pendingPin === null ? 'Drag the pin to the exact spot.' : null}
-            onPinDrag={onPinDrag}
-            onReady={() => setMapReady(true)}
-          />
+          <Suspense fallback={null}>
+            <MapView
+              handle={mapHandle}
+              venue={pendingPin?.at ?? at}
+              onVenueChange={pendingPin === null ? onPinChange : onPendingMove}
+              mode={null}
+              plan={[]}
+              conePlan={[]}
+              isolatedId={null}
+              onPositionMove={() => {}}
+              onLongPress={pendingPin === null ? onPinChange : onPendingMove}
+              sunAzimuth={null}
+              sunOverlay={null}
+              showSun={false}
+              showArc={false}
+              selectedId={null}
+              onSelect={() => {}}
+              onPitchChange={() => {}}
+              bottomInset={0}
+              radiusMeters={reachMeters}
+              pinHint={showPinHint && pendingPin === null ? 'Drag the pin to the exact spot.' : null}
+              onPinDrag={onPinDrag}
+              onReady={() => setMapReady(true)}
+            />
+          </Suspense>
           {/* A searched place is a proposal until confirmed: name, Confirm or No. */}
           {pendingPin === null ? null : (
             <div className="confirm">

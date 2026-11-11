@@ -13,7 +13,7 @@ import { getSunPosition } from '../core/sun.ts'
 import { onLiveTime } from '../lib/liveTime.ts'
 import { ComparePhoto } from './ComparePhoto.tsx'
 import type { BuildCheck } from '../lib/build.ts'
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { LatLon } from '../core/geo.ts'
 import { loadAirspaceOverlay, type AirspaceOverlay } from '../lib/airspaceOverlay.ts'
 import { measureWords } from '../lib/measureWords.ts'
@@ -108,7 +108,8 @@ import { SunReadout } from './SunReadout.tsx'
 import { CamList } from './CamList.tsx'
 import { SunCurve } from './SunCurve.tsx'
 import { Page } from './Page.tsx'
-import { BUILDINGS_MIN_ZOOM, MapView, type MapHandle } from './MapView.tsx'
+import { BUILDINGS_MIN_ZOOM } from '../lib/mapConstants.ts'
+import type { MapHandle } from './MapView.tsx'
 import { mapBack, type MapFrom } from '../lib/mapBack.ts'
 import { buildingsToGeoJson, fetchBuildings, type Building } from '../lib/buildings.ts'
 import { shadowMap } from '../core/shadowMap.ts'
@@ -120,7 +121,6 @@ import { PositionCard } from './PositionCard.tsx'
 import { ShotList } from './ShotList.tsx'
 import { SunSearchPanel } from './SunSearchPanel.tsx'
 import { TimeBar } from './TimeBar.tsx'
-import { Clay3D } from './Clay3D.tsx'
 import { goldenChip } from '../lib/goldenChip.ts'
 import { useTideSheet } from '../lib/useTideSheet.ts'
 import { useWaterline } from '../lib/waterline/useWaterline.ts'
@@ -476,6 +476,13 @@ interface PlanModeProps {
  * permanent lens chip row that is now one control. See the comments at each
  * site.
  */
+/*
+ * Batch Polish, Section 1, step 3: the map (MapLibre) and the 3D view
+ * (three.js) are their own downloads, asked for when they first mount.
+ */
+const MapView = lazy(() => import('./MapView.tsx').then((m) => ({ default: m.MapView })))
+const Clay3D = lazy(() => import('./Clay3D.tsx').then((m) => ({ default: m.Clay3D })))
+
 /* The card requests that open a full page (or the calendar) over the map. */
 const PAGE_REQUESTS: ReadonlySet<string> = new Set(['exposure', 'tides', 'surf', 'buoys', 'wind', 'terrain', 'settings', 'about', 'calendar'])
 
@@ -892,6 +899,9 @@ export function PlanMode({
   const [pagePending, setPagePending] = useState(() => cardRequest.tick > 0 && PAGE_REQUESTS.has(cardRequest.kind))
   if (pagePending && (page !== null || calendarOpen)) setPagePending(false)
   const mapOnScreen = !covered && !pagePending && page === null && !calendarOpen
+  /* Step 3: the map mounts the first time it is on screen, and stays (not under a page opened from the home). */
+  const [mapMounted, setMapMounted] = useState(false)
+  if (mapOnScreen && !mapMounted) setMapMounted(true)
   useEffect(() => {
     if (mapOnScreen) onMapShown?.()
   }, [mapOnScreen, onMapShown])
@@ -2474,93 +2484,97 @@ export function PlanMode({
         } as React.CSSProperties
       }
     >
-      <MapView
-        infoNotes={shadows === null || threeD ? [] : shadowKeyNotes(shadows, scanYearUsed, sunriseWords)}
-        airspace={airspaceOn ? airspaceOverlay : null}
-        onAirspaceDense={setAirspaceDense}
-        measurePins={measurePins ?? undefined}
-        onMeasureAt={onMeasureAt}
-        onFlightAt={pf.addPoint}
-        flight={card.kind === 'preflight' ? pf.features : null}
-        guide={layerFC === null ? bow : { type: 'FeatureCollection', features: [...(bow?.features ?? []), ...layerFC.features] }}
-        radarAt={radarAt}
-        waterline={waterline !== null && waterline !== 'no-offset' ? { url: waterline.url, coordinates: waterline.coordinates } : null}
-        lightmap={lightImage === null ? null : { url: lightImage.url, coordinates: lightImage.coordinates }}
-        onHorizon={setHorizonProfile}
-        handle={mapHandle}
-        venue={venue}
-        onVenueChange={onVenueChange}
-        mode={
-          marking
-            ? 'mark'
-            : placing
-              ? 'add'
-              : placingPilot
-                ? 'pilot'
-                : placingAim
-                  ? 'aim'
-                  : measurePins !== null
-                    ? 'measure'
-                    : flightPicking && card.kind === 'preflight'
-                      ? 'flight'
-                      : null
-        }
-        marks={marks}
-        markDraft={markDraft}
-        onMarkAt={onMarkAt}
-        onSelectMark={onSelectMark}
-        onAddAt={onAddAt}
-        plan={visiblePlan}
-        conePlan={conePlan}
-        isolatedId={isolatedId}
-        pilotAt={pilotAt}
-        onPilotMove={onPilotMove}
-        onAimAt={onAimAt}
-        onPositionMove={onPositionMove}
-        onLongPress={onMeasurePress}
-        sunAzimuth={sun === null ? null : sun.azimuth}
-        sunAltitude={sun?.altitude ?? null}
-        showSky={showSky}
-        showLabels={showLabels}
-        showTerrain={showTerrain}
-        contours={relief === null || flatHere ? null : relief.contours}
-        onTerrainPaused={setTerrainPaused}
-        showBuildings={showBuildings}
-        buildings={buildingData}
-        skyFrameAt={sky.frameAt}
-        skyForecast={sky.cells}
-        skyLayer={skyLayer}
-        windMeters={weatherLayer === 'wind' ? (windLayerFt === 0 ? GROUND_WIND_METERS : windLayerFt * 0.3048) : windHeight.feet === null ? GROUND_WIND_METERS : windHeight.feet * 0.3048}
-        ratedWindMps={ratedWindMps}
-        skyForecastOpacity={sky.opacity}
-        sunOverlay={
-          sunOverlay === null || !moonOn || venue === null || scrubbedAt === null
-            ? sunOverlay
-            : { ...sunOverlay, moon: getMoonArc(scrubbedAt, venue.lat, venue.lon) }
-        }
-        shadowFeatures={shadowFeatures}
-        linkPins={camPins}
-        rayClock={venueWindow === null ? undefined : (at: Date) => formatClock(at, venueWindow.timeZone)}
-        /* Batch Map, Section 1: the sun and moon lines step aside while a weather layer is on, and come back when it is off. */
-        showSun={showSun && weatherLayer === 'off'}
-        showArc={showArc && weatherLayer === 'off'}
-        windModel={windModel}
-        windAt={scrubbedAt}
-        windUnit={units.wind}
-        windSpot={venue}
-        windFacing={windFacing !== null && windFacing.key === windSpotKey ? windFacing.deg : null}
-        onWindStrip={setWindStrip}
-        vectorBase={vectorMap && !threeD}
-        selectedId={selectedId}
-        onSelect={onSelectAndRaise}
-        onPitchChange={setPitch}
-        onBearingChange={setMapBearing}
-        onViewChange={(zoom: number, width: number) => {
-          setMapZoom(zoom)
-          setMapWidth(width)
-        }}
-        bottomInset={sheetHeight}
-      />
+      {mapMounted ? (
+        <Suspense fallback={null}>
+          <MapView
+            infoNotes={shadows === null || threeD ? [] : shadowKeyNotes(shadows, scanYearUsed, sunriseWords)}
+            airspace={airspaceOn ? airspaceOverlay : null}
+            onAirspaceDense={setAirspaceDense}
+            measurePins={measurePins ?? undefined}
+            onMeasureAt={onMeasureAt}
+            onFlightAt={pf.addPoint}
+            flight={card.kind === 'preflight' ? pf.features : null}
+            guide={layerFC === null ? bow : { type: 'FeatureCollection', features: [...(bow?.features ?? []), ...layerFC.features] }}
+            radarAt={radarAt}
+            waterline={waterline !== null && waterline !== 'no-offset' ? { url: waterline.url, coordinates: waterline.coordinates } : null}
+            lightmap={lightImage === null ? null : { url: lightImage.url, coordinates: lightImage.coordinates }}
+            onHorizon={setHorizonProfile}
+            handle={mapHandle}
+            venue={venue}
+            onVenueChange={onVenueChange}
+            mode={
+              marking
+                ? 'mark'
+                : placing
+                  ? 'add'
+                  : placingPilot
+                    ? 'pilot'
+                    : placingAim
+                      ? 'aim'
+                      : measurePins !== null
+                        ? 'measure'
+                        : flightPicking && card.kind === 'preflight'
+                          ? 'flight'
+                          : null
+            }
+            marks={marks}
+            markDraft={markDraft}
+            onMarkAt={onMarkAt}
+            onSelectMark={onSelectMark}
+            onAddAt={onAddAt}
+            plan={visiblePlan}
+            conePlan={conePlan}
+            isolatedId={isolatedId}
+            pilotAt={pilotAt}
+            onPilotMove={onPilotMove}
+            onAimAt={onAimAt}
+            onPositionMove={onPositionMove}
+            onLongPress={onMeasurePress}
+            sunAzimuth={sun === null ? null : sun.azimuth}
+            sunAltitude={sun?.altitude ?? null}
+            showSky={showSky}
+            showLabels={showLabels}
+            showTerrain={showTerrain}
+            contours={relief === null || flatHere ? null : relief.contours}
+            onTerrainPaused={setTerrainPaused}
+            showBuildings={showBuildings}
+            buildings={buildingData}
+            skyFrameAt={sky.frameAt}
+            skyForecast={sky.cells}
+            skyLayer={skyLayer}
+            windMeters={weatherLayer === 'wind' ? (windLayerFt === 0 ? GROUND_WIND_METERS : windLayerFt * 0.3048) : windHeight.feet === null ? GROUND_WIND_METERS : windHeight.feet * 0.3048}
+            ratedWindMps={ratedWindMps}
+            skyForecastOpacity={sky.opacity}
+            sunOverlay={
+              sunOverlay === null || !moonOn || venue === null || scrubbedAt === null
+                ? sunOverlay
+                : { ...sunOverlay, moon: getMoonArc(scrubbedAt, venue.lat, venue.lon) }
+            }
+            shadowFeatures={shadowFeatures}
+            linkPins={camPins}
+            rayClock={venueWindow === null ? undefined : (at: Date) => formatClock(at, venueWindow.timeZone)}
+            /* Batch Map, Section 1: the sun and moon lines step aside while a weather layer is on, and come back when it is off. */
+            showSun={showSun && weatherLayer === 'off'}
+            showArc={showArc && weatherLayer === 'off'}
+            windModel={windModel}
+            windAt={scrubbedAt}
+            windUnit={units.wind}
+            windSpot={venue}
+            windFacing={windFacing !== null && windFacing.key === windSpotKey ? windFacing.deg : null}
+            onWindStrip={setWindStrip}
+            vectorBase={vectorMap && !threeD}
+            selectedId={selectedId}
+            onSelect={onSelectAndRaise}
+            onPitchChange={setPitch}
+            onBearingChange={setMapBearing}
+            onViewChange={(zoom: number, width: number) => {
+              setMapZoom(zoom)
+              setMapWidth(width)
+            }}
+            bottomInset={sheetHeight}
+          />
+        </Suspense>
+      ) : null}
 
       {calendarOpen && venue !== null && venueWindow !== null ? (
         <CalendarPage
@@ -2650,46 +2664,48 @@ export function PlanMode({
       {compareOpen ? <ComparePhoto fallbackAt={venue} distanceUnit={units.distance} onClose={() => setCompareOpen(false)} /> : null}
 
       {threeD && venue !== null && venueWindow !== null && scrubbedAt !== null ? (
-        <Clay3D
-          venue={venue}
-          venueLabel={venueNameLine}
-          at={scrubbedAt}
-          timeZone={venueWindow.timeZone}
-          sheetOpen={sheet !== 'peek'}
-          moonShown={moonOpen && card.kind === 'sky'}
-          pins={threeDPins}
-          stand={stand}
-          onLeaveStand={() => setStand(null)}
-          onCompare={() => setCompareOpen(true)}
-          flight={flightPlay}
-          sea={cinema}
-          onFlightTime={scrubTo}
-          fly={flySession}
-          onCrash={(message) => {
-            /* Batch Flow, Section 1: back to the drone card, with one line; never a blank screen. */
-            logTouch(`3D crashed: ${message}`)
-            setFlySession(null)
-            setThreeD(false)
-            setCard({ kind: 'preflight' } as SheetCard)
-            setCrashNote('3D view restarted')
-          }}
-          onLanded={(track, clip) => {
-            setFlySession(null)
-            if (track.length > 1) pf.setFlown(track)
-            if (clip !== null) {
+        <Suspense fallback={null}>
+          <Clay3D
+            venue={venue}
+            venueLabel={venueNameLine}
+            at={scrubbedAt}
+            timeZone={venueWindow.timeZone}
+            sheetOpen={sheet !== 'peek'}
+            moonShown={moonOpen && card.kind === 'sky'}
+            pins={threeDPins}
+            stand={stand}
+            onLeaveStand={() => setStand(null)}
+            onCompare={() => setCompareOpen(true)}
+            flight={flightPlay}
+            sea={cinema}
+            onFlightTime={scrubTo}
+            fly={flySession}
+            onCrash={(message) => {
+              /* Batch Flow, Section 1: back to the drone card, with one line; never a blank screen. */
+              logTouch(`3D crashed: ${message}`)
+              setFlySession(null)
+              setThreeD(false)
+              setCard({ kind: 'preflight' } as SheetCard)
+              setCrashNote('3D view restarted')
+            }}
+            onLanded={(track, clip) => {
+              setFlySession(null)
+              if (track.length > 1) pf.setFlown(track)
+              if (clip !== null) {
+                setRecordedClip(clip)
+                setRecordNote('Your flight, recorded and watermarked.')
+              }
+              /* Back to the card, open (openCard would toggle it shut). */
+              setCard({ kind: 'preflight' } as SheetCard)
+            }}
+            onRecorded={(clip: Blob | null, note: string) => {
+              setRecordNote(note)
               setRecordedClip(clip)
-              setRecordNote('Your flight, recorded and watermarked.')
-            }
-            /* Back to the card, open (openCard would toggle it shut). */
-            setCard({ kind: 'preflight' } as SheetCard)
-          }}
-          onRecorded={(clip: Blob | null, note: string) => {
-            setRecordNote(note)
-            setRecordedClip(clip)
-            setRenderShare(null)
-          }}
-          onRenderProgress={setRenderShare}
-        />
+              setRenderShare(null)
+            }}
+            onRenderProgress={setRenderShare}
+          />
+        </Suspense>
       ) : null}
 
       {/*

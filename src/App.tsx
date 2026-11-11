@@ -2,17 +2,13 @@ import { useBundledPlaceName } from './lib/useBundledPlaceName.ts'
 import { seaReach } from './lib/coast.ts'
 import { placeKeyOf, resolveReach } from './lib/placeMemory.ts'
 import { showSurf, SURF_COAST_M, useSurfSetting } from './lib/surfSetting.ts'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { type ConeMode } from './lib/coneMode.ts'
 import type { MapHandle } from './components/MapView.tsx'
-import { FieldMode } from './components/FieldMode.tsx'
-import { PlanMode } from './components/PlanMode.tsx'
 import { NewBuildNotice } from './components/NewBuildNotice.tsx'
 import { Landing } from './components/Landing.tsx'
-import { NowScreen } from './components/NowScreen.tsx'
 import { NUMERALS_DEFAULT } from './core/numerals.ts'
 import { NumeralsProvider } from './lib/numerals.tsx'
-import { SetupMode } from './components/SetupMode.tsx'
 import type { LatLon } from './core/geo.ts'
 import { DEFAULT_ALTITUDE_FEET } from './core/air.ts'
 import type { ShotType } from './core/shotType.ts'
@@ -105,19 +101,14 @@ import {
 import { useTide } from './lib/useTide.ts'
 import { lowTideNearest } from './lib/lowTide.ts'
 import { useVenueCache } from './lib/useVenueCache.ts'
-import { PrivacyPage } from './components/PrivacyPage.tsx'
 import { atPrivacy, closePrivacy } from './lib/privacyRoute.ts'
 import { buildScoutFile, saveScoutFile, scoutFilename, type ReadFile } from './lib/scoutFile.ts'
 import { readShareHash, SHARE_PREFIX } from './lib/planShare.ts'
-import { Viewfinder, ViewfinderNeedsPlace } from './components/Viewfinder.tsx'
 import { Menu, type MenuRows, type MenuTarget } from './components/Menu.tsx'
 import { lastBackup } from './lib/backup.ts'
 import { PACK_STORAGE_KEY } from './lib/venuePack.ts'
 import { Home, type HomeTarget } from './components/Home.tsx'
-import { WeatherPage } from './components/WeatherPage.tsx'
 import { OPEN_RADAR_EVENT, OPEN_SKY_EVENT, OPEN_WEATHER_EVENT } from './lib/pageEvents.ts'
-import { SkyPage } from './components/SkyPage.tsx'
-import { DronePage } from './components/DronePage.tsx'
 import { homeOrder, readActivities, showsDrone, showsPhotoTools, useActivities } from './lib/activities.ts'
 import { homeCardsShown } from './core/homeCards.ts'
 import { ActivityPicker } from './components/ActivityPicker.tsx'
@@ -168,6 +159,23 @@ import type { SkyLayerKind } from './core/skyLayer.ts'
 import { revivalNote, revivePositions } from './lib/revivePositions.ts'
 import { generateBlock } from './lib/generateGate.ts'
 import { readLastSetup, writeLastSetup, type LastSetup } from './lib/lastSetup.ts'
+
+/*
+ * Batch Polish, Section 1, step 3: the screens past the home are their own
+ * downloads, asked for when first opened (the map and 3D, setup, field, the
+ * viewfinder, the weather, sky, drone, privacy and Now screens). The home and
+ * the menu come with the app.
+ */
+const PlanMode = lazy(() => import('./components/PlanMode.tsx').then((m) => ({ default: m.PlanMode })))
+const FieldMode = lazy(() => import('./components/FieldMode.tsx').then((m) => ({ default: m.FieldMode })))
+const NowScreen = lazy(() => import('./components/NowScreen.tsx').then((m) => ({ default: m.NowScreen })))
+const SetupMode = lazy(() => import('./components/SetupMode.tsx').then((m) => ({ default: m.SetupMode })))
+const PrivacyPage = lazy(() => import('./components/PrivacyPage.tsx').then((m) => ({ default: m.PrivacyPage })))
+const Viewfinder = lazy(() => import('./components/Viewfinder.tsx').then((m) => ({ default: m.Viewfinder })))
+const ViewfinderNeedsPlace = lazy(() => import('./components/Viewfinder.tsx').then((m) => ({ default: m.ViewfinderNeedsPlace })))
+const WeatherPage = lazy(() => import('./components/WeatherPage.tsx').then((m) => ({ default: m.WeatherPage })))
+const SkyPage = lazy(() => import('./components/SkyPage.tsx').then((m) => ({ default: m.SkyPage })))
+const DronePage = lazy(() => import('./components/DronePage.tsx').then((m) => ({ default: m.DronePage })))
 
 /*
  * The calibration venue is a DEVELOPER SHORTCUT and means nothing to anyone
@@ -2212,14 +2220,15 @@ function App() {
         <Landing onDismiss={() => { setLandingSeen(true); setAtHowPath(false) }} />
       )}
       {!nowOpen ? null : (
-        <NowScreen onClose={() => setNowOpen(false)} onPlanHere={planFromNow} />
+        <Suspense fallback={null}><NowScreen onClose={() => setNowOpen(false)} onPlanHere={planFromNow} /></Suspense>
       )}
 
-      {privacyOpen ? <PrivacyPage onClose={closePrivacy} /> : null}
+      {privacyOpen ? <Suspense fallback={null}><PrivacyPage onClose={closePrivacy} /></Suspense> : null}
       <NewBuildNotice check={newBuild} />
       {/* Batch Polish, Section 1: setup (and its map) mounts when the home is not over it; its state is this component's. */}
       {mode === 'setup' && !briefOpen ? (
         <div className="mode-setup">
+          <Suspense fallback={null}>
           <SetupMode
             venue={venue}
             errors={errors}
@@ -2288,6 +2297,7 @@ function App() {
               setPlacing(true)
             }}
           />
+          </Suspense>
         </div>
       ) : null}
 
@@ -2302,6 +2312,7 @@ function App() {
         />
       ) : null}
       {mode === 'plan' && mapSeen ? (
+        <Suspense fallback={null}>
         <PlanMode
           backupReminder={
             backupNag === null
@@ -2526,9 +2537,11 @@ function App() {
           onOpenNow={() => setNowOpen(true)}
           onBackToNow={onBackToNow}
         />
+        </Suspense>
       ) : null}
 
       {mode === 'field' ? (
+        <Suspense fallback={null}>
         <FieldMode
           plan={plan}
           venue={centre}
@@ -2539,6 +2552,7 @@ function App() {
           onMenu={() => setMenuOpen(true)}
           menuOpen={menuOpen}
         />
+        </Suspense>
       ) : null}
 
       {/*
@@ -2571,6 +2585,7 @@ function App() {
       )}
 
       {viewfinderOpen && centre === null ? (
+        <Suspense fallback={null}>
         <ViewfinderNeedsPlace
           onSetup={() => {
             setViewfinderOpen(false)
@@ -2578,8 +2593,10 @@ function App() {
           }}
           onClose={() => setViewfinderOpen(false)}
         />
+        </Suspense>
       ) : null}
       {viewfinderOpen && centre !== null ? (
+        <Suspense fallback={null}>
         <Viewfinder
           venue={centre}
           pins={plan.map((p) => ({ id: p.position.id, label: String(p.position.number), at: p.position.at }))}
@@ -2590,6 +2607,7 @@ function App() {
           preset={viewfinderPresetNow}
           onClose={() => setViewfinderOpen(false)}
         />
+        </Suspense>
       ) : null}
 
       {/* FIRST RUN, NO SETUP (Batch I, Section 1): no spot yet, so "Where do you go?" (Batch M), over everything. */}
@@ -2634,6 +2652,7 @@ function App() {
         />
       ) : null}
       {droneOpen && centre !== null ? (
+        <Suspense fallback={null}>
         <DronePage
           venue={centre}
           placeName={venueShort}
@@ -2659,8 +2678,10 @@ function App() {
             setCardRequest((r) => ({ kind: 'fly', tick: r.tick + 1 }))
           }}
         />
+        </Suspense>
       ) : null}
       {skyOpen && centre !== null ? (
+        <Suspense fallback={null}>
         <SkyPage
           venue={centre}
           placeName={venueShort}
@@ -2686,8 +2707,10 @@ function App() {
             setCardRequest((r) => ({ kind: 'sky', skyTab: view, tick: r.tick + 1 }))
           }}
         />
+        </Suspense>
       ) : null}
       {weatherOpen && centre !== null ? (
+        <Suspense fallback={null}>
         <WeatherPage
           venue={centre}
           placeName={venueShort}
@@ -2707,6 +2730,7 @@ function App() {
             setMode('plan')
           }}
         />
+        </Suspense>
       ) : null}
 
       {askWhat ? (
