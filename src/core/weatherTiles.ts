@@ -74,7 +74,7 @@ export function cloudHeightWord(baseFt: number): 'low' | 'mid' | 'high' {
  */
 export function cloudTile(sky: MetarSky | null, forecastPct: number | null, forecastWords: (pct: number | null) => string): { big: string; line: string } {
   if (sky !== null) {
-    if (sky.groups.length === 0) return sky.clear ? { big: 'None', line: `below 12,000 ft, at ${sky.station}` } : { big: 'None', line: `reported at ${sky.station}` }
+    if (sky.groups.length === 0) return sky.clear ? { big: 'Clear', line: `below 12,000 ft, at ${sky.station}` } : { big: 'Clear', line: `reported at ${sky.station}` }
     const rank = ['FEW', 'SCT', 'BKN', 'OVC', 'VV']
     const most = sky.groups.reduce((a, b) => (rank.indexOf(b.amount) > rank.indexOf(a.amount) ? b : a))
     return { big: AMOUNT[most.amount], line: `${cloudHeightWord(most.baseFt)}, at ${sky.station}` }

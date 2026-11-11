@@ -100,10 +100,15 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Batch Beach, Section 5: the note on its own line under the label, not run on after it. */
 .feat3__rnote {
+  display: block;
+  overflow: hidden;
   font-size: var(--text-sm);
   font-weight: 400;
   color: var(--glass-ink-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .feat3__chev {
   color: var(--glass-ink-2);
@@ -165,6 +170,15 @@
 }
 .feat3__link {
   min-height: 44px;
+}
+.feat3__info {
+  min-height: 44px;
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--glass-ink-2);
+  font-size: var(--text-sm);
 }
 .feat3__about {
   margin-top: 12px;

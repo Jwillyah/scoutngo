@@ -117,9 +117,8 @@ try {
     if (l.sheet.bottom < l.vh - 1) fail(`${name}: the sheet ends at ${l.sheet.bottom}, above the screen's foot (${l.vh})`)
     for (const c of l.covers.slice(0, 3)) fail(`${name}: over the sheet in the home-indicator band: ${c}`)
     if (want === 'peek') {
-      /* Batch H: at peek the sheet still holds the toggles themselves, not a summary of them. */
-      if (!l.summaryShown) fail(`peek: no row of layer toggles in the visible sheet (got ${JSON.stringify(l.summary)})`)
-      if (l.toggles < 3) fail(`peek: only ${l.toggles} layer toggles on screen`)
+      /* Batch Beach, Section 5: one layers UI. The old strip of layer chips at peek is gone (the layers button opens the Map sheet). */
+      if (l.summary !== null) fail(`peek: the old layer strip is back (${JSON.stringify(l.summary)})`)
     } else {
       if (!l.headShown) fail(`${name}: the "Map & layers" header is not in the visible part of the sheet`)
       if (l.head && l.head.top - l.grab.bottom > 8) fail(`${name}: the header is ${Math.round(l.head.top - l.grab.bottom)} px under the grab handle, not right under it`)

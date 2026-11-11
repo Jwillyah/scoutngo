@@ -75,7 +75,7 @@ function Rows({ items, more }: { items: Switch[]; more?: { sub: string; onOpen: 
           </span>
           <span className="feat3__rlabel">
             {s.label}
-            {s.note === undefined ? null : <span className="feat3__rnote"> {s.note}</span>}
+            {s.note === undefined ? null : <span className="feat3__rnote">{s.note}</span>}
           </span>
           <Toggle on={s.on} label={s.label} feature={s.id} onChange={() => s.onToggle()} />
         </div>
@@ -86,7 +86,7 @@ function Rows({ items, more }: { items: Switch[]; more?: { sub: string; onOpen: 
             {svg(<path d="M6 12h.01M12 12h.01M18 12h.01" />, 'feat3__glyph')}
           </span>
           <span className="feat3__rlabel">
-            More<span className="feat3__rnote"> {more.sub}</span>
+            More<span className="feat3__rnote">{more.sub}</span>
           </span>
           <span className="feat3__chev" aria-hidden="true">
             ›
@@ -99,6 +99,8 @@ function Rows({ items, more }: { items: Switch[]; more?: { sub: string; onOpen: 
 
 export function FeaturesSheet(p: FeaturesProps) {
   const [more, setMore] = useState(false)
+  /* Batch Beach, Section 5: what each layer is, behind an (i), not a paragraph on the page. */
+  const [info, setInfo] = useState(false)
   if (more) {
     return (
       <div className="feat3" data-feat-more>
@@ -114,7 +116,12 @@ export function FeaturesSheet(p: FeaturesProps) {
             </button>
           ))}
         </div>
-        {p.about === undefined ? null : <div className="feat3__about">{p.about}</div>}
+        {p.about === undefined ? null : (
+          <button type="button" className="feat3__info" aria-expanded={info} onClick={() => setInfo((v) => !v)}>
+            ⓘ What each layer is
+          </button>
+        )}
+        {p.about === undefined || !info ? null : <div className="feat3__about">{p.about}</div>}
         <p className="feat3__credit">{p.credit}</p>
       </div>
     )

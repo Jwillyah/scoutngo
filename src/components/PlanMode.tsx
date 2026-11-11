@@ -103,13 +103,13 @@ import { readCeilingFeet } from '../lib/venue.ts'
 import { MAX_ALTITUDE_FEET } from '../core/air.ts'
 import { facilityCellAt } from '../lib/uasfm.ts'
 import { AboutSheet, type HowSection } from './AboutSheet.tsx'
-import { TILE_ART } from './tileArt.tsx'
 import { WeatherPanel } from './WeatherPanel.tsx'
 import { SunReadout } from './SunReadout.tsx'
 import { CamList } from './CamList.tsx'
 import { SunCurve } from './SunCurve.tsx'
 import { Page } from './Page.tsx'
 import { BUILDINGS_MIN_ZOOM, MapView, type MapHandle } from './MapView.tsx'
+import { mapBack, type MapFrom } from '../lib/mapBack.ts'
 import { buildingsToGeoJson, fetchBuildings, type Building } from '../lib/buildings.ts'
 import { shadowMap } from '../core/shadowMap.ts'
 import { shadowCollection } from '../lib/shadowLayer.ts'
@@ -659,7 +659,8 @@ export function PlanMode({
    * there is nothing to yield to and the detent the shooter set is the detent
    * they keep.
    */
-  const [terrainPaused, setTerrainPaused] = useState(false)
+  /* The map reports a paused terrain; the old layer tiles said it, and nothing reads it since Batch Beach, Section 5. */
+  const [, setTerrainPaused] = useState(false)
   const [buildingsNote, setBuildingsNote] = useState<string | null>(null)
   /* A Retry on the Buildings tile asks again; so does a 3D scan arriving or going (the heights changed). */
   const [buildingsAttempt, setBuildingsAttempt] = useState(0)
@@ -873,6 +874,8 @@ export function PlanMode({
   }
   /* Sky › Calendar, a page of its own (CalendarPage.tsx). ?calendar=1 opens it, for the overflow audit. */
   const [calendarOpen, setCalendarOpen] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('calendar') === '1')
+  /* Batch Beach, Section 5: the page the map was opened from, which the map's Back returns to; null: Back is the home. */
+  const [mapFrom, setMapFrom] = useState<MapFrom>(null)
   /* Compare a photo (src/components/ComparePhoto.tsx). ?compare=1 opens it, for scripts/measure-compare.mjs. */
   const [compareOpen, setCompareOpen] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('compare') === '1')
 
@@ -1934,89 +1937,6 @@ export function PlanMode({
   )
 
   /*
-   * LAYERS AS TILES. Every tile is a drawing of what it does and carries its
-   * own state; the paragraphs that used to be on every row are behind the i.
-   */
-  /* The base and the overlays, named once: the tiles draw them and the peek line reads them. */
-  const layerBase = [
-    {
-      id: 'satellite',
-      label: 'Satellite',
-      state: `ON · z${Math.round(mapZoom)}`,
-      on: true,
-      art: TILE_ART.satellite,
-      onToggle: () => {},
-    },
-    {
-      id: 'terrain',
-      /* Elevation for the horizon and the sun curve. 2D no longer tilts; the 3D button is the clay model. */
-      label: 'Terrain',
-      /* The tile says what the layer is actually doing, suspension included. */
-      /* Under FLAT_M of relief round the venue there is nothing to draw: the tile says so and does nothing (30 Oct). */
-      state: flatHere ? 'FLAT HERE' : !showTerrain ? 'OFF' : terrainPaused ? 'PAUSED' : 'ON',
-      on: showTerrain && !flatHere,
-      art: TILE_ART.terrain,
-      onToggle: () => (flatHere ? undefined : turnTerrain(!showTerrain)),
-    },
-    /*
-     * NO CHART TILE. It toggled the same setting as Labels -- the Esri
-     * roads and place names -- under a drawing of a nautical chart the app
-     * does not have. Two tiles for one switch, one of them promising a
-     * layer that does not exist: merged into Labels.
-     */
-  ]
-  const layerOverlays = [
-    { id: 'cones', label: 'Cones', state: coneMode === 'all' ? 'ON' : 'OFF', on: coneMode === 'all', art: TILE_ART.cones, onToggle: () => onConeMode(coneMode === 'all' ? 'none' : 'all') },
-    { id: 'sun', label: 'Sun arc', state: showArc ? 'ON' : 'OFF', on: showArc, art: TILE_ART.sunArc, onToggle: () => onShowArc(!showArc) },
-    { id: 'shadows', label: 'Shadows', state: showSun ? 'ON' : 'OFF', on: showSun, art: TILE_ART.shadows, onToggle: () => onShowSun(!showSun) },
-    /* Addendum E: the old Cloud tile is Features › Weather › Clouds. */
-    { id: 'cloud', label: 'Clouds', state: weatherLayer === 'clouds' ? 'ON' : 'OFF', on: weatherLayer === 'clouds', art: TILE_ART.cloud, onToggle: () => pickWeather(weatherLayer === 'clouds' ? 'off' : 'clouds') },
-    {
-      id: 'hazards',
-      label: 'Hazards',
-      state: marks.length === 0 ? 'NONE' : `${marks.length} MARKED`,
-      on: marks.length > 0,
-      art: TILE_ART.hazards,
-      onToggle: () => setCard({ kind: 'hazards' }),
-    },
-    {
-      id: 'buildings',
-      label: 'Buildings',
-      /* A note from the fetch -- "none mapped here" -- is the state. */
-      state: !showBuildings ? 'OFF' : (buildingsNote ?? 'ON'),
-      on: showBuildings,
-      art: TILE_ART.buildings,
-      /* Failed, the tile is its own Retry. */
-      onToggle: () => (showBuildings && buildingsNote === LAYER_FAILED ? setBuildingsAttempt((n) => n + 1) : onShowBuildings(!showBuildings)),
-    },
-    { id: 'labels', label: 'Labels', state: showLabels ? 'ON' : 'OFF', on: showLabels, art: TILE_ART.labels, onToggle: () => onShowLabels(!showLabels) },
-    {
-      id: 'airspace',
-      label: 'Airspace',
-      /* The state says what is on the map, including when the grid is left out. */
-      state: !airspaceOn
-        ? 'OFF'
-        : airspaceFailed
-          ? LAYER_FAILED
-          : airspaceOverlay === null
-            ? 'Loading'
-            : airspaceDense
-              ? 'ON · zoom for grid'
-              : 'ON',
-      on: airspaceOn,
-      art: TILE_ART.airspace,
-      /* On also opens the card: the shapes on the map, the words for the venue. Failed, the tile is its own Retry. */
-      onToggle: () => {
-        if (airspaceOn && airspaceFailed) {
-          setAirspaceFailed(false)
-          return
-        }
-        if (!airspaceOn) setCard({ kind: 'airspace' })
-        setAirspaceOn(!airspaceOn)
-      },
-    },
-  ]
-  /*
    * LAYERS AT THE LOWEST DETENT: WHAT IS ON, IN ONE LINE. The peek is the time
    * strip's room, and Layers has no time strip, so dragged to the bottom the
    * sheet showed its grab handle over empty black (29 Oct, from the home-screen
@@ -2655,9 +2575,14 @@ export function PlanMode({
             onPageBack?.()
           },
           onSwitch: (id: DetailId) => setPage(id === 'tide' ? 'tides' : id),
-          onMap: () => setPage(null),
+          /* Batch Beach, Section 5: the map's Back returns to this page (Wind Data → Map → Back → Wind Data). */
+          onMap: () => {
+            setMapFrom(page)
+            setPage(null)
+          },
           /* Batch Flow, Section 6: the Wind page's Map: the map's moving wind, at the spot. */
           onWindMap: () => {
+            setMapFrom(page)
             setPage(null)
             setRadarAt(null)
             onSkyLayer('wind')
@@ -2932,7 +2857,16 @@ export function PlanMode({
         /* Batch Flow, Section 2: the + is "Plan a shoot" (where's the shoot, the next setup), there only when Shoot is picked. */
         addLabel={onShootSetup === undefined ? undefined : 'Plan a shoot'}
         addHidden={planShoot === false}
-        onBack={onHome}
+        onBack={
+          onHome === undefined
+            ? undefined
+            : () => {
+                const to = mapBack(mapFrom)
+                setMapFrom(null)
+                if (to.kind === 'page') setPage(to.page)
+                else onHome()
+              }
+        }
         onLocate={onLocate}
         locating={locating}
         locateNote={null}
@@ -3019,22 +2953,7 @@ export function PlanMode({
               </button>
             )}
 
-            {/*
-              * LAYERS AT THE BOTTOM STILL SWITCH LAYERS (Batch H, 2 Nov: the
-              * sheet at peek said only "LAYERS Satellite · Terrain · Cloud",
-              * an empty sheet to a thumb). One row of the real toggles, the
-              * same ones as the tiles above; the grabber raises the rest.
-              */}
-            {card.kind === 'layers' && sheet === 'peek' ? (
-              <div className="peeklayers" role="group" aria-label="Layers">
-                {[...layerBase, ...layerOverlays].map((t) => (
-                  <button key={t.id} type="button" className={`peeklayers__chip${t.on ? ' peeklayers__chip--on' : ''}`} aria-pressed={t.on} onClick={t.onToggle}>
-                    <span className="peeklayers__art" aria-hidden="true">{t.art}</span>
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-            ) : null}
+            {/* Batch Beach, Section 5: the old horizontal layer strip at peek is gone; the layers button opens the Map sheet, one layers UI. */}
 
             {/*
               * THE TIME STRIP, ONLY WHERE TIME CHANGES THE READING.

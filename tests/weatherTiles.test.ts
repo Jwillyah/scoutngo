@@ -43,7 +43,7 @@ describe('the Cloud tile', () => {
   it('the station first: the most cloud it reports, how high, and which station', () => {
     expect(cloudTile(parseMetarSky('KNTU 091953Z 29008KT 10SM FEW250 18/06 A3012'), 30, cloudWords)).toEqual({ big: 'A few', line: 'high, at KNTU' })
     expect(cloudTile(parseMetarSky('KNTU 091953Z 29008KT 10SM SCT035 BKN120 18/06 A3012'), 30, cloudWords)).toEqual({ big: 'Broken', line: 'mid, at KNTU' })
-    expect(cloudTile(parseMetarSky('KNTU 091953Z 29008KT 10SM CLR 18/06 A3012'), 30, cloudWords)).toEqual({ big: 'None', line: 'below 12,000 ft, at KNTU' })
+    expect(cloudTile(parseMetarSky('KNTU 091953Z 29008KT 10SM CLR 18/06 A3012'), 30, cloudWords)).toEqual({ big: 'Clear', line: 'below 12,000 ft, at KNTU' })
   })
   it('no station: the forecast, said as the forecast; nothing: a dash', () => {
     expect(cloudTile(null, 40, cloudWords)).toEqual({ big: 'Partly cloudy', line: 'forecast' })
