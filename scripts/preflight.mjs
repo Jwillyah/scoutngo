@@ -474,10 +474,10 @@ export async function goToStage(ev, wait, stage) {
     const now = await ev(`document.querySelector('.shell')?.className.match(/shell--([a-z]+)/)?.[1] ?? null`)
     if (now === 'setup') return now
     if (now !== 'plan') await goToStage(ev, wait, 'plan')
-    const tapped = await ev(`(() => { const b = document.querySelector('button.topbar__btn--add[aria-label="Plan a shoot"]') ?? document.querySelector('button.pill-venue'); if (!b) return false; b.click(); return true })()`)
-    if (!tapped) throw new PreflightError("no Plan a shoot button (the +) in Plan's top bar (src/components/PlanMode.tsx)")
+    /* Batch Polish, Section 2: the map's + moved into the Map sheet's tools; setup by its address, as /plan and /field are. */
+    await ev(`(() => { history.pushState(null, '', '/setup' + location.search + location.hash); dispatchEvent(new PopStateEvent('popstate')); return 1 })()`)
     await wait(600)
-    return arrivedAt(ev, want, "tapped Plan's Shoot setup (+)")
+    return arrivedAt(ev, want, 'went to /setup')
   }
 
   /*
@@ -526,20 +526,13 @@ export async function goToStage(ev, wait, stage) {
 
   /* A first load on a cold dev server can take a while: wait for the top bar, up to 15 s. */
   for (let i = 0; i < 30; i += 1) {
-    if (await ev(`!!document.querySelector('nav[aria-label="Stage"], button[aria-label="Menu"]')`)) break
+    if (await ev(`!!document.querySelector('nav[aria-label="Stage"], button[aria-label="Menu"], .topbar__back')`)) break
     await wait(500)
   }
-  const opened = await ev(`(() => {
-    if (document.querySelector('nav[aria-label="Stage"]')) return 'ok'
-    const menu = document.querySelector('button[aria-label="Menu"]')
-    if (!menu) return 'no menu button in the top bar'
-    menu.click()
-    return 'ok'
-  })()`)
-  if (opened !== 'ok') {
-    throw new PreflightError(`could not open the menu: ${opened}. It is the top bar's first button, src/components/TopBar.tsx.`)
+  if (!(await ev(`!!document.querySelector('nav[aria-label="Stage"]')`))) {
+    const opened = await openMenu(ev, wait)
+    if (opened !== 'menu') throw new PreflightError(`could not open the menu: ${opened}. It is on the home (src/components/Home.tsx), on setup's and field's top bars.`)
   }
-  await wait(300)
 
   const clicked = await ev(`(() => {
     const buttons = [...document.querySelectorAll('nav[aria-label="Stage"] button')]
@@ -634,4 +627,35 @@ export async function pressSuggest(ev, wait) {
     if (state === 'done') return
   }
   throw new PreflightError('pressed Suggest and it never reported a result in 75 s')
+}
+
+/*
+ * OPEN THE MENU FROM WHEREVER THE AUDIT IS (Batch Polish, Section 2). The
+ * menu lives on the home, on setup's and on field's top bars; the map's top
+ * bar is back · spot · locate. A visible Menu button is tapped; on the map,
+ * its Back goes to the home first (up to 5 s for the home to draw). Returns
+ * 'menu' when the menu is open, else what stopped it.
+ */
+export const MENU_TAP = `(() => {
+  const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && !e.closest('[inert]') }
+  const m = [...document.querySelectorAll('button[aria-label="Menu"]')].find(vis)
+  if (m) { m.click(); return 'menu' }
+  const back = [...document.querySelectorAll('.topbar__back')].find(vis)
+  if (back) { back.click(); return 'back' }
+  return 'no Menu button and no Back to the home'
+})()`
+
+export async function openMenu(ev, wait) {
+  let r = await ev(MENU_TAP)
+  if (r !== 'back') {
+    if (r === 'menu') await wait(400)
+    return r
+  }
+  for (let i = 0; i < 25; i += 1) {
+    await wait(200)
+    if (await ev(`!!document.querySelector('.home button[aria-label="Menu"]')`)) break
+  }
+  r = await ev(MENU_TAP)
+  if (r === 'menu') await wait(400)
+  return r === 'menu' ? 'menu' : `went Back, and then: ${r}`
 }

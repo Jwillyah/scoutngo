@@ -30,7 +30,7 @@
  * short, or the run fails rather than passing on a short one.
  */
 import { connect } from './cdp.mjs'
-import { goToStage, guardAudit, setSheet, startWatchdog, APP_ORIGIN } from './preflight.mjs'
+import { goToStage, guardAudit, setSheet, startWatchdog, APP_ORIGIN, openMenu } from './preflight.mjs'
 import { shareLink } from '../src/lib/planShare.ts'
 import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
 import { placeKey } from '../src/core/venueName.ts'
@@ -246,7 +246,7 @@ try {
    * your settings on a photo". Batch Flow, Section 8: Surf is its own card.
    */
   for (const item of ['Surf', 'Exposure']) {
-    await ev(`document.querySelector('button[aria-label="Menu"]')?.click()`)
+    await openMenu(ev, wait)
     await wait(600)
     const door = item === 'Surf' ? 'Surf' : 'Kit'
     const found = await ev(`(() => { const b = [...document.querySelectorAll('.sidemenu__item')].find((x) => x.querySelector('.sidemenu__label')?.textContent === '${door}'); if (!b) return false; b.click(); return true })()`)
@@ -353,7 +353,7 @@ try {
 
   /* THE CALENDAR: a page of its own, the whole month on one screen with nothing below it (29 Oct). */
   /* Batch K addendum: the dock is gone; the calendar is Sky › Calendar. */
-  await ev(`document.querySelector('button[aria-label="Menu"]')?.click()`)
+  await openMenu(ev, wait)
   await wait(900)
   await ev(`document.querySelector('.mcard--sky')?.click()`)
   await wait(1500)
@@ -375,7 +375,7 @@ try {
     await wait(600)
   }
 
-  await ev(`document.querySelector('button[aria-label="Menu"]')?.click()`)
+  await openMenu(ev, wait)
   await check('the menu', 'nav[aria-label="Stage"]')
   await ev(`document.querySelector('button[aria-label="Menu"]')?.click(); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`)
   await wait(500)

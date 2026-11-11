@@ -18,7 +18,10 @@ import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { webkit, devices } from './gate/playwright.mjs'
-import { ensureApp, goToStage, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mjs'
+import { ensureApp, goToStage, guardAudit, startWatchdog, APP_ORIGIN, openMenu } from './preflight.mjs'
+
+/* Batch Polish, Section 2: the menu is the home's (and setup's and field's); on the map its Back goes home first (scripts/preflight.mjs openMenu). */
+const menuOn = (pg) => openMenu((x) => pg.evaluate(x), (ms) => pg.waitForTimeout(ms))
 import { shareLink } from '../src/lib/planShare.ts'
 import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
 import { OPEN_METEO, fakeAnswer } from './openMeteoFake.mjs'
@@ -204,7 +207,7 @@ try {
   await goToStage(ev, wait, 'plan')
   await wait(800)
   /* Sky, from the menu. */
-  await page.locator('button[aria-label="Menu"]').first().tap()
+  await menuOn(page)
   await wait(500)
   await check('Menu', '.sidemenu__panel', 'tab-menu')
   await page.locator('.sidemenu__panel .sidemenu__item', { hasText: /^Sky/ }).first().tap()

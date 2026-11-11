@@ -23,7 +23,10 @@ import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { webkit, devices } from './gate/playwright.mjs'
-import { ensureApp, goToStage, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mjs'
+import { ensureApp, goToStage, guardAudit, startWatchdog, APP_ORIGIN, openMenu } from './preflight.mjs'
+
+/* Batch Polish, Section 2: the menu is the home's (and setup's and field's); on the map its Back goes home first (scripts/preflight.mjs openMenu). */
+const menuOn = (pg) => openMenu((x) => pg.evaluate(x), (ms) => pg.waitForTimeout(ms))
 import { shareLink } from '../src/lib/planShare.ts'
 import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
 import { placeKey } from '../src/core/venueName.ts'
@@ -75,7 +78,7 @@ try {
     await page.getByRole('button', { name: /^open$/i }).click({ timeout: 4000 }).catch(() => {})
     await goToStage(ev, wait, 'plan')
     await wait(1500)
-    await page.locator('button[aria-label="Menu"]').first().click()
+    await menuOn(page)
     await wait(6000)
     const m = JSON.parse(await ev(`JSON.stringify((() => {
       const nav = document.querySelector('nav[aria-label="Stage"]')
@@ -125,7 +128,7 @@ try {
     /* Batch M: the home has no ×; its round Map button goes to the map. */
     await ev(`document.querySelector('.home .hbtn--round[aria-label="Open the map"]')?.click()`)
     await wait(500)
-    await page.locator('button[aria-label="Menu"]').first().click()
+    await menuOn(page)
     await wait(800)
     await page.locator('.mcard--sky').click()
     await wait(1500)
@@ -136,7 +139,7 @@ try {
     /* Batch QA, Section 0: the Weather card opens the Weather page. */
     await ev(`document.querySelector('.spage .ppage__back')?.click()`)
     await wait(800)
-    await page.locator('button[aria-label="Menu"]:visible').first().click()
+    await menuOn(page)
     await wait(800)
     await page.locator('.mcard--weather').click()
     await wait(1500)

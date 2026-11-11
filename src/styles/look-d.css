@@ -311,3 +311,42 @@
   width: fit-content;
   margin-inline: auto;
 }
+
+/*
+ * THE SUN AND MOON LINES' LABELS AS LOOK-D PILLS (Batch Polish, Section 2):
+ * the black SUN / SHADOW / SET plates were the old look. A pill like the
+ * chips, a dot in the line's own colour where the heavy edge was, the word
+ * as written. Placement is unchanged (MapView keeps them off each other and
+ * off the chrome).
+ */
+.ray-label {
+  flex-direction: row;
+  gap: 6px;
+  padding: 4px 10px 4px 8px;
+  border-left: 0;
+  border-radius: 999px;
+  background: var(--surface-raised);
+}
+.ray-label::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--sun);
+}
+.ray-label--shadow::before {
+  background: var(--sun-shadow);
+}
+.ray-label--sunrise::before {
+  background: var(--sun-rise);
+}
+.ray-label--sunset::before {
+  background: var(--sun-set);
+}
+.ray-label__text {
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--color-text);
+  font-weight: var(--weight-medium);
+}

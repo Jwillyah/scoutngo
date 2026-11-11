@@ -33,7 +33,10 @@ import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { chromium, webkit, devices } from './gate/playwright.mjs'
-import { ensureApp, findChrome, goToStage, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mjs'
+import { ensureApp, findChrome, goToStage, guardAudit, startWatchdog, APP_ORIGIN, openMenu } from './preflight.mjs'
+
+/* Batch Polish, Section 2: the menu is the home's (and setup's and field's); on the map its Back goes home first (scripts/preflight.mjs openMenu). */
+const menuOn = (pg) => openMenu((x) => pg.evaluate(x), (ms) => pg.waitForTimeout(ms))
 import { shareLink } from '../src/lib/planShare.ts'
 import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
 import { placeKey } from '../src/core/venueName.ts'
@@ -110,7 +113,7 @@ try {
     await goToStage(ev, wait, 'plan')
     await wait(2500)
     if (await ev(`!!document.querySelector('.home')`)) fail(`${label}: the home opened by itself on a shared plan's link`)
-    await page.locator('button[aria-label="Menu"]').first().click()
+    await menuOn(page)
     await wait(700)
     await page.locator('.mcard--today').first().click()
     await wait(6000)

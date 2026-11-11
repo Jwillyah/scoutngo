@@ -19,7 +19,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { webkit, devices } from './gate/playwright.mjs'
 import { decodePng } from '../src/lib/png.ts'
-import { ensureApp, goToStage, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mjs'
+import { ensureApp, goToStage, guardAudit, startWatchdog, APP_ORIGIN, openMenu } from './preflight.mjs'
+
+/* Batch Polish, Section 2: the menu is the home's (and setup's and field's); on the map its Back goes home first (scripts/preflight.mjs openMenu). */
+const menuOn = (pg) => openMenu((x) => pg.evaluate(x), (ms) => pg.waitForTimeout(ms))
 import { shareLink } from '../src/lib/planShare.ts'
 import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
 import { placeKey } from '../src/core/venueName.ts'
@@ -107,7 +110,7 @@ try {
     await goToStage(ev, wait, 'plan')
     await wait(2000)
     await names('map')
-    await tap('button[aria-label="Menu"]:visible')
+    await menuOn(page)
     await names('menu')
     await tap('.mcard--today', 4000)
     await names('home')
@@ -147,7 +150,7 @@ try {
     await page.getByRole('button', { name: /^open$/i }).click({ timeout: 4000 }).catch(() => {})
     await wait(3500)
     await goToStage(ev, wait, 'plan')
-    await page.locator('button[aria-label="Menu"]:visible').first().click({ noWaitAfter: true }).catch(() => {})
+    await menuOn(page)
     await wait(800)
     await page.locator('.mcard--today').first().click({ noWaitAfter: true }).catch(() => {})
     await wait(5000)
@@ -223,7 +226,7 @@ try {
     await page.getByRole('button', { name: /^open$/i }).click({ timeout: 4000 }).catch(() => {})
     await wait(3500)
     await goToStage(ev, wait, 'plan')
-    await page.locator('button[aria-label="Menu"]:visible').first().click({ noWaitAfter: true }).catch(() => {})
+    await menuOn(page)
     await wait(800)
     await page.locator('.mcard--today').first().click({ noWaitAfter: true }).catch(() => {})
     await wait(5000)

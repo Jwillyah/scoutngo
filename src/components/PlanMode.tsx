@@ -2052,6 +2052,8 @@ export function PlanMode({
         ...(onViewfinder === undefined ? [] : [{ label: 'Viewfinder', icon: featIcon('M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8zM8 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z'), onClick: onViewfinder }]),
         { label: 'Measure', icon: featIcon('M2 12 12 2l2 2L4 14zM5 9l1 1M7 7l1 1M9 5l1 1'), on: measurePins !== null, onClick: () => { setMeasurePins((pins) => (pins === null ? [] : null)); setSheet('peek') } },
         { label: 'Skyline', icon: featIcon('M2 14V8h3v6M6 14V4h4v10M11 14V7h3v7'), on: card.kind === 'skyline', onClick: () => openCard('skyline') },
+        /* Batch Polish, Section 2: "Plan a shoot" lives here when Shoot is picked; the map's top bar is back · spot · locate. */
+        ...(planShoot === false || onHome === undefined ? [] : [{ label: 'Plan a shoot', icon: featIcon('M8 3v10M3 8h10'), on: onShootSetup === undefined ? placing : false, onClick: onShootSetup ?? (() => onPlacing(!placing)) }]),
       ]}
       credit="Imagery Esri · labels OpenFreeMap"
       about={
@@ -2893,7 +2895,8 @@ export function PlanMode({
         adding={onShootSetup === undefined ? placing : false}
         /* Batch Flow, Section 2: the + is "Plan a shoot" (where's the shoot, the next setup), there only when Shoot is picked. */
         addLabel={onShootSetup === undefined ? undefined : 'Plan a shoot'}
-        addHidden={planShoot === false}
+        addHidden={planShoot === false || onHome !== undefined}
+        menuHidden={onHome !== undefined}
         onBack={
           onHome === undefined
             ? undefined

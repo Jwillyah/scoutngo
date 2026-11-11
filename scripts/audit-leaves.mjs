@@ -26,7 +26,10 @@ import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { webkit, devices } from './gate/playwright.mjs'
-import { ensureApp, goToStage, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mjs'
+import { ensureApp, goToStage, guardAudit, startWatchdog, APP_ORIGIN, openMenu } from './preflight.mjs'
+
+/* Batch Polish, Section 2: the menu is the home's (and setup's and field's); on the map its Back goes home first (scripts/preflight.mjs openMenu). */
+const menuOn = (pg) => openMenu((x) => pg.evaluate(x), (ms) => pg.waitForTimeout(ms))
 import { shareLink } from '../src/lib/planShare.ts'
 import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
 import { placeKey } from '../src/core/venueName.ts'
@@ -74,7 +77,7 @@ try {
   await goToStage(ev, wait, 'plan')
   await wait(2500)
   watchdog.note('the map')
-  await tap('button[aria-label="Menu"]:visible')
+  await menuOn(page)
   await tap('.mcard--today', 4000)
   for (const card of ['surf', 'wind', 'tide']) {
     await tap(`.home__page[aria-label="Today"] .hcard--${card}`, 4000)
@@ -89,7 +92,7 @@ try {
     await page.getByRole('button', { name: /^open$/i }).click({ timeout: 4000 }).catch(() => {})
   await wait(3000)
   await goToStage(ev, wait, 'plan')
-  await tap('button[aria-label="Menu"]:visible')
+  await menuOn(page)
   await tap('nav[aria-label="Stage"] .mcard--weather', 4000)
   await page.goto(url)
     /* The shared plan's own question first: other screens wait under it. */

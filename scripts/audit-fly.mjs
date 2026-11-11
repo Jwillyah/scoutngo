@@ -24,7 +24,10 @@ import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { webkit, devices } from './gate/playwright.mjs'
-import { ensureApp, goToStage, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mjs'
+import { ensureApp, goToStage, guardAudit, startWatchdog, APP_ORIGIN, openMenu } from './preflight.mjs'
+
+/* Batch Polish, Section 2: the menu is the home's (and setup's and field's); on the map its Back goes home first (scripts/preflight.mjs openMenu). */
+const menuOn = (pg) => openMenu((x) => pg.evaluate(x), (ms) => pg.waitForTimeout(ms))
 import { shareLink } from '../src/lib/planShare.ts'
 import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
 import { placeKey } from '../src/core/venueName.ts'
@@ -92,7 +95,7 @@ try {
     await goToStage(ev, wait, 'plan')
     await wait(3000)
     /* Batch K addendum: Preflight moved from the layers sheet to the menu's Drone card; Batch Flow: the Drone page first. */
-    await page.locator('button[aria-label="Menu"]').first().tap()
+    await menuOn(page)
     await wait(900)
     await page.locator('.mcard--drone').first().tap()
     await wait(1500)

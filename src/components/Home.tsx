@@ -171,7 +171,8 @@ export function Home({ venue, placeName, timeZone, units, drone, now, onClose, o
           ))}
         </div>
       </div>
-      <div className="home__track" ref={track}>
+      {/* Swipe pages by design (Today · Tomorrow · Week, with the dots that name them): marked for the overflow audit, as Sky › Now is. */}
+      <div className="home__track" ref={track} data-sideways>
         <section className="home__page" aria-label="Today">
           <DayView placeName={placeName} which="today" brief={brief} day={brief.days[0] ?? null} order={order} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} alert={alert === null ? null : alert.event} stormLine={play.inPlay ? play.headline : null} onOpen={onOpen} onDebug={() => setDebug((d) => !d)} surf={surf} obs={stationObs} layout={layout} shown={shown} />
         </section>

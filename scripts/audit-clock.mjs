@@ -29,7 +29,7 @@
  * first and fails if any goes undetected, and fails on zero files read. The
  * screen half fails unless it read times on screen in both modes.
  */
-import { APP_ORIGIN } from './preflight.mjs'
+import { APP_ORIGIN, openMenu } from './preflight.mjs'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 
@@ -144,7 +144,7 @@ async function screenHalf() {
       await ev(`document.querySelector('.card [aria-label="Close"], .card__close')?.click()`)
       await wait(500)
     }
-    await ev(`document.querySelector('button[aria-label="Menu"]')?.click()`)
+    await openMenu(ev, wait)
     await wait(400)
     await ev(`[...document.querySelectorAll('.sidemenu__item')].find((x) => x.textContent.includes('Sky'))?.click()`)
     await wait(1500)

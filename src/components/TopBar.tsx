@@ -33,6 +33,8 @@ interface TopBarProps {
   onBack?: () => void
   /** Batch Flow, Section 2: no + at all (it is "Plan a shoot", only when Shoot is picked). */
   addHidden?: boolean
+  /** Batch Polish, Section 2: on the map (with its Back to the home) the menu is the home's: back · spot · locate. */
+  menuHidden?: boolean
 }
 
 /* Batch Beach, Section 6: the four on the 24-unit grid with one stroke (they were 20-unit, four stroke widths). */
@@ -56,6 +58,7 @@ export function TopBar({
   online,
   onBack,
   addHidden = false,
+  menuHidden = false,
 }: TopBarProps) {
   return (
     <header className="topbar">
@@ -64,9 +67,11 @@ export function TopBar({
           {icon(<path d="M15 5.5 8.5 12l6.5 6.5" />)}
         </button>
       )}
-      <button type="button" className="topbar__btn" onClick={onMenu} aria-label="Menu" aria-expanded={menuOpen}>
-        {icon(<path d="M4 7h16M4 12h16M4 17h16" />)}
-      </button>
+      {menuHidden ? null : (
+        <button type="button" className="topbar__btn" onClick={onMenu} aria-label="Menu" aria-expanded={menuOpen}>
+          {icon(<path d="M4 7h16M4 12h16M4 17h16" />)}
+        </button>
+      )}
 
       <div className="topbar__pill">
         {pill}

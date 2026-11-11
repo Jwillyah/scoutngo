@@ -12,7 +12,10 @@ describe('Batch MAP leftovers', () => {
     expect(app).toMatch(/onSearch=\{\(\) => setSpotPickOpen\(true\)\}/)
     expect(app).toMatch(/onShootSetup=\{\(\) => setMode\('setup'\)\}/)
     expect(src('src/components/PlanMode.tsx')).toMatch(/addLabel=\{onShootSetup === undefined \? undefined : 'Plan a shoot'\}/)
-    expect(src('src/components/PlanMode.tsx')).toMatch(/addHidden=\{planShoot === false\}/)
+    /* Batch Polish, Section 2: on the map (with its Back to the home) the top bar is back · spot · locate; "Plan a shoot" is in the Map sheet's tools. */
+    expect(src('src/components/PlanMode.tsx')).toMatch(/addHidden=\{planShoot === false \|\| onHome !== undefined\}/)
+    expect(src('src/components/PlanMode.tsx')).toMatch(/menuHidden=\{onHome !== undefined\}/)
+    expect(src('src/components/PlanMode.tsx')).toMatch(/label: 'Plan a shoot', icon: featIcon/)
   })
 
   it('Map style is Satellite · Map · 3D, Map the plain vector map that hides the satellite', () => {

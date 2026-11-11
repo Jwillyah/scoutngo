@@ -25,7 +25,10 @@ import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { webkit, devices } from './gate/playwright.mjs'
-import { ensureApp, goToStage, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mjs'
+import { ensureApp, goToStage, guardAudit, startWatchdog, APP_ORIGIN, openMenu } from './preflight.mjs'
+
+/* Batch Polish, Section 2: the menu is the home's (and setup's and field's); on the map its Back goes home first (scripts/preflight.mjs openMenu). */
+const menuOn = (pg) => openMenu((x) => pg.evaluate(x), (ms) => pg.waitForTimeout(ms))
 import { shareLink } from '../src/lib/planShare.ts'
 import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
 import { placeKey } from '../src/core/venueName.ts'
@@ -157,9 +160,10 @@ try {
     await bar.focus()
     for (let i = 0; i < 12; i += 1) await page.keyboard.press('ArrowRight')
     await wait(1500)
-    await page.locator('button[aria-label="Menu"]').first().tap()
+    await menuOn(page)
     await wait(500)
-    await page.getByText('Sky', { exact: true }).first().tap()
+    /* Batch Polish, Section 2: the menu's Sky row (the menu opens over the home now, whose Sky card says the same word). */
+    await page.locator('nav[aria-label="Stage"] .sidemenu__item').filter({ hasText: /^\s*Sky/ }).first().tap()
     await wait(800)
     /* Batch Pages, Section 3: Menu › Sky is the Sky page; the Sky color page in full is its "Color detail ›". */
     await page.locator('.spage .ppage__foot button:has-text("Color detail")').tap({ timeout: 4000 }).catch(() => fail(`${label}: no Color detail on the Sky page`))

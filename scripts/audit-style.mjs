@@ -32,7 +32,10 @@ import { mkdirSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { chromium, webkit, devices } from './gate/playwright.mjs'
-import { ensureApp, findChrome, goToStage, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mjs'
+import { ensureApp, findChrome, goToStage, guardAudit, startWatchdog, APP_ORIGIN, openMenu } from './preflight.mjs'
+
+/* Batch Polish, Section 2: the menu is the home's (and setup's and field's); on the map its Back goes home first (scripts/preflight.mjs openMenu). */
+const menuOn = (pg) => openMenu((x) => pg.evaluate(x), (ms) => pg.waitForTimeout(ms))
 import { shareLink } from '../src/lib/planShare.ts'
 import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
 import { placeKey } from '../src/core/venueName.ts'
@@ -253,7 +256,7 @@ try {
   if (await tap('button[aria-label="Features"]', 'Features')) await look('features sheet')
   await closeAll()
 
-  await tap('button[aria-label="Menu"]', 'menu')
+  await menuOn(page)
   await wait(3000)
   await look('menu')
   for (const [what, screen] of [['.mcard--sky', 'sky page'], ['.mcard--drone', 'drone page']]) {
@@ -267,7 +270,7 @@ try {
       /* Batch QA, Section 1: Color detail, which no screen here reached (its best-view line was cut). */
       if (what === '.mcard--sky') {
         await closeAll()
-        await tap('button[aria-label="Menu"]', 'menu')
+        await menuOn(page)
         if ((await tap(`nav[aria-label="Stage"] ${what}`, screen)) && (await tap('.spage button:has-text("Color detail")', 'color detail'))) {
           await wait(3000)
           await look('color detail')
@@ -275,7 +278,7 @@ try {
       }
     }
     await closeAll()
-    await tap('button[aria-label="Menu"]', 'menu')
+    await menuOn(page)
   }
   if (await tap('nav[aria-label="Stage"] .mrow:has-text("Settings")', 'settings')) {
     await look('settings')
@@ -284,7 +287,7 @@ try {
       await look('about')
       await closeAll()
     }
-    await tap('button[aria-label="Menu"]', 'menu')
+    await menuOn(page)
     await tap('nav[aria-label="Stage"] .mrow:has-text("Settings")', 'settings')
     if (await tap('.set2__row:has-text("What leaves my phone")', 'privacy')) {
       await look('privacy')
@@ -298,7 +301,7 @@ try {
   await page.getByRole('button', { name: /^open$/i }).click({ timeout: 4000 }).catch(() => {})
   await goToStage(ev, wait, 'plan')
   await wait(2000)
-  await tap('button[aria-label="Menu"]', 'menu')
+  await menuOn(page)
   if (await tap('nav[aria-label="Stage"] .mcard--today', 'home')) {
     await wait(2500)
     await look('home')
@@ -322,7 +325,7 @@ try {
   /* Last in WebKit: the drone view is kept across a reload, so nothing is looked at after it. Back from the detail page and the home to the map first (both are kept too). */
   await tap('.dpage__back', 'back')
   await tap('.home .hbtn--round[aria-label="Open the map"]', 'the map')
-  await tap('button[aria-label="Menu"]:visible', 'menu')
+  await menuOn(page)
   /* The drone view's HUD: the Drone page › Fly it yourself (Batch Flow, Section 5). */
   if (await tap('nav[aria-label="Stage"] .mcard--drone', 'drone page')) {
     if (await tap('.drp__buttons button:has-text("Fly it yourself")', 'drone view')) {
@@ -355,7 +358,7 @@ try {
     await cp.getByRole('button', { name: /^open$/i }).click({ timeout: 4000 }).catch(() => {})
     await goToStage((x) => cp.evaluate(x), (ms) => cp.waitForTimeout(ms), 'plan')
     await cp.waitForTimeout(2000)
-    await cp.locator('button[aria-label="Menu"]').first().click({ timeout: 4000 }).catch(() => {})
+    await menuOn(cp)
     await cp.waitForTimeout(1500)
     const page0 = page
     page = cp

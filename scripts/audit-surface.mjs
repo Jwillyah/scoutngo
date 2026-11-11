@@ -52,7 +52,7 @@
  *      opening the sheet, which is one action with no nesting.
  */
 import { readFileSync } from 'node:fs'
-import { goToStage, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mjs'
+import { goToStage, guardAudit, startWatchdog, APP_ORIGIN, openMenu as openMenuAnywhere } from './preflight.mjs'
 
 guardAudit('surface')
 
@@ -573,15 +573,12 @@ const IN_MENU = ['Plan a shoot', 'Calendar', 'Kit', 'Saved', 'Settings']
 const NOT_IN_MENU = ['Shoot setup', 'Field', 'Plan', 'Viewfinder']
 const STAGE_IDS = ['setup', 'plan', 'field']
 
-const openMenu = () =>
-  ev(`(() => {
-    if (document.querySelector('nav[aria-label="Stage"]')) return 'open'
-    const menu = document.querySelector('button[aria-label="Menu"]')
-    if (!menu) return 'no menu button'
-    if (menu.disabled) return 'menu button disabled'
-    menu.click()
-    return 'open'
-  })()`)
+/* Batch Polish, Section 2: the map's menu is the home's; from the map, its Back goes home first (scripts/preflight.mjs openMenu). */
+const openMenu = async () => {
+  if (await ev(`!!document.querySelector('nav[aria-label="Stage"]')`)) return 'open'
+  const r = await openMenuAnywhere(ev, wait)
+  return r === 'menu' ? 'open' : r
+}
 
 const STAGES = `(() => {
   const labels = [...document.querySelectorAll('nav[aria-label="Stage"] .sidemenu__label')]
@@ -1218,7 +1215,8 @@ const OPENERS = `(() => {
    * a door is "open the menu, pick this item"; the item's own words are its
    * index. Found by the menu button being there, not by a list of cards.
    */
-  if (document.querySelector('button[aria-label="Menu"]')) {
+  /* Batch Polish, Section 2: the menu is reachable from the map by its Back to the home. */
+  if (document.querySelector('button[aria-label="Menu"]') || document.querySelector('.topbar__back')) {
     add('menu', 'Sky', 'sky')
     /* The call sheet's door is a row on Plan's shoot card since Batch H (walked with the .more2__row doors below). */
     add('menu', 'Settings', 'settings')
@@ -1255,7 +1253,7 @@ const click = async (sel, i) => {
     return
   }
   if (sel === 'dronepage') {
-    await ev(`document.querySelector('button[aria-label="Menu"]')?.click()`)
+    await openMenuAnywhere(ev, wait)
     await wait(400)
     await ev(`[...document.querySelectorAll('nav[aria-label="Stage"] button')].find((b) => (b.querySelector('.sidemenu__label')?.textContent ?? '').trim() === 'Drone')?.click()`)
     for (let k = 0; k < 10 && !(await ev(`!!document.querySelector('.drpage')`)); k += 1) await wait(200)
@@ -1266,7 +1264,7 @@ const click = async (sel, i) => {
     return
   }
   if (sel === 'menu') {
-    await ev(`document.querySelector('button[aria-label="Menu"]')?.click()`)
+    await openMenuAnywhere(ev, wait)
     await wait(300)
     await ev(`(() => {
       const hit = [...document.querySelectorAll('nav[aria-label="Stage"] button')]

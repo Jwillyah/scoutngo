@@ -48,4 +48,15 @@ describe('the top bar status', () => {
     }
     expect(html).not.toMatch(/<path[^>]*stroke-width/)
   })
+
+  /* Batch Polish, Section 2: the map's top bar is back · spot · locate (the menu is the home's, the + in the Map sheet's tools). */
+  it('on the map: back, the spot pill and locate; no menu, no +', () => {
+    const html = renderToStaticMarkup(
+      <TopBar onMenu={() => {}} menuOpen={false} pill={<span>Spot</span>} onAdd={() => {}} adding={false} addHidden menuHidden onLocate={() => {}} locating={false} locateNote={null} online onBack={() => {}} />,
+    )
+    expect(html).toContain('aria-label="Back to the home"')
+    expect(html).toContain('Go to where I am')
+    expect(html).not.toContain('aria-label="Menu"')
+    expect(html).not.toContain('topbar__btn--add')
+  })
 })

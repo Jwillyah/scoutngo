@@ -27,7 +27,10 @@ import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { webkit, devices } from './gate/playwright.mjs'
-import { ensureApp, goToStage, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mjs'
+import { ensureApp, goToStage, guardAudit, startWatchdog, APP_ORIGIN, openMenu } from './preflight.mjs'
+
+/* Batch Polish, Section 2: the menu is the home's (and setup's and field's); on the map its Back goes home first (scripts/preflight.mjs openMenu). */
+const menuOn = (pg) => openMenu((x) => pg.evaluate(x), (ms) => pg.waitForTimeout(ms))
 import { shareLink } from '../src/lib/planShare.ts'
 import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
 import { placeKey } from '../src/core/venueName.ts'
@@ -135,7 +138,7 @@ try {
         for (let i = 0; i < 40 && !(await ev(`(document.querySelector('.pill-venue__name')?.textContent ?? '').includes(${JSON.stringify(spot.name)})`)); i += 1) await wait(250)
         await wait(1500)
         take('map', await read('map', '.chips2'))
-        await tap('button[aria-label="Menu"]:visible')
+        await menuOn(page)
         take('menu', await read('menu', 'nav[aria-label="Stage"]'))
         await tap('.mcard--today')
         await wait(1500)
@@ -157,13 +160,13 @@ try {
         await page.goto(url)
         await wait(3000)
         await goToStage(ev, wait, 'plan')
-        await tap('button[aria-label="Menu"]:visible')
+        await menuOn(page)
         await wait(600)
         await tap('nav[aria-label="Stage"] .mcard--weather')
         take('weather', await read('weather', '.wpage'))
         await tap('.wpage .ppage__back')
         await wait(800)
-        await tap('button[aria-label="Menu"]:visible')
+        await menuOn(page)
         await wait(600)
         await tap('nav[aria-label="Stage"] .mcard--sky')
         take('sky', await read('sky', '.spage'))
@@ -192,7 +195,7 @@ try {
           await wait(20_000)
           await goToStage(ev, wait, 'plan')
           for (let i = 0; i < 40 && !(await ev(`(document.querySelector('.pill-venue__name')?.textContent ?? '').includes(${JSON.stringify(spot.name)})`)); i += 1) await wait(250)
-          await tap('button[aria-label="Menu"]:visible')
+          await menuOn(page)
           await wait(3000)
           again.menu = JSON.parse(await ev(READ('nav[aria-label="Stage"]')))?.[k] ?? []
           await tap('.mcard--today')
@@ -263,7 +266,7 @@ if (runs < SPOTS.length * TIMES.length) fail(`only ${runs} of ${SPOTS.length * T
     await tap('.home .hbtn--round[aria-label="Open the map"]')
     await wait(1500)
     labels.map = await ev(`document.querySelector('.pill-venue__name')?.textContent ?? null`)
-    await tap('button[aria-label="Menu"]:visible')
+    await menuOn(page)
     await wait(800)
     labels.menu = await ev(`document.querySelector('.menu__spot .menu__title')?.textContent ?? null`)
     await tap('.mcard--today')
