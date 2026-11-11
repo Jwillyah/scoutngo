@@ -138,7 +138,8 @@ describe('Surf page v2 (Batch N, Section 1)', () => {
   it('says the buoy against the forecast, its name, number and time', () => {
     const t = text(render())
     expect(t).toMatch(/Buoy reads \d+\.\d ft · 8 s/)
-    expect(t).toMatch(/As faces at this beach ≈ \d+\.\d ft · (in line with|bigger than|smaller than) forecast/)
+    expect(t).toMatch(/As faces at this beach ≈ \d+\.\d ft( · (bigger than|smaller than) forecast)?/)
+    expect(t).not.toContain('in line with forecast')
     expect(t).toContain('Cape Henry 44099 · 9:56 AM')
   })
 

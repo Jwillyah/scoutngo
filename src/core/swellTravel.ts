@@ -75,7 +75,8 @@ export function swellTravel(buoy: LatLon, spot: LatLon, periodS: number | null, 
  * the larger of FORECAST_TOLERANCE_M and FORECAST_TOLERANCE_FRACTION of the
  * forecast.
  */
-export const FORECAST_TOLERANCE_M = 0.15
+/* Half a foot (Batch Polish, Section 3: no "bigger or smaller than forecast" for less). */
+export const FORECAST_TOLERANCE_M = 0.5 / 3.28084
 export const FORECAST_TOLERANCE_FRACTION = 0.2
 
 export type VersusForecast = 'smaller' | 'bigger' | 'as-forecast'

@@ -366,7 +366,7 @@ function BuoyCard({ buoy, facing, factor, marine, wind, stats, clock }: { buoy: 
         </p>
         {face === null ? null : (
           <p className="dsurf__small" data-buoy-faces>
-            As faces at this beach ≈ {face.toFixed(1)} ft · {there === null ? 'the forecast did not say for that hour' : `${buoyVsForecast(face, there.centerFt)} forecast`}
+            As faces at this beach ≈ {face.toFixed(1)} ft{there === null ? ' · the forecast did not say for that hour' : buoyVsForecast(face, there.centerFt) === 'in line with' ? '' : ` · ${buoyVsForecast(face, there.centerFt)} forecast`}
           </p>
         )}
         {split.length === 0 ? null : <p className="dsurf__small">{split.map((p) => `${p.name.toLowerCase()} ${partWords(p)}${p.fromDeg === null ? '' : ` ${compass(p.fromDeg)}`}`).join(' · ')}</p>}

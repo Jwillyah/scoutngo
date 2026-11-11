@@ -1,5 +1,5 @@
 import '../styles/home-d.css'
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 /* suncalc 2.0.2 (this repo's): altitude and azimuth in DEGREES, azimuth from north, clockwise (Batch N E10: the moon read "S" when it was treated as radians from south). */
 import { getMoonPosition, getPosition } from 'suncalc'
 import { saneAzimuth } from '../core/sanity.ts'
@@ -24,7 +24,7 @@ import { compass } from '../lib/tideWords.ts'
 import { formatTemperature, windIn, windUnitLabel, type Units } from '../lib/units.ts'
 import { useBriefing, type Briefing, type BriefingDrone, type DayBrief } from '../lib/useBriefing.ts'
 import { useStormPlay } from '../lib/useStormPlay.ts'
-import { useCoast, useMarineAlerts } from '../lib/coastData.ts'
+import { useMarineAlerts } from '../lib/coastData.ts'
 import { NetDebug } from './NetDebug.tsx'
 import { refreshLine, useWeatherRefreshing } from '../lib/useWeatherStatus.ts'
 import { ActivityIcon } from './ActivityIcon.tsx'
@@ -293,9 +293,6 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
   const sunAz = day?.events.sunset === null || day === null ? null : getPosition(day.events.sunset, venue.lat, venue.lon).azimuth
   const cams = which === 'today' ? camsFacingWaterOrSun(venue, sunAz, brief.facing, COAST_CAMS) : []
   const [camsOpen, setCamsOpen] = useState(false)
-  /* Fish or boat (Batch M, Section 2): the NWS marine forecast for the zone, first period, as written; asked only when picked, at a beach. */
-  const fish = order.includes('fish') && brief.facing !== null
-  const marine = useCoast(fish && which === 'today' ? venue : null, null, units.distance === 'ft' ? 'mi' : 'km', fish && which === 'today').coast?.marine ?? null
 
   /* Batch Flow, Section 3: within 3 h of a sunrise or sunset, it is said up top. */
   const soon = which !== 'today' ? null : [day?.events.sunrise ?? null, day?.events.sunset ?? null, brief.days[1]?.events.sunrise ?? null].find((t): t is Date => t !== null && t.getTime() > now.getTime() && t.getTime() - now.getTime() <= 3 * 3_600_000) ?? null
@@ -313,8 +310,33 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
   void noForecast
   void nextGood
 
+  /*
+   * THE HOME NEVER SCROLLS (Batch Polish, Section 3; scripts/audit-home-fit.mjs).
+   * Measured on the page itself after each draw: first tighter (the hero, the
+   * charts and the dial smaller, the tide's turns in its line), then the
+   * lowest-priority card left for the menu, until nothing scrolls. A resize
+   * (rotation, Safari's bars, the text size) starts again.
+   */
+  const nextText = nextWords === null ? (loading ? 'Reading the forecast…' : noForecast ? 'No forecast yet · retrying' : nothingLine(which, nextGood)) : `Next: ${nextWords}`
+  const root = useRef<HTMLDivElement | null>(null)
+  const [fit, setFit] = useState<{ tight: 0 | 1 | 2; drop: number }>({ tight: 0, drop: 0 })
+  useEffect(() => {
+    const again = () => setFit({ tight: 0, drop: 0 })
+    window.addEventListener('resize', again)
+    return () => window.removeEventListener('resize', again)
+  }, [])
+  /* oxlint-disable react/set-state-in-effect -- the fit is measured from the drawn page (a layout read), one step at a time, never back down until a resize */
+  useLayoutEffect(() => {
+    const page = root.current?.closest('.home__page') as HTMLElement | null
+    if (page === null || page === undefined || page.scrollHeight <= page.clientHeight + 1) return
+    if (fit.tight < 2) setFit({ tight: fit.tight === 0 ? 1 : 2, drop: 0 })
+    else if (fit.drop < shown.length - 1) setFit({ tight: 2, drop: fit.drop + 1 })
+  }, [fit, shown.length, brief, layout, nextText, cams.length])
+  /* oxlint-enable react/set-state-in-effect */
+  const cardsShown = fit.drop === 0 ? shown : shown.slice(0, shown.length - fit.drop)
+
   return (
-    <div className={`hday hday--d hday--${layout}`}>
+    <div ref={root} className={`hday hday--d hday--${layout}${fit.tight === 0 ? '' : fit.tight === 1 ? ' hday--snug' : ' hday--snug hday--tight'}`} data-fit={fit.tight === 0 ? 'full' : `${fit.tight === 1 ? 'snug' : 'tight'}${fit.drop === 0 ? '' : `, ${fit.drop} left for the menu`}`}>
       {alert === null ? null : (
         <p className="hday__alert" role="status">
           {alert}
@@ -335,24 +357,24 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
       </div>
       {stormLine === null ? null : <p className="hday__storm">{stormLine}</p>}
 
-      {marine === null ? null : (
-        <button type="button" className="hmarine" onClick={() => onOpen('tides')}>
-          <b>NWS marine · {marine.period}:</b> {marine.text}
-        </button>
-      )}
+      {/* Batch Polish, Section 3: no routine NWS marine text on the home; an advisory or warning is the alert line above. */}
 
       <div className={`hcards hcards--${layout}`}>
-        {shown.map((c) => (
+        {cardsShown.map((c) => (
           <Card key={c} kind={c} layout={layout} which={which} day={day} brief={brief} units={units} drone={drone} now={now} venue={venue} timeZone={timeZone} onOpen={onOpen} surf={surf} obs={obs} />
         ))}
       </div>
-      <p className="hnext">{nextWords === null ? (loading ? 'Reading the forecast…' : noForecast ? 'No forecast yet · retrying' : nothingLine(which, nextGood)) : <>Next: {nextWords}</>}</p>
-
-      {cams.length === 0 ? null : (
+      {/* Batch Polish, Section 3: the "Next:" line rides in the Cams row (one row, always on screen); on its own where there are no cams. */}
+      {cams.length === 0 ? (
+        <p className="hnext">{nextText}</p>
+      ) : (
         /* Batch N A4: the row opens "Cams near <spot>"; the cams themselves are links out (docs/cams.md). */
-        <button type="button" className="hcams" onClick={() => setCamsOpen(true)}>
+        <button type="button" className="hcams hcams--next" onClick={() => setCamsOpen(true)}>
           <CamGlyph />
-          <span className="hcams__words">Cams · {cams.map((c) => beachName(c.cam.name)).join(', ')}</span>
+          <span className="hcams__text">
+            <span className="hnext hnext--in">{nextText}</span>
+            <span className="hcams__words">Cams · {cams.map((c) => beachName(c.cam.name)).join(', ')}</span>
+          </span>
           <span aria-hidden="true">›</span>
         </button>
       )}

@@ -154,7 +154,8 @@ function ForecastLine({ nearest, marine, marineFailed, timeZone, units }: { near
     line =
       v === null
         ? `The forecast did not say for ${formatClock(nearest.at, timeZone, units.clock)}`
-        : `${v === 'smaller' ? 'Running smaller than forecast' : v === 'bigger' ? 'Running bigger than forecast' : 'Running about as forecast'} · ${nearest.buoy.id} ${waveHeight(nearest.waveM, units)}, forecast ${waveHeight(f, units)}`
+        : /* Batch Polish, Section 3: under half a foot apart, the numbers and no verdict. */
+          `${v === 'smaller' ? 'Running smaller than forecast · ' : v === 'bigger' ? 'Running bigger than forecast · ' : ''}${nearest.buoy.id} ${waveHeight(nearest.waveM, units)}, forecast ${waveHeight(f, units)}`
   }
   return <p className="dhead__line dbuoy__vs">{line}</p>
 }

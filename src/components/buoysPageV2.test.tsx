@@ -70,7 +70,9 @@ describe('the Buoys page v2', () => {
   })
 
   it('against the forecast: as forecast, smaller, bigger, and what it says when it cannot compare', () => {
-    expect(render()).toContain('Running about as forecast · 44099 2.3 ft, forecast 2.3 ft')
+    /* Batch Polish, Section 3: under half a foot apart, the numbers and no verdict. */
+    expect(render()).toContain('44099 2.3 ft, forecast 2.3 ft')
+    expect(render()).not.toMatch(/about as forecast|in line with/)
     expect(render({ marine: marine(1.2) })).toContain('Running smaller than forecast · 44099 2.3 ft, forecast 3.9 ft')
     expect(render({ marine: marine(0.3) })).toContain('Running bigger than forecast')
     expect(render({ marine: 'inland' })).toContain('No sea forecast here to compare')

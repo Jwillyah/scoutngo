@@ -53,6 +53,8 @@ export const AUDITS = [
   { name: 'special light', script: 'audit-special.mjs', summary: /SPECIAL LIGHT PROBLEMS/ },
   { name: 'briefing', script: 'audit-briefing.mjs', summary: /BRIEFING PROBLEMS/ },
   { name: 'pages', script: 'audit-pages.mjs', summary: /PAGES PROBLEMS/ },
+  /* Batch Polish, Section 3: the home never scrolls, in five looks and three numbers of activities. */
+  { name: 'home fit', script: 'audit-home-fit.mjs', summary: /HOME FIT PROBLEMS/ },
   { name: 'menu', script: 'audit-menu.mjs', summary: /MENU PROBLEMS/ },
   { name: 'one number', script: 'audit-one-number.mjs', summary: /ONE NUMBER PROBLEMS/ },
   { name: 'style', script: 'audit-style.mjs', summary: /STYLE PROBLEMS/ },

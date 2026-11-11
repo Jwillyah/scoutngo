@@ -357,3 +357,86 @@
 .hcard--moon.hcard--small .hcard__line {
   white-space: nowrap;
 }
+
+/* The first, milder step (Batch Polish, Section 3): the hero and the charts a little smaller. */
+.hday--snug .hwx--d .hwx__temp {
+  font-size: 72px;
+}
+.hday--snug .hcards--few .hcard__chart,
+.hday--snug .hcard__chart--tide {
+  height: 52px;
+}
+.hday--snug .hcards--few .hcard__dial {
+  width: 80px;
+  height: 80px;
+}
+
+/*
+ * THE HOME NEVER SCROLLS (Batch Polish, Section 3): the second step when the
+ * page is taller than the screen (Home.tsx measures it). The hero, the
+ * charts and the dial smaller, the gaps closer, the tide's turns left to its
+ * line. Still too tall, the lowest-priority card is left for the menu.
+ */
+.hday--tight {
+  gap: 6px;
+}
+.hday--tight .hwx--d .hwx__temp {
+  font-size: 60px;
+}
+.hday--tight .hcard {
+  padding: 8px 14px;
+  gap: 2px;
+}
+.hday--tight .hcard__chart,
+.hday--tight .hcards--few .hcard__chart {
+  height: 40px;
+}
+.hday--tight .hcard__chart--tide {
+  height: 40px;
+}
+.hday--tight .hcard__dial,
+.hday--tight .hcards--few .hcard__dial,
+.hday--tight .hcards--many .hcard__dial {
+  width: 56px;
+  height: 56px;
+}
+.hday--tight .hcard__turns {
+  display: none;
+}
+
+/* The "Next:" line rides in the Cams row: two short lines, one tap. */
+.hcams--next {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+}
+.hcams__text {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+.hnext--in {
+  text-align: left;
+}
+.hcams__text .hcams__words {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Inside the Cams row the row's own glass carries the contrast the "Next:" pill gave it on the open sky. */
+.home .hcams .hnext--in {
+  width: auto;
+  margin-inline: 0;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  font-weight: 600;
+}
+/* The merged row on the card glass the "Next:" pill used (4.5:1 over the golden sky, Batch QA, Section 6). */
+.home .hcams--next {
+  background: var(--d-card);
+}
