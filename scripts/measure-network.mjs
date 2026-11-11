@@ -15,6 +15,10 @@
  *                "Updated", "ago", "not answered"), or still reading after
  *                15 s ("Reading", "Asking", "…" alone).
  *   counts       requests per app open, and per page opened after it
+ *   load         (Batch Beach, Section 4) the home's first useful paint on
+ *                slow 3G cold (nothing cached), and the JavaScript fetched
+ *                before it, gzipped; --only-load runs only the counts, the
+ *                paints and the size
  *   paint        the home's first useful paint on slow 3G with the forecast
  *                cached (a second open): the temperature drawn as a number
  *   size         the built app: every file, and the JavaScript gzipped
@@ -38,12 +42,13 @@ const opt = (name, dflt) => {
   return i < 0 ? dflt : args[i + 1]
 }
 const MAP_MIN = Number(opt('--map-min', '10'))
+const ONLY_LOAD = args.includes('--only-load')
 const OUT = opt('--out', `measurements/${new Date().toISOString().slice(0, 10)}-network.md`)
 const PORT = 5206
 const NOW = new Date('2026-11-02T15:30:00Z')
 const SPOT = { at: { lat: 36.8435575, lon: -75.9713104 }, name: { key: 'x', name: 'Virginia Beach Fishing Pier' }, shootKind: 'sunset', platform: 'both', reachMeters: 2000 }
 
-const server = spawn(process.execPath, ['scripts/gate/server.mjs'], { env: { ...process.env, SCOUTNGO_GATE_DIST: DIST, SCOUTNGO_GATE_APP_PORT: String(PORT), SCOUTNGO_GATE_PROXY_PORT: String(PORT + 1) }, stdio: 'ignore' })
+const server = spawn(process.execPath, ['scripts/gate/server.mjs'], { env: { ...process.env, SCOUTNGO_GATE_GZIP: '1', SCOUTNGO_GATE_DIST: DIST, SCOUTNGO_GATE_APP_PORT: String(PORT), SCOUTNGO_GATE_PROXY_PORT: String(PORT + 1) }, stdio: 'ignore' })
 await new Promise((r) => setTimeout(r, 2500))
 const APP = `http://127.0.0.1:${PORT}`
 const browser = await chromium.launch({ executablePath: findChrome(), proxy: { server: `http://127.0.0.1:${PORT + 1}`, bypass: '127.0.0.1' } })
@@ -57,6 +62,13 @@ const fresh = async () => {
   const ctx = await browser.newContext({ ...devices['Pixel 7'], viewport: { width: 412, height: 915 }, serviceWorkers: 'allow' })
   await ctx.addInitScript((spot) => {
     try {
+      /*
+       * Batch Beach, Section 4: a phone's open, the home first. Under automation
+       * the app opens the setup map instead (src/lib/briefingOpen.ts, webdriver),
+       * which is what 2026-11-10-network.md counted as "one app open": the setup
+       * screen's imagery, not the home's. As scripts/measure-cellular.mjs does.
+       */
+      Object.defineProperty(Navigator.prototype, 'webdriver', { get: () => false })
       localStorage.setItem('scoutngo.landing.v1', 'true')
       localStorage.setItem('scoutngo.nearMe.v1', 'off')
       if (!localStorage.getItem('scoutngo.lastSetup.v1')) localStorage.setItem('scoutngo.lastSetup.v1', JSON.stringify(spot))
@@ -133,10 +145,11 @@ const cdpThrottle = async (s, on) => {
 
 say(`# Network, offline and speed`)
 say('')
-say(`Run ${new Date().toISOString()} · \`node scripts/measure-network.mjs ${DIST} --map-min ${MAP_MIN}\` · Chromium (Pixel 7) 412 x 915 · the VB pier saved · page clock ${NOW.toISOString()} · the gate's server and fixture proxy (scripts/gate/server.mjs), nothing live.`)
+say(`Run ${new Date().toISOString()} · \`node scripts/measure-network.mjs ${DIST} --map-min ${MAP_MIN}${ONLY_LOAD ? ' --only-load' : ''}\` · Chromium (Pixel 7) 412 x 915 · the VB pier saved · page clock ${NOW.toISOString()} · the gate's server and fixture proxy (scripts/gate/server.mjs), the app's files gzipped as the host sends them (SCOUTNGO_GATE_GZIP), nothing live.`)
 say('')
 const ONLY_MEMORY = args.includes('--only-memory')
 if (!ONLY_MEMORY) {
+if (!ONLY_LOAD) {
 say('## Every page under each condition')
 say('')
 say('BLANK: under 40 characters of text. STILL READING: a "Reading…" or a lone "…" after 15 s. "said its state": a status line (retrying, didn\'t load, offline, updated, ago).')
@@ -162,6 +175,7 @@ notOk += await walk('LibreWXR down', { before: (s) => s.ctx.route(/librewxr/, (r
 notOk += await walk('offline after one good load', { warm: true, before: (s) => s.ctx.setOffline(true) })
 say('')
 say(`${notOk} screen(s) blank or still reading across the conditions.`)
+}
 
 /* Requests per open and per page. */
 say('')
@@ -178,6 +192,42 @@ say('')
     await go(s.page, s.wait)
     say(`- ${screen}: ${s.reqs.slice(n0).filter((u) => !u.startsWith(`${APP}/assets`)).length} more`)
   }
+  await s.ctx.close()
+}
+
+/* Batch Beach, Section 4: the first useful paint on slow 3G, cold, and the JavaScript asked for before it. */
+const tempDrawn = (page) => page.evaluate(() => /\d+°/.test(document.querySelector('.home .hwx__temp')?.textContent ?? '')).catch(() => false)
+say('')
+say('## The home on slow 3G, cold (nothing cached)')
+say('')
+{
+  const s = await fresh()
+  await cdpThrottle(s, true)
+  const js = []
+  s.page.on('request', (r) => {
+    const u = r.url()
+    if (u.startsWith(`${APP}/`) && u.endsWith('.js')) js.push(u)
+  })
+  const t0 = Date.now()
+  await s.page.goto(`${APP}/`, { waitUntil: 'commit', timeout: 90_000 }).catch(() => {})
+  let ms = null
+  for (let i = 0; i < 600; i += 1) {
+    if (await tempDrawn(s.page)) {
+      ms = Date.now() - t0
+      break
+    }
+    await s.wait(100)
+  }
+  const before = [...new Set(js)]
+  const gz = before.reduce((a, u) => {
+    try {
+      return a + gzipSync(readFileSync(join(DIST, new URL(u).pathname))).length
+    } catch {
+      return a
+    }
+  }, 0)
+  say(`- the temperature drawn as a number: ${ms === null ? 'not within 60 s' : `${(ms / 1000).toFixed(1)} s`} after the open (target under 8 s)`)
+  say(`- JavaScript asked for before it: ${before.length} files, ${(gz / 1000).toFixed(0)} KB gzipped (target under 250 KB)`)
   await s.ctx.close()
 }
 
@@ -227,6 +277,7 @@ say('')
 
 }
 
+if (!ONLY_LOAD) {
 /* Memory after the map in use. */
 say('')
 say('## Memory')
@@ -256,6 +307,7 @@ say('')
   const after = await heap()
   say(`- the JS heap: ${start.toFixed(0)} MB on the map, ${after.toFixed(0)} MB after ${MAP_MIN} min of panning (${step} drags)`)
   await s.ctx.close()
+}
 }
 
 await browser.close()

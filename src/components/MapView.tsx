@@ -197,8 +197,9 @@ function vectorBasePalette(dark: boolean) {
 export const ESRI_NATIVE_MAX_ZOOM = 19
 
 
-export const ESRI_ATTRIBUTION =
-  'Tiles by Esri. Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
+/* Batch Beach, Section 4: in src/lib/mapConstants.ts, so a screen without the map need not import this file. */
+import { BUILDINGS_MIN_ZOOM, ESRI_ATTRIBUTION } from '../lib/mapConstants.ts'
+export { BUILDINGS_MIN_ZOOM, ESRI_ATTRIBUTION }
 
 /*
  * THE REFERENCE OVERLAYS: place names and roads, drawn ON TOP of the imagery.
@@ -314,14 +315,6 @@ function flatBuildings(instance: maplibregl.Map): void {
   show(BUILDING_EDGE_LAYER, flat)
 }
 
-/**
- * The zoom buildings start at.
- *
- * Below this a city is a grey smear and the Overpass query covers a box too
- * big to answer, so the layer stays empty rather than asking for something it
- * cannot draw.
- */
-export const BUILDINGS_MIN_ZOOM = 15
 
 /**
  * Put the map into the terrain state an image was taken in, and give back the

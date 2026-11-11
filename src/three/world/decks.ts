@@ -37,6 +37,20 @@ function inRing(ring: readonly { x: number; z: number }[], x: number, z: number)
   return inside
 }
 
+/*
+ * Batch Beach, Section 4 (the 3D console's "mergeGeometries() failed"): a
+ * box and a piling are indexed, an extruded pier outline is not, and three
+ * merges only alike geometries, returning null (and the deck not drawn)
+ * otherwise. Every one non-indexed, with only the attributes all of them
+ * have.
+ */
+export function mergeable(geoms: readonly THREE.BufferGeometry[]): THREE.BufferGeometry[] {
+  const flat = geoms.map((g) => (g.index === null ? g : g.toNonIndexed()))
+  const names = Object.keys(flat[0]?.attributes ?? {}).filter((n) => flat.every((g) => g.getAttribute(n) !== undefined))
+  for (const g of flat) for (const n of Object.keys(g.attributes)) if (!names.includes(n)) g.deleteAttribute(n)
+  return flat
+}
+
 export function createDecks(frame: Frame, onChange: () => void): Decks {
   const group = new THREE.Group()
   group.name = 'decks'
@@ -49,8 +63,9 @@ export function createDecks(frame: Frame, onChange: () => void): Decks {
 
   const add = (geoms: THREE.BufferGeometry[], material: THREE.Material) => {
     if (geoms.length === 0) return
-    const merged = mergeGeometries(geoms, false)
-    for (const g of geoms) g.dispose()
+    const ready = mergeable(geoms)
+    const merged = mergeGeometries(ready, false)
+    for (const g of new Set([...geoms, ...ready])) g.dispose()
     if (merged === null) return
     const mesh = new THREE.Mesh(merged, material)
     mesh.castShadow = true

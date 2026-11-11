@@ -12,7 +12,6 @@ import { destinationPoint, distanceMeters, type LatLon } from '../core/geo.ts'
 import { SURF_SPOTS } from '../data/surfSpots.ts'
 import type { TilePoint } from '../core/oceanMask.ts'
 import { boxAround, tileAt, tilesInBox } from './tileRange.ts'
-import { loadVectorTile, oceanFeatures, vectorExtent } from './vectorTiles.ts'
 
 export const COAST_ZOOM = 12
 
@@ -57,6 +56,8 @@ function inRings(rings: TilePoint[][], px: number, py: number): boolean {
 /** A sea test over the tiles around `venue`, or null when the tiles cannot be had. */
 export async function seaTestAround(venue: LatLon, radiusM = CIRCLE_M + 200, zoom = COAST_ZOOM): Promise<((at: LatLon) => boolean) | null> {
   const ids = tilesInBox(boxAround(venue, radiusM), zoom)
+  /* Batch Beach, Section 4: the tile reader (and its protobuf parser) is asked for here, not with the home. */
+  const { loadVectorTile, oceanFeatures, vectorExtent } = await import('./vectorTiles.ts')
   const loaded: Loaded[] = []
   for (const id of ids) {
     const tile = await loadVectorTile({ z: zoom, x: id.x, y: id.y })

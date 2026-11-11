@@ -29,6 +29,7 @@ import { createServer as createTls } from 'node:https'
 import { existsSync, mkdtempSync, readFileSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { extname, join, normalize } from 'node:path'
+import { gzipSync } from 'node:zlib'
 import { answer } from './fixtures.mjs'
 
 export const GATE_APP_PORT = Number(process.env.SCOUTNGO_GATE_APP_PORT ?? 5180)
@@ -118,12 +119,20 @@ const app = createServer(async (req, res) => {
     }
     file = join(DIST, 'index.html')
   }
+  /*
+   * Batch Beach, Section 4: as the host sends them, gzipped, when
+   * SCOUTNGO_GATE_GZIP=1 (scripts/measure-network.mjs only: a slow-3G paint
+   * measured with the files uncompressed counts bytes no phone downloads).
+   * The audits run without it, as before.
+   */
+  const gzip = process.env.SCOUTNGO_GATE_GZIP === '1' && /\bgzip\b/.test(String(req.headers['accept-encoding'] ?? '')) && /\.(js|css|html|json|svg)$/.test(file)
   res.writeHead(200, {
     'content-type': TYPES[extname(file)] ?? 'application/octet-stream',
     'cache-control': url.pathname.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache',
     'access-control-allow-origin': '*',
+    ...(gzip ? { 'content-encoding': 'gzip', vary: 'accept-encoding' } : {}),
   })
-  res.end(readFileSync(file))
+  res.end(gzip ? gzipSync(readFileSync(file)) : readFileSync(file))
 })
 
 /* ------------------------------------------------------------------ the proxy */

@@ -1,7 +1,7 @@
 import { HOSTS } from '../lib/hosts.ts'
 import { buildLabel } from '../lib/build.ts'
 import { COLOR_RULE } from '../core/colorRole.ts'
-import { ESRI_ATTRIBUTION } from './MapView.tsx'
+import { ESRI_ATTRIBUTION } from '../lib/mapConstants.ts'
 
 /**
  * /how — THE PAGE BEHIND THE LINK.

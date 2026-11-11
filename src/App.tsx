@@ -4,7 +4,7 @@ import { placeKeyOf, resolveReach } from './lib/placeMemory.ts'
 import { showSurf, SURF_COAST_M, useSurfSetting } from './lib/surfSetting.ts'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { type ConeMode } from './lib/coneMode.ts'
-import { type MapHandle } from './components/MapView.tsx'
+import type { MapHandle } from './components/MapView.tsx'
 import { FieldMode } from './components/FieldMode.tsx'
 import { PlanMode } from './components/PlanMode.tsx'
 import { NewBuildNotice } from './components/NewBuildNotice.tsx'
@@ -108,7 +108,6 @@ import { useVenueCache } from './lib/useVenueCache.ts'
 import { PrivacyPage } from './components/PrivacyPage.tsx'
 import { atPrivacy, closePrivacy } from './lib/privacyRoute.ts'
 import { buildScoutFile, saveScoutFile, scoutFilename, type ReadFile } from './lib/scoutFile.ts'
-import { runSuggest } from './lib/suggestRun.ts'
 import { readShareHash, SHARE_PREFIX } from './lib/planShare.ts'
 import { Viewfinder, ViewfinderNeedsPlace } from './components/Viewfinder.tsx'
 import { Menu, type MenuRows, type MenuTarget } from './components/Menu.tsx'
@@ -129,7 +128,6 @@ import { backToNow, openingScrub } from './lib/backToNow.ts'
 import { retrying } from './lib/retrying.ts'
 import { planForNow } from './lib/planForNow.ts'
 import { useNow } from './lib/useNow.ts'
-import { clearPlace, loadPlace } from './lib/place.ts'
 import { pathToMenuItem, type MenuItem } from './lib/menu.ts'
 import { placeOf, shownGroups, usePlaceGroups } from './lib/placeGroups.ts'
 import {
@@ -628,11 +626,16 @@ function App() {
    * buildings and trees the 3D view draws. Saved on the phone once fetched.
    */
   useEffect(() => {
-    if (centre === null) {
-      clearPlace()
-      return
+    /* Batch Polish, Section 1: the place's code (buildings, the tile reader) is its own download, not the home's. */
+    let live = true
+    void import('./lib/place.ts').then((m) => {
+      if (!live) return
+      if (centre === null) m.clearPlace()
+      else void m.loadPlace(centre)
+    })
+    return () => {
+      live = false
     }
-    void loadPlace(centre)
   }, [centre])
 
   /*
@@ -1433,7 +1436,14 @@ function App() {
    * while the home needed the bandwidth for its forecasts). The map mounts,
    * and the venue saves itself, once the map has been opened this session.
    */
-  const venueCache = useVenueCache(mapSeen ? centre : null, reachMeters, venueNameLine)
+  /*
+   * Batch Polish, Section 1: "opened" is the map on screen, not the home
+   * closed: a Surf page opened from the home started this save (about 1,500
+   * imagery tiles) under a page that shows none. PlanMode says when its map
+   * is shown.
+   */
+  const [mapShown, setMapShown] = useState(false)
+  const venueCache = useVenueCache(mapShown ? centre : null, reachMeters, venueNameLine)
   /* The spot switcher over Today (Batch I, Section 1). */
   const [spotPickOpen, setSpotPickOpen] = useState(false)
   /* The first run asks only on a bare launch: a shared plan's link, or ?calibration=1, brings its own place. */
@@ -2008,6 +2018,8 @@ function App() {
     setSiteNote(null)
     setTerrainNote(null)
     setGeneration({ status: 'working', stage: 'capture' })
+    /* Batch Polish, Section 1: the suggester (and the FAA grid it reads, 947 KB of source) is its own download, asked for when it runs. */
+    const { runSuggest } = await import('./lib/suggestRun.ts')
     const outcome = await runSuggest({
       subject: aim,
       reach: { centre, radiusMeters: reachMeters },
@@ -2205,7 +2217,8 @@ function App() {
 
       {privacyOpen ? <PrivacyPage onClose={closePrivacy} /> : null}
       <NewBuildNotice check={newBuild} />
-      {mode === 'setup' ? (
+      {/* Batch Polish, Section 1: setup (and its map) mounts when the home is not over it; its state is this component's. */}
+      {mode === 'setup' && !briefOpen ? (
         <div className="mode-setup">
           <SetupMode
             venue={venue}
@@ -2496,6 +2509,8 @@ function App() {
           onMenu={() => setMenuOpen(true)}
           menuOpen={menuOpen}
           cardRequest={cardRequest}
+          covered={briefOpen}
+          onMapShown={() => setMapShown(true)}
           onViewfinder={() => setViewfinderOpen(true)}
           bag={kit}
           /* Batch MAP2, Section 3: the place pill finds a spot (search v2); the + is Shoot setup. */

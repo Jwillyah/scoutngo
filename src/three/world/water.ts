@@ -127,11 +127,12 @@ void main() {
 
 const shoreVertex = /* glsl */ `
 #include <fog_pars_vertex>
-attribute float out;
+/* Batch Beach, Section 4: not "out", a reserved word in GLSL 3.00 (WebGL2): the shader failed to compile and the water drew nothing, 256 errors on the console. */
+attribute float outward;
 varying float vOut;
 varying vec3 vWorld;
 void main() {
-  vOut = out;
+  vOut = outward;
   vec4 w = modelMatrix * vec4(position, 1.0);
   vWorld = w.xyz;
   vec4 mvPosition = viewMatrix * w;
@@ -287,7 +288,7 @@ export function createWater(frame: Frame, onChange: () => void) {
     }
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
-    geo.setAttribute('out', new THREE.Float32BufferAttribute(outs, 1))
+    geo.setAttribute('outward', new THREE.Float32BufferAttribute(outs, 1))
     const mesh = new THREE.Mesh(geo, shoreMaterial)
     mesh.position.y = level + 0.05
     mesh.userData.drop = -0.05

@@ -379,6 +379,10 @@ interface PlanModeProps {
   /** Batch H: opens the Viewfinder (App's), from the Preflight card. */
   onViewfinder?: () => void
   cardRequest: { kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'buoys' | 'wind' | 'terrain' | 'preflight' | 'calendar' | 'fly'; skyTab?: SkyTab; tick: number }
+  /** Batch Polish, Section 1: the home is over the map. */
+  covered?: boolean
+  /** Called once the map is on screen (nothing over it); the venue's offline save waits for it. */
+  onMapShown?: () => void
   /** The backup nudge (src/lib/backup.ts): "Back up? Last backup: never" in the status line, with Back up and Not now. */
   backupReminder?: { line: string; onBackup: () => void; onDismiss: () => void } | null
   /** Coast or inland, and which of Water and Land are offered (src/lib/placeGroups.ts). */
@@ -472,6 +476,9 @@ interface PlanModeProps {
  * permanent lens chip row that is now one control. See the comments at each
  * site.
  */
+/* The card requests that open a full page (or the calendar) over the map. */
+const PAGE_REQUESTS: ReadonlySet<string> = new Set(['exposure', 'tides', 'surf', 'buoys', 'wind', 'terrain', 'settings', 'about', 'calendar'])
+
 /* Set once the moon's one-time hint has been shown. */
 const MOON_HINT_KEY = 'scoutngo.moonHint.v1'
 
@@ -584,6 +591,8 @@ export function PlanMode({
   onMenu,
   menuOpen,
   cardRequest,
+  covered = false,
+  onMapShown,
   onViewfinder,
   place = 'unknown',
   backupReminder = null,
@@ -874,6 +883,18 @@ export function PlanMode({
   }
   /* Sky › Calendar, a page of its own (CalendarPage.tsx). ?calendar=1 opens it, for the overflow audit. */
   const [calendarOpen, setCalendarOpen] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('calendar') === '1')
+  /*
+   * Batch Polish, Section 1: is the map on screen yet: not under the home, a
+   * page or the calendar, and not with a page asked for from the home that
+   * arrives a tick after the mount (the card request below). It mounts as
+   * before; only the venue's offline save waits for this.
+   */
+  const [pagePending, setPagePending] = useState(() => cardRequest.tick > 0 && PAGE_REQUESTS.has(cardRequest.kind))
+  if (pagePending && (page !== null || calendarOpen)) setPagePending(false)
+  const mapOnScreen = !covered && !pagePending && page === null && !calendarOpen
+  useEffect(() => {
+    if (mapOnScreen) onMapShown?.()
+  }, [mapOnScreen, onMapShown])
   /* Batch Beach, Section 5: the page the map was opened from, which the map's Back returns to; null: Back is the home. */
   const [mapFrom, setMapFrom] = useState<MapFrom>(null)
   /* Compare a photo (src/components/ComparePhoto.tsx). ?compare=1 opens it, for scripts/measure-compare.mjs. */
