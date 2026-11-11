@@ -24,17 +24,36 @@ export function shadowRings(hull: readonly GeoJSON.Position[], footprint: readon
 import { destinationPoint, toPosition, type LatLon } from '../core/geo.ts'
 import type { ShadowMap } from '../core/shadowMap.ts'
 
+/*
+ * REAL SHADOWS, THE DRAWING (Batch Polish, Section 5). Under LOW_SUN_DEG the
+ * buildings' shadows run so long they have dissolved into the dusk: none
+ * drawn (the subject's own line stays). The tint follows the light: warm
+ * brown low in the sky, cool grey high (shadowTint). The shapes themselves
+ * are shadowMap's, unchanged: they also answer "is this point in shadow".
+ */
+export const LOW_SUN_DEG = 2
+const WARM = [58, 38, 24] as const
+const COOL = [28, 34, 48] as const
+/** The shadow's colour at this sun height: warm at and under 10°, cool grey at and over 30°, between in between. */
+export function shadowTint(altitudeDeg: number): string {
+  const t = Math.min(1, Math.max(0, (altitudeDeg - 10) / 20))
+  const c = WARM.map((w, i) => Math.round(w + (COOL[i] - w) * t))
+  return `rgb(${c[0]}, ${c[1]}, ${c[2]})`
+}
+
 export function shadowCollection(
   map: ShadowMap | null,
   subject: { at: LatLon; lengthMeters: number; bearing: number } | null,
+  sunAltitudeDeg: number | null = null,
 ): GeoJSON.FeatureCollection {
   const features: GeoJSON.Feature[] = []
-  if (map !== null && map.status === 'ok') {
+  const tint = shadowTint(sunAltitudeDeg ?? 45)
+  if (map !== null && map.status === 'ok' && (sunAltitudeDeg === null || sunAltitudeDeg >= LOW_SUN_DEG)) {
     for (const shadow of map.shadows) {
       if (shadow.hull.length < 3) continue
       features.push({
         type: 'Feature',
-        properties: { kind: 'building', id: shadow.id },
+        properties: { kind: 'building', id: shadow.id, tint },
         geometry: { type: 'Polygon', coordinates: shadowRings(shadow.hull, shadow.footprint) },
       })
     }
@@ -42,7 +61,7 @@ export function shadowCollection(
   if (subject !== null) {
     features.push({
       type: 'Feature',
-      properties: { kind: 'subject' },
+      properties: { kind: 'subject', tint },
       geometry: {
         type: 'LineString',
         coordinates: [toPosition(subject.at), toPosition(destinationPoint(subject.at, subject.bearing, subject.lengthMeters))],

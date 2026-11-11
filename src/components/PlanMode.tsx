@@ -1283,8 +1283,8 @@ export function PlanMode({
   const shadowFeatures = useMemo(() => {
     if (!showSun || venue === null || scrubbedAt === null) return null
     const person = lightNow(scrubbedAt, venue.lat, venue.lon).personShadow
-    return shadowCollection(shadows, person === null ? null : { at: venue, lengthMeters: person.lengthMeters, bearing: person.bearing })
-  }, [showSun, venue, scrubbedAt, shadows])
+    return shadowCollection(shadows, person === null ? null : { at: venue, lengthMeters: person.lengthMeters, bearing: person.bearing }, sun?.altitude ?? null)
+  }, [showSun, venue, scrubbedAt, shadows, sun])
   /* With the sun down, when the shadows come back: the next sunrise, as a clock time at the venue. */
   const sunriseWords = useMemo(() => {
     if (shadows === null || 'shadows' in shadows || venue === null || scrubbedAt === null || venueWindow === null) return null

@@ -1874,7 +1874,8 @@ export function MapView({
         source: SHADOW_SOURCE,
         minzoom: SHADOWS_MIN_ZOOM,
         filter: ['==', ['get', 'kind'], 'building'],
-        paint: { 'fill-color': readToken('--black', '#0a090c', container.current), 'fill-opacity': 0.45 },
+        /* Batch Polish, Section 5: the tint follows the light (src/lib/shadowLayer.ts shadowTint); no outline. */
+        paint: { 'fill-color': ['coalesce', ['get', 'tint'], readToken('--black', '#0a090c', container.current)], 'fill-opacity': 0.45, 'fill-antialias': false },
       })
       instance.addLayer({
         id: 'shadow-subject',
@@ -1882,7 +1883,7 @@ export function MapView({
         source: SHADOW_SOURCE,
         minzoom: SHADOWS_MIN_ZOOM,
         filter: ['==', ['get', 'kind'], 'subject'],
-        paint: { 'line-color': readToken('--black', '#0a090c', container.current), 'line-width': 6, 'line-opacity': 0.6 },
+        paint: { 'line-color': ['coalesce', ['get', 'tint'], readToken('--black', '#0a090c', container.current)], 'line-width': 6, 'line-opacity': 0.6, 'line-blur': 2 },
       })
 
       /*
