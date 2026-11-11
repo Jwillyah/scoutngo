@@ -763,7 +763,7 @@ function WeekView({ brief, order, timeZone, units, now, venue }: { brief: Briefi
     /* Batch QA, Section 0B: the day's weather, for a week with nothing else to say (weather only): the strongest wind and the hours of rain, from the briefing's own hours. */
     const rainH = wx === null ? null : Array.from({ length: 24 }, (_, i) => hourlyAt(wx, 'precipitation', new Date(d.start.getTime() + i * 3_600_000 + 1_800_000))).filter((mm) => mm !== null && mm >= 0.1).length
     const weather = [d.windMaxKt === null ? null : `${Math.round(d.windMaxKt)} kt`, rainH === null ? null : rainH === 0 ? 'dry' : `rain ${rainH} h`].filter((x) => x !== null).join(' · ')
-    return { d, name: d.index === 0 ? 'Today' : day(d.start), cond, hi: temps.length === 0 ? null : Math.max(...temps), lo: temps.length === 0 ? null : Math.min(...temps), worth, surfWords: worth === null ? (surfDay?.words ?? null) : null, weather: weather === '' ? null : weather, call: d.reads.sunset?.call ?? null, guess: d.index >= WEEK_SURE_DAYS }
+    return { d, name: d.index === 0 ? 'Today' : day(d.start), cond, hi: temps.length === 0 ? null : Math.max(...temps), lo: temps.length === 0 ? null : Math.min(...temps), worth, surfWords: worth === null ? (surfDay?.words ?? null) : null, surfFact: surfDay === null ? null : weekSurfFact(d.surf), weather: weather === '' ? null : weather, call: d.reads.sunset?.call ?? null, guess: d.index >= WEEK_SURE_DAYS }
   })
   const head = weekHeadline(rows.filter((r) => r.d.index > 0 && r.worth !== null).map((r) => ({ day: r.name, what: (r.worth as Activity) === 'shoot' ? 'sunset' : (r.worth as string) })))
   void now
@@ -776,10 +776,12 @@ function WeekView({ brief, order, timeZone, units, now, venue }: { brief: Briefi
           <li key={r.d.iso} className={`hweek__row${r.guess ? ' hweek__row--guess' : ''}`}>
             <span className="hweek__day">{r.name}</span>
             {r.cond === null ? <span className="hweek__icon">—</span> : <SkyIconSvg icon={r.cond.icon} className="hweek__icon" />}
-            <span className="hweek__worth">{r.worth !== null ? <><ActivityIcon activity={r.worth} className="hweek__act" /> {WORTH_WORD[r.worth]}</> : r.surfWords !== null ? <span className="hweek__range num">{r.surfWords}</span> : r.weather !== null ? <span className="hweek__range num">{r.weather}</span> : '—'}</span>
+            {/* Batch Polish, Section 4: a day's worth carries its fact ("Drone · 6 kt max"), never the word alone. */}
+            <span className="hweek__worth">{r.worth !== null ? <><ActivityIcon activity={r.worth} className="hweek__act" /> {WORTH_WORD[r.worth]}{worthFact(r.worth, r.d, r.surfFact) === null ? '' : ` · ${worthFact(r.worth, r.d, r.surfFact)}`}</> : r.surfWords !== null ? <span className="hweek__range num">{r.surfWords}</span> : r.weather !== null ? <span className="hweek__range num">{r.weather}</span> : '—'}</span>
+            {/* Batch Polish, Section 4: the high and the low on one line, "64° · 45°". */}
             <span className="hweek__t">
               {formatTemperature(r.hi, units.temperature).replace(/°[FC]$/, '°')}
-              {r.lo === null ? null : <span className="hweek__lo"> {formatTemperature(r.lo, units.temperature).replace(/°[FC]$/, '°')}</span>}
+              {r.lo === null ? null : <span className="hweek__lo"> · {formatTemperature(r.lo, units.temperature).replace(/°[FC]$/, '°')}</span>}
             </span>
             {/* Sunset and sunrise calls are Shoot's (Batch QA, Section 0B): none in a week with Shoot not picked. */}
             {order.includes('shoot') ? <span className={`hweek__call hweek__call--${(r.call ?? 'none').toLowerCase()}`}>{r.call ?? '—'}</span> : null}
@@ -792,6 +794,22 @@ function WeekView({ brief, order, timeZone, units, now, venue }: { brief: Briefi
 }
 
 const WORTH_WORD: Record<Activity, string> = { surf: 'Surf', shoot: 'Sunset', drone: 'Drone', fish: 'Calm', weather: 'Dry' }
+
+/** The fact behind a day's worth (Batch Polish, Section 4): the day's strongest wind for the drone and calm water, the surf's range, the call for the light. */
+function worthFact(worth: Activity, d: DayBrief, surfFact: string | null): string | null {
+  if (worth === 'drone' || worth === 'fish') return d.windMaxKt === null ? null : `${Math.round(d.windMaxKt)} kt max`
+  if (worth === 'surf') return surfFact
+  if (worth === 'shoot') return d.reads.sunset?.call === 'Go' ? 'sunset Go' : d.reads.sunrise?.call === 'Go' ? 'sunrise Go' : null
+  return null
+}
+
+/** The surf day's faces as a range, "2–3 ft" (whole feet, the day's hours). */
+function weekSurfFact(bars: readonly { faceFt: number }[]): string | null {
+  if (bars.length === 0) return null
+  const lo = Math.floor(Math.min(...bars.map((b) => b.faceFt)))
+  const hi = Math.ceil(Math.max(...bars.map((b) => b.faceFt)))
+  return lo === hi ? `${hi} ft` : `${lo}–${hi} ft`
+}
 
 /** What a day is worth, in the user's order: Fun or Firing surf (weekSurf: never past day 3), a Go sunset or sunrise, a calm day at 400 ft, wind under 10 kt, dry. */
 function worthOf(d: DayBrief, order: readonly Activity[], surfOnDay: boolean): Activity | null {

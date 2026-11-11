@@ -6,7 +6,6 @@ import { colorWords, conditionOf, rainLine, sideWords, type CardKind } from '../
 import { menuCardList, type MenuCard } from '../core/menuCards.ts'
 import { formatClock } from '../core/timezone.ts'
 import { hourlyAt } from '../lib/tideSheetData.ts'
-import { compass } from '../lib/tideWords.ts'
 import { useBriefing } from '../lib/useBriefing.ts'
 import { useStationObs } from '../lib/useStationObs.ts'
 import { useSurfNow } from '../lib/useSurfNow.ts'
@@ -147,10 +146,9 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
     <div className="menu menu--d" role="presentation">
       <nav className="menu__panel sidemenu__panel" aria-label="Stage">
         <div className="menu__head">
-          {/* Batch Flow, Section 8: the spot once, with the weather now; a tap is the home. */}
+          {/* Batch Flow, Section 8: the spot once; a tap is the home. Batch Polish, Section 4: no weather line under it (the Weather card says it). */}
           <button type="button" ref={first} className="menu__spot mcard--today sidemenu__item" onClick={() => pick('today')} aria-label={`${placeShort}: the home`}>
             <span className="menu__title sidemenu__label">{placeShort}</span>
-            <span className="menu__where num">{loading ? 'reading the forecast…' : [temp(at('temperature_2m', now)), cond?.word.toLowerCase() ?? null, wind === null ? null : `${wind.fromDeg === null ? '' : `${compass(wind.fromDeg)} `}${Math.round(windIn(wind.mps, units.wind) ?? 0)} ${windUnitLabel(units.wind)}`].filter((x) => x !== null && x !== '—').join(' · ')}</span>
           </button>
           <button type="button" className="menu__x sidemenu__scrim" aria-label="Close the menu" onClick={onClose}>
             ×
@@ -171,7 +169,8 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
         </div>
 
         <div className="menu__rows">
-          {!photoTools ? null : <Row label="Plan a shoot" value="Shoot" icon={<PlanIcon />} onTap={() => pick('setup')} />}
+          {/* Batch Polish, Section 4: Plan a shoot and Settings, just the arrow; Kit its counts, Saved its spots. */}
+          {!photoTools ? null : <Row label="Plan a shoot" value="" icon={<PlanIcon />} onTap={() => pick('setup')} />}
           <Row label="Calendar" value="the month" icon={<SavedIcon />} onTap={() => pick('calendar')} />
           <Row label="Kit" value={rows.kit} icon={<KitIcon />} onTap={() => pick('kit')} />
           <Row label="Saved" value={rows.saved} icon={<SavedIcon />} onTap={() => pick('saved')} />

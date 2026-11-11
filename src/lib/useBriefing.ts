@@ -292,7 +292,7 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
           const wh = wind[i]
           /* The Surf page's shape (src/core/surf.ts): Clean is light or offshore; with no direction, never Messy. */
           const shape = wh.mps === null ? null : surfShape(wh.mps, wh.fromDeg ?? 0, wh.fromDeg === null ? null : facing)
-          surf.push({ at: h, faceFt: sh.estimate.faceFt, clean: shape === 'Clean', shape })
+          surf.push({ at: h, faceFt: sh.estimate.faceFt, clean: shape === 'Clean', shape, swellFt: sh.swellFt, windWaveFt: sh.windWaveFt })
           if (periodAtMax === null || sh.estimate.faceFt >= Math.max(...surf.map((b) => b.faceFt))) periodAtMax = sh.periodS
         }
       }

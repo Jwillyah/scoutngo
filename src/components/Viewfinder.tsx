@@ -16,7 +16,7 @@ import {
 } from '../core/arProjection.ts'
 import { computeFOV, SENSORS } from '../core/fov.ts'
 import { bearingBetween, distanceMeters, type LatLon } from '../core/geo.ts'
-import { resolveSensor, type KitProfile } from '../core/kit.ts'
+import { bagFirst, resolveSensor, type KitProfile } from '../core/kit.ts'
 import { normalizeBearing } from '../core/sun.ts'
 import { formatClock, formatHour } from '../core/timezone.ts'
 import type { KitSelection } from '../lib/kitSelection.ts'
@@ -173,7 +173,7 @@ export function Viewfinder({ venue, pins, profile, bag, timeZone, units, preset 
   }, [phase.kind])
   const fov = visibleFov(size.w, size.h, phoneFov)
 
-  const lenses = profile.lenses.filter((l) => bag.lensIds.includes(l.id))
+  const lenses = bagFirst(profile.lenses, bag.lensIds)
   const bodies = profile.bodies.filter((b) => bag.bodyIds.includes(b.id))
   const [lensId, setLensId] = useState<string | null>(preset?.lensId ?? lenses[0]?.id ?? null)
   const lens = lenses.find((l) => l.id === lensId) ?? null

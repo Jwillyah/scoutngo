@@ -142,6 +142,14 @@ describe('a week day’s surf (Batch QA, Section 0B: "Surf" on every day while t
     expect(weekSurf([{ faceFt: 1.8, shape: 'Bumpy' }, { faceFt: 3.1, shape: 'Bumpy' }], 1)).toEqual({ on: false, words: '2–3 ft' })
     expect(weekSurf([], 1)).toEqual({ on: false, words: null })
   })
+  it('a range made by wind waves says so (Batch Polish, Section 4: VB 14 Nov, swell 1.9 ft, wind waves 3.2 ft)', async () => {
+    const { weekSurf } = await import('../src/core/homeDay.ts')
+    const windy = [{ faceFt: 2.6, shape: 'Messy' as const, swellFt: 1.5, windWaveFt: 2.1 }, { faceFt: 3.7, shape: 'Messy' as const, swellFt: 1.9, windWaveFt: 3.2 }]
+    expect(weekSurf(windy, 4).words).toBe('3–4 ft · wind sea · low odds')
+    const swell = [{ faceFt: 2.6, shape: 'Bumpy' as const, swellFt: 2.4, windWaveFt: 0.6 }, { faceFt: 3.7, shape: 'Bumpy' as const, swellFt: 3.5, windWaveFt: 0.8 }]
+    expect(weekSurf(swell, 4).words).toBe('3–4 ft · low odds')
+    expect(weekSurf([{ faceFt: 3.7, shape: 'Bumpy' }], 4).words).toBe('4–5 ft · low odds')
+  })
   it('days 4-7: never Fun, the range and the odds', async () => {
     const { weekSurf } = await import('../src/core/homeDay.ts')
     const big = [{ faceFt: 3, shape: 'Clean' as const }, { faceFt: 3.5, shape: 'Clean' as const }]

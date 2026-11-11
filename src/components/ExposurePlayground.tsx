@@ -1,7 +1,7 @@
 import { SceneBackground, SceneFigure } from './PlaygroundScene.tsx'
 import { useId, useMemo, useState, type CSSProperties } from 'react'
 import { METER_RIGHT_STOPS } from '../core/exposure.ts'
-import { effectiveSensor, type KitProfile } from '../core/kit.ts'
+import { bagFirst, effectiveSensor, type KitProfile } from '../core/kit.ts'
 import {
   APERTURE_STOPS,
   DISTANCE_RANGE,
@@ -52,10 +52,10 @@ const nearest = (stops: readonly number[], value: number) =>
 export function ExposurePlayground({ kit, bag }: ExposurePlaygroundProps) {
   const uid = useId().replace(/:/g, '')
   const bodies = kit.bodies.filter((b) => bag.bodyIds.includes(b.id) && b.role !== 'drone')
-  const lenses = kit.lenses.filter((l) => bag.lensIds.includes(l.id))
+  const lenses = bagFirst(kit.lenses, bag.lensIds)
   /* The photo's own camera when it is in the bag, else the first; the longest lens, which is what the photo was shot on. */
   const [bodyId, setBodyId] = useState(() => (bodies.find((b) => b.id === 'a7iv') ?? bodies[0])?.id ?? null)
-  const [lensId, setLensId] = useState(() => [...lenses].sort((a, b) => b.maxFocalLength - a.maxFocalLength)[0]?.id ?? null)
+  const [lensId, setLensId] = useState(() => [...(lenses.some((l) => bag.lensIds.includes(l.id)) ? lenses.filter((l) => bag.lensIds.includes(l.id)) : lenses)].sort((a, b) => b.maxFocalLength - a.maxFocalLength)[0]?.id ?? null)
   const body = bodies.find((b) => b.id === bodyId) ?? bodies[0] ?? null
   const lens = lenses.find((l) => l.id === lensId) ?? lenses[0] ?? null
 

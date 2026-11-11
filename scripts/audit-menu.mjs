@@ -105,7 +105,8 @@ try {
     /* The header: the spot, then temperature · condition · wind. */
     console.log(`  header: ${JSON.stringify(m.spot)} / ${JSON.stringify(m.where)}`)
     if (!m.spot) fail(`${label}: the header has no spot`)
-    if (!/^-?\d+° · [a-z][a-z ]* · ([NESW]{1,3} )?\d+ (kt|mph|km\/h|m\/s)$/.test(m.where ?? '')) fail(`${label}: the header reads ${JSON.stringify(m.where)}, not temperature · condition · wind`)
+    /* Batch Polish, Section 4: the header is the spot; the weather is the Weather card's, not said twice. */
+    if (m.where !== undefined && m.where !== null) fail(`${label}: the header repeats the weather (${JSON.stringify(m.where)})`)
     /* The spot once (9 Nov: "Virginia Beach" in the header and on the Water card's chip): the beach chip only when it is another place. */
     const spot = (m.spot ?? '').trim()
     if (m.chip !== null && spot !== '' && m.chip.trim() === spot) fail(`${label}: the Water card's chip repeats the spot (${JSON.stringify(m.chip)})`)

@@ -133,6 +133,19 @@ export interface KitProfile {
   style: ShootingStyle
 }
 
+/** Batch Polish, Section 4: every lens picker offers the whole kit, the bag's lenses first (it offered the bag's only). */
+export function bagFirst<T extends { id: string }>(all: readonly T[], bagIds: readonly string[]): T[] {
+  return [...all.filter((x) => bagIds.includes(x.id)), ...all.filter((x) => !bagIds.includes(x.id))]
+}
+
+/** Batch Polish, Section 4: the menu's Kit row, counts and the drone: "1 camera · 3 lenses · Air 3S". */
+export function kitCounts(profile: KitProfile, droneIds: readonly string[]): string {
+  const n = (k: number, one: string, many: string) => `${k} ${k === 1 ? one : many}`
+  const drone = profile.drones.find((d) => droneIds.includes(d.id)) ?? profile.drones[0] ?? null
+  const parts = [profile.bodies.length > 0 ? n(profile.bodies.length, 'camera', 'cameras') : null, profile.lenses.length > 0 ? n(profile.lenses.length, 'lens', 'lenses') : null, drone === null ? null : drone.name.replace(/^DJI /, '')]
+  return parts.filter((x): x is string => x !== null).join(' · ') || 'Nothing in the bag'
+}
+
 /**
  * Default kit profile, taken from the gear section of docs/brief.md.
  * Plain data so it can become a user editable profile later.

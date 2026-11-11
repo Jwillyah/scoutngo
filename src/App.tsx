@@ -21,7 +21,7 @@ import {
   showsPlatform,
   type PlatformFilter,
 } from './core/platformFilter.ts'
-import { DEFAULT_KIT, type KitProfile } from './core/kit.ts'
+import { DEFAULT_KIT, kitCounts, type KitProfile } from './core/kit.ts'
 import { defaultOpticFor } from './core/optics.ts'
 import { sharedOptic } from './core/mapLabel.ts'
 import { skyLayerOn, type MapPanel } from './core/mapPanel.ts'
@@ -105,8 +105,6 @@ import { atPrivacy, closePrivacy } from './lib/privacyRoute.ts'
 import { buildScoutFile, saveScoutFile, scoutFilename, type ReadFile } from './lib/scoutFile.ts'
 import { readShareHash, SHARE_PREFIX } from './lib/planShare.ts'
 import { Menu, type MenuRows, type MenuTarget } from './components/Menu.tsx'
-import { lastBackup } from './lib/backup.ts'
-import { PACK_STORAGE_KEY } from './lib/venuePack.ts'
 import { Home, type HomeTarget } from './components/Home.tsx'
 import { OPEN_RADAR_EVENT, OPEN_SKY_EVENT, OPEN_WEATHER_EVENT } from './lib/pageEvents.ts'
 import { homeOrder, readActivities, showsDrone, showsPhotoTools, useActivities } from './lib/activities.ts'
@@ -1644,26 +1642,16 @@ function App() {
   useEffect(() => {
     if (menuOpen) setMenuNow(new Date())
   }, [menuOpen])
-  const menuRows = useMemo<MenuRows>(() => {
-    const body = kitProfile.bodies.find((b) => kit.bodyIds.includes(b.id))?.name ?? null
-    const lens = kitProfile.lenses.find((l) => kit.lensIds.includes(l.id))?.name ?? null
-    let packs = 0
-    let backup: Date | null = null
-    try {
-      const raw = JSON.parse(localStorage.getItem(PACK_STORAGE_KEY) ?? '[]') as unknown
-      packs = Array.isArray(raw) ? raw.length : 0
-      backup = lastBackup(localStorage)
-    } catch {
-      /* Not readable here: said as none. */
-    }
-    const days = backup === null ? null : Math.floor((menuNow.getTime() - backup.getTime()) / 86_400_000)
-    return {
+  /* Batch Polish, Section 4: Kit its counts, Saved its spots, Settings just the arrow (the backup's age is in Settings itself). */
+  const menuRows = useMemo<MenuRows>(
+    () => ({
       plan: 'Set up a shoot',
-      kit: [body, lens].filter((x) => x !== null).join(' · ') || 'Nothing in the bag',
-      saved: `${spots.length} ${spots.length === 1 ? 'spot' : 'spots'} · ${packs} offline`,
-      settings: days === null ? 'backup never' : days === 0 ? 'backup today' : `backup ${days} ${days === 1 ? 'day' : 'days'} ago`,
-    }
-  }, [kitProfile, kit.bodyIds, kit.lensIds, spots.length, menuNow])
+      kit: kitCounts(kitProfile, kit.droneIds),
+      saved: `${spots.length} ${spots.length === 1 ? 'spot' : 'spots'}`,
+      settings: '',
+    }),
+    [kitProfile, kit.droneIds, spots.length],
+  )
 
   /* The dock's Back to now: this minute at the venue, moving the shoot day to today if it is not. See src/lib/backToNow.ts. */
   const onBackToNow = useCallback(() => {

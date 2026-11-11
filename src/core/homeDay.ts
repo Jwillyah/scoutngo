@@ -164,12 +164,21 @@ export function nothingLine(day: 'today' | 'tomorrow', nextGood: { day: string; 
  */
 export const WEEK_SURE_DAYS = 3
 export type SurfOdds = 'good odds' | 'some odds' | 'low odds'
-export function weekSurf(bars: readonly { faceFt: number; shape: SurfShape | null }[], dayIndex: number): { on: boolean; words: string | null } {
+/*
+ * Batch Polish, Section 4: a day's range follows the model's whole sea, which
+ * on a windy day is mostly wind waves (VB, 14 Nov in the 11 Nov forecast:
+ * "3–4 ft" with the swell at 1.9 ft and the wind waves at 3.2 ft). The range
+ * is not widened past the model; it says which made it, "· wind sea", when
+ * the wind waves outran the swell at the day's biggest hour.
+ */
+export function weekSurf(bars: readonly { faceFt: number; shape: SurfShape | null; swellFt?: number | null; windWaveFt?: number | null }[], dayIndex: number): { on: boolean; words: string | null } {
   if (bars.length === 0) return { on: false, words: null }
   const lo = Math.min(...bars.map((b) => b.faceFt))
   const hi = Math.max(...bars.map((b) => b.faceFt))
   const [a, b] = rangeEnds(lo, hi)
-  const range = `${a}–${b} ft`
+  const top = bars.reduce((m, x) => (x.faceFt > m.faceFt ? x : m))
+  const windSea = top.windWaveFt != null && top.swellFt != null && top.windWaveFt > top.swellFt
+  const range = `${a}–${b} ft${windSea ? ' · wind sea' : ''}`
   const onShare = bars.filter((x) => surfOn(surfTag(x.faceFt, x.shape))).length / bars.length
   if (dayIndex >= WEEK_SURE_DAYS) return { on: false, words: `${range} · ${onShare >= 0.5 ? 'good odds' : onShare > 0 ? 'some odds' : 'low odds'}` }
   const peak = bars.reduce((m, x) => (x.faceFt > m.faceFt ? x : m))

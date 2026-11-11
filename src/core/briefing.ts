@@ -207,6 +207,9 @@ export interface SurfBar {
   clean: boolean
   /** The wind's shape on the water at that hour (src/core/surf.ts surfShape); null with no wind forecast. */
   shape: SurfShape | null
+  /** Batch Polish, Section 4: the hour's swell and wind waves, feet (null where the forecast did not say), so a day can say which made its range. */
+  swellFt?: number | null
+  windWaveFt?: number | null
 }
 
 

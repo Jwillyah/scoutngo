@@ -440,3 +440,18 @@
 .home .hcams--next {
   background: var(--d-card);
 }
+
+/* Batch Polish, Section 4: the week fills the page rather than leaving half of it empty; the rows share the height evenly. */
+.home .hweek {
+  flex: 1;
+  min-height: 0;
+}
+.home .hweek__rows {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+.home .hweek__row {
+  flex: 1 1 0;
+}
