@@ -14,7 +14,7 @@ import { COAST_CAMS } from '../data/coastCams.ts'
 import { homeOrder, primaryFor, useActivities } from '../lib/activities.ts'
 import { seaNow, surfLine, useSurfNow, type SurfNow } from '../lib/useSurfNow.ts'
 import { rangeSizeWords } from '../core/surfReads.ts'
-import { droneLadder, firstFun, homeCardsShown, homeLayout, nextLine, nightSpans, surfPath, tideAt, tideCurve, type HomeLayout } from '../core/homeCards.ts'
+import { droneLadder, firstFun, homeCardsShown, homeLayout, nextLine, nightSpans, surfChartMarks, surfPath, tideAt, tideCurve, type HomeLayout } from '../core/homeCards.ts'
 import { beachName } from '../lib/surfBeach.ts'
 import { gustWords, windAt, windWords } from '../lib/windNow.ts'
 import { useStationObs } from '../lib/useStationObs.ts'
@@ -532,6 +532,7 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
     tag = fun === null ? (band?.tag ?? null) : fun === 'now' ? `${band?.tag === 'Firing' ? 'Firing' : 'Fun'} now` : `Fun ${short(fun)}`
     tagGood = fun !== null
     const path = surfPath(pts, from, 24, CHART)
+    const marks = surfChartMarks(pts, from, 24, timeZone)
     const nights = nightSpans(from, 24, brief.days.map((d) => d.events.sunset).filter((x): x is Date => x !== null), brief.days.map((d) => d.events.sunrise).filter((x): x is Date => x !== null))
     /* The parts, at the hour (S7 look), in the few-cards layout: the Surf page's own (seaNow). */
     const parts = layout === 'few' && which === 'today' ? seaNow(surf.sea, now).parts.slice(0, 2) : []
@@ -547,7 +548,12 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
           </span>
         )}
         {path === null ? null : (
+          /* Batch Polish, Section 3: readable: whole-foot gridlines labelled on the right, the time ticks, the peak and its height, "steady all day"; the words are text over the drawing, never stretched with it. */
+          <span className="hcard__chartbox">
           <svg className="hcard__chart hcard__chart--surf" viewBox={`0 0 ${CHART.w} ${CHART.h}`} preserveAspectRatio="none" aria-hidden="true">
+            {(marks?.grid ?? []).map((g) => (
+              <line key={g.ft} x1="0" x2={CHART.w} y1={g.y * CHART.h} y2={g.y * CHART.h} className="hcard__grid" />
+            ))}
             <defs>
               <linearGradient id="surfFill" x1="0" x2="0" y1="0" y2="1">
                 <stop offset="0" stopColor="var(--d-surf)" stopOpacity="0.55" />
@@ -561,6 +567,30 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
             <path d={path.line} className="hcard__line hcard__line--surf" />
             <line x1="1" x2="1" y1="0" y2={CHART.h} className="hcard__now" />
           </svg>
+          {marks === null ? null : (
+            <>
+              {marks.grid.map((g, i) => (
+                <span key={g.ft} className={`hcard__gl${i === 1 ? ' hcard__gl--mid' : ''}`} style={{ top: `${g.y * 100}%` }}>
+                  {g.ft}
+                </span>
+              ))}
+              {marks.peak === null ? null : (
+                <span className="hcard__peak" style={{ left: `${marks.peak.x * 100}%`, top: `${marks.peak.y * 100}%` }}>
+                  <span className="hcard__peakdot" />
+                  <span className="hcard__peaklabel">{marks.peak.ft.toFixed(1)} ft</span>
+                </span>
+              )}
+              {marks.steady ? <span className="hcard__steady">steady all day</span> : null}
+              <span className="hcard__ticks" aria-hidden="true">
+                {marks.ticks.map((t) => (
+                  <span key={t.label} style={{ left: `${t.x * 100}%` }}>
+                    {t.label}
+                  </span>
+                ))}
+              </span>
+            </>
+          )}
+          </span>
         )}
       </>
     )

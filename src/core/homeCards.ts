@@ -16,6 +16,7 @@
  *            6:30 AM"
  */
 import { cardList, type Activity, type CardKind } from './homeDay.ts'
+import { wallClock } from './timezone.ts'
 
 export type HomeLayout = 'few' | 'many'
 
@@ -89,6 +90,46 @@ export function surfPath(points: readonly SurfPoint[], from: Date, hours: number
   const xy = inside.map((p) => [Math.max(0, Math.min(box.w, ((p.at.getTime() - t0) / span) * box.w)), box.h - (p.ft / top) * box.h] as const)
   const line = xy.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)} ${y.toFixed(1)}`).join(' ')
   return { line, fill: `${line} L${xy[xy.length - 1][0].toFixed(1)} ${box.h} L${xy[0][0].toFixed(1)} ${box.h} Z` }
+}
+
+/*
+ * THE SURF CHART, READABLE (Batch Polish, Section 3). Where its labels go,
+ * as shares of the chart (0-1, y from the top), so the page draws them as
+ * text over the stretched drawing: gridlines at whole feet, labelled on the
+ * right; the time ticks (now, then 6a, noon, 6p in the venue's zone); the
+ * peak with its height; "steady" when the faces move less than STEADY_FT.
+ * The scale starts at 0-4 ft and grows for a bigger day (surfPath's own).
+ */
+export const STEADY_FT = 0.5
+
+export interface SurfChartMarks {
+  grid: { ft: number; y: number }[]
+  ticks: { label: string; x: number }[]
+  peak: { x: number; y: number; ft: number } | null
+  steady: boolean
+}
+
+export function surfChartMarks(points: readonly SurfPoint[], from: Date, hours: number, timeZone: string): SurfChartMarks | null {
+  const t0 = from.getTime()
+  const span = hours * 3_600_000
+  const inside = points.filter((p) => p.at.getTime() >= t0 - 3_600_000 && p.at.getTime() <= t0 + span + 3_600_000)
+  if (inside.length < 2) return null
+  const top = Math.max(4, ...inside.map((p) => p.ft)) * 1.15
+  const grid = [1, 2, 3, 4, 6, 8, 10, 12].filter((ft) => ft < top * 0.92).slice(0, 3).map((ft) => ({ ft, y: 1 - ft / top }))
+  const hourAt = (t: number) => wallClock(new Date(t), timeZone)?.hour ?? -1
+  const ticks: SurfChartMarks['ticks'] = [{ label: 'now', x: 0 }]
+  for (let t = Math.ceil(t0 / 3_600_000) * 3_600_000; t <= t0 + span; t += 3_600_000) {
+    const h = hourAt(t)
+    const label = h === 6 ? '6a' : h === 12 ? 'noon' : h === 18 ? '6p' : null
+    const x = (t - t0) / span
+    /* Clear of "now" and of the right edge: 12 px words at a card's width. */
+    if (label !== null && x > 0.12 && x < 0.92) ticks.push({ label, x })
+  }
+  const inWindow = inside.filter((p) => p.at.getTime() >= t0 && p.at.getTime() <= t0 + span)
+  const best = inWindow.length === 0 ? null : inWindow.reduce((m, p) => (p.ft > m.ft ? p : m))
+  const fts = inWindow.map((p) => p.ft)
+  const steady = fts.length > 1 && Math.max(...fts) - Math.min(...fts) < STEADY_FT
+  return { grid, ticks, peak: best === null || steady ? null : { x: (best.at.getTime() - t0) / span, y: 1 - best.ft / top, ft: best.ft }, steady }
 }
 
 /** The night inside the window, as shares of its width: from sunset (or the start) to sunrise (or the end). */
