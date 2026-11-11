@@ -1,6 +1,6 @@
-import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import App from '../App.tsx'
+import { renderAll } from '../test/renderAll.tsx'
 
 /*
  * A COLD START OFFERS THE PLACE QUESTION, NOT AN ANSWER.
@@ -10,7 +10,11 @@ import App from '../App.tsx'
  * car park. It now opens wide, with search and one "Use my location" button.
  */
 describe('cold start', () => {
-  const html = renderToStaticMarkup(<App />)
+  /* Batch Polish, Section 1: the lazy screens waited for (src/test/renderAll.tsx). */
+  let html = ''
+  beforeAll(async () => {
+    html = await renderAll(<App />)
+  })
 
   /* The locate button is the top bar's arrow now, there on every screen. */
   it('offers to go to where you are', () => {

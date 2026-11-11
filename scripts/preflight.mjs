@@ -510,7 +510,18 @@ export async function goToStage(ev, wait, stage) {
       if (arrived === 'plan') break
     }
     if (arrived !== 'plan') throw new PreflightError(`${here === 'home' ? "tapped the home's Map" : here === 'there' ? 'on the map' : 'went to /plan'} and the shell is "${arrived}" (src/App.tsx follows /plan; src/components/Home.tsx has the Map button)`)
-    return arrived
+    /*
+     * Batch Polish, Section 1: the shell's class says "plan" before the plan
+     * screen is drawn when that screen is its own download (Beach Section 4:
+     * the class at 15 ms, the sheet and the map at 340 ms, and every audit
+     * after this read an empty screen). Arrived is the sheet and the map's
+     * canvas on screen, up to 10 s.
+     */
+    for (let i = 0; i < 50; i += 1) {
+      if (await ev(`!!document.querySelector('.mode-plan .sheet') && !!document.querySelector('.mode-plan .maplibregl-canvas')`)) return arrived
+      await wait(200)
+    }
+    throw new PreflightError('the shell says "plan" and in 10 s no sheet and map canvas were drawn (src/components/PlanMode.tsx)')
   }
 
   /* A first load on a cold dev server can take a while: wait for the top bar, up to 15 s. */
@@ -576,6 +587,11 @@ export async function goToStage(ev, wait, stage) {
  * the sheet's own word for where it is.
  */
 export async function setSheet(ev, wait, want) {
+  /* Batch Polish, Section 1: a sheet still being drawn (its screen a download of its own) is waited for, up to 5 s, before "no sheet". */
+  for (let i = 0; i < 25; i += 1) {
+    if (await ev(`!!document.querySelector('.sheet')`)) break
+    await wait(200)
+  }
   for (let i = 0; i < 4; i += 1) {
     const now = await ev(`document.querySelector('.sheet')?.dataset.detent ?? null`)
     if (now === want) return want

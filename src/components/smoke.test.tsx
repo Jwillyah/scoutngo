@@ -1,7 +1,8 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { NumeralsProvider } from '../lib/numerals.tsx'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import App from '../App.tsx'
+import { renderAll } from '../test/renderAll.tsx'
 import { CALIBRATION_VENUE, resolveWindow } from '../lib/venue.ts'
 import { SunReadout } from './SunReadout.tsx'
 import { ReachSlider } from './ReachSlider.tsx'
@@ -16,7 +17,11 @@ import { ReachSlider } from './ReachSlider.tsx'
  * one fixed instant everywhere. See src/core/timezone.ts.
  */
 describe('render smoke', () => {
-  const html = renderToStaticMarkup(<App />)
+  /* Batch Polish, Section 1: the lazy screens waited for (src/test/renderAll.tsx). */
+  let html = ''
+  beforeAll(async () => {
+    html = await renderAll(<App />)
+  })
 
   it('renders the shell', () => {
     expect(html).toContain('class="shell shell--setup"')
