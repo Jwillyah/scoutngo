@@ -64,7 +64,7 @@ const NOT_BACKED_UP = new Set([
 ])
 /** What counts as something to lose, for the nudge. */
 /* Not the kit: the app writes its default kit on first open, and a default is nothing to lose. */
-const WORTH_KEEPING = ['scoutngo.spots.v1', 'scoutngo.fireLog.v1', 'scoutngo.truthLog.v1', 'scoutngo.marks.v1', 'scoutngo.kitAmendments.v1']
+const WORTH_KEEPING = ['scoutngo.spots.v1', 'scoutngo.fireLog.v1', 'scoutngo.truthLog.v1', 'scoutngo.marks.v1', 'scoutngo.kitAmendments.v1', 'scoutngo.fieldReports.v1']
 
 type Store = Pick<Storage, 'getItem' | 'setItem' | 'removeItem' | 'key' | 'length'>
 

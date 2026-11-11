@@ -12,8 +12,9 @@
  * Coordinates are rounded to 2 decimals by the fetchers; the buoy is picked
  * on the phone. Nothing about the user leaves it.
  */
-import { useEffect, useState } from 'react'
-import { beachFactorAt } from '../core/beachFactor.ts'
+import { useEffect, useMemo, useState } from 'react'
+import { factorHere } from './beachFactorHere.ts'
+import { readReports, REPORTS_CHANGED } from './fieldReportStore.ts'
 import type { LatLon } from '../core/geo.ts'
 import { latestBuoyWaves, type BuoyReading } from './buoy.ts'
 import { coastFacing } from './coast.ts'
@@ -93,6 +94,14 @@ export function useSurfSea(spot: LatLon | null): SurfSea {
     }
   }, [key, lat, lon, epoch])
 
+  /* The spot's factor: your reports here, else the region's; read again when a report is saved. */
+  const [reports, setReports] = useState(readReports)
+  useEffect(() => {
+    const on = () => setReports(readReports())
+    window.addEventListener(REPORTS_CHANGED, on)
+    return () => window.removeEventListener(REPORTS_CHANGED, on)
+  }, [])
+  const factor = useMemo(() => (lat === null || lon === null ? undefined : factorHere({ lat, lon }, reports)), [lat, lon, reports])
   const v = sea !== null && sea.key === key ? sea.v : EMPTY
-  return lat === null || lon === null ? v : { ...v, factor: beachFactorAt({ lat, lon }) }
+  return useMemo(() => (factor === undefined ? v : { ...v, factor }), [v, factor])
 }

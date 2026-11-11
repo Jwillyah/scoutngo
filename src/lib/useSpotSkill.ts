@@ -12,7 +12,7 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import type { LatLon } from '../core/geo.ts'
-import { beachFactorAt } from '../core/beachFactor.ts'
+import { factorHere } from './beachFactorHere.ts'
 import { BEACH_CAP } from '../core/surf.ts'
 import { buoyFaceFt, hourOf, HOUR_MS, spotKey, spotStats, type SkillSample, type SpotStats } from '../core/spotSkill.ts'
 import { latestBuoyWaves, type BuoyReading } from './buoy.ts'
@@ -87,7 +87,7 @@ export function useSpotSkill(spot: LatLon | null, given: SpotSkillGiven = {}): S
         if (marine === null) return
         if (buoy.status === 'none' && buoy.reason === "The buoy didn't load.") return
         const now = Date.now()
-        const book = withSample(readSkillBook(), key, sampleFrom(marine, buoy, facing, now, beachFactorAt(at)), now)
+        const book = withSample(readSkillBook(), key, sampleFrom(marine, buoy, facing, now, factorHere(at)), now)
         writeSkillBook(book)
         if (live) setTaken(now)
       } catch {

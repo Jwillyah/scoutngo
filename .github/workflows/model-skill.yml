@@ -8,6 +8,9 @@
 # and public archived forecasts (Open-Meteo previous runs). Nothing about any
 # user is read, and nothing is sent anywhere but those public services.
 #
+# Batch Beach, Section 3: also the nightly surf record per public spot
+# (scripts/skill/build-surf.ts), into public/skill/v1/surf/.
+#
 # It commits ONLY public/skill/. A failed source stops the run with nothing
 # written (the script is never partial), and yesterday's file stays.
 name: model-skill
@@ -37,6 +40,12 @@ jobs:
       - run: npm ci
       - name: Build the file into public/
         run: node scripts/skill/build-shared.ts skill/midatl.json public
+      # Batch Beach, Section 3: the surf record per public spot (our range by
+      # lead day, the buoy's face, yesterday's proxy), into public/skill/v1/surf/.
+      # Never partial: a failure writes nothing, and the skill file still ships.
+      - name: Build the surf record into public/
+        continue-on-error: true
+        run: node scripts/skill/build-surf.ts public
       - name: Commit public/skill only
         run: |
           git config user.name "github-actions[bot]"

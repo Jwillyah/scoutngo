@@ -1,6 +1,6 @@
 import '../styles/surf.css'
 import type { LatLon } from '../core/geo.ts'
-import { beachFactorAt } from '../core/beachFactor.ts'
+import { factorHere } from '../lib/beachFactorHere.ts'
 import { buoyFaceFt } from '../core/spotSkill.ts'
 import { buoyParts, partWords } from '../core/surfReads.ts'
 import { placePills } from '../core/pillPlace.ts'
@@ -166,7 +166,7 @@ function ForecastLine({ nearest, marine, marineFailed, timeZone, units }: { near
  * function and facing: one buoy→beach number in the app.
  */
 function FacesLine({ venue, nearest, facing, units }: { venue: LatLon; nearest: OkBuoy; facing: number | null; units: Units }) {
-  const ft = facing === null ? null : buoyFaceFt({ waveM: nearest.waveM, periodS: nearest.periodS, fromDeg: nearest.fromDeg }, facing, beachFactorAt(venue))
+  const ft = facing === null ? null : buoyFaceFt({ waveM: nearest.waveM, periodS: nearest.periodS, fromDeg: nearest.fromDeg }, facing, factorHere(venue))
   if (ft === null) return null
   return (
     <p className="dhead__line dbuoy__vs" data-buoy-faces>

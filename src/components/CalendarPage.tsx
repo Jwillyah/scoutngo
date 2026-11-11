@@ -1,7 +1,7 @@
 import '../styles/calendar.css'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { beachFactorAt } from '../core/beachFactor.ts'
+import { factorHere } from '../lib/beachFactorHere.ts'
 import { bestTime, calendarMonth, type CalendarDay } from '../core/calendarMonth.ts'
 import { CAT_LABEL, CAT_ORDER, dayCats, dayLines, shownCats, type CalCat } from '../core/calendarV2.ts'
 import type { LatLon } from '../core/geo.ts'
@@ -117,7 +117,7 @@ export function CalendarPage({ venue, timeZone, stationId, tideData, windUnit, o
         },
         skyAt: (t) => (sky === null ? null : { low: hourlyAt(sky, 'cloud_cover_low', t), mid: hourlyAt(sky, 'cloud_cover_mid', t), high: hourlyAt(sky, 'cloud_cover_high', t) }),
         facing,
-        surfFtAt: (t) => (marine === null ? null : (surfAt(marine, t, facing, beachFactorAt(venue))?.estimate.faceFt ?? null)),
+        surfFtAt: (t) => (marine === null ? null : (surfAt(marine, t, facing, factorHere(venue))?.estimate.faceFt ?? null)),
         milkyDates: milky,
       }),
     [ym, venue, timeZone, today, forecastUntil, tides, tideKey, wind, sky, facing, marine, milky],

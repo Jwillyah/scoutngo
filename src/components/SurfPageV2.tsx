@@ -21,13 +21,14 @@ import type { DetailId } from '../lib/detailTabs.ts'
 import { readSkillBook } from '../lib/spotSkillStore.ts'
 import { seaNow, surfNowFrom, surfWords, useSurfNow } from '../lib/useSurfNow.ts'
 import { spotKey } from '../core/spotSkill.ts'
-import { buoyDots, buoyLean, dotsOutside, FIRST_HOUR, LAST_HOUR, dayHours, rangeHourAt, weekPeaks, type BuoyDot, type RangeHour } from '../lib/surfPageData.ts'
+import { buoyDots, buoyLean, dotsOutside, LEAN_BUOY_MAX_AGE_MS, FIRST_HOUR, LAST_HOUR, dayHours, rangeHourAt, weekPeaks, type BuoyDot, type RangeHour } from '../lib/surfPageData.ts'
 import { compass, metresToFeet } from '../lib/tideWords.ts'
 import { getSunPosition } from '../core/sun.ts'
 import type { Units } from '../lib/units.ts'
 import { useSpotSkill } from '../lib/useSpotSkill.ts'
 import type { SurfSea } from '../lib/useSurfSea.ts'
 import { DCard, DetailShell } from './DetailShell.tsx'
+import { FieldReportCard } from './FieldReportCard.tsx'
 
 /*
  * SURF, HONEST (Batch N, Section 1; boards "DETAIL v2 · Surf").
@@ -243,6 +244,15 @@ export function SurfBody({ now, timeZone, spot, spotName, away, sea, stats, kept
       <DCard label="This week">
         <WeekBars week={week} />
       </DCard>
+
+      {/* Batch Beach, Section 3: one tap after a session or a look; kept on this phone, calibrating this spot. */}
+      <FieldReportCard
+        spot={spotKey(spot)}
+        name={spotName}
+        timeZone={timeZone}
+        buoyFt={sea.buoy?.status === 'ok' && now.getTime() - sea.buoy.at.getTime() <= LEAN_BUOY_MAX_AGE_MS ? buoyFaceFt({ waveM: sea.buoy.waveM, periodS: sea.buoy.periodS, fromDeg: sea.buoy.fromDeg }, facing, BEACH_CAP) : null}
+        now={() => Date.now()}
+      />
     </>
   )
 }

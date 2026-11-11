@@ -22,7 +22,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { getPosition, getTimes } from 'suncalc'
 import { certainty, dayCall, eventCall, kt, moonOn, surfLine, surfTag, tideDay, windLevel, windTag, type CallRead, type Kind, type MoonDay, type SurfBar, type TideDay, type WindHourIn } from '../core/briefing.ts'
 import { calmDirection } from './windNow.ts'
-import { beachFactorAt } from '../core/beachFactor.ts'
+import { factorHere } from './beachFactorHere.ts'
 import { saneGust, saneSunsetHour, saneWind } from '../core/sanity.ts'
 import { wallClock } from '../core/timezone.ts'
 import { fireVerdict, type FireVerdict } from '../core/fireOutlook.ts'
@@ -249,7 +249,7 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
     const station = st?.[0] !== undefined && st[0].at !== '' ? { sky: st[0].sky, at: new Date(st[0].at) } : null
     const ext = tides?.key === key ? tides.list : null
     const facing = s?.facing ?? null
-    const factor = beachFactorAt(at)
+    const factor = factorHere(at)
     const days: DayBrief[] = []
     for (let n = 0; n < (scope === 'week' ? WEEK_DAYS : 2); n += 1) {
       const iso = dayIso(today, n)
