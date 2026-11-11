@@ -200,7 +200,7 @@ try {
   }
   const chips = await ev(`[...document.querySelectorAll('.chips2 .chip2')].length`)
   for (let i = 0; i < chips; i += 1) {
-    const label = await ev(`(() => { const c = document.querySelectorAll('.chips2 .chip2')[${i}]; c.click(); return c.querySelector('.chip2__label')?.textContent ?? 'chip' })()`)
+    const label = await ev(`(() => { const c = document.querySelectorAll('.chips2 .chip2')[${i}]; c.click(); return c.dataset.chip ?? 'chip' })()`)
     await check(`Plan, ${label} card`, '.sheet')
   }
   /*
@@ -231,7 +231,7 @@ try {
     if (t.clipped.length > 0) fail(`${label}: ${t.clipped.length} parts run below the screen (${t.clipped.slice(0, 3).join(', ')})`)
   }
   const tab = (name) => ev(`[...document.querySelectorAll('.page__tabs button')].find((b) => b.textContent === '${name}')?.click()`)
-  await ev(`[...document.querySelectorAll('.chip2')].find((c) => /TIDE/.test(c.textContent))?.click()`)
+  await ev(`document.querySelector('.chip2[data-chip="tide"]')?.click()`)
   await checkPage('Tides, from its chip')
   await tab('Advanced')
   await checkPage('Tides, Advanced')

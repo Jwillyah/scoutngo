@@ -186,3 +186,44 @@ export function particleCount(widthPx: number, heightPx: number, zoom: number): 
 
 /** Pixels a particle moves in a second: proportional to the wind speed, the same at any zoom. */
 export const PX_PER_S_PER_MPS = 7
+
+/**
+ * THE FIELD'S EDGE FADES (Batch Polish 2, Section 1). `rgba` is the colour
+ * grid, cols x rows, alpha 0 where the field said nothing. Each painted cell's
+ * alpha is scaled by its distance in cells to the nearest unpainted one (or
+ * to nothing past the grid's own edge, which is the screen's and does not
+ * fade), up to `fadeCells`. Returns whether any cell was unpainted: the wind
+ * covers only part of the view.
+ */
+export function fadeEdges(rgba: Uint8ClampedArray, cols: number, rows: number, fadeCells: number): boolean {
+  const far = fadeCells + 1
+  const d = new Float32Array(cols * rows)
+  let partial = false
+  for (let k = 0; k < cols * rows; k += 1) {
+    const empty = rgba[k * 4 + 3] === 0
+    if (empty) partial = true
+    d[k] = empty ? 0 : far
+  }
+  if (!partial) return false
+  /* Two passes of a chamfer distance (1 across, 1.4 diagonal). */
+  const at = (x: number, y: number) => (x < 0 || y < 0 || x >= cols || y >= rows ? far : d[y * cols + x])
+  for (let y = 0; y < rows; y += 1) {
+    for (let x = 0; x < cols; x += 1) {
+      const k = y * cols + x
+      if (d[k] === 0) continue
+      d[k] = Math.min(d[k], at(x - 1, y) + 1, at(x, y - 1) + 1, at(x - 1, y - 1) + 1.4, at(x + 1, y - 1) + 1.4)
+    }
+  }
+  for (let y = rows - 1; y >= 0; y -= 1) {
+    for (let x = cols - 1; x >= 0; x -= 1) {
+      const k = y * cols + x
+      if (d[k] === 0) continue
+      d[k] = Math.min(d[k], at(x + 1, y) + 1, at(x, y + 1) + 1, at(x + 1, y + 1) + 1.4, at(x - 1, y + 1) + 1.4)
+    }
+  }
+  for (let k = 0; k < cols * rows; k += 1) {
+    if (d[k] === 0 || d[k] >= fadeCells) continue
+    rgba[k * 4 + 3] = Math.round(rgba[k * 4 + 3] * (d[k] / fadeCells))
+  }
+  return true
+}

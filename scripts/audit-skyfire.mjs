@@ -128,26 +128,23 @@ try {
 
       if (phase === 'before') {
         const chip = await ev(`(() => {
-          const c = [...document.querySelectorAll('.chip2')].find((b) => /CLOUD/.test(b.querySelector('.chip2__label')?.textContent ?? ''))
+          const c = document.querySelector('.chip2[data-chip="cloud"]')
           if (!c) return null
           const v = c.querySelector('.chip2__value')
-          return { label: c.querySelector('.chip2__label')?.textContent ?? '', value: v?.textContent ?? '', fits: v ? v.scrollWidth <= v.clientWidth + 1 : false, note: c.querySelector('.chip2__note')?.textContent ?? null, spoken: c.getAttribute('aria-label') }
+          const r = c.getBoundingClientRect()
+          return { value: v?.textContent ?? '', fits: v ? v.getBoundingClientRect().width <= r.width + 1 : false, spoken: c.getAttribute('aria-label') }
         })()`)
         console.log(`  chip: ${JSON.stringify(chip)}`)
-        if (chip === null) fail(`${label}: no cloud chip`)
+        if (chip === null) fail(`${label}: no sky cell on the map`)
         else {
           /*
-           * NEAR NOW THE STATION LEADS (Batch E): the page clock is 10:15 UTC
-           * and the bar is within two hours of it, so the chip is KNTU's
-           * lowest layer with the forecast's low·mid·high under it, and the
-           * spoken line has both, and that the models split.
+           * Batch Polish 2, Section 1: the strip's Sky cell is the forecast's
+           * three layers at the bar's time in a word (src/core/statStrip.ts
+           * skyCell); the station's report is the Sky page's, checked there.
            */
-          /* Batch Map, Section 0: the pill in plain words, "CLOUD Overcast at KNTU": the most cover of KNTU's groups (BKN 3,000 ft under an OVC deck), src/core/cloudWords.ts. */
-          if (chip.label !== 'CLOUD') fail(`${label}: near now the chip's label is "${chip.label}", not CLOUD`)
-          if (chip.value !== 'Overcast') fail(`${label}: near now the chip's value "${chip.value}" is not KNTU's sky in words (Overcast)`)
-          if (!chip.fits) fail(`${label}: the chip's value is cut off`)
-          if (chip.note !== 'at KNTU') fail(`${label}: the station is not named under the value (${chip.note})`)
-          if (!/^Station KNTU: broken at 3,000 ft/.test(chip.spoken ?? '') || !/Forecast: Low \d+ · Mid \d+ · High \d+, models split/.test(chip.spoken ?? '')) fail(`${label}: the chip does not say the station and the forecast in words (${chip.spoken})`)
+          if (!/^(Clear|A few clouds|High cloud|Some cloud|Mostly cloudy|Overcast)$/.test(chip.value)) fail(`${label}: the sky cell reads "${chip.value}", not a sky word`)
+          if (!chip.fits) fail(`${label}: the sky cell's words run past it`)
+          if (!/Cloud Low \d+ · Mid \d+ · High \d+, models split/.test(chip.spoken ?? '')) fail(`${label}: the sky cell does not say the three layers and that the models split (${chip.spoken})`)
         }
       }
 
@@ -156,6 +153,16 @@ try {
       /* Batch Polish, Section 2: the menu's Sky row (the menu opens over the home now, whose Sky card says the same word). */
       await page.locator('nav[aria-label="Stage"] .sidemenu__item').filter({ hasText: /^\s*Sky/ }).first().tap()
       await wait(1200)
+      /* Batch Polish 2, Section 1: the station's sky is the Sky page's now ("KNTU now: Overcast · broken at 3,000 ft, ..."), not the map strip's. */
+      if (phase === 'before') {
+        let st = null
+        for (let i = 0; i < 12 && st === null; i += 1) {
+          st = await ev(`document.querySelector('.spage__station')?.textContent ?? null`)
+          if (st === null) await wait(500)
+        }
+        console.log(`  the Sky page's station: ${st}`)
+        if (st === null || !/^KNTU now: Overcast · broken at 3,000 ft/.test(st)) fail(`${label}: the Sky page does not say KNTU's sky (${JSON.stringify(st)})`)
+      }
       /* Batch Pages, Section 3: Menu › Sky is the Sky page; the Sky color page in full is its "Color detail ›". */
       await page.locator('.spage .ppage__foot button:has-text("Color detail")').tap()
       let fire = null

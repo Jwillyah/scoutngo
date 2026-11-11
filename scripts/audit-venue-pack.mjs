@@ -305,14 +305,16 @@ try {
     const lineBox = await ev(`(() => { const e = document.querySelector('.offline-line'); if (!e) return null; const r = e.getBoundingClientRect(); return { top: r.top, h: r.height, wraps: e.scrollWidth > e.clientWidth + 1 } })()`)
     if (lineBox !== null && (lineBox.top < insets.top || lineBox.wraps || lineBox.h > 24)) fail(`${label}: the offline line is under the status bar, cut or two lines ${JSON.stringify(lineBox)}`)
 
-    const chips = await ev(`[...document.querySelectorAll('.chip2')].map((c) => ({ label: c.querySelector('.chip2__label')?.textContent ?? '', value: c.querySelector('.chip2__value')?.textContent ?? '', age: c.querySelector('.chip2__age')?.textContent ?? null }))`)
+    const chips = await ev(`[...document.querySelectorAll('.chip2')].map((c) => ({ label: c.dataset.chip ?? '', value: c.querySelector('.chip2__value')?.textContent ?? '' }))`)
     console.log(`  chips: ${JSON.stringify(chips)}`)
-    const wind = chips.find((c) => /WIND/.test(c.label))
+    const wind = chips.find((c) => c.label === 'wind')
     if (wind === undefined || /no data|^—/.test(wind.value)) fail(`${label}: the wind chip has no value offline (${JSON.stringify(wind)})`)
-    const cloud = chips.find((c) => /CLOUD/.test(c.label))
+    const cloud = chips.find((c) => c.label === 'cloud')
     if (cloud === undefined || /no data|^—/.test(cloud.value)) fail(`${label}: the cloud chip has no value offline (${JSON.stringify(cloud)})`)
-    if (!chips.some((c) => c.age !== null)) fail(`${label}: no chip says how old its saved value is`)
-    const cut = await ev(`[...document.querySelectorAll('.chip2__label, .chip2__value')].filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent)`)
+    /* Batch Polish 2, Section 1: the saved forecast's age is said once, on the stat strip's second line. */
+    const age = await ev(`document.querySelector('.stat__when')?.textContent ?? null`)
+    if (age === null || !/saved .*old/.test(age)) fail(`${label}: the strip does not say how old its saved values are (${JSON.stringify(age)})`)
+    const cut = await ev(`[...document.querySelectorAll('.chip2__value, .stat__when')].filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent)`)
     if (cut.length > 0) fail(`${label}: chip text cut off offline: ${JSON.stringify(cut)}`)
 
     /* The picture: the fixture's colour, which only the pack could have supplied. */
@@ -357,11 +359,11 @@ try {
      * chip does: it goes only when the place is taken for inland
      * (src/components/PlanMode.tsx, !groups.water && place === 'inland').
      */
-    const coastChips = await ev(`[...document.querySelectorAll('.chip2')].map((c) => c.textContent.trim())`)
+    const coastChips = await ev(`[...document.querySelectorAll('.chip2')].map((c) => c.dataset.chip ?? '')`)
     console.log(`  chips offline: ${JSON.stringify(coastChips)}`)
-    if (!Array.isArray(coastChips) || !coastChips.some((t) => /^TIDE/.test(t))) fail(`${label}: offline the pier lost its TIDE chip: the coast was forgotten`)
+    if (!Array.isArray(coastChips) || !coastChips.includes('tide')) fail(`${label}: offline the pier lost its TIDE chip: the coast was forgotten`)
     /* The tide curve. */
-    await page.locator('.chip2', { hasText: 'TIDE' }).first().click({ timeout: 3000 }).catch(() => {})
+    await page.locator('.chip2[data-chip="tide"]').first().click({ timeout: 3000 }).catch(() => {})
     await wait(2500)
     const tide = await ev(`(() => { const p = document.querySelector('.tpage, .dpage--tide'); const path = document.querySelector('.tpage .tides__line, .dpage--tide .dtide__line'); return { page: !!p, curve: !!path && (path.getAttribute('d') ?? '').length > 20, text: p?.textContent ?? '' } })()`)
     console.log(`  tides offline: ${JSON.stringify({ page: tide.page, curve: tide.curve })}`)

@@ -355,3 +355,198 @@
 .mode-plan:has(.sheet[data-detent='half'], .sheet[data-detent='full']) .maplibregl-ctrl-scale {
   display: none;
 }
+
+/*
+ * THE STAT STRIP (Batch Polish 2, Section 1): one frosted strip, four equal
+ * cells, one line each, one type size, in place of the four two-line pills
+ * (src/components/ChipRow.tsx). It steps aside while a sheet is open, and
+ * says the time on the bar on its own second line when that is not now.
+ */
+.chips2 {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-1);
+}
+/* Out of the strip's flow: the strip's box (what the sheet and the rail keep clear of) is its cells alone, and the line sits centred under it, clear of the rail at the side. */
+.chips2 > .stat__when {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.stat {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--glass-edge);
+  border-radius: 18px;
+  background: var(--map-glass);
+}
+.stat .chip2,
+.stat .chip2--none,
+.stat .chip2--on {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  text-align: center;
+}
+.stat .chip2 + .chip2 {
+  border-left: 1px solid var(--glass-edge);
+}
+.stat .chip2:first-child {
+  border-radius: 17px 0 0 17px;
+}
+.stat .chip2:last-child {
+  border-radius: 0 17px 17px 0;
+}
+.stat .chip2--on {
+  background: rgb(255 255 255 / 0.14);
+}
+.stat .chip2__value,
+.stat .chip2__value--long {
+  font-size: 12px;
+  font-weight: var(--weight-medium);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: visible;
+}
+.chip2__mark {
+  display: inline-block;
+  margin-left: 3px;
+  font-weight: var(--weight-heavy);
+}
+.chip2__mark--offshore,
+.chip2__mark--cross,
+.chip2__mark--onshore {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  vertical-align: 1px;
+}
+.chip2__mark--offshore {
+  background: var(--good);
+}
+.chip2__mark--onshore {
+  background: var(--strong);
+}
+.chip2__mark--cross {
+  background: rgb(255 255 255 / 0.6);
+}
+.stat__when {
+  align-self: center;
+  margin: 0;
+  padding: 2px var(--space-2);
+  border-radius: 999px;
+  background: var(--map-glass);
+  color: var(--white);
+  font-size: 12px;
+  line-height: 1.3;
+}
+/* Portrait only: in a short landscape the sheet is a side panel and covers nothing of the strip. */
+@media not ((orientation: landscape) and (max-height: 540px)) {
+  .mode-plan:has(.sheet[data-detent='half'], .sheet[data-detent='full']) :is(.chips2 .stat, .chips2 .stat__when) {
+    display: none;
+  }
+}
+
+/* The radar's legend (Batch Polish 2, Section 1): one labelled bar, light to extreme, and what the dotted edge means. */
+.wlay__legend--bar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 2px;
+}
+.wlay__legend--bar .wlay__bar {
+  grid-column: 1 / -1;
+}
+.wlay__legend--bar .wlay__ends {
+  display: contents;
+}
+.wlay__legend--bar .wlay__ends > span:nth-child(2) {
+  display: none;
+}
+.wlay__legend--bar .wlay__ends > span:first-child {
+  grid-column: 1;
+  grid-row: 2;
+}
+.wlay__legend--bar .wlay__ends > span:last-child {
+  grid-column: 3;
+  grid-row: 2;
+}
+.wlay__legend--bar .wlay__est {
+  grid-column: 2;
+  grid-row: 2;
+  justify-content: center;
+}
+.wlay__bar {
+  display: block;
+  height: 10px;
+  border-radius: 999px;
+}
+.wlay__ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--glass-ink-2, rgb(255 255 255 / 0.8));
+}
+.wlay__est {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--glass-ink-2, rgb(255 255 255 / 0.8));
+}
+.rain__dots {
+  display: inline-block;
+  width: 22px;
+  border-top: 2px dotted var(--white);
+}
+/* The radar's time slider in look D: a rounded glass track and the time bar's white pill for a thumb (board D_TimeBar). */
+.rslide__range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 44px;
+  background: transparent;
+}
+.rslide__range::-webkit-slider-runnable-track {
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgb(255 255 255 / 0.35) 0 57%, rgb(255 255 255 / 0.15) 57% 100%);
+}
+.rslide__range::-moz-range-track {
+  height: 10px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.25);
+}
+.rslide__range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 30px;
+  margin-top: -10px;
+  border-radius: 999px;
+  background: var(--white);
+  box-shadow: 0 0 10px rgb(255 255 255 / 0.5);
+}
+.rslide__range::-moz-range-thumb {
+  width: 14px;
+  height: 30px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--white);
+}
+.wlay__play {
+  border: 0;
+  background: var(--white);
+  color: var(--sky-ink);
+}
+

@@ -11,6 +11,9 @@ import { formatClock } from '../core/timezone.ts'
 import { fetchGlassWeek, fetchSpecialWeek, specialsFrom } from '../lib/specialLightData.ts'
 import { hourlyAt } from '../lib/tideSheetData.ts'
 import { useBriefing } from '../lib/useBriefing.ts'
+import { useStationNow } from '../lib/useStationNow.ts'
+import { layersWords } from '../core/metar.ts'
+import { stationCloudWord } from '../core/cloudWords.ts'
 import { PageShell } from './PageShell.tsx'
 
 /*
@@ -50,6 +53,8 @@ type Kind = 'sunset' | 'sunrise'
 
 export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onViewfinder, onCalendar, onDetail }: SkyPageProps) {
   const brief = useBriefing(venue, timeZone, now, true)
+  /* Batch Polish 2, Section 1: the nearest station's sky is this page's, not the map's strip (the strip follows the time bar; a station reports now). */
+  const station = useStationNow(venue, now, typeof navigator === 'undefined' ? false : navigator.onLine)
   const clock = (d: Date | null) => (d === null ? '—' : formatClock(d, timeZone))
   /*
    * THE NEXT OF EACH, NEVER ONE THAT HAS PASSED (Batch Flow, Section 4;
@@ -172,6 +177,7 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
           </svg>
         )}
         <p className="spage__gap">{read?.gapLine ?? checks.map((c) => `${c.label.replace(/ \(.*\)$/, '')}: ${c.value}`).join(' · ')}</p>
+        {station === null ? null : <p className="spage__station">{`${station.sky.station} now: ${stationCloudWord(station.sky) ?? 'not said'} · ${layersWords(station.sky)}`}</p>}
       </section>
 
       <section className="dcard spage__light" aria-label={`${dayWordOf(kind)}'s light`}>

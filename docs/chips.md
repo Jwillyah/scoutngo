@@ -12,28 +12,30 @@ deciding to go. Those are cards, not chips.
 
 ---
 
-## The four
+## The four (Batch Polish 2: one strip, one line each)
 
-| | what it answers | what it could stop |
+| cell | reads | what it could stop |
 |---|---|---|
-| `GOLDEN · 48 min` | how long the light lasts | leaving too late |
-| `WIND · 14 kt` | whether the aircraft flies | a grounded drone |
-| `CLOUD · 38%` | whether there is light at all | a flat grey hour |
-| `LOW TIDE · 20:14` | whether the ground is there | a sandbar under water |
+| Light | `Sunrise 6:37a` at night, `Golden 4:22p` in the day, `Golden now · 38 m` | leaving too late |
+| Wind | `6 kt WSW` and a dot: offshore, cross or onshore at this beach | a grounded drone, blown-out surf |
+| Sky | `Clear`, `High cloud`, `Overcast` (the forecast's layers at the bar's time) | a flat grey hour |
+| Tide | `Low 1:54a` and an arrow, rising or falling | a sandbar under water |
 
-## Two lines, not one
+Every cell reads at the time on the bar, and the strip says which time on its
+own second line when it is not now ("at 7:36 AM Wed"). The station's sky is
+the Sky page's: it is a reading of now. The strip steps aside while a sheet is
+open.
 
-Each chip is an 8px label over a 14px value **with its unit**.
+## One line, not two
 
-Single-line chips do not fit a readable label and a unit in seven characters,
-which is why the previous ones were unreadable: `GOLD 48`, `W 14`. The label
-has to say what the number is *of*, and the value has to carry its unit, or
-the number is a riddle. Two lines is the fix, and it costs eleven pixels.
+The old pills were an 8px label over a value, because "48" or "in 6 h" said
+nothing alone. Each cell's words now say what the number is of ("Sunrise",
+"Low", "kt"), so the label line went (src/core/statStrip.ts).
 
 ## The count is enforced
 
-`scripts/audit-surface.mjs` asserts the row holds exactly four chips and does
-not scroll horizontally. A fifth fails the commit.
+`scripts/audit-surface.mjs` asserts the strip holds exactly four cells, each one
+line that fits its cell, and does not scroll horizontally. A fifth fails the commit.
 
 The horizontal scroll matters as much as the count: a scrolling row has no
 limit, so it never forces the question "which one comes out". The row is four

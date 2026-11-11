@@ -2,7 +2,6 @@ import { NetDebug } from './NetDebug.tsx'
 import { WindTimeBar } from './WindTimeBar.tsx'
 import { coastFacing } from '../lib/coast.ts'
 import type { WindModelChip } from '../lib/useWindViewport.ts'
-import { cloudWord, stationCloudWord } from '../core/cloudWords.ts'
 import { compass } from '../lib/tideWords.ts'
 import { ExposurePage } from './ExposurePage.tsx'
 import { CalendarPage } from './CalendarPage.tsx'
@@ -27,6 +26,8 @@ import type {
 } from '../core/platformFilter.ts'
 import type { ShotType } from '../core/shotType.ts'
 import { formatClock } from '../core/timezone.ts'
+import { lightCell, skyCell, stripWhen, tideCell } from '../core/statStrip.ts'
+import { windToBeach } from '../core/coastFacing.ts'
 import type { SkyState } from '../lib/useSkyFrames.ts'
 import type { Wind } from '../core/upwind.ts'
 import type { LevelWind } from '../core/windProfile.ts'
@@ -150,6 +151,7 @@ import { useSurfSetting } from '../lib/surfSetting.ts'
 import { LAYER_FAILED } from '../lib/layerFailed.ts'
 import type { PlanForNow } from '../lib/planForNow.ts'
 import { goldenNext } from '../core/goldenNext.ts'
+import { useNow } from '../lib/useNow.ts'
 import { getPosition, getTimes } from 'suncalc'
 import { hasWebGL2 } from '../lib/webgl.ts'
 import { standAtPosition, standForLineUp, type StandRequest } from '../lib/standRequest.ts'
@@ -163,8 +165,6 @@ import { LightNowBlock } from './LightNowBlock.tsx'
 import { getMoonArc } from '../core/moonArc.ts'
 import type { SkyTab } from '../lib/skyTab.ts'
 import { layersLine, modelsSplit } from '../core/skyFire.ts'
-import { layersWords } from '../core/metar.ts'
-import { useStationNow } from '../lib/useStationNow.ts'
 import { fetchModelLows, nearestHour } from '../lib/skyFireData.ts'
 import { useWeatherBusy, useWeatherEpoch } from '../lib/useWeatherStatus.ts'
 import type { Place } from '../lib/placeGroups.ts'
@@ -1365,8 +1365,6 @@ export function PlanMode({
   const weatherBusy = useWeatherBusy()
   /* Special light on now (src/lib/useSpecialNow.ts): the status line when there is a signal, a tap to the list. */
   const specialNow = useSpecialNow(online ? venue : null, scrubbedAt)
-  /* Within two hours of now the station's sky leads the Cloud chip (src/lib/useStationNow.ts). */
-  const stationSkyNow = useStationNow(venue, scrubbedAt, online)
   const specialStatus = specialNow === null ? null : `${specialNameOf(specialNow)} ${specialNow.word} now · ${specialNow.agree} of ${specialNow.of} models`
   /* A rainbow's bow, drawn on the map from Sky › Special. */
   const [bow, setBow] = useState<GeoJSON.FeatureCollection | null>(null)
@@ -1389,7 +1387,8 @@ export function PlanMode({
   const [windFacing, setWindFacing] = useState<{ key: string; deg: number | null } | null>(null)
   const windSpotKey = venue === null ? null : `${venue.lat.toFixed(3)},${venue.lon.toFixed(3)}`
   useEffect(() => {
-    if (!showSky || skyLayer !== 'wind' || venue === null || windSpotKey === null || windFacing?.key === windSpotKey) return
+    /* Batch Polish 2, Section 1: the stat strip's wind dot needs the beach's facing too, so it is read at the coast whether or not the wind layer is on. */
+    if (((!showSky || skyLayer !== 'wind') && place !== 'coast') || venue === null || windSpotKey === null || windFacing?.key === windSpotKey) return
     let live = true
     void coastFacing({ lat: venue.lat, lon: venue.lon })
       .then((f) => {
@@ -1399,7 +1398,7 @@ export function PlanMode({
     return () => {
       live = false
     }
-  }, [showSky, skyLayer, venue, windSpotKey, windFacing?.key])
+  }, [showSky, skyLayer, venue, windSpotKey, windFacing?.key, place])
   /* The layer last picked: a radar time that arrives after the shooter picked something else is dropped (Batch N: Off, then the late answer turned radar back on). */
   const pickedWeather = useRef<WeatherLayer>('off')
   const pickWeather = (w: WeatherLayer) => {
@@ -1660,63 +1659,60 @@ export function PlanMode({
     /* A saved forecast carries its age onto the chip; a live one carries nothing. */
     const age = forecast.kind === 'saved' ? forecastAge(forecast.fetchedAt, new Date()) : null
 
+    /*
+     * Batch Polish 2, Section 1: the stat strip. One line a cell, every one
+     * at the time on the bar; the station's report is the Sky page's (it is
+     * a reading of now, and the strip follows the bar).
+     */
+    const tz = venueWindow?.timeZone ?? null
+    const sunAlt = venue === null || scrubbedAt === null ? null : getPosition(scrubbedAt, venue.lat, venue.lon).altitude
+    const golden = goldenChip(goldenLeft)
+    const facing = windFacing !== null && windFacing.key === windSpotKey ? windFacing.deg : null
+    const side = wind === null || facing === null ? null : windToBeach(wind.fromDegrees, facing)
+    const sky = skyCell(layers)
+    const turn = tideCell(nextTurn, tz)
     return [
-      goldenChip(goldenLeft),
+      { ...golden, label: 'LIGHT', value: lightCell(goldenLeft, scrubbedAt, sunAlt, tz), spoken: `Light: ${lightCell(goldenLeft, scrubbedAt, sunAlt, tz) ?? 'not known'}` },
       {
         kind: 'wind',
         label: 'WIND',
-        /*
-         * NULL, NOT formatWind's DASH. formatWind returns '—' for an absent
-         * reading, which is right in a sentence and wrong on a chip -- see
-         * the note on Chip.value in ChipRow.tsx.
-         */
-        /* Batch Map, Section 0: "9 kt W", the speed and where it is from (board MapChrome). */
+        /* "6 kt WSW", the speed and where it is from; the dot says offshore, cross or onshore at this beach. */
         value: groundWind === null ? null : `${formatWind(groundWind, units.wind)}${wind === null ? '' : ` ${compass(wind.fromDegrees)}`}`,
+        ...(side === null ? {} : { mark: side }),
+        spoken: groundWind === null ? 'Wind: not known' : `Wind ${formatWind(groundWind, units.wind)}${wind === null ? '' : ` from the ${compass(wind.fromDegrees)}`}${side === null ? '' : `, ${side === 'cross' ? 'cross-shore' : side}`}`,
         urgent: overRated,
         age: groundWind === null ? null : age,
       },
-      /*
-       * NEAR NOW THE STATION LEADS (Batch E, 1 Nov): its lowest layer on the
-       * chip, the forecast's low·mid·high under it; both in the spoken line.
-       */
-      stationSkyNow !== null
-        ? {
-            kind: 'cloud' as const,
-            /* Batch Map, Section 0: plain words ("Cloud: None"), not METAR groups; the card has the layers. */
-            label: 'CLOUD',
-            shortLabel: 'CLOUD',
-            value: stationCloudWord(stationSkyNow.sky),
-            spoken: `Station ${stationSkyNow.sky.station}: ${layersWords(stationSkyNow.sky)}.${layers === null ? '' : ` Forecast: ${layersLine(layers)}${split ? ', models split' : ''}.`}`,
-            note: `at ${stationSkyNow.sky.station}`,
-            age: null,
-          }
-        : {
-            kind: 'cloud' as const,
-            label: 'CLOUD',
-            shortLabel: 'CLOUD',
-            value: cloudPct === null || layers === null ? null : cloudWord(layers),
-            spoken: layers === null ? undefined : `Cloud: ${layersLine(layers)}${split ? ', models split' : ''}`,
-            note: split ? 'models split' : undefined,
-            age: cloudPct === null ? null : age,
-          },
-      /* Inland, no tide anywhere (30 Oct): the chip goes with Water. */
+      {
+        kind: 'cloud' as const,
+        label: 'SKY',
+        value: sky,
+        spoken: layers === null ? 'Sky: not known' : `Sky: ${sky ?? 'not known'}. Cloud ${layersLine(layers)}${split ? ', models split' : ''}`,
+        age: cloudPct === null ? null : age,
+      },
+      /* Inland, no tide anywhere (30 Oct): the cell goes with Water. */
       ...(!groups.water && place === 'inland' ? [] : [{
         kind: 'tide' as const,
-        /* The next turn after the time on the bar, high or low: never one that has passed (29 Oct). */
-        /* Batch Map, Section 0: "TIDE · Low 1:33" (board MapChrome). */
+        /* The next turn after the time on the bar, high or low, and which way the water is going until then. */
         label: 'TIDE',
-        value: nextTurn === null ? null : `${nextTurn.kind === 'high' ? 'High' : 'Low'} ${clock(nextTurn.at)}`,
-        /* The zone is the unit of a clock time, said only away from the phone's own zone; see Chip.unit. */
-        ...(venueWindow === null || venueWindow.timeZoneShort === '' ? {} : { unit: venueWindow.timeZoneShort }),
+        value: turn?.text ?? null,
+        ...(turn === null ? {} : { mark: turn.going }),
+        spoken: turn === null ? 'Tide: not known' : `Tide ${turn.going}, ${nextTurn?.kind} at ${clock(nextTurn?.at ?? null) ?? ''}`,
       }]),
     ]
-  }, [venue, venueWindow, scrubbedAt, wind, ratedWindMps, nextTurn, venueCloud, forecast, units, clock, modelLows, groups.water, place, stationSkyNow])
+  }, [venue, venueWindow, scrubbedAt, wind, ratedWindMps, nextTurn, venueCloud, forecast, units, clock, modelLows, groups.water, place, windFacing, windSpotKey])
 
   /*
    * WHICH GOES BAND THE SKY LAYER PAINTS, from the sun's altitude: visible
    * light has nothing to show after dark, and the infrared band does.
    */
   const skyBand = goesBandFor(sun?.altitude ?? -90)
+
+  /* "at 7:36 AM Wed" on the strip while the bar is away from now; the venue's zone after it when it is not this phone's. */
+  const stripNow = useNow(60_000)
+  const zoneShort = venueWindow?.timeZoneShort ?? ''
+  const stripAt = stripWhen(scrubbedAt, stripNow, venueWindow?.timeZone ?? null)
+  const stripLine = stripAt === null ? (zoneShort === '' ? null : `${zoneShort} times`) : `${stripAt}${zoneShort === '' ? '' : ` ${zoneShort}`}`
 
   const weatherCommon = {
     at: scrubbedAt,
@@ -2922,6 +2918,7 @@ export function PlanMode({
         active={page === 'tides' ? 'tide' : card.kind}
         onOpen={openChip}
         measureRef={measureChips}
+        when={stripLine}
         status={locateNote ?? offlineStatus ?? weatherBusy ?? (backupReminder == null ? null : backupReminder.line) ?? specialStatus}
         statusAction={
           locateNote !== null

@@ -201,6 +201,14 @@ export function formatShortHour(at: Date, timeZone: string, hours: ClockHours = 
   return `${wall.hour % 12 === 0 ? 12 : wall.hour % 12}${wall.hour < 12 ? 'a' : 'p'}`
 }
 
+/** A clock time on a narrow strip: "1:54a", "6:37p", or "13:54" (the map's stat strip, Batch Polish 2). */
+export function formatShortClock(at: Date, timeZone: string, hours: ClockHours = clockHours): string {
+  const wall = wallClock(at, timeZone)
+  if (wall === null) return '--:--'
+  if (hours === 24) return writeClock(wall.hour, wall.minute, 24)
+  return `${wall.hour % 12 === 0 ? 12 : wall.hour % 12}:${String(wall.minute).padStart(2, '0')}${wall.hour < 12 ? 'a' : 'p'}`
+}
+
 /** A time typed as "17:00" (an <input type="time"> value), written the shooter's way. Null when it is not one. */
 export function formatWallTime(typed: string, hours: ClockHours = clockHours): string | null {
   const match = /^(\d{1,2}):(\d{2})$/.exec(typed.trim())

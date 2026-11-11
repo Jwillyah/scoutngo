@@ -104,8 +104,8 @@ try {
     }
     const read = () =>
       ev(`(() => {
-        const chip = (re) => { const c = [...document.querySelectorAll('.chip2')].find((b) => re.test(b.textContent)); const l = c?.querySelector('.chip2__label'); return c ? { label: l?.textContent ?? '', cut: l !== null && l !== undefined && l.scrollWidth > l.clientWidth + 1, value: c.querySelector('.chip2__value')?.textContent ?? '', text: c.textContent } : null }
-        return { wind: chip(/WIND/), cloud: chip(/CLOUD/), line: document.querySelector('.offline-line')?.textContent ?? null, lineCut: (() => { const l = document.querySelector('.offline-line'); return l !== null && l.scrollWidth > l.clientWidth + 1 })(), map: (() => { const c = document.querySelector('.maplibregl-canvas'); if (!c) return 0; const r = c.getBoundingClientRect(); return (r.width * r.height) / (innerWidth * innerHeight) })() }
+        const chip = (kind) => { const c = document.querySelector('.chip2[data-chip="' + kind + '"]'); const l = c?.querySelector('.chip2__value'); const b = c?.getBoundingClientRect(); return c ? { label: kind, cut: l !== null && l !== undefined && b !== undefined && (l.scrollWidth > l.clientWidth + 1 || l.getBoundingClientRect().width > b.width + 1), value: l?.textContent ?? '', text: c.textContent } : null }
+        return { wind: chip('wind'), cloud: chip('cloud'), when: document.querySelector('.stat__when')?.textContent ?? '', line: document.querySelector('.offline-line')?.textContent ?? null, lineCut: (() => { const l = document.querySelector('.offline-line'); return l !== null && l.scrollWidth > l.clientWidth + 1 })(), map: (() => { const c = document.querySelector('.maplibregl-canvas'); if (!c) return 0; const r = c.getBoundingClientRect(); return (r.width * r.height) / (innerWidth * innerHeight) })() }
       })()`)
     const open = async () => {
       /* about:blank first: the same URL with a hash is not a reload, and the reload is the point. */
@@ -146,8 +146,9 @@ try {
     if (refusedNow === 0) fail(`${label}: nothing was asked after the reload, so no 429 was seen`)
     for (const [name, c] of [['wind', busy.wind], ['cloud', busy.cloud]]) {
       if (c === null || /—|no data/.test(c.value)) fail(`${label}: the ${name} chip lost its last value under a 429 (${JSON.stringify(c)})`)
-      else if (!/9h ago/.test(c.label)) fail(`${label}: the ${name} chip does not say its value is 9h old ("${c.label}")`)
-      if (c !== null && c.cut) fail(`${label}: the ${name} chip's label is cut off ("${c.label}", ux-rules 4)`)
+      /* Batch Polish 2, Section 1: the age is said once, on the strip's second line. */
+      else if (!/saved 9 h old/.test(busy.when)) fail(`${label}: the strip does not say its ${name} value is 9 h old ("${busy.when}")`)
+      if (c !== null && c.cut) fail(`${label}: the ${name} cell's words are cut off ("${c.value}", ux-rules 4)`)
     }
     /* Batch M: the back-off is jittered 0.8 to 1.2 times (weatherStore JITTER), so the hour reads 48 to 72 min. */
     if (busy.line === null || !/^Weather daily limit reached, retrying in (4[89]|[56]\d|7[0-2]) min$/.test(busy.line)) fail(`${label}: the line under the chips reads ${JSON.stringify(busy.line)}, not the service at its limit and when it is asked again`)
@@ -187,7 +188,7 @@ try {
     await wait(2500)
     const off = await read()
     console.log(`  offline: wind "${off.wind?.label}" · cloud "${off.cloud?.label}" · line "${off.line}"`)
-    for (const [name, c] of [['wind', off.wind], ['cloud', off.cloud]]) if (c !== null && c.cut) fail(`${label}: offline, the ${name} chip's label is cut off ("${c.label}")`)
+    for (const [name, c] of [['wind', off.wind], ['cloud', off.cloud]]) if (c !== null && c.cut) fail(`${label}: offline, the ${name} cell's words are cut off ("${c.value}")`)
     if (off.lineCut) fail(`${label}: offline, the status line is cut off ("${off.line}")`)
     await page.screenshot({ path: join(OUT, `weather-offline-${label}.png`) })
     await ctx.close()

@@ -3,7 +3,7 @@ import { useNumerals } from '../lib/numeralsContext.ts'
 import * as maplibregl from 'maplibre-gl'
 import { WindLayerV3 } from './WindLayerV3.tsx'
 import { MapLabels } from './MapLabels.tsx'
-import { estimateArea, fetchRainMaps, frameFor, RAIN_HOST, RAIN_MAX_ZOOM, RAIN_PROTOCOL, rainMaskProtocol, rainTileUrl } from '../lib/worldRain.ts'
+import { fetchRainMaps, frameFor, RAIN_HOST, RAIN_MAX_ZOOM, RAIN_PROTOCOL, rainMaskProtocol, rainTileUrl } from '../lib/worldRain.ts'
 import { fieldAt, useWindViewport, type WindModelChip } from '../lib/useWindViewport.ts'
 import { loadTile, PROTOCOL, viaProtocol } from '../lib/offlineCache.ts'
 import { RAY_SCREEN_FRACTION } from '../lib/rayLength.ts'
@@ -1185,14 +1185,6 @@ function makeMarkerElement(className: string): HTMLDivElement {
   return el
 }
 
-/* The satellite estimate's hatching: thin white diagonals on clear, 12 px repeat. */
-function hatchImage(): ImageData {
-  const n = 12
-  const data = new Uint8ClampedArray(n * n * 4)
-  for (let y = 0; y < n; y += 1) for (let x = 0; x < n; x += 1) if ((x + y) % n === 0 || (x + y) % n === 1) data.set([255, 255, 255, 200], (y * n + x) * 4)
-  return new ImageData(data, n, n)
-}
-
 export function MapView({
   handle,
   venue,
@@ -1911,13 +1903,11 @@ export function MapView({
        * (src/lib/worldRain.ts, LibreWXR), and the hatching where it is the
        * satellite estimate, no radar there.
        */
+      /* Batch Polish 2, Section 1: no hatching across the map; the estimate is softer, with a dotted edge, only where it rains (src/lib/worldRain.ts softenEstimate). Smoothed between pixels, both layers. */
       instance.addSource('rain-world', { type: 'raster', tiles: [`${RAIN_HOST}/none/{z}/{x}/{y}.png`], tileSize: 256, maxzoom: RAIN_MAX_ZOOM, attribution: 'Rain: LibreWXR · CC BY 4.0' })
-      instance.addLayer({ id: 'rain-world', type: 'raster', source: 'rain-world', layout: { visibility: 'none' }, paint: { 'raster-opacity': 0.7 } })
-      instance.addImage('rain-hatch', hatchImage())
-      instance.addSource('rain-estimate', { type: 'geojson', data: estimateArea() })
-      instance.addLayer({ id: 'rain-estimate', type: 'fill', source: 'rain-estimate', layout: { visibility: 'none' }, paint: { 'fill-pattern': 'rain-hatch', 'fill-opacity': 0.55 } })
+      instance.addLayer({ id: 'rain-world', type: 'raster', source: 'rain-world', layout: { visibility: 'none' }, paint: { 'raster-opacity': 0.7, 'raster-resampling': 'linear' } })
       instance.addSource('radar', { type: 'raster', tiles: [radarTemplate(new Date(0))], tileSize: 256, maxzoom: RADAR_MAX_ZOOM, attribution: 'Radar: Iowa Environmental Mesonet' })
-      instance.addLayer({ id: 'radar', type: 'raster', source: 'radar', layout: { visibility: 'none' }, paint: { 'raster-opacity': 0.7 } })
+      instance.addLayer({ id: 'radar', type: 'raster', source: 'radar', layout: { visibility: 'none' }, paint: { 'raster-opacity': 0.7, 'raster-resampling': 'linear' } })
       /* A guide on the ground (a rainbow's bow): white, dashed, over a dark edge. Never red. */
       instance.addSource('guide', { type: 'geojson', data: emptyCollection() })
       instance.addLayer({ id: 'guide-edge', type: 'line', source: 'guide', paint: { 'line-color': readToken('--mark-edge', '#0a0b09', container.current), 'line-width': 5 } })
@@ -2897,7 +2887,6 @@ export function MapView({
     const sat = m.getLayer('radar-sat') === undefined ? null : m
     const world = m.getLayer('rain-world') === undefined ? null : m
     world?.setLayoutProperty('rain-world', 'visibility', radarMs === null ? 'none' : 'visible')
-    world?.setLayoutProperty('rain-estimate', 'visibility', radarMs === null ? 'none' : 'visible')
     if (radarMs !== null && world !== null) {
       void fetchRainMaps().then((maps) => {
         if (maps === null) return

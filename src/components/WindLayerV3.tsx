@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type * as maplibregl from 'maplibre-gl'
 import { windToBeach } from '../core/coastFacing.ts'
 import { distanceMeters, type LatLon } from '../core/geo.ts'
-import { fromUV, particleCount, PX_PER_S_PER_MPS, sampleField, windRgb, type Field } from '../core/windViewport.ts'
+import { fadeEdges, fromUV, particleCount, PX_PER_S_PER_MPS, sampleField, windRgb, type Field } from '../core/windViewport.ts'
 import { nearestStation, stationWind, type StationWind } from '../lib/stationNear.ts'
 import { compass } from '../lib/tideWords.ts'
 import { windIn, windUnitLabel, type WindUnit } from '../lib/units.ts'
@@ -27,6 +27,8 @@ import '../styles/wind.css'
  * into data-fps for the wind audit.
  */
 const CELL_PX = 8
+/** Cells over which the colour fades to where the field ends: 40 px. */
+const EDGE_FADE_CELLS = 5
 const FADE = 0.09
 const MAX_AGE_FRAMES = 90
 
@@ -46,6 +48,7 @@ export function WindLayerV3({ map, field, unit, spot, facing, status }: Props) {
   /* The screen's velocity grid, rebuilt when the map settles: px/s east and down per CELL_PX cell. */
   const grid = useRef<{ cols: number; rows: number; vx: Float32Array; vy: Float32Array } | null>(null)
   const [centre, setCentre] = useState<LatLon | null>(null)
+  const [partial, setPartial] = useState(false)
 
   useEffect(() => {
     const c = colour.current
@@ -96,6 +99,15 @@ export function WindLayerV3({ map, field, unit, spot, facing, status }: Props) {
           vy[k] = -s.v * PX_PER_S_PER_MPS
         }
       }
+      /*
+       * THE EDGES FADE (Batch Polish 2, Section 1): zoomed out, the blocks the
+       * view asked can stop short of the screen. The colour fades over
+       * EDGE_FADE_CELLS to where the field ends, not a hard edge, and the
+       * card says the wind is shown for this area.
+       */
+      const partial = fadeEdges(img.data, cols, rows, EDGE_FADE_CELLS)
+      c.dataset.partial = partial ? '1' : '0'
+      setPartial(partial)
       const small = document.createElement('canvas')
       small.width = cols
       small.height = rows
@@ -274,6 +286,7 @@ export function WindLayerV3({ map, field, unit, spot, facing, status }: Props) {
               {[here.gust === null ? null : `gusts ${say(here.gust)}`, side === null ? null : `${side === 'cross' ? 'cross-shore' : side} here`, 'at the crosshair'].filter((x) => x !== null).join(' · ')}
             </p>
           )}
+          {partial ? <p className="windv3__area">Wind shown for this area</p> : null}
         </div>
         {station === null || stationSays === null ? null : (
           <p className="windv3__station">

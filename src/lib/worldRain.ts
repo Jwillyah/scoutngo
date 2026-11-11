@@ -121,6 +121,49 @@ export function droppedPixels(z: number, x: number, y: number, size = 256): { x0
   }))
 }
 
+/** The radar boxes a tile touches, as pixel rectangles in the tile: outside them its rain is the satellite's estimate. */
+export function radarPixels(z: number, x: number, y: number, size = 256): { x0: number; y0: number; x1: number; y1: number }[] {
+  const b = tileBounds(z, x, y)
+  const n = 2 ** z
+  const px = (lon: number) => (((lon + 180) / 360) * n - x) * size
+  const py = (lat: number) => (((1 - Math.asinh(Math.tan((lat * Math.PI) / 180)) / Math.PI) / 2) * n - y) * size
+  return RADAR_COVER.filter((d) => d.west < b.east && d.east > b.west && d.south < b.north && d.north > b.south).map((d) => ({
+    x0: Math.max(0, Math.floor(px(d.west))),
+    x1: Math.min(size, Math.ceil(px(d.east))),
+    y0: Math.max(0, Math.floor(py(d.north))),
+    y1: Math.min(size, Math.ceil(py(d.south))),
+  }))
+}
+
+/** Of the satellite estimate's own alpha, what is kept: softer than radar. */
+export const ESTIMATE_ALPHA = 0.55
+/**
+ * THE SATELLITE'S ESTIMATE, SOFTER, WITH A THIN DOTTED EDGE (Batch Polish 2,
+ * Section 1; it was a hatching over the whole world without radar, raining
+ * or not). Outside the radar rectangles, rain pixels keep ESTIMATE_ALPHA of
+ * their alpha, and a rain pixel at the edge of its patch is a white dot on
+ * every other pair: only where it is raining, and never looking like radar.
+ * Returns how many pixels it changed.
+ */
+export function softenEstimate(rgba: Uint8ClampedArray, w: number, h: number, radar: readonly { x0: number; y0: number; x1: number; y1: number }[]): number {
+  const alpha = new Uint8ClampedArray(w * h)
+  for (let k = 0; k < w * h; k += 1) alpha[k] = rgba[k * 4 + 3]
+  const inRadar = (x: number, y: number) => radar.some((r) => x >= r.x0 && x < r.x1 && y >= r.y0 && y < r.y1)
+  const dry = (x: number, y: number) => x < 0 || y < 0 || x >= w || y >= h ? false : alpha[y * w + x] === 0
+  let changed = 0
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      const k = y * w + x
+      if (alpha[k] === 0 || inRadar(x, y)) continue
+      const edge = dry(x - 1, y) || dry(x + 1, y) || dry(x, y - 1) || dry(x, y + 1)
+      if (edge && ((x + y) >> 1) % 2 === 0) rgba.set([255, 255, 255, 210], k * 4)
+      else rgba[k * 4 + 3] = Math.round(alpha[k] * ESTIMATE_ALPHA)
+      changed += 1
+    }
+  }
+  return changed
+}
+
 export const RAIN_PROTOCOL = 'rainw'
 /** The rain tile through the phone: as LibreWXR serves it, the dropped boxes cleared. */
 export async function rainMaskProtocol(params: { url: string }, abort: AbortController): Promise<{ data: ArrayBuffer }> {
@@ -129,7 +172,10 @@ export async function rainMaskProtocol(params: { url: string }, abort: AbortCont
   if (!r.ok) throw new Error(`rain tile ${r.status}`)
   const m = /\/(\d+)\/(\d+)\/(\d+)\/\d+\/[\d_]+\.png$/.exec(real)
   const cuts = m === null ? [] : droppedPixels(Number(m[1]), Number(m[2]), Number(m[3]))
-  if (cuts.length === 0 || typeof OffscreenCanvas === 'undefined') return { data: await r.arrayBuffer() }
+  const radar = m === null ? [] : radarPixels(Number(m[1]), Number(m[2]), Number(m[3]))
+  /* All radar, nothing dropped: the tile as served. */
+  const allRadar = radar.some((q) => q.x0 <= 0 && q.y0 <= 0 && q.x1 >= 256 && q.y1 >= 256)
+  if ((cuts.length === 0 && allRadar) || typeof OffscreenCanvas === 'undefined') return { data: await r.arrayBuffer() }
   const img = await createImageBitmap(await r.blob())
   const c = new OffscreenCanvas(img.width, img.height)
   const g = c.getContext('2d')
@@ -137,6 +183,11 @@ export async function rainMaskProtocol(params: { url: string }, abort: AbortCont
   g.drawImage(img, 0, 0)
   const k = img.width / 256
   for (const q of cuts) g.clearRect(q.x0 * k, q.y0 * k, (q.x1 - q.x0) * k, (q.y1 - q.y0) * k)
+  if (!allRadar) {
+    const px = g.getImageData(0, 0, img.width, img.height)
+    softenEstimate(px.data, img.width, img.height, radar.map((q) => ({ x0: q.x0 * k, y0: q.y0 * k, x1: q.x1 * k, y1: q.y1 * k })))
+    g.putImageData(px, 0, 0)
+  }
   return { data: await (await c.convertToBlob({ type: 'image/png' })).arrayBuffer() }
 }
 

@@ -979,13 +979,13 @@ for (const detent of ['peek', 'half', 'full']) {
  * check that cannot fail is not a check, and "exactly four" read off a row
  * that the audit never tried to break is a comment with a line number.
  */
-console.log('\n### the chip row: four chips at the coast, three inland, two lines, no horizontal scroll')
+console.log('\n### the stat strip: four cells at the coast, three inland, one line each, no horizontal scroll')
 
 const CHIPS = `(() => {
   const row = document.querySelector('.chips2')
   if (!row) return { error: 'no chip row on screen' }
   /* The chips, not every child: the one status line under them lives in the row too (30 Oct: a real 429 put "Weather daily limit reached" there and it was counted as a fifth chip). */
-  const kids = [...row.querySelectorAll(':scope > .chip2')].filter((c) => c.getBoundingClientRect().width > 0)
+  const kids = [...row.querySelectorAll('.chip2')].filter((c) => c.getBoundingClientRect().width > 0)
   const widths = kids.map((k) => Math.round(k.getBoundingClientRect().width))
   return {
     count: kids.length,
@@ -995,9 +995,11 @@ const CHIPS = `(() => {
     /* Distinct top edges: a chip that wrapped is on a second row. */
     rows: new Set(kids.map((k) => Math.round(k.getBoundingClientRect().top))).size,
     chips: kids.map((k) => ({
-      label: (k.querySelector('.chip2__label')?.textContent ?? '').trim(),
+      label: k.dataset.chip ?? '',
       value: (k.querySelector('.chip2__value')?.textContent ?? '').trim(),
-      lines: k.querySelectorAll('.chip2__label, .chip2__value').length,
+      /* Batch Polish 2, Section 1: one line, the words saying what the number is; lines counted from the value's height. */
+      lines: (() => { const v = k.querySelector('.chip2__value'); if (!v) return 0; const lh = parseFloat(getComputedStyle(v).lineHeight) || 14; return Math.round(v.getBoundingClientRect().height / lh) })(),
+      runsOver: (() => { const v = k.querySelector('.chip2__value'); return v ? v.getBoundingClientRect().width > k.getBoundingClientRect().width + 1 : false })(),
     })),
     widthSpread: widths.length === 0 ? 0 : Math.max(...widths) - Math.min(...widths),
   }
@@ -1025,7 +1027,7 @@ const judgeChips = (m) => {
   const bad = []
   if (m.error !== undefined) return [m.error]
   if (m.count !== WANT_CHIPS) bad.push(`${m.count} chips, not ${WANT_CHIPS}`)
-  const tide = m.chips.some((c) => /TIDE/i.test(c.label))
+  const tide = m.chips.some((c) => c.label === 'tide')
   if (PLACE === 'inland' && tide) bad.push('a tide chip inland')
   if (PLACE === 'coast' && !tide) bad.push('no tide chip at the coast')
   if (m.rows !== 1) bad.push(`the chips wrap onto ${m.rows} rows`)
@@ -1037,8 +1039,9 @@ const judgeChips = (m) => {
   }
   if (m.widthSpread > 2) bad.push(`chips are not equal width (${m.widthSpread}px spread)`)
   for (const chip of m.chips) {
-    if (chip.lines !== 2) bad.push(`chip "${chip.label}" has ${chip.lines} lines, not 2`)
-    if (chip.label === '') bad.push('a chip has no label line')
+    if (chip.lines !== 1) bad.push(`cell "${chip.label}" has ${chip.lines} lines, not 1`)
+    if (chip.runsOver) bad.push(`cell "${chip.label}" reads "${chip.value}", wider than its cell`)
+    if (chip.label === '') bad.push('a cell says nothing of what it is (no data-chip)')
     if (chip.value === '') bad.push(`chip "${chip.label}" has no value line`)
     else if (!/[^0-9.,:\s-]/.test(chip.value)) {
       bad.push(`chip "${chip.label}" reads "${chip.value}" with no unit`)
@@ -1047,6 +1050,9 @@ const judgeChips = (m) => {
   return bad
 }
 
+/* Batch Polish 2, Section 1: the strip steps aside while a sheet is open, so it is read with the sheet at peek. */
+await setDetent('peek')
+await wait(600)
 const chipMeasure = await ev(CHIPS)
 for (const chip of chipMeasure.chips ?? []) {
   console.log(`  ${chip.label.padEnd(8)} ${chip.value}`)
@@ -1059,7 +1065,7 @@ for (const bad of judgeChips(chipMeasure)) fail(`chip row: ${bad}`)
 /* ------ and now break it on purpose, because a check that cannot fail is not one */
 
 const fifth = await ev(`(() => {
-  const row = document.querySelector('.chips2')
+  const row = document.querySelector('.chips2 .stat')
   if (!row || !row.firstElementChild) return 'no row to break'
   const clone = row.firstElementChild.cloneNode(true)
   clone.id = 'audit-fifth-chip'
@@ -1196,7 +1202,7 @@ const OPENERS = `(() => {
   const out = []
   const add = (sel, i, name) => out.push({ sel, i, name })
   document.querySelectorAll('.chip2').forEach((b, i) =>
-    add('.chip2', i, (b.querySelector('.chip2__label')?.textContent ?? '').trim()))
+    add('.chip2', i, b.dataset.chip ?? ''))
   /* Batch K addendum: the dock is gone; Features is in the rail, and behind it Skyline and the light map, doors two taps deep (Preflight is the menu's Drone card, Calendar is Sky's tab). */
   document.querySelectorAll('.rail2__btn').forEach((b, i) => {
     const label = (b.getAttribute('aria-label') ?? '').toLowerCase()

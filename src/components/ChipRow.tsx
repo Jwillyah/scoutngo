@@ -2,18 +2,16 @@ import type { CardKind } from '../lib/sheetCard.ts'
 import type { ForecastAge } from '../lib/savedForecast.ts'
 
 /*
- * FOUR CHIPS, TWO LINES EACH, FIXED.
+ * FOUR CELLS IN ONE STRIP, ONE LINE EACH, FIXED (Batch Polish 2, Section 1;
+ * it was four two-line pills).
  *
- * THE RULE IS IN docs/chips.md AND THE AUDIT ENFORCES IT: a chip earns its
- * place only if its value could make you not go. Wind grounds the drone,
- * cloud kills the light, time-left means you missed it, tide means the
- * sandbar is under water. Moon phase, focal length, airspace class and NPF
- * are looked up AFTER deciding to go; those are cards.
+ * THE RULE IS IN docs/chips.md AND THE AUDIT ENFORCES IT: a cell earns its
+ * place only if its value could make you not go. Light, wind, sky, tide.
  *
- * TWO LINES, AND THE SECOND LINE CARRIES ITS UNIT. One line cannot hold a
- * readable label and a unit in seven characters, which is why the row this
- * replaces read "GOLD 48" and "W 14" -- a number with no statement of what it
- * is a number OF. The label says what, the value says how much and in what.
+ * ONE LINE, AND THE WORDS SAY WHAT THE NUMBER IS: "Sunrise 6:37a", "6 kt
+ * WSW", "High cloud", "Low 1:54a". The old two-line chips needed a label
+ * because "48" or "in 6 h" said nothing alone; each cell's value now names
+ * itself, so the label line went and the strip is one row of type.
  *
  * FIXED WIDTHS, NOT A SCROLL. Four equal columns filling the row. A scrolling
  * row has no limit, so it never forces the question "which one comes out",
@@ -83,6 +81,8 @@ export interface Chip {
   spoken?: string
   /** A short second word under the value, small: "models split". */
   note?: string
+  /** The wind's dot (offshore, cross, onshore at this beach) or the tide's arrow. */
+  mark?: 'offshore' | 'cross' | 'onshore' | 'rising' | 'falling'
 }
 
 interface ChipRowProps {
@@ -113,6 +113,8 @@ interface ChipRowProps {
    * in BottomSheet.tsx.
    */
   measureRef?: (node: HTMLDivElement | null) => void
+  /** "at 7:36 AM Wed": the time on the bar when it is away from now, on the strip itself so it can never sit on the rail. */
+  when?: string | null
 }
 
 /*
@@ -133,21 +135,24 @@ interface ChipRowProps {
  * aria-pressed STAYS. A chip genuinely is pressed or not -- its card is open
  * or it is not -- and that is what the lit border means.
  */
-export function ChipRow({ chips, active, onOpen, measureRef, status = null, statusAction, onStatus }: ChipRowProps) {
+export function ChipRow({ chips, active, onOpen, measureRef, status = null, statusAction, onStatus, when = null }: ChipRowProps) {
+  /* A saved forecast's age is the same on every cell: said once, on the strip's second line. */
+  const age = chips.find((c) => c.age !== null && c.age !== undefined)?.age ?? null
+  const under = [when, age === null ? null : `saved ${age.text}`].filter((x): x is string => x !== null)
   return (
     <div className="chips2" ref={measureRef} role="toolbar" aria-label="Conditions">
+      {/* As many equal columns as cells: three inland, where the tide's cell goes. */}
+      <div className="stat" style={{ gridTemplateColumns: `repeat(${Math.max(1, chips.length)}, minmax(0, 1fr))` }}>
       {chips.map((chip) => (
         <button
           type="button"
           key={chip.kind}
+          data-chip={chip.kind}
           className={[
             'chip2',
             active === chip.kind ? 'chip2--on' : '',
             chip.urgent === true ? 'chip2--urgent' : '',
             chip.soon === true ? 'chip2--soon' : '',
-            /* The WHOLE chip dims, label included: the label is a promise of
-             * a number, and a bright promise over "no data" is the thing
-             * that read as broken. */
             chip.value === null ? 'chip2--none' : '',
             chip.age?.mark === 'marked' ? 'chip2--aged' : '',
             chip.age?.mark === 'dimmed' ? 'chip2--old' : '',
@@ -155,29 +160,19 @@ export function ChipRow({ chips, active, onOpen, measureRef, status = null, stat
             .filter((c) => c !== '')
             .join(' ')}
           aria-pressed={active === chip.kind}
-          aria-label={chip.spoken}
+          aria-label={chip.spoken ?? `${chip.label}: ${chip.value ?? 'not known'}`}
           title={chip.spoken}
           onClick={() => onOpen(chip.kind)}
         >
-          <span className="chip2__label">
-            {chip.age === null || chip.age === undefined ? chip.label : (chip.shortLabel ?? chip.label)}
-            {chip.age === null || chip.age === undefined ? null : (
-              <span className="chip2__age">
-                {/* The short form: an 8px label has no room for "3 h old". The card says it in full. */}
-                {chip.age.mark === 'dimmed' ? ` old ${chip.age.short}` : ` ${chip.age.short} ago`}
-              </span>
-            )}
-          </span>
-          {/* A value past seven characters ("38 m left") is set a size down rather than cut. */}
-          <span className={`chip2__value${chip.value === null ? '' : ' num'}${(chip.value?.length ?? 0) > 7 ? ' chip2__value--long' : ''}`} {...(chip.kind === 'tide' && chip.value !== null && /^(High|Low) /.test(chip.value) ? { 'data-shared': 'tide', 'data-value': chip.value.toLowerCase() } : {})}>
+          {/* Batch Polish 2, Section 1: one line, the words say what the number is ("Sunrise 6:37a", "High cloud"). */}
+          <span className={`chip2__value${chip.value === null ? '' : ' num'}`} {...(chip.kind === 'tide' && chip.value !== null && /^(High|Low) /.test(chip.value) ? { 'data-shared': 'tide', 'data-value': chip.value.toLowerCase() } : {})}>
             {chip.value ?? NO_DATA}
-            {chip.value === null || chip.unit === undefined ? null : (
-              <span className="chip2__unit"> {chip.unit}</span>
-            )}
+            {chip.mark === undefined || chip.value === null ? null : <span className={`chip2__mark chip2__mark--${chip.mark}`} aria-hidden="true">{chip.mark === 'rising' ? '↑' : chip.mark === 'falling' ? '↓' : ''}</span>}
           </span>
-          {chip.note === undefined ? null : <span className="chip2__note">{chip.note}</span>}
         </button>
       ))}
+      </div>
+      {under.length === 0 ? null : <p className="stat__when">{under.join(' · ')}</p>}
       {status === null ? null : statusAction !== undefined ? (
         <div className={`offline-line offline-line--act${statusAction.whole === true ? ' offline-line--whole' : ''}`} role="status">
           {statusAction.whole === true ? (

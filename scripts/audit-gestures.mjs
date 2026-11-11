@@ -154,7 +154,7 @@ try {
     /* Layers is a page in the sheet with the time bar stepped aside: closed before going on. */
     await ev(`document.querySelector('.card2__x')?.click()`)
     await wait(600)
-    await ev(`[...document.querySelectorAll('.chip2')].find((x) => /TIDE/.test(x.textContent))?.click()`)
+    await ev(`document.querySelector('.chip2[data-chip="tide"]')?.click()`)
     await wait(2500)
     await targets('the Tides page')
     await ev(`document.querySelector('.page__close, .page__back, .dpage__back')?.click()`)
@@ -303,7 +303,7 @@ try {
 
     /* The tide curve: the ruler's rules (src/lib/useSidewaysScrub.ts). */
     console.log('### the tide curve: sideways is the time, and never the sheet')
-    await ev(`[...document.querySelectorAll('.chip2')].find((x) => /TIDE/.test(x.textContent))?.click()`)
+    await ev(`document.querySelector('.chip2[data-chip="tide"]')?.click()`)
     await wait(2500)
     const curve = JSON.parse(await ev(`JSON.stringify(document.querySelector('[data-sideways][aria-label^="The tide"]')?.getBoundingClientRect() ?? null)`))
     /*

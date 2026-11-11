@@ -244,7 +244,7 @@ for (const run of MODES) {
 
   /* THE LIGHT CARD: sun at start, mid, end. */
   /* The Golden chip opens Sky › Now since 30 Oct; the light card is a tap from its Sun page. */
-  await ev(`[...document.querySelectorAll('.chip2')].find((b) => /GOLDEN/.test(b.textContent))?.click()`)
+  await ev(`document.querySelector('.chip2[data-chip="golden"]')?.click()`)
   await wait(900)
   await ev(`[...document.querySelectorAll('button')].find((b) => /The light through your window/.test(b.textContent))?.click()`)
   await wait(900)

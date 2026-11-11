@@ -37,7 +37,6 @@ const colour = (dbz: number) => `#${N0Q_PALETTE[Math.round((dbz + 32.5) * 2)].to
  * time bar has nothing to say to radar, which has its own timeline here.
  */
 export function RadarLegend({ scanAt, calls, strikes, timeZone }: { scanAt: Date | null; calls: readonly CellCall[]; strikes: readonly Strike[]; timeZone: string }) {
-  const [tapped, setTapped] = useState<number | null>(null)
   const [play, setPlay] = useState(false)
   const [step, setStep] = useState(sliderSteps().indexOf(0))
   useEffect(() => {
@@ -47,19 +46,16 @@ export function RadarLegend({ scanAt, calls, strikes, timeZone }: { scanAt: Date
   }, [play])
   return (
     <div className="wlay wlay--peek" data-radar-legend>
-      <div className="wlay__legend" role="group" aria-label="Radar colours">
-        {DBZ.map((d) => (
-          <button key={d} type="button" className="wlay__sw" style={{ background: colour(d) }} aria-label={`${d} dBZ: ${WORD[d]}`} onClick={() => setTapped(d)} />
-        ))}
-        {/* Batch Map, Section 5 (board MapChrome): until a colour is tapped, what the layer is: radar where it exists, the hatched satellite estimate elsewhere. */}
-        <span className="wlay__val">
-          {tapped === null ? (
-            <span className="rain__title">
-              <b>Rain</b> <i className="rain__hatch" aria-hidden="true" /> = satellite estimate
-            </span>
-          ) : (
-            `${tapped} dBZ · ${WORD[tapped]}`
-          )}
+      {/* Batch Polish 2, Section 1: one labelled bar, light to extreme, the radar's own colours; the dotted edge is where radar ends and the satellite's estimate goes on. */}
+      <div className="wlay__legend wlay__legend--bar" role="img" aria-label={`Radar colours, light to extreme: ${DBZ.map((d) => WORD[d]).join(', ')}. Past the dotted line, the satellite's estimate.`}>
+        <span className="wlay__bar" style={{ background: `linear-gradient(90deg, ${DBZ.map((d, i) => `${colour(d)} ${Math.round((i / (DBZ.length - 1)) * 100)}%`).join(', ')})` }} />
+        <span className="wlay__ends" aria-hidden="true">
+          <span>Light</span>
+          <span>Heavy</span>
+          <span>Extreme</span>
+        </span>
+        <span className="wlay__est" aria-hidden="true">
+          <i className="rain__dots" /> satellite estimate
         </span>
       </div>
       {scanAt === null ? (

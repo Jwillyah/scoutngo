@@ -254,3 +254,9 @@ body:has(.windv3__read) .rail2 {
 .dwind__photo--on {
   opacity: 0.45;
 }
+/* Batch Polish 2, Section 1: zoomed out past what the field covers, the colour fades at its edge and this says so. */
+.windv3__area {
+  margin: 2px 0 0;
+  font-size: var(--text-sm);
+  color: var(--glass-ink-2);
+}

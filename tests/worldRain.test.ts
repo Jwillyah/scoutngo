@@ -39,3 +39,32 @@ describe('world rain', () => {
     expect(droppedPixels(6, 56, 25)).toEqual([])
   })
 })
+
+describe('the satellite estimate: softer, dotted at its edge, only where it rains (Batch Polish 2, Section 1)', () => {
+  it('outside radar a rain patch keeps a share of its alpha and its edge is dotted white; dry pixels and radar are left alone', async () => {
+    const { softenEstimate, ESTIMATE_ALPHA, radarPixels } = await import('../src/lib/worldRain.ts')
+    const w = 8
+    const h = 8
+    const px = new Uint8ClampedArray(w * h * 4)
+    /* A 4 x 4 patch of rain in the middle, alpha 200, blue. */
+    for (let y = 2; y < 6; y += 1) for (let x = 2; x < 6; x += 1) px.set([40, 90, 220, 200], (y * w + x) * 4)
+    const a = (x: number, y: number) => px[(y * w + x) * 4 + 3]
+    const changed = softenEstimate(px, w, h, [])
+    expect(changed).toBe(16)
+    /* The middle: softer, still blue. */
+    expect(a(3, 3)).toBe(Math.round(200 * ESTIMATE_ALPHA))
+    expect(px[(3 * w + 3) * 4 + 2]).toBe(220)
+    /* The edge: some white dots, and dry pixels stay dry. */
+    const edge = [[2, 2], [3, 2], [4, 2], [5, 2], [2, 3], [2, 4], [2, 5]].map(([x, y]) => px[(y * w + x) * 4])
+    expect(edge.some((r) => r === 255)).toBe(true)
+    expect(edge.some((r) => r === 40)).toBe(true)
+    expect(a(0, 0)).toBe(0)
+    /* Under radar: untouched. */
+    const radar = new Uint8ClampedArray(w * h * 4).fill(200)
+    expect(softenEstimate(radar, w, h, [{ x0: 0, y0: 0, x1: w, y1: h }])).toBe(0)
+    expect([...radar].every((v) => v === 200)).toBe(true)
+    /* A tile over Kansas is all radar; one over the mid-Atlantic none. */
+    expect(radarPixels(6, 14, 24).some((q) => q.x0 <= 0 && q.y0 <= 0 && q.x1 >= 256 && q.y1 >= 256)).toBe(true)
+    expect(radarPixels(6, 24, 24)).toEqual([])
+  })
+})

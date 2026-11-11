@@ -208,7 +208,7 @@ try {
     /* The map: its Cloud chip opens the Sky page; no Sky sheet with tabs. */
     await page.locator('.home .hbtn--round[aria-label="Open the map"]').click().catch(() => fail(`${label}: no map button on the home`))
     await wait(2500)
-    const chip = await page.locator('.chips2 button:has-text("Cloud"), .chip2:has-text("Cloud")').first().click({ timeout: 4000 }).then(() => true, () => false)
+    const chip = await page.locator('.chip2[data-chip="cloud"]').first().click({ timeout: 4000 }).then(() => true, () => false)
     if (!chip) fail(`${label}: no Cloud chip on the map`)
     await wait(3000)
     if (!(await ev(`!!document.querySelector('.spage')`))) fail(`${label}: the map's Cloud chip opened no Sky page`)

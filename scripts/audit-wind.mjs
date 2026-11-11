@@ -116,7 +116,7 @@ try {
     await goToStage(ev, wait, 'plan')
     await wait(2500)
     /* The Wind chip opens the Wind page itself since 30 Oct (docs/navigation.md). */
-    await page.locator('.chip2', { hasText: 'WIND' }).first().tap()
+    await page.locator('.chip2[data-chip="wind"]').first().tap()
     let w = null
     for (let i = 0; i < 20; i += 1) {
       await wait(500)

@@ -120,7 +120,7 @@ const WIND = `JSON.stringify((() => {
 
 /* The radar legend: where it is, whether it is in the peek, and the slider's box. */
 const RADAR = `JSON.stringify((() => {
-  const l = document.querySelector('.wlay__legend[aria-label="Radar colours"]')
+  const l = document.querySelector('.wlay__legend[aria-label^="Radar colours"]')
   if (!l) return { present: false }
   const shown = (e) => !!e && !e.closest('[hidden]') && e.getBoundingClientRect().height > 0 && getComputedStyle(e).visibility !== 'hidden'
   const box = (e) => { const r = e.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.right), Math.round(r.bottom)] }
@@ -134,7 +134,7 @@ const RADAR = `JSON.stringify((() => {
     whole: wrap ? box(wrap) : null,
     range: range && shown(range) ? box(range) : null,
     text: wrap?.innerText ?? '',
-    swatches: l.querySelectorAll('.wlay__sw').length,
+    bar: !!l.querySelector('.wlay__bar') && /Light/.test(l.textContent) && /Extreme/.test(l.textContent),
   }
 })())`
 
@@ -263,7 +263,7 @@ try {
       if (!r.present || !r.shown) return fail(`${label}, radar ${when}: the radar legend is not on show`)
       if (!r.inPeek) fail(`${label}, radar ${when}: the legend is not in the time sheet's place (it is in the card)`)
       if (s.timebar) fail(`${label}, radar ${when}: the time bar is still in the peek beside the legend`)
-      if (r.swatches < 6) fail(`${label}, radar ${when}: ${r.swatches} colours in the legend`)
+      if (!r.bar) fail(`${label}, radar ${when}: no labelled bar, light to extreme, in the legend`)
       const floor = viewport.height - insets.bottom
       for (const [name, b] of [['legend', r.legend], ['legend and timeline', r.whole], ['radar slider', r.range]]) {
         if (b === null) {

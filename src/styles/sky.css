@@ -186,7 +186,8 @@
   font-size: 12px;
   font-weight: 700;
 }
-.spage__gap {
+.spage__gap,
+.spage__station {
   margin: 6px 0 0;
   font-size: var(--text-sm);
   color: rgb(255 255 255 / 0.85);

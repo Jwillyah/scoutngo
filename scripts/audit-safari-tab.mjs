@@ -18,7 +18,7 @@ import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { webkit, devices } from './gate/playwright.mjs'
-import { ensureApp, goToStage, guardAudit, startWatchdog, APP_ORIGIN, openMenu } from './preflight.mjs'
+import { ensureApp, goToStage, guardAudit, startWatchdog, APP_ORIGIN, openMenu, setSheet } from './preflight.mjs'
 
 /* Batch Polish, Section 2: the menu is the home's (and setup's and field's); on the map its Back goes home first (scripts/preflight.mjs openMenu). */
 const menuOn = (pg) => openMenu((x) => pg.evaluate(x), (ms) => pg.waitForTimeout(ms))
@@ -182,8 +182,9 @@ try {
 
   /* The plan sheet at each stop. */
   await check('Plan sheet', '.sheet', 'tab-sheet')
-  /* The Tides page, from its chip. */
-  await page.locator('.chip2', { hasText: 'TIDE' }).first().tap()
+  /* The Tides page, from its cell; the strip steps aside while the sheet is open (Batch Polish 2, Section 1), so the sheet goes to peek first. */
+  await setSheet(ev, wait, 'peek')
+  await page.locator('.chip2[data-chip="tide"]').first().tap()
   await wait(1500)
   await check('Tides page', '.page, .dpage', 'tab-tides')
   await page.keyboard.press('Escape')
@@ -191,7 +192,8 @@ try {
   await wait(800)
   /* Every chip opens its page (30 Oct, docs/navigation.md): Golden the sun, moon and night (the Sky sheet, no tabs), Cloud the Sky page (Batch Pages, Section 3), Wind the Wind page. */
   for (const [chip, sel, shot] of [['GOLDEN', '.mpage', 'tab-golden'], ['CLOUD', '.spage', 'tab-cloud']]) {
-    await page.locator('.chip2', { hasText: chip }).first().tap()
+    await setSheet(ev, wait, 'peek')
+    await page.locator(`.chip2[data-chip="${chip === 'GOLDEN' ? 'golden' : 'cloud'}"]`).first().tap()
     await wait(1500)
     if (chip === 'CLOUD' && !(await ev(`!!document.querySelector('.spage')`))) fail(`the ${chip} chip opened no Sky page`)
     if (chip === 'GOLDEN' && !(await ev(`!!document.querySelector('.mpage .skyc__swipe')`))) fail(`the ${chip} chip opened no sun, moon and night page`)
@@ -200,7 +202,8 @@ try {
     await goToStage(ev, wait, 'plan')
     await wait(800)
   }
-  await page.locator('.chip2', { hasText: 'WIND' }).first().tap()
+  await setSheet(ev, wait, 'peek')
+  await page.locator('.chip2[data-chip="wind"]').first().tap()
   await wait(1500)
   await check('Wind page', '.windp, .dpage--wind', 'tab-wind-page')
   await page.keyboard.press('Escape')
