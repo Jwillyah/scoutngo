@@ -160,6 +160,7 @@ export function SettingsPage(props: Props) {
   const [debug, setDebug] = useState(false)
   const [nearMe, setNearMe] = useNearMeSetting()
   const [feed, setFeed] = useCalendarFeed()
+  const [feedHow, setFeedHow] = useState(false)
   const feedHref = feedAddress(props.feedPlace)
   const [home, setHome] = useState<Home | null>(readHome)
   const [locateLine, setLocateLine] = useState<string | null>(null)
@@ -216,7 +217,14 @@ export function SettingsPage(props: Props) {
       </Group>
 
       <Group title="Alerts">
-        <Row label="Sky calls in my calendar" sub="Off unless you switch it on" end={<Toggle on={feed} label="Sky calls in my calendar" onChange={setFeed} />} />
+        {/* Batch Beach, Section 6: one line for what it does and what it sends; the detail under How it works. */}
+        <Row label="Sky calls in my calendar" sub="Puts sunrise/sunset calls in your calendar · sends your spot rounded to ~1 km" end={<Toggle on={feed} label="Sky calls in my calendar" onChange={setFeed} />} />
+        <Row label="How it works" onClick={() => setFeedHow((v) => !v)} />
+        {feedHow ? (
+          <p className="set2__note" data-feed-how>
+            Off unless you switch it on. Your calendar app sends this spot, rounded to about a kilometre, to this app’s server each time it refreshes, about hourly. The server asks the forecast, and in the hour before a sunrise or sunset the weather stations by their ids, so a call that changes from Maybe to Go or Skip changes in your calendar too; it logs nothing. Vercel’s own request logs keep the request line for an hour. Turn it off here and remove the calendar in your calendar app to stop it.
+          </p>
+        ) : null}
         {!feed || feedHref === null ? null : (
           <>
             <a className="set2__row set2__row--tap" href={feedHref}>
@@ -226,7 +234,7 @@ export function SettingsPage(props: Props) {
               <span className="set2__chev" aria-hidden="true">›</span>
             </a>
             <p className="set2__note">
-              Your calendar app sends this spot, rounded to about a kilometre ({props.feedPlace?.lat.toFixed(2)}, {props.feedPlace?.lon.toFixed(2)}), to this app’s server each time it refreshes, about hourly. The server asks the forecast, and in the hour before a sunrise or sunset the weather stations by their ids, so a call that changes to Go or Skip changes in your calendar too; it logs nothing. Vercel’s own request logs keep the request line for an hour. Turn it off here and remove the calendar in your calendar app to stop it.
+              Sends {props.feedPlace?.lat.toFixed(2)}, {props.feedPlace?.lon.toFixed(2)} each time your calendar refreshes.
             </p>
           </>
         )}

@@ -34,4 +34,18 @@ describe('the top bar status', () => {
   it('online shows nothing', () => {
     expect(bar(true)).not.toContain('topbar__offline')
   })
+
+  /* Batch Beach, Section 6: the four map icons on the 24-unit grid, one stroke. */
+  it('back, menu, plus and locate: 24-unit grid, one stroke width', () => {
+    const html = renderToStaticMarkup(
+      <TopBar onMenu={() => {}} menuOpen={false} pill={null} onAdd={() => {}} adding={false} onLocate={() => {}} locating={false} locateNote={null} online onBack={() => {}} />,
+    )
+    const svgs = html.match(/<svg[^>]*>/g) ?? []
+    expect(svgs.length).toBe(4)
+    for (const s of svgs) {
+      expect(s).toContain('viewBox="0 0 24 24"')
+      expect(s).toContain('stroke-width="2"')
+    }
+    expect(html).not.toMatch(/<path[^>]*stroke-width/)
+  })
 })

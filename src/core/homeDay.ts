@@ -231,3 +231,6 @@ export function groundOf(sunDeg: number, code: number | null, storms: boolean): 
   if (code === 3) return 'cloud'
   return 'day'
 }
+
+/** Batch Beach, Section 6: the Sky card's strip is in colour only for a possible or likely call (Maybe, Go); grey for Unlikely (Skip) and for none. */
+export const skyStripLit = (call: 'Go' | 'Maybe' | 'Skip' | null): boolean => call === 'Go' || call === 'Maybe'

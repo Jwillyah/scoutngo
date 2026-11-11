@@ -68,6 +68,15 @@ describe('Settings, a page of its own (30 Oct)', () => {
     expect(html).not.toMatch(/\bsafe\b/i)
   })
 
+  /* Batch Beach, Section 6: the calendar row in one line, the detail behind How it works. */
+  it('sky calls in my calendar: one line of what it does and what it sends, then How it works', () => {
+    const t = page().replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
+    expect(t).toContain('Sky calls in my calendar Puts sunrise/sunset calls in your calendar · sends your spot rounded to ~1 km')
+    expect(t).toContain('How it works')
+    expect(page()).not.toContain('data-feed-how')
+    expect(t).not.toContain('Vercel’s own request logs')
+  })
+
   it('and the units have left About', () => {
     const html = renderToStaticMarkup(
       <AboutSheet onHow={() => {}} />,

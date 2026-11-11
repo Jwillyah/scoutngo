@@ -35,8 +35,10 @@ interface TopBarProps {
   addHidden?: boolean
 }
 
+/* Batch Beach, Section 6: the four on the 24-unit grid with one stroke (they were 20-unit, four stroke widths). */
+export const TOP_ICON_STROKE = 2
 const icon = (path: ReactNode) => (
-  <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={TOP_ICON_STROKE} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     {path}
   </svg>
 )
@@ -59,17 +61,11 @@ export function TopBar({
     <header className="topbar">
       {onBack === undefined ? null : (
         <button type="button" className="topbar__btn topbar__back" onClick={onBack} aria-label="Back to the home">
-          {icon(<path d="M12.5 4.5 7 10l5.5 5.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />)}
+          {icon(<path d="M15 5.5 8.5 12l6.5 6.5" />)}
         </button>
       )}
-      <button
-        type="button"
-        className="topbar__btn"
-        onClick={onMenu}
-        aria-label="Menu"
-        aria-expanded={menuOpen}
-      >
-        {icon(<path d="M3 5.5h14M3 10h14M3 14.5h14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />)}
+      <button type="button" className="topbar__btn" onClick={onMenu} aria-label="Menu" aria-expanded={menuOpen}>
+        {icon(<path d="M4 7h16M4 12h16M4 17h16" />)}
       </button>
 
       <div className="topbar__pill">
@@ -94,7 +90,7 @@ export function TopBar({
         aria-pressed={adding}
         aria-label={addLabel ?? (adding ? 'Tap the map to place it' : 'Add a position')}
       >
-        {icon(<path d="M10 4v12M4 10h12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />)}
+        {icon(<path d="M12 5v14M5 12h14" />)}
       </button>
       )}
       {onLocate === null ? null : (
@@ -105,15 +101,7 @@ export function TopBar({
         disabled={locating}
         aria-label={locating ? 'Finding where you are' : 'Go to where I am'}
       >
-        {icon(
-          <path
-            d="M16.5 3.5 3.5 9l5.6 1.9L11 16.5z"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinejoin="round"
-          />,
-        )}
+        {icon(<path d="M19.8 4.2 4.2 10.8l6.7 2.3 2.3 6.7z" />)}
       </button>
       )}
       {locateNote === null ? null : (

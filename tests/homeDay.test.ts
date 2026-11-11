@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bestRun, bestWindows, cardList, colorWords, conditionOf, sideWords, nothingLine, rainLine, spanWords, stripSteps, weekHeadline } from '../src/core/homeDay.ts'
+import { bestRun, bestWindows, skyStripLit, cardList, colorWords, conditionOf, sideWords, nothingLine, rainLine, spanWords, stripSteps, weekHeadline } from '../src/core/homeDay.ts'
 import { homeOrder, primaryFor, reviveActivities, shootPicked, showsDrone, showsPhotoTools } from '../src/lib/activities.ts'
 
 /*
@@ -121,5 +121,14 @@ describe('what you do orders the home, and hides only tools', () => {
     expect(reviveActivities('["surf","nonsense","surf","fish"]')).toEqual(['surf', 'fish'])
     expect(reviveActivities('{')).toBeNull()
     expect(reviveActivities(null)).toBeNull()
+  })
+})
+
+describe('the Sky card strip (Batch Beach, Section 6)', () => {
+  it('colour for Go and Maybe; grey for Unlikely and for no call', () => {
+    expect(skyStripLit('Go')).toBe(true)
+    expect(skyStripLit('Maybe')).toBe(true)
+    expect(skyStripLit('Skip')).toBe(false)
+    expect(skyStripLit(null)).toBe(false)
   })
 })

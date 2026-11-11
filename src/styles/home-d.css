@@ -175,19 +175,30 @@
 .hcard__dot {
   fill: var(--white);
 }
-.hcard__turn {
-  fill: var(--white);
-  font-size: 12px;
+.hcard__tidepic {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+/* Batch Beach, Section 6: the next low and high as text, 12 px or more (they were about 9 px inside the stretched chart). */
+.hcard__turns {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--white);
+  font-size: var(--text-xs);
   font-weight: 700;
 }
+/* Batch Beach, Section 6: the dial bigger (64 and 84 px before). */
 .hcard__dial {
-  width: 64px;
-  height: 64px;
+  width: 80px;
+  height: 80px;
   flex: none;
 }
 .hcards--few .hcard__dial {
-  width: 84px;
-  height: 84px;
+  width: 100px;
+  height: 100px;
 }
 .hcard__dialface {
   fill: rgb(255 255 255 / 0.04);
@@ -219,6 +230,11 @@
 }
 .hcard__strip--set {
   background: linear-gradient(90deg, var(--caution), var(--d-glow), var(--d-glow-violet), var(--d-night-top));
+}
+/* Batch Beach, Section 6: an Unlikely sky (or no call) is not drawn in colour. */
+.hcard__strip--muted {
+  background: var(--color-line-strong);
+  opacity: 0.6;
 }
 .hcard__ladder {
   display: grid;
@@ -279,8 +295,8 @@
   font-size: var(--text-lg);
 }
 .hcards--many .hcard__dial {
-  width: 52px;
-  height: 52px;
+  width: 64px;
+  height: 64px;
 }
 .hcards--many .hcard__chart--tide {
   height: 44px;
@@ -332,7 +348,12 @@
     gap: 2px;
   }
 }
-/* The six's half-width tide chart is drawn under half size: its turn labels came out 5.8 px (Batch QA, Section 1). The card's tag and line say the next turn there; the big chart keeps them. */
-.hday--many .hcard__turn {
+/* The six's half-width tide card: the card's tag and line say the next turn there; the wider cards show the next low and high (Batch QA, Section 1; Batch Beach, Section 6). */
+.hday--many .hcard__turns {
   display: none;
+}
+
+/* Batch Beach, Section 6: the small Moon card's line never wraps. */
+.hcard--moon.hcard--small .hcard__line {
+  white-space: nowrap;
 }

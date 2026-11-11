@@ -6,7 +6,7 @@ import { saneAzimuth } from '../core/sanity.ts'
 import { moonTimesOnLocalDay } from '../core/moonTimes.ts'
 import { droneTag, kt, surfOn, surfTag, windTag, type CallRead } from '../core/briefing.ts'
 import { droneWindow } from '../core/droneWindow.ts'
-import { bestRun, bestWindows, colorWords, weekSurf, WEEK_SURE_DAYS, conditionOf, groundOf, sideWords, nothingLine, rainLine, spanWords, stripSteps, weekHeadline, type Activity, type CardKind, type WindowRow } from '../core/homeDay.ts'
+import { bestRun, bestWindows, colorWords, skyStripLit, weekSurf, WEEK_SURE_DAYS, conditionOf, groundOf, sideWords, nothingLine, rainLine, spanWords, stripSteps, weekHeadline, type Activity, type CardKind, type WindowRow } from '../core/homeDay.ts'
 import { camsFacingWaterOrSun } from '../core/skyCams.ts'
 import { wakeAt } from '../core/alertIcs.ts'
 import { formatClock } from '../core/timezone.ts'
@@ -567,19 +567,33 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
     line = next === null ? null : `${next.kind} ${clock(next.at)}${layout === 'few' ? ` · ${next.feet.toFixed(1)} ft${feet === null ? '' : ` · now ${feet.toFixed(1)} ft`}` : ''}`
     tag = next === null ? null : `${next.kind === 'high' ? 'High' : 'Low'} ${clock(next.at)}`
     const curve = tideCurve(brief.turns, new Date(from - 3 * 3_600_000), 24, CHART)
-    pic = curve === null ? null : (
-      <svg className="hcard__chart hcard__chart--tide" viewBox={`0 0 ${CHART.w} ${CHART.h + 22}`} preserveAspectRatio="none" aria-hidden="true">
-        <g transform="translate(0 11)">
-          <path d={curve.line} className="hcard__line hcard__line--tide" />
-          <circle cx={(3 / 24) * CHART.w} cy={curve.scale(tideAt(brief.turns, new Date(from)) ?? 0)} r="4" className="hcard__dot" />
-          {curve.turns.map((p) => (
-            <text key={p.turn.at.getTime()} x={Math.min(CHART.w - 40, Math.max(2, p.x - 24))} y={p.turn.kind === 'high' ? p.y - 4 : p.y + 11} className="hcard__turn">
-              {p.turn.kind === 'high' ? 'H' : 'L'} {p.turn.feet.toFixed(1)} · {clock(p.turn.at).replace(/:00 /, ' ').replace(/ ([AP])M$/, (_m, a: string) => a.toLowerCase())}
-            </text>
-          ))}
-        </g>
-      </svg>
-    )
+    /*
+     * Batch Beach, Section 6: the turns' labels sat inside the stretched chart
+     * at about 9 px; now only the next low and the next high, as text at 12 px
+     * or more under the curve.
+     */
+    const nextLow = brief.turns.find((x) => x.kind === 'low' && x.at.getTime() > from) ?? null
+    const nextHigh = brief.turns.find((x) => x.kind === 'high' && x.at.getTime() > from) ?? null
+    const turnWords = (t: typeof nextLow) => (t === null ? null : `${t.kind === 'high' ? 'High' : 'Low'} ${clock(t.at)} · ${t.feet.toFixed(1)} ft`)
+    pic =
+      curve === null ? null : (
+        <span className="hcard__tidepic">
+          <svg className="hcard__chart hcard__chart--tide" viewBox={`0 0 ${CHART.w} ${CHART.h + 22}`} preserveAspectRatio="none" aria-hidden="true">
+            <g transform="translate(0 11)">
+              <path d={curve.line} className="hcard__line hcard__line--tide" />
+              <circle cx={(3 / 24) * CHART.w} cy={curve.scale(tideAt(brief.turns, new Date(from)) ?? 0)} r="4" className="hcard__dot" />
+            </g>
+          </svg>
+          <span className="hcard__turns" data-tide-turns>
+            {[nextLow, nextHigh]
+              .filter((t): t is NonNullable<typeof t> => t !== null)
+              .sort((a, b) => a.at.getTime() - b.at.getTime())
+              .map((t) => (
+                <span key={t.at.getTime()}>{turnWords(t)}</span>
+              ))}
+          </span>
+        </span>
+      )
   } else if (kind === 'sky') {
     /* The sunset still to come, or after it tomorrow's sunrise: never an event that has passed (Batch Flow, Section 4). */
     title = 'Sky'
@@ -595,7 +609,9 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
     if (which === 'today' && !past && at != null) shared = { key: 'sunset', value: `sunset ${clock(at)}`.toLowerCase() }
     tag = read?.call ?? null
     tagGood = read?.call === 'Go'
-    pic = <span className={`hcard__strip hcard__strip--${past ? 'rise' : 'set'}`} aria-hidden="true" />
+    /* Batch Beach, Section 6: colour only for a possible or likely call; grey for Unlikely and for none. */
+    const lit = skyStripLit(read?.call ?? null)
+    pic = <span className={`hcard__strip hcard__strip--${past ? 'rise' : 'set'}${lit ? '' : ' hcard__strip--muted'}`} data-strip={lit ? 'lit' : 'muted'} aria-hidden="true" />
   } else if (kind === 'drone') {
     title = small ? 'Drone' : 'Drone · 400 ft'
     /* Batch Flow, Section 5: the Drone page first. */
@@ -627,8 +643,10 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
     const moon = day?.moon ?? null
     big = moon === null ? '—' : moon.fraction < 0.03 ? 'New' : moon.fraction > 0.97 ? 'Full' : `${Math.round(moon.fraction * 100)}%`
     /* The small card has room for the time alone (Batch QA, Section 0B: "rise 10:05 PM · ENE" was cut, then wrapped to four lines); its bearing is the Sky page's. */
-    line = `${rise === null ? 'no rise' : `rise ${clock(rise)}`}${az === null || small ? '' : ` · ${compass(az)}`}`
-    pic = moon === null ? null : <MoonGlyph phase={moon.phase} size={layout === 'few' ? 56 : 40} />
+    /* Batch Beach, Section 6: the small card in one line, the short clock ("rise 10:05p"; it wrapped to three lines). */
+    const riseAt = rise === null ? null : small ? clock(rise).replace(/ ([AP])M$/, (_m, x: string) => x.toLowerCase()) : clock(rise)
+    line = `${riseAt === null ? 'no rise' : `rise ${riseAt}`}${az === null || small ? '' : ` · ${compass(az)}`}`
+    pic = moon === null ? null : <MoonGlyph phase={moon.phase} size={layout === 'few' ? 56 : small ? 32 : 40} />
   }
   return (
     <button type="button" className={`hcard hcard--${kind}${wide ? ' hcard--wide' : ''}${small ? ' hcard--small' : ''}`} onClick={() => onOpen(target)}>
