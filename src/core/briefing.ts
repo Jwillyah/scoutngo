@@ -68,6 +68,8 @@ export interface CallRead {
   peak?: Date | null
   /** "Gap to the WSW: open · Henderson scattered, Roxboro clear", when the gap watch spoke (Batch J). */
   gapLine?: string | null
+  /** The best spot near when it beats here (Batch BEST SKY, Section 6): "Lynnhaven Inlet 6 mi NW". */
+  bestNear?: string | null
   /** Models agreeing that it fires, for the week's certainty dots. */
   agree: number
   of: number

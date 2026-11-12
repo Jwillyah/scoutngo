@@ -1,4 +1,4 @@
-import { betterColorLine } from '../core/bestSky.ts'
+import { bestSpotWords, betterColorLine } from '../core/bestSky.ts'
 import { useBestSky } from '../lib/useBestSky.ts'
 import '../styles/home-d.css'
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -281,7 +281,9 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
     station: which === 'today' && obs !== null && obsFresh(obs, now) ? { sky: obs.sky, visMi: obs.visMi } : null,
   })
   /* Batch TRUTH, Section 0.5: a live colour window with a Maybe or better leads the home. */
-  const colorNow = which !== 'today' || day === null ? null : colorNowLine([day.reads.sunrise, day.reads.sunset], now, venue, timeZone)
+  /* Batch BEST SKY, Section 4: today only, with Shoot picked: the grid within 15 mi (7 or so questions, each kept an hour). */
+  const bestSky = useBestSky(which === 'today' && order.includes('shoot') ? venue : null, 15, now)
+  const colorNow = which !== 'today' || day === null ? null : colorNowLine([day.reads.sunrise, day.reads.sunset], now, venue, timeZone, bestSky.event === null ? null : bestSpotWords(bestSky.ranked, bestSky.here, venue, units.distance === 'ft'))
   const bigTemp = which === 'today' ? at('temperature_2m', now) : hi
   /* The one wind now (src/lib/windNow.ts), as the wind card and the Wind page read it. */
   const heroWind = windAt(wx, when, obs)
@@ -331,8 +333,6 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
    * lowest-priority card left for the menu, until nothing scrolls. A resize
    * (rotation, Safari's bars, the text size) starts again.
    */
-  /* Batch BEST SKY, Section 4: today only, with Shoot picked: the grid within 15 mi (7 or so questions, each kept an hour). */
-  const bestSky = useBestSky(which === 'today' && order.includes('shoot') ? venue : null, 15, now)
   const better = bestSky.event === null ? null : betterColorLine(bestSky.ranked, bestSky.here, venue, formatClock(bestSky.event.peak, timeZone), units.distance === 'ft')
   const nextText = nextWords === null ? (loading ? 'Reading the forecast…' : noForecast ? 'No forecast yet · retrying' : nothingLine(which, nextGood)) : `Next: ${nextWords}`
   const root = useRef<HTMLDivElement | null>(null)

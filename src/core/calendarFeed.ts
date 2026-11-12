@@ -62,7 +62,7 @@ export function feedIcs(reads: readonly CallRead[], at: { lat: number; lon: numb
         `DTSTART:${icsStamp(from)}`,
         `DTEND:${icsStamp(to)}`,
         `SUMMARY:${icsText(`${KIND[r.kind]} ${r.call}`)}`,
-        `DESCRIPTION:${icsText(stations ? `${r.why}${r.gapLine == null ? '' : ` ${r.gapLine}.`} The stations' call, from ${r.by}.` : `${r.why} From the forecast models only; open ScoutNGo for the stations' final call within the hour.`)}`,
+        `DESCRIPTION:${icsText(`${stations ? `${r.why}${r.gapLine == null ? '' : ` ${r.gapLine}.`} The stations' call, from ${r.by}.` : `${r.why} From the forecast models only; open ScoutNGo for the stations' final call within the hour.`}${r.bestNear == null ? '' : ` Best near: ${r.bestNear}.`}`)}`,
         ...alarm,
         'END:VEVENT',
       ]

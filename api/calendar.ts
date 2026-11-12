@@ -27,6 +27,7 @@ import { feedIds, feedObsFrom, latestSkies } from '../src/lib/feedObs.ts'
 import { feedCoords, feedIcs, FEED_DAYS } from '../src/core/calendarFeed.ts'
 import { fireVerdict } from '../src/core/fireOutlook.ts'
 import { firePathsRangeUrl, nearestHour, parseFirePaths, pathsAt } from '../src/lib/skyFireData.ts'
+import { feedBestSpot } from '../src/lib/feedBestSky.ts'
 
 const AVWX_METAR = 'https://aviationweather.gov/api/data/metar'
 /** The stations are read this long before an event, as the phone's observations (src/lib/useSkyObs.ts OBS_FROM_MS). */
@@ -69,7 +70,10 @@ export async function GET(request: Request): Promise<Response> {
         const paths = data === null ? [] : pathsAt(data, nearestHour(e.at))
         const lead = e.at.getTime() - now.getTime()
         const obs = lead <= FEED_OBS_MS && lead >= -CONFIRM_WITHIN_MS ? await stationsFor(at, e.at) : null
-        reads.push(eventCall(paths.length === 0 ? null : fireVerdict(paths, { event: e.at, kind, venue: at }), kind, e.at, now, null, obs))
+        const read = eventCall(paths.length === 0 ? null : fireVerdict(paths, { event: e.at, kind, venue: at }), kind, e.at, now, null, obs)
+        /* Batch BEST SKY, Section 6: the best spot near, for the next day's events worth a look. */
+        const bestNear = read.call === 'Go' || read.call === 'Maybe' ? await feedBestSpot(at, e.at, now).catch(() => null) : null
+        reads.push({ ...read, bestNear })
       }
     } catch {
       /* No answer: no events for this kind; the calendar keeps asking. */

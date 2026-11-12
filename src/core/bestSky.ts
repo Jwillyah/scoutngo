@@ -276,3 +276,10 @@ export function betterColorLine(ranked: readonly RankedSpot[], here: ScoredPoint
   if (best.score < here.score + BETTER_BY) return null
   return `Better color ${distanceWords(from, best.spot.at, miles)} · ${best.spot.name} · ${at}`
 }
+
+/** The best spot near in a few words, when it beats where you are: "Lynnhaven Inlet 6 mi NW" (the "Color now" line and the calendar). */
+export function bestSpotWords(ranked: readonly RankedSpot[], here: ScoredPoint | null, from: LatLon, miles: boolean): string | null {
+  const best = ranked.find((r) => r.word !== 'Little')
+  if (best === undefined || here === null || distanceMeters(from, best.spot.at) / 1000 < BETTER_FROM_KM || best.score < here.score + BETTER_BY) return null
+  return `${best.spot.name} ${distanceWords(from, best.spot.at, miles)}`
+}

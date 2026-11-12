@@ -38,9 +38,13 @@ export function BestSkyPage({ venue, placeName, timeZone, now, miles, saved = []
   const track = useRef<HTMLDivElement>(null)
   const sky = useBestSky(venue, radius, now, saved)
   const ev = sky.event
+  /* Sideways only, and each page from its top: the three share one vertical scroller, so a page would otherwise open at the last one's depth. */
+  const toTop = () => track.current?.closest('.ppage__body')?.scrollTo({ top: 0 })
   const go = (i: number) => {
     setPage(i)
-    track.current?.children[i]?.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' })
+    const t = track.current
+    t?.scrollTo({ left: i * t.clientWidth, behavior: 'smooth' })
+    toTop()
   }
   const top = sky.ranked.filter((r) => r.word !== 'Little').slice(0, 3)
   const chosen = sky.ranked.find((r) => r.spot.id === picked) ?? top[0] ?? sky.ranked[0] ?? null
@@ -67,7 +71,10 @@ export function BestSkyPage({ venue, placeName, timeZone, now, miles, saved = []
         onScroll={(e) => {
           const el = e.currentTarget
           const i = Math.round(el.scrollLeft / Math.max(1, el.clientWidth))
-          if (i !== page) setPage(i)
+          if (i !== page) {
+            setPage(i)
+            toTop()
+          }
         }}
       >
         <BestSkyMap venue={venue} radius={radius} sky={sky} top={top} miles={miles} timeZone={timeZone} onPick={pick} onRadius={setRadius} />

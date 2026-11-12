@@ -216,6 +216,9 @@ try {
     )
     console.log(`  page 3: ${JSON.stringify(sp)}`)
     if (sp.on !== 'true') fail(`${label}: a row on page 2 did not bring page 3 up`)
+    /* The view whole and in sight: on 390 x 664 the page's column squeezed it to a 25 px sliver (12 Nov). */
+    const scene = JSON.parse(await ev(`JSON.stringify((() => { const b = document.querySelectorAll('.bsky__page')[2]?.querySelector('.bsky__scene')?.getBoundingClientRect(); return b ? { top: b.top, h: b.height, w: b.width } : null })())`))
+    if (scene === null || scene.top < 0 || scene.h < scene.w * 0.5) fail(`${label}: page 3's view is ${JSON.stringify(scene)}, not whole and in sight`)
     if (sp.name !== 'Lesner Bridge') fail(`${label}: page 3 shows ${JSON.stringify(sp.name)}, not the spot picked (Lesner Bridge)`)
     if (!/^(Likely|Possible|Little)$/.test(sp.word ?? '')) fail(`${label}: page 3's word is ${JSON.stringify(sp.word)}`)
     if (!sp.scene || !sp.glow) fail(`${label}: no view from the spot`)
