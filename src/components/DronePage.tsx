@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { getPosition } from 'suncalc'
 import { droneTag } from '../core/briefing.ts'
 import type { LatLon } from '../core/geo.ts'
-import { airColumn, bestTimeBar, calmWindow, PLANNED_FT } from '../core/dronePage.ts'
+import { airColumn, arrowPath, bestTimeBar, calmWindow, NIGHT_STARS, PLANNED_FT, starsOut } from '../core/dronePage.ts'
 import { groundOf } from '../core/homeDay.ts'
 import { windAtFeet } from '../core/homeCards.ts'
 import { formatClock } from '../core/timezone.ts'
@@ -116,6 +116,8 @@ export function DronePage({ venue, placeName, timeZone, units, now, drone, onBac
         <p className="dcard__label">The air above the beach · now</p>
         <svg className="drp__pic" viewBox="0 0 300 200" role="img" aria-label={rows.map((r) => `${r.ft === 0 ? 'ground' : `${r.ft} ft`}: ${speed(r.mps)} ${unit}`).join(', ')}>
           <rect x="0" y="0" width="300" height="200" className={`drp__sky drp__sky--${alt(now) < -6 ? 'night' : 'day'}`} />
+          {/* The board's night sky: a scatter of stars (drawn, not a star chart) when the sun is down past civil dusk. */}
+          {starsOut(alt(now)) ? NIGHT_STARS.map(([sx, sy, sr]) => <circle key={`${sx},${sy}`} cx={sx} cy={sy} r={sr} className="drp__star" />) : null}
           <rect x="0" y="176" width="300" height="24" className="drp__sea" />
           <path d="M175 200 L196 172 Q240 160 300 166 L300 200 Z" className="drp__beach" />
           {rows.map((r) => (
@@ -125,7 +127,8 @@ export function DronePage({ venue, placeName, timeZone, units, now, drone, onBac
                 const len = 14 + r.length * 36
                 const x0 = 62 + k * 60
                 return (
-                  <path key={k} d={goesEast ? `M${x0} 0 h${len} m-6 -5 l6 5 l-6 5` : `M${x0 + len} 0 h-${len} m6 -5 l-6 5 l6 5`} className={`drp__arrow drp__arrow--${r.role}`} />
+                  /* Batch Polish 2, Section 5 (board D_Drone): a streak with a slight lift, the head at its end. */
+                  <path key={k} d={arrowPath(x0, len, goesEast)} className={`drp__arrow drp__arrow--${r.role}`} />
                 )
               })}
               <text x="294" y="4" textAnchor="end" className={`drp__rowv drp__rowv--${r.role}`}>{speed(r.mps)} {unit}</text>

@@ -73,3 +73,17 @@ export function bestTimeBar(now: Date, hours: number, sunAlt: (t: Date) => numbe
 
 /** The first calm window ahead, or null. */
 export const calmWindow = (segs: readonly FlySegment[]): FlySegment | null => segs.find((s) => s.band === 'calm') ?? null
+
+/* ----------------------------------------------- the drawing (Batch Polish 2, Section 5; board D_Drone) */
+
+/** One wind streak in the air picture: a slight lift along its length, the head where the wind goes. */
+export function arrowPath(x0: number, len: number, east: boolean): string {
+  return east ? `M${x0} 2 q${len / 2} -5 ${len} -2 m-7 -4 l7 4 l-6 5` : `M${x0 + len} 2 q-${len / 2} -5 -${len} -2 m7 -4 l-7 4 l6 5`
+}
+
+/** The night sky's stars (decoration, the same every night) once the sun is past civil dusk. */
+export const starsOut = (sunAltitudeDeg: number): boolean => sunAltitudeDeg < -6
+export const NIGHT_STARS: readonly [number, number, number][] = [
+  [14, 12, 0.8], [52, 30, 0.6], [88, 9, 0.9], [121, 41, 0.6], [160, 18, 0.7], [197, 35, 0.6], [232, 8, 0.9], [271, 27, 0.7],
+  [31, 58, 0.6], [104, 70, 0.5], [176, 61, 0.6], [248, 74, 0.5], [289, 52, 0.6], [69, 96, 0.5], [214, 104, 0.5], [143, 118, 0.4],
+]

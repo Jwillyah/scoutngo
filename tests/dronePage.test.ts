@@ -39,3 +39,17 @@ describe('the GPS tile', () => {
     expect(kpWord(6.3)).toBe('storm G2')
   })
 })
+
+describe('the air picture, drawn as the board (Batch Polish 2, Section 5)', () => {
+  it('a streak points where the wind goes, its head at the far end', async () => {
+    const { arrowPath } = await import('../src/core/dronePage.ts')
+    expect(arrowPath(62, 40, true)).toBe('M62 2 q20 -5 40 -2 m-7 -4 l7 4 l-6 5')
+    expect(arrowPath(62, 40, false)).toBe('M102 2 q-20 -5 -40 -2 m7 -4 l-7 4 l6 5')
+  })
+  it('stars only after civil dusk, inside the picture', async () => {
+    const { starsOut, NIGHT_STARS } = await import('../src/core/dronePage.ts')
+    expect(starsOut(-7)).toBe(true)
+    expect(starsOut(-5)).toBe(false)
+    expect(NIGHT_STARS.every(([x, y]) => x > 0 && x < 300 && y > 0 && y < 130)).toBe(true)
+  })
+})

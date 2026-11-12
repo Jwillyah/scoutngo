@@ -178,3 +178,7 @@
   flex: 1;
   min-height: 52px;
 }
+/* Batch Polish 2, Section 5 (board D_Drone): the night sky's stars. */
+.drp__star {
+  fill: rgb(255 255 255 / 0.7);
+}
