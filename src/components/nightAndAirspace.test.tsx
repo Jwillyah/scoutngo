@@ -135,9 +135,9 @@ describe('the airspace panel', () => {
    * ground-level ceiling, which is a different and much worse answer than
    * "there is no cell here".
    */
-  it('prints a dash rather than a zero where there is no cell', () => {
+  it('prints no ceiling, never a zero, where there is no cell (the ceiling is said once, in the lead: Batch TRUTH)', () => {
     const html = render(SANDBRIDGE, 200)
-    expect(html).toContain('air__dash')
+    expect(text(html)).not.toMatch(/Cell ceiling|\b0 ft\b/)
     expect(text(html)).toContain('no facility-map cell')
     expect(text(html)).toContain('absence of data')
   })
@@ -287,5 +287,16 @@ describe('the reverse sun search', () => {
     const html = render({ picking: true })
     expect(html).toContain('aria-pressed="true"')
     expect(text(html)).toContain('Tap the map')
+  })
+})
+
+describe('the airspace sheet, cleaned (Batch TRUTH, Section 6)', () => {
+  const render = (venue: LatLon | null) => renderToStaticMarkup(<AirspacePanel venue={venue} altitudeFeet={200} laanc={false} onLaanc={() => {}} />)
+  it('today\'s restrictions said once; the rest behind Details; "generalized"', () => {
+    const html = render({ lat: 36.8946, lon: -76.2012 })
+    expect(html).not.toContain('Check today&#x27;s flight restrictions')
+    expect(text(html).match(/tfr\.faa\.gov/g)?.length).toBe(1)
+    expect(html).toContain('<details class="air__details">')
+    expect(html).not.toContain('generalised')
   })
 })

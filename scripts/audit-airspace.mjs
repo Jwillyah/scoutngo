@@ -74,11 +74,15 @@ if (!opened || toggled !== 'clicked') abort(toggled)
 await wait(4000)
 const card = await ev(`(() => {
   const lines = [...document.querySelectorAll('.air__line .air__main')].map((p) => p.textContent)
-  return { lines, link: document.querySelector('.air__tfrlink')?.getAttribute('href') ?? null }
+  /* Batch TRUTH, Section 6: one line first; today's restrictions said once, with one link, above Details. */
+  const tfr = document.querySelector('.air__tfrline')
+  return { lines, lead: document.querySelector('[data-lead]')?.textContent ?? null, tfr: tfr?.textContent ?? null, links: document.querySelectorAll('a[href="https://tfr.faa.gov/"]').length, link: tfr?.querySelector('a')?.getAttribute('href') ?? null }
 })()`)
 if (card.lines.length === 0) abort('the airspace card shows no lines, so the words were not checked')
-check(card.lines[card.lines.length - 1] === "Check today's flight restrictions before you fly.", `card ends with the restrictions line: "${card.lines.at(-1)}"`)
-check(card.link === 'https://tfr.faa.gov/', `restrictions link is ${card.link}`)
+check(/NOT checked/.test(card.tfr ?? '') && /before you fly/.test(card.tfr ?? ''), `today's restrictions line reads "${card.tfr}"`)
+check(card.link === 'https://tfr.faa.gov/' && card.links === 1, `restrictions link is ${card.link}, ${card.links} on the card`)
+check(!card.lines.some((l) => /Check today/.test(l ?? '')), 'today\'s restrictions said twice')
+check(typeof card.lead === 'string' && card.lead.length > 0 && !/clear|safe/i.test(card.lead), `the lead line reads "${card.lead}"`)
 watchdog.note('card')
 
 /* 2. Atlantic Park, inside Oceana's Class D. */

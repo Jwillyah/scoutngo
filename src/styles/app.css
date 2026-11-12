@@ -19263,3 +19263,31 @@ a.about__row * {
   white-space: normal;
   overflow-wrap: anywhere;
 }
+
+/* Batch TRUTH, Section 6: the airspace sheet leads with one line; the rest behind Details. */
+.air__lead {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-heavy);
+}
+.air__tfrline {
+  margin: 4px 0 0;
+  font-size: var(--text-sm);
+  opacity: 0.85;
+}
+.air__details {
+  margin-top: var(--space-2);
+}
+.air__summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: var(--weight-medium);
+}
+.air__switch {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+}

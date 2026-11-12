@@ -51,7 +51,7 @@ export const CHECKED_NOTHING = 'Nothing the app holds is marked at this point. T
 
 export const CHECKED_DETAIL =
   'Checked against the FAA class airspace, facility map grid and special use airspace, ' +
-  'and the National Park Service boundaries, all baked into the app and generalised at their edges.'
+  'and the National Park Service boundaries, all baked into the app and generalized at their edges.'
 
 /** Every card ends with this. Today's restrictions are never checked by the app. */
 export const TODAY_LINE: CardLine = {
@@ -130,4 +130,28 @@ export function airspaceCard(at: AirspaceAtPoint): CardLine[] {
   if (lines.length === 0) lines.push({ tone: 'note', text: CHECKED_NOTHING, detail: CHECKED_DETAIL })
   lines.push(TODAY_LINE)
   return lines
+}
+
+/*
+ * THE SHEET'S ONE LINE (Batch TRUTH, Section 6): what the shooter needs
+ * first, the rest behind Details. A no-fly line leads when there is one;
+ * else controlled airspace and its LAANC ceiling, said once
+ * ("Controlled · LAANC up to 250 ft here"); else that nothing the app holds
+ * is marked (never "clear"). Today's restrictions are said once, apart.
+ */
+export function airspaceLead(lines: readonly CardLine[], gridCeilingFeet: number | null): string {
+  const hazard = lines.find((l) => l.tone === 'hazard')
+  if (hazard !== undefined) return hazard.text
+  if (lines.some((l) => l.tone === 'authorization')) {
+    if (gridCeilingFeet === null) return 'Controlled · LAANC, no grid ceiling here'
+    if (gridCeilingFeet === 0) return 'Controlled · 0 ft grid: no LAANC here'
+    return `Controlled · LAANC up to ${gridCeilingFeet} ft here`
+  }
+  return 'Nothing the app holds is marked here'
+}
+
+/** The lines behind Details: the lead's own line and today's restrictions (said once, apart) left out. */
+export function detailLines(lines: readonly CardLine[]): CardLine[] {
+  const lead = lines.find((l) => l.tone === 'hazard') ?? lines.find((l) => l.tone === 'authorization') ?? null
+  return lines.filter((l) => l !== lead && l !== TODAY_LINE)
 }

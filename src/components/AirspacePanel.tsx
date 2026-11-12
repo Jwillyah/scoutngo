@@ -12,7 +12,9 @@ import type { LatLon } from '../core/geo.ts'
 import { ROUTE_LABEL, ROUTE_TIMING, laancPath, laancWhy } from '../core/laanc.ts'
 import { airspaceAnswer, type AirspaceAnswer } from '../lib/airspace.ts'
 import { facilityCellAt, facilityEffective } from '../lib/uasfm.ts'
-import { airspaceCard, type CardLine } from '../core/airspaceCard.ts'
+import { airspaceCard, airspaceLead, detailLines, type CardLine } from '../core/airspaceCard.ts'
+import { titleName, upperWords } from '../core/faaWords.ts'
+import { Toggle } from './ui.tsx'
 import { airspaceAtPoint } from '../lib/airspaceAtPoint.ts'
 import { Group } from './Panel.tsx'
 
@@ -141,12 +143,25 @@ export function AirspacePanel({ venue, altitudeFeet, laanc, onLaanc, approvedCei
 
   return (
     <div className="air">
+      {/* Batch TRUTH, Section 6: one line first ("Controlled · LAANC up to 250 ft here"), today's restrictions once, the rest behind Details. */}
+      <p className="air__lead" data-lead>
+        {lines === null ? 'Reading what the app holds for this point…' : airspaceLead(lines, cell?.ceilingFeet ?? null)}
+      </p>
+      <p className="air__tfrline">
+        {TFR_NOT_CHECKED.replace(/ Check tfr\.faa\.gov before you fly\.$/, '')} Check{' '}
+        <a href={TFR_URL} target="_blank" rel="noreferrer noopener">
+          tfr.faa.gov
+        </a>{' '}
+        before you fly.
+      </p>
+      <details className="air__details">
+        <summary className="air__summary">Details</summary>
       <Group title="Here">
         {lines === null ? (
           <p className="air__none">Reading what the app holds for this point…</p>
         ) : (
           <ul className="air__lines">
-            {lines.map((line) => (
+            {detailLines(lines).map((line) => (
               <li key={line.text} className={`air__line air__line--${line.tone}`}>
                 <p className="air__main">{line.text}</p>
                 <p className="air__detail">{line.detail}</p>
@@ -171,8 +186,8 @@ export function AirspacePanel({ venue, altitudeFeet, laanc, onLaanc, approvedCei
           * flight is approved, and it is never sent anywhere.
           */}
         {controlled || laanc ? (
-          <label className="air__switch">
-            <input type="checkbox" checked={laanc} onChange={(event) => onLaanc(event.target.checked)} />
+          <div className="air__switch">
+            <Toggle on={laanc} label="I have LAANC here" onChange={onLaanc} />
             <span className="air__switchtext">
               I have LAANC here
               <span className="air__detail">
@@ -180,7 +195,7 @@ export function AirspacePanel({ venue, altitudeFeet, laanc, onLaanc, approvedCei
                 approved ceiling. Saved on this phone with this spot; moving the pin turns it off.
               </span>
             </span>
-          </label>
+          </div>
         ) : null}
         {/*
           * MY APPROVED CEILING, beside the switch and only while it is on. It
@@ -209,8 +224,8 @@ export function AirspacePanel({ venue, altitudeFeet, laanc, onLaanc, approvedCei
               {cell === null
                 ? 'No grid square here, so Suggest keeps drones out of the controlled airspace whatever is typed.'
                 : approvedCeiling.trim() === ''
-                  ? `The grid's ${cell.ceilingFeet} ft until you change it.`
-                  : `Suggest flies under the lower of this and the grid's ${cell.ceilingFeet} ft.`}
+                  ? "The grid's ceiling until you change it."
+                  : "Suggest flies under the lower of this and the grid's ceiling."}
             </span>
           </label>
         ) : null}
@@ -222,7 +237,7 @@ export function AirspacePanel({ venue, altitudeFeet, laanc, onLaanc, approvedCei
             No air position in the plan, so there is no altitude to compare against the map.
             {cell === null
               ? ' This pin has no facility-map cell either.'
-              : ` The map's ceiling for this cell is ${cell.ceilingFeet} ft AGL.`}
+              : ` The cell's ceiling is the one in the line above.`}
           </p>
         ) : (
           <>
@@ -231,18 +246,8 @@ export function AirspacePanel({ venue, altitudeFeet, laanc, onLaanc, approvedCei
               <p className="air__timing">{ROUTE_TIMING[path.route]}</p>
             </div>
 
+            {/* The cell's ceiling is said once, in the lead line (Batch TRUTH, Section 6). */}
             <dl className="air__pair">
-              <div className="air__cell">
-                <dt>Cell ceiling</dt>
-                <dd>
-                  {path.route === 'manual' && path.reason === 'outside-coverage' ? (
-                    /* A dash, not a zero. There is no ceiling here to print. */
-                    <span className="air__dash">—</span>
-                  ) : (
-                    <span className="num">{path.ceilingFeet} ft</span>
-                  )}
-                </dd>
-              </div>
               <div className="air__cell">
                 <dt>Your altitude</dt>
                 <dd>
@@ -303,12 +308,8 @@ export function AirspacePanel({ venue, altitudeFeet, laanc, onLaanc, approvedCei
                   {answer.hits.map((hit: AirspaceShape) => (
                     <li key={`${hit.name}-${hit.cls}`}>
                       <span className="air__class num">{hit.cls}</span>
-                      <span className="air__name">{hit.name}</span>
-                      {hit.upper === null ? null : (
-                        <span className="air__upper num">
-                          to {hit.upper} {hit.upperUom}
-                        </span>
-                      )}
+                      <span className="air__name">{titleName(hit.name)}</span>
+                      {upperWords(hit.upper, hit.upperUom) === null ? null : <span className="air__upper num">{upperWords(hit.upper, hit.upperUom)}</span>}
                     </li>
                   ))}
                 </ul>
@@ -317,7 +318,7 @@ export function AirspacePanel({ venue, altitudeFeet, laanc, onLaanc, approvedCei
 
             <p className="air__rule">{AUTHORIZATION_RULE}</p>
             <p className="air__slop">
-              Boundaries in this extract are generalised to about{' '}
+              Boundaries in this extract are generalized to about{' '}
               <span className="num">{answer.boundaryMetres} m</span>, so a pin within that of an
               edge could fall either side. Baked {answer.bakedAt}.
             </p>
@@ -333,16 +334,8 @@ export function AirspacePanel({ venue, altitudeFeet, laanc, onLaanc, approvedCei
         * warnings read as an absence of restrictions, which is the same lie as
         * an unmarked power line.
         */}
-      <Group title="Not checked">
-        <p className="air__tfr">{TFR_NOT_CHECKED}</p>
-        <p className="air__link">
-          <a href={TFR_URL} target="_blank" rel="noreferrer noopener">
-            tfr.faa.gov
-          </a>
-        </p>
-      </Group>
-
       <p className="air__credit">{FAA_SOURCE_NOTE}</p>
+      </details>
     </div>
   )
 }
