@@ -45,7 +45,8 @@ let mask: HTMLCanvasElement | null = null
  */
 export function paintShadows(map: ShadowMap | null, tint: string, canvas: HTMLCanvasElement, maxPx = 1024, within: { west: number; south: number; east: number; north: number } | null = null): ShadowRaster | null {
   const t0 = performance.now()
-  const out = canvas.getContext('2d')
+  /* Read back every paint (the tint goes into the alpha): kept on the CPU, no GPU readback. */
+  const out = canvas.getContext('2d', { willReadFrequently: true })
   if (out === null) return null
   /* Only the shadows in view (and a margin): the pixels go where they are seen, half a metre each near the ground. */
   const shadows =

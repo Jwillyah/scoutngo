@@ -60,3 +60,25 @@ describe('real shadows, painted (Batch Polish 2, Section 3)', () => {
     expect(high.status === 'ok' && high.shadows[0].heightMeters).toBe(20)
   })
 })
+
+describe('a scrub sweeps each minute once (Batch Polish 2, Section 3, part 2)', () => {
+  it('the same footprints and the same sun give the same answer, not a second sweep; another sun, a new one', () => {
+    const list = [box]
+    const a = shadowMap(list, { azimuth: 200, altitude: 30 })
+    expect(shadowMap(list, { azimuth: 200, altitude: 30 })).toBe(a)
+    const b = shadowMap(list, { azimuth: 201, altitude: 30 })
+    expect(b).not.toBe(a)
+  })
+  it('the footprint moved by one offset lands where the geodesic puts each corner, to the millimetre', async () => {
+    const { destinationPoint, distanceMeters } = await import('../src/core/geo.ts')
+    const m = shadowMap([{ ...box }], { azimuth: 250, altitude: 5 })
+    if (m.status !== 'ok') throw new Error('no shadow')
+    const s = m.shadows[0]
+    const ring = box.ring
+    for (let i = 0; i < ring.length; i += 1) {
+      const want = destinationPoint({ lat: ring[i][1], lon: ring[i][0] }, s.bearing, s.lengthMeters)
+      const got = s.parts[1][i]
+      expect(distanceMeters(want, { lat: got[1], lon: got[0] })).toBeLessThan(0.001)
+    }
+  })
+})

@@ -102,7 +102,7 @@ try {
 
 const r = (x) => (x === null ? '—' : x.toFixed(1))
 lines.push('# The shadows while the time bar is scrubbed', '')
-lines.push(`Run ${new Date().toISOString()} · \`node scripts/measure-shadow-fps.mjs ${DIST}\` · Chromium (Pixel 7) 412 x 915, CPU slowed ${THROTTLE}x (a mid-range Android stand-in) · the Virginia Beach oceanfront at zoom 16.5, page clock 2026-10-29T19:00:00Z · the gate's server and fixture proxy, nothing live.`, '')
+lines.push(`Run ${new Date().toISOString()} · \`node scripts/measure-shadow-fps.mjs ${DIST}\` · Chromium (Pixel 7) 412 x 915, ${THROTTLE === 1 ? "CPU not slowed" : `CPU slowed ${THROTTLE}x (a mid-range Android stand-in)`} · the Virginia Beach oceanfront at zoom 16.5, page clock 2026-10-29T19:00:00Z · the gate's server and fixture proxy, nothing live.`, '')
 lines.push(`- building shadows painted: ${result.drawn ?? 'not reported by this build (before the painted shadows, its shadows were map polygons)'}`)
 lines.push(`- frames while scrubbing: ${result.frames} in ${r(result.seconds)} s, ${r(result.fps)} fps`)
 lines.push(`- frame time: median ${r(result.p50)} ms, 95th percentile ${r(result.p95)} ms, worst ${r(result.worst)} ms`)

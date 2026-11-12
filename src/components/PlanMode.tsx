@@ -1273,13 +1273,15 @@ export function PlanMode({
    * height / tan(sun altitude), src/core/shadowMap.ts; flat ground; a building
    * with no known height casts nothing and is counted, never guessed.
    */
+  /* One list of footprints for both the plan's render and the needle's own draw, so the same minute is swept once (src/core/shadowMap.ts keeps the last answer). */
+  const footprints = useMemo(() => (buildingList === null ? null : buildingList.map((b) => ({ id: b.id, ring: b.ring, heightMeters: b.height.metres }))), [buildingList])
+  /* The sun at the bar's minute, as the needle's draw works it out: the same minute, the same sun, the same answer. */
+  const shadowMinute = scrubbedAt === null ? null : Math.round(scrubbedAt.getTime() / 60_000)
   const shadows = useMemo(() => {
-    if (!showSun || buildingList === null || sun === null) return null
-    return shadowMap(
-      buildingList.map((b) => ({ id: b.id, ring: b.ring, heightMeters: b.height.metres })),
-      { azimuth: sun.azimuth, altitude: sun.altitude },
-    )
-  }, [showSun, buildingList, sun])
+    if (!showSun || footprints === null || sun === null || venue === null || shadowMinute === null) return null
+    const s = getSunPosition(new Date(shadowMinute * 60_000), venue.lat, venue.lon)
+    return shadowMap(footprints, { azimuth: s.azimuth, altitude: s.altitude })
+  }, [showSun, footprints, sun, venue, shadowMinute])
   const shadowFeatures = useMemo(() => {
     if (!showSun || venue === null || scrubbedAt === null) return null
     const person = lightNow(scrubbedAt, venue.lat, venue.lon).personShadow
@@ -1310,8 +1312,7 @@ export function PlanMode({
    * shadows for the same minute.
    */
   useEffect(() => {
-    if (!showSun || venue === null || buildingList === null) return
-    const footprints = buildingList.map((b) => ({ id: b.id, ring: b.ring, heightMeters: b.height.metres }))
+    if (!showSun || venue === null || footprints === null) return
     let frame = 0
     let pending = 0
     let drawnMinute = Number.NaN
@@ -1336,7 +1337,7 @@ export function PlanMode({
       off()
       if (frame !== 0) cancelAnimationFrame(frame)
     }
-  }, [showSun, venue, buildingList, probing, handle])
+  }, [showSun, venue, footprints, probing, handle])
 
   /* Whether anything is in the air, which is what the pilot control is for. */
   const airPositions = plan.filter((p) => p.position.platform === 'air').length

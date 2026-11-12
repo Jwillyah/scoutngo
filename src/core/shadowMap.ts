@@ -106,13 +106,20 @@ function openRing(ring: Position[]): Position[] | null {
 
 const close = (ring: Position[]): Position[] => [...ring, ring[0]]
 
-/** Shift every vertex the same distance along one bearing. */
+/*
+ * Shift every vertex the same distance along one bearing. The move is worked
+ * out once, at the first vertex, and the same degrees added to the rest
+ * (Batch Polish 2, Section 3: a geodesic per vertex was the largest single
+ * cost of a scrub). Over a building's few hundred metres the two differ by
+ * well under a millimetre.
+ */
 function translate(ring: Position[], bearing: number, meters: number): Position[] {
   if (meters === 0) return ring.map((p) => [p[0], p[1]] as Position)
-  return ring.map(([lon, lat]) => {
-    const moved = destinationPoint({ lat, lon }, bearing, meters)
-    return [moved.lon, moved.lat] as Position
-  })
+  const [lon0, lat0] = ring[0]
+  const moved = destinationPoint({ lat: lat0, lon: lon0 }, bearing, meters)
+  const dLon = moved.lon - lon0
+  const dLat = moved.lat - lat0
+  return ring.map(([lon, lat]) => [lon + dLon, lat + dLat] as Position)
 }
 
 const cross = (o: Position, a: Position, b: Position) =>
@@ -148,7 +155,31 @@ function isConvex(ring: Position[]): boolean {
   return true
 }
 
+/*
+ * THE LAST ANSWER KEPT. A moving needle works out each minute's shadows to
+ * draw them at once, and the plan's own render asks for the same minute
+ * again (Batch Polish 2, Section 3): the same footprints (the same list) and
+ * the same sun get the same answer, not a second sweep of every building.
+ */
+let lastAsked: { footprints: readonly FootprintIn[]; azimuth: number; altitude: number; map: ShadowMap } | null = null
+
 export function shadowMap(footprints: readonly FootprintIn[], sun: SunIn): ShadowMap {
+  if (lastAsked !== null && lastAsked.footprints === footprints && lastAsked.azimuth === sun.azimuth && lastAsked.altitude === sun.altitude) return lastAsked.map
+  const map = sweepShadows(footprints, sun)
+  lastAsked = { footprints, azimuth: sun.azimuth, altitude: sun.altitude, map }
+  return map
+}
+
+const hulls = new WeakMap<FootprintIn, { hull: Position[]; convex: boolean }>()
+function ownHull(footprint: FootprintIn, ring: Position[]): { hull: Position[]; convex: boolean } {
+  const kept = hulls.get(footprint)
+  if (kept !== undefined) return kept
+  const made = { hull: convexHull(ring), convex: isConvex(ring) }
+  hulls.set(footprint, made)
+  return made
+}
+
+function sweepShadows(footprints: readonly FootprintIn[], sun: SunIn): ShadowMap {
   const withHeight = footprints.filter(
     (f) => f.heightMeters !== null && Number.isFinite(f.heightMeters) && f.heightMeters > 0,
   )
@@ -170,6 +201,8 @@ export function shadowMap(footprints: readonly FootprintIn[], sun: SunIn): Shado
     const capped = raw > MAX_SHADOW_METERS
     const length = capped ? MAX_SHADOW_METERS : raw
     const moved = translate(ring, bearing, length)
+    /* The footprint's own hull is the same at every sun: kept per footprint; the swept hull is the hull of it and its moved copy. */
+    const own = ownHull(footprint, ring)
     const parts: Position[][] = [close(ring), close(moved)]
     for (let i = 0; i < ring.length; i++) {
       const j = (i + 1) % ring.length
@@ -178,8 +211,8 @@ export function shadowMap(footprints: readonly FootprintIn[], sun: SunIn): Shado
     shadows.push({
       id: footprint.id,
       parts,
-      hull: close(convexHull([...ring, ...moved])),
-      hullExact: isConvex(ring),
+      hull: close(convexHull([...own.hull, ...translate(own.hull, bearing, length)])),
+      hullExact: own.convex,
       footprint: close(ring),
       lengthMeters: length,
       bearing,
