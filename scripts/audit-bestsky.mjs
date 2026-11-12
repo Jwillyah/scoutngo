@@ -18,6 +18,8 @@
  *   page 2    "Best 8 mi WNW", three ranked rows with Lynnhaven Inlet first,
  *             where you are, Show on map, Remind me (in Chromium the file
  *             it hands over: the event, its alarm, no coordinate)
+ *   page 3    a row on page 2 brings up that spot: the view, its tags, Why
+ *             here, the clock and its bar, the satellite's line
  *
  * Nothing runs off the side of a page; nothing says safe or clear (rule 28);
  * every time reads AM or PM.
@@ -206,6 +208,25 @@ try {
     }
     // </page 2>
     // <page 3>
+    /* ------------------------------------------------------------ page 3 (Section 5; board BestSky_Spot): the spot picked on page 2 */
+    await tap('.bsky__page:nth-child(2) .bsky__row[data-bsky-rank="2"]')
+    await wait(1800)
+    const sp = JSON.parse(
+      await ev(`JSON.stringify((() => { const pg = document.querySelectorAll('.bsky__page')[2]; return { on: document.querySelectorAll('.bsky__dots [role=tab]')[2]?.getAttribute('aria-selected'), name: pg.querySelector('[data-bsky-spot]')?.textContent, word: pg.querySelector('.bsky__spothead .bsky__pill')?.textContent, scene: !!pg.querySelector('.bsky__scene'), glow: !!pg.querySelector('[data-bsky-glow]'), tags: [...pg.querySelectorAll('.bsky__tag')].map((t) => t.textContent), why: !!pg.querySelector('.bsky__whyhere .bsky__profile'), times: pg.querySelector('.bsky__times')?.textContent, bar: pg.querySelectorAll('.bsky__barpart').length, sat: pg.querySelector('.bsky__sat')?.textContent } })())`),
+    )
+    console.log(`  page 3: ${JSON.stringify(sp)}`)
+    if (sp.on !== 'true') fail(`${label}: a row on page 2 did not bring page 3 up`)
+    if (sp.name !== 'Lesner Bridge') fail(`${label}: page 3 shows ${JSON.stringify(sp.name)}, not the spot picked (Lesner Bridge)`)
+    if (!/^(Likely|Possible|Little)$/.test(sp.word ?? '')) fail(`${label}: page 3's word is ${JSON.stringify(sp.word)}`)
+    if (!sp.scene || !sp.glow) fail(`${label}: no view from the spot`)
+    if (!sp.tags.some((t) => /^faces [NESW]+$/.test(t)) || !sp.tags.includes('water in front')) fail(`${label}: the tags read ${JSON.stringify(sp.tags)}`)
+    if (!sp.why) fail(`${label}: no "Why here"`)
+    if (!/set up \d+:\d\d [AP]M.*color \d+:\d\d [AP]M–\d+:\d\d [AP]M.*peak \d+:\d\d [AP]M.*dark \d+:\d\d [AP]M/.test(sp.times ?? '')) fail(`${label}: the clock reads ${JSON.stringify(sp.times)}`)
+    if (sp.bar < 2) fail(`${label}: the clock's bar has ${sp.bar} parts`)
+    if (!sp.sat) fail(`${label}: no line on where the satellite stands`)
+    const p3 = JSON.parse(await ev(SEEN(2)))
+    if (p3.off.length > 0) fail(`${label}: page 3 runs off the side: ${JSON.stringify(p3.off)}`)
+    await page.screenshot({ path: join(OUT, `3-spot-${label.replace(/\s/g, '-').toLowerCase()}.png`) })
     // </page 3>
     for (const i of [0, 1, 2]) {
       const t = JSON.parse(await ev(SEEN(i)))

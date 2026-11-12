@@ -1,0 +1,148 @@
+/*
+ * WHERE'S THE COLOR? 3 · THE SPOT (Batch BEST SKY, Section 5; board
+ * BestSky_Spot): the view from the spot, its card, "Why here", the clock.
+ */
+.bsky__page--spot {
+  gap: 0;
+}
+.bsky__scene {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 360 / 220;
+  border-radius: 24px 24px 0 0;
+}
+.bsky__land {
+  fill: #2a3a35;
+}
+.bsky__water {
+  fill: #183a66;
+}
+.bsky__silhouette line {
+  stroke: rgb(200 210 225 / 0.7);
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+.bsky__silhouette text,
+.bsky__plab {
+  font-size: 12px;
+  font-weight: 700;
+  fill: rgb(255 255 255 / 0.85);
+}
+.bsky__plab {
+  text-anchor: middle;
+}
+.bsky__plab--dim {
+  fill: rgb(255 255 255 / 0.7);
+}
+.bsky__ray {
+  stroke: rgb(255 255 255 / 0.45);
+  stroke-width: 1.5;
+}
+.bsky__here {
+  fill: #fff;
+}
+.bsky__herehalo {
+  fill: rgb(255 255 255 / 0.25);
+}
+.bsky__spotcard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: -18px;
+  padding: 18px 16px 14px;
+  border: 1px solid var(--d-edge);
+  border-radius: 24px;
+  background: rgb(44 52 110 / 0.96);
+}
+.bsky__spothead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.bsky__spotname {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.bsky__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+}
+.bsky__tag {
+  padding: 4px 12px;
+  border: 1px solid var(--d-edge);
+  border-radius: 999px;
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+.bsky__whyhere {
+  padding: 12px 14px;
+  border: 1px solid var(--d-edge);
+  border-radius: 20px;
+  background: rgb(20 24 60 / 0.35);
+}
+.bsky__profile {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  background: rgb(20 24 60 / 0.5);
+}
+.bsky__horizon {
+  stroke: rgb(255 255 255 / 0.5);
+  stroke-width: 1;
+}
+.bsky__sun {
+  fill: #fde3a7;
+}
+.bsky__light {
+  fill: none;
+  stroke: #f3d98f;
+  stroke-width: 1.6;
+  stroke-dasharray: 4 4;
+}
+.bsky__cloud {
+  fill: #f08a6c;
+}
+.bsky__cloud--deep {
+  fill: #d9668a;
+}
+.bsky__youmark {
+  fill: #fff;
+}
+.bsky__times {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+.bsky__bar {
+  display: flex;
+  height: 12px;
+  margin-top: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.bsky__barpart {
+  flex-basis: 0;
+}
+.bsky__barpart--setup {
+  background: #f2c14e;
+}
+.bsky__barpart--color {
+  background: var(--d-glow);
+}
+.bsky__barpart--fade {
+  background: #7b68b8;
+}
+.bsky__barpart--dark {
+  background: var(--d-night-top);
+}

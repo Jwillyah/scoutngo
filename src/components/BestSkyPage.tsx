@@ -5,6 +5,7 @@ import { formatClock } from '../core/timezone.ts'
 import { DEFAULT_RADIUS, useBestSky } from '../lib/useBestSky.ts'
 import { BestSkyList } from './BestSkyList.tsx'
 import { BestSkyMap } from './BestSkyMap.tsx'
+import { BestSkySpot } from './BestSkySpot.tsx'
 import { PageShell } from './PageShell.tsx'
 import '../styles/bestsky.css'
 
@@ -28,7 +29,7 @@ interface Props {
   onShowOnMap: (at: LatLon, when: Date) => void
 }
 
-const PAGES = ['Map', 'List'] as const
+const PAGES = ['Map', 'List', 'Spot'] as const
 
 export function BestSkyPage({ venue, placeName, timeZone, now, miles, saved = [], onBack, onShowOnMap }: Props) {
   const [radius, setRadius] = useState<RadiusMi>(DEFAULT_RADIUS)
@@ -45,7 +46,7 @@ export function BestSkyPage({ venue, placeName, timeZone, now, miles, saved = []
   const chosen = sky.ranked.find((r) => r.spot.id === picked) ?? top[0] ?? sky.ranked[0] ?? null
   const pick = (id: string) => {
     setPicked(id)
-    go(1)
+    go(2)
   }
   const when = ev === null ? 'next' : ev.kind === 'sunset' ? (sameDay(ev.at, now, timeZone) ? 'tonight' : 'tomorrow evening') : sameDay(ev.at, now, timeZone) ? 'this morning' : 'tomorrow morning'
   /* Page 1 is named as its board: "Color tonight · sunset 4:56". */
@@ -71,6 +72,7 @@ export function BestSkyPage({ venue, placeName, timeZone, now, miles, saved = []
       >
         <BestSkyMap venue={venue} radius={radius} sky={sky} top={top} miles={miles} timeZone={timeZone} onPick={pick} onRadius={setRadius} />
         <BestSkyList venue={venue} placeName={placeName} radius={radius} sky={sky} top={top} miles={miles} timeZone={timeZone} now={now} chosen={chosen} onPick={pick} onRadius={setRadius} onShowOnMap={onShowOnMap} />
+        <BestSkySpot venue={venue} sky={sky} chosen={chosen} miles={miles} timeZone={timeZone} now={now} onShowOnMap={onShowOnMap} />
       </div>
     </PageShell>
   )
