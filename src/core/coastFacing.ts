@@ -117,4 +117,28 @@ export function windToBeach(windFrom: number, facing: number): WindToBeach {
   return 'cross'
 }
 
+/*
+ * THE WIND TO THE BEACH IN FIVE (Batch TRUTH, Section 2), by how far the
+ * wind's FROM is from the beach's facing:
+ *
+ *   onshore          45° or less            straight in
+ *   cross-onshore    over 45°, under 80°
+ *   cross-shore      80° to under 100°      along the beach
+ *   cross-offshore   100° to under 135°     (SSW 200° at a beach facing 100°)
+ *   offshore         135° or more           (NW at Virginia Beach)
+ *
+ * The three-way windToBeach above is the same cut, with the three middle
+ * bands one "cross".
+ */
+export type WindSide = 'offshore' | 'cross-offshore' | 'cross-shore' | 'cross-onshore' | 'onshore'
+
+export function windSide(windFrom: number, facing: number): WindSide {
+  const d = angleApart(windFrom, facing)
+  if (d <= 45) return 'onshore'
+  if (d < 80) return 'cross-onshore'
+  if (d < 100) return 'cross-shore'
+  if (d < 135) return 'cross-offshore'
+  return 'offshore'
+}
+
 export const isGlassy = (speedMps: number, relation: WindToBeach | null): boolean => speedMps < GLASSY_MPS || relation === 'offshore'

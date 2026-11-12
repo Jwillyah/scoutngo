@@ -43,8 +43,8 @@ const render = (props: Partial<Parameters<typeof BuoysBody>[0]> = {}) => html(pr
 const NEVER = /\b(safe|clear|all clear|no hazard)/i
 
 describe('the Buoys page v2', () => {
-  it('headline: Near <spot>, the biggest reading (44100, 0.9 m = 3.0 ft), its period and direction', () => {
-    expect(render()).toMatch(/^ ?Near Sandbridge 3\.0 ft biggest reading · 8 s from the E /)
+  it('headline: Near <spot>, the buoy the forecast uses (Batch TRUTH: 44099, the nearest, not 44100\'s bigger 0.9 m), its period and direction', () => {
+    expect(render()).toMatch(/^ ?Near Sandbridge 2\.3 ft 44099, the forecast(&#x27;|')s buoy · 8 s from the ESE /)
   })
 
   it('the list: each buoy and its time; a travel time only for Cape Henry (Duck’s waves head west, past the pier)', () => {

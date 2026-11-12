@@ -227,3 +227,51 @@ export function worstRows<T extends Row>(rows: readonly T[], count: number): T[]
     .sort((a, b) => (a.score.hit ?? 0) - (b.score.hit ?? 0) || (b.score.mae ?? 0) - (a.score.mae ?? 0))
     .slice(0, count)
 }
+
+/*
+ * THE CALL AGAINST WHAT WAS SEEN (Batch TRUTH, Section 2.5): a field truth
+ * file (fixtures/truth/<date>-<place>.json) holds what the cams and the eye
+ * said; the app's call for that day is held against it. The range hits when
+ * it overlaps what was seen; the word when it is the same word.
+ */
+export interface TruthSurf {
+  date: string
+  place: string
+  /** What was seen, feet of face, low and high. */
+  seenFt: readonly [number, number]
+  sizeWord: string
+}
+
+export interface TruthRow {
+  date: string
+  place: string
+  ours: string
+  seen: string
+  oursWord: string
+  seenWord: string
+  rangeHit: boolean
+  wordHit: boolean
+}
+
+export function truthRow(t: TruthSurf, call: { lowFt: number; highFt: number; size: string } | null): TruthRow {
+  const seen = `${t.seenFt[0]}–${t.seenFt[1]} ft`
+  if (call === null) return { date: t.date, place: t.place, ours: '—', seen, oursWord: '—', seenWord: t.sizeWord, rangeHit: false, wordHit: false }
+  return {
+    date: t.date,
+    place: t.place,
+    ours: `${call.lowFt}–${call.highFt} ft`,
+    seen,
+    oursWord: call.size,
+    seenWord: t.sizeWord,
+    rangeHit: call.lowFt <= t.seenFt[1] && call.highFt >= t.seenFt[0],
+    wordHit: call.size === t.sizeWord,
+  }
+}
+
+/** A field truth file's surf, as truthRow takes it; null when it says no surf. */
+export function truthSurfOf(file: { place?: { name?: string }; surf?: { observed?: { surflineJettyCamFt?: number[]; sizeWord?: string } } }, date: string): TruthSurf | null {
+  const ft = file.surf?.observed?.surflineJettyCamFt
+  const word = file.surf?.observed?.sizeWord
+  if (!Array.isArray(ft) || ft.length !== 2 || typeof word !== 'string') return null
+  return { date, place: file.place?.name ?? '', seenFt: [ft[0], ft[1]], sizeWord: word }
+}

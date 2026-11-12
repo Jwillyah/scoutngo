@@ -42,9 +42,12 @@ describe('swell parts', () => {
     expect(parts[0].ft).toBeCloseTo(2.1, 1)
   })
   it('a buoy\'s parts are what its .spec has, never a third', () => {
-    const p = buoyParts({ swellM: 0.6, swellS: 11.8, swellFrom: 'ESE', windWaveM: 0.8, windWaveS: 9.9, windWaveFrom: 'E' })
+    const p = buoyParts({ swellM: 0.6, swellS: 11.8, swellFrom: 'ESE', windWaveM: 0.8, windWaveS: 6.2, windWaveFrom: 'E' })
     expect(p.map((x) => x.name)).toEqual(['Swell', 'Wind waves'])
     expect(p[0].fromDeg).toBe(112.5)
+    /* Batch TRUTH, Section 2: NDBC's "wind waves" at 8 s or longer are swell (12 Nov, 44099: 1.3 ft · 9 s SE beside a 0.3 ft swell). */
+    const truth = buoyParts({ swellM: 0.3 / 3.28084, swellS: 11, swellFrom: 'ESE', windWaveM: 1.3 / 3.28084, windWaveS: 9, windWaveFrom: 'SE' })
+    expect(truth.map((x) => [x.name, x.ft.toFixed(1), x.periodS])).toEqual([['Swell', '1.3', 9], ['Second swell', '0.3', 11]])
     expect(buoyParts({ swellM: null, swellS: null, swellFrom: null, windWaveM: 0.8, windWaveS: 9.9, windWaveFrom: 'E' })).toHaveLength(1)
     expect(buoyParts(null)).toEqual([])
   })

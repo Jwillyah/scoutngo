@@ -8,7 +8,7 @@
  * card and the per-spot check (src/lib/useSpotSkill.ts) use: one source.
  */
 import { surfTag, windTag, type SurfTag, type WindTag } from '../core/briefing.ts'
-import { BEACH_CAP, surfEstimate, surfShape, type SurfShape } from '../core/surf.ts'
+import { BEACH_CAP, surfEstimate, surfShape, towardBeachM, type SurfShape } from '../core/surf.ts'
 import { buoyFaceFt, correctedRange, type SkillSample, type SpotStats, type SurfRange } from '../core/spotSkill.ts'
 import { leanRange, surfLean, type SurfLean } from '../core/surfNowcast.ts'
 import { peakHour, seaSpreadFt } from '../core/surfRange.ts'
@@ -39,7 +39,9 @@ export interface RangeHour {
 /** The whole sea's face (wave_*), only when the swell was what surfAt used; else null (one reading, no spread). */
 function wholeSeaFaceFt(marine: Hourly, at: Date, facing: number | null, factor: number): number | null {
   if (hourlyAt(marine, 'swell_wave_height', at) === null) return null
-  const h = hourlyAt(marine, 'wave_height', at)
+  const total = hourlyAt(marine, 'wave_height', at)
+  /* Only the sea heading for the beach (src/core/surf.ts towardBeachM, Batch TRUTH). */
+  const h = total === null ? null : towardBeachM(total, hourlyAt(marine, 'wind_wave_height', at), hourlyAt(marine, 'wind_wave_direction', at), facing)
   const t = hourlyAt(marine, 'wave_period', at)
   const d = hourlyAt(marine, 'wave_direction', at)
   return h === null || t === null || d === null ? null : surfEstimate(h, t, d, facing, factor).faceFt

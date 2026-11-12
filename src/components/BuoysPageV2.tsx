@@ -26,7 +26,7 @@ import { DCard, DetailShell } from './DetailShell.tsx'
  * nearest NDBC buoys on the water the beach faces (src/lib/buoy.ts), in the
  * new home's look:
  *
- *   headline   "Near <spot>", the biggest reading, its period and direction,
+ *   headline   "Near <spot>", the buoy the forecast uses (Batch TRUTH), its period and direction,
  *              and the nearest buoy against the spot's own wave forecast
  *   map        Esri imagery, dimmed, a few tiles (src/core/tileView.ts): a pin
  *              per buoy with "id · height · period", a dotted line to the spot
@@ -100,7 +100,7 @@ export function BuoysBody({ venue, placeName, timeZone, units, buoys, marine, ma
       <div className="dbuoy__head">
         {near}
         <p className="dhead__big">{waveHeight(top.b.waveM, units)}</p>
-        <p className="dhead__line">{how === '' ? 'biggest reading' : `biggest reading · ${how}`}</p>
+        <p className="dhead__line">{how === '' ? `${top.b.buoy.id}, the forecast's buoy` : `${top.b.buoy.id}, the forecast's buoy · ${how}`}</p>
         <ForecastLine nearest={rows[0].b} marine={marine} marineFailed={marineFailed} timeZone={timeZone} units={units} />
         <FacesLine venue={venue} nearest={rows[0].b} facing={facing} units={units} />
       </div>

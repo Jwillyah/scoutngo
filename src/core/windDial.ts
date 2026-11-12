@@ -6,8 +6,8 @@
  * beach faces, src/lib/coast.ts), the dial tinted by what a wind FROM each
  * bearing does to this beach, and an arrow where the wind goes.
  *
- * ONE SOURCE FOR ONSHORE AND OFFSHORE. The tint is windToBeach
- * (src/core/coastFacing.ts), asked for every degree as a FROM bearing: the
+ * ONE SOURCE FOR ONSHORE AND OFFSHORE. The tint is windSide's five bands
+ * (src/core/coastFacing.ts; Batch TRUTH), asked for every degree as a FROM bearing: the
  * land side reads offshore (wind off the land), the sea side onshore, and the
  * two quarters along the beach cross-shore, exactly where the headline's tag
  * and the hours' colours put them. Nothing here has its own threshold. The
@@ -20,7 +20,7 @@
  * had "offshore" printed over the W). tests/windDial.test.ts holds every
  * facing to no overlap and to staying inside the drawing.
  */
-import { windToBeach, type WindToBeach } from './coastFacing.ts'
+import { windSide, type WindSide } from './coastFacing.ts'
 
 export const DIAL_SIZE = 200
 export const DIAL_C = DIAL_SIZE / 2
@@ -111,7 +111,7 @@ export const dialLabels = (facing: number): PlacedLabel[] =>
   ])
 
 export interface DialSector {
-  kind: WindToBeach
+  kind: WindSide
   /** Clockwise from start to end, degrees; end may pass 360. */
   start: number
   end: number
@@ -121,7 +121,7 @@ export interface DialSector {
 export function dialSectors(facing: number): DialSector[] {
   const runs: DialSector[] = []
   for (let b = 0; b < 360; b += 1) {
-    const kind = windToBeach(b + 0.5, facing)
+    const kind = windSide(b + 0.5, facing)
     const last = runs[runs.length - 1]
     if (last !== undefined && last.kind === kind) last.end = b + 1
     else runs.push({ kind, start: b, end: b + 1 })
@@ -156,8 +156,8 @@ export function beachLine(facing: number): { x1: number; y1: number; x2: number;
  * the first hour that has one. Null when the hours hold one kind throughout,
  * or have none. Hours with no direction are skipped, never read as a change.
  */
-export function windFlip(hours: readonly { at: Date; kind: WindToBeach | null }[]): { at: Date; to: WindToBeach } | null {
-  const known = hours.filter((h): h is { at: Date; kind: WindToBeach } => h.kind !== null)
+export function windFlip(hours: readonly { at: Date; kind: WindSide | null }[]): { at: Date; to: WindSide } | null {
+  const known = hours.filter((h): h is { at: Date; kind: WindSide } => h.kind !== null)
   const start = known[0]
   if (start === undefined) return null
   const change = known.find((h) => h.kind !== start.kind)

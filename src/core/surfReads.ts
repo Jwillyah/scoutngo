@@ -78,13 +78,26 @@ export function forecastParts(read: (name: string) => number | null): SwellPart[
 
 const POINTS: Record<string, number> = { N: 0, NNE: 22.5, NE: 45, ENE: 67.5, E: 90, ESE: 112.5, SE: 135, SSE: 157.5, S: 180, SSW: 202.5, SW: 225, WSW: 247.5, W: 270, WNW: 292.5, NW: 315, NNW: 337.5 }
 
-/** A buoy's own parts from its spectral summary: the swell and the wind waves, those it reported; never a third. */
+/**
+ * NDBC's "wind waves" this long or longer are swell (Batch TRUTH, Section 2):
+ * on 12 Nov 44099 split 1.3 ft · 9 s SE as wind waves beside a 0.3 ft swell,
+ * and the beach had small clean lines, not chop. The split is by frequency
+ * against the local wind; 8 s and up has travelled.
+ */
+export const SWELL_FROM_S = 8
+
+/** A buoy's own parts from its spectral summary: the swell and the wind waves, those it reported; never a third. Wind waves of SWELL_FROM_S or longer are named swell, the bigger swell first. */
 export function buoyParts(split: { swellM: number | null; swellS: number | null; swellFrom: string | null; windWaveM: number | null; windWaveS: number | null; windWaveFrom: string | null } | null): SwellPart[] {
   if (split === null) return []
   const out: SwellPart[] = []
   if (split.swellM !== null && split.swellM > 0) out.push({ name: 'Swell', ft: split.swellM * FT, periodS: sanePeriod(split.swellS), fromDeg: split.swellFrom === null ? null : (POINTS[split.swellFrom] ?? null) })
-  if (split.windWaveM !== null && split.windWaveM > 0) out.push({ name: 'Wind waves', ft: split.windWaveM * FT, periodS: sanePeriod(split.windWaveS), fromDeg: split.windWaveFrom === null ? null : (POINTS[split.windWaveFrom] ?? null) })
-  return out
+  if (split.windWaveM !== null && split.windWaveM > 0) {
+    const periodS = sanePeriod(split.windWaveS)
+    out.push({ name: periodS !== null && periodS >= SWELL_FROM_S ? 'Swell' : 'Wind waves', ft: split.windWaveM * FT, periodS, fromDeg: split.windWaveFrom === null ? null : (POINTS[split.windWaveFrom] ?? null) })
+  }
+  const swells = out.filter((p) => p.name === 'Swell').sort((a, b) => b.ft - a.ft)
+  if (swells.length === 2) swells[1].name = 'Second swell'
+  return [...swells, ...out.filter((p) => p.name !== 'Swell' && p.name !== 'Second swell')]
 }
 
 /** "2.1 ft · 9 s": a part's height and period, no direction (the arrow says that). */

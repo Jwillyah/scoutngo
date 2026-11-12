@@ -40,7 +40,13 @@ export interface BuoyRow {
 export const buoyRows = (buoys: BuoyReading[] | null, venue: LatLon): BuoyRow[] =>
   (buoys ?? []).filter((b): b is OkBuoy => b.status === 'ok').map((b) => ({ b, leg: swellTravel(b.buoy.at, venue, b.periodS, b.fromDeg) }))
 
-/** The biggest reading of the buoys shown (all on the water the beach faces, src/lib/buoy.ts); the nearer one on a tie. */
+/**
+ * The buoy the forecast uses (Batch TRUTH, Section 2): the first of the rows,
+ * the one src/lib/buoy.ts latestBuoyWaves hands the surf forecast (44099 at
+ * Virginia Beach), not the biggest reading (on 12 Nov that was Duck's,
+ * further south and not the water the forecast leans on). The others stay as
+ * rows.
+ */
 export function headlineRow(rows: BuoyRow[]): BuoyRow | null {
-  return rows.reduce<BuoyRow | null>((best, r) => (best === null || r.b.waveM > best.b.waveM ? r : best), null)
+  return rows[0] ?? null
 }

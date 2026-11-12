@@ -19,7 +19,7 @@
  * beach faces; swell running away from the beach (theta of 90 or more)
  * breaks nothing here.
  */
-import { angleApart, isGlassy, windToBeach } from './coastFacing.ts'
+import { angleApart, isGlassy, windSide, windToBeach } from './coastFacing.ts'
 
 export const G = 9.81
 /* A typical sandy foreshore; stated on screen as an assumption. */
@@ -104,10 +104,29 @@ export const surfOn = (tag: SurfTag | null): boolean => tag === 'Fun' || tag ===
 /** Onshore at this or more blows the faces apart: 5.1 m/s, 10 kt. */
 export const MESSY_ONSHORE_MPS = 5.1
 
-/** Clean when glassy (light under GLASSY_MPS, 5 kt, or offshore); messy when onshore and MESSY_ONSHORE_MPS (10 kt) or more; bumpy between. */
+/*
+ * WIND SEA HEADING AWAY FROM THE BEACH (Batch TRUTH, Section 2). Waves blown
+ * off the land travel out to sea; they never reach the sand. A wind sea
+ * coming FROM more than 90° off the beach's facing carries nothing to it, so
+ * its energy comes out of the whole sea's height (heights add as squares).
+ * Fri 13 Nov at Virginia Beach: NW 12 g21, offshore, read 1-4 ft from the
+ * NW wind sea alone.
+ */
+export function towardBeachM(totalM: number, windWaveM: number | null, windWaveFromDeg: number | null, facingDeg: number | null): number {
+  if (windWaveM === null || windWaveFromDeg === null || facingDeg === null || !(windWaveM > 0)) return totalM
+  if (angleApart(windWaveFromDeg, facingDeg) <= 90) return totalM
+  return Math.sqrt(Math.max(0, totalM * totalM - windWaveM * windWaveM))
+}
+
+/** Cross-offshore under this grooms the faces like offshore (Batch TRUTH, Section 2): 12 kt. */
+export const CLEAN_CROSS_OFF_MPS = 12 * 0.514444
+
+/** Clean when glassy (light under GLASSY_MPS, 5 kt, or offshore) or cross-offshore under 12 kt; messy when onshore and MESSY_ONSHORE_MPS (10 kt) or more; bumpy between. */
 export function surfShape(windMps: number, windFromDeg: number, facingDeg: number | null): SurfShape {
   const relation = facingDeg === null ? null : windToBeach(windFromDeg, facingDeg)
   if (isGlassy(windMps, relation)) return 'Clean'
+  /* 12 Nov: SSW at 4-7 kt on a beach facing 100°, "clean" by every eye and cam; the page said "bumpy, cross-shore". */
+  if (facingDeg !== null && windSide(windFromDeg, facingDeg) === 'cross-offshore' && windMps < CLEAN_CROSS_OFF_MPS) return 'Clean'
   if (relation === 'onshore' && windMps >= MESSY_ONSHORE_MPS) return 'Messy'
   return 'Bumpy'
 }

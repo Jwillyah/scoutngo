@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { windToBeach } from '../src/core/coastFacing.ts'
+import { windSide, windToBeach } from '../src/core/coastFacing.ts'
 import {
   beachLine,
   boxesOverlap,
@@ -72,17 +72,20 @@ describe('the dial labels never sit on N, E, S or W', () => {
   })
 })
 
-describe('the tint is windToBeach, degree by degree', () => {
-  it('matches the one onshore/offshore function for every facing tried', () => {
+describe('the tint is windSide, degree by degree (five bands since Batch TRUTH)', () => {
+  it('matches the one wind-to-beach function for every facing tried, and the three-way one at its ends', () => {
     for (const facing of [0, 37, 90, 133.5, 200, 359]) {
       const sectors = dialSectors(facing)
       expect(sectors.reduce((s, x) => s + (x.end - x.start), 0)).toBe(360)
       for (let b = 0; b < 360; b += 1) {
         const s = sectors.find((x) => (b >= x.start && b < x.end) || (b + 360 >= x.start && b + 360 < x.end))
-        expect(s?.kind, `facing ${facing} bearing ${b}`).toBe(windToBeach(b + 0.5, facing))
+        expect(s?.kind, `facing ${facing} bearing ${b}`).toBe(windSide(b + 0.5, facing))
+        const three = windToBeach(b + 0.5, facing)
+        if (s?.kind === 'offshore' || s?.kind === 'onshore') expect(three).toBe(s.kind)
+        else expect(three).toBe('cross')
       }
-      /* Four runs: onshore, cross, offshore, cross. */
-      expect(sectors.length).toBe(4)
+      /* Eight runs: onshore, cross-onshore, cross-shore, cross-offshore, offshore, and back. */
+      expect(sectors.length).toBe(8)
     }
   })
   it('puts offshore at the land, behind the facing', () => {
@@ -104,10 +107,10 @@ describe('beachLine', () => {
 describe('windFlip', () => {
   const at = (h: number) => new Date(Date.UTC(2026, 10, 2, h))
   it('finds the first hour that changes', () => {
-    expect(windFlip([{ at: at(9), kind: 'offshore' }, { at: at(10), kind: null }, { at: at(11), kind: 'offshore' }, { at: at(14), kind: 'onshore' }, { at: at(15), kind: 'cross' }])).toEqual({ at: at(14), to: 'onshore' })
+    expect(windFlip([{ at: at(9), kind: 'offshore' }, { at: at(10), kind: null }, { at: at(11), kind: 'offshore' }, { at: at(14), kind: 'onshore' }, { at: at(15), kind: 'cross-shore' }])).toEqual({ at: at(14), to: 'onshore' })
   })
   it('says nothing when it holds, or when nothing is known', () => {
-    expect(windFlip([{ at: at(9), kind: 'cross' }, { at: at(10), kind: 'cross' }])).toBeNull()
+    expect(windFlip([{ at: at(9), kind: 'cross-shore' }, { at: at(10), kind: 'cross-shore' }])).toBeNull()
     expect(windFlip([{ at: at(9), kind: null }])).toBeNull()
   })
 })

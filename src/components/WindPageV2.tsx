@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { LatLon } from '../core/geo.ts'
 import { squareThumbUrl } from '../lib/thumb.ts'
-import { CIRCLE_M, windToBeach, type WindToBeach } from '../core/coastFacing.ts'
+import { CIRCLE_M, windSide, type WindSide } from '../core/coastFacing.ts'
 import { compassPoint } from '../core/field.ts'
 import { STABILITY_WORD } from '../core/localWind.ts'
 import { formatClock, formatHour, formatShortHour } from '../core/timezone.ts'
@@ -126,7 +126,7 @@ export function WindPageV2({ venue, placeName, timeZone, units, ground, onBack, 
   )
 }
 
-const KIND_WORD: Record<WindToBeach, string> = { offshore: 'Offshore', cross: 'Cross-shore', onshore: 'Onshore' }
+const KIND_WORD: Record<WindSide, string> = { offshore: 'Offshore', 'cross-offshore': 'Cross-offshore', 'cross-shore': 'Cross-shore', 'cross-onshore': 'Cross-onshore', onshore: 'Onshore' }
 const STRIP_HOURS = 12
 /** One arrow every this many hours across the twelve: six, as on the board. */
 const STRIP_STEP = 2
@@ -147,7 +147,7 @@ export function WindContent({ now, data, facing, placeName, timeZone, units, dro
 
   if (data === null || models === null || hour === null) {
     /* Batch Map A4: never a dash and a blank page. The one wind now (the home's) when it is here, the beach on the dial, and that the models are still being asked. */
-    const sKind = shared === null || shared.fromDeg === null || face === null ? null : windToBeach(shared.fromDeg, face)
+    const sKind = shared === null || shared.fromDeg === null || face === null ? null : windSide(shared.fromDeg, face)
     return (
       <>
         <div className="dhead">
@@ -171,14 +171,14 @@ export function WindContent({ now, data, facing, placeName, timeZone, units, dro
     )
   }
 
-  const kind = hour.from === null || face === null ? null : windToBeach(hour.from, face)
+  const kind = hour.from === null || face === null ? null : windSide(hour.from, face)
   /* Batch Map A2: the headline is the one wind now (the home's); the models draw the rest. */
   const headFrom = shared === null ? hour.from : shared.fromDeg
   const headGust = shared === null ? hour.gust : shared.gustMps
-  const headKind = headFrom === null || face === null ? null : windToBeach(headFrom, face)
+  const headKind = headFrom === null || face === null ? null : windSide(headFrom, face)
   const hours = models.byLevel.ground.slice(i, i + STRIP_HOURS).map((r0, k) => {
     const r = { ...r0, from: calmDirection(r0.median, r0.from) }
-    return { at: models.hours[i + k], r, kind: r.from === null || face === null ? null : windToBeach(r.from, face) }
+    return { at: models.hours[i + k], r, kind: r.from === null || face === null ? null : windSide(r.from, face) }
   })
   const flip = windFlip(hours)
   const shown = hours.filter((_, k) => k % STRIP_STEP === 0)

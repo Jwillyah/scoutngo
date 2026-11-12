@@ -9,7 +9,7 @@
  * "Small" while the buoy gave "Fun": 4% of words right, 25% with the whole sea
  * (measurements/2026-11-10-accuracy-words.md, 3-9 Nov, the same week).
  */
-import { BEACH_CAP, surfEstimate, surfShape, type SurfEstimate, type SurfShape } from '../core/surf.ts'
+import { BEACH_CAP, surfEstimate, surfShape, towardBeachM, type SurfEstimate, type SurfShape } from '../core/surf.ts'
 import { hourlyAt, type Hourly } from './tideSheetData.ts'
 
 export interface SurfHour {
@@ -23,11 +23,13 @@ export interface SurfHour {
 
 export function surfAt(marine: Hourly, at: Date, facing: number | null, factor: number = BEACH_CAP): SurfHour | null {
   const swell = hourlyAt(marine, 'swell_wave_height', at)
-  const h = hourlyAt(marine, 'wave_height', at) ?? swell
+  const ww = hourlyAt(marine, 'wind_wave_height', at)
+  const total = hourlyAt(marine, 'wave_height', at)
+  /* Batch TRUTH, Section 2: only the sea heading for the beach (src/core/surf.ts towardBeachM). */
+  const h = (total === null ? null : towardBeachM(total, ww, hourlyAt(marine, 'wind_wave_direction', at), facing)) ?? swell
   const t = hourlyAt(marine, 'swell_wave_period', at) ?? hourlyAt(marine, 'wave_period', at)
   const d = hourlyAt(marine, 'swell_wave_direction', at) ?? hourlyAt(marine, 'wave_direction', at)
   if (h === null || t === null || d === null) return null
-  const ww = hourlyAt(marine, 'wind_wave_height', at)
   return { at, estimate: surfEstimate(h, t, d, facing, factor), swellFt: (swell ?? h) * 3.28084, periodS: t, fromDeg: d, windWaveFt: ww === null ? null : ww * 3.28084 }
 }
 

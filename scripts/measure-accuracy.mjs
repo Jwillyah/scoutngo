@@ -548,6 +548,40 @@ for (const t of wordTables) {
   for (const a of W) L.push(`| ${a} | ${W.map((b) => t.words.filter(([x, y]) => x === a && y === b).length).join(' | ')} |`)
 }
 L.push('')
+/*
+ * THE FIELD TRUTH (Batch TRUTH, Section 2.5): each fixtures/truth/<date>-*.json
+ * with the forecast kept that day (tests/data/surf-<date>/), the app's one
+ * call against what was seen (scripts/measure-truth-surf.mjs, src/core/accuracy.ts truthRow).
+ */
+L.push('## Surf call against the field truth')
+L.push('')
+{
+  const { readdirSync } = await import('node:fs')
+  const { truthRow, truthSurfOf } = await import('../src/core/accuracy.ts')
+  const { spotStats } = await import('../src/core/spotSkill.ts')
+  const { MARINE_NAMES, BRIEF_WIND_NAMES, parseHourly } = await import('../src/lib/tideSheetData.ts')
+  const { surfNowFrom } = await import('../src/lib/useSurfNow.ts')
+  const files = existsSync('fixtures/truth') ? readdirSync('fixtures/truth').filter((f) => /^\d{4}-\d{2}-\d{2}-.*\.json$/.test(f)) : []
+  const rows = []
+  for (const f of files) {
+    const date = f.slice(0, 10)
+    const truth = JSON.parse(readFileSync(`fixtures/truth/${f}`, 'utf8'))
+    const seen = truthSurfOf(truth, date)
+    if (seen === null || !existsSync(`tests/data/surf-${date}/marine.json`)) continue
+    const marine = parseHourly(JSON.parse(readFileSync(`tests/data/surf-${date}/marine.json`, 'utf8')), MARINE_NAMES)
+    const wind = parseHourly(JSON.parse(readFileSync(`tests/data/surf-${date}/wind.json`, 'utf8')), BRIEF_WIND_NAMES)
+    const t = new Date(`${date}T12:00:00Z`)
+    const read = surfNowFrom({ status: 'ready', marine, wind, facing: truth.place?.facingDeg ?? null, facingState: 'ok', buoy: null }, spotStats([], t.getTime()), t, truth.place?.timeZone ?? 'UTC')
+    rows.push(truthRow(seen, read.week[0]?.call ?? null))
+  }
+  if (rows.length === 0) L.push('No field truth with a kept forecast.')
+  else {
+    L.push('| day | place | ours | seen | range overlaps | our word | seen word | word matches |')
+    L.push('|---|---|---|---|---|---|---|---|')
+    for (const r of rows) L.push(`| ${r.date} | ${r.place} | ${r.ours} | ${r.seen} | ${r.rangeHit ? 'yes' : 'no'} | ${r.oursWord} | ${r.seenWord} | ${r.wordHit ? 'yes' : 'no'} |`)
+  }
+}
+L.push('')
 L.push('## Notes')
 L.push('')
 for (const n of notes) L.push(`- ${n}`)

@@ -8,6 +8,7 @@
  * "Clear sky" at night only as a description of cloud.
  */
 import type { SurfCall } from './surfCall.ts'
+import type { WindTag } from './briefing.ts'
 import { getTimes } from 'suncalc'
 import { formatClock, formatShortHour } from './timezone.ts'
 import { surfOn, surfTag, type SurfShape } from './surf.ts'
@@ -230,8 +231,8 @@ export function colorWords(call: 'Go' | 'Maybe' | 'Skip' | null): string | null 
   return call === 'Go' ? 'color likely' : call === 'Maybe' ? 'color possible' : call === 'Skip' ? 'color unlikely' : null
 }
 
-/** The wind to the beach in words: "cross-shore", never the bare "cross" (Batch Pages, Section 1). */
-export function sideWords(tag: 'Offshore' | 'Cross' | 'Onshore'): string {
+/** The wind to the beach in words: "cross-shore", never the bare "cross" (Batch Pages, Section 1); five bands since Batch TRUTH ("cross-offshore"). */
+export function sideWords(tag: WindTag): string {
   return tag === 'Cross' ? 'cross-shore' : tag.toLowerCase()
 }
 

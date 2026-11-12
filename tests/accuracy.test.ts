@@ -133,3 +133,16 @@ describe('the worst rows', () => {
     expect(worstRows(rows, 3).map((x) => x.label)).toEqual(['c', 'b', 'e'])
   })
 })
+
+describe('the call against the field truth (Batch TRUTH, Section 2.5)', () => {
+  it('12 Nov at the pier: seen 1–2 ft, Small (fixtures/truth/2026-11-12-vb.json)', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { truthRow, truthSurfOf } = await import('../src/core/accuracy.ts')
+    const t = truthSurfOf(JSON.parse(readFileSync('fixtures/truth/2026-11-12-vb.json', 'utf8')), '2026-11-12')
+    expect(t).toMatchObject({ seenFt: [1, 2], sizeWord: 'Small' })
+    expect(truthRow(t!, { lowFt: 0, highFt: 2, size: 'Flat' })).toMatchObject({ rangeHit: true, wordHit: false })
+    expect(truthRow(t!, { lowFt: 1, highFt: 2, size: 'Small' })).toMatchObject({ rangeHit: true, wordHit: true })
+    expect(truthRow(t!, { lowFt: 3, highFt: 4, size: 'Fun' })).toMatchObject({ rangeHit: false, wordHit: false })
+    expect(truthRow(t!, null).ours).toBe('—')
+  })
+})

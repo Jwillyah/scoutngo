@@ -18965,7 +18965,8 @@ a.about__row * {
   background: rgb(255 255 255 / 0.2);
   color: #fff;
 }
-.dwind__tag--offshore {
+.dwind__tag--offshore,
+.dwind__tag--cross-offshore {
   background: rgb(20 60 70 / 0.55);
   color: var(--dwind-off);
 }
@@ -18995,8 +18996,17 @@ a.about__row * {
   fill: var(--dwind-on);
   fill-opacity: 0.32;
 }
-.dwind__sector--cross {
+.dwind__sector--cross-shore {
   fill: transparent;
+}
+/* Batch TRUTH, Section 2: the five bands; the in-between wedges a lighter tint of their side. */
+.dwind__sector--cross-offshore {
+  fill: var(--dwind-off);
+  fill-opacity: 0.16;
+}
+.dwind__sector--cross-onshore {
+  fill: var(--dwind-on);
+  fill-opacity: 0.14;
 }
 .dwind__ring {
   fill: none;
@@ -19058,7 +19068,8 @@ a.about__row * {
   height: 22px;
   fill: #fff;
 }
-.dwind__h--offshore .dwind__ha {
+.dwind__h--offshore .dwind__ha,
+.dwind__h--cross-offshore .dwind__ha {
   fill: var(--dwind-off);
 }
 .dwind__h--onshore .dwind__ha {

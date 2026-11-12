@@ -26,7 +26,7 @@
  * windy. Never "safe", never "clear".
  */
 import { getMoonIllumination, getPosition, getTimes } from 'suncalc'
-import { windToBeach, type WindToBeach } from './coastFacing.ts'
+import { windSide, type WindSide } from './coastFacing.ts'
 import { lookWindow, type FireVerdict } from './fireOutlook.ts'
 import type { SatRead } from './goesNowcast.ts'
 import { layerWords, type DeckTruth } from './layerTruth.ts'
@@ -257,8 +257,9 @@ export interface WindHourIn {
   /** At 120 m, about 400 ft, for the drone. */
   highMps: number | null
 }
-export type WindTag = 'Offshore' | 'Cross' | 'Onshore'
-export const WIND_TAG: Record<WindToBeach, WindTag> = { offshore: 'Offshore', cross: 'Cross', onshore: 'Onshore' }
+/* Five bands since Batch TRUTH, Section 2 (src/core/coastFacing.ts windSide): "Cross" is cross-shore. */
+export type WindTag = 'Offshore' | 'Cross-offshore' | 'Cross' | 'Cross-onshore' | 'Onshore'
+export const WIND_TAG: Record<WindSide, WindTag> = { offshore: 'Offshore', 'cross-offshore': 'Cross-offshore', 'cross-shore': 'Cross', 'cross-onshore': 'Cross-onshore', onshore: 'Onshore' }
 
 export const kt = (mps: number | null): number | null => (mps === null ? null : mps * MS_TO_KT)
 
@@ -270,7 +271,7 @@ export function windLevel(knots: number | null): 'calm' | 'amber' | 'orange' {
 
 export function windTag(fromDeg: number | null, facing: number | null): WindTag | null {
   if (fromDeg === null || facing === null) return null
-  return WIND_TAG[windToBeach(fromDeg, facing)]
+  return WIND_TAG[windSide(fromDeg, facing)]
 }
 
 /* ------------------------------------------------------------------- tide */
