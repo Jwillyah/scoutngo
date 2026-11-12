@@ -633,3 +633,14 @@
   opacity: 0.75;
   white-space: nowrap;
 }
+
+/* Batch BEST SKY, Section 4: "Better color 6 mi NW · Lynnhaven · 4:55", the Next line's place, a tap to "Where's the color?". */
+.home .hnext--better {
+  border: 0;
+  color: #fff;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  background: linear-gradient(90deg, rgb(232 135 106 / 0.55), rgb(108 90 168 / 0.55));
+  cursor: pointer;
+}

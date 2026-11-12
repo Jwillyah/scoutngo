@@ -1,3 +1,5 @@
+import { betterColorLine } from '../core/bestSky.ts'
+import { useBestSky } from '../lib/useBestSky.ts'
 import '../styles/home-d.css'
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 /* suncalc 2.0.2 (this repo's): altitude and azimuth in DEGREES, azimuth from north, clockwise (Batch N E10: the moon read "S" when it was treated as radians from south). */
@@ -59,7 +61,7 @@ import { SkyIconSvg } from './SkyIconSvg.tsx'
  * never instructions (rule 28). It fits 390 x 844 and 412 x 915 on a calm
  * day with nothing scrolled (scripts/audit-briefing.mjs).
  */
-export type HomeTarget = 'surf' | 'wind' | 'tides' | 'sky' | 'preflight' | 'moon' | 'weather' | 'drone'
+export type HomeTarget = 'surf' | 'wind' | 'tides' | 'sky' | 'preflight' | 'moon' | 'weather' | 'drone' | 'bestsky'
 
 interface HomeProps {
   venue: { lat: number; lon: number }
@@ -329,6 +331,9 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
    * lowest-priority card left for the menu, until nothing scrolls. A resize
    * (rotation, Safari's bars, the text size) starts again.
    */
+  /* Batch BEST SKY, Section 4: today only, with Shoot picked: the grid within 15 mi (7 or so questions, each kept an hour). */
+  const bestSky = useBestSky(which === 'today' && order.includes('shoot') ? venue : null, 15, now)
+  const better = bestSky.event === null ? null : betterColorLine(bestSky.ranked, bestSky.here, venue, formatClock(bestSky.event.peak, timeZone), units.distance === 'ft')
   const nextText = nextWords === null ? (loading ? 'Reading the forecast…' : noForecast ? 'No forecast yet · retrying' : nothingLine(which, nextGood)) : `Next: ${nextWords}`
   const root = useRef<HTMLDivElement | null>(null)
   const [fit, setFit] = useState<{ tight: 0 | 1 | 2; drop: number }>({ tight: 0, drop: 0 })
@@ -391,7 +396,14 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
         </div>
       )}
       {/* Batch TRUTH, Section 4: the Next line alone; the cams live in the menu ("Next: … / Cams · VB Pier" was two things in one row). */}
-      <p className="hnext">{nextText}</p>
+      {/* Batch BEST SKY, Section 4: when somewhere near has better color than here, that is the row; it opens "Where's the color?". */}
+      {better === null ? (
+        <p className="hnext">{nextText}</p>
+      ) : (
+        <button type="button" className="hnext hnext--better" data-better onClick={() => onOpen('bestsky')}>
+          {better} ›
+        </button>
+      )}
     </div>
   )
 }

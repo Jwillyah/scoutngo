@@ -11,9 +11,13 @@
  *   privacy   every grid question names a tile (25 points on the 0.05° grid)
  *             and the day, never the spot; one question per tile; a radius
  *             changed and changed back asks nothing again (each kept an hour)
- *   page 1    (from the Sky page's "Where's the color nearby?") "Color tonight · sunset 4:57 PM", a dot per page, the imagery (at most 16
+ *   page 1    "Color tonight · sunset 4:57 PM", a dot per page, the imagery (at most 16
  *             tiles), the wash, pin 1 Lynnhaven Inlet, the sheet's "Best:"
  *             and its word, the four radii
+ *   home row  "Better color 8 mi WNW · Lynnhaven Inlet · 5:02 PM ›" opens it
+ *   page 2    "Best 8 mi WNW", three ranked rows with Lynnhaven Inlet first,
+ *             where you are, Show on map, Remind me (in Chromium the file
+ *             it hands over: the event, its alarm, no coordinate)
  *
  * Nothing runs off the side of a page; nothing says safe or clear (rule 28);
  * every time reads AM or PM.
@@ -120,9 +124,11 @@ try {
       continue
     }
     // <open>
-    if (!(await tap('.home__page[aria-label="Today"] .hcard--sky'))) fail(`${label}: no Sky card on the home`)
-    await wait(4000)
-    if (!(await tap('.spage__bestsky'))) fail(`${label}: no "Where's the color nearby?" on the Sky page`)
+    /* Section 4: the home's row, when somewhere near beats here, opens the page. */
+    const row = await ev(`document.querySelector('.home__page[aria-label="Today"] [data-better]')?.textContent ?? null`)
+    console.log(`  home row: ${JSON.stringify(row)}`)
+    if (!/^Better color \d+ mi [NESW]+ · Lynnhaven Inlet · \d+:\d\d [AP]M ›$/.test(row ?? '')) fail(`${label}: the home's row reads ${JSON.stringify(row)}`)
+    if (!(await tap('.home__page[aria-label="Today"] [data-better]'))) fail(`${label}: the home's row does not open the page`)
     // </open>
     await wait(5000)
     if (!(await ev(`!!document.querySelector('.bsky')`))) {
@@ -172,6 +178,32 @@ try {
     if (at30 < 1) fail(`${label}: 30 mi asked nothing`)
     if (again !== 0) fail(`${label}: back at 15 mi the tiles were asked again (${again}), not kept the hour`)
     // <page 2>
+    /* ------------------------------------------------------------ page 2 (Section 4; board BestSky_Card) */
+    await ev(`document.querySelectorAll('.bsky__page')[1]?.scrollIntoView({ inline: 'start' })`)
+    await wait(1500)
+    const l = JSON.parse(
+      await ev(`JSON.stringify((() => { const pg = document.querySelectorAll('.bsky__page')[1]; return { sub: document.querySelector('.bsky .ppage__sub')?.textContent, big: pg.querySelector('[data-bsky-best]')?.textContent, rows: [...pg.querySelectorAll('.bsky__row[data-bsky-rank]')].map((b) => b.querySelector('.bsky__rname')?.textContent + ' ' + b.querySelector('.bsky__pill')?.textContent), here: pg.querySelector('.bsky__row--here .bsky__rname')?.textContent, remind: pg.querySelector('[data-bsky-remind]')?.textContent ?? null, show: !!pg.querySelector('.bsky__btn--main') } })())`),
+    )
+    console.log(`  page 2: ${JSON.stringify(l)}`)
+    if (l.sub !== 'near you · tonight') fail(`${label}: page 2's line reads ${JSON.stringify(l.sub)}`)
+    if (!/^Best \d+ mi [NESW]+$/.test(l.big ?? '')) fail(`${label}: page 2's headline reads ${JSON.stringify(l.big)}`)
+    if (l.rows.length !== 3 || l.rows[0] !== 'Lynnhaven Inlet Likely') fail(`${label}: the ranked rows are ${JSON.stringify(l.rows)}`)
+    if (!/^Where you are · /.test(l.here ?? '')) fail(`${label}: no "Where you are" row`)
+    if (!l.show) fail(`${label}: no "Show on map"`)
+    if (!/^Remind me \d+:\d\d [AP]M$/.test(l.remind ?? '')) fail(`${label}: the reminder button reads ${JSON.stringify(l.remind)}`)
+    const p2 = JSON.parse(await ev(SEEN(1)))
+    if (p2.off.length > 0) fail(`${label}: page 2 runs off the side: ${JSON.stringify(p2.off)}`)
+    await page.screenshot({ path: join(OUT, `2-list-${label.replace(/\s/g, '-').toLowerCase()}.png`) })
+    /* The reminder is a file made on the phone: the colour's window at the spot, its alarm, and no coordinate in it. */
+    if (engine === 'chromium') {
+      const [file] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }).catch(() => null), tap('.bsky__page:nth-child(2) [data-bsky-remind]')])
+      const text = file === null ? null : readFileSync(await file.path(), 'utf8')
+      if (text === null) fail(`${label}: "Remind me" handed over no file`)
+      else {
+        if (!/SUMMARY:Sunset color · Lynnhaven Inlet/.test(text) || !/BEGIN:VALARM/.test(text)) fail(`${label}: the reminder file reads ${JSON.stringify(text.slice(0, 300))}`)
+        if (/36\.8|75\.9|GEO:/.test(text)) fail(`${label}: the reminder file carries a coordinate`)
+      }
+    }
     // </page 2>
     // <page 3>
     // </page 3>

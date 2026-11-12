@@ -3,6 +3,7 @@ import type { RadiusMi } from '../core/bestSky.ts'
 import type { LatLon } from '../core/geo.ts'
 import { formatClock } from '../core/timezone.ts'
 import { DEFAULT_RADIUS, useBestSky } from '../lib/useBestSky.ts'
+import { BestSkyList } from './BestSkyList.tsx'
 import { BestSkyMap } from './BestSkyMap.tsx'
 import { PageShell } from './PageShell.tsx'
 import '../styles/bestsky.css'
@@ -27,11 +28,12 @@ interface Props {
   onShowOnMap: (at: LatLon, when: Date) => void
 }
 
-const PAGES = ['Map'] as const
+const PAGES = ['Map', 'List'] as const
 
-export function BestSkyPage({ venue, timeZone, now, miles, saved = [], onBack, onShowOnMap }: Props) {
+export function BestSkyPage({ venue, placeName, timeZone, now, miles, saved = [], onBack, onShowOnMap }: Props) {
   const [radius, setRadius] = useState<RadiusMi>(DEFAULT_RADIUS)
   const [page, setPage] = useState(0)
+  const [picked, setPicked] = useState<string | null>(null)
   const track = useRef<HTMLDivElement>(null)
   const sky = useBestSky(venue, radius, now, saved)
   const ev = sky.event
@@ -40,10 +42,10 @@ export function BestSkyPage({ venue, timeZone, now, miles, saved = [], onBack, o
     track.current?.children[i]?.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' })
   }
   const top = sky.ranked.filter((r) => r.word !== 'Little').slice(0, 3)
-  /* Section 3: the list and the spot pages come in Sections 4 and 5; a pin opens the map there meanwhile. */
+  const chosen = sky.ranked.find((r) => r.spot.id === picked) ?? top[0] ?? sky.ranked[0] ?? null
   const pick = (id: string) => {
-    const r = top.find((x) => x.spot.id === id)
-    if (r !== undefined && ev !== null) onShowOnMap(r.spot.at, ev.peak)
+    setPicked(id)
+    go(1)
   }
   const when = ev === null ? 'next' : ev.kind === 'sunset' ? (sameDay(ev.at, now, timeZone) ? 'tonight' : 'tomorrow evening') : sameDay(ev.at, now, timeZone) ? 'this morning' : 'tomorrow morning'
   /* Page 1 is named as its board: "Color tonight · sunset 4:56". */
@@ -68,6 +70,7 @@ export function BestSkyPage({ venue, timeZone, now, miles, saved = [], onBack, o
         }}
       >
         <BestSkyMap venue={venue} radius={radius} sky={sky} top={top} miles={miles} timeZone={timeZone} onPick={pick} onRadius={setRadius} />
+        <BestSkyList venue={venue} placeName={placeName} radius={radius} sky={sky} top={top} miles={miles} timeZone={timeZone} now={now} chosen={chosen} onPick={pick} onRadius={setRadius} onShowOnMap={onShowOnMap} />
       </div>
     </PageShell>
   )

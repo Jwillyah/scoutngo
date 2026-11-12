@@ -1640,6 +1640,9 @@ function App() {
       case 'drone':
         setDroneOpen(true)
         return
+      case 'bestsky':
+        setBestSkyOpen(true)
+        return
       case 'moon':
         /* The sun, the moon and the night as swipe pages: the Sky sheet's one other view. */
         setMode('plan')
@@ -2659,7 +2662,7 @@ function App() {
           onViewfinder={showsPhotoTools(activities) ? () => setViewfinderOpen(true) : undefined}
           onOpen={(t) => {
             /* The Weather and Sky pages open over the home: Back is the home again. */
-            if (t === 'weather' || t === 'sky' || t === 'drone') {
+            if (t === 'weather' || t === 'sky' || t === 'drone' || t === 'bestsky') {
               homeOpen(t)
               return
             }

@@ -1,0 +1,99 @@
+/*
+ * WHERE'S THE COLOR? 2 · THE LIST (Batch BEST SKY, Section 4; board
+ * BestSky_Card): the big "Best 6 mi NW", three ranked rows, where you are,
+ * the two buttons.
+ */
+.bsky__event,
+.bsky__sum {
+  text-align: center;
+}
+.bsky__big {
+  margin: 0;
+  text-align: center;
+  font-size: 48px;
+  font-weight: 300;
+  line-height: 1.1;
+}
+.bsky__list {
+  padding: 14px 16px;
+  border: 1px solid var(--d-edge);
+  border-radius: 24px;
+  background: var(--d-card);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+.bsky__rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bsky__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 0;
+  border: 0;
+  border-bottom: 1px solid rgb(255 255 255 / 0.1);
+  background: none;
+  color: #fff;
+  font: inherit;
+  text-align: left;
+}
+.bsky__rows li:last-child .bsky__row {
+  border-bottom: 0;
+}
+.bsky__n {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.75);
+  color: #141821;
+  font-weight: 700;
+}
+.bsky__n--first {
+  background: #fff;
+}
+.bsky__n--here {
+  background: none;
+  border: 3px solid #4a8cff;
+}
+.bsky__rtext {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.bsky__rname {
+  font-weight: 700;
+}
+.bsky__rline {
+  font-size: var(--text-sm);
+  color: rgb(255 255 255 / 0.8);
+}
+.bsky__actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+}
+.bsky__btn {
+  flex: 1;
+  min-height: 52px;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 700;
+}
+.bsky__btn--main {
+  background: #fff;
+  color: #141821;
+}
+.bsky__btn--glass {
+  border: 1px solid var(--d-edge);
+  background: rgb(255 255 255 / 0.12);
+  color: #fff;
+}

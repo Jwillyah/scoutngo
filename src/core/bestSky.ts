@@ -260,3 +260,19 @@ export function rankSpots(grid: readonly ScoredPoint[], spots: readonly SpotIn[]
     })
     .sort(compareRanked)
 }
+
+/** Better by at least this much than where you are, and further than this, before the home says so. */
+export const BETTER_BY = 0.2
+export const BETTER_FROM_KM = 1.5
+
+/**
+ * The home's row (Batch BEST SKY, Section 4) when the best spot beats where
+ * you are: "Better color 6 mi NW · Rudee Inlet · 4:55". Null otherwise.
+ */
+export function betterColorLine(ranked: readonly RankedSpot[], here: ScoredPoint | null, from: LatLon, at: string, miles: boolean): string | null {
+  const best = ranked.find((r) => r.word !== 'Little')
+  if (best === undefined || here === null) return null
+  if (distanceMeters(from, best.spot.at) / 1000 < BETTER_FROM_KM) return null
+  if (best.score < here.score + BETTER_BY) return null
+  return `Better color ${distanceWords(from, best.spot.at, miles)} · ${best.spot.name} · ${at}`
+}
