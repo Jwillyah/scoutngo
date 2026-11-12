@@ -18,7 +18,7 @@
 
 import { curveFromExtremes, type CurveSource, type TideExtreme, type TideSample, type TideStation } from '../core/tide.ts'
 import { readForecast, saveForecast, tideKey, type Provenance } from './savedForecast.ts'
-import { reportNetwork } from './offlineCache.ts'
+import { reportNetwork } from './netState.ts'
 
 export const STATIONS_URL =
   'https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations.json?type=tidepredictions'

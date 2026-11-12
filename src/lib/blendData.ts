@@ -16,7 +16,6 @@
  * phone's own scores wait (Batch L); offline or stale, the phone's.
  */
 import { useEffect, useState } from 'react'
-import { ASOS_STATIONS } from '../data/asosStations.ts'
 import { distanceMeters, type LatLon } from '../core/geo.ts'
 import {
   addDay,
@@ -96,7 +95,9 @@ export interface Station {
 }
 
 /** The two nearest reporting stations within SKILL_STATION_KM: KNTU and KORF at Virginia Beach. */
-export function skillStations(venue: LatLon, n = 2): Station[] {
+export async function skillStations(venue: LatLon, n = 2): Promise<Station[]> {
+  /* Batch Polish 2, Section 4: the station list is loaded when first asked, not with the first paint. */
+  const { ASOS_STATIONS } = await import('../data/asosStations.ts')
   return ASOS_STATIONS.map(([id, name, lat, lon]) => ({ id, name, at: { lat, lon }, km: distanceMeters(venue, { lat, lon }) / 1000 }))
     .filter((s) => s.km <= SKILL_STATION_KM)
     .sort((a, b) => a.km - b.km)
@@ -183,7 +184,7 @@ export function dayHours(date: string, timeZone: string): (Date | null)[] {
 
 /** Scores the days not yet scored and keeps them. Returns the history, scored or not. */
 export async function updateSkill(venue: LatLon, timeZone: string, now: Date, fetchImpl: typeof fetch = fetch): Promise<SkillHistory | null> {
-  const stations = skillStations(venue)
+  const stations = await skillStations(venue)
   if (stations.length === 0) return null
   const key = stations.map((s) => s.id).join(',')
   let h = readSkill(key) ?? { stations: key, days: [] }
@@ -246,7 +247,7 @@ export function useBlend(venue: LatLon | null, timeZone: string | null, on: bool
     const at = { lat, lon }
     void (async () => {
       /* The forecast first, blended with the scores already kept; the day's scoring after, then blended again. */
-      const stations = skillStations(at)
+      const stations = await skillStations(at)
       const kept = stations.length === 0 ? null : readSkill(stations.map((s) => s.id).join(','))
       const got = await weatherJson(blendUrl(at), { maxAgeMs: FORECAST_MAX_AGE_MS, timeoutMs: TIMEOUT_MS * 2 })
       if (!live) return

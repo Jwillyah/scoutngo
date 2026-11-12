@@ -12,7 +12,6 @@
  */
 import { livePeriod, type MarinePeriodIn } from '../core/marinePeriod.ts'
 import { useEffect, useState } from 'react'
-import { ASOS_STATIONS } from '../data/asosStations.ts'
 import { destinationPoint, distanceMeters, type LatLon } from '../core/geo.ts'
 import { parseStorms, pwsFor, ripLine, stormsNear, surfZoneFor, tropicsLine } from '../core/coastWx.ts'
 import { TIMEOUT_MS } from './forecast.ts'
@@ -112,7 +111,9 @@ export interface Tropics {
 }
 
 /** The PWS rows are named for places; the nearest is found among weather stations whose names start them, within 100 km. */
-function pwsPlaces(venue: LatLon): { name: string; at: LatLon }[] {
+async function pwsPlaces(venue: LatLon): Promise<{ name: string; at: LatLon }[]> {
+  /* Batch Polish 2, Section 4: the station list is loaded when first asked. */
+  const { ASOS_STATIONS } = await import('../data/asosStations.ts')
   return ASOS_STATIONS.filter(([, , lat, lon]) => distanceMeters(venue, { lat, lon }) <= 100_000).map(([, name, lat, lon]) => ({ name: name.toUpperCase(), at: { lat, lon } }))
 }
 
@@ -129,7 +130,7 @@ export async function fetchTropics(venue: LatLon, dist: 'mi' | 'km', fetchImpl: 
       const text = t.ok ? ((await t.json()) as { text?: string }).text : undefined
       /* Row names are like "NORFOLK NAS": a station named "Norfolk" within 100 km stands for it. */
       const rows = text === undefined ? [] : [...new Set([...text.matchAll(/^([A-Z][A-Z .'/-]+?)\s+34\s/gm)].map((m) => m[1].trim()))]
-      const places = pwsPlaces(venue).flatMap((p) => rows.filter((row) => row.startsWith(p.name)).map((row) => ({ name: row, at: p.at })))
+      const places = (await pwsPlaces(venue)).flatMap((p) => rows.filter((row) => row.startsWith(p.name)).map((row) => ({ name: row, at: p.at })))
       const p = text === undefined ? null : pwsFor(text, places, venue)
       if (p !== null && p.p34 !== null) odds = `Tropical-storm-force winds (34 kt) ${p.p34}% over 5 days at ${p.place.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}${p.p64 === null || p.p64 === 0 ? '' : `, hurricane-force ${p.p64}%`} (NHC)`
     }

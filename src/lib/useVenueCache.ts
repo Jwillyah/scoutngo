@@ -1,17 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { LatLon } from '../core/geo.ts'
-import {
-  downloadArea,
-  fitsCeiling,
-  isOnline,
-  loadAreas,
-  measureArea,
-  sameBox,
-  sizeLine,
-  tilesToFetch,
-  venueBox,
-  type SavedArea,
-} from './offlineCache.ts'
+import type { SavedArea } from './offlineCache.ts'
 import { IMAGERY_ZOOMS, TERRAIN_ZOOMS } from './offlineSources.ts'
 
 /*
@@ -45,8 +34,12 @@ export type VenueCacheState =
   | { status: 'skipped'; reason: string }
   | { status: 'error'; reason: string }
 
-const savedFor = (box: ReturnType<typeof venueBox>): SavedArea | null =>
-  loadAreas().find((a) => a.kind === 'venue' && sameBox(a.box, box)) ?? null
+/*
+ * THE TILE STORE LOADED WHEN FIRST NEEDED (Batch Polish 2, Section 4): this
+ * runs after the map is shown, and src/lib/offlineCache.ts (with the vector
+ * tile reader behind it) stays out of the home's first paint.
+ */
+type Store = typeof import('./offlineCache.ts')
 
 export function useVenueCache(
   centre: LatLon | null,
@@ -62,19 +55,22 @@ export function useVenueCache(
       setState({ status: 'idle' })
       return
     }
-    const box = venueBox({ lat, lon }, radiusMeters)
-    const already = savedFor(box)
-    if (already !== null) {
-      setState({ status: 'saved', area: already })
-      return
-    }
-    if (!isOnline()) {
-      setState({ status: 'offline' })
-      return
-    }
-
     const controller = new AbortController()
-    const timer = setTimeout(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    void import('./offlineCache.ts').then((store: Store) => {
+      if (controller.signal.aborted) return
+      const { downloadArea, fitsCeiling, isOnline, loadAreas, measureArea, sameBox, sizeLine, tilesToFetch, venueBox } = store
+      const box = venueBox({ lat, lon }, radiusMeters)
+      const already = loadAreas().find((a) => a.kind === 'venue' && sameBox(a.box, box)) ?? null
+      if (already !== null) {
+        setState({ status: 'saved', area: already })
+        return
+      }
+      if (!isOnline()) {
+        setState({ status: 'offline' })
+        return
+      }
+      timer = setTimeout(() => {
       void (async () => {
         setState({ status: 'measuring' })
         let imageryZooms: [number, number] = [IMAGERY_ZOOMS[0], IMAGERY_ZOOMS[1]]
@@ -124,7 +120,8 @@ export function useVenueCache(
               : { status: 'idle' },
         )
       })()
-    }, SETTLE_MS)
+      }, SETTLE_MS)
+    })
 
     return () => {
       clearTimeout(timer)

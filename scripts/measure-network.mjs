@@ -228,6 +228,8 @@ say('')
   }, 0)
   say(`- the temperature drawn as a number: ${ms === null ? 'not within 60 s' : `${(ms / 1000).toFixed(1)} s`} after the open (target under 8 s)`)
   say(`- JavaScript asked for before it: ${before.length} files, ${(gz / 1000).toFixed(0)} KB gzipped (target under 250 KB)`)
+  /* SCOUTNGO_LIST_JS=1: each file and its gzipped size, on the console (not the report). */
+  if (process.env.SCOUTNGO_LIST_JS) for (const u of before) { try { console.log(`  ${String(gzipSync(readFileSync(join(DIST, new URL(u).pathname))).length).padStart(7)} ${new URL(u).pathname}`) } catch { /* not in dist */ } }
   await s.ctx.close()
 }
 

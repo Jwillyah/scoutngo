@@ -6,7 +6,6 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { type ConeMode } from './lib/coneMode.ts'
 import type { MapHandle } from './components/MapView.tsx'
 import { NewBuildNotice } from './components/NewBuildNotice.tsx'
-import { Landing } from './components/Landing.tsx'
 import { NUMERALS_DEFAULT } from './core/numerals.ts'
 import { NumeralsProvider } from './lib/numerals.tsx'
 import type { LatLon } from './core/geo.ts'
@@ -34,7 +33,6 @@ import { extremesAround, tideStateAt } from './core/tide.ts'
 import { LOCATED_ZOOM, locateOnce } from './lib/locateOnce.ts'
 import { markNearMeSeen, nearMeDue, nearMeItems, placesNear, snoozeNearMe, type NearItem } from './lib/nearMe.ts'
 import { readHome } from './lib/home.ts'
-import { NearYou } from './components/NearYou.tsx'
 import { askToPersist, backupDue, backupLine, backupShare, markReminded, yoursChanged, YOURS_CHANGED } from './lib/backup.ts'
 import { useNewBuild } from './lib/useNewBuild.ts'
 import { useSkyFrames } from './lib/useSkyFrames.ts'
@@ -104,13 +102,11 @@ import { useVenueCache } from './lib/useVenueCache.ts'
 import { atPrivacy, closePrivacy } from './lib/privacyRoute.ts'
 import { buildScoutFile, saveScoutFile, scoutFilename, type ReadFile } from './lib/scoutFile.ts'
 import { readShareHash, SHARE_PREFIX } from './lib/planShare.ts'
-import { Menu, type MenuRows, type MenuTarget } from './components/Menu.tsx'
+import type { MenuRows, MenuTarget } from './components/Menu.tsx'
 import { Home, type HomeTarget } from './components/Home.tsx'
 import { OPEN_RADAR_EVENT, OPEN_SKY_EVENT, OPEN_WEATHER_EVENT } from './lib/pageEvents.ts'
 import { homeOrder, readActivities, showsDrone, showsPhotoTools, useActivities } from './lib/activities.ts'
 import { homeCardsShown } from './core/homeCards.ts'
-import { ActivityPicker } from './components/ActivityPicker.tsx'
-import { SpotPicker } from './components/SpotPicker.tsx'
 import { viewfinderPreset } from './core/viewfinderPreset.ts'
 import { shouldOpenBriefing } from './lib/briefingOpen.ts'
 import { backToNow, openingScrub } from './lib/backToNow.ts'
@@ -164,6 +160,18 @@ import { readLastSetup, writeLastSetup, type LastSetup } from './lib/lastSetup.t
  * viewfinder, the weather, sky, drone, privacy and Now screens). The home and
  * the menu come with the app.
  */
+/*
+ * Batch Polish 2, Section 4: not in the first paint's JavaScript. The spot
+ * picker carries the coast cams' list and opens on a tap or on the very
+ * first run; the landing and the activity picker are first-run screens; Near
+ * you is the plan's; the menu opens on a tap (fetched at the first touch).
+ */
+const Landing = lazy(() => import('./components/Landing.tsx').then((m) => ({ default: m.Landing })))
+const NearYou = lazy(() => import('./components/NearYou.tsx').then((m) => ({ default: m.NearYou })))
+const ActivityPicker = lazy(() => import('./components/ActivityPicker.tsx').then((m) => ({ default: m.ActivityPicker })))
+const loadMenu = () => import('./components/Menu.tsx').then((m) => ({ default: m.Menu }))
+const Menu = lazy(loadMenu)
+const SpotPicker = lazy(() => import('./components/SpotPicker.tsx').then((m) => ({ default: m.SpotPicker })))
 const PlanMode = lazy(() => import('./components/PlanMode.tsx').then((m) => ({ default: m.PlanMode })))
 const FieldMode = lazy(() => import('./components/FieldMode.tsx').then((m) => ({ default: m.FieldMode })))
 const NowScreen = lazy(() => import('./components/NowScreen.tsx').then((m) => ({ default: m.NowScreen })))
@@ -1199,7 +1207,8 @@ function App() {
   }, [nameUnknown, venue.latitude, venue.longitude])
 
   /* A name from bundled data while the lookup is out or refused (E9): never the bare coordinate when a spot or town is near. */
-  const nearbyName = useBundledPlaceName(centre)
+  /* Batch Polish 2, Section 4: only when the spot has no name of its own: the bundled lists (the stations', the cams') stay out of the first paint. */
+  const nearbyName = useBundledPlaceName(venueNameState.kind === 'name' ? null : centre)
   const venueNameLine = useMemo(
     () => venueLabel(venueNameState, venue.latitude, venue.longitude, nearbyName),
     [venueNameState, venue.latitude, venue.longitude, nearbyName],
@@ -1642,6 +1651,17 @@ function App() {
   useEffect(() => {
     if (menuOpen) setMenuNow(new Date())
   }, [menuOpen])
+  /* Batch Polish 2, Section 4: the menu's file fetched at the first touch, so the tap that opens it does not wait for it. */
+  useEffect(() => {
+    /* On the first touch anywhere, or 20 s in: never ahead of the first paint on a slow line. */
+    const go = () => void loadMenu()
+    const t = setTimeout(go, 20_000)
+    window.addEventListener('pointerdown', go, { once: true })
+    return () => {
+      clearTimeout(t)
+      window.removeEventListener('pointerdown', go)
+    }
+  }, [])
   /* Batch Polish, Section 4: Kit its counts, Saved its spots, Settings just the arrow (the backup's age is in Settings itself). */
   const menuRows = useMemo<MenuRows>(
     () => ({
@@ -2205,7 +2225,9 @@ function App() {
         * somebody who has the app already.
         */}
       {landingSeen && !atHowPath ? null : (
-        <Landing onDismiss={() => { setLandingSeen(true); setAtHowPath(false) }} />
+        <Suspense fallback={null}>
+          <Landing onDismiss={() => { setLandingSeen(true); setAtHowPath(false) }} />
+        </Suspense>
       )}
       {!nowOpen ? null : (
         <Suspense fallback={null}><NowScreen onClose={() => setNowOpen(false)} onPlanHere={planFromNow} /></Suspense>
@@ -2290,6 +2312,7 @@ function App() {
       ) : null}
 
       {mode === 'plan' && nearItems !== null ? (
+        <Suspense fallback={null}>
         <NearYou
           items={nearItems}
           onGo={goNear}
@@ -2298,6 +2321,7 @@ function App() {
             setNearItems(null)
           }}
         />
+        </Suspense>
       ) : null}
       {mode === 'plan' && mapSeen ? (
         <Suspense fallback={null}>
@@ -2600,6 +2624,7 @@ function App() {
 
       {/* FIRST RUN, NO SETUP (Batch I, Section 1): no spot yet, so "Where do you go?" (Batch M), over everything. */}
       {(landingSeen && centre === null && bareLaunch) || spotPickOpen ? (
+        <Suspense fallback={null}>
         <SpotPicker
           title={centre === null ? 'Where do you go?' : 'Find a spot'}
           saved={spots.flatMap((sp) => {
@@ -2610,6 +2635,7 @@ function App() {
           onPick={chooseSpot}
           onClose={centre === null ? undefined : () => setSpotPickOpen(false)}
         />
+        </Suspense>
       ) : null}
       {briefOpen && centre !== null && !spotPickOpen ? (
         /* THE HOME (Batch M, Section 3): the front door, weather first, ordered by what you do. */
@@ -2722,6 +2748,7 @@ function App() {
       ) : null}
 
       {askWhat ? (
+        <Suspense fallback={null}>
         <ActivityPicker
           variant="sheet"
           value={activities}
@@ -2731,8 +2758,10 @@ function App() {
           }}
           onLater={() => setAskWhat(false)}
         />
+        </Suspense>
       ) : null}
 
+      <Suspense fallback={null}>
       <Menu
         open={menuOpen}
         venue={centre}
@@ -2749,6 +2778,7 @@ function App() {
         onPick={onMenuTarget}
         onClose={() => setMenuOpen(false)}
       />
+      </Suspense>
 
     </div>
     </NumeralsProvider>

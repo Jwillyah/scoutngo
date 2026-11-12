@@ -3,7 +3,7 @@ import { lightGoneLine, sunriseLine } from '../core/lightGone.ts'
 import { blockerWords, nameBlocker, type Footprint, type TreePoint } from '../core/horizonBlocker.ts'
 import { bodyPosition } from '../core/sun.ts'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { TILE_TIMEOUT_MS } from '../lib/offlineCache.ts'
+import { TILE_TIMEOUT_MS } from '../lib/netState.ts'
 import {
   altitudeRange,
   band,

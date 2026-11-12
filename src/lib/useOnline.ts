@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { isOnline, onConnectivity } from './offlineCache.ts'
+import { isOnline, onConnectivity } from './netState.ts'
 
 /**
  * Whether there is a connection, as the venue bar's quiet mark shows it.

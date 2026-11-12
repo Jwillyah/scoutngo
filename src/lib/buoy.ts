@@ -8,7 +8,7 @@
  */
 import { NDBC_BUOYS } from '../data/ndbc.ts'
 import { bearingBetween, distanceMeters, type LatLon } from '../core/geo.ts'
-import { reportNetwork } from './offlineCache.ts'
+import { reportNetwork } from './netState.ts'
 
 export const BUOY_ENDPOINT = '/api/buoy'
 /*

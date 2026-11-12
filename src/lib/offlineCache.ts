@@ -37,7 +37,7 @@ import {
   VECTOR_TEMPLATE,
   vectorZoomsFor,
 } from './offlineSources.ts'
-import { connectivity } from './connectivity.ts'
+import { isOnline, onConnectivity, reportNetwork, resetConnectivity, TILE_TIMEOUT_MS } from './netState.ts'
 import { cleanTerrainBytes } from './seaMask.ts'
 import { boxAround, tilesForRange, tileUrl, type Box } from './tileRange.ts'
 
@@ -47,14 +47,8 @@ export const AREAS_STORAGE_KEY = 'scoutngo.offline.areas.v1'
 /** The scheme the map's tile URLs carry so they come through loadTile. */
 export const PROTOCOL = 'scoutngo'
 
-/**
- * How long one tile may take before it is given up on.
- *
- * Long enough for a slow but working connection to answer a 20 KB tile, short
- * enough that a dead one costs seconds rather than the browser's own timeout,
- * which is minutes.
- */
-export const TILE_TIMEOUT_MS = 8000
+/* How long one tile may take, and the network's state: src/lib/netState.ts. */
+export { TILE_TIMEOUT_MS }
 
 /*
  * THE DEFAULT RING: 2.34 MB at Big Meadow, 400 m radius, MEASURED in
@@ -113,15 +107,7 @@ export const realUrl = (url: string): string =>
  * a reason to check the app's own origin, never a verdict by itself. These are
  * the names the rest of the app already calls.
  */
-export const isOnline = (): boolean => connectivity.isOnline()
-
-/** Every network call that can tell success from failure reports it here. */
-export const reportNetwork = (ok: boolean): void => connectivity.report(ok)
-
-export const onConnectivity = (listener: (online: boolean) => void): (() => void) => connectivity.onChange(listener)
-
-/** For tests: forget what the network did. */
-export const resetConnectivity = (): void => connectivity.reset()
+export { isOnline, onConnectivity, reportNetwork, resetConnectivity }
 
 /* ------------------------------------------------------------------ storage */
 

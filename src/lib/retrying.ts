@@ -1,4 +1,4 @@
-import { onConnectivity } from './offlineCache.ts'
+import { onConnectivity } from './netState.ts'
 
 /*
  * ASK AGAIN AFTER A FAILURE, BY ITSELF.

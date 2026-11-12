@@ -1,6 +1,5 @@
 import '../styles/home-d.css'
-import { WeatherHome } from './WeatherHome.tsx'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 /* suncalc 2.0.2 (this repo's): altitude and azimuth in DEGREES, azimuth from north, clockwise (Batch N E10: the moon read "S" when it was treated as radians from south). */
 import { getMoonPosition, getPosition } from 'suncalc'
 import { saneAzimuth } from '../core/sanity.ts'
@@ -11,7 +10,7 @@ import { bestRun, bestWindows, colorWords, skyStripLit, weekSurf, WEEK_SURE_DAYS
 import { camsFacingWaterOrSun } from '../core/skyCams.ts'
 import { wakeAt } from '../core/alertIcs.ts'
 import { formatClock } from '../core/timezone.ts'
-import { COAST_CAMS } from '../data/coastCams.ts'
+import { useCoastCams } from '../lib/coastCamsLazy.ts'
 import { homeOrder, primaryFor, useActivities } from '../lib/activities.ts'
 import { seaNow, surfLine, useSurfNow, type SurfNow } from '../lib/useSurfNow.ts'
 import { rangeSizeWords } from '../core/surfReads.ts'
@@ -30,7 +29,9 @@ import { NetDebug } from './NetDebug.tsx'
 import { refreshLine, useWeatherRefreshing } from '../lib/useWeatherStatus.ts'
 import { ActivityIcon } from './ActivityIcon.tsx'
 import { MoonGlyph } from './MoonGlyph.tsx'
-import { CamsSheet } from './CamsSheet.tsx'
+/* Batch Polish 2, Section 4: not in the first paint's JavaScript. The cams' sheet opens on a tap; the weather-only home is one choice of five. */
+const CamsSheet = lazy(() => import('./CamsSheet.tsx').then((m) => ({ default: m.CamsSheet })))
+const WeatherHome = lazy(() => import('./WeatherHome.tsx').then((m) => ({ default: m.WeatherHome })))
 import { OPEN_RADAR_EVENT } from '../lib/pageEvents.ts'
 import { SkyIconSvg } from './SkyIconSvg.tsx'
 
@@ -294,7 +295,8 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
   const noForecast = !loading && (wx === null || day === null || day.wind.every((w) => w.mps === null))
   const nextGood = useMemo(() => nextGoodDay(brief.days, which === 'today' ? 1 : 2, timeZone), [brief.days, which, timeZone])
   const sunAz = day?.events.sunset === null || day === null ? null : getPosition(day.events.sunset, venue.lat, venue.lon).azimuth
-  const cams = which === 'today' ? camsFacingWaterOrSun(venue, sunAz, brief.facing, COAST_CAMS) : []
+  const coastCams = useCoastCams()
+  const cams = which === 'today' && coastCams !== null ? camsFacingWaterOrSun(venue, sunAz, brief.facing, coastCams) : []
   const [camsOpen, setCamsOpen] = useState(false)
 
   /* Batch Flow, Section 3: within 3 h of a sunrise or sunset, it is said up top. */
@@ -364,7 +366,9 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
       {/* Batch Polish, Section 3: no routine NWS marine text on the home; an advisory or warning is the alert line above. */}
 
       {weatherOnly && which === 'today' ? (
+        <Suspense fallback={null}>
         <WeatherHome venue={venue} timeZone={timeZone} units={units} now={now} wx={wx} obs={obs} drop={fit.drop} onOpen={() => onOpen('weather')} />
+        </Suspense>
       ) : (
         <div className={`hcards hcards--${layout}`}>
           {cardsShown.map((c) => (
@@ -386,7 +390,7 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
           <span aria-hidden="true">›</span>
         </button>
       )}
-      {camsOpen ? <CamsSheet spot={placeName} venue={venue} sunsetAzDeg={sunAz} seaFacingDeg={brief.facing} onClose={() => setCamsOpen(false)} /> : null}
+      {camsOpen ? <Suspense fallback={null}><CamsSheet spot={placeName} venue={venue} sunsetAzDeg={sunAz} seaFacingDeg={brief.facing} onClose={() => setCamsOpen(false)} /></Suspense> : null}
     </div>
   )
 }

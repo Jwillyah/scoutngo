@@ -1,3 +1,4 @@
+import { COAST_CAMS } from '../src/data/coastCams.ts'
 import { describe, expect, it } from 'vitest'
 import { droneLadder, fewCards, firstFun, homeCardsShown, homeLayout, nextLine, nightSpans, surfPath, tideAt, tideCurve, windAtFeet } from '../src/core/homeCards.ts'
 import { awayFrom, beachFor, namedBeach } from '../src/lib/surfBeach.ts'
@@ -87,7 +88,7 @@ describe('a named beach is its own beach (field 9 Nov: "Sandbridge" said "Neares
     const inland = { lat: 36.705, lon: -75.985 }
     expect(namedBeach(inland, 'Sandbridge')?.name).toBe('Sandbridge')
     expect(namedBeach(inland, 'Sandbridge Beach')?.name).toBe('Sandbridge')
-    expect(beachFor(inland, null, 'Sandbridge')?.name).toBe('Sandbridge')
+    expect(beachFor(inland, null, 'Sandbridge', COAST_CAMS)?.name).toBe('Sandbridge')
   })
   it('a name far from that beach, or no name, is the nearest beach as before', () => {
     expect(namedBeach({ lat: 38.3, lon: -75.1 }, 'Sandbridge')).toBeNull()
@@ -117,13 +118,13 @@ describe('a spot on a beach is on that beach (Batch QA, Section 0B, field 10 Nov
   const pier = { lat: 36.8435575, lon: -75.9713104 }
   const northEnd = { name: 'Virginia Beach', at: { lat: 36.88, lon: -75.981 } }
   it('the pier, with North End picked elsewhere: the pier’s own beach, never "Nearest surf"', () => {
-    const b = beachFor(pier, northEnd, 'Virginia Beach Fishing Pier')
+    const b = beachFor(pier, northEnd, 'Virginia Beach Fishing Pier', COAST_CAMS)
     expect(b?.name).toBe('Virginia Beach Pier')
     expect(awayFrom(pier, b, 'Virginia Beach Fishing Pier')).toBe(false)
   })
   it('inland, a pick still holds, and is away', () => {
     const inland = { lat: 36.78, lon: -76.1 }
-    expect(beachFor(inland, northEnd, null)?.name).toBe('Virginia Beach')
+    expect(beachFor(inland, northEnd, null, COAST_CAMS)?.name).toBe('Virginia Beach')
     expect(awayFrom(inland, northEnd, null)).toBe(true)
   })
 })

@@ -8,7 +8,7 @@
 import type { LatLon } from '../core/geo.ts'
 import type { TideExtreme } from '../core/tide.ts'
 import { parseExtremes, PREDICTIONS_URL, APPLICATION } from './noaa.ts'
-import { reportNetwork } from './offlineCache.ts'
+import { reportNetwork } from './netState.ts'
 import { readForecast, saveForecast, savedKeys } from './savedForecast.ts'
 import { SLOW_MAX_AGE_MS, weatherJson } from './weatherStore.ts'
 

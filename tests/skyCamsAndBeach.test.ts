@@ -40,10 +40,10 @@ describe('Look west now', () => {
 
 describe('the Water card names its beach', () => {
   it('the nearest known beach by default, said short', () => {
-    expect(nearestBeach(PIER)?.name).toBe('Virginia Beach Pier')
+    expect(nearestBeach(PIER, COAST_CAMS)?.name).toBe('Virginia Beach Pier')
     expect(beachName('Virginia Beach, North End')).toBe('Virginia Beach')
     /* Inland too: Richmond's nearest beach. */
-    expect(nearestBeach({ lat: 37.54, lon: -77.43 })).not.toBeNull()
+    expect(nearestBeach({ lat: 37.54, lon: -77.43 }, COAST_CAMS)).not.toBeNull()
   })
 })
 
@@ -52,17 +52,17 @@ describe('one spot drives the beach (Batch Map A1)', () => {
   const VB_PICK = { name: 'Virginia Beach', at: { lat: 36.8529, lon: -75.978 } }
   it('a beach picked at Virginia Beach does not follow the spot to Kill Devil Hills (9 Nov, the menu said "Virginia Beach")', () => {
     expect(distanceMeters(KDH, VB_PICK.at)).toBeGreaterThan(PICK_HOLDS_KM * 1000)
-    const b = beachFor(KDH, VB_PICK)
-    expect(b).toEqual(nearestBeach(KDH))
+    const b = beachFor(KDH, VB_PICK, null, COAST_CAMS)
+    expect(b).toEqual(nearestBeach(KDH, COAST_CAMS))
     expect(b?.name).not.toMatch(/Virginia Beach/)
   })
   it('a pick near the spot holds; no pick is the nearest beach', () => {
     const SANDBRIDGE = { name: 'Sandbridge', at: { lat: 36.722, lon: -75.927 } }
     /* A spot off the beach (inland Virginia Beach): the pick holds. */
-    expect(beachFor({ lat: 36.8, lon: -76.05 }, SANDBRIDGE)).toBe(SANDBRIDGE)
+    expect(beachFor({ lat: 36.8, lon: -76.05 }, SANDBRIDGE, null, COAST_CAMS)).toBe(SANDBRIDGE)
     /* A spot on a beach is on that beach, whatever was picked (Batch QA, Section 0B). */
-    expect(beachFor({ lat: 36.85, lon: -75.98 }, SANDBRIDGE)?.name).not.toBe('Sandbridge')
-    expect(beachFor(KDH, null)).toEqual(nearestBeach(KDH))
-    expect(beachFor(null, SANDBRIDGE)).toBeNull()
+    expect(beachFor({ lat: 36.85, lon: -75.98 }, SANDBRIDGE, null, COAST_CAMS)?.name).not.toBe('Sandbridge')
+    expect(beachFor(KDH, null, null, COAST_CAMS)).toEqual(nearestBeach(KDH, COAST_CAMS))
+    expect(beachFor(null, SANDBRIDGE, null, COAST_CAMS)).toBeNull()
   })
 })

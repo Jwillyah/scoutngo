@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { distanceMeters, type LatLon } from '../core/geo.ts'
-import { COAST_CAMS } from '../data/coastCams.ts'
+import { useCoastCams } from './coastCamsLazy.ts'
 import { SURF_SPOTS } from '../data/surfSpots.ts'
 import { spotBaseName } from '../core/knownSpots.ts'
 
@@ -30,10 +30,10 @@ export interface Beach {
 /** "Virginia Beach, North End" is said "Virginia Beach". */
 export const beachName = (name: string): string => name.split(/[,(]/)[0].trim()
 
-/** The nearest known beach to a place (the coast cams' beaches). */
-export function nearestBeach(at: LatLon): Beach | null {
+/** The nearest known beach to a place (the coast cams' beaches; the list is loaded when first asked, src/lib/coastCamsLazy.ts). */
+export function nearestBeach(at: LatLon, cams: readonly { name: string; at: LatLon }[]): Beach | null {
   let best: { b: Beach; d: number } | null = null
-  for (const c of COAST_CAMS) {
+  for (const c of cams) {
     const d = distanceMeters(at, c.at)
     if (best === null || d < best.d) best = { b: { name: beachName(c.name), at: c.at }, d }
   }
@@ -88,11 +88,13 @@ export function namedBeach(venue: LatLon, name: string | null): Beach | null {
  *   3. the one picked, when it is within PICK_HOLDS_KM
  *   4. the nearest
  */
-export function beachFor(venue: LatLon | null, picked: Beach | null, name: string | null = null): Beach | null {
+export function beachFor(venue: LatLon | null, picked: Beach | null, name: string | null, cams: readonly { name: string; at: LatLon }[] | null): Beach | null {
   if (venue === null) return null
   const named = namedBeach(venue, name)
   if (named !== null) return named
-  const near = nearestBeach(venue)
+  /* Until the cams' list has loaded, nothing is said rather than a guess (a moment after the first paint). */
+  if (cams === null) return null
+  const near = nearestBeach(venue, cams)
   if (near !== null && sameBeach(venue, near)) return near
   if (picked !== null && distanceMeters(venue, picked.at) <= PICK_HOLDS_KM * 1000) return picked
   return near
@@ -103,6 +105,7 @@ const told = new Set<() => void>()
 /** The spot's surf beach (beachFor), and the pick; a pick on one screen reaches every screen showing one. */
 export function useSurfBeach(venue: LatLon | null, name: string | null = null): [Beach | null, (b: Beach) => void] {
   const [picked, setPicked] = useState<Beach | null>(() => readBeach())
+  const cams = useCoastCams()
   useEffect(() => {
     const f = () => setPicked(readBeach())
     told.add(f)
@@ -111,7 +114,7 @@ export function useSurfBeach(venue: LatLon | null, name: string | null = null): 
     }
   }, [])
   return [
-    beachFor(venue, picked, name),
+    beachFor(venue, picked, name, cams),
     (b) => {
       writeBeach(b)
       setPicked(b)
