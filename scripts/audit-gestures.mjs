@@ -357,6 +357,7 @@ try {
     const need = Math.ceil((MIN_REAL_FLICKS / 20) * 6)
     for (const [k, n] of Object.entries(rows.realFlicks ?? {})) if (n < need) fail(`only ${n} of 6 ${k} drags arrived as flicks, so flicks were not tested`)
     console.log(`  ${done.length - done.filter((r) => r.wrong).length} of ${done.length} landed right`)
+    if ((rows.coalesced ?? 0) > 0) console.log(`  ${rows.coalesced} flicks tried again: their moves reached the page all at once (no frame drawn mid-drag)`)
     await c.dispose()
   }
 

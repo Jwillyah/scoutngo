@@ -126,6 +126,9 @@ export const MIN_REAL_FLICKS = 12
  * Runs the flicks and slow drags; returns one row per drag with what it should
  * have done and what it did. `perDirection` flicks each way from each detent.
  */
+/** How many times a flick whose moves arrived all at once is tried again. */
+export const COALESCED_RETRIES = 2
+
 export async function runSheetFlicks({ send, ev, wait }, perDirection = 20, flow = null) {
   const rows = []
   /* The detents' heights first: a drag that arrived slow is judged against them. */
@@ -159,13 +162,32 @@ export async function runSheetFlicks({ send, ev, wait }, perDirection = 20, flow
         const where = ['handle', 'date', 'blank'][k % 3]
         const at = s[where] ?? s.handle
         const [len, speed] = FLICKS[k % FLICKS.length]
-        await ev(SPEED_PROBE)
-        /* Batch Polish 2, Section 0: a flick timed only while frames are drawn (scripts/preflight.mjs framesFlowing). */
-        if (flow !== null) await flow()
-        await verticalDrag(send, at, dir === 'up' ? -len : len, speed)
-        await settled(ev, wait)
-        const got = await detentNow(ev)
-        const seen = await ev(`window.__flick?.last ?? null`)
+        /*
+         * Batch Polish 2, Section 0: a flick timed only while frames are drawn
+         * (scripts/preflight.mjs framesFlowing). And a flick whose moves
+         * reached the page all at once (the page saw under 0.005 px/ms, printed 0.00: the tab drew
+         * no frame mid-drag, and touches move with frames) was not a flick the
+         * page could judge: it is tried again from the same detent, at most
+         * COALESCED_RETRIES times. A sheet that truly reads no speed reads 0
+         * every time and still fails.
+         */
+        let got = null
+        let seen = null
+        for (let attempt = 0; attempt <= COALESCED_RETRIES; attempt += 1) {
+          if (attempt > 0) {
+            rows.coalesced = (rows.coalesced ?? 0) + 1
+            if (!(await settleAt(ev, wait, from))) break
+            await ev(`(() => { const b = document.querySelector('.sheet__body:not([hidden])'); if (b) b.scrollTop = 0; return 1 })()`)
+            await wait(350)
+          }
+          await ev(SPEED_PROBE)
+          if (flow !== null) await flow()
+          await verticalDrag(send, at, dir === 'up' ? -len : len, speed)
+          await settled(ev, wait)
+          got = await detentNow(ev)
+          seen = await ev(`window.__flick?.last ?? null`)
+          if (typeof seen !== 'number' || Math.abs(seen) >= 0.005) break
+        }
         const i = ORDER.indexOf(from)
         const fast = typeof seen === 'number' && Math.abs(seen) >= FLICK_PX_PER_MS
         if (fast) rows.realFlicks[`${from} ${dir}`] += 1
