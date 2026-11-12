@@ -8,12 +8,17 @@
 import { useEffect, useState } from 'react'
 import type { LatLon } from '../core/geo.ts'
 import { NOWCAST_STATION_KM, type StationObs } from '../core/nowcast.ts'
-import { nearestStation, stationWind } from './stationNear.ts'
+import type { MetarSky } from '../core/metar.ts'
+import { metarVisMiles } from '../core/skyWord.ts'
+import { nearestStation, stationReport, stationWind } from './stationNear.ts'
 
 const KT = 0.514444
 
 export interface StationNow extends StationObs {
   id: string
+  /** The same report's sky and visibility, for the one sky word (src/core/skyWord.ts). */
+  sky: MetarSky | null
+  visMi: number | null
 }
 
 export function useStationObs(spot: LatLon | null): StationNow | null {
@@ -29,8 +34,9 @@ export function useStationObs(spot: LatLon | null): StationNow | null {
         return
       }
       const w = await stationWind(s.id).catch(() => null)
+      const r = await stationReport(s.id).catch(() => null)
       const at = w === null ? null : new Date(w.at)
-      if (live) setObs({ key, v: w === null || at === null || !Number.isFinite(at.getTime()) ? null : { id: s.id, at, mps: w.kt * KT, fromDeg: w.fromDeg, gustMps: w.gustKt === null ? null : w.gustKt * KT } })
+      if (live) setObs({ key, v: w === null || at === null || !Number.isFinite(at.getTime()) ? null : { id: s.id, at, mps: w.kt * KT, fromDeg: w.fromDeg, gustMps: w.gustKt === null ? null : w.gustKt * KT, sky: r?.sky ?? null, visMi: r === null ? null : metarVisMiles(r.raw) } })
     }
     void ask()
     const t = setInterval(() => void ask(), 10 * 60_000)

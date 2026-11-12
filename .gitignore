@@ -33,7 +33,10 @@ dist-ssr
 .env*
 
 # Organizer artwork and other people's images. Ours to read, not ours to ship.
-fixtures/
+# The field truth (fixtures/truth/, Batch TRUTH) is ours: text the tests read.
+fixtures/*
+!fixtures/truth/
+scripts/fixtures/
 
 # Audit screenshots. The scripts write them beside themselves unless
 # SCOUTNGO_OUT says otherwise; they are evidence, not source.

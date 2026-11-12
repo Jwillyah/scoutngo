@@ -1,0 +1,11 @@
+# The 12 Nov sunrise at the Virginia Beach Fishing Pier, replayed as called
+
+Run: 2026-11-12T13:46:10.111Z · node scripts/measure-sunrise-replay.mjs · sunrise 2026-11-12T11:39:06.536Z, azimuth 111.7° · forecast hour 2026-11-12T12:00 GMT · inputs kept in tests/data/sunrise-2026-11-12/
+
+Assumed publication delays (run to Open-Meteo): HRRR 1.5 h, GFS 5 h, ECMWF 7 h, ICON 4 h, GEM 6 h. Best match is read as HRRR. Not replayed: soundings, pilot reports, the satellite drift.
+
+| stage | runs | overhead low/mid/high (each model) | station | satellite | verdict | call | why | calendar |
+|---|---|---|---|---|---|---|---|---|
+| T-12h (2026-11-11T23:39Z) | best_match 21:00Z, gfs_hrrr 21:00Z, gfs_seamless 18:00Z, ecmwf_ifs025 12:00Z, icon_seamless 18:00Z, gem_seamless 12:00Z | best_match 1/44/0, gfs_hrrr 1/44/0, gfs 2/100/0, ecmwf 0/2/0, icon 48/75/0, gem 40/0/0 | not asked (outside 2 h) | outside the window | Color possible (2 of 5) | Maybe | Possible: 2 of 5 models see lit mid deck. | event: "Sunrise Maybe" |
+| T-3h (2026-11-12T08:39Z) | best_match 06:00Z, gfs_hrrr 06:00Z, gfs_seamless 00:00Z, ecmwf_ifs025 00:00Z, icon_seamless 00:00Z, gem_seamless 00:00Z | best_match 0/0/0, gfs_hrrr 0/0/0, gfs 5/0/0, ecmwf 0/2/0, icon 48/77/0, gem 48/0/0 | not asked (outside 2 h) | The satellite sees high or mid cloud over you, and the way to the sun 42% cold (frame 2026-11-12T08:10Z) | Color unlikely: no clouds to catch the light (1 of 5) | Maybe | The satellite sees high or mid cloud over you, which the models do not have. Whether the light gets under it is the stations' call within the hour. · deck over you: none · Gap to the ESE: shut · satellite cloud to the end | event: "Sunrise Maybe" |
+| T-30min (2026-11-12T11:09Z) | best_match 09:00Z, gfs_hrrr 09:00Z, gfs_seamless 06:00Z, ecmwf_ifs025 00:00Z, icon_seamless 06:00Z, gem_seamless 00:00Z | best_match 100/0/0, gfs_hrrr 100/0/0, gfs 0/0/0, ecmwf 0/2/0, icon 47/72/0, gem 48/0/0 | KNTU 121056Z 19003KT 10SM SCT120 BKN150 13/12 A2958 | The satellite sees no high or mid cloud over you (frame 2026-11-12T10:40Z) | Color possible (2 of 5) | Go | Stations see a mid deck 15k over you and the gap toward the sun open. · deck over you: mid deck (15,000 ft) · Gap to the ESE: open · satellite clear past 20 km | event: "Sunrise Maybe" |

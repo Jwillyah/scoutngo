@@ -612,3 +612,25 @@
 .hcard--small .hcard__gl {
   display: none;
 }
+
+/* Batch TRUTH, Section 0.5: "Color now · sunrise 6:40 · look E", in the date line's slot at the top of the home, no taller than it. */
+.hwx--d .hday__colornow {
+  display: inline-block;
+  align-self: flex-start;
+  max-width: 100%;
+  margin: 0;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--d-glow), var(--d-glow-violet));
+  color: #fff;
+  font: inherit;
+  font-size: var(--text-xs);
+  line-height: 1.2;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}

@@ -6,7 +6,7 @@ import { saneAzimuth } from '../core/sanity.ts'
 import { moonTimesOnLocalDay } from '../core/moonTimes.ts'
 import { droneTag, kt, surfOn, surfTag, windTag, type CallRead } from '../core/briefing.ts'
 import { droneWindow } from '../core/droneWindow.ts'
-import { bestRun, bestWindows, colorWords, skyStripLit, weekSurf, WEEK_SURE_DAYS, conditionOf, groundOf, sideWords, nothingLine, rainLine, spanWords, stripSteps, weekHeadline, type Activity, type CardKind, type WindowRow } from '../core/homeDay.ts'
+import { bestRun, bestWindows, colorWords, skyStripLit, weekSurf, WEEK_SURE_DAYS, groundOf, sideWords, nothingLine, rainLine, spanWords, stripSteps, weekHeadline, type Activity, type CardKind, type WindowRow } from '../core/homeDay.ts'
 import { camsFacingWaterOrSun } from '../core/skyCams.ts'
 import { wakeAt } from '../core/alertIcs.ts'
 import { formatClock } from '../core/timezone.ts'
@@ -17,8 +17,10 @@ import { rangeSizeWords } from '../core/surfReads.ts'
 import { chartMarks, firstFun, homeCardsShown, homeLayout, nextLine, nightSpans, surfChartMarks, surfPath, tideAt, tideCurve, type HomeLayout, type SurfChartMarks } from '../core/homeCards.ts'
 import { beachName } from '../lib/surfBeach.ts'
 import { gustWords, windAt, windWords } from '../lib/windNow.ts'
-import { useStationObs } from '../lib/useStationObs.ts'
-import type { StationObs } from '../core/nowcast.ts'
+import { useStationObs, type StationNow } from '../lib/useStationObs.ts'
+import { skyCondition } from '../core/skyWord.ts'
+import { colorNowLine } from '../core/colorNow.ts'
+import { obsFresh } from '../core/nowcast.ts'
 import { hourlyAt } from '../lib/tideSheetData.ts'
 import { compass } from '../lib/tideWords.ts'
 import { formatTemperature, windIn, windUnitLabel, type Units } from '../lib/units.ts'
@@ -249,7 +251,7 @@ interface DayViewProps {
   onDebug?: () => void
   placeName: string
   surf: SurfNow
-  obs: StationObs | null
+  obs: StationNow | null
   /** Batch Flow, Section 3: few (1-3 activities picked) or many cards. */
   layout: HomeLayout
   /** Batch Polish 2, Section 2: only Weather picked: today is the weather itself (src/components/WeatherHome.tsx). */
@@ -271,7 +273,15 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
   const hi = temps.length === 0 ? null : Math.max(...temps)
   const lo = temps.length === 0 ? null : Math.min(...temps)
   const sunUp = getPosition(when, venue.lat, venue.lon).altitude > -0.8
-  const cond = conditionOf(at('weather_code', when), sunUp)
+  /* One sky word with the map's strip (src/core/skyWord.ts): fog only from the station, else the layers. */
+  const cond = skyCondition({
+    code: at('weather_code', when),
+    layers: { low: at('cloud_cover_low', when), mid: at('cloud_cover_mid', when), high: at('cloud_cover_high', when) },
+    day: sunUp,
+    station: which === 'today' && obs !== null && obsFresh(obs, now) ? { sky: obs.sky, visMi: obs.visMi } : null,
+  })
+  /* Batch TRUTH, Section 0.5: a live colour window with a Maybe or better leads the home. */
+  const colorNow = which !== 'today' || day === null ? null : colorNowLine([day.reads.sunrise, day.reads.sunset], now, venue, timeZone)
   const bigTemp = which === 'today' ? at('temperature_2m', now) : hi
   /* The one wind now (src/lib/windNow.ts), as the wind card and the Wind page read it. */
   const heroWind = windAt(wx, when, obs)
@@ -349,9 +359,16 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
         </p>
       )}
       <div className="hwx hwx--d">
-        <p className="hwx__date" onClick={(e) => (e.detail >= 3 ? onDebug?.() : undefined)}>
-          {dateWords}
-        </p>
+        {/* Batch TRUTH, Section 0.5: in a live colour window the date line's slot leads with it, at no extra height. */}
+        {colorNow === null ? (
+          <p className="hwx__date" onClick={(e) => (e.detail >= 3 ? onDebug?.() : undefined)}>
+            {dateWords}
+          </p>
+        ) : (
+          <button type="button" className="hwx__date hday__colornow" data-colornow="" onClick={() => onOpen('sky')}>
+            {colorNow}
+          </button>
+        )}
         {/* Batch Pages / Flow: the temperature opens the Weather page. */}
         <button type="button" className="hwx__temp num" data-shared="temp" data-value={bigTemp === null ? '' : temp(bigTemp)} onClick={() => onOpen('weather')} aria-label={`${bigTemp === null ? 'No temperature' : temp(bigTemp)}: the weather`}>
           {bigTemp === null ? (loading ? '…' : '—') : temp(bigTemp)}
@@ -529,7 +546,7 @@ interface CardProps {
   onOpen: (t: HomeTarget) => void
   /** Batch Map A2: the spot's surf (src/lib/useSurfNow.ts); when away, the nearest surf beach's name and how far. */
   surf: SurfNow
-  obs: StationObs | null
+  obs: StationNow | null
 }
 
 const CHART = { w: 300, h: 70 }
@@ -839,7 +856,8 @@ function WeekView({ brief, order, timeZone, units, now, venue }: { brief: Briefi
   const rows = brief.days.map((d) => {
     const noon = new Date(d.start.getTime() + 13 * 3_600_000)
     const temps = wx === null ? [] : Array.from({ length: 24 }, (_, i) => hourlyAt(wx, 'temperature_2m', new Date(d.start.getTime() + i * 3_600_000 + 1_800_000))).filter((t): t is number => t !== null)
-    const cond = conditionOf(wx === null ? null : hourlyAt(wx, 'weather_code', noon), true)
+    const wxAt = (name: string) => (wx === null ? null : hourlyAt(wx, name, noon))
+    const cond = skyCondition({ code: wxAt('weather_code'), layers: { low: wxAt('cloud_cover_low'), mid: wxAt('cloud_cover_mid'), high: wxAt('cloud_cover_high') }, day: true, station: null })
     /* Batch QA, Section 0B: surf from the one scale; days 4-7 a range and the odds, never Fun (src/core/homeDay.ts weekSurf). */
     const surfDay = order.includes('surf') ? weekSurf(d.surf, d.index) : null
     const worth = worthOf(d, order, surfDay?.on ?? false)

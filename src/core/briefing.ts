@@ -124,6 +124,19 @@ export function eventCall(v: FireVerdict | null, kind: Kind, event: Date, now: D
     return { ...base, ...timing0, by: truth.station, call: 'Skip', why: `A ${truth.words} over you, and the gap toward the sun shut: the light cannot get under it.` }
   }
   if (v === null) return { ...base, call: null, why: 'The forecast did not say.' }
+  /*
+   * A CANVAS THE MODELS MISSED (Batch TRUTH, Section 0: 12 Nov sunrise). The
+   * overnight runs dropped the altocumulus (HRRR 06Z, GFS, ECMWF and GEM 00Z:
+   * no mid cloud over the pier) while KNTU reported BKN140 and the satellite
+   * saw mid cloud overhead; it fired. When the models' only reason is "no
+   * clouds to catch the light" and a station reports a mid or high deck over
+   * you with no low deck under it, or the satellite sees one, the cloud is
+   * there: Maybe, until the stations and the gap make the call in the hour.
+   */
+  if (v.word === 'unlikely' && v.why === 'none') {
+    const seen = observedCanvas(truth, sat)
+    if (seen !== null) return { ...base, ...timing0, by: seen.by, call: 'Maybe', why: `${seen.line}, which the models do not have. Whether the light gets under it is the stations' call within the hour.` }
+  }
   const w = lookWindow(v)
   const top = firing(v)
   const lit = top !== undefined && top.agree > 0 ? `${top.agree} of ${top.of} models see lit ${layerWords(top.layer, obs?.truth ?? null, LAYER_WORD)}` : null
@@ -138,6 +151,13 @@ export function eventCall(v: FireVerdict | null, kind: Kind, event: Date, now: D
   if (v.word === 'likely' && !satAgrees) return { ...base, ...timing, call: 'Maybe', why: `Likely by the models, but ${sat?.line.replace(/^The /, 'the ') ?? ''}.` }
   if (v.word === 'likely') return { ...base, ...timing, call: 'Maybe', why: `Likely: ${lit ?? 'the models see a lit layer'}. Final call within the hour, from the stations.` }
   return { ...base, ...timing, call: 'Maybe', why: `Possible: ${lit ?? 'some models see a lit layer'}.` }
+}
+
+/** A mid or high deck over you that was observed, not forecast: the station's report, else the satellite's. */
+export function observedCanvas(truth: DeckTruth | null, sat: SatRead | null): { line: string; by: string | null } | null {
+  if (truth?.measured === true && truth.layer !== 'low') return { line: `${truth.station ?? 'The station'} reports a ${truth.words} over you`, by: truth.station }
+  if (sat !== null && sat.canvas && !sat.blocked) return { line: 'The satellite sees high or mid cloud over you', by: null }
+  return null
 }
 
 /** The day's call: the better of its sunrise and sunset still to come (Go over Maybe over Skip), else the first. */

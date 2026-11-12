@@ -35,8 +35,10 @@ describe('api/calendar', () => {
     expect(ics).toMatch(/^BEGIN:VCALENDAR/)
     expect(ics).toContain('SUMMARY:Sunrise Maybe')
     expect(ics).not.toContain('SUMMARY:Sunrise Go')
-    for (const u of asked) {
+    /* Open-Meteo gets rounded points; the stations (asked in the three hours before, Batch TRUTH) get ids only. */
+    for (const u of asked.filter((x) => x.includes('open-meteo'))) {
       for (const v of (new URL(u).searchParams.get('latitude') ?? '').split(',')) expect(v).toMatch(/^-?\d+\.\d{2}$/)
     }
+    for (const u of asked.filter((x) => !x.includes('open-meteo'))) expect(u).not.toMatch(/36\.8|75\.9|lat|lon|bbox/)
   })
 })

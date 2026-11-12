@@ -70,9 +70,10 @@ describe('the calendar feed in the hour before', () => {
     expect(ics).not.toContain('BEGIN:VALARM')
   })
 
-  it('further out it reads the models only, and asks no station', async () => {
+  it('further out than its three hours it reads the models only, and asks no station', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
-    const early = new Date('2026-11-02T19:30:00Z')
+    /* Sunset 22:06Z: 3 h 36 min before (Batch TRUTH widened the stations' window from one hour to three). */
+    const early = new Date('2026-11-02T18:30:00Z')
     vi.setSystemTime(early)
     const asked: string[] = []
     stub(early, asked)

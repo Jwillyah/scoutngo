@@ -11,7 +11,8 @@
  * than adding a second. A Skip is left out: no alarm for nothing.
  *
  * Further out the feed's server reads the models only: it says Maybe, never
- * Go. In the hour before (Batch J, Section 6) it reads the stations too, and
+ * Go. In the three hours before (Batch J, Section 6; three since Batch
+ * TRUTH) it reads the stations too, and
  * the event says their call, Go, Maybe or Skip, with the same UID and a
  * higher SEQUENCE, so the calendar replaces its title and alarm. A Skip
  * then stays, with no alarm, so a Go that falls through is seen to.

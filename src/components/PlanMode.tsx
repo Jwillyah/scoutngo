@@ -26,7 +26,10 @@ import type {
 } from '../core/platformFilter.ts'
 import type { ShotType } from '../core/shotType.ts'
 import { formatClock } from '../core/timezone.ts'
-import { lightCell, skyCell, stripWhen, tideCell } from '../core/statStrip.ts'
+import { AT_NOW_MS, lightCell, stripWhen, tideCell } from '../core/statStrip.ts'
+import { skyCondition } from '../core/skyWord.ts'
+import { obsFresh } from '../core/nowcast.ts'
+import { useStationObs } from '../lib/useStationObs.ts'
 import { windToBeach } from '../core/coastFacing.ts'
 import type { SkyState } from '../lib/useSkyFrames.ts'
 import type { Wind } from '../core/upwind.ts'
@@ -1664,6 +1667,8 @@ export function PlanMode({
    * go. Every value carries its unit, and a value that is not known is a
    * dash rather than a zero.
    */
+  /* The nearest station's report, for the one sky word (src/core/skyWord.ts) while the bar is at now. */
+  const stationObs = useStationObs(venue)
   const chips: Chip[] = useMemo(() => {
     /* The next golden light from the time on the bar, morning or evening (src/core/goldenNext.ts). */
     const goldenLeft =
@@ -1692,7 +1697,9 @@ export function PlanMode({
     const golden = goldenChip(goldenLeft)
     const facing = windFacing !== null && windFacing.key === windSpotKey ? windFacing.deg : null
     const side = wind === null || facing === null ? null : windToBeach(wind.fromDegrees, facing)
-    const sky = skyCell(layers)
+    const atNow = scrubbedAt === null || Math.abs(scrubbedAt.getTime() - Date.now()) <= AT_NOW_MS
+    const sunUp = (sunAlt ?? -1) > -0.8
+    const sky = skyCondition({ code: null, layers, day: sunUp, station: atNow && stationObs !== null && obsFresh(stationObs, new Date()) ? { sky: stationObs.sky, visMi: stationObs.visMi } : null })?.word ?? null
     const turn = tideCell(nextTurn, tz)
     return [
       { ...golden, label: 'LIGHT', value: lightCell(goldenLeft, scrubbedAt, sunAlt, tz), spoken: `Light: ${lightCell(goldenLeft, scrubbedAt, sunAlt, tz) ?? 'not known'}` },
@@ -1723,7 +1730,7 @@ export function PlanMode({
         spoken: turn === null ? 'Tide: not known' : `Tide ${turn.going}, ${nextTurn?.kind} at ${clock(nextTurn?.at ?? null) ?? ''}`,
       }]),
     ]
-  }, [venue, venueWindow, scrubbedAt, wind, ratedWindMps, nextTurn, venueCloud, forecast, units, clock, modelLows, groups.water, place, windFacing, windSpotKey])
+  }, [venue, venueWindow, scrubbedAt, wind, ratedWindMps, nextTurn, venueCloud, forecast, units, clock, modelLows, groups.water, place, windFacing, windSpotKey, stationObs])
 
   /*
    * WHICH GOES BAND THE SKY LAYER PAINTS, from the sun's altitude: visible

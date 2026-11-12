@@ -14,9 +14,11 @@
  * WHAT IT DOES: for the next FEED_DAYS sunrises and sunsets, the same Sky
  * fire read the app makes (src/core/fireOutlook.ts, src/core/briefing.ts)
  * from Open-Meteo's models, asked with the same rounded points; Go or Maybe
- * become events with an alarm. In the hour before an event it also reads
- * the stations by id (src/lib/feedObs.ts, Batch J, Section 6), as the phone
- * does: a call that moves to Go, or to Skip, moves in the calendar.
+ * become events with an alarm. In the three hours before an event it also
+ * reads the stations by id (src/lib/feedObs.ts, Batch J, Section 6; three,
+ * not one, since Batch TRUTH: on 12 Nov the overnight models dropped the
+ * deck KNTU was reporting, the Maybe fell to Skip and left the calendar), as
+ * the phone does: a call that moves to Go, or to Skip, moves in the calendar.
  * ===========================================================================
  */
 import { getPosition, getTimes } from 'suncalc'
@@ -27,6 +29,8 @@ import { fireVerdict } from '../src/core/fireOutlook.ts'
 import { firePathsRangeUrl, nearestHour, parseFirePaths, pathsAt } from '../src/lib/skyFireData.ts'
 
 const AVWX_METAR = 'https://aviationweather.gov/api/data/metar'
+/** The stations are read this long before an event, as the phone's observations (src/lib/useSkyObs.ts OBS_FROM_MS). */
+export const FEED_OBS_MS = 3 * 3_600_000
 
 /** The stations' read for one event, by ids only (src/lib/feedObs.ts); null when the service does not answer. */
 async function stationsFor(at: { lat: number; lon: number }, event: Date): Promise<CallObs | null> {
@@ -63,8 +67,8 @@ export async function GET(request: Request): Promise<Response> {
       const data = r.ok ? parseFirePaths(await r.json()) : null
       for (const e of mine) {
         const paths = data === null ? [] : pathsAt(data, nearestHour(e.at))
-        const near = Math.abs(e.at.getTime() - now.getTime()) <= CONFIRM_WITHIN_MS
-        const obs = near ? await stationsFor(at, e.at) : null
+        const lead = e.at.getTime() - now.getTime()
+        const obs = lead <= FEED_OBS_MS && lead >= -CONFIRM_WITHIN_MS ? await stationsFor(at, e.at) : null
         reads.push(eventCall(paths.length === 0 ? null : fireVerdict(paths, { event: e.at, kind, venue: at }), kind, e.at, now, null, obs))
       }
     } catch {
