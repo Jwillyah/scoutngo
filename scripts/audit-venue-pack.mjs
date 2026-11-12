@@ -339,7 +339,9 @@ try {
       if (!m) return null
       const ids = (re) => m.getStyle().layers.filter((l) => re.test(l.id) || re.test(String(l.source))).map((l) => l.id)
       const n = (re) => { const l = ids(re); return l.length === 0 ? -1 : m.queryRenderedFeatures({ layers: l }).length }
-      return { sun: n(/^sun-(axis|rays)/), shadows: n(/^shadow-fill$/) }
+      /* Batch Polish 2, Section 3: the buildings' shadows are painted (one picture, src/lib/shadowRaster.ts): how many it drew, and its layer on. */
+      const painted = m.getLayer('shadow-fill') !== undefined && m.getLayoutProperty('shadow-fill', 'visibility') !== 'none' ? (window.__shadowPaint?.drawn ?? 0) : 0
+      return { sun: n(/^sun-(axis|rays)/), shadows: painted }
     })()`)
     console.log(`  drawn offline: ${JSON.stringify(drawn)}`)
     if (drawn === null) fail(`${label}: no map probe after the offline reload`)

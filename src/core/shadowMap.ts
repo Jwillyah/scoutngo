@@ -74,6 +74,8 @@ export interface BuildingShadow {
   bearing: number
   /** True when the length was cut to MAX_SHADOW_METERS. */
   capped: boolean
+  /** The building's height, metres (Batch Polish 2, Section 3: the drawing fades by 6x it). */
+  heightMeters: number
 }
 
 export type ShadowMap =
@@ -182,6 +184,7 @@ export function shadowMap(footprints: readonly FootprintIn[], sun: SunIn): Shado
       lengthMeters: length,
       bearing,
       capped,
+      heightMeters: footprint.heightMeters as number,
     })
   }
   return { status: 'ok', shadows, skippedNoHeight, anyCapped: shadows.some((s) => s.capped) }

@@ -26,3 +26,37 @@ describe('shadows that follow the light', () => {
     expect(c.features[0].properties?.tint).toBe(shadowTint(40))
   })
 })
+
+describe('real shadows, painted (Batch Polish 2, Section 3)', () => {
+  it('a shadow fades with distance from its building, gone at 6x its height', async () => {
+    const { drawnLength, fadeLength, fadeAt, FADE_HEIGHTS } = await import('../src/core/shadowFade.ts')
+    expect(FADE_HEIGHTS).toBe(6)
+    expect(fadeLength(20)).toBe(120)
+    /* Sun at 40°: a 20 m building's shadow is 24 m, drawn all the way, its end still dark (0.94 of it). */
+    expect(drawnLength(24, 20)).toBe(24)
+    expect(fadeAt(24, fadeLength(20))).toBeCloseTo(0.94, 2)
+    /* Sun at 3°: 382 m long, drawn to 120 m. */
+    expect(drawnLength(382, 20)).toBe(120)
+    expect(fadeAt(0, 120)).toBe(1)
+    expect(fadeAt(60, 120)).toBeCloseTo(0.85, 2)
+    expect(fadeAt(90, 120)).toBeCloseTo(0.425, 2)
+    expect(fadeAt(130, 120)).toBe(0)
+  })
+  it('the raster: a quarter metre a pixel or coarser, never over its pixels across', async () => {
+    const { rasterScale } = await import('../src/core/shadowFade.ts')
+    expect(rasterScale(200)).toBe(0.25)
+    expect(rasterScale(1000, 2048)).toBeCloseTo(0.488, 3)
+    expect(rasterScale(2048)).toBe(2)
+  })
+  it('the buildings are painted, not features: under 2° nothing, over it the shadows in the light’s tint', async () => {
+    const { shadowPaintFor } = await import('../src/lib/shadowLayer.ts')
+    const high = shadowMap([box], { azimuth: 200, altitude: 40 })
+    expect(shadowPaintFor(high, 40)).toEqual({ map: high, tint: shadowTint(40) })
+    expect(shadowPaintFor(high, LOW_SUN_DEG - 0.5).map).toBeNull()
+    expect(shadowCollection(high, { at, lengthMeters: 30, bearing: 70 }, 40, false).features.map((f) => f.properties?.kind)).toEqual(['subject'])
+  })
+  it('the shadow carries its building’s height', () => {
+    const high = shadowMap([box], { azimuth: 200, altitude: 40 })
+    expect(high.status === 'ok' && high.shadows[0].heightMeters).toBe(20)
+  })
+})

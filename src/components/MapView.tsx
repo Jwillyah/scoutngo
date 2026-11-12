@@ -1,3 +1,5 @@
+import { paintShadows } from '../lib/shadowRaster.ts'
+import type { ShadowMap } from '../core/shadowMap.ts'
 import { moonGlyphSvg } from '../lib/moonGlyph.ts'
 import { useNumerals } from '../lib/numeralsContext.ts'
 import * as maplibregl from 'maplibre-gl'
@@ -616,8 +618,82 @@ export interface MapHandle {
   zoomBy(delta: number): void
   /** Goes to an exact zoom, keeping the centre. Used by the sky layer nudge. */
   zoomTo(zoom: number): void
-  /** The shadows for the time under a moving needle, drawn now, ahead of the plan's own render. */
-  drawShadows(features: GeoJSON.FeatureCollection): void
+  /** The shadows for the time under a moving needle, drawn now, ahead of the plan's own render: the subject's line as features, the buildings' painted (src/lib/shadowRaster.ts). */
+  drawShadows(features: GeoJSON.FeatureCollection, paint?: ShadowPaint | null): void
+}
+
+/** The buildings' shadows to paint, and the light's tint (Batch Polish 2, Section 3). */
+export interface ShadowPaint {
+  map: ShadowMap | null
+  tint: string
+  /** While the needle moves: half the pixels (SCRUB_PX), the full picture once it stops. */
+  quick?: boolean
+}
+/** A moving needle's paint, pixels across: a quarter of the work of the settled one (twice this). */
+const SCRUB_PX = 1024
+let painted: { key: string; quick: boolean } | null = null
+/* The last shadows asked for, repainted for the new view when the map stops moving. */
+let lastPaint: ShadowPaint | null = null
+/* The bounds and zoom the picture was painted for. */
+let paintedWithin: { west: number; south: number; east: number; north: number } | null = null
+let paintedZoom = 0
+/** The view and 15% round it at the sides, 50% above and below: the sheet's detents pan the map up and down about a third of its height to keep the pin in sight, and that is no reason to repaint. */
+function viewWithMargin(instance: maplibregl.Map): { west: number; south: number; east: number; north: number } {
+  const b = instance.getBounds()
+  const dx = (b.getEast() - b.getWest()) * 0.15
+  const dy = (b.getNorth() - b.getSouth()) * 0.5
+  return { west: b.getWest() - dx, east: b.getEast() + dx, south: b.getSouth() - dy, north: b.getNorth() + dy }
+}
+/* The same shadows painted twice in one minute (the needle's own paint, then the plan's render of that minute) is once. */
+const paintKey = (p: ShadowPaint | null): string => {
+  const m = p?.map
+  if (p === null || m == null || m.status !== 'ok') return 'none'
+  const a = m.shadows[0]
+  return `${m.shadows.length}|${a?.bearing.toFixed(3)}|${a?.lengthMeters.toFixed(2)}|${p.tint}`
+}
+
+/*
+ * THE PAINTED SHADOWS ON THE MAP: one canvas, a canvas source over the
+ * shadows' extent, re-uploaded once per paint (play then pause uploads it;
+ * a playing source would upload every frame).
+ */
+const SHADOW_RASTER = 'shadow-raster'
+let shadowCanvas: HTMLCanvasElement | null = null
+function applyShadowPaint(instance: maplibregl.Map, paint: ShadowPaint | null): void {
+  const src = instance.getSource(SHADOW_RASTER) as (maplibregl.CanvasSource & { play?: () => void; pause?: () => void }) | undefined
+  if (src === undefined || shadowCanvas === null) return
+  lastPaint = paint
+  const within = viewWithMargin(instance)
+  paintedWithin = within
+  paintedZoom = instance.getZoom()
+  const key = `${paintKey(paint)}|${within.west.toFixed(4)},${within.north.toFixed(4)},${within.east.toFixed(4)}`
+  const quick = paint?.quick === true
+  if (painted !== null && painted.key === key && (quick || !painted.quick)) return
+  painted = { key, quick }
+  const r = paint === null ? null : paintShadows(paint.map, paint.tint, shadowCanvas, quick ? SCRUB_PX : 2 * SCRUB_PX, within)
+  if (instance.getLayer('shadow-fill') !== undefined) instance.setLayoutProperty('shadow-fill', 'visibility', r === null ? 'none' : 'visible')
+  if (r === null) return
+  src.setCoordinates(r.coordinates)
+  /*
+   * Uploaded while playing, then still: a source with no tiles yet (its layer
+   * just shown) skips an upload asked for at once, so it plays until the map
+   * has drawn twice with it.
+   */
+  src.play?.()
+  let renders = 0
+  const settle = () => {
+    renders += 1
+    if (renders < 2) return
+    instance.off('render', settle)
+    src.pause?.()
+  }
+  instance.on('render', settle)
+  if (new URLSearchParams(window.location.search).get('probe') === '1') {
+    const w = window as unknown as { __shadowPaint?: { drawn: number; ms: number }; __shadowPaints?: number[] }
+    w.__shadowPaint = { drawn: r.drawn, ms: r.ms }
+    ;(w as unknown as { __shadowCanvas?: HTMLCanvasElement }).__shadowCanvas = shadowCanvas
+    ;(w.__shadowPaints ??= []).push(r.ms)
+  }
 }
 
 export interface SunOverlay {
@@ -764,8 +840,10 @@ interface MapViewProps {
    * The map draws an anchor and nothing else; it never loads what is behind it.
    */
   linkPins?: readonly { id: string; label: string; at: LatLon; href: string }[]
-  /** Building shadows and the subject's shadow, as features. See src/lib/shadowLayer.ts. */
+  /** The subject's shadow, as features. See src/lib/shadowLayer.ts. */
   shadowFeatures?: GeoJSON.FeatureCollection | null
+  /** The buildings' shadows, painted (src/lib/shadowRaster.ts). */
+  shadowPaint?: ShadowPaint | null
   /** The two-pin measure's pins, none to two. The numbers are src/core/measure.ts. */
   measurePins?: readonly LatLon[]
   /** A tap while measuring. */
@@ -1241,6 +1319,7 @@ export function MapView({
   measurePins = NO_PINS,
   rayClock,
   shadowFeatures = null,
+  shadowPaint = null,
   linkPins = NO_LINK_PINS,
   onMeasureAt,
   onFlightAt,
@@ -1860,14 +1939,22 @@ export function MapView({
        * SHADOWS: dark, translucent, under everything placed. The subject's own
        * shadow is a short heavy line from the pin.
        */
+      /*
+       * Batch Polish 2, Section 3: the buildings' shadows painted as one picture
+       * (src/lib/shadowRaster.ts): one union, never darker where two meet,
+       * fading along their length, feathered, in the light's tint.
+       */
+      shadowCanvas ??= document.createElement('canvas')
+      shadowCanvas.width = 2
+      shadowCanvas.height = 2
+      instance.addSource(SHADOW_RASTER, { type: 'canvas', canvas: shadowCanvas, animate: false, coordinates: [[0, 0.001], [0.001, 0.001], [0.001, 0], [0, 0]] })
       instance.addLayer({
         id: 'shadow-fill',
-        type: 'fill',
-        source: SHADOW_SOURCE,
+        type: 'raster',
+        source: SHADOW_RASTER,
         minzoom: SHADOWS_MIN_ZOOM,
-        filter: ['==', ['get', 'kind'], 'building'],
-        /* Batch Polish, Section 5: the tint follows the light (src/lib/shadowLayer.ts shadowTint); no outline. */
-        paint: { 'fill-color': ['coalesce', ['get', 'tint'], readToken('--black', '#0a090c', container.current)], 'fill-opacity': 0.45, 'fill-antialias': false },
+        layout: { visibility: 'none' },
+        paint: { 'raster-opacity': 1, 'raster-fade-duration': 0, 'raster-resampling': 'linear' },
       })
       instance.addLayer({
         id: 'shadow-subject',
@@ -2606,9 +2693,10 @@ export function MapView({
       zoomTo(zoom) {
         moveCamera('zoomTo', () => map.current?.easeTo({ zoom, duration: 400 }))
       },
-      drawShadows(features) {
+      drawShadows(features, paint) {
         const source = map.current?.getSource(SHADOW_SOURCE) as maplibregl.GeoJSONSource | undefined
         source?.setData(features)
+        if (paint !== undefined && map.current !== null) applyShadowPaint(map.current, paint)
       },
       zoomBy(delta) {
         moveCamera('zoomBy', () => map.current?.easeTo({ zoom: (map.current.getZoom() ?? 16) + delta, duration: 250 }))
@@ -2823,7 +2911,23 @@ export function MapView({
     if (map.current === null || !ready) return
     const source = map.current.getSource(SHADOW_SOURCE) as maplibregl.GeoJSONSource | undefined
     source?.setData(shadowFeatures ?? emptyCollection())
-  }, [shadowFeatures, ready])
+    /* Just after a moving needle's quick paints, the full one waits until it has rested 300 ms; each new minute puts it off again. */
+    const m = map.current
+    const t = setTimeout(() => applyShadowPaint(m, shadowPaint), painted?.quick === true ? 300 : 0)
+    /* A pan or a zoom: the shadows painted again for the new view, at its resolution. */
+    /* Only when the view has left what was painted (its margin): a sheet moving resizes the map, and a repaint then cost the sheet its frames (Batch Polish 2, Section 3: the gesture audit's flicks arrived slow). */
+    const moved = () => {
+      const b = m.getBounds()
+      const p = paintedWithin
+      if (p !== null && b.getWest() >= p.west && b.getEast() <= p.east && b.getSouth() >= p.south && b.getNorth() <= p.north && Math.abs(m.getZoom() - paintedZoom) < 0.5) return
+      applyShadowPaint(m, lastPaint)
+    }
+    m.on('moveend', moved)
+    return () => {
+      clearTimeout(t)
+      m.off('moveend', moved)
+    }
+  }, [shadowFeatures, shadowPaint, ready])
 
   /* The waterline: an image source over the scan's patch, added under everything drawn on top. */
   useEffect(() => {

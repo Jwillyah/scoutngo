@@ -45,10 +45,12 @@ export function shadowCollection(
   map: ShadowMap | null,
   subject: { at: LatLon; lengthMeters: number; bearing: number } | null,
   sunAltitudeDeg: number | null = null,
+  /* Batch Polish 2, Section 3: the map paints the buildings' shadows (shadowPaintFor, src/lib/shadowRaster.ts); false leaves them out of the features. */
+  buildings = true,
 ): GeoJSON.FeatureCollection {
   const features: GeoJSON.Feature[] = []
   const tint = shadowTint(sunAltitudeDeg ?? 45)
-  if (map !== null && map.status === 'ok' && (sunAltitudeDeg === null || sunAltitudeDeg >= LOW_SUN_DEG)) {
+  if (buildings && map !== null && map.status === 'ok' && (sunAltitudeDeg === null || sunAltitudeDeg >= LOW_SUN_DEG)) {
     for (const shadow of map.shadows) {
       if (shadow.hull.length < 3) continue
       features.push({
@@ -69,4 +71,10 @@ export function shadowCollection(
     })
   }
   return { type: 'FeatureCollection', features }
+}
+
+/** What the map paints for the buildings (Batch Polish 2, Section 3): nothing under LOW_SUN_DEG, else the shadows in the light's tint. */
+export function shadowPaintFor(map: ShadowMap | null, sunAltitudeDeg: number | null): { map: ShadowMap | null; tint: string } {
+  const alt = sunAltitudeDeg ?? 45
+  return { map: alt < LOW_SUN_DEG ? null : map, tint: shadowTint(alt) }
 }

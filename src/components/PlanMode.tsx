@@ -114,7 +114,7 @@ import type { MapHandle } from './MapView.tsx'
 import { mapBack, type MapFrom } from '../lib/mapBack.ts'
 import { buildingsToGeoJson, fetchBuildings, type Building } from '../lib/buildings.ts'
 import { shadowMap } from '../core/shadowMap.ts'
-import { shadowCollection } from '../lib/shadowLayer.ts'
+import { shadowCollection, shadowPaintFor } from '../lib/shadowLayer.ts'
 import { lightNow } from '../core/lightNow.ts'
 import { PlatformFilter } from './PlatformFilter.tsx'
 import { PlanStatus } from './PlanStatus.tsx'
@@ -1283,8 +1283,10 @@ export function PlanMode({
   const shadowFeatures = useMemo(() => {
     if (!showSun || venue === null || scrubbedAt === null) return null
     const person = lightNow(scrubbedAt, venue.lat, venue.lon).personShadow
-    return shadowCollection(shadows, person === null ? null : { at: venue, lengthMeters: person.lengthMeters, bearing: person.bearing }, sun?.altitude ?? null)
+    return shadowCollection(shadows, person === null ? null : { at: venue, lengthMeters: person.lengthMeters, bearing: person.bearing }, sun?.altitude ?? null, false)
   }, [showSun, venue, scrubbedAt, shadows, sun])
+  /* Batch Polish 2, Section 3: the buildings' shadows painted as one union, fading and feathered (src/lib/shadowRaster.ts). */
+  const shadowPaint = useMemo(() => (!showSun ? null : shadowPaintFor(shadows, sun?.altitude ?? null)), [showSun, shadows, sun])
   /* With the sun down, when the shadows come back: the next sunrise, as a clock time at the venue. */
   const sunriseWords = useMemo(() => {
     if (shadows === null || 'shadows' in shadows || venue === null || scrubbedAt === null || venueWindow === null) return null
@@ -1322,7 +1324,8 @@ export function PlanMode({
       const s = getSunPosition(at, venue.lat, venue.lon)
       const person = lightNow(at, venue.lat, venue.lon).personShadow
       const map = shadowMap(footprints, { azimuth: s.azimuth, altitude: s.altitude })
-      handle.current?.drawShadows(shadowCollection(map, person === null ? null : { at: venue, lengthMeters: person.lengthMeters, bearing: person.bearing }))
+      /* The sun's height too: the tint and the low-sun rule held while the needle moves (it was left out, so a scrub drew the default tint). */
+      handle.current?.drawShadows(shadowCollection(map, person === null ? null : { at: venue, lengthMeters: person.lengthMeters, bearing: person.bearing }, s.altitude, false), { ...shadowPaintFor(map, s.altitude), quick: true })
       if (probing) (window as unknown as { __shadowAt?: number }).__shadowAt = at.getTime()
     }
     const off = onLiveTime((t) => {
@@ -2549,6 +2552,7 @@ export function PlanMode({
                 : { ...sunOverlay, moon: getMoonArc(scrubbedAt, venue.lat, venue.lon) }
             }
             shadowFeatures={shadowFeatures}
+            shadowPaint={shadowPaint}
             linkPins={camPins}
             rayClock={venueWindow === null ? undefined : (at: Date) => formatClock(at, venueWindow.timeZone)}
             /* Batch Map, Section 1: the sun and moon lines step aside while a weather layer is on, and come back when it is off. */
