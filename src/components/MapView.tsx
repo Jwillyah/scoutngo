@@ -2154,6 +2154,8 @@ export function MapView({
       instance.addLayer({
         id: 'sun-line',
         type: 'line',
+        /* Batch TRUTH, Section 7: the sun's line is a place's; a continent or the world has none (below about z5). */
+        minzoom: 5,
         source: SUN_SOURCE,
         paint: {
           'line-color': readToken('--sun'),
@@ -2169,6 +2171,8 @@ export function MapView({
       instance.addLayer({
         id: 'ray-casing',
         type: 'line',
+        /* Batch TRUTH, Section 7: the sun's line is a place's; a continent or the world has none (below about z5). */
+        minzoom: 5,
         source: RAY_SOURCE,
         paint: {
           'line-color': readToken('--mark-edge'),
@@ -2179,6 +2183,8 @@ export function MapView({
       instance.addLayer({
         id: 'ray-line',
         type: 'line',
+        /* Batch TRUTH, Section 7: the sun's line is a place's; a continent or the world has none (below about z5). */
+        minzoom: 5,
         source: RAY_SOURCE,
         filter: ['!', ['in', ['get', 'kind'], ['literal', ['moonrise', 'moonset', 'moon']]]],
         paint: { 'line-color': rayColor, 'line-width': 2, 'line-opacity': 0.35 },
@@ -4158,7 +4164,8 @@ export function MapView({
   /* Batch Map, Section 1: the wind over the screen, for the hour on the time bar. */
   const windOn = showSky && skyLayer === 'wind'
   const windHour = windAt === null ? null : Math.floor(windAt.getTime() / 3_600_000)
-  const windView = useWindViewport(ready ? map.current : null, windOn, windModel, windHour === null ? null : new Date(windHour * 3_600_000), windMeters > 10 ? '120m' : '10m')
+  const [windRetry, setWindRetry] = useState(0)
+  const windView = useWindViewport(ready ? map.current : null, windOn, windModel, windHour === null ? null : new Date(windHour * 3_600_000), windMeters > 10 ? '120m' : '10m', windRetry)
   const windField = useMemo(() => (windHour === null || windView.series.length === 0 ? null : fieldAt(windView.series, windView.step, new Date(windHour * 3_600_000))), [windView, windHour])
   /* The time bar's strip: the grid point nearest the crosshair, hour by hour; read again when the map stops. */
   useEffect(() => {
@@ -4186,7 +4193,7 @@ export function MapView({
       <div className="map__canvas" ref={container} />
       {/* Batch Map, Section 1: the wind layer v3 over the whole screen (the old grid streaks only at a height above the ground). */}
       {/* Batch MAP2, Section 3: the drone's 400 ft in the same look (120 m level), not the old streaks. */}
-      {windOn ? <WindLayerV3 map={ready ? map.current : null} field={windField} unit={windUnit} spot={windSpot} facing={windFacing} status={windView.status} /> : null}
+      {windOn ? <WindLayerV3 map={ready ? map.current : null} field={windField} unit={windUnit} spot={windSpot} facing={windFacing} status={windView.status} when={windHour === null ? null : new Date(windHour * 3_600_000)} onRetry={() => setWindRetry((n) => n + 1)} /> : null}
       {/* Batch Map, Section 3: the map's own labels, in the app's font, never under the crosshair or the pin. */}
       <MapLabels map={ready ? map.current : null} on={showLabels} keepClear={keepLabelsClear} crosshair={showSky && skyLayer === 'wind'} />
       <div className="raypills" ref={pillLayer} aria-hidden="true" />

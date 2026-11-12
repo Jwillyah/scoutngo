@@ -29,7 +29,11 @@ export interface Bounds {
   east: number
 }
 
-const STEPS = [0.05, 0.25, 0.5, 1, 2, 4] as const
+/* 8°, 16° and 24° (Batch TRUTH, Section 7): at 1,000 and 2,000 mi and the whole world the 4° grid ran out of blocks and the field came in patches; now every zoom is covered whole. */
+const STEPS = [0.05, 0.25, 0.5, 1, 2, 4, 8, 16, 24] as const
+
+/** A grid this coarse or coarser is a global model's, never HRRR's (it covers the US alone): the whole view gets wind. */
+export const GLOBAL_FROM_STEP = 1
 
 /** The grid's spacing, degrees: the finest of STEPS at this zoom whose blocks cover the bounds in MAX_BLOCKS. */
 export function gridStep(bounds: Bounds, zoom: number): number {
@@ -180,7 +184,8 @@ export function legendStops(unit: 'kt' | 'mph' | 'kmh' | 'ms'): string[] {
 /** How many particles for a canvas of this size at this zoom: denser zoomed in, never more than MAX_PARTICLES. */
 export const MAX_PARTICLES = 2200
 export function particleCount(widthPx: number, heightPx: number, zoom: number): number {
-  const perMegapixel = 2600 * Math.min(1.4, Math.max(0.6, zoom / 8))
+  /* Fewer zoomed out (Batch TRUTH, Section 7): at a country or a continent the streaks were a grey fur over the colour. */
+  const perMegapixel = 2600 * Math.min(1.4, Math.max(0.25, zoom / 8))
   return Math.min(MAX_PARTICLES, Math.round(((widthPx * heightPx) / 1e6) * perMegapixel))
 }
 
@@ -226,4 +231,11 @@ export function fadeEdges(rgba: Uint8ClampedArray, cols: number, rows: number, f
     rgba[k * 4 + 3] = Math.round(rgba[k * 4 + 3] * (d[k] / fadeCells))
   }
   return true
+}
+
+/** The legend's ticks (Batch TRUTH, Section 7): 0, 10, 20 and 30+ knots, placed on the colour scale, said in the user's unit. */
+export function legendTicks(unit: 'kt' | 'mph' | 'kmh' | 'ms'): { x: number; label: string }[] {
+  const per = { kt: 1, mph: 1.150779, kmh: 1.852, ms: 0.514444 }[unit]
+  const top = SCALE[SCALE.length - 1].kt
+  return [0, 10, 20, 30].map((kt) => ({ x: kt / top, label: `${Math.round(kt * per)}${kt === 30 ? '+' : ''}` }))
 }

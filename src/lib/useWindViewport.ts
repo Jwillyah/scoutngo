@@ -12,7 +12,7 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import type * as maplibregl from 'maplibre-gl'
-import { blocksFor, buildField, gridStep, toUV, type Bounds, type Field, type WindSample } from '../core/windViewport.ts'
+import { blocksFor, buildField, GLOBAL_FROM_STEP, gridStep, toUV, type Bounds, type Field, type WindSample } from '../core/windViewport.ts'
 import { FORECAST_MAX_AGE_MS, weatherJson } from './weatherStore.ts'
 
 export type WindModelChip = 'hrrr' | 'blend' | 'ecmwf'
@@ -108,7 +108,8 @@ const boundsOf = (m: maplibregl.Map): Bounds => {
   return { south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast() }
 }
 
-export function useWindViewport(map: maplibregl.Map | null, on: boolean, model: WindModelChip, at: Date | null = null, level: WindLevel = '10m'): WindViewport {
+/** `retry`: a new number asks again ("Wind didn't load · Retry", Batch TRUTH, Section 7). */
+export function useWindViewport(map: maplibregl.Map | null, on: boolean, model: WindModelChip, at: Date | null = null, level: WindLevel = '10m', retry = 0): WindViewport {
   const days = gridDays(at)
   const [view, setView] = useState<{ bounds: Bounds; zoom: number } | null>(null)
   const [got, setGot] = useState<{ key: string; v: WindViewport } | null>(null)
@@ -140,7 +141,8 @@ export function useWindViewport(map: maplibregl.Map | null, on: boolean, model: 
     let live = true
     void Promise.all(
       plan.blocks.map(async (b) => {
-        const r = await weatherJson(blockUrl(b.points, model, days, level), { maxAgeMs: FORECAST_MAX_AGE_MS })
+        /* Zoomed out, the global blend (GFS, ICON and the rest); HRRR only close in, where it has the ground (Batch TRUTH, Section 7). */
+        const r = await weatherJson(blockUrl(b.points, plan.step >= GLOBAL_FROM_STEP && model === 'hrrr' ? 'blend' : model, days, level), { maxAgeMs: FORECAST_MAX_AGE_MS })
         return r.ok ? parseBlock(r.payload, b.points, level) : null
       }),
     ).then((parts) => {
@@ -151,7 +153,7 @@ export function useWindViewport(map: maplibregl.Map | null, on: boolean, model: 
     return () => {
       live = false
     }
-  }, [on, key, plan, model, days, level])
+  }, [on, key, plan, model, days, level, retry])
 
   /*
    * ONE OBJECT PER STATE, NOT PER RENDER (Batch MAP2: switching to 400 ft

@@ -260,3 +260,293 @@ body:has(.windv3__read) .rail2 {
   font-size: var(--text-sm);
   color: var(--glass-ink-2);
 }
+
+/*
+ * WIND IS THE WHOLE MAP (Batch TRUTH, Section 7; Windy-style, our look).
+ * With the wind layer on: back, the search pill and the compass stay; every
+ * other control goes. The readout is one thin pill under the search; the
+ * sheet's peek is one thin bar (WindTimeBar); the colour field lets the
+ * satellite through at 60%.
+ */
+.mode-plan[data-wind-mode] .windv3__field {
+  opacity: 0.6;
+}
+.mode-plan[data-wind-mode] .chips2,
+.mode-plan[data-wind-mode] .stat__when,
+.mode-plan[data-wind-mode] .wxchip,
+.mode-plan[data-wind-mode] .raypills,
+.mode-plan[data-wind-mode] .topbar__btn--add,
+.mode-plan[data-wind-mode] .topbar__btn[aria-label*='where you are'],
+.mode-plan[data-wind-mode] .topbar__btn[aria-label*='Finding'],
+.mode-plan[data-wind-mode] .rail2__note,
+.mode-plan[data-wind-mode] .maplibregl-ctrl-scale,
+.mode-plan[data-wind-mode] .credits__ctrl {
+  display: none !important;
+}
+/* The rail keeps its compass alone. */
+.mode-plan[data-wind-mode] .rail2__slot:not(:has(.rail2__btn[aria-label*='north'], .rail2__btn[aria-label*='heading'])) {
+  display: none;
+}
+.mode-plan[data-wind-mode] .rail2 {
+  top: calc(var(--safe-top) + 112px);
+}
+.windv3__read--pill {
+  top: calc(var(--safe-top) + var(--space-2) + 52px + 6px);
+  left: 50%;
+  right: auto;
+  max-width: calc(100% - 96px);
+  min-height: 0;
+  padding: 4px 12px;
+  border-radius: 999px;
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
+.windv3__pill,
+.windv3__failed {
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.windv3__retry {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--black);
+  font: inherit;
+}
+/* The arrows at the crosshair: the wind where it goes, the swell (at sea) where it goes. */
+.windv3__arrows {
+  position: absolute;
+  z-index: 6;
+  top: 50%;
+  left: 50%;
+  width: 120px;
+  height: 120px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  overflow: visible;
+}
+.windv3__warrow path,
+.windv3__sarrow path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 2px rgb(0 0 0 / 0.7));
+}
+.windv3__warrow path {
+  stroke: var(--white);
+  stroke-width: 3;
+}
+.windv3__sarrow path {
+  stroke: var(--d-surf);
+  stroke-width: 2.5;
+  stroke-dasharray: 5 3;
+}
+.windv3__lab {
+  position: absolute;
+  z-index: 6;
+  left: calc(50% + 22px);
+  margin: 0;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--map-glass);
+  color: var(--white);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.windv3__lab--wind {
+  top: calc(50% - 28px);
+}
+.windv3__lab--wind:empty {
+  display: none;
+}
+.windv3__lab--swell {
+  top: calc(50% + 12px);
+  color: var(--d-surf);
+}
+/* The bar: 96 px and the safe area; the legend a 4 px line along its top. */
+.wbar--thin {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 14px;
+}
+.wbar__legend {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  border-radius: 2px;
+}
+.wbar__legend > span {
+  position: absolute;
+  top: 4px;
+  transform: translateX(-50%);
+  font-size: 9px;
+  line-height: 10px;
+  color: var(--glass-ink-2);
+}
+.wbar__legend > span:first-child {
+  transform: none;
+}
+.wbar__legend > span:last-child {
+  transform: translateX(-100%);
+}
+.wbar--thin .wbar__top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.wbar__play,
+.wbar__info {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--white);
+  color: var(--black);
+  font: inherit;
+  font-size: 13px;
+}
+.wbar__info {
+  background: rgb(255 255 255 / 0.16);
+  color: var(--white);
+  font-style: italic;
+  font-weight: 700;
+}
+.wbar--thin .wbar__when {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--text-sm);
+}
+.wbar--thin .wbar__time {
+  font-weight: 700;
+}
+.wbar__pill {
+  flex: none;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.1);
+  color: var(--white);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+.wbar__menuwrap {
+  position: relative;
+}
+.wbar__menu {
+  position: absolute;
+  z-index: 3;
+  bottom: calc(100% + 6px);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 14px;
+  background: var(--d-card-solid);
+}
+.wbar__menuitem {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--white);
+  font: inherit;
+  text-align: left;
+}
+.wbar__menuitem--on {
+  background: rgb(255 255 255 / 0.16);
+}
+.wbar__note {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--glass-ink-2);
+}
+.wbar--thin .wbar__track {
+  position: relative;
+  height: 22px;
+}
+.wbar--thin .wbar__strip {
+  position: absolute;
+  inset: 0 0 10px;
+  border-radius: 6px;
+}
+.wbar__tick {
+  position: absolute;
+  bottom: -2px;
+  transform: translateX(-50%);
+  font-size: 9px;
+  color: var(--glass-ink-2);
+  pointer-events: none;
+}
+
+/* The crosshair's hours, in the half sheet (Batch TRUTH, Section 7). */
+.whours__head {
+  margin: 0 0 6px;
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+.whours__rows {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 4px 10px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+.whours__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-sm);
+}
+.whours__t {
+  width: 3.2em;
+  color: var(--glass-ink-2);
+}
+.whours__sw {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+/* A 390 px phone: the bar's row fits (the day goes, the buttons are 32 px). */
+@media (max-width: 430px) {
+  .wbar--thin .wbar__day {
+    display: none;
+  }
+  .wbar--thin .wbar__time {
+    font-size: 15px;
+  }
+  .wbar--thin .wbar__play,
+  .wbar--thin .wbar__info {
+    width: 32px;
+    height: 32px;
+  }
+  .wbar--thin .wbar__pill {
+    padding: 0 8px;
+  }
+}
+.wbar--thin .wbar__top {
+  min-width: 0;
+  overflow: hidden;
+}

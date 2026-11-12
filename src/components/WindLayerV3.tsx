@@ -5,6 +5,8 @@ import { distanceMeters, type LatLon } from '../core/geo.ts'
 import { fadeEdges, fromUV, particleCount, PX_PER_S_PER_MPS, sampleField, windRgb, type Field } from '../core/windViewport.ts'
 import { nearestStation, stationWind, type StationWind } from '../lib/stationNear.ts'
 import { compass } from '../lib/tideWords.ts'
+import { fetchMarine, hourlyAt } from '../lib/tideSheetData.ts'
+import { agoWords } from '../lib/nearWind.ts'
 import { windIn, windUnitLabel, type WindUnit } from '../lib/units.ts'
 import '../styles/wind.css'
 
@@ -40,9 +42,13 @@ interface Props {
   spot: LatLon | null
   facing: number | null
   status: 'off' | 'loading' | 'ok' | 'failed'
+  /** The time on the bar, for the swell at the crosshair. */
+  when?: Date | null
+  /** Ask the wind again after it failed to load. */
+  onRetry?: () => void
 }
 
-export function WindLayerV3({ map, field, unit, spot, facing, status }: Props) {
+export function WindLayerV3({ map, field, unit, spot, facing, status, when = null, onRetry }: Props) {
   const colour = useRef<HTMLCanvasElement>(null)
   const trails = useRef<HTMLCanvasElement>(null)
   /* The screen's velocity grid, rebuilt when the map settles: px/s east and down per CELL_PX cell. */
@@ -258,41 +264,86 @@ export function WindLayerV3({ map, field, unit, spot, facing, status }: Props) {
       clearTimeout(t)
     }
   }, [ck]) // eslint-disable-line react-hooks/exhaustive-deps
+  /*
+   * THE SWELL AT THE CROSSHAIR, AT SEA (Batch TRUTH, Section 7): the forecast's
+   * primary swell where the crosshair is, its height, period and the way it
+   * goes; on land the sea forecast answers nothing and no arrow is drawn.
+   * The crosshair rounded to 2 decimals, as every forecast question.
+   */
+  const [swell, setSwell] = useState<{ ft: number; s: number | null; fromDeg: number } | null>(null)
+  useEffect(() => {
+    if (centre === null) return
+    let live = true
+    const t = setTimeout(() => {
+      void fetchMarine({ lat: Number(centre.lat.toFixed(2)), lon: Number(centre.lon.toFixed(2)) })
+        .then((m) => {
+          if (!live) return
+          const h = m?.value ?? null
+          const at = when ?? new Date()
+          const ht = h === null ? null : hourlyAt(h, 'swell_wave_height', at)
+          const dir = h === null ? null : hourlyAt(h, 'swell_wave_direction', at)
+          setSwell(ht === null || dir === null || !(ht > 0.03) ? null : { ft: ht * 3.28084, s: h === null ? null : hourlyAt(h, 'swell_wave_period', at), fromDeg: dir })
+        })
+        .catch(() => live && setSwell(null))
+    }, 700)
+    return () => {
+      live = false
+      clearTimeout(t)
+    }
+  }, [ck, when?.getTime()]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const say = (mps: number | null) => (mps === null ? '—' : `${Math.round(windIn(mps, unit) ?? 0)}`)
   const side = here === null || facing === null || spot === null || centre === null || distanceMeters(spot, centre) > 3000 ? null : windToBeach(here.fromDeg, facing)
-  const stationSays = station?.w == null ? null : `${Math.round(windIn(station.w.kt / 1.9438444924406, unit) ?? 0)} ${windUnitLabel(unit)}${station.w.fromDeg === null ? ' variable' : ` ${compass(station.w.fromDeg)}`}`
+  const stationLine = station?.w == null ? null : `${station.id} ${Math.round(windIn(station.w.kt / 1.9438444924406, unit) ?? 0)}${station.w.fromDeg === null ? ' var' : ` ${compass(station.w.fromDeg)}`}${(() => {
+    const at = new Date(station.w.at)
+    return Number.isFinite(at.getTime()) ? `, ${agoWords(at, new Date())}` : ''
+  })()}`
+  /* "9 kt S · g11 · KORF 5 SW, 4 min ago": one line under the search (Batch TRUTH, Section 7). */
+  const line =
+    here === null
+      ? status === 'loading'
+        ? 'Reading the wind…'
+        : status === 'failed'
+          ? null
+          : 'No wind here'
+      : [`${say(here.speedMps)} ${windUnitLabel(unit)} ${compass(here.fromDeg)}`, here.gust === null ? null : `g${say(here.gust)}`, side === null ? null : `${side === 'cross' ? 'cross-shore' : side} here`, stationLine].filter((x) => x !== null).join(' · ')
 
   return (
     <>
       <canvas ref={colour} className="windv3__field" aria-hidden="true" />
       <canvas ref={trails} className="windv3__trails" aria-hidden="true" />
       <div className="windv3__cross" aria-hidden="true" />
-      <div className="windv3__read" role="status" data-wind-readout>
-        <svg className="windv3__arrow" viewBox="-12 -12 24 24" aria-hidden="true">
-          <circle r="11" />
-          {here === null ? null : <path d="M-6 0H6M2 -4L6 0L2 4" transform={`rotate(${(here.fromDeg + 90) % 360})`} />}
-        </svg>
-        <div className="windv3__words">
-          <p className="windv3__big">
-            {here === null ? (status === 'loading' ? 'Reading the wind…' : status === 'failed' ? 'The wind didn\'t load · retrying' : 'No wind here') : (
-              <>
-                <span className="windv3__num">{say(here.speedMps)}</span> {windUnitLabel(unit)} <b>from {compass(here.fromDeg)}</b>
-              </>
-            )}
+      {/* At the crosshair: where the wind goes, "16 kt"; at sea the swell too, "swell 1.3 ft 9 s". */}
+      <svg className="windv3__arrows" viewBox="-60 -60 120 120" aria-hidden="true">
+        {here === null ? null : (
+          <g className="windv3__warrow" transform={`rotate(${(here.fromDeg + 180) % 360})`}>
+            <path d="M0 8V-34M-6 -26L0 -34L6 -26" />
+          </g>
+        )}
+        {swell === null ? null : (
+          <g className="windv3__sarrow" transform={`rotate(${(swell.fromDeg + 180) % 360})`}>
+            <path d="M0 8V-28M-5 -21L0 -28L5 -21" />
+          </g>
+        )}
+      </svg>
+      <p className="windv3__lab windv3__lab--wind" aria-hidden="true">
+        {here === null ? '' : `${say(here.speedMps)} ${windUnitLabel(unit)}`}
+      </p>
+      {swell === null ? null : (
+        <p className="windv3__lab windv3__lab--swell" aria-hidden="true" data-swell>
+          swell {swell.ft.toFixed(1)} ft{swell.s === null ? '' : ` ${Math.round(swell.s)} s`}
+        </p>
+      )}
+      <div className="windv3__read windv3__read--pill" role="status" data-wind-readout data-partial={partial ? '1' : '0'}>
+        {line === null ? (
+          <p className="windv3__failed">
+            Wind didn&rsquo;t load ·{' '}
+            <button type="button" className="windv3__retry" onClick={onRetry}>
+              Retry
+            </button>
           </p>
-          {here === null ? null : (
-            <p className="windv3__line">
-              {[here.gust === null ? null : `gusts ${say(here.gust)}`, side === null ? null : `${side === 'cross' ? 'cross-shore' : side} here`, 'at the crosshair'].filter((x) => x !== null).join(' · ')}
-            </p>
-          )}
-          {partial ? <p className="windv3__area">Wind shown for this area</p> : null}
-        </div>
-        {station === null || stationSays === null ? null : (
-          <p className="windv3__station">
-            {station.id} reads
-            <b>{stationSays}</b>
-          </p>
+        ) : (
+          <p className="windv3__pill">{line}</p>
         )}
       </div>
     </>

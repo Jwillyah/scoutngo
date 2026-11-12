@@ -1,6 +1,6 @@
 import { buildingsBox, type Box as BuildingsBox } from '../core/buildingsBox.ts'
 import { NetDebug } from './NetDebug.tsx'
-import { WindTimeBar } from './WindTimeBar.tsx'
+import { WindHours, WindTimeBar } from './WindTimeBar.tsx'
 import { coastFacing } from '../lib/coast.ts'
 import type { WindModelChip } from '../lib/useWindViewport.ts'
 import { compass } from '../lib/tideWords.ts'
@@ -188,6 +188,8 @@ import { useTouchDebug } from '../lib/touchDebug.ts'
  * its hour labels), and 13 to spare.
  */
 const PLAN_PEEK_PX = 187
+/* Batch TRUTH, Section 7: wind is the whole map; the sheet's peek is one thin bar. */
+const WIND_PEEK_PX = 96
 
 /** What the one sheet is currently showing. Chosen by an explicit control. */
 /*
@@ -1407,6 +1409,13 @@ export function PlanMode({
   /* Batch MAP2, Section 3: the plain vector map in place of the satellite. */
   const [vectorMap, setVectorMap] = useState(false)
   const [windStrip, setWindStrip] = useState<{ from: number; mps: (number | null)[] } | null>(null)
+  /* Batch TRUTH, Section 7: wind on is the whole map (wind.css .mode-plan[data-wind-mode]); its bar opens on now. */
+  const windMode = weatherLayer === 'wind' && !threeD
+  const windWasOn = useRef(false)
+  useEffect(() => {
+    if (windMode && !windWasOn.current) scrubTo(new Date())
+    windWasOn.current = windMode
+  }, [windMode]) // eslint-disable-line react-hooks/exhaustive-deps
   const [windFacing, setWindFacing] = useState<{ key: string; deg: number | null } | null>(null)
   const windSpotKey = venue === null ? null : `${venue.lat.toFixed(3)},${venue.lon.toFixed(3)}`
   useEffect(() => {
@@ -2446,6 +2455,7 @@ export function PlanMode({
       case 'wxlayer':
         return (
           <Card title={layerWords.join(' · ') || 'Weather'} onClose={home}>
+            {windMode && scrubbedAt !== null ? <WindHours at={scrubbedAt} from={new Date(windStrip?.from ?? Math.floor(Date.now() / 3_600_000) * 3_600_000)} strip={windStrip?.mps ?? []} unit={units.wind} timeZone={venueWindow?.timeZone ?? 'UTC'} /> : null}
             <WeatherLayerCard layer={weatherLayer} alerts={layerNow?.alerts ?? []} upstream={layerUpstream} dist={units.distance === 'ft' ? 'mi' : 'km'} timeZone={venueWindow?.timeZone ?? 'UTC'} windFt={windLayerFt} onWindFt={setWindLayerFt} />
           </Card>
         )
@@ -2488,6 +2498,7 @@ export function PlanMode({
     <div
       className="mode-plan"
       data-weather-layer={weatherLayer}
+      data-wind-mode={windMode ? "" : undefined}
       style={
         {
           ['--sheet-live-height' as string]: `${sheetHeight}px`,
@@ -2987,7 +2998,7 @@ export function PlanMode({
 
       <BottomSheet
         /* Room for the time bar: its date line and its strip, measured, not the old one-line scrubber. */
-        peekPx={PLAN_PEEK_PX}
+        peekPx={windMode ? WIND_PEEK_PX : PLAN_PEEK_PX}
         detent={sheet}
         onDetentChange={setSheet}
         onHeightChange={setSheetHeight}
@@ -3035,7 +3046,7 @@ export function PlanMode({
             {/* Only on the map's own view (the home card, the radar card): a card that reads a moment keeps its time strip (Batch N; the surface audit). */}
             {weatherLayer === 'radar' && !threeD && (card.kind === HOME.kind || card.kind === 'wxlayer') ? (
               <RadarLegend scanAt={radarAt === null ? null : (layerNow?.radar?.scanAt ?? radarAt)} calls={layerCalls} strikes={layerNow?.strikes ?? []} timeZone={venueWindow?.timeZone ?? 'UTC'} />
-            ) : weatherLayer === 'wind' && windLayerFt === 0 && !threeD && (card.kind === HOME.kind || card.kind === 'wxlayer') && venueWindow !== null && scrubbedAt !== null ? (
+            ) : windMode && (card.kind === HOME.kind || card.kind === 'wxlayer') && venueWindow !== null && scrubbedAt !== null ? (
               /* Batch Map, Section 1: the wind's own time bar (play, the models, the strip at the crosshair) in the time sheet's place. */
               <WindTimeBar
                 at={scrubbedAt}
@@ -3047,6 +3058,11 @@ export function PlanMode({
                 onModel={setWindModel}
                 strip={windStrip?.mps ?? []}
                 unit={units.wind}
+                now={stripNow}
+                onOff={allLayersOff}
+                levelFt={windLayerFt}
+                onLevel={setWindLayerFt}
+                note={windLayerFt === 0 ? 'The colour is the wind’s speed; the white lines move with it. The crosshair reads the wind under it, and at sea the swell. Zoomed out the map uses the global models (GFS, ICON and the rest); HRRR only close in.' : 'Streaks move with the wind at 400 ft; brighter is stronger.'}
               />
             ) : ((!TIME_MATTERS[card.kind] || (card.kind === 'sky' && skyTab !== 'now')) && !threeD) || venueWindow === null || scrubbedAt === null ? null : (
               <TimeBar

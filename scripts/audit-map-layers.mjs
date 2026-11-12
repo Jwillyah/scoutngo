@@ -85,6 +85,8 @@ const SHEET = `JSON.stringify((() => {
  * wind's time bar is in the time sheet's place with Blend chosen, and the
  * sun's lines are off while it is on.
  */
+/* "9 kt S · g11 · KORF 5 SW, 4 min ago" (Batch TRUTH, Section 7). */
+const READ = /\d+ (kt|mph|km\/h|m\/s) [NESW]{1,3}\b/
 const WIND = `JSON.stringify((() => {
   const c = document.querySelector('canvas.windv3__field')
   if (!c) return { present: false }
@@ -111,8 +113,15 @@ const WIND = `JSON.stringify((() => {
     particles: Number(t?.dataset.particles ?? 0),
     fps: Number(t?.dataset.fps ?? 0),
     readout: read?.textContent ?? null,
-    legend: document.querySelectorAll('.windv3__bar span').length,
-    bar: bar === null ? null : { inPeek: !!bar.closest('.sheet__peek'), models: [...bar.querySelectorAll('[role=radio]')].map((b) => b.textContent + (b.getAttribute('aria-checked') === 'true' ? '*' : '')) },
+    legend: document.querySelectorAll('.wbar__legend span').length,
+    bar: bar === null ? null : { inPeek: !!bar.closest('.sheet__peek'), model: bar.querySelector('.wbar__pill')?.textContent ?? null, h: Math.round(bar.getBoundingClientRect().height) },
+    readH: read === null ? 0 : Math.round(read.getBoundingClientRect().height),
+    centre: (() => {
+      if (!(c.width > 0)) return 0
+      return c.getContext('2d').getImageData(Math.floor(c.width / 2), Math.floor(c.height / 2), 1, 1).data[3]
+    })(),
+    /* Wind is the whole map: no chips, no layer chip, the rail down to its compass. */
+    chrome: [...document.querySelectorAll('.chips2, .wxchip, .rail2__slot')].filter((e) => e.getBoundingClientRect().height > 0 && getComputedStyle(e).display !== 'none').map((e) => e.className + ':' + (e.querySelector('button')?.getAttribute('aria-label') ?? '')),
     pills: document.querySelectorAll('.raypills > *').length,
     cross: !!document.querySelector('.windv3__cross'),
   }
@@ -165,7 +174,10 @@ try {
     const wait = (ms) => page.waitForTimeout(ms)
     const ev = (x) => page.evaluate(x)
     const shot = (name) => page.screenshot({ path: join(OUT, `${name}-${label.replace(/\s/g, '-').toLowerCase()}.png`) })
-    await page.goto(url)
+    /* ?probe=1: the map instance reachable, for the zooms the wind is checked at (Batch TRUTH, Section 7). */
+    const probed = new URL(url)
+    probed.searchParams.set('probe', '1')
+    await page.goto(probed.href)
     await wait(3500)
     await page.getByRole('button', { name: /^open$/i }).click({ timeout: 4000 }).catch(() => {})
     await goToStage(ev, wait, 'plan')
@@ -208,7 +220,7 @@ try {
     for (let i = 0; i < 24; i += 1) {
       await wait(500)
       w = JSON.parse(await ev(WIND))
-      if (w.present && !w.hidden && w.painted >= 36 && w.particles > 0 && /from/.test(w.readout ?? '')) break
+      if (w.present && !w.hidden && w.painted >= 36 && w.particles > 0 && READ.test(w.readout ?? '')) break
     }
     looked.wind += 1
     console.log(`  wind layer: ${JSON.stringify(w)}`)
@@ -218,13 +230,17 @@ try {
       if (w.w < viewport.width * 0.9 || w.h < viewport.height * 0.6) fail(`${label}: the wind canvas is ${w.w} x ${w.h}, not the map's size`)
       if (w.painted < 36) fail(`${label}: the wind colour covers ${w.painted} of 36 spots across the screen, not all of it`)
       if (w.particles === 0) fail(`${label}: no particles`)
-      if (!/\d+ (kt|mph|km\/h|m\/s) from [NESW]/.test(w.readout ?? '')) fail(`${label}: the crosshair's readout says "${w.readout}"`)
+      if (!READ.test(w.readout ?? '')) fail(`${label}: the crosshair's readout says "${w.readout}"`)
+      /* Batch TRUTH, Section 7: one thin pill, and nothing but back, search and the compass on the map. */
+      if (w.readH > 40) fail(`${label}: the wind readout is ${w.readH} px tall, not one thin line`)
+      if (w.chrome.length !== 1 || !/heading|north/.test(w.chrome[0] ?? '')) fail(`${label}: with wind on, the map still shows ${JSON.stringify(w.chrome)}`)
       if (!w.cross) fail(`${label}: no crosshair`)
-      if (w.legend !== 7) fail(`${label}: the legend has ${w.legend} stops, not 7`)
+      if (w.legend !== 4) fail(`${label}: the legend line has ${w.legend} ticks, not 0 · 10 · 20 · 30+`)
       if (w.bar === null) fail(`${label}: no wind time bar`)
       else {
         if (!w.bar.inPeek) fail(`${label}: the wind time bar is not in the time sheet's place`)
-        if (JSON.stringify(w.bar.models) !== JSON.stringify(['HRRR', 'Blend*', 'ECMWF'])) fail(`${label}: the models read ${JSON.stringify(w.bar.models)}, not HRRR · Blend (chosen) · ECMWF`)
+        if (w.bar.model !== 'Blend') fail(`${label}: the model chip reads ${w.bar.model}, not Blend`)
+        if (w.bar.h > 96) fail(`${label}: the wind bar is ${w.bar.h} px tall, more than 96`)
       }
       if (w.pills > 0) fail(`${label}: the sun's line labels are on the map with the wind layer on`)
       console.log(`  wind grid requests for this view: ${gridAsks}; frame rate ${w.fps} fps`)
@@ -243,12 +259,31 @@ try {
     for (let i = 0; i < 20; i += 1) {
       await wait(500)
       w4 = JSON.parse(await ev(WIND))
-      if (w4.present && w4.painted >= 36 && /from/.test(w4.readout ?? '')) break
+      if (w4.present && w4.painted >= 36 && READ.test(w4.readout ?? '')) break
     }
     console.log(`  wind at 400 ft: ${JSON.stringify({ painted: w4?.painted, particles: w4?.particles, readout: w4?.readout })}`)
     if (crashed.length > 0) fail(`${label}: the page crashed at 400 ft: ${crashed[0]}`)
-    else if (!w4?.present || w4.painted < 36 || !/from/.test(w4.readout ?? '')) fail(`${label}: the wind layer did not draw at 400 ft`)
+    else if (!w4?.present || w4.painted < 36 || !READ.test(w4.readout ?? '')) fail(`${label}: the wind layer did not draw at 400 ft`)
     await page.locator('.seg__btn', { hasText: 'Surface' }).first().click({ timeout: 4000 }).catch(() => {})
+    await wait(800)
+    /* Batch TRUTH, Section 7: wind colour under the crosshair at every zoom, a street to the world. */
+    for (const z of [12, 7, 4, 2]) {
+      await ev(`window.__probe?.map?.jumpTo({ zoom: ${z} })`)
+      let wz = null
+      for (let i = 0; i < 24; i += 1) {
+        await wait(500)
+        wz = JSON.parse(await ev(WIND))
+        if (wz.centre > 0 && READ.test(wz.readout ?? '')) break
+      }
+      console.log(`  wind at zoom ${z}: centre alpha ${wz?.centre}, painted ${wz?.painted} of 36, "${wz?.readout}"`)
+      if (!(wz?.centre > 0)) fail(`${label}: no wind colour under the crosshair at zoom ${z}`)
+      if (/No wind here|didn.t load/.test(wz?.readout ?? '')) fail(`${label}: at zoom ${z} the readout says "${wz?.readout}"`)
+      await shot(`wind-z${z}`)
+    }
+    await ev(`window.__probe?.map?.jumpTo({ zoom: 16.5 })`)
+    await wait(800)
+    /* Wind mode hides the rail and the layer chip; its bar's ✕ turns it off and gives them back. */
+    await page.locator('[data-wind-off]').first().click({ timeout: 4000 }).catch(() => fail(`${label}: no way to turn the wind off from its bar`))
     await wait(800)
     watchdog.note(`${label} wind`)
 
