@@ -6,7 +6,7 @@ import { saneAzimuth } from '../core/sanity.ts'
 import { moonTimesOnLocalDay } from '../core/moonTimes.ts'
 import { droneTag, kt, surfOn, surfTag, windTag, type CallRead } from '../core/briefing.ts'
 import { droneWindow } from '../core/droneWindow.ts'
-import { bestRun, bestWindows, colorWords, skyStripLit, weekSurfRow, WEEK_SURE_DAYS, groundOf, sideWords, nothingLine, rainLine, spanWords, stripSteps, weekHeadline, type Activity, type CardKind, type WindowRow } from '../core/homeDay.ts'
+import { bestRun, bestWindows, colorWords, skyStripLit, sideShort, sideSpanWords, weekPill, weekSurfRow, WEEK_SURE_DAYS, groundOf, sideWords, nothingLine, rainLine, spanWords, stripSteps, weekHeadline, type Activity, type CardKind, type WindowRow } from '../core/homeDay.ts'
 import { camsFacingWaterOrSun } from '../core/skyCams.ts'
 import { wakeAt } from '../core/alertIcs.ts'
 import { formatClock } from '../core/timezone.ts'
@@ -15,7 +15,6 @@ import { homeOrder, primaryFor, useActivities } from '../lib/activities.ts'
 import { seaNow, surfLine, useSurfNow, type SurfNow } from '../lib/useSurfNow.ts'
 import { rangeSizeWords } from '../core/surfReads.ts'
 import { chartMarks, firstFun, homeCardsShown, homeLayout, nextLine, nightSpans, surfChartMarks, surfPath, tideAt, tideCurve, type HomeLayout, type SurfChartMarks } from '../core/homeCards.ts'
-import { beachName } from '../lib/surfBeach.ts'
 import { gustWords, windAt, windWords } from '../lib/windNow.ts'
 import { useStationObs, type StationNow } from '../lib/useStationObs.ts'
 import { skyCondition } from '../core/skyWord.ts'
@@ -32,7 +31,6 @@ import { refreshLine, useWeatherRefreshing } from '../lib/useWeatherStatus.ts'
 import { ActivityIcon } from './ActivityIcon.tsx'
 import { MoonGlyph } from './MoonGlyph.tsx'
 /* Batch Polish 2, Section 4: not in the first paint's JavaScript. The cams' sheet opens on a tap; the weather-only home is one choice of five. */
-const CamsSheet = lazy(() => import('./CamsSheet.tsx').then((m) => ({ default: m.CamsSheet })))
 const WeatherHome = lazy(() => import('./WeatherHome.tsx').then((m) => ({ default: m.WeatherHome })))
 import { OPEN_RADAR_EVENT } from '../lib/pageEvents.ts'
 import { SkyIconSvg } from './SkyIconSvg.tsx'
@@ -258,7 +256,7 @@ interface DayViewProps {
   weatherOnly?: boolean
 }
 
-function DayView({ which, brief, day, order, venue, timeZone, units, drone, now, alert, stormLine, onOpen, onDebug, placeName, surf, obs, layout, shown, weatherOnly = false }: DayViewProps) {
+function DayView({ which, brief, day, order, venue, timeZone, units, drone, now, alert, stormLine, onOpen, onDebug, surf, obs, layout, shown, weatherOnly = false }: DayViewProps) {
   const clock = (d: Date | null) => (d === null ? '—' : formatClock(d, timeZone))
   const wx = brief.wx
   const at = (name: string, t: Date) => (wx === null ? null : hourlyAt(wx, name, t))
@@ -307,7 +305,6 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
   const sunAz = day?.events.sunset === null || day === null ? null : getPosition(day.events.sunset, venue.lat, venue.lon).azimuth
   const coastCams = useCoastCams()
   const cams = which === 'today' && coastCams !== null ? camsFacingWaterOrSun(venue, sunAz, brief.facing, coastCams) : []
-  const [camsOpen, setCamsOpen] = useState(false)
 
   /* Batch Flow, Section 3: within 3 h of a sunrise or sunset, it is said up top. */
   const soon = which !== 'today' ? null : [day?.events.sunrise ?? null, day?.events.sunset ?? null, brief.days[1]?.events.sunrise ?? null].find((t): t is Date => t !== null && t.getTime() > now.getTime() && t.getTime() - now.getTime() <= 3 * 3_600_000) ?? null
@@ -393,21 +390,8 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
           ))}
         </div>
       )}
-      {/* Batch Polish, Section 3: the "Next:" line rides in the Cams row (one row, always on screen); on its own where there are no cams. */}
-      {cams.length === 0 ? (
-        <p className="hnext">{nextText}</p>
-      ) : (
-        /* Batch N A4: the row opens "Cams near <spot>"; the cams themselves are links out (docs/cams.md). */
-        <button type="button" className="hcams hcams--next" onClick={() => setCamsOpen(true)}>
-          <CamGlyph />
-          <span className="hcams__text">
-            <span className="hnext hnext--in">{nextText}</span>
-            <span className="hcams__words">Cams · {cams.map((c) => beachName(c.cam.name)).join(', ')}</span>
-          </span>
-          <span aria-hidden="true">›</span>
-        </button>
-      )}
-      {camsOpen ? <Suspense fallback={null}><CamsSheet spot={placeName} venue={venue} sunsetAzDeg={sunAz} seaFacingDeg={brief.facing} onClose={() => setCamsOpen(false)} /></Suspense> : null}
+      {/* Batch TRUTH, Section 4: the Next line alone; the cams live in the menu ("Next: … / Cams · VB Pier" was two things in one row). */}
+      <p className="hnext">{nextText}</p>
     </div>
   )
 }
@@ -424,14 +408,14 @@ function ChartMarksText({ marks, unit }: { marks: SurfChartMarks | null; unit: s
         </span>
       ))}
       {marks.peak === null ? null : (
-        <span className="hcard__peak" style={{ left: `${marks.peak.x * 100}%`, top: `${marks.peak.y * 100}%` }}>
+        /* Inside the plot (Batch TRUTH, Section 4): past the middle the label sits left of its dot, clear of the right edge and the axis words; never above the top. */
+        <span className={`hcard__peak${marks.peak.x > 0.55 ? ' hcard__peak--left' : ''}`} style={{ left: `${marks.peak.x * 100}%`, top: `${Math.max(12, marks.peak.y * 100)}%` }}>
           <span className="hcard__peakdot" />
           <span className="hcard__peaklabel">
             {one(marks.peak.ft)} {unit}
           </span>
         </span>
       )}
-      {marks.steady ? <span className="hcard__steady">steady all day</span> : null}
       <span className="hcard__ticks" aria-hidden="true">
         {marks.ticks.map((t) => (
           <span key={t.label} className={t.x === 0 ? 'hcard__tick--edge' : undefined} style={{ left: `${t.x * 100}%` }}>
@@ -567,6 +551,9 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
   const t = which === 'today' ? now : day === null ? now : new Date(day.start.getTime() + 13 * 3_600_000)
   const wide = layout === 'few' || kind === 'surf'
   const small = layout === 'many' && (kind === 'sky' || kind === 'drone' || kind === 'moon')
+  /* The chart's width on the card, near enough for the tick words' spacing (chartMarks TICK_GAP_PX). */
+  /* A small card's chart is about 96 px across (the six-card home's thirds). */
+  const cardPx = wide ? 340 : small ? 96 : 160
   let title = ''
   let big: ReactNode = '—'
   /* A value this card says that other screens say too (Batch QA, Section 3: scripts/audit-one-number.mjs). */
@@ -597,7 +584,8 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
     tag = !on || fun === null ? (call?.size ?? null) : fun === 'now' ? `${call.size} now` : `${call.size} ${short(fun)}`
     tagGood = on
     const path = surfPath(pts, from, 24, CHART)
-    const marks = surfChartMarks(pts, from, 24, timeZone)
+    const marks = surfChartMarks(pts, from, 24, timeZone, { widthPx: cardPx, dayStart: which === 'tomorrow' })
+    if (marks?.steady === true) title = 'Surf · next 24 h · steady'
     const nights = nightSpans(from, 24, brief.days.map((d) => d.events.sunset).filter((x): x is Date => x !== null), brief.days.map((d) => d.events.sunrise).filter((x): x is Date => x !== null))
     /* The parts, at the hour (S7 look), in the few-cards layout: the Surf page's own (seaNow). */
     const parts = layout === 'few' && which === 'today' ? seaNow(surf.sea, now).parts.slice(0, 2) : []
@@ -630,7 +618,7 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
             ))}
             <path d={path.fill} fill="url(#surfFill)" />
             <path d={path.line} className="hcard__line hcard__line--surf" />
-            <line x1="1" x2="1" y1="0" y2={CHART.h} className="hcard__now" />
+            {which === 'today' ? <line x1="1" x2="1" y1="0" y2={CHART.h} className="hcard__now" /> : null}
           </svg>
           <ChartMarksText marks={marks} unit="ft" />
           </span>
@@ -646,11 +634,12 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
     big = said === null ? '—' : which === 'today' ? <span data-shared="wind">{said}</span> : said
     /* Batch Flow, Section 3: one function decides the side, for the tag and the line alike (it read "Offshore" over "cross-shore"). */
     const sideNow = w?.fromDeg == null ? null : windTag(w.fromDeg, brief.facing)
-    tag = sideNow === null ? null : sideWords(sideNow).replace(/^./, (c) => c.toUpperCase())
+    /* Batch TRUTH, Section 4: the short word on the tag ("Cross-on"), so it never wraps on a half-width card; the line says it in full. */
+    tag = sideNow === null ? null : sideShort(sideNow).replace(/^./, (c) => c.toUpperCase())
     tagGood = sideNow === 'Offshore'
     const span = windSideSpan(day, brief.facing, which === 'today' ? now : null, timeZone)
     const gusts = gustWords(w, units.wind)
-    line = [gusts, span !== null && !span.endsWith('all day') ? span.replace(/^\w+ until/, (m) => m) : null].filter((x) => x !== null).join(' · ') || null
+    line = [gusts, span !== null && !span.endsWith('all day') ? span : null].filter((x) => x !== null).join(' · ') || null
     pic = <WindDial fromDeg={w?.fromDeg ?? null} facing={brief.facing} />
   } else if (kind === 'tide') {
     title = layout === 'few' ? 'Tide · today' : 'Tide'
@@ -672,12 +661,13 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
     const nextHigh = brief.turns.find((x) => x.kind === 'high' && x.at.getTime() > from) ?? null
     const turnWords = (t: typeof nextLow) => (t === null ? null : `${t.kind === 'high' ? 'High' : 'Low'} ${clock(t.at)} · ${t.feet.toFixed(1)} ft`)
     /* Batch Polish 2, Section 2: the surf chart's treatment: whole-foot gridlines, the time ticks with "now" 3 h in, the highest water and its height, the night. */
-    const tideFrom = new Date(from - 3 * 3_600_000)
+    /* Tomorrow's chart is tomorrow's day, from 12a, with no "now" (Batch TRUTH, Section 4). */
+    const tideFrom = new Date(which === 'today' ? from - 3 * 3_600_000 : from)
     const tidePts = Array.from({ length: 73 }, (_, i) => new Date(tideFrom.getTime() + i * 20 * 60_000)).flatMap((t) => {
       const v = tideAt(brief.turns, t)
       return v === null ? [] : [{ at: t, v }]
     })
-    const tideMarks = curve === null ? null : chartMarks(tidePts, tideFrom, 24, timeZone, { floor: 0, steady: 0.3, steps: [-1, 0, 1, 2, 3, 4, 5, 6, 8, 10], low: curve.range.lo, high: curve.range.hi, nowAt: 3 / 24 })
+    const tideMarks = curve === null ? null : chartMarks(tidePts, tideFrom, 24, timeZone, { floor: 0, steady: 0.3, steps: [-1, 0, 1, 2, 3, 4, 5, 6, 8, 10], low: curve.range.lo, high: curve.range.hi, nowAt: 3 / 24, widthPx: cardPx, dayStart: which === 'tomorrow' })
     const tideNights = nightSpans(tideFrom, 24, brief.days.map((d) => d.events.sunset).filter((x): x is Date => x !== null), brief.days.map((d) => d.events.sunrise).filter((x): x is Date => x !== null))
     pic =
       curve === null ? null : (
@@ -691,8 +681,12 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
               <rect key={n.a} x={n.a * CHART.w} y="0" width={(n.b - n.a) * CHART.w} height={CHART.h} className="hcard__night" />
             ))}
             <path d={curve.line} className="hcard__line hcard__line--tide" />
-            <line x1={(3 / 24) * CHART.w} x2={(3 / 24) * CHART.w} y1="0" y2={CHART.h} className="hcard__now" />
-            <circle cx={(3 / 24) * CHART.w} cy={curve.scale(tideAt(brief.turns, new Date(from)) ?? 0)} r="4" className="hcard__dot" />
+            {which === 'today' ? (
+              <>
+                <line x1={(3 / 24) * CHART.w} x2={(3 / 24) * CHART.w} y1="0" y2={CHART.h} className="hcard__now" />
+                <circle cx={(3 / 24) * CHART.w} cy={curve.scale(tideAt(brief.turns, new Date(from)) ?? 0)} r="4" className="hcard__dot" />
+              </>
+            ) : null}
           </svg>
           <ChartMarksText marks={tideMarks} unit="ft" />
           </span>
@@ -748,7 +742,8 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
     const dPts = brief.days.flatMap((d) => d.wind).flatMap((h) => (h.highMps === null ? [] : [{ at: h.at, v: toUnit(h.highMps) }]))
     const rated = drone?.maxWindMps == null ? null : toUnit(drone.maxWindMps)
     const dTop = Math.max(rated ?? 0, 10, ...dPts.filter((p) => p.at.getTime() >= dFrom.getTime() && p.at.getTime() <= dFrom.getTime() + 24 * 3_600_000).map((p) => p.v)) * 1.15
-    const dMarks = chartMarks(dPts, dFrom, 24, timeZone, { floor: 10, steady: 3, steps: [5, 10, 15, 20, 25, 30, 40, 50], high: dTop })
+    const dMarks = chartMarks(dPts, dFrom, 24, timeZone, { floor: 10, steady: 3, steps: [5, 10, 15, 20, 25, 30, 40, 50], high: dTop, widthPx: cardPx, dayStart: which === 'tomorrow' })
+    if (dMarks?.steady === true) title = small ? 'Drone · steady' : 'Drone · 400 ft · steady'
     const dPath = surfPath(dPts.map((p) => ({ at: p.at, ft: p.v, fun: false })), dFrom, 24, CHART, dTop)
     const dNights = nightSpans(dFrom, 24, brief.days.map((d) => d.events.sunset).filter((x): x is Date => x !== null), brief.days.map((d) => d.events.sunrise).filter((x): x is Date => x !== null))
     pic =
@@ -763,7 +758,7 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
             ))}
             {rated === null ? null : <line x1="0" x2={CHART.w} y1={(1 - rated / dTop) * CHART.h} y2={(1 - rated / dTop) * CHART.h} className="hcard__rated" />}
             <path d={dPath.line} className="hcard__line hcard__line--drone" />
-            <line x1="1" x2="1" y1="0" y2={CHART.h} className="hcard__now" />
+            {which === 'today' ? <line x1="1" x2="1" y1="0" y2={CHART.h} className="hcard__now" /> : null}
           </svg>
           <ChartMarksText marks={dMarks} unit={unit} />
         </span>
@@ -841,8 +836,8 @@ function windSideSpan(day: DayBrief | null, facing: number | null, now: Date | n
   const first = sides[0]
   if (first === undefined || first.side === null) return null
   const change = sides.find((s) => s.side !== first.side && s.side !== null)
-  const hour = (d: Date) => formatClock(new Date(d.getTime() - 1_800_000), timeZone).replace(/:00 /, ' ')
-  return change === undefined ? `${sideWords(first.side)} all day` : `${sideWords(first.side)} until ${hour(change.at)}`
+  /* Batch TRUTH, Section 4: "cross-off · offshore 9a", at the hour the change starts. */
+  return sideSpanWords(first.side, change === undefined || change.side === null ? null : { tag: change.side, at: new Date(change.at.getTime() - 1_800_000) }, timeZone)
 }
 
 /**
@@ -875,7 +870,8 @@ function WeekView({ brief, order, timeZone, units, now, venue, surf }: { brief: 
     /* Batch QA, Section 0B: the day's weather, for a week with nothing else to say (weather only): the strongest wind and the hours of rain, from the briefing's own hours. */
     const rainH = wx === null ? null : Array.from({ length: 24 }, (_, i) => hourlyAt(wx, 'precipitation', new Date(d.start.getTime() + i * 3_600_000 + 1_800_000))).filter((mm) => mm !== null && mm >= 0.1).length
     const weather = [d.windMaxKt === null ? null : `${Math.round(d.windMaxKt)} kt`, rainH === null ? null : rainH === 0 ? 'dry' : `rain ${rainH} h`].filter((x) => x !== null).join(' · ')
-    return { d, name: d.index === 0 ? 'Today' : day(d.start), cond, hi: temps.length === 0 ? null : Math.max(...temps), lo: temps.length === 0 ? null : Math.min(...temps), worth, surfWords: worth === null ? (surfDay?.words ?? null) : null, surfFact: surfDay?.fact ?? null, weather: weather === '' ? null : weather, call: d.reads.sunset?.call ?? null, guess: d.index >= WEEK_SURE_DAYS }
+    const pill = weekPill(worth, d.reads.sunset?.call ?? null, order.includes('shoot'))
+    return { d, pill, name: d.index === 0 ? 'Today' : day(d.start), cond, hi: temps.length === 0 ? null : Math.max(...temps), lo: temps.length === 0 ? null : Math.min(...temps), worth, surfWords: worth === null ? (surfDay?.words ?? null) : null, surfFact: surfDay?.fact ?? null, weather: weather === '' ? null : weather, call: d.reads.sunset?.call ?? null, guess: d.index >= WEEK_SURE_DAYS }
   })
   const head = weekHeadline(rows.filter((r) => r.d.index > 0 && r.worth !== null).map((r) => ({ day: r.name, what: (r.worth as Activity) === 'shoot' ? 'sunset' : (r.worth as string) })))
   void now
@@ -895,8 +891,11 @@ function WeekView({ brief, order, timeZone, units, now, venue, surf }: { brief: 
               {formatTemperature(r.hi, units.temperature).replace(/°[FC]$/, '°')}
               {r.lo === null ? null : <span className="hweek__lo"> · {formatTemperature(r.lo, units.temperature).replace(/°[FC]$/, '°')}</span>}
             </span>
-            {/* Sunset and sunrise calls are Shoot's (Batch QA, Section 0B): none in a week with Shoot not picked. */}
-            {order.includes('shoot') ? <span className={`hweek__call hweek__call--${(r.call ?? 'none').toLowerCase()}`}>{r.call ?? '—'}</span> : null}
+            {/*
+              * Batch TRUTH, Section 4: the pill is the row's best activity, the same call the "Best this week" line reads
+              * ("Best: Tue fish" over a Tue row that said Skip, 12 Nov); a day with none shows the sunset call, Shoot's alone.
+              */}
+            {r.pill === null ? null : <span className={`hweek__call hweek__call--${r.pill.tone}`} data-pill={r.pill.word}>{r.pill.word}</span>}
           </li>
         ))}
       </ol>

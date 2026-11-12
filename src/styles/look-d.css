@@ -618,3 +618,45 @@
 .wxchip {
   top: calc(var(--chips-bottom, var(--top-chrome, 120px)) + 6px);
 }
+
+/*
+ * UNDER THE HOME INDICATOR (Batch TRUTH, Section 4: a navy band below the
+ * buttons on every home page and the map). Where the page's ground stops
+ * short of the bottom safe area (the browser's toolbar sliding away, the
+ * standalone home bar), the document shows through: it wore the night's top
+ * navy. Now it wears the bottom of whichever ground is up, so the gradient
+ * runs on through env(safe-area-inset-bottom).
+ */
+html:has(.home--night),
+html:has(.home--night) body,
+html:has(.dpage.home--night),
+html:has(.dpage.home--night) body {
+  background: var(--d-night-low);
+}
+html:has(.home--day),
+html:has(.home--day) body {
+  background: var(--d-day-low);
+}
+html:has(.home--golden),
+html:has(.home--golden) body {
+  background: #3b3f86;
+}
+html:has(.home--cloud),
+html:has(.home--cloud) body {
+  background: var(--d-cloud-low);
+}
+html:has(.home--rain),
+html:has(.home--rain) body,
+html:has(.home--storm),
+html:has(.home--storm) body {
+  background: var(--d-rain-low);
+}
+html:has(.home--fog),
+html:has(.home--fog) body {
+  background: var(--d-fog-low);
+}
+/* The map: under its sheet, the night ground the sheet sits on. */
+html:has(.mode-plan),
+html:has(.mode-plan) body {
+  background: linear-gradient(180deg, var(--d-night-top), var(--d-night-low));
+}

@@ -109,8 +109,8 @@ export interface SurfChartMarks {
   steady: boolean
 }
 
-export function surfChartMarks(points: readonly SurfPoint[], from: Date, hours: number, timeZone: string): SurfChartMarks | null {
-  return chartMarks(points.map((p) => ({ at: p.at, v: p.ft })), from, hours, timeZone, { floor: 4, steady: STEADY_FT, steps: [1, 2, 3, 4, 6, 8, 10, 12] })
+export function surfChartMarks(points: readonly SurfPoint[], from: Date, hours: number, timeZone: string, more: { widthPx?: number; dayStart?: boolean } = {}): SurfChartMarks | null {
+  return chartMarks(points.map((p) => ({ at: p.at, v: p.ft })), from, hours, timeZone, { floor: 4, steady: STEADY_FT, steps: [1, 2, 3, 4, 6, 8, 10, 12], ...more })
 }
 
 /*
@@ -122,7 +122,10 @@ export function surfChartMarks(points: readonly SurfPoint[], from: Date, hours: 
  * than `steady`. `nowAt` puts the "now" tick where the window starts after
  * now (the tide's starts 3 h back).
  */
-export function chartMarks(points: readonly { at: Date; v: number }[], from: Date, hours: number, timeZone: string, opts: { floor: number; steady: number; steps: readonly number[]; low?: number; high?: number; nowAt?: number }): SurfChartMarks | null {
+/** Tick words closer than this many pixels on the card are one too many: the later goes ("nmoon", "now6a"; Batch TRUTH, Section 4). */
+export const TICK_GAP_PX = 28
+
+export function chartMarks(points: readonly { at: Date; v: number }[], from: Date, hours: number, timeZone: string, opts: { floor: number; steady: number; steps: readonly number[]; low?: number; high?: number; nowAt?: number; widthPx?: number; dayStart?: boolean }): SurfChartMarks | null {
   const t0 = from.getTime()
   const span = hours * 3_600_000
   const inside = points.filter((p) => p.at.getTime() >= t0 - 3_600_000 && p.at.getTime() <= t0 + span + 3_600_000)
@@ -130,16 +133,29 @@ export function chartMarks(points: readonly { at: Date; v: number }[], from: Dat
   const low = opts.low ?? 0
   const top = opts.high ?? Math.max(opts.floor, ...inside.map((p) => p.v)) * 1.15
   const yOf = (v: number) => 1 - (v - low) / Math.max(1e-6, top - low)
-  const grid = opts.steps.filter((ft) => ft > low && ft < top - (top - low) * 0.08).slice(0, 3).map((ft) => ({ ft, y: yOf(ft) }))
+  /*
+   * THE Y AXIS: 0, the middle and the top, every chart (Batch TRUTH, Section
+   * 4; the Surf page's 0 / 1.5 / 3), never just "1" and "3". The top is the
+   * largest step under the scale's top; with a given range (the tide's), its
+   * own ends.
+   */
+  const round1 = (v: number) => Math.round(v * 10) / 10
+  const base = (Number.isInteger(low) ? low : Math.ceil(low)) + 0
+  const max = [...opts.steps].reverse().find((v) => v > base && v <= top - (top - low) * 0.08) ?? round1(top)
+  const grid = [base, round1((base + max) / 2), max].map((ft) => ({ ft, y: yOf(ft) }))
+  const width = opts.widthPx ?? 300
+  const gap = TICK_GAP_PX / width
   const nowX = opts.nowAt ?? 0
   const hourAt = (t: number) => wallClock(new Date(t), timeZone)?.hour ?? -1
-  const ticks: SurfChartMarks['ticks'] = [{ label: 'now', x: nowX }]
+  /* A day's chart (tomorrow's) starts at midnight: no "now", and 12a at its start. */
+  const ticks: SurfChartMarks['ticks'] = opts.dayStart === true ? [] : [{ label: 'now', x: nowX }]
   for (let t = Math.ceil(t0 / 3_600_000) * 3_600_000; t <= t0 + span; t += 3_600_000) {
     const h = hourAt(t)
-    const label = h === 6 ? '6a' : h === 12 ? 'noon' : h === 18 ? '6p' : null
+    const label = h === 0 && opts.dayStart === true ? '12a' : h === 6 ? '6a' : h === 12 ? 'noon' : h === 18 ? '6p' : null
     const x = (t - t0) / span
-    /* Clear of "now" and of the edges: 12 px words at a card's width. */
-    if (label !== null && Math.abs(x - nowX) > 0.12 && x > 0.06 && x < 0.92) ticks.push({ label, x })
+    /* Clear of every word already placed ("now" first), and of the right edge. */
+    if (label === null || x > 1 - gap || ticks.some((k) => k.label === label)) continue
+    if (ticks.every((k) => Math.abs(k.x - x) >= gap)) ticks.push({ label, x })
   }
   const inWindow = inside.filter((p) => p.at.getTime() >= t0 && p.at.getTime() <= t0 + span)
   const best = inWindow.length === 0 ? null : inWindow.reduce((m, p) => (p.v > m.v ? p : m))

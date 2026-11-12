@@ -1,5 +1,5 @@
 import '../styles/menu.css'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
 import { nextMarkWord, rareRows } from '../core/skyPage.ts'
 import { fetchSpecialWeek, specialsFrom } from '../lib/specialLightData.ts'
 import { getPosition } from 'suncalc'
@@ -70,6 +70,9 @@ interface MenuProps {
   onClose: () => void
 }
 
+/* Batch TRUTH, Section 4: the cams moved off the home's Next row; they open from here. */
+const CamsSheet = lazy(() => import('./CamsSheet.tsx').then((m) => ({ default: m.CamsSheet })))
+
 export function Menu(props: MenuProps) {
   const { open, onClose } = props
   const first = useRef<HTMLButtonElement>(null)
@@ -94,6 +97,9 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
     return () => clearTimeout(t)
   }, [])
   const brief = useBriefing(venue, timeZone, now, venue !== null && looking, 'next')
+  const [camsOpen, setCamsOpen] = useState(false)
+  const sunsetToday = brief.days[0]?.events.sunset ?? null
+  const camsSunAz = sunsetToday === null || venue === null ? null : getPosition(sunsetToday, venue.lat, venue.lon).azimuth
   const clock = (d: Date) => formatClock(d, timeZone)
   const obs = useStationObs(looking ? venue : null)
   /* Batch Map A2: the value is the one surf number (src/lib/useSurfNow.ts), the home's and the Surf page's. */
@@ -194,11 +200,17 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
           {/* Batch Polish, Section 4: Plan a shoot and Settings, just the arrow; Kit its counts, Saved its spots. */}
           {!photoTools ? null : <Row label="Plan a shoot" value="" icon={<PlanIcon />} onTap={() => pick('setup')} />}
           <Row label="Calendar" value={mark ?? 'the month'} icon={<SavedIcon />} onTap={() => pick('calendar')} />
+          {venue === null ? null : <Row label="Cams" value="near here" icon={<CamIcon />} onTap={() => setCamsOpen(true)} />}
           <Row label="Kit" value={rows.kit} icon={<KitIcon />} onTap={() => pick('kit')} />
           <Row label="Saved" value={rows.saved} icon={<SavedIcon />} onTap={() => pick('saved')} />
           <Row label="Settings" value={rows.settings} icon={<GearIcon />} onTap={() => pick('settings')} />
         </div>
       </nav>
+      {camsOpen && venue !== null ? (
+        <Suspense fallback={null}>
+          <CamsSheet spot={placeShort} venue={venue} sunsetAzDeg={camsSunAz} seaFacingDeg={brief.facing} onClose={() => setCamsOpen(false)} />
+        </Suspense>
+      ) : null}
     </div>
   )
 }
@@ -228,4 +240,5 @@ const svg = (d: ReactNode) => (
 const PlanIcon = () => svg(<><path d="M12 21s-6-5.6-6-11a6 6 0 0 1 12 0c0 5.4-6 11-6 11z" /><circle cx="12" cy="10" r="2.2" /></>)
 const KitIcon = () => svg(<><rect x="3" y="7" width="18" height="13" rx="2" /><circle cx="12" cy="13.5" r="3.5" /><path d="M8 7l1.5-2.5h5L16 7" /></>)
 const SavedIcon = () => svg(<path d="M6 3h12v18l-6-4-6 4z" />)
+const CamIcon = () => svg(<><rect x="3" y="7" width="18" height="13" rx="2" /><circle cx="12" cy="13.5" r="3.5" /></>)
 const GearIcon = () => svg(<><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1" /></>)

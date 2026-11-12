@@ -118,7 +118,8 @@ try {
       if (!c.value) fail(`${label}: the ${c.name} card has no value`)
       if (/255,\s*59,\s*48/.test(c.bg)) fail(`${label}: the ${c.name} card is the hazard red`)
     }
-    const wantRows = picked === null ? ['Plan a shoot', 'Calendar', 'Kit', 'Saved', 'Settings'] : ['Calendar', 'Kit', 'Saved', 'Settings']
+    /* Batch TRUTH, Section 4: Cams moved here from the home's Next row. */
+    const wantRows = picked === null ? ['Plan a shoot', 'Calendar', 'Cams', 'Kit', 'Saved', 'Settings'] : ['Calendar', 'Cams', 'Kit', 'Saved', 'Settings']
     if (JSON.stringify(m.rows.map((r) => r.name)) !== JSON.stringify(wantRows)) fail(`${label}: the rows are ${JSON.stringify(m.rows.map((r) => r.name))}`)
     for (const r of m.rows) if (r.h < 44) fail(`${label}: the ${r.name} row is ${r.h} px, under a 44 px target`)
     await page.screenshot({ path: join(OUT, `menu-${label}.png`) })

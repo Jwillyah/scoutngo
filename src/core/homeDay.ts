@@ -10,7 +10,7 @@
 import type { SurfCall } from './surfCall.ts'
 import type { WindTag } from './briefing.ts'
 import { getTimes } from 'suncalc'
-import { formatClock, formatShortHour } from './timezone.ts'
+import { formatClock, formatShortHour, wallClock } from './timezone.ts'
 import { surfOn, surfTag, type SurfShape } from './surf.ts'
 import { rangeEnds } from './surfRange.ts'
 
@@ -200,6 +200,19 @@ export function weekSurfRow(call: SurfCall | null, dayIndex: number): { on: bool
   return { on, words: on ? null : call.words, fact: call.words }
 }
 
+/**
+ * A week row's pill (Batch TRUTH, Section 4): its best activity, the one the
+ * "Best this week" line names, as a go; else, with Shoot picked, the
+ * sunset's call; else none. The line and the pills read the same worth, so a
+ * row the line calls best never says Skip.
+ */
+export function weekPill(worth: Activity | null, sunsetCall: 'Go' | 'Maybe' | 'Skip' | null, shoot: boolean): { word: string; tone: 'go' | 'maybe' | 'skip' | 'none' } | null {
+  const WORD: Record<Activity, string> = { surf: 'Surf', shoot: 'Go', drone: 'Drone', fish: 'Calm', weather: 'Dry' }
+  if (worth !== null) return { word: WORD[worth], tone: 'go' }
+  if (!shoot) return null
+  return sunsetCall === null ? { word: '—', tone: 'none' } : { word: sunsetCall, tone: sunsetCall.toLowerCase() as 'go' | 'maybe' | 'skip' }
+}
+
 /** "Best this week: Mon sunset · Thu surf", or null when nothing in the week stands out. */
 export function weekHeadline(best: readonly { day: string; what: string }[]): string | null {
   if (best.length === 0) return null
@@ -234,6 +247,23 @@ export function colorWords(call: 'Go' | 'Maybe' | 'Skip' | null): string | null 
 /** The wind to the beach in words: "cross-shore", never the bare "cross" (Batch Pages, Section 1); five bands since Batch TRUTH ("cross-offshore"). */
 export function sideWords(tag: WindTag): string {
   return tag === 'Cross' ? 'cross-shore' : tag.toLowerCase()
+}
+
+/** The side in a short word, for a narrow card line: "cross-off", "cross-on", "cross" (Batch TRUTH, Section 4). */
+export function sideShort(tag: WindTag): string {
+  return tag === 'Cross-offshore' ? 'cross-off' : tag === 'Cross-onshore' ? 'cross-on' : tag === 'Cross' ? 'cross' : tag.toLowerCase()
+}
+
+/**
+ * The wind card's side line, short enough for two lines at most (Batch TRUTH,
+ * Section 4: "cross-shore until 9 AM" wrapped to three): the side now and,
+ * when it turns, what it turns to and when: "cross-off · offshore 9a".
+ */
+export function sideSpanWords(now: WindTag, change: { tag: WindTag; at: Date } | null, timeZone: string): string {
+  if (change === null) return `${sideWords(now)} all day`
+  const h = wallClock(change.at, timeZone)
+  const hour = h === null ? '' : ` ${h.hour === 0 ? 12 : h.hour > 12 ? h.hour - 12 : h.hour}${h.minute === 0 ? '' : `:${String(h.minute).padStart(2, '0')}`}${h.hour < 12 ? 'a' : 'p'}`
+  return `${sideShort(now)} · ${sideShort(change.tag)}${hour}`
 }
 
 /* ------------------------------------------------------------- the ground */
