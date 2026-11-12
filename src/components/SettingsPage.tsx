@@ -222,7 +222,7 @@ export function SettingsPage(props: Props) {
         <Row label="How it works" onClick={() => setFeedHow((v) => !v)} />
         {feedHow ? (
           <p className="set2__note" data-feed-how>
-            Off unless you switch it on. Your calendar app sends this spot, rounded to about a kilometre, to this app’s server each time it refreshes, about hourly. The server asks the forecast, and in the hour before a sunrise or sunset the weather stations by their ids, so a call that changes from Maybe to Go or Skip changes in your calendar too; it logs nothing. Vercel’s own request logs keep the request line for an hour. Turn it off here and remove the calendar in your calendar app to stop it.
+            Off unless you switch it on. Your calendar app sends this spot, rounded to about a kilometre, to this app’s server each time it refreshes, about hourly. The server asks the forecast, and in the three hours before a sunrise or sunset the weather stations by their ids, so a call that changes from Maybe to Go or Skip changes in your calendar too; it logs nothing. Vercel’s own request logs keep the request line for an hour. Turn it off here and remove the calendar in your calendar app to stop it.
           </p>
         ) : null}
         {!feed || feedHref === null ? null : (

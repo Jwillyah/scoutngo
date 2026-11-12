@@ -261,7 +261,10 @@ if (swapped === null) {
     const reg = await navigator.serviceWorker.getRegistration()
     const keys = (await (await caches.open('scoutngo-shell-v1')).keys()).map((r) => new URL(r.url).pathname)
     const text = await (await fetch('/sw.js', { cache: 'no-store' })).text()
-    return { active: !!reg?.active, waiting: !!reg?.waiting, installing: !!reg?.installing, served: /build (\\w+)/.exec(text)?.[1], keys }
+    /* Batch TRUTH: each kept asset's type, so an old build's path holding the document (shellRoutes.ts keepAsset) shows itself. */
+    const cache = await caches.open('scoutngo-shell-v1')
+    const types = await Promise.all(keys.filter((k) => k.startsWith('/assets/')).map(async (k) => k + ' ' + ((await cache.match(k))?.headers.get('content-type') ?? '?')))
+    return { active: !!reg?.active, waiting: !!reg?.waiting, installing: !!reg?.installing, served: /build (\\w+)/.exec(text)?.[1], keys, types }
   })()`)
   console.log(`  why: ${JSON.stringify(why)}`)
   problem('B was never cached with A dropped')

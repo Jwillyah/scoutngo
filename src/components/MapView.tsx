@@ -1,4 +1,5 @@
-import { paintShadows } from '../lib/shadowRaster.ts'
+import { paintShadows, shadowsWithin } from '../lib/shadowRaster.ts'
+import { shadowWorker } from '../lib/shadowPainter.ts'
 import type { ShadowMap } from '../core/shadowMap.ts'
 import { moonGlyphSvg } from '../lib/moonGlyph.ts'
 import { useNumerals } from '../lib/numeralsContext.ts'
@@ -670,7 +671,47 @@ function applyShadowPaint(instance: maplibregl.Map, paint: ShadowPaint | null): 
   const quick = paint?.quick === true
   if (painted !== null && painted.key === key && (quick || !painted.quick)) return
   painted = { key, quick }
-  const r = paint === null ? null : paintShadows(paint.map, paint.tint, shadowCanvas, quick ? SCRUB_PX : 2 * SCRUB_PX, within)
+  const maxPx = quick ? SCRUB_PX : 2 * SCRUB_PX
+  /*
+   * OFF THE MAIN THREAD where it can be (Batch TRUTH, Section 5;
+   * src/lib/shadowRaster.worker.ts): the job goes over, the picture comes back
+   * as a bitmap; only the newest job's answer is used.
+   */
+  const w = paint === null ? null : shadowWorker()
+  if (w !== null && paint !== null) {
+    shadowSeq += 1
+    const seq = shadowSeq
+    w.onmessage = (e: MessageEvent<{ seq: number; empty: boolean; bitmap?: ImageBitmap; coordinates?: ShadowRasterCoords; drawn?: number; ms?: number }>) => {
+      const d = e.data
+      if (d.seq !== shadowSeq) {
+        d.bitmap?.close()
+        return
+      }
+      if (d.empty || d.bitmap === undefined || d.coordinates === undefined) {
+        uploadShadows(instance, src, null)
+        return
+      }
+      const canvas = shadowCanvas
+      if (canvas === null) return
+      canvas.width = d.bitmap.width
+      canvas.height = d.bitmap.height
+      const ctx = canvas.getContext('2d')
+      ctx?.clearRect(0, 0, canvas.width, canvas.height)
+      ctx?.drawImage(d.bitmap, 0, 0)
+      d.bitmap.close()
+      uploadShadows(instance, src, { coordinates: d.coordinates, drawn: d.drawn ?? 0, ms: d.ms ?? 0 })
+    }
+    w.postMessage({ seq, shadows: shadowsWithin(paint.map, within), tint: paint.tint, maxPx, within })
+    return
+  }
+  const r = paint === null ? null : paintShadows(paint.map, paint.tint, shadowCanvas, maxPx, within)
+  uploadShadows(instance, src, r)
+}
+
+type ShadowRasterCoords = [[number, number], [number, number], [number, number], [number, number]]
+let shadowSeq = 0
+/** The painted picture onto the map: the layer shown or hidden, the source's corners, one upload. */
+function uploadShadows(instance: maplibregl.Map, src: maplibregl.CanvasSource & { play?: () => void; pause?: () => void }, r: { coordinates: ShadowRasterCoords; drawn: number; ms: number } | null): void {
   if (instance.getLayer('shadow-fill') !== undefined) instance.setLayoutProperty('shadow-fill', 'visibility', r === null ? 'none' : 'visible')
   if (r === null) return
   src.setCoordinates(r.coordinates)
@@ -691,7 +732,7 @@ function applyShadowPaint(instance: maplibregl.Map, paint: ShadowPaint | null): 
   if (new URLSearchParams(window.location.search).get('probe') === '1') {
     const w = window as unknown as { __shadowPaint?: { drawn: number; ms: number }; __shadowPaints?: number[] }
     w.__shadowPaint = { drawn: r.drawn, ms: r.ms }
-    ;(w as unknown as { __shadowCanvas?: HTMLCanvasElement }).__shadowCanvas = shadowCanvas
+    ;(w as unknown as { __shadowCanvas?: HTMLCanvasElement | null }).__shadowCanvas = shadowCanvas
     ;(w.__shadowPaints ??= []).push(r.ms)
   }
 }
@@ -821,7 +862,7 @@ interface MapViewProps {
    * satellite pixel covers, so it needs the real width rather than an assumed
    * phone. Reported from here because the map is the only thing that knows.
    */
-  onViewChange?: (zoom: number, widthPx: number) => void
+  onViewChange?: (zoom: number, widthPx: number, bounds?: { west: number; south: number; east: number; north: number }) => void
   /**
    * The airspace overlay, or null when it is off. A function of the view, so
    * the map redraws it on every pan from data already loaded. See
@@ -1726,7 +1767,8 @@ export function MapView({
      */
     let reportedLevel = Number.NaN
     const reportView = () => {
-      latestView.current?.(instance.getZoom(), instance.getCanvas().clientWidth)
+      const b = instance.getBounds()
+      latestView.current?.(instance.getZoom(), instance.getCanvas().clientWidth, { west: b.getWest(), south: b.getSouth(), east: b.getEast(), north: b.getNorth() })
     }
     instance.on('move', () => {
       const level = Math.floor(instance.getZoom())
@@ -1911,7 +1953,8 @@ export function MapView({
         type: 'fill',
         source: AIRSPACE_SOURCE,
         filter: ['all', ['in', ['get', 'kind'], ['literal', ['restricted', 'park']]], ['==', ['get', 'draw'], 'fill']],
-        paint: { 'fill-color': readToken('--hazard', '#ff3b30', container.current), 'fill-opacity': 0.14 },
+        /* Batch TRUTH, Section 5: about 15%, light enough zoomed out to read the map through. */
+        paint: { 'fill-color': readToken('--hazard', '#ff3b30', container.current), 'fill-opacity': 0.15 },
       })
       instance.addLayer({
         id: 'airspace-class-line',
@@ -1920,7 +1963,9 @@ export function MapView({
         filter: ['all', ['==', ['get', 'kind'], 'class'], ['==', ['get', 'draw'], 'line']],
         paint: {
           'line-color': readToken('--white', '#ffffff', container.current),
-          'line-width': 2.5,
+          /* Batch TRUTH, Section 5: thin at regional zoom, the dashed circles gone below about z9. */
+          'line-width': ['interpolate', ['linear'], ['zoom'], 8, 0.75, 12, 2.5],
+          'line-opacity': ['interpolate', ['linear'], ['zoom'], 8, 0, 9.5, 1],
           'line-dasharray': [3, 2],
         },
       })
@@ -1931,7 +1976,7 @@ export function MapView({
         filter: ['all', ['in', ['get', 'kind'], ['literal', ['restricted', 'park']]], ['==', ['get', 'draw'], 'line']],
         paint: {
           'line-color': readToken('--hazard', '#ff3b30', container.current),
-          'line-width': 3,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 7, 1, 12, 3],
         },
       })
 
@@ -2705,6 +2750,30 @@ export function MapView({
     [probeHandle, moveCamera],
   )
 
+  /*
+   * THE PIN CLEAR OF THE CONTROL COLUMN (Batch TRUTH, Section 5: it hid under
+   * the 3D button). After a move the app made (never a finger's), a pin under
+   * the column is panned out from under it.
+   */
+  useEffect(() => {
+    const instance = map.current
+    if (instance === null || !ready) return
+    const clear = (e: { originalEvent?: unknown }) => {
+      if (e.originalEvent !== undefined) return
+      const pin = venueMarker.current?.getElement().getBoundingClientRect()
+      const col = document.querySelector('.rail2')?.getBoundingClientRect()
+      if (pin === undefined || col === undefined || col.width === 0) return
+      const overlap = pin.right - col.left + 12
+      if (overlap > 0 && pin.left < col.right && pin.bottom > col.top && pin.top < col.bottom) {
+        moveCamera('pinClear', () => instance.panBy([overlap, 0], { duration: 200 }))
+      }
+    }
+    instance.on('moveend', clear)
+    return () => {
+      instance.off('moveend', clear)
+    }
+  }, [ready, moveCamera])
+
   /* --------------------------------------------------------- venue marker */
   useEffect(() => {
     const instance = map.current
@@ -2876,7 +2945,13 @@ export function MapView({
       const chrome = floatingChromeNodes(document, FLOATING_CHROME_SELECTORS).map((n) => n.getBoundingClientRect())
       /* And not under the status bar, from the home-screen icon (src/lib/safeArea.ts). */
       const statusBar = safeInsetTop()
+      /* Batch TRUTH, Section 5: a square's number half off the screen's edge ("250" clipped at the left) is drawn inside it. */
+      const inset = 6
+      const width = instance.getContainer().getBoundingClientRect()
       for (const tag of tags) {
+        const r0 = tag.getElement().getBoundingClientRect()
+        const dx = r0.left < width.left + inset ? width.left + inset - r0.left : r0.right > width.right - inset ? width.right - inset - r0.right : 0
+        if (dx !== 0) tag.setOffset([dx, 0])
         const r = tag.getElement().getBoundingClientRect()
         const under = r.top < statusBar || chrome.some((c) => r.left < c.right && r.right > c.left && r.top < c.bottom && r.bottom > c.top)
         tag.getElement().style.visibility = under ? 'hidden' : ''

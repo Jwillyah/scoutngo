@@ -1,3 +1,4 @@
+import { buildingsBox, type Box as BuildingsBox } from '../core/buildingsBox.ts'
 import { NetDebug } from './NetDebug.tsx'
 import { WindTimeBar } from './WindTimeBar.tsx'
 import { coastFacing } from '../lib/coast.ts'
@@ -1158,6 +1159,8 @@ export function PlanMode({
   const [buildingData, setBuildingData] = useState<GeoJSON.FeatureCollection | null>(null)
   /* The footprints themselves, for the shadows. Loaded for either switch. */
   const [buildingList, setBuildingList] = useState<Building[] | null>(null)
+  /* The box the buildings were last fetched for; moves with the view (Batch TRUTH, Section 5). */
+  const [buildingsArea, setBuildingsArea] = useState<BuildingsBox | null>(null)
   const wantBuildings = showBuildings || showSun
 
   useEffect(() => {
@@ -1173,14 +1176,8 @@ export function PlanMode({
       return
     }
     let live = true
-    /* A box around the venue, which is what the extrusion needs covering. */
-    const span = 0.01
-    void fetchBuildings({
-      west: venue.lon - span,
-      east: venue.lon + span,
-      south: venue.lat - span,
-      north: venue.lat + span,
-    }).then(
+    /* The venue's box and the view's, grown by the longest shadow (src/core/buildingsBox.ts); the extrusion needs the venue's covered too. */
+    void fetchBuildings(buildingsBox(null, venue, buildingsArea)).then(
       (result) => {
         if (!live) return
         if (result.status === 'ok') {
@@ -1204,7 +1201,7 @@ export function PlanMode({
     }
     /* mapZoom only matters for crossing the threshold, not every nudge. */
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wantBuildings, venue, mapZoom >= BUILDINGS_MIN_ZOOM, buildingsAttempt])
+  }, [wantBuildings, venue, mapZoom >= BUILDINGS_MIN_ZOOM, buildingsAttempt, buildingsArea])
 
   /* The kept 3D scan for this place, for Preflight's ground and surface (src/lib/preflight/heights.ts). */
   const [scanCtx, setScanCtx] = useState<ScanContext | null>(null)
@@ -2596,9 +2593,11 @@ export function PlanMode({
             onSelect={onSelectAndRaise}
             onPitchChange={setPitch}
             onBearingChange={setMapBearing}
-            onViewChange={(zoom: number, width: number) => {
+            onViewChange={(zoom: number, width: number, bounds?: BuildingsBox) => {
               setMapZoom(zoom)
               setMapWidth(width)
+              /* Batch TRUTH, Section 5: the buildings follow the view, and only when it leaves their box (src/core/buildingsBox.ts). */
+              if (bounds !== undefined && venue !== null) setBuildingsArea((cur) => buildingsBox(bounds, venue, cur))
             }}
             bottomInset={sheetHeight}
           />

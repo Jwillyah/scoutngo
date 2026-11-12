@@ -17,6 +17,7 @@ import {
   SHELL_DOCUMENT,
   SHELL_PUBLIC,
   installAssets,
+  keepAsset,
   staleShellEntries,
 } from './shellRoutes.ts'
 
@@ -109,7 +110,8 @@ async function asset(request: Request): Promise<Response> {
   const saved = await cache.match(request)
   if (saved !== undefined) return saved
   const response = await fetch(request)
-  if (response.ok) await cache.put(request, response.clone())
+  /* A missing file answered with the document is passed on, never kept (shellRoutes.ts keepAsset). */
+  if (keepAsset(response)) await cache.put(request, response.clone())
   return response
 }
 

@@ -660,3 +660,16 @@ html:has(.mode-plan),
 html:has(.mode-plan) body {
   background: linear-gradient(180deg, var(--d-night-top), var(--d-night-low));
 }
+
+/* Batch TRUTH, Section 5: nothing drawn under the status bar on the map (airspace polygons ran up under the clock); the band is the sheet's glass. */
+.mode-plan::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 5;
+  height: var(--safe-top, 0px);
+  background: var(--d-card-solid);
+  pointer-events: none;
+}

@@ -31,12 +31,19 @@ const outAt = process.argv.indexOf('--out')
 const OUT = outAt > 0 ? process.argv[outAt + 1] : `measurements/${new Date().toISOString().slice(0, 10)}-shadow-fps.md`
 const PORT = 5390
 const THROTTLE = Number(process.env.SCOUTNGO_THROTTLE ?? 4)
+const AT = process.env.SCOUTNGO_AT ?? '2026-10-29T19:00:00Z'
+/* The plan's day and window round the page clock, in the pier's zone (EDT/EST), so the bar opens at it. */
+const atLocal = new Date(new Date(AT).toLocaleString('en-US', { timeZone: 'America/New_York' }))
+const pad = (n) => String(n).padStart(2, '0')
+const AT_DAY = `${atLocal.getFullYear()}-${pad(atLocal.getMonth() + 1)}-${pad(atLocal.getDate())}`
+const AT_START = `${pad(atLocal.getHours())}:00`
+const AT_END = `${pad(Math.min(23, atLocal.getHours() + 2))}:00`
 /* The Virginia Beach oceanfront by the pier: hotels, many buildings with heights in the recorded tiles. */
 const COLISEUM = { lat: 36.8435575, lon: -75.9713104 }
 const server = spawn(process.execPath, ['scripts/gate/server.mjs'], { env: { ...process.env, SCOUTNGO_GATE_DIST: DIST, SCOUTNGO_GATE_APP_PORT: String(PORT), SCOUTNGO_GATE_PROXY_PORT: String(PORT + 1) }, stdio: 'ignore' })
 await new Promise((r) => setTimeout(r, 2500))
 const APP = `http://127.0.0.1:${PORT}`
-const venue = { ...CALIBRATION_VENUE, name: { key: placeKey(String(COLISEUM.lat), String(COLISEUM.lon)), name: 'Virginia Beach Fishing Pier' }, latitude: String(COLISEUM.lat), longitude: String(COLISEUM.lon), date: '2026-10-29', startTime: '15:00', endTime: '17:00' }
+const venue = { ...CALIBRATION_VENUE, name: { key: placeKey(String(COLISEUM.lat), String(COLISEUM.lon)), name: 'Virginia Beach Fishing Pier' }, latitude: String(COLISEUM.lat), longitude: String(COLISEUM.lon), date: AT_DAY, startTime: AT_START, endTime: AT_END }
 const url = new URL(await shareLink(`${APP}/`, { id: 'sf', name: 'Shadow fps', savedAt: '2026-10-29T00:00:00Z', venue, kit: { bodyIds: [], lensIds: [], droneIds: [], styleNotes: '' }, positions: [] }))
 url.searchParams.set('probe', '1')
 
@@ -48,7 +55,8 @@ try {
   const page = await ctx.newPage()
   const wait = (ms) => page.waitForTimeout(ms)
   const ev = (x) => page.evaluate(x)
-  await page.clock.install({ time: new Date('2026-10-29T19:00:00Z') })
+  /* SCOUTNGO_AT: the page clock (Batch TRUTH: 2026-11-12T11:59:00Z, the 6:59 AM low sun the seams showed in). */
+  await page.clock.install({ time: new Date(AT) })
   await page.clock.resume()
   await page.goto(url.href)
   await wait(3500)
@@ -102,7 +110,7 @@ try {
 
 const r = (x) => (x === null ? '—' : x.toFixed(1))
 lines.push('# The shadows while the time bar is scrubbed', '')
-lines.push(`Run ${new Date().toISOString()} · \`node scripts/measure-shadow-fps.mjs ${DIST}\` · Chromium (Pixel 7) 412 x 915, ${THROTTLE === 1 ? "CPU not slowed" : `CPU slowed ${THROTTLE}x (a mid-range Android stand-in)`} · the Virginia Beach oceanfront at zoom 16.5, page clock 2026-10-29T19:00:00Z · the gate's server and fixture proxy, nothing live.`, '')
+lines.push(`Run ${new Date().toISOString()} · \`node scripts/measure-shadow-fps.mjs ${DIST}\` · Chromium (Pixel 7) 412 x 915, ${THROTTLE === 1 ? "CPU not slowed" : `CPU slowed ${THROTTLE}x (a mid-range Android stand-in)`} · the Virginia Beach oceanfront at zoom ${Number(process.env.SCOUTNGO_ZOOM ?? 16.5)}, page clock ${AT} · the gate's server and fixture proxy, nothing live · the raster painted ${process.env.SCOUTNGO_PAINTER ?? 'where the build paints it'}.`, '')
 lines.push(`- building shadows painted: ${result.drawn ?? 'not reported by this build (before the painted shadows, its shadows were map polygons)'}`)
 lines.push(`- frames while scrubbing: ${result.frames} in ${r(result.seconds)} s, ${r(result.fps)} fps`)
 lines.push(`- frame time: median ${r(result.p50)} ms, 95th percentile ${r(result.p95)} ms, worst ${r(result.worst)} ms`)

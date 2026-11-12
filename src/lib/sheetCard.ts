@@ -136,7 +136,12 @@ export const TIME_MATTERS: Record<CardKind, boolean> = {
   /* A plan for a night, not a reading at the bar's moment. */
   moonrise: false,
   hazards: false,
-  airspace: false,
+  /*
+   * THE TIME SLIDER STAYS WITH THE AIRSPACE LAYER (Batch TRUTH, Section 5):
+   * turning it or the LAANC grid on opens this card, and the sheet went blank,
+   * no time slider, nothing to get back to the time with.
+   */
+  airspace: true,
   /* Written for the whole window, not the moment on the bar. */
   callsheet: false,
   /* The move is flown at a time: the bar sets the light it is played in. */

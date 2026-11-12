@@ -71,6 +71,9 @@ function venueParts(at: Date, timeZone: string): { date: string; time: string } 
   return { date, time: formatClock(at, timeZone, 24) }
 }
 
+/** While the ruler is held or coasting, the plan is told the time at most this often (ms); the shadows follow every frame. */
+export const SCRUB_COMMIT_MS = 250
+
 export function TimeBar({ at, lat, lon, timeZone, moon, onAt, onReset, onHoldReset }: TimeBarProps) {
   /* The ↺: a tap is Back to now, a hold the shoot window; the first tap shows that once. */
   const holdTimer = useRef<number | null>(null)
@@ -151,6 +154,8 @@ export function TimeBar({ at, lat, lon, timeZone, moon, onAt, onReset, onHoldRes
 
   /* ------------------------------------------------- the ruler, by hand */
   const sent = useRef(0)
+  /* When the plan was last told the time (performance.now()). */
+  const committed = useRef(0)
   const quarter = useRef(Math.floor(at.getTime() / QUARTER))
   /** Puts the ruler at a time: the drawing slid, the label rewritten, the app told once a frame. */
   const show = (t: number) => {
@@ -169,12 +174,25 @@ export function TimeBar({ at, lat, lon, timeZone, moon, onAt, onReset, onHoldRes
       ;(navigator as Navigator & { vibrate?: (ms: number) => boolean }).vibrate?.(4)
     }
     if (sent.current === 0) {
-      sent.current = requestAnimationFrame(() => {
+      /*
+       * NOT EVERY MINUTE WHILE THE FINGER MOVES (Batch TRUTH, Section 5: 32 fps
+       * at 4x slowdown, the plan rendering each minute). The shadows and the
+       * sun follow the needle every frame on their own (publishLiveTime); the
+       * plan hears the time at most every SCRUB_COMMIT_MS while the ruler is
+       * held or coasting, and at once when it stops (finish).
+       */
+      const tick = () => {
+        if (busy.current && performance.now() - committed.current < SCRUB_COMMIT_MS) {
+          sent.current = requestAnimationFrame(tick)
+          return
+        }
         sent.current = 0
+        committed.current = performance.now()
         const next = new Date(Math.round(live.current / MINUTE) * MINUTE)
         sentAt.current = next.getTime()
         startTransition(() => onAt(next))
-      })
+      }
+      sent.current = requestAnimationFrame(tick)
     }
     /* A screen's width from the drawing's centre: redraw round here. */
     if (Math.abs(t - anchorAt.current) * pxPerMs > width * 0.9) setAnchor(new Date(t))
@@ -206,6 +224,8 @@ export function TimeBar({ at, lat, lon, timeZone, moon, onAt, onReset, onHoldRes
 
   const finish = () => {
     busy.current = false
+    if (sent.current !== 0) cancelAnimationFrame(sent.current)
+    sent.current = 0
     const final = new Date(Math.round(live.current / MINUTE) * MINUTE)
     sentAt.current = final.getTime()
     onAt(final)

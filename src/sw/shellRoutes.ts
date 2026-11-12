@@ -110,3 +110,20 @@ export function staleShellEntries(cachedPaths: readonly string[], current: reado
 export const isLazy3d = (_path: string): boolean => false
 
 export const installAssets = (assets: readonly string[]): string[] => assets.filter((path) => !isLazy3d(path))
+
+/*
+ * AN ASSET ANSWERED WITH THE APP'S DOCUMENT IS A MISSING FILE, NEVER KEPT
+ * (Batch TRUTH, Section 5: the service-worker audit's "B was never cached
+ * with A dropped"). A build's hashed file asked for after a newer build is
+ * deployed is not there any more, and the host's fallback answers it with
+ * index.html, 200. The old worker kept that under the old file's path, in
+ * the shell cache the new worker had just cleaned: an old-build entry back
+ * after the cleanup, and the new worker held waiting while the old one
+ * finished. In the audit it came from the hang step: the held requests were
+ * cut when the signal "came back", the browser retried them, and the server,
+ * by then serving B, answered A's missing chunk with B's document.
+ */
+export function keepAsset(response: { ok: boolean; headers: { get(name: string): string | null } }): boolean {
+  if (!response.ok) return false
+  return !/text\/html/i.test(response.headers.get('content-type') ?? '')
+}

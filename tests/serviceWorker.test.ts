@@ -152,3 +152,17 @@ it('keeps offline field packs in localStorage', () => {
   expect(source).toContain('localStorage')
   expect(source).not.toMatch(/caches\s*\.\s*open|CacheStorage|serviceWorker/)
 })
+
+describe('an asset answered with the document is never kept (Batch TRUTH, Section 5)', () => {
+  it('a hashed file gone after a deploy, answered by the host\'s fallback with index.html, is not cached under the file\'s path', async () => {
+    const { keepAsset } = await import('../src/sw/shellRoutes.ts')
+    const r = (status: number, type: string) => new Response('x', { status, headers: { 'content-type': type } })
+    expect(keepAsset(r(200, 'text/javascript'))).toBe(true)
+    expect(keepAsset(r(200, 'text/css'))).toBe(true)
+    expect(keepAsset(r(200, 'text/html; charset=utf-8'))).toBe(false)
+    expect(keepAsset(r(404, 'text/javascript'))).toBe(false)
+  })
+  it('the worker asks it before keeping an asset', () => {
+    expect(readFileSync('src/sw/sw.ts', 'utf8')).toMatch(/if \(keepAsset\(response\)\) await cache\.put\(request, response\.clone\(\)\)/)
+  })
+})

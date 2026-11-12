@@ -14467,47 +14467,50 @@
   top: calc(var(--safe-top) + 150px);
   max-width: var(--page-max);
   margin: 0 auto;
-  display: grid;
+  /* Batch TRUTH, Section 5: one line, its two actions at the end. */
+  display: flex;
+  align-items: center;
   gap: var(--space-1);
-  padding: var(--space-3);
-  border-radius: var(--radius-panel);
+  padding: 4px 4px 4px var(--space-3);
+  border-radius: 999px;
   background: var(--panel-sheen);
   border: var(--line-hair) solid var(--color-edge-top);
   color: var(--color-text);
 }
 
-.nearyou__title {
+.nearyou__line {
+  flex: 1 1 auto;
+  min-width: 0;
   margin: 0;
+  overflow: hidden;
   font-size: var(--text-sm);
   font-weight: var(--weight-heavy);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-.nearyou__list {
-  display: grid;
-  gap: var(--space-1);
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.nearyou__more {
+  font-weight: 400;
+  opacity: 0.75;
 }
 
-.nearyou__item,
+.nearyou__go,
 .nearyou__not {
-  width: 100%;
+  flex: 0 0 auto;
   min-height: 44px;
   padding: 0 var(--space-3);
   border: var(--line-hair) solid var(--color-line);
-  border-radius: var(--radius-panel);
+  border-radius: 999px;
   background: transparent;
   color: var(--color-text);
   font: inherit;
   font-size: var(--text-sm);
-  text-align: left;
 }
 
-.nearyou__not {
-  width: auto;
-  justify-self: end;
-  border-radius: 999px;
+.nearyou__go {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: transparent;
 }
 
 /*

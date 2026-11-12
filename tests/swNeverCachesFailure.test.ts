@@ -13,7 +13,8 @@ describe('the service worker caches only good answers', () => {
     expect(puts.length).toBeGreaterThan(0)
     for (const at of puts) {
       const before = src.slice(Math.max(0, at - 260), at)
-      expect(before, src.slice(at, at + 80)).toMatch(/\.ok\)|!\w+\.ok\)/)
+      /* keepAsset (src/sw/shellRoutes.ts) checks .ok first, then that an asset is not the document (Batch TRUTH). */
+      expect(before, src.slice(at, at + 80)).toMatch(/\.ok\)|!\w+\.ok\)|keepAsset\(/)
     }
   })
 })

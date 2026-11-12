@@ -18,7 +18,7 @@
  * shadow"); this only draws them. Local metres around the shadows' middle,
  * so a few hundred metres either way stay square.
  */
-import type { ShadowMap } from '../core/shadowMap.ts'
+import type { BuildingShadow, ShadowMap } from '../core/shadowMap.ts'
 import { FADE_STOPS, fadeLength, FEATHER_M, rasterScale, SHADOW_OPACITY } from '../core/shadowFade.ts'
 
 const M_PER_DEG = 111_320
@@ -39,22 +39,40 @@ const rgbOf = (tint: string): [number, number, number] => {
 
 let mask: HTMLCanvasElement | null = null
 
+/** What a shadow needs to be painted: what the worker is sent (src/lib/shadowRaster.worker.ts). */
+export type RasterShadow = Pick<BuildingShadow, 'hull' | 'footprint' | 'bearing' | 'lengthMeters' | 'heightMeters'>
+export interface Within {
+  west: number
+  south: number
+  east: number
+  north: number
+}
+/* A canvas on the page or off it (the worker's); the drawing calls are the same. */
+type AnyCanvas = HTMLCanvasElement | OffscreenCanvas
+type Ctx2d = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D
+
+/** The shadows in view (and a margin), as the painter takes them. */
+export function shadowsWithin(map: ShadowMap | null, within: Within | null): RasterShadow[] {
+  if (map === null || map.status !== 'ok') return []
+  const all = within === null ? map.shadows : map.shadows.filter((sh) => sh.hull.some(([x, y]) => x >= within.west && x <= within.east && y >= within.south && y <= within.north))
+  return all.map((sh) => ({ hull: sh.hull, footprint: sh.footprint, bearing: sh.bearing, lengthMeters: sh.lengthMeters, heightMeters: sh.heightMeters }))
+}
+
 /**
  * Paints `map`'s shadows onto `canvas` and returns where it lies, or null
  * when there is nothing to draw (the canvas is then cleared).
  */
-export function paintShadows(map: ShadowMap | null, tint: string, canvas: HTMLCanvasElement, maxPx = 1024, within: { west: number; south: number; east: number; north: number } | null = null): ShadowRaster | null {
+export function paintShadows(map: ShadowMap | null, tint: string, canvas: HTMLCanvasElement, maxPx = 1024, within: Within | null = null): ShadowRaster | null {
+  mask ??= document.createElement('canvas')
+  return paintRaster(shadowsWithin(map, within), tint, canvas, mask, maxPx, within)
+}
+
+/** The painting itself, on any canvas: the page's, or the worker's OffscreenCanvas. */
+export function paintRaster(shadows: readonly RasterShadow[], tint: string, canvas: AnyCanvas, maskCanvas: AnyCanvas, maxPx = 1024, within: Within | null = null): ShadowRaster | null {
   const t0 = performance.now()
   /* Read back every paint (the tint goes into the alpha): kept on the CPU, no GPU readback. */
-  const out = canvas.getContext('2d', { willReadFrequently: true })
+  const out = canvas.getContext('2d', { willReadFrequently: true }) as Ctx2d | null
   if (out === null) return null
-  /* Only the shadows in view (and a margin): the pixels go where they are seen, half a metre each near the ground. */
-  const shadows =
-    map === null || map.status !== 'ok'
-      ? []
-      : within === null
-        ? map.shadows
-        : map.shadows.filter((sh) => sh.hull.some(([x, y]) => x >= within.west && x <= within.east && y >= within.south && y <= within.north))
   if (shadows.length === 0) {
     out.clearRect(0, 0, canvas.width, canvas.height)
     return null
@@ -95,10 +113,9 @@ export function paintShadows(map: ShadowMap | null, tint: string, canvas: HTMLCa
   const py = (lat: number) => ((n - lat) * M_PER_DEG) / mpp
 
   /* The mask: black, each shadow in grey by its darkness, the greater kept. */
-  mask ??= document.createElement('canvas')
-  mask.width = W
-  mask.height = H
-  const g = mask.getContext('2d')
+  maskCanvas.width = W
+  maskCanvas.height = H
+  const g = maskCanvas.getContext('2d') as Ctx2d | null
   if (g === null) return null
   g.globalCompositeOperation = 'source-over'
   g.fillStyle = '#000'
@@ -138,7 +155,7 @@ export function paintShadows(map: ShadowMap | null, tint: string, canvas: HTMLCa
   canvas.height = H
   out.clearRect(0, 0, W, H)
   out.filter = `blur(${Math.max(0.5, FEATHER_M / mpp).toFixed(2)}px)`
-  out.drawImage(mask, 0, 0)
+  out.drawImage(maskCanvas, 0, 0)
   out.filter = 'none'
   const img = out.getImageData(0, 0, W, H)
   const d = img.data
