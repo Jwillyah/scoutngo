@@ -634,3 +634,11 @@
   text-overflow: ellipsis;
   cursor: pointer;
 }
+
+/* Batch TRUTH, Section 3: "14 kt at 400 ft" on the drone card; the height smaller than the number. */
+.hday--d .hcard__at {
+  font-size: var(--text-xs);
+  font-weight: 400;
+  opacity: 0.75;
+  white-space: nowrap;
+}

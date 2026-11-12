@@ -111,6 +111,8 @@ function openMeteo(u) {
 /** NOAA: one station by the pier; highs and lows every 6 h 12 m, and the curve between them. */
 function noaa(u) {
   if (u.pathname.includes('/mdapi/')) return { stations: [{ id: 'TEST001', name: 'Virginia Beach pier (audit)', lat: PIER.lat + 0.002, lng: PIER.lon, state: 'VA' }] }
+  /* Batch TRUTH, Section 3: a coastal station's latest wind (src/lib/nearWind.ts), no dates asked. */
+  if (u.searchParams.get('product') === 'wind') return { error: { message: 'No data was found (audit)' } }
   const day = (s) => Date.UTC(+s.slice(0, 4), +s.slice(4, 6) - 1, +s.slice(6, 8))
   const begin = day(u.searchParams.get('begin_date'))
   const end = day(u.searchParams.get('end_date')) + 86_400_000

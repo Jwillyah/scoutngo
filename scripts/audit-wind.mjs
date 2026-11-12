@@ -148,7 +148,8 @@ try {
       if (w.dial === null || Math.abs(Number(w.dial) - 180) > 5) fail(`${label}: the dial's arrow does not point south for a north wind (to ${w.dial})`)
       if (w.arrows.length < 6 || !w.arrows.every((t) => /rotate\((17[5-9]|18[0-5])(\.\d+)?\)/.test(t ?? ''))) fail(`${label}: the 12 hours' arrows do not all point south: ${JSON.stringify(w.arrows.slice(0, 3))}`)
       if (!w.tiles.some((t) => /At 400 ft.*over rated/.test(t))) fail(`${label}: the 400 ft tile does not say it is over the Air 3S's rating: ${JSON.stringify(w.tiles)}`)
-      if (!w.tiles.some((t) => /Station KNTU.*NNE/.test(t))) fail(`${label}: the station's 02007KT is not shown as KNTU from the NNE: ${JSON.stringify(w.tiles)}`)
+      /* Batch TRUTH, Section 3: "Nearest station · 7 kt NNE · KNTU · 34 min ago". */
+      if (!w.tiles.some((t) => /Nearest station.*NNE.*KNTU · \d+ (min|h)/.test(t))) fail(`${label}: the station's 02007KT is not shown as KNTU from the NNE with its age: ${JSON.stringify(w.tiles)}`)
       if (!w.tiles.some((t) => /Models/.test(t))) fail(`${label}: no models tile`)
       if (/\bsafe\b/i.test(w.text)) fail(`${label}: the page says safe`)
       if (w.wide) fail(`${label}: something runs past 390 px`)

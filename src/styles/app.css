@@ -19251,3 +19251,12 @@ a.about__row * {
   font-size: var(--text-xs);
   color: rgb(255 255 255 / 0.65);
 }
+
+/* Batch TRUTH, Section 3: the nearest station's tile is the widest, its name and age on two lines if they must. */
+.dwind__tile--near {
+  flex: 1.6 1 0;
+}
+.dwind__tile--near .dwind__line {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

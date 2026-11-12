@@ -729,7 +729,13 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
     /* Batch Flow, Section 5: the Drone page first. */
     target = 'drone'
     const w = day === null ? null : nearest(day.wind, t)
-    big = w?.highMps == null ? '—' : `${speed(w.highMps)} ${unit}`
+    /* Batch TRUTH, Section 3: the number says where it is, so 14 kt up here never reads as a contradiction of the Wind card's 7 kt on the ground. */
+    big = w?.highMps == null ? '—' : (
+      <>
+        {speed(w.highMps)} {unit}
+        <span className="hcard__at"> at 400 ft</span>
+      </>
+    )
     tag = drone === null || w === null ? null : droneTag(w.highMps, drone.maxWindMps)
     /*
      * Batch Polish 2, Section 2: the 400 ft wind over the next 24 hours with

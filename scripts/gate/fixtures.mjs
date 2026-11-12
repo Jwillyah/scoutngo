@@ -111,6 +111,11 @@ function noaa(u) {
       ],
     }
   }
+  /* Batch TRUTH, Section 3: a coastal station's latest wind (src/lib/nearWind.ts), 8 kt SW at the fixture's now. */
+  if (u.searchParams.get('product') === 'wind') {
+    const t = new Date(FIXTURE_NOW.getTime() - 6 * 60_000).toISOString().slice(0, 16).replace('T', ' ')
+    return { metadata: { id: u.searchParams.get('station') ?? '', name: 'fixture', lat: '0', lon: '0' }, data: [{ t, s: '8.00', d: '225.0', dr: 'SW', g: '11.00', f: '0,0' }] }
+  }
   const begin = u.searchParams.get('begin_date')
   const end = u.searchParams.get('end_date')
   const t0 = begin ? ymd(begin) : Date.parse(FIXTURE_NOW.toISOString().slice(0, 10))

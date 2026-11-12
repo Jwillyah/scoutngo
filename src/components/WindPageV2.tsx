@@ -1,3 +1,4 @@
+import { agoWords, MAX_AGE_MS } from '../lib/nearWind.ts'
 import { useEffect, useState } from 'react'
 import type { LatLon } from '../core/geo.ts'
 import { squareThumbUrl } from '../lib/thumb.ts'
@@ -121,7 +122,7 @@ export function WindPageV2({ venue, placeName, timeZone, units, ground, onBack, 
           </button>
         </div>
       )}
-      <WindContent now={now} data={loaded} facing={face} placeName={placeName} timeZone={timeZone} units={units} drone={drone} shared={shared} photo={squareThumbUrl(venue)} />
+      <WindContent now={now} data={loaded} facing={face} placeName={placeName} timeZone={timeZone} units={units} drone={drone} shared={shared} photo={squareThumbUrl(venue)} near={stationObs} />
     </DetailShell>
   )
 }
@@ -131,7 +132,7 @@ const STRIP_HOURS = 12
 /** One arrow every this many hours across the twelve: six, as on the board. */
 const STRIP_STEP = 2
 
-export function WindContent({ now, data, facing, placeName, timeZone, units, drone, shared = null, photo = null }: { now: Date; data: WindData | null; facing: FacingState; placeName: string; timeZone: string; units: Units; drone: { name: string; maxWindMps: number | null } | null; shared?: WindNow | null; photo?: string | null }) {
+export function WindContent({ now, data, facing, placeName, timeZone, units, drone, shared = null, photo = null, near = null }: { now: Date; data: WindData | null; facing: FacingState; placeName: string; timeZone: string; units: Units; drone: { name: string; maxWindMps: number | null } | null; shared?: WindNow | null; photo?: string | null; near?: StationNow | null }) {
   const unit = units.wind
   const say = (mps: number | null) => {
     const v = windIn(mps, unit)
@@ -183,7 +184,11 @@ export function WindContent({ now, data, facing, placeName, timeZone, units, dro
   const flip = windFlip(hours)
   const shown = hours.filter((_, k) => k % STRIP_STEP === 0)
   const at400 = models.byLevel['120m'][i]
-  const station = data.measured.find((m) => !m.source.startsWith('buoy')) ?? null
+  /* The page's own measured list, only when fresh; the nearest-freshest station first. */
+  const listed = data.measured.find((m) => !m.source.startsWith('buoy')) ?? null
+  const station = listed !== null && now.getTime() - listed.at.getTime() <= MAX_AGE_MS ? listed : null
+  const nearNow = near !== null && now.getTime() - near.at.getTime() <= MAX_AGE_MS ? near : null
+  const tileObs = nearNow ?? station
   const agree = modelsAgreeing(
     Object.values(models.perModel).map((s) => s[i] ?? null),
     hour.median,
@@ -196,7 +201,8 @@ export function WindContent({ now, data, facing, placeName, timeZone, units, dro
         {kicker}
         <p className="dhead__big" data-shared="wind" data-value={windWords(shared ?? { mps: hour.median ?? 0, fromDeg: hour.from, gustMps: hour.gust }, unit) ?? ''}>
           {say(shared?.mps ?? hour.median)}
-          {kind === null ? null : <span className={`dwind__tag dwind__tag--${kind}`}>{KIND_WORD[kind]}</span>}
+          {/* Batch TRUTH, Section 3: the tag is the headline wind's side (the one wind now), the same as the line under it; it read "cross-onshore" over "offshore". */}
+          {headKind === null ? null : <span className={`dwind__tag dwind__tag--${headKind}`}>{KIND_WORD[headKind]}</span>}
         </p>
         <p className="dhead__line" data-wind-headline>
           {headFrom === null ? (isCalm(shared?.mps ?? hour.median) ? 'Light and variable' : 'No one direction') : `from the ${compassPoint(headFrom)}`}
@@ -245,10 +251,11 @@ export function WindContent({ now, data, facing, placeName, timeZone, units, dro
             {rated !== null && overRated(at400?.median ?? null, rated) ? <p className="dwind__line">over rated {say(rated)}</p> : null}
           </div>
         )}
-        <div className="dwind__tile">
-          <p className="dcard__label">{station === null ? 'Station' : `Station ${station.source}`}</p>
-          <p className="dwind__big">{station === null ? '—' : `${say(station.mps)}${station.fromDeg === null ? '' : ` ${compassPoint(station.fromDeg)}`}`}</p>
-          <p className="dwind__line">{station === null ? 'none answered' : formatClock(station.at, timeZone)}</p>
+        <div className="dwind__tile dwind__tile--near">
+          {/* Batch TRUTH, Section 3: the freshest of the nearest three (src/lib/nearWind.ts), its age, none past 75 minutes. */}
+          <p className="dcard__label dwind__nearlabel">Nearest station</p>
+          <p className="dwind__big" data-near={nearNow?.label ?? station?.source ?? ''}>{tileObs === null ? '—' : `${say(tileObs.mps)}${tileObs.fromDeg === null ? '' : ` ${compassPoint(tileObs.fromDeg)}`}`}</p>
+          <p className="dwind__line">{nearNow === null ? (station === null ? 'none answered' : `${station.source} · ${agoWords(station.at, now)}`) : `${nearNow.label} · ${agoWords(nearNow.at, now)}`}</p>
         </div>
         <div className="dwind__tile">
           <p className="dcard__label">Models</p>
@@ -318,7 +325,7 @@ export function WindHow({ now, data, facing, unit, lean = null, timeZone = 'UTC'
     <>
       {/* Batch MAP2, Section 2. */}
       <p>
-        Now: the forecast's wind{lean === null ? ', no station within 15 km reported in the last hour.' : `, leaned toward ${lean.id}'s report at ${formatClock(lean.at, timeZone)} (${formatWind(lean.mps, unit)}); the lean fades back to the forecast over three hours.`}
+        Now: the forecast's wind{lean === null ? ', none of the three stations nearest (within 30 km, airports and NOAA coastal) reported in the last 75 minutes.' : `, leaned toward ${lean.label}'s report at ${formatClock(lean.at, timeZone)} (${formatWind(lean.mps, unit)}), the freshest of the three stations nearest; the lean fades back to the forecast over three hours.`}
       </p>
       <p>Models: {WIND_MODELS.map((m) => MODEL_NAME[m]).join(', ')}, through Open-Meteo: the next 12 hours and the spread are their median (the big number is the wind now, above). “Agree”: a model’s ground speed within {formatWind(AGREE_MPS, unit)} of that median.</p>
       <p>Direction: the circular mean of where the models say it comes from. Arrows point where it goes. Gusts: the highest any model gives.</p>

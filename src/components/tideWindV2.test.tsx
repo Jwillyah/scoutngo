@@ -152,7 +152,9 @@ describe('WindContent', () => {
     expect(html).toContain('Turns onshore around 1 PM')
   })
   it('shows the station and the models; 400 ft only with a drone', () => {
-    expect(html).toContain('Station KNTU')
+    /* Batch TRUTH, Section 3: "Nearest station", its name and age under the reading. */
+    expect(html).toContain('Nearest station')
+    expect(html).toMatch(/KNTU · \d+ min ago/)
     expect(html).toContain('4 kt NW')
     expect(html).toContain('4 of 5')
     expect(html).not.toContain('At 400 ft')

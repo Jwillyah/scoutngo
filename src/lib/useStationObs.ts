@@ -1,22 +1,27 @@
 /*
- * THE STATION NEAR THE SPOT, NOW (Batch MAP2, Section 2). An airport station
- * (ASOS/AWOS, the bundled list) within 15 km of the spot, and its latest
- * report when it is under an hour old: what src/core/nowcast.ts leans "now"
- * toward. Only the station's id is asked (src/lib/stationNear.ts); again
+ * THE STATION NEAR THE SPOT, NOW (Batch MAP2, Section 2; Batch TRUTH,
+ * Section 3). The freshest of the nearest three stations within 30 km,
+ * airports and NOAA's coastal stations alike (src/lib/nearWind.ts), when
+ * under 75 minutes old: what src/core/nowcast.ts leans "now" toward and what
+ * the Wind page says. The sky and visibility for the one sky word come from
+ * the freshest airport report among them. Only station ids are asked; again
  * every 10 minutes while a screen shows it.
  */
 import { useEffect, useState } from 'react'
 import type { LatLon } from '../core/geo.ts'
-import { NOWCAST_STATION_KM, type StationObs } from '../core/nowcast.ts'
+import type { StationObs } from '../core/nowcast.ts'
 import type { MetarSky } from '../core/metar.ts'
-import { metarVisMiles } from '../core/skyWord.ts'
-import { nearestStation, stationReport, stationWind } from './stationNear.ts'
+import { freshest, nearWind, type NearStation } from './nearWind.ts'
 
 const KT = 0.514444
 
 export interface StationNow extends StationObs {
   id: string
-  /** The same report's sky and visibility, for the one sky word (src/core/skyWord.ts). */
+  /** What the page calls it: "KNTU", "Cape Henry". */
+  label: string
+  kind: NearStation['kind']
+  km: number
+  /** The freshest airport report's sky and visibility, for the one sky word (src/core/skyWord.ts). */
   sky: MetarSky | null
   visMi: number | null
 }
@@ -28,15 +33,18 @@ export function useStationObs(spot: LatLon | null): StationNow | null {
     if (spot === null || key === null) return
     let live = true
     const ask = async () => {
-      const s = await nearestStation(spot, NOWCAST_STATION_KM).catch(() => null)
-      if (s === null) {
-        if (live) setObs({ key, v: null })
-        return
-      }
-      const w = await stationWind(s.id).catch(() => null)
-      const r = await stationReport(s.id).catch(() => null)
-      const at = w === null ? null : new Date(w.at)
-      if (live) setObs({ key, v: w === null || at === null || !Number.isFinite(at.getTime()) ? null : { id: s.id, at, mps: w.kt * KT, fromDeg: w.fromDeg, gustMps: w.gustKt === null ? null : w.gustKt * KT, sky: r?.sky ?? null, visMi: r === null ? null : metarVisMiles(r.raw) } })
+      const now = new Date()
+      const got = await nearWind(spot, now).catch(() => null)
+      const best = got?.best ?? null
+      const air = got === null ? null : freshest(got.readings.filter((r) => r?.station.kind === 'airport'), now)
+      if (live)
+        setObs({
+          key,
+          v:
+            best === null
+              ? null
+              : { id: best.station.id, label: best.station.label, kind: best.station.kind, km: best.station.km, at: best.at, mps: best.kt * KT, fromDeg: best.fromDeg, gustMps: best.gustKt === null ? null : best.gustKt * KT, sky: air?.sky ?? null, visMi: air?.visMi ?? null },
+        })
     }
     void ask()
     const t = setInterval(() => void ask(), 10 * 60_000)
