@@ -161,3 +161,102 @@ export function distanceWords(from: LatLon, to: LatLon, miles: boolean): string 
 
 /** A point at a bearing and distance, for tests and the map's labels. */
 export const offset = (at: LatLon, bearingDeg: number, km: number): LatLon => destinationPoint(at, bearingDeg, km * 1000)
+
+/*
+ * WHO SEES THE PATCH (Batch BEST SKY, Section 2). Cloud overhead lights up
+ * for anyone under it; the low glow on the horizon needs a view open toward
+ * the sun. Water in front (the reflection) and a silhouette (a bridge, a
+ * pier) are small bonuses. Distance and bearing are straight lines from you,
+ * worked out here.
+ */
+export interface SpotIn {
+  id: string
+  name: string
+  at: LatLon
+  /** The bearing the open view faces; null when not known (then the sky overhead only). */
+  facing: number | null
+  openDeg: number
+  water: boolean
+  silhouette: string | null
+}
+
+export interface RankedSpot {
+  spot: SpotIn
+  score: number
+  word: ColorWord
+  /** "faces WSW over water", "edge of the patch". */
+  view: string
+  why: string[]
+  seesSun: boolean
+  /** The tie-break, worked out here (see rankSpots). */
+  tie: SpotTie
+}
+
+/**
+ * WHEN TWO SPOTS SCORE THE SAME (Batch BEST SKY: on 11 Nov five spots read
+ * 1.00), in this order: how directly the spot faces the sun (10° steps), how
+ * much of the lit patch is in its view (tenths), water in front, then the
+ * straight-line distance from you.
+ */
+export interface SpotTie {
+  /** Degrees between the way the view faces and the sun; 180 when the facing is not known. */
+  aimDeg: number
+  /** Of the patch's points within CANVAS_REACH_KM, the share in the open view (or overhead), 0-1; 0 when there is no patch. */
+  inView: number
+  water: boolean
+  /** From you, km; null when there is no "you". */
+  km: number | null
+}
+
+export const AIM_STEP_DEG = 10
+/** A grid point this close counts as overhead, whichever way you face. */
+export const OVERHEAD_KM = 3
+/** A grid point counts as the patch from this canvas up. */
+export const PATCH_CANVAS = 0.8
+
+export const WATER_BONUS = 0.08
+export const SILHOUETTE_BONUS = 0.04
+
+const apart = (a: number, b: number) => Math.abs((((a - b) % 360) + 540) % 360 - 180)
+
+/** How much of the lit patch a spot has in front of it (or overhead), 0-1. */
+export function patchInView(grid: readonly ScoredPoint[], s: SpotIn): number {
+  const patch = grid.filter((g) => !g.blocked && g.canvas >= PATCH_CANVAS && distanceMeters(s.at, g) / 1000 <= CANVAS_REACH_KM)
+  if (patch.length === 0) return 0
+  const seen = patch.filter((g) => distanceMeters(s.at, g) / 1000 <= OVERHEAD_KM || (s.facing !== null && apart(bearingBetween(s.at, g), s.facing) <= s.openDeg))
+  return seen.length / patch.length
+}
+
+/** Best first: the score to the hundredth (what the page shows), then the tie-break in order. */
+export function compareRanked(a: RankedSpot, b: RankedSpot): number {
+  return (
+    Math.round(b.score * 100) - Math.round(a.score * 100) ||
+    Math.round(a.tie.aimDeg / AIM_STEP_DEG) - Math.round(b.tie.aimDeg / AIM_STEP_DEG) ||
+    Math.round(b.tie.inView * 10) - Math.round(a.tie.inView * 10) ||
+    Number(b.tie.water) - Number(a.tie.water) ||
+    (a.tie.km ?? 0) - (b.tie.km ?? 0)
+  )
+}
+
+export function rankSpots(grid: readonly ScoredPoint[], spots: readonly SpotIn[], sunAzDeg: number, from: LatLon | null = null): RankedSpot[] {
+  return spots
+    .flatMap((s) => {
+      const g = scoreAt(grid, s.at)
+      if (g === null) return []
+      const seesSun = s.facing !== null && apart(s.facing, sunAzDeg) <= s.openDeg
+      /* Without the view toward the sun, only the cloud overhead lights up for you. */
+      const base = seesSun ? g.score : g.blocked ? 0 : g.overhead * g.gap
+      const bonus = base <= 0 ? 0 : (s.water && seesSun ? WATER_BONUS : 0) + (s.silhouette !== null && seesSun ? SILHOUETTE_BONUS : 0)
+      const score = Math.min(1, base + bonus)
+      const word: ColorWord = score >= LIKELY_FROM ? 'Likely' : score >= POSSIBLE_FROM ? 'Possible' : 'Little'
+      const view = s.facing === null ? 'facing not known' : `faces ${compassPoint(s.facing)}${s.water ? ' over water' : ''}`
+      const tie: SpotTie = {
+        aimDeg: s.facing === null ? 180 : apart(s.facing, sunAzDeg),
+        inView: patchInView(grid, s),
+        water: s.water,
+        km: from === null ? null : distanceMeters(from, s.at) / 1000,
+      }
+      return [{ spot: s, score, word, view, why: seesSun ? g.why : [g.why[0], 'faces away from the sun'], seesSun, tie }]
+    })
+    .sort(compareRanked)
+}
