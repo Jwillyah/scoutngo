@@ -9,7 +9,7 @@ import { type LatLon } from '../core/geo.ts'
 import { camsNear, type SkyCam } from '../core/skyCams.ts'
 import { distanceMeters } from '../core/geo.ts'
 import { BAND_FLOOR_FT, skillLine, UNTESTED_ERROR_FT, type SkillSample, type SpotStats } from '../core/spotSkill.ts'
-import { BUOY_MATCH_FT, buoyVsForecast, camDistance, chartTopFt, cleanRuns, rangeWords, SURF_SPREAD_SOURCE } from '../core/surfRange.ts'
+import { BUOY_MATCH_FT, buoyVsForecast, camDistance, chartTopFt, cleanRuns, SURF_SPREAD_SOURCE } from '../core/surfRange.ts'
 import { bestWindow, faceLight, type FaceLight } from '../core/surfShoot.ts'
 import { buoyParts, partWords, rangeSizeWords } from '../core/surfReads.ts'
 import { SURF_FIRING_FT, SURF_FUN_FT } from '../core/briefing.ts'
@@ -20,9 +20,9 @@ import { buoyFaceFt } from '../core/spotSkill.ts'
 import type { BuoyReading } from '../lib/buoy.ts'
 import type { DetailId } from '../lib/detailTabs.ts'
 import { readSkillBook } from '../lib/spotSkillStore.ts'
-import { seaNow, surfNowFrom, surfWords, useSurfNow } from '../lib/useSurfNow.ts'
+import { seaNow, surfNowFrom, useSurfNow, type SurfDay } from '../lib/useSurfNow.ts'
 import { spotKey } from '../core/spotSkill.ts'
-import { buoyDots, buoyLean, dotsOutside, LEAN_BUOY_MAX_AGE_MS, FIRST_HOUR, LAST_HOUR, dayHours, rangeHourAt, weekPeaks, type BuoyDot, type RangeHour } from '../lib/surfPageData.ts'
+import { buoyDots, buoyLean, dotsOutside, LEAN_BUOY_MAX_AGE_MS, FIRST_HOUR, LAST_HOUR, dayHours, rangeHourAt, type BuoyDot, type RangeHour } from '../lib/surfPageData.ts'
 import { compass, metresToFeet } from '../lib/tideWords.ts'
 import { getSunPosition } from '../core/sun.ts'
 import type { Units } from '../lib/units.ts'
@@ -68,12 +68,6 @@ const LIGHT_WORDS: Record<FaceLight, string> = {
   back: 'backlit, the lip glows',
   dark: 'no sun on it',
 }
-const SIDE_WORDS = {
-  Offshore: 'offshore',
-  Cross: 'cross-shore',
-  Onshore: 'onshore',
-} as const
-const SHAPE_WORDS = { Clean: 'clean', Bumpy: 'bumpy', Messy: 'messy' } as const
 
 export function SurfPageV2({ venue, placeName, timeZone, units, ground, onBack, onSwitch, onMap }: SurfPageV2Props) {
   const [now, setNow] = useState(() => new Date())
@@ -133,8 +127,11 @@ export function SurfBody({ now, timeZone, spot, spotName, away, sea, stats, kept
   const nowMs = now.getTime()
   const lean = useMemo(() => (marine === null ? null : buoyLean(marine, wind, sea.buoy, facing, stats, factor ?? BEACH_CAP, nowMs)), [marine, wind, sea.buoy, facing, stats, factor, nowMs])
   const hours = useMemo(() => (marine === null ? [] : dayHours(marine, wind, today, timeZone, facing, stats, factor, lean)), [marine, wind, today, timeZone, facing, stats, factor, lean])
-  const week = useMemo(() => (marine === null ? [] : weekPeaks(marine, wind, today, timeZone, facing, stats, factor, lean)), [marine, wind, today, timeZone, facing, stats, factor, lean])
-  const head = useMemo(() => surfNowFrom(sea, stats, now, timeZone).now, [sea, stats, now, timeZone])
+  /* Batch TRUTH, Section 1: the head and the week strip read the day calls the home reads (useSurfNow's week, src/core/surfCall.ts). */
+  const read = useMemo(() => surfNowFrom(sea, stats, now, timeZone), [sea, stats, now, timeZone])
+  const week = read.week
+  const head = read.now
+  const headCall = week[0]?.call ?? null
   /* Batch QA, Section 0B: the period and the parts from one source (src/lib/useSurfNow.ts seaNow), the buoy card's own when the buoy is fresh. */
   const now0 = seaNow(sea, now, head?.periodS ?? null)
   const period = head === null ? null : now0.period
@@ -178,13 +175,13 @@ export function SurfBody({ now, timeZone, spot, spotName, away, sea, stats, kept
       <div className="dsurf__head">
         {place}
         <div className="dsurf__bigrow">
-          <p className="dhead__big" data-shared="surf">{surfWords(head) ?? '—'}</p>
-          {head === null ? null : <span className={`dsurf__tag dsurf__tag--${head.tag.toLowerCase()}`}>{head.tag}</span>}
+          <p className="dhead__big" data-shared="surf">{headCall?.words ?? '—'}</p>
+          {headCall === null ? null : <span className={`dsurf__tag dsurf__tag--${headCall.size.toLowerCase()}`}>{headCall.size}</span>}
         </div>
         <p className="dhead__line">
-          {head === null
+          {headCall === null
             ? 'The forecast did not say for this hour'
-            : [rangeSizeWords(head.range.lowFt, head.range.highFt), [head.shape === null ? 'wind not forecast' : SHAPE_WORDS[head.shape], head.side === null ? null : SIDE_WORDS[head.side]].filter((x) => x !== null).join(', '), period?.words ?? null].filter((x) => x !== null).join(' · ')}
+            : [rangeSizeWords(headCall.lowFt, headCall.highFt), headCall.wind, period?.words ?? null].filter((x) => x !== null).join(' · ')}
         </p>
         {/* Batch MAP2, Section 1 (board LOOKS · Surf, S7): the top two parts of the sea, each its own bar, height · period, and an arrow the way it goes. */}
         {parts.length === 0 ? null : (
@@ -385,8 +382,8 @@ function BuoyCard({ buoy, facing, factor, marine, wind, stats, clock }: { buoy: 
 
 /* ------------------------------------------------------------ the week */
 
-function WeekBars({ week }: { week: { date: string; peak: RangeHour | null }[] }) {
-  const top = chartTopFt(week.map((d) => d.peak?.range.highFt ?? 0))
+function WeekBars({ week }: { week: SurfDay[] }) {
+  const top = chartTopFt(week.map((d) => d.call?.highFt ?? 0))
   return (
     <div className="dsurf__week" role="img" aria-label="Seven days, each day's biggest hour and its likely range; grey Flat, teal Fun, amber Firing">
       {week.map((d, i) => (
@@ -398,16 +395,16 @@ function WeekBars({ week }: { week: { date: string; peak: RangeHour | null }[] }
             }).format(new Date(`${d.date}T12:00:00Z`))}
           </span>
           <div className="dsurf__barbox">
-            {d.peak === null ? null : (
+            {d.call === null || d.hour === null ? null : (
               <span
-                className={`dsurf__bar dsurf__bar--${d.peak.tag.toLowerCase()}`}
+                className={`dsurf__bar dsurf__bar--${d.call.size.toLowerCase()}`}
                 style={{
-                  height: `${Math.max(12, (d.peak.centerFt / top) * 100)}%`,
+                  height: `${Math.max(12, (d.hour.centerFt / top) * 100)}%`,
                 }}
               />
             )}
           </div>
-          <span className="dsurf__drange">{d.peak === null ? '—' : rangeWords(d.peak.range, '')}</span>
+          <span className="dsurf__drange" data-day={d.date}>{d.call === null ? '—' : d.call.words.replace(/ ft$/, '')}</span>
         </div>
       ))}
     </div>

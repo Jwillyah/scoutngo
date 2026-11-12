@@ -6,7 +6,7 @@ import { saneAzimuth } from '../core/sanity.ts'
 import { moonTimesOnLocalDay } from '../core/moonTimes.ts'
 import { droneTag, kt, surfOn, surfTag, windTag, type CallRead } from '../core/briefing.ts'
 import { droneWindow } from '../core/droneWindow.ts'
-import { bestRun, bestWindows, colorWords, skyStripLit, weekSurf, WEEK_SURE_DAYS, groundOf, sideWords, nothingLine, rainLine, spanWords, stripSteps, weekHeadline, type Activity, type CardKind, type WindowRow } from '../core/homeDay.ts'
+import { bestRun, bestWindows, colorWords, skyStripLit, weekSurfRow, WEEK_SURE_DAYS, groundOf, sideWords, nothingLine, rainLine, spanWords, stripSteps, weekHeadline, type Activity, type CardKind, type WindowRow } from '../core/homeDay.ts'
 import { camsFacingWaterOrSun } from '../core/skyCams.ts'
 import { wakeAt } from '../core/alertIcs.ts'
 import { formatClock } from '../core/timezone.ts'
@@ -184,7 +184,7 @@ export function Home({ venue, placeName, timeZone, units, drone, now, onClose, o
           <DayView placeName={placeName} which="tomorrow" brief={brief} day={brief.days[1] ?? null} order={order} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} alert={null} stormLine={null} onOpen={onOpen} surf={surf} obs={stationObs} layout={layout} shown={shown} />
         </section>
         <section className="home__page" aria-label="Week">
-          <WeekView brief={brief} order={order} timeZone={timeZone} units={units} now={now} venue={venue} />
+          <WeekView brief={brief} order={order} timeZone={timeZone} units={units} now={now} venue={venue} surf={surf} />
         </section>
       </div>
       {debug ? <NetDebug onClose={() => setDebug(false)} /> : null}
@@ -579,18 +579,23 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
   if (kind === 'surf') {
     title = 'Surf · next 24 hours'
     target = 'surf'
-    const band = which === 'today' ? surf.now : surf.tomorrow
-    const words = which === 'today' ? surf.nowWords : surf.tomorrowWords
-    if (words !== null) {
+    /* Batch TRUTH, Section 1: the day's one call (src/core/surfCall.ts), the week list's and the Surf page's too. */
+    const daySurf = surf.week[which === 'today' ? 0 : 1] ?? null
+    const band = daySurf?.hour ?? null
+    const call = daySurf?.call ?? null
+    const words = call === null ? null : call.words
+    if (words !== null && call !== null) {
       big = <span data-shared={which === 'today' ? 'surf' : 'surf-tomorrow'}>{words}</span>
-      line = surf.away !== null ? null : which === 'today' ? surfLine(surf.sea, band, now) : band === null ? null : rangeSizeWords(band.range.lowFt, band.range.highFt)
+      line = surf.away !== null ? null : which === 'today' ? surfLine(surf.sea, band, now) : rangeSizeWords(call.lowFt, call.highFt)
     }
     if (surf.away !== null) line = `Nearest surf: ${surf.away.name} · ${surf.away.far}`
     /* The next 24 hours of faces, from the briefing's hours, today's and tomorrow's. */
     const from = which === 'today' ? now : (day?.start ?? now)
     const { pts, fun } = surfFunAt(brief, surf, which, now, day)
-    tag = fun === null ? (band?.tag ?? null) : fun === 'now' ? `${band?.tag === 'Firing' ? 'Firing' : 'Fun'} now` : `Fun ${short(fun)}`
-    tagGood = fun !== null
+    /* The tag is the call's size; "Fun 3p" only says when, for a day the call says is Fun or Firing. */
+    const on = call !== null && surfOn(call.size)
+    tag = !on || fun === null ? (call?.size ?? null) : fun === 'now' ? `${call.size} now` : `${call.size} ${short(fun)}`
+    tagGood = on
     const path = surfPath(pts, from, 24, CHART)
     const marks = surfChartMarks(pts, from, 24, timeZone)
     const nights = nightSpans(from, 24, brief.days.map((d) => d.events.sunset).filter((x): x is Date => x !== null), brief.days.map((d) => d.events.sunrise).filter((x): x is Date => x !== null))
@@ -850,7 +855,7 @@ function surfFunAt(brief: Briefing, surf: SurfNow, which: 'today' | 'tomorrow', 
 
 /* ------------------------------------------------------------- the week */
 
-function WeekView({ brief, order, timeZone, units, now, venue }: { brief: Briefing; order: readonly Activity[]; timeZone: string; units: Units; now: Date; venue: { lat: number; lon: number } }) {
+function WeekView({ brief, order, timeZone, units, now, venue, surf }: { brief: Briefing; order: readonly Activity[]; timeZone: string; units: Units; now: Date; venue: { lat: number; lon: number }; surf: SurfNow }) {
   const wx = brief.wx
   const day = (d: Date) => new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone }).format(d)
   const rows = brief.days.map((d) => {
@@ -858,13 +863,13 @@ function WeekView({ brief, order, timeZone, units, now, venue }: { brief: Briefi
     const temps = wx === null ? [] : Array.from({ length: 24 }, (_, i) => hourlyAt(wx, 'temperature_2m', new Date(d.start.getTime() + i * 3_600_000 + 1_800_000))).filter((t): t is number => t !== null)
     const wxAt = (name: string) => (wx === null ? null : hourlyAt(wx, name, noon))
     const cond = skyCondition({ code: wxAt('weather_code'), layers: { low: wxAt('cloud_cover_low'), mid: wxAt('cloud_cover_mid'), high: wxAt('cloud_cover_high') }, day: true, station: null })
-    /* Batch QA, Section 0B: surf from the one scale; days 4-7 a range and the odds, never Fun (src/core/homeDay.ts weekSurf). */
-    const surfDay = order.includes('surf') ? weekSurf(d.surf, d.index) : null
+    /* Batch TRUTH, Section 1: the day's one call (useSurfNow's week), the cards' and the Surf page's. */
+    const surfDay = order.includes('surf') ? weekSurfRow(surf.week.find((w) => w.date === d.iso)?.call ?? null, d.index) : null
     const worth = worthOf(d, order, surfDay?.on ?? false)
     /* Batch QA, Section 0B: the day's weather, for a week with nothing else to say (weather only): the strongest wind and the hours of rain, from the briefing's own hours. */
     const rainH = wx === null ? null : Array.from({ length: 24 }, (_, i) => hourlyAt(wx, 'precipitation', new Date(d.start.getTime() + i * 3_600_000 + 1_800_000))).filter((mm) => mm !== null && mm >= 0.1).length
     const weather = [d.windMaxKt === null ? null : `${Math.round(d.windMaxKt)} kt`, rainH === null ? null : rainH === 0 ? 'dry' : `rain ${rainH} h`].filter((x) => x !== null).join(' · ')
-    return { d, name: d.index === 0 ? 'Today' : day(d.start), cond, hi: temps.length === 0 ? null : Math.max(...temps), lo: temps.length === 0 ? null : Math.min(...temps), worth, surfWords: worth === null ? (surfDay?.words ?? null) : null, surfFact: surfDay === null ? null : weekSurfFact(d.surf), weather: weather === '' ? null : weather, call: d.reads.sunset?.call ?? null, guess: d.index >= WEEK_SURE_DAYS }
+    return { d, name: d.index === 0 ? 'Today' : day(d.start), cond, hi: temps.length === 0 ? null : Math.max(...temps), lo: temps.length === 0 ? null : Math.min(...temps), worth, surfWords: worth === null ? (surfDay?.words ?? null) : null, surfFact: surfDay?.fact ?? null, weather: weather === '' ? null : weather, call: d.reads.sunset?.call ?? null, guess: d.index >= WEEK_SURE_DAYS }
   })
   const head = weekHeadline(rows.filter((r) => r.d.index > 0 && r.worth !== null).map((r) => ({ day: r.name, what: (r.worth as Activity) === 'shoot' ? 'sunset' : (r.worth as string) })))
   void now
@@ -904,13 +909,6 @@ function worthFact(worth: Activity, d: DayBrief, surfFact: string | null): strin
   return null
 }
 
-/** The surf day's faces as a range, "2–3 ft" (whole feet, the day's hours). */
-function weekSurfFact(bars: readonly { faceFt: number }[]): string | null {
-  if (bars.length === 0) return null
-  const lo = Math.floor(Math.min(...bars.map((b) => b.faceFt)))
-  const hi = Math.ceil(Math.max(...bars.map((b) => b.faceFt)))
-  return lo === hi ? `${hi} ft` : `${lo}–${hi} ft`
-}
 
 /** What a day is worth, in the user's order: Fun or Firing surf (weekSurf: never past day 3), a Go sunset or sunrise, a calm day at 400 ft, wind under 10 kt, dry. */
 function worthOf(d: DayBrief, order: readonly Activity[], surfOnDay: boolean): Activity | null {

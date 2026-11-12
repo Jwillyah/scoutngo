@@ -13,6 +13,8 @@ import { useMemo, useSyncExternalStore } from 'react'
 import { distanceMeters, type LatLon } from '../core/geo.ts'
 import { spotKey, spotStats, type SpotStats } from '../core/spotSkill.ts'
 import { BEACH_CAP } from '../core/surf.ts'
+import { surfBand, surfCall, type SurfCall } from '../core/surfCall.ts'
+import { sideWords } from '../core/homeDay.ts'
 import { rangeWords } from '../core/surfRange.ts'
 import { buoyParts, forecastParts, periodRead, rangeSizeWords, type PeriodRead, type SwellPart } from '../core/surfReads.ts'
 import { hourlyAt } from './tideSheetData.ts'
@@ -38,7 +40,21 @@ export interface SurfNow {
   /** Tomorrow's biggest hour, and in words. */
   tomorrow: RangeHour | null
   tomorrowWords: string | null
+  /** Seven days, each called once (src/core/surfCall.ts): today by the hour now, the rest by their biggest hour. Every screen's day number. */
+  week: SurfDay[]
 }
+
+export interface SurfDay {
+  date: string
+  hour: RangeHour | null
+  call: SurfCall | null
+}
+
+/** The wind to the beach as the call says it. */
+export const sideWord = (h: RangeHour): string | null => (h.side === null ? null : sideWords(h.side))
+
+/** surfCall(spot, time): one hour of one spot, called (Batch TRUTH, Section 1). */
+export const callOf = (h: RangeHour | null, dayIndex: number): SurfCall | null => (h === null ? null : surfCall({ centerFt: h.centerFt, shape: h.shape, side: sideWord(h) }, dayIndex))
 
 /**
  * THE SEA NOW, ONE SOURCE (Batch QA, Section 0B; field 10 Nov: one Surf page
@@ -73,14 +89,15 @@ export function seaNow(sea: SurfSea, now: Date, meanS: number | null = null): Se
 export function surfLine(sea: SurfSea, h: RangeHour | null, now: Date): string | null {
   if (h === null) return null
   const p = seaNow(sea, now, h.periodS).period
-  return [rangeSizeWords(h.range.lowFt, h.range.highFt), p?.words ?? null].filter((x) => x !== null).join(' · ')
+  const [lo, hi] = surfBand(h.centerFt)
+  return [rangeSizeWords(lo, hi), p?.words ?? null].filter((x) => x !== null).join(' · ')
 }
 
 /** The words for a band, the one way every screen says it. */
 export const surfWords = (h: RangeHour | null): string | null => (h === null || saneRange(h.range.lowFt, h.range.highFt) === null ? null : rangeWords(h.range))
 
-export function surfNowFrom(sea: SurfSea, stats: SpotStats, now: Date, timeZone: string): { now: RangeHour | null; tomorrow: RangeHour | null } {
-  if (sea.marine === null) return { now: null, tomorrow: null }
+export function surfNowFrom(sea: SurfSea, stats: SpotStats, now: Date, timeZone: string): { now: RangeHour | null; tomorrow: RangeHour | null; week: SurfDay[] } {
+  if (sea.marine === null) return { now: null, tomorrow: null, week: [] }
   const today = venueToday(now, timeZone)
   /* Batch Beach, Section 2: the next 6 h lean to the live buoy, and the tag reads the leaned centre. */
   const lean = buoyLean(sea.marine, sea.wind, sea.buoy, sea.facing, stats, sea.factor ?? BEACH_CAP, now.getTime())
@@ -88,7 +105,13 @@ export function surfNowFrom(sea: SurfSea, stats: SpotStats, now: Date, timeZone:
   const tomorrow = week.find((d) => d.date === addDays(today, 1))?.peak ?? null
   /* Read at the hour's half past, as the day's bars are: two screens a few seconds apart read the same hour. */
   const half = new Date(Math.floor(now.getTime() / 3_600_000) * 3_600_000 + 1_800_000)
-  return { now: rangeHourAt(sea.marine, sea.wind, half, sea.facing, stats, sea.factor, lean), tomorrow }
+  const hourNow = rangeHourAt(sea.marine, sea.wind, half, sea.facing, stats, sea.factor, lean)
+  /* Today is called by the hour now, the home card's and the Surf page's head; the other days by their biggest hour. */
+  const days = week.map((d, i) => {
+    const hour = i === 0 ? hourNow : d.peak
+    return { date: d.date, hour, call: callOf(hour, i) }
+  })
+  return { now: hourNow, tomorrow, week: days }
 }
 
 /** This phone's per-spot stats, read from the book (src/lib/spotSkillStore.ts); the Surf page's sampling writes it. */
@@ -120,5 +143,6 @@ export function useSurfNow(venue: LatLon | null, now: Date, timeZone: string, mi
     nowWords: surfWords(read.now),
     tomorrow: read.tomorrow,
     tomorrowWords: surfWords(read.tomorrow),
+    week: read.week,
   }
 }

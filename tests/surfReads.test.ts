@@ -5,8 +5,10 @@ import { rangeEnds, rangeWords } from '../src/core/surfRange.ts'
 /* Batch MAP2, Section 1: field check 9 Nov 12:46 PM, Virginia Beach. */
 describe('size words come from the headline\'s own ends', () => {
   it('"2–4 ft" is knee to chest, never knee to waist', () => {
-    expect(rangeWords({ lowFt: 2, highFt: 4 })).toBe('2–4 ft')
-    expect(rangeSizeWords(2, 4)).toBe('knee to chest')
+    /* Batch TRUTH, Section 1: a band under 4 ft is one foot wide, from its middle: never "2–4 ft". */
+    expect(rangeWords({ lowFt: 2, highFt: 4 })).toBe('3–4 ft')
+    expect(rangeSizeWords(2, 4)).toBe('waist to chest')
+    expect(rangeSizeWords(2, 3)).toBe('knee to waist')
   })
   it('every half foot from 0 to 10, the words name the two printed ends', () => {
     for (let c = 0; c <= 10; c += 0.5) {

@@ -64,8 +64,10 @@ export function surfSize(faceFt: number): SurfSize {
  * field 10 Nov 6:52 AM, VB Pier: "2–4 ft · FUN · bumpy, onshore" while the cam
  * showed thigh to waist with onshore texture). Size first, from the faces:
  *
- *   Flat      under SURF_SMALL_FT, 1.5 ft: under knee high
- *   Small     SURF_SMALL_FT to SURF_FUN_FT, 1.5 to 2.5 ft: knee to thigh
+ *   Flat      under SURF_SMALL_FT, 0.6 ft: nothing to ride
+ *   Small     SURF_SMALL_FT to SURF_FUN_FT, 0.6 to 2.5 ft: ankle to thigh
+ *             (Batch TRUTH: 12 Nov, ankle to knee and clean, was Small, not
+ *             the Flat this scale said under 1.5 ft)
  *   Fun       SURF_FUN_FT to SURF_FIRING_FT, 2.5 to 4 ft: waist and up
  *   Firing    SURF_FIRING_FT, 4 ft, and up
  *
@@ -83,7 +85,7 @@ export function surfSize(faceFt: number): SurfSize {
  */
 export type SurfTag = 'Flat' | 'Small' | 'Rideable' | 'Fun' | 'Firing'
 export const SURF_TAGS: readonly SurfTag[] = ['Flat', 'Small', 'Rideable', 'Fun', 'Firing']
-export const SURF_SMALL_FT = 1.5
+export const SURF_SMALL_FT = 0.6
 export const SURF_FUN_FT = 2.5
 export const SURF_FIRING_FT = 4
 

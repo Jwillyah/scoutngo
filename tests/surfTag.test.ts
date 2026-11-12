@@ -14,7 +14,7 @@ describe('the surf tag scale: Flat · Small · Rideable · Fun · Firing', () =>
     const table = Object.fromEntries([1, 2, 3, 5].map((ft) => [ft, shapes.map((s) => surfTag(ft, s))]))
     expect(table).toEqual({
       /*      Clean      Bumpy       Messy       no wind */
-      1: ['Flat', 'Flat', 'Flat', 'Flat'],
+      1: ['Small', 'Small', 'Flat', 'Small'],
       2: ['Small', 'Small', 'Flat', 'Small'],
       3: ['Fun', 'Rideable', 'Small', 'Rideable'],
       5: ['Firing', 'Fun', 'Rideable', 'Fun'],
@@ -46,10 +46,10 @@ describe('the surf tag scale: Flat · Small · Rideable · Fun · Firing', () =>
     }
   })
 
-  it('boundaries: 1.5, 2.5 and 4 ft', () => {
-    expect([SURF_SMALL_FT, SURF_FUN_FT, SURF_FIRING_FT]).toEqual([1.5, 2.5, 4])
-    expect(surfTag(1.49, 'Clean')).toBe('Flat')
-    expect(surfTag(1.5, 'Clean')).toBe('Small')
+  it('boundaries: 0.6, 2.5 and 4 ft (Flat under 0.6 since Batch TRUTH: 12 Nov, ankle to knee, was Small)', () => {
+    expect([SURF_SMALL_FT, SURF_FUN_FT, SURF_FIRING_FT]).toEqual([0.6, 2.5, 4])
+    expect(surfTag(0.59, 'Clean')).toBe('Flat')
+    expect(surfTag(0.6, 'Clean')).toBe('Small')
     expect(surfTag(2.49, 'Clean')).toBe('Small')
     expect(surfTag(2.5, 'Clean')).toBe('Fun')
     expect(surfTag(3.99, 'Clean')).toBe('Fun')
@@ -148,7 +148,7 @@ describe('a week day’s surf (Batch QA, Section 0B: "Surf" on every day while t
     expect(weekSurf(windy, 4).words).toBe('3–4 ft · wind sea · low odds')
     const swell = [{ faceFt: 2.6, shape: 'Bumpy' as const, swellFt: 2.4, windWaveFt: 0.6 }, { faceFt: 3.7, shape: 'Bumpy' as const, swellFt: 3.5, windWaveFt: 0.8 }]
     expect(weekSurf(swell, 4).words).toBe('3–4 ft · low odds')
-    expect(weekSurf([{ faceFt: 3.7, shape: 'Bumpy' }], 4).words).toBe('4–5 ft · low odds')
+    expect(weekSurf([{ faceFt: 3.7, shape: 'Bumpy' }], 4).words).toBe('3–4 ft · low odds')
   })
   it('days 4-7: never Fun, the range and the odds', async () => {
     const { weekSurf } = await import('../src/core/homeDay.ts')

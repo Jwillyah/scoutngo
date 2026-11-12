@@ -7,6 +7,7 @@
  * the sense of safe, and the sky word for WMO code 0 is "Sunny" by day and
  * "Clear sky" at night only as a description of cloud.
  */
+import type { SurfCall } from './surfCall.ts'
 import { getTimes } from 'suncalc'
 import { formatClock, formatShortHour } from './timezone.ts'
 import { surfOn, surfTag, type SurfShape } from './surf.ts'
@@ -184,6 +185,18 @@ export function weekSurf(bars: readonly { faceFt: number; shape: SurfShape | nul
   const peak = bars.reduce((m, x) => (x.faceFt > m.faceFt ? x : m))
   const on = surfOn(surfTag(peak.faceFt, peak.shape))
   return { on, words: on ? null : range }
+}
+
+/**
+ * A week row's surf from the day's one call (Batch TRUTH, Section 1;
+ * src/core/surfCall.ts): "Surf" when the call is Fun or Firing in the first
+ * WEEK_SURE_DAYS days, else its range; the range is the fact either way, the
+ * same the cards and the Surf page print.
+ */
+export function weekSurfRow(call: SurfCall | null, dayIndex: number): { on: boolean; words: string | null; fact: string | null } {
+  if (call === null) return { on: false, words: null, fact: null }
+  const on = dayIndex < WEEK_SURE_DAYS && surfOn(call.size)
+  return { on, words: on ? null : call.words, fact: call.words }
 }
 
 /** "Best this week: Mon sunset · Thu surf", or null when nothing in the week stands out. */

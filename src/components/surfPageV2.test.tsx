@@ -107,10 +107,12 @@ const text = (html: string) =>
 describe('Surf page v2 (Batch N, Section 1)', () => {
   it('heads with a range, the one computed from the forecast and the band, never one number', () => {
     /* Worked out here from the fixture, not read back from the page's own helper. */
-    const swellFace = surfEstimate(SWELL_M, SWELL_S, 100, FACING).faceFt
+    /* The face as src/lib/surfDay.ts surfAt takes it: the whole sea's height on the swell's period. */
+    const swellFace = surfEstimate(WAVE_M, SWELL_S, 100, FACING).faceFt
     const wholeFace = surfEstimate(WAVE_M, WAVE_S, 100, FACING).faceFt
     const want = rangeWords(correctedRange(swellFace, Math.abs(swellFace - wholeFace), NONE))
-    const html = render()
+    /* Without the buoy: with it, the head leans to it (src/core/surfNowcast.ts), and since Batch TRUTH the band follows the leaned centre. */
+    const html = render({ sea: { ...sea, buoy: null } })
     const big = /<p class="dhead__big" data-shared="surf">([^<]*)<\/p>/.exec(html)?.[1]
     expect(big).toBe(want)
     expect(big).toMatch(/^\d+–\d+ ft$/)
@@ -164,7 +166,7 @@ describe('Surf page v2 (Batch N, Section 1)', () => {
     const html = render()
     expect(html.match(/class="dsurf__day( dsurf__day--later)?"/g)?.length).toBe(7)
     expect(html.match(/dsurf__day--later/g)?.length).toBe(4)
-    expect(html.match(/class="dsurf__drange">\d+–\d+</g)?.length).toBe(7)
+    expect(html.match(/class="dsurf__drange"[^>]*>\d+–\d+</g)?.length).toBe(7)
   })
 
   it('the light on the face only for Shoot', () => {

@@ -15,6 +15,7 @@
  * and this spot's own error against the buoy, combined there.
  */
 import type { SurfRange } from './spotSkill.ts'
+import { surfBand } from './surfCall.ts'
 
 /*
  * WHERE THE SPREAD COMES FROM. Open-Meteo Marine is one model (its best
@@ -35,15 +36,18 @@ export function seaSpreadFt(swellFaceFt: number | null, wholeSeaFaceFt: number |
   return Math.abs(swellFaceFt - wholeSeaFaceFt)
 }
 
-/** The band's ends in whole feet, always two different numbers: "1–2 ft" (en dash). Never a single number. */
+/**
+ * The band's ends in whole feet, always two different numbers: "1–2 ft" (en
+ * dash). Since Batch TRUTH, from the band's middle by the one rule
+ * (src/core/surfCall.ts surfBand): one foot wide under 4 ft, two above.
+ */
 export function rangeEnds(lowFt: number, highFt: number): [number, number] {
-  const lo = Math.max(0, Math.round(Math.min(lowFt, highFt)))
-  const hi = Math.max(lo + 1, Math.round(Math.max(lowFt, highFt)))
-  return [lo, hi]
+  return surfBand((lowFt + highFt) / 2)
 }
 
-export function rangeWords(r: Pick<SurfRange, 'lowFt' | 'highFt'>, unit = 'ft'): string {
-  const [lo, hi] = rangeEnds(r.lowFt, r.highFt)
+/** A band in words; by its centre when it has one (a band clamped at 0 ft is not centred on its middle). */
+export function rangeWords(r: Pick<SurfRange, 'lowFt' | 'highFt'> & { centerFt?: number }, unit = 'ft'): string {
+  const [lo, hi] = r.centerFt === undefined ? rangeEnds(r.lowFt, r.highFt) : surfBand(r.centerFt)
   return `${lo}–${hi}${unit === '' ? '' : ` ${unit}`}`
 }
 
