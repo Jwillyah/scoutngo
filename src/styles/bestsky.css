@@ -1,0 +1,177 @@
+/*
+ * WHERE'S THE COLOR? (Batch BEST SKY; boards BestSky_Map, BestSky_Card,
+ * BestSky_Spot), look D: the night ground, the frosted glass, the glow.
+ */
+.bsky__dots {
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+  margin: -4px 0 6px;
+}
+.bsky__track {
+  display: flex;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.bsky__track::-webkit-scrollbar {
+  display: none;
+}
+.bsky__page {
+  flex: 0 0 100%;
+  min-width: 0;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 2px 16px;
+}
+/* 1 · The map (board BestSky_Map): the imagery darkened to the night ground, the wash, the pins, the sheet over its foot. */
+.bsky__page--map {
+  gap: 0;
+}
+.bsky__map {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 24px;
+  background: var(--d-night-low);
+}
+.bsky__shade {
+  fill: rgb(12 18 48 / 0.62);
+}
+.bsky__ring {
+  fill: none;
+  stroke: rgb(255 255 255 / 0.45);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 6;
+}
+.bsky__ringlab {
+  font-size: 13px;
+  font-weight: 700;
+  fill: rgb(255 255 255 / 0.7);
+}
+.bsky__sunline {
+  stroke: #f3d98f;
+  stroke-width: 2.2;
+  stroke-dasharray: 8 7;
+}
+.bsky__sunlab {
+  font-size: 14px;
+  font-weight: 700;
+  text-anchor: middle;
+  fill: #f3d98f;
+  paint-order: stroke;
+  stroke: rgb(10 14 40 / 0.8);
+  stroke-width: 3px;
+}
+.bsky__sunlab--left {
+  text-anchor: start;
+}
+.bsky__you {
+  fill: #4a8cff;
+  stroke: #fff;
+  stroke-width: 3;
+}
+.bsky__spot {
+  cursor: pointer;
+}
+.bsky__spotdot {
+  fill: rgb(255 255 255 / 0.82);
+}
+.bsky__spotdot--first {
+  fill: #fff;
+}
+.bsky__spotnum {
+  font-size: 15px;
+  font-weight: 700;
+  text-anchor: middle;
+  fill: var(--d-night-low);
+}
+.bsky__lab rect {
+  fill: rgb(20 24 60 / 0.82);
+}
+.bsky__lab text {
+  font-size: 14px;
+  font-weight: 700;
+  text-anchor: middle;
+  fill: #fff;
+}
+.bsky__sheet {
+  position: relative;
+  margin-top: -28px;
+  padding: 16px 16px 14px;
+  border: 1px solid var(--d-edge);
+  border-radius: 24px;
+  background: rgb(28 34 70 / 0.94);
+}
+.bsky__best {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 700;
+}
+.bsky__why,
+.bsky__sum,
+.bsky__event,
+.bsky__spotsub,
+.bsky__sat {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: rgb(255 255 255 / 0.8);
+}
+.bsky__why {
+  margin-top: 4px;
+}
+.bsky__radii {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+.bsky__radius {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--d-edge);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.08);
+  color: #fff;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+.bsky__radius--on {
+  background: #fff;
+  color: #141821;
+}
+.bsky__pill {
+  flex: none;
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  background: rgb(255 255 255 / 0.16);
+  color: #fff;
+}
+.bsky__pill--likely {
+  background: var(--d-glow);
+}
+.bsky__pill--possible {
+  background: #8c5a5a;
+}
+.bsky__label {
+  margin: 0 0 6px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgb(255 255 255 / 0.75);
+}
+.bsky__how p {
+  margin: 0 0 8px;
+}

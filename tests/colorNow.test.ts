@@ -10,7 +10,7 @@ const at = (min: number) => new Date(event.getTime() + min * 60_000)
 
 describe('"Color now" on the home', () => {
   it('a Maybe or a Go inside T-30 min to T+20 min', () => {
-    expect(colorNowLine([read('Maybe'), null], at(-10), PIER, 'America/New_York')).toBe('Color now · sunrise 6:39 · look E')
+    expect(colorNowLine([read('Maybe'), null], at(-10), PIER, 'America/New_York')).toBe('Color now · sunrise 6:39 AM · look E')
     expect(colorNowLine([read('Go')], at(-30), PIER, 'America/New_York')).not.toBeNull()
     expect(colorNowLine([read('Go')], at(20), PIER, 'America/New_York')).not.toBeNull()
   })

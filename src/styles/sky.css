@@ -232,3 +232,17 @@
 .spage__light .spage__marks {
   margin: 0 0 8px;
 }
+
+/* Batch BEST SKY: "Where's the color nearby? ›", under the call. */
+.spage__bestsky {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--d-edge);
+  border-radius: 999px;
+  background: var(--d-card);
+  color: #fff;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 700;
+}

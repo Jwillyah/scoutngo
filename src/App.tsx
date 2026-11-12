@@ -181,6 +181,7 @@ const Viewfinder = lazy(() => import('./components/Viewfinder.tsx').then((m) => 
 const ViewfinderNeedsPlace = lazy(() => import('./components/Viewfinder.tsx').then((m) => ({ default: m.ViewfinderNeedsPlace })))
 const WeatherPage = lazy(() => import('./components/WeatherPage.tsx').then((m) => ({ default: m.WeatherPage })))
 const SkyPage = lazy(() => import('./components/SkyPage.tsx').then((m) => ({ default: m.SkyPage })))
+const BestSkyPage = lazy(() => import('./components/BestSkyPage.tsx').then((m) => ({ default: m.BestSkyPage })))
 const DronePage = lazy(() => import('./components/DronePage.tsx').then((m) => ({ default: m.DronePage })))
 
 /*
@@ -1435,6 +1436,8 @@ function App() {
   }, [])
   /* The Sky page (Batch Pages, Section 3): from the home's Sky card, the menu's, and the map's sky chips. */
   const [skyOpen, setSkyOpen] = useState(false)
+  /* Batch BEST SKY: "Where's the color?". */
+  const [bestSkyOpen, setBestSkyOpen] = useState(false)
   /* Batch Flow, Section 5: the Drone page, first from the home's Drone card and the menu's. */
   const [droneOpen, setDroneOpen] = useState(false)
   useEffect(() => {
@@ -2720,7 +2723,30 @@ function App() {
             setMode('plan')
             setCardRequest((r) => ({ kind: 'sky', skyTab: view, tick: r.tick + 1 }))
           }}
+          onBestSky={() => setBestSkyOpen(true)}
         />
+        </Suspense>
+      ) : null}
+      {bestSkyOpen && centre !== null ? (
+        <Suspense fallback={null}>
+          <BestSkyPage
+            venue={centre}
+            placeName={venueShort}
+            timeZone={venueWindow?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}
+            now={briefNow}
+            miles={settings.units.distance === 'ft'}
+            saved={spots.map((sp) => ({ id: sp.id, name: sp.name, at: { lat: Number(sp.venue.latitude), lon: Number(sp.venue.longitude) } }))}
+            onBack={() => setBestSkyOpen(false)}
+            onShowOnMap={(at, when) => {
+              /* The map at the spot and the colour's time, the sun's line on: as "Near you" does (goNear). */
+              setBestSkyOpen(false)
+              setSkyOpen(false)
+              setBriefOpen(false)
+              jumpTo.current = when.getTime()
+              setVenue((current) => ({ ...withCoordinates(current, at), date: when.toLocaleDateString('en-CA') }))
+              setMode('plan')
+            }}
+          />
         </Suspense>
       ) : null}
       {weatherOpen && centre !== null ? (

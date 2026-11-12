@@ -47,11 +47,13 @@ interface SkyPageProps {
   onCalendar: () => void
   /** On the map's sheet: the Sky color page in full (the colour clock, your log), or the sun, the moon and the night. */
   onDetail: (view: 'fire' | 'now') => void
+  /** Batch BEST SKY: "Where's the color?", the best place within a radius. */
+  onBestSky?: () => void
 }
 
 type Kind = 'sunset' | 'sunrise'
 
-export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onViewfinder, onCalendar, onDetail }: SkyPageProps) {
+export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onViewfinder, onCalendar, onDetail, onBestSky }: SkyPageProps) {
   const brief = useBriefing(venue, timeZone, now, true)
   /* Batch Polish 2, Section 1: the nearest station's sky is this page's, not the map's strip (the strip follows the time bar; a station reports now). */
   const station = useStationNow(venue, now, typeof navigator === 'undefined' ? false : navigator.onLine)
@@ -150,6 +152,11 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
       </p>
       <p className="spage__head" data-shared={picked === null ? 'skycall' : 'skycall-picked'} data-value={colorWords(read?.call ?? null) ?? ''}>{brief.status === 'loading' && read === null ? '…' : colorHeadline(read?.call ?? null)}</p>
       <p className="spage__why">{plainReason(read?.why ?? null) ?? (brief.status === 'loading' ? 'Reading the forecast…' : 'The forecast did not say.')}</p>
+      {onBestSky === undefined ? null : (
+        <button type="button" className="spage__bestsky" onClick={onBestSky}>
+          Where&rsquo;s the color nearby? ›
+        </button>
+      )}
 
       <section className="dcard spage__side" aria-label="The sky toward the sun">
         <p className="dcard__label">The sky toward the sun</p>
