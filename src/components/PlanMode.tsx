@@ -744,8 +744,27 @@ export function PlanMode({
    * constant written here would say.
    */
   const [topChrome, setTopChrome] = useState(0)
+  /*
+   * THE SHEET'S TOP IS READ ONCE, as it always was: re-reading it as the strip
+   * hides under a rising sheet moved the sheet under a finger mid-drag (Batch
+   * Polish 2, Section 1, part 2: the surface audit's drag on the chart). The
+   * weather chip alone follows the strip's bottom as it changes (a status
+   * line that arrives later), through --chips-bottom set on the plan's own
+   * box, with no render.
+   */
+  const chipsWatch = useRef<ResizeObserver | null>(null)
   const measureChips = useCallback((node: HTMLDivElement | null) => {
-    if (node !== null) setTopChrome(Math.round(node.getBoundingClientRect().bottom))
+    chipsWatch.current?.disconnect()
+    chipsWatch.current = null
+    if (node === null) return
+    setTopChrome(Math.round(node.getBoundingClientRect().bottom))
+    const box = node.closest('.mode-plan') as HTMLElement | null
+    const follow = () => box?.style.setProperty('--chips-bottom', `${Math.round(node.getBoundingClientRect().bottom)}px`)
+    follow()
+    if (typeof ResizeObserver !== 'undefined') {
+      chipsWatch.current = new ResizeObserver(follow)
+      chipsWatch.current.observe(node)
+    }
   }, [])
 
   /*

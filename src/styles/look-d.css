@@ -368,6 +368,11 @@
   align-items: stretch;
   gap: var(--space-1);
 }
+/* The one status line under the strip: as wide as its words, left, clear of the rail at the right (it stretched to the full width in the strip's column). */
+.chips2 > :is(.offline-line, .offline-line--act, .offline-line--btn) {
+  align-self: flex-start;
+  max-width: calc(100% - 64px);
+}
 /* Out of the strip's flow: the strip's box (what the sheet and the rail keep clear of) is its cells alone, and the line sits centred under it, clear of the rail at the side. */
 .chips2 > .stat__when {
   position: absolute;
@@ -607,4 +612,9 @@
   margin: 0;
   font-size: 12px;
   color: rgb(255 255 255 / 0.8);
+}
+
+/* The weather chip under the strip as it is now, a status line that came later included (PlanMode measureChips sets --chips-bottom). */
+.wxchip {
+  top: calc(var(--chips-bottom, var(--top-chrome, 120px)) + 6px);
 }
