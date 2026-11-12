@@ -8,9 +8,9 @@ import { useCoast } from '../lib/coastData.ts'
  * a tap opens the period's text in full, as written, over the page, so the
  * page itself still fits one screen. Nothing when the spot has no marine zone.
  */
-export function MarineLine({ venue }: { venue: LatLon | null }) {
+export function MarineLine({ venue, startOpen = false }: { venue: LatLon | null; startOpen?: boolean }) {
   const marine = useCoast(venue, null, 'mi', venue !== null).coast?.marine ?? null
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(startOpen)
   if (marine === null) return null
   return (
     <>
