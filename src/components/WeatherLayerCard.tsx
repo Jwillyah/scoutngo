@@ -70,7 +70,7 @@ export function RadarLegend({ scanAt, calls, strikes, timeZone }: { scanAt: Date
   )
 }
 
-export function WeatherLayerCard({ layer, alerts, upstream = [], dist = 'mi', timeZone, windFt, onWindFt }: { layer: WeatherLayer; alerts: readonly Alert[]; upstream?: readonly { alert: Alert; up: Upstream }[]; dist?: 'mi' | 'km'; timeZone: string; windFt: 0 | 400; onWindFt: (ft: 0 | 400) => void }) {
+export function WeatherLayerCard({ layer, alerts, upstream = [], dist = 'mi', timeZone, windFt, onWindFt, cloudLabel = null, onCloudRetry }: { layer: WeatherLayer; alerts: readonly Alert[]; upstream?: readonly { alert: Alert; up: Upstream }[]; dist?: 'mi' | 'km'; timeZone: string; windFt: 0 | 400; onWindFt: (ft: 0 | 400) => void; cloudLabel?: { text: string; failed: boolean } | null; onCloudRetry?: () => void }) {
   const warnings = alerts.filter((a) => /warning/i.test(a.event))
   return (
     <div className="wlay">
@@ -94,7 +94,22 @@ export function WeatherLayerCard({ layer, alerts, upstream = [], dist = 'mi', ti
           <p className="wlay__note">{windFt === 0 ? 'The colour is the wind’s speed (the legend over the time bar); the white lines move with it. The crosshair reads the wind under it. Play runs the next three days.' : 'Streaks move with the wind at 400 ft; brighter is stronger. Cloud-level wind is not in the forecast the map uses (it reaches 180 m).'}</p>
         </>
       ) : layer === 'clouds' ? (
-        <p className="wlay__note">GOES satellite cloud over the map, and the forecast&rsquo;s low, mid and high cloud in the squares; the time bar moves it.</p>
+        <>
+          {/* Batch NOW, Section 4: one label, "Satellite 11:10 AM" or "Forecast · Sat 1 AM"; a satellite that failed says so, with a retry, never an empty map. */}
+          {cloudLabel === null ? null : cloudLabel.failed ? (
+            <p className="wlay__label" data-sky-label="failed">
+              Satellite didn&rsquo;t load ·{' '}
+              <button type="button" className="skykey__retry" onClick={onCloudRetry}>
+                Retry
+              </button>
+            </p>
+          ) : (
+            <p className="wlay__label" data-sky-label={cloudLabel.text.startsWith('Satellite') ? 'satellite' : 'forecast'}>
+              {cloudLabel.text}
+            </p>
+          )}
+          <p className="wlay__note">GOES satellite cloud now and before (infrared at night); after now the forecast&rsquo;s low, mid and high cloud as a soft field, the last frame fading into it over 3 hours. The time bar moves it.</p>
+        </>
       ) : null}
     </div>
   )

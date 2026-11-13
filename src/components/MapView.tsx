@@ -2,6 +2,10 @@ import { paintShadows, shadowsWithin } from '../lib/shadowRaster.ts'
 import { shadowWorker } from '../lib/shadowPainter.ts'
 import type { ShadowMap } from '../core/shadowMap.ts'
 import { moonGlyphSvg } from '../lib/moonGlyph.ts'
+import { cloudFieldPixels, fieldGrid, FIELD_PX } from '../core/mapCloudField.ts'
+/* Batch NOW, Section 4: the soft cloud field's image source, and a 1 px clear PNG to start it with. */
+const CLOUD_FIELD_SOURCE = 'cloud-field'
+const BLANK_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
 import { useNumerals } from '../lib/numeralsContext.ts'
 import * as maplibregl from 'maplibre-gl'
 import { WindLayerV3 } from './WindLayerV3.tsx'
@@ -743,6 +747,8 @@ export interface SunOverlay {
   arc: SunArc
   /** The moon's rise, set and place, when the dock's moon switch is on. See src/core/moonArc.ts. */
   moon?: MoonArc | null
+  /** Batch NOW, Section 4: the sun's height; under the horizon there is no sun line and no shadow to draw. */
+  altitude?: number | null
 }
 
 interface MapViewProps {
@@ -798,6 +804,14 @@ interface MapViewProps {
   windUnit?: WindUnit
   windSpot?: LatLon | null
   windFacing?: number | null
+  /** Batch NOW, Section 4: the bearing the line through the pin is drawn on; at night the moon's while it is up, else none (the sun's by default). */
+  axisAzimuth?: number | null
+  /** Batch NOW, Section 4: just past now, the newest frame fading out as the forecast (its share, 0-1) comes in. */
+  skyFadeFrameAt?: Date | null
+  skyFade?: number
+  /** Batch NOW, Section 4: a retry of the satellite's tiles, and word when they fail (every tile of the frame 404 or refused). */
+  satRetry?: number
+  onSatFailed?: (failed: boolean) => void
   /** Batch NOW, Section 2.1: the wind now at the spot, the Wind page's headline; the pill says it at the spot at now. */
   windHeadline?: { mps: number; fromDeg: number | null; gustMps: number | null } | null
   onWindStrip?: (strip: { from: number; mps: (number | null)[] } | null) => void
@@ -1139,10 +1153,14 @@ function rayCollection(
 ): GeoJSON.FeatureCollection {
   if (venue === null || overlay === null || !showSun) return emptyCollection()
 
-  const rays: { kind: string; bearing: number }[] = [
-    { kind: 'sun', bearing: overlay.azimuth },
-    { kind: 'shadow', bearing: overlay.shadowBearing },
-  ]
+  /* Batch NOW, Section 4: at night no sun line (the moon's, when it is up, below). */
+  const rays: { kind: string; bearing: number }[] =
+    overlay.altitude != null && overlay.altitude < 0
+      ? []
+      : [
+          { kind: 'sun', bearing: overlay.azimuth },
+          { kind: 'shadow', bearing: overlay.shadowBearing },
+        ]
   // Sunrise and sunset matter less inside a midday window, so they are opt in.
   if (showArc && overlay.arc.sunrise !== null) {
     rays.push({ kind: 'sunrise', bearing: overlay.arc.sunrise.azimuth })
@@ -1327,6 +1345,11 @@ export function MapView({
   windSpot = null,
   windFacing = null,
   windHeadline = null,
+  satRetry = 0,
+  skyFadeFrameAt = null,
+  axisAzimuth,
+  skyFade = 0,
+  onSatFailed,
   onWindStrip,
   vectorBase = false,
   markDraft,
@@ -1852,6 +1875,9 @@ export function MapView({
        * draws, because it is weather over the ground rather than annotation.
        */
       instance.addSource(CLOUD_FORECAST_SOURCE, { type: 'geojson', data: emptyCollection() })
+      /* Batch NOW, Section 4: the forecast cloud as a soft field (src/core/cloudField.ts), an image drawn on the phone. */
+      instance.addSource(CLOUD_FIELD_SOURCE, { type: 'image', url: BLANK_PNG, coordinates: [[0, 0.001], [0.001, 0.001], [0.001, 0], [0, 0]] })
+      instance.addLayer({ id: CLOUD_FIELD_SOURCE, type: 'raster', source: CLOUD_FIELD_SOURCE, layout: { visibility: 'none' }, paint: { 'raster-fade-duration': 0, 'raster-resampling': 'linear' } })
       instance.addLayer({
         id: 'cloud-forecast-fill',
         type: 'fill',
@@ -3450,7 +3476,9 @@ export function MapView({
      * caption that says observed is the failure this whole split exists to
      * avoid.
      */
-    const satellite = showSky && skyFrameAt !== null
+    /* Batch NOW, Section 4: just past now the newest frame stays, fading as the forecast comes in. */
+    const frame = skyFrameAt ?? skyFadeFrameAt
+    const satellite = showSky && frame !== null
 
     for (const band of ['visible', 'infrared'] as const) {
       const id = `${GOES_SOURCE}-${band}`
@@ -3459,6 +3487,7 @@ export function MapView({
         'visibility',
         satellite && band === wanted ? 'visible' : 'none',
       )
+      instance.setPaintProperty(id, 'raster-opacity', skyFrameAt !== null ? 0.55 : 0.55 * (1 - skyFade))
     }
 
     /*
@@ -3468,12 +3497,36 @@ export function MapView({
      * documented setTiles where available, falling back to removing and
      * re-adding the source.
      */
-    if (!satellite || skyFrameAt === null) return
+    if (!satellite || frame === null) return
     const source = instance.getSource(`${GOES_SOURCE}-${wanted}`) as
       | (maplibregl.RasterTileSource & { setTiles?: (tiles: string[]) => void })
       | undefined
-    source?.setTiles?.([goesTileUrl(wanted, skyFrameAt)])
-  }, [showSky, sunAltitude, skyFrameAt, ready])
+    source?.setTiles?.([goesTileUrl(wanted, frame)])
+    /*
+     * Batch NOW, Section 4: a frame whose tiles all fail is said ("Satellite
+     * didn't load · Retry"), never an empty map. A tile that loads clears it.
+     */
+    let failed = 0
+    let loaded = 0
+    const onError = (ev: unknown) => {
+      const e = ev as { sourceId?: string }
+      if (e.sourceId !== `${GOES_SOURCE}-${wanted}`) return
+      failed += 1
+      if (loaded === 0 && failed >= 2) onSatFailed?.(true)
+    }
+    const onData = (ev: unknown) => {
+      const e = ev as { sourceId?: string; tile?: unknown }
+      if (e.sourceId !== `${GOES_SOURCE}-${wanted}` || e.tile === undefined) return
+      loaded += 1
+      onSatFailed?.(false)
+    }
+    instance.on('error', onError)
+    instance.on('sourcedata', onData)
+    return () => {
+      instance.off('error', onError)
+      instance.off('sourcedata', onData)
+    }
+  }, [showSky, sunAltitude, skyFrameAt, skyFadeFrameAt?.getTime(), skyFade, ready, satRetry]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /*
    * THE FORECAST GRID, which is what the future looks like.
@@ -3492,12 +3545,25 @@ export function MapView({
       | undefined
     const data = cloudForecastCollection(skyForecast, skyLayer, windMeters, ratedWindMps)
     source?.setData(data)
-    instance.setLayoutProperty(
-      'cloud-forecast-fill',
-      'visibility',
-      /* Batch Map, Section 1: the wind is the v3 layer's smooth field now, never the grid's squares. */
-      showSky && skyLayer !== 'wind' && data.features.length > 0 ? 'visible' : 'none',
-    )
+    /* Batch Map, Section 1: the wind is the v3 layer's smooth field; Batch NOW, Section 4: the cloud a soft field too. Never the grid's squares. */
+    instance.setLayoutProperty('cloud-forecast-fill', 'visibility', 'none')
+    const field = showSky && skyLayer === 'cloud' ? fieldGrid(skyForecast) : null
+    if (instance.getLayer(CLOUD_FIELD_SOURCE) === undefined) {
+      /* Not drawn yet (a style still loading): the next run draws it. */
+    } else if (field === null) {
+      instance.setLayoutProperty(CLOUD_FIELD_SOURCE, 'visibility', 'none')
+    } else {
+      const canvas = document.createElement('canvas')
+      canvas.width = FIELD_PX
+      canvas.height = FIELD_PX
+      const ctx = canvas.getContext('2d')
+      if (ctx !== null) {
+        ctx.putImageData(new ImageData(cloudFieldPixels(field.grid, FIELD_PX, Math.min(1, skyForecastOpacity / 0.5) * (skyFadeFrameAt === null ? 1 : skyFade)) as unknown as Uint8ClampedArray<ArrayBuffer>, FIELD_PX, FIELD_PX), 0, 0)
+        const img = instance.getSource(CLOUD_FIELD_SOURCE) as maplibregl.ImageSource | undefined
+        img?.updateImage({ url: canvas.toDataURL('image/png'), coordinates: field.corners })
+        instance.setLayoutProperty(CLOUD_FIELD_SOURCE, 'visibility', 'visible')
+      }
+    }
     instance.setPaintProperty(
       'cloud-forecast-fill',
       'fill-opacity',
@@ -3522,7 +3588,7 @@ export function MapView({
           ]
         : ['min', ['*', ['get', 'cover'], 0.01, skyForecastOpacity], skyForecastOpacity],
     )
-  }, [showSky, skyForecast, skyForecastOpacity, skyLayer, windMeters, ratedWindMps, ready])
+  }, [showSky, skyForecast, skyForecastOpacity, skyLayer, windMeters, ratedWindMps, ready, skyFade, skyFadeFrameAt?.getTime()]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /*
    * THE SUN LINE AND THE RAYS, SIZED TO THE VIEWPORT.
@@ -3538,8 +3604,10 @@ export function MapView({
    * times per gesture rather than once per frame, and the comparison below is
    * what skips the rest.
    */
-  const bearingInputs = useRef({ venue, sunAzimuth, sunOverlay, showSun, showArc })
-  bearingInputs.current = { venue, sunAzimuth, sunOverlay, showSun, showArc }
+  /* Batch NOW, Section 4: the line through the pin is the sun's by day; the caller may give the moon's at night, or none. */
+  const lineAzimuth = axisAzimuth === undefined ? sunAzimuth : axisAzimuth
+  const bearingInputs = useRef({ venue, sunAzimuth: lineAzimuth, sunOverlay, showSun, showArc })
+  bearingInputs.current = { venue, sunAzimuth: lineAzimuth, sunOverlay, showSun, showArc }
   /*
    * The lengths last drawn, joined, so a move that changes none of them does
    * no work. It was one number; there is a length per ray now.
@@ -3712,7 +3780,7 @@ export function MapView({
   useEffect(() => {
     if (map.current === null || !ready) return
     drawBearingLines(map.current, true)
-  }, [venue, sunAzimuth, sunOverlay, showSun, showArc, ready, drawBearingLines])
+  }, [venue, lineAzimuth, sunOverlay, showSun, showArc, ready, drawBearingLines])
 
   /* And the camera changed, so re-length them. */
   useEffect(() => {

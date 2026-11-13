@@ -5,6 +5,7 @@ import type { LatLon } from '../core/geo.ts'
 import { FORECAST_OPACITY, skySourceFor, type SkySource } from '../core/skyTime.ts'
 import { fetchCloudGrid } from './forecast.ts'
 import { snapToFrame } from './goesLayer.ts'
+import { CROSSFADE_H, forecastShare } from '../core/mapCloudField.ts'
 
 /**
  * WHAT THE SKY LAYER SHOWS FOR THE SCRUBBED MOMENT.
@@ -28,6 +29,13 @@ export interface SkyState {
   opacity: number
   /** Why there is no forecast, when there is not. */
   forecastProblem: string | null
+  /**
+   * Batch NOW, Section 4: in the first CROSSFADE_H hours after now, the
+   * newest frame still shows, fading as the forecast comes in: the frame,
+   * and the forecast's share (0 at now, 1 at CROSSFADE_H).
+   */
+  fadeFrameAt: Date | null
+  fade: number
 }
 
 export function useSkyFrames(
@@ -119,9 +127,16 @@ export function useSkyFrames(
   const fallback: SkySource = { kind: 'forecast', hoursAhead: 0, trust: 'near', draw: false }
   const resolved = source ?? fallback
 
+  const newest = useMemo(() => {
+    const s = skySourceFor(new Date(), new Date(), (at) => snapToFrame(at))
+    return s.kind === 'satellite' ? s.frameAt : null
+  }, [scrubbedAt]) // eslint-disable-line react-hooks/exhaustive-deps
+  const fading = hasSatellite(layer) && resolved.kind === 'forecast' && resolved.hoursAhead < CROSSFADE_H
   return {
     source: resolved,
     frameAt: resolved.kind === 'satellite' ? resolved.frameAt : null,
+    fadeFrameAt: fading ? newest : null,
+    fade: resolved.kind === 'forecast' ? forecastShare(resolved.hoursAhead) : 0,
     /*
      * The wind grid is shown whatever the clock says, because wind has no
      * satellite frame to prefer over it.

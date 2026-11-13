@@ -1412,6 +1412,9 @@ export function PlanMode({
   const [windStrip, setWindStrip] = useState<{ from: number; mps: (number | null)[] } | null>(null)
   /* Batch TRUTH, Section 7: wind on is the whole map (wind.css .mode-plan[data-wind-mode]); its bar opens on now. */
   const windMode = weatherLayer === 'wind' && !threeD
+  /* Batch NOW, Section 4: the satellite's tiles failed (said on the legend, with a retry). */
+  const [satFailed, setSatFailed] = useState(false)
+  const [satRetry, setSatRetry] = useState(0)
   /* Batch NOW, Section 2.1: the wind now at the spot, as the Wind page's headline (the same kept answer, the same station), asked only in wind mode. */
   const [briefWx, setBriefWx] = useState<{ key: string; wx: Hourly | null } | null>(null)
   useEffect(() => {
@@ -1687,6 +1690,13 @@ export function PlanMode({
    */
   /* The nearest station's report, for the one sky word (src/core/skyWord.ts) while the bar is at now. */
   const stationObs = useStationObs(venue)
+  /* Batch NOW, Section 4: at night the line through the pin is the moon's while it is up, else none; by day the sun's. */
+  const nightAxis = useMemo(() => {
+    if (sun === null || sun.altitude >= 0) return undefined
+    if (venue === null || scrubbedAt === null) return null
+    const m = getMoonArc(scrubbedAt, venue.lat, venue.lon)
+    return m.altitude > 0 ? m.azimuth : null
+  }, [sun, venue, scrubbedAt])
   const windHeadline = useMemo(() => {
     const now = new Date()
     /* Only at now: a scrubbed hour is the models' own. */
@@ -2122,7 +2132,8 @@ export function PlanMode({
   const cardBody = ((): ReactNode => {
     switch (card.kind) {
       case 'shoot':
-        return shootCard
+        /* Batch NOW, Section 4.2: in wind mode the sheet is the wind's time bar alone; the planner ("0 positions · Suggest · BOTH GROUND AIR") never shows under it. */
+        return windMode ? null : shootCard
       case 'wind':
         return (
           <WindCard
@@ -2178,6 +2189,16 @@ export function PlanMode({
                 layer={skyLayer}
                 onLayer={onSkyLayer}
                 windHeight={windHeight}
+                at={scrubbedAt}
+                dayHour={(t) => {
+                  const tz = venueWindow?.timeZone ?? 'UTC'
+                  return `${new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short' }).format(t)} ${formatClock(t, tz).replace(/:00 /, ' ')}`
+                }}
+                satFailed={satFailed}
+                onSatRetry={() => {
+                  setSatFailed(false)
+                  setSatRetry((n) => n + 1)
+                }}
                 ratedWindMps={ratedWindMps}
               />
             )}
@@ -2474,7 +2495,19 @@ export function PlanMode({
         return (
           <Card title={layerWords.join(' · ') || 'Weather'} onClose={home}>
             {windMode && scrubbedAt !== null ? <WindHours at={scrubbedAt} from={new Date(windStrip?.from ?? Math.floor(Date.now() / 3_600_000) * 3_600_000)} strip={windStrip?.mps ?? []} unit={units.wind} timeZone={venueWindow?.timeZone ?? 'UTC'} /> : null}
-            <WeatherLayerCard layer={weatherLayer} alerts={layerNow?.alerts ?? []} upstream={layerUpstream} dist={units.distance === 'ft' ? 'mi' : 'km'} timeZone={venueWindow?.timeZone ?? 'UTC'} windFt={windLayerFt} onWindFt={setWindLayerFt} />
+            <WeatherLayerCard
+              cloudLabel={
+                sky.source.kind === 'satellite'
+                  ? { text: `Satellite ${formatClock(sky.source.frameAt, venueWindow?.timeZone ?? 'UTC')}`, failed: satFailed }
+                  : scrubbedAt === null
+                    ? null
+                    : { text: `Forecast · ${new Intl.DateTimeFormat('en-US', { timeZone: venueWindow?.timeZone ?? 'UTC', weekday: 'short' }).format(scrubbedAt)} ${formatClock(scrubbedAt, venueWindow?.timeZone ?? 'UTC').replace(/:00 /, ' ')}`, failed: false }
+              }
+              onCloudRetry={() => {
+                setSatFailed(false)
+                setSatRetry((n) => n + 1)
+              }}
+              layer={weatherLayer} alerts={layerNow?.alerts ?? []} upstream={layerUpstream} dist={units.distance === 'ft' ? 'mi' : 'km'} timeZone={venueWindow?.timeZone ?? 'UTC'} windFt={windLayerFt} onWindFt={setWindLayerFt} />
           </Card>
         )
       case 'moonrise':
@@ -2585,6 +2618,7 @@ export function PlanMode({
             onPositionMove={onPositionMove}
             onLongPress={onMeasurePress}
             sunAzimuth={sun === null ? null : sun.azimuth}
+            axisAzimuth={nightAxis}
             sunAltitude={sun?.altitude ?? null}
             showSky={showSky}
             showLabels={showLabels}
@@ -2594,15 +2628,24 @@ export function PlanMode({
             showBuildings={showBuildings}
             buildings={buildingData}
             skyFrameAt={sky.frameAt}
+            skyFadeFrameAt={sky.fadeFrameAt}
+            skyFade={sky.fade}
             skyForecast={sky.cells}
             skyLayer={skyLayer}
             windMeters={weatherLayer === 'wind' ? (windLayerFt === 0 ? GROUND_WIND_METERS : windLayerFt * 0.3048) : windHeight.feet === null ? GROUND_WIND_METERS : windHeight.feet * 0.3048}
             ratedWindMps={ratedWindMps}
             skyForecastOpacity={sky.opacity}
             sunOverlay={
-              sunOverlay === null || !moonOn || venue === null || scrubbedAt === null
+              /* Batch NOW, Section 4: at night the sun's line goes and the moon's comes, when it is up, without the switch. */
+              sunOverlay === null || venue === null || scrubbedAt === null
                 ? sunOverlay
-                : { ...sunOverlay, moon: getMoonArc(scrubbedAt, venue.lat, venue.lon) }
+                : (() => {
+                    const night = sun !== null && sun.altitude < 0
+                    const arc = moonOn || night ? getMoonArc(scrubbedAt, venue.lat, venue.lon) : null
+                    /* Without the switch, only the moon's own line, and only while it is up. */
+                    const moon = moonOn ? arc : arc !== null && arc.altitude > 0 ? { ...arc, rise: null, set: null } : null
+                    return { ...sunOverlay, altitude: sun?.altitude ?? null, ...(moon === null ? {} : { moon }) }
+                  })()
             }
             shadowFeatures={shadowFeatures}
             shadowPaint={shadowPaint}
@@ -2617,6 +2660,8 @@ export function PlanMode({
             windSpot={venue}
             windFacing={windFacing !== null && windFacing.key === windSpotKey ? windFacing.deg : null}
             windHeadline={windHeadline}
+            satRetry={satRetry}
+            onSatFailed={setSatFailed}
             onWindStrip={setWindStrip}
             vectorBase={vectorMap && !threeD}
             selectedId={selectedId}

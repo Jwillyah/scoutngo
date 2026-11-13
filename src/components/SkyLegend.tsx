@@ -38,6 +38,12 @@ interface SkyLegendProps {
   onLayer: (next: SkyLayerKind) => void
   /** The height the wind layer reads at, and what it is measured against. */
   windHeight: WindHeight
+  /** Batch NOW, Section 4: the scrubbed moment, and its day and hour in words ("Sat 1 AM") for the one label. */
+  at?: Date | null
+  dayHour?: (at: Date) => string
+  /** The satellite's tiles did not load: said, with a retry, never an empty map. */
+  satFailed?: boolean
+  onSatRetry?: () => void
   ratedWindMps: number | null
 }
 
@@ -69,6 +75,10 @@ export function SkyLegend({
   onLayer,
   windHeight,
   ratedWindMps,
+  at = null,
+  dayHour,
+  satFailed = false,
+  onSatRetry,
 }: SkyLegendProps) {
   const [table, setTable] = useState<ColormapResult | null>(null)
 
@@ -223,7 +233,9 @@ export function SkyLegend({
           * Everything else about what a model is goes behind the info tap.
           */}
         <p className="skykey__src skykey__src--fc">
-          <span className="skykey__badge skykey__badge--fc">Forecast</span>
+          <span className="skykey__badge skykey__badge--fc" data-sky-label="forecast">
+            Forecast{at === null || dayHour === undefined ? '' : ` · ${dayHour(at)}`}
+          </span>
           <span className="skykey__srcnote">Wind {windHeightLabel(windHeight)}</span>
         </p>
 
@@ -317,11 +329,21 @@ export function SkyLegend({
         * model result under a label that says observed is the exact failure
         * this split exists to avoid.
         */}
-      {sky.source.kind === 'satellite' ? (
+      {/* Batch NOW, Section 4: one label, "Satellite 11:10 AM" (the frame's own time) or "Forecast · Sat 1 AM"; a failed satellite says so. */}
+      {sky.source.kind === 'satellite' && satFailed ? (
+        <p className="skykey__src skykey__src--fail" data-sky-label="failed">
+          Satellite didn&rsquo;t load ·{' '}
+          <button type="button" className="skykey__retry" onClick={onSatRetry}>
+            Retry
+          </button>
+        </p>
+      ) : sky.source.kind === 'satellite' ? (
         <p className="skykey__src skykey__src--obs">
-          <span className="skykey__badge">Satellite</span>
+          <span className="skykey__badge" data-sky-label="satellite">
+            Satellite <span className="num">{clock(sky.source.frameAt)}</span>
+          </span>
           <span className="skykey__srcnote">
-            Frame <span className="num">{clock(sky.source.frameAt)}</span>, observed.
+            Observed.
             {sky.source.far
               ? ` Nearest frame is ${durationWords(sky.source.offsetMinutes)} from where you are scrubbing.`
               : ''}

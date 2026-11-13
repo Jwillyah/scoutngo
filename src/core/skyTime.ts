@@ -107,15 +107,28 @@ export const FRAME_FAR_MINUTES = 10
  * definition of where frames fall; this decides WHICH side of now the moment
  * is on and what that means.
  */
+/*
+ * THE NEWEST FRAME THERE IS (Batch NOW, Section 4; 12 Nov 11:17 AM the map's
+ * clouds were empty on a mostly cloudy day). GIBS publishes a GOES-East frame
+ * some time after its scan: measured 13 Nov 13:43Z, the visible band's newest
+ * was 13:10Z (13:20-13:40 answered 404) and the infrared's 13:20Z. At now the
+ * layer asked for the 0-10 minute old frame, every tile 404'd, and the map
+ * drew nothing and said nothing. So no frame newer than GIBS_LATENCY_MS
+ * before now is asked for; the label says the frame's own time.
+ */
+export const GIBS_LATENCY_MS = 40 * 60_000
+
 export function skySourceFor(
   scrubbedAt: Date,
   now: Date,
   snapToFrame: (at: Date) => Date,
+  latencyMs: number = GIBS_LATENCY_MS,
 ): SkySource {
   const aheadMs = scrubbedAt.getTime() - now.getTime()
 
   if (aheadMs <= 0) {
-    const frameAt = snapToFrame(scrubbedAt)
+    const newest = now.getTime() - latencyMs
+    const frameAt = snapToFrame(new Date(Math.min(scrubbedAt.getTime(), newest)))
     const offsetMinutes = Math.abs(scrubbedAt.getTime() - frameAt.getTime()) / 60_000
     return {
       kind: 'satellite',

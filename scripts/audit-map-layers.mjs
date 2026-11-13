@@ -248,6 +248,22 @@ try {
     }
     await shot('wind')
     /*
+     * Batch NOW, Section 4.2: wind mode at a future time. A tap on the bar
+     * lifts the sheet; under it was the planner ("0 positions · Suggest ·
+     * BOTH GROUND AIR"). Three hours on, then a tap: none of the planner.
+     */
+    {
+      const slider = page.locator('[data-wind-timebar] [role="slider"]').first()
+      await slider.focus().catch(() => undefined)
+      for (let i = 0; i < 3; i += 1) await page.keyboard.press('ArrowRight')
+      await slider.click({ timeout: 3000 }).catch(() => undefined)
+      await wait(1500)
+      const planner = JSON.parse(await ev(`JSON.stringify([...document.querySelectorAll('.shootc__acts, .shootc__head')].filter((e) => e.getBoundingClientRect().height > 0).map((e) => e.className))`))
+      console.log(`  wind mode, 3 h on: planner shown ${JSON.stringify(planner)}`)
+      if (planner.length > 0) fail(`${label}: wind mode at a future time shows the planner under the wind bar (${planner.join(', ')})`)
+      await shot('wind-future')
+    }
+    /*
      * Batch MAP2: the drone's 400 ft in the same look. Switching to it once
      * blanked the app (an update loop); here the layer must still draw, with
      * its readout, after the switch.

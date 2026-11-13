@@ -19291,3 +19291,26 @@ a.about__row * {
   gap: var(--space-3);
   padding: var(--space-2) 0;
 }
+
+/* Batch NOW, Section 4: the satellite failed, said in the legend's first line, with its retry. */
+.skykey__src--fail {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+.skykey__retry {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* Batch NOW, Section 4: the clouds layer's one label, over its note. */
+.wlay__label {
+  margin: 0 0 4px;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-heavy);
+}
