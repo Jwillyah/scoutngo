@@ -617,3 +617,11 @@ input[type='radio'] {
 .wweek__hi {
   text-align: right;
 }
+
+/* Batch NOW, Section 3.4: the 7 days take the page's spare height (no empty band above the foot); on a short phone the page scrolls as before. */
+.wpage .wweek {
+  flex: 1 0 auto;
+}
+.wpage .wweek__day {
+  flex: 1 0 auto;
+}

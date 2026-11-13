@@ -64,7 +64,23 @@ const MEASURE = `JSON.stringify((() => {
   if (page && page.scrollHeight > page.clientHeight + 1) scrolls.push('the page ' + page.scrollHeight + '/' + page.clientHeight)
   const today = home.querySelector('.home__page[aria-label="Today"]') ?? home
   const below = [...today.querySelectorAll('button, a, .hcard, p, span')].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.bottom > innerHeight + 1 }).map((e) => (e.getAttribute('class') ?? e.tagName).split(' ')[0] + ' ' + Math.round(e.getBoundingClientRect().bottom)).slice(0, 4)
-  return { scrolls, below, cards: today.querySelectorAll('.hcard, .hwh__tile').length, vh: innerHeight }
+  /*
+   * Batch NOW, Section 3.2: no chart word on another, every chart, every look.
+   * The words drawn in each chart box (gridline numbers, the peak's bubble and
+   * dot, the time ticks); any two sharing more than a pixel each way.
+   */
+  const hits = []
+  for (const box of today.querySelectorAll('.hcard__chartbox')) {
+    const card = (box.closest('.hcard')?.getAttribute('class') ?? '').split(' ').find((c) => /^hcard--/.test(c) && !/--(small|wide)$/.test(c)) ?? 'hcard'
+    const words = [...box.querySelectorAll('.hcard__gl, .hcard__peaklabel, .hcard__peakdot, .hcard__ticks > span')].filter((e) => { const s = getComputedStyle(e); const r = e.getBoundingClientRect(); return s.visibility !== 'hidden' && s.display !== 'none' && r.width > 0 && r.height > 0 })
+    for (let i = 0; i < words.length; i += 1) for (let j = i + 1; j < words.length; j += 1) {
+      const a = words[i].getBoundingClientRect()
+      const b = words[j].getBoundingClientRect()
+      const same = words[i].closest('.hcard__peak') !== null && words[i].closest('.hcard__peak') === words[j].closest('.hcard__peak')
+      if (!same && a.right - 1 > b.left && b.right - 1 > a.left && a.bottom - 1 > b.top && b.bottom - 1 > a.top) hits.push(card + ': "' + words[i].textContent.trim() + '" on "' + words[j].textContent.trim() + '"')
+    }
+  }
+  return { scrolls, below, hits, cards: today.querySelectorAll('.hcard, .hwh__tile').length, vh: innerHeight }
 })())`
 
 const browsers = {}
@@ -116,6 +132,7 @@ try {
       console.log(`  ${name}: ${m.cards} cards, ${m.scrolls.length === 0 ? 'no scroll' : `SCROLLS ${m.scrolls.join(', ')}`}${m.below.length === 0 ? '' : `, below the screen: ${m.below.join(', ')}`}`)
       for (const x of m.scrolls) fail(`${name}: ${x} scrolls`)
       if (m.below.length > 0) fail(`${name}: drawn below the screen's foot (${m.below.join(', ')})`)
+      for (const h of m.hits) fail(`${name}: a chart's words on each other: ${h}`)
       await page.screenshot({ path: join(OUT, `${name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.png`) })
       await ctx.close()
     }

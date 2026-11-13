@@ -60,6 +60,12 @@
   letter-spacing: -0.03em;
 }
 .hwx--d .hwx__cond {
+  /* A button since Batch NOW (3.1): it opens the Weather page. */
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
   margin: 2px 0 0;
   font-size: var(--text-md);
   color: rgb(255 255 255 / 0.85);
@@ -446,16 +452,40 @@
   flex: 1;
   min-height: 0;
 }
-/* Batch TRUTH, Section 4: rows their own height, not stretched over the page: seven fit with room. */
+/* Batch NOW, Section 3.3: the rows take the page's height (no empty band under them); the best line sits under the list. */
 .home .hweek__rows {
   display: flex;
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   min-height: 0;
   flex-direction: column;
 }
 .home .hweek__row {
-  flex: 0 0 auto;
+  flex: 1 0 auto;
   min-height: 40px;
+}
+/* The same columns every day: day, sky, (surf), wind, temperatures, the pill. */
+.hweek__row {
+  grid-template-columns: 3.2em 22px 1fr auto 3.6em;
+}
+.hweek--surf .hweek__row {
+  grid-template-columns: 3.2em 22px minmax(0, 1fr) 3.4em auto 3.4em;
+}
+.hweek__surf,
+.hweek__wind {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+.hweek__wind {
+  text-align: right;
+}
+.hweek__call--empty {
+  background: none;
+}
+.home .hweek__head {
+  margin: 0;
+  font-size: var(--text-md);
 }
 
 /*
@@ -643,4 +673,72 @@
   font-weight: 700;
   background: linear-gradient(90deg, rgb(232 135 106 / 0.55), rgb(108 90 168 / 0.55));
   cursor: pointer;
+}
+
+/* Batch NOW, Section 3.1: the eight hours above "Next:", slim, at the foot of the cards' space. */
+.hhours {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  padding: 3px 2px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 14px;
+  background: var(--glass);
+  color: var(--white);
+  font: inherit;
+  cursor: pointer;
+}
+.hhours__h {
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-areas: 'at at' 'icon t' 'r r';
+  justify-content: center;
+  justify-items: center;
+  align-items: center;
+  column-gap: 2px;
+  min-width: 0;
+  line-height: 1.1;
+}
+.hhours__at {
+  grid-area: at;
+}
+.hhours__t {
+  grid-area: t;
+}
+.hhours__r {
+  grid-area: r;
+}
+.hhours__at,
+.hhours__r {
+  font-size: var(--text-xs);
+  color: var(--white);
+  white-space: nowrap;
+}
+.hhours__icon {
+  grid-area: icon;
+  width: 14px;
+  height: 14px;
+}
+.hhours__t {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+}
+
+/* Batch NOW, Section 3.2: the bubble moved off an axis word (src/lib/chartLabelsDom.ts): to its other side, or under its dot. */
+.hcard__peak--flip {
+  flex-direction: row-reverse;
+  transform: translate(calc(-100% + 4px), -50%);
+}
+.hcard__peak--left.hcard__peak--flip {
+  flex-direction: row;
+  transform: translate(-4px, -50%);
+}
+.hcard__peak--below {
+  flex-direction: column;
+  gap: 2px;
+  transform: translate(-50%, -4px);
+}
+.hcard__peak--above {
+  flex-direction: column-reverse;
+  gap: 2px;
+  transform: translate(-50%, calc(-100% + 4px));
 }

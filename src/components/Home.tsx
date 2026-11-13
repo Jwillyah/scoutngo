@@ -29,12 +29,13 @@ import { useStormPlay } from '../lib/useStormPlay.ts'
 import { useMarineAlerts } from '../lib/coastData.ts'
 import { NetDebug } from './NetDebug.tsx'
 import { refreshLine, useWeatherRefreshing } from '../lib/useWeatherStatus.ts'
-import { ActivityIcon } from './ActivityIcon.tsx'
 import { MoonGlyph } from './MoonGlyph.tsx'
 /* Batch Polish 2, Section 4: not in the first paint's JavaScript. The cams' sheet opens on a tap; the weather-only home is one choice of five. */
 const WeatherHome = lazy(() => import('./WeatherHome.tsx').then((m) => ({ default: m.WeatherHome })))
 import { OPEN_RADAR_EVENT } from '../lib/pageEvents.ts'
 import { SkyIconSvg } from './SkyIconSvg.tsx'
+import { HomeHours } from './HomeHours.tsx'
+import { fitChartLabels } from '../lib/chartLabelsDom.ts'
 
 /*
  * THE HOME (Batch M, Section 3; boards "HOME 8 Nov · surfer / shooter").
@@ -335,9 +336,10 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
   const better = bestSky.event === null ? null : betterColorLine(bestSky.ranked, bestSky.here, venue, formatClock(bestSky.event.peak, timeZone), units.distance === 'ft')
   const nextText = nextWords === null ? (loading ? 'Reading the forecast…' : noForecast ? 'No forecast yet · retrying' : nothingLine(which, nextGood)) : `Next: ${nextWords}`
   const root = useRef<HTMLDivElement | null>(null)
-  const [fit, setFit] = useState<{ tight: 0 | 1 | 2; drop: number }>({ tight: 0, drop: 0 })
+  /* Batch NOW, Section 3.1: the eight hours go first when the page would scroll. */
+  const [fit, setFit] = useState<{ tight: 0 | 1 | 2; drop: number; hours?: boolean }>({ tight: 0, drop: 0, hours: true })
   useEffect(() => {
-    const again = () => setFit({ tight: 0, drop: 0 })
+    const again = () => setFit({ tight: 0, drop: 0, hours: true })
     window.addEventListener('resize', again)
     return () => window.removeEventListener('resize', again)
   }, [])
@@ -345,9 +347,11 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
   useLayoutEffect(() => {
     const page = root.current?.closest('.home__page') as HTMLElement | null
     if (page === null || page === undefined || page.scrollHeight <= page.clientHeight + 1) return
-    if (fit.tight < 2) setFit({ tight: fit.tight === 0 ? 1 : 2, drop: 0 })
+    /* The hours first (a snug home with no room for them shrinks the hero for nothing: 390 x 844 with five cards), then tighter. */
+    if (fit.hours === true) setFit({ ...fit, hours: false })
+    else if (fit.tight < 2) setFit({ tight: fit.tight === 0 ? 1 : 2, drop: 0, hours: false })
     /* The weather-only home has one block: its week is the one thing it can leave (WeatherHome's drop). */
-    else if (fit.drop < Math.max(shown.length - 1, weatherOnly && which === 'today' ? 1 : 0)) setFit({ tight: 2, drop: fit.drop + 1 })
+    else if (fit.drop < Math.max(shown.length - 1, weatherOnly && which === 'today' ? 1 : 0)) setFit({ tight: 2, drop: fit.drop + 1, hours: false })
   }, [fit, shown.length, brief, layout, nextText, cams.length, weatherOnly, which])
   /* oxlint-enable react/set-state-in-effect */
   const cardsShown = fit.drop === 0 ? shown : shown.slice(0, shown.length - fit.drop)
@@ -374,10 +378,11 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
         <button type="button" className="hwx__temp num" data-shared="temp" data-value={bigTemp === null ? '' : temp(bigTemp)} onClick={() => onOpen('weather')} aria-label={`${bigTemp === null ? 'No temperature' : temp(bigTemp)}: the weather`}>
           {bigTemp === null ? (loading ? '…' : '—') : temp(bigTemp)}
         </button>
-        <p className="hwx__cond">
+        {/* Batch NOW, Section 3.1: the condition and the day's high and low open the Weather page too. */}
+        <button type="button" className="hwx__cond" data-open-weather onClick={() => onOpen('weather')}>
           {cond?.word ?? '—'} · H {temp(hi)} L {temp(lo)}
-          {soonWord === null ? '' : ` · ${soonWord}`}
-        </p>
+          {soonWord === null ? '' : ` · ${soonWord}`} ›
+        </button>
       </div>
       {stormLine === null ? null : <p className="hday__storm">{stormLine}</p>}
 
@@ -394,6 +399,7 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
           ))}
         </div>
       )}
+      {weatherOnly || which !== 'today' || fit.hours !== true ? null : <HomeHours wx={wx} now={now} venue={venue} timeZone={timeZone} units={units} obs={obs} onOpen={() => onOpen('weather')} />}
       {/* Batch TRUTH, Section 4: the Next line alone; the cams live in the menu ("Next: … / Cams · VB Pier" was two things in one row). */}
       {/* Batch BEST SKY, Section 4: when somewhere near has better color than here, that is the row; it opens "Where's the color?". */}
       {better === null ? (
@@ -409,10 +415,17 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
 
 /** A mini chart's words over its drawing (Batch Polish, Section 3; Batch Polish 2, Section 2): gridline labels, the peak, "steady all day", the time ticks. */
 function ChartMarksText({ marks, unit }: { marks: SurfChartMarks | null; unit: string }) {
+  /* Batch NOW, Section 3.2: after every draw, the words measured and moved off each other (src/lib/chartLabelsDom.ts). */
+  const anchor = useRef<HTMLSpanElement | null>(null)
+  useLayoutEffect(() => {
+    const box = anchor.current?.closest('.hcard__chartbox') as HTMLElement | null | undefined
+    if (box != null) fitChartLabels(box)
+  })
   if (marks === null) return null
   const one = (v: number) => (unit === 'ft' ? v.toFixed(1) : String(Math.round(v)))
   return (
     <>
+      <span ref={anchor} hidden />
       {marks.grid.map((g, i) => (
         <span key={g.ft} className={`hcard__gl${i === 1 ? ' hcard__gl--mid' : ''}`} style={{ top: `${g.y * 100}%` }}>
           {g.ft}
@@ -886,18 +899,19 @@ function WeekView({ brief, order, timeZone, units, now, venue, surf }: { brief: 
     return { d, pill, name: d.index === 0 ? 'Today' : day(d.start), cond, hi: temps.length === 0 ? null : Math.max(...temps), lo: temps.length === 0 ? null : Math.min(...temps), worth, surfWords: worth === null ? (surfDay?.words ?? null) : null, surfFact: surfDay?.fact ?? null, weather: weather === '' ? null : weather, call: d.reads.sunset?.call ?? null, guess: d.index >= WEEK_SURE_DAYS }
   })
   const head = weekHeadline(rows.filter((r) => r.d.index > 0 && r.worth !== null).map((r) => ({ day: r.name, what: (r.worth as Activity) === 'shoot' ? 'sunset' : (r.worth as string) })))
+  const surfCol = order.includes('surf')
   void now
   void venue
   return (
-    <div className="hweek">
-      <p className="hweek__head">{head ?? (brief.status === 'loading' ? 'Reading the forecast…' : wx === null || brief.days.every((d) => d.wind.every((w) => w.mps === null)) ? 'No forecast yet · retrying' : 'Nothing standout this week')}</p>
+    <div className={`hweek${surfCol ? ' hweek--surf' : ''}`}>
+      {/* Batch NOW, Section 3.3: every day the same columns (surf, wind, temperatures, the pill); the drone is a pill, never a row of its own words; the rows take the height and the best line sits under them. */}
       <ol className="hweek__rows">
         {rows.map((r) => (
           <li key={r.d.iso} className={`hweek__row${r.guess ? ' hweek__row--guess' : ''}`}>
             <span className="hweek__day">{r.name}</span>
             {r.cond === null ? <span className="hweek__icon">—</span> : <SkyIconSvg icon={r.cond.icon} className="hweek__icon" />}
-            {/* Batch Polish, Section 4: a day's worth carries its fact ("Drone · 6 kt max"), never the word alone. */}
-            <span className="hweek__worth">{r.worth !== null ? <><ActivityIcon activity={r.worth} className="hweek__act" /> {WORTH_WORD[r.worth]}{worthFact(r.worth, r.d, r.surfFact) === null ? '' : ` · ${worthFact(r.worth, r.d, r.surfFact)}`}</> : r.surfWords !== null ? <span className="hweek__range num">{r.surfWords}</span> : r.weather !== null ? <span className="hweek__range num">{r.weather}</span> : '—'}</span>
+            {surfCol ? <span className="hweek__surf num">{r.surfFact ?? '—'}</span> : null}
+            <span className="hweek__wind num">{r.d.windMaxKt === null ? '—' : `${Math.round(r.d.windMaxKt)} kt`}</span>
             {/* Batch Polish, Section 4: the high and the low on one line, "64° · 45°". */}
             <span className="hweek__t">
               {formatTemperature(r.hi, units.temperature).replace(/°[FC]$/, '°')}
@@ -907,25 +921,15 @@ function WeekView({ brief, order, timeZone, units, now, venue, surf }: { brief: 
               * Batch TRUTH, Section 4: the pill is the row's best activity, the same call the "Best this week" line reads
               * ("Best: Tue fish" over a Tue row that said Skip, 12 Nov); a day with none shows the sunset call, Shoot's alone.
               */}
-            {r.pill === null ? null : <span className={`hweek__call hweek__call--${r.pill.tone}`} data-pill={r.pill.word}>{r.pill.word}</span>}
+            {r.pill === null ? <span className="hweek__call hweek__call--empty" aria-hidden="true" /> : <span className={`hweek__call hweek__call--${r.pill.tone}`} data-pill={r.pill.word}>{r.pill.word}</span>}
           </li>
         ))}
       </ol>
+      <p className="hweek__head">{head ?? (brief.status === 'loading' ? 'Reading the forecast…' : wx === null || brief.days.every((d) => d.wind.every((w) => w.mps === null)) ? 'No forecast yet · retrying' : 'Nothing standout this week')}</p>
       <p className="hweek__note">Days 4–7 are guesses: the models drift apart that far out.</p>
     </div>
   )
 }
-
-const WORTH_WORD: Record<Activity, string> = { surf: 'Surf', shoot: 'Sunset', drone: 'Drone', fish: 'Calm', weather: 'Dry' }
-
-/** The fact behind a day's worth (Batch Polish, Section 4): the day's strongest wind for the drone and calm water, the surf's range, the call for the light. */
-function worthFact(worth: Activity, d: DayBrief, surfFact: string | null): string | null {
-  if (worth === 'drone' || worth === 'fish') return d.windMaxKt === null ? null : `${Math.round(d.windMaxKt)} kt max`
-  if (worth === 'surf') return surfFact
-  if (worth === 'shoot') return d.reads.sunset?.call === 'Go' ? 'sunset Go' : d.reads.sunrise?.call === 'Go' ? 'sunrise Go' : null
-  return null
-}
-
 
 /** What a day is worth, in the user's order: Fun or Firing surf (weekSurf: never past day 3), a Go sunset or sunrise, a calm day at 400 ft, wind under 10 kt, dry. */
 function worthOf(d: DayBrief, order: readonly Activity[], surfOnDay: boolean): Activity | null {
