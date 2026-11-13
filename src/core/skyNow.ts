@@ -27,6 +27,7 @@
 import type { CallRead } from './briefing.ts'
 import type { FireVerdict } from './fireOutlook.ts'
 import type { CloudGroup, MetarSky } from './metar.ts'
+import { skyCell } from './statStrip.ts'
 
 export const NOW_AFTER_SUNRISE_MIN = 30
 export const NOW_BEFORE_SUNSET_MIN = 90
@@ -77,8 +78,10 @@ export function skyNow(station: MetarSky | null, modelIn: { low: number | null; 
   const reportedHigh = groups.some((g) => layerOf(g.baseFt) === 'high')
   if (!reportedHigh && high !== null && high >= 10) parts.push(`${high >= 60 ? 'a high veil' : 'thin cirrus'} above${station === null ? '' : ' (forecast)'}`)
   if (station === null && model !== null) {
+    /* The one sky word's (src/core/statStrip.ts skyCell), as the home and the Weather page say it. */
     const under = Math.max(model.low ?? 0, model.mid ?? 0)
-    if (under >= 10) parts.unshift(`${under >= 90 ? 'overcast' : under >= 60 ? 'mostly cloudy' : under >= 30 ? 'some cloud' : 'a few clouds'} under 20,000 ft (forecast)`)
+    const word = skyCell({ low: model.low, mid: model.mid, high: 0 })
+    if (under >= 10 && word !== null) parts.unshift(`${word.toLowerCase()} under 20,000 ft (forecast)`)
   }
   const clouds = parts.length === 0 ? (model === null ? 'the forecast did not say, and no station report in the last 75 minutes' : 'no cloud in the forecast') : parts.join(' · ')
   const source = station !== null ? 'station' : model !== null ? 'forecast' : null

@@ -76,3 +76,9 @@ describe('Now never says clear from nothing', () => {
     expect(r.nothing).toMatch(/nothing to go on/)
   })
 })
+
+describe('Now says the one sky word', () => {
+  it('the forecast under 20,000 ft in the home\'s and the Weather page\'s words: "Partly cloudy", never "some cloud"', () => {
+    expect(skyNow(null, { low: 40, mid: 20, high: 10 }, 30, 'S').clouds).toBe('partly cloudy under 20,000 ft (forecast) · thin cirrus above')
+  })
+})
