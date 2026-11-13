@@ -6,7 +6,7 @@ import { inView } from '../src/core/tileView.ts'
 
 /* WHERE'S THE COLOR? PAGE 1, THE MAP (Batch BEST SKY, Section 3; board BestSky_Map). */
 const PIER = { lat: 36.8435575, lon: -75.9713104 }
-const point = (lat: number, lon: number, score: number, blocked = false): ScoredPoint => ({ lat, lon, canvas: score, overhead: score, gap: 1, blocked, score, word: score >= 0.5 ? 'Likely' : score >= 0.25 ? 'Possible' : 'Little', why: [] })
+const point = (lat: number, lon: number, score: number, blocked = false): ScoredPoint => ({ lat, lon, sunScore: score, sunWhy: [], glow: 0, glowFires: false, belt: false, canvas: score, overhead: score, gap: 1, blocked, score, word: score >= 0.5 ? 'Likely' : score >= 0.25 ? 'Possible' : 'Little', why: [] })
 
 describe('the area as a map', () => {
   it('every radius: the ring inside the box, you in it, at most 16 imagery tiles', () => {

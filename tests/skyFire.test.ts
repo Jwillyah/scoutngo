@@ -64,7 +64,15 @@ describe('29 Oct, replayed', () => {
   it('was asked for with every point rounded to 2 decimals', () => {
     const q = new URL(FIXTURE.url).searchParams
     for (const v of [...(q.get('latitude') ?? '').split(','), ...(q.get('longitude') ?? '').split(',')]) expect(v).toMatch(/^-?\d+\.\d{2}$/)
-    expect(firePathsUrl(FIXTURE.venue, FIXTURE.azimuth, '2026-10-29')).toBe(FIXTURE.url)
+    /* Kept before the opposite sky was asked (Batch NOW, Section 0): the same eight path points first, then the opposite sky's two, rounded the same. */
+    const now = new URL(firePathsUrl(FIXTURE.venue, FIXTURE.azimuth, '2026-10-29')).searchParams
+    for (const k of ['latitude', 'longitude']) {
+      const was = (q.get(k) ?? '').split(',')
+      const is = (now.get(k) ?? '').split(',')
+      expect(is.slice(0, was.length)).toEqual(was)
+      expect(is).toHaveLength(was.length + 2)
+      for (const v of is) expect(v).toMatch(/^-?\d+\.\d{2}$/)
+    }
   })
 })
 

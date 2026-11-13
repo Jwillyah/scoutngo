@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { gridSpacing, gridTiles, roundedCentre, scoreAt } from '../src/core/bestSky.ts'
+import { gridSpacing, gridTiles, POSSIBLE_FROM, roundedCentre, scoreAt } from '../src/core/bestSky.ts'
 import { STARTER_SPOTS } from '../src/data/bestSkySpots.ts'
 import { tileUrl } from '../src/lib/bestSkyData.ts'
 import { replay, spot } from './bestSkyReplay.ts'
@@ -46,7 +46,8 @@ describe('replays', () => {
   })
   it('12 Nov sunrise: the east-facing beaches Possible or better, from the satellite\'s patch (the models had none)', () => {
     const sat = readdirSync('tests/data/bestsky-2026-11-12').find((f) => f.startsWith('goes-'))!
-    expect(replay('2026-11-12', 'sunrise', null).every((g) => g.word === 'Little')).toBe(true)
+    /* Toward the sun, nothing lit without it (the opposite sky's pink is its own score, Batch NOW). */
+    expect(replay('2026-11-12', 'sunrise', null).every((g) => g.sunScore < POSSIBLE_FROM)).toBe(true)
     const grid = replay('2026-11-12', 'sunrise', sat)
     for (const id of ['vb-pier', 'rudee-inlet', 'fort-story', 'sandbridge']) expect(['Likely', 'Possible']).toContain(scoreAt(grid, spot(id))!.word)
   })

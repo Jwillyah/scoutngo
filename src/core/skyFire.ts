@@ -29,6 +29,7 @@
  */
 import { destination } from '@turf/destination'
 import { getTimes } from 'suncalc'
+import { antiSolar, OPPOSITE_SAMPLES } from './afterglow.ts'
 import type { LatLon } from './geo.ts'
 
 export const EARTH_RADIUS_KM = 6371
@@ -92,6 +93,16 @@ export interface Layers {
 export interface ModelPath {
   model: FireModel
   samples: Layers[]
+  /** The opposite sky (Batch NOW, Section 0): opposite[i] is at OPPOSITE_SAMPLES[i]; absent in answers kept before it was asked. */
+  opposite?: Layers[]
+}
+
+/** The opposite sky's sample points (src/core/afterglow.ts), rounded for sending as the path's. */
+export function oppositePoints(from: LatLon, sunAzDeg: number): { km: number; at: LatLon }[] {
+  return OPPOSITE_SAMPLES.map(({ dAz, km }) => {
+    const [lon, lat] = destination([from.lon, from.lat], km, antiSolar(sunAzDeg) + dAz, { units: 'kilometers' }).geometry.coordinates
+    return { km, at: { lat: roundCoord(lat), lon: roundCoord(lon) } }
+  })
 }
 
 /** The spread of low cloud overhead across the five, for "models split" on the chip. */

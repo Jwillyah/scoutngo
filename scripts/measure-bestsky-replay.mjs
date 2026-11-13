@@ -22,7 +22,9 @@ const centre = { lat: Number(lat), lon: Number(lon) }
 const event = getTimes(new Date(`${date}T12:00:00Z`), centre.lat, centre.lon)[kind]
 const az = getPosition(event, centre.lat, centre.lon).azimuth
 const hour = new Date(Math.round(event.getTime() / 3_600_000) * 3_600_000).toISOString().slice(0, 13) + ':00'
-const dir = `tests/data/bestsky-${date}`
+/* tag=<name>: kept apart from the date's other replay (12 Nov has a sunrise's and a sunset's). */
+const tag = rest.find((a) => a.startsWith('tag='))?.slice(4) ?? null
+const dir = `tests/data/bestsky-${date}${tag === null ? '' : `-${tag}`}`
 mkdirSync(dir, { recursive: true })
 const tiles = gridTiles(centre, Number(radius))
 const points = []

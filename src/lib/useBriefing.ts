@@ -263,7 +263,7 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
         if (e === null || f === null) continue
         const data = f.week[kind]
         const paths = data === null ? [] : pathsAt(data, nearestHour(e))
-        verdicts[kind] = paths.length === 0 ? null : fireVerdict(paths, { event: e, kind, venue: at, station })
+        verdicts[kind] = paths.length === 0 ? null : fireVerdict(paths, { event: e, kind, venue: at, station, facing })
         const satHere = sat !== null && sat.key === key && sat.event === e.getTime() ? sat.read : null
         const obsHere = nextEvent !== null && e.getTime() === nextEvent.getTime() ? obs : null
         reads[kind] = eventCall(verdicts[kind], kind, e, now, satHere, obsHere === null ? null : { venue: at, truth: obsHere.truth, gap: obsHere.gap })

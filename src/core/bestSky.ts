@@ -15,9 +15,14 @@
  *   blocked   a thick low deck overhead: nothing gets under it
  *   patch     within 3 h of the event, the satellite's cold cloud tops over a
  *             point where the models smeared the cloud thin (lib)
+ *   afterglow the opposite sky (Batch NOW, Section 0; src/core/afterglow.ts):
+ *             broken low or mid cloud within 50 km and 60° of the anti-solar
+ *             bearing, lit pink after the sunset when the light gets in;
+ *             the Belt of Venus over a clear one
  *
  * Words are facts on a scale: Likely, Possible, Little. Never a promise.
  */
+import { antiSolar, apartDeg, OPPOSITE_SPREAD_DEG, readAfterglow } from './afterglow.ts'
 import { bearingBetween, destinationPoint, distanceMeters, type LatLon } from './geo.ts'
 import { compassPoint } from './field.ts'
 
@@ -77,11 +82,20 @@ export interface PointSky extends LatLon {
 export type ColorWord = 'Likely' | 'Possible' | 'Little'
 
 export interface ScoredPoint extends LatLon {
+  /** The cloud toward the sun lit: what a spot facing the sun sees. */
+  sunScore: number
+  /** The sunScore's reasons, as `why`. */
+  sunWhy: string[]
+  /** The opposite sky's pink (or the Belt of Venus): what a spot facing away sees, 0-0.6. */
+  glow: number
+  glowFires: boolean
+  belt: boolean
   canvas: number
   /** The canvas over the point itself, a real one (CANVAS_FROM up, or the satellite's patch): what lights up for anyone under it, whichever way they face. Thin cloud lights only toward the sun. */
   overhead: number
   gap: number
   blocked: boolean
+  /** The better of the two: turn round. */
   score: number
   word: ColorWord
   /** In three words or so: "patch overhead", "gap open WSW". */
@@ -115,6 +129,8 @@ const upper = (p: PointSky) => Math.max(p.mid ?? 0, p.high ?? 0)
  */
 export function scoreGrid(points: readonly PointSky[], sunAzDeg: number, farLow: number | null = null): ScoredPoint[] {
   const toward = compassPoint(sunAzDeg)
+  const anti = antiSolar(sunAzDeg)
+  const away = compassPoint(anti)
   return points.map((p) => {
     const blocked = (p.low ?? 0) >= BLOCK_LOW
     /* Toward the sun: the grid's points within ±30° of its bearing. */
@@ -128,13 +144,19 @@ export function scoreGrid(points: readonly PointSky[], sunAzDeg: number, farLow:
     const lows = [...ahead.map((q) => q.low ?? 0), ...(farLow === null ? [] : [farLow])]
     const meanLow = lows.length === 0 ? (p.low ?? 0) : lows.reduce((a, b) => a + b, 0) / lows.length
     const gap = Math.max(0, 1 - meanLow / 100)
-    const score = blocked ? 0 : canvas * gap
+    const sunScore = blocked ? 0 : canvas * gap
+    /* The opposite sky: the grid's points within reach and OPPOSITE_SPREAD_DEG of the anti-solar bearing, and the point itself. */
+    const opposite = points.filter((q) => q !== p && distanceMeters(p, q) / 1000 <= CANVAS_REACH_KM && apartDeg(bearingBetween(p, q), anti) <= OPPOSITE_SPREAD_DEG)
+    const ag = blocked ? null : readAfterglow({ opposite: [p, ...opposite], sunLow: lows.length === 0 ? [p.low] : lows })
+    const glow = ag?.score ?? 0
+    const score = Math.max(sunScore, glow)
     const word: ColorWord = score >= LIKELY_FROM ? 'Likely' : score >= POSSIBLE_FROM ? 'Possible' : 'Little'
-    const why = [
+    const sunWhy = [
       blocked ? 'low deck overhead' : patch || overhead >= 0.8 ? 'patch overhead' : nearBest >= 0.8 ? `patch to the ${toward}` : upper(p) < 10 && nearBest < 0.3 ? 'clear sky' : 'thin cloud',
       gap >= 0.7 ? `gap open ${toward}` : gap >= 0.4 ? `gap partly ${toward}` : `gap shut ${toward}`,
     ]
-    return { lat: p.lat, lon: p.lon, canvas, overhead: Math.max(upper(p) >= CANVAS_FROM ? overhead : 0, patch ? 0.9 : 0), gap, blocked, score, word, why }
+    const why = glow > sunScore && ag !== null ? [ag.fires ? `cloud to the ${away} to catch the pink` : `Belt of Venus ${away}`, gap >= 0.7 ? `light in from the ${toward}` : `light partly in from the ${toward}`] : sunWhy
+    return { lat: p.lat, lon: p.lon, sunScore, sunWhy, glow, glowFires: ag?.fires === true, belt: ag?.belt === true, canvas, overhead: Math.max(upper(p) >= CANVAS_FROM ? overhead : 0, patch ? 0.9 : 0), gap, blocked, score, word, why }
   })
 }
 
@@ -215,6 +237,8 @@ export const OVERHEAD_KM = 3
 export const PATCH_CANVAS = 0.8
 
 export const WATER_BONUS = 0.08
+/** A spot faces the opposite sky when its view is within this of the anti-solar bearing. */
+export const AWAY_HALF_DEG = 90
 export const SILHOUETTE_BONUS = 0.04
 
 const apart = (a: number, b: number) => Math.abs((((a - b) % 360) + 540) % 360 - 180)
@@ -245,9 +269,14 @@ export function rankSpots(grid: readonly ScoredPoint[], spots: readonly SpotIn[]
       if (g === null) return []
       const seesSun = s.facing !== null && apart(s.facing, sunAzDeg) <= s.openDeg
       /* Without the view toward the sun, only the cloud overhead lights up for you. */
-      const base = seesSun ? g.score : g.blocked ? 0 : g.overhead * g.gap
+      const base = seesSun ? g.sunScore : g.blocked ? 0 : g.overhead * g.gap
       const bonus = base <= 0 ? 0 : (s.water && seesSun ? WATER_BONUS : 0) + (s.silhouette !== null && seesSun ? SILHOUETTE_BONUS : 0)
-      const score = Math.min(1, base + bonus)
+      /* Facing the opposite half of the sky (Batch NOW, Section 0): its pink, water in front a little more. */
+      const anti = antiSolar(sunAzDeg)
+      const facesAway = s.facing !== null && apart(s.facing, anti) <= AWAY_HALF_DEG
+      const glow = facesAway && g.glow > 0 ? g.glow + (s.water && g.glowFires ? WATER_BONUS : 0) : 0
+      const byGlow = glow > base + bonus
+      const score = Math.min(1, byGlow ? glow : base + bonus)
       const word: ColorWord = score >= LIKELY_FROM ? 'Likely' : score >= POSSIBLE_FROM ? 'Possible' : 'Little'
       const view = s.facing === null ? 'facing not known' : `faces ${compassPoint(s.facing)}${s.water ? ' over water' : ''}`
       const tie: SpotTie = {
@@ -256,7 +285,9 @@ export function rankSpots(grid: readonly ScoredPoint[], spots: readonly SpotIn[]
         water: s.water,
         km: from === null ? null : distanceMeters(from, s.at) / 1000,
       }
-      return [{ spot: s, score, word, view, why: seesSun ? g.why : [g.why[0], 'faces away from the sun'], seesSun, tie }]
+      const look = compassPoint(anti)
+      const why = byGlow ? [g.glowFires ? `pink on the clouds ${look}` : `Belt of Venus ${look}`, s.water ? 'over the water' : 'facing that way'] : seesSun ? g.sunWhy : [g.sunWhy[0], 'faces away from the sun']
+      return [{ spot: s, score, word, view, why, seesSun, tie }]
     })
     .sort(compareRanked)
 }

@@ -18,16 +18,18 @@ export function eventOf(date: string, kind: 'sunrise' | 'sunset'): { at: Date; a
   return { at, az: getPosition(at, VB.lat, VB.lon).azimuth }
 }
 
-export function replay(date: string, kind: 'sunrise' | 'sunset', sat: string | null) {
+/** `tag`: the replay kept apart from the date's other (tests/data/bestsky-<date>-<tag>/: 12 Nov's sunset). */
+export function replay(date: string, kind: 'sunrise' | 'sunset', sat: string | null, tag: string | null = null) {
+  const dir = `tests/data/bestsky-${date}${tag === null ? '' : `-${tag}`}`
   const event = getTimes(new Date(`${date}T12:00:00Z`), VB.lat, VB.lon)[kind] as Date
   const hour = new Date(Math.round(event.getTime() / 3_600_000) * 3_600_000).toISOString().slice(0, 13) + ':00'
   const points: PointSky[] = []
   for (const t of gridTiles(VB, 15)) {
-    const kept = JSON.parse(readFileSync(`tests/data/bestsky-${date}/tile-${t.spacing}-${t.south}-${t.west}.json`, 'utf8'))
+    const kept = JSON.parse(readFileSync(`${dir}/tile-${t.spacing}-${t.south}-${t.west}.json`, 'utf8'))
     points.push(...(readTile(kept, t.points, hour) ?? []))
   }
   if (sat !== null) {
-    const g = JSON.parse(readFileSync(`tests/data/bestsky-${date}/${sat}`, 'utf8')) as { c: (number | null)[] }
+    const g = JSON.parse(readFileSync(`${dir}/${sat}`, 'utf8')) as { c: (number | null)[] }
     const ground = Math.max(...g.c.filter((c): c is number => c !== null))
     g.c.forEach((c, i) => (points[i].satPatch = c === null ? null : c < ground - 12))
   }

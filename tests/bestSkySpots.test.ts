@@ -32,8 +32,8 @@ describe('who sees the patch (Section 2)', () => {
     expect(ranked.findIndex((r) => r.spot.id === 'lynnhaven-inlet')).toBeLessThan(ranked.findIndex((r) => r.spot.id === 'vb-pier'))
     const pier = ranked.find((r) => r.spot.id === 'vb-pier')!
     expect(pier.seesSun).toBe(false)
-    expect(pier.why).toContain('faces away from the sun')
-    /* The oceanfront was cloudless (the truth file): 13% mid overhead is no canvas for a view facing away. */
+    /* The oceanfront was cloudless (the truth file): 13% mid overhead is no canvas for a view facing away; the clear east is the Belt of Venus at most (Batch NOW, Section 0), Little alone. */
+    expect(pier.why[0]).toMatch(/^Belt of Venus /)
     expect(pier.word).toBe('Little')
     expect(ranked.slice(0, 3).map((r) => `${r.spot.name} ${r.score.toFixed(2)}`)).toHaveLength(3)
   })
@@ -45,7 +45,7 @@ describe('the tie-break, from code (11 Nov: five spots at 1.00)', () => {
     /* One patch, a 5 km ring of points round the spots, every one a canvas with the gap open. */
     const grid = [0, 45, 90, 135, 180, 225, 270, 315].map((b) => {
       const p = offset(at, b, 5)
-      return { ...p, canvas: 1, overhead: 1, gap: 1, blocked: false, score: 1, word: 'Likely' as const, why: [] }
+      return { ...p, sunScore: 1, sunWhy: [], glow: 0, glowFires: false, belt: false, canvas: 1, overhead: 1, gap: 1, blocked: false, score: 1, word: 'Likely' as const, why: [] }
     })
     const base = { at, openDeg: 60, water: true, silhouette: null }
     const ids = (from: { lat: number; lon: number } | null, spots: Parameters<typeof rankSpots>[1]) => rankSpots(grid, spots, 270, from).map((r) => r.spot.id)

@@ -1,0 +1,23 @@
+{
+  "about": "Field truth, Virginia Beach, Fri 13 Nov 2026 (Batch NOW). What was seen and measured, and what the app showed. Times local (America/New_York).",
+  "place": { "name": "VB oceanfront / Croatan / 1st St Jetty", "lat": 36.8435575, "lon": -75.9713104, "facingDeg": 100, "timeZone": "America/New_York" },
+  "surf": { "surflineObserved": "Flat", "ours": { "range": "0-1", "word": "Flat" }, "hit": true },
+  "sunrise": {
+    "at": "06:45",
+    "seen": "broken Sc/Ac deck with a clear E slot, gold and orange under the deck",
+    "cams": [{ "where": "Croatan", "at": "06:52" }, { "where": "Jetty", "at": "06:47" }],
+    "truth": "Maybe"
+  },
+  "wind": {
+    "at": "07:55",
+    "observed": [
+      { "source": "Surfline", "kt": 14, "gustKt": 19, "from": "WNW" },
+      { "source": "Cape Henry", "kt": 23, "gustKt": null, "from": "NNW" }
+    ],
+    "ours": { "where": "Sandbridge", "kt": 7, "from": "W" }
+  },
+  "skyWord": {
+    "station": { "id": "KNTU", "report": "broken deck" },
+    "weShowed": [{ "where": "Pembroke", "word": "Overcast" }, { "where": "Sandbridge", "word": "Mostly cloudy" }]
+  }
+}

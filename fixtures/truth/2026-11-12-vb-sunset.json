@@ -1,0 +1,12 @@
+{
+  "about": "Field truth, sunset Thu 12 Nov 2026, Virginia Beach oceanfront (Batch NOW). What was seen and what the app showed. Times local (America/New_York).",
+  "place": { "name": "VB oceanfront (Fishing Pier)", "lat": 36.8435575, "lon": -75.9713104, "facingDeg": 100, "timeZone": "America/New_York" },
+  "event": "sunset",
+  "seen": {
+    "westHorizon": "clear",
+    "overhead": "scattered cumulus lit gold",
+    "east": "pink on the clouds over the ocean to the E"
+  },
+  "jwilly": "okay, Oceanfront prob more pink",
+  "appSaid": { "sky": "Unlikely", "weatherWord": "Clear" }
+}

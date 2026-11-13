@@ -1,14 +1,16 @@
 /*
  * THE FIGURES BEHIND SKY FIRE, fetched. Arithmetic is src/core/skyFire.ts.
  *
- * WHAT LEAVES THE PHONE. To Open-Meteo: eight points along the sun's line,
- * each rounded to 2 decimals (about a kilometre), and a date. To
+ * WHAT LEAVES THE PHONE. To Open-Meteo: eight points along the sun's line
+ * and two on the opposite sky (Batch NOW, Section 0: the afterglow), each
+ * rounded to 2 decimals (about a kilometre), and a date. To
  * api.weather.gov, only in the two hours before the event: the venue rounded
  * the same way, to find the nearest stations, then station ids. To this
  * app's /api/metar, only when weather.gov gives no METAR text: a station id.
  * No key, nothing stored server-side.
  */
-import { FIRE_MODELS, PATH_KM, pathPoints, roundCoord, type FireModel, type Layers, type ModelPath } from '../core/skyFire.ts'
+import { OPPOSITE_SAMPLES } from '../core/afterglow.ts'
+import { FIRE_MODELS, oppositePoints, PATH_KM, pathPoints, roundCoord, type FireModel, type Layers, type ModelPath } from '../core/skyFire.ts'
 import { parseMetarSky, type MetarSky } from '../core/metar.ts'
 import type { LatLon } from '../core/geo.ts'
 import { OPEN_METEO_URL, TIMEOUT_MS } from './forecast.ts'
@@ -24,8 +26,13 @@ export interface FirePaths {
   stale?: boolean
 }
 
+/** One event's points: the sun's line, then the opposite sky. */
+const linePoints = (from: LatLon, azimuthDeg: number) => [...pathPoints(from, azimuthDeg), ...oppositePoints(from, azimuthDeg)]
+/** Points in one event's answer. */
+export const LINE_POINTS = PATH_KM.length + OPPOSITE_SAMPLES.length
+
 export function firePathsUrl(from: LatLon, azimuthDeg: number, date: string): string {
-  const pts = pathPoints(from, azimuthDeg)
+  const pts = linePoints(from, azimuthDeg)
   const params = new URLSearchParams({
     latitude: pts.map((p) => p.at.lat.toFixed(2)).join(','),
     longitude: pts.map((p) => p.at.lon.toFixed(2)).join(','),
@@ -68,7 +75,7 @@ export async function fetchFirePathsRange(from: LatLon, azimuthDeg: number, star
  * about a degree in two days in November), the week's dates.
  */
 export function firePathsBothUrl(from: LatLon, riseAzDeg: number, setAzDeg: number, startDate: string, endDate: string): string {
-  const pts = [...pathPoints(from, riseAzDeg), ...pathPoints(from, setAzDeg)]
+  const pts = [...linePoints(from, riseAzDeg), ...linePoints(from, setAzDeg)]
   const u = new URL(firePathsUrl(from, riseAzDeg, startDate))
   u.searchParams.set('latitude', pts.map((p) => p.at.lat.toFixed(2)).join(','))
   u.searchParams.set('longitude', pts.map((p) => p.at.lon.toFixed(2)).join(','))
@@ -78,8 +85,10 @@ export function firePathsBothUrl(from: LatLon, riseAzDeg: number, setAzDeg: numb
 
 /** The two halves of the 16-point answer, each parsed as its own path. */
 export function splitBoth(payload: unknown): { sunrise: FirePaths | null; sunset: FirePaths | null } {
-  if (!Array.isArray(payload) || payload.length !== 2 * PATH_KM.length) return { sunrise: null, sunset: null }
-  return { sunrise: parseFirePaths(payload.slice(0, PATH_KM.length)), sunset: parseFirePaths(payload.slice(PATH_KM.length)) }
+  /* Answers kept from before the opposite sky was asked have the eight path points a line. */
+  const n = Array.isArray(payload) && payload.length === 2 * LINE_POINTS ? LINE_POINTS : PATH_KM.length
+  if (!Array.isArray(payload) || payload.length !== 2 * n) return { sunrise: null, sunset: null }
+  return { sunrise: parseFirePaths(payload.slice(0, n)), sunset: parseFirePaths(payload.slice(n)) }
 }
 
 export async function fetchFirePathsBoth(from: LatLon, riseAzDeg: number, setAzDeg: number, startDate: string, endDate: string): Promise<{ sunrise: FirePaths | null; sunset: FirePaths | null }> {
@@ -95,7 +104,7 @@ type Hourly = Record<string, (number | null)[] | string[] | undefined> & { time?
 /** Open-Meteo's answer for many points and models, as one path per model per hour. Tolerant: a bad payload is null. */
 export function parseFirePaths(payload: unknown): FirePaths | null {
   const locations = Array.isArray(payload) ? payload : [payload]
-  if (locations.length !== PATH_KM.length) return null
+  if (locations.length !== PATH_KM.length && locations.length !== LINE_POINTS) return null
   const hourly = locations.map((l) => (l as { hourly?: Hourly }).hourly)
   const hours = hourly[0]?.time
   if (!Array.isArray(hours) || hourly.some((h) => h === undefined)) return null
@@ -106,10 +115,11 @@ export function parseFirePaths(payload: unknown): FirePaths | null {
       const x = series?.[i]
       return typeof x === 'number' && Number.isFinite(x) ? x : null
     }
-    const paths: ModelPath[] = hours.map((_, i) => ({
-      model,
-      samples: hourly.map((h): Layers => ({ low: read(h as Hourly, 'cloud_cover_low', i), mid: read(h as Hourly, 'cloud_cover_mid', i), high: read(h as Hourly, 'cloud_cover_high', i) })),
-    }))
+    const layers = (h: Hourly, i: number): Layers => ({ low: read(h, 'cloud_cover_low', i), mid: read(h, 'cloud_cover_mid', i), high: read(h, 'cloud_cover_high', i) })
+    const paths: ModelPath[] = hours.map((_, i) => {
+      const samples = hourly.slice(0, PATH_KM.length).map((h) => layers(h as Hourly, i))
+      return hourly.length === LINE_POINTS ? { model, samples, opposite: hourly.slice(PATH_KM.length).map((h) => layers(h as Hourly, i)) } : { model, samples }
+    })
     if (paths.some((p) => p.samples.some((s) => s.low !== null))) byModel[model] = paths
   }
   return { hours: hours as string[], byModel }

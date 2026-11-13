@@ -27,6 +27,8 @@
  */
 import { getMoonIllumination, getPosition, getTimes } from 'suncalc'
 import { windSide, type WindSide } from './coastFacing.ts'
+import { antiSolar } from './afterglow.ts'
+import { compassPoint } from './field.ts'
 import { lookWindow, type FireVerdict } from './fireOutlook.ts'
 import type { SatRead } from './goesNowcast.ts'
 import { layerWords, type DeckTruth } from './layerTruth.ts'
@@ -70,6 +72,8 @@ export interface CallRead {
   gapLine?: string | null
   /** The best spot near when it beats here (Batch BEST SKY, Section 6): "Lynnhaven Inlet 6 mi NW". */
   bestNear?: string | null
+  /** Where to look, degrees, when it is not the sun's way (the opposite sky's pink, Batch NOW, Section 0). */
+  lookDeg?: number | null
   /** Models agreeing that it fires, for the week's certainty dots. */
   agree: number
   of: number
@@ -144,6 +148,13 @@ export function eventCall(v: FireVerdict | null, kind: Kind, event: Date, now: D
   const lit = top !== undefined && top.agree > 0 ? `${top.agree} of ${top.of} models see lit ${layerWords(top.layer, obs?.truth ?? null, LAYER_WORD)}` : null
   const timing = { colorFrom: w?.from ?? null, colorTo: w?.to ?? null, setUp: w === null ? null : new Date(w.from.getTime() - SET_UP_BEFORE_MS), agree: v.agree, of: v.of }
   if (v.word === 'unlikely') return { ...base, ...timing, call: 'Skip', why: `${v.line.replace(/^Color unlikely: /, '').replace(/^./, (c) => c.toUpperCase())}.` }
+  /* Possible by the opposite sky alone (Batch NOW, Section 0): its own minutes, from the sunset (to the sunrise). */
+  const glow = v.afterglow
+  if (w === null && glow?.counts === true) {
+    const look = compassPoint(antiSolar(glow.sunAzDeg))
+    const at = glow.overWater ? 'over the ocean' : `to the ${look}`
+    return { ...base, ...timing, colorFrom: glow.window.from, colorTo: glow.window.to, setUp: new Date(glow.window.from.getTime() - SET_UP_BEFORE_MS), lookDeg: antiSolar(glow.sunAzDeg), call: 'Maybe', why: `Possible: pink on the clouds ${at} ${kind === 'sunset' ? 'after the sunset' : 'before the sunrise'}, look ${look} (${glow.agree} of ${glow.of} models).` }
+  }
   const st = v.station
   const gapHolds = st === null ? false : w?.layer === 'low' ? st.lowBaseM === null || st.lowBaseM >= LOW_LID_M : st.lowOverhead < OVERCAST_PCT
   /* A high or mid canvas the satellite does not see over you is not confirmed. */

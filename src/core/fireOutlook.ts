@@ -40,6 +40,7 @@
  * pressure-level cloud, so tops and bases are LAYER_BAND_M.
  */
 import { getPosition } from 'suncalc'
+import { afterglowLine, afterglowWindow, facesOpposite, readAfterglow, type AfterglowRead } from './afterglow.ts'
 import type { LatLon } from './geo.ts'
 import { lowestDeck, type MetarSky } from './metar.ts'
 import { BLOCKED_AT, CANVAS_MIN, DECK_HEIGHT_M, EARTH_RADIUS_KM, MODEL_LABEL, PATH_KM, type FireModel, type ModelPath } from './skyFire.ts'
@@ -109,6 +110,8 @@ export interface FireContext {
   station?: StationReport | null
   /** Suncalc's apparent altitude, degrees; injected for tests. */
   sunAltitudeDeg?: (t: Date) => number
+  /** The beach's facing, when it is one: the opposite sky over the water (the afterglow's words). */
+  facing?: number | null
 }
 
 /** Cover of one layer at a distance along the sun's line, straight between samples; null past the last one. */
@@ -277,6 +280,7 @@ export function meanPath(paths: readonly ModelPath[]): ModelPath | null {
   const named = paths.filter((p) => p.model !== 'best_match')
   const use = named.length > 0 ? named : paths
   if (use.length === 0) return null
+  const opp = use.every((p) => p.opposite !== undefined) ? (use[0].opposite ?? []) : null
   return {
     model: use[0].model,
     samples: PATH_KM.map((_, i) => ({
@@ -284,7 +288,46 @@ export function meanPath(paths: readonly ModelPath[]): ModelPath | null {
       mid: mean(use.map((p) => p.samples[i]?.mid)),
       high: mean(use.map((p) => p.samples[i]?.high)),
     })),
+    ...(opp === null
+      ? {}
+      : {
+          opposite: opp.map((_, i) => ({
+            low: mean(use.map((p) => p.opposite?.[i]?.low)),
+            mid: mean(use.map((p) => p.opposite?.[i]?.mid)),
+            high: mean(use.map((p) => p.opposite?.[i]?.high)),
+          })),
+        }),
   }
+}
+
+/*
+ * THE OPPOSITE SKY (Batch NOW, Section 0; src/core/afterglow.ts). Per model:
+ * the cloud over you and on the opposite sky, the low cloud along the sun's
+ * line to 100 km (the station's in place of the forecast's over you), or a
+ * station that reports none under 6,500 ft.
+ */
+export interface FireAfterglow {
+  /** The models' mean, what the words say. */
+  sky: AfterglowRead
+  /** Of the five named models with figures, how many see the pink. */
+  agree: number
+  of: number
+  /** Best match sees it. */
+  best: boolean
+  /** It counts toward the verdict: 2 of the named, or best match. */
+  counts: boolean
+  window: { from: Date; to: Date }
+  sunAzDeg: number
+  overWater: boolean
+}
+
+/** Null when the path carries no opposite sky (answers kept from before it was asked): the cloud over you alone is Sky fire's own canvas, not the afterglow's. */
+export function modelAfterglow(raw: ModelPath, ctx: FireContext): AfterglowRead | null {
+  if (raw.opposite === undefined || raw.opposite.length === 0) return null
+  const st = stationRead(ctx.station, ctx.event)
+  const s = withStation(raw, st).samples
+  const sunLow = PATH_KM.flatMap((km, i) => (km <= 100 ? [s[i]?.low ?? null] : []))
+  return readAfterglow({ opposite: [s[0] ?? { low: null, mid: null }, ...(raw.opposite ?? [])], sunLow, lowClear: st?.lowClear === true })
 }
 
 export type FireWord = 'likely' | 'possible' | 'unlikely'
@@ -303,6 +346,8 @@ export interface FireVerdict {
   sky: ModelRead
   why: FireWhy | null
   station: StationRead | null
+  /** The opposite sky's pink (Batch NOW, Section 0); null when the paths carry no opposite sky and no model sees it. */
+  afterglow: FireAfterglow | null
 }
 
 /** The reason the sky read gives no fire: a lid before a gap before light, and nothing to light last. */
@@ -327,7 +372,10 @@ export function fireVerdict(paths: readonly ModelPath[], ctx: FireContext): Fire
   const sky = readModel(mp, ctx, 'sky')
   const agree = named.filter((m) => m.fires).length
   const of = named.length
-  const word: FireWord = agree / of >= 0.6 ? 'likely' : agree >= 2 || best.fires ? 'possible' : 'unlikely'
+  const glow = verdictAfterglow(paths, models, mp, ctx)
+  const lit: FireWord = agree / of >= 0.6 ? 'likely' : agree >= 2 || best.fires ? 'possible' : 'unlikely'
+  /* The pink on the opposite sky is a Possible by itself: it is softer than the clouds lit toward the sun. */
+  const word: FireWord = lit === 'unlikely' && glow?.counts === true ? 'possible' : lit
   const perLayer = LAYERS.map((layer) => ({ layer, agree: named.filter((m) => m.layers.find((l) => l.layer === layer)?.fires === true).length, of }))
   const skyLayer = sky.layers.find((l) => l.fires)
   const why: FireWhy | null = word !== 'unlikely' ? null : skyLayer !== undefined ? null : reason(sky)
@@ -337,7 +385,27 @@ export function fireVerdict(paths: readonly ModelPath[], ctx: FireContext): Fire
       : skyLayer !== undefined
         ? `Color unlikely: only ${perLayer.find((x) => x.layer === skyLayer.layer)?.agree ?? 0} of ${of} models see lit ${LAYER_WORD[skyLayer.layer]}`
         : `Color unlikely: ${WHY_WORDS[why ?? 'none']}`
-  return { word, line, agree, of, perLayer, models, sky, why, station: stationRead(ctx.station, ctx.event) }
+  return { word, line, agree, of, perLayer, models, sky, why, station: stationRead(ctx.station, ctx.event), afterglow: glow }
+}
+
+function verdictAfterglow(paths: readonly ModelPath[], models: readonly ModelRead[], mp: ModelPath, ctx: FireContext): FireAfterglow | null {
+  const reads = paths.map((p) => modelAfterglow(p, ctx))
+  const named = reads.filter((_, i) => models[i].model !== 'best_match' && paths[i].samples.some((x) => x.low !== null || x.mid !== null || x.high !== null))
+  const bestAt = models.findIndex((m) => m.model === 'best_match')
+  const best = reads[bestAt === -1 ? 0 : bestAt]?.fires === true
+  const agree = named.filter((r) => r?.fires === true).length
+  const sky = modelAfterglow(mp, ctx)
+  if (sky === null) return null
+  const sunAzDeg = getPosition(ctx.event, ctx.venue.lat, ctx.venue.lon).azimuth
+  return { sky, agree, of: named.length, best, counts: agree >= 2 || best, window: afterglowWindow(ctx.kind, ctx.event), sunAzDeg, overWater: facesOpposite(ctx.facing, sunAzDeg) }
+}
+
+/** "Pink on the clouds over the ocean, 4:57 PM–5:12 PM · look ENE", when it counts; the Belt of Venus when the opposite sky is clear and the light gets in. */
+export function afterglowWords(v: FireVerdict | null, clock: (d: Date) => string): string | null {
+  const g = v?.afterglow ?? null
+  if (g === null) return null
+  const read = g.counts && !g.sky.fires ? { ...g.sky, fires: true } : g.sky
+  return afterglowLine(read, g.sunAzDeg, g.overWater, g.window, (a, b) => `${clock(a)}–${clock(b)}`)
 }
 
 /** "4 of 5 see lit high cirrus · 1 of 5 lit low deck": the layers any model sees lit. */
@@ -374,6 +442,9 @@ export function clockStrips(v: FireVerdict): Strip[] {
 export function verdictSentence(v: FireVerdict, clock: (d: Date) => string, name: LayerName = SPLIT_NAME): string {
   if (v.word === 'unlikely') return `${v.line}.`
   const top = [...v.perLayer].sort((a, b) => b.agree - a.agree)[0]
+  /* Possible by the opposite sky alone: say that, not "no model sees a lit layer". */
+  const glow = v.afterglow?.counts === true && (top === undefined || top.agree === 0) ? afterglowWords(v, clock) : null
+  if (glow !== null) return `${glow} (${v.afterglow?.agree ?? 0} of ${v.of} models).`
   const w = lookWindow(v)
   const when = w === null ? '' : `, ${clock(w.from)}–${clock(w.to)}`
   /* Batch QA, Section 2: what the models see, never their own word: the call above it is the word (src/core/briefing.ts eventCall). */
