@@ -263,7 +263,8 @@ export function sideSpanWords(now: WindTag, change: { tag: WindTag; at: Date } |
   if (change === null) return `${sideWords(now)} all day`
   const h = wallClock(change.at, timeZone)
   const hour = h === null ? '' : ` ${h.hour === 0 ? 12 : h.hour > 12 ? h.hour - 12 : h.hour}${h.minute === 0 ? '' : `:${String(h.minute).padStart(2, '0')}`}${h.hour < 12 ? 'a' : 'p'}`
-  return `${sideShort(now)} · ${sideShort(change.tag)}${hour}`
+  /* Batch NOW, Section 2.4: one line, the side now to the side it turns: "offshore → cross-shore 5p". */
+  return `${sideShort(now)} → ${change.tag === 'Cross' ? 'cross-shore' : sideShort(change.tag)}${hour}`
 }
 
 /* ------------------------------------------------------------- the ground */

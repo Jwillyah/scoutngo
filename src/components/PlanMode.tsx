@@ -30,6 +30,8 @@ import { formatClock } from '../core/timezone.ts'
 import { AT_NOW_MS, lightCell, stripWhen, tideCell } from '../core/statStrip.ts'
 import { freshSky, skyCondition } from '../core/skyWord.ts'
 import { useStationObs } from '../lib/useStationObs.ts'
+import { windAt as windNowAt } from '../lib/windNow.ts'
+import { fetchBriefWind, type Hourly } from '../lib/tideSheetData.ts'
 import { windToBeach } from '../core/coastFacing.ts'
 import type { SkyState } from '../lib/useSkyFrames.ts'
 import type { Wind } from '../core/upwind.ts'
@@ -1410,6 +1412,17 @@ export function PlanMode({
   const [windStrip, setWindStrip] = useState<{ from: number; mps: (number | null)[] } | null>(null)
   /* Batch TRUTH, Section 7: wind on is the whole map (wind.css .mode-plan[data-wind-mode]); its bar opens on now. */
   const windMode = weatherLayer === 'wind' && !threeD
+  /* Batch NOW, Section 2.1: the wind now at the spot, as the Wind page's headline (the same kept answer, the same station), asked only in wind mode. */
+  const [briefWx, setBriefWx] = useState<{ key: string; wx: Hourly | null } | null>(null)
+  useEffect(() => {
+    if (!windMode || venue === null) return
+    const key = `${venue.lat.toFixed(2)},${venue.lon.toFixed(2)}`
+    let live = true
+    void fetchBriefWind(venue).then((wx) => live && setBriefWx({ key, wx }), () => undefined)
+    return () => {
+      live = false
+    }
+  }, [windMode, venue?.lat, venue?.lon]) // eslint-disable-line react-hooks/exhaustive-deps
   const windWasOn = useRef(false)
   useEffect(() => {
     if (windMode && !windWasOn.current) scrubTo(new Date())
@@ -1674,6 +1687,12 @@ export function PlanMode({
    */
   /* The nearest station's report, for the one sky word (src/core/skyWord.ts) while the bar is at now. */
   const stationObs = useStationObs(venue)
+  const windHeadline = useMemo(() => {
+    const now = new Date()
+    /* Only at now: a scrubbed hour is the models' own. */
+    if (!windMode || venue === null || scrubbedAt === null || Math.abs(scrubbedAt.getTime() - now.getTime()) >= 3_600_000 || briefWx === null || briefWx.key !== `${venue.lat.toFixed(2)},${venue.lon.toFixed(2)}`) return null
+    return windNowAt(briefWx.wx, now, stationObs)
+  }, [windMode, venue, scrubbedAt, briefWx, stationObs])
   const chips: Chip[] = useMemo(() => {
     /* The next golden light from the time on the bar, morning or evening (src/core/goldenNext.ts). */
     const goldenLeft =
@@ -2597,6 +2616,7 @@ export function PlanMode({
             windUnit={units.wind}
             windSpot={venue}
             windFacing={windFacing !== null && windFacing.key === windSpotKey ? windFacing.deg : null}
+            windHeadline={windHeadline}
             onWindStrip={setWindStrip}
             vectorBase={vectorMap && !threeD}
             selectedId={selectedId}

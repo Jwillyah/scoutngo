@@ -13,7 +13,9 @@ import { useEffect, useState } from 'react'
 import type { LatLon } from '../core/geo.ts'
 import type { StationObs } from '../core/nowcast.ts'
 import type { MetarSky } from '../core/metar.ts'
-import { nearestFresh, nearWind, type NearStation } from './nearWind.ts'
+import { coastFacing } from './coast.ts'
+import { MAX_AGE_MS, nearestFresh, nearWind, type NearReading, type NearStation } from './nearWind.ts'
+import { normalizeWind, stationOrder, type Normalized } from '../core/stationWind.ts'
 
 const KT = 0.514444
 
@@ -29,6 +31,23 @@ export interface StationNow extends StationObs {
   /** That airport's report time, and its id. */
   skyAt: Date | null
   skyId: string | null
+  /**
+   * Batch NOW, Section 2: `mps` and `gustMps` are the reading carried to 10 m
+   * over the spot (src/core/stationWind.ts); what the station itself read,
+   * and how it was carried.
+   */
+  rawMps: number
+  rawGustMps: number | null
+  norm: Normalized
+  /** The nearest fresh coastal station's, at a beach, for the page's "models · station" line. */
+  coast: { label: string; rawKt: number; normKt: number } | null
+}
+
+/** The beach's facing, or null inland; waits at most FACING_WAIT_MS (the sea polygons can take seconds on a slow link). */
+const FACING_WAIT_MS = 4000
+async function facingOf(spot: LatLon): Promise<number | null> {
+  const f = await Promise.race([coastFacing(spot).catch(() => 'unavailable' as const), new Promise<'unavailable'>((r) => setTimeout(() => r('unavailable'), FACING_WAIT_MS))])
+  return f === 'inland' || f === 'unavailable' ? null : f.facing
 }
 
 export function useStationObs(spot: LatLon | null): StationNow | null {
@@ -39,16 +58,37 @@ export function useStationObs(spot: LatLon | null): StationNow | null {
     let live = true
     const ask = async () => {
       const now = new Date()
-      const got = await nearWind(spot, now).catch(() => null)
+      const facing = await facingOf(spot)
+      const got = await nearWind(spot, now, fetch, facing !== null).catch(() => null)
       const best = got?.best ?? null
+      const norm = best === null ? null : normalizeWind({ id: best.station.id, kind: best.station.kind, mps: best.kt * KT, gustMps: best.gustKt === null ? null : best.gustKt * KT, fromDeg: best.fromDeg }, facing)
+      const coastRead = facing === null || got === null ? null : (stationOrder(got.readings.filter((r): r is NearReading => r !== null && r.station.kind === 'coastal' && now.getTime() - r.at.getTime() <= MAX_AGE_MS), true)[0] ?? null)
+      const coastNorm = coastRead === null ? null : normalizeWind({ id: coastRead.station.id, kind: 'coastal', mps: coastRead.kt * KT, gustMps: null, fromDeg: coastRead.fromDeg }, facing)
       const air = got === null ? null : nearestFresh(got.readings.filter((r) => r?.station.kind === 'airport'), now)
       if (live)
         setObs({
           key,
           v:
-            best === null
+            best === null || norm === null
               ? null
-              : { id: best.station.id, label: best.station.label, kind: best.station.kind, km: best.station.km, at: best.at, mps: best.kt * KT, fromDeg: best.fromDeg, gustMps: best.gustKt === null ? null : best.gustKt * KT, sky: air?.sky ?? null, visMi: air?.visMi ?? null, skyAt: air?.at ?? null, skyId: air?.station.id ?? null },
+              : {
+                  id: best.station.id,
+                  label: best.station.label,
+                  kind: best.station.kind,
+                  km: best.station.km,
+                  at: best.at,
+                  mps: norm.mps,
+                  fromDeg: best.fromDeg,
+                  gustMps: norm.gustMps,
+                  rawMps: best.kt * KT,
+                  rawGustMps: best.gustKt === null ? null : best.gustKt * KT,
+                  norm,
+                  coast: coastRead === null || coastNorm === null ? null : { label: coastRead.station.label, rawKt: coastRead.kt, normKt: coastNorm.mps / KT },
+                  sky: air?.sky ?? null,
+                  visMi: air?.visMi ?? null,
+                  skyAt: air?.at ?? null,
+                  skyId: air?.station.id ?? null,
+                },
         })
     }
     void ask()

@@ -9,7 +9,8 @@ import { type LatLon } from '../core/geo.ts'
 import { camsNear, type SkyCam } from '../core/skyCams.ts'
 import { distanceMeters } from '../core/geo.ts'
 import { BAND_FLOOR_FT, skillLine, UNTESTED_ERROR_FT, type SkillSample, type SpotStats } from '../core/spotSkill.ts'
-import { BUOY_MATCH_FT, buoyVsForecast, camDistance, chartTopFt, cleanRuns, SURF_SPREAD_SOURCE } from '../core/surfRange.ts'
+import { forecastWord } from '../core/buoyHeadline.ts'
+import { BUOY_MATCH_FT, camDistance, chartTopFt, cleanRuns, SURF_SPREAD_SOURCE } from '../core/surfRange.ts'
 import { bestWindow, faceLight, type FaceLight } from '../core/surfShoot.ts'
 import { buoyParts, partWords, rangeSizeWords } from '../core/surfReads.ts'
 import { SURF_FIRING_FT, SURF_FUN_FT } from '../core/briefing.ts'
@@ -367,7 +368,7 @@ function BuoyCard({ buoy, facing, factor, marine, wind, stats, clock }: { buoy: 
         </p>
         {face === null ? null : (
           <p className="dsurf__small" data-buoy-faces>
-            As faces at this beach ≈ {face.toFixed(1)} ft{there === null ? ' · the forecast did not say for that hour' : buoyVsForecast(face, there.centerFt) === 'in line with' ? '' : ` · ${buoyVsForecast(face, there.centerFt)} forecast`}
+            As faces at this beach ≈ {face.toFixed(1)} ft{there === null ? ' · the forecast did not say for that hour' : forecastWord(face, there.centerFt) === null ? '' : ` · ${forecastWord(face, there.centerFt)}`}
           </p>
         )}
         {split.length === 0 ? null : <p className="dsurf__small">{split.map((p) => `${p.name.toLowerCase()} ${partWords(p)}${p.fromDeg === null ? '' : ` ${compass(p.fromDeg)}`}`).join(' · ')}</p>}

@@ -73,8 +73,9 @@ describe('the Buoys page v2', () => {
     /* Batch Polish, Section 3: under half a foot apart, the numbers and no verdict. */
     expect(render()).toContain('44099 2.3 ft, forecast 2.3 ft')
     expect(render()).not.toMatch(/about as forecast|in line with/)
-    expect(render({ marine: marine(1.2) })).toContain('Running smaller than forecast · 44099 2.3 ft, forecast 3.9 ft')
-    expect(render({ marine: marine(0.3) })).toContain('Running bigger than forecast')
+    /* Batch NOW, Section 2.3: the Surf page's words, "smaller than forecast" / "bigger than forecast". */
+    expect(render({ marine: marine(1.2) })).toContain('Smaller than forecast · 44099 2.3 ft, forecast 3.9 ft')
+    expect(render({ marine: marine(0.3) })).toContain('Bigger than forecast')
     expect(render({ marine: 'inland' })).toContain('No sea forecast here to compare')
     expect(render({ marine: null, marineFailed: true })).toContain('The sea forecast didn’t load')
     const outside = { times: [Date.parse('2026-11-05T00:00:00Z')], values: { wave_height: [1] } }

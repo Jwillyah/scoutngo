@@ -798,6 +798,8 @@ interface MapViewProps {
   windUnit?: WindUnit
   windSpot?: LatLon | null
   windFacing?: number | null
+  /** Batch NOW, Section 2.1: the wind now at the spot, the Wind page's headline; the pill says it at the spot at now. */
+  windHeadline?: { mps: number; fromDeg: number | null; gustMps: number | null } | null
   onWindStrip?: (strip: { from: number; mps: (number | null)[] } | null) => void
   /** Batch MAP2, Section 3: the plain vector map instead of the satellite ("Map" in the Map sheet). */
   vectorBase?: boolean
@@ -1324,6 +1326,7 @@ export function MapView({
   windUnit = 'kt',
   windSpot = null,
   windFacing = null,
+  windHeadline = null,
   onWindStrip,
   vectorBase = false,
   markDraft,
@@ -4193,7 +4196,7 @@ export function MapView({
       <div className="map__canvas" ref={container} />
       {/* Batch Map, Section 1: the wind layer v3 over the whole screen (the old grid streaks only at a height above the ground). */}
       {/* Batch MAP2, Section 3: the drone's 400 ft in the same look (120 m level), not the old streaks. */}
-      {windOn ? <WindLayerV3 map={ready ? map.current : null} field={windField} unit={windUnit} spot={windSpot} facing={windFacing} status={windView.status} when={windHour === null ? null : new Date(windHour * 3_600_000)} onRetry={() => setWindRetry((n) => n + 1)} /> : null}
+      {windOn ? <WindLayerV3 map={ready ? map.current : null} field={windField} unit={windUnit} spot={windSpot} facing={windFacing} headline={windHeadline} status={windView.status} when={windHour === null ? null : new Date(windHour * 3_600_000)} onRetry={() => setWindRetry((n) => n + 1)} /> : null}
       {/* Batch Map, Section 3: the map's own labels, in the app's font, never under the crosshair or the pin. */}
       <MapLabels map={ready ? map.current : null} on={showLabels} keepClear={keepLabelsClear} crosshair={showSky && skyLayer === 'wind'} />
       <div className="raypills" ref={pillLayer} aria-hidden="true" />

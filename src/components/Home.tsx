@@ -6,7 +6,7 @@ import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, 
 import { getMoonPosition, getPosition } from 'suncalc'
 import { saneAzimuth } from '../core/sanity.ts'
 import { moonTimesOnLocalDay } from '../core/moonTimes.ts'
-import { droneTag, kt, surfOn, surfTag, windTag, type CallRead } from '../core/briefing.ts'
+import { droneTag, kt, surfOn, surfTag, windTag, type CallRead, type WindTag } from '../core/briefing.ts'
 import { droneWindow } from '../core/droneWindow.ts'
 import { bestRun, bestWindows, colorWords, skyStripLit, sideShort, sideSpanWords, weekPill, weekSurfRow, WEEK_SURE_DAYS, groundOf, sideWords, nothingLine, rainLine, spanWords, stripSteps, weekHeadline, type Activity, type CardKind, type WindowRow } from '../core/homeDay.ts'
 import { camsFacingWaterOrSun } from '../core/skyCams.ts'
@@ -648,7 +648,7 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
     /* Batch TRUTH, Section 4: the short word on the tag ("Cross-on"), so it never wraps on a half-width card; the line says it in full. */
     tag = sideNow === null ? null : sideShort(sideNow).replace(/^./, (c) => c.toUpperCase())
     tagGood = sideNow === 'Offshore'
-    const span = windSideSpan(day, brief.facing, which === 'today' ? now : null, timeZone)
+    const span = windSideSpan(day, brief.facing, which === 'today' ? now : null, timeZone, which === 'today' ? sideNow : null)
     const gusts = gustWords(w, units.wind)
     line = [gusts, span !== null && !span.endsWith('all day') ? span : null].filter((x) => x !== null).join(' · ') || null
     pic = <WindDial fromDeg={w?.fromDeg ?? null} facing={brief.facing} />
@@ -840,11 +840,12 @@ function WindDial({ fromDeg, facing }: { fromDeg: number | null; facing: number 
 }
 
 /** "Offshore until 11 AM", "Onshore from 2 PM": the wind's side to the beach and when it changes. */
-function windSideSpan(day: DayBrief | null, facing: number | null, now: Date | null, timeZone: string): string | null {
+function windSideSpan(day: DayBrief | null, facing: number | null, now: Date | null, timeZone: string, sideNow: WindTag | null = null): string | null {
   if (day === null || facing === null) return null
   const hours = day.wind.filter((h) => now === null || h.at.getTime() + 1_800_000 > now.getTime())
   const sides = hours.map((h) => ({ at: h.at, side: windTag(h.fromDeg, facing) }))
-  const first = sides[0]
+  /* Batch NOW, Section 2.4: the line starts from the headline's side (the one wind now), never a second "now" from the model's hour. */
+  const first = sideNow === null ? sides[0] : { at: now ?? sides[0]?.at, side: sideNow }
   if (first === undefined || first.side === null) return null
   const change = sides.find((s) => s.side !== first.side && s.side !== null)
   /* Batch TRUTH, Section 4: "cross-off · offshore 9a", at the hour the change starts. */

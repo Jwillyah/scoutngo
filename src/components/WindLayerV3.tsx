@@ -40,6 +40,8 @@ interface Props {
   unit: WindUnit
   /** The spot and its beach's facing: "offshore here" only within 3 km of it. */
   spot: LatLon | null
+  /** Batch NOW, Section 2.1: the one wind now at the spot (the Wind page's headline, leaned to the station); the pill and the arrow say it within 3 km of the spot at now. */
+  headline?: { mps: number; fromDeg: number | null; gustMps: number | null } | null
   facing: number | null
   status: 'off' | 'loading' | 'ok' | 'failed'
   /** The time on the bar, for the swell at the crosshair. */
@@ -48,7 +50,7 @@ interface Props {
   onRetry?: () => void
 }
 
-export function WindLayerV3({ map, field, unit, spot, facing, status, when = null, onRetry }: Props) {
+export function WindLayerV3({ map, field, unit, spot, facing, headline = null, status, when = null, onRetry }: Props) {
   const colour = useRef<HTMLCanvasElement>(null)
   const trails = useRef<HTMLCanvasElement>(null)
   /* The screen's velocity grid, rebuilt when the map settles: px/s east and down per CELL_PX cell. */
@@ -238,14 +240,17 @@ export function WindLayerV3({ map, field, unit, spot, facing, status, when = nul
     }
   }, [map, field])
 
-  /* The value under the crosshair, and the station near it. */
+  /* The value under the crosshair, and the station near it; at the spot at now, the one wind now. */
+  /* The map hands a headline only while the bar is at now (src/components/PlanMode.tsx). */
+  const atSpotNow = headline !== null && headline.fromDeg !== null && spot !== null && centre !== null && distanceMeters(spot, centre) <= 3000
   const here = useMemo(() => {
+    if (atSpotNow && headline !== null && headline.fromDeg !== null) return { speedMps: headline.mps, fromDeg: headline.fromDeg, gust: headline.gustMps }
     if (field === null || centre === null) return null
     const s = sampleField(field, centre.lat, centre.lon)
     if (s === null) return null
     const w = fromUV(s.u, s.v)
     return { ...w, gust: s.gust }
-  }, [field, centre])
+  }, [field, centre, atSpotNow, headline?.mps, headline?.fromDeg, headline?.gustMps]) // eslint-disable-line react-hooks/exhaustive-deps
   const [station, setStation] = useState<{ id: string; w: StationWind | null } | null>(null)
   const ck = centre === null ? null : `${centre.lat.toFixed(2)},${centre.lon.toFixed(2)}`
   useEffect(() => {

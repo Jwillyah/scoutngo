@@ -13,6 +13,7 @@
  * station ids leave the phone; no key anywhere.
  */
 import { distanceMeters, type LatLon } from '../core/geo.ts'
+import { stationOrder } from '../core/stationWind.ts'
 import { metarVisMiles } from '../core/skyWord.ts'
 import { parseMetarSky, parseMetarWind, type MetarSky } from '../core/metar.ts'
 import { TIMEOUT_MS } from './forecast.ts'
@@ -118,7 +119,7 @@ async function airport(st: NearStation, now: Date, fetchImpl: typeof fetch): Pro
   return got.filter((r): r is NearReading => r !== null).sort((a, b) => b.at.getTime() - a.at.getTime())[0] ?? null
 }
 
-async function coastal(st: NearStation, fetchImpl: typeof fetch): Promise<NearReading | null> {
+async function coastalReading(st: NearStation, fetchImpl: typeof fetch): Promise<NearReading | null> {
   const p = new URLSearchParams({ station: st.id, product: 'wind', date: 'latest', units: 'english', time_zone: 'gmt', format: 'json', application: 'scoutngo' })
   try {
     const r = await fetchImpl(`${COOPS_URL}?${p}`, { signal: AbortSignal.timeout(TIMEOUT_MS) })
@@ -129,11 +130,21 @@ async function coastal(st: NearStation, fetchImpl: typeof fetch): Promise<NearRe
 }
 
 /** The nearest stations' readings, each asked once, and the freshest of them. */
-export async function nearWind(at: LatLon, now: Date, fetchImpl: typeof fetch = fetch): Promise<{ stations: NearStation[]; readings: (NearReading | null)[]; best: NearReading | null }> {
+/*
+ * AT A BEACH, THE COAST FIRST (Batch NOW, Section 2.1; 13 Nov at Sandbridge
+ * the freshest of the three was KNTU, inland, and the lean missed Cape
+ * Henry): with `coastal`, the nearest coastal station within NEAR_KM is
+ * always asked, and the best is the nearest fresh coastal station, else the
+ * nearest fresh airport. Inland, the freshest as before.
+ */
+export async function nearWind(at: LatLon, now: Date, fetchImpl: typeof fetch = fetch, coastal = false): Promise<{ stations: NearStation[]; readings: (NearReading | null)[]; best: NearReading | null }> {
   const [{ ASOS_STATIONS }, { COOPS_MET }] = await Promise.all([import('../data/asosStations.ts'), import('../data/coopsMet.ts')])
-  const stations = nearStations(at, ASOS_STATIONS, COOPS_MET)
-  const readings = await Promise.all(stations.map((s) => (s.kind === 'airport' ? airport(s, now, fetchImpl) : coastal(s, fetchImpl))))
-  return { stations, readings, best: freshest(readings, now) }
+  const near = nearStations(at, ASOS_STATIONS, COOPS_MET)
+  const coast = coastal && !near.some((s) => s.kind === 'coastal') ? nearStations(at, [], COOPS_MET, NEAR_KM, 1) : []
+  const stations = [...near, ...coast]
+  const readings = await Promise.all(stations.map((s) => (s.kind === 'airport' ? airport(s, now, fetchImpl) : coastalReading(s, fetchImpl))))
+  const fresh = readings.filter((r): r is NearReading => r !== null && now.getTime() - r.at.getTime() <= MAX_AGE_MS && r.at.getTime() <= now.getTime() + 10 * 60_000)
+  return { stations, readings, best: coastal ? (stationOrder(fresh, true)[0] ?? null) : freshest(readings, now) }
 }
 
 /** "4 min ago", "1 h 10 min ago". */

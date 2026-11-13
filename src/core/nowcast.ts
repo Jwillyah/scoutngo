@@ -8,7 +8,12 @@
  *   the miss    the station's wind minus the model's, at the report's time,
  *               as east and north parts (so direction is blended too)
  *   the weight  1 at the report, falling in a straight line to 0 at
- *               FADE_MS after it; nothing before the report
+ *               FADE_MS after it; nothing before the report, except within
+ *               AHEAD_MS: an hour is read at its half past (src/lib/
+ *               windNow.ts halfHour), so a report at :54 leans its own hour
+ *               (Batch NOW, Section 2: 13 Nov 7:55 AM, Cape Henry's 12:54Z
+ *               report was 24 minutes "ahead" of 12:30Z and weighed 0; the
+ *               page said 7 kt while it read 21)
  *   the gust    the model's gust plus the same weight of the station's gust
  *               miss, or of its speed miss when it reported no gust
  *
@@ -36,9 +41,10 @@ export interface StationObs {
 }
 
 /** How much of the station's miss is still applied at `t`. */
+export const AHEAD_MS = 30 * 60_000
 export function nowcastWeight(obsAt: Date, t: Date): number {
   const dt = t.getTime() - obsAt.getTime()
-  if (dt < -15 * 60_000) return 0
+  if (dt < -AHEAD_MS) return 0
   return Math.max(0, Math.min(1, 1 - Math.max(0, dt) / FADE_MS))
 }
 

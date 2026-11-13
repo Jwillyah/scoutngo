@@ -2,6 +2,7 @@ import '../styles/surf.css'
 import type { LatLon } from '../core/geo.ts'
 import { factorHere } from '../lib/beachFactorHere.ts'
 import { buoyFaceFt } from '../core/spotSkill.ts'
+import { blowingOut, forecastWord } from '../core/buoyHeadline.ts'
 import { buoyParts, partWords } from '../core/surfReads.ts'
 import { placePills } from '../core/pillPlace.ts'
 import { feetToMeters } from '../core/reachScale.ts'
@@ -95,14 +96,26 @@ export function BuoysBody({ venue, placeName, timeZone, units, buoys, marine, ma
     )
   }
   const how = [top.b.periodS === null ? null : `${Math.round(top.b.periodS)} s`, top.b.fromDeg === null ? null : `from the ${compass(top.b.fromDeg)}`].filter((x) => x !== null).join(' ')
+  /* Batch NOW, Section 2.3: chop from behind the beach leads with what reaches it; the buoy's height is a row. */
+  const out = blowingOut(top.b.fromDeg, facing)
+  const faceHere = out ? buoyFaceFt({ waveM: top.b.waveM, periodS: top.b.periodS, fromDeg: top.b.fromDeg }, facing, factorHere(venue)) : null
   return (
     <>
       <div className="dbuoy__head">
         {near}
-        <p className="dhead__big">{waveHeight(top.b.waveM, units)}</p>
-        <p className="dhead__line">{how === '' ? `${top.b.buoy.id}, the forecast's buoy` : `${top.b.buoy.id}, the forecast's buoy · ${how}`}</p>
-        <ForecastLine nearest={rows[0].b} marine={marine} marineFailed={marineFailed} timeZone={timeZone} units={units} />
-        <FacesLine venue={venue} nearest={rows[0].b} facing={facing} units={units} />
+        {out ? (
+          <>
+            <p className="dhead__big" data-buoy-head="faces">≈ {waveHeight(feetToMeters(faceHere ?? 0), units)} here</p>
+            <p className="dhead__line" data-buoy-out>{waveHeight(top.b.waveM, units)} wind chop blowing out to sea · {top.b.buoy.id}{how === '' ? '' : ` · ${how}`}</p>
+          </>
+        ) : (
+          <>
+            <p className="dhead__big" data-buoy-head="raw">{waveHeight(top.b.waveM, units)}</p>
+            <p className="dhead__line">{how === '' ? `${top.b.buoy.id}, the forecast's buoy` : `${top.b.buoy.id}, the forecast's buoy · ${how}`}</p>
+          </>
+        )}
+        <ForecastLine venue={venue} nearest={rows[0].b} marine={marine} marineFailed={marineFailed} facing={facing} timeZone={timeZone} units={units} />
+        {out ? null : <FacesLine venue={venue} nearest={rows[0].b} facing={facing} units={units} />}
       </div>
       <section className="dbuoy__mapcard" aria-label="Where the buoys are">
         <BuoyMap venue={venue} rows={rows} units={units} />
@@ -144,18 +157,29 @@ export function BuoysBody({ venue, placeName, timeZone, units, buoys, marine, ma
 }
 
 /** "Running smaller than forecast", from the nearest buoy against the spot's own wave forecast at the hour it read. */
-function ForecastLine({ nearest, marine, marineFailed, timeZone, units }: { nearest: OkBuoy; marine: Hourly | 'inland' | null; marineFailed: boolean; timeZone: string; units: Units }) {
+function ForecastLine({ venue, nearest, marine, marineFailed, facing, timeZone, units }: { venue: LatLon; nearest: OkBuoy; marine: Hourly | 'inland' | null; marineFailed: boolean; facing: number | null; timeZone: string; units: Units }) {
   let line: string
   if (marine === 'inland') line = 'No sea forecast here to compare'
   else if (marine === null) line = marineFailed ? 'The sea forecast didn’t load · retrying' : 'Asking the sea forecast…'
-  else {
+  else if (facing !== null) {
+    /* Batch NOW, Section 2.3: the Surf page's word, as faces against as faces (src/core/buoyHeadline.ts). */
+    const sea = (n: string) => hourlyAt(marine, n, nearest.at)
+    const fWave = sea('wave_height')
+    const fFace = fWave === null ? null : buoyFaceFt({ waveM: fWave, periodS: sea('wave_period'), fromDeg: sea('wave_direction') }, facing, factorHere(venue))
+    const face = buoyFaceFt({ waveM: nearest.waveM, periodS: nearest.periodS, fromDeg: nearest.fromDeg }, facing, factorHere(venue))
+    const word = forecastWord(face, fFace)
+    line =
+      face === null || fFace === null
+        ? `The forecast did not say for ${formatClock(nearest.at, timeZone, units.clock)}`
+        : `${word === null ? '' : `${word.charAt(0).toUpperCase()}${word.slice(1)} · `}as faces ≈ ${waveHeight(feetToMeters(face), units)}, forecast ${waveHeight(feetToMeters(fFace), units)}`
+  } else {
     const f = hourlyAt(marine, 'wave_height', nearest.at)
     const v = versusForecast(nearest.waveM, f)
     line =
       v === null
         ? `The forecast did not say for ${formatClock(nearest.at, timeZone, units.clock)}`
         : /* Batch Polish, Section 3: under half a foot apart, the numbers and no verdict. */
-          `${v === 'smaller' ? 'Running smaller than forecast · ' : v === 'bigger' ? 'Running bigger than forecast · ' : ''}${nearest.buoy.id} ${waveHeight(nearest.waveM, units)}, forecast ${waveHeight(f, units)}`
+          `${v === 'smaller' ? 'Smaller than forecast · ' : v === 'bigger' ? 'Bigger than forecast · ' : ''}${nearest.buoy.id} ${waveHeight(nearest.waveM, units)}, forecast ${waveHeight(f, units)}`
   }
   return <p className="dhead__line dbuoy__vs">{line}</p>
 }

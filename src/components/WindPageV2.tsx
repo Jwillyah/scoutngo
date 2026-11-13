@@ -1,3 +1,4 @@
+import { disagreeLine } from '../core/stationWind.ts'
 import { agoWords, MAX_AGE_MS } from '../lib/nearWind.ts'
 import { useEffect, useState } from 'react'
 import type { LatLon } from '../core/geo.ts'
@@ -179,6 +180,8 @@ export function WindContent({ now, data, facing, placeName, timeZone, units, dro
   const headKind = headFrom === null || face === null ? null : windSide(headFrom, face)
   const hours = models.byLevel.ground.slice(i, i + STRIP_HOURS).map((r0, k) => {
     const r = { ...r0, from: calmDirection(r0.median, r0.from) }
+    /* Batch NOW, Section 2.1: the first hour is now, the headline's wind and side, so the strip's words agree with it. */
+    if (k === 0 && shared !== null) return { at: models.hours[i + k], r, kind: headKind }
     return { at: models.hours[i + k], r, kind: r.from === null || face === null ? null : windSide(r.from, face) }
   })
   const flip = windFlip(hours)
@@ -194,6 +197,8 @@ export function WindContent({ now, data, facing, placeName, timeZone, units, dro
     hour.median,
   )
   const rated = drone?.maxWindMps ?? null
+  /* Batch NOW, Section 2.2: the headline and the nearest coastal station, carried to 10 m here, more than DISAGREE_KT apart: both said. */
+  const disagree = disagreeLine(shared === null ? null : shared.mps * 1.943844, nearNow?.coast ?? null)
 
   return (
     <>
@@ -209,6 +214,11 @@ export function WindContent({ now, data, facing, placeName, timeZone, units, dro
           {headKind === null ? '' : ` · ${KIND_WORD[headKind].toLowerCase()}`}
           {headGust === null ? '' : ` · gusts ${say(headGust)}`}
         </p>
+        {disagree === null ? null : (
+          <p className="dhead__line dwind__disagree" data-wind-disagree>
+            {disagree}
+          </p>
+        )}
       </div>
 
       <div className="dwind__dialbox">
@@ -230,9 +240,10 @@ export function WindContent({ now, data, facing, placeName, timeZone, units, dro
             <div key={at.getTime()} className={`dwind__h${k === null ? '' : ` dwind__h--${k}`}`} data-kind={k ?? 'none'}>
               <span className="dwind__ht">{n === 0 ? 'now' : formatShortHour(at, timeZone)}</span>
               <svg viewBox="-8 -8 16 16" className="dwind__ha" aria-hidden="true">
-                {r.from === null ? <circle r={2} /> : <path d="M0 -7 L4.5 4 L0 1.5 L-4.5 4 Z" transform={`rotate(${windTo(r.from).toFixed(0)})`} />}
+                {(n === 0 && shared !== null ? shared.fromDeg : r.from) === null ? <circle r={2} /> : <path d="M0 -7 L4.5 4 L0 1.5 L-4.5 4 Z" transform={`rotate(${windTo((n === 0 && shared !== null ? shared.fromDeg : r.from) as number).toFixed(0)})`} />}
               </svg>
-              <span className="dwind__hs">{r.median === null ? '—' : Math.round(windIn(r.median, unit) ?? 0)}</span>
+              {/* Batch NOW, Section 2.1: "now" is the headline's one value, not the models' median. */}
+              <span className="dwind__hs" {...(n === 0 ? { 'data-wind-now': '' } : {})}>{n === 0 && shared !== null ? Math.round(windIn(shared.mps, unit) ?? 0) : r.median === null ? '—' : Math.round(windIn(r.median, unit) ?? 0)}</span>
             </div>
           ))}
         </div>
@@ -254,8 +265,9 @@ export function WindContent({ now, data, facing, placeName, timeZone, units, dro
         <div className="dwind__tile dwind__tile--near">
           {/* Batch TRUTH, Section 3: the freshest of the nearest three (src/lib/nearWind.ts), its age, none past 75 minutes. */}
           <p className="dcard__label dwind__nearlabel">Nearest station</p>
-          <p className="dwind__big" data-near={nearNow?.label ?? station?.source ?? ''}>{tileObs === null ? '—' : `${say(tileObs.mps)}${tileObs.fromDeg === null ? '' : ` ${compassPoint(tileObs.fromDeg)}`}`}</p>
-          <p className="dwind__line">{nearNow === null ? (station === null ? 'none answered' : `${station.source} · ${agoWords(station.at, now)}`) : `${nearNow.label} · ${agoWords(nearNow.at, now)}`}</p>
+          {/* What the station itself reads, and how high (Batch NOW, Section 2: the headline leans to it carried to 10 m over the beach). */}
+          <p className="dwind__big" data-near={nearNow?.label ?? station?.source ?? ''}>{tileObs === null ? '—' : `${say(nearNow?.rawMps ?? tileObs.mps)}${tileObs.fromDeg === null ? '' : ` ${compassPoint(tileObs.fromDeg)}`}`}</p>
+          <p className="dwind__line">{nearNow === null ? (station === null ? 'none answered' : `${station.source} · ${agoWords(station.at, now)}`) : `${nearNow.label} · ${agoWords(nearNow.at, now)} · ${nearNow.norm.heightKnown ? `${Math.round(nearNow.norm.sensorM)} m up` : 'height not published'}`}</p>
         </div>
         <div className="dwind__tile">
           <p className="dcard__label">Models</p>
