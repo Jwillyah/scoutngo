@@ -77,6 +77,8 @@ export interface PointSky extends LatLon {
   high: number | null
   /** The satellite saw cold cloud tops over it in the nowcast window (a patch the models smear); null when not asked. */
   satPatch?: boolean | null
+  /** The 500 hPa wind there (km/h, from), which carries the patch (src/core/satDrift.ts). */
+  wind500?: { kmh: number | null; fromDeg: number | null }
 }
 
 export type ColorWord = 'Likely' | 'Possible' | 'Little'

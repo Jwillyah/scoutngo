@@ -1,3 +1,4 @@
+import { driftWords } from '../core/satDrift.ts'
 import { distanceWords, type RankedSpot } from '../core/bestSky.ts'
 import { clockParts } from '../core/bestSkyClock.ts'
 import { compassPoint } from '../core/field.ts'
@@ -50,7 +51,7 @@ export function BestSkySpot({ venue, sky, chosen, miles, timeZone, now, onShowOn
           <WhyHere ranked={chosen} ev={ev} />
         </div>
         <ColorClock ev={ev} timeZone={timeZone} />
-        <p className="bsky__sat">{sky.satAt !== null ? `Satellite ${formatClock(sky.satAt, timeZone)} · the patch as it was then` : sky.satAsked ? 'The satellite did not answer; from the forecast models.' : 'From the forecast models; the satellite is read within 3 hours of the color.'}</p>
+        <p className="bsky__sat">{sky.satAt !== null ? `Satellite ${formatClock(sky.satAt, timeZone)} · ${sky.drift === null ? 'the patch as it was then' : `${driftWords(sky.drift)}, carried to the color`}` : sky.satAsked ? 'The satellite did not answer; from the forecast models.' : 'From the forecast models; the satellite is read within 3 hours of the color.'}</p>
         <BestSkyActions sky={sky} chosen={chosen} timeZone={timeZone} now={now} onShowOnMap={onShowOnMap} />
       </div>
     </section>

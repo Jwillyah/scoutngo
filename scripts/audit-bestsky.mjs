@@ -94,8 +94,8 @@ try {
     const every = []
     page.on('request', (r) => every.push(r.url()))
     await page.route(
-      /* The grid's question only: its hourly list is exactly the three cloud layers and it names no models (src/lib/bestSkyData.ts tileUrl; the Sky fire path names its models). */
-      (u) => decodeURIComponent(u.href).includes('hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high&') && !u.href.includes('models='),
+      /* The grid's question only: its hourly list is exactly the three cloud layers and the 500 hPa wind (Batch NOW, 0.3), and it names no models (src/lib/bestSkyData.ts tileUrl; the Sky fire path names its models). */
+      (u) => decodeURIComponent(u.href).includes('hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high,wind_speed_500hPa,wind_direction_500hPa&') && !u.href.includes('models='),
       (route) => {
         const u = decodeURIComponent(route.request().url())
         asked.push(u)

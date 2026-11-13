@@ -91,7 +91,7 @@ function BestSkyHow({ asked, satAt, timeZone }: { asked: number; satAt: Date | n
   return (
     <div className="bsky__how">
       <p>
-        Every point of a grid round you (about 5 km apart, on the forecast cache's own grid) is scored the Sky color way: mid and high cloud 25–80% overhead or within about 50 km toward the sun to light; the low cloud toward the sun mostly clear; no thick low deck overhead. A patch toward the sun is a low glow on the horizon at most. Within 3 hours of the color, the satellite's cold cloud tops mark the real patches the models smear.
+        Every point of a grid round you (about 5 km apart, on the forecast cache's own grid) is scored the Sky color way: mid and high cloud 25–80% overhead or within about 50 km toward the sun to light; the low cloud toward the sun mostly clear; no thick low deck overhead. A patch toward the sun is a low glow on the horizon at most. Within 3 hours of the color, the satellite's cold cloud tops mark the real patches the models smear, carried to the color's time with the wind at 500 hPa (about 18,000 ft). After the sunset (before a sunrise) the clouds on the opposite side of the sky turn pink too: spots facing them score for it.
       </p>
       <p>
         <b>The map's wash</b>: a soft glow on every grid point that scores Possible or better, as strong as its score. No glow where the sky is clear or a low deck shuts it.

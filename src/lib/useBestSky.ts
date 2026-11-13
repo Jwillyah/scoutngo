@@ -11,6 +11,7 @@ import { RADII_MI, rankSpots, scoreAt, scoreGrid, type RadiusMi, type RankedSpot
 import { distanceMeters, type LatLon } from '../core/geo.ts'
 import { STARTER_SPOTS } from '../data/bestSkySpots.ts'
 import { fetchGrid } from './bestSkyData.ts'
+import type { Drift } from '../core/satDrift.ts'
 
 export interface BestSkyEvent {
   kind: 'sunrise' | 'sunset'
@@ -36,6 +37,8 @@ export interface BestSky {
   satAt: Date | null
   /** The satellite was asked (within 3 h of the colour), whether or not it answered. */
   satAsked: boolean
+  /** Batch NOW, Section 0.3: how the satellite's patch was carried to the color's time; null without one. */
+  drift: Drift | null
 }
 
 const MIN = 60_000
@@ -62,27 +65,27 @@ export function useBestSky(spot: LatLon | null, radius: RadiusMi, now: Date, sav
   const tenMin = Math.floor(now.getTime() / (10 * MIN))
   const event = useMemo(() => (spot === null ? null : nextColorEvent(spot, new Date(tenMin * 10 * MIN))), [spot?.lat, spot?.lon, tenMin]) // eslint-disable-line react-hooks/exhaustive-deps
   const key = spot === null || event === null ? null : `${spot.lat.toFixed(2)},${spot.lon.toFixed(2)}|${radius}|${event.at.getTime()}`
-  const [got, setGot] = useState<{ key: string; grid: ScoredPoint[]; asked: number; satAt: Date | null; satAsked: boolean; failed: boolean } | null>(null)
+  const [got, setGot] = useState<{ key: string; grid: ScoredPoint[]; asked: number; satAt: Date | null; satAsked: boolean; failed: boolean; drift: Drift | null } | null>(null)
   useEffect(() => {
     if (key === null || spot === null || event === null) return
     let live = true
     void fetchGrid(spot, radius, event.at)
       .then((g) => {
-        if (live) setGot({ key, grid: scoreGrid(g.points, event.azimuth), asked: g.asked, satAt: g.satAt, satAsked: g.satAsked, failed: g.points.length === 0 })
+        if (live) setGot({ key, grid: scoreGrid(g.points, event.azimuth), asked: g.asked, satAt: g.satAt, satAsked: g.satAsked, failed: g.points.length === 0, drift: g.drift ?? null })
       })
-      .catch(() => live && setGot({ key, grid: [], asked: 0, satAt: null, satAsked: false, failed: true }))
+      .catch(() => live && setGot({ key, grid: [], asked: 0, satAt: null, satAsked: false, failed: true, drift: null }))
     return () => {
       live = false
     }
   }, [key]) // eslint-disable-line react-hooks/exhaustive-deps
   return useMemo((): BestSky => {
-    if (got === null || got.key !== key || spot === null || event === null) return { status: 'loading', event, grid: [], ranked: [], here: null, asked: 0, satAt: null, satAsked: false }
+    if (got === null || got.key !== key || spot === null || event === null) return { status: 'loading', event, grid: [], ranked: [], here: null, asked: 0, satAt: null, satAsked: false, drift: null }
     const rKm = radius * 1.609344
     const spots: SpotIn[] = [
       ...STARTER_SPOTS.filter((s) => distanceMeters(spot, s.at) / 1000 <= rKm),
       ...saved.filter((s) => distanceMeters(spot, s.at) / 1000 <= rKm).map((s) => ({ id: `saved-${s.id}`, name: s.name, at: s.at, facing: null, openDeg: 0, water: false, silhouette: null })),
     ]
-    return { status: got.failed ? 'failed' : 'ok', event, grid: got.grid, ranked: rankSpots(got.grid, spots, event.azimuth, spot), here: scoreAt(got.grid, spot), asked: got.asked, satAt: got.satAt, satAsked: got.satAsked }
+    return { status: got.failed ? 'failed' : 'ok', event, grid: got.grid, ranked: rankSpots(got.grid, spots, event.azimuth, spot), here: scoreAt(got.grid, spot), asked: got.asked, satAt: got.satAt, satAsked: got.satAsked, drift: got.drift }
   }, [got, key, spot, event, radius, saved])
 }
 
