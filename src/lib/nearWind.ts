@@ -78,6 +78,12 @@ export function freshest(readings: readonly (NearReading | null)[], now: Date): 
   return ok.sort((a, b) => b.at.getTime() - a.at.getTime() || a.station.km - b.station.km)[0] ?? null
 }
 
+/** The nearest station whose reading is under MAX_AGE_MS old (the one sky word's airport, Batch NOW). */
+export function nearestFresh(readings: readonly (NearReading | null)[], now: Date): NearReading | null {
+  const ok = readings.filter((r): r is NearReading => r !== null && now.getTime() - r.at.getTime() <= MAX_AGE_MS && r.at.getTime() <= now.getTime() + 10 * 60_000)
+  return ok.sort((a, b) => a.station.km - b.station.km)[0] ?? null
+}
+
 /** CO-OPS's latest wind, in knots ("english"), its time GMT: "2026-11-12 13:42". */
 export function parseCoopsWind(body: unknown, station: NearStation): NearReading | null {
   const row = (body as { data?: { t?: string; s?: string; d?: string; g?: string }[] } | null)?.data?.[0]

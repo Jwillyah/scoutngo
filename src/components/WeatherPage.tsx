@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getPosition, getTimes } from 'suncalc'
 import type { LatLon } from '../core/geo.ts'
-import { conditionOf, groundOf } from '../core/homeDay.ts'
+import { groundOf } from '../core/homeDay.ts'
+import { freshSky, skyCondition } from '../core/skyWord.ts'
 import { cloudWords, localDate } from '../core/modelSkill.ts'
 import type { MetarSky } from '../core/metar.ts'
 import { formatClock, formatShortHour } from '../core/timezone.ts'
@@ -83,7 +84,9 @@ export function WeatherPage({ venue, placeName, timeZone, units, now, onBack, on
   const today = localDate(now, timeZone)
   const dayTemps = wx === null ? [] : wx.times.map((t, i) => ({ t, v: wx.values.temperature_2m?.[i] ?? null })).filter((x) => x.v !== null && localDate(new Date(x.t), timeZone) === today).map((x) => x.v as number)
   const temp = at(wx, 'temperature_2m', now)
-  const cond = conditionOf(at(wx, 'weather_code', now), sunUp(now))
+  /* One sky word (src/core/skyWord.ts, Batch NOW 1.3): the station's when fresh, else the layers. */
+  const skyAt = (t: Date, station: ReturnType<typeof freshSky>) => skyCondition({ code: at(wx, 'weather_code', t), layers: { low: at(wx, 'cloud_cover_low', t), mid: at(wx, 'cloud_cover_mid', t), high: at(wx, 'cloud_cover_high', t) }, day: sunUp(t), station })
+  const cond = skyAt(now, freshSky(obs, now))
   const feels = at(extra, 'apparent_temperature', now)
   const wind = windAt(wx, now, obs)
 
@@ -110,7 +113,8 @@ export function WeatherPage({ venue, placeName, timeZone, units, now, onBack, on
   const hpa = at(extra, 'pressure_msl', now)
   const trend = pressureTrend(hpa, at(extra, 'pressure_msl', new Date(now.getTime() - 3 * 3_600_000)))
   const blendNow = state?.hours.find((h) => Math.abs(h.at.getTime() - now.getTime()) <= 1_800_000) ?? null
-  const cloud = cloudTile(sky, blendNow?.cloud.value ?? null, cloudWords)
+  /* Batch NOW, Section 1.3: without a station, the tile says the headline's one sky word, never a second one. */
+  const cloud = cloudTile(sky, blendNow?.cloud.value ?? null, (pct) => cond?.word ?? cloudWords(pct))
   const imperial = units.distance === 'ft'
   const tiles: { k: string; label: string; big: string; line: string }[] = [
     { k: 'wind', label: 'Wind', big: windWords(wind, units.wind) ?? '—', line: gustWords(wind, units.wind) ?? 'gusts not said' },
@@ -203,7 +207,7 @@ export function WeatherPage({ venue, placeName, timeZone, units, now, onBack, on
                 )
               }
               const t = new Date(c.at.getTime() + 1_800_000)
-              const cc = conditionOf(at(wx, 'weather_code', t), sunUp(t))
+              const cc = skyAt(t, null)
               return (
                 <li key={c.at.getTime()} className="hstrip__step">
                   <span className="hstrip__at">{c.at.getTime() <= now.getTime() ? 'Now' : formatShortHour(c.at, timeZone)}</span>

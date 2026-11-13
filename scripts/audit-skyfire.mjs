@@ -142,7 +142,7 @@ try {
            * three layers at the bar's time in a word (src/core/statStrip.ts
            * skyCell); the station's report is the Sky page's, checked there.
            */
-          if (!/^(Clear|A few clouds|High cloud|Some cloud|Mostly cloudy|Overcast)$/.test(chip.value)) fail(`${label}: the sky cell reads "${chip.value}", not a sky word`)
+          if (!/^(Clear|Few clouds|High cloud|Partly cloudy|Mostly cloudy|Overcast)$/.test(chip.value)) fail(`${label}: the sky cell reads "${chip.value}", not a sky word`)
           if (!chip.fits) fail(`${label}: the sky cell's words run past it`)
           if (!/Cloud Low \d+ · Mid \d+ · High \d+, models split/.test(chip.spoken ?? '')) fail(`${label}: the sky cell does not say the three layers and that the models split (${chip.spoken})`)
         }

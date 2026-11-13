@@ -105,6 +105,22 @@
 .spage__row + .spage__row {
   border-top: 1px solid var(--glass-edge);
 }
+.spage__morerow {
+  display: block;
+  padding: 0;
+}
+.spage__more {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  text-decoration: underline;
+  cursor: pointer;
+}
 .spage__when {
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
@@ -245,4 +261,38 @@
   font: inherit;
   font-size: var(--text-sm);
   font-weight: 700;
+}
+
+/* Batch NOW, Section 1: Now, and the station that sees what the models do not. */
+.spage__doubt {
+  margin: 4px 0 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--glass-ink-2);
+}
+.spage__nowclouds {
+  margin: 0;
+  font-size: var(--text-md, 1rem);
+  font-weight: var(--weight-medium);
+}
+.spage__nowsrc {
+  margin: 2px 0 0;
+  font-size: var(--text-xs);
+  color: var(--glass-ink-2);
+}
+.spage__nowlist {
+  margin: 8px 0 0;
+  padding-left: 1.1em;
+  font-size: var(--text-sm);
+}
+.spage__nextbtn {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: var(--weight-medium);
+  text-align: left;
+  cursor: pointer;
 }

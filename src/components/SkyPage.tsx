@@ -1,6 +1,6 @@
 import '../styles/sky.css'
 import { useEffect, useState } from 'react'
-import { getPosition } from 'suncalc'
+import { getPosition, getTimes } from 'suncalc'
 import { compassPoint } from '../core/field.ts'
 import type { LatLon } from '../core/geo.ts'
 import { leadLayer } from '../core/fireOutlook.ts'
@@ -13,8 +13,10 @@ import { hourlyAt } from '../lib/tideSheetData.ts'
 import { useBriefing } from '../lib/useBriefing.ts'
 import { useStationNow } from '../lib/useStationNow.ts'
 import { layersWords } from '../core/metar.ts'
-import { stationCloudWord } from '../core/cloudWords.ts'
+import { stationWord } from '../core/skyWord.ts'
 import { PageShell } from './PageShell.tsx'
+import { opensOnNow, stationDoubt, withDoubt, type SkyTab } from '../core/skyNow.ts'
+import { SkyNowView } from './SkyNowView.tsx'
 
 /*
  * THE SKY PAGE (Batch Pages, Section 3; board SkyPage). Its own page: from
@@ -69,10 +71,21 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
   const soonest: Kind = days.sunrise?.events.sunrise != null && days.sunset?.events.sunset != null && days.sunrise.events.sunrise < days.sunset.events.sunset ? 'sunrise' : 'sunset'
   const [picked, setPicked] = useState<Kind | null>(null)
   const kind = picked ?? soonest
+  /* Batch NOW, Section 1.1: Now · Tonight · Tomorrow morning; Now first, and the page opens there in the day's middle. */
+  const today = getTimes(realNow, venue.lat, venue.lon)
+  const [tabPicked, setTabPicked] = useState<SkyTab | null>(null)
+  const tab: SkyTab = tabPicked ?? (opensOnNow(realNow, today.sunrise ?? null, today.sunset ?? null) ? 'now' : kind)
+  const pickTab = (t: SkyTab) => {
+    setTabPicked(t)
+    if (t !== 'now') setPicked(t)
+  }
   const day = days[kind]
   const event = day?.events[kind] ?? null
-  const read = day?.reads[kind] ?? null
   const verdict = day?.verdicts[kind] ?? null
+  /* Batch NOW, Section 1.2: a deck the station reports now that the models clear by the event: said, and the call one step less sure. */
+  const stationAt = station === null || station.at === '' ? null : new Date(station.at)
+  const doubt = stationDoubt(verdict, station === null || stationAt === null ? null : { sky: station.sky, at: stationAt }, day?.events[kind] ?? null, realNow, (d) => formatClock(d, timeZone))
+  const read = withDoubt(day?.reads[kind] ?? null, doubt)
   const az = event === null ? null : getPosition(event, venue.lat, venue.lon).azimuth
   const lead = verdict === null ? null : leadLayer(verdict)
   const checks = plainChecks(lead, az === null ? '—' : compassPoint(az))
@@ -85,9 +98,16 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
     return e === null ? (k === 'sunset' ? 'Sunset' : 'Sunrise') : eventDayWord(e, k, realNow, timeZone)
   }
   const segSpan = segs.length === 0 ? 1 : segs[segs.length - 1].to.getTime() - segs[0].from.getTime()
+  /* Now's "next": the soonest sunset or sunrise and its call. */
+  const nextToday = (() => {
+    const e = days[soonest]?.events[soonest] ?? null
+    const r = withDoubt(days[soonest]?.reads[soonest] ?? null, soonest === kind ? doubt : null)
+    return e === null ? null : { kind: soonest, at: e, call: colorHeadline(r?.call ?? null), value: colorWords(r?.call ?? null) ?? '' }
+  })()
 
   /* The week's rare light: five models' rules and the glassy mornings (at a coast). */
-  const [rare, setRare] = useState<{ key: string; rows: RareRow[] | null } | null>(null)
+  const [rare, setRare] = useState<{ key: string; rows: RareRow[] | null; all: RareRow[] } | null>(null)
+  const [rareOpen, setRareOpen] = useState(false)
   const key = `${venue.lat},${venue.lon}`
   useEffect(() => {
     let live = true
@@ -95,13 +115,16 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
       const week = await fetchSpecialWeek(venue).catch(() => null)
       const list: Special[] = week === null ? [] : specialsFrom(week.week, venue, week.seaCAt)
       const glass = brief.facing === null ? [] : await fetchGlassWeek(venue, new Date()).catch(() => [])
-      if (live) setRare({ key, rows: week === null && glass.length === 0 ? null : rareRows([...list, ...glass], new Date()) })
+      const found = [...list, ...glass]
+      if (live) setRare({ key, rows: week === null && glass.length === 0 ? null : rareRows(found, new Date(), venue), all: rareRows(found, new Date(), venue, Infinity) })
     })()
     return () => {
       live = false
     }
   }, [key, brief.facing]) // eslint-disable-line react-hooks/exhaustive-deps
-  const rows = rare === null || rare.key !== key ? 'loading' : rare.rows
+  const rows = rare === null || rare.key !== key ? 'loading' : rareOpen && rare.rows !== null ? rare.all : rare.rows
+  /* Batch NOW, Section 1.5: the list fits, or says how many more; never cut silently. */
+  const rareMore = rare === null || rare.key !== key || rare.rows === null || rareOpen ? 0 : rare.all.length - rare.rows.length
   const dayWord = (d: Date) => {
     const iso = (x: Date) => new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(x)
     return iso(d) === iso(now) ? 'Today' : new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'short' }).format(d)
@@ -121,7 +144,7 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
     <PageShell
       kind="spage"
       title="Sky"
-      sub={`${placeName} · ${event === null ? 'now' : dayWordOf(kind).toLowerCase()}`}
+      sub={`${placeName} · ${tab === 'now' || event === null ? 'now' : dayWordOf(kind).toLowerCase()}`}
       ground={ground}
       onBack={onBack}
       onMap={onMap}
@@ -138,20 +161,25 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
       }
     >
       {/* Batch Flow, Section 4 (board D_Sky): Tonight · Tomorrow, the next sunset and sunrise, each by its own day. */}
-      <div className="ui-seg spage__seg" role="tablist" aria-label="Sunset or sunrise">
-        {/* In the order they come: at night the morning is first. */}
-        {(soonest === 'sunrise' ? (['sunrise', 'sunset'] as const) : (['sunset', 'sunrise'] as const)).map((k) => (
-          <button key={k} type="button" role="tab" aria-selected={kind === k} className={`ui-seg__opt${kind === k ? ' ui-seg__opt--on' : ''}`} onClick={() => setPicked(k)}>
-            {dayWordOf(k)}
+      <div className="ui-seg spage__seg" role="tablist" aria-label="Now, sunset or sunrise">
+        {/* Now first; then in the order they come: at night the morning is first. */}
+        {(['now', ...(soonest === 'sunrise' ? (['sunrise', 'sunset'] as const) : (['sunset', 'sunrise'] as const))] as const).map((k) => (
+          <button key={k} type="button" role="tab" aria-selected={tab === k} className={`ui-seg__opt${tab === k ? ' ui-seg__opt--on' : ''}`} onClick={() => pickTab(k)}>
+            {k === 'now' ? 'Now' : dayWordOf(k)}
           </button>
         ))}
       </div>
+      {tab === 'now' ? (
+        <SkyNowView venue={venue} now={realNow} timeZone={timeZone} station={station === null || stationAt === null ? null : { sky: station.sky, at: stationAt }} wx={brief.wx} next={nextToday} onNext={(k) => pickTab(k)} />
+      ) : (
+      <>
       <p className="spage__event num" {...(event !== null && kind === 'sunset' && picked === null ? { 'data-shared': 'sunset', 'data-value': `sunset ${clock(event)}`.toLowerCase() } : {})}>
         {event === null ? '—' : `${kind === 'sunset' ? 'Sunset' : 'Sunrise'} ${clock(event)}`}
         {az === null ? '' : ` · looking ${compassPoint(az)}`}
       </p>
       <p className="spage__head" data-shared={picked === null ? 'skycall' : 'skycall-picked'} data-value={colorWords(read?.call ?? null) ?? ''}>{brief.status === 'loading' && read === null ? '…' : colorHeadline(read?.call ?? null)}</p>
       <p className="spage__why">{plainReason(read?.why ?? null) ?? (brief.status === 'loading' ? 'Reading the forecast…' : 'The forecast did not say.')}</p>
+      {doubt === null ? null : <p className="spage__doubt" data-doubt>{doubt.line}</p>}
       {onBestSky === undefined ? null : (
         <button type="button" className="spage__bestsky" onClick={onBestSky}>
           Where&rsquo;s the color nearby? ›
@@ -184,7 +212,7 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
           </svg>
         )}
         <p className="spage__gap">{read?.gapLine ?? checks.map((c) => `${c.label.replace(/ \(.*\)$/, '')}: ${c.value}`).join(' · ')}</p>
-        {station === null ? null : <p className="spage__station">{`${station.sky.station} now: ${stationCloudWord(station.sky) ?? 'not said'} · ${layersWords(station.sky)}`}</p>}
+        {station === null ? null : <p className="spage__station">{`${station.sky.station} now: ${stationWord(station.sky) ?? 'not said'} · ${layersWords(station.sky)}`}</p>}
       </section>
 
       <section className="dcard spage__light" aria-label={`${dayWordOf(kind)}'s light`}>
@@ -203,6 +231,8 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
           {thumb === null ? null : <span className="spage__thumb" style={{ left: `${thumb * 100}%` }} />}
         </div>
       </section>
+      </>
+      )}
 
       <section className="dcard spage__rare" aria-label="Rare light this week">
         <p className="dcard__label">Rare light this week</p>
@@ -225,6 +255,13 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
                 </span>
               </li>
             ))}
+            {rareMore > 0 ? (
+              <li className="spage__morerow">
+                <button type="button" className="spage__more" onClick={() => setRareOpen(true)}>
+                  +{rareMore} more
+                </button>
+              </li>
+            ) : null}
           </ul>
         )}
       </section>

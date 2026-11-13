@@ -35,9 +35,9 @@ describe('the sky cell: which layer matters, in a word', () => {
     expect(skyCell({ low: 0, mid: 2, high: 5 })).toBe('Clear')
     expect(skyCell({ low: 0, mid: 0, high: 70 })).toBe('High cloud')
     expect(skyCell({ low: 95, mid: 20, high: 0 })).toBe('Overcast')
-    expect(skyCell({ low: 40, mid: 0, high: 0 })).toBe('Some cloud')
+    expect(skyCell({ low: 40, mid: 0, high: 0 })).toBe('Partly cloudy')
     expect(skyCell({ low: 10, mid: 70, high: 100 })).toBe('Mostly cloudy')
-    expect(skyCell({ low: 15, mid: 0, high: 20 })).toBe('A few clouds')
+    expect(skyCell({ low: 15, mid: 0, high: 20 })).toBe('Few clouds')
   })
   it('a dash when no layer was said', () => {
     expect(skyCell(null)).toBeNull()

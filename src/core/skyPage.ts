@@ -5,6 +5,8 @@
  * each in one line from the numbers that found it. Facts, never advice
  * (rule 28); nothing here says the sky or the area is "clear" of anything.
  */
+import { getPosition } from 'suncalc'
+import type { LatLon } from './geo.ts'
 import type { LayerRead } from './fireOutlook.ts'
 import { colorWords } from './homeDay.ts'
 import type { Special, SpecialKind } from './specialLight.ts'
@@ -30,7 +32,7 @@ export function plainChecks(l: LayerRead | null, toward: string): PlainCheck[] {
   return [
     { label: 'Clouds to light up', value: l.canvas ? `${LAYER_PLAIN[l.layer]}${pct}` : 'none' },
     /* No cloud to light: the gap does not decide anything. */
-    { label: gapLabel, value: !l.canvas ? 'not needed' : l.gap === 'open' ? 'open' : l.gap === 'partial' ? 'partly open' : l.gap === 'closed' ? 'closed' : 'no glow this hour' },
+    { label: gapLabel, value: !l.canvas ? 'no clouds, so no gap needed' : l.gap === 'open' ? 'open' : l.gap === 'partial' ? 'partly open' : l.gap === 'closed' ? 'closed' : 'no glow this hour' },
     { label: 'Anything blocking the sun', value: l.hiddenBy === null ? 'no' : `yes, ${LAYER_PLAIN[l.hiddenBy.layer]} ${Math.round(l.hiddenBy.cover)}%` },
   ]
 }
@@ -130,16 +132,31 @@ export interface RareRow {
   word: 'possible' | 'likely'
 }
 
+/** Light rays need the sun up, or all but (Batch NOW, Section 1.5: "Light rays Mon 2:00 AM"). */
+export const RAYS_SUN_FROM_DEG = -1
+
+/**
+ * ONE FILTER FOR THE LIST AND THE MAP (Batch NOW, Section 1.5: iridescence on
+ * the map's card, not in the list): a kept kind, and rays only with the sun
+ * above RAYS_SUN_FROM_DEG at their time where you are.
+ */
+export function rareKept(s: Special, venue: LatLon | null): boolean {
+  if (!RARE_KEPT.includes(s.kind)) return false
+  if (s.kind === 'rays' && venue !== null && getPosition(s.from, venue.lat, venue.lon).altitude <= RAYS_SUN_FROM_DEG) return false
+  return true
+}
+
 /**
  * The week's rare light, kept kinds only, each with its one line; the
- * likeliest first, then by time, RARE_MAX of them. The same kind for the same
+ * likeliest first, then by time, `max` of them (RARE_MAX; the page shows the
+ * rest behind "+2 more"). The same kind for the same
  * reason is said once, at its first time (Batch QA, Section 0: four "Light
  * rays" rows, one reason, said four days running).
  */
-export function rareRows(list: readonly Special[], now: Date): RareRow[] {
+export function rareRows(list: readonly Special[], now: Date, venue: LatLon | null = null, max = RARE_MAX): RareRow[] {
   const seen = new Set<string>()
   return list
-    .filter((s) => RARE_KEPT.includes(s.kind) && s.to.getTime() > now.getTime() && s.brief !== undefined && s.brief !== '')
+    .filter((s) => rareKept(s, venue) && s.to.getTime() > now.getTime() && s.brief !== undefined && s.brief !== '')
     .sort((a, b) => a.from.getTime() - b.from.getTime())
     .filter((s) => {
       const key = `${s.kind}|${s.brief}`
@@ -149,7 +166,7 @@ export function rareRows(list: readonly Special[], now: Date): RareRow[] {
     })
     .map((s) => ({ kind: s.kind, at: s.from, name: RARE_NAME[s.kind] ?? s.kind, why: s.brief as string, word: s.word, share: s.of === 0 ? 0 : s.agree / s.of }))
     .sort((a, b) => b.share - a.share || a.at.getTime() - b.at.getTime())
-    .slice(0, RARE_MAX)
+    .slice(0, max)
     .sort((a, b) => a.at.getTime() - b.at.getTime())
     .map(({ share: _share, ...r }) => r)
 }

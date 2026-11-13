@@ -14482,11 +14482,11 @@
   flex: 1 1 auto;
   min-width: 0;
   margin: 0;
-  overflow: hidden;
   font-size: var(--text-sm);
   font-weight: var(--weight-heavy);
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  /* Batch NOW, Section 1.6: wraps to a second line, never cut. */
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .nearyou__more {

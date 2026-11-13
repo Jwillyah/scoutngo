@@ -28,8 +28,7 @@ import type {
 import type { ShotType } from '../core/shotType.ts'
 import { formatClock } from '../core/timezone.ts'
 import { AT_NOW_MS, lightCell, stripWhen, tideCell } from '../core/statStrip.ts'
-import { skyCondition } from '../core/skyWord.ts'
-import { obsFresh } from '../core/nowcast.ts'
+import { freshSky, skyCondition } from '../core/skyWord.ts'
 import { useStationObs } from '../lib/useStationObs.ts'
 import { windToBeach } from '../core/coastFacing.ts'
 import type { SkyState } from '../lib/useSkyFrames.ts'
@@ -1705,7 +1704,7 @@ export function PlanMode({
     const side = wind === null || facing === null ? null : windToBeach(wind.fromDegrees, facing)
     const atNow = scrubbedAt === null || Math.abs(scrubbedAt.getTime() - Date.now()) <= AT_NOW_MS
     const sunUp = (sunAlt ?? -1) > -0.8
-    const sky = skyCondition({ code: null, layers, day: sunUp, station: atNow && stationObs !== null && obsFresh(stationObs, new Date()) ? { sky: stationObs.sky, visMi: stationObs.visMi } : null })?.word ?? null
+    const sky = skyCondition({ code: null, layers, day: sunUp, station: atNow ? freshSky(stationObs, new Date()) : null })?.word ?? null
     const turn = tideCell(nextTurn, tz)
     return [
       { ...golden, label: 'LIGHT', value: lightCell(goldenLeft, scrubbedAt, sunAlt, tz), spoken: `Light: ${lightCell(goldenLeft, scrubbedAt, sunAlt, tz) ?? 'not known'}` },

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { LatLon } from '../core/geo.ts'
+import { rareKept } from '../core/skyPage.ts'
 import { strong, type Special } from '../core/specialLight.ts'
 import { fetchSpecialWeek, specialsFrom } from './specialLightData.ts'
 import { useWeatherEpoch } from './useWeatherStatus.ts'
@@ -27,5 +28,6 @@ export function useSpecialNow(venue: LatLon | null, at: Date | null): Special | 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, epoch])
   if (answer === null || answer.key !== key || at === null) return null
-  return answer.list.find((s) => strong(s) && s.from <= at && at < s.to) ?? null
+  /* The Sky page's list's own filter (src/core/skyPage.ts rareKept): what the map's card says, the list says too. */
+  return answer.list.find((s) => strong(s) && rareKept(s, venue) && s.from <= at && at < s.to) ?? null
 }

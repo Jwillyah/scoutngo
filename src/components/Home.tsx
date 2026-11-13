@@ -19,9 +19,8 @@ import { rangeSizeWords } from '../core/surfReads.ts'
 import { chartMarks, firstFun, homeCardsShown, homeLayout, nextLine, nightSpans, surfChartMarks, surfPath, tideAt, tideCurve, type HomeLayout, type SurfChartMarks } from '../core/homeCards.ts'
 import { gustWords, windAt, windWords } from '../lib/windNow.ts'
 import { useStationObs, type StationNow } from '../lib/useStationObs.ts'
-import { skyCondition } from '../core/skyWord.ts'
+import { freshSky, skyCondition } from '../core/skyWord.ts'
 import { colorNowLine } from '../core/colorNow.ts'
-import { obsFresh } from '../core/nowcast.ts'
 import { hourlyAt } from '../lib/tideSheetData.ts'
 import { compass } from '../lib/tideWords.ts'
 import { formatTemperature, windIn, windUnitLabel, type Units } from '../lib/units.ts'
@@ -278,7 +277,7 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
     code: at('weather_code', when),
     layers: { low: at('cloud_cover_low', when), mid: at('cloud_cover_mid', when), high: at('cloud_cover_high', when) },
     day: sunUp,
-    station: which === 'today' && obs !== null && obsFresh(obs, now) ? { sky: obs.sky, visMi: obs.visMi } : null,
+    station: which === 'today' ? freshSky(obs, now) : null,
   })
   /* Batch TRUTH, Section 0.5: a live colour window with a Maybe or better leads the home. */
   /* Batch BEST SKY, Section 4: today only, with Shoot picked: the grid within 15 mi (7 or so questions, each kept an hour). */

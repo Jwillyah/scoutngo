@@ -7,6 +7,7 @@
  */
 import type { CloudGroup, MetarSky } from './metar.ts'
 import { RAIN_SOME } from './weatherWords.ts'
+import { SAT_CLEAR_PCT, stationWord } from './skyWord.ts'
 
 /* ------------------------------------------------------------------ UV */
 
@@ -74,10 +75,12 @@ export function cloudHeightWord(baseFt: number): 'low' | 'mid' | 'high' {
  */
 export function cloudTile(sky: MetarSky | null, forecastPct: number | null, forecastWords: (pct: number | null) => string): { big: string; line: string } {
   if (sky !== null) {
-    if (sky.groups.length === 0) return sky.clear ? { big: 'Clear', line: `below 12,000 ft, at ${sky.station}` } : { big: 'Clear', line: `reported at ${sky.station}` }
+    /* Batch NOW, Section 1.4: a station's CLR reaches 12,000 ft; with cloud forecast above it, say so, never "Clear" beside "Cloudy". */
+    if (sky.groups.length === 0) return forecastPct !== null && forecastPct >= SAT_CLEAR_PCT ? { big: 'Above 12,000 ft', line: `${sky.station} clear below` } : { big: 'Clear', line: `below 12,000 ft, at ${sky.station}` }
     const rank = ['FEW', 'SCT', 'BKN', 'OVC', 'VV']
     const most = sky.groups.reduce((a, b) => (rank.indexOf(b.amount) > rank.indexOf(a.amount) ? b : a))
-    return { big: AMOUNT[most.amount], line: `${cloudHeightWord(most.baseFt)}, at ${sky.station}` }
+    /* The one sky word's (src/core/skyWord.ts): FEW Few clouds, SCT Partly cloudy, BKN Mostly cloudy, OVC Overcast. */
+    return { big: most.amount === 'VV' ? AMOUNT.VV : (stationWord(sky) ?? AMOUNT[most.amount]), line: `${cloudHeightWord(most.baseFt)}, at ${sky.station}` }
   }
   if (forecastPct === null) return { big: '—', line: 'not said' }
   const w = forecastWords(forecastPct)

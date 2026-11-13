@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getPosition, getTimes } from 'suncalc'
-import { conditionOf } from '../core/homeDay.ts'
+import { freshSky, skyCondition } from '../core/skyWord.ts'
 import { localDate } from '../core/modelSkill.ts'
 import { formatClock, formatShortHour } from '../core/timezone.ts'
 import { rainTileLine, uvBand, uvLine } from '../core/weatherTiles.ts'
@@ -9,6 +9,7 @@ import { useBlend } from '../lib/blendData.ts'
 import { fetchWeatherExtras, hourlyAt, type Hourly } from '../lib/tideSheetData.ts'
 import { formatTemperature, type Units } from '../lib/units.ts'
 import type { StationObs } from '../core/nowcast.ts'
+import type { MetarSky } from '../core/metar.ts'
 import { gustWords, windAt, windWords } from '../lib/windNow.ts'
 import { SkyGlyph } from './SkyGlyph.tsx'
 import { SkyIconSvg } from './SkyIconSvg.tsx'
@@ -28,7 +29,7 @@ interface Props {
   units: Units
   now: Date
   wx: Hourly | null
-  obs: StationObs | null
+  obs: (StationObs & { sky?: MetarSky | null; visMi?: number | null; skyAt?: Date | null }) | null
   /** The home's fit (Home.tsx DayView): above 0, the week is left to the Weather page. */
   drop: number
   onOpen: () => void
@@ -88,7 +89,7 @@ export function WeatherHome({ venue, timeZone, units, now, wx, obs, drop, onOpen
       <button type="button" className="hwh__hours" onClick={onOpen} aria-label="The next six hours: the weather">
         {hours.map((h, i) => {
           const t = new Date(h.getTime() + 1_800_000)
-          const cc = conditionOf(at(wx, 'weather_code', t), sunUp(t))
+          const cc = skyCondition({ code: at(wx, 'weather_code', t), layers: { low: at(wx, 'cloud_cover_low', t), mid: at(wx, 'cloud_cover_mid', t), high: at(wx, 'cloud_cover_high', t) }, day: sunUp(t), station: i === 0 ? freshSky(obs, now) : null })
           return (
             <span key={h.getTime()} className="hstrip__step">
               <span className="hstrip__at">{i === 0 ? 'Now' : formatShortHour(h, timeZone)}</span>

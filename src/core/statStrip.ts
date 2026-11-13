@@ -33,7 +33,8 @@ export function lightCell(next: GoldenNext | null, from: Date | null, sunAltitud
  * follows the bar). Which layer matters: high cloud alone lets the sun
  * through and colours it; low and mid cloud take it away.
  */
-export type SkyWord = 'Clear' | 'A few clouds' | 'High cloud' | 'Some cloud' | 'Mostly cloudy' | 'Overcast'
+/* The station's words (Batch NOW, Section 1.3): FEW Few clouds, SCT Partly cloudy, BKN Mostly cloudy, OVC Overcast; the model's layers said the same way. */
+export type SkyWord = 'Clear' | 'Few clouds' | 'High cloud' | 'Partly cloudy' | 'Mostly cloudy' | 'Overcast'
 
 export function skyCell(layers: { low: number | null; mid: number | null; high: number | null } | null): SkyWord | null {
   if (layers === null) return null
@@ -45,9 +46,9 @@ export function skyCell(layers: { low: number | null; mid: number | null; high: 
   const under = Math.max(low, mid)
   if (under >= 90) return 'Overcast'
   if (under >= 60) return 'Mostly cloudy'
-  if (under >= 30) return 'Some cloud'
+  if (under >= 30) return 'Partly cloudy'
   if (high >= 30) return 'High cloud'
-  if (Math.max(under, high) >= 10) return 'A few clouds'
+  if (Math.max(under, high) >= 10) return 'Few clouds'
   return 'Clear'
 }
 

@@ -1,6 +1,7 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { getPosition } from 'suncalc'
-import { colorHeadline, eventDayWord, lightMarks, lightTimeline, nextEvent, nowShare, plainChecks, plainReason, rareRows, RARE_KEPT, sideView, sunCrosses } from '../src/core/skyPage.ts'
+import { colorHeadline, eventDayWord, lightMarks, lightTimeline, nextEvent, nowShare, plainChecks, plainReason, rareKept, rareRows, RARE_KEPT, RARE_MAX, sideView, sunCrosses } from '../src/core/skyPage.ts'
 import type { LayerRead } from '../src/core/fireOutlook.ts'
 import type { Special } from '../src/core/specialLight.ts'
 
@@ -19,7 +20,7 @@ describe('the three checks, said plainly', () => {
   })
   it('no cloud: none, and the gap is not needed (never "clear")', () => {
     const v = plainChecks(layer({ canvas: false, cover: 5, fires: false, why: 'none' }), 'WSW').map((c) => c.value)
-    expect(v).toEqual(['none', 'not needed', 'no'])
+    expect(v).toEqual(['none', 'no clouds, so no gap needed', 'no'])
     expect(v.join(' ')).not.toMatch(/clear/i)
   })
   it('no forecast: dashes', () => {
@@ -139,5 +140,27 @@ describe('the light as one bar, and the side view', () => {
     expect(y.mid).toBeGreaterThan(y.high)
     expect(v.path?.to.y).toBe(y.mid)
     expect(sideView([{ layer: 'low', heightM: 1000, cover: 5, canvas: false, fires: false }], 0, 'low').path).toBeNull()
+  })
+})
+
+describe('rare light, one filter for the list and the map (Batch NOW, Section 1.5)', () => {
+  const VB = { lat: 36.84, lon: -75.97 }
+  const sp = (kind: Special['kind'], iso: string): Special => ({ kind, from: new Date(iso), to: new Date(new Date(iso).getTime() + 3_600_000), agree: 4, of: 5, word: 'likely', why: 'long why', brief: 'broken low cloud, sun low' })
+  it('light rays only with the sun above -1°: never "Mon 2:00 AM"', () => {
+    expect(rareKept(sp('rays', '2026-11-16T07:00:00Z'), VB)).toBe(false)
+    expect(rareKept(sp('rays', '2026-11-16T21:00:00Z'), VB)).toBe(true)
+    const rows = rareRows([sp('rays', '2026-11-16T07:00:00Z'), sp('rays', '2026-11-16T21:00:00Z')], new Date('2026-11-13T12:00:00Z'), VB)
+    expect(rows.map((r) => r.at.toISOString())).toEqual(['2026-11-16T21:00:00.000Z'])
+  })
+  it('iridescence is dropped by both: the map card reads the list\'s filter', () => {
+    expect(rareKept(sp('iridescence', '2026-11-16T21:00:00Z'), VB)).toBe(false)
+    expect(readFileSync('src/lib/useSpecialNow.ts', 'utf8')).toMatch(/rareKept\(s, venue\)/)
+  })
+  it('the rest of the list is kept behind "+N more", never cut', () => {
+    const many = ['rainbow', 'fog', 'glass', 'rays', 'fog', 'rainbow'].map((k, i) => ({ ...sp(k as Special['kind'], `2026-11-1${4 + i}T20:00:00Z`), brief: `reason ${i}` }))
+    const now = new Date('2026-11-13T12:00:00Z')
+    expect(rareRows(many, now, VB)).toHaveLength(RARE_MAX)
+    expect(rareRows(many, now, VB, Infinity)).toHaveLength(6)
+    expect(readFileSync('src/components/SkyPage.tsx', 'utf8')).toMatch(/\+\{rareMore\} more/)
   })
 })

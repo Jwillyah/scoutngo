@@ -165,7 +165,16 @@ try {
     else {
       looked += 1
       console.log(`  Sky: ${k.content}/${k.box} px, ${k.out.length === 0 && !k.scrolls ? 'fits' : `scrolls or runs off ${JSON.stringify(k.out)}`}`)
-      const d = JSON.parse(await ev(`JSON.stringify({ seg: [...document.querySelectorAll('.spage__seg button')].map((b) => b.textContent), head: document.querySelector('.spage__head')?.textContent ?? null, why: document.querySelector('.spage__why')?.textContent ?? null, event: document.querySelector('.spage__event')?.textContent ?? null, side: !!document.querySelector('.spage__side svg, .spage__side .spage__none'), gap: document.querySelector('.spage__gap')?.textContent ?? null, marks: document.querySelector('.spage__marks')?.textContent ?? null, rare: document.querySelector('.spage__rare')?.innerText ?? null, grid: !!document.querySelector('.spage .spec__week, .spage .spec__grid, .spage .spec__lane'), buttons: [...document.querySelectorAll('.spage__buttons button')].map((b) => b.textContent) })`))
+      /* Batch NOW, Section 1.1: Now · Tonight · Tomorrow morning; at 10:30 AM the page opens on Now: the sky in words, then the next event. */
+      const nowTab = JSON.parse(await ev(`JSON.stringify({ seg: [...document.querySelectorAll('.spage__seg button')].map((b) => ({ t: b.textContent, on: b.getAttribute('aria-selected') === 'true' })), head: document.querySelector('[data-now-head]')?.textContent ?? null, clouds: document.querySelector('[data-now-clouds]')?.textContent ?? null, next: document.querySelector('.spage__nextbtn')?.textContent ?? null })`))
+      console.log(`  Now: ${JSON.stringify(nowTab)}`)
+      if (nowTab.seg[0]?.t !== 'Now' || nowTab.seg[0]?.on !== true) fail(`${label}: the Sky page did not open on Now at 10:30 AM (${JSON.stringify(nowTab.seg)})`)
+      if (!/^(Worth a look|Nothing special now)$/.test(nowTab.head ?? '')) fail(`${label}: Now's headline reads ${JSON.stringify(nowTab.head)}`)
+      if (nowTab.clouds === null || nowTab.clouds.trim() === '') fail(`${label}: Now does not say the clouds`)
+      if (!/^(Sunset|Sunrise) \d+:\d\d [AP]M · (Color (likely|possible|unlikely)|No call yet) ›$/.test(nowTab.next ?? '')) fail(`${label}: Now's next line reads ${JSON.stringify(nowTab.next)}`)
+      await ev(`[...document.querySelectorAll('.spage__seg button')][1]?.click()`)
+      await wait(800)
+      const d = JSON.parse(await ev(`JSON.stringify({ seg: [...document.querySelectorAll('.spage__seg button')].map((b) => b.textContent).slice(1), head: document.querySelector('.spage__head')?.textContent ?? null, why: document.querySelector('.spage__why')?.textContent ?? null, event: document.querySelector('.spage__event')?.textContent ?? null, side: !!document.querySelector('.spage__side svg, .spage__side .spage__none'), gap: document.querySelector('.spage__gap')?.textContent ?? null, marks: document.querySelector('.spage__marks')?.textContent ?? null, rare: document.querySelector('.spage__rare')?.innerText ?? null, grid: !!document.querySelector('.spage .spec__week, .spage .spec__grid, .spage .spec__lane'), buttons: [...document.querySelectorAll('.spage__buttons button')].map((b) => b.textContent) })`))
       console.log(`  ${JSON.stringify(d).slice(0, 500)}`)
       /* Batch Flow, Section 4 (board D_Sky): the toggle names the day of each event, never one that has passed. */
       const evening = d.seg.find((x) => /evening$|^Tonight$/.test(x))

@@ -3,8 +3,9 @@
  * method of scripts/measure-sunrise-replay.mjs, Batch TRUTH), with the
  * opposite sky (src/core/afterglow.ts).
  *
- * Usage:  node scripts/measure-stage-replay.mjs <date> <sunrise|sunset> [fetch]
- *         e.g. 2026-11-13 sunrise fetch
+ * Usage:  node scripts/measure-stage-replay.mjs <date> <sunrise|sunset> [fetch] [at=<ISO>]
+ *         e.g. 2026-11-13 sunrise fetch; at=2026-11-12T14:40:00Z adds that
+ *         moment as a stage of its own (12 Nov 9:40 AM, Section 1.2)
  *         With "fetch": asks Open-Meteo's single-runs API, for each model,
  *         for the run that was out at each stage (the publication delays
  *         below are this script's assumption), at the points the app asks
@@ -34,8 +35,10 @@ const FACING = 100
 const DIR = `tests/data/stages-${date}-${kind}`
 const event = getTimes(new Date(`${date}T12:00:00Z`), PIER.lat, PIER.lon)[kind]
 const azimuth = getPosition(event, PIER.lat, PIER.lon).azimuth
+const atArg = process.argv.find((a) => a.startsWith('at='))?.slice(3) ?? null
 const STAGES = [
   ['T-12h', 12 * 3_600_000],
+  ...(atArg === null ? [] : [[`at-${atArg.slice(11, 16).replace(':', '')}Z`, event.getTime() - new Date(atArg).getTime()]]),
   ['T-3h', 3 * 3_600_000],
   ['T-30min', 30 * 60_000],
 ]

@@ -84,9 +84,12 @@
 .dcard__label,
 .wtile__label,
 .wweek__head,
-.hbest__title,
-.ppage__sub {
+.hbest__title {
   letter-spacing: 0.12em;
+}
+/* Batch NOW, Section 1.6: a page's subtitle is a line of words, in normal spacing. */
+.ppage__sub {
+  letter-spacing: normal;
 }
 
 /* Round glass icon buttons. */

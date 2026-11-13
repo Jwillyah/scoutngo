@@ -4,7 +4,8 @@ import { nextMarkWord, rareRows } from '../core/skyPage.ts'
 import { fetchSpecialWeek, specialsFrom } from '../lib/specialLightData.ts'
 import { getPosition } from 'suncalc'
 import { droneTag, windTag } from '../core/briefing.ts'
-import { colorWords, conditionOf, groundOf, rainLine, sideWords, type CardKind } from '../core/homeDay.ts'
+import { freshSky, skyCondition } from '../core/skyWord.ts'
+import { colorWords, groundOf, rainLine, sideWords, type CardKind } from '../core/homeDay.ts'
 import { menuCardList, type MenuCard } from '../core/menuCards.ts'
 import { formatClock } from '../core/timezone.ts'
 import { hourlyAt } from '../lib/tideSheetData.ts'
@@ -115,7 +116,7 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
     void fetchSpecialWeek(here)
       .then((week) => {
         if (!live || week === null) return
-        setMark(nextMarkWord(rareRows(specialsFrom(week.week, here, week.seaCAt), new Date()), new Date(), timeZone))
+        setMark(nextMarkWord(rareRows(specialsFrom(week.week, here, week.seaCAt), new Date(), here), new Date(), timeZone))
       })
       .catch(() => {})
     return () => {
@@ -131,7 +132,7 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
   const at = (name: string, t: Date) => (wx === null || venue === null ? null : hourlyAt(wx, name, t))
   const temp = (c: number | null) => formatTemperature(c, units.temperature).replace(/°[FC]$/, '°')
   const sunUp = venue !== null && getPosition(now, venue.lat, venue.lon).altitude > -0.8
-  const cond = conditionOf(at('weather_code', now), sunUp)
+  const cond = skyCondition({ code: at('weather_code', now), layers: { low: at('cloud_cover_low', now), mid: at('cloud_cover_mid', now), high: at('cloud_cover_high', now) }, day: sunUp, station: freshSky(obs, now) })
   /* Batch Polish, Section 4: the home's live sky behind the menu (night, golden, day, cloud, rain, fog), by the home's own groundOf. */
   const ground = venue === null ? 'night' : groundOf(getPosition(now, venue.lat, venue.lon).altitude, at('weather_code', now), false)
   const wind = windAt(wx, now, obs)

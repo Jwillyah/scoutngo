@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { parseMetarSky } from '../src/core/metar.ts'
-import { metarVisMiles, skyCondition, stationLayers } from '../src/core/skyWord.ts'
+import { freshSky, metarVisMiles, skyCondition, stationLayers } from '../src/core/skyWord.ts'
 
 /*
  * ONE SKY WORD (Batch TRUTH, Section 0.6). 12 Nov, 7:21 AM at the Virginia
@@ -64,5 +64,55 @@ describe('the home and the map strip ask the same function', () => {
     expect(plan).toMatch(/const sky = skyCondition\(/)
     expect(plan).not.toMatch(/skyCell\(/)
     expect(home).not.toMatch(/const cond = conditionOf\(/)
+  })
+})
+
+/*
+ * THE STATION'S OWN WORD (Batch NOW, Section 1.3; fixtures/truth/2026-11-13-vb.json,
+ * fixtures/truth/2026-11-12-vb-sunset.json). KNTU's reports from
+ * tests/data/metars-2026-11-12-13.txt (the Iowa Environmental Mesonet's archive).
+ */
+describe('one sky word, the station first (Batch NOW)', () => {
+  const rows = readFileSync('tests/data/metars-2026-11-12-13.txt', 'utf8').split('\n').filter((l) => /^(NTU|ORF),/.test(l))
+  const latest = (id: string, at: string) =>
+    rows
+      .map((l) => l.split(','))
+      .filter(([st, t]) => st === id && new Date(`${t.replace(' ', 'T')}:00Z`) <= new Date(at))
+      .map(([, t, m]) => ({ at: new Date(`${t.replace(' ', 'T')}:00Z`), raw: m }))
+      .at(-1)!
+  const wordAt = (id: string, at: string, model: { low: number; mid: number; high: number }) => {
+    const r = latest(id, at)
+    const station = freshSky({ sky: parseMetarSky(r.raw), visMi: metarVisMiles(r.raw), skyAt: r.at }, new Date(at))
+    expect(station).not.toBeNull()
+    return skyCondition({ code: 3, layers: model, day: true, station })?.word
+  }
+  const overcastModel = { low: 100, mid: 100, high: 0 }
+  const clearModel = { low: 0, mid: 0, high: 0 }
+  it('12 Nov 7:21 AM: not Overcast (KNTU BKN120)', () => {
+    expect(wordAt('NTU', '2026-11-12T12:21:00Z', overcastModel)).toBe('Mostly cloudy')
+  })
+  it('13 Nov 7:55 AM: not Overcast (KNTU FEW050 BKN065, 59 min old)', () => {
+    expect(wordAt('NTU', '2026-11-13T12:55:00Z', overcastModel)).toBe('Mostly cloudy')
+  })
+  it('12 Nov 4:36 PM: not Clear (KNTU three broken decks; KORF a few at 9,000 ft)', () => {
+    expect(wordAt('NTU', '2026-11-12T21:36:00Z', clearModel)).toBe('Mostly cloudy')
+    expect(wordAt('ORF', '2026-11-12T21:36:00Z', clearModel)).toBe('Few clouds')
+  })
+  it('Pembroke and Sandbridge: the same station, the same word, whatever each spot\'s model says', () => {
+    expect(wordAt('NTU', '2026-11-13T12:55:00Z', overcastModel)).toBe(wordAt('NTU', '2026-11-13T12:55:00Z', clearModel))
+  })
+  it('FEW, SCT, BKN, OVC in words; CLR is Clear only when the sky above is empty too', () => {
+    const w = (m: string, extra: Partial<Parameters<typeof skyCondition>[0]> = {}) => skyCondition({ code: 0, layers: { low: 0, mid: 0, high: 0 }, day: true, station: { sky: parseMetarSky(m), visMi: 10 }, ...extra })?.word
+    expect(w('KXXX 131256Z 00000KT 10SM FEW040 A2961')).toBe('Few clouds')
+    expect(w('KXXX 131256Z 00000KT 10SM SCT040 A2961')).toBe('Partly cloudy')
+    expect(w('KXXX 131256Z 00000KT 10SM FEW040 BKN065 A2961')).toBe('Mostly cloudy')
+    expect(w('KXXX 131256Z 00000KT 10SM OVC060 A2961')).toBe('Overcast')
+    expect(w('KXXX 131256Z 00000KT 10SM CLR A2961')).toBe('Clear')
+    expect(w('KXXX 131256Z 00000KT 10SM CLR A2961', { satCover: 40 })).not.toBe('Clear')
+    expect(w('KXXX 131256Z 00000KT 10SM CLR A2961', { layers: { low: 0, mid: 0, high: 70 } })).toBe('High cloud')
+  })
+  it('a report older than 75 minutes is not the word', () => {
+    const r = latest('NTU', '2026-11-13T12:55:00Z')
+    expect(freshSky({ sky: parseMetarSky(r.raw), visMi: 10, skyAt: r.at }, new Date(r.at.getTime() + 76 * 60_000))).toBeNull()
   })
 })
