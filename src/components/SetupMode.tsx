@@ -1,3 +1,4 @@
+import { nowWindow } from '../core/nowWindow.ts'
 import { SavedLists } from './SavedLists.tsx'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -179,6 +180,20 @@ export function SetupMode({
     return () => clearTimeout(timer)
   }, [pointAt])
   const [picking, setPicking] = useState(false)
+  /* Batch NOW, Section 5: Now is the WHEN step's default. */
+  const [whenNow, setWhenNow] = useState(true)
+  const applyNow = (): boolean => {
+    setWhenNow(true)
+    setPicking(false)
+    const lat = Number(venue.latitude)
+    const lon = Number(venue.longitude)
+    if (venue.latitude === '' || venue.longitude === '' || !Number.isFinite(lat) || !Number.isFinite(lon)) return false
+    onVenueChange({ ...venue, ...nowWindow(new Date(), lat, lon) })
+    return true
+  }
+  const goNow = () => {
+    if (applyNow()) onDone()
+  }
   const [drawer, setDrawer] = useState<Drawer>('none')
   useEffect(() => {
     if (drawerRequest.tick === 0) return
@@ -338,7 +353,7 @@ export function SetupMode({
         <TopBar
           onMenu={onMenu}
           menuOpen={menuOpen}
-          pill={<SearchField onPick={onSearchPick} label="Where's the shoot?" bias={searchBias} />}
+          pill={<SearchField onPick={onSearchPick} label="Search a spot or place" bias={searchBias} />}
           onAdd={onAddPosition}
           adding={false}
           onLocate={locate}
@@ -380,14 +395,25 @@ export function SetupMode({
             ) : step === 2 ? (
               <>
                 <p className="wiz__title">When</p>
-                <div className="wiz__kinds" role="group" aria-label="What kind of shoot">
+                {/* Batch NOW, Section 5: Now first, full width and picked by default; it goes straight to this minute's light, shadows, wind and sun. */}
+                <div className="wiz__kinds wiz__kinds--now" role="group" aria-label="When to shoot">
+                <button
+                  type="button"
+                  className={`wiz__big wiz__big--now${whenNow ? ' wiz__big--on' : ''}`}
+                  aria-pressed={whenNow}
+                  data-when-now
+                  onClick={goNow}
+                >
+                  Now
+                </button>
                   {(['sunrise', 'sunset', 'daytime'] as const).map((k) => (
                     <button
                       key={k}
                       type="button"
-                      className={`wiz__big${!picking && shootKind === k ? ' wiz__big--on' : ''}`}
-                      aria-pressed={!picking && shootKind === k}
+                      className={`wiz__big${!whenNow && !picking && shootKind === k ? ' wiz__big--on' : ''}`}
+                      aria-pressed={!whenNow && !picking && shootKind === k}
                       onClick={() => {
+                        setWhenNow(false)
                         setPicking(false)
                         onShootKind(k)
                       }}
@@ -395,7 +421,15 @@ export function SetupMode({
                       {SHOOT_KIND_LABEL[k]}
                     </button>
                   ))}
-                  <button type="button" className={`wiz__big${picking ? ' wiz__big--on' : ''}`} aria-pressed={picking} onClick={() => setPicking(true)}>
+                  <button
+                    type="button"
+                    className={`wiz__big${!whenNow && picking ? ' wiz__big--on' : ''}`}
+                    aria-pressed={!whenNow && picking}
+                    onClick={() => {
+                      setWhenNow(false)
+                      setPicking(true)
+                    }}
+                  >
                     Pick a time
                   </button>
                 </div>
@@ -405,6 +439,11 @@ export function SetupMode({
                     <span aria-hidden="true">to</span>
                     <input className="wiz__time num" type="time" aria-label="End" value={venue.endTime} onChange={(e) => setField('endTime')(e.target.value)} />
                   </div>
+                ) : whenNow ? (
+                  /* Batch NOW, Section 5: Now picked says what Now does, never the sunset's window under it. */
+                  <p className="wiz__small" data-when-line>
+                    This minute&rsquo;s light, shadows, wind and sun.
+                  </p>
                 ) : shootLine === null ? null : (
                   <p className="wiz__small num">{shootLine}</p>
                 )}
@@ -459,6 +498,8 @@ export function SetupMode({
                   aria-disabled={step === 1 && at === null}
                   onClick={() => {
                     if (step === 1 && at === null) return
+                    /* Now picked (the default): the window is this minute's, then the How step as before; a tap on Now itself goes straight to the plan. */
+                    if (step === 2 && whenNow) applyNow()
                     setStep((step + 1) as Step)
                   }}
                 >

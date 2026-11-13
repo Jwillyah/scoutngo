@@ -21,9 +21,8 @@ describe('cold start', () => {
     expect(html).toContain('Go to where I am')
   })
 
-  it('asks where the shoot is rather than naming a place', () => {
-    // The apostrophe is entity escaped in the rendered markup.
-    expect(html).toContain('Where&#x27;s the shoot?')
+  it('asks for a spot or place rather than naming one (Batch NOW, Section 5: "Search a spot or place")', () => {
+    expect(html).toContain('Search a spot or place')
     expect(html).toContain('Find the venue, or tap the map.')
   })
 

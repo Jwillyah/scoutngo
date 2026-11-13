@@ -72,8 +72,8 @@ describe('render smoke', () => {
   it('leads with the map and its own search', () => {
     expect(html).toContain('class="setup"')
     expect(html).toContain('class="setup__map"')
-    // The apostrophe is HTML-escaped in the rendered markup.
-    expect(html).toContain('the shoot?')
+    /* Batch NOW, Section 5: the search says what it finds, as the map's search does. */
+    expect(html).toContain('Search a spot or place')
   })
 
   /*

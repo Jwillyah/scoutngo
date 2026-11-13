@@ -19314,3 +19314,21 @@ a.about__row * {
   font-size: var(--text-sm);
   font-weight: var(--weight-heavy);
 }
+
+/* Batch NOW, Section 5: "Search a spot or place" whole in the top bar's pill on a 390 px phone (it ran to "…or pla"); typed words keep their size. */
+.topbar__pill .search__input::placeholder {
+  font-size: var(--text-sm);
+}
+
+/* Batch NOW, Section 5: "Now" first in the WHEN step, the full width; the four others in one row under it (the card stays its height: scripts/audit-overflow.mjs holds it to a third of the screen). */
+.wiz__kinds--now {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.wiz__kinds--now .wiz__big {
+  padding: 0 4px;
+  font-size: var(--text-sm);
+}
+.wiz__kinds--now .wiz__big--now {
+  grid-column: 1 / -1;
+  font-size: var(--text-base);
+}
