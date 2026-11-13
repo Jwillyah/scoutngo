@@ -7,10 +7,12 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import { getPosition, getTimes } from 'suncalc'
-import { RADII_MI, rankSpots, scoreAt, scoreGrid, type RadiusMi, type RankedSpot, type ScoredPoint, type SpotIn } from '../core/bestSky.ts'
+import { RADII_MI, rankSpots, roundedCentre, scoreAt, scoreGrid, type RadiusMi, type RankedSpot, type ScoredPoint, type SpotIn } from '../core/bestSky.ts'
 import { distanceMeters, type LatLon } from '../core/geo.ts'
 import { STARTER_SPOTS } from '../data/bestSkySpots.ts'
 import { fetchGrid } from './bestSkyData.ts'
+import { fetchOsmSpots } from './bestSkyOsm.ts'
+import { dedupeSpots } from '../core/osmSpots.ts'
 import type { Drift } from '../core/satDrift.ts'
 
 export interface BestSkyEvent {
@@ -66,6 +68,18 @@ export function useBestSky(spot: LatLon | null, radius: RadiusMi, now: Date, sav
   const event = useMemo(() => (spot === null ? null : nextColorEvent(spot, new Date(tenMin * 10 * MIN))), [spot?.lat, spot?.lon, tenMin]) // eslint-disable-line react-hooks/exhaustive-deps
   const key = spot === null || event === null ? null : `${spot.lat.toFixed(2)},${spot.lon.toFixed(2)}|${radius}|${event.at.getTime()}`
   const [got, setGot] = useState<{ key: string; grid: ScoredPoint[]; asked: number; satAt: Date | null; satAsked: boolean; failed: boolean; drift: Drift | null } | null>(null)
+  /* Batch NOW, Section 0.4: the map's viewpoints, piers, boat ramps and parks on the water, beside the starter list. */
+  const [osm, setOsm] = useState<{ key: string; spots: SpotIn[] } | null>(null)
+  useEffect(() => {
+    if (key === null || spot === null) return
+    let live = true
+    void fetchOsmSpots(roundedCentre(spot), radius * 1.609344)
+      .then((r) => live && setOsm({ key, spots: r.spots }))
+      .catch(() => undefined)
+    return () => {
+      live = false
+    }
+  }, [key]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (key === null || spot === null || event === null) return
     let live = true
@@ -81,12 +95,15 @@ export function useBestSky(spot: LatLon | null, radius: RadiusMi, now: Date, sav
   return useMemo((): BestSky => {
     if (got === null || got.key !== key || spot === null || event === null) return { status: 'loading', event, grid: [], ranked: [], here: null, asked: 0, satAt: null, satAsked: false, drift: null }
     const rKm = radius * 1.609344
+    const starter = STARTER_SPOTS.filter((s) => distanceMeters(spot, s.at) / 1000 <= rKm)
+    const mapSpots = osm === null || osm.key !== key ? [] : dedupeSpots(starter, osm.spots.filter((s) => distanceMeters(spot, s.at) / 1000 <= rKm), 300, distanceMeters)
     const spots: SpotIn[] = [
-      ...STARTER_SPOTS.filter((s) => distanceMeters(spot, s.at) / 1000 <= rKm),
+      ...starter,
+      ...mapSpots,
       ...saved.filter((s) => distanceMeters(spot, s.at) / 1000 <= rKm).map((s) => ({ id: `saved-${s.id}`, name: s.name, at: s.at, facing: null, openDeg: 0, water: false, silhouette: null })),
     ]
     return { status: got.failed ? 'failed' : 'ok', event, grid: got.grid, ranked: rankSpots(got.grid, spots, event.azimuth, spot), here: scoreAt(got.grid, spot), asked: got.asked, satAt: got.satAt, satAsked: got.satAsked, drift: got.drift }
-  }, [got, key, spot, event, radius, saved])
+  }, [got, key, spot, event, radius, saved, osm])
 }
 
 export const DEFAULT_RADIUS: RadiusMi = RADII_MI[1]

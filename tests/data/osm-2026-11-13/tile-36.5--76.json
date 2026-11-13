@@ -1,0 +1,274 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API 0.7.62.11 87bfad18",
+  "osm3s": {
+    "timestamp_osm_base": "2026-11-13T18:32:07Z",
+    "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+  },
+  "elements": [
+
+{
+  "type": "node",
+  "id": 221348484,
+  "lat": 36.6710020,
+  "lon": -75.9173890,
+  "tags": {
+    "tourism": "viewpoint"
+  }
+},
+{
+  "type": "node",
+  "id": 221394025,
+  "lat": 36.6685470,
+  "lon": -75.9192860,
+  "tags": {
+    "tourism": "viewpoint"
+  }
+},
+{
+  "type": "node",
+  "id": 4627330780,
+  "lat": 36.6692189,
+  "lon": -75.9191044,
+  "tags": {
+    "tourism": "viewpoint"
+  }
+},
+{
+  "type": "node",
+  "id": 12172909343,
+  "lat": 36.6339884,
+  "lon": -75.9924895,
+  "tags": {
+    "access": "yes",
+    "fee": "no",
+    "leisure": "slipway",
+    "name": "Mill Landing Boat Ramp",
+    "surface": "gravel"
+  }
+},
+{
+  "type": "node",
+  "id": 12175097322,
+  "lat": 36.7078373,
+  "lon": -75.9702923,
+  "tags": {
+    "leisure": "park",
+    "name": "Horn Point",
+    "operator": "US Fish and Wildlife"
+  }
+},
+{
+  "type": "way",
+  "id": 194226862,
+  "bounds": {
+    "minlat": 36.7470655,
+    "minlon": -76.0052844,
+    "maxlat": 36.7499761,
+    "maxlon": -76.0020299
+  },
+  "geometry": [
+    { "lat": 36.7485682, "lon": -76.0052844 },
+    { "lat": 36.7496151, "lon": -76.0043766 },
+    { "lat": 36.7499761, "lon": -76.0042049 },
+    { "lat": 36.7492724, "lon": -76.0020299 },
+    { "lat": 36.7486345, "lon": -76.0020353 },
+    { "lat": 36.7480442, "lon": -76.0021355 },
+    { "lat": 36.7470655, "lon": -76.0024349 },
+    { "lat": 36.7471180, "lon": -76.0027824 },
+    { "lat": 36.7472930, "lon": -76.0033536 },
+    { "lat": 36.7475407, "lon": -76.0038687 },
+    { "lat": 36.7485682, "lon": -76.0052844 }
+  ],
+  "tags": {
+    "leisure": "park",
+    "name": "Red Mills Farms Park"
+  }
+},
+{
+  "type": "way",
+  "id": 283886276,
+  "bounds": {
+    "minlat": 36.6937692,
+    "minlon": -75.9238564,
+    "maxlat": 36.6943953,
+    "maxlon": -75.9218787
+  },
+  "geometry": [
+    { "lat": 36.6942487, "lon": -75.9224035 },
+    { "lat": 36.6943953, "lon": -75.9219000 },
+    { "lat": 36.6943484, "lon": -75.9218787 },
+    { "lat": 36.6942799, "lon": -75.9221139 },
+    { "lat": 36.6942442, "lon": -75.9220977 },
+    { "lat": 36.6942088, "lon": -75.9222193 },
+    { "lat": 36.6942380, "lon": -75.9222325 },
+    { "lat": 36.6937692, "lon": -75.9238426 },
+    { "lat": 36.6937997, "lon": -75.9238564 },
+    { "lat": 36.6942259, "lon": -75.9223932 },
+    { "lat": 36.6942487, "lon": -75.9224035 }
+  ],
+  "tags": {
+    "fishing": "yes",
+    "leisure": "fishing",
+    "lit": "yes",
+    "man_made": "pier",
+    "name": "Little Island Fishing Pier",
+    "surface": "wood"
+  }
+},
+{
+  "type": "way",
+  "id": 1065948252,
+  "bounds": {
+    "minlat": 36.5260418,
+    "minlon": -75.9105690,
+    "maxlat": 36.5260738,
+    "maxlon": -75.9104445
+  },
+  "geometry": [
+    { "lat": 36.5260418, "lon": -75.9105690 },
+    { "lat": 36.5260738, "lon": -75.9104445 }
+  ],
+  "tags": {
+    "highway": "service",
+    "leisure": "slipway",
+    "service": "slipway"
+  }
+},
+{
+  "type": "way",
+  "id": 1066136183,
+  "bounds": {
+    "minlat": 36.5216264,
+    "minlon": -75.9117743,
+    "maxlat": 36.5216371,
+    "maxlon": -75.9116750
+  },
+  "geometry": [
+    { "lat": 36.5216371, "lon": -75.9117743 },
+    { "lat": 36.5216264, "lon": -75.9116750 }
+  ],
+  "tags": {
+    "highway": "service",
+    "leisure": "slipway",
+    "service": "slipway"
+  }
+},
+{
+  "type": "way",
+  "id": 1066456797,
+  "bounds": {
+    "minlat": 36.5208784,
+    "minlon": -75.9116080,
+    "maxlat": 36.5208849,
+    "maxlon": -75.9114176
+  },
+  "geometry": [
+    { "lat": 36.5208849, "lon": -75.9116080 },
+    { "lat": 36.5208784, "lon": -75.9114176 }
+  ],
+  "tags": {
+    "highway": "service",
+    "leisure": "slipway",
+    "service": "slipway"
+  }
+},
+{
+  "type": "way",
+  "id": 1066509553,
+  "bounds": {
+    "minlat": 36.5191432,
+    "minlon": -75.9109307,
+    "maxlat": 36.5191496,
+    "maxlon": -75.9108288
+  },
+  "geometry": [
+    { "lat": 36.5191496, "lon": -75.9109307 },
+    { "lat": 36.5191432, "lon": -75.9108288 }
+  ],
+  "tags": {
+    "highway": "service",
+    "leisure": "slipway",
+    "service": "slipway"
+  }
+},
+{
+  "type": "way",
+  "id": 1066509563,
+  "bounds": {
+    "minlat": 36.5185515,
+    "minlon": -75.9110206,
+    "maxlat": 36.5185612,
+    "maxlon": -75.9109254
+  },
+  "geometry": [
+    { "lat": 36.5185612, "lon": -75.9110206 },
+    { "lat": 36.5185515, "lon": -75.9109254 }
+  ],
+  "tags": {
+    "highway": "service",
+    "leisure": "slipway",
+    "service": "slipway"
+  }
+},
+{
+  "type": "way",
+  "id": 1067173105,
+  "bounds": {
+    "minlat": 36.5144669,
+    "minlon": -75.9112470,
+    "maxlat": 36.5144819,
+    "maxlon": -75.9110579
+  },
+  "geometry": [
+    { "lat": 36.5144819, "lon": -75.9112470 },
+    { "lat": 36.5144669, "lon": -75.9110579 }
+  ],
+  "tags": {
+    "highway": "service",
+    "leisure": "slipway",
+    "service": "slipway"
+  }
+},
+{
+  "type": "way",
+  "id": 1069921885,
+  "bounds": {
+    "minlat": 36.5093039,
+    "minlon": -75.9110865,
+    "maxlat": 36.5093905,
+    "maxlon": -75.9110295
+  },
+  "geometry": [
+    { "lat": 36.5093905, "lon": -75.9110295 },
+    { "lat": 36.5093039, "lon": -75.9110865 }
+  ],
+  "tags": {
+    "highway": "service",
+    "leisure": "slipway",
+    "service": "slipway"
+  }
+},
+{
+  "type": "way",
+  "id": 1069929073,
+  "bounds": {
+    "minlat": 36.5079458,
+    "minlon": -75.9102675,
+    "maxlat": 36.5079658,
+    "maxlon": -75.9100316
+  },
+  "geometry": [
+    { "lat": 36.5079458, "lon": -75.9102675 },
+    { "lat": 36.5079658, "lon": -75.9101909 },
+    { "lat": 36.5079644, "lon": -75.9100316 }
+  ],
+  "tags": {
+    "highway": "service",
+    "leisure": "slipway",
+    "service": "slipway"
+  }
+}
+
+  ]
+}

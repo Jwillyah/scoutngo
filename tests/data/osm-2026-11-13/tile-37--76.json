@@ -1,0 +1,176 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API 0.7.62.11 87bfad18",
+  "osm3s": {
+    "timestamp_osm_base": "2026-11-13T18:38:21Z",
+    "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+  },
+  "elements": [
+
+{
+  "type": "node",
+  "id": 8540680543,
+  "lat": 37.1299162,
+  "lon": -75.9620315,
+  "tags": {
+    "name": "Observation Deck",
+    "tourism": "viewpoint"
+  }
+},
+{
+  "type": "way",
+  "id": 222585372,
+  "bounds": {
+    "minlat": 37.1274974,
+    "minlon": -75.9503539,
+    "maxlat": 37.1277411,
+    "maxlon": -75.9500588
+  },
+  "geometry": [
+    { "lat": 37.1276595, "lon": -75.9503539 },
+    { "lat": 37.1276115, "lon": -75.9502999 },
+    { "lat": 37.1274974, "lon": -75.9501707 },
+    { "lat": 37.1275141, "lon": -75.9501501 },
+    { "lat": 37.1275650, "lon": -75.9500873 },
+    { "lat": 37.1275881, "lon": -75.9500588 },
+    { "lat": 37.1276648, "lon": -75.9501473 },
+    { "lat": 37.1277411, "lon": -75.9502386 },
+    { "lat": 37.1276595, "lon": -75.9503539 }
+  ],
+  "tags": {
+    "addr:city": "Cape Charles",
+    "addr:postcode": "23310",
+    "addr:street": "Ramp Road",
+    "alt_name": "ESV NWR Boat Ramp",
+    "leisure": "slipway",
+    "name": "Wise Point Boat Ramp",
+    "operator": "Eastern Shore Of Virginia National Wildlife Refuge",
+    "source": "local_knowledge",
+    "website": "https://www.fws.gov/refuge/Eastern_Shore_of_Virginia/visit/boatlaunch.html",
+    "wifi": "no"
+  }
+},
+{
+  "type": "way",
+  "id": 424677256,
+  "bounds": {
+    "minlat": 37.1648063,
+    "minlon": -75.9837133,
+    "maxlat": 37.1654685,
+    "maxlon": -75.9820878
+  },
+  "geometry": [
+    { "lat": 37.1648063, "lon": -75.9837133 },
+    { "lat": 37.1650968, "lon": -75.9830798 },
+    { "lat": 37.1650622, "lon": -75.9828281 },
+    { "lat": 37.1651279, "lon": -75.9826763 },
+    { "lat": 37.1651861, "lon": -75.9825294 },
+    { "lat": 37.1652947, "lon": -75.9825002 },
+    { "lat": 37.1654685, "lon": -75.9820878 }
+  ],
+  "tags": {
+    "bridge": "yes",
+    "highway": "path",
+    "man_made": "pier",
+    "name": "Peregine Boardwalk"
+  }
+},
+{
+  "type": "way",
+  "id": 424677271,
+  "bounds": {
+    "minlat": 37.1672936,
+    "minlon": -75.9876137,
+    "maxlat": 37.1674471,
+    "maxlon": -75.9869059
+  },
+  "geometry": [
+    { "lat": 37.1674471, "lon": -75.9869059 },
+    { "lat": 37.1672936, "lon": -75.9876137 }
+  ],
+  "tags": {
+    "highway": "service",
+    "leisure": "slipway",
+    "service": "slipway"
+  }
+},
+{
+  "type": "way",
+  "id": 424854032,
+  "bounds": {
+    "minlat": 37.1697580,
+    "minlon": -75.9870293,
+    "maxlat": 37.1703924,
+    "maxlon": -75.9852788
+  },
+  "geometry": [
+    { "lat": 37.1697580, "lon": -75.9870293 },
+    { "lat": 37.1698190, "lon": -75.9866618 },
+    { "lat": 37.1703924, "lon": -75.9852788 }
+  ],
+  "tags": {
+    "man_made": "pier",
+    "name": "Osprey Boardwalk"
+  }
+},
+{
+  "type": "way",
+  "id": 424854033,
+  "bounds": {
+    "minlat": 37.1721227,
+    "minlon": -75.9876560,
+    "maxlat": 37.1721700,
+    "maxlon": -75.9864168
+  },
+  "geometry": [
+    { "lat": 37.1721227, "lon": -75.9876560 },
+    { "lat": 37.1721700, "lon": -75.9864168 }
+  ],
+  "tags": {
+    "man_made": "pier",
+    "name": "Bald Eagle Boardwalk"
+  }
+},
+{
+  "type": "way",
+  "id": 745387317,
+  "bounds": {
+    "minlat": 37.1275141,
+    "minlon": -75.9502736,
+    "maxlat": 37.1276564,
+    "maxlon": -75.9501501
+  },
+  "geometry": [
+    { "lat": 37.1276564, "lon": -75.9502689 },
+    { "lat": 37.1276249, "lon": -75.9502736 },
+    { "lat": 37.1275141, "lon": -75.9501501 }
+  ],
+  "tags": {
+    "highway": "service",
+    "leisure": "slipway",
+    "service": "slipway"
+  }
+},
+{
+  "type": "way",
+  "id": 745387318,
+  "bounds": {
+    "minlat": 37.1275650,
+    "minlon": -75.9502689,
+    "maxlat": 37.1276692,
+    "maxlon": -75.9500873
+  },
+  "geometry": [
+    { "lat": 37.1276564, "lon": -75.9502689 },
+    { "lat": 37.1276692, "lon": -75.9502180 },
+    { "lat": 37.1275650, "lon": -75.9500873 }
+  ],
+  "tags": {
+    "highway": "service",
+    "leisure": "slipway",
+    "service": "slipway"
+  }
+}
+
+  ]
+}

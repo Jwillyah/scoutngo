@@ -202,6 +202,8 @@ export interface SpotIn {
   openDeg: number
   water: boolean
   silhouette: string | null
+  /** Where the spot came from: the starter list (undefined) or the map (Batch NOW, Section 0.4). */
+  kind?: 'viewpoint' | 'pier' | 'boat ramp' | 'park'
 }
 
 export interface RankedSpot {
