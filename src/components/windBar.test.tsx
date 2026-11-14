@@ -11,7 +11,7 @@ describe('the wind bar', () => {
   )
   it('play, the day and time "now", the model chip, Surface, i, the scrubber and the legend line', () => {
     expect(html).toContain('aria-label="Play the wind"')
-    expect(html).toMatch(/Thu<\/span> <span class="wbar__time">7:41 AM<\/span><span class="wbar__now"> · now/)
+    expect(html).toMatch(/<span class="wbar__time" data-wind-when="true">Thu 7:41 AM<\/span><span class="wbar__now"> · now/)
     expect(html).toContain('aria-label="Model: Blend"')
     expect(html).toContain('>Surface<')
     expect(html).toContain('aria-label="What the colours mean"')

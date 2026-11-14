@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { legendTicks, SCALE, windRgb } from '../core/windViewport.ts'
 import { windIn, windUnitLabel, type WindUnit } from '../lib/units.ts'
-import { formatClock, zoneOffsetMs } from '../core/timezone.ts'
+import { formatClock, formatDayHour, zoneOffsetMs } from '../core/timezone.ts'
 import { MODEL_CHIPS, type WindModelChip } from '../lib/useWindViewport.ts'
 import '../styles/wind.css'
 
@@ -89,7 +89,7 @@ export function WindTimeBar({ at, from, hours, timeZone, onAt, model, onModel, s
           {play ? '❚❚' : '▶'}
         </button>
         <p className="wbar__when">
-          <span className="wbar__day">{new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone }).format(at)}</span> <span className="wbar__time">{formatClock(at, timeZone)}</span>
+          <span className="wbar__time" data-wind-when>{formatDayHour(at, timeZone)}</span>
           {isNow ? <span className="wbar__now"> · now</span> : null}
         </p>
         <div className="wbar__menuwrap">
@@ -134,7 +134,7 @@ export function WindTimeBar({ at, from, hours, timeZone, onAt, model, onModel, s
         aria-valuemin={0}
         aria-valuemax={hours - 1}
         aria-valuenow={Math.round(frac * (hours - 1))}
-        aria-valuetext={formatClock(at, timeZone)}
+        aria-valuetext={formatDayHour(at, timeZone)}
         tabIndex={0}
         onPointerDown={(e) => {
           e.stopPropagation()
@@ -147,7 +147,8 @@ export function WindTimeBar({ at, from, hours, timeZone, onAt, model, onModel, s
         }}
       >
         <div className="wbar__strip" style={{ background: stops.length < 2 ? undefined : `linear-gradient(90deg, ${stops.join(', ')})` }} />
-        <div className="wbar__needle" style={{ left: `${(frac * 100).toFixed(2)}%` }} />
+        {/* Batch LIVE, Section 1.4: a thumb that moves while it plays; a tap on the track pauses and jumps there (pick). */}
+        <div className="wbar__needle wbar__thumb" data-wind-thumb data-playing={play ? '1' : '0'} style={{ left: `${(frac * 100).toFixed(2)}%` }} />
         {ticks.map((t) => (
           <span key={`${t.x}`} className="wbar__tick" style={{ left: `${(t.x * 100).toFixed(2)}%` }}>
             {t.label}

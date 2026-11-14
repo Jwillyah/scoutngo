@@ -12,7 +12,8 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "audit:wind-live": "node scripts/audit-wind-live.mjs"
   },
   "dependencies": {
     "@fontsource-variable/archivo": "5.3.0",

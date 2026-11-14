@@ -21,6 +21,8 @@
 export const BLOCK = 5
 /** At most this many requests for one viewport; a wider view takes a wider step. */
 export const MAX_BLOCKS = 9
+/** No grid point past this latitude: the map's own edge (Web Mercator's 85.05°). */
+export const MAX_LAT = 85
 
 export interface Bounds {
   south: number
@@ -63,8 +65,15 @@ export function blocksFor(b: Bounds, step: number): Block[] {
   for (let s = s0; s < Math.min(85, b.north + step); s += size) {
     for (let w = w0; w < b.east + step; w += size) {
       const points: { lat: number; lon: number }[] = []
-      for (let i = 0; i < BLOCK; i += 1) for (let j = 0; j < BLOCK; j += 1) points.push({ lat: fix(s + i * step), lon: fix(((w + j * step + 540) % 360) - 180) })
-      out.push({ south: fix(s), west: fix(w), step, points })
+      /*
+       * Batch LIVE, Section 1.2 (14 Nov, "Wind didn't load" at world zoom): at
+       * the 24° step the blocks snapped south to -120°, and Open-Meteo refuses
+       * a whole request over one latitude past 90° ("Latitude must be in range
+       * of -90 to 90°"). Points past MAX_LAT are left out; a block with none
+       * is not asked.
+       */
+      for (let i = 0; i < BLOCK; i += 1) for (let j = 0; j < BLOCK; j += 1) if (Math.abs(s + i * step) <= MAX_LAT) points.push({ lat: fix(s + i * step), lon: fix(((w + j * step + 540) % 360) - 180) })
+      if (points.length > 0) out.push({ south: fix(s), west: fix(w), step, points })
       if (out.length > 64) return out
     }
   }
@@ -118,7 +127,10 @@ export function buildField(samples: readonly WindSample[], step: number): Field 
 }
 
 /** u, v and gust at a point, bilinear between the four grid points around it; null outside the field or where a corner is missing. */
-export function sampleField(f: Field, lat: number, lon: number): { u: number; v: number; gust: number | null } | null {
+export function sampleField(f: Field, lat: number, lonIn: number): { u: number; v: number; gust: number | null } | null {
+  /* Batch LIVE, Section 1.3: a world copy's longitude (the map past ±180°) reads the same place. */
+  let lon = ((((lonIn + 180) % 360) + 360) % 360) - 180
+  if (lon < f.west && lon + 360 <= f.west + (f.cols - 1) * f.step) lon += 360
   const y = (lat - f.south) / f.step
   const x = (lon - f.west) / f.step
   if (y < 0 || x < 0 || y > f.rows - 1 || x > f.cols - 1) return null

@@ -194,6 +194,15 @@ export function formatHour(at: Date, timeZone: string, hours: ClockHours = clock
 }
 
 /** An hour on a narrow strip: "10a", "2p", or "14" (the Surf page's hours wrapped "10 / AM", 30 Oct). */
+/** The wind bar's day and hour, "Sat 3 PM", "Sat 3:30 PM", "Sat 15:00" (Batch LIVE, Section 1.4: the day said while playing, at every width). */
+export function formatDayHour(at: Date, timeZone: string, hours: ClockHours = clockHours): string {
+  const wall = wallClock(at, timeZone)
+  if (wall === null) return '--'
+  const day = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone }).format(at)
+  if (hours === 24) return `${day} ${String(wall.hour).padStart(2, '0')}:${String(wall.minute).padStart(2, '0')}`
+  return `${day} ${wall.hour % 12 === 0 ? 12 : wall.hour % 12}${wall.minute === 0 ? '' : `:${String(wall.minute).padStart(2, '0')}`} ${wall.hour < 12 ? 'AM' : 'PM'}`
+}
+
 export function formatShortHour(at: Date, timeZone: string, hours: ClockHours = clockHours): string {
   const wall = wallClock(at, timeZone)
   if (wall === null) return '--'

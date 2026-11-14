@@ -15,6 +15,7 @@ import { ComparePhoto } from './ComparePhoto.tsx'
 import type { BuildCheck } from '../lib/build.ts'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { LatLon } from '../core/geo.ts'
+import { awayDistance, awayLabel } from '../core/awayWords.ts'
 import { loadAirspaceOverlay, type AirspaceOverlay } from '../lib/airspaceOverlay.ts'
 import { measureWords } from '../lib/measureWords.ts'
 import { shootDayIcs } from '../core/shootIcs.ts'
@@ -1391,7 +1392,10 @@ export function PlanMode({
   const weatherBusy = useWeatherBusy()
   /* Special light on now (src/lib/useSpecialNow.ts): the status line when there is a signal, a tap to the list. */
   const specialNow = useSpecialNow(online ? venue : null, scrubbedAt)
-  const specialStatus = specialNow === null ? null : `${specialNameOf(specialNow)} ${specialNow.word} now · ${specialNow.agree} of ${specialNow.of} models`
+  /* Batch LIVE, Section 1.5: the map's view, so a line about the spot off screen names it and how far when the map is elsewhere. */
+  const [viewBounds, setViewBounds] = useState<{ south: number; west: number; north: number; east: number } | null>(null)
+  const away = awayDistance(venue, viewBounds, units.distance === 'ft')
+  const specialStatus = specialNow === null ? null : `${specialNameOf(specialNow)} ${specialNow.word} now · ${specialNow.agree} of ${specialNow.of} models${away === null ? '' : ` · ${awayLabel(venueNameLine, venue, viewBounds, units.distance === 'ft')}`}`
   /* A rainbow's bow, drawn on the map from Sky › Special. */
   const [bow, setBow] = useState<GeoJSON.FeatureCollection | null>(null)
   /* Batch K, Section 6: the radar frame the Weather tab's slider is on. */
@@ -2671,6 +2675,7 @@ export function PlanMode({
             onViewChange={(zoom: number, width: number, bounds?: BuildingsBox) => {
               setMapZoom(zoom)
               setMapWidth(width)
+              if (bounds !== undefined) setViewBounds({ south: bounds.south, west: bounds.west, north: bounds.north, east: bounds.east })
               /* Batch TRUTH, Section 5: the buildings follow the view, and only when it leaves their box (src/core/buildingsBox.ts). */
               if (bounds !== undefined && venue !== null) setBuildingsArea((cur) => buildingsBox(bounds, venue, cur))
             }}
@@ -2989,7 +2994,7 @@ export function PlanMode({
           /* Batch MAP2, Section 3: the place pill opens the spot search (search v2); Shoot setup is the +. */
           <button type="button" className="pill-venue" onClick={onSearch} aria-label="Find a spot">
             {/* Batch Flow, Section 2: the spot's name, the whole pill (the day is on the time bar). */}
-            <span className="pill-venue__name">{venueNameLine}</span>
+            <span className="pill-venue__name">{awayLabel(venueNameLine, venue, viewBounds, units.distance === 'ft')}</span>
           </button>
         }
         onAdd={onShootSetup ?? (() => onPlacing(!placing))}

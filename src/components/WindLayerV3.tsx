@@ -8,6 +8,7 @@ import { compass } from '../lib/tideWords.ts'
 import { fetchMarine, hourlyAt } from '../lib/tideSheetData.ts'
 import { agoWords } from '../lib/nearWind.ts'
 import { windIn, windUnitLabel, type WindUnit } from '../lib/units.ts'
+import { usePointWind, type WindLevel, type WindModelChip } from '../lib/useWindViewport.ts'
 import '../styles/wind.css'
 
 /*
@@ -48,9 +49,12 @@ interface Props {
   when?: Date | null
   /** Ask the wind again after it failed to load. */
   onRetry?: () => void
+  /** The model and height asked, for the crosshair's own fine-grid reading (usePointWind). */
+  model?: WindModelChip
+  level?: WindLevel
 }
 
-export function WindLayerV3({ map, field, unit, spot, facing, headline = null, status, when = null, onRetry }: Props) {
+export function WindLayerV3({ map, field, unit, spot, facing, headline = null, status, when = null, onRetry, model = 'blend', level = '10m' }: Props) {
   const colour = useRef<HTMLCanvasElement>(null)
   const trails = useRef<HTMLCanvasElement>(null)
   /* The screen's velocity grid, rebuilt when the map settles: px/s east and down per CELL_PX cell. */
@@ -242,15 +246,17 @@ export function WindLayerV3({ map, field, unit, spot, facing, headline = null, s
 
   /* The value under the crosshair, and the station near it; at the spot at now, the one wind now. */
   /* The map hands a headline only while the bar is at now (src/components/PlanMode.tsx). */
+  const point = usePointWind(centre, status !== 'off', model, when ?? new Date(), level)
   const atSpotNow = headline !== null && headline.fromDeg !== null && spot !== null && centre !== null && distanceMeters(spot, centre) <= 3000
   const here = useMemo(() => {
     if (atSpotNow && headline !== null && headline.fromDeg !== null) return { speedMps: headline.mps, fromDeg: headline.fromDeg, gust: headline.gustMps }
     if (field === null || centre === null) return null
-    const s = sampleField(field, centre.lat, centre.lon)
+    /* Batch LIVE, Section 1.1: the fine grid's reading at the crosshair when it has come, the same at every zoom; the view's grid until then. */
+    const s = point ?? sampleField(field, centre.lat, centre.lon)
     if (s === null) return null
     const w = fromUV(s.u, s.v)
     return { ...w, gust: s.gust }
-  }, [field, centre, atSpotNow, headline?.mps, headline?.fromDeg, headline?.gustMps]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [field, centre, point, atSpotNow, headline?.mps, headline?.fromDeg, headline?.gustMps]) // eslint-disable-line react-hooks/exhaustive-deps
   const [station, setStation] = useState<{ id: string; w: StationWind | null } | null>(null)
   const ck = centre === null ? null : `${centre.lat.toFixed(2)},${centre.lon.toFixed(2)}`
   useEffect(() => {

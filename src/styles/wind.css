@@ -280,7 +280,11 @@ body:has(.windv3__read) .rail2 {
 .mode-plan[data-wind-mode] .topbar__btn[aria-label*='Finding'],
 .mode-plan[data-wind-mode] .rail2__note,
 .mode-plan[data-wind-mode] .maplibregl-ctrl-scale,
-.mode-plan[data-wind-mode] .credits__ctrl {
+.mode-plan[data-wind-mode] .credits__ctrl,
+/* Batch LIVE, Section 1.5: no banners over the wind. */
+.mode-plan[data-wind-mode] .toast,
+.mode-plan[data-wind-mode] .tapnote,
+.mode-plan[data-wind-mode] .shadowkey {
   display: none !important;
 }
 /* The rail keeps its compass alone. */
@@ -549,4 +553,17 @@ body:has(.windv3__read) .rail2 {
 .wbar--thin .wbar__top {
   min-width: 0;
   overflow: hidden;
+}
+
+/* Batch LIVE, Section 1.4: the thin bar's thumb, a dot on the strip that moves while the wind plays. */
+.wbar--thin .wbar__thumb {
+  top: -3px;
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
+  border-radius: 50%;
+  border: 3px solid var(--black);
+  background: var(--white);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.4);
+  pointer-events: none;
 }

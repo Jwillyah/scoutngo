@@ -12,7 +12,7 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import type * as maplibregl from 'maplibre-gl'
-import { blocksFor, buildField, GLOBAL_FROM_STEP, gridStep, toUV, type Bounds, type Field, type WindSample } from '../core/windViewport.ts'
+import { blocksFor, buildField, GLOBAL_FROM_STEP, gridStep, sampleField, toUV, type Bounds, type Field, type WindSample } from '../core/windViewport.ts'
 import { FORECAST_MAX_AGE_MS, weatherJson } from './weatherStore.ts'
 
 export type WindModelChip = 'hrrr' | 'blend' | 'ecmwf'
@@ -168,4 +168,46 @@ export function useWindViewport(map: maplibregl.Map | null, on: boolean, model: 
     if (got === null) return { series: [], step, status: 'loading', asked: 0 }
     return got.key === key ? got.v : { ...got.v, status: 'loading' }
   }, [on, got, key, step])
+}
+
+/** The fine grid the crosshair always reads: the cache's own 0.05°, as at zoom 9 and in. */
+export const POINT_STEP = 0.05
+
+/**
+ * THE CROSSHAIR READS THE SAME AT EVERY ZOOM (Batch LIVE, Section 1.1; 14 Nov
+ * the reading went 20 kt at zoom 12 to 9 kt at zoom 7 at the same point).
+ * The colour is painted from the view's grid, coarser zoomed out; the number
+ * under the crosshair is read from the fine grid's block around it (one
+ * request, the same URL zoom 12 asks, so through the same cache), bilinear
+ * between its points. Asked when the crosshair settles on a new 0.01°.
+ */
+export function usePointWind(centre: { lat: number; lon: number } | null, on: boolean, model: WindModelChip, at: Date | null, level: WindLevel = '10m'): { u: number; v: number; gust: number | null } | null {
+  const days = gridDays(at)
+  const key = centre === null || !on ? null : `${centre.lat.toFixed(2)},${centre.lon.toFixed(2)}|${model}|${level}|${days}`
+  const [got, setGot] = useState<{ key: string; series: PointSeries[] } | null>(null)
+  useEffect(() => {
+    if (key === null || centre === null) return
+    let live = true
+    const t = setTimeout(() => {
+      const lat = Number(centre.lat.toFixed(2))
+      const lon = ((((Number(centre.lon.toFixed(2)) + 180) % 360) + 360) % 360) - 180
+      const blocks = blocksFor({ south: lat, west: lon, north: lat, east: lon }, POINT_STEP)
+      void Promise.all(
+        blocks.map(async (b) => {
+          const r = await weatherJson(blockUrl(b.points, model, days, level), { maxAgeMs: FORECAST_MAX_AGE_MS })
+          return r.ok ? parseBlock(r.payload, b.points, level) : []
+        }),
+      ).then((parts) => live && setGot({ key, series: parts.flat() }), () => undefined)
+    }, 400)
+    return () => {
+      live = false
+      clearTimeout(t)
+    }
+  }, [key]) // eslint-disable-line react-hooks/exhaustive-deps
+  const hour = at === null ? null : Math.floor(at.getTime() / 3_600_000)
+  return useMemo(() => {
+    if (got === null || got.key !== key || centre === null || hour === null) return null
+    const f = fieldAt(got.series, POINT_STEP, new Date(hour * 3_600_000))
+    return f === null ? null : sampleField(f, centre.lat, centre.lon)
+  }, [got, key, hour, centre?.lat, centre?.lon]) // eslint-disable-line react-hooks/exhaustive-deps
 }

@@ -4234,6 +4234,23 @@ export function MapView({
 
   /* Batch Map, Section 1: the wind over the screen, for the hour on the time bar. */
   const windOn = showSky && skyLayer === 'wind'
+  /*
+   * NORTH UP IN WIND MODE (Batch LIVE, Section 1.3; 14 Nov far out the wind
+   * drew over the wrong place on a rotated map). The particles move east and
+   * north on screen, so the map is turned back to north and flat on entering
+   * wind mode, and cannot be turned or tilted while it is on.
+   */
+  useEffect(() => {
+    const m = map.current
+    if (!ready || m === null || !windOn) return
+    if (m.getBearing() !== 0 || m.getPitch() !== 0) moveCamera('wind north', () => m.jumpTo({ bearing: 0, pitch: 0 }))
+    m.dragRotate.disable()
+    m.touchZoomRotate.disableRotation()
+    return () => {
+      m.dragRotate.enable()
+      m.touchZoomRotate.enableRotation()
+    }
+  }, [ready, windOn, moveCamera])
   const windHour = windAt === null ? null : Math.floor(windAt.getTime() / 3_600_000)
   const [windRetry, setWindRetry] = useState(0)
   const windView = useWindViewport(ready ? map.current : null, windOn, windModel, windHour === null ? null : new Date(windHour * 3_600_000), windMeters > 10 ? '120m' : '10m', windRetry)
@@ -4264,7 +4281,7 @@ export function MapView({
       <div className="map__canvas" ref={container} />
       {/* Batch Map, Section 1: the wind layer v3 over the whole screen (the old grid streaks only at a height above the ground). */}
       {/* Batch MAP2, Section 3: the drone's 400 ft in the same look (120 m level), not the old streaks. */}
-      {windOn ? <WindLayerV3 map={ready ? map.current : null} field={windField} unit={windUnit} spot={windSpot} facing={windFacing} headline={windHeadline} status={windView.status} when={windHour === null ? null : new Date(windHour * 3_600_000)} onRetry={() => setWindRetry((n) => n + 1)} /> : null}
+      {windOn ? <WindLayerV3 map={ready ? map.current : null} field={windField} unit={windUnit} spot={windSpot} facing={windFacing} headline={windHeadline} status={windView.status} when={windHour === null ? null : new Date(windHour * 3_600_000)} onRetry={() => setWindRetry((n) => n + 1)} model={windModel} level={windMeters > 10 ? '120m' : '10m'} /> : null}
       {/* Batch Map, Section 3: the map's own labels, in the app's font, never under the crosshair or the pin. */}
       <MapLabels map={ready ? map.current : null} on={showLabels} keepClear={keepLabelsClear} crosshair={showSky && skyLayer === 'wind'} />
       <div className="raypills" ref={pillLayer} aria-hidden="true" />
