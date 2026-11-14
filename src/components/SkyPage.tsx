@@ -5,7 +5,7 @@ import { compassPoint } from '../core/field.ts'
 import type { LatLon } from '../core/geo.ts'
 import { leadLayer } from '../core/fireOutlook.ts'
 import { colorWords, groundOf } from '../core/homeDay.ts'
-import { colorHeadline, eventDayWord, lightMarks, lightTimeline, nextEvent, nowShare, plainChecks, plainReason, rareRows, sideView, type RareRow } from '../core/skyPage.ts'
+import { colorHeadline, eventDayWord, lightMarks, lightTimeline, nextEvent, nowShare, plainChecks, plainReason, rareRows, sideView, SIDE_TOP_M, type RareRow } from '../core/skyPage.ts'
 import type { Special } from '../core/specialLight.ts'
 import { formatClock } from '../core/timezone.ts'
 import { fetchGlassWeek, fetchSpecialWeek, specialsFrom } from '../lib/specialLightData.ts'
@@ -94,6 +94,8 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
   const marks = event === null ? [] : lightMarks(kind, event, (t) => getPosition(t, venue.lat, venue.lon).altitude)
   const segs = event === null ? [] : lightTimeline(kind, event, marks, read?.colorFrom ?? null, read?.colorTo ?? null)
   const thumb = nowShare(segs, realNow)
+  /* The station's report counts here while it is fresh and the event is within 3 hours, when it is the newer word on the sky. */
+  const stationFresh = station !== null && stationAt !== null && realNow.getTime() - stationAt.getTime() <= 75 * 60_000 && event !== null && event.getTime() - realNow.getTime() <= 3 * 3_600_000 ? station : null
   const side = verdict === null ? null : sideView(verdict.sky.layers, event === null ? 0 : getPosition(event, venue.lat, venue.lon).altitude, lead?.layer ?? null)
   const dayWordOf = (k: Kind) => {
     const e = days[k]?.events[k] ?? null
@@ -151,6 +153,7 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
       title="Sky"
       sub={`${placeName} · ${tab === 'now' || event === null ? 'now' : dayWordOf(kind).toLowerCase()}`}
       ground={ground}
+      footInScroll
       backdrop={live === null ? null : <LiveSkyDraw sky={live} />}
       onBack={onBack}
       onMap={onMap}
@@ -181,7 +184,9 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
       <>
       <p className="spage__event num" {...(event !== null && kind === 'sunset' && picked === null ? { 'data-shared': 'sunset', 'data-value': `sunset ${clock(event)}`.toLowerCase() } : {})}>
         {event === null ? '—' : `${kind === 'sunset' ? 'Sunset' : 'Sunrise'} ${clock(event)}`}
-        {az === null ? '' : ` · looking ${compassPoint(az)}`}
+        {/* Batch LIVE, Section 8.3: both ways when they differ, "sun sets WSW · pink ENE". */}
+        {az === null ? '' : ` · sun ${kind === 'sunset' ? 'sets' : 'rises'} ${compassPoint(az)}`}
+        {az === null || verdict?.afterglow == null || !(verdict.afterglow.sky.fires || verdict.afterglow.sky.belt) ? '' : ` · pink ${compassPoint((az + 180) % 360)}`}
       </p>
       <p className="spage__head" data-shared={picked === null ? 'skycall' : 'skycall-picked'} data-value={colorWords(read?.call ?? null) ?? ''}>{brief.status === 'loading' && read === null ? '…' : colorHeadline(read?.call ?? null)}</p>
       <p className="spage__why">{plainReason(read?.why ?? null) ?? (brief.status === 'loading' ? 'Reading the forecast…' : 'The forecast did not say.')}</p>
@@ -207,6 +212,22 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
                 {l.canvas ? <ellipse cx="200" cy={l.y * 150} rx="95" ry="9" className={`spage__deck${l.lit ? ' spage__deck--lit' : ''}`} /> : null}
               </g>
             ))}
+            {/* Batch LIVE, Section 8.3: the decks the station reports now, dashed, at their heights, when its report is fresher than the models' hour. */}
+            {stationFresh === null
+              ? null
+              : stationFresh.sky.groups
+                  .filter((g) => g.amount === 'BKN' || g.amount === 'OVC' || g.amount === 'SCT')
+                  .map((g) => {
+                    const y = (0.92 - 0.82 * Math.sqrt(Math.min(SIDE_TOP_M, g.baseFt * 0.3048) / SIDE_TOP_M)) * 150
+                    return (
+                      <g key={`st${g.amount}${g.baseFt}`} data-station-deck>
+                        <line x1="20" x2="290" y1={y} y2={y} className="spage__stdeck" />
+                        <text x="296" y={y - 4} className="spage__lvlk" textAnchor="end">
+                          {stationFresh.sky.station} {g.amount} {Math.round(g.baseFt / 1000)}K now
+                        </text>
+                      </g>
+                    )
+                  })}
             <line x1="0" x2="300" y1={0.92 * 150} y2={0.92 * 150} className="spage__horizon" />
             {side.path === null ? null : <line x1={side.path.from.x * 300} y1={side.path.from.y * 150} x2={side.path.to.x * 300} y2={side.path.to.y * 150} className="spage__ray" />}
             <circle cx={side.sun.x * 300} cy={side.sun.y * 150} r="10" className="spage__sun" />

@@ -138,6 +138,12 @@ function WhyHere({ ranked, ev }: { ranked: RankedSpot; ev: BestSkyEvent }) {
           {gap}
         </text>
       )}
+      {/* Batch LIVE, Section 8.2: a Little says why, over the drawing. */}
+      {ranked.word !== 'Little' || ranked.why[1] === undefined || ranked.why[1] === gap ? null : (
+        <text x="160" y="96" className="bsky__plab" textAnchor="middle" data-little-why>
+          {ranked.why[1]}
+        </text>
+      )}
       <path d="M224 66 L236 66 L230 78 Z" className="bsky__youmark" />
       <text x="244" y="76" className="bsky__plab bsky__plab--dim">
         you

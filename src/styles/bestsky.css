@@ -179,3 +179,12 @@
 .bsky__how p {
   margin: 0 0 8px;
 }
+/* Batch LIVE, Section 8.1: each label's line to its pin, and a moved pin's line to its true place. */
+.bsky__leader {
+  stroke: rgb(255 255 255 / 0.7);
+  stroke-width: 1.2;
+}
+/* Batch LIVE, Section 8.2: the spot page's buttons whole on first view. */
+.bsky__page--spot {
+  padding-bottom: calc(var(--safe-bottom) + 28px);
+}

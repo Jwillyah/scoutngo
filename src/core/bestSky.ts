@@ -22,7 +22,7 @@
  *
  * Words are facts on a scale: Likely, Possible, Little. Never a promise.
  */
-import { antiSolar, apartDeg, OPPOSITE_SPREAD_DEG, readAfterglow } from './afterglow.ts'
+import { AFTERGLOW_FROM, antiSolar, apartDeg, OPPOSITE_SPREAD_DEG, readAfterglow } from './afterglow.ts'
 import { bearingBetween, destinationPoint, distanceMeters, type LatLon } from './geo.ts'
 import { compassPoint } from './field.ts'
 
@@ -129,7 +129,25 @@ const upper = (p: PointSky) => Math.max(p.mid ?? 0, p.high ?? 0)
  * bearing at the event. `farLow`: the low cloud along the sun's path past the
  * grid, out to GAP_REACH_KM, % (the Sky fire path's), or null.
  */
-export function scoreGrid(points: readonly PointSky[], sunAzDeg: number, farLow: number | null = null): ScoredPoint[] {
+/*
+ * THE PINK NEEDS CLOUD SEEN (Batch LIVE, Section 8.1; 14 Nov 2:45 PM the
+ * map's pink wash covered the oceanfront on a few per cent of model cloud).
+ * With `seen` (the app's own call), the opposite sky's glow counts only
+ * where cloud was observed there: the satellite's patch at the point or in
+ * its anti-sun half, or the station's report AFTERGLOW_FROM per cent or
+ * more. Nothing observed, no glow; the models alone never paint it.
+ * Without `seen` (the replays of past days), the models' as before.
+ */
+export interface SeenOpposite {
+  /** The fresh station's cover, %, its most-covering deck; null with none. */
+  stationCover: number | null
+  /** Whether the satellite was read for this event. */
+  satAsked: boolean
+  /** The station's sky in words, "KNTU mostly cloudy": said in place of a model's "clear sky" (Batch LIVE, Section 8.2). */
+  stationLine?: string | null
+}
+
+export function scoreGrid(points: readonly PointSky[], sunAzDeg: number, farLow: number | null = null, seen: SeenOpposite | null = null): ScoredPoint[] {
   const toward = compassPoint(sunAzDeg)
   const anti = antiSolar(sunAzDeg)
   const away = compassPoint(anti)
@@ -149,12 +167,13 @@ export function scoreGrid(points: readonly PointSky[], sunAzDeg: number, farLow:
     const sunScore = blocked ? 0 : canvas * gap
     /* The opposite sky: the grid's points within reach and OPPOSITE_SPREAD_DEG of the anti-solar bearing, and the point itself. */
     const opposite = points.filter((q) => q !== p && distanceMeters(p, q) / 1000 <= CANVAS_REACH_KM && apartDeg(bearingBetween(p, q), anti) <= OPPOSITE_SPREAD_DEG)
-    const ag = blocked ? null : readAfterglow({ opposite: [p, ...opposite], sunLow: lows.length === 0 ? [p.low] : lows })
+    const observed = seen === null || (seen.satAsked && (p.satPatch === true || opposite.some((q) => q.satPatch === true))) || (seen.stationCover ?? 0) >= AFTERGLOW_FROM
+    const ag = blocked || !observed ? null : readAfterglow({ opposite: [p, ...opposite], sunLow: lows.length === 0 ? [p.low] : lows })
     const glow = ag?.score ?? 0
     const score = Math.max(sunScore, glow)
     const word: ColorWord = score >= LIKELY_FROM ? 'Likely' : score >= POSSIBLE_FROM ? 'Possible' : 'Little'
     const sunWhy = [
-      blocked ? 'low deck overhead' : patch || overhead >= 0.8 ? 'patch overhead' : nearBest >= 0.8 ? `patch to the ${toward}` : upper(p) < 10 && nearBest < 0.3 ? 'clear sky' : 'thin cloud',
+      blocked ? 'low deck overhead' : patch || overhead >= 0.8 ? 'patch overhead' : nearBest >= 0.8 ? `patch to the ${toward}` : upper(p) < 10 && nearBest < 0.3 ? ((seen?.stationCover ?? 0) >= CANVAS_FROM && seen?.stationLine ? seen.stationLine : 'clear sky') : 'thin cloud',
       gap >= 0.7 ? `gap open ${toward}` : gap >= 0.4 ? `gap partly ${toward}` : `gap shut ${toward}`,
     ]
     const why = glow > sunScore && ag !== null ? [ag.fires ? `cloud to the ${away} to catch the pink` : `Belt of Venus ${away}`, gap >= 0.7 ? `light in from the ${toward}` : `light partly in from the ${toward}`] : sunWhy
@@ -290,7 +309,14 @@ export function rankSpots(grid: readonly ScoredPoint[], spots: readonly SpotIn[]
         km: from === null ? null : distanceMeters(from, s.at) / 1000,
       }
       const look = compassPoint(anti)
-      const why = byGlow ? [g.glowFires ? `pink on the clouds ${look}` : `Belt of Venus ${look}`, s.water ? 'over the water' : 'facing that way'] : seesSun ? g.sunWhy : [g.sunWhy[0], 'faces away from the sun']
+      const why = byGlow
+        ? [g.glowFires ? `pink on the clouds ${look}` : `Belt of Venus ${look}`, s.water ? 'over the water' : 'facing that way']
+        : word === 'Little'
+          ? /* Batch LIVE, Section 8.2: a Little says why. */
+            [g.sunWhy[0], g.glow > 0 && !facesAway ? `faces away from the pink (${look})` : !seesSun ? 'faces away from the sun' : g.sunWhy[1]]
+          : seesSun
+            ? g.sunWhy
+            : [g.sunWhy[0], 'faces away from the sun']
       return [{ spot: s, score, word, view, why, seesSun, tie }]
     })
     .sort(compareRanked)

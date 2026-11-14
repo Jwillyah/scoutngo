@@ -12,6 +12,8 @@ import { NetDebug } from './NetDebug.tsx'
 interface PageShellProps {
   /** Batch LIVE, Section 7: the live sky behind the page, when the setting has it here. */
   backdrop?: ReactNode
+  /** Batch LIVE, Section 8.3: the footer's links at the end of the scroll, never over the page's content. */
+  footInScroll?: boolean
   /** Its class: `wpage`, `spage`. */
   kind: string
   title: string
@@ -30,7 +32,7 @@ interface PageShellProps {
   children: ReactNode
 }
 
-export function PageShell({ kind, title, sub, ground, onBack, how, foot, inner, onMap, children, backdrop = null }: PageShellProps) {
+export function PageShell({ kind, title, sub, ground, onBack, how, foot, inner, onMap, children, backdrop = null, footInScroll = false }: PageShellProps) {
   const [howOpen, setHowOpen] = useState(false)
   const [debug, setDebug] = useState(false)
   const back = () => {
@@ -45,6 +47,17 @@ export function PageShell({ kind, title, sub, ground, onBack, how, foot, inner, 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   })
+  const footer =
+    foot === undefined && how === null ? null : (
+      <div className={`dpage__foot ppage__foot${footInScroll ? ' ppage__foot--end' : ''}`}>
+        {foot}
+        {how === null ? null : (
+          <button type="button" className="dpage__link" onClick={() => setHowOpen(true)}>
+            How we got this ›
+          </button>
+        )}
+      </div>
+    )
   return createPortal(
     <div className={`dpage ppage ${kind} home--${ground}`} role="dialog" aria-label={title}>
       {backdrop}
@@ -68,18 +81,10 @@ export function PageShell({ kind, title, sub, ground, onBack, how, foot, inner, 
         }}
       >
         {children}
+        {footInScroll ? footer : null}
       </div>
       {debug ? <NetDebug onClose={() => setDebug(false)} /> : null}
-      {foot === undefined && how === null ? null : (
-        <div className="dpage__foot ppage__foot">
-          {foot}
-          {how === null ? null : (
-            <button type="button" className="dpage__link" onClick={() => setHowOpen(true)}>
-              How we got this ›
-            </button>
-          )}
-        </div>
-      )}
+      {footInScroll ? null : footer}
       {howOpen ? (
         <div className="dhow" role="dialog" aria-label={`${title}: how we got this`}>
           <div className="dhow__panel">

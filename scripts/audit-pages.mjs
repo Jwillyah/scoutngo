@@ -180,7 +180,8 @@ try {
       const evening = d.seg.find((x) => /evening$|^Tonight$/.test(x))
       const morning = d.seg.find((x) => /morning$/.test(x))
       if (d.seg.length !== 2 || evening === undefined || morning === undefined) fail(`${label}: the toggle reads ${JSON.stringify(d.seg)}`)
-      if (!/^(Sunset|Sunrise) \d+:\d\d [AP]M · looking [NESW]+$/.test(d.event ?? '')) fail(`${label}: the event line reads ${JSON.stringify(d.event)}`)
+      /* Batch LIVE, Section 8.3: both ways when they differ, "Sunset 5:05 PM · sun sets WSW · pink ENE". */
+      if (!/^(Sunset|Sunrise) \d+:\d\d [AP]M · sun (sets|rises) [NESW]+( · pink [NESW]+)?$/.test(d.event ?? '')) fail(`${label}: the event line reads ${JSON.stringify(d.event)}`)
       if (!d.side) fail(`${label}: no side view toward the sun`)
       if (d.gap === null || d.gap.trim() === '') fail(`${label}: no gap line under the side view`)
       if (!/^(Color (likely|possible|unlikely)|No call yet)$/.test(d.head ?? '')) fail(`${label}: the headline reads ${JSON.stringify(d.head)}`)

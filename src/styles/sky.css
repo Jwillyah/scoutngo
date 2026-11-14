@@ -296,3 +296,15 @@
   text-align: left;
   cursor: pointer;
 }
+
+/* Batch LIVE, Section 8.3: the station's decks over the models' picture; the footer at the end of the scroll. */
+.spage__stdeck {
+  stroke: var(--white);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+  opacity: 0.8;
+}
+.ppage__foot--end {
+  margin-top: auto;
+  padding: 16px 0 calc(var(--safe-bottom) + 12px);
+}

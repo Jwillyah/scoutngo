@@ -1,3 +1,5 @@
+import { stationNow } from './useStationNow.ts'
+import { stationWord } from '../core/skyWord.ts'
 /*
  * WHERE'S THE COLOR: THE PAGE'S DATA (Batch BEST SKY, Sections 1-2). The next
  * sunrise or sunset, the grid's cloud at its hour (src/lib/bestSkyData.ts,
@@ -83,9 +85,15 @@ export function useBestSky(spot: LatLon | null, radius: RadiusMi, now: Date, sav
   useEffect(() => {
     if (key === null || spot === null || event === null) return
     let live = true
-    void fetchGrid(spot, radius, event.at)
-      .then((g) => {
-        if (live) setGot({ key, grid: scoreGrid(g.points, event.azimuth), asked: g.asked, satAt: g.satAt, satAsked: g.satAsked, failed: g.points.length === 0, drift: g.drift ?? null })
+    void Promise.all([fetchGrid(spot, radius, event.at), stationNow(spot, Date.now()).catch(() => null)])
+      .then(([g, st]) => {
+        /* Batch LIVE, Section 8: the pink only on cloud seen (the satellite, or the station within 75 minutes); the station's word for a model's "clear sky". */
+        const at = st === null ? NaN : Date.parse(st.at)
+        const fresh = st !== null && Number.isFinite(at) && Date.now() - at <= 75 * MIN ? st : null
+        const cover = fresh === null ? null : fresh.sky.groups.reduce((m, gr) => Math.max(m, { FEW: 25, SCT: 50, BKN: 75, OVC: 100, VV: 100 }[gr.amount]), fresh.sky.clear ? 0 : 0)
+        const word = fresh === null ? null : stationWord(fresh.sky)
+        const seen = { stationCover: cover, satAsked: g.satAsked, stationLine: fresh === null || word === null ? null : `${fresh.sky.station} ${word.toLowerCase()}` }
+        if (live) setGot({ key, grid: scoreGrid(g.points, event.azimuth, null, seen), asked: g.asked, satAt: g.satAt, satAsked: g.satAsked, failed: g.points.length === 0, drift: g.drift ?? null })
       })
       .catch(() => live && setGot({ key, grid: [], asked: 0, satAt: null, satAsked: false, failed: true, drift: null }))
     return () => {
