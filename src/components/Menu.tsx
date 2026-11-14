@@ -14,6 +14,8 @@ import { useStationObs } from '../lib/useStationObs.ts'
 import { useSurfNow } from '../lib/useSurfNow.ts'
 import { formatTemperature, windIn, windUnitLabel, type Units } from '../lib/units.ts'
 import { gustWords, windAt, windWords } from '../lib/windNow.ts'
+import { MenuArt, type ArtInput } from './MenuArt.tsx'
+import '../styles/menu-a.css'
 
 /*
  * THE MENU (Batch H, Section 3; it replaced the side menu entirely).
@@ -145,6 +147,22 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
   const rain = rainLine(rainHours, now, timeZone)
   /* Batch Flow, Section 8 (board D_Menu): Weather, then the home's own cards in its order (no Moon), Sky always there. */
   const kinds = menuCardList(order, droneTools)
+  /* Batch LIVE, Section 4.1 (board Menu_A): each card's live drawing, from the card's own numbers. */
+  const artOf = (k: MenuCard): ArtInput => {
+    if (k === 'weather') return { kind: 'weather', icon: cond?.icon ?? null }
+    if (k === 'surf') return { kind: 'surf' }
+    if (k === 'wind') return { kind: 'wind', fromDeg: wind?.fromDeg ?? null }
+    if (k === 'tide') {
+      const next = brief.turns.find((x) => x.at.getTime() > now.getTime()) ?? null
+      return { kind: 'tide', rising: next === null ? null : next.kind === 'high' }
+    }
+    if (k === 'sky') {
+      const past = day?.events.sunset != null && now.getTime() > day.events.sunset.getTime()
+      const read = past ? (brief.days[1]?.reads.sunrise ?? null) : (day?.reads.sunset ?? null)
+      return { kind: 'sky', lit: read?.call === 'Go' || read?.call === 'Maybe' }
+    }
+    return { kind: 'drone' }
+  }
   const card = (k: MenuCard): { title: string; big: string; line: string; target: MenuTarget } => {
     if (k === 'weather') {
       return { title: 'Weather', big: `${temp(at('temperature_2m', now))} ${cond?.word ?? ''}`.trim(), line: `H ${temp(dayTemps.length === 0 ? null : Math.max(...dayTemps))} L ${temp(dayTemps.length === 0 ? null : Math.min(...dayTemps))}${rain === null ? '' : ` · ${rain.replace(/^No rain next/, 'dry')}`}`, target: 'weather' }
@@ -191,6 +209,7 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
               <button key={k} type="button" className={`mcard mcard--${k === 'surf' ? 'water' : k} mcard--d sidemenu__item`} onClick={() => pick(c.target)}>
                 <span className="mcard__name sidemenu__label">{c.title}</span>
                 <span className="mcard__value">{loading ? '…' : k === 'surf' ? <span data-shared="surf">{c.big}</span> : k === 'sky' && c.big !== '—' ? <span data-shared="skycall" data-value={c.big.toLowerCase()}>{c.big}</span> : c.big}</span>
+                <MenuArt art={artOf(k)} />
                 <span className="mcard__sub" {...(!loading && ((k === 'tide' && /^(high|low) /.test(c.line)) || (k === 'sky' && /^sunset /.test(c.line))) ? { 'data-shared': k === 'tide' ? 'tide' : 'sunset', 'data-value': c.line.toLowerCase() } : {})}>{loading ? '' : c.line}</span>
               </button>
             )
@@ -199,12 +218,12 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
 
         <div className="menu__rows">
           {/* Batch Polish, Section 4: Plan a shoot and Settings, just the arrow; Kit its counts, Saved its spots. */}
-          {!photoTools ? null : <Row label="Plan a shoot" value="" icon={<PlanIcon />} onTap={() => pick('setup')} />}
-          <Row label="Calendar" value={mark ?? 'the month'} icon={<SavedIcon />} onTap={() => pick('calendar')} />
-          {venue === null ? null : <Row label="Cams" value="near here" icon={<CamIcon />} onTap={() => setCamsOpen(true)} />}
-          <Row label="Kit" value={rows.kit} icon={<KitIcon />} onTap={() => pick('kit')} />
-          <Row label="Saved" value={rows.saved} icon={<SavedIcon />} onTap={() => pick('saved')} />
-          <Row label="Settings" value={rows.settings} icon={<GearIcon />} onTap={() => pick('settings')} />
+          {!photoTools ? null : <Row label="Plan a shoot" value="" tone="plan" icon={<PlanIcon />} onTap={() => pick('setup')} />}
+          <Row label="Calendar" value={mark ?? 'the month'} tone="calendar" icon={<CalendarIcon />} onTap={() => pick('calendar')} />
+          {venue === null ? null : <Row label="Cams" value="near here" tone="cams" icon={<CamIcon />} onTap={() => setCamsOpen(true)} />}
+          <Row label="Kit" value={rows.kit} tone="kit" icon={<KitIcon />} onTap={() => pick('kit')} />
+          <Row label="Saved" value={rows.saved} tone="saved" icon={<SavedIcon />} onTap={() => pick('saved')} />
+          <Row label="Settings" value={rows.settings} tone="settings" icon={<GearIcon />} onTap={() => pick('settings')} />
         </div>
       </nav>
       {camsOpen && venue !== null ? (
@@ -219,10 +238,11 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
 
 
 
-function Row({ label, value, icon, onTap }: { label: string; value: string; icon: ReactNode; onTap: () => void }) {
+function Row({ label, value, icon, onTap, tone }: { label: string; value: string; icon: ReactNode; onTap: () => void; tone: 'plan' | 'calendar' | 'cams' | 'kit' | 'saved' | 'settings' }) {
   return (
     <button type="button" className="mrow sidemenu__item" onClick={onTap}>
-      <span className="mrow__icon">{icon}</span>
+      {/* Batch LIVE, Section 4.1 (board Menu_A): a coloured tile for each row. */}
+      <span className={`mrow__icon mrow__tile mrow__tile--${tone}`}>{icon}</span>
       <span className="mrow__label sidemenu__label">{label}</span>
       <span className="mrow__value">{value}</span>
       <span className="mrow__chev" aria-hidden="true">
@@ -241,5 +261,6 @@ const svg = (d: ReactNode) => (
 const PlanIcon = () => svg(<><path d="M12 21s-6-5.6-6-11a6 6 0 0 1 12 0c0 5.4-6 11-6 11z" /><circle cx="12" cy="10" r="2.2" /></>)
 const KitIcon = () => svg(<><rect x="3" y="7" width="18" height="13" rx="2" /><circle cx="12" cy="13.5" r="3.5" /><path d="M8 7l1.5-2.5h5L16 7" /></>)
 const SavedIcon = () => svg(<path d="M6 3h12v18l-6-4-6 4z" />)
+const CalendarIcon = () => svg(<><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M4 10h16M8 3v4M16 3v4" /></>)
 const CamIcon = () => svg(<><rect x="3" y="7" width="18" height="13" rx="2" /><circle cx="12" cy="13.5" r="3.5" /></>)
 const GearIcon = () => svg(<><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1" /></>)

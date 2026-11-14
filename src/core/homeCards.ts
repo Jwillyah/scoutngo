@@ -209,6 +209,9 @@ export function tideAt(turns: readonly Turn[], t: Date): number | null {
 }
 
 /** The curve over a window, sampled every `stepMin` minutes, with the turns inside it placed. */
+/** A chart's top over its highest value, as a share of the range: the peak's value bubble sits there, off the line (Batch LIVE, Section 4.2). */
+export const BUBBLE_ROOM = 1
+
 export function tideCurve(turns: readonly Turn[], from: Date, hours: number, box: ChartBox, stepMin = 20): { line: string; turns: { x: number; y: number; turn: Turn }[]; scale: (ft: number) => number; range: { lo: number; hi: number } } | null {
   const t0 = from.getTime()
   const span = hours * 3_600_000
@@ -217,7 +220,9 @@ export function tideCurve(turns: readonly Turn[], from: Date, hours: number, box
   const lo = Math.min(...near.map((t) => t.feet))
   const hi = Math.max(...near.map((t) => t.feet))
   const pad = Math.max(0.3, (hi - lo) * 0.15)
-  const y = (ft: number) => box.h - ((ft - (lo - pad)) / (hi - lo + 2 * pad)) * box.h
+  /* Batch LIVE, Section 4.2: room over the high water for its value bubble, so the bubble never sits on the line. */
+  const padTop = Math.max(pad, (hi - lo) * BUBBLE_ROOM)
+  const y = (ft: number) => box.h - ((ft - (lo - pad)) / (hi - lo + pad + padTop)) * box.h
   const pts: string[] = []
   for (let m = 0; m <= hours * 60; m += stepMin) {
     const ft = tideAt(near, new Date(t0 + m * 60_000))
@@ -228,7 +233,7 @@ export function tideCurve(turns: readonly Turn[], from: Date, hours: number, box
     line: pts.join(' '),
     turns: near.filter((t) => t.at.getTime() >= t0 && t.at.getTime() <= t0 + span).map((t) => ({ x: ((t.at.getTime() - t0) / span) * box.w, y: y(t.feet), turn: t })),
     scale: y,
-    range: { lo: lo - pad, hi: hi + pad },
+    range: { lo: lo - pad, hi: hi + padTop },
   }
 }
 

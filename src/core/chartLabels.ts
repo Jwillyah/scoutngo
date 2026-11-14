@@ -40,7 +40,21 @@ export interface LabelPlan {
   ticks: boolean[]
 }
 
-export function planChartLabels(p: { area: Box; grid: readonly Box[]; ticks: readonly Box[]; fixed: readonly Box[]; bubble: { usual: 'right' | 'left'; boxes: Record<BubbleSide, Box> } | null; dots?: readonly Box[] }): LabelPlan {
+/** How far past the plot's edge a value bubble may stand. */
+export const BUBBLE_EDGE_PX = 4
+
+/** Line points inside a box, a pixel in from its edge. */
+export function lineHits(b: Box, line: readonly { x: number; y: number }[]): number {
+  return line.filter((pt) => pt.x > b.x + 1 && pt.x < b.x + b.w - 1 && pt.y > b.y + 1 && pt.y < b.y + b.h - 1).length
+}
+
+/*
+ * Batch LIVE, Section 4.2 (14 Nov: the drone card's "22 kt" bubble on its
+ * own line): `line` is the chart's drawn lines sampled as points (the data
+ * line and the now line); the bubble takes a side no point of them is in,
+ * else the side with the fewest.
+ */
+export function planChartLabels(p: { area: Box; grid: readonly Box[]; ticks: readonly Box[]; fixed: readonly Box[]; bubble: { usual: 'right' | 'left'; boxes: Record<BubbleSide, Box> } | null; dots?: readonly Box[]; line?: readonly { x: number; y: number }[] }): LabelPlan {
   const grid = p.grid.map(() => true)
   /* Ticks left to right: a later one on an earlier one goes; one under a dot goes. */
   const ticks = p.ticks.map(() => true)
@@ -62,13 +76,23 @@ export function planChartLabels(p: { area: Box; grid: readonly Box[]; ticks: rea
     if (p.grid.some((g, j) => j !== i && grid[j] && overlaps(p.grid[i], g))) grid[i] = false
   }
   if (p.bubble === null) return { bubble: null, grid, ticks }
+  /* Batch LIVE, Section 4.2: a bubble may stand a few px past the plot's edge (on a 44 px chart, "above" missed by one). */
+  const roomy = { x: p.area.x - BUBBLE_EDGE_PX, y: p.area.y - BUBBLE_EDGE_PX, w: p.area.w + 2 * BUBBLE_EDGE_PX, h: p.area.h + 2 * BUBBLE_EDGE_PX }
   const sides: BubbleSide[] = [p.bubble.usual, p.bubble.usual === 'right' ? 'left' : 'right', 'above', 'below']
   const clear = (s: BubbleSide) => {
     const b = p.bubble?.boxes[s] as Box
-    return inside(b, p.area) && !hitsFixed(b) && !p.grid.some((g, i) => grid[i] && overlaps(b, g))
+    return inside(b, roomy) && !hitsFixed(b) && !p.grid.some((g, i) => grid[i] && overlaps(b, g)) && lineHits(b, p.line ?? []) === 0
   }
   const pick = sides.find(clear)
   if (pick !== undefined) return { bubble: pick, grid, ticks }
+  /* No side is clear of everything: off the line and the ticks first (inside the chart), the gridline numbers give way. */
+  const offLine = sides.filter((s) => inside(p.bubble?.boxes[s] as Box, roomy) && lineHits(p.bubble?.boxes[s] as Box, p.line ?? []) === 0 && !hitsFixed(p.bubble?.boxes[s] as Box))[0]
+  if (offLine !== undefined) {
+    const b = p.bubble.boxes[offLine]
+    return { bubble: offLine, grid: grid.map((on, i) => on && !overlaps(b, p.grid[i])), ticks }
+  }
+  /* Batch LIVE, Section 4.2: with a line known and no room anywhere (the largest text on a small chart), the value is left off; the dot stays. */
+  if ((p.line ?? []).length > 0) return { bubble: null, grid, ticks }
   const usual = p.bubble.boxes[p.bubble.usual]
   return { bubble: p.bubble.usual, grid: grid.map((on, i) => on && !overlaps(usual, p.grid[i])), ticks: ticks.map((on, i) => on && (i === 0 || !overlaps(usual, p.ticks[i]))) }
 }

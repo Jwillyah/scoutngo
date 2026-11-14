@@ -84,7 +84,19 @@ try {
       const nav = document.querySelector('nav[aria-label="Stage"]')
       if (!nav) return { missing: true }
       const out = [...nav.querySelectorAll('*')].filter((e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0 && (b.bottom > innerHeight + 1 || b.right > innerWidth + 1 || b.left < -1) }).map((e) => (e.getAttribute('class') ?? e.tagName) + ' ' + Math.round(e.getBoundingClientRect().bottom)).slice(0, 4)
-      const cards = [...nav.querySelectorAll('.mcard:not(.menu__spot)')].map((c) => ({ name: c.querySelector('.sidemenu__label')?.textContent, h: Math.round(c.getBoundingClientRect().height), value: c.querySelector('.mcard__value')?.textContent, bg: getComputedStyle(c).backgroundImage }))
+      /* Batch LIVE, Section 4.1 (Menu A): each card's art, at most 60% opacity and never under the value. */
+      const overlap = (a, b) => a !== null && b !== null && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
+      const cards = [...nav.querySelectorAll('.mcard:not(.menu__spot)')].map((c) => {
+        const art = c.querySelector('.mart')
+        const v = c.querySelector('.mcard__value')
+        const ar = art === null ? null : art.getBoundingClientRect()
+        const vr = v === null ? null : v.getBoundingClientRect()
+        /* The value's own text, not its box's full width. */
+        const range = v === null ? null : document.createRange()
+        if (range !== null && v !== null) range.selectNodeContents(v)
+        const tr = range === null ? null : range.getBoundingClientRect()
+        return { name: c.querySelector('.sidemenu__label')?.textContent, h: Math.round(c.getBoundingClientRect().height), value: v?.textContent, bg: getComputedStyle(c).backgroundImage, art: art !== null, artOpacity: art === null ? null : Number(getComputedStyle(art).opacity), artUnderValue: ar !== null && ar.height > 0 && overlap(ar, tr ?? vr) }
+      })
       const rows = [...nav.querySelectorAll('.mrow')].map((r) => ({ name: r.querySelector('.sidemenu__label')?.textContent, value: r.querySelector('.mrow__value')?.textContent, h: Math.round(r.getBoundingClientRect().height) }))
       return { out, scrolls: nav.scrollHeight > nav.clientHeight + 1, cards, rows, where: document.querySelector('.menu__where')?.textContent, spot: document.querySelector('.menu__spot .menu__title')?.textContent ?? '', chip: nav.querySelector('.mcard__beach')?.textContent ?? null, text: nav.innerText }
     })())`))
@@ -116,6 +128,9 @@ try {
     for (const c of m.cards) {
       if (c.h < 44) fail(`${label}: the ${c.name} card is ${c.h} px, under a 44 px target`)
       if (!c.value) fail(`${label}: the ${c.name} card has no value`)
+      if (!c.art) fail(`${label}: the ${c.name} card has no art (Menu A)`)
+      if (c.artOpacity !== null && c.artOpacity > 0.6) fail(`${label}: the ${c.name} card's art is at ${c.artOpacity} opacity, over 60%`)
+      if (c.artUnderValue) fail(`${label}: the ${c.name} card's art is under its value`)
       if (/255,\s*59,\s*48/.test(c.bg)) fail(`${label}: the ${c.name} card is the hazard red`)
     }
     /* Batch TRUTH, Section 4: Cams moved here from the home's Next row. */

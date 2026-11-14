@@ -1,0 +1,92 @@
+/*
+ * MENU A (Batch LIVE, Section 4.1; board docs/mockups/Menu_A.png): each card
+ * tinted by its kind, its live drawing faded in the bottom-right corner, the
+ * rows with coloured icon tiles. The drawing sits below the card's name and
+ * value (its height is the card's less the 66 px they take), so it is never
+ * under the value.
+ */
+.menu--d .mcard--d {
+  /* Taller where the screen has room, so the art has some; a short phone keeps its fit. */
+  min-height: clamp(84px, 13svh, 128px);
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.menu--d .mcard--d > span {
+  position: relative;
+  z-index: 1;
+}
+.menu--d .mcard--weather {
+  background-image: linear-gradient(135deg, rgb(255 255 255 / 0.12), transparent 70%);
+}
+.menu--d .mcard--water {
+  background-image: linear-gradient(135deg, color-mix(in srgb, var(--d-surf) 45%, transparent), transparent 75%);
+}
+.menu--d .mcard--wind {
+  background-image: linear-gradient(135deg, color-mix(in srgb, var(--d-tide) 35%, transparent), transparent 75%);
+}
+.menu--d .mcard--tide {
+  background-image: linear-gradient(135deg, color-mix(in srgb, var(--d-tide) 50%, transparent), transparent 75%);
+}
+.menu--d .mcard--sky {
+  background-image: linear-gradient(135deg, color-mix(in srgb, var(--d-glow-violet) 50%, transparent), transparent 75%);
+}
+.menu--d .mcard--drone {
+  background-image: linear-gradient(135deg, color-mix(in srgb, var(--d-drone) 40%, transparent), transparent 75%);
+}
+.mart {
+  position: absolute;
+  z-index: 0;
+  right: -4px;
+  bottom: -4px;
+  height: calc(100% - 66px);
+  max-height: 76px;
+  width: auto;
+  aspect-ratio: 112 / 96;
+  fill: none;
+  stroke: var(--white);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.mart__fill {
+  fill: var(--white);
+  stroke: none;
+}
+.mart__warm {
+  fill: var(--d-glow);
+}
+.mart--weather circle {
+  fill: var(--white);
+  stroke: none;
+}
+
+/* The rows' coloured tiles. */
+.mrow__tile {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  color: var(--black);
+}
+.mrow__tile--plan {
+  background: var(--d-glow);
+}
+.mrow__tile--calendar {
+  background: var(--strong);
+}
+.mrow__tile--cams {
+  background: var(--d-surf);
+}
+.mrow__tile--kit {
+  background: var(--d-glow-violet);
+}
+.mrow__tile--saved {
+  background: var(--good);
+}
+.mrow__tile--settings {
+  background: var(--white);
+}

@@ -16,7 +16,7 @@ import { useCoastCams } from '../lib/coastCamsLazy.ts'
 import { homeOrder, primaryFor, useActivities } from '../lib/activities.ts'
 import { seaNow, surfLine, useSurfNow, type SurfNow } from '../lib/useSurfNow.ts'
 import { rangeSizeWords } from '../core/surfReads.ts'
-import { chartMarks, firstFun, homeCardsShown, homeLayout, nextLine, nightSpans, surfChartMarks, surfPath, tideAt, tideCurve, type HomeLayout, type SurfChartMarks } from '../core/homeCards.ts'
+import { BUBBLE_ROOM, chartMarks, firstFun, homeCardsShown, homeLayout, nextLine, nightSpans, surfChartMarks, surfPath, tideAt, tideCurve, type HomeLayout, type SurfChartMarks } from '../core/homeCards.ts'
 import { gustWords, windAt, windWords } from '../lib/windNow.ts'
 import { useStationObs, type StationNow } from '../lib/useStationObs.ts'
 import { freshSky, skyCondition } from '../core/skyWord.ts'
@@ -414,12 +414,28 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
 }
 
 /** A mini chart's words over its drawing (Batch Polish, Section 3; Batch Polish 2, Section 2): gridline labels, the peak, "steady all day", the time ticks. */
+/** The chart box's bottom padding, the time ticks' row (src/styles/home-d.css .hcard__chartbox). */
+const TICKS_ROW_PX = 16
+
 function ChartMarksText({ marks, unit }: { marks: SurfChartMarks | null; unit: string }) {
   /* Batch NOW, Section 3.2: after every draw, the words measured and moved off each other (src/lib/chartLabelsDom.ts). */
   const anchor = useRef<HTMLSpanElement | null>(null)
   useLayoutEffect(() => {
     const box = anchor.current?.closest('.hcard__chartbox') as HTMLElement | null | undefined
-    if (box != null) fitChartLabels(box)
+    if (box == null) return
+    fitChartLabels(box)
+    /* Batch LIVE, Section 4.2: and again whenever the chart's size changes (the home's fit shrinks a card after it drew; the bubble kept the side it took at the old size, on the line). */
+    if (typeof ResizeObserver === 'undefined') return
+    let last = ''
+    const ro = new ResizeObserver(() => {
+      const r = box.getBoundingClientRect()
+      const k = `${Math.round(r.width)}x${Math.round(r.height)}`
+      if (k === last) return
+      last = k
+      fitChartLabels(box)
+    })
+    ro.observe(box)
+    return () => ro.disconnect()
   })
   if (marks === null) return null
   const one = (v: number) => (unit === 'ft' ? v.toFixed(1) : String(Math.round(v)))
@@ -427,13 +443,14 @@ function ChartMarksText({ marks, unit }: { marks: SurfChartMarks | null; unit: s
     <>
       <span ref={anchor} hidden />
       {marks.grid.map((g, i) => (
-        <span key={g.ft} className={`hcard__gl${i === 1 ? ' hcard__gl--mid' : ''}`} style={{ top: `${g.y * 100}%` }}>
+        /* Batch LIVE, Section 4.2: on the plot's own scale, its height the box's less the ticks' row (16 px), as the line is drawn; at a percentage of the whole box the words sat below their lines. */
+        <span key={g.ft} className={`hcard__gl${i === 1 ? ' hcard__gl--mid' : ''}`} style={{ top: `calc(${g.y} * (100% - ${TICKS_ROW_PX}px))` }}>
           {g.ft}
         </span>
       ))}
       {marks.peak === null ? null : (
         /* Inside the plot (Batch TRUTH, Section 4): past the middle the label sits left of its dot, clear of the right edge and the axis words; never above the top. */
-        <span className={`hcard__peak${marks.peak.x > 0.55 ? ' hcard__peak--left' : ''}`} style={{ left: `${marks.peak.x * 100}%`, top: `${Math.max(12, marks.peak.y * 100)}%` }}>
+        <span className={`hcard__peak${marks.peak.x > 0.55 ? ' hcard__peak--left' : ''}`} style={{ left: `${marks.peak.x * 100}%`, top: `calc(${Math.max(0.12, marks.peak.y)} * (100% - ${TICKS_ROW_PX}px))` }}>
           <span className="hcard__peakdot" />
           <span className="hcard__peaklabel">
             {one(marks.peak.ft)} {unit}
@@ -765,7 +782,8 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
     const toUnit = (mps: number) => windIn(mps, units.wind) ?? 0
     const dPts = brief.days.flatMap((d) => d.wind).flatMap((h) => (h.highMps === null ? [] : [{ at: h.at, v: toUnit(h.highMps) }]))
     const rated = drone?.maxWindMps == null ? null : toUnit(drone.maxWindMps)
-    const dTop = Math.max(rated ?? 0, 10, ...dPts.filter((p) => p.at.getTime() >= dFrom.getTime() && p.at.getTime() <= dFrom.getTime() + 24 * 3_600_000).map((p) => p.v)) * 1.15
+    /* Batch LIVE, Section 4.2: room over the peak for its bubble (14 Nov: "22 kt" on its own line). */
+    const dTop = Math.max(rated ?? 0, 10, ...dPts.filter((p) => p.at.getTime() >= dFrom.getTime() && p.at.getTime() <= dFrom.getTime() + 24 * 3_600_000).map((p) => p.v)) * (1 + BUBBLE_ROOM)
     const dMarks = chartMarks(dPts, dFrom, 24, timeZone, { floor: 10, steady: 3, steps: [5, 10, 15, 20, 25, 30, 40, 50], high: dTop, widthPx: cardPx, dayStart: which === 'tomorrow' })
     if (dMarks?.steady === true) title = small ? 'Drone · steady' : 'Drone · 400 ft · steady'
     const dPath = surfPath(dPts.map((p) => ({ at: p.at, ft: p.v, fun: false })), dFrom, 24, CHART, dTop)

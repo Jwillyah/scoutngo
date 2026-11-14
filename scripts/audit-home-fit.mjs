@@ -79,6 +79,37 @@ const MEASURE = `JSON.stringify((() => {
       const same = words[i].closest('.hcard__peak') !== null && words[i].closest('.hcard__peak') === words[j].closest('.hcard__peak')
       if (!same && a.right - 1 > b.left && b.right - 1 > a.left && a.bottom - 1 > b.top && b.bottom - 1 > a.top) hits.push(card + ': "' + words[i].textContent.trim() + '" on "' + words[j].textContent.trim() + '"')
     }
+    /*
+     * Batch LIVE, Section 4.2 (14 Nov: the drone card's "22 kt" on its line):
+     * a value bubble on none of the chart's drawn lines (the data line, the
+     * drone's rated wind), each sampled along its length on screen; the now
+     * marker is a guide, as the gridlines are, and a bubble may cross it.
+     */
+    const bubbles = [...box.querySelectorAll('.hcard__peaklabel')].filter((e) => { const s = getComputedStyle(e); return s.visibility !== 'hidden' && s.display !== 'none' })
+    for (const el of box.querySelectorAll('svg .hcard__line, svg .hcard__rated')) {
+      let m = null
+      let len = 0
+      try {
+        m = el.getScreenCTM()
+        if (m === null || typeof el.getTotalLength !== 'function' || el.getClientRects().length === 0) continue
+        len = el.getTotalLength()
+      } catch {
+        continue
+      }
+      const n = Math.max(2, Math.min(240, Math.round(len / 2)))
+      for (const bub of bubbles) {
+        const r = bub.getBoundingClientRect()
+        for (let k = 0; k <= n; k += 1) {
+          const p = el.getPointAtLength((len * k) / n)
+          const x = m.a * p.x + m.c * p.y + m.e
+          const y = m.b * p.x + m.d * p.y + m.f
+          if (x > r.left + 1 && x < r.right - 1 && y > r.top + 1 && y < r.bottom - 1) {
+            hits.push(card + ': "' + bub.textContent.trim() + '" on its ' + ((el.getAttribute('class') ?? '').split(' ').pop() ?? 'line'))
+            break
+          }
+        }
+      }
+    }
   }
   return { scrolls, below, hits, cards: today.querySelectorAll('.hcard, .hwh__tile').length, vh: innerHeight }
 })())`
