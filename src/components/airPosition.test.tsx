@@ -171,7 +171,8 @@ describe('the pilot separation is shown', () => {
 
   it('asks for a pilot position rather than showing a blank, when there is none', () => {
     const html = card(null)
-    expect(html).toContain('Place the pilot position')
+    /* Batch LIVE, Section 5.1: one button for the pilot. */
+    expect(html).toContain('Set where you stand')
     expect(html).not.toContain('Pilot to aircraft')
   })
 
@@ -427,6 +428,9 @@ describe('a drone position looks at the subject from its own side', () => {
         onPlacePilot={() => {}}
       />,
     )
-    expect(html).toContain('no venue pin to aim a ground view at')
+    /* Batch LIVE, Section 5.1: no Street View for a drone position at all; its light row stays. */
+    expect(html).not.toContain('ground view')
+    expect(html).not.toContain('<img')
+    expect(html).toContain('frame__light')
   })
 })

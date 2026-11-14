@@ -23,7 +23,8 @@ export function scanContextAt(lat: number, lon: number): Promise<ScanContext | n
   const id = areaFor(lat, lon).id
   let hit = contexts.get(id)
   if (hit === undefined) {
-    hit = loadScan(id).then((s) => (s === null ? null : scanContext(s)))
+    /* Batch LIVE, Section 5.2: a read that fails is no scan, never a promise the 3D view waits on forever. */
+    hit = loadScan(id).then((s) => (s === null ? null : scanContext(s))).catch(() => null)
     contexts.set(id, hit)
   }
   return hit

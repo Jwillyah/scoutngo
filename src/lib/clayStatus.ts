@@ -12,6 +12,9 @@ export type ClayStatus =
   | { kind: 'view-loading' }
   | { kind: 'map-loading' }
 
+/** Batch LIVE, Section 5.2: the 3D view not shown this long after it was asked: "3D didn't load · Back to 2D". */
+export const CLAY_LOAD_MS = 10_000
+
 export function clayStatus(failed: string | null, shown: boolean, place: PlaceState): ClayStatus | null {
   if (failed !== null) return { kind: 'broken', why: failed }
   if (place.status === 'failed') return { kind: 'map-failed' }

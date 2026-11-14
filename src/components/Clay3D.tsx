@@ -1,4 +1,6 @@
-import { clayStatus, type ClayStatus } from '../lib/clayStatus.ts'
+import { CLAY_LOAD_MS, clayStatus, type ClayStatus } from '../lib/clayStatus.ts'
+/* The longest the 3D view waits for a kept scan before it builds without one (Batch LIVE, Section 5.2). */
+const SCAN_WAIT_MS = 4000
 import { Component, Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { logTouch, useTouchDebug } from '../lib/touchDebug.ts'
 import { airspaceAt, type AirspaceShape } from '../core/airspaceLookup.ts'
@@ -61,6 +63,8 @@ interface Clay3DProps {
   pins: readonly Pin[]
   stand: StandRequest | null
   onLeaveStand: () => void
+  /** Batch LIVE, Section 5.2: back to the 2D map, offered when the 3D view has not shown in CLAY_LOAD_MS. */
+  onBack2D?: () => void
   /** A Preflight move to fly (src/lib/preflight/play.ts), or null. */
   flight?: FlightPlay | null
   /** The time bar follows the move. */
@@ -144,7 +148,7 @@ export function Clay3D(props: Clay3DProps) {
   )
 }
 
-function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonShown = false, pins, stand, onLeaveStand, flight = null, onFlightTime, onRecorded, onRenderProgress, fly = null, onLanded, sea = null, onCompare, onCrash }: Clay3DProps) {
+function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonShown = false, pins, stand, onLeaveStand, onBack2D, flight = null, onFlightTime, onRecorded, onRenderProgress, fly = null, onLanded, sea = null, onCompare, onCrash }: Clay3DProps) {
   const host = useRef<HTMLDivElement>(null)
   const scene = useRef<ClayScene | null>(null)
   /* How many times the scene has been built: every build (a scan arriving rebuilds it) re-runs the effects that feed it. 0 is not built yet. */
@@ -197,9 +201,14 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
   }, [])
   useEffect(() => {
     let live = true
-    void scanContextAt(venue.lat, venue.lon).then((c) => {
-      if (live) setScanLoaded({ key: scanKey, ctx: c })
-    })
+    /* Batch LIVE, Section 5.2: the kept scan is waited on SCAN_WAIT_MS at most; then the scene is built without it. */
+    const fallback = setTimeout(() => live && setScanLoaded((cur) => (cur !== null && cur.key === scanKey ? cur : { key: scanKey, ctx: null })), SCAN_WAIT_MS)
+    void scanContextAt(venue.lat, venue.lon)
+      .catch(() => null)
+      .then((c) => {
+        clearTimeout(fallback)
+        if (live) setScanLoaded({ key: scanKey, ctx: c })
+      })
     /* The place's buildings are fetched again so they carry the new heights (fetchBuildings applies the scan). */
     if (scanVersion > 0) void loadPlace(venue, { refresh: true })
     return () => {
@@ -485,6 +494,14 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
   }, [ready, stand])
 
   const pill = clayStatus(failed, shown, place)
+  /* Batch LIVE, Section 5.2: never a blank map: not shown in CLAY_LOAD_MS, say so and offer the 2D map. */
+  const [late, setLate] = useState(false)
+  useEffect(() => {
+    setLate(false)
+    if (shown) return
+    const t = setTimeout(() => setLate(true), CLAY_LOAD_MS)
+    return () => clearTimeout(t)
+  }, [shown, venue.lat, venue.lon, build])
   const unknown = place.buildings?.list.filter((b) => b.height.metres === null).length ?? 0
 
   const box =
@@ -495,6 +512,16 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
   return (
     <div className={`${shown ? 'clay clay--shown' : 'clay clay--waiting'}${flying ? ' clay--flying' : ''}`}>
       <div ref={host} className="clay__canvas" />
+      {late && !shown && failed === null ? (
+        <div className="clay__error" role="alert" data-clay-late>
+          <p className="clay__errtitle">3D didn&rsquo;t load</p>
+          {onBack2D === undefined ? null : (
+            <button type="button" className="btn btn--primary btn--small" onClick={onBack2D}>
+              Back to 2D
+            </button>
+          )}
+        </div>
+      ) : null}
       {trouble === null ? null : trouble.kind === 'lost' ? (
         <div className="clay__error" role="status">
           <p className="clay__errtitle">Rebuilding the 3D view…</p>

@@ -18255,6 +18255,8 @@ a.about__row * {
   gap: 8px;
   padding: 8px 16px 0;
   overflow-y: auto;
+  /* Batch LIVE (14 Nov, the overflow audit from about 5 PM on the code that passed at 4:25): 4 px of scroll width no box reaches made every page scroll sideways; a page's body never does. Anything running past the edge is still caught (scripts/audit-overflow.mjs "runs past"). */
+  overflow-x: hidden;
 }
 .dpage__foot {
   display: flex;

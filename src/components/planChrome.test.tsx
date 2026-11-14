@@ -140,10 +140,10 @@ describe('PositionCard', () => {
     expect(html).toContain(`frame__light--${classificationOf(plan[0].read)}`)
   })
 
-  /* Focal length, range in feet, tide with a direction. Nothing else. */
-  it('leads with exactly three numbers', () => {
+  /* Batch LIVE, Section 5.1: the light, then focal length, range in feet, tide with a direction (height on a drone). */
+  it('leads with the light and three numbers', () => {
     const labels = [...html.matchAll(/class="three__label">([^<]+)</g)].map((m) => m[1])
-    expect(labels).toEqual(['Lens', 'Range', 'Tide'])
+    expect(labels).toEqual(['Light', 'Lens', 'Range', 'Tide'])
     expect(html).toContain('400mm')
     expect(html).toContain('↑')
   })
@@ -175,7 +175,7 @@ describe('PositionCard', () => {
       />,
     )
     const labels = [...dry.matchAll(/class="three__label">([^<]+)</g)].map((m) => m[1])
-    expect(labels).toEqual(['Lens', 'Range'])
+    expect(labels).toEqual(['Light', 'Lens', 'Range'])
     expect(dry).toContain('three--pair')
   })
 
@@ -262,8 +262,9 @@ describe('isolating one position', () => {
   })
 
   it('says which state it is in, rather than only looking different', () => {
-    expect(card(false)).toContain('aria-pressed="false"')
-    expect(card(true)).toContain('aria-pressed="true"')
+    /* Batch LIVE, Section 5.1: a menu item now, its state said by aria-checked. */
+    expect(card(false)).toContain('aria-checked="false"')
+    expect(card(true)).toContain('aria-checked="true"')
   })
 
   /*
@@ -283,7 +284,7 @@ describe('isolating one position', () => {
   it('still offers an enabled control while isolated', () => {
     const on = card(true)
     expect(on).toContain('Only this')
-    const button = on.slice(on.indexOf('aria-pressed="true"'))
+    const button = on.slice(on.indexOf('aria-checked="true"'))
     expect(button.slice(0, button.indexOf('</button>'))).not.toContain('disabled')
   })
 })

@@ -32,6 +32,7 @@ import {
   imageryYearsOld,
 } from '../core/imageryAge.ts'
 import { lightLine } from '../lib/lightCopy.ts'
+import '../styles/position-card.css'
 import { focalOn, opticsFor, type OpticSelection } from '../core/optics.ts'
 import { frameLine, wideFrameLine } from '../lib/framingCopy.ts'
 import { blockedLine, blockerLine } from '../lib/sightlineCopy.ts'
@@ -120,8 +121,8 @@ const pct = (n: number | null) => (n === null ? '–' : String(Math.round(n)))
  * that constant; the other three were consolidated into reachScale.ts and this
  * one was missed because it is in a component rather than in core.
  */
-const distance = (metres: number) =>
-  `${Math.round(metres)}m · ${Math.round(metersToFeet(metres))}ft`
+/* Batch LIVE, Section 5.1: feet everywhere. */
+const distance = (metres: number) => `${Math.round(metersToFeet(metres)).toLocaleString('en-US')} ft`
 
 const feet = (metres: number) => Math.round(metersToFeet(metres)).toLocaleString('en-US')
 
@@ -281,6 +282,15 @@ function PhotoSlot({
    * whole picture slot standing empty around one sentence. Without a picture
    * the slot is one line, with Retry where asking again could help.
    */
+  /* Batch LIVE, Section 5.1: no Street View for a drone position (a ground photo is not its view); its light row stays. */
+  if (air) {
+    return (
+      <div className="frame frame--line">
+        <span className="frame__num num">{planned.position.number}</span>
+        {lightRow}
+      </div>
+    )
+  }
   const slim = groundLine(view, air, borrowed)
   if (slim !== null) {
     return (
@@ -597,6 +607,7 @@ export function PositionCard({
       : pilotSeparation(pilotAt, position.at, position.altitudeFeet)
   const pilotAcross = separation === null ? null : formatReach(separation.horizontalMeters)
   const pilotSlant = separation === null ? null : formatReach(separation.slantMeters)
+  const lightWord = lightLine(read).word
 
   return (
     <aside
@@ -841,10 +852,16 @@ export function PositionCard({
             * either way, which is a field limit and says so.
             */}
           {position.platform !== 'air' ? null : (
-            <p className="card__air-note">
-              Part 107 sets the altitude limit at {FAA_CEILING_FEET} ft above ground level.
-              The field stops there.
-            </p>
+            /* Batch LIVE, Section 5.1: explanations behind "i". */
+            <details className="cardinfo">
+              <summary className="cardinfo__i" aria-label="About the altitude limit">
+                i
+              </summary>
+              <p className="card__air-note">
+                Part 107 sets the altitude limit at {FAA_CEILING_FEET} ft above ground level.
+                The field stops there.
+              </p>
+            </details>
           )}
 
           {/*
@@ -863,10 +880,10 @@ export function PositionCard({
             pilotAcross === null ||
             pilotSlant === null ? (
             <p className="card__air-note">
-              <button type="button" className="card__air-place" onClick={onPlacePilot}>
-                Place the pilot position
-              </button>{' '}
-              to measure the distance from it.
+              {/* Batch LIVE, Section 5.1: one button for the pilot's position. */}
+              <button type="button" className="btn btn--small card__air-place" onClick={onPlacePilot}>
+                Set where you stand
+              </button>
             </p>
           ) : (
             <div className="card__pilot">
@@ -874,15 +891,16 @@ export function PositionCard({
                 <div className="card__pilot-cell">
                   <dt>Pilot, across ground</dt>
                   <dd>
-                    <span className="num">{pilotAcross.metric}</span>
-                    <span className="card__pilot-alt num">{pilotAcross.imperial}</span>
+                    {/* Batch LIVE, Section 5.1: feet first. */}
+                    <span className="num">{pilotAcross.imperial}</span>
+                    <span className="card__pilot-alt num">{pilotAcross.metric}</span>
                   </dd>
                 </div>
                 <div className="card__pilot-cell">
                   <dt>Pilot to aircraft</dt>
                   <dd>
-                    <span className="num">{pilotSlant.metric}</span>
-                    <span className="card__pilot-alt num">{pilotSlant.imperial}</span>
+                    <span className="num">{pilotSlant.imperial}</span>
+                    <span className="card__pilot-alt num">{pilotSlant.metric}</span>
                   </dd>
                 </div>
               </dl>
@@ -905,7 +923,21 @@ export function PositionCard({
         * app can see, and the shooter is the one who will be standing there.
         * Computed in src/core/tide.ts from NOAA predictions; never from a model.
         */}
+      {/* Batch LIVE, Section 5.1: one simple row: light · lens · height · range · tide. */}
       <dl className={`three${tide === null ? ' three--pair' : ''}`}>
+        <div className="three__cell">
+          <dt className="three__label">Light</dt>
+          <dd className="three__value" data-pos-light>{lightWord}</dd>
+        </div>
+        {!usesAltitude(position.platform, position.shotType) ? null : (
+          <div className="three__cell">
+            <dt className="three__label">Height</dt>
+            <dd className="three__value num">
+              {position.altitudeFeet}
+              <span className="three__unit">ft</span>
+            </dd>
+          </div>
+        )}
         <div className="three__cell">
           <dt className="three__label">Lens</dt>
           <dd className="three__value num">{position.focalLength}mm</dd>
@@ -949,76 +981,34 @@ export function PositionCard({
         * id, which is how you compare two focal lengths from one place without
         * throwing the first away.
         */}
-      <div className="cardacts">
-        {/*
-          * THE ARROWS SAY WHAT THEY DO.
-          *
-          * They were a bare up and a bare down. "They reorder positions and
-          * nothing says so." An arrow on a card can mean half a dozen things
-          * and a screen reader was the only thing being told which: the
-          * aria-labels were right and nobody holding the phone could see them.
-          *
-          * The word is ORDER, which is what the number on the disc is. The
-          * arrows keep their shape because the shape is what says which way,
-          * and the label stops them being a guess.
-          */}
-        <span className="cardacts__order">
-          <span className="cardacts__order-label">Order</span>
-          <button
-            type="button"
-            className="cardacts__btn"
-            onClick={() => onMove(position.id, -1)}
-            disabled={position.number <= 1}
-            aria-label="Move earlier in the order"
-          >
-            ↑
+      {/* Batch LIVE, Section 5.1: the actions behind "…", normal-case words, never a row running off the card. */}
+      <details className="cardmenu">
+        <summary className="cardmenu__btn" aria-label="Position actions">
+          …
+        </summary>
+        <div className="cardmenu__list" role="menu">
+          <button type="button" role="menuitem" className="cardmenu__item" onClick={() => onMove(position.id, -1)} disabled={position.number <= 1}>
+            Earlier in the order ({position.number}/{count})
           </button>
-          <span className="cardacts__order-n num">
-            {position.number}/{count}
-          </span>
-          <button
-            type="button"
-            className="cardacts__btn"
-            onClick={() => onMove(position.id, 1)}
-            disabled={position.number >= count}
-            aria-label="Move later in the order"
-          >
-            ↓
+          <button type="button" role="menuitem" className="cardmenu__item" onClick={() => onMove(position.id, 1)} disabled={position.number >= count}>
+            Later in the order
           </button>
-        </span>
-        {/*
-          * ISOLATE: one cone filled, the others outlined rather than hidden.
-          * Seeing what this position covers THAT THE OTHERS DO NOT is the
-          * question people have when they ask for one cone.
-          */}
-        {onStandHere === undefined ? null : (
-          <button type="button" className="cardacts__btn cardacts__btn--wide" onClick={onStandHere}>
-            Stand here
+          {onStandHere === undefined ? null : (
+            <button type="button" role="menuitem" className="cardmenu__item" onClick={onStandHere}>
+              Stand here
+            </button>
+          )}
+          <button type="button" role="menuitemcheckbox" aria-checked={isolated} className="cardmenu__item" onClick={() => onIsolate(isolated ? null : position.id)}>
+            Only this
           </button>
-        )}
-        <button
-          type="button"
-          className={`cardacts__btn${isolated ? ' cardacts__btn--on' : ''}`}
-          aria-pressed={isolated}
-          onClick={() => onIsolate(isolated ? null : position.id)}
-        >
-          Only this
-        </button>
-        <button
-          type="button"
-          className="cardacts__btn cardacts__btn--wide"
-          onClick={() => onDuplicate(position.id)}
-        >
-          Duplicate
-        </button>
-        <button
-          type="button"
-          className="cardacts__btn cardacts__btn--danger"
-          onClick={() => onDelete(position.id)}
-        >
-          Delete
-        </button>
-      </div>
+          <button type="button" role="menuitem" className="cardmenu__item" onClick={() => onDuplicate(position.id)}>
+            Duplicate
+          </button>
+          <button type="button" role="menuitem" className="cardmenu__item cardmenu__item--danger" onClick={() => onDelete(position.id)}>
+            Delete
+          </button>
+        </div>
+      </details>
 
       {/*
         * EVERYTHING ELSE, CLOSED. Not deleted, not hidden: one tap away, in the
@@ -1036,7 +1026,7 @@ export function PositionCard({
             </div>
             <div className="card__stat">
               <dt>Usable to</dt>
-              <dd className="num">{Math.round(standoff.maxMeters)}m</dd>
+              <dd className="num">{feet(standoff.maxMeters)} ft</dd>
             </div>
             {/*
               * CAMERA BEARING AND SUN DELTA ONLY EXIST FOR A FRAMED SHOT.

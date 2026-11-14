@@ -209,7 +209,8 @@ for (const run of MODES) {
    */
   const computed = {
     light: /(Front-lit|Backlit|Side-lit|Sidelit|Back-lit)/i.exec(card ?? '')?.[1] ?? null,
-    frame: /Frame width\s*([\d.]+\s*m)/.exec(card ?? '')?.[1] ?? null,
+    /* Batch LIVE, Section 5.1: feet everywhere, so the frame width is said in ft. */
+    frame: /Frame width\s*([\d.,]+\s*(m|ft))/.exec(card ?? '')?.[1] ?? null,
     range: /Range\s*([\d.]+\s*(m|ft))/.exec(card ?? '')?.[1] ?? null,
   }
   console.log(`  position card: ${JSON.stringify(computed)}`)

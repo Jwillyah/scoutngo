@@ -1,0 +1,98 @@
+/*
+ * ONE SIMPLE CARD PER POSITION (Batch LIVE, Section 5.1; 14 Nov the card ran
+ * off the right edge at 390 px). One row of numbers that wraps, the actions
+ * behind "…", the explanations behind "i", button words in normal case.
+ */
+aside.card {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+aside.card .three {
+  grid-template-columns: repeat(auto-fit, minmax(4.5em, 1fr));
+}
+aside.card .three__value {
+  overflow-wrap: anywhere;
+}
+aside.card button,
+aside.card .btn {
+  text-transform: none;
+  letter-spacing: normal;
+}
+aside.card .card__air-place {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--black);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+.cardmenu {
+  position: relative;
+  margin: var(--space-2) var(--space-3) 0;
+}
+.cardmenu__btn {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: var(--line-hair) solid var(--color-line);
+  background: var(--panel-sheen-2);
+  color: var(--color-text);
+  font-size: 20px;
+  line-height: 1;
+  list-style: none;
+  cursor: pointer;
+}
+.cardmenu__btn::-webkit-details-marker {
+  display: none;
+}
+.cardmenu__list {
+  display: flex;
+  flex-direction: column;
+  margin-top: 6px;
+  border: var(--line-hair) solid var(--color-line);
+  border-radius: 14px;
+  background: var(--d-card-solid);
+  overflow: hidden;
+}
+.cardmenu__item {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-top: var(--line-hair) solid var(--color-line);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+}
+.cardmenu__item:first-child {
+  border-top: 0;
+}
+.cardmenu__item:disabled {
+  opacity: 0.4;
+}
+.cardmenu__item--danger {
+  font-weight: 700;
+}
+.cardinfo {
+  display: inline-block;
+}
+.cardinfo__i {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: var(--line-hair) solid var(--color-line);
+  font-style: italic;
+  font-weight: 700;
+  list-style: none;
+  cursor: pointer;
+}
+.cardinfo__i::-webkit-details-marker {
+  display: none;
+}

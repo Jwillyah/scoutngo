@@ -2787,6 +2787,13 @@ export function PlanMode({
             pins={threeDPins}
             stand={stand}
             onLeaveStand={() => setStand(null)}
+            onBack2D={() => {
+              /* Batch LIVE, Section 5.2: "3D didn't load · Back to 2D". */
+              logTouch('3D: not shown in 10 s, back to 2D')
+              setFlySession(null)
+              setStand(null)
+              setThreeD(false)
+            }}
             onCompare={() => setCompareOpen(true)}
             flight={flightPlay}
             sea={cinema}

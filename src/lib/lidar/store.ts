@@ -35,13 +35,34 @@ export interface StoredScan {
 const DB = 'scoutngo-lidar'
 const STORE = 'scans'
 
+/*
+ * NEVER WAIT ON THE STORE FOREVER (Batch LIVE, Section 5.2; 14 Nov the 3D
+ * view stood at "Loading the 3D view…" on an iPhone). The scene is built
+ * only once the kept scan is read (src/components/Clay3D.tsx), and WebKit's
+ * IndexedDB can leave an open with no answer at all, or throw from a
+ * transaction: the read never came back and the scene was never built. An
+ * open with no answer in IDB_OPEN_MS, a blocked open, or a throw is "no
+ * scan kept".
+ */
+export const IDB_OPEN_MS = 3000
+
 function open(): Promise<IDBDatabase | null> {
   if (typeof indexedDB === 'undefined') return Promise.resolve(null)
   return new Promise((resolve) => {
-    const req = indexedDB.open(DB, 1)
-    req.onupgradeneeded = () => req.result.createObjectStore(STORE, { keyPath: 'id' })
-    req.onsuccess = () => resolve(req.result)
-    req.onerror = () => resolve(null)
+    const timer = setTimeout(() => resolve(null), IDB_OPEN_MS)
+    const done = (v: IDBDatabase | null) => {
+      clearTimeout(timer)
+      resolve(v)
+    }
+    try {
+      const req = indexedDB.open(DB, 1)
+      req.onupgradeneeded = () => req.result.createObjectStore(STORE, { keyPath: 'id' })
+      req.onsuccess = () => done(req.result)
+      req.onerror = () => done(null)
+      req.onblocked = () => done(null)
+    } catch {
+      done(null)
+    }
   })
 }
 
@@ -67,9 +88,13 @@ export async function loadScan(id: string): Promise<StoredScan | null> {
   const db = await open()
   if (db === null) return null
   return new Promise((resolve) => {
-    const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(id)
-    req.onsuccess = () => resolve((req.result as StoredScan | undefined) ?? null)
-    req.onerror = () => resolve(null)
+    try {
+      const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(id)
+      req.onsuccess = () => resolve((req.result as StoredScan | undefined) ?? null)
+      req.onerror = () => resolve(null)
+    } catch {
+      resolve(null)
+    }
   })
 }
 
