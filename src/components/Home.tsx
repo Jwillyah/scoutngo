@@ -36,6 +36,8 @@ import { OPEN_RADAR_EVENT } from '../lib/pageEvents.ts'
 import { SkyIconSvg } from './SkyIconSvg.tsx'
 import { HomeHours } from './HomeHours.tsx'
 import { fitChartLabels } from '../lib/chartLabelsDom.ts'
+import { LiveSkyDraw } from './LiveSky.tsx'
+import { useLiveSky } from '../lib/useLiveSky.ts'
 
 /*
  * THE HOME (Batch M, Section 3; boards "HOME 8 Nov · surfer / shooter").
@@ -156,11 +158,17 @@ export function Home({ venue, placeName, timeZone, units, drone, now, onClose, o
     onOpenMap()
   }
   const primary = play.inPlay ? 'radar' : primaryFor(order)
-  const sky = skyOf(brief, now, venue, play.inPlay)
+  /* Batch LIVE, Section 7: the live sky, from the sky word's own state (the station's report when fresh); its ground is the page's gradient. */
+  const wxNow = (n: string) => (brief.wx === null ? null : hourlyAt(brief.wx, n, now))
+  const liveCover = { low: wxNow('cloud_cover_low'), mid: wxNow('cloud_cover_mid'), high: wxNow('cloud_cover_high') }
+  const liveWord = skyCondition({ code: wxNow('weather_code'), layers: liveCover, day: getPosition(now, venue.lat, venue.lon).altitude > -0.8, station: freshSky(stationObs, now) })?.word ?? null
+  const live = useLiveSky('home', venue, now, wxNow('weather_code'), liveCover, liveWord)
+  const sky = play.inPlay || live === null ? skyOf(brief, now, venue, play.inPlay) : live.ground
   const refreshing = refreshLine(brief.checkedAt, useWeatherRefreshing(), (d) => formatClock(d, timeZone))
 
   return (
     <div className={`home home--${sky}`} role="dialog" aria-label="Home">
+      {live === null || play.inPlay ? null : <LiveSkyDraw sky={live} />}
       {/* Batch Flow, Section 3 (boards D_Home6, D_Home2): the spot ⌄ centred; Today · Tomorrow · Week are swiped, three dots under it. */}
       <div className="home__top home__top--d">
         <button type="button" className="home__spot" onClick={onSwitchSpot} disabled={onSwitchSpot === undefined} aria-label={`${placeName}: switch spot`}>

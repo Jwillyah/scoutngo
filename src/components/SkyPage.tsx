@@ -10,6 +10,8 @@ import type { Special } from '../core/specialLight.ts'
 import { formatClock } from '../core/timezone.ts'
 import { fetchGlassWeek, fetchSpecialWeek, specialsFrom } from '../lib/specialLightData.ts'
 import { hourlyAt } from '../lib/tideSheetData.ts'
+import { LiveSkyDraw } from './LiveSky.tsx'
+import { useLiveSky } from '../lib/useLiveSky.ts'
 import { useBriefing } from '../lib/useBriefing.ts'
 import { useStationNow } from '../lib/useStationNow.ts'
 import { layersWords } from '../core/metar.ts'
@@ -129,7 +131,10 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
     const iso = (x: Date) => new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(x)
     return iso(d) === iso(now) ? 'Today' : new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'short' }).format(d)
   }
-  const ground = groundOf(getPosition(now, venue.lat, venue.lon).altitude, brief.wx === null ? null : hourlyAt(brief.wx, 'weather_code', now), false)
+  const wxAt = (n: string) => (brief.wx === null ? null : hourlyAt(brief.wx, n, now))
+  /* Batch LIVE, Section 7: the live sky here only with Settings › Live sky on everywhere. */
+  const live = useLiveSky('sky', venue, now, wxAt('weather_code'), { low: wxAt('cloud_cover_low'), mid: wxAt('cloud_cover_mid'), high: wxAt('cloud_cover_high') }, station === null ? null : stationWord(station.sky))
+  const ground = live?.ground ?? groundOf(getPosition(now, venue.lat, venue.lon).altitude, wxAt('weather_code'), false)
 
   const how = (
     <>
@@ -146,6 +151,7 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
       title="Sky"
       sub={`${placeName} · ${tab === 'now' || event === null ? 'now' : dayWordOf(kind).toLowerCase()}`}
       ground={ground}
+      backdrop={live === null ? null : <LiveSkyDraw sky={live} />}
       onBack={onBack}
       onMap={onMap}
       how={how}

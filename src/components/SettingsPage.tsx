@@ -17,6 +17,7 @@ import { useTouchDebug } from '../lib/touchDebug.ts'
 import { formatWind, type Units } from '../lib/units.ts'
 import { deletePack, loadPacks, onPacksChanged, packBytes, type VenuePack } from '../lib/venuePack.ts'
 import { useNearMeSetting } from '../lib/nearMe.ts'
+import { useLiveSkySetting } from '../lib/liveSkySetting.ts'
 import { weatherSent } from '../lib/weatherStore.ts'
 import { API_KEY_SAY, ApiKeyField } from './ApiKeyField.tsx'
 import { ActivityIcon } from './ActivityIcon.tsx'
@@ -159,6 +160,7 @@ export function SettingsPage(props: Props) {
   const [more, setMore] = useState(false)
   const [debug, setDebug] = useState(false)
   const [nearMe, setNearMe] = useNearMeSetting()
+  const [liveSky, setLiveSky] = useLiveSkySetting()
   const [feed, setFeed] = useCalendarFeed()
   const [feedHow, setFeedHow] = useState(false)
   const feedHref = feedAddress(props.feedPlace)
@@ -239,6 +241,20 @@ export function SettingsPage(props: Props) {
           </>
         )}
         <Row label="Special light near me" sub="fog, rainbows, color within 25 mi" end={<Toggle on={nearMe} label="Special light near me" onChange={setNearMe} />} />
+        {/* Batch LIVE, Section 7.4: the sky at the spot behind the page; the home only until it is approved everywhere. */}
+        <Row
+          label="Live sky"
+          sub="The sky at your spot, drawn behind the page"
+          end={
+            <span className="ui-seg set2__seg" role="radiogroup" aria-label="Live sky">
+              {(['home', 'all', 'off'] as const).map((w) => (
+                <button key={w} type="button" role="radio" aria-checked={liveSky === w} className={`ui-seg__opt${liveSky === w ? ' ui-seg__opt--on' : ''}`} onClick={() => setLiveSky(w)}>
+                  {w === 'home' ? 'Home' : w === 'all' ? 'All' : 'Off'}
+                </button>
+              ))}
+            </span>
+          }
+        />
       </Group>
 
       <Group title="My data · on this phone only">

@@ -20,6 +20,8 @@ import { MarineLine } from './MarineLine.tsx'
 import { RadarStrip } from './RadarStrip.tsx'
 import { SkyGlyph } from './SkyGlyph.tsx'
 import { SkyIconSvg } from './SkyIconSvg.tsx'
+import { LiveSkyDraw } from './LiveSky.tsx'
+import { useLiveSky } from '../lib/useLiveSky.ts'
 import { DaysPage, ModelsPage } from './WeatherPages.tsx'
 
 /*
@@ -136,7 +138,9 @@ export function WeatherPage({ venue, placeName, timeZone, units, now, onBack, on
   const lo = Math.min(...lows)
   const hi = Math.max(...highs)
   const x = (v: number) => `${(((v - lo) / Math.max(1, hi - lo)) * 100).toFixed(1)}%`
-  const ground = groundOf(getPosition(now, venue.lat, venue.lon).altitude, at(wx, 'weather_code', now), false)
+  /* Batch LIVE, Section 7: the live sky here only with Settings › Live sky on everywhere. */
+  const live = useLiveSky('weather', venue, now, at(wx, 'weather_code', now), { low: at(wx, 'cloud_cover_low', now), mid: at(wx, 'cloud_cover_mid', now), high: at(wx, 'cloud_cover_high', now) }, cond?.word ?? null)
+  const ground = live?.ground ?? groundOf(getPosition(now, venue.lat, venue.lon).altitude, at(wx, 'weather_code', now), false)
   const dist = imperial ? 'mi' : 'km'
   const alerts = nowcast?.alerts ?? []
 
@@ -157,6 +161,7 @@ export function WeatherPage({ venue, placeName, timeZone, units, now, onBack, on
       title="Weather"
       sub={`${placeName} · now`}
       ground={ground}
+      backdrop={live === null ? null : <LiveSkyDraw sky={live} />}
       onBack={onBack}
       onMap={onMap}
       inner={{ open: view !== 'main', close: () => setView('main') }}

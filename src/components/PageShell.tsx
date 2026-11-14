@@ -10,6 +10,8 @@ import { NetDebug } from './NetDebug.tsx'
  * over it, as on the detail pages.
  */
 interface PageShellProps {
+  /** Batch LIVE, Section 7: the live sky behind the page, when the setting has it here. */
+  backdrop?: ReactNode
   /** Its class: `wpage`, `spage`. */
   kind: string
   title: string
@@ -28,7 +30,7 @@ interface PageShellProps {
   children: ReactNode
 }
 
-export function PageShell({ kind, title, sub, ground, onBack, how, foot, inner, onMap, children }: PageShellProps) {
+export function PageShell({ kind, title, sub, ground, onBack, how, foot, inner, onMap, children, backdrop = null }: PageShellProps) {
   const [howOpen, setHowOpen] = useState(false)
   const [debug, setDebug] = useState(false)
   const back = () => {
@@ -45,6 +47,7 @@ export function PageShell({ kind, title, sub, ground, onBack, how, foot, inner, 
   })
   return createPortal(
     <div className={`dpage ppage ${kind} home--${ground}`} role="dialog" aria-label={title}>
+      {backdrop}
       <div className="ppage__top">
         <button type="button" className="dpage__back ppage__back" aria-label="Back" onClick={back}>
           <svg viewBox="0 0 24 24" aria-hidden="true">
