@@ -32,7 +32,8 @@ const THICK: Record<'low' | 'mid' | 'high', number> = { low: 700, mid: 900, high
 const SCALE: Record<'low' | 'mid' | 'high', number> = { low: 1100, mid: 2200, high: 3800 }
 
 export const CLOUD_NOISE_GLSL = /* glsl */ `
-float hash2(vec2 p) { return fract(sin(p.x * 127.1 + p.y * 311.7) * 43758.5453); }
+/* Batch LIVE, Section 6.5 (14 Nov: vertical banding, a tiled look on an iPhone): fract(sin(x) * 43758) loses its digits on Apple GPUs, whose sin of a large argument is low precision, and repeats in stripes; Hoskins' hash12 uses no sine. */
+float hash2(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
 float noise2(vec2 p) {
   vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
   float a = hash2(i), b = hash2(i + vec2(1.0, 0.0)), c = hash2(i + vec2(0.0, 1.0)), d = hash2(i + vec2(1.0, 1.0));

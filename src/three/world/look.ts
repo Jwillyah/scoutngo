@@ -81,14 +81,25 @@ void main() {
    * colour: sand, vegetation, roofs and paving, shade. The boundaries between
    * classes stay crisp; nothing is blurred over the picture.
    */
-  vec3 p = texture2D(map, vUv, 1.5).rgb;
+  /*
+   * Batch LIVE, Section 6.4 (14 Nov: posterised blotches, stair-step edges):
+   * the photo read sharper (mip bias 0.5, not 1.5), each class a soft weight
+   * (smoothstep) rather than an if/else cut, the tones blended by weight so
+   * a boundary is a short ramp, a softer palette, and a quarter of the photo
+   * kept under it so a field is never one flat blotch.
+   */
+  vec3 p = texture2D(map, vUv, 0.5).rgb;
   float lum = dot(p, vec3(0.299, 0.587, 0.114));
   float sat = max(p.r, max(p.g, p.b)) - min(p.r, min(p.g, p.b));
-  vec3 tone;
-  if (lum < 0.16) tone = vec3(0.30, 0.32, 0.36);
-  else if (p.g > p.r * 1.04 && p.g > p.b * 1.04 && sat > 0.04) tone = lum > 0.32 ? vec3(0.52, 0.68, 0.38) : vec3(0.33, 0.52, 0.30);
-  else if (p.r > p.b * 1.12 && lum > 0.38) tone = vec3(0.90, 0.82, 0.62);
-  else tone = lum > 0.45 ? vec3(0.80, 0.79, 0.76) : vec3(0.58, 0.58, 0.58);
+  float wShade = 1.0 - smoothstep(0.12, 0.22, lum);
+  float green = min(p.g - p.r * 1.04, p.g - p.b * 1.04);
+  float wVeg = smoothstep(-0.01, 0.03, green) * smoothstep(0.02, 0.08, sat) * (1.0 - wShade);
+  float wSand = smoothstep(0.0, 0.08, p.r - p.b * 1.12) * smoothstep(0.32, 0.44, lum) * (1.0 - wShade) * (1.0 - wVeg);
+  float wPave = max(0.0, 1.0 - wShade - wVeg - wSand);
+  vec3 veg = mix(vec3(0.36, 0.50, 0.34), vec3(0.54, 0.66, 0.44), smoothstep(0.26, 0.38, lum));
+  vec3 pave = mix(vec3(0.60, 0.60, 0.60), vec3(0.78, 0.77, 0.74), smoothstep(0.38, 0.52, lum));
+  vec3 tone = wShade * vec3(0.34, 0.36, 0.40) + wVeg * veg + wSand * vec3(0.86, 0.80, 0.66) + wPave * pave;
+  tone = mix(tone, p * 1.1, 0.25);
   /* Flat facets: the face's own normal from the screen derivatives. */
   vec3 n = normalize(cross(dFdx(vWorld), dFdy(vWorld)));
   if (n.y < 0.0) n = -n;

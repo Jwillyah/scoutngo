@@ -11,8 +11,21 @@
  */
 
 const fract = (x: number) => x - Math.floor(x)
-/* Hash and noise written so float32 GLSL and float64 JS land within a hair of each other. */
-export const hash2 = (x: number, y: number) => fract(Math.sin(x * 127.1 + y * 311.7) * 43758.5453)
+/*
+ * Hash and noise written as the GLSL (src/three/world/clouds.ts) does them.
+ * Batch LIVE, Section 6.5: Hoskins' hash12, no sine: fract(sin(x) * 43758)
+ * banded on Apple GPUs, whose sin of a large argument is low precision.
+ */
+export const hash2 = (x: number, y: number) => {
+  let a = fract(x * 0.1031)
+  let b = fract(y * 0.1031)
+  let c = fract(x * 0.1031)
+  const d = a * (b + 33.33) + b * (c + 33.33) + c * (a + 33.33)
+  a += d
+  b += d
+  c += d
+  return fract((a + b) * c)
+}
 
 export function noise2(x: number, y: number): number {
   const ix = Math.floor(x)

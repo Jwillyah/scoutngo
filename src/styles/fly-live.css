@@ -1,0 +1,38 @@
+/* Batch LIVE, Section 6 (the Fly screen). */
+/* 6.1: Land · Keep flying, one row, never wrapped or cut. */
+.fly__confirm {
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  padding: 4px;
+}
+.fly__confirm .fly__pill {
+  white-space: nowrap;
+}
+/* 6.3: "43 min" on one line. */
+.fly__batt {
+  white-space: nowrap;
+  flex: none;
+}
+/* 6.2: the airspace line under the HUD row, never over the controls; then an amber chip. */
+.fly__remind {
+  top: calc(var(--safe-top) + 64px);
+  max-width: calc(100% - 2 * var(--space-3) - 72px);
+  border: 0;
+  text-align: left;
+  font: inherit;
+  font-size: var(--text-xs);
+}
+.fly__airchip {
+  position: absolute;
+  top: calc(var(--safe-top) + 64px);
+  left: var(--space-3);
+  min-height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--caution);
+  color: var(--black);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 700;
+}

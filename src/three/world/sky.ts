@@ -54,7 +54,8 @@ float coverToward(vec3 r) {
   q.x /= cloudStretch;
   return clamp((fbm(q) - cloudThresh) * 6.0, 0.0, 1.0);
 }
-float hash(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 45.164))) * 43758.5453); }
+/* Batch LIVE, Section 6.5: no sine in the hash (Apple GPUs band it); Hoskins' hash13. */
+float hash(vec3 p) { vec3 p3 = fract(p * 0.1031); p3 += dot(p3, p3.zyx + 31.32); return fract((p3.x + p3.y) * p3.z); }
 void main() {
   vec3 d = normalize(vDir);
   float el = d.y;

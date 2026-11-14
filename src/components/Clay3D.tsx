@@ -429,7 +429,18 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
     if (!flying) setChosenLook(null)
   }, [flying])
   const low = hud !== null && hud.state.alt / 0.3048 < ANIMATED_BELOW_FT
-  const flyLook: Look = chosenLook ?? (low ? 'animated' : 'real')
+  /* Batch LIVE, Section 6.4: Real is the default while there is signal; Animated by itself below ANIMATED_BELOW_FT only offline. */
+  const [online, setOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine)
+  useEffect(() => {
+    const on = () => setOnline(navigator.onLine)
+    window.addEventListener('online', on)
+    window.addEventListener('offline', on)
+    return () => {
+      window.removeEventListener('online', on)
+      window.removeEventListener('offline', on)
+    }
+  }, [])
+  const flyLook: Look = chosenLook ?? (low && !online ? 'animated' : 'real')
   useEffect(() => {
     if (!ready) return
     scene.current?.setFlyLook(flying ? flyLook : null, flying ? sea : null)

@@ -1,3 +1,4 @@
+import '../styles/fly-live.css'
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { MODES, type FlyMode, type Sticks } from '../core/flyModel.ts'
 import type { Look } from '../three/world/inputs.ts'
@@ -168,12 +169,22 @@ interface FlyControlsProps {
 
 /** How long the turn-sideways hint stays before it goes by itself. */
 export const HINT_MS = 4000
+/** The airspace banner folds to a chip after this (Batch LIVE, Section 6.2). */
+export const AIR_CHIP_MS = 5000
 
 export function FlyControls({ onSticks, mode, onMode, hud, ceilingFt, warning = null, ladder = null, flightMinutes, wind, exposure, bars, units, look, lookAuto, onLook, chase = false, onChase, credits = [], onExit }: FlyControlsProps) {
   const s = hud?.state
   const used = hud === null ? 0 : hud.t / 60
   const [confirm, setConfirm] = useState(false)
   const [info, setInfo] = useState(false)
+  /* Batch LIVE, Section 6.2: the airspace line open for AIR_CHIP_MS, then a chip. */
+  const [warningOpen, setWarningOpen] = useState(true)
+  const warnLine = warning?.line ?? null
+  useEffect(() => {
+    if (warnLine === null || !warningOpen) return
+    const t = window.setTimeout(() => setWarningOpen(false), AIR_CHIP_MS)
+    return () => window.clearTimeout(t)
+  }, [warnLine, warningOpen])
   /* Landscape is the way to hold it; say so once, in portrait, and let it go. */
   const [portrait, setPortrait] = useState(() => typeof window !== 'undefined' && window.innerHeight > window.innerWidth)
   const [hintGone, setHintGone] = useState(false)
@@ -213,8 +224,8 @@ export function FlyControls({ onSticks, mode, onMode, hud, ceilingFt, warning = 
     <div className={`fly${hud?.hidden === true ? ' fly--hidden' : ''}${portrait ? ' fly--portrait' : ''}`}>
       <div className="fly__top">
         {confirm ? (
+          /* Batch LIVE, Section 6.1: one row, Land · Keep flying; the question is the group's label, not a line that wraps and clips. */
           <div className="fly__confirm" role="group" aria-label="Land and keep this flight?">
-            <span>Land and keep this flight?</span>
             <button type="button" className="fly__pill fly__pill--on" onClick={onExit}>
               Land
             </button>
@@ -263,7 +274,7 @@ export function FlyControls({ onSticks, mode, onMode, hud, ceilingFt, warning = 
               ))}
             </span>
           )}
-          <p>{lookAuto ? `The look turns Animated below 150 ft by itself, where the photo is stretched and soft; tap Real or Animated to choose.` : 'You chose the look; it stays until you land.'}</p>
+          <p>{lookAuto ? `Real while there is signal; with none, the look turns Animated below 150 ft by itself. Tap Real or Animated to choose.` : 'You chose the look; it stays until you land.'}</p>
           {exposure === null ? null : <p>Exposure from your ND table: {exposure}.</p>}
           <p>
             No height cap in practice: the ladder marks 400 ft (Part 107) and the facility map's grid ceiling where you are; your approved ceiling is{' '}
@@ -281,7 +292,16 @@ export function FlyControls({ onSticks, mode, onMode, hud, ceilingFt, warning = 
           Turn sideways to fly. Portrait works too.
         </button>
       ) : warning !== null ? (
-        <p className="fly__remind">{warning.line}</p>
+        /* Batch LIVE, Section 6.2: under the HUD row, never over the controls; after AIR_CHIP_MS an amber chip, a tap opens it again. */
+        warningOpen ? (
+          <button type="button" className="fly__remind" data-air-banner onClick={() => setWarningOpen(false)}>
+            {warning.line}
+          </button>
+        ) : (
+          <button type="button" className="fly__airchip" data-air-chip aria-label={`Airspace: ${warning.line}`} onClick={() => setWarningOpen(true)}>
+            Airspace
+          </button>
+        )
       ) : null}
       {ladder === null ? null : <Ladder altFt={ladder.altFt} marks={ladder.marks} unit={units.length} />}
 
