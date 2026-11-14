@@ -28,15 +28,17 @@ export const MAX_MARKS = 2
 
 const KT = 1.943844
 
-/** A day's kinds, in order of importance; none past the forecast. */
+/** The kinds that need a forecast (Batch LIVE, Section 3.1: only within the week; dimmed with "?" from day 4). */
+export const FORECAST_CATS: readonly CalCat[] = ['surf', 'sky', 'glassy']
+
+/** A day's kinds, in order of importance: the forecast ones only on forecast days, the moon and the tide any day. */
 export function dayCats(d: CalendarDay): CalCat[] {
-  if (!d.forecast) return []
   const w = d.facts.windAtSunrise
   const has: Record<CalCat, boolean> = {
-    surf: d.marks.includes('surf'),
-    sky: d.marks.includes('colour-rise') || d.marks.includes('colour-set'),
-    glassy: w !== null && w.speedMps * KT <= GLASSY_KT,
-    tide: d.facts.lowNearSunrise !== null || d.facts.lowNearSunset !== null,
+    surf: d.forecast && d.marks.includes('surf'),
+    sky: d.forecast && (d.marks.includes('colour-rise') || d.marks.includes('colour-set')),
+    glassy: d.forecast && w !== null && w.speedMps * KT <= GLASSY_KT,
+    tide: !d.past && (d.facts.lowNearSunrise !== null || d.facts.lowNearSunset !== null),
     moon: d.moon.named !== null,
   }
   return CAT_ORDER.filter((c) => has[c])
@@ -92,3 +94,60 @@ export function dayLines(d: CalendarDay, clock: (t: Date | null) => string, spee
 }
 
 export { LOW_NEAR_SUNRISE_MIN }
+
+/*
+ * WHAT HAPPENED, ON A PAST DAY (Batch LIVE, Section 3.2): from this phone's
+ * own logs only, the photos logged (src/lib/truthLog.ts) and their sky's
+ * outcome, and the field reports (src/lib/fieldReportStore.ts), each on the
+ * local day it was taken. Muted on the grid; said in the day's card.
+ */
+/** The moon's phase in words, from suncalc's phase (0 new, 0.5 full). */
+export function phaseName(phase: number): string {
+  const p = ((phase % 1) + 1) % 1
+  if (p < 0.03 || p > 0.97) return 'New moon'
+  if (p < 0.22) return 'Waxing crescent'
+  if (p < 0.28) return 'First quarter'
+  if (p < 0.47) return 'Waxing gibbous'
+  if (p < 0.53) return 'Full moon'
+  if (p < 0.72) return 'Waning gibbous'
+  if (p < 0.78) return 'Last quarter'
+  return 'Waning crescent'
+}
+
+export interface PastLog {
+  photos: { at: Date; outcome: 'fired' | 'meh' | 'nothing' | 'clear' | null }[]
+  reports: { at: Date; name: string; size: string; rating: string }[]
+}
+
+export function pastLines(date: string, dayOf: (t: Date) => string, log: PastLog): string[] {
+  const photos = log.photos.filter((p) => dayOf(p.at) === date)
+  const reports = log.reports.filter((r) => dayOf(r.at) === date)
+  const out: string[] = []
+  if (photos.some((p) => p.outcome === 'fired')) out.push('The sky fired (your photos)')
+  if (photos.length > 0) out.push(`${photos.length} ${photos.length === 1 ? 'photo' : 'photos'} logged`)
+  for (const r of reports) out.push(`Your report: ${r.name} ${r.size}, ${r.rating}`)
+  return out
+}
+
+/*
+ * THE DAY IN FULL (Batch LIVE, Section 3.4): the day card says the whole
+ * day, not just its marks: sunrise and sunset with the colour call when the
+ * forecast reaches, the low and high tides, the wind and the surf at
+ * sunrise, the moon.
+ */
+export function dayFull(d: CalendarDay, clock: (t: Date | null) => string, speed: (mps: number) => string, tides: readonly { at: Date; kind: 'high' | 'low' }[], colour: { rise: string | null; set: string | null }, moonName: string): string[] {
+  const out: string[] = []
+  out.push(`Sunrise ${clock(d.sunrise)}${colour.rise === null ? '' : ` · ${colour.rise}`} · sunset ${clock(d.sunset)}${colour.set === null ? '' : ` · ${colour.set}`}`)
+  if (tides.length > 0) out.push(`Tides: ${tides.map((t) => `${t.kind} ${clock(t.at)}`).join(' · ')}`)
+  const w = d.facts.windAtSunrise
+  if (d.forecast && w !== null) out.push(`Wind at sunrise ${speed(w.speedMps)}${w.relation === null ? '' : `, ${w.relation === 'cross' ? 'cross-shore' : w.relation}`}`)
+  if (d.forecast && d.facts.surfFt !== null) out.push(`Surf at sunrise about ${Math.round(d.facts.surfFt)} ft`)
+  out.push(`Moon: ${moonName}, ${Math.round(d.moon.lit * 100)}% lit${d.facts.moonrise === null ? '' : ` · rises ${clock(d.facts.moonrise)}`}`)
+  return out
+}
+
+/** "none in the next 7 days" when an on filter has nothing from today to the forecast's end (Batch LIVE, Section 3.3). */
+export function filterEmpty(days: readonly CalendarDay[], filters: ReadonlySet<CalCat>): CalCat[] {
+  const ahead = days.filter((d) => !d.past && (d.forecast || d.today))
+  return [...filters].filter((c) => !ahead.some((d) => dayCats(d).includes(c)))
+}

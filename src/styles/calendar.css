@@ -108,7 +108,8 @@
   fill: var(--strong);
 }
 .cal2__icon--glassy .cal2__disc {
-  fill: var(--sky-mid);
+  /* Batch LIVE, Section 3.3: the glassy disc was sky-on-sky; the surf blue reads on the gradient and under the white glyph. */
+  fill: var(--d-surf);
 }
 .cal2__icon--tide .cal2__disc {
   fill: var(--tile-fish);
@@ -128,6 +129,10 @@
   stroke: none;
 }
 .cal2__card {
+  /* Batch LIVE, Section 3.4: the day card fills the space and scrolls inside it; "Plan this day" always shows. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
   padding: 12px 14px;
   border-radius: 22px;
   border: 1px solid var(--glass-edge);
@@ -160,6 +165,55 @@
   background: var(--glass-strong);
 }
 .cal2__plan {
+  flex: none;
   margin-top: auto;
   min-height: 52px;
+}
+
+/* Batch LIVE, Section 3: a chip says on or off (a tick, an outline when off); a filter with nothing ahead says so. */
+.cal2__chip:not(.cal2__chip--on) {
+  background: transparent;
+  border: 1px solid var(--glass-edge);
+}
+.cal2__chipstate {
+  min-width: 0.8em;
+  font-weight: 700;
+}
+.cal2__empty {
+  margin: 4px 0 0;
+  font-size: var(--text-xs);
+  color: var(--glass-ink-2);
+}
+/* Days 4-7: the forecast's marks are a guess. */
+.cal2__marks--guess .cal2__icon {
+  opacity: 0.55;
+}
+.cal2__q {
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+/* Past days, muted; a small dot where this phone logged something. */
+.cal2__day--past:not(.cal2__day--on) {
+  opacity: 0.55;
+}
+.cal2__happened {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--glass-ink-2);
+}
+.cal2__line--guess,
+.cal2__line--past {
+  color: var(--glass-ink-2);
+}
+.cal2__full {
+  margin: 8px 0 0;
+  padding: 8px 0 0;
+  border-top: 1px solid var(--glass-edge);
+  list-style: none;
+  font-size: var(--text-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }

@@ -14,8 +14,8 @@ describe('the calendar and the showers', () => {
   const app = readFileSync('src/App.tsx', 'utf8')
   it('the Sky page has a Calendar button, and App opens the month from it', () => {
     expect(page).toMatch(/onClick=\{onCalendar\}[\s\S]{0,40}Calendar ›/)
-    expect(app).toMatch(/onCalendar=\{\(\) => \{[\s\S]{0,200}kind: 'calendar'/)
-    expect(readFileSync('src/components/PlanMode.tsx', 'utf8')).toMatch(/cardRequest\.kind === 'calendar'\) \{[\s\S]{0,120}setCalendarOpen\(true\)/)
+    expect(app).toMatch(/onCalendar=\{\(\) => \{[\s\S]{0,400}kind: 'calendar'/)
+    expect(readFileSync('src/components/PlanMode.tsx', 'utf8')).toMatch(/cardRequest\.kind === 'calendar'\) \{[\s\S]{0,200}setCalendarOpen\(true\)/)
   })
   it('has no year compass, no tabs, and keeps the showers and moons with their alerts', () => {
     expect(card).not.toMatch(/through the year/)

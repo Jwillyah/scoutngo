@@ -3,7 +3,10 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { factorHere } from '../lib/beachFactorHere.ts'
 import { bestTime, calendarMonth, type CalendarDay } from '../core/calendarMonth.ts'
-import { CAT_LABEL, CAT_ORDER, dayCats, dayLines, shownCats, type CalCat } from '../core/calendarV2.ts'
+import { CAT_LABEL, CAT_ORDER, dayCats, dayFull, dayLines, filterEmpty, FORECAST_CATS, pastLines, phaseName, shownCats, type CalCat, type PastLog } from '../core/calendarV2.ts'
+import { readReports } from '../lib/fieldReportStore.ts'
+import { readTruthLog } from '../lib/truthLog.ts'
+import { sizeOf } from '../core/fieldReports.ts'
 import type { LatLon } from '../core/geo.ts'
 import { rankNights } from '../core/milkyWay.ts'
 import { localDate } from '../core/moonTimes.ts'
@@ -43,6 +46,8 @@ interface CalendarPageProps {
   windUnit: WindUnit
   onPlan: (date: string, at: Date) => void
   onClose: () => void
+  /** Batch LIVE, Section 3.5: filters on when it opens (the Sky page's link: Sky color + Moon). */
+  initialFilters?: readonly CalCat[]
 }
 
 const WEEK = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
@@ -51,13 +56,25 @@ const MILKY_SCORE = 60
 
 const MONTH_NAME = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })
 
-export function CalendarPage({ venue, timeZone, stationId, tideData, windUnit, onPlan, onClose }: CalendarPageProps) {
+export function CalendarPage({ venue, timeZone, stationId, tideData, windUnit, onPlan, onClose, initialFilters = [] }: CalendarPageProps) {
   /* Read once when the page opens: what has passed is left out of the day's list. */
   const [nowMs] = useState(() => Date.now())
   const today = localDate(new Date(nowMs), timeZone)
   const [ym, setYm] = useState(() => ({ y: Number(today.slice(0, 4)), m: Number(today.slice(5, 7)) }))
   const [picked, setPicked] = useState<string | null>(today)
-  const [filters, setFilters] = useState<ReadonlySet<CalCat>>(new Set())
+  const [filters, setFilters] = useState<ReadonlySet<CalCat>>(() => new Set(initialFilters))
+  /* Batch LIVE, Section 3.2: this phone's own logs, read once, for what happened on a past day. */
+  const [pastLog] = useState<PastLog>(() => {
+    try {
+      return {
+        photos: readTruthLog().map((e) => ({ at: new Date(e.at), outcome: e.outcome })),
+        reports: readReports().map((r) => ({ at: new Date(r.at), name: r.name, size: sizeOf(r.size).words, rating: r.rating })),
+      }
+    } catch {
+      return { photos: [], reports: [] }
+    }
+  })
+  const dayOf = (t: Date) => localDate(t, timeZone)
   const [sky, setSky] = useState<Hourly | null>(null)
   const [tides, setTides] = useState<{ key: string; list: { at: Date; kind: 'high' | 'low' }[] | null } | null>(null)
 
@@ -126,6 +143,7 @@ export function CalendarPage({ venue, timeZone, stationId, tideData, windUnit, o
   const step = (n: number) => setYm(({ y, m }) => ({ y: m + n > 12 ? y + 1 : m + n < 1 ? y - 1 : y, m: ((m + n + 11) % 12) + 1 }))
   const swipe = useRef<{ x: number; y: number } | null>(null)
   const pickedDay = days.find((d) => d.date === picked) ?? null
+  const empty = filterEmpty(days, filters)
   const clock = (t: Date | null) => (t === null ? '—' : formatClock(t, timeZone))
   const speed = (mps: number) => formatWind(mps, windUnit)
   const dayTitle = (d: CalendarDay) => `${d.today ? 'Today, ' : ''}${new Date(`${d.date}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })}`
@@ -164,10 +182,19 @@ export function CalendarPage({ venue, timeZone, stationId, tideData, windUnit, o
             >
               <CalIcon cat={c} />
               {CAT_LABEL[c]}
+              {/* Batch LIVE, Section 3.3: a real toggle, said on or off. */}
+              <span className="cal2__chipstate" aria-hidden="true">
+                {on ? '✓' : ''}
+              </span>
             </button>
           )
         })}
       </div>
+      {empty.length === 0 ? null : (
+        <p className="cal2__empty" data-cal-empty>
+          {empty.map((c) => CAT_LABEL[c]).join(', ')}: none in the next 7 days
+        </p>
+      )}
 
       <div
         className="cal2__grid"
@@ -190,21 +217,24 @@ export function CalendarPage({ venue, timeZone, stationId, tideData, windUnit, o
         ))}
         {days.map((d) => {
           const marks = shownCats(d, filters)
-          const faded = !d.inMonth || (!d.forecast && !d.past)
+          const faded = !d.inMonth
+          const happened = d.past ? pastLines(d.date, dayOf, pastLog) : []
           return (
             <button
               key={d.date}
               type="button"
-              className={`cal2__day${faded ? ' cal2__day--faded' : ''}${d.date === picked ? ' cal2__day--on' : ''}`}
+              className={`cal2__day${faded ? ' cal2__day--faded' : ''}${d.past ? ' cal2__day--past' : ''}${d.date === picked ? ' cal2__day--on' : ''}`}
               aria-pressed={d.date === picked}
               aria-label={`${d.date}${marks.length === 0 ? '' : `: ${dayCats(d).map((c) => CAT_LABEL[c]).join(', ')}`}${d.forecast || d.past ? '' : ', past the forecast'}`}
               onClick={() => setPicked(d.date)}
             >
               <span className="cal2__num num">{Number(d.date.slice(8))}</span>
-              <span className="cal2__marks">
+              <span className={`cal2__marks${d.guess ? ' cal2__marks--guess' : ''}`} {...(d.guess ? { 'data-guess': '' } : {})}>
                 {marks.map((c) => (
                   <CalIcon key={c} cat={c} />
                 ))}
+                {d.guess && marks.some((c) => FORECAST_CATS.includes(c)) ? <span className="cal2__q">?</span> : null}
+                {happened.length > 0 ? <span className="cal2__happened" aria-hidden="true" /> : null}
               </span>
             </button>
           )
@@ -218,11 +248,28 @@ export function CalendarPage({ venue, timeZone, stationId, tideData, windUnit, o
           <>
             <p className="cal2__title">{dayTitle(pickedDay)}</p>
             <ul className="cal2__lines">
-              {dayLines(pickedDay, clock, speed, new Date(nowMs)).map((l) => (
-                <li key={l.text} className="cal2__line">
-                  {l.cat === null ? <span className="cal2__dot" aria-hidden="true" /> : <CalIcon cat={l.cat} />}
-                  <span>{l.text}</span>
+              {dayLines(pickedDay, clock, speed, new Date(nowMs))
+                .filter((l) => !(l.cat === null && /^(Nothing marked|Past the forecast|Sunrise )/.test(l.text)))
+                .map((l) => (
+                  <li key={l.text} className={`cal2__line${pickedDay.guess && l.cat !== null && FORECAST_CATS.includes(l.cat) ? ' cal2__line--guess' : ''}`}>
+                    {l.cat === null ? <span className="cal2__dot" aria-hidden="true" /> : <CalIcon cat={l.cat} />}
+                    <span>{l.text}{pickedDay.guess && l.cat !== null && FORECAST_CATS.includes(l.cat) ? ' (a guess, 4+ days out)' : ''}</span>
+                  </li>
+                ))}
+              {pastLines(pickedDay.date, dayOf, pastLog).map((t) => (
+                <li key={t} className="cal2__line cal2__line--past">
+                  <span className="cal2__dot" aria-hidden="true" />
+                  <span>{t}</span>
                 </li>
+              ))}
+            </ul>
+            {/* Batch LIVE, Section 3.4: the whole day, not just its marks. */}
+            <ul className="cal2__full" data-day-full>
+              {dayFull(pickedDay, clock, speed, (tides !== null && tides.key === tideKey ? (tides.list ?? []) : []).filter((t) => localDate(t.at, timeZone) === pickedDay.date), {
+                rise: !pickedDay.forecast ? null : pickedDay.marks.includes('colour-rise') ? 'color possible' : 'color unlikely',
+                set: !pickedDay.forecast ? null : pickedDay.marks.includes('colour-set') ? 'color possible' : 'color unlikely',
+              }, phaseName(pickedDay.moon.phase)).map((t) => (
+                <li key={t}>{t}</li>
               ))}
             </ul>
           </>

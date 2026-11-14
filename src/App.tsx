@@ -1494,7 +1494,7 @@ function App() {
     drawer: 'kit',
     tick: 0,
   })
-  const [cardRequest, setCardRequest] = useState<{ kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'buoys' | 'wind' | 'terrain' | 'preflight' | 'calendar' | 'fly'; skyTab?: 'now' | 'fire'; tick: number }>({
+  const [cardRequest, setCardRequest] = useState<{ kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'buoys' | 'wind' | 'terrain' | 'preflight' | 'calendar' | 'fly'; skyTab?: 'now' | 'fire'; calFilters?: ('surf' | 'sky' | 'glassy' | 'tide' | 'moon')[]; tick: number }>({
     kind: 'sky',
     tick: 0,
   })
@@ -1642,6 +1642,11 @@ function App() {
         return
       case 'bestsky':
         setBestSkyOpen(true)
+        return
+      case 'calendar':
+        /* Batch LIVE, Section 3.5: "See the month ›" under the home's week. */
+        setMode('plan')
+        setCardRequest((r) => ({ kind: 'calendar', tick: r.tick + 1 }))
         return
       case 'moon':
         /* The sun, the moon and the night as swipe pages: the Sky sheet's one other view. */
@@ -2718,7 +2723,8 @@ function App() {
             setSkyOpen(false)
             setBriefOpen(false)
             setMode('plan')
-            setCardRequest((r) => ({ kind: 'calendar', tick: r.tick + 1 }))
+            /* Batch LIVE, Section 3.5: from the Sky page, the month filtered to Sky color and the moon. */
+            setCardRequest((r) => ({ kind: 'calendar', calFilters: ['sky', 'moon'], tick: r.tick + 1 }))
           }}
           onDetail={(view) => {
             setSkyOpen(false)

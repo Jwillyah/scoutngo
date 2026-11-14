@@ -10,6 +10,7 @@ const day = (o: Omit<Partial<CalendarDay>, 'facts'> & { facts?: Partial<Calendar
   date: '2026-11-09',
   inMonth: true,
   today: true,
+  guess: false,
   forecast: true,
   past: false,
   sunrise: RISE,
@@ -42,8 +43,8 @@ describe('the marks', () => {
     expect(shownCats(all, new Set(['tide']))).toEqual(['tide'])
     expect(shownCats(all, new Set(['moon']))).toEqual([])
   })
-  it('a day past the forecast carries no marks at all, not even the moon or the tide', () => {
-    expect(dayCats(day({ forecast: false, moon: { phase: 0.5, lit: 1, named: 'full' }, facts: { lowNearSunrise: RISE } }))).toEqual([])
+  it('a day past the forecast week carries the moon and the tide, never surf, sky color or glassy (Batch LIVE, Section 3.1)', () => {
+    expect(dayCats(day({ forecast: false, marks: ['surf', 'colour-set'], moon: { phase: 0.5, lit: 1, named: 'full' }, facts: { lowNearSunrise: RISE, windAtSunrise: { speedMps: 1, relation: 'offshore' } } }))).toEqual(['tide', 'moon'])
   })
 })
 
@@ -68,5 +69,22 @@ describe('never an event that has passed (Batch Flow, Section 4)', () => {
     const after = new Date(RISE.getTime() + 3 * 3_600_000)
     expect(dayLines(d, clock, speed, after).map((l) => l.cat)).toEqual(['sky', 'tide'])
     expect(dayLines(d, clock, speed).map((l) => l.cat)).toEqual(['surf', 'sky', 'glassy', 'tide'])
+  })
+})
+
+describe('forecast marks only a week out (Batch LIVE, Section 3.1)', () => {
+  it('14 Nov: no sky color on 22 or 26 Nov, no glassy to 28 Nov; days 4 to 7 a guess', async () => {
+    const { calendarMonth, FORECAST_DAYS } = await import('../src/core/calendarMonth.ts')
+    const days = calendarMonth({
+      year: 2026, month: 11, lat: 36.8435575, lon: -75.9713104, timeZone: 'America/New_York', today: '2026-11-14', forecastUntil: '2026-11-29', extremes: null,
+      windAt: () => ({ speedMps: 1, fromDeg: 270 }), skyAt: () => ({ low: 0, mid: 50, high: 40 }), facing: 100, surfFtAt: () => null, milkyDates: new Set(),
+    })
+    const by = (d: string) => days.find((x) => x.date === d)!
+    for (const d of ['2026-11-22', '2026-11-26', '2026-11-28']) expect(dayCats(by(d)).filter((c) => c === 'sky' || c === 'glassy')).toEqual([])
+    expect(FORECAST_DAYS).toBe(7)
+    expect(by('2026-11-20').forecast).toBe(true)
+    expect(by('2026-11-21').forecast).toBe(false)
+    expect(by('2026-11-16').guess).toBe(false)
+    expect(by('2026-11-17').guess).toBe(true)
   })
 })

@@ -16,6 +16,7 @@ import type { BuildCheck } from '../lib/build.ts'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { LatLon } from '../core/geo.ts'
 import { awayDistance, awayLabel } from '../core/awayWords.ts'
+import type { CalCat } from '../core/calendarV2.ts'
 import { loadAirspaceOverlay, type AirspaceOverlay } from '../lib/airspaceOverlay.ts'
 import { measureWords } from '../lib/measureWords.ts'
 import { shootDayIcs } from '../core/shootIcs.ts'
@@ -386,7 +387,7 @@ interface PlanModeProps {
   /** The menu asked for a card: Sky or About. The tick makes a repeat ask open it again. */
   /** Batch H: opens the Viewfinder (App's), from the Preflight card. */
   onViewfinder?: () => void
-  cardRequest: { kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'buoys' | 'wind' | 'terrain' | 'preflight' | 'calendar' | 'fly'; skyTab?: SkyTab; tick: number }
+  cardRequest: { kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'buoys' | 'wind' | 'terrain' | 'preflight' | 'calendar' | 'fly'; skyTab?: SkyTab; calFilters?: CalCat[]; tick: number }
   /** Batch Polish, Section 1: the home is over the map. */
   covered?: boolean
   /** Called once the map is on screen (nothing over it); the venue's offline save waits for it. */
@@ -916,6 +917,7 @@ export function PlanMode({
     else setPage(null)
   }
   /* Sky › Calendar, a page of its own (CalendarPage.tsx). ?calendar=1 opens it, for the overflow audit. */
+  const [calFilters, setCalFilters] = useState<CalCat[]>([])
   const [calendarOpen, setCalendarOpen] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('calendar') === '1')
   /*
    * Batch Polish, Section 1: is the map on screen yet: not under the home, a
@@ -1607,7 +1609,8 @@ export function PlanMode({
         setPage(cardRequest.kind)
         return
       } else if (cardRequest.kind === 'calendar') {
-        /* Batch Pages, Section 3: the Sky page's Calendar button. */
+        /* Batch Pages, Section 3: the Sky page's Calendar button; Batch LIVE 3.5: with its filters. */
+        setCalFilters(cardRequest.calFilters ?? [])
         setCalendarOpen(true)
         return
       } else if (cardRequest.kind === 'fly') {
@@ -2696,6 +2699,7 @@ export function PlanMode({
             onJumpDay(date, at)
           }}
           onClose={() => setCalendarOpen(false)}
+          initialFilters={calFilters}
         />
       ) : null}
       {page === 'exposure' ? <ExposurePage kit={kitProfile} bag={bag} onClose={() => setPage(null)} /> : null}

@@ -61,7 +61,7 @@ import { fitChartLabels } from '../lib/chartLabelsDom.ts'
  * never instructions (rule 28). It fits 390 x 844 and 412 x 915 on a calm
  * day with nothing scrolled (scripts/audit-briefing.mjs).
  */
-export type HomeTarget = 'surf' | 'wind' | 'tides' | 'sky' | 'preflight' | 'moon' | 'weather' | 'drone' | 'bestsky'
+export type HomeTarget = 'surf' | 'wind' | 'tides' | 'sky' | 'preflight' | 'moon' | 'weather' | 'drone' | 'bestsky' | 'calendar'
 
 interface HomeProps {
   venue: { lat: number; lon: number }
@@ -184,7 +184,7 @@ export function Home({ venue, placeName, timeZone, units, drone, now, onClose, o
           <DayView placeName={placeName} which="tomorrow" brief={brief} day={brief.days[1] ?? null} order={order} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} alert={null} stormLine={null} onOpen={onOpen} surf={surf} obs={stationObs} layout={layout} shown={shown} />
         </section>
         <section className="home__page" aria-label="Week">
-          <WeekView brief={brief} order={order} timeZone={timeZone} units={units} now={now} venue={venue} surf={surf} />
+          <WeekView brief={brief} order={order} timeZone={timeZone} units={units} now={now} venue={venue} surf={surf} onMonth={() => onOpen('calendar')} />
         </section>
       </div>
       {debug ? <NetDebug onClose={() => setDebug(false)} /> : null}
@@ -881,7 +881,7 @@ function surfFunAt(brief: Briefing, surf: SurfNow, which: 'today' | 'tomorrow', 
 
 /* ------------------------------------------------------------- the week */
 
-function WeekView({ brief, order, timeZone, units, now, venue, surf }: { brief: Briefing; order: readonly Activity[]; timeZone: string; units: Units; now: Date; venue: { lat: number; lon: number }; surf: SurfNow }) {
+function WeekView({ brief, order, timeZone, units, now, venue, surf, onMonth }: { brief: Briefing; order: readonly Activity[]; timeZone: string; units: Units; now: Date; venue: { lat: number; lon: number }; surf: SurfNow; onMonth?: () => void }) {
   const wx = brief.wx
   const day = (d: Date) => new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone }).format(d)
   const rows = brief.days.map((d) => {
@@ -898,7 +898,8 @@ function WeekView({ brief, order, timeZone, units, now, venue, surf }: { brief: 
     const pill = weekPill(worth, d.reads.sunset?.call ?? null, order.includes('shoot'))
     return { d, pill, name: d.index === 0 ? 'Today' : day(d.start), cond, hi: temps.length === 0 ? null : Math.max(...temps), lo: temps.length === 0 ? null : Math.min(...temps), worth, surfWords: worth === null ? (surfDay?.words ?? null) : null, surfFact: surfDay?.fact ?? null, weather: weather === '' ? null : weather, call: d.reads.sunset?.call ?? null, guess: d.index >= WEEK_SURE_DAYS }
   })
-  const head = weekHeadline(rows.filter((r) => r.d.index > 0 && r.worth !== null).map((r) => ({ day: r.name, what: (r.worth as Activity) === 'shoot' ? 'sunset' : (r.worth as string) })))
+  /* Batch LIVE, Section 3.6: the best line says each day's pill word, never a second name for it. */
+  const head = weekHeadline(rows.filter((r) => r.d.index > 0 && r.worth !== null && r.pill !== null).map((r) => ({ day: r.name, what: (r.pill as { word: string }).word.toLowerCase() })))
   const surfCol = order.includes('surf')
   void now
   void venue
@@ -927,6 +928,11 @@ function WeekView({ brief, order, timeZone, units, now, venue, surf }: { brief: 
       </ol>
       <p className="hweek__head">{head ?? (brief.status === 'loading' ? 'Reading the forecast…' : wx === null || brief.days.every((d) => d.wind.every((w) => w.mps === null)) ? 'No forecast yet · retrying' : 'Nothing standout this week')}</p>
       <p className="hweek__note">Days 4–7 are guesses: the models drift apart that far out.</p>
+      {onMonth === undefined ? null : (
+        <button type="button" className="hweek__month" data-see-month onClick={onMonth}>
+          See the month ›
+        </button>
+      )}
     </div>
   )
 }

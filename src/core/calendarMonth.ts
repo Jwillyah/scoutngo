@@ -35,6 +35,16 @@ import { surfOn, surfShape, surfTag } from './surf.ts'
 import { zonedTimeToUtc } from './timezone.ts'
 
 export const MOON_NEAR_SUN_MIN = 45
+/*
+ * FORECAST MARKS ONLY A WEEK OUT (Batch LIVE, Section 3.1; 14 Nov the month
+ * showed sky color on 22 and 26 Nov and glassy to 28 Nov, from the far end
+ * of a 16-day run). Glass, colour and surf are said for today and the next
+ * FORECAST_DAYS - 1 days only; from GUESS_FROM_DAY on they are a guess, drawn
+ * dimmed with "?". Moon, tide, Milky Way and meteors need no forecast and
+ * are said any day.
+ */
+export const FORECAST_DAYS = 7
+export const GUESS_FROM_DAY = 3
 /* A full moon nearer than this is called a supermoon: about 90% of the way to perigee. */
 export const SUPERMOON_KM = 361_000
 
@@ -61,6 +71,8 @@ export interface CalendarDay {
   forecast: boolean
   /** Before today: no forecast is coming, so it is not said to be waiting for one. */
   past: boolean
+  /** A forecast day GUESS_FROM_DAY or more from today: its forecast marks are a guess. */
+  guess: boolean
   sunrise: Date | null
   sunset: Date | null
   moon: {
@@ -170,7 +182,9 @@ export function calendarMonth(input: CalendarInput): CalendarDay[] {
     }
     const sunrise = sunriseOn(date, input.lat, input.lon, tz)
     const sunset = sunsetOn(date, input.lat, input.lon, tz)
-    const forecast = input.forecastUntil !== null && date >= input.today && date <= input.forecastUntil
+    const lastForecast = input.forecastUntil === null ? null : [input.forecastUntil, addDays(input.today, FORECAST_DAYS - 1)].sort()[0]
+    const forecast = lastForecast !== null && date >= input.today && date <= lastForecast
+    const guess = forecast && date >= addDays(input.today, GUESS_FROM_DAY)
     const marks: DayMark[] = []
 
     const windRise = forecast && sunrise !== null ? input.windAt(sunrise) : null
@@ -215,6 +229,7 @@ export function calendarMonth(input: CalendarInput): CalendarDay[] {
       today: date === input.today,
       forecast,
       past: date < input.today,
+      guess,
       sunrise,
       sunset,
       moon: { phase: illum.phase, lit: illum.fraction, named },

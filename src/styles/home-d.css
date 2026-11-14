@@ -452,16 +452,25 @@
   flex: 1;
   min-height: 0;
 }
-/* Batch NOW, Section 3.3: the rows take the page's height (no empty band under them); the best line sits under the list. */
+/* Batch LIVE, Section 3.6: rows at their normal height, never stretched to fill; the best line and "See the month" under them. */
 .home .hweek__rows {
   display: flex;
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: none;
   flex-direction: column;
 }
 .home .hweek__row {
-  flex: 1 0 auto;
-  min-height: 40px;
+  flex: none;
+  min-height: 44px;
+}
+.hweek__month {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--white);
+  font: inherit;
+  font-weight: 700;
 }
 /* The same columns every day: day, sky, (surf), wind, temperatures, the pill. */
 .hweek__row {

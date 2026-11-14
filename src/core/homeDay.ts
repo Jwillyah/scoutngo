@@ -206,8 +206,11 @@ export function weekSurfRow(call: SurfCall | null, dayIndex: number): { on: bool
  * sunset's call; else none. The line and the pills read the same worth, so a
  * row the line calls best never says Skip.
  */
+/** The pill's word for a day's best activity; the "Best this week" line says the same word (Batch LIVE, Section 3.6: "Tue fish" over a pill saying "Calm"). */
+export const WEEK_WORD: Record<Activity, string> = { surf: 'Surf', shoot: 'Color', drone: 'Drone', fish: 'Calm', weather: 'Dry' }
+
 export function weekPill(worth: Activity | null, sunsetCall: 'Go' | 'Maybe' | 'Skip' | null, shoot: boolean): { word: string; tone: 'go' | 'maybe' | 'skip' | 'none' } | null {
-  const WORD: Record<Activity, string> = { surf: 'Surf', shoot: 'Go', drone: 'Drone', fish: 'Calm', weather: 'Dry' }
+  const WORD = WEEK_WORD
   if (worth !== null) return { word: WORD[worth], tone: 'go' }
   if (!shoot) return null
   return sunsetCall === null ? { word: '—', tone: 'none' } : { word: sunsetCall, tone: sunsetCall.toLowerCase() as 'go' | 'maybe' | 'skip' }
