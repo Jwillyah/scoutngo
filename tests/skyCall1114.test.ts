@@ -26,6 +26,11 @@ describe('the pill says "Color now" only when it is', () => {
   it('at 4:39 PM: "Color from 4:49 PM · look WSW + ENE", not "Color now"', () => {
     expect(colorNowLine([null, read('Maybe')], now, VB, TZ)).toBe(truth.shouldSay.pillAt1639)
   })
+  it('the call\'s own colour window wins: the start every other surface says', () => {
+    const r = { ...read('Maybe'), colorFrom: new Date(sunset.getTime() - 11 * 60_000) }
+    expect(colorNowLine([r], now, VB, TZ)).toBe('Color from 4:44 PM · look WSW + ENE')
+    expect(colorNowLine([r], new Date(sunset.getTime() - 11 * 60_000), VB, TZ)).toMatch(/^Color now/)
+  })
   it('from the colour window\'s start to 20 min after the sunset, "Color now"', () => {
     expect(colorNowLine([read('Go')], new Date(sunset.getTime() - SUNSET_NOW_BEFORE_MS), VB, TZ)).toMatch(/^Color now · sunset 4:5\d PM · look /)
     expect(colorNowLine([read('Go')], new Date(sunset.getTime() + 20 * 60_000), VB, TZ)).toMatch(/^Color now/)
