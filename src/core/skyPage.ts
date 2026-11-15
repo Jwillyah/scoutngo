@@ -29,11 +29,17 @@ export function plainChecks(l: LayerRead | null, toward: string): PlainCheck[] {
   const gapLabel = `Gap at the horizon (${toward})`
   if (l === null) return [{ label: 'Clouds to light up', value: '—' }, { label: gapLabel, value: '—' }, { label: 'Anything blocking the sun', value: '—' }]
   const pct = l.cover === null ? '' : `, ${Math.round(l.cover)}%`
+  /*
+   * Batch LIVE, Section 10.4: the three lines from the one state, so they never disagree. On 14 Nov they read "Clouds
+   * to light up: none", "no clouds, so no gap needed" and "Anything blocking: yes" together. Cloud blocking the sun
+   * is cloud: the gap is closed by it, and nothing above it is lit.
+   */
+  const blocked = l.hiddenBy === null ? null : `${LAYER_PLAIN[l.hiddenBy.layer]} ${Math.round(l.hiddenBy.cover)}%`
   return [
-    { label: 'Clouds to light up', value: l.canvas ? `${LAYER_PLAIN[l.layer]}${pct}` : 'none' },
-    /* No cloud to light: the gap does not decide anything. */
-    { label: gapLabel, value: !l.canvas ? 'no clouds, so no gap needed' : l.gap === 'open' ? 'open' : l.gap === 'partial' ? 'partly open' : l.gap === 'closed' ? 'closed' : 'no glow this hour' },
-    { label: 'Anything blocking the sun', value: l.hiddenBy === null ? 'no' : `yes, ${LAYER_PLAIN[l.hiddenBy.layer]} ${Math.round(l.hiddenBy.cover)}%` },
+    { label: 'Clouds to light up', value: l.canvas ? `${LAYER_PLAIN[l.layer]}${pct}` : blocked !== null ? 'none lit past the blocking cloud' : 'none' },
+    /* No cloud to light and none in the way: the gap does not decide anything. */
+    { label: gapLabel, value: blocked !== null && !l.canvas ? 'closed' : !l.canvas ? 'no clouds, so no gap needed' : l.gap === 'open' ? 'open' : l.gap === 'partial' ? 'partly open' : l.gap === 'closed' ? 'closed' : 'no glow this hour' },
+    { label: 'Anything blocking the sun', value: blocked === null ? 'no' : `yes, ${blocked}` },
   ]
 }
 
@@ -121,7 +127,10 @@ export function lightMarks(kind: 'sunrise' | 'sunset', event: Date, altAt: (t: D
 export const RARE_KEPT: readonly SpecialKind[] = ['rainbow', 'rays', 'fog', 'glass']
 export const RARE_NAME: Partial<Record<SpecialKind, string>> = { rainbow: 'Rainbow chance', rays: 'Light rays', fog: 'Fog', glass: 'Mirror water' }
 /** At most this many rows: the likeliest, then the soonest. */
-export const RARE_MAX = 4
+/* Batch LIVE, Section 10.7: at most three a week shown (it was four); the rest behind "+N more". */
+export const RARE_MAX = 3
+/** The week's rare light waits this long for its forecasts, then says they did not arrive. */
+export const RARE_WAIT_MS = 10_000
 
 export interface RareRow {
   kind: SpecialKind

@@ -43,6 +43,8 @@ export interface BestSky {
   satAsked: boolean
   /** Batch NOW, Section 0.3: how the satellite's patch was carried to the color's time; null without one. */
   drift: Drift | null
+  /** Batch LIVE, Section 10.5: the station's sky when fresh (cover %, "KNTU mostly cloudy"); the grid's summary never says "no patch" under it. */
+  station?: { cover: number | null; line: string | null } | null
 }
 
 const MIN = 60_000
@@ -69,7 +71,7 @@ export function useBestSky(spot: LatLon | null, radius: RadiusMi, now: Date, sav
   const tenMin = Math.floor(now.getTime() / (10 * MIN))
   const event = useMemo(() => (spot === null ? null : nextColorEvent(spot, new Date(tenMin * 10 * MIN))), [spot?.lat, spot?.lon, tenMin]) // eslint-disable-line react-hooks/exhaustive-deps
   const key = spot === null || event === null ? null : `${spot.lat.toFixed(2)},${spot.lon.toFixed(2)}|${radius}|${event.at.getTime()}`
-  const [got, setGot] = useState<{ key: string; grid: ScoredPoint[]; asked: number; satAt: Date | null; satAsked: boolean; failed: boolean; drift: Drift | null } | null>(null)
+  const [got, setGot] = useState<{ key: string; grid: ScoredPoint[]; asked: number; satAt: Date | null; satAsked: boolean; failed: boolean; drift: Drift | null; station: BestSky['station'] } | null>(null)
   /* Batch NOW, Section 0.4: the map's viewpoints, piers, boat ramps and parks on the water, beside the starter list. */
   const [osm, setOsm] = useState<{ key: string; spots: SpotIn[] } | null>(null)
   useEffect(() => {
@@ -93,9 +95,9 @@ export function useBestSky(spot: LatLon | null, radius: RadiusMi, now: Date, sav
         const cover = fresh === null ? null : fresh.sky.groups.reduce((m, gr) => Math.max(m, { FEW: 25, SCT: 50, BKN: 75, OVC: 100, VV: 100 }[gr.amount]), fresh.sky.clear ? 0 : 0)
         const word = fresh === null ? null : stationWord(fresh.sky)
         const seen = { stationCover: cover, satAsked: g.satAsked, stationLine: fresh === null || word === null ? null : `${fresh.sky.station} ${word.toLowerCase()}` }
-        if (live) setGot({ key, grid: scoreGrid(g.points, event.azimuth, null, seen), asked: g.asked, satAt: g.satAt, satAsked: g.satAsked, failed: g.points.length === 0, drift: g.drift ?? null })
+        if (live) setGot({ key, grid: scoreGrid(g.points, event.azimuth, null, seen), asked: g.asked, satAt: g.satAt, satAsked: g.satAsked, failed: g.points.length === 0, drift: g.drift ?? null, station: fresh === null ? null : { cover, line: seen.stationLine } })
       })
-      .catch(() => live && setGot({ key, grid: [], asked: 0, satAt: null, satAsked: false, failed: true, drift: null }))
+      .catch(() => live && setGot({ key, grid: [], asked: 0, satAt: null, satAsked: false, failed: true, drift: null, station: null }))
     return () => {
       live = false
     }
@@ -110,7 +112,7 @@ export function useBestSky(spot: LatLon | null, radius: RadiusMi, now: Date, sav
       ...mapSpots,
       ...saved.filter((s) => distanceMeters(spot, s.at) / 1000 <= rKm).map((s) => ({ id: `saved-${s.id}`, name: s.name, at: s.at, facing: null, openDeg: 0, water: false, silhouette: null })),
     ]
-    return { status: got.failed ? 'failed' : 'ok', event, grid: got.grid, ranked: rankSpots(got.grid, spots, event.azimuth, spot), here: scoreAt(got.grid, spot), asked: got.asked, satAt: got.satAt, satAsked: got.satAsked, drift: got.drift }
+    return { status: got.failed ? 'failed' : 'ok', event, grid: got.grid, ranked: rankSpots(got.grid, spots, event.azimuth, spot), here: scoreAt(got.grid, spot), asked: got.asked, satAt: got.satAt, satAsked: got.satAsked, drift: got.drift, station: got.station }
   }, [got, key, spot, event, radius, saved, osm])
 }
 

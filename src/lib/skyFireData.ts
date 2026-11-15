@@ -11,7 +11,7 @@
  */
 import { OPPOSITE_SAMPLES } from '../core/afterglow.ts'
 import { FIRE_MODELS, oppositePoints, PATH_KM, pathPoints, roundCoord, type FireModel, type Layers, type ModelPath } from '../core/skyFire.ts'
-import { parseMetarSky, type MetarSky } from '../core/metar.ts'
+import { metarTime, parseMetarSky, type MetarSky } from '../core/metar.ts'
 import type { LatLon } from '../core/geo.ts'
 import { OPEN_METEO_URL, TIMEOUT_MS } from './forecast.ts'
 import { FORECAST_MAX_AGE_MS, SLOW_MAX_AGE_MS, weatherJson } from './weatherStore.ts'
@@ -228,14 +228,15 @@ export async function stationSky(id: string, fetchImpl: typeof fetch = fetch): P
     if (r.ok) {
       const p = ((await r.json()) as { properties?: { rawMessage?: string; timestamp?: string } }).properties
       const sky = typeof p?.rawMessage === 'string' ? parseMetarSky(p.rawMessage) : null
-      if (sky !== null) return { sky, at: p?.timestamp ?? '', raw: p?.rawMessage ?? '' }
+      if (sky !== null) return { sky, at: p?.timestamp ?? metarTime(p?.rawMessage ?? '', new Date())?.toISOString() ?? '', raw: p?.rawMessage ?? '' }
     }
     /* weather.gov had no METAR text for it: ask this app's function, which reads aviationweather.gov. */
     const m = await fetchImpl(METAR_ENDPOINT, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ station: id }), signal: AbortSignal.timeout(TIMEOUT_MS) })
     if (!m.ok) return null
     const body = (await m.json()) as { metar?: string; at?: string }
     const sky = typeof body.metar === 'string' ? parseMetarSky(body.metar) : null
-    return sky === null ? null : { sky, at: body.at ?? '', raw: body.metar ?? '' }
+    /* The function's answer carries no time: the report's own (DDHHMMZ), so Sky Now and Sky Tonight read the same station (Batch LIVE, Section 10.2). */
+    return sky === null ? null : { sky, at: body.at ?? metarTime(body.metar ?? '', new Date())?.toISOString() ?? '', raw: body.metar ?? '' }
   } catch {
     return null
   }

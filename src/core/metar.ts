@@ -99,3 +99,19 @@ export function parseMetarWind(text: string): { fromDeg: number | null; kt: numb
   if (m === null) return null
   return { fromDeg: m[1] === 'VRB' ? null : Number(m[1]), kt: Number(m[2]), gustKt: m[3] === undefined ? null : Number(m[3]) }
 }
+
+/**
+ * The report's own time, from its DDHHMMZ group, in the month of `now` (the
+ * month before when that day is still ahead). Batch LIVE, Section 10.2: on 14
+ * Nov the METAR fallback answered with no time, so Sky Now said "no station
+ * report" while Sky Tonight showed KNTU BKN 5,500 from the same answer.
+ */
+export function metarTime(raw: string, now: Date): Date | null {
+  const m = /\b(\d{2})(\d{2})(\d{2})Z\b/.exec(raw)
+  if (m === null) return null
+  const [day, hour, min] = [Number(m[1]), Number(m[2]), Number(m[3])]
+  if (day < 1 || day > 31 || hour > 23 || min > 59) return null
+  let t = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), day, hour, min)
+  if (t > now.getTime() + 86_400_000) t = Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, day, hour, min)
+  return new Date(t)
+}

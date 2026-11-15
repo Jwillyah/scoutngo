@@ -10,7 +10,7 @@ const event = eventOf('2026-11-11', 'sunset').at
 describe('the best spot named', () => {
   it('"Color now · sunset 4:56 · look W · best Lynnhaven Inlet 9 mi NW"', () => {
     const read = { kind: 'sunset' as const, event, call: 'Maybe' as const, why: '', confirmed: false, colorFrom: null, colorTo: null, setUp: null, agree: 2, of: 5 }
-    expect(colorNowLine([read], new Date(event.getTime() - 10 * 60_000), VB, 'America/New_York', 'Lynnhaven Inlet 9 mi NW')).toMatch(/^Color now · sunset 4:5\d PM · look \w+ · best Lynnhaven Inlet 9 mi NW$/)
+    expect(colorNowLine([read], new Date(event.getTime() - 5 * 60_000), VB, 'America/New_York', 'Lynnhaven Inlet 9 mi NW')).toMatch(/^Color now · sunset 4:5\d PM · look \w+ · best Lynnhaven Inlet 9 mi NW$/)
     expect(colorNowLine([read], new Date(event.getTime() - 10 * 60_000), VB, 'America/New_York')).not.toContain('best')
   })
   it('the feed\'s server asks the tiles only (no spot), and its event says the best spot near', async () => {

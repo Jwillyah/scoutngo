@@ -1,0 +1,44 @@
+{
+  "date": "2026-11-14",
+  "event": "sunset",
+  "observedAt": "2026-11-14T16:39:00-05:00",
+  "place": {
+    "where": "VB inland ~9 mi W of oceanfront",
+    "note": "No exact coordinate kept. Tests use a rounded Virginia Beach point (36.8, -76.1)."
+  },
+  "station": {
+    "id": "KNTU",
+    "metar": "KNTU 142135Z BKN055",
+    "note": "Only the deck the Sky Tonight page showed (BKN 5,500 ft). The report's time group is the test's assumption, not read from the phone; no other groups are kept."
+  },
+  "truth": {
+    "sky": "broken cumulus at about 5,000-6,000 ft",
+    "color": "gold toward WSW, pink tops toward ENE",
+    "call": "Good toward WSW, afterglow ENE"
+  },
+  "appSaid": {
+    "home": [
+      "Clear",
+      "Mostly cloudy"
+    ],
+    "pill": "Color now · look NE",
+    "skyNow": [
+      "Nothing special now",
+      "A clear sky",
+      "no station report"
+    ],
+    "skyTonight": "KNTU BKN 5,500 with contradictory why lines",
+    "bestSky": [
+      "no patch overhead anywhere in reach",
+      "here: Little · Belt of Venus ENE"
+    ],
+    "surf": [
+      "2-3 ft Rideable",
+      "0-1 ft Flat"
+    ]
+  },
+  "shouldSay": {
+    "pillAt1639": "Color from 4:49 PM · look WSW + ENE",
+    "callTowardWSW": "Possible or better"
+  }
+}

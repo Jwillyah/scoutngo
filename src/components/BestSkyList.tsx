@@ -23,7 +23,7 @@ export function BestSkyList({ venue, placeName, radius, sky, top, miles, timeZon
       <p className="bsky__big" data-bsky-best>
         {best === null ? (sky.status === 'loading' ? '…' : 'Little anywhere') : distanceMeters(venue, best.spot.at) / 1000 < BETTER_FROM_KM ? 'Best right here' : `Best ${distanceWords(venue, best.spot.at, miles)}`}
       </p>
-      <p className="bsky__sum">{gridSummary(sky.ranked)}</p>
+      <p className="bsky__sum">{gridSummary(sky.ranked, sky.station ?? null)}</p>
       <RadiusChips radius={radius} miles={miles} onRadius={onRadius} />
       <div className="bsky__list">
         <p className="bsky__label">Best within {radiusWords(radius, miles)}</p>

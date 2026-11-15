@@ -5,7 +5,7 @@ import { compassPoint } from '../core/field.ts'
 import type { LatLon } from '../core/geo.ts'
 import { leadLayer } from '../core/fireOutlook.ts'
 import { colorWords, groundOf } from '../core/homeDay.ts'
-import { colorHeadline, eventDayWord, lightMarks, lightTimeline, nextEvent, nowShare, plainChecks, plainReason, rareRows, sideView, SIDE_TOP_M, type RareRow } from '../core/skyPage.ts'
+import { colorHeadline, eventDayWord, lightMarks, lightTimeline, nextEvent, nowShare, plainChecks, plainReason, rareRows, RARE_WAIT_MS, sideView, SIDE_TOP_M, type RareRow } from '../core/skyPage.ts'
 import type { Special } from '../core/specialLight.ts'
 import { formatClock } from '../core/timezone.ts'
 import { fetchGlassWeek, fetchSpecialWeek, specialsFrom } from '../lib/specialLightData.ts'
@@ -115,15 +115,19 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
   const key = `${venue.lat},${venue.lon}`
   useEffect(() => {
     let live = true
+    /* Batch LIVE, Section 10.7: on 14 Nov the list sat on "Reading five forecasts…"; after RARE_WAIT_MS it says the forecast did not arrive. */
+    const late = window.setTimeout(() => live && setRare((r) => (r !== null && r.key === key ? r : { key, rows: null, all: [] })), RARE_WAIT_MS)
     void (async () => {
       const week = await fetchSpecialWeek(venue).catch(() => null)
       const list: Special[] = week === null ? [] : specialsFrom(week.week, venue, week.seaCAt)
       const glass = brief.facing === null ? [] : await fetchGlassWeek(venue, new Date()).catch(() => [])
       const found = [...list, ...glass]
+      window.clearTimeout(late)
       if (live) setRare({ key, rows: week === null && glass.length === 0 ? null : rareRows(found, new Date(), venue), all: rareRows(found, new Date(), venue, Infinity) })
     })()
     return () => {
       live = false
+      window.clearTimeout(late)
     }
   }, [key, brief.facing]) // eslint-disable-line react-hooks/exhaustive-deps
   const rows = rare === null || rare.key !== key ? 'loading' : rareOpen && rare.rows !== null ? rare.all : rare.rows

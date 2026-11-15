@@ -71,9 +71,10 @@ describe('rare light this week', () => {
     expect(rows.map((r) => r.name)).toEqual(['Rainbow chance', 'Light rays'])
     expect(rows[0].why).toBe('showers to the east, sun 12° up in the west')
   })
-  it('the likeliest four, then said in time order; nothing already over', () => {
+  /* Batch LIVE, Section 10.7: three a week (RARE_MAX), was four. */
+  it('the likeliest three, then said in time order; nothing already over', () => {
     const rows = rareRows([sp('rays', 10, 'a', 1), sp('rays', 20, 'b', 5), sp('fog', 30, 'c', 4), sp('glass', 40, 'd', 4), sp('rainbow', 50, 'e', 3), sp('fog', -5, 'gone', 5)], now)
-    expect(rows.map((r) => r.why)).toEqual(['b', 'c', 'd', 'e'])
+    expect(rows.map((r) => r.why)).toEqual(['b', 'c', 'd'])
   })
 })
 
@@ -86,7 +87,7 @@ describe('rare light never repeats itself (Batch QA, Section 0: four identical "
     expect(rows[0].at.getTime()).toBe(now.getTime() + 6 * 3_600_000)
   })
   it('no two consecutive rows are the same item: a repeated name always carries a different reason and a different time', () => {
-    const rows = rareRows([sp('rays', 6, 'a'), sp('rays', 30, 'a'), sp('rays', 30, 'b'), sp('fog', 40, 'c'), sp('fog', 64, 'c'), sp('glass', 70, 'd')], now)
+    const rows = rareRows([sp('rays', 6, 'a'), sp('rays', 30, 'a'), sp('rays', 30, 'b'), sp('fog', 40, 'c'), sp('fog', 64, 'c'), sp('glass', 70, 'd')], now, null, Infinity)
     for (let i = 1; i < rows.length; i += 1) {
       const [p, r] = [rows[i - 1], rows[i]]
       if (p.name === r.name) {

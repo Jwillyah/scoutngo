@@ -10,11 +10,19 @@ export const radiusWords = (r: RadiusMi, miles: boolean): string => (miles ? `${
 /** "4:51 PM–5:13 PM": a window, each end with its AM or PM (or on the 24 hour clock), as every time on screen. */
 export const clockSpan = (from: Date, to: Date, timeZone: string): string => `${formatClock(from, timeZone)}–${formatClock(to, timeZone)}`
 
-/** "cloud over Lynnhaven Inlet and 3 more · clear elsewhere": what the grid says, in a line. */
-export function gridSummary(ranked: readonly RankedSpot[]): string {
+/** Station cover this much or more (BKN, 75%) is a deck overhead the models' grid may have missed. */
+export const STATION_DECK_PCT = 75
+
+/**
+ * "cloud over Lynnhaven Inlet and 3 more · clear elsewhere": what the grid says, in a line.
+ * Batch LIVE, Section 10.5: on 14 Nov 4:39 PM KNTU read BKN 5,500 ft and the line said "no patch overhead anywhere in
+ * reach"; with the station's deck (`station`, fresh) it says the station's sky instead, never "no patch" or "clear".
+ */
+export function gridSummary(ranked: readonly RankedSpot[], station: { cover: number | null; line: string | null } | null = null): string {
   const lit = ranked.filter((r) => r.why[0] === 'patch overhead')
   const clear = ranked.filter((r) => r.why[0] === 'clear sky')
   if (ranked.length === 0) return ''
+  if (lit.length === 0 && station !== null && station.line !== null && (station.cover ?? 0) >= STATION_DECK_PCT) return `${station.line} overhead · the models show no patch`
   if (lit.length === 0) return clear.length === ranked.length ? 'clear everywhere in reach' : 'no patch overhead anywhere in reach'
   return `cloud over ${lit[0].spot.name}${lit.length > 1 ? ` and ${lit.length - 1} more` : ''}${clear.length > 0 ? ' · clear elsewhere' : ''}`
 }
