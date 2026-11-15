@@ -81,13 +81,58 @@ export const LEAN_BUOY_MAX_AGE_MS = 2 * 3_600_000
  * beach against the forecast's corrected centre at its hour. Null when the
  * buoy is not fresh at `now` or either side cannot be worked out.
  */
-export function buoyLean(marine: Hourly, wind: Hourly | null, buoy: BuoyReading | null, facing: number | null, stats: SpotStats, factor: number, now: number): SurfLean | null {
+/*
+ * THE NOWCAST, WEIGHED (Batch LIVE, Section 9A; 14 Nov 2 PM: 44099, at the
+ * bay's mouth, read a 5.9 ft NW wind sea "as faces 0.0 ft" and zeroed a
+ * forecast of about 1.4 ft while the beaches had 1-3 ft).
+ *
+ *   direction  the buoy's face is worked at the circular mean of the
+ *              model's wave direction, the other buoys' on the same water
+ *              (44014, 44100), and its own; a bay-mouth buoy's own counts
+ *              half (BAY_MOUTH)
+ *   cap        the pull is at most PULL_MAX_FT, or half the forecast's
+ *              centre if more: a buoy that disagrees with the model is
+ *              capped, not followed; when the buoys disagree with each
+ *              other by more than DISAGREE_FT there is no one measurement
+ *              to lean to: no pull (DISAGREE_PULL_FT 0)
+ *   floor      a buoy never takes the centre below FLOOR_SHARE of the
+ *              forecast's: one buoy's 0 never zeroes a forecast
+ */
+export const BAY_MOUTH: ReadonlySet<string> = new Set(['44099'])
+export const PULL_MAX_FT = 1
+export const DISAGREE_FT = 1
+export const DISAGREE_PULL_FT = 0
+export const FLOOR_SHARE = 0.5
+
+const circularMean = (xs: readonly { deg: number; w: number }[]): number | null => {
+  const ok = xs.filter((x) => Number.isFinite(x.deg) && x.w > 0)
+  if (ok.length === 0) return null
+  const s = ok.reduce((m, x) => m + Math.sin((x.deg * Math.PI) / 180) * x.w, 0)
+  const c = ok.reduce((m, x) => m + Math.cos((x.deg * Math.PI) / 180) * x.w, 0)
+  return (((Math.atan2(s, c) * 180) / Math.PI) + 360) % 360
+}
+
+export function buoyLean(marine: Hourly, wind: Hourly | null, buoy: BuoyReading | null, facing: number | null, stats: SpotStats, factor: number, now: number, others: readonly BuoyReading[] = []): SurfLean | null {
   if (buoy === null || buoy.status !== 'ok') return null
   const at = buoy.at.getTime()
   if (!Number.isFinite(at) || now - at > LEAN_BUOY_MAX_AGE_MS || at > now + 3_600_000) return null
-  const ft = buoyFaceFt({ waveM: buoy.waveM, periodS: buoy.periodS, fromDeg: buoy.fromDeg }, facing, factor)
+  const fresh = others.filter((o): o is Extract<BuoyReading, { status: 'ok' }> => o.status === 'ok' && o.buoy.id !== buoy.buoy.id && Math.abs(o.at.getTime() - at) <= LEAN_BUOY_MAX_AGE_MS)
+  const modelDir = hourlyAt(marine, 'wave_direction', buoy.at)
+  const dir = circularMean([
+    ...(modelDir === null ? [] : [{ deg: modelDir, w: 1 }]),
+    ...fresh.flatMap((o) => (o.fromDeg === null ? [] : [{ deg: o.fromDeg, w: 1 }])),
+    ...(buoy.fromDeg === null ? [] : [{ deg: buoy.fromDeg, w: BAY_MOUTH.has(buoy.buoy.id) ? 0.5 : 1 }]),
+  ])
+  const ft = buoyFaceFt({ waveM: buoy.waveM, periodS: buoy.periodS, fromDeg: dir }, facing, factor)
   const there = rangeHourAt(marine, wind, buoy.at, facing, stats, factor)
-  return surfLean(ft, there === null ? null : there.centerFt, at)
+  const centre = there === null ? null : there.centerFt
+  const raw = surfLean(ft, centre, at)
+  if (raw === null || centre === null || ft === null) return raw
+  const faces = [ft, ...fresh.map((o) => buoyFaceFt({ waveM: o.waveM, periodS: o.periodS, fromDeg: o.fromDeg }, facing, factor)).filter((x): x is number => x !== null)]
+  const disagree = Math.max(...faces) - Math.min(...faces) > DISAGREE_FT
+  const cap = disagree ? DISAGREE_PULL_FT : Math.max(PULL_MAX_FT, centre / 2)
+  const floor = -(1 - FLOOR_SHARE) * centre
+  return { ...raw, missFt: Math.max(floor, Math.max(-cap, Math.min(cap, raw.missFt))) }
 }
 
 /* The hours the page draws, local: 5 AM to 8 PM, each at half past (the home's hours). */

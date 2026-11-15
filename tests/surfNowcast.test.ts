@@ -5,7 +5,7 @@ import { leanRange, SURF_FADE_MS, surfLeanWeight } from '../src/core/surfNowcast
 import { SURF_SPOTS } from '../src/data/surfSpots.ts'
 import type { BuoyReading } from '../src/lib/buoy.ts'
 import { nearestBuoys } from '../src/lib/buoy.ts'
-import { buoyLean, LEAN_BUOY_MAX_AGE_MS } from '../src/lib/surfPageData.ts'
+import { buoyLean, LEAN_BUOY_MAX_AGE_MS, PULL_MAX_FT } from '../src/lib/surfPageData.ts'
 import { surfNowFrom } from '../src/lib/useSurfNow.ts'
 import type { SurfSea } from '../src/lib/useSurfSea.ts'
 import type { Hourly } from '../src/lib/tideSheetData.ts'
@@ -51,7 +51,8 @@ describe('the surf nowcast: the next 6 h lean to the buoy, then the model', () =
     const face = buoyFaceFt({ waveM: 3.0 / 3.28084, periodS: 12, fromDeg: 90 }, MIRLO.facing, beachFactorAt(MIRLO.at)) as number
     expect(face).toBeGreaterThanOrEqual(3)
     const lean = buoyLean(marine, wind, buoy(at), MIRLO.facing, NO_STATS, beachFactorAt(MIRLO.at), NOW)
-    expect(lean?.missFt).toBeGreaterThan(1)
+    /* Batch LIVE, Section 9A: a buoy against the model is capped at 1 ft or half the centre, not followed. */
+    expect(lean?.missFt).toBeCloseTo(Math.max(PULL_MAX_FT, (without?.centerFt as number) / 2), 6)
     const withBuoy = surfNowFrom(sea(buoy(at)), NO_STATS, new Date(NOW), TZ).now
     /* Read at half past: 50 minutes after the reading, the lean is still 1 - 50/360. */
     expect(withBuoy?.centerFt).toBeCloseTo((without?.centerFt as number) + (1 - 50 / 360) * (lean?.missFt as number), 6)

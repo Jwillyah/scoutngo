@@ -100,7 +100,7 @@ export function surfNowFrom(sea: SurfSea, stats: SpotStats, now: Date, timeZone:
   if (sea.marine === null) return { now: null, tomorrow: null, week: [] }
   const today = venueToday(now, timeZone)
   /* Batch Beach, Section 2: the next 6 h lean to the live buoy, and the tag reads the leaned centre. */
-  const lean = buoyLean(sea.marine, sea.wind, sea.buoy, sea.facing, stats, sea.factor ?? BEACH_CAP, now.getTime())
+  const lean = buoyLean(sea.marine, sea.wind, sea.buoy, sea.facing, stats, sea.factor ?? BEACH_CAP, now.getTime(), sea.buoys ?? [])
   const week = weekPeaks(sea.marine, sea.wind, today, timeZone, sea.facing, stats, sea.factor, lean)
   const tomorrow = week.find((d) => d.date === addDays(today, 1))?.peak ?? null
   /* Read at the hour's half past, as the day's bars are: two screens a few seconds apart read the same hour. */

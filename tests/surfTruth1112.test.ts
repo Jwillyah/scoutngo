@@ -42,9 +42,12 @@ describe('the wind to the beach in five', () => {
 })
 
 describe('wind sea blown off the land never reaches the beach', () => {
-  it('a wind sea from more than 90° off the facing comes out of the height; one from the sea stays', () => {
+  /* Batch LIVE, Section 9A: a taper, not a cut: the wind sea's share by the spread cos² of its angle (src/core/surf.ts reachShare). */
+  it('a wind sea blowing off the land comes out of the height; one from the sea stays, nearly whole', () => {
     expect(towardBeachM(1, 0.8, 315, FACING)).toBeCloseTo(0.6, 5)
-    expect(towardBeachM(1, 0.8, 120, FACING)).toBe(1)
+    expect(towardBeachM(1, 0.8, 120, FACING)).toBeGreaterThan(0.95)
+    expect(towardBeachM(1, 0.8, 0, FACING)).toBeGreaterThan(0.6)
+    expect(towardBeachM(1, 0.8, 0, FACING)).toBeLessThan(1)
     expect(towardBeachM(1, null, 315, FACING)).toBe(1)
   })
   it('Fri 13 Nov, NW wind: no longer the 1–4 ft the screens said; Small at most', () => {

@@ -16,7 +16,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { factorHere } from './beachFactorHere.ts'
 import { readReports, REPORTS_CHANGED } from './fieldReportStore.ts'
 import type { LatLon } from '../core/geo.ts'
-import { latestBuoyWaves, type BuoyReading } from './buoy.ts'
+import { latestBuoys, type BuoyReading } from './buoy.ts'
 import { coastFacing } from './coast.ts'
 import { fetchBriefWind, fetchMarine, type Hourly } from './tideSheetData.ts'
 import { retrying } from './retrying.ts'
@@ -32,6 +32,8 @@ export interface SurfSea {
   /** 'inland': the map has no sea here. */
   facingState: 'loading' | 'ok' | 'inland' | 'unavailable'
   buoy: BuoyReading | null
+  /** Batch LIVE, Section 9A: every nearby buoy on the same water that answered, the nowcast's check on the nearest. */
+  buoys?: BuoyReading[]
   /** The region's beach factor (src/core/beachFactor.ts); absent: BEACH_CAP. */
   factor?: number
 }
@@ -82,10 +84,11 @@ export function useSurfSea(spot: LatLon | null): SurfSea {
           facingState: f === 'inland' ? 'inland' : f === 'unavailable' ? 'unavailable' : 'ok',
         })
       }
-      const buoy = await latestBuoyWaves(at, facing ?? null).catch(() => null)
+      const all = await latestBuoys(at, facing ?? null).catch(() => null)
+      const buoy = all === null ? null : (all[0] ?? null)
       const buoyLost = buoy === null || (buoy.status === 'none' && buoy.reason === "The buoy didn't load.")
       if (!buoyLost) gotBuoy = true
-      if (!buoyLost || !gotBuoy) put({ buoy })
+      if (!buoyLost || !gotBuoy) put({ buoy, buoys: all ?? [] })
       return m !== null && w !== null && facing !== undefined && !buoyLost
     })
     return () => {

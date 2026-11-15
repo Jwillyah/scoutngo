@@ -126,7 +126,7 @@ export function SurfBody({ now, timeZone, spot, spotName, away, sea, stats, kept
   const today = venueToday(now, timeZone)
   /* Batch Beach, Section 2: the next 6 h lean to the live buoy (src/core/surfNowcast.ts), as the head does (surfNowFrom). */
   const nowMs = now.getTime()
-  const lean = useMemo(() => (marine === null ? null : buoyLean(marine, wind, sea.buoy, facing, stats, factor ?? BEACH_CAP, nowMs)), [marine, wind, sea.buoy, facing, stats, factor, nowMs])
+  const lean = useMemo(() => (marine === null ? null : buoyLean(marine, wind, sea.buoy, facing, stats, factor ?? BEACH_CAP, nowMs, sea.buoys ?? [])), [marine, wind, sea.buoy, sea.buoys, facing, stats, factor, nowMs])
   const hours = useMemo(() => (marine === null ? [] : dayHours(marine, wind, today, timeZone, facing, stats, factor, lean)), [marine, wind, today, timeZone, facing, stats, factor, lean])
   /* Batch TRUTH, Section 1: the head and the week strip read the day calls the home reads (useSurfNow's week, src/core/surfCall.ts). */
   const read = useMemo(() => surfNowFrom(sea, stats, now, timeZone), [sea, stats, now, timeZone])

@@ -137,3 +137,28 @@
   color: var(--color-text);
   font-weight: 700;
 }
+
+/* Batch LIVE, Section 9B: which spot, as chips that wrap; the move button; the share toggle at the row's end. */
+.drep__spots {
+  display: flex;
+  flex-wrap: wrap;
+}
+.drep__spots .drep__chip {
+  flex: 0 1 auto;
+  padding: 0 12px;
+}
+.drep__share {
+  align-items: center;
+  justify-content: space-between;
+}
+.drep__move {
+  flex: none;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  color: var(--white);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 700;
+}

@@ -73,3 +73,19 @@ export function removeReport(at: number, spot: string, store: Store | null = loc
   changed()
   return next
 }
+
+/**
+ * Move a report to another spot (Batch LIVE, Section 9B: the 14 Nov 3:17 PM
+ * Croatan report saved as "Virginia Beach" before there was a picker). Its
+ * time, size, rating and buoy stay as they were.
+ */
+export function retagReport(at: number, spot: string, to: { key: string; name: string }, store: Store | null = local()): FieldReport[] {
+  const next = readReports(store).map((r) => (r.at === at && r.spot === spot ? { ...r, spot: to.key, name: to.name } : r))
+  try {
+    store?.setItem(FIELD_REPORTS_KEY, JSON.stringify(next))
+  } catch {
+    /* As above. */
+  }
+  changed()
+  return next
+}

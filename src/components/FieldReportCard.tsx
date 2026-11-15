@@ -8,7 +8,10 @@ import { SURF_SPOTS } from '../data/surfSpots.ts'
 import { BUOY_WITHIN_MS, choice, photoPrefill, type PhotoPrefill, type SpotChoice } from '../lib/photoReport.ts'
 import { reviveSpots, SPOTS_STORAGE_KEY } from '../lib/spots.ts'
 import { venueLatLon } from '../lib/venue.ts'
-import { addReport, readReports, removeReport } from '../lib/fieldReportStore.ts'
+import { addReport, readReports, removeReport, retagReport } from '../lib/fieldReportStore.ts'
+import { distanceMeters } from '../core/geo.ts'
+import { spotKey } from '../core/spotSkill.ts'
+import { Toggle } from './ui.tsx'
 import { DCard } from './DetailShell.tsx'
 import { PageGroup } from '../lib/pageGroup.ts'
 import { Page } from './Page.tsx'
@@ -45,9 +48,17 @@ export function FieldReportCard({ spot, name, at: spotAt, timeZone, buoyFt, now,
   const [saved, setSaved] = useState<FieldReport | null>(null)
   /* Batch Beach, Section 3: on the Surf page one row (the page fits one screen, nothing scrolls); the chips on a page of their own. */
   const [open, setOpen] = useState(startOpen)
-  const here = reports.filter((r) => r.spot === spot)
+  /*
+   * Batch LIVE, Section 9B: which spot it was. The nearest surf spots as
+   * chips, the nearest first and picked; the report, its count and the
+   * spot's own factor are the chosen spot's (a jetty breaks its own way).
+   */
+  const near = nearSurfSpots(spotAt ?? null)
+  const [chosenKey, setChosenKey] = useState<string | null>(null)
+  const chosen = near.find((c) => c.key === chosenKey) ?? near[0] ?? { key: spot, name, km: 0 }
+  const here = reports.filter((r) => r.spot === chosen.key)
   const withBuoy = here.filter((r) => r.buoyFt !== null).length
-  const factor = spotFactor(reports, spot)
+  const factor = spotFactor(reports, chosen.key)
 
   /* Batch Polish, Section 6: a photo prefills the time and the spot; the photo itself is read here and dropped. */
   const [photo, setPhoto] = useState<PhotoPrefill | null>(null)
@@ -59,9 +70,9 @@ export function FieldReportCard({ spot, name, at: spotAt, timeZone, buoyFt, now,
   const save = () => {
     if (size === null || rating === null) return
     const at = photo?.at ?? now()
-    const target = photo?.spot ?? { key: spot, name }
-    /* The live buoy stands beside a report about now, here; a photo from earlier, or of another spot, has none. */
-    const buoy = target.key === spot && Math.abs(at - now()) <= BUOY_WITHIN_MS ? buoyFt : null
+    const target = photo?.spot ?? { key: chosen.key, name: chosen.name }
+    /* The live buoy stands beside a report about now, near here; a photo from earlier has none. */
+    const buoy = (target.key === chosen.key || target.key === spot) && Math.abs(at - now()) <= BUOY_WITHIN_MS ? buoyFt : null
     const r: FieldReport = { spot: target.key, name: target.name, at, size, rating, buoyFt: buoy }
     setReports(addReport(r))
     setSaved(r)
@@ -74,7 +85,7 @@ export function FieldReportCard({ spot, name, at: spotAt, timeZone, buoyFt, now,
     here.length === 0
       ? 'Your reports stay on this phone.'
       : factor === null
-        ? `${here.length} ${here.length === 1 ? 'report' : 'reports'} here · ${withBuoy} with a buoy; ${SPOT_FACTOR_MIN_REPORTS} calibrate this spot`
+        ? `${Math.min(withBuoy, SPOT_FACTOR_MIN_REPORTS)} of ${SPOT_FACTOR_MIN_REPORTS} reports needed to tune this spot`
         : `${here.length} reports here · this spot breaks ${factor.toFixed(2)}× the buoy, from yours`
 
   const row = (
@@ -99,7 +110,16 @@ export function FieldReportCard({ spot, name, at: spotAt, timeZone, buoyFt, now,
       {row}
       <PageGroup.Provider value={null}>
         <Page title="What did you see?" className="reportpage" back onClose={() => setOpen(false)}>
-    <DCard label={name} className="drep">
+    <DCard label={chosen.name} className="drep">
+      {near.length < 2 ? null : (
+        <div className="drep__row drep__spots" role="radiogroup" aria-label="Which spot">
+          {near.map((c) => (
+            <button key={c.key} type="button" role="radio" aria-checked={c.key === chosen.key} className={`drep__chip${c.key === chosen.key ? ' drep__chip--on' : ''}`} data-report-spot={c.name} onClick={() => setChosenKey(c.key)}>
+              {c.name}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="drep__row" role="group" aria-label="Size">
         {REPORT_SIZES.map((s) => (
           <button key={s.id} type="button" className={`drep__chip${size === s.id ? ' drep__chip--on' : ''}`} aria-pressed={size === s.id} onClick={() => setSize(s.id)}>
@@ -121,7 +141,7 @@ export function FieldReportCard({ spot, name, at: spotAt, timeZone, buoyFt, now,
             e.target.value = ''
           }} />
           <span className="drep__photobtn">Add a photo</span>
-          <span>its time and place fill this in; the photo is not kept or sent</span>
+          <span>The photo’s time and place fill this in. The photo isn’t kept or sent.</span>
         </label>
       )}
       {photo === null ? null : (
@@ -131,10 +151,10 @@ export function FieldReportCard({ spot, name, at: spotAt, timeZone, buoyFt, now,
           {photo.spot === null ? '' : ` · ${photo.spot.name}`}
         </p>
       )}
-      <label className="drep__share">
-        <input type="checkbox" checked={share} onChange={(e) => setShare(e.target.checked)} />
-        <span>Also share publicly: the spot’s name, the hour, the size and the rating, nothing else. Off unless you tick it; you post it yourself.</span>
-      </label>
+      <div className="drep__share">
+        <span>Also share publicly: the spot’s name, the hour, the size and the rating, nothing else. Off unless you turn it on; you post it yourself.</span>
+        <Toggle on={share} label="Also share publicly" onChange={setShare} />
+      </div>
       <button type="button" className="drep__save" disabled={size === null || rating === null} onClick={save}>
         Save on this phone
       </button>
@@ -164,6 +184,11 @@ export function FieldReportCard({ spot, name, at: spotAt, timeZone, buoyFt, now,
                 <span>
                   {r.name} · {sizeOf(r.size).words} · {r.rating} · {formatClock(new Date(r.at), timeZone)}
                 </span>
+                {r.spot === chosen.key ? null : (
+                  <button type="button" className="drep__move" onClick={() => setReports(retagReport(r.at, r.spot, { key: chosen.key, name: chosen.name }))}>
+                    Move to {chosen.name}
+                  </button>
+                )}
                 <button type="button" className="drep__del" aria-label="Delete this report" onClick={() => setReports(removeReport(r.at, r.spot))}>
                   ×
                 </button>
@@ -176,6 +201,17 @@ export function FieldReportCard({ spot, name, at: spotAt, timeZone, buoyFt, now,
       </PageGroup.Provider>
     </>
   )
+}
+
+/** The surf spots within NEAR_SPOTS_KM, nearest first, at most NEAR_SPOTS (Batch LIVE, Section 9B). */
+const NEAR_SPOTS_KM = 25
+const NEAR_SPOTS = 6
+function nearSurfSpots(at: LatLon | null): { key: string; name: string; km: number }[] {
+  if (at === null) return []
+  return SURF_SPOTS.map((s) => ({ key: spotKey(s.at), name: s.name, km: distanceMeters(at, s.at) / 1000 }))
+    .filter((s) => s.km <= NEAR_SPOTS_KM)
+    .sort((a, b) => a.km - b.km)
+    .slice(0, NEAR_SPOTS)
 }
 
 /** The spots a photo can be matched to: the surf spots and your saved ones (read here, never sent). */

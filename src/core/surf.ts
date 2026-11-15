@@ -35,8 +35,14 @@ export const BREAK_AGREE = 0.15
 export function angledHeight(h0: number, swellFromDeg: number, facingDeg: number | null): number {
   if (facingDeg === null) return h0
   const theta = angleApart(swellFromDeg, facingDeg)
-  if (theta >= 90) return 0
-  return h0 * Math.sqrt(Math.cos((theta * Math.PI) / 180))
+  /*
+   * Batch LIVE, Section 9A: the calibrated √cos up to where it was fitted,
+   * then the spread taper (reachShare): a sea 94° off an E-facing beach, the
+   * N windswell of 14 Nov, reaches it at about a fifth of its height instead
+   * of none. Nothing past about 120°.
+   */
+  const fitted = theta >= 90 ? 0 : Math.sqrt(Math.cos((theta * Math.PI) / 180))
+  return h0 * Math.max(fitted, Math.sqrt(reachShare(theta)))
 }
 
 export const breakKomar = (h0: number, period: number): number => (h0 <= 0 || period <= 0 ? 0 : 0.39 * G ** 0.2 * (period * h0 * h0) ** 0.4)
@@ -112,10 +118,30 @@ export const MESSY_ONSHORE_MPS = 5.1
  * Fri 13 Nov at Virginia Beach: NW 12 g21, offshore, read 1-4 ft from the
  * NW wind sea alone.
  */
+/*
+ * A TAPER, NOT A CUT (Batch LIVE, Section 9A; 14 Nov 3:13 PM: 2-3 ft at 1st
+ * St Jetty, 1-2 at Croatan and North End, while a NW wind sea read as "0 ft"
+ * and the page said Flat). The share of a wind sea's energy that reaches the
+ * beach falls as cos² of its angle off the beach's normal, spread over
+ * ±SPREAD_DEG the way a real sea is (SPREAD_STEPS directions, each cos²
+ * where it faces in, 0 where it faces out), normalised to 1 head-on: about
+ * 0.56 at 45°, 0.07 at 90°, nothing past about 110°. Heights add as squares.
+ */
+export const SPREAD_DEG = 30
+const SPREAD_STEPS = [-1, -0.5, 0, 0.5, 1]
+const spreadCos2 = (offDeg: number) => SPREAD_STEPS.reduce((m, k) => m + Math.max(0, Math.cos(((offDeg + k * SPREAD_DEG) * Math.PI) / 180)) ** 2, 0) / SPREAD_STEPS.length
+const HEAD_ON = spreadCos2(0)
+
+/** The share of a sea's energy that reaches a beach from `offDeg` off its normal, 0-1. */
+export function reachShare(offDeg: number): number {
+  return Math.max(0, Math.min(1, spreadCos2(Math.abs(offDeg)) / HEAD_ON))
+}
+
 export function towardBeachM(totalM: number, windWaveM: number | null, windWaveFromDeg: number | null, facingDeg: number | null): number {
   if (windWaveM === null || windWaveFromDeg === null || facingDeg === null || !(windWaveM > 0)) return totalM
-  if (angleApart(windWaveFromDeg, facingDeg) <= 90) return totalM
-  return Math.sqrt(Math.max(0, totalM * totalM - windWaveM * windWaveM))
+  const share = reachShare(angleApart(windWaveFromDeg, facingDeg))
+  const ww = Math.min(windWaveM, totalM)
+  return Math.sqrt(Math.max(0, totalM * totalM - ww * ww * (1 - share)))
 }
 
 /** Cross-offshore under this grooms the faces like offshore (Batch TRUTH, Section 2): 12 kt. */
