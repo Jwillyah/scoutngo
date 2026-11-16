@@ -79,6 +79,20 @@ let wake: ReturnType<typeof setTimeout> | null = null
 /** Counts the ends of back-offs: screens depend on it to ask again then, and on nothing else. */
 let epoch = 0
 export const weatherEpoch = (): number => epoch
+
+/*
+ * WHAT THE SCREENS ARE SHOWING (Batch CORE, Section 7A.6): the newest forecast
+ * answer given out this session, fresh or kept, for the signal chip ("Offline
+ * · showing 3:10 PM"). Null until one is given.
+ */
+let shownAt: number | null = null
+function noteShown(at: number): void {
+  if (shownAt === null || at > shownAt) {
+    shownAt = at
+    tell()
+  }
+}
+export const weatherShownAt = (): number | null => shownAt
 /** Every request actually sent, for Settings › Debug and for the tests' budget. */
 const sent: { at: number; host: string; status: number | 'failed' }[] = []
 
@@ -321,9 +335,16 @@ export async function weatherJson(asked: string, opts: { maxAgeMs: number; fetch
   const key = weatherKey(url)
   const now = Date.now()
   const kept = await readKept(key)
-  if (kept !== null && now - kept.fetchedAt <= opts.maxAgeMs) return { ok: true, payload: kept.payload, fetchedAt: kept.fetchedAt, stale: false, kept: true }
+  if (kept !== null && now - kept.fetchedAt <= opts.maxAgeMs) {
+    noteShown(kept.fetchedAt)
+    return { ok: true, payload: kept.payload, fetchedAt: kept.fetchedAt, stale: false, kept: true }
+  }
   const usable = kept !== null && now - kept.fetchedAt <= KEEP_MS ? kept : null
-  const fallback = (miss: WeatherMiss): WeatherAnswer => (usable !== null ? { ok: true, payload: usable.payload, fetchedAt: usable.fetchedAt, stale: true, kept: true } : miss)
+  const fallback = (miss: WeatherMiss): WeatherAnswer => {
+    if (usable === null) return miss
+    noteShown(usable.fetchedAt)
+    return { ok: true, payload: usable.payload, fetchedAt: usable.fetchedAt, stale: true, kept: true }
+  }
   const b = weatherBusy(now)
   if (b !== null) return fallback({ ok: false, unreachable: false, reason: busyWords(b, now) })
   const waiting = inFlight.get(key)
@@ -354,6 +375,7 @@ export async function weatherJson(asked: string, opts: { maxAgeMs: number; fetch
       refusals = 0
       busy = null
       const fresh = { payload, fetchedAt: Date.now() }
+      noteShown(fresh.fetchedAt)
       await writeKept(key, fresh)
       /* A refresh behind a kept answer: the screens showing the old one ask again. */
       if (usable !== null) epoch += 1

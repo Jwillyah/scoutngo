@@ -1,8 +1,9 @@
 import { useBundledPlaceName } from './lib/useBundledPlaceName.ts'
+import { lazyPage } from './lib/lazyPage.ts'
 import { seaReach } from './lib/coast.ts'
 import { placeKeyOf, resolveReach } from './lib/placeMemory.ts'
 import { showSurf, SURF_COAST_M, useSurfSetting } from './lib/surfSetting.ts'
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { type ConeMode } from './lib/coneMode.ts'
 import type { MapHandle } from './components/MapView.tsx'
 import { NewBuildNotice } from './components/NewBuildNotice.tsx'
@@ -168,23 +169,23 @@ import { readLastSetup, writeLastSetup, type LastSetup } from './lib/lastSetup.t
  * first run; the landing and the activity picker are first-run screens; Near
  * you is the plan's; the menu opens on a tap (fetched at the first touch).
  */
-const Landing = lazy(() => import('./components/Landing.tsx').then((m) => ({ default: m.Landing })))
-const NearYou = lazy(() => import('./components/NearYou.tsx').then((m) => ({ default: m.NearYou })))
-const ActivityPicker = lazy(() => import('./components/ActivityPicker.tsx').then((m) => ({ default: m.ActivityPicker })))
+const Landing = lazyPage(() => import('./components/Landing.tsx').then((m) => ({ default: m.Landing })))
+const NearYou = lazyPage(() => import('./components/NearYou.tsx').then((m) => ({ default: m.NearYou })))
+const ActivityPicker = lazyPage(() => import('./components/ActivityPicker.tsx').then((m) => ({ default: m.ActivityPicker })))
 const loadMenu = () => import('./components/Menu.tsx').then((m) => ({ default: m.Menu }))
-const Menu = lazy(loadMenu)
-const SpotPicker = lazy(() => import('./components/SpotPicker.tsx').then((m) => ({ default: m.SpotPicker })))
-const PlanMode = lazy(() => import('./components/PlanMode.tsx').then((m) => ({ default: m.PlanMode })))
-const FieldMode = lazy(() => import('./components/FieldMode.tsx').then((m) => ({ default: m.FieldMode })))
-const NowScreen = lazy(() => import('./components/NowScreen.tsx').then((m) => ({ default: m.NowScreen })))
-const SetupMode = lazy(() => import('./components/SetupMode.tsx').then((m) => ({ default: m.SetupMode })))
-const PrivacyPage = lazy(() => import('./components/PrivacyPage.tsx').then((m) => ({ default: m.PrivacyPage })))
-const Viewfinder = lazy(() => import('./components/Viewfinder.tsx').then((m) => ({ default: m.Viewfinder })))
-const ViewfinderNeedsPlace = lazy(() => import('./components/Viewfinder.tsx').then((m) => ({ default: m.ViewfinderNeedsPlace })))
-const WeatherPage = lazy(() => import('./components/WeatherPage.tsx').then((m) => ({ default: m.WeatherPage })))
-const SkyPage = lazy(() => import('./components/SkyPage.tsx').then((m) => ({ default: m.SkyPage })))
-const BestSkyPage = lazy(() => import('./components/BestSkyPage.tsx').then((m) => ({ default: m.BestSkyPage })))
-const DronePage = lazy(() => import('./components/DronePage.tsx').then((m) => ({ default: m.DronePage })))
+const Menu = lazyPage(loadMenu)
+const SpotPicker = lazyPage(() => import('./components/SpotPicker.tsx').then((m) => ({ default: m.SpotPicker })))
+const PlanMode = lazyPage(() => import('./components/PlanMode.tsx').then((m) => ({ default: m.PlanMode })))
+const FieldMode = lazyPage(() => import('./components/FieldMode.tsx').then((m) => ({ default: m.FieldMode })))
+const NowScreen = lazyPage(() => import('./components/NowScreen.tsx').then((m) => ({ default: m.NowScreen })))
+const SetupMode = lazyPage(() => import('./components/SetupMode.tsx').then((m) => ({ default: m.SetupMode })))
+const PrivacyPage = lazyPage(() => import('./components/PrivacyPage.tsx').then((m) => ({ default: m.PrivacyPage })))
+const Viewfinder = lazyPage(() => import('./components/Viewfinder.tsx').then((m) => ({ default: m.Viewfinder })))
+const ViewfinderNeedsPlace = lazyPage(() => import('./components/Viewfinder.tsx').then((m) => ({ default: m.ViewfinderNeedsPlace })))
+const WeatherPage = lazyPage(() => import('./components/WeatherPage.tsx').then((m) => ({ default: m.WeatherPage })))
+const SkyPage = lazyPage(() => import('./components/SkyPage.tsx').then((m) => ({ default: m.SkyPage })))
+const BestSkyPage = lazyPage(() => import('./components/BestSkyPage.tsx').then((m) => ({ default: m.BestSkyPage })))
+const DronePage = lazyPage(() => import('./components/DronePage.tsx').then((m) => ({ default: m.DronePage })))
 
 /*
  * The calibration venue is a DEVELOPER SHORTCUT and means nothing to anyone

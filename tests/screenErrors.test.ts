@@ -7,7 +7,9 @@ describe('3D, Fly, the planner and the map say when they did not load', () => {
   it('Fly within 3 s or "Fly didn\'t load"; 3D and Fly failures go to the phone\'s log', () => {
     expect(FLY_LOAD_MS).toBe(3000)
     const clay = readFileSync('src/components/Clay3D.tsx', 'utf8')
-    expect(clay).toMatch(/<ScreenFailCard title="Fly didn't load"/)
+    expect(clay).toMatch(/<ScreenFailCard title=\{online \? "Fly didn't load" : 'Fly needs a signal'\}/)
+    /* Batch CORE, Section 7A.2: offline, said at once. */
+    expect(clay).toMatch(/\{online \? <>3D didn&rsquo;t load<\/> : '3D needs a signal'\}/)
     expect(clay).toMatch(/recordError\(fly !== null \? 'Fly' : '3D', 'WebGL context lost/)
   })
   it('a boundary round the map and the planner; a 3D crash says which screen over the map', () => {

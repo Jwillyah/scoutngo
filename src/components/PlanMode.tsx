@@ -1,4 +1,5 @@
 import { buildingsBox, type Box as BuildingsBox } from '../core/buildingsBox.ts'
+import { lazyPage } from '../lib/lazyPage.ts'
 import { ScreenBoundary, ScreenFailCard } from './ScreenBoundary.tsx'
 import { markScreenOpen, recordError } from '../lib/errorLog.ts'
 import { NetDebug } from './NetDebug.tsx'
@@ -15,7 +16,7 @@ import { getSunPosition } from '../core/sun.ts'
 import { onLiveTime } from '../lib/liveTime.ts'
 import { ComparePhoto } from './ComparePhoto.tsx'
 import type { BuildCheck } from '../lib/build.ts'
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { LatLon } from '../core/geo.ts'
 import { awayDistance, awayLabel } from '../core/awayWords.ts'
 import type { CalCat } from '../core/calendarV2.ts'
@@ -491,8 +492,8 @@ interface PlanModeProps {
  * Batch Polish, Section 1, step 3: the map (MapLibre) and the 3D view
  * (three.js) are their own downloads, asked for when they first mount.
  */
-const MapView = lazy(() => import('./MapView.tsx').then((m) => ({ default: m.MapView })))
-const Clay3D = lazy(() => import('./Clay3D.tsx').then((m) => ({ default: m.Clay3D })))
+const MapView = lazyPage(() => import('./MapView.tsx').then((m) => ({ default: m.MapView })))
+const Clay3D = lazyPage(() => import('./Clay3D.tsx').then((m) => ({ default: m.Clay3D })))
 
 /* The card requests that open a full page (or the calendar) over the map. */
 const PAGE_REQUESTS: ReadonlySet<string> = new Set(['exposure', 'tides', 'surf', 'buoys', 'wind', 'terrain', 'settings', 'about', 'calendar'])

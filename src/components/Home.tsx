@@ -1,9 +1,12 @@
 import { bestSpotWords, betterColorLine } from '../core/bestSky.ts'
+import { lazyPage } from '../lib/lazyPage.ts'
 import { skyCallNow } from '../core/skyCall.ts'
 import { useGoAlert } from '../lib/goAlert.ts'
+import { SignalChip } from './SignalChip.tsx'
+import { useSignalWords } from '../lib/useSignalWords.ts'
 import { useBestSky } from '../lib/useBestSky.ts'
 import '../styles/home-d.css'
-import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 /* suncalc 2.0.2 (this repo's): altitude and azimuth in DEGREES, azimuth from north, clockwise (Batch N E10: the moon read "S" when it was treated as radians from south). */
 import { getMoonPosition, getPosition } from 'suncalc'
 import { saneAzimuth } from '../core/sanity.ts'
@@ -33,7 +36,7 @@ import { NetDebug } from './NetDebug.tsx'
 import { refreshLine, useWeatherRefreshing } from '../lib/useWeatherStatus.ts'
 import { MoonGlyph } from './MoonGlyph.tsx'
 /* Batch Polish 2, Section 4: not in the first paint's JavaScript. The cams' sheet opens on a tap; the weather-only home is one choice of five. */
-const WeatherHome = lazy(() => import('./WeatherHome.tsx').then((m) => ({ default: m.WeatherHome })))
+const WeatherHome = lazyPage(() => import('./WeatherHome.tsx').then((m) => ({ default: m.WeatherHome })))
 import { OPEN_RADAR_EVENT } from '../lib/pageEvents.ts'
 import { SkyIconSvg } from './SkyIconSvg.tsx'
 import { HomeHours } from './HomeHours.tsx'
@@ -271,6 +274,7 @@ interface DayViewProps {
 }
 
 function DayView({ which, brief, day, order, venue, timeZone, units, drone, now, alert, stormLine, onOpen, onDebug, surf, obs, layout, shown, weatherOnly = false }: DayViewProps) {
+  const signal = useSignalWords(timeZone)
   const clock = (d: Date | null) => (d === null ? '—' : formatClock(d, timeZone))
   const wx = brief.wx
   const at = (name: string, t: Date) => (wx === null ? null : hourlyAt(wx, name, t))
@@ -379,7 +383,10 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
       )}
       <div className="hwx hwx--d">
         {/* Batch TRUTH, Section 0.5: in a live colour window the date line's slot leads with it, at no extra height. */}
-        {colorNow === null ? (
+        {/* Batch CORE, Section 7A.6: no signal, or old data, said once, in the same slot (src/components/SignalChip.tsx). */}
+        {colorNow === null && signal !== null && which === 'today' ? (
+          <SignalChip words={signal} />
+        ) : colorNow === null ? (
           <p className="hwx__date" onClick={(e) => (e.detail >= 3 ? onDebug?.() : undefined)}>
             {dateWords}
           </p>

@@ -241,6 +241,8 @@ export function predictionsKey(stationId: string, at: Date): string {
 
 /** Days asked for in one request, the day itself first (Batch CORE, Section 3.1). */
 export const TIDE_AHEAD_DAYS = 7
+/** With a saved table, how long the network has before the table is shown (Batch CORE, Section 7A.3). */
+export const SAVED_WAIT_MS = 4000
 
 /** A day's window, as fetchPredictions has always asked it: the day before to the day after, in UTC days. */
 function windowOf(at: Date): { begin: string; end: string; from: number; to: number } {
@@ -277,7 +279,13 @@ export async function fetchPredictions(
   }
 
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
+  /*
+   * Batch CORE, Section 7A.3: network first, then the saved table. With a
+   * table kept for this day the network gets SAVED_WAIT_MS before it is
+   * shown; with none, the full TIMEOUT_MS, since there is nothing else.
+   */
+  const hasSaved = readForecast(tideKey(stationId, begin, end)) !== null
+  const timer = setTimeout(() => controller.abort(), hasSaved ? SAVED_WAIT_MS : TIMEOUT_MS)
   try {
     const [hiloRaw, curveRaw] = await Promise.all([
       getJson(new URLSearchParams({ ...base, interval: 'hilo' }), controller.signal),

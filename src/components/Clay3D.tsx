@@ -541,9 +541,11 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
   return (
     <div className={`${shown ? 'clay clay--shown' : 'clay clay--waiting'}${flying ? ' clay--flying' : ''}`}>
       <div ref={host} className="clay__canvas" />
-      {late && !shown && failed === null ? (
+      {(late || !online) && !shown && failed === null ? (
         <div className="clay__error" role="alert" data-clay-late>
-          <p className="clay__errtitle">3D didn&rsquo;t load</p>
+          {/* Batch CORE, Section 7A.2: with no signal, said at once, not after the 10 s wait. */}
+          <p className="clay__errtitle">{online ? <>3D didn&rsquo;t load</> : '3D needs a signal'}</p>
+          {online ? null : <p className="clay__errmsg">The ground and buildings come from the map services. The 2D map, the sun and the shadows work offline.</p>}
           {onBack2D === undefined ? null : (
             <button type="button" className="btn btn--primary btn--small" onClick={onBack2D}>
               Back to 2D
@@ -551,8 +553,8 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
           )}
         </div>
       ) : null}
-      {flyLate === 'late' && fly !== null && !flying ? (
-        <ScreenFailCard title="Fly didn't load" message={`Not open in ${FLY_LOAD_MS / 1000} s.`} onWait={() => setFlyLate('waiting')} onBack={() => onLanded?.([], null)} />
+      {(flyLate === 'late' || (!online && fly !== null && !shown)) && fly !== null && !flying ? (
+        <ScreenFailCard title={online ? "Fly didn't load" : 'Fly needs a signal'} message={online ? `Not open in ${FLY_LOAD_MS / 1000} s.` : 'The world to fly in comes from the map services.'} onWait={() => setFlyLate('waiting')} onBack={() => onLanded?.([], null)} />
       ) : null}
       {trouble === null ? null : trouble.kind === 'lost' ? (
         <div className="clay__error" role="status">
