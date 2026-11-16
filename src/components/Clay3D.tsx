@@ -27,7 +27,8 @@ import type { Building } from '../lib/buildings.ts'
 import { WATERMARK, type FlightPlay } from '../lib/preflight/play.ts'
 import type { FlySession } from '../lib/fly/session.ts'
 import { NO_STICKS, useFly } from '../lib/fly/useFly.ts'
-import { obstacleBars, type FlyMode, type Sticks } from '../core/flyModel.ts'
+import { obstacleBars, START, type FlyMode, type Sticks } from '../core/flyModel.ts'
+import { pilotSpot } from '../core/pilotFigure.ts'
 import { destinationPoint } from '../core/geo.ts'
 import type { PathPoint } from '../core/flight.ts'
 import { FlyControls } from './FlyControls.tsx'
@@ -456,7 +457,7 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
   /* Batch Flow, Section 1: you, at the home point, while flying. */
   useEffect(() => {
     if (!ready) return
-    scene.current?.setPilot(flying && fly !== null ? fly.takeoff : null, groundM)
+    scene.current?.setPilot(flying && fly !== null ? pilotSpot(fly.takeoff, START.yaw) : null, groundM)
     return () => scene.current?.setPilot(null, 0)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, flying, groundM])

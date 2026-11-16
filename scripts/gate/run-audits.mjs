@@ -78,6 +78,8 @@ export const AUDITS = [
   { name: 'api url', script: 'audit-api-urls.mjs', summary: /API URL PROBLEMS/ },
   { name: '3d network', script: 'audit-3d-network.mjs', summary: /3D NETWORK PROBLEMS/ },
   { name: '3d context', script: 'audit-3d-context.mjs', summary: /3D CONTEXT PROBLEMS/ },
+  /* Batch DRONE, Section 2.6: 3D opens five times in a row as an iPhone, the near picture at the iOS size. */
+  { name: '3d five', script: 'audit-3d-five.mjs', summary: /3D FIVE PROBLEMS/ },
   { name: 'airspace', script: 'audit-airspace.mjs', summary: /AIRSPACE PROBLEMS/ },
   { name: 'call sheet', script: 'audit-callsheet.mjs', summary: /CALL SHEET PROBLEMS/ },
   { name: 'clock screen', script: 'audit-clock-screen.mjs', summary: /CLOCK SCREEN PROBLEMS/ },

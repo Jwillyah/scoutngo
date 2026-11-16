@@ -15,7 +15,7 @@
  *   Drone     the home's Drone card opens it (Batch Flow, Section 5): the
  *             wind at 400 ft and the drone's limit, the air from the
  *             ground to 400 ft, the best time to fly, Airspace · Battery ·
- *             GPS, Preflight and Fly it yourself
+ *             GPS, Preflight check and Plan the flight (Batch DRONE: the 3D view's button, renamed)
  *   Sky       the home's Sky card opens it; Sunset · Sunrise; "Color
  *             likely / possible / unlikely" and a reason; the three plain
  *             checks by name; Golden · Set · Blue · Dark with times; RARE
@@ -200,16 +200,19 @@ try {
     const droneCard = await page.locator('.home__page[aria-label="Today"] .hcard--drone').first().click({ timeout: 4000, noWaitAfter: true }).then(() => true, (e) => String(e?.message ?? e).split('\n').slice(0, 14).join(' | '))
     if (droneCard !== true) fail(`${label}: no Drone card on the home (a drone is in this kit) (${droneCard})`)
     await wait(4000)
-    const dr = JSON.parse(await ev(`JSON.stringify((() => { const p = document.querySelector('.drpage'); if (!p) return null; return { big: p.querySelector('.drp__big')?.textContent ?? null, limit: p.querySelector('.drp__limit')?.textContent ?? null, rows: p.querySelectorAll('.drp__rowk').length, segs: p.querySelectorAll('.drp__seg').length, tiles: [...p.querySelectorAll('.wtile__label')].map((e) => e.textContent), buttons: [...p.querySelectorAll('.drp__buttons button')].map((b) => b.textContent), text: p.innerText } })())`))
+    /* Batch DRONE, Section 2: four swiped pages under the Sky page's pill; Now first. The rows are By height's grid, the bars Now's hours at 400 ft, the tiles Now's four cards. */
+    const dr = JSON.parse(await ev(`JSON.stringify((() => { const p = document.querySelector('.drpage'); if (!p) return null; const now = p.querySelector('[data-drone-page="now"]'); return { tabs: [...p.querySelectorAll('.drp__seg [role="tab"]')].map((b) => b.textContent), on: p.querySelector('.drp__seg [aria-selected="true"]')?.textContent ?? null, big: p.querySelector('.drp__big')?.textContent ?? null, limit: p.querySelector('.drp__limit')?.textContent ?? null, rows: p.querySelectorAll('[data-drone-page="height"] [role="rowheader"]').length, segs: p.querySelectorAll('[data-drone-page="now"] .drp__bar').length + p.querySelectorAll('[data-drone-page="now"] .drp__today .drp__none').length, tiles: now === null ? [] : [...now.querySelectorAll('.wtile__label')].map((e) => e.textContent.split(' · ')[0] === 'GPS' ? 'GPS · Kp' : e.textContent.split(' · ')[0]), buttons: [...p.querySelectorAll('.drp__buttons button')].map((b) => b.textContent), text: p.innerText } })())`))
     console.log(`  Drone: ${JSON.stringify(dr === null ? null : { ...dr, text: undefined })}`)
     if (dr === null) fail(`${label}: the home's Drone card opened no Drone page`)
     else {
+      if (dr.tabs.join('|') !== 'Now|By height|Airspace|Plan') fail(`${label}: the Drone page's tabs are ${JSON.stringify(dr.tabs)}`)
+      if (dr.on !== 'Now') fail(`${label}: the Drone page opened on ${JSON.stringify(dr.on)}, not Now`)
       if (!/^\d+ (kt|mph|km\/h|m\/s)$/.test(dr.big ?? '')) fail(`${label}: the Drone page's headline reads ${JSON.stringify(dr.big)}`)
       if (!/limit|My gear/.test(dr.limit ?? '')) fail(`${label}: no drone limit line (${JSON.stringify(dr.limit)})`)
-      if (dr.rows !== 5) fail(`${label}: ${dr.rows} heights in the air above the beach, not gnd to 400 ft`)
-      if (dr.segs < 1) fail(`${label}: no best-time-to-fly bar`)
-      if (dr.tiles.join('|') !== 'Airspace|Battery|GPS') fail(`${label}: the tiles are ${JSON.stringify(dr.tiles)}`)
-      if (dr.buttons.join('|') !== 'Preflight|Fly it yourself') fail(`${label}: the buttons are ${JSON.stringify(dr.buttons)}`)
+      if (dr.rows !== 5) fail(`${label}: ${dr.rows} heights in the By height grid, not gnd to 400 ft`)
+      if (dr.segs < 1) fail(`${label}: no hours at 400 ft on Now, and no words saying why`)
+      if (dr.tiles.join('|') !== 'Airspace|Battery|Sky|GPS · Kp') fail(`${label}: the tiles are ${JSON.stringify(dr.tiles)}`)
+      if (dr.buttons.join('|') !== 'Preflight check|Plan the flight') fail(`${label}: the buttons are ${JSON.stringify(dr.buttons)}`)
       if (/\bsafe\b|all clear|clear to fly/i.test(dr.text)) fail(`${label}: the Drone page says safe or clear`)
       await page.screenshot({ path: join(OUT, `drone-${label.replace(/\s/g, '-').toLowerCase()}.png`) })
       await page.locator('.drpage .ppage__back').click()

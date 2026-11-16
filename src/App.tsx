@@ -2758,6 +2758,11 @@ function App() {
             setMode('plan')
             setCardRequest((r) => ({ kind: 'fly', tick: r.tick + 1 }))
           }}
+          onSaveSpot={(at, name) => {
+            /* Batch DRONE, Section 2.3: the Airspace tab's marker, saved on this phone as a spot of its own (no positions). */
+            setSpots(mergeSpots(spots, [{ ...spotNamed(name), venue: { ...venue, name: null, latitude: at.lat.toFixed(6), longitude: at.lon.toFixed(6) }, positions: [], marks: [] }]))
+            yoursChanged('spot')
+          }}
         />
         </Suspense>
       ) : null}

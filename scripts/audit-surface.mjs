@@ -1227,7 +1227,8 @@ const OPENERS = `(() => {
     /* The call sheet's door is a row on Plan's shoot card since Batch H (walked with the .more2__row doors below). */
     add('menu', 'Settings', 'settings')
     /* Preflight is the Drone card's since Batch K addendum E; Batch Flow, Section 5: the Drone page first, Preflight its button. */
-    add('dronepage', 'Preflight', 'preflight')
+    /* Batch DRONE, Section 2: the Drone page's button reads "Preflight check". */
+    add('dronepage', 'Preflight check', 'preflight')
     /* Behind the Sky card's Moon page: a door two taps deep, walked the way a person walks it. */
     add('skymoon', 'Plan this moonrise', 'moonrise')
   }

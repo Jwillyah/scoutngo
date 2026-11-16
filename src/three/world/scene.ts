@@ -30,6 +30,8 @@ import { logTouch } from '../../lib/touchDebug.ts'
 import { createDecks } from './decks.ts'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { NOMINAL_DRAW_HEIGHT } from '../../core/buildingHeight.ts'
+import { pilotShown } from '../../core/pilotFigure.ts'
+import { MAX_3D_DPR } from '../../core/groundAtlas.ts'
 import { bearingBetween, distanceMeters, type LatLon } from '../../core/geo.ts'
 import { domePoint, skyArc, type SkyArc } from '../../core/sky3d.ts'
 import { getSunPosition } from '../../core/sun.ts'
@@ -162,7 +164,7 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
    * before it is drawn, and asks for that frame.
    * Pixel ratio: never over 2 (a 3x iPhone would draw 2.25x the pixels).
    */
-  const maxScale = Math.min(2, window.devicePixelRatio || 1)
+  const maxScale = Math.min(MAX_3D_DPR, window.devicePixelRatio || 1)
   let scale = maxScale
   let wantScale = scale
   renderer.setPixelRatio(scale)
@@ -393,6 +395,8 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
       velocity = { vx: (pos.x - lastDrone.pos.x) / dt, vz: (pos.z - lastDrone.pos.z) / dt }
     }
     lastDrone = { pos: pos.clone(), t }
+    /* Batch DRONE, Section 2.5: the figure is not drawn while the drone is within 10 m of it. */
+    if (pilot !== null) pilot.visible = pilotShown(pos.distanceTo(pilot.position))
     setFov(horizontalFov(focal))
     if (chase) {
       /* Third person: behind and above the drone, looking along its heading at it. */

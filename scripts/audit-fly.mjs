@@ -99,8 +99,9 @@ try {
     await wait(900)
     await page.locator('.mcard--drone').first().tap()
     await wait(1500)
-    /* Batch Flow, Section 5: the menu's Drone card is the Drone page; its "Fly it yourself" opens the 3D view (the drone card under it). */
-    await ev(`[...document.querySelectorAll('.drp__buttons button, .pf button')].find(b => b.textContent === 'Fly it yourself')?.click()`)
+    /* Batch Flow, Section 5: the menu's Drone card is the Drone page; its "Plan the flight" (was "Fly it yourself") opens the 3D view (the drone card under it). */
+    /* Batch DRONE, Section 2.5: on the Drone page the button reads "Plan the flight"; Preflight's card keeps "Fly it yourself". */
+    await ev(`[...document.querySelectorAll('.drp__buttons button, .pf button')].find(b => b.textContent === 'Plan the flight' || b.textContent === 'Fly it yourself')?.click()`)
     let up = false
     for (let i = 0; i < 120 && !up; i += 1) {
       await wait(1000)

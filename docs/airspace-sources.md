@@ -30,11 +30,28 @@ dates are carried in the generated files).
   2014). Units overlap: a scenic trail runs through a park, and every unit at a
   point is reported.
 
+## Fetched on the phone (Batch DRONE, Section 2.3: the Drone page's Airspace tab)
+
+Asked whole, nationwide, with no place in the request (`where=1=1` or a type
+filter, no geometry), and kept in Cache Storage with the time they arrived
+(`src/lib/faaLiveData.ts`; which is near the marker is worked out on the phone,
+`src/core/faaLive.ts`). TFRs again after 30 minutes, the rest after a week;
+with no signal the kept copy is shown with its date.
+
+| layer | source |
+|---|---|
+| National Security UAS Flight Restrictions | `services6.arcgis.com/ssFJjBXIUyZDrSYZ/.../DoD_Mar_13/FeatureServer/0` (layer "National_Security_UAS_Flight_Restrictions") and `.../Part_Time_National_Security_UAS_Flight_Restrictions/FeatureServer/0` |
+| FAA-Recognized Identification Areas | `.../FAA_Recognized_Identification_Areas/FeatureServer/0` |
+| Heliports (NASR) | `.../US_Airport/FeatureServer/0`, `TYPE_CODE='HP'` |
+| Warning, alert and military operations areas | `.../Special_Use_Airspace/FeatureServer/0`, `TYPE_CODE IN ('W','A','MOA')` |
+| Temporary flight restrictions | the FAA's TFR map service, `tfr.faa.gov/geoserver/TFR/ows` layer `TFR:V_TFR_LOC`, through this app's `/api/tfr` (an empty POST; tfr.faa.gov sends no CORS header). "Today" is read from the dates in each TFR's title. |
+
 ## What the app never checks
 
-Temporary flight restrictions and NOTAMs. There is no keyless public feed, so the
-card always ends by saying so and pointing at tfr.faa.gov. An empty card is a
-statement about this extract, never permission to fly.
+NOTAMs other than TFRs, and state, county and city park drone rules (no FAA
+dataset carries them). The Plan screen's airspace card still ends by pointing
+at tfr.faa.gov. An empty card is a statement about this extract, never
+permission to fly.
 
 ## Size
 

@@ -140,6 +140,19 @@ export const CREDITS: readonly Credit[] = [
     link: 'https://www.weather.gov/disclaimer',
   },
   {
+    /* Batch DRONE, Section 2.3: the Airspace tab's live FAA layers (src/lib/faaLiveData.ts); the grid, classes and parks are baked in. */
+    name: 'FAA (UAS Facility Maps, airspace, TFRs)',
+    hosts: ['services6.arcgis.com', 'this app (/api/tfr)'],
+    use: 'The drone Airspace map: national security UAS restrictions, FRIAs, heliports, special use airspace (asked whole, nationwide, no spot sent), and TFRs (tfr.faa.gov through this app)',
+    license: 'US public domain',
+    attribution: 'FAA',
+    key: 'No',
+    rate: 'None published; kept on the phone 7 days (TFRs 30 minutes)',
+    status: 'ok',
+    note: 'Not an official FAA source in this app: check B4UFLY/LAANC before you fly. The app never issues LAANC.',
+    link: 'https://www.faa.gov/uas',
+  },
+  {
     name: 'NOAA CO-OPS (tides)',
     hosts: ['api.tidesandcurrents.noaa.gov'],
     use: 'Tide predictions, water levels, coastal station wind',

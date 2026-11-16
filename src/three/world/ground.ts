@@ -31,11 +31,14 @@
 import * as THREE from 'three'
 import type { ImagerySource } from '../../data/imagerySources.ts'
 import { waterMaskFor } from './waterMask.ts'
+import { isIOSDevice, nearAtlasPx } from '../../core/groundAtlas.ts'
 import { working, frameAt, heightAt, latOf, lonOf, pictureOnly, pictureOrParent, sampleTile, terrainTile, tileX, tileY, TERRAIN_MAX_Z, type Frame } from './sources.ts'
 
 export const NEAR_Z = 18
 export const NEAR_TILES = 16
-export const ATLAS_PX = NEAR_TILES * 256
+/* Batch DRONE, Section 2.6: 4096 px, or 2048 on iOS (src/core/groundAtlas.ts); a near tile is drawn ATLAS_PX / NEAR_TILES across. */
+export const ATLAS_PX = nearAtlasPx(typeof navigator !== 'undefined' && isIOSDevice(navigator.userAgent, navigator.maxTouchPoints ?? 0))
+const NEAR_TILE_PX = ATLAS_PX / NEAR_TILES
 export const MID_Z = 15
 export const FAR_Z = 12
 export const MID_HALF_M = 4500
@@ -302,6 +305,9 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
       const canvas = document.createElement('canvas')
       canvas.width = ATLAS_PX
       canvas.height = ATLAS_PX
+      /* For scripts/audit-3d-five.mjs: the size the near picture was made at, and how many were made this page. */
+      const probe = globalThis as unknown as { __nearAtlas?: { px: number; made: number } }
+      probe.__nearAtlas = { px: ATLAS_PX, made: (probe.__nearAtlas?.made ?? 0) + 1 }
       const ctx = canvas.getContext('2d')
       const tex = new THREE.CanvasTexture(canvas)
       tex.colorSpace = THREE.SRGBColorSpace
@@ -322,9 +328,9 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
           const py = py0 + Math.floor(k / (px1 - px0 + 1))
           const pic = await pictureOrParent(px, py, PZ, null, 4)
           if (pic === null || ctx === null) return
-          const dx = (px * s - tx0) * 256
-          const dy = (py * s - ty0) * 256
-          ctx.drawImage(pic.image, pic.sx, pic.sy, pic.sw, pic.sh, dx, dy, s * 256, s * 256)
+          const dx = (px * s - tx0) * NEAR_TILE_PX
+          const dy = (py * s - ty0) * NEAR_TILE_PX
+          ctx.drawImage(pic.image, pic.sx, pic.sy, pic.sw, pic.sh, dx, dy, s * NEAR_TILE_PX, s * NEAR_TILE_PX)
         }),
       )
       void tilePx
@@ -362,7 +368,7 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
           if (near === null || near.tex !== tex) return
           const img = await pictureOnly(tx0 + t.i, ty0 + t.j, NEAR_Z, source)
           if (img === null || ctx === null) continue
-          ctx.drawImage(img, t.i * 256, t.j * 256, 256, 256)
+          ctx.drawImage(img, t.i * NEAR_TILE_PX, t.j * NEAR_TILE_PX, NEAR_TILE_PX, NEAR_TILE_PX)
           dirty = true
         }
       }

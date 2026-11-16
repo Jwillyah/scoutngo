@@ -171,6 +171,19 @@ export async function answer(href) {
   if (host === 'api.tidesandcurrents.noaa.gov') return json(noaa(u), 'tide curve')
   /* Batch Flow, Section 5: NOAA SWPC's planetary K index, the shape it answers (a header row, then time, Kp, a-running, station count). */
   if (host === 'services.swpc.noaa.gov') return json([['time_tag', 'Kp', 'a_running', 'station_count'], ['2026-10-30 06:00:00.000', '2.00', '7', '8'], ['2026-10-30 09:00:00.000', '2.33', '9', '8']], 'planetary K index')
+  /*
+   * Batch DRONE, Section 2.3: the FAA's drone layers, asked whole (no place in the request; src/lib/faaLiveData.ts).
+   * One heliport by the Virginia Beach pier, nothing else, and one page each so the paging stops.
+   */
+  if (host === 'services6.arcgis.com') {
+    const heliports = /\/US_Airport\//.test(u.pathname) && u.searchParams.get('resultOffset') === '0'
+    return json({ type: 'FeatureCollection', features: heliports ? [{ type: 'Feature', geometry: { type: 'Point', coordinates: [-75.9846, 36.8521] }, properties: { IDENT: 'VA99', NAME: 'Fixture Hospital Heliport' } }] : [] }, 'FAA drone layers')
+  }
+  /* The TFR map service, through /api/tfr: one TFR in Nevada on the fixture's day, none near the coast. */
+  if (host === 'tfr.faa.gov') {
+    const ring = [[-115.2, 36.1], [-115.1, 36.1], [-115.1, 36.2], [-115.2, 36.2], [-115.2, 36.1]]
+    return json({ type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Polygon', coordinates: [ring] }, properties: { NOTAM_KEY: '6/0001-1-FDC-F', TITLE: 'Las Vegas, NV, Friday, October 30, 2026 Local', LEGAL: 'SECURITY', LAST_MODIFICATION_DATETIME: '202610300000', STATE: 'NV' } }] }, 'TFR shapes')
+  }
   if (host === 'server.arcgisonline.com' && /World_Imagery/.test(u.pathname)) return { status: 200, type: 'image/png', body: IMAGERY, fixture: 'flat imagery' }
   if (host === 'server.arcgisonline.com') return { status: 200, type: 'image/png', body: OVERLAY, fixture: 'clear overlay' }
   if (/vdem\.virginia\.gov|nconemap\.gov|mdgeodata\.md\.gov|firstmap\.delaware\.gov|tiles\.arcgis\.com|nationalmap\.gov|gibs\.earthdata\.nasa\.gov/.test(host)) return { status: 200, type: 'image/png', body: IMAGERY, fixture: 'flat imagery' }
