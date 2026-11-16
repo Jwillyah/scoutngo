@@ -140,7 +140,7 @@ try {
   await page.goto(url)
   await wait(3000)
   await page.getByRole('button', { name: /^open$/i }).click({ timeout: 3000 }).catch(() => {})
-  await page.getByText('Open the map', { exact: true }).click({ timeout: 3000 }).catch(() => {})
+  await page.getByText(/^(Open the map|Open ScoutNGo)$/).click({ timeout: 3000 }).catch(() => {})
   await goToStage(ev, wait, 'plan')
   await wait(2000)
   await ev(`document.querySelector('button[aria-label="Open the 3D clay model"]')?.click()`)

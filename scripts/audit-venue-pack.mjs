@@ -213,7 +213,7 @@ const open = async (dir, insets, serviceWorkers) => {
     await wait(3000)
     await page.getByRole('button', { name: /^open$/i }).click({ timeout: 4000 }).catch(() => {})
     await wait(1500)
-    await page.getByText('Open the map', { exact: true }).click({ timeout: 3000 }).catch(() => {})
+    await page.getByText(/^(Open the map|Open ScoutNGo)$/).click({ timeout: 3000 }).catch(() => {})
     await until(`!!window.__probe?.map`, 20000)
     await goToStage(ev, wait, 'plan').catch(() => {})
     await wait(3000)

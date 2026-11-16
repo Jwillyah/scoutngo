@@ -67,7 +67,7 @@ try {
     await page.goto(await shareLink(`${APP_ORIGIN}/`, { id: 'wc', name: 'Water', savedAt: '2026-10-31T00:00:00Z', venue, kit: { bodyIds: [], lensIds: [], droneIds: [], styleNotes: '' }, positions: [] }))
     await wait(3000)
     await page.getByRole('button', { name: /^open$/i }).click({ timeout: 3000 }).catch(() => {})
-    await page.getByText('Open the map', { exact: true }).click({ timeout: 3000 }).catch(() => {})
+    await page.getByText(/^(Open the map|Open ScoutNGo)$/).click({ timeout: 3000 }).catch(() => {})
     await goToStage(ev, wait, 'plan')
     await wait(1500)
     await ev(`document.querySelector('button[aria-label="Open the 3D clay model"]')?.click()`)

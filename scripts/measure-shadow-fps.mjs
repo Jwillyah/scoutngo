@@ -61,7 +61,7 @@ try {
   await page.goto(url.href)
   await wait(3500)
   await page.getByRole('button', { name: /^open$/i }).click({ timeout: 4000 }).catch(() => {})
-  await page.getByText('Open the map', { exact: true }).click({ timeout: 4000 }).catch(() => {})
+  await page.getByText(/^(Open the map|Open ScoutNGo)$/).click({ timeout: 4000 }).catch(() => {})
   await goToStage(ev, wait, 'plan')
   await wait(4000)
   await ev(`window.__probe?.map?.jumpTo({ center: [${COLISEUM.lon}, ${COLISEUM.lat}], zoom: ${Number(process.env.SCOUTNGO_ZOOM ?? 16.5)} })`)

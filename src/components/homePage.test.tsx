@@ -2,33 +2,13 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { Landing } from './Landing.tsx'
 
-/*
- * THE HOME PAGE (Batch F, board HOME V · with real photos): four photo bands
- * for a fixed sample beach, four rows, one gold button, the footer. Its fit at
- * 390 x 664 is checked in WebKit by scripts/audit-home.mjs.
- */
-describe('the home page', () => {
+/* The landing's own parts: src/components/landingAndDevice.test.tsx (board E, Batch CORE Section 6). */
+describe('the landing', () => {
   const html = renderToStaticMarkup(<Landing onDismiss={() => {}} />)
-
-  it('has the brand, the line, four bands, four rows, one gold button and the footer, in order (board HOME V)', () => {
-    expect(html).toContain('>ScoutNGo<')
-    const order = ['Four apps in one.', 'Private, and yours.', '>Light<', '>Tide<', '>Surf<', '>Wind<', 'Sky color', 'Drone preflight', 'Fly it here first: line of sight, roofs, wind.', 'Moon line-ups', 'No account, no tracking', 'Open source. Your spots never leave your phone.', 'Open the map', 'Free · open source · works offline ·', '>How it works<', '>Privacy<']
-    const at = order.map((t) => html.indexOf(t))
-    expect(at.every((i) => i >= 0), JSON.stringify(order.filter((_, i) => at[i] < 0))).toBe(true)
-    expect([...at].sort((a, b) => a - b)).toEqual(at)
-    expect(html.match(/class="cover__go"/g)?.length).toBe(1)
-  })
-
-  it('names the fixed sample beach, and before anything arrives every value is a dash', () => {
-    expect(html).toContain('Virginia Beach Fishing Pier')
-    /* Light is arithmetic on the sun and is there at once; tide, surf and wind wait for an answer. */
-    expect(html.match(/class="cover__bandnum">—</g)?.length).toBe(3)
-    expect(html).not.toMatch(/safe|clear/i)
-  })
-
-  it('carries no <img> and no photographer’s credit: the bands are CSS backgrounds from public/home', () => {
-    expect(html).not.toMatch(/<img/)
-    expect(html).not.toMatch(/Photo by|Jwilly|home-hero/)
+  it('every example value is said, none is a dash, and nothing says safe or clear', () => {
+    for (const v of ['2–3 ft', '4:21 PM', '11 kt', 'Low 3:36 PM', '8 kt NW']) expect(html).toContain(v)
+    expect(html).not.toMatch(/class="land__num[^"]*">—</)
+    expect(html).not.toMatch(/\bsafe\b|\bclear\b/i)
   })
 })
 

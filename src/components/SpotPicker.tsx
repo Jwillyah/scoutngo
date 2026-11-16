@@ -47,6 +47,7 @@ interface SpotPickerProps {
 
 export function SpotPicker({ title, saved, around, onPick, onClose }: SpotPickerProps) {
   const [query, setQuery] = useState('')
+  const searchBox = useRef<HTMLInputElement | null>(null)
   /* The geocoders' answer, kept with the words it answers: an answer to older words is not shown (E7). */
   const [online, setOnline] = useState<{ text: string; result: GeoAnswer | 'searching' } | null>(null)
   const [centre, setCentre] = useState<{ at: LatLon; label: string } | null>(around === null ? null : { at: around, label: 'here' })
@@ -104,11 +105,29 @@ export function SpotPicker({ title, saved, around, onPick, onClose }: SpotPicker
           </button>
         )}
       </div>
-      <input className="spick__search" type="search" inputMode="search" placeholder="Search a beach, town or spot" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search a beach, town or spot" />
+      <input ref={searchBox} className="spick__search" type="search" inputMode="search" placeholder="Search a beach, town or spot" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search a beach, town or spot" />
       <button type="button" className="spick__locate" onClick={() => void askLocation()}>
         Use my location once
       </button>
       {locating === null ? null : <p className="spick__note">{locating}</p>}
+      {/* Batch CORE, Section 6.5: the empty first page gets a start: a word in the search, the cursor after it for the town. */}
+      {searching || centre !== null || saved.length > 0 || query !== '' ? null : (
+        <div className="spick__chips spick__try" role="group" aria-label="Try">
+          <span className="spick__tryword">Try</span>
+          {(['Beach', 'Park', 'Lake'] as const).map((w) => (
+            <Chip
+              key={w}
+              on={false}
+              onClick={() => {
+                setQuery(`${w.toLowerCase()} `)
+                searchBox.current?.focus()
+              }}
+            >
+              {w}
+            </Chip>
+          ))}
+        </div>
+      )}
 
       {!searching ? null : (
         <div className="spick__chips" role="group" aria-label="Show">

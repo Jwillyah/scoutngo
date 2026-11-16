@@ -19378,3 +19378,11 @@ a.about__row * {
 .set2__errbuild {
   opacity: 0.7;
 }
+/* Batch CORE, Section 6.5: "Try Beach · Park · Lake" on the empty first page. */
+.spick__try {
+  align-items: center;
+}
+.spick__tryword {
+  font-size: 13px;
+  opacity: 0.75;
+}

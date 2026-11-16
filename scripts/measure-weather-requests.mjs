@@ -80,7 +80,7 @@ const started = Date.now()
 await page.goto(url.href)
 await wait(3500)
 await page.getByRole('button', { name: /^open$/i }).click({ timeout: 4000 }).catch(() => {})
-await page.getByText('Open the map', { exact: true }).click({ timeout: 4000 }).catch(() => {})
+await page.getByText(/^(Open the map|Open ScoutNGo)$/).click({ timeout: 4000 }).catch(() => {})
 await goToStage(ev, wait, 'plan')
 /* Loaded: until nothing new has been asked for 10 s. */
 for (let quiet = 0; quiet < 10; ) {

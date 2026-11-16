@@ -100,36 +100,30 @@ try {
     await home.waitForTimeout(2500)
     /* Long enough for the sample beach's values to come back from the fixtures. */
     await home.waitForTimeout(2500)
+    /* Batch CORE, Section 6: the landing is board E (docs/mockups/Landing_E.png); it still fits 390 x 664 with nothing to scroll. */
     const fit = await home.evaluate(`(() => {
-      const c = document.querySelector('.cover')
+      const c = document.querySelector('.land')
       if (!c) return null
-      const parts = [...c.querySelectorAll('.cover__name, .cover__head, .cover__band, .cover__row, .cover__go, .cover__licence, .cover__more')]
-      const bands = [...c.querySelectorAll('.cover__band')]
+      const parts = [...c.querySelectorAll('.land__name, .land__head, .land__sub, .land__row, .land__color, .land__go, .land__foot, .land__more')]
       return {
         parts: parts.length,
+        rows: c.querySelectorAll('.land__row').length,
         out: parts.filter((e) => { const r = e.getBoundingClientRect(); return r.top < 0 || r.bottom > innerHeight + 1 || r.right > innerWidth + 1 }).map((e) => e.className),
-        scrolls: document.documentElement.scrollHeight > innerHeight + 1,
+        scrolls: document.documentElement.scrollHeight > innerHeight + 1 || c.scrollHeight > c.clientHeight + 1,
         img: c.querySelectorAll('img').length,
-        bandH: bands.map((b) => Math.round(b.getBoundingClientRect().height)),
-        bandPhoto: bands.filter((b) => getComputedStyle(b).backgroundImage.includes('/home/band-')).length,
-        values: [...c.querySelectorAll('.cover__bandnum')].map((e) => e.textContent),
-        live: [...c.querySelectorAll('.cover__rowlive')].map((e) => e.textContent),
+        values: [...c.querySelectorAll('.land__num')].map((e) => e.textContent),
       }
     })()`)
     console.log(`  home: ${JSON.stringify(fit)}`)
-    if (fit === null) fail('home: no cover on a first visit, so its fit was not looked at')
+    if (fit === null) fail('home: no landing on a first visit, so its fit was not looked at')
     else {
       surfaces += 1
-      if (fit.parts < 14) fail(`home: only ${fit.parts} of the cover's parts are there`)
+      if (fit.parts < 12) fail(`home: only ${fit.parts} of the landing's parts are there`)
+      if (fit.rows !== 5) fail(`home: ${fit.rows} example rows, not Surf, Shoot, Drone, Tide and Wind`)
       if (fit.out.length > 0) fail(`home: off the 390 x 664 screen: ${fit.out.join(', ')}`)
-      if (fit.scrolls) fail('home: the page scrolls at 390 x 664')
-      if (fit.img > 0) fail('home: an <img> is on the cover; the bands are backgrounds')
-      if (fit.bandPhoto !== 4) fail(`home: ${fit.bandPhoto} of 4 bands show their photo`)
-      if (fit.bandH.some((h) => h < 40)) fail(`home: a band shrank below 40 px: ${fit.bandH.join(', ')}`)
-      if (fit.values[0] === '—') fail('home: Light is a dash, and it is arithmetic on the sun')
-      /* Each photo must actually arrive: a 404 would still leave the CSS url in place. */
-      const sizes = await Promise.all(['light', 'tide', 'surf', 'wind'].map((b) => home.request.get(`${APP_ORIGIN}/home/band-${b}.webp`).then((r) => (r.ok() ? r.body().then((x) => x.length) : 0))))
-      if (sizes.some((n) => n === 0 || n >= 60 * 1024)) fail(`home: band photos not served under 60 KB: ${sizes.join(', ')}`)
+      if (fit.scrolls) fail('home: the landing scrolls at 390 x 664')
+      if (fit.img > 0) fail('home: an <img> is on the landing')
+      if (fit.values.some((v) => v === '—' || v === '')) fail(`home: an example value is missing: ${JSON.stringify(fit.values)}`)
     }
     await home.screenshot({ path: join(OUT, 'tab-home.png') })
     await hctx.close()
@@ -142,7 +136,7 @@ try {
   await page.goto(url.href)
   await wait(3000)
   await page.getByRole('button', { name: /^open$/i }).click({ timeout: 3000 }).catch(() => {})
-  await page.getByText('Open the map', { exact: true }).click({ timeout: 3000 }).catch(() => {})
+  await page.getByText(/^(Open the map|Open ScoutNGo)$/).click({ timeout: 3000 }).catch(() => {})
 
   /* A sheet's body scrolls at its top stop; at half it is pulled up, which is how a finger gets to the rest. */
   const toFull = async () => {

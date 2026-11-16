@@ -1,0 +1,214 @@
+/*
+ * THE LANDING, BOARD E (Batch CORE, Section 6; docs/mockups/Landing_E.png):
+ * the night sky with the sunset low in it, the example card, the colour card,
+ * the white button. Fits 390 x 664 with nothing to scroll (the tighter
+ * spacing below 700 px tall); scrolls rather than clips anywhere smaller.
+ */
+.land {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  overflow-y: auto;
+  color: var(--white);
+  background:
+    radial-gradient(70% 30% at 30% 100%, rgb(232 135 106 / 0.75) 0%, transparent 70%),
+    radial-gradient(80% 35% at 80% 92%, rgb(108 90 168 / 0.55) 0%, transparent 70%),
+    linear-gradient(180deg, var(--d-night-low) 0%, var(--d-night-mid) 45%, var(--d-night-top) 100%);
+}
+.land__in {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 480px;
+  min-height: 100%;
+  margin: 0 auto;
+  padding: calc(var(--safe-top, 0px) + 28px) 18px calc(var(--safe-bottom, 0px) + 14px);
+  box-sizing: border-box;
+}
+.land__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.land__pin {
+  fill: var(--d-glow);
+}
+.land__pinhole {
+  fill: var(--d-night-low);
+}
+.land__name {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+}
+.land__head {
+  margin: 4px 0 0;
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+}
+.land__sub {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.35;
+  opacity: 0.85;
+}
+.land__card {
+  border: 1px solid rgb(255 255 255 / 0.16);
+  border-radius: 24px;
+  background: rgb(12 18 48 / 0.45);
+  overflow: hidden;
+}
+.land__label {
+  margin: 0;
+  padding: 12px 14px 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+.land__rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.land__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 6px 14px;
+}
+.land__row + .land__row {
+  border-top: 1px solid rgb(255 255 255 / 0.1);
+}
+.land__icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.12);
+}
+.land__row--surf .land__icon {
+  color: var(--d-glow-violet);
+}
+.land__row--shoot .land__icon,
+.land__row--drone .land__icon {
+  color: var(--d-glow);
+}
+.land__text,
+.land__value {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.land__text {
+  flex: 1;
+}
+.land__value {
+  align-items: flex-end;
+  text-align: right;
+}
+.land__rowname,
+.land__num {
+  font-size: 16px;
+  font-weight: 700;
+}
+.land__rowline,
+.land__word {
+  font-size: 12px;
+  opacity: 0.8;
+}
+.land__color {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid rgb(255 255 255 / 0.22);
+  border-radius: 20px;
+  background: linear-gradient(90deg, var(--d-glow-violet), var(--d-glow));
+  color: var(--white);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.land__colorico {
+  flex: none;
+}
+.land__colortext {
+  display: flex;
+  flex-direction: column;
+}
+.land__colorhead {
+  font-size: 16px;
+  font-weight: 700;
+}
+.land__colorline {
+  font-size: 12px;
+  opacity: 0.9;
+}
+.land__go {
+  min-height: 52px;
+  margin-top: auto;
+  border: 0;
+  border-radius: 26px;
+  background: var(--white);
+  color: var(--d-night-low);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.land__foot {
+  margin: 0;
+  font-size: 13px;
+  text-align: center;
+  opacity: 0.85;
+}
+.land__more {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+@media (max-height: 700px) {
+  .land__in {
+    gap: 8px;
+    padding-top: calc(var(--safe-top, 0px) + 12px);
+  }
+  .land__head {
+    font-size: 30px;
+  }
+  .land__sub {
+    font-size: 13px;
+  }
+  .land__row {
+    min-height: 42px;
+    padding: 3px 14px;
+  }
+  .land__icon {
+    width: 30px;
+    height: 30px;
+  }
+  .land__label {
+    padding-top: 8px;
+  }
+  .land__color {
+    padding: 8px 12px;
+  }
+  .land__go {
+    min-height: 46px;
+  }
+  .land__more {
+    min-height: 32px;
+  }
+}

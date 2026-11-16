@@ -11,98 +11,57 @@ const html = renderToStaticMarkup(<Landing onDismiss={() => {}} />)
 const text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ')
 
 /*
- * THE COVER IS THE APPROVED BOARD AND NOTHING ELSE (Batch F: "HOME V · with
- * real photos"; before that, five elements and two quiet lines).
- *
- * The list is the specification, so the test is a count as well as a content
- * check: a sixth element added in six months fails here rather than being
- * noticed on a phone.
+ * THE LANDING IS BOARD E AND NOTHING ELSE (Batch CORE, Section 6; docs/mockups/
+ * Landing_E.png, Jwilly's pick). The list is the specification, so the test is
+ * a count as well as a content check.
  */
-describe('the cover carries the board\'s parts and stops', () => {
-  it('leads with the wordmark and the line', () => {
+describe('the landing carries board E\'s parts and stops', () => {
+  it('leads with the wordmark, the headline and the line, in Jwilly\'s words', () => {
     expect(text).toContain('ScoutNGo')
-    expect(text).toContain('Four apps in one.')
+    expect(text).toContain('Know before you go outside.')
+    expect(text).toContain('Free and open source. Your spots stay on your phone.')
   })
 
-  it('has exactly one primary action and it says what it does', () => {
-    expect(html.match(/class="cover__go"/g)).toHaveLength(1)
-    expect(text).toContain('Open the map')
+  it('never says "no account", anywhere on it (Jwilly, 16 Nov)', () => {
+    expect(text.toLowerCase()).not.toMatch(/no account/)
   })
 
-  it('carries the two quiet lines, in their places', () => {
-    /* How it works, and since 29 Oct Privacy (the brief: /privacy linked from the home footer). */
-    expect(html.match(/class="cover__more"/g)).toHaveLength(2)
-    expect(text).toContain('Free · open source · works offline · How it works · Privacy')
+  it('five example rows, Surf · Shoot · Drone · Tide · Wind, labelled Example; no Fish, no Weather, no Fly', () => {
+    expect(html.match(/class="land__row /g)).toHaveLength(5)
+    const order = ['>Surf<', '>Shoot<', '>Drone<', '>Tide<', '>Wind<'].map((t) => html.indexOf(t))
+    expect(order.every((i) => i >= 0)).toBe(true)
+    expect([...order].sort((x, y) => x - y)).toEqual(order)
+    expect(text).toMatch(/Example · what you(&rsquo;|’|&#x27;|')ll see/)
+    expect(text).not.toMatch(/\bFish\b|\bWeather\b|Fly it|fly it here/i)
   })
 
-  it('carries no <img>: the four band photos are CSS backgrounds, stripped of metadata (homeBands.test.ts)', () => {
+  it('no real place on it: no Virginia Beach, no pier, no coordinate', () => {
+    expect(text).not.toMatch(/Virginia Beach|pier/i)
+    expect(text).not.toMatch(/\d{1,3}\.\d{3,}/)
+  })
+
+  it('the color card, then one primary action that says what it does', () => {
+    expect(text).toMatch(/Where(&rsquo;|’|&#x27;|')s the color tonight\?/)
+    expect(html.match(/class="land__go"/g)).toHaveLength(1)
+    expect(text).toContain('Open ScoutNGo')
+    expect(html.indexOf('land__color')).toBeLessThan(html.indexOf('land__go'))
+  })
+
+  it('the footer: Free · open source · Privacy ("works offline" waits for Section 7A on the phone)', () => {
+    expect(text).toContain('Free · open source · Privacy')
+    expect(text).not.toMatch(/works offline/)
+  })
+
+  it('carries no <img> and no slider', () => {
     expect([...html.matchAll(/<img[^>]*src="([^"]*)"/g)]).toHaveLength(0)
-  })
-
-  it('carries no scrubbing control, because a still frame cannot have one', () => {
-    /*
-     * The cover briefly carried a real time scrubber, computed from the
-     * calibration venue. It was real arithmetic and still the wrong thing:
-     * this page is a picture of the app, and a slider on a picture is a
-     * control that cannot do anything.
-     *
-     * ASSERTED AS A PROPERTY, NOT AS THREE CLASS NAMES. It was
-     * `not.toContain('scrub__range')` and two more like it -- a blocklist of
-     * spellings, which passes the moment somebody renames the thing it is
-     * watching for. That happened: the scrubber became the time strip and
-     * every one of those three names stopped existing, so the test went on
-     * passing while checking nothing. Shape C in docs/failure-modes.md, and
-     * the guard rule there is to assert the positive property instead.
-     *
-     * The property is that the cover holds no slider of any kind. The GO
-     * button is a control and is meant to be there, so this cannot simply
-     * forbid interactivity.
-     */
     expect(html).not.toContain('type="range"')
-    expect(html).not.toContain('role="slider"')
     expect(html).not.toMatch(/<input\b/)
   })
 
-  it('orders the copy: wordmark, line, the bands, the rows, button, footer with its links', () => {
-    const order = ['cover__name', 'cover__head', 'cover__bands', 'cover__rows', 'cover__go', 'cover__licence', 'cover__more']
-    const at = order.map((c) => html.indexOf(c))
-    expect(at.every((i) => i >= 0)).toBe(true)
-    for (let i = 1; i < at.length; i += 1) expect(at[i]).toBeGreaterThan(at[i - 1] ?? -1)
-  })
-
-  it('credits no photographer: there is no photograph', () => {
-    expect(html).not.toContain('cover__attrib')
-    expect(text).not.toMatch(/Photo by/)
-  })
-
-  /*
-   * WHAT WAS DELETED FROM THE COVER. Each of these was on it and is now on
-   * /how. The point of naming them here is that a future edit that drags one
-   * back onto the cover fails a test rather than quietly undoing the pass.
-   */
-  it('no longer carries the three stages, the two rule blocks or the build hash', () => {
+  it('no SaaS furniture, and none of what moved to /how', () => {
+    expect(text.toLowerCase()).not.toMatch(/get started|sign up|trusted by/)
     expect(text).not.toContain('Three stages')
-    expect(text).not.toContain('Before the day')
-    expect(text).not.toMatch(/\bComputed\b\s*Every number/)
-    expect(text).not.toContain('Yours')
     expect(text).not.toContain('Build ')
-    expect(text).not.toContain('this page is in Settings')
-  })
-
-  /* The four feature tiles were asked for by name; the rest of the furniture still is not. */
-  it('has no SaaS furniture', () => {
-    expect(html).not.toContain('card')
-    expect(text.toLowerCase()).not.toContain('get started')
-    expect(text.toLowerCase()).not.toContain('sign up')
-    expect(text.toLowerCase()).not.toContain('trusted by')
-  })
-
-  /*
-   * AND NO COORDINATE ON THE FIRST SCREEN. The app does not know where you
-   * are and does not ask; a latitude on the cold start reads as your own.
-   */
-  it('prints no coordinate', () => {
-    expect(text).not.toMatch(/\d{1,3}\.\d{3,}/)
   })
 })
 

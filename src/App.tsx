@@ -169,6 +169,8 @@ import { readLastSetup, writeLastSetup, type LastSetup } from './lib/lastSetup.t
  * first run; the landing and the activity picker are first-run screens; Near
  * you is the plan's; the menu opens on a tap (fetched at the first touch).
  */
+/** Batch CORE, Section 6.1: what the landing asked to open once first run is done. */
+const AFTER_FIRST_RUN_KEY = 'scoutngo.afterFirstRun.v1'
 const Landing = lazyPage(() => import('./components/Landing.tsx').then((m) => ({ default: m.Landing })))
 const NearYou = lazyPage(() => import('./components/NearYou.tsx').then((m) => ({ default: m.NearYou })))
 const ActivityPicker = lazyPage(() => import('./components/ActivityPicker.tsx').then((m) => ({ default: m.ActivityPicker })))
@@ -1659,7 +1661,19 @@ function App() {
         setCardRequest((r) => ({ kind: 'sky', skyTab: 'now', tick: r.tick + 1 }))
         return
     }
-  }
+  }  /* Batch CORE, Section 6.1: asked for from the landing, Best Sky opens the first time the home has a spot. */
+  useEffect(() => {
+    if (!briefOpen || centre === null) return
+    let asked: string | null = null
+    try {
+      asked = localStorage.getItem(AFTER_FIRST_RUN_KEY)
+      if (asked !== null) localStorage.removeItem(AFTER_FIRST_RUN_KEY)
+    } catch {
+      asked = null
+    }
+    if (asked === 'bestsky') homeOpen('bestsky')
+  }, [briefOpen, centre]) // eslint-disable-line react-hooks/exhaustive-deps
+
   /* Batch Flow, Section 8: the menu's cards are the ones the home shows, in its order (few or many: src/core/homeCards.ts homeCardsShown). */
   const menuCardOrder = useMemo(() => homeCardsShown(activities, homeOrder(activities, briefDrone !== null), briefDrone !== null), [activities, briefDrone])
   /* Its clock, read when it opens. */
@@ -2253,7 +2267,19 @@ function App() {
         */}
       {landingSeen && !atHowPath ? null : (
         <Suspense fallback={null}>
-          <Landing onDismiss={() => { setLandingSeen(true); setAtHowPath(false) }} />
+          <Landing
+            onDismiss={() => { setLandingSeen(true); setAtHowPath(false) }}
+            onBestSky={() => {
+              /* Batch CORE, Section 6.1: "Where's the color tonight?" opens Best Sky once first run has a spot. */
+              try {
+                localStorage.setItem(AFTER_FIRST_RUN_KEY, 'bestsky')
+              } catch {
+                /* Not kept: first run ends on the home. */
+              }
+              setLandingSeen(true)
+              setAtHowPath(false)
+            }}
+          />
         </Suspense>
       )}
       {!nowOpen ? null : (

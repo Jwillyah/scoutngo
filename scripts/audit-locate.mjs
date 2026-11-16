@@ -65,7 +65,7 @@ try {
       await page.goto(url.href)
       await wait(3000)
       await page.getByRole('button', { name: /^open$/i }).click({ timeout: 3000 }).catch(() => {})
-      await page.getByText('Open the map', { exact: true }).click({ timeout: 3000 }).catch(() => {})
+      await page.getByText(/^(Open the map|Open ScoutNGo)$/).click({ timeout: 3000 }).catch(() => {})
       await goToStage(ev, wait, 'plan')
       await wait(2000)
       const arrow = page.getByRole('button', { name: 'Go to where I am' })

@@ -112,7 +112,7 @@ try {
     await wait(3500)
     await page.getByRole('button', { name: /^open$/i }).click({ timeout: 4000 }).catch(() => {})
     await wait(1500)
-    await page.getByText('Open the map', { exact: true }).click({ timeout: 4000 }).catch(() => {})
+    await page.getByText(/^(Open the map|Open ScoutNGo)$/).click({ timeout: 4000 }).catch(() => {})
     await wait(1500)
     await goToStage(ev, wait, 'plan')
     await wait(3000)
