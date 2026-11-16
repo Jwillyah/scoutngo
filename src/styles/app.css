@@ -19334,3 +19334,47 @@ a.about__row * {
   grid-column: 1 / -1;
   font-size: var(--text-base);
 }
+
+/* Batch CORE, Section 2.3: a screen that did not load says so on that screen. */
+.screenfail {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  /* --d-night-low at 60%: the palette's own night (the style audit holds every colour to src/styles/tokens.css). */
+  background: rgb(12 18 48 / 0.6);
+}
+.screenfail__card {
+  max-width: 360px;
+  width: 100%;
+  padding: 18px;
+  border-radius: 18px;
+  background: var(--d-night-mid);
+  color: #fff;
+}
+.screenfail__title {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 600;
+}
+.screenfail__msg {
+  margin: 0 0 6px;
+  font-size: 13px;
+  word-break: break-word;
+  opacity: 0.85;
+}
+.screenfail__note {
+  margin: 0 0 12px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+/* Batch CORE, Section 2: Settings › Debug › Last errors; long messages wrap, never widen the page. */
+.set2__errlog li {
+  overflow-wrap: anywhere;
+}
+.set2__errbuild {
+  opacity: 0.7;
+}

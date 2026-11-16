@@ -14,6 +14,7 @@ import { openPrivacy } from '../lib/privacyRoute.ts'
 import { seenHosts } from '../lib/privacy.ts'
 import { SURF_OPTIONS, useSurfSetting } from '../lib/surfSetting.ts'
 import { useTouchDebug } from '../lib/touchDebug.ts'
+import { clearErrors, ERROR_LOG_MAX, onErrors, readErrors, type LoggedError } from '../lib/errorLog.ts'
 import { formatWind, type Units } from '../lib/units.ts'
 import { deletePack, loadPacks, onPacksChanged, packBytes, type VenuePack } from '../lib/venuePack.ts'
 import { useNearMeSetting } from '../lib/nearMe.ts'
@@ -160,6 +161,7 @@ export function SettingsPage(props: Props) {
   const { units, onUnits, venue, drone } = props
   const [more, setMore] = useState(false)
   const [debug, setDebug] = useState(false)
+  const errorCount = useErrors().length
   const [nearMe, setNearMe] = useNearMeSetting()
   const [liveSky, setLiveSky] = useLiveSkySetting()
   const [goOn, setGoOn, goPerm] = useGoAlertSetting()
@@ -271,6 +273,8 @@ export function SettingsPage(props: Props) {
         <Row label="More" sub="restore, export, clear, storage, AI key" onClick={() => setMore(true)} />
         {/* Batch QA, Section 1: About was a tap on the version line only; it is a row. */}
         <Row label="About" value={versionLine()} onClick={props.onAbout} />
+        {/* Batch CORE, Section 2: the phone's own error log, shown in Debug; this row only while it holds any. */}
+        {errorCount === 0 ? null : <Row label="Last errors" value={String(errorCount)} onClick={() => setDebug(true)} />}
       </Group>
 
       <button type="button" className="set2__version" onPointerDown={down} onPointerUp={up} onPointerLeave={up} onContextMenu={(e) => e.preventDefault()} onClick={props.onAbout}>
@@ -344,6 +348,35 @@ function MorePage(props: Props & { onBack: () => void }) {
 
 /* ------------------------------------------------------------- Debug */
 
+/** The phone's last errors, newest first (src/lib/errorLog.ts): for a screenshot; nothing is sent. */
+function useErrors(): LoggedError[] {
+  const [list, setList] = useState(readErrors)
+  useEffect(() => onErrors(() => setList(readErrors())), [])
+  return list
+}
+
+function LastErrors({ zone }: { zone: string }) {
+  const list = useErrors()
+  return (
+    <div className="set2__errors" aria-label="Last errors">
+      <p className="set2__note">Last errors · kept on this phone only · {list.length} of {ERROR_LOG_MAX}</p>
+      <ul className="set2__log set2__errlog">
+        {list.length === 0 ? <li>None kept</li> : null}
+        {[...list].reverse().map((e, i) => (
+          <li key={i}>
+            <b>{new Date(e.at).toLocaleDateString('en-US', { timeZone: zone, month: 'short', day: 'numeric' })} {formatClock(new Date(e.at), zone)} · {e.where}</b> {e.message} <span className="set2__errbuild">({e.build})</span>
+          </li>
+        ))}
+      </ul>
+      {list.length === 0 ? null : (
+        <button type="button" className="btn btn--small" onClick={clearErrors}>
+          Clear the list
+        </button>
+      )}
+    </div>
+  )
+}
+
 function Debug(props: Props) {
   const [debugTouch, setDebugTouch] = useTouchDebug()
   const attempts = useLocateAttempts()
@@ -351,6 +384,7 @@ function Debug(props: Props) {
   return (
     <section className="set2__sec set__debug" aria-label="Debug">
       <p className="set2__title">Debug</p>
+      <LastErrors zone={zone} />
       <div className="set2__card">
         <Row label="Touch log" sub="A box over the map; nothing is sent." end={<Toggle on={debugTouch} label="Touch log" onChange={setDebugTouch} />} />
         <Row label="Show the home page" onClick={props.onShowHome} />

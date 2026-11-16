@@ -128,10 +128,11 @@ try {
    */
   await ev(`(() => { const s = window.__clay; window.__clayBefore = s; s.renderer.render = () => { throw new Error('test: a frame threw') }; s.setTime(new Date('${AT}')) })()`)
   await wait(1500)
-  const err = await ev(`JSON.stringify({ toast: document.querySelector('.toast')?.textContent ?? null, clay: !!document.querySelector('.clay__canvas'), map: !!document.querySelector('.maplibregl-canvas'), words: document.body.innerText.trim().length })`)
+  const err = await ev(`JSON.stringify({ toast: document.querySelector('.toast')?.textContent ?? document.querySelector('.screenfail__title')?.textContent ?? null, clay: !!document.querySelector('.clay__canvas'), map: !!document.querySelector('.maplibregl-canvas'), words: document.body.innerText.trim().length })`)
   console.log(`  a throw: ${err}`)
   const e = JSON.parse(err)
-  if (e.toast === null || !/3D view restarted/.test(e.toast)) fail(`a frame threw and nothing said so (${JSON.stringify(e.toast)})`)
+  /* Batch CORE, Section 2.3: the card says which screen did not load (src/components/ScreenBoundary.tsx). */
+  if (e.toast === null || !/3D view restarted|3D didn't load/.test(e.toast)) fail(`a frame threw and nothing said so (${JSON.stringify(e.toast)})`)
   if (e.clay) fail('a frame threw and the broken 3D view is still up')
   if (!e.map || e.words < 20) fail('a frame threw and the screen behind it is blank')
   await page.screenshot({ path: join(OUT, 'error.png') })

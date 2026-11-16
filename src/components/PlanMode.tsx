@@ -1,4 +1,6 @@
 import { buildingsBox, type Box as BuildingsBox } from '../core/buildingsBox.ts'
+import { ScreenBoundary, ScreenFailCard } from './ScreenBoundary.tsx'
+import { markScreenOpen, recordError } from '../lib/errorLog.ts'
 import { NetDebug } from './NetDebug.tsx'
 import { WindHours, WindTimeBar } from './WindTimeBar.tsx'
 import { coastFacing } from '../lib/coast.ts'
@@ -1097,6 +1099,8 @@ export function PlanMode({
   const [headingNote, setHeadingNote] = useState<string | null>(null)
   /* Batch Flow, Section 1: "3D view restarted", after the view crashed and closed. */
   const [crashNote, setCrashNote] = useState<string | null>(null)
+  /* Batch CORE, Section 2.3: 3D or Fly that stopped, said over the map with its message. */
+  const [screenFail, setScreenFail] = useState<{ title: string; message: string | null } | null>(null)
   const dismissHeadingNote = useCallback(() => setHeadingNote(null), [])
   const stopHeading = useRef<(() => void) | null>(null)
   const onCompass = useCallback(() => {
@@ -1236,6 +1240,8 @@ export function PlanMode({
   /* The skyline from where you stand (or the venue pin), at eye height or the drone's (src/lib/skyline/). */
   const [skyHeight, setSkyHeight] = useState<'eye' | 'drone'>('eye')
   const [flySession, setFlySession] = useState<FlySession | null>(null)
+  /* Batch CORE, Section 2.1: which of 3D and Fly is open, so a page iOS reloads for memory is known at start-up (src/lib/errorLog.ts). */
+  useEffect(() => markScreenOpen(flySession !== null && threeD ? 'Fly' : threeD ? '3D' : null), [threeD, flySession])
   const [pendingFly, setPendingFly] = useState(false)
   const startFly = (record: boolean) => {
     if (venue === null || pf.pilot === null || scrubbedAt === null) return
@@ -2580,6 +2586,8 @@ export function PlanMode({
     >
       {mapMounted ? (
         <Suspense fallback={null}>
+          {/* Batch CORE, Section 2.3: a map crash says so here; Back is the home. */}
+          <ScreenBoundary name="Map" onBack={() => onHome?.()}>
           <MapView
             infoNotes={shadows === null || threeD ? [] : shadowKeyNotes(shadows, scanYearUsed, sunriseWords)}
             airspace={airspaceOn ? airspaceOverlay : null}
@@ -2684,6 +2692,7 @@ export function PlanMode({
             }}
             bottomInset={sheetHeight}
           />
+          </ScreenBoundary>
         </Suspense>
       ) : null}
 
@@ -2800,12 +2809,14 @@ export function PlanMode({
             onFlightTime={scrubTo}
             fly={flySession}
             onCrash={(message) => {
-              /* Batch Flow, Section 1: back to the drone card, with one line; never a blank screen. */
+              /* Batch Flow, Section 1: back to the drone card; Batch CORE, Section 2.3: the card says which screen and why, and the phone's log keeps it. */
+              const which = flySession !== null ? 'Fly' : '3D'
               logTouch(`3D crashed: ${message}`)
+              recordError(which, message)
               setFlySession(null)
               setThreeD(false)
               setCard({ kind: 'preflight' } as SheetCard)
-              setCrashNote('3D view restarted')
+              setScreenFail({ title: `${which} didn't load`, message })
             }}
             onLanded={(track, clip) => {
               setFlySession(null)
@@ -2863,6 +2874,7 @@ export function PlanMode({
       )}
       {headingNote === null ? null : <Toast message={headingNote} onDone={dismissHeadingNote} />}
       {crashNote === null ? null : <Toast message={crashNote} onDone={() => setCrashNote(null)} />}
+      {screenFail === null ? null : <ScreenFailCard title={screenFail.title} message={screenFail.message} onBack={() => setScreenFail(null)} />}
       {moonHint ? <Toast message="Moon: where it rises and sets today." onDone={() => setMoonHint(false)} /> : null}
       {!placing ? null : (
         <p className="tapnote">{placingHint('position', addsAir ? 'air' : 'ground')}</p>

@@ -100,6 +100,8 @@ import { useTide } from './lib/useTide.ts'
 import { lowTideNearest } from './lib/lowTide.ts'
 import { useVenueCache } from './lib/useVenueCache.ts'
 import { atPrivacy, closePrivacy } from './lib/privacyRoute.ts'
+import { diedIn } from './lib/errorLog.ts'
+import { ScreenBoundary, ScreenFailCard } from './components/ScreenBoundary.tsx'
 import { buildScoutFile, saveScoutFile, scoutFilename, type ReadFile } from './lib/scoutFile.ts'
 import { readShareHash, SHARE_PREFIX } from './lib/planShare.ts'
 import type { MenuRows, MenuTarget } from './components/Menu.tsx'
@@ -1426,7 +1428,9 @@ function App() {
   /* Batch M, Section 2: "What do you do outside?", once, after the first spot is picked. */
   const [askWhat, setAskWhat] = useState(false)
   /* The Today briefing: on a plain launch (src/lib/briefingOpen.ts), and from Menu › Today. */
-  const [briefOpen, setBriefOpen] = useState(() => shouldOpenBriefing(typeof window === 'undefined' ? null : window, landingSeen))
+  /* Batch CORE, Section 2.1: 3D or Fly open when iOS reloaded the tab (15 Nov): back on the map, saying so, never the home. */
+  const [died, setDied] = useState(() => diedIn())
+  const [briefOpen, setBriefOpen] = useState(() => died === null && shouldOpenBriefing(typeof window === 'undefined' ? null : window, landingSeen))
   /* The Weather page (Batch Pages, Section 2): over the home or the map, from the home's "Weather ›" or the map's Sky sheet. */
   const [weatherOpen, setWeatherOpen] = useState(false)
   useEffect(() => {
@@ -2245,6 +2249,7 @@ function App() {
       )}
 
       {privacyOpen ? <Suspense fallback={null}><PrivacyPage onClose={closePrivacy} /></Suspense> : null}
+      {died === null ? null : <ScreenFailCard title={`${died} didn't load`} message="The phone reloaded the app while it was open, most likely out of memory. Back on the map." onBack={() => setDied(null)} />}
       <NewBuildNotice check={newBuild} />
       {/* Batch Polish, Section 1: setup (and its map) mounts when the home is not over it; its state is this component's. */}
       {mode === 'setup' && !briefOpen ? (
@@ -2336,6 +2341,8 @@ function App() {
       ) : null}
       {mode === 'plan' && mapSeen ? (
         <Suspense fallback={null}>
+        {/* Batch CORE, Section 2.3: a planner crash says so on the planner; Back is the home. */}
+        <ScreenBoundary name="Planner" onBack={() => setBriefOpen(true)}>
         <PlanMode
           backupReminder={
             backupNag === null
@@ -2560,6 +2567,7 @@ function App() {
           onOpenNow={() => setNowOpen(true)}
           onBackToNow={onBackToNow}
         />
+        </ScreenBoundary>
         </Suspense>
       ) : null}
 

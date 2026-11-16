@@ -1,3 +1,4 @@
+import { installErrorLog } from './lib/errorLog.ts'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 // maplibre-gl's stylesheet must load BEFORE ours. It styles .maplibregl-map and
@@ -43,6 +44,9 @@ watchHosts()
 for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
   document.addEventListener(type, (event) => event.preventDefault(), { passive: false })
 }
+
+/* Batch CORE, Section 2: the last 20 errors kept on this phone (src/lib/errorLog.ts). */
+installErrorLog()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

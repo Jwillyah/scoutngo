@@ -40,7 +40,7 @@ describe('context lost, and a frame that throws', () => {
     expect(CLAY).toMatch(/componentDidCatch\(error: unknown\) \{\s*this\.props\.onCrash\?\./)
     expect(CLAY).toMatch(/if \(crashRef\.current !== undefined\) crashRef\.current\(message\)/)
     const plan = readFileSync('src/components/PlanMode.tsx', 'utf8')
-    expect(plan).toMatch(/onCrash=\{\(message\) => \{[\s\S]{0,300}setThreeD\(false\)[\s\S]{0,120}kind: 'preflight'[\s\S]{0,80}setCrashNote\('3D view restarted'\)/)
+    expect(plan).toMatch(/onCrash=\{\(message\) => \{[\s\S]{0,600}setThreeD\(false\)[\s\S]{0,120}kind: 'preflight'[\s\S]{0,80}setScreenFail\(\{ title: `\$\{which\} didn't load`, message \}\)/)
   })
 
   it('Clay3D rebuilds on restore, or after REBUILD_AFTER_MS, and has an error boundary with Copy error and Try again', () => {

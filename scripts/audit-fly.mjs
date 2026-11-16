@@ -189,12 +189,13 @@ try {
     let back = null
     for (let i = 0; i < 12 && back === null; i += 1) {
       await wait(500)
-      back = JSON.parse(await ev(`JSON.stringify((() => { const t = document.querySelector('.toast')?.textContent ?? null; return t === null ? null : { toast: t, fly: !!document.querySelector('.fly'), card: !!document.querySelector('.pf'), words: document.body.innerText.trim().length } })())`))
+      back = JSON.parse(await ev(`JSON.stringify((() => { const t = document.querySelector('.toast')?.textContent ?? document.querySelector('.screenfail__title')?.textContent ?? null; return t === null ? null : { toast: t, fly: !!document.querySelector('.fly'), card: !!document.querySelector('.pf'), words: document.body.innerText.trim().length } })())`))
     }
     console.log(`  after a frame threw: ${JSON.stringify(back)}`)
     if (back === null) fail(`${label}: a crash in the 3D view said nothing (no "3D view restarted")`)
     else {
-      if (!/3D view restarted/.test(back.toast)) fail(`${label}: after a crash the line reads ${JSON.stringify(back.toast)}`)
+      /* Batch CORE, Section 2.3: "Fly didn't load" or "3D didn't load", the card over the map. */
+      if (!/3D view restarted|(Fly|3D) didn't load/.test(back.toast)) fail(`${label}: after a crash the line reads ${JSON.stringify(back.toast)}`)
       if (back.fly) fail(`${label}: after a crash the fly screen is still up`)
       if (!back.card) fail(`${label}: after a crash the drone card is not back`)
       if (back.words < 20) fail(`${label}: after a crash the screen is blank`)

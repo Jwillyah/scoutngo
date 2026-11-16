@@ -48,7 +48,8 @@ describe('never a blank map', () => {
     const { CLAY_LOAD_MS } = await import('../src/lib/clayStatus.ts')
     expect(CLAY_LOAD_MS).toBe(10_000)
     const src = readFileSync('src/components/Clay3D.tsx', 'utf8')
-    expect(src).toMatch(/setTimeout\(\(\) => setLate\(true\), CLAY_LOAD_MS\)/)
+    /* Batch CORE, Section 2: and the phone's error log keeps it. */
+    expect(src).toMatch(/setTimeout\(\(\) => \{\s*setLate\(true\)\s*recordError\('3D', [^\n]*\n\s*\}, CLAY_LOAD_MS\)/)
     expect(src).toMatch(/3D didn&rsquo;t load/)
     expect(src).toMatch(/Back to 2D/)
     expect(src).toMatch(/const SCAN_WAIT_MS = 4000/)

@@ -1,4 +1,6 @@
-import { CLAY_LOAD_MS, clayStatus, type ClayStatus } from '../lib/clayStatus.ts'
+import { CLAY_LOAD_MS, clayStatus, FLY_LOAD_MS, type ClayStatus } from '../lib/clayStatus.ts'
+import { recordError } from '../lib/errorLog.ts'
+import { ScreenFailCard } from './ScreenBoundary.tsx'
 /* The longest the 3D view waits for a kept scan before it builds without one (Batch LIVE, Section 5.2). */
 const SCAN_WAIT_MS = 4000
 import { Component, Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -245,6 +247,7 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
         made.onTrouble({
           lost: () => {
             logTouch('3D: WebGL context lost')
+            recordError(fly !== null ? 'Fly' : '3D', 'WebGL context lost: the phone took back the graphics memory')
             setTrouble({ kind: 'lost' })
             rebuildTimer = setTimeout(() => setBuild((n) => n + 1), REBUILD_AFTER_MS)
           },
@@ -510,9 +513,24 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
   useEffect(() => {
     setLate(false)
     if (shown) return
-    const t = setTimeout(() => setLate(true), CLAY_LOAD_MS)
+    const t = setTimeout(() => {
+      setLate(true)
+      recordError('3D', `not shown in ${CLAY_LOAD_MS / 1000} s`)
+    }, CLAY_LOAD_MS)
     return () => clearTimeout(t)
   }, [shown, venue.lat, venue.lon, build])
+  /* Batch CORE, Section 2.2: Fly opens within FLY_LOAD_MS, or says it did not; Keep waiting lets it go on. */
+  const [flyLate, setFlyLate] = useState<'no' | 'late' | 'waiting'>('no')
+  useEffect(() => {
+    setFlyLate('no')
+    if (fly === null || flying) return
+    const t = setTimeout(() => {
+      setFlyLate('late')
+      recordError('Fly', `not open in ${FLY_LOAD_MS / 1000} s (3D ${shown ? 'shown' : 'not shown yet'}, take-off ground ${flyGround === null ? 'not read' : 'read'})`)
+    }, FLY_LOAD_MS)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fly?.tick, flying])
   const unknown = place.buildings?.list.filter((b) => b.height.metres === null).length ?? 0
 
   const box =
@@ -532,6 +550,9 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
             </button>
           )}
         </div>
+      ) : null}
+      {flyLate === 'late' && fly !== null && !flying ? (
+        <ScreenFailCard title="Fly didn't load" message={`Not open in ${FLY_LOAD_MS / 1000} s.`} onWait={() => setFlyLate('waiting')} onBack={() => onLanded?.([], null)} />
       ) : null}
       {trouble === null ? null : trouble.kind === 'lost' ? (
         <div className="clay__error" role="status">
