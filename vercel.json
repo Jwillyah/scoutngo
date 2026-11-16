@@ -11,6 +11,10 @@
       "destination": "/"
     },
     {
+      "source": "/credits",
+      "destination": "/"
+    },
+    {
       "source": "/:place(plan|setup|field|now|sky|kit|saved|settings|about)",
       "destination": "/"
     }

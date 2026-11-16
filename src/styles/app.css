@@ -18359,6 +18359,55 @@ a.about__row * {
 .dhow__body p {
   margin: 0 0 6px;
 }
+/* Batch DRONE, Section 0.4: Data & credits, from every "How we got this". */
+.dhow__credits {
+  min-height: 44px;
+  margin: 8px 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+}
+.credits__body {
+  padding: 0 0 24px;
+}
+.credits__lead {
+  margin: 0 0 14px;
+}
+.credits__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.credits__row {
+  padding: 10px 0;
+  border-top: 1px solid rgba(127, 127, 127, 0.25);
+}
+.credits__row p {
+  margin: 0 0 2px;
+}
+.credits__name {
+  font-weight: 600;
+}
+.credits__use,
+.credits__lic,
+.credits__attr {
+  font-size: 13px;
+  opacity: 0.85;
+}
+.credits__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: inherit;
+}
+.credits__build {
+  margin: 12px 0 0;
+  font-size: 12px;
+  opacity: 0.7;
+}
 /* Batch DRONE, Section 0.2: which build, at the sheet's foot. */
 .dhow__build {
   margin: 10px 0 0;

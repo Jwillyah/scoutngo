@@ -1,4 +1,5 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { CREDITS } from '../src/core/credits.ts'
 import { COAST_CAMS } from '../src/data/coastCams.ts'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -50,7 +51,9 @@ describe('the privacy page', () => {
   const hostsInCode = new Set(files('src').flatMap((f) => [...readFileSync(f, 'utf8').matchAll(/https:\/\/([a-z0-9.-]+\.[a-z]{2,})/g)].map((m) => m[1])))
 
   it('names every host the app’s code can ask, or the host is a link with a reason', () => {
-    const unexplained = [...hostsInCode].filter((h) => listed(h) === undefined && LINK_ONLY[h] === undefined)
+    /* Batch DRONE, Section 0.4: a licence page, opened by you from Data & credits (src/core/credits.ts), is a link. */
+    const creditLinks = new Set(CREDITS.map((c) => new URL(c.link).host))
+    const unexplained = [...hostsInCode].filter((h) => listed(h) === undefined && LINK_ONLY[h] === undefined && !creditLinks.has(h))
     expect(unexplained).toEqual([])
   })
 

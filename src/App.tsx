@@ -101,6 +101,7 @@ import { useTide } from './lib/useTide.ts'
 import { lowTideNearest } from './lib/lowTide.ts'
 import { useVenueCache } from './lib/useVenueCache.ts'
 import { atPrivacy, closePrivacy } from './lib/privacyRoute.ts'
+import { atCredits, closeCredits } from './lib/creditsRoute.ts'
 import { diedIn } from './lib/errorLog.ts'
 import { ScreenBoundary, ScreenFailCard } from './components/ScreenBoundary.tsx'
 import { buildScoutFile, saveScoutFile, scoutFilename, type ReadFile } from './lib/scoutFile.ts'
@@ -182,6 +183,7 @@ const FieldMode = lazyPage(() => import('./components/FieldMode.tsx').then((m) =
 const NowScreen = lazyPage(() => import('./components/NowScreen.tsx').then((m) => ({ default: m.NowScreen })))
 const SetupMode = lazyPage(() => import('./components/SetupMode.tsx').then((m) => ({ default: m.SetupMode })))
 const PrivacyPage = lazyPage(() => import('./components/PrivacyPage.tsx').then((m) => ({ default: m.PrivacyPage })))
+const CreditsPage = lazyPage(() => import('./components/CreditsPage.tsx').then((m) => ({ default: m.CreditsPage })))
 const Viewfinder = lazyPage(() => import('./components/Viewfinder.tsx').then((m) => ({ default: m.Viewfinder })))
 const ViewfinderNeedsPlace = lazyPage(() => import('./components/Viewfinder.tsx').then((m) => ({ default: m.ViewfinderNeedsPlace })))
 const WeatherPage = lazyPage(() => import('./components/WeatherPage.tsx').then((m) => ({ default: m.WeatherPage })))
@@ -910,6 +912,13 @@ function App() {
   )
   /* /privacy: the same way, a real address over whatever is under it (src/lib/privacyRoute.ts). */
   const [privacyOpen, setPrivacyOpen] = useState(atPrivacy)
+  /* /credits: Data & credits, the same way (src/lib/creditsRoute.ts; Batch DRONE, Section 0.4). */
+  const [creditsOpen, setCreditsOpen] = useState(atCredits)
+  useEffect(() => {
+    const onPop = () => setCreditsOpen(atCredits())
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
   useEffect(() => {
     const onPop = () => setPrivacyOpen(atPrivacy())
     window.addEventListener('popstate', onPop)
@@ -2287,6 +2296,7 @@ function App() {
       )}
 
       {privacyOpen ? <Suspense fallback={null}><PrivacyPage onClose={closePrivacy} /></Suspense> : null}
+      {creditsOpen ? <Suspense fallback={null}><CreditsPage onClose={closeCredits} /></Suspense> : null}
       {died === null ? null : <ScreenFailCard title={`${died} didn't load`} message="The phone reloaded the app while it was open, most likely out of memory. Back on the map." onBack={() => setDied(null)} />}
       <NewBuildNotice check={newBuild} />
       {/* Batch Polish, Section 1: setup (and its map) mounts when the home is not over it; its state is this component's. */}

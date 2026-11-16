@@ -17,7 +17,7 @@ import { IMAGERY_TEMPLATE, TERRAIN_TEMPLATE } from '../../lib/offlineSources.ts'
 import { covers, pickImagery, sourceTileUrl, type ImagerySource } from '../../data/imagerySources.ts'
 import { tileUrl } from '../../lib/tileRange.ts'
 
-export const ESRI_CREDIT = 'Tiles by Esri. Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
+export const ESRI_CREDIT = 'Powered by Esri. Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community'
 export const TERRAIN_CREDIT = 'Elevation: Terrarium, AWS Open Data'
 export const OSM_CREDIT = 'Buildings and water: OpenStreetMap contributors, via OpenFreeMap'
 /* The deepest elevation the source has. */

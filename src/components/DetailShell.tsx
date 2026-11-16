@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { versionLine } from '../lib/build.ts'
+import { openCredits } from '../lib/creditsRoute.ts'
 import { WATER_SAFETY } from '../core/safetyWords.ts'
 import { createPortal } from 'react-dom'
 import { DETAIL_TABS, type DetailId } from '../lib/detailTabs.ts'
@@ -90,6 +91,10 @@ export function DetailShell({ id, ground, onBack, onSwitch, onMap, how, children
             </div>
             <div className="dhow__body">{how}</div>
             {/* Batch DRONE, Section 0.2: which build, at the foot of every "How we got this". */}
+            {/* Batch DRONE, Section 0.4. */}
+            <button type="button" className="dhow__credits" onClick={openCredits}>
+              Data & credits ›
+            </button>
             <p className="dhow__build num">{versionLine()}</p>
           </div>
         </div>

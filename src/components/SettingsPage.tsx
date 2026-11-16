@@ -11,6 +11,7 @@ import { locateOnce, locateWords, useLocateAttempts } from '../lib/locateOnce.ts
 import { formatClock } from '../core/timezone.ts'
 import { GROUP_OPTIONS, usePlaceGroups, type Place } from '../lib/placeGroups.ts'
 import { openPrivacy } from '../lib/privacyRoute.ts'
+import { openCredits } from '../lib/creditsRoute.ts'
 import { seenHosts } from '../lib/privacy.ts'
 import { SURF_OPTIONS, useSurfSetting } from '../lib/surfSetting.ts'
 import { useTouchDebug } from '../lib/touchDebug.ts'
@@ -270,6 +271,7 @@ export function SettingsPage(props: Props) {
       <Group title="My data · on this phone only">
         <Row label="Back up to a file" value="One file" onClick={props.onExport} />
         <Row label="What leaves my phone" onClick={openPrivacy} />
+        <Row label="Data & credits" onClick={openCredits} />
         <Row label="More" sub="restore, export, clear, storage, AI key" onClick={() => setMore(true)} />
         {/* Batch QA, Section 1: About was a tap on the version line only; it is a row. */}
         <Row label="About" value={versionLine()} onClick={props.onAbout} />
