@@ -38,7 +38,7 @@ export class ScreenBoundary extends Component<Props, { message: string | null }>
 }
 
 /** The card itself, also for a screen that did not open in time (Fly in 3 s). */
-export function ScreenFailCard({ title, message, onBack, onWait }: { title: string; message: string | null; onBack: () => void; onWait?: () => void }) {
+export function ScreenFailCard({ title, message, onBack, onWait, waitLabel = 'Keep waiting' }: { title: string; message: string | null; onBack: () => void; onWait?: () => void; waitLabel?: string }) {
   return (
     <div className="screenfail" role="alert">
       <div className="screenfail__card">
@@ -48,7 +48,7 @@ export function ScreenFailCard({ title, message, onBack, onWait }: { title: stri
         <div className="btn-row">
           {onWait === undefined ? null : (
             <button type="button" className="btn" onClick={onWait}>
-              Keep waiting
+              {waitLabel}
             </button>
           )}
           <button type="button" className="btn btn--primary" onClick={onBack}>

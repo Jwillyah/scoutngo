@@ -8,5 +8,6 @@ import { ScreenFailCard } from './ScreenBoundary.tsx'
  */
 export function PageNotLoaded(props: { onClose?: () => void; onBack?: () => void }) {
   const back = props.onBack ?? props.onClose ?? (() => window.history.back())
-  return <ScreenFailCard title="This page needs a signal" message="It has not been kept on this phone yet. Open it once with signal and it works offline after." onBack={back} />
+  /* With the signal back, a reload asks again (the phone keeps the app; a reload offline still opens it). */
+  return <ScreenFailCard title="This page needs a signal" message="It has not been kept on this phone yet. Open it once with signal and it works offline after." onBack={back} onWait={() => window.location.reload()} waitLabel="Try again" />
 }
