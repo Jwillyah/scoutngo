@@ -18,6 +18,7 @@ import { formatWind, type Units } from '../lib/units.ts'
 import { deletePack, loadPacks, onPacksChanged, packBytes, type VenuePack } from '../lib/venuePack.ts'
 import { useNearMeSetting } from '../lib/nearMe.ts'
 import { useLiveSkySetting } from '../lib/liveSkySetting.ts'
+import { useGoAlertSetting } from '../lib/goAlert.ts'
 import { weatherSent } from '../lib/weatherStore.ts'
 import { API_KEY_SAY, ApiKeyField } from './ApiKeyField.tsx'
 import { ActivityIcon } from './ActivityIcon.tsx'
@@ -161,6 +162,7 @@ export function SettingsPage(props: Props) {
   const [debug, setDebug] = useState(false)
   const [nearMe, setNearMe] = useNearMeSetting()
   const [liveSky, setLiveSky] = useLiveSkySetting()
+  const [goOn, setGoOn, goPerm] = useGoAlertSetting()
   const [feed, setFeed] = useCalendarFeed()
   const [feedHow, setFeedHow] = useState(false)
   const feedHref = feedAddress(props.feedPlace)
@@ -241,6 +243,12 @@ export function SettingsPage(props: Props) {
           </>
         )}
         <Row label="Special light near me" sub="fog, rainbows, color within 25 mi" end={<Toggle on={nearMe} label="Special light near me" onChange={setNearMe} />} />
+        {/* Batch CORE, Section 1.4: local only, opt-in; the phone shows it while the app is open or just put away. */}
+        <Row
+          label="Go alert"
+          sub={goPerm === 'denied' ? 'Notifications are off for this app in the phone’s settings' : goPerm === 'unsupported' ? 'This browser cannot show notifications; add the app to the home screen' : 'When the sky call reaches Likely, 45 min before · while the app is open'}
+          end={<Toggle on={goOn} label="Go alert" onChange={setGoOn} />}
+        />
         {/* Batch LIVE, Section 7.4: the sky at the spot behind the page; the home only until it is approved everywhere. */}
         <Row
           label="Live sky"

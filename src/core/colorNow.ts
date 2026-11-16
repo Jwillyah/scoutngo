@@ -44,5 +44,6 @@ export function colorNowLine(reads: readonly (CallRead | null)[], now: Date, ven
   }
   /* The opposite sky's pink looks away from the sun (Batch NOW, Section 0). */
   const look = live.lookDeg ?? getPosition(live.event, venue.lat, venue.lon).azimuth
-  return `Color now · ${live.kind} ${clock} · look ${compass8(look)}${best === null ? '' : ` · best ${best}`}`
+  /* Batch CORE, Section 1.1: 16 points, as the sky call and the Sky page say it (247° is WSW everywhere, not SW here). */
+  return `Color now · ${live.kind} ${clock} · look ${compass16(look)}${best === null ? '' : ` · best ${best}`}`
 }

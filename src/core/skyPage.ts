@@ -25,8 +25,21 @@ export interface PlainCheck {
  * The three checks for the layer the page speaks for (src/core/fireOutlook.ts
  * leadLayer). `toward` is the compass point of the sun at the event.
  */
-export function plainChecks(l: LayerRead | null, toward: string): PlainCheck[] {
+/**
+ * Batch CORE, Section 1.7: `seen`, a deck the station reports now (fresh, under 20,000 ft) in words ("KNTU broken at
+ * 6,000 ft"), and `gapSeen`, the gap as the observed call read it: the three lines then say the deck that is there,
+ * not the models' empty sky.
+ */
+export function plainChecks(l: LayerRead | null, toward: string, seen: string | null = null, gapSeen: 'open' | null = null): PlainCheck[] {
   const gapLabel = `Gap at the horizon (${toward})`
+  if (seen !== null) {
+    const blockedBy = l?.hiddenBy == null ? null : `${LAYER_PLAIN[l.hiddenBy.layer]} ${Math.round(l.hiddenBy.cover)}%`
+    return [
+      { label: 'Clouds to light up', value: seen },
+      { label: gapLabel, value: gapSeen === 'open' ? 'open (satellite)' : l?.canvas === true && l.gap !== null ? (l.gap === 'open' ? 'open' : l.gap === 'partial' ? 'partly open' : 'closed') : 'not read yet' },
+      { label: 'Anything blocking the sun', value: blockedBy === null ? 'no' : `yes, ${blockedBy}` },
+    ]
+  }
   if (l === null) return [{ label: 'Clouds to light up', value: '—' }, { label: gapLabel, value: '—' }, { label: 'Anything blocking the sun', value: '—' }]
   const pct = l.cover === null ? '' : `, ${Math.round(l.cover)}%`
   /*

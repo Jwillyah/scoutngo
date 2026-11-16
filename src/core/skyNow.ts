@@ -112,11 +112,33 @@ export interface StationDoubt {
   layers: Layer[]
 }
 
+/*
+ * A MOVING DECK (Batch CORE, Section 1.6). A point report is where the deck
+ * was at that minute. When the wind aloft carries the deck at FAST_DECK_KT or
+ * more, a report older than MOVING_STALE_MS is not held against the models;
+ * a fresher one says which way the deck is going and when the models clear
+ * it here: "deck moving SE · clearing here by ~3:30 PM".
+ */
+export const FAST_DECK_KT = 20
+export const MOVING_STALE_MS = 30 * 60_000
+const POINTS8 = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'] as const
+const point8 = (deg: number) => POINTS8[Math.round((((deg % 360) + 360) % 360) / 45) % 8]
+
 /** A deck the station reports now that the models' mean clears by the event; null when they agree or the report is stale. */
-export function stationDoubt(v: FireVerdict | null, station: { sky: MetarSky; at: Date } | null, event: Date | null, now: Date, clock: (d: Date) => string): StationDoubt | null {
+export function stationDoubt(
+  v: FireVerdict | null,
+  station: { sky: MetarSky; at: Date } | null,
+  event: Date | null,
+  now: Date,
+  clock: (d: Date) => string,
+  motion: { fromDeg: number; mps: number } | null = null,
+  clearsAt: Date | null = null,
+): StationDoubt | null {
   if (v === null || station === null || event === null) return null
   const age = now.getTime() - station.at.getTime()
   if (age > STATION_FRESH_MS || age < -10 * 60_000 || event.getTime() <= now.getTime()) return null
+  const fast = motion !== null && motion.mps / 0.514444 >= FAST_DECK_KT
+  if (fast && age > MOVING_STALE_MS) return null
   const cover = (l: Layer) => v.sky.layers.find((x) => x.layer === l)?.cover ?? null
   const missed = decks(station.sky).filter((d) => {
     const c = cover(d.layer)
@@ -126,11 +148,13 @@ export function stationDoubt(v: FireVerdict | null, station: { sky: MetarSky; at
   const layers = [...new Set(missed.map((d) => d.layer))]
   const amount = missed.some((d) => d.amount === 'OVC') ? 'overcast' : 'broken'
   const named = layers.length === 1 ? layers[0] : `${layers.slice(0, -1).join(', ')} and ${layers[layers.length - 1]}`
-  return { line: `${station.sky.station} sees ${amount} ${named} cloud now · models clear it by ${clock(event)}`, layers }
+  const trend = motion === null ? null : `deck moving ${point8(motion.fromDeg + 180)}${clearsAt !== null && clearsAt.getTime() < event.getTime() ? ` · clearing here by ~${clock(clearsAt)}` : ''}`
+  return { line: `${station.sky.station} sees ${amount} ${named} cloud now · ${trend ?? `models clear it by ${clock(event)}`}`, layers }
 }
 
 /** The call, one step less sure when the station disagrees: a Go or a Skip becomes a Maybe. */
 export function withDoubt(read: CallRead | null, doubt: StationDoubt | null): CallRead | null {
-  if (read === null || doubt === null || read.call === null || read.call === 'Maybe') return read
+  /* A call made from what was seen (Batch CORE 1.2, src/core/briefing.ts observedDeck) is not doubted by the same report. */
+  if (read === null || doubt === null || read.call === null || read.call === 'Maybe' || read.confirmed) return read
   return { ...read, call: 'Maybe', why: `${read.call === 'Skip' ? 'Less sure than the models' : 'Less sure'}: ${doubt.line}. ${read.why}` }
 }

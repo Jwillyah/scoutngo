@@ -1,4 +1,6 @@
 import { bestSpotWords, betterColorLine } from '../core/bestSky.ts'
+import { skyCallNow } from '../core/skyCall.ts'
+import { useGoAlert } from '../lib/goAlert.ts'
 import { useBestSky } from '../lib/useBestSky.ts'
 import '../styles/home-d.css'
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -19,7 +21,7 @@ import { rangeSizeWords } from '../core/surfReads.ts'
 import { BUBBLE_ROOM, chartMarks, firstFun, homeCardsShown, homeLayout, nextLine, nightSpans, surfChartMarks, surfPath, tideAt, tideCurve, type HomeLayout, type SurfChartMarks } from '../core/homeCards.ts'
 import { gustWords, windAt, windWords } from '../lib/windNow.ts'
 import { useStationObs, type StationNow } from '../lib/useStationObs.ts'
-import { freshSky, skyCondition } from '../core/skyWord.ts'
+import { cloudRange, freshSky, rangeWord, skyCondition } from '../core/skyWord.ts'
 import { colorNowLine } from '../core/colorNow.ts'
 import { hourlyAt } from '../lib/tideSheetData.ts'
 import { compass } from '../lib/tideWords.ts'
@@ -102,6 +104,8 @@ function writeHomeTab(p: Page): void {
 
 export function Home({ venue, placeName, timeZone, units, drone, now, onClose, onOpenMap, onMenu, onSwitchSpot, onViewfinder, onOpen, start = 0 }: HomeProps) {
   const brief = useBriefing(venue, timeZone, now, true)
+  /* Batch CORE, Section 1.4: the Go alert, from the one sky call. */
+  useGoAlert(skyCallNow(brief.days.slice(0, 2), now, venue), now, timeZone)
   /* Batch Map A1/A2: the spot's surf beach and its band, the same hook the menu and the Surf page read. */
   const surf = useSurfNow(venue, now, timeZone, units.distance === 'ft', placeName)
   /* Batch MAP2, Section 2: a station within 15 km that reported in the last hour; the wind now leans to it (the Wind page reads the same). */
@@ -288,6 +292,8 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
     day: sunUp,
     station: which === 'today' ? freshSky(obs, now) : null,
   })
+  /* Batch CORE, Section 1.5: on a fast cloud day the range, not a word that flips with each row (src/core/skyWord.ts cloudRange). */
+  const fast = which === 'today' ? cloudRange([-2, -1, 0, 1, 2].map((h) => at('cloud_cover', new Date(now.getTime() + h * 3_600_000))), at('wind_speed_500hPa', now)) : null
   /* Batch TRUTH, Section 0.5: a live colour window with a Maybe or better leads the home. */
   /* Batch BEST SKY, Section 4: today only, with Shoot picked: the grid within 15 mi (7 or so questions, each kept an hour). */
   const bestSky = useBestSky(which === 'today' && order.includes('shoot') ? venue : null, 15, now)
@@ -388,7 +394,7 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
         </button>
         {/* Batch NOW, Section 3.1: the condition and the day's high and low open the Weather page too. */}
         <button type="button" className="hwx__cond" data-open-weather onClick={() => onOpen('weather')}>
-          {cond?.word ?? '—'} · H {temp(hi)} L {temp(lo)}
+          {fast !== null ? rangeWord(fast) : (cond?.word ?? '—')} · H {temp(hi)} L {temp(lo)}
           {soonWord === null ? '' : ` · ${soonWord}`} ›
         </button>
       </div>
@@ -753,7 +759,10 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
     /* The sunset still to come, or after it tomorrow's sunrise: never an event that has passed (Batch Flow, Section 4). */
     title = 'Sky'
     target = 'sky'
-    const past = which === 'today' && day?.events.sunset != null && now.getTime() > day.events.sunset.getTime()
+    /* Batch CORE, Section 1.1 and 1.3: the one sky call; tonight's sunset holds the card until its colour is over (src/core/skyCall.ts). */
+    const cur = which === 'today' ? skyCallNow(brief.days.slice(0, 2), now, venue) : null
+    const holding = cur !== null && cur.dayIndex === 0 && cur.kind === 'sunset'
+    const past = which === 'today' && !holding && day?.events.sunset != null && now.getTime() > day.events.sunset.getTime()
     const next = past ? (brief.days[1] ?? null) : null
     const read = past ? (next?.reads.sunrise ?? null) : (day?.reads.sunset ?? null)
     const at = past ? (next?.events.sunrise ?? null) : (day?.events.sunset ?? null)

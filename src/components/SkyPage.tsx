@@ -1,11 +1,12 @@
 import '../styles/sky.css'
+import { colourNowWords, skyCallNow } from '../core/skyCall.ts'
 import { useEffect, useState } from 'react'
 import { getPosition, getTimes } from 'suncalc'
 import { compassPoint } from '../core/field.ts'
 import type { LatLon } from '../core/geo.ts'
 import { leadLayer } from '../core/fireOutlook.ts'
 import { colorWords, groundOf } from '../core/homeDay.ts'
-import { colorHeadline, eventDayWord, lightMarks, lightTimeline, nextEvent, nowShare, plainChecks, plainReason, rareRows, RARE_WAIT_MS, sideView, SIDE_TOP_M, type RareRow } from '../core/skyPage.ts'
+import { colorHeadline, eventDayWord, lightMarks, lightTimeline, nowShare, plainChecks, plainReason, rareRows, RARE_WAIT_MS, sideView, SIDE_TOP_M, type RareRow } from '../core/skyPage.ts'
 import type { Special } from '../core/specialLight.ts'
 import { formatClock } from '../core/timezone.ts'
 import { fetchGlassWeek, fetchSpecialWeek, specialsFrom } from '../lib/specialLightData.ts'
@@ -17,7 +18,7 @@ import { useStationNow } from '../lib/useStationNow.ts'
 import { layersWords } from '../core/metar.ts'
 import { stationWord } from '../core/skyWord.ts'
 import { PageShell } from './PageShell.tsx'
-import { opensOnNow, stationDoubt, withDoubt, type SkyTab } from '../core/skyNow.ts'
+import { MODELS_CLEAR, opensOnNow, stationDoubt, withDoubt, type SkyTab } from '../core/skyNow.ts'
 import { SkyNowView } from './SkyNowView.tsx'
 
 /*
@@ -69,8 +70,14 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
    * (a phone that slept left it hours behind).
    */
   const realNow = now
-  const days = { sunset: nextEvent(brief.days, 'sunset', realNow), sunrise: nextEvent(brief.days, 'sunrise', realNow) }
-  const soonest: Kind = days.sunrise?.events.sunrise != null && days.sunset?.events.sunset != null && days.sunrise.events.sunrise < days.sunset.events.sunset ? 'sunrise' : 'sunset'
+  /* Batch CORE, Section 1.1 and 1.3: the one sky call (src/core/skyCall.ts). An event stays until its colour is over, so tonight's sunset holds the page through its colour. */
+  const callOf = (k: Kind) => skyCallNow(brief.days, realNow, venue, k)
+  const dayOf = (k: Kind) => {
+    const c = callOf(k)
+    return c === null ? null : (brief.days[c.dayIndex] ?? null)
+  }
+  const days = { sunset: dayOf('sunset'), sunrise: dayOf('sunrise') }
+  const soonest: Kind = skyCallNow(brief.days, realNow, venue)?.kind ?? 'sunset'
   const [picked, setPicked] = useState<Kind | null>(null)
   const kind = picked ?? soonest
   /* Batch NOW, Section 1.1: Now · Tonight · Tomorrow morning; Now first, and the page opens there in the day's middle. */
@@ -86,11 +93,31 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
   const verdict = day?.verdicts[kind] ?? null
   /* Batch NOW, Section 1.2: a deck the station reports now that the models clear by the event: said, and the call one step less sure. */
   const stationAt = station === null || station.at === '' ? null : new Date(station.at)
-  const doubt = stationDoubt(verdict, station === null || stationAt === null ? null : { sky: station.sky, at: stationAt }, day?.events[kind] ?? null, realNow, (d) => formatClock(d, timeZone))
+  /* A broken or overcast deck the station reports within 75 min: the colour is the whole sky's. */
+  const deckOverhead = station !== null && stationAt !== null && realNow.getTime() - stationAt.getTime() <= 75 * 60_000 && station.sky.groups.some((g) => (g.amount === 'BKN' || g.amount === 'OVC') && g.baseFt < 20_000)
+  /* Batch CORE, Section 1.6: the deck's motion (the wind at 500 hPa) and the hour the models clear it here. */
+  const wxWhen = (n: string, t: Date) => (brief.wx === null ? null : hourlyAt(brief.wx, n, t))
+  const aloft = wxWhen('wind_speed_500hPa', realNow)
+  const aloftFrom = wxWhen('wind_direction_500hPa', realNow)
+  const motion = aloft === null || aloftFrom === null ? null : { fromDeg: aloftFrom, mps: aloft }
+  const evAt = day?.events[kind] ?? null
+  const clearsAt = (() => {
+    if (evAt === null) return null
+    for (let t = realNow.getTime(); t <= evAt.getTime(); t += 15 * 60_000) {
+      const low = wxWhen('cloud_cover_low', new Date(t))
+      const mid = wxWhen('cloud_cover_mid', new Date(t))
+      if (low !== null && mid !== null && Math.max(low, mid) < MODELS_CLEAR) return new Date(t)
+    }
+    return null
+  })()
+  const doubt = stationDoubt(verdict, station === null || stationAt === null ? null : { sky: station.sky, at: stationAt }, evAt, realNow, (d) => formatClock(d, timeZone), motion, clearsAt)
   const read = withDoubt(day?.reads[kind] ?? null, doubt)
   const az = event === null ? null : getPosition(event, venue.lat, venue.lon).azimuth
   const lead = verdict === null ? null : leadLayer(verdict)
-  const checks = plainChecks(lead, az === null ? '—' : compassPoint(az))
+  /* Batch CORE, Section 1.7: the deck the station reports now, in the why lines too. */
+  const seenGroup = station === null || stationAt === null || realNow.getTime() - stationAt.getTime() > 75 * 60_000 ? null : (station.sky.groups.filter((g) => (g.amount === 'SCT' || g.amount === 'BKN' || g.amount === 'OVC') && g.baseFt < 20_000).sort((a, b) => ({ SCT: 1, BKN: 2, OVC: 3 } as Record<string, number>)[b.amount] - ({ SCT: 1, BKN: 2, OVC: 3 } as Record<string, number>)[a.amount] || a.baseFt - b.baseFt)[0] ?? null)
+  const seenWords = seenGroup === null ? null : `${station!.sky.station} ${seenGroup.amount === 'SCT' ? 'scattered' : seenGroup.amount === 'BKN' ? 'broken' : 'overcast'} at ${seenGroup.baseFt.toLocaleString('en-US')} ft`
+  const checks = plainChecks(lead, az === null ? '—' : compassPoint(az), seenWords, read?.confirmed === true ? 'open' : null)
   const marks = event === null ? [] : lightMarks(kind, event, (t) => getPosition(t, venue.lat, venue.lon).altitude)
   const segs = event === null ? [] : lightTimeline(kind, event, marks, read?.colorFrom ?? null, read?.colorTo ?? null)
   const thumb = nowShare(segs, realNow)
@@ -183,7 +210,7 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
         ))}
       </div>
       {tab === 'now' ? (
-        <SkyNowView venue={venue} now={realNow} timeZone={timeZone} station={station === null || stationAt === null ? null : { sky: station.sky, at: stationAt }} wx={brief.wx} next={nextToday} onNext={(k) => pickTab(k)} />
+        <SkyNowView venue={venue} now={realNow} timeZone={timeZone} station={station === null || stationAt === null ? null : { sky: station.sky, at: stationAt }} wx={brief.wx} next={nextToday} onNext={(k) => pickTab(k)} colourNow={colourNowWords(skyCallNow(brief.days, realNow, venue), realNow, deckOverhead)} />
       ) : (
       <>
       <p className="spage__event num" {...(event !== null && kind === 'sunset' && picked === null ? { 'data-shared': 'sunset', 'data-value': `sunset ${clock(event)}`.toLowerCase() } : {})}>

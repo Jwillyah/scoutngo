@@ -32,6 +32,7 @@ import { compassPoint } from './field.ts'
 import { lookWindow, type FireVerdict } from './fireOutlook.ts'
 import type { SatRead } from './goesNowcast.ts'
 import { layerWords, type DeckTruth } from './layerTruth.ts'
+import type { MetarSky } from './metar.ts'
 import type { GapRead } from './gapWatch.ts'
 import { underLitWindow } from './underLight.ts'
 import { LAYER_WORD } from './skyColour.ts'
@@ -98,6 +99,40 @@ export interface CallObs {
   truth?: DeckTruth | null
   /** The gap toward the sun (src/core/gapWatch.ts). */
   gap?: GapRead | null
+  /** The nearest station's report and its time (Batch CORE, Section 1.2: a scattered deck counts too). */
+  sky?: { sky: MetarSky; at: Date } | null
+}
+
+/*
+ * OBSERVED CLOUD BEATS THE MODELS INSIDE T-90 (Batch CORE, Section 1.2; 14 and
+ * 15 Nov, inland VB). On 15 Nov KNTU reported BKN065 then BKN060 over a whole
+ * sky that lit red-pink, the satellite saw the way to the sun 3-19% cold, and
+ * the models said Possible at T-60. From OBSERVED_WITHIN_MS before the event
+ * until its colour is over, a station report no older than OBSERVED_FRESH_MS
+ * of a low or mid deck over you (base under 20,000 ft) and the satellite
+ * seeing the way to the sun open (at most GAP_OPEN_SHARE of 100-400 km cold,
+ * nothing deep) rescore the sun's side: a broken or overcast deck is a Go, a
+ * scattered one at least a Maybe, looking toward the sun. The satellite read
+ * the app takes is carried upwind to the event (src/lib/goesNowcast.ts).
+ */
+export const OBSERVED_WITHIN_MS = 90 * 60_000
+export const OBSERVED_FRESH_MS = 75 * 60_000
+export const GAP_OPEN_SHARE = 0.3
+const OBSERVED_TOP_FT = 20_000
+
+export function observedDeck(obs: CallObs | null, sat: SatRead | null, event: Date, now: Date): { amount: 'SCT' | 'BKN' | 'OVC'; baseFt: number; station: string; line: string } | null {
+  const lead = event.getTime() - now.getTime()
+  if (lead > OBSERVED_WITHIN_MS || lead < -20 * 60_000) return null
+  const st = obs?.sky ?? null
+  if (st === null || now.getTime() - st.at.getTime() > OBSERVED_FRESH_MS || now.getTime() < st.at.getTime() - 10 * 60_000) return null
+  if (sat === null || sat.blocked || sat.farCold > GAP_OPEN_SHARE) return null
+  const rank = { SCT: 1, BKN: 2, OVC: 3 } as const
+  const deck = st.sky.groups
+    .filter((g): g is typeof g & { amount: 'SCT' | 'BKN' | 'OVC' } => (g.amount === 'SCT' || g.amount === 'BKN' || g.amount === 'OVC') && g.baseFt < OBSERVED_TOP_FT)
+    .sort((a, b) => rank[b.amount] - rank[a.amount] || a.baseFt - b.baseFt)[0]
+  if (deck === undefined) return null
+  const word = deck.amount === 'SCT' ? 'scattered cloud' : deck.amount === 'BKN' ? 'a broken deck' : 'an overcast deck'
+  return { amount: deck.amount, baseFt: deck.baseFt, station: st.sky.station, line: `${st.sky.station} reports ${word} at ${deck.baseFt.toLocaleString('en-US')} ft over you, and the satellite sees the way to the sun ${Math.round(sat.farCold * 100)}% cold` }
 }
 
 const venueOf = (o: CallObs | null) => o?.venue ?? { lat: 0, lon: 0 }
@@ -125,6 +160,14 @@ export function eventCall(v: FireVerdict | null, kind: Kind, event: Date, now: D
     const u = truth.baseFt === null ? null : underLitWindow(kind, event, truth.baseFt * 0.3048, gap.slotEdgeKm, (t) => getPosition(t, venueOf(obs).lat, venueOf(obs).lon).altitude)
     const timing = u === null ? timing0 : { ...timing0, colorFrom: u.from, colorTo: u.to, peak: u.peak, setUp: new Date(u.from.getTime() - SET_UP_BEFORE_MS) }
     return { ...base, ...timing, by: truth.station, confirmed: true, call: 'Go', why: `Stations see a ${truth.short} over you and the gap toward the sun open.` }
+  }
+  /* Batch CORE, Section 1.2: an observed deck over you and the way to the sun open beat the models inside T-90. */
+  const seen = gap?.state === 'shut' ? null : observedDeck(obs, sat, event, now)
+  if (seen !== null) {
+    const sunDeg = getPosition(event, venueOf(obs).lat, venueOf(obs).lon).azimuth
+    const look = compassPoint(sunDeg)
+    if (seen.amount !== 'SCT') return { ...base, ...timing0, by: seen.station, confirmed: true, lookDeg: sunDeg, call: 'Go', why: `Observed over the models: ${seen.line}. Lit from underneath, look ${look}.` }
+    if (v === null || v.word === 'unlikely' || (v.word === 'possible' && v.afterglow?.counts === true && lookWindow(v) === null)) return { ...base, ...timing0, by: seen.station, lookDeg: sunDeg, call: 'Maybe', why: `Observed over the models: ${seen.line}. Possible, look ${look}.` }
   }
   if (near && truth?.measured === true && gap?.state === 'shut') {
     return { ...base, ...timing0, by: truth.station, call: 'Skip', why: `A ${truth.words} over you, and the gap toward the sun shut: the light cannot get under it.` }

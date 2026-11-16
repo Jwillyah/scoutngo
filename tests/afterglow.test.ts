@@ -92,7 +92,7 @@ describe('the home says where to look', () => {
     const { colorNowLine } = await import('../src/core/colorNow.ts')
     const event = new Date('2026-11-12T21:56:37Z')
     const read = { kind: 'sunset' as const, event, call: 'Maybe' as const, why: '', confirmed: false, colorFrom: event, colorTo: event, setUp: null, agree: 2, of: 5, lookDeg: 68 }
-    expect(colorNowLine([read], new Date(event.getTime() + 5 * 60_000), PIER, 'America/New_York')).toBe('Color now · sunset 4:56 PM · look E')
-    expect(colorNowLine([{ ...read, lookDeg: null }], new Date(event.getTime() + 5 * 60_000), PIER, 'America/New_York')).toMatch(/look W$/)
+    expect(colorNowLine([read], new Date(event.getTime() + 5 * 60_000), PIER, 'America/New_York')).toBe('Color now · sunset 4:56 PM · look ENE')
+    expect(colorNowLine([{ ...read, lookDeg: null }], new Date(event.getTime() + 5 * 60_000), PIER, 'America/New_York')).toMatch(/look WSW$/)
   })
 })

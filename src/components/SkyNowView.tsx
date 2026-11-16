@@ -12,7 +12,7 @@ import { hourlyAt, type Hourly } from '../lib/tideSheetData.ts'
  * it is worth a look and why, then what is next today. The words are
  * src/core/skyNow.ts's.
  */
-export function SkyNowView({ venue, now, timeZone, station, wx, next, onNext }: { venue: LatLon; now: Date; timeZone: string; station: { sky: MetarSky; at: Date } | null; wx: Hourly | null; next: { kind: 'sunset' | 'sunrise'; at: Date; call: string; value: string } | null; onNext: (k: 'sunset' | 'sunrise') => void }) {
+export function SkyNowView({ venue, now, timeZone, station, wx, next, onNext, colourNow = null }: { venue: LatLon; now: Date; timeZone: string; station: { sky: MetarSky; at: Date } | null; wx: Hourly | null; colourNow?: string | null; next: { kind: 'sunset' | 'sunrise'; at: Date; call: string; value: string } | null; onNext: (k: 'sunset' | 'sunrise') => void }) {
   const fresh = station !== null && now.getTime() - station.at.getTime() <= STATION_FRESH_MS ? station : null
   const at = (name: string) => (wx === null ? null : hourlyAt(wx, name, now))
   const model = wx === null ? null : { low: at('cloud_cover_low'), mid: at('cloud_cover_mid'), high: at('cloud_cover_high') }
@@ -22,8 +22,9 @@ export function SkyNowView({ venue, now, timeZone, station, wx, next, onNext }: 
   return (
     <>
       <p className="spage__event num">Now · {clock(now)}</p>
-      <p className="spage__head" data-now-head>{read.worth.length > 0 ? 'Worth a look' : 'Nothing special now'}</p>
-      <p className="spage__why">{read.worth.length > 0 ? `${read.worth.length === 1 ? 'One thing' : `${read.worth.length} things`} in the sky now.` : `${read.nothing?.replace(/^./, (c) => c.toUpperCase()) ?? 'Nothing found'}.`}</p>
+      {/* Batch CORE, Section 1.3: while the colour is on, the headline is the event itself. */}
+      <p className="spage__head" data-now-head>{colourNow !== null ? 'Color now' : read.worth.length > 0 ? 'Worth a look' : 'Nothing special now'}</p>
+      <p className="spage__why">{colourNow !== null ? `${colourNow.replace(/^./, (c) => c.toUpperCase())}.` : read.worth.length > 0 ? `${read.worth.length === 1 ? 'One thing' : `${read.worth.length} things`} in the sky now.` : `${read.nothing?.replace(/^./, (c) => c.toUpperCase()) ?? 'Nothing found'}.`}</p>
       <section className="dcard spage__now" aria-label="The sky now">
         <p className="dcard__label">The sky now</p>
         <p className="spage__nowclouds" data-now-clouds>{read.clouds.replace(/^./, (c) => c.toUpperCase())}</p>

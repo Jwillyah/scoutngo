@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-15",
+  "event": "sunset",
+  "place": { "where": "VB inland ~9 mi W of oceanfront", "note": "No exact coordinate kept. Replays use a rounded Virginia Beach point (36.80, -76.10)." },
+  "observedAt": "2026-11-15T17:00:00-05:00",
+  "truth": {
+    "sky": "a whole-sky altocumulus/stratocumulus deck lit vivid red-pink from the horizon to overhead, with a lit gap at the WSW horizon",
+    "time": "about 5:00-5:10 PM, from Jwilly's photo",
+    "call": "Fire"
+  },
+  "appSaid": {
+    "at": "4:59 PM",
+    "skyNow": ["Worth a look · One thing in the sky now", "Partly cloudy under 20,000 ft (forecast) · no station report in the last 75 minutes"],
+    "next": "Sunrise 6:43 AM · Color possible",
+    "tabs": "Tomorrow morning · Tomorrow evening",
+    "alert": "none"
+  },
+  "station": {
+    "id": "KNTU",
+    "reports": ["KNTU 151956Z 34009KT 10SM FEW035 BKN065", "KNTU 152056Z 36010KT 10SM FEW047 BKN060", "KNTU 152156Z 33010KT 10SM FEW045 BKN065"],
+    "note": "As weather.gov's archive holds them (read 16 Nov, Batch CORE). The phone at 4:59 PM had none of them in the last 75 minutes: weather.gov's latest-observation answer was behind (Batch CORE 0.1)."
+  },
+  "shouldSay": {
+    "T-60": "Likely or Fire",
+    "T-30": "Likely or Fire",
+    "at4:59": "tonight's sunset, colour on, look WSW then overhead"
+  }
+}

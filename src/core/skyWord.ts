@@ -133,3 +133,25 @@ export function skyCondition(s: SkyIn): { word: string; icon: SkyIcon } | null {
   /* No layers: the code's word, but never its fog. */
   return coded === null || coded.icon === 'fog' ? null : coded
 }
+
+/*
+ * FAST CLOUD DAYS (Batch CORE, Section 1.5; 14 Nov 3:42 PM, inland VB): cloud
+ * rows crossing at 20 kt and more turned the word over between "Clear" and
+ * "Mostly cloudy" as each row passed the station. When the wind aloft is
+ * FAST_CLOUD_KT or more and the hours round now swing by RANGE_MIN_PCT or
+ * more, the word is the range: "Clouds coming and going · 30–70%".
+ */
+export const FAST_CLOUD_KT = 20
+export const RANGE_MIN_PCT = 30
+
+/** The cover's range when the cloud is fast and coming and going, to the nearest 10%; else null. `covers` are the hours round now, %; `aloftMps` the wind aloft. */
+export function cloudRange(covers: readonly (number | null)[], aloftMps: number | null): { lo: number; hi: number } | null {
+  if (aloftMps === null || aloftMps / 0.514444 < FAST_CLOUD_KT) return null
+  const known = covers.filter((c): c is number => c !== null && Number.isFinite(c))
+  if (known.length < 3) return null
+  const lo = Math.round(Math.min(...known) / 10) * 10
+  const hi = Math.round(Math.max(...known) / 10) * 10
+  return hi - lo >= RANGE_MIN_PCT ? { lo, hi } : null
+}
+
+export const rangeWord = (r: { lo: number; hi: number }): string => `Clouds coming and going · ${r.lo}–${r.hi}%`
