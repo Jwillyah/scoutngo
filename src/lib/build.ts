@@ -1,3 +1,4 @@
+import { formatClock } from '../core/timezone.ts'
 /**
  * WHICH BUILD IS RUNNING, AND WHETHER A NEWER ONE EXISTS.
  *
@@ -78,10 +79,23 @@ export function buildLabelWithDate(time: string = BUILD_TIME): string {
  * SETTINGS' ONE LINE (Batch G): "Version c8786df · 2 Nov". The comparison
  * with origin is in Debug, folded (BuildStamp.tsx), not on this line.
  */
-export function versionLine(time: string = BUILD_TIME): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(time)
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-  return m === null ? `Version ${buildLabel()}` : `Version ${buildLabel()} · ${Number(m[3])} ${months[Number(m[2]) - 1]}`
+export function versionLine(time: string = BUILD_TIME, timeZone: string = deviceZone()): string {
+  const at = new Date(time)
+  if (time === '' || Number.isNaN(at.getTime())) return `Version ${buildLabel()}`
+  /*
+   * Batch CORE, Section 0.1: the build's time too, on this phone's clock ("Version a9b98ad · 14 Nov 9:31 PM"), so a
+   * screenshot says which build and when; the day read in UTC said 15 Nov for an evening build on the 14th.
+   */
+  const part = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat('en-US', { timeZone, ...o }).format(at)
+  return `Version ${buildLabel()} · ${part({ day: 'numeric' })} ${part({ month: 'short' })} ${formatClock(at, timeZone)}`
+}
+
+function deviceZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+  } catch {
+    return 'UTC'
+  }
 }
 
 /**

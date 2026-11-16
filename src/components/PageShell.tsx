@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { versionLine } from '../lib/build.ts'
 import { createPortal } from 'react-dom'
 import { NetDebug } from './NetDebug.tsx'
 
@@ -95,6 +96,8 @@ export function PageShell({ kind, title, sub, ground, onBack, how, foot, inner, 
               </button>
             </div>
             <div className="dhow__body">{how}</div>
+            {/* Batch DRONE, Section 0.2: which build, at the foot of every "How we got this". */}
+            <p className="dhow__build num">{versionLine()}</p>
           </div>
         </div>
       ) : null}

@@ -18342,6 +18342,12 @@ a.about__row * {
 .dhow__body p {
   margin: 0 0 6px;
 }
+/* Batch DRONE, Section 0.2: which build, at the sheet's foot. */
+.dhow__build {
+  margin: 10px 0 0;
+  font-size: 12px;
+  opacity: 0.7;
+}
 @media (max-height: 700px) {
   .dhead__big {
     font-size: 44px;

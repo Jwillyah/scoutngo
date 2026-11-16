@@ -181,6 +181,8 @@ describe('what the stamp says', () => {
 describe('Settings’ one version line (Batch G)', () => {
   it('reads "Version <hash> · <day> <Mon>", nothing else', async () => {
     const { versionLine } = await import('./build.ts')
-    expect(versionLine('2026-11-02T14:00:00Z')).toMatch(/^Version [0-9a-f]{7}\+? · 2 Nov$/)
+    expect(versionLine('2026-11-02T14:00:00Z', 'UTC')).toMatch(/^Version [0-9a-f]{7}\+? · 2 Nov 2:00 PM$/)
+    /* Batch CORE, Section 0.1: the build's own day on this phone's clock, not UTC's. */
+    expect(versionLine('2026-11-15T02:31:00Z', 'America/New_York')).toMatch(/· 14 Nov 9:31 PM$/)
   })
 })
