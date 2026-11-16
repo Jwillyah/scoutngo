@@ -1,4 +1,5 @@
 import { paintShadows, shadowsWithin } from '../lib/shadowRaster.ts'
+import { recordError } from '../lib/errorLog.ts'
 import { shadowWorker } from '../lib/shadowPainter.ts'
 import type { ShadowMap } from '../core/shadowMap.ts'
 import { moonGlyphSvg } from '../lib/moonGlyph.ts'
@@ -1637,6 +1638,29 @@ export function MapView({
        * buffer survives the frame. Off by default in maplibre.
        */
       canvasContextAttributes: { preserveDrawingBuffer: true },
+    })
+
+    /*
+     * WHICH REQUEST FAILED (Batch CORE, Section 3.3; 15 Nov 5:41 PM, radar on:
+     * "Map data didn't load · Retry" with nothing drawn, and nothing to say
+     * which). Each source's failure goes to the phone's error log (Settings ›
+     * Debug › Last errors) with its source and host, at most once a minute
+     * per source; nothing is sent.
+     */
+    const errorSeen = new Map<string, number>()
+    instance.on('error', (ev: unknown) => {
+      const e = ev as { sourceId?: string; error?: { message?: string; status?: number; url?: string } }
+      const id = e.sourceId ?? 'style'
+      const now = Date.now()
+      if (now - (errorSeen.get(id) ?? 0) < 60_000) return
+      errorSeen.set(id, now)
+      let host = ''
+      try {
+        host = e.error?.url === undefined ? '' : new URL(e.error.url).host
+      } catch {
+        host = ''
+      }
+      recordError('Map', `${id}${host === '' ? '' : ` (${host})`}: ${e.error?.status === undefined ? '' : `HTTP ${e.error.status} `}${e.error?.message ?? 'failed'}`)
     })
 
     /*

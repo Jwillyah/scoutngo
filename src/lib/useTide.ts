@@ -33,6 +33,28 @@ export type TideInfo =
   | { status: 'no-station'; nearestKm: number; nearestName: string }
   | { status: 'unavailable'; reason: string }
 
+/** The coast's answer is waited on at most this long before the station is chosen. */
+export const COAST_WAIT_MS = 4000
+const spotKey = (p: LatLon) => `${p.lat.toFixed(4)},${p.lon.toFixed(4)}`
+const beaches = new Map<string, Promise<LatLon | null>>()
+/** The ocean beach a sound-side pin takes its tide from, or null: one answer per spot for every screen. */
+export function beachFor(at: LatLon): Promise<LatLon | null> {
+  const k = spotKey(at)
+  const had = beaches.get(k)
+  if (had !== undefined) return had
+  const p = Promise.race([
+    coastFacing(at)
+      .then((c) => (typeof c === 'object' && c.side === 'island' && c.beachAt !== undefined ? c.beachAt : null))
+      .catch(() => null),
+    new Promise<null>((done) => setTimeout(() => done(null), COAST_WAIT_MS)),
+  ])
+  beaches.set(k, p)
+  return p
+}
+/** The station a spot's tide comes from, once one has answered: the home, the map and the Tide page say the same. */
+const chosen = new Map<string, string>()
+export const chosenFor = (at: LatLon): string | null => chosen.get(spotKey(at)) ?? null
+
 /** How many stations to try before giving up. See the loop below. */
 export const STATION_ATTEMPTS = 3
 
@@ -46,31 +68,15 @@ export function useTide(venue: LatLon | null, shootAt: Date | null): TideInfo {
 
   /*
    * Batch Beach, Section 1: a pin on a barrier island's sound side takes its
-   * tide from the ocean beach (src/lib/coast.ts). Asked beside the tide, never
-   * before it: offline the coast's open-sea tiles may not be in the pack, and
-   * the tide must not wait on them. The pin's own station first; the ocean
-   * beach's once the coast has answered "island".
+   * tide from the ocean beach (src/lib/coast.ts). Batch CORE, Section 3.2: the
+   * coast's answer is awaited (at most COAST_WAIT_MS, shared by every screen,
+   * beachFor) before the station is chosen, and the station chosen for a spot
+   * is the one every screen uses (chosenFor). On 15 Nov the map said "Low
+   * 5:52p" (Rudee Heights, 8639214) and the home "Low 9:15 PM" (Buchanan
+   * Creek entrance, 8638854) for one spot: two stations, each right for itself.
    */
-  const key = lat === null || lon === null ? null : `${lat},${lon}`
-  const [island, setIsland] = useState<{ key: string; at: LatLon } | null>(null)
   useEffect(() => {
-    if (key === null || lat === null || lon === null) return
-    let live = true
-    void coastFacing({ lat, lon })
-      .then((c) => {
-        if (live && typeof c === 'object' && c.side === 'island' && c.beachAt !== undefined) setIsland({ key, at: c.beachAt })
-      })
-      .catch(() => undefined)
-    return () => {
-      live = false
-    }
-  }, [key, lat, lon])
-  const beach = island !== null && island.key === key ? island.at : null
-  const fromLat = beach?.lat ?? lat
-  const fromLon = beach?.lon ?? lon
-
-  useEffect(() => {
-    if (lat === null || lon === null || fromLat === null || fromLon === null || dayKey === null || shootAt === null) {
+    if (lat === null || lon === null || dayKey === null || shootAt === null) {
       setInfo({ status: 'idle' })
       return
     }
@@ -91,7 +97,13 @@ export function useTide(venue: LatLon | null, shootAt: Date | null): TideInfo {
        * Batch MAP2, Section 2: the open coast first among the nearest (a spot on the beach, not up a creek).
        * Batch Beach, Section 1: from the ocean beach, when the spot is on a barrier island's sound side (above).
        */
-      const candidates = openCoastFirst(nearestStations({ lat: fromLat, lon: fromLon }, stations.stations, STATION_ATTEMPTS + 3)).slice(0, STATION_ATTEMPTS)
+      const beach = await beachFor({ lat, lon })
+      if (!live) return true
+      const from = beach ?? { lat, lon }
+      const spot = spotKey({ lat, lon })
+      const ordered = openCoastFirst(nearestStations(from, stations.stations, STATION_ATTEMPTS + 3)).slice(0, STATION_ATTEMPTS)
+      const was = chosen.get(spot)
+      const candidates = was === undefined ? ordered : [...ordered.filter((c) => c.station.id === was), ...ordered.filter((c) => c.station.id !== was)]
       const nearest = candidates[0]
       if (nearest === undefined) {
         setInfo({ status: 'unavailable', reason: 'NOAA listed no tide stations.' })
@@ -120,6 +132,7 @@ export function useTide(venue: LatLon | null, shootAt: Date | null): TideInfo {
         const predictions = await fetchPredictions(candidate.station.id, shootAt)
         if (!live) return true
         if (predictions.status === 'ok') {
+          chosen.set(spot, candidate.station.id)
           setInfo({
             status: 'ok',
             station: candidate.station,
@@ -147,7 +160,7 @@ export function useTide(venue: LatLon | null, shootAt: Date | null): TideInfo {
      * every drag of the time scrubber.
      */
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lat, lon, fromLat, fromLon, dayKey])
+  }, [lat, lon, dayKey])
 
   return info
 }

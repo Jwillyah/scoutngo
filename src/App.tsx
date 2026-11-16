@@ -1698,6 +1698,17 @@ function App() {
   }, [venue])
 
   /*
+   * OPENING THE MAP IS NOW (Batch CORE, Section 3.4; 15 Nov 5:41 PM the map
+   * read "at 5:22 PM Sun": the bar kept where it was when last left). Each
+   * time the home gives way to the map, the bar goes to the current minute.
+   */
+  const homeWasOpen = useRef(briefOpen)
+  useEffect(() => {
+    if (homeWasOpen.current && !briefOpen) onBackToNow()
+    homeWasOpen.current = briefOpen
+  }, [briefOpen]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /*
    * A PLACE THAT MOVED IS STILL A PLACE. /field, /now and the rest are the
    * names of places (src/lib/menu.ts OLD_PATHS); vercel.json serves the app
    * for each, and here the app goes there once and puts the address back.

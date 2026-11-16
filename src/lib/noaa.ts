@@ -239,6 +239,18 @@ export function predictionsKey(stationId: string, at: Date): string {
   return tideKey(stationId, stamp(new Date(at.getTime() - day)), stamp(new Date(at.getTime() + day)))
 }
 
+/** Days asked for in one request, the day itself first (Batch CORE, Section 3.1). */
+export const TIDE_AHEAD_DAYS = 7
+
+/** A day's window, as fetchPredictions has always asked it: the day before to the day after, in UTC days. */
+function windowOf(at: Date): { begin: string; end: string; from: number; to: number } {
+  const day = 86_400_000
+  const begin = stamp(new Date(at.getTime() - day))
+  const end = stamp(new Date(at.getTime() + day))
+  const ymd = (x: string) => Date.UTC(Number(x.slice(0, 4)), Number(x.slice(4, 6)) - 1, Number(x.slice(6, 8)))
+  return { begin, end, from: ymd(begin), to: ymd(end) + day }
+}
+
 export async function fetchPredictions(
   stationId: string,
   at: Date,
@@ -249,12 +261,14 @@ export async function fetchPredictions(
   const key = `${stationId}|${begin}|${end}`
   const hit = cache.get(key)
   if (hit !== undefined) return hit
+  /* Batch CORE, Section 3.1: asked to TIDE_AHEAD_DAYS ahead in the same request; each day's window is kept (below). */
+  const wideEnd = stamp(new Date(at.getTime() + TIDE_AHEAD_DAYS * day))
 
   const base = {
     product: 'predictions',
     application: APPLICATION,
     begin_date: begin,
-    end_date: end,
+    end_date: wideEnd,
     datum: 'MLLW',
     station: stationId,
     time_zone: 'gmt',
@@ -316,7 +330,8 @@ export async function fetchPredictions(
       return result
     }
 
-    const extremes = parseExtremes(hiloRaw)
+    const extremesWide = parseExtremes(hiloRaw)
+    const extremes = extremesWide.filter((e) => e.at.getTime() >= windowOf(at).from && e.at.getTime() < windowOf(at).to)
     if (extremes.length === 0) {
       const result: PredictionsResult = {
         status: 'unavailable',
@@ -330,9 +345,28 @@ export async function fetchPredictions(
      * The published curve when there is one, and one derived from the turns
      * when there is not. Derived in core, labelled either way.
      */
-    const published = noaaError(curveRaw) === null ? parseCurve(curveRaw) : []
-    const curveSource: CurveSource = published.length > 0 ? 'published' : 'derived'
-    const curve = published.length > 0 ? published : curveFromExtremes(extremes)
+    const publishedAll = noaaError(curveRaw) === null ? parseCurve(curveRaw) : []
+    const curveSource: CurveSource = publishedAll.length > 0 ? 'published' : 'derived'
+    const extremesAll = extremesWide
+    const curveAll = publishedAll.length > 0 ? publishedAll : curveFromExtremes(extremesAll)
+    /*
+     * SAVED AHEAD (Batch CORE, Section 3.1; 15 Nov 5:22 PM on 5G: "Could not
+     * reach NOAA for tide predictions, and none is saved for this date"). One
+     * answer to TIDE_AHEAD_DAYS ahead keeps each following day's window on the
+     * phone, so a later day with a failed request still has its table, said
+     * with its age. The day asked gets the same window as before.
+     */
+    for (let k = 1; k < TIDE_AHEAD_DAYS; k += 1) {
+      const d = new Date(at.getTime() + k * day)
+      const w = windowOf(d)
+      const ex = extremesAll.filter((e) => e.at.getTime() >= w.from && e.at.getTime() < w.to)
+      const cv = curveAll.filter((c) => c.at.getTime() >= w.from && c.at.getTime() < w.to)
+      if (ex.length < 2 || cv.length < 2) continue
+      cache.set(`${stationId}|${w.begin}|${w.end}`, { status: 'ok', predictions: { extremes: ex, curve: cv, curveSource, provenance: { kind: 'live' } } })
+      saveForecast(tideKey(stationId, w.begin, w.end), { extremes: ex, curve: cv, curveSource })
+    }
+    const w0 = windowOf(at)
+    const curve = curveAll.filter((c) => c.at.getTime() >= w0.from && c.at.getTime() < w0.to)
 
     /* Two turns is the least that can be interpolated between. */
     if (curve.length === 0) {
