@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-16",
+  "observedAt": "2026-11-16T10:50:00-05:00",
+  "place": { "where": "Virginia Beach oceanfront: North End, 1st St, Croatan, Sandbridge cams", "note": "No coordinate kept. Replays use the oceanfront point the 14 Nov data used (36.83, -75.97), facing 100." },
+  "truth": {
+    "cams": "small, wind-chopped, knee to thigh at North End, Sandbridge, 1st St and Croatan",
+    "jwilly": "Croatan Jetty only one looks okay, barely rideable.",
+    "surflineNote": "1-2 ft Poor everywhere; N 10-14 kt cross-shore; spectrum 2.7 ft 5 s NNE (33 deg) + 0.3 ft 11 s E. A hand note, not an input."
+  },
+  "appSaid": {
+    "headline": "2-3 ft RIDEABLE · knee to waist · bumpy, cross-shore",
+    "chart": "a 'clean' band shaded 11 AM-1 PM",
+    "buoy": "44099 3.9 ft 6 s NE -> 'as faces ~3.3 ft · bigger than forecast'",
+    "week": "Mon 2-3, Tue 1-2, Wed 0-1, Sat 1-2 (truth-side check: 1-2 / 0-1 / Flat / 0-1)"
+  },
+  "shouldSay": { "VB": "1-2 ft, not 2-3", "best": "Croatan", "quality": "Poor / choppy, no clean band" },
+  "data": "tests/data/surf-2026-11-16/ (NDBC 44099, 44014, 44100 realtime and spectral; Open-Meteo marine and wind, 12-17 Nov), read 16 Nov"
+}
