@@ -1,6 +1,7 @@
 import { bestSpotWords, betterColorLine } from '../core/bestSky.ts'
 import { lazyPage } from '../lib/lazyPage.ts'
-import { skyCallNow } from '../core/skyCall.ts'
+import { colourLive, colourOver, skyCallNow } from '../core/skyCall.ts'
+import { shareSkyWordNow } from '../lib/skyWordNow.ts'
 import { useGoAlert } from '../lib/goAlert.ts'
 import { SignalChip } from './SignalChip.tsx'
 import { useSignalWords } from '../lib/useSignalWords.ts'
@@ -298,6 +299,11 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
   })
   /* Batch CORE, Section 1.5: on a fast cloud day the range, not a word that flips with each row (src/core/skyWord.ts cloudRange). */
   const fast = which === 'today' ? cloudRange([-2, -1, 0, 1, 2].map((h) => at('cloud_cover', new Date(now.getTime() + h * 3_600_000))), at('wind_speed_500hPa', now)) : null
+  /* Batch CORE, Section 4.1: the word for now, the one the map's strip says too (src/lib/skyWordNow.ts). */
+  useEffect(() => {
+    /* A fast day's range is too long for a strip cell: "Coming and going" there, the range here. */
+    if (which === 'today') shareSkyWordNow(venue, fast !== null ? 'Coming and going' : (cond?.word ?? null))
+  }, [which, venue, fast?.lo, fast?.hi, cond?.word]) // eslint-disable-line react-hooks/exhaustive-deps
   /* Batch TRUTH, Section 0.5: a live colour window with a Maybe or better leads the home. */
   /* Batch BEST SKY, Section 4: today only, with Shoot picked: the grid within 15 mi (7 or so questions, each kept an hour). */
   const bestSky = useBestSky(which === 'today' && order.includes('shoot') ? venue : null, 15, now)
@@ -317,7 +323,8 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
     const own = windowRows(which, day, order, units, drone, now, venue, timeZone, brief.facing)
     /* Batch N E3: after dark, nothing is left today: tomorrow's first windows, said as tomorrow's. */
     const next = brief.days[1] ?? null
-    const dark = which === 'today' && day.events.sunset !== null && now.getTime() > day.events.sunset.getTime()
+    /* Batch CORE, Section 1.3: not "after dark" until tonight's colour is over (src/core/skyCall.ts colourOver). */
+    const dark = which === 'today' && day.events.sunset !== null && now.getTime() > colourOver(day.events.sunset, day.reads.sunset).getTime()
     if (own.length > 0 || !dark || next === null) return own
     return windowRows('tomorrow', next, order, units, drone, now, venue, timeZone, brief.facing).map((r) => ({ ...r, head: `Tomorrow: ${r.head}` }))
   }, [which, day, order, units, drone, now, venue, timeZone, brief.facing, brief.days])
@@ -335,6 +342,12 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
   const items = rows.filter((r) => r.from !== undefined).map((r) => ({ what: NEXT_WORD[r.activity], from: r.from as Date }))
   const surfFun = order.includes('surf') ? surfFunAt(brief, surf, which, now, day).fun : null
   if (surfFun !== null && !items.some((i) => i.what === NEXT_WORD.surf)) items.push({ what: NEXT_WORD.surf, from: surfFun === 'now' ? now : surfFun })
+  /* Batch CORE, Section 1.3: the colour on now leads the line ("Next: sky color now"), from the one sky call; on 15 Nov at 4:59 PM it said tomorrow's 6:35 AM. */
+  const liveSky = which === 'today' ? skyCallNow(brief.days.slice(0, 2), now, venue) : null
+  if (liveSky !== null && (liveSky.call === 'Go' || liveSky.call === 'Maybe') && colourLive(liveSky, now) && order.includes('shoot')) {
+    for (let i = items.length - 1; i >= 0; i -= 1) if (items[i].what === NEXT_WORD.shoot) items.splice(i, 1)
+    items.unshift({ what: NEXT_WORD.shoot, from: now })
+  }
   const nextWords = nextLine(items, now, (d) => clock(d))
   void rain
   void steps

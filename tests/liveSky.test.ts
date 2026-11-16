@@ -1,6 +1,6 @@
 import { readFileSync, statSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { liveSkyOf, LIVE_SKY_STATES, STAR_MAX, type LiveSkyIn } from '../src/core/liveSky.ts'
+import { liveSkyOf, LIVE_SKY_STATES, MOON_BAND, STAR_MAX, type LiveSkyIn } from '../src/core/liveSky.ts'
 
 /*
  * THE LIVE SKY (Batch LIVE, Section 7): eight states from the sky word's own
@@ -45,7 +45,7 @@ describe('the night', () => {
     expect(west.x).toBeGreaterThan(0.5)
     expect(west.y).toBeLessThan(east.y)
     /* In the band above the cards, never behind their words. */
-    expect(east.y).toBeLessThanOrEqual(0.1)
+    expect(east.y).toBeLessThanOrEqual(MOON_BAND[1])
     expect(liveSkyOf({ ...base, sunDeg: -30, moon: { alt: -5, az: 100, fraction: 0.5, waxing: true } }).moon).toBeNull()
   })
 })
@@ -57,5 +57,25 @@ describe('drawn in code', () => {
     for (const f of files) expect(readFileSync(f, 'utf8')).not.toMatch(/\.(jpe?g|png|webp)\b|<img/)
     expect(readFileSync('src/styles/live-sky.css', 'utf8')).toMatch(/prefers-reduced-motion: reduce\)\s*\{\s*\.lsky__drift\s*\{\s*animation: none/)
     expect(readFileSync('src/lib/liveSkySetting.ts', 'utf8')).toMatch(/return v === 'all' \|\| v === 'off' \? v : 'home'/)
+  })
+})
+
+describe('Batch CORE, Section 4.6: the moon inside the safe area, never crisp behind a deck', () => {
+  it('9% down at the least and 14% in from each side: at 390 x 844 its edges stay off the bars and on the screen', () => {
+    for (const az of [60, 100, 180, 260, 300]) {
+      const m = liveSkyOf({ ...base, sunDeg: -30, moon: { alt: 80, az, fraction: 0.6, waxing: true } }).moon!
+      /* Radius 5 of the 100 x 200 frame, scaled 4.22 to fill 844 px; 47 px is the home-screen app's top inset. */
+      expect(m.y * 844 - 5 * 4.22).toBeGreaterThanOrEqual(47)
+      expect(m.x * 422 - 16 + 5 * 4.22).toBeLessThanOrEqual(390)
+      expect(m.x * 422 - 16 - 5 * 4.22).toBeGreaterThanOrEqual(0)
+    }
+  })
+  it('a mostly cloudy night hides it; thinner cloud dims it', () => {
+    const moon = { alt: 40, az: 180, fraction: 0.9, waxing: false }
+    expect(liveSkyOf({ ...base, sunDeg: -30, word: 'Overcast', cover: { low: 100, mid: 0, high: 0 }, moon }).moon).toBeNull()
+    expect(liveSkyOf({ ...base, sunDeg: -30, word: null, cover: { low: 75, mid: 0, high: 0 }, moon }).moon).toBeNull()
+    const clear = liveSkyOf({ ...base, sunDeg: -30, word: null, cover: { low: 0, mid: 0, high: 0 }, moon }).moon!
+    const thin = liveSkyOf({ ...base, sunDeg: -30, word: null, cover: { low: 40, mid: 0, high: 0 }, moon }).moon!
+    expect(thin.opacity).toBeLessThan(clear.opacity)
   })
 })

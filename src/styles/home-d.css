@@ -333,10 +333,20 @@
   .hcards--many {
     gap: 6px;
   }
-  .hcards--many .hcard__chart--tide,
+  /*
+   * Batch CORE, Sections 4.3 and 4.4: hiding only the drawing left its words
+   * ("3.4 ft", "now", a lone "1", "● 14 kt now" over "Breezy"), which are HTML
+   * over it, with nothing under them. Below 760 px tall the whole chart box
+   * goes, drawing and words together; a shorter chart (30 px and its 16 px of
+   * labels) left the 390 x 664 home a card short (scripts/audit-briefing.mjs).
+   */
   .hcards--many .hcard__dial,
   .hcard--small .hcard__strip,
   .hcard--small svg {
+    display: none;
+  }
+  .hcards--many .hcard--tide .hcard__chartbox,
+  .hcard--small .hcard__chartbox {
     display: none;
   }
   .hcards--many .hcard--wide .hcard__chart {

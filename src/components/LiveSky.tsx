@@ -22,7 +22,7 @@ export function LiveSkyDraw({ sky }: { sky: Sky }) {
         {stars.map((s, i) => (
           <circle key={`s${i}`} cx={s.x * 100} cy={s.y * 200 * STAR_BAND} r={0.25 + s.r * 0.45} className="lsky__star" style={{ opacity: 0.35 + s.r * 0.6 }} />
         ))}
-        {sky.moon === null ? null : <path d={moonPath(sky.moon.x * 100, sky.moon.y * 200, 5, sky.moon.fraction, sky.moon.waxing)} className="lsky__moon" />}
+        {sky.moon === null ? null : <path d={moonPath(sky.moon.x * 100, sky.moon.y * 200, 5, sky.moon.fraction, sky.moon.waxing)} className="lsky__moon" style={{ opacity: sky.moon.opacity }} />}
         <g className="lsky__drift" filter="url(#lsky-soft)">
           {clouds.map((c, i) => {
             /* Every shape inside the frame, with room for the drift and the blur: nothing past the screen's edge. */

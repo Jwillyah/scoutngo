@@ -1,5 +1,6 @@
 import { buildingsBox, type Box as BuildingsBox } from '../core/buildingsBox.ts'
 import { lazyPage } from '../lib/lazyPage.ts'
+import { skyWordNowFor } from '../lib/skyWordNow.ts'
 import { ScreenBoundary, ScreenFailCard } from './ScreenBoundary.tsx'
 import { markScreenOpen, recordError } from '../lib/errorLog.ts'
 import { NetDebug } from './NetDebug.tsx'
@@ -1747,7 +1748,8 @@ export function PlanMode({
     const side = wind === null || facing === null ? null : windToBeach(wind.fromDegrees, facing)
     const atNow = scrubbedAt === null || Math.abs(scrubbedAt.getTime() - Date.now()) <= AT_NOW_MS
     const sunUp = (sunAlt ?? -1) > -0.8
-    const sky = skyCondition({ code: null, layers, day: sunUp, station: atNow ? freshSky(stationObs, new Date()) : null })?.word ?? null
+    /* Batch CORE, Section 4.1: at now, the home's word for this spot (src/lib/skyWordNow.ts); its own reading for other hours. */
+    const sky = (atNow && venue !== null ? skyWordNowFor(venue) : null) ?? skyCondition({ code: null, layers, day: sunUp, station: atNow ? freshSky(stationObs, new Date()) : null })?.word ?? null
     const turn = tideCell(nextTurn, tz)
     return [
       { ...golden, label: 'LIGHT', value: lightCell(goldenLeft, scrubbedAt, sunAlt, tz), spoken: `Light: ${lightCell(goldenLeft, scrubbedAt, sunAlt, tz) ?? 'not known'}` },

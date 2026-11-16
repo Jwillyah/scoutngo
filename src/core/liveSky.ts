@@ -32,7 +32,14 @@ export const CLEAR_PCT = 20
 /** At night, this much cover or more hides the stars. */
 export const NIGHT_CLOUDY_PCT = 70
 /** The band above the cards the moon and stars are drawn in, as shares of the page's height. */
-export const MOON_BAND: readonly [number, number] = [0.035, 0.1]
+/*
+ * Batch CORE, Section 4.6: from 9% down, never under the URL bar or the status
+ * bar (it was 3.5%: at 390 x 844 its top edge sat 8 px from the top), and
+ * MOON_SIDE in from each edge (the frame is scaled to fill the screen and
+ * spills 16 px off each side at 390 x 844; at 0.92 the moon's edge was past it).
+ */
+export const MOON_BAND: readonly [number, number] = [0.09, 0.14]
+export const MOON_SIDE: readonly [number, number] = [0.14, 0.86]
 export const STAR_BAND = 0.2
 
 export interface LiveSkyIn {
@@ -55,8 +62,8 @@ export interface LiveSky {
   cover: number
   clouds: number
   stars: number
-  /** The moon on the page: x, y as shares of the width and height; null when down or by day. */
-  moon: { x: number; y: number; fraction: number; waxing: boolean } | null
+  /** The moon on the page: x, y as shares of the width and height; null when down, by day, or behind a deck. */
+  moon: { x: number; y: number; fraction: number; waxing: boolean; opacity: number } | null
 }
 
 const GROUND: Record<LiveSkyState, Ground> = { 'clear-day': 'day', cloudy: 'day', overcast: 'cloud', rain: 'rain', fog: 'fog', golden: 'golden', 'night-clear': 'night', 'night-cloudy': 'night' }
@@ -88,9 +95,10 @@ export function liveSkyOf(s: LiveSkyIn): LiveSky {
    * never behind a card's words.
    */
   const side = (x: number) => (x < 0.5 ? Math.min(x, 0.24) : Math.max(x, 0.76))
+  /* Batch CORE, Section 4.6: behind a night deck, no crisp moon; under thinner cloud, dimmer by the cover. */
   const moon =
-    night && moonUp && s.moon !== null
-      ? { x: side(Math.max(0.08, Math.min(0.92, 0.5 + Math.sin(((s.moon.az - 180) * Math.PI) / 180) * 0.42))), y: MOON_BAND[1] - (Math.min(90, s.moon.alt) / 90) * (MOON_BAND[1] - MOON_BAND[0]), fraction: s.moon.fraction, waxing: s.moon.waxing }
+    night && moonUp && s.moon !== null && state === 'night-clear'
+      ? { x: side(Math.max(MOON_SIDE[0], Math.min(MOON_SIDE[1], 0.5 + Math.sin(((s.moon.az - 180) * Math.PI) / 180) * 0.42))), y: MOON_BAND[1] - (Math.min(90, s.moon.alt) / 90) * (MOON_BAND[1] - MOON_BAND[0]), fraction: s.moon.fraction, waxing: s.moon.waxing, opacity: Math.round((0.85 - 0.6 * cover) * 100) / 100 }
       : null
   return { state, ground: GROUND[state], cover, clouds, stars, moon }
 }

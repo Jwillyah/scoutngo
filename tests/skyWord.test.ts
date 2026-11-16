@@ -61,7 +61,8 @@ describe('the home and the map strip ask the same function', () => {
     const home = readFileSync('src/components/Home.tsx', 'utf8')
     const plan = readFileSync('src/components/PlanMode.tsx', 'utf8')
     expect(home).toMatch(/const cond = skyCondition\(/)
-    expect(plan).toMatch(/const sky = skyCondition\(/)
+    /* Batch CORE, Section 4.1: at now, the strip says the home's word (src/lib/skyWordNow.ts); otherwise skyCondition. */
+    expect(plan).toMatch(/const sky = \(atNow && venue !== null \? skyWordNowFor\(venue\) : null\) \?\? skyCondition\(/)
     expect(plan).not.toMatch(/skyCell\(/)
     expect(home).not.toMatch(/const cond = conditionOf\(/)
   })

@@ -23,7 +23,8 @@ export function HomeHours({ wx, now, venue, timeZone, units, obs, onOpen }: { wx
   return (
     <button type="button" className="hhours" data-home-hours onClick={onOpen} aria-label="The next eight hours: the weather">
       {hours.map((h, i) => {
-        const t = new Date(h.getTime() + 1_800_000)
+        /* Batch CORE, Section 4.5: "Now" is the headline's own reading, at this minute (it read the half hour: 50° under a 47° headline). */
+        const t = i === 0 ? now : new Date(h.getTime() + 1_800_000)
         const at = (n: string) => hourlyAt(wx, n, t)
         const cc = skyCondition({ code: at('weather_code'), layers: { low: at('cloud_cover_low'), mid: at('cloud_cover_mid'), high: at('cloud_cover_high') }, day: getPosition(t, venue.lat, venue.lon).altitude > -0.8, station: i === 0 ? freshSky(obs, now) : null })
         const rain = at('precipitation_probability')
