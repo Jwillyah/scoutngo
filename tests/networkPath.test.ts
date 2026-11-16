@@ -64,7 +64,8 @@ describe('a refusal given to the phone directly', () => {
     expect(weatherBusy()).toBeNull()
     const second = await weatherJson(B, { maxAgeMs: 60_000, fetchImpl })
     expect(second.ok).toBe(true)
-    expect(asked).toEqual(['edge', 'direct', 'edge'])
+    /* Batch DRONE, Section 0.5: the phone first, then the cache, for each. */
+    expect(asked).toEqual(['direct', 'edge', 'direct', 'edge'])
   })
 
   it('a refusal the cache passes on (its own address over the limit) still holds every request back', async () => {

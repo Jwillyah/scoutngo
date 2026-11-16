@@ -157,9 +157,9 @@ export function jittered(ms: number, r: number = random()): number {
  * spot, model set and hour for every phone. The key in this store stays the
  * Open-Meteo request, so nothing kept changes meaning.
  *
- * When our function is not there (404, 405: a dev server) the phone asks
- * Open-Meteo directly for the rest of the session; when it fails (502-504,
- * no answer) that one request is asked directly. A 429 from it is a 429.
+ * Asked only after Open-Meteo refuses this phone or cannot be reached (Batch
+ * CORE, Section 0.4; send below). When our function is not there (404, 405: a
+ * dev server) it is not asked again this session. A 429 from it is a 429.
  */
 export const EDGE_TIMEOUT_MS = 4000
 let edge: string | null = null
@@ -304,23 +304,46 @@ export function weatherRefreshing(): number {
   return inFlight.size
 }
 
-/** Sends one request: through the forecast cache when it is set, else (or when it is missing or failing) to Open-Meteo. `via` says which answered. */
+/**
+ * Sends one request: to Open-Meteo from the phone first; through the forecast cache (when it is set) only when
+ * Open-Meteo refuses this phone (429: a carrier's shared address over its limit) or cannot be reached. `via` says
+ * which answered.
+ *
+ * Batch DRONE, Section 0.5 (16 Nov): the calls go from the phone, so Open-Meteo's per-address limits fall on each
+ * phone's own address and do not stack on this app's server; the cache stays as the measured fix for the carrier
+ * case (Batch M, measurements/2026-11-08-cellular.md), asked only then.
+ */
 async function send(url: string, fetchImpl: typeof fetch, timeoutMs: number): Promise<{ r: Response; via: 'edge' | 'direct' }> {
-  const direct = async () => ({ r: await fetchImpl(url, { signal: AbortSignal.timeout(timeoutMs) }), via: 'direct' as const })
-  if (edge === null || edgeMissing) return direct()
+  const cacheOn = () => edge !== null && !edgeMissing
+  /* The cache's answer, or null when it is not there or fails (the caller then keeps the direct outcome). */
+  const viaEdge = async (): Promise<{ r: Response; via: 'edge' } | null> => {
+    if (edge === null) return null
+    try {
+      /* Batch N E1: a cache that hangs costs 4 s, not the whole timeout. */
+      const r = await fetchImpl(edgeUrl(url, new Date(), edge), { signal: AbortSignal.timeout(Math.min(EDGE_TIMEOUT_MS, timeoutMs)) })
+      if (r.status === 404 || r.status === 405) {
+        edgeMissing = true
+        return null
+      }
+      /* Batch N: a request the cache refuses (400, 414) or fails (502-504) is no answer from it. */
+      return (r.status >= 502 && r.status <= 504) || r.status === 400 || r.status === 414 ? null : { r, via: 'edge' }
+    } catch {
+      return null
+    }
+  }
   let r: Response
   try {
-    /* Batch N E1: a cache that hangs (8 Nov, LTE: requests to this app's own address never answered) costs 4 s, not the whole timeout, before the direct ask. */
-    r = await fetchImpl(edgeUrl(url, new Date(), edge), { signal: AbortSignal.timeout(Math.min(EDGE_TIMEOUT_MS, timeoutMs)) })
-  } catch {
-    return direct()
+    r = await fetchImpl(url, { signal: AbortSignal.timeout(timeoutMs) })
+  } catch (error) {
+    const got = cacheOn() ? await viaEdge() : null
+    if (got !== null) return got
+    throw error
   }
-  if (r.status === 404 || r.status === 405) {
-    edgeMissing = true
-    return direct()
+  if (r.status === 429 && cacheOn()) {
+    const got = await viaEdge()
+    if (got !== null) return got
   }
-  /* Batch N: a request the cache refuses (400, 414: more points than it takes, the sightline's many positions) is asked directly, at 2 decimals, as before the cache. */
-  return (r.status >= 502 && r.status <= 504) || r.status === 400 || r.status === 414 ? direct() : { r, via: 'edge' }
+  return { r, via: 'direct' }
 }
 
 /**

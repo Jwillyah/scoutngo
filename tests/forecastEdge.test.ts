@@ -81,15 +81,17 @@ describe('every multi-point request the app makes fits', () => {
       const asked: string[] = []
       const fake = (async (input: RequestInfo | URL) => {
         asked.push(String(input))
+        /* Batch DRONE, Section 0.5: the phone asks Open-Meteo first; refused there, the grid goes through the cache. */
+        if (!String(input).startsWith('/api/')) return new Response('{"reason":"Minutely API request limit exceeded"}', { status: 429 })
         const time = Array.from({ length: 24 }, (_, h) => `2026-11-08T${String(h).padStart(2, '0')}:00`)
         const one = { hourly: { time, cloud_cover_low: time.map(() => 10), cloud_cover_mid: time.map(() => 0), cloud_cover_high: time.map(() => 0) } }
         return new Response(JSON.stringify(Array.from({ length: GRID_CELLS ** 2 }, () => one)), { status: 200, headers: { 'content-type': 'application/json' } })
       }) as typeof fetch
       const now = new Date()
       const got = await fetchCloudGrid({ lat: 36.8435575, lon: -75.9713104 }, now, 'America/New_York', fake)
-      expect(asked).toHaveLength(1)
-      expect(asked[0]).toMatch(/^\/api\/forecast\?/)
-      expect(upstreamFor(`https://scoutngo.vercel.app${asked[0]}`, now)).toMatchObject({ ok: true })
+      expect(asked).toHaveLength(2)
+      expect(asked[1]).toMatch(/^\/api\/forecast\?/)
+      expect(upstreamFor(`https://scoutngo.vercel.app${asked[1]}`, now)).toMatchObject({ ok: true })
       expect(got.status).toBe('ok')
       expect(GRID_CELLS ** 2).toBeLessThanOrEqual(MAX_POINTS)
     } finally {

@@ -133,43 +133,55 @@ describe('Batch M: on a phone network', () => {
     expect(jittered(120_000, 1)).toBe(144_000)
   })
 
-  it('goes through the forecast cache: host and path in om, the UTC hour in hr, coordinates as rounded', async () => {
+  /* Batch DRONE, Section 0.5: Open-Meteo from the phone first; the cache only when it refuses this phone or cannot be reached. */
+  it('asks Open-Meteo from the phone first; the cache is not asked when that answers', async () => {
     expect(edgeUrl('https://marine-api.open-meteo.com/v1/marine?latitude=36.84&longitude=-75.97&hourly=wave_height', new Date('2026-11-08T13:42:00Z'), '/api/forecast')).toBe(
       '/api/forecast?om=marine-api.open-meteo.com/v1/marine&latitude=36.85&longitude=-75.95&hourly=wave_height&hr=2026-11-08T13',
     )
     setForecastEdge('http://127.0.0.1/api/forecast')
     const f = ok()
     await weatherJson('https://api.open-meteo.com/v1/forecast?latitude=36.84356&longitude=-75.97131&hourly=wind_speed_10m', { maxAgeMs: HOUR, fetchImpl: f })
-    const asked = String((f.mock.calls[0] as unknown[])[0])
-    expect(asked).toContain('/api/forecast?om=api.open-meteo.com/v1/forecast&latitude=36.85&longitude=-75.95')
-    expect(asked).not.toMatch(/36\.84|75\.97/)
+    expect(f).toHaveBeenCalledTimes(1)
+    expect(String((f.mock.calls[0] as unknown[])[0])).toMatch(/^https:\/\/api\.open-meteo\.com\/v1\/forecast\?latitude=36\.84&longitude=-75\.97/)
   })
 
-  it('our function missing (a dev server, 404) asks Open-Meteo directly, and stops trying the cache', async () => {
+  it('a 429 given to the phone goes through the cache, on its coarser grid', async () => {
     setForecastEdge('http://127.0.0.1/api/forecast')
-    const f = vi.fn(async (u: string) => (u.includes('/api/forecast') ? new Response('', { status: 404 }) : new Response(JSON.stringify(PAYLOAD), { status: 200 })))
-    const r = await weatherJson(URL_A, { maxAgeMs: HOUR, fetchImpl: f as unknown as typeof fetch })
+    const f = vi.fn(async (u: string) => (u.includes('/api/forecast') ? new Response(JSON.stringify(PAYLOAD), { status: 200 }) : new Response('{"reason":"Minutely API request limit exceeded"}', { status: 429 })))
+    const r = await weatherJson('https://api.open-meteo.com/v1/forecast?latitude=36.84356&longitude=-75.97131&hourly=wind_speed_10m', { maxAgeMs: HOUR, fetchImpl: f as unknown as typeof fetch })
     expect(r.ok).toBe(true)
-    await weatherJson(URL_A.replace('wind_speed_10m', 'cloud_cover'), { maxAgeMs: HOUR, fetchImpl: f as unknown as typeof fetch })
-    expect(f.mock.calls.map((c) => String(c[0]).includes('/api/forecast'))).toEqual([true, false, false])
+    const asked = f.mock.calls.map((c) => String(c[0]))
+    expect(asked[0]).toMatch(/^https:\/\/api\.open-meteo\.com/)
+    expect(asked[1]).toContain('/api/forecast?om=api.open-meteo.com/v1/forecast&latitude=36.85&longitude=-75.95')
+    expect(asked[1]).not.toMatch(/36\.84|75\.97/)
   })
 
-  it('a request the cache refuses (400: too many points) is asked directly', async () => {
+  it('no network to Open-Meteo: the cache answers', async () => {
     setForecastEdge('http://127.0.0.1/api/forecast')
-    const f = vi.fn(async (u: string) => (u.includes('/api/forecast') ? new Response('{"error":true}', { status: 400 }) : new Response(JSON.stringify(PAYLOAD), { status: 200 })))
+    const f = vi.fn(async (u: string) => {
+      if (u.includes('/api/forecast')) return new Response(JSON.stringify(PAYLOAD), { status: 200 })
+      throw new TypeError('Load failed')
+    })
     expect((await weatherJson(URL_A, { maxAgeMs: HOUR, fetchImpl: f as unknown as typeof fetch })).ok).toBe(true)
     expect(f).toHaveBeenCalledTimes(2)
   })
 
-  it('our function failing (502) asks that one directly; a 429 from it is a 429', async () => {
+  it('our function missing (a dev server, 404) is not asked again this session; its 400 or 502 is no answer', async () => {
     setForecastEdge('http://127.0.0.1/api/forecast')
-    const bad = vi.fn(async (u: string) => (u.includes('/api/forecast') ? new Response('', { status: 502 }) : new Response(JSON.stringify(PAYLOAD), { status: 200 })))
-    expect((await weatherJson(URL_A, { maxAgeMs: HOUR, fetchImpl: bad as unknown as typeof fetch })).ok).toBe(true)
+    const refusedHere = (edgeStatus: number) => vi.fn(async (u: string) => (u.includes('/api/forecast') ? new Response('', { status: edgeStatus }) : new Response('{"reason":"Minutely API request limit exceeded"}', { status: 429 })))
+    const bad = refusedHere(502)
+    await weatherJson(URL_A, { maxAgeMs: HOUR, fetchImpl: bad as unknown as typeof fetch })
     expect(bad).toHaveBeenCalledTimes(2)
-    const refused = vi.fn(async () => new Response('{"reason":"Minutely API request limit exceeded"}', { status: 429 }))
-    await weatherJson(URL_A.replace('wind_speed_10m', 'gusts'), { maxAgeMs: HOUR, fetchImpl: refused })
-    expect(refused).toHaveBeenCalledTimes(1)
-    expect(weatherBusy()?.why).toBe('busy')
+    /* A refusal given to the phone does not hold the cache back (tests/networkPath.test.ts). */
+    expect(weatherBusy()).toBeNull()
+    await clearWeatherStore()
+    setForecastEdge('http://127.0.0.1/api/forecast')
+    const missing = refusedHere(404)
+    await weatherJson(URL_A, { maxAgeMs: HOUR, fetchImpl: missing as unknown as typeof fetch })
+    /* With no cache, the refusal holds requests back; let it go. The cache's 404 is remembered for the session. */
+    await clearWeatherStore()
+    await weatherJson(URL_A.replace('wind_speed_10m', 'cloud_cover'), { maxAgeMs: HOUR, fetchImpl: missing as unknown as typeof fetch })
+    expect(missing.mock.calls.map((c) => String(c[0]).includes('/api/forecast'))).toEqual([false, true, false])
   })
 })
 

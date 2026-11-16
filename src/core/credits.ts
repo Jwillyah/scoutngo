@@ -108,13 +108,13 @@ export const CREDITS: readonly Credit[] = [
   {
     name: 'Open-Meteo',
     hosts: ['api.open-meteo.com', 'air-quality-api.open-meteo.com', 'ensemble-api.open-meteo.com', 'previous-runs-api.open-meteo.com', 'marine-api.open-meteo.com', 'this app (/api/forecast)'],
-    use: 'Wind, cloud, rain, waves, air quality, the five models; through this app’s forecast cache (/api/forecast), else asked directly',
+    use: 'Wind, cloud, rain, waves, air quality, the five models; this app’s cache only when Open-Meteo refuses the phone',
     license: 'Data CC BY 4.0; free API for non-commercial use',
     attribution: 'Weather data by Open-Meteo.com (CC BY 4.0)',
     key: 'No (free tier)',
     rate: '600 a minute, 5,000 an hour, 10,000 a day, per address',
     status: 'ok',
-    note: 'No ads, no subscriptions.',
+    note: 'Asked from the phone first (Batch DRONE 0.5); no ads, no subscriptions.',
     link: 'https://open-meteo.com/en/terms',
   },
   {
