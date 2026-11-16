@@ -36,3 +36,12 @@
   font-size: var(--text-xs);
   font-weight: 700;
 }
+
+/* Batch DRONE, Section 0.3: the airspace banner's source line, small, under it. */
+.fly__remind-src {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 400;
+  opacity: 0.85;
+}

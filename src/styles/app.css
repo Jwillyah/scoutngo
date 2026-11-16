@@ -18263,6 +18263,23 @@ a.about__row * {
   justify-content: space-between;
   padding: 4px 16px 0;
 }
+/* Batch DRONE, Section 0.3: the water safety line, beside "How we got this", two short lines inside the link's 44 px; 12 px, the style audit's floor. */
+.dpage__safety {
+  max-width: 62%;
+  margin: 0;
+  align-self: center;
+  font-size: 12px;
+  line-height: 1.25;
+  text-align: right;
+  opacity: 0.75;
+}
+/* Batch DRONE, Section 0.3: the air safety line at the end of a page's scroll. */
+.dsafety {
+  margin: 14px 0 4px;
+  font-size: 12px;
+  text-align: center;
+  opacity: 0.75;
+}
 .dpage__link {
   min-height: 44px;
   padding: 0;

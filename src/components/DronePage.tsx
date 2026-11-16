@@ -1,4 +1,5 @@
 import '../styles/drone.css'
+import { AIR_SAFETY } from '../core/safetyWords.ts'
 import { useEffect, useState } from 'react'
 import { getPosition } from 'suncalc'
 import { droneTag } from '../core/briefing.ts'
@@ -86,6 +87,7 @@ export function DronePage({ venue, placeName, timeZone, units, now, drone, onBac
 
   return (
     <PageShell
+      safety={AIR_SAFETY}
       kind="drpage"
       title="Drone"
       sub={`${placeName}${drone === null ? '' : ` · ${drone.name}`} · now`}

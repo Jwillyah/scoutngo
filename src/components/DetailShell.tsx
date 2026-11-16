@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { versionLine } from '../lib/build.ts'
+import { WATER_SAFETY } from '../core/safetyWords.ts'
 import { createPortal } from 'react-dom'
 import { DETAIL_TABS, type DetailId } from '../lib/detailTabs.ts'
 import { NetDebug } from './NetDebug.tsx'
@@ -75,6 +76,8 @@ export function DetailShell({ id, ground, onBack, onSwitch, onMap, how, children
         <button type="button" className="dpage__link" onClick={() => setHowOpen(true)}>
           How we got this ›
         </button>
+        {/* Batch DRONE, Section 0.3: on every surf, tide, wind and buoy page; in the foot beside the link, so the page's own height is not changed (CORE's strike: at the end of the scroll it made the Wind page scroll). */}
+        <p className="dpage__safety">{WATER_SAFETY}</p>
       </div>
       {howOpen ? (
         <div className="dhow" role="dialog" aria-label={`${label}: how we got this`}>

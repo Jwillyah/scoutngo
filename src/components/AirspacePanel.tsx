@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { AIR_SAFETY } from '../core/safetyWords.ts'
 import {
   AUTHORIZATION_RULE,
   NO_SURFACE_AIRSPACE_NOTE,
@@ -336,6 +337,8 @@ export function AirspacePanel({ venue, altitudeFeet, laanc, onLaanc, approvedCei
         */}
       <p className="air__credit">{FAA_SOURCE_NOTE}</p>
       </details>
+      {/* Batch DRONE, Section 0.3. */}
+      <p className="dsafety">{AIR_SAFETY}</p>
     </div>
   )
 }

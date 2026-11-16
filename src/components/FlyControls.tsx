@@ -1,4 +1,5 @@
 import '../styles/fly-live.css'
+import { AIR_SAFETY } from '../core/safetyWords.ts'
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { MODES, type FlyMode, type Sticks } from '../core/flyModel.ts'
 import type { Look } from '../three/world/inputs.ts'
@@ -296,6 +297,8 @@ export function FlyControls({ onSticks, mode, onMode, hud, ceilingFt, warning = 
         warningOpen ? (
           <button type="button" className="fly__remind" data-air-banner onClick={() => setWarningOpen(false)}>
             {warning.line}
+            {/* Batch DRONE, Section 0.3. */}
+            <span className="fly__remind-src">{AIR_SAFETY}</span>
           </button>
         ) : (
           <button type="button" className="fly__airchip" data-air-chip aria-label={`Airspace: ${warning.line}`} onClick={() => setWarningOpen(true)}>

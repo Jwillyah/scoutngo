@@ -15,6 +15,8 @@ interface PageShellProps {
   backdrop?: ReactNode
   /** Batch LIVE, Section 8.3: the footer's links at the end of the scroll, never over the page's content. */
   footInScroll?: boolean
+  /** Batch DRONE, Section 0.3: a safety line at the end of the scroll (src/core/safetyWords.ts). */
+  safety?: string | null
   /** Its class: `wpage`, `spage`. */
   kind: string
   title: string
@@ -33,7 +35,7 @@ interface PageShellProps {
   children: ReactNode
 }
 
-export function PageShell({ kind, title, sub, ground, onBack, how, foot, inner, onMap, children, backdrop = null, footInScroll = false }: PageShellProps) {
+export function PageShell({ kind, title, sub, ground, onBack, how, foot, inner, onMap, children, backdrop = null, footInScroll = false, safety = null }: PageShellProps) {
   const [howOpen, setHowOpen] = useState(false)
   const [debug, setDebug] = useState(false)
   const back = () => {
@@ -82,6 +84,7 @@ export function PageShell({ kind, title, sub, ground, onBack, how, foot, inner, 
         }}
       >
         {children}
+        {safety === null ? null : <p className="dsafety">{safety}</p>}
         {footInScroll ? footer : null}
       </div>
       {debug ? <NetDebug onClose={() => setDebug(false)} /> : null}
