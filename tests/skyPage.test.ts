@@ -157,11 +157,8 @@ describe('rare light, one filter for the list and the map (Batch NOW, Section 1.
     expect(rareKept(sp('iridescence', '2026-11-16T21:00:00Z'), VB)).toBe(false)
     expect(readFileSync('src/lib/useSpecialNow.ts', 'utf8')).toMatch(/rareKept\(s, venue\)/)
   })
-  it('the rest of the list is kept behind "+N more", never cut', () => {
-    const many = ['rainbow', 'fog', 'glass', 'rays', 'fog', 'rainbow'].map((k, i) => ({ ...sp(k as Special['kind'], `2026-11-1${4 + i}T20:00:00Z`), brief: `reason ${i}` }))
-    const now = new Date('2026-11-13T12:00:00Z')
-    expect(rareRows(many, now, VB)).toHaveLength(RARE_MAX)
-    expect(rareRows(many, now, VB, Infinity)).toHaveLength(6)
-    expect(readFileSync('src/components/SkyPage.tsx', 'utf8')).toMatch(/\+\{rareMore\} more/)
+  it('Batch CORE, Section 5.3: at most three, ranked; no "+N more"', () => {
+    expect(RARE_MAX).toBe(3)
+    expect(readFileSync('src/components/SkyPage.tsx', 'utf8')).not.toMatch(/more<\/button>|rareMore/)
   })
 })

@@ -42,7 +42,8 @@ export const FOG_WIND_KT = 6
 export const RAINBOW_DEG = 42
 export const SHOWERS_MM = 0.1
 export const GOD_RAYS_LOW: readonly [number, number] = [30, 80]
-export const GOD_RAYS_SUN_MAX = 25
+/* Batch CORE, Section 5.3: 15°, was 25° (Mon 3 PM at 18° still showed light rays). */
+export const GOD_RAYS_SUN_MAX = 15
 export const IRID_THIN: readonly [number, number] = [10, 60]
 export const IRID_LOW_MAX = 50
 export const IRID_SUN_MIN = 5

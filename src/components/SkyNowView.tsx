@@ -2,7 +2,7 @@ import { getPosition } from 'suncalc'
 import { compassPoint } from '../core/field.ts'
 import type { LatLon } from '../core/geo.ts'
 import type { MetarSky } from '../core/metar.ts'
-import { skyNow, STATION_FRESH_MS } from '../core/skyNow.ts'
+import { nowHeadline, skyNow, STATION_FRESH_MS } from '../core/skyNow.ts'
 import { formatClock } from '../core/timezone.ts'
 import { hourlyAt, type Hourly } from '../lib/tideSheetData.ts'
 
@@ -19,23 +19,19 @@ export function SkyNowView({ venue, now, timeZone, station, wx, next, onNext, co
   const sun = getPosition(now, venue.lat, venue.lon)
   const read = skyNow(fresh?.sky ?? null, model, sun.altitude, compassPoint(sun.azimuth))
   const clock = (d: Date) => formatClock(d, timeZone)
+  const named = nowHeadline(read.worth)
   return (
     <>
       <p className="spage__event num">Now · {clock(now)}</p>
       {/* Batch CORE, Section 1.3: while the colour is on, the headline is the event itself. */}
-      <p className="spage__head" data-now-head>{colourNow !== null ? 'Color now' : read.worth.length > 0 ? 'Worth a look' : 'Nothing special now'}</p>
-      <p className="spage__why">{colourNow !== null ? `${colourNow.replace(/^./, (c) => c.toUpperCase())}.` : read.worth.length > 0 ? `${read.worth.length === 1 ? 'One thing' : `${read.worth.length} things`} in the sky now.` : `${read.nothing?.replace(/^./, (c) => c.toUpperCase()) ?? 'Nothing found'}.`}</p>
+      {/* Batch CORE, Section 5.1: the headline names the thing (src/core/skyNow.ts nowHeadline). */}
+      <p className="spage__head" data-now-head>{colourNow !== null ? 'Color now' : (named?.head ?? 'Nothing special now')}</p>
+      <p className="spage__why">{colourNow !== null ? `${colourNow.replace(/^./, (c) => c.toUpperCase())}.` : (named?.why ?? `${read.nothing?.replace(/^./, (c) => c.toUpperCase()) ?? 'Nothing found'}.`)}</p>
       <section className="dcard spage__now" aria-label="The sky now">
         <p className="dcard__label">The sky now</p>
         <p className="spage__nowclouds" data-now-clouds>{read.clouds.replace(/^./, (c) => c.toUpperCase())}</p>
         <p className="spage__nowsrc">{fresh !== null ? `${fresh.sky.station} at ${clock(fresh.at)}` : 'Forecast: no station report in the last 75 minutes'}</p>
-        {read.worth.length === 0 ? null : (
-          <ul className="spage__nowlist">
-            {read.worth.map((w) => (
-              <li key={w.kind}>{w.line.replace(/^./, (c) => c.toUpperCase())}</li>
-            ))}
-          </ul>
-        )}
+        {/* Batch CORE, Section 5.2: the lone bulleted line is gone; the headline and its line say each thing found. */}
       </section>
       {next === null ? null : (
         <section className="dcard spage__next" aria-label="Next today">

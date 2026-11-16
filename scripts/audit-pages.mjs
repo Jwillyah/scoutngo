@@ -169,7 +169,7 @@ try {
       const nowTab = JSON.parse(await ev(`JSON.stringify({ seg: [...document.querySelectorAll('.spage__seg button')].map((b) => ({ t: b.textContent, on: b.getAttribute('aria-selected') === 'true' })), head: document.querySelector('[data-now-head]')?.textContent ?? null, clouds: document.querySelector('[data-now-clouds]')?.textContent ?? null, next: document.querySelector('.spage__nextbtn')?.textContent ?? null })`))
       console.log(`  Now: ${JSON.stringify(nowTab)}`)
       if (nowTab.seg[0]?.t !== 'Now' || nowTab.seg[0]?.on !== true) fail(`${label}: the Sky page did not open on Now at 10:30 AM (${JSON.stringify(nowTab.seg)})`)
-      if (!/^(Worth a look|Nothing special now)$/.test(nowTab.head ?? '')) fail(`${label}: Now's headline reads ${JSON.stringify(nowTab.head)}`)
+      if (!/^(Textured clouds now|Light rays now|Iridescence now|A halo now|Color now|Nothing special now)$/.test(nowTab.head ?? '')) fail(`${label}: Now's headline reads ${JSON.stringify(nowTab.head)}`)
       if (nowTab.clouds === null || nowTab.clouds.trim() === '') fail(`${label}: Now does not say the clouds`)
       if (!/^(Sunset|Sunrise) \d+:\d\d [AP]M · (Color (likely|possible|unlikely)|No call yet) ›$/.test(nowTab.next ?? '')) fail(`${label}: Now's next line reads ${JSON.stringify(nowTab.next)}`)
       await ev(`[...document.querySelectorAll('.spage__seg button')][1]?.click()`)

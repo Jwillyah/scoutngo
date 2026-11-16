@@ -101,6 +101,22 @@ export function skyNow(station: MetarSky | null, modelIn: { low: number | null; 
   return { clouds, source, worth, nothing }
 }
 
+/*
+ * THE NOW HEADLINE NAMES THE THING (Batch CORE, Section 5.1; LIVE S2, never
+ * shipped): "Textured clouds now", not "Worth a look · One thing in the sky
+ * now". The first thing found is the headline; its own words are the line
+ * under it, with how many more.
+ */
+export const NOW_NAME: Record<SkyNowRead['worth'][number]['kind'], string> = { texture: 'Textured clouds now', rays: 'Light rays now', iridescence: 'Iridescence now', halo: 'A halo now' }
+
+export function nowHeadline(worth: SkyNowRead['worth']): { head: string; why: string } | null {
+  const first = worth[0]
+  if (first === undefined) return null
+  const detail = first.line.replace(/^[a-z]+: /, '')
+  const more = worth.length > 1 ? ` · and ${worth.slice(1).map((w) => NOW_NAME[w.kind].replace(/ now$/, '').toLowerCase()).join(', ')}` : ''
+  return { head: NOW_NAME[first.kind], why: `${detail.charAt(0).toUpperCase()}${detail.slice(1)}${more}.` }
+}
+
 /** Broken or overcast decks a fresh report has, by layer. */
 function decks(sky: MetarSky): { layer: Layer; amount: 'BKN' | 'OVC' }[] {
   return sky.groups.filter((g): g is CloudGroup & { amount: 'BKN' | 'OVC' } => g.amount === 'BKN' || g.amount === 'OVC').map((g) => ({ layer: layerOf(g.baseFt), amount: g.amount }))

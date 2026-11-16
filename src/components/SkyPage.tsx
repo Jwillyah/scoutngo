@@ -138,7 +138,6 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
 
   /* The week's rare light: five models' rules and the glassy mornings (at a coast). */
   const [rare, setRare] = useState<{ key: string; rows: RareRow[] | null; all: RareRow[] } | null>(null)
-  const [rareOpen, setRareOpen] = useState(false)
   const key = `${venue.lat},${venue.lon}`
   useEffect(() => {
     let live = true
@@ -157,9 +156,8 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
       window.clearTimeout(late)
     }
   }, [key, brief.facing]) // eslint-disable-line react-hooks/exhaustive-deps
-  const rows = rare === null || rare.key !== key ? 'loading' : rareOpen && rare.rows !== null ? rare.all : rare.rows
-  /* Batch NOW, Section 1.5: the list fits, or says how many more; never cut silently. */
-  const rareMore = rare === null || rare.key !== key || rare.rows === null || rareOpen ? 0 : rare.all.length - rare.rows.length
+  /* Batch CORE, Section 5.3: at most three, ranked; no "+N more" (it said +3 for six that qualified: not rare). */
+  const rows = rare === null || rare.key !== key ? 'loading' : rare.rows
   const dayWord = (d: Date) => {
     const iso = (x: Date) => new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(x)
     return iso(d) === iso(now) ? 'Today' : new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'short' }).format(d)
@@ -174,7 +172,7 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
       <p>The call: the same read as the home's Sky card, from six weather models along the line toward the sun, and from the stations in the hours before.</p>
       <p>Clouds to light up: cloud 30–90% over you and toward the sun, at the height the light reaches. Gap at the horizon: whether the light gets through to it, along 400 km toward the {kind}. Anything blocking: a thicker deck under it, over you, at 70% or more.</p>
       <p>The light: the sun's height, golden from +6°, blue from −4°, dark from −6° (civil dusk); the colour window is the call's own, else the 20 minutes round the event. The side view draws each deck at its height and how much of the sky it covers toward the sun; a lit deck is warm.</p>
-      <p>Rare light: five models' hours, by written rules. Fog: dew point within 2°F of the air and wind under 6 kt. Rainbow: showers within 25 km opposite the sun, the sun under 42°. Light rays: low cloud 30–80% with the sun under 25°. Mirror water: a low tide within 90 minutes of sunrise and a light wind. A rule, not a promise.</p>
+      <p>Rare light: five models' hours, by written rules. Fog: dew point within 2°F of the air and wind under 6 kt. Rainbow: showers within 25 km opposite the sun, the sun under 42°. Light rays: low cloud 30–80% with the sun under 15°. Mirror water: a low tide within 90 minutes of sunrise and a light wind. A rule, not a promise.</p>
     </>
   )
 
@@ -313,13 +311,6 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
                 </span>
               </li>
             ))}
-            {rareMore > 0 ? (
-              <li className="spage__morerow">
-                <button type="button" className="spage__more" onClick={() => setRareOpen(true)}>
-                  +{rareMore} more
-                </button>
-              </li>
-            ) : null}
           </ul>
         )}
       </section>
