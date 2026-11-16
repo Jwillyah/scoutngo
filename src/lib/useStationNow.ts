@@ -25,7 +25,7 @@ export async function stationNow(venue: LatLon, now: number, fetchImpl: typeof f
   const key = `${venue.lat.toFixed(2)},${venue.lon.toFixed(2)}`
   const hit = cache.get(key)
   if (hit !== undefined && now - hit.at < CACHE_MS) return hit.pending ?? hit.sky
-  const pending = fetchStationSkies(venue, fetchImpl, 1).then((list) => list[0] ?? null)
+  const pending = fetchStationSkies(venue, fetchImpl, 1, new Date(now)).then((list) => list[0] ?? null)
   cache.set(key, { at: now, sky: null, pending })
   const sky = await pending
   cache.set(key, { at: now, sky })

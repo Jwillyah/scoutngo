@@ -12,7 +12,7 @@ import { hourlyAt, type Hourly } from '../lib/tideSheetData.ts'
  * it is worth a look and why, then what is next today. The words are
  * src/core/skyNow.ts's.
  */
-export function SkyNowView({ venue, now, timeZone, station, wx, next, onNext, colourNow = null }: { venue: LatLon; now: Date; timeZone: string; station: { sky: MetarSky; at: Date } | null; wx: Hourly | null; colourNow?: string | null; next: { kind: 'sunset' | 'sunrise'; at: Date; call: string; value: string } | null; onNext: (k: 'sunset' | 'sunrise') => void }) {
+export function SkyNowView({ venue, now, timeZone, station, wx, next, onNext, colourNow = null }: { venue: LatLon; now: Date; timeZone: string; station: { sky: MetarSky; at: Date; via?: string } | null; wx: Hourly | null; colourNow?: string | null; next: { kind: 'sunset' | 'sunrise'; at: Date; call: string; value: string } | null; onNext: (k: 'sunset' | 'sunrise') => void }) {
   const fresh = station !== null && now.getTime() - station.at.getTime() <= STATION_FRESH_MS ? station : null
   const at = (name: string) => (wx === null ? null : hourlyAt(wx, name, now))
   const model = wx === null ? null : { low: at('cloud_cover_low'), mid: at('cloud_cover_mid'), high: at('cloud_cover_high') }
@@ -30,7 +30,7 @@ export function SkyNowView({ venue, now, timeZone, station, wx, next, onNext, co
       <section className="dcard spage__now" aria-label="The sky now">
         <p className="dcard__label">The sky now</p>
         <p className="spage__nowclouds" data-now-clouds>{read.clouds.replace(/^./, (c) => c.toUpperCase())}</p>
-        <p className="spage__nowsrc">{fresh !== null ? `${fresh.sky.station} at ${clock(fresh.at)}` : 'Forecast: no station report in the last 75 minutes'}</p>
+        <p className="spage__nowsrc">{fresh !== null ? `${fresh.sky.station} ${clock(fresh.at)}${fresh.via === undefined ? '' : ` · ${fresh.via}`}` : 'Forecast: no station report in the last 75 minutes'}</p>
         {/* Batch CORE, Section 5.2: the lone bulleted line is gone; the headline and its line say each thing found. */}
       </section>
       {next === null ? null : (

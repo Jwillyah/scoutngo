@@ -196,10 +196,14 @@ export interface StationSky {
   at: string
   /** The METAR as the station sent it, for its other groups (the wind, on the Wind page). */
   raw: string
+  /** Who answered (Batch DRONE, Section 0.1): the screen says it beside the time. */
+  via: StationVia
 }
 
+export type StationVia = 'weather.gov' | 'aviationweather.gov'
+
 /** The nearest stations' latest skies, nearest first: weather.gov's METAR text, else /api/metar's. */
-export async function fetchStationSkies(venue: LatLon, fetchImpl: typeof fetch = fetch, count = 2): Promise<StationSky[]> {
+export async function fetchStationSkies(venue: LatLon, fetchImpl: typeof fetch = fetch, count = 2, now: Date = new Date()): Promise<StationSky[]> {
   try {
     const point = await fetchImpl(`${NWS}/points/${roundCoord(venue.lat).toFixed(2)},${roundCoord(venue.lon).toFixed(2)}`, { headers: NWS_HEADERS, signal: AbortSignal.timeout(TIMEOUT_MS) })
     if (!point.ok) return []
@@ -213,7 +217,7 @@ export async function fetchStationSkies(venue: LatLon, fetchImpl: typeof fetch =
       .slice(0, count)
     const out: StationSky[] = []
     for (const id of ids) {
-      const sky = await stationSky(id, fetchImpl)
+      const sky = await stationSky(id, fetchImpl, now)
       if (sky !== null) out.push(sky)
     }
     return out
@@ -222,23 +226,43 @@ export async function fetchStationSkies(venue: LatLon, fetchImpl: typeof fetch =
   }
 }
 
-export async function stationSky(id: string, fetchImpl: typeof fetch = fetch): Promise<StationSky | null> {
+/**
+ * A report older than this from weather.gov is not taken alone: the METAR source is asked too, and the newer kept.
+ * Batch CORE, Section 0.1 (16 Nov): weather.gov's KNTU feed runs behind. At 14:47Z on 16 Nov its newest KNTU
+ * observation was 12:56Z while aviationweather.gov had 13:56Z; on 14 Nov at 4:39 PM the phone showed KNTU's 2:56 PM
+ * deck (BKN055). The app took weather.gov's answer however old, and Sky Now said "no station report in the last 75
+ * minutes" on any build.
+ */
+export const NWS_STALE_MS = 75 * 60_000
+
+export async function stationSky(id: string, fetchImpl: typeof fetch = fetch, now: Date = new Date()): Promise<StationSky | null> {
+  let nws: StationSky | null = null
   try {
     const r = await fetchImpl(`${NWS}/stations/${id}/observations/latest`, { headers: NWS_HEADERS, signal: AbortSignal.timeout(TIMEOUT_MS) })
     if (r.ok) {
       const p = ((await r.json()) as { properties?: { rawMessage?: string; timestamp?: string } }).properties
       const sky = typeof p?.rawMessage === 'string' ? parseMetarSky(p.rawMessage) : null
-      if (sky !== null) return { sky, at: p?.timestamp ?? metarTime(p?.rawMessage ?? '', new Date())?.toISOString() ?? '', raw: p?.rawMessage ?? '' }
+      if (sky !== null) nws = { sky, at: p?.timestamp ?? metarTime(p?.rawMessage ?? '', now)?.toISOString() ?? '', raw: p?.rawMessage ?? '', via: 'weather.gov' as const }
     }
-    /* weather.gov had no METAR text for it: ask this app's function, which reads aviationweather.gov. */
+  } catch {
+    /* weather.gov did not answer: the METAR source below. */
+  }
+  const nwsAt = nws === null || nws.at === '' ? NaN : Date.parse(nws.at)
+  if (nws !== null && Number.isFinite(nwsAt) && now.getTime() - nwsAt <= NWS_STALE_MS) return nws
+  /* weather.gov had no METAR text for it, or an old one: ask this app's function, which reads aviationweather.gov. */
+  try {
     const m = await fetchImpl(METAR_ENDPOINT, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ station: id }), signal: AbortSignal.timeout(TIMEOUT_MS) })
-    if (!m.ok) return null
+    if (!m.ok) return nws
     const body = (await m.json()) as { metar?: string; at?: string }
     const sky = typeof body.metar === 'string' ? parseMetarSky(body.metar) : null
     /* The function's answer carries no time: the report's own (DDHHMMZ), so Sky Now and Sky Tonight read the same station (Batch LIVE, Section 10.2). */
-    return sky === null ? null : { sky, at: body.at ?? metarTime(body.metar ?? '', new Date())?.toISOString() ?? '', raw: body.metar ?? '' }
+    const metar = sky === null ? null : { sky, at: body.at ?? metarTime(body.metar ?? '', now)?.toISOString() ?? '', raw: body.metar ?? '', via: 'aviationweather.gov' as const }
+    if (metar === null) return nws
+    const metarAt = metar.at === '' ? NaN : Date.parse(metar.at)
+    /* The newer of the two; weather.gov's when the other says no time. */
+    return nws === null || (Number.isFinite(metarAt) && (!Number.isFinite(nwsAt) || metarAt > nwsAt)) ? metar : nws
   } catch {
-    return null
+    return nws
   }
 }
 

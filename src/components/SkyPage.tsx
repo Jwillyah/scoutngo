@@ -208,7 +208,7 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
         ))}
       </div>
       {tab === 'now' ? (
-        <SkyNowView venue={venue} now={realNow} timeZone={timeZone} station={station === null || stationAt === null ? null : { sky: station.sky, at: stationAt }} wx={brief.wx} next={nextToday} onNext={(k) => pickTab(k)} colourNow={colourNowWords(skyCallNow(brief.days, realNow, venue), realNow, deckOverhead)} />
+        <SkyNowView venue={venue} now={realNow} timeZone={timeZone} station={station === null || stationAt === null ? null : { sky: station.sky, at: stationAt, via: station.via }} wx={brief.wx} next={nextToday} onNext={(k) => pickTab(k)} colourNow={colourNowWords(skyCallNow(brief.days, realNow, venue), realNow, deckOverhead)} />
       ) : (
       <>
       <p className="spage__event num" {...(event !== null && kind === 'sunset' && picked === null ? { 'data-shared': 'sunset', 'data-value': `sunset ${clock(event)}`.toLowerCase() } : {})}>
