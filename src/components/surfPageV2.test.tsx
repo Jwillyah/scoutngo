@@ -1,13 +1,15 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { correctedRange, type SkillSample, type SpotStats } from '../core/spotSkill.ts'
-import { surfEstimate } from '../core/surf.ts'
+import { seaFaceFt } from '../core/surfTransform.ts'
 import { rangeWords, SURF_SPREAD_SOURCE } from '../core/surfRange.ts'
 import type { SkyCam } from '../core/skyCams.ts'
 import type { BuoyReading } from '../lib/buoy.ts'
 import type { Hourly } from '../lib/tideSheetData.ts'
 import type { SurfSea } from '../lib/useSurfSea.ts'
 import { SurfBody, SurfHow, type SurfBodyProps } from './SurfPageV2.tsx'
+import { partWords, swellOf } from '../core/surfReads.ts'
+import { seaNow } from '../lib/useSurfNow.ts'
 
 /* 44099's significant height in the fixture, metres (2.3 ft raw). */
 const BUOY_WAVE_M = 0.7
@@ -107,9 +109,10 @@ const text = (html: string) =>
 describe('Surf page v2 (Batch N, Section 1)', () => {
   it('heads with a range, the one computed from the forecast and the band, never one number', () => {
     /* Worked out here from the fixture, not read back from the page's own helper. */
-    /* The face as src/lib/surfDay.ts surfAt takes it: the whole sea's height on the swell's period. */
-    const swellFace = surfEstimate(WAVE_M, SWELL_S, 100, FACING).faceFt
-    const wholeFace = surfEstimate(WAVE_M, WAVE_S, 100, FACING).faceFt
+    /* Batch DRONE, Section 1: the face as src/lib/surfDay.ts surfAt takes it, the sea's parts by the per-part transform: the swell, and the rest of the whole sea at its period (the wind waves give no period of their own, so are left out); the spread against the whole sea as one part. */
+    const rest = Math.sqrt(WAVE_M ** 2 - SWELL_M ** 2 - 0.3 ** 2)
+    const swellFace = seaFaceFt([{ heightM: SWELL_M, periodS: SWELL_S, fromDeg: 100 }, { heightM: rest, periodS: WAVE_S, fromDeg: 100 }], FACING, 1) as number
+    const wholeFace = seaFaceFt([{ heightM: WAVE_M, periodS: WAVE_S, fromDeg: 100 }], FACING, 1) as number
     const want = rangeWords(correctedRange(swellFace, Math.abs(swellFace - wholeFace), NONE))
     /* Without the buoy: with it, the head leans to it (src/core/surfNowcast.ts), and since Batch TRUTH the band follows the leaned centre. */
     const html = render({ sea: { ...sea, buoy: null } })
@@ -210,5 +213,24 @@ describe('Surf page v2 (Batch N, Section 1)', () => {
     expect(t).toContain('times 0.83: Virginia Beach, from 1 look at the beach set against the buoy, provisional until 3')
     expect(t).toContain('the forecast leans to the buoy')
     expect(t).toContain('6 h after it')
+  })
+})
+
+/*
+ * ONE SURF SERIES (Batch DRONE, Section 1.6; 16 Nov 11:02 AM the map's
+ * crosshair said "swell 1.6 ft 4 s", the page "0.7 ft 12 s"). The map at the
+ * spot now reads swellOf(seaNow(...)) (src/components/WindLayerV3.tsx); the
+ * page draws that same part. The reading is 44099's at 15:26Z that day
+ * (tests/data/surf-2026-11-16/44099.spec), on this file's forecast.
+ */
+describe('one surf series (Batch DRONE, Section 1.6)', () => {
+  it('the Surf page draws the swell the map says at the spot, 44099\'s own 0.7 ft · 12 s', () => {
+    const b: BuoyReading = { ...buoy, waveM: 1.2, periodS: 6, fromDeg: 44, split: { swellM: 0.2, swellS: 11.8, swellFrom: 'ENE', windWaveM: 1.1, windWaveS: 5.6, windWaveFrom: 'NE' } }
+    const now = new Date((buoy as { at: Date }).at.getTime() + 36 * 60_000)
+    const s16: SurfSea = { ...sea, buoy: b, buoys: [] }
+    const swell = swellOf(seaNow(s16, now).parts)
+    expect(swell === null ? null : partWords(swell)).toBe('0.7 ft · 12 s')
+    const html = renderToStaticMarkup(<SurfBody now={now} timeZone="America/New_York" spot={SPOT} spotName="Virginia Beach" away={null} sea={s16} stats={NONE} kept={[]} shoot={false} cam={null} miles />)
+    expect(html).toContain('0.7 ft · 12 s')
   })
 })

@@ -2,6 +2,7 @@ import '../styles/surf.css'
 import type { LatLon } from '../core/geo.ts'
 import { factorHere } from '../lib/beachFactorHere.ts'
 import { buoyFaceFt } from '../core/spotSkill.ts'
+import { forecastSeaParts, seaFaceFt } from '../core/surfTransform.ts'
 import { blowingOut, forecastWord } from '../core/buoyHeadline.ts'
 import { buoyParts, partWords } from '../core/surfReads.ts'
 import { placePills } from '../core/pillPlace.ts'
@@ -98,7 +99,7 @@ export function BuoysBody({ venue, placeName, timeZone, units, buoys, marine, ma
   const how = [top.b.periodS === null ? null : `${Math.round(top.b.periodS)} s`, top.b.fromDeg === null ? null : `from the ${compass(top.b.fromDeg)}`].filter((x) => x !== null).join(' ')
   /* Batch NOW, Section 2.3: chop from behind the beach leads with what reaches it; the buoy's height is a row. */
   const out = blowingOut(top.b.fromDeg, facing)
-  const faceHere = out ? buoyFaceFt({ waveM: top.b.waveM, periodS: top.b.periodS, fromDeg: top.b.fromDeg }, facing, factorHere(venue)) : null
+  const faceHere = out ? buoyFaceFt(top.b, facing, factorHere(venue)) : null
   return (
     <>
       <div className="dbuoy__head">
@@ -165,8 +166,9 @@ function ForecastLine({ venue, nearest, marine, marineFailed, facing, timeZone, 
     /* Batch NOW, Section 2.3: the Surf page's word, as faces against as faces (src/core/buoyHeadline.ts). */
     const sea = (n: string) => hourlyAt(marine, n, nearest.at)
     const fWave = sea('wave_height')
-    const fFace = fWave === null ? null : buoyFaceFt({ waveM: fWave, periodS: sea('wave_period'), fromDeg: sea('wave_direction') }, facing, factorHere(venue))
-    const face = buoyFaceFt({ waveM: nearest.waveM, periodS: nearest.periodS, fromDeg: nearest.fromDeg }, facing, factorHere(venue))
+    /* Batch DRONE, Section 1: the forecast part by part, the Surf page's own transform (src/core/surfTransform.ts). */
+    const fFace = fWave === null ? null : seaFaceFt(forecastSeaParts(sea), facing, factorHere(venue))
+    const face = buoyFaceFt(nearest, facing, factorHere(venue))
     const word = forecastWord(face, fFace)
     line =
       face === null || fFace === null
@@ -191,7 +193,7 @@ function ForecastLine({ venue, nearest, marine, marineFailed, facing, timeZone, 
  * function and facing: one buoy→beach number in the app.
  */
 function FacesLine({ venue, nearest, facing, units }: { venue: LatLon; nearest: OkBuoy; facing: number | null; units: Units }) {
-  const ft = facing === null ? null : buoyFaceFt({ waveM: nearest.waveM, periodS: nearest.periodS, fromDeg: nearest.fromDeg }, facing, factorHere(venue))
+  const ft = facing === null ? null : buoyFaceFt(nearest, facing, factorHere(venue))
   if (ft === null) return null
   return (
     <p className="dhead__line dbuoy__vs" data-buoy-faces>

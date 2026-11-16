@@ -13,6 +13,7 @@
  *   wind    the water's shape and the wind to the beach, "clean, offshore".
  *   sure    firm for the first WEEK_SURE_DAYS days, a guess after.
  */
+import type { WindSide } from './coastFacing.ts'
 import { surfTag, type SurfShape, type SurfTag } from './surf.ts'
 
 /** Days from today this sure; after, the models drift apart (src/core/homeDay.ts WEEK_SURE_DAYS). */
@@ -34,6 +35,33 @@ export interface SurfHourIn {
   shape: SurfShape | null
   /** The wind to the beach in words, "offshore", "cross-offshore"; null when not known. */
   side: string | null
+  /** Whether the wind chops the water this hour (surfChop); absent: not known, no quality words. */
+  chop?: boolean
+}
+
+/*
+ * THE QUALITY WORDS (Batch DRONE, Section 1.4; CORE 8.1 addendum, 16 Nov:
+ * "2-3 ft RIDEABLE" and a "clean" band while the cams showed small and
+ * wind-chopped). With the wind at CHOP_WIND_KT or more from cross-shore round
+ * to onshore, the water is choppy: no "clean", no "Rideable"; the call says
+ * how it is instead, "Poor · choppy" at Small and under, "Fair · textured"
+ * for a size worth riding. 10 kt: the addendum's line, the same as Messy
+ * onshore (src/core/surf.ts MESSY_ONSHORE_MPS).
+ */
+export const CHOP_WIND_KT = 10
+export type SurfQuality = 'Poor · choppy' | 'Fair · textured'
+const CHOP_SIDES: ReadonlySet<WindSide> = new Set<WindSide>(['onshore', 'cross-onshore', 'cross-shore'])
+
+/** Whether a wind chops the water at this beach: CHOP_WIND_KT or more, from cross-shore round to onshore. */
+export function surfChop(windKt: number | null, side: WindSide | null): boolean {
+  return windKt !== null && side !== null && windKt >= CHOP_WIND_KT && CHOP_SIDES.has(side)
+}
+
+/** The quality words for a choppy hour; null when the wind does not chop it (the size tag stands). */
+export function surfQuality(centerFt: number, chop: boolean): SurfQuality | null {
+  if (!chop) return null
+  const size = surfTag(centerFt, 'Clean')
+  return size === 'Flat' || size === 'Small' ? 'Poor · choppy' : 'Fair · textured'
 }
 
 export interface SurfCall {
@@ -45,6 +73,8 @@ export interface SurfCall {
   /** "clean, offshore"; "wind not forecast" when no wind came. */
   wind: string
   confidence: 'firm' | 'guess'
+  /** "Poor · choppy" / "Fair · textured" when the wind chops the water; shown in place of the size tag. */
+  quality: SurfQuality | null
 }
 
 export const SHAPE_WORD: Record<SurfShape, string> = { Clean: 'clean', Bumpy: 'bumpy', Messy: 'messy' }
@@ -59,5 +89,6 @@ export function surfCall(h: SurfHourIn | null, dayIndex: number): SurfCall | nul
     size: surfTag(h.centerFt, h.shape),
     wind: [h.shape === null ? 'wind not forecast' : SHAPE_WORD[h.shape], h.side].filter((x) => x !== null).join(', '),
     confidence: dayIndex < SURF_SURE_DAYS ? 'firm' : 'guess',
+    quality: surfQuality(h.centerFt, h.chop === true),
   }
 }

@@ -9,7 +9,7 @@
  * Surf page all read it; scripts/audit-one-number.mjs fails when any two
  * screens show a different value.
  */
-import { useMemo, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useSyncExternalStore } from 'react'
 import { distanceMeters, type LatLon } from '../core/geo.ts'
 import { spotKey, spotStats, type SpotStats } from '../core/spotSkill.ts'
 import { BEACH_CAP } from '../core/surf.ts'
@@ -24,6 +24,7 @@ import { addDays, buoyLean, rangeHourAt, weekPeaks, type RangeHour } from './sur
 import { onSkillBook, readSkillBook, skillBookVersion } from './spotSkillStore.ts'
 import { awayFrom, beachName, sameBeach, useSurfBeach, type Beach } from './surfBeach.ts'
 import { useSurfSea, type SurfSea } from './useSurfSea.ts'
+import { keepWeek } from './weekBiasStore.ts'
 
 export interface SurfNow {
   /** The spot's surf beach; null far from any. */
@@ -54,7 +55,7 @@ export interface SurfDay {
 export const sideWord = (h: RangeHour): string | null => (h.side === null ? null : sideWords(h.side))
 
 /** surfCall(spot, time): one hour of one spot, called (Batch TRUTH, Section 1). */
-export const callOf = (h: RangeHour | null, dayIndex: number): SurfCall | null => (h === null ? null : surfCall({ centerFt: h.centerFt, shape: h.shape, side: sideWord(h) }, dayIndex))
+export const callOf = (h: RangeHour | null, dayIndex: number): SurfCall | null => (h === null ? null : surfCall({ centerFt: h.centerFt, shape: h.shape, side: sideWord(h), chop: h.chop }, dayIndex))
 
 /**
  * THE SEA NOW, ONE SOURCE (Batch QA, Section 0B; field 10 Nov: one Surf page
@@ -100,12 +101,13 @@ export function surfNowFrom(sea: SurfSea, stats: SpotStats, now: Date, timeZone:
   if (sea.marine === null) return { now: null, tomorrow: null, week: [] }
   const today = venueToday(now, timeZone)
   /* Batch Beach, Section 2: the next 6 h lean to the live buoy, and the tag reads the leaned centre. */
-  const lean = buoyLean(sea.marine, sea.wind, sea.buoy, sea.facing, stats, sea.factor ?? BEACH_CAP, now.getTime(), sea.buoys ?? [])
-  const week = weekPeaks(sea.marine, sea.wind, today, timeZone, sea.facing, stats, sea.factor, lean)
+  const shelter = sea.shelter ?? null
+  const lean = buoyLean(sea.marine, sea.wind, sea.buoy, sea.facing, stats, sea.factor ?? BEACH_CAP, now.getTime(), sea.buoys ?? [], shelter)
+  const week = weekPeaks(sea.marine, sea.wind, today, timeZone, sea.facing, stats, sea.factor, lean, shelter)
   const tomorrow = week.find((d) => d.date === addDays(today, 1))?.peak ?? null
   /* Read at the hour's half past, as the day's bars are: two screens a few seconds apart read the same hour. */
   const half = new Date(Math.floor(now.getTime() / 3_600_000) * 3_600_000 + 1_800_000)
-  const hourNow = rangeHourAt(sea.marine, sea.wind, half, sea.facing, stats, sea.factor, lean)
+  const hourNow = rangeHourAt(sea.marine, sea.wind, half, sea.facing, stats, sea.factor, lean, shelter)
   /* Today is called by the hour now, the home card's and the Surf page's head; the other days by their biggest hour. */
   const days = week.map((d, i) => {
     const hour = i === 0 ? hourNow : d.peak
@@ -133,6 +135,13 @@ export function useSurfNow(venue: LatLon | null, now: Date, timeZone: string, mi
   const use = useMemo(() => (spot === null ? storedStats({ lat: 0, lon: 0 }, 0) : storedStats(spot, hour * 3_600_000)), [spot?.lat, spot?.lon, hour, version]) // eslint-disable-line react-hooks/exhaustive-deps
   const km = away && venue !== null && beach !== null ? distanceMeters(venue, beach.at) / 1000 : 0
   const read = useMemo(() => surfNowFrom(sea, use, now, timeZone), [sea, use, now, timeZone])
+  /* Batch DRONE, Section 1.7: the week's calls, kept on this phone for the week's bias (src/core/weekBias.ts); written when a call changes, not each minute. */
+  const spotK = spot === null ? null : spotKey(spot)
+  const weekSig = read.week.map((d) => `${d.date}:${d.call?.lowFt ?? '-'}`).join(',')
+  useEffect(() => {
+    if (spotK === null || read.week.length === 0) return
+    keepWeek(spotK, read.week[0].date, read.week.map((d) => ({ date: d.date, lowFt: d.call?.lowFt ?? null })), Date.now())
+  }, [spotK, weekSig]) // eslint-disable-line react-hooks/exhaustive-deps
   return {
     beach,
     away: away && beach !== null ? { name: beachName(beach.name), far: miles ? `${Math.max(1, Math.round(km / 1.609))} mi` : `${Math.max(1, Math.round(km))} km` } : null,

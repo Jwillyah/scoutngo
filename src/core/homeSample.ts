@@ -55,7 +55,7 @@ export function tideBand(extremes: readonly TideExtreme[] | null, now: Date, clo
 }
 
 /** Surf: the breaking face height as a range of whole feet, and its size word. */
-export function surfBand(e: SurfEstimate | null): BandValue {
+export function surfBand(e: Pick<SurfEstimate, 'faceFt' | 'size'> | null): BandValue {
   if (e === null || !Number.isFinite(e.faceFt)) return none
   if (e.faceFt < 1) return { value: '< 1 ft', word: e.size.toLowerCase() }
   const lo = Math.floor(e.faceFt)

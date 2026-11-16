@@ -7,9 +7,9 @@
  *
  *   forecast   the face height the app shows: Open-Meteo Marine's swell (or
  *              the combined sea when no swell is given) broken at the beach
- *              by surfEstimate() (src/lib/surfDay.ts surfAt, as useBriefing)
+ *              by seaFaceFt() (src/lib/surfDay.ts surfAt, as useBriefing)
  *   buoy       the nearest NDBC buoy's whole sea, WVHT, DPD and MWD, broken
- *              by THE SAME surfEstimate() with the same beach facing
+ *              by THE SAME seaFaceFt() with the same beach facing
  *
  * One function on both sides, so the only thing that differs is the input:
  * the forecast's sea against the sea the buoy measured. Whatever the buoy
@@ -36,7 +36,8 @@
  * wider one. Never under BAND_FLOOR_FT.
  */
 import type { LatLon } from './geo.ts'
-import { BEACH_CAP, surfEstimate } from './surf.ts'
+import { BEACH_CAP } from './surf.ts'
+import { buoySeaParts, seaFaceFt, type BuoySplitIn } from './surfTransform.ts'
 
 /** A slot for the surfer's own word on a session; no session log feeds it yet. */
 export type SessionRating = 'Fun' | 'Meh' | 'Bad'
@@ -131,18 +132,25 @@ export function correctedRange(forecastFt: number, modelSpreadFt: number | null,
   return { centerFt: center, lowFt: Math.max(0, center - half), highFt: center + half, corrected }
 }
 
-/** What the buoy measured, as it reads (src/lib/buoy.ts). */
+/** What the buoy measured, as it reads (src/lib/buoy.ts): the whole sea, and its spectral split when it sent one. */
 export interface BuoySea {
   waveM: number
   periodS: number | null
   fromDeg: number | null
+  split?: BuoySplitIn | null
 }
 
-/** The buoy's breaking face height by the forecast's own function, or null when it cannot be worked out. */
+/**
+ * The buoy's breaking face height by the forecast's own function (Batch
+ * DRONE, Section 1: src/core/surfTransform.ts, part by part: its swell and
+ * its wind sea each by their own period and direction, combined by energy;
+ * the whole sea as one part when no split came), or null when it cannot be
+ * worked out. 16 Nov: 44099's 1.2 m, 6 s NE was "as faces ~3.3 ft" by the old
+ * step, under 1 ft by this one.
+ */
 export function buoyFaceFt(sea: BuoySea, facingDeg: number | null, factor: number = BEACH_CAP): number | null {
-  if (sea.periodS === null || sea.periodS <= 0 || !Number.isFinite(sea.waveM)) return null
-  if (sea.fromDeg === null && facingDeg !== null) return null
-  return surfEstimate(sea.waveM, sea.periodS, sea.fromDeg ?? 0, facingDeg, factor).faceFt
+  if (!Number.isFinite(sea.waveM)) return null
+  return seaFaceFt(buoySeaParts(sea), facingDeg, factor)
 }
 
 /** "last 30 days (240 hours): forecast ran 0.6 ft high here against the buoy, corrected". Facts only. */

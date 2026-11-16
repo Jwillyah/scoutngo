@@ -15,7 +15,7 @@ import {
   UNTESTED_ERROR_FT,
   type SkillSample,
 } from '../src/core/spotSkill.ts'
-import { surfEstimate } from '../src/core/surf.ts'
+import { seaFaceFt } from '../src/core/surfTransform.ts'
 import { buildBackup, isYours, restoreBackup } from '../src/lib/backup.ts'
 import { MAX_SPOTS, readSkillBook, sampleDue, SPOT_SKILL_KEY, withSample, writeSkillBook } from '../src/lib/spotSkillStore.ts'
 import { sampleFrom } from '../src/lib/useSpotSkill.ts'
@@ -148,7 +148,8 @@ describe('both sides through the same function', () => {
     const s = sampleFrom(marine, buoy(1.2, 9, 100), 90, NOW)
     expect(s).not.toBeNull()
     expect(s?.forecastFt).toBeCloseTo(s?.buoyFt as number, 9)
-    expect(s?.buoyFt).toBeCloseTo(surfEstimate(1.2, 9, 100, 90).faceFt, 9)
+    /* Batch DRONE, Section 1: both through the per-part transform (src/core/surfTransform.ts). */
+    expect(s?.buoyFt).toBeCloseTo(seaFaceFt([{ heightM: 1.2, periodS: 9, fromDeg: 100 }], 90, 1) as number, 9)
     expect(s?.at).toBe(t0)
   })
 

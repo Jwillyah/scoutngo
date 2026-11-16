@@ -6,6 +6,9 @@ import { fadeEdges, fromUV, particleCount, PX_PER_S_PER_MPS, sampleField, windRg
 import { nearestStation, stationWind, type StationWind } from '../lib/stationNear.ts'
 import { compass } from '../lib/tideWords.ts'
 import { fetchMarine, hourlyAt } from '../lib/tideSheetData.ts'
+import { forecastParts, swellOf, type SwellPart } from '../core/surfReads.ts'
+import { seaNow } from '../lib/useSurfNow.ts'
+import { useSurfSea } from '../lib/useSurfSea.ts'
 import { agoWords } from '../lib/nearWind.ts'
 import { windIn, windUnitLabel, type WindUnit } from '../lib/units.ts'
 import { usePointWind, type WindLevel, type WindModelChip } from '../lib/useWindViewport.ts'
@@ -277,11 +280,22 @@ export function WindLayerV3({ map, field, unit, spot, facing, headline = null, s
   }, [ck]) // eslint-disable-line react-hooks/exhaustive-deps
   /*
    * THE SWELL AT THE CROSSHAIR, AT SEA (Batch TRUTH, Section 7): the forecast's
-   * primary swell where the crosshair is, its height, period and the way it
-   * goes; on land the sea forecast answers nothing and no arrow is drawn.
-   * The crosshair rounded to 2 decimals, as every forecast question.
+   * swell where the crosshair is, its height, period and the way it goes; on
+   * land the sea forecast answers nothing and no arrow is drawn. The
+   * crosshair rounded to 2 decimals, as every forecast question.
+   *
+   * Batch DRONE, Section 1.6 (16 Nov 11:02: the map "swell 1.6 ft 4 s", the
+   * Surf page "0.7 ft 12 s", same beach, same hour): at the spot and at now,
+   * the Surf page's own parts (seaNow: the fresh buoy's split, else the
+   * forecast's) and its swell (swellOf); elsewhere the forecast's parts at
+   * the crosshair through the same swellOf.
    */
-  const [swell, setSwell] = useState<{ ft: number; s: number | null; fromDeg: number } | null>(null)
+  const [crossSwell, setSwell] = useState<SwellPart | null>(null)
+  const swellAtSpot = headline !== null && spot !== null && centre !== null && distanceMeters(spot, centre) <= 3000
+  const spotSea = useSurfSea(swellAtSpot ? spot : null)
+  const spotSwell = swellAtSpot && spotSea.marine !== null ? swellOf(seaNow(spotSea, new Date()).parts) : null
+  const lead = swellAtSpot && spotSea.marine !== null ? spotSwell : crossSwell
+  const swell = lead === null || lead.fromDeg === null ? null : { ft: lead.ft, s: lead.periodS, fromDeg: lead.fromDeg }
   useEffect(() => {
     if (centre === null) return
     let live = true
@@ -291,9 +305,7 @@ export function WindLayerV3({ map, field, unit, spot, facing, headline = null, s
           if (!live) return
           const h = m?.value ?? null
           const at = when ?? new Date()
-          const ht = h === null ? null : hourlyAt(h, 'swell_wave_height', at)
-          const dir = h === null ? null : hourlyAt(h, 'swell_wave_direction', at)
-          setSwell(ht === null || dir === null || !(ht > 0.03) ? null : { ft: ht * 3.28084, s: h === null ? null : hourlyAt(h, 'swell_wave_period', at), fromDeg: dir })
+          setSwell(h === null ? null : swellOf(forecastParts((n) => hourlyAt(h, n, at))))
         })
         .catch(() => live && setSwell(null))
     }, 700)

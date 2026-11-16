@@ -4,7 +4,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { venueToday } from '../core/eventDay.ts'
 import { PROVISIONAL_BELOW, regionEvidence, regionOf } from '../core/beachFactor.ts'
 import { BEACH_CAP } from '../core/surf.ts'
-import { SURF_FADE_MS } from '../core/surfNowcast.ts'
+import { LEAN_CAP_FT, SURF_FADE_MS } from '../core/surfNowcast.ts'
+import { CHOP_WIND_KT } from '../core/surfCall.ts'
+import { PART_GONE_DEG, PERIOD_LONG_S, PERIOD_SHORT_S, PERIOD_SHORT_SHARE } from '../core/surfTransform.ts'
+import { WEEK_BIAS_MIN_DAYS, weekBias, weekBiasLine } from '../core/weekBias.ts'
+import { readWeekLog } from '../lib/weekBiasStore.ts'
 import { type LatLon } from '../core/geo.ts'
 import { camsNear, type SkyCam } from '../core/skyCams.ts'
 import { distanceMeters } from '../core/geo.ts'
@@ -96,7 +100,7 @@ export function SurfPageV2({ venue, placeName, timeZone, units, ground, onBack, 
   const cam = camNear === null ? null : { ...camNear, km: distanceMeters(venue, camNear.cam.at) / 1000 }
 
   return (
-    <DetailShell id="surf" ground={ground} onBack={onBack} onSwitch={onSwitch} onMap={onMap} how={<SurfHow sea={sea} stats={skill.stats} away={awayWords} placeName={placeName} spot={spot} />}>
+    <DetailShell id="surf" ground={ground} onBack={onBack} onSwitch={onSwitch} onMap={onMap} how={<SurfHow sea={sea} stats={skill.stats} away={awayWords} placeName={placeName} spot={spot} today={venueToday(now, timeZone)} />}>
       <SurfBody now={now} timeZone={timeZone} spot={spot} spotName={awayWords?.name ?? placeName} away={awayWords} sea={sea} stats={skill.stats} kept={kept} shoot={shootPicked(picked)} cam={cam} miles={units.distance === 'ft'} />
     </DetailShell>
   )
@@ -126,8 +130,9 @@ export function SurfBody({ now, timeZone, spot, spotName, away, sea, stats, kept
   const today = venueToday(now, timeZone)
   /* Batch Beach, Section 2: the next 6 h lean to the live buoy (src/core/surfNowcast.ts), as the head does (surfNowFrom). */
   const nowMs = now.getTime()
-  const lean = useMemo(() => (marine === null ? null : buoyLean(marine, wind, sea.buoy, facing, stats, factor ?? BEACH_CAP, nowMs, sea.buoys ?? [])), [marine, wind, sea.buoy, sea.buoys, facing, stats, factor, nowMs])
-  const hours = useMemo(() => (marine === null ? [] : dayHours(marine, wind, today, timeZone, facing, stats, factor, lean)), [marine, wind, today, timeZone, facing, stats, factor, lean])
+  const shelter = sea.shelter ?? null
+  const lean = useMemo(() => (marine === null ? null : buoyLean(marine, wind, sea.buoy, facing, stats, factor ?? BEACH_CAP, nowMs, sea.buoys ?? [], shelter)), [marine, wind, sea.buoy, sea.buoys, facing, stats, factor, nowMs, shelter])
+  const hours = useMemo(() => (marine === null ? [] : dayHours(marine, wind, today, timeZone, facing, stats, factor, lean, shelter)), [marine, wind, today, timeZone, facing, stats, factor, lean, shelter])
   /* Batch TRUTH, Section 1: the head and the week strip read the day calls the home reads (useSurfNow's week, src/core/surfCall.ts). */
   const read = useMemo(() => surfNowFrom(sea, stats, now, timeZone), [sea, stats, now, timeZone])
   const week = read.week
@@ -177,7 +182,8 @@ export function SurfBody({ now, timeZone, spot, spotName, away, sea, stats, kept
         {place}
         <div className="dsurf__bigrow">
           <p className="dhead__big" data-shared="surf">{headCall?.words ?? '—'}</p>
-          {headCall === null ? null : <span className={`dsurf__tag dsurf__tag--${headCall.size.toLowerCase()}`}>{headCall.size}</span>}
+          {/* Batch DRONE, Section 1.4: in a chopping wind the quality words stand in for the tag: never "Rideable" in chop. */}
+          {headCall === null ? null : <span className={`dsurf__tag dsurf__tag--${headCall.quality === null ? headCall.size.toLowerCase() : 'small'}`}>{headCall.quality ?? headCall.size}</span>}
         </div>
         <p className="dhead__line">
           {headCall === null
@@ -252,7 +258,7 @@ export function SurfBody({ now, timeZone, spot, spotName, away, sea, stats, kept
         at={spot}
         name={spotName}
         timeZone={timeZone}
-        buoyFt={sea.buoy?.status === 'ok' && now.getTime() - sea.buoy.at.getTime() <= LEAN_BUOY_MAX_AGE_MS ? buoyFaceFt({ waveM: sea.buoy.waveM, periodS: sea.buoy.periodS, fromDeg: sea.buoy.fromDeg }, facing, BEACH_CAP) : null}
+        buoyFt={sea.buoy?.status === 'ok' && now.getTime() - sea.buoy.at.getTime() <= LEAN_BUOY_MAX_AGE_MS ? buoyFaceFt(sea.buoy, facing, BEACH_CAP) : null}
         now={() => Date.now()}
       />
     </>
@@ -349,7 +355,7 @@ function BuoyCard({ buoy, facing, factor, marine, wind, stats, clock }: { buoy: 
         <p className="dsurf__line">{buoy.reason === "The buoy didn't load." ? "The buoy didn't load · retrying" : buoy.reason}</p>
       </DCard>
     )
-  const face = buoyFaceFt({ waveM: buoy.waveM, periodS: buoy.periodS, fromDeg: buoy.fromDeg }, facing, factor)
+  const face = buoyFaceFt(buoy, facing, factor)
   const there = marine === null ? null : rangeHourAt(marine, wind, buoy.at, facing, stats, factor)
   const name = buoy.buoy.name
     .replace(/\s*\(\d+\)\s*$/, '')
@@ -414,8 +420,10 @@ function WeekBars({ week }: { week: SurfDay[] }) {
 
 /* ------------------------------------------------------------ how we got this */
 
-export function SurfHow({ sea, stats, away, placeName, spot }: { sea: SurfSea; stats: SpotStats; away: { name: string; far: string } | null; placeName: string; spot?: LatLon }) {
+export function SurfHow({ sea, stats, away, placeName, spot, today }: { sea: SurfSea; stats: SpotStats; away: { name: string; far: string } | null; placeName: string; spot?: LatLon; today?: string }) {
   const region = spot === undefined ? null : regionOf(spot)
+  /* Batch DRONE, Section 1.7: this phone's week of calls against each day's own (src/core/weekBias.ts). */
+  const bias = spot === undefined || today === undefined ? null : weekBias(readWeekLog(spotKey(spot)), today)
   const evidence = regionEvidence(region)
   const b = sea.buoy?.status === 'ok' ? sea.buoy : null
   return (
@@ -428,20 +436,25 @@ export function SurfHow({ sea, stats, away, placeName, spot }: { sea: SurfSea; s
       <p>Forecast: Open-Meteo Marine, one model. The swell (height, period, direction), the whole sea (wave height, period, direction), by the hour.</p>
       <p>Wind: Open-Meteo, 10 m, by the hour.</p>
       <p>
-        Faces: the whole sea's height, with the swell's period and direction, broken at a 1:50 beach
-        {sea.facing === null ? '' : ` facing ${compass(sea.facing)}`}, angled by its direction (Komar and Gaillard), never above the height they came from times {(sea.factor ?? BEACH_CAP).toFixed(2)}: {region === null ? 'no region with a look at the beach yet' : `${region.name}, from ${evidence.looks} ${evidence.looks === 1 ? 'look' : 'looks'} at the beach set against the buoy${evidence.provisional ? `, provisional until ${PROVISIONAL_BELOW}` : ''}`}.
+        Faces: the sea part by part (each swell and the wind waves), each by its own period and direction at this beach
+        {sea.facing === null ? '' : ` facing ${compass(sea.facing)}`}: a short-period sea breaks smaller ({Math.round(PERIOD_SHORT_SHARE * 100)}% of its height at {PERIOD_SHORT_S} s and under, all of it from {PERIOD_LONG_S} s), a sea at an angle reaches the beach with less of its energy (none from about {PART_GONE_DEG}° off). The parts combine by energy, times {(sea.factor ?? BEACH_CAP).toFixed(2)}: {region === null ? 'no region with a look at the beach yet' : `${region.name}, from ${evidence.looks} ${evidence.looks === 1 ? 'look' : 'looks'} at the beach set against the buoy${evidence.provisional ? `, provisional until ${PROVISIONAL_BELOW}` : ''}`}
+        {sea.shelter == null ? '' : '; a jetty here, its size and its lee from the looks kept for it'}.
       </p>
-      <p>Now and the next {SURF_FADE_MS / 3_600_000} h: the forecast leans to the buoy's face here, all the way at the reading and back to the forecast {SURF_FADE_MS / 3_600_000} h after it. The tag reads the leaned number.</p>
+      <p>Now and the next {SURF_FADE_MS / 3_600_000} h: the forecast leans to the buoys' face here, each buoy worked the same way, weighed by how much of its sea heads for this beach; all the way at the reading and back to the forecast {SURF_FADE_MS / 3_600_000} h after it, and never more than {LEAN_CAP_FT} ft when the buoys disagree with each other or the forecast. The tag reads the leaned number.</p>
       <p>
         Likely range: the spread is {SURF_SPREAD_SOURCE}, with this spot's error against the buoy ({UNTESTED_ERROR_FT} ft assumed until it has a record). At least {BAND_FLOOR_FT} ft each way.
       </p>
       <p>
-        Buoy check: NDBC{b === null ? '' : ` ${b.buoy.id}`}, its latest reading broken at this beach by the same formula. Within {BUOY_MATCH_FT} ft of the line is "in line".
+        Buoy check: NDBC{b === null ? '' : ` ${b.buoy.id}`}, its latest reading, part by part, broken at this beach by the same formula. Within {BUOY_MATCH_FT} ft of the line is "in line".
       </p>
       <p>Buoy dots: that reading, and the ones this phone checked here earlier today, once an hour while the app was open.</p>
       <p>This spot: {skillLine(stats, 'ft')}.</p>
       <p>
-        Tags: Flat under {SURF_FUN_FT} ft, Fun {SURF_FUN_FT}–{SURF_FIRING_FT} ft, Firing {SURF_FIRING_FT} ft and up and clean; messy onshore drops a step. Clean: wind under 5 kt, or offshore. Messy: onshore, 10 kt or more.
+        The week, checked:{' '}
+        {bias === null ? `this phone keeps its seven-day calls here; after ${WEEK_BIAS_MIN_DAYS} days, how far each day ahead ran from the day's own call shows here` : `each day's early calls against its own call on the day (leaned to the buoy), in bins of a foot: ${weekBiasLine(bias)}`}.
+      </p>
+      <p>
+        Tags: Flat under {SURF_FUN_FT} ft, Fun {SURF_FUN_FT}–{SURF_FIRING_FT} ft, Firing {SURF_FIRING_FT} ft and up and clean; messy onshore drops a step. Clean: wind under 5 kt, offshore, or cross-offshore under 8 kt. Messy: onshore, 10 kt or more. Wind of {CHOP_WIND_KT} kt or more from cross-shore round to onshore chops it: never clean, and "Poor · choppy" or "Fair · textured" in place of the tag.
       </p>
       <p>An estimate from an offshore forecast, not a surf report.</p>
     </>

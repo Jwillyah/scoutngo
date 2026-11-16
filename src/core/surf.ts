@@ -144,14 +144,20 @@ export function towardBeachM(totalM: number, windWaveM: number | null, windWaveF
   return Math.sqrt(Math.max(0, totalM * totalM - ww * ww * (1 - share)))
 }
 
-/** Cross-offshore under this grooms the faces like offshore (Batch TRUTH, Section 2): 12 kt. */
-export const CLEAN_CROSS_OFF_MPS = 12 * 0.514444
+/*
+ * Cross-offshore under this grooms the faces like offshore (Batch TRUTH,
+ * Section 2, 12 Nov: SSW 4-7 kt, clean by every eye and cam). 8 kt since
+ * Batch DRONE, Section 1: on 16 Nov the forecast's 8.8-10.3 kt NNW, 110-130°
+ * off the oceanfront, shaded 11 AM-1 PM "clean" while every cam showed
+ * wind-chop (fixtures/truth/2026-11-16-vb-surf.json). Was 12 kt.
+ */
+export const CLEAN_CROSS_OFF_MPS = 8 * 0.514444
 
-/** Clean when glassy (light under GLASSY_MPS, 5 kt, or offshore) or cross-offshore under 12 kt; messy when onshore and MESSY_ONSHORE_MPS (10 kt) or more; bumpy between. */
+/** Clean when glassy (light under GLASSY_MPS, 5 kt, or offshore) or cross-offshore under 8 kt; messy when onshore and MESSY_ONSHORE_MPS (10 kt) or more; bumpy between. */
 export function surfShape(windMps: number, windFromDeg: number, facingDeg: number | null): SurfShape {
   const relation = facingDeg === null ? null : windToBeach(windFromDeg, facingDeg)
   if (isGlassy(windMps, relation)) return 'Clean'
-  /* 12 Nov: SSW at 4-7 kt on a beach facing 100°, "clean" by every eye and cam; the page said "bumpy, cross-shore". */
+  /* 12 Nov: SSW at 4-7 kt on a beach facing 100°, "clean" by every eye and cam; the page said "bumpy, cross-shore". 16 Nov: 8.8 kt NNW was not. */
   if (facingDeg !== null && windSide(windFromDeg, facingDeg) === 'cross-offshore' && windMps < CLEAN_CROSS_OFF_MPS) return 'Clean'
   if (relation === 'onshore' && windMps >= MESSY_ONSHORE_MPS) return 'Messy'
   return 'Bumpy'

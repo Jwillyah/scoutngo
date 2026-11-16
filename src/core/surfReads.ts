@@ -102,3 +102,13 @@ export function buoyParts(split: { swellM: number | null; swellS: number | null;
 
 /** "2.1 ft · 9 s": a part's height and period, no direction (the arrow says that). */
 export const partWords = (p: SwellPart): string => `${p.ft.toFixed(1)} ft${p.periodS === null ? '' : ` · ${Math.round(p.periodS)} s`}`
+
+/*
+ * THE SWELL, ONE READING (Batch DRONE, Section 1.6; 16 Nov 11:02 the map's
+ * crosshair said "swell 1.6 ft 4 s" while the Surf page said "Swell 0.7 ft ·
+ * 12 s" for the same beach and hour: the map read the forecast's primary
+ * swell at the crosshair, the page 44099's own split, fresh). Both now read
+ * the sea's parts from one place (src/lib/useSurfNow.ts seaNow: the fresh
+ * buoy's split, else the forecast's parts) and the swell from them here.
+ */
+export const swellOf = (parts: readonly SwellPart[]): SwellPart | null => parts.find((p) => p.name === 'Swell') ?? null

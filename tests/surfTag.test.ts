@@ -124,14 +124,16 @@ describe('the beach factor per region (Batch Beach, Section 2: the Outer Banks b
 describe('the forecast face is worked from the whole sea (Batch Beach, Section 2: Sandbridge, 4% of size words right with swell-only)', () => {
   it('the height is wave_height, the period and direction the swell’s; the swell’s height only where the whole sea’s is missing', async () => {
     const { surfAt } = await import('../src/lib/surfDay.ts')
-    const { surfEstimate } = await import('../src/core/surf.ts')
+    const { seaFaceFt } = await import('../src/core/surfTransform.ts')
     const t = Date.UTC(2026, 10, 5, 15)
     const m = (wave: number | null) => ({ times: [t], values: { wave_height: [wave], wave_period: [6], wave_direction: [60], swell_wave_height: [0.4], swell_wave_period: [11], swell_wave_direction: [95] } })
     const s = surfAt(m(0.9), new Date(t), 100)
-    expect(s?.estimate.faceFt).toBeCloseTo(surfEstimate(0.9, 11, 95, 100).faceFt, 9)
+    /* Batch DRONE, Section 1: still the whole sea's energy, but part by part: the swell its own way, the rest of the sea at the whole sea's period and direction. */
+    const rest = Math.sqrt(0.9 ** 2 - 0.4 ** 2)
+    expect(s?.estimate.faceFt).toBeCloseTo(seaFaceFt([{ heightM: 0.4, periodS: 11, fromDeg: 95 }, { heightM: rest, periodS: 6, fromDeg: 60 }], 100, 1) as number, 9)
     expect(s?.periodS).toBe(11)
     expect(s?.swellFt).toBeCloseTo(0.4 * 3.28084, 9)
-    expect(surfAt(m(null), new Date(t), 100)?.estimate.faceFt).toBeCloseTo(surfEstimate(0.4, 11, 95, 100).faceFt, 9)
+    expect(surfAt(m(null), new Date(t), 100)?.estimate.faceFt).toBeCloseTo(seaFaceFt([{ heightM: 0.4, periodS: 11, fromDeg: 95 }], 100, 1) as number, 9)
   })
 })
 

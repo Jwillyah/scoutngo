@@ -31,7 +31,7 @@ export function sampleFrom(marine: Hourly, buoy: BuoyReading, facingDeg: number 
   if (buoy.status !== 'ok') return null
   const at = buoy.at.getTime()
   if (!Number.isFinite(at) || now - at > BUOY_FRESH_MS || at > now + HOUR_MS) return null
-  const buoyFt = buoyFaceFt({ waveM: buoy.waveM, periodS: buoy.periodS, fromDeg: buoy.fromDeg }, facingDeg, factor)
+  const buoyFt = buoyFaceFt(buoy, facingDeg, factor)
   if (buoyFt === null) return null
   const forecast = surfAt(marine, buoy.at, facingDeg, factor)
   if (forecast === null) return null

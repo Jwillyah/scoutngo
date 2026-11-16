@@ -20,15 +20,16 @@ import { surfBand } from './surfCall.ts'
 /*
  * WHERE THE SPREAD COMES FROM. Open-Meteo Marine is one model (its best
  * match), so there is no per-hour spread between models for the surf. What
- * the forecast does give is the sea two ways: the swell on its own
- * (swell_wave_*), which is what the face is broken from, and the whole sea,
- * swell and wind waves together (wave_*). Both are broken at the beach by the
- * same surfEstimate(); how far apart the two faces come out is how much the
+ * the forecast does give is the sea two ways: part by part (its swells and
+ * wind waves, each its own period and direction), which is what the face is
+ * broken from, and the whole sea taken as one (wave_*). Both are broken at
+ * the beach by the same transform (src/core/surfTransform.ts seaFaceFt, Batch
+ * DRONE, Section 1); how far apart the two faces come out is how much the
  * answer depends on which part of the sea reaches the sand, and is used as
  * the spread (high minus low). Where the forecast has only one of the two,
  * there is no spread (null) and the band is this spot's error alone.
  */
-export const SURF_SPREAD_SOURCE = 'the swell alone against the whole sea (swell and wind waves), each broken at this beach'
+export const SURF_SPREAD_SOURCE = 'the sea part by part against the whole sea taken as one, each broken at this beach'
 
 /** High minus low of the two faces, feet; null when either is missing. */
 export function seaSpreadFt(swellFaceFt: number | null, wholeSeaFaceFt: number | null): number | null {

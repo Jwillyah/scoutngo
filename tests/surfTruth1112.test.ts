@@ -30,10 +30,11 @@ describe('the wind to the beach in five', () => {
   it('the five, in order round from the sea', () => {
     expect([100, 150, 190, 230, 280].map((d) => windSide(d, FACING))).toEqual(['onshore', 'cross-onshore', 'cross-shore', 'cross-offshore', 'offshore'])
   })
-  it('cross-offshore under 12 kt reads clean, not bumpy; at 12 kt and up, bumpy', () => {
+  /* Batch DRONE, Section 1: the line moved from 12 kt to 8 (16 Nov, 8.8 kt NNW was wind-chop, not clean); 12 Nov's 4-7 kt stays clean. */
+  it('cross-offshore under 8 kt reads clean, not bumpy; at 8 kt and up, bumpy', () => {
     expect(surfShape(7 * KT, 210, FACING)).toBe('Clean')
-    expect(surfShape(11.9 * KT, 210, FACING)).toBe('Clean')
-    expect(surfShape(12 * KT, 210, FACING)).toBe('Bumpy')
+    expect(surfShape(7.9 * KT, 210, FACING)).toBe('Clean')
+    expect(surfShape(8 * KT, 210, FACING)).toBe('Bumpy')
     expect(surfShape(8 * KT, 190, FACING)).toBe('Bumpy')
   })
   it('the dial\'s wedges are the same five bands', () => {

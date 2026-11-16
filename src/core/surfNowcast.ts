@@ -50,3 +50,43 @@ export function leanRange(range: SurfRange, lean: SurfLean | null, t: number): {
     shiftFt: centerFt - range.centerFt,
   }
 }
+
+/*
+ * THE BUOYS, WEIGHED (Batch DRONE, Section 1; CORE 8.1). Each fresh buoy is
+ * worked to faces at this beach by the one transform (src/core/surfTransform.ts
+ * seaFaceFt, the forecast's own), and the lean goes to their weighted mean:
+ *
+ *   weight   the share of the buoy's sea that is heading for this beach
+ *            (seaReach): 44099's bay wind sea and 44014's offshore NW sea on
+ *            14 Nov measured a sea going away, and said little about the one
+ *            arriving; a bay-mouth buoy (BAY_MOUTH) counts half again
+ *   cap      ±LEAN_CAP_FT when the buoys disagree with each other, or with
+ *            the forecast, by more than DISAGREE_FT: no one measurement to
+ *            follow, so the lean is held to a foot
+ *   floor    never below FLOOR_SHARE of the forecast's centre (applied by
+ *            the caller, src/lib/surfPageData.ts buoyLean)
+ */
+export const LEAN_CAP_FT = 1
+export const DISAGREE_FT = 1
+
+export interface BuoyFace {
+  faceFt: number
+  /** 0-1, the weight it carries. */
+  weight: number
+}
+
+/** The buoys' face at this beach, weighted; null when none can be worked out. With every weight 0 (no buoy's sea heads here), the plain mean. */
+export function buoyConsensus(faces: readonly BuoyFace[]): number | null {
+  const ok = faces.filter((f) => Number.isFinite(f.faceFt) && Number.isFinite(f.weight) && f.weight >= 0)
+  if (ok.length === 0) return null
+  const w = ok.reduce((m, f) => m + f.weight, 0)
+  if (!(w > 0)) return ok.reduce((m, f) => m + f.faceFt, 0) / ok.length
+  return ok.reduce((m, f) => m + f.faceFt * f.weight, 0) / w
+}
+
+/** The buoys' miss, capped at ±LEAN_CAP_FT when they disagree with each other or with the forecast by more than DISAGREE_FT. */
+export function cappedMiss(missFt: number, faces: readonly number[]): number {
+  const apart = faces.length < 2 ? 0 : Math.max(...faces) - Math.min(...faces)
+  const disagree = apart > DISAGREE_FT || Math.abs(missFt) > DISAGREE_FT
+  return disagree ? Math.max(-LEAN_CAP_FT, Math.min(LEAN_CAP_FT, missFt)) : missFt
+}

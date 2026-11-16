@@ -655,8 +655,9 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
     const from = which === 'today' ? now : (day?.start ?? now)
     const { pts, fun } = surfFunAt(brief, surf, which, now, day)
     /* The tag is the call's size; "Fun 3p" only says when, for a day the call says is Fun or Firing. */
-    const on = call !== null && surfOn(call.size)
-    tag = !on || fun === null ? (call?.size ?? null) : fun === 'now' ? `${call.size} now` : `${call.size} ${short(fun)}`
+    /* Batch DRONE, Section 1.4: in a chopping wind the quality words, never "Rideable" or "Fun". */
+    const on = call !== null && call.quality === null && surfOn(call.size)
+    tag = call?.quality ?? (!on || fun === null ? (call?.size ?? null) : fun === 'now' ? `${call.size} now` : `${call.size} ${short(fun)}`)
     tagGood = on
     const path = surfPath(pts, from, 24, CHART)
     const marks = surfChartMarks(pts, from, 24, timeZone, { widthPx: cardPx, dayStart: which === 'tomorrow' })

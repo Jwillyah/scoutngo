@@ -175,7 +175,7 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
       const said = colorWords(read?.call ?? null)
       return { title: 'Sky', big: said === null ? '—' : said.replace(/^./, (c) => c.toUpperCase()), line: ev == null ? '' : `${past ? 'sunrise' : 'sunset'} ${clock(ev)}`, target: 'sky' }
     }
-    if (k === 'surf') return { title: 'Surf', big: surf.nowWords ?? '—', line: surf.away !== null ? `nearest: ${surf.away.name}` : surf.now === null ? '' : `${surf.now.tag.toLowerCase()} now`, target: 'surf' }
+    if (k === 'surf') return { title: 'Surf', big: surf.nowWords ?? '—', line: surf.away !== null ? `nearest: ${surf.away.name}` : surf.now === null ? '' : `${(surf.now.quality ?? surf.now.tag).toLowerCase()} now`, target: 'surf' }
     if (k === 'wind') {
       const side = wind?.fromDeg == null ? null : windTag(wind.fromDeg, brief.facing)
       return { title: 'Wind', big: windWords(wind, units.wind) ?? '—', line: [side === null ? null : sideWords(side), gustWords(wind, units.wind)].filter((x) => x !== null).join(' · '), target: 'wind' }

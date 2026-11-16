@@ -13,7 +13,8 @@
  * on the phone. Nothing about the user leaves it.
  */
 import { useEffect, useMemo, useState } from 'react'
-import { factorHere } from './beachFactorHere.ts'
+import { factorHere, jettyHere } from './beachFactorHere.ts'
+import type { Shelter } from '../core/jettyFactor.ts'
 import { readReports, REPORTS_CHANGED } from './fieldReportStore.ts'
 import type { LatLon } from '../core/geo.ts'
 import { latestBuoys, type BuoyReading } from './buoy.ts'
@@ -36,6 +37,8 @@ export interface SurfSea {
   buoys?: BuoyReading[]
   /** The region's beach factor (src/core/beachFactor.ts); absent: BEACH_CAP. */
   factor?: number
+  /** Batch DRONE, Section 1.3: a jetty's lee (src/core/jettyFactor.ts); absent or null on an open beach. */
+  shelter?: Shelter | null
 }
 
 const EMPTY: SurfSea = {
@@ -105,6 +108,7 @@ export function useSurfSea(spot: LatLon | null): SurfSea {
     return () => window.removeEventListener(REPORTS_CHANGED, on)
   }, [])
   const factor = useMemo(() => (lat === null || lon === null ? undefined : factorHere({ lat, lon }, reports)), [lat, lon, reports])
+  const shelter = useMemo(() => (lat === null || lon === null ? null : (jettyHere({ lat, lon })?.shelter ?? null)), [lat, lon])
   const v = sea !== null && sea.key === key ? sea.v : EMPTY
-  return useMemo(() => (factor === undefined ? v : { ...v, factor }), [v, factor])
+  return useMemo(() => (factor === undefined ? v : { ...v, factor, shelter }), [v, factor, shelter])
 }
