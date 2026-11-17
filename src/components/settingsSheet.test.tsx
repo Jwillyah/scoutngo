@@ -87,21 +87,45 @@ describe('Settings, a page of its own (30 Oct)', () => {
 })
 
 /*
- * ABOUT, SHORT (Batch G, Section 8): the story, How it works in three rows,
- * Version and Open source; no API key, no backup or import, no raw file
- * input, no Safari-clearing words (those are in Settings, once).
+ * ABOUT, THE STORY (Batch DRONE, Section 5; docs/mockups/About_Story.png):
+ * the headline, the story word for word, four "how it's different" lines,
+ * three rows and the foot; no key, no backup, no file input, and never "no
+ * account".
  */
-describe('About, short', () => {
+describe('About, the story', () => {
   const html = renderToStaticMarkup(<AboutSheet onHow={() => {}} />)
-  const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
-  it('has only the story, How it works, Version and Open source', () => {
-    const eyebrows = [...html.matchAll(/class="about__eyebrow[^"]*">([^<]+)</g)].map((m) => m[1])
-    expect(eyebrows).toEqual(['Why this exists', 'How it works', 'Version', 'Open source'])
-    expect(html.match(/class="about__why"/g)?.length).toBe(2)
-    for (const row of ['Every number is arithmetic', 'Privacy: what leaves your device', 'What it will not tell you']) expect(text).toContain(row)
+  const text = html.replace(/<[^>]+>/g, ' ').replace(/&#x27;|&#39;/g, "'").replace(/&amp;/g, '&').replace(/&rsquo;/g, '’').replace(/\s+/g, ' ')
+  it('says the board, in its order', () => {
+    const order = [
+      'One check before you go outside.',
+      "I'm a photographer and surfer in Virginia Beach. Every morning I flipped through nine apps to answer one question: is it worth going out, and where? ScoutNGo puts it in one look: the best sunset spot near you from the real clouds, wind at 400 ft and your airspace ceiling, plus surf, tide and wind.",
+      'How it’s different',
+      'Where, not just whether. It names the spot and the direction to look.',
+      'It checks itself. Every call is compared to what really happened. Hits and misses are public.',
+      'All in one. Surf, light, drone, tide and wind from the same data.',
+      'Free and open source. No ads, no tracking. Your spots stay on your phone.',
+      'How we got this · our hit rate',
+      'Data & credits',
+      'Source code',
+      'Made in Virginia Beach · Privacy',
+    ]
+    const at = order.map((t) => text.indexOf(t))
+    expect(at.every((i) => i >= 0), JSON.stringify(order.filter((_, i) => at[i] < 0))).toBe(true)
+    expect([...at].sort((a, b) => a - b)).toEqual(at)
   })
-  it('carries no key, no backup, no file input and no Safari-clearing check', () => {
+  it('never says "no account"; carries no key, no backup and no file input', () => {
+    expect(text.toLowerCase()).not.toMatch(/no account/)
     expect(html).not.toMatch(/type="file"/)
     expect(text).not.toMatch(/API key|Back ?up|Restore|Import|Choose File|clearing Safari|Safari erase/i)
+  })
+})
+
+describe('the hit rate the About row opens (Batch DRONE, Section 5)', () => {
+  it('the How page says where each score is, and for how many days', async () => {
+    const { HowPage } = await import('./HowPage.tsx')
+    const t = renderToStaticMarkup(<HowPage onBack={() => {}} />).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
+    expect(t).toContain('Our hit rate')
+    expect(t).toMatch(/nearest airport station over the last 30 days/)
+    expect(t).toMatch(/nearest buoy over the last 30 days/)
   })
 })

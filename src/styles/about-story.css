@@ -1,0 +1,131 @@
+/*
+ * ABOUT, THE STORY (Batch DRONE, Section 5; docs/mockups/About_Story.png), in
+ * Look D's night colours: the headline, the story, the "how it's different"
+ * card with its four coloured leads, the three rows, the foot.
+ */
+.aboutpage {
+  background: linear-gradient(180deg, var(--d-night-low) 0%, var(--d-night-mid) 45%, var(--d-glow-violet) 100%);
+}
+.astory {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 100%;
+  padding-bottom: 8px;
+  color: var(--white);
+}
+/* Nothing here shrinks: the page scrolls instead (the rows card, overflow hidden for its corners, collapsed to a line at 390 x 664). */
+.astory > * {
+  flex-shrink: 0;
+}
+.astory__head {
+  margin: 4px 0 0;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+.astory__story {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.45;
+  opacity: 0.9;
+}
+.astory__card,
+.astory__rows {
+  border: 1px solid var(--d-edge);
+  border-radius: 24px;
+  background: var(--d-card);
+}
+.astory__card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px 16px;
+}
+.astory__label {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+.astory__line {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.4;
+}
+.astory__line--where .astory__lead {
+  color: var(--d-drone);
+}
+.astory__line--checks .astory__lead {
+  color: var(--d-surf);
+}
+.astory__line--one .astory__lead {
+  color: var(--d-tide);
+}
+.astory__line--free .astory__lead {
+  color: var(--d-glow);
+}
+.astory__rows {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.astory__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  margin: 0;
+  padding: 8px 16px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.astory__row + .astory__row {
+  border-top: 1px solid var(--d-edge);
+}
+.astory__row--static {
+  flex-direction: column;
+  align-items: flex-start;
+  cursor: default;
+}
+.astory__rownote {
+  font-size: 12px;
+  font-weight: 400;
+  opacity: 0.8;
+}
+.astory__chev {
+  opacity: 0.7;
+}
+.astory__version {
+  margin: 0;
+  font-size: 12px;
+  text-align: center;
+  opacity: 0.6;
+}
+.astory__foot {
+  margin: auto 0 0;
+  font-size: 13px;
+  text-align: center;
+  opacity: 0.8;
+}
+.astory__privacy {
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}

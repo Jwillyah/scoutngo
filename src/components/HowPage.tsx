@@ -2,6 +2,8 @@ import { HOSTS } from '../lib/hosts.ts'
 import { buildLabel } from '../lib/build.ts'
 import { COLOR_RULE } from '../core/colorRole.ts'
 import { ESRI_ATTRIBUTION } from '../lib/mapConstants.ts'
+import { SKILL_WINDOW_DAYS } from '../core/spotSkill.ts'
+import { SKILL_DAYS } from '../core/modelSkill.ts'
 
 /**
  * /how — THE PAGE BEHIND THE LINK.
@@ -103,6 +105,17 @@ export function HowPage({ onBack }: { onBack: () => void }) {
               and what the shot might be. It is never asked for a bearing, a distance, a time or an
               angle, and anything it says that looks like geometry is recomputed here before you
               see it.
+            </p>
+
+            {/* Batch DRONE, Section 5: About's "How we got this · our hit rate" opens here. */}
+            <h3 className="how__sub" data-how="hit-rate">
+              Our hit rate
+            </h3>
+            <p className="how__p">
+              Every call is compared to what really happened. The weather models are scored against the nearest airport
+              station over the last {SKILL_DAYS} days (Weather › How well each model did here), and the surf forecast
+              against the nearest buoy over the last {SKILL_WINDOW_DAYS} days (Surf › How we got this). The coast&rsquo;s
+              nightly scores are published with the source code, in public/skill.
             </p>
 
             <h3 className="how__sub">The honesty rule</h3>
