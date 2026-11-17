@@ -29,12 +29,17 @@ describe('the wind bar keeps its words apart', () => {
     const bars = Array.from({ length: 120 }, (_, i) => ({ x: i / 120, w: 1 / 120, h: 0.3, gustH: i === 1 ? limitH - 0.04 : 0.35, band: 1 as const, kt: 8 }))
     const plot: WindPlot = { bars, topKt: 25 * 1.15, limitH, peaks: [0, 1, 2, 3, 4].map((d) => ({ x: (d === 0 ? 1.5 : d * 24 + 14.5) / 120, kt: 11 })) }
     /* Without the rule the two boxes would meet: the limit from 0 to 105 px, the peak at 4 px. */
-    const limit = { x: 0, bottomPct: limitBottomPct(limitH), text: 'drone limit 23' }
+    const old = { x: 0, bottomPct: limitBottomPct(limitH), text: 'drone limit 23' }
     const first = { x: plot.peaks[0].x, bottomPct: peakBottomPct(limitH - 0.04), text: '11' }
-    expect(overlap(box(limit, false), box(first, true))).toBe(true)
+    expect(overlap(box(old, false), box(first, true))).toBe(true)
     const got = windLabels(plot, PLOT_W, PLOT_H, (k) => String(Math.round(k)), 'drone limit 23')
-    expect(got.limit).toEqual(limit)
-    expect(got.peaks.map((p) => p.x)).toEqual(plot.peaks.slice(1).map((p) => p.x))
+    /* Since the 17 Nov walk the limit's words sit inside the plot (under the line when over it they would not fit), and nothing returned overlaps. */
+    expect(got.limit).toEqual({ x: 0, bottomPct: limitBottomPct(limitH, PLOT_H), text: 'drone limit 23' })
+    expect(PLOT_H * ((got.limit?.bottomPct ?? 0) / 100) + LABEL_LINE_PX).toBeLessThanOrEqual(PLOT_H + 0.001)
+    const boxes = [box(got.limit!, false), ...got.peaks.map((p) => box(p, true))]
+    for (let i = 0; i < boxes.length; i += 1) for (let j = i + 1; j < boxes.length; j += 1) expect(overlap(boxes[i], boxes[j])).toBe(false)
+    /* Under the line the words reach the second day's peak too: that one goes as well; the last three days keep theirs. */
+    expect(got.peaks.map((p) => p.x)).toEqual(plot.peaks.slice(2).map((p) => p.x))
   })
 
   it('with no drone chosen there is no limit, and every day keeps its peak', () => {
@@ -63,5 +68,20 @@ describe('the wind bar keeps its words apart', () => {
     }
     /* Something was looked at (failure-modes B). */
     expect(checked).toBeGreaterThan(600)
+  })
+})
+
+describe('the limit label stays inside the plot (Batch FIX, Section 2.7 walk)', () => {
+  it('near the top it sits under its line, never above the plot into the arrows', () => {
+    const plotH = 46
+    for (const limitH of [0.1, 0.5, 0.7, 0.8, 0.85, 0.9, 0.95, 1]) {
+      const foot = limitBottomPct(limitH, plotH)
+      const topPx = plotH * (foot / 100) + LABEL_LINE_PX
+      expect(topPx, `limit at ${limitH}`).toBeLessThanOrEqual(plotH + 0.001)
+      expect(foot).toBeGreaterThanOrEqual(0)
+    }
+  })
+  it('with room, still just over its line', () => {
+    expect(limitBottomPct(0.4, 46)).toBe(42)
   })
 })

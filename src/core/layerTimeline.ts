@@ -219,8 +219,18 @@ export interface WindLabel {
 
 /** A peak's foot: just over the taller of its bar and its gust cap, held under the plot's top. */
 export const peakBottomPct = (barTop: number): number => Math.min(80, barTop * 100 + 4)
-/** The limit's foot: just over its dashed line. */
-export const limitBottomPct = (limitH: number): number => Math.min(88, limitH * 100 + 2)
+/**
+ * The limit's foot: just over its dashed line; and when the label would not
+ * fit under the plot's top there (the 17 Nov live walk: "drone limit 23" ran
+ * up into the row of arrows above the plot), just under the line instead.
+ * `plotH` is the plot's height in px (without it, the old rule).
+ */
+export function limitBottomPct(limitH: number, plotH: number | null = null): number {
+  const above = limitH * 100 + 2
+  if (plotH === null) return Math.min(88, above)
+  const labelPct = (LABEL_LINE_PX / plotH) * 100
+  return above + labelPct <= 100 ? above : Math.max(0, limitH * 100 - 2 - labelPct)
+}
 
 export function windLabels(
   plot: WindPlot,
@@ -235,7 +245,7 @@ export function windLabels(
     return { l: left, r: left + w, t: bottom - LABEL_LINE_PX, b: bottom }
   }
   const touch = (a: ReturnType<typeof box>, b: ReturnType<typeof box>) => a.l < b.r + 2 && b.l < a.r + 2 && a.t < b.b + 1 && b.t < a.b + 1
-  const limit = plot.limitH === null || limitText === null ? null : { x: 0, bottomPct: limitBottomPct(plot.limitH), text: limitText }
+  const limit = plot.limitH === null || limitText === null ? null : { x: 0, bottomPct: limitBottomPct(plot.limitH, plotH), text: limitText }
   const taken = limit === null ? [] : [box(0, limit.bottomPct, limit.text)]
   const peaks: WindLabel[] = []
   for (const p of plot.peaks) {

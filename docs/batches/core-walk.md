@@ -71,3 +71,19 @@ Run 16 Nov 2026, 9:27 PM, with `node scripts/walk-live-more.mjs https://scoutngo
 - **Console:** the same kinds as above: cancelled requests, and overpass-api.de's 406.
 
 Found, both passes: 0 blank, 0 NaN, 0 "didn't load" on 33 screens; console errors in 3 kinds, traced above (DRONE 6.4), none a fault in this app.
+
+## Batch FIX, Section 2.7: z4 and z2 in wind mode, live tiles (17 Nov, 12:10 PM)
+
+`node scripts/walk-zoom.mjs https://scoutngo.vercel.app` on the deployed 87e0fc3. WebKit at 390 x 844 as a desktop window (mobile WebKit takes no wheel); the wheel zoomed out until the scale bar read the distance, and the bar was read back.
+
+| stop | scale bar | wind drawn (sampled pixels) | NaN | "didn't load" | readout |
+|---|---|---|---|---|---|
+| as opened | 200 ft | 13574 | 0 | 0 | 5 kt N · g7 · cross-shore here · surf 0–1 ft · Small · Cape Henry 5 kt N · 10 min ago |
+| z4 | 300 mi | 13574 | 0 | 0 | the same |
+| z2 | 1000 mi | 3562 | 0 | 0 | the same, 11 min ago |
+
+- **Drawn:** the wind field and its particles at every stop; at z2 the colour field covers the eastern US and the Atlantic (fewer sampled pixels: more of the frame is land the field leaves pale).
+- **Found, not fixed:**
+  - The readout's "5 kt N" (leaned to Cape Henry, Section 1) and the list under it, "at the marker, hour by hour", disagree at the same hour: 12 PM reads 8 kt as opened and 13 kt at z4 and z2 (the model alone, at a coarser grid point as the map zooms out).
+  - "drone limit 23", now at the left end of the wind bar (Section 2.4), sits under the row of arrows. It is clear of the peak labels, which is all the overlap check measures.
+- **Console:** overpass-api.de's 406 (asked last now, after the mirrors), and one 429 from a forecast host.
