@@ -116,6 +116,11 @@ function noaa(u) {
     const t = new Date(FIXTURE_NOW.getTime() - 6 * 60_000).toISOString().slice(0, 16).replace('T', ' ')
     return { metadata: { id: u.searchParams.get('station') ?? '', name: 'fixture', lat: '0', lon: '0' }, data: [{ t, s: '8.00', d: '225.0', dr: 'SW', g: '11.00', f: '0,0' }] }
   }
+  /* Batch FIX, Section 4: a station's latest water temperature, 14.5 °C at the fixture's now. */
+  if (u.searchParams.get('product') === 'water_temperature') {
+    const t = new Date(FIXTURE_NOW.getTime() - 6 * 60_000).toISOString().slice(0, 16).replace('T', ' ')
+    return { metadata: { id: u.searchParams.get('station') ?? '', name: 'fixture', lat: '0', lon: '0' }, data: [{ t, v: '14.5', f: '0,0,0' }] }
+  }
   const begin = u.searchParams.get('begin_date')
   const end = u.searchParams.get('end_date')
   const t0 = begin ? ymd(begin) : Date.parse(FIXTURE_NOW.toISOString().slice(0, 10))
@@ -158,6 +163,32 @@ function asosCsv(u) {
     for (const id of ids) rows.push(`${id},${new Date(t).toISOString().slice(0, 16).replace('T', ' ')},57.00,8.00,null,BKN,null,null,null,0.00,null`)
   }
   return rows.join('\n')
+}
+
+/*
+ * Batch FIX, Section 4: the satellite's sea temperature (MUR through ERDDAP,
+ * asked by api/sst.ts): the box the query names, every cell 15.0 °C, the day
+ * before the fixture's now. Real answers are in tests/data/water-2026-11-17.
+ */
+function murTable(u) {
+  const q = decodeURIComponent(u.search)
+  const m = /\[\(([-\d.]+)\):(\d+):\(([-\d.]+)\)\]\[\(([-\d.]+)\):(\d+):\(([-\d.]+)\)\]/.exec(q)
+  const rows = []
+  if (m !== null) {
+    const step = 0.01 * Number(m[2])
+    const day = new Date(FIXTURE_NOW.getTime() - 86_400_000).toISOString().slice(0, 10)
+    for (let lat = Number(m[1]); lat <= Number(m[3]) + 1e-9; lat += step) {
+      for (let lon = Number(m[4]); lon <= Number(m[6]) + 1e-9; lon += step) rows.push([`${day}T09:00:00Z`, Math.round(lat * 100) / 100, Math.round(lon * 100) / 100, 15.0])
+    }
+  }
+  return { table: { columnNames: ['time', 'latitude', 'longitude', 'analysed_sst'], columnTypes: ['String', 'float', 'float', 'double'], columnUnits: ['UTC', 'degrees_north', 'degrees_east', 'degree_C'], rows } }
+}
+
+/* USGS instantaneous water temperature for each site asked: 14.0 °C, 15 minutes before the fixture's now. */
+function usgsIv(u) {
+  const at = new Date(FIXTURE_NOW.getTime() - 15 * 60_000).toISOString().replace('Z', '+00:00')
+  const sites = (u.searchParams.get('sites') ?? '').split(',').filter((s) => s !== '')
+  return { value: { timeSeries: sites.map((id) => ({ sourceInfo: { siteName: 'FIXTURE GAUGE', siteCode: [{ value: id }] }, variable: { noDataValue: -999999 }, values: [{ value: [{ value: '14.0', dateTime: at }] }] })) } }
 }
 
 const json = (value, fixture) => ({ status: 200, type: 'application/json', body: Buffer.from(JSON.stringify(value)), fixture })
@@ -208,6 +239,8 @@ export async function answer(href) {
   if (host === 'www.ndbc.noaa.gov' && u.pathname.endsWith('.spec')) return text(NDBC_SPEC, 'text/plain', 'NDBC spectral summary')
   if (host === 'www.ndbc.noaa.gov') return text(NDBC_TEXT, 'text/plain', 'NDBC buoy text')
   if (host === 'aviationweather.gov') return text(METAR, 'text/plain', 'METAR text')
+  if (host === 'coastwatch.pfeg.noaa.gov') return json(murTable(u), 'satellite sea temperature')
+  if (host === 'waterservices.usgs.gov') return json(usgsIv(u), 'USGS water temperature')
   /* Soundings: none launched in the fixture's world; radar: no echoes (a clear tile). */
   if (host === 'mesonet.agron.iastate.edu' && u.pathname.startsWith('/json/raob')) return json({ profiles: [] }, 'no sounding')
   if (host === 'mesonet.agron.iastate.edu' && u.pathname.startsWith('/cgi-bin/request/asos.py')) return text(asosCsv(u), 'text/plain', 'station reports')

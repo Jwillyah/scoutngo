@@ -261,3 +261,13 @@ describe('one surf series (Batch FIX, Section 3.3)', () => {
     expect(render()).not.toContain('Poor · choppy')
   })
 })
+
+/* Batch FIX, Section 4: the header carries the water line (src/components/WaterLine.tsx), under the size line. */
+describe('the water line in the header', () => {
+  it('sits under the size', () => {
+    const html = render({ water: <span className="dhead__line" data-water="coops">Water 58° · 4/3</span> })
+    const size = html.indexOf('class="dhead__line"')
+    expect(size).toBeGreaterThan(-1)
+    expect(html.indexOf('Water 58° · 4/3')).toBeGreaterThan(size)
+  })
+})

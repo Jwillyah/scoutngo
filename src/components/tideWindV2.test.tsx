@@ -71,8 +71,9 @@ describe('TideContent', () => {
     expect(html).toContain('Range today')
     expect(html).toContain('>3.6 ft<')
     expect(html).toMatch(/moon \d+%/)
-    expect(html).toContain('>61°F<')
-    expect(html).toContain('4/3 typical')
+    /* Batch FIX, Section 4: the Water tile is measured only; the model's 16 °C sea surface (61°F) is never said. */
+    expect(html).toContain('asking the nearest stations')
+    expect(html).not.toContain('61°F')
   })
   it('counts mirror mornings from the one function, and says the rule', () => {
     expect(html).toContain('Mirror mornings')
@@ -89,9 +90,9 @@ describe('TideContent', () => {
     expect(none).toContain('>—<')
     expect(none).toContain('Far Point')
   })
-  it('says the water is not known, and that it is asking again, when the sea forecast did not load (Batch Map A4)', () => {
+  it('asks the measured water whatever the sea forecast did (Batch FIX, Section 4; it said the forecast had not loaded, Batch Map A4)', () => {
     const dry = renderToStaticMarkup(<TideContent now={NOW} tide={TIDE} data={{ ...DATA, marine: { value: null, savedAt: null, status: 'failed' } }} venue={VB} placeName="Sandbridge" timeZone={NY} units={DEFAULT_UNITS} />)
-    expect(dry).toContain('sea forecast didn’t load · retrying')
+    expect(dry).toContain('asking the nearest stations')
   })
   it('instructs nothing and promises nothing', () => {
     expect(html.replace(/<[^>]+>/g, ' ')).not.toMatch(BANNED)
@@ -104,7 +105,8 @@ describe('TideHow', () => {
     expect(html).toContain('NOAA 8639348, Sandbridge')
     expect(html).toContain('MLLW')
     expect(html).toContain('Predictions, not observations')
-    expect(html).toContain('Open-Meteo Marine')
+    expect(html).toContain('Water temperature: measured only')
+    expect(html).toContain('Never worked out from the air')
     expect(html.replace(/<[^>]+>/g, ' ')).not.toMatch(BANNED)
   })
 })

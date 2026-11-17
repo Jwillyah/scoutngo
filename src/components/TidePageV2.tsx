@@ -7,13 +7,13 @@ import { SPRING_WITHIN, tideWeek } from '../core/moonTides.ts'
 import { sunriseOn } from '../core/sunrise.ts'
 import { directionAt, levelAt, STATION_LOCAL_KM } from '../core/tide.ts'
 import { formatClock, formatShortHour } from '../core/timezone.ts'
-import { wetsuitFor } from '../core/wetsuit.ts'
+import { WaterTile } from './WaterLine.tsx'
 import { dayRangeFeet, moonLitPercent, nextTurns, SCRUB_RETURN_MS, springOrNeap, SPRING_OVER, typicalRangeFeet, tideDayWindow, tideHeight, timeAtShare, untilWords } from '../core/tideWindow.ts'
 import type { DetailId } from '../lib/detailTabs.ts'
 import { hourlyAt } from '../lib/tideSheetData.ts'
 import { useTide, type TideInfo } from '../lib/useTide.ts'
 import { useTideSheet, type TideSheetData } from '../lib/useTideSheet.ts'
-import { formatRange, formatTemperature, formatWind, type Units } from '../lib/units.ts'
+import { formatRange, formatWind, type Units } from '../lib/units.ts'
 import { DCard, DetailShell } from './DetailShell.tsx'
 import { saneTide } from '../core/sanity.ts'
 
@@ -147,9 +147,6 @@ export function TideContent({ now, tide, data, venue, placeName, timeZone, units
   /* Batch Beach, Section 2: spring or neap from the moon AND this station's own typical day. */
   const typical = typicalRangeFeet([...extremes, ...(data.month.value ?? [])], timeZone)
   const kind = springOrNeap(week?.kind ?? null, range, typical)
-  const marine = data.marine.value !== null && data.marine.value !== 'inland' ? data.marine.value : null
-  const waterC = marine === null ? null : hourlyAt(marine, 'sea_surface_temperature', now)
-  const suit = wetsuitFor(waterC)
   const mirror = mornings.filter((m) => (m.mark === 'glass' || m.mark === 'surf-glass') && m.sunrise !== null && m.sunrise.getTime() > now.getTime() - 3_600_000)
   const tideOnly = mornings.filter((m) => m.mark === 'tide-only')
   const next = turns.next
@@ -238,18 +235,8 @@ export function TideContent({ now, tide, data, venue, placeName, timeZone, units
           </p>
         </DCard>
         <DCard label="Water" className="dtide__tile">
-          <p className="dtide__big">{waterC === null ? '—' : formatTemperature(waterC, units.temperature)}</p>
-          <p className="dtide__line">
-            {waterC === null || suit === null
-              ? data.marine.value === 'inland'
-                ? 'no open sea here'
-                : data.marine.status === 'loading'
-                  ? 'waiting for the sea forecast'
-                  : data.marine.status === 'failed'
-                    ? 'sea forecast didn’t load · retrying'
-                    : 'the sea forecast did not say'
-              : `${suit.suit} typical`}
-          </p>
+          {/* Batch FIX, Section 4: measured only (a station, the satellite, a river gauge), never the model's sea surface. */}
+          <WaterTile at={venue} unit={units.temperature} miles={units.distance === 'ft'} bigClass="dtide__big" lineClass="dtide__line" />
         </DCard>
       </div>
 
@@ -307,7 +294,7 @@ export function TideContent({ now, tide, data, venue, placeName, timeZone, units
 }
 
 /** "How we got this": the station, the datum, predictions not observations, the sea's source. Short lines. */
-export function TideHow({ tide, data, units }: { tide: TideInfo; data: TideSheetData; units: Units }) {
+export function TideHow({ tide, units }: { tide: TideInfo; data: TideSheetData; units: Units }) {
   const ok = tide.status === 'ok' ? tide : null
   return (
     <>
@@ -326,7 +313,7 @@ export function TideHow({ tide, data, units }: { tide: TideInfo; data: TideSheet
         </>
       )}
       <p>Spring or neap: from the moon’s phase (suncalc) and this station’s own table. Within {SPRING_WITHIN} of a cycle (about 3 days) of a new or full moon, and today’s range at least {SPRING_OVER} times the station’s typical day (the median day over NOAA’s month), is spring; a half moon and a smaller day than typical, neap. Without a month of the station’s turns, neither is said.</p>
-      <p>Water temperature: Open-Meteo Marine’s sea-surface forecast for this hour, a model, not a buoy.{data.marine.savedAt === null ? '' : ' Saved copy.'}</p>
+      <p>Water temperature: measured only. The nearest NOAA station or buoy within 15 km (CO-OPS, NDBC); on the open sea with none that close, NASA’s MUR satellite analysis from the day before (NOAA CoastWatch); else a USGS river gauge within 5 km. Never worked out from the air. Each with its distance and age.</p>
       <p>Wetsuit: the thickness chart wetsuit makers print. A convention; brands differ by a few degrees.</p>
       <p>
         Mirror mornings: a low within {LOW_NEAR_SUNRISE_MIN} min of sunrise, and wind at sunrise under {formatWind(GLASSY_MPS, units.wind)} or offshore (Open-Meteo, 16 days).

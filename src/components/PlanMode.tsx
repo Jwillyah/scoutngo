@@ -2809,6 +2809,7 @@ export function PlanMode({
             windModel={windModel}
             windAt={scrubbedAt}
             windUnit={units.wind}
+            windTempUnit={units.temperature}
             windSpot={venue}
             windFacing={windFacing !== null && windFacing.key === windSpotKey ? windFacing.deg : null}
             windHeadline={windHeadline}

@@ -12,6 +12,7 @@ Every function in `api/` writes no log line: no `console.*` call, no request bod
 | `/api/metar` | A station id | POST body |
 | `/api/pirep` | A station id (pilot reports within 100 miles of it) | POST body |
 | `/api/buoy` | A buoy number | POST body |
+| `/api/sst` | The spot snapped to a half degree (about 55 km; anything finer is refused), only for a spot on the sea with no water-temperature station within 15 km. It asks NOAA CoastWatch's ERDDAP for that box (the cell is then in its outgoing URL) | POST body |
 | `/api/nhc` | Nothing, or one storm's NHC product URL (which storm is near is worked out on the phone) | POST body |
 | `/api/search` | What you typed, and a proximity point | POST body |
 | `/api/streetview` | The spot being considered | POST body |
@@ -40,7 +41,7 @@ Vercel's request logs cannot be switched off. They are kept small by:
 2. **No log drains** configured. A drain would copy every request elsewhere. Check: Project › Settings › Log Drains is empty.
 3. **No Web Analytics, no Speed Insights**: neither package is in `package.json`. Check: Project › Analytics and Speed Insights are disabled.
 4. **Coordinates in bodies, not URLs**, everywhere a URL is not required (search, Street View); station and buoy ids in bodies too.
-5. **Coarse where a URL is required**: 0.05° for the forecast cache; 2 decimals for the calendar feed.
+5. **Coarse where a URL is required**: 0.05° for the forecast cache; 2 decimals for the calendar feed; half a degree for the satellite sea temperature's onward request (`/api/sst`).
 6. **Phone first**: Open-Meteo, NOAA, NWS and the map tiles are asked by the phone directly, so Vercel never sees those requests.
 
 Items 1–3 are dashboard settings this repo cannot see. Jwilly should confirm them once in the Vercel dashboard.

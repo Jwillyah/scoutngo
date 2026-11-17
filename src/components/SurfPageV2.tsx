@@ -37,6 +37,8 @@ import { useSpotSkill } from '../lib/useSpotSkill.ts'
 import type { SurfSea } from '../lib/useSurfSea.ts'
 import { DCard, DetailShell } from './DetailShell.tsx'
 import { FieldReportCard } from './FieldReportCard.tsx'
+import { WaterLine } from './WaterLine.tsx'
+import type { ReactNode } from 'react'
 
 /*
  * SURF, HONEST (Batch N, Section 1; boards "DETAIL v2 · Surf").
@@ -105,7 +107,7 @@ export function SurfPageV2({ venue, placeName, timeZone, units, ground, onBack, 
 
   return (
     <DetailShell id="surf" ground={ground} onBack={onBack} onSwitch={onSwitch} onMap={onMap} how={<SurfHow sea={sea} stats={skill.stats} away={awayWords} placeName={placeName} spot={spot} today={venueToday(now, timeZone)} />}>
-      <SurfBody now={now} timeZone={timeZone} spot={spot} spotName={awayWords?.name ?? placeName} away={awayWords} sea={sea} stats={skill.stats} kept={kept} shoot={shootPicked(picked)} cam={cam} miles={units.distance === 'ft'} station={station} />
+      <SurfBody now={now} timeZone={timeZone} spot={spot} spotName={awayWords?.name ?? placeName} away={awayWords} sea={sea} stats={skill.stats} kept={kept} shoot={shootPicked(picked)} cam={cam} miles={units.distance === 'ft'} station={station} water={<WaterLine at={spot} unit={units.temperature} miles={units.distance === 'ft'} className="dhead__line" source />} />
     </DetailShell>
   )
 }
@@ -126,11 +128,13 @@ export interface SurfBodyProps {
   miles: boolean
   /** The station's report near now (src/lib/useStationObs.ts); absent or null: the forecast's wind alone. */
   station?: StationObs | null
+  /** Batch FIX, Section 4: the header's water line ("Water 58° · 4/3", src/components/WaterLine.tsx). */
+  water?: ReactNode
 }
 
 
 /** The page's body, from data in hand (rendered on its own in tests). */
-export function SurfBody({ now, timeZone, spot, spotName, away, sea, stats, kept, shoot, cam, miles, station = null }: SurfBodyProps) {
+export function SurfBody({ now, timeZone, spot, spotName, away, sea, stats, kept, shoot, cam, miles, station = null, water = null }: SurfBodyProps) {
   const clock = (t: Date) => formatClock(t, timeZone)
   const { marine, wind, facing, factor } = sea
   const today = venueToday(now, timeZone)
@@ -198,6 +202,7 @@ export function SurfBody({ now, timeZone, spot, spotName, away, sea, stats, kept
             ? 'The forecast did not say for this hour'
             : [rangeSizeWords(headCall.lowFt, headCall.highFt), headCall.wind, period?.words ?? null].filter((x) => x !== null).join(' · ')}
         </p>
+        {water}
         {/* Batch MAP2, Section 1 (board LOOKS · Surf, S7): the top two parts of the sea, each its own bar, height · period, and an arrow the way it goes. */}
         {parts.length === 0 ? null : (
           <div className="dsurf__parts" data-swell-parts>

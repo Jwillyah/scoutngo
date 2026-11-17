@@ -33,6 +33,8 @@ import { DroneAirspace } from './DroneAirspace.tsx'
 import { DroneHeightView } from './DroneHeight.tsx'
 import { DroneNowView, type DroneCardsData } from './DroneNow.tsx'
 import { DronePlanView } from './DronePlan.tsx'
+import { waterFogWords } from '../core/waterTemp.ts'
+import { useWaterTemp } from '../lib/waterTemp.ts'
 import { PageShell } from './PageShell.tsx'
 
 /*
@@ -105,6 +107,8 @@ export function DronePage({ venue: spot, placeName, timeZone, units, now, drone,
   const online = typeof navigator === 'undefined' ? true : navigator.onLine
   const station = useStationNow(venue, now, online)
   const near = useStationObs(venue)
+  /* Batch FIX, Section 4: the measured water, for the lens fog row (src/core/waterTemp.ts). */
+  const water = useWaterTemp(venue)
   const clock = (d: Date) => formatClock(d, timeZone)
   const hourWord = (d: Date) => clock(d).replace(/:00 /, ' ')
   const spanWords = (from: Date, to: Date) => formatSpan(hourWord(from), hourWord(to))
@@ -294,7 +298,7 @@ export function DronePage({ venue: spot, placeName, timeZone, units, now, drone,
         ? { big: 'Not forecast', line: 'The forecast did not give the dew point.' }
         : {
             big: la.icing ? 'Icing possible' : la.fog === 'likely' ? 'Lens may fog' : la.fog === 'possible' ? 'Fog possible' : 'Lens fog unlikely',
-            line: `Dew point ${temp(dewC)} vs ${temp(tempC)} · ${temp(la.aloftC)} at 400 ft`,
+            line: `Dew point ${temp(dewC)} vs ${temp(tempC)} · ${temp(la.aloftC)} at 400 ft${water.status === 'ok' ? ` · ${waterFogWords(water.reading.c, dewC, temp)}` : ''}`,
           },
     lastFlight:
       keptHere === null

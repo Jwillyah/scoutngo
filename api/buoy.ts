@@ -58,6 +58,27 @@ export function parseRealtimeWind(text: string): { at: string; mps: number; from
 }
 
 /*
+ * THE WATER'S TEMPERATURE (Batch FIX, Section 4): the newest line with a
+ * WTMP, in °C, from the same file. Not every buoy carries the sensor; one
+ * that does not says "MM" and this is null.
+ */
+export function parseRealtimeWater(text: string): { at: string; c: number } | null {
+  const lines = text.split('\n')
+  const head = lines[0]?.replace(/^#/, '').trim().split(/\s+/) ?? []
+  const iw = head.indexOf('WTMP')
+  if (iw < 0) return null
+  for (const line of lines) {
+    if (line.startsWith('#') || line.trim() === '') continue
+    const f = line.trim().split(/\s+/)
+    const c = value(f[iw])
+    if (c === null) continue
+    const [yy, mm, dd, hh, mi] = f
+    return { at: `${yy}-${mm}-${dd}T${hh}:${mi}:00Z`, c }
+  }
+  return null
+}
+
+/*
  * THE SWELL AND THE WIND WAVES, APART (Batch H). NDBC's spectral summary
  * (<station>.spec) splits the sea into one swell and one wind-wave part:
  * height, period and the direction each comes from, in compass words. That
@@ -119,9 +140,10 @@ export async function POST(request: Request): Promise<Response> {
     const text = await response.text()
     const latest = parseRealtime(text)
     const wind = parseRealtimeWind(text)
+    const water = parseRealtimeWater(text)
     const spec = specResponse !== null && specResponse.ok ? parseSpec(await specResponse.text()) : null
-    if (latest === null) return Response.json({ status: 'no-waves', message: 'This buoy reports no wave height lately.', station, wind, spec })
-    return Response.json({ status: 'ok', station, ...latest, wind, spec })
+    if (latest === null) return Response.json({ status: 'no-waves', message: 'This buoy reports no wave height lately.', station, wind, water, spec })
+    return Response.json({ status: 'ok', station, ...latest, wind, water, spec })
   } catch {
     return Response.json({ status: 'unavailable', message: 'Could not reach NDBC.' })
   }

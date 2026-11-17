@@ -15,6 +15,8 @@ import { windIn, windUnitLabel, type WindUnit } from '../lib/units.ts'
 import { usePointWind, type WindLevel, type WindModelChip } from '../lib/useWindViewport.ts'
 import { stationLine, surfCallLine, swellLine, windLine } from '../core/markerReadout.ts'
 import { LayerMarker } from './LayerMarker.tsx'
+import { waterHead } from '../core/waterTemp.ts'
+import { useWaterTemp } from '../lib/waterTemp.ts'
 import '../styles/wind.css'
 
 /*
@@ -64,9 +66,11 @@ interface Props {
   /** The model and height asked, for the marker's own fine-grid reading (usePointWind). */
   model?: WindModelChip
   level?: WindLevel
+  /** Batch FIX, Section 4: the water's temperature at the marker, at sea, in this unit. */
+  tempUnit?: 'F' | 'C'
 }
 
-export function WindLayerV3({ map, field, unit, spot, facing, headline = null, status, when = null, marker, fetchAt = null, onRetry, model = 'blend', level = '10m' }: Props) {
+export function WindLayerV3({ map, field, unit, spot, facing, headline = null, status, when = null, marker, fetchAt = null, onRetry, model = 'blend', level = '10m', tempUnit = 'F' }: Props) {
   const colour = useRef<HTMLCanvasElement>(null)
   const trails = useRef<HTMLCanvasElement>(null)
   /* The screen's velocity grid, rebuilt when the map settles: px/s east and down per CELL_PX cell. */
@@ -352,6 +356,9 @@ export function WindLayerV3({ map, field, unit, spot, facing, headline = null, s
   }, [sea, ck, whenMs])
   const surfHere = surfSpot === null ? null : surfHourOf(surf.series, whenMs === null ? surfNow : new Date(whenMs), 0)
   const swell = markerSwell === null || markerSwell.fromDeg === null ? null : { ft: markerSwell.ft, s: markerSwell.periodS, fromDeg: markerSwell.fromDeg }
+  /* Batch FIX, Section 4: at sea (the swell line is said), the measured water at the marker: "Water 58° · 4/3". */
+  const water = useWaterTemp(swell === null ? null : centre)
+  const waterText = swell === null || water.status !== 'ok' ? null : waterHead(water.reading.c, tempUnit)
 
   const say = (mps: number | null) => (mps === null ? null : windIn(mps, unit))
   const side = here === null || facing === null || spot === null || centre === null || distanceMeters(spot, centre) > 3000 ? null : windToBeach(here.fromDeg, facing)
@@ -382,6 +389,7 @@ export function WindLayerV3({ map, field, unit, spot, facing, headline = null, s
           [windLine(say(here.speedMps), here.fromDeg, say(here.gust), u), side === null ? null : `${side === 'cross' ? 'cross-shore' : side} here`].filter((x) => x !== null).join(' · '),
           surfHere !== null ? surfCallLine(surfHere.call) : swell === null ? null : swellLine(swell.ft, swell.s, swell.fromDeg),
           stationText,
+          waterText,
         ].filter((x): x is string => x !== null)
   const atSpot = spot !== null && centre !== null && distanceMeters(spot, centre) < 30
 

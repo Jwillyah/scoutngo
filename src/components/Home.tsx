@@ -45,6 +45,7 @@ import { HomeHours } from './HomeHours.tsx'
 import { fitChartLabels } from '../lib/chartLabelsDom.ts'
 import { LiveSkyDraw } from './LiveSky.tsx'
 import { useLiveSky } from '../lib/useLiveSky.ts'
+import { WaterLine } from './WaterLine.tsx'
 
 /*
  * THE HOME (Batch M, Section 3; boards "HOME 8 Nov · surfer / shooter").
@@ -430,7 +431,7 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
       ) : (
         <div className={`hcards hcards--${layout}`}>
           {cardsShown.map((c) => (
-            <Card key={c} kind={c} layout={layout} which={which} day={day} brief={brief} units={units} drone={drone} now={now} venue={venue} timeZone={timeZone} onOpen={onOpen} surf={surf} obs={obs} />
+            <Card key={c} kind={c} layout={layout} which={which} day={day} brief={brief} units={units} drone={drone} now={now} venue={venue} timeZone={timeZone} onOpen={onOpen} surf={surf} obs={obs} water={which === 'today' && c === (cardsShown.includes('surf') ? 'surf' : 'tide')} />
           ))}
         </div>
       )}
@@ -614,6 +615,8 @@ interface CardProps {
   /** Batch Map A2: the spot's surf (src/lib/useSurfNow.ts); when away, the nearest surf beach's name and how far. */
   surf: SurfNow
   obs: StationNow | null
+  /** Batch FIX, Section 4: "Water 58° · 4/3" under the size: on the Surf card, else the Tide card (Fish's). */
+  water?: boolean
 }
 
 const CHART = { w: 300, h: 70 }
@@ -625,7 +628,7 @@ const CHART = { w: 300, h: 70 }
  * curve with its turns, the sky's light strip, the drone's height ladder,
  * the moon's phase. Every number is the code's (src/core/homeCards.ts).
  */
-function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZone, onOpen, surf, obs }: CardProps) {
+function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZone, onOpen, surf, obs, water = false }: CardProps) {
   const clock = (d: Date) => formatClock(d, timeZone)
   const short = (d: Date) => clock(d).replace(/:00 /, ' ')
   const speed = (mps: number | null) => (mps === null ? '—' : `${Math.round(windIn(mps, units.wind) ?? 0)}`)
@@ -878,7 +881,16 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
           {/* No line, no placeholder (Batch QA, Section 0B: a stray "—" under the Drone card's number). */}
           {(() => {
             const said = small && tag !== null && kind !== 'sky' ? tag : line
-            return said === null || said === '' ? null : <span className="hcard__line" {...(shared === null ? {} : { 'data-shared': shared.key, 'data-value': shared.value })}>{said}</span>
+            /* Batch FIX, Section 4: the water rides on the line under the size ("knee to waist · 8 s · Water 58° · 4/3"), so the card grows no line and the home still fits. */
+            const wet = water && surf.away === null ? <WaterLine at={venue} unit={units.temperature} miles={units.distance === 'ft'} className="hcard__water" lead={said === null || said === '' ? '' : ' · '} /> : null
+            if (said === null || said === '') return wet === null ? null : <span className="hcard__line">{wet}</span>
+            if (wet === null) return <span className="hcard__line" {...(shared === null ? {} : { 'data-shared': shared.key, 'data-value': shared.value })}>{said}</span>
+            return (
+              <span className="hcard__line">
+                <span {...(shared === null ? {} : { 'data-shared': shared.key, 'data-value': shared.value })}>{said}</span>
+                {wet}
+              </span>
+            )
           })()}
         </span>
         {kind === 'wind' || kind === 'moon' ? pic : null}

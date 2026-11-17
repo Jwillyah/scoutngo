@@ -1,0 +1,17 @@
+/*
+ * THE WATER'S TEMPERATURE LINE (Batch FIX, Section 4; src/components/WaterLine.tsx).
+ * The head takes the screen's own line style; the source under it is 12 px,
+ * dimmer, and never wraps mid-word.
+ */
+span[data-water] {
+  display: block;
+}
+.waterline__from {
+  display: block;
+  font-size: var(--text-xs);
+  opacity: 0.75;
+}
+/* On the home card it rides on the line under the size, in the same run of text (Batch FIX, Section 4: the home must still fit). */
+span[data-water].hcard__water {
+  display: inline;
+}
