@@ -188,6 +188,7 @@ const Viewfinder = lazyPage(() => import('./components/Viewfinder.tsx').then((m)
 const ViewfinderNeedsPlace = lazyPage(() => import('./components/Viewfinder.tsx').then((m) => ({ default: m.ViewfinderNeedsPlace })))
 const WeatherPage = lazyPage(() => import('./components/WeatherPage.tsx').then((m) => ({ default: m.WeatherPage })))
 const SkyPage = lazyPage(() => import('./components/SkyPage.tsx').then((m) => ({ default: m.SkyPage })))
+const SunMoonNightPage = lazyPage(() => import('./components/SunMoonNightPage.tsx').then((m) => ({ default: m.SunMoonNightPage })))
 const BestSkyPage = lazyPage(() => import('./components/BestSkyPage.tsx').then((m) => ({ default: m.BestSkyPage })))
 const DronePage = lazyPage(() => import('./components/DronePage.tsx').then((m) => ({ default: m.DronePage })))
 
@@ -1454,6 +1455,8 @@ function App() {
   const [skyOpen, setSkyOpen] = useState(false)
   /* Batch BEST SKY: "Where's the color?". */
   const [bestSkyOpen, setBestSkyOpen] = useState(false)
+  /* Batch DRONE, Section 4: Sun · Moon · Night, its own page (from the Sky page and the home's Moon card); 'auto' opens on the tab the hour wants. */
+  const [smnOpen, setSmnOpen] = useState<'sun' | 'moon' | 'night' | 'auto' | null>(null)
   /* Batch Flow, Section 5: the Drone page, first from the home's Drone card and the menu's. */
   const [droneOpen, setDroneOpen] = useState(false)
   useEffect(() => {
@@ -1510,7 +1513,7 @@ function App() {
     drawer: 'kit',
     tick: 0,
   })
-  const [cardRequest, setCardRequest] = useState<{ kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'buoys' | 'wind' | 'terrain' | 'preflight' | 'calendar' | 'fly'; skyTab?: 'now' | 'fire'; calFilters?: ('surf' | 'sky' | 'glassy' | 'tide' | 'moon')[]; tick: number }>({
+  const [cardRequest, setCardRequest] = useState<{ kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'buoys' | 'wind' | 'terrain' | 'preflight' | 'calendar' | 'fly' | 'moonrise'; skyTab?: 'now' | 'fire'; calFilters?: ('surf' | 'sky' | 'glassy' | 'tide' | 'moon')[]; tick: number }>({
     kind: 'sky',
     tick: 0,
   })
@@ -1665,9 +1668,8 @@ function App() {
         setCardRequest((r) => ({ kind: 'calendar', tick: r.tick + 1 }))
         return
       case 'moon':
-        /* The sun, the moon and the night as swipe pages: the Sky sheet's one other view. */
-        setMode('plan')
-        setCardRequest((r) => ({ kind: 'sky', skyTab: 'now', tick: r.tick + 1 }))
+        /* Batch DRONE, Section 4: the Sun · Moon · Night page, on the moon. */
+        setSmnOpen('moon')
         return
     }
   }  /* Batch CORE, Section 6.1: asked for from the landing, Best Sky opens the first time the home has a spot. */
@@ -2788,6 +2790,11 @@ function App() {
             setCardRequest((r) => ({ kind: 'calendar', calFilters: ['sky', 'moon'], tick: r.tick + 1 }))
           }}
           onDetail={(view) => {
+            /* Batch DRONE, Section 4: "Sun, moon, night ›" opens its own page, over the Sky page. */
+            if (view === 'now') {
+              setSmnOpen('auto')
+              return
+            }
             setSkyOpen(false)
             setBriefOpen(false)
             setMode('plan')
@@ -2795,6 +2802,32 @@ function App() {
           }}
           onBestSky={() => setBestSkyOpen(true)}
         />
+        </Suspense>
+      ) : null}
+      {smnOpen !== null && centre !== null ? (
+        <Suspense fallback={null}>
+          <SunMoonNightPage
+            venue={centre}
+            placeName={venueShort}
+            timeZone={venueWindow?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}
+            now={briefNow}
+            initial={smnOpen === 'auto' ? undefined : smnOpen}
+            onBack={() => setSmnOpen(null)}
+            onMap={() => {
+              setSmnOpen(null)
+              setSkyOpen(false)
+              setBriefOpen(false)
+              setMode('plan')
+            }}
+            onPlanMoonrise={() => {
+              /* The map's Moonrise card: the same night, worked into a shot list. */
+              setSmnOpen(null)
+              setSkyOpen(false)
+              setBriefOpen(false)
+              setMode('plan')
+              setCardRequest((r) => ({ kind: 'moonrise', tick: r.tick + 1 }))
+            }}
+          />
         </Suspense>
       ) : null}
       {bestSkyOpen && centre !== null ? (

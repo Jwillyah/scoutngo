@@ -87,3 +87,73 @@ export function moonPosition2(t: Date, lat: number, lon: number): { azimuth: num
   const parallax = Math.asin(6378.14 / distanceKm) / DEG
   return { azimuth: geo.azimuth, altitude: geo.altitude - parallax * cos(geo.altitude), distanceKm }
 }
+
+/* ------------------------------------------------------------------ times */
+/*
+ * RISE, SET AND TWILIGHT FROM THIS EPHEMERIS, so the times the Sun · Moon ·
+ * Night page prints (src/core/sunMoonNight.ts, from suncalc) can be held
+ * against a second source (src/core/sunMoonNight.ephemeris.test.ts). Nothing
+ * on screen reads these: they are the check, not the answer.
+ *
+ * CONVENTIONS, each the standard one, stated so a disagreement is the
+ * ephemeris and not the definition:
+ *
+ *   sunrise, sunset   the sun's centre at -0.833° geometric (34' of
+ *                     refraction and a 16' semidiameter), as USNO
+ *   moonrise, moonset the moon's upper limb on the horizon: its topocentric
+ *                     centre at -(34' + semidiameter), the semidiameter from
+ *                     its distance (Meeus chapter 15)
+ *   twilight heights  the app measures golden +6°, blue -4° and dark -6° on
+ *                     the APPARENT altitude (refraction in). Refraction here
+ *                     is Saemundsson's (Meeus 16.4), held at its horizon value
+ *                     below the horizon, where the formula does not apply.
+ */
+/** Apparent altitude from geometric, Meeus 16.4, in degrees. */
+export function apparent2(h: number): number {
+  const at = Math.max(h, 0)
+  return h + 1.02 / Math.tan((at + 10.3 / (at + 5.11)) * DEG) / 60
+}
+
+/** Every time `altAt` crosses `deg` between `from` and `to`, rising or falling, to the second. */
+export function crossings2(altAt: (t: Date) => number, from: Date, to: Date, deg: number): { at: Date; rising: boolean }[] {
+  const STEP = 5 * 60_000
+  const out: { at: Date; rising: boolean }[] = []
+  let a = from.getTime()
+  let fa = altAt(from) - deg
+  for (let b = a + STEP; a < to.getTime(); a = b, b += STEP) {
+    const fb = altAt(new Date(b)) - deg
+    if (fa === 0 || fa * fb < 0) {
+      let lo = a
+      let hi = b
+      const flo = fa
+      while (hi - lo > 1000) {
+        const m = (lo + hi) / 2
+        const fm = altAt(new Date(m)) - deg
+        if ((fm > 0) === (flo > 0)) lo = m
+        else hi = m
+      }
+      out.push({ at: new Date((lo + hi) / 2), rising: fb > fa })
+    }
+    fa = fb
+  }
+  return out
+}
+
+/** The sun's centre at -0.833° geometric between two instants. */
+export function sunRiseSet2(from: Date, to: Date, lat: number, lon: number): { at: Date; rising: boolean }[] {
+  return crossings2((t) => sunPosition2(t, lat, lon).altitude, from, to, -0.833)
+}
+
+/** The sun's apparent centre at `deg` between two instants (the twilight heights). */
+export function sunApparentCrossings2(from: Date, to: Date, lat: number, lon: number, deg: number): { at: Date; rising: boolean }[] {
+  return crossings2((t) => apparent2(sunPosition2(t, lat, lon).altitude), from, to, deg)
+}
+
+/** The moon's upper limb on the horizon between two instants. */
+export function moonRiseSet2(from: Date, to: Date, lat: number, lon: number): { at: Date; rising: boolean }[] {
+  const limb = (t: Date) => {
+    const m = moonPosition2(t, lat, lon)
+    return m.altitude + 34 / 60 + Math.asin(1737.4 / m.distanceKm) / DEG
+  }
+  return crossings2(limb, from, to, 0)
+}

@@ -403,7 +403,7 @@ interface PlanModeProps {
   /** The menu asked for a card: Sky or About. The tick makes a repeat ask open it again. */
   /** Batch H: opens the Viewfinder (App's), from the Preflight card. */
   onViewfinder?: () => void
-  cardRequest: { kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'buoys' | 'wind' | 'terrain' | 'preflight' | 'calendar' | 'fly'; skyTab?: SkyTab; calFilters?: CalCat[]; tick: number }
+  cardRequest: { kind: 'sky' | 'settings' | 'about' | 'callsheet' | 'exposure' | 'tides' | 'surf' | 'buoys' | 'wind' | 'terrain' | 'preflight' | 'calendar' | 'fly' | 'moonrise'; skyTab?: SkyTab; calFilters?: CalCat[]; tick: number }
   /** Batch Polish, Section 1: the home is over the map. */
   covered?: boolean
   /** Called once the map is on screen (nothing over it); the venue's offline save waits for it. */

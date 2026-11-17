@@ -1,0 +1,303 @@
+/*
+ * SUN · MOON · NIGHT (Batch DRONE, Section 4; boards SkySun, SkyMoon, SkyB2n)
+ * in Look D: the frosted dcard, the Sky page's pills (.spage__seg), the data
+ * colours keeping their meaning (--sun, --sun-set, --moon). The page is
+ * .smn on the page shell (src/components/SunMoonNightPage.tsx). It scrolls
+ * up and down; nothing in it scrolls sideways (scripts/audit-overflow.mjs):
+ * the fourteen moons are two rows of seven.
+ */
+.smn__seg {
+  align-self: stretch;
+}
+
+/* ------------------------------------------------------------ the heroes */
+.smn__hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 12px;
+  padding: 18px 18px 16px;
+}
+.smn__hero > * {
+  grid-column: 1 / -1;
+}
+.smn__hero .smn__heroText {
+  grid-column: 1;
+  min-width: 0;
+}
+.smn__hero .smn__bigmoon {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+}
+.smn__kicker {
+  margin: 0;
+  color: var(--glass-ink-2);
+}
+.smn__title {
+  margin: 2px 0 0;
+  font-size: 34px;
+  line-height: 1.08;
+  font-weight: var(--weight-medium);
+}
+/* Beside a drawn moon the line is narrower: "Sets 11:08 PM" stays one line at 390. */
+.smn__hero--moon .smn__title,
+.smn__hero--night .smn__title {
+  font-size: 28px;
+}
+.smn__hero--sun .smn__title {
+  color: var(--sun);
+}
+.smn__title[data-phase='blue'],
+.smn__title[data-phase='dark'] {
+  color: var(--moon);
+}
+.smn__line {
+  margin: 4px 0 0;
+  font-size: var(--text-md);
+}
+.smn__phase {
+  margin: 4px 0 0;
+  font-size: var(--text-md);
+  color: var(--moon);
+}
+.smn__bigmoon .calm,
+.smn__bigglyph .calm {
+  display: block;
+}
+.smn__strip {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 6px;
+}
+.smn__strip-horizon {
+  stroke: var(--glass-ink-2);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
+.smn__strip-tick {
+  fill: var(--glass-ink-2);
+  font-size: 11px;
+}
+.smn__strip-path {
+  fill: none;
+  stroke: var(--white);
+  stroke-width: 2;
+  stroke-dasharray: 2 4;
+  stroke-linecap: round;
+}
+.smn__strip-sun {
+  fill: var(--sun);
+}
+.smn__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 6px 0 0;
+}
+.smn__chips:empty {
+  display: none;
+}
+.smn__chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--glass-strong);
+  font-size: var(--text-md);
+}
+
+/* --------------------------------------------------------- the sections */
+.smn__section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.smn__head {
+  margin: 4px 0 0;
+  color: var(--glass-ink-2);
+}
+.smn__none,
+.smn__note {
+  margin: 0;
+  font-size: var(--text-md);
+  color: var(--glass-ink-2);
+}
+.smn__note--dark {
+  color: var(--good);
+}
+
+/* A timeline: time · dot on a rail · what · compass. */
+.smn__rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.smn__row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 5.6em 18px minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  font-size: var(--text-lg);
+}
+.smn__row + .smn__row::before {
+  content: '';
+  position: absolute;
+  left: calc(5.6em + 12px + 8px);
+  top: -14px;
+  height: 28px;
+  width: 2px;
+  background: var(--glass-edge);
+}
+.smn__time {
+  text-align: right;
+  font-size: var(--text-md);
+  color: var(--glass-ink-2);
+}
+.smn__row--now .smn__time {
+  color: var(--sun);
+}
+.smn__row--past {
+  color: var(--glass-ink-2);
+}
+.smn__dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  background: var(--surface-3);
+  border: 2px solid var(--glass-edge);
+  box-sizing: border-box;
+}
+.smn__dot--golden {
+  background: var(--caution);
+}
+.smn__dot--sunset {
+  background: var(--sun-set);
+}
+.smn__dot--blue {
+  background: var(--d-nautical);
+}
+.smn__dot--dark {
+  background: var(--d-astro);
+}
+.smn__dot--moonrise,
+.smn__dot--moon {
+  background: var(--moon);
+  border-radius: 50%;
+}
+.smn__row--now .smn__dot {
+  border-color: var(--white);
+}
+.smn__what {
+  min-width: 0;
+  font-weight: var(--weight-medium);
+}
+
+.smn__compass {
+  width: 28px;
+  height: 28px;
+}
+.smn__compass-ring {
+  fill: none;
+  stroke: var(--glass-ink-2);
+  stroke-width: 1.5;
+}
+.smn__compass-n {
+  stroke: var(--glass-ink-2);
+  stroke-width: 1.5;
+}
+.smn__compass-needle {
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.smn__compass--sun .smn__compass-needle {
+  stroke: var(--sun);
+}
+.smn__compass--moon .smn__compass-needle {
+  stroke: var(--moon);
+}
+
+/* The next sunrise, and the next big moonrise. */
+.smn__card,
+.smn__big {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+}
+.smn__card-icon--rise {
+  width: 22px;
+  height: 22px;
+  border-radius: 22px 22px 0 0;
+  background: var(--sun-rise);
+}
+.smn__card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.smn__card-text b {
+  font-weight: var(--weight-medium);
+  font-size: var(--text-lg);
+}
+.smn__card-text span {
+  font-size: var(--text-md);
+  color: var(--glass-ink-2);
+}
+.smn__big .dcard__label {
+  color: var(--sun);
+}
+.smn__plan {
+  min-height: 44px;
+  padding-inline: 20px;
+  border-radius: 999px;
+}
+
+/* The fourteen evenings: two rows of seven. */
+.smn__phases {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.smn__phaseday {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-xs);
+}
+.smn__phaseday span:last-child {
+  color: var(--glass-ink-2);
+}
+
+/* The night's facts. */
+.smn__facts {
+  padding: 4px 16px;
+}
+.smn__dl {
+  margin: 0;
+}
+.smn__fact {
+  display: grid;
+  grid-template-columns: 6.5em minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+  padding: 10px 0;
+}
+.smn__fact + .smn__fact {
+  border-top: 1px solid var(--glass-edge);
+}
+.smn__fact dt {
+  font-size: var(--text-sm);
+  color: var(--glass-ink-2);
+}
+.smn__fact dd {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+}
