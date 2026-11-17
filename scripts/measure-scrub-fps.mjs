@@ -54,13 +54,18 @@ const couldNotLook = (why) => {
   process.exit(2)
 }
 
-const browser = await chromium.launch({ executablePath: findChrome() })
+/* SCOUTNGO_PROXY: the gate's fixture proxy (http://127.0.0.1:5181), so the layers have data to draw without a live host. */
+const PROXY = process.env.SCOUTNGO_PROXY ?? null
+const browser = await chromium.launch({ executablePath: findChrome(), ...(PROXY === null ? {} : { proxy: { server: PROXY, bypass: '127.0.0.1' } }) })
 let result = null
 try {
   const ctx = await browser.newContext({ ...devices['Pixel 7'], viewport: VIEWPORT, serviceWorkers: 'block', ignoreHTTPSErrors: true })
   await ctx.addInitScript(() => {
     try {
       localStorage.setItem('scoutngo.landing.v1', 'true')
+      /* A spot (the Virginia Beach Fishing Pier, a public landmark), so the map opens on a place. */
+      if (localStorage.getItem('scoutngo.lastSetup.v1') === null)
+        localStorage.setItem('scoutngo.lastSetup.v1', JSON.stringify({ at: { lat: 36.8435575, lon: -75.9713104 }, name: { key: 'pier', name: 'Virginia Beach Fishing Pier' }, shootKind: 'sunset', platform: 'both', reachMeters: 2000 }))
     } catch {
       /* about:blank */
     }
@@ -99,6 +104,7 @@ try {
   let dragging = false
   page.on('request', (rq) => {
     if (dragging) asks.push(new URL(rq.url()).host)
+    if (dragging && process.env.SCRUB_URLS === '1') console.log('asked during the drag:', rq.url().slice(0, 160))
   })
   const before = JSON.parse(await ev(`JSON.stringify(window.__scrub ?? { frames: 0, drags: 0, worstMs: 0 })`))
   const y = box.y + box.height / 2

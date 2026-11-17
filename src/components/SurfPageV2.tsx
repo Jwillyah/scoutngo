@@ -10,7 +10,7 @@ import { PART_GONE_DEG, PERIOD_LONG_S, PERIOD_SHORT_S, PERIOD_SHORT_SHARE } from
 import { WEEK_BIAS_MIN_DAYS, weekBias, weekBiasLine } from '../core/weekBias.ts'
 import { readWeekLog } from '../lib/weekBiasStore.ts'
 import { type LatLon } from '../core/geo.ts'
-import { camsNear, type SkyCam } from '../core/skyCams.ts'
+import { camDistanceKnown, camsNear, type SkyCam } from '../core/skyCams.ts'
 import { distanceMeters } from '../core/geo.ts'
 import { BAND_FLOOR_FT, skillLine, UNTESTED_ERROR_FT, type SkillSample, type SpotStats } from '../core/spotSkill.ts'
 import { forecastWord } from '../core/buoyHeadline.ts'
@@ -236,7 +236,9 @@ export function SurfBody({ now, timeZone, spot, spotName, away, sea, stats, kept
             <span className="dsurf__camtext">
               <b className="dsurf__val">See it yourself</b>
               <span className="dsurf__small">
-                {cam.cam.name} · {camDistance(cam.km, miles)}
+                {cam.cam.name}
+                {/* Batch DRONE, Section 6.7: only when the cam's own position is known; an anchor's distance is not the cam's. */}
+                {camDistanceKnown(cam.cam) ? ` · ${camDistance(cam.km, miles)}` : ''}
                 {cam.cam.facing === null ? '' : ` · faces ${compass(cam.cam.facing)}`}
                 {cam.cam.access === 'paid' ? ' · paid' : ''}
               </span>

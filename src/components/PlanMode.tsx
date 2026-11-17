@@ -506,7 +506,7 @@ interface PlanModeProps {
  * (three.js) are their own downloads, asked for when they first mount.
  */
 const MapView = lazyPage(() => import('./MapView.tsx').then((m) => ({ default: m.MapView })))
-const Clay3D = lazyPage(() => import('./Clay3D.tsx').then((m) => ({ default: m.Clay3D })))
+const Clay3D = lazyPage(() => import('./Clay3D.tsx').then((m) => ({ default: m.Clay3D })), { preload: false })
 
 /* The card requests that open a full page (or the calendar) over the map. */
 const PAGE_REQUESTS: ReadonlySet<string> = new Set(['exposure', 'tides', 'surf', 'buoys', 'wind', 'terrain', 'settings', 'about', 'calendar'])

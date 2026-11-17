@@ -27,3 +27,42 @@ describe('a page loaded on demand, with no signal', () => {
     expect(tries).toBe(3)
   })
 })
+
+describe('pages fetched while there is signal (Batch DRONE, Section 6.1)', () => {
+  it('a preloaded page is asked once, and opening it asks nothing more', async () => {
+    const { lazyPage: lp, preloadPages } = await import('./lazyPage.ts')
+    let asked = 0
+    lp(async () => {
+      asked += 1
+      return { default: () => null }
+    })
+    await preloadPages()
+    await preloadPages()
+    expect(asked).toBe(1)
+  })
+  it('a preload that fails is forgotten: the page asks again when it opens', async () => {
+    const { lazyPage: lp, preloadPages } = await import('./lazyPage.ts')
+    let asked = 0
+    lp(async () => {
+      asked += 1
+      if (asked === 1) throw new TypeError('Load failed')
+      return { default: () => null }
+    })
+    await preloadPages()
+    await preloadPages()
+    expect(asked).toBe(2)
+  })
+  it('the 3D view is not preloaded', async () => {
+    const { lazyPage: lp, preloadPages } = await import('./lazyPage.ts')
+    let asked = 0
+    lp(
+      async () => {
+        asked += 1
+        return { default: () => null }
+      },
+      { preload: false },
+    )
+    await preloadPages()
+    expect(asked).toBe(0)
+  })
+})

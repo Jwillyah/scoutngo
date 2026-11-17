@@ -252,6 +252,10 @@ export function SettingsPage(props: Props) {
           sub={goPerm === 'denied' ? 'Notifications are off for this app in the phone’s settings' : goPerm === 'unsupported' ? 'This browser cannot show notifications; add the app to the home screen' : 'When the sky call reaches Likely, 45 min before · while the app is open'}
           end={<Toggle on={goOn} label="Go alert" onChange={setGoOn} />}
         />
+        {/* Batch DRONE, Section 6.8: it fires only while the app is open (docs/go-alert.md). */}
+        <p className="set2__note" data-go-alert-note>
+          Keep ScoutNGo open for Go alerts
+        </p>
         {/* Batch LIVE, Section 7.4: the sky at the spot behind the page; the home only until it is approved everywhere. */}
         <Row
           label="Live sky"

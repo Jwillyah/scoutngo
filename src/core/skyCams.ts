@@ -36,6 +36,11 @@ export interface FacingCam {
   facing: number | null
   /** 'lanes': `facing` is the traffic direction a road cam watches, not where it looks. */
   facingIs?: 'lanes'
+  /**
+   * 'cam': `at` is the camera's own measured position. Absent: the pier's or beach's approximate position (docs/cams.md,
+   * every coast cam today), so a distance from it is not the distance to the cam (Batch DRONE, Section 6.7).
+   */
+  atIs?: 'cam'
   url: string
   access: 'free' | 'paid'
 }
@@ -48,6 +53,9 @@ export interface SkyCam {
 }
 
 /** Where the cam's lens looks, when that is recorded; null otherwise. */
+/** The distance to the cam is said only when its own position is known. */
+export const camDistanceKnown = (cam: FacingCam): boolean => cam.atIs === 'cam'
+
 export const lensFacing = (cam: FacingCam): number | null => (cam.facingIs === 'lanes' ? null : cam.facing)
 
 /** The nearest cams within CAM_MAX_KM whose recorded facing is within CAM_FACING_DEG of any of `lines`. */

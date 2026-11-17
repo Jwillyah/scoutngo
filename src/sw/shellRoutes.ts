@@ -127,3 +127,16 @@ export function keepAsset(response: { ok: boolean; headers: { get(name: string):
   if (!response.ok) return false
   return !/text\/html/i.test(response.headers.get('content-type') ?? '')
 }
+
+/**
+ * ONLY THIS BUILD'S FILES ARE KEPT (Batch DRONE, Section 6). A page still on
+ * the old build, after the new worker has taken over and dropped the old
+ * build's files (staleShellEntries), can still ask for them: the app fetches
+ * every page's code in the background (src/lib/lazyPage.ts preloadPages).
+ * The worker answers it from the network but does not put it back in the
+ * shell: the gate's service worker audit failed with "B was never cached
+ * with A dropped" until this.
+ */
+export function ownAsset(path: string, current: readonly string[]): boolean {
+  return current.includes(path)
+}

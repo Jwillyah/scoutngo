@@ -161,7 +161,11 @@ describe('Surf page v2 (Batch N, Section 1)', () => {
 
   it('shows the cam as a link out, and no card without one', () => {
     expect(render()).toContain('href="https://example.invalid/cam"')
-    expect(text(render())).toContain('See it yourself Virginia Beach, 31st St · 0.2 mi · faces E')
+    /* Batch DRONE, Section 6.7: a coast cam's position is its beach's (docs/cams.md): no distance said. */
+    expect(text(render())).toContain('See it yourself Virginia Beach, 31st St · faces E')
+    expect(text(render())).not.toMatch(/See it yourself[^›]* mi/)
+    /* A cam whose own position is known says how far it is. */
+    expect(text(render({ cam: { ...cam, cam: { ...cam.cam, atIs: 'cam' } } }))).toContain('See it yourself Virginia Beach, 31st St · 0.2 mi · faces E')
     expect(text(render({ cam: null }))).not.toContain('See it yourself')
   })
 

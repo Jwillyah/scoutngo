@@ -93,10 +93,12 @@ export function SpotPicker({ title, saved, around, onPick, onClose }: SpotPicker
   const results: Result[] = searching ? rankResults(q, own, rows, from) : []
   const shown = results.filter((r) => chip === 'all' || r.group === chip)
   const groups = (['spot', 'beach', 'town', 'business'] as const).map((g) => ({ g, list: shown.filter((r) => r.group === g).slice(0, g === 'spot' ? 6 : 4) })).filter((x) => x.list.length > 0)
+  const firstRun = !searching && centre === null && saved.length === 0 && query === ''
   const stillLooking = searching && (answer === null || answer === 'searching')
 
   return (
-    <div className="spick" role="dialog" aria-label={title}>
+    /* Batch DRONE, Section 6.6: the first run (nothing searched, saved or near): the block sits in the middle, not over an empty two-thirds. No "nearest" spots: with no location there is no nearest. */
+    <div className={`spick${firstRun ? ' spick--first' : ''}`} role="dialog" aria-label={title}>
       <div className="spick__head">
         <p className="spick__title">{title}</p>
         {onClose === undefined ? null : (

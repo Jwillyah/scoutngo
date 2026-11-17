@@ -16065,6 +16065,10 @@ a.about__row * {
 .spick__foot {
   margin-top: auto;
 }
+/* Batch DRONE, Section 6.6: on the first run the head, search and Try sit mid-screen; the privacy line stays at the foot. */
+.spick--first > .spick__head {
+  margin-top: auto;
+}
 .spick__list {
   list-style: none;
   margin: 0;

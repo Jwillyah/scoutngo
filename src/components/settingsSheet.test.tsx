@@ -129,3 +129,14 @@ describe('the hit rate the About row opens (Batch DRONE, Section 5)', () => {
     expect(t).toMatch(/nearest buoy over the last 30 days/)
   })
 })
+
+describe('the Go alert says it needs the app open (Batch DRONE, Section 6.8; docs/go-alert.md)', () => {
+  it('"Keep ScoutNGo open for Go alerts" right under the toggle', () => {
+    const html = page()
+    const row = html.indexOf('aria-label="Go alert"')
+    const note = html.indexOf('Keep ScoutNGo open for Go alerts')
+    expect(row).toBeGreaterThan(0)
+    expect(note).toBeGreaterThan(row)
+    expect(html.slice(row, note)).not.toMatch(/Live sky/)
+  })
+})

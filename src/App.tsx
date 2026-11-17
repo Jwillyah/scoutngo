@@ -1,5 +1,5 @@
 import { useBundledPlaceName } from './lib/useBundledPlaceName.ts'
-import { lazyPage } from './lib/lazyPage.ts'
+import { lazyPage, preloadPages } from './lib/lazyPage.ts'
 import { seaReach } from './lib/coast.ts'
 import { placeKeyOf, resolveReach } from './lib/placeMemory.ts'
 import { showSurf, SURF_COAST_M, useSurfSetting } from './lib/surfSetting.ts'
@@ -172,6 +172,8 @@ import { readLastSetup, writeLastSetup, type LastSetup } from './lib/lastSetup.t
  */
 /** Batch CORE, Section 6.1: what the landing asked to open once first run is done. */
 const AFTER_FIRST_RUN_KEY = 'scoutngo.afterFirstRun.v1'
+/* Batch DRONE, Section 6.1: long enough for the first screen's own requests to go first. */
+const PRELOAD_AFTER_MS = 3000
 const Landing = lazyPage(() => import('./components/Landing.tsx').then((m) => ({ default: m.Landing })))
 const NearYou = lazyPage(() => import('./components/NearYou.tsx').then((m) => ({ default: m.NearYou })))
 const ActivityPicker = lazyPage(() => import('./components/ActivityPicker.tsx').then((m) => ({ default: m.ActivityPicker })))
@@ -892,6 +894,13 @@ function App() {
    */
   /* Whether a newer build is deployed. Reports only; never reloads by itself. */
   const newBuild = useNewBuild()
+  /* Batch DRONE, Section 6.1: every page's code, fetched in the background a moment after the app opens with signal (src/lib/lazyPage.ts). */
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      if (navigator.onLine) void preloadPages()
+    }, PRELOAD_AFTER_MS)
+    return () => window.clearTimeout(t)
+  }, [])
 
   /*
    * THE LANDING PAGE, SHOWN ONCE.

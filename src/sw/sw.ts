@@ -18,6 +18,7 @@ import {
   SHELL_PUBLIC,
   installAssets,
   keepAsset,
+  ownAsset,
   staleShellEntries,
 } from './shellRoutes.ts'
 
@@ -111,7 +112,8 @@ async function asset(request: Request): Promise<Response> {
   if (saved !== undefined) return saved
   const response = await fetch(request)
   /* A missing file answered with the document is passed on, never kept (shellRoutes.ts keepAsset). */
-  if (keepAsset(response)) await cache.put(request, response.clone())
+  /* And only this build's own files (shellRoutes.ts ownAsset): an old build's page asking for its files does not put them back. */
+  if (keepAsset(response) && ownAsset(new URL(request.url).pathname, SHELL_ASSETS)) await cache.put(request, response.clone())
   return response
 }
 

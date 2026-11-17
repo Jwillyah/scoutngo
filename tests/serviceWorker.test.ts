@@ -1,13 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import {
-  NAVIGATION_TIMEOUT_MS,
-  routeOf,
-  SHELL_CACHE,
-  SHELL_DOCUMENT,
-  staleShellEntries,
-} from '../src/sw/shellRoutes.ts'
+import { NAVIGATION_TIMEOUT_MS, SHELL_CACHE, SHELL_DOCUMENT, ownAsset, routeOf, staleShellEntries } from '../src/sw/shellRoutes.ts'
 import { TILE_CACHE } from '../src/lib/offlineCache.ts'
 
 /*
@@ -163,6 +157,18 @@ describe('an asset answered with the document is never kept (Batch TRUTH, Sectio
     expect(keepAsset(r(404, 'text/javascript'))).toBe(false)
   })
   it('the worker asks it before keeping an asset', () => {
-    expect(readFileSync('src/sw/sw.ts', 'utf8')).toMatch(/if \(keepAsset\(response\)\) await cache\.put\(request, response\.clone\(\)\)/)
+    expect(readFileSync('src/sw/sw.ts', 'utf8')).toMatch(/if \(keepAsset\(response\)[^\n]*\) await cache\.put\(request, response\.clone\(\)\)/)
+  })
+})
+
+describe('only this build\'s files are kept (Batch DRONE, Section 6)', () => {
+  it('an old build\'s file, asked after the new worker took over, is not put back', () => {
+    const current = ['/assets/index-B.js', '/assets/PlanMode-B.js']
+    expect(ownAsset('/assets/PlanMode-B.js', current)).toBe(true)
+    expect(ownAsset('/assets/PlanMode-A.js', current)).toBe(false)
+  })
+  it('the worker puts a fetched asset in the shell only when it is its own', async () => {
+    const { readFileSync } = await import('node:fs')
+    expect(readFileSync('src/sw/sw.ts', 'utf8')).toMatch(/if \(keepAsset\(response\) && ownAsset\(new URL\(request\.url\)\.pathname, SHELL_ASSETS\)\) await cache\.put/)
   })
 })
