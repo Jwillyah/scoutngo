@@ -26,6 +26,7 @@ import type { LatLon } from '../core/geo.ts'
 import type { Wind } from '../core/upwind.ts'
 import { WIND_LEVELS_METERS, type LevelWind } from '../core/windProfile.ts'
 import { cellCover, cloudGridPoints } from '../core/cloudGrid.ts'
+import { inScrubDays, scrubDays } from '../core/layerTimeline.ts'
 import { FORECAST_MAX_AGE_MS, weatherJson } from './weatherStore.ts'
 
 export const OPEN_METEO_URL = 'https://api.open-meteo.com/v1/forecast'
@@ -431,6 +432,23 @@ export async function fetchVenueDay(
   timeZone: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<VenueDayResult> {
+  const day = venueClock(when, timeZone).date
+  return fetchVenueDays(at, day, day, timeZone, fetchImpl)
+}
+
+/**
+ * The same answer for a run of the venue's days, `start` to `end` inclusive
+ * ("YYYY-MM-DD"): the map's bar asks for all of src/core/layerTimeline.ts
+ * scrubDays at once (Batch FIX, Section 2.6), so the thumb crossing a day is
+ * an answer in hand, not a request. One day is fetchVenueDay's own URL.
+ */
+export async function fetchVenueDays(
+  at: LatLon,
+  start: string,
+  end: string,
+  timeZone: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<VenueDayResult> {
   const params = new URLSearchParams({
     latitude: at.lat.toFixed(2),
     longitude: at.lon.toFixed(2),
@@ -444,8 +462,8 @@ export async function fetchVenueDay(
       'wind_gusts_10m',
       ...VENUE_CLOUD_VARIABLES,
     ].join(','),
-    start_date: venueClock(when, timeZone).date,
-    end_date: venueClock(when, timeZone).date,
+    start_date: start,
+    end_date: end,
     timezone: timeZone,
   })
 
@@ -454,6 +472,18 @@ export async function fetchVenueDay(
   return got.ok
     ? { status: 'ok', payload: got.payload, fetchedAt: got.fetchedAt, stale: got.stale, kept: got.kept }
     : { status: 'unavailable', reason: got.reason, ...(got.unreachable ? { unreachable: true } : {}) }
+}
+
+/**
+ * THE ANSWER FOR ONE HOUR OF THE BAR (Batch FIX, Section 2.6). An hour from
+ * 48 h behind today to the bar's last day is read from ONE answer for all of
+ * those days (src/core/layerTimeline.ts scrubDays), asked once per spot and
+ * then kept in the shared store's memory: scrubbing across days asks nothing.
+ * Any other hour (a shoot planned for next month) is its own day, as before.
+ */
+export function fetchVenueHour(at: LatLon, when: Date, timeZone: string, now: Date = new Date(), fetchImpl: typeof fetch = fetch): Promise<VenueDayResult> {
+  const days = scrubDays(venueClock(now, timeZone).date)
+  return inScrubDays(venueClock(when, timeZone).date, days) ? fetchVenueDays(at, days.start, days.end, timeZone, fetchImpl) : fetchVenueDay(at, when, timeZone, fetchImpl)
 }
 
 /*

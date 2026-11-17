@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { distanceMeters, type LatLon } from '../core/geo.ts'
 import { nextEvents } from '../core/skyFire.ts'
 import { fireVerdict } from '../core/fireOutlook.ts'
+import { afterglowWindow } from '../core/afterglow.ts'
 import { specialNameOf, strong, type Special } from '../core/specialLight.ts'
 import { getSunPosition } from '../core/sun.ts'
 import { fetchFirePaths, nearestHour, pathsAt } from './skyFireData.ts'
@@ -40,6 +41,14 @@ export interface NearItem {
   line: string
   place: NearPlace
   at: Date
+  /**
+   * When what it names is over (Batch FIX, Section 2.2; "Sky color at sunrise
+   * possible 6:43 AM" was still up at 7:05): a window's end, and for the
+   * colour at a sunrise or sunset the end of its colour window
+   * (src/core/afterglow.ts afterglowWindow: at sunrise, the sunrise itself;
+   * at sunset, AFTERGLOW_MIN after it).
+   */
+  until: Date
 }
 
 /* ------------------------------------------------------------- the setting */
@@ -119,16 +128,22 @@ export function placesNear(you: { at: LatLon; name: string }, spots: readonly { 
   return named.filter((p) => p.m <= NEAR_M).sort((a, b) => a.m - b.m).slice(0, NEAR_PLACES)
 }
 
+/** When a window is over: its end; for the colour at one sunrise or sunset (an instant, from Sky fire), the end of its colour window. */
+export function nearEnd(s: Pick<Special, 'kind' | 'event' | 'from' | 'to'>): Date {
+  return s.kind === 'fire' && s.event !== undefined && s.from.getTime() === s.to.getTime() ? afterglowWindow(s.event, s.to).to : s.to
+}
+
 /** The windows that touch the next 24 hours, soonest first, at most NEAR_ITEMS. */
 export function pickNear(found: readonly { s: Special; place: NearPlace }[], now: number, clock: (d: Date) => string, place: Place): NearItem[] {
   return found
-    .filter(({ s }) => s.to.getTime() > now && s.from.getTime() < now + DAY_MS)
+    .filter(({ s }) => nearEnd(s).getTime() > now && s.from.getTime() < now + DAY_MS)
     .sort((a, b) => a.s.from.getTime() - b.s.from.getTime())
     .slice(0, NEAR_ITEMS)
     .map(({ s, place: p }) => {
       const from = new Date(Math.max(s.from.getTime(), now))
       const when = s.kind === 'fire' ? clock(new Date((s.from.getTime() + s.to.getTime()) / 2)) : `${clock(from)}–${clock(s.to)}`
-      return { line: `${s.kind === 'fire' ? specialNameOf(s) : specialName(s.kind, place)} ${s.word} ${when} · ${p.name}`, place: p, at: from }
+      const until = nearEnd(s)
+      return { line: `${s.kind === 'fire' ? specialNameOf(s) : specialName(s.kind, place)} ${s.word} ${when} · ${p.name}`, place: p, at: from, until }
     })
 }
 
@@ -152,4 +167,36 @@ export async function nearMeItems(places: readonly NearPlace[], now: number, clo
     }
   }
   return pickNear(found, now, clock, place)
+}
+
+/* ------------------------------------------------------- one banner at most */
+
+/** The items whose event has not ended at `now`; null when none is left (the card goes). */
+export function nearStill(items: readonly NearItem[] | null, now: number): NearItem[] | null {
+  if (items === null) return null
+  const left = items.filter((i) => i.until.getTime() > now)
+  return left.length === 0 ? null : left
+}
+
+/*
+ * ONE BANNER OVER THE MAP (Batch FIX, Section 2.2; ux-rules 2). Over the map
+ * there is the status line under the chips and the "Near you" card, and on
+ * the phone both were up at once. At most one shows:
+ *
+ *   a layer's bar up     none: the layer is the whole map (wind mode and
+ *                        every other layer the bar plays), and its source
+ *                        pill is the one line
+ *   a hard status        it: where you are failed, no signal, the weather
+ *                        service busy; the user needs these to act
+ *   Near you             it, and the status line's soft lines (the backup
+ *                        nudge, special light now) wait
+ *   a soft status        it
+ */
+export type MapBanner = 'none' | 'status' | 'near'
+
+export function mapBanner(o: { layerUp: boolean; hardStatus: boolean; softStatus: boolean; near: boolean }): MapBanner {
+  if (o.layerUp) return 'none'
+  if (o.hardStatus) return 'status'
+  if (o.near) return 'near'
+  return o.softStatus ? 'status' : 'none'
 }

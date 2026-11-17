@@ -6,7 +6,7 @@ import { markScreenOpen, recordError } from '../lib/errorLog.ts'
 import { NetDebug } from './NetDebug.tsx'
 import { WindHours } from './WindTimeBar.tsx'
 import { LayerTimeline, type TimelineLayer, type TimelinePick } from './LayerTimeline.tsx'
-import { barSpan, onBar, type WindHour, type WindStrip } from '../core/layerTimeline.ts'
+import { barSpan, onBar, rainSpan, type WindHour, type WindStrip } from '../core/layerTimeline.ts'
 import { percentLine, tideLines } from '../core/markerReadout.ts'
 import { tideStateAt } from '../core/tide.ts'
 import { hoursOnBar, useBriefHours, useTideWeek } from '../lib/useLayerHours.ts'
@@ -183,7 +183,7 @@ import { LightNowBlock } from './LightNowBlock.tsx'
 import { getMoonArc } from '../core/moonArc.ts'
 import type { SkyTab } from '../lib/skyTab.ts'
 import { layersLine, modelsSplit } from '../core/skyFire.ts'
-import { fetchModelLows, nearestHour } from '../lib/skyFireData.ts'
+import { fetchModelLows, modelLowsAsk, nearestHour } from '../lib/skyFireData.ts'
 import { useWeatherBusy, useWeatherEpoch } from '../lib/useWeatherStatus.ts'
 import type { Place } from '../lib/placeGroups.ts'
 import { PageGroup, type PageGroupValue } from '../lib/pageGroup.ts'
@@ -429,6 +429,10 @@ interface PlanModeProps {
   onOpenNow: () => void
   /** The dock's Back to now: the current time at the venue, today if the shoot day is not today. */
   onBackToNow: () => void
+  /** Batch FIX 2.2: whether App's "Near you" card is the one banner over the map (src/lib/nearMe.ts mapBanner): the status line's soft lines wait while it is. */
+  nearUp?: boolean
+  /** What the map has up for that decision: a layer's bar, a status line that must show, one that can wait. */
+  onBannerRoom?: (room: { layerUp: boolean; hardStatus: boolean; softStatus: boolean }) => void
   /** Ground, air or both. Decides what shows here AND what a generate asks for. */
   platformFilter: PlatformFilterValue
   showLabels: boolean
@@ -637,6 +641,8 @@ export function PlanMode({
   onPageBack,
   onOpenNow,
   onBackToNow,
+  nearUp = false,
+  onBannerRoom,
   onShootWindow,
   platformFilter,
   showLabels,
@@ -1049,19 +1055,21 @@ export function PlanMode({
   /* Which page of the Sky card is open. The dock's calendar opens it at the calendar. */
   /* The five models' low cloud overhead for the bar's day, for the chip's "models split". */
   const [modelLows, setModelLows] = useState<{ hours: string[]; lows: (number | null)[][] } | null>(null)
-  const modelDay = scrubbedAt === null ? null : scrubbedAt.toISOString().slice(0, 10)
+  /* Batch FIX 2.6: one request for the bar's days and 48 h back (src/lib/skyFireData.ts modelLowsAsk), so the thumb crossing midnight asks nothing. */
+  const modelAsk = scrubbedAt === null ? null : modelLowsAsk(scrubbedAt)
+  const modelKey = modelAsk?.key ?? null
   /* Asked again when a back-off ends (src/lib/weatherStore.ts). */
   const weatherEpoch = useWeatherEpoch()
   useEffect(() => {
-    if (venue === null || modelDay === null) return
+    if (venue === null || modelAsk === null) return
     let live = true
-    void fetchModelLows(venue, modelDay).then((r) => {
+    void fetchModelLows(venue, modelAsk.start, undefined, modelAsk.end).then((r) => {
       if (live) setModelLows(r)
     })
     return () => {
       live = false
     }
-  }, [venue, modelDay, weatherEpoch])
+  }, [venue, modelKey, weatherEpoch]) // eslint-disable-line react-hooks/exhaustive-deps
   /* Batch K addendum: Sky opens on the weather first. */
   const [skyTab, setSkyTab] = useState<SkyTab>('fire')
   /* The Moon page open: the 3D view draws the moon's arc only then (Batch D, Section 9). */
@@ -1849,6 +1857,14 @@ export function PlanMode({
     return mps.map((v, i) => ({ mps: v, gustMps: gust[i], fromDeg: dir[i] }))
   }, [windStrip, span])
   const briefHours = useBriefHours(marker, timelineLayer === 'clouds')
+  /* Batch FIX 2.5: radar's bar carries the chance of rain at the spot, the past 2 h and the next 24, from the same briefing answer (no new request). */
+  const radarUp = weatherLayer === 'radar' && !threeD
+  const rainHours = useBriefHours(venue, radarUp)
+  const rainStrip = useMemo(() => {
+    if (!radarUp || rainHours === null) return null
+    const { span: s, nowX } = rainSpan(stripNow)
+    return { values: hoursOnBar(rainHours, 'precipitation_probability', s), span: s, nowX }
+  }, [radarUp, rainHours, stripNow])
   const cloudHours = useMemo(() => hoursOnBar(briefHours, 'cloud_cover', span), [briefHours, span])
   const tideWeek = useTideWeek(tide.status === 'ok' ? tide.station.id : null, span, timelineLayer === 'tide')
   const tideProblem =
@@ -1892,6 +1908,19 @@ export function PlanMode({
     return () => clearTimeout(t)
   }, [timelineLayer])
   const markerMoved = markerAt !== null
+  /*
+   * ONE BANNER OVER THE MAP (Batch FIX 2.2, src/lib/nearMe.ts mapBanner): the
+   * status line's lines that must show (where you are, no signal, the weather
+   * service) and the ones that can wait (the backup nudge, special light now),
+   * told to App, which holds the "Near you" card, with whether a layer's bar
+   * is up (then neither shows: the layer is the map).
+   */
+  const hardStatus = locateNote ?? offlineStatus ?? weatherBusy
+  const softStatus = (backupReminder == null ? null : backupReminder.line) ?? specialStatus
+  const bannerLayerUp = timelineUp || (weatherLayer === 'radar' && !threeD)
+  useEffect(() => {
+    onBannerRoom?.({ layerUp: bannerLayerUp, hardStatus: hardStatus !== null, softStatus: softStatus !== null })
+  }, [onBannerRoom, bannerLayerUp, hardStatus, softStatus])
   const onTimelinePick = (p: TimelinePick) => (p === 'off' ? allLayersOff() : pickWeather(p))
 
   const weatherCommon = {
@@ -3160,15 +3189,15 @@ export function PlanMode({
         onOpen={openChip}
         measureRef={measureChips}
         when={stripLine}
-        status={locateNote ?? offlineStatus ?? weatherBusy ?? (backupReminder == null ? null : backupReminder.line) ?? specialStatus}
+        status={hardStatus ?? (nearUp ? null : softStatus)}
         statusAction={
           locateNote !== null
             ? { label: locating ? 'Finding you…' : 'Retry', onClick: onLocate }
-            : offlineStatus === null && weatherBusy === null && backupReminder != null
+            : hardStatus === null && !nearUp && backupReminder != null
               ? { label: 'Back up', whole: true, onClick: backupReminder.onBackup, dismiss: { label: 'Not now', mark: '×', onClick: backupReminder.onDismiss } }
               : undefined
         }
-        onStatus={locateNote === null && offlineStatus === null && weatherBusy === null && backupReminder == null && specialStatus !== null ? () => window.dispatchEvent(new CustomEvent(OPEN_SKY_EVENT)) : undefined}
+        onStatus={hardStatus === null && !nearUp && backupReminder == null && specialStatus !== null ? () => window.dispatchEvent(new CustomEvent(OPEN_SKY_EVENT)) : undefined}
       />
       </div>
       {netDebug ? <NetDebug onClose={() => setNetDebug(false)} /> : null}
@@ -3262,7 +3291,7 @@ export function PlanMode({
             {/* Radar on (8 Nov): its legend and timeline take the time bar's place here, up at every height of the sheet. */}
             {/* Only on the map's own view (the home card, the radar card): a card that reads a moment keeps its time strip (Batch N; the surface audit). */}
             {weatherLayer === 'radar' && !threeD && (card.kind === HOME.kind || card.kind === 'wxlayer') ? (
-              <RadarLegend scanAt={radarAt === null ? null : (layerNow?.radar?.scanAt ?? radarAt)} calls={layerCalls} strikes={layerNow?.strikes ?? []} timeZone={venueWindow?.timeZone ?? 'UTC'} />
+              <RadarLegend scanAt={radarAt === null ? null : (layerNow?.radar?.scanAt ?? radarAt)} calls={layerCalls} strikes={layerNow?.strikes ?? []} timeZone={venueWindow?.timeZone ?? 'UTC'} rain={rainStrip} />
             ) : timelineUp && timelineLayer !== null && venueWindow !== null && scrubbedAt !== null ? (
               /* Batch DRONE, Section 3: the one timeline bar for wind, clouds and tide, docked in the time sheet's place. */
               <LayerTimeline
@@ -3274,6 +3303,7 @@ export function PlanMode({
                 lat={venue?.lat ?? 0}
                 lon={venue?.lon ?? 0}
                 onAt={scrubTo}
+                onNow={onBackToNow}
                 onHold={setScrubHeld}
                 onPick={onTimelinePick}
                 wind={timelineLayer === 'wind' ? { hours: windHours, unit: units.wind, limitMps: ratedWindMps, levelFt: windLayerFt, onLevel: setWindLayerFt, model: windModel, onModel: setWindModel } : undefined}

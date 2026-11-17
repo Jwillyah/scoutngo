@@ -8,10 +8,14 @@
  * a busy server was asked again and again and answered none of them. So the app never has more than one request in flight: the rest wait
  * their turn, in the order they were asked.
  *
- * THREE SERVERS, IN ORDER. overpass-api.de first; when it fails,
- * overpass.kumi.systems, then overpass.private.coffee. All three serve the
- * same OpenStreetMap data with the same query language, keyless. They are
- * the only Overpass hosts the 3D network audit allows
+ * THREE SERVERS, IN ORDER: the ones that answer first. overpass.kumi.systems,
+ * then overpass.private.coffee, then overpass-api.de last (Batch FIX,
+ * Section 2.8: on the phone, 16-17 Nov, overpass-api.de refused the app's
+ * requests with HTTP 406, which a browser cannot answer by changing its
+ * User-Agent or its Accept, so it was a refusal the place waited through
+ * every time before the mirrors were asked). All three serve the same
+ * OpenStreetMap data with the same query language, keyless. They are the
+ * only Overpass hosts the 3D network audit allows
  * (scripts/audit-3d-network.mjs).
  *
  * 429 AND 504 MEAN "BUSY, ASK AGAIN": the server is up and shedding load. The
@@ -24,9 +28,9 @@
  */
 
 export const OVERPASS_SERVERS = [
-  'https://overpass-api.de/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
   'https://overpass.private.coffee/api/interpreter',
+  'https://overpass-api.de/api/interpreter',
 ] as const
 
 /** First back-off after a 429 or 504; doubled for the next one on the same server. */

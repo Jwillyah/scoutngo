@@ -13,6 +13,7 @@ import { OPPOSITE_SAMPLES } from '../core/afterglow.ts'
 import { FIRE_MODELS, oppositePoints, PATH_KM, pathPoints, roundCoord, type FireModel, type Layers, type ModelPath } from '../core/skyFire.ts'
 import { metarTime, parseMetarSky, type MetarSky } from '../core/metar.ts'
 import type { LatLon } from '../core/geo.ts'
+import { inScrubDays, scrubDays } from '../core/layerTimeline.ts'
 import { OPEN_METEO_URL, TIMEOUT_MS } from './forecast.ts'
 import { FORECAST_MAX_AGE_MS, SLOW_MAX_AGE_MS, weatherJson } from './weatherStore.ts'
 
@@ -273,7 +274,7 @@ export async function stationSky(id: string, fetchImpl: typeof fetch = fetch, no
  * the chip says "models split" when they are far apart. One point, the venue
  * rounded to 2 decimals.
  */
-export async function fetchModelLows(venue: LatLon, date: string, fetchImpl: typeof fetch = fetch): Promise<{ hours: string[]; lows: (number | null)[][] } | null> {
+export async function fetchModelLows(venue: LatLon, date: string, fetchImpl: typeof fetch = fetch, endDate: string = date): Promise<{ hours: string[]; lows: (number | null)[][] } | null> {
   const models = FIRE_MODELS.filter((m) => m !== 'best_match')
   const params = new URLSearchParams({
     latitude: roundCoord(venue.lat).toFixed(2),
@@ -281,7 +282,7 @@ export async function fetchModelLows(venue: LatLon, date: string, fetchImpl: typ
     hourly: 'cloud_cover_low',
     models: models.join(','),
     start_date: date,
-    end_date: date,
+    end_date: endDate,
     timezone: 'GMT',
   })
   try {
@@ -298,4 +299,18 @@ export async function fetchModelLows(venue: LatLon, date: string, fetchImpl: typ
   } catch {
     return null
   }
+}
+
+/**
+ * THE MODELS' LOW CLOUD FOR THE MAP'S CHIP, BY THE RANGE (Batch FIX, Section
+ * 2.6): the day the bar is on (GMT, as the request counts days) inside
+ * src/core/layerTimeline.ts scrubDays is one answer for the whole range, so the
+ * thumb crossing midnight asks nothing; a day outside it is asked alone. The
+ * returned `key` names the request: the same key is the same answer.
+ */
+export function modelLowsAsk(at: Date, now: Date = new Date()): { key: string; start: string; end: string } {
+  const day = at.toISOString().slice(0, 10)
+  /* A day more each side: the bar's days are the spot's, these are GMT's (its last evening is the next GMT day). */
+  const r = scrubDays(now.toISOString().slice(0, 10), 1)
+  return inScrubDays(day, r) ? { key: `${r.start}|${r.end}`, ...r } : { key: `${day}|${day}`, start: day, end: day }
 }

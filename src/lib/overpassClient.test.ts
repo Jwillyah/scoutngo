@@ -29,7 +29,8 @@ describe('the one Overpass client', () => {
     expect(overpassInFlight().peak).toBe(1)
   })
 
-  it('tries overpass-api.de, then kumi.systems, then private.coffee', async () => {
+  it('tries kumi.systems, then private.coffee, then overpass-api.de last (it answered 406 on the phone, Batch FIX 2.8)', async () => {
+    expect([...OVERPASS_SERVERS]).toEqual(['https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://overpass-api.de/api/interpreter'])
     const asked: string[] = []
     const fetcher = vi.fn(async (url: string) => {
       asked.push(url)
@@ -38,7 +39,19 @@ describe('the one Overpass client', () => {
     })
     const answer = await askOverpass('q', { budgetMs: 5000, fetcher: fetcher as unknown as typeof fetch, sleep: noSleep })
     expect(asked).toEqual([...OVERPASS_SERVERS])
-    expect(answer).toMatchObject({ ok: true, server: 'https://overpass.private.coffee/api/interpreter' })
+    expect(answer).toMatchObject({ ok: true, server: 'https://overpass-api.de/api/interpreter' })
+    expect(noSleep).not.toHaveBeenCalled()
+  })
+
+  it('a 406 from a server is not "busy": the next server is asked at once, with no back-off', async () => {
+    const asked: string[] = []
+    const fetcher = vi.fn(async (url: string) => {
+      asked.push(url)
+      return url === OVERPASS_SERVERS[0] ? status(406) : ok()
+    })
+    const answer = await askOverpass('q', { budgetMs: 30_000, fetcher: fetcher as unknown as typeof fetch, sleep: noSleep })
+    expect(asked).toEqual([OVERPASS_SERVERS[0], OVERPASS_SERVERS[1]])
+    expect(answer).toMatchObject({ ok: true, server: OVERPASS_SERVERS[1] })
     expect(noSleep).not.toHaveBeenCalled()
   })
 

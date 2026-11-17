@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import type * as maplibregl from 'maplibre-gl'
 import type { LatLon } from '../core/geo.ts'
+import { readoutBeside } from '../core/markerReadout.ts'
 import '../styles/timeline.css'
 
 /*
@@ -49,14 +50,23 @@ export function LayerMarker({ map, at, lines, children, layer, atSpot }: Props) 
       const p = map.project([lon, lat])
       const box = map.getContainer().getBoundingClientRect()
       m.style.transform = `translate(${p.x}px, ${p.y}px)`
-      /* The card to the right of the marker; to its left when it would leave the screen; held inside top and bottom. */
-      const w = c.offsetWidth
-      const h = c.offsetHeight
-      const right = p.x + GAP + w <= box.width - EDGE
-      const x = right ? p.x + GAP : Math.max(EDGE, p.x - GAP - w)
-      const y = Math.max(EDGE, Math.min(box.height - h - EDGE, p.y - h / 2))
-      c.style.transform = `translate(${x}px, ${y}px)`
-      c.dataset.side = right ? 'right' : 'left'
+      /*
+       * Beside the marker, never on it (src/core/markerReadout.ts readoutBeside,
+       * Batch FIX 2.3): right, or left near the edge, or narrowed to the wider
+       * side. Measured at its own width first, then again once narrowed, since
+       * its lines wrap and it grows taller.
+       */
+      c.style.maxWidth = ''
+      c.dataset.tight = '0'
+      const fit = { px: p.x, py: p.y, w: c.offsetWidth, h: c.offsetHeight, boxW: box.width, boxH: box.height, gap: GAP, edge: EDGE }
+      let at = readoutBeside(fit)
+      if (at.maxWidth !== null) {
+        c.style.maxWidth = `${Math.floor(at.maxWidth)}px`
+        c.dataset.tight = '1'
+        at = readoutBeside({ ...fit, h: c.offsetHeight })
+      }
+      c.style.transform = `translate(${at.x}px, ${at.y}px)`
+      c.dataset.side = at.side
       const off = p.x < -20 || p.y < -20 || p.x > box.width + 20 || p.y > box.height + 20
       m.dataset.off = off ? '1' : '0'
       c.dataset.off = off ? '1' : '0'

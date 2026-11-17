@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { markNearMeSeen, nearMeDue, pickNear, placesNear, RETURN_AFTER_MS, snoozeNearMe, type NearPlace } from '../src/lib/nearMe.ts'
+import { mapBanner, markNearMeSeen, nearMeDue, nearStill, pickNear, placesNear, RETURN_AFTER_MS, snoozeNearMe, type NearPlace } from '../src/lib/nearMe.ts'
+import { AFTERGLOW_MIN } from '../src/core/afterglow.ts'
 import type { Special } from '../src/core/specialLight.ts'
 
 /* "Near you in the next 24 h" on opening (src/lib/nearMe.ts), field test 30 Oct. */
@@ -36,6 +37,46 @@ describe('which windows', () => {
     const items = pickNear([w('fog', -1, 2)], NOW, clock, 'inland')
     expect(items[0].line).toBe('Valley fog possible 9:00–11:00 · Rudee Inlet')
     expect(items[0].at.getTime()).toBe(NOW)
+  })
+})
+
+/* Batch FIX, Section 2.2 (phone, 17 Nov): "Sky color at sunrise possible 6:43 AM" was still over the map at 7:05, and over a layer, beside the status line. */
+describe('the banner goes when its event is over, and is the only one', () => {
+  const place: NearPlace = { name: 'Virginia Beach', at: VB, m: 0 }
+  const sunrise = new Date('2026-11-17T11:43:00Z') /* 6:43 AM EST */
+  const sunset = new Date('2026-11-17T21:50:00Z')
+  const fire = (event: 'sunrise' | 'sunset', at: Date): { s: Special; place: NearPlace } => ({ s: { kind: 'fire', event, from: at, to: at, agree: 3, of: 5, word: 'possible', why: '' }, place })
+  const clock = (d: Date) => new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }).format(d)
+  const asked = Date.parse('2026-11-17T09:00:00Z') /* 4 AM */
+
+  it('the colour at sunrise is offered until the sun is up, and gone at 7:05', () => {
+    const items = pickNear([fire('sunrise', sunrise)], asked, clock, 'coast')
+    expect(items[0].line).toBe('Sky color at sunrise possible 6:43 AM · Virginia Beach')
+    expect(items[0].until.toISOString()).toBe(sunrise.toISOString())
+    expect(nearStill(items, sunrise.getTime() - 60_000)).toHaveLength(1)
+    expect(nearStill(items, Date.parse('2026-11-17T12:05:00Z'))).toBeNull()
+  })
+
+  it('the colour at sunset lasts its afterglow, AFTERGLOW_MIN after the sun is down', () => {
+    const items = pickNear([fire('sunset', sunset)], asked, clock, 'coast')
+    expect(items[0].until.getTime()).toBe(sunset.getTime() + AFTERGLOW_MIN * 60_000)
+    expect(nearStill(items, sunset.getTime() + 60_000)).toHaveLength(1)
+    expect(nearStill(items, sunset.getTime() + AFTERGLOW_MIN * 60_000)).toBeNull()
+  })
+
+  it('a window goes at its end; the rest of the list stays', () => {
+    const fog = { s: { kind: 'fog' as const, from: new Date(asked), to: new Date(asked + 2 * 3_600_000), agree: 3, of: 5, word: 'possible' as const, why: '' }, place }
+    const items = pickNear([fog, fire('sunset', sunset)], asked, clock, 'coast')
+    expect(nearStill(items, asked + 3 * 3_600_000)?.map((i) => i.line)).toEqual(['Sky color at sunset possible 4:50 PM · Virginia Beach'])
+  })
+
+  it('one banner at most: none under a layer, the status line when it must show, else Near you before the soft lines', () => {
+    const no = { layerUp: false, hardStatus: false, softStatus: false, near: false }
+    expect(mapBanner({ ...no, near: true, hardStatus: true, softStatus: true, layerUp: true })).toBe('none')
+    expect(mapBanner({ ...no, near: true, hardStatus: true })).toBe('status')
+    expect(mapBanner({ ...no, near: true, softStatus: true })).toBe('near')
+    expect(mapBanner({ ...no, softStatus: true })).toBe('status')
+    expect(mapBanner(no)).toBe('none')
   })
 })
 

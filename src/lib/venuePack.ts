@@ -40,7 +40,7 @@ import {
   type SavedArea,
 } from './offlineCache.ts'
 import type { LatLon } from '../core/geo.ts'
-import { fetchVenueDay, venueClock } from './forecast.ts'
+import { fetchVenueHour, venueClock } from './forecast.ts'
 import { saveForecast, savedForecastBytes, readForecast, venueDayKey } from './savedForecast.ts'
 import { fetchMarine, fetchMonthExtremes, fetchSkyHours, fetchWindMonth } from './tideSheetData.ts'
 import { fetchPredictions, fetchStations, predictionsKey } from './noaa.ts'
@@ -271,7 +271,8 @@ export async function savePackData(
 
   onStep('the forecast for the day')
   const dayKey = venueDayKey(centre.lat, centre.lon, venueClock(shootAt, timeZone).date, timeZone)
-  const dayResult = await fetchVenueDay(centre, shootAt, timeZone)
+  /* The map's own answer when the shoot is on the bar's days (Batch FIX 2.6): one request kept for both. */
+  const dayResult = await fetchVenueHour(centre, shootAt, timeZone)
   if (dayResult.status === 'ok') saveForecast(dayKey, dayResult.payload)
   const day = readForecast(dayKey) !== null
   if (day) keys.push(dayKey)

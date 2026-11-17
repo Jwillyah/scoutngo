@@ -32,7 +32,7 @@ import { EMPTY_LANDCOVER, type Landcover } from './core/siting.ts'
 import { getSunArc, getSunPosition } from './core/sun.ts'
 import { extremesAround, tideStateAt } from './core/tide.ts'
 import { LOCATED_ZOOM, locateOnce } from './lib/locateOnce.ts'
-import { markNearMeSeen, nearMeDue, nearMeItems, placesNear, snoozeNearMe, type NearItem } from './lib/nearMe.ts'
+import { mapBanner, markNearMeSeen, nearMeDue, nearMeItems, nearStill, placesNear, snoozeNearMe, type NearItem } from './lib/nearMe.ts'
 import { readHome } from './lib/home.ts'
 import { askToPersist, backupDue, backupLine, backupShare, markReminded, yoursChanged, YOURS_CHANGED } from './lib/backup.ts'
 import { useNewBuild } from './lib/useNewBuild.ts'
@@ -114,7 +114,7 @@ import { homeOrder, readActivities, showsDrone, showsPhotoTools, useActivities }
 import { homeCardsShown } from './core/homeCards.ts'
 import { viewfinderPreset } from './core/viewfinderPreset.ts'
 import { shouldOpenBriefing } from './lib/briefingOpen.ts'
-import { backToNow, openingScrub } from './lib/backToNow.ts'
+import { backToNow, openingScrub, resumeGoesToNow } from './lib/backToNow.ts'
 import { retrying } from './lib/retrying.ts'
 import { planForNow } from './lib/planForNow.ts'
 import { useNow } from './lib/useNow.ts'
@@ -1745,6 +1745,36 @@ function App() {
   }, [briefOpen]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /*
+   * AND COMING BACK TO THE APP IS NOW (Batch FIX, Section 2.1; 17 Nov 7:05 AM
+   * the map read "Tue 2 PM", the bar where it was left the night before: iOS
+   * resumed the page and nothing put the time right). Away RESUME_NOW_MS or
+   * more, the map goes to now, as the home's own clock already does.
+   */
+  const resumeNow = useRef({ onBackToNow, briefOpen })
+  resumeNow.current = { onBackToNow, briefOpen }
+  useEffect(() => {
+    let hiddenAt: number | null = document.visibilityState === 'hidden' ? Date.now() : null
+    const away = () => {
+      hiddenAt ??= Date.now()
+    }
+    const back = () => {
+      if (document.visibilityState !== 'visible') return
+      const go = resumeGoesToNow(hiddenAt, Date.now())
+      hiddenAt = null
+      if (go && !resumeNow.current.briefOpen) resumeNow.current.onBackToNow()
+    }
+    const change = () => (document.visibilityState === 'hidden' ? away() : back())
+    document.addEventListener('visibilitychange', change)
+    window.addEventListener('pagehide', away)
+    window.addEventListener('pageshow', back)
+    return () => {
+      document.removeEventListener('visibilitychange', change)
+      window.removeEventListener('pagehide', away)
+      window.removeEventListener('pageshow', back)
+    }
+  }, [])
+
+  /*
    * A PLACE THAT MOVED IS STILL A PLACE. /field, /now and the rest are the
    * names of places (src/lib/menu.ts OLD_PATHS); vercel.json serves the app
    * for each, and here the app goes there once and puts the address back.
@@ -1890,6 +1920,18 @@ function App() {
       document.removeEventListener('visibilitychange', onShow)
     }
   }, [])
+  /*
+   * Batch FIX 2.2: the card goes when what it names is over (the colour at
+   * 6:43 AM was still offered at 7:05), and it is one banner at most over the
+   * map: not while a layer's bar is up, not over a status line that must
+   * show (src/lib/nearMe.ts mapBanner).
+   */
+  const nearLive = nearStill(nearItems, clockNow.getTime())
+  const [bannerRoom, setBannerRoom] = useState({ layerUp: false, hardStatus: false, softStatus: false })
+  const onBannerRoom = useCallback((room: { layerUp: boolean; hardStatus: boolean; softStatus: boolean }) => {
+    setBannerRoom((was) => (was.layerUp === room.layerUp && was.hardStatus === room.hardStatus && was.softStatus === room.softStatus ? was : room))
+  }, [])
+  const nearUp = mode === 'plan' && nearLive !== null && mapBanner({ ...bannerRoom, near: true }) === 'near'
   const goNear = (item: NearItem) => {
     setNearItems(null)
     const spot = spots.find((sp) => Math.abs(Number(sp.venue.latitude) - item.place.at.lat) < 1e-6 && Math.abs(Number(sp.venue.longitude) - item.place.at.lon) < 1e-6)
@@ -2387,10 +2429,10 @@ function App() {
         </div>
       ) : null}
 
-      {mode === 'plan' && nearItems !== null ? (
+      {nearUp && nearLive !== null ? (
         <Suspense fallback={null}>
         <NearYou
-          items={nearItems}
+          items={nearLive}
           onGo={goNear}
           onNotNow={() => {
             snoozeNearMe()
@@ -2626,6 +2668,8 @@ function App() {
           }}
           onOpenNow={() => setNowOpen(true)}
           onBackToNow={onBackToNow}
+          nearUp={nearUp}
+          onBannerRoom={onBannerRoom}
         />
         </ScreenBoundary>
         </Suspense>

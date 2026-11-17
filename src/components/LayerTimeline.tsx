@@ -11,6 +11,7 @@ import {
   tidePlot,
   windArrows,
   windPlot,
+  windLabels,
   type BarSpan,
   type WindHour,
 } from '../core/layerTimeline.ts'
@@ -73,6 +74,8 @@ interface Props {
   lat: number
   lon: number
   onAt: (t: Date) => void
+  /** "now": the plan's own Back to now (the current minute, today made the shoot day if it is not); onAt(this minute) when not given. */
+  onNow?: () => void
   /** The time a drag began (the layer holds its frames for it), and null when it ends. */
   onHold: (held: Date | null) => void
   onPick: (p: TimelinePick) => void
@@ -99,12 +102,15 @@ const probing = (): boolean => {
   }
 }
 
+/** The strip's plot height, px (timeline.css .ltl__plot). */
+const PLOT_PX = 40
+
 const flagShift = (f: number) => `translateX(-${(Math.max(0, Math.min(1, f)) * 100).toFixed(1)}%)`
 
 const LAYER_WORD: Record<TimelinePick, string> = { wind: 'Wind', clouds: 'Clouds', tide: 'Tide', radar: 'Rain', off: 'Off' }
 const PICKS: readonly TimelinePick[] = ['wind', 'clouds', 'tide', 'radar', 'off']
 
-export function LayerTimeline({ layer, span, at, now, timeZone, lat, lon, onAt, onHold, onPick, wind, tide, percent }: Props) {
+export function LayerTimeline({ layer, span, at, now, timeZone, lat, lon, onAt, onNow, onHold, onPick, wind, tide, percent }: Props) {
   const [play, setPlay] = useState(false)
   const [menu, setMenu] = useState<'layer' | 'level' | null>(null)
   const track = useRef<HTMLDivElement>(null)
@@ -191,7 +197,7 @@ export function LayerTimeline({ layer, span, at, now, timeZone, lat, lon, onAt, 
         {isNow ? (
           <span className="ltl__now">now</span>
         ) : (
-          <button type="button" className="ltl__now ltl__now--go" onClick={() => (setPlay(false), onAt(now))} aria-label="Back to now">
+          <button type="button" className="ltl__now ltl__now--go" onClick={() => (setPlay(false), onNow === undefined ? onAt(new Date()) : onNow())} aria-label="Back to now">
             now
           </button>
         )}
@@ -325,11 +331,22 @@ const Plot = memo(function Plot({ layer, span, timeZone, lat, lon, wind, tide, p
   const water = useMemo(() => (layer === 'tide' && curve !== undefined ? tidePlot(curve, span) : null), [layer, curve, span])
   const band = useMemo(() => (layer === 'clouds' && percent !== undefined ? percentBand(percent, span) : []), [layer, percent, span])
   const unit = wind?.unit ?? 'kt'
-  const say = (kt: number) => Math.round(windIn(kt / KT_PER_MPS, unit) ?? 0)
   const W = 1000
   const H = 100
   const pct = (x: number) => `${(x * 100).toFixed(2)}%`
   const empty = layer === 'wind' ? (plot?.bars.length ?? 0) === 0 : layer === 'tide' ? (water?.points.length ?? 0) === 0 : band.length === 0
+  /* The plot's width on screen, for keeping the bar's words apart; 350 until it is measured (a 390 px phone's bar). */
+  const plotBox = useRef<HTMLDivElement>(null)
+  const [plotW, setPlotW] = useState(350)
+  useEffect(() => {
+    const el = plotBox.current
+    if (el === null || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => setPlotW(Math.round(el.getBoundingClientRect().width) || 350))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const limitText = limit === null ? null : `drone limit ${Math.round(windIn(limit, unit) ?? 0)}`
+  const labels = useMemo(() => (plot === null ? null : windLabels(plot, plotW, PLOT_PX, (kt) => String(Math.round(windIn(kt / KT_PER_MPS, unit) ?? 0)), limitText)), [plot, plotW, limitText, unit])
   return (
     <div className="ltl__plotwrap">
       {layer === 'wind' ? (
@@ -343,7 +360,7 @@ const Plot = memo(function Plot({ layer, span, timeZone, lat, lon, wind, tide, p
           ))}
         </div>
       ) : null}
-      <div className="ltl__plot">
+      <div ref={plotBox} className="ltl__plot">
         <svg className="ltl__svg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
           {nights.map((n) => (
             <rect key={n.x0} className="ltl__night" x={n.x0 * W} y={0} width={(n.x1 - n.x0) * W} height={H} />
@@ -363,20 +380,17 @@ const Plot = memo(function Plot({ layer, span, timeZone, lat, lon, wind, tide, p
             <rect key={b.x} className="ltl__pct" x={b.x * W + 0.5} y={H - b.h * H} width={Math.max(1, b.w * W - 1)} height={b.h * H} />
           ))}
         </svg>
-        {plot === null
+        {/* Batch FIX 2.4: the limit at the bar's left end, and no peak under it (src/core/layerTimeline.ts windLabels). */}
+        {labels === null
           ? null
-          : plot.peaks.map((p) => {
-              const bar = plot.bars.find((b) => Math.abs(b.x + b.w / 2 - p.x) < 1e-9)
-              const top = Math.max(bar?.gustH ?? 0, bar?.h ?? 0)
-              return (
-                <span key={p.x} className="ltl__peak num" data-wind-peak style={{ left: pct(p.x), bottom: `${Math.min(80, top * 100 + 4).toFixed(0)}%` }}>
-                  {say(p.kt)}
-                </span>
-              )
-            })}
-        {plot?.limitH == null || limit === null ? null : (
-          <span className="ltl__limitword num" data-drone-limit style={{ bottom: `${Math.min(88, plot.limitH * 100 + 2).toFixed(0)}%` }}>
-            drone limit {Math.round(windIn(limit, unit) ?? 0)}
+          : labels.peaks.map((p) => (
+              <span key={p.x} className="ltl__peak num" data-wind-peak style={{ left: pct(p.x), bottom: `${p.bottomPct.toFixed(0)}%` }}>
+                {p.text}
+              </span>
+            ))}
+        {labels?.limit == null ? null : (
+          <span className="ltl__limitword num" data-drone-limit style={{ bottom: `${labels.limit.bottomPct.toFixed(0)}%` }}>
+            {labels.limit.text}
           </span>
         )}
         {empty ? <span className="ltl__empty">{layer === 'tide' ? (tide?.problem ?? 'Reading the tide…') : layer === 'wind' ? 'Reading the wind…' : 'Reading the clouds…'}</span> : null}

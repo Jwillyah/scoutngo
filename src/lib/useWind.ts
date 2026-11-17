@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { LatLon } from '../core/geo.ts'
 import type { Wind } from '../core/upwind.ts'
 import type { LevelWind } from '../core/windProfile.ts'
-import { fetchVenueDay, parseVenueCloud, parseWind, venueClock, type VenueCloud } from './forecast.ts'
+import { fetchVenueHour, parseVenueCloud, parseWind, venueClock, type VenueCloud } from './forecast.ts'
 import { isOnline, reportNetwork } from './netState.ts'
 import { useOnline } from './useOnline.ts'
 import { retrying } from './retrying.ts'
@@ -88,6 +88,9 @@ function fromPayload(
   }
 }
 
+/** The answer last saved for the offline copy, per day key: an hour on the same answer does not write it again (each save rewrites the whole saved list, and it ran on every hour crossed while a finger was on the bar). */
+const savedFrom = new Map<string, number>()
+
 export function useWind(
   venue: LatLon | null,
   at: Date | null,
@@ -114,13 +117,16 @@ export function useWind(
     const key = venueDayKey(lat, lon, venueClock(at, timeZone).date, timeZone)
     /* Asked again after a failure that a second try could change (src/lib/retrying.ts). */
     return retrying(async () => {
-      const result = await fetchVenueDay({ lat, lon }, at, timeZone)
+      const result = await fetchVenueHour({ lat, lon }, at, timeZone)
       /* Kept and offline is not live: the chip says its age (ux-rules 13; the venue pack audit caught it, 30 Oct). */
       const aged = result.status === 'ok' && (result.stale || (result.kept && !isOnline()))
       if (result.status === 'ok' && !aged) {
         /* Only an answer that came over the network says the network works (Batch N: kept answers reset the 30 s offline count). */
         if (!result.kept) reportNetwork(true)
-        saveForecast(key, result.payload)
+        if (savedFrom.get(key) !== result.fetchedAt) {
+          saveForecast(key, result.payload)
+          savedFrom.set(key, result.fetchedAt)
+        }
         setState(fromPayload(result.payload, at, timeZone, { kind: 'live' }))
         return true
       }

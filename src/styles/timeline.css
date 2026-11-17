@@ -38,6 +38,8 @@
   top: 0;
   left: 0;
   max-width: min(64%, 260px);
+  /* Its width is the box's, padding and edge in it: the placement (src/core/markerReadout.ts readoutBeside) counts the whole card. */
+  box-sizing: border-box;
   padding: 8px 12px;
   border: 1px solid var(--glass-edge);
   border-radius: 14px;
@@ -45,6 +47,12 @@
   color: var(--white);
   pointer-events: none;
   will-change: transform;
+}
+/* Narrowed to the room beside the marker (Batch FIX 2.3): the lines wrap at a space, never cut, never mid-word. */
+.lmark__card[data-tight='1'] .lmark__line {
+  white-space: normal;
+  overflow-wrap: normal;
+  text-overflow: clip;
 }
 .lmark__card button {
   pointer-events: auto;
@@ -354,8 +362,9 @@
 .ltl__peak {
   transform: translateX(-50%);
 }
+/* At the bar's left end (Batch FIX 2.4: at the right it sat on the last day's peak); src/core/layerTimeline.ts windLabels drops a peak under it. */
 .ltl__limitword {
-  right: 0;
+  left: 0;
   color: var(--wind-limit);
 }
 .ltl__empty {

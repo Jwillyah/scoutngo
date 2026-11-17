@@ -53,13 +53,15 @@ describe('the timeline bar, wind', () => {
     expect(html.match(/class="ltl__cap"/g)?.length).toBe(115)
     expect(html).toContain('class="ltl__limit"')
     expect(html).toMatch(/data-drone-limit[^>]*>drone limit 23</)
-    expect(html.match(/data-wind-peak/g)?.length).toBe(5)
+    /* Batch FIX 2.4: the limit's words at the left end take the first two days' "14" (their boxes would touch it on a 350 px bar); the other three stay. */
+    expect(html.match(/data-wind-peak/g)?.length).toBe(3)
     expect(html).toContain('arrows = where it blows · bars = wind (kt) · caps = gusts')
   })
-  it('no limit line without a drone with a rating', () => {
+  it('no limit line without a drone with a rating, and then every day keeps its peak', () => {
     const h = wind(null)
     expect(h).not.toContain('ltl__limit')
     expect(h).not.toContain('drone limit')
+    expect(h.match(/data-wind-peak/g)?.length).toBe(5)
   })
   it('the colours are tokens, never a literal', () => {
     expect(html).not.toMatch(/#[0-9a-f]{3,6}\b|rgb\(/i)

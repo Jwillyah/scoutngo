@@ -17,7 +17,21 @@ export function useNow(intervalMs = 30_000): Date {
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), intervalMs)
-    return () => clearInterval(timer)
+    /*
+     * A phone in the background pauses the timer: back in front, the clock is
+     * put right at once, not at the next tick (Batch FIX, Section 2.1: the
+     * map's bar compared itself with last night's "now" after a resume).
+     */
+    const wake = () => {
+      if (document.visibilityState === 'visible') setNow(new Date())
+    }
+    document.addEventListener('visibilitychange', wake)
+    window.addEventListener('pageshow', wake)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', wake)
+      window.removeEventListener('pageshow', wake)
+    }
   }, [intervalMs])
 
   return now

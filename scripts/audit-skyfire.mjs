@@ -62,8 +62,12 @@ const asked = { fire: 0, split: 0, nws: 0, aod: 0 }
  */
 function venueDay(u) {
   const vars = (u.searchParams.get('hourly') ?? '').split(',').filter(Boolean)
+  /* Batch FIX, Section 2.6: the app asks once for the bar's whole range (start_date to end_date), so every day asked is answered, not only the first. */
   const day = u.searchParams.get('start_date') ?? '2026-10-29'
-  const time = Array.from({ length: 24 }, (_, h) => `${day}T${String(h).padStart(2, '0')}:00`)
+  const end = u.searchParams.get('end_date') ?? day
+  const days = []
+  for (let d = Date.parse(`${day}T00:00:00Z`); d <= Date.parse(`${end}T00:00:00Z`) && days.length < 16; d += 86_400_000) days.push(new Date(d).toISOString().slice(0, 10))
+  const time = days.flatMap((dd) => Array.from({ length: 24 }, (_, h) => `${dd}T${String(h).padStart(2, '0')}:00`))
   const value = (v) => (/cloud_cover_low/.test(v) ? 100 : /cloud_cover_mid/.test(v) ? 5 : /cloud_cover_high/.test(v) ? 0 : /cloud_cover/.test(v) ? 100 : /direction/.test(v) ? 20 : /gust/.test(v) ? 6 : /wind_speed/.test(v) ? 3 : /visibility/.test(v) ? 16000 : 0)
   return { hourly: Object.fromEntries([['time', time], ...vars.map((v) => [v, time.map(() => value(v))])]) }
 }

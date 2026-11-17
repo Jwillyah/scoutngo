@@ -466,15 +466,17 @@
 }
 
 /* The radar's legend (Batch Polish 2, Section 1): one labelled bar, light to extreme, and what the dotted edge means. */
+/* Batch FIX, Section 2.5: one row, Light · the bar · Extreme · the satellite's dots, so the rain row fits under it in a standalone iPhone's peek. */
 .wlay__legend--bar {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   column-gap: 8px;
   row-gap: 2px;
 }
 .wlay__legend--bar .wlay__bar {
-  grid-column: 1 / -1;
+  grid-column: 2;
+  grid-row: 1;
 }
 .wlay__legend--bar .wlay__ends {
   display: contents;
@@ -484,16 +486,16 @@
 }
 .wlay__legend--bar .wlay__ends > span:first-child {
   grid-column: 1;
-  grid-row: 2;
+  grid-row: 1;
 }
 .wlay__legend--bar .wlay__ends > span:last-child {
   grid-column: 3;
-  grid-row: 2;
+  grid-row: 1;
 }
 .wlay__legend--bar .wlay__est {
-  grid-column: 2;
-  grid-row: 2;
-  justify-content: center;
+  grid-column: 4;
+  grid-row: 1;
+  white-space: nowrap;
 }
 .wlay__bar {
   display: block;
@@ -675,4 +677,59 @@ html:has(.mode-plan) body {
   height: var(--safe-top, 0px);
   background: var(--d-card-solid);
   pointer-events: none;
+}
+
+/*
+ * RADAR'S RAIN STRIP (Batch FIX, Section 2.5): one row under the colour bar,
+ * the chance of rain by the hour, the past 2 h and the next 24, a line at
+ * now. Kept to one 16 px plot and one 12 px line: the radar's peek is short.
+ */
+.wlay__rain {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 0;
+}
+.wlay__rainword {
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--white);
+}
+.wlay__rainplot {
+  position: relative;
+  display: block;
+  height: 16px;
+  border-radius: 3px;
+  background: rgb(255 255 255 / 0.06);
+  overflow: hidden;
+}
+.wlay__rainplot svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.wlay__rainbar {
+  fill: var(--white);
+  fill-opacity: 0.55;
+}
+.wlay__rainnow {
+  stroke: var(--white);
+  stroke-width: 2;
+}
+.wlay__rainnone {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  color: var(--glass-ink-2, rgb(255 255 255 / 0.8));
+}
+.wlay__rainend {
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
+  color: var(--glass-ink-2, rgb(255 255 255 / 0.8));
 }

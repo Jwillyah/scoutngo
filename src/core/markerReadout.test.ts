@@ -1,5 +1,40 @@
 import { describe, expect, it } from 'vitest'
-import { percentLine, stationLine, swellLine, tideLines, windLine } from './markerReadout.ts'
+import { percentLine, readoutBeside, stationLine, swellLine, tideLines, windLine, type ReadoutIn } from './markerReadout.ts'
+
+/* Batch FIX, Section 2.3: the card beside the marker, never on it. LayerMarker.tsx's gap and edge, a 390 x 700 map, the 44 px ring. */
+describe('where the readout sits', () => {
+  const base: ReadoutIn = { px: 195, py: 350, w: 200, h: 70, boxW: 390, boxH: 700, gap: 30, edge: 8 }
+  const RING = 22
+  /* The card's box and the ring's box share no pixel. */
+  const apart = (r: ReadoutIn) => {
+    const at = readoutBeside(r)
+    const w = at.maxWidth ?? r.w
+    const ringL = r.px - RING
+    const ringR = r.px + RING
+    return at.x >= ringR || at.x + w <= ringL
+  }
+  it('the old bug: a 200 px card on a marker in the middle of a 390 px phone fits on neither side, and is not put over it', () => {
+    /* The old rule: x = max(EDGE, px - GAP - w) = max(8, -35) = 8, the card from 8 to 208 over a marker at 195. */
+    const old = Math.max(8, base.px - base.gap - base.w)
+    expect(old < base.px && old + base.w > base.px).toBe(true)
+    const at = readoutBeside(base)
+    expect(apart(base)).toBe(true)
+    expect(at.maxWidth).toBe(157)
+  })
+  it('to the right when it fits there', () => {
+    expect(readoutBeside({ ...base, px: 100 })).toEqual({ x: 130, y: 315, side: 'right', maxWidth: null })
+  })
+  it('to the left near the right edge', () => {
+    expect(readoutBeside({ ...base, px: 340 })).toEqual({ x: 110, y: 315, side: 'left', maxWidth: null })
+  })
+  it('held inside the map top and bottom, and still beside', () => {
+    expect(readoutBeside({ ...base, px: 100, py: 10 }).y).toBe(8)
+    expect(readoutBeside({ ...base, px: 100, py: 695 }).y).toBe(622)
+  })
+  it('never on the marker, anywhere across the screen, for any card width', () => {
+    for (let px = 0; px <= 390; px += 5) for (const w of [80, 150, 200, 260]) expect(apart({ ...base, px, w }), `px ${px} w ${w}`).toBe(true)
+  })
+})
 
 /* The boards' readout (docs/mockups/Map_Timeline_Wind.png, Map_Timeline_Tide.png). */
 describe('the marker readout', () => {

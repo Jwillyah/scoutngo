@@ -8,6 +8,7 @@ import type { Alert } from '../lib/stormData.ts'
 import type { Upstream } from '../core/warnUpstream.ts'
 import { compassPoint } from '../core/field.ts'
 import { sliderSteps } from '../lib/radarLayer.ts'
+import { percentBand, RAIN_AHEAD_H, RAIN_PAST_H, type BarSpan } from '../core/layerTimeline.ts'
 import { RadarSlider } from './RadarSlider.tsx'
 import type { WeatherLayer } from './FeaturesSheet.tsx'
 
@@ -36,7 +37,16 @@ const colour = (dbz: number) => `#${N0Q_PALETTE[Math.round((dbz + 32.5) * 2)].to
  * toward the bottom edge, and lowering the sheet to see the map hid it. The
  * time bar has nothing to say to radar, which has its own timeline here.
  */
-export function RadarLegend({ scanAt, calls, strikes, timeZone }: { scanAt: Date | null; calls: readonly CellCall[]; strikes: readonly Strike[]; timeZone: string }) {
+/** Radar's rain strip (Batch FIX 2.5): the chance of rain at the marker, by the hour, over src/core/layerTimeline.ts rainSpan. */
+export interface RainStrip {
+  /** Per cent by the hour from the strip's start; null where the forecast did not say. */
+  values: readonly (number | null)[]
+  span: BarSpan
+  /** Now along the strip, 0 to 1. */
+  nowX: number
+}
+
+export function RadarLegend({ scanAt, calls, strikes, timeZone, rain = null }: { scanAt: Date | null; calls: readonly CellCall[]; strikes: readonly Strike[]; timeZone: string; rain?: RainStrip | null }) {
   const [play, setPlay] = useState(false)
   const [step, setStep] = useState(sliderSteps().indexOf(0))
   useEffect(() => {
@@ -58,6 +68,7 @@ export function RadarLegend({ scanAt, calls, strikes, timeZone }: { scanAt: Date
           <i className="rain__dots" /> satellite estimate
         </span>
       </div>
+      {rain === null ? null : <RainBand rain={rain} />}
       {scanAt === null ? (
         <p className="wlay__note">Reading the radar…</p>
       ) : (
@@ -66,6 +77,34 @@ export function RadarLegend({ scanAt, calls, strikes, timeZone }: { scanAt: Date
           <RadarSlider scanAt={scanAt} calls={calls} strikes={strikes} timeZone={timeZone} step={step} onStep={(i) => { setPlay(false); setStep(i) }} />
         </div>
       )}
+    </div>
+  )
+}
+
+/*
+ * THE CHANCE OF RAIN ON RADAR'S BAR (Batch FIX, Section 2.5): the past
+ * RAIN_PAST_H hours and the next RAIN_AHEAD_H, a bar per hour at its per cent,
+ * a line at now. Where the forecast said nothing there is no bar (never a
+ * zero), and with nothing at all the strip says so.
+ */
+function RainBand({ rain }: { rain: RainStrip }) {
+  const band = percentBand(rain.values, rain.span)
+  const most = rain.values.reduce<number | null>((m, v) => (v === null ? m : m === null ? v : Math.max(m, v)), null)
+  return (
+    <div className="wlay__rain" data-rain-band={band.length}>
+      <span className="wlay__rainword">{most === null ? 'Rain —' : `Rain up to ${Math.round(most)}%`}</span>
+      {/* Batch FIX, Section 2.5: one row (the ends beside the plot, not under it), so the radar's peek still fits a standalone iPhone. */}
+      <span className="wlay__rainend" aria-hidden="true">−{RAIN_PAST_H} h</span>
+      <span className="wlay__rainplot" role="img" aria-label={most === null ? 'Chance of rain: the forecast did not say' : `Chance of rain, the past ${RAIN_PAST_H} h and the next ${RAIN_AHEAD_H} h, up to ${Math.round(most)}%; the line is now`}>
+        <svg viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true">
+          {band.map((b) => (
+            <rect key={b.x} className="wlay__rainbar" x={b.x * 1000 + 0.5} y={100 - b.h * 100} width={Math.max(1, b.w * 1000 - 1)} height={b.h * 100} />
+          ))}
+          <line className="wlay__rainnow" x1={rain.nowX * 1000} x2={rain.nowX * 1000} y1={0} y2={100} vectorEffect="non-scaling-stroke" />
+        </svg>
+        {band.length === 0 ? <span className="wlay__rainnone">the forecast did not say</span> : null}
+      </span>
+      <span className="wlay__rainend" aria-hidden="true">+{RAIN_AHEAD_H} h</span>
     </div>
   )
 }

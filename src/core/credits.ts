@@ -29,7 +29,7 @@ export interface Credit {
 export const CREDITS: readonly Credit[] = [
   {
     name: 'OpenStreetMap',
-    hosts: ['nominatim.openstreetmap.org', 'overpass-api.de'],
+    hosts: ['nominatim.openstreetmap.org', 'overpass.kumi.systems', 'overpass.private.coffee', 'overpass-api.de'],
     use: 'Place names, search, beaches, piers and parks near a spot',
     license: 'ODbL 1.0 (data); Nominatim and Overpass usage policies',
     attribution: '© OpenStreetMap contributors',

@@ -194,6 +194,63 @@ export function dailyPeaks(values: readonly (number | null)[], span: BarSpan, ti
   return out
 }
 
+/*
+ * THE WIND BAR'S WORDS, KEPT APART (Batch FIX, Section 2.4; 17 Nov: "drone
+ * limit 23" sat on the "11" over Tuesday's peak). The drone's limit is said at
+ * the bar's LEFT end, on its line; each day's peak sits over its own bar; a
+ * peak whose box would touch the limit's, or an earlier peak's, is not drawn
+ * (the bar under it still says the speed). Boxes are estimated from the
+ * characters at the bar's 12 px type, a little wide, so a dropped label is
+ * the error and an overlap is not; scripts/audit-map-layers.mjs measures the
+ * real boxes in a browser.
+ */
+/** Width of one character of the bar's 12 px bold labels, px: a little over the widest digit, so a box errs wide. */
+export const LABEL_CHAR_PX = 7.5
+/** The labels' line height, px (line-height 1 at 12 px, and the shadow). */
+export const LABEL_LINE_PX = 13
+
+export interface WindLabel {
+  /** Where along the bar (its centre for a peak), 0 to 1. */
+  x: number
+  /** Its foot above the plot's floor, per cent of the plot's height. */
+  bottomPct: number
+  text: string
+}
+
+/** A peak's foot: just over the taller of its bar and its gust cap, held under the plot's top. */
+export const peakBottomPct = (barTop: number): number => Math.min(80, barTop * 100 + 4)
+/** The limit's foot: just over its dashed line. */
+export const limitBottomPct = (limitH: number): number => Math.min(88, limitH * 100 + 2)
+
+export function windLabels(
+  plot: WindPlot,
+  plotW: number,
+  plotH: number,
+  peakText: (kt: number) => string,
+  limitText: string | null,
+): { peaks: WindLabel[]; limit: WindLabel | null } {
+  const box = (left: number, bottomPct: number, text: string) => {
+    const w = text.length * LABEL_CHAR_PX
+    const bottom = plotH * (1 - bottomPct / 100)
+    return { l: left, r: left + w, t: bottom - LABEL_LINE_PX, b: bottom }
+  }
+  const touch = (a: ReturnType<typeof box>, b: ReturnType<typeof box>) => a.l < b.r + 2 && b.l < a.r + 2 && a.t < b.b + 1 && b.t < a.b + 1
+  const limit = plot.limitH === null || limitText === null ? null : { x: 0, bottomPct: limitBottomPct(plot.limitH), text: limitText }
+  const taken = limit === null ? [] : [box(0, limit.bottomPct, limit.text)]
+  const peaks: WindLabel[] = []
+  for (const p of plot.peaks) {
+    const bar = plot.bars.find((b) => Math.abs(b.x + b.w / 2 - p.x) < 1e-9)
+    const bottomPct = peakBottomPct(Math.max(bar?.gustH ?? 0, bar?.h ?? 0))
+    const text = peakText(p.kt)
+    const w = text.length * LABEL_CHAR_PX
+    const mine = box(p.x * plotW - w / 2, bottomPct, text)
+    if (taken.some((t) => touch(t, mine))) continue
+    taken.push(mine)
+    peaks.push({ x: p.x, bottomPct, text })
+  }
+  return { peaks, limit }
+}
+
 /** Sun below the horizon (the apparent sunrise and sunset height, -0.833°). */
 const NIGHT_BELOW_RAD = (-0.833 * Math.PI) / 180
 const NIGHT_STEP_MS = 10 * 60_000
@@ -290,6 +347,48 @@ export function daysToReach(to: Date, now: Date, min = 3, max = 7): number {
   const today = Math.floor(now.getTime() / DAY_MS) * DAY_MS
   return Math.max(min, Math.min(max, Math.floor((to.getTime() - today) / DAY_MS) + 1))
 }
+
+/*
+ * RADAR'S STRIP (Batch FIX, Section 2.5): the chance of rain at the marker by
+ * the hour, the past RAIN_PAST_H and the next RAIN_AHEAD_H, under the radar's
+ * own frames. From the briefing's hourly answer (precipitation_probability),
+ * which the app already asks at the spot: no new request, no new host.
+ */
+export const RAIN_PAST_H = 2
+export const RAIN_AHEAD_H = 24
+
+/** The strip's hours: from RAIN_PAST_H whole hours before now's hour to RAIN_AHEAD_H after it; `now` along it. */
+export function rainSpan(now: Date): { span: BarSpan; nowX: number } {
+  const hour = Math.floor(now.getTime() / HOUR_MS) * HOUR_MS
+  const span = { from: new Date(hour - RAIN_PAST_H * HOUR_MS), hours: RAIN_PAST_H + RAIN_AHEAD_H }
+  return { span, nowX: (now.getTime() - span.from.getTime()) / (span.hours * HOUR_MS) }
+}
+
+/*
+ * THE DAYS ASKED FOR ONCE PER SPOT (Batch FIX, Section 2.6; measured on
+ * 17 Nov, measurements/2026-11-17-scrub-fps-tide-1x.md: a 3 s drag on the
+ * bar sent 9 requests to Open-Meteo, the wind by height and the five models'
+ * low cloud at the spot, each asked again for every new day the thumb
+ * crossed). Both are asked for this whole range at once: 48 h behind today
+ * and the bar's five days ahead, so the thumb anywhere on the bar, or two
+ * days back, is an answer in hand. Days are the forecast's calendar dates,
+ * "YYYY-MM-DD" (the venue's for the wind, GMT for the models).
+ */
+export const SCRUB_PAST_DAYS = 2
+
+const addDays = (day: string, n: number): string => new Date(Date.parse(`${day}T00:00:00Z`) + n * DAY_MS).toISOString().slice(0, 10)
+
+/**
+ * From SCRUB_PAST_DAYS before `today` to the bar's last day. `margin` more
+ * days each side when the days are counted in another zone than the bar's:
+ * the bar's last evening at Virginia Beach is the next day in GMT.
+ */
+export function scrubDays(today: string, margin = 0): { start: string; end: string } {
+  return { start: addDays(today, -SCRUB_PAST_DAYS - margin), end: addDays(today, BAR_DAYS - 1 + margin) }
+}
+
+/** Whether a calendar day is inside the range (ISO dates compare as text). */
+export const inScrubDays = (day: string, r: { start: string; end: string }): boolean => day >= r.start && day <= r.end
 
 /** The hours of a series from `seriesFrom` (epoch ms, on the hour) laid on the bar: index i is span.from + i h. */
 export function onBar<T>(series: readonly T[], seriesFrom: number, span: BarSpan): (T | null)[] {

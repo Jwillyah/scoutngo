@@ -122,6 +122,11 @@ const WIND = `JSON.stringify((() => {
     legend: document.querySelector('[data-wind-timebar] [data-timeline-legend]')?.textContent ?? null,
     bar: bar === null ? null : { inPeek: !!bar.closest('.sheet__peek'), model: bar.dataset.model ?? null, h: Math.round(bar.getBoundingClientRect().height), arrows: bar.querySelectorAll('.ltl__arrow').length, bars: bar.querySelectorAll('.ltl__bar').length, days: [...bar.querySelectorAll('.ltl__day')].map((d) => d.textContent), flag: bar.querySelector('[data-time-flag]')?.textContent ?? null },
     readH: read === null ? 0 : Math.round(read.getBoundingClientRect().height),
+    /* Batch FIX, Section 2.3: the readout beside the marker, never on it; the ring's box and the card's. */
+    ring: (() => { const e = document.querySelector('[data-layer-marker="wind"] .lmark__ring'); if (!e) return null; const q = e.getBoundingClientRect(); return [q.left, q.top, q.right, q.bottom] })(),
+    card: read === null ? null : (() => { const q = read.getBoundingClientRect(); return [q.left, q.top, q.right, q.bottom] })(),
+    /* Batch FIX, Section 2.4: the bar's own labels (each day's peak, the drone's limit), their boxes, for the overlap check. */
+    barLabels: bar === null ? [] : [...bar.querySelectorAll('[data-wind-peak], [data-drone-limit]')].filter((e) => getComputedStyle(e).display !== 'none').map((e) => { const q = e.getBoundingClientRect(); return { t: e.textContent, limit: e.hasAttribute('data-drone-limit'), b: [q.left, q.top, q.right, q.bottom] } }),
     centre: (() => {
       if (!(c.width > 0)) return 0
       return c.getContext('2d').getImageData(Math.floor(c.width / 2), Math.floor(c.height / 2), 1, 1).data[3]
@@ -239,7 +244,16 @@ try {
       if (w.particles === 0) fail(`${label}: no particles`)
       if (!READ.test(w.readout ?? '')) fail(`${label}: the marker's readout says "${w.readout}"`)
       /* Batch DRONE, Section 3: the readout beside the marker, three lines at most (the wind, the swell, the station). */
-      if (w.readH === 0 || w.readH > 90) fail(`${label}: the marker's readout is ${w.readH} px tall, not one to three lines`)
+      /* Batch FIX 2.3: narrowed beside a marker in mid-screen its lines may wrap once more at a space; 120 px is four lines and the padding. */
+      if (w.readH === 0 || w.readH > 120) fail(`${label}: the marker's readout is ${w.readH} px tall, not one to four lines`)
+      /* Batch FIX 2.3: beside the marker, never on it. Both boxes must be there to say so (failure-modes B). */
+      if (w.ring === null || w.card === null) fail(`${label}: could not find the marker's ring (${JSON.stringify(w.ring)}) or its readout (${JSON.stringify(w.card)}) to check they are apart`)
+      else if (w.card[0] < w.ring[2] - 0.5 && w.ring[0] < w.card[2] - 0.5 && w.card[1] < w.ring[3] - 0.5 && w.ring[1] < w.card[3] - 0.5) fail(`${label}: the readout ${JSON.stringify(w.card.map(Math.round))} sits on the marker ${JSON.stringify(w.ring.map(Math.round))}`)
+      /* Batch FIX 2.4: no label on the wind bar over another ("drone limit 23" over the "11" peak, 17 Nov). The kit has the Air 3S, so the limit is drawn: counted, so an empty bar is not a pass. */
+      const peaks = w.barLabels.filter((l) => !l.limit)
+      if (peaks.length === 0 || !w.barLabels.some((l) => l.limit)) fail(`${label}: the wind bar shows ${peaks.length} peak labels and ${w.barLabels.some((l) => l.limit) ? 'a' : 'no'} drone limit: nothing to check for overlap`)
+      for (const [i, a] of w.barLabels.entries()) for (const b of w.barLabels.slice(i + 1)) if (a.b[0] < b.b[2] - 0.5 && b.b[0] < a.b[2] - 0.5 && a.b[1] < b.b[3] - 0.5 && b.b[1] < a.b[3] - 0.5) fail(`${label}: on the wind bar "${a.t}" overlaps "${b.t}"`)
+      console.log(`  wind bar labels: ${w.barLabels.map((l) => l.t).join(' | ')}`)
       if (w.chrome.length !== 1 || !/heading|north/.test(w.chrome[0] ?? '')) fail(`${label}: with wind on, the map still shows ${JSON.stringify(w.chrome)}`)
       if (!w.marker) fail(`${label}: no marker`)
       if (w.cross) fail(`${label}: the old crosshair is still on the map beside the marker`)
