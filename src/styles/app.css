@@ -11675,6 +11675,8 @@
 .clay__link {
   border: 0;
   background: none;
+  /* Batch FIX: 44 px tall in its own right; the panel's edge clipped the invisible hit box below (audit-gestures, 17 Nov). */
+  min-height: 44px;
   padding: 6px 0;
   color: var(--color-accent);
   font: inherit;

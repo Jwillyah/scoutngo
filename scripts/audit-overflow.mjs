@@ -376,6 +376,33 @@ try {
     await wait(600)
   }
 
+  /*
+   * SUN · MOON · NIGHT (Batch DRONE, Section 4; Batch FIX, Section 5.2): the
+   * three are swipe pages. Nothing runs past the edge; the row is paged (the
+   * check's own rule); a swipe to the last page names Night on the pill.
+   */
+  await openMenu(ev, wait)
+  await wait(900)
+  await ev(`document.querySelector('.mcard--sky')?.click()`)
+  await wait(1500)
+  await ev(`[...document.querySelectorAll('button')].find((b) => /^Sun, moon, night/.test(b.textContent.trim()))?.click()`)
+  await wait(2500)
+  await check('Sun · Moon · Night', '.smn .smn__track')
+  {
+    const swiped = JSON.parse(await ev(`(async () => { const t = document.querySelector('.smn__track'); if (!t) return 'null'; t.scrollTo({ left: t.clientWidth * 2, behavior: 'auto' }); await new Promise((r) => setTimeout(r, 600)); return JSON.stringify({ pages: t.querySelectorAll('[data-smn-page]').length, on: document.querySelector('.smn__seg [aria-selected="true"]')?.textContent ?? null, left: Math.round(t.scrollLeft), w: t.clientWidth }) })()`))
+    if (swiped === null) fail('Sun · Moon · Night: no swipe row')
+    else {
+      console.log(`  Sun · Moon · Night: ${swiped.pages} pages; swiped to ${swiped.left} of ${swiped.w * 2} px, the pill says ${swiped.on}`)
+      if (swiped.pages !== 3) fail(`Sun · Moon · Night: ${swiped.pages} swipe pages, not 3`)
+      if (swiped.on !== 'Night') fail(`Sun · Moon · Night: swiped to the last page, the pill says ${swiped.on}`)
+    }
+    await ev(`document.querySelector('.smn .ppage__back')?.click()`)
+    await wait(800)
+    /* And the Sky page under it, so the menu below opens from the map as before. */
+    await ev(`document.querySelector('.spage .ppage__back')?.click()`)
+    await wait(800)
+  }
+
   await openMenu(ev, wait)
   await check('the menu', 'nav[aria-label="Stage"]')
   await ev(`document.querySelector('button[aria-label="Menu"]')?.click(); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))`)

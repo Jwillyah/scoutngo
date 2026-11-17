@@ -8,7 +8,7 @@ import { sunriseOn } from '../core/sunrise.ts'
 import { directionAt, levelAt, STATION_LOCAL_KM } from '../core/tide.ts'
 import { formatClock, formatShortHour } from '../core/timezone.ts'
 import { WaterTile } from './WaterLine.tsx'
-import { dayRangeFeet, moonLitPercent, nextTurns, SCRUB_RETURN_MS, springOrNeap, SPRING_OVER, typicalRangeFeet, tideDayWindow, tideHeight, timeAtShare, untilWords } from '../core/tideWindow.ts'
+import { dayRangeFeet, moonLitPercent, NOW_DOT_R, nextTurns, SCRUB_RETURN_MS, springOrNeap, SPRING_OVER, typicalRangeFeet, tideDayWindow, tideHeight, timeAtShare, untilWords } from '../core/tideWindow.ts'
 import type { DetailId } from '../lib/detailTabs.ts'
 import { hourlyAt } from '../lib/tideSheetData.ts'
 import { useTide, type TideInfo } from '../lib/useTide.ts'
@@ -193,17 +193,22 @@ export function TideContent({ now, tide, data, venue, placeName, timeZone, units
             {model.marks.map((m) => (
               <g key={m.at.getTime()} className={`dtide__mark dtide__mark--${m.kind}`}>
                 <circle cx={m.x} cy={m.y} r={2.5} />
-                <text x={m.labelX} y={m.labelY} textAnchor="middle" className="dtide__t">
-                  {formatClock(m.at, timeZone)}
-                </text>
-                <text x={m.labelX} y={m.labelY + 11} textAnchor="middle" className="dtide__h">
-                  {tideHeight(m.feet, units.distance)}
-                </text>
+                {/* Batch FIX, Section 5.1: not drawn while the now dot or label is on it (src/core/tideWindow.ts). */}
+                {m.hidden === true ? null : (
+                  <>
+                    <text x={m.labelX} y={m.labelY} textAnchor="middle" className="dtide__t">
+                      {formatClock(m.at, timeZone)}
+                    </text>
+                    <text x={m.labelX} y={m.labelY + 11} textAnchor="middle" className="dtide__h">
+                      {tideHeight(m.feet, units.distance)}
+                    </text>
+                  </>
+                )}
               </g>
             ))}
             {model.now === null ? null : (
               <g data-now>
-                <circle className="dtide__now" cx={model.now.x} cy={model.now.y} r={6} />
+                <circle className="dtide__now" cx={model.now.x} cy={model.now.y} r={NOW_DOT_R} />
                 <text className="dtide__nowt" x={model.now.labelX} y={model.now.labelY} textAnchor="middle">
                   now
                 </text>

@@ -1,6 +1,6 @@
 import '../styles/sky.css'
 import '../styles/sky-sun-moon.css'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { compassPoint } from '../core/field.ts'
 import type { LatLon } from '../core/geo.ts'
 import { colorWords } from '../core/homeDay.ts'
@@ -342,6 +342,30 @@ export function SunMoonNightPage({ venue, placeName, timeZone, now, initial, onB
   const opened = useMemo(() => initial ?? opensOn(sunHero(now, venue.lat, venue.lon).phase), [initial, now, venue])
   const [picked, setPicked] = useState<SmnTab | null>(null)
   const tab = picked ?? opened
+  /*
+   * Batch FIX, Section 5.2: the three are swipe pages, as the Sky and Drone
+   * pages' (a snapping row, the pill naming the page in view); a tap on the
+   * pill slides to its page.
+   */
+  const track = useRef<HTMLDivElement>(null)
+  const index = (t: SmnTab) => TABS.findIndex((x) => x.id === t)
+  const go = (t: SmnTab) => {
+    setPicked(t)
+    const el = track.current
+    const still = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
+    if (el !== null) el.scrollTo({ left: index(t) * el.clientWidth, behavior: still ? 'auto' : 'smooth' })
+  }
+  useEffect(() => {
+    const el = track.current
+    if (el === null) return
+    el.scrollLeft = index(tab) * el.clientWidth
+    const onScroll = () => {
+      const t = TABS[Math.round(el.scrollLeft / Math.max(1, el.clientWidth))]?.id
+      if (t !== undefined) setPicked(t)
+    }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const callWord = (k: 'sunset' | 'sunrise') => colorWords(skyCallNow(brief.days, now, venue, k)?.call ?? null)
   const how = (
     <>
@@ -355,18 +379,22 @@ export function SunMoonNightPage({ venue, placeName, timeZone, now, initial, onB
     <PageShell kind="spage smn" title="Sun · Moon · Night" sub={`${placeName} · ${dayWords(localDate(now, timeZone))}`} ground="night" onBack={onBack} onMap={onMap} how={how} footInScroll>
       <div className="ui-seg spage__seg smn__seg" role="tablist" aria-label="Sun, moon or night">
         {TABS.map((t) => (
-          <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className={`ui-seg__opt${tab === t.id ? ' ui-seg__opt--on' : ''}`} onClick={() => setPicked(t.id)}>
+          <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className={`ui-seg__opt${tab === t.id ? ' ui-seg__opt--on' : ''}`} onClick={() => go(t.id)}>
             {t.label}
           </button>
         ))}
       </div>
-      {tab === 'sun' ? (
-        <SunView venue={venue} timeZone={timeZone} now={now} sunsetCall={callWord('sunset')} sunriseCall={callWord('sunrise')} />
-      ) : tab === 'moon' ? (
-        <MoonView venue={venue} timeZone={timeZone} now={now} onPlanMoonrise={onPlanMoonrise} />
-      ) : (
-        <NightView venue={venue} timeZone={timeZone} now={now} />
-      )}
+      <div className="smn__track" ref={track} data-sideways>
+        <section className="smn__page" aria-label="Sun" data-smn-page="sun" aria-hidden={tab !== 'sun'}>
+          <SunView venue={venue} timeZone={timeZone} now={now} sunsetCall={callWord('sunset')} sunriseCall={callWord('sunrise')} />
+        </section>
+        <section className="smn__page" aria-label="Moon" data-smn-page="moon" aria-hidden={tab !== 'moon'}>
+          <MoonView venue={venue} timeZone={timeZone} now={now} onPlanMoonrise={onPlanMoonrise} />
+        </section>
+        <section className="smn__page" aria-label="Night" data-smn-page="night" aria-hidden={tab !== 'night'}>
+          <NightView venue={venue} timeZone={timeZone} now={now} />
+        </section>
+      </div>
     </PageShell>
   )
 }

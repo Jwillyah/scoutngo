@@ -15,6 +15,9 @@
  *   labels     a high's time and height above its dot, a low's below, each
  *              kept inside the drawing by LABEL_HALF_W. "now" sits above
  *              its dot, or below it when that would touch a turn's label.
+ *              Batch FIX, Section 5.1 (17 Nov, 7:05 AM: "now" on the 6:41 AM
+ *              low's label): a turn's label that the now dot or its label
+ *              still touches is not drawn while they touch (its dot stays).
  */
 import { getMoonIllumination, getPosition } from 'suncalc'
 import { localDate } from './moonTimes.ts'
@@ -33,6 +36,25 @@ export const LABEL_HALF_W = 26
 /** A turn's two-line label, px tall, from 10 px above its first baseline. */
 export const LABEL_H = 24
 export const NOW_LABEL = { w: 24, h: 12 }
+/** The now dot's radius, px (TidePageV2 draws it). */
+export const NOW_DOT_R = 6
+
+interface Box {
+  l: number
+  r: number
+  t: number
+  b: number
+}
+const meets = (a: Box, b: Box) => a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b
+/** A turn's two-line label: LABEL_HALF_W either side of its middle, from 10 px above its first baseline, LABEL_H tall. */
+export const turnLabelBox = (m: Pick<TideMark, 'labelX' | 'labelY'>): Box => ({ l: m.labelX - LABEL_HALF_W, r: m.labelX + LABEL_HALF_W, t: m.labelY - 10, b: m.labelY - 10 + LABEL_H })
+/** The now dot and the now label, as boxes. */
+export const nowBoxes = (n: NonNullable<TideWindowModel['now']>): Box[] => [
+  { l: n.x - NOW_DOT_R, r: n.x + NOW_DOT_R, t: n.y - NOW_DOT_R, b: n.y + NOW_DOT_R },
+  { l: n.labelX - NOW_LABEL.w / 2, r: n.labelX + NOW_LABEL.w / 2, t: n.labelY - NOW_LABEL.h, b: n.labelY },
+]
+/** Does the now dot or label touch this turn's label? */
+export const nowMeetsLabel = (n: NonNullable<TideWindowModel['now']>, m: Pick<TideMark, 'labelX' | 'labelY'>): boolean => nowBoxes(n).some((b) => meets(b, turnLabelBox(m)))
 
 export interface TideMark {
   kind: 'high' | 'low'
@@ -43,6 +65,8 @@ export interface TideMark {
   /** Where the label's middle sits (clamped inside the drawing), and its first line's baseline. */
   labelX: number
   labelY: number
+  /** The label is not drawn: the now dot or the now label is on it (Batch FIX, Section 5.1). */
+  hidden?: boolean
 }
 
 export interface TideWindowModel {
@@ -115,6 +139,7 @@ export function tideDayWindow(input: { now: Date; date: string; timeZone: string
     const hits = (labelY: number) => marks.some((m) => Math.abs(m.labelX - labelX) * 2 < NOW_LABEL.w + LABEL_HALF_W * 2 && labelY > m.labelY - 10 - NOW_LABEL.h / 2 && labelY - NOW_LABEL.h < m.labelY - 10 + LABEL_H)
     const above = y - 10
     now = { x, y, labelX, labelY: hits(above) ? y + 20 : above }
+    for (const m of marks) if (nowMeetsLabel(now, m)) m.hidden = true
   }
   const ticks = ['00:00', '06:00', '12:00', '18:00']
     .map((hm) => zonedTimeToUtc(input.date, hm, input.timeZone))

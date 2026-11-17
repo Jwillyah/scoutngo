@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { phaseBySynodic } from '../src/core/moonTides.ts'
 import { curveFromExtremes, type TideExtreme } from '../src/core/tide.ts'
-import { CURVE_PAD_PX, dayRangeFeet, LABEL_H, LABEL_HALF_W, moonLitPercent, NOW_LABEL, nextTurns, SCRUB_RETURN_MS, tideDayWindow, tideHeight, timeAtShare, untilWords } from '../src/core/tideWindow.ts'
+import { CURVE_PAD_PX, dayRangeFeet, LABEL_H, LABEL_HALF_W, moonLitPercent, NOW_LABEL, nowMeetsLabel, nextTurns, SCRUB_RETURN_MS, tideDayWindow, tideHeight, timeAtShare, untilWords } from '../src/core/tideWindow.ts'
 import { cToF, WETSUIT_BANDS, wetsuitFor } from '../src/core/wetsuit.ts'
 
 /*
@@ -108,6 +108,28 @@ describe('tideDayWindow: the day, drawn', () => {
       checked += 1
     }
     expect(checked).toBe(144)
+  })
+
+  it('Batch FIX, Section 5.1: the now dot or label never sits on a drawn turn label (17 Nov, 7:05 AM, 24 min after the 6:41 low)', () => {
+    let hidden = 0
+    for (let t = Date.parse('2026-11-02T05:00:00Z'); t < Date.parse('2026-11-03T05:00:00Z'); t += 5 * 60_000) {
+      const m = model(new Date(t))
+      if (m === null || m.now === null) continue
+      for (const k of m.marks) {
+        if (k.hidden === true) hidden += 1
+        else expect(nowMeetsLabel(m.now, k), `now at ${new Date(t).toISOString()} on the ${k.kind} at ${k.at.toISOString()}`).toBe(false)
+      }
+    }
+    /* Next to a turn the dot does touch its label: that label goes, for those minutes only. */
+    const low = EXTREMES.find((e) => e.kind === 'low' && e.at.getTime() > Date.parse('2026-11-02T05:00:00Z'))
+    expect(low).toBeDefined()
+    const near = model(new Date((low as TideExtreme).at.getTime() + 24 * 60_000))
+    const mark = near?.marks.find((k) => k.at.getTime() === (low as TideExtreme).at.getTime())
+    expect(near?.now).not.toBeNull()
+    expect(mark?.hidden === true || !nowMeetsLabel(near!.now!, mark!)).toBe(true)
+    expect(hidden).toBeGreaterThan(0)
+    const far = model(new Date((low as TideExtreme).at.getTime() + 4 * 3_600_000))
+    expect(far?.marks.every((k) => k.hidden !== true)).toBe(true)
   })
 
   it('has five ticks, midnight to midnight', () => {

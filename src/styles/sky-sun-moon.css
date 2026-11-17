@@ -3,11 +3,41 @@
  * in Look D: the frosted dcard, the Sky page's pills (.spage__seg), the data
  * colours keeping their meaning (--sun, --sun-set, --moon). The page is
  * .smn on the page shell (src/components/SunMoonNightPage.tsx). It scrolls
- * up and down; nothing in it scrolls sideways (scripts/audit-overflow.mjs):
- * the fourteen moons are two rows of seven.
+ * up and down; nothing in it scrolls sideways (scripts/audit-overflow.mjs)
+ * but the swipe row of the three pages (Batch FIX, Section 5.2: marked
+ * data-sideways, snapping a page at a time, the pill naming the page): the
+ * fourteen moons are two rows of seven.
  */
 .smn__seg {
   align-self: stretch;
+}
+.smn__track {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  margin-inline: -16px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.smn__track::-webkit-scrollbar {
+  display: none;
+}
+.smn__page {
+  flex: 0 0 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-inline: 16px;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+.smn__page > * {
+  flex-shrink: 0;
 }
 
 /* ------------------------------------------------------------ the heroes */

@@ -243,13 +243,26 @@ watchdog.note('step 5')
 
 /* 6 */
 console.log('\n### 6 · the new worker takes over')
+/*
+ * Batch FIX, Section 5.3. The first-run failures (DRONE 6, 16 Nov) printed
+ * "waiting": true: worker B had installed and called skipWaiting, and was
+ * held waiting. A browser activates a skipWaiting worker only once the old
+ * one has no fetch in flight, and since DRONE 6.1 the page asks for every
+ * page's code 3 s after it opens (src/lib/lazyPage.ts preloadPages): on a
+ * loaded gate those fetches through worker A can outlast the 10 s this step
+ * gave. Now: 30 s, and the line says how long the swap took and whether B was
+ * seen waiting, so a slow swap shows itself instead of failing as a flake.
+ */
 const swapped = await tab.ev(`(async () => {
-  for (let i = 0; i < 40; i += 1) {
+  const t0 = performance.now()
+  let sawWaiting = false
+  for (let i = 0; i < 120; i += 1) {
     const reg = await navigator.serviceWorker.getRegistration()
+    if (reg?.waiting) sawWaiting = true
     const keys = (await (await caches.open('scoutngo-shell-v1')).keys()).map((r) => new URL(r.url).pathname)
     if (reg?.active && keys.includes(${JSON.stringify(entryOf.B)}) && !keys.includes(${JSON.stringify(entryOf.A)})) {
       const text = await (await fetch('/sw.js', { cache: 'no-store' })).text()
-      return { build: /build (\\w+)/.exec(text)?.[1] ?? null, keys: keys.length }
+      return { build: /build (\\w+)/.exec(text)?.[1] ?? null, keys: keys.length, ms: Math.round(performance.now() - t0), sawWaiting }
     }
     await new Promise((r) => setTimeout(r, 250))
   }

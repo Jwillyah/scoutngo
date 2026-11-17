@@ -2,13 +2,16 @@
  * THE TIMELINE BAR'S SCRUB, FRAMES A SECOND (Batch DRONE, Section 3: "60 fps,
  * with no layer refetch while dragging").
  *
- * Usage:  node scripts/measure-scrub-fps.mjs <url> [--layer wind|clouds|tide] [--out file] [--throttle 4]
+ * Usage:  node scripts/measure-scrub-fps.mjs <url> [--layer wind|clouds|tide] [--out file] [--throttle 4] [--engine chromium|webkit]
  *
  *   <url>   the app, served built (the gate's dist on :5180 behind its
  *           fixture proxy, or any server of dist/). ?probe=1 is added, which
  *           arms the bar's frame counter in a production build
  *           (src/components/LayerTimeline.tsx, window.__scrub).
  *
+ * --engine webkit (Batch FIX, Section 5.4: "on a real frame clock, WebKit, not
+ * headless Chrome"): WebKit as an iPhone 13 (390 x 844), headed off, no CPU
+ * throttle (WebKit has no DevTools protocol for it: the run says so). Else
  * Chromium as a Pixel 7 (412 x 915), the CPU slowed --throttle times through
  * the DevTools protocol (4x: Lighthouse's mid-range Android). Opens the map,
  * turns the layer on from Features, waits for the bar, then a finger drags
@@ -27,7 +30,7 @@
  */
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { chromium, devices } from './gate/playwright.mjs'
+import { chromium, devices, webkit } from './gate/playwright.mjs'
 import { findChrome, goToStage } from './preflight.mjs'
 
 const arg = (name, fallback) => {
@@ -40,11 +43,13 @@ if (!URL_ARG || URL_ARG.startsWith('--')) {
   process.exit(2)
 }
 const LAYER = arg('layer', 'wind')
+const ENGINE = arg('engine', 'chromium')
+const WEBKIT = ENGINE === 'webkit'
 const THROTTLE = Number(arg('throttle', '4'))
 const DRAG_MS = 3000
 const DATE = new Date().toISOString().slice(0, 10)
 const OUT = arg('out', `measurements/${DATE}-scrub-fps.md`)
-const VIEWPORT = { width: 412, height: 915 }
+const VIEWPORT = WEBKIT ? { width: 390, height: 844 } : { width: 412, height: 915 }
 
 const url = new URL(URL_ARG)
 url.searchParams.set('probe', '1')
@@ -56,10 +61,11 @@ const couldNotLook = (why) => {
 
 /* SCOUTNGO_PROXY: the gate's fixture proxy (http://127.0.0.1:5181), so the layers have data to draw without a live host. */
 const PROXY = process.env.SCOUTNGO_PROXY ?? null
-const browser = await chromium.launch({ executablePath: findChrome(), ...(PROXY === null ? {} : { proxy: { server: PROXY, bypass: '127.0.0.1' } }) })
+const proxyOpt = PROXY === null ? {} : { proxy: { server: PROXY, bypass: '127.0.0.1' } }
+const browser = WEBKIT ? await webkit.launch(proxyOpt) : await chromium.launch({ executablePath: findChrome(), ...proxyOpt })
 let result = null
 try {
-  const ctx = await browser.newContext({ ...devices['Pixel 7'], viewport: VIEWPORT, serviceWorkers: 'block', ignoreHTTPSErrors: true })
+  const ctx = await browser.newContext({ ...devices[WEBKIT ? 'iPhone 13' : 'Pixel 7'], viewport: VIEWPORT, serviceWorkers: 'block', ignoreHTTPSErrors: true })
   await ctx.addInitScript(() => {
     try {
       localStorage.setItem('scoutngo.landing.v1', 'true')
@@ -96,8 +102,8 @@ try {
   if (drawn === 0) couldNotLook(`the ${LAYER} bar drew nothing in 20 s`)
   await wait(2000)
 
-  const cdp = await ctx.newCDPSession(page)
-  await cdp.send('Emulation.setCPUThrottlingRate', { rate: THROTTLE })
+  const cdp = WEBKIT ? null : await ctx.newCDPSession(page)
+  await cdp?.send('Emulation.setCPUThrottlingRate', { rate: THROTTLE })
 
   /* Every request from the finger down to the finger up. */
   const asks = []
@@ -127,7 +133,7 @@ try {
   await page.mouse.up()
   dragging = false
   const after = JSON.parse(await ev(`JSON.stringify(window.__scrub ?? { frames: 0, drags: 0, worstMs: 0 })`))
-  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 })
+  await cdp?.send('Emulation.setCPUThrottlingRate', { rate: 1 })
   const frames = after.frames - before.frames
   if (frames <= 0) couldNotLook('the bar counted no frames during the drag (window.__scrub absent: was ?probe=1 dropped?)')
   const byHost = {}
@@ -147,8 +153,8 @@ const lines = [
   '',
   `- url: ${url.href}`,
   `- layer: ${LAYER}`,
-  `- browser: Chromium, Pixel 7 profile, ${VIEWPORT.width} x ${VIEWPORT.height}`,
-  `- CPU throttle: ${THROTTLE}x`,
+  WEBKIT ? `- browser: WebKit, iPhone 13 profile, ${VIEWPORT.width} x ${VIEWPORT.height}` : `- browser: Chromium, Pixel 7 profile, ${VIEWPORT.width} x ${VIEWPORT.height}`,
+  WEBKIT ? '- CPU throttle: none (WebKit has no DevTools protocol to slow it)' : `- CPU throttle: ${THROTTLE}x`,
   `- drag: ${result.heldMs} ms across the day strip and back, ${result.moves} finger moves`,
   '',
   '## Result',
