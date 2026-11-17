@@ -1,0 +1,458 @@
+/*
+ * THE MAP'S ONE MARKER AND ITS ONE TIMELINE BAR (Batch DRONE, Section 3;
+ * boards docs/mockups/Map_Timeline_Wind.png, Map_Timeline_Tide.png,
+ * Wind_Bar_7.png). Colours are tokens only (src/styles/tokens.css): the wind
+ * bands, the drone limit and the time flag are tokens of their own.
+ */
+
+/* ------------------------------------------------------------ the marker */
+.lmark {
+  position: absolute;
+  z-index: 6;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  will-change: transform;
+}
+.lmark__ring {
+  position: absolute;
+  left: -22px;
+  top: -22px;
+  width: 44px;
+  height: 44px;
+  box-sizing: border-box;
+  border: 4px solid var(--white);
+  border-radius: 14px;
+  background: radial-gradient(circle, var(--white) 0 3px, transparent 3.5px);
+  box-shadow: 0 0 0 3px rgb(0 0 0 / 0.35), 0 2px 8px rgb(0 0 0 / 0.4);
+}
+.lmark[data-off='1'],
+.lmark__card[data-off='1'] {
+  visibility: hidden;
+}
+.lmark__card {
+  position: absolute;
+  z-index: 7;
+  top: 0;
+  left: 0;
+  max-width: min(64%, 260px);
+  padding: 8px 12px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 14px;
+  background: var(--map-glass);
+  color: var(--white);
+  pointer-events: none;
+  will-change: transform;
+}
+.lmark__card button {
+  pointer-events: auto;
+}
+.lmark__line {
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--text-sm);
+  line-height: 1.35;
+}
+.lmark__line--value {
+  font-size: 17px;
+  font-weight: 700;
+}
+.lmark__line--second {
+  color: var(--d-surf);
+}
+.lmark__line--third {
+  color: var(--glass-ink-2);
+}
+
+/* One marker: while it sits on the spot it is the spot's mark, and the venue pin under it steps aside. */
+.mode-plan[data-layer-mode]:has(.lmark[data-at-spot='1']) .pin--venue {
+  visibility: hidden;
+}
+
+/* The source pill under the search and the back-to-spot chip over the bar. */
+.lmark-source {
+  position: absolute;
+  z-index: 7;
+  top: calc(var(--safe-top) + var(--space-2) + 52px + 6px);
+  left: 50%;
+  max-width: calc(100% - 96px);
+  margin: 0;
+  padding: 4px 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--map-glass);
+  color: var(--white);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.lmark-hint {
+  position: absolute;
+  z-index: 7;
+  left: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+.lmark-hint__words {
+  min-width: 0;
+  margin: 0;
+  padding: 6px 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--map-glass);
+  color: var(--glass-ink-2);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.lmark-back {
+  flex: none;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  background: var(--map-glass);
+  color: var(--white);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+/* ---------------------------------------------------------- the bar */
+.ltl {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 2px 0 4px;
+  color: var(--white);
+  touch-action: none;
+}
+.ltl__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.ltl__play {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--white);
+  color: var(--black);
+}
+.ltl__play svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+.ltl__when {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ltl__time {
+  font-size: 17px;
+  font-weight: 700;
+}
+.ltl__now {
+  flex: none;
+  color: var(--d-surf);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+.ltl__now--go {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--d-surf);
+  text-decoration: underline;
+}
+.ltl__chips {
+  display: flex;
+  flex: none;
+  gap: 4px;
+  margin-left: auto;
+}
+.ltl__menuwrap {
+  position: relative;
+}
+.ltl__chip {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.08);
+  color: var(--white);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.ltl__menu {
+  position: absolute;
+  z-index: 9;
+  right: 0;
+  bottom: calc(100% + 6px);
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+  padding: 4px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 14px;
+  background: var(--d-card-solid);
+}
+.ltl__menuhead {
+  margin: 6px 12px 2px;
+  font-size: var(--text-xs);
+  color: var(--glass-ink-2);
+}
+.ltl__item {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--white);
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+}
+.ltl__item--on {
+  background: rgb(255 255 255 / 0.16);
+}
+
+/* The strip: dragged anywhere (the arrows, the plot, the ticks, the days). */
+.ltl__track {
+  position: relative;
+  margin-top: 18px;
+  touch-action: none;
+  cursor: ew-resize;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.ltl__track:focus-visible {
+  outline: 2px solid var(--white);
+  outline-offset: 2px;
+}
+.ltl__plotwrap {
+  position: relative;
+}
+.ltl__arrows {
+  position: relative;
+  height: 16px;
+}
+.ltl__arrow {
+  position: absolute;
+  top: 1px;
+  width: 14px;
+  height: 14px;
+}
+.ltl__arrow svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: var(--white);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ltl__plot {
+  position: relative;
+  height: 40px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: rgb(255 255 255 / 0.06);
+}
+.ltl--wind .ltl__plot {
+  overflow: visible;
+  background: transparent;
+}
+.ltl__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.ltl__night {
+  fill: var(--black);
+  fill-opacity: 0.45;
+}
+.ltl__bar--b0 {
+  fill: var(--wind-0);
+}
+.ltl__bar--b1 {
+  fill: var(--wind-7);
+}
+.ltl__bar--b2 {
+  fill: var(--wind-12);
+}
+.ltl__bar--b3 {
+  fill: var(--wind-17);
+}
+.ltl__bar--b4 {
+  fill: var(--wind-25);
+}
+.ltl__cap {
+  fill: var(--white);
+}
+.ltl__limit {
+  stroke: var(--wind-limit);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+}
+.ltl__water {
+  fill: var(--tide);
+  fill-opacity: 0.28;
+}
+.ltl__waterline {
+  fill: none;
+  stroke: var(--tide);
+  stroke-width: 2;
+}
+.ltl__pct {
+  fill: var(--white);
+  fill-opacity: 0.5;
+}
+.ltl__peak,
+.ltl__limitword {
+  position: absolute;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow: 0 0 3px rgb(0 0 0 / 0.8);
+}
+.ltl__peak {
+  transform: translateX(-50%);
+}
+.ltl__limitword {
+  right: 0;
+  color: var(--wind-limit);
+}
+.ltl__empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: var(--text-sm);
+  color: var(--glass-ink-2);
+}
+.ltl__ticks {
+  position: relative;
+  height: 6px;
+}
+.ltl__tick {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  height: 4px;
+  background: var(--glass-ink-2);
+}
+.ltl__tick--day {
+  height: 6px;
+  background: var(--white);
+}
+.ltl__days {
+  position: relative;
+  height: 14px;
+}
+.ltl__day {
+  position: absolute;
+  top: 1px;
+  transform: translateX(-50%);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 13px;
+  color: var(--glass-ink-2);
+}
+.ltl__thumb {
+  position: absolute;
+  z-index: 2;
+  top: -2px;
+  bottom: 18px;
+  width: 3px;
+  margin-left: -1.5px;
+  border-radius: 2px;
+  background: var(--white);
+  box-shadow: 0 0 3px rgb(0 0 0 / 0.6);
+  pointer-events: none;
+  will-change: left;
+}
+.ltl__flag {
+  position: absolute;
+  z-index: 3;
+  top: -18px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--time-flag);
+  color: var(--sky-ink);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 16px;
+  white-space: nowrap;
+  pointer-events: none;
+  will-change: left, transform;
+}
+.ltl__foot {
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--text-xs);
+  color: var(--glass-ink-2);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Docked, flat: no rounded card and no second sheet while a layer's bar is the peek (Section 3). */
+.mode-plan[data-layer-mode] .sheet {
+  border-radius: 0;
+}
+/*
+ * One message at a time over the map (ux-rules 2): with the tide or the
+ * clouds on the bar, as with the wind (wind.css), the source pill under the
+ * search says what is read, so the stat chips and the layer chip step aside;
+ * the bar's layer chip turns it off.
+ */
+.mode-plan[data-layer-mode] .chips2,
+.mode-plan[data-layer-mode] .wxchip,
+.mode-plan[data-layer-mode] .raypills {
+  display: none !important;
+}
+
+/* A 360-390 px phone: the time a size down so the row keeps one line. */
+@media (max-width: 400px) {
+  .ltl__time {
+    font-size: 15px;
+  }
+  .ltl__chip {
+    padding: 0 8px;
+  }
+}

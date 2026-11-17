@@ -6,6 +6,10 @@ import { FORECAST_OPACITY, skySourceFor, type SkySource } from '../core/skyTime.
 import { fetchCloudGrid } from './forecast.ts'
 import { snapToFrame } from './goesLayer.ts'
 import { CROSSFADE_H, forecastShare } from '../core/mapCloudField.ts'
+import { prefetchWindow } from '../core/layerTimeline.ts'
+
+/* clock-audit: data, a cache key per day */
+const venueDay = (at: Date) => at.toDateString()
 
 /**
  * WHAT THE SKY LAYER SHOWS FOR THE SCRUBBED MOMENT.
@@ -123,6 +127,21 @@ export function useSkyFrames(
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wantForecast, hourKey, timeZone])
+
+  /*
+   * PREFETCH ±24 H (Batch DRONE, Section 3). Each answer is a whole day at the
+   * venue, kept in the shared store (src/lib/weatherStore.ts), so asking for
+   * the days 24 h either side of the thumb once puts every hour a drag can
+   * reach in memory: a new hour under the thumb reads the store, never the
+   * network. Only future days: the past and now are the satellite's.
+   */
+  const dayKey = scrubbedAt === null ? null : venueDay(scrubbedAt)
+  useEffect(() => {
+    if (!wantForecast || venue === null || scrubbedAt === null || timeZone === null) return
+    const w = prefetchWindow(scrubbedAt)
+    for (const t of [w.from, w.to]) if (t.getTime() > Date.now()) void fetchCloudGrid(venue, t, timeZone).catch(() => undefined)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantForecast, dayKey, timeZone, venue?.lat, venue?.lon])
 
   const fallback: SkySource = { kind: 'forecast', hoursAhead: 0, trust: 'near', draw: false }
   const resolved = source ?? fallback

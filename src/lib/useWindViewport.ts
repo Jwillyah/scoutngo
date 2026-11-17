@@ -108,7 +108,12 @@ const boundsOf = (m: maplibregl.Map): Bounds => {
   return { south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast() }
 }
 
-/** `retry`: a new number asks again ("Wind didn't load · Retry", Batch TRUTH, Section 7). */
+/**
+ * `retry`: a new number asks again ("Wind didn't load · Retry", Batch TRUTH, Section 7).
+ * `at` decides only how many days are asked for; every hour of them comes in
+ * the same answer, so the map hands the thumb's time 24 h ahead, held while a
+ * drag lasts (src/core/layerTimeline.ts prefetchWindow).
+ */
 export function useWindViewport(map: maplibregl.Map | null, on: boolean, model: WindModelChip, at: Date | null = null, level: WindLevel = '10m', retry = 0): WindViewport {
   const days = gridDays(at)
   const [view, setView] = useState<{ bounds: Bounds; zoom: number } | null>(null)
@@ -170,7 +175,7 @@ export function useWindViewport(map: maplibregl.Map | null, on: boolean, model: 
   }, [on, got, key, step])
 }
 
-/** The fine grid the crosshair always reads: the cache's own 0.05°, as at zoom 9 and in. */
+/** The fine grid the marker always reads (it was a crosshair until Batch DRONE, Section 3): the cache's own 0.05°, as at zoom 9 and in. */
 export const POINT_STEP = 0.05
 
 /**
@@ -181,8 +186,9 @@ export const POINT_STEP = 0.05
  * request, the same URL zoom 12 asks, so through the same cache), bilinear
  * between its points. Asked when the crosshair settles on a new 0.01°.
  */
-export function usePointWind(centre: { lat: number; lon: number } | null, on: boolean, model: WindModelChip, at: Date | null, level: WindLevel = '10m'): { u: number; v: number; gust: number | null } | null {
-  const days = gridDays(at)
+/** `daysAt`: the time the days asked for must reach (Batch DRONE, Section 3: the thumb's time held 24 h ahead while a drag lasts, so a new hour never asks again). */
+export function usePointWind(centre: { lat: number; lon: number } | null, on: boolean, model: WindModelChip, at: Date | null, level: WindLevel = '10m', daysAt: Date | null = at): { u: number; v: number; gust: number | null } | null {
+  const days = gridDays(daysAt)
   const key = centre === null || !on ? null : `${centre.lat.toFixed(2)},${centre.lon.toFixed(2)}|${model}|${level}|${days}`
   const [got, setGot] = useState<{ key: string; series: PointSeries[] } | null>(null)
   useEffect(() => {

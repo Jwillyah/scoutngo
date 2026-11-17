@@ -91,7 +91,7 @@ export function WeatherLayerCard({ layer, alerts, upstream = [], dist = 'mi', ti
             <button type="button" className={`seg__btn${windFt === 0 ? ' seg__btn--on' : ''}`} aria-pressed={windFt === 0} onClick={() => onWindFt(0)}>Surface</button>
             <button type="button" className={`seg__btn${windFt === 400 ? ' seg__btn--on' : ''}`} aria-pressed={windFt === 400} onClick={() => onWindFt(400)}>400 ft</button>
           </div>
-          <p className="wlay__note">{windFt === 0 ? 'The colour is the wind’s speed (the legend over the time bar); the white lines move with it. The crosshair reads the wind under it. Play runs the next three days.' : 'Streaks move with the wind at 400 ft; brighter is stronger. Cloud-level wind is not in the forecast the map uses (it reaches 180 m).'}</p>
+          <p className="wlay__note">{windFt === 0 ? 'The colour is the wind’s speed; the white lines move with it. The marker reads the wind where it sits: hold the map anywhere to move it. Play runs the bar’s five days.' : 'Streaks move with the wind at 400 ft; brighter is stronger. Cloud-level wind is not in the forecast the map uses (it reaches 180 m).'}</p>
         </>
       ) : layer === 'clouds' ? (
         <>

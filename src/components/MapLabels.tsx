@@ -8,18 +8,17 @@ import '../styles/labels.css'
  * THE MAP'S LABELS (Batch Map, Section 3), drawn over the map in the app's
  * font: white with a soft dark halo, water names light and upright, towns
  * sized by importance, no route shields, at most twelve, never under the
- * crosshair or the spot's pin (src/core/mapLabels.ts chooses them). They
+ * marker or the spot's pin (src/core/mapLabels.ts chooses them). They
  * replace Esri's reference overlay. Placed again as the map moves.
  */
 interface Props {
   map: maplibregl.Map | null
   on: boolean
-  /** Points no label may cover: the spot's pin, and the crosshair when one is up. */
+  /** Points no label may cover: the spot's pin and the layer marker (Batch DRONE, Section 3: the crosshair is gone). */
   keepClear: () => { lat: number; lon: number }[]
-  crosshair: boolean
 }
 
-export function MapLabels({ map, on, keepClear, crosshair }: Props) {
+export function MapLabels({ map, on, keepClear }: Props) {
   const [placed, setPlaced] = useState<PlacedLabel[]>([])
   const cands = useRef<LabelCandidate[]>([])
   const clear = useRef(keepClear)
@@ -37,7 +36,6 @@ export function MapLabels({ map, on, keepClear, crosshair }: Props) {
         const s = map.project([p.lon, p.lat])
         return { x: s.x, y: s.y }
       })
-      if (crosshair) pts.push({ x: c.width / 2, y: c.height / 2 })
       setPlaced(chooseLabels(cands.current, map.getZoom(), (lat, lon) => {
         const s = map.project([lon, lat])
         return { x: s.x, y: s.y }
@@ -64,7 +62,7 @@ export function MapLabels({ map, on, keepClear, crosshair }: Props) {
       map.off('move', onMove)
       map.off('moveend', load)
     }
-  }, [map, on, crosshair])
+  }, [map, on])
 
   if (!on) return null
   return (

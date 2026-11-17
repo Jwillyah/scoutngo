@@ -22,7 +22,8 @@
 }
 .feat3__weather {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* Off · Rain · Wind · Clouds · Tide (Batch DRONE, Section 3): 5 tiles, 62 px each at 390. */
+  grid-template-columns: repeat(5, 1fr);
   gap: 8px;
 }
 .feat3__wtile {

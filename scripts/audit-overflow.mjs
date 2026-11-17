@@ -319,7 +319,8 @@ try {
     if (layers.mono > 0) fail(`${layers.mono} monospace elements in the Map sheet`)
     if (layers.debug) fail('debug words (a zoom level) in the Map sheet')
     if (!layers.tools) fail('no Measure in the Map sheet')
-    if (JSON.stringify(layers.weather) !== JSON.stringify(['Off', 'Rain', 'Wind', 'Clouds'])) fail(`the weather tiles read ${JSON.stringify(layers.weather)}`)
+    /* Batch DRONE, Section 3: Tide is a layer of the one timeline bar. */
+    if (JSON.stringify(layers.weather) !== JSON.stringify(['Off', 'Rain', 'Wind', 'Clouds', 'Tide'])) fail(`the weather tiles read ${JSON.stringify(layers.weather)}`)
   }
   /*
    * A NOTE WITH A CLOSE (measuring here; the waterline's is the same note):

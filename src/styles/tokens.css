@@ -148,6 +148,20 @@
   --light-back: #d08a5a; /* backlit, shooting into the sun */
   --sun: #ffd54a; /* current sun bearing */
   --tide: #6cc4ff; /* the water: the tide curve and the glass mornings (Tide sheet) */
+  /*
+   * THE MAP TIMELINE BAR (Batch DRONE, Section 3; board Wind_Bar_7): the wind
+   * bars by knots, 0 / 7 / 12 / 17 / 25+ (src/core/layerTimeline.ts
+   * WIND_BANDS_KT), calm blue to strong orange. Never red: wind is not a
+   * hazard by itself. The drone's rated limit is a salmon dash, and the time
+   * flag on the thumb is a pale yellow, apart from the sun's own amber.
+   */
+  --wind-0: #4a8fd0;
+  --wind-7: #5fdcc4;
+  --wind-12: #8fd17a;
+  --wind-17: #e8c04a;
+  --wind-25: #f08a5d;
+  --wind-limit: #ff9e8a;
+  --time-flag: #ffd47a;
   --sun-shadow: #9aa7ff; /* current shadow bearing */
   --moon: #c4b5fd; /* the moon and the night: its lines, its phase, the calendar's night marks. Not the shadow's periwinkle */
   --sun-rise: #ffa04a; /* sunrise bearing */

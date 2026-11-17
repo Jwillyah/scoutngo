@@ -80,12 +80,18 @@ const SHEET = `JSON.stringify((() => {
  * Batch Map, Section 1: the wind layer v3. Its colour canvas must cover the
  * WHOLE map: read back in a 6 x 6 grid of spots, every spot painted (the old
  * layer covered a 5 x 5 block of squares around the spot). Its particles
- * move (a count and the frame rate the layer itself counts), the crosshair's
- * readout says a speed and where from, the legend has its seven stops, the
- * wind's time bar is in the time sheet's place with Blend chosen, and the
+ * move (a count and the frame rate the layer itself counts), the marker's
+ * readout says a speed and where from, the timeline bar is in the time
+ * sheet's place with Blend chosen, its arrows, bars and key drawn, and the
  * sun's lines are off while it is on.
+ *
+ * Batch DRONE, Section 3: the crosshair fixed in the middle, the pill under
+ * the search and the thin wind bar (.wbar) are gone. The readout is the card
+ * beside the one marker ([data-marker-readout="wind"], up to three lines),
+ * the bar is the one timeline bar ([data-wind-timebar] on .ltl), and "off"
+ * is in the bar's layer menu.
  */
-/* "9 kt S · g11 · KORF 5 SW, 4 min ago" (Batch TRUTH, Section 7). */
+/* "9 kt NNW · g13" (board Map_Timeline_Wind). */
 const READ = /\d+ (kt|mph|km\/h|m\/s) [NESW]{1,3}\b/
 const WIND = `JSON.stringify((() => {
   const c = document.querySelector('canvas.windv3__field')
@@ -102,7 +108,7 @@ const WIND = `JSON.stringify((() => {
     }
   }
   const t = document.querySelector('canvas.windv3__trails')
-  const read = document.querySelector('[data-wind-readout]')
+  const read = document.querySelector('[data-marker-readout="wind"]')
   const bar = document.querySelector('[data-wind-timebar]')
   return {
     present: true,
@@ -113,8 +119,8 @@ const WIND = `JSON.stringify((() => {
     particles: Number(t?.dataset.particles ?? 0),
     fps: Number(t?.dataset.fps ?? 0),
     readout: read?.textContent ?? null,
-    legend: document.querySelectorAll('.wbar__legend span').length,
-    bar: bar === null ? null : { inPeek: !!bar.closest('.sheet__peek'), model: bar.querySelector('.wbar__pill')?.textContent ?? null, h: Math.round(bar.getBoundingClientRect().height) },
+    legend: document.querySelector('[data-wind-timebar] [data-timeline-legend]')?.textContent ?? null,
+    bar: bar === null ? null : { inPeek: !!bar.closest('.sheet__peek'), model: bar.dataset.model ?? null, h: Math.round(bar.getBoundingClientRect().height), arrows: bar.querySelectorAll('.ltl__arrow').length, bars: bar.querySelectorAll('.ltl__bar').length, days: [...bar.querySelectorAll('.ltl__day')].map((d) => d.textContent), flag: bar.querySelector('[data-time-flag]')?.textContent ?? null },
     readH: read === null ? 0 : Math.round(read.getBoundingClientRect().height),
     centre: (() => {
       if (!(c.width > 0)) return 0
@@ -123,6 +129,7 @@ const WIND = `JSON.stringify((() => {
     /* Wind is the whole map: no chips, no layer chip, the rail down to its compass. */
     chrome: [...document.querySelectorAll('.chips2, .wxchip, .rail2__slot')].filter((e) => e.getBoundingClientRect().height > 0 && getComputedStyle(e).display !== 'none').map((e) => e.className + ':' + (e.querySelector('button')?.getAttribute('aria-label') ?? '')),
     pills: document.querySelectorAll('.raypills > *').length,
+    marker: !!document.querySelector('[data-layer-marker="wind"]'),
     cross: !!document.querySelector('.windv3__cross'),
   }
 })())`
@@ -230,17 +237,22 @@ try {
       if (w.w < viewport.width * 0.9 || w.h < viewport.height * 0.6) fail(`${label}: the wind canvas is ${w.w} x ${w.h}, not the map's size`)
       if (w.painted < 36) fail(`${label}: the wind colour covers ${w.painted} of 36 spots across the screen, not all of it`)
       if (w.particles === 0) fail(`${label}: no particles`)
-      if (!READ.test(w.readout ?? '')) fail(`${label}: the crosshair's readout says "${w.readout}"`)
-      /* Batch TRUTH, Section 7: one thin pill, and nothing but back, search and the compass on the map. */
-      if (w.readH > 40) fail(`${label}: the wind readout is ${w.readH} px tall, not one thin line`)
+      if (!READ.test(w.readout ?? '')) fail(`${label}: the marker's readout says "${w.readout}"`)
+      /* Batch DRONE, Section 3: the readout beside the marker, three lines at most (the wind, the swell, the station). */
+      if (w.readH === 0 || w.readH > 90) fail(`${label}: the marker's readout is ${w.readH} px tall, not one to three lines`)
       if (w.chrome.length !== 1 || !/heading|north/.test(w.chrome[0] ?? '')) fail(`${label}: with wind on, the map still shows ${JSON.stringify(w.chrome)}`)
-      if (!w.cross) fail(`${label}: no crosshair`)
-      if (w.legend !== 4) fail(`${label}: the legend line has ${w.legend} ticks, not 0 · 10 · 20 · 30+`)
-      if (w.bar === null) fail(`${label}: no wind time bar`)
+      if (!w.marker) fail(`${label}: no marker`)
+      if (w.cross) fail(`${label}: the old crosshair is still on the map beside the marker`)
+      if (!/arrows = where it blows · bars = wind/.test(w.legend ?? '')) fail(`${label}: the bar's key reads ${JSON.stringify(w.legend)}`)
+      if (w.bar === null) fail(`${label}: no wind timeline bar`)
       else {
-        if (!w.bar.inPeek) fail(`${label}: the wind time bar is not in the time sheet's place`)
-        if (w.bar.model !== 'Blend') fail(`${label}: the model chip reads ${w.bar.model}, not Blend`)
-        if (w.bar.h > 96) fail(`${label}: the wind bar is ${w.bar.h} px tall, more than 96`)
+        if (!w.bar.inPeek) fail(`${label}: the wind timeline bar is not in the time sheet's place`)
+        if (w.bar.model !== 'Blend') fail(`${label}: the bar's model reads ${w.bar.model}, not Blend`)
+        /* The row 44, the flag, the arrows, the strip, the ticks, the days and the key: 167 summed from timeline.css (not yet measured in a browser); 190 is the most. */
+        if (w.bar.h > 190) fail(`${label}: the wind bar is ${w.bar.h} px tall, more than 190`)
+        if (w.bar.arrows === 0 || w.bar.bars === 0) fail(`${label}: the wind bar drew ${w.bar.arrows} arrows and ${w.bar.bars} bars`)
+        if (w.bar.days.length !== 5) fail(`${label}: the day strip reads ${JSON.stringify(w.bar.days)}, not five days`)
+        if (!w.bar.flag) fail(`${label}: no time flag on the thumb`)
       }
       if (w.pills > 0) fail(`${label}: the sun's line labels are on the map with the wind layer on`)
       console.log(`  wind grid requests for this view: ${gridAsks}; frame rate ${w.fps} fps`)
@@ -282,7 +294,7 @@ try {
     else if (!w4?.present || w4.painted < 36 || !READ.test(w4.readout ?? '')) fail(`${label}: the wind layer did not draw at 400 ft`)
     await page.locator('.seg__btn', { hasText: 'Surface' }).first().click({ timeout: 4000 }).catch(() => {})
     await wait(800)
-    /* Batch TRUTH, Section 7: wind colour under the crosshair at every zoom, a street to the world. */
+    /* Batch TRUTH, Section 7: wind colour at the map's centre at every zoom, a street to the world (the marker reads the same point at every zoom). */
     for (const z of [12, 7, 4, 2]) {
       await ev(`window.__probe?.map?.jumpTo({ zoom: ${z} })`)
       let wz = null
@@ -292,13 +304,15 @@ try {
         if (wz.centre > 0 && READ.test(wz.readout ?? '')) break
       }
       console.log(`  wind at zoom ${z}: centre alpha ${wz?.centre}, painted ${wz?.painted} of 36, "${wz?.readout}"`)
-      if (!(wz?.centre > 0)) fail(`${label}: no wind colour under the crosshair at zoom ${z}`)
+      if (!(wz?.centre > 0)) fail(`${label}: no wind colour at the map's centre at zoom ${z}`)
       if (/No wind here|didn.t load/.test(wz?.readout ?? '')) fail(`${label}: at zoom ${z} the readout says "${wz?.readout}"`)
       await shot(`wind-z${z}`)
     }
     await ev(`window.__probe?.map?.jumpTo({ zoom: 16.5 })`)
     await wait(800)
-    /* Wind mode hides the rail and the layer chip; its bar's ✕ turns it off and gives them back. */
+    /* Wind mode hides the rail and the layer chip; the bar's layer menu turns it off and gives them back (Batch DRONE, Section 3). */
+    await page.locator('[data-wind-timebar] [data-layer-chip]').first().click({ timeout: 4000 }).catch(() => undefined)
+    await wait(300)
     await page.locator('[data-wind-off]').first().click({ timeout: 4000 }).catch(() => fail(`${label}: no way to turn the wind off from its bar`))
     await wait(800)
     watchdog.note(`${label} wind`)

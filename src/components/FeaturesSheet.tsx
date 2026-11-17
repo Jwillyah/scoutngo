@@ -6,7 +6,7 @@ import '../styles/features.css'
  * THE MAP SHEET, FEATURES v3 (Batch Map, Section 4; board
  * docs/mockups/FeaturesV3.png), in the one style (src/components/ui.tsx):
  *
- *   WEATHER       four tiles with icons: Off · Rain · Wind · Clouds, the
+ *   WEATHER       five tiles with icons: Off · Rain · Wind · Clouds · Tide, the
  *                 chosen one white
  *   ON THE MAP    one glass card of 50 px rows, an icon and a toggle each:
  *                 Lightning (last 45 min), Warnings, Sun and moon lines,
@@ -21,7 +21,8 @@ import '../styles/features.css'
  * height. The picker's rules (Batch M) still decide which rows are offered:
  * the lead filters them before they get here.
  */
-export type WeatherLayer = 'off' | 'radar' | 'wind' | 'clouds'
+/* Batch DRONE, Section 3: tide is a layer of the one timeline bar (the curve, the marker's level). */
+export type WeatherLayer = 'off' | 'radar' | 'wind' | 'clouds' | 'tide'
 
 export interface Switch {
   id: string
@@ -57,6 +58,7 @@ const WEATHER: { id: WeatherLayer; label: string; icon: ReactNode }[] = [
   { id: 'radar', label: 'Rain', icon: <path d="M7 15a4.5 4.5 0 0 1 .8-8.9A5.5 5.5 0 0 1 18 8a3.5 3.5 0 0 1-.5 7M9 18l-1 2M13 18l-1 2M17 18l-1 2" /> },
   { id: 'wind', label: 'Wind', icon: <path d="M3 9h11a3 3 0 1 0-3-3M3 15h15a3 3 0 1 1-3 3M3 12h7" /> },
   { id: 'clouds', label: 'Clouds', icon: <path d="M7 18a5 5 0 0 1-.9-9.9A6 6 0 0 1 17.6 9 4.5 4.5 0 0 1 17 18z" /> },
+  { id: 'tide', label: 'Tide', icon: <path d="M2 10c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0M2 16c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0" /> },
 ]
 
 const svg = (path: ReactNode, className: string) => (

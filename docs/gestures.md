@@ -28,7 +28,7 @@ map; their buttons take taps (`app.css`, "only buttons take a finger").
 | one finger, drag | pans |
 | one finger, tap | in a placing mode, places (a position, the pilot, the aim, a mark, a measure point, a flight point); otherwise deselects |
 | one finger, double tap | zooms in one level, round the finger |
-| one finger, long press (550 ms) | starts a measure here, or ends the one started |
+| one finger, long press (550 ms) | with a weather or tide layer on (the timeline bar up): moves the reading marker here ("◎ back to spot" returns it); otherwise starts a measure here, or ends the one started |
 | two fingers, pinch | zooms round the fingers, from the first couple of pixels (dead zone 0.02 of a level) |
 | two fingers, tap | zooms out one level |
 | two fingers, twist | turns the map, only past a deliberate twist (MapLibre's 25 px round the circle of the two fingers) |

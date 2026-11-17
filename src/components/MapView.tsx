@@ -10,7 +10,9 @@ const BLANK_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAA
 import { useNumerals } from '../lib/numeralsContext.ts'
 import * as maplibregl from 'maplibre-gl'
 import { WindLayerV3 } from './WindLayerV3.tsx'
+import { LayerMarker } from './LayerMarker.tsx'
 import { MapLabels } from './MapLabels.tsx'
+import { BAR_DAYS, daysToReach, prefetchWindow, type WindStrip } from '../core/layerTimeline.ts'
 import { fetchRainMaps, frameFor, RAIN_HOST, RAIN_MAX_ZOOM, RAIN_PROTOCOL, rainMaskProtocol, rainTileUrl } from '../lib/worldRain.ts'
 import { fieldAt, useWindViewport, type WindModelChip } from '../lib/useWindViewport.ts'
 import { loadTile, PROTOCOL, viaProtocol } from '../lib/offlineCache.ts'
@@ -421,6 +423,7 @@ const FLAG_DISC_OVERLAP_PX = 24
 const FLOATING_CHROME = FLOATING_CHROME_SELECTORS.join(', ')
 /** How long a press has to be held before it drops a pin. */
 const LONG_PRESS_MS = 550
+const NO_LINES: readonly string[] = []
 
 /**
  * THE ONE CAPTURE PATH, AND IT CAPTURES IMAGERY ONLY.
@@ -798,7 +801,7 @@ interface MapViewProps {
   /*
    * Batch Map, Section 1: the wind layer v3 (src/components/WindLayerV3.tsx)
    * over the whole screen, at `windAt`, from the chosen model; `onWindStrip`
-   * hands the time bar the wind at the crosshair by the hour.
+   * hands the timeline bar the wind at the marker by the hour.
    */
   windModel?: WindModelChip
   windAt?: Date | null
@@ -815,7 +818,18 @@ interface MapViewProps {
   onSatFailed?: (failed: boolean) => void
   /** Batch NOW, Section 2.1: the wind now at the spot, the Wind page's headline; the pill says it at the spot at now. */
   windHeadline?: { mps: number; fromDeg: number | null; gustMps: number | null } | null
-  onWindStrip?: (strip: { from: number; mps: (number | null)[] } | null) => void
+  onWindStrip?: (strip: WindStrip | null) => void
+  /*
+   * Batch DRONE, Section 3: THE ONE MARKER. Where the layer is read: the spot
+   * unless it was moved by holding the map. With wind on, the wind layer
+   * draws it with its readout; with clouds or tide, `markerLines` are its
+   * readout (worked out by the plan).
+   */
+  marker?: LatLon | null
+  markerLayer?: 'clouds' | 'tide' | null
+  markerLines?: readonly string[]
+  /** The time the layer's frames are held for while the thumb is dragged (its time when the drag began); null when no drag. */
+  scrubHeld?: Date | null
   /** Batch MAP2, Section 3: the plain vector map instead of the satellite ("Map" in the Map sheet). */
   vectorBase?: boolean
   markDraft?: readonly LatLon[]
@@ -1346,6 +1360,10 @@ export function MapView({
   windSpot = null,
   windFacing = null,
   windHeadline = null,
+  marker = null,
+  markerLayer = null,
+  markerLines = NO_LINES,
+  scrubHeld = null,
   satRetry = 0,
   skyFadeFrameAt = null,
   axisAzimuth,
@@ -4277,37 +4295,53 @@ export function MapView({
   }, [ready, windOn, moveCamera])
   const windHour = windAt === null ? null : Math.floor(windAt.getTime() / 3_600_000)
   const [windRetry, setWindRetry] = useState(0)
-  const windView = useWindViewport(ready ? map.current : null, windOn, windModel, windHour === null ? null : new Date(windHour * 3_600_000), windMeters > 10 ? '120m' : '10m', windRetry)
+  /*
+   * PREFETCH ±24 H (Batch DRONE, Section 3). Every hour of the days asked
+   * for comes in one answer per block, so the frames either side of the
+   * thumb are in hand once the days reach 24 h past it (and the bar's five
+   * days are always asked, so its bars come from the same answer). While the thumb is
+   * dragged the time is held at where the drag began: a new hour under the
+   * thumb is a frame already here, never a new request. The days are
+   * whole, so only crossing into a day not yet asked for (after the drag)
+   * asks again.
+   */
+  const heldHour = scrubHeld === null ? windHour : Math.floor(scrubHeld.getTime() / 3_600_000)
+  const windDaysAt = useMemo(() => {
+    if (heldHour === null) return null
+    /* The whole bar too (BAR_DAYS from today), so its wind bars are drawn from the answer the colour comes from. */
+    const reach = new Date(Math.max(prefetchWindow(new Date(heldHour * 3_600_000)).to.getTime(), Date.now() + BAR_DAYS * 86_400_000))
+    /* As a time on the day the days must reach (gridDays counts the same way). */
+    const today = Math.floor(Date.now() / 86_400_000) * 86_400_000
+    return new Date(today + (daysToReach(reach, new Date()) - 1) * 86_400_000)
+  }, [heldHour])
+  const windView = useWindViewport(ready ? map.current : null, windOn, windModel, windDaysAt, windMeters > 10 ? '120m' : '10m', windRetry)
   const windField = useMemo(() => (windHour === null || windView.series.length === 0 ? null : fieldAt(windView.series, windView.step, new Date(windHour * 3_600_000))), [windView, windHour])
-  /* The time bar's strip: the grid point nearest the crosshair, hour by hour; read again when the map stops. */
+  /* The timeline bar's wind: the grid point nearest the marker, hour by hour, from the same answer the colour is painted from. */
+  const markLat = marker?.lat ?? null
+  const markLon = marker?.lon ?? null
   useEffect(() => {
     if (onWindStrip === undefined) return
-    const m = map.current
-    if (!windOn || m === null || windView.series.length === 0) {
+    if (!windOn || windView.series.length === 0 || markLat === null || markLon === null) {
       onWindStrip(null)
       return
     }
-    const read = () => {
-      const c = m.getCenter()
-      let best = windView.series[0]
-      for (const s of windView.series) if (Math.hypot(s.lat - c.lat, s.lon - c.lng) < Math.hypot(best.lat - c.lat, best.lon - c.lng)) best = s
-      onWindStrip({ from: best.times[0], mps: best.speed })
-    }
-    read()
-    m.on('moveend', read)
-    return () => {
-      m.off('moveend', read)
-    }
-  }, [windOn, windView.series, onWindStrip]) // eslint-disable-line react-hooks/exhaustive-deps
-  const keepLabelsClear = useCallback(() => (venue === null ? [] : [{ lat: venue.lat, lon: venue.lon }]), [venue])
+    let best = windView.series[0]
+    for (const s of windView.series) if (Math.hypot(s.lat - markLat, s.lon - markLon) < Math.hypot(best.lat - markLat, best.lon - markLon)) best = s
+    onWindStrip({ from: best.times[0], mps: best.speed, gust: best.gust, fromDeg: best.from })
+  }, [windOn, windView.series, onWindStrip, markLat, markLon])
+  /* The labels keep off the spot's pin and the marker. */
+  const keepLabelsClear = useCallback(() => [...(venue === null ? [] : [{ lat: venue.lat, lon: venue.lon }]), ...(marker === null ? [] : [marker])], [venue, marker])
+  const markerAtSpot = marker !== null && venue !== null && Math.abs(marker.lat - venue.lat) < 1e-6 && Math.abs(marker.lon - venue.lon) < 1e-6
   return (
     <div className={`map${mode === null ? '' : ' map--picking'}`}>
       <div className="map__canvas" ref={container} />
       {/* Batch Map, Section 1: the wind layer v3 over the whole screen (the old grid streaks only at a height above the ground). */}
       {/* Batch MAP2, Section 3: the drone's 400 ft in the same look (120 m level), not the old streaks. */}
-      {windOn ? <WindLayerV3 map={ready ? map.current : null} field={windField} unit={windUnit} spot={windSpot} facing={windFacing} headline={windHeadline} status={windView.status} when={windHour === null ? null : new Date(windHour * 3_600_000)} onRetry={() => setWindRetry((n) => n + 1)} model={windModel} level={windMeters > 10 ? '120m' : '10m'} /> : null}
-      {/* Batch Map, Section 3: the map's own labels, in the app's font, never under the crosshair or the pin. */}
-      <MapLabels map={ready ? map.current : null} on={showLabels} keepClear={keepLabelsClear} crosshair={showSky && skyLayer === 'wind'} />
+      {windOn ? <WindLayerV3 map={ready ? map.current : null} field={windField} unit={windUnit} spot={windSpot} facing={windFacing} headline={windHeadline} status={windView.status} when={windHour === null ? null : new Date(windHour * 3_600_000)} marker={marker} fetchAt={windDaysAt} onRetry={() => setWindRetry((n) => n + 1)} model={windModel} level={windMeters > 10 ? '120m' : '10m'} /> : null}
+      {/* Batch DRONE, Section 3: with clouds or tide on, the one marker and its readout (the wind layer draws its own above). */}
+      {!windOn && markerLayer !== null ? <LayerMarker map={ready ? map.current : null} at={marker} lines={markerLines} layer={markerLayer} atSpot={markerAtSpot} /> : null}
+      {/* Batch Map, Section 3: the map's own labels, in the app's font, never under the marker or the pin. */}
+      <MapLabels map={ready ? map.current : null} on={showLabels} keepClear={keepLabelsClear} />
       <div className="raypills" ref={pillLayer} aria-hidden="true" />
       {debugTouch ? <TouchDebug /> : null}
       {/*

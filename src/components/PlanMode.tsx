@@ -4,7 +4,14 @@ import { skyWordNowFor } from '../lib/skyWordNow.ts'
 import { ScreenBoundary, ScreenFailCard } from './ScreenBoundary.tsx'
 import { markScreenOpen, recordError } from '../lib/errorLog.ts'
 import { NetDebug } from './NetDebug.tsx'
-import { WindHours, WindTimeBar } from './WindTimeBar.tsx'
+import { WindHours } from './WindTimeBar.tsx'
+import { LayerTimeline, type TimelineLayer, type TimelinePick } from './LayerTimeline.tsx'
+import { barSpan, onBar, type WindHour, type WindStrip } from '../core/layerTimeline.ts'
+import { percentLine, tideLines } from '../core/markerReadout.ts'
+import { tideStateAt } from '../core/tide.ts'
+import { hoursOnBar, useBriefHours, useTideWeek } from '../lib/useLayerHours.ts'
+import { hourlyAt } from '../lib/tideSheetData.ts'
+import { MODEL_CHIPS } from '../lib/useWindViewport.ts'
 import { coastFacing } from '../lib/coast.ts'
 import type { WindModelChip } from '../lib/useWindViewport.ts'
 import { compass } from '../lib/tideWords.ts'
@@ -195,8 +202,13 @@ import { useTouchDebug } from '../lib/touchDebug.ts'
  * its hour labels), and 13 to spare.
  */
 const PLAN_PEEK_PX = 187
-/* Batch TRUTH, Section 7: wind is the whole map; the sheet's peek is one thin bar. */
-const WIND_PEEK_PX = 96
+/*
+ * Batch DRONE, Section 3: with a layer on, the peek is the one timeline bar:
+ * the grab 44, the row 44, the flag 18, the arrows 16 (wind only), the strip
+ * 40, ticks 6, days 14, the key 15, gaps and padding 14, and 12 to spare.
+ */
+const LAYER_PEEK_PX = 207
+const WIND_PEEK_PX = LAYER_PEEK_PX + 16
 
 /** What the one sheet is currently showing. Chosen by an explicit control. */
 /*
@@ -1414,16 +1426,18 @@ export function PlanMode({
    * Batch K addendum, D: the weather layer on the main map, one at a time
    * (Off · Radar · Wind · Clouds), and the storm layers beside it.
    */
-  const weatherLayer: WeatherLayer = radarAt !== null ? 'radar' : showSky ? (skyLayer === 'wind' ? 'wind' : 'clouds') : 'off'
+  /* Batch DRONE, Section 3: the tide is a layer of the bar too (its curve, no paint on the map). */
+  const [tideOn, setTideOn] = useState(false)
+  const weatherLayer: WeatherLayer = radarAt !== null ? 'radar' : showSky ? (skyLayer === 'wind' ? 'wind' : 'clouds') : tideOn ? 'tide' : 'off'
   const [lightningOn, setLightningOn] = useState(false)
   const [warningsOn, setWarningsOn] = useState(false)
   const [tracksOn, setTracksOn] = useState(false)
   const [windLayerFt, setWindLayerFt] = useState<0 | 400>(0)
-  /* Batch Map, Section 1: the wind layer v3's model (Blend first), the strip at its crosshair, and the spot's beach for "offshore here". */
+  /* Batch Map, Section 1: the wind layer v3's model (Blend first), the strip at its marker, and the spot's beach for "offshore here". */
   const [windModel, setWindModel] = useState<WindModelChip>('blend')
   /* Batch MAP2, Section 3: the plain vector map in place of the satellite. */
   const [vectorMap, setVectorMap] = useState(false)
-  const [windStrip, setWindStrip] = useState<{ from: number; mps: (number | null)[] } | null>(null)
+  const [windStrip, setWindStrip] = useState<WindStrip | null>(null)
   /* Batch TRUTH, Section 7: wind on is the whole map (wind.css .mode-plan[data-wind-mode]); its bar opens on now. */
   const windMode = weatherLayer === 'wind' && !threeD
   /* Batch NOW, Section 4: the satellite's tiles failed (said on the legend, with a retry). */
@@ -1464,7 +1478,11 @@ export function PlanMode({
   const pickedWeather = useRef<WeatherLayer>('off')
   const pickWeather = (w: WeatherLayer) => {
     pickedWeather.current = w
-    if (w === 'radar') {
+    setTideOn(w === 'tide')
+    if (w === 'tide') {
+      setRadarAt(null)
+      onShowSky(false)
+    } else if (w === 'radar') {
       onShowSky(false)
       void radarValid().then((v) => {
         if (pickedWeather.current === 'radar') setRadarAt(v ?? new Date(Math.floor(Date.now() / 300_000) * 300_000 - 600_000))
@@ -1793,6 +1811,78 @@ export function PlanMode({
   const zoneShort = venueWindow?.timeZoneShort ?? ''
   const stripAt = stripWhen(scrubbedAt, stripNow, venueWindow?.timeZone ?? null)
   const stripLine = stripAt === null ? (zoneShort === '' ? null : `${zoneShort} times`) : `${stripAt}${zoneShort === '' ? '' : ` ${zoneShort}`}`
+
+  /*
+   * BATCH DRONE, SECTION 3: ONE MARKER AND ONE TIMELINE BAR.
+   *
+   * The marker is where the layer is read: the spot, until the map is held
+   * somewhere else (the long press means "move the marker" while a layer's
+   * bar is up; measure otherwise, docs/gestures.md). "◎ back to spot" puts it
+   * back, and a new spot does too. It is a point on this phone only: the
+   * forecasts it asks for are rounded to 2 decimals like every other.
+   */
+  const [markerAt, setMarkerAt] = useState<LatLon | null>(null)
+  useEffect(() => setMarkerAt(null), [venue?.lat, venue?.lon])
+  const marker = markerAt ?? venue
+  const timelineLayer: TimelineLayer | null = threeD ? null : weatherLayer === 'wind' || weatherLayer === 'clouds' || weatherLayer === 'tide' ? weatherLayer : null
+  const timelineUp = timelineLayer !== null && (card.kind === HOME.kind || card.kind === 'wxlayer') && venueWindow !== null && scrubbedAt !== null
+  /* The time a drag began, while it lasts: the map holds its frames for it (no refetch while scrubbing). */
+  const [scrubHeld, setScrubHeld] = useState<Date | null>(null)
+  const tz = venueWindow?.timeZone ?? 'UTC'
+  const barDay = new Intl.DateTimeFormat('en-US', { timeZone: tz, year: 'numeric', month: 'numeric', day: 'numeric' }).format(stripNow)
+  const span = useMemo(() => barSpan(new Date(), tz), [tz, barDay]) // eslint-disable-line react-hooks/exhaustive-deps
+  const windHours = useMemo<WindHour[]>(() => {
+    if (windStrip === null) return []
+    const mps = onBar(windStrip.mps, windStrip.from, span)
+    const gust = onBar(windStrip.gust, windStrip.from, span)
+    const dir = onBar(windStrip.fromDeg, windStrip.from, span)
+    return mps.map((v, i) => ({ mps: v, gustMps: gust[i], fromDeg: dir[i] }))
+  }, [windStrip, span])
+  const briefHours = useBriefHours(marker, timelineLayer === 'clouds')
+  const cloudHours = useMemo(() => hoursOnBar(briefHours, 'cloud_cover', span), [briefHours, span])
+  const tideWeek = useTideWeek(tide.status === 'ok' ? tide.station.id : null, span, timelineLayer === 'tide')
+  const tideProblem =
+    tide.status === 'no-station'
+      ? `No tide station near here (nearest ${tide.nearestName}, ${Math.round(tide.nearestKm)} km)`
+      : tide.status === 'unavailable'
+        ? tide.reason
+        : (tideWeek?.problem ?? null)
+  /* The marker's readout for clouds and tide (the wind layer writes its own from the same point). */
+  const markerLines = useMemo<string[]>(() => {
+    if (scrubbedAt === null) return []
+    if (timelineLayer === 'clouds') {
+      const pct = briefHours === null ? null : hourlyAt(briefHours, 'cloud_cover', scrubbedAt)
+      const layers = briefHours === null ? null : (['low', 'mid', 'high'] as const).map((k) => hourlyAt(briefHours, `cloud_cover_${k}`, scrubbedAt))
+      return [percentLine(pct, 'cloud'), ...(layers === null || layers.some((v) => v === null) ? [] : [`low ${Math.round(layers[0] ?? 0)}% · mid ${Math.round(layers[1] ?? 0)}% · high ${Math.round(layers[2] ?? 0)}%`])]
+    }
+    if (timelineLayer === 'tide') {
+      if (tideWeek === null || tideWeek.curve.length === 0) return [tideProblem ?? 'Reading the tide…']
+      const st = tideStateAt(tideWeek.curve, tideWeek.extremes, scrubbedAt)
+      return tideLines(st?.feet ?? null, st?.direction ?? null, st?.next == null ? null : { kind: st.next.kind, feet: st.next.feet, at: formatClock(st.next.at, tz) })
+    }
+    return []
+  }, [timelineLayer, scrubbedAt, briefHours, tideWeek, tideProblem, tz])
+  /* The source under the search: "Wind · Blend · surface", "Tide · Lynnhaven Inlet station". */
+  const layerSource =
+    timelineLayer === 'wind'
+      ? `Wind · ${MODEL_CHIPS.find((m) => m.id === windModel)?.label ?? 'Blend'} · ${windLayerFt === 0 ? 'surface' : '400 ft'}`
+      : timelineLayer === 'tide'
+        ? tide.status === 'ok'
+          ? `Tide · ${tide.station.name} station`
+          : 'Tide'
+        : timelineLayer === 'clouds'
+          ? 'Clouds · cover by the hour'
+          : null
+  /* "Hold anywhere to move the marker", for 4 s after a layer comes up (ux-rules 2). */
+  const [holdHint, setHoldHint] = useState(false)
+  useEffect(() => {
+    if (timelineLayer === null) return
+    setHoldHint(true)
+    const t = setTimeout(() => setHoldHint(false), 4000)
+    return () => clearTimeout(t)
+  }, [timelineLayer])
+  const markerMoved = markerAt !== null
+  const onTimelinePick = (p: TimelinePick) => (p === 'off' ? allLayersOff() : pickWeather(p))
 
   const weatherCommon = {
     at: scrubbedAt,
@@ -2566,6 +2656,7 @@ export function PlanMode({
       className="mode-plan"
       data-weather-layer={weatherLayer}
       data-wind-mode={windMode ? "" : undefined}
+      data-layer-mode={timelineUp ? timelineLayer ?? undefined : undefined}
       style={
         {
           ['--sheet-live-height' as string]: `${sheetHeight}px`,
@@ -2634,7 +2725,11 @@ export function PlanMode({
             onPilotMove={onPilotMove}
             onAimAt={onAimAt}
             onPositionMove={onPositionMove}
-            onLongPress={onMeasurePress}
+            onLongPress={timelineLayer !== null ? setMarkerAt : onMeasurePress}
+            marker={timelineLayer === null ? null : marker}
+            markerLayer={timelineLayer === 'clouds' || timelineLayer === 'tide' ? timelineLayer : null}
+            markerLines={markerLines}
+            scrubHeld={scrubHeld}
             sunAzimuth={sun === null ? null : sun.azimuth}
             axisAzimuth={nightAxis}
             sunAltitude={sun?.altitude ?? null}
@@ -3081,6 +3176,23 @@ export function PlanMode({
       />
       )}
 
+      {/* Batch DRONE, Section 3: what the layer is read from, under the search, and the marker's hint and way home over the bar. */}
+      {timelineUp && layerSource !== null && sheet !== 'full' ? (
+        <p className="lmark-source" data-layer-source>
+          {layerSource}
+        </p>
+      ) : null}
+      {timelineUp && sheet === 'peek' && (holdHint || markerMoved) ? (
+        <div className="lmark-hint" style={{ bottom: `${sheetHeight + dockHeight + 10}px` }}>
+          {holdHint ? <p className="lmark-hint__words">Hold anywhere to move the marker</p> : null}
+          {markerMoved ? (
+            <button type="button" className="lmark-back" data-back-to-spot onClick={() => setMarkerAt(null)}>
+              ◎ back to spot
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       {/* Batch K addendum, D: what weather is on the map, one chip under the top bar; ✕ turns it all off. */}
       {layerWords.length === 0 || sheet === 'full' ? null : (
         <div className="wxchip" role="status">
@@ -3093,7 +3205,7 @@ export function PlanMode({
 
       <BottomSheet
         /* Room for the time bar: its date line and its strip, measured, not the old one-line scrubber. */
-        peekPx={windMode ? WIND_PEEK_PX : PLAN_PEEK_PX}
+        peekPx={timelineUp ? (timelineLayer === 'wind' ? WIND_PEEK_PX : LAYER_PEEK_PX) : PLAN_PEEK_PX}
         detent={sheet}
         onDetentChange={setSheet}
         onHeightChange={setSheetHeight}
@@ -3141,23 +3253,22 @@ export function PlanMode({
             {/* Only on the map's own view (the home card, the radar card): a card that reads a moment keeps its time strip (Batch N; the surface audit). */}
             {weatherLayer === 'radar' && !threeD && (card.kind === HOME.kind || card.kind === 'wxlayer') ? (
               <RadarLegend scanAt={radarAt === null ? null : (layerNow?.radar?.scanAt ?? radarAt)} calls={layerCalls} strikes={layerNow?.strikes ?? []} timeZone={venueWindow?.timeZone ?? 'UTC'} />
-            ) : windMode && (card.kind === HOME.kind || card.kind === 'wxlayer') && venueWindow !== null && scrubbedAt !== null ? (
-              /* Batch Map, Section 1: the wind's own time bar (play, the models, the strip at the crosshair) in the time sheet's place. */
-              <WindTimeBar
+            ) : timelineUp && timelineLayer !== null && venueWindow !== null && scrubbedAt !== null ? (
+              /* Batch DRONE, Section 3: the one timeline bar for wind, clouds and tide, docked in the time sheet's place. */
+              <LayerTimeline
+                layer={timelineLayer}
+                span={span}
                 at={scrubbedAt}
-                from={new Date(windStrip?.from ?? Math.floor(Date.now() / 3_600_000) * 3_600_000)}
-                hours={Math.max(24, windStrip?.mps.length ?? 72)}
-                timeZone={venueWindow.timeZone}
-                onAt={scrubTo}
-                model={windModel}
-                onModel={setWindModel}
-                strip={windStrip?.mps ?? []}
-                unit={units.wind}
                 now={stripNow}
-                onOff={allLayersOff}
-                levelFt={windLayerFt}
-                onLevel={setWindLayerFt}
-                note={windLayerFt === 0 ? 'The colour is the wind’s speed; the white lines move with it. The crosshair reads the wind under it, and at sea the swell. Zoomed out the map uses the global models (GFS, ICON and the rest); HRRR only close in.' : 'Streaks move with the wind at 400 ft; brighter is stronger.'}
+                timeZone={venueWindow.timeZone}
+                lat={venue?.lat ?? 0}
+                lon={venue?.lon ?? 0}
+                onAt={scrubTo}
+                onHold={setScrubHeld}
+                onPick={onTimelinePick}
+                wind={timelineLayer === 'wind' ? { hours: windHours, unit: units.wind, limitMps: ratedWindMps, levelFt: windLayerFt, onLevel: setWindLayerFt, model: windModel, onModel: setWindModel } : undefined}
+                tide={timelineLayer === 'tide' ? { curve: tideWeek?.curve ?? [], extremes: tideWeek?.extremes ?? [], problem: tideProblem } : undefined}
+                percent={timelineLayer === 'clouds' ? cloudHours : undefined}
               />
             ) : ((!TIME_MATTERS[card.kind] || (card.kind === 'sky' && skyTab !== 'now')) && !threeD) || venueWindow === null || scrubbedAt === null ? null : (
               <TimeBar

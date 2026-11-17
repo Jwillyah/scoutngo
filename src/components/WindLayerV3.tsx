@@ -4,14 +4,15 @@ import { windToBeach } from '../core/coastFacing.ts'
 import { distanceMeters, type LatLon } from '../core/geo.ts'
 import { fadeEdges, fromUV, particleCount, PX_PER_S_PER_MPS, sampleField, windRgb, type Field } from '../core/windViewport.ts'
 import { nearestStation, stationWind, type StationWind } from '../lib/stationNear.ts'
-import { compass } from '../lib/tideWords.ts'
-import { fetchMarine, hourlyAt } from '../lib/tideSheetData.ts'
-import { forecastParts, swellOf, type SwellPart } from '../core/surfReads.ts'
+import { fetchMarine, hourlyAt, type Hourly } from '../lib/tideSheetData.ts'
+import { forecastParts, swellOf } from '../core/surfReads.ts'
 import { seaNow } from '../lib/useSurfNow.ts'
 import { useSurfSea } from '../lib/useSurfSea.ts'
 import { agoWords } from '../lib/nearWind.ts'
 import { windIn, windUnitLabel, type WindUnit } from '../lib/units.ts'
 import { usePointWind, type WindLevel, type WindModelChip } from '../lib/useWindViewport.ts'
+import { stationLine, swellLine, windLine } from '../core/markerReadout.ts'
+import { LayerMarker } from './LayerMarker.tsx'
 import '../styles/wind.css'
 
 /*
@@ -24,10 +25,12 @@ import '../styles/wind.css'
  *   particles  thin white lines (1.2 px) with fading tails, speed in
  *              proportion to the wind, as many as the screen and zoom call
  *              for; paused while a finger is on the map or it is moving
- *   crosshair  fixed in the middle; the card under the top bar reads the
- *              wind under it ("9 kt from W · gusts 14 · offshore here") and,
- *              with a station within 15 km, the station's own reading
- *   legend     the colour bar, in the time bar (src/components/WindTimeBar.tsx)
+ *   marker     Batch DRONE, Section 3: the one marker (the spot's, moved by
+ *              holding anywhere; src/components/LayerMarker.tsx) with its
+ *              readout beside it: "9 kt NNW · g13", the swell at sea, and
+ *              the nearest station with its age. The crosshair fixed in the
+ *              middle and the pill under the search are gone.
+ *   legend     the timeline bar (src/components/LayerTimeline.tsx)
  *
  * It paints only; the arithmetic is in src/core. The frame rate is counted
  * into data-fps for the wind audit.
@@ -48,22 +51,39 @@ interface Props {
   headline?: { mps: number; fromDeg: number | null; gustMps: number | null } | null
   facing: number | null
   status: 'off' | 'loading' | 'ok' | 'failed'
-  /** The time on the bar, for the swell at the crosshair. */
+  /** The time on the bar, for the swell at the marker. */
   when?: Date | null
+  /** Where the marker is (the spot unless it was moved by holding the map). */
+  marker: LatLon | null
+  /** The time the forecast's days must reach: the thumb's plus 24 h, held while a drag lasts. */
+  fetchAt?: Date | null
   /** Ask the wind again after it failed to load. */
   onRetry?: () => void
-  /** The model and height asked, for the crosshair's own fine-grid reading (usePointWind). */
+  /** The model and height asked, for the marker's own fine-grid reading (usePointWind). */
   model?: WindModelChip
   level?: WindLevel
 }
 
-export function WindLayerV3({ map, field, unit, spot, facing, headline = null, status, when = null, onRetry, model = 'blend', level = '10m' }: Props) {
+export function WindLayerV3({ map, field, unit, spot, facing, headline = null, status, when = null, marker, fetchAt = null, onRetry, model = 'blend', level = '10m' }: Props) {
   const colour = useRef<HTMLCanvasElement>(null)
   const trails = useRef<HTMLCanvasElement>(null)
   /* The screen's velocity grid, rebuilt when the map settles: px/s east and down per CELL_PX cell. */
   const grid = useRef<{ cols: number; rows: number; vx: Float32Array; vy: Float32Array } | null>(null)
-  const [centre, setCentre] = useState<LatLon | null>(null)
+  /* The marker's point is where everything below is read (it was the screen's centre, under a crosshair). */
+  const centre = marker
   const [partial, setPartial] = useState(false)
+  /*
+   * A NEW HOUR IS A REPAINT, NOT A NEW LAYER (Batch DRONE, Section 3). The
+   * field was a dependency of the effect below, so every hour under the
+   * thumb tore down the frame loop and its listeners and built them again.
+   * The field is read from a ref now; a new one repaints the colour alone.
+   */
+  const fieldRef = useRef<Field | null>(field)
+  const repaint = useRef<() => void>(() => undefined)
+  useEffect(() => {
+    fieldRef.current = field
+    repaint.current()
+  }, [field])
 
   useEffect(() => {
     const c = colour.current
@@ -80,8 +100,11 @@ export function WindLayerV3({ map, field, unit, spot, facing, headline = null, s
     const fit = () => {
       const r = map.getContainer().getBoundingClientRect()
       for (const k of [c, t]) {
-        k.width = Math.round(r.width * dpr)
-        k.height = Math.round(r.height * dpr)
+        /* Only when the size changed: setting a canvas's width clears it, trails and all. */
+        const w = Math.round(r.width * dpr)
+        const h = Math.round(r.height * dpr)
+        if (k.width !== w) k.width = w
+        if (k.height !== h) k.height = h
         k.style.width = `${r.width}px`
         k.style.height = `${r.height}px`
       }
@@ -89,7 +112,7 @@ export function WindLayerV3({ map, field, unit, spot, facing, headline = null, s
     }
 
     /* The colour, and the velocity grid the particles read. */
-    const paint = () => {
+    const paint = (scatter = true) => {
       const r = fit()
       const g = c.getContext('2d')
       if (g === null) return
@@ -97,6 +120,7 @@ export function WindLayerV3({ map, field, unit, spot, facing, headline = null, s
       const cols = Math.ceil(r.width / CELL_PX) + 1
       const rows = Math.ceil(r.height / CELL_PX) + 1
       grid.current = null
+      const field = fieldRef.current
       if (field === null) return
       const img = new ImageData(cols, rows)
       const vx = new Float32Array(cols * rows)
@@ -123,6 +147,7 @@ export function WindLayerV3({ map, field, unit, spot, facing, headline = null, s
       const partial = fadeEdges(img.data, cols, rows, EDGE_FADE_CELLS)
       c.dataset.partial = partial ? '1' : '0'
       setPartial(partial)
+      /* Particles are kept across hours: only a new view (or none yet) scatters them again. */
       const small = document.createElement('canvas')
       small.width = cols
       small.height = rows
@@ -132,6 +157,10 @@ export function WindLayerV3({ map, field, unit, spot, facing, headline = null, s
       g.drawImage(small, 0, 0, cols * CELL_PX * dpr, rows * CELL_PX * dpr)
       grid.current = { cols, rows, vx, vy }
       const n = particleCount(r.width, r.height, map.getZoom())
+      if (!scatter && parts.length === n) {
+        c.dataset.cells = String(cols * rows)
+        return
+      }
       parts = Array.from({ length: n }, () => ({ x: Math.random() * r.width, y: Math.random() * r.height, age: Math.floor(Math.random() * MAX_AGE_FRAMES) }))
       c.dataset.cells = String(cols * rows)
       t.dataset.particles = String(n)
@@ -201,24 +230,12 @@ export function WindLayerV3({ map, field, unit, spot, facing, headline = null, s
       g.stroke()
     }
 
-    const readCentre = () => {
-      const r = map.getContainer().getBoundingClientRect()
-      const ll = map.unproject([r.width / 2, r.height / 2])
-      setCentre({ lat: ll.lat, lon: ll.lng })
-    }
-    let throttle = 0
     const onMove = () => {
       moving = true
-      const now = performance.now()
-      if (now - throttle > 150) {
-        throttle = now
-        readCentre()
-      }
     }
     const onEnd = () => {
       moving = false
       paint()
-      readCentre()
     }
     const down = () => {
       touching = true
@@ -234,10 +251,11 @@ export function WindLayerV3({ map, field, unit, spot, facing, headline = null, s
     map.on('moveend', onEnd)
     map.on('resize', onEnd)
     paint()
-    readCentre()
+    repaint.current = () => paint(false)
     raf = requestAnimationFrame(tick)
     return () => {
       cancelAnimationFrame(raf)
+      repaint.current = () => undefined
       el.removeEventListener('pointerdown', down)
       window.removeEventListener('pointerup', up)
       window.removeEventListener('pointercancel', up)
@@ -245,16 +263,16 @@ export function WindLayerV3({ map, field, unit, spot, facing, headline = null, s
       map.off('moveend', onEnd)
       map.off('resize', onEnd)
     }
-  }, [map, field])
+  }, [map])
 
-  /* The value under the crosshair, and the station near it; at the spot at now, the one wind now. */
+  /* The value at the marker, and the station near it; at the spot at now, the one wind now. */
   /* The map hands a headline only while the bar is at now (src/components/PlanMode.tsx). */
-  const point = usePointWind(centre, status !== 'off', model, when ?? new Date(), level)
+  const point = usePointWind(centre, status !== 'off', model, when ?? new Date(), level, fetchAt ?? when ?? new Date())
   const atSpotNow = headline !== null && headline.fromDeg !== null && spot !== null && centre !== null && distanceMeters(spot, centre) <= 3000
   const here = useMemo(() => {
     if (atSpotNow && headline !== null && headline.fromDeg !== null) return { speedMps: headline.mps, fromDeg: headline.fromDeg, gust: headline.gustMps }
     if (field === null || centre === null) return null
-    /* Batch LIVE, Section 1.1: the fine grid's reading at the crosshair when it has come, the same at every zoom; the view's grid until then. */
+    /* Batch LIVE, Section 1.1: the fine grid's reading at the marker when it has come, the same at every zoom; the view's grid until then. */
     const s = point ?? sampleField(field, centre.lat, centre.lon)
     if (s === null) return null
     const w = fromUV(s.u, s.v)
@@ -279,96 +297,82 @@ export function WindLayerV3({ map, field, unit, spot, facing, headline = null, s
     }
   }, [ck]) // eslint-disable-line react-hooks/exhaustive-deps
   /*
-   * THE SWELL AT THE CROSSHAIR, AT SEA (Batch TRUTH, Section 7): the forecast's
-   * swell where the crosshair is, its height, period and the way it goes; on
-   * land the sea forecast answers nothing and no arrow is drawn. The
-   * crosshair rounded to 2 decimals, as every forecast question.
+   * THE SWELL AT THE MARKER, AT SEA (Batch TRUTH, Section 7): the forecast's
+   * swell where the marker is, its height, period and the way it comes from;
+   * on land the sea forecast answers nothing and no line is said. The marker
+   * rounded to 2 decimals, as every forecast question.
    *
    * Batch DRONE, Section 1.6 (16 Nov 11:02: the map "swell 1.6 ft 4 s", the
    * Surf page "0.7 ft 12 s", same beach, same hour): at the spot and at now,
    * the Surf page's own parts (seaNow: the fresh buoy's split, else the
-   * forecast's) and its swell (swellOf); elsewhere the forecast's parts at
-   * the crosshair through the same swellOf.
+   * forecast's) and its swell (swellOf); elsewhere, and at any other hour,
+   * the forecast's parts at the marker through the same swellOf.
    */
-  const [crossSwell, setSwell] = useState<SwellPart | null>(null)
-  const swellAtSpot = headline !== null && spot !== null && centre !== null && distanceMeters(spot, centre) <= 3000
+  /* Asked once per place, and read for the hour under the thumb without asking again (Batch DRONE, Section 3: no refetch while scrubbing). */
+  const [sea, setSea] = useState<{ ck: string; h: Hourly | null } | null>(null)
+  const swellAtSpot = headline !== null && spot !== null && centre !== null && distanceMeters(spot, centre) <= 3000 && (when === null || Math.abs(when.getTime() - new Date().getTime()) < 3_600_000)
   const spotSea = useSurfSea(swellAtSpot ? spot : null)
-  const spotSwell = swellAtSpot && spotSea.marine !== null ? swellOf(seaNow(spotSea, new Date()).parts) : null
-  const lead = swellAtSpot && spotSea.marine !== null ? spotSwell : crossSwell
-  const swell = lead === null || lead.fromDeg === null ? null : { ft: lead.ft, s: lead.periodS, fromDeg: lead.fromDeg }
   useEffect(() => {
-    if (centre === null) return
+    if (centre === null || ck === null) return
     let live = true
     const t = setTimeout(() => {
       void fetchMarine({ lat: Number(centre.lat.toFixed(2)), lon: Number(centre.lon.toFixed(2)) })
-        .then((m) => {
-          if (!live) return
-          const h = m?.value ?? null
-          const at = when ?? new Date()
-          setSwell(h === null ? null : swellOf(forecastParts((n) => hourlyAt(h, n, at))))
-        })
-        .catch(() => live && setSwell(null))
+        .then((m) => live && setSea({ ck, h: m?.value ?? null }))
+        .catch(() => live && setSea({ ck, h: null }))
     }, 700)
     return () => {
       live = false
       clearTimeout(t)
     }
-  }, [ck, when?.getTime()]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ck]) // eslint-disable-line react-hooks/exhaustive-deps
+  const whenMs = when?.getTime() ?? null
+  const markerSwell = useMemo(() => {
+    const h = sea !== null && sea.ck === ck ? sea.h : null
+    if (h === null) return null
+    const at = whenMs === null ? new Date() : new Date(whenMs)
+    return swellOf(forecastParts((n) => hourlyAt(h, n, at)))
+  }, [sea, ck, whenMs])
+  const lead = swellAtSpot && spotSea.marine !== null ? swellOf(seaNow(spotSea, new Date()).parts) : markerSwell
+  const swell = lead === null || lead.fromDeg === null ? null : { ft: lead.ft, s: lead.periodS, fromDeg: lead.fromDeg }
 
-  const say = (mps: number | null) => (mps === null ? '—' : `${Math.round(windIn(mps, unit) ?? 0)}`)
+  const say = (mps: number | null) => (mps === null ? null : windIn(mps, unit))
   const side = here === null || facing === null || spot === null || centre === null || distanceMeters(spot, centre) > 3000 ? null : windToBeach(here.fromDeg, facing)
-  const stationLine = station?.w == null ? null : `${station.id} ${Math.round(windIn(station.w.kt / 1.9438444924406, unit) ?? 0)}${station.w.fromDeg === null ? ' var' : ` ${compass(station.w.fromDeg)}`}${(() => {
-    const at = new Date(station.w.at)
-    return Number.isFinite(at.getTime()) ? `, ${agoWords(at, new Date())}` : ''
-  })()}`
-  /* "9 kt S · g11 · KORF 5 SW, 4 min ago": one line under the search (Batch TRUTH, Section 7). */
-  const line =
+  const u = windUnitLabel(unit)
+  const stationText =
+    station?.w == null
+      ? null
+      : stationLine(
+          station.id,
+          say(station.w.kt / 1.9438444924406),
+          station.w.fromDeg,
+          u,
+          (() => {
+            const at = new Date(station.w.at)
+            return Number.isFinite(at.getTime()) ? agoWords(at, new Date()) : null
+          })(),
+        )
+  /* "9 kt NNW · g13 · offshore here" / "swell 0.7 ft 12 s ENE" / "KNTU 13 kt N · 1 h ago" (board Map_Timeline_Wind). */
+  const lines: string[] =
     here === null
-      ? status === 'loading'
-        ? 'Reading the wind…'
-        : status === 'failed'
-          ? null
-          : 'No wind here'
-      : [`${say(here.speedMps)} ${windUnitLabel(unit)} ${compass(here.fromDeg)}`, here.gust === null ? null : `g${say(here.gust)}`, side === null ? null : `${side === 'cross' ? 'cross-shore' : side} here`, stationLine].filter((x) => x !== null).join(' · ')
+      ? [status === 'loading' ? 'Reading the wind…' : status === 'failed' ? 'Wind didn’t load' : 'No wind here']
+      : [
+          [windLine(say(here.speedMps), here.fromDeg, say(here.gust), u), side === null ? null : `${side === 'cross' ? 'cross-shore' : side} here`].filter((x) => x !== null).join(' · '),
+          swell === null ? null : swellLine(swell.ft, swell.s, swell.fromDeg),
+          stationText,
+        ].filter((x): x is string => x !== null)
+  const atSpot = spot !== null && centre !== null && distanceMeters(spot, centre) < 30
 
   return (
     <>
-      <canvas ref={colour} className="windv3__field" aria-hidden="true" />
+      <canvas ref={colour} className="windv3__field" aria-hidden="true" data-partial={partial ? '1' : '0'} />
       <canvas ref={trails} className="windv3__trails" aria-hidden="true" />
-      <div className="windv3__cross" aria-hidden="true" />
-      {/* At the crosshair: where the wind goes, "16 kt"; at sea the swell too, "swell 1.3 ft 9 s". */}
-      <svg className="windv3__arrows" viewBox="-60 -60 120 120" aria-hidden="true">
-        {here === null ? null : (
-          <g className="windv3__warrow" transform={`rotate(${(here.fromDeg + 180) % 360})`}>
-            <path d="M0 8V-34M-6 -26L0 -34L6 -26" />
-          </g>
-        )}
-        {swell === null ? null : (
-          <g className="windv3__sarrow" transform={`rotate(${(swell.fromDeg + 180) % 360})`}>
-            <path d="M0 8V-28M-5 -21L0 -28L5 -21" />
-          </g>
-        )}
-      </svg>
-      <p className="windv3__lab windv3__lab--wind" aria-hidden="true">
-        {here === null ? '' : `${say(here.speedMps)} ${windUnitLabel(unit)}`}
-      </p>
-      {swell === null ? null : (
-        <p className="windv3__lab windv3__lab--swell" aria-hidden="true" data-swell>
-          swell {swell.ft.toFixed(1)} ft{swell.s === null ? '' : ` ${Math.round(swell.s)} s`}
-        </p>
-      )}
-      <div className="windv3__read windv3__read--pill" role="status" data-wind-readout data-partial={partial ? '1' : '0'}>
-        {line === null ? (
-          <p className="windv3__failed">
-            Wind didn&rsquo;t load ·{' '}
-            <button type="button" className="windv3__retry" onClick={onRetry}>
-              Retry
-            </button>
-          </p>
-        ) : (
-          <p className="windv3__pill">{line}</p>
-        )}
-      </div>
+      <LayerMarker map={map} at={centre} lines={lines} layer="wind" atSpot={atSpot}>
+        {here === null && status === 'failed' ? (
+          <button type="button" className="windv3__retry" onClick={onRetry}>
+            Retry
+          </button>
+        ) : null}
+      </LayerMarker>
     </>
   )
 }
