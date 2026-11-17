@@ -15,6 +15,7 @@ import { openCredits } from '../lib/creditsRoute.ts'
 import { seenHosts } from '../lib/privacy.ts'
 import { SURF_OPTIONS, useSurfSetting } from '../lib/surfSetting.ts'
 import { useTouchDebug } from '../lib/touchDebug.ts'
+import { debugMemoryLine } from '../lib/quality3d.ts'
 import { clearErrors, ERROR_LOG_MAX, onErrors, readErrors, type LoggedError } from '../lib/errorLog.ts'
 import { formatWind, type Units } from '../lib/units.ts'
 import { deletePack, loadPacks, onPacksChanged, packBytes, type VenuePack } from '../lib/venuePack.ts'
@@ -393,6 +394,8 @@ function Debug(props: Props) {
       <LastErrors zone={zone} />
       <div className="set2__card">
         <Row label="Touch log" sub="A box over the map; nothing is sent." end={<Toggle on={debugTouch} label="Touch log" onChange={setDebugTouch} />} />
+        {/* Batch FIX, Section 0.3: what the 3D view put on the GPU at its last count, by the app's own count (src/core/gpuBudget.ts). */}
+        <Row label={debugMemoryLine()} sub="Our own count of the 3D view's pictures and shapes; the phone's own use is more." />
         <Row label="Show the home page" onClick={props.onShowHome} />
         <Row label="How it works" onClick={props.onHow} />
       </div>

@@ -1268,7 +1268,17 @@ export function PlanMode({
     const nd = ndFor({ minutesBeforeSunset: sunset == null ? Number.NaN : (sunset.getTime() - scrubbedAt.getTime()) / 60_000, sky: 'full-sun', mode: 'default', overWater: false })
     const heights = pf.heights
     const pilot = pf.pilot
-    setThreeD(true)
+    /*
+     * Batch FIX, Section 0.4: Fly is built from the settled 2D map, never on
+     * top of a 3D map already up: that one is closed first (its scene freed,
+     * src/three/world/sharedRenderer.ts) and Fly's own built a moment later.
+     */
+    const over3D = threeD
+    if (over3D) {
+      logTouch('Fly: the 3D map closes first, Fly builds on its own')
+      setThreeD(false)
+      setTimeout(() => setThreeD(true), 0)
+    } else setThreeD(true)
     setFlightPlay(null)
     /* The sheet down out of the way: the sticks sit just above it. */
     setSheet('peek')

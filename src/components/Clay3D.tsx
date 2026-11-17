@@ -257,6 +257,16 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
             if (rebuildTimer !== null) clearTimeout(rebuildTimer)
             setBuild((n) => n + 1)
           },
+          /* Batch FIX, Section 0.2: Compare borrowed the app's one renderer; built again once it is handed back. */
+          evicted: () => {
+            logTouch('3D: the renderer was lent to another view; back when it is free')
+            void import('../three/world/sharedRenderer.ts').then(({ whenFree }) => {
+              const off = whenFree(() => {
+                off()
+                if (!cancelled) setBuild((n) => n + 1)
+              })
+            })
+          },
           error: (message) => {
             logTouch(`3D: a frame threw: ${message}`)
             if (crashRef.current !== undefined) crashRef.current(message)

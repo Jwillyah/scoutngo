@@ -32,6 +32,10 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { NOMINAL_DRAW_HEIGHT } from '../../core/buildingHeight.ts'
 import { pilotShown } from '../../core/pilotFigure.ts'
 import { MAX_3D_DPR } from '../../core/groundAtlas.ts'
+import { earnedStepUp } from '../../core/lite3d.ts'
+import { overBudget } from '../../core/gpuBudget.ts'
+import { currentQuality, gpuCap, keepQuality, noteMemory } from '../../lib/quality3d.ts'
+import { borrowRenderer, countGpu, disposeTree } from './sharedRenderer.ts'
 import { bearingBetween, distanceMeters, type LatLon } from '../../core/geo.ts'
 import { domePoint, skyArc, type SkyArc } from '../../core/sky3d.ts'
 import { getSunPosition } from '../../core/sun.ts'
@@ -45,7 +49,7 @@ import { NOMINAL_TREE_HEIGHT, type MappedTree } from '../../lib/trees.ts'
 import type { CinemaInputs, Look } from './inputs.ts'
 import { createGround, type GroundStatus } from './ground.ts'
 import { createSky } from './sky.ts'
-import { ESRI_CREDIT, frameAt, heightAt, imagerySourceFor, OSM_CREDIT, pending, TERRAIN_CREDIT, tileCounts } from './sources.ts'
+import { ESRI_CREDIT, frameAt, heightAt, imagerySourceFor, OSM_CREDIT, pending, setTileCaches, TERRAIN_CREDIT, tileCounts } from './sources.ts'
 import { createWorldLook } from './look.ts'
 import { createBuildings } from './buildings.ts'
 import { createWater } from './water.ts'
@@ -126,11 +130,11 @@ export interface ClayScene {
   /** Frame times of the last frames drawn, milliseconds, for the report (Section 7). */
   frameTimes(): number[]
   /** Batch I: told when the GPU context is lost or restored, or a frame throws (Clay3D rebuilds or says why). */
-  onTrouble(hooks: { lost?: () => void; restored?: () => void; error?: (message: string) => void }): void
+  onTrouble(hooks: { lost?: () => void; restored?: () => void; error?: (message: string) => void; evicted?: () => void }): void
   /** Batch I: the bridges, piers and pilings drawn, for checks. */
   decks(): { bridges: number; piers: number; pilings: number }
   /** Batch I: what is on the GPU, for Debug touch. */
-  gpu(): { textures: number; geometries: number; calls: number; scale: number; lost: boolean; groundPieces: number; groundCanvasMB: number }
+  gpu(): { bytes: number; level: string; textures: number; geometries: number; calls: number; scale: number; lost: boolean; groundPieces: number; groundCanvasMB: number }
   renderer: THREE.WebGLRenderer
   destroy(): void
 }
@@ -147,11 +151,19 @@ export const sunDirection = (azimuthDeg: number, altitudeDeg: number) => lookDir
 export function createClayScene(container: HTMLElement, venue: LatLon, timeZone: string, status: GroundStatus, onStatus: () => void, scan: Rasters | null = null): ClayScene {
   void scan
   const frame = frameAt(venue)
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: false })
+  /* Batch FIX, Section 0: lite on an iPhone (src/core/lite3d.ts), and the app's one renderer, borrowed (sharedRenderer.ts). */
+  const quality = currentQuality()
+  setTileCaches(quality.pictureCache, quality.terrainCache)
+  let destroyNow: () => void = () => {}
+  const borrowed = borrowRenderer(() => {
+    destroyNow()
+    trouble.evicted?.()
+  })
+  const renderer = borrowed.renderer
   renderer.toneMapping = THREE.ACESFilmicToneMapping
   renderer.toneMappingExposure = 1
   renderer.outputColorSpace = THREE.SRGBColorSpace
-  renderer.shadowMap.enabled = true
+  renderer.shadowMap.enabled = quality.shadows
   /* PCFSoftShadowMap is gone from three.js (it warned and fell back to this): asked for by name (Batch QA, Section 7, console clean-up). */
   renderer.shadowMap.type = THREE.PCFShadowMap
   /*
@@ -164,7 +176,7 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
    * before it is drawn, and asks for that frame.
    * Pixel ratio: never over 2 (a 3x iPhone would draw 2.25x the pixels).
    */
-  const maxScale = Math.min(MAX_3D_DPR, window.devicePixelRatio || 1)
+  const maxScale = Math.min(MAX_3D_DPR, quality.maxDpr, window.devicePixelRatio || 1)
   let scale = maxScale
   let wantScale = scale
   renderer.setPixelRatio(scale)
@@ -200,8 +212,8 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
   scene.add(sky.mesh)
   scene.fog = new THREE.FogExp2(0xffffff, 1 / 18_000)
   const sun = new THREE.DirectionalLight(0xffffff, 3)
-  sun.castShadow = true
-  sun.shadow.mapSize.set(2048, 2048)
+  sun.castShadow = quality.shadows
+  sun.shadow.mapSize.set(Math.max(1, quality.shadowPx), Math.max(1, quality.shadowPx))
   sun.shadow.bias = -0.0004
   sun.shadow.normalBias = 0.6
   sun.shadow.radius = 3
@@ -233,7 +245,7 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
     ;(scene.fog as THREE.FogExp2).color.setRGB(haze[0], haze[1], haze[2], THREE.LinearSRGBColorSpace)
     sun.color.setRGB(c.light[0], c.light[1], c.light[2], THREE.LinearSRGBColorSpace)
     sun.intensity = c.lightIntensity
-    sun.castShadow = sunNow.altitude > 0
+    sun.castShadow = quality.shadows && sunNow.altitude > 0
     const amb = ambientSky(c, sunNow.altitude)
     hemi.color.setRGB(amb[0], amb[1], amb[2], THREE.LinearSRGBColorSpace)
     hemi.groundColor.setRGB(c.ground[0] * 3, c.ground[1] * 3, c.ground[2] * 3, THREE.LinearSRGBColorSpace)
@@ -266,7 +278,7 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
   const ground = createGround(venue, source, status, () => {
     onStatus()
     touch()
-  }, look.groundHook())
+  }, look.groundHook(), quality)
   scene.add(ground.group)
   const water = createWater(frame, touch)
   scene.add(water.group)
@@ -484,6 +496,7 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
     const ms = performance.now() - t0
     times.push(ms)
     if (times.length > 240) times.shift()
+    watchBudget(t0, ms)
     /* Adaptive resolution: a slow frame drops the scale, steady quick ones bring it back. */
     if (ms > 26 && scale > 0.6) {
       wantScale = Math.max(0.6, scale - 0.1)
@@ -501,10 +514,41 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
    * that throws stops the loop and Clay3D shows the message.
    */
   let lost = false
-  const trouble: { lost?: () => void; restored?: () => void; error?: (message: string) => void } = {}
+  /*
+   * THE BUDGET AND THE STEP UP (Batch FIX, Sections 0.2 and 0.3). Every 2 s
+   * of drawing: the GPU count (src/core/gpuBudget.ts) goes to Settings ›
+   * Debug; over the cap, the pixel ratio drops to 1 and the fine square goes.
+   * Lite and kept up for 20 s at 30 fps with no context loss: this phone is
+   * stepped up to the 2048 picture from its next open (src/core/lite3d.ts).
+   */
+  let lastCount = 0
+  let shownAt: number | null = null
+  const sinceShown: number[] = []
+  const cap = gpuCap()
+  const watchBudget = (now: number, ms: number) => {
+    if (shownAt !== null) sinceShown.push(ms)
+    if (now - lastCount < 2000) return
+    lastCount = now
+    const { bytes } = countGpu(scene, renderer, quality.shadowPx)
+    noteMemory({ bytes, cap, level: quality.level, at: Date.now() })
+    if (overBudget(bytes, cap) && wantScale > 1) {
+      logTouch(`3D memory ${Math.round(bytes / 1e6)} MB over ${Math.round((cap ?? 0) / 1e6)}: pixel ratio to 1`)
+      wantScale = 1
+      ground.dropFine()
+      touch()
+    }
+    if (quality.level === 'lite' && shownAt !== null && earnedStepUp(now - shownAt, sinceShown, lost)) {
+      logTouch('3D: kept up for 20 s at 30 fps, this phone steps up to the 2048 picture next time')
+      keepQuality('stepped')
+      shownAt = null
+    }
+  }
+  const trouble: { lost?: () => void; restored?: () => void; error?: (message: string) => void; evicted?: () => void } = {}
   const onLost = (e: Event) => {
     e.preventDefault()
     lost = true
+    /* Lost while stepped up: back to lite on this phone, for good. */
+    if (quality.level === 'stepped') keepQuality('lite')
     trouble.lost?.()
   }
   const onRestored = () => {
@@ -557,6 +601,7 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
       clearTimeout(timer)
       postRender.delete(check)
       probe.__clayShown = { by, ms: Math.round(performance.now() - builtAt) }
+      shownAt = performance.now()
       resolve()
     }
     function check() {
@@ -884,6 +929,24 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
     return { x: ((v.x + 1) / 2) * w, y: ((1 - v.y) / 2) * h }
   }
 
+  /* Leave: everything this scene put on the GPU is freed, and the app's one renderer handed back (Batch FIX, Section 0.2). */
+  let destroyed = false
+  destroyNow = () => {
+    if (destroyed) return
+    destroyed = true
+    cancelAnimationFrame(raf)
+    renderer.domElement.removeEventListener('webglcontextlost', onLost, false)
+    renderer.domElement.removeEventListener('webglcontextrestored', onRestored, false)
+    observer.disconnect()
+    controls.dispose()
+    ground.dispose()
+    decks.dispose()
+    disposeTree(scene)
+    sun.shadow.map?.dispose()
+    sun.shadow.map = null
+    borrowed.release()
+  }
+
   return {
     whenShown: () => shown,
     sunNow: () => sunNow,
@@ -974,18 +1037,8 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
       Object.assign(trouble, hooks)
     },
     decks: () => decks.counts(),
-    gpu: () => ({ textures: renderer.info.memory.textures, geometries: renderer.info.memory.geometries, calls: renderer.info.render.calls, scale, lost, groundPieces: ground.kept().pieces, groundCanvasMB: ground.kept().canvasMB }),
-    destroy: () => {
-      cancelAnimationFrame(raf)
-      renderer.domElement.removeEventListener('webglcontextlost', onLost, false)
-      renderer.domElement.removeEventListener('webglcontextrestored', onRestored, false)
-      observer.disconnect()
-      controls.dispose()
-      ground.dispose()
-      decks.dispose()
-      renderer.dispose()
-      renderer.domElement.remove()
-    },
+    gpu: () => ({ bytes: countGpu(scene, renderer, quality.shadowPx).bytes, level: quality.level, textures: renderer.info.memory.textures, geometries: renderer.info.memory.geometries, calls: renderer.info.render.calls, scale, lost, groundPieces: ground.kept().pieces, groundCanvasMB: ground.kept().canvasMB }),
+    destroy: () => destroyNow(),
   }
 }
 

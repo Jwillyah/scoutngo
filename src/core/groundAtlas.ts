@@ -6,6 +6,10 @@
  * (Batch CORE, Section 2: the 3D reload, most likely that, not proven), so
  * on iOS each tile is drawn at half size: 2048 x 2048, a quarter of the
  * memory. Elsewhere the picture stays sharp.
+ *
+ * Batch FIX, Section 0: the 3D view now takes its sizes from src/core/lite3d.ts
+ * (1024 on an iPhone until it earns 2048); nearAtlasPx is kept for the old
+ * measurement's sake (tests/groundAtlas.test.ts).
  */
 export const ATLAS_PX_FULL = 4096
 export const ATLAS_PX_IOS = 2048

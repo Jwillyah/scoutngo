@@ -7,7 +7,9 @@
  * place is drawn, only its sky. Clouds illustrative (their places are the
  * noise field's; their amounts and heights are the forecast's).
  *
- * One renderer for every picture, made on first use and kept; each picture
+ * The app's one renderer (world/sharedRenderer.ts, Batch FIX, Section 0),
+ * borrowed for each picture and handed back; never while a 3D view holds it
+ * (then no picture: null, the page shows none). Each picture
  * is a data URL, cached by its inputs, so a page drawn once is not drawn
  * again. Loaded only when a page asks (a dynamic import), so the 3D code
  * stays out of the app's first download.
@@ -17,6 +19,7 @@ import type { Cover } from '../core/clouds.ts'
 import { createClouds } from './world/clouds.ts'
 import { createSky } from './world/sky.ts'
 import { lookDir, sunDirection } from './world/scene.ts'
+import { borrowRenderer, disposeTree, rendererBusy } from './world/sharedRenderer.ts'
 
 export interface SkyThumbInput {
   sunAzimuthDeg: number
@@ -28,7 +31,6 @@ export interface SkyThumbInput {
   glow?: Partial<Record<'low' | 'mid' | 'high', readonly [number, number, number]>>
 }
 
-let renderer: THREE.WebGLRenderer | null = null
 const cache = new Map<string, string>()
 
 export function thumbKey(i: SkyThumbInput): string {
@@ -41,15 +43,16 @@ export function renderSkyThumb(i: SkyThumbInput): string | null {
   const key = thumbKey(i)
   const kept = cache.get(key)
   if (kept !== undefined) return kept
+  if (rendererBusy()) return null
+  const borrowed = borrowRenderer(() => {})
+  const renderer = borrowed.renderer
+  let scene: THREE.Scene | null = null
   try {
-    if (renderer === null) {
-      renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: false })
-      renderer.toneMapping = THREE.ACESFilmicToneMapping
-      renderer.outputColorSpace = THREE.SRGBColorSpace
-    }
+    renderer.toneMapping = THREE.ACESFilmicToneMapping
+    renderer.outputColorSpace = THREE.SRGBColorSpace
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1))
     renderer.setSize(i.width, i.height, false)
-    const scene = new THREE.Scene()
+    scene = new THREE.Scene()
     const sky = createSky()
     scene.add(sky.mesh)
     const sunDir = sunDirection(i.sunAzimuthDeg, i.sunAltitudeDeg)
@@ -79,12 +82,14 @@ export function renderSkyThumb(i: SkyThumbInput): string | null {
     camera.lookAt(camera.position.clone().add(lookDir(i.sunAzimuthDeg, 9)))
     clouds.frame(0, camera)
     renderer.render(scene, camera)
+    /* Read in the same task as the draw: the buffer is still there without preserveDrawingBuffer. */
     const url = renderer.domElement.toDataURL('image/jpeg', 0.82)
-    sky.mesh.geometry.dispose()
-    sea.geometry.dispose()
     cache.set(key, url)
     return url
   } catch {
     return null
+  } finally {
+    if (scene !== null) disposeTree(scene)
+    borrowed.release()
   }
 }

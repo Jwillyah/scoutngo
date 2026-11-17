@@ -20,9 +20,9 @@ describe('no black frame from the pixel ratio', () => {
     expect(after).not.toMatch(/setPixelRatio/)
   })
 
-  it('never more than 2', () => {
-    /* Batch DRONE, Section 2.6: the cap is MAX_3D_DPR (src/core/groundAtlas.ts, 2, tested in tests/groundAtlas.test.ts). */
-    expect(SCENE).toMatch(/const maxScale = Math\.min\(MAX_3D_DPR, window\.devicePixelRatio \|\| 1\)/)
+  it('never more than 2, and never more than the quality allows (1.5 on an iPhone)', () => {
+    /* Batch DRONE, Section 2.6: the cap is MAX_3D_DPR (src/core/groundAtlas.ts, 2); Batch FIX, Section 0: quality.maxDpr (src/core/lite3d.ts, tests/lite3d.test.ts). */
+    expect(SCENE).toMatch(/const maxScale = Math\.min\(MAX_3D_DPR, quality\.maxDpr, window\.devicePixelRatio \|\| 1\)/)
   })
 })
 

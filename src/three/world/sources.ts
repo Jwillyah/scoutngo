@@ -90,6 +90,24 @@ interface Heights {
   h: Float32Array
 }
 const terrainCache = new Map<string, Promise<Heights | null>>()
+/*
+ * THE TILE CACHES' SIZE (Batch FIX, Section 0.2). They live as long as the
+ * page, across every 3D open: 600 decoded pictures (256 KB each) and 160
+ * terrain tiles on a desktop; on an iPhone 64 of each (src/core/lite3d.ts).
+ * A picture let go is closed a few seconds later, so its memory is handed
+ * back at once rather than at some later collection, after anyone still
+ * drawing it has drawn.
+ */
+let pictureMax = 600
+let terrainMax = 160
+export const CLOSE_AFTER_MS = 5000
+export function setTileCaches(pictures: number, terrain: number): void {
+  pictureMax = pictures
+  terrainMax = terrain
+  while (pictureCache.size > pictureMax) dropOldestPicture()
+  while (terrainCache.size > terrainMax) terrainCache.delete(terrainCache.keys().next().value as string)
+}
+export const tileCacheSizes = () => ({ pictures: pictureCache.size, terrain: terrainCache.size, pictureMax, terrainMax })
 
 /** One terrarium tile's heights in metres, or null where it cannot be had (offline and not saved). */
 export function terrainTile(x: number, y: number, z: number): Promise<Heights | null> {
@@ -106,7 +124,7 @@ export function terrainTile(x: number, y: number, z: number): Promise<Heights | 
       })
       .catch(() => null)
     terrainCache.set(key, hit)
-    if (terrainCache.size > 160) terrainCache.delete(terrainCache.keys().next().value as string)
+    while (terrainCache.size > terrainMax) terrainCache.delete(terrainCache.keys().next().value as string)
   }
   return hit
 }
@@ -149,6 +167,14 @@ export interface Picture {
 }
 
 const pictureCache = new Map<string, Promise<ImageBitmap | null>>()
+function dropOldestPicture(): void {
+  const key = pictureCache.keys().next().value as string
+  const gone = pictureCache.get(key)
+  pictureCache.delete(key)
+  void gone?.then((img) => {
+    if (img !== null) setTimeout(() => img.close(), CLOSE_AFTER_MS)
+  })
+}
 const isPng = (b: ArrayBuffer) => {
   const h = new Uint8Array(b, 0, Math.min(4, b.byteLength))
   return h[0] === 0x89 && h[1] === 0x50
@@ -191,7 +217,7 @@ function picture(x: number, y: number, z: number, source: ImagerySource | null):
       })
       .catch(() => null)
     pictureCache.set(key, hit)
-    if (pictureCache.size > 600) pictureCache.delete(pictureCache.keys().next().value as string)
+    while (pictureCache.size > pictureMax) dropOldestPicture()
   }
   return hit
 }

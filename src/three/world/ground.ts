@@ -31,14 +31,16 @@
 import * as THREE from 'three'
 import type { ImagerySource } from '../../data/imagerySources.ts'
 import { waterMaskFor } from './waterMask.ts'
-import { isIOSDevice, nearAtlasPx } from '../../core/groundAtlas.ts'
+import { quality3D, type Quality3D } from '../../core/lite3d.ts'
 import { working, frameAt, heightAt, latOf, lonOf, pictureOnly, pictureOrParent, sampleTile, terrainTile, tileX, tileY, TERRAIN_MAX_Z, type Frame } from './sources.ts'
 
 export const NEAR_Z = 18
 export const NEAR_TILES = 16
-/* Batch DRONE, Section 2.6: 4096 px, or 2048 on iOS (src/core/groundAtlas.ts); a near tile is drawn ATLAS_PX / NEAR_TILES across. */
-export const ATLAS_PX = nearAtlasPx(typeof navigator !== 'undefined' && isIOSDevice(navigator.userAgent, navigator.maxTouchPoints ?? 0))
-const NEAR_TILE_PX = ATLAS_PX / NEAR_TILES
+/*
+ * Batch DRONE, Section 2.6: 4096 px, or 2048 on iOS; Batch FIX, Section 0:
+ * on iOS 1024 (lite) or 2048 once stepped up, the quality given to
+ * createGround (src/core/lite3d.ts). A near tile is drawn nearPx / NEAR_TILES across.
+ */
 export const MID_Z = 15
 export const FAR_Z = 12
 export const MID_HALF_M = 4500
@@ -208,14 +210,20 @@ export interface Ground {
   ready(): boolean
   /** Swap every ground material (the Animated look). */
   setMaterial(hook: GroundMaterialHook): void
-  /** Hide the picture's water under the sea (the coarse rings' sea floor is already low). */
+  /** Take the fine square away, and keep it away (over the memory budget, Batch FIX, Section 0.3). */
+  dropFine(): void
+  /** Free every piece: meshes, materials, textures, and their canvases. */
   dispose(): void
   /** Batch Flow, Section 1: the textured pieces this ground still holds, and their pictures' canvas memory (MB, 4 bytes a pixel). */
   kept(): { pieces: number; canvasMB: number }
 }
 
-export function createGround(venue: { lat: number; lon: number }, source: ImagerySource | null, status: GroundStatus, onChange: () => void, hook: GroundMaterialHook): Ground {
+export function createGround(venue: { lat: number; lon: number }, source: ImagerySource | null, status: GroundStatus, onChange: () => void, hook: GroundMaterialHook, quality: Quality3D = quality3D(false, false)): Ground {
   const frame = frameAt(venue)
+  const ATLAS_PX = quality.nearPx
+  const NEAR_TILE_PX = ATLAS_PX / NEAR_TILES
+  const FINE_PX = Math.min(FINE_TILES * 256, quality.finePx)
+  const FINE_TILE_PX = FINE_PX / FINE_TILES
   const group = new THREE.Group()
   group.name = 'ground'
   let materialHook = hook
@@ -285,8 +293,8 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
       }
     }
   }
-  ring(FAR_Z, FAR_HALF_M, 32, FAR_DROP_M, Math.min(FAR_Z - 1, 11), -2)
-  ring(MID_Z, MID_HALF_M, 32, MID_DROP_M, 13, -1)
+  ring(FAR_Z, FAR_HALF_M, quality.ringSegments, FAR_DROP_M, Math.min(FAR_Z - 1, 11), -2)
+  ring(MID_Z, MID_HALF_M, quality.ringSegments, MID_DROP_M, 13, -1)
 
   /* ------------------------------------------------- the near square */
   let near: { mesh: THREE.Mesh; tex: THREE.CanvasTexture; cx: number; cz: number; box: { west: number; east: number; north: number; south: number }; born: number } | null = null
@@ -335,7 +343,7 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
       )
       void tilePx
       const h = await heightsFor(box.north, box.south, box.west, box.east, TERRAIN_MAX_Z, status, onChange, 14)
-      const mesh = new THREE.Mesh(gridGeometry(frame, box.north, box.south, box.west, box.east, 128, h, 0))
+      const mesh = new THREE.Mesh(gridGeometry(frame, box.north, box.south, box.west, box.east, quality.nearSegments, h, 0))
       mesh.receiveShadow = true
       mesh.renderOrder = 0
       mesh.name = 'ground near'
@@ -387,6 +395,8 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
   const fineZ = source === null ? null : Math.min(FINE_Z, source.maxZoom)
   let fine: { mesh: THREE.Mesh; tex: THREE.CanvasTexture; cx: number; cz: number } | null = null
   let fineBuilding = false
+  /* Over the memory budget, the fine square stays away for this ground's life. */
+  let fineOff = false
   const dropFine = () => {
     if (fine === null) return
     release(fine.mesh)
@@ -394,11 +404,11 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
     onChange()
   }
   const fineSquare = async (cx: number, cz: number) => {
-    if (fineBuilding || fineZ === null || fineZ <= NEAR_Z || near === null) return
+    if (fineOff || fineBuilding || fineZ === null || fineZ <= NEAR_Z || near === null) return
     fineBuilding = true
     try {
       const p = finePatch(frame.lat(cz), frame.lon(cx), fineZ)
-      const px = FINE_TILES * 256
+      const px = FINE_PX
       const canvas = document.createElement('canvas')
       canvas.width = px
       canvas.height = px
@@ -435,7 +445,7 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
             if (t === undefined || fine?.tex !== tex) return
             const img = await pictureOnly(p.tx0 + t.i, p.ty0 + t.j, fineZ, source)
             if (img === null || ctx === null) continue
-            ctx.drawImage(img, t.i * 256, t.j * 256, 256, 256)
+            ctx.drawImage(img, t.i * FINE_TILE_PX, t.j * FINE_TILE_PX, FINE_TILE_PX, FINE_TILE_PX)
             tex.needsUpdate = true
             onChange()
           }
@@ -477,12 +487,13 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
         return sum + (img?.width ?? 0) * (img?.height ?? 0) * 4
       }, 0) / 1e6),
     }),
+    dropFine: () => {
+      fineOff = true
+      dropFine()
+    },
     dispose: () => {
-      for (const t of textured) {
-        t.mesh.geometry.dispose()
-        t.map.dispose()
-        ;(t.mesh.material as THREE.Material).dispose()
-      }
+      /* Every piece let go the whole way, canvases shrunk to nothing (Batch FIX, Section 0.2: on leave, not only in flight). */
+      for (const t of [...textured]) release(t.mesh)
     },
   }
 }
