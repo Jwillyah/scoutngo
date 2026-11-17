@@ -32,6 +32,17 @@ export function swellLine(feet: number | null, periodS: number | null, fromDeg: 
   return `swell ${feet.toFixed(1)} ft${periodS === null ? '' : ` ${round(periodS)} s`}${fromDeg === null ? '' : ` ${compassPoint(fromDeg)}`}`
 }
 
+/*
+ * AT THE SPOT, THE CALL (Batch FIX, Section 3.3; 17 Nov 7:05 AM the map
+ * said "swell 1.0 ft 3 s NE" beside a Surf page reading 44099's own parts).
+ * With the marker on the spot the readout says the surf call for the hour
+ * under the thumb, the one the home, the Surf page and the week say
+ * (src/lib/useSurfNow.ts surfHourOf): "surf 1–2 ft · Poor · choppy".
+ */
+export function surfCallLine(call: { words: string; size: string; quality: string | null }): string {
+  return `surf ${call.words} · ${call.quality ?? call.size}`
+}
+
 /** "KNTU 13 kt N · 1 h ago"; "KNTU calm" below a knot; "var" when it gave no direction. */
 export function stationLine(id: string, speed: number | null, fromDeg: number | null, unit: string, age: string | null): string {
   const read = speed === null ? '—' : speed < 1 ? 'calm' : `${round(speed)} ${unit}${fromDeg === null ? ' var' : ` ${compassPoint(fromDeg)}`}`

@@ -17845,6 +17845,16 @@ a.about__row * {
   font-size: var(--text-xs);
   color: rgb(255 255 255 / 0.75);
 }
+/* Batch FIX, Section 3.4: the bigger-swell watch, one chip under the days. */
+.hweek__watch {
+  align-self: flex-start;
+  margin: 0;
+  padding: 4px 10px;
+  border: 1px solid var(--d-surf);
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  color: var(--white);
+}
 
 /* ------------------------------------------------- WHAT DO YOU DO OUTSIDE? (Batch M, Section 2) */
 .actpick--sheet {

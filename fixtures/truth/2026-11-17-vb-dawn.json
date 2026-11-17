@@ -1,0 +1,16 @@
+{
+  "date": "2026-11-17",
+  "observedAt": "2026-11-17T07:05:00-05:00",
+  "place": { "where": "Virginia Beach oceanfront, 1st St Jetty", "note": "No coordinate kept. Replays use the oceanfront point the 14 and 16 Nov data used (36.83, -75.97), facing 100." },
+  "truth": {
+    "observed": "1st St 0-1 ft, shin to knee",
+    "source": "Surfline, read by hand (a sanity check, not an input)",
+    "wind": "N 13 kt gusting 15, cross-shore"
+  },
+  "appSaid": {
+    "headline": "1-2 ft · ankle to knee",
+    "buoy": "44099 3.0 ft 4 s NE -> as faces 1.2 ft"
+  },
+  "shouldSay": { "VB": "0-1 or 1-2 ft", "quality": "no 'clean' (wind-chopped in N 13 kt)" },
+  "data": "tests/data/surf-2026-11-17/ (NDBC 44099, 44014, 44100 realtime and spectral, 16-17 Nov; Open-Meteo marine and wind at 36.83,-75.97, 17-23 Nov; NOAA CO-OPS 8638999 Cape Henry wind, 12-17 Nov), read 17 Nov 7:24-7:34 AM, 20-30 min after the look"
+}

@@ -15,6 +15,7 @@
  */
 import { rangeEnds } from './surfRange.ts'
 import { saneAzimuth, sanePeriod } from './sanity.ts'
+import { seaKind, SWELL_FROM_S, type SeaKind } from './surfTransform.ts'
 
 /** The body ruler, by whole feet of face (board LOOKS · Surf, S6). */
 const PART = ['flat', 'ankle', 'knee', 'waist', 'chest', 'shoulder', 'head', 'head', 'overhead'] as const
@@ -59,21 +60,36 @@ export interface SwellPart {
 
 const FT = 3.28084
 
-/** The forecast's parts at an hour: swell, second and third swell, wind waves; biggest first; only those the forecast gives. */
-export function forecastParts(read: (name: string) => number | null): SwellPart[] {
-  const part = (name: string, h: string, t: string, d: string): SwellPart | null => {
-    const m = read(h)
-    if (m === null || !(m > 0.03)) return null
-    return { name, ft: m * FT, periodS: sanePeriod(read(t)), fromDeg: saneAzimuth(read(d)) }
-  }
-  return [
-    part('Swell', 'swell_wave_height', 'swell_wave_period', 'swell_wave_direction'),
-    part('Second swell', 'secondary_swell_wave_height', 'secondary_swell_wave_period', 'secondary_swell_wave_direction'),
-    part('Third swell', 'tertiary_swell_wave_height', 'tertiary_swell_wave_period', 'tertiary_swell_wave_direction'),
-    part('Wind waves', 'wind_wave_height', 'wind_wave_period', 'wind_wave_direction'),
-  ]
-    .filter((p): p is SwellPart => p !== null)
+/*
+ * NAMED BY THE ONE PERIOD RULE (Batch FIX, Section 3.3; 17 Nov 7:05 AM the
+ * map said "swell 1.0 ft 3 s NE", the forecast's part it calls a swell,
+ * while the Surf page said 44099's "swell 0.3 ft 11 s" beside "wind waves
+ * 3.0 ft 4 s"). A part is wind waves or swell by src/core/surfTransform.ts
+ * seaKind, from the forecast and from a buoy alike; two wind-wave parts are
+ * one sea, joined by energy (root-sum-square) with the bigger one's period
+ * and direction.
+ */
+const SWELL_NAMES = ['Swell', 'Second swell', 'Third swell'] as const
+type Kinded = SwellPart & { kind: SeaKind }
+const named = (parts: readonly Kinded[]): SwellPart[] => {
+  const winds = parts.filter((p) => p.kind === 'wind').sort((a, b) => b.ft - a.ft)
+  const wind: SwellPart[] = winds.length === 0 ? [] : [{ name: 'Wind waves', ft: Math.sqrt(winds.reduce((m, p) => m + p.ft * p.ft, 0)), periodS: winds[0].periodS, fromDeg: winds[0].fromDeg }]
+  const swells = parts
+    .filter((p) => p.kind === 'swell')
     .sort((a, b) => b.ft - a.ft)
+    .map((p, i) => ({ name: SWELL_NAMES[Math.min(i, SWELL_NAMES.length - 1)] as string, ft: p.ft, periodS: p.periodS, fromDeg: p.fromDeg }))
+  return [...swells, ...wind]
+}
+
+/** The forecast's parts at an hour: swells and wind waves, named by period (seaKind); biggest first; only those the forecast gives. */
+export function forecastParts(read: (name: string) => number | null): SwellPart[] {
+  const part = (kind: SeaKind, k: string): Kinded | null => {
+    const m = read(`${k}_height`)
+    if (m === null || !(m > 0.03)) return null
+    const periodS = sanePeriod(read(`${k}_period`))
+    return { name: '', kind: seaKind(periodS, kind), ft: m * FT, periodS, fromDeg: saneAzimuth(read(`${k}_direction`)) }
+  }
+  return named([part('swell', 'swell_wave'), part('swell', 'secondary_swell_wave'), part('swell', 'tertiary_swell_wave'), part('wind', 'wind_wave')].filter((p): p is Kinded => p !== null)).sort((a, b) => b.ft - a.ft)
 }
 
 const POINTS: Record<string, number> = { N: 0, NNE: 22.5, NE: 45, ENE: 67.5, E: 90, ESE: 112.5, SE: 135, SSE: 157.5, S: 180, SSW: 202.5, SW: 225, WSW: 247.5, W: 270, WNW: 292.5, NW: 315, NNW: 337.5 }
@@ -82,22 +98,24 @@ const POINTS: Record<string, number> = { N: 0, NNE: 22.5, NE: 45, ENE: 67.5, E: 
  * NDBC's "wind waves" this long or longer are swell (Batch TRUTH, Section 2):
  * on 12 Nov 44099 split 1.3 ft · 9 s SE as wind waves beside a 0.3 ft swell,
  * and the beach had small clean lines, not chop. The split is by frequency
- * against the local wind; 8 s and up has travelled.
+ * against the local wind; 8 s and up has travelled. Since Batch FIX, Section
+ * 3, the line lives with the transform (src/core/surfTransform.ts seaKind).
  */
-export const SWELL_FROM_S = 8
+export { SWELL_FROM_S }
 
-/** A buoy's own parts from its spectral summary: the swell and the wind waves, those it reported; never a third. Wind waves of SWELL_FROM_S or longer are named swell, the bigger swell first. */
+/** A buoy's own parts from its spectral summary: the swell and the wind waves, those it reported; never a third. Named by period (seaKind): wind waves of SWELL_FROM_S or longer are swell, the bigger swell first. */
 export function buoyParts(split: { swellM: number | null; swellS: number | null; swellFrom: string | null; windWaveM: number | null; windWaveS: number | null; windWaveFrom: string | null } | null): SwellPart[] {
   if (split === null) return []
-  const out: SwellPart[] = []
-  if (split.swellM !== null && split.swellM > 0) out.push({ name: 'Swell', ft: split.swellM * FT, periodS: sanePeriod(split.swellS), fromDeg: split.swellFrom === null ? null : (POINTS[split.swellFrom] ?? null) })
+  const out: Kinded[] = []
+  if (split.swellM !== null && split.swellM > 0) {
+    const periodS = sanePeriod(split.swellS)
+    out.push({ name: '', kind: seaKind(periodS, 'swell'), ft: split.swellM * FT, periodS, fromDeg: split.swellFrom === null ? null : (POINTS[split.swellFrom] ?? null) })
+  }
   if (split.windWaveM !== null && split.windWaveM > 0) {
     const periodS = sanePeriod(split.windWaveS)
-    out.push({ name: periodS !== null && periodS >= SWELL_FROM_S ? 'Swell' : 'Wind waves', ft: split.windWaveM * FT, periodS, fromDeg: split.windWaveFrom === null ? null : (POINTS[split.windWaveFrom] ?? null) })
+    out.push({ name: '', kind: seaKind(periodS, 'wind'), ft: split.windWaveM * FT, periodS, fromDeg: split.windWaveFrom === null ? null : (POINTS[split.windWaveFrom] ?? null) })
   }
-  const swells = out.filter((p) => p.name === 'Swell').sort((a, b) => b.ft - a.ft)
-  if (swells.length === 2) swells[1].name = 'Second swell'
-  return [...swells, ...out.filter((p) => p.name !== 'Swell' && p.name !== 'Second swell')]
+  return named(out)
 }
 
 /** "2.1 ft · 9 s": a part's height and period, no direction (the arrow says that). */

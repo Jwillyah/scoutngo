@@ -9,7 +9,7 @@ import type { Hourly } from '../lib/tideSheetData.ts'
 import type { SurfSea } from '../lib/useSurfSea.ts'
 import { SurfBody, SurfHow, type SurfBodyProps } from './SurfPageV2.tsx'
 import { partWords, swellOf } from '../core/surfReads.ts'
-import { seaNow } from '../lib/useSurfNow.ts'
+import { seaNow, surfNowFrom } from '../lib/useSurfNow.ts'
 
 /* 44099's significant height in the fixture, metres (2.3 ft raw). */
 const BUOY_WAVE_M = 0.7
@@ -236,5 +236,28 @@ describe('one surf series (Batch DRONE, Section 1.6)', () => {
     expect(swell === null ? null : partWords(swell)).toBe('0.7 ft · 12 s')
     const html = renderToStaticMarkup(<SurfBody now={now} timeZone="America/New_York" spot={SPOT} spotName="Virginia Beach" away={null} sea={s16} stats={NONE} kept={[]} shoot={false} cam={null} miles />)
     expect(html).toContain('0.7 ft · 12 s')
+  })
+})
+
+/*
+ * Batch FIX, Section 3.3: the page's head is the call every screen reads
+ * (src/lib/useSurfNow.ts surfNowFrom), with the same station's wind near now.
+ * A fixture report: 15 kt from the NE, ten minutes old, over this file's
+ * light-offshore forecast.
+ */
+describe('one surf series (Batch FIX, Section 3.3)', () => {
+  const station = { at: new Date(NOW.getTime() - 10 * 60_000), mps: 15 * 0.514444, fromDeg: 45, gustMps: null }
+  it('with the station the head says what surfNowFrom says with it: chopped, never clean', () => {
+    const read = surfNowFrom(sea, NONE, NOW, 'America/New_York', station)
+    const call = read.week[0].call
+    expect(call?.quality).not.toBe(null)
+    const html = render({ station })
+    expect(html).toContain(`data-shared="surf">${call?.words}<`)
+    expect(html).toContain(`>${call?.quality}<`)
+    expect(read.now?.clean).toBe(false)
+  })
+  it('without it, the forecast’s light offshore wind: no quality words', () => {
+    expect(surfNowFrom(sea, NONE, NOW, 'America/New_York').week[0].call?.quality).toBe(null)
+    expect(render()).not.toContain('Poor · choppy')
   })
 })

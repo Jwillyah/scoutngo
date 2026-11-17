@@ -106,7 +106,7 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
   const clock = (d: Date) => formatClock(d, timeZone)
   const obs = useStationObs(looking ? venue : null)
   /* Batch Map A2: the value is the one surf number (src/lib/useSurfNow.ts), the home's and the Surf page's. */
-  const surf = useSurfNow(looking ? venue : null, now, timeZone, units.distance === 'ft', placeShort)
+  const surf = useSurfNow(looking ? venue : null, now, timeZone, units.distance === 'ft', placeShort, obs)
   /* Batch Polish 2, Section 2: the Calendar row says the next marked day ("Thu · rainbow"), from the week's rare light (the Sky page's, src/core/skyPage.ts). */
   const [mark, setMark] = useState<string | null>(null)
   const lat = venue?.lat ?? null

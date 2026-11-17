@@ -25,7 +25,9 @@ import { buoyFaceFt } from '../core/spotSkill.ts'
 import type { BuoyReading } from '../lib/buoy.ts'
 import type { DetailId } from '../lib/detailTabs.ts'
 import { readSkillBook } from '../lib/spotSkillStore.ts'
-import { seaNow, surfNowFrom, useSurfNow, type SurfDay } from '../lib/useSurfNow.ts'
+import { seaNow, surfNowFrom, surfObs, useSurfNow, type SurfDay } from '../lib/useSurfNow.ts'
+import { useStationObs } from '../lib/useStationObs.ts'
+import type { StationObs } from '../core/nowcast.ts'
 import { spotKey } from '../core/spotSkill.ts'
 import { buoyDots, buoyLean, dotsOutside, LEAN_BUOY_MAX_AGE_MS, FIRST_HOUR, LAST_HOUR, dayHours, rangeHourAt, type BuoyDot, type RangeHour } from '../lib/surfPageData.ts'
 import { compass, metresToFeet } from '../lib/tideWords.ts'
@@ -81,7 +83,9 @@ export function SurfPageV2({ venue, placeName, timeZone, units, ground, onBack, 
     return () => clearInterval(t)
   }, [])
   /* Batch Map A1/A2: the spot's surf beach and this hour's band, from the one hook the home and the menu read too. */
-  const surf = useSurfNow(venue, now, timeZone, units.distance === 'ft', placeName)
+  /* Batch FIX, Section 3.1: the station's wind near now, as the home's surf reads it (src/lib/surfPageData.ts SurfObs). */
+  const station = useStationObs(venue)
+  const surf = useSurfNow(venue, now, timeZone, units.distance === 'ft', placeName, station)
   const spot = surf.spot ?? venue
   const { sea, away: awayWords } = surf
   const ready = sea.marine !== null && sea.facingState !== 'loading' && sea.buoy !== null
@@ -101,7 +105,7 @@ export function SurfPageV2({ venue, placeName, timeZone, units, ground, onBack, 
 
   return (
     <DetailShell id="surf" ground={ground} onBack={onBack} onSwitch={onSwitch} onMap={onMap} how={<SurfHow sea={sea} stats={skill.stats} away={awayWords} placeName={placeName} spot={spot} today={venueToday(now, timeZone)} />}>
-      <SurfBody now={now} timeZone={timeZone} spot={spot} spotName={awayWords?.name ?? placeName} away={awayWords} sea={sea} stats={skill.stats} kept={kept} shoot={shootPicked(picked)} cam={cam} miles={units.distance === 'ft'} />
+      <SurfBody now={now} timeZone={timeZone} spot={spot} spotName={awayWords?.name ?? placeName} away={awayWords} sea={sea} stats={skill.stats} kept={kept} shoot={shootPicked(picked)} cam={cam} miles={units.distance === 'ft'} station={station} />
     </DetailShell>
   )
 }
@@ -120,11 +124,13 @@ export interface SurfBodyProps {
   cam: SkyCam | null
   /** Distances in miles (units.distance 'ft'), else km. */
   miles: boolean
+  /** The station's report near now (src/lib/useStationObs.ts); absent or null: the forecast's wind alone. */
+  station?: StationObs | null
 }
 
 
 /** The page's body, from data in hand (rendered on its own in tests). */
-export function SurfBody({ now, timeZone, spot, spotName, away, sea, stats, kept, shoot, cam, miles }: SurfBodyProps) {
+export function SurfBody({ now, timeZone, spot, spotName, away, sea, stats, kept, shoot, cam, miles, station = null }: SurfBodyProps) {
   const clock = (t: Date) => formatClock(t, timeZone)
   const { marine, wind, facing, factor } = sea
   const today = venueToday(now, timeZone)
@@ -132,9 +138,11 @@ export function SurfBody({ now, timeZone, spot, spotName, away, sea, stats, kept
   const nowMs = now.getTime()
   const shelter = sea.shelter ?? null
   const lean = useMemo(() => (marine === null ? null : buoyLean(marine, wind, sea.buoy, facing, stats, factor ?? BEACH_CAP, nowMs, sea.buoys ?? [], shelter)), [marine, wind, sea.buoy, sea.buoys, facing, stats, factor, nowMs, shelter])
-  const hours = useMemo(() => (marine === null ? [] : dayHours(marine, wind, today, timeZone, facing, stats, factor, lean, shelter)), [marine, wind, today, timeZone, facing, stats, factor, lean, shelter])
+  /* Batch FIX, Section 3.3: the chart's hours with the same measured wind and sea near now as the head (surfNowFrom). */
+  const obs = useMemo(() => surfObs(sea, now, station), [sea, now, station])
+  const hours = useMemo(() => (marine === null ? [] : dayHours(marine, wind, today, timeZone, facing, stats, factor, lean, shelter, obs)), [marine, wind, today, timeZone, facing, stats, factor, lean, shelter, obs])
   /* Batch TRUTH, Section 1: the head and the week strip read the day calls the home reads (useSurfNow's week, src/core/surfCall.ts). */
-  const read = useMemo(() => surfNowFrom(sea, stats, now, timeZone), [sea, stats, now, timeZone])
+  const read = useMemo(() => surfNowFrom(sea, stats, now, timeZone, station), [sea, stats, now, timeZone, station])
   const week = read.week
   const head = read.now
   const headCall = week[0]?.call ?? null

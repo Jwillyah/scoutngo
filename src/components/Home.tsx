@@ -20,7 +20,8 @@ import { wakeAt } from '../core/alertIcs.ts'
 import { formatClock } from '../core/timezone.ts'
 import { useCoastCams } from '../lib/coastCamsLazy.ts'
 import { homeOrder, primaryFor, useActivities } from '../lib/activities.ts'
-import { seaNow, surfLine, useSurfNow, type SurfNow } from '../lib/useSurfNow.ts'
+import { seaNow, surfDayHours, surfLine, useSurfNow, type SurfNow } from '../lib/useSurfNow.ts'
+import type { SurfShape } from '../core/surf.ts'
 import { rangeSizeWords } from '../core/surfReads.ts'
 import { BUBBLE_ROOM, chartMarks, firstFun, homeCardsShown, homeLayout, nextLine, nightSpans, surfChartMarks, surfPath, tideAt, tideCurve, type HomeLayout, type SurfChartMarks } from '../core/homeCards.ts'
 import { gustWords, windAt, windWords } from '../lib/windNow.ts'
@@ -110,10 +111,10 @@ export function Home({ venue, placeName, timeZone, units, drone, now, onClose, o
   const brief = useBriefing(venue, timeZone, now, true)
   /* Batch CORE, Section 1.4: the Go alert, from the one sky call. */
   useGoAlert(skyCallNow(brief.days.slice(0, 2), now, venue), now, timeZone)
-  /* Batch Map A1/A2: the spot's surf beach and its band, the same hook the menu and the Surf page read. */
-  const surf = useSurfNow(venue, now, timeZone, units.distance === 'ft', placeName)
   /* Batch MAP2, Section 2: a station within 15 km that reported in the last hour; the wind now leans to it (the Wind page reads the same). */
   const stationObs = useStationObs(venue)
+  /* Batch Map A1/A2: the spot's surf beach and its band, the same hook the menu and the Surf page read; Batch FIX, Section 3.1: the same station's wind near now. */
+  const surf = useSurfNow(venue, now, timeZone, units.distance === 'ft', placeName, stationObs)
   const [picked] = useActivities()
   const order = homeOrder(picked, drone !== null)
   /* Batch Flow, Section 3: 1-3 activities picked, big full-width cards; else the six (boards D_Home2, D_Home6). */
@@ -320,14 +321,14 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
 
   const rows = useMemo(() => {
     if (day === null) return []
-    const own = windowRows(which, day, order, units, drone, now, venue, timeZone, brief.facing)
+    const own = windowRows(which, day, order, units, drone, now, venue, timeZone, brief.facing, surfBars(surf, day, timeZone))
     /* Batch N E3: after dark, nothing is left today: tomorrow's first windows, said as tomorrow's. */
     const next = brief.days[1] ?? null
     /* Batch CORE, Section 1.3: not "after dark" until tonight's colour is over (src/core/skyCall.ts colourOver). */
     const dark = which === 'today' && day.events.sunset !== null && now.getTime() > colourOver(day.events.sunset, day.reads.sunset).getTime()
     if (own.length > 0 || !dark || next === null) return own
-    return windowRows('tomorrow', next, order, units, drone, now, venue, timeZone, brief.facing).map((r) => ({ ...r, head: `Tomorrow: ${r.head}` }))
-  }, [which, day, order, units, drone, now, venue, timeZone, brief.facing, brief.days])
+    return windowRows('tomorrow', next, order, units, drone, now, venue, timeZone, brief.facing, surfBars(surf, next, timeZone)).map((r) => ({ ...r, head: `Tomorrow: ${r.head}` }))
+  }, [which, day, order, units, drone, now, venue, timeZone, brief.facing, brief.days, surf])
   /* Batch N E2: no forecast is not "nothing standout": it says so, and that it is asking again. */
   const noForecast = !loading && (wx === null || day === null || day.wind.every((w) => w.mps === null))
   const nextGood = useMemo(() => nextGoodDay(brief.days, which === 'today' ? 1 : 2, timeZone), [brief.days, which, timeZone])
@@ -340,7 +341,7 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
   const soonWord = soon === null ? null : `${soon === day?.events.sunset ? 'sunset' : 'sunrise'} ${clock(soon)}`
   /* One decision for the day's line and the Surf card's tag (Batch QA, Section 0B: "Nothing standout today" under "Fun now"): the card's first Fun is an item here too. */
   const items = rows.filter((r) => r.from !== undefined).map((r) => ({ what: NEXT_WORD[r.activity], from: r.from as Date }))
-  const surfFun = order.includes('surf') ? surfFunAt(brief, surf, which, now, day).fun : null
+  const surfFun = order.includes('surf') ? surfFunAt(surf, which, now, day, timeZone).fun : null
   if (surfFun !== null && !items.some((i) => i.what === NEXT_WORD.surf)) items.push({ what: NEXT_WORD.surf, from: surfFun === 'now' ? now : surfFun })
   /* Batch CORE, Section 1.3: the colour on now leads the line ("Next: sky color now"), from the one sky call; on 15 Nov at 4:59 PM it said tomorrow's 6:35 AM. */
   const liveSky = which === 'today' ? skyCallNow(brief.days.slice(0, 2), now, venue) : null
@@ -514,7 +515,14 @@ function rainDay(hours: readonly { at: Date; mm: number | null }[], timeZone: st
 
 /* ---------------------------------------------------------- the windows */
 
-function windowRows(which: 'today' | 'tomorrow', day: DayBrief, order: readonly Activity[], units: Units, drone: BriefingDrone | null, now: Date, venue: { lat: number; lon: number }, timeZone: string, facing: number | null): WindowRow[] {
+/** Batch FIX, Section 3.3: a day's surf hours from the one series (useSurfNow), as the windows read them. */
+function surfBars(surf: SurfNow, day: DayBrief, timeZone: string): { at: Date; faceFt: number; shape: SurfShape | null }[] {
+  return surfDayHours(surf.series, timeZone)
+    .filter((h) => h.at.getTime() >= day.start.getTime() && h.at.getTime() < day.end.getTime())
+    .map((h) => ({ at: h.at, faceFt: h.centerFt, shape: h.shape }))
+}
+
+function windowRows(which: 'today' | 'tomorrow', day: DayBrief, order: readonly Activity[], units: Units, drone: BriefingDrone | null, now: Date, venue: { lat: number; lon: number }, timeZone: string, facing: number | null, surfHours: readonly { at: Date; faceFt: number; shape: SurfShape | null }[]): WindowRow[] {
   /* Batch N E3: in the future (8:11 PM offered "Surf 7-9 PM"), and in daylight for surf, the drone and the light. */
   const after = which === 'today' ? now.getTime() : 0
   const rise = day.events.sunrise?.getTime() ?? null
@@ -525,7 +533,7 @@ function windowRows(which: 'today' | 'tomorrow', day: DayBrief, order: readonly 
 
   /* Surf: the longest run of Fun or Firing hours still to come. */
   const surfRun = bestRun(
-    day.surf.filter((b) => b.at.getTime() > after && daylight(b.at.getTime())).map((b) => ({ at: new Date(b.at.getTime() - 1_800_000), value: b })),
+    surfHours.filter((b) => b.at.getTime() > after && daylight(b.at.getTime())).map((b) => ({ at: new Date(b.at.getTime() - 1_800_000), value: b })),
     (b) => surfOn(surfTag(b.faceFt, b.shape)),
   )
   if (surfRun !== null) {
@@ -653,7 +661,7 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
     if (surf.away !== null) line = `Nearest surf: ${surf.away.name} · ${surf.away.far}`
     /* The next 24 hours of faces, from the briefing's hours, today's and tomorrow's. */
     const from = which === 'today' ? now : (day?.start ?? now)
-    const { pts, fun } = surfFunAt(brief, surf, which, now, day)
+    const { pts, fun } = surfFunAt(surf, which, now, day, timeZone)
     /* The tag is the call's size; "Fun 3p" only says when, for a day the call says is Fun or Firing. */
     /* Batch DRONE, Section 1.4: in a chopping wind the quality words, never "Rideable" or "Fun". */
     const on = call !== null && call.quality === null && surfOn(call.size)
@@ -927,10 +935,16 @@ function windSideSpan(day: DayBrief | null, facing: number | null, now: Date | n
  * only when the reading the card's line is from (useSurfNow's band) agrees:
  * never "Fun now" over "bumpy, onshore".
  */
-function surfFunAt(brief: Briefing, surf: SurfNow, which: 'today' | 'tomorrow', now: Date, day: DayBrief | null): { pts: { at: Date; ft: number; fun: boolean }[]; fun: Date | 'now' | null } {
+/*
+ * Batch FIX, Section 3.3: the line is the call's own series (useSurfNow),
+ * the leaned centre at each hour, 5 AM to 8 PM as before; it read the
+ * forecast's raw face (the briefing's), about 0.3 ft under a 1-2 ft call on
+ * 17 Nov at 7:05 AM.
+ */
+function surfFunAt(surf: SurfNow, which: 'today' | 'tomorrow', now: Date, day: DayBrief | null, timeZone: string): { pts: { at: Date; ft: number; fun: boolean }[]; fun: Date | 'now' | null } {
   const band = which === 'today' ? surf.now : surf.tomorrow
   const from = which === 'today' ? now : (day?.start ?? now)
-  const pts = brief.days.flatMap((d) => d.surf).map((b) => ({ at: b.at, ft: b.faceFt, fun: surfOn(surfTag(b.faceFt, b.shape)) }))
+  const pts = surfDayHours(surf.series, timeZone).map((h) => ({ at: h.at, ft: h.centerFt, fun: surfOn(h.tag) }))
   const fun = firstFun(pts, from)
   return { pts, fun: fun === 'now' && band !== null && !surfOn(band.tag) ? null : fun }
 }
@@ -982,7 +996,13 @@ function WeekView({ brief, order, timeZone, units, now, venue, surf, onMonth }: 
           </li>
         ))}
       </ol>
-      <p className="hweek__head">{head ?? (brief.status === 'loading' ? 'Reading the forecast…' : wx === null || brief.days.every((d) => d.wind.every((w) => w.mps === null)) ? 'No forecast yet · retrying' : 'Nothing standout this week')}</p>
+      {/* Batch FIX, Section 3.4: a reading of the sea 4 ft or more at the beach on a day we call 2 or under (src/core/swellWatch.ts); a watch, never a size. */}
+      {surfCol && surf.watch !== null ? (
+        <p className="hweek__watch" data-swell-watch={surf.watch.date}>
+          {surf.watch.words}
+        </p>
+      ) : null}
+      <p className="hweek__head">{head ??(brief.status === 'loading' ? 'Reading the forecast…' : wx === null || brief.days.every((d) => d.wind.every((w) => w.mps === null)) ? 'No forecast yet · retrying' : 'Nothing standout this week')}</p>
       <p className="hweek__note">Days 4–7 are guesses: the models drift apart that far out.</p>
       {onMonth === undefined ? null : (
         <button type="button" className="hweek__month" data-see-month onClick={onMonth}>

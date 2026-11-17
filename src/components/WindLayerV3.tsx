@@ -6,14 +6,14 @@ import { fadeEdges, fromUV, particleCount, PX_PER_S_PER_MPS, sampleField, windRg
 import { nearestStation, stationWind, type StationWind } from '../lib/stationNear.ts'
 import { fetchMarine, hourlyAt, type Hourly } from '../lib/tideSheetData.ts'
 import { forecastParts, swellOf } from '../core/surfReads.ts'
-import { seaNow } from '../lib/useSurfNow.ts'
-import { useSurfSea } from '../lib/useSurfSea.ts'
-import { agoWords } from '../lib/nearWind.ts'
+import { surfHourOf, useSurfNow } from '../lib/useSurfNow.ts'
 import { useStationObs } from '../lib/useStationObs.ts'
+import { venueTimeZone } from '../core/timezone.ts'
+import { agoWords } from '../lib/nearWind.ts'
 import { isFresh } from '../core/stationPick.ts'
 import { windIn, windUnitLabel, type WindUnit } from '../lib/units.ts'
 import { usePointWind, type WindLevel, type WindModelChip } from '../lib/useWindViewport.ts'
-import { stationLine, swellLine, windLine } from '../core/markerReadout.ts'
+import { stationLine, surfCallLine, swellLine, windLine } from '../core/markerReadout.ts'
 import { LayerMarker } from './LayerMarker.tsx'
 import '../styles/wind.css'
 
@@ -306,15 +306,30 @@ export function WindLayerV3({ map, field, unit, spot, facing, headline = null, s
    * rounded to 2 decimals, as every forecast question.
    *
    * Batch DRONE, Section 1.6 (16 Nov 11:02: the map "swell 1.6 ft 4 s", the
-   * Surf page "0.7 ft 12 s", same beach, same hour): at the spot and at now,
-   * the Surf page's own parts (seaNow: the fresh buoy's split, else the
-   * forecast's) and its swell (swellOf); elsewhere, and at any other hour,
-   * the forecast's parts at the marker through the same swellOf.
+   * Surf page "0.7 ft 12 s", same beach, same hour) read the Surf page's
+   * parts at the spot at now; Batch FIX, Section 3.3 says the surf call there
+   * instead, at any hour (below). Away from the spot, the forecast's parts at
+   * the marker, named by period (src/core/surfReads.ts forecastParts).
    */
   /* Asked once per place, and read for the hour under the thumb without asking again (Batch DRONE, Section 3: no refetch while scrubbing). */
   const [sea, setSea] = useState<{ ck: string; h: Hourly | null } | null>(null)
-  const swellAtSpot = headline !== null && spot !== null && centre !== null && distanceMeters(spot, centre) <= 3000 && (when === null || Math.abs(when.getTime() - new Date().getTime()) < 3_600_000)
-  const spotSea = useSurfSea(swellAtSpot ? spot : null)
+  /*
+   * Batch FIX, Section 3.3: at the spot, at any hour on the bar, the surf
+   * call itself, from the one series the home, the Surf page and the week
+   * read (src/lib/useSurfNow.ts surfHourOf), with the same station's wind
+   * near now; asked only while the marker is on the spot.
+   */
+  const surfSpot = headline !== null && spot !== null && centre !== null && distanceMeters(spot, centre) <= 3000 ? spot : null
+  const [nowMin, setNowMin] = useState(() => Math.floor(Date.now() / 60_000))
+  useEffect(() => {
+    if (surfSpot === null) return
+    const t = setInterval(() => setNowMin(Math.floor(Date.now() / 60_000)), 60_000)
+    return () => clearInterval(t)
+  }, [surfSpot === null]) // eslint-disable-line react-hooks/exhaustive-deps
+  const surfNow = useMemo(() => new Date(nowMin * 60_000), [nowMin])
+  const surfZone = useMemo(() => (surfSpot === null ? 'UTC' : (venueTimeZone(surfSpot.lat, surfSpot.lon) ?? 'UTC')), [surfSpot?.lat, surfSpot?.lon]) // eslint-disable-line react-hooks/exhaustive-deps
+  const surfStation = useStationObs(surfSpot)
+  const surf = useSurfNow(surfSpot, surfNow, surfZone, false, null, surfStation)
   useEffect(() => {
     if (centre === null || ck === null) return
     let live = true
@@ -335,8 +350,8 @@ export function WindLayerV3({ map, field, unit, spot, facing, headline = null, s
     const at = whenMs === null ? new Date() : new Date(whenMs)
     return swellOf(forecastParts((n) => hourlyAt(h, n, at)))
   }, [sea, ck, whenMs])
-  const lead = swellAtSpot && spotSea.marine !== null ? swellOf(seaNow(spotSea, new Date()).parts) : markerSwell
-  const swell = lead === null || lead.fromDeg === null ? null : { ft: lead.ft, s: lead.periodS, fromDeg: lead.fromDeg }
+  const surfHere = surfSpot === null ? null : surfHourOf(surf.series, whenMs === null ? surfNow : new Date(whenMs), 0)
+  const swell = markerSwell === null || markerSwell.fromDeg === null ? null : { ft: markerSwell.ft, s: markerSwell.periodS, fromDeg: markerSwell.fromDeg }
 
   const say = (mps: number | null) => (mps === null ? null : windIn(mps, unit))
   const side = here === null || facing === null || spot === null || centre === null || distanceMeters(spot, centre) > 3000 ? null : windToBeach(here.fromDeg, facing)
@@ -365,7 +380,7 @@ export function WindLayerV3({ map, field, unit, spot, facing, headline = null, s
       ? [status === 'loading' ? 'Reading the wind…' : status === 'failed' ? 'Wind didn’t load' : 'No wind here']
       : [
           [windLine(say(here.speedMps), here.fromDeg, say(here.gust), u), side === null ? null : `${side === 'cross' ? 'cross-shore' : side} here`].filter((x) => x !== null).join(' · '),
-          swell === null ? null : swellLine(swell.ft, swell.s, swell.fromDeg),
+          surfHere !== null ? surfCallLine(surfHere.call) : swell === null ? null : swellLine(swell.ft, swell.s, swell.fromDeg),
           stationText,
         ].filter((x): x is string => x !== null)
   const atSpot = spot !== null && centre !== null && distanceMeters(spot, centre) < 30

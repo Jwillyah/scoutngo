@@ -11,12 +11,14 @@ import { surfTag, windTag, type SurfTag, type WindTag } from '../core/briefing.t
 import { windSide } from '../core/coastFacing.ts'
 import { shelteredMps, type Shelter } from '../core/jettyFactor.ts'
 import { BEACH_CAP, surfShape, type SurfShape } from '../core/surf.ts'
-import { surfChop, surfQuality, type SurfQuality } from '../core/surfCall.ts'
-import { buoySeaParts, seaFaceFt, seaReach } from '../core/surfTransform.ts'
+import { seaChop, surfChop, surfQuality, type SurfQuality } from '../core/surfCall.ts'
+import { buoySeaParts, forecastSeaKinds, seaEnergyAtBeach, seaFaceFt, seaReach, windSeaDominates, type KindPart } from '../core/surfTransform.ts'
+import { nowcastAt, type StationObs } from '../core/nowcast.ts'
 import { buoyFaceFt, correctedRange, type SkillSample, type SpotStats, type SurfRange } from '../core/spotSkill.ts'
 import { buoyConsensus, cappedMiss, LEAN_CAP_FT, leanRange, surfLean, type SurfLean } from '../core/surfNowcast.ts'
 import { peakHour, seaSpreadFt } from '../core/surfRange.ts'
 import { zonedTimeToUtc } from '../core/timezone.ts'
+import type { WatchReading } from '../core/swellWatch.ts'
 import type { BuoyReading } from './buoy.ts'
 import { surfAt } from './surfDay.ts'
 import { hourlyAt, type Hourly } from './tideSheetData.ts'
@@ -44,6 +46,31 @@ export interface RangeHour {
   chop: boolean
   /** "Poor · choppy" / "Fair · textured" when it does; null otherwise. */
   quality: SurfQuality | null
+  /** Whether the wind sea dominates the swell at the beach this hour (src/core/surfTransform.ts windSeaDominates); null when the sea's parts could not be worked out. */
+  windSeaDominant: boolean | null
+}
+
+/*
+ * WHAT THE STATION AND THE BUOY SAY NEAR NOW (Batch FIX, Section 3.1). The
+ * forecast's wind at VB read 7.8 kt for the 10:30 AM hour on 16 Nov and 7.6
+ * kt for 7:30 AM on 17 Nov (measurements/2026-11-17-surf-fix.md), while the
+ * beach had N 10-14 and N 13 g15 (fixtures/truth/2026-11-16-vb-surf.json,
+ * 2026-11-17-vb-dawn.json): the chop rule needs what is blowing. So an hour
+ * near now reads
+ *
+ *   station  the station's report (src/core/nowcast.ts StationObs, carried to
+ *            10 m over the spot), leaning the model's wind the way the home's
+ *            wind leans (nowcastAt: all of it at the report, fading over 3 h);
+ *            the caller passes only a fresh one (obsFresh)
+ *   buoy     the fresh buoy's own parts, wind sea and swell
+ *            (src/core/surfTransform.ts buoySeaKinds), for the hours within
+ *            LEAN_BUOY_MAX_AGE_MS of its reading; the forecast's parts after
+ *
+ * Every screen passes the same (src/lib/useSurfNow.ts surfObs).
+ */
+export interface SurfObs {
+  station: StationObs | null
+  buoy: { at: number; parts: KindPart[] } | null
 }
 
 /*
@@ -58,17 +85,27 @@ function wholeSeaFaceFt(marine: Hourly, at: Date, facing: number | null, factor:
 }
 
 /** One hour, or null where the forecast said nothing. `shelter`: a jetty's lee (src/core/jettyFactor.ts), null on an open beach. */
-export function rangeHourAt(marine: Hourly, wind: Hourly | null, at: Date, facing: number | null, stats: SpotStats, factor: number = BEACH_CAP, lean: SurfLean | null = null, shelter: Shelter | null = null): RangeHour | null {
+export function rangeHourAt(marine: Hourly, wind: Hourly | null, at: Date, facing: number | null, stats: SpotStats, factor: number = BEACH_CAP, lean: SurfLean | null = null, shelter: Shelter | null = null, obs: SurfObs | null = null): RangeHour | null {
   const s = surfAt(marine, at, facing, factor)
   if (s === null) return null
-  const from = wind === null ? null : hourlyAt(wind, 'wind_direction_10m', at)
-  const raw = wind === null ? null : hourlyAt(wind, 'wind_speed_10m', at)
+  const model = (t: Date) => {
+    const mps = wind === null ? null : hourlyAt(wind, 'wind_speed_10m', t)
+    return mps === null || wind === null ? null : { mps, fromDeg: hourlyAt(wind, 'wind_direction_10m', t), gustMps: null }
+  }
+  /* Batch FIX, Section 3.1: near a station's report, its wind (SurfObs). */
+  const blown = obs?.station == null ? model(at) : nowcastAt(model, obs.station, at)
+  const from = blown === null ? null : blown.fromDeg
+  const raw = blown === null ? null : blown.mps
   /* Batch DRONE, Section 1.3: at a jetty, the wind from its lee counts its share. */
   const mps = raw === null ? null : shelteredMps(raw, from, shelter)
   /* The briefing's shape (src/lib/useBriefing.ts): with no direction, never Messy. */
   const shape0 = mps === null ? null : surfShape(mps, from ?? 0, from === null ? null : facing)
   const windKt = mps === null ? null : mps / 0.514444
-  const chop = surfChop(windKt, from === null || facing === null ? null : windSide(from, facing))
+  /* Batch FIX, Section 3.1: the wind sea against the swell at the beach, the buoy's own near its reading, else the forecast's. */
+  const b = obs?.buoy ?? null
+  const kinds = b !== null && Math.abs(at.getTime() - b.at) <= LEAN_BUOY_MAX_AGE_MS ? b.parts : forecastSeaKinds((n) => hourlyAt(marine, n, at))
+  const windSeaDominant = windSeaDominates(seaEnergyAtBeach(kinds, facing, factor))
+  const chop = surfChop(windKt, from === null || facing === null ? null : windSide(from, facing)) || seaChop(windKt, from, facing, windSeaDominant)
   /* Batch DRONE, Section 1.4: chop is never clean. */
   const shape = chop && shape0 === 'Clean' ? 'Bumpy' : shape0
   const spread = seaSpreadFt(s.estimate.faceFt, wholeSeaFaceFt(marine, at, facing, factor))
@@ -89,6 +126,7 @@ export function rangeHourAt(marine: Hourly, wind: Hourly | null, at: Date, facin
     windKt,
     chop,
     quality: surfQuality(range.centerFt, chop),
+    windSeaDominant,
   }
 }
 
@@ -151,26 +189,53 @@ export const FIRST_HOUR = 5
 export const LAST_HOUR = 20
 
 /** A local day's hours, FIRST_HOUR to LAST_HOUR, at half past. */
-export function dayHours(marine: Hourly, wind: Hourly | null, isoDate: string, timeZone: string, facing: number | null, stats: SpotStats, factor: number = BEACH_CAP, lean: SurfLean | null = null, shelter: Shelter | null = null): RangeHour[] {
+export function dayHours(marine: Hourly, wind: Hourly | null, isoDate: string, timeZone: string, facing: number | null, stats: SpotStats, factor: number = BEACH_CAP, lean: SurfLean | null = null, shelter: Shelter | null = null, obs: SurfObs | null = null): RangeHour[] {
   const out: RangeHour[] = []
   for (let h = FIRST_HOUR; h <= LAST_HOUR; h += 1) {
     const t = zonedTimeToUtc(isoDate, `${String(h).padStart(2, '0')}:30`, timeZone)
     if (t === null) continue
-    const r = rangeHourAt(marine, wind, t, facing, stats, factor, lean, shelter)
+    const r = rangeHourAt(marine, wind, t, facing, stats, factor, lean, shelter, obs)
     if (r !== null) out.push(r)
   }
   return out
 }
 
-export const addDays = (iso: string, n: number): string => new Date(Date.parse(`${iso}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10)
+/*
+ * THE READINGS THE BIGGER-SWELL WATCH SETS AGAINST THE CALL (Batch FIX,
+ * Section 3.4; src/core/swellWatch.ts). What the app already holds: one
+ * model, Open-Meteo Marine's best match (fetchMarine asks no other and no
+ * ensemble), read the two ways the spread reads it, each broken at this
+ * beach by the transform, before any lean or this spot's correction: part by
+ * part, and the whole sea taken as one. Each its biggest face of the day,
+ * FIRST_HOUR to LAST_HOUR.
+ */
+export const WATCH_MODEL = 'Open-Meteo Marine (best match)'
+export function dayReadings(marine: Hourly, isoDate: string, timeZone: string, facing: number | null, factor: number = BEACH_CAP): WatchReading[] {
+  let parts: number | null = null
+  let whole: number | null = null
+  for (let h = FIRST_HOUR; h <= LAST_HOUR; h += 1) {
+    const t = zonedTimeToUtc(isoDate, `${String(h).padStart(2, '0')}:30`, timeZone)
+    if (t === null) continue
+    const s = surfAt(marine, t, facing, factor)
+    if (s !== null) parts = Math.max(parts ?? 0, s.estimate.faceFt)
+    const w = wholeSeaFaceFt(marine, t, facing, factor)
+    if (w !== null) whole = Math.max(whole ?? 0, w)
+  }
+  return [
+    ...(parts === null ? [] : [{ model: WATCH_MODEL, read: 'part by part', faceFt: parts }]),
+    ...(whole === null ? [] : [{ model: WATCH_MODEL, read: 'the whole sea as one', faceFt: whole }]),
+  ]
+}
+
+export const addDays =(iso: string, n: number): string => new Date(Date.parse(`${iso}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10)
 
 /** Seven days from `today`, each its biggest hour (null where the forecast does not reach). */
-export function weekPeaks(marine: Hourly, wind: Hourly | null, today: string, timeZone: string, facing: number | null, stats: SpotStats, factor: number = BEACH_CAP, lean: SurfLean | null = null, shelter: Shelter | null = null): { date: string; peak: RangeHour | null }[] {
+export function weekPeaks(marine: Hourly, wind: Hourly | null, today: string, timeZone: string, facing: number | null, stats: SpotStats, factor: number = BEACH_CAP, lean: SurfLean | null = null, shelter: Shelter | null = null, obs: SurfObs | null = null): { date: string; peak: RangeHour | null }[] {
   return Array.from({ length: 7 }, (_, i) => {
     const date = addDays(today, i)
     return {
       date,
-      peak: peakHour(dayHours(marine, wind, date, timeZone, facing, stats, factor, lean, shelter)),
+      peak: peakHour(dayHours(marine, wind, date, timeZone, facing, stats, factor, lean, shelter, obs)),
     }
   })
 }

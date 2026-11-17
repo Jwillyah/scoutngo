@@ -13,7 +13,7 @@
  *   wind    the water's shape and the wind to the beach, "clean, offshore".
  *   sure    firm for the first WEEK_SURE_DAYS days, a guess after.
  */
-import type { WindSide } from './coastFacing.ts'
+import { angleApart, type WindSide } from './coastFacing.ts'
 import { surfTag, type SurfShape, type SurfTag } from './surf.ts'
 
 /** Days from today this sure; after, the models drift apart (src/core/homeDay.ts WEEK_SURE_DAYS). */
@@ -30,8 +30,27 @@ export function surfBand(centerFt: number): [number, number] {
   return [lo, lo + 2]
 }
 
+/*
+ * AT A BOUNDARY, THE LIKELY RANGE PICKS (Batch FIX, Section 3.2; 14 Nov 4:30
+ * PM read 0.97 ft and said 0-1 while the beach had 1-2,
+ * measurements/2026-11-16-surf-transform.md). A centre within BOUNDARY_FT
+ * under a whole foot takes the band above when the likely range's top
+ * reaches that foot; 0.03 ft is not a reading the forecast can make.
+ */
+export const BOUNDARY_FT = 0.1
+
+/** The band for a centre and its likely range's top (null: the centre alone, surfBand). */
+export function callBand(centerFt: number, highFt: number | null = null): [number, number] {
+  const c = Number.isFinite(centerFt) ? Math.max(0, centerFt) : 0
+  const up = Math.floor(c) + 1
+  if (highFt !== null && Number.isFinite(highFt) && up - c <= BOUNDARY_FT + 1e-9 && highFt >= up) return surfBand(up)
+  return surfBand(c)
+}
+
 export interface SurfHourIn {
   centerFt: number
+  /** The likely range's top, feet (src/core/spotSkill.ts SurfRange): picks the band at a boundary (callBand); absent, the centre alone. */
+  highFt?: number | null
   shape: SurfShape | null
   /** The wind to the beach in words, "offshore", "cross-offshore"; null when not known. */
   side: string | null
@@ -55,6 +74,30 @@ const CHOP_SIDES: ReadonlySet<WindSide> = new Set<WindSide>(['onshore', 'cross-o
 /** Whether a wind chops the water at this beach: CHOP_WIND_KT or more, from cross-shore round to onshore. */
 export function surfChop(windKt: number | null, side: WindSide | null): boolean {
   return windKt !== null && side !== null && windKt >= CHOP_WIND_KT && CHOP_SIDES.has(side)
+}
+
+/*
+ * THE CHOP ITSELF (Batch FIX, Section 3.1). 16 Nov 10:50 AM the beach was
+ * wind-chopped by a N wind sea while the model's NNW counted as
+ * cross-offshore, so the rule above never fired (fixtures/truth/
+ * 2026-11-16-vb-surf.json); on 17 Nov a "clean" stretch was shaded 6-7 PM
+ * under N 13 kt. Now also: when the wind sea dominates the swell at the beach
+ * (src/core/surfTransform.ts windSeaDominates: its energy after the transform
+ * twice the swell's or more) and the wind is CHOP_WIND_KT or more from
+ * anywhere but straight offshore, within OFFSHORE_HALF_DEG of it, the water
+ * is choppy: "Poor · choppy", and no "clean".
+ */
+export const OFFSHORE_HALF_DEG = 30
+
+/** Whether a wind blows from within OFFSHORE_HALF_DEG of straight offshore (the facing's opposite). */
+export function nearOffshore(fromDeg: number, facing: number, halfDeg: number = OFFSHORE_HALF_DEG): boolean {
+  return angleApart(fromDeg, (facing + 180) % 360) <= halfDeg
+}
+
+/** Whether a dominant wind sea chops the water: CHOP_WIND_KT or more from anywhere but near offshore. Unknown wind, direction or facing: no. */
+export function seaChop(windKt: number | null, fromDeg: number | null, facing: number | null, windSeaDominant: boolean | null): boolean {
+  if (windSeaDominant !== true || windKt === null || fromDeg === null || facing === null) return false
+  return windKt >= CHOP_WIND_KT && !nearOffshore(fromDeg, facing)
 }
 
 /** The quality words for a choppy hour; null when the wind does not chop it (the size tag stands). */
@@ -81,7 +124,7 @@ export const SHAPE_WORD: Record<SurfShape, string> = { Clean: 'clean', Bumpy: 'b
 
 export function surfCall(h: SurfHourIn | null, dayIndex: number): SurfCall | null {
   if (h === null || !Number.isFinite(h.centerFt)) return null
-  const [lowFt, highFt] = surfBand(h.centerFt)
+  const [lowFt, highFt] = callBand(h.centerFt, h.highFt ?? null)
   return {
     lowFt,
     highFt,

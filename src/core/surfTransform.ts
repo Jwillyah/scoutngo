@@ -159,3 +159,99 @@ export function forecastSeaParts(read: (name: string) => number | null): SeaPart
 
 /** Where a part's share reaches nothing: the spread's far edge past square-on (derived, not tuned). */
 export const PART_GONE_DEG = 90 + PART_SPREAD_DEG
+
+/* ------------------------------------------------- wind sea against swell */
+
+/*
+ * WHICH PART IS WIND SEA (Batch FIX, Section 3.1). 16 Nov 10:50 AM the beach
+ * was wind-chopped by a N wind sea (fixtures/truth/2026-11-16-vb-surf.json)
+ * and nothing said so: the model's NNW wind counted as cross-offshore. The
+ * quality now keys on the chop itself, the wind sea against the swell at the
+ * beach, each through the transform above.
+ *
+ * A part is wind sea or swell by its period, one line for both sources:
+ *
+ *   under WIND_SEA_MAX_S   wind sea, whatever the source called it. Open-
+ *                          Meteo names its biggest part "swell" even at
+ *                          3.5-4.5 s (tests/data/surf-2026-11-17/marine.json,
+ *                          17 Nov 7 AM); NDBC split the same morning's sea as
+ *                          wind waves at 4.3-5.0 s and 16 Nov's at 5.3 s
+ *                          (tests/data/surf-2026-11-16/44099.spec,
+ *                          tests/data/surf-2026-11-17/44099.spec)
+ *   SWELL_FROM_S and over  swell, even when the source called it wind waves
+ *                          (src/core/surfReads.ts, Batch TRUTH 2: 44099's
+ *                          9 s "wind waves" on 12 Nov were clean lines)
+ *   between                as the source named it
+ *
+ * 6 s: about the peak period of a sea fully grown under a 16 kt wind
+ * (Pierson-Moskowitz, T ≈ 0.73 × U in m/s), so a part under it can be the
+ * local wind's own sea; the measured splits above sit under it.
+ */
+export const WIND_SEA_MAX_S = 6
+export const SWELL_FROM_S = 8
+
+export type SeaKind = 'swell' | 'wind'
+export interface KindPart extends SeaPart {
+  kind: SeaKind
+}
+
+/** Wind sea or swell, by the period first and the source's own name between the two lines. */
+export function seaKind(periodS: number | null, named: SeaKind): SeaKind {
+  if (periodS === null || !(periodS > 0)) return named
+  if (periodS < WIND_SEA_MAX_S) return 'wind'
+  if (periodS >= SWELL_FROM_S) return 'swell'
+  return named
+}
+
+/** The forecast's parts, each named wind sea or swell (forecastSeaParts, kept apart). */
+export function forecastSeaKinds(read: (name: string) => number | null): KindPart[] {
+  const part = (k: string, named: SeaKind): KindPart => {
+    const p = { heightM: read(`${k}_height`), periodS: read(`${k}_period`), fromDeg: read(`${k}_direction`) }
+    return { ...p, kind: seaKind(p.periodS, named) }
+  }
+  const parts = [part('swell_wave', 'swell'), part('secondary_swell_wave', 'swell'), part('tertiary_swell_wave', 'swell'), part('wind_wave', 'wind')].filter((p) => (p.heightM ?? 0) > 0)
+  const whole = part('wave', 'swell')
+  if (parts.length === 0) return [whole]
+  const left = (whole.heightM ?? 0) ** 2 - parts.reduce((m, p) => m + (p.heightM as number) ** 2, 0)
+  return left > 0 ? [...parts, { ...whole, heightM: Math.sqrt(left) }] : parts
+}
+
+/** A buoy's parts, each named: its split's swell and wind waves by the same period lines; its whole sea, by its period, when it sent no split. */
+export function buoySeaKinds(b: { waveM: number; periodS: number | null; fromDeg: number | null; split?: BuoySplitIn | null }): KindPart[] {
+  const s = b.split ?? null
+  if (s !== null && ((s.swellM ?? 0) > 0 || (s.windWaveM ?? 0) > 0)) {
+    const out: KindPart[] = [
+      { heightM: s.swellM, periodS: s.swellS, fromDeg: point(s.swellFrom), kind: seaKind(s.swellS, 'swell') },
+      { heightM: s.windWaveM, periodS: s.windWaveS, fromDeg: point(s.windWaveFrom), kind: seaKind(s.windWaveS, 'wind') },
+    ]
+    return out.filter((p) => (p.heightM ?? 0) > 0)
+  }
+  return [{ heightM: b.waveM, periodS: b.periodS, fromDeg: b.fromDeg, kind: seaKind(b.periodS, 'swell') }]
+}
+
+/** The energy (face², ft²) of the wind sea and of the swell that reach this beach; null when no part can be worked out. */
+export function seaEnergyAtBeach(parts: readonly KindPart[], facing: number | null, factor: number): { windFt2: number; swellFt2: number } | null {
+  let windFt2 = 0
+  let swellFt2 = 0
+  let any = false
+  for (const p of parts) {
+    const f = partFaceFt(p, facing, factor)
+    if (f === null) continue
+    any = true
+    if (p.kind === 'wind') windFt2 += f * f
+    else swellFt2 += f * f
+  }
+  return any ? { windFt2, swellFt2 } : null
+}
+
+/*
+ * THE WIND SEA DOMINATES when its energy at the beach is WIND_SEA_DOMINANCE
+ * times the swell's or more (the batch's line: "wind-sea energy ≥ 2× swell
+ * after the transform"). A sea with nothing reaching the beach does not
+ * dominate anything; null when no part can be worked out.
+ */
+export const WIND_SEA_DOMINANCE = 2
+export function windSeaDominates(e: { windFt2: number; swellFt2: number } | null): boolean | null {
+  if (e === null) return null
+  return e.windFt2 > 0 && e.windFt2 >= WIND_SEA_DOMINANCE * e.swellFt2
+}
