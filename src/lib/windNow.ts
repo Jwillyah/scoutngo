@@ -8,7 +8,7 @@
  * they have not arrived the page still has this (A4: never a blank page).
  */
 import type { Hourly } from './tideSheetData.ts'
-import { nowcastAt, obsFresh, type StationObs } from '../core/nowcast.ts'
+import { nowcastAt, nowcastWeight, obsFresh, type StationObs } from '../core/nowcast.ts'
 import { hourlyAt } from './tideSheetData.ts'
 import { saneAzimuth, saneGust, saneWind } from '../core/sanity.ts'
 import { compass } from './tideWords.ts'
@@ -49,8 +49,7 @@ export function modelWindAt(wx: Hourly | null, t: Date): WindNow | null {
  * under an hour old (src/core/nowcast.ts), fading back to the model over
  * three hours. Every screen passes the same report (src/lib/useStationObs.ts).
  */
-export function windAt(wx: Hourly | null, t: Date, obs: StationObs | null = null): WindNow | null {
-  const now = new Date()
+export function windAt(wx: Hourly | null, t: Date, obs: StationObs | null = null, now: Date = new Date()): WindNow | null {
   const lean = obsFresh(obs, now) ? obs : null
   const w = nowcastAt((tt) => modelWindAt(wx, tt), lean, halfHour(t)) as WindNow | null
   return w === null ? null : { ...w, fromDeg: calmDirection(w.mps, w.fromDeg) }
@@ -69,4 +68,34 @@ export function windWords(w: WindNow | null, unit: WindUnit): string | null {
 export function gustWords(w: WindNow | null, unit: WindUnit): string | null {
   const v = w === null ? null : windIn(w.gustMps, unit)
   return v === null ? null : `gusts ${Math.round(v)} ${windUnitLabel(unit)}`
+}
+
+/*
+ * THE WEEK'S WIND WITH "NOW" LEANED (Batch FIX, Section 1): the hours the
+ * station's report still weighs on carry windAt's wind, the rest the
+ * model's untouched. Each hour's stamp holds the wind at its half past, the
+ * hour windAt reads, so a reader of the hour that holds now (the surf call,
+ * src/lib/surfPageData.ts) reads exactly the home's and the Wind page's.
+ */
+export function leanHourly(wx: Hourly | null, obs: StationObs | null, now: Date = new Date()): Hourly | null {
+  if (wx === null || obs === null || !obsFresh(obs, now)) return wx
+  const speed = wx.values.wind_speed_10m
+  if (speed === undefined) return wx
+  const dir = wx.values.wind_direction_10m ?? speed.map(() => null)
+  const gust = wx.values.wind_gusts_10m ?? speed.map(() => null)
+  const s2 = [...speed]
+  const d2 = [...dir]
+  const g2 = [...gust]
+  let moved = false
+  wx.times.forEach((t, i) => {
+    const at = halfHour(new Date(t))
+    if (nowcastWeight(obs.at, at) === 0) return
+    const w = windAt(wx, at, obs, now)
+    if (w === null) return
+    s2[i] = w.mps
+    d2[i] = w.fromDeg
+    g2[i] = w.gustMps
+    moved = true
+  })
+  return moved ? { times: wx.times, values: { ...wx.values, wind_speed_10m: s2, wind_direction_10m: d2, wind_gusts_10m: g2 } } : wx
 }

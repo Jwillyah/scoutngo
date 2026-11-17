@@ -24,6 +24,8 @@ import { addDays, buoyLean, rangeHourAt, weekPeaks, type RangeHour } from './sur
 import { onSkillBook, readSkillBook, skillBookVersion } from './spotSkillStore.ts'
 import { awayFrom, beachName, sameBeach, useSurfBeach, type Beach } from './surfBeach.ts'
 import { useSurfSea, type SurfSea } from './useSurfSea.ts'
+import { useStationObs } from './useStationObs.ts'
+import { leanHourly } from './windNow.ts'
 import { keepWeek } from './weekBiasStore.ts'
 
 export interface SurfNow {
@@ -128,7 +130,13 @@ export function useSurfNow(venue: LatLon | null, now: Date, timeZone: string, mi
   /* Read where the beach's surf is; said to be elsewhere only when it is (a spot named for the beach is on it). */
   const away = awayFrom(venue, beach, spotName)
   const spot = venue !== null && beach !== null && !sameBeach(venue, beach) ? beach.at : venue
-  const sea = useSurfSea(spot)
+  const seaRaw = useSurfSea(spot)
+  /* Batch FIX, Section 1: the wind the call reads leans to the one station now, the home's and the Wind page's (src/lib/useStationObs.ts). */
+  const near = useStationObs(venue)
+  const sea = useMemo(() => {
+    const wind = leanHourly(seaRaw.wind, near, now)
+    return wind === seaRaw.wind ? seaRaw : { ...seaRaw, wind }
+  }, [seaRaw, near, now])
   /* The hour, not the minute: the stats move when a check lands (the Surf page's sampling) or the hour turns, not each render. */
   const hour = Math.floor(now.getTime() / 3_600_000)
   const version = useSyncExternalStore(onSkillBook, skillBookVersion, skillBookVersion)

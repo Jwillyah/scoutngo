@@ -881,7 +881,7 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
 }
 
 /** The wind's dial: where it comes from the offshore half is teal, onshore orange; the arrow points where it goes (board D_Home6). */
-function WindDial({ fromDeg, facing }: { fromDeg: number | null; facing: number | null }) {
+export function WindDial({ fromDeg, facing }: { fromDeg: number | null; facing: number | null }) {
   const r = 26
   const wedge = (centre: number, half: number) => {
     const p = (a: number) => [30 + r * Math.sin((a * Math.PI) / 180), 30 - r * Math.cos((a * Math.PI) / 180)]

@@ -9,6 +9,8 @@ import { forecastParts, swellOf } from '../core/surfReads.ts'
 import { seaNow } from '../lib/useSurfNow.ts'
 import { useSurfSea } from '../lib/useSurfSea.ts'
 import { agoWords } from '../lib/nearWind.ts'
+import { useStationObs } from '../lib/useStationObs.ts'
+import { isFresh } from '../core/stationPick.ts'
 import { windIn, windUnitLabel, type WindUnit } from '../lib/units.ts'
 import { usePointWind, type WindLevel, type WindModelChip } from '../lib/useWindViewport.ts'
 import { stationLine, swellLine, windLine } from '../core/markerReadout.ts'
@@ -279,6 +281,7 @@ export function WindLayerV3({ map, field, unit, spot, facing, headline = null, s
     return { ...w, gust: s.gust }
   }, [field, centre, point, atSpotNow, headline?.mps, headline?.fromDeg, headline?.gustMps]) // eslint-disable-line react-hooks/exhaustive-deps
   const [station, setStation] = useState<{ id: string; w: StationWind | null } | null>(null)
+  const picked = useStationObs(spot)
   const ck = centre === null ? null : `${centre.lat.toFixed(2)},${centre.lon.toFixed(2)}`
   useEffect(() => {
     if (centre === null) return
@@ -338,19 +341,24 @@ export function WindLayerV3({ map, field, unit, spot, facing, headline = null, s
   const say = (mps: number | null) => (mps === null ? null : windIn(mps, unit))
   const side = here === null || facing === null || spot === null || centre === null || distanceMeters(spot, centre) > 3000 ? null : windToBeach(here.fromDeg, facing)
   const u = windUnitLabel(unit)
-  const stationText =
-    station?.w == null
+  /*
+   * Batch FIX, Section 1 (17 Nov 7:06: the readout said KNTU at 1 h 10 min
+   * while Cape Henry had read 7 minutes before): within 3 km of the spot,
+   * the one station every screen reads (src/lib/useStationObs.ts);
+   * elsewhere the airport nearest the marker, and only while its report is
+   * fresh by the same rule (src/core/stationPick.ts isFresh).
+   */
+  const nowAt = new Date()
+  const nearSpot = spot !== null && centre !== null && distanceMeters(spot, centre) <= 3000
+  const away = station?.w == null ? null : { id: station.id, at: new Date(station.w.at), kt: station.w.kt, fromDeg: station.w.fromDeg }
+  const read = nearSpot
+    ? picked === null
       ? null
-      : stationLine(
-          station.id,
-          say(station.w.kt / 1.9438444924406),
-          station.w.fromDeg,
-          u,
-          (() => {
-            const at = new Date(station.w.at)
-            return Number.isFinite(at.getTime()) ? agoWords(at, new Date()) : null
-          })(),
-        )
+      : { id: picked.label, at: picked.at, kt: picked.rawMps / 0.514444, fromDeg: picked.fromDeg }
+    : away !== null && Number.isFinite(away.at.getTime()) && isFresh({ station: { id: away.id, kind: 'airport', km: 0 }, at: away.at, kt: away.kt, gustKt: null, fromDeg: away.fromDeg }, nowAt)
+      ? away
+      : null
+  const stationText = read === null ? null : stationLine(read.id, say(read.kt / 1.9438444924406), read.fromDeg, u, agoWords(read.at, nowAt))
   /* "9 kt NNW · g13 · offshore here" / "swell 0.7 ft 12 s ENE" / "KNTU 13 kt N · 1 h ago" (board Map_Timeline_Wind). */
   const lines: string[] =
     here === null

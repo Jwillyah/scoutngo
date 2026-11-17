@@ -1,4 +1,5 @@
 import { disagreeLine } from '../core/stationWind.ts'
+import { stationLine } from '../core/markerReadout.ts'
 import { agoWords, MAX_AGE_MS } from '../lib/nearWind.ts'
 import { useEffect, useState } from 'react'
 import type { LatLon } from '../core/geo.ts'
@@ -64,6 +65,16 @@ function useMinute(): Date {
   }, [])
   return now
 }
+
+/*
+ * Batch FIX, Section 1.3 (17 Nov, 7:06: "the now arrow pointed E while the
+ * wind was from NE"). The bearing was right (where the wind goes, tested per
+ * octant in src/components/arrowBearings.test.tsx): the glyph was a notched
+ * arrowhead whose long back edge, at 22 px and turned toward the SW, read as
+ * a flag pointing sideways. Now a block arrow, a shaft and a head, that
+ * reads one way only.
+ */
+export const HOUR_ARROW = 'M-1.3 7 L-1.3 -1 L-4.8 -1 L0 -7.5 L4.8 -1 L1.3 -1 L1.3 7 Z'
 
 export function WindPageV2({ venue, placeName, timeZone, units, ground, onBack, onSwitch, onMap, drone = null, onWindMap }: WindPageV2Props) {
   const now = useMinute()
@@ -214,9 +225,14 @@ export function WindContent({ now, data, facing, placeName, timeZone, units, dro
           {headKind === null ? '' : ` · ${KIND_WORD[headKind].toLowerCase()}`}
           {headGust === null ? '' : ` · gusts ${say(headGust)}`}
         </p>
-        {disagree === null ? null : (
-          <p className="dhead__line dwind__disagree" data-wind-disagree>
+        {/* Batch FIX, Section 1: the station the headline leans to, under it (the one pick, src/lib/useStationObs.ts); when the two are far apart, both said. */}
+        {disagree !== null ? (
+          <p className="dhead__line dwind__disagree" data-wind-disagree data-wind-station={nearNow?.id ?? ''}>
             {disagree}
+          </p>
+        ) : nearNow === null ? null : (
+          <p className="dhead__line dwind__station" data-wind-station={nearNow.id}>
+            {stationLine(nearNow.label, windIn(nearNow.rawMps, unit), nearNow.fromDeg, windUnitLabel(unit), agoWords(nearNow.at, now))}
           </p>
         )}
       </div>
@@ -240,7 +256,7 @@ export function WindContent({ now, data, facing, placeName, timeZone, units, dro
             <div key={at.getTime()} className={`dwind__h${k === null ? '' : ` dwind__h--${k}`}`} data-kind={k ?? 'none'}>
               <span className="dwind__ht">{n === 0 ? 'now' : formatShortHour(at, timeZone)}</span>
               <svg viewBox="-8 -8 16 16" className="dwind__ha" aria-hidden="true">
-                {(n === 0 && shared !== null ? shared.fromDeg : r.from) === null ? <circle r={2} /> : <path d="M0 -7 L4.5 4 L0 1.5 L-4.5 4 Z" transform={`rotate(${windTo((n === 0 && shared !== null ? shared.fromDeg : r.from) as number).toFixed(0)})`} />}
+                {(n === 0 && shared !== null ? shared.fromDeg : r.from) === null ? <circle r={2} /> : <path d={HOUR_ARROW} transform={`rotate(${windTo((n === 0 && shared !== null ? shared.fromDeg : r.from) as number).toFixed(0)})`} data-to={Math.round(windTo((n === 0 && shared !== null ? shared.fromDeg : r.from) as number))} />}
               </svg>
               {/* Batch NOW, Section 2.1: "now" is the headline's one value, not the models' median. */}
               <span className="dwind__hs" {...(n === 0 ? { 'data-wind-now': '' } : {})}>{n === 0 && shared !== null ? Math.round(windIn(shared.mps, unit) ?? 0) : r.median === null ? '—' : Math.round(windIn(r.median, unit) ?? 0)}</span>
@@ -337,7 +353,7 @@ export function WindHow({ now, data, facing, unit, lean = null, timeZone = 'UTC'
     <>
       {/* Batch MAP2, Section 2. */}
       <p>
-        Now: the forecast's wind{lean === null ? ', none of the three stations nearest (within 30 km, airports and NOAA coastal) reported in the last 75 minutes.' : `, leaned toward ${lean.label}'s report at ${formatClock(lean.at, timeZone)} (${formatWind(lean.mps, unit)}), the freshest of the three stations nearest; the lean fades back to the forecast over three hours.`}
+        Now: the forecast's wind{lean === null ? ', none of the three stations nearest (within 30 km, airports and NOAA coastal) reported in the last 75 minutes.' : `, leaned toward ${lean.label}'s report at ${formatClock(lean.at, timeZone)} (${formatWind(lean.mps, unit)} at 10 m here). One station for every screen: of the three nearest, a report under 75 minutes old (under 30 when two or more are), at a beach the coast's station first, kept for 30 minutes once picked. The lean fades back to the forecast over three hours.`}
       </p>
       <p>Models: {WIND_MODELS.map((m) => MODEL_NAME[m]).join(', ')}, through Open-Meteo: the next 12 hours and the spread are their median (the big number is the wind now, above). “Agree”: a model’s ground speed within {formatWind(AGREE_MPS, unit)} of that median.</p>
       <p>Direction: the circular mean of where the models say it comes from. Arrows point where it goes. Gusts: the highest any model gives.</p>

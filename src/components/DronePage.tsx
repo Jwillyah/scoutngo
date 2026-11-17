@@ -27,7 +27,8 @@ import { useBriefing, type BriefingDrone } from '../lib/useBriefing.ts'
 import { useStationNow } from '../lib/useStationNow.ts'
 import { formatTemperature, windIn, windUnitLabel, type Units } from '../lib/units.ts'
 import { facilityCellAt } from '../lib/uasfm.ts'
-import { calmDirection } from '../lib/windNow.ts'
+import { calmDirection, windAt } from '../lib/windNow.ts'
+import { useStationObs } from '../lib/useStationObs.ts'
 import { DroneAirspace } from './DroneAirspace.tsx'
 import { DroneHeightView } from './DroneHeight.tsx'
 import { DroneNowView, type DroneCardsData } from './DroneNow.tsx'
@@ -103,6 +104,7 @@ export function DronePage({ venue: spot, placeName, timeZone, units, now, drone,
   const brief = useBriefing(venue, timeZone, now, true)
   const online = typeof navigator === 'undefined' ? true : navigator.onLine
   const station = useStationNow(venue, now, online)
+  const near = useStationObs(venue)
   const clock = (d: Date) => formatClock(d, timeZone)
   const hourWord = (d: Date) => clock(d).replace(/:00 /, ' ')
   const spanWords = (from: Date, to: Date) => formatSpan(hourWord(from), hourWord(to))
@@ -115,10 +117,12 @@ export function DronePage({ venue: spot, placeName, timeZone, units, now, drone,
   const temp = (c: number | null) => formatTemperature(c, units.temperature)
 
   /* ------------------------------------------------ the wind now */
-  const mps10 = at('wind_speed_10m', now)
-  const gust10 = at('wind_gusts_10m', now)
+  /* Batch FIX, Section 1: the ground's wind now is the one wind now (src/lib/windNow.ts), leaned to the one station every screen reads (src/lib/useStationObs.ts); 400 ft is the forecast's 120 m. */
+  const wind10 = windAt(wx, now, near)
+  const mps10 = wind10?.mps ?? null
+  const gust10 = wind10?.gustMps ?? null
   const mps400 = at('wind_speed_120m', now)
-  const fromDeg = calmDirection(mps10, at('wind_direction_10m', now))
+  const fromDeg = calmDirection(mps10, wind10?.fromDeg ?? null)
   const gust400 = gustAloft(mps10, gust10, mps400)
   const limit = drone?.maxWindMps ?? null
   const dir = fromDeg === null ? null : compassPoint(fromDeg)

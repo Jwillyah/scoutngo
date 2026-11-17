@@ -1,0 +1,23 @@
+{
+  "about": "Field truth, Virginia Beach, Tue 17 Nov 2026, 7:06 AM (Batch FIX, Section 1). Two loads of the app a minute apart said two different winds now, leaning to two different stations. Times local (America/New_York) unless marked Z.",
+  "place": { "name": "VB oceanfront / 1st St Jetty", "lat": 36.8435575, "lon": -75.9713104, "facingDeg": 100, "timeZone": "America/New_York", "note": "The 13 Nov point (fixtures/truth/2026-11-13-vb.json), the same jetty." },
+  "shown": [
+    { "at": "07:06", "headline": "13 kt NE", "side": "onshore", "station": "Cape Henry", "stationKt": 16, "stationAge": "7 min" },
+    { "at": "07:07", "headline": "7 kt NNE", "side": "cross-onshore", "station": "KNTU", "stationKt": 3, "stationAge": "1 h 11 min" }
+  ],
+  "map": { "readout": "KNTU", "stationAge": "1 h 10 min" },
+  "feeds": {
+    "note": "The two stations' readings as the field notes give them (docs/batches/batch-fix.md, Section 1): speed, direction, observed time. The raw bodies were not saved; these are those readings in each feed's own shape. Neither note gives a gust, so none is here.",
+    "now": "2026-11-17T12:06:00Z",
+    "coops": { "8638999": { "data": [{ "t": "2026-11-17 11:59", "s": "16.00", "d": "45.00", "dr": "NE", "f": "0,0" }] } },
+    "metar": { "KNTU": "KNTU 171056Z 02003KT" }
+  },
+  "model": {
+    "recorded": false,
+    "note": "The forecast the phone had at 7:06 was not saved. A flat stand-in for the replay only, so the station's lean can be seen: 3.0 m/s (5.8 kt) from 30 degrees, gusts 4.5 m/s, every hour of the day. No number from it is a claim about the morning.",
+    "mps": 3.0,
+    "fromDeg": 30,
+    "gustMps": 4.5
+  },
+  "diagnosis": "The second load leaned to KNTU at 70 minutes. With both feeds answered the old pick chose Cape Henry whether the beach's facing came back or not; it chose KNTU only when Cape Henry's feed gave nothing on that load. Replayed in tests/windStation1117.test.ts."
+}

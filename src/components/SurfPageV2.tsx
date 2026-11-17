@@ -198,11 +198,7 @@ export function SurfBody({ now, timeZone, spot, spotName, away, sea, stats, kept
                 <span className="dsurf__pname">{p.name}</span>
                 <span className="dsurf__pbar" style={{ width: `${Math.max(12, Math.min(100, (p.ft / partTop) * 100)).toFixed(0)}%` }} />
                 <span className="dsurf__pval">{partWords(p)}</span>
-                {p.fromDeg === null ? null : (
-                  <svg className="dsurf__parrow" viewBox="-8 -8 16 16" aria-label={`from ${compass(p.fromDeg)}`}>
-                    <path d="M0 -6 L0 6 M-3.5 2.5 L0 6 L3.5 2.5" transform={`rotate(${(p.fromDeg + 180) % 360})`} />
-                  </svg>
-                )}
+                {p.fromDeg === null ? null : <PartArrow fromDeg={p.fromDeg} />}
               </div>
             ))}
           </div>
@@ -460,5 +456,21 @@ export function SurfHow({ sea, stats, away, placeName, spot, today }: { sea: Sur
       </p>
       <p>An estimate from an offshore forecast, not a surf report.</p>
     </>
+  )
+}
+
+/*
+ * The way a part of the sea goes (Batch FIX, Section 1.3). The glyph's head
+ * was drawn at the bottom and then turned by from + 180, so it pointed back
+ * the way the sea came from: 44099's NE wind sea drew an arrow to the NE.
+ * The head is at the top now, where every other arrow in the app has it,
+ * and the turn is the way it goes (src/components/arrowBearings.test.tsx).
+ */
+export function PartArrow({ fromDeg }: { fromDeg: number }) {
+  const to = (((fromDeg + 180) % 360) + 360) % 360
+  return (
+    <svg className="dsurf__parrow" viewBox="-8 -8 16 16" aria-label={`from ${compass(fromDeg)}`}>
+      <path d="M0 6 L0 -6 M-3.5 -2.5 L0 -6 L3.5 -2.5" transform={`rotate(${to})`} data-to={Math.round(to)} />
+    </svg>
   )
 }
