@@ -1,13 +1,13 @@
 import '../styles/drone.css'
-import { AIR_SAFETY } from '../core/safetyWords.ts'
+import { AIR_FOOT } from '../core/safetyWords.ts'
 import { useEffect, useRef, useState } from 'react'
 import { getPosition, getTimes } from 'suncalc'
 import type { AirspaceAtPoint } from '../core/airspaceCard.ts'
 import { DRONE_LIGHT_RATIO } from '../core/briefing.ts'
 import { airspaceRead } from '../core/droneAirRead.ts'
-import { gridLegend, heightGrid, type GridHour } from '../core/droneHeight.ts'
-import { baseWords, coldMinutes, coldTrim, dayBars, estimatedBaseFt, gustAloft, blowsToward, kpCard, kpTime, limitLine, visibilityWords, windChip, type DayBars, type HourAloft, type KpState } from '../core/droneNow.ts'
-import { lensAir, lensSun, sunsetAtHeight } from '../core/dronePlan.ts'
+import { gridLegend, heightGrid, heightHeadline, heightSub, type GridHour } from '../core/droneHeight.ts'
+import { coldMinutes, coldTrim, dayBars, gustAloft, blowsToward, kpRow, kpTime, limitChip, skyRow, visibilityWords, type DayBars, type HourAloft, type KpState } from '../core/droneNow.ts'
+import { lensAir, lensFog, lensSun, lensSunWords, sunAtHeightWords, sunsetAtHeight } from '../core/dronePlan.ts'
 import { droneWindow, type CalmRead } from '../core/droneWindow.ts'
 import { metresBetween } from '../core/faaLive.ts'
 import { compassPoint } from '../core/field.ts'
@@ -16,11 +16,11 @@ import type { LatLon } from '../core/geo.ts'
 import { groundOf } from '../core/homeDay.ts'
 import { windAtFeet } from '../core/homeCards.ts'
 import { shortPlace } from '../core/spotName.ts'
-import { formatClock, formatShortClock, formatShortHour, formatSpan } from '../core/timezone.ts'
+import { formatClock, formatDayTime, formatShortClock, formatShortHour, formatSpan } from '../core/timezone.ts'
 import { coordinateLabel } from '../core/venueName.ts'
 import { airspaceAtPoint } from '../lib/airspaceAtPoint.ts'
 import { forgetFlight, keepFlight, readKeptFlight, type KeptFlight } from '../lib/flightLogStore.ts'
-import { fetchKp, kpWord } from '../lib/kp.ts'
+import { fetchKp, kpWord, readKeptKp } from '../lib/kp.ts'
 import { keptFlightMinutes } from '../lib/preflight/usePreflight.ts'
 import { fetchSkyHours, fetchWeatherExtras, hourlyAt, type Hourly } from '../lib/tideSheetData.ts'
 import { useBriefing, type BriefingDrone } from '../lib/useBriefing.ts'
@@ -31,9 +31,8 @@ import { calmDirection, windAt } from '../lib/windNow.ts'
 import { useStationObs } from '../lib/useStationObs.ts'
 import { DroneAirspace } from './DroneAirspace.tsx'
 import { DroneHeightView } from './DroneHeight.tsx'
-import { DroneNowView, type DroneCardsData } from './DroneNow.tsx'
+import { DroneNowView, type DroneRow } from './DroneNow.tsx'
 import { DronePlanView } from './DronePlan.tsx'
-import { waterFogWords } from '../core/waterTemp.ts'
 import { useWaterTemp } from '../lib/waterTemp.ts'
 import { PageShell } from './PageShell.tsx'
 
@@ -152,21 +151,25 @@ export function DronePage({ venue: spot, placeName, timeZone, units, now, drone,
   const light = day === null ? null : lightOf(day.start)
   /* The calm window: the home's own (src/core/droneWindow.ts), so the two never disagree. */
   const calm: CalmRead = day === null ? { kind: 'unknown' } : droneWindow(day.wind, limit, day.start, venue.lat, venue.lon, dayIdx === 0 ? now : day.start).calm
-  const calmMax = calm.kind !== 'calm' || day === null ? null : day.wind.filter((h) => h.at.getTime() + HOUR > calm.span.from.getTime() && h.at.getTime() < calm.span.to.getTime()).reduce<number | null>((a, h) => (h.highMps === null ? a : Math.max(a ?? 0, h.highMps)), null)
-  const chip = dayIdx === 0 ? windChip(now, calm, mps10, gust10, calmMax, spanWords, hourWord, speed) : null
+  const sunsetToday = dayIdx === 0 ? (light?.sunset ?? null) : null
+  /* ONE chip (Batch FIX, Section 6.2): teal under the limit, orange only for limit or gust trouble. */
+  const chip = limitChip(now, hours, mps400, gust400, limit, sunsetToday, clock, speed)
   const dayWord = dayIdx === 0 ? 'Today' : 'Tomorrow'
 
   /* ------------------------------------------------------- the cards */
   /* The point's airspace, looked up ONCE here and read by every tab (src/core/droneAirRead.ts). */
   const [air, setAir] = useState<{ key: string; here: AirspaceAtPoint } | null>(null)
   const airKey = `${venue.lat},${venue.lon}`
-  const [kp, setKp] = useState<KpState>('loading')
+  const [kp, setKp] = useState<KpState>(() => {
+    const k = readKeptKp()
+    return k === null ? 'loading' : { kp: k.kp, at: kpTime(k.at), kept: true }
+  })
   const [extras, setExtras] = useState<Hourly | null>(null)
   const [skyHours, setSkyHours] = useState<Hourly | null>(null)
   useEffect(() => {
     let live = true
     void fetchKp().then(
-      (k) => live && setKp(k === null ? (navigator.onLine ? 'missing' : 'offline') : { kp: k.kp, at: kpTime(k.at) }),
+      (k) => live && setKp(k === null ? (navigator.onLine ? 'missing' : 'offline') : { kp: k.kp, at: kpTime(k.at), kept: k.kept }),
       () => live && setKp(navigator.onLine ? 'missing' : 'offline'),
     )
     void fetchWeatherExtras(venue).then((x) => live && setExtras(x), () => undefined)
@@ -189,50 +192,40 @@ export function DronePage({ venue: spot, placeName, timeZone, units, now, drone,
   const tempC = at('temperature_2m', now)
   const dewC = extras === null ? null : hourlyAt(extras, 'dew_point_2m', now)
   const rainPct = at('precipitation_probability', now)
-  const lowCover = at('cloud_cover_low', now)
   const vis = visibilityWords(skyHours === null ? null : hourlyAt(skyHours, 'visibility', now))
   const stationAt = station === null || station.at === '' ? null : new Date(station.at)
   const fresh = station !== null && stationAt !== null && now.getTime() - stationAt.getTime() <= 75 * 60_000 ? station : null
   const lowest = fresh === null ? null : ([...fresh.sky.groups].sort((a, b) => a.baseFt - b.baseFt)[0] ?? null)
-  const est = estimatedBaseFt(tempC, dewC)
-  const skyBig = lowest !== null ? `Base ${baseWords(lowest.baseFt)}` : fresh !== null ? 'No low cloud' : lowCover !== null && lowCover < 10 ? 'Little low cloud' : est !== null ? `Base ~${baseWords(est)}` : 'Base not forecast'
-  const skySource = fresh !== null ? fresh.sky.station : lowCover !== null && lowCover < 10 ? `low cloud ${Math.round(lowCover)}%` : est !== null ? 'est. from dew point' : null
-  const cards: DroneCardsData = {
-    airspace:
-      read === null
-        ? { big: '…', line: 'reading' }
-        : {
-            big: read.row.big,
-            line: read.icao !== null ? `LAANC near ${read.icao}` : read.cls !== null ? 'no grid square here' : 'in the app’s data',
-          },
-    battery: {
-      label: tempC === null ? 'Battery' : `Battery · ${temp(tempC)}`,
-      big: `~${coldMinutes(rated, tempC)} min`,
-      line: coldTrim(tempC) > 0 ? `${rated} min rated · cold trims it` : tempC === null ? `${rated} min rated · no temperature` : `${rated} min rated`,
-    },
-    sky: { big: skyBig, line: [vis === null ? null : `vis ${vis}`, rainPct === null ? null : `rain ${Math.round(rainPct)}%`, skySource].filter((s) => s !== null).join(' · ') || 'the forecast did not say' },
-    kp: kpCard(kp, kpWord, clock),
-  }
+  const sky = skyRow(lowest?.baseFt ?? null, fresh?.sky.station ?? null, at('cloud_cover', now), vis, rainPct)
+  /* NOAA's time tag: the clock today, the day and clock before. */
+  const kpWhen = (d: Date) => (isoDay(d, timeZone) === isoDay(now, timeZone) ? clock(d) : formatDayTime(d, timeZone))
+  const gps = kpRow(kp, kpWord, kpWhen)
+  /* The four rows (Batch FIX, Section 6.2): one line each; Airspace reads the page's one airspace read. */
+  const rows: DroneRow[] = [
+    { key: 'airspace', label: 'Airspace', big: read === null ? 'Reading…' : read.row.big, small: read?.row.small ?? null, tone: read?.controlled === true ? 'drone' : undefined, onTap: () => go('airspace') },
+    { key: 'battery', label: 'Battery', big: `~${coldMinutes(rated, tempC)} min`, small: tempC === null ? `${rated} min rated · no temperature` : `${temp(tempC)}${coldTrim(tempC) > 0 ? ' cold' : ''}` },
+    { key: 'sky', label: 'Sky', big: sky.big, small: sky.small },
+    ...(gps === null ? [] : [{ key: 'gps', label: 'GPS', big: gps.big, small: gps.small }]),
+  ]
 
   /* ------------------------------------------------------------- Now */
-  const calmInBars = calm.kind === 'calm' && bars !== null && calm.span.from.getTime() < bars.to.getTime()
+  const calmInBars = calm.kind === 'calm' && bars !== null && calm.span.from.getTime() > bars.from.getTime() && calm.span.from.getTime() < bars.to.getTime()
   const nowData = {
     speed: mps400 === null ? null : num(mps400),
     unit,
-    fromLine: dir === null && gust400 === null ? null : [dir === null ? null : `from ${dir}`, gust400 === null ? null : `gusts ${num(gust400)}`].filter((s) => s !== null).join(' · '),
-    /* With a limit and no wind at 400 ft, the limit is said, not "no wind limit" (the contact sheet, 16 Nov). */
-    limitLine: limitLine(mps400, gust400, limit, speed) ?? (limit !== null ? `Your limit ${speed(limit)} · the forecast did not give the wind at 400 ft` : drone === null ? 'Add your drone in Settings › My gear for its wind limit' : `${drone.name} has no wind limit in My gear`),
+    fromLine: [dir === null ? null : `from ${dir}`, gust400 === null ? null : `gusts ${num(gust400)}`, mps400 === null ? null : 'at 400 ft'].filter((s) => s !== null).join(' · ') || null,
     towardDeg: fromDeg === null ? null : blowsToward(fromDeg),
     chip,
+    /* With no chip, why: no limit, or no wind at 400 ft (the contact sheet, 16 Nov). */
+    note: chip !== null ? null : limit !== null ? `Your limit ${speed(limit)} · the forecast did not give the wind at 400 ft` : drone === null ? 'Add your drone in Settings › My gear for its wind limit' : `${drone.name} has no wind limit in My gear`,
     bars,
-    barsLabel: `${dayWord} at 400 ft${limit === null ? '' : ` · your limit ${speed(limit)}`}`,
+    barsLabel: `${dayWord} at 400 ft`,
     marks: bars === null || light === null
       ? []
       : [
           { key: 'start', text: dayIdx === 0 && bars.from.getTime() <= now.getTime() + HOUR ? 'now' : formatShortClock(bars.from, timeZone) },
           ...(calmInBars && calm.kind === 'calm' ? [{ key: 'calm', text: `calmer ${formatSpan(formatShortClock(calm.span.from, timeZone), formatShortClock(calm.span.to, timeZone))}`, tone: 'calm' as const }] : []),
           ...(bars.sunsetAt === null ? [] : [{ key: 'sunset', text: `sunset ${formatShortClock(light.sunset, timeZone)}` }]),
-          ...(bars.duskAt === null ? [] : [{ key: 'dusk', text: `twilight ${formatShortClock(light.dusk, timeZone)}`, tone: 'dusk' as const }]),
         ],
     barsNone: wx === null ? (brief.status === 'loading' ? 'Reading the forecast…' : 'The forecast did not arrive.') : 'The forecast does not reach the next daylight.',
   }
@@ -240,22 +233,13 @@ export function DronePage({ venue: spot, placeName, timeZone, units, now, drone,
   /* ------------------------------------------------------- By height */
   const gridHours = bars === null ? [] : hours.filter((h) => h.at.getTime() >= bars.from.getTime() && h.at.getTime() < bars.to.getTime()).slice(0, 8)
   const grid = gridHours.length === 0 ? null : heightGrid(gridHours, limit, ceilingFt, light?.sunset ?? null)
-  const headline =
-    calm.kind === 'calm'
-      ? `Best window ${dayIdx === 1 ? 'tomorrow ' : ''}${spanWords(calm.span.from, calm.span.to)}`
-      : calm.kind === 'windy'
-        ? `Over ${speed(calm.overMps)} at 400 ft ${calm.allDay ? 'all day' : 'the rest of the day'}`
-        : calm.kind === 'no-rating'
-          ? 'No wind limit to hold the hours against'
-          : calm.kind === 'dark'
-            ? 'Sun down'
-            : 'Wind at 400 ft not forecast'
+  const sunrise = day === null ? null : getTimes(new Date(day.start.getTime() + 12 * HOUR), venue.lat, venue.lon).sunrise
   const heightData = {
-    headline,
-    sub: mps400 === null ? 'The forecast did not give the wind at 400 ft now.' : `Now: ${dir === null ? '' : `${dir} `}${speed(mps400)} at 400 ft${gust400 === null ? '' : `, gusts ${num(gust400)}`}${limit === null ? '' : ` (limit ${num(limit)})`}.`,
+    headline: heightHeadline(calm, bars?.from ?? null, light?.sunset ?? null, dayIdx === 1 || sunrise === null || now.getTime() <= sunrise.getTime() + 2 * HOUR, dayIdx === 1, spanWords, speed),
+    sub: heightSub(grid, limit, dir, toUnit, unit),
     grid,
-    label: `Wind by height · ${unit}${dir === null ? '' : ` · from ${dir}`}`,
-    ceilingLabel: ceilingFt === null || ceilingFt >= 400 ? null : `LAANC ${ceilingFt} ft`,
+    label: `${unit} by height`,
+    ceilingLabel: ceilingFt === null || ceilingFt >= 400 ? null : `your ceiling ${ceilingFt} ft`,
     hourLabels: gridHours.map((h, i) => (i === 0 && dayIdx === 0 && h.at.getTime() <= now.getTime() ? 'now' : formatShortHour(h.at, timeZone))),
     value: (mps: number | null) => (mps === null ? '—' : num(mps)),
     legend: gridLegend(limit, DRONE_LIGHT_RATIO, toUnit),
@@ -266,9 +250,9 @@ export function DronePage({ venue: spot, placeName, timeZone, units, now, drone,
   const nextSunset = brief.days.map((d) => d.events.sunset).find((s): s is Date => s !== null && s.getTime() > now.getTime()) ?? null
   const alt = (t: Date) => getPosition(t, venue.lat, venue.lon).altitude
   const s400 = nextSunset === null ? null : sunsetAtHeight(nextSunset, 400, alt)
-  const later = s400 === null || nextSunset === null ? 0 : Math.round((s400.getTime() - nextSunset.getTime()) / 60_000)
   const low = lensSun(now, (t) => getPosition(t, venue.lat, venue.lon))
   const la = tempC === null || dewC === null ? null : lensAir(tempC, dewC, 400, rainPct)
+  const fog = tempC === null || dewC === null ? null : lensFog(tempC, dewC)
   const [kept, setKept] = useState<KeptFlight | null>(() => readKeptFlight())
   const [logError, setLogError] = useState<string | null>(null)
   const keptHere = kept !== null && metresBetween(kept.place, venue) <= 3000 ? kept : null
@@ -282,47 +266,35 @@ export function DronePage({ venue: spot, placeName, timeZone, units, now, drone,
     tempWords: tempC === null ? null : temp(tempC),
     speed,
     distanceUnit: units.distance,
-    sunAtHeight:
-      s400 === null || nextSunset === null
-        ? { big: 'No sunset', line: 'No sunset in the days the forecast covers.' }
-        : { big: `Sets ${clock(s400)}`, line: later < 1 ? `Under a minute after the beach (${clock(nextSunset)}).` : `${later} min after the beach (${clock(nextSunset)}): one more pass of light up high.` },
-    lens:
-      low === null
-        ? { big: 'No low sun', line: 'The sun is not low in the next day.' }
-        : {
-            big: `Flare ${low.fromDeg}–${low.toDeg}°`,
-            line: low.part === 'evening' ? `Facing ${compassPoint(low.midDeg)} from ${clock(low.from)} to sunset puts the low sun in frame.` : `Facing ${compassPoint(low.midDeg)} from sunrise to ${clock(low.to)} puts the low sun in frame.`,
-          },
-    lensAir:
-      la === null || tempC === null || dewC === null
-        ? { big: 'Not forecast', line: 'The forecast did not give the dew point.' }
-        : {
-            big: la.icing ? 'Icing possible' : la.fog === 'likely' ? 'Lens may fog' : la.fog === 'possible' ? 'Fog possible' : 'Lens fog unlikely',
-            line: `Dew point ${temp(dewC)} vs ${temp(tempC)} · ${temp(la.aloftC)} at 400 ft${water.status === 'ok' ? ` · ${waterFogWords(water.reading.c, dewC, temp)}` : ''}`,
-          },
+    sunAtHeight: sunAtHeightWords(s400, nextSunset, clock),
+    lens: lensSunWords(low, compassPoint, clock),
+    /* Batch FIX, Section 6.8: "Possible" or "Low" (src/core/dronePlan.ts lensFog); ice at 400 ft over both. */
+    lensFog:
+      fog === null || tempC === null || dewC === null
+        ? { big: 'Not forecast', small: 'no dew point', notice: false }
+        : la?.icing === true
+          ? { big: 'Icing possible', small: `${temp(la.aloftC)} at 400 ft`, notice: true }
+          : { big: fog.word, small: `dew ${temp(dewC)} / ${temp(tempC)}${water.status === 'ok' ? ` · water ${temp(water.reading.c)}` : ''}`, notice: fog.word === 'Possible' },
     lastFlight:
       keptHere === null
         ? null
         : {
             big: `${flightAt === null ? '' : `${new Intl.DateTimeFormat('en-US', { timeZone, month: 'short', day: 'numeric' }).format(flightAt)} · `}${Math.round(keptHere.summary.durationS / 60)} min · max ${heightWords(keptHere.summary.maxHeightFt)}`,
-            line: `${keptHere.summary.windMps === null ? 'This log has no wind column.' : `Wind it felt: ${speed(keptHere.summary.windMps)}`}${forecastThen === null ? (keptHere.summary.windMps === null ? '' : ' · our forecast for that hour is not on this phone') : ` · we forecast ${speed(forecastThen)}`}.`,
+            small: `${keptHere.summary.windMps === null ? 'no wind in the log' : `felt ${speed(keptHere.summary.windMps)}`}${forecastThen === null ? '' : ` · forecast ${speed(forecastThen)}`}`,
           },
-    lastFlightNone:
-      kept === null
-        ? 'Import a flight log CSV (an Airdata or PhantomHelp export) to see it here. DJI’s own .txt logs are encrypted, so export a CSV. The file is read on this phone and never sent.'
-        : 'Your kept flight was somewhere else, more than 3 km from here.',
+    lastFlightNone: kept !== null && keptHere === null ? 'Your kept flight was more than 3 km from here.' : null,
     lastFlightError: logError,
     onImport: (file: File) => {
       void file.text().then((text) => {
-        const read = readFlightCsv(text)
-        if (!read.ok) {
-          setLogError(read.why)
+        const log = readFlightCsv(text)
+        if (!log.ok) {
+          setLogError(log.why)
           return
         }
-        const k: KeptFlight = { summary: read.summary, place: read.summary.takeoff ?? venue, name: file.name }
+        const k: KeptFlight = { summary: log.summary, place: log.summary.takeoff ?? venue, name: file.name }
         keepFlight(k)
         setKept(k)
-        setLogError(read.summary.takeoff !== null && metresBetween(read.summary.takeoff, venue) > 3000 ? 'That flight took off more than 3 km from here; it shows when this spot is near it.' : null)
+        setLogError(log.summary.takeoff !== null && metresBetween(log.summary.takeoff, venue) > 3000 ? 'That flight took off more than 3 km from here; it shows when this spot is near it.' : null)
       })
     },
     onForget: () => {
@@ -359,11 +331,11 @@ export function DronePage({ venue: spot, placeName, timeZone, units, now, drone,
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const ground = groundOf(alt(now), at('weather_code', now), false)
-  const toAirspace = () => go('airspace')
 
   return (
     <PageShell
-      safety={AIR_SAFETY}
+      /* Batch FIX, Section 6.6: one footer per page; on Airspace the sheet's own line is the one disclaimer. */
+      footNote={tab === 'airspace' ? null : AIR_FOOT}
       kind="drpage"
       title="Drone"
       sub={`${pointName}${drone === null ? '' : ` · ${drone.name}`} · now`}
@@ -375,9 +347,9 @@ export function DronePage({ venue: spot, placeName, timeZone, units, now, drone,
           <p>The wind at 400 ft is the forecast's at 120 m; the ground's at 10 m; 100 to 300 ft between them, on a log of the height. Its direction is the 10 m wind's. Gusts are forecast at 10 m only: the gust's excess over the steady wind there is added to the wind at 400 ft.</p>
           <p>Colour: teal under {Math.round(DRONE_LIGHT_RATIO * 100)}% of your drone's limit (the home's "Light wind"), amber up to it, orange at or past it. The calm window is the first run of daylight hours under that line, the same one the home's drone line says. Today's bars run from civil dawn to civil dusk (the sun 6° down).</p>
           <p>Battery: your pack's rated minutes (Preflight), less {Math.round((0.4 / 30) * 1000) / 10}% for every °C under 20 °C, at most 40%: a rule of thumb for cold lithium cells, not a measurement of your battery.</p>
-          <p>Sky: the nearest station's lowest cloud when its report is under 75 minutes old; otherwise estimated from the dew point (125 m per °C of spread), and only where the models have low cloud. GPS: NOAA's planetary K index; 5 and over is a geomagnetic storm, which degrades GPS.</p>
+          <p>Sky: the nearest station's lowest cloud when its report is under 75 minutes old; otherwise the forecast's total cloud, and visibility. GPS: NOAA's planetary K index and the time NOAA gave it; 5 and over is a geomagnetic storm, which degrades GPS. When NOAA does not answer, the last value this phone received, with its time; no row when it never has.</p>
           <p>Airspace: the class airspace, the FAA facility map grid, restricted and prohibited areas and national parks are in the app. TFRs, national security UAS restrictions, FRIAs, heliports and warning, alert and military operations areas are fetched from the FAA whole, for the country, with no place in the request, and kept on this phone with their date. State and city park rules are not in any FAA data, so they are not shown. This is not an authorization, and the app never issues LAANC.</p>
-          <p>Turn back by: out and straight back at the cruise on the card, in the wind at 400 ft, landing with the reserve on the card; climb, hover and descent are not counted. Sun at 400 ft: the horizon dips by √(2h/R) from up there, so the sun sets when it is that much lower. Sun in the lens: the bearings within 20° of the sun while it is under 25°. Lens fog: the dew point within 2.5 °C of the air. Birds: no free forecast the app can check, so no card.</p>
+          <p>Turn back by: out and straight back at the cruise on the card, in the wind at 400 ft, landing with the reserve on the card; climb, hover and descent are not counted. Sun at 400 ft: the horizon dips by √(2h/R) from up there, so the sun sets when it is that much lower. Sun in the lens: the bearings within 20° of the sun while it is under 25°. Lens fog: "Possible" when the air is within 5 °F of its dew point, or 15 °F or more colder than a warm car (taken as 70 °F: the car is not measured); "Low" otherwise. Last flight: a flight log CSV (an Airdata or PhantomHelp export; DJI’s own .txt logs are encrypted), read on this phone and never sent. Birds: no free forecast the app can check, so no row.</p>
         </>
       }
     >
@@ -391,10 +363,10 @@ export function DronePage({ venue: spot, placeName, timeZone, units, now, drone,
       {/* Swipe pages by design (Now · By height · Airspace · Plan, with the pill that names them), as the home's days. */}
       <div className="drp__track" ref={track} data-sideways>
         <section className="drp__page drp__page--now" aria-label="Now" data-drone-page="now">
-          <DroneNowView data={nowData} cards={cards} onAirspace={toAirspace} />
+          <DroneNowView data={nowData} rows={rows} />
         </section>
         <section className="drp__page drp__page--height" aria-label="By height" data-drone-page="height">
-          <DroneHeightView data={heightData} cards={cards} onAirspace={toAirspace} />
+          <DroneHeightView data={heightData} />
         </section>
         <section className="drp__page drp__page--airspace" aria-label="Airspace" data-drone-page="airspace">
           {airSeen ? <DroneAirspace spot={spot} marker={venue} here={here} read={read} onMarker={(at, name) => setPoint({ at, name: name === null ? null : shortPlace(name) })} timeZone={timeZone} now={now} online={online} todayIso={isoDay(now, timeZone)} windWords={mps400 === null ? null : `Wind ${speed(mps400)}${dir === null ? '' : ` from ${dir}`} at 400 ft`} gustWords={gust400 === null ? null : `Gusts ${speed(gust400)} at 400 ft`} sunsetWords={nextSunset === null ? null : clock(nextSunset)} onSaveSpot={onSaveSpot} /> : null}
@@ -403,7 +375,8 @@ export function DronePage({ venue: spot, placeName, timeZone, units, now, drone,
           <DronePlanView data={planData} />
         </section>
       </div>
-      {tab === 'airspace' ? null : (
+      {/* The buttons on Now and Plan (boards Drone_Slim_1 and 4); By height and Airspace have none. */}
+      {tab === 'now' || tab === 'plan' ? (
         <div className="drp__foot">
           <div className="drp__buttons">
             <button type="button" className="btn btn--primary drp__btn" onClick={onPreflight}>
@@ -414,7 +387,7 @@ export function DronePage({ venue: spot, placeName, timeZone, units, now, drone,
             </button>
           </div>
         </div>
-      )}
+      ) : null}
     </PageShell>
   )
 }

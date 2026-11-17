@@ -193,3 +193,48 @@ export function lensAir(tempC: number, dewC: number, heightFt: number, rainPct: 
     icing: wet && aloftC <= 0,
   }
 }
+
+/*
+ * THE LENS FOG WORD (Batch FIX, Section 6.8). Two words, one rule:
+ *
+ *   Possible   the air's temperature and dew point are within
+ *              LENS_FOG_SPREAD_F (5 °F) of each other, or the lens comes from
+ *              a warm car into air at least WARM_CAR_DROP_F (15 °F) colder
+ *   Low        otherwise
+ *
+ * The car's cabin is not measured: WARM_CAR_F (70 °F) stands for a heated
+ * car, and "How we got this" says so. The old card's three steps ("likely",
+ * "possible", "unlikely") at 2.5 and 5 °C said "Fog possible" at a 9 °F
+ * spread.
+ */
+export const LENS_FOG_SPREAD_F = 5
+export const WARM_CAR_DROP_F = 15
+export const WARM_CAR_F = 70
+
+export interface LensFog {
+  word: 'Possible' | 'Low'
+  /** Why "Possible": the dew point is close, or the car is warm. Null for "Low". */
+  why: 'dew' | 'car' | null
+}
+
+export function lensFog(tempC: number, dewC: number, carF: number = WARM_CAR_F): LensFog {
+  /* In tenths of a °F, so 5.0 °F stays 5.0 and not 5.000000001 after the °C round trip. */
+  const spreadF = Math.round(Math.max(0, tempC - dewC) * 1.8 * 10) / 10
+  const airF = Math.round((tempC * 1.8 + 32) * 10) / 10
+  if (spreadF <= LENS_FOG_SPREAD_F) return { word: 'Possible', why: 'dew' }
+  if (carF - airF >= WARM_CAR_DROP_F) return { word: 'Possible', why: 'car' }
+  return { word: 'Low', why: null }
+}
+
+/** "Low sun SE" with "until 9:29 AM" (morning) or "from 3:40 PM" (evening): where the sun sits low, as a fact. */
+export function lensSunWords(low: LensSun | null, point: (deg: number) => string, clock: (d: Date) => string): { big: string; small: string } {
+  if (low === null) return { big: 'Sun not low', small: 'in the next day' }
+  return { big: `Low sun ${point(low.midDeg)}`, small: low.part === 'morning' ? `until ${clock(low.to)}` : `from ${clock(low.from)}` }
+}
+
+/** "Sets 4:55 PM" and "+2 min" over the beach's sunset. */
+export function sunAtHeightWords(s400: Date | null, beach: Date | null, clock: (d: Date) => string): { big: string; small: string } {
+  if (s400 === null || beach === null) return { big: 'No sunset', small: 'in the forecast’s days' }
+  const later = Math.round((s400.getTime() - beach.getTime()) / 60_000)
+  return { big: `Sets ${clock(s400)}`, small: later < 1 ? 'as on the beach' : `+${later} min` }
+}

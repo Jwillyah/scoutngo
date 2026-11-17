@@ -29,6 +29,8 @@ interface PageShellProps {
   how: ReactNode | null
   /** Any other links at the foot, before "How we got this ›". */
   foot?: ReactNode
+  /** Batch FIX, Section 6.6: one short line at the foot's right, after "How we got this ›" ("Not official FAA · check LAANC"). */
+  footNote?: string | null
   /** A view inside the page (Models, 7 days): Back closes it first. */
   inner?: { open: boolean; close: () => void }
   /** Batch Flow, Section 2: the round Map button top right; the map is its own destination. */
@@ -36,7 +38,7 @@ interface PageShellProps {
   children: ReactNode
 }
 
-export function PageShell({ kind, title, sub, ground, onBack, how, foot, inner, onMap, children, backdrop = null, footInScroll = false, safety = null }: PageShellProps) {
+export function PageShell({ kind, title, sub, ground, onBack, how, foot, inner, onMap, children, backdrop = null, footInScroll = false, safety = null, footNote = null }: PageShellProps) {
   const [howOpen, setHowOpen] = useState(false)
   const [debug, setDebug] = useState(false)
   const back = () => {
@@ -52,7 +54,7 @@ export function PageShell({ kind, title, sub, ground, onBack, how, foot, inner, 
     return () => window.removeEventListener('keydown', onKey)
   })
   const footer =
-    foot === undefined && how === null ? null : (
+    foot === undefined && how === null && footNote === null ? null : (
       <div className={`dpage__foot ppage__foot${footInScroll ? ' ppage__foot--end' : ''}`}>
         {foot}
         {how === null ? null : (
@@ -60,6 +62,7 @@ export function PageShell({ kind, title, sub, ground, onBack, how, foot, inner, 
             How we got this ›
           </button>
         )}
+        {footNote === null ? null : <p className="dpage__safety">{footNote}</p>}
       </div>
     )
   return createPortal(

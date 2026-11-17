@@ -53,3 +53,45 @@ export function airspaceRead(here: AirspaceAtPoint, cell: FacilityCell | null): 
     row: { big, small: cell?.icao ?? null },
   }
 }
+
+/**
+ * THE SHEET'S SECOND LINE, collapsed (Batch FIX, Section 6.4; board
+ * Drone_Slim_3): "Norfolk Intl grid · LAANC needed · 0 TFRs here · Remote ID
+ * needed". The details are one swipe up.
+ *
+ *   `tfrsInside`  TFRs in force today over the point, null when the FAA's
+ *                 layer has not arrived (then it says so)
+ *   `fria`        inside a FAA-Recognized Identification Area, or 'unknown'
+ *                 before the layer arrives (then nothing is said)
+ *
+ * "LAANC needed" only where the facility's grid lists Part 107 LAANC; under
+ * class airspace without it, "FAA authorization needed". Never "clear".
+ */
+export function sheetSummary(read: AirspaceRead | null, tfrsInside: number | null, fria: boolean | 'unknown'): string {
+  if (read === null) return 'Reading the FAA data in the app…'
+  const parts: string[] = []
+  if (read.facility !== null) parts.push(`${read.facility} grid`)
+  if (read.controlled) parts.push(read.laanc ? 'LAANC needed' : 'FAA authorization needed')
+  parts.push(tfrsInside === null ? 'TFRs not received' : `${tfrsInside} TFR${tfrsInside === 1 ? '' : 's'} here`)
+  if (fria !== 'unknown') parts.push(fria ? 'In a FRIA' : 'Remote ID needed')
+  return parts.join(' · ')
+}
+
+/**
+ * THE MAP'S LAYERS, BY DEFAULT (Batch FIX, Section 6.4). The LAANC grid,
+ * no-fly and security areas, and today's TFRs are drawn; the rest are a
+ * toggle away. No-fly and TFRs START ON EVERY TIME the map opens: a hazard
+ * layer switched off on another day must not stay hidden by a toggle you
+ * forgot. The other choices are kept on the phone.
+ */
+export type AirToggle = 'grid' | 'nofly' | 'tfr' | 'sua' | 'parks' | 'fria' | 'heliport'
+export const AIR_DEFAULTS: Readonly<Record<AirToggle, boolean>> = { grid: true, nofly: true, tfr: true, sua: false, parks: false, fria: false, heliport: false }
+export const ALWAYS_ON_AT_OPEN: readonly AirToggle[] = ['nofly', 'tfr']
+
+/** The toggles a visit opens with: the kept choices, with no-fly and TFRs on. */
+export function openingLayers(kept: Partial<Record<AirToggle, unknown>> | null): Record<AirToggle, boolean> {
+  const on = { ...AIR_DEFAULTS }
+  for (const k of Object.keys(on) as AirToggle[]) if (typeof kept?.[k] === 'boolean') on[k] = kept[k] as boolean
+  for (const k of ALWAYS_ON_AT_OPEN) on[k] = true
+  return on
+}

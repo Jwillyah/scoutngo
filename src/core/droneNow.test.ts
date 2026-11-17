@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { blowsToward, coldMinutes, coldTrim, COLD_TRIM_MAX, dayBars, estimatedBaseFt, gustAloft, kpCard, kpTime, limitLine, limitRole, visibilityWords, windChip } from './droneNow.ts'
+import { blowsToward, cloudWords, coldMinutes, coldTrim, COLD_TRIM_MAX, dayBars, estimatedBaseFt, gustAloft, kpRow, kpTime, limitChip, limitLine, limitRole, skyRow, visibilityWords } from './droneNow.ts'
 
 const KT = 0.514444
 const kt = (mps: number) => `${Math.round(mps / KT)} kt`
@@ -33,18 +33,36 @@ describe('the wind at 400 ft (board Drone_P1)', () => {
   })
 })
 
-describe('the chip', () => {
-  const span = (a: Date, b: Date) => `${a.getUTCHours()}–${b.getUTCHours()}`
-  const until = (d: Date) => `${d.getUTCHours()}`
-  const calm = { kind: 'calm' as const, span: { from: at('2026-11-16T20:00:00Z'), to: at('2026-11-16T21:50:00Z') } }
-  it('says gusty now and the calmer window with its strongest wind', () => {
-    expect(windChip(at('2026-11-16T17:00:00Z'), calm, 4, 9, 11 * KT, span, until, kt)).toBe('Gusty now · calmer 20–21 (11 kt)')
+describe('the one chip (Batch FIX, Section 6.2; board Drone_Slim_1)', () => {
+  const clock = (d: Date) => `${d.getUTCHours()}:${String(d.getUTCMinutes()).padStart(2, '0')}`
+  const sunset = at('2026-11-17T21:53:00Z')
+  const hours = (mps: (h: number) => number | null) => Array.from({ length: 24 }, (_, i) => ({ at: new Date(Date.UTC(2026, 10, 17, i)), mps: mps(i) }))
+  const now = at('2026-11-17T12:13:00Z')
+  it('teal, under the limit until sunset, with the gusts’ share: "Under your limit until sunset 21:53 · gusts 46%"', () => {
+    const c = limitChip(now, hours(() => 7 * KT), 7 * KT, 10.58 * KT, 23 * KT, sunset, clock, kt)
+    expect(c).toEqual({ text: 'Under your limit until sunset 21:53 · gusts 46%', tone: 'ok' })
   })
-  it('says calm now when the window has begun', () => {
-    expect(windChip(at('2026-11-16T20:30:00Z'), calm, 4, 9, 11 * KT, span, until, kt)).toBe('Calm now until 21')
+  it('teal, until the first hour at the limit before sunset', () => {
+    const c = limitChip(now, hours((h) => (h >= 18 ? 25 * KT : 9 * KT)), 9 * KT, 12 * KT, 23 * KT, sunset, clock, kt)
+    expect(c).toEqual({ text: 'Under your limit until 18:00 · gusts 52%', tone: 'ok' })
   })
-  it('says nothing with no calm window', () => {
-    expect(windChip(at('2026-11-16T17:00:00Z'), { kind: 'windy', overMps: 6, allDay: false }, 4, 9, null, span, until, kt)).toBeNull()
+  it('says no "until" when an hour ahead is not forecast: it does not know how long', () => {
+    expect(limitChip(now, hours((h) => (h === 15 ? null : 9 * KT)), 9 * KT, null, 23 * KT, sunset, clock, kt)).toEqual({ text: 'Under your limit', tone: 'ok' })
+  })
+  it('orange ONLY for limit or gust trouble', () => {
+    expect(limitChip(now, hours(() => 25 * KT), 25 * KT, 30 * KT, 23 * KT, sunset, clock, kt)).toEqual({ text: 'Over your 23 kt limit · gusts 130%', tone: 'trouble' })
+    expect(limitChip(now, hours(() => 18 * KT), 18 * KT, 24 * KT, 23 * KT, sunset, clock, kt)).toEqual({ text: 'Gusts 104% of your 23 kt limit', tone: 'trouble' })
+    /* 96% gusts are under the limit: teal. */
+    expect(limitChip(now, hours(() => 15 * KT), 15 * KT, 22 * KT, 23 * KT, sunset, clock, kt)?.tone).toBe('ok')
+  })
+  it('no chip with no limit or no wind at 400 ft (the page says which)', () => {
+    expect(limitChip(now, [], 7 * KT, 10 * KT, null, sunset, clock, kt)).toBeNull()
+    expect(limitChip(now, [], null, null, 23 * KT, sunset, clock, kt)).toBeNull()
+  })
+  it('never repeats the old orange "Calm now"', () => {
+    const c = limitChip(now, hours(() => 3 * KT), 3 * KT, 4 * KT, 23 * KT, sunset, clock, kt)
+    expect(c?.text).not.toMatch(/calm now/i)
+    expect(c?.tone).toBe('ok')
   })
 })
 
@@ -81,26 +99,45 @@ describe('the battery, trimmed for the cold', () => {
   })
 })
 
-describe('the GPS card is never a dash', () => {
-  const word = () => 'quiet'
+describe('the GPS row (Batch FIX, Section 6.7)', () => {
+  const word = (kp: number) => (kp >= 5 ? 'storm G1' : 'quiet')
   const clock = (d: Date) => `${d.getUTCHours()}:${String(d.getUTCMinutes()).padStart(2, '0')}`
-  it('says the value and its age', () => {
-    expect(kpCard({ kp: 2.33, at: kpTime('2026-10-30 09:00:00.000') }, word, clock)).toEqual({ big: 'Kp 2 · quiet', line: 'from 9:00' })
+  it('says NOAA’s word, the value and when NOAA gave it', () => {
+    expect(kpRow({ kp: 2.33, at: kpTime('2026-10-30 09:00:00.000'), kept: false }, word, clock)).toEqual({ big: 'Quiet', small: 'Kp 2 · 9:00' })
+    expect(kpRow({ kp: 5.33, at: kpTime('2026-10-30 09:00:00.000'), kept: false }, word, clock)?.big).toBe('Storm G1')
   })
-  it('says why there is no value, in words', () => {
-    for (const s of ['loading', 'offline', 'missing'] as const) {
-      const c = kpCard(s, word, clock)
-      expect(`${c.big} ${c.line}`).not.toMatch(/—|^-$/)
-    }
-    expect(kpCard('missing', word, clock).big).toBe('Kp not received')
+  it('the last value with its age when NOAA does not answer now', () => {
+    expect(kpRow({ kp: 2.33, at: kpTime('2026-10-30 09:00:00.000'), kept: true }, word, clock)).toEqual({ big: 'Quiet', small: 'Kp 2 · kept from 9:00' })
   })
-  it('reads NOAA’s time tag as UTC', () => {
+  it('no row when this phone has never had one: never "Kp not received"', () => {
+    for (const s of ['loading', 'offline', 'missing'] as const) expect(kpRow(s, word, clock)).toBeNull()
+  })
+  it('reads NOAA’s time tag as UTC, in either form', () => {
     expect(kpTime('2026-10-30 09:00:00.000')?.toISOString()).toBe('2026-10-30T09:00:00.000Z')
+    expect(kpTime('2026-10-30T09:00:00')?.toISOString()).toBe('2026-10-30T09:00:00.000Z')
     expect(kpTime('soon')).toBeNull()
   })
 })
 
-describe('the sky card', () => {
+describe('the sky row (Batch FIX, Section 6.2)', () => {
+  it('one word for the cloud, then visibility: never "Little low cloud · low cloud 0%"', () => {
+    expect(skyRow(null, null, 3, '10 mi', 0)).toEqual({ big: 'Little cloud', small: 'vis 10 mi' })
+    const r = skyRow(null, null, 3, '10 mi', 0)
+    expect(`${r.big} ${r.small}`).not.toMatch(/low cloud|\d+%/)
+  })
+  it('the station’s base when its report is fresh, with its name', () => {
+    expect(skyRow(5500, 'KNTU', 60, '10 mi', 0)).toEqual({ big: 'Base 5,500 ft', small: 'vis 10 mi · KNTU' })
+  })
+  it('rain from 20%, and words for what the forecast did not say', () => {
+    expect(skyRow(null, null, 90, '3 mi', 60)).toEqual({ big: 'Overcast', small: 'vis 3 mi · rain 60%' })
+    expect(skyRow(null, null, null, null, null)).toEqual({ big: 'Cloud not forecast', small: 'the forecast did not say' })
+  })
+  it('never says clear (docs/ux-rules.md, rule 12)', () => {
+    for (const c of [0, 9, 10, 39, 40, 79, 80, 100]) expect(cloudWords(c)).not.toMatch(/clear/i)
+  })
+})
+
+describe('the sky estimate', () => {
   it('estimates the base from the dew-point spread, 125 m per °C', () => {
     expect(Math.round(estimatedBaseFt(15, 1.6)!)).toBe(Math.round(13.4 * 125 * 3.28084))
     expect(estimatedBaseFt(null, 3)).toBeNull()

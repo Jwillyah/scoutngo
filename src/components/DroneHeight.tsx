@@ -1,18 +1,24 @@
 import type { HeightGrid } from '../core/droneHeight.ts'
-import { DroneCards, type DroneCardsData } from './DroneNow.tsx'
 
 /*
- * THE DRONE PAGE'S BY HEIGHT TAB (Batch DRONE, Section 2.2; board Drone_P2).
- * Renders only: the grid is src/core/droneHeight.ts's.
+ * THE DRONE PAGE'S BY HEIGHT TAB (Batch DRONE, Section 2.2; Batch FIX,
+ * Section 6.3: board Drone_Slim_2). Renders only: the grid, the headline and
+ * its line are src/core/droneHeight.ts's.
+ *
+ * A short headline, one line under it, the grid and the legend. No cards:
+ * they repeated Now's, and sat cut off behind the buttons.
  */
 export interface DroneHeightData {
+  /** "Calm all day", "Best 3–4:50 PM". */
   headline: string
+  /** "6–9 kt from NNE at every height · limit 23". */
   sub: string
   grid: HeightGrid | null
-  /** "Wind by height · kt · from NNW". */
+  /** "kt by height". */
   label: string
+  /** "your ceiling 100 ft", or null with no ceiling under 400 ft. */
   ceilingLabel: string | null
-  /** The hour under each column: "now", "11", "1p". */
+  /** The hour under each column: "now", "11a", "1p". */
   hourLabels: string[]
   /** One number per cell in the pilot's unit, rounded; "—" when the forecast does not say. */
   value: (mps: number | null) => string
@@ -20,7 +26,7 @@ export interface DroneHeightData {
   none: string
 }
 
-export function DroneHeightView({ data, cards, onAirspace }: { data: DroneHeightData; cards: DroneCardsData; onAirspace: () => void }) {
+export function DroneHeightView({ data }: { data: DroneHeightData }) {
   const g = data.grid
   const cols = g?.hours.length ?? 0
   const columns = `2.4em repeat(${Math.max(1, cols)}, minmax(0, 1fr))`
@@ -66,7 +72,6 @@ export function DroneHeightView({ data, cards, onAirspace }: { data: DroneHeight
           <span className="drp__key drp__key--over">{data.legend.over}</span>
         </p>
       )}
-      <DroneCards cards={cards} onAirspace={onAirspace} />
     </>
   )
 }

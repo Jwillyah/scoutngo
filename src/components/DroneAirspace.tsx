@@ -2,7 +2,8 @@ import { ESRI_ATTRIBUTION } from '../lib/mapConstants.ts'
 import * as maplibregl from 'maplibre-gl'
 import { useEffect, useRef, useState } from 'react'
 import type { AirspaceAtPoint } from '../core/airspaceCard.ts'
-import type { AirspaceRead } from '../core/droneAirRead.ts'
+import { openingLayers, sheetSummary, type AirspaceRead, type AirToggle } from '../core/droneAirRead.ts'
+import { AIR_FOOT, AIR_SHEET } from '../core/safetyWords.ts'
 import { GOES_MAX_TILE_ZOOM } from '../core/goes.ts'
 import { atMarker, liveCollection, markerChips, type FaaLayerId, type FaaLayers } from '../core/faaLive.ts'
 import type { LatLon } from '../core/geo.ts'
@@ -44,12 +45,13 @@ maplibregl.addProtocol(RAIN_PROTOCOL, rainMaskProtocol)
 
 const LAANC_URL = 'https://www.faa.gov/uas/getting_started/laanc'
 const CHART_TILES = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'
-const PREFS_KEY = 'scoutngo.droneMap.v1'
+/* v2 (Batch FIX, Section 6.4): the slimmer defaults; v1 kept every layer on. */
+const PREFS_KEY = 'scoutngo.droneMap.v2'
 
 export type BaseMap = 'chart' | 'satellite' | '3d'
 export type WeatherLayer = 'wind' | 'gusts' | 'clouds' | 'radar'
 /** The sheet's toggles (board Drone_Layers). */
-export type ToggleKey = 'grid' | 'nofly' | 'tfr' | 'sua' | 'parks' | 'fria' | 'heliport'
+export type ToggleKey = AirToggle
 
 const TOGGLES: readonly { key: ToggleKey; name: string; line: string; swatch: string }[] = [
   { key: 'grid', name: 'LAANC grids', line: 'Max height per square, from the FAA', swatch: 'grid' },
@@ -67,7 +69,8 @@ interface Prefs {
   weather: WeatherLayer | null
 }
 
-const DEFAULT_PREFS: Prefs = { base: 'chart', on: { grid: true, nofly: true, tfr: true, sua: true, parks: true, fria: true, heliport: true }, weather: null }
+/* The grid, no-fly and TFRs drawn; no-fly and TFRs on at every opening (src/core/droneAirRead.ts openingLayers). */
+const DEFAULT_PREFS: Prefs = { base: 'chart', on: openingLayers(null), weather: null }
 
 function readPrefs(): Prefs {
   try {
@@ -75,7 +78,7 @@ function readPrefs(): Prefs {
     if (raw === null) return DEFAULT_PREFS
     return {
       base: raw.base === 'satellite' || raw.base === '3d' ? raw.base : 'chart',
-      on: { ...DEFAULT_PREFS.on, ...(raw.on ?? {}) },
+      on: openingLayers(raw.on ?? null),
       weather: raw.weather === 'wind' || raw.weather === 'gusts' || raw.weather === 'clouds' || raw.weather === 'radar' ? raw.weather : null,
     }
   } catch {
@@ -122,12 +125,17 @@ export function DroneAirspace({ spot, marker: markerAt, onMarker, here, read, ti
   }
   const marker = { at: markerAt }
   const [named, setNamed] = useState<string | null>(null)
+  /* The map's click handler is bound once: it calls the page's latest onMarker through this. */
+  const onMarkerRef = useRef(onMarker)
+  onMarkerRef.current = onMarker
   const setMarker = ({ at, name }: { at: LatLon; name: string | null }) => {
     setNamed(name)
-    onMarker(at, name)
+    onMarkerRef.current(at, name)
   }
   const [layersOpen, setLayersOpen] = useState(false)
-  const [compact, setCompact] = useState(false)
+  /* Collapsed to two lines at first (board Drone_Slim_3); swipe up, or the handle, for the details. */
+  const [compact, setCompact] = useState(true)
+  const swipe = useRef<number | null>(null)
   const [overlay, setOverlay] = useState<AirspaceOverlay | null>(null)
   const [live, setLive] = useState<Partial<Record<FaaLayerId, LayerAnswer<unknown>>>>({})
   const [query, setQuery] = useState('')
@@ -324,6 +332,8 @@ export function DroneAirspace({ spot, marker: markerAt, onMarker, here, read, ti
   for (const t of at.tfrsToday?.inside ?? []) lines.push({ text: `${t.name}: ${t.detail}.`, tone: 'hazard' })
   for (const a of at.sua ?? []) lines.push({ text: `${a.name}${a.detail === '' ? '' : `, ${a.detail}`}.`, tone: 'note' })
   if (here !== null && lines.length === 0) lines.push({ text: 'Nothing the app holds is marked at this point. That is not permission to fly.', tone: 'note' })
+  /* Was the sheet's second disclaimer; a fact about what is checked, so it is a line of the details. */
+  lines.push({ text: 'FAA facility maps, TFRs and special use airspace; NOTAMs other than TFRs are not checked.', tone: 'note' })
   const chips = markerChips(at, sunsetWords)
   const keptAt = LIVE_IDS.map((id) => live[id]).filter((a): a is LayerAnswer<unknown> => a !== undefined && a.from === 'kept' && a.at !== null)
   const oldest = keptAt.length === 0 ? null : Math.min(...keptAt.map((a) => a.at as number))
@@ -374,14 +384,31 @@ export function DroneAirspace({ spot, marker: markerAt, onMarker, here, read, ti
       </div>
       {wxWords === null ? null : <p className="drp__wxword">{wxWords}</p>}
 
-      <section className={`drp__sheet${compact ? ' drp__sheet--compact' : ''}`} aria-label="What is over the marker">
-        <button type="button" className="drp__handle" aria-label={compact ? 'Show more' : 'Show less'} onClick={() => setCompact((c) => !c)}>
-          <i />
-        </button>
-        <p className="drp__sheethead" data-marker-head>
-          <span className="drp__dot" aria-hidden="true" />
-          {read === null ? 'Reading the airspace…' : read.headline}
-        </p>
+      <section className={`drp__sheet${compact ? ' drp__sheet--compact' : ''}`} aria-label="What is over the marker" data-sheet={compact ? 'collapsed' : 'open'}>
+        <div
+          className="drp__sheettop"
+          onTouchStart={(e) => {
+            swipe.current = e.touches[0]?.clientY ?? null
+          }}
+          onTouchEnd={(e) => {
+            const y0 = swipe.current
+            const y1 = e.changedTouches[0]?.clientY ?? null
+            swipe.current = null
+            if (y0 === null || y1 === null || Math.abs(y1 - y0) < 24) return
+            setCompact(y1 > y0)
+          }}
+        >
+          <button type="button" className="drp__handle" aria-label={compact ? 'Show the details' : 'Show less'} aria-expanded={!compact} onClick={() => setCompact((c) => !c)}>
+            <i />
+          </button>
+          <p className="drp__sheethead" data-marker-head>
+            <span className={`drp__dot${read?.controlled === true ? '' : ' drp__dot--none'}`} aria-hidden="true" />
+            {read === null ? 'Reading the airspace…' : read.headline}
+          </p>
+          <p className="drp__sheetsum" data-marker-sum>
+            {sheetSummary(read, at.tfrsToday === null ? null : at.tfrsToday.inside.length, at.fria === 'unknown' ? 'unknown' : at.fria !== null)}
+          </p>
+        </div>
         {compact ? null : (
           <>
             <ul className="drp__lines">
@@ -403,7 +430,7 @@ export function DroneAirspace({ spot, marker: markerAt, onMarker, here, read, ti
         )}
         <div className="drp__sheetbtns">
           <a className="btn btn--primary drp__laanc" href={LAANC_URL} target="_blank" rel="noopener noreferrer">
-            Get LAANC in an FAA app ›
+            Get LAANC ›
           </a>
           {onSaveSpot === undefined ? null : (
             <button
@@ -414,15 +441,17 @@ export function DroneAirspace({ spot, marker: markerAt, onMarker, here, read, ti
                 setSaved(true)
               }}
             >
-              {saved ? 'Saved' : 'Save spot'}
+              {saved ? 'Saved' : 'Save'}
             </button>
           )}
         </div>
-        {compact ? null : <p className="drp__faa">FAA facility maps, TFRs and special use airspace · not an official FAA source · NOTAMs other than TFRs are not checked</p>}
+        {/* ONE disclaimer line (Batch FIX, Section 6.4; there were two). */}
+        <p className="drp__faa1">{compact ? AIR_SHEET : AIR_FOOT}</p>
       </section>
 
+      {layersOpen ? <button type="button" className="drp__layerscrim" aria-label="Close map layers" onClick={() => setLayersOpen(false)} /> : null}
       {layersOpen ? (
-        <div className="drp__layers" role="dialog" aria-label="Map layers">
+        <div className="drp__layers" role="dialog" aria-label="Map layers" data-half-sheet>
           <div className="drp__layershead">
             <p className="drp__layerstitle">Map layers</p>
             <button type="button" className="drp__x" aria-label="Close" onClick={() => setLayersOpen(false)}>
@@ -433,7 +462,8 @@ export function DroneAirspace({ spot, marker: markerAt, onMarker, here, read, ti
           <div className="drp__bases">
             {(['chart', 'satellite', '3d'] as const).map((b) => (
               <button key={b} type="button" className={`drp__base drp__base--${b}${prefs.base === b ? ' drp__base--on' : ''}`} aria-pressed={prefs.base === b} onClick={() => setPrefs({ ...prefs, base: b })}>
-                {b === 'chart' ? 'Chart' : b === 'satellite' ? 'Satellite' : '3D'}
+                <span className={`drp__thumb drp__thumb--${b}`} aria-hidden="true" />
+                <span className="drp__basek">{b === 'chart' ? 'Chart' : b === 'satellite' ? 'Satellite' : '3D'}</span>
               </button>
             ))}
           </div>

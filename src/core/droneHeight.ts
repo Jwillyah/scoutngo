@@ -13,6 +13,7 @@
  */
 import { windAtFeet } from './homeCards.ts'
 import { limitRole, type LimitRole } from './droneNow.ts'
+import type { CalmRead } from './droneWindow.ts'
 
 export const GRID_ROWS_FT = [400, 300, 200, 100, 0] as const
 
@@ -76,4 +77,34 @@ export function gridLegend(limitMps: number | null, lightRatio: number, toUnit: 
   const light = Math.round(toUnit(limitMps * lightRatio))
   const limit = Math.round(toUnit(limitMps))
   return { calm: `under ${light}`, near: `${light}–${limit - 1}`, over: `at your limit ${limit}` }
+}
+
+/**
+ * THE HEADLINE, SHORT (Batch FIX, Section 6.3; board Drone_Slim_2): "Calm all
+ * day", "Best 3–4:50 PM". The calm window is the home's (droneWindow.ts).
+ * `wholeDay` is the caller's: the day's light has not yet begun, or it is
+ * tomorrow's; otherwise a run to sunset is "Calm until sunset".
+ */
+export function heightHeadline(calm: CalmRead, firstHourAt: Date | null, sunset: Date | null, wholeDay: boolean, tomorrow: boolean, span: (from: Date, to: Date) => string, speed: (mps: number) => string): string {
+  const day = tomorrow ? ' tomorrow' : ''
+  if (calm.kind === 'calm') {
+    const fromFirst = firstHourAt !== null && calm.span.from.getTime() <= firstHourAt.getTime()
+    const toSunset = sunset !== null && calm.span.to.getTime() >= sunset.getTime()
+    if (fromFirst && toSunset) return wholeDay || tomorrow ? `Calm all day${day}` : 'Calm until sunset'
+    return `Best${day} ${span(calm.span.from, calm.span.to)}`
+  }
+  if (calm.kind === 'windy') return `Over ${speed(calm.overMps)} ${calm.allDay ? 'all day' : 'rest of day'}${day}`
+  if (calm.kind === 'no-rating') return 'No wind limit set'
+  if (calm.kind === 'dark') return 'Sun down'
+  return 'Wind at 400 ft not forecast'
+}
+
+/** The one line under it: "6–9 kt from NNE at every height · limit 23", from the grid's own cells. */
+export function heightSub(grid: HeightGrid | null, limitMps: number | null, dir: string | null, toUnit: (mps: number) => number, unit: string): string {
+  const vals = grid === null ? [] : grid.rows.flatMap((r) => r.cells.map((c) => c.mps)).filter((v): v is number => v !== null)
+  if (vals.length === 0) return 'The forecast did not give the wind by height.'
+  const lo = Math.round(toUnit(Math.min(...vals)))
+  const hi = Math.round(toUnit(Math.max(...vals)))
+  const limit = limitMps === null || limitMps <= 0 ? '' : ` · limit ${Math.round(toUnit(limitMps))}`
+  return `${lo === hi ? lo : `${lo}–${hi}`} ${unit}${dir === null ? '' : ` from ${dir}`} at every height${limit}`
 }

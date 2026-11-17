@@ -8,8 +8,7 @@
  *              the steady wind at 10 m is carried up unchanged:
  *              gust400 = wind400 + max(0, gust10 - wind10)
  *   arrow      points where the wind blows TO (from + 180)
- *   chip       the calm window is the home's (src/core/droneWindow.ts): one
- *              source for "calm", so the home and this page cannot disagree
+ *   chip       one: under the limit (teal) until when, or at/over it (orange)
  *   bars       today's hours at 400 ft, civil dawn to civil dusk only, each
  *              coloured by its share of the limit (DRONE_LIGHT_RATIO, the
  *              home's line); sunset and civil dusk marked
@@ -22,7 +21,6 @@
  * Facts, never "safe" (rule 12, rule 28).
  */
 import { DRONE_LIGHT_RATIO } from './briefing.ts'
-import type { CalmRead } from './droneWindow.ts'
 
 const HOUR = 3_600_000
 
@@ -53,20 +51,51 @@ export function limitLine(mps400: number | null, gust400: number | null, limitMp
   return `${where} your ${speed(limitMps)} limit${gusts}`
 }
 
-/** A gust this far over the steady wind (10 m) is "gusty": 8 kt. */
-export const GUSTY_EXCESS_MPS = 4.1
-
 /**
- * The chip: what the wind is doing now, and when the calm window is.
- * "Gusty now · calmer 3–4:50 PM (11 kt)", "Calm now until 1 PM", or null when
- * there is no calm window to point at.
+ * THE ONE CHIP UNDER THE NUMBER (Batch FIX, Section 6.2; board Drone_Slim_1).
+ *
+ * "Under your limit until sunset 4:53 PM · gusts 46%". Teal (`ok`) while the
+ * steady wind and its gusts at 400 ft are under the drone's limit; orange
+ * (`trouble`) ONLY when one of them is at or over it. The old orange "Calm
+ * now until 4:53" was the wrong colour for good news and repeated the line
+ * above it.
+ *
+ * "Until" is the first forecast hour at 400 ft at or over the limit, before
+ * sunset; "until sunset" when every hour to sunset is under it. An hour the
+ * forecast does not give ends the run without a time: the chip does not say
+ * how long it lasts when it does not know.
+ *
+ * Null with no limit or no wind at 400 ft: the caller says which.
  */
-export function windChip(now: Date, calm: CalmRead, mps10: number | null, gust10: number | null, calmMaxMps: number | null, span: (from: Date, to: Date) => string, until: (d: Date) => string, speed: (mps: number) => string): string | null {
-  if (calm.kind !== 'calm') return null
-  const { from, to } = calm.span
-  if (from.getTime() <= now.getTime()) return `Calm now until ${until(to)}`
-  const gusty = mps10 !== null && gust10 !== null && gust10 - mps10 >= GUSTY_EXCESS_MPS
-  return `${gusty ? 'Gusty now' : 'Windier now'} · calmer ${span(from, to)}${calmMaxMps === null ? '' : ` (${speed(calmMaxMps)})`}`
+export interface LimitChip {
+  text: string
+  tone: 'ok' | 'trouble'
+}
+
+export function limitChip(now: Date, hours: readonly HourAloft[], mps400: number | null, gust400: number | null, limitMps: number | null, sunset: Date | null, clock: (d: Date) => string, speed: (mps: number) => string): LimitChip | null {
+  if (limitMps === null || limitMps <= 0 || mps400 === null) return null
+  const pct = gust400 === null ? null : Math.round((gust400 / limitMps) * 100)
+  const gusts = pct === null ? '' : ` · gusts ${pct}%`
+  if (mps400 >= limitMps) return { text: `${mps400 === limitMps ? 'At' : 'Over'} your ${speed(limitMps)} limit${gusts}`, tone: 'trouble' }
+  if (gust400 !== null && gust400 >= limitMps) return { text: `Gusts ${pct}% of your ${speed(limitMps)} limit`, tone: 'trouble' }
+  let until = ''
+  if (sunset !== null && sunset.getTime() > now.getTime()) {
+    const ahead = [...hours].sort((a, b) => a.at.getTime() - b.at.getTime()).filter((h) => h.at.getTime() + HOUR > now.getTime() && h.at.getTime() < sunset.getTime())
+    let ended: 'over' | 'unknown' | null = null
+    for (const h of ahead) {
+      if (h.mps === null) {
+        ended = 'unknown'
+        break
+      }
+      if (h.mps >= limitMps) {
+        ended = 'over'
+        if (h.at.getTime() > now.getTime()) until = ` until ${clock(h.at)}`
+        break
+      }
+    }
+    if (ended === null && ahead.length > 0) until = ` until sunset ${clock(sunset)}`
+  }
+  return { text: `Under your limit${until}${gusts}`, tone: 'ok' }
 }
 
 export interface HourAloft {
@@ -143,14 +172,27 @@ export const coldMinutes = (ratedMin: number, tempC: number | null): number => M
 
 /* ------------------------------------------------------------------ Kp */
 
-export type KpState = 'loading' | 'offline' | 'missing' | { kp: number; at: Date | null }
+/** The last Kp this phone has: NOAA's value, its time tag, and whether it came from the phone's copy because NOAA did not answer now. */
+export interface KpValue {
+  kp: number
+  at: Date | null
+  kept: boolean
+}
+export type KpState = 'loading' | 'offline' | 'missing' | KpValue
 
-/** The GPS card, never a dash: the number and its age, or why there is no number. */
-export function kpCard(state: KpState, word: (kp: number) => string, clock: (d: Date) => string): { big: string; line: string } {
-  if (state === 'loading') return { big: 'Reading Kp…', line: 'asking NOAA' }
-  if (state === 'offline') return { big: 'Kp not received', line: 'no signal to ask NOAA' }
-  if (state === 'missing') return { big: 'Kp not received', line: 'NOAA did not answer' }
-  return { big: `Kp ${Math.round(state.kp)} · ${word(state.kp)}`, line: state.at === null ? 'NOAA SWPC' : `from ${clock(state.at)}` }
+/**
+ * THE GPS ROW (Batch FIX, Section 6.7): NOAA's word for the K index, then the
+ * number and when NOAA measured it ("Quiet · Kp 2 · 7:00 AM"), the last value
+ * received when NOAA does not answer now (with "kept from" and its time, so
+ * its age shows), and NO ROW when this phone has never received one: "Kp not
+ * received · NOAA did not answer" said nothing a pilot could use.
+ */
+export function kpRow(state: KpState, word: (kp: number) => string, when: (d: Date) => string): { big: string; small: string } | null {
+  if (typeof state === 'string') return null
+  const w = word(state.kp)
+  const big = w.charAt(0).toUpperCase() + w.slice(1)
+  const at = state.at === null ? '' : ` · ${state.kept ? 'kept from ' : ''}${when(state.at)}`
+  return { big, small: `Kp ${Math.round(state.kp)}${at}` }
 }
 
 /** NOAA's time tag ("2026-10-30 09:00:00.000", UTC) as a Date, or null. */
@@ -181,4 +223,24 @@ export function visibilityWords(m: number | null): string | null {
   const mi = m / 1609.344
   if (mi >= 10) return '10 mi'
   return mi >= 1 ? `${Math.round(mi)} mi` : `${Math.round(mi * 10) / 10} mi`
+}
+
+/**
+ * THE SKY ROW (Batch FIX, Section 6.2): one word for the cloud, then
+ * visibility. "Little low cloud · low cloud 0%" said the same thing twice.
+ * The station's lowest layer when its report is fresh, else the forecast's
+ * total cloud. Never "clear" (docs/ux-rules.md, rule 12).
+ */
+export function cloudWords(coverPct: number | null): string | null {
+  if (coverPct === null || !Number.isFinite(coverPct)) return null
+  return coverPct < 10 ? 'Little cloud' : coverPct < 40 ? 'Some cloud' : coverPct < 80 ? 'Mostly cloudy' : 'Overcast'
+}
+
+/** Rain chance is said from this share up; under it, the row stays one fact. */
+export const SKY_RAIN_FROM_PCT = 20
+
+export function skyRow(stationBaseFt: number | null, station: string | null, coverPct: number | null, vis: string | null, rainPct: number | null): { big: string; small: string } {
+  const big = stationBaseFt !== null ? `Base ${baseWords(stationBaseFt)}` : (cloudWords(coverPct) ?? 'Cloud not forecast')
+  const small = [vis === null ? null : `vis ${vis}`, rainPct !== null && rainPct >= SKY_RAIN_FROM_PCT ? `rain ${Math.round(rainPct)}%` : null, stationBaseFt !== null ? station : null].filter((x): x is string => x !== null).join(' · ')
+  return { big, small: small === '' ? 'the forecast did not say' : small }
 }
