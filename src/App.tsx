@@ -87,6 +87,7 @@ import {
 import type { PackBuildState } from './components/FieldPackControl.tsx'
 import { parseShotList, type DesiredShot } from './lib/shotList.ts'
 import { clampRadius, RADIUS_DEFAULT_METERS } from './core/radius.ts'
+import { spotNameAt } from './core/spotName.ts'
 import { formatClock, formatSpan, formatWallTime, setClockHours, venueTimeZone } from './core/timezone.ts'
 import { msUntilNominatim, reverseGeocode } from './lib/search.ts'
 import { usePersistentState } from './lib/usePersistentState.ts'
@@ -2747,7 +2748,8 @@ function App() {
         <Suspense fallback={null}>
         <DronePage
           venue={centre}
-          placeName={venueShort}
+          /* Batch FIX, Section 6.1: your spot's name when the pin is one of your saved spots ("Chic's Beach", not the city). */
+          placeName={spotNameAt(spots, centre) ?? venueShort}
           timeZone={venueWindow?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}
           units={settings.units}
           now={briefNow}

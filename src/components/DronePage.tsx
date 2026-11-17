@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { getPosition, getTimes } from 'suncalc'
 import type { AirspaceAtPoint } from '../core/airspaceCard.ts'
 import { DRONE_LIGHT_RATIO } from '../core/briefing.ts'
+import { airspaceRead } from '../core/droneAirRead.ts'
 import { gridLegend, heightGrid, type GridHour } from '../core/droneHeight.ts'
 import { baseWords, coldMinutes, coldTrim, dayBars, estimatedBaseFt, gustAloft, blowsToward, kpCard, kpTime, limitLine, visibilityWords, windChip, type DayBars, type HourAloft, type KpState } from '../core/droneNow.ts'
 import { lensAir, lensSun, sunsetAtHeight } from '../core/dronePlan.ts'
@@ -14,7 +15,9 @@ import { readFlightCsv } from '../core/flightLog.ts'
 import type { LatLon } from '../core/geo.ts'
 import { groundOf } from '../core/homeDay.ts'
 import { windAtFeet } from '../core/homeCards.ts'
+import { shortPlace } from '../core/spotName.ts'
 import { formatClock, formatShortClock, formatShortHour, formatSpan } from '../core/timezone.ts'
+import { coordinateLabel } from '../core/venueName.ts'
 import { airspaceAtPoint } from '../lib/airspaceAtPoint.ts'
 import { forgetFlight, keepFlight, readKeptFlight, type KeptFlight } from '../lib/flightLogStore.ts'
 import { fetchKp, kpWord } from '../lib/kp.ts'
@@ -82,7 +85,21 @@ function hoursFrom(wx: Hourly | null): (HourAloft & GridHour)[] {
   return wx.times.map((t, i) => ({ at: new Date(t), mps: wx.values.wind_speed_120m?.[i] ?? null, mps10: wx.values.wind_speed_10m?.[i] ?? null, mps120: wx.values.wind_speed_120m?.[i] ?? null }))
 }
 
-export function DronePage({ venue, placeName, timeZone, units, now, drone, tab: startTab = 'now', onBack, onMap, onPreflight, onFly, onSaveSpot }: DronePageProps) {
+export function DronePage({ venue: spot, placeName, timeZone, units, now, drone, tab: startTab = 'now', onBack, onMap, onPreflight, onFly, onSaveSpot }: DronePageProps) {
+  /*
+   * ONE POINT FOR THE WHOLE PAGE (Batch FIX, Section 6.1). The Airspace tab's
+   * marker IS the page's point: a tap or a search moves it, and the header,
+   * the wind, the cards and the sheet all follow. The spot comes back with ◎.
+   * `venue` below is that point, never the spot behind it.
+   */
+  const spotKey = `${spot.lat},${spot.lon}`
+  /* A moved point is kept with the spot it was moved from: a new spot starts the page there again. */
+  const [moved, setMoved] = useState<{ spotKey: string; at: LatLon; name: string | null } | null>(null)
+  const point = moved !== null && moved.spotKey === spotKey ? moved : { at: spot, name: null }
+  const setPoint = (p: { at: LatLon; name: string | null }) => setMoved({ spotKey, ...p })
+  const venue = point.at
+  const atSpot = venue.lat === spot.lat && venue.lon === spot.lon
+  const pointName = point.name ?? (atSpot ? placeName : coordinateLabel(venue.lat.toFixed(4), venue.lon.toFixed(4)))
   const brief = useBriefing(venue, timeZone, now, true)
   const online = typeof navigator === 'undefined' ? true : navigator.onLine
   const station = useStationNow(venue, now, online)
@@ -132,13 +149,14 @@ export function DronePage({ venue, placeName, timeZone, units, now, drone, tab: 
   const dayWord = dayIdx === 0 ? 'Today' : 'Tomorrow'
 
   /* ------------------------------------------------------- the cards */
-  const [air, setAir] = useState<AirspaceAtPoint | null>(null)
+  /* The point's airspace, looked up ONCE here and read by every tab (src/core/droneAirRead.ts). */
+  const [air, setAir] = useState<{ key: string; here: AirspaceAtPoint } | null>(null)
+  const airKey = `${venue.lat},${venue.lon}`
   const [kp, setKp] = useState<KpState>('loading')
   const [extras, setExtras] = useState<Hourly | null>(null)
   const [skyHours, setSkyHours] = useState<Hourly | null>(null)
   useEffect(() => {
     let live = true
-    void airspaceAtPoint(venue, 400).then((a) => live && setAir(a), () => undefined)
     void fetchKp().then(
       (k) => live && setKp(k === null ? (navigator.onLine ? 'missing' : 'offline') : { kp: k.kp, at: kpTime(k.at) }),
       () => live && setKp(navigator.onLine ? 'missing' : 'offline'),
@@ -149,9 +167,16 @@ export function DronePage({ venue, placeName, timeZone, units, now, drone, tab: 
       live = false
     }
   }, [venue.lat, venue.lon]) // eslint-disable-line react-hooks/exhaustive-deps
-  const ceilingFt = air?.gridCeilingFeet ?? null
-  const cell = facilityCellAt(venue.lat, venue.lon)
-  const cls = air === null ? null : (air.classes.find((c) => c !== 'E') ?? (air.classes.includes('E') ? 'E' : null))
+  useEffect(() => {
+    let live = true
+    void airspaceAtPoint(venue, 400).then((here) => live && setAir({ key: airKey, here }), () => undefined)
+    return () => {
+      live = false
+    }
+  }, [airKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  const here = air !== null && air.key === airKey ? air.here : null
+  const read = here === null ? null : airspaceRead(here, facilityCellAt(venue.lat, venue.lon))
+  const ceilingFt = read?.ceilingFt ?? null
   const rated = keptFlightMinutes()
   const tempC = at('temperature_2m', now)
   const dewC = extras === null ? null : hourlyAt(extras, 'dew_point_2m', now)
@@ -166,11 +191,11 @@ export function DronePage({ venue, placeName, timeZone, units, now, drone, tab: 
   const skySource = fresh !== null ? fresh.sky.station : lowCover !== null && lowCover < 10 ? `low cloud ${Math.round(lowCover)}%` : est !== null ? 'est. from dew point' : null
   const cards: DroneCardsData = {
     airspace:
-      air === null
+      read === null
         ? { big: '…', line: 'reading' }
         : {
-            big: cls === null ? (ceilingFt === null ? 'None marked' : `Grid · ${ceilingFt} ft`) : ceilingFt === null ? `Class ${cls}` : `Class ${cls} · ${ceilingFt} ft`,
-            line: cell?.icao != null ? `LAANC near ${cell.icao}` : cls !== null ? 'no grid square here' : 'in the app’s data',
+            big: read.row.big,
+            line: read.icao !== null ? `LAANC near ${read.icao}` : read.cls !== null ? 'no grid square here' : 'in the app’s data',
           },
     battery: {
       label: tempC === null ? 'Battery' : `Battery · ${temp(tempC)}`,
@@ -333,7 +358,7 @@ export function DronePage({ venue, placeName, timeZone, units, now, drone, tab: 
       safety={AIR_SAFETY}
       kind="drpage"
       title="Drone"
-      sub={`${placeName}${drone === null ? '' : ` · ${drone.name}`} · now`}
+      sub={`${pointName}${drone === null ? '' : ` · ${drone.name}`} · now`}
       ground={ground}
       onBack={onBack}
       onMap={onMap}
@@ -364,7 +389,7 @@ export function DronePage({ venue, placeName, timeZone, units, now, drone, tab: 
           <DroneHeightView data={heightData} cards={cards} onAirspace={toAirspace} />
         </section>
         <section className="drp__page drp__page--airspace" aria-label="Airspace" data-drone-page="airspace">
-          {airSeen ? <DroneAirspace venue={venue} timeZone={timeZone} now={now} online={online} todayIso={isoDay(now, timeZone)} windWords={mps400 === null ? null : `Wind ${speed(mps400)}${dir === null ? '' : ` from ${dir}`} at 400 ft`} gustWords={gust400 === null ? null : `Gusts ${speed(gust400)} at 400 ft`} sunsetWords={nextSunset === null ? null : clock(nextSunset)} onSaveSpot={onSaveSpot} /> : null}
+          {airSeen ? <DroneAirspace spot={spot} marker={venue} here={here} read={read} onMarker={(at, name) => setPoint({ at, name: name === null ? null : shortPlace(name) })} timeZone={timeZone} now={now} online={online} todayIso={isoDay(now, timeZone)} windWords={mps400 === null ? null : `Wind ${speed(mps400)}${dir === null ? '' : ` from ${dir}`} at 400 ft`} gustWords={gust400 === null ? null : `Gusts ${speed(gust400)} at 400 ft`} sunsetWords={nextSunset === null ? null : clock(nextSunset)} onSaveSpot={onSaveSpot} /> : null}
         </section>
         <section className="drp__page drp__page--plan" aria-label="Plan" data-drone-page="plan">
           <DronePlanView data={planData} />

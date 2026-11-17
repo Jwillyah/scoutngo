@@ -2,11 +2,11 @@ import { ESRI_ATTRIBUTION } from '../lib/mapConstants.ts'
 import * as maplibregl from 'maplibre-gl'
 import { useEffect, useRef, useState } from 'react'
 import type { AirspaceAtPoint } from '../core/airspaceCard.ts'
+import type { AirspaceRead } from '../core/droneAirRead.ts'
 import { GOES_MAX_TILE_ZOOM } from '../core/goes.ts'
-import { atMarker, liveCollection, markerChips, markerHeadline, type FaaLayerId, type FaaLayers } from '../core/faaLive.ts'
+import { atMarker, liveCollection, markerChips, type FaaLayerId, type FaaLayers } from '../core/faaLive.ts'
 import type { LatLon } from '../core/geo.ts'
 import { formatDayTime } from '../core/timezone.ts'
-import { airspaceAtPoint } from '../lib/airspaceAtPoint.ts'
 import { loadAirspaceOverlay, type AirspaceOverlay } from '../lib/airspaceOverlay.ts'
 import { faaLayer, type LayerAnswer } from '../lib/faaLiveData.ts'
 import { goesTileUrl } from '../lib/goesLayer.ts'
@@ -14,7 +14,6 @@ import { loadTile, PROTOCOL, viaProtocol } from '../lib/offlineCache.ts'
 import { IMAGERY_TEMPLATE, TERRAIN_TEMPLATE } from '../lib/offlineSources.ts'
 import { searchVenues, type SearchHit } from '../lib/search.ts'
 import { readToken } from '../lib/tokens.ts'
-import { facilityCellAt } from '../lib/uasfm.ts'
 import { fetchRainMaps, frameFor, RAIN_MAX_ZOOM, RAIN_PROTOCOL, rainMaskProtocol, rainTileUrl } from '../lib/worldRain.ts'
 
 /*
@@ -87,7 +86,14 @@ function readPrefs(): Prefs {
 const LIVE_IDS: readonly FaaLayerId[] = ['tfr', 'nsufr', 'fria', 'heliport', 'sua']
 
 interface DroneAirspaceProps {
-  venue: LatLon
+  /** The spot the page opened on: ◎ brings the marker back to it. */
+  spot: LatLon
+  /** The page's point (Batch FIX, Section 6.1): the marker is it, and moving the marker moves the page. */
+  marker: LatLon
+  onMarker: (at: LatLon, name: string | null) => void
+  /** The page's one airspace lookup for that point, and its read (src/core/droneAirRead.ts); null while reading. */
+  here: AirspaceAtPoint | null
+  read: AirspaceRead | null
   timeZone: string
   now: Date
   online: boolean
@@ -100,7 +106,7 @@ interface DroneAirspaceProps {
   onSaveSpot?: (at: LatLon, name: string) => void
 }
 
-export function DroneAirspace({ venue, timeZone, now, online, todayIso, windWords, gustWords, sunsetWords, onSaveSpot }: DroneAirspaceProps) {
+export function DroneAirspace({ spot, marker: markerAt, onMarker, here, read, timeZone, now, online, todayIso, windWords, gustWords, sunsetWords, onSaveSpot }: DroneAirspaceProps) {
   const box = useRef<HTMLDivElement>(null)
   const map = useRef<maplibregl.Map | null>(null)
   const pin = useRef<maplibregl.Marker | null>(null)
@@ -114,11 +120,15 @@ export function DroneAirspace({ venue, timeZone, now, online, todayIso, windWord
       /* kept for this visit only */
     }
   }
-  const [marker, setMarker] = useState<{ at: LatLon; name: string | null }>({ at: venue, name: null })
+  const marker = { at: markerAt }
+  const [named, setNamed] = useState<string | null>(null)
+  const setMarker = ({ at, name }: { at: LatLon; name: string | null }) => {
+    setNamed(name)
+    onMarker(at, name)
+  }
   const [layersOpen, setLayersOpen] = useState(false)
   const [compact, setCompact] = useState(false)
   const [overlay, setOverlay] = useState<AirspaceOverlay | null>(null)
-  const [here, setHere] = useState<AirspaceAtPoint | null>(null)
   const [live, setLive] = useState<Partial<Record<FaaLayerId, LayerAnswer<unknown>>>>({})
   const [query, setQuery] = useState('')
   const [hits, setHits] = useState<SearchHit[] | 'searching' | 'none' | null>(null)
@@ -135,15 +145,6 @@ export function DroneAirspace({ venue, timeZone, now, online, todayIso, windWord
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  /* What is over the marker, from the baked data. */
-  useEffect(() => {
-    let alive = true
-    void airspaceAtPoint(marker.at, 400).then((a) => alive && setHere(a), () => undefined)
-    return () => {
-      alive = false
-    }
-  }, [marker.at.lat, marker.at.lon]) // eslint-disable-line react-hooks/exhaustive-deps
-
   /* The map, built once. */
   useEffect(() => {
     if (box.current === null) return
@@ -151,7 +152,7 @@ export function DroneAirspace({ venue, timeZone, now, online, todayIso, windWord
     const tone = (name: string, fallback: string) => readToken(name, fallback, el)
     const m = new maplibregl.Map({
       container: el,
-      center: [venue.lon, venue.lat],
+      center: [markerAt.lon, markerAt.lat],
       zoom: 12,
       dragRotate: false,
       pitchWithRotate: false,
@@ -191,7 +192,7 @@ export function DroneAirspace({ venue, timeZone, now, online, todayIso, windWord
     const dot = document.createElement('div')
     dot.className = 'drp__pin'
     dot.setAttribute('aria-hidden', 'true')
-    pin.current = new maplibregl.Marker({ element: dot }).setLngLat([venue.lon, venue.lat]).addTo(m)
+    pin.current = new maplibregl.Marker({ element: dot }).setLngLat([markerAt.lon, markerAt.lat]).addTo(m)
     m.on('click', (e) => setMarker({ at: { lat: e.lngLat.lat, lon: e.lngLat.lng }, name: null }))
     m.on('load', () => setReady(true))
     map.current = m
@@ -310,15 +311,13 @@ export function DroneAirspace({ venue, timeZone, now, online, todayIso, windWord
   }
 
   /* The sheet. */
-  const cell = facilityCellAt(marker.at.lat, marker.at.lon)
-  const ceiling = here?.gridCeilingFeet ?? null
-  const classes = here?.classes ?? []
+  const ceiling = read?.ceilingFt ?? null
   /* Class B, C, D and surface E are all controlled (14 CFR 107.41). */
-  const controlled = classes.length > 0
+  const controlled = read?.controlled ?? false
   const at = atMarker(layers, marker.at, todayIso)
   const lines: { text: string; tone: 'hazard' | 'note' }[] = []
   if (controlled) lines.push({ text: `Controlled airspace: flying here needs an FAA authorization${ceiling === null ? '' : `; LAANC can approve up to ${ceiling} ft at this square`}.`, tone: 'note' })
-  if (cell?.facility != null) lines.push({ text: `Facility map: ${cell.facility}${cell.icao === null ? '' : ` (${cell.icao})`}.`, tone: 'note' })
+  if (read?.facility != null) lines.push({ text: `Facility map: ${read.facility}${read.icao === null ? '' : ` (${read.icao})`}.`, tone: 'note' })
   for (const a of here?.specialUse ?? []) lines.push({ text: `${a.name}: ${a.type === 'P' ? 'prohibited' : 'restricted'} area.`, tone: 'hazard' })
   for (const p of here?.parks ?? []) lines.push({ text: `${p.name}: no drone launch on National Park Service land.`, tone: 'hazard' })
   for (const a of at.nsufr ?? []) lines.push({ text: `National security UAS restriction: ${a.name}${a.detail === '' ? '' : ` (${a.detail})`}.`, tone: 'hazard' })
@@ -366,7 +365,7 @@ export function DroneAirspace({ venue, timeZone, now, online, todayIso, windWord
         )}
       </form>
       <div className="drp__rail">
-        <button type="button" className="drp__railbtn" aria-label="Back to the spot" onClick={() => goTo(venue, null)}>
+        <button type="button" className="drp__railbtn" aria-label="Back to the spot" onClick={() => goTo(spot, null)}>
           ◎
         </button>
         <button type="button" className="drp__railbtn" aria-expanded={layersOpen} onClick={() => setLayersOpen(true)}>
@@ -381,7 +380,7 @@ export function DroneAirspace({ venue, timeZone, now, online, todayIso, windWord
         </button>
         <p className="drp__sheethead" data-marker-head>
           <span className="drp__dot" aria-hidden="true" />
-          {here === null ? 'Reading the airspace…' : markerHeadline(classes, ceiling)}
+          {read === null ? 'Reading the airspace…' : read.headline}
         </p>
         {compact ? null : (
           <>
@@ -411,7 +410,7 @@ export function DroneAirspace({ venue, timeZone, now, online, todayIso, windWord
               type="button"
               className="btn drp__save"
               onClick={() => {
-                onSaveSpot(marker.at, marker.name ?? `${marker.at.lat.toFixed(4)}, ${marker.at.lon.toFixed(4)}`)
+                onSaveSpot(marker.at, named ?? `${marker.at.lat.toFixed(4)}, ${marker.at.lon.toFixed(4)}`)
                 setSaved(true)
               }}
             >
