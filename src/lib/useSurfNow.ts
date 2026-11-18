@@ -9,7 +9,7 @@
  * Surf page all read it; scripts/audit-one-number.mjs fails when any two
  * screens show a different value.
  */
-import { useEffect, useMemo, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { distanceMeters, type LatLon } from '../core/geo.ts'
 import { spotKey, spotStats, type SpotStats } from '../core/spotSkill.ts'
 import { BEACH_CAP } from '../core/surf.ts'
@@ -23,12 +23,13 @@ import { hourlyAt } from './tideSheetData.ts'
 import { saneRange } from '../core/sanity.ts'
 import { venueToday } from '../core/eventDay.ts'
 import { wallClock } from '../core/timezone.ts'
-import { addDays, buoyLean, dayReadings, FIRST_HOUR, LAST_HOUR, LEAN_BUOY_MAX_AGE_MS, rangeHourAt, weekPeaks, type RangeHour, type SurfObs } from './surfPageData.ts'
-import { swellWatch, type SwellWatch, type WatchReading } from '../core/swellWatch.ts'
+import { addDays, buoyLean, dayReadings, modelDayReadings, FIRST_HOUR, LAST_HOUR, LEAN_BUOY_MAX_AGE_MS, rangeHourAt, weekPeaks, type RangeHour, type SurfObs } from './surfPageData.ts'
+import { modelTops, swellWatch, type SwellWatch, type WatchReading } from '../core/swellWatch.ts'
 import { keepWatch } from './swellWatchStore.ts'
 import { onSkillBook, readSkillBook, skillBookVersion } from './spotSkillStore.ts'
 import { awayFrom, beachName, sameBeach, useSurfBeach, type Beach } from './surfBeach.ts'
 import { useSurfSea, type SurfSea } from './useSurfSea.ts'
+import { fetchWaveModels, type ModelSea } from './waveModels.ts'
 import { useStationObs } from './useStationObs.ts'
 import { leanHourly } from './windNow.ts'
 import { keepWeek } from './weekBiasStore.ts'
@@ -157,7 +158,8 @@ export function surfNowFrom(sea: SurfSea, stats: SpotStats, now: Date, timeZone:
   /* Today is called by the hour now, the home card's and the Surf page's head; the other days by their biggest hour. */
   const days = week.map((d, i) => {
     const hour = i === 0 ? hourNow : d.peak
-    return { date: d.date, hour, call: callOf(hour, i), readings: dayReadings(marine, d.date, timeZone, sea.facing, sea.factor) }
+    /* Batch 3D, Section 3.2: and each other wave model's, where the screen asked them. */
+    return { date: d.date, hour, call: callOf(hour, i), readings: [...dayReadings(marine, d.date, timeZone, sea.facing, sea.factor), ...modelDayReadings(sea.models ?? [], d.date, timeZone, sea.facing, sea.factor)] }
   })
   const watch = swellWatch(days.map((d) => ({ date: d.date, callHighFt: d.call?.highFt ?? null, readings: d.readings })), weekdayOf)
   return { now: hourNow, tomorrow, week: days, series, watch }
@@ -184,14 +186,39 @@ export function storedStats(spot: LatLon, now: number): SpotStats {
   return spotStats(readSkillBook()[spotKey(spot)]?.samples ?? [], now)
 }
 
-/** `venue` null asks nothing (the menu before it has been open a moment). */
-export function useSurfNow(venue: LatLon | null, now: Date, timeZone: string, miles: boolean, spotName: string | null = null, station: StationObs | null = null): SurfNow {
+/*
+ * The other wave models at a spot (Batch 3D, Section 3.2), asked only by a
+ * screen that shows the bigger-swell watch (the home's week): one request,
+ * kept by the weather store. `at` null asks nothing.
+ */
+function useWaveModels(at: LatLon | null): ModelSea[] | null {
+  const key = at === null ? null : `${at.lat.toFixed(3)},${at.lon.toFixed(3)}`
+  const [got, setGot] = useState<{ key: string; v: ModelSea[] } | null>(null)
+  useEffect(() => {
+    if (key === null || at === null) return
+    let live = true
+    fetchWaveModels(at)
+      .then((v) => {
+        if (live) setGot({ key, v })
+      })
+      .catch(() => {})
+    return () => {
+      live = false
+    }
+  }, [key]) // eslint-disable-line react-hooks/exhaustive-deps
+  return got !== null && got.key === key ? got.v : null
+}
+
+/** `venue` null asks nothing (the menu before it has been open a moment). `models`: ask the other wave models too (the home's week, Batch 3D Section 3.2). */
+export function useSurfNow(venue: LatLon | null, now: Date, timeZone: string, miles: boolean, spotName: string | null = null, station: StationObs | null = null, models = false): SurfNow {
   /* Batch Flow, Section 3: a spot named for a beach is on that beach (src/lib/surfBeach.ts namedBeach). */
   const [beach] = useSurfBeach(venue, spotName)
   /* Read where the beach's surf is; said to be elsewhere only when it is (a spot named for the beach is on it). */
   const away = awayFrom(venue, beach, spotName)
   const spot = venue !== null && beach !== null && !sameBeach(venue, beach) ? beach.at : venue
-  const seaRaw = useSurfSea(spot)
+  const seaOwn = useSurfSea(spot)
+  const waveModels = useWaveModels(models ? spot : null)
+  const seaRaw = useMemo(() => (waveModels === null ? seaOwn : { ...seaOwn, models: waveModels }), [seaOwn, waveModels])
   /* Batch FIX, Section 1: the wind the call reads leans to the one station now, the home's and the Wind page's (src/lib/useStationObs.ts). */
   const near = useStationObs(venue)
   const sea = useMemo(() => {
@@ -213,12 +240,12 @@ export function useSurfNow(venue: LatLon | null, now: Date, timeZone: string, mi
   const read = useMemo(() => surfNowFrom(sea, use, now, timeZone, measured), [sea, use, now, timeZone, measured])
   /* Batch DRONE, Section 1.7: the week's calls, kept on this phone for the week's bias (src/core/weekBias.ts); written when a call changes, not each minute. */
   const spotK = spot === null ? null : spotKey(spot)
-  const weekSig = read.week.map((d) => `${d.date}:${d.call?.lowFt ?? '-'}`).join(',')
+  const weekSig = `${read.week.map((d) => `${d.date}:${d.call?.lowFt ?? '-'}`).join(',')}|${waveModels === null ? '' : waveModels.map((m) => m.id).join(',')}`
   useEffect(() => {
     if (spotK === null || read.week.length === 0) return
     keepWeek(spotK, read.week[0].date, read.week.map((d) => ({ date: d.date, lowFt: d.call?.lowFt ?? null })), Date.now())
     /* Batch FIX, Section 3.4: and the bigger-swell log, each day's call and its top reading (Mon 23 Nov is the first it watches). */
-    keepWatch(spotK, read.week[0].date, read.week.map((d) => ({ date: d.date, callLowFt: d.call?.lowFt ?? null, callHighFt: d.call?.highFt ?? null, topFt: (d.readings ?? []).reduce<number | null>((m, r) => Math.max(m ?? 0, r.faceFt), null) })), Date.now())
+    keepWatch(spotK, read.week[0].date, read.week.map((d) => ({ date: d.date, callLowFt: d.call?.lowFt ?? null, callHighFt: d.call?.highFt ?? null, topFt: (d.readings ?? []).reduce<number | null>((m, r) => Math.max(m ?? 0, r.faceFt), null), ...(waveModels === null ? {} : { models: modelTops(d.readings ?? []) }) })), Date.now())
   }, [spotK, weekSig]) // eslint-disable-line react-hooks/exhaustive-deps
   return {
     beach,

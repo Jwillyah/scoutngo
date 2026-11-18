@@ -21,6 +21,7 @@ import { latestBuoys, type BuoyReading } from './buoy.ts'
 import { coastFacing } from './coast.ts'
 import { fetchBriefWind, fetchMarine, type Hourly } from './tideSheetData.ts'
 import { retrying } from './retrying.ts'
+import type { ModelSea } from './waveModels.ts'
 import { useWeatherEpoch } from './useWeatherStatus.ts'
 
 export interface SurfSea {
@@ -39,6 +40,8 @@ export interface SurfSea {
   factor?: number
   /** Batch DRONE, Section 1.3: a jetty's lee (src/core/jettyFactor.ts); absent or null on an open beach. */
   shelter?: Shelter | null
+  /** Batch 3D, Section 3.2: the other wave models, for the bigger-swell watch only (src/lib/waveModels.ts); absent where the screen did not ask. */
+  models?: ModelSea[]
 }
 
 const EMPTY: SurfSea = {

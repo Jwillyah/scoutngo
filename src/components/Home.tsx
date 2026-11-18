@@ -115,15 +115,22 @@ export function Home({ venue, placeName, timeZone, units, drone, now, onClose, o
   /* Batch MAP2, Section 2: a station within 15 km that reported in the last hour; the wind now leans to it (the Wind page reads the same). */
   const stationObs = useStationObs(venue)
   /* Batch Map A1/A2: the spot's surf beach and its band, the same hook the menu and the Surf page read; Batch FIX, Section 3.1: the same station's wind near now. */
-  const surf = useSurfNow(venue, now, timeZone, units.distance === 'ft', placeName, stationObs)
+  /* Batch N A2: reopening lands on the tab last used (kept on this phone). Read before the surf: the Week page asks for more. */
+  const [page, setPageRaw] = useState<Page>(() => readHomeTab() ?? start)
+  /*
+   * Batch 3D, Section 3.2: the Week page shows the bigger-swell watch, so once
+   * it has been on screen the other wave models are asked too (one request,
+   * kept by the weather store); the Today page's load asks nothing more.
+   */
+  const [weekSeen, setWeekSeen] = useState(page === 2)
+  if (page === 2 && !weekSeen) setWeekSeen(true)
+  const surf = useSurfNow(venue, now, timeZone, units.distance === 'ft', placeName, stationObs, weekSeen)
   const [picked] = useActivities()
   const order = homeOrder(picked, drone !== null)
   /* Batch Flow, Section 3: 1-3 activities picked, big full-width cards; else the six (boards D_Home2, D_Home6). */
   const layout = homeLayout(picked)
   /* The cards, the menu's too (src/core/homeCards.ts homeCardsShown). */
   const shown = homeCardsShown(picked, order, drone !== null)
-  /* Batch N A2: reopening lands on the tab last used (kept on this phone). */
-  const [page, setPageRaw] = useState<Page>(() => readHomeTab() ?? start)
   const setPage = (p: Page) => {
     setPageRaw(p)
     writeHomeTab(p)

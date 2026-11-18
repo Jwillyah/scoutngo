@@ -87,7 +87,8 @@ export function SurfPageV2({ venue, placeName, timeZone, units, ground, onBack, 
   /* Batch Map A1/A2: the spot's surf beach and this hour's band, from the one hook the home and the menu read too. */
   /* Batch FIX, Section 3.1: the station's wind near now, as the home's surf reads it (src/lib/surfPageData.ts SurfObs). */
   const station = useStationObs(venue)
-  const surf = useSurfNow(venue, now, timeZone, units.distance === 'ft', placeName, station)
+  /* Batch 3D, Section 3.2: the Surf page asks the other wave models too, so the bigger-swell log (scoutngo.swellWatch.v1) has them each day it is opened. */
+  const surf = useSurfNow(venue, now, timeZone, units.distance === 'ft', placeName, station, true)
   const spot = surf.spot ?? venue
   const { sea, away: awayWords } = surf
   const ready = sea.marine !== null && sea.facingState !== 'loading' && sea.buoy !== null

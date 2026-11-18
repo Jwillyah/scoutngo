@@ -8,10 +8,17 @@
  *   "Possible bigger swell Mon · models disagree · low confidence"
  *
  * "models disagree" only when the readings come from two models or more;
- * from one model read two ways it says "readings disagree" (the app asks
- * Open-Meteo Marine's one best-match model and no ensemble: src/lib/
- * tideSheetData.ts fetchMarine; what it reads is src/lib/surfPageData.ts
- * dayReadings). Never a size, never a time: we do not know them.
+ * from one model read two ways it says "readings disagree" (src/lib/
+ * tideSheetData.ts fetchMarine, the best match; what it reads is
+ * src/lib/surfPageData.ts dayReadings). Never a size, never a time: we do
+ * not know them.
+ *
+ * Batch 3D, Section 3.2 (Jwilly approved): three wave models beside the best
+ * match, asked from the phone (WAVE_MODELS, src/lib/waveModels.ts), each read
+ * at the beach the same way (src/lib/surfPageData.ts modelDayReadings). The
+ * chip is the same rule over every reading: any one model at WATCH_FT or more
+ * on a day called WATCH_CALL_MAX_FT or under. docs/batches/3d-decisions.md,
+ * Section 3, has the options.
  *
  * And a log, kept on this phone each day (src/lib/swellWatchStore.ts), of
  * our call and the top reading for every day of the week, so Mon 23 Nov can
@@ -19,6 +26,39 @@
  */
 export const WATCH_FT = 4
 export const WATCH_CALL_MAX_FT = 2
+
+/*
+ * THE WAVE MODELS (Batch 3D, Section 3.2), by Open-Meteo Marine's own ids
+ * (checked against marine-api.open-meteo.com on 17 Nov 2026). GFS-Wave is
+ * asked at both grids and read from the first whose cell is sea: at
+ * 37.00,-76.00 (the VB spots) the 0.25° cell answered 0.00 m every hour of
+ * the week, a land-masked cell, while the 0.16° Atlantic grid read the sea.
+ * ECMWF WAM gives the whole sea only (no swell or wind-sea split).
+ */
+export interface WaveModel {
+  /** The name the log and the readings carry. */
+  name: string
+  /** Open-Meteo's ids, the first with sea in its cell read. */
+  ids: readonly string[]
+}
+export const WAVE_MODELS: readonly WaveModel[] = [
+  { name: 'ECMWF WAM', ids: ['ecmwf_wam025'] },
+  { name: 'GFS-Wave', ids: ['ncep_gfswave016', 'ncep_gfswave025'] },
+  { name: 'Météo-France MFWAM', ids: ['meteofrance_wave'] },
+]
+export const WAVE_MODEL_IDS: readonly string[] = WAVE_MODELS.flatMap((m) => m.ids)
+
+/** Whether a model's cell is sea: some wave height above 0. A land-masked cell answers 0 every hour, and no sea is flat for a week; null throughout (outside the grid) is no sea either. */
+export function seaInCell(heights: readonly (number | null)[] | undefined): boolean {
+  return (heights ?? []).some((h) => h !== null && Number.isFinite(h) && h > 0)
+}
+
+/** Each model's top reading that day, feet, one decimal (the log's per-model column). */
+export function modelTops(readings: readonly WatchReading[]): Record<string, number> {
+  const out: Record<string, number> = {}
+  for (const r of readings) if (Number.isFinite(r.faceFt)) out[r.model] = Math.max(out[r.model] ?? 0, Math.round(r.faceFt * 10) / 10)
+  return out
+}
 
 export interface WatchReading {
   /** The model, e.g. "Open-Meteo Marine (best match)". */
@@ -67,6 +107,8 @@ export interface WatchLogRow {
   callHighFt: number | null
   /** The top reading that day, feet, one decimal; null when none. */
   topFt: number | null
+  /** Batch 3D, Section 3.2: each model's top that day, feet, one decimal (modelTops); absent when the screen that wrote it did not ask the models. */
+  models?: Record<string, number>
 }
 
 /** How long a made day is kept: three weeks, past the day it was watching. */
@@ -74,10 +116,19 @@ export const WATCH_KEEP_DAYS = 21
 
 const dayNo = (iso: string) => Math.floor(Date.parse(`${iso}T12:00:00Z`) / 86_400_000)
 
-/** Add one day's week to the log: one row per (made, date), today's replacing an earlier write the same day; rows older than WATCH_KEEP_DAYS dropped. */
+/**
+ * Add one day's week to the log: one row per (made, date), today's replacing
+ * an earlier write the same day; rows older than WATCH_KEEP_DAYS dropped. A
+ * write without the models (a screen that does not ask them) keeps the
+ * models an earlier write that day had (Batch 3D, Section 3.2).
+ */
 export function logWatch(log: readonly WatchLogRow[], made: string, rows: readonly Omit<WatchLogRow, 'made'>[]): WatchLogRow[] {
   const keep = log.filter((r) => r.made !== made && dayNo(made) - dayNo(r.made) <= WATCH_KEEP_DAYS)
-  const add = rows.map((r) => ({ made, date: r.date, callLowFt: r.callLowFt, callHighFt: r.callHighFt, topFt: r.topFt === null ? null : Math.round(r.topFt * 10) / 10 }))
+  const had = new Map(log.filter((r) => r.made === made && r.models !== undefined).map((r) => [r.date, r.models]))
+  const add = rows.map((r) => {
+    const models = r.models !== undefined && Object.keys(r.models).length > 0 ? r.models : had.get(r.date)
+    return { made, date: r.date, callLowFt: r.callLowFt, callHighFt: r.callHighFt, topFt: r.topFt === null ? null : Math.round(r.topFt * 10) / 10, ...(models === undefined ? {} : { models }) }
+  })
   return [...keep, ...add].sort((a, b) => (a.made === b.made ? a.date.localeCompare(b.date) : a.made.localeCompare(b.made)))
 }
 

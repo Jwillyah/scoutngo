@@ -37,12 +37,14 @@ function readRaw(store: Store | null): Raw {
 
 const iso = (x: unknown): x is string => typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x)
 const ft = (x: unknown): x is number | null => x === null || (typeof x === 'number' && Number.isFinite(x))
+/* Batch 3D, Section 3.2: each model's top, absent on rows from before it. */
+const models = (x: unknown): boolean => x === undefined || (x !== null && typeof x === 'object' && Object.values(x).every((v) => typeof v === 'number' && Number.isFinite(v)))
 
 /** This spot's log. */
 export function readWatchLog(spot: string, store: Store | null = local()): WatchLogRow[] {
   const e = readRaw(store)[spot]
   if (e === undefined || !Array.isArray(e.r)) return []
-  return e.r.filter((r) => r !== null && typeof r === 'object' && iso(r.made) && iso(r.date) && ft(r.callLowFt) && ft(r.callHighFt) && ft(r.topFt))
+  return e.r.filter((r) => r !== null && typeof r === 'object' && iso(r.made) && iso(r.date) && ft(r.callLowFt) && ft(r.callHighFt) && ft(r.topFt) && models(r.models))
 }
 
 /** Add today's week for this spot. Quietly nothing when storage is not there. */

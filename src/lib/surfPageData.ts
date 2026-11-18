@@ -227,6 +227,33 @@ export function dayReadings(marine: Hourly, isoDate: string, timeZone: string, f
   ]
 }
 
+/*
+ * EACH WAVE MODEL'S DAY AT THE BEACH (Batch 3D, Section 3.2): read as the best
+ * match is (dayReadings), the same hours, the same transform: part by part
+ * where the model splits the sea, and the whole sea as one always (ECMWF WAM
+ * gives only the whole). Labelled by the model's own name.
+ */
+export function modelDayReadings(models: readonly { model: string; marine: Hourly }[], isoDate: string, timeZone: string, facing: number | null, factor: number = BEACH_CAP): WatchReading[] {
+  const out: WatchReading[] = []
+  for (const m of models) {
+    let parts: number | null = null
+    let whole: number | null = null
+    for (let h = FIRST_HOUR; h <= LAST_HOUR; h += 1) {
+      const t = zonedTimeToUtc(isoDate, `${String(h).padStart(2, '0')}:30`, timeZone)
+      if (t === null) continue
+      if (hourlyAt(m.marine, 'swell_wave_height', t) !== null) {
+        const s = surfAt(m.marine, t, facing, factor)
+        if (s !== null) parts = Math.max(parts ?? 0, s.estimate.faceFt)
+      }
+      const w = seaFaceFt([{ heightM: hourlyAt(m.marine, 'wave_height', t), periodS: hourlyAt(m.marine, 'wave_period', t), fromDeg: hourlyAt(m.marine, 'wave_direction', t) }], facing, factor)
+      if (w !== null) whole = Math.max(whole ?? 0, w)
+    }
+    if (parts !== null) out.push({ model: m.model, read: 'part by part', faceFt: parts })
+    if (whole !== null) out.push({ model: m.model, read: 'the whole sea as one', faceFt: whole })
+  }
+  return out
+}
+
 export const addDays =(iso: string, n: number): string => new Date(Date.parse(`${iso}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10)
 
 /** Seven days from `today`, each its biggest hour (null where the forecast does not reach). */

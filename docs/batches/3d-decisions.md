@@ -142,3 +142,57 @@ The phone has not run the probe. Findings 1, 2, 6 and the MapLibre buffer
 are what the code does, not what the phone did. Next: Jwilly opens
 `/?probe=webgl` once and sends the screenshot (or Copy all), and reads out
 Settings › Debug › Last errors.
+
+## Section 3
+
+### 3.1 The surf boundary rule (Batch FIX 3.2): dropped
+
+Jwilly approved dropping it. `callBand` and `BOUNDARY_FT` are gone; the band
+is the centre's own (`surfBand`) everywhere. Kept from d9f5f4b: the chop rule,
+one surf series, the bigger-swell watch. Table:
+`measurements/2026-11-17-surf-noboundary.md` (13 Nov 12:30 VB and Croatan are
+0–1 again; 14 Nov 4:30 PM VB goes back to 0–1 against a truth of 1–2, the
+miss the rule was written for).
+
+### 3.2 Which wave models, and how the chip combines them
+
+**Models.** Options:
+
+1. ECMWF WAM, GFS-Wave, Météo-France MFWAM, each at its single Open-Meteo id
+   (`ecmwf_wam025`, `ncep_gfswave025`, `meteofrance_wave`).
+2. The same three, with GFS-Wave asked at both grids (`ncep_gfswave016`, the
+   0.16° Atlantic grid, then `ncep_gfswave025`) and read from the first whose
+   cell is sea.
+3. Add DWD EWAM/GWAM or the ECMWF WAM ensemble.
+
+Checked live on 17 Nov against marine-api.open-meteo.com: all four ids are
+accepted. At 37.00,-76.00 (where VB, Croatan and Lynnhaven snap)
+`ncep_gfswave025` answered **0.00 m for every hour of the week** (a
+land-masked cell, a zero, not a null), while `ncep_gfswave016` read up to
+1.92 m. At Wrightsville (34.25,-77.75) `ecmwf_wam025` answered null for every
+hour. ECMWF WAM gives the whole sea only (no swell / wind-sea split).
+
+**Pick: 2.** Option 1 would carry a false 0 ft "GFS-Wave" reading at every VB
+spot. Option 3 adds request weight for models outside the approved list. A
+model's cell counts as sea only when some wave height is above 0
+(`seaInCell`); otherwise the model is left out rather than read as flat.
+
+**How the chip combines them.** Options: (a) any one model ≥ 4 ft; (b) two
+or more models ≥ 4 ft; (c) the mean of the models ≥ 4 ft. The approved rule
+is (a): any model ≥ 4 ft at the beach within 7 days, on a day called ≤ 2 ft.
+Each model is read the same way as the best match (part by part where it
+splits the sea, the whole sea as one always, the same transform, 5 AM to
+8 PM local), and the existing `swellWatch` rule runs over all the readings.
+The words stay "Possible bigger swell Mon · models disagree · low confidence":
+no size, no time.
+
+**Where it is asked.** One extra request to the same host. The weather audit
+holds the page load to 5 requests and was at 5 on its last measurement
+(measurements/2026-11-02-weather-requests-batch-h-after.md), so the request
+is not made on the home's first page. It is made by the Surf page, and by the
+home once its Week page (where the chip shows) has been on screen. The
+per-model daily log (`scoutngo.swellWatch.v1`, a `models` column per row) is
+written when one of those screens is open that day. A later write that day
+from a screen that did not ask the models keeps the models already logged.
+The tradeoff: a day on which neither the Surf page nor the Week is opened
+logs no per-model row.
