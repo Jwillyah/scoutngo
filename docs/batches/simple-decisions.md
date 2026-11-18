@@ -111,3 +111,15 @@ The mark lives in localStorage (`scoutngo.swellDaily.v1`).
 **Ranking:** a new "place" group (a named feature holding every typed word, roads excluded) ranks above Businesses.
 
 **Privacy note:** while diagnosing, two of the agent's first scripts sent a User-Agent containing Jwilly's email to Photon and Nominatim. It was stopped as soon as it was noticed. Every recording uses a plain test User-Agent, and nothing in the repo holds the email.
+
+**Section 2: two strikes that weren't its own.**
+- Both of Section 2's full-gate runs failed the same audit, fly, on its standalone pass ("the fly screen never came up", 215 s).
+- Run alone on the same files, fly passed.
+- **The diagnosis:** HEAD (80b904a, without Section 2) failed fly the same way with the heavy audits beside it. The cause was Section 1's audit edit: it gave the Drone page's Preflight tab a fixed 600 ms, and under load the tap missed.
+- **The fix:** fly now waits for the tab and the button, and passes under the same load. It went in as its own commit.
+
+Options:
+- (a) keep Section 2 reverted, by the letter of the rule;
+- (b) land it again after the fix, as a fresh piece.
+
+**Picked: (b).** The rule is there to drop a piece that breaks the gate, and this one didn't. The patch stays in docs/batches/simple-section2-reverted.patch in case it is needed.

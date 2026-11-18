@@ -52,6 +52,8 @@
   background: var(--caution);
 }
 .spick__tile--town,
+.spick__tile--address,
+.spick__tile--place,
 .spick__tile--business {
   background: var(--surface-3);
 }

@@ -100,7 +100,8 @@ export function missing(query: readonly string[], name: string): number {
 
 const inBox = (at: LatLon, b: { south: number; west: number; north: number; east: number }) => at.lat >= b.south && at.lat <= b.north && at.lon >= b.west && at.lon <= b.east
 
-export type Group = 'spot' | 'beach' | 'town' | 'business' | 'other'
+/* Batch SIMPLE-1, Section 2: 'address' (a house the geocoder found by its number) and 'place' (a named park, garden or refuge). */
+export type Group = 'address' | 'spot' | 'beach' | 'town' | 'place' | 'business' | 'other'
 
 export interface Result {
   id: string
@@ -171,16 +172,22 @@ export function groupOf(r: Pick<GeoRow, 'osmKey' | 'osmValue' | 'name'>): Group 
 }
 
 /**
- * The whole answer: our spots, then the geocoders' rows that match every word
- * (inside the region when one was said), grouped, businesses only for a
+ * The whole answer: the addresses the geocoder matched by house number (Batch
+ * SIMPLE-1, Section 2), our spots, then the geocoders' rows that match every
+ * word (inside the region when one was said), grouped, businesses only for a
  * business-like query, each group nearest first, duplicates of our own spots
  * (within 300 m) dropped.
  */
-export function rankResults(q: Query, own: readonly Result[], rows: readonly GeoRow[], from: LatLon | null): Result[] {
+export function rankResults(q: Query, own: readonly Result[], rows: readonly GeoRow[], from: LatLon | null, addresses: readonly GeoRow[] = []): Result[] {
+  const km = (at: LatLon) => (from === null ? null : distanceMeters(from, at) / 1000)
+  /* The geocoder's own order, the house it matched first: the whole address was typed, so no word or region filter. */
+  const fromAddresses: Result[] = addresses.map((r) => ({ id: r.id, name: r.name, where: r.where, at: r.at, group: 'address' as const, note: null, km: km(r.at) }))
   const fromRows: Result[] = []
   for (const r of rows) {
     if (q.region !== null && !inBox(r.at, q.region.box)) continue
-    const group = groupOf(r)
+    let group = groupOf(r)
+    /* Batch SIMPLE-1, Section 2: "Norfolk Botanical Garden" is a garden, no beach, town or business, and was dropped; a named place whose name holds every word is the place asked for. Not a road. */
+    if (group === 'other' && r.osmKey !== 'highway' && missing(q.words, r.name) === 0) group = 'place'
     /* Batch 3D, Section 2: a name search is searching for the business: shown when the words are in its name, not only when they look like one. */
     if (group === 'business' && !q.business && missing(q.words, r.name) > 0) continue
     if (group === 'other') continue
@@ -188,12 +195,84 @@ export function rankResults(q: Query, own: readonly Result[], rows: readonly Geo
     /* One place once: a row within 300 m of one of ours, or with one of our names within 5 km (Sandbridge the spot and Sandbridge the village), is ours. */
     const sameName = (o: Result) => words(o.name).join(' ') === words(r.name).join(' ') && distanceMeters(o.at, r.at) < 5000
     if (own.some((o) => distanceMeters(o.at, r.at) < 300 || sameName(o)) || fromRows.some((o) => o.name === r.name && distanceMeters(o.at, r.at) < 300)) continue
-    fromRows.push({ id: r.id, name: r.name, where: r.where, at: r.at, group, note: null, km: from === null ? null : distanceMeters(from, r.at) / 1000 })
+    /* The address's own building, said again by the other gazetteer: once. */
+    if (fromAddresses.some((o) => distanceMeters(o.at, r.at) < 50)) continue
+    fromRows.push({ id: r.id, name: r.name, where: r.where, at: r.at, group, note: null, km: km(r.at) })
   }
-  const order: Group[] = ['spot', 'beach', 'town', 'business']
+  const order: Group[] = ['spot', 'beach', 'town', 'place', 'business']
   const near = (a: Result, b: Result) => (a.km ?? 0) - (b.km ?? 0)
   /* Our own spots keep the match's order (best first); the map's rows go nearest first after them. */
-  return order.flatMap((g) => [...own.filter((r) => r.group === g), ...fromRows.filter((r) => r.group === g).sort(near)])
+  return [...fromAddresses, ...order.flatMap((g) => [...own.filter((r) => r.group === g), ...fromRows.filter((r) => r.group === g).sort(near)])]
 }
 
-export const GROUP_TITLE: Record<Exclude<Group, 'other'>, string> = { spot: 'Spots', beach: 'Beach accesses', town: 'Towns', business: 'Businesses' }
+export const GROUP_TITLE: Record<Exclude<Group, 'other'>, string> = { address: 'Addresses', spot: 'Spots', beach: 'Beach accesses', town: 'Towns', place: 'Places', business: 'Businesses' }
+
+/*
+ * AN ADDRESS, TYPED (Batch SIMPLE-1, Section 2). 18 Nov: "Pub, 425 E Pinner
+ * St, Suffolk, VA 23434" and "425 E Pinner St, Suffolk" said "Nothing found
+ * by that name". Both gazetteers were asked and both answered with the house;
+ * the phone threw it away. Photon's unnamed building had no name to show,
+ * Nominatim's was a building (no group), and the restaurant at the address did
+ * not hold "425 e pinner st" in its name. Every test address failed the same
+ * way, and so did "Norfolk Botanical Garden", a garden being in no group
+ * (measurements/2026-11-18-search-address-before.md; after the change,
+ * measurements/2026-11-18-search-address.md).
+ *
+ * An address is a part, between commas, that starts with a house number and
+ * goes on with a street: "425 E Pinner St". Whatever comes before it is a name
+ * typed in front ("Pub"), tried without when the whole string finds nothing.
+ */
+export interface Address {
+  /** What was typed, spaces tidied: sent first. */
+  full: string
+  /** From the house number on, the name before it dropped; null when nothing came before it. */
+  bare: string | null
+  /** "425" */
+  number: string
+  /** The street's own words, its direction and kind left out: ["pinner"]. */
+  street: string[]
+}
+
+const STREET_KIND = new Set(['st', 'ave', 'rd', 'dr', 'blvd', 'boulevard', 'ln', 'lane', 'ct', 'court', 'pl', 'place', 'way', 'hwy', 'highway', 'pkwy', 'parkway', 'cir', 'circle', 'ter', 'terrace', 'trl', 'trail', 'n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'])
+const HOUSE = /^(\d+[a-z]?)\s+(.*[a-z].*)$/i
+
+/** The street words two spellings share: "E Pinner St" and "East Pinner Street" are both ["pinner"]. */
+export const streetWords = (s: string): string[] => words(s).filter((w) => !STREET_KIND.has(w))
+
+export function addressParts(raw: string): Address | null {
+  const parts = raw.split(',').map((p) => p.replace(/\s+/g, ' ').trim()).filter((p) => p !== '')
+  const i = parts.findIndex((p) => HOUSE.test(p))
+  const m = i < 0 ? null : HOUSE.exec(parts[i])
+  if (m === null) return null
+  const street = streetWords(m[2])
+  /* A number, then a street with a word of its own and its kind ("425 E Pinner St"), or a town after a comma: "7 Eleven" and "17th Street Park" are not addresses. */
+  const kind = words(m[2]).some((w) => STREET_KIND.has(w) && w.length > 1)
+  if (street.length === 0 || (!kind && i === parts.length - 1)) return null
+  return { full: parts.join(', '), bare: i === 0 ? null : parts.slice(i).join(', '), number: m[1].toLowerCase(), street }
+}
+
+/** Is a geocoder's house this address: the same number, and a street word in common. */
+export function sameHouse(a: Address, number: string, street: string): boolean {
+  if (number.trim().toLowerCase() !== a.number) return false
+  const got = streetWords(street)
+  return a.street.some((w) => got.includes(w))
+}
+
+/**
+ * What the spot picker asks the geocoders, or null for nothing: an address
+ * when the words are one and nothing on the phone matched them, the words
+ * otherwise (the region left out, as before). Only the typed words, never a
+ * position.
+ */
+export type GeoAsk = { kind: 'address'; address: Address; text: string } | { kind: 'words'; text: string }
+
+export function geoAsk(raw: string, localMatched: boolean): GeoAsk | null {
+  /* `text`, the words search (region left out), is also the address's fallback when no house matches. */
+  const text = parseQuery(raw).geocoderText
+  const address = localMatched ? null : addressParts(raw)
+  if (address !== null) return { kind: 'address', address, text }
+  return text === '' ? null : { kind: 'words', text }
+}
+
+/** One key per question: an answer to another question is not shown (E7). */
+export const askKey = (a: GeoAsk): string => (a.kind === 'address' ? `address:${a.address.full}` : a.text)

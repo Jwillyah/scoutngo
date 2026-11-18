@@ -232,7 +232,7 @@ export const CREDITS: readonly Credit[] = [
   {
     name: 'Photon (komoot)',
     hosts: ['photon.komoot.io'],
-    use: 'Search, when OpenStreetMap finds nothing',
+    use: 'Search, beside OpenStreetMap; first for a typed address',
     license: 'Free public instance, fair use; data ODbL',
     attribution: 'Search: Photon by komoot · © OpenStreetMap contributors',
     key: 'No',

@@ -63,7 +63,7 @@ export const HOSTS: readonly Host[] = [
   { host: 'waterservices.usgs.gov', who: 'US Geological Survey', learns: 'river gauge numbers, never the venue (which gauges are near is worked out on the phone)', when: 'the water temperature, when no sea station or satellite answers and a gauge is within 5 km', trigger: 'on-pin' },
   /* Asked only when you open or press the thing named (29 Oct: these five were missing from this list). */
   { host: 'gibs.earthdata.nasa.gov', who: 'NASA GIBS satellite imagery', learns: 'which satellite tiles: a map cell', when: 'the satellite cloud layer; and Sky color and Today in the three hours before a sunrise or sunset, along the sun\u2019s line', trigger: 'on-pin' },
-  { host: 'photon.komoot.io', who: 'Photon (komoot), a place search', learns: 'what you search', when: 'search, when OpenStreetMap finds nothing', trigger: 'if-you-tap' },
+  { host: 'photon.komoot.io', who: 'Photon (komoot), a place search', learns: 'what you search', when: 'search, beside OpenStreetMap; asked first for a typed address', trigger: 'if-you-tap' },
   { host: 'this app (/api/search)', who: 'this app, asking Mapbox', learns: 'what you search, never who you are', when: 'search, as the last try', trigger: 'if-you-tap' },
   { host: 'api.github.com', who: 'GitHub', learns: 'the app’s public repository name, nothing about you', when: 'Settings, to say whether a newer build exists', trigger: 'if-you-tap' },
   { host: 'api.anthropic.com', who: 'Anthropic, with your own key', learns: 'what you ask it to write, sent with your key', when: 'only when you press Write on the call sheet', trigger: 'if-you-tap' },
