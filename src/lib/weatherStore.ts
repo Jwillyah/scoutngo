@@ -14,10 +14,11 @@
  *    screens asking for the same thing share one answer, and a question
  *    already on its way is waited for, not asked twice.
  *  - Kept in memory and in IndexedDB on the phone with the time it arrived,
- *    and reused until it is older than the caller's `maxAgeMs`. Moving the
+ *    and reused until it is older than the caller's `maxAgeMs` (never under
+ *    ten minutes, MIN_REUSE_MS, Batch SIMPLE-1 Section 4b). Moving the
  *    time bar asks for the same day again, which is the same request.
  *  - When the service says 429 ("too many"), nothing is sent to it for a
- *    while that doubles each time (2, 4, 8 ... 30 min; an hour for its daily
+ *    while that doubles each time (1, 2, 4 ... 30 min; an hour for its daily
  *    limit), and callers get the last answer at any age, marked stale, so a
  *    chip can say "6 kt · 9 h ago" instead of "no data". `weatherBusy()`
  *    says why, for the one status line.
@@ -56,9 +57,25 @@ export interface Busy {
   why: 'busy' | 'daily'
 }
 
-export const FIRST_BACKOFF_MS = 2 * 60_000
+/* Batch SIMPLE-1, Section 4b: a minute, not two (the phone's log at 1:07 PM on 18 Nov: api.open-meteo.com 429); then doubling, as before. */
+export const FIRST_BACKOFF_MS = 60_000
 export const MAX_BACKOFF_MS = 30 * 60_000
 export const DAILY_BACKOFF_MS = 60 * 60_000
+/*
+ * Batch SIMPLE-1, Section 4b: an answer younger than this is reused whatever
+ * the caller asks, so no screen can ask the same question twice in ten
+ * minutes. Every caller asks for an hour or more today; this is the floor.
+ */
+export const MIN_REUSE_MS = 10 * 60_000
+/*
+ * Batch SIMPLE-1, Section 4b: after Open-Meteo refuses this phone (a 429 to a
+ * direct ask), nothing more goes to it from the phone for this long; asks go
+ * through the forecast cache instead (when there is one), and the kept
+ * answer with its age stands in where the cache cannot answer. Before, every
+ * ask went to Open-Meteo first again and was refused again, one 429 a
+ * question (tests/networkPath.test.ts had it as direct, cache, direct, cache).
+ */
+export const DIRECT_HOLD_MS = 60_000
 /** An answer older than this is not kept even as a stale stand-in. */
 export const KEEP_MS = 3 * 86_400_000
 const TIMEOUT_MS = 10_000
@@ -74,6 +91,10 @@ const memory = new Map<string, Kept>()
 const inFlight = new Map<string, Promise<WeatherAnswer>>()
 let busy: Busy | null = null
 let refusals = 0
+/** Until when nothing is asked of Open-Meteo directly from the phone, ms since 1970 (DIRECT_HOLD_MS). */
+let directHeldUntil = 0
+/** Whether a direct ask is held now (Section 4b), for the tests and Settings › Debug. */
+export const directHeld = (now: number = Date.now()): boolean => directHeldUntil > now
 const listeners = new Set<() => void>()
 let wake: ReturnType<typeof setTimeout> | null = null
 /** Counts the ends of back-offs: screens depend on it to ask again then, and on nothing else. */
@@ -217,9 +238,12 @@ export async function clearWeatherStore(): Promise<void> {
   inFlight.clear()
   busy = null
   refusals = 0
+  directHeldUntil = 0
   sent.length = 0
   if (wake !== null) clearTimeout(wake)
   wake = null
+  if (holdWake !== null) clearTimeout(holdWake)
+  holdWake = null
   if (typeof indexedDB !== 'undefined') {
     await new Promise<void>((done) => {
       const r = indexedDB.deleteDatabase(DB)
@@ -299,6 +323,18 @@ function refused(daily: boolean, now: number) {
   tell()
 }
 
+/* Section 4b: hold the phone's direct asks for DIRECT_HOLD_MS; when it ends, the screens that got no answer ask again (weatherEpoch). */
+let holdWake: ReturnType<typeof setTimeout> | null = null
+function holdDirect(now: number) {
+  directHeldUntil = now + DIRECT_HOLD_MS
+  if (holdWake !== null) clearTimeout(holdWake)
+  holdWake = setTimeout(() => {
+    holdWake = null
+    epoch += 1
+    tell()
+  }, DIRECT_HOLD_MS)
+}
+
 /** Answers fetched behind a kept one, for the "refreshing" line: how many are on their way. */
 export function weatherRefreshing(): number {
   return inFlight.size
@@ -313,7 +349,7 @@ export function weatherRefreshing(): number {
  * phone's own address and do not stack on this app's server; the cache stays as the measured fix for the carrier
  * case (Batch M, measurements/2026-11-08-cellular.md), asked only then.
  */
-async function send(url: string, fetchImpl: typeof fetch, timeoutMs: number): Promise<{ r: Response; via: 'edge' | 'direct' }> {
+async function send(url: string, fetchImpl: typeof fetch, timeoutMs: number): Promise<{ r: Response; via: 'edge' | 'direct' | 'held' }> {
   const cacheOn = () => edge !== null && !edgeMissing
   /* The cache's answer, or null when it is not there or fails (the caller then keeps the direct outcome). */
   const viaEdge = async (): Promise<{ r: Response; via: 'edge' } | null> => {
@@ -331,6 +367,11 @@ async function send(url: string, fetchImpl: typeof fetch, timeoutMs: number): Pr
       return null
     }
   }
+  /* Section 4b: Open-Meteo refused this phone under a minute ago: the cache only, and nothing to Open-Meteo itself. */
+  if (directHeld()) {
+    const got = cacheOn() ? await viaEdge() : null
+    return got ?? { r: new Response('', { status: 429 }), via: 'held' }
+  }
   let r: Response
   try {
     r = await fetchImpl(url, { signal: AbortSignal.timeout(timeoutMs) })
@@ -340,6 +381,7 @@ async function send(url: string, fetchImpl: typeof fetch, timeoutMs: number): Pr
     throw error
   }
   if (r.status === 429 && cacheOn()) {
+    holdDirect(Date.now())
     const got = await viaEdge()
     if (got !== null) return got
   }
@@ -358,7 +400,7 @@ export async function weatherJson(asked: string, opts: { maxAgeMs: number; fetch
   const key = weatherKey(url)
   const now = Date.now()
   const kept = await readKept(key)
-  if (kept !== null && now - kept.fetchedAt <= opts.maxAgeMs) {
+  if (kept !== null && now - kept.fetchedAt <= Math.max(opts.maxAgeMs, MIN_REUSE_MS)) {
     noteShown(kept.fetchedAt)
     return { ok: true, payload: kept.payload, fetchedAt: kept.fetchedAt, stale: false, kept: true }
   }
@@ -376,6 +418,8 @@ export async function weatherJson(asked: string, opts: { maxAgeMs: number; fetch
     const host = new URL(url).host
     try {
       const { r, via } = await send(url, opts.fetchImpl ?? fetch, opts.timeoutMs ?? TIMEOUT_MS)
+      /* Section 4b: held, and the cache had no answer either: nothing reached Open-Meteo; the kept answer with its age, or why not. */
+      if (via === 'held') return fallback({ ok: false, unreachable: false, reason: 'Open-Meteo refused this phone a moment ago; asking again in a minute.' })
       sent.push({ at: Date.now(), host, status: r.status })
       /* Any answer is the network working (src/lib/connectivity.ts). */
       connectivity.report(true)

@@ -49,3 +49,65 @@ Fly now waits for the same first useful frame plus the take-off ground. Before, 
 - One hung first-ring tile can still hold "shown" back for up to its 8 s timeout.
 
 **Labs:** on by default everywhere, iOS included (Jwilly, 18 Nov). The switch stays in Settings › Labs.
+
+## Section 4b: Open-Meteo 429
+
+**Measured** in WebKit, with every Open-Meteo host answered by a fake (measurements/2026-11-18-openmeteo-calls.md):
+- A cold home open sends 13 requests: 11 to api., 1 to ensemble-api., 1 to marine-api.
+- None of them is a duplicate. The store already deduped in-flight requests and kept answers for 1–3 h.
+
+**The defect:**
+- After a direct 429, the next request went straight back to Open-Meteo.
+- All 13 left in the first second, so a refused phone drew 13 refusals per open.
+
+**What changed:**
+- A 60 s hold after a 429: requests go to the forecast cache only, or get the kept answer with its age, or nothing at all, never a made-up value.
+- The first back-off is now 60 s.
+- Answers are always reused for at least 10 minutes.
+- The home's Best Sky grid waits for the first load to settle, so 6 requests leave in the first second, not 13.
+
+**Merging variables into one call:** no two requests ask the same question at the same point, so there was nothing cheap to merge. **Not done.**
+
+**Decision for Jwilly:**
+- Open-Meteo bills per location: a 25-point request counts as 25 calls.
+- Best Sky's 7 grid tiles are 175 of the 220 billed calls per home open.
+- Against Open-Meteo's 600 a minute, about 3 cold opens in one minute reach the limit. That fits the phone's 429.
+- Neither piece lowers the billed count. Lowering it means fewer Best Sky grid points on the home, which reverses Batch BEST SKY, Section 4.
+
+## Section 5: Mon 23 swell log
+
+One marine request carries all four model ids, as waveModels.ts already did. That's one request at the home spot, not one per model.
+
+It runs:
+- once a day per spot;
+- after the first load settles;
+- only at a spot with a sea forecast;
+- not at all if today's row already has the models.
+
+The mark lives in localStorage (`scoutngo.swellDaily.v1`).
+
+## Section 1: Drone = Wind · Airspace · Preflight
+
+**Fly's door.** With the Plan tab behind `DRONE_PLAN_TAB` (off), the old "Preflight check" and "Plan the flight" buttons went with it, and Fly had no door. The options were:
+- (a) cut Fly from the Drone page;
+- (b) add a third button to Preflight's foot;
+- (c) a small "Plan the flight" under the two buttons, shown only while Settings › Labs is on.
+
+**Picked: (c).** Jwilly keeps 3D and Fly on for testing (Section 4), and the batch names only two buttons. The Labs switch takes the row away.
+
+**The map's Preflight card** is now reached only through Fly, because the old "Preflight check" door went with the Plan tab.
+
+**`DRONE_WIND_ROWS` (off)** hides the Airspace, Battery, Sky and GPS rows under the Wind bars. Preflight carries Airspace, Battery and Kp now.
+
+## Section 2: addresses
+
+**Why it said "Nothing found" at 3db2f29.** Both geocoders answered with the house. The phone dropped it in three places:
+- Photon rows with no name;
+- Nominatim `building` rows, put in the dropped group "other";
+- the every-word filter.
+
+**The truth points** are the local government's address points (VGIN, New Hanover County, Wicomico County), not the Census geocoder. Its points are interpolated along the street, and for big sites they were 211 to 333 m off.
+
+**Ranking:** a new "place" group (a named feature holding every typed word, roads excluded) ranks above Businesses.
+
+**Privacy note:** while diagnosing, two of the agent's first scripts sent a User-Agent containing Jwilly's email to Photon and Nominatim. It was stopped as soon as it was noticed. Every recording uses a plain test User-Agent, and nothing in the repo holds the email.

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { backoffMs, busyWords, clearWeatherStore, DAILY_BACKOFF_MS, edgeUrl, FIRST_BACKOFF_MS, jittered, MAX_BACKOFF_MS, setBackoffRandom, setForecastEdge, weatherBusy, weatherEpoch, weatherJson, weatherKey, weatherSent } from '../src/lib/weatherStore.ts'
+import { backoffMs, busyWords, clearWeatherStore, DAILY_BACKOFF_MS, DIRECT_HOLD_MS, directHeld, edgeUrl, FIRST_BACKOFF_MS, jittered, MAX_BACKOFF_MS, MIN_REUSE_MS, setBackoffRandom, setForecastEdge, weatherBusy, weatherEpoch, weatherJson, weatherKey, weatherRefreshing, weatherSent } from '../src/lib/weatherStore.ts'
 
 /*
  * THE SHARED WEATHER STORE (src/lib/weatherStore.ts): one request per
@@ -49,10 +49,11 @@ describe('one question, one request', () => {
 })
 
 describe('a 429', () => {
-  it('backs off 2, 4, 8, 16 then 30 min, and an hour for the daily limit', () => {
-    expect([1, 2, 3, 4, 5, 6].map((n) => backoffMs(n, false) / 60_000)).toEqual([2, 4, 8, 16, 30, 30])
+  /* Batch SIMPLE-1, Section 4b: the first back-off is a minute (it was two). */
+  it('backs off 1, 2, 4, 8, 16 then 30 min, and an hour for the daily limit', () => {
+    expect([1, 2, 3, 4, 5, 6, 7].map((n) => backoffMs(n, false) / 60_000)).toEqual([1, 2, 4, 8, 16, 30, 30])
     expect(backoffMs(1, true)).toBe(DAILY_BACKOFF_MS)
-    expect(FIRST_BACKOFF_MS).toBe(2 * 60_000)
+    expect(FIRST_BACKOFF_MS).toBe(60_000)
     expect(MAX_BACKOFF_MS).toBe(30 * 60_000)
   })
 
@@ -71,17 +72,17 @@ describe('a 429', () => {
     expect(f).toHaveBeenCalledTimes(1)
     const busy = weatherBusy()
     expect(busy?.why).toBe('busy')
-    expect(busyWords(busy!)).toBe('Weather service busy, retrying in 2 min')
-    /* A minute later, from any screen: nothing is sent. */
-    vi.setSystemTime(Date.now() + 60_000)
+    expect(busyWords(busy!)).toBe('Weather service busy, retrying in 1 min')
+    /* Half a minute later, from any screen: nothing is sent. */
+    vi.setSystemTime(Date.now() + 30_000)
     const during = await weatherJson(URL_A, { maxAgeMs: HOUR, fetchImpl: f })
     expect(during).toMatchObject({ ok: false, reason: 'Weather service busy, retrying in 1 min' })
     expect(f).toHaveBeenCalledTimes(1)
-    /* Past the two minutes: asked again, refused again, now four. */
-    vi.setSystemTime(Date.now() + 61_000)
+    /* Past the minute: asked again, refused again, now two. */
+    vi.setSystemTime(Date.now() + 31_000)
     await weatherJson(URL_A, { maxAgeMs: HOUR, fetchImpl: f })
     expect(f).toHaveBeenCalledTimes(2)
-    expect(Math.round(((weatherBusy()?.until ?? 0) - Date.now()) / 60_000)).toBe(4)
+    expect(Math.round(((weatherBusy()?.until ?? 0) - Date.now()) / 60_000)).toBe(2)
   })
 
   it('reads the daily limit from the body and says so', async () => {
@@ -182,6 +183,90 @@ describe('Batch M: on a phone network', () => {
     await clearWeatherStore()
     await weatherJson(URL_A.replace('wind_speed_10m', 'cloud_cover'), { maxAgeMs: HOUR, fetchImpl: missing as unknown as typeof fetch })
     expect(missing.mock.calls.map((c) => String(c[0]).includes('/api/forecast'))).toEqual([false, true, false])
+  })
+})
+
+/*
+ * Batch SIMPLE-1, Section 4b (18 Nov, 1:07 PM: api.open-meteo.com 429 among
+ * ~15 calls in a minute). One question in flight is one request, an answer
+ * is kept ten minutes at the least, and a refusal holds the phone's own asks
+ * for a minute while the kept answer, with its age, stands in.
+ */
+describe('Section 4b: dedupe, ten minutes, a minute after a 429', () => {
+  it('an answer is reused for ten minutes even by a caller that wants a fresher one', async () => {
+    expect(MIN_REUSE_MS).toBe(10 * 60_000)
+    const f = ok()
+    await weatherJson(URL_A, { maxAgeMs: 60_000, fetchImpl: f })
+    vi.setSystemTime(Date.now() + 9 * 60_000)
+    expect(await weatherJson(URL_A, { maxAgeMs: 60_000, fetchImpl: f })).toMatchObject({ ok: true, stale: false, kept: true })
+    expect(f).toHaveBeenCalledTimes(1)
+    vi.setSystemTime(Date.now() + 2 * 60_000)
+    await weatherJson(URL_A, { maxAgeMs: 60_000, fetchImpl: f })
+    expect(f).toHaveBeenCalledTimes(2)
+  })
+
+  it('five screens asking the same question at once send one request', async () => {
+    const f = ok()
+    const all = await Promise.all(Array.from({ length: 5 }, () => weatherJson(URL_A, { maxAgeMs: HOUR, fetchImpl: f })))
+    expect(f).toHaveBeenCalledTimes(1)
+    expect(all.every((a) => a.ok)).toBe(true)
+  })
+
+  it('a 429 to the phone holds its direct asks for 60 s: the cache only, then Open-Meteo again', async () => {
+    expect(DIRECT_HOLD_MS).toBe(60_000)
+    setForecastEdge('http://127.0.0.1/api/forecast')
+    const asked: string[] = []
+    const f = vi.fn(async (u: string) => {
+      const edge = u.includes('/api/forecast')
+      asked.push(edge ? 'edge' : 'direct')
+      return edge ? new Response(JSON.stringify(PAYLOAD), { status: 200 }) : new Response('{"reason":"Minutely API request limit exceeded"}', { status: 429 })
+    })
+    const fetchImpl = f as unknown as typeof fetch
+    expect((await weatherJson(URL_A, { maxAgeMs: HOUR, fetchImpl })).ok).toBe(true)
+    expect(directHeld()).toBe(true)
+    /* Two more questions inside the minute: nothing to Open-Meteo itself. */
+    await weatherJson(URL_A.replace('wind_speed_10m', 'cloud_cover'), { maxAgeMs: HOUR, fetchImpl })
+    vi.setSystemTime(Date.now() + 59_000)
+    await weatherJson(URL_A.replace('wind_speed_10m', 'wind_gusts_10m'), { maxAgeMs: HOUR, fetchImpl })
+    expect(asked).toEqual(['direct', 'edge', 'edge', 'edge'])
+    /* Past the minute, the phone asks Open-Meteo first again. */
+    vi.setSystemTime(Date.now() + 2_000)
+    expect(directHeld()).toBe(false)
+    await weatherJson(URL_A.replace('wind_speed_10m', 'temperature_2m'), { maxAgeMs: HOUR, fetchImpl })
+    expect(asked.slice(4)).toEqual(['direct', 'edge'])
+  })
+
+  it('held with no cache answer: the kept answer and the time it arrived, never a made-up one; with none kept, no value', async () => {
+    await weatherJson(URL_A, { maxAgeMs: HOUR, fetchImpl: ok() })
+    const kept = Date.now()
+    vi.setSystemTime(kept + 2 * HOUR)
+    setForecastEdge('http://127.0.0.1/api/forecast')
+    /* Open-Meteo refuses the phone and the cache fails too (a 502). */
+    const f = vi.fn(async (u: string) => (u.includes('/api/forecast') ? new Response('', { status: 502 }) : new Response('{"reason":"Minutely API request limit exceeded"}', { status: 429 })))
+    const fetchImpl = f as unknown as typeof fetch
+    const first = await weatherJson(URL_A, { maxAgeMs: HOUR, fetchImpl })
+    /* The kept answer is given at once, marked as refreshing; the refusal lands behind it. */
+    expect(first).toMatchObject({ ok: true, stale: true, kept: true, fetchedAt: kept, payload: PAYLOAD })
+    await vi.waitFor(() => expect(weatherRefreshing()).toBe(0))
+    expect(directHeld()).toBe(true)
+    const calls = f.mock.calls.length
+    const again = await weatherJson(URL_A, { maxAgeMs: HOUR, fetchImpl })
+    await vi.waitFor(() => expect(f.mock.calls.length).toBe(calls + 1))
+    expect(again).toMatchObject({ ok: true, stale: true, fetchedAt: kept, payload: PAYLOAD })
+    /* The one call made while held went to the cache, not to Open-Meteo. */
+    expect(String((f.mock.calls[calls] as unknown[])[0])).toContain('/api/forecast')
+    const none = await weatherJson(URL_A.replace('wind_speed_10m', 'cloud_cover'), { maxAgeMs: HOUR, fetchImpl })
+    expect(none).toMatchObject({ ok: false, unreachable: false })
+    expect('payload' in none).toBe(false)
+  })
+
+  it('the hold ending tells the screens to ask again', async () => {
+    setForecastEdge('http://127.0.0.1/api/forecast')
+    const f = vi.fn(async (u: string) => (u.includes('/api/forecast') ? new Response('', { status: 502 }) : new Response('{}', { status: 429 })))
+    await weatherJson(URL_A, { maxAgeMs: HOUR, fetchImpl: f as unknown as typeof fetch })
+    const before = weatherEpoch()
+    vi.advanceTimersByTime(DIRECT_HOLD_MS)
+    expect(weatherEpoch()).toBe(before + 1)
   })
 })
 

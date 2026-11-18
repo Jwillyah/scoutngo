@@ -6,6 +6,7 @@ import { useGoAlert } from '../lib/goAlert.ts'
 import { SignalChip } from './SignalChip.tsx'
 import { useSignalWords } from '../lib/useSignalWords.ts'
 import { useBestSky } from '../lib/useBestSky.ts'
+import { useFirstLoadSettled } from '../lib/firstLoad.ts'
 import '../styles/home-d.css'
 import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 /* suncalc 2.0.2 (this repo's): altitude and azimuth in DEGREES, azimuth from north, clockwise (Batch N E10: the moon read "S" when it was treated as radians from south). */
@@ -315,7 +316,9 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
   }, [which, venue, fast?.lo, fast?.hi, cond?.word]) // eslint-disable-line react-hooks/exhaustive-deps
   /* Batch TRUTH, Section 0.5: a live colour window with a Maybe or better leads the home. */
   /* Batch BEST SKY, Section 4: today only, with Shoot picked: the grid within 15 mi (7 or so questions, each kept an hour). */
-  const bestSky = useBestSky(which === 'today' && order.includes('shoot') ? venue : null, 15, now)
+  /* Batch SIMPLE-1, Section 4b: asked once the first load has settled (src/lib/firstLoad.ts), not in the opening burst: 7 of its 13 questions, 175 of its 220 billed calls. */
+  const settled = useFirstLoadSettled()
+  const bestSky = useBestSky(which === 'today' && order.includes('shoot') && settled ? venue : null, 15, now)
   const colorNow = which !== 'today' || day === null ? null : colorNowLine([day.reads.sunrise, day.reads.sunset], now, venue, timeZone, bestSky.event === null ? null : bestSpotWords(bestSky.ranked, bestSky.here, venue, units.distance === 'ft'))
   const bigTemp = which === 'today' ? at('temperature_2m', now) : hi
   /* The one wind now (src/lib/windNow.ts), as the wind card and the Wind page read it. */

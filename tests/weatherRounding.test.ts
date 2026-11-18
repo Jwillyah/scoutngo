@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it } from 'vitest'
-import { clearWeatherStore, roundedWeatherUrl, weatherJson, weatherSent, FORECAST_MAX_AGE_MS } from '../src/lib/weatherStore.ts'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { clearWeatherStore, roundedWeatherUrl, weatherJson, weatherSent, FORECAST_MAX_AGE_MS, MIN_REUSE_MS } from '../src/lib/weatherStore.ts'
 
 /*
  * "WEATHER SERVICE BUSY" ON AN ORDINARY SESSION (Batch H, 2 Nov 9:36 AM).
@@ -44,6 +44,9 @@ describe('the weather question, rounded', () => {
       return new Response('{"a":1}', { status: 200 })
     }) as unknown as typeof fetch
     await weatherJson(at('36.84', '-75.97'), { maxAgeMs: FORECAST_MAX_AGE_MS, fetchImpl: ok })
+    /* Batch SIMPLE-1, Section 4b: an answer is reused for ten minutes whatever the caller wants; past them, it is asked again. */
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(Date.now() + MIN_REUSE_MS + 1000)
     const busy = (async () => {
       calls += 1
       return new Response('Too many', { status: 429 })
@@ -53,5 +56,6 @@ describe('the weather question, rounded', () => {
     const again = await weatherJson(at('36.84', '-75.97'), { maxAgeMs: -1, fetchImpl: busy })
     expect(again.ok && again.stale).toBe(true)
     expect(calls).toBe(2)
+    vi.useRealTimers()
   })
 })
