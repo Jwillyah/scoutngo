@@ -170,3 +170,10 @@ export const FORWARD_LABEL: Record<Mode, string | null> = {
   plan: 'Plan done · Go to field',
   field: null,
 }
+
+/**
+ * Batch SIMPLE-1, Section 0: the mode the app starts in. The map whenever
+ * there is a place to show on it, so a link or a reload never opens the
+ * planner by itself; setup only when there is no place yet, where the pin goes.
+ */
+export const startMode = (hasPlace: boolean): Mode => (hasPlace ? 'plan' : 'setup')

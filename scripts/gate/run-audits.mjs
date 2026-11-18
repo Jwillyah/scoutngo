@@ -57,6 +57,7 @@ export const AUDITS = [
   /* Batch Polish, Section 3: the home never scrolls, in five looks and three numbers of activities. */
   { name: 'home fit', script: 'audit-home-fit.mjs', summary: /HOME FIT PROBLEMS/ },
   { name: 'menu', script: 'audit-menu.mjs', summary: /MENU PROBLEMS/ },
+  { name: 'clean map', script: 'audit-clean-map.mjs', summary: /CLEAN MAP PROBLEMS/, pattern: /PROBLEM|ABORTED/ },
   { name: 'one number', script: 'audit-one-number.mjs', summary: /ONE NUMBER PROBLEMS/ },
   { name: 'style', script: 'audit-style.mjs', summary: /STYLE PROBLEMS/ },
   { name: 'map labels', script: 'audit-map-labels.mjs', summary: /MAP LABELS PROBLEMS/ },

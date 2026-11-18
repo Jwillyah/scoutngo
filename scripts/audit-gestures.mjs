@@ -49,9 +49,10 @@ async function plan() {
   let went = false
   for (let i = 0; i < 30 && !went; i += 1) {
     await c.wait(500)
-    went = await c.ev(`(() => { const b = [...document.querySelectorAll('.wiz__ghost')].find((x) => /Same as last time/.test(x.textContent)); if (!b) return false; b.click(); return true })()`)
+    /* Batch SIMPLE-1, Section 0: a stored place starts on the map; setup (and its Same as last time) only with none. */
+    went = await c.ev(`(() => { if (document.querySelector('.mode-plan')) return true; const b = [...document.querySelectorAll('.wiz__ghost')].find((x) => /Same as last time/.test(x.textContent)); if (!b) return false; b.click(); return true })()`)
   }
-  if (!went) throw new Error('no "Same as last time" on Setup')
+  if (!went) throw new Error('neither the map nor "Same as last time" on Setup')
   /* Batch Polish, Section 1: the plan screen and the map are downloads of their own; waited for drawn (up to 20 s), then as long as before for the pills to settle. */
   for (let i = 0; i < 40; i += 1) {
     if (await c.ev(`!!document.querySelector('.mode-plan .sheet') && !!document.querySelector('.mode-plan .maplibregl-canvas')`)) break

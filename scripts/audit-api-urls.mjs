@@ -47,6 +47,9 @@ await ev(`localStorage.clear(); localStorage.setItem('scoutngo.landing.v1','true
 await send('Page.navigate', { url: `${APP_ORIGIN}/?calibration=1&probe=1` })
 await wait(8000)
 watchdog.note('loaded')
+/* Batch SIMPLE-1, Section 0: with a place the app starts on the map; the venue search is setup's, so setup first. */
+await goToStage(ev, wait, 'setup')
+await wait(1500)
 
 /* A venue search, typed the way a person types it. */
 const typed = await ev(`(() => {

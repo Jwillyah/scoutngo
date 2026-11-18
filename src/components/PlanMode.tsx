@@ -1687,6 +1687,29 @@ export function PlanMode({
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cardRequest])
+  /*
+   * Batch SIMPLE-1, Section 0: LEAVING A MODE CLEARS IT. The map stays mounted
+   * under the home, so a drone sheet (Preflight, airspace, the 3D view) left
+   * open came back with the map. Each time the home steps off the map it is
+   * the map, the marker and the time bar; a page or card asked for on the way
+   * (the request above, a tick later) still opens.
+   */
+  const wasCovered = useRef(covered)
+  useEffect(() => {
+    const uncovered = wasCovered.current && !covered
+    wasCovered.current = covered
+    if (!uncovered) return
+    /* oxlint-disable react/set-state-in-effect -- one reset on the home's way out, not a render loop */
+    setCard(HOME)
+    setSheet('peek')
+    setPendingFly(false)
+    setFlightPicking(false)
+    setMeasurePins(null)
+    setFlySession(null)
+    setStand(null)
+    setThreeD(false)
+    /* oxlint-enable react/set-state-in-effect */
+  }, [covered])
 
   /*
    * THE RELIEF ROUND THE VENUE, for the Terrain tile and its 2D contours

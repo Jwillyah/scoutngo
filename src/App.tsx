@@ -123,6 +123,7 @@ import { placeOf, shownGroups, usePlaceGroups } from './lib/placeGroups.ts'
 import {
   blockedReason,
   setupGap,
+  startMode,
   type Mode,
   type ModeAvailability,
   type SetupTarget,
@@ -462,7 +463,14 @@ function App() {
    * plus three sheet detents plus accordions. The sheet keeps its own state
    * inside PlanMode, because it is a detail of that mode rather than of the app.
    */
-  const [mode, setMode] = useState<Mode>('setup')
+  /*
+   * Batch SIMPLE-1, Section 0: THE PLANNER NEVER OPENS BY ITSELF. A start with
+   * no home over it (a link, a reload) used to land in setup, the planner;
+   * it lands on the map now. Setup is Menu › Plan a shoot (/setup) or a
+   * button that names it. With no place yet there is no map to show, and
+   * setup is where the pin goes (src/lib/mode.ts startMode).
+   */
+  const [mode, setMode] = useState<Mode>(() => startMode(venueLatLon(venue) !== null))
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   /*
@@ -1527,6 +1535,17 @@ function App() {
     kind: 'sky',
     tick: 0,
   })
+  /*
+   * Batch SIMPLE-1, Section 0: a request is spent once. The map and setup
+   * remount when their mode comes back, and a remount read the last request
+   * again (Preflight reopened on the way back from the planner).
+   */
+  useEffect(() => {
+    /* oxlint-disable react/set-state-in-effect -- spends a one-shot request when its mode is left */
+    if (mode !== 'plan') setCardRequest((r) => (r.tick === 0 ? r : { ...r, tick: 0 }))
+    if (mode !== 'setup') setDrawerRequest((r) => (r.tick === 0 ? r : { ...r, tick: 0 }))
+    /* oxlint-enable react/set-state-in-effect */
+  }, [mode])
   /* The viewfinder: the camera with the plan over it. Opened from the menu, asks for its permissions on a tap. */
   const [viewfinderOpen, setViewfinderOpen] = useState(false)
   /* The Viewfinder opens ready: the next event and the lens for it (src/core/viewfinderPreset.ts). */
@@ -2076,7 +2095,7 @@ function App() {
     setPositionNote(revivalNote(revival))
     setMarks(reviveMarks(spot.marks ?? []))
     setGeneration({ status: 'idle' })
-    setMode('setup')
+    /* Batch SIMPLE-1, Section 0: no mode of its own: picked in setup it stays there; a shared plan opens on the map. */
   }
 
   /*
@@ -2713,6 +2732,7 @@ function App() {
               onClick={() => {
                 loadSpot(sharedPlan)
                 setSharedPlan(null)
+                setMode('plan')
               }}
             >
               Open

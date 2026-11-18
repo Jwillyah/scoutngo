@@ -1,0 +1,168 @@
+/*
+ * THE MAP OPENS CLEAN (Batch SIMPLE-1, Section 0).
+ *
+ * Usage:  node scripts/audit-clean-map.mjs [screenshot-dir]
+ *
+ * A friend took twenty minutes to find their way round the app; part of it was
+ * sheets that came up by themselves: the planner on a link, the drone's
+ * Preflight back with the map after the home. Five ways onto the map, each
+ * must land on the map, the marker and the time bar, and nothing else:
+ *
+ *   home       the home's Map button
+ *   menu       Menu › Plan a shoot (the planner, asked for), then its way out
+ *   drone      the Drone page's Preflight check, Back to the home, then Map;
+ *              and the Drone page's own Map button
+ *   search     the place pill, a spot picked, then Map
+ *   link       a link with a query (no home over it), and a reload
+ *
+ * Clean: the map's shell, no setup, the sheet's own card (the time bar) at
+ * its lowest, no page, no dialog, no 3D.
+ */
+import { mkdirSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { webkit, devices } from './gate/playwright.mjs'
+import { ensureApp, guardAudit, startWatchdog, APP_ORIGIN, openMenu } from './preflight.mjs'
+
+guardAudit('clean map')
+const watchdog = startWatchdog('clean map', 300_000)
+const OUT = process.argv[2] ?? join(process.env.SCOUTNGO_OUT ?? tmpdir(), 'clean-map')
+mkdirSync(OUT, { recursive: true })
+await ensureApp()
+
+const PIER = { lat: 36.8435575, lon: -75.9713104 }
+let problems = 0
+let looked = 0
+const fail = (why) => {
+  console.log('      PROBLEM: ' + why)
+  problems += 1
+}
+
+const STATE = `JSON.stringify((() => {
+  const shell = document.querySelector('.shell')?.className.match(/shell--([a-z]+)/)?.[1] ?? null
+  return {
+    shell,
+    setup: !!document.querySelector('.mode-setup'),
+    card: document.querySelector('.sheet [data-card]')?.getAttribute('data-card') ?? null,
+    peek: !!document.querySelector('.sheet.sheet--peek'),
+    home: !!document.querySelector('.home'),
+    page: [...document.querySelectorAll('.page[aria-label]')].map((p) => p.getAttribute('aria-label')),
+    dialogs: [...document.querySelectorAll('[role="dialog"][aria-label]')].map((d) => d.getAttribute('aria-label')),
+    threeD: !!document.querySelector('.clay3d, [data-clay3d]'),
+  }
+})())`
+
+const browser = await webkit.launch()
+try {
+  const ctx = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height: 844 } })
+  await ctx.addInitScript(([at]) => {
+    try {
+      localStorage.setItem('scoutngo.landing.v1', 'true')
+      localStorage.setItem('scoutngo.nearMe.v1', 'off')
+      localStorage.setItem('scoutngo.activities.v1', JSON.stringify(['shoot', 'drone', 'surf']))
+      if (localStorage.getItem('scoutngo.lastSetup.v1') === null) localStorage.setItem('scoutngo.lastSetup.v1', JSON.stringify({ at, name: { key: 'x', name: 'Virginia Beach Fishing Pier' }, shootKind: 'sunset', platform: 'both', reachMeters: 2000 }))
+    } catch {
+      /* about:blank */
+    }
+    /* A person, not a driver: the home opens on a bare front door (src/lib/briefingOpen.ts). */
+    Object.defineProperty(Navigator.prototype, 'webdriver', { get: () => false })
+  }, [PIER])
+  const page = await ctx.newPage()
+  await page.clock.install({ time: new Date('2026-11-02T15:00:00Z') })
+  await page.clock.resume()
+  const wait = (ms) => page.waitForTimeout(ms)
+  const ev = (x) => page.evaluate(x)
+  const tap = async (locator, what) => {
+    try {
+      await locator.first().click({ timeout: 5000 })
+      return true
+    } catch {
+      fail(`could not tap ${what}`)
+      return false
+    }
+  }
+  const openMap = () => tap(page.getByRole('button', { name: /^open the map$/i }), 'the Map button')
+  const front = async () => {
+    await page.goto(`${APP_ORIGIN}/`)
+    for (let i = 0; i < 20 && !(await ev(`!!document.querySelector('.home')`)); i += 1) await wait(500)
+    await wait(800)
+  }
+  const clean = async (way) => {
+    await wait(1800)
+    const s = JSON.parse(await ev(STATE))
+    looked += 1
+    console.log(`  ${way}: ${JSON.stringify(s)}`)
+    await page.screenshot({ path: join(OUT, `${way.replace(/\W+/g, '-')}.png`) })
+    if (s.shell !== 'plan' || s.home) fail(`${way}: not on the map (${s.shell}${s.home ? ', the home over it' : ''})`)
+    if (s.setup) fail(`${way}: the planner opened by itself`)
+    if (s.card !== 'shoot') fail(`${way}: the sheet shows the ${s.card} card, not just the time bar`)
+    if (!s.peek) fail(`${way}: the sheet is up, not at its lowest`)
+    if (s.page.length > 0) fail(`${way}: a page is over the map (${s.page.join(', ')})`)
+    if (s.dialogs.length > 0) fail(`${way}: a dialog is up (${s.dialogs.join(', ')})`)
+    if (s.threeD) fail(`${way}: the 3D view is up`)
+  }
+
+  console.log('\n### home')
+  await front()
+  if (await openMap()) await clean('home')
+
+  console.log('\n### menu › Plan a shoot, then out of it')
+  await openMenu(ev, wait)
+  if (await tap(page.locator('.mrow', { hasText: 'Plan a shoot' }), 'Menu › Plan a shoot')) {
+    await wait(1500)
+    if (!(await ev(`!!document.querySelector('.mode-setup')`))) fail('menu: Plan a shoot did not open the planner')
+    if (await tap(page.getByRole('button', { name: /^same as last time$/i }), "the planner's Same as last time")) await clean('menu')
+  }
+
+  console.log('\n### drone')
+  await front()
+  if (await tap(page.locator('.home button', { hasText: /^Drone/ }), "the home's Drone card")) {
+    await wait(1500)
+    if (await tap(page.getByRole('button', { name: /^preflight check$/i }), "the Drone page's Preflight check")) {
+      await wait(1500)
+      if ((await ev(`document.querySelector('.sheet [data-card]')?.getAttribute('data-card')`)) !== 'preflight') fail('drone: Preflight check did not open Preflight')
+      if (await tap(page.locator('button[aria-label="Back to the home"]'), "the map's Back")) {
+        await wait(1200)
+        if (await openMap()) await clean('drone, Preflight, back, Map')
+      }
+    }
+  }
+  await front()
+  if (await tap(page.locator('.home button', { hasText: /^Drone/ }), "the home's Drone card")) {
+    await wait(1500)
+    const onDrone = page.locator('.page[aria-label="Drone"] button[aria-label="Open the map"], [aria-label="Drone"] button[aria-label="Open the map"]')
+    if (await tap(onDrone, "the Drone page's Map button")) await clean("drone page's Map")
+  }
+
+  console.log('\n### search')
+  if (await tap(page.locator('button.pill-venue'), 'the place pill')) {
+    await wait(800)
+    await page.locator('.spick__search').fill('Croatan')
+    await wait(1500)
+    if (await tap(page.locator('.spick button', { hasText: 'Croatan' }), 'the Croatan result')) {
+      await wait(1500)
+      if (await ev(`!!document.querySelector('.home')`)) await openMap()
+      await clean('search pick')
+    }
+  }
+
+  console.log('\n### link')
+  await page.goto(`${APP_ORIGIN}/?from=link`)
+  await wait(3500)
+  await clean('link with a query')
+  await page.reload()
+  await wait(3500)
+  await clean('reload')
+  await ctx.close()
+  watchdog.note('clean map')
+} finally {
+  await browser.close()
+}
+watchdog.stop()
+if (looked < 7) {
+  console.log(`=== CLEAN MAP AUDIT ABORTED: ${looked} of 7 ways looked at ===`)
+  process.exit(2)
+}
+console.log(`  screenshots: ${OUT}`)
+console.log(`\n=== CLEAN MAP PROBLEMS: ${problems} ===`)
+process.exit(problems === 0 ? 0 : 1)
