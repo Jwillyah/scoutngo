@@ -81,6 +81,8 @@ export interface ObserverView {
 
 export interface ClayScene {
   whenShown(): Promise<void>
+  /** Batch 3D, Section 1.3: the first frame drawn, whatever has arrived. Fly opens on this, not on the whole near ground. */
+  whenDrawn(): Promise<void>
   sunNow(): { azimuth: number; altitude: number }
   setTime(at: Date): void
   setBuildings(buildings: readonly Building[]): void
@@ -558,6 +560,8 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
   renderer.domElement.addEventListener('webglcontextlost', onLost, false)
   renderer.domElement.addEventListener('webglcontextrestored', onRestored, false)
   let manual = false
+  let firstDrawn: () => void = () => {}
+  const drawnOnce = new Promise<void>((resolve) => (firstDrawn = resolve))
   const loop = (now: number) => {
     raf = requestAnimationFrame(loop)
     if (manual || lost) return
@@ -581,6 +585,7 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
         throw new Error('test crash from the fly audit')
       }
       draw()
+      firstDrawn()
     } catch (error) {
       /* Stopped, and said: never a frozen or black canvas with nothing on it. */
       cancelAnimationFrame(raf)
@@ -949,6 +954,7 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
 
   return {
     whenShown: () => shown,
+    whenDrawn: () => drawnOnce,
     sunNow: () => sunNow,
     setTime,
     setBuildings: (b) => buildings.set(b),

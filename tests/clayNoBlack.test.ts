@@ -34,7 +34,7 @@ describe('context lost, and a frame that throws', () => {
   })
 
   it('a throw in the frame loop is caught and said', () => {
-    expect(SCENE).toMatch(/try \{[\s\S]{0,400}draw\(\)\s*\} catch \(error\) \{[\s\S]{0,200}trouble\.error\?\./)
+    expect(SCENE).toMatch(/try \{[\s\S]{0,400}draw\(\)\s*(firstDrawn\(\)\s*)?\} catch \(error\) \{[\s\S]{0,200}trouble\.error\?\./)
   })
 
   it('Batch Flow: a crash closes the view and goes back to the drone card with one line, never a blank screen', () => {

@@ -19,51 +19,62 @@ import { watchHosts } from './lib/privacy.ts'
 import { setForecastEdge } from './lib/weatherStore.ts'
 import { watchNet } from './lib/netLog.ts'
 
-/* Batch N E1: what each request did, in memory, for the home's hidden debug line. */
-watchNet()
-
-/* Open-Meteo through this app's forecast cache (api/forecast.ts, Batch M): on a phone network many phones share one address. */
-setForecastEdge('/api/forecast')
-
-/* The privacy page's live check: which hosts this session asks, in memory only (src/lib/privacy.ts). */
-watchHosts()
-
 /*
- * THE PAGE DOES NOT PINCH-ZOOM UNDER THE MAP. iOS Safari ignores
- * user-scalable=no in the viewport tag, and a pinch that the page also takes
- * is a page that scales round the map while the map scales too (29 Oct, the
- * snapping). Its own `gesturestart` is the one hook it honours. MapLibre's
- * pinch reads touch events, which this leaves alone. Chrome has no such event,
- * so this is the one part of the pinch fix the emulation cannot exercise.
+ * Batch 3D, Section 1.1: /?probe=webgl is the WebGL probe, a plain page with
+ * no app shell. Its module is imported only here, so the app does not carry
+ * it; nothing below runs for it (no worker, no app).
  */
-/*
- * ALL THREE, NOT ONE (29 Oct, still snapping on a real iPhone). Only
- * gesturestart was stopped; Safari also scales the page from gesturechange
- * and settles it on gestureend. Each is stopped, on the document, not passive.
- */
-for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
-  document.addEventListener(type, (event) => event.preventDefault(), { passive: false })
-}
+const probe = new URLSearchParams(location.search).get('probe') === 'webgl'
+if (probe) void import('./lib/webglProbePage.ts').then(({ startWebglProbe }) => startWebglProbe(document.getElementById('root')!))
+else startApp()
 
-/* Batch CORE, Section 2: the last 20 errors kept on this phone (src/lib/errorLog.ts). */
-installErrorLog()
+function startApp() {
+  /* Batch N E1: what each request did, in memory, for the home's hidden debug line. */
+  watchNet()
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+  /* Open-Meteo through this app's forecast cache (api/forecast.ts, Batch M): on a phone network many phones share one address. */
+  setForecastEdge('/api/forecast')
 
-/*
- * THE APP SHELL, FOR A COLD LAUNCH WITH NO SIGNAL. Production builds only: the
- * dev server has no sw.js and no hashed assets to keep. What the worker does,
- * and why it cannot pin an old build, is in src/sw/shellRoutes.ts; the proof
- * that a new deploy is still adopted is scripts/audit-sw-update.mjs.
- */
-if (import.meta.env.PROD && 'serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    void navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {
-      /* No worker means no offline cold launch, and everything else works as before. */
+  /* The privacy page's live check: which hosts this session asks, in memory only (src/lib/privacy.ts). */
+  watchHosts()
+
+  /*
+   * THE PAGE DOES NOT PINCH-ZOOM UNDER THE MAP. iOS Safari ignores
+   * user-scalable=no in the viewport tag, and a pinch that the page also takes
+   * is a page that scales round the map while the map scales too (29 Oct, the
+   * snapping). Its own `gesturestart` is the one hook it honours. MapLibre's
+   * pinch reads touch events, which this leaves alone. Chrome has no such event,
+   * so this is the one part of the pinch fix the emulation cannot exercise.
+   */
+  /*
+   * ALL THREE, NOT ONE (29 Oct, still snapping on a real iPhone). Only
+   * gesturestart was stopped; Safari also scales the page from gesturechange
+   * and settles it on gestureend. Each is stopped, on the document, not passive.
+   */
+  for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
+    document.addEventListener(type, (event) => event.preventDefault(), { passive: false })
+  }
+
+  /* Batch CORE, Section 2: the last 20 errors kept on this phone (src/lib/errorLog.ts). */
+  installErrorLog()
+
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  )
+
+  /*
+   * THE APP SHELL, FOR A COLD LAUNCH WITH NO SIGNAL. Production builds only: the
+   * dev server has no sw.js and no hashed assets to keep. What the worker does,
+   * and why it cannot pin an old build, is in src/sw/shellRoutes.ts; the proof
+   * that a new deploy is still adopted is scripts/audit-sw-update.mjs.
+   */
+  if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      void navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {
+        /* No worker means no offline cold launch, and everything else works as before. */
+      })
     })
-  })
+  }
 }

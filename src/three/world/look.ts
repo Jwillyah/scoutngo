@@ -52,7 +52,7 @@ export function daylightTint(c: SkyColours): THREE.Color {
   return new THREE.Color().setRGB(k * (0.75 + 0.25 * warm[0]), k * (0.75 + 0.25 * warm[1]), k * (0.75 + 0.25 * warm[2]), THREE.LinearSRGBColorSpace)
 }
 
-const toonVertex = /* glsl */ `
+export const toonVertex = /* glsl */ `
 #include <fog_pars_vertex>
 varying vec2 vUv;
 varying vec3 vWorld;
@@ -65,7 +65,7 @@ void main() {
   #include <fog_vertex>
 }`
 
-const toonFragment = /* glsl */ `
+export const toonFragment = /* glsl */ `
 #include <fog_pars_fragment>
 uniform sampler2D map;
 uniform vec3 sunDir;
@@ -126,6 +126,16 @@ void main() {
   #include <fog_fragment>
 }`
 
+/** The Animated ground's material; Batch 3D, Section 1.1: the WebGL probe (/?probe=webgl) compiles this very one. */
+export function toonGroundMaterial(map: THREE.Texture | null, shared: Record<string, THREE.IUniform> = {}): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    uniforms: { map: { value: map }, ...shared, ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog) },
+    vertexShader: toonVertex,
+    fragmentShader: toonFragment,
+    fog: true,
+  })
+}
+
 export function createWorldLook(): LookControl {
   let current: WorldLook = 'real'
   const tint = new THREE.Color(1, 1, 1)
@@ -145,15 +155,7 @@ export function createWorldLook(): LookControl {
       return m
     },
   }
-  const animated: GroundMaterialHook = {
-    make: (map) =>
-      new THREE.ShaderMaterial({
-        uniforms: { map: { value: map }, ...shared, ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog) },
-        vertexShader: toonVertex,
-        fragmentShader: toonFragment,
-        fog: true,
-      }),
-  }
+  const animated: GroundMaterialHook = { make: (map) => toonGroundMaterial(map, shared) }
   let hook = real
   return {
     groundHook: () => ({ make: (map) => hook.make(map) }),

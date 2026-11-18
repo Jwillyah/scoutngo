@@ -1,4 +1,4 @@
-import { CLAY_LOAD_MS, clayStatus, FLY_LOAD_MS, type ClayStatus } from '../lib/clayStatus.ts'
+import { CLAY_LOAD_MS, clayStatus, FLY_LOAD_MS, FLY_NO_GRAPHICS, flyGate, type ClayStatus } from '../lib/clayStatus.ts'
 import { recordError } from '../lib/errorLog.ts'
 import { ScreenFailCard } from './ScreenBoundary.tsx'
 /* The longest the 3D view waits for a kept scan before it builds without one (Batch LIVE, Section 5.2). */
@@ -159,6 +159,8 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
   const [ready, setReady] = useState(0)
   /* The first view's tiles have arrived: until then the canvas is hidden and the 2D map shows through. */
   const [shown, setShown] = useState(false)
+  /* Batch 3D, Section 1.3: the scene's first frame is drawn (Fly opens on it, src/lib/clayStatus.ts flyGate). */
+  const [drawn, setDrawn] = useState(false)
   const [failed, setFailed] = useState<string | null>(null)
   /* Batch I: the GPU lost (rebuilding), or a frame that threw (the message); a build count to rebuild on. */
   const [trouble, setTrouble] = useState<{ kind: 'lost' } | { kind: 'error'; message: string } | null>(null)
@@ -279,13 +281,22 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
         void made.whenShown().then(() => {
           if (!cancelled) setShown(true)
         })
+        void made.whenDrawn().then(() => {
+          if (!cancelled) setDrawn(true)
+        })
       })
-      .catch((error: unknown) => setFailed(error instanceof Error ? error.message : String(error)))
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error)
+        /* Batch 3D, Section 1.2: why 3D could not start, kept on the phone (a refused context is logged where it is refused). */
+        if (!(error instanceof Error && error.name === 'GraphicsRefused')) recordError(fly !== null ? 'Fly' : '3D', `could not start: ${message}`)
+        setFailed(message)
+      })
     return () => {
       cancelled = true
       made?.destroy()
       scene.current = null
       setShown(false)
+      setDrawn(false)
     }
     /* The coordinate, not the object: the same place must not rebuild the engine. */
   }, [venue.lat, venue.lon, timeZone, scanCtx === 'loading' ? 'loading' : (scanCtx?.scan.savedAt ?? 'none'), build]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -383,7 +394,9 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, fly?.tick])
-  const flying = fly !== null && shown && flyGround !== null && flyGround.tick === fly.tick
+  /* Batch 3D, Section 1.3: Fly on its own minimal start, not on the whole 3D view's pictures; no graphics said at once. */
+  const gate = flyGate({ failed, lost: trouble?.kind === 'lost', drawn, groundRead: fly !== null && flyGround !== null && flyGround.tick === fly.tick })
+  const flying = fly !== null && gate.kind === 'open'
   const groundM = flyGround?.m ?? 0
   const surfaceAbsAt = (p: LatLon) => {
     if (fly === null) return null
@@ -533,12 +546,16 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
   }, [shown, venue.lat, venue.lon, build])
   /* Batch CORE, Section 2.2: Fly opens within FLY_LOAD_MS, or says it did not; Keep waiting lets it go on. */
   const [flyLate, setFlyLate] = useState<'no' | 'late' | 'waiting'>('no')
+  /* What was so when the timer ran out, not when it was set. */
+  const flyFacts = useRef({ drawn, shown, ground: flyGround !== null })
+  flyFacts.current = { drawn, shown, ground: flyGround !== null }
   useEffect(() => {
     setFlyLate('no')
     if (fly === null || flying) return
     const t = setTimeout(() => {
       setFlyLate('late')
-      recordError('Fly', `not open in ${FLY_LOAD_MS / 1000} s (3D ${shown ? 'shown' : 'not shown yet'}, take-off ground ${flyGround === null ? 'not read' : 'read'})`)
+      const f = flyFacts.current
+      recordError('Fly', `not open in ${FLY_LOAD_MS / 1000} s (first frame ${f.drawn ? 'drawn' : 'not drawn yet'}, 3D ${f.shown ? 'shown' : 'not shown yet'}, take-off ground ${f.ground ? 'read' : 'not read'})`)
     }, FLY_LOAD_MS)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -551,9 +568,9 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
       : frameBox(lensFocal, SENSORS[stand.sensor], viewWidthDegrees(frameBox(stand.focal, SENSORS[stand.sensor], 60, 100).lensHorizontal), width)
 
   return (
-    <div className={`${shown ? 'clay clay--shown' : 'clay clay--waiting'}${flying ? ' clay--flying' : ''}`}>
+    <div className={`${shown || flying ? 'clay clay--shown' : 'clay clay--waiting'}${flying ? ' clay--flying' : ''}`}>
       <div ref={host} className="clay__canvas" />
-      {(late || !online) && !shown && failed === null ? (
+      {(late || !online) && !shown && !flying && failed === null ? (
         <div className="clay__error" role="alert" data-clay-late>
           {/* Batch CORE, Section 7A.2: with no signal, said at once, not after the 10 s wait. */}
           <p className="clay__errtitle">{online ? <>3D didn&rsquo;t load</> : '3D needs a signal'}</p>
@@ -565,7 +582,9 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
           )}
         </div>
       ) : null}
-      {(flyLate === 'late' || (!online && fly !== null && !shown)) && fly !== null && !flying ? (
+      {fly !== null && gate.kind === 'no-graphics' ? (
+        <ScreenFailCard title={"Fly didn't open"} message={`${FLY_NO_GRAPHICS}. ${gate.why}`} onBack={() => onLanded?.([], null)} />
+      ) : (flyLate === 'late' || (!online && fly !== null && !flying)) && fly !== null && !flying ? (
         <ScreenFailCard title={online ? "Fly didn't load" : 'Fly needs a signal'} message={online ? `Not open in ${FLY_LOAD_MS / 1000} s.` : 'The world to fly in comes from the map services.'} onWait={() => setFlyLate('waiting')} onBack={() => onLanded?.([], null)} />
       ) : null}
       {trouble === null ? null : trouble.kind === 'lost' ? (

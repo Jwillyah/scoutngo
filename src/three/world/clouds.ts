@@ -55,7 +55,7 @@ export interface CloudMirror {
   colour: THREE.Color
 }
 
-const slabVertex = /* glsl */ `
+export const slabVertex = /* glsl */ `
 varying vec3 vWorld;
 void main() {
   vec4 w = modelMatrix * vec4(position, 1.0);
@@ -63,7 +63,7 @@ void main() {
   gl_Position = projectionMatrix * viewMatrix * w;
 }`
 
-const slabFragment = /* glsl */ `
+export const slabFragment = /* glsl */ `
 uniform float base;
 uniform float top;
 uniform float thresh;
@@ -132,6 +132,10 @@ void main() {
   #include <colorspace_fragment>
 }`
 
+/** One raymarched cloud layer's material; Batch 3D, Section 1.1: the WebGL probe compiles this very one. */
+export const slabMaterial = (uniforms: Record<string, THREE.IUniform>): THREE.ShaderMaterial =>
+  new THREE.ShaderMaterial({ uniforms, vertexShader: slabVertex, fragmentShader: slabFragment, transparent: true, depthWrite: false, side: THREE.BackSide })
+
 /* The billboards' picture: the SVG puff (inputs.ts), never a canvas WebKit adds noise to. */
 function puffTexture(): THREE.Texture {
   const t = new THREE.TextureLoader().load(cloudSprite())
@@ -181,7 +185,7 @@ export function createClouds(onChange: () => void) {
           fogCol: { value: sun.fog },
           fogDensity: { value: 1 / 60_000 },
         }
-        const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: slabVertex, fragmentShader: slabFragment, transparent: true, depthWrite: false, side: THREE.BackSide })
+        const mat = slabMaterial(uniforms)
         const geo = new THREE.BoxGeometry(FIELD_HALF_M * 2, THICK[layer.name], FIELD_HALF_M * 2)
         geo.translate(0, layer.heightM + THICK[layer.name] / 2, 0)
         const mesh = new THREE.Mesh(geo, mat)

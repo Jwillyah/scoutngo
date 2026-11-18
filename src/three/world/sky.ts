@@ -17,7 +17,7 @@ export const SKY_RADIUS = 60_000
 /* How bright the shafts are against the glow: a ray at most half the glow's own colour brighter or darker than its neighbours. */
 export const SHAFT_STRENGTH = 0.9
 
-const vertex = /* glsl */ `
+export const skyVertex = /* glsl */ `
 varying vec3 vDir;
 void main() {
   vDir = normalize(position);
@@ -26,7 +26,7 @@ void main() {
   gl_Position.z = gl_Position.w; /* always at the far plane */
 }`
 
-const fragment = /* glsl */ `
+export const skyFragment = /* glsl */ `
 uniform vec3 zenith;
 uniform vec3 horizon;
 uniform vec3 below;
@@ -151,7 +151,7 @@ export function createSky(): Sky {
     cloudStretch: { value: 1 },
     cloudDrift: { value: new THREE.Vector2() },
   }
-  const material = new THREE.ShaderMaterial({ uniforms, vertexShader: vertex, fragmentShader: fragment, side: THREE.BackSide, depthWrite: false, depthTest: false, fog: false })
+  const material = new THREE.ShaderMaterial({ uniforms, vertexShader: skyVertex, fragmentShader: skyFragment, side: THREE.BackSide, depthWrite: false, depthTest: false, fog: false })
   const mesh = new THREE.Mesh(new THREE.SphereGeometry(SKY_RADIUS, 48, 24), material)
   mesh.name = 'sky'
   mesh.renderOrder = -1000

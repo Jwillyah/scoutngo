@@ -25,3 +25,23 @@ export function clayStatus(failed: string | null, shown: boolean, place: PlaceSt
   return null
 }
 
+
+/*
+ * FLY OPENS ON ITS OWN (Batch 3D, Section 1.3). Fly waited for the whole 3D
+ * view: `shown`, which waits for every near ground picture (up to the
+ * scene's SHOW_WITHIN_MS, 30 s), against FLY_LOAD_MS, 3 s. On a phone over
+ * a mobile network that is "Not open in 3 s" before the graphics had a say,
+ * and with no graphics at all it was the same 3 s card. Now Fly needs only
+ * its own minimal start: the scene made, its first frame drawn, the ground
+ * at take-off read. The pictures fill in as it flies. A context the phone
+ * refused, or took back, is said at once, never after a timer.
+ */
+export const FLY_NO_GRAPHICS = "Needs 3D graphics this phone didn't allow"
+
+export type FlyGate = { kind: 'open' } | { kind: 'waiting' } | { kind: 'no-graphics'; why: string }
+
+export function flyGate(s: { failed: string | null; lost: boolean; drawn: boolean; groundRead: boolean }): FlyGate {
+  if (s.failed !== null) return { kind: 'no-graphics', why: s.failed }
+  if (s.lost) return { kind: 'no-graphics', why: 'the phone took back the graphics memory' }
+  return s.drawn && s.groundRead ? { kind: 'open' } : { kind: 'waiting' }
+}

@@ -64,12 +64,12 @@ const OUTLINE_NIGHT = new THREE.Color().setRGB(0.62, 0.66, 0.76, THREE.LinearSRG
  * WINDOWS_FROM_M or has no height. Along the wall, bays every BAY_M by the
  * world position; which are lit, by a hash of the pane, against the share.
  */
-const WALL_PARS = /* glsl */ `
+export const WALL_PARS = /* glsl */ `
 attribute float above;
 varying float vAbove;
 varying vec3 vWallWorld;
 `
-const WALL_FRAG_PARS = /* glsl */ `
+export const WALL_FRAG_PARS = /* glsl */ `
 uniform float nightWall;
 uniform float windowsLit;
 uniform vec3 nightWallCol;
@@ -78,7 +78,7 @@ varying float vAbove;
 varying vec3 vWallWorld;
 float paneHash(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }
 `
-const WALL_FRAG = /* glsl */ `
+export const WALL_FRAG = /* glsl */ `
   totalEmissiveRadiance += nightWallCol * nightWall;
   if (vAbove > 4.0 && windowsLit > 0.0) {
     float f = fract(vAbove / ${FLOOR_M.toFixed(1)});
@@ -151,7 +151,7 @@ const norm = (v: P) => {
   return { x: v.x / l, y: v.y / l }
 }
 
-const roofVertex = /* glsl */ `
+export const roofVertex = /* glsl */ `
 #include <fog_pars_vertex>
 varying vec3 vWorld;
 void main() {
@@ -161,7 +161,7 @@ void main() {
   gl_Position = projectionMatrix * mvPosition;
   #include <fog_vertex>
 }`
-const roofFragment = /* glsl */ `
+export const roofFragment = /* glsl */ `
 #include <fog_pars_fragment>
 uniform sampler2D atlas;
 uniform vec4 box; /* west x, east x, north z, south z */
@@ -180,14 +180,12 @@ void main() {
   #include <fog_fragment>
 }`
 
-export function createBuildings(frame: Frame, ground: Ground, onChange: () => void) {
-  const group = new THREE.Group()
-  group.name = 'buildings'
-  const treeGroup = new THREE.Group()
-  treeGroup.name = 'trees'
-  group.add(treeGroup)
-  let list: readonly Building[] = []
-  const cells = new Map<string, { group: THREE.Group; x: number; z: number }>()
+/*
+ * The walls (Standard, with the windows patched in) and the roofs (the near
+ * picture, else clay). Batch 3D, Section 1.1: the WebGL probe (/?probe=webgl)
+ * compiles these very ones.
+ */
+export function wallMaterial() {
   const walls = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 })
   const nightUniforms = {
     nightWall: { value: 0 },
@@ -205,10 +203,10 @@ export function createBuildings(frame: Frame, ground: Ground, onChange: () => vo
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\n${WALL_FRAG}`)
   }
   walls.customProgramCacheKey = () => 'walls-night-v1'
-  /* The Animated look: flat pale clay faces and a crisp dark outline round each block. */
-  const toonWalls = new THREE.MeshLambertMaterial({ color: new THREE.Color().setRGB(0.8, 0.74, 0.64, THREE.LinearSRGBColorSpace), emissive: new THREE.Color().setRGB(0.12, 0.11, 0.1, THREE.LinearSRGBColorSpace), flatShading: true })
-  const outline = new THREE.LineBasicMaterial({ color: 0x1d1a16 })
-  let look = 'real'
+  return { walls, nightUniforms }
+}
+
+export function roofMaterial() {
   const roofUniforms = {
     atlas: { value: null as THREE.Texture | null },
     box: { value: new THREE.Vector4(0, 1, 0, 1) },
@@ -220,6 +218,23 @@ export function createBuildings(frame: Frame, ground: Ground, onChange: () => vo
     ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
   }
   const roofs = new THREE.ShaderMaterial({ uniforms: roofUniforms, vertexShader: roofVertex, fragmentShader: roofFragment, fog: true })
+  return { roofs, roofUniforms }
+}
+
+export function createBuildings(frame: Frame, ground: Ground, onChange: () => void) {
+  const group = new THREE.Group()
+  group.name = 'buildings'
+  const treeGroup = new THREE.Group()
+  treeGroup.name = 'trees'
+  group.add(treeGroup)
+  let list: readonly Building[] = []
+  const cells = new Map<string, { group: THREE.Group; x: number; z: number }>()
+  const { walls, nightUniforms } = wallMaterial()
+  /* The Animated look: flat pale clay faces and a crisp dark outline round each block. */
+  const toonWalls = new THREE.MeshLambertMaterial({ color: new THREE.Color().setRGB(0.8, 0.74, 0.64, THREE.LinearSRGBColorSpace), emissive: new THREE.Color().setRGB(0.12, 0.11, 0.1, THREE.LinearSRGBColorSpace), flatShading: true })
+  const outline = new THREE.LineBasicMaterial({ color: 0x1d1a16 })
+  let look = 'real'
+  const { roofs, roofUniforms } = roofMaterial()
   /* The roofs follow the near picture as it moves with the camera. */
   let atlasSeen: THREE.Texture | null = null
   const syncAtlas = () => {

@@ -36,7 +36,7 @@ export const SHALLOW_M = 28
 
 type Pt = { x: number; y: number }
 
-const waterVertex = /* glsl */ `
+export const waterVertex = /* glsl */ `
 #include <fog_pars_vertex>
 varying vec3 vWorld;
 void main() {
@@ -47,7 +47,7 @@ void main() {
   #include <fog_vertex>
 }`
 
-const waterFragment = /* glsl */ `
+export const waterFragment = /* glsl */ `
 #include <fog_pars_fragment>
 uniform float time;
 uniform vec3 sunDir;
@@ -125,7 +125,7 @@ void main() {
   #include <fog_fragment>
 }`
 
-const shoreVertex = /* glsl */ `
+export const shoreVertex = /* glsl */ `
 #include <fog_pars_vertex>
 /* Batch Beach, Section 4: not "out", a reserved word in GLSL 3.00 (WebGL2): the shader failed to compile and the water drew nothing, 256 errors on the console. */
 attribute float outward;
@@ -140,7 +140,7 @@ void main() {
   #include <fog_vertex>
 }`
 
-const shoreFragment = /* glsl */ `
+export const shoreFragment = /* glsl */ `
 #include <fog_pars_fragment>
 uniform float time;
 uniform vec3 shallow;
@@ -165,9 +165,8 @@ void main() {
 }`
 
 
-export function createWater(frame: Frame, onChange: () => void) {
-  const group = new THREE.Group()
-  group.name = 'water'
+/** The sea's surface and its shore ribbon; Batch 3D, Section 1.1: the WebGL probe (/?probe=webgl) compiles these very ones. */
+export function createWaterMaterials() {
   const uniforms = {
     time: { value: 0 },
     sunDir: { value: new THREE.Vector3(0, 1, 0) },
@@ -197,6 +196,13 @@ export function createWater(frame: Frame, onChange: () => void) {
   }
   const material = new THREE.ShaderMaterial({ uniforms, vertexShader: waterVertex, fragmentShader: waterFragment, fog: true })
   const shoreMaterial = new THREE.ShaderMaterial({ uniforms: shoreUniforms, vertexShader: shoreVertex, fragmentShader: shoreFragment, fog: true, transparent: true, depthWrite: false })
+  return { uniforms, shoreUniforms, material, shoreMaterial }
+}
+
+export function createWater(frame: Frame, onChange: () => void) {
+  const group = new THREE.Group()
+  group.name = 'water'
+  const { uniforms, shoreUniforms, material, shoreMaterial } = createWaterMaterials()
   let level = 0
   let animated = false
   let shown = 0

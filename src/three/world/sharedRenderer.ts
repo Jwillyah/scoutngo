@@ -15,6 +15,15 @@
  */
 import * as THREE from 'three'
 import { gpuBytes, type GpuCount, type GpuTexture } from '../../core/gpuBudget.ts'
+import { recordError } from '../../lib/errorLog.ts'
+
+/** The phone would not give the 3D view a WebGL context: 3D and Fly say so at once (src/lib/clayStatus.ts flyGate). */
+export class GraphicsRefused extends Error {
+  constructor(why: string) {
+    super(`This phone did not allow 3D graphics: ${why}`)
+    this.name = 'GraphicsRefused'
+  }
+}
 
 interface Holder {
   renderer: THREE.WebGLRenderer
@@ -24,8 +33,28 @@ interface Holder {
 }
 let held: Holder | null = null
 
+/*
+ * Batch 3D, Section 1.2: WHAT THE PHONE REFUSED, KEPT. A context the phone
+ * would not give, and a shader it would not compile, went to the console
+ * only, which nobody reads on an iPhone (17 Nov: "3D didn't load", and
+ * nothing in Last errors said why). Both go to the phone's error log now
+ * (src/lib/errorLog.ts), with the browser's own words.
+ */
 const make = (): Holder => {
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: false })
+  let renderer: THREE.WebGLRenderer
+  try {
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: false })
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
+    recordError('3D', `WebGL context refused: ${message}`)
+    throw new GraphicsRefused(message)
+  }
+  renderer.debug.onShaderError = (gl, program, vs, fs) => {
+    const log = (s: string | null) => (s ?? '').trim().replace(/\s+/g, ' ')
+    const words = [!gl.getShaderParameter(vs, gl.COMPILE_STATUS) ? `vertex: ${log(gl.getShaderInfoLog(vs))}` : '', !gl.getShaderParameter(fs, gl.COMPILE_STATUS) ? `fragment: ${log(gl.getShaderInfoLog(fs))}` : '', `link: ${log(gl.getProgramInfoLog(program))}`].filter((w) => w !== '')
+    console.error('3D shader refused', ...words)
+    recordError('3D', `A shader did not compile on this phone: ${words.join(' · ')}`)
+  }
   const h: Holder = { renderer, owner: null, evict: null, lost: false }
   renderer.domElement.addEventListener('webglcontextlost', () => (h.lost = true), false)
   renderer.domElement.addEventListener('webglcontextrestored', () => (h.lost = false), false)
