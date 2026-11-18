@@ -92,8 +92,10 @@ describe('it never says an area is open', () => {
     expect(cases[0][0].text).toBe(CHECKED_NOTHING)
   })
 
-  it("every card ends with today's restrictions not checked", () => {
+  it("every card ends with today's restrictions, and no card says TFRs are not checked", () => {
     for (const lines of cases) expect(lines.at(-1)).toEqual(TODAY_LINE)
+    expect(TODAY_LINE.detail).toContain('other NOTAMs are not checked')
+    expect(TODAY_LINE.detail).not.toMatch(/TFRs[^;]* not checked/)
   })
 
   it('no line uses a word that grants permission, or an em dash', () => {

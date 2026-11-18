@@ -23,6 +23,7 @@
  */
 import type { LatLon } from './geo.ts'
 import { polygonsOf } from './airspaceLayer.ts'
+import { heliportShown } from './heliportRule.ts'
 
 export type FaaLayerId = 'nsufr' | 'fria' | 'heliport' | 'sua' | 'tfr'
 
@@ -257,7 +258,7 @@ export const milesWords = (m: number): string => {
 /** The chips under the headline, in words. `sunset` is already written. */
 export function markerChips(m: AtMarker, sunset: string | null): { text: string; tone: 'hazard' | 'note' }[] {
   const out: { text: string; tone: 'hazard' | 'note' }[] = []
-  if (m.tfrsToday === null) out.push({ text: 'TFRs not received', tone: 'note' })
+  if (m.tfrsToday === null) out.push({ text: "TFRs: couldn't check", tone: 'note' })
   else if (m.tfrsToday.inside.length > 0) out.push({ text: `Inside ${m.tfrsToday.inside.length === 1 ? 'a TFR' : `${m.tfrsToday.inside.length} TFRs`} today`, tone: 'hazard' })
   else out.push({ text: `${m.tfrsToday.near} TFR${m.tfrsToday.near === 1 ? '' : 's'} within 20 mi today`, tone: 'note' })
   if (m.heliport === null) out.push({ text: 'Heliports not received', tone: 'note' })
@@ -280,7 +281,7 @@ export interface View {
 const meets = (b: readonly number[], v: View) => b[0] <= v.east && b[2] >= v.west && b[1] <= v.north && b[3] >= v.south
 
 /** The layers' shapes that meet the view, as GeoJSON for the map, each tagged with its kind. TFRs only those in force today. */
-export function liveCollection(layers: FaaLayers, view: View, on: Readonly<Record<FaaLayerId, boolean>>, todayIso: string): GeoJSON.FeatureCollection {
+export function liveCollection(layers: FaaLayers, view: View, on: Readonly<Record<FaaLayerId, boolean>>, todayIso: string, heli?: { marker: LatLon; zoom: number }): GeoJSON.FeatureCollection {
   const features: GeoJSON.Feature[] = []
   const add = (kind: FaaLayerId, list: FaaArea[] | null) => {
     if (!on[kind] || list === null) return
@@ -298,6 +299,8 @@ export function liveCollection(layers: FaaLayers, view: View, on: Readonly<Recor
   if (on.heliport && layers.heliport !== null) {
     for (const h of layers.heliport) {
       if (h.at.lon < view.west || h.at.lon > view.east || h.at.lat < view.south || h.at.lat > view.north) continue
+      /* Batch SIMPLE-1, Section 1: near the marker, or zoomed in (src/core/heliportRule.ts). */
+      if (heli !== undefined && !heliportShown(metresBetween(heli.marker, h.at), heli.zoom)) continue
       features.push({ type: 'Feature', properties: { kind: 'heliport', name: h.name }, geometry: { type: 'Point', coordinates: [h.at.lon, h.at.lat] } })
     }
   }

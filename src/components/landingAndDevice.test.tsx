@@ -115,7 +115,8 @@ describe('/how carries everything the cover gave up, and more', () => {
   it('states the refusals', () => {
     expect(how).toContain('never says an area is clear of hazards')
     expect(how).toContain('never says a flight is legal, cleared or compliant')
-    expect(how).toContain('Temporary flight restrictions are not checked')
+    expect(how).toContain('Temporary flight restrictions are read from tfr.faa.gov')
+    expect(how).toContain('Other NOTAMs are not checked')
     expect(how).toContain('prints a dash')
   })
 

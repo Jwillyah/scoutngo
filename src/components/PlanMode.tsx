@@ -34,6 +34,7 @@ import { shootDayIcs } from '../core/shootIcs.ts'
 import { saveText } from '../lib/saveText.ts'
 import { isEventDay, venueToday } from '../core/eventDay.ts'
 import { TFR_URL } from '../core/airspaceLookup.ts'
+import { TfrToday } from './TfrToday.tsx'
 import type {
   Platform,
   PlatformFilter as PlatformFilterValue,
@@ -2152,8 +2153,8 @@ export function PlanMode({
           )}
 
           {/*
-            * ON THE DAY, WITH A DRONE IN THE PLAN: today's restrictions are
-            * the one thing this app cannot check. A link, never a verdict:
+            * ON THE DAY, WITH A DRONE IN THE PLAN: today's restrictions. The
+            * count is what the TFR fetch found; a link, never a verdict:
             * nothing here ever says there are none.
             */}
           {venueWindow !== null &&
@@ -2163,7 +2164,8 @@ export function PlanMode({
               <a href={TFR_URL} target="_blank" rel="noreferrer noopener">
                 Check today's flight restrictions
               </a>
-              <span className="eventday__why">This app does not check them.</span>
+              {/* Batch SIMPLE-1, Section 1: what the TFR fetch found, never "not checked" (src/core/tfrLine.ts). */}
+              <span className="eventday__why"><TfrToday at={venue} timeZone={venueWindow.timeZone} /></span>
             </p>
           ) : null}
 
@@ -2666,6 +2668,7 @@ export function PlanMode({
               onLaanc={onLaanc}
               approvedCeiling={approvedCeiling}
               onApprovedCeiling={onApprovedCeiling}
+              timeZone={venueWindow?.timeZone}
             />
           </Card>
         )

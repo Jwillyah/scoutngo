@@ -6,6 +6,8 @@ import { dayBars } from '../core/droneNow.ts'
 import { DroneHeightView, type DroneHeightData } from './DroneHeight.tsx'
 import { DroneNowView, type DroneNowData, type DroneRow } from './DroneNow.tsx'
 import { DronePlanView, type DronePlanData } from './DronePlan.tsx'
+import { DronePreflightView } from './DronePreflight.tsx'
+import { preflightRows } from '../core/dronePreflight.ts'
 
 /*
  * THE DRONE PAGE'S VIEWS (Batch DRONE, Section 2; Batch FIX, Section 6:
@@ -31,6 +33,7 @@ describe('Now (board Drone_Slim_1)', () => {
     unit: 'kt',
     fromLine: 'from NNE · gusts 11 · at 400 ft',
     towardDeg: 202.5,
+    dial: 'arrow',
     chip: { text: 'Under your limit until sunset 4:53 PM · gusts 46%', tone: 'ok' },
     note: null,
     bars,
@@ -180,5 +183,41 @@ describe('Plan (board Drone_Slim_4)', () => {
     const words = text(renderToStaticMarkup(<DronePlanView data={{ ...base, wind: null }} />))
     expect(words).toContain('did not give the wind at 400 ft')
     expect(words).not.toMatch(/\d+% battery/)
+  })
+})
+
+describe('the Wind tab and Preflight (Batch SIMPLE-1, Section 1)', () => {
+  const nowData: DroneNowData = { speed: '0', unit: 'kt', fromLine: 'gusts 2 · at 400 ft', towardDeg: null, dial: 'calm', chip: null, note: null, bars: null, barsLabel: 'Today at 400 ft', marks: [], barsNone: 'n/a' }
+
+  it('calm says "Calm" in the compass, never an empty circle', () => {
+    const html = renderToStaticMarkup(<DroneNowView data={nowData} rows={[]} />)
+    expect(html).toContain('data-calm')
+    expect(text(html)).toContain('Calm')
+    expect(html).not.toContain('data-toward')
+    expect(html).toContain('Calm: no wind direction')
+  })
+
+  it('no direction and not calm is a dash, not an empty circle', () => {
+    const html = renderToStaticMarkup(<DroneNowView data={{ ...nowData, speed: '12', dial: 'none' }} rows={[]} />)
+    expect(html).toContain('data-nodir')
+    expect(html).not.toContain('data-calm')
+  })
+
+  it('with no rows the Wind tab draws none', () => {
+    const html = renderToStaticMarkup(<DroneNowView data={nowData} rows={[]} />)
+    expect(html).not.toContain('drp__rows')
+  })
+
+  it('Preflight is a list of rows, green or amber, each with its words', () => {
+    const rows = preflightRows({
+      air: null, marked: null, mps400: null, gust400: null, limitMps: null, speed: kt, ratedMin: 38, tempC: null, temp: (c) => `${c}`,
+      now: new Date('2026-11-18T14:00:00Z'), sunset: null, dusk: null, clock: () => '', tfr: { kind: 'failed' }, timeZone: 'America/New_York', fria: 'unknown', kp: null, kpWord: () => '',
+    })
+    const html = renderToStaticMarkup(<DronePreflightView rows={rows} />)
+    expect((html.match(/<li /g) ?? []).length).toBe(8)
+    expect(html).toContain('data-tone="amber"')
+    expect(html).not.toContain('data-tone="green"')
+    expect(text(html)).toContain('TFRs: couldn’t check')
+    expect(text(html)).not.toMatch(/\b(clear|safe)\b/i)
   })
 })

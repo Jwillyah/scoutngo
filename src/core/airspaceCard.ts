@@ -53,11 +53,11 @@ export const CHECKED_DETAIL =
   'Checked against the FAA class airspace, facility map grid and special use airspace, ' +
   'and the National Park Service boundaries, all baked into the app and generalized at their edges.'
 
-/** Every card ends with this. Today's restrictions are never checked by the app. */
+/** Every card ends with this (Batch SIMPLE-1, Section 1: the TFR count itself is src/core/tfrLine.ts's, where a place and a fetch are in hand; this is the static close). */
 export const TODAY_LINE: CardLine = {
   tone: 'note',
   text: "Check today's flight restrictions before you fly.",
-  detail: 'Temporary flight restrictions (TFRs) and NOTAMs are not checked by this app. See tfr.faa.gov.',
+  detail: 'The app reads TFRs from tfr.faa.gov when it can reach it and says what it found; other NOTAMs are not checked. See tfr.faa.gov.',
 }
 
 export function airspaceCard(at: AirspaceAtPoint): CardLine[] {

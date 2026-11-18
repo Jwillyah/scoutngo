@@ -187,8 +187,10 @@ export function HowPage({ onBack }: { onBack: () => void }) {
             </p>
             <p className="how__p">
               It is not a substitute for checking the airspace yourself before you fly. Temporary
-              flight restrictions are not checked at all, and it says so where that matters rather
-              than leaving the silence to be read as nothing to report.
+              flight restrictions are read from tfr.faa.gov when the phone can reach it, with the
+              time it did, and a failed read says it could not check rather than a zero. Other NOTAMs are not
+              checked, and it says so where that matters rather than leaving the silence to be read as
+              nothing to report.
             </p>
           </div>
         </section>

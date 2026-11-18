@@ -2,10 +2,11 @@ import { ESRI_ATTRIBUTION } from '../lib/mapConstants.ts'
 import * as maplibregl from 'maplibre-gl'
 import { useEffect, useRef, useState } from 'react'
 import type { AirspaceAtPoint } from '../core/airspaceCard.ts'
-import { openingLayers, sheetSummary, type AirspaceRead, type AirToggle } from '../core/droneAirRead.ts'
+import { LAANC_URL, openingLayers, sheetSummary, type AirspaceRead, type AirToggle } from '../core/droneAirRead.ts'
 import { AIR_FOOT, AIR_SHEET } from '../core/safetyWords.ts'
 import { GOES_MAX_TILE_ZOOM } from '../core/goes.ts'
-import { atMarker, liveCollection, markerChips, type FaaLayerId, type FaaLayers } from '../core/faaLive.ts'
+import { atMarker, liveCollection, markerChips, type FaaArea, type FaaLayerId, type FaaLayers } from '../core/faaLive.ts'
+import { tfrLine, tfrRead } from '../core/tfrLine.ts'
 import type { LatLon } from '../core/geo.ts'
 import { formatDayTime } from '../core/timezone.ts'
 import { loadAirspaceOverlay, type AirspaceOverlay } from '../lib/airspaceOverlay.ts'
@@ -43,7 +44,6 @@ import { fetchRainMaps, frameFor, RAIN_MAX_ZOOM, RAIN_PROTOCOL, rainMaskProtocol
 maplibregl.addProtocol(PROTOCOL, loadTile)
 maplibregl.addProtocol(RAIN_PROTOCOL, rainMaskProtocol)
 
-const LAANC_URL = 'https://www.faa.gov/uas/getting_started/laanc'
 const CHART_TILES = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'
 /* v2 (Batch FIX, Section 6.4): the slimmer defaults; v1 kept every layer on. */
 const PREFS_KEY = 'scoutngo.droneMap.v2'
@@ -278,7 +278,7 @@ export function DroneAirspace({ spot, marker: markerAt, onMarker, here, read, ti
       return k === 'cell' || k === 'class' ? on.grid : k === 'restricted' ? on.nofly : k === 'park' ? on.parks : false
     })
     ;(m.getSource('baked') as maplibregl.GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: kept })
-    ;(m.getSource('live') as maplibregl.GeoJSONSource | undefined)?.setData(liveCollection(layers, view, { tfr: on.tfr, nsufr: on.nofly, fria: on.fria, heliport: on.heliport, sua: on.sua }, todayIso))
+    ;(m.getSource('live') as maplibregl.GeoJSONSource | undefined)?.setData(liveCollection(layers, view, { tfr: on.tfr, nsufr: on.nofly, fria: on.fria, heliport: on.heliport, sua: on.sua }, todayIso, { marker: markerAt, zoom: m.getZoom() }))
     /* The heights on the squares: markers, as on the main map (this style carries no glyphs); only when few enough to read. */
     for (const t of tags.current) t.remove()
     tags.current = []
@@ -304,7 +304,7 @@ export function DroneAirspace({ spot, marker: markerAt, onMarker, here, read, ti
   }, [ready])
   useEffect(() => {
     drawRef.current()
-  }, [overlay, live, prefs.on]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [overlay, live, prefs.on, markerAt.lat, markerAt.lon]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const goTo = (at: LatLon, name: string | null) => {
     setMarker({ at, name })
@@ -333,8 +333,11 @@ export function DroneAirspace({ spot, marker: markerAt, onMarker, here, read, ti
   for (const a of at.sua ?? []) lines.push({ text: `${a.name}${a.detail === '' ? '' : `, ${a.detail}`}.`, tone: 'note' })
   if (here !== null && lines.length === 0) lines.push({ text: 'Nothing the app holds is marked at this point. That is not permission to fly.', tone: 'note' })
   /* Was the sheet's second disclaimer; a fact about what is checked, so it is a line of the details. */
-  lines.push({ text: 'FAA facility maps, TFRs and special use airspace; NOTAMs other than TFRs are not checked.', tone: 'note' })
-  const chips = markerChips(at, sunsetWords)
+  /* Batch SIMPLE-1, Section 1: one TFR truth, from the fetch itself (src/core/tfrLine.ts); the chip and the summary say the same, so the chip is not drawn twice. */
+  const tfr = tfrRead((live.tfr as LayerAnswer<FaaArea[]> | undefined) ?? null, marker.at, todayIso)
+  lines.push({ text: tfrLine(tfr, timeZone, now), tone: 'note' })
+  lines.push({ text: 'Class airspace, facility maps and special use airspace are the FAA data this app holds.', tone: 'note' })
+  const chips = markerChips(at, sunsetWords).filter((c) => !/TFR/.test(c.text))
   const keptAt = LIVE_IDS.map((id) => live[id]).filter((a): a is LayerAnswer<unknown> => a !== undefined && a.from === 'kept' && a.at !== null)
   const oldest = keptAt.length === 0 ? null : Math.min(...keptAt.map((a) => a.at as number))
   const wxWords = prefs.weather === 'wind' ? windWords : prefs.weather === 'gusts' ? gustWords : null
@@ -406,7 +409,7 @@ export function DroneAirspace({ spot, marker: markerAt, onMarker, here, read, ti
             {read === null ? 'Reading the airspace…' : read.headline}
           </p>
           <p className="drp__sheetsum" data-marker-sum>
-            {sheetSummary(read, at.tfrsToday === null ? null : at.tfrsToday.inside.length, at.fria === 'unknown' ? 'unknown' : at.fria !== null)}
+            {sheetSummary(read, tfr.kind === 'checking' ? 'checking' : at.tfrsToday === null ? null : at.tfrsToday.inside.length, at.fria === 'unknown' ? 'unknown' : at.fria !== null)}
           </p>
         </div>
         {compact ? null : (

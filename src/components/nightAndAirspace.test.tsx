@@ -156,9 +156,11 @@ describe('the airspace panel', () => {
   })
 
   /* Silence about TFRs would be the same lie as an unmarked power line. */
-  it('says plainly that TFRs are not checked', () => {
+  it('says what the TFR fetch found (checking, before it answers), that other NOTAMs are not checked, and where to look', () => {
     const shown = text(render(SANDBRIDGE, 200))
-    expect(shown).toContain('NOT checked')
+    expect(shown).toContain('TFRs: checking tfr.faa.gov')
+    expect(shown).toContain('other NOTAMs not checked')
+    expect(shown).not.toContain('NOT checked')
     expect(shown).toContain('tfr.faa.gov')
   })
 
@@ -295,7 +297,10 @@ describe('the airspace sheet, cleaned (Batch TRUTH, Section 6)', () => {
   it('today\'s restrictions said once; the rest behind Details; "generalized"', () => {
     const html = render({ lat: 36.8946, lon: -76.2012 })
     expect(html).not.toContain('Check today&#x27;s flight restrictions')
-    expect(text(html).match(/tfr\.faa\.gov/g)?.length).toBe(1)
+    /* Batch SIMPLE-1, Section 1: one link; the line says where the count is from, and says other NOTAMs are not checked. */
+    expect(html.match(/href="https:\/\/tfr\.faa\.gov\/"/g)?.length).toBe(1)
+    expect(text(html)).toContain('other NOTAMs not checked')
+    expect(text(html)).not.toMatch(/TFRs? (are|is) (NOT|not) checked/)
     expect(html).toContain('<details class="air__details">')
     expect(html).not.toContain('generalised')
   })

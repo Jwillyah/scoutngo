@@ -64,7 +64,7 @@ describe('at the marker', () => {
     const chips = markerChips(atMarker(layers, PIER, '2026-11-16'), '4:53 PM').map((c) => c.text)
     expect(chips).toEqual(['Inside a TFR today', 'Heliport 0.9 mi', 'Remote ID needed', 'Sunset 4:53 PM'])
     const none = markerChips(atMarker({ nsufr: null, fria: null, heliport: null, sua: null, tfr: null }, PIER, '2026-11-16'), null).map((c) => c.text)
-    expect(none).toEqual(['TFRs not received', 'Heliports not received', 'FRIAs not received'])
+    expect(none).toEqual(["TFRs: couldn't check", 'Heliports not received', 'FRIAs not received'])
   })
 
   it('never says clear, safe or OK', () => {

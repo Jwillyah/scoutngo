@@ -15,6 +15,7 @@ import { saneAzimuth } from '../core/sanity.ts'
 import { moonTimesOnLocalDay } from '../core/moonTimes.ts'
 import { droneTag, kt, surfOn, surfTag, windTag, type CallRead, type WindTag } from '../core/briefing.ts'
 import { droneWindow } from '../core/droneWindow.ts'
+import { dialRead } from '../core/calmDial.ts'
 import { bestRun, bestWindows, colorWords, skyStripLit, sideShort, sideSpanWords, weekPill, weekSurfRow, WEEK_SURE_DAYS, groundOf, sideWords, nothingLine, rainLine, spanWords, stripSteps, weekHeadline, type Activity, type CardKind, type WindowRow } from '../core/homeDay.ts'
 import { camsFacingWaterOrSun } from '../core/skyCams.ts'
 import { wakeAt } from '../core/alertIcs.ts'
@@ -737,7 +738,7 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
     const span = windSideSpan(day, brief.facing, which === 'today' ? now : null, timeZone, which === 'today' ? sideNow : null)
     const gusts = gustWords(w, units.wind)
     line = [gusts, span !== null && !span.endsWith('all day') ? span : null].filter((x) => x !== null).join(' · ') || null
-    pic = <WindDial fromDeg={w?.fromDeg ?? null} facing={brief.facing} />
+    pic = <WindDial fromDeg={w?.fromDeg ?? null} facing={brief.facing} calm={dialRead(w?.mps ?? null, w?.mps == null ? null : Math.round(windIn(w.mps, units.wind) ?? 0), w?.fromDeg ?? null) === 'calm'} />
   } else if (kind === 'tide') {
     title = layout === 'few' ? 'Tide · today' : 'Tide'
     target = 'tides'
@@ -911,7 +912,7 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
 }
 
 /** The wind's dial: where it comes from the offshore half is teal, onshore orange; the arrow points where it goes (board D_Home6). */
-export function WindDial({ fromDeg, facing }: { fromDeg: number | null; facing: number | null }) {
+export function WindDial({ fromDeg, facing, calm = false }: { fromDeg: number | null; facing: number | null; calm?: boolean }) {
   const r = 26
   const wedge = (centre: number, half: number) => {
     const p = (a: number) => [30 + r * Math.sin((a * Math.PI) / 180), 30 - r * Math.cos((a * Math.PI) / 180)]
@@ -929,7 +930,12 @@ export function WindDial({ fromDeg, facing }: { fromDeg: number | null; facing: 
           <path d={wedge(facing, 45)} className="hcard__dial--on" />
         </>
       )}
-      {fromDeg === null ? null : (
+      {/* Batch SIMPLE-1, Section 1: calm has no direction, so the ring says "Calm" rather than staying empty (src/core/calmDial.ts). */}
+      {calm ? (
+        <text x="30" y="35" textAnchor="middle" className="hcard__dialcalm" data-calm>
+          Calm
+        </text>
+      ) : fromDeg === null ? null : (
         <g transform={`rotate(${fromDeg + 180} 30 30)`}>
           <path d="M30 50 V12 M24 18 L30 10 L36 18" className="hcard__arrow" />
         </g>

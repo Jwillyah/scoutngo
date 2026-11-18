@@ -68,7 +68,7 @@ describe('businesses on a name search', () => {
   it('a business whose name matches is returned, below our own spots', () => {
     const q = parseQuery('chicks')
     const got = rankResults(q, ownSpots(q, null, undefined, localPool([], [])), [CAFE, OTHER], null)
-    expect(got.map((r) => r.name)).toEqual(["Chick's Beach", "Chick's Oyster Bar"])
+    expect(got.map((r) => r.name)).toEqual(["Chic's Beach", "Chick's Oyster Bar"])
     expect(got[1].group).toBe('business')
   })
 })

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   AUTHORIZATION_RULE,
   NO_SURFACE_AIRSPACE_NOTE,
-  TFR_NOT_CHECKED,
+  NOTAMS_NOT_CHECKED,
   airspaceAt,
   authorizationState,
   decodeShape,
@@ -126,9 +126,10 @@ describe('the stated wording', () => {
   })
 
   /* Silence about TFRs would be the same lie as an unmarked power line. */
-  it('says plainly that TFRs are not checked, and where to look', () => {
-    expect(TFR_NOT_CHECKED).toContain('NOT checked')
-    expect(TFR_NOT_CHECKED).toContain('tfr.faa.gov')
+  it('says plainly that other NOTAMs are not checked, and where to look; it no longer says TFRs are not', () => {
+    expect(NOTAMS_NOT_CHECKED).toContain('Other NOTAMs are not checked')
+    expect(NOTAMS_NOT_CHECKED).toContain('tfr.faa.gov')
+    expect(NOTAMS_NOT_CHECKED).not.toMatch(/TFRs? (are|is) (NOT|not) checked/)
   })
 
   /*
@@ -146,7 +147,7 @@ describe('the stated wording', () => {
   })
 
   it('states no verdict anywhere', () => {
-    const shown = [AUTHORIZATION_RULE, NO_SURFACE_AIRSPACE_NOTE, TFR_NOT_CHECKED]
+    const shown = [AUTHORIZATION_RULE, NO_SURFACE_AIRSPACE_NOTE, NOTAMS_NOT_CHECKED]
       .join(' ')
       .toLowerCase()
     for (const banned of [

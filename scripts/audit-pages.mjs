@@ -200,24 +200,37 @@ try {
     const droneCard = await page.locator('.home__page[aria-label="Today"] .hcard--drone').first().click({ timeout: 4000, noWaitAfter: true }).then(() => true, (e) => String(e?.message ?? e).split('\n').slice(0, 14).join(' | '))
     if (droneCard !== true) fail(`${label}: no Drone card on the home (a drone is in this kit) (${droneCard})`)
     await wait(4000)
-    /* Batch DRONE, Section 2: four swiped pages under the Sky page's pill; Now first. The rows are By height's grid, the bars Now's hours at 400 ft, the tiles Now's four cards. */
-    const dr = JSON.parse(await ev(`JSON.stringify((() => { const p = document.querySelector('.drpage'); if (!p) return null; const now = p.querySelector('[data-drone-page="now"]'); return { tabs: [...p.querySelectorAll('.drp__seg [role="tab"]')].map((b) => b.textContent), on: p.querySelector('.drp__seg [aria-selected="true"]')?.textContent ?? null, big: p.querySelector('.drp__big')?.textContent ?? null, limit: p.querySelector('.drp__limit')?.textContent ?? null, rows: p.querySelectorAll('[data-drone-page="height"] [role="rowheader"]').length, segs: p.querySelectorAll('[data-drone-page="now"] .drp__bar').length + p.querySelectorAll('[data-drone-page="now"] .drp__today .drp__none').length, tiles: now === null ? [] : [...now.querySelectorAll('.drp__rowline .drp__rlabel')].map((e) => e.textContent), cards: p.querySelectorAll('[data-drone-page="now"] .wtile, [data-drone-page="height"] .wtile, [data-drone-page="height"] .drp__rowline').length, chip: p.querySelector('.drp__chip')?.getAttribute('data-tone') ?? null, chipText: p.querySelector('.drp__chip')?.textContent ?? null, buttons: [...p.querySelectorAll('.drp__buttons button')].map((b) => b.textContent), text: p.innerText } })())`))
+    /* Batch SIMPLE-1, Section 1: three tabs, Wind · Airspace · Preflight. The Wind page is the old Now page with By height's grid below it on one scroll; Preflight is a checklist of green and amber rows with "Get LAANC ›" and "Plan a shoot ›". */
+    const dr = JSON.parse(await ev(`JSON.stringify((() => { const p = document.querySelector('.drpage'); if (!p) return null; const wind = p.querySelector('[data-drone-page="wind"]'); return { tabs: [...p.querySelectorAll('.drp__seg [role="tab"]')].map((b) => b.textContent), on: p.querySelector('.drp__seg [aria-selected="true"]')?.textContent ?? null, big: p.querySelector('.drp__big')?.textContent ?? null, limit: p.querySelector('.drp__limit')?.textContent ?? null, rows: p.querySelectorAll('[data-drone-page="wind"] [role="rowheader"]').length, segs: p.querySelectorAll('[data-drone-page="wind"] .drp__bar').length + p.querySelectorAll('[data-drone-page="wind"] .drp__today .drp__none').length, tiles: wind === null ? [] : [...wind.querySelectorAll('.drp__rowline .drp__rlabel')].map((e) => e.textContent), cards: p.querySelectorAll('[data-drone-page="wind"] .wtile, [data-drone-page="wind"] .drp__rowline').length, chip: p.querySelector('.drp__chip')?.getAttribute('data-tone') ?? null, chipText: p.querySelector('.drp__chip')?.textContent ?? null, compass: p.querySelector('.drp__compass [data-toward], .drp__compass [data-calm], .drp__compass [data-nodir]') !== null, text: p.innerText } })())`))
     console.log(`  Drone: ${JSON.stringify(dr === null ? null : { ...dr, text: undefined })}`)
     if (dr === null) fail(`${label}: the home's Drone card opened no Drone page`)
     else {
-      if (dr.tabs.join('|') !== 'Now|By height|Airspace|Plan') fail(`${label}: the Drone page's tabs are ${JSON.stringify(dr.tabs)}`)
-      if (dr.on !== 'Now') fail(`${label}: the Drone page opened on ${JSON.stringify(dr.on)}, not Now`)
+      if (dr.tabs.join('|') !== 'Wind|Airspace|Preflight') fail(`${label}: the Drone page's tabs are ${JSON.stringify(dr.tabs)}`)
+      if (dr.on !== 'Wind') fail(`${label}: the Drone page opened on ${JSON.stringify(dr.on)}, not Wind`)
       if (!/^\d+ (kt|mph|km\/h|m\/s)$/.test(dr.big ?? '')) fail(`${label}: the Drone page's headline reads ${JSON.stringify(dr.big)}`)
       if (!/limit|My gear/.test(dr.limit ?? '')) fail(`${label}: no drone limit line (${JSON.stringify(dr.limit)})`)
-      if (dr.rows !== 5) fail(`${label}: ${dr.rows} heights in the By height grid, not gnd to 400 ft`)
-      if (dr.segs < 1) fail(`${label}: no hours at 400 ft on Now, and no words saying why`)
-      /* Batch FIX, Section 6.2: four one-line rows, no cards; the GPS row only once a Kp has been received (the gate's fixture answers). */
-      if (dr.tiles.join('|') !== 'Airspace|Battery|Sky|GPS') fail(`${label}: the Now rows are ${JSON.stringify(dr.tiles)}`)
-      if (dr.cards !== 0) fail(`${label}: ${dr.cards} cards still on Now or By height`)
+      if (dr.rows !== 5) fail(`${label}: ${dr.rows} heights in the By height grid under the wind, not gnd to 400 ft`)
+      if (dr.segs < 1) fail(`${label}: no hours at 400 ft on Wind, and no words saying why`)
+      /* The compass is never an empty circle: an arrow, "Calm", or a dash. */
+      if (!dr.compass) fail(`${label}: the compass has no arrow, no "Calm" and no dash: an empty circle`)
+      /* The Now rows are off (src/config/flags.ts DRONE_WIND_ROWS); no cards either. */
+      if (dr.tiles.length !== 0 || dr.cards !== 0) fail(`${label}: the Wind page still has rows or cards: ${JSON.stringify(dr.tiles)} / ${dr.cards}`)
       /* One chip, orange only for limit or gust trouble. */
       if (dr.chip !== null && (dr.chip === 'trouble') !== /^(Over|At) your|^Gusts \d+% of your/.test(dr.chipText ?? '')) fail(`${label}: the chip is ${dr.chip} for ${JSON.stringify(dr.chipText)}`)
-      if (dr.buttons.join('|') !== 'Preflight check|Plan the flight') fail(`${label}: the buttons are ${JSON.stringify(dr.buttons)}`)
       if (/\bsafe\b|all clear|clear to fly/i.test(dr.text)) fail(`${label}: the Drone page says safe or clear`)
+      /* The Preflight tab: eight rows, green or amber, the TFR line from the fetch, and the two buttons. */
+      await page.locator('.drpage .drp__seg [role="tab"]:has-text("Preflight")').click({ timeout: 4000 }).catch(() => fail(`${label}: no Preflight tab to open`))
+      await wait(2500)
+      const pf = JSON.parse(await ev(`JSON.stringify((() => { const p = document.querySelector('.drpage'); const rows = [...p.querySelectorAll('[data-drone-page="preflight"] [data-pf]')]; return { on: p.querySelector('.drp__seg [aria-selected="true"]')?.textContent ?? null, keys: rows.map((r) => r.getAttribute('data-pf')), tones: rows.map((r) => r.getAttribute('data-tone')), tfr: p.querySelector('[data-pf="tfr"] .drp__pfline')?.textContent ?? null, buttons: [...p.querySelectorAll('.drp__buttons a, .drp__buttons button')].map((b) => b.textContent.trim()), laanc: p.querySelector('.drp__buttons a')?.getAttribute('href') ?? null, text: p.innerText } })())`))
+      console.log(`  Preflight: ${JSON.stringify({ ...pf, text: undefined })}`)
+      if (pf.on !== 'Preflight') fail(`${label}: the Preflight tab did not open (on ${JSON.stringify(pf.on)})`)
+      if (pf.keys.join('|') !== 'airspace|wind|gusts|battery|sunset|tfr|remoteid|kp') fail(`${label}: the Preflight rows are ${JSON.stringify(pf.keys)}`)
+      if (pf.tones.some((t) => t !== 'green' && t !== 'amber')) fail(`${label}: a Preflight row is neither green nor amber: ${JSON.stringify(pf.tones)}`)
+      if (!/TFRs/.test(pf.tfr ?? '') || !/other NOTAMs not checked/.test(pf.tfr ?? '')) fail(`${label}: the TFR row reads ${JSON.stringify(pf.tfr)}`)
+      if (/TFRs? (are|is) not checked|NOT checked/.test(pf.text)) fail(`${label}: the Drone page still says TFRs are not checked`)
+      if (pf.buttons.join('|') !== 'Get LAANC ›|Plan a shoot ›') fail(`${label}: the Preflight buttons are ${JSON.stringify(pf.buttons)}`)
+      if (!/faa\.gov/.test(pf.laanc ?? '')) fail(`${label}: Get LAANC goes to ${JSON.stringify(pf.laanc)}`)
+      if (/\bsafe\b|all clear|clear to fly/i.test(pf.text)) fail(`${label}: Preflight says safe or clear`)
       await page.screenshot({ path: join(OUT, `drone-${label.replace(/\s/g, '-').toLowerCase()}.png`) })
       await page.locator('.drpage .ppage__back').click()
       await wait(800)

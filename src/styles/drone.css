@@ -94,6 +94,12 @@
   font-size: 14px;
   font-weight: 700;
 }
+/* Batch SIMPLE-1, Section 1: "Calm" in the ring, 16 in the 120 viewBox: 13.9 px on screen. */
+.drp__compasscalm {
+  fill: var(--white);
+  font-size: 16px;
+  font-weight: 700;
+}
 /* 14 in the 120 viewBox drawn at 104 px: 12.1 px on screen, the style audit's floor (12 was 10.4). */
 .drp__compassarrow {
   fill: none;
@@ -397,6 +403,46 @@
   min-height: 44px;
 }
 
+/* ------------------------------------------- Preflight (Batch SIMPLE-1, Section 1): green --good, amber --caution */
+.drp__pf {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.drp__pfrow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 48px;
+  padding: 10px 0;
+  border-top: 1px solid var(--glass-edge);
+}
+.drp__pfdot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--caution);
+}
+.drp__pfrow--green .drp__pfdot {
+  background: var(--good);
+}
+.drp__pfwords {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.drp__pflabel {
+  font-size: var(--text-md);
+}
+.drp__pfline {
+  font-size: var(--text-md);
+  color: var(--glass-ink-2);
+  overflow-wrap: anywhere;
+}
+
 /* --------------------------------------------------------------- foot */
 .drp__foot {
   flex: none;
@@ -409,6 +455,27 @@
 .drp__btn {
   flex: 1;
   min-height: 52px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+/* Batch SIMPLE-1, Section 1: the 3D flight under Preflight's two, while Labs is on. */
+.drp__labsrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+.drp__fly {
+  flex: none;
+  min-height: 44px;
+}
+.drp__labs {
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--glass-ink-2);
 }
 
 /* ------------------------------------------------------------ Airspace */

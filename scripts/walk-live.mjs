@@ -133,7 +133,9 @@ await look('map', async () => {
 await look('planner (preflight)', async () => {
   await home()
   await tap('.hcard--drone', 3000)
-  return tap('.drp__btn', 5000)
+  /* Batch SIMPLE-1, Section 1: Fly is on the Preflight tab, under its two buttons. */
+  await tap('button[role="tab"]:nth-child(3)', 3000)
+  return tap('.drp__labsrow button', 5000)
 })
 await look('3D', async () => page.getByRole('button', { name: 'Play in 3D' }).first().click({ timeout: 8000 }).then(async () => { await wait(15000); return true }, () => false))
 await look('drone Fly', async () => page.getByRole('button', { name: 'Fly it yourself' }).first().click({ timeout: 8000 }).then(async () => { await wait(15000); return true }, () => false))

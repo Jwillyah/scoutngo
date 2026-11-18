@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
+import { TfrToday } from './TfrToday.tsx'
 import { AIR_SAFETY } from '../core/safetyWords.ts'
 import {
   AUTHORIZATION_RULE,
   NO_SURFACE_AIRSPACE_NOTE,
-  TFR_NOT_CHECKED,
   TFR_URL,
   type AirspaceShape,
 } from '../core/airspaceLookup.ts'
@@ -43,6 +43,8 @@ interface AirspacePanelProps {
   /** "My approved ceiling" as typed, or '' for the grid value. See approvedCeilingHere in src/lib/venue.ts. */
   approvedCeiling?: string
   onApprovedCeiling?: (typed: string) => void
+  /** The venue's time zone, for the TFR line's clock (Batch SIMPLE-1); the phone's when absent. */
+  timeZone?: string
 }
 
 /**
@@ -61,7 +63,7 @@ interface AirspacePanelProps {
  * NOTHING HERE IS AN AUTHORIZATION, and the panel says so in the FAA's own
  * terms rather than in a disclaimer at the bottom nobody reads.
  */
-export function AirspacePanel({ venue, altitudeFeet, laanc, onLaanc, approvedCeiling = '', onApprovedCeiling }: AirspacePanelProps) {
+export function AirspacePanel({ venue, altitudeFeet, laanc, onLaanc, approvedCeiling = '', onApprovedCeiling, timeZone }: AirspacePanelProps) {
   /*
    * THE ANSWER CARRIES THE PIN IT IS FOR.
    *
@@ -149,7 +151,8 @@ export function AirspacePanel({ venue, altitudeFeet, laanc, onLaanc, approvedCei
         {lines === null ? 'Reading what the app holds for this point…' : airspaceLead(lines, cell?.ceilingFeet ?? null)}
       </p>
       <p className="air__tfrline">
-        {TFR_NOT_CHECKED.replace(/ Check tfr\.faa\.gov before you fly\.$/, '')} Check{' '}
+        {/* Batch SIMPLE-1, Section 1: what the TFR fetch found (src/core/tfrLine.ts), then the link. */}
+        <TfrToday at={venue} timeZone={timeZone} /> Check{' '}
         <a href={TFR_URL} target="_blank" rel="noreferrer noopener">
           tfr.faa.gov
         </a>{' '}
@@ -327,14 +330,7 @@ export function AirspacePanel({ venue, altitudeFeet, laanc, onLaanc, approvedCei
         )}
       </Group>
 
-      {/*
-        * TFRs ARE NOT CHECKED, SAID WHERE IT CANNOT BE MISSED.
-        *
-        * There is no usable keyless public TFR feed and NOTAMs need OAuth2, so
-        * this app checks neither. Leaving that silent would let an absence of
-        * warnings read as an absence of restrictions, which is the same lie as
-        * an unmarked power line.
-        */}
+      {/* TFRs are said at the top, from the fetch (Batch SIMPLE-1, Section 1); other NOTAMs are said there too. */}
       <p className="air__credit">{FAA_SOURCE_NOTE}</p>
       </details>
       {/* Batch DRONE, Section 0.3. */}

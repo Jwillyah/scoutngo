@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import type { DayBars, LimitChip } from '../core/droneNow.ts'
+import type { DialRead } from '../core/calmDial.ts'
 
 /*
  * THE DRONE PAGE'S NOW TAB (Batch DRONE, Section 2.1; Batch FIX, Section 6.2:
@@ -35,6 +36,8 @@ export interface DroneNowData {
   fromLine: string | null
   /** Where the arrow points (where the wind blows to), or null with no direction. */
   towardDeg: number | null
+  /** What the compass says (src/core/calmDial.ts): an arrow, "Calm", or a dash (Batch SIMPLE-1, Section 1: never an empty circle). */
+  dial: DialRead
   /** The one chip (src/core/droneNow.ts limitChip), or null with no limit or no wind at 400 ft. */
   chip: LimitChip | null
   /** With no chip, why: "Add your drone in Settings › My gear for its wind limit". */
@@ -48,12 +51,22 @@ export interface DroneNowData {
   barsNone: string
 }
 
-export function DroneCompass({ towardDeg }: { towardDeg: number | null }) {
+export function DroneCompass({ towardDeg, read }: { towardDeg: number | null; read?: DialRead }) {
+  /* Callers that predate the dial read just the arrow: a direction is an arrow, none is a dash. */
+  const dial: DialRead = read ?? (towardDeg === null ? 'none' : 'arrow')
   return (
-    <svg className="drp__compass" viewBox="0 0 120 120" role="img" aria-label={towardDeg === null ? 'No wind direction in the forecast' : `The wind blows toward ${Math.round(towardDeg)}°`}>
+    <svg className="drp__compass" viewBox="0 0 120 120" role="img" aria-label={dial === 'calm' ? 'Calm: no wind direction' : dial === 'none' || towardDeg === null ? 'No wind direction in the forecast' : `The wind blows toward ${Math.round(towardDeg)}°`}>
       <circle cx="60" cy="60" r="56" className="drp__compassring" />
       <text x="60" y="18" textAnchor="middle" className="drp__compassn">N</text>
-      {towardDeg === null ? null : (
+      {dial === 'calm' ? (
+        <text x="60" y="70" textAnchor="middle" className="drp__compasscalm" data-calm>
+          Calm
+        </text>
+      ) : dial === 'none' || towardDeg === null ? (
+        <text x="60" y="70" textAnchor="middle" className="drp__compasscalm" data-nodir>
+          —
+        </text>
+      ) : (
         <g transform={`rotate(${towardDeg} 60 60)`} data-toward={Math.round(towardDeg)}>
           <path d="M60 92 L60 32 M48 46 L60 30 L72 46" className="drp__compassarrow" />
         </g>
@@ -137,7 +150,7 @@ export function DroneNowView({ data, rows }: { data: DroneNowData; rows: readonl
           </p>
           <p className="drp__from">{data.fromLine ?? 'The forecast did not say the direction.'}</p>
         </div>
-        <DroneCompass towardDeg={data.towardDeg} />
+        <DroneCompass towardDeg={data.towardDeg} read={data.dial} />
       </div>
       {data.chip === null ? (
         data.note === null ? null : <p className="drp__limit drp__note">{data.note}</p>
@@ -147,7 +160,7 @@ export function DroneNowView({ data, rows }: { data: DroneNowData; rows: readonl
         </p>
       )}
       <DroneBars bars={data.bars} label={data.barsLabel} marks={data.marks} none={data.barsNone} />
-      <DroneRows rows={rows} label="Airspace, battery, sky and GPS" />
+      {rows.length === 0 ? null : <DroneRows rows={rows} label="Airspace, battery, sky and GPS" />}
     </>
   )
 }

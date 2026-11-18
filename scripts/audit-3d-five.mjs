@@ -116,6 +116,9 @@ try {
       await openMenu(ev, wait)
       await page.locator('.mcard--drone').first().tap({ timeout: 4000 }).catch(() => {})
       await wait(1500)
+      /* Batch SIMPLE-1, Section 1: on the Preflight tab, while Labs is on. */
+      await ev(`[...document.querySelectorAll('button[role="tab"]')].find(b => b.textContent.trim() === 'Preflight')?.click()`)
+      await wait(600)
       can = await ev(`!!${flyButton}`)
     }
     if (!can) {

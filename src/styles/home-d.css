@@ -217,6 +217,11 @@
 .hcard__dial--on {
   fill: rgb(239 138 74 / 0.3);
 }
+.hcard__dialcalm {
+  fill: var(--white);
+  font-size: 13px;
+  font-weight: 700;
+}
 .hcard__arrow {
   fill: none;
   stroke: var(--white);

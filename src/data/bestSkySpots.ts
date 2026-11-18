@@ -19,7 +19,7 @@ export interface StarterSpot {
 export const STARTER_SPOTS: readonly StarterSpot[] = [
   { id: 'lynnhaven-inlet', name: 'Lynnhaven Inlet', at: { lat: 36.9076, lon: -76.0915 }, facing: 250, openDeg: 70, water: true, silhouette: 'bridge' },
   { id: 'lesner-bridge', name: 'Lesner Bridge', at: { lat: 36.9097, lon: -76.0863 }, facing: 270, openDeg: 60, water: true, silhouette: 'bridge' },
-  { id: 'chicks-beach', name: "Chick's Beach", at: { lat: 36.9196, lon: -76.1255 }, facing: 330, openDeg: 80, water: true, silhouette: null },
+  { id: 'chicks-beach', name: "Chic's Beach", at: { lat: 36.9196, lon: -76.1255 }, facing: 330, openDeg: 80, water: true, silhouette: null },
   { id: 'first-landing', name: 'First Landing', at: { lat: 36.9214, lon: -76.0507 }, facing: 300, openDeg: 80, water: true, silhouette: null },
   { id: 'fort-story', name: 'Ft Story', at: { lat: 36.9262, lon: -76.0079 }, facing: 45, openDeg: 90, water: true, silhouette: 'lighthouse' },
   { id: 'vb-pier', name: 'VB Pier', at: { lat: 36.8436, lon: -75.9713 }, facing: 100, openDeg: 90, water: true, silhouette: 'pier' },

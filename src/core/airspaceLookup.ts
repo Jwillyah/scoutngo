@@ -181,17 +181,12 @@ export const AUTHORIZATION_RULE =
   'Class B, C, D, and surface-area Class E.'
 
 /**
- * TFRs AND NOTAMS ARE NOT CHECKED, AND SAYING SO IS NOT OPTIONAL.
- *
- * There is no usable keyless public feed for temporary flight restrictions,
- * and NOTAMs are behind OAuth2 client credentials. So this app does not check
- * either, and the one thing it must not do is let that silence read as
- * nothing-to-report. An unchecked TFR and an unmarked power line are the same
- * class of lie.
+ * WHAT IS NOT CHECKED, SAID PLAINLY (Batch SIMPLE-1, Section 1). The app does
+ * fetch TFRs (/api/tfr, src/lib/faaLiveData.ts) and says what that fetch found
+ * (src/core/tfrLine.ts). NOTAMs other than TFRs are behind OAuth2 client
+ * credentials and are not fetched, and the one thing this must not do is let
+ * that silence read as nothing-to-report.
  */
-export const TFR_NOT_CHECKED =
-  'Temporary flight restrictions and NOTAMs are NOT checked by this app. ' +
-  'A TFR can close this airspace at any time and none of the above would change. ' +
-  'Check tfr.faa.gov before you fly.'
+export const NOTAMS_NOT_CHECKED = 'Other NOTAMs are not checked by this app. Check tfr.faa.gov and the NOTAMs before you fly.'
 
 export const TFR_URL = 'https://tfr.faa.gov/'

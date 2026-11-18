@@ -10,8 +10,8 @@
  *
  *   home       the home's Map button
  *   menu       Menu › Plan a shoot (the planner, asked for), then its way out
- *   drone      the Drone page's Preflight check, Back to the home, then Map;
- *              and the Drone page's own Map button
+ *   drone      the Drone page's Preflight › Plan a shoot (the planner, asked
+ *              for), then its way out; and the Drone page's own Map button
  *   search     the place pill, a spot picked, then Map
  *   link       a link with a query (no home over it), and a reload
  *
@@ -116,15 +116,15 @@ try {
 
   console.log('\n### drone')
   await front()
+  /* Batch SIMPLE-1, Section 1: the Drone page's door to the planner is Preflight › Plan a shoot. */
   if (await tap(page.locator('.home button', { hasText: /^Drone/ }), "the home's Drone card")) {
     await wait(1500)
-    if (await tap(page.getByRole('button', { name: /^preflight check$/i }), "the Drone page's Preflight check")) {
+    await tap(page.locator('button[role="tab"]', { hasText: /^Preflight$/ }), "the Drone page's Preflight tab")
+    await wait(800)
+    if (await tap(page.getByRole('button', { name: /^plan a shoot ›$/i }), "Preflight's Plan a shoot")) {
       await wait(1500)
-      if ((await ev(`document.querySelector('.sheet [data-card]')?.getAttribute('data-card')`)) !== 'preflight') fail('drone: Preflight check did not open Preflight')
-      if (await tap(page.locator('button[aria-label="Back to the home"]'), "the map's Back")) {
-        await wait(1200)
-        if (await openMap()) await clean('drone, Preflight, back, Map')
-      }
+      if (!(await ev(`!!document.querySelector('.mode-setup')`))) fail('drone: Plan a shoot did not open the planner')
+      if (await tap(page.getByRole('button', { name: /^same as last time$/i }), "the planner's Same as last time")) await clean('drone, Plan a shoot, out')
     }
   }
   await front()

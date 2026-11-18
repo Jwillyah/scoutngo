@@ -1226,9 +1226,8 @@ const OPENERS = `(() => {
     add('menu', 'Sky', 'sky')
     /* The call sheet's door is a row on Plan's shoot card since Batch H (walked with the .more2__row doors below). */
     add('menu', 'Settings', 'settings')
-    /* Preflight is the Drone card's since Batch K addendum E; Batch Flow, Section 5: the Drone page first, Preflight its button. */
-    /* Batch DRONE, Section 2: the Drone page's button reads "Preflight check". */
-    add('dronepage', 'Preflight check', 'preflight')
+    /* Batch SIMPLE-1, Section 1: "Preflight check" went behind src/config/flags.ts DRONE_PLAN_TAB with the Plan tab; the card's door is now the Preflight tab's "Plan the flight" (while Labs is on: the gate's browsers have it on), which opens it under Fly. */
+    add('dronepage', 'Plan the flight', 'preflight')
     /* Behind the Sky card's Moon page: a door two taps deep, walked the way a person walks it. */
     add('skymoon', 'Plan this moonrise', 'moonrise')
   }
@@ -1264,10 +1263,22 @@ const click = async (sel, i) => {
     await wait(400)
     await ev(`[...document.querySelectorAll('nav[aria-label="Stage"] button')].find((b) => (b.querySelector('.sidemenu__label')?.textContent ?? '').trim() === 'Drone')?.click()`)
     for (let k = 0; k < 10 && !(await ev(`!!document.querySelector('.drpage')`)); k += 1) await wait(200)
-    await ev(`[...document.querySelectorAll('.drpage .drp__buttons button')].find((b) => b.textContent.trim() === ${JSON.stringify(i)})?.click()`)
+    /* Batch SIMPLE-1, Section 1: the button is on the Preflight tab, under its two. */
+    await ev(`[...document.querySelectorAll('.drpage button[role="tab"]')].find((b) => b.textContent.trim() === 'Preflight')?.click()`)
+    await wait(400)
+    await ev(`[...document.querySelectorAll('.drpage .drp__labsrow button, .drpage .drp__buttons button')].find((b) => b.textContent.trim() === ${JSON.stringify(i)})?.click()`)
     /* The Preflight card arrives after the page closes, sometimes past 700 ms (Batch QA, Section 0: a run read the shoot card still there): wait for it, up to 4 s. */
     for (let k = 0; k < 20 && !(await ev(`!!document.querySelector('.pf, .sheet [data-card="preflight"]')`)); k += 1) await wait(200)
     await wait(300)
+    /* Batch SIMPLE-1, Section 1: that door also starts Fly over the card; the walk measures the card on the 2D map, so the 3D view is closed once it is up (the card stays). */
+    if (i === 'Plan the flight') {
+      for (let k = 0; k < 50 && !(await ev(`!!document.querySelector('.clay, .fly__stick')`)); k += 1) await wait(200)
+      for (let k = 0; k < 10 && (await ev(`!!document.querySelector('.clay')`)); k += 1) {
+        await ev(`(document.querySelector('button[aria-label="Back to the 2D map"]') ?? [...document.querySelectorAll('.clay button')].find((b) => /Back to 2D/.test(b.textContent)))?.click()`)
+        await wait(500)
+      }
+      await wait(300)
+    }
     return
   }
   if (sel === 'menu') {

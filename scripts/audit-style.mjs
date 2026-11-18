@@ -328,7 +328,9 @@ try {
   await menuOn(page)
   /* The drone view's HUD: the Drone page › Plan the flight (Batch Flow, Section 5; renamed in Batch DRONE, Section 2.5). */
   if (await tap('nav[aria-label="Stage"] .mcard--drone', 'drone page')) {
-    if (await tap('.drp__buttons button:has-text("Plan the flight")', 'drone view')) {
+    /* Batch SIMPLE-1, Section 1: on the Preflight tab, under its two buttons, while Labs is on. */
+    await tap('button[role="tab"]:has-text("Preflight")', 'the Preflight tab')
+    if (await tap('.drp__labsrow button:has-text("Plan the flight")', 'drone view')) {
       await wait(3000)
       await look('drone view hud')
     }

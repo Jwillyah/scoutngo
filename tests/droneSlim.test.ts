@@ -44,10 +44,11 @@ describe('By height: a short headline (6.3)', () => {
     expect(heightSub(g, 23 * KT, 'NNE', (m) => m / KT, 'kt')).toBe('6–9 kt from NNE at every height · limit 23')
     expect(heightSub(null, 23 * KT, 'NNE', (m) => m / KT, 'kt')).toBe('The forecast did not give the wind by height.')
   })
-  it('the tab has no cards and no buttons under it (they were cut off)', () => {
+  it("the grid has no cards and no buttons of its own: it sits under the Wind tab, and the buttons are Preflight's (Batch SIMPLE-1, Section 1)", () => {
     const page = readFileSync('src/components/DronePage.tsx', 'utf8')
     expect(page).toContain('<DroneHeightView data={heightData} />')
-    expect(page).toContain("{tab === 'now' || tab === 'plan' ? (")
+    expect(page).toContain("{tab === 'preflight' ? (")
+    expect(page).not.toContain("tab === 'now'")
   })
 })
 
@@ -57,8 +58,9 @@ describe('Airspace: the sheet in two lines (6.4)', () => {
     expect(sheetSummary(read, 0, false)).toBe('Norfolk Intl grid · LAANC needed · 0 TFRs here · Remote ID needed')
     expect(sheetSummary(read, 1, true)).toBe('Norfolk Intl grid · LAANC needed · 1 TFR here · In a FRIA')
   })
-  it('says what it does not have: TFRs not received; nothing about Remote ID before the FRIA layer', () => {
-    expect(sheetSummary(read, null, 'unknown')).toBe('Norfolk Intl grid · LAANC needed · TFRs not received')
+  it("says what it does not have: TFRs couldn't be checked (never 0); nothing about Remote ID before the FRIA layer", () => {
+    expect(sheetSummary(read, null, 'unknown')).toBe("Norfolk Intl grid · LAANC needed · TFRs: couldn't check")
+    expect(sheetSummary(read, 'checking', 'unknown')).toBe('Norfolk Intl grid · LAANC needed · TFRs: checking')
     expect(sheetSummary({ ...read, laanc: false, facility: null }, 0, false)).toBe('FAA authorization needed · 0 TFRs here · Remote ID needed')
     expect(sheetSummary(null, 0, false)).toMatch(/Reading/)
   })

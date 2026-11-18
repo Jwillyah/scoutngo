@@ -15,7 +15,8 @@
  *                    from there (src/lib/coast.ts).
  */
 export const STARTER_ALIASES: Readonly<Record<string, readonly string[]>> = {
-  'chicks-beach': ["Chic's Beach", 'Chics Beach', 'Chicks Beach', 'Chesapeake Beach'],
+  /* Batch SIMPLE-1, Section 1: the display name is "Chic's Beach" (bestSkySpots.ts); "Chick's" and "Chicks" stay as aliases so search still finds it. */
+  'chicks-beach': ["Chick's Beach", 'Chicks Beach', 'Chics Beach', 'Chesapeake Beach'],
   'fort-story': ['Fort Story', 'Cape Henry'],
   'lynnhaven-inlet': ['Lynnhaven'],
   'rudee-inlet': ['Rudee'],

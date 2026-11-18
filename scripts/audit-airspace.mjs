@@ -79,7 +79,8 @@ const card = await ev(`(() => {
   return { lines, lead: document.querySelector('[data-lead]')?.textContent ?? null, tfr: tfr?.textContent ?? null, links: document.querySelectorAll('a[href="https://tfr.faa.gov/"]').length, link: tfr?.querySelector('a')?.getAttribute('href') ?? null }
 })()`)
 if (card.lines.length === 0) abort('the airspace card shows no lines, so the words were not checked')
-check(/NOT checked/.test(card.tfr ?? '') && /before you fly/.test(card.tfr ?? ''), `today's restrictions line reads "${card.tfr}"`)
+/* Batch SIMPLE-1, Section 1: the line says what the TFR fetch found (or that it could not check), and that other NOTAMs are not checked; it never says TFRs are not checked. */
+check(/^TFRs( today)?:/.test(card.tfr ?? '') && /other NOTAMs not checked/.test(card.tfr ?? '') && /before you fly/.test(card.tfr ?? '') && !/NOT checked/.test(card.tfr ?? ''), `today's restrictions line reads "${card.tfr}"`)
 check(card.link === 'https://tfr.faa.gov/' && card.links === 1, `restrictions link is ${card.link}, ${card.links} on the card`)
 check(!card.lines.some((l) => /Check today/.test(l ?? '')), 'today\'s restrictions said twice')
 check(typeof card.lead === 'string' && card.lead.length > 0 && !/clear|safe/i.test(card.lead), `the lead line reads "${card.lead}"`)
