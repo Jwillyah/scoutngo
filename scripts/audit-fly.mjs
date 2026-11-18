@@ -102,14 +102,24 @@ try {
     /* Batch Flow, Section 5: the menu's Drone card is the Drone page; its "Plan the flight" (was "Fly it yourself") opens the 3D view (the drone card under it). */
     /* Batch DRONE, Section 2.5: on the Drone page the button reads "Plan the flight"; Preflight's card keeps "Fly it yourself". */
     /* Batch SIMPLE-1, Section 1: "Plan the flight" is under the Preflight tab's two buttons, while Labs is on. */
-    await ev(`[...document.querySelectorAll('button[role="tab"]')].find(b => b.textContent.trim() === 'Preflight')?.click()`)
-    await wait(600)
-    await ev(`[...document.querySelectorAll('.drp__labsrow button, .drp__buttons button, .pf button')].find(b => b.textContent === 'Plan the flight' || b.textContent === 'Fly it yourself')?.click()`)
+    /* Waited for, not timed: under the gate's load the page and its tab come late. */
+    let tabbed = false
+    for (let i = 0; i < 40 && !tabbed; i += 1) {
+      tabbed = await ev(`(() => { const t = [...document.querySelectorAll('button[role="tab"]')].find(b => b.textContent.trim() === 'Preflight'); if (!t) return false; t.click(); return true })()`)
+      if (!tabbed) await wait(250)
+    }
+    let pressed = false
+    for (let i = 0; i < 40 && !pressed; i += 1) {
+      await wait(250)
+      pressed = await ev(`(() => { const b = [...document.querySelectorAll('.drp__labsrow button, .drp__buttons button, .pf button')].find(b => b.textContent === 'Plan the flight' || b.textContent === 'Fly it yourself'); if (!b) return false; b.click(); return true })()`)
+    }
+    console.log(`  the Drone page: Preflight tab ${tabbed ? 'tapped' : 'NOT FOUND'}, Plan the flight ${pressed ? 'tapped' : 'NOT FOUND'}`)
     let up = false
     for (let i = 0; i < 120 && !up; i += 1) {
       await wait(1000)
       up = await ev(`!!document.querySelector('.fly__stick')`)
     }
+    if (!up) console.log(`  after 120 s: ${await ev(`JSON.stringify({ card: document.querySelector('.sheet [data-card]')?.getAttribute('data-card') ?? null, clay: document.querySelector('.clay')?.className ?? null, alert: document.querySelector('[role="alert"]')?.textContent?.slice(0, 120) ?? null, drone: !!document.querySelector('.drpage') })`)}`)
     if (!up) throw new Error(`${label}: the fly screen never came up`)
     const began = Date.now()
     await wait(600)
