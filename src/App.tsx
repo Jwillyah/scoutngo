@@ -32,7 +32,7 @@ import { EMPTY_LANDCOVER, type Landcover } from './core/siting.ts'
 import { getSunArc, getSunPosition } from './core/sun.ts'
 import { extremesAround, tideStateAt } from './core/tide.ts'
 import { LOCATED_ZOOM, locateOnce } from './lib/locateOnce.ts'
-import { mapBanner, markNearMeSeen, nearMeDue, nearMeItems, nearStill, placesNear, snoozeNearMe, type NearItem } from './lib/nearMe.ts'
+import { mapBanner, markNearMeSeen, nearHere, nearMeDue, nearMeItems, placesNear, snoozeNearMe, type NearItem } from './lib/nearMe.ts'
 import { readHome } from './lib/home.ts'
 import { askToPersist, backupDue, backupLine, backupShare, markReminded, yoursChanged, YOURS_CHANGED } from './lib/backup.ts'
 import { useNewBuild } from './lib/useNewBuild.ts'
@@ -1926,12 +1926,14 @@ function App() {
    * map: not while a layer's bar is up, not over a status line that must
    * show (src/lib/nearMe.ts mapBanner).
    */
-  const nearLive = nearStill(nearItems, clockNow.getTime())
-  const [bannerRoom, setBannerRoom] = useState({ layerUp: false, hardStatus: false, softStatus: false })
-  const onBannerRoom = useCallback((room: { layerUp: boolean; hardStatus: boolean; softStatus: boolean }) => {
-    setBannerRoom((was) => (was.layerUp === room.layerUp && was.hardStatus === room.hardStatus && was.softStatus === room.softStatus ? was : room))
+  const [bannerRoom, setBannerRoom] = useState<{ layerUp: boolean; hardStatus: boolean; softStatus: boolean; centre: LatLon | null }>({ layerUp: false, hardStatus: false, softStatus: false, centre: null })
+  const onBannerRoom = useCallback((room: { layerUp: boolean; hardStatus: boolean; softStatus: boolean; centre: LatLon | null }) => {
+    setBannerRoom((was) => (was.layerUp === room.layerUp && was.hardStatus === room.hardStatus && was.softStatus === room.softStatus && was.centre?.lat === room.centre?.lat && was.centre?.lon === room.centre?.lon ? was : room))
   }, [])
-  const nearUp = mode === 'plan' && nearLive !== null && mapBanner({ ...bannerRoom, near: true }) === 'near'
+  /* Batch 3D, Section 3.4: and only the items about the place on screen, within 25 mi of the map's middle (src/lib/nearMe.ts nearHere). */
+  const nearLive = nearHere(nearItems, clockNow.getTime(), bannerRoom.centre)
+  const { layerUp, hardStatus, softStatus } = bannerRoom
+  const nearUp = mode === 'plan' && nearLive !== null && mapBanner({ layerUp, hardStatus, softStatus, near: true }) === 'near'
   const goNear = (item: NearItem) => {
     setNearItems(null)
     const spot = spots.find((sp) => Math.abs(Number(sp.venue.latitude) - item.place.at.lat) < 1e-6 && Math.abs(Number(sp.venue.longitude) - item.place.at.lon) < 1e-6)

@@ -37,3 +37,22 @@ export function awayLabel(name: string, spot: LatLon | null, view: ViewBounds | 
   const far = awayDistance(spot, view, miles)
   return far === null ? name : `${name.replace(/\s+(Beach|Fishing Pier|Pier|State Park|Park)$/i, '')} · ${far}`
 }
+
+/*
+ * BANNERS ONLY ABOUT THE PLACE ON SCREEN (Batch 3D, Section 3.4; 17 Nov
+ * 12:27 PM the map was over North Carolina and the card said "Sky color at
+ * sunrise · Sandbridge", about 250 mi away). A banner over the map speaks of
+ * a place only when that place is within BANNER_MI of the map's middle and
+ * what it names has not ended. The distance is worked out here, not guessed.
+ */
+export const BANNER_MI = 25
+const BANNER_M = BANNER_MI * 1609.344
+
+/** The middle of the map's view. */
+export const viewCentre = (v: ViewBounds): LatLon => ({ lat: (v.south + v.north) / 2, lon: (v.west + v.east) / 2 })
+
+/** Whether a banner about `spot`, over at `until`, may show over a map centred on `centre` at `now`. An unknown centre shows nothing. */
+export function aboutHere(spot: LatLon, centre: LatLon | null, until: Date, now: number): boolean {
+  if (centre === null || !(until.getTime() > now)) return false
+  return distanceMeters(spot, centre) <= BANNER_M
+}

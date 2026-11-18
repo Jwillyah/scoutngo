@@ -26,7 +26,7 @@ import { ComparePhoto } from './ComparePhoto.tsx'
 import type { BuildCheck } from '../lib/build.ts'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { LatLon } from '../core/geo.ts'
-import { awayDistance, awayLabel } from '../core/awayWords.ts'
+import { aboutHere, awayDistance, awayLabel, viewCentre } from '../core/awayWords.ts'
 import type { CalCat } from '../core/calendarV2.ts'
 import { loadAirspaceOverlay, type AirspaceOverlay } from '../lib/airspaceOverlay.ts'
 import { measureWords } from '../lib/measureWords.ts'
@@ -433,7 +433,7 @@ interface PlanModeProps {
   /** Batch FIX 2.2: whether App's "Near you" card is the one banner over the map (src/lib/nearMe.ts mapBanner): the status line's soft lines wait while it is. */
   nearUp?: boolean
   /** What the map has up for that decision: a layer's bar, a status line that must show, one that can wait. */
-  onBannerRoom?: (room: { layerUp: boolean; hardStatus: boolean; softStatus: boolean }) => void
+  onBannerRoom?: (room: { layerUp: boolean; hardStatus: boolean; softStatus: boolean; centre: LatLon | null }) => void
   /** Ground, air or both. Decides what shows here AND what a generate asks for. */
   platformFilter: PlatformFilterValue
   showLabels: boolean
@@ -1443,7 +1443,9 @@ export function PlanMode({
   /* Batch LIVE, Section 1.5: the map's view, so a line about the spot off screen names it and how far when the map is elsewhere. */
   const [viewBounds, setViewBounds] = useState<{ south: number; west: number; north: number; east: number } | null>(null)
   const away = awayDistance(venue, viewBounds, units.distance === 'ft')
-  const specialStatus = specialNow === null ? null : `${specialNameOf(specialNow)} ${specialNow.word} now · ${specialNow.agree} of ${specialNow.of} models${away === null ? '' : ` · ${awayLabel(venueNameLine, venue, viewBounds, units.distance === 'ft')}`}`
+  /* Batch 3D, Section 3.4: the map's middle (the venue until the map says its view); a banner speaks only of a place within 25 mi of it, and only before its event ends (src/core/awayWords.ts aboutHere). */
+  const mapCentre = useMemo(() => (viewBounds !== null ? viewCentre(viewBounds) : venue === null ? null : { lat: venue.lat, lon: venue.lon }), [viewBounds, venue?.lat, venue?.lon]) // eslint-disable-line react-hooks/exhaustive-deps
+  const specialStatus = specialNow === null || venue === null || !aboutHere(venue, mapCentre, specialNow.to, Date.now()) ? null : `${specialNameOf(specialNow)} ${specialNow.word} now · ${specialNow.agree} of ${specialNow.of} models${away === null ? '' : ` · ${awayLabel(venueNameLine, venue, viewBounds, units.distance === 'ft')}`}`
   /* A rainbow's bow, drawn on the map from Sky › Special. */
   const [bow, setBow] = useState<GeoJSON.FeatureCollection | null>(null)
   /* Batch K, Section 6: the radar frame the Weather tab's slider is on. */
@@ -1927,8 +1929,8 @@ export function PlanMode({
   const softStatus = (backupReminder == null ? null : backupReminder.line) ?? specialStatus
   const bannerLayerUp = timelineUp || (weatherLayer === 'radar' && !threeD)
   useEffect(() => {
-    onBannerRoom?.({ layerUp: bannerLayerUp, hardStatus: hardStatus !== null, softStatus: softStatus !== null })
-  }, [onBannerRoom, bannerLayerUp, hardStatus, softStatus])
+    onBannerRoom?.({ layerUp: bannerLayerUp, hardStatus: hardStatus !== null, softStatus: softStatus !== null, centre: mapCentre })
+  }, [onBannerRoom, bannerLayerUp, hardStatus, softStatus, mapCentre])
   const onTimelinePick = (p: TimelinePick) => (p === 'off' ? allLayersOff() : pickWeather(p))
 
   const weatherCommon = {

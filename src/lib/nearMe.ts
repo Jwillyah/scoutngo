@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { distanceMeters, type LatLon } from '../core/geo.ts'
+import { aboutHere } from '../core/awayWords.ts'
 import { nextEvents } from '../core/skyFire.ts'
 import { fireVerdict } from '../core/fireOutlook.ts'
 import { afterglowWindow } from '../core/afterglow.ts'
@@ -175,6 +176,12 @@ export async function nearMeItems(places: readonly NearPlace[], now: number, clo
 export function nearStill(items: readonly NearItem[] | null, now: number): NearItem[] | null {
   if (items === null) return null
   const left = items.filter((i) => i.until.getTime() > now)
+  return left.length === 0 ? null : left
+}
+
+/** Batch 3D, Section 3.4: the items about the place on screen (within BANNER_MI of the map's middle, src/core/awayWords.ts aboutHere) whose event has not ended; null when none is left. */
+export function nearHere(items: readonly NearItem[] | null, now: number, centre: LatLon | null): NearItem[] | null {
+  const left = (items ?? []).filter((i) => aboutHere(i.place.at, centre, i.until, now))
   return left.length === 0 ? null : left
 }
 
