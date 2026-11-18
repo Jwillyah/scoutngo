@@ -136,3 +136,18 @@ export function logWatch(log: readonly WatchLogRow[], made: string, rows: readon
 export function watchFor(log: readonly WatchLogRow[], date: string): WatchLogRow[] {
   return log.filter((r) => r.date === date).sort((a, b) => a.made.localeCompare(b.made))
 }
+
+/*
+ * THE DAILY CHECK (Batch SIMPLE-1, Section 5). The models were asked only by
+ * the Surf page and the home's Week, so a day neither was opened logged no
+ * per-model row, and Mon 23 Nov's log could have gaps. The home now asks them
+ * once a day, after its first load. Due when no row made that day carries the
+ * models' column and the check has not already asked that day.
+ */
+export function modelsLoggedOn(log: readonly WatchLogRow[], made: string): boolean {
+  return log.some((r) => r.made === made && r.models !== undefined && Object.keys(r.models).length > 0)
+}
+
+export function dailyModelsDue(log: readonly WatchLogRow[], made: string, askedOn: string | null): boolean {
+  return askedOn !== made && !modelsLoggedOn(log, made)
+}

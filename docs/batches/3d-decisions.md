@@ -196,3 +196,8 @@ written when one of those screens is open that day. A later write that day
 from a screen that did not ask the models keeps the models already logged.
 The tradeoff: a day on which neither the Surf page nor the Week is opened
 logs no per-model row.
+
+Batch SIMPLE-1, Section 5 (18 Nov) closes that gap: the home asks the models
+once a day per spot, after its first load has settled (src/lib/firstLoad.ts),
+so not in the first load's burst; skipped when that day's row already has
+the models or the check already asked that day (`scoutngo.swellDaily.v1`).

@@ -8,7 +8,7 @@
  * Under "scoutngo.", so the backup carries it and Privacy › Clear this phone
  * removes it. Not in backup.ts's WORTH_KEEPING: the app writes it by itself.
  */
-import { logWatch, type WatchLogRow } from '../core/swellWatch.ts'
+import { dailyModelsDue, logWatch, type WatchLogRow } from '../core/swellWatch.ts'
 
 export const SWELL_WATCH_KEY = 'scoutngo.swellWatch.v1'
 /* The spots you surf, as the week's log keeps (weekBiasStore MAX_WEEK_SPOTS). */
@@ -60,4 +60,41 @@ export function keepWatch(spot: string, made: string, rows: readonly Omit<WatchL
   } catch {
     /* A full or locked store: the log waits for the next open. */
   }
+}
+
+/*
+ * THE DAILY CHECK'S MARK (Batch SIMPLE-1, Section 5): the day the home last
+ * asked the other wave models for a spot, so an open whose ask failed or was
+ * cut short does not ask again that day. This phone only, beside the log.
+ */
+export const SWELL_DAILY_KEY = 'scoutngo.swellDaily.v1'
+
+function readAsked(store: Store | null): Record<string, string> {
+  if (store === null) return {}
+  try {
+    const raw = JSON.parse(store.getItem(SWELL_DAILY_KEY) ?? '{}') as unknown
+    return raw !== null && typeof raw === 'object' ? (raw as Record<string, string>) : {}
+  } catch {
+    return {}
+  }
+}
+
+/**
+ * Whether this open asks the wave models for `spot` today (`made`, the spot's
+ * own date); when it does, the day is marked first, so it is once a day.
+ * False with no storage: nothing to remember it by, so nothing extra asked.
+ */
+export function takeDailyModelsAsk(spot: string, made: string, store: Store | null = local()): boolean {
+  if (store === null) return false
+  const asked = readAsked(store)
+  if (!dailyModelsDue(readWatchLog(spot, store), made, asked[spot] ?? null)) return false
+  try {
+    const keep = Object.entries({ ...asked, [spot]: made })
+      .sort((a, b) => b[1].localeCompare(a[1]))
+      .slice(0, MAX_WATCH_SPOTS)
+    store.setItem(SWELL_DAILY_KEY, JSON.stringify(Object.fromEntries(keep)))
+  } catch {
+    return false
+  }
+  return true
 }

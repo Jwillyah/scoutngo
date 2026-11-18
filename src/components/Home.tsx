@@ -126,7 +126,8 @@ export function Home({ venue, placeName, timeZone, units, drone, now, onClose, o
    */
   const [weekSeen, setWeekSeen] = useState(page === 2)
   if (page === 2 && !weekSeen) setWeekSeen(true)
-  const surf = useSurfNow(venue, now, timeZone, units.distance === 'ft', placeName, stationObs, weekSeen)
+  /* Batch SIMPLE-1, Section 5: and once a day without the Week, after the first load (the bigger-swell log's models). */
+  const surf = useSurfNow(venue, now, timeZone, units.distance === 'ft', placeName, stationObs, weekSeen ? true : 'daily')
   const [picked] = useActivities()
   const order = homeOrder(picked, drone !== null)
   /* Batch Flow, Section 3: 1-3 activities picked, big full-width cards; else the six (boards D_Home2, D_Home6). */

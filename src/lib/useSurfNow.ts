@@ -25,7 +25,8 @@ import { venueToday } from '../core/eventDay.ts'
 import { wallClock } from '../core/timezone.ts'
 import { addDays, buoyLean, dayReadings, modelDayReadings, FIRST_HOUR, LAST_HOUR, LEAN_BUOY_MAX_AGE_MS, rangeHourAt, weekPeaks, type RangeHour, type SurfObs } from './surfPageData.ts'
 import { modelTops, swellWatch, type SwellWatch, type WatchReading } from '../core/swellWatch.ts'
-import { keepWatch } from './swellWatchStore.ts'
+import { keepWatch, takeDailyModelsAsk } from './swellWatchStore.ts'
+import { useFirstLoadSettled } from './firstLoad.ts'
 import { onSkillBook, readSkillBook, skillBookVersion } from './spotSkillStore.ts'
 import { awayFrom, beachName, sameBeach, useSurfBeach, type Beach } from './surfBeach.ts'
 import { useSurfSea, type SurfSea } from './useSurfSea.ts'
@@ -209,15 +210,37 @@ function useWaveModels(at: LatLon | null): ModelSea[] | null {
   return got !== null && got.key === key ? got.v : null
 }
 
-/** `venue` null asks nothing (the menu before it has been open a moment). `models`: ask the other wave models too (the home's week, Batch 3D Section 3.2). */
-export function useSurfNow(venue: LatLon | null, now: Date, timeZone: string, miles: boolean, spotName: string | null = null, station: StationObs | null = null, models = false): SurfNow {
+/**
+ * `venue` null asks nothing (the menu before it has been open a moment). `models`: ask the other wave models too (the
+ * home's week, Batch 3D Section 3.2); 'daily' (the home, Batch SIMPLE-1 Section 5): once a day per spot, after the first
+ * load has settled (src/lib/firstLoad.ts), so the bigger-swell log has them on a day the Surf page and the Week are not
+ * opened.
+ */
+export function useSurfNow(venue: LatLon | null, now: Date, timeZone: string, miles: boolean, spotName: string | null = null, station: StationObs | null = null, models: boolean | 'daily' = false): SurfNow {
   /* Batch Flow, Section 3: a spot named for a beach is on that beach (src/lib/surfBeach.ts namedBeach). */
   const [beach] = useSurfBeach(venue, spotName)
   /* Read where the beach's surf is; said to be elsewhere only when it is (a spot named for the beach is on it). */
   const away = awayFrom(venue, beach, spotName)
   const spot = venue !== null && beach !== null && !sameBeach(venue, beach) ? beach.at : venue
   const seaOwn = useSurfSea(spot)
-  const waveModels = useWaveModels(models ? spot : null)
+  /*
+   * Batch SIMPLE-1, Section 5: the daily check. One request (every model in it, src/lib/waveModels.ts) through the
+   * weather store, at a spot with a sea forecast, once the first load has settled; not when today's row already has the
+   * models or the check already asked today (src/lib/swellWatchStore.ts takeDailyModelsAsk). Held for the session once
+   * asked, so the row it writes keeps them.
+   */
+  const settled = useFirstLoadSettled()
+  const dailyKey = spot === null ? null : spotKey(spot)
+  const dailyDay = venueToday(now, timeZone)
+  const seaReady = seaOwn.marine !== null
+  const [dailyAsked, setDailyAsked] = useState<string | null>(null)
+  useEffect(() => {
+    if (models !== 'daily' || !settled || !seaReady || dailyKey === null || dailyAsked === dailyKey) return
+    /* oxlint-disable react/set-state-in-effect -- the day's mark is taken from this phone's storage (an external system) once, then held */
+    if (takeDailyModelsAsk(dailyKey, dailyDay)) setDailyAsked(dailyKey)
+    /* oxlint-enable react/set-state-in-effect */
+  }, [models, settled, seaReady, dailyKey, dailyDay]) // eslint-disable-line react-hooks/exhaustive-deps
+  const waveModels = useWaveModels(models === true || (dailyKey !== null && dailyAsked === dailyKey) ? spot : null)
   const seaRaw = useMemo(() => (waveModels === null ? seaOwn : { ...seaOwn, models: waveModels }), [seaOwn, waveModels])
   /* Batch FIX, Section 1: the wind the call reads leans to the one station now, the home's and the Wind page's (src/lib/useStationObs.ts). */
   const near = useStationObs(venue)
