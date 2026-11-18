@@ -820,6 +820,8 @@ interface MapViewProps {
   onSatFailed?: (failed: boolean) => void
   /** Batch NOW, Section 2.1: the wind now at the spot, the Wind page's headline; the pill says it at the spot at now. */
   windHeadline?: { mps: number; fromDeg: number | null; gustMps: number | null } | null
+  /** Batch 3D, Section 4.1: the same wind now at the spot, whatever hour the bar is at; it stands for the hour that holds now in the marker's readout and hours. */
+  windAnchor?: { at: Date; wind: { mps: number; fromDeg: number | null; gustMps: number | null } } | null
   onWindStrip?: (strip: WindStrip | null) => void
   /*
    * Batch DRONE, Section 3: THE ONE MARKER. Where the layer is read: the spot
@@ -1363,6 +1365,7 @@ export function MapView({
   windSpot = null,
   windFacing = null,
   windHeadline = null,
+  windAnchor = null,
   marker = null,
   markerLayer = null,
   markerLines = NO_LINES,
@@ -4319,19 +4322,7 @@ export function MapView({
   }, [heldHour])
   const windView = useWindViewport(ready ? map.current : null, windOn, windModel, windDaysAt, windMeters > 10 ? '120m' : '10m', windRetry)
   const windField = useMemo(() => (windHour === null || windView.series.length === 0 ? null : fieldAt(windView.series, windView.step, new Date(windHour * 3_600_000))), [windView, windHour])
-  /* The timeline bar's wind: the grid point nearest the marker, hour by hour, from the same answer the colour is painted from. */
-  const markLat = marker?.lat ?? null
-  const markLon = marker?.lon ?? null
-  useEffect(() => {
-    if (onWindStrip === undefined) return
-    if (!windOn || windView.series.length === 0 || markLat === null || markLon === null) {
-      onWindStrip(null)
-      return
-    }
-    let best = windView.series[0]
-    for (const s of windView.series) if (Math.hypot(s.lat - markLat, s.lon - markLon) < Math.hypot(best.lat - markLat, best.lon - markLon)) best = s
-    onWindStrip({ from: best.times[0], mps: best.speed, gust: best.gust, fromDeg: best.from })
-  }, [windOn, windView.series, onWindStrip, markLat, markLon])
+  /* The timeline bar's wind and the half sheet's hours: computed in the wind layer from the readout's own function (src/core/markerWind.ts, Batch 3D 4.1). */
   /* The labels keep off the spot's pin and the marker. */
   const keepLabelsClear = useCallback(() => [...(venue === null ? [] : [{ lat: venue.lat, lon: venue.lon }]), ...(marker === null ? [] : [marker])], [venue, marker])
   const markerAtSpot = marker !== null && venue !== null && Math.abs(marker.lat - venue.lat) < 1e-6 && Math.abs(marker.lon - venue.lon) < 1e-6
@@ -4340,7 +4331,7 @@ export function MapView({
       <div className="map__canvas" ref={container} />
       {/* Batch Map, Section 1: the wind layer v3 over the whole screen (the old grid streaks only at a height above the ground). */}
       {/* Batch MAP2, Section 3: the drone's 400 ft in the same look (120 m level), not the old streaks. */}
-      {windOn ? <WindLayerV3 map={ready ? map.current : null} field={windField} unit={windUnit} spot={windSpot} facing={windFacing} headline={windHeadline} status={windView.status} when={windHour === null ? null : new Date(windHour * 3_600_000)} marker={marker} fetchAt={windDaysAt} onRetry={() => setWindRetry((n) => n + 1)} model={windModel} level={windMeters > 10 ? '120m' : '10m'} tempUnit={windTempUnit} /> : null}
+      {windOn ? <WindLayerV3 map={ready ? map.current : null} field={windField} unit={windUnit} spot={windSpot} facing={windFacing} headline={windHeadline} status={windView.status} when={windHour === null ? null : new Date(windHour * 3_600_000)} marker={marker} fetchAt={windDaysAt} onRetry={() => setWindRetry((n) => n + 1)} model={windModel} level={windMeters > 10 ? '120m' : '10m'} tempUnit={windTempUnit} series={windView.series} step={windView.step} anchor={windAnchor} onStrip={onWindStrip} /> : null}
       {/* Batch DRONE, Section 3: with clouds or tide on, the one marker and its readout (the wind layer draws its own above). */}
       {!windOn && markerLayer !== null ? <LayerMarker map={ready ? map.current : null} at={marker} lines={markerLines} layer={markerLayer} atSpot={markerAtSpot} /> : null}
       {/* Batch Map, Section 3: the map's own labels, in the app's font, never under the marker or the pin. */}

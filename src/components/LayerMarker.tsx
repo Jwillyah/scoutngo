@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import type * as maplibregl from 'maplibre-gl'
 import type { LatLon } from '../core/geo.ts'
-import { readoutBeside } from '../core/markerReadout.ts'
+import { readoutBeside, type ReadoutLine, type Rect } from '../core/markerReadout.ts'
 import '../styles/timeline.css'
 
 /*
@@ -20,7 +20,7 @@ interface Props {
   map: maplibregl.Map | null
   at: LatLon | null
   /** The readout's lines; the first is the value. */
-  lines: readonly string[]
+  lines: readonly ReadoutLine[]
   /** Extra content in the card (a Retry). */
   children?: ReactNode
   /** Which layer it reads, for the audits: wind, clouds, tide. */
@@ -58,7 +58,17 @@ export function LayerMarker({ map, at, lines, children, layer, atSpot }: Props) 
        */
       c.style.maxWidth = ''
       c.dataset.tight = '0'
-      const fit = { px: p.x, py: p.y, w: c.offsetWidth, h: c.offsetHeight, boxW: box.width, boxH: box.height, gap: GAP, edge: EDGE }
+      /*
+       * Batch 3D, Section 4.2: the layer chip under the search is an obstacle
+       * (src/core/markerReadout.ts avoid), and so is each of the rail's round
+       * buttons: on the right of the marker at 390 x 664 the card covered the
+       * compass.
+       */
+      const avoid: Rect[] = [...document.querySelectorAll('[data-layer-source], .rail2__btn')]
+        .map((e) => e.getBoundingClientRect())
+        .filter((q) => q.width > 0 && q.height > 0)
+        .map((q) => ({ x: q.left - box.left, y: q.top - box.top, w: q.width, h: q.height }))
+      const fit = { avoid, px: p.x, py: p.y, w: c.offsetWidth, h: c.offsetHeight, boxW: box.width, boxH: box.height, gap: GAP, edge: EDGE }
       let at = readoutBeside(fit)
       if (at.maxWidth !== null) {
         c.style.maxWidth = `${Math.floor(at.maxWidth)}px`
@@ -96,11 +106,22 @@ export function LayerMarker({ map, at, lines, children, layer, atSpot }: Props) 
         <span className="lmark__ring" />
       </div>
       <div ref={card} className="lmark__card" role="status" data-marker-readout={layer}>
-        {lines.map((l, i) => (
-          <p key={i} className={`lmark__line lmark__line--${i === 0 ? 'value' : i === 1 ? 'second' : 'third'}`}>
-            {l}
-          </p>
-        ))}
+        {lines.map((l, i) => {
+          const tone = typeof l === 'object' && 'tone' in l ? l.tone : i === 0 ? 'value' : i === 1 ? 'second' : 'third'
+          /* Batch 3D, Section 4.3: a station's name may be cut, its reading and age never. */
+          if (typeof l === 'object' && 'name' in l) {
+            return (
+              <p key={i} className={`lmark__line lmark__line--${tone} lmark__line--split`}>
+                <span className="lmark__name">{l.name}</span> <span className="lmark__rest">{l.rest}</span>
+              </p>
+            )
+          }
+          return (
+            <p key={i} className={`lmark__line lmark__line--${tone}`}>
+              {typeof l === 'string' ? l : l.text}
+            </p>
+          )
+        })}
         {children}
       </div>
     </>

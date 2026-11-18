@@ -1764,6 +1764,13 @@ export function PlanMode({
     if (!windMode || venue === null || scrubbedAt === null || Math.abs(scrubbedAt.getTime() - now.getTime()) >= 3_600_000 || briefWx === null || briefWx.key !== `${venue.lat.toFixed(2)},${venue.lon.toFixed(2)}`) return null
     return windNowAt(briefWx.wx, now, stationObs)
   }, [windMode, venue, scrubbedAt, briefWx, stationObs])
+  /* Batch 3D, Section 4.1: the same one wind now, at any hour on the bar, for the marker's readout and its hour list to stand on for the hour that holds now. */
+  const windAnchor = useMemo(() => {
+    const now = new Date()
+    if (!windMode || venue === null || briefWx === null || briefWx.key !== `${venue.lat.toFixed(2)},${venue.lon.toFixed(2)}`) return null
+    const w = windNowAt(briefWx.wx, now, stationObs)
+    return w === null ? null : { at: now, wind: w }
+  }, [windMode, venue, briefWx, stationObs])
   const chips: Chip[] = useMemo(() => {
     /* The next golden light from the time on the bar, morning or evening (src/core/goldenNext.ts). */
     const goldenLeft =
@@ -2819,6 +2826,7 @@ export function PlanMode({
             windSpot={venue}
             windFacing={windFacing !== null && windFacing.key === windSpotKey ? windFacing.deg : null}
             windHeadline={windHeadline}
+            windAnchor={windAnchor}
             satRetry={satRetry}
             onSatFailed={setSatFailed}
             onWindStrip={setWindStrip}

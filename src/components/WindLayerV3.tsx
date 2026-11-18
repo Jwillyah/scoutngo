@@ -2,7 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type * as maplibregl from 'maplibre-gl'
 import { windToBeach } from '../core/coastFacing.ts'
 import { distanceMeters, type LatLon } from '../core/geo.ts'
-import { fadeEdges, fromUV, particleCount, PX_PER_S_PER_MPS, sampleField, windRgb, type Field } from '../core/windViewport.ts'
+import { fadeEdges, particleCount, PX_PER_S_PER_MPS, sampleField, windRgb, type Field } from '../core/windViewport.ts'
+import { markerModelFor, markerStrip, markerWindAt, type MarkerWindIn } from '../core/markerWind.ts'
+import type { WindAt } from '../core/nowcast.ts'
+import type { WindStrip } from '../core/layerTimeline.ts'
 import { nearestStation, stationWind, type StationWind } from '../lib/stationNear.ts'
 import { fetchMarine, hourlyAt, type Hourly } from '../lib/tideSheetData.ts'
 import { forecastParts, swellOf } from '../core/surfReads.ts'
@@ -12,8 +15,8 @@ import { venueTimeZone } from '../core/timezone.ts'
 import { agoWords } from '../lib/nearWind.ts'
 import { isFresh } from '../core/stationPick.ts'
 import { windIn, windUnitLabel, type WindUnit } from '../lib/units.ts'
-import { usePointWind, type WindLevel, type WindModelChip } from '../lib/useWindViewport.ts'
-import { stationLine, surfCallLine, swellLine, windLine } from '../core/markerReadout.ts'
+import { usePointSeries, type PointSeries, type WindLevel, type WindModelChip } from '../lib/useWindViewport.ts'
+import { stationParts, surfCallLine, swellLine, windLines, type ReadoutLine } from '../core/markerReadout.ts'
 import { LayerMarker } from './LayerMarker.tsx'
 import { waterHead } from '../core/waterTemp.ts'
 import { useWaterTemp } from '../lib/waterTemp.ts'
@@ -68,9 +71,20 @@ interface Props {
   level?: WindLevel
   /** Batch FIX, Section 4: the water's temperature at the marker, at sea, in this unit. */
   tempUnit?: 'F' | 'C'
+  /**
+   * Batch 3D, Section 4.1: the view's grid (its points' hours and step), read at the
+   * marker until the fine block has come; the one wind now at the spot, which
+   * stands for the hour that holds now; and where the marker's hours go (the
+   * timeline bar and the half sheet's list), computed here from the same
+   * function as the readout (src/core/markerWind.ts).
+   */
+  series?: readonly PointSeries[]
+  step?: number
+  anchor?: { at: Date; wind: WindAt } | null
+  onStrip?: (strip: WindStrip | null) => void
 }
 
-export function WindLayerV3({ map, field, unit, spot, facing, headline = null, status, when = null, marker, fetchAt = null, onRetry, model = 'blend', level = '10m', tempUnit = 'F' }: Props) {
+export function WindLayerV3({ map, field, unit, spot, facing, headline = null, status, when = null, marker, fetchAt = null, onRetry, model = 'blend', level = '10m', tempUnit = 'F', series = [], step = 0.25, anchor = null, onStrip }: Props) {
   const colour = useRef<HTMLCanvasElement>(null)
   const trails = useRef<HTMLCanvasElement>(null)
   /* The screen's velocity grid, rebuilt when the map settles: px/s east and down per CELL_PX cell. */
@@ -271,21 +285,34 @@ export function WindLayerV3({ map, field, unit, spot, facing, headline = null, s
     }
   }, [map])
 
-  /* The value at the marker, and the station near it; at the spot at now, the one wind now. */
-  /* The map hands a headline only while the bar is at now (src/components/PlanMode.tsx). */
-  const point = usePointWind(centre, status !== 'off', model, when ?? new Date(), level, fetchAt ?? when ?? new Date())
-  const atSpotNow = headline !== null && headline.fromDeg !== null && spot !== null && centre !== null && distanceMeters(spot, centre) <= 3000
-  const here = useMemo(() => {
-    if (atSpotNow && headline !== null && headline.fromDeg !== null) return { speedMps: headline.mps, fromDeg: headline.fromDeg, gust: headline.gustMps }
-    if (field === null || centre === null) return null
-    /* Batch LIVE, Section 1.1: the fine grid's reading at the marker when it has come, the same at every zoom; the view's grid until then. */
-    const s = point ?? sampleField(field, centre.lat, centre.lon)
-    if (s === null) return null
-    const w = fromUV(s.u, s.v)
-    return { ...w, gust: s.gust }
-  }, [field, centre, point, atSpotNow, headline?.mps, headline?.fromDeg, headline?.gustMps]) // eslint-disable-line react-hooks/exhaustive-deps
-  const [station, setStation] = useState<{ id: string; w: StationWind | null } | null>(null)
+  /*
+   * The value at the marker, for the hour on the bar: one function
+   * (src/core/markerWind.ts markerWindAt), the model at the marker (the fine
+   * block when it has come, the view's grid until then, the same at every
+   * zoom once it has), leaned to the spot's one station, the one wind now at
+   * the spot standing for the hour that holds now. The hour list under the
+   * readout is the same function over the hours (Batch 3D, Section 4.1).
+   */
+  const fine = usePointSeries(centre, status !== 'off', model, level, fetchAt ?? when ?? new Date())
+  const nearSpot = spot !== null && centre !== null && distanceMeters(spot, centre) <= 3000
   const picked = useStationObs(spot)
+  const nowMs = Math.floor(new Date().getTime() / 60_000) * 60_000
+  const reads = useMemo<MarkerWindIn | null>(() => {
+    const from = fine ?? series
+    if (centre === null || from.length === 0) return null
+    return { model: markerModelFor(fine, series, step, centre.lat, centre.lon), obs: nearSpot ? picked : null, anchor: nearSpot ? anchor : null, now: new Date(nowMs) }
+  }, [fine, series, step, centre?.lat, centre?.lon, nearSpot, picked, anchor, nowMs]) // eslint-disable-line react-hooks/exhaustive-deps
+  const strip = useMemo(() => {
+    const times = (fine ?? series)[0]?.times
+    return reads === null || times === undefined ? null : markerStrip(reads, times)
+  }, [reads, fine, series])
+  useEffect(() => {
+    onStrip?.(strip)
+  }, [strip, onStrip])
+  useEffect(() => () => onStrip?.(null), [onStrip])
+  const w = reads === null ? null : markerWindAt(reads, when ?? new Date())
+  const here = w === null ? null : { speedMps: w.mps, fromDeg: w.fromDeg, gust: w.gustMps }
+  const [station, setStation] = useState<{ id: string; w: StationWind | null } | null>(null)
   const ck = centre === null ? null : `${centre.lat.toFixed(2)},${centre.lon.toFixed(2)}`
   useEffect(() => {
     if (centre === null) return
@@ -361,7 +388,7 @@ export function WindLayerV3({ map, field, unit, spot, facing, headline = null, s
   const waterText = swell === null || water.status !== 'ok' ? null : waterHead(water.reading.c, tempUnit)
 
   const say = (mps: number | null) => (mps === null ? null : windIn(mps, unit))
-  const side = here === null || facing === null || spot === null || centre === null || distanceMeters(spot, centre) > 3000 ? null : windToBeach(here.fromDeg, facing)
+  const side = here === null || here.fromDeg === null || facing === null || spot === null || centre === null || distanceMeters(spot, centre) > 3000 ? null : windToBeach(here.fromDeg, facing)
   const u = windUnitLabel(unit)
   /*
    * Batch FIX, Section 1 (17 Nov 7:06: the readout said KNTU at 1 h 10 min
@@ -371,7 +398,6 @@ export function WindLayerV3({ map, field, unit, spot, facing, headline = null, s
    * fresh by the same rule (src/core/stationPick.ts isFresh).
    */
   const nowAt = new Date()
-  const nearSpot = spot !== null && centre !== null && distanceMeters(spot, centre) <= 3000
   const away = station?.w == null ? null : { id: station.id, at: new Date(station.w.at), kt: station.w.kt, fromDeg: station.w.fromDeg }
   const read = nearSpot
     ? picked === null
@@ -380,17 +406,21 @@ export function WindLayerV3({ map, field, unit, spot, facing, headline = null, s
     : away !== null && Number.isFinite(away.at.getTime()) && isFresh({ station: { id: away.id, kind: 'airport', km: 0 }, at: away.at, kt: away.kt, gustKt: null, fromDeg: away.fromDeg }, nowAt)
       ? away
       : null
-  const stationText = read === null ? null : stationLine(read.id, say(read.kt / 1.9438444924406), read.fromDeg, u, agoWords(read.at, nowAt))
-  /* "9 kt NNW · g13 · offshore here" / "swell 0.7 ft 12 s ENE" / "KNTU 13 kt N · 1 h ago" (board Map_Timeline_Wind). */
-  const lines: string[] =
+  const stationText = read === null ? null : stationParts(read.id, say(read.kt / 1.9438444924406), read.fromDeg, u, agoWords(read.at, nowAt))
+  /*
+   * "9 kt NNW · g13" / "offshore" / "swell 0.7 ft 12 s ENE" / "KNTU" + "13 kt N · 1 h ago"
+   * (board Map_Timeline_Wind; Batch 3D, Section 4.3: the side to the beach on its own line,
+   * the station's name apart from its reading and age).
+   */
+  const lines: ReadoutLine[] =
     here === null
       ? [status === 'loading' ? 'Reading the wind…' : status === 'failed' ? 'Wind didn’t load' : 'No wind here']
       : [
-          [windLine(say(here.speedMps), here.fromDeg, say(here.gust), u), side === null ? null : `${side === 'cross' ? 'cross-shore' : side} here`].filter((x) => x !== null).join(' · '),
-          surfHere !== null ? surfCallLine(surfHere.call) : swell === null ? null : swellLine(swell.ft, swell.s, swell.fromDeg),
+          ...windLines(say(here.speedMps), here.fromDeg, say(here.gust), u, side).map((text, i): ReadoutLine => (i === 0 ? text : { text, tone: 'third' })),
+          surfHere !== null ? { text: surfCallLine(surfHere.call), tone: 'second' as const } : swell === null ? null : { text: swellLine(swell.ft, swell.s, swell.fromDeg) ?? '', tone: 'second' as const },
           stationText,
-          waterText,
-        ].filter((x): x is string => x !== null)
+          waterText === null ? null : { text: waterText, tone: 'third' as const },
+        ].filter((x): x is ReadoutLine => x !== null)
   const atSpot = spot !== null && centre !== null && distanceMeters(spot, centre) < 30
 
   return (

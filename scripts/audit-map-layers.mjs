@@ -118,13 +118,16 @@ const WIND = `JSON.stringify((() => {
     painted,
     particles: Number(t?.dataset.particles ?? 0),
     fps: Number(t?.dataset.fps ?? 0),
-    readout: read?.textContent ?? null,
+    /* Batch 3D, Section 4.3: the readout's lines as they are drawn, one per line (textContent ran "NNE" into "cross-shore"). */
+    readout: read?.innerText ?? null,
     legend: document.querySelector('[data-wind-timebar] [data-timeline-legend]')?.textContent ?? null,
     bar: bar === null ? null : { inPeek: !!bar.closest('.sheet__peek'), model: bar.dataset.model ?? null, h: Math.round(bar.getBoundingClientRect().height), arrows: bar.querySelectorAll('.ltl__arrow').length, bars: bar.querySelectorAll('.ltl__bar').length, days: [...bar.querySelectorAll('.ltl__day')].map((d) => d.textContent), flag: bar.querySelector('[data-time-flag]')?.textContent ?? null },
     readH: read === null ? 0 : Math.round(read.getBoundingClientRect().height),
     /* Batch FIX, Section 2.3: the readout beside the marker, never on it; the ring's box and the card's. */
     ring: (() => { const e = document.querySelector('[data-layer-marker="wind"] .lmark__ring'); if (!e) return null; const q = e.getBoundingClientRect(); return [q.left, q.top, q.right, q.bottom] })(),
     card: read === null ? null : (() => { const q = read.getBoundingClientRect(); return [q.left, q.top, q.right, q.bottom] })(),
+    /* Batch 3D, Section 4.2: what the readout covers of the layer chip and the rail's buttons. */
+    covers: read === null ? [] : (() => { const q = read.getBoundingClientRect(); return [...document.querySelectorAll('[data-layer-source], .rail2__btn')].filter((e) => { const o = e.getBoundingClientRect(); return o.width > 0 && q.left < o.right && o.left < q.right && q.top < o.bottom && o.top < q.bottom }).map((e) => e.getAttribute('aria-label') ?? e.textContent) })(),
     /* Batch FIX, Section 2.4: the bar's own labels (each day's peak, the drone's limit), their boxes, for the overlap check. */
     barLabels: bar === null ? [] : [...bar.querySelectorAll('[data-wind-peak], [data-drone-limit]')].filter((e) => getComputedStyle(e).display !== 'none').map((e) => { const q = e.getBoundingClientRect(); return { t: e.textContent, limit: e.hasAttribute('data-drone-limit'), b: [q.left, q.top, q.right, q.bottom] } }),
     centre: (() => {
@@ -248,7 +251,8 @@ try {
       if (w.readH === 0 || w.readH > 120) fail(`${label}: the marker's readout is ${w.readH} px tall, not one to four lines`)
       /* Batch FIX 2.3: beside the marker, never on it. Both boxes must be there to say so (failure-modes B). */
       if (w.ring === null || w.card === null) fail(`${label}: could not find the marker's ring (${JSON.stringify(w.ring)}) or its readout (${JSON.stringify(w.card)}) to check they are apart`)
-      else if (w.card[0] < w.ring[2] - 0.5 && w.ring[0] < w.card[2] - 0.5 && w.card[1] < w.ring[3] - 0.5 && w.ring[1] < w.card[3] - 0.5) fail(`${label}: the readout ${JSON.stringify(w.card.map(Math.round))} sits on the marker ${JSON.stringify(w.ring.map(Math.round))}`)
+      for (const c of w.covers ?? []) fail(`${label}: the readout covers ${JSON.stringify(c)}`)
+      if (w.ring !== null && w.card !== null && w.card[0] < w.ring[2] - 0.5 && w.ring[0] < w.card[2] - 0.5 && w.card[1] < w.ring[3] - 0.5 && w.ring[1] < w.card[3] - 0.5) fail(`${label}: the readout ${JSON.stringify(w.card.map(Math.round))} sits on the marker ${JSON.stringify(w.ring.map(Math.round))}`)
       /* Batch FIX 2.4: no label on the wind bar over another ("drone limit 23" over the "11" peak, 17 Nov). The kit has the Air 3S, so the limit is drawn: counted, so an empty bar is not a pass. */
       const peaks = w.barLabels.filter((l) => !l.limit)
       if (peaks.length === 0 || !w.barLabels.some((l) => l.limit)) fail(`${label}: the wind bar shows ${peaks.length} peak labels and ${w.barLabels.some((l) => l.limit) ? 'a' : 'no'} drone limit: nothing to check for overlap`)

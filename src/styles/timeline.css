@@ -49,10 +49,32 @@
   will-change: transform;
 }
 /* Narrowed to the room beside the marker (Batch FIX 2.3): the lines wrap at a space, never cut, never mid-word. */
-.lmark__card[data-tight='1'] .lmark__line {
+.lmark__card[data-tight='1'] .lmark__line--second {
   white-space: normal;
   overflow-wrap: normal;
   text-overflow: clip;
+}
+/*
+ * Batch 3D, Section 4.3 (17 Nov live: "cross-/shore here", "14 / min ago"):
+ * the value ("5 kt NNE · g6"), the side to the beach and the water stay on one
+ * line, narrow or not; the station line is its name, which is cut with an
+ * ellipsis when short of room, beside its reading and age, which never are.
+ */
+.lmark__line--split {
+  display: flex;
+  gap: 0.3em;
+  align-items: baseline;
+}
+.lmark__name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lmark__rest {
+  flex: none;
+  white-space: nowrap;
 }
 .lmark__card button {
   pointer-events: auto;

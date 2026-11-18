@@ -8,6 +8,7 @@
  * they have not arrived the page still has this (A4: never a blank page).
  */
 import type { Hourly } from './tideSheetData.ts'
+import { CALM_KT, CALM_MPS, calmDirection, halfHour, isCalm } from '../core/markerWind.ts'
 import { nowcastAt, nowcastWeight, obsFresh, type StationObs } from '../core/nowcast.ts'
 import { hourlyAt } from './tideSheetData.ts'
 import { saneAzimuth, saneGust, saneWind } from '../core/sanity.ts'
@@ -20,19 +21,8 @@ export interface WindNow {
   gustMps: number | null
 }
 
-/*
- * CALM HAS NO DIRECTION (Batch QA, Section 0B; field 10 Nov: "1 kt NNE
- * cross-shore" became "2 kt SW offshore" nine minutes later). Under CALM_KT,
- * 3 kt, the vane says nothing the beach can use: the wind is "Calm", with no
- * side to the beach and no arrow. Every wind now passes through here.
- */
-export const CALM_KT = 3
-export const CALM_MPS = CALM_KT / 1.943844
-export const calmDirection = (mps: number | null, fromDeg: number | null): number | null => (mps === null || mps < CALM_MPS ? null : fromDeg)
-export const isCalm = (mps: number | null): boolean => mps !== null && mps < CALM_MPS
-
-/** The hour's half past: two screens a few seconds apart read the same hour. */
-export const halfHour = (t: Date): Date => new Date(Math.floor(t.getTime() / 3_600_000) * 3_600_000 + 1_800_000)
+/* Calm has no direction (Batch QA, Section 0B); the rule and the half hour live in src/core/markerWind.ts, the one place a wind at the marker is computed (Batch 3D, Section 4.1). */
+export { CALM_KT, CALM_MPS, calmDirection, isCalm, halfHour }
 
 /** The model's wind at the hour, raw. */
 export function modelWindAt(wx: Hourly | null, t: Date): WindNow | null {

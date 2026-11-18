@@ -12,7 +12,8 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import type * as maplibregl from 'maplibre-gl'
-import { blocksFor, buildField, GLOBAL_FROM_STEP, gridStep, sampleField, toUV, type Bounds, type Field, type WindSample } from '../core/windViewport.ts'
+import { fieldFromSeries, POINT_STEP } from '../core/markerWind.ts'
+import { blocksFor, GLOBAL_FROM_STEP, gridStep, sampleField, type Bounds, type Field } from '../core/windViewport.ts'
 import { FORECAST_MAX_AGE_MS, weatherJson } from './weatherStore.ts'
 
 export type WindModelChip = 'hrrr' | 'blend' | 'ecmwf'
@@ -79,21 +80,8 @@ export function parseBlock(payload: unknown, points: readonly { lat: number; lon
   })
 }
 
-/** The field at one hour (the nearest the series has). */
-export function fieldAt(series: readonly PointSeries[], step: number, at: Date): Field | null {
-  const t = at.getTime()
-  const samples: WindSample[] = []
-  for (const s of series) {
-    let best = -1
-    for (let i = 0; i < s.times.length; i += 1) if (best < 0 || Math.abs(s.times[i] - t) < Math.abs(s.times[best] - t)) best = i
-    if (best < 0 || Math.abs(s.times[best] - t) > 90 * 60_000) continue
-    const sp = s.speed[best]
-    const fr = s.from[best]
-    if (sp === null || fr === null) continue
-    samples.push({ lat: s.lat, lon: s.lon, ...toUV(sp, fr), gust: s.gust[best] })
-  }
-  return buildField(samples, step)
-}
+/** The field at one hour (the nearest the series has); src/core/markerWind.ts fieldFromSeries. */
+export const fieldAt = (series: readonly PointSeries[], step: number, at: Date): Field | null => fieldFromSeries(series, step, at)
 
 export interface WindViewport {
   series: PointSeries[]
@@ -176,7 +164,7 @@ export function useWindViewport(map: maplibregl.Map | null, on: boolean, model: 
 }
 
 /** The fine grid the marker always reads (it was a crosshair until Batch DRONE, Section 3): the cache's own 0.05°, as at zoom 9 and in. */
-export const POINT_STEP = 0.05
+export { POINT_STEP }
 
 /**
  * THE CROSSHAIR READS THE SAME AT EVERY ZOOM (Batch LIVE, Section 1.1; 14 Nov
@@ -187,7 +175,7 @@ export const POINT_STEP = 0.05
  * between its points. Asked when the crosshair settles on a new 0.01°.
  */
 /** `daysAt`: the time the days asked for must reach (Batch DRONE, Section 3: the thumb's time held 24 h ahead while a drag lasts, so a new hour never asks again). */
-export function usePointWind(centre: { lat: number; lon: number } | null, on: boolean, model: WindModelChip, at: Date | null, level: WindLevel = '10m', daysAt: Date | null = at): { u: number; v: number; gust: number | null } | null {
+export function usePointSeries(centre: { lat: number; lon: number } | null, on: boolean, model: WindModelChip, level: WindLevel = '10m', daysAt: Date | null = null): PointSeries[] | null {
   const days = gridDays(daysAt)
   const key = centre === null || !on ? null : `${centre.lat.toFixed(2)},${centre.lon.toFixed(2)}|${model}|${level}|${days}`
   const [got, setGot] = useState<{ key: string; series: PointSeries[] } | null>(null)
@@ -210,10 +198,16 @@ export function usePointWind(centre: { lat: number; lon: number } | null, on: bo
       clearTimeout(t)
     }
   }, [key]) // eslint-disable-line react-hooks/exhaustive-deps
+  return got !== null && got.key === key && got.series.length > 0 ? got.series : null
+}
+
+/** The fine grid's reading at the crosshair for one hour (kept for scripts/audit-wind-live.mjs; the map reads src/core/markerWind.ts through usePointSeries). */
+export function usePointWind(centre: { lat: number; lon: number } | null, on: boolean, model: WindModelChip, at: Date | null, level: WindLevel = '10m', daysAt: Date | null = at): { u: number; v: number; gust: number | null } | null {
+  const series = usePointSeries(centre, on, model, level, daysAt)
   const hour = at === null ? null : Math.floor(at.getTime() / 3_600_000)
   return useMemo(() => {
-    if (got === null || got.key !== key || centre === null || hour === null) return null
-    const f = fieldAt(got.series, POINT_STEP, new Date(hour * 3_600_000))
+    if (series === null || centre === null || hour === null) return null
+    const f = fieldAt(series, POINT_STEP, new Date(hour * 3_600_000))
     return f === null ? null : sampleField(f, centre.lat, centre.lon)
-  }, [got, key, hour, centre?.lat, centre?.lon]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [series, hour, centre?.lat, centre?.lon]) // eslint-disable-line react-hooks/exhaustive-deps
 }
