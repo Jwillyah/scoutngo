@@ -16,6 +16,10 @@
  */
 import { distanceMeters, type LatLon } from './geo.ts'
 import { REGIONS, SURF_SPOTS, type SurfSpot } from '../data/surfSpots.ts'
+import { STARTER_SPOTS } from '../data/bestSkySpots.ts'
+import { EXTRA_SPOTS, STARTER_ALIASES } from '../data/searchSpots.ts'
+import type { SpotIn } from './bestSky.ts'
+import { findLocal, type Candidate } from './spotFind.ts'
 
 const ORDINAL: Record<string, string> = { first: '1st', second: '2nd', third: '3rd', fourth: '4th', fifth: '5th', sixth: '6th', seventh: '7th', eighth: '8th', ninth: '9th', tenth: '10th' }
 const SAME: Record<string, string> = { street: 'st', avenue: 'ave', road: 'rd', drive: 'dr', north: 'n', south: 's', east: 'e', west: 'w', beach: 'beach', saint: 'st', mount: 'mt', point: 'pt', fishing: 'fishing' }
@@ -114,12 +118,35 @@ export interface Result {
 const COMPASS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW']
 const faces = (deg: number) => `faces ${COMPASS[Math.round(((deg % 360) + 360) % 360 / 22.5) % 16]}`
 
-/** Our own spots that match: every word in the name or one alias, inside the region when one was said. */
-export function ownSpots(q: Query, from: LatLon | null, spots: readonly SurfSpot[] = SURF_SPOTS): Result[] {
+/** A surf spot as the fuzzy match reads it (Batch 3D, Section 2). */
+export function surfCandidate(s: SurfSpot): Candidate {
+  return { id: s.id, name: s.name, aliases: s.aliases, where: [s.town, s.state].filter((x) => x !== '').join(', '), at: s.at, note: s.kind === 'pier' ? 'pier' : faces(s.facing), source: 'spot' }
+}
+
+/**
+ * Everything the phone knows by name besides the surf spots: your saved
+ * spots, the starter list with its aliases, the places in no list, and the
+ * map's spots already cached here (Batch 3D, Section 2).
+ */
+export function localPool(saved: readonly { id: string; name: string; at: LatLon }[], osm: readonly SpotIn[]): Candidate[] {
+  return [
+    ...saved.map((s): Candidate => ({ id: `saved-${s.id}`, name: s.name, aliases: [], where: '', at: s.at, note: 'your spot', source: 'saved' })),
+    ...STARTER_SPOTS.map((s): Candidate => ({ id: s.id, name: s.name, aliases: STARTER_ALIASES[s.id] ?? [], where: 'Virginia Beach, VA', at: s.at, note: faces(s.facing), source: 'starter' })),
+    ...EXTRA_SPOTS.map((s): Candidate => ({ id: s.id, name: s.name, aliases: s.aliases, where: s.where, at: s.at, note: s.facing === null ? null : faces(s.facing), source: 'starter' })),
+    ...osm.map((s): Candidate => ({ id: s.id, name: s.name, aliases: [], where: '', at: s.at, note: s.kind ?? 'on the map', source: 'osm' })),
+  ]
+}
+
+/**
+ * Our own spots that match, best match first (src/core/spotFind.ts: fuzzy,
+ * aliases, plurals, two typos), inside the region when one was said. `extra`
+ * is the rest of what the phone has: the starter list, your saved spots and
+ * the map's cached spots.
+ */
+export function ownSpots(q: Query, from: LatLon | null, spots: readonly SurfSpot[] = SURF_SPOTS, extra: readonly Candidate[] = []): Result[] {
   if (q.words.length === 0) return []
-  return spots
-    .filter((s) => (q.region === null || inBox(s.at, q.region.box)) && [s.name, ...s.aliases].some((n) => missing(q.words, n) === 0))
-    .map((s) => ({ id: s.id, name: s.name, where: [s.town, s.state].filter((x) => x !== '').join(', '), at: s.at, group: 'spot' as const, note: s.kind === 'pier' ? 'pier' : faces(s.facing), km: from === null ? null : distanceMeters(from, s.at) / 1000 }))
+  const pool = [...extra, ...spots.map(surfCandidate)].filter((c) => q.region === null || inBox(c.at, q.region.box))
+  return findLocal(q.geocoderText, pool, from).map((f) => ({ id: f.candidate.id, name: f.candidate.name, where: f.candidate.where, at: f.candidate.at, group: 'spot' as const, note: f.candidate.note, km: f.km }))
 }
 
 /** A geocoder's row, with OpenStreetMap's own class and type. */
@@ -154,7 +181,8 @@ export function rankResults(q: Query, own: readonly Result[], rows: readonly Geo
   for (const r of rows) {
     if (q.region !== null && !inBox(r.at, q.region.box)) continue
     const group = groupOf(r)
-    if (group === 'business' && !q.business) continue
+    /* Batch 3D, Section 2: a name search is searching for the business: shown when the words are in its name, not only when they look like one. */
+    if (group === 'business' && !q.business && missing(q.words, r.name) > 0) continue
     if (group === 'other') continue
     if (missing(q.words, `${r.name} ${group === 'beach' ? '' : r.where}`) > 0 && missing(q.words, r.name) > 0) continue
     /* One place once: a row within 300 m of one of ours, or with one of our names within 5 km (Sandbridge the spot and Sandbridge the village), is ours. */
@@ -164,7 +192,8 @@ export function rankResults(q: Query, own: readonly Result[], rows: readonly Geo
   }
   const order: Group[] = ['spot', 'beach', 'town', 'business']
   const near = (a: Result, b: Result) => (a.km ?? 0) - (b.km ?? 0)
-  return order.flatMap((g) => [...own, ...fromRows].filter((r) => r.group === g).sort(near))
+  /* Our own spots keep the match's order (best first); the map's rows go nearest first after them. */
+  return order.flatMap((g) => [...own.filter((r) => r.group === g), ...fromRows.filter((r) => r.group === g).sort(near)])
 }
 
-export const GROUP_TITLE: Record<Exclude<Group, 'other'>, string> = { spot: 'Surf spots', beach: 'Beach accesses', town: 'Towns', business: 'Businesses' }
+export const GROUP_TITLE: Record<Exclude<Group, 'other'>, string> = { spot: 'Spots', beach: 'Beach accesses', town: 'Towns', business: 'Businesses' }

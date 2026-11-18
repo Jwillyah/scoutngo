@@ -42,7 +42,7 @@ export const SURF_SPOTS: readonly SurfSpot[] = [
   { id: 'frisco-pier', name: 'Frisco Pier', aliases: ['Frisco Fishing Pier', 'Frisco Beach'], town: 'Frisco', state: 'NC', at: { lat: 35.2268, lon: -75.633 }, facing: 165, kind: 'pier' },
   { id: 'vb-1st-street-jetty', name: '1st Street Jetty', aliases: ['First Street Jetty', '1st St Jetty', 'Rudee Inlet Jetty'], town: 'Virginia Beach', state: 'VA', at: { lat: 36.8318, lon: -75.9678 }, facing: 80, kind: 'surf' },
   /* Batch LIVE, Section 9B: the oceanfront's spots, so a report says where it was (14 Nov 3:17 PM, a Croatan report saved as "Virginia Beach"). Facing 100°, the oceanfront's (fixtures/truth/2026-11-13-vb.json); the phone measures its own (src/lib/coast.ts). */
-  { id: 'vb-croatan', name: 'Croatan', aliases: ['Croatan Beach'], town: 'Virginia Beach', state: 'VA', at: { lat: 36.8172, lon: -75.9725 }, facing: 100, kind: 'surf' },
+  { id: 'vb-croatan', name: 'Croatan', aliases: ['Croatan Beach', 'Croatan Jetty'], town: 'Virginia Beach', state: 'VA', at: { lat: 36.8172, lon: -75.9725 }, facing: 100, kind: 'surf' },
   { id: 'vb-fishing-pier', name: 'Virginia Beach Pier', aliases: ['Virginia Beach Fishing Pier', 'VB Fishing Pier', '15th Street Pier', 'The Pier'], town: 'Virginia Beach', state: 'VA', at: { lat: 36.8436, lon: -75.9713 }, facing: 100, kind: 'pier' },
   { id: 'vb-north-end', name: 'North End', aliases: ['North End VB'], town: 'Virginia Beach', state: 'VA', at: { lat: 36.8985, lon: -75.9873 }, facing: 100, kind: 'surf' },
 ]

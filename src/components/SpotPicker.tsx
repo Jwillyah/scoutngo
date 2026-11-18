@@ -2,7 +2,9 @@ import '../styles/search.css'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { nearSpots, roundToKm, spotKind, type KnownSpot } from '../core/knownSpots.ts'
 import type { LatLon } from '../core/geo.ts'
-import { GROUP_TITLE, ownSpots, parseQuery, rankResults, type Group, type Result } from '../core/spotSearch.ts'
+import { GROUP_TITLE, localPool, ownSpots, parseQuery, rankResults, type Group, type Result } from '../core/spotSearch.ts'
+import type { SpotIn } from '../core/bestSky.ts'
+import { keptOsmSpots } from '../lib/bestSkyOsm.ts'
 import { COAST_CAMS } from '../data/coastCams.ts'
 import { SURF_SPOTS, type SurfSpot } from '../data/surfSpots.ts'
 import { locateOnce, locateWords } from '../lib/locateOnce.ts'
@@ -29,7 +31,7 @@ const OWN: SurfSpot[] = [
 ]
 const CHIPS: readonly { id: 'all' | Group; label: string }[] = [
   { id: 'all', label: 'All' },
-  { id: 'spot', label: 'Surf spots' },
+  { id: 'spot', label: 'Spots' },
   { id: 'beach', label: 'Beaches' },
   { id: 'town', label: 'Towns' },
 ]
@@ -41,12 +43,25 @@ interface SpotPickerProps {
   saved: readonly { id: string; name: string; at: LatLon }[]
   /** Where to look for known spots before anything is searched (the current venue), or null. */
   around: LatLon | null
+  /** Words already in the search box (a test renders the picker with them). */
+  initialQuery?: string
   onPick: (at: LatLon, label: string) => void
   onClose?: () => void
 }
 
-export function SpotPicker({ title, saved, around, onPick, onClose }: SpotPickerProps) {
-  const [query, setQuery] = useState('')
+export function SpotPicker({ title, saved, around, initialQuery = '', onPick, onClose }: SpotPickerProps) {
+  const [query, setQuery] = useState(initialQuery)
+  /* Batch 3D, Section 2: the map's spots already kept on this phone, read once, searched by name; nothing is asked. */
+  const [osm, setOsm] = useState<SpotIn[]>([])
+  useEffect(() => {
+    let live = true
+    void keptOsmSpots().then((s) => {
+      if (live) setOsm(s)
+    })
+    return () => {
+      live = false
+    }
+  }, [])
   const searchBox = useRef<HTMLInputElement | null>(null)
   /* The geocoders' answer, kept with the words it answers: an answer to older words is not shown (E7). */
   const [online, setOnline] = useState<{ text: string; result: GeoAnswer | 'searching' } | null>(null)
@@ -60,7 +75,8 @@ export function SpotPicker({ title, saved, around, onPick, onClose }: SpotPicker
   /* Batch Map, Section 2: the words normalised, the region a filter (src/core/spotSearch.ts). */
   const q = useMemo(() => parseQuery(query), [query])
   const from = around ?? centre?.at ?? null
-  const own = useMemo(() => (searching ? ownSpots(q, from, OWN) : []), [searching, q, from])
+  /* Batch 3D, Section 2: our spots first and on the phone: yours, the surf spots, the starter list, the map's cached spots; fuzzy, with aliases. */
+  const own = useMemo(() => (searching ? ownSpots(q, from, OWN, localPool(saved, osm)) : []), [searching, q, from, saved, osm])
   useEffect(() => {
     if (timer.current !== null) clearTimeout(timer.current)
     if (!searching || q.geocoderText === '') return
@@ -164,7 +180,7 @@ export function SpotPicker({ title, saved, around, onPick, onClose }: SpotPicker
       {stillLooking && results.length === 0 ? <p className="spick__note">Searching…</p> : null}
       {answer !== null && answer !== 'searching' && answer.status === 'failed' && results.length === 0 ? <p className="spick__note">The place search did not answer: no signal, or the service is busy.</p> : null}
       {searching && !stillLooking && results.length === 0 && (answer === null || answer === 'searching' || answer.status === 'ok') ? <p className="spick__note">Nothing found by that name.</p> : null}
-      {searching ? <p className="spick__foot">Only the words you type are sent. Results are sorted by distance on your phone. Businesses hidden unless you search for one.</p> : null}
+      {searching ? <p className="spick__foot">Only the words you type are sent. Your own and our spots are found on your phone first. Businesses show when their name matches.</p> : null}
 
       {centre === null ? null : (
         <>

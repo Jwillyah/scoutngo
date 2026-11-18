@@ -32,7 +32,9 @@ describe('search v2', () => {
     /* Batch Beach, Section 1: the coastline's own facing, 61° (measurements/2026-11-10-spot-facing.md); the hand-set 110 read ESE. */
     expect(got[0].note).toBe('faces ENE')
     expect(got.map((r) => r.name)).not.toContain('Outer Banks')
-    expect(got.map((r) => r.name)).not.toContain('First Street Grill')
+    /* Batch 3D, Section 2: a business whose name holds the words is a name match and shows, last (it was hidden unless the words looked like one); the hospital's name does not hold them. */
+    expect(got.filter((r) => r.group === 'business').map((r) => r.name)).toEqual(['First Street Grill'])
+    expect(got.at(-1)?.name).toBe('First Street Grill')
     expect(got.map((r) => r.name)).not.toContain('Outer Banks Hospital')
     /* The beach accesses after the spots: KDH's own access is within 300 m of the spot, so it is the spot. */
     expect(got.filter((r) => r.group === 'beach').map((r) => r.name)).toEqual(['1st St, Kitty Hawk'])
@@ -55,8 +57,9 @@ describe('search v2', () => {
     expect(got.map((r) => r.name)).toEqual(['Sandbridge'])
   })
 
-  it('shows businesses only when the words look like one', () => {
-    expect(search('first street', [RESTAURANT]).some((r) => r.group === 'business')).toBe(false)
+  it('shows a business when its name matches; one that only sits on the street does not', () => {
+    expect(search('first street', [RESTAURANT]).some((r) => r.group === 'business')).toBe(true)
+    expect(search('first street', [row('z', 'Sunrise Diner', '1st Street, Kill Devil Hills', 36.03, -75.67, 'amenity', 'restaurant')]).some((r) => r.group === 'business')).toBe(false)
     expect(search('first street grill', [RESTAURANT]).map((r) => r.name)).toEqual(['First Street Grill'])
   })
 

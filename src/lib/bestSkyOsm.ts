@@ -44,6 +44,29 @@ async function keep(t: OsmTile, spots: SpotIn[]): Promise<void> {
   }
 }
 
+/**
+ * Every map spot already kept on this phone, for the name search (Batch 3D,
+ * Section 2): read from Cache Storage and memory, never asked of Overpass.
+ * [] with no Cache Storage.
+ */
+export async function keptOsmSpots(): Promise<SpotIn[]> {
+  const byId = new Map<string, SpotIn>()
+  for (const spots of memory.values()) for (const s of spots) byId.set(s.id, s)
+  try {
+    const cache = await caches.open(OSM_CACHE)
+    for (const req of await cache.keys()) {
+      const r = await cache.match(req)
+      if (r === undefined) continue
+      const body = (await r.json()) as { at: number; spots: SpotIn[] }
+      if (Date.now() - body.at > OSM_KEEP_MS || !Array.isArray(body.spots)) continue
+      for (const s of body.spots) byId.set(s.id, s)
+    }
+  } catch {
+    /* No Cache Storage: what this session holds in memory. */
+  }
+  return [...byId.values()]
+}
+
 /** The map's spots within the radius's tiles; [] past 30 mi, offline, or when Overpass does not answer. */
 export async function fetchOsmSpots(centre: LatLon, radiusKm: number): Promise<{ spots: SpotIn[]; asked: number }> {
   if (radiusKm > OSM_MAX_RADIUS_KM) return { spots: [], asked: 0 }
