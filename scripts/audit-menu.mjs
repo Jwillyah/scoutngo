@@ -168,7 +168,8 @@ try {
   }
   /*
    * Batch 3D, Section 0 (Jwilly's iPhone, 17 Nov): 3D and Fly behind Settings ›
-   * Labs, off by default on an iPhone; Debug a plain row under About, Last
+   * Labs; Batch SIMPLE-1, Section 4 (18 Nov): on by default on an iPhone too,
+   * while they are tested; Debug a plain row under About, Last
    * errors a row that opens it, the version's long press Debug and not About;
    * Last errors opening to the stack, and Copy all.
    */
@@ -197,7 +198,7 @@ try {
     await goToStage(ev, wait, 'plan')
     await wait(1500)
     looked += 1
-    if (await ev(`!!document.querySelector('button[aria-label="Open the 3D clay model"]')`)) fail(`${label}: the 3D button shows on an iPhone with Labs left alone`)
+    if (!(await ev(`!!document.querySelector('button[aria-label="Open the 3D clay model"]')`))) fail(`${label}: no 3D button on an iPhone with Labs left alone (on by default, Batch SIMPLE-1, Section 4)`)
     await menuOn(page)
     await wait(800)
     await page.locator('.mrow', { hasText: 'Settings' }).first().click()
@@ -209,7 +210,7 @@ try {
       return { rows, labs: sw === null ? null : sw.getAttribute('aria-checked'), debugH: debug === undefined ? 0 : Math.round(debug.getBoundingClientRect().height) }
     })())`))
     console.log(`  settings rows: ${JSON.stringify(s.rows.slice(-6))}; labs ${s.labs}; Debug row ${s.debugH}px`)
-    if (s.labs !== 'false') fail(`${label}: Labs › 3D and Fly is ${s.labs}, not off by default on an iPhone`)
+    if (s.labs !== 'true') fail(`${label}: Labs › 3D and Fly is ${s.labs}, not on by default on an iPhone`)
     const at = s.rows.indexOf('About')
     if (at < 0 || s.rows[at + 1] !== 'Debug') fail(`${label}: no plain Debug row right under About (${JSON.stringify(s.rows.slice(at, at + 3))})`)
     if (s.debugH < 44) fail(`${label}: the Debug row is ${s.debugH}px, under a 44 px target`)

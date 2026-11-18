@@ -726,7 +726,7 @@ export function PlanMode({
   const [threeD, setThreeD] = useState(false)
   const [stand, setStand] = useState<StandRequest | null>(null)
   const [threeDNote, setThreeDNote] = useState<string | null>(null)
-  /* Batch 3D, Section 0.1: 3D and Fly behind Settings › Labs (off by default on iOS); every way in asks here first. */
+  /* Batch 3D, Section 0.1: 3D and Fly behind Settings › Labs (on by default everywhere since Batch SIMPLE-1, Section 4); every way in asks here first. */
   const [labs3D] = useLabs3D()
   const no3D = (): boolean => {
     if (!labs3D) {
@@ -2972,8 +2972,8 @@ export function PlanMode({
             stand={stand}
             onLeaveStand={() => setStand(null)}
             onBack2D={() => {
-              /* Batch LIVE, Section 5.2: "3D didn't load · Back to 2D". */
-              logTouch('3D: not shown in 10 s, back to 2D')
+              /* Batch LIVE, Section 5.2: "3D didn't load · Back to 2D"; Batch SIMPLE-1, Section 4: also after the third lost context. */
+              logTouch('3D: Back to 2D (not shown in 10 s, or the graphics lost too often)')
               setFlySession(null)
               setStand(null)
               setThreeD(false)

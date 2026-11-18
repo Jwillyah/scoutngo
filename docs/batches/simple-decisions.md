@@ -26,3 +26,26 @@ Each consequential call is listed with its options and the one picked. Jwilly ca
 Options for those last two: move the drawers out of setup (a restyle, which this batch doesn't do), or leave them. **Picked: leave them.** For the mockups, the Section 6 audit lists them as duplicate paths.
 
 **Not reset when leaving:** the map's layers, including Airspace switched on in Features. A layer is a choice the user made on the map, not a sheet that pops up.
+
+## Section 4: 3D leftovers
+
+**The phone's evidence** (18 Nov, 1:07 PM, build 3db2f29): 13 × "3D not shown in 10 s" and 5 × "Fly not open in 3 s", with no shader or context error.
+
+**The code at 3db2f29** (src/three/world/scene.ts:601): "shown" was `pending.n === 0 && ground.ready()`, that is, nothing in flight anywhere. The mid and far rings started at once, so they competed with the near square.
+
+**What "shown" means now:** the first useful frame. That's the near square built on its terrain, wearing its coarse picture, with the 16 sharp tiles of its first ring settled (src/core/firstView3d.ts). The mid and far rings start after it.
+
+Options were:
+- (a) the near square only, without its sharp ring;
+- (b) the near square plus its first ring;
+- (c) everything, as before.
+
+**Picked: (b).** (a) shows a blurry square, which would read as broken; (c) is the 10 s timeout.
+
+Fly now waits for the same first useful frame plus the take-off ground. Before, it waited for any first frame. That frame can be one with no ground.
+
+**Not covered by the cancel:**
+- The water and woods vector tiles (`loadRawTile`) are not in the abort scope. The imagery and terrain requests are, and they are the bulk.
+- One hung first-ring tile can still hold "shown" back for up to its 8 s timeout.
+
+**Labs:** on by default everywhere, iOS included (Jwilly, 18 Nov). The switch stays in Settings › Labs.

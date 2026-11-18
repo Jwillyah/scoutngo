@@ -46,7 +46,7 @@ import '../styles/settings.css'
  *   Units            Wind kt / mph / km/h, Height ft / m, Temp, Time
  *   My gear          Camera + lenses, the drone with its rated wind
  *   Alerts           Sky calls in my calendar, Special light near me
- *   Labs             3D and Fly (testing): off by default on iOS
+ *   Labs             3D and Fly (testing): on by default (Batch SIMPLE-1, Section 4)
  *   My data · on this phone only
  *                    Back up to a file, What leaves my phone, More ›,
  *                    About, Debug, Last errors
@@ -291,9 +291,9 @@ export function SettingsPage(props: Props) {
         />
       </Group>
 
-      {/* Batch 3D, Section 0.1: off by default on iOS until the iPhone passes; on elsewhere. */}
+      {/* Batch 3D, Section 0.1; Batch SIMPLE-1, Section 4: on by default everywhere while 3D and Fly are tested; this switch turns them off. */}
       <Group title="Labs">
-        <Row label="3D and Fly (testing)" sub="The 3D map and flying the drone in it. Off on iPhone while it is tested." end={<Toggle on={labs3D} label="3D and Fly (testing)" onChange={setLabs3D} />} />
+        <Row label="3D and Fly (testing)" sub="The 3D map and flying the drone in it. On while it is tested; turn it off if it gives trouble." end={<Toggle on={labs3D} label="3D and Fly (testing)" onChange={setLabs3D} />} />
       </Group>
 
       <Group title="My data · on this phone only">

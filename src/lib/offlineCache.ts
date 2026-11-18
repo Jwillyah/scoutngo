@@ -197,6 +197,8 @@ export async function loadTile(
   if (saved !== null) return { data: await cleanTerrainBytes(url, saved, loadRawTile) }
 
   if (!isOnline()) throw new Error(`offline and not saved: ${url}`)
+  /* Batch SIMPLE-1, Section 4: cancelled while the saved copy was looked up (a 3D view closed): no request at all. */
+  if (abort.signal.aborted) throw new DOMException('cancelled before it was asked', 'AbortError')
 
   let response: Response
   try {
@@ -208,7 +210,10 @@ export async function loadTile(
   }
   reportNetwork(true)
   if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`)
-  return { data: await cleanTerrainBytes(url, await response.arrayBuffer(), loadRawTile) }
+  const body = await response.arrayBuffer()
+  /* Cancelled while the body came in: the elevation cleanup's neighbour reads are not started for it. */
+  if (abort.signal.aborted) throw new DOMException('cancelled', 'AbortError')
+  return { data: await cleanTerrainBytes(url, body, loadRawTile) }
 }
 
 /* -------------------------------------------------------------------- areas */

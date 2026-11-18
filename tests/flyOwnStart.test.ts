@@ -18,15 +18,16 @@ afterEach(() => {
 const strip = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
 
 describe("Fly's own start", () => {
-  it('opens once the first frame is drawn and the take-off ground is read, not on the whole view', () => {
-    expect(flyGate({ failed: null, lost: false, drawn: true, groundRead: true })).toEqual({ kind: 'open' })
-    expect(flyGate({ failed: null, lost: false, drawn: false, groundRead: true })).toEqual({ kind: 'waiting' })
-    expect(flyGate({ failed: null, lost: false, drawn: true, groundRead: false })).toEqual({ kind: 'waiting' })
+  /* Batch SIMPLE-1, Section 4: the first USEFUL frame (`shown`: the near square and its first ring), not a first frame of nothing. */
+  it('opens once the first useful frame is shown and the take-off ground is read, not on the whole view', () => {
+    expect(flyGate({ failed: null, lost: false, shown: true, groundRead: true })).toEqual({ kind: 'open' })
+    expect(flyGate({ failed: null, lost: false, shown: false, groundRead: true })).toEqual({ kind: 'waiting' })
+    expect(flyGate({ failed: null, lost: false, shown: true, groundRead: false })).toEqual({ kind: 'waiting' })
   })
 
   it('graphics refused or taken back: no-graphics straight away, whatever else is so', () => {
-    expect(flyGate({ failed: 'This phone did not allow 3D graphics: Error creating WebGL context.', lost: false, drawn: false, groundRead: false })).toEqual({ kind: 'no-graphics', why: 'This phone did not allow 3D graphics: Error creating WebGL context.' })
-    expect(flyGate({ failed: null, lost: true, drawn: true, groundRead: true }).kind).toBe('no-graphics')
+    expect(flyGate({ failed: 'This phone did not allow 3D graphics: Error creating WebGL context.', lost: false, shown: false, groundRead: false })).toEqual({ kind: 'no-graphics', why: 'This phone did not allow 3D graphics: Error creating WebGL context.' })
+    expect(flyGate({ failed: null, lost: true, shown: true, groundRead: true }).kind).toBe('no-graphics')
     expect(FLY_NO_GRAPHICS).toBe("Needs 3D graphics this phone didn't allow")
   })
 
@@ -53,7 +54,7 @@ describe("Fly's own start", () => {
     expect((caught as Error).name).toBe('GraphicsRefused')
     expect(rendererCount()).toBe(0)
     /* Clay3D's catch puts the message in `failed`; the gate answers on it with no time passed. */
-    const gate = flyGate({ failed: (caught as Error).message, lost: false, drawn: false, groundRead: false })
+    const gate = flyGate({ failed: (caught as Error).message, lost: false, shown: false, groundRead: false })
     expect(gate).toEqual({ kind: 'no-graphics', why: 'This phone did not allow 3D graphics: THREE.WebGLRenderer: Error creating WebGL context.' })
     expect(vi.getTimerCount()).toBe(0)
     /* And the phone's error log has the browser's words. */
@@ -64,7 +65,7 @@ describe("Fly's own start", () => {
 
   it('Clay3D: the no-graphics card comes from the gate, ahead of the timer, with only Back; flying is the gate, not `shown`', () => {
     const CLAY = strip(readFileSync('src/components/Clay3D.tsx', 'utf8'))
-    expect(CLAY).toMatch(/const gate = flyGate\(\{ failed, lost: trouble\?\.kind === 'lost', drawn, groundRead: /)
+    expect(CLAY).toMatch(/const gate = flyGate\(\{ failed, lost: trouble\?\.kind === 'lost' \|\| trouble\?\.kind === 'gave-up', shown, groundRead: /)
     expect(CLAY).toMatch(/const flying = fly !== null && gate\.kind === 'open'/)
     expect(CLAY).not.toMatch(/const flying = fly !== null && shown/)
     const card = CLAY.slice(CLAY.indexOf("gate.kind === 'no-graphics' ? ("), CLAY.indexOf("flyLate === 'late'"))

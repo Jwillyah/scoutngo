@@ -49,7 +49,7 @@ import { NOMINAL_TREE_HEIGHT, type MappedTree } from '../../lib/trees.ts'
 import type { CinemaInputs, Look } from './inputs.ts'
 import { createGround, type GroundStatus } from './ground.ts'
 import { createSky } from './sky.ts'
-import { ESRI_CREDIT, frameAt, heightAt, imagerySourceFor, OSM_CREDIT, pending, setTileCaches, TERRAIN_CREDIT, tileCounts } from './sources.ts'
+import { closeDownloads, ESRI_CREDIT, frameAt, heightAt, imagerySourceFor, openDownloads, OSM_CREDIT, pending, setTileCaches, TERRAIN_CREDIT, tileCounts } from './sources.ts'
 import { createWorldLook } from './look.ts'
 import { createBuildings } from './buildings.ts'
 import { createWater } from './water.ts'
@@ -80,8 +80,9 @@ export interface ObserverView {
 }
 
 export interface ClayScene {
+  /** Batch SIMPLE-1, Section 4: the first useful frame drawn: the near square on its terrain, its first ring of sharp tiles in. 3D and Fly open on this. */
   whenShown(): Promise<void>
-  /** Batch 3D, Section 1.3: the first frame drawn, whatever has arrived. Fly opens on this, not on the whole near ground. */
+  /** Batch 3D, Section 1.3: the first frame drawn, whatever has arrived (for the probe and the error log; Fly waits for whenShown since Batch SIMPLE-1, Section 4). */
   whenDrawn(): Promise<void>
   sunNow(): { azimuth: number; altitude: number }
   setTime(at: Date): void
@@ -156,6 +157,8 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
   /* Batch FIX, Section 0: lite on an iPhone (src/core/lite3d.ts), and the app's one renderer, borrowed (sharedRenderer.ts). */
   const quality = currentQuality()
   setTileCaches(quality.pictureCache, quality.terrainCache)
+  /* Batch SIMPLE-1, Section 4: this view's tile requests, every one aborted when it is destroyed (sources.ts). */
+  const downloads = openDownloads()
   let destroyNow: () => void = () => {}
   const borrowed = borrowRenderer(() => {
     destroyNow()
@@ -599,6 +602,14 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
   const builtAt = performance.now()
   /* Nothing in flight and the near ground drawn: pictures kept in memory from an earlier open count. */
   const loaded = () => pending.n === 0 && ground.ready()
+  /*
+   * SHOWN AT THE FIRST USEFUL FRAME (Batch SIMPLE-1, Section 4). Shown was
+   * `loaded()`: nothing in flight anywhere, 860 to 980 requests at the pier,
+   * and on Jwilly's phone 13 of 20 errors were "3D not shown in 10 s". Now
+   * the near square on its terrain with its first ring of sharp tiles
+   * (ground.ts firstUseful, src/core/firstView3d.ts); the rest streams in.
+   * `loaded()` still says when everything is in, for the audits and settled().
+   */
   const shown = new Promise<void>((resolve) => {
     const timer = setTimeout(() => done('timer'), SHOW_WITHIN_MS)
     let quiet = 0
@@ -610,8 +621,8 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
       resolve()
     }
     function check() {
-      quiet = loaded() ? quiet + 1 : 0
-      if (quiet >= 3) done('tiles')
+      quiet = ground.firstUseful() ? quiet + 1 : 0
+      if (quiet >= 3) done('first useful frame')
       else touch()
     }
     postRender.add(check)
@@ -939,6 +950,8 @@ export function createClayScene(container: HTMLElement, venue: LatLon, timeZone:
   destroyNow = () => {
     if (destroyed) return
     destroyed = true
+    /* Batch SIMPLE-1, Section 4: first, so no job still running asks for another tile. */
+    closeDownloads(downloads)
     cancelAnimationFrame(raf)
     renderer.domElement.removeEventListener('webglcontextlost', onLost, false)
     renderer.domElement.removeEventListener('webglcontextrestored', onRestored, false)

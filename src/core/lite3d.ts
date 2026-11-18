@@ -87,9 +87,19 @@ export function earnedStepUp(shownMs: number, frames: readonly number[], context
 /*
  * LABS (Batch 3D, Section 0.1; Jwilly's iPhone 13 Pro Max, iOS 18.7.8, 17 Nov
  * on 62899a6: "3D didn't load" within seconds, then a reload out of memory,
- * then Safari's "A problem repeatedly occurred"). Until the phone passes, 3D
- * and Fly are a Settings › Labs switch, off by default on iOS and on
- * elsewhere. A choice made on the phone ('on' or 'off') wins over the default.
+ * then Safari's "A problem repeatedly occurred"). 3D and Fly are a Settings ›
+ * Labs switch. A choice made on the phone ('on' or 'off') wins over the
+ * default.
+ *
+ * Batch SIMPLE-1, Section 4 (Jwilly, 18 Nov: "keep 3D and Fly on for testing
+ * until they work"): on by default everywhere, iOS included. A failure lands
+ * on the 2D map, never in a reload loop: a lost context is rebuilt at most
+ * twice (src/core/firstView3d.ts), then "3D didn't load · Back to 2D", and
+ * nothing reopens 3D or Fly after a reload (src/lib/errorLog.ts diedIn).
+ * `ios` stays in the signature so the rule can differ again without moving.
  */
 export const LABS_3D_KEY = 'scoutngo.labs3d.v1'
-export const labs3DOn = (ios: boolean, stored: string | null): boolean => (stored === 'on' ? true : stored === 'off' ? false : !ios)
+export const labs3DOn = (ios: boolean, stored: string | null): boolean => {
+  void ios
+  return stored !== 'off'
+}

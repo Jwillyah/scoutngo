@@ -32,7 +32,8 @@ import * as THREE from 'three'
 import type { ImagerySource } from '../../data/imagerySources.ts'
 import { waterMaskFor } from './waterMask.ts'
 import { quality3D, type Quality3D } from '../../core/lite3d.ts'
-import { working, frameAt, heightAt, latOf, lonOf, pictureOnly, pictureOrParent, sampleTile, terrainTile, tileX, tileY, TERRAIN_MAX_Z, type Frame } from './sources.ts'
+import { firstRingCount, firstUseful, nearTileOrder } from '../../core/firstView3d.ts'
+import { currentDownloads, working, frameAt, heightAt, latOf, lonOf, pictureOnly, pictureOrParent, sampleTile, terrainTile, tileX, tileY, TERRAIN_MAX_Z, type Frame } from './sources.ts'
 
 export const NEAR_Z = 18
 export const NEAR_TILES = 16
@@ -206,13 +207,15 @@ export interface Ground {
   follow(x: number, z: number, ahead?: { vx: number; vz: number }, heightM?: number): void
   /** The near atlas's canvas texture and its box in the frame, for roofs (Section 4). */
   atlas(): { texture: THREE.Texture; west: number; east: number; north: number; south: number } | null
-  /** The near square is drawn (its parent picture at least). */
+  /** Everything asked for: the near square's sharp tiles in, and the mid and far rings started. */
   ready(): boolean
+  /** Batch SIMPLE-1, Section 4: the first useful frame's ground is in: the near square on its terrain, its first ring of sharp tiles settled. */
+  firstUseful(): boolean
   /** Swap every ground material (the Animated look). */
   setMaterial(hook: GroundMaterialHook): void
   /** Take the fine square away, and keep it away (over the memory budget, Batch FIX, Section 0.3). */
   dropFine(): void
-  /** Free every piece: meshes, materials, textures, and their canvases. */
+  /** Free every piece: meshes, materials, textures, and their canvases; no job of this ground builds or asks anything after it. */
   dispose(): void
   /** Batch Flow, Section 1: the textured pieces this ground still holds, and their pictures' canvas memory (MB, 4 bytes a pixel). */
   kept(): { pieces: number; canvasMB: number }
@@ -226,6 +229,14 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
   const FINE_TILE_PX = FINE_PX / FINE_TILES
   const group = new THREE.Group()
   group.name = 'ground'
+  /*
+   * Batch SIMPLE-1, Section 4: the scope this ground's tiles are asked under
+   * (sources.ts). Disposed, or its view closed: every job stops at its next
+   * step, asks no more tiles and builds nothing.
+   */
+  const scope = currentDownloads()
+  let disposed = false
+  const gone = () => disposed || scope.signal.aborted
   let materialHook = hook
   const textured: { mesh: THREE.Mesh; map: THREE.Texture }[] = []
   const wear = (mesh: THREE.Mesh, map: THREE.Texture) => {
@@ -274,8 +285,11 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
         const west = lonOf(x, z)
         const east = lonOf(x + 1, z)
         void working(async () => {
+          if (gone()) return
           const h = await heightsFor(north, south, west, east, terrainZ, status, onChange, 12, (north - south) / segments / 2)
+          if (gone()) return
           const pic = await pictureOrParent(x, y, z, z >= 14 ? source : null)
+          if (gone()) return
           const canvas = new OffscreenCanvas(256, 256)
           const ctx = canvas.getContext('2d')
           if (pic !== null && ctx !== null) ctx.drawImage(pic.image, pic.sx, pic.sy, pic.sw, pic.sh, 0, 0, 256, 256)
@@ -293,17 +307,38 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
       }
     }
   }
-  ring(FAR_Z, FAR_HALF_M, quality.ringSegments, FAR_DROP_M, Math.min(FAR_Z - 1, 11), -2)
-  ring(MID_Z, MID_HALF_M, quality.ringSegments, MID_DROP_M, 13, -1)
+  /*
+   * Batch SIMPLE-1, Section 4: the rings start once the first useful frame's
+   * ground is in, so their few hundred requests do not stand in front of the
+   * near square's on a phone network. Then they stream in.
+   */
+  let ringsStarted = false
+  const startRings = () => {
+    if (ringsStarted || gone()) return
+    ringsStarted = true
+    ring(FAR_Z, FAR_HALF_M, quality.ringSegments, FAR_DROP_M, Math.min(FAR_Z - 1, 11), -2)
+    ring(MID_Z, MID_HALF_M, quality.ringSegments, MID_DROP_M, 13, -1)
+  }
 
   /* ------------------------------------------------- the near square */
   let near: { mesh: THREE.Mesh; tex: THREE.CanvasTexture; cx: number; cz: number; box: { west: number; east: number; north: number; south: number }; born: number } | null = null
   let building: { cx: number; cz: number } | null = null
   /* The sharp tiles of the current square still arriving: not "loaded" until they are. */
   let refining = false
+  /* Batch SIMPLE-1, Section 4: the first square's first ring of sharp tiles, how many have settled, and the first useful frame's ground. */
+  const FIRST_RING = firstRingCount(NEAR_TILES)
+  let firstSettled = 0
+  let useful = false
+  const checkUseful = () => {
+    if (useful || !firstUseful({ nearBuilt: near !== null, firstRingSettled: firstSettled, firstRingCount: FIRST_RING })) return
+    useful = true
+    onChange()
+    startRings()
+  }
   const nearSquare = async (cx: number, cz: number) => {
-    if (building !== null) return
+    if (building !== null || gone()) return
     building = { cx, cz }
+    const first = near === null
     try {
       const lat = frame.lat(cz)
       const lon = frame.lon(cx)
@@ -342,7 +377,9 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
         }),
       )
       void tilePx
+      if (gone()) return
       const h = await heightsFor(box.north, box.south, box.west, box.east, TERRAIN_MAX_Z, status, onChange, 14)
+      if (gone()) return
       const mesh = new THREE.Mesh(gridGeometry(frame, box.north, box.south, box.west, box.east, quality.nearSegments, h, 0))
       mesh.receiveShadow = true
       mesh.renderOrder = 0
@@ -355,10 +392,8 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
       if (old !== null) release(old.mesh)
       tex.needsUpdate = true
       onChange()
-      /* Then the sharp tiles, nearest the centre first, each over its parent as it arrives. */
-      const order = Array.from({ length: NEAR_TILES * NEAR_TILES }, (_, k) => ({ i: k % NEAR_TILES, j: Math.floor(k / NEAR_TILES) })).sort(
-        (a, b) => Math.hypot(a.i - NEAR_TILES / 2, a.j - NEAR_TILES / 2) - Math.hypot(b.i - NEAR_TILES / 2, b.j - NEAR_TILES / 2),
-      )
+      /* Then the sharp tiles, ring by ring from the centre (src/core/firstView3d.ts), each over its parent as it arrives. */
+      const order = nearTileOrder(NEAR_TILES).map((t, k) => ({ ...t, firstRing: first && k < FIRST_RING }))
       let dirty = false
       const flush = setInterval(() => {
         if (dirty) {
@@ -373,13 +408,22 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
         while (queue.length > 0) {
           const t = queue.shift()
           if (t === undefined) break
-          if (near === null || near.tex !== tex) return
+          if (gone() || near === null || near.tex !== tex) return
           const img = await pictureOnly(tx0 + t.i, ty0 + t.j, NEAR_Z, source)
-          if (img === null || ctx === null) continue
-          ctx.drawImage(img, t.i * NEAR_TILE_PX, t.j * NEAR_TILE_PX, NEAR_TILE_PX, NEAR_TILE_PX)
-          dirty = true
+          if (gone()) return
+          if (img !== null && ctx !== null) {
+            ctx.drawImage(img, t.i * NEAR_TILE_PX, t.j * NEAR_TILE_PX, NEAR_TILE_PX, NEAR_TILE_PX)
+            dirty = true
+          }
+          if (t.firstRing) {
+            /* Drawn now, not at the next 250 ms flush: this frame is the one the view is shown on. */
+            if (dirty) tex.needsUpdate = true
+            firstSettled += 1
+            checkUseful()
+          }
         }
       }
+      checkUseful()
       await Promise.all(Array.from({ length: 6 }, worker))
       refining = false
       clearInterval(flush)
@@ -387,6 +431,8 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
       onChange()
     } finally {
       building = null
+      /* Whatever became of the first square, the rings are not left unasked. */
+      if (first) startRings()
     }
   }
   void nearSquare(0, 0)
@@ -404,7 +450,7 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
     onChange()
   }
   const fineSquare = async (cx: number, cz: number) => {
-    if (fineOff || fineBuilding || fineZ === null || fineZ <= NEAR_Z || near === null) return
+    if (gone() || fineOff || fineBuilding || fineZ === null || fineZ <= NEAR_Z || near === null) return
     fineBuilding = true
     try {
       const p = finePatch(frame.lat(cz), frame.lon(cx), fineZ)
@@ -425,6 +471,7 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
       tex.colorSpace = THREE.SRGBColorSpace
       tex.anisotropy = 8
       const h = await heightsFor(p.north, p.south, p.west, p.east, TERRAIN_MAX_Z, status, onChange, 15)
+      if (gone()) return
       /* A hair above the near square, drawn after it, so the sharper picture wins. */
       const mesh = new THREE.Mesh(gridGeometry(frame, p.north, p.south, p.west, p.east, 48, h, -0.15))
       mesh.receiveShadow = true
@@ -442,7 +489,7 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
         Array.from({ length: 4 }, async () => {
           while (order.length > 0) {
             const t = order.shift()
-            if (t === undefined || fine?.tex !== tex) return
+            if (t === undefined || gone() || fine?.tex !== tex) return
             const img = await pictureOnly(p.tx0 + t.i, p.ty0 + t.j, fineZ, source)
             if (img === null || ctx === null) continue
             ctx.drawImage(img, t.i * FINE_TILE_PX, t.j * FINE_TILE_PX, FINE_TILE_PX, FINE_TILE_PX)
@@ -459,7 +506,7 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
   const follow = (x: number, z: number, ahead?: { vx: number; vz: number }, heightM?: number) => {
     const tx = x + (ahead?.vx ?? 0) * 6
     const tz = z + (ahead?.vz ?? 0) * 6
-    if (near === null) return
+    if (near === null || gone()) return
     if (Math.hypot(tx - near.cx, tz - near.cz) > RECENTRE_M) void nearSquare(tx, tz)
     /* Low over the ground: the fine square under it; high again, away with it. */
     if (heightM !== undefined && heightM < FINE_BELOW_M) {
@@ -471,7 +518,8 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
     group,
     follow,
     atlas: () => (near === null ? null : { texture: near.tex, ...near.box }),
-    ready: () => near !== null && !refining && building === null,
+    ready: () => near !== null && !refining && building === null && ringsStarted,
+    firstUseful: () => useful,
     setMaterial: (h) => {
       materialHook = h
       for (const t of textured) {
@@ -492,6 +540,7 @@ export function createGround(venue: { lat: number; lon: number }, source: Imager
       dropFine()
     },
     dispose: () => {
+      disposed = true
       /* Every piece let go the whole way, canvases shrunk to nothing (Batch FIX, Section 0.2: on leave, not only in flight). */
       for (const t of [...textured]) release(t.mesh)
     },

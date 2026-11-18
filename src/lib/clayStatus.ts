@@ -12,7 +12,7 @@ export type ClayStatus =
   | { kind: 'view-loading' }
   | { kind: 'map-loading' }
 
-/** Batch LIVE, Section 5.2: the 3D view not shown this long after it was asked: "3D didn't load · Back to 2D". */
+/** Batch LIVE, Section 5.2: the 3D view not shown this long after it was asked: "3D didn't load · Back to 2D". Batch SIMPLE-1, Section 4: shown is the first useful frame, not every tile. */
 export const CLAY_LOAD_MS = 10_000
 /** Batch CORE, Section 2.2: Fly opens within this, or says "Fly didn't load · Back". */
 export const FLY_LOAD_MS = 3000
@@ -40,8 +40,14 @@ export const FLY_NO_GRAPHICS = "Needs 3D graphics this phone didn't allow"
 
 export type FlyGate = { kind: 'open' } | { kind: 'waiting' } | { kind: 'no-graphics'; why: string }
 
-export function flyGate(s: { failed: string | null; lost: boolean; drawn: boolean; groundRead: boolean }): FlyGate {
+/*
+ * Batch SIMPLE-1, Section 4: `shown` is the 3D view's first useful frame now
+ * (the near square on its terrain and its first ring of sharp tiles,
+ * src/core/firstView3d.ts), not every tile: Fly opens on that and the
+ * take-off ground, never on a first frame with no ground in it.
+ */
+export function flyGate(s: { failed: string | null; lost: boolean; shown: boolean; groundRead: boolean }): FlyGate {
   if (s.failed !== null) return { kind: 'no-graphics', why: s.failed }
   if (s.lost) return { kind: 'no-graphics', why: 'the phone took back the graphics memory' }
-  return s.drawn && s.groundRead ? { kind: 'open' } : { kind: 'waiting' }
+  return s.shown && s.groundRead ? { kind: 'open' } : { kind: 'waiting' }
 }

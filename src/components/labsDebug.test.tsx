@@ -8,7 +8,7 @@ import SETTINGS_SRC from './SettingsPage.tsx?raw'
  * BATCH 3D, SECTION 0 (Jwilly's iPhone 13 Pro Max, iOS 18.7.8, 17 Nov on
  * 62899a6): 3D failed and reloaded the app, Fly never opened, and Settings'
  * "Last errors 20 ›" did nothing when tapped. 3D and Fly go behind Labs (off
- * by default on iOS), Debug is a plain row under About, and Last errors can be
+ * by default on iOS until Batch SIMPLE-1, Section 4; on everywhere since), Debug is a plain row under About, and Last errors can be
  * copied as one paste. The taps themselves are checked in WebKit as an iPhone
  * (scripts/audit-menu.mjs, "labs and debug").
  */
@@ -18,12 +18,14 @@ const store = () => {
 }
 
 describe('Labs › 3D and Fly (testing)', () => {
-  it('off by default on iOS, on elsewhere; a choice made on the phone wins', () => {
-    expect(labs3DOn(true, null)).toBe(false)
+  /* Batch SIMPLE-1, Section 4 (Jwilly, 18 Nov): on by default everywhere, iOS included, while 3D and Fly are tested. */
+  it('on by default on iOS and elsewhere; a choice made on the phone wins', () => {
+    expect(labs3DOn(true, null)).toBe(true)
     expect(labs3DOn(false, null)).toBe(true)
     expect(labs3DOn(true, 'on')).toBe(true)
     expect(labs3DOn(false, 'off')).toBe(false)
-    expect(labs3DOn(true, 'garbage')).toBe(false)
+    expect(labs3DOn(true, 'off')).toBe(false)
+    expect(labs3DOn(true, 'garbage')).toBe(true)
   })
 
   it('every way into 3D on the map asks the switch first', () => {

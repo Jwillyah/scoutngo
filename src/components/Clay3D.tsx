@@ -1,5 +1,6 @@
 import { CLAY_LOAD_MS, clayStatus, FLY_LOAD_MS, FLY_NO_GRAPHICS, flyGate, type ClayStatus } from '../lib/clayStatus.ts'
 import { recordError } from '../lib/errorLog.ts'
+import { afterContextLoss, MAX_CONTEXT_REBUILDS } from '../core/firstView3d.ts'
 import { ScreenFailCard } from './ScreenBoundary.tsx'
 /* The longest the 3D view waits for a kept scan before it builds without one (Batch LIVE, Section 5.2). */
 const SCAN_WAIT_MS = 4000
@@ -66,7 +67,7 @@ interface Clay3DProps {
   pins: readonly Pin[]
   stand: StandRequest | null
   onLeaveStand: () => void
-  /** Batch LIVE, Section 5.2: back to the 2D map, offered when the 3D view has not shown in CLAY_LOAD_MS. */
+  /** Batch LIVE, Section 5.2: back to the 2D map, offered when the 3D view has not shown in CLAY_LOAD_MS; Batch SIMPLE-1, Section 4: and after the third lost context. */
   onBack2D?: () => void
   /** A Preflight move to fly (src/lib/preflight/play.ts), or null. */
   flight?: FlightPlay | null
@@ -157,14 +158,16 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
   const scene = useRef<ClayScene | null>(null)
   /* How many times the scene has been built: every build (a scan arriving rebuilds it) re-runs the effects that feed it. 0 is not built yet. */
   const [ready, setReady] = useState(0)
-  /* The first view's tiles have arrived: until then the canvas is hidden and the 2D map shows through. */
+  /* The first useful frame is drawn (Batch SIMPLE-1, Section 4: the near square and its first ring, not every tile): until then the canvas is hidden and the 2D map shows through. */
   const [shown, setShown] = useState(false)
   /* Batch 3D, Section 1.3: the scene's first frame is drawn (Fly opens on it, src/lib/clayStatus.ts flyGate). */
   const [drawn, setDrawn] = useState(false)
   const [failed, setFailed] = useState<string | null>(null)
-  /* Batch I: the GPU lost (rebuilding), or a frame that threw (the message); a build count to rebuild on. */
-  const [trouble, setTrouble] = useState<{ kind: 'lost' } | { kind: 'error'; message: string } | null>(null)
+  /* Batch I: the GPU lost (rebuilding), or a frame that threw (the message); a build count to rebuild on. Batch SIMPLE-1, Section 4: or lost once too often (gave up). */
+  const [trouble, setTrouble] = useState<{ kind: 'lost' } | { kind: 'gave-up' } | { kind: 'error'; message: string } | null>(null)
   const [build, setBuild] = useState(0)
+  /* Batch SIMPLE-1, Section 4: contexts lost in this open of the view; past MAX_CONTEXT_REBUILDS it stops rebuilding (src/core/firstView3d.ts). */
+  const losses = useRef(0)
   /* The caller's way back, read when a frame throws (the build effect does not re-run for it). */
   const crashRef = useRef(onCrash)
   useEffect(() => {
@@ -246,16 +249,31 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
          * LOST, THEN RESTORED: the scene is built again from scratch (its
          * textures went with the context). Lost and never restored within
          * REBUILD_AFTER_MS: built again anyway, on a new context.
+         *
+         * AT MOST TWICE (Batch SIMPLE-1, Section 4). It rebuilt every 3 s
+         * with no limit: a phone that takes the memory back takes it again,
+         * and the loop ends in a reload. The third loss in this open stops:
+         * the scene is let go and "3D didn't load · Back to 2D" is said.
          */
         let rebuildTimer: ReturnType<typeof setTimeout> | null = null
         made.onTrouble({
           lost: () => {
             logTouch('3D: WebGL context lost')
             recordError(fly !== null ? 'Fly' : '3D', 'WebGL context lost: the phone took back the graphics memory')
+            losses.current += 1
+            if (afterContextLoss(losses.current) === 'give-up') {
+              logTouch(`3D: context lost ${losses.current} times, no more rebuilds`)
+              recordError(fly !== null ? 'Fly' : '3D', `WebGL context lost ${losses.current} times in this open: not rebuilt again, Back to 2D offered`)
+              made?.destroy()
+              scene.current = null
+              setTrouble({ kind: 'gave-up' })
+              return
+            }
             setTrouble({ kind: 'lost' })
             rebuildTimer = setTimeout(() => setBuild((n) => n + 1), REBUILD_AFTER_MS)
           },
           restored: () => {
+            if (losses.current > MAX_CONTEXT_REBUILDS) return
             logTouch('3D: WebGL context restored')
             if (rebuildTimer !== null) clearTimeout(rebuildTimer)
             setBuild((n) => n + 1)
@@ -394,8 +412,11 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, fly?.tick])
-  /* Batch 3D, Section 1.3: Fly on its own minimal start, not on the whole 3D view's pictures; no graphics said at once. */
-  const gate = flyGate({ failed, lost: trouble?.kind === 'lost', drawn, groundRead: fly !== null && flyGround !== null && flyGround.tick === fly.tick })
+  /*
+   * Batch 3D, Section 1.3: Fly on its own minimal start, not on the whole 3D view's pictures; no graphics said at once.
+   * Batch SIMPLE-1, Section 4: that start is the first useful frame (`shown`: the near square and its first ring), not a first frame of nothing.
+   */
+  const gate = flyGate({ failed, lost: trouble?.kind === 'lost' || trouble?.kind === 'gave-up', shown, groundRead: fly !== null && flyGround !== null && flyGround.tick === fly.tick })
   const flying = fly !== null && gate.kind === 'open'
   const groundM = flyGround?.m ?? 0
   const surfaceAbsAt = (p: LatLon) => {
@@ -547,15 +568,15 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
   /* Batch CORE, Section 2.2: Fly opens within FLY_LOAD_MS, or says it did not; Keep waiting lets it go on. */
   const [flyLate, setFlyLate] = useState<'no' | 'late' | 'waiting'>('no')
   /* What was so when the timer ran out, not when it was set. */
-  const flyFacts = useRef({ drawn, shown, ground: flyGround !== null })
-  flyFacts.current = { drawn, shown, ground: flyGround !== null }
+  const flyFacts = useRef({ made: ready > 0, drawn, shown, ground: flyGround !== null })
+  flyFacts.current = { made: ready > 0, drawn, shown, ground: flyGround !== null }
   useEffect(() => {
     setFlyLate('no')
     if (fly === null || flying) return
     const t = setTimeout(() => {
       setFlyLate('late')
       const f = flyFacts.current
-      recordError('Fly', `not open in ${FLY_LOAD_MS / 1000} s (first frame ${f.drawn ? 'drawn' : 'not drawn yet'}, 3D ${f.shown ? 'shown' : 'not shown yet'}, take-off ground ${f.ground ? 'read' : 'not read'})`)
+      recordError('Fly', `not open in ${FLY_LOAD_MS / 1000} s (scene ${f.made ? 'made' : 'not made yet'}, first frame ${f.drawn ? 'drawn' : 'not drawn yet'}, first useful frame ${f.shown ? 'shown' : 'not shown yet'}, take-off ground ${f.ground ? 'read' : 'not read'})`)
     }, FLY_LOAD_MS)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -570,7 +591,7 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
   return (
     <div className={`${shown || flying ? 'clay clay--shown' : 'clay clay--waiting'}${flying ? ' clay--flying' : ''}`}>
       <div ref={host} className="clay__canvas" />
-      {(late || !online) && !shown && !flying && failed === null ? (
+      {(late || !online) && !shown && !flying && failed === null && trouble?.kind !== 'gave-up' ? (
         <div className="clay__error" role="alert" data-clay-late>
           {/* Batch CORE, Section 7A.2: with no signal, said at once, not after the 10 s wait. */}
           <p className="clay__errtitle">{online ? <>3D didn&rsquo;t load</> : '3D needs a signal'}</p>
@@ -592,6 +613,19 @@ function Clay3DView({ venue, venueLabel, at, timeZone, sheetOpen = false, moonSh
           <p className="clay__errtitle">Rebuilding the 3D view…</p>
           <p className="clay__errmsg">The phone took back its graphics memory. Building it again.</p>
         </div>
+      ) : trouble.kind === 'gave-up' ? (
+        /* Batch SIMPLE-1, Section 4: lost once too often; Fly says it through its own card (the gate's no-graphics). */
+        fly !== null ? null : (
+          <div className="clay__error" role="alert" data-clay-gave-up>
+            <p className="clay__errtitle">3D didn&rsquo;t load</p>
+            <p className="clay__errmsg">The phone took back its graphics memory {MAX_CONTEXT_REBUILDS + 1} times. The 2D map, the sun and the shadows still work.</p>
+            {onBack2D === undefined ? null : (
+              <button type="button" className="btn btn--primary btn--small" onClick={onBack2D}>
+                Back to 2D
+              </button>
+            )}
+          </div>
+        )
       ) : (
         <ClayError message={trouble.message} onRetry={() => setBuild((n) => n + 1)} />
       )}

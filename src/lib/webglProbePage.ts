@@ -350,6 +350,8 @@ const terrainStep: ProbeStep = {
     const [{ createGround }, { createWorldLook }, sources] = await Promise.all([import('../three/world/ground.ts'), import('../three/world/look.ts'), import('../three/world/sources.ts')])
     const q = currentQuality()
     sources.setTileCaches(q.pictureCache, q.terrainCache)
+    /* Batch SIMPLE-1, Section 4: a scope of its own, not one a 3D view closed earlier on this page. */
+    sources.openDownloads()
     const ground = createGround(PROBE_POINT, sources.imagerySourceFor(PROBE_POINT), { flatTiles: 0 }, () => {}, createWorldLook().groundHook(), q)
     w.scene.add(ground.group)
     parts = { ground, buildings: null }
@@ -460,7 +462,7 @@ const fullStep = (host: HTMLElement): ProbeStep => ({
       const bad = programs.filter((p) => gl.getProgramParameter((p as unknown as { program: WebGLProgram }).program, gl.LINK_STATUS) !== true).length
       const g = made.gpu()
       if (bad > 0) throw new Error(`${bad} of ${programs.length} programs did not link`)
-      if (!shown) throw new Error(`not shown in ${SCENE_WAIT_MS / 1000} s (first frame drawn at ${drawnMs ?? 'never'} ms, ${requests} requests made, the scene's own wait is for every tile); ${g.textures} textures, ${Math.round(g.bytes / 1e6)} MB`)
+      if (!shown) throw new Error(`not shown in ${SCENE_WAIT_MS / 1000} s (first frame drawn at ${drawnMs ?? 'never'} ms, ${requests} requests made, the scene's own wait is for the near square and its first ring of sharp tiles); ${g.textures} textures, ${Math.round(g.bytes / 1e6)} MB`)
       return `first frame at ${drawnMs ?? '?'} ms, shown at ${ms} ms (by ${by}) after ${requests} requests; ${programs.length} programs, all linked; ${pose} + ${times.length - pose} frames kept, slowest ${slowest} ms; ${Math.round(g.bytes / 1e6)} MB by our count, level ${g.level}, pixel ratio ${g.scale.toFixed(1)}`
     } finally {
       made.destroy()

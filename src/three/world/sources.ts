@@ -73,10 +73,50 @@ export async function working<T>(job: () => Promise<T>): Promise<T> {
 /** How many tiles the scene has drawn from, for the network audit's "did it look at all". */
 export const tileCounts = { imagery: 0, terrain: 0 }
 
-async function bytes(url: string): Promise<ArrayBuffer> {
+/*
+ * THE OPEN VIEW'S DOWNLOADS, CANCELLED WHEN IT CLOSES (Batch SIMPLE-1,
+ * Section 4; docs/batches/3d-decisions.md, finding 2). Every tile request
+ * went to loadTile with an AbortController nobody aborted: a view closed
+ * while loading kept fetching and decoding hundreds of pictures for a scene
+ * that was gone, and "Back to 2D" then 3D again started the next view's on
+ * top. The scene opens a scope when it is made and aborts it when it is
+ * destroyed: what is in flight is aborted, and nothing asked under it after
+ * that reaches the network. A tile the closed view asked for and never got is
+ * not kept as an answer; the next view asks again.
+ */
+let downloads = new AbortController()
+/** A new scope for the 3D view being made: its tile requests from now on. */
+export function openDownloads(): AbortController {
+  downloads = new AbortController()
+  return downloads
+}
+/** The view is gone: its requests in flight are aborted, and none asked under it start. */
+export function closeDownloads(scope: AbortController): void {
+  scope.abort()
+}
+/** The scope tile requests are asked under now, for a piece of the view that checks it between steps. */
+export const currentDownloads = (): AbortController => downloads
+
+const askedBy = new WeakMap<Promise<unknown>, AbortSignal>()
+const answered = new WeakSet<Promise<unknown>>()
+/** Remember which scope a cached tile was asked under, and whether it came back before that scope closed. */
+function scoped<T>(p: Promise<T>, signal: AbortSignal): Promise<T> {
+  askedBy.set(p, signal)
+  void p.then(() => {
+    if (!signal.aborted) answered.add(p)
+  })
+  return p
+}
+/** A cached tile its closed view asked for and never got: not an answer. */
+const cancelled = (p: Promise<unknown> | undefined): boolean => p !== undefined && askedBy.get(p)?.aborted === true && !answered.has(p)
+
+const abortError = () => new DOMException('The 3D view closed', 'AbortError')
+
+async function bytes(url: string, scope: AbortController): Promise<ArrayBuffer> {
+  if (scope.signal.aborted) throw abortError()
   pending.n += 1
   try {
-    const { data } = await loadTile({ url }, new AbortController())
+    const { data } = await loadTile({ url }, scope)
     return data
   } finally {
     pending.n -= 1
@@ -110,11 +150,12 @@ export function setTileCaches(pictures: number, terrain: number): void {
 export const tileCacheSizes = () => ({ pictures: pictureCache.size, terrain: terrainCache.size, pictureMax, terrainMax })
 
 /** One terrarium tile's heights in metres, or null where it cannot be had (offline and not saved). */
-export function terrainTile(x: number, y: number, z: number): Promise<Heights | null> {
+export function terrainTile(x: number, y: number, z: number, scope: AbortController = downloads): Promise<Heights | null> {
   const key = `${z}/${x}/${y}`
   let hit = terrainCache.get(key)
-  if (hit === undefined) {
-    hit = bytes(tileUrl(TERRAIN_TEMPLATE, { x, y, z }))
+  if (hit === undefined || cancelled(hit)) {
+    if (hit !== undefined) terrainCache.delete(key)
+    hit = bytes(tileUrl(TERRAIN_TEMPLATE, { x, y, z }), scope)
       .then(async (b) => {
         const png = await decodePng(b)
         const h = new Float32Array(png.width * png.height)
@@ -123,6 +164,7 @@ export function terrainTile(x: number, y: number, z: number): Promise<Heights | 
         return { size: png.width, h }
       })
       .catch(() => null)
+    hit = scoped(hit, scope.signal)
     terrainCache.set(key, hit)
     while (terrainCache.size > terrainMax) terrainCache.delete(terrainCache.keys().next().value as string)
   }
@@ -186,16 +228,17 @@ const isPng = (b: ArrayBuffer) => {
  * it has none, a source's transparent edge laid over Esri's (drawn into a
  * fresh canvas, never read back). Null when it cannot be had.
  */
-function picture(x: number, y: number, z: number, source: ImagerySource | null): Promise<ImageBitmap | null> {
+function picture(x: number, y: number, z: number, source: ImagerySource | null, scope: AbortController = downloads): Promise<ImageBitmap | null> {
   const key = `${source?.id ?? 'esri'}:${z}/${x}/${y}`
   let hit = pictureCache.get(key)
-  if (hit === undefined) {
-    const esri = () => bytes(tileUrl(IMAGERY_TEMPLATE, { x, y, z })).then((b) => createImageBitmap(new Blob([b])))
+  if (hit === undefined || cancelled(hit)) {
+    if (hit !== undefined) pictureCache.delete(key)
+    const esri = () => bytes(tileUrl(IMAGERY_TEMPLATE, { x, y, z }), scope).then((b) => createImageBitmap(new Blob([b])))
     const centre = { lat: latOf(y + 0.5, z), lon: lonOf(x + 0.5, z) }
     const fromSource =
       source === null || z > source.maxZoom || !covers(source, centre)
         ? esri()
-        : bytes(sourceTileUrl(source, x, y, z)).then(
+        : bytes(sourceTileUrl(source, x, y, z), scope).then(
             async (b) => {
               const over = await createImageBitmap(new Blob([b]))
               if (!isPng(b)) return over
@@ -208,7 +251,11 @@ function picture(x: number, y: number, z: number, source: ImagerySource | null):
               ctx.drawImage(over, 0, 0, under.width, under.height)
               return c.transferToImageBitmap()
             },
-            () => esri(),
+            /* A closed view's abort is not a source that failed: no Esri asked for instead. */
+            () => {
+              if (scope.signal.aborted) throw abortError()
+              return esri()
+            },
           )
     hit = fromSource
       .then((img) => {
@@ -216,6 +263,7 @@ function picture(x: number, y: number, z: number, source: ImagerySource | null):
         return img
       })
       .catch(() => null)
+    hit = scoped(hit, scope.signal)
     pictureCache.set(key, hit)
     while (pictureCache.size > pictureMax) dropOldestPicture()
   }
@@ -229,10 +277,13 @@ function picture(x: number, y: number, z: number, source: ImagerySource | null):
  * loads.
  */
 export async function pictureOrParent(x: number, y: number, z: number, source: ImagerySource | null, climb = 6): Promise<Picture | null> {
+  /* The scope asked under at the start: a view closed mid-climb asks no ancestors (Batch SIMPLE-1, Section 4). */
+  const scope = downloads
   for (let d = 0; d <= climb; d += 1) {
+    if (scope.signal.aborted) return null
     const px = Math.floor(x / 2 ** d)
     const py = Math.floor(y / 2 ** d)
-    const img = await picture(px, py, z - d, source)
+    const img = await picture(px, py, z - d, source, scope)
     if (img !== null) {
       const n = 2 ** d
       const sw = img.width / n
