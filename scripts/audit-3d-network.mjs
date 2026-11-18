@@ -80,7 +80,7 @@ try {
   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true })
   await send('Page.navigate', { url: `${APP_ORIGIN}/` })
   await wait(2500)
-  await ev(`localStorage.setItem('scoutngo.landing.v1', 'true')`)
+  await ev(`localStorage.setItem('scoutngo.landing.v1', 'true'); localStorage.setItem('scoutngo.labs3d.v1','on')`)
   await send('Page.navigate', { url: `${APP_ORIGIN}/?calibration=1` })
   await wait(8000)
   await goToStage(ev, wait, 'plan')

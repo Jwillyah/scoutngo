@@ -117,7 +117,7 @@ try {
   await send('Emulation.setDeviceMetricsOverride', { width: WIDTH, height: 844, deviceScaleFactor: 2, mobile: true })
   await send('Page.navigate', { url: `${APP_ORIGIN}/` })
   await wait(2500)
-  await ev(`localStorage.clear(); localStorage.setItem('scoutngo.landing.v1','true')`)
+  await ev(`localStorage.clear(); localStorage.setItem('scoutngo.landing.v1','true'); localStorage.setItem('scoutngo.labs3d.v1','on')`)
   await send('Page.navigate', { url: 'about:blank' })
   await send('Page.navigate', { url: link })
   let opened = false

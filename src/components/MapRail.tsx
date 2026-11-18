@@ -30,7 +30,8 @@ const LONG_PRESS_MS = 400
 interface MapRailProps {
   /** Whether the 3D clay model is showing instead of the 2D map. */
   threeD: boolean
-  onThreeD: () => void
+  /** Undefined: no 3D button (Batch 3D, Section 0.1: switched off under Settings › Labs). */
+  onThreeD?: () => void
   /** Why 3D cannot open here, said beside the button, or null. */
   threeDNote: string | null
   /** The map's rotation, so the compass needle points at real north. */
@@ -159,7 +160,7 @@ export function MapRail({
       )}
 
       {/* 2D OR 3D, said on the face. 3D is the clay model of the same place at the same time. */}
-      {button(
+      {onThreeD === undefined ? null : button(
         'tilt',
         threeD ? 'Back to the 2D map' : 'Open the 3D clay model',
         null,

@@ -1,5 +1,5 @@
 import { Component, type ReactNode } from 'react'
-import { describe, recordError } from '../lib/errorLog.ts'
+import { describe, recordError, stackOf } from '../lib/errorLog.ts'
 
 /*
  * ONE SCREEN'S CRASH STAYS ON THAT SCREEN (Batch CORE, Section 2.3). A throw
@@ -19,8 +19,8 @@ export class ScreenBoundary extends Component<Props, { message: string | null }>
   static getDerivedStateFromError(error: unknown) {
     return { message: describe(error) }
   }
-  componentDidCatch(error: unknown) {
-    recordError(this.props.name, describe(error))
+  componentDidCatch(error: unknown, info?: { componentStack?: string | null }) {
+    recordError(this.props.name, describe(error), new Date(), [stackOf(error), info?.componentStack].filter(Boolean).join('\n'))
   }
   render() {
     if (this.state.message === null) return this.props.children

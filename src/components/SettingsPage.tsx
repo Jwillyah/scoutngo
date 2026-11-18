@@ -17,6 +17,10 @@ import { SURF_OPTIONS, useSurfSetting } from '../lib/surfSetting.ts'
 import { useTouchDebug } from '../lib/touchDebug.ts'
 import { debugMemoryLine } from '../lib/quality3d.ts'
 import { clearErrors, ERROR_LOG_MAX, onErrors, readErrors, type LoggedError } from '../lib/errorLog.ts'
+import { errorReport } from '../core/errorReport.ts'
+import { copyText, gpuFacts } from '../lib/gpuInfo.ts'
+import { BUILD_ID } from '../lib/build.ts'
+import { useLabs3D } from '../lib/labs3d.ts'
 import { formatWind, type Units } from '../lib/units.ts'
 import { deletePack, loadPacks, onPacksChanged, packBytes, type VenuePack } from '../lib/venuePack.ts'
 import { useNearMeSetting } from '../lib/nearMe.ts'
@@ -42,9 +46,11 @@ import '../styles/settings.css'
  *   Units            Wind kt / mph / km/h, Height ft / m, Temp, Time
  *   My gear          Camera + lenses, the drone with its rated wind
  *   Alerts           Sky calls in my calendar, Special light near me
+ *   Labs             3D and Fly (testing): off by default on iOS
  *   My data · on this phone only
- *                    Back up to a file, What leaves my phone, More ›
- *   the version      a long press shows Debug
+ *                    Back up to a file, What leaves my phone, More ›,
+ *                    About, Debug, Last errors
+ *   the version      a tap shows About, a long press Debug
  *
  * More › holds what left the main list: restore, export, clear, storage and
  * what is kept when space runs short, the AI key, wind in m/s, the coast and
@@ -162,7 +168,9 @@ function WhatIDo() {
 export function SettingsPage(props: Props) {
   const { units, onUnits, venue, drone } = props
   const [more, setMore] = useState(false)
+  /* Batch 3D, Section 0.3: Debug is its own page, from a plain row under About, Last errors, or a long press on the version. */
   const [debug, setDebug] = useState(false)
+  const [labs3D, setLabs3D] = useLabs3D()
   const errorCount = useErrors().length
   const [nearMe, setNearMe] = useNearMeSetting()
   const [liveSky, setLiveSky] = useLiveSkySetting()
@@ -176,10 +184,19 @@ export function SettingsPage(props: Props) {
     setLocateLine('Finding you…')
     void locateOnce().then((r) => setLocateLine(r.status === 'ok' ? `Found, ±${Math.round(r.accuracyMeters)} m, not kept` : locateWords(r)))
   }
-  /* The version line: a long press (600 ms) shows Debug. */
+  /*
+   * The version line: a long press (600 ms) shows Debug. On the iPhone (17 Nov)
+   * the click that follows the lift opened About on top of it; a press that
+   * became a long one swallows its click.
+   */
   const press = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const longPressed = useRef(false)
   const down = () => {
-    press.current = setTimeout(() => setDebug((d) => !d), 600)
+    longPressed.current = false
+    press.current = setTimeout(() => {
+      longPressed.current = true
+      setDebug(true)
+    }, 600)
   }
   const up = () => {
     if (press.current !== null) clearTimeout(press.current)
@@ -187,6 +204,7 @@ export function SettingsPage(props: Props) {
   }
 
   if (more) return <MorePage {...props} onBack={() => setMore(false)} />
+  if (debug) return <DebugPage {...props} onBack={() => setDebug(false)} />
 
   return (
     <Page title="Settings" className="setpage set2" back onClose={props.onClose}>
@@ -273,6 +291,11 @@ export function SettingsPage(props: Props) {
         />
       </Group>
 
+      {/* Batch 3D, Section 0.1: off by default on iOS until the iPhone passes; on elsewhere. */}
+      <Group title="Labs">
+        <Row label="3D and Fly (testing)" sub="The 3D map and flying the drone in it. Off on iPhone while it is tested." end={<Toggle on={labs3D} label="3D and Fly (testing)" onChange={setLabs3D} />} />
+      </Group>
+
       <Group title="My data · on this phone only">
         <Row label="Back up to a file" value="One file" onClick={props.onExport} />
         <Row label="What leaves my phone" onClick={openPrivacy} />
@@ -280,14 +303,27 @@ export function SettingsPage(props: Props) {
         <Row label="More" sub="restore, export, clear, storage, AI key" onClick={() => setMore(true)} />
         {/* Batch QA, Section 1: About was a tap on the version line only; it is a row. */}
         <Row label="About" value={versionLine()} onClick={props.onAbout} />
-        {/* Batch CORE, Section 2: the phone's own error log, shown in Debug; this row only while it holds any. */}
+        {/* Batch 3D, Section 0.3 (Jwilly, 17 Nov): neither way into Debug worked on the iPhone; a plain row. */}
+        <Row label="Debug" onClick={() => setDebug(true)} />
+        {/* Batch CORE, Section 2: the phone's own error log, on the Debug page; this row only while it holds any. */}
         {errorCount === 0 ? null : <Row label="Last errors" value={String(errorCount)} onClick={() => setDebug(true)} />}
       </Group>
 
-      <button type="button" className="set2__version" onPointerDown={down} onPointerUp={up} onPointerLeave={up} onContextMenu={(e) => e.preventDefault()} onClick={props.onAbout}>
+      <button
+        type="button"
+        className="set2__version"
+        onPointerDown={down}
+        onPointerUp={up}
+        onPointerLeave={up}
+        onPointerCancel={up}
+        onContextMenu={(e) => e.preventDefault()}
+        onClick={() => {
+          if (longPressed.current) longPressed.current = false
+          else props.onAbout()
+        }}
+      >
         {versionLine()}
       </button>
-      {debug ? <Debug {...props} /> : null}
     </Page>
   )
 }
@@ -362,8 +398,18 @@ function useErrors(): LoggedError[] {
   return list
 }
 
+/*
+ * Batch 3D, Section 0.4: each row opens to its whole message and stack, and
+ * Copy all puts the lot on the clipboard as plain text (src/core/errorReport.ts)
+ * with the build, the browser and what the graphics said. Nothing is sent.
+ */
 function LastErrors({ zone }: { zone: string }) {
   const list = useErrors()
+  const [copied, setCopied] = useState<'yes' | 'no' | null>(null)
+  const copyAll = () => {
+    const text = errorReport({ build: BUILD_ID, userAgent: navigator.userAgent, gpu: gpuFacts(), errors: list, at: new Date() })
+    void copyText(text).then((ok) => setCopied(ok ? 'yes' : 'no'))
+  }
   return (
     <div className="set2__errors" aria-label="Last errors">
       <p className="set2__note">Last errors · kept on this phone only · {list.length} of {ERROR_LOG_MAX}</p>
@@ -371,26 +417,42 @@ function LastErrors({ zone }: { zone: string }) {
         {list.length === 0 ? <li>None kept</li> : null}
         {[...list].reverse().map((e, i) => (
           <li key={i}>
-            <b>{new Date(e.at).toLocaleDateString('en-US', { timeZone: zone, month: 'short', day: 'numeric' })} {formatClock(new Date(e.at), zone)} · {e.where}</b> {e.message} <span className="set2__errbuild">({e.build})</span>
+            <details className="set2__err">
+              <summary>
+                <b>
+                  {new Date(e.at).toLocaleDateString('en-US', { timeZone: zone, month: 'short', day: 'numeric' })} {formatClock(new Date(e.at), zone)} · {e.where}
+                </b>{' '}
+                <span className="set2__errmsg">{e.message}</span>
+              </summary>
+              <p className="set2__errfull">{e.message}</p>
+              <p className="set2__errbuild">Build {e.build}</p>
+              {e.stack === undefined ? null : <pre className="set2__errstack">{e.stack}</pre>}
+            </details>
           </li>
         ))}
       </ul>
-      {list.length === 0 ? null : (
-        <button type="button" className="btn btn--small" onClick={clearErrors}>
-          Clear the list
+      <div className="set2__erracts">
+        <button type="button" className="btn btn--small" onClick={copyAll}>
+          Copy all
         </button>
-      )}
+        {list.length === 0 ? null : (
+          <button type="button" className="btn btn--small" onClick={clearErrors}>
+            Clear the list
+          </button>
+        )}
+      </div>
+      {copied === null ? null : <p className="set2__note" role="status">{copied === 'yes' ? 'Copied: paste it into a message. Nothing was sent.' : 'This browser would not copy. Press and hold an error to select its text.'}</p>}
     </div>
   )
 }
 
-function Debug(props: Props) {
+function DebugPage(props: Props & { onBack: () => void }) {
   const [debugTouch, setDebugTouch] = useTouchDebug()
   const attempts = useLocateAttempts()
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
   return (
+    <Page title="Debug" className="setpage set2" back onClose={props.onBack}>
     <section className="set2__sec set__debug" aria-label="Debug">
-      <p className="set2__title">Debug</p>
       <LastErrors zone={zone} />
       <div className="set2__card">
         <Row label="Touch log" sub="A box over the map; nothing is sent." end={<Toggle on={debugTouch} label="Touch log" onChange={setDebugTouch} />} />
@@ -421,5 +483,6 @@ function Debug(props: Props) {
         <li>Hosts this session: {seenHosts().join(', ') || 'none yet'}</li>
       </ul>
     </section>
+    </Page>
   )
 }

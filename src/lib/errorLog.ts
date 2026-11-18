@@ -18,6 +18,8 @@ import { BUILD_ID } from './build.ts'
 export const ERROR_LOG_KEY = 'scoutngo.errors.v1'
 export const ERROR_LOG_MAX = 20
 const MSG_MAX = 300
+/** Batch 3D, Section 0.4: the stack too, for Copy all; the top of it is what says where. */
+const STACK_MAX = 1500
 const OPEN_KEY = 'scoutngo.screenOpen.v1'
 const EVENT = 'scoutngo:errors'
 
@@ -28,6 +30,8 @@ export interface LoggedError {
   where: string
   message: string
   build: string
+  /** The error's stack when it had one (Batch 3D, Section 0.4); entries kept before then have none. */
+  stack?: string
 }
 
 export function readErrors(): LoggedError[] {
@@ -39,8 +43,8 @@ export function readErrors(): LoggedError[] {
   }
 }
 
-export function recordError(where: string, message: string, at: Date = new Date()): void {
-  const entry: LoggedError = { at: at.toISOString(), where, message: message.slice(0, MSG_MAX), build: BUILD_ID }
+export function recordError(where: string, message: string, at: Date = new Date(), stack?: string): void {
+  const entry: LoggedError = { at: at.toISOString(), where, message: message.slice(0, MSG_MAX), build: BUILD_ID, ...(stack === undefined || stack === '' ? {} : { stack: stack.slice(0, STACK_MAX) }) }
   try {
     const list = [...readErrors(), entry].slice(-ERROR_LOG_MAX)
     localStorage.setItem(ERROR_LOG_KEY, JSON.stringify(list))
@@ -72,6 +76,9 @@ export const describe = (e: unknown): string => (e instanceof Error ? `${e.name}
   }
 })())
 
+/** An error's stack, or undefined (a thrown string, an object). */
+export const stackOf = (e: unknown): string | undefined => (e instanceof Error && typeof e.stack === 'string' ? e.stack : undefined)
+
 let installed = false
 /** Uncaught errors and unhandled rejections, from start-up on (src/main.tsx). */
 export function installErrorLog(): void {
@@ -79,9 +86,9 @@ export function installErrorLog(): void {
   installed = true
   window.addEventListener('error', (e) => {
     const where = e.filename ? `${e.filename.split('/').pop() ?? ''}:${e.lineno}` : ''
-    recordError('window', `${describe(e.error ?? e.message)}${where === '' ? '' : ` (${where})`}`)
+    recordError('window', `${describe(e.error ?? e.message)}${where === '' ? '' : ` (${where})`}`, new Date(), stackOf(e.error))
   })
-  window.addEventListener('unhandledrejection', (e) => recordError('promise', describe(e.reason)))
+  window.addEventListener('unhandledrejection', (e) => recordError('promise', describe(e.reason), new Date(), stackOf(e.reason)))
   /* A reload by hand or leaving the page fires pagehide; a tab iOS kills for memory does not, so its marker stays. */
   window.addEventListener('pagehide', () => markScreenOpen(null))
 }

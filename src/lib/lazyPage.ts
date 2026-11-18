@@ -1,6 +1,6 @@
 import { lazy, type ComponentType } from 'react'
 import { PageNotLoaded } from '../components/PageNotLoaded.tsx'
-import { describe, recordError } from './errorLog.ts'
+import { describe, recordError, stackOf } from './errorLog.ts'
 
 /**
  * React's lazy(), but a page whose code does not arrive (no signal, before the
@@ -26,7 +26,7 @@ export async function orNotLoaded<T extends ComponentType<any>>(load: () => Prom
       if (i < waits.length) await new Promise((done) => setTimeout(done, waits[i]))
     }
   }
-  recordError('Page', describe(last))
+  recordError('Page', describe(last), new Date(), stackOf(last))
   return { default: PageNotLoaded as unknown as T }
 }
 

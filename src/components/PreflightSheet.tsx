@@ -25,6 +25,8 @@ interface PreflightSheetProps {
   onPlay: () => void
   /** Fly it yourself in the 3D view, the sticks on screen; recorded when asked. */
   onFly: (record: boolean) => void
+  /** Batch 3D, Section 0.1: false while 3D and Fly are switched off under Settings › Labs: no Play in 3D or Fly, the plan stays on the 2D map. */
+  with3D?: boolean
   onRecord: () => void
   recordNote: string | null
   /** How far a recording's frame-by-frame render has got, 0 to 1, or null when none is running. */
@@ -71,7 +73,7 @@ async function share(name: string, text: string | Blob, type: string): Promise<s
   }
 }
 
-export function PreflightSheet({ pf, picking, onPick, onPlay, onFly, onRecord, recordNote, renderShare, look, onLook, clip, onPlacePilot, pilotSet, onViewfinder, onClose }: PreflightSheetProps) {
+export function PreflightSheet({ pf, picking, onPick, onPlay, onFly, with3D = true, onRecord, recordNote, renderShare, look, onLook, clip, onPlacePilot, pilotSet, onViewfinder, onClose }: PreflightSheetProps) {
   const card = pf.card
   const need = POINTS_NEEDED[pf.kind]
   return (
@@ -151,7 +153,7 @@ export function PreflightSheet({ pf, picking, onPick, onPlay, onFly, onRecord, r
       </details>
 
       {/* Batch J, Section 8: flying it sits with Play in 3D, below, when there is a move. */}
-      {card !== null ? null : (
+      {card !== null || !with3D ? null : (
         <p className="pf__prompt">
         {pf.flown !== null ? 'This is the flight you flew by hand; pick a move to draw instead. ' : ''}
         <button type="button" className="btn btn--small" onClick={() => onFly(false)}>
@@ -173,6 +175,7 @@ export function PreflightSheet({ pf, picking, onPick, onPlay, onFly, onRecord, r
               {l}
             </p>
           ))}
+          {!with3D ? null : (
           <div className="pf__actions">
             <button type="button" className="btn btn--small" onClick={onPlay}>
               Play in 3D
@@ -184,6 +187,7 @@ export function PreflightSheet({ pf, picking, onPick, onPlay, onFly, onRecord, r
               Fly and record
             </button>
           </div>
+          )}
           <details className="frow">
             <summary>Clearance, airspace, wind, battery</summary>
             {card.lines.slice(1, -1).map((l) => (

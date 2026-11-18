@@ -55,7 +55,7 @@ describe('the build, with its day', () => {
     expect(readFileSync('src/components/AboutSheet.tsx', 'utf8')).toContain('{versionLine()}')
     const settings = readFileSync('src/components/SettingsPage.tsx', 'utf8')
     /* Batch Map, Section 6: the version line at the foot of Settings opens About (a long press shows Debug). */
-    expect(settings).toMatch(/className="set2__version"[\s\S]*?onClick=\{props\.onAbout\}>\s*\{versionLine\(\)\}/)
+    expect(settings).toMatch(/className="set2__version"[\s\S]*?else props\.onAbout\(\)[\s\S]{0,40}>\s*\{versionLine\(\)\}/)
     expect(readFileSync('src/components/TouchDebug.tsx', 'utf8')).toMatch(/`build \$\{buildLabelWithDate\(\)\}`, \.\.\.lines/)
   })
 })

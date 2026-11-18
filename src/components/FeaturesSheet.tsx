@@ -46,6 +46,8 @@ interface FeaturesProps {
   onBase: (b: 'satellite' | 'map' | '3d') => void
   /** "Flat here" when the terrain round the venue is too flat to draw; null otherwise. */
   baseNote: string | null
+  /** Batch 3D, Section 0.1: false while 3D is switched off under Settings › Labs; Map style has no 3D then. */
+  with3D?: boolean
   tools: { label: string; icon: ReactNode; onClick: () => void; on?: boolean }[]
   /** "Imagery Esri · labels OpenFreeMap". */
   credit: string
@@ -150,7 +152,7 @@ export function FeaturesSheet(p: FeaturesProps) {
         options={[
           { id: 'satellite', label: 'Satellite' },
           { id: 'map', label: 'Map' },
-          { id: '3d', label: '3D' },
+          ...(p.with3D === false ? [] : [{ id: '3d' as const, label: '3D' }]),
         ]}
         onChange={p.onBase}
       />

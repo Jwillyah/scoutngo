@@ -89,7 +89,7 @@ interface Clay3DProps {
    * that threw): the caller closes it and goes back to where it came from,
    * with one line. Without it the view says why in place (Batch I).
    */
-  onCrash?: (message: string) => void
+  onCrash?: (message: string, stack?: string) => void
 }
 
 export const CLAY_NOTE = 'Clay model from map data; real buildings may differ'
@@ -102,13 +102,14 @@ export const CLAY_NOTE = 'Clay model from map data; real buildings may differ'
 /** Lost and not restored this long: build again anyway, on a new context. */
 export const REBUILD_AFTER_MS = 3000
 
-export class Clay3DBoundary extends Component<{ children: ReactNode; onCrash?: (message: string) => void }, { message: string | null; tick: number }> {
+export class Clay3DBoundary extends Component<{ children: ReactNode; onCrash?: (message: string, stack?: string) => void }, { message: string | null; tick: number }> {
   state = { message: null as string | null, tick: 0 }
   static getDerivedStateFromError(error: unknown) {
     return { message: error instanceof Error ? `${error.name}: ${error.message}` : String(error) }
   }
   componentDidCatch(error: unknown) {
-    this.props.onCrash?.(error instanceof Error ? `${error.name}: ${error.message}` : String(error))
+    /* Batch 3D, Section 0.4: the stack goes with it, for Last errors' Copy all. */
+    this.props.onCrash?.(error instanceof Error ? `${error.name}: ${error.message}` : String(error), error instanceof Error ? error.stack : undefined)
   }
   render() {
     /* Batch Flow, Section 1: with a way back, nothing here; the caller has closed the view. */

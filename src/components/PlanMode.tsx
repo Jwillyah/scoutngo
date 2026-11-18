@@ -172,6 +172,7 @@ import { goldenNext } from '../core/goldenNext.ts'
 import { useNow } from '../lib/useNow.ts'
 import { getPosition, getTimes } from 'suncalc'
 import { hasWebGL2 } from '../lib/webgl.ts'
+import { LABS_OFF_NOTE, useLabs3D } from '../lib/labs3d.ts'
 import { standAtPosition, standForLineUp, type StandRequest } from '../lib/standRequest.ts'
 import { SkyCard } from './SkyCard.tsx'
 import { CAMS, camKind } from '../data/cams.ts'
@@ -725,17 +726,29 @@ export function PlanMode({
   const [threeD, setThreeD] = useState(false)
   const [stand, setStand] = useState<StandRequest | null>(null)
   const [threeDNote, setThreeDNote] = useState<string | null>(null)
-  const toggleThreeD = useCallback(() => {
+  /* Batch 3D, Section 0.1: 3D and Fly behind Settings › Labs (off by default on iOS); every way in asks here first. */
+  const [labs3D] = useLabs3D()
+  const no3D = (): boolean => {
+    if (!labs3D) {
+      setThreeDNote(LABS_OFF_NOTE)
+      return true
+    }
     if (!hasWebGL2()) {
       setThreeDNote('3D needs WebGL 2, which this browser does not have. The 2D map works as before.')
-      return
+      return true
     }
+    return false
+  }
+  const toggleThreeD = useCallback(() => {
+    /* Closing is always allowed; opening asks. */
+    if (!threeD && no3D()) return
     setThreeDNote(null)
     setThreeD((on) => {
       if (on) setStand(null)
       return !on
     })
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [threeD, labs3D])
   const threeDPins = useMemo(() => plan.map((p) => ({ number: p.position.number, at: p.position.at })), [plan])
 
   const nightPhase = useMemo(
@@ -1267,10 +1280,7 @@ export function PlanMode({
   const [pendingFly, setPendingFly] = useState(false)
   const startFly = (record: boolean) => {
     if (venue === null || pf.pilot === null || scrubbedAt === null) return
-    if (!hasWebGL2()) {
-      setThreeDNote('3D needs WebGL 2, which this browser does not have. The 2D map works as before.')
-      return
-    }
+    if (no3D()) return
     const w = windLevels.find((l) => l.heightMeters === 80)
     const sunset = getTimes(scrubbedAt, venue.lat, venue.lon).sunset
     const nd = ndFor({ minutesBeforeSunset: sunset == null ? Number.NaN : (sunset.getTime() - scrubbedAt.getTime()) / 60_000, sky: 'full-sun', mode: 'default', overWater: false })
@@ -1310,7 +1320,8 @@ export function PlanMode({
   useEffect(() => {
     if (!pendingFly || card.kind !== 'preflight') return
     setPendingFly(false)
-    startFly(false)
+    /* Batch 3D, Section 0.1: with 3D off "Plan the flight" is the drone card on the 2D map, and stops there. */
+    if (labs3D) startFly(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingFly, card.kind])
 
@@ -1318,10 +1329,7 @@ export function PlanMode({
   const [recordedClip, setRecordedClip] = useState<Blob | null>(null)
   const playFlight = (record: boolean) => {
     if (venue === null || pf.path.length < 2 || scrubbedAt === null) return
-    if (!hasWebGL2()) {
-      setThreeDNote('3D needs WebGL 2, which this browser does not have. The 2D map works as before.')
-      return
-    }
+    if (no3D()) return
     setRecordNote(record ? 'Rendering frame by frame for a steady 30 fps…' : null)
     setRenderShare(record ? 0 : null)
     setThreeD(true)
@@ -1999,13 +2007,10 @@ export function PlanMode({
           pilotAt={pilotAt}
           onPlacePilot={() => onPlacingPilot(true)}
           onStandHere={
-            venue === null
+            venue === null || !labs3D
               ? undefined
               : () => {
-                  if (!hasWebGL2()) {
-                    setThreeDNote('3D needs WebGL 2, which this browser does not have. The 2D map works as before.')
-                    return
-                  }
+                  if (no3D()) return
                   setStand(standAtPosition(selected, kitProfile, venue, Date.now()))
                   setThreeD(true)
                   /* The eye-level view needs the screen: the sheet goes down to its time bar. */
@@ -2253,6 +2258,7 @@ export function PlanMode({
         setVectorMap(b === 'map')
       }}
       baseNote={threeDNote}
+      with3D={labs3D || threeD}
       tools={[
         ...(onViewfinder === undefined ? [] : [{ label: 'Viewfinder', icon: featIcon('M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8zM8 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z'), onClick: onViewfinder }]),
         { label: 'Measure', icon: featIcon('M2 12 12 2l2 2L4 14zM5 9l1 1M7 7l1 1M9 5l1 1'), on: measurePins !== null, onClick: () => { setMeasurePins((pins) => (pins === null ? [] : null)); setSheet('peek') } },
@@ -2386,6 +2392,7 @@ export function PlanMode({
             onPick={setFlightPicking}
             onPlay={() => playFlight(false)}
             onFly={startFly}
+            with3D={labs3D}
             onRecord={() => playFlight(true)}
             recordNote={recordNote}
             renderShare={renderShare}
@@ -2671,10 +2678,7 @@ export function PlanMode({
                 onOpenKey={() => setPage('settings')}
                 onLineUp={(first, lens) => {
                   if (aimAt === null) return
-                  if (!hasWebGL2()) {
-                    setThreeDNote('3D needs WebGL 2, which this browser does not have. The 2D map works as before.')
-                    return
-                  }
+                  if (no3D()) return
                   const body = kitProfile.bodies.find((b) => bag.bodyIds.includes(b.id) && b.role !== 'drone')
                   const kitLens = lens === null ? undefined : kitProfile.lenses.find((l) => l.id === lens.id)
                   const sensor = body !== undefined && kitLens !== undefined ? effectiveSensor(kitLens, body) : 'fullFrame'
@@ -2946,11 +2950,11 @@ export function PlanMode({
             sea={cinema}
             onFlightTime={scrubTo}
             fly={flySession}
-            onCrash={(message) => {
+            onCrash={(message, stack) => {
               /* Batch Flow, Section 1: back to the drone card; Batch CORE, Section 2.3: the card says which screen and why, and the phone's log keeps it. */
               const which = flySession !== null ? 'Fly' : '3D'
               logTouch(`3D crashed: ${message}`)
-              recordError(which, message)
+              recordError(which, message, new Date(), stack)
               setFlySession(null)
               setThreeD(false)
               setCard({ kind: 'preflight' } as SheetCard)
@@ -3206,7 +3210,7 @@ export function PlanMode({
       {sheet === 'full' ? null : (
       <MapRail
         threeD={threeD}
-        onThreeD={toggleThreeD}
+        onThreeD={labs3D || threeD ? toggleThreeD : undefined}
         threeDNote={threeDNote}
         bearing={mapBearing}
         heading={followHeading}

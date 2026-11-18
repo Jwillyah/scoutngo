@@ -83,3 +83,13 @@ export function earnedStepUp(shownMs: number, frames: readonly number[], context
   const p90 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.9))]
   return p90 <= 1000 / STEP_UP_FPS
 }
+
+/*
+ * LABS (Batch 3D, Section 0.1; Jwilly's iPhone 13 Pro Max, iOS 18.7.8, 17 Nov
+ * on 62899a6: "3D didn't load" within seconds, then a reload out of memory,
+ * then Safari's "A problem repeatedly occurred"). Until the phone passes, 3D
+ * and Fly are a Settings › Labs switch, off by default on iOS and on
+ * elsewhere. A choice made on the phone ('on' or 'off') wins over the default.
+ */
+export const LABS_3D_KEY = 'scoutngo.labs3d.v1'
+export const labs3DOn = (ios: boolean, stored: string | null): boolean => (stored === 'on' ? true : stored === 'off' ? false : !ios)

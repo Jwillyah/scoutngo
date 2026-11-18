@@ -166,6 +166,96 @@ try {
     await ctx.close()
     watchdog.note(label)
   }
+  /*
+   * Batch 3D, Section 0 (Jwilly's iPhone, 17 Nov): 3D and Fly behind Settings ›
+   * Labs, off by default on an iPhone; Debug a plain row under About, Last
+   * errors a row that opens it, the version's long press Debug and not About;
+   * Last errors opening to the stack, and Copy all.
+   */
+  {
+    const label = 'labs and debug'
+    console.log(`\n### ${label}`)
+    const ctx = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height: 844 } })
+    await ctx.addInitScript(() => {
+      try {
+        localStorage.setItem('scoutngo.landing.v1', 'true')
+        /* The default, not the gate's switch (scripts/gate/playwright.mjs): nothing chosen on this phone. */
+        localStorage.removeItem('scoutngo.labs3d.v1')
+        if (localStorage.getItem('scoutngo.errors.v1') === null) localStorage.setItem('scoutngo.errors.v1', JSON.stringify([{ at: '2026-11-17T17:27:00Z', where: '3D', message: 'Error: seeded for the audit', build: 'audit', stack: 'Error: seeded for the audit\n    at seededFrame (audit.js:1:1)' }]))
+      } catch {
+        /* about:blank */
+      }
+    })
+    const page = await ctx.newPage()
+    await page.clock.install({ time: new Date('2026-11-02T11:11:00Z') })
+    await page.clock.resume()
+    const wait = (ms) => page.waitForTimeout(ms)
+    const ev = (x) => page.evaluate(x)
+    await page.goto(url)
+    await wait(3500)
+    await page.getByRole('button', { name: /^open$/i }).click({ timeout: 4000 }).catch(() => {})
+    await goToStage(ev, wait, 'plan')
+    await wait(1500)
+    looked += 1
+    if (await ev(`!!document.querySelector('button[aria-label="Open the 3D clay model"]')`)) fail(`${label}: the 3D button shows on an iPhone with Labs left alone`)
+    await menuOn(page)
+    await wait(800)
+    await page.locator('.mrow', { hasText: 'Settings' }).first().click()
+    await wait(1200)
+    const s = JSON.parse(await ev(`JSON.stringify((() => {
+      const rows = [...document.querySelectorAll('.set2 .set2__row')].map((r) => r.querySelector('.set2__label')?.textContent ?? '')
+      const sw = document.querySelector('[role="switch"][aria-label="3D and Fly (testing)"]')
+      const debug = [...document.querySelectorAll('.set2 button.set2__row')].find((b) => b.querySelector('.set2__label')?.textContent === 'Debug')
+      return { rows, labs: sw === null ? null : sw.getAttribute('aria-checked'), debugH: debug === undefined ? 0 : Math.round(debug.getBoundingClientRect().height) }
+    })())`))
+    console.log(`  settings rows: ${JSON.stringify(s.rows.slice(-6))}; labs ${s.labs}; Debug row ${s.debugH}px`)
+    if (s.labs !== 'false') fail(`${label}: Labs › 3D and Fly is ${s.labs}, not off by default on an iPhone`)
+    const at = s.rows.indexOf('About')
+    if (at < 0 || s.rows[at + 1] !== 'Debug') fail(`${label}: no plain Debug row right under About (${JSON.stringify(s.rows.slice(at, at + 3))})`)
+    if (s.debugH < 44) fail(`${label}: the Debug row is ${s.debugH}px, under a 44 px target`)
+    const onDebug = () => ev(`document.querySelector('.page[aria-label="Debug"]') !== null && !!document.querySelector('.set2__errors')`)
+    const back = async () => {
+      await ev(`document.querySelector('.page[aria-label="Debug"] .page__back')?.click()`)
+      await wait(600)
+    }
+    await page.locator('button.set2__row', { hasText: 'Debug' }).first().tap()
+    await wait(800)
+    if (!(await onDebug())) fail(`${label}: tapping Debug opened no Debug page`)
+    await back()
+    await page.locator('button.set2__row', { hasText: 'Last errors' }).first().tap()
+    await wait(800)
+    if (!(await onDebug())) fail(`${label}: tapping Last errors opened no Debug page`)
+    else {
+      await page.locator('.set2__err summary').first().tap()
+      await wait(400)
+      const stack = await ev(`document.querySelector('.set2__err[open] .set2__errstack')?.textContent ?? ''`)
+      if (!stack.includes('seededFrame')) fail(`${label}: an opened error row shows no stack`)
+      await page.getByRole('button', { name: 'Copy all' }).tap()
+      await wait(800)
+      const said = await ev(`document.querySelector('.set2__errors [role="status"]')?.textContent ?? ''`)
+      console.log(`  Copy all said: ${JSON.stringify(said)}`)
+      if (said === '') fail(`${label}: Copy all said nothing`)
+      await page.screenshot({ path: join(OUT, 'menu-debug.png') })
+    }
+    await back()
+    /* The long press: a finger held 900 ms on the version line, then lifted. */
+    await page.locator('.set2__version').scrollIntoViewIfNeeded()
+    await wait(300)
+    const v = await page.locator('.set2__version').boundingBox()
+    if (v === null) fail(`${label}: no version line`)
+    else {
+      await page.mouse.move(v.x + v.width / 2, v.y + v.height / 2)
+      await page.mouse.down()
+      await wait(900)
+      await page.mouse.up()
+      await wait(800)
+      const about = await ev(`!!document.querySelector('.astory')`)
+      if (!(await onDebug())) fail(`${label}: a long press on the version opened no Debug page`)
+      if (about) fail(`${label}: a long press on the version opened About too`)
+    }
+    await ctx.close()
+    watchdog.note(label)
+  }
 } finally {
   await browser.close()
 }

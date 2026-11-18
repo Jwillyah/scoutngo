@@ -37,8 +37,9 @@ describe('Settings, a page of its own (30 Oct)', () => {
   it('has its groups in the board\'s order, and nothing it moved out', () => {
     const html = page()
     const titles = [...html.matchAll(/class="set2__title">([^<]+)</g)].map((m) => m[1])
-    expect(titles).toEqual(['What I do', 'My spot', 'Units', 'My gear', 'Alerts', 'My data · on this phone only'])
-    for (const gone of ['Last venue', 'Coast &amp; inland', 'Kept when space runs short', 'Imagery', 'Terrain', 'Wind map', 'Debug', 'Show the numbers']) expect(html).not.toContain(`>${gone}<`)
+    expect(titles).toEqual(['What I do', 'My spot', 'Units', 'My gear', 'Alerts', 'Labs', 'My data · on this phone only'])
+    /* Batch 3D, Section 0.3: Debug is a plain row now (src/components/labsDebug.test.tsx), its contents on a page of their own. */
+    for (const gone of ['Last venue', 'Coast &amp; inland', 'Kept when space runs short', 'Imagery', 'Terrain', 'Wind map', 'Touch log', 'Show the numbers']) expect(html).not.toContain(`>${gone}<`)
     expect(html).toMatch(/class="set2__version"/)
   })
 

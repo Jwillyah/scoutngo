@@ -142,3 +142,34 @@
   font-size: var(--text-xs);
   color: var(--glass-ink-2);
 }
+/* Batch 3D, Section 0.4: Last errors, each row opening to its whole text. */
+.set2__err summary {
+  min-height: 44px;
+  padding: 6px 0;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.set2__err[open] summary {
+  white-space: normal;
+}
+.set2__errfull,
+.set2__errbuild {
+  margin: 0 0 6px;
+  overflow-wrap: anywhere;
+}
+.set2__errstack {
+  margin: 0 0 8px;
+  max-height: 18em;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: var(--text-xs);
+}
+.set2__erracts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 14px;
+}

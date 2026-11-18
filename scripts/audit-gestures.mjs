@@ -43,7 +43,7 @@ async function plan() {
   const c = await connect()
   await c.send('Page.navigate', { url: `${APP_ORIGIN}/?probe=1` })
   await c.wait(2500)
-  await c.ev(`localStorage.clear(); localStorage.setItem('scoutngo.landing.v1','true'); localStorage.setItem('scoutngo.lastSetup.v1', ${JSON.stringify(JSON.stringify(LAST))})`)
+  await c.ev(`localStorage.clear(); localStorage.setItem('scoutngo.landing.v1','true'); localStorage.setItem('scoutngo.labs3d.v1','on'); localStorage.setItem('scoutngo.lastSetup.v1', ${JSON.stringify(JSON.stringify(LAST))})`)
   await c.send('Page.navigate', { url: `${APP_ORIGIN}/?probe=1` })
   /* Waited for, not timed: under the gate's load a cold Setup took longer than a fixed 5 s (30 Oct). */
   let went = false
