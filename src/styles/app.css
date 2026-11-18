@@ -18988,6 +18988,11 @@ a.about__row * {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Batch 3D, Section 3.3: the water's source wraps rather than being cut. */
+.dtide__line--src {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .dtide__mirror {
   display: flex;
   align-items: center;

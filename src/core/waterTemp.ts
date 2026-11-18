@@ -1,27 +1,27 @@
 /*
- * THE WATER'S TEMPERATURE, FROM INSTRUMENTS ONLY (Batch FIX, Section 4).
+ * THE WATER'S TEMPERATURE (Batch FIX, Section 4; Batch 3D, Section 3.3).
  *
- * Until now only the Tide page said it, and from Open-Meteo Marine's sea
- * surface temperature: a model, not a measurement. Now one reading, picked
- * here by distance and age, and every screen that says it says this one:
+ * One reading, picked here by distance and age, and every screen that says
+ * it says this one; the source line says which it is:
  *
  *   1  a station on the water: NOAA CO-OPS (water_temperature) or an NDBC
  *      buoy (WTMP), the nearest with a reading under IN_SITU_MAX_AGE_MS,
  *      within STATION_KM of a spot on the sea (the map tiles' ocean within
  *      SURF_COAST_M), within RIVER_KM of any other spot;
- *   2  open sea with no station that close: the satellite, NASA JPL's MUR
- *      analysis (about 1 km, daily) through NOAA CoastWatch, the nearest
- *      cell with water within SAT_CELL_KM, said "satellite · yesterday";
+ *   2  open sea with no station that close: Open-Meteo Marine's
+ *      sea_surface_temperature at the spot for this hour, asked from the
+ *      phone like every Open-Meteo forecast (Batch 3D, Section 3.3, Jwilly
+ *      approved; it replaced the satellite through /api/sst). A model, so
+ *      it is said as one: "Open-Meteo model · not measured";
  *   3  rivers: a USGS gauge reporting water temperature (parameter 00010)
  *      within RIVER_KM, said with the gauge's name;
- *   4  nothing measured: "No water temp here". Never from the air.
+ *   4  none of these: "No water temp here". Never from the air.
  *
- * Back Bay, Virginia Beach, is why the satellite asks for the sea: MUR's
- * land mask counts the bay as water, but its cells there read the ocean's
- * value to a few hundredths of a degree (14.84 °C against 14.82 °C a few km
- * off Sandbridge, 16 Nov, tests/data/water-2026-11-17), an analysis filled
- * in from the sea, not a measurement of a shallow bay. The map tiles say the
- * bay is not the ocean, so it gets no satellite value.
+ * Back Bay, Virginia Beach, is why the model is asked only on the sea: a
+ * grid filled in from the ocean is not a measurement of a shallow bay (the
+ * satellite this replaced read the ocean's value there to a few hundredths
+ * of a degree, 16 Nov). The map tiles say the bay is not the ocean, so it
+ * gets no model value.
  *
  * Pure: the lists, the readings and the clock come in; nothing is fetched.
  * The wetsuit comes from the reading through src/core/wetsuit.ts.
@@ -33,27 +33,19 @@ import { cToF, WETSUIT_BANDS } from './wetsuit.ts'
 export const STATION_KM = 15
 /** A river gauge (or a station, away from the sea) this close. */
 export const RIVER_KM = 5
-/** The satellite's nearest cell with water, at most this far. */
-export const SAT_CELL_KM = 3
 /** A station's or gauge's reading older than this is not said. */
 export const IN_SITU_MAX_AGE_MS = 6 * 3_600_000
-/** The satellite's analysis day at most this many days back. */
-export const SAT_MAX_AGE_DAYS = 3
+/** The model's hour at most this far from now: the hour the forecast gives for now, never another. */
+export const MODEL_MAX_GAP_MS = 60 * 60_000
 /** How many stations of each list are asked. */
 export const ASK_COUNT = 2
-/** The satellite's grid: the cell asked is snapped to this (about 55 km), and the box reaches SST_BOX_DEG past it. */
-export const SST_CELL_DEG = 0.5
-export const SST_BOX_DEG = 0.3
-/** Every second MUR cell: 0.02°, about 2 km. */
-export const SST_STRIDE = 2
-
-export type WaterKind = 'coops' | 'ndbc' | 'usgs' | 'satellite'
+export type WaterKind = 'coops' | 'ndbc' | 'usgs' | 'model'
 
 export interface WaterSite {
   kind: WaterKind
-  /** The CO-OPS number, the NDBC buoy, the USGS site number, or "MUR". */
+  /** The CO-OPS number, the NDBC buoy, the USGS site number, or "open-meteo-marine". */
   id: string
-  /** What the line calls it: "Sewells Point", "Buoy 44099", "Elizabeth Riv at Midtown Tunnel", "satellite". */
+  /** What the line calls it: "Sewells Point", "Buoy 44099", "Elizabeth Riv at Midtown Tunnel", "Open-Meteo model". */
   name: string
   at: LatLon
   km: number
@@ -61,7 +53,7 @@ export interface WaterSite {
 
 export interface WaterReading {
   site: WaterSite
-  /** When it was measured (the satellite: its analysis day, 09:00 UTC). */
+  /** When it was measured (the model: the forecast's hour). */
   at: Date
   /** °C. */
   c: number
@@ -122,18 +114,17 @@ export function freshInSitu(r: WaterReading | null, now: Date): r is WaterReadin
   return age <= IN_SITU_MAX_AGE_MS && age >= -10 * 60_000
 }
 
-/** The satellite's day, at most SAT_MAX_AGE_DAYS back. */
-export function freshSatellite(r: WaterReading | null, now: Date): r is WaterReading {
-  if (r === null || !plausible(r.c)) return false
-  const age = now.getTime() - r.at.getTime()
-  return age <= (SAT_MAX_AGE_DAYS + 1) * 86_400_000 && age >= -86_400_000
+/** The model's value for this hour: within MODEL_MAX_GAP_MS of now. */
+export function freshModel(r: WaterReading | null, now: Date): r is WaterReading {
+  return r !== null && plausible(r.c) && Math.abs(now.getTime() - r.at.getTime()) <= MODEL_MAX_GAP_MS
 }
 
 export interface WaterInputs {
   /** The map tiles' ocean within SURF_COAST_M: true, false, or null when not known. */
   ocean: boolean | null
   stations: readonly (WaterReading | null)[]
-  satellite: WaterReading | null
+  /** Open-Meteo Marine's sea surface temperature at the spot this hour (modelSst). */
+  model: WaterReading | null
   rivers: readonly (WaterReading | null)[]
 }
 
@@ -146,7 +137,7 @@ export function pickWater(input: WaterInputs, now: Date): WaterReading | null {
   if (input.ocean === false) return nearest([...stations.filter((r) => r.site.km <= RIVER_KM), ...rivers])
   const station = nearest(stations.filter((r) => r.site.km <= STATION_KM))
   if (station !== null) return station
-  if (input.ocean === true && freshSatellite(input.satellite, now)) return input.satellite
+  if (input.ocean === true && freshModel(input.model, now)) return input.model
   return nearest(rivers)
 }
 
@@ -198,38 +189,18 @@ export function parseUsgsWater(body: unknown, sites: readonly WaterSite[]): Wate
   return out
 }
 
-/** The satellite's grid as the sst function hands it on: rows south to north, columns west to east. */
-export interface SstGrid {
-  /** The analysis day, "2026-11-16". */
-  day: string
-  lat0: number
-  lon0: number
-  step: number
-  rows: (number | null)[][]
-}
-
-/** The cell asked for a spot: its latitude and longitude snapped to SST_CELL_DEG. Nothing finer leaves the phone. */
-export function sstCell(at: LatLon): LatLon {
-  const snap = (v: number) => Math.round(Math.round(v / SST_CELL_DEG) * SST_CELL_DEG * 10) / 10
-  return { lat: snap(at.lat), lon: snap(at.lon) }
-}
-
-/** The nearest cell with water within SAT_CELL_KM, as a reading at its analysis day (09:00 UTC, MUR's time). */
-export function nearestSst(grid: SstGrid, venue: LatLon): WaterReading | null {
-  let best: { c: number; at: LatLon; km: number } | null = null
-  grid.rows.forEach((row, i) =>
-    row.forEach((c, j) => {
-      if (c === null || !plausible(c)) return
-      const at = { lat: Math.round((grid.lat0 + i * grid.step) * 1000) / 1000, lon: Math.round((grid.lon0 + j * grid.step) * 1000) / 1000 }
-      if (Math.abs(at.lat - venue.lat) > 0.05 || Math.abs(at.lon - venue.lon) > 0.06) return
-      const km = distanceMeters(venue, at) / 1000
-      if (km <= SAT_CELL_KM && (best === null || km < best.km)) best = { c, at, km }
-    }),
-  )
-  const day = new Date(`${grid.day}T09:00:00Z`)
-  if (best === null || !Number.isFinite(day.getTime())) return null
-  const b = best as { c: number; at: LatLon; km: number }
-  return { site: { kind: 'satellite', id: 'MUR', name: 'satellite', at: b.at, km: b.km }, at: day, c: b.c }
+/**
+ * Open-Meteo Marine's sea_surface_temperature at the spot, the hour nearest
+ * now (within MODEL_MAX_GAP_MS), as a reading; null when the series has no
+ * value for this hour. `times` epoch ms, °C.
+ */
+export function modelSst(times: readonly number[], values: readonly (number | null)[] | undefined, at: LatLon, now: Date): WaterReading | null {
+  if (values === undefined || times.length === 0) return null
+  let best = -1
+  for (let i = 0; i < times.length; i += 1) if (best < 0 || Math.abs(times[i] - now.getTime()) < Math.abs(times[best] - now.getTime())) best = i
+  const c = values[best]
+  const r: WaterReading | null = c === null || c === undefined ? null : { site: { kind: 'model', id: 'open-meteo-marine', name: 'Open-Meteo model', at, km: 0 }, at: new Date(times[best]), c }
+  return freshModel(r, now) ? r : null
 }
 
 /* --------------------------------------------------------------- words */
@@ -267,19 +238,12 @@ export function readingAge(at: Date, now: Date): string {
   return h < 48 ? `${h} h ago` : `${Math.round(h / 24)} days ago`
 }
 
-/** The satellite's day against the phone's: "today", "yesterday", "3 days ago". Both "YYYY-MM-DD". */
-export function satelliteDay(day: string, today: string): string {
-  const n = Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${day}T00:00:00Z`)) / 86_400_000)
-  if (!Number.isFinite(n)) return day
-  return n <= 0 ? 'today' : n === 1 ? 'yesterday' : `${n} days ago`
-}
-
 /**
  * Where it is from, how far, how old: "Sewells Point · 9 km · 20 min ago",
- * "Buoy 44099 · 14 mi · 40 min ago", "satellite · yesterday".
+ * "Buoy 44099 · 14 mi · 40 min ago", "Open-Meteo model · not measured".
  */
-export function waterSource(r: WaterReading, now: Date, miles: boolean, today: string): string {
-  if (r.site.kind === 'satellite') return `satellite · ${satelliteDay(r.at.toISOString().slice(0, 10), today)}`
+export function waterSource(r: WaterReading, now: Date, miles: boolean): string {
+  if (r.site.kind === 'model') return 'Open-Meteo model · not measured'
   const far = miles ? r.site.km / 1.609344 : r.site.km
   const d = far < 1 ? `under 1 ${miles ? 'mi' : 'km'}` : `${Math.round(far)} ${miles ? 'mi' : 'km'}`
   return `${r.site.name} · ${d} · ${readingAge(r.at, now)}`

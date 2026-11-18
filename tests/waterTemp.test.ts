@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { gaugeName, nearestSst, parseBuoyWater, parseCoopsWater, parseUsgsWater, pickWater, readingAge, satelliteDay, sitesNear, sstCell, STATION_KM, waterHead, waterSource, type SstGrid, type WaterReading, type WaterSite } from '../src/core/waterTemp.ts'
-import { cellOf, gridOf, murUrl, POST as sstPost } from '../api/sst.ts'
+import { gaugeName, MODEL_MAX_GAP_MS, modelSst, parseBuoyWater, parseCoopsWater, parseUsgsWater, pickWater, readingAge, sitesNear, STATION_KM, waterHead, waterSource, type WaterReading, type WaterSite } from '../src/core/waterTemp.ts'
 import { parseRealtimeWater } from '../api/buoy.ts'
 import { askWater, forgetWater, keepWater, keptWater, waterAt, waterKeyOf, type WaterDeps } from '../src/lib/waterTemp.ts'
 import { COOPS_WATER_TEMP } from '../src/data/coopsWaterTemp.ts'
@@ -9,11 +8,12 @@ import { USGS_WATER_TEMP } from '../src/data/usgsWaterTemp.ts'
 import { NDBC_BUOYS } from '../src/data/ndbc.ts'
 
 /*
- * THE WATER'S TEMPERATURE, FROM INSTRUMENTS ONLY (Batch FIX, Section 4). Recorded
- * 17 Nov 2026 at about 7:57 AM EST (tests/data/water-2026-11-17): CO-OPS's
- * latest at Sewells Point, the USGS gauge at the Midtown Tunnel, and MUR
- * through ERDDAP for the two half-degree cells round Virginia Beach; NDBC
- * 44099 from 16 Nov (tests/data/surf-2026-11-16).
+ * THE WATER'S TEMPERATURE (Batch FIX, Section 4). Recorded 17 Nov 2026 at
+ * about 7:57 AM EST (tests/data/water-2026-11-17): CO-OPS's latest at
+ * Sewells Point and the USGS gauge at the Midtown Tunnel; NDBC 44099 from
+ * 16 Nov (tests/data/surf-2026-11-16). Batch 3D, Section 3.3: on the sea with
+ * no station within 15 km, Open-Meteo Marine's sea_surface_temperature (a
+ * model, said as one) in place of the satellite through /api/sst.
  */
 const DIR = 'tests/data/water-2026-11-17'
 const json = (f: string) => JSON.parse(readFileSync(`${DIR}/${f}`, 'utf8')) as unknown
@@ -37,8 +37,9 @@ const OCEAN: Record<keyof typeof SPOTS, boolean> = { vb: true, croatan: true, sa
 const site = (kind: WaterSite['kind'], km: number, id = 'x'): WaterSite => ({ kind, id, name: id, at: { lat: 0, lon: 0 }, km })
 const reading = (kind: WaterSite['kind'], km: number, agoMin: number, c = 14): WaterReading => ({ site: site(kind, km), at: new Date(NOW.getTime() - agoMin * 60_000), c })
 
-const sstFile = (cell: { lat: number; lon: number }) => `mur-${cell.lat.toFixed(1)}_${cell.lon.toFixed(1)}.json`
-const gridFor = (at: { lat: number; lon: number }) => gridOf(json(sstFile(sstCell(at)))) as SstGrid
+/* Open-Meteo Marine's hourly sea_surface_temperature as fetchMarine parses it: the 17 Nov hours, 14.7 °C (VB, live at 8:46 PM EST, measurements/2026-11-18-water-sources.md). */
+const HOURS = Array.from({ length: 48 }, (_, i) => Date.parse('2026-11-17T00:00:00Z') + i * 3_600_000)
+const SST = { times: HOURS, values: HOURS.map(() => 14.7) }
 
 describe('reading each source', () => {
   it('CO-OPS: Sewells Point 13.8 °C at 13:00 UTC', () => {
@@ -73,75 +74,47 @@ describe('reading each source', () => {
   })
 })
 
-describe('the satellite, round one coarse cell', () => {
-  it('sends a half-degree cell, never the spot, and the function refuses anything finer', () => {
-    expect(sstCell(SPOTS.vb)).toEqual({ lat: 37, lon: -76 })
-    expect(sstCell(SPOTS.sandbridge)).toEqual({ lat: 36.5, lon: -76 })
-    expect(cellOf({ lat: 37, lon: -76 })).toEqual({ lat: 37, lon: -76 })
-    expect(cellOf({ lat: 36.85, lon: -75.97 })).toBeNull()
-    expect(cellOf({ lat: 36.9, lon: -76 })).toBeNull()
-    expect(cellOf({ lat: '37', lon: -76 })).toBeNull()
-    expect(decodeURIComponent(murUrl({ lat: 37, lon: -76 }))).toBe('https://coastwatch.pfeg.noaa.gov/erddap/griddap/jplMURSST41.json?analysed_sst[(last)][(36.70):2:(37.30)][(-76.30):2:(-75.70)]')
+describe("Open-Meteo Marine's sea temperature, the model", () => {
+  it('the hour nearest now, as a reading at the spot; nothing when the series has no value for this hour', () => {
+    const r = modelSst(SST.times, SST.values, SPOTS.vb, NOW)
+    expect(r?.c).toBe(14.7)
+    expect(r?.site).toMatchObject({ kind: 'model', name: 'Open-Meteo model', km: 0 })
+    expect(r?.at.toISOString()).toBe('2026-11-17T13:00:00.000Z')
+    expect(modelSst(SST.times, SST.values.map(() => null), SPOTS.vb, NOW)).toBeNull()
+    expect(modelSst(SST.times, undefined, SPOTS.vb, NOW)).toBeNull()
+    /* A series that ends before now says nothing for now. */
+    expect(modelSst(SST.times.slice(0, 5), SST.values.slice(0, 5), SPOTS.vb, NOW)).toBeNull()
+    expect(MODEL_MAX_GAP_MS).toBe(3_600_000)
   })
 
-  it('reads ERDDAP into a grid: 16 Nov, 31 by 31 cells 0.02° apart, land null', () => {
-    const g = gridFor(SPOTS.vb)
-    expect(g.day).toBe('2026-11-16')
-    expect(g.rows.length).toBe(31)
-    expect(g.rows[0].length).toBe(31)
-    expect(g.step).toBeCloseTo(0.02, 6)
-    expect(g.lat0).toBeCloseTo(36.7, 6)
-    expect(g.rows.flat().some((c) => c === null)).toBe(true)
-  })
-
-  it('the function answers POST with a cell in its body (the upstream stubbed)', async () => {
-    vi.stubGlobal('fetch', async () => new Response(JSON.stringify(json(sstFile({ lat: 37, lon: -76 }))), { status: 200 }))
-    try {
-      const r = await sstPost(new Request('http://127.0.0.1/api/sst', { method: 'POST', body: JSON.stringify({ lat: 37, lon: -76 }) }))
-      const body = (await r.json()) as { status: string; day: string; rows: unknown[] }
-      expect(body.status).toBe('ok')
-      expect(body.day).toBe('2026-11-16')
-      const bad = await sstPost(new Request('http://127.0.0.1/api/sst', { method: 'POST', body: JSON.stringify({ lat: 36.85, lon: -75.97 }) }))
-      expect(bad.status).toBe(400)
-    } finally {
-      vi.unstubAllGlobals()
-    }
-  })
-
-  it('the nearest cell with water within 3 km: Croatan, on the sand, reads the sea beside it', () => {
-    const vb = nearestSst(gridFor(SPOTS.vb), SPOTS.vb)
-    const cro = nearestSst(gridFor(SPOTS.croatan), SPOTS.croatan)
-    expect(vb?.c).toBeGreaterThan(14)
-    expect(vb?.c).toBeLessThan(15.5)
-    expect(cro).not.toBeNull()
-    expect(cro?.site.km).toBeLessThan(3)
-    expect(cro?.at.toISOString()).toBe('2026-11-16T09:00:00.000Z')
-    /* Inland Norfolk: no water within 3 km in the cell. */
-    expect(nearestSst(gridFor({ lat: 36.85, lon: -76.2 }), { lat: 36.85, lon: -76.2 })).toBeNull()
+  it('the satellite function is gone: no /api/sst in the app', () => {
+    const src = readFileSync('src/lib/waterTemp.ts', 'utf8')
+    expect(src).not.toMatch(/api\/sst/)
+    expect(() => readFileSync('api/sst.ts', 'utf8')).toThrow()
   })
 })
 
 describe('which reading is said', () => {
-  it('a station within 15 km on the sea, nearest, before the satellite', () => {
-    const r = pickWater({ ocean: true, stations: [reading('ndbc', 12, 30, 15), reading('coops', 9, 20, 14)], satellite: reading('satellite', 1, 24 * 60), rivers: [] }, NOW)
+  it('a station within 15 km on the sea, nearest, before the model', () => {
+    const r = pickWater({ ocean: true, stations: [reading('ndbc', 12, 30, 15), reading('coops', 9, 20, 14)], model: reading('model', 0, 10), rivers: [] }, NOW)
     expect(r?.site.kind).toBe('coops')
   })
 
-  it('a station farther than 15 km, or older than 6 h, gives way to the satellite', () => {
-    expect(pickWater({ ocean: true, stations: [reading('ndbc', 16, 30)], satellite: reading('satellite', 1, 24 * 60), rivers: [] }, NOW)?.site.kind).toBe('satellite')
-    expect(pickWater({ ocean: true, stations: [reading('coops', 5, 7 * 60)], satellite: reading('satellite', 1, 24 * 60), rivers: [] }, NOW)?.site.kind).toBe('satellite')
+  it('a station farther than 15 km, or older than 6 h, gives way to the model', () => {
+    expect(pickWater({ ocean: true, stations: [reading('ndbc', 16, 30)], model: reading('model', 0, 10), rivers: [] }, NOW)?.site.kind).toBe('model')
+    expect(pickWater({ ocean: true, stations: [reading('coops', 5, 7 * 60)], model: reading('model', 0, 10), rivers: [] }, NOW)?.site.kind).toBe('model')
   })
 
-  it('no satellite off the sea, nor when the sea is not known; a gauge within 5 km; else nothing', () => {
-    expect(pickWater({ ocean: false, stations: [], satellite: reading('satellite', 1, 60), rivers: [] }, NOW)).toBeNull()
-    expect(pickWater({ ocean: null, stations: [], satellite: reading('satellite', 1, 60), rivers: [] }, NOW)).toBeNull()
-    expect(pickWater({ ocean: false, stations: [reading('coops', 8, 10)], satellite: null, rivers: [reading('usgs', 3, 15)] }, NOW)?.site.kind).toBe('usgs')
-    expect(pickWater({ ocean: false, stations: [], satellite: null, rivers: [reading('usgs', 6, 15)] }, NOW)).toBeNull()
+  it('no model off the sea, nor when the sea is not known; a gauge within 5 km; else nothing', () => {
+    expect(pickWater({ ocean: false, stations: [], model: reading('model', 0, 10), rivers: [] }, NOW)).toBeNull()
+    expect(pickWater({ ocean: null, stations: [], model: reading('model', 0, 10), rivers: [] }, NOW)).toBeNull()
+    expect(pickWater({ ocean: false, stations: [reading('coops', 8, 10)], model: null, rivers: [reading('usgs', 3, 15)] }, NOW)?.site.kind).toBe('usgs')
+    expect(pickWater({ ocean: false, stations: [], model: null, rivers: [reading('usgs', 6, 15)] }, NOW)).toBeNull()
   })
 
-  it('never a value out of the water’s range, and never a satellite day older than 3 days', () => {
-    expect(pickWater({ ocean: true, stations: [reading('coops', 2, 10, 99)], satellite: null, rivers: [] }, NOW)).toBeNull()
-    expect(pickWater({ ocean: true, stations: [], satellite: reading('satellite', 1, 5 * 24 * 60), rivers: [] }, NOW)).toBeNull()
+  it('never a value out of the water’s range, and never a model hour more than an hour from now', () => {
+    expect(pickWater({ ocean: true, stations: [reading('coops', 2, 10, 99)], model: null, rivers: [] }, NOW)).toBeNull()
+    expect(pickWater({ ocean: true, stations: [], model: reading('model', 0, 2 * 60), rivers: [] }, NOW)).toBeNull()
   })
 })
 
@@ -155,10 +128,10 @@ describe('the words', () => {
 
   it('where from, how far, how old', () => {
     const s: WaterSite = { kind: 'coops', id: '8638610', name: 'Sewells Point', at: { lat: 0, lon: 0 }, km: 9.2 }
-    expect(waterSource({ site: s, at: new Date(NOW.getTime() - 20 * 60_000), c: 14 }, NOW, false, '2026-11-17')).toBe('Sewells Point · 9 km · 20 min ago')
-    expect(waterSource({ site: s, at: new Date(NOW.getTime() - 20 * 60_000), c: 14 }, NOW, true, '2026-11-17')).toBe('Sewells Point · 6 mi · 20 min ago')
-    expect(waterSource({ site: site('satellite', 1), at: new Date('2026-11-16T09:00:00Z'), c: 14 }, NOW, true, '2026-11-17')).toBe('satellite · yesterday')
-    expect(satelliteDay('2026-11-14', '2026-11-17')).toBe('3 days ago')
+    expect(waterSource({ site: s, at: new Date(NOW.getTime() - 20 * 60_000), c: 14 }, NOW, false)).toBe('Sewells Point · 9 km · 20 min ago')
+    expect(waterSource({ site: s, at: new Date(NOW.getTime() - 20 * 60_000), c: 14 }, NOW, true)).toBe('Sewells Point · 6 mi · 20 min ago')
+    /* A model is said as one: never "measured", never a distance. */
+    expect(waterSource({ site: site('model', 0), at: new Date('2026-11-17T13:00:00Z'), c: 14 }, NOW, true)).toBe('Open-Meteo model · not measured')
     expect(readingAge(new Date(NOW.getTime() - 150 * 60_000), NOW)).toBe('3 h ago')
   })
 })
@@ -179,24 +152,27 @@ describe('the five spots, from the baked station lists (17 Nov)', () => {
 
   /* The phone's asking, end to end, with every answer recorded: the source each spot says. */
   const deps = (ocean: boolean, asked: string[]): WaterDeps => ({
-    fetchImpl: (async (input: RequestInfo | URL, init?: RequestInit) => {
+    fetchImpl: (async (input: RequestInfo | URL) => {
       const href = String(input)
       asked.push(href)
-      if (href === '/api/sst') return new Response(JSON.stringify({ status: 'ok', ...gridOf(json(sstFile(JSON.parse(String(init?.body)) as { lat: number; lon: number }))) }))
       throw new TypeError(`not recorded: ${href}`)
     }) as typeof fetch,
     buoy: async () => {
       throw new TypeError('no buoy asked')
     },
     ocean: async () => ocean,
+    sst: async () => {
+      asked.push('open-meteo marine')
+      return SST
+    },
     lists: async () => ({ coops: COOPS_WATER_TEMP, buoys: NDBC_BUOYS, usgs: async () => USGS_WATER_TEMP }),
   })
 
   for (const [name, want, head] of [
-    ['vb', 'satellite', 'Water 58° · 4/3'],
-    ['croatan', 'satellite', 'Water 58° · 4/3'],
-    ['sandbridge', 'satellite', 'Water 59° · 4/3'],
-    ['lynnhaven', 'satellite', 'Water 58° · 4/3'],
+    ['vb', 'model', 'Water 58° · 4/3'],
+    ['croatan', 'model', 'Water 58° · 4/3'],
+    ['sandbridge', 'model', 'Water 58° · 4/3'],
+    ['lynnhaven', 'model', 'Water 58° · 4/3'],
     ['backBay', null, 'No water temp here'],
   ] as const) {
     it(`${name}: ${want ?? 'No water temp here'}`, async () => {
@@ -205,15 +181,26 @@ describe('the five spots, from the baked station lists (17 Nov)', () => {
       expect(got.reading?.site.kind ?? null).toBe(want)
       /* Back Bay asks nobody: no station within 5 km, no gauge, and not the sea. */
       if (want === null) expect(asked).toEqual([])
-      else expect(asked).toEqual(['/api/sst'])
+      else expect(asked).toEqual(['open-meteo marine'])
       expect(waterHead(got.reading?.c ?? null, 'F')).toBe(head)
     })
   }
 
-  it('one satellite ask per half-degree cell: VB, Croatan and Lynnhaven share one', async () => {
+  /* Wrightsville Beach, NC: CO-OPS 8658163 under 1 km away, so the station, never the model (the map's "Water 64° · 3/2" on 17 Nov). */
+  it('Wrightsville Beach: the CO-OPS station first, the model not asked', async () => {
     const asked: string[] = []
-    for (const at of [SPOTS.vb, SPOTS.croatan, SPOTS.lynnhaven]) expect((await askWater(at, NOW, deps(true, asked))).reading?.site.kind).toBe('satellite')
-    expect(asked).toEqual(['/api/sst'])
+    const wb = { lat: 34.2104, lon: -77.7964 }
+    const d: WaterDeps = {
+      ...deps(true, asked),
+      fetchImpl: (async (input: RequestInfo | URL) => {
+        asked.push(String(input).split('?')[0])
+        return new Response(JSON.stringify({ data: [{ t: '2026-11-17 13:00', v: '17.8' }] }))
+      }) as typeof fetch,
+    }
+    const got = await askWater(wb, NOW, d)
+    expect(got.reading?.site).toMatchObject({ kind: 'coops', id: '8658163', name: 'Wrightsville Beach' })
+    expect(waterHead(got.reading?.c ?? null, 'F')).toBe('Water 64° · 3/2')
+    expect(asked).not.toContain('open-meteo marine')
   })
 })
 
@@ -226,7 +213,7 @@ describe('kept on the phone', () => {
 
   it('says the last reading, with its age, when nothing answers; not one over 48 h old', async () => {
     const key = waterKeyOf(SPOTS.vb)
-    const r: WaterReading = { site: { kind: 'satellite', id: 'MUR', name: 'satellite', at: SPOTS.vb, km: 0.5 }, at: new Date('2026-11-16T09:00:00Z'), c: 14.4 }
+    const r: WaterReading = { site: { kind: 'model', id: 'open-meteo-marine', name: 'Open-Meteo model', at: SPOTS.vb, km: 0 }, at: new Date('2026-11-16T09:00:00Z'), c: 14.4 }
     keepWater(key, r, NOW)
     expect(keptWater(key, NOW)?.c).toBe(14.4)
     expect(keptWater(key, new Date('2026-11-19T10:00:00Z'))).toBeNull()
@@ -238,6 +225,7 @@ describe('kept on the phone', () => {
         throw new TypeError('offline')
       },
       ocean: async () => true,
+      sst: async () => 'unreachable',
       lists: async () => ({ coops: COOPS_WATER_TEMP, buoys: NDBC_BUOYS, usgs: async () => USGS_WATER_TEMP }),
     }
     const s = await waterAt(SPOTS.vb, NOW, offline)

@@ -7,8 +7,11 @@
  *   1  the stations near (CO-OPS from the phone, NDBC through /api/buoy):
  *      only station ids leave the phone, from the lists baked into the app
  *      (src/data/coopsWaterTemp.ts, src/data/ndbc.ts);
- *   2  on the sea with no station close: /api/sst, the satellite, sent the
- *      spot snapped to a half degree (about 55 km), never finer;
+ *   2  on the sea with no station close: Open-Meteo Marine's
+ *      sea_surface_temperature, the same question the surf and the Tide
+ *      sheet ask (src/lib/tideSheetData.ts fetchMarine, through the weather
+ *      store: the spot on its 0.05° grid), so usually no new request at all
+ *      (Batch 3D, Section 3.3; the satellite function is gone);
  *   3  then the USGS gauges near (src/data/usgsWaterTemp.ts): site numbers
  *      only, from the phone (waterservices.usgs.gov sends CORS).
  *
@@ -19,7 +22,7 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import type { LatLon } from '../core/geo.ts'
-import { parseBuoyWater, parseCoopsWater, parseUsgsWater, nearestSst, pickWater, sitesNear, sstCell, STATION_KM, RIVER_KM, type SstGrid, type WaterReading, type WaterSite } from '../core/waterTemp.ts'
+import { modelSst, parseBuoyWater, parseCoopsWater, parseUsgsWater, pickWater, sitesNear, STATION_KM, RIVER_KM, type WaterReading, type WaterSite } from '../core/waterTemp.ts'
 import { postBuoy } from './buoy.ts'
 import { COOPS_URL } from './nearWind.ts'
 import { TIMEOUT_MS } from './forecast.ts'
@@ -27,7 +30,6 @@ import { placeKeyOf, resolveReach } from './placeMemory.ts'
 import { SURF_COAST_M } from './surfSetting.ts'
 import { NDBC_BUOYS } from '../data/ndbc.ts'
 
-export const SST_ENDPOINT = '/api/sst'
 export const USGS_IV_URL = 'https://waterservices.usgs.gov/nwis/iv/'
 export const WATER_KEY = 'scoutngo.waterTemp.v1'
 /** A kept reading older than this is not shown, even offline. */
@@ -92,6 +94,8 @@ export interface WaterDeps {
   buoy: (id: string) => Promise<Response>
   /** The map tiles' ocean within SURF_COAST_M: true, false, null when not known. */
   ocean: (at: LatLon) => Promise<boolean | null>
+  /** Open-Meteo Marine's hourly sea_surface_temperature at the spot (°C); null when it answered nothing, 'unreachable' when it could not be asked. */
+  sst: (at: LatLon) => Promise<{ times: readonly number[]; values: readonly (number | null)[] } | null | 'unreachable'>
   lists: () => Promise<{ coops: readonly (readonly [string, string, number, number])[]; buoys: readonly (readonly [string, number, number, string])[]; usgs: () => Promise<readonly (readonly [string, string, number, number])[]> }>
 }
 
@@ -101,10 +105,21 @@ async function defaultOcean(at: LatLon): Promise<boolean | null> {
   return m === undefined ? null : m !== null
 }
 
+async function defaultSst(at: LatLon): Promise<{ times: readonly number[]; values: readonly (number | null)[] } | null | 'unreachable'> {
+  const { fetchMarine } = await import('./tideSheetData.ts')
+  try {
+    const m = await fetchMarine(at)
+    return m === null ? null : { times: m.value.times, values: m.value.values.sea_surface_temperature ?? [] }
+  } catch {
+    return 'unreachable'
+  }
+}
+
 const DEFAULT_DEPS: WaterDeps = {
   fetchImpl: (...a) => fetch(...a),
   buoy: (id) => postBuoy(id),
   ocean: defaultOcean,
+  sst: defaultSst,
   lists: async () => {
     const { COOPS_WATER_TEMP } = await import('../data/coopsWaterTemp.ts')
     return { coops: COOPS_WATER_TEMP, buoys: NDBC_BUOYS, usgs: async () => (await import('../data/usgsWaterTemp.ts')).USGS_WATER_TEMP }
@@ -115,29 +130,6 @@ const DEFAULT_DEPS: WaterDeps = {
 export interface WaterAsked {
   reading: WaterReading | null
   answered: boolean
-}
-
-/* One satellite ask per half-degree cell per ASK_EVERY_MS: every spot and marker position in the cell reads the same grid. */
-const grids = new Map<string, { t: number; p: Promise<SstGrid | null | 'unreachable'> }>()
-
-function sstGrid(cell: LatLon, now: Date, fetchImpl: typeof fetch): Promise<SstGrid | null | 'unreachable'> {
-  const key = `${cell.lat},${cell.lon}`
-  const hit = grids.get(key)
-  if (hit !== undefined && now.getTime() - hit.t < ASK_EVERY_MS) return hit.p
-  const p = (async (): Promise<SstGrid | null | 'unreachable'> => {
-    try {
-      const r = await fetchImpl(SST_ENDPOINT, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(cell), signal: AbortSignal.timeout(20_000) })
-      const body = r.ok ? ((await r.json()) as { status?: string } & Partial<SstGrid>) : null
-      return body?.status === 'ok' && typeof body.day === 'string' && Array.isArray(body.rows) ? (body as SstGrid) : null
-    } catch {
-      return 'unreachable'
-    }
-  })()
-  grids.set(key, { t: now.getTime(), p })
-  void p.then((g) => {
-    if (g === 'unreachable' || g === null) grids.delete(key)
-  })
-  return p
 }
 
 export async function askWater(at: LatLon, now: Date, deps: WaterDeps = DEFAULT_DEPS): Promise<WaterAsked> {
@@ -162,16 +154,16 @@ export async function askWater(at: LatLon, now: Date, deps: WaterDeps = DEFAULT_
       }
     }),
   )
-  const first = pickWater({ ocean, stations: stationReadings, satellite: null, rivers: [] }, now)
+  const first = pickWater({ ocean, stations: stationReadings, model: null, rivers: [] }, now)
   if (first !== null) return { reading: first, answered }
 
-  let satellite: WaterReading | null = null
+  let model: WaterReading | null = null
   if (ocean === true) {
-    const grid = await sstGrid(sstCell(at), now, deps.fetchImpl)
-    if (grid !== 'unreachable') answered = true
-    if (grid !== 'unreachable' && grid !== null) satellite = nearestSst(grid, at)
+    const got = await deps.sst(at).catch(() => 'unreachable' as const)
+    if (got !== 'unreachable') answered = true
+    if (got !== 'unreachable' && got !== null) model = modelSst(got.times, got.values, at, now)
   }
-  const second = pickWater({ ocean, stations: stationReadings, satellite, rivers: [] }, now)
+  const second = pickWater({ ocean, stations: stationReadings, model, rivers: [] }, now)
   if (second !== null) return { reading: second, answered }
 
   const { rivers } = sitesNear(at, [], [], await lists.usgs(), RIVER_KM)
@@ -186,7 +178,7 @@ export async function askWater(at: LatLon, now: Date, deps: WaterDeps = DEFAULT_
       /* No gauge reading. */
     }
   }
-  return { reading: pickWater({ ocean, stations: stationReadings, satellite, rivers: riverReadings }, now), answered: answered || (stations.length === 0 && rivers.length === 0 && ocean !== true) }
+  return { reading: pickWater({ ocean, stations: stationReadings, model, rivers: riverReadings }, now), answered: answered || (stations.length === 0 && rivers.length === 0 && ocean !== true) }
 }
 
 /* ------------------------------------------------------------ the store */
@@ -222,7 +214,6 @@ export function waterAt(at: LatLon, now = new Date(), deps: WaterDeps = DEFAULT_
 /** For tests: forget what was asked. */
 export function forgetWater(): void {
   asked.clear()
-  grids.clear()
 }
 
 /** A moving marker asks once it has stopped this long. */

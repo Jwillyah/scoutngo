@@ -240,7 +240,7 @@ export function TideContent({ now, tide, data, venue, placeName, timeZone, units
           </p>
         </DCard>
         <DCard label="Water" className="dtide__tile">
-          {/* Batch FIX, Section 4: measured only (a station, the satellite, a river gauge), never the model's sea surface. */}
+          {/* Batch FIX, Section 4: one reading for every screen (src/lib/waterTemp.ts); Batch 3D, Section 3.3: Open-Meteo's model on the open sea with no station, said as a model. */}
           <WaterTile at={venue} unit={units.temperature} miles={units.distance === 'ft'} bigClass="dtide__big" lineClass="dtide__line" />
         </DCard>
       </div>
@@ -318,7 +318,7 @@ export function TideHow({ tide, units }: { tide: TideInfo; data: TideSheetData; 
         </>
       )}
       <p>Spring or neap: from the moon’s phase (suncalc) and this station’s own table. Within {SPRING_WITHIN} of a cycle (about 3 days) of a new or full moon, and today’s range at least {SPRING_OVER} times the station’s typical day (the median day over NOAA’s month), is spring; a half moon and a smaller day than typical, neap. Without a month of the station’s turns, neither is said.</p>
-      <p>Water temperature: measured only. The nearest NOAA station or buoy within 15 km (CO-OPS, NDBC); on the open sea with none that close, NASA’s MUR satellite analysis from the day before (NOAA CoastWatch); else a USGS river gauge within 5 km. Never worked out from the air. Each with its distance and age.</p>
+      <p>Water temperature: measured first. The nearest NOAA station or buoy within 15 km (CO-OPS, NDBC); on the open sea with none that close, Open-Meteo Marine’s model for this hour, said as a model, not measured; else a USGS river gauge within 5 km. Never worked out from the air. Each with its source, and a measurement with its distance and age.</p>
       <p>Wetsuit: the thickness chart wetsuit makers print. A convention; brands differ by a few degrees.</p>
       <p>
         Mirror mornings: a low within {LOW_NEAR_SUNRISE_MIN} min of sunrise, and wind at sunrise under {formatWind(GLASSY_MPS, units.wind)} or offshore (Open-Meteo, 16 days).

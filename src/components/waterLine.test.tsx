@@ -37,10 +37,11 @@ describe('the water line', () => {
 })
 
 describe('the Tide page tile', () => {
-  it('the number big, the suit and the source under it', () => {
+  it('the number big, the suit, and the source on a line of its own that may wrap (Batch 3D, Section 3.3: it was cut)', () => {
     const html = renderToStaticMarkup(<WaterTile at={VB} unit="F" miles bigClass="dtide__big" lineClass="dtide__line" state={{ status: 'ok', reading: SEWELLS, kept: false }} />)
     expect(html).toContain('>58°F<')
-    expect(html).toContain('4/3 typical · Sewells Point · 6 mi · 20 min ago')
+    expect(html).toContain('<p class="dtide__line">4/3 typical</p>')
+    expect(html).toContain('<p class="dtide__line dtide__line--src">Sewells Point · 6 mi · 20 min ago</p>')
   })
   it('a dash and the words when nothing is measured near', () => {
     const html = renderToStaticMarkup(<WaterTile at={VB} unit="F" miles bigClass="b" lineClass="l" state={{ status: 'none' }} />)

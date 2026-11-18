@@ -175,17 +175,6 @@ export const CREDITS: readonly Credit[] = [
     link: 'https://www.ndbc.noaa.gov/disclaimer.shtml',
   },
   {
-    name: 'NASA JPL MUR sea surface temperature, through NOAA CoastWatch ERDDAP',
-    hosts: ['this app (/api/sst)'],
-    use: 'Satellite water temperature on the open sea, where no station is within 15 km',
-    license: 'NASA data, free to use; citation asked',
-    attribution: 'JPL MUR MEaSUREs Project, GHRSST Level 4 MUR Global Foundation SST Analysis v4.1 (PO.DAAC), served by NOAA CoastWatch',
-    key: 'No',
-    rate: 'None published',
-    status: 'ok',
-    link: 'https://podaac.jpl.nasa.gov/dataset/MUR-JPL-L4-GLOB-v4.1',
-  },
-  {
     name: 'USGS Water Services (river gauges)',
     hosts: ['waterservices.usgs.gov'],
     use: 'River and estuary water temperature at gauges within 5 km',

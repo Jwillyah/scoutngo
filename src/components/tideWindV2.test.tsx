@@ -71,7 +71,7 @@ describe('TideContent', () => {
     expect(html).toContain('Range today')
     expect(html).toContain('>3.6 ft<')
     expect(html).toMatch(/moon \d+%/)
-    /* Batch FIX, Section 4: the Water tile is measured only; the model's 16 °C sea surface (61°F) is never said. */
+    /* Batch FIX, Section 4: the Water tile is the one reading (src/lib/waterTemp.ts), never the Tide sheet's own sea series (16 °C, 61°F). */
     expect(html).toContain('asking the nearest stations')
     expect(html).not.toContain('61°F')
   })
@@ -105,7 +105,9 @@ describe('TideHow', () => {
     expect(html).toContain('NOAA 8639348, Sandbridge')
     expect(html).toContain('MLLW')
     expect(html).toContain('Predictions, not observations')
-    expect(html).toContain('Water temperature: measured only')
+    /* Batch 3D, Section 3.3: Open-Meteo's model on the open sea with no station within 15 km, said as one. */
+    expect(html).toContain('Water temperature: measured first')
+    expect(html).toContain('said as a model, not measured')
     expect(html).toContain('Never worked out from the air')
     expect(html.replace(/<[^>]+>/g, ' ')).not.toMatch(BANNED)
   })
