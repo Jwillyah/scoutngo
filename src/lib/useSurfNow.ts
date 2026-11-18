@@ -13,7 +13,7 @@ import { useEffect, useMemo, useSyncExternalStore } from 'react'
 import { distanceMeters, type LatLon } from '../core/geo.ts'
 import { spotKey, spotStats, type SpotStats } from '../core/spotSkill.ts'
 import { BEACH_CAP } from '../core/surf.ts'
-import { callBand, surfCall, type SurfCall } from '../core/surfCall.ts'
+import { surfBand, surfCall, type SurfCall } from '../core/surfCall.ts'
 import { buoySeaKinds } from '../core/surfTransform.ts'
 import { obsFresh, type StationObs } from '../core/nowcast.ts'
 import { sideWords } from '../core/homeDay.ts'
@@ -68,7 +68,7 @@ export interface SurfDay {
 export const sideWord = (h: RangeHour): string | null => (h.side === null ? null : sideWords(h.side))
 
 /** surfCall(spot, time): one hour of one spot, called (Batch TRUTH, Section 1). */
-export const callOf = (h: RangeHour | null, dayIndex: number): SurfCall | null => (h === null ? null : surfCall({ centerFt: h.centerFt, highFt: h.range.highFt, shape: h.shape, side: sideWord(h), chop: h.chop }, dayIndex))
+export const callOf = (h: RangeHour | null, dayIndex: number): SurfCall | null => (h === null ? null : surfCall({ centerFt: h.centerFt, shape: h.shape, side: sideWord(h), chop: h.chop }, dayIndex))
 
 /**
  * THE SEA NOW, ONE SOURCE (Batch QA, Section 0B; field 10 Nov: one Surf page
@@ -103,7 +103,7 @@ export function seaNow(sea: SurfSea, now: Date, meanS: number | null = null): Se
 export function surfLine(sea: SurfSea, h: RangeHour | null, now: Date): string | null {
   if (h === null) return null
   const p = seaNow(sea, now, h.periodS).period
-  const [lo, hi] = callBand(h.centerFt, h.range.highFt)
+  const [lo, hi] = surfBand(h.centerFt)
   return [rangeSizeWords(lo, hi), p?.words ?? null].filter((x) => x !== null).join(' · ')
 }
 

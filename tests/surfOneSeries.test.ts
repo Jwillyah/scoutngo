@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { surfDayHours, surfHourOf, surfNowFrom, surfObs } from '../src/lib/useSurfNow.ts'
 import { buoyLean, dayHours } from '../src/lib/surfPageData.ts'
-import { callBand } from '../src/core/surfCall.ts'
+import { surfBand } from '../src/core/surfCall.ts'
 import { surfCallLine } from '../src/core/markerReadout.ts'
 import { spotStats } from '../src/core/spotSkill.ts'
 import { venueToday } from '../src/core/eventDay.ts'
@@ -44,7 +44,7 @@ describe('home, Surf page, map readout and week: one call for the hour', () => {
     const at = pts.find((h) => h.at.getTime() === half.getTime())
     expect(at).toBeDefined()
     expect(at?.centerFt).toBe(read.now?.centerFt)
-    const [lo, hi] = callBand(at?.centerFt ?? -1, at?.range.highFt ?? null)
+    const [lo, hi] = surfBand(at?.centerFt ?? -1)
     expect(`${lo}–${hi} ft`).toBe(words)
   })
 

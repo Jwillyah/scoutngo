@@ -30,27 +30,8 @@ export function surfBand(centerFt: number): [number, number] {
   return [lo, lo + 2]
 }
 
-/*
- * AT A BOUNDARY, THE LIKELY RANGE PICKS (Batch FIX, Section 3.2; 14 Nov 4:30
- * PM read 0.97 ft and said 0-1 while the beach had 1-2,
- * measurements/2026-11-16-surf-transform.md). A centre within BOUNDARY_FT
- * under a whole foot takes the band above when the likely range's top
- * reaches that foot; 0.03 ft is not a reading the forecast can make.
- */
-export const BOUNDARY_FT = 0.1
-
-/** The band for a centre and its likely range's top (null: the centre alone, surfBand). */
-export function callBand(centerFt: number, highFt: number | null = null): [number, number] {
-  const c = Number.isFinite(centerFt) ? Math.max(0, centerFt) : 0
-  const up = Math.floor(c) + 1
-  if (highFt !== null && Number.isFinite(highFt) && up - c <= BOUNDARY_FT + 1e-9 && highFt >= up) return surfBand(up)
-  return surfBand(c)
-}
-
 export interface SurfHourIn {
   centerFt: number
-  /** The likely range's top, feet (src/core/spotSkill.ts SurfRange): picks the band at a boundary (callBand); absent, the centre alone. */
-  highFt?: number | null
   shape: SurfShape | null
   /** The wind to the beach in words, "offshore", "cross-offshore"; null when not known. */
   side: string | null
@@ -124,7 +105,7 @@ export const SHAPE_WORD: Record<SurfShape, string> = { Clean: 'clean', Bumpy: 'b
 
 export function surfCall(h: SurfHourIn | null, dayIndex: number): SurfCall | null {
   if (h === null || !Number.isFinite(h.centerFt)) return null
-  const [lowFt, highFt] = callBand(h.centerFt, h.highFt ?? null)
+  const [lowFt, highFt] = surfBand(h.centerFt)
   return {
     lowFt,
     highFt,

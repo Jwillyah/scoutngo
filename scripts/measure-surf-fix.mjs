@@ -21,6 +21,8 @@
  *         NOAA CO-OPS 8638999 Cape Henry wind, 12-17 Nov)
  * Writes: measurements/2026-11-17-surf-fix-before.md (label=before)
  *         measurements/2026-11-17-surf-fix.md (before → after, per day)
+ *         measurements/2026-11-17-surf-noboundary.md (label=noboundary: Batch 3D,
+ *         Section 3.1, the boundary rule dropped, against surf-fix.md's columns)
  *
  * The buoys: what NDBC had posted BUOY_LAG_MIN before the look; 44099 the
  * nearest, 44014 and 44100 its check. The station: Cape Henry's reading
@@ -136,6 +138,23 @@ const run = `Run: node scripts/measure-surf-fix.mjs${LABEL === 'after' ? '' : ` 
 if (LABEL === 'before') {
   const out = ['# The surf call, 12-17 Nov: before (Batch FIX, Section 3)', '', run, '', 'The code before Batch FIX Section 3 takes no station: its model and station columns are the same call.', '', '| hour | place | call |', '|---|---|---|', ...rows.map((r) => `| ${r.key} | ${r.model} |`), '', '## Week from 17 Nov 7:05 AM, VB', '', ...notes]
   writeFileSync('measurements/2026-11-17-surf-fix-before.md', out.join('\n') + '\n')
+  console.log(out.join('\n'))
+} else if (LABEL === 'noboundary') {
+  /* Batch 3D, Section 3.1: the boundary rule (Batch FIX 3.2) dropped; compared with the FIX run, which had it. */
+  const fixFile = 'measurements/2026-11-17-surf-fix.md'
+  if (!existsSync(fixFile)) throw new Error(`${fixFile} is missing`)
+  const fix = new Map(readFileSync(fixFile, 'utf8').split('\n').filter((l) => l.startsWith('| Nov')).map((l) => {
+    const c = l.split(' | ')
+    return [`${c[0].slice(2)} | ${c[1]}`, { model: c[3], obs: c[4] }]
+  }))
+  const out = ['# The surf call, 12-17 Nov: the boundary rule dropped (Batch 3D, Section 3.1)', '', run, '', `With the rule: ${fixFile} (Batch FIX, Section 3.2's callBand, the same script and data).`, '', 'Truth: 12 and 13 Nov Flat; 14 Nov 1-4 PM VB 1-2, Croatan 1-2, 1st St Jetty 2-3 (Surfline cams 3:13 PM); 16 Nov 10:50 knee to thigh everywhere, Croatan the only one okay, wind-chopped (N 10-14 kt); 17 Nov 7:05 1st St 0-1 shin to knee, N 13 g15.', '']
+  for (const [label] of SLOTS) {
+    out.push(`## ${label}`, '', '| hour | place | with the rule, station | without, model wind | without, with the station | wind sea dominates |', '|---|---|---|---|---|---|')
+    for (const r of rows.filter((x) => x.key.startsWith(`${label},`))) out.push(`| ${r.key} | ${fix.get(r.key)?.obs ?? '—'} | ${r.model} | ${r.obs} | ${r.dominant === null ? '—' : r.dominant ? 'yes' : 'no'} |`)
+    out.push('')
+  }
+  out.push('## Week from 17 Nov 7:05 AM, VB (with the station)', '', ...notes, '')
+  writeFileSync('measurements/2026-11-17-surf-noboundary.md', out.join('\n'))
   console.log(out.join('\n'))
 } else {
   const beforeFile = 'measurements/2026-11-17-surf-fix-before.md'

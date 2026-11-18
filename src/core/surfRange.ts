@@ -15,7 +15,7 @@
  * and this spot's own error against the buoy, combined there.
  */
 import type { SurfRange } from './spotSkill.ts'
-import { callBand, surfBand } from './surfCall.ts'
+import { surfBand } from './surfCall.ts'
 
 /*
  * WHERE THE SPREAD COMES FROM. Open-Meteo Marine is one model (its best
@@ -48,8 +48,8 @@ export function rangeEnds(lowFt: number, highFt: number): [number, number] {
 
 /** A band in words; by its centre when it has one (a band clamped at 0 ft is not centred on its middle). */
 export function rangeWords(r: Pick<SurfRange, 'lowFt' | 'highFt'> & { centerFt?: number }, unit = 'ft'): string {
-  /* Batch FIX, Section 3.2: by the call's own band, the likely range's top picking at a boundary (callBand). */
-  const [lo, hi] = r.centerFt === undefined ? rangeEnds(r.lowFt, r.highFt) : callBand(r.centerFt, r.highFt)
+  /* Batch 3D, Section 3.1: by the centre's own band; the boundary rule (Batch FIX 3.2) is gone. */
+  const [lo, hi] = r.centerFt === undefined ? rangeEnds(r.lowFt, r.highFt) : surfBand(r.centerFt)
   return `${lo}–${hi}${unit === '' ? '' : ` ${unit}`}`
 }
 
