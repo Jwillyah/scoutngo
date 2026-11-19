@@ -29,7 +29,7 @@ let raw
 try {
   const response = await fetch(ENDPOINT, {
     method: 'POST',
-    headers: { 'content-type': 'text/plain;charset=UTF-8', 'user-agent': 'scoutngo-measure/1.0' },
+    headers: { 'content-type': 'text/plain;charset=UTF-8', 'user-agent': 'ScoutNGo (+https://github.com/Jwillyah/scoutngo)' },
     body: buildQuery({ west: box.west, south: box.south, east: box.east, north: box.north }),
     signal: AbortSignal.timeout(120_000),
   })

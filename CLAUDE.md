@@ -28,6 +28,12 @@ localStorage for what is yours (kit, spots, settings, saved forecasts); Cache
 Storage holds map tiles and the app shell, nothing about the user. No account,
 no database, no analytics, no telemetry.
 
+Nothing personal in a request, from the app, `api/` or any script, throwaway
+diagnosis scripts included: no email, no name, no username, no home path, in
+a User-Agent, any other header, a URL or a body. Where a service asks for
+identification, send `ScoutNGo (+https://github.com/Jwillyah/scoutngo)` and
+nothing else. `tests/requestIdentity.test.ts` holds the code to it.
+
 ## The gate
 
 `.githooks/pre-commit` runs, in order:

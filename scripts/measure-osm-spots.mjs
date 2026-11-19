@@ -43,7 +43,7 @@ async function fetchTile(t) {
     let r = null
     let text = ''
     for (const server of ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter']) {
-      r = await fetch(server, { method: 'POST', headers: { 'user-agent': 'scoutngo-measure (Batch NOW, measurements)', 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ data: osmQuery(t) }) }).catch(() => null)
+      r = await fetch(server, { method: 'POST', headers: { 'user-agent': 'ScoutNGo (+https://github.com/Jwillyah/scoutngo)', 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ data: osmQuery(t) }) }).catch(() => null)
       text = r === null ? '' : await r.text()
       if (r !== null && r.ok) break
       await new Promise((res) => setTimeout(res, 3000))

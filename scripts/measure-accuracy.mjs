@@ -121,7 +121,7 @@ const couldNot = []
 const say = (s) => console.log(s)
 
 async function getText(url) {
-  const r = await fetch(url, { headers: { 'User-Agent': 'scoutngo-measure-accuracy' } })
+  const r = await fetch(url, { headers: { 'User-Agent': 'ScoutNGo (+https://github.com/Jwillyah/scoutngo)' } })
   if (!r.ok) throw new Error(`HTTP ${r.status} from ${new URL(url).host}`)
   return r.text()
 }

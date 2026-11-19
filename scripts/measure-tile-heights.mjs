@@ -26,7 +26,7 @@ const PIER = { lat: 36.8435575, lon: -75.9713104 }
 const RADIUS = 600
 const box = boxAround(PIER, RADIUS)
 const query = `[out:json][timeout:60];way["building"](${box.south},${box.west},${box.north},${box.east});out center tags;`
-const res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: new URLSearchParams({ data: query }), headers: { 'User-Agent': 'ScoutNGo measure-tile-heights' } })
+const res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: new URLSearchParams({ data: query }), headers: { 'User-Agent': 'ScoutNGo (+https://github.com/Jwillyah/scoutngo)' } })
 if (!res.ok) {
   console.log(`=== TILE HEIGHTS ABORTED: Overpass answered ${res.status} ===`)
   process.exit(2)

@@ -21,7 +21,7 @@
 import { writeFileSync } from 'node:fs'
 
 const URL_ = 'https://511.vdot.virginia.gov/services/511/map/array/cameras'
-const r = await fetch(URL_, { headers: { 'user-agent': 'Mozilla/5.0', referer: 'https://511.vdot.virginia.gov/' } })
+const r = await fetch(URL_, { headers: { 'user-agent': 'ScoutNGo (+https://github.com/Jwillyah/scoutngo)', referer: 'https://511.vdot.virginia.gov/' } })
 const body = await r.json()
 const all = body.data ?? body.features ?? []
 const FACING = { NB: 0, N: 0, Northbound: 0, NE: 45, EB: 90, E: 90, Eastbound: 90, SE: 135, SB: 180, S: 180, Southbound: 180, SW: 225, WB: 270, W: 270, Westbound: 270, NW: 315 }

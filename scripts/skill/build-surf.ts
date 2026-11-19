@@ -40,7 +40,7 @@ const TZ = 'America/New_York'
 const KEEP_DAYS = 60
 const LEAD_DAYS = 3
 const MARINE = 'https://marine-api.open-meteo.com/v1/marine'
-const UA = { 'user-agent': 'scoutngo-surf-record (github.com/Jwillyah/scoutngo)' }
+const UA = { 'user-agent': 'ScoutNGo (+https://github.com/Jwillyah/scoutngo)' }
 
 const die = (why: string): never => {
   console.error(`\nFAILED: ${why}`)

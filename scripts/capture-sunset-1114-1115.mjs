@@ -23,7 +23,7 @@ import { firePathsUrl } from '../src/lib/skyFireData.ts'
 import { satSamples } from '../src/lib/goesNowcast.ts'
 
 const VB = { lat: 36.8, lon: -76.1 }
-const UA = { 'user-agent': 'scoutngo-replay (github.com/Jwillyah/scoutngo)', accept: 'application/geo+json' }
+const UA = { 'user-agent': 'ScoutNGo (+https://github.com/Jwillyah/scoutngo)', accept: 'application/geo+json' }
 const STAGES = { 'T-3h': 180, 'T-60': 60, 'T-30': 30 }
 for (const date of ['2026-11-14', '2026-11-15']) {
   const dir = `tests/data/sunset-${date}-vb-inland`

@@ -24,7 +24,7 @@ const { markNominatim } = await import('../src/lib/search.ts')
 
 const FIXTURE = new URL('../tests/fixtures/search-address.json', import.meta.url)
 const TOLERANCE = 150
-const UA = 'scoutngo-search-test/1.0 (fixture recording for tests/searchAddress.test.ts)'
+const UA = 'ScoutNGo (+https://github.com/Jwillyah/scoutngo)'
 const record = process.argv.includes('--record')
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 

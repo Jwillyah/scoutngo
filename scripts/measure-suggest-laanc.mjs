@@ -91,7 +91,7 @@ async function overpass(query) {
     try {
       const response = await fetch(ENDPOINT, {
         method: 'POST',
-        headers: { 'content-type': 'text/plain;charset=UTF-8', 'user-agent': 'scoutngo-measure/1.0' },
+        headers: { 'content-type': 'text/plain;charset=UTF-8', 'user-agent': 'ScoutNGo (+https://github.com/Jwillyah/scoutngo)' },
         body: query,
         signal: AbortSignal.timeout(60_000),
       })

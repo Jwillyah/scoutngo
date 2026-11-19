@@ -54,7 +54,7 @@ async function get(url: string, what: string, tries = 3): Promise<Response> {
   let last = ''
   for (let i = 0; i < tries; i += 1) {
     try {
-      const r = await fetch(url, { signal: AbortSignal.timeout(120_000), headers: { 'user-agent': 'scoutngo-model-skill (github.com/Jwillyah/scoutngo)' } })
+      const r = await fetch(url, { signal: AbortSignal.timeout(120_000), headers: { 'user-agent': 'ScoutNGo (+https://github.com/Jwillyah/scoutngo)' } })
       if (r.ok) return r
       last = `HTTP ${r.status}`
     } catch (e) {

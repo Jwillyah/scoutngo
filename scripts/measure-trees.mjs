@@ -16,7 +16,7 @@ import { treesQuery, TREE_BOX_METERS, SPARSE_TREES } from '../src/lib/trees.ts'
 
 const at = { lat: Number(CALIBRATION_VENUE.latitude), lon: Number(CALIBRATION_VENUE.longitude) }
 const query = treesQuery(at)
-const res = await fetch(OVERPASS_URL, { method: 'POST', body: new URLSearchParams({ data: query }), headers: { 'User-Agent': 'ScoutNGo measurement (github.com/Jwillyah/scoutngo)' } })
+const res = await fetch(OVERPASS_URL, { method: 'POST', body: new URLSearchParams({ data: query }), headers: { 'User-Agent': 'ScoutNGo (+https://github.com/Jwillyah/scoutngo)' } })
 if (!res.ok) {
   console.log(`could not look: Overpass answered ${res.status}`)
   process.exit(2)
