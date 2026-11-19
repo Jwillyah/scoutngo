@@ -14,7 +14,10 @@
  *   page 1    "Color tonight · sunset 4:57 PM", a dot per page, the imagery (at most 16
  *             tiles), the wash, pin 1 Lynnhaven Inlet, the sheet's "Best:"
  *             and its word, the four radii
- *   home row  "Better color 8 mi WNW · Lynnhaven Inlet · 5:02 PM ›" opens it
+ *   cold home asks the grid nothing and shows no row; the page opens from
+ *             Sky › Where's the color?
+ *   home row  after the page, "Better color 8 mi WNW · Lynnhaven Inlet · 5:02 PM ›"
+ *             from the kept answer opens it, and the page asks nothing again
  *   page 2    "Best 8 mi WNW", three ranked rows with Lynnhaven Inlet first,
  *             where you are, Show on map, Remind me (in Chromium the file
  *             it hands over: the event, its alarm, no coordinate)
@@ -126,11 +129,19 @@ try {
       continue
     }
     // <open>
-    /* Section 4: the home's row, when somewhere near beats here, opens the page. */
-    const row = await ev(`document.querySelector('.home__page[aria-label="Today"] [data-better]')?.textContent ?? null`)
-    console.log(`  home row: ${JSON.stringify(row)}`)
-    if (!/^Better color \d+ mi [NESW]+ · Lynnhaven Inlet · \d+:\d\d [AP]M ›$/.test(row ?? '')) fail(`${label}: the home's row reads ${JSON.stringify(row)}`)
-    if (!(await tap('.home__page[aria-label="Today"] [data-better]'))) fail(`${label}: the home's row does not open the page`)
+    /*
+     * 18 Nov (src/lib/bestSkyKept.ts): the home never asks the grid. A cold
+     * home has asked nothing and shows no row; the page is opened from the
+     * Sky page, and only then does the home's row read the kept answer.
+     */
+    const coldAsked = asked.length
+    const coldRow = await ev(`document.querySelector('.home__page[aria-label="Today"] [data-better]')?.textContent ?? null`)
+    console.log(`  cold home: grid questions ${coldAsked}, row ${JSON.stringify(coldRow)}`)
+    if (coldAsked !== 0) fail(`${label}: the home asked the grid ${coldAsked} times before Best Sky was opened`)
+    if (coldRow !== null) fail(`${label}: the cold home shows a Best Sky row with nothing kept: ${JSON.stringify(coldRow)}`)
+    if (!(await tap('.home__page[aria-label="Today"] .hcard--sky, .home__page[aria-label="Today"] [data-colornow]'))) fail(`${label}: the home's Sky card did not open`)
+    await wait(2500)
+    if (!(await tap('.spage__bestsky'))) fail(`${label}: the Sky page's "Where's the color?" did not open`)
     // </open>
     await wait(5000)
     if (!(await ev(`!!document.querySelector('.bsky')`))) {
@@ -241,6 +252,18 @@ try {
     await page.locator('.bsky .ppage__back').click()
     await wait(800)
     if (await ev(`!!document.querySelector('.bsky')`)) fail(`${label}: Back left the page open`)
+    /* Section 4's home row, now from the page's kept answer (src/lib/bestSkyKept.ts): it reads, it opens the page, and the page asks nothing again inside the 30 minutes. */
+    await page.locator('.ppage__back').first().click({ timeout: 4000 }).catch(() => {})
+    await wait(1500)
+    const row = await ev(`document.querySelector('.home__page[aria-label="Today"] [data-better]')?.textContent ?? null`)
+    console.log(`  home row, kept: ${JSON.stringify(row)}`)
+    if (!/^Better color \d+ mi [NESW]+ · Lynnhaven Inlet · \d+:\d\d [AP]M ›$/.test(row ?? '')) fail(`${label}: after the page, the home's row reads ${JSON.stringify(row)}`)
+    const keptBefore = asked.length
+    if (!(await tap('.home__page[aria-label="Today"] [data-better]'))) fail(`${label}: the home's row does not open the page`)
+    await wait(3000)
+    if (!(await ev(`!!document.querySelector('.bsky')`))) fail(`${label}: the home's row did not open "Where's the color?"`)
+    console.log(`  reopened from the row: grid questions ${asked.length - keptBefore}`)
+    if (asked.length !== keptBefore) fail(`${label}: reopened inside 30 minutes, the page asked the grid ${asked.length - keptBefore} times, not kept`)
     await ctx.close()
     watchdog.note(label)
   }

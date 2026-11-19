@@ -16,6 +16,7 @@ import { fetchGrid } from './bestSkyData.ts'
 import { fetchOsmSpots } from './bestSkyOsm.ts'
 import { dedupeSpots } from '../core/osmSpots.ts'
 import type { Drift } from '../core/satDrift.ts'
+import { keepBestSky, keptGot, placeKey } from './bestSkyKept.ts'
 
 export interface BestSkyEvent {
   kind: 'sunrise' | 'sunset'
@@ -86,6 +87,12 @@ export function useBestSky(spot: LatLon | null, radius: RadiusMi, now: Date, sav
   }, [key]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (key === null || spot === null || event === null) return
+    /* Kept 30 minutes (src/lib/bestSkyKept.ts): a second opening inside it asks nothing. */
+    const kept = keptGot(placeKey(spot, event.at), radius, Date.now())
+    if (kept !== null) {
+      setGot({ key, ...kept }) // oxlint-disable-line react/set-state-in-effect -- the kept answer, read once per key
+      return
+    }
     let live = true
     void Promise.all([fetchGrid(spot, radius, event.at), stationNow(spot, Date.now()).catch(() => null)])
       .then(([g, st]) => {
@@ -102,7 +109,7 @@ export function useBestSky(spot: LatLon | null, radius: RadiusMi, now: Date, sav
       live = false
     }
   }, [key]) // eslint-disable-line react-hooks/exhaustive-deps
-  return useMemo((): BestSky => {
+  const result = useMemo((): BestSky => {
     if (got === null || got.key !== key || spot === null || event === null) return { status: 'loading', event, grid: [], ranked: [], here: null, asked: 0, satAt: null, satAsked: false, drift: null }
     const rKm = radius * 1.609344
     const starter = STARTER_SPOTS.filter((s) => distanceMeters(spot, s.at) / 1000 <= rKm)
@@ -114,6 +121,11 @@ export function useBestSky(spot: LatLon | null, radius: RadiusMi, now: Date, sav
     ]
     return { status: got.failed ? 'failed' : 'ok', event, grid: got.grid, ranked: rankSpots(got.grid, spots, event.azimuth, spot), here: scoreAt(got.grid, spot), asked: got.asked, satAt: got.satAt, satAsked: got.satAsked, drift: got.drift, station: got.station }
   }, [got, key, spot, event, radius, saved, osm])
+  useEffect(() => {
+    if (got === null || got.key !== key || spot === null || event === null || result.status !== 'ok') return
+    keepBestSky(placeKey(spot, event.at), radius, got, result.ranked, result.here, Date.now())
+  }, [result]) // eslint-disable-line react-hooks/exhaustive-deps
+  return result
 }
 
 export const DEFAULT_RADIUS: RadiusMi = RADII_MI[1]

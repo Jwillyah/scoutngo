@@ -123,3 +123,12 @@ Options:
 - (b) land it again after the fix, as a fresh piece.
 
 **Picked: (b).** The rule is there to drop a piece that breaks the gate, and this one didn't. The patch stays in docs/batches/simple-section2-reverted.patch in case it is needed.
+
+## After the batch: Best Sky on its own page (Jwilly, 18 Nov)
+
+Jwilly's answer to the 4b decision: the grid is asked only when the Best Sky page is opened, and its answer is kept 30 minutes (src/lib/bestSkyKept.ts).
+
+- **A cold home open:** 14 requests and 223.6 billed calls before, 7 requests and 48.6 billed calls after (measurements/2026-11-18-bestsky-on-page.md).
+- **The home's "Better color" row** now shows only after the page has been opened in the last 30 minutes. It reads the kept answer and never asks. Before, every home open showed it when somewhere near beat here.
+- **The page reopened inside 30 minutes** asks nothing: no grid, no satellite, no station. The satellite line keeps the time of its frame, so a kept answer says how old it is.
+- **The Sky fire grid** on the Sky page is a separate question and is unchanged.
