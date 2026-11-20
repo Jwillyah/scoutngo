@@ -43,6 +43,19 @@ export interface EncodedParkUnit {
   rings: string[]
 }
 
+/**
+ * A National Wildlife Refuge (Batch SIMPLE-1, Section 3), baked by
+ * scripts/bake-refuges.mjs from the Fish and Wildlife Service's interest
+ * boundary. `simplify` is the generalisation applied to this refuge, degrees.
+ */
+export interface EncodedRefuge {
+  code: string
+  name: string
+  simplify: number
+  bbox: number[]
+  rings: string[]
+}
+
 interface Decoded {
   /** Flat [lon, lat, lon, lat, ...] per ring, degrees. */
   rings: number[][]
@@ -52,6 +65,7 @@ interface Decoded {
 export type SpecialUseArea = Omit<EncodedSpecialUse, 'rings' | 'bbox' | 'type'> &
   Decoded & { type: 'R' | 'P' }
 export type ParkUnit = Omit<EncodedParkUnit, 'rings' | 'bbox'> & Decoded
+export type RefugeUnit = Omit<EncodedRefuge, 'rings' | 'bbox'> & Decoded
 
 function decodeRings(rings: string[], bbox: number[], precision: number): Decoded {
   const out = rings.map((ring) => {
@@ -77,6 +91,10 @@ export function decodeSpecialUse(encoded: EncodedSpecialUse, precision: number):
 }
 
 export function decodeParkUnit(encoded: EncodedParkUnit, precision: number): ParkUnit {
+  return { ...encoded, ...decodeRings(encoded.rings, encoded.bbox, precision) }
+}
+
+export function decodeRefuge(encoded: EncodedRefuge, precision: number): RefugeUnit {
   return { ...encoded, ...decodeRings(encoded.rings, encoded.bbox, precision) }
 }
 
@@ -113,6 +131,11 @@ export function specialUseAt(areas: readonly SpecialUseArea[], at: LatLon): Spec
  * and the first version returned only the trail.
  */
 export function parkUnitsAt(units: readonly ParkUnit[], at: LatLon): ParkUnit[] {
+  return units.filter((u) => insideShape(u, at))
+}
+
+/** Every refuge over the point (Batch SIMPLE-1, Section 3). Pieces and holes by the same even-odd rule. */
+export function refugesAt(units: readonly RefugeUnit[], at: LatLon): RefugeUnit[] {
   return units.filter((u) => insideShape(u, at))
 }
 

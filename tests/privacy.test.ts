@@ -33,6 +33,8 @@ const LINK_ONLY: Readonly<Record<string, string>> = {
   'github.com': 'the source code, opened by you',
   'raw.githubusercontent.com': 'where a baked data file came from, in a comment',
   'services1.arcgis.com': 'where baked restriction data came from, in a comment',
+  /* Batch SIMPLE-1, Section 3: the FWS refuge boundaries are baked (scripts/bake-refuges.mjs); the phone never asks this host. */
+  'services.arcgis.com': 'where the baked wildlife refuge boundaries came from, in a comment',
   /* services6.arcgis.com is asked now (the Drone page's Airspace tab, src/lib/faaLiveData.ts), so it is on the hosts list, not here. */
   'www.faa.gov': 'the FAA’s LAANC page, opened by you (the app never issues LAANC)',
   'www.ndbc.noaa.gov': 'NOAA’s buoy pages, linked; the app reads buoys through /api/buoy',

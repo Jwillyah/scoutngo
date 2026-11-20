@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { airspaceCard, airspaceLead, detailLines, TODAY_LINE, type AirspaceAtPoint } from '../src/core/airspaceCard.ts'
 
 /* Batch TRUTH, Section 6: the sheet leads with one line; the 250 ft ceiling and today's restrictions said once. */
-const at = (over: Partial<AirspaceAtPoint>): AirspaceAtPoint => ({ classes: [], gridCeilingFeet: null, parks: [], specialUse: [], droneFeet: 400, ...over }) as AirspaceAtPoint
+const at = (over: Partial<AirspaceAtPoint>): AirspaceAtPoint => ({ classes: [], gridCeilingFeet: null, parks: [], refuges: [], specialUse: [], droneFeet: 400, ...over }) as AirspaceAtPoint
 
 describe('one line first', () => {
   it('"Controlled · LAANC up to 250 ft here"', () => {

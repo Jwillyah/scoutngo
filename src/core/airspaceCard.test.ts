@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { airspaceCard, CHECKED_NOTHING, TODAY_LINE } from './airspaceCard.ts'
 import type { ParkUnit, SpecialUseArea } from './restrictions.ts'
 
-const base = { classes: [], gridCeilingFeet: null, specialUse: [], parks: [], droneFeet: 200 }
+const base = { classes: [], gridCeilingFeet: null, specialUse: [], parks: [], refuges: [], droneFeet: 200 }
 const area = (over: Partial<SpecialUseArea>): SpecialUseArea => ({
   type: 'R',
   name: 'R-6604',

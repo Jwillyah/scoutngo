@@ -1,7 +1,7 @@
 import { ESRI_ATTRIBUTION } from '../lib/mapConstants.ts'
 import * as maplibregl from 'maplibre-gl'
 import { useEffect, useRef, useState } from 'react'
-import type { AirspaceAtPoint } from '../core/airspaceCard.ts'
+import { groundLines, type AirspaceAtPoint } from '../core/airspaceCard.ts'
 import { LAANC_URL, openingLayers, sheetSummary, type AirspaceRead, type AirToggle } from '../core/droneAirRead.ts'
 import { AIR_FOOT, AIR_SHEET } from '../core/safetyWords.ts'
 import { GOES_MAX_TILE_ZOOM } from '../core/goes.ts'
@@ -25,7 +25,8 @@ import { fetchRainMaps, frameFor, RAIN_MAX_ZOOM, RAIN_PROTOCOL, rainMaskProtocol
  * over the marker, in facts.
  *
  *   baked     class airspace, the facility map grid with its heights,
- *             restricted and prohibited areas, national parks: in the app,
+ *             restricted and prohibited areas, national parks and wildlife
+ *             refuges: in the app,
  *             nothing sent (src/lib/airspaceOverlay.ts)
  *   fetched   TFRs, national security UAS restrictions, FRIAs, heliports,
  *             warning, alert and military operations areas: whole national
@@ -58,7 +59,8 @@ const TOGGLES: readonly { key: ToggleKey; name: string; line: string; swatch: st
   { key: 'nofly', name: 'No-fly and security', line: 'Restricted, prohibited, national security', swatch: 'nofly' },
   { key: 'tfr', name: 'TFRs today', line: 'Temporary closures: events, VIPs, fires', swatch: 'tfr' },
   { key: 'sua', name: 'Special use', line: 'Military warning, alert and operations areas', swatch: 'sua' },
-  { key: 'parks', name: 'National parks', line: 'National Park Service land (no state or city parks)', swatch: 'parks' },
+  /* Batch SIMPLE-1, Section 3: the parks layer carries the National Wildlife Refuges too. */
+  { key: 'parks', name: 'Parks and local rules', line: 'National parks and wildlife refuges (no state or city parks)', swatch: 'parks' },
   { key: 'fria', name: 'FRIAs', line: 'Fly without a Remote ID broadcast inside', swatch: 'fria' },
   { key: 'heliport', name: 'Heliports', line: 'Low helicopters, from the FAA’s airport data', swatch: 'heliport' },
 ]
@@ -327,7 +329,8 @@ export function DroneAirspace({ spot, marker: markerAt, onMarker, here, read, ti
   if (controlled) lines.push({ text: `Controlled airspace: flying here needs an FAA authorization${ceiling === null ? '' : `; LAANC can approve up to ${ceiling} ft at this square`}.`, tone: 'note' })
   if (read?.facility != null) lines.push({ text: `Facility map: ${read.facility}${read.icao === null ? '' : ` (${read.icao})`}.`, tone: 'note' })
   for (const a of here?.specialUse ?? []) lines.push({ text: `${a.name}: ${a.type === 'P' ? 'prohibited' : 'restricted'} area.`, tone: 'hazard' })
-  for (const p of here?.parks ?? []) lines.push({ text: `${p.name}: no drone launch on National Park Service land.`, tone: 'hazard' })
+  /* Parks and refuges at the marker, in the sheet's words (src/core/airspaceCard.ts groundLines; Batch SIMPLE-1, Section 3). */
+  if (here !== null) lines.push(...groundLines(here))
   for (const a of at.nsufr ?? []) lines.push({ text: `National security UAS restriction: ${a.name}${a.detail === '' ? '' : ` (${a.detail})`}.`, tone: 'hazard' })
   for (const t of at.tfrsToday?.inside ?? []) lines.push({ text: `${t.name}: ${t.detail}.`, tone: 'hazard' })
   for (const a of at.sua ?? []) lines.push({ text: `${a.name}${a.detail === '' ? '' : `, ${a.detail}`}.`, tone: 'note' })

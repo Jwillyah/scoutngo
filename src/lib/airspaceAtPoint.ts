@@ -7,7 +7,7 @@
  */
 import type { AirspaceAtPoint } from '../core/airspaceCard.ts'
 import type { LatLon } from '../core/geo.ts'
-import { parkUnitsAt, specialUseAt } from '../core/restrictions.ts'
+import { parkUnitsAt, refugesAt, specialUseAt } from '../core/restrictions.ts'
 import { airspaceAnswer } from './airspace.ts'
 import { restrictions } from './restrictions.ts'
 import { facilityCellAt } from './uasfm.ts'
@@ -19,6 +19,8 @@ export async function airspaceAtPoint(at: LatLon, droneFeet: number): Promise<Ai
     gridCeilingFeet: facilityCellAt(at.lat, at.lon)?.ceilingFeet ?? null,
     specialUse: specialUseAt(closed.specialUse, at),
     parks: parkUnitsAt(closed.parks, at),
+    /* Batch SIMPLE-1, Section 3: the National Wildlife Refuges, baked beside the parks. */
+    refuges: refugesAt(closed.refuges, at),
     droneFeet,
   }
 }

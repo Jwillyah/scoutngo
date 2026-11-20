@@ -70,7 +70,7 @@ export function preflightRows(i: PreflightInput): PreflightRow[] {
   else if (i.air.controlled) {
     const ceiling = i.air.ceilingFt === null ? 'no grid ceiling here' : `ceiling ${i.air.ceilingFt} ft`
     out.push(row('airspace', 'Airspace', 'amber', `${i.air.cls === null ? 'Controlled' : `Class ${i.air.cls}`} · ${ceiling} · ${i.air.laanc ? 'LAANC needed' : 'FAA authorization needed'}`))
-  } else if (i.marked === null || i.marked > 0) out.push(row('airspace', 'Airspace', 'amber', i.marked === null ? 'Still reading the FAA data in the app' : 'A restricted area or park is over this point'))
+  } else if (i.marked === null || i.marked > 0) out.push(row('airspace', 'Airspace', 'amber', i.marked === null ? 'Still reading the FAA data in the app' : 'A restricted area, park or wildlife refuge is over this point'))
   else out.push(row('airspace', 'Airspace', 'green', i.air.ceilingFt === null ? 'No class airspace in the app’s data here' : `No class airspace in the app’s data · grid ${i.air.ceilingFt} ft`))
 
   /* Wind at 400 ft against the pilot's limit: the home's own line (limitRole). */

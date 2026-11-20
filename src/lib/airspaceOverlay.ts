@@ -21,6 +21,7 @@ export async function loadAirspaceOverlay(): Promise<AirspaceOverlay> {
       classShapes,
       specialUse: closed.specialUse,
       parks: closed.parks,
+      refuges: closed.refuges,
       ceilingAt: (lat, lon) => facilityCellAt(lat, lon)?.ceilingFeet ?? null,
       cellsPerDegree,
     })

@@ -7,7 +7,9 @@
  *   cell        the FAA facility map grid, one square per half arc-minute,
  *               carrying the ceiling LAANC can approve there.
  *   restricted  restricted (R) and prohibited (P) areas.
- *   park        National Park Service units: no drone launch inside.
+ *   park        National Park Service units: no drone launch inside; and
+ *               National Wildlife Refuges (Batch SIMPLE-1, Section 3), drawn
+ *               the same, tagged agency 'fws': drone use needs refuge permission.
  *
  * ONLY WHAT IS IN VIEW. Shapes are kept when their box meets the view; grid
  * squares are enumerated for the view and given up past MAX_GRID_CELLS rather
@@ -23,7 +25,7 @@
  */
 import type { AirspaceShape } from './airspaceLookup.ts'
 import type { LatLon, Position } from './geo.ts'
-import type { ParkUnit, SpecialUseArea } from './restrictions.ts'
+import type { ParkUnit, RefugeUnit, SpecialUseArea } from './restrictions.ts'
 
 export interface ViewBox {
   south: number
@@ -40,6 +42,8 @@ export interface AirspaceLayerInput {
   classShapes: readonly AirspaceShape[]
   specialUse: readonly SpecialUseArea[]
   parks: readonly ParkUnit[]
+  /** National Wildlife Refuges (Batch SIMPLE-1, Section 3). */
+  refuges: readonly RefugeUnit[]
   /** The facility map ceiling at a point, in feet above ground, or null with no square there. */
   ceilingAt: (lat: number, lon: number) => number | null
   /** The grid's own squares per degree, read from the baked grid rather than restated here. */
@@ -147,6 +151,9 @@ export function airspaceLayer(input: AirspaceLayerInput): AirspaceLayer {
   }
   for (const park of input.parks) {
     if (meets(park.bbox, view)) features.push(...outline(park.rings, { kind: 'park' }))
+  }
+  for (const refuge of input.refuges) {
+    if (meets(refuge.bbox, view)) features.push(...outline(refuge.rings, { kind: 'park', agency: 'fws' }))
   }
 
   const per = input.cellsPerDegree

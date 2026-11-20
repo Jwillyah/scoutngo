@@ -17,7 +17,7 @@ const view = { south: 36.84, west: -76.0, north: 36.85, east: -75.99 }
 describe('the airspace overlay for one view', () => {
   it('outlines a shape in view, closes its ring, and leaves out one that is not', () => {
     const far: AirspaceShape = { ...classD, name: 'Far', bbox: [-80, 30, -79.9, 30.1], rings: [square(-80, 30, -79.9, 30.1)] }
-    const out = airspaceLayer({ view, classShapes: [classD, far], specialUse: [], parks: [], ceilingAt: () => null, cellsPerDegree: 120 })
+    const out = airspaceLayer({ view, classShapes: [classD, far], specialUse: [], parks: [], refuges: [], ceilingAt: () => null, cellsPerDegree: 120 })
     const classes = out.collection.features.filter((f) => f.properties?.kind === 'class' && f.properties.draw === 'line')
     expect(classes).toHaveLength(1)
     const line = (classes[0].geometry as GeoJSON.MultiLineString).coordinates[0]
@@ -30,6 +30,7 @@ describe('the airspace overlay for one view', () => {
       classShapes: [],
       specialUse: [],
       parks: [],
+      refuges: [],
       ceilingAt: (lat) => (lat > 36.845 ? 200 : null),
       cellsPerDegree: 120,
     })
@@ -46,7 +47,7 @@ describe('the airspace overlay for one view', () => {
 
   it('says the grid was left out when the view is too wide, rather than drawing nothing silently', () => {
     const wide = { south: 36, west: -77, north: 37, east: -76 }
-    const out = airspaceLayer({ view: wide, classShapes: [], specialUse: [], parks: [], ceilingAt: () => 100, cellsPerDegree: 120 })
+    const out = airspaceLayer({ view: wide, classShapes: [], specialUse: [], parks: [], refuges: [], ceilingAt: () => 100, cellsPerDegree: 120 })
     expect(120 * 120).toBeGreaterThan(MAX_GRID_CELLS)
     expect(out.gridTooDense).toBe(true)
     expect(out.gridLabels).toHaveLength(0)

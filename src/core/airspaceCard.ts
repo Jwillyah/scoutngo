@@ -11,7 +11,7 @@
  * today's temporary restrictions were not, every time, because an empty
  * answer is a statement about a dated, generalised extract.
  */
-import { floorReaches, type ParkUnit, type SpecialUseArea } from './restrictions.ts'
+import { floorReaches, type ParkUnit, type RefugeUnit, type SpecialUseArea } from './restrictions.ts'
 
 export type CardTone = 'hazard' | 'authorization' | 'note'
 
@@ -29,6 +29,8 @@ export interface AirspaceAtPoint {
   specialUse: readonly SpecialUseArea[]
   /** Every park unit over the point. Units overlap: a scenic trail runs through a park. */
   parks: readonly ParkUnit[]
+  /** Every National Wildlife Refuge over the point (Batch SIMPLE-1, Section 3). */
+  refuges: readonly RefugeUnit[]
   /** The height the card is judged at, for whether an area's floor reaches it. */
   droneFeet: number
 }
@@ -51,7 +53,39 @@ export const CHECKED_NOTHING = 'Nothing the app holds is marked at this point. T
 
 export const CHECKED_DETAIL =
   'Checked against the FAA class airspace, facility map grid and special use airspace, ' +
-  'and the National Park Service boundaries, all baked into the app and generalized at their edges.'
+  'the National Park Service boundaries and the National Wildlife Refuge boundaries, all baked into the app ' +
+  'and generalized at their edges. State, county and city park rules are not in the app.'
+
+/*
+ * A NATIONAL WILDLIFE REFUGE (Batch SIMPLE-1, Section 3). The brief's words,
+ * after the refuge's name: "Great Dismal Swamp · National Wildlife Refuge ·
+ * drone use needs refuge permission". A name that does not end in the words
+ * keeps its own ("National Elk Refuge · National Wildlife Refuge · ...": it is
+ * a unit of the refuge system all the same).
+ */
+export const REFUGE_RULE = 'National Wildlife Refuge · drone use needs refuge permission'
+export const REFUGE_DETAIL =
+  'Operating an aircraft on a national wildlife refuge without the refuge’s authorization is prohibited ' +
+  '(50 CFR 27.34), and the Fish and Wildlife Service counts a drone as one. Ask the refuge for a special use permit. ' +
+  'The boundary is the land the Service holds, generalized at its edges.'
+
+export function refugeLine(refuge: Pick<RefugeUnit, 'name'>): string {
+  const stem = refuge.name.replace(/\s+National Wildlife Refuge$/i, '').trim()
+  return `${stem === '' ? refuge.name : stem} · ${REFUGE_RULE}`
+}
+
+/**
+ * THE GROUND UNDER THE MARKER, for the Drone page's Airspace sheet ("Parks
+ * and local rules"): every park unit and every refuge at the point, in the
+ * sheet's words. Pure, so the sheet's lines are tested from the lookup's
+ * answer (tests/refugeLine.test.ts).
+ */
+export function groundLines(at: Pick<AirspaceAtPoint, 'parks' | 'refuges'>): { text: string; tone: 'hazard' }[] {
+  return [
+    ...at.parks.map((p) => ({ text: `${p.name}: no drone launch on National Park Service land.`, tone: 'hazard' as const })),
+    ...at.refuges.map((r) => ({ text: refugeLine(r), tone: 'hazard' as const })),
+  ]
+}
 
 /** Every card ends with this (Batch SIMPLE-1, Section 1: the TFR count itself is src/core/tfrLine.ts's, where a place and a fetch are in hand; this is the static close). */
 export const TODAY_LINE: CardLine = {
@@ -76,6 +110,8 @@ export function airspaceCard(at: AirspaceAtPoint): CardLine[] {
         '(National Park Service policy memorandum 14-05).',
     })
   }
+
+  for (const refuge of at.refuges) lines.push({ tone: 'hazard', text: refugeLine(refuge), detail: REFUGE_DETAIL })
 
   for (const area of at.specialUse) {
     const reach = floorReaches(area, at.droneFeet)
