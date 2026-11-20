@@ -1,0 +1,642 @@
+{
+  "2026-11-19 Moon Set 01:10": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-19&time=06:10&coords=36.92,-76.10",
+    "utc": "2026-11-19T06:10:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": -3.330154,
+        "gha": 163.352112,
+        "hc": 0.193022,
+        "zn": 265.687794
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Moon"
+    }
+  },
+  "2026-11-19 Moon Rise 13:44": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-19&time=18:44&coords=36.92,-76.10",
+    "utc": "2026-11-19T18:44:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": -0.187067,
+        "gha": 346.363758,
+        "hc": 0.098495,
+        "zn": 90.307995
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Moon"
+    }
+  },
+  "2026-11-19 Sun Rise 06:47": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-19&time=11:47&coords=36.92,-76.10",
+    "utc": "2026-11-19T11:47:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": -19.522428,
+        "gha": 0.404046,
+        "hc": -0.834856,
+        "zn": 114.022133
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Sun"
+    }
+  },
+  "2026-11-19 Sun Set 16:52": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-19&time=21:52&coords=36.92,-76.10",
+    "utc": "2026-11-19T21:52:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": -19.618889,
+        "gha": 151.630132,
+        "hc": -0.774871,
+        "zn": 245.804303
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Sun"
+    }
+  },
+  "2026-11-20 Moon Set 02:14": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-20&time=07:14&coords=36.92,-76.10",
+    "utc": "2026-11-20T07:14:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": 2.995326,
+        "gha": 168.302123,
+        "hc": 0.040766,
+        "zn": 273.716886
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Moon"
+    }
+  },
+  "2026-11-20 Moon Rise 14:09": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-20&time=19:09&coords=36.92,-76.10",
+    "utc": "2026-11-20T19:09:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": 6.049975,
+        "gha": 341.614791,
+        "hc": 0.065266,
+        "zn": 82.474031
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Moon"
+    }
+  },
+  "2026-11-20 Sun Rise 06:48": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-20&time=11:48&coords=36.92,-76.10",
+    "utc": "2026-11-20T11:48:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": -19.750457,
+        "gha": 0.596123,
+        "hc": -0.839017,
+        "zn": 114.31321
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Sun"
+    }
+  },
+  "2026-11-20 Sun Set 16:52": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-20&time=21:52&coords=36.92,-76.10",
+    "utc": "2026-11-20T21:52:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": -19.844259,
+        "gha": 151.570858,
+        "hc": -0.874357,
+        "zn": 245.594503
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Sun"
+    }
+  },
+  "2026-11-21 Moon Set 03:20": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-21&time=08:20&coords=36.92,-76.10",
+    "utc": "2026-11-21T08:20:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": 9.410782,
+        "gha": 173.148071,
+        "hc": 0.082755,
+        "zn": 281.738118
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Moon"
+    }
+  },
+  "2026-11-21 Moon Rise 14:37": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-21&time=19:37&coords=36.92,-76.10",
+    "utc": "2026-11-21T19:37:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": 12.232107,
+        "gha": 336.871027,
+        "hc": 0.112444,
+        "zn": 74.719756
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Moon"
+    }
+  },
+  "2026-11-21 Sun Rise 06:49": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-21&time=11:49&coords=36.92,-76.10",
+    "utc": "2026-11-21T11:49:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": -19.972493,
+        "gha": 0.784889,
+        "hc": -0.842293,
+        "zn": 114.597509
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Sun"
+    }
+  },
+  "2026-11-21 Sun Set 16:51": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-21&time=21:51&coords=36.92,-76.10",
+    "utc": "2026-11-21T21:51:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": -20.063454,
+        "gha": 151.258335,
+        "hc": -0.786091,
+        "zn": 245.238725
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Sun"
+    }
+  },
+  "2026-11-22 Moon Set 04:30": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-22&time=09:30&coords=36.92,-76.10",
+    "utc": "2026-11-22T09:30:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": 15.572331,
+        "gha": 178.011286,
+        "hc": 0.132265,
+        "zn": 289.515087
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Moon"
+    }
+  },
+  "2026-11-22 Moon Rise 15:10": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-22&time=20:10&coords=36.92,-76.10",
+    "utc": "2026-11-22T20:10:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": 17.991341,
+        "gha": 332.288223,
+        "hc": 0.229833,
+        "zn": 67.459636
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Moon"
+    }
+  },
+  "2026-11-22 Sun Rise 06:50": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-22&time=11:50&coords=36.92,-76.10",
+    "utc": "2026-11-22T11:50:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": -20.18844,
+        "gha": 0.970375,
+        "hc": -0.844577,
+        "zn": 114.874986
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Sun"
+    }
+  },
+  "2026-11-22 Sun Set 16:51": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-22&time=21:51&coords=36.92,-76.10",
+    "utc": "2026-11-22T21:51:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": -20.276685,
+        "gha": 151.192506,
+        "hc": -0.873677,
+        "zn": 245.034707
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Sun"
+    }
+  },
+  "2026-11-23 Moon Set 05:44": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-23&time=10:44&coords=36.92,-76.10",
+    "utc": "2026-11-23T10:44:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": 21.004784,
+        "gha": 182.576118,
+        "hc": 0.208647,
+        "zn": 296.462909
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Moon"
+    }
+  },
+  "2026-11-23 Moon Rise 15:49": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-23&time=20:49&coords=36.92,-76.10",
+    "utc": "2026-11-23T20:49:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": 22.840504,
+        "gha": 327.866999,
+        "hc": 0.151504,
+        "zn": 61.082976
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Moon"
+    }
+  },
+  "2026-11-23 Sun Rise 06:51": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-23&time=11:51&coords=36.92,-76.10",
+    "utc": "2026-11-23T11:51:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": -20.398209,
+        "gha": 1.15261,
+        "hc": -0.845763,
+        "zn": 115.145602
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Sun"
+    }
+  },
+  "2026-11-23 Sun Set 16:50": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-23&time=21:50&coords=36.92,-76.10",
+    "utc": "2026-11-23T21:50:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": -20.483568,
+        "gha": 150.873493,
+        "hc": -0.774276,
+        "zn": 244.684889
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Sun"
+    }
+  },
+  "2026-11-24 Moon Set 07:01": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-24&time=12:01&coords=36.92,-76.10",
+    "utc": "2026-11-24T12:01:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": 25.125853,
+        "gha": 186.479274,
+        "hc": 0.171971,
+        "zn": 301.928171
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Moon"
+    }
+  },
+  "2026-11-24 Moon Rise 16:38": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-24&time=21:38&coords=36.92,-76.10",
+    "utc": "2026-11-24T21:38:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": 26.224369,
+        "gha": 324.569208,
+        "hc": 0.127974,
+        "zn": 56.561256
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Moon"
+    }
+  },
+  "2026-11-24 Sun Rise 06:52": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-24&time=11:52&coords=36.92,-76.10",
+    "utc": "2026-11-24T11:52:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": -20.601713,
+        "gha": 1.331627,
+        "hc": -0.845748,
+        "zn": 115.409316
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Sun"
+    }
+  },
+  "2026-11-24 Sun Set 16:50": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-24&time=21:50&coords=36.92,-76.10",
+    "utc": "2026-11-24T21:50:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": -20.684304,
+        "gha": 150.801232,
+        "hc": -0.849846,
+        "zn": 244.486979
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Sun"
+    }
+  },
+  "2026-11-25 Moon Set 08:16": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-25&time=13:16&coords=36.92,-76.10",
+    "utc": "2026-11-25T13:16:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": 27.359993,
+        "gha": 188.789735,
+        "hc": 0.124719,
+        "zn": 304.974915
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Moon"
+    }
+  },
+  "2026-11-25 Moon Rise 17:39": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-25&time=22:39&coords=36.92,-76.10",
+    "utc": "2026-11-25T22:39:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": 27.629252,
+        "gha": 323.280431,
+        "hc": 0.221724,
+        "zn": 54.748761
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Moon"
+    }
+  },
+  "2026-11-25 Sun Rise 06:53": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-25&time=11:53&coords=36.92,-76.10",
+    "utc": "2026-11-25T11:53:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": -20.798863,
+        "gha": 1.507457,
+        "hc": -0.844426,
+        "zn": 115.666093
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Sun"
+    }
+  },
+  "2026-11-25 Sun Set 16:50": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-25&time=21:50&coords=36.92,-76.10",
+    "utc": "2026-11-25T21:50:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": -20.87866,
+        "gha": 150.725804,
+        "hc": -0.919217,
+        "zn": 244.292187
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Sun"
+    }
+  },
+  "2026-11-26 Moon Set 09:23": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-26&time=14:23&coords=36.92,-76.10",
+    "utc": "2026-11-26T14:23:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": 27.368303,
+        "gha": 188.789988,
+        "hc": 0.130164,
+        "zn": 304.981196
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Moon"
+    }
+  },
+  "2026-11-26 Moon Rise 18:49": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-26&time=23:49&coords=36.92,-76.10",
+    "utc": "2026-11-26T23:49:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": 26.792261,
+        "gha": 324.082226,
+        "hc": 0.184873,
+        "zn": 55.847691
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Moon"
+    }
+  },
+  "2026-11-26 Sun Rise 06:54": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-26&time=11:54&coords=36.92,-76.10",
+    "utc": "2026-11-26T11:54:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": -20.989573,
+        "gha": 1.680138,
+        "hc": -0.841689,
+        "zn": 115.915897
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Sun"
+    }
+  },
+  "2026-11-26 Sun Set 16:49": {
+    "url": "https://aa.usno.navy.mil/api/celnav?date=2026-11-26&time=21:49&coords=36.92,-76.10",
+    "utc": "2026-11-26T21:49:00.000Z",
+    "object": {
+      "almanac_data": {
+        "dec": -21.066419,
+        "gha": 150.397303,
+        "hc": -0.802645,
+        "zn": 243.951925
+      },
+      "altitude_corrections": {
+        "isCorrected": false,
+        "pa": "---",
+        "refr": "---",
+        "sd": "---",
+        "sum": "---"
+      },
+      "object": "Sun"
+    }
+  }
+}
