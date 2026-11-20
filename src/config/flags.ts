@@ -31,3 +31,12 @@ export const DRONE_WIND_ROWS = false
  * (src/lib/planner.ts). On, each of those taps opens it again.
  */
 export const PLANNER_EXTRA_DOORS = false
+
+/**
+ * The Tide page's old body (Batch Pages, Batch N: the day's curve you can
+ * scrub, four tiles, the mirror-morning list) as the page itself. OFF: the
+ * Tide page is the tap-in skeleton now (Batch SIMPLE-2, Section 1, board
+ * Page_Tide), and the old body is what "More details ›" opens, unchanged.
+ * On, the old body opens first and there is no skeleton page.
+ */
+export const TIDE_PAGE_OLD_FIRST = false

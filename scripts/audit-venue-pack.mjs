@@ -369,7 +369,7 @@ try {
     /* The tide curve. */
     await page.locator('.chip2[data-chip="tide"]').first().click({ timeout: 3000 }).catch(() => {})
     await wait(2500)
-    const tide = await ev(`(() => { const p = document.querySelector('.tpage, .dpage--tide'); const path = document.querySelector('.tpage .tides__line, .dpage--tide .dtide__line'); return { page: !!p, curve: !!path && (path.getAttribute('d') ?? '').length > 20, text: p?.textContent ?? '' } })()`)
+    const tide = await ev(`(() => { const p = document.querySelector('.tpage, .dpage--tide'); const path = document.querySelector('path.tides__line, .tipage--tide [data-tide-curve] path.tcurve__line, .dpage--tide path.dtide__line'); return { page: !!p, curve: !!path && (path.getAttribute('d') ?? '').length > 20, text: p?.textContent ?? '' } })()`)
     console.log(`  tides offline: ${JSON.stringify({ page: tide.page, curve: tide.curve })}`)
     if (!tide.curve) fail(`${label}: no tide curve offline`)
     if (/didn.t load/.test(tide.text)) fail(`${label}: part of the Tides page did not load offline: "${tide.text.match(/[^.]*didn.t load[^.]*/)?.[0]}"`)

@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { LatLon } from '../core/geo.ts'
 import { GLASSY_MPS } from '../core/coastFacing.ts'
-import { glassMornings, LOW_NEAR_SUNRISE_MIN, type Morning } from '../core/glassMornings.ts'
+import { LOW_NEAR_SUNRISE_MIN, type Morning } from '../core/glassMornings.ts'
 import { localDate } from '../core/moonTimes.ts'
 import { SPRING_WITHIN, tideWeek } from '../core/moonTides.ts'
-import { sunriseOn } from '../core/sunrise.ts'
 import { directionAt, levelAt, STATION_LOCAL_KM } from '../core/tide.ts'
 import { formatClock, formatShortHour } from '../core/timezone.ts'
 import { WaterTile } from './WaterLine.tsx'
 import { dayRangeFeet, moonLitPercent, NOW_DOT_R, nextTurns, SCRUB_RETURN_MS, springOrNeap, SPRING_OVER, typicalRangeFeet, tideDayWindow, tideHeight, timeAtShare, untilWords } from '../core/tideWindow.ts'
 import type { DetailId } from '../lib/detailTabs.ts'
-import { hourlyAt } from '../lib/tideSheetData.ts'
+import { mirrorMornings, tidePageModel } from '../lib/tidePage.ts'
+import { TIDE_PAGE_OLD_FIRST } from '../config/flags.ts'
+import { TapInPage } from './TapInPage.tsx'
+import { TideCurve } from './TideCurve.tsx'
 import { useTide, type TideInfo } from '../lib/useTide.ts'
 import { useTideSheet, type TideSheetData } from '../lib/useTideSheet.ts'
 import { formatRange, formatWind, type Units } from '../lib/units.ts'
@@ -52,23 +54,104 @@ function useMinute(): Date {
   return now
 }
 
-export function TidePageV2({ venue, placeName, timeZone, units, ground, onBack, onSwitch, onMap }: TidePageV2Props) {
+export function TidePageV2(props: TidePageV2Props) {
+  const { venue, placeName, timeZone, units, ground, onBack, onSwitch, onMap } = props
+  /* Batch SIMPLE-2, Section 1: the skeleton page first; "More details ›" opens the old page, unchanged (src/config/flags.ts TIDE_PAGE_OLD_FIRST). */
+  const [more, setMore] = useState(TIDE_PAGE_OLD_FIRST)
   const now = useMinute()
   const tide = useTide(venue, now)
   /* 'off': the surf row is the Surf page's now, so no buoys are asked for here. */
   const data = useTideSheet(true, venue, tide.status === 'ok' ? tide.station.id : null, 'off')
+  if (more) {
+    return (
+      <DetailShell id="tide" ground={ground} onBack={TIDE_PAGE_OLD_FIRST ? onBack : () => setMore(false)} onSwitch={onSwitch} onMap={onMap} how={<TideHow tide={tide} data={data} units={units} />}>
+        <TideContent now={now} tide={tide} data={data} venue={venue} placeName={placeName} timeZone={timeZone} units={units} />
+      </DetailShell>
+    )
+  }
+  return <TideTapIn now={now} tide={tide} data={data} venue={venue} placeName={placeName} timeZone={timeZone} units={units} ground={ground} onBack={onBack} onMore={() => setMore(true)} />
+}
+
+/** The Tide page as the tap-in skeleton (board Page_Tide): which way the water is going, the next turn, the curve with now, four rows, More details. */
+function TideTapIn({ now, tide, data, venue, placeName, timeZone, units, ground, onBack, onMore }: { now: Date; tide: TideInfo; data: TideSheetData; venue: LatLon; placeName: string; timeZone: string; units: Units; ground: string; onBack: () => void; onMore: () => void }) {
+  const [scrub, setScrub] = useState<Date | null>(null)
+  const back = useRef<number | null>(null)
+  useEffect(() => () => (back.current === null ? undefined : window.clearTimeout(back.current)), [])
+  const model = useMemo(() => (tide.status === 'ok' ? tidePageModel({ now, tide, data, venue, timeZone, units }) : null), [now, tide, data, venue, timeZone, units])
+  const howNode = <TideHow tide={tide} data={data} units={units} />
+  if (tide.status !== 'ok' || model === null) {
+    return (
+      <TapInPage
+        title="Tide"
+        spot={placeName}
+        ground={ground}
+        kind="tipage--tide dpage--tide"
+        onBack={onBack}
+        how={howNode}
+        safety={WATER_SAFETY_LINE}
+        hero={{
+          eyebrow: 'Tide',
+          value: '—',
+          sub:
+            tide.status === 'no-station'
+              ? `No tide station near here. The closest, ${tide.nearestName}, is ${formatRange(tide.nearestKm * 1000, units.distance)} away.`
+              : tide.status === 'unavailable'
+                ? tide.reason
+                : 'Waiting for NOAA.',
+        }}
+      />
+    )
+  }
+  const letGo = () => {
+    if (back.current !== null) window.clearTimeout(back.current)
+    back.current = window.setTimeout(() => setScrub(null), SCRUB_RETURN_MS)
+  }
   return (
-    <DetailShell id="tide" ground={ground} onBack={onBack} onSwitch={onSwitch} onMap={onMap} how={<TideHow tide={tide} data={data} units={units} />}>
-      <TideContent now={now} tide={tide} data={data} venue={venue} placeName={placeName} timeZone={timeZone} units={units} />
-    </DetailShell>
+    <TapInPage
+      title="Tide"
+      spot={placeName}
+      ground={ground}
+      kind="tipage--tide dpage--tide"
+      onBack={onBack}
+      how={howNode}
+      safety={WATER_SAFETY_LINE}
+      hero={{
+        eyebrow: model.eyebrow,
+        value: model.value,
+        sub: scrub === null ? model.sub : model.subAt(scrub),
+        subData: { 'data-tide-headline': '' },
+        ...(model.shared === null || scrub !== null ? {} : { shared: model.shared }),
+      }}
+      chart={
+        <TideCurve
+          variant="page"
+          curve={tide.predictions.curve}
+          from={model.window.from}
+          to={model.window.to}
+          timeZone={timeZone}
+          now={now}
+          marks={model.marks}
+          scrubAt={scrub}
+          onScrub={(t) => {
+            if (back.current !== null) window.clearTimeout(back.current)
+            setScrub(t)
+          }}
+          onRelease={letGo}
+          label="The water level from two hours ago to sixteen ahead, with now and the next turn marked. Drag along it to read any time."
+        />
+      }
+      rows={model.rows}
+      onMore={onMore}
+    />
   )
 }
+
+/** The footer's right: the page's one safety line (Section 1; board Page_Tide). */
+const WATER_SAFETY_LINE = 'Forecasts can be wrong · look first'
 
 const DIRECTION_WORD = { rising: 'Rising', falling: 'Falling', slack: 'Turning' } as const
 const CURVE_W = 330
 const CURVE_H = 150
-/** Mirror mornings are looked for this far ahead; NOAA's month reaches it, the wind forecast stops sooner. */
-const MIRROR_DAYS = 30
 
 const dayWords = (date: string) => new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`))
 const weekdayWord = (date: string) => new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`))
@@ -88,22 +171,7 @@ export function TideContent({ now, tide, data, venue, placeName, timeZone, units
     () => (ok === null ? null : tideDayWindow({ now, date: today, timeZone, curve: ok.predictions.curve, extremes: ok.predictions.extremes, lat: venue.lat, lon: venue.lon, width: CURVE_W, height: CURVE_H })),
     [ok, now, today, timeZone, venue.lat, venue.lon],
   )
-  const facing = data.facing.value !== null && data.facing.value !== 'inland' ? data.facing.value.facing : null
-  const mornings = useMemo((): Morning[] => {
-    const days = Array.from({ length: MIRROR_DAYS }, (_, i) => {
-      const d = new Date(Date.parse(`${today}T12:00:00Z`) + i * 86_400_000).toISOString().slice(0, 10)
-      return { date: d, sunrise: sunriseOn(d, venue.lat, venue.lon, timeZone) }
-    })
-    const lows = (data.month.value ?? []).filter((e) => e.kind === 'low').map((e) => e.at)
-    const wind = data.wind.value
-    const windAt = (t: Date) => {
-      if (wind === null) return null
-      const s = hourlyAt(wind, 'wind_speed_10m', t)
-      const f = hourlyAt(wind, 'wind_direction_10m', t)
-      return s === null || f === null ? null : { speedMps: s, fromDeg: f }
-    }
-    return glassMornings(days, lows, windAt, facing)
-  }, [today, data.month.value, data.wind.value, facing, venue.lat, venue.lon, timeZone])
+  const mornings = useMemo((): Morning[] => mirrorMornings({ today, data, venue, timeZone }), [today, data, venue, timeZone])
 
   const kicker = <p className="dtide__kick">{placeName === '' ? 'Now' : `${placeName} · now`}</p>
   if (ok === null) {

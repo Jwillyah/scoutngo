@@ -1,0 +1,243 @@
+/*
+ * THE TAP-IN PAGE SKELETON (Batch SIMPLE-2, Section 1) and the shared
+ * pictures it holds: the one tide curve (.tcurve) and the one wind bar
+ * (.wbar7). Colours are tokens only (src/styles/tokens.css); the shell
+ * itself is PageShell's (.dpage, .ppage).
+ */
+.tipage__swipe {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  /* Vertical scroll is the body's; the swipe is read from touch start and end, never by taking the scroll. */
+  touch-action: pan-y;
+}
+.tipage__tabs {
+  flex: none;
+}
+.tipage__tabs .ui-seg__opt {
+  /* A finger's 44 px (UX rule 7). */
+  min-height: 44px;
+}
+.tipage__hero {
+  flex: none;
+  padding: 4px 8px 6px;
+}
+.tipage__eyebrow {
+  margin: 0;
+  font-size: var(--text-label);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--glass-ink-2);
+}
+.tipage__value {
+  margin: 2px 0 0;
+  font-size: 56px;
+  line-height: 1.05;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+.tipage__sub {
+  margin: 4px 0 0;
+  font-size: var(--text-md);
+  color: var(--white);
+}
+.tipage__card {
+  flex: none;
+  background: var(--d-card);
+  border: 1px solid var(--d-edge);
+  border-radius: 24px;
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+.tipage__chart {
+  padding: 8px 12px;
+}
+.tipage__rows {
+  overflow: hidden;
+}
+.tipage__row {
+  width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border: 0;
+  border-top: 1px solid var(--d-edge);
+  background: transparent;
+  color: var(--white);
+  font: inherit;
+  text-align: left;
+}
+.tipage__row:first-child {
+  border-top: 0;
+}
+.tipage__label {
+  flex: none;
+  font-size: var(--text-label);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--glass-ink-2);
+}
+.tipage__val {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+  font-size: var(--text-md);
+}
+.tipage__val b {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+}
+.tipage__detail {
+  color: var(--glass-ink-2);
+}
+.tipage__dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+}
+.tipage__dot--good {
+  background: var(--good);
+}
+.tipage__dot--caution {
+  background: var(--caution);
+}
+.tipage__more {
+  justify-content: space-between;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+}
+.tipage__actions {
+  flex: none;
+  display: flex;
+  gap: 12px;
+}
+.tipage__btn {
+  flex: 1;
+  min-height: 48px;
+  padding: 0 12px;
+  border: 1px solid var(--d-edge);
+  border-radius: 999px;
+  background: var(--d-card);
+  color: var(--white);
+  font: inherit;
+  font-weight: var(--weight-medium);
+}
+.tipage__btn--primary {
+  background: var(--white);
+  color: var(--sky-ink);
+}
+
+/* ------------------------------------------------------ the one tide curve */
+.tcurve {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.tcurve__none {
+  margin: 8px 0;
+  font-size: var(--text-sm);
+  color: var(--glass-ink-2);
+}
+.tcurve__line {
+  fill: none;
+  stroke: var(--d-tide);
+  stroke-width: 3;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.tcurve--strip .tcurve__line {
+  stroke-width: 2;
+}
+.tcurve__area {
+  fill: var(--d-tide);
+  fill-opacity: 0.12;
+}
+.tcurve__band {
+  fill: var(--d-surf);
+  fill-opacity: 0.25;
+}
+.tcurve__bandt {
+  fill: var(--d-surf);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+}
+.tcurve__nowline {
+  stroke: var(--white);
+  stroke-width: 2;
+}
+.tcurve__nowt {
+  fill: var(--white);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+}
+.tcurve__nowdot {
+  fill: var(--white);
+}
+.tcurve__mark circle {
+  fill: var(--caution);
+}
+.tcurve__mark text {
+  fill: var(--caution);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+}
+.tcurve__tick {
+  fill: var(--glass-ink-2);
+  font-size: var(--text-md);
+}
+
+/* ------------------------------------------------------- the one wind bar */
+.wbar7 {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.wbar7__bar--b0 {
+  fill: var(--wind-0);
+}
+.wbar7__bar--b1 {
+  fill: var(--wind-7);
+}
+.wbar7__bar--b2 {
+  fill: var(--wind-12);
+}
+.wbar7__bar--b3 {
+  fill: var(--wind-17);
+}
+.wbar7__bar--b4 {
+  fill: var(--wind-25);
+}
+.wbar7__cap {
+  fill: var(--white);
+}
+.wbar7__limit {
+  stroke: var(--wind-limit);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+}
+.wbar7__limitt {
+  fill: var(--wind-limit);
+  font-size: var(--text-sm);
+}
+.wbar7__arrow path {
+  fill: none;
+  stroke: var(--white);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.wbar7__now {
+  stroke: var(--caution);
+  stroke-width: 2;
+}

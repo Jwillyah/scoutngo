@@ -53,6 +53,8 @@ export const AUDITS = [
   { name: 'special light', script: 'audit-special.mjs', summary: /SPECIAL LIGHT PROBLEMS/ },
   { name: 'briefing', script: 'audit-briefing.mjs', summary: /BRIEFING PROBLEMS/ },
   { name: 'pages', script: 'audit-pages.mjs', summary: /PAGES PROBLEMS/ },
+  /* Batch SIMPLE-2, Section 1: the tap-in page skeleton, on the Tide page, at every size and standalone. */
+  { name: 'tap in', script: 'audit-tapin.mjs', summary: /TAP IN PROBLEMS/ },
   { name: 'best sky', script: 'audit-bestsky.mjs', summary: /BEST SKY PROBLEMS/ },
   /* Batch Polish, Section 3: the home never scrolls, in five looks and three numbers of activities. */
   { name: 'home fit', script: 'audit-home-fit.mjs', summary: /HOME FIT PROBLEMS/ },
