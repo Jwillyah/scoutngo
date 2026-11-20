@@ -1,0 +1,123 @@
+[
+  {
+    "id": "vdot",
+    "name": "VDOT 511 traffic cams",
+    "runs": "Virginia Department of Transportation (511 run for it by Iteris); stills on snapshot.vdotcameras.com",
+    "terms": "https://www.vdot.virginia.gov/policies/privacy-security/",
+    "alsoRead": ["https://ops.fhwa.dot.gov/travelinfo/resources/datashare/app2vdot.htm", "https://511.vdot.virginia.gov/"],
+    "read": "2026-11-19",
+    "says": "VDOT's site terms say nothing on showing its camera stills elsewhere (\"© Copyright 2026, VDOT. All rights reserved\" only). Its 2001 Guidelines on Access to Smart Traffic Center Data and Video Imagery, written for video distribution partners under agreement, say: \"All VDOT-provided video images must display the VDOT logo or give equivalent attribution to VDOT.\" The official channel for camera data today is SmarterRoads, behind a usage agreement and an account.",
+    "embed": false,
+    "why": "Unclear for an app that is not a signed partner: the current terms are silent, the 2001 rule is for partners, and SmarterRoads' agreement was not read (it needs an account). Link out until VDOT says yes or the list comes through SmarterRoads."
+  },
+  {
+    "id": "ncdot",
+    "name": "NCDOT traffic cams (DriveNC)",
+    "runs": "North Carolina Department of Transportation; some DriveNC cams are run by cities",
+    "terms": "https://www.ncdot.gov/about-us/how-we-operate/policy-process/Pages/terms-use.aspx",
+    "alsoRead": ["https://www.drivenc.gov/about/disclaimer", "https://www.drivenc.gov/developers/doc"],
+    "read": "2026-11-19",
+    "says": "\"the state of North Carolina grants permission to copy and distribute images, documents and other information for non-commercial use, provided they are copied and distributed without alteration.\" DriveNC's disclaimer: \"Live traffic camera video is provided by NCDOT for general travel information only and may be delayed, unavailable, or inaccurate.\"",
+    "embed": true,
+    "why": "Allowed for NCDOT's own cams: the app is free (no ads, no subscription) and would show the still as NCDOT serves it, unaltered, credited to NCDOT. Not for city-run cams on DriveNC (their terms were not read). No NC traffic cam is in cams.json yet: DriveNC's camera list needs a developer key (\"Requires a developer key\")."
+  },
+  {
+    "id": "surfchex",
+    "name": "Surfchex",
+    "runs": "Surfchex (Resort Management LLC, per its cam pages); also the cams on the Wilmington and Beaches CVB page (\"Live Webcams Provided by Surfchex\")",
+    "terms": "https://surfchex.com/",
+    "alsoRead": ["https://surfchex.com/llms.txt", "https://www.wilmingtonandbeaches.com/about/area-information/wilmington-webcam"],
+    "read": "2026-11-19",
+    "says": null,
+    "embed": false,
+    "why": "No terms page found (the site links only a privacy policy), and the project's rule: Surfchex is link out only, no embed, no logo."
+  },
+  {
+    "id": "surfline",
+    "name": "Surfline",
+    "runs": "Surfline/Wavetrak; also hosts the Jennette's Pier and Nags Head Pier cams (Town of Nags Head web cams page)",
+    "terms": "https://www.surfline.com/terms-of-use",
+    "alsoRead": ["https://nagsheadnc.gov/569/Web-Cams"],
+    "read": "2026-11-19",
+    "says": null,
+    "embed": false,
+    "why": "The terms page answers 403 to automated requests and was not read. The project's rule: Surfline is link out only, no embed, no logo. Cams are paid."
+  },
+  {
+    "id": "skylinewebcams",
+    "name": "SkylineWebcams",
+    "runs": "VisioRay Srl (Italy)",
+    "terms": "https://www.skylinewebcams.com/en/terms-of-use.html",
+    "alsoRead": [],
+    "read": "2026-11-19",
+    "says": "\"The User may view the Content for strictly personal use and share it only by means of the sharing buttons and links provided on the pages\"; forbidden: \"to record, download, copy, photograph, print, retransmit or republish the Content, in whole or in part\".",
+    "embed": false,
+    "why": "Sharing is by their links only."
+  },
+  {
+    "id": "earthcam",
+    "name": "EarthCam",
+    "runs": "EarthCam, Inc.",
+    "terms": "https://earthcam.com/faq.php",
+    "alsoRead": [],
+    "read": "2026-11-19",
+    "says": "\"You can share links to our EarthCam Network pages on other social media platforms. You may not rebroadcast our live feeds without permission.\" On embedding: \"We are happy to discuss your request to license EarthCam's content.\"",
+    "embed": false,
+    "why": "Embedding needs a licence; links are allowed."
+  },
+  {
+    "id": "hdontap",
+    "name": "HDOnTap",
+    "runs": "IP Video Specialists, Inc. (d.b.a. HDOnTap), for the cam's owner",
+    "terms": "https://sales.hdontap.com/general-terms-and-conditions-of-sales/",
+    "alsoRead": ["https://sales.hdontap.com/pages/streaming-faq"],
+    "read": "2026-11-19",
+    "says": null,
+    "embed": false,
+    "why": "Only terms of sale (to the cam owners who buy the service) were found; nothing for third parties showing a stream. Silent, so link out. The player is an iframe on the owner's site; asking an owner directly is the way to an embed."
+  },
+  {
+    "id": "pier",
+    "name": "Pier and town pages (Avalon Pier, Nags Head Pier, Outer Banks Fishing Pier, Town of Nags Head)",
+    "runs": "Each pier; the Town of Nags Head runs no cam of its own (its page points to DriveNC and to Surfline-hosted pier cams)",
+    "terms": "https://nagsheadnc.gov/569/Web-Cams",
+    "alsoRead": [],
+    "read": "2026-11-19",
+    "says": null,
+    "embed": false,
+    "why": "No terms on the pages read; the pier streams are Surfline's player. Silent, so link out."
+  },
+  {
+    "id": "webcoos",
+    "name": "WebCOOS (NOAA IOOS / SECOORA coastal cams)",
+    "runs": "SECOORA with NOAA IOOS partners",
+    "terms": "https://webcoos.org/",
+    "alsoRead": [],
+    "read": "2026-11-19",
+    "says": null,
+    "embed": false,
+    "why": "Its data needs an account and no licence text was readable. Not in cams.json."
+  },
+  {
+    "id": "aggregator",
+    "name": "Aggregators and hotel cams (LiveBeaches, hotel boardwalk cams at Virginia Beach, surf-forecast.com, Windy)",
+    "runs": "Sites that re-show other owners' cams; the hotels' own streams (Hampton Inn 31st St, Courtyard 25th St, Embassy Suites) were found only through them",
+    "terms": "https://www.livebeaches.com/",
+    "alsoRead": [],
+    "read": "2026-11-19",
+    "says": null,
+    "embed": false,
+    "why": "Not the owner, and no owner terms were found. Not in cams.json."
+  },
+  {
+    "id": "other",
+    "name": "Other operators in the coast list (towns, tourism boards, hotels outside VA and NC)",
+    "runs": "See data/coast-cams.json, operator field",
+    "terms": "https://github.com/Jwillyah/scoutngo/blob/main/docs/cams.md",
+    "alsoRead": [],
+    "read": "2026-11-19",
+    "says": null,
+    "embed": false,
+    "why": "Terms not checked one by one in this batch. Unchecked means link out."
+  }
+]

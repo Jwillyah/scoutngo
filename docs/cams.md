@@ -113,3 +113,49 @@ Linking to a public image is not copying it, and the © notice is about
 copying; but if VDOT's answer is that the list should come through
 SmarterRoads, the bake script should switch to it or the cams come out.
 Nobody at VDOT has been asked.
+
+## One list with tags: src/data/cams.json (Batch SIMPLE-2, 19 Nov 2026)
+
+`src/data/cams.json` is the list the Surf › Cams and Sky › Now pages use:
+each cam's id, name, lat/lon, source, operator, url, access, `tags` (some of
+`sky`, `surf`, `road`), `facing` (degrees, or null), `facingIs` (`sea`: the
+sea's direction from a beach cam's beach; `name`: read from the cam's own
+name) and `embed` (may the phone show the owner's image in the app). It is
+**generated**, never edited by hand: `node scripts/build-cams.mjs` joins
+`data/coast-cams.json` (through `src/data/coastCams.ts`),
+`src/data/vdotCams.ts`, the hand tags in `data/cam-tags.json` and the
+per-source verdicts in `data/cam-sources.json`. `tests/camsJson.test.ts`
+fails when the committed file is not what the build makes. The picking
+(surf cams by distance, the big sky cam) is `src/core/camPick.ts`.
+`src/data/cams.ts`, the older upwind list behind CamList, is not part of it.
+
+### Tagging a cam
+
+1. **Is it in a list?** A beach cam goes in `data/coast-cams.json` (above). A
+   VDOT cam comes from the bake. A cam in neither (a bay or harbour cam, not
+   surf) goes under `added` in `data/cam-tags.json` with its position and
+   where that position came from.
+2. **Its source.** The cam's `source` must be a row in
+   `data/cam-sources.json`. A new operator gets a new row: read its terms,
+   quote the sentence about showing its images elsewhere, and set `embed`
+   true only when the terms allow it in words. Silent or unclear is false.
+   Surfline and Surfchex are false whatever their terms say. Then
+   `node scripts/write-sources-doc.ts`.
+3. **Tags.** Without a hand tag a beach cam is `surf` + `sky` and a VDOT cam
+   is `road`. Add a tag in `data/cam-tags.json` with a `why`:
+   `sky` when the cam's position puts it over open water or the beach, so
+   buildings do not block the sky (a bridge span, a tunnel island, a pier);
+   `road` only when it is in a tunnel, at an inland intersection, or
+   nothing says otherwise; `surf` only when it looks at the ocean surf.
+4. **Facing.** Only from evidence you can cite: the cam's own name or page
+   ("looking north", "Toward Berkley Bridge": `facingToward` another cam's
+   id, and the build computes the bearing), or the sea's direction from a
+   beach cam's beach. VDOT's NB/WB label is the lanes, never the facing
+   (Batch M). No evidence: leave it null; the pick handles null.
+5. `node scripts/build-cams.mjs`, then
+   `npx vitest run tests/camsJson.test.ts tests/camPick.test.ts`. Every sky
+   cam within 30 km of Chic's Beach must carry a hand tag.
+
+Tags were set on 19 Nov from names, positions and page text; no cam image
+was looked at. Looking at each VB-area still in daylight would confirm sky
+in frame and may give facings.
