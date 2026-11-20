@@ -56,3 +56,31 @@ The batch says push after each piece. The auto-mode classifier refused the push 
 ## Flakes, not strikes
 
 The moon piece's first gate failed `viewfinder` (could not find Menu › Kit in 30 s) and `gesture` (slow-flick timing) with the machine's load at 13.5 and four agents working. Both passed alone on the same tree (viewfinder 0 problems in 168 s; gesture 0 on its second run). Counted as flakes, re-gated.
+
+## Section 1: the page skeleton
+
+- **Shell.** Build `TapInPage` on the existing `PageShell` (back, Escape, safe areas, the "How we got this" sheet, the pinned foot), not a new shell. **Picked.**
+- **Rows cap.** 5 by default with a dev warning; a `maxRows` prop lets Drone Preflight show its 8 on purpose.
+- **Old Tide body.** It opens from More details, unchanged; `TIDE_PAGE_OLD_FIRST` (off) decides only whether it opens first.
+- **Pills.** The existing `.ui-seg` (role tablist), as Sky and Drone already use.
+- **One tide curve** (`TideCurve`: strip / chart / page) from one geometry (`src/core/tideCurve.ts`). **One moon drawing**: `MoonDrawing` wraps the existing `MoonGlyph`, whose lit side was already right (waxing right, waning left).
+- **WindBar vs LayerTimeline.** Section 1 drew them from the same `windPlot`/`windArrows` code; Section 5 then made LayerTimeline itself take the Wind_Bar_7 look, so the map has one bar.
+- **Tide window.** The page shows now −2 h to now +16 h, like the board; the midnight-to-midnight day is in More details.
+- **Mirror morning** exists (`glassMornings`), so the row stays; one helper (`mirrorMornings`) feeds both bodies.
+
+## The gate went blind at night (found 3:30 AM)
+
+The moon piece's second gate failed `projection` (16: "no bearing lines drawn") and `offline` (2: "no sun or shadow ray on the glass"), and both failed again alone. Its bundle is byte-for-byte HEAD's (nothing imports the new moon files), so the cause had to be outside the code: both audits measured the sun and moon rays on **this machine's clock**, the moon set at 2:13 AM and the sun rises at 6:51 AM. Section 0's gate passed at 1:50 AM only because the moon was still up. Shape B: the audit's could-not-look state depended on the hour.
+
+**Fix:** `scripts/daytimeClock.mjs` pins the page's clock to 2 Nov 2026 10:30 AM EST (the a11y audit's instant) and lets it run on; both audits call it before their first page. Its own commit. Not counted as a strike against the moon piece.
+
+## Sections 2 and 3: home and menu
+
+- **One persona store**, `scoutngo.persona.v1`, over the multi-pick activities list. The old list is migrated as its first pick, read only. Side effect: a Surf persona no longer gets the map's photo tools that were gated on Shoot.
+- **Skipped picker:** Surf order, asked again on the next spot pick. The pill reads "PICK YOURS".
+- **Moments**, all from existing rules: sky Likely within 3 h (Go only, not Maybe); glassy within 12 h (`isGlassy`, coast only); calm-water run starting within 2 h (the Fish moment: no bite window exists); first Fun surf hour within 24 h ("swell arriving"); Big moonrise today (`moonMoments`). Persona ranks them (`MOMENT_RANK`). No "Moonset at sunrise" moment on home (it is on Sky › Night).
+- **Drone tile** shows the 400 ft wind against the kit's limit, not the airspace class: the class data is 1.3 MB to load on every home open; Preflight answers it in one tap.
+- **Water tile** (Fish persona) is a gauge, not a trend: no trend is held.
+- **Menu** is the batch's eight rows. Old cards, Cams, Kit and spot rows behind `MENU_CARDS` (off); old home behind `HOME_OLD` (off); multi-pick behind `ACTIVITY_MULTI` (off).
+- **First-run search box opens focused**, saving a tap (needs an iPhone check: a focus outside a tap may not raise the keyboard).
+- **Duplicates not removed:** the wizard's own search box, the map's "Find a spot" pill, the Sky page's Calendar button. Left for the next batch.

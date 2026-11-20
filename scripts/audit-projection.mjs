@@ -237,6 +237,8 @@ export const BEARING_LINE_EXTENT = `(() => {
 const HERE = new URL('.', import.meta.url).pathname
 const FIXTURES = process.argv[2] ?? HERE
 const { ev, ws, wait, send, errs, dispose } = await (await import(FIXTURES + '/cdp.mjs')).connect()
+/* The rays need the sun or moon up: a fixed mid-morning, not this machine's hour (scripts/daytimeClock.mjs). */
+await (await import(FIXTURES + '/daytimeClock.mjs')).pinDaytime(send)
 const watchdog = startWatchdog('projection')
 const show = (l, v) => console.log('\n### ' + l + '\n' + JSON.stringify(v, null, 2))
 

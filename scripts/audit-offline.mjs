@@ -37,6 +37,7 @@
  */
 import { mkdirSync } from 'node:fs'
 import { connect } from './cdp.mjs'
+import { pinDaytime } from './daytimeClock.mjs'
 import { goToStage, guardAudit, openPlanner, setSheet, startWatchdog, APP_ORIGIN } from './preflight.mjs'
 
 guardAudit('offline')
@@ -53,6 +54,8 @@ const OUT = process.env.SCOUTNGO_OUT ?? `${process.env.TMPDIR ?? '/tmp'}/scoutng
 mkdirSync(OUT, { recursive: true })
 
 const { send, ev, wait, shot, ws, dispose } = await connect()
+/* The sun ray needs the sun up: a fixed mid-morning, not this machine's hour (scripts/daytimeClock.mjs). */
+await pinDaytime(send)
 
 let problems = 0
 const problem = (mode, line) => {
