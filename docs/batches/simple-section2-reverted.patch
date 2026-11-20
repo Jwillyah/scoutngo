@@ -1,0 +1,989 @@
+diff --git a/measurements/2026-11-18-search-address-before.md b/measurements/2026-11-18-search-address-before.md
+new file mode 100644
+index 0000000..57a689a
+--- /dev/null
++++ b/measurements/2026-11-18-search-address-before.md
+@@ -0,0 +1,24 @@
++# The spot search before Batch SIMPLE-1, Section 2: addresses and place names
++
++Run: `node scripts/measure-search-address.mjs --before=/private/tmp/claude-501/-Users-jordanwilliams-Projects-scoutngo/00b79a51-e95d-4318-8bfb-a7941092a466/scratchpad/old3db2f29/src`, 2026-11-18T18:35:40.046Z, live against photon.komoot.io and nominatim.openstreetmap.org (User-Agent "scoutngo-search-test/1.0 (fixture recording for tests/searchAddress.test.ts)"). The older tree's own parseQuery, ownSpots, geocodeWords and rankResults, in the spot picker's order, first run (no position); the picker's spots from this tree (the same lists, moved). Queries and truths from tests/fixtures/search-address.json.
++
++| Query | Geocoders | Rows they gave | Results shown | First result | Against the truth | Asked |
++|---|---|---|---|---|---|---|
++| 2401 Courthouse Dr, Virginia Beach, VA 23456 | ok | 3 | 0 | nothing ("Nothing found by that name.") | nothing | nominatim, photon |
++| 717 General Booth Blvd, Virginia Beach | ok | 4 | 0 | nothing ("Nothing found by that name.") | nothing | nominatim, photon |
++| 425 E Pinner St, Suffolk | ok | 3 | 0 | nothing ("Nothing found by that name.") | nothing | nominatim, photon |
++| Pub, 425 E Pinner St, Suffolk, VA 23434 | ok | 2 | 0 | nothing ("Nothing found by that name.") | nothing | nominatim, photon |
++| 442 W Washington St, Suffolk, VA | ok | 3 | 0 | nothing ("Nothing found by that name.") | nothing | nominatim, photon |
++| Joe's Pizza, 442 W Washington St, Suffolk | ok | 19 | 0 | nothing ("Nothing found by that name.") | nothing | nominatim, photon |
++| 810 Union St, Norfolk, VA 23510 | ok | 3 | 0 | nothing ("Nothing found by that name.") | nothing | nominatim, photon |
++| 245 W Olney Rd, Norfolk | ok | 3 | 0 | nothing ("Nothing found by that name.") | nothing | nominatim, photon |
++| 102 N 3rd St, Wilmington, NC 28401 | ok | 7 | 0 | nothing ("Nothing found by that name.") | nothing | nominatim, photon |
++| Blue Heron Coffee Roasters, 102 N 3rd St, Wilmington, NC | ok | 1 | 0 | nothing ("Nothing found by that name.") | nothing | nominatim, photon |
++| 310 Chestnut St, Wilmington, NC | ok | 21 | 0 | nothing ("Nothing found by that name.") | nothing | nominatim, photon |
++| 125 N Division St, Salisbury, MD 21801 | ok | 22 | 0 | nothing ("Nothing found by that name.") | nothing | nominatim, photon |
++| 909 S Schumaker Dr, Salisbury, MD | ok | 2 | 0 | nothing ("Nothing found by that name.") | nothing | nominatim, photon |
++| Norfolk Botanical Garden | ok | 4 | 0 | nothing ("Nothing found by that name.") | nothing | nominatim, photon |
++| Wrightsville Beach | ok | 21 | 10 | Wrightsville Beach [spot] | inside | nominatim, photon |
++| Assateague | ok | 30 | 1 | Assateague Island [town] | inside | nominatim, photon |
++| Great Dismal Swamp | ok | 7 | 1 | Great Dismal Swamp National Wildlife Refuge [business] | inside | nominatim, photon |
++| First Landing State Park | ok | 11 | 3 | First Landing State Park [business] | inside | nominatim, photon |
+diff --git a/measurements/2026-11-18-search-address.md b/measurements/2026-11-18-search-address.md
+new file mode 100644
+index 0000000..2faa4e4
+--- /dev/null
++++ b/measurements/2026-11-18-search-address.md
+@@ -0,0 +1,26 @@
++# Addresses and place names in the spot search (Batch SIMPLE-1, Section 2)
++
++Run: `node scripts/measure-search-address.mjs`, 2026-11-18T18:35:56.215Z, replaying tests/fixtures/search-address.json (recorded 2026-11-18T18:32:37.391Z from photon.komoot.io and nominatim.openstreetmap.org, User-Agent "scoutngo-search-test/1.0 (fixture recording for tests/searchAddress.test.ts)"). Path: tests/searchAddressRun.ts, the spot picker's own calls (parseQuery, ownSpots over the picker's spots with no saved or cached spots, geoAsk, geocodeAsk, rankResults), first run: no position, so no distance sort. Only the typed words were sent: no lat, lon, viewbox or bias parameter in any URL asked. Right means, for an address, within 150 m of the local government's address point (the Census geocoder's interpolated point is given beside it for reference); for a name, inside the boundary.
++
++Right first: 18 of 18.
++
++| Query | First result [group] (lat, lon) | Distance from truth | Right | Truth source | Asked, in order |
++|---|---|---|---|---|---|
++| 2401 Courthouse Dr, Virginia Beach, VA 23456 | Virginia Beach City Hall, 2401 Courthouse Drive, Virginia Beach [address] (36.75015, -76.05725) | 25 m (Census point: 211 m) | yes | VGIN Virginia Address Points (36.75034, -76.05711) | photon "2401 Courthouse Dr, Virginia Beach, VA 23456" |
++| 717 General Booth Blvd, Virginia Beach | Virginia Aquarium and Marine Science Centers, 717 General Booth Boulevard, Virginia Beach [address] (36.82112, -75.98372) | 79 m (Census point: 333 m) | yes | VGIN Virginia Address Points (36.82131, -75.98286) | photon "717 General Booth Blvd, Virginia Beach" |
++| 425 E Pinner St, Suffolk | 425 Pinner Street, Suffolk, VA [address] (36.73671, -76.56993) | 1 m (Census point: 28 m) | yes | VGIN Virginia Address Points (36.73672, -76.56993) | photon "425 E Pinner St, Suffolk" |
++| Pub, 425 E Pinner St, Suffolk, VA 23434 | Derl'z Restaurant & Pub, 425 Pinner Street, Suffolk [address] (36.73671, -76.56993) | 1 m (Census point: 28 m) | yes | VGIN Virginia Address Points (36.73672, -76.56993) | photon "Pub, 425 E Pinner St, Suffolk, VA 23434" |
++| 442 W Washington St, Suffolk, VA | Suffolk City Hall Building, 442 West Washington Street, Suffolk [address] (36.73007, -76.58897) | 24 m (Census point: 44 m) | yes | VGIN Virginia Address Points (36.72987, -76.58889) | photon "442 W Washington St, Suffolk, VA" |
++| Joe's Pizza, 442 W Washington St, Suffolk | Suffolk City Hall Building, 442 West Washington Street, Suffolk [address] (36.73007, -76.58897) | 24 m (Census point: 44 m) | yes | VGIN Virginia Address Points (36.72987, -76.58889) | photon "Joe's Pizza, 442 W Washington St, Suffolk" |
++| 810 Union St, Norfolk, VA 23510 | City Hall Complex, 810 Union Street, Norfolk [address] (36.84466, -76.28575) | 9 m (Census point: 123 m) | yes | VGIN Virginia Address Points (36.84459, -76.28572) | photon "810 Union St, Norfolk, VA 23510" |
++| 245 W Olney Rd, Norfolk | 245 West Olney Road, Norfolk, VA [address] (36.85695, -76.29266) | 49 m (Census point: 3 m) | yes | VGIN Virginia Address Points (36.85652, -76.29278) | photon "245 W Olney Rd, Norfolk" → nominatim "245 W Olney Rd, Norfolk" |
++| 102 N 3rd St, Wilmington, NC 28401 | 102 North 3rd Street, Wilmington, NC [address] (34.23682, -77.94609) | 36 m (Census point: 8 m) | yes | New Hanover County GIS addressing (34.23710, -77.94590) | photon "102 N 3rd St, Wilmington, NC 28401" → nominatim "102 N 3rd St, Wilmington, NC 28401" |
++| Blue Heron Coffee Roasters, 102 N 3rd St, Wilmington, NC | 102 North 3rd Street, Wilmington, NC [address] (34.23682, -77.94609) | 36 m (Census point: 8 m) | yes | New Hanover County GIS addressing (34.23710, -77.94590) | photon "Blue Heron Coffee Roasters, 102 N 3rd St, Wilmington, NC" → nominatim "Blue Heron Coffee Roasters, 102 N 3rd St, Wilmington, NC" → photon "102 N 3rd St, Wilmington, NC" → nominatim "102 N 3rd St, Wilmington, NC" |
++| 310 Chestnut St, Wilmington, NC | Thalian Hall, 310 Chestnut Street, Wilmington [address] (34.23710, -77.94566) | 15 m (Census point: 80 m) | yes | New Hanover County GIS addressing (34.23723, -77.94562) | photon "310 Chestnut St, Wilmington, NC" |
++| 125 N Division St, Salisbury, MD 21801 | 125 North Division Street, Salisbury, MD [address] (38.36582, -75.60058) | 63 m (Census point: 16 m) | yes | Wicomico County address points (City of Salisbury GIS) (38.36620, -75.60004) | photon "125 N Division St, Salisbury, MD 21801" → nominatim "125 N Division St, Salisbury, MD 21801" |
++| 909 S Schumaker Dr, Salisbury, MD | Ward Museum of Wildfowl Art, 909 South Schumaker Drive, Salisbury [address] (38.35148, -75.57176) | 11 m (Census point: 57 m) | yes | Wicomico County address points (City of Salisbury GIS) (38.35150, -75.57164) | photon "909 S Schumaker Dr, Salisbury, MD" |
++| Norfolk Botanical Garden | Norfolk Botanical Garden, East Beach, Norfolk [place] (36.90509, -76.20017) | inside | yes | PAD-US 4.1 fee unit "Botanical Gardens" (Norfolk, VA) | nominatim "norfolk botanical garden" → photon "norfolk botanical garden" |
++| Wrightsville Beach | Wrightsville Beach, C Street, NC [spot] (34.21500, -77.78800) | inside | yes | TIGERweb incorporated place "Wrightsville Beach town", NC | nominatim "wrightsville beach" → photon "wrightsville beach" |
++| Assateague | Assateague Island, West Ocean City, Maryland [town] (38.08698, -75.21018) | inside | yes | PAD-US 4.1 fee unit "Assateague Island National Seashore" (MD, VA) | nominatim "assateague" → photon "assateague" |
++| Great Dismal Swamp | Great Dismal Swamp, North Carolina [place] (36.53758, -76.42042) | inside | yes | PAD-US 4.1 fee units "Great Dismal Swamp National Wildlife Refuge" (VA, NC) and "Dismal Swamp State Park" (NC) | nominatim "great dismal swamp" → photon "great dismal swamp" |
++| First Landing State Park | First Landing State Park, Virginia Beach, Virginia [place] (36.90622, -76.01359) | inside | yes | PAD-US 4.1 fee unit "First Landing State Park" (VA) | nominatim "first landing state park" → photon "first landing state park" |
+diff --git a/scripts/measure-search-address.mjs b/scripts/measure-search-address.mjs
+new file mode 100644
+index 0000000..beefeb1
+--- /dev/null
++++ b/scripts/measure-search-address.mjs
+@@ -0,0 +1,212 @@
++/*
++ * ADDRESSES AND PLACE NAMES IN THE SPOT SEARCH (Batch SIMPLE-1, Section 2).
++ *
++ * Usage:  node scripts/measure-search-address.mjs --record   (asks the live services, writes the fixture)
++ *         node scripts/measure-search-address.mjs            (replays the fixture, nothing asked)
++ * Writes: tests/fixtures/search-address.json (with --record)
++ *         measurements/<today>-search-address.md
++ *
++ * Each query goes through the spot picker's own path (tests/searchAddressRun.ts):
++ * the words parsed, our spots searched, Photon then Nominatim asked with the
++ * typed words and nothing else, the answer ranked. The first result is held
++ * against a truth that is not OpenStreetMap: the local government's address
++ * point for an address (within TOLERANCE metres), the boundary of the place
++ * for a name (PAD-US 4.1 for the parks and the refuge, TIGERweb for the
++ * town). Recording asks Nominatim no faster than one a second (the app's own
++ * clock in src/lib/search.ts, and a pause between queries) with a User-Agent
++ * naming this run.
++ */
++import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
++
++const { runPicker, insidePolygons, nearestVertexMeters, replayFetch } = await import('../tests/searchAddressRun.ts')
++const { distanceMeters } = await import('../src/core/geo.ts')
++const { markNominatim } = await import('../src/lib/search.ts')
++
++const FIXTURE = new URL('../tests/fixtures/search-address.json', import.meta.url)
++const TOLERANCE = 150
++const UA = 'scoutngo-search-test/1.0 (fixture recording for tests/searchAddress.test.ts)'
++const record = process.argv.includes('--record')
++const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
++
++/*
++ * Ten addresses, two a town; the Pinner St pair from the report and three with
++ * a name typed in front; five place names. Each address's truth is the local
++ * government's own address point: VGIN's statewide Virginia Address Points
++ * (the cities' own points, merged), New Hanover County's addressing layer,
++ * Wicomico County's address points (the City of Salisbury's GIS). One point a
++ * case, no unit, or the run stops. The Census geocoder's point is kept beside
++ * it for reference: it is interpolated along the street.
++ */
++const VGIN = ['VGIN Virginia Address Points', 'https://vginmaps.vdem.virginia.gov/arcgis/rest/services/VA_Base_Layers/VA_Address_Points/FeatureServer/0/query']
++const NHC = ['New Hanover County GIS addressing', 'https://gis.nhcgov.com/server/rest/services/Layers/Addressing/FeatureServer/0/query']
++const WICO = ['Wicomico County address points (City of Salisbury GIS)', 'https://services6.arcgis.com/Hx8jJ6McXQ0jnqLk/arcgis/rest/services/Wicomico_Address_Points/FeatureServer/1/query']
++const ADDRESSES = [
++  ['2401 Courthouse Dr, Virginia Beach, VA 23456', '2401 Courthouse Dr, Virginia Beach, VA 23456', VGIN, "ADDRNUM = '2401' AND STREET_NAME = 'COURTHOUSE' AND MUNICIPALITY = 'Virginia Beach City'"],
++  ['717 General Booth Blvd, Virginia Beach', '717 General Booth Blvd, Virginia Beach, VA 23451', VGIN, "ADDRNUM = '717' AND STREET_NAME = 'GENERAL BOOTH' AND MUNICIPALITY = 'Virginia Beach City'"],
++  ['425 E Pinner St, Suffolk', '425 E Pinner St, Suffolk, VA 23434', VGIN, "ADDRNUM = '425' AND STREET_NAME = 'PINNER' AND MUNICIPALITY = 'Suffolk City'"],
++  ['Pub, 425 E Pinner St, Suffolk, VA 23434', '425 E Pinner St, Suffolk, VA 23434', VGIN, "ADDRNUM = '425' AND STREET_NAME = 'PINNER' AND MUNICIPALITY = 'Suffolk City'"],
++  ['442 W Washington St, Suffolk, VA', '442 W Washington St, Suffolk, VA 23434', VGIN, "ADDRNUM = '442' AND STREET_NAME = 'WASHINGTON' AND MUNICIPALITY = 'Suffolk City'"],
++  ["Joe's Pizza, 442 W Washington St, Suffolk", '442 W Washington St, Suffolk, VA 23434', VGIN, "ADDRNUM = '442' AND STREET_NAME = 'WASHINGTON' AND MUNICIPALITY = 'Suffolk City'"],
++  ['810 Union St, Norfolk, VA 23510', '810 Union St, Norfolk, VA 23510', VGIN, "ADDRNUM = '810' AND STREET_NAME = 'UNION' AND MUNICIPALITY = 'Norfolk City'"],
++  ['245 W Olney Rd, Norfolk', '245 W Olney Rd, Norfolk, VA 23510', VGIN, "ADDRNUM = '245' AND STREET_NAME = 'OLNEY' AND MUNICIPALITY = 'Norfolk City'"],
++  ['102 N 3rd St, Wilmington, NC 28401', '102 N 3rd St, Wilmington, NC 28401', NHC, "NUMBER = 102 AND STREET = '3RD' AND DIR_ABBR = 'N' AND INCMUNI = 'WILMINGTON'"],
++  ['Blue Heron Coffee Roasters, 102 N 3rd St, Wilmington, NC', '102 N 3rd St, Wilmington, NC 28401', NHC, "NUMBER = 102 AND STREET = '3RD' AND DIR_ABBR = 'N' AND INCMUNI = 'WILMINGTON'"],
++  ['310 Chestnut St, Wilmington, NC', '310 Chestnut St, Wilmington, NC 28401', NHC, "NUMBER = 310 AND STREET = 'CHESTNUT' AND INCMUNI = 'WILMINGTON'"],
++  ['125 N Division St, Salisbury, MD 21801', '125 N Division St, Salisbury, MD 21801', WICO, "add_number = 125 AND st_name = 'DIVISION' AND inc_muni = 'Salisbury' AND unit IS NULL"],
++  ['909 S Schumaker Dr, Salisbury, MD', '909 S Schumaker Dr, Salisbury, MD 21804', WICO, "add_number = 909 AND st_name = 'SCHUMAKER' AND inc_muni = 'Salisbury' AND unit IS NULL"],
++]
++const PADUS = 'https://edits.nationalmap.gov/arcgis/rest/services/PAD-US/PAD_US_4_1/MapServer/0/query'
++const TIGER_PLACES = 'https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/4/query'
++const AREA = { geometry: '-77.9,34.1,-75.0,38.4', geometryType: 'esriGeometryEnvelope', inSR: '4326', spatialRel: 'esriSpatialRelIntersects' }
++const PLACES = [
++  ['Norfolk Botanical Garden', 'PAD-US 4.1 fee unit "Botanical Gardens" (Norfolk, VA)', PADUS, { where: "Unit_Nm = 'Botanical Gardens' AND State_Nm = 'VA'", ...AREA }],
++  ['Wrightsville Beach', 'TIGERweb incorporated place "Wrightsville Beach town", NC', TIGER_PLACES, { where: "BASENAME = 'Wrightsville Beach' AND STATE = '37'" }],
++  ['Assateague', 'PAD-US 4.1 fee unit "Assateague Island National Seashore" (MD, VA)', PADUS, { where: "Unit_Nm = 'Assateague Island National Seashore'", ...AREA }],
++  /* The swamp's public land: the federal refuge (VA, NC) and North Carolina's state park, both in the swamp. */
++  ['Great Dismal Swamp', 'PAD-US 4.1 fee units "Great Dismal Swamp National Wildlife Refuge" (VA, NC) and "Dismal Swamp State Park" (NC)', PADUS, { where: "Unit_Nm IN ('Great Dismal Swamp National Wildlife Refuge', 'Dismal Swamp State Park')", ...AREA }],
++  ['First Landing State Park', 'PAD-US 4.1 fee unit "First Landing State Park" (VA)', PADUS, { where: "Unit_Nm = 'First Landing State Park'", ...AREA }],
++]
++
++async function getJson(url) {
++  const r = await fetch(url, { headers: { 'User-Agent': UA, Accept: 'application/json' } })
++  if (!r.ok) throw new Error(`${r.status} from ${url}`)
++  return r.json()
++}
++
++/*
++ * --before=<src>: the same queries through an older tree's picker path (its
++ * parseQuery, ownSpots, geocodeWords and rankResults), live, for the table of
++ * what it did. <src> is that tree's src/, e.g. from `git archive 3db2f29 src`.
++ * Writes measurements/<today>-search-address-before.md.
++ */
++const beforeArg = process.argv.find((a) => a.startsWith('--before='))
++if (beforeArg !== undefined) {
++  const src = beforeArg.slice('--before='.length).replace(/\/$/, '')
++  const old = await import(`${src}/core/spotSearch.ts`)
++  const { geocodeWords } = await import(`${src}/lib/spotSearchData.ts`)
++  const { PICKER_SPOTS } = await import('../src/lib/spotSearchData.ts')
++  const fx = JSON.parse(readFileSync(FIXTURE, 'utf8'))
++  const realFetch = globalThis.fetch
++  const sent = []
++  globalThis.fetch = (input, init) => {
++    sent.push(String(input))
++    return realFetch(input, { ...init, headers: { ...(init?.headers ?? {}), 'User-Agent': UA } })
++  }
++  const lines = []
++  for (const c of fx.cases) {
++    sent.length = 0
++    const q = old.parseQuery(c.query)
++    const own = old.ownSpots(q, null, PICKER_SPOTS, old.localPool([], []))
++    const answer = await geocodeWords(q.geocoderText)
++    const rows = answer.status === 'ok' ? answer.rows : []
++    const results = old.rankResults(q, own, rows, null)
++    const top = results[0]
++    const right = top === undefined ? 'nothing' : c.kind === 'address' ? `${Math.round(distanceMeters(top.at, c.truth.at))} m` : insidePolygons(top.at, c.truth.polygons) ? 'inside' : 'outside'
++    lines.push(`| ${c.query} | ${answer.status} | ${rows.length} | ${results.length} | ${top === undefined ? 'nothing ("Nothing found by that name.")' : `${top.name} [${top.group}]`} | ${right} | ${sent.map((u) => new URL(u).hostname.split('.')[0]).join(', ')} |`)
++    await sleep(1100)
++  }
++  const day = new Date().toISOString().slice(0, 10)
++  const out = [
++    '# The spot search before Batch SIMPLE-1, Section 2: addresses and place names',
++    '',
++    `Run: \`node scripts/measure-search-address.mjs --before=${src}\`, ${new Date().toISOString()}, live against photon.komoot.io and nominatim.openstreetmap.org (User-Agent "${UA}"). The older tree's own parseQuery, ownSpots, geocodeWords and rankResults, in the spot picker's order, first run (no position); the picker's spots from this tree (the same lists, moved). Queries and truths from tests/fixtures/search-address.json.`,
++    '',
++    '| Query | Geocoders | Rows they gave | Results shown | First result | Against the truth | Asked |',
++    '|---|---|---|---|---|---|---|',
++    ...lines,
++    '',
++  ]
++  const path = `measurements/${day}-search-address-before.md`
++  writeFileSync(new URL(`../${path}`, import.meta.url), out.join('\n'))
++  console.log(out.join('\n'))
++  console.log(`wrote ${path}`)
++  process.exit(0)
++}
++
++let fixture
++if (record) {
++  const realFetch = globalThis.fetch
++  const cases = []
++  for (const [query, census, [source, base], where] of ADDRESSES) {
++    const url = `${base}?${new URLSearchParams({ where, outFields: '*', returnGeometry: 'true', outSR: '4326', f: 'json' })}`
++    const pts = (await getJson(url)).features ?? []
++    if (pts.length !== 1) throw new Error(`${source} has ${pts.length} points for ${query}`)
++    const censusUrl = `https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?${new URLSearchParams({ address: census, benchmark: 'Public_AR_Current', format: 'json' })}`
++    const m = (await getJson(censusUrl)).result.addressMatches
++    if (m.length !== 1) throw new Error(`Census matched ${m.length} for ${census}`)
++    cases.push({ query, kind: 'address', truth: { source, url, at: { lat: pts[0].geometry.y, lon: pts[0].geometry.x }, matched: census, census: { url: censusUrl, at: { lat: m[0].coordinates.y, lon: m[0].coordinates.x }, matched: m[0].matchedAddress } }, responses: {} })
++  }
++  for (const [query, source, base, params] of PLACES) {
++    const url = `${base}?${new URLSearchParams({ ...params, returnGeometry: 'true', outSR: '4326', maxAllowableOffset: '0.0003', outFields: 'OBJECTID', f: 'json' })}`
++    const d = await getJson(url)
++    /* One polygon a record: PAD-US lists a unit once per manager, and two copies of one ring cancel under even-odd. */
++    const polygons = (d.features ?? []).map((f) => (f.geometry?.rings ?? []).map((ring) => ring.map(([x, y]) => [Number(x.toFixed(5)), Number(y.toFixed(5))])))
++    if (polygons.length === 0) throw new Error(`no boundary for ${query}: ${JSON.stringify(d).slice(0, 200)}`)
++    cases.push({ query, kind: 'place', truth: { source, url, polygons, name: query }, responses: {} })
++  }
++  /* Now the app's own path against the live geocoders, every answer kept under the URL that asked it. */
++  for (const c of cases) {
++    globalThis.fetch = async (input, init) => {
++      const href = String(input)
++      const r = await realFetch(input, { ...init, headers: { ...(init?.headers ?? {}), 'User-Agent': UA } })
++      const body = await r.json()
++      c.responses[href] = body
++      return new Response(JSON.stringify(body), { status: r.status, headers: { 'Content-Type': 'application/json' } })
++    }
++    await runPicker(c.query)
++    console.log(`recorded ${c.query}: ${Object.keys(c.responses).length} answers`)
++    await sleep(1100)
++  }
++  globalThis.fetch = realFetch
++  fixture = { recorded: new Date().toISOString(), userAgent: UA, toleranceMeters: TOLERANCE, cases }
++  mkdirSync(new URL('../tests/fixtures/', import.meta.url), { recursive: true })
++  writeFileSync(FIXTURE, `${JSON.stringify(fixture)}\n`)
++} else {
++  fixture = JSON.parse(readFileSync(FIXTURE, 'utf8'))
++}
++
++/* The table: replayed from the fixture, as the test runs it. */
++const asked = []
++globalThis.fetch = replayFetch(fixture.cases, asked)
++const rows = []
++let right = 0
++const ll = (at) => `${at.lat.toFixed(5)}, ${at.lon.toFixed(5)}`
++for (const c of fixture.cases) {
++  markNominatim(0)
++  asked.length = 0
++  const run = await runPicker(c.query)
++  const top = run.results[0]
++  let verdict = 'nothing'
++  let far = '-'
++  if (top !== undefined && c.kind === 'address') {
++    const m = distanceMeters(top.at, c.truth.at)
++    far = `${Math.round(m)} m (Census point: ${Math.round(distanceMeters(top.at, c.truth.census.at))} m)`
++    verdict = m <= fixture.toleranceMeters ? 'yes' : 'NO'
++  } else if (top !== undefined) {
++    const inside = insidePolygons(top.at, c.truth.polygons)
++    far = inside ? 'inside' : `outside, ${Math.round(nearestVertexMeters(top.at, c.truth.polygons))} m from the boundary`
++    verdict = inside ? 'yes' : 'NO'
++  }
++  if (verdict === 'yes') right += 1
++  const sent = asked.map((u) => `${new URL(u).hostname.split('.')[0]} "${new URL(u).searchParams.get('q')}"`).join(' → ')
++  const truth = c.kind === 'address' ? `${c.truth.source} (${ll(c.truth.at)})` : c.truth.source
++  rows.push(`| ${c.query} | ${top === undefined ? 'nothing' : `${top.name}${top.where === '' ? '' : `, ${top.where}`} [${top.group}] (${ll(top.at)})`} | ${far} | ${verdict} | ${truth} | ${sent} |`)
++}
++
++const day = new Date().toISOString().slice(0, 10)
++const out = [
++  '# Addresses and place names in the spot search (Batch SIMPLE-1, Section 2)',
++  '',
++  `Run: \`node scripts/measure-search-address.mjs\`, ${new Date().toISOString()}, replaying tests/fixtures/search-address.json (recorded ${fixture.recorded} from photon.komoot.io and nominatim.openstreetmap.org, User-Agent "${fixture.userAgent}"). Path: tests/searchAddressRun.ts, the spot picker's own calls (parseQuery, ownSpots over the picker's spots with no saved or cached spots, geoAsk, geocodeAsk, rankResults), first run: no position, so no distance sort. Only the typed words were sent: no lat, lon, viewbox or bias parameter in any URL asked. Right means, for an address, within ${fixture.toleranceMeters} m of the local government's address point (the Census geocoder's interpolated point is given beside it for reference); for a name, inside the boundary.`,
++  '',
++  `Right first: ${right} of ${fixture.cases.length}.`,
++  '',
++  '| Query | First result [group] (lat, lon) | Distance from truth | Right | Truth source | Asked, in order |',
++  '|---|---|---|---|---|---|',
++  ...rows,
++  '',
++]
++const path = `measurements/${day}-search-address.md`
++writeFileSync(new URL(`../${path}`, import.meta.url), out.join('\n'))
++console.log(out.join('\n'))
++console.log(`wrote ${path}`)
+diff --git a/src/components/SpotPicker.tsx b/src/components/SpotPicker.tsx
+index 3a3f36a..a0314c5 100644
+--- a/src/components/SpotPicker.tsx
++++ b/src/components/SpotPicker.tsx
+@@ -1,16 +1,13 @@
+ import '../styles/search.css'
+ import { useEffect, useMemo, useRef, useState } from 'react'
+-import { nearSpots, roundToKm, spotKind, type KnownSpot } from '../core/knownSpots.ts'
++import { nearSpots, roundToKm } from '../core/knownSpots.ts'
+ import type { LatLon } from '../core/geo.ts'
+-import { GROUP_TITLE, localPool, ownSpots, parseQuery, rankResults, type Group, type Result } from '../core/spotSearch.ts'
++import { askKey, geoAsk, GROUP_TITLE, localPool, ownSpots, parseQuery, rankResults, type Group, type Result } from '../core/spotSearch.ts'
+ import type { SpotIn } from '../core/bestSky.ts'
+ import { keptOsmSpots } from '../lib/bestSkyOsm.ts'
+-import { COAST_CAMS } from '../data/coastCams.ts'
+-import { SURF_SPOTS, type SurfSpot } from '../data/surfSpots.ts'
+ import { locateOnce, locateWords } from '../lib/locateOnce.ts'
+-import { geocodeWords, type GeoAnswer } from '../lib/spotSearchData.ts'
++import { geocodeAsk, PICKER_KNOWN as KNOWN, PICKER_SPOTS as OWN, type GeoAnswer } from '../lib/spotSearchData.ts'
+ import { Chip } from './ui.tsx'
+-import { distanceMeters } from '../core/geo.ts'
+ 
+ /*
+  * WHERE DO YOU SHOOT? (Batch I, Section 1; board "BATCH I · first run").
+@@ -21,14 +18,7 @@ import { distanceMeters } from '../core/geo.ts'
+  * the spots the app knows near there, each with the way it faces. One tap
+  * and Today is that spot's.
+  */
+-/* One row a place: two cams at the same pier under one name were two rows (Batch QA, Section 1). */
+-const KNOWN: KnownSpot[] = COAST_CAMS.filter((c, i) => COAST_CAMS.findIndex((d) => d.name === c.name && Math.abs(d.at.lat - c.at.lat) < 0.003 && Math.abs(d.at.lon - c.at.lon) < 0.003) === i).map((c) => ({ id: c.id, name: c.name, at: c.at, facing: c.facing, state: c.state }))
+-/* Batch Map, Section 2: our own spots to search, the surf spots with their aliases first, then the cams' beaches and piers. */
+-const OWN: SurfSpot[] = [
+-  ...SURF_SPOTS,
+-  /* A cam within 500 m of one of our spots is that spot (Batch Beach, Section 1: "Rodanthe, S-Turns" and "S-Turns" were two rows). */
+-  ...KNOWN.filter((k) => !SURF_SPOTS.some((s) => distanceMeters(s.at, k.at) <= 500)).map((k) => ({ id: k.id, name: k.name.split(',')[0].trim(), aliases: [k.name], town: k.name.split(',')[1]?.trim() ?? '', state: k.state ?? '', at: k.at, facing: k.facing ?? 90, kind: spotKind(k.name) === 'pier' ? ('pier' as const) : ('surf' as const) })),
+-]
++/* KNOWN (the cams, a place once) and OWN (our spots) live in src/lib/spotSearchData.ts, so the address test searches the same lists. */
+ const CHIPS: readonly { id: 'all' | Group; label: string }[] = [
+   { id: 'all', label: 'All' },
+   { id: 'spot', label: 'Spots' },
+@@ -77,20 +67,26 @@ export function SpotPicker({ title, saved, around, initialQuery = '', onPick, on
+   const from = around ?? centre?.at ?? null
+   /* Batch 3D, Section 2: our spots first and on the phone: yours, the surf spots, the starter list, the map's cached spots; fuzzy, with aliases. */
+   const own = useMemo(() => (searching ? ownSpots(q, from, OWN, localPool(saved, osm)) : []), [searching, q, from, saved, osm])
++  /* Batch SIMPLE-1, Section 2: an address, when the words are one and nothing here matched them; the words otherwise. */
++  const ownFound = own.length > 0
++  const asked = useMemo(() => (searching ? geoAsk(query, ownFound) : null), [searching, query, ownFound])
++  const key = asked === null ? '' : askKey(asked)
+   useEffect(() => {
+     if (timer.current !== null) clearTimeout(timer.current)
+-    if (!searching || q.geocoderText === '') return
+-    const text = q.geocoderText
++    if (asked === null) return
++    const text = askKey(asked)
+     const ctl = new AbortController()
+     timer.current = setTimeout(() => {
+       setOnline({ text, result: 'searching' })
+       /* Only the typed words go out: no location, no bias (src/lib/spotSearchData.ts). */
+-      void geocodeWords(text, ctl.signal).then((result) => {
++      void geocodeAsk(asked, ctl.signal).then((result) => {
+         if (result.status !== 'aborted') setOnline({ text, result })
+       })
+     }, 450)
+     return () => ctl.abort()
+-  }, [q.geocoderText, searching])
++    // `asked` is a new object on every keystroke; `key` is the question, and the same question is not asked twice.
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [key])
+ 
+   const askLocation = async () => {
+     setLocating('Asking the phone once…')
+@@ -104,11 +100,11 @@ export function SpotPicker({ title, saved, around, initialQuery = '', onPick, on
+   }
+ 
+   const near = centre === null ? [] : nearSpots(centre.at, KNOWN)
+-  const answer = searching && online !== null && online.text === q.geocoderText ? online.result : null
+-  const rows = answer !== null && answer !== 'searching' && answer.status === 'ok' ? answer.rows : []
+-  const results: Result[] = searching ? rankResults(q, own, rows, from) : []
++  const answer = searching && online !== null && online.text === key ? online.result : null
++  const got = answer !== null && answer !== 'searching' && answer.status === 'ok' ? answer : null
++  const results: Result[] = searching ? rankResults(q, own, got?.rows ?? [], from, got?.addresses ?? []) : []
+   const shown = results.filter((r) => chip === 'all' || r.group === chip)
+-  const groups = (['spot', 'beach', 'town', 'business'] as const).map((g) => ({ g, list: shown.filter((r) => r.group === g).slice(0, g === 'spot' ? 6 : 4) })).filter((x) => x.list.length > 0)
++  const groups = (['address', 'spot', 'beach', 'town', 'place', 'business'] as const).map((g) => ({ g, list: shown.filter((r) => r.group === g).slice(0, g === 'spot' ? 6 : 4) })).filter((x) => x.list.length > 0)
+   const firstRun = !searching && centre === null && saved.length === 0 && query === ''
+   const stillLooking = searching && (answer === null || answer === 'searching')
+ 
+@@ -231,7 +227,7 @@ export function SpotPicker({ title, saved, around, initialQuery = '', onPick, on
+ function TileGlyph({ group }: { group: Group }) {
+   return (
+     <svg viewBox="0 0 24 24" className="spick__glyph" aria-hidden="true">
+-      {group === 'spot' ? <path d="M3 15c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 3 2M4 10c3-5 9-6 13-3-3-1-6 0-7 3" /> : group === 'beach' ? <path d="M12 4v16M5 10a7 7 0 0 1 14 0zM3 20h18" /> : group === 'town' ? <path d="M12 21s-6-5.5-6-10a6 6 0 0 1 12 0c0 4.5-6 10-6 10zM12 13a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" /> : <path d="M4 9h16l-1 11H5zM8 9V6a4 4 0 0 1 8 0v3" />}
++      {group === 'spot' ? <path d="M3 15c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 3 2M4 10c3-5 9-6 13-3-3-1-6 0-7 3" /> : group === 'beach' ? <path d="M12 4v16M5 10a7 7 0 0 1 14 0zM3 20h18" /> : group === 'town' || group === 'address' || group === 'place' ? <path d="M12 21s-6-5.5-6-10a6 6 0 0 1 12 0c0 4.5-6 10-6 10zM12 13a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" /> : <path d="M4 9h16l-1 11H5zM8 9V6a4 4 0 0 1 8 0v3" />}
+     </svg>
+   )
+ }
+diff --git a/src/core/credits.ts b/src/core/credits.ts
+index 37066ac..2eb2841 100644
+--- a/src/core/credits.ts
++++ b/src/core/credits.ts
+@@ -232,7 +232,7 @@ export const CREDITS: readonly Credit[] = [
+   {
+     name: 'Photon (komoot)',
+     hosts: ['photon.komoot.io'],
+-    use: 'Search, when OpenStreetMap finds nothing',
++    use: 'Search, beside OpenStreetMap; first for a typed address',
+     license: 'Free public instance, fair use; data ODbL',
+     attribution: 'Search: Photon by komoot · © OpenStreetMap contributors',
+     key: 'No',
+diff --git a/src/core/spotSearch.ts b/src/core/spotSearch.ts
+index 59ac0e5..b75749d 100644
+--- a/src/core/spotSearch.ts
++++ b/src/core/spotSearch.ts
+@@ -100,7 +100,8 @@ export function missing(query: readonly string[], name: string): number {
+ 
+ const inBox = (at: LatLon, b: { south: number; west: number; north: number; east: number }) => at.lat >= b.south && at.lat <= b.north && at.lon >= b.west && at.lon <= b.east
+ 
+-export type Group = 'spot' | 'beach' | 'town' | 'business' | 'other'
++/* Batch SIMPLE-1, Section 2: 'address' (a house the geocoder found by its number) and 'place' (a named park, garden or refuge). */
++export type Group = 'address' | 'spot' | 'beach' | 'town' | 'place' | 'business' | 'other'
+ 
+ export interface Result {
+   id: string
+@@ -171,16 +172,22 @@ export function groupOf(r: Pick<GeoRow, 'osmKey' | 'osmValue' | 'name'>): Group
+ }
+ 
+ /**
+- * The whole answer: our spots, then the geocoders' rows that match every word
+- * (inside the region when one was said), grouped, businesses only for a
++ * The whole answer: the addresses the geocoder matched by house number (Batch
++ * SIMPLE-1, Section 2), our spots, then the geocoders' rows that match every
++ * word (inside the region when one was said), grouped, businesses only for a
+  * business-like query, each group nearest first, duplicates of our own spots
+  * (within 300 m) dropped.
+  */
+-export function rankResults(q: Query, own: readonly Result[], rows: readonly GeoRow[], from: LatLon | null): Result[] {
++export function rankResults(q: Query, own: readonly Result[], rows: readonly GeoRow[], from: LatLon | null, addresses: readonly GeoRow[] = []): Result[] {
++  const km = (at: LatLon) => (from === null ? null : distanceMeters(from, at) / 1000)
++  /* The geocoder's own order, the house it matched first: the whole address was typed, so no word or region filter. */
++  const fromAddresses: Result[] = addresses.map((r) => ({ id: r.id, name: r.name, where: r.where, at: r.at, group: 'address' as const, note: null, km: km(r.at) }))
+   const fromRows: Result[] = []
+   for (const r of rows) {
+     if (q.region !== null && !inBox(r.at, q.region.box)) continue
+-    const group = groupOf(r)
++    let group = groupOf(r)
++    /* Batch SIMPLE-1, Section 2: "Norfolk Botanical Garden" is a garden, no beach, town or business, and was dropped; a named place whose name holds every word is the place asked for. Not a road. */
++    if (group === 'other' && r.osmKey !== 'highway' && missing(q.words, r.name) === 0) group = 'place'
+     /* Batch 3D, Section 2: a name search is searching for the business: shown when the words are in its name, not only when they look like one. */
+     if (group === 'business' && !q.business && missing(q.words, r.name) > 0) continue
+     if (group === 'other') continue
+@@ -188,12 +195,84 @@ export function rankResults(q: Query, own: readonly Result[], rows: readonly Geo
+     /* One place once: a row within 300 m of one of ours, or with one of our names within 5 km (Sandbridge the spot and Sandbridge the village), is ours. */
+     const sameName = (o: Result) => words(o.name).join(' ') === words(r.name).join(' ') && distanceMeters(o.at, r.at) < 5000
+     if (own.some((o) => distanceMeters(o.at, r.at) < 300 || sameName(o)) || fromRows.some((o) => o.name === r.name && distanceMeters(o.at, r.at) < 300)) continue
+-    fromRows.push({ id: r.id, name: r.name, where: r.where, at: r.at, group, note: null, km: from === null ? null : distanceMeters(from, r.at) / 1000 })
++    /* The address's own building, said again by the other gazetteer: once. */
++    if (fromAddresses.some((o) => distanceMeters(o.at, r.at) < 50)) continue
++    fromRows.push({ id: r.id, name: r.name, where: r.where, at: r.at, group, note: null, km: km(r.at) })
+   }
+-  const order: Group[] = ['spot', 'beach', 'town', 'business']
++  const order: Group[] = ['spot', 'beach', 'town', 'place', 'business']
+   const near = (a: Result, b: Result) => (a.km ?? 0) - (b.km ?? 0)
+   /* Our own spots keep the match's order (best first); the map's rows go nearest first after them. */
+-  return order.flatMap((g) => [...own.filter((r) => r.group === g), ...fromRows.filter((r) => r.group === g).sort(near)])
++  return [...fromAddresses, ...order.flatMap((g) => [...own.filter((r) => r.group === g), ...fromRows.filter((r) => r.group === g).sort(near)])]
+ }
+ 
+-export const GROUP_TITLE: Record<Exclude<Group, 'other'>, string> = { spot: 'Spots', beach: 'Beach accesses', town: 'Towns', business: 'Businesses' }
++export const GROUP_TITLE: Record<Exclude<Group, 'other'>, string> = { address: 'Addresses', spot: 'Spots', beach: 'Beach accesses', town: 'Towns', place: 'Places', business: 'Businesses' }
++
++/*
++ * AN ADDRESS, TYPED (Batch SIMPLE-1, Section 2). 18 Nov: "Pub, 425 E Pinner
++ * St, Suffolk, VA 23434" and "425 E Pinner St, Suffolk" said "Nothing found
++ * by that name". Both gazetteers were asked and both answered with the house;
++ * the phone threw it away. Photon's unnamed building had no name to show,
++ * Nominatim's was a building (no group), and the restaurant at the address did
++ * not hold "425 e pinner st" in its name. Every test address failed the same
++ * way, and so did "Norfolk Botanical Garden", a garden being in no group
++ * (measurements/2026-11-18-search-address-before.md; after the change,
++ * measurements/2026-11-18-search-address.md).
++ *
++ * An address is a part, between commas, that starts with a house number and
++ * goes on with a street: "425 E Pinner St". Whatever comes before it is a name
++ * typed in front ("Pub"), tried without when the whole string finds nothing.
++ */
++export interface Address {
++  /** What was typed, spaces tidied: sent first. */
++  full: string
++  /** From the house number on, the name before it dropped; null when nothing came before it. */
++  bare: string | null
++  /** "425" */
++  number: string
++  /** The street's own words, its direction and kind left out: ["pinner"]. */
++  street: string[]
++}
++
++const STREET_KIND = new Set(['st', 'ave', 'rd', 'dr', 'blvd', 'boulevard', 'ln', 'lane', 'ct', 'court', 'pl', 'place', 'way', 'hwy', 'highway', 'pkwy', 'parkway', 'cir', 'circle', 'ter', 'terrace', 'trl', 'trail', 'n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'])
++const HOUSE = /^(\d+[a-z]?)\s+(.*[a-z].*)$/i
++
++/** The street words two spellings share: "E Pinner St" and "East Pinner Street" are both ["pinner"]. */
++export const streetWords = (s: string): string[] => words(s).filter((w) => !STREET_KIND.has(w))
++
++export function addressParts(raw: string): Address | null {
++  const parts = raw.split(',').map((p) => p.replace(/\s+/g, ' ').trim()).filter((p) => p !== '')
++  const i = parts.findIndex((p) => HOUSE.test(p))
++  const m = i < 0 ? null : HOUSE.exec(parts[i])
++  if (m === null) return null
++  const street = streetWords(m[2])
++  /* A number, then a street with a word of its own and its kind ("425 E Pinner St"), or a town after a comma: "7 Eleven" and "17th Street Park" are not addresses. */
++  const kind = words(m[2]).some((w) => STREET_KIND.has(w) && w.length > 1)
++  if (street.length === 0 || (!kind && i === parts.length - 1)) return null
++  return { full: parts.join(', '), bare: i === 0 ? null : parts.slice(i).join(', '), number: m[1].toLowerCase(), street }
++}
++
++/** Is a geocoder's house this address: the same number, and a street word in common. */
++export function sameHouse(a: Address, number: string, street: string): boolean {
++  if (number.trim().toLowerCase() !== a.number) return false
++  const got = streetWords(street)
++  return a.street.some((w) => got.includes(w))
++}
++
++/**
++ * What the spot picker asks the geocoders, or null for nothing: an address
++ * when the words are one and nothing on the phone matched them, the words
++ * otherwise (the region left out, as before). Only the typed words, never a
++ * position.
++ */
++export type GeoAsk = { kind: 'address'; address: Address; text: string } | { kind: 'words'; text: string }
++
++export function geoAsk(raw: string, localMatched: boolean): GeoAsk | null {
++  /* `text`, the words search (region left out), is also the address's fallback when no house matches. */
++  const text = parseQuery(raw).geocoderText
++  const address = localMatched ? null : addressParts(raw)
++  if (address !== null) return { kind: 'address', address, text }
++  return text === '' ? null : { kind: 'words', text }
++}
++
++/** One key per question: an answer to another question is not shown (E7). */
++export const askKey = (a: GeoAsk): string => (a.kind === 'address' ? `address:${a.address.full}` : a.text)
+diff --git a/src/lib/hosts.ts b/src/lib/hosts.ts
+index b58069d..e8337df 100644
+--- a/src/lib/hosts.ts
++++ b/src/lib/hosts.ts
+@@ -63,7 +63,7 @@ export const HOSTS: readonly Host[] = [
+   { host: 'waterservices.usgs.gov', who: 'US Geological Survey', learns: 'river gauge numbers, never the venue (which gauges are near is worked out on the phone)', when: 'the water temperature, when no sea station or satellite answers and a gauge is within 5 km', trigger: 'on-pin' },
+   /* Asked only when you open or press the thing named (29 Oct: these five were missing from this list). */
+   { host: 'gibs.earthdata.nasa.gov', who: 'NASA GIBS satellite imagery', learns: 'which satellite tiles: a map cell', when: 'the satellite cloud layer; and Sky color and Today in the three hours before a sunrise or sunset, along the sun\u2019s line', trigger: 'on-pin' },
+-  { host: 'photon.komoot.io', who: 'Photon (komoot), a place search', learns: 'what you search', when: 'search, when OpenStreetMap finds nothing', trigger: 'if-you-tap' },
++  { host: 'photon.komoot.io', who: 'Photon (komoot), a place search', learns: 'what you search', when: 'search, beside OpenStreetMap; asked first for a typed address', trigger: 'if-you-tap' },
+   { host: 'this app (/api/search)', who: 'this app, asking Mapbox', learns: 'what you search, never who you are', when: 'search, as the last try', trigger: 'if-you-tap' },
+   { host: 'api.github.com', who: 'GitHub', learns: 'the app’s public repository name, nothing about you', when: 'Settings, to say whether a newer build exists', trigger: 'if-you-tap' },
+   { host: 'api.anthropic.com', who: 'Anthropic, with your own key', learns: 'what you ask it to write, sent with your key', when: 'only when you press Write on the call sheet', trigger: 'if-you-tap' },
+diff --git a/src/lib/spotSearchData.ts b/src/lib/spotSearchData.ts
+index 959f3de..f51d844 100644
+--- a/src/lib/spotSearchData.ts
++++ b/src/lib/spotSearchData.ts
+@@ -6,7 +6,25 @@
+  * (beaches, towns, businesses) and sort them by distance itself.
+  */
+ import { msUntilNominatim, markNominatim, NOMINATIM_URL, PHOTON_URL } from './search.ts'
+-import type { GeoRow } from '../core/spotSearch.ts'
++import { sameHouse, type Address, type GeoAsk, type GeoRow } from '../core/spotSearch.ts'
++import { distanceMeters } from '../core/geo.ts'
++import { spotKind, type KnownSpot } from '../core/knownSpots.ts'
++import { COAST_CAMS } from '../data/coastCams.ts'
++import { SURF_SPOTS, type SurfSpot } from '../data/surfSpots.ts'
++
++/*
++ * THE PICKER'S OWN LISTS, here rather than in the component (Batch SIMPLE-1,
++ * Section 2) so tests/searchAddress.test.ts searches exactly what the picker
++ * searches.
++ */
++/* One row a place: two cams at the same pier under one name were two rows (Batch QA, Section 1). */
++export const PICKER_KNOWN: KnownSpot[] = COAST_CAMS.filter((c, i) => COAST_CAMS.findIndex((d) => d.name === c.name && Math.abs(d.at.lat - c.at.lat) < 0.003 && Math.abs(d.at.lon - c.at.lon) < 0.003) === i).map((c) => ({ id: c.id, name: c.name, at: c.at, facing: c.facing, state: c.state }))
++/* Batch Map, Section 2: our own spots to search, the surf spots with their aliases first, then the cams' beaches and piers. */
++export const PICKER_SPOTS: SurfSpot[] = [
++  ...SURF_SPOTS,
++  /* A cam within 500 m of one of our spots is that spot (Batch Beach, Section 1: "Rodanthe, S-Turns" and "S-Turns" were two rows). */
++  ...PICKER_KNOWN.filter((k) => !SURF_SPOTS.some((s) => distanceMeters(s.at, k.at) <= 500)).map((k) => ({ id: k.id, name: k.name.split(',')[0].trim(), aliases: [k.name], town: k.name.split(',')[1]?.trim() ?? '', state: k.state ?? '', at: k.at, facing: k.facing ?? 90, kind: spotKind(k.name) === 'pier' ? ('pier' as const) : ('surf' as const) })),
++]
+ 
+ export const ROWS_ASKED = 20
+ 
+@@ -38,27 +56,112 @@ export function nominatimRows(payload: unknown): GeoRow[] {
+   })
+ }
+ 
+-export type GeoAnswer = { status: 'ok'; rows: GeoRow[] } | { status: 'failed' } | { status: 'aborted' }
++/** `addresses`: the houses matched by number (Batch SIMPLE-1, Section 2), shown first; empty for a search by name. */
++export type GeoAnswer = { status: 'ok'; rows: GeoRow[]; addresses: GeoRow[] } | { status: 'failed' } | { status: 'aborted' }
+ 
+-export async function geocodeWords(text: string, signal?: AbortSignal): Promise<GeoAnswer> {
+-  if (text.trim() === '') return { status: 'ok', rows: [] }
+-  const ask = async (url: string, parse: (b: unknown) => GeoRow[]): Promise<GeoRow[] | null> => {
+-    try {
+-      const r = await fetch(url, { signal, headers: { Accept: 'application/json' } })
+-      return r.ok ? parse(await r.json()) : null
+-    } catch {
+-      return null
+-    }
+-  }
+-  const nominatim = async () => {
+-    const gap = msUntilNominatim()
+-    if (gap > 0) await new Promise((r) => setTimeout(r, gap))
+-    if (signal?.aborted === true) return null
+-    markNominatim()
+-    return ask(`${NOMINATIM_URL}?${new URLSearchParams({ format: 'json', q: text, limit: String(ROWS_ASKED), countrycodes: 'us' })}`, nominatimRows)
++/** One request, its rows, or null when it did not answer. */
++async function ask<T>(url: string, parse: (b: unknown) => T[], signal?: AbortSignal): Promise<T[] | null> {
++  try {
++    const r = await fetch(url, { signal, headers: { Accept: 'application/json' } })
++    return r.ok ? parse(await r.json()) : null
++  } catch {
++    return null
+   }
+-  const [a, b] = await Promise.all([nominatim(), ask(`${PHOTON_URL}?${new URLSearchParams({ q: text, limit: String(ROWS_ASKED) })}`, photonRows)])
++}
++
++/** Nominatim, after its one-a-second clock (src/lib/search.ts). */
++async function askNominatim<T>(params: Record<string, string>, parse: (b: unknown) => T[], signal?: AbortSignal): Promise<T[] | null> {
++  const gap = msUntilNominatim()
++  if (gap > 0) await new Promise((r) => setTimeout(r, gap))
++  if (signal?.aborted === true) return null
++  markNominatim()
++  return ask(`${NOMINATIM_URL}?${new URLSearchParams({ format: 'json', limit: String(ROWS_ASKED), countrycodes: 'us', ...params })}`, parse, signal)
++}
++
++export const photonUrlFor = (text: string): string => `${PHOTON_URL}?${new URLSearchParams({ q: text, limit: String(ROWS_ASKED) })}`
++
++export async function geocodeWords(text: string, signal?: AbortSignal): Promise<GeoAnswer> {
++  if (text.trim() === '') return { status: 'ok', rows: [], addresses: [] }
++  const [a, b] = await Promise.all([askNominatim({ q: text }, nominatimRows, signal), ask(photonUrlFor(text), photonRows, signal)])
+   if (signal?.aborted === true) return { status: 'aborted' }
+   if (a === null && b === null) return { status: 'failed' }
+-  return { status: 'ok', rows: [...(a ?? []), ...(b ?? [])] }
++  return { status: 'ok', rows: [...(a ?? []), ...(b ?? [])], addresses: [] }
++}
++
++/*
++ * AN ADDRESS (Batch SIMPLE-1, Section 2). The typed string as it was typed,
++ * commas and all, and nothing else: no position, no bias, no box. Photon
++ * first; Nominatim only when Photon has not got the house; then the same two
++ * with the name in front dropped ("Pub, 425 E Pinner St" is "425 E Pinner
++ * St"). A house is the one asked for when its number is the typed number and
++ * its street shares a word with the typed street; nothing else is shown as
++ * the address. When no house matches, the words are searched as before, so
++ * "2 Mile Beach, NC" still finds the beach.
++ */
++interface House {
++  row: GeoRow
++  number: string
++  street: string
++}
++
++const STATE: Record<string, string> = { Virginia: 'VA', 'North Carolina': 'NC', Maryland: 'MD', 'South Carolina': 'SC', Delaware: 'DE' }
++const place = (town: string, state: string) => [town, STATE[state] ?? state].filter((x) => x !== '').join(', ')
++
++/** A house the way the picker shows it: a name when it has one, the street address under it. */
++function houseRow(id: string, at: GeoRow['at'], name: string, number: string, street: string, town: string, state: string, osmKey: string, osmValue: string): House {
++  const line = [number, street].filter((x) => x !== '').join(' ')
++  return { row: { id, name: name || line, where: name === '' ? place(town, state) : [line, town].filter((x) => x !== '').join(', '), at, osmKey, osmValue }, number, street }
++}
++
++export function photonHouses(payload: unknown): House[] {
++  const features = (payload as { features?: unknown })?.features
++  if (!Array.isArray(features)) return []
++  return features.flatMap((f: { properties?: Record<string, unknown>; geometry?: { coordinates?: unknown } }) => {
++    const c = f.geometry?.coordinates
++    const p = f.properties ?? {}
++    if (!Array.isArray(c) || c.length < 2 || !Number.isFinite(Number(c[0])) || !Number.isFinite(Number(c[1]))) return []
++    if (s(p.countrycode).toUpperCase() !== 'US' || s(p.housenumber) === '') return []
++    return [houseRow(`pa${s(p.osm_type)}${String(p.osm_id ?? '')}`, { lat: Number(c[1]), lon: Number(c[0]) }, s(p.name), s(p.housenumber), s(p.street), s(p.city) || s(p.town) || s(p.county), s(p.state), s(p.osm_key), s(p.osm_value))]
++  })
++}
++
++export function nominatimHouses(payload: unknown): House[] {
++  if (!Array.isArray(payload)) return []
++  return payload.flatMap((r: Record<string, unknown>) => {
++    const lat = Number(r.lat)
++    const lon = Number(r.lon)
++    const a = typeof r.address === 'object' && r.address !== null ? (r.address as Record<string, unknown>) : {}
++    if (!Number.isFinite(lat) || !Number.isFinite(lon) || s(a.house_number) === '') return []
++    return [houseRow(`na${String(r.osm_type ?? '')}${String(r.osm_id ?? '')}`, { lat, lon }, s(r.name), s(a.house_number), s(a.road), s(a.city) || s(a.town) || s(a.village) || s(a.hamlet), s(a.state), s(r.class), s(r.type))]
++  })
++}
++
++/** `words`: what the search by words would send (parseQuery's geocoderText), asked when no house matches. */
++export async function geocodeAddress(address: Address, words: string, signal?: AbortSignal): Promise<GeoAnswer> {
++  let answered = false
++  /* A function, so the check after each await is read afresh. */
++  const stopped = () => signal?.aborted === true
++  const houses = (got: House[] | null): GeoRow[] => {
++    if (got !== null) answered = true
++    const out: GeoRow[] = []
++    /* One house once: the building and the pub in it are one pin, and three rows of one name and line are one row. */
++    for (const h of got ?? []) if (sameHouse(address, h.number, h.street) && !out.some((o) => distanceMeters(o.at, h.row.at) < 30 || (o.name === h.row.name && o.where === h.row.where))) out.push(h.row)
++    return out
++  }
++  for (const text of [address.full, ...(address.bare === null ? [] : [address.bare])]) {
++    const photon = houses(await ask(photonUrlFor(text), photonHouses, signal))
++    if (stopped()) return { status: 'aborted' }
++    if (photon.length > 0) return { status: 'ok', rows: [], addresses: photon }
++    const osm = houses(await askNominatim({ q: text, addressdetails: '1' }, nominatimHouses, signal))
++    if (stopped()) return { status: 'aborted' }
++    if (osm.length > 0) return { status: 'ok', rows: [], addresses: osm }
++  }
++  /* No house by that number: the words, as any other search. */
++  const byWords = await geocodeWords(words, signal)
++  return byWords.status === 'failed' && answered ? { status: 'ok', rows: [], addresses: [] } : byWords
++}
++
++/** The spot picker's question, asked (src/core/spotSearch.ts geoAsk). */
++export function geocodeAsk(a: GeoAsk, signal?: AbortSignal): Promise<GeoAnswer> {
++  return a.kind === 'address' ? geocodeAddress(a.address, a.text, signal) : geocodeWords(a.text, signal)
+ }
+diff --git a/src/styles/search.css b/src/styles/search.css
+index 0b3f947..0e680e6 100644
+--- a/src/styles/search.css
++++ b/src/styles/search.css
+@@ -52,6 +52,8 @@
+   background: var(--caution);
+ }
+ .spick__tile--town,
++.spick__tile--address,
++.spick__tile--place,
+ .spick__tile--business {
+   background: var(--surface-3);
+ }
+diff --git a/tests/fixtures/search-address.json b/tests/fixtures/search-address.json
+new file mode 100644
+index 0000000..a90b667
+--- /dev/null
++++ b/tests/fixtures/search-address.json
+@@ -0,0 +1 @@
++{"recorded":"2026-11-18T18:32:37.391Z","userAgent":"scoutngo-search-test/1.0 (fixture recording for tests/searchAddress.test.ts)","toleranceMeters":150,"cases":[{"query":"2401 Courthouse Dr, Virginia Beach, VA 23456","kind":"address","truth":{"source":"VGIN Virginia Address Points","url":"https://vginmaps.vdem.virginia.gov/arcgis/rest/services/VA_Base_Layers/VA_Address_Points/FeatureServer/0/query?where=ADDRNUM+%3D+%272401%27+AND+STREET_NAME+%3D+%27COURTHOUSE%27+AND+MUNICIPALITY+%3D+%27Virginia+Beach+City%27&outFields=*&returnGeometry=true&outSR=4326&f=json","at":{"lat":36.7503372394998,"lon":-76.05711459253126},"matched":"2401 Courthouse Dr, Virginia Beach, VA 23456","census":{"url":"https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=2401+Courthouse+Dr%2C+Virginia+Beach%2C+VA+23456&benchmark=Public_AR_Current&format=json","at":{"lat":36.750161421618,"lon":-76.054884206967},"matched":"2401 COURTHOUSE DR, VIRGINIA BEACH, VA, 23456"}},"responses":{"https://photon.komoot.io/api/?q=2401+Courthouse+Dr%2C+Virginia+Beach%2C+VA+23456&limit=20":{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"osm_type":"W","osm_id":1314925242,"osm_key":"amenity","osm_value":"townhall","type":"house","housenumber":"2401","name":"Virginia Beach City Hall","street":"Courthouse Drive","district":"Princess Anne","city":"Virginia Beach","state":"VA","country":"United States","postcode":"23456","countrycode":"US","extent":[-76.0577991,36.7505564,-76.0567102,36.7497347]},"geometry":{"type":"Point","coordinates":[-76.0572544,36.7501461]}}]}}},{"query":"717 General Booth Blvd, Virginia Beach","kind":"address","truth":{"source":"VGIN Virginia Address Points","url":"https://vginmaps.vdem.virginia.gov/arcgis/rest/services/VA_Base_Layers/VA_Address_Points/FeatureServer/0/query?where=ADDRNUM+%3D+%27717%27+AND+STREET_NAME+%3D+%27GENERAL+BOOTH%27+AND+MUNICIPALITY+%3D+%27Virginia+Beach+City%27&outFields=*&returnGeometry=true&outSR=4326&f=json","at":{"lat":36.82130560863728,"lon":-75.98285788021771},"matched":"717 General Booth Blvd, Virginia Beach, VA 23451","census":{"url":"https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=717+General+Booth+Blvd%2C+Virginia+Beach%2C+VA+23451&benchmark=Public_AR_Current&format=json","at":{"lat":36.82232292216,"lon":-75.980300427717},"matched":"717 GENERAL BOOTH BLVD, VIRGINIA BEACH, VA, 23451"}},"responses":{"https://photon.komoot.io/api/?q=717+General+Booth+Blvd%2C+Virginia+Beach&limit=20":{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"osm_type":"R","osm_id":8668260,"osm_key":"tourism","osm_value":"aquarium","type":"house","housenumber":"717","name":"Virginia Aquarium and Marine Science Centers","street":"General Booth Boulevard","locality":"Rudee Heights","city":"Virginia Beach","state":"VA","country":"United States","postcode":"23451","countrycode":"US","extent":[-75.984176,36.8219215,-75.9829133,36.8203184]},"geometry":{"type":"Point","coordinates":[-75.9837181,36.8211151]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":966022303,"osm_key":"amenity","osm_value":"cinema","type":"house","housenumber":"717","name":"IMAX","street":"General Booth Boulevard","locality":"Rudee Heights","city":"Virginia Beach","state":"VA","country":"United States","postcode":"23451","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-75.9834441,36.8206306]}}]}}},{"query":"425 E Pinner St, Suffolk","kind":"address","truth":{"source":"VGIN Virginia Address Points","url":"https://vginmaps.vdem.virginia.gov/arcgis/rest/services/VA_Base_Layers/VA_Address_Points/FeatureServer/0/query?where=ADDRNUM+%3D+%27425%27+AND+STREET_NAME+%3D+%27PINNER%27+AND+MUNICIPALITY+%3D+%27Suffolk+City%27&outFields=*&returnGeometry=true&outSR=4326&f=json","at":{"lat":36.73672025911643,"lon":-76.56993110706118},"matched":"425 E Pinner St, Suffolk, VA 23434","census":{"url":"https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=425+E+Pinner+St%2C+Suffolk%2C+VA+23434&benchmark=Public_AR_Current&format=json","at":{"lat":36.736875927581,"lon":-76.569698911174},"matched":"425 E PINNER ST, SUFFOLK, VA, 23434"}},"responses":{"https://photon.komoot.io/api/?q=425+E+Pinner+St%2C+Suffolk&limit=20":{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"osm_type":"W","osm_id":384049634,"osm_key":"building","osm_value":"yes","type":"house","housenumber":"425","street":"Pinner Street","locality":"Suffolk Trailer Park","city":"Suffolk","state":"Virginia","country":"United States","postcode":"23434","countrycode":"US","extent":[-76.5700515,36.7367954,-76.5698086,36.7366285]},"geometry":{"type":"Point","coordinates":[-76.5699301,36.736712]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":12193120647,"osm_key":"amenity","osm_value":"restaurant","type":"house","housenumber":"425","name":"Derl'z Restaurant & Pub","street":"Pinner Street","locality":"Suffolk Trailer Park","city":"Suffolk","state":"Virginia","country":"United States","postcode":"23434","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-76.56993,36.736712]}}]}}},{"query":"Pub, 425 E Pinner St, Suffolk, VA 23434","kind":"address","truth":{"source":"VGIN Virginia Address Points","url":"https://vginmaps.vdem.virginia.gov/arcgis/rest/services/VA_Base_Layers/VA_Address_Points/FeatureServer/0/query?where=ADDRNUM+%3D+%27425%27+AND+STREET_NAME+%3D+%27PINNER%27+AND+MUNICIPALITY+%3D+%27Suffolk+City%27&outFields=*&returnGeometry=true&outSR=4326&f=json","at":{"lat":36.73672025911643,"lon":-76.56993110706118},"matched":"425 E Pinner St, Suffolk, VA 23434","census":{"url":"https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=425+E+Pinner+St%2C+Suffolk%2C+VA+23434&benchmark=Public_AR_Current&format=json","at":{"lat":36.736875927581,"lon":-76.569698911174},"matched":"425 E PINNER ST, SUFFOLK, VA, 23434"}},"responses":{"https://photon.komoot.io/api/?q=Pub%2C+425+E+Pinner+St%2C+Suffolk%2C+VA+23434&limit=20":{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"osm_type":"N","osm_id":12193120647,"osm_key":"amenity","osm_value":"restaurant","type":"house","housenumber":"425","name":"Derl'z Restaurant & Pub","street":"Pinner Street","locality":"Suffolk Trailer Park","city":"Suffolk","state":"Virginia","country":"United States","postcode":"23434","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-76.56993,36.736712]}}]}}},{"query":"442 W Washington St, Suffolk, VA","kind":"address","truth":{"source":"VGIN Virginia Address Points","url":"https://vginmaps.vdem.virginia.gov/arcgis/rest/services/VA_Base_Layers/VA_Address_Points/FeatureServer/0/query?where=ADDRNUM+%3D+%27442%27+AND+STREET_NAME+%3D+%27WASHINGTON%27+AND+MUNICIPALITY+%3D+%27Suffolk+City%27&outFields=*&returnGeometry=true&outSR=4326&f=json","at":{"lat":36.729867979703954,"lon":-76.58889269847097},"matched":"442 W Washington St, Suffolk, VA 23434","census":{"url":"https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=442+W+Washington+St%2C+Suffolk%2C+VA+23434&benchmark=Public_AR_Current&format=json","at":{"lat":36.72968142214,"lon":-76.588939409698},"matched":"442 W WASHINGTON ST, SUFFOLK, VA, 23434"}},"responses":{"https://photon.komoot.io/api/?q=442+W+Washington+St%2C+Suffolk%2C+VA&limit=20":{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"osm_type":"W","osm_id":384053179,"osm_key":"building","osm_value":"public","type":"house","housenumber":"442","name":"Suffolk City Hall Building","street":"West Washington Street","city":"Suffolk","state":"Virginia","country":"United States","postcode":"23434","countrycode":"US","extent":[-76.5896519,36.730423,-76.5883345,36.7297011]},"geometry":{"type":"Point","coordinates":[-76.5889727,36.7300747]}}]}}},{"query":"Joe's Pizza, 442 W Washington St, Suffolk","kind":"address","truth":{"source":"VGIN Virginia Address Points","url":"https://vginmaps.vdem.virginia.gov/arcgis/rest/services/VA_Base_Layers/VA_Address_Points/FeatureServer/0/query?where=ADDRNUM+%3D+%27442%27+AND+STREET_NAME+%3D+%27WASHINGTON%27+AND+MUNICIPALITY+%3D+%27Suffolk+City%27&outFields=*&returnGeometry=true&outSR=4326&f=json","at":{"lat":36.729867979703954,"lon":-76.58889269847097},"matched":"442 W Washington St, Suffolk, VA 23434","census":{"url":"https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=442+W+Washington+St%2C+Suffolk%2C+VA+23434&benchmark=Public_AR_Current&format=json","at":{"lat":36.72968142214,"lon":-76.588939409698},"matched":"442 W WASHINGTON ST, SUFFOLK, VA, 23434"}},"responses":{"https://photon.komoot.io/api/?q=Joe%27s+Pizza%2C+442+W+Washington+St%2C+Suffolk&limit=20":{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"osm_type":"N","osm_id":7122827901,"osm_key":"amenity","osm_value":"restaurant","type":"house","housenumber":"1938","name":"Joe's Pizza","street":"Washington Valley Road","district":"Martinsville","city":"Martinsville","county":"Somerset","state":"NJ","country":"United States","postcode":"08836","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-74.5625675,40.6016332]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":1399799345,"osm_key":"highway","osm_value":"bus_stop","type":"house","name":"Washington St @ Joe L Smith Way","street":"Washington Street","locality":"Mount Bowdoin","district":"Dorchester","city":"Boston","county":"Suffolk","state":"Massachusetts","country":"United States","postcode":"02121","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-71.08123,42.306049]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":664502849,"osm_key":"amenity","osm_value":"restaurant","type":"house","name":"Happy Joe's Pizza & Ice Cream","street":"South Washington Street East Frontage Road","city":"Grand Forks","county":"Grand Forks","state":"North Dakota","country":"United States","postcode":"58201","countrycode":"US","extent":[-97.0446261,47.8919911,-97.0442332,47.8918422]},"geometry":{"type":"Point","coordinates":[-97.0444295,47.891922]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":384053179,"osm_key":"building","osm_value":"public","type":"house","housenumber":"442","name":"Suffolk City Hall Building","street":"West Washington Street","city":"Suffolk","state":"Virginia","country":"United States","postcode":"23434","countrycode":"US","extent":[-76.5896519,36.730423,-76.5883345,36.7297011]},"geometry":{"type":"Point","coordinates":[-76.5889727,36.7300747]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":11477314935,"osm_key":"amenity","osm_value":"fast_food","type":"house","housenumber":"750","name":"Nonni's Pizza","street":"Washington Avenue","city":"Revere","county":"Suffolk","state":"MA","country":"United States","postcode":"02151","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-71.0227397,42.4295912]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":363397836,"osm_key":"amenity","osm_value":"restaurant","type":"house","housenumber":"2815","name":"Joe's Woodfired Pizza","street":"Howard Road","city":"Langley","county":"Island","state":"WA","country":"United States","postcode":"98260","countrycode":"US","extent":[-122.4613885,48.0005628,-122.4609467,48.0002759]},"geometry":{"type":"Point","coordinates":[-122.4611675,48.0004194]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":4123603493,"osm_key":"amenity","osm_value":"fast_food","type":"house","housenumber":"389","name":"Little Pizza King","street":"Washington Street","locality":"Brighton Center","district":"Brighton","city":"Boston","county":"Suffolk","state":"Massachusetts","country":"United States","postcode":"02135","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-71.1547768,42.3493335]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":4045929123,"osm_key":"amenity","osm_value":"fast_food","type":"house","housenumber":"3722","name":"Forest Hills Pizza","street":"Washington Street","locality":"Forest Hills","district":"Jamaica Plain","city":"Boston","county":"Suffolk","state":"Massachusetts","country":"United States","postcode":"02130","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-71.1132798,42.3000636]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":10221571134,"osm_key":"amenity","osm_value":"restaurant","type":"house","housenumber":"707","name":"Boston Pizza","street":"Washington Street","locality":"Downtown Crossing","district":"Downtown","city":"Boston","county":"Suffolk","state":"MA","country":"United States","postcode":"02116","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-71.0630471,42.3510917]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":9537495077,"osm_key":"amenity","osm_value":"restaurant","type":"house","housenumber":"1252","name":"Alex Pizza & Grill","street":"Washington Street","district":"South End","city":"Boston","county":"Suffolk","state":"MA","country":"United States","postcode":"02118","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-71.0673038,42.3424538]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":5037895386,"osm_key":"amenity","osm_value":"fast_food","type":"house","housenumber":"357","name":"Metro Pizza","street":"Washington Avenue","locality":"Prattville","city":"Chelsea","county":"Suffolk","state":"MA","country":"United States","postcode":"02150","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-71.0354328,42.404833]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":5037895387,"osm_key":"amenity","osm_value":"fast_food","type":"house","housenumber":"368","name":"Pizza Lovers","street":"Washington Avenue","locality":"Prattville","city":"Chelsea","county":"Suffolk","state":"MA","country":"United States","postcode":"02150","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-71.0356779,42.4050297]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":5567734727,"osm_key":"amenity","osm_value":"fast_food","type":"house","name":"Arizona BBQ House of Pizza","street":"Washington Street","locality":"Nubian Square","district":"Roxbury","city":"Boston","county":"Suffolk","state":"Massachusetts","country":"United States","postcode":"02119","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-71.0845913,42.3294508]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":723764961,"osm_key":"amenity","osm_value":"restaurant","type":"house","name":"Pizza Joe's","street":"West Main Street","city":"Cortland","county":"Trumbull County","state":"Ohio","country":"United States","postcode":"44410","countrycode":"US","extent":[-80.7293998,41.3304009,-80.7293087,41.3302115]},"geometry":{"type":"Point","coordinates":[-80.7293573,41.3302802]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":1337246893,"osm_key":"amenity","osm_value":"restaurant","type":"house","name":"Pizza Joe's - Hubbard","street":"Youngstown Hubbard Road","locality":"Westview Heights","city":"Hubbard","county":"Trumbull County","state":"Ohio","country":"United States","postcode":"44425","countrycode":"US","extent":[-80.5858126,41.155247,-80.5854814,41.1549908]},"geometry":{"type":"Point","coordinates":[-80.5856771,41.1551451]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":3096924451,"osm_key":"amenity","osm_value":"fast_food","type":"house","housenumber":"59","name":"St Edmunds Fried Chicken & Pizza","street":"St Johns Street","locality":"Mildenhall Road Estate","district":"Bury St Edmunds","city":"Bury St Edmunds","county":"Suffolk","state":"England","country":"United Kingdom","postcode":"IP33 1SJ","countrycode":"GB"},"geometry":{"type":"Point","coordinates":[0.7121672,52.2483993]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":133535657,"osm_key":"leisure","osm_value":"dog_park","type":"house","housenumber":"1277","name":"Joe Wex Dog Recreation Space","street":"Washington Street","district":"South End","city":"Boston","county":"Suffolk","state":"MA","country":"United States","postcode":"02118","countrycode":"US","extent":[-71.0679872,42.3428742,-71.0672916,42.3424125]},"geometry":{"type":"Point","coordinates":[-71.0676785,42.3426795]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":7978143784,"osm_key":"amenity","osm_value":"restaurant","type":"house","housenumber":"815","name":"Frank's Pizza and Italian Restaurant","street":"John Small Avenue","district":"Washington Heights","city":"Washington","county":"Beaufort","state":"NC","country":"United States","postcode":"27889","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-77.0427106,35.5463112]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":2520481088,"osm_key":"amenity","osm_value":"restaurant","type":"house","housenumber":"44568","name":"Annie's Pizza Station","street":"State Route 20","district":"Grassmere","city":"Concrete","county":"Skagit","state":"Washington","country":"United States","postcode":"98237","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-121.7761163,48.5379751]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":1687573827,"osm_key":"amenity","osm_value":"restaurant","type":"house","housenumber":"2120","name":"Bellacino's Pizza & Grinders","street":"South Roan Street","locality":"Reece Terrace","district":"East Park","city":"Johnson City","county":"Washington","state":"TN","country":"United States","postcode":"37601","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-82.3385383,36.3018838]}}]}}},{"query":"810 Union St, Norfolk, VA 23510","kind":"address","truth":{"source":"VGIN Virginia Address Points","url":"https://vginmaps.vdem.virginia.gov/arcgis/rest/services/VA_Base_Layers/VA_Address_Points/FeatureServer/0/query?where=ADDRNUM+%3D+%27810%27+AND+STREET_NAME+%3D+%27UNION%27+AND+MUNICIPALITY+%3D+%27Norfolk+City%27&outFields=*&returnGeometry=true&outSR=4326&f=json","at":{"lat":36.844586864742126,"lon":-76.28572180796182},"matched":"810 Union St, Norfolk, VA 23510","census":{"url":"https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=810+Union+St%2C+Norfolk%2C+VA+23510&benchmark=Public_AR_Current&format=json","at":{"lat":36.844469369521,"lon":-76.287112913337},"matched":"810 UNION ST, NORFOLK, VA, 23510"}},"responses":{"https://photon.komoot.io/api/?q=810+Union+St%2C+Norfolk%2C+VA+23510&limit=20":{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"osm_type":"N","osm_id":317004555,"osm_key":"office","osm_value":"government","type":"house","housenumber":"810","name":"City Hall Complex","street":"Union Street","district":"Berkley","city":"Norfolk","state":"Virginia","country":"United States","postcode":"23510","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-76.28575,36.8446625]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":317004555,"osm_key":"amenity","osm_value":"townhall","type":"house","housenumber":"810","name":"City Hall Complex","street":"Union Street","district":"Berkley","city":"Norfolk","state":"Virginia","country":"United States","postcode":"23510","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-76.28575,36.8446625]}}]}}},{"query":"245 W Olney Rd, Norfolk","kind":"address","truth":{"source":"VGIN Virginia Address Points","url":"https://vginmaps.vdem.virginia.gov/arcgis/rest/services/VA_Base_Layers/VA_Address_Points/FeatureServer/0/query?where=ADDRNUM+%3D+%27245%27+AND+STREET_NAME+%3D+%27OLNEY%27+AND+MUNICIPALITY+%3D+%27Norfolk+City%27&outFields=*&returnGeometry=true&outSR=4326&f=json","at":{"lat":36.856516661081756,"lon":-76.29277914474082},"matched":"245 W Olney Rd, Norfolk, VA 23510","census":{"url":"https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=245+W+Olney+Rd%2C+Norfolk%2C+VA+23510&benchmark=Public_AR_Current&format=json","at":{"lat":36.856976241944,"lon":-76.292649965229},"matched":"245 W OLNEY RD, NORFOLK, VA, 23510"}},"responses":{"https://photon.komoot.io/api/?q=245+W+Olney+Rd%2C+Norfolk&limit=20":{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"osm_key":"place","osm_value":"postcode","type":"other","name":"IP24 1RD","district":"Wretham","city":"Breckland","county":"Norfolk","state":"England","country":"United Kingdom","countrycode":"GB","extent":[0.8093880442608302,52.48204449657444,0.8299854706122778,52.46946729540281]},"geometry":{"type":"Point","coordinates":[0.8196867,52.4757559]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":475631846,"osm_key":"amenity","osm_value":"scout_hut","type":"house","name":"3rd Thetford Scout Group","street":"Hood Way","locality":"Admirals","district":"Thetford","city":"Breckland","county":"Norfolk","state":"England","country":"United Kingdom","postcode":"IP24 2JP","countrycode":"GB","extent":[0.7577392,52.421459,0.7580428,52.4212694]},"geometry":{"type":"Point","coordinates":[0.757896,52.421369]}}]},"https://nominatim.openstreetmap.org/search?format=json&limit=20&countrycodes=us&q=245+W+Olney+Rd%2C+Norfolk&addressdetails=1":[{"place_id":392484034,"licence":"Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright","osm_type":"way","osm_id":690905424,"lat":"36.8569499","lon":"-76.2926574","class":"place","type":"house","place_rank":30,"importance":0.00000999999999995449,"addresstype":"place","name":"","display_name":"245, West Olney Road, Norfolk, Virginia, 23510, United States","address":{"house_number":"245","road":"West Olney Road","city":"Norfolk","state":"Virginia","ISO3166-2-lvl4":"US-VA","postcode":"23510","country":"United States","country_code":"us"},"boundingbox":["36.8568999","36.8569999","-76.2927074","-76.2926074"]},{"place_id":392484029,"licence":"Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright","osm_type":"way","osm_id":690929498,"lat":"36.8571966","lon":"-76.2925037","class":"place","type":"house","place_rank":30,"importance":0.00000999999999995449,"addresstype":"place","name":"","display_name":"245, West Olney Road, Ghent, Norfolk, Virginia, 23507, United States","address":{"house_number":"245","road":"West Olney Road","neighbourhood":"Ghent","city":"Norfolk","state":"Virginia","ISO3166-2-lvl4":"US-VA","postcode":"23507","country":"United States","country_code":"us"},"boundingbox":["36.8571466","36.8572466","-76.2925537","-76.2924537"]},{"place_id":392471131,"licence":"Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright","osm_type":"way","osm_id":1215394606,"lat":"36.8566087","lon":"-76.2917767","class":"place","type":"house","place_rank":30,"importance":0.00000999999999995449,"addresstype":"place","name":"","display_name":"245, West Olney Road, Norfolk, Virginia, 23507, United States","address":{"house_number":"245","road":"West Olney Road","city":"Norfolk","state":"Virginia","ISO3166-2-lvl4":"US-VA","postcode":"23507","country":"United States","country_code":"us"},"boundingbox":["36.8565587","36.8566587","-76.2918267","-76.2917267"]}]}},{"query":"102 N 3rd St, Wilmington, NC 28401","kind":"address","truth":{"source":"New Hanover County GIS addressing","url":"https://gis.nhcgov.com/server/rest/services/Layers/Addressing/FeatureServer/0/query?where=NUMBER+%3D+102+AND+STREET+%3D+%273RD%27+AND+DIR_ABBR+%3D+%27N%27+AND+INCMUNI+%3D+%27WILMINGTON%27&outFields=*&returnGeometry=true&outSR=4326&f=json","at":{"lat":34.23709882647369,"lon":-77.94589810936459},"matched":"102 N 3rd St, Wilmington, NC 28401","census":{"url":"https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=102+N+3rd+St%2C+Wilmington%2C+NC+28401&benchmark=Public_AR_Current&format=json","at":{"lat":34.23675452261,"lon":-77.94611334046},"matched":"102 N 3RD ST, WILMINGTON, NC, 28401"}},"responses":{"https://photon.komoot.io/api/?q=102+N+3rd+St%2C+Wilmington%2C+NC+28401&limit=20":{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"osm_type":"W","osm_id":405031724,"osm_key":"building","osm_value":"yes","type":"house","housenumber":"25","name":"St James Episcopal Church","street":"South 3rd Street","city":"Wilmington","county":"New Hanover","state":"NC","country":"United States","postcode":"28401","countrycode":"US","extent":[-77.9457994,34.2354313,-77.9454357,34.2352158]},"geometry":{"type":"Point","coordinates":[-77.9456293,34.2353062]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":593927067,"osm_key":"tourism","osm_value":"hotel","type":"house","housenumber":"106","name":"Riverview Suites Wilmington","street":"N Water St","district":"Brooklyn","city":"Wilmington","county":"New Hanover","state":"NC","country":"United States","postcode":"28401","countrycode":"US","extent":[-77.9501084,34.2373876,-77.9498467,34.2368361]},"geometry":{"type":"Point","coordinates":[-77.949971,34.2371174]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":48891723,"osm_key":"highway","osm_value":"primary","type":"street","name":"North 3rd Street","district":"Brooklyn","city":"Wilmington","county":"New Hanover","state":"North Carolina","country":"United States","postcode":"28401","countrycode":"US","extent":[-77.9475756,34.2496217,-77.9474975,34.2483402]},"geometry":{"type":"Point","coordinates":[-77.9475579,34.2489803]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":758854255,"osm_key":"highway","osm_value":"primary","type":"street","name":"South 3rd Street","city":"Wilmington","county":"New Hanover","state":"North Carolina","country":"United States","postcode":"28401","countrycode":"US","extent":[-77.9456615,34.2317848,-77.944855,34.22547]},"geometry":{"type":"Point","coordinates":[-77.9452933,34.2286125]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":48894402,"osm_key":"highway","osm_value":"trunk","type":"street","name":"South 3rd Street","district":"Lake Forest","city":"Wilmington","county":"New Hanover","state":"North Carolina","country":"United States","postcode":"28401","countrycode":"US","extent":[-77.944855,34.22547,-77.944714,34.224216]},"geometry":{"type":"Point","coordinates":[-77.9447845,34.224843]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":31961411,"osm_key":"highway","osm_value":"residential","type":"street","name":"South 3rd Street","district":"Lake Forest","city":"Wilmington","county":"New Hanover","state":"North Carolina","country":"United States","postcode":"28401","countrycode":"US","extent":[-77.943821,34.21592,-77.9435845,34.2148331]},"geometry":{"type":"Point","coordinates":[-77.9436523,34.215395]}}]},"https://nominatim.openstreetmap.org/search?format=json&limit=20&countrycodes=us&q=102+N+3rd+St%2C+Wilmington%2C+NC+28401&addressdetails=1":[{"place_id":403732704,"licence":"Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright","osm_type":"way","osm_id":132296043,"lat":"34.2368201","lon":"-77.9460911","class":"place","type":"house","place_rank":30,"importance":0.00000999999999995449,"addresstype":"place","name":"","display_name":"102, North 3rd Street, Brooklyn, Wilmington, New Hanover County, North Carolina, 28401, United States","address":{"house_number":"102","road":"North 3rd Street","hamlet":"Brooklyn","city":"Wilmington","county":"New Hanover County","state":"North Carolina","ISO3166-2-lvl4":"US-NC","postcode":"28401","country":"United States","country_code":"us"},"boundingbox":["34.2367701","34.2368701","-77.9461411","-77.9460411"]}]}},{"query":"Blue Heron Coffee Roasters, 102 N 3rd St, Wilmington, NC","kind":"address","truth":{"source":"New Hanover County GIS addressing","url":"https://gis.nhcgov.com/server/rest/services/Layers/Addressing/FeatureServer/0/query?where=NUMBER+%3D+102+AND+STREET+%3D+%273RD%27+AND+DIR_ABBR+%3D+%27N%27+AND+INCMUNI+%3D+%27WILMINGTON%27&outFields=*&returnGeometry=true&outSR=4326&f=json","at":{"lat":34.23709882647369,"lon":-77.94589810936459},"matched":"102 N 3rd St, Wilmington, NC 28401","census":{"url":"https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=102+N+3rd+St%2C+Wilmington%2C+NC+28401&benchmark=Public_AR_Current&format=json","at":{"lat":34.23675452261,"lon":-77.94611334046},"matched":"102 N 3RD ST, WILMINGTON, NC, 28401"}},"responses":{"https://photon.komoot.io/api/?q=Blue+Heron+Coffee+Roasters%2C+102+N+3rd+St%2C+Wilmington%2C+NC&limit=20":{"type":"FeatureCollection","features":[]},"https://nominatim.openstreetmap.org/search?format=json&limit=20&countrycodes=us&q=Blue+Heron+Coffee+Roasters%2C+102+N+3rd+St%2C+Wilmington%2C+NC&addressdetails=1":[],"https://photon.komoot.io/api/?q=102+N+3rd+St%2C+Wilmington%2C+NC&limit=20":{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"osm_type":"W","osm_id":405031724,"osm_key":"building","osm_value":"yes","type":"house","housenumber":"25","name":"St James Episcopal Church","street":"South 3rd Street","city":"Wilmington","county":"New Hanover","state":"NC","country":"United States","postcode":"28401","countrycode":"US","extent":[-77.9457994,34.2354313,-77.9454357,34.2352158]},"geometry":{"type":"Point","coordinates":[-77.9456293,34.2353062]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":7447261836,"osm_key":"shop","osm_value":"car_repair","type":"house","housenumber":"102","name":"Adam's Tire & Auto Repair","street":"West Wilmington Street","city":"Burgaw","county":"Pender","state":"NC","country":"United States","postcode":"28425","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-77.9271565,34.5514288]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":132296043,"osm_key":"highway","osm_value":"primary","type":"street","name":"North 3rd Street","district":"Brooklyn","city":"Wilmington","county":"New Hanover","state":"North Carolina","country":"United States","postcode":"28401","countrycode":"US","extent":[-77.946731,34.241199,-77.946173,34.2366676]},"geometry":{"type":"Point","coordinates":[-77.9464557,34.2389328]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":1155699367,"osm_key":"highway","osm_value":"primary","type":"street","name":"South 3rd Street","city":"Wilmington","county":"New Hanover","state":"North Carolina","country":"United States","postcode":"28401","countrycode":"US","extent":[-77.9460223,34.234849,-77.9459735,34.2344006]},"geometry":{"type":"Point","coordinates":[-77.9460049,34.2346296]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":16698774,"osm_key":"highway","osm_value":"trunk","type":"street","name":"South 3rd Street","district":"Lake Forest","city":"Wilmington","county":"New Hanover","state":"North Carolina","country":"United States","postcode":"28401","countrycode":"US","extent":[-77.944714,34.224216,-77.943765,34.21592]},"geometry":{"type":"Point","coordinates":[-77.9441692,34.2200767]}}]},"https://nominatim.openstreetmap.org/search?format=json&limit=20&countrycodes=us&q=102+N+3rd+St%2C+Wilmington%2C+NC&addressdetails=1":[{"place_id":391577180,"licence":"Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright","osm_type":"way","osm_id":132296043,"lat":"34.2368201","lon":"-77.9460911","class":"place","type":"house","place_rank":30,"importance":0.00000999999999995449,"addresstype":"place","name":"","display_name":"102, North 3rd Street, Brooklyn, Wilmington, New Hanover County, North Carolina, 28401, United States","address":{"house_number":"102","road":"North 3rd Street","hamlet":"Brooklyn","city":"Wilmington","county":"New Hanover County","state":"North Carolina","ISO3166-2-lvl4":"US-NC","postcode":"28401","country":"United States","country_code":"us"},"boundingbox":["34.2367701","34.2368701","-77.9461411","-77.9460411"]}]}},{"query":"310 Chestnut St, Wilmington, NC","kind":"address","truth":{"source":"New Hanover County GIS addressing","url":"https://gis.nhcgov.com/server/rest/services/Layers/Addressing/FeatureServer/0/query?where=NUMBER+%3D+310+AND+STREET+%3D+%27CHESTNUT%27+AND+INCMUNI+%3D+%27WILMINGTON%27&outFields=*&returnGeometry=true&outSR=4326&f=json","at":{"lat":34.237231717941306,"lon":-77.94562049786211},"matched":"310 Chestnut St, Wilmington, NC 28401","census":{"url":"https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=310+Chestnut+St%2C+Wilmington%2C+NC+28401&benchmark=Public_AR_Current&format=json","at":{"lat":34.237715951735,"lon":-77.946105357967},"matched":"310 CHESTNUT ST, WILMINGTON, NC, 28401"}},"responses":{"https://photon.komoot.io/api/?q=310+Chestnut+St%2C+Wilmington%2C+NC&limit=20":{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"osm_type":"W","osm_id":747395001,"osm_key":"amenity","osm_value":"theatre","type":"house","housenumber":"310","name":"Thalian Hall","street":"Chestnut Street","city":"Wilmington","county":"New Hanover","state":"NC","country":"United States","postcode":"28401","countrycode":"US","extent":[-77.9460266,34.2373284,-77.9453017,34.2369534]},"geometry":{"type":"Point","coordinates":[-77.9456641,34.2370994]}}]}}},{"query":"125 N Division St, Salisbury, MD 21801","kind":"address","truth":{"source":"Wicomico County address points (City of Salisbury GIS)","url":"https://services6.arcgis.com/Hx8jJ6McXQ0jnqLk/arcgis/rest/services/Wicomico_Address_Points/FeatureServer/1/query?where=add_number+%3D+125+AND+st_name+%3D+%27DIVISION%27+AND+inc_muni+%3D+%27Salisbury%27+AND+unit+IS+NULL&outFields=*&returnGeometry=true&outSR=4326&f=json","at":{"lat":38.36620259534591,"lon":-75.60004085113873},"matched":"125 N Division St, Salisbury, MD 21801","census":{"url":"https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=125+N+Division+St%2C+Salisbury%2C+MD+21801&benchmark=Public_AR_Current&format=json","at":{"lat":38.365754721064,"lon":-75.600418596712},"matched":"125 N DIVISION ST, SALISBURY, MD, 21801"}},"responses":{"https://photon.komoot.io/api/?q=125+N+Division+St%2C+Salisbury%2C+MD+21801&limit=20":{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"osm_type":"N","osm_id":11200471508,"osm_key":"leisure","osm_value":"escape_game","type":"house","housenumber":"116","name":"Escape Salisbury","street":"North Division Street","city":"Salisbury","county":"Wicomico","state":"MD","country":"United States","postcode":"21801","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-75.6005952,38.3660644]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":153867610,"osm_key":"amenity","osm_value":"townhall","type":"house","housenumber":"115","name":"City of Salisbury Headquarters","street":"South Division Street","city":"Salisbury","county":"Wicomico","state":"MD","country":"United States","postcode":"21801","countrycode":"US","extent":[-75.6003528,38.3643949,-75.600034,38.364141]},"geometry":{"type":"Point","coordinates":[-75.6001938,38.364267]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":154043312,"osm_key":"shop","osm_value":"mall","type":"house","housenumber":"2300","name":"The Centre at Salisbury","street":"North Salisbury Boulevard","city":"Salisbury","county":"Wicomico","state":"MD","country":"United States","postcode":"21801","countrycode":"US","extent":[-75.5683189,38.4014356,-75.5642925,38.3968634]},"geometry":{"type":"Point","coordinates":[-75.5667703,38.399159]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":153868133,"osm_key":"amenity","osm_value":"community_centre","type":"house","name":"Newton St Community Center","street":"Newton Street","locality":"Camden","city":"Salisbury","county":"Wicomico","state":"Maryland","country":"United States","postcode":"21801","countrycode":"US","extent":[-75.6034427,38.3607453,-75.6032088,38.3605496]},"geometry":{"type":"Point","coordinates":[-75.6033258,38.3606475]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":1054564213,"osm_key":"amenity","osm_value":"restaurant","type":"house","housenumber":"1311","name":"Wok N Bowl","street":"South Salisbury Boulevard","locality":"University Park","district":"Brookshire Knolls","city":"Salisbury","county":"Wicomico","state":"MD","country":"United States","postcode":"21801","countrycode":"US","extent":[-75.6042773,38.3426457,-75.6039012,38.3424703]},"geometry":{"type":"Point","coordinates":[-75.6040893,38.3425581]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":819154824,"osm_key":"amenity","osm_value":"fire_station","type":"house","housenumber":"419","name":"Salisbury Fire Department Station 2","street":"Naylor Street","locality":"Canton","city":"Salisbury","county":"Wicomico","state":"MD","country":"United States","postcode":"21801","countrycode":"US","extent":[-75.5895674,38.3743914,-75.5890476,38.373962]},"geometry":{"type":"Point","coordinates":[-75.5892966,38.3741716]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":17709173,"osm_key":"highway","osm_value":"trunk","type":"street","name":"North Salisbury Boulevard","district":"Victory Gardens","city":"Salisbury","county":"Wicomico","state":"Maryland","country":"United States","postcode":"21801","countrycode":"US","extent":[-75.5674623,38.4159839,-75.566115,38.4103704]},"geometry":{"type":"Point","coordinates":[-75.5669457,38.4132089]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":154002218,"osm_key":"shop","osm_value":"car","type":"house","housenumber":"2531","name":"Hertrich Chevrolet Of Salisbury","street":"North Salisbury Boulevard","city":"Salisbury","county":"Wicomico","state":"MD","country":"United States","postcode":"21801","countrycode":"US","extent":[-75.5671162,38.4093136,-75.5660199,38.4088163]},"geometry":{"type":"Point","coordinates":[-75.5661715,38.409065]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":153996858,"osm_key":"shop","osm_value":"car","type":"house","housenumber":"1911","name":"Sherwood Kia of Salisbury","street":"North Salisbury Boulevard","district":"Northwood","city":"Salisbury","county":"Wicomico","state":"MD","country":"United States","postcode":"21801","countrycode":"US","extent":[-75.5783501,38.3887617,-75.5777251,38.3882878]},"geometry":{"type":"Point","coordinates":[-75.5780607,38.3885243]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":154018986,"osm_key":"shop","osm_value":"car","type":"house","housenumber":"2013","name":"Mercedes-Benz Of Salisbury","street":"North Salisbury Boulevard","district":"Northwood","city":"Salisbury","county":"Wicomico","state":"MD","country":"United States","postcode":"21801","countrycode":"US","extent":[-75.5752986,38.3917499,-75.5744153,38.3911885]},"geometry":{"type":"Point","coordinates":[-75.5748607,38.3914514]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":153993960,"osm_key":"shop","osm_value":"car","type":"house","housenumber":"2011","name":"Pohanka Honda Of Salisbury","street":"North Salisbury Boulevard","district":"Northwood","city":"Salisbury","county":"Wicomico","state":"MD","country":"United States","postcode":"21801","countrycode":"US","extent":[-75.5758537,38.3913762,-75.5748942,38.3906763]},"geometry":{"type":"Point","coordinates":[-75.5754701,38.3910195]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":3628352099,"osm_key":"shop","osm_value":"car","type":"house","housenumber":"1915","name":"Sherwood of Salisbury","street":"North Salisbury Boulevard","district":"Northwood","city":"Salisbury","county":"Wicomico","state":"MD","country":"United States","postcode":"21801","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-75.5793153,38.3891104]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":154007738,"osm_key":"tourism","osm_value":"hotel","type":"house","housenumber":"140","name":"Residence Inn by Marriott Salisbury","street":"Centre Road","district":"Northwood","city":"Salisbury","county":"Wicomico","state":"MD","country":"United States","postcode":"21801","countrycode":"US","extent":[-75.5720305,38.4021218,-75.5714353,38.4013313]},"geometry":{"type":"Point","coordinates":[-75.5717197,38.4017207]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":154001680,"osm_key":"shop","osm_value":"car_repair","type":"house","name":"Hertrich Collision Center of Salisbury","street":"East Naylor Mill Road","city":"Salisbury","county":"Wicomico","state":"Maryland","country":"United States","postcode":"21801","countrycode":"US","extent":[-75.5652827,38.4084307,-75.5643744,38.4076139]},"geometry":{"type":"Point","coordinates":[-75.5648514,38.4081114]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":154043277,"osm_key":"shop","osm_value":"car","type":"house","housenumber":"2012","name":"Pohanka Nissan Of Salisbury","street":"North Salisbury Boulevard","district":"Northwood","city":"Salisbury","county":"Wicomico","state":"MD","country":"United States","postcode":"21801","countrycode":"US","extent":[-75.5764163,38.3923864,-75.5757073,38.3918078]},"geometry":{"type":"Point","coordinates":[-75.5760567,38.3921514]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":153993249,"osm_key":"shop","osm_value":"car","type":"house","housenumber":"2015","name":"Pohanka Hyundai Of Salisbury","street":"North Salisbury Boulevard","district":"Northwood","city":"Salisbury","county":"Wicomico","state":"MD","country":"United States","postcode":"21801","countrycode":"US","extent":[-75.5750551,38.3921526,-75.5744013,38.3917116]},"geometry":{"type":"Point","coordinates":[-75.5748174,38.3919828]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":358245897,"osm_key":"man_made","osm_value":"tower","type":"house","name":"WJDY-AM (Salisbury)","street":"Brick Kiln Road","district":"Newland Park","county":"Wicomico","state":"Maryland","country":"United States","postcode":"21801","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-75.6469202,38.3922988]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":17702304,"osm_key":"highway","osm_value":"residential","type":"street","name":"North Division Street","locality":"Hyde Park","city":"Salisbury","county":"Wicomico","state":"Maryland","country":"United States","postcode":"21802","countrycode":"US","extent":[-75.592343,38.3779826,-75.5910232,38.376812]},"geometry":{"type":"Point","coordinates":[-75.5916928,38.3774195]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":91536480,"osm_key":"highway","osm_value":"tertiary","type":"street","name":"North Division Street","locality":"Jersey","city":"Salisbury","county":"Wicomico","state":"Maryland","country":"United States","postcode":"21803","countrycode":"US","extent":[-75.6003763,38.3722096,-75.5972075,38.3667539]},"geometry":{"type":"Point","coordinates":[-75.5991912,38.3696918]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":1208202181,"osm_key":"highway","osm_value":"tertiary","type":"street","name":"South Division Street","city":"Salisbury","county":"Wicomico","state":"Maryland","country":"United States","postcode":"21803","countrycode":"US","extent":[-75.6004119,38.3641475,-75.6002744,38.3640304]},"geometry":{"type":"Point","coordinates":[-75.6003431,38.364089]}}]},"https://nominatim.openstreetmap.org/search?format=json&limit=20&countrycodes=us&q=125+N+Division+St%2C+Salisbury%2C+MD+21801&addressdetails=1":[{"place_id":399138373,"licence":"Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright","osm_type":"way","osm_id":17702289,"lat":"38.3658192","lon":"-75.6005785","class":"place","type":"house","place_rank":30,"importance":0.00000999999999995449,"addresstype":"place","name":"","display_name":"125, North Division Street, Salisbury, Wicomico County, Maryland, 21801, United States","address":{"house_number":"125","road":"North Division Street","city":"Salisbury","county":"Wicomico County","state":"Maryland","ISO3166-2-lvl4":"US-MD","postcode":"21801","country":"United States","country_code":"us"},"boundingbox":["38.3657692","38.3658692","-75.6006285","-75.6005285"]},{"place_id":399130276,"licence":"Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright","osm_type":"way","osm_id":131947838,"lat":"38.3665520","lon":"-75.6002025","class":"place","type":"house","place_rank":30,"importance":0.00000999999999995449,"addresstype":"place","name":"","display_name":"125, North Division Street, Salisbury, Wicomico County, Maryland, 21801, United States","address":{"house_number":"125","road":"North Division Street","city":"Salisbury","county":"Wicomico County","state":"Maryland","ISO3166-2-lvl4":"US-MD","postcode":"21801","country":"United States","country_code":"us"},"boundingbox":["38.3665020","38.3666020","-75.6002525","-75.6001525"]}]}},{"query":"909 S Schumaker Dr, Salisbury, MD","kind":"address","truth":{"source":"Wicomico County address points (City of Salisbury GIS)","url":"https://services6.arcgis.com/Hx8jJ6McXQ0jnqLk/arcgis/rest/services/Wicomico_Address_Points/FeatureServer/1/query?where=add_number+%3D+909+AND+st_name+%3D+%27SCHUMAKER%27+AND+inc_muni+%3D+%27Salisbury%27+AND+unit+IS+NULL&outFields=*&returnGeometry=true&outSR=4326&f=json","at":{"lat":38.351504982262,"lon":-75.57163926430994},"matched":"909 S Schumaker Dr, Salisbury, MD 21804","census":{"url":"https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?address=909+S+Schumaker+Dr%2C+Salisbury%2C+MD+21804&benchmark=Public_AR_Current&format=json","at":{"lat":38.350961759421,"lon":-75.571775361561},"matched":"909 S SCHUMAKER DR, SALISBURY, MD, 21804"}},"responses":{"https://photon.komoot.io/api/?q=909+S+Schumaker+Dr%2C+Salisbury%2C+MD&limit=20":{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"osm_type":"W","osm_id":153830904,"osm_key":"tourism","osm_value":"museum","type":"house","housenumber":"909","name":"Ward Museum of Wildfowl Art","street":"South Schumaker Drive","district":"Nevins Addition","city":"Salisbury","county":"Wicomico","state":"Maryland","country":"United States","postcode":"21804","countrycode":"US","extent":[-75.5720504,38.3517902,-75.5710664,38.3511942]},"geometry":{"type":"Point","coordinates":[-75.5717597,38.3514769]}}]}}},{"query":"Norfolk Botanical Garden","kind":"place","truth":{"source":"PAD-US 4.1 fee unit \"Botanical Gardens\" (Norfolk, VA)","url":"https://edits.nationalmap.gov/arcgis/rest/services/PAD-US/PAD_US_4_1/MapServer/0/query?where=Unit_Nm+%3D+%27Botanical+Gardens%27+AND+State_Nm+%3D+%27VA%27&geometry=-77.9%2C34.1%2C-75.0%2C38.4&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&returnGeometry=true&outSR=4326&maxAllowableOffset=0.0003&outFields=OBJECTID&f=json","polygons":[[[[-76.19416,36.90983],[-76.19316,36.90767],[-76.19643,36.90749],[-76.19394,36.90701],[-76.19362,36.90645],[-76.19738,36.90498],[-76.19624,36.90445],[-76.19806,36.90244],[-76.20358,36.90118],[-76.20472,36.90214],[-76.2066,36.9025],[-76.20675,36.90339],[-76.20377,36.90441],[-76.20358,36.90516],[-76.20315,36.90505],[-76.20325,36.90606],[-76.20218,36.9066],[-76.20246,36.90716],[-76.20162,36.90691],[-76.20113,36.90731],[-76.20177,36.90769],[-76.20137,36.90823],[-76.19934,36.90807],[-76.19953,36.90889],[-76.19894,36.91003],[-76.19856,36.9098],[-76.19863,36.90853],[-76.19833,36.9095],[-76.19708,36.91014],[-76.19673,36.90944],[-76.19416,36.90983]]],[[[-76.19416,36.90983],[-76.19316,36.90767],[-76.19643,36.90749],[-76.19394,36.90701],[-76.19362,36.90645],[-76.19738,36.90498],[-76.19624,36.90445],[-76.19806,36.90244],[-76.20358,36.90118],[-76.20472,36.90214],[-76.2066,36.9025],[-76.20675,36.90339],[-76.20377,36.90441],[-76.20358,36.90516],[-76.20315,36.90505],[-76.20325,36.90606],[-76.20218,36.9066],[-76.20246,36.90716],[-76.20162,36.90691],[-76.20113,36.90731],[-76.20177,36.90769],[-76.20137,36.90823],[-76.19934,36.90807],[-76.19953,36.90889],[-76.19894,36.91003],[-76.19856,36.9098],[-76.19863,36.90853],[-76.19833,36.9095],[-76.19708,36.91014],[-76.19673,36.90944],[-76.19416,36.90983]]]],"name":"Norfolk Botanical Garden"},"responses":{"https://nominatim.openstreetmap.org/search?format=json&limit=20&countrycodes=us&q=norfolk+botanical+garden":[{"place_id":343122140,"licence":"Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright","osm_type":"way","osm_id":196947670,"lat":"36.9050880","lon":"-76.2001661","class":"leisure","type":"garden","place_rank":25,"importance":0.2917175836992075,"addresstype":"garden","name":"Norfolk Botanical Garden","display_name":"Norfolk Botanical Garden, East Beach, Norfolk, Virginia, United States","boundingbox":["36.8999593","36.9102330","-76.2116845","-76.1932286"]}],"https://photon.komoot.io/api/?q=norfolk+botanical+garden&limit=20":{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"osm_type":"W","osm_id":196947670,"osm_key":"leisure","osm_value":"garden","type":"other","name":"Norfolk Botanical Garden","district":"East Beach","city":"Norfolk","state":"Virginia","country":"United States","countrycode":"US","extent":[-76.2116845,36.910233,-76.1932286,36.8999593]},"geometry":{"type":"Point","coordinates":[-76.2001661,36.905088]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":557489097,"osm_key":"leisure","osm_value":"park","type":"other","name":"Alexandra Botanical Garden","city":"Wellesley","county":"Norfolk","state":"Massachusetts","country":"United States","countrycode":"US","extent":[-71.3060075,42.2961309,-71.2997932,42.294515]},"geometry":{"type":"Point","coordinates":[-71.3042253,42.2953203]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":8829156654,"osm_key":"amenity","osm_value":"bar","type":"house","housenumber":"49","name":"Botanical Garden Bar","street":"Elm Hill","district":"New Catton","city":"Norwich","county":"Norfolk","state":"England","country":"United Kingdom","postcode":"NR3 1HG","countrycode":"GB"},"geometry":{"type":"Point","coordinates":[1.2978418,52.6320048]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":196947668,"osm_key":"highway","osm_value":"residential","type":"street","name":"Botanical Gardens Access Road","city":"Norfolk","state":"Virginia","country":"United States","postcode":"23518","countrycode":"US","extent":[-76.2092964,36.9048847,-76.199879,36.900877]},"geometry":{"type":"Point","coordinates":[-76.2044914,36.9027783]}}]}}},{"query":"Wrightsville Beach","kind":"place","truth":{"source":"TIGERweb incorporated place \"Wrightsville Beach town\", NC","url":"https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/4/query?where=BASENAME+%3D+%27Wrightsville+Beach%27+AND+STATE+%3D+%2737%27&returnGeometry=true&outSR=4326&maxAllowableOffset=0.0003&outFields=OBJECTID&f=json","polygons":[[[[-77.81563,34.18636],[-77.80456,34.20036],[-77.80533,34.20205],[-77.803,34.20459],[-77.80671,34.20699],[-77.8062,34.20738],[-77.80702,34.20781],[-77.80487,34.21035],[-77.81125,34.21454],[-77.81343,34.21406],[-77.81548,34.21493],[-77.81049,34.22018],[-77.80732,34.21961],[-77.80469,34.21817],[-77.7941,34.22027],[-77.79415,34.21953],[-77.79277,34.2185],[-77.79099,34.21874],[-77.79145,34.22105],[-77.78991,34.222],[-77.79028,34.22335],[-77.79174,34.22345],[-77.79148,34.22583],[-77.78826,34.22556],[-77.78818,34.22341],[-77.78767,34.22306],[-77.78503,34.22788],[-77.78469,34.22755],[-77.78413,34.22835],[-77.78366,34.22812],[-77.78184,34.23077],[-77.78086,34.23028],[-77.77607,34.23732],[-77.77366,34.23578],[-77.77411,34.23506],[-77.77322,34.23393],[-77.77145,34.23404],[-77.77849,34.22561],[-77.78797,34.21129],[-77.79375,34.2035],[-77.80921,34.1842],[-77.81036,34.18477],[-77.81085,34.18421],[-77.81563,34.18636]],[[-77.81464,34.21925],[-77.81388,34.21899],[-77.81417,34.21825],[-77.81496,34.219],[-77.81464,34.21925]],[[-77.81563,34.2193],[-77.81479,34.21954],[-77.81535,34.21893],[-77.81563,34.2193]],[[-77.81697,34.21994],[-77.81609,34.21989],[-77.81684,34.21928],[-77.81729,34.21968],[-77.81697,34.21994]],[[-77.81767,34.22109],[-77.81638,34.22279],[-77.81591,34.22271],[-77.81683,34.22151],[-77.81639,34.22125],[-77.81683,34.22068],[-77.81767,34.22109]],[[-77.81866,34.22084],[-77.81842,34.22118],[-77.81755,34.22074],[-77.8179,34.22016],[-77.81861,34.2202],[-77.81866,34.22084]],[[-77.81942,34.22014],[-77.81816,34.22007],[-77.81797,34.21942],[-77.81832,34.21911],[-77.81942,34.22014]],[[-77.82008,34.22062],[-77.81925,34.22059],[-77.81928,34.22025],[-77.82011,34.22029],[-77.82008,34.22062]],[[-77.82059,34.22179],[-77.81984,34.22185],[-77.82019,34.22141],[-77.82059,34.22179]],[[-77.8218,34.2202],[-77.82086,34.22015],[-77.82106,34.21982],[-77.8218,34.2202]],[[-77.82324,34.21978],[-77.82321,34.22023],[-77.82254,34.22021],[-77.82291,34.21961],[-77.82324,34.21978]],[[-77.82453,34.22154],[-77.82416,34.22207],[-77.8236,34.22176],[-77.82396,34.22118],[-77.82453,34.22154]]]],"name":"Wrightsville Beach"},"responses":{"https://nominatim.openstreetmap.org/search?format=json&limit=20&countrycodes=us&q=wrightsville+beach":[{"place_id":344080969,"licence":"Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright","osm_type":"relation","osm_id":179033,"lat":"34.2079917","lon":"-77.7955907","class":"boundary","type":"administrative","place_rank":16,"importance":0.38456813059540323,"addresstype":"village","name":"Wrightsville Beach","display_name":"Wrightsville Beach, New Hanover County, North Carolina, United States","boundingbox":["34.1842020","34.2371420","-77.8277230","-77.7714470"]}],"https://photon.komoot.io/api/?q=wrightsville+beach&limit=20":{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"osm_type":"R","osm_id":179033,"osm_key":"place","osm_value":"village","type":"city","name":"Wrightsville Beach","county":"New Hanover","state":"North Carolina","country":"United States","postcode":"28480","countrycode":"US","extra":{"admin_level":"8"},"extent":[-77.827723,34.237142,-77.771447,34.184202]},"geometry":{"type":"Point","coordinates":[-77.7955907,34.2079917]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":10936780535,"osm_key":"leisure","osm_value":"park","type":"other","housenumber":"369","name":"Wrightsville Beach Recreation Area","street":"Vermont Route 12","city":"Montpelier","county":"Washington","state":"VT","country":"United States","postcode":"05602","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-72.5749649,44.3298049]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":469274185,"osm_key":"leisure","osm_value":"park","type":"other","name":"Wrightsville Beach Park","district":"Shore Acres","city":"Wrightsville Beach","county":"New Hanover","state":"North Carolina","country":"United States","countrycode":"US","extent":[-77.806508,34.2162301,-77.8024132,34.2130938]},"geometry":{"type":"Point","coordinates":[-77.8038367,34.2146083]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":4636441748,"osm_key":"tourism","osm_value":"museum","type":"house","name":"Wrightsville Beach Museum of History","street":"West Salisbury Street","district":"Channel Acres","city":"Wrightsville Beach","county":"New Hanover","state":"North Carolina","country":"United States","postcode":"28480","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-77.8032071,34.2166426]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":367909561,"osm_key":"amenity","osm_value":"police","type":"house","name":"Wrightsville Beach Police Department","street":"Gene Floyd Drive","district":"Shore Acres","city":"Wrightsville Beach","county":"New Hanover","state":"NC","country":"United States","postcode":"28480","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-77.8056661,34.2149178]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":936133206,"osm_key":"craft","osm_value":"brewery","type":"house","housenumber":"6201","name":"Wrightsville Beach Brewery","street":"Oleander Drive","district":"Seagate","city":"Wilmington","county":"New Hanover","state":"NC","country":"United States","postcode":"28403","countrycode":"US","extent":[-77.8374754,34.2115603,-77.8369462,34.2112403]},"geometry":{"type":"Point","coordinates":[-77.8372014,34.2113796]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":357814644,"osm_key":"amenity","osm_value":"post_office","type":"house","name":"Wrightsville Beach Post Office","street":"Causeway Drive","district":"Shore Acres","city":"Wrightsville Beach","county":"New Hanover","state":"North Carolina","country":"United States","postcode":"28480","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-77.809696,34.2165]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":10936780544,"osm_key":"leisure","osm_value":"disc_golf_course","type":"house","name":"Wrightsville Beach Disc Golf","street":"Vermont Route 12","district":"Wrightsville","city":"Middlesex","county":"Washington","state":"Vermont","country":"United States","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-72.574525,44.3302667]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":590196078,"osm_key":"amenity","osm_value":"school","type":"house","name":"Wrightsville Beach Elementary School","street":"North Channel Drive","district":"Channel Acres","city":"Wrightsville Beach","county":"New Hanover","state":"North Carolina","country":"United States","postcode":"28480","countrycode":"US","extent":[-77.7987592,34.2157887,-77.796823,34.2138876]},"geometry":{"type":"Point","coordinates":[-77.7979706,34.2147998]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":1842967509,"osm_key":"man_made","osm_value":"water_tower","type":"house","name":"Wrightsville Beach Water Tower","street":"Lumina Avenue South","district":"Shore Acres","city":"Wrightsville Beach","county":"New Hanover","state":"North Carolina","country":"United States","postcode":"28480","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-77.801056,34.2007453]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":900989155,"osm_key":"tourism","osm_value":"hotel","type":"house","housenumber":"1989","name":"Hampton Inn & Suites Wilmington/Wrightsville Beach","street":"Eastwood Road","district":"Wrightsville","city":"Wilmington","county":"New Hanover","state":"NC","country":"United States","postcode":"28403","countrycode":"US","extent":[-77.8199284,34.2237253,-77.8188823,34.2232003]},"geometry":{"type":"Point","coordinates":[-77.8195142,34.2234619]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":894827936,"osm_key":"landuse","osm_value":"residential","type":"locality","name":"Airlie at Wrightsville Beach","district":"Airlie","city":"Wilmington","county":"New Hanover","state":"North Carolina","country":"United States","countrycode":"US","extent":[-77.8296232,34.2198615,-77.8265175,34.2173825]},"geometry":{"type":"Point","coordinates":[-77.8281267,34.218622]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":921487003,"osm_key":"tourism","osm_value":"hotel","type":"house","housenumber":"5518","name":"Home2 Suites by Hilton Wilmington Wrightsville Beach","street":"Market Street","district":"College Acres","city":"Wilmington","county":"New Hanover","state":"NC","country":"United States","postcode":"28403","countrycode":"US","extent":[-77.8655164,34.2469976,-77.8646734,34.2466624]},"geometry":{"type":"Point","coordinates":[-77.8650949,34.24683]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":424390688,"osm_key":"emergency","osm_value":"coast_guard","type":"house","housenumber":"912","name":"United States Coast Guard Station Wrightsville Beach","street":"Water Street","city":"Wrightsville Beach","county":"New Hanover","state":"NC","country":"United States","postcode":"28480","countrycode":"US","extent":[-77.8125715,34.1893407,-77.8108951,34.1882413]},"geometry":{"type":"Point","coordinates":[-77.8116522,34.1887823]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":746281441,"osm_key":"tourism","osm_value":"hotel","type":"house","housenumber":"1706","name":"Holiday Inn Resort Wrightsville Beach","street":"North Lumina Avenue","district":"Shell Island","city":"Wrightsville Beach","county":"New Hanover","state":"NC","country":"United States","postcode":"28480","countrycode":"US","extent":[-77.7862317,34.2209005,-77.7851929,34.2198236]},"geometry":{"type":"Point","coordinates":[-77.7856885,34.2203557]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":746281445,"osm_key":"highway","osm_value":"primary","type":"street","name":"Wrightsville Avenue","city":"Wrightsville Beach","county":"New Hanover","state":"North Carolina","country":"United States","postcode":"28480","countrycode":"US","extent":[-77.8122421,34.2180992,-77.8114849,34.217686]},"geometry":{"type":"Point","coordinates":[-77.8118635,34.2178926]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":1334008905,"osm_key":"highway","osm_value":"footway","type":"street","name":"beach access","district":"Shell Island","city":"Wrightsville Beach","county":"New Hanover","state":"North Carolina","country":"United States","postcode":"28480","countrycode":"US","extent":[-77.7849899,34.2205382,-77.7846425,34.220431]},"geometry":{"type":"Point","coordinates":[-77.7848116,34.2205007]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":202127574,"osm_key":"highway","osm_value":"path","type":"street","name":"CAMA Public Beach Access","district":"Shore Acres","city":"Wrightsville Beach","county":"New Hanover","state":"North Carolina","country":"United States","postcode":"28480","countrycode":"US","extent":[-77.7968017,34.2051622,-77.7961598,34.2047398]},"geometry":{"type":"Point","coordinates":[-77.7964751,34.2049552]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":173824165,"osm_key":"highway","osm_value":"path","type":"street","name":"CAMA Public Beach Access 38","city":"Wrightsville Beach","county":"New Hanover","state":"North Carolina","country":"United States","postcode":"28480","countrycode":"US","extent":[-77.807346,34.192506,-77.8060585,34.1917087]},"geometry":{"type":"Point","coordinates":[-77.8066724,34.1921551]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":174325616,"osm_key":"highway","osm_value":"path","type":"street","name":"CAMA Public Beach Access 37","city":"Wrightsville Beach","county":"New Hanover","state":"North Carolina","country":"United States","postcode":"28480","countrycode":"US","extent":[-77.8067967,34.1930879,-77.8055491,34.1923271]},"geometry":{"type":"Point","coordinates":[-77.8061486,34.192738]}}]}}},{"query":"Assateague","kind":"place","truth":{"source":"PAD-US 4.1 fee unit \"Assateague Island National Seashore\" (MD, VA)","url":"https://edits.nationalmap.gov/arcgis/rest/services/PAD-US/PAD_US_4_1/MapServer/0/query?where=Unit_Nm+%3D+%27Assateague+Island+National+Seashore%27&geometry=-77.9%2C34.1%2C-75.0%2C38.4&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&returnGeometry=true&outSR=4326&maxAllowableOffset=0.0003&outFields=OBJECTID&f=json","polygons":[[[[-75.19754,38.07461],[-75.23176,38.02722],[-75.24961,38.02672],[-75.28481,38.02365],[-75.27301,38.05348],[-75.24164,38.08539],[-75.24135,38.10514],[-75.21566,38.10469],[-75.19234,38.15267],[-75.20241,38.17765],[-75.13574,38.25937],[-75.1277,38.2769],[-75.12731,38.28537],[-75.12326,38.28886],[-75.12013,38.29529],[-75.11463,38.30247],[-75.11167,38.31087],[-75.10812,38.31794],[-75.09647,38.32716],[-75.09508,38.32716],[-75.08771,38.32142],[-75.08968,38.31333],[-75.09107,38.31102],[-75.09375,38.30867],[-75.09591,38.30596],[-75.11704,38.25678],[-75.14145,38.20344],[-75.15781,38.16048],[-75.17036,38.12449],[-75.18711,38.0906],[-75.19754,38.07461]],[[-75.24108,38.07211],[-75.24108,38.07211],[-75.24108,38.07211],[-75.24108,38.07211]],[[-75.23066,38.06795],[-75.23066,38.06795],[-75.23066,38.06795],[-75.23066,38.06795]],[[-75.23435,38.06817],[-75.23435,38.06817],[-75.23435,38.06817],[-75.23435,38.06817]],[[-75.23885,38.06812],[-75.23885,38.06812],[-75.23885,38.06812],[-75.23885,38.06812]],[[-75.23125,38.06419],[-75.23125,38.06419],[-75.23125,38.06419],[-75.23125,38.06419]],[[-75.23222,38.06419],[-75.23222,38.06419],[-75.23222,38.06419],[-75.23222,38.06419]],[[-75.2402,38.0655],[-75.2402,38.0655],[-75.2402,38.0655],[-75.2402,38.0655]],[[-75.23214,38.06404],[-75.23214,38.06404],[-75.23214,38.06404],[-75.23214,38.06404]],[[-75.23643,38.06388],[-75.23643,38.06388],[-75.23643,38.06388],[-75.23643,38.06388]],[[-75.23597,38.06116],[-75.23597,38.06116],[-75.23597,38.06116],[-75.23597,38.06116]],[[-75.2403,38.06163],[-75.2403,38.06163],[-75.2403,38.06164],[-75.2403,38.06163]],[[-75.23667,38.061],[-75.23667,38.061],[-75.23667,38.061],[-75.23667,38.061]],[[-75.23888,38.06112],[-75.23888,38.06112],[-75.23888,38.06112],[-75.23888,38.06112]],[[-75.24162,38.06118],[-75.24162,38.06118],[-75.24162,38.06118],[-75.24162,38.06118]],[[-75.23684,38.0603],[-75.23684,38.0603],[-75.23684,38.0603],[-75.23684,38.0603]],[[-75.24277,38.06081],[-75.24277,38.06081],[-75.24277,38.06081],[-75.24277,38.06081]],[[-75.23694,38.0589],[-75.23694,38.0589],[-75.23694,38.0589],[-75.23694,38.0589]],[[-75.24229,38.05963],[-75.24229,38.05963],[-75.24229,38.05963],[-75.24229,38.05963]],[[-75.25514,38.0615],[-75.25514,38.0615],[-75.25514,38.0615],[-75.25514,38.0615]],[[-75.23851,38.0584],[-75.23851,38.0584],[-75.23851,38.05841],[-75.23851,38.0584]],[[-75.24015,38.05868],[-75.24015,38.05868],[-75.24015,38.05869],[-75.24015,38.05868]],[[-75.25198,38.06022],[-75.25198,38.06021],[-75.25198,38.06022],[-75.25198,38.06022]],[[-75.23853,38.05748],[-75.23853,38.05748],[-75.23853,38.05748],[-75.23853,38.05748]],[[-75.24146,38.05788],[-75.24147,38.05788],[-75.24146,38.05788],[-75.24146,38.05788]],[[-75.24015,38.05743],[-75.24015,38.05743],[-75.24014,38.05743],[-75.24015,38.05743]],[[-75.25259,38.05951],[-75.25282,38.05949],[-75.25259,38.05951],[-75.25259,38.05951]],[[-75.24349,38.05778],[-75.24349,38.05778],[-75.24349,38.05778],[-75.24349,38.05778]],[[-75.24019,38.05703],[-75.24019,38.05703],[-75.24019,38.05703],[-75.24019,38.05703]],[[-75.24467,38.05742],[-75.24467,38.05742],[-75.24467,38.05742],[-75.24467,38.05742]],[[-75.23993,38.05652],[-75.23993,38.05652],[-75.23993,38.05652],[-75.23993,38.05652]],[[-75.24314,38.05628],[-75.24313,38.05628],[-75.24314,38.05628],[-75.24314,38.05628]],[[-75.2397,38.05492],[-75.2397,38.05492],[-75.2397,38.05492],[-75.2397,38.05492]],[[-75.25469,38.05738],[-75.25469,38.05738],[-75.25469,38.05738],[-75.25469,38.05738]],[[-75.24009,38.05305],[-75.24009,38.05305],[-75.24009,38.05305],[-75.24009,38.05305]],[[-75.24066,38.05209],[-75.24066,38.05209],[-75.24066,38.05209],[-75.24066,38.05209]],[[-75.24133,38.05197],[-75.24133,38.05197],[-75.24133,38.05197],[-75.24133,38.05197]]],[[[-75.23332,38.02506],[-75.25393,37.99971],[-75.278,37.96791],[-75.29388,37.94839],[-75.30948,37.92314],[-75.32879,37.89418],[-75.33396,37.88523],[-75.34186,37.87412],[-75.36162,37.85443],[-75.37366,37.84606],[-75.37603,37.84488],[-75.3819,37.84324],[-75.42126,37.86702],[-75.37964,37.9022],[-75.38258,37.91455],[-75.37657,37.9161],[-75.36719,37.91419],[-75.35447,37.91481],[-75.34737,37.91832],[-75.34011,37.93113],[-75.3242,37.93646],[-75.31667,37.94391],[-75.31641,37.94588],[-75.32425,37.95244],[-75.32272,37.96557],[-75.30493,37.98256],[-75.31527,37.99125],[-75.28891,38.01326],[-75.28481,38.02365],[-75.24961,38.02672],[-75.23176,38.02722],[-75.23332,38.02506]],[[-75.25526,38.01953],[-75.25526,38.01953],[-75.25526,38.01953],[-75.25526,38.01953]],[[-75.24935,38.01769],[-75.24935,38.01769],[-75.24935,38.01769],[-75.24935,38.01769]],[[-75.27382,38.01655],[-75.27382,38.01655],[-75.27382,38.01655],[-75.27382,38.01655]],[[-75.27531,38.01678],[-75.27531,38.01678],[-75.27531,38.01678],[-75.27531,38.01678]],[[-75.27673,38.01217],[-75.27673,38.01217],[-75.27673,38.01217],[-75.27673,38.01217]],[[-75.27797,38.00739],[-75.27797,38.00739],[-75.27797,38.00739],[-75.27797,38.00739]],[[-75.28443,38.0029],[-75.28443,38.0029],[-75.28443,38.0029],[-75.28443,38.0029]],[[-75.28588,37.99855],[-75.28588,37.99855],[-75.28588,37.99855],[-75.28588,37.99855]],[[-75.28753,37.99713],[-75.28754,37.99713],[-75.28753,37.99713],[-75.28753,37.99713]],[[-75.28133,37.99549],[-75.28133,37.99549],[-75.28133,37.99549],[-75.28133,37.99549]],[[-75.29622,37.99486],[-75.29622,37.99486],[-75.29622,37.99486],[-75.29622,37.99486]],[[-75.28851,37.9931],[-75.28852,37.9931],[-75.28852,37.9931],[-75.28851,37.9931]],[[-75.29953,37.98128],[-75.29953,37.98128],[-75.29953,37.98128],[-75.29953,37.98128]],[[-75.29933,37.97944],[-75.29933,37.97944],[-75.29933,37.97944],[-75.29933,37.97944]],[[-75.30114,37.97756],[-75.30114,37.97756],[-75.30114,37.97756],[-75.30114,37.97756]],[[-75.30349,37.97369],[-75.3035,37.97369],[-75.3035,37.97369],[-75.30349,37.97369]],[[-75.31756,37.94934],[-75.31756,37.94933],[-75.31756,37.94934],[-75.31756,37.94934]],[[-75.31416,37.94589],[-75.31416,37.94589],[-75.31416,37.94589],[-75.31416,37.94589]],[[-75.3197,37.93951],[-75.3197,37.9395],[-75.3197,37.93951],[-75.3197,37.93951]],[[-75.37175,37.90451],[-75.37175,37.90451],[-75.37174,37.90451],[-75.37175,37.90451]],[[-75.3541,37.87612],[-75.3541,37.87612],[-75.3541,37.87612],[-75.3541,37.87612]]]],"name":"Assateague"},"responses":{"https://nominatim.openstreetmap.org/search?format=json&limit=20&countrycodes=us&q=assateague":[{"place_id":344953792,"licence":"Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright","osm_type":"relation","osm_id":4234479,"lat":"38.1485979","lon":"-75.1858333","class":"boundary","type":"protected_area","place_rank":25,"importance":0.4194818330375235,"addresstype":"protected_area","name":"Assateague Island National Seashore","display_name":"Assateague Island National Seashore, West Ocean City, Worcester County, Maryland, United States","boundingbox":["37.8590684","38.3248173","-75.3691876","-75.0901352"]},{"place_id":344946232,"licence":"Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright","osm_type":"relation","osm_id":4234480,"lat":"38.2522368","lon":"-75.1606247","class":"leisure","type":"park","place_rank":24,"importance":0.35263345776344923,"addresstype":"park","name":"Assateague State Park","display_name":"Assateague State Park, 7307, Golf Club Shores, Berlin, Worcester County, Maryland, 21811, United States","boundingbox":["38.2136541","38.2591259","-75.1683145","-75.1334770"]},{"place_id":344932861,"licence":"Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright","osm_type":"relation","osm_id":5253290,"lat":"38.0869769","lon":"-75.2101753","class":"place","type":"island","place_rank":17,"importance":0.33557113795112237,"addresstype":"island","name":"Assateague Island","display_name":"Assateague Island, West Ocean City, Worcester County, Maryland, United States","boundingbox":["37.8491375","38.3248173","-75.3999531","-75.0901352"]},{"place_id":344969271,"licence":"Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright","osm_type":"way","osm_id":61007958,"lat":"37.9149619","lon":"-75.3809344","class":"waterway","type":"river","place_rank":19,"importance":0.14671691844052792,"addresstype":"river","name":"Assateague Channel","display_name":"Assateague Channel, Black Point Landing, Chincoteague, Accomack County, Virginia, United States","boundingbox":["37.8967133","37.9151447","-75.3890855","-75.3556963"]},{"place_id":345001324,"licence":"Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright","osm_type":"way","osm_id":874153843,"lat":"37.8860560","lon":"-75.4028300","class":"waterway","type":"river","place_rank":19,"importance":0.14671691844052792,"addresstype":"river","name":"Assateague Channel","display_name":"Assateague Channel, Chincoteague, Accomack County, Virginia, United States","boundingbox":["37.8725970","37.8967133","-75.4114401","-75.3890855"]},{"place_id":344832267,"licence":"Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright","osm_type":"way","osm_id":1214842307,"lat":"38.3240988","lon":"-75.0909592","class":"waterway","type":"river","place_rank":19,"importance":0.14670698939497973,"addresstype":"river","name":"Assateague Channel","display_name":"Assateague Channel, West Ocean City, Worcester County, Maryland, 21843, United States","boundingbox":["38.3232509","38.3271565","-75.0950777","-75.0856674"]},{"place_id":344896255,"licence":"Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright","osm_type":"way","osm_id":415311895,"lat":"38.1656291","lon":"-75.2026436","class":"waterway","type":"river","place_rank":19,"importance":0.14667666666666662,"addresstype":"river","name":"Assateague Channel","display_name":"Assateague Channel, West Ocean City, Worcester County, Maryland, United States","boundingbox":["38.0232219","38.3271565","-75.2894402","-75.0950777"]},{"place_id":344881266,"licence":"Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright","osm_type":"node","osm_id":368939994,"lat":"37.9717893","lon":"-75.3126941","class":"natural","type":"bay","place_rank":22,"importance":0.10671691844052794,"addresstype":"bay","name":"Assateague Bay","display_name":"Assateague Bay, Chincoteague, Accomack County, Virginia, United States","boundingbox":["37.9717393","37.9718393","-75.3127441","-75.3126441"]},{"place_id":344955584,"licence":"Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright","osm_type":"node","osm_id":7535768097,"lat":"37.8940244","lon":"-75.3830338","class":"natural","type":"cape","place_rank":22,"importance":0.10670642481116958,"addresstype":"cape","name":"Assateague Point","display_name":"Assateague Point, Chincoteague, Accomack County, Virginia, 23336, United States","boundingbox":["37.8939744","37.8940744","-75.3830838","-75.3829838"]},{"place_id":345254323,"licence":"Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright","osm_type":"relation","osm_id":11900450,"lat":"37.9419022","lon":"-75.3193749","class":"water","type":"lagoon","place_rank":22,"importance":0.10669266727702752,"addresstype":"lagoon","name":"Assateague Channel","display_name":"Assateague Channel, Chincoteague, Accomack County, Virginia, United States","boundingbox":["37.8940981","37.9896930","-75.3886543","-75.3005397"]}],"https://photon.komoot.io/api/?q=assateague&limit=20":{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"osm_type":"R","osm_id":4234479,"osm_key":"boundary","osm_value":"protected_area","type":"other","name":"Assateague Island National Seashore","city":"West Ocean City","county":"Worcester","state":"Maryland","country":"United States","countrycode":"US","extent":[-75.3691876,38.3248173,-75.0901352,37.8590684]},"geometry":{"type":"Point","coordinates":[-75.1858333,38.1485979]}},{"type":"Feature","properties":{"osm_type":"R","osm_id":4234480,"osm_key":"leisure","osm_value":"park","type":"other","housenumber":"7307","name":"Assateague State Park","street":"Stephen Decatur Highway","district":"Golf Club Shores","city":"Berlin","county":"Worcester","state":"MD","country":"United States","postcode":"21811","countrycode":"US","extent":[-75.1683145,38.2591259,-75.133477,38.2136541]},"geometry":{"type":"Point","coordinates":[-75.1606247,38.2522368]}},{"type":"Feature","properties":{"osm_type":"R","osm_id":5253290,"osm_key":"place","osm_value":"island","type":"other","name":"Assateague Island","city":"West Ocean City","county":"Worcester","state":"Maryland","country":"United States","countrycode":"US","extent":[-75.3999531,38.3248173,-75.0901352,37.8491375]},"geometry":{"type":"Point","coordinates":[-75.2101753,38.0869769]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":562175159,"osm_key":"man_made","osm_value":"lighthouse","type":"house","name":"Assateague Light","street":"Lighthouse Trail","county":"Accomack","state":"Virginia","country":"United States","postcode":"23336","countrycode":"US","extent":[-75.3560712,37.9112151,-75.3559784,37.9111419]},"geometry":{"type":"Point","coordinates":[-75.356025,37.9111751]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":1214842313,"osm_key":"waterway","osm_value":"river","type":"other","name":"Assateague Channel","city":"Chincoteague","county":"Accomack","state":"Virginia","country":"United States","countrycode":"US","extent":[-75.3556963,38.0232219,-75.2894402,37.914531]},"geometry":{"type":"Point","coordinates":[-75.3184695,37.9675376]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":874153843,"osm_key":"waterway","osm_value":"river","type":"other","name":"Assateague Channel","city":"Chincoteague","county":"Accomack","state":"Virginia","country":"United States","countrycode":"US","extent":[-75.4114401,37.8967133,-75.3890855,37.872597]},"geometry":{"type":"Point","coordinates":[-75.40283,37.886056]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":61007958,"osm_key":"waterway","osm_value":"river","type":"other","name":"Assateague Channel","district":"Black Point Landing","city":"Chincoteague","county":"Accomack","state":"Virginia","country":"United States","countrycode":"US","extent":[-75.3890855,37.9151447,-75.3556963,37.8967133]},"geometry":{"type":"Point","coordinates":[-75.3809344,37.9149619]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":1214842307,"osm_key":"waterway","osm_value":"river","type":"other","name":"Assateague Channel","city":"West Ocean City","county":"Worcester","state":"Maryland","country":"United States","postcode":"21843","countrycode":"US","extent":[-75.0950777,38.3271565,-75.0856674,38.3232509]},"geometry":{"type":"Point","coordinates":[-75.0909592,38.3240988]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":415311895,"osm_key":"waterway","osm_value":"river","type":"other","name":"Assateague Channel","city":"West Ocean City","county":"Worcester","state":"Maryland","country":"United States","countrycode":"US","extent":[-75.2894402,38.3271565,-75.0950777,38.0232219]},"geometry":{"type":"Point","coordinates":[-75.2026436,38.1656291]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":368939994,"osm_key":"natural","osm_value":"bay","type":"other","name":"Assateague Bay","city":"Chincoteague","county":"Accomack","state":"VA","country":"United States","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-75.3126941,37.9717893]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":7535768097,"osm_key":"natural","osm_value":"cape","type":"other","name":"Assateague Point","city":"Chincoteague","county":"Accomack","state":"Virginia","country":"United States","postcode":"23336","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-75.3830338,37.8940244]}},{"type":"Feature","properties":{"osm_type":"R","osm_id":11900450,"osm_key":"water","osm_value":"lagoon","type":"other","name":"Assateague Channel","city":"Chincoteague","county":"Accomack","state":"Virginia","country":"United States","countrycode":"US","extent":[-75.3886543,37.989693,-75.3005397,37.8940981]},"geometry":{"type":"Point","coordinates":[-75.3193749,37.9419022]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":311160439,"osm_key":"landuse","osm_value":"residential","type":"locality","name":"Assateague Pointe","district":"Snug Harbor","county":"Worcester","state":"Maryland","country":"United States","countrycode":"US","extent":[-75.1414867,38.295613,-75.1330334,38.2895638]},"geometry":{"type":"Point","coordinates":[-75.1372936,38.2923221]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":908679588,"osm_key":"highway","osm_value":"tertiary","type":"street","name":"Assateague Drive","locality":"Columbia East Marketplace","district":"Waterloo","city":"Columbia","county":"Howard","state":"Maryland","country":"United States","postcode":"20794","countrycode":"US","extent":[-76.7874367,39.1692181,-76.7868704,39.1689966]},"geometry":{"type":"Point","coordinates":[-76.78716,39.169079]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":20038596,"osm_key":"highway","osm_value":"residential","type":"street","name":"Assateague Trail","city":"Shawneeland","county":"Frederick","state":"Virginia","country":"United States","postcode":"22602","countrycode":"US","extent":[-78.3414383,39.1859249,-78.33754,39.1823495]},"geometry":{"type":"Point","coordinates":[-78.339502,39.1841516]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":47842591,"osm_key":"highway","osm_value":"secondary","type":"street","name":"Assateague Road","district":"Trappe","county":"Worcester","state":"Maryland","country":"United States","countrycode":"US","extent":[-75.1918955,38.3139122,-75.1628445,38.2945816]},"geometry":{"type":"Point","coordinates":[-75.1773009,38.3044175]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":17707124,"osm_key":"highway","osm_value":"residential","type":"street","name":"Assateague Way","district":"Lewis Corner","county":"Worcester","state":"Maryland","country":"United States","postcode":"21811","countrycode":"US","extent":[-75.146644,38.2966141,-75.1457441,38.295991]},"geometry":{"type":"Point","coordinates":[-75.1461778,38.2963248]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":17707171,"osm_key":"highway","osm_value":"secondary","type":"street","name":"Assateague Road","city":"Berlin","county":"Worcester","state":"Maryland","country":"United States","postcode":"21811","countrycode":"US","extent":[-75.210958,38.3239017,-75.1919894,38.3139385]},"geometry":{"type":"Point","coordinates":[-75.2008979,38.3200147]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":1480412540,"osm_key":"landuse","osm_value":"cemetery","type":"other","name":"Assateague Village Cemetery","county":"Accomack","state":"Virginia","country":"United States","countrycode":"US","extent":[-75.35382,37.9130544,-75.3537046,37.9129664]},"geometry":{"type":"Point","coordinates":[-75.3537623,37.91301]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":11690459,"osm_key":"highway","osm_value":"residential","type":"street","name":"Assateague Road","locality":"Ramtown Manor","district":"Ramtown","city":"Howell Township","county":"Monmouth","state":"New Jersey","country":"United States","postcode":"07731","countrycode":"US","extent":[-74.146576,40.128313,-74.143751,40.12693]},"geometry":{"type":"Point","coordinates":[-74.145559,40.1282502]}}]}}},{"query":"Great Dismal Swamp","kind":"place","truth":{"source":"PAD-US 4.1 fee units \"Great Dismal Swamp National Wildlife Refuge\" (VA, NC) and \"Dismal Swamp State Park\" (NC)","url":"https://edits.nationalmap.gov/arcgis/rest/services/PAD-US/PAD_US_4_1/MapServer/0/query?where=Unit_Nm+IN+%28%27Great+Dismal+Swamp+National+Wildlife+Refuge%27%2C+%27Dismal+Swamp+State+Park%27%29&geometry=-77.9%2C34.1%2C-75.0%2C38.4&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&returnGeometry=true&outSR=4326&maxAllowableOffset=0.0003&outFields=OBJECTID&f=json","polygons":[[[[-76.46814,36.53287],[-76.46825,36.51468],[-76.44859,36.51461],[-76.38185,36.47151],[-76.38179,36.46869],[-76.39717,36.46865],[-76.39705,36.46776],[-76.41232,36.47267],[-76.41407,36.47226],[-76.41359,36.47042],[-76.41427,36.46927],[-76.41539,36.46917],[-76.42111,36.47127],[-76.42553,36.46401],[-76.42623,36.46446],[-76.42632,36.46534],[-76.43191,36.46696],[-76.43478,36.4635],[-76.43538,36.46179],[-76.43642,36.46072],[-76.43775,36.46028],[-76.436,36.46356],[-76.43342,36.46543],[-76.43278,36.46654],[-76.43634,36.46696],[-76.43928,36.46643],[-76.44203,36.46965],[-76.44346,36.46864],[-76.44568,36.47018],[-76.44835,36.46927],[-76.44933,36.46734],[-76.4524,36.4698],[-76.4599,36.46611],[-76.45272,36.45947],[-76.45417,36.45859],[-76.45042,36.45461],[-76.45014,36.44479],[-76.45075,36.44478],[-76.45076,36.45384],[-76.45194,36.45549],[-76.4805,36.45541],[-76.47976,36.4337],[-76.5129,36.43792],[-76.51641,36.44738],[-76.534,36.44753],[-76.53446,36.44857],[-76.53527,36.44846],[-76.53509,36.45002],[-76.53736,36.44922],[-76.53937,36.45157],[-76.54062,36.45215],[-76.54142,36.4541],[-76.5373,36.45508],[-76.53986,36.46108],[-76.53929,36.46114],[-76.53849,36.46368],[-76.53957,36.46745],[-76.54244,36.46692],[-76.54156,36.46724],[-76.54146,36.46781],[-76.54375,36.46852],[-76.54442,36.46978],[-76.54758,36.46974],[-76.54726,36.47023],[-76.54767,36.47115],[-76.55005,36.4707],[-76.55061,36.47276],[-76.54852,36.47346],[-76.5495,36.47502],[-76.54873,36.47507],[-76.55249,36.48586],[-76.55192,36.48765],[-76.55087,36.4875],[-76.55099,36.48936],[-76.5523,36.48966],[-76.55504,36.48859],[-76.55784,36.48866],[-76.56054,36.48797],[-76.55867,36.49019],[-76.55714,36.48979],[-76.55208,36.49144],[-76.55301,36.49441],[-76.55131,36.49456],[-76.55223,36.49576],[-76.55126,36.49814],[-76.55332,36.49767],[-76.55217,36.50144],[-76.55291,36.50183],[-76.55248,36.50734],[-76.54766,36.50653],[-76.54669,36.50748],[-76.5466,36.51002],[-76.55278,36.51001],[-76.55338,36.51426],[-76.55148,36.51556],[-76.54784,36.51582],[-76.54858,36.52937],[-76.5484,36.53328],[-76.55005,36.53305],[-76.5504,36.53449],[-76.55107,36.53448],[-76.55168,36.53361],[-76.5527,36.53397],[-76.55113,36.53649],[-76.54982,36.53629],[-76.55101,36.53826],[-76.55142,36.54192],[-76.55104,36.54191],[-76.55097,36.54273],[-76.54965,36.54332],[-76.54907,36.54451],[-76.5481,36.54441],[-76.54865,36.54595],[-76.55177,36.54594],[-76.55161,36.54808],[-76.5421,36.54782],[-76.54193,36.55066],[-76.38072,36.55061],[-76.46767,36.5506],[-76.46814,36.53287]]],[[[-76.38616,36.58977],[-76.38752,36.58982],[-76.38682,36.59276],[-76.38546,36.59271],[-76.38616,36.58977]],[[-76.3826,36.59378],[-76.38334,36.59104],[-76.38467,36.59128],[-76.38393,36.59401],[-76.3826,36.59378]],[[-76.56358,36.71324],[-76.56245,36.71348],[-76.56245,36.71345],[-76.56358,36.71324]],[[-76.55587,36.71623],[-76.56542,36.71587],[-76.56544,36.71687],[-76.5627,36.71716],[-76.56247,36.71828],[-76.55402,36.71807],[-76.55538,36.71688],[-76.55503,36.71626],[-76.55587,36.71623]],[[-76.54627,36.73783],[-76.54482,36.73556],[-76.54459,36.73336],[-76.54846,36.73263],[-76.55441,36.73633],[-76.55335,36.73602],[-76.5513,36.73746],[-76.54794,36.73627],[-76.54733,36.73738],[-76.54627,36.73783]],[[-76.56246,36.71348],[-76.56358,36.71324],[-76.56408,36.7145],[-76.56558,36.71417],[-76.5659,36.71539],[-76.55277,36.71584],[-76.54895,36.71517],[-76.5465,36.7223],[-76.54103,36.72267],[-76.54102,36.72409],[-76.54611,36.72608],[-76.54835,36.72743],[-76.5454,36.72954],[-76.54681,36.73019],[-76.54762,36.72987],[-76.5474,36.7315],[-76.54858,36.73233],[-76.38868,36.7592],[-76.38794,36.74339],[-76.38222,36.7432],[-76.38076,36.74419],[-76.37847,36.74387],[-76.37429,36.75096],[-76.37394,36.75091],[-76.37816,36.74377],[-76.37601,36.74399],[-76.37562,36.74359],[-76.3783,36.74352],[-76.38685,36.72681],[-76.35158,36.71999],[-76.36057,36.68777],[-76.37994,36.61413],[-76.40973,36.61874],[-76.41057,36.61474],[-76.42731,36.61551],[-76.43197,36.5953],[-76.44652,36.59589],[-76.44669,36.59498],[-76.39189,36.59295],[-76.39291,36.58773],[-76.38675,36.58707],[-76.38946,36.5756],[-76.37704,36.55061],[-76.54193,36.55066],[-76.54195,36.55272],[-76.54847,36.55413],[-76.5482,36.55776],[-76.54864,36.56146],[-76.54793,36.56432],[-76.5489,36.56777],[-76.54569,36.56693],[-76.54466,36.56826],[-76.54265,36.5671],[-76.54366,36.57499],[-76.54701,36.57487],[-76.5472,36.57833],[-76.54785,36.57855],[-76.54726,36.58135],[-76.54507,36.58374],[-76.54763,36.58646],[-76.54656,36.58656],[-76.54709,36.59078],[-76.54757,36.59121],[-76.54763,36.59396],[-76.54695,36.59398],[-76.54754,36.598],[-76.54871,36.59953],[-76.54679,36.60161],[-76.54448,36.60222],[-76.53899,36.60168],[-76.54324,36.60724],[-76.54389,36.6102],[-76.5449,36.6118],[-76.54924,36.61288],[-76.55579,36.61189],[-76.5576,36.61502],[-76.5558,36.61535],[-76.55619,36.61766],[-76.56084,36.61726],[-76.56125,36.61771],[-76.55945,36.61814],[-76.5615,36.61797],[-76.56201,36.6207],[-76.56162,36.62176],[-76.55141,36.62253],[-76.55322,36.63427],[-76.55395,36.63526],[-76.55574,36.63523],[-76.55995,36.63285],[-76.56113,36.63144],[-76.56285,36.63262],[-76.56219,36.63461],[-76.56571,36.63542],[-76.56614,36.6362],[-76.56522,36.63756],[-76.56145,36.63757],[-76.56062,36.63991],[-76.56021,36.63985],[-76.56097,36.64092],[-76.56012,36.64121],[-76.55995,36.64187],[-76.55302,36.6413],[-76.54917,36.64225],[-76.55338,36.64573],[-76.55323,36.6474],[-76.54629,36.65347],[-76.54215,36.65478],[-76.54219,36.66634],[-76.55379,36.66634],[-76.55383,36.67066],[-76.55188,36.67067],[-76.5519,36.6755],[-76.554,36.67551],[-76.55451,36.67799],[-76.55535,36.67846],[-76.55518,36.681],[-76.55574,36.68337],[-76.55638,36.6834],[-76.55738,36.68641],[-76.55624,36.6871],[-76.55614,36.69115],[-76.55793,36.6967],[-76.55947,36.69677],[-76.55868,36.69688],[-76.55878,36.70037],[-76.55811,36.70066],[-76.55808,36.70114],[-76.55912,36.70129],[-76.55953,36.70498],[-76.55868,36.70561],[-76.5593,36.70777],[-76.55024,36.7103],[-76.55336,36.71422],[-76.55873,36.71293],[-76.55905,36.71414],[-76.56004,36.71394],[-76.56024,36.71529],[-76.56179,36.7148],[-76.56197,36.71517],[-76.56278,36.71458],[-76.56246,36.71348]],[[-76.43537,36.77107],[-76.43093,36.77172],[-76.42978,36.76673],[-76.42748,36.76707],[-76.42664,36.76343],[-76.42332,36.76393],[-76.42249,36.76037],[-76.4232,36.76026],[-76.41567,36.75499],[-76.51432,36.73855],[-76.51169,36.74214],[-76.51399,36.74796],[-76.51021,36.74918],[-76.51208,36.75442],[-76.46628,36.76878],[-76.46285,36.76865],[-76.46298,36.76814],[-76.45741,36.76865],[-76.43938,36.76855],[-76.44021,36.77218],[-76.43578,36.77284],[-76.43537,36.77107]],[[-76.43467,36.76853],[-76.43897,36.76855],[-76.43359,36.76852],[-76.43467,36.76853]]],[[[-76.46815,36.53288],[-76.46826,36.51469],[-76.4486,36.51462],[-76.38186,36.47153],[-76.3818,36.4687],[-76.39718,36.46866],[-76.39706,36.46777],[-76.41233,36.47268],[-76.41408,36.47227],[-76.4136,36.47043],[-76.41428,36.46928],[-76.4154,36.46918],[-76.42112,36.47129],[-76.42554,36.46402],[-76.42623,36.46447],[-76.42633,36.46535],[-76.43192,36.46697],[-76.43479,36.46351],[-76.43539,36.46181],[-76.43643,36.46073],[-76.43776,36.46029],[-76.43601,36.46357],[-76.43343,36.46544],[-76.43279,36.46655],[-76.43635,36.46697],[-76.43929,36.46644],[-76.44204,36.46966],[-76.44347,36.46865],[-76.44569,36.47019],[-76.44836,36.46928],[-76.44934,36.46735],[-76.45241,36.46981],[-76.46088,36.46565],[-76.45043,36.45462],[-76.45015,36.4448],[-76.45075,36.44479],[-76.45077,36.45385],[-76.45195,36.4555],[-76.48051,36.45542],[-76.47977,36.43371],[-76.51291,36.43793],[-76.51642,36.4474],[-76.53401,36.44754],[-76.53447,36.44858],[-76.53528,36.44847],[-76.5351,36.45003],[-76.53737,36.44923],[-76.53938,36.45158],[-76.54063,36.45216],[-76.54143,36.45411],[-76.5373,36.45509],[-76.53987,36.4611],[-76.5393,36.46115],[-76.5385,36.46369],[-76.53958,36.46746],[-76.54245,36.46693],[-76.54157,36.46725],[-76.54147,36.46782],[-76.54376,36.46853],[-76.54443,36.46979],[-76.54759,36.46975],[-76.54727,36.47024],[-76.54768,36.47116],[-76.55006,36.47071],[-76.55062,36.47277],[-76.54853,36.47347],[-76.54951,36.47503],[-76.54874,36.47508],[-76.5525,36.48587],[-76.55193,36.48766],[-76.55088,36.48751],[-76.551,36.48937],[-76.55231,36.48967],[-76.55505,36.4886],[-76.55785,36.48867],[-76.56055,36.48798],[-76.55868,36.4902],[-76.55715,36.4898],[-76.55209,36.49145],[-76.55302,36.49442],[-76.55132,36.49457],[-76.55224,36.49577],[-76.55127,36.49815],[-76.55333,36.49768],[-76.55218,36.50145],[-76.55292,36.50184],[-76.55249,36.50735],[-76.54767,36.50654],[-76.54671,36.50749],[-76.54661,36.51003],[-76.55279,36.51002],[-76.55339,36.51427],[-76.55149,36.51557],[-76.54785,36.51583],[-76.54859,36.52938],[-76.54841,36.53329],[-76.55006,36.53306],[-76.55041,36.5345],[-76.55108,36.53449],[-76.55169,36.53362],[-76.55271,36.53398],[-76.55114,36.5365],[-76.54983,36.5363],[-76.55102,36.53827],[-76.55143,36.54193],[-76.55105,36.54192],[-76.55098,36.54274],[-76.54966,36.54333],[-76.54908,36.54452],[-76.54811,36.54442],[-76.54866,36.54596],[-76.55178,36.54595],[-76.55162,36.54809],[-76.54211,36.54783],[-76.54217,36.55066],[-76.39842,36.55062],[-76.46768,36.55061],[-76.46815,36.53288]]],[[[-76.38752,36.58983],[-76.38683,36.59277],[-76.38547,36.59272],[-76.38617,36.58978],[-76.38752,36.58983]],[[-76.38261,36.59378],[-76.38335,36.59105],[-76.38468,36.59128],[-76.38394,36.59402],[-76.38261,36.59378]],[[-76.54627,36.73783],[-76.54483,36.73557],[-76.5446,36.73337],[-76.54847,36.73264],[-76.55441,36.73634],[-76.55336,36.73603],[-76.55131,36.73747],[-76.54795,36.73628],[-76.54734,36.73739],[-76.54627,36.73783]],[[-76.38822,36.74808],[-76.38795,36.7434],[-76.38223,36.74321],[-76.38077,36.7442],[-76.37848,36.74388],[-76.3743,36.75097],[-76.37396,36.75092],[-76.37436,36.75023],[-76.37371,36.75004],[-76.37424,36.74915],[-76.37275,36.74872],[-76.37588,36.74766],[-76.37817,36.74378],[-76.37602,36.744],[-76.37563,36.7436],[-76.37832,36.74353],[-76.38686,36.72681],[-76.35159,36.72],[-76.36058,36.68778],[-76.37995,36.61413],[-76.40974,36.61875],[-76.41058,36.61475],[-76.42732,36.61552],[-76.43198,36.59531],[-76.44653,36.5959],[-76.4467,36.59499],[-76.3919,36.59296],[-76.39292,36.58774],[-76.38676,36.58708],[-76.38947,36.57561],[-76.37705,36.55062],[-76.54217,36.55066],[-76.54196,36.55273],[-76.54848,36.55414],[-76.54821,36.55777],[-76.54865,36.56147],[-76.54794,36.56433],[-76.54891,36.56778],[-76.5457,36.56694],[-76.54467,36.56827],[-76.54267,36.56711],[-76.54367,36.575],[-76.54702,36.57488],[-76.54721,36.57834],[-76.54786,36.57856],[-76.54727,36.58136],[-76.54508,36.58375],[-76.54764,36.58647],[-76.54657,36.58657],[-76.5471,36.59078],[-76.54758,36.59122],[-76.54764,36.59397],[-76.54696,36.59399],[-76.54755,36.59801],[-76.54872,36.59954],[-76.54679,36.60162],[-76.54897,36.60335],[-76.54954,36.6044],[-76.55202,36.60612],[-76.55326,36.606],[-76.55668,36.61388],[-76.55761,36.61503],[-76.5558,36.61536],[-76.5562,36.61767],[-76.56085,36.61727],[-76.56126,36.61772],[-76.55946,36.61815],[-76.56137,36.61783],[-76.56202,36.62071],[-76.56163,36.62177],[-76.55142,36.62253],[-76.55323,36.63428],[-76.55396,36.63527],[-76.55574,36.63524],[-76.55996,36.63286],[-76.56114,36.63145],[-76.56286,36.63263],[-76.5622,36.63462],[-76.56572,36.63543],[-76.56615,36.63621],[-76.56523,36.63757],[-76.56146,36.63758],[-76.56063,36.63992],[-76.56022,36.63986],[-76.56098,36.64093],[-76.56013,36.64122],[-76.55996,36.64188],[-76.55303,36.64131],[-76.54917,36.64226],[-76.55339,36.64574],[-76.55324,36.64741],[-76.5463,36.65348],[-76.54216,36.65479],[-76.5422,36.66635],[-76.5538,36.66635],[-76.55384,36.67067],[-76.55189,36.67068],[-76.55191,36.67551],[-76.55401,36.67552],[-76.55452,36.678],[-76.55536,36.67847],[-76.55519,36.68101],[-76.55575,36.68338],[-76.55639,36.68341],[-76.55739,36.68642],[-76.55625,36.68711],[-76.55615,36.69116],[-76.55794,36.69671],[-76.55948,36.69678],[-76.55869,36.69689],[-76.55879,36.70038],[-76.55812,36.70067],[-76.55809,36.70115],[-76.55913,36.7013],[-76.55953,36.70499],[-76.55869,36.70562],[-76.55931,36.70777],[-76.55025,36.71031],[-76.55337,36.71423],[-76.55874,36.71293],[-76.55906,36.71415],[-76.56005,36.71395],[-76.56025,36.7153],[-76.5618,36.71481],[-76.56198,36.71518],[-76.56279,36.71458],[-76.56246,36.71346],[-76.56359,36.71324],[-76.56409,36.71451],[-76.56559,36.71418],[-76.56589,36.71512],[-76.55584,36.71576],[-76.55587,36.71624],[-76.56543,36.71588],[-76.56545,36.71688],[-76.56271,36.71717],[-76.56248,36.71829],[-76.55403,36.71808],[-76.55539,36.71689],[-76.55478,36.7158],[-76.54896,36.71517],[-76.54651,36.7223],[-76.54104,36.72268],[-76.54103,36.7241],[-76.54612,36.72608],[-76.54836,36.72744],[-76.54541,36.72955],[-76.54682,36.7302],[-76.54763,36.72988],[-76.54741,36.73151],[-76.54859,36.73234],[-76.53656,36.73459],[-76.38869,36.75921],[-76.38822,36.74808]],[[-76.43578,36.77284],[-76.43538,36.77107],[-76.43094,36.77173],[-76.42979,36.76674],[-76.42749,36.76708],[-76.42665,36.76344],[-76.42333,36.76394],[-76.4225,36.76038],[-76.42321,36.76027],[-76.41568,36.755],[-76.51433,36.73856],[-76.5117,36.74215],[-76.514,36.74796],[-76.51022,36.74918],[-76.51209,36.75443],[-76.46629,36.76879],[-76.46286,36.76866],[-76.46299,36.76815],[-76.45742,36.76866],[-76.43939,36.76856],[-76.44022,36.77219],[-76.43578,36.77284]],[[-76.43468,36.76854],[-76.43898,36.76856],[-76.43361,36.76853],[-76.43468,36.76854]]],[[[-76.38167,36.46348],[-76.38173,36.47126],[-76.37564,36.47113],[-76.3757,36.46657],[-76.37904,36.46647],[-76.37909,36.46342],[-76.38167,36.46348]],[[-76.35628,36.50634],[-76.35603,36.50578],[-76.35502,36.50609],[-76.35464,36.50545],[-76.35414,36.50439],[-76.35523,36.50405],[-76.34769,36.48844],[-76.36543,36.48822],[-76.36221,36.48144],[-76.37219,36.48138],[-76.37306,36.48268],[-76.38193,36.48192],[-76.38179,36.47171],[-76.44817,36.51468],[-76.46802,36.51473],[-76.46763,36.55046],[-76.3777,36.55041],[-76.35628,36.50634]]]],"name":"Great Dismal Swamp"},"responses":{"https://nominatim.openstreetmap.org/search?format=json&limit=20&countrycodes=us&q=great+dismal+swamp":[{"place_id":347763806,"licence":"Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright","osm_type":"relation","osm_id":274655,"lat":"36.5375826","lon":"-76.4204223","class":"natural","type":"wetland","place_rank":22,"importance":0.33518014852624106,"addresstype":"wetland","name":"Great Dismal Swamp","display_name":"Great Dismal Swamp, Camden County, North Carolina, United States","boundingbox":["36.4330745","36.7760691","-76.5649116","-76.3489938"]}],"https://photon.komoot.io/api/?q=great+dismal+swamp&limit=20":{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"osm_type":"R","osm_id":274655,"osm_key":"natural","osm_value":"wetland","type":"other","name":"Great Dismal Swamp","county":"Camden","state":"NC","country":"United States","countrycode":"US","extent":[-76.5649116,36.7760691,-76.3489938,36.4330745]},"geometry":{"type":"Point","coordinates":[-76.4204223,36.5375826]}},{"type":"Feature","properties":{"osm_type":"R","osm_id":10067582,"osm_key":"leisure","osm_value":"nature_reserve","type":"other","name":"Great Dismal Swamp National Wildlife Refuge","state":"Virginia","country":"United States","countrycode":"US","extent":[-76.5659714,36.7688049,-76.3513843,36.4336958]},"geometry":{"type":"Point","coordinates":[-76.4890459,36.601032]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":356575866,"osm_key":"leisure","osm_value":"park","type":"other","name":"Great Dismal Swamp National Wildlife Refuge","city":"Chesapeake","state":"Virginia","country":"United States","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-76.4663353,36.5834848]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":312278440,"osm_key":"building","osm_value":"residential","type":"house","name":"Great Dismal Swamp Wetlands Bank","street":"Garland Drive","city":"Chesapeake","state":"Virginia","country":"United States","postcode":"23323","countrycode":"US","extent":[-76.3680124,36.7347809,-76.3674266,36.7344614]},"geometry":{"type":"Point","coordinates":[-76.3676286,36.7345917]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":637184439,"osm_key":"office","osm_value":"government","type":"house","name":"Great Dismal Swamp National Wildlife Refuge","street":"Pines Trail","city":"Suffolk","state":"VA","country":"United States","postcode":"23704","countrycode":"US","extent":[-76.5599427,36.61949,-76.559652,36.6193011]},"geometry":{"type":"Point","coordinates":[-76.5597973,36.6193744]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":12843888428,"osm_key":"historic","osm_value":"memorial","type":"house","name":"Great Dismal Swamp Historical Marker","street":"Portsmouth Boulevard","city":"Suffolk","state":"Virginia","country":"United States","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-76.5381407,36.7469861]}}]}}},{"query":"First Landing State Park","kind":"place","truth":{"source":"PAD-US 4.1 fee unit \"First Landing State Park\" (VA)","url":"https://edits.nationalmap.gov/arcgis/rest/services/PAD-US/PAD_US_4_1/MapServer/0/query?where=Unit_Nm+%3D+%27First+Landing+State+Park%27&geometry=-77.9%2C34.1%2C-75.0%2C38.4&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&returnGeometry=true&outSR=4326&maxAllowableOffset=0.0003&outFields=OBJECTID&f=json","polygons":[[[[-76.04336,36.92175],[-76.04338,36.92104],[-76.03866,36.91981],[-76.02377,36.91962],[-76.02082,36.91913],[-76.00142,36.90878],[-75.99954,36.91276],[-75.99733,36.91345],[-75.99297,36.89805],[-75.99443,36.89778],[-75.99305,36.89612],[-75.99245,36.89623],[-75.99014,36.88809],[-76.00449,36.88534],[-76.01725,36.88968],[-76.01856,36.89136],[-76.01851,36.89247],[-76.01935,36.89293],[-76.01903,36.89362],[-76.01994,36.8946],[-76.02009,36.89572],[-76.02112,36.89621],[-76.02183,36.8974],[-76.02445,36.8988],[-76.02545,36.90004],[-76.02733,36.90074],[-76.03191,36.90555],[-76.03193,36.90628],[-76.03132,36.90692],[-76.03191,36.90758],[-76.03372,36.90821],[-76.0355,36.90773],[-76.03791,36.90972],[-76.04679,36.9113],[-76.04879,36.911],[-76.05227,36.90929],[-76.05816,36.91753],[-76.05233,36.92091],[-76.0473,36.92508],[-76.04582,36.92698],[-76.04201,36.92359],[-76.04297,36.92286],[-76.04336,36.92175]]],[[[-76.04336,36.92175],[-76.04338,36.92104],[-76.03866,36.91981],[-76.02377,36.91962],[-76.02082,36.91913],[-76.00142,36.90878],[-75.99954,36.91276],[-75.99733,36.91345],[-75.99297,36.89805],[-75.99443,36.89778],[-75.99305,36.89612],[-75.99245,36.89623],[-75.99014,36.88809],[-76.00449,36.88534],[-76.01725,36.88968],[-76.01856,36.89136],[-76.01851,36.89247],[-76.01935,36.89293],[-76.01903,36.89362],[-76.01994,36.8946],[-76.02009,36.89572],[-76.02112,36.89621],[-76.02183,36.8974],[-76.02445,36.8988],[-76.02545,36.90004],[-76.02733,36.90074],[-76.03191,36.90555],[-76.03193,36.90628],[-76.03132,36.90692],[-76.03191,36.90758],[-76.03372,36.90821],[-76.0355,36.90773],[-76.03791,36.90972],[-76.04679,36.9113],[-76.04879,36.911],[-76.05227,36.90929],[-76.05816,36.91753],[-76.05233,36.92091],[-76.0473,36.92508],[-76.04582,36.92698],[-76.04201,36.92359],[-76.04297,36.92286],[-76.04336,36.92175]]]],"name":"First Landing State Park"},"responses":{"https://nominatim.openstreetmap.org/search?format=json&limit=20&countrycodes=us&q=first+landing+state+park":[{"place_id":347486533,"licence":"Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright","osm_type":"relation","osm_id":392207,"lat":"36.9062174","lon":"-76.0135943","class":"leisure","type":"nature_reserve","place_rank":24,"importance":0.4094405247320548,"addresstype":"nature_reserve","name":"First Landing State Park","display_name":"First Landing State Park, 2500, Virginia Beach, Virginia, 23451, United States","boundingbox":["36.8852486","36.9274221","-76.0583797","-75.9905113"]}],"https://photon.komoot.io/api/?q=first+landing+state+park&limit=20":{"type":"FeatureCollection","features":[{"type":"Feature","properties":{"osm_type":"R","osm_id":392207,"osm_key":"leisure","osm_value":"nature_reserve","type":"other","housenumber":"2500","name":"First Landing State Park","street":"Shore Drive","city":"Virginia Beach","state":"VA","country":"United States","postcode":"23451","countrycode":"US","extent":[-76.0583797,36.9274221,-75.9905113,36.8852486]},"geometry":{"type":"Point","coordinates":[-76.0135943,36.9062174]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":402304371,"osm_key":"amenity","osm_value":"ranger_station","type":"house","housenumber":"2500","name":"First Landing State Park","street":"Shore Drive","city":"Virginia Beach","state":"Virginia","country":"United States","postcode":"23451","countrycode":"US","extent":[-76.0519212,36.9187906,-76.0518421,36.9187154]},"geometry":{"type":"Point","coordinates":[-76.0518817,36.9187531]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":885293597,"osm_key":"tourism","osm_value":"camp_site","type":"house","housenumber":"2500","name":"First Landing State Park Campground","street":"Shore Dr","city":"Virginia Beach","state":"VA","country":"United States","postcode":"23451","countrycode":"US","extent":[-76.0581501,36.9267347,-76.04203,36.9158065]},"geometry":{"type":"Point","coordinates":[-76.0492719,36.9209016]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":4113126693,"osm_key":"amenity","osm_value":"theatre","type":"house","housenumber":"2500","name":"First Landing State Park Amphitheatre","street":"Shore Dr","city":"Virginia Beach","state":"VA","country":"United States","postcode":"23451","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-76.0543489,36.9180742]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":200756693,"osm_key":"leisure","osm_value":"park","type":"other","name":"First Landing Park","district":"Highlands","city":"Haverhill","county":"Essex County","state":"Massachusetts","country":"United States","countrycode":"US","extent":[-71.0691304,42.7739081,-71.0683991,42.773322]},"geometry":{"type":"Point","coordinates":[-71.068781,42.7735725]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":236160458,"osm_key":"leisure","osm_value":"park","type":"other","name":"Pilgrim's First Landing Park","city":"Provincetown","county":"Barnstable","state":"Massachusetts","country":"United States","countrycode":"US","extent":[-70.1968221,42.0373486,-70.1962988,42.0369333]},"geometry":{"type":"Point","coordinates":[-70.1965601,42.0371421]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":2794000733,"osm_key":"leisure","osm_value":"slipway","type":"house","name":"First Settlers' Landing","street":"Cottage Road","locality":"Parker River Residential District","district":"Newbury Old Town","city":"Newbury","county":"Essex County","state":"Massachusetts","country":"United States","postcode":"01951","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-70.8371987,42.7628877]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":561841983,"osm_key":"historic","osm_value":"monument","type":"house","name":"Landing Place of the First Settlers","street":"Cottage Road","locality":"Parker River Residential District","district":"Newbury Old Town","city":"Newbury","county":"Essex County","state":"Massachusetts","country":"United States","postcode":"01951","countrycode":"US","extent":[-70.8371116,42.7629935,-70.8371013,42.7629784]},"geometry":{"type":"Point","coordinates":[-70.8371064,42.762986]}},{"type":"Feature","properties":{"osm_type":"W","osm_id":271765298,"osm_key":"amenity","osm_value":"parking","type":"house","name":"ArchPark First Street Parking","street":"Lucas Avenue","locality":"Laclede's Landing","city":"Saint Louis","state":"Missouri","country":"United States","postcode":"63102","countrycode":"US","extent":[-90.1839891,38.6299358,-90.1834282,38.6294781]},"geometry":{"type":"Point","coordinates":[-90.1837032,38.6297382]}},{"type":"Feature","properties":{"osm_type":"N","osm_id":7175461702,"osm_key":"amenity","osm_value":"restaurant","type":"house","housenumber":"544","name":"First Watch","street":"Marsh Landing Parkway","locality":"South Beach Parkway","city":"Jacksonville Beach","county":"Duval","state":"FL","country":"United States","postcode":"32250","countrycode":"US"},"geometry":{"type":"Point","coordinates":[-81.3910458,30.2550025]}}]}}}]}
+diff --git a/tests/searchAddress.test.ts b/tests/searchAddress.test.ts
+new file mode 100644
+index 0000000..89c6fcc
+--- /dev/null
++++ b/tests/searchAddress.test.ts
+@@ -0,0 +1,178 @@
++import { readFileSync } from 'node:fs'
++import { afterAll, beforeAll, describe, expect, it } from 'vitest'
++import { distanceMeters } from '../src/core/geo.ts'
++import { addressParts, geoAsk, parseQuery, rankResults, sameHouse, type GeoRow } from '../src/core/spotSearch.ts'
++import { markNominatim } from '../src/lib/search.ts'
++import { geocodeAddress } from '../src/lib/spotSearchData.ts'
++import { insidePolygons, replayFetch, runPicker, type AddressFixture } from './searchAddressRun.ts'
++
++/*
++ * Batch SIMPLE-1, Section 2. "Pub, 425 E Pinner St, Suffolk, VA 23434" and
++ * "425 E Pinner St, Suffolk" said "Nothing found by that name" though both
++ * gazetteers answered with the house. The saved answers here were recorded
++ * from Photon and Nominatim by scripts/measure-search-address.mjs --record;
++ * each truth is a local government's address point or a published boundary,
++ * not OpenStreetMap (measurements/2026-11-18-search-address.md). The search
++ * runs through the spot picker's own path (tests/searchAddressRun.ts).
++ */
++const fixture = JSON.parse(readFileSync(new URL('./fixtures/search-address.json', import.meta.url), 'utf8')) as AddressFixture
++const addresses = fixture.cases.filter((c) => c.kind === 'address')
++const places = fixture.cases.filter((c) => c.kind === 'place')
++const asked: string[] = []
++const realFetch = globalThis.fetch
++
++beforeAll(() => {
++  globalThis.fetch = replayFetch(fixture.cases, asked)
++})
++afterAll(() => {
++  globalThis.fetch = realFetch
++})
++
++/** Run one saved query; the Nominatim clock starts clear, so a query waits only on its own requests. */
++async function run(query: string) {
++  markNominatim(0)
++  asked.length = 0
++  const got = await runPicker(query)
++  return { ...got, asked: [...asked] }
++}
++
++describe('the saved run (a check that looked at something)', () => {
++  it('holds ten or more addresses across the five towns, five place names, and both strings from the report', () => {
++    expect(addresses.length).toBeGreaterThanOrEqual(10)
++    expect(places.length).toBe(5)
++    const towns = ['Virginia Beach', 'Suffolk', 'Norfolk', 'Wilmington', 'Salisbury']
++    for (const t of towns) expect(addresses.filter((c) => c.query.includes(t)).length, t).toBeGreaterThanOrEqual(2)
++    const queries = fixture.cases.map((c) => c.query)
++    expect(queries).toContain('Pub, 425 E Pinner St, Suffolk, VA 23434')
++    expect(queries).toContain('425 E Pinner St, Suffolk')
++    for (const c of addresses) expect(c.truth.at, c.query).toBeDefined()
++    for (const c of places) expect(c.truth.polygons?.length ?? 0, c.query).toBeGreaterThan(0)
++  })
++})
++
++describe('addresses: the right house first', () => {
++  for (const c of addresses) {
++    it(`"${c.query}" within ${fixture.toleranceMeters} m of ${c.truth.source}`, async () => {
++      const got = await run(c.query)
++      expect(got.status).toBe('ok')
++      expect(got.asked.length).toBeGreaterThan(0)
++      const top = got.results[0]
++      expect(top, 'a first result').toBeDefined()
++      expect(top.group).toBe('address')
++      expect(distanceMeters(top.at, c.truth.at!)).toBeLessThanOrEqual(fixture.toleranceMeters)
++    })
++  }
++
++  it('the two strings from the report find 425 E Pinner St, the pub by its name', async () => {
++    const pub = await run('Pub, 425 E Pinner St, Suffolk, VA 23434')
++    expect(pub.results[0].name).toBe("Derl'z Restaurant & Pub")
++    expect(pub.results[0].where).toBe('425 Pinner Street, Suffolk')
++    const bare = await run('425 E Pinner St, Suffolk')
++    expect(bare.results[0].name).toBe('425 Pinner Street')
++    expect(bare.results[0].where).toBe('Suffolk, VA')
++    /* The building and the pub in it are one pin: one address row. */
++    expect(bare.results.filter((r) => r.group === 'address')).toHaveLength(1)
++    /* Photon first, and it had the house: nothing else was asked. */
++    expect(bare.asked).toEqual(['https://photon.komoot.io/api/?q=425+E+Pinner+St%2C+Suffolk&limit=20'])
++  })
++
++  it('a name in front that finds nothing is dropped: Photon, Nominatim, then both again without it', async () => {
++    const got = await run('Blue Heron Coffee Roasters, 102 N 3rd St, Wilmington, NC')
++    expect(got.asked.map((u) => `${new URL(u).hostname} ${new URL(u).searchParams.get('q')}`)).toEqual([
++      'photon.komoot.io Blue Heron Coffee Roasters, 102 N 3rd St, Wilmington, NC',
++      'nominatim.openstreetmap.org Blue Heron Coffee Roasters, 102 N 3rd St, Wilmington, NC',
++      'photon.komoot.io 102 N 3rd St, Wilmington, NC',
++      'nominatim.openstreetmap.org 102 N 3rd St, Wilmington, NC',
++    ])
++    expect(got.results[0].name).toBe('102 North 3rd Street')
++  })
++
++  it('only the typed words leave: no position, box or bias on any request', async () => {
++    let looked = 0
++    for (const c of fixture.cases) {
++      const got = await run(c.query)
++      for (const u of got.asked) {
++        const url = new URL(u)
++        looked += 1
++        expect(['photon.komoot.io', 'nominatim.openstreetmap.org']).toContain(url.hostname)
++        for (const p of ['lat', 'lon', 'viewbox', 'bounded', 'bbox', 'location_bias_scale', 'zoom']) expect(url.searchParams.has(p), `${p} in ${u}`).toBe(false)
++        const q = url.searchParams.get('q') ?? ''
++        /* Every word sent was typed (case and punctuation aside). */
++        const typed = new Set(c.query.toLowerCase().split(/[^a-z0-9']+/))
++        for (const w of q.toLowerCase().split(/[^a-z0-9']+/).filter((x) => x !== '')) expect(typed.has(w), `"${w}" in ${u}`).toBe(true)
++      }
++    }
++    expect(looked).toBeGreaterThanOrEqual(fixture.cases.length)
++  })
++})
++
++describe('place names: inside the place first', () => {
++  for (const c of places) {
++    it(`"${c.query}" inside ${c.truth.source}`, async () => {
++      const got = await run(c.query)
++      const top = got.results[0]
++      expect(top, 'a first result').toBeDefined()
++      expect(insidePolygons(top.at, c.truth.polygons!)).toBe(true)
++    })
++  }
++})
++
++describe('what is an address', () => {
++  it('a house number and a street, a name before it dropped for the second try', () => {
++    expect(addressParts('Pub, 425 E Pinner St, Suffolk, VA 23434')).toEqual({ full: 'Pub, 425 E Pinner St, Suffolk, VA 23434', bare: '425 E Pinner St, Suffolk, VA 23434', number: '425', street: ['pinner'] })
++    expect(addressParts('425  E Pinner St ,Suffolk')).toEqual({ full: '425 E Pinner St, Suffolk', bare: null, number: '425', street: ['pinner'] })
++    expect(addressParts('102 N 3rd St')?.street).toEqual(['3rd'])
++    expect(addressParts('2 Mile Beach, NC')?.number).toBe('2')
++  })
++
++  it('names with a number in them are not addresses', () => {
++    for (const q of ['first st outer banks', '1st St', '7 Eleven', '17th Street Park', '2 Mile Beach', 'Virginia Beach', 'Pub']) expect(addressParts(q), q).toBeNull()
++  })
++
++  it('the same house: its number and a street word in common', () => {
++    const a = addressParts('425 E Pinner St, Suffolk')!
++    expect(sameHouse(a, '425', 'East Pinner Street')).toBe(true)
++    expect(sameHouse(a, '425', 'Pinner Street')).toBe(true)
++    expect(sameHouse(a, '427', 'East Pinner Street')).toBe(false)
++    expect(sameHouse(a, '425', 'Washington Street')).toBe(false)
++  })
++
++  it('a spot of ours that matches keeps the search by words', () => {
++    expect(geoAsk('425 E Pinner St, Suffolk', false)?.kind).toBe('address')
++    expect(geoAsk('425 E Pinner St, Suffolk', true)).toEqual({ kind: 'words', text: '425 e pinner st suffolk' })
++    expect(geoAsk('wrightsville beach', false)).toEqual({ kind: 'words', text: 'wrightsville beach' })
++  })
++})
++
++describe('the ranking', () => {
++  const row = (id: string, name: string, osmKey: string, osmValue: string, lat = 36.905, lon = -76.2): GeoRow => ({ id, name, where: 'Norfolk, Virginia', at: { lat, lon }, osmKey, osmValue })
++
++  it('a garden named by every word is a place; a road with the words is not', () => {
++    const q = parseQuery('norfolk botanical garden')
++    const got = rankResults(q, [], [row('g', 'Norfolk Botanical Garden', 'leisure', 'garden'), row('r', 'Botanical Garden Norfolk Road', 'highway', 'residential', 36.9, -76.21)], null)
++    expect(got.map((r) => [r.name, r.group])).toEqual([['Norfolk Botanical Garden', 'place']])
++  })
++
++  it('addresses first, and the same building said again by the words search is dropped', () => {
++    const house: GeoRow = { id: 'h', name: '425 Pinner Street', where: 'Suffolk, VA', at: { lat: 36.736712, lon: -76.5699301 }, osmKey: 'building', osmValue: 'yes' }
++    const pub: GeoRow = { id: 'p', name: "Derl'z Restaurant & Pub", where: 'Suffolk, Virginia', at: { lat: 36.736712, lon: -76.56993 }, osmKey: 'amenity', osmValue: 'restaurant' }
++    const got = rankResults(parseQuery("derl'z pub"), [], [pub], null, [house])
++    expect(got.map((r) => r.id)).toEqual(['h'])
++  })
++})
++
++describe('when the services do not answer', () => {
++  it('says it failed, not that nothing was found', async () => {
++    const saved = globalThis.fetch
++    globalThis.fetch = (async () => {
++      throw new TypeError('offline')
++    }) as typeof fetch
++    try {
++      markNominatim(0)
++      const a = addressParts('425 E Pinner St, Suffolk')!
++      expect(await geocodeAddress(a, '425 e pinner st suffolk')).toEqual({ status: 'failed' })
++    } finally {
++      globalThis.fetch = saved
++    }
++  })
++})
+diff --git a/tests/searchAddressRun.ts b/tests/searchAddressRun.ts
+new file mode 100644
+index 0000000..cd28d93
+--- /dev/null
++++ b/tests/searchAddressRun.ts
+@@ -0,0 +1,84 @@
++/*
++ * THE SPOT PICKER'S SEARCH, RUN OUTSIDE THE PICKER (Batch SIMPLE-1, Section 2).
++ *
++ * The same calls src/components/SpotPicker.tsx makes, in the same order, over
++ * the same lists: the words parsed, our spots searched on the phone, the
++ * geocoders asked (an address when the words are one and nothing here
++ * matched), the answer ranked. Used by tests/searchAddress.test.ts against
++ * saved answers and by scripts/measure-search-address.mjs to record them.
++ */
++import { distanceMeters, type LatLon } from '../src/core/geo.ts'
++import { geoAsk, localPool, ownSpots, parseQuery, rankResults, type Result } from '../src/core/spotSearch.ts'
++import { geocodeAsk, PICKER_SPOTS } from '../src/lib/spotSearchData.ts'
++
++export interface PickerRun {
++  results: Result[]
++  /** 'address' or 'words': what the picker asked; null when it asked nothing. */
++  asked: 'address' | 'words' | null
++  status: 'ok' | 'failed' | 'aborted' | 'not asked'
++}
++
++/** One search, first run (no saved spots, no cached map spots, no position). */
++export async function runPicker(raw: string): Promise<PickerRun> {
++  const q = parseQuery(raw)
++  const own = ownSpots(q, null, PICKER_SPOTS, localPool([], []))
++  const a = geoAsk(raw, own.length > 0)
++  if (a === null) return { results: rankResults(q, own, [], null), asked: null, status: 'not asked' }
++  const answer = await geocodeAsk(a)
++  const ok = answer.status === 'ok' ? answer : null
++  return { results: rankResults(q, own, ok?.rows ?? [], null, ok?.addresses ?? []), asked: a.kind, status: answer.status }
++}
++
++/** An ArcGIS polygon: rings of [lon, lat], even-odd. */
++export type Rings = number[][][]
++
++export function insideRings(at: LatLon, rings: Rings): boolean {
++  let inside = false
++  for (const ring of rings) {
++    for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
++      const [xi, yi] = ring[i]
++      const [xj, yj] = ring[j]
++      if (yi > at.lat !== yj > at.lat && at.lon < ((xj - xi) * (at.lat - yi)) / (yj - yi) + xi) inside = !inside
++    }
++  }
++  return inside
++}
++
++/** Inside any one of the place's polygons (PAD-US lists a unit once a state and once a manager). */
++export const insidePolygons = (at: LatLon, polygons: readonly Rings[]): boolean => polygons.some((p) => insideRings(at, p))
++
++/** How far a point is from the nearest vertex of the boundary, metres: for the table when it is outside. */
++export function nearestVertexMeters(at: LatLon, polygons: readonly Rings[]): number {
++  let best = Infinity
++  for (const rings of polygons) for (const ring of rings) for (const [lon, lat] of ring) best = Math.min(best, distanceMeters(at, { lat, lon }))
++  return best
++}
++
++/** The saved run: each query, its truth and every answer the geocoders gave it. */
++export interface AddressCase {
++  query: string
++  kind: 'address' | 'place'
++  /** An address: the local address point (`at`), the Census point beside it. A name: its boundary. */
++  truth: { source: string; url: string; at?: LatLon; matched?: string; census?: { url: string; at: LatLon; matched: string }; polygons?: Rings[]; name?: string }
++  /** URL asked → the JSON body that came back. */
++  responses: Record<string, unknown>
++}
++
++export interface AddressFixture {
++  recorded: string
++  userAgent: string
++  toleranceMeters: number
++  cases: AddressCase[]
++}
++
++/** fetch, answered from the saved bodies; an unsaved URL is a failure that names it. */
++export function replayFetch(cases: readonly AddressCase[], asked: string[] = []): typeof fetch {
++  const all = new Map<string, unknown>()
++  for (const c of cases) for (const [u, body] of Object.entries(c.responses)) all.set(u, body)
++  return (async (input: RequestInfo | URL) => {
++    const href = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
++    asked.push(href)
++    if (!all.has(href)) throw new TypeError(`no saved answer for ${href}`)
++    return new Response(JSON.stringify(all.get(href)), { status: 200, headers: { 'Content-Type': 'application/json' } })
++  }) as typeof fetch
++}

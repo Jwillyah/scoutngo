@@ -1,0 +1,1441 @@
+diff --git a/docs/batches/live-status.md b/docs/batches/live-status.md
+new file mode 100644
+index 0000000..13424fd
+--- /dev/null
++++ b/docs/batches/live-status.md
+@@ -0,0 +1,17 @@
++# Batch LIVE · final per-section status (14 Nov, written 16 Nov from the LIVE report + git log)
++
++| Section | Commit | Status |
++|---|---|---|
++| 0 · Data truth first | — | **Reverted** (two strikes: tsc on its own test, then the sky fire audit). Patch kept at `docs/batches/live-section0-reverted.patch`. None of 0.1–0.7 shipped in LIVE, except 0.1's Sky Now/Tonight station split, fixed later in S10 (60bb388). |
++| 1 · Wind map | 4ac5548 | Done: MAX_LAT 85 and longitude wrap, point wind at the crosshair, north and pitch locked, playback "Sat 3 PM", banners off-screen distance, `audit:wind-live`, tests. |
++| 2 · Sky pages | — | **Reverted** (two strikes: the safari tab audit selector, then tsc packaging). Patch at `docs/batches/live-section2-reverted.patch`. Not shipped: the Now headline, the Now side view, rare light limits, the layout, the Sun · Moon · Night rebuild. |
++| 3 · Calendar and week | 85d34a2 | Done: forecast icons within 7 days, guesses marked "?", past days, real chip toggles, full day card, "See the month ›", one word a day on the week. |
++| 4 · Menu A and charts | 286aace | Done: Menu A art, value bubbles kept off lines (drone chart included), home-fit and menu audits. |
++| 5 · Planner and 3D | b3398a5 | Done: one simple card with "…" and "i", feet first, no horizontal scroll; 3D 10 s load timeout and "3D didn't load · Back to 2D". |
++| 6 · Drone Fly | c2c8c30 | Done: one-row Land · Keep flying, airspace chip after 5 s, battery on one line, soft animated ground, sine-free sky hashes, Real while online. |
++| 7 · Live sky | ea8ea39 | Done behind a flag (home only). 8-state contact sheets made (iOS tab and Android tab, home/Sky/Weather); **not yet approved by Jwilly**. |
++| 8 · Best Sky pins and pink (paste-in) | 58008e0 | Done: pins spread, labels attached, pink only on observed cloud, station tags, "Little" says why, header "sun sets X · pink Y", station deck in the picture, footer at the end of the scroll. Not done: page 3 opening on #1 (not verified). |
++| 9 · Surf nowcast and field report (paste-in) | 82cc8ae | Done: cos² taper with spread, 44099 at half weight, pull cap on disagreement, per-spot beach factor, spot chips, toggle, wording, re-tagged 14 Nov report, before/after measurement. |
++| 10 · One sky call (paste-in) | 60bb388, a9b98ad | Partly done: pill timing (call's own colour window), Sky Now uses the station Tonight uses (METAR time), Best Sky line under a station deck, why lines consistent when blocked, rare light cap 3 + 10 s timeout. **Not done:** 10.1 one sky-call object, 10.3 observed clouds over models inside T-90, 10.4 station deck in the why lines, 10.8 pin-collision fixture, 10.9 surf headline path. |
++
++Fly after LIVE: the 14 Nov 11:47 PM iPhone failure did not reproduce on the Mac (headless WebKit, and headed WebKit on the Apple GPU) at Near you, Croatan and the pier; no console errors. Bisect skipped (Jwilly, 16 Nov).
+diff --git a/docs/privacy-hosting.md b/docs/privacy-hosting.md
+new file mode 100644
+index 0000000..8614724
+--- /dev/null
++++ b/docs/privacy-hosting.md
+@@ -0,0 +1,46 @@
++# Privacy on the host (Vercel)
++
++Batch CORE, Section 0.3 (16 Nov). The deploy is scoutngo.vercel.app. This says what our own code on Vercel receives and keeps, what Vercel itself keeps by default, and how it is kept small.
++
++## Our functions log nothing
++
++Every function in `api/` writes no log line: no `console.*` call, no request body, no coordinate, no IP. `tests/apiNoLogs.test.ts` fails if one appears. None reads a client IP header (`x-forwarded-for`, `x-real-ip`) or keeps anything between requests.
++
++| Function | What it receives | Where |
++|---|---|---|
++| `/api/forecast` | An Open-Meteo request, every coordinate snapped to a 0.05° grid (about 5 km; finer is refused), and the UTC hour | URL query string |
++| `/api/metar` | A station id | POST body |
++| `/api/pirep` | A station id (pilot reports within 100 miles of it) | POST body |
++| `/api/buoy` | A buoy number | POST body |
++| `/api/nhc` | Nothing, or one storm's NHC product URL (which storm is near is worked out on the phone) | POST body |
++| `/api/search` | What you typed, and a proximity point | POST body |
++| `/api/streetview` | The spot being considered | POST body |
++| `/api/calendar` | The venue to 2 decimals (about 1 km) | URL query string (a calendar app subscribes to a URL, so it cannot be a body) |
++
++The phone asks Open-Meteo directly first (Batch CORE 0.4); `/api/forecast` is asked only when Open-Meteo refuses the phone or cannot be reached.
++
++## What Vercel keeps by default
++
++From Vercel's Runtime Logs documentation (vercel.com/docs/runtime-logs, read 16 Nov 2026):
++
++- **Runtime logs** hold each function request's method, **request path and its search parameters**, status, host, time, region, **user agent**, cache status, function metadata, and the **outgoing requests** the function made, plus anything the function prints (ours print nothing).
++- Vercel matches **your IP address** and user agent against requests for its "logs from your browser" filter, so it holds the requesting IP alongside the request.
++- **Retention:** Hobby 1 hour, Pro 1 day, Pro or Enterprise with Observability Plus 30 days, Enterprise 3 days.
++- Static requests answered from the CDN appear only when they serve cache; all of them only through a log drain.
++
++So, by default, Vercel can see: the forecast cache's 5 km grid point, the calendar feed's 1 km venue, and the IP and user agent of whoever asked, for the retention above. POST bodies (search text, the spot for Street View, station and buoy ids) are not in the request log.
++
++**Not confirmed:** whether the "Outgoing Requests" panel shows the full URL of a function's own request onward. `/api/search` sends the search text and proximity point to Mapbox, and `/api/streetview` sends the spot to Google, in those URLs. If Vercel records them in full, they sit in the log for the retention period. Check one request in the dashboard (Logs › a `/api/search` row › Outgoing Requests).
++
++## How it is kept small
++
++Vercel's request logs cannot be switched off. They are kept small by:
++
++1. **Shortest retention**: on Hobby, 1 hour of logs; Observability Plus (30 days) stays off. Which plan the project is on is not visible from the repo.
++2. **No log drains** configured. A drain would copy every request elsewhere. Check: Project › Settings › Log Drains is empty.
++3. **No Web Analytics, no Speed Insights**: neither package is in `package.json`. Check: Project › Analytics and Speed Insights are disabled.
++4. **Coordinates in bodies, not URLs**, everywhere a URL is not required (search, Street View); station and buoy ids in bodies too.
++5. **Coarse where a URL is required**: 0.05° for the forecast cache; 2 decimals for the calendar feed.
++6. **Phone first**: Open-Meteo, NOAA, NWS and the map tiles are asked by the phone directly, so Vercel never sees those requests.
++
++Items 1–3 are dashboard settings this repo cannot see. Jwilly should confirm them once in the Vercel dashboard.
+diff --git a/docs/sources-licenses.md b/docs/sources-licenses.md
+new file mode 100644
+index 0000000..6ec9f38
+--- /dev/null
++++ b/docs/sources-licenses.md
+@@ -0,0 +1,39 @@
++# Sources and licences
++
++Every outside thing ScoutNGo touches. Generated from `src/core/credits.ts` by `npx tsx scripts/write-sources-doc.ts`; the in-app "Data & credits" page (/credits) shows the same list, and `tests/credits.test.ts` fails when a host in `src/lib/hosts.ts` has no row.
++
++Status: **ok** used within its terms as far as we know · **fix** something to change · **check** terms not yet confirmed.
++
++| Source | What we use | Licence / terms | Credit | Key | Rate limit | Status |
++|---|---|---|---|---|---|---|
++| OpenStreetMap | Place names, search, beaches, piers and parks near a spot | ODbL 1.0 (data); Nominatim and Overpass usage policies | © OpenStreetMap contributors | No | Nominatim: at most 1 request a second, no heavy use; Overpass: fair use | **ok** |
++| OpenFreeMap | Map labels, buildings, the sea, the 3D view | Free to use; map data ODbL (OpenStreetMap), schema OpenMapTiles | OpenFreeMap © OpenMapTiles · Data from OpenStreetMap | No | None stated; fair use | **ok** |
++| Esri World Imagery | The satellite photo under the map; South Carolina imagery for 3D | Esri Master Agreement / Terms of Use | Powered by Esri · Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community | The tile URL answers without one; Esri points developers to ArcGIS Location Platform (free tier, API key) | Free tier limits on ArcGIS Location Platform | **fix** · Needs an ArcGIS Location Platform key from Jwilly’s own Esri account (free tier), or a switch to USGS imagery in the US. Credit added. |
++| State imagery (VGIN, NC OneMap, MD iMAP, Delaware FirstMap) | Sharper ground photos for the 3D view in those states | Public state services | Imagery: Virginia VGIN, NC OneMap, Maryland MD iMAP, Delaware FirstMap | No | None stated | **ok** |
++| USGS (NAIP imagery, 3DEP lidar) | Ground photos for 3D in the lower 48; lidar scans when you tap Download | US public domain | USGS The National Map; USDA NAIP | No | None stated | **ok** |
++| Terrain tiles (AWS Open Data, Terrarium) | Ground height for terrain and 3D | Open data; sources include SRTM, USGS 3DEP, GMTED, ETOPO1 | Terrain: Mapzen terrain tiles (SRTM, USGS, GMTED, ETOPO1) on AWS Open Data | No | None stated | **ok** |
++| Overture Maps | Building heights, when you tap Fill in heights | ODbL (buildings), CDLA Permissive 2.0 (other themes) | © OpenStreetMap contributors, Overture Maps Foundation | No | None stated | **ok** |
++| Open-Meteo | Wind, cloud, rain, waves, air quality, the five models; this app’s cache only when Open-Meteo refuses the phone | Data CC BY 4.0; free API for non-commercial use | Weather data by Open-Meteo.com (CC BY 4.0) | No (free tier) | 600 a minute, 5,000 an hour, 10,000 a day, per address | **ok** · Asked from the phone first (Batch CORE 0.4); no ads, no subscriptions. |
++| ECMWF, NOAA GFS/HRRR, DWD ICON, Météo-France, JMA and others (through Open-Meteo) | The models behind Open-Meteo’s answers | Each centre’s open-data licence (ECMWF: CC BY 4.0) | Model data: ECMWF, NOAA, DWD, Météo-France, JMA (via Open-Meteo) | No | Through Open-Meteo | **ok** |
++| NOAA / National Weather Service | Station reports, marine and rip current forecasts, alerts, storm outlooks, lightning, hurricanes, the K index | US public domain | NOAA / National Weather Service | No (a User-Agent is asked) | None published; reasonable use | **ok** |
++| NOAA CO-OPS (tides) | Tide predictions, water levels, coastal station wind | US public domain | NOAA CO-OPS Tides & Currents | No | None published | **ok** |
++| NOAA NDBC (buoys) | Buoy wave height, period and direction | US public domain | NOAA National Data Buoy Center | No | None published | **ok** |
++| Aviation Weather Center (METARs, PIREPs) | Airport station reports and pilot reports of cloud | US public domain | NOAA Aviation Weather Center | No | About 100 requests a minute | **ok** |
++| NASA GIBS | Satellite cloud pictures (GOES) on the map and for Sky color | NASA open data; no restrictions | Imagery: NASA EOSDIS GIBS | No | None stated | **ok** |
++| Iowa Environmental Mesonet | Weather balloon soundings, radar along the sun’s line, station history, SPC watches | Free, public | Iowa Environmental Mesonet, Iowa State University | No | Fair use | **ok** |
++| LibreWXR | Radar and satellite rain on the map | CC BY 4.0 | Radar: LibreWXR (CC BY 4.0) | No | None stated | **ok** |
++| Photon (komoot) | Search, when OpenStreetMap finds nothing | Free public instance, fair use; data ODbL | Search: Photon by komoot · © OpenStreetMap contributors | No | Fair use; no heavy use | **ok** |
++| Mapbox Search | Search, as the last try | Mapbox Terms of Service | Search by Mapbox | Yes, on the server (Vercel environment) | Free tier monthly allowance | **check** · Mapbox’s terms limit how geocoding results are shown and kept; confirm they allow results on a non-Mapbox map, else remove this last try. |
++| Google Street View | The ground picture at a planned spot (this app’s /api/streetview) | Google Maps Platform Terms | Google | Yes, on the server (Vercel environment) | Google Maps Platform free monthly credit | **check** · Confirm the Street View Static API terms allow the picture shown as it is; the picture must carry Google’s logo and credit. |
++| Beach and road cams (SurfChex, Surfline, piers, VDOT, NCDOT, DelDOT, MD CHART) | Links to the operator’s own page, in a new tab | Each operator’s terms | none asked | No | Not asked: nothing is fetched | **ok** · Link out only: no embed, no frame, no image, no logo, no numbers copied (tests/camsLinkOnly.test.ts). |
++| GitHub | Settings: whether a newer build exists | GitHub Terms of Service | none asked | No | 60 requests an hour per address, unauthenticated | **ok** |
++| Anthropic (your own key) | Writing the call sheet, only when you press Write | Anthropic terms, under your own key | none asked | Yes, yours, kept on your phone | Your key’s limits | **ok** |
++| This app’s calendar feed | The calendar subscription (/api/calendar), asking the sources above | This app (MIT) | none asked | No | Each calendar app’s refresh | **ok** |
++
++## Rules (Batch CORE, 16 Nov)
++
++- Third-party surf sites (Surfline, Surfchex and the like): links that open their page in a new tab only. No embedding or framing of their cams or pages, no scraping, no copying their numbers into the app, no logos. Checked 16 Nov: the app links out only (src/components/CamsSheet.tsx, CamList.tsx, SurfPageV2.tsx, all `target="_blank"`); nothing embeds, frames, scrapes or copies. Nothing was removed.
++- Cams: every cam the app lists is a link to its operator's page (src/data/coastCams.ts, src/data/vdotCams.ts; tests/camsLinkOnly.test.ts). None is embedded.
++- Truth fixtures may carry a hand-written note such as "Surfline said Flat". Nothing fetches one automatically.
++- Open-Meteo is asked from the phone; this app's cache (/api/forecast) only when Open-Meteo refuses the phone or cannot be reached.
++- Licence: MIT (LICENSE), with its no-warranty clause. No keys are in the repository or its history (scanned 16 Nov for Anthropic, AWS, Google, Mapbox and GitHub key patterns: none; the only "sk-ant-" string is a test's placeholder).
+diff --git a/fixtures/truth/2026-11-14-vb-sunset.json b/fixtures/truth/2026-11-14-vb-sunset.json
+index 7eb86ac..3721fac 100644
+--- a/fixtures/truth/2026-11-14-vb-sunset.json
++++ b/fixtures/truth/2026-11-14-vb-sunset.json
+@@ -8,8 +8,8 @@
+   },
+   "station": {
+     "id": "KNTU",
+-    "metar": "KNTU 142135Z BKN055",
+-    "note": "Only the deck the Sky Tonight page showed (BKN 5,500 ft). The report's time group is the test's assumption, not read from the phone; no other groups are kept."
++    "metar": "KNTU 141956Z 30011G24KT 10SM BKN055 10/M03 A2995",
++    "note": "The report the phone showed at 4:39 PM: KNTU's 2:56 PM (19:56Z) observation, BKN 5,500 ft, as weather.gov's archive holds it (read 16 Nov, Batch CORE 0.1). Newer reports existed: 20:56Z SCT055 and 21:56Z SCT070. LIVE S10 had written a 2135Z time here as an assumption; this replaces it."
+   },
+   "truth": {
+     "sky": "broken cumulus at about 5,000-6,000 ft",
+diff --git a/scripts/audit-fly.mjs b/scripts/audit-fly.mjs
+index d02cba4..2598425 100644
+--- a/scripts/audit-fly.mjs
++++ b/scripts/audit-fly.mjs
+@@ -62,7 +62,7 @@ const LOOK = `(() => {
+     wind: box(document.querySelector('.fly__wind')),
+     cardinals: [...document.querySelectorAll('.fly__cardinal')].map((t) => ({ c: t.textContent, rot: t.getAttribute('transform') ?? t.closest('[transform*="rotate"]')?.getAttribute('transform') ?? null, box: box(t) })),
+     /* The new scene (Batch D) draws no credits of its own; the old check for the globe library's credit box could never fire. Any credit text over the flight is still caught here. */
+-    creditsShown: /Tiles by Esri|OpenStreetMap contributors/.test([...document.querySelectorAll('.fly, .fly *')].filter((el) => !el.closest('.fly__credits') && el.children.length === 0).map((el) => el.textContent).join(' ')),
++    creditsShown: /Tiles by Esri|Powered by Esri|OpenStreetMap contributors/.test([...document.querySelectorAll('.fly, .fly *')].filter((el) => !el.closest('.fly__credits') && el.children.length === 0).map((el) => el.textContent).join(' ')),
+     attribution: /Data attribution/.test(document.body.innerText),
+     info: document.querySelector('.fly__credits')?.textContent ?? null,
+     vw: innerWidth,
+diff --git a/scripts/write-sources-doc.ts b/scripts/write-sources-doc.ts
+new file mode 100644
+index 0000000..6cd7cd2
+--- /dev/null
++++ b/scripts/write-sources-doc.ts
+@@ -0,0 +1,30 @@
++/*
++ * docs/sources-licenses.md from src/core/credits.ts (Batch CORE, Section 0.4).
++ * Run: npx tsx scripts/write-sources-doc.ts. tests/credits.test.ts fails when
++ * the doc and the list disagree.
++ */
++import { writeFileSync } from 'node:fs'
++import { CREDITS } from '../src/core/credits.ts'
++
++const cell = (s: string) => s.replace(/\|/g, '\\|')
++const rows = CREDITS.map((c) => `| ${cell(c.name)} | ${cell(c.use)} | ${cell(c.license)} | ${c.attribution === null ? 'none asked' : cell(c.attribution)} | ${cell(c.key)} | ${cell(c.rate)} | **${c.status}**${c.note === undefined ? '' : ` · ${cell(c.note)}`} |`)
++const doc = `# Sources and licences
++
++Every outside thing ScoutNGo touches. Generated from \`src/core/credits.ts\` by \`npx tsx scripts/write-sources-doc.ts\`; the in-app "Data & credits" page (/credits) shows the same list, and \`tests/credits.test.ts\` fails when a host in \`src/lib/hosts.ts\` has no row.
++
++Status: **ok** used within its terms as far as we know · **fix** something to change · **check** terms not yet confirmed.
++
++| Source | What we use | Licence / terms | Credit | Key | Rate limit | Status |
++|---|---|---|---|---|---|---|
++${rows.join('\n')}
++
++## Rules (Batch CORE, 16 Nov)
++
++- Third-party surf sites (Surfline, Surfchex and the like): links that open their page in a new tab only. No embedding or framing of their cams or pages, no scraping, no copying their numbers into the app, no logos. Checked 16 Nov: the app links out only (src/components/CamsSheet.tsx, CamList.tsx, SurfPageV2.tsx, all \`target="_blank"\`); nothing embeds, frames, scrapes or copies. Nothing was removed.
++- Cams: every cam the app lists is a link to its operator's page (src/data/coastCams.ts, src/data/vdotCams.ts; tests/camsLinkOnly.test.ts). None is embedded.
++- Truth fixtures may carry a hand-written note such as "Surfline said Flat". Nothing fetches one automatically.
++- Open-Meteo is asked from the phone; this app's cache (/api/forecast) only when Open-Meteo refuses the phone or cannot be reached.
++- Licence: MIT (LICENSE), with its no-warranty clause. No keys are in the repository or its history (scanned 16 Nov for Anthropic, AWS, Google, Mapbox and GitHub key patterns: none; the only "sk-ant-" string is a test's placeholder).
++`
++writeFileSync('docs/sources-licenses.md', doc)
++console.log(`docs/sources-licenses.md: ${CREDITS.length} rows`)
+diff --git a/src/App.tsx b/src/App.tsx
+index 989fa18..3061c89 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -100,6 +100,7 @@ import { useTide } from './lib/useTide.ts'
+ import { lowTideNearest } from './lib/lowTide.ts'
+ import { useVenueCache } from './lib/useVenueCache.ts'
+ import { atPrivacy, closePrivacy } from './lib/privacyRoute.ts'
++import { atCredits, closeCredits } from './lib/creditsRoute.ts'
+ import { buildScoutFile, saveScoutFile, scoutFilename, type ReadFile } from './lib/scoutFile.ts'
+ import { readShareHash, SHARE_PREFIX } from './lib/planShare.ts'
+ import type { MenuRows, MenuTarget } from './components/Menu.tsx'
+@@ -177,6 +178,7 @@ const FieldMode = lazy(() => import('./components/FieldMode.tsx').then((m) => ({
+ const NowScreen = lazy(() => import('./components/NowScreen.tsx').then((m) => ({ default: m.NowScreen })))
+ const SetupMode = lazy(() => import('./components/SetupMode.tsx').then((m) => ({ default: m.SetupMode })))
+ const PrivacyPage = lazy(() => import('./components/PrivacyPage.tsx').then((m) => ({ default: m.PrivacyPage })))
++const CreditsPage = lazy(() => import('./components/CreditsPage.tsx').then((m) => ({ default: m.CreditsPage })))
+ const Viewfinder = lazy(() => import('./components/Viewfinder.tsx').then((m) => ({ default: m.Viewfinder })))
+ const ViewfinderNeedsPlace = lazy(() => import('./components/Viewfinder.tsx').then((m) => ({ default: m.ViewfinderNeedsPlace })))
+ const WeatherPage = lazy(() => import('./components/WeatherPage.tsx').then((m) => ({ default: m.WeatherPage })))
+@@ -905,6 +907,13 @@ function App() {
+   )
+   /* /privacy: the same way, a real address over whatever is under it (src/lib/privacyRoute.ts). */
+   const [privacyOpen, setPrivacyOpen] = useState(atPrivacy)
++  /* /credits: Data & credits, the same way (src/lib/creditsRoute.ts; Batch CORE, Section 0.4). */
++  const [creditsOpen, setCreditsOpen] = useState(atCredits)
++  useEffect(() => {
++    const onPop = () => setCreditsOpen(atCredits())
++    window.addEventListener('popstate', onPop)
++    return () => window.removeEventListener('popstate', onPop)
++  }, [])
+   useEffect(() => {
+     const onPop = () => setPrivacyOpen(atPrivacy())
+     window.addEventListener('popstate', onPop)
+@@ -2245,6 +2254,7 @@ function App() {
+       )}
+ 
+       {privacyOpen ? <Suspense fallback={null}><PrivacyPage onClose={closePrivacy} /></Suspense> : null}
++      {creditsOpen ? <Suspense fallback={null}><CreditsPage onClose={closeCredits} /></Suspense> : null}
+       <NewBuildNotice check={newBuild} />
+       {/* Batch Polish, Section 1: setup (and its map) mounts when the home is not over it; its state is this component's. */}
+       {mode === 'setup' && !briefOpen ? (
+diff --git a/src/components/AirspacePanel.tsx b/src/components/AirspacePanel.tsx
+index c83aa75..6a35842 100644
+--- a/src/components/AirspacePanel.tsx
++++ b/src/components/AirspacePanel.tsx
+@@ -1,4 +1,5 @@
+ import { useEffect, useState } from 'react'
++import { AIR_SAFETY } from '../core/safetyWords.ts'
+ import {
+   AUTHORIZATION_RULE,
+   NO_SURFACE_AIRSPACE_NOTE,
+@@ -336,6 +337,8 @@ export function AirspacePanel({ venue, altitudeFeet, laanc, onLaanc, approvedCei
+         */}
+       <p className="air__credit">{FAA_SOURCE_NOTE}</p>
+       </details>
++      {/* Batch CORE, Section 0.4. */}
++      <p className="dsafety">{AIR_SAFETY}</p>
+     </div>
+   )
+ }
+diff --git a/src/components/CreditsPage.tsx b/src/components/CreditsPage.tsx
+new file mode 100644
+index 0000000..e6f952c
+--- /dev/null
++++ b/src/components/CreditsPage.tsx
+@@ -0,0 +1,38 @@
++import { CREDITS } from '../core/credits.ts'
++import { versionLine } from '../lib/build.ts'
++import { Page } from './Page.tsx'
++
++/*
++ * DATA & CREDITS (Batch CORE, Section 0.4): who the app's data comes from,
++ * under what licence, and the credit each asks for. Drawn from
++ * src/core/credits.ts, the same list as docs/sources-licenses.md.
++ */
++export function CreditsPage({ onClose }: { onClose: () => void }) {
++  return (
++    <Page title="Data & credits" className="credits" onClose={onClose}>
++      <CreditsBody />
++    </Page>
++  )
++}
++
++export function CreditsBody() {
++  return (
++    <div className="credits__body">
++      <p className="credits__lead">ScoutNGo is free and open source (MIT licence), provided as is, without warranty. Forecasts can be wrong: look before you go in. Not an official FAA source: check B4UFLY or LAANC before you fly.</p>
++      <ul className="credits__list">
++        {CREDITS.map((c) => (
++          <li key={c.name} className="credits__row">
++            <p className="credits__name">{c.name}</p>
++            <p className="credits__use">{c.use}</p>
++            <p className="credits__lic">{c.license}</p>
++            {c.attribution === null ? null : <p className="credits__attr">{c.attribution}</p>}
++            <a className="credits__link" href={c.link} target="_blank" rel="noreferrer noopener">
++              Terms ›
++            </a>
++          </li>
++        ))}
++      </ul>
++      <p className="credits__build num">{versionLine()}</p>
++    </div>
++  )
++}
+diff --git a/src/components/DetailShell.tsx b/src/components/DetailShell.tsx
+index 9ee55a0..1f90df0 100644
+--- a/src/components/DetailShell.tsx
++++ b/src/components/DetailShell.tsx
+@@ -1,4 +1,7 @@
+ import { useEffect, useState, type ReactNode } from 'react'
++import { versionLine } from '../lib/build.ts'
++import { openCredits } from '../lib/creditsRoute.ts'
++import { WATER_SAFETY } from '../core/safetyWords.ts'
+ import { createPortal } from 'react-dom'
+ import { DETAIL_TABS, type DetailId } from '../lib/detailTabs.ts'
+ import { NetDebug } from './NetDebug.tsx'
+@@ -68,6 +71,8 @@ export function DetailShell({ id, ground, onBack, onSwitch, onMap, how, children
+         }}
+       >
+         {children}
++        {/* Batch CORE, Section 0.4: on every surf, tide, wind and buoy page. */}
++        <p className="dsafety">{WATER_SAFETY}</p>
+       </div>
+       {debug ? <NetDebug onClose={() => setDebug(false)} /> : null}
+       <div className="dpage__foot">
+@@ -85,6 +90,11 @@ export function DetailShell({ id, ground, onBack, onSwitch, onMap, how, children
+               </button>
+             </div>
+             <div className="dhow__body">{how}</div>
++            {/* Batch CORE, Section 0.1: which build, at the foot of every "How we got this". */}
++            <button type="button" className="dhow__credits" onClick={openCredits}>
++              Data & credits ›
++            </button>
++            <p className="dhow__build num">{versionLine()}</p>
+           </div>
+         </div>
+       ) : null}
+diff --git a/src/components/DronePage.tsx b/src/components/DronePage.tsx
+index c999ca8..9e4d9a0 100644
+--- a/src/components/DronePage.tsx
++++ b/src/components/DronePage.tsx
+@@ -1,4 +1,5 @@
+ import '../styles/drone.css'
++import { AIR_SAFETY } from '../core/safetyWords.ts'
+ import { useEffect, useState } from 'react'
+ import { getPosition } from 'suncalc'
+ import { droneTag } from '../core/briefing.ts'
+@@ -86,6 +87,7 @@ export function DronePage({ venue, placeName, timeZone, units, now, drone, onBac
+ 
+   return (
+     <PageShell
++      safety={AIR_SAFETY}
+       kind="drpage"
+       title="Drone"
+       sub={`${placeName}${drone === null ? '' : ` · ${drone.name}`} · now`}
+diff --git a/src/components/FlyControls.tsx b/src/components/FlyControls.tsx
+index 6197c81..484257e 100644
+--- a/src/components/FlyControls.tsx
++++ b/src/components/FlyControls.tsx
+@@ -1,4 +1,5 @@
+ import '../styles/fly-live.css'
++import { AIR_SAFETY } from '../core/safetyWords.ts'
+ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+ import { MODES, type FlyMode, type Sticks } from '../core/flyModel.ts'
+ import type { Look } from '../three/world/inputs.ts'
+@@ -296,6 +297,8 @@ export function FlyControls({ onSticks, mode, onMode, hud, ceilingFt, warning =
+         warningOpen ? (
+           <button type="button" className="fly__remind" data-air-banner onClick={() => setWarningOpen(false)}>
+             {warning.line}
++            {/* Batch CORE, Section 0.4. */}
++            <span className="fly__remind-src">{AIR_SAFETY}</span>
+           </button>
+         ) : (
+           <button type="button" className="fly__airchip" data-air-chip aria-label={`Airspace: ${warning.line}`} onClick={() => setWarningOpen(true)}>
+diff --git a/src/components/Landing.tsx b/src/components/Landing.tsx
+index 277e08f..c6a4de7 100644
+--- a/src/components/Landing.tsx
++++ b/src/components/Landing.tsx
+@@ -3,6 +3,7 @@ import { DASH, SAMPLE_NAME } from '../core/homeSample.ts'
+ import { useHomeSample } from '../lib/useHomeSample.ts'
+ import { useNow } from '../lib/useNow.ts'
+ import { openPrivacy } from '../lib/privacyRoute.ts'
++import { openCredits } from '../lib/creditsRoute.ts'
+ import { HowPage } from './HowPage.tsx'
+ 
+ /**
+@@ -17,7 +18,7 @@ import { HowPage } from './HowPage.tsx'
+  *   four rows        Sky fire (tonight's real verdict), Drone preflight, Moon
+  *                    line-ups (the next real alignment), No account
+  *   one button       Open the map
+- *   the footer       Free · open source · works offline · How it works · Privacy
++ *   the footer       Free · open source · How it works · Privacy · Credits
+  *
+  * The band photos are the owner's own, in public/home/, stripped of every
+  * byte of metadata (scripts/strip-photo-metadata.mjs). A value that did not
+@@ -147,7 +148,8 @@ function Cover({ onDismiss, onHow }: { onDismiss: () => void; onHow: () => void
+           Open the map
+         </button>
+         <p className="cover__licence">
+-          Free · open source · works offline ·{' '}
++          {/* Batch CORE: "works offline" comes back only after Section 7A passes (Section 6.1). */}
++          Free · open source ·{' '}
+           <button type="button" className="cover__more" onClick={onHow}>
+             How it works
+           </button>
+@@ -155,6 +157,10 @@ function Cover({ onDismiss, onHow }: { onDismiss: () => void; onHow: () => void
+           <button type="button" className="cover__more" onClick={openPrivacy}>
+             Privacy
+           </button>
++          {' · '}
++          <button type="button" className="cover__more" onClick={openCredits}>
++            Credits
++          </button>
+         </p>
+       </div>
+     </div>
+diff --git a/src/components/PageShell.tsx b/src/components/PageShell.tsx
+index d73409f..cc2116a 100644
+--- a/src/components/PageShell.tsx
++++ b/src/components/PageShell.tsx
+@@ -1,4 +1,6 @@
+ import { useEffect, useState, type ReactNode } from 'react'
++import { versionLine } from '../lib/build.ts'
++import { openCredits } from '../lib/creditsRoute.ts'
+ import { createPortal } from 'react-dom'
+ import { NetDebug } from './NetDebug.tsx'
+ 
+@@ -14,6 +16,8 @@ interface PageShellProps {
+   backdrop?: ReactNode
+   /** Batch LIVE, Section 8.3: the footer's links at the end of the scroll, never over the page's content. */
+   footInScroll?: boolean
++  /** Batch CORE, Section 0.4: a safety line at the end of the scroll (src/core/safetyWords.ts). */
++  safety?: string | null
+   /** Its class: `wpage`, `spage`. */
+   kind: string
+   title: string
+@@ -32,7 +36,7 @@ interface PageShellProps {
+   children: ReactNode
+ }
+ 
+-export function PageShell({ kind, title, sub, ground, onBack, how, foot, inner, onMap, children, backdrop = null, footInScroll = false }: PageShellProps) {
++export function PageShell({ kind, title, sub, ground, onBack, how, foot, inner, onMap, children, backdrop = null, footInScroll = false, safety = null }: PageShellProps) {
+   const [howOpen, setHowOpen] = useState(false)
+   const [debug, setDebug] = useState(false)
+   const back = () => {
+@@ -81,6 +85,7 @@ export function PageShell({ kind, title, sub, ground, onBack, how, foot, inner,
+         }}
+       >
+         {children}
++        {safety === null ? null : <p className="dsafety">{safety}</p>}
+         {footInScroll ? footer : null}
+       </div>
+       {debug ? <NetDebug onClose={() => setDebug(false)} /> : null}
+@@ -95,6 +100,11 @@ export function PageShell({ kind, title, sub, ground, onBack, how, foot, inner,
+               </button>
+             </div>
+             <div className="dhow__body">{how}</div>
++            {/* Batch CORE, Section 0.1: which build, at the foot of every "How we got this". */}
++            <button type="button" className="dhow__credits" onClick={openCredits}>
++              Data & credits ›
++            </button>
++            <p className="dhow__build num">{versionLine()}</p>
+           </div>
+         </div>
+       ) : null}
+diff --git a/src/components/creditsPage.test.tsx b/src/components/creditsPage.test.tsx
+new file mode 100644
+index 0000000..ddacfa4
+--- /dev/null
++++ b/src/components/creditsPage.test.tsx
+@@ -0,0 +1,15 @@
++import { renderToStaticMarkup } from 'react-dom/server'
++import { describe, expect, it } from 'vitest'
++import { CREDITS } from '../core/credits.ts'
++import { CreditsBody } from './CreditsPage.tsx'
++
++/* Batch CORE, Section 0.4: the Data & credits page. */
++describe('Data & credits page', () => {
++  it('names each source and its credit, and the no-warranty line', () => {
++    const html = renderToStaticMarkup(<CreditsBody />)
++    for (const c of CREDITS) expect(html).toContain(c.name.replace(/&/g, '&amp;'))
++    expect(html).toContain('without warranty')
++    expect(html).toContain('Powered by Esri')
++    expect(html).toContain('Open-Meteo.com (CC BY 4.0)')
++  })
++})
+diff --git a/src/components/homePage.test.tsx b/src/components/homePage.test.tsx
+index ddee3b2..82b199a 100644
+--- a/src/components/homePage.test.tsx
++++ b/src/components/homePage.test.tsx
+@@ -12,7 +12,7 @@ describe('the home page', () => {
+ 
+   it('has the brand, the line, four bands, four rows, one gold button and the footer, in order (board HOME V)', () => {
+     expect(html).toContain('>ScoutNGo<')
+-    const order = ['Four apps in one.', 'Private, and yours.', '>Light<', '>Tide<', '>Surf<', '>Wind<', 'Sky color', 'Drone preflight', 'Fly it here first: line of sight, roofs, wind.', 'Moon line-ups', 'No account, no tracking', 'Open source. Your spots never leave your phone.', 'Open the map', 'Free · open source · works offline ·', '>How it works<', '>Privacy<']
++    const order = ['Four apps in one.', 'Private, and yours.', '>Light<', '>Tide<', '>Surf<', '>Wind<', 'Sky color', 'Drone preflight', 'Fly it here first: line of sight, roofs, wind.', 'Moon line-ups', 'No account, no tracking', 'Open source. Your spots never leave your phone.', 'Open the map', 'Free · open source ·', '>How it works<', '>Privacy<', '>Credits<']
+     const at = order.map((t) => html.indexOf(t))
+     expect(at.every((i) => i >= 0), JSON.stringify(order.filter((_, i) => at[i] < 0))).toBe(true)
+     expect([...at].sort((a, b) => a - b)).toEqual(at)
+diff --git a/src/components/landingAndDevice.test.tsx b/src/components/landingAndDevice.test.tsx
+index c65803d..2610ce1 100644
+--- a/src/components/landingAndDevice.test.tsx
++++ b/src/components/landingAndDevice.test.tsx
+@@ -31,8 +31,10 @@ describe('the cover carries the board\'s parts and stops', () => {
+ 
+   it('carries the two quiet lines, in their places', () => {
+     /* How it works, and since 29 Oct Privacy (the brief: /privacy linked from the home footer). */
+-    expect(html.match(/class="cover__more"/g)).toHaveLength(2)
+-    expect(text).toContain('Free · open source · works offline · How it works · Privacy')
++    /* Batch CORE, Section 0.4: and Credits (Data & credits). */
++    expect(html.match(/class="cover__more"/g)).toHaveLength(3)
++    /* "works offline" is back only after Section 7A passes (Batch CORE 6.1). */
++    expect(text).toContain('Free · open source · How it works · Privacy · Credits')
+   })
+ 
+   it('carries no <img>: the four band photos are CSS backgrounds, stripped of metadata (homeBands.test.ts)', () => {
+diff --git a/src/core/credits.ts b/src/core/credits.ts
+new file mode 100644
+index 0000000..8819d27
+--- /dev/null
++++ b/src/core/credits.ts
+@@ -0,0 +1,291 @@
++/*
++ * DATA & CREDITS (Batch CORE, Section 0.4). One row per outside thing the app
++ * touches: what we use it for, its licence or terms, the credit it asks for,
++ * whether it needs a key, its rate limit, and our status with it. The
++ * "Data & credits" page (src/components/CreditsPage.tsx) and
++ * docs/sources-licenses.md are drawn from this list; tests/credits.test.ts
++ * fails when a host the app asks (src/lib/hosts.ts) has no row here.
++ *
++ * Status: 'ok' (used within its terms as far as we know), 'fix' (something to
++ * change, said in `note`), 'check' (terms we have not been able to confirm).
++ */
++export type CreditStatus = 'ok' | 'fix' | 'check'
++
++export interface Credit {
++  name: string
++  /** The hosts in src/lib/hosts.ts this row covers. */
++  hosts: readonly string[]
++  use: string
++  license: string
++  /** The credit we show, or null when none is asked. */
++  attribution: string | null
++  key: string
++  rate: string
++  status: CreditStatus
++  note?: string
++  link: string
++}
++
++export const CREDITS: readonly Credit[] = [
++  {
++    name: 'OpenStreetMap',
++    hosts: ['nominatim.openstreetmap.org', 'overpass-api.de'],
++    use: 'Place names, search, beaches, piers and parks near a spot',
++    license: 'ODbL 1.0 (data); Nominatim and Overpass usage policies',
++    attribution: '© OpenStreetMap contributors',
++    key: 'No',
++    rate: 'Nominatim: at most 1 request a second, no heavy use; Overpass: fair use',
++    status: 'ok',
++    link: 'https://www.openstreetmap.org/copyright',
++  },
++  {
++    name: 'OpenFreeMap',
++    hosts: ['tiles.openfreemap.org'],
++    use: 'Map labels, buildings, the sea, the 3D view',
++    license: 'Free to use; map data ODbL (OpenStreetMap), schema OpenMapTiles',
++    attribution: 'OpenFreeMap © OpenMapTiles · Data from OpenStreetMap',
++    key: 'No',
++    rate: 'None stated; fair use',
++    status: 'ok',
++    link: 'https://openfreemap.org',
++  },
++  {
++    name: 'Esri World Imagery',
++    hosts: ['server.arcgisonline.com', 'tiles.arcgis.com'],
++    use: 'The satellite photo under the map; South Carolina imagery for 3D',
++    license: 'Esri Master Agreement / Terms of Use',
++    attribution: 'Powered by Esri · Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community',
++    key: 'The tile URL answers without one; Esri points developers to ArcGIS Location Platform (free tier, API key)',
++    rate: 'Free tier limits on ArcGIS Location Platform',
++    status: 'fix',
++    note: 'Needs an ArcGIS Location Platform key from Jwilly’s own Esri account (free tier), or a switch to USGS imagery in the US. Credit added.',
++    link: 'https://goto.arcgisonline.com/maps/World_Imagery',
++  },
++  {
++    name: 'State imagery (VGIN, NC OneMap, MD iMAP, Delaware FirstMap)',
++    hosts: ['vginmaps.vdem.virginia.gov', 'services.nconemap.gov', 'mdgeodata.md.gov', 'enterprise.firstmap.delaware.gov'],
++    use: 'Sharper ground photos for the 3D view in those states',
++    license: 'Public state services',
++    attribution: 'Imagery: Virginia VGIN, NC OneMap, Maryland MD iMAP, Delaware FirstMap',
++    key: 'No',
++    rate: 'None stated',
++    status: 'ok',
++    link: 'https://vgin.vdem.virginia.gov',
++  },
++  {
++    name: 'USGS (NAIP imagery, 3DEP lidar)',
++    hosts: ['imagery.nationalmap.gov', 's3-us-west-2.amazonaws.com'],
++    use: 'Ground photos for 3D in the lower 48; lidar scans when you tap Download',
++    license: 'US public domain',
++    attribution: 'USGS The National Map; USDA NAIP',
++    key: 'No',
++    rate: 'None stated',
++    status: 'ok',
++    link: 'https://www.usgs.gov/the-national-map-data-delivery',
++  },
++  {
++    name: 'Terrain tiles (AWS Open Data, Terrarium)',
++    hosts: ['s3.amazonaws.com'],
++    use: 'Ground height for terrain and 3D',
++    license: 'Open data; sources include SRTM, USGS 3DEP, GMTED, ETOPO1',
++    attribution: 'Terrain: Mapzen terrain tiles (SRTM, USGS, GMTED, ETOPO1) on AWS Open Data',
++    key: 'No',
++    rate: 'None stated',
++    status: 'ok',
++    link: 'https://registry.opendata.aws/terrain-tiles/',
++  },
++  {
++    name: 'Overture Maps',
++    hosts: ['overturemaps-extras-us-west-2.s3.amazonaws.com'],
++    use: 'Building heights, when you tap Fill in heights',
++    license: 'ODbL (buildings), CDLA Permissive 2.0 (other themes)',
++    attribution: '© OpenStreetMap contributors, Overture Maps Foundation',
++    key: 'No',
++    rate: 'None stated',
++    status: 'ok',
++    link: 'https://docs.overturemaps.org/attribution/',
++  },
++  {
++    name: 'Open-Meteo',
++    hosts: ['api.open-meteo.com', 'air-quality-api.open-meteo.com', 'ensemble-api.open-meteo.com', 'previous-runs-api.open-meteo.com', 'marine-api.open-meteo.com', 'this app (/api/forecast)'],
++    use: 'Wind, cloud, rain, waves, air quality, the five models; this app’s cache only when Open-Meteo refuses the phone',
++    license: 'Data CC BY 4.0; free API for non-commercial use',
++    attribution: 'Weather data by Open-Meteo.com (CC BY 4.0)',
++    key: 'No (free tier)',
++    rate: '600 a minute, 5,000 an hour, 10,000 a day, per address',
++    status: 'ok',
++    note: 'Asked from the phone first (Batch CORE 0.4); no ads, no subscriptions.',
++    link: 'https://open-meteo.com/en/terms',
++  },
++  {
++    name: 'ECMWF, NOAA GFS/HRRR, DWD ICON, Météo-France, JMA and others (through Open-Meteo)',
++    hosts: [],
++    use: 'The models behind Open-Meteo’s answers',
++    license: 'Each centre’s open-data licence (ECMWF: CC BY 4.0)',
++    attribution: 'Model data: ECMWF, NOAA, DWD, Météo-France, JMA (via Open-Meteo)',
++    key: 'No',
++    rate: 'Through Open-Meteo',
++    status: 'ok',
++    link: 'https://open-meteo.com/en/license',
++  },
++  {
++    name: 'NOAA / National Weather Service',
++    hosts: ['api.weather.gov', 'www.spc.noaa.gov', 'nowcoast.noaa.gov', 'services.swpc.noaa.gov', 'this app (/api/nhc)'],
++    use: 'Station reports, marine and rip current forecasts, alerts, storm outlooks, lightning, hurricanes, the K index',
++    license: 'US public domain',
++    attribution: 'NOAA / National Weather Service',
++    key: 'No (a User-Agent is asked)',
++    rate: 'None published; reasonable use',
++    status: 'ok',
++    link: 'https://www.weather.gov/disclaimer',
++  },
++  {
++    name: 'NOAA CO-OPS (tides)',
++    hosts: ['api.tidesandcurrents.noaa.gov'],
++    use: 'Tide predictions, water levels, coastal station wind',
++    license: 'US public domain',
++    attribution: 'NOAA CO-OPS Tides & Currents',
++    key: 'No',
++    rate: 'None published',
++    status: 'ok',
++    link: 'https://tidesandcurrents.noaa.gov/disclaimers.html',
++  },
++  {
++    name: 'NOAA NDBC (buoys)',
++    hosts: ['this app (/api/buoy)'],
++    use: 'Buoy wave height, period and direction',
++    license: 'US public domain',
++    attribution: 'NOAA National Data Buoy Center',
++    key: 'No',
++    rate: 'None published',
++    status: 'ok',
++    link: 'https://www.ndbc.noaa.gov/disclaimer.shtml',
++  },
++  {
++    name: 'Aviation Weather Center (METARs, PIREPs)',
++    hosts: ['this app (/api/metar)', 'this app (/api/pirep)'],
++    use: 'Airport station reports and pilot reports of cloud',
++    license: 'US public domain',
++    attribution: 'NOAA Aviation Weather Center',
++    key: 'No',
++    rate: 'About 100 requests a minute',
++    status: 'ok',
++    link: 'https://aviationweather.gov/data/api/',
++  },
++  {
++    name: 'NASA GIBS',
++    hosts: ['gibs.earthdata.nasa.gov'],
++    use: 'Satellite cloud pictures (GOES) on the map and for Sky color',
++    license: 'NASA open data; no restrictions',
++    attribution: 'Imagery: NASA EOSDIS GIBS',
++    key: 'No',
++    rate: 'None stated',
++    status: 'ok',
++    link: 'https://nasa-gibs.github.io/gibs-api-docs/',
++  },
++  {
++    name: 'Iowa Environmental Mesonet',
++    hosts: ['mesonet.agron.iastate.edu'],
++    use: 'Weather balloon soundings, radar along the sun\u2019s line, station history, SPC watches',
++    license: 'Free, public',
++    attribution: 'Iowa Environmental Mesonet, Iowa State University',
++    key: 'No',
++    rate: 'Fair use',
++    status: 'ok',
++    link: 'https://mesonet.agron.iastate.edu/disclaimer.php',
++  },
++  {
++    name: 'LibreWXR',
++    hosts: ['api.librewxr.net'],
++    use: 'Radar and satellite rain on the map',
++    license: 'CC BY 4.0',
++    attribution: 'Radar: LibreWXR (CC BY 4.0)',
++    key: 'No',
++    rate: 'None stated',
++    status: 'ok',
++    link: 'https://librewxr.net',
++  },
++  {
++    name: 'Photon (komoot)',
++    hosts: ['photon.komoot.io'],
++    use: 'Search, when OpenStreetMap finds nothing',
++    license: 'Free public instance, fair use; data ODbL',
++    attribution: 'Search: Photon by komoot · © OpenStreetMap contributors',
++    key: 'No',
++    rate: 'Fair use; no heavy use',
++    status: 'ok',
++    link: 'https://photon.komoot.io',
++  },
++  {
++    name: 'Mapbox Search',
++    hosts: ['this app (/api/search)'],
++    use: 'Search, as the last try',
++    license: 'Mapbox Terms of Service',
++    attribution: 'Search by Mapbox',
++    key: 'Yes, on the server (Vercel environment)',
++    rate: 'Free tier monthly allowance',
++    status: 'check',
++    note: 'Mapbox’s terms limit how geocoding results are shown and kept; confirm they allow results on a non-Mapbox map, else remove this last try.',
++    link: 'https://www.mapbox.com/legal/tos',
++  },
++  {
++    name: 'Google Street View',
++    hosts: [],
++    use: 'The ground picture at a planned spot (this app’s /api/streetview)',
++    license: 'Google Maps Platform Terms',
++    attribution: 'Google',
++    key: 'Yes, on the server (Vercel environment)',
++    rate: 'Google Maps Platform free monthly credit',
++    status: 'check',
++    note: 'Confirm the Street View Static API terms allow the picture shown as it is; the picture must carry Google’s logo and credit.',
++    link: 'https://cloud.google.com/maps-platform/terms',
++  },
++  {
++    name: 'Beach and road cams (SurfChex, Surfline, piers, VDOT, NCDOT, DelDOT, MD CHART)',
++    hosts: [],
++    use: 'Links to the operator’s own page, in a new tab',
++    license: 'Each operator’s terms',
++    attribution: null,
++    key: 'No',
++    rate: 'Not asked: nothing is fetched',
++    status: 'ok',
++    note: 'Link out only: no embed, no frame, no image, no logo, no numbers copied (tests/camsLinkOnly.test.ts).',
++    link: 'https://www.surfchex.com',
++  },
++  {
++    name: 'GitHub',
++    hosts: ['api.github.com'],
++    use: 'Settings: whether a newer build exists',
++    license: 'GitHub Terms of Service',
++    attribution: null,
++    key: 'No',
++    rate: '60 requests an hour per address, unauthenticated',
++    status: 'ok',
++    link: 'https://docs.github.com/en/site-policy/github-terms/github-terms-of-service',
++  },
++  {
++    name: 'Anthropic (your own key)',
++    hosts: ['api.anthropic.com'],
++    use: 'Writing the call sheet, only when you press Write',
++    license: 'Anthropic terms, under your own key',
++    attribution: null,
++    key: 'Yes, yours, kept on your phone',
++    rate: 'Your key’s limits',
++    status: 'ok',
++    link: 'https://www.anthropic.com/legal',
++  },
++  {
++    name: 'This app’s calendar feed',
++    hosts: [],
++    use: 'The calendar subscription (/api/calendar), asking the sources above',
++    license: 'This app (MIT)',
++    attribution: null,
++    key: 'No',
++    rate: 'Each calendar app’s refresh',
++    status: 'ok',
++    link: 'https://github.com/Jwillyah/scoutngo',
++  },
++]
++
++/** The credits shown on the map and the page, once each. */
++export const creditLinesAll = (): string[] => CREDITS.map((c) => c.attribution).filter((a): a is string => a !== null)
+diff --git a/src/core/safetyWords.ts b/src/core/safetyWords.ts
+new file mode 100644
+index 0000000..4885408
+--- /dev/null
++++ b/src/core/safetyWords.ts
+@@ -0,0 +1,7 @@
++/*
++ * THE SAFETY LINES (Batch CORE, Section 0.4), word for word, one place. The
++ * airspace and drone screens carry AIR_SAFETY; the surf, wind and tide
++ * screens carry WATER_SAFETY. Facts only: the app never says safe or clear.
++ */
++export const AIR_SAFETY = 'Not an official FAA source · check B4UFLY/LAANC before you fly'
++export const WATER_SAFETY = 'Forecasts can be wrong · look before you go in'
+diff --git a/src/lib/build.ts b/src/lib/build.ts
+index ff4e783..4001c2d 100644
+--- a/src/lib/build.ts
++++ b/src/lib/build.ts
+@@ -1,3 +1,4 @@
++import { formatClock } from '../core/timezone.ts'
+ /**
+  * WHICH BUILD IS RUNNING, AND WHETHER A NEWER ONE EXISTS.
+  *
+@@ -78,10 +79,23 @@ export function buildLabelWithDate(time: string = BUILD_TIME): string {
+  * SETTINGS' ONE LINE (Batch G): "Version c8786df · 2 Nov". The comparison
+  * with origin is in Debug, folded (BuildStamp.tsx), not on this line.
+  */
+-export function versionLine(time: string = BUILD_TIME): string {
+-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(time)
+-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+-  return m === null ? `Version ${buildLabel()}` : `Version ${buildLabel()} · ${Number(m[3])} ${months[Number(m[2]) - 1]}`
++export function versionLine(time: string = BUILD_TIME, timeZone: string = deviceZone()): string {
++  const at = new Date(time)
++  if (time === '' || Number.isNaN(at.getTime())) return `Version ${buildLabel()}`
++  /*
++   * Batch CORE, Section 0.1: the build's time too, on this phone's clock ("Version a9b98ad · 14 Nov 9:31 PM"), so a
++   * screenshot says which build and when; the day read in UTC said 15 Nov for an evening build on the 14th.
++   */
++  const part = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat('en-US', { timeZone, ...o }).format(at)
++  return `Version ${buildLabel()} · ${part({ day: 'numeric' })} ${part({ month: 'short' })} ${formatClock(at, timeZone)}`
++}
++
++function deviceZone(): string {
++  try {
++    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
++  } catch {
++    return 'UTC'
++  }
+ }
+ 
+ /**
+diff --git a/src/lib/buildOrigin.test.ts b/src/lib/buildOrigin.test.ts
+index 19cfa97..474f12b 100644
+--- a/src/lib/buildOrigin.test.ts
++++ b/src/lib/buildOrigin.test.ts
+@@ -181,6 +181,8 @@ describe('what the stamp says', () => {
+ describe('Settings’ one version line (Batch G)', () => {
+   it('reads "Version <hash> · <day> <Mon>", nothing else', async () => {
+     const { versionLine } = await import('./build.ts')
+-    expect(versionLine('2026-11-02T14:00:00Z')).toMatch(/^Version [0-9a-f]{7}\+? · 2 Nov$/)
++    expect(versionLine('2026-11-02T14:00:00Z', 'UTC')).toMatch(/^Version [0-9a-f]{7}\+? · 2 Nov 2:00 PM$/)
++    /* Batch CORE, Section 0.1: the build's own day on this phone's clock, not UTC's. */
++    expect(versionLine('2026-11-15T02:31:00Z', 'America/New_York')).toMatch(/· 14 Nov 9:31 PM$/)
+   })
+ })
+diff --git a/src/lib/creditsRoute.ts b/src/lib/creditsRoute.ts
+new file mode 100644
+index 0000000..24008bc
+--- /dev/null
++++ b/src/lib/creditsRoute.ts
+@@ -0,0 +1,21 @@
++/*
++ * /credits is a real address, opened from every "How we got this" and the
++ * landing's footer (Batch CORE, Section 0.4). As /privacy: opening it is a
++ * history entry, so Back closes it; App listens to popstate.
++ */
++export const CREDITS_PATH = '/credits'
++
++export const atCredits = (): boolean => typeof window !== 'undefined' && window.location.pathname === CREDITS_PATH
++
++export function openCredits(): void {
++  window.history.pushState({}, '', CREDITS_PATH)
++  window.dispatchEvent(new PopStateEvent('popstate'))
++}
++
++export function closeCredits(): void {
++  if (window.history.length > 1 && atCredits()) window.history.back()
++  else {
++    window.history.replaceState({}, '', '/')
++    window.dispatchEvent(new PopStateEvent('popstate'))
++  }
++}
+diff --git a/src/lib/mapConstants.ts b/src/lib/mapConstants.ts
+index f494443..1b17d3c 100644
+--- a/src/lib/mapConstants.ts
++++ b/src/lib/mapConstants.ts
+@@ -3,7 +3,8 @@
+  * Section 4): kept out of src/components/MapView.tsx so that importing one
+  * does not pull MapLibre into the first download. MapView re-exports them.
+  */
+-export const ESRI_ATTRIBUTION = 'Tiles by Esri. Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
++/* Batch CORE, Section 0.4: "Powered by Esri", and the service's own copyright line (Vantor, formerly Maxar). */
++export const ESRI_ATTRIBUTION = 'Powered by Esri. Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community'
+ 
+ /*
+  * The zoom buildings start at.
+diff --git a/src/lib/skyFireData.ts b/src/lib/skyFireData.ts
+index d2fa26c..04365f2 100644
+--- a/src/lib/skyFireData.ts
++++ b/src/lib/skyFireData.ts
+@@ -199,7 +199,7 @@ export interface StationSky {
+ }
+ 
+ /** The nearest stations' latest skies, nearest first: weather.gov's METAR text, else /api/metar's. */
+-export async function fetchStationSkies(venue: LatLon, fetchImpl: typeof fetch = fetch, count = 2): Promise<StationSky[]> {
++export async function fetchStationSkies(venue: LatLon, fetchImpl: typeof fetch = fetch, count = 2, now: Date = new Date()): Promise<StationSky[]> {
+   try {
+     const point = await fetchImpl(`${NWS}/points/${roundCoord(venue.lat).toFixed(2)},${roundCoord(venue.lon).toFixed(2)}`, { headers: NWS_HEADERS, signal: AbortSignal.timeout(TIMEOUT_MS) })
+     if (!point.ok) return []
+@@ -213,7 +213,7 @@ export async function fetchStationSkies(venue: LatLon, fetchImpl: typeof fetch =
+       .slice(0, count)
+     const out: StationSky[] = []
+     for (const id of ids) {
+-      const sky = await stationSky(id, fetchImpl)
++      const sky = await stationSky(id, fetchImpl, now)
+       if (sky !== null) out.push(sky)
+     }
+     return out
+@@ -222,23 +222,43 @@ export async function fetchStationSkies(venue: LatLon, fetchImpl: typeof fetch =
+   }
+ }
+ 
+-export async function stationSky(id: string, fetchImpl: typeof fetch = fetch): Promise<StationSky | null> {
++/**
++ * A report older than this from weather.gov is not taken alone: the METAR source is asked too, and the newer kept.
++ * Batch CORE, Section 0.1 (16 Nov): weather.gov's KNTU feed runs behind. At 14:47Z on 16 Nov its newest KNTU
++ * observation was 12:56Z while aviationweather.gov had 13:56Z; on 14 Nov at 4:39 PM the phone showed KNTU's 2:56 PM
++ * deck (BKN055). The app took weather.gov's answer however old, and Sky Now said "no station report in the last 75
++ * minutes" on any build.
++ */
++export const NWS_STALE_MS = 75 * 60_000
++
++export async function stationSky(id: string, fetchImpl: typeof fetch = fetch, now: Date = new Date()): Promise<StationSky | null> {
++  let nws: StationSky | null = null
+   try {
+     const r = await fetchImpl(`${NWS}/stations/${id}/observations/latest`, { headers: NWS_HEADERS, signal: AbortSignal.timeout(TIMEOUT_MS) })
+     if (r.ok) {
+       const p = ((await r.json()) as { properties?: { rawMessage?: string; timestamp?: string } }).properties
+       const sky = typeof p?.rawMessage === 'string' ? parseMetarSky(p.rawMessage) : null
+-      if (sky !== null) return { sky, at: p?.timestamp ?? metarTime(p?.rawMessage ?? '', new Date())?.toISOString() ?? '', raw: p?.rawMessage ?? '' }
++      if (sky !== null) nws = { sky, at: p?.timestamp ?? metarTime(p?.rawMessage ?? '', now)?.toISOString() ?? '', raw: p?.rawMessage ?? '' }
+     }
+-    /* weather.gov had no METAR text for it: ask this app's function, which reads aviationweather.gov. */
++  } catch {
++    /* weather.gov did not answer: the METAR source below. */
++  }
++  const nwsAt = nws === null || nws.at === '' ? NaN : Date.parse(nws.at)
++  if (nws !== null && Number.isFinite(nwsAt) && now.getTime() - nwsAt <= NWS_STALE_MS) return nws
++  /* weather.gov had no METAR text for it, or an old one: ask this app's function, which reads aviationweather.gov. */
++  try {
+     const m = await fetchImpl(METAR_ENDPOINT, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ station: id }), signal: AbortSignal.timeout(TIMEOUT_MS) })
+-    if (!m.ok) return null
++    if (!m.ok) return nws
+     const body = (await m.json()) as { metar?: string; at?: string }
+     const sky = typeof body.metar === 'string' ? parseMetarSky(body.metar) : null
+     /* The function's answer carries no time: the report's own (DDHHMMZ), so Sky Now and Sky Tonight read the same station (Batch LIVE, Section 10.2). */
+-    return sky === null ? null : { sky, at: body.at ?? metarTime(body.metar ?? '', new Date())?.toISOString() ?? '', raw: body.metar ?? '' }
++    const metar = sky === null ? null : { sky, at: body.at ?? metarTime(body.metar ?? '', now)?.toISOString() ?? '', raw: body.metar ?? '' }
++    if (metar === null) return nws
++    const metarAt = metar.at === '' ? NaN : Date.parse(metar.at)
++    /* The newer of the two; weather.gov's when the other says no time. */
++    return nws === null || (Number.isFinite(metarAt) && (!Number.isFinite(nwsAt) || metarAt > nwsAt)) ? metar : nws
+   } catch {
+-    return null
++    return nws
+   }
+ }
+ 
+diff --git a/src/lib/useStationNow.ts b/src/lib/useStationNow.ts
+index 1162579..95208c6 100644
+--- a/src/lib/useStationNow.ts
++++ b/src/lib/useStationNow.ts
+@@ -25,7 +25,7 @@ export async function stationNow(venue: LatLon, now: number, fetchImpl: typeof f
+   const key = `${venue.lat.toFixed(2)},${venue.lon.toFixed(2)}`
+   const hit = cache.get(key)
+   if (hit !== undefined && now - hit.at < CACHE_MS) return hit.pending ?? hit.sky
+-  const pending = fetchStationSkies(venue, fetchImpl, 1).then((list) => list[0] ?? null)
++  const pending = fetchStationSkies(venue, fetchImpl, 1, new Date(now)).then((list) => list[0] ?? null)
+   cache.set(key, { at: now, sky: null, pending })
+   const sky = await pending
+   cache.set(key, { at: now, sky })
+diff --git a/src/lib/weatherStore.ts b/src/lib/weatherStore.ts
+index bcc055d..67ac35d 100644
+--- a/src/lib/weatherStore.ts
++++ b/src/lib/weatherStore.ts
+@@ -143,9 +143,9 @@ export function jittered(ms: number, r: number = random()): number {
+  * spot, model set and hour for every phone. The key in this store stays the
+  * Open-Meteo request, so nothing kept changes meaning.
+  *
+- * When our function is not there (404, 405: a dev server) the phone asks
+- * Open-Meteo directly for the rest of the session; when it fails (502-504,
+- * no answer) that one request is asked directly. A 429 from it is a 429.
++ * Asked only after Open-Meteo refuses this phone or cannot be reached (Batch
++ * CORE, Section 0.4; send below). When our function is not there (404, 405: a
++ * dev server) it is not asked again this session. A 429 from it is a 429.
+  */
+ export const EDGE_TIMEOUT_MS = 4000
+ let edge: string | null = null
+@@ -290,23 +290,46 @@ export function weatherRefreshing(): number {
+   return inFlight.size
+ }
+ 
+-/** Sends one request: through the forecast cache when it is set, else (or when it is missing or failing) to Open-Meteo. `via` says which answered. */
++/**
++ * Sends one request: to Open-Meteo from the phone first; through the forecast cache (when it is set) only when
++ * Open-Meteo refuses this phone (429: a carrier's shared address over its limit) or cannot be reached. `via` says
++ * which answered.
++ *
++ * Batch CORE, Section 0.4 (16 Nov): the calls go from the phone, so Open-Meteo's per-address limits fall on each
++ * phone's own address and do not stack on this app's server; the cache stays as the measured fix for the carrier
++ * case (Batch M, measurements/2026-11-08-cellular.md), asked only then.
++ */
+ async function send(url: string, fetchImpl: typeof fetch, timeoutMs: number): Promise<{ r: Response; via: 'edge' | 'direct' }> {
+-  const direct = async () => ({ r: await fetchImpl(url, { signal: AbortSignal.timeout(timeoutMs) }), via: 'direct' as const })
+-  if (edge === null || edgeMissing) return direct()
++  const cacheOn = () => edge !== null && !edgeMissing
++  /* The cache's answer, or null when it is not there or fails (the caller then keeps the direct outcome). */
++  const viaEdge = async (): Promise<{ r: Response; via: 'edge' } | null> => {
++    if (edge === null) return null
++    try {
++      /* Batch N E1: a cache that hangs costs 4 s, not the whole timeout. */
++      const r = await fetchImpl(edgeUrl(url, new Date(), edge), { signal: AbortSignal.timeout(Math.min(EDGE_TIMEOUT_MS, timeoutMs)) })
++      if (r.status === 404 || r.status === 405) {
++        edgeMissing = true
++        return null
++      }
++      /* Batch N: a request the cache refuses (400, 414) or fails (502-504) is no answer from it. */
++      return (r.status >= 502 && r.status <= 504) || r.status === 400 || r.status === 414 ? null : { r, via: 'edge' }
++    } catch {
++      return null
++    }
++  }
+   let r: Response
+   try {
+-    /* Batch N E1: a cache that hangs (8 Nov, LTE: requests to this app's own address never answered) costs 4 s, not the whole timeout, before the direct ask. */
+-    r = await fetchImpl(edgeUrl(url, new Date(), edge), { signal: AbortSignal.timeout(Math.min(EDGE_TIMEOUT_MS, timeoutMs)) })
+-  } catch {
+-    return direct()
++    r = await fetchImpl(url, { signal: AbortSignal.timeout(timeoutMs) })
++  } catch (error) {
++    const got = cacheOn() ? await viaEdge() : null
++    if (got !== null) return got
++    throw error
+   }
+-  if (r.status === 404 || r.status === 405) {
+-    edgeMissing = true
+-    return direct()
++  if (r.status === 429 && cacheOn()) {
++    const got = await viaEdge()
++    if (got !== null) return got
+   }
+-  /* Batch N: a request the cache refuses (400, 414: more points than it takes, the sightline's many positions) is asked directly, at 2 decimals, as before the cache. */
+-  return (r.status >= 502 && r.status <= 504) || r.status === 400 || r.status === 414 ? direct() : { r, via: 'edge' }
++  return { r, via: 'direct' }
+ }
+ 
+ /**
+diff --git a/src/styles/app.css b/src/styles/app.css
+index 449ed03..826e3dd 100644
+--- a/src/styles/app.css
++++ b/src/styles/app.css
+@@ -18342,6 +18342,68 @@ a.about__row * {
+ .dhow__body p {
+   margin: 0 0 6px;
+ }
++/* Batch CORE, Section 0.4: the safety line at the end of a page's scroll. */
++.dsafety {
++  margin: 14px 0 4px;
++  font-size: 12px;
++  text-align: center;
++  opacity: 0.75;
++}
++/* Batch CORE, Section 0.4: Data & credits, from every "How we got this". */
++.dhow__credits {
++  min-height: 44px;
++  margin: 8px 0 0;
++  padding: 0;
++  border: 0;
++  background: transparent;
++  color: inherit;
++  font: inherit;
++  text-decoration: underline;
++}
++.credits__body {
++  padding: 0 0 24px;
++}
++.credits__lead {
++  margin: 0 0 14px;
++}
++.credits__list {
++  list-style: none;
++  margin: 0;
++  padding: 0;
++}
++.credits__row {
++  padding: 10px 0;
++  border-top: 1px solid rgba(127, 127, 127, 0.25);
++}
++.credits__row p {
++  margin: 0 0 2px;
++}
++.credits__name {
++  font-weight: 600;
++}
++.credits__use,
++.credits__lic,
++.credits__attr {
++  font-size: 13px;
++  opacity: 0.85;
++}
++.credits__link {
++  display: inline-flex;
++  align-items: center;
++  min-height: 44px;
++  color: inherit;
++}
++.credits__build {
++  margin: 12px 0 0;
++  font-size: 12px;
++  opacity: 0.7;
++}
++/* Batch CORE, Section 0.1: which build, at the sheet's foot. */
++.dhow__build {
++  margin: 10px 0 0;
++  font-size: 12px;
++  opacity: 0.7;
++}
+ @media (max-height: 700px) {
+   .dhead__big {
+     font-size: 44px;
+diff --git a/src/styles/fly-live.css b/src/styles/fly-live.css
+index 4e3897b..a031485 100644
+--- a/src/styles/fly-live.css
++++ b/src/styles/fly-live.css
+@@ -36,3 +36,12 @@
+   font-size: var(--text-xs);
+   font-weight: 700;
+ }
++
++/* Batch CORE, Section 0.4: the airspace banner's source line, small, under it. */
++.fly__remind-src {
++  display: block;
++  margin-top: 2px;
++  font-size: 11px;
++  font-weight: 400;
++  opacity: 0.85;
++}
+diff --git a/src/three/world/sources.ts b/src/three/world/sources.ts
+index cb8adba..f32a52b 100644
+--- a/src/three/world/sources.ts
++++ b/src/three/world/sources.ts
+@@ -17,7 +17,7 @@ import { IMAGERY_TEMPLATE, TERRAIN_TEMPLATE } from '../../lib/offlineSources.ts'
+ import { covers, pickImagery, sourceTileUrl, type ImagerySource } from '../../data/imagerySources.ts'
+ import { tileUrl } from '../../lib/tileRange.ts'
+ 
+-export const ESRI_CREDIT = 'Tiles by Esri. Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
++export const ESRI_CREDIT = 'Powered by Esri. Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community'
+ export const TERRAIN_CREDIT = 'Elevation: Terrarium, AWS Open Data'
+ export const OSM_CREDIT = 'Buildings and water: OpenStreetMap contributors, via OpenFreeMap'
+ /* The deepest elevation the source has. */
+diff --git a/tests/apiNoLogs.test.ts b/tests/apiNoLogs.test.ts
+new file mode 100644
+index 0000000..214c185
+--- /dev/null
++++ b/tests/apiNoLogs.test.ts
+@@ -0,0 +1,14 @@
++import { readdirSync, readFileSync } from 'node:fs'
++import { describe, expect, it } from 'vitest'
++
++/* Batch CORE, Section 0.3 (docs/privacy-hosting.md): the functions on Vercel log nothing and read no client address. */
++describe('the Vercel functions', () => {
++  const files = readdirSync('api').filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
++  it('write no log line', () => {
++    for (const f of files) expect(readFileSync(`api/${f}`, 'utf8'), f).not.toMatch(/\bconsole\s*\.\s*\w+\s*\(/)
++  })
++  it('read no client IP or location header', () => {
++    for (const f of files) expect(readFileSync(`api/${f}`, 'utf8'), f).not.toMatch(/x-forwarded-for|x-real-ip|x-vercel-ip|request\.ip\b|request\.geo\b/i)
++  })
++  it('there are functions to check', () => expect(files.length).toBeGreaterThanOrEqual(8))
++})
+diff --git a/tests/credits.test.ts b/tests/credits.test.ts
+new file mode 100644
+index 0000000..ffda6dc
+--- /dev/null
++++ b/tests/credits.test.ts
+@@ -0,0 +1,36 @@
++import { readFileSync } from 'node:fs'
++import { describe, expect, it } from 'vitest'
++import { CREDITS } from '../src/core/credits.ts'
++import { AIR_SAFETY, WATER_SAFETY } from '../src/core/safetyWords.ts'
++import { HOSTS } from '../src/lib/hosts.ts'
++
++/* Batch CORE, Section 0.4: sources, licences, credits, the safety lines. */
++describe('Data & credits', () => {
++  it('every host the app asks has a row', () => {
++    const covered = new Set(CREDITS.flatMap((c) => c.hosts))
++    expect(HOSTS.map((h) => h.host).filter((h) => !covered.has(h))).toEqual([])
++  })
++  it('docs/sources-licenses.md is the same list (npx tsx scripts/write-sources-doc.ts)', () => {
++    const doc = readFileSync('docs/sources-licenses.md', 'utf8')
++    for (const c of CREDITS) expect(doc).toContain(`| ${c.name.replace(/\|/g, '\\|')} |`)
++    expect((doc.match(/^\| .* \| \*\*(ok|fix|check)\*\*/gm) ?? []).length).toBe(CREDITS.length)
++  })
++  it('linked from every "How we got this" and the landing; /credits is a real address', () => {
++    for (const f of ['src/components/PageShell.tsx', 'src/components/DetailShell.tsx', 'src/components/Landing.tsx']) expect(readFileSync(f, 'utf8')).toContain('onClick={openCredits}')
++    expect(readFileSync('vercel.json', 'utf8')).toContain('"source": "/credits"')
++  })
++})
++
++describe('the safety lines', () => {
++  it('word for word', () => {
++    expect(AIR_SAFETY).toBe('Not an official FAA source · check B4UFLY/LAANC before you fly')
++    expect(WATER_SAFETY).toBe('Forecasts can be wrong · look before you go in')
++  })
++  it('on the drone, Fly and airspace screens, and every surf, tide, wind and buoy page', () => {
++    for (const f of ['src/components/DronePage.tsx', 'src/components/FlyControls.tsx', 'src/components/AirspacePanel.tsx']) expect(readFileSync(f, 'utf8')).toContain('AIR_SAFETY')
++    expect(readFileSync('src/components/DetailShell.tsx', 'utf8')).toMatch(/<p className="dsafety">\{WATER_SAFETY\}<\/p>/)
++  })
++  it('never says safe or clear', () => {
++    for (const w of [AIR_SAFETY, WATER_SAFETY]) expect(w).not.toMatch(/\b(safe|clear)\b/i)
++  })
++})
+diff --git a/tests/forecastEdge.test.ts b/tests/forecastEdge.test.ts
+index 355f527..df7fb8e 100644
+--- a/tests/forecastEdge.test.ts
++++ b/tests/forecastEdge.test.ts
+@@ -81,15 +81,17 @@ describe('every multi-point request the app makes fits', () => {
+       const asked: string[] = []
+       const fake = (async (input: RequestInfo | URL) => {
+         asked.push(String(input))
++        /* Batch CORE, Section 0.4: the phone asks Open-Meteo first; refused there, the grid goes through the cache. */
++        if (!String(input).startsWith('/api/')) return new Response('{"reason":"Minutely API request limit exceeded"}', { status: 429 })
+         const time = Array.from({ length: 24 }, (_, h) => `2026-11-08T${String(h).padStart(2, '0')}:00`)
+         const one = { hourly: { time, cloud_cover_low: time.map(() => 10), cloud_cover_mid: time.map(() => 0), cloud_cover_high: time.map(() => 0) } }
+         return new Response(JSON.stringify(Array.from({ length: GRID_CELLS ** 2 }, () => one)), { status: 200, headers: { 'content-type': 'application/json' } })
+       }) as typeof fetch
+       const now = new Date()
+       const got = await fetchCloudGrid({ lat: 36.8435575, lon: -75.9713104 }, now, 'America/New_York', fake)
+-      expect(asked).toHaveLength(1)
+-      expect(asked[0]).toMatch(/^\/api\/forecast\?/)
+-      expect(upstreamFor(`https://scoutngo.vercel.app${asked[0]}`, now)).toMatchObject({ ok: true })
++      expect(asked).toHaveLength(2)
++      expect(asked[1]).toMatch(/^\/api\/forecast\?/)
++      expect(upstreamFor(`https://scoutngo.vercel.app${asked[1]}`, now)).toMatchObject({ ok: true })
+       expect(got.status).toBe('ok')
+       expect(GRID_CELLS ** 2).toBeLessThanOrEqual(MAX_POINTS)
+     } finally {
+diff --git a/tests/networkPath.test.ts b/tests/networkPath.test.ts
+index 6774ae0..8887607 100644
+--- a/tests/networkPath.test.ts
++++ b/tests/networkPath.test.ts
+@@ -64,7 +64,8 @@ describe('a refusal given to the phone directly', () => {
+     expect(weatherBusy()).toBeNull()
+     const second = await weatherJson(B, { maxAgeMs: 60_000, fetchImpl })
+     expect(second.ok).toBe(true)
+-    expect(asked).toEqual(['edge', 'direct', 'edge'])
++    /* Batch CORE, Section 0.4: the phone first, then the cache, for each. */
++    expect(asked).toEqual(['direct', 'edge', 'direct', 'edge'])
+   })
+ 
+   it('a refusal the cache passes on (its own address over the limit) still holds every request back', async () => {
+diff --git a/tests/privacy.test.ts b/tests/privacy.test.ts
+index 62baba1..99a83a3 100644
+--- a/tests/privacy.test.ts
++++ b/tests/privacy.test.ts
+@@ -1,4 +1,5 @@
+ import { readdirSync, readFileSync, statSync } from 'node:fs'
++import { CREDITS } from '../src/core/credits.ts'
+ import { COAST_CAMS } from '../src/data/coastCams.ts'
+ import { join } from 'node:path'
+ import { describe, expect, it } from 'vitest'
+@@ -50,7 +51,9 @@ describe('the privacy page', () => {
+   const hostsInCode = new Set(files('src').flatMap((f) => [...readFileSync(f, 'utf8').matchAll(/https:\/\/([a-z0-9.-]+\.[a-z]{2,})/g)].map((m) => m[1])))
+ 
+   it('names every host the app’s code can ask, or the host is a link with a reason', () => {
+-    const unexplained = [...hostsInCode].filter((h) => listed(h) === undefined && LINK_ONLY[h] === undefined)
++    /* Batch CORE, Section 0.4: a licence page, opened by you from Data & credits (src/core/credits.ts), is a link. */
++    const creditLinks = new Set(CREDITS.map((c) => new URL(c.link).host))
++    const unexplained = [...hostsInCode].filter((h) => listed(h) === undefined && LINK_ONLY[h] === undefined && !creditLinks.has(h))
+     expect(unexplained).toEqual([])
+   })
+ 
+diff --git a/tests/skyCall1114.test.ts b/tests/skyCall1114.test.ts
+index 7b381a6..8495d73 100644
+--- a/tests/skyCall1114.test.ts
++++ b/tests/skyCall1114.test.ts
+@@ -40,7 +40,7 @@ describe('the pill says "Color now" only when it is', () => {
+ 
+ describe('Sky Now and Sky Tonight read the same station', () => {
+   it('the METAR fallback\'s answer has no time; the report\'s own DDHHMMZ gives it', async () => {
+-    expect(metarTime(truth.station.metar, now)?.toISOString()).toBe('2026-11-14T21:35:00.000Z')
++    expect(metarTime(truth.station.metar, now)?.toISOString()).toBe('2026-11-14T19:56:00.000Z')
+     expect(metarTime('KNTU 302355Z BKN055', new Date('2026-12-01T01:00:00Z'))?.toISOString()).toBe('2026-11-30T23:55:00.000Z')
+     expect(metarTime('no time here', now)).toBeNull()
+     const fake = (async (url: RequestInfo | URL) =>
+diff --git a/tests/stationStale.test.ts b/tests/stationStale.test.ts
+new file mode 100644
+index 0000000..cecb6ea
+--- /dev/null
++++ b/tests/stationStale.test.ts
+@@ -0,0 +1,40 @@
++import { describe, expect, it } from 'vitest'
++import { NWS_STALE_MS, stationSky } from '../src/lib/skyFireData.ts'
++
++/*
++ * WEATHER.GOV RUNS BEHIND FOR KNTU (Batch CORE, Section 0.1). At 14:47Z on
++ * 16 Nov its newest KNTU observation was 12:56Z; aviationweather.gov had
++ * 13:56Z. The app took weather.gov's answer however old, so Sky Now said "no
++ * station report in the last 75 minutes" with a fresh METAR to be had.
++ */
++const now = new Date('2026-11-16T14:47:00Z')
++const fake = (nwsRaw: string | null, nwsAt: string, metar: string | null) => {
++  const asked: string[] = []
++  const f = (async (input: RequestInfo | URL) => {
++    const u = String(input)
++    asked.push(u.includes('weather.gov') ? 'nws' : 'metar')
++    if (u.includes('weather.gov')) return Response.json({ properties: { rawMessage: nwsRaw, timestamp: nwsAt } })
++    return metar === null ? new Response('', { status: 502 }) : Response.json({ metar })
++  }) as typeof fetch
++  return { f, asked }
++}
++
++describe('a station report weather.gov holds back', () => {
++  it('older than 75 minutes: the METAR source is asked, and its newer report kept', async () => {
++    const { f, asked } = fake('KNTU 161256Z 03008KT 10SM SCT037 08/02 A3043', '2026-11-16T12:56:00+00:00', 'METAR KNTU 161356Z 03010KT 10SM FEW028 BKN035 09/02 A3046')
++    const st = await stationSky('KNTU', f, now)
++    expect(asked).toEqual(['nws', 'metar'])
++    expect(st?.at).toBe('2026-11-16T13:56:00.000Z')
++    expect(st?.sky.groups.map((g) => g.amount)).toEqual(['FEW', 'BKN'])
++    expect(now.getTime() - Date.parse(st!.at)).toBeLessThanOrEqual(NWS_STALE_MS)
++  })
++  it('fresh from weather.gov: taken, nothing else asked', async () => {
++    const { f, asked } = fake('KNTU 161356Z 03010KT 10SM FEW028 BKN035 09/02 A3046', '2026-11-16T13:56:00+00:00', null)
++    expect((await stationSky('KNTU', f, now))?.at).toBe('2026-11-16T13:56:00+00:00')
++    expect(asked).toEqual(['nws'])
++  })
++  it('old from weather.gov and the METAR source down: the old one, which the screens then call old', async () => {
++    const { f } = fake('KNTU 161256Z 03008KT 10SM SCT037 08/02 A3043', '2026-11-16T12:56:00+00:00', null)
++    expect((await stationSky('KNTU', f, now))?.at).toBe('2026-11-16T12:56:00+00:00')
++  })
++})
+diff --git a/tests/weatherStore.test.ts b/tests/weatherStore.test.ts
+index b5342d9..2dce624 100644
+--- a/tests/weatherStore.test.ts
++++ b/tests/weatherStore.test.ts
+@@ -133,43 +133,55 @@ describe('Batch M: on a phone network', () => {
+     expect(jittered(120_000, 1)).toBe(144_000)
+   })
+ 
+-  it('goes through the forecast cache: host and path in om, the UTC hour in hr, coordinates as rounded', async () => {
++  /* Batch CORE, Section 0.4: Open-Meteo from the phone first; the cache only when it refuses this phone or cannot be reached. */
++  it('asks Open-Meteo from the phone first; the cache is not asked when that answers', async () => {
+     expect(edgeUrl('https://marine-api.open-meteo.com/v1/marine?latitude=36.84&longitude=-75.97&hourly=wave_height', new Date('2026-11-08T13:42:00Z'), '/api/forecast')).toBe(
+       '/api/forecast?om=marine-api.open-meteo.com/v1/marine&latitude=36.85&longitude=-75.95&hourly=wave_height&hr=2026-11-08T13',
+     )
+     setForecastEdge('http://127.0.0.1/api/forecast')
+     const f = ok()
+     await weatherJson('https://api.open-meteo.com/v1/forecast?latitude=36.84356&longitude=-75.97131&hourly=wind_speed_10m', { maxAgeMs: HOUR, fetchImpl: f })
+-    const asked = String((f.mock.calls[0] as unknown[])[0])
+-    expect(asked).toContain('/api/forecast?om=api.open-meteo.com/v1/forecast&latitude=36.85&longitude=-75.95')
+-    expect(asked).not.toMatch(/36\.84|75\.97/)
++    expect(f).toHaveBeenCalledTimes(1)
++    expect(String((f.mock.calls[0] as unknown[])[0])).toMatch(/^https:\/\/api\.open-meteo\.com\/v1\/forecast\?latitude=36\.84&longitude=-75\.97/)
+   })
+ 
+-  it('our function missing (a dev server, 404) asks Open-Meteo directly, and stops trying the cache', async () => {
++  it('a 429 given to the phone goes through the cache, on its coarser grid', async () => {
+     setForecastEdge('http://127.0.0.1/api/forecast')
+-    const f = vi.fn(async (u: string) => (u.includes('/api/forecast') ? new Response('', { status: 404 }) : new Response(JSON.stringify(PAYLOAD), { status: 200 })))
+-    const r = await weatherJson(URL_A, { maxAgeMs: HOUR, fetchImpl: f as unknown as typeof fetch })
++    const f = vi.fn(async (u: string) => (u.includes('/api/forecast') ? new Response(JSON.stringify(PAYLOAD), { status: 200 }) : new Response('{"reason":"Minutely API request limit exceeded"}', { status: 429 })))
++    const r = await weatherJson('https://api.open-meteo.com/v1/forecast?latitude=36.84356&longitude=-75.97131&hourly=wind_speed_10m', { maxAgeMs: HOUR, fetchImpl: f as unknown as typeof fetch })
+     expect(r.ok).toBe(true)
+-    await weatherJson(URL_A.replace('wind_speed_10m', 'cloud_cover'), { maxAgeMs: HOUR, fetchImpl: f as unknown as typeof fetch })
+-    expect(f.mock.calls.map((c) => String(c[0]).includes('/api/forecast'))).toEqual([true, false, false])
++    const asked = f.mock.calls.map((c) => String(c[0]))
++    expect(asked[0]).toMatch(/^https:\/\/api\.open-meteo\.com/)
++    expect(asked[1]).toContain('/api/forecast?om=api.open-meteo.com/v1/forecast&latitude=36.85&longitude=-75.95')
++    expect(asked[1]).not.toMatch(/36\.84|75\.97/)
+   })
+ 
+-  it('a request the cache refuses (400: too many points) is asked directly', async () => {
++  it('no network to Open-Meteo: the cache answers', async () => {
+     setForecastEdge('http://127.0.0.1/api/forecast')
+-    const f = vi.fn(async (u: string) => (u.includes('/api/forecast') ? new Response('{"error":true}', { status: 400 }) : new Response(JSON.stringify(PAYLOAD), { status: 200 })))
++    const f = vi.fn(async (u: string) => {
++      if (u.includes('/api/forecast')) return new Response(JSON.stringify(PAYLOAD), { status: 200 })
++      throw new TypeError('Load failed')
++    })
+     expect((await weatherJson(URL_A, { maxAgeMs: HOUR, fetchImpl: f as unknown as typeof fetch })).ok).toBe(true)
+     expect(f).toHaveBeenCalledTimes(2)
+   })
+ 
+-  it('our function failing (502) asks that one directly; a 429 from it is a 429', async () => {
++  it('our function missing (a dev server, 404) is not asked again this session; its 400 or 502 is no answer', async () => {
+     setForecastEdge('http://127.0.0.1/api/forecast')
+-    const bad = vi.fn(async (u: string) => (u.includes('/api/forecast') ? new Response('', { status: 502 }) : new Response(JSON.stringify(PAYLOAD), { status: 200 })))
+-    expect((await weatherJson(URL_A, { maxAgeMs: HOUR, fetchImpl: bad as unknown as typeof fetch })).ok).toBe(true)
++    const refusedHere = (edgeStatus: number) => vi.fn(async (u: string) => (u.includes('/api/forecast') ? new Response('', { status: edgeStatus }) : new Response('{"reason":"Minutely API request limit exceeded"}', { status: 429 })))
++    const bad = refusedHere(502)
++    await weatherJson(URL_A, { maxAgeMs: HOUR, fetchImpl: bad as unknown as typeof fetch })
+     expect(bad).toHaveBeenCalledTimes(2)
+-    const refused = vi.fn(async () => new Response('{"reason":"Minutely API request limit exceeded"}', { status: 429 }))
+-    await weatherJson(URL_A.replace('wind_speed_10m', 'gusts'), { maxAgeMs: HOUR, fetchImpl: refused })
+-    expect(refused).toHaveBeenCalledTimes(1)
+-    expect(weatherBusy()?.why).toBe('busy')
++    /* A refusal given to the phone does not hold the cache back (tests/networkPath.test.ts). */
++    expect(weatherBusy()).toBeNull()
++    await clearWeatherStore()
++    setForecastEdge('http://127.0.0.1/api/forecast')
++    const missing = refusedHere(404)
++    await weatherJson(URL_A, { maxAgeMs: HOUR, fetchImpl: missing as unknown as typeof fetch })
++    /* With no cache, the refusal holds requests back; let it go. The cache's 404 is remembered for the session. */
++    await clearWeatherStore()
++    await weatherJson(URL_A.replace('wind_speed_10m', 'cloud_cover'), { maxAgeMs: HOUR, fetchImpl: missing as unknown as typeof fetch })
++    expect(missing.mock.calls.map((c) => String(c[0]).includes('/api/forecast'))).toEqual([false, true, false])
+   })
+ })
+ 
+diff --git a/vercel.json b/vercel.json
+index 3390e72..838d375 100644
+--- a/vercel.json
++++ b/vercel.json
+@@ -10,6 +10,10 @@
+       "source": "/privacy",
+       "destination": "/"
+     },
++    {
++      "source": "/credits",
++      "destination": "/"
++    },
+     {
+       "source": "/:place(plan|setup|field|now|sky|kit|saved|settings|about)",
+       "destination": "/"

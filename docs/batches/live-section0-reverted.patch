@@ -1,0 +1,2498 @@
+diff --git a/fixtures/truth/2026-11-14-vb.json b/fixtures/truth/2026-11-14-vb.json
+new file mode 100644
+index 0000000..83b77f2
+--- /dev/null
++++ b/fixtures/truth/2026-11-14-vb.json
+@@ -0,0 +1,22 @@
++{
++  "about": "Field truth, Virginia Beach and Sandbridge, Sat 14 Nov 2026, and the evening before (Batch LIVE). What was seen, and what the app showed. Times local (America/New_York).",
++  "place": { "name": "VB oceanfront", "lat": 36.8435575, "lon": -75.9713104, "facingDeg": 100, "timeZone": "America/New_York" },
++  "sandbridge": { "lat": 36.72, "lon": -75.93, "facingDeg": 73 },
++  "surfMorning": {
++    "at": "05:38",
++    "where": "Sandbridge",
++    "weShowed": { "home": "4-6 ft Firing", "chart": 1.7, "buoyDot": 1.7, "week": "Sat 1-2" },
++    "wind": { "kt": 20, "gustKt": 24, "from": "N", "side": "cross-onshore" },
++    "truth": "small and messy, not firing"
++  },
++  "noon": {
++    "at": "12:19",
++    "where": "VB",
++    "weShowed": { "sky": "Overcast", "surf": "0-1 ft Flat", "chartDot": 2.3 },
++    "photo": "broken cumulus, sun through, blue gaps",
++    "skyTruth": "Mostly cloudy"
++  },
++  "skyNow": { "at": "12:21", "weShowed": "Forecast: no station report in the last 75 minutes", "truth": "KNTU and KORF report hourly" },
++  "eveningBefore": { "date": "2026-11-13", "event": "evening twilight", "seen": "clear, a few dark clouds, no color", "weShowed": "Color unlikely", "hit": true },
++  "windCardMorning": { "at": "05:38", "weShowed": "→ cross-off 5a", "problem": "already past" }
++}
+diff --git a/measurements/2026-11-14-surf-replay.md b/measurements/2026-11-14-surf-replay.md
+new file mode 100644
+index 0000000..1a8bf08
+--- /dev/null
++++ b/measurements/2026-11-14-surf-replay.md
+@@ -0,0 +1,19 @@
++# 14 Nov surf, both paths (Batch LIVE, Section 0.3)
++
++Run: node scripts/measure-surf-replay.mjs, 2026-11-14T18:16:46.694Z. Sandbridge 36.72,-75.93, facing 73°, beach factor 0.8333333333333334, buoy 44099, no per-spot history.
++
++## 5:38 AM
++
++- buoy 44099 as the phone had it (30 min late): 09:56Z 1.7 m 9 s from 54°, split {"swellM":0.2,"swellS":10.5,"windWaveM":1.6,"windWaveS":9.1,"swellFrom":"ENE","windWaveFrom":"NE"}
++- before: buoy face 4.65 ft, headline 4–6 ft Fun (centre 4.65); chart 1.78 ft (the briefing's faces, unleaned)
++- after: buoy face 4.65 ft, lean 1.00 ft, headline 2–3 ft Rideable, bumpy, cross-shore (centre 2.69); chart now 2.69 ft (the same series)
++- after, with the wind the Wind card showed (N 20 kt): 2–3 ft Blown out
++- wind 11.2 kt from 335°; marine wave 0.9 m, swell 0.52 m 5.2 s from 41°, wind wave 0.62 m 2.9 s from 339°
++
++## 12:19 PM
++
++- buoy 44099 as the phone had it (30 min late): 16:26Z 1.8 m 5 s from 314°, split {"swellM":0.1,"swellS":10.5,"windWaveM":1.8,"windWaveS":5,"swellFrom":"E","windWaveFrom":"NW"}
++- before: buoy face 0.00 ft, headline 0–1 ft Flat (centre 0.00); chart 1.55 ft (the briefing's faces, unleaned)
++- after: buoy face 0.00 ft, lean -1.00 ft, headline 0–1 ft Small, bumpy, cross-offshore (centre 0.73); chart now 0.73 ft (the same series)
++- wind 16.8 kt from 326°; marine wave 0.84 m, swell 0.48 m 6.1 s from 48°, wind wave 0.62 m 2.85 s from 320°
++
+diff --git a/scripts/gate/fixtures.mjs b/scripts/gate/fixtures.mjs
+index f480a92..dc4d5a3 100644
+--- a/scripts/gate/fixtures.mjs
++++ b/scripts/gate/fixtures.mjs
+@@ -194,7 +194,11 @@ export async function answer(href) {
+   if (host === 'api.weather.gov') return { status: 503, type: 'application/json', body: Buffer.from('{}'), fixture: 'NWS unavailable' }
+   if (host === 'www.ndbc.noaa.gov' && u.pathname.endsWith('.spec')) return text(NDBC_SPEC, 'text/plain', 'NDBC spectral summary')
+   if (host === 'www.ndbc.noaa.gov') return text(NDBC_TEXT, 'text/plain', 'NDBC buoy text')
+-  if (host === 'aviationweather.gov') return text(METAR, 'text/plain', 'METAR text')
++  /* Batch LIVE, Section 0.2: the sky word reads two stations (KNTU and KNGU at the pier, src/core/skyConsensus.ts); each id asked gets the same report under its own name. */
++  if (host === 'aviationweather.gov') {
++    const ids = (u.searchParams.get('ids') ?? 'KORF').split(',').filter((id) => /^[A-Z][A-Z0-9]{3}$/.test(id))
++    return text((ids.length === 0 ? ['KORF'] : ids).map((id) => METAR.replace(/^KORF/, id)).join('\n'), 'text/plain', 'METAR text')
++  }
+   /* Soundings: none launched in the fixture's world; radar: no echoes (a clear tile). */
+   if (host === 'mesonet.agron.iastate.edu' && u.pathname.startsWith('/json/raob')) return json({ profiles: [] }, 'no sounding')
+   if (host === 'mesonet.agron.iastate.edu' && u.pathname.startsWith('/cgi-bin/request/asos.py')) return text(asosCsv(u), 'text/plain', 'station reports')
+diff --git a/scripts/measure-surf-replay.mjs b/scripts/measure-surf-replay.mjs
+new file mode 100644
+index 0000000..94ec2a4
+--- /dev/null
++++ b/scripts/measure-surf-replay.mjs
+@@ -0,0 +1,99 @@
++/*
++ * THE HOME'S SURF ON 14 NOV REPLAYED, BOTH PATHS (Batch LIVE, Section 0.3).
++ * At 5:38 AM the home card said "4–6 ft Firing" while its own chart read
++ * 1.7 ft; at 12:19 PM "0–1 ft Flat" while the now-dot read 2.3 ft.
++ *
++ * Usage:  node scripts/measure-surf-replay.mjs [fetch]
++ *         With "fetch": asks Open-Meteo (marine and wind, 14 Nov, Sandbridge
++ *         to 2 decimals) and NDBC (44099's realtime file) and keeps them in
++ *         tests/data/surf-2026-11-14/. Without it: replays the kept files.
++ * Writes: measurements/2026-11-14-surf-replay.md
++ *
++ * Open-Meteo's past hours are its best run since, not the run the phone
++ * had at 5:38; the phone's per-spot book (its correction) is not known, so
++ * both are replayed untested (no history), as a new phone reads them. The
++ * buoy reading the phone had is the latest LAG_MIN before the moment (NDBC
++ * posts a half-hour's reading about that late: this script's assumption).
++ *
++ * before  the lean as it was: the buoy's whole height at its dominant
++ *         period and mean direction, the whole miss applied
++ * after   the lean now (src/core/spotSkill.ts buoyFaceFt with the .spec
++ *         split, src/core/surfNowcast.ts surfLean bounded), the call with
++ *         the hour's wind (src/core/surf.ts windQuality); the chart is the
++ *         same series (src/lib/useSurfNow.ts hours)
++ */
++import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
++import { parseHourly, MARINE_NAMES, BRIEF_WIND_NAMES, hourlyAt } from '../src/lib/tideSheetData.ts'
++import { surfAt } from '../src/lib/surfDay.ts'
++import { rangeHourAt, buoyLean } from '../src/lib/surfPageData.ts'
++import { surfCall } from '../src/core/surfCall.ts'
++import { sideWords } from '../src/core/homeDay.ts'
++import { buoyFaceFt, spotStats } from '../src/core/spotSkill.ts'
++import { surfBand } from '../src/core/surfCall.ts'
++import { surfTag } from '../src/core/surf.ts'
++import { beachFactorAt } from '../src/core/beachFactor.ts'
++
++const DIR = 'tests/data/surf-2026-11-14'
++const AT = { lat: 36.72, lon: -75.93 }
++const FACING = Number(process.argv.find((a) => a.startsWith('facing='))?.slice(7) ?? 73)
++const BUOY = '44099'
++const LAG_MIN = Number(process.argv.find((a) => a.startsWith('lag='))?.slice(4) ?? 30)
++if (process.argv.includes('fetch')) {
++  mkdirSync(DIR, { recursive: true })
++  const q = (names) => new URLSearchParams({ latitude: AT.lat.toFixed(2), longitude: AT.lon.toFixed(2), hourly: names.join(','), start_date: '2026-11-14', end_date: '2026-11-15', timezone: 'GMT' })
++  const m = await fetch(`https://marine-api.open-meteo.com/v1/marine?${q(MARINE_NAMES)}`)
++  writeFileSync(`${DIR}/marine.json`, await m.text())
++  const wq = q(BRIEF_WIND_NAMES)
++  wq.set('wind_speed_unit', 'ms')
++  const w = await fetch(`https://api.open-meteo.com/v1/forecast?${wq}`)
++  writeFileSync(`${DIR}/wind.json`, await w.text())
++  const b = await fetch(`https://www.ndbc.noaa.gov/data/realtime2/${BUOY}.txt`)
++  writeFileSync(`${DIR}/${BUOY}.txt`, (await b.text()).split('\n').filter((l) => l.startsWith('#') || / 11 14 /.test(l)).join('\n'))
++  const sp = await fetch(`https://www.ndbc.noaa.gov/data/realtime2/${BUOY}.spec`)
++  writeFileSync(`${DIR}/${BUOY}.spec`, (await sp.text()).split('\n').filter((l) => l.startsWith('#') || / 11 14 /.test(l)).join('\n'))
++}
++const marine = parseHourly(JSON.parse(readFileSync(`${DIR}/marine.json`, 'utf8')), MARINE_NAMES)
++const wind = parseHourly(JSON.parse(readFileSync(`${DIR}/wind.json`, 'utf8')), BRIEF_WIND_NAMES)
++const rows = readFileSync(`${DIR}/${BUOY}.txt`, 'utf8').split('\n').filter((l) => !l.startsWith('#') && l.trim() !== '').map((l) => l.trim().split(/\s+/))
++const spec = readFileSync(`${DIR}/${BUOY}.spec`, 'utf8').split('\n').filter((l) => !l.startsWith('#') && l.trim() !== '').map((l) => l.trim().split(/\s+/))
++const num = (x) => (x === 'MM' || x === undefined ? null : Number(x))
++const splitAt = (at) => {
++  const f = spec.find((g) => new Date(`${g[0]}-${g[1]}-${g[2]}T${g[3]}:${g[4]}:00Z`).getTime() === at.getTime())
++  return f === undefined ? null : { swellM: num(f[6]), swellS: num(f[7]), windWaveM: num(f[8]), windWaveS: num(f[9]), swellFrom: f[10] === 'MM' ? null : f[10], windWaveFrom: f[11] === 'MM' ? null : f[11] }
++}
++const buoyAt = (t0) => {
++  const t = new Date(t0.getTime() - LAG_MIN * 60_000)
++  const r = rows.map((f) => ({ at: new Date(`${f[0]}-${f[1]}-${f[2]}T${f[3]}:${f[4]}:00Z`), waveM: Number(f[8]), periodS: f[9] === 'MM' ? null : Number(f[9]), fromDeg: f[11] === 'MM' ? null : Number(f[11]) })).filter((x) => x.at.getTime() <= t.getTime() && Number.isFinite(x.waveM)).sort((a, b) => b.at - a.at)[0]
++  return r === undefined ? null : { status: 'ok', buoy: { id: BUOY, name: BUOY, at: AT, km: 0 }, at: r.at, waveM: r.waveM, periodS: r.periodS, fromDeg: r.fromDeg, split: splitAt(r.at) }
++}
++const factor = beachFactorAt(AT)
++const stats = spotStats([], 0)
++const out = [`# 14 Nov surf, both paths (Batch LIVE, Section 0.3)`, '', `Run: node scripts/measure-surf-replay.mjs, ${new Date().toISOString()}. Sandbridge ${AT.lat},${AT.lon}, facing ${FACING}°, beach factor ${factor}, buoy ${BUOY}, no per-spot history.`, '']
++for (const [label, iso] of [['5:38 AM', '2026-11-14T10:38:00Z'], ['12:19 PM', '2026-11-14T17:19:00Z']]) {
++  const now = new Date(iso)
++  const half = new Date(Math.floor(now.getTime() / 3_600_000) * 3_600_000 + 1_800_000)
++  const b = buoyAt(now)
++  const oldFt = b === null ? null : buoyFaceFt({ waveM: b.waveM, periodS: b.periodS, fromDeg: b.fromDeg }, FACING, factor)
++  const newFt = b === null ? null : buoyFaceFt(b, FACING, factor)
++  const chartWas = surfAt(marine, half, FACING, factor)
++  const plain = rangeHourAt(marine, wind, half, FACING, stats, factor, null)
++  const lean = buoyLean(marine, wind, b, FACING, stats, factor, now.getTime())
++  const head = rangeHourAt(marine, wind, half, FACING, stats, factor, lean)
++  const oldCentre = plain === null || oldFt === null ? null : Math.max(0, oldFt)
++  const oldBand = oldCentre === null ? null : surfBand(oldCentre)
++  const oldTag = oldCentre === null ? null : surfTag(oldCentre, plain.shape)
++  const call = head === null ? null : surfCall({ centerFt: head.centerFt, shape: head.shape, side: head.side === null ? null : sideWords(head.side), wind: head.wind }, 0)
++  out.push(`## ${label}`, '')
++  out.push(`- buoy ${BUOY} as the phone had it (${LAG_MIN} min late): ${b === null ? 'none' : `${b.at.toISOString().slice(11, 16)}Z ${b.waveM} m ${b.periodS} s from ${b.fromDeg}°, split ${JSON.stringify(b.split)}`}`)
++  out.push(`- before: buoy face ${oldFt === null ? 'none' : oldFt.toFixed(2)} ft, headline ${oldBand === null ? 'none' : `${oldBand[0]}–${oldBand[1]} ft ${oldTag}`} (centre ${oldCentre === null ? 'none' : oldCentre.toFixed(2)}); chart ${chartWas === null ? 'none' : chartWas.estimate.faceFt.toFixed(2)} ft (the briefing's faces, unleaned)`)
++  out.push(`- after: buoy face ${newFt === null ? 'none' : newFt.toFixed(2)} ft, lean ${lean === null ? 'none' : lean.missFt.toFixed(2)} ft, headline ${call === null ? 'none' : `${call.words} ${call.size}, ${call.wind}`} (centre ${head === null ? 'none' : head.centerFt.toFixed(2)}); chart now ${head === null ? 'none' : head.centerFt.toFixed(2)} ft (the same series)`)
++  if (label === '5:38 AM' && head !== null) {
++    /* The wind the home's Wind card said then (fixtures/truth/2026-11-14-vb.json): N 20 kt. */
++    const seen = surfCall({ centerFt: head.centerFt, shape: head.shape, side: null, wind: { mps: 20 / 1.943844, fromDeg: 0, facing: FACING } }, 0)
++    out.push(`- after, with the wind the Wind card showed (N 20 kt): ${seen.words} ${seen.size}`)
++  }
++  out.push(`- wind ${(hourlyAt(wind, 'wind_speed_10m', half) * 1.943844).toFixed(1)} kt from ${hourlyAt(wind, 'wind_direction_10m', half)}°; marine wave ${hourlyAt(marine, 'wave_height', half)} m, swell ${hourlyAt(marine, 'swell_wave_height', half)} m ${hourlyAt(marine, 'swell_wave_period', half)} s from ${hourlyAt(marine, 'swell_wave_direction', half)}°, wind wave ${hourlyAt(marine, 'wind_wave_height', half)} m ${hourlyAt(marine, 'wind_wave_period', half)} s from ${hourlyAt(marine, 'wind_wave_direction', half)}°`, '')
++}
++mkdirSync('measurements', { recursive: true })
++writeFileSync('measurements/2026-11-14-surf-replay.md', out.join('\n') + '\n')
++console.log(out.join('\n'))
+diff --git a/src/components/Home.tsx b/src/components/Home.tsx
+index 40f3d8f..32bec70 100644
+--- a/src/components/Home.tsx
++++ b/src/components/Home.tsx
+@@ -8,7 +8,7 @@ import { saneAzimuth } from '../core/sanity.ts'
+ import { moonTimesOnLocalDay } from '../core/moonTimes.ts'
+ import { droneTag, kt, surfOn, surfTag, windTag, type CallRead, type WindTag } from '../core/briefing.ts'
+ import { droneWindow } from '../core/droneWindow.ts'
+-import { bestRun, bestWindows, colorWords, skyStripLit, sideShort, sideSpanWords, weekPill, weekSurfRow, WEEK_SURE_DAYS, groundOf, sideWords, nothingLine, rainLine, spanWords, stripSteps, weekHeadline, type Activity, type CardKind, type WindowRow } from '../core/homeDay.ts'
++import { bestRun, bestWindows, colorWords, skyStripLit, sideShort, sideSpanWords, nextSideChange, weekPill, weekSurfRow, WEEK_SURE_DAYS, groundOf, sideWords, nothingLine, rainLine, spanWords, stripSteps, weekHeadline, type Activity, type CardKind, type WindowRow } from '../core/homeDay.ts'
+ import { camsFacingWaterOrSun } from '../core/skyCams.ts'
+ import { wakeAt } from '../core/alertIcs.ts'
+ import { formatClock } from '../core/timezone.ts'
+@@ -18,7 +18,7 @@ import { seaNow, surfLine, useSurfNow, type SurfNow } from '../lib/useSurfNow.ts
+ import { rangeSizeWords } from '../core/surfReads.ts'
+ import { chartMarks, firstFun, homeCardsShown, homeLayout, nextLine, nightSpans, surfChartMarks, surfPath, tideAt, tideCurve, type HomeLayout, type SurfChartMarks } from '../core/homeCards.ts'
+ import { gustWords, windAt, windWords } from '../lib/windNow.ts'
+-import { useStationObs, type StationNow } from '../lib/useStationObs.ts'
++import { skyFields, useSkyStation, useStationObs, type StationNow } from '../lib/useStationObs.ts'
+ import { freshSky, skyCondition } from '../core/skyWord.ts'
+ import { colorNowLine } from '../core/colorNow.ts'
+ import { hourlyAt } from '../lib/tideSheetData.ts'
+@@ -101,9 +101,11 @@ function writeHomeTab(p: Page): void {
+ export function Home({ venue, placeName, timeZone, units, drone, now, onClose, onOpenMap, onMenu, onSwitchSpot, onViewfinder, onOpen, start = 0 }: HomeProps) {
+   const brief = useBriefing(venue, timeZone, now, true)
+   /* Batch Map A1/A2: the spot's surf beach and its band, the same hook the menu and the Surf page read. */
+-  const surf = useSurfNow(venue, now, timeZone, units.distance === 'ft', placeName)
+   /* Batch MAP2, Section 2: a station within 15 km that reported in the last hour; the wind now leans to it (the Wind page reads the same). */
+   const stationObs = useStationObs(venue)
++  const surf = useSurfNow(venue, now, timeZone, units.distance === 'ft', placeName, stationObs)
++  /* Batch LIVE, Section 0.2: the sky word's report by consensus, there even when no station's wind is fresh. */
++  const skyObs = skyFields(useSkyStation(venue))
+   const [picked] = useActivities()
+   const order = homeOrder(picked, drone !== null)
+   /* Batch Flow, Section 3: 1-3 activities picked, big full-width cards; else the six (boards D_Home2, D_Home6). */
+@@ -178,10 +180,10 @@ export function Home({ venue, placeName, timeZone, units, drone, now, onClose, o
+       {/* Swipe pages by design (Today · Tomorrow · Week, with the dots that name them): marked for the overflow audit, as Sky › Now is. */}
+       <div className="home__track" ref={track} data-sideways>
+         <section className="home__page" aria-label="Today">
+-          <DayView placeName={placeName} which="today" brief={brief} day={brief.days[0] ?? null} order={order} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} alert={alert === null ? null : alert.event} stormLine={play.inPlay ? play.headline : null} onOpen={onOpen} onDebug={() => setDebug((d) => !d)} surf={surf} obs={stationObs} layout={layout} shown={shown} weatherOnly={picked !== null && picked.length === 1 && picked[0] === 'weather'} />
++          <DayView placeName={placeName} which="today" brief={brief} day={brief.days[0] ?? null} order={order} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} alert={alert === null ? null : alert.event} stormLine={play.inPlay ? play.headline : null} onOpen={onOpen} onDebug={() => setDebug((d) => !d)} surf={surf} obs={stationObs} skyObs={skyObs} layout={layout} shown={shown} weatherOnly={picked !== null && picked.length === 1 && picked[0] === 'weather'} />
+         </section>
+         <section className="home__page" aria-label="Tomorrow">
+-          <DayView placeName={placeName} which="tomorrow" brief={brief} day={brief.days[1] ?? null} order={order} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} alert={null} stormLine={null} onOpen={onOpen} surf={surf} obs={stationObs} layout={layout} shown={shown} />
++          <DayView placeName={placeName} which="tomorrow" brief={brief} day={brief.days[1] ?? null} order={order} venue={venue} timeZone={timeZone} units={units} drone={drone} now={now} alert={null} stormLine={null} onOpen={onOpen} surf={surf} obs={stationObs} skyObs={skyObs} layout={layout} shown={shown} />
+         </section>
+         <section className="home__page" aria-label="Week">
+           <WeekView brief={brief} order={order} timeZone={timeZone} units={units} now={now} venue={venue} surf={surf} />
+@@ -252,13 +254,14 @@ interface DayViewProps {
+   placeName: string
+   surf: SurfNow
+   obs: StationNow | null
++  skyObs: ReturnType<typeof skyFields>
+   /** Batch Flow, Section 3: few (1-3 activities picked) or many cards. */
+   layout: HomeLayout
+   /** Batch Polish 2, Section 2: only Weather picked: today is the weather itself (src/components/WeatherHome.tsx). */
+   weatherOnly?: boolean
+ }
+ 
+-function DayView({ which, brief, day, order, venue, timeZone, units, drone, now, alert, stormLine, onOpen, onDebug, surf, obs, layout, shown, weatherOnly = false }: DayViewProps) {
++function DayView({ which, brief, day, order, venue, timeZone, units, drone, now, alert, stormLine, onOpen, onDebug, surf, obs, skyObs, layout, shown, weatherOnly = false }: DayViewProps) {
+   const clock = (d: Date | null) => (d === null ? '—' : formatClock(d, timeZone))
+   const wx = brief.wx
+   const at = (name: string, t: Date) => (wx === null ? null : hourlyAt(wx, name, t))
+@@ -278,7 +281,7 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
+     code: at('weather_code', when),
+     layers: { low: at('cloud_cover_low', when), mid: at('cloud_cover_mid', when), high: at('cloud_cover_high', when) },
+     day: sunUp,
+-    station: which === 'today' ? freshSky(obs, now) : null,
++    station: which === 'today' ? freshSky(skyObs, now) : null,
+   })
+   /* Batch TRUTH, Section 0.5: a live colour window with a Maybe or better leads the home. */
+   /* Batch BEST SKY, Section 4: today only, with Shoot picked: the grid within 15 mi (7 or so questions, each kept an hour). */
+@@ -315,7 +318,7 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
+   const soonWord = soon === null ? null : `${soon === day?.events.sunset ? 'sunset' : 'sunrise'} ${clock(soon)}`
+   /* One decision for the day's line and the Surf card's tag (Batch QA, Section 0B: "Nothing standout today" under "Fun now"): the card's first Fun is an item here too. */
+   const items = rows.filter((r) => r.from !== undefined).map((r) => ({ what: NEXT_WORD[r.activity], from: r.from as Date }))
+-  const surfFun = order.includes('surf') ? surfFunAt(brief, surf, which, now, day).fun : null
++  const surfFun = order.includes('surf') ? surfFunAt(surf, which, now, day).fun : null
+   if (surfFun !== null && !items.some((i) => i.what === NEXT_WORD.surf)) items.push({ what: NEXT_WORD.surf, from: surfFun === 'now' ? now : surfFun })
+   const nextWords = nextLine(items, now, (d) => clock(d))
+   void rain
+@@ -390,16 +393,16 @@ function DayView({ which, brief, day, order, venue, timeZone, units, drone, now,
+ 
+       {weatherOnly && which === 'today' ? (
+         <Suspense fallback={null}>
+-        <WeatherHome venue={venue} timeZone={timeZone} units={units} now={now} wx={wx} obs={obs} drop={fit.drop} onOpen={() => onOpen('weather')} />
++        <WeatherHome venue={venue} timeZone={timeZone} units={units} now={now} wx={wx} obs={obs} skyObs={skyObs} drop={fit.drop} onOpen={() => onOpen('weather')} />
+         </Suspense>
+       ) : (
+         <div className={`hcards hcards--${layout}`}>
+           {cardsShown.map((c) => (
+-            <Card key={c} kind={c} layout={layout} which={which} day={day} brief={brief} units={units} drone={drone} now={now} venue={venue} timeZone={timeZone} onOpen={onOpen} surf={surf} obs={obs} />
++            <Card key={c} kind={c} layout={layout} which={which} day={day} brief={brief} units={units} drone={drone} now={now} venue={venue} timeZone={timeZone} onOpen={onOpen} surf={surf} obs={obs} skyObs={skyObs} />
+           ))}
+         </div>
+       )}
+-      {weatherOnly || which !== 'today' || fit.hours !== true ? null : <HomeHours wx={wx} now={now} venue={venue} timeZone={timeZone} units={units} obs={obs} onOpen={() => onOpen('weather')} />}
++      {weatherOnly || which !== 'today' || fit.hours !== true ? null : <HomeHours wx={wx} now={now} venue={venue} timeZone={timeZone} units={units} obs={skyObs} onOpen={() => onOpen('weather')} />}
+       {/* Batch TRUTH, Section 4: the Next line alone; the cams live in the menu ("Next: … / Cams · VB Pier" was two things in one row). */}
+       {/* Batch BEST SKY, Section 4: when somewhere near has better color than here, that is the row; it opens "Where's the color?". */}
+       {better === null ? (
+@@ -475,7 +478,7 @@ function windowRows(which: 'today' | 'tomorrow', day: DayBrief, order: readonly
+   /* Surf: the longest run of Fun or Firing hours still to come. */
+   const surfRun = bestRun(
+     day.surf.filter((b) => b.at.getTime() > after && daylight(b.at.getTime())).map((b) => ({ at: new Date(b.at.getTime() - 1_800_000), value: b })),
+-    (b) => surfOn(surfTag(b.faceFt, b.shape)),
++    (b) => surfOn(surfTag(b.faceFt, b.shape, b.wind)),
+   )
+   if (surfRun !== null) {
+     const ft = Math.round(Math.max(...surfRun.values.map((b) => b.faceFt)))
+@@ -555,6 +558,7 @@ interface CardProps {
+   /** Batch Map A2: the spot's surf (src/lib/useSurfNow.ts); when away, the nearest surf beach's name and how far. */
+   surf: SurfNow
+   obs: StationNow | null
++  skyObs: ReturnType<typeof skyFields>
+ }
+ 
+ const CHART = { w: 300, h: 70 }
+@@ -602,7 +606,7 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
+     if (surf.away !== null) line = `Nearest surf: ${surf.away.name} · ${surf.away.far}`
+     /* The next 24 hours of faces, from the briefing's hours, today's and tomorrow's. */
+     const from = which === 'today' ? now : (day?.start ?? now)
+-    const { pts, fun } = surfFunAt(brief, surf, which, now, day)
++    const { pts, fun } = surfFunAt(surf, which, now, day)
+     /* The tag is the call's size; "Fun 3p" only says when, for a day the call says is Fun or Firing. */
+     const on = call !== null && surfOn(call.size)
+     tag = !on || fun === null ? (call?.size ?? null) : fun === 'now' ? `${call.size} now` : `${call.size} ${short(fun)}`
+@@ -733,8 +737,9 @@ function Card({ kind, layout, which, day, brief, units, drone, now, venue, timeZ
+     const read = past ? (next?.reads.sunrise ?? null) : (day?.reads.sunset ?? null)
+     const at = past ? (next?.events.sunrise ?? null) : (day?.events.sunset ?? null)
+     const said = colorWords(read?.call ?? null)
+-    big = said === null ? '—' : <span data-shared={which === 'today' ? 'skycall' : 'skycall-tomorrow'} data-value={said}>{said.replace(/^color /, '').replace(/^./, (c) => c.toUpperCase())}</span>
+-    line = at == null ? null : `${past ? 'rise' : 'set'} ${clock(at)}`
++    /* Batch LIVE, Section 0.6: never a bare dash; with no call, say so and when it is made. */
++    big = said === null ? NO_SKY_CALL : <span data-shared={which === 'today' ? 'skycall' : 'skycall-tomorrow'} data-value={said}>{said.replace(/^color /, '').replace(/^./, (c) => c.toUpperCase())}</span>
++    line = [said === null ? NO_SKY_CALL_WHEN : null, at == null ? null : `${past ? 'rise' : 'set'} ${clock(at)}`].filter((x) => x !== null).join(' · ') || null
+     /* Batch QA, Section 3: the sunset the card says, compared with every screen that says it. */
+     if (which === 'today' && !past && at != null) shared = { key: 'sunset', value: `sunset ${clock(at)}`.toLowerCase() }
+     tag = read?.call ?? null
+@@ -853,6 +858,10 @@ function WindDial({ fromDeg, facing }: { fromDeg: number | null; facing: number
+ }
+ 
+ /** "Offshore until 11 AM", "Onshore from 2 PM": the wind's side to the beach and when it changes. */
++/** The Sky card with no call (Batch LIVE, Section 0.6). */
++const NO_SKY_CALL = 'No call yet'
++const NO_SKY_CALL_WHEN = 'checks 3 h before'
++
+ function windSideSpan(day: DayBrief | null, facing: number | null, now: Date | null, timeZone: string, sideNow: WindTag | null = null): string | null {
+   if (day === null || facing === null) return null
+   const hours = day.wind.filter((h) => now === null || h.at.getTime() + 1_800_000 > now.getTime())
+@@ -860,9 +869,8 @@ function windSideSpan(day: DayBrief | null, facing: number | null, now: Date | n
+   /* Batch NOW, Section 2.4: the line starts from the headline's side (the one wind now), never a second "now" from the model's hour. */
+   const first = sideNow === null ? sides[0] : { at: now ?? sides[0]?.at, side: sideNow }
+   if (first === undefined || first.side === null) return null
+-  const change = sides.find((s) => s.side !== first.side && s.side !== null)
+-  /* Batch TRUTH, Section 4: "cross-off · offshore 9a", at the hour the change starts. */
+-  return sideSpanWords(first.side, change === undefined || change.side === null ? null : { tag: change.side, at: new Date(change.at.getTime() - 1_800_000) }, timeZone)
++  /* Batch TRUTH, Section 4: "cross-off · offshore 9a", at the hour the change starts; Batch LIVE 0.5: only a change still to come. */
++  return sideSpanWords(first.side, nextSideChange(sides, first.side, now), timeZone)
+ }
+ 
+ /**
+@@ -871,10 +879,11 @@ function windSideSpan(day: DayBrief | null, facing: number | null, now: Date | n
+  * only when the reading the card's line is from (useSurfNow's band) agrees:
+  * never "Fun now" over "bumpy, onshore".
+  */
+-function surfFunAt(brief: Briefing, surf: SurfNow, which: 'today' | 'tomorrow', now: Date, day: DayBrief | null): { pts: { at: Date; ft: number; fun: boolean }[]; fun: Date | 'now' | null } {
++function surfFunAt(surf: SurfNow, which: 'today' | 'tomorrow', now: Date, day: DayBrief | null): { pts: { at: Date; ft: number; fun: boolean }[]; fun: Date | 'now' | null } {
+   const band = which === 'today' ? surf.now : surf.tomorrow
+   const from = which === 'today' ? now : (day?.start ?? now)
+-  const pts = brief.days.flatMap((d) => d.surf).map((b) => ({ at: b.at, ft: b.faceFt, fun: surfOn(surfTag(b.faceFt, b.shape)) }))
++  /* Batch LIVE, Section 0.3: the line and its now are the headline's own series (useSurfNow hours: the same lean, the same call), never the briefing's unleaned faces. */
++  const pts = surf.hours.map((h) => ({ at: h.at, ft: h.centerFt, fun: surfOn(h.tag) }))
+   const fun = firstFun(pts, from)
+   return { pts, fun: fun === 'now' && band !== null && !surfOn(band.tag) ? null : fun }
+ }
+diff --git a/src/components/Menu.tsx b/src/components/Menu.tsx
+index 01540f5..7ff4042 100644
+--- a/src/components/Menu.tsx
++++ b/src/components/Menu.tsx
+@@ -10,7 +10,7 @@ import { menuCardList, type MenuCard } from '../core/menuCards.ts'
+ import { formatClock } from '../core/timezone.ts'
+ import { hourlyAt } from '../lib/tideSheetData.ts'
+ import { useBriefing } from '../lib/useBriefing.ts'
+-import { useStationObs } from '../lib/useStationObs.ts'
++import { skyFields, useSkyStation, useStationObs } from '../lib/useStationObs.ts'
+ import { useSurfNow } from '../lib/useSurfNow.ts'
+ import { formatTemperature, windIn, windUnitLabel, type Units } from '../lib/units.ts'
+ import { gustWords, windAt, windWords } from '../lib/windNow.ts'
+@@ -103,8 +103,9 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
+   const camsSunAz = sunsetToday === null || venue === null ? null : getPosition(sunsetToday, venue.lat, venue.lon).azimuth
+   const clock = (d: Date) => formatClock(d, timeZone)
+   const obs = useStationObs(looking ? venue : null)
++  const skyObs = skyFields(useSkyStation(looking ? venue : null))
+   /* Batch Map A2: the value is the one surf number (src/lib/useSurfNow.ts), the home's and the Surf page's. */
+-  const surf = useSurfNow(looking ? venue : null, now, timeZone, units.distance === 'ft', placeShort)
++  const surf = useSurfNow(looking ? venue : null, now, timeZone, units.distance === 'ft', placeShort, obs)
+   /* Batch Polish 2, Section 2: the Calendar row says the next marked day ("Thu · rainbow"), from the week's rare light (the Sky page's, src/core/skyPage.ts). */
+   const [mark, setMark] = useState<string | null>(null)
+   const lat = venue?.lat ?? null
+@@ -132,7 +133,7 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
+   const at = (name: string, t: Date) => (wx === null || venue === null ? null : hourlyAt(wx, name, t))
+   const temp = (c: number | null) => formatTemperature(c, units.temperature).replace(/°[FC]$/, '°')
+   const sunUp = venue !== null && getPosition(now, venue.lat, venue.lon).altitude > -0.8
+-  const cond = skyCondition({ code: at('weather_code', now), layers: { low: at('cloud_cover_low', now), mid: at('cloud_cover_mid', now), high: at('cloud_cover_high', now) }, day: sunUp, station: freshSky(obs, now) })
++  const cond = skyCondition({ code: at('weather_code', now), layers: { low: at('cloud_cover_low', now), mid: at('cloud_cover_mid', now), high: at('cloud_cover_high', now) }, day: sunUp, station: freshSky(skyObs, now) })
+   /* Batch Polish, Section 4: the home's live sky behind the menu (night, golden, day, cloud, rain, fog), by the home's own groundOf. */
+   const ground = venue === null ? 'night' : groundOf(getPosition(now, venue.lat, venue.lon).altitude, at('weather_code', now), false)
+   const wind = windAt(wx, now, obs)
+@@ -145,7 +146,7 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
+   const rain = rainLine(rainHours, now, timeZone)
+   /* Batch Flow, Section 8 (board D_Menu): Weather, then the home's own cards in its order (no Moon), Sky always there. */
+   const kinds = menuCardList(order, droneTools)
+-  const card = (k: MenuCard): { title: string; big: string; line: string; target: MenuTarget } => {
++  const card = (k: MenuCard): { title: string; big: string; line: string; target: MenuTarget; called?: boolean } => {
+     if (k === 'weather') {
+       return { title: 'Weather', big: `${temp(at('temperature_2m', now))} ${cond?.word ?? ''}`.trim(), line: `H ${temp(dayTemps.length === 0 ? null : Math.max(...dayTemps))} L ${temp(dayTemps.length === 0 ? null : Math.min(...dayTemps))}${rain === null ? '' : ` · ${rain.replace(/^No rain next/, 'dry')}`}`, target: 'weather' }
+     }
+@@ -155,7 +156,8 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
+       const read = past ? (d?.reads.sunrise ?? null) : (d?.reads.sunset ?? null)
+       const ev = past ? (d?.events.sunrise ?? null) : (d?.events.sunset ?? null)
+       const said = colorWords(read?.call ?? null)
+-      return { title: 'Sky', big: said === null ? '—' : said.replace(/^./, (c) => c.toUpperCase()), line: ev == null ? '' : `${past ? 'sunrise' : 'sunset'} ${clock(ev)}`, target: 'sky' }
++      /* Batch LIVE, Section 0.6: never a bare dash; with no call, say so and when it is made. */
++      return { title: 'Sky', big: said === null ? 'No call yet' : said.replace(/^./, (c) => c.toUpperCase()), line: [ev == null ? null : `${past ? 'sunrise' : 'sunset'} ${clock(ev)}`, said === null ? 'checks 3 h before' : null].filter((x) => x !== null).join(' · '), target: 'sky', called: said !== null }
+     }
+     if (k === 'surf') return { title: 'Surf', big: surf.nowWords ?? '—', line: surf.away !== null ? `nearest: ${surf.away.name}` : surf.now === null ? '' : `${surf.now.tag.toLowerCase()} now`, target: 'surf' }
+     if (k === 'wind') {
+@@ -190,8 +192,8 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
+             return (
+               <button key={k} type="button" className={`mcard mcard--${k === 'surf' ? 'water' : k} mcard--d sidemenu__item`} onClick={() => pick(c.target)}>
+                 <span className="mcard__name sidemenu__label">{c.title}</span>
+-                <span className="mcard__value">{loading ? '…' : k === 'surf' ? <span data-shared="surf">{c.big}</span> : k === 'sky' && c.big !== '—' ? <span data-shared="skycall" data-value={c.big.toLowerCase()}>{c.big}</span> : c.big}</span>
+-                <span className="mcard__sub" {...(!loading && ((k === 'tide' && /^(high|low) /.test(c.line)) || (k === 'sky' && /^sunset /.test(c.line))) ? { 'data-shared': k === 'tide' ? 'tide' : 'sunset', 'data-value': c.line.toLowerCase() } : {})}>{loading ? '' : c.line}</span>
++                <span className="mcard__value">{loading ? '…' : k === 'surf' ? <span data-shared="surf">{c.big}</span> : k === 'sky' && c.called === true ? <span data-shared="skycall" data-value={c.big.toLowerCase()}>{c.big}</span> : c.big}</span>
++                <span className="mcard__sub" {...(!loading && ((k === 'tide' && /^(high|low) /.test(c.line)) || (k === 'sky' && /^sunset /.test(c.line))) ? { 'data-shared': k === 'tide' ? 'tide' : 'sunset', 'data-value': c.line.split(' · ')[0].toLowerCase() } : {})}>{loading ? '' : c.line}</span>
+               </button>
+             )
+           })}
+diff --git a/src/components/PlanMode.tsx b/src/components/PlanMode.tsx
+index 855f4f6..838c107 100644
+--- a/src/components/PlanMode.tsx
++++ b/src/components/PlanMode.tsx
+@@ -29,7 +29,7 @@ import type { ShotType } from '../core/shotType.ts'
+ import { formatClock } from '../core/timezone.ts'
+ import { AT_NOW_MS, lightCell, stripWhen, tideCell } from '../core/statStrip.ts'
+ import { freshSky, skyCondition } from '../core/skyWord.ts'
+-import { useStationObs } from '../lib/useStationObs.ts'
++import { skyFields, useSkyStation, useStationObs } from '../lib/useStationObs.ts'
+ import { windAt as windNowAt } from '../lib/windNow.ts'
+ import { fetchBriefWind, type Hourly } from '../lib/tideSheetData.ts'
+ import { windToBeach } from '../core/coastFacing.ts'
+@@ -1690,6 +1690,8 @@ export function PlanMode({
+    */
+   /* The nearest station's report, for the one sky word (src/core/skyWord.ts) while the bar is at now. */
+   const stationObs = useStationObs(venue)
++  const skyStation = useSkyStation(venue)
++  const skyObs = useMemo(() => skyFields(skyStation), [skyStation])
+   /* Batch NOW, Section 4: at night the line through the pin is the moon's while it is up, else none; by day the sun's. */
+   const nightAxis = useMemo(() => {
+     if (sun === null || sun.altitude >= 0) return undefined
+@@ -1733,7 +1735,7 @@ export function PlanMode({
+     const side = wind === null || facing === null ? null : windToBeach(wind.fromDegrees, facing)
+     const atNow = scrubbedAt === null || Math.abs(scrubbedAt.getTime() - Date.now()) <= AT_NOW_MS
+     const sunUp = (sunAlt ?? -1) > -0.8
+-    const sky = skyCondition({ code: null, layers, day: sunUp, station: atNow ? freshSky(stationObs, new Date()) : null })?.word ?? null
++    const sky = skyCondition({ code: null, layers, day: sunUp, station: atNow ? freshSky(skyObs, new Date()) : null })?.word ?? null
+     const turn = tideCell(nextTurn, tz)
+     return [
+       { ...golden, label: 'LIGHT', value: lightCell(goldenLeft, scrubbedAt, sunAlt, tz), spoken: `Light: ${lightCell(goldenLeft, scrubbedAt, sunAlt, tz) ?? 'not known'}` },
+@@ -1764,7 +1766,7 @@ export function PlanMode({
+         spoken: turn === null ? 'Tide: not known' : `Tide ${turn.going}, ${nextTurn?.kind} at ${clock(nextTurn?.at ?? null) ?? ''}`,
+       }]),
+     ]
+-  }, [venue, venueWindow, scrubbedAt, wind, ratedWindMps, nextTurn, venueCloud, forecast, units, clock, modelLows, groups.water, place, windFacing, windSpotKey, stationObs])
++  }, [venue, venueWindow, scrubbedAt, wind, ratedWindMps, nextTurn, venueCloud, forecast, units, clock, modelLows, groups.water, place, windFacing, windSpotKey, skyObs])
+ 
+   /*
+    * WHICH GOES BAND THE SKY LAYER PAINTS, from the sun's altitude: visible
+diff --git a/src/components/SkyNowView.tsx b/src/components/SkyNowView.tsx
+index 2b953ac..1d4cf6c 100644
+--- a/src/components/SkyNowView.tsx
++++ b/src/components/SkyNowView.tsx
+@@ -4,6 +4,7 @@ import type { LatLon } from '../core/geo.ts'
+ import type { MetarSky } from '../core/metar.ts'
+ import { skyNow, STATION_FRESH_MS } from '../core/skyNow.ts'
+ import { formatClock } from '../core/timezone.ts'
++import { agoWords } from '../lib/nearWind.ts'
+ import { hourlyAt, type Hourly } from '../lib/tideSheetData.ts'
+ 
+ /*
+@@ -12,7 +13,7 @@ import { hourlyAt, type Hourly } from '../lib/tideSheetData.ts'
+  * it is worth a look and why, then what is next today. The words are
+  * src/core/skyNow.ts's.
+  */
+-export function SkyNowView({ venue, now, timeZone, station, wx, next, onNext }: { venue: LatLon; now: Date; timeZone: string; station: { sky: MetarSky; at: Date } | null; wx: Hourly | null; next: { kind: 'sunset' | 'sunrise'; at: Date; call: string; value: string } | null; onNext: (k: 'sunset' | 'sunrise') => void }) {
++export function SkyNowView({ venue, now, timeZone, station, wx, next, onNext }: { venue: LatLon; now: Date; timeZone: string; station: { sky: MetarSky; at: Date; other?: string | null } | null; wx: Hourly | null; next: { kind: 'sunset' | 'sunrise'; at: Date; call: string; value: string } | null; onNext: (k: 'sunset' | 'sunrise') => void }) {
+   const fresh = station !== null && now.getTime() - station.at.getTime() <= STATION_FRESH_MS ? station : null
+   const at = (name: string) => (wx === null ? null : hourlyAt(wx, name, now))
+   const model = wx === null ? null : { low: at('cloud_cover_low'), mid: at('cloud_cover_mid'), high: at('cloud_cover_high') }
+@@ -27,7 +28,7 @@ export function SkyNowView({ venue, now, timeZone, station, wx, next, onNext }:
+       <section className="dcard spage__now" aria-label="The sky now">
+         <p className="dcard__label">The sky now</p>
+         <p className="spage__nowclouds" data-now-clouds>{read.clouds.replace(/^./, (c) => c.toUpperCase())}</p>
+-        <p className="spage__nowsrc">{fresh !== null ? `${fresh.sky.station} at ${clock(fresh.at)}` : 'Forecast: no station report in the last 75 minutes'}</p>
++        <p className="spage__nowsrc">{fresh !== null ? `${fresh.sky.station} at ${clock(fresh.at)} · ${agoWords(fresh.at, now)}${fresh.other == null ? '' : ` · read with ${fresh.other}`}` : 'Forecast: no station report in the last 75 minutes'}</p>
+         {read.worth.length === 0 ? null : (
+           <ul className="spage__nowlist">
+             {read.worth.map((w) => (
+diff --git a/src/components/SkyPage.tsx b/src/components/SkyPage.tsx
+index ebfa5d0..af9b326 100644
+--- a/src/components/SkyPage.tsx
++++ b/src/components/SkyPage.tsx
+@@ -11,7 +11,7 @@ import { formatClock } from '../core/timezone.ts'
+ import { fetchGlassWeek, fetchSpecialWeek, specialsFrom } from '../lib/specialLightData.ts'
+ import { hourlyAt } from '../lib/tideSheetData.ts'
+ import { useBriefing } from '../lib/useBriefing.ts'
+-import { useStationNow } from '../lib/useStationNow.ts'
++import { useSkyStation } from '../lib/useStationObs.ts'
+ import { layersWords } from '../core/metar.ts'
+ import { stationWord } from '../core/skyWord.ts'
+ import { PageShell } from './PageShell.tsx'
+@@ -58,7 +58,8 @@ type Kind = 'sunset' | 'sunrise'
+ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onViewfinder, onCalendar, onDetail, onBestSky }: SkyPageProps) {
+   const brief = useBriefing(venue, timeZone, now, true)
+   /* Batch Polish 2, Section 1: the nearest station's sky is this page's, not the map's strip (the strip follows the time bar; a station reports now). */
+-  const station = useStationNow(venue, now, typeof navigator === 'undefined' ? false : navigator.onLine)
++  /* Batch LIVE, Section 0.1: the sky word's own report (src/core/skyConsensus.ts), each station read by its METAR's time; the page said "no station report" at noon when weather.gov's latest had no text. */
++  const station = useSkyStation(venue)
+   const clock = (d: Date | null) => (d === null ? '—' : formatClock(d, timeZone))
+   /*
+    * THE NEXT OF EACH, NEVER ONE THAT HAS PASSED (Batch Flow, Section 4;
+@@ -83,7 +84,7 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
+   const event = day?.events[kind] ?? null
+   const verdict = day?.verdicts[kind] ?? null
+   /* Batch NOW, Section 1.2: a deck the station reports now that the models clear by the event: said, and the call one step less sure. */
+-  const stationAt = station === null || station.at === '' ? null : new Date(station.at)
++  const stationAt = station === null ? null : station.at
+   const doubt = stationDoubt(verdict, station === null || stationAt === null ? null : { sky: station.sky, at: stationAt }, day?.events[kind] ?? null, realNow, (d) => formatClock(d, timeZone))
+   const read = withDoubt(day?.reads[kind] ?? null, doubt)
+   const az = event === null ? null : getPosition(event, venue.lat, venue.lon).azimuth
+@@ -170,7 +171,7 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onMap, onView
+         ))}
+       </div>
+       {tab === 'now' ? (
+-        <SkyNowView venue={venue} now={realNow} timeZone={timeZone} station={station === null || stationAt === null ? null : { sky: station.sky, at: stationAt }} wx={brief.wx} next={nextToday} onNext={(k) => pickTab(k)} />
++        <SkyNowView venue={venue} now={realNow} timeZone={timeZone} station={station === null || stationAt === null ? null : { sky: station.sky, at: stationAt, other: station.other?.id ?? null }} wx={brief.wx} next={nextToday} onNext={(k) => pickTab(k)} />
+       ) : (
+       <>
+       <p className="spage__event num" {...(event !== null && kind === 'sunset' && picked === null ? { 'data-shared': 'sunset', 'data-value': `sunset ${clock(event)}`.toLowerCase() } : {})}>
+diff --git a/src/components/SurfPageV2.tsx b/src/components/SurfPageV2.tsx
+index e85db9f..45a7536 100644
+--- a/src/components/SurfPageV2.tsx
++++ b/src/components/SurfPageV2.tsx
+@@ -1,3 +1,4 @@
++import { useStationObs } from '../lib/useStationObs.ts'
+ import { MarineLine } from './MarineLine.tsx'
+ import '../styles/surf.css'
+ import { useEffect, useMemo, useState } from 'react'
+@@ -77,7 +78,9 @@ export function SurfPageV2({ venue, placeName, timeZone, units, ground, onBack,
+     return () => clearInterval(t)
+   }, [])
+   /* Batch Map A1/A2: the spot's surf beach and this hour's band, from the one hook the home and the menu read too. */
+-  const surf = useSurfNow(venue, now, timeZone, units.distance === 'ft', placeName)
++  /* Batch LIVE, Section 0.4: the wind now as the home's Wind card says it, for the call's wind word. */
++  const stationObs = useStationObs(venue)
++  const surf = useSurfNow(venue, now, timeZone, units.distance === 'ft', placeName, stationObs)
+   const spot = surf.spot ?? venue
+   const { sea, away: awayWords } = surf
+   const ready = sea.marine !== null && sea.facingState !== 'loading' && sea.buoy !== null
+diff --git a/src/components/WeatherHome.tsx b/src/components/WeatherHome.tsx
+index 4fd67a8..2e3f493 100644
+--- a/src/components/WeatherHome.tsx
++++ b/src/components/WeatherHome.tsx
+@@ -30,12 +30,14 @@ interface Props {
+   now: Date
+   wx: Hourly | null
+   obs: (StationObs & { sky?: MetarSky | null; visMi?: number | null; skyAt?: Date | null }) | null
++  /** The sky word's report (src/lib/useStationObs.ts skyFields). */
++  skyObs: { sky: MetarSky | null; visMi: number | null; skyAt: Date | null } | null
+   /** The home's fit (Home.tsx DayView): above 0, the week is left to the Weather page. */
+   drop: number
+   onOpen: () => void
+ }
+ 
+-export function WeatherHome({ venue, timeZone, units, now, wx, obs, drop, onOpen }: Props) {
++export function WeatherHome({ venue, timeZone, units, now, wx, obs, skyObs, drop, onOpen }: Props) {
+   const { state } = useBlend(venue, timeZone, true)
+   const [extra, setExtra] = useState<Hourly | null>(null)
+   useEffect(() => {
+@@ -89,7 +91,7 @@ export function WeatherHome({ venue, timeZone, units, now, wx, obs, drop, onOpen
+       <button type="button" className="hwh__hours" onClick={onOpen} aria-label="The next six hours: the weather">
+         {hours.map((h, i) => {
+           const t = new Date(h.getTime() + 1_800_000)
+-          const cc = skyCondition({ code: at(wx, 'weather_code', t), layers: { low: at(wx, 'cloud_cover_low', t), mid: at(wx, 'cloud_cover_mid', t), high: at(wx, 'cloud_cover_high', t) }, day: sunUp(t), station: i === 0 ? freshSky(obs, now) : null })
++          const cc = skyCondition({ code: at(wx, 'weather_code', t), layers: { low: at(wx, 'cloud_cover_low', t), mid: at(wx, 'cloud_cover_mid', t), high: at(wx, 'cloud_cover_high', t) }, day: sunUp(t), station: i === 0 ? freshSky(skyObs, now) : null })
+           return (
+             <span key={h.getTime()} className="hstrip__step">
+               <span className="hstrip__at">{i === 0 ? 'Now' : formatShortHour(h, timeZone)}</span>
+diff --git a/src/components/WeatherPage.tsx b/src/components/WeatherPage.tsx
+index 4a3f6d2..251becd 100644
+--- a/src/components/WeatherPage.tsx
++++ b/src/components/WeatherPage.tsx
+@@ -4,16 +4,15 @@ import type { LatLon } from '../core/geo.ts'
+ import { groundOf } from '../core/homeDay.ts'
+ import { freshSky, skyCondition } from '../core/skyWord.ts'
+ import { cloudWords, localDate } from '../core/modelSkill.ts'
+-import type { MetarSky } from '../core/metar.ts'
+ import { formatClock, formatShortHour } from '../core/timezone.ts'
+ import { cloudTile, pressureTrend, pressureWords, rainTileLine, uvBand, uvLine } from '../core/weatherTiles.ts'
+ import { dayAgreement, dayIcon, leading, modelName } from '../core/weatherWords.ts'
+ import { useBlend } from '../lib/blendData.ts'
+ import { useNowcast } from '../lib/stormData.ts'
+-import { nearestStation, stationReport } from '../lib/stationNear.ts'
++import { agoWords } from '../lib/nearWind.ts'
+ import { fetchBriefWind, fetchWeatherExtras, hourlyAt, type Hourly } from '../lib/tideSheetData.ts'
+ import { formatTemperature, type Units } from '../lib/units.ts'
+-import { useStationObs } from '../lib/useStationObs.ts'
++import { skyFields, useSkyStation, useStationObs } from '../lib/useStationObs.ts'
+ import { gustWords, windAt, windWords } from '../lib/windNow.ts'
+ import { PageShell } from './PageShell.tsx'
+ import { MarineLine } from './MarineLine.tsx'
+@@ -57,18 +56,15 @@ export function WeatherPage({ venue, placeName, timeZone, units, now, onBack, on
+   const { state, reason } = useBlend(venue, timeZone, true)
+   const nowcast = useNowcast(venue, true)
+   const obs = useStationObs(venue)
++  const skyRead = useSkyStation(venue)
++  const skyObs = skyFields(skyRead)
+   const [wx, setWx] = useState<Hourly | null>(null)
+   const [extra, setExtra] = useState<Hourly | null>(null)
+-  const [sky, setSky] = useState<MetarSky | null>(null)
+   const [view, setView] = useState<'main' | 'days' | 'models'>('main')
+   useEffect(() => {
+     let live = true
+     void fetchBriefWind(venue).then((w) => live && setWx(w), () => undefined)
+     void fetchWeatherExtras(venue).then((x) => live && setExtra(x), () => undefined)
+-    /* The Cloud tile: the nearest airport station's latest report (only its id is asked), within 25 km. */
+-    void nearestStation(venue, 25)
+-      .then((s) => (s === null ? null : stationReport(s.id)))
+-      .then((r) => live && setSky(r?.sky ?? null), () => undefined)
+     return () => {
+       live = false
+     }
+@@ -86,7 +82,7 @@ export function WeatherPage({ venue, placeName, timeZone, units, now, onBack, on
+   const temp = at(wx, 'temperature_2m', now)
+   /* One sky word (src/core/skyWord.ts, Batch NOW 1.3): the station's when fresh, else the layers. */
+   const skyAt = (t: Date, station: ReturnType<typeof freshSky>) => skyCondition({ code: at(wx, 'weather_code', t), layers: { low: at(wx, 'cloud_cover_low', t), mid: at(wx, 'cloud_cover_mid', t), high: at(wx, 'cloud_cover_high', t) }, day: sunUp(t), station })
+-  const cond = skyAt(now, freshSky(obs, now))
++  const cond = skyAt(now, freshSky(skyObs, now))
+   const feels = at(extra, 'apparent_temperature', now)
+   const wind = windAt(wx, now, obs)
+ 
+@@ -114,7 +110,10 @@ export function WeatherPage({ venue, placeName, timeZone, units, now, onBack, on
+   const trend = pressureTrend(hpa, at(extra, 'pressure_msl', new Date(now.getTime() - 3 * 3_600_000)))
+   const blendNow = state?.hours.find((h) => Math.abs(h.at.getTime() - now.getTime()) <= 1_800_000) ?? null
+   /* Batch NOW, Section 1.3: without a station, the tile says the headline's one sky word, never a second one. */
+-  const cloud = cloudTile(sky, blendNow?.cloud.value ?? null, (pct) => cond?.word ?? cloudWords(pct))
++  /* Batch LIVE, Section 0: the Cloud tile reads the sky word's own report (src/core/skyConsensus.ts), only while fresh, with its age. */
++  const sky = skyRead !== null && freshSky(skyObs, now) !== null ? skyRead.sky : null
++  const tile = cloudTile(sky, blendNow?.cloud.value ?? null, (pct) => cond?.word ?? cloudWords(pct))
++  const cloud = sky === null || skyRead === null ? tile : { ...tile, line: `${tile.line} · ${agoWords(skyRead.at, now)}` }
+   const imperial = units.distance === 'ft'
+   const tiles: { k: string; label: string; big: string; line: string }[] = [
+     { k: 'wind', label: 'Wind', big: windWords(wind, units.wind) ?? '—', line: gustWords(wind, units.wind) ?? 'gusts not said' },
+@@ -145,7 +144,7 @@ export function WeatherPage({ venue, placeName, timeZone, units, now, onBack, on
+       <p>The temperature, the sky word, high and low: Open-Meteo's forecast for this spot, the home's own numbers.</p>
+       <p>The wind: the same forecast{obs === null ? '' : `, leaned toward ${obs.id}'s report of ${formatShortHour(obs.at, timeZone)}`} (src/core/nowcast.ts).</p>
+       <p>Feels-like, UV, humidity, dew point, pressure: Open-Meteo, by the hour. Pressure's trend: now against three hours ago; under 1 hPa is steady.</p>
+-      <p>Cloud: {sky === null ? 'the blended forecast\'s cover (no report came back from an airport station within 25 km).' : `${sky.station}'s latest report, the most cloud it gives and how high.`}</p>
++      <p>Cloud: {sky === null ? 'the blended forecast\'s cover (no airport report in the last 75 minutes).' : `${sky.station}'s latest report, the most cloud it gives and how high; picked with ${skyRead?.other?.id ?? 'no second station'} (the nearest coastal airport and the nearest airport; when they differ, the one with less cover).`}</p>
+       <p>Rain and the 7 days: {state === null ? 'the models, once they answer.' : `${state.models.length} models (${state.models.map(modelName).join(', ')}), each corrected for how it has done here and blended by it.`}</p>
+       <p>Radar: the nearest rain on the latest scan.</p>
+     </>
+diff --git a/src/core/briefing.ts b/src/core/briefing.ts
+index 2b52100..ccecee2 100644
+--- a/src/core/briefing.ts
++++ b/src/core/briefing.ts
+@@ -243,6 +243,8 @@ export interface SurfBar {
+   /** Batch Polish, Section 4: the hour's swell and wind waves, feet (null where the forecast did not say), so a day can say which made its range. */
+   swellFt?: number | null
+   windWaveFt?: number | null
++  /** Batch LIVE, Section 0.4: the hour's wind, for the wind's word over the size (src/core/surf.ts windQuality). */
++  wind?: { mps: number | null; fromDeg: number | null; facing: number | null }
+ }
+ 
+ 
+diff --git a/src/core/calendarMonth.ts b/src/core/calendarMonth.ts
+index e1d3f49..ff3916d 100644
+--- a/src/core/calendarMonth.ts
++++ b/src/core/calendarMonth.ts
+@@ -196,7 +196,7 @@ export function calendarMonth(input: CalendarInput): CalendarDay[] {
+     if (lowNearSunset !== null) marks.push('tide-set')
+     const surfFt = forecast && sunrise !== null && input.facing !== null ? input.surfFtAt(sunrise) : null
+     /* The one scale (src/core/surf.ts surfTag): Fun or better at sunrise, with the wind then (Batch QA, Section 0B). */
+-    if (surfFt !== null && surfOn(surfTag(surfFt, windRise === null ? null : surfShape(windRise.speedMps, windRise.fromDeg, input.facing)))) marks.push('surf')
++    if (surfFt !== null && surfOn(surfTag(surfFt, windRise === null ? null : surfShape(windRise.speedMps, windRise.fromDeg, input.facing), windRise === null ? null : { mps: windRise.speedMps, fromDeg: windRise.fromDeg, facing: input.facing }))) marks.push('surf')
+     if (input.milkyDates.has(date)) marks.push('milky')
+     const shower = showers.find((s) => {
+       const e = s.eveningOf
+diff --git a/src/core/homeDay.ts b/src/core/homeDay.ts
+index 3e39bb2..3900fa3 100644
+--- a/src/core/homeDay.ts
++++ b/src/core/homeDay.ts
+@@ -11,7 +11,7 @@ import type { SurfCall } from './surfCall.ts'
+ import type { WindTag } from './briefing.ts'
+ import { getTimes } from 'suncalc'
+ import { formatClock, formatShortHour, wallClock } from './timezone.ts'
+-import { surfOn, surfTag, type SurfShape } from './surf.ts'
++import { surfOn, surfTag, type SurfShape, type SurfWind } from './surf.ts'
+ import { rangeEnds } from './surfRange.ts'
+ 
+ const HOUR = 3_600_000
+@@ -173,7 +173,7 @@ export type SurfOdds = 'good odds' | 'some odds' | 'low odds'
+  * is not widened past the model; it says which made it, "· wind sea", when
+  * the wind waves outran the swell at the day's biggest hour.
+  */
+-export function weekSurf(bars: readonly { faceFt: number; shape: SurfShape | null; swellFt?: number | null; windWaveFt?: number | null }[], dayIndex: number): { on: boolean; words: string | null } {
++export function weekSurf(bars: readonly { faceFt: number; shape: SurfShape | null; swellFt?: number | null; windWaveFt?: number | null; wind?: SurfWind }[], dayIndex: number): { on: boolean; words: string | null } {
+   if (bars.length === 0) return { on: false, words: null }
+   const lo = Math.min(...bars.map((b) => b.faceFt))
+   const hi = Math.max(...bars.map((b) => b.faceFt))
+@@ -181,10 +181,10 @@ export function weekSurf(bars: readonly { faceFt: number; shape: SurfShape | nul
+   const top = bars.reduce((m, x) => (x.faceFt > m.faceFt ? x : m))
+   const windSea = top.windWaveFt != null && top.swellFt != null && top.windWaveFt > top.swellFt
+   const range = `${a}–${b} ft${windSea ? ' · wind sea' : ''}`
+-  const onShare = bars.filter((x) => surfOn(surfTag(x.faceFt, x.shape))).length / bars.length
++  const onShare = bars.filter((x) => surfOn(surfTag(x.faceFt, x.shape, x.wind))).length / bars.length
+   if (dayIndex >= WEEK_SURE_DAYS) return { on: false, words: `${range} · ${onShare >= 0.5 ? 'good odds' : onShare > 0 ? 'some odds' : 'low odds'}` }
+   const peak = bars.reduce((m, x) => (x.faceFt > m.faceFt ? x : m))
+-  const on = surfOn(surfTag(peak.faceFt, peak.shape))
++  const on = surfOn(surfTag(peak.faceFt, peak.shape, peak.wind))
+   return { on, words: on ? null : range }
+ }
+ 
+@@ -259,6 +259,17 @@ export function sideShort(tag: WindTag): string {
+  * Section 4: "cross-shore until 9 AM" wrapped to three): the side now and,
+  * when it turns, what it turns to and when: "cross-off · offshore 9a".
+  */
++/**
++ * The next change of side still to come (Batch LIVE, Section 0.5; 14 Nov
++ * 5:38 AM the Wind card said "→ cross-off 5a", already past). `hours` are
++ * the forecast's hours at half past; an hour's change counts only when the
++ * hour starts after `now`. Null when the side holds.
++ */
++export function nextSideChange(hours: readonly { at: Date; side: WindTag | null }[], first: WindTag, now: Date | null): { tag: WindTag; at: Date } | null {
++  const c = hours.find((s) => s.side !== null && s.side !== first && (now === null || s.at.getTime() - 1_800_000 > now.getTime()))
++  return c === undefined || c.side === null ? null : { tag: c.side, at: new Date(c.at.getTime() - 1_800_000) }
++}
++
+ export function sideSpanWords(now: WindTag, change: { tag: WindTag; at: Date } | null, timeZone: string): string {
+   if (change === null) return `${sideWords(now)} all day`
+   const h = wallClock(change.at, timeZone)
+diff --git a/src/core/metar.ts b/src/core/metar.ts
+index 03ea424..c4bf172 100644
+--- a/src/core/metar.ts
++++ b/src/core/metar.ts
+@@ -99,3 +99,17 @@ export function parseMetarWind(text: string): { fromDeg: number | null; kt: numb
+   if (m === null) return null
+   return { fromDeg: m[1] === 'VRB' ? null : Number(m[1]), kt: Number(m[2]), gustKt: m[3] === undefined ? null : Number(m[3]) }
+ }
++
++/**
++ * A METAR's own time, from its day-hour-minute group ("141656Z"), in the
++ * month of `now` (or the one before, for a report from the end of last
++ * month read early in this one). Batch LIVE, Section 0.1: a report's age is
++ * read from the report, never from the service that passed it on.
++ */
++export function metarTime(raw: string, now: Date): Date | null {
++  const m = /\b(\d{2})(\d{2})(\d{2})Z\b/.exec(raw)
++  if (m === null) return null
++  let at = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), Number(m[1]), Number(m[2]), Number(m[3])))
++  if (at.getTime() > now.getTime() + 86_400_000) at = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, Number(m[1]), Number(m[2]), Number(m[3])))
++  return Number.isFinite(at.getTime()) ? at : null
++}
+diff --git a/src/core/skyConsensus.ts b/src/core/skyConsensus.ts
+new file mode 100644
+index 0000000..2a3ef65
+--- /dev/null
++++ b/src/core/skyConsensus.ts
+@@ -0,0 +1,102 @@
++/*
++ * THE SKY WORD BY CONSENSUS (Batch LIVE, Section 0.2). 14 Nov 12:19 PM at
++ * Virginia Beach the home said "Overcast": KNTU's ceilometer read OVC060
++ * while the sky over the beach was broken cumulus with the sun through and
++ * blue gaps, and KNGU, on the water at Sewells Point, read SCT045 BKN060
++ * (tests/data/stations-2026-11-14/iem-metars.csv). One overcast report
++ * outvoted the rest.
++ *
++ * Now two stations are read:
++ *
++ *   coastal   the nearest airport within COAST_KM of the spot that sits on
++ *             the water: within WATER_KM of a NOAA water station (CO-OPS)
++ *   airport   the nearest airport within AIRPORT_KM, other than that one
++ *
++ * Each counts only when fresh (SKY_MAX_AGE_MS, src/core/skyWord.ts). When
++ * both are fresh and say the same word, that word. When they disagree, the
++ * one with less cover: a ceilometer looks straight up through a 30-minute
++ * window and calls a dense broken deck overcast; the station that saw gaps
++ * saw them. With one fresh, that one. Every surface takes the report this
++ * returns (src/lib/useStationObs.ts): home, menu, map strip, week, Weather,
++ * the Sky page.
++ */
++import { distanceMeters, type LatLon } from './geo.ts'
++import type { MetarSky } from './metar.ts'
++import { SKY_MAX_AGE_MS, stationWord } from './skyWord.ts'
++import type { SkyWord } from './statStrip.ts'
++
++export const COAST_KM = 40
++export const WATER_KM = 5
++export const AIRPORT_KM = 30
++
++type Asos = readonly [string, string, number, number]
++type Coops = readonly [string, string | null, string, number, number]
++
++export interface SkyStation {
++  id: string
++  km: number
++  role: 'coastal' | 'airport'
++}
++
++/** The two stations the sky word is read from, nearest first; one or none where there are fewer. */
++export function skyStations(at: LatLon, asos: readonly Asos[], coops: readonly Coops[]): SkyStation[] {
++  const box = (lat: number, lon: number, km: number) => Math.abs(lat - at.lat) <= km / 100 && Math.abs(lon - at.lon) <= km / 70
++  const near = asos
++    .filter(([, , lat, lon]) => box(lat, lon, COAST_KM + 5))
++    .map(([id, , lat, lon]) => ({ id, lat, lon, km: distanceMeters(at, { lat, lon }) / 1000 }))
++    .filter((s) => s.km <= COAST_KM)
++    .sort((a, b) => a.km - b.km)
++  const onWater = (s: { lat: number; lon: number }) => coops.some(([, , , lat, lon]) => Math.abs(lat - s.lat) < 0.1 && Math.abs(lon - s.lon) < 0.12 && distanceMeters(s, { lat, lon }) / 1000 <= WATER_KM)
++  const coast = near.find(onWater) ?? null
++  const air = near.find((s) => s.km <= AIRPORT_KM && s.id !== coast?.id) ?? null
++  const out: SkyStation[] = []
++  if (coast !== null) out.push({ id: coast.id, km: coast.km, role: 'coastal' })
++  if (air !== null) out.push({ id: air.id, km: air.km, role: 'airport' })
++  return out.sort((a, b) => a.km - b.km)
++}
++
++export interface SkyReport {
++  id: string
++  sky: MetarSky
++  visMi: number | null
++  at: Date
++}
++
++export interface SkyConsensus {
++  /** The report the word is read from. */
++  sky: MetarSky
++  visMi: number | null
++  at: Date
++  id: string
++  /** Its word (src/core/skyWord.ts stationWord). */
++  word: SkyWord | null
++  /** How it was chosen. */
++  rule: 'agree' | 'lesser' | 'one'
++  /** The other station's id and word when two were read. */
++  other: { id: string; word: SkyWord | null; at: Date } | null
++}
++
++const RANK: readonly (SkyWord | null)[] = [null, 'Clear', 'Few clouds', 'High cloud', 'Partly cloudy', 'Mostly cloudy', 'Overcast']
++
++export const isFresh = (at: Date, now: Date): boolean => {
++  const age = now.getTime() - at.getTime()
++  return age <= SKY_MAX_AGE_MS && age >= -10 * 60_000
++}
++
++/** The sky word's report from the stations' latest, or null when none is fresh. */
++export function skyConsensus(reports: readonly (SkyReport | null)[], now: Date): SkyConsensus | null {
++  const fresh = reports.filter((r): r is SkyReport => r !== null && isFresh(r.at, now))
++  if (fresh.length === 0) return null
++  const said = fresh.map((r) => ({ r, word: stationWord(r.sky) }))
++  if (said.length === 1) return { ...pick(said[0].r), word: said[0].word, rule: 'one', other: null }
++  const [a, b] = said
++  if (a.word === b.word) return { ...pick(a.r), word: a.word, rule: 'agree', other: { id: b.r.id, word: b.word, at: b.r.at } }
++  /* A report that says nothing of the sky is not a vote for less. */
++  const ranked = [a, b].filter((x) => x.word !== null).sort((x, y) => RANK.indexOf(x.word) - RANK.indexOf(y.word))
++  const lo = ranked[0] ?? a
++  const hi = lo === a ? b : a
++  return { ...pick(lo.r), word: lo.word, rule: ranked.length === 2 ? 'lesser' : 'one', other: { id: hi.r.id, word: hi.word, at: hi.r.at } }
++}
++
++const pick = (r: SkyReport) => ({ sky: r.sky, visMi: r.visMi, at: r.at, id: r.id })
++
+diff --git a/src/core/spotSkill.ts b/src/core/spotSkill.ts
+index 8b4c26f..750f51c 100644
+--- a/src/core/spotSkill.ts
++++ b/src/core/spotSkill.ts
+@@ -36,7 +36,7 @@
+  * wider one. Never under BAND_FLOOR_FT.
+  */
+ import type { LatLon } from './geo.ts'
+-import { BEACH_CAP, surfEstimate } from './surf.ts'
++import { BEACH_CAP, surfEstimate, towardBeachM } from './surf.ts'
+ 
+ /** A slot for the surfer's own word on a session; no session log feeds it yet. */
+ export type SessionRating = 'Fun' | 'Meh' | 'Bad'
+@@ -136,10 +136,28 @@ export interface BuoySea {
+   waveM: number
+   periodS: number | null
+   fromDeg: number | null
++  /** The buoy's spectral split (its .spec file), compass words; absent or null when it has none. */
++  split?: { swellM: number | null; swellS: number | null; swellFrom: string | null; windWaveM: number | null; windWaveS: number | null; windWaveFrom: string | null } | null
+ }
+ 
++const POINTS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW']
++const pointDeg = (p: string | null): number | null => (p === null || !POINTS.includes(p) ? null : POINTS.indexOf(p) * 22.5)
++
+ /** The buoy's breaking face height by the forecast's own function, or null when it cannot be worked out. */
+ export function buoyFaceFt(sea: BuoySea, facingDeg: number | null, factor: number = BEACH_CAP): number | null {
++  /*
++   * Batch LIVE, Section 0.3: with the split, the buoy is read as the
++   * forecast is (src/lib/surfDay.ts surfAt): the whole sea less the wind sea
++   * heading away from the beach (towardBeachM), at the swell's period and
++   * direction. The mean direction alone swung NE to NW within half an hour
++   * at 44099 on 14 Nov and the face with it, 4.65 ft to 0.
++   */
++  const sp = sea.split ?? null
++  const swellFrom = pointDeg(sp?.swellFrom ?? null)
++  if (sp != null && sp.swellS !== null && sp.swellS > 0 && swellFrom !== null) {
++    const h = towardBeachM(sea.waveM, sp.windWaveM, pointDeg(sp.windWaveFrom), facingDeg)
++    return surfEstimate(h, sp.swellS, swellFrom, facingDeg, factor).faceFt
++  }
+   if (sea.periodS === null || sea.periodS <= 0 || !Number.isFinite(sea.waveM)) return null
+   if (sea.fromDeg === null && facingDeg !== null) return null
+   return surfEstimate(sea.waveM, sea.periodS, sea.fromDeg ?? 0, facingDeg, factor).faceFt
+diff --git a/src/core/surf.ts b/src/core/surf.ts
+index 5f4badc..51426d8 100644
+--- a/src/core/surf.ts
++++ b/src/core/surf.ts
+@@ -83,13 +83,43 @@ export function surfSize(faceFt: number): SurfSize {
+  * the same shape as the line beside it ("bumpy, onshore"), so it can never
+  * contradict it.
+  */
+-export type SurfTag = 'Flat' | 'Small' | 'Rideable' | 'Fun' | 'Firing'
++export type SurfTag = 'Flat' | 'Small' | 'Rideable' | 'Fun' | 'Firing' | 'Choppy' | 'Blown out'
++/** The size scale, smallest first; "Choppy" and "Blown out" are the wind's words over it (windQuality). */
+ export const SURF_TAGS: readonly SurfTag[] = ['Flat', 'Small', 'Rideable', 'Fun', 'Firing']
+ export const SURF_SMALL_FT = 0.6
+ export const SURF_FUN_FT = 2.5
+ export const SURF_FIRING_FT = 4
+ 
+-export function surfTag(faceFt: number, shape: SurfShape | null): SurfTag {
++/*
++ * THE WIND'S WORD OVER THE SIZE (Batch LIVE, Section 0.4; 14 Nov 5:38 AM at
++ * Sandbridge the home said "Firing" in N 20 kt, gusts 24, cross-onshore:
++ * small and messy). With the wind onshore or cross-onshore over CHOPPY_KT,
++ * a Rideable, Fun or Firing size is never said: "Choppy" to BLOWN_KT,
++ * "Blown out" over it.
++ */
++export const CHOPPY_KT = 12
++export const BLOWN_KT = 18
++
++export interface SurfWind {
++  mps: number | null
++  fromDeg: number | null
++  facing: number | null
++}
++
++export function windQuality(tag: SurfTag, wind: SurfWind | null | undefined): SurfTag {
++  if (tag !== 'Rideable' && tag !== 'Fun' && tag !== 'Firing') return tag
++  if (wind == null || wind.mps === null || wind.fromDeg === null || wind.facing === null) return tag
++  const side = windSide(wind.fromDeg, wind.facing)
++  const kt = wind.mps * 1.943844
++  if ((side !== 'onshore' && side !== 'cross-onshore') || kt <= CHOPPY_KT) return tag
++  return kt > BLOWN_KT ? 'Blown out' : 'Choppy'
++}
++
++export function surfTag(faceFt: number, shape: SurfShape | null, wind?: SurfWind | null): SurfTag {
++  return windQuality(sizeTag(faceFt, shape), wind)
++}
++
++function sizeTag(faceFt: number, shape: SurfShape | null): SurfTag {
+   const size: SurfTag = faceFt < SURF_SMALL_FT ? 'Flat' : faceFt < SURF_FUN_FT ? 'Small' : faceFt < SURF_FIRING_FT ? 'Fun' : 'Firing'
+   const at = SURF_TAGS.indexOf(size)
+   const drop = shape === 'Clean' ? 0 : shape === 'Messy' ? 2 : 1
+diff --git a/src/core/surfCall.ts b/src/core/surfCall.ts
+index 1857a0a..649cd0d 100644
+--- a/src/core/surfCall.ts
++++ b/src/core/surfCall.ts
+@@ -13,7 +13,7 @@
+  *   wind    the water's shape and the wind to the beach, "clean, offshore".
+  *   sure    firm for the first WEEK_SURE_DAYS days, a guess after.
+  */
+-import { surfTag, type SurfShape, type SurfTag } from './surf.ts'
++import { surfTag, type SurfShape, type SurfTag, type SurfWind } from './surf.ts'
+ 
+ /** Days from today this sure; after, the models drift apart (src/core/homeDay.ts WEEK_SURE_DAYS). */
+ export const SURF_SURE_DAYS = 3
+@@ -34,6 +34,8 @@ export interface SurfHourIn {
+   shape: SurfShape | null
+   /** The wind to the beach in words, "offshore", "cross-offshore"; null when not known. */
+   side: string | null
++  /** The hour's wind: Fun or Firing in onshore wind over 12 kt is "Choppy" or "Blown out" (src/core/surf.ts windQuality). */
++  wind?: SurfWind | null
+ }
+ 
+ export interface SurfCall {
+@@ -56,7 +58,7 @@ export function surfCall(h: SurfHourIn | null, dayIndex: number): SurfCall | nul
+     lowFt,
+     highFt,
+     words: `${lowFt}–${highFt} ft`,
+-    size: surfTag(h.centerFt, h.shape),
++    size: surfTag(h.centerFt, h.shape, h.wind),
+     wind: [h.shape === null ? 'wind not forecast' : SHAPE_WORD[h.shape], h.side].filter((x) => x !== null).join(', '),
+     confidence: dayIndex < SURF_SURE_DAYS ? 'firm' : 'guess',
+   }
+diff --git a/src/core/surfNowcast.ts b/src/core/surfNowcast.ts
+index 025b0ab..ef6680c 100644
+--- a/src/core/surfNowcast.ts
++++ b/src/core/surfNowcast.ts
+@@ -18,6 +18,17 @@
+ import type { SurfRange } from './spotSkill.ts'
+ 
+ export const SURF_FADE_MS = 6 * 3_600_000
++/*
++ * A BOUNDED LEAN (Batch LIVE, Section 0.3; 14 Nov at Sandbridge,
++ * measurements/2026-11-14-surf-replay.md). 44099 at Cape Henry read 1.6-1.9 m,
++ * nearly all of it local wind sea (WWH 1.6-1.9 m, 4-5 s), its direction
++ * swinging between NE and NW from one half hour to the next: the lean moved
++ * the home from the forecast's 1.8 ft to 4.65 ("4-6 ft Firing") at 5:38 and
++ * to 0.15 ("0-1 ft Flat") at noon. One reading moves the centre by at most
++ * LEAN_MAX_FT or LEAN_MAX_SHARE of the forecast's centre, whichever is more.
++ */
++export const LEAN_MAX_FT = 1
++export const LEAN_MAX_SHARE = 0.5
+ 
+ export interface SurfLean {
+   /** The buoy reading's time, ms. */
+@@ -36,7 +47,8 @@ export function surfLeanWeight(lean: SurfLean, t: number): number {
+ /** The lean from a buoy face and the forecast's centre at its hour; null when either is missing. */
+ export function surfLean(buoyFt: number | null, centerFt: number | null, at: number): SurfLean | null {
+   if (buoyFt === null || centerFt === null || !Number.isFinite(buoyFt) || !Number.isFinite(centerFt) || !Number.isFinite(at)) return null
+-  return { at, missFt: buoyFt - centerFt }
++  const cap = Math.max(LEAN_MAX_FT, LEAN_MAX_SHARE * Math.max(0, centerFt))
++  return { at, missFt: Math.max(-cap, Math.min(cap, buoyFt - centerFt)) }
+ }
+ 
+ /** The range at `t` leaned by `lean`, and the shift applied (0 when none). */
+diff --git a/src/lib/nearWind.ts b/src/lib/nearWind.ts
+index 21051ab..b607db3 100644
+--- a/src/lib/nearWind.ts
++++ b/src/lib/nearWind.ts
+@@ -15,7 +15,7 @@
+ import { distanceMeters, type LatLon } from '../core/geo.ts'
+ import { stationOrder } from '../core/stationWind.ts'
+ import { metarVisMiles } from '../core/skyWord.ts'
+-import { parseMetarSky, parseMetarWind, type MetarSky } from '../core/metar.ts'
++import { metarTime, parseMetarSky, parseMetarWind, type MetarSky } from '../core/metar.ts'
+ import { TIMEOUT_MS } from './forecast.ts'
+ import { METAR_ENDPOINT } from './skyFireData.ts'
+ 
+@@ -100,15 +100,13 @@ export function parseCoopsWind(body: unknown, station: NearStation): NearReading
+ /** A METAR's reading: its time from the day-hour-minute group, in the month of `now`. */
+ export function parseMetarReading(raw: string, station: NearStation, now: Date): NearReading | null {
+   const w = parseMetarWind(raw)
+-  const m = /\b(\d{2})(\d{2})(\d{2})Z\b/.exec(raw)
+-  if (w === null || m === null) return null
+-  let at = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), Number(m[1]), Number(m[2]), Number(m[3])))
+-  /* A report from the end of last month read early in this one. */
+-  if (at.getTime() > now.getTime() + 86_400_000) at = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, Number(m[1]), Number(m[2]), Number(m[3])))
++  const at = metarTime(raw, now)
++  if (w === null || at === null) return null
+   return { station, at, kt: w.kt, gustKt: w.gustKt, fromDeg: w.fromDeg, sky: parseMetarSky(raw), visMi: metarVisMiles(raw) }
+ }
+ 
+-async function airport(st: NearStation, now: Date, fetchImpl: typeof fetch): Promise<NearReading | null> {
++/** An airport's latest METAR: the newer of weather.gov's and /api/metar's, its time from the report itself (Batch LIVE, Section 0.1). */
++export async function airport(st: NearStation, now: Date, fetchImpl: typeof fetch): Promise<NearReading | null> {
+   const nws = fetchImpl(`${NWS}/stations/${st.id}/observations/latest`, { headers: NWS_HEADERS, signal: AbortSignal.timeout(TIMEOUT_MS) })
+     .then(async (r) => (r.ok ? (((await r.json()) as { properties?: { rawMessage?: string } }).properties?.rawMessage ?? null) : null))
+     .catch(() => null)
+diff --git a/src/lib/skyFireData.ts b/src/lib/skyFireData.ts
+index 7ed0a85..f278952 100644
+--- a/src/lib/skyFireData.ts
++++ b/src/lib/skyFireData.ts
+@@ -11,7 +11,7 @@
+  */
+ import { OPPOSITE_SAMPLES } from '../core/afterglow.ts'
+ import { FIRE_MODELS, oppositePoints, PATH_KM, pathPoints, roundCoord, type FireModel, type Layers, type ModelPath } from '../core/skyFire.ts'
+-import { parseMetarSky, type MetarSky } from '../core/metar.ts'
++import { metarTime, parseMetarSky, type MetarSky } from '../core/metar.ts'
+ import type { LatLon } from '../core/geo.ts'
+ import { OPEN_METEO_URL, TIMEOUT_MS } from './forecast.ts'
+ import { FORECAST_MAX_AGE_MS, SLOW_MAX_AGE_MS, weatherJson } from './weatherStore.ts'
+@@ -222,23 +222,30 @@ export async function fetchStationSkies(venue: LatLon, fetchImpl: typeof fetch =
+   }
+ }
+ 
+-export async function stationSky(id: string, fetchImpl: typeof fetch = fetch): Promise<StationSky | null> {
+-  try {
+-    const r = await fetchImpl(`${NWS}/stations/${id}/observations/latest`, { headers: NWS_HEADERS, signal: AbortSignal.timeout(TIMEOUT_MS) })
+-    if (r.ok) {
+-      const p = ((await r.json()) as { properties?: { rawMessage?: string; timestamp?: string } }).properties
+-      const sky = typeof p?.rawMessage === 'string' ? parseMetarSky(p.rawMessage) : null
+-      if (sky !== null) return { sky, at: p?.timestamp ?? '', raw: p?.rawMessage ?? '' }
+-    }
+-    /* weather.gov had no METAR text for it: ask this app's function, which reads aviationweather.gov. */
+-    const m = await fetchImpl(METAR_ENDPOINT, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ station: id }), signal: AbortSignal.timeout(TIMEOUT_MS) })
+-    if (!m.ok) return null
+-    const body = (await m.json()) as { metar?: string; at?: string }
+-    const sky = typeof body.metar === 'string' ? parseMetarSky(body.metar) : null
+-    return sky === null ? null : { sky, at: body.at ?? '', raw: body.metar ?? '' }
+-  } catch {
+-    return null
+-  }
++/*
++ * Batch LIVE, Section 0.1 (14 Nov 12:21 PM, "no station report in the last
++ * 75 minutes" at noon): weather.gov's latest runs about an hour behind the
++ * METARs (at 18:12Z its KNTU was the 16:56Z report while aviationweather.gov
++ * had 17:56Z), and some of its observations carry no METAR text (KORF's
++ * 17:20Z, KNTU's 15:56Z); the fallback's answer had no time, so the page
++ * threw it away. Now both are asked, the newer report wins, and its time is
++ * the METAR's own (src/core/metar.ts metarTime).
++ */
++export async function stationSky(id: string, fetchImpl: typeof fetch = fetch, now: Date = new Date()): Promise<StationSky | null> {
++  const nws = fetchImpl(`${NWS}/stations/${id}/observations/latest`, { headers: NWS_HEADERS, signal: AbortSignal.timeout(TIMEOUT_MS) })
++    .then(async (r) => (r.ok ? (((await r.json()) as { properties?: { rawMessage?: string } }).properties?.rawMessage ?? null) : null))
++    .catch(() => null)
++  const avwx = fetchImpl(METAR_ENDPOINT, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ station: id }), signal: AbortSignal.timeout(TIMEOUT_MS) })
++    .then(async (r) => (r.ok ? (((await r.json()) as { metar?: string }).metar ?? null) : null))
++    .catch(() => null)
++  const got = (await Promise.all([nws, avwx])).flatMap((raw) => {
++    if (typeof raw !== 'string' || raw === '') return []
++    const sky = parseMetarSky(raw)
++    const at = metarTime(raw, now)
++    return sky === null || at === null ? [] : [{ sky, at, raw }]
++  })
++  const best = got.sort((a, b) => b.at.getTime() - a.at.getTime())[0]
++  return best === undefined ? null : { sky: best.sky, at: best.at.toISOString(), raw: best.raw }
+ }
+ 
+ /* ------------------------------------------------------- the chip's split */
+diff --git a/src/lib/surfPageData.ts b/src/lib/surfPageData.ts
+index b9aef9c..54033bd 100644
+--- a/src/lib/surfPageData.ts
++++ b/src/lib/surfPageData.ts
+@@ -33,6 +33,8 @@ export interface RangeHour {
+   shape: SurfShape | null
+   side: WindTag | null
+   clean: boolean
++  /** The hour's wind, for the wind's word over the size (Batch LIVE, Section 0.4). */
++  wind: { mps: number | null; fromDeg: number | null; facing: number | null }
+   tag: SurfTag
+ }
+ 
+@@ -69,7 +71,8 @@ export function rangeHourAt(marine: Hourly, wind: Hourly | null, at: Date, facin
+     shape,
+     side: windTag(from, facing),
+     clean: shape === 'Clean',
+-    tag: surfTag(range.centerFt, shape),
++    wind: { mps, fromDeg: from, facing },
++    tag: surfTag(range.centerFt, shape, { mps, fromDeg: from, facing }),
+   }
+ }
+ 
+@@ -85,7 +88,7 @@ export function buoyLean(marine: Hourly, wind: Hourly | null, buoy: BuoyReading
+   if (buoy === null || buoy.status !== 'ok') return null
+   const at = buoy.at.getTime()
+   if (!Number.isFinite(at) || now - at > LEAN_BUOY_MAX_AGE_MS || at > now + 3_600_000) return null
+-  const ft = buoyFaceFt({ waveM: buoy.waveM, periodS: buoy.periodS, fromDeg: buoy.fromDeg }, facing, factor)
++  const ft = buoyFaceFt({ waveM: buoy.waveM, periodS: buoy.periodS, fromDeg: buoy.fromDeg, split: buoy.split }, facing, factor)
+   const there = rangeHourAt(marine, wind, buoy.at, facing, stats, factor)
+   return surfLean(ft, there === null ? null : there.centerFt, at)
+ }
+diff --git a/src/lib/useBriefing.ts b/src/lib/useBriefing.ts
+index 21e3e7b..2f1db93 100644
+--- a/src/lib/useBriefing.ts
++++ b/src/lib/useBriefing.ts
+@@ -292,7 +292,7 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
+           const wh = wind[i]
+           /* The Surf page's shape (src/core/surf.ts): Clean is light or offshore; with no direction, never Messy. */
+           const shape = wh.mps === null ? null : surfShape(wh.mps, wh.fromDeg ?? 0, wh.fromDeg === null ? null : facing)
+-          surf.push({ at: h, faceFt: sh.estimate.faceFt, clean: shape === 'Clean', shape, swellFt: sh.swellFt, windWaveFt: sh.windWaveFt })
++          surf.push({ at: h, faceFt: sh.estimate.faceFt, clean: shape === 'Clean', shape, swellFt: sh.swellFt, windWaveFt: sh.windWaveFt, wind: { mps: wh.mps, fromDeg: wh.fromDeg, facing } })
+           if (periodAtMax === null || sh.estimate.faceFt >= Math.max(...surf.map((b) => b.faceFt))) periodAtMax = sh.periodS
+         }
+       }
+@@ -314,7 +314,7 @@ export function useBriefing(venue: LatLon | null, timeZone: string, now: Date, o
+         call,
+         surf,
+         surfWords: surfLine(surf, periodAtMax),
+-        surfTag: maxBar === null ? null : surfTag(maxBar.faceFt, maxBar.shape),
++        surfTag: maxBar === null ? null : surfTag(maxBar.faceFt, maxBar.shape, maxBar.wind),
+         surfClean: maxBar?.clean ?? false,
+         wind,
+         windTag: tag,
+diff --git a/src/lib/useStationObs.ts b/src/lib/useStationObs.ts
+index 6f77985..0368a5b 100644
+--- a/src/lib/useStationObs.ts
++++ b/src/lib/useStationObs.ts
+@@ -8,13 +8,20 @@
+  * 1.3: by the station, not by the wind's pick, so the same station is the
+  * same word), with its own time. Only station ids are asked; again
+  * every 10 minutes while a screen shows it.
++ *
++ * THE SKY BY CONSENSUS (Batch LIVE, Section 0.2): the sky fields are the
++ * report src/core/skyConsensus.ts picks from the nearest coastal airport and
++ * the nearest airport, each read by its own METAR's time (nearWind airport:
++ * the newer of weather.gov's and aviationweather.gov's). One read per spot
++ * every 10 minutes, shared by every screen (readStations).
+  */
+ import { useEffect, useState } from 'react'
+ import type { LatLon } from '../core/geo.ts'
+ import type { StationObs } from '../core/nowcast.ts'
+ import type { MetarSky } from '../core/metar.ts'
+ import { coastFacing } from './coast.ts'
+-import { MAX_AGE_MS, nearestFresh, nearWind, type NearReading, type NearStation } from './nearWind.ts'
++import { airport, MAX_AGE_MS, nearWind, type NearReading, type NearStation } from './nearWind.ts'
++import { skyConsensus, skyStations, type SkyConsensus } from '../core/skyConsensus.ts'
+ import { normalizeWind, stationOrder, type Normalized } from '../core/stationWind.ts'
+ 
+ const KT = 0.514444
+@@ -41,6 +48,8 @@ export interface StationNow extends StationObs {
+   norm: Normalized
+   /** The nearest fresh coastal station's, at a beach, for the page's "models · station" line. */
+   coast: { label: string; rawKt: number; normKt: number } | null
++  /** The sky word's report and how it was chosen (src/core/skyConsensus.ts). */
++  skyRead: SkyConsensus | null
+ }
+ 
+ /** The beach's facing, or null inland; waits at most FACING_WAIT_MS (the sea polygons can take seconds on a slow link). */
+@@ -50,53 +59,97 @@ async function facingOf(spot: LatLon): Promise<number | null> {
+   return f === 'inland' || f === 'unavailable' ? null : f.facing
+ }
+ 
+-export function useStationObs(spot: LatLon | null): StationNow | null {
+-  const [obs, setObs] = useState<{ key: string; v: StationNow | null } | null>(null)
++interface StationsRead {
++  obs: StationNow | null
++  sky: SkyConsensus | null
++}
++
++const READ_MS = 10 * 60_000
++const reads = new Map<string, { at: number; p: Promise<StationsRead> }>()
++
++/** The stations near the spot, read once per spot every READ_MS whichever screens ask. */
++export function readStations(spot: LatLon, fetchImpl: typeof fetch = fetch): Promise<StationsRead> {
++  const key = `${spot.lat.toFixed(2)},${spot.lon.toFixed(2)}`
++  const hit = reads.get(key)
++  if (hit !== undefined && Date.now() - hit.at < READ_MS) return hit.p
++  const p = askStations(spot, fetchImpl)
++  reads.set(key, { at: Date.now(), p })
++  return p
++}
++
++/** The sky stations' readings: the ones nearWind already read, the others asked here. */
++export async function skyReadings(spot: LatLon, have: readonly (NearReading | null)[], now: Date, fetchImpl: typeof fetch): Promise<(NearReading | null)[]> {
++  const [{ ASOS_STATIONS }, { COOPS_MET }] = await Promise.all([import('../data/asosStations.ts'), import('../data/coopsMet.ts')])
++  return Promise.all(
++    skyStations(spot, ASOS_STATIONS, COOPS_MET).map((s) => {
++      const got = have.find((r) => r !== null && r.station.id === s.id)
++      return got !== undefined ? Promise.resolve(got) : airport({ kind: 'airport', id: s.id, label: s.id, name: s.id, km: s.km }, now, fetchImpl).catch(() => null)
++    }),
++  )
++}
++
++export const consensusOf = (readings: readonly (NearReading | null)[], now: Date): SkyConsensus | null =>
++  skyConsensus(readings.map((r) => (r === null || r.sky === null ? null : { id: r.station.id, sky: r.sky, visMi: r.visMi, at: r.at })), now)
++
++async function askStations(spot: LatLon, fetchImpl: typeof fetch): Promise<StationsRead> {
++  const now = new Date()
++  const facing = await facingOf(spot)
++  const got = await nearWind(spot, now, fetchImpl, facing !== null).catch(() => null)
++  const sky = consensusOf(await skyReadings(spot, got?.readings ?? [], now, fetchImpl).catch(() => []), now)
++  const best = got?.best ?? null
++  const norm = best === null ? null : normalizeWind({ id: best.station.id, kind: best.station.kind, mps: best.kt * KT, gustMps: best.gustKt === null ? null : best.gustKt * KT, fromDeg: best.fromDeg }, facing)
++  const coastRead = facing === null || got === null ? null : (stationOrder(got.readings.filter((r): r is NearReading => r !== null && r.station.kind === 'coastal' && now.getTime() - r.at.getTime() <= MAX_AGE_MS), true)[0] ?? null)
++  const coastNorm = coastRead === null ? null : normalizeWind({ id: coastRead.station.id, kind: 'coastal', mps: coastRead.kt * KT, gustMps: null, fromDeg: coastRead.fromDeg }, facing)
++  const obs: StationNow | null =
++    best === null || norm === null
++      ? null
++      : {
++          id: best.station.id,
++          label: best.station.label,
++          kind: best.station.kind,
++          km: best.station.km,
++          at: best.at,
++          mps: norm.mps,
++          fromDeg: best.fromDeg,
++          gustMps: norm.gustMps,
++          rawMps: best.kt * KT,
++          rawGustMps: best.gustKt === null ? null : best.gustKt * KT,
++          norm,
++          coast: coastRead === null || coastNorm === null ? null : { label: coastRead.station.label, rawKt: coastRead.kt, normKt: coastNorm.mps / KT },
++          sky: sky?.sky ?? null,
++          visMi: sky?.visMi ?? null,
++          skyAt: sky?.at ?? null,
++          skyId: sky?.id ?? null,
++          skyRead: sky,
++        }
++  return { obs, sky }
++}
++
++function useStations(spot: LatLon | null): StationsRead | null {
++  const [read, setRead] = useState<{ key: string; v: StationsRead } | null>(null)
+   const key = spot === null ? null : `${spot.lat.toFixed(2)},${spot.lon.toFixed(2)}`
+   useEffect(() => {
+     if (spot === null || key === null) return
+     let live = true
+-    const ask = async () => {
+-      const now = new Date()
+-      const facing = await facingOf(spot)
+-      const got = await nearWind(spot, now, fetch, facing !== null).catch(() => null)
+-      const best = got?.best ?? null
+-      const norm = best === null ? null : normalizeWind({ id: best.station.id, kind: best.station.kind, mps: best.kt * KT, gustMps: best.gustKt === null ? null : best.gustKt * KT, fromDeg: best.fromDeg }, facing)
+-      const coastRead = facing === null || got === null ? null : (stationOrder(got.readings.filter((r): r is NearReading => r !== null && r.station.kind === 'coastal' && now.getTime() - r.at.getTime() <= MAX_AGE_MS), true)[0] ?? null)
+-      const coastNorm = coastRead === null ? null : normalizeWind({ id: coastRead.station.id, kind: 'coastal', mps: coastRead.kt * KT, gustMps: null, fromDeg: coastRead.fromDeg }, facing)
+-      const air = got === null ? null : nearestFresh(got.readings.filter((r) => r?.station.kind === 'airport'), now)
+-      if (live)
+-        setObs({
+-          key,
+-          v:
+-            best === null || norm === null
+-              ? null
+-              : {
+-                  id: best.station.id,
+-                  label: best.station.label,
+-                  kind: best.station.kind,
+-                  km: best.station.km,
+-                  at: best.at,
+-                  mps: norm.mps,
+-                  fromDeg: best.fromDeg,
+-                  gustMps: norm.gustMps,
+-                  rawMps: best.kt * KT,
+-                  rawGustMps: best.gustKt === null ? null : best.gustKt * KT,
+-                  norm,
+-                  coast: coastRead === null || coastNorm === null ? null : { label: coastRead.station.label, rawKt: coastRead.kt, normKt: coastNorm.mps / KT },
+-                  sky: air?.sky ?? null,
+-                  visMi: air?.visMi ?? null,
+-                  skyAt: air?.at ?? null,
+-                  skyId: air?.station.id ?? null,
+-                },
+-        })
+-    }
+-    void ask()
+-    const t = setInterval(() => void ask(), 10 * 60_000)
++    const ask = () => void readStations(spot).then((v) => live && setRead({ key, v })).catch(() => undefined)
++    ask()
++    const t = setInterval(ask, READ_MS)
+     return () => {
+       live = false
+       clearInterval(t)
+     }
+   }, [key]) // eslint-disable-line react-hooks/exhaustive-deps
+-  return obs !== null && obs.key === key ? obs.v : null
++  return read !== null && read.key === key ? read.v : null
+ }
++
++export function useStationObs(spot: LatLon | null): StationNow | null {
++  return useStations(spot)?.obs ?? null
++}
++
++/** The sky word's report alone: there even when no station's wind is fresh (the Sky page). */
++export function useSkyStation(spot: LatLon | null): SkyConsensus | null {
++  return useStations(spot)?.sky ?? null
++}
++
++/** The sky fields freshSky (src/core/skyWord.ts) reads, from the consensus. */
++export const skyFields = (s: SkyConsensus | null): { sky: SkyConsensus['sky'] | null; visMi: number | null; skyAt: Date | null } | null => (s === null ? null : { sky: s.sky, visMi: s.visMi, skyAt: s.at })
+diff --git a/src/lib/useSurfNow.ts b/src/lib/useSurfNow.ts
+index 60065f9..c99551e 100644
+--- a/src/lib/useSurfNow.ts
++++ b/src/lib/useSurfNow.ts
+@@ -18,6 +18,8 @@ import { sideWords } from '../core/homeDay.ts'
+ import { rangeWords } from '../core/surfRange.ts'
+ import { buoyParts, forecastParts, periodRead, rangeSizeWords, type PeriodRead, type SwellPart } from '../core/surfReads.ts'
+ import { hourlyAt } from './tideSheetData.ts'
++import { windAt } from './windNow.ts'
++import type { StationObs } from '../core/nowcast.ts'
+ import { saneRange } from '../core/sanity.ts'
+ import { venueToday } from '../core/eventDay.ts'
+ import { addDays, buoyLean, rangeHourAt, weekPeaks, type RangeHour } from './surfPageData.ts'
+@@ -42,6 +44,14 @@ export interface SurfNow {
+   tomorrowWords: string | null
+   /** Seven days, each called once (src/core/surfCall.ts): today by the hour now, the rest by their biggest hour. Every screen's day number. */
+   week: SurfDay[]
++  /**
++   * ONE SURF SERIES (Batch LIVE, Section 0.3; 14 Nov the home said "4-6 ft"
++   * over a chart reading 1.7, and "0-1 ft" over a dot at 2.3: the headline
++   * was this hook's leaned hour, the chart the briefing's unleaned faces).
++   * SERIES_HOURS hours from this one at half past, each through rangeHourAt
++   * with the same lean: the chart's line and its now are these.
++   */
++  hours: RangeHour[]
+ }
+ 
+ export interface SurfDay {
+@@ -54,7 +64,10 @@ export interface SurfDay {
+ export const sideWord = (h: RangeHour): string | null => (h.side === null ? null : sideWords(h.side))
+ 
+ /** surfCall(spot, time): one hour of one spot, called (Batch TRUTH, Section 1). */
+-export const callOf = (h: RangeHour | null, dayIndex: number): SurfCall | null => (h === null ? null : surfCall({ centerFt: h.centerFt, shape: h.shape, side: sideWord(h) }, dayIndex))
++export const callOf = (h: RangeHour | null, dayIndex: number, wind: RangeHour['wind'] | null = null): SurfCall | null => (h === null ? null : surfCall({ centerFt: h.centerFt, shape: h.shape, side: sideWord(h), wind: wind ?? h.wind }, dayIndex))
++
++/** The hours the home's chart draws, from this hour: the same leaned series the headline is called from (Batch LIVE, Section 0.3). */
++export const SERIES_HOURS = 48
+ 
+ /**
+  * THE SEA NOW, ONE SOURCE (Batch QA, Section 0B; field 10 Nov: one Surf page
+@@ -96,8 +109,8 @@ export function surfLine(sea: SurfSea, h: RangeHour | null, now: Date): string |
+ /** The words for a band, the one way every screen says it. */
+ export const surfWords = (h: RangeHour | null): string | null => (h === null || saneRange(h.range.lowFt, h.range.highFt) === null ? null : rangeWords(h.range))
+ 
+-export function surfNowFrom(sea: SurfSea, stats: SpotStats, now: Date, timeZone: string): { now: RangeHour | null; tomorrow: RangeHour | null; week: SurfDay[] } {
+-  if (sea.marine === null) return { now: null, tomorrow: null, week: [] }
++export function surfNowFrom(sea: SurfSea, stats: SpotStats, now: Date, timeZone: string, windNow: RangeHour['wind'] | null = null): { now: RangeHour | null; tomorrow: RangeHour | null; week: SurfDay[]; hours: RangeHour[] } {
++  if (sea.marine === null) return { now: null, tomorrow: null, week: [], hours: [] }
+   const today = venueToday(now, timeZone)
+   /* Batch Beach, Section 2: the next 6 h lean to the live buoy, and the tag reads the leaned centre. */
+   const lean = buoyLean(sea.marine, sea.wind, sea.buoy, sea.facing, stats, sea.factor ?? BEACH_CAP, now.getTime())
+@@ -109,9 +122,12 @@ export function surfNowFrom(sea: SurfSea, stats: SpotStats, now: Date, timeZone:
+   /* Today is called by the hour now, the home card's and the Surf page's head; the other days by their biggest hour. */
+   const days = week.map((d, i) => {
+     const hour = i === 0 ? hourNow : d.peak
+-    return { date: d.date, hour, call: callOf(hour, i) }
++    /* Today's call reads the wind the home's Wind card says now (the station's lean), when given. */
++    return { date: d.date, hour, call: callOf(hour, i, i === 0 ? windNow : null) }
+   })
+-  return { now: hourNow, tomorrow, week: days }
++  const marine = sea.marine
++  const hours = Array.from({ length: SERIES_HOURS }, (_, i) => rangeHourAt(marine, sea.wind, new Date(half.getTime() + i * 3_600_000), sea.facing, stats, sea.factor, lean)).filter((h): h is RangeHour => h !== null)
++  return { now: hourNow, tomorrow, week: days, hours }
+ }
+ 
+ /** This phone's per-spot stats, read from the book (src/lib/spotSkillStore.ts); the Surf page's sampling writes it. */
+@@ -120,7 +136,7 @@ export function storedStats(spot: LatLon, now: number): SpotStats {
+ }
+ 
+ /** `venue` null asks nothing (the menu before it has been open a moment). */
+-export function useSurfNow(venue: LatLon | null, now: Date, timeZone: string, miles: boolean, spotName: string | null = null): SurfNow {
++export function useSurfNow(venue: LatLon | null, now: Date, timeZone: string, miles: boolean, spotName: string | null = null, obs: StationObs | null = null): SurfNow {
+   /* Batch Flow, Section 3: a spot named for a beach is on that beach (src/lib/surfBeach.ts namedBeach). */
+   const [beach] = useSurfBeach(venue, spotName)
+   /* Read where the beach's surf is; said to be elsewhere only when it is (a spot named for the beach is on it). */
+@@ -132,7 +148,11 @@ export function useSurfNow(venue: LatLon | null, now: Date, timeZone: string, mi
+   const version = useSyncExternalStore(onSkillBook, skillBookVersion, skillBookVersion)
+   const use = useMemo(() => (spot === null ? storedStats({ lat: 0, lon: 0 }, 0) : storedStats(spot, hour * 3_600_000)), [spot?.lat, spot?.lon, hour, version]) // eslint-disable-line react-hooks/exhaustive-deps
+   const km = away && venue !== null && beach !== null ? distanceMeters(venue, beach.at) / 1000 : 0
+-  const read = useMemo(() => surfNowFrom(sea, use, now, timeZone), [sea, use, now, timeZone])
++  /* Batch LIVE, Section 0.4: today's call reads the wind now as the Wind card says it, the station's lean on the forecast (src/lib/windNow.ts windAt). */
++  const w = windAt(sea.wind, now, obs)
++  const wMps = w?.mps ?? null
++  const wFrom = w?.fromDeg ?? null
++  const read = useMemo(() => surfNowFrom(sea, use, now, timeZone, w === null ? null : { mps: wMps, fromDeg: wFrom, facing: sea.facing }), [sea, use, now, timeZone, wMps, wFrom]) // eslint-disable-line react-hooks/exhaustive-deps
+   return {
+     beach,
+     away: away && beach !== null ? { name: beachName(beach.name), far: miles ? `${Math.max(1, Math.round(km / 1.609))} mi` : `${Math.max(1, Math.round(km))} km` } : null,
+@@ -144,5 +164,6 @@ export function useSurfNow(venue: LatLon | null, now: Date, timeZone: string, mi
+     tomorrow: read.tomorrow,
+     tomorrowWords: surfWords(read.tomorrow),
+     week: read.week,
++    hours: read.hours,
+   }
+ }
+diff --git a/tests/data/stations-2026-11-14/avwx-raw.txt b/tests/data/stations-2026-11-14/avwx-raw.txt
+new file mode 100644
+index 0000000..afaa2e3
+--- /dev/null
++++ b/tests/data/stations-2026-11-14/avwx-raw.txt
+@@ -0,0 +1,6 @@
++METAR KNGU 141759Z 31015KT 10SM OVC050 09/M02 A2996 RMK AO2 PK WND 29028/1730 SLP145 T00941017 10100 20056 51002 $
++METAR KNGU 141659Z 31017G24KT 10SM SCT045 BKN060 10/M02 A2996 RMK AO2 PK WND 31028/1627 SLP145 T01001022 $
++METAR KNTU 141756Z 32012KT 10SM OVC055 09/M02 A2993 RMK AO2 PK WND 32028/1725 SLP139 T00941022 10100 20067 51005
++METAR KNTU 141656Z 33014G25KT 10SM OVC060 09/M03 A2993 RMK AO2 PK WND 33032/1633 SLP138 T00941028
++METAR KORF 141751Z AUTO 30007G20KT 180V360 10SM OVC055 09/M02 A2994 RMK AO2 SLP138 T00941022 10100 20056 51003
++METAR KORF 141651Z 32010G18KT 280V360 10SM OVC060 09/M03 A2994 RMK AO2 SLP138 T00941028
+\ No newline at end of file
+diff --git a/tests/data/stations-2026-11-14/iem-metars.csv b/tests/data/stations-2026-11-14/iem-metars.csv
+new file mode 100644
+index 0000000..298aff8
+--- /dev/null
++++ b/tests/data/stations-2026-11-14/iem-metars.csv
+@@ -0,0 +1,13 @@
++station,valid,metar
++ORF,2026-11-14 15:51,KORF 141551Z 32011G23KT 290V350 10SM OVC060 09/M04 A2995 RMK AO2 SLP140 T00891039
++ILM,2026-11-14 15:53,KILM 141553Z 28010KT 10SM CLR 12/00 A3004 RMK AO2 SLP170 T01220000
++NTU,2026-11-14 15:56,KNTU 141556Z 33017G32KT 7SM BLDU BKN050 09/M03 A2994 RMK AO2 PK WND 33033/1459 SLP140 T00891033
++NGU,2026-11-14 15:59,KNGU 141559Z 34019G28KT 10SM SCT040 BKN065 09/M02 A2997 RMK AO2 PK WND 35028/1556 SLP147 T00941022 $
++ORF,2026-11-14 16:51,KORF 141651Z 32010G18KT 280V360 10SM OVC060 09/M03 A2994 RMK AO2 SLP138 T00941028
++ILM,2026-11-14 16:53,KILM 141653Z 30011G24KT 10SM CLR 13/01 A3002 RMK AO2 SLP164 T01330006
++NTU,2026-11-14 16:56,KNTU 141656Z 33014G25KT 10SM OVC060 09/M03 A2993 RMK AO2 PK WND 33032/1633 SLP138 T00941028
++NGU,2026-11-14 16:59,KNGU 141659Z 31017G24KT 10SM SCT045 BKN060 10/M02 A2996 RMK AO2 PK WND 31028/1627 SLP145 T01001022 $
++ORF,2026-11-14 17:51,KORF 141751Z AUTO 30007G20KT 180V360 10SM OVC055 09/M02 A2994 RMK AO2 SLP138 T00941022 10100 20056 51003
++ILM,2026-11-14 17:53,KILM 141753Z 33013G18KT 10SM CLR 14/00 A3000 RMK AO2 SLP160 T01390000 10139 20039 58007
++NTU,2026-11-14 17:56,KNTU 141756Z 32012KT 10SM OVC055 09/M02 A2993 RMK AO2 PK WND 32028/1725 SLP139 T00941022 10100 20067 51005
++NGU,2026-11-14 17:59,KNGU 141759Z 31015KT 10SM OVC050 09/M02 A2996 RMK AO2 PK WND 29028/1730 SLP145 T00941017 10100 20056 51002 $
+diff --git a/tests/data/stations-2026-11-14/nws-KNFE-latest.json b/tests/data/stations-2026-11-14/nws-KNFE-latest.json
+new file mode 100644
+index 0000000..7448433
+--- /dev/null
++++ b/tests/data/stations-2026-11-14/nws-KNFE-latest.json
+@@ -0,0 +1,149 @@
++{
++    "@context": [
++        "https://geojson.org/geojson-ld/geojson-context.jsonld",
++        {
++            "@version": "1.1",
++            "wx": "https://api.weather.gov/ontology#",
++            "s": "https://schema.org/",
++            "geo": "http://www.opengis.net/ont/geosparql#",
++            "unit": "http://codes.wmo.int/common/unit/",
++            "@vocab": "https://api.weather.gov/ontology#",
++            "geometry": {
++                "@id": "s:GeoCoordinates",
++                "@type": "geo:wktLiteral"
++            },
++            "city": "s:addressLocality",
++            "state": "s:addressRegion",
++            "distance": {
++                "@id": "s:Distance",
++                "@type": "s:QuantitativeValue"
++            },
++            "bearing": {
++                "@type": "s:QuantitativeValue"
++            },
++            "value": {
++                "@id": "s:value"
++            },
++            "unitCode": {
++                "@id": "s:unitCode",
++                "@type": "@id"
++            },
++            "forecastOffice": {
++                "@type": "@id"
++            },
++            "forecastGridData": {
++                "@type": "@id"
++            },
++            "publicZone": {
++                "@type": "@id"
++            },
++            "county": {
++                "@type": "@id"
++            }
++        }
++    ],
++    "id": "https://api.weather.gov/stations/KNFE/observations/2026-11-14T15:58:00+00:00",
++    "type": "Feature",
++    "geometry": {
++        "type": "Point",
++        "coordinates": [
++            -76.13,
++            36.7
++        ]
++    },
++    "properties": {
++        "@id": "https://api.weather.gov/stations/KNFE/observations/2026-11-14T15:58:00+00:00",
++        "@type": "wx:ObservationStation",
++        "elevation": {
++            "unitCode": "wmoUnit:m",
++            "value": 3
++        },
++        "station": "https://api.weather.gov/stations/KNFE",
++        "stationId": "KNFE",
++        "stationName": "Fentress, Naval Auxiliary Landing Field",
++        "timestamp": "2026-11-14T15:58:00+00:00",
++        "rawMessage": "",
++        "textDescription": "",
++        "icon": null,
++        "presentWeather": [],
++        "temperature": {
++            "unitCode": "wmoUnit:degC",
++            "value": 8.9,
++            "qualityControl": "V"
++        },
++        "dewpoint": {
++            "unitCode": "wmoUnit:degC",
++            "value": -3.3,
++            "qualityControl": "V"
++        },
++        "windDirection": {
++            "unitCode": "wmoUnit:degree_(angle)",
++            "value": 340,
++            "qualityControl": "V"
++        },
++        "windSpeed": {
++            "unitCode": "wmoUnit:km_h-1",
++            "value": 16.56,
++            "qualityControl": "V"
++        },
++        "windGust": {
++            "unitCode": "wmoUnit:km_h-1",
++            "value": 48.24,
++            "qualityControl": "C"
++        },
++        "barometricPressure": {
++            "unitCode": "wmoUnit:Pa",
++            "value": 101460,
++            "qualityControl": "V"
++        },
++        "seaLevelPressure": {
++            "unitCode": "wmoUnit:Pa",
++            "value": 101460,
++            "qualityControl": "V"
++        },
++        "visibility": {
++            "unitCode": "wmoUnit:m",
++            "value": 16090,
++            "qualityControl": "C"
++        },
++        "maxTemperatureLast24Hours": {
++            "unitCode": "wmoUnit:degC",
++            "value": null
++        },
++        "minTemperatureLast24Hours": {
++            "unitCode": "wmoUnit:degC",
++            "value": null
++        },
++        "precipitationLastHour": {
++            "unitCode": "wmoUnit:mm",
++            "value": null,
++            "qualityControl": "Z"
++        },
++        "precipitationLast3Hours": {
++            "unitCode": "wmoUnit:mm",
++            "value": null,
++            "qualityControl": "Z"
++        },
++        "precipitationLast6Hours": {
++            "unitCode": "wmoUnit:mm",
++            "value": null,
++            "qualityControl": "Z"
++        },
++        "relativeHumidity": {
++            "unitCode": "wmoUnit:percent",
++            "value": 42.095680379388,
++            "qualityControl": "V"
++        },
++        "windChill": {
++            "unitCode": "wmoUnit:degC",
++            "value": 6.378837057682222,
++            "qualityControl": "V"
++        },
++        "heatIndex": {
++            "unitCode": "wmoUnit:degC",
++            "value": null,
++            "qualityControl": "V"
++        },
++        "cloudLayers": []
++    }
++}
+\ No newline at end of file
+diff --git a/tests/data/stations-2026-11-14/nws-KNGU-latest.json b/tests/data/stations-2026-11-14/nws-KNGU-latest.json
+new file mode 100644
+index 0000000..0c1064a
+--- /dev/null
++++ b/tests/data/stations-2026-11-14/nws-KNGU-latest.json
+@@ -0,0 +1,149 @@
++{
++    "@context": [
++        "https://geojson.org/geojson-ld/geojson-context.jsonld",
++        {
++            "@version": "1.1",
++            "wx": "https://api.weather.gov/ontology#",
++            "s": "https://schema.org/",
++            "geo": "http://www.opengis.net/ont/geosparql#",
++            "unit": "http://codes.wmo.int/common/unit/",
++            "@vocab": "https://api.weather.gov/ontology#",
++            "geometry": {
++                "@id": "s:GeoCoordinates",
++                "@type": "geo:wktLiteral"
++            },
++            "city": "s:addressLocality",
++            "state": "s:addressRegion",
++            "distance": {
++                "@id": "s:Distance",
++                "@type": "s:QuantitativeValue"
++            },
++            "bearing": {
++                "@type": "s:QuantitativeValue"
++            },
++            "value": {
++                "@id": "s:value"
++            },
++            "unitCode": {
++                "@id": "s:unitCode",
++                "@type": "@id"
++            },
++            "forecastOffice": {
++                "@type": "@id"
++            },
++            "forecastGridData": {
++                "@type": "@id"
++            },
++            "publicZone": {
++                "@type": "@id"
++            },
++            "county": {
++                "@type": "@id"
++            }
++        }
++    ],
++    "id": "https://api.weather.gov/stations/KNGU/observations/2026-11-14T16:59:00+00:00",
++    "type": "Feature",
++    "geometry": {
++        "type": "Point",
++        "coordinates": [
++            -76.28,
++            36.93
++        ]
++    },
++    "properties": {
++        "@id": "https://api.weather.gov/stations/KNGU/observations/2026-11-14T16:59:00+00:00",
++        "@type": "wx:ObservationStation",
++        "elevation": {
++            "unitCode": "wmoUnit:m",
++            "value": 5
++        },
++        "station": "https://api.weather.gov/stations/KNGU",
++        "stationId": "KNGU",
++        "stationName": "Norfolk, Naval Air Station",
++        "timestamp": "2026-11-14T16:59:00+00:00",
++        "rawMessage": "KNGU 141659Z 31017G24KT 10SM SCT045 BKN060 10/M02 A2996 RMK AO2 PK WND 31028/1627 SLP145 T01001022 $",
++        "textDescription": "",
++        "icon": null,
++        "presentWeather": [],
++        "temperature": {
++            "unitCode": "wmoUnit:degC",
++            "value": 10,
++            "qualityControl": "V"
++        },
++        "dewpoint": {
++            "unitCode": "wmoUnit:degC",
++            "value": -2.2,
++            "qualityControl": "V"
++        },
++        "windDirection": {
++            "unitCode": "wmoUnit:degree_(angle)",
++            "value": null,
++            "qualityControl": "Z"
++        },
++        "windSpeed": {
++            "unitCode": "wmoUnit:km_h-1",
++            "value": null,
++            "qualityControl": "Z"
++        },
++        "windGust": {
++            "unitCode": "wmoUnit:km_h-1",
++            "value": null,
++            "qualityControl": "Z"
++        },
++        "barometricPressure": {
++            "unitCode": "wmoUnit:Pa",
++            "value": 101460,
++            "qualityControl": "V"
++        },
++        "seaLevelPressure": {
++            "unitCode": "wmoUnit:Pa",
++            "value": 101450,
++            "qualityControl": "V"
++        },
++        "visibility": {
++            "unitCode": "wmoUnit:m",
++            "value": 16090,
++            "qualityControl": "C"
++        },
++        "maxTemperatureLast24Hours": {
++            "unitCode": "wmoUnit:degC",
++            "value": null
++        },
++        "minTemperatureLast24Hours": {
++            "unitCode": "wmoUnit:degC",
++            "value": null
++        },
++        "precipitationLastHour": {
++            "unitCode": "wmoUnit:mm",
++            "value": null,
++            "qualityControl": "Z"
++        },
++        "precipitationLast3Hours": {
++            "unitCode": "wmoUnit:mm",
++            "value": null,
++            "qualityControl": "Z"
++        },
++        "precipitationLast6Hours": {
++            "unitCode": "wmoUnit:mm",
++            "value": null,
++            "qualityControl": "Z"
++        },
++        "relativeHumidity": {
++            "unitCode": "wmoUnit:percent",
++            "value": 42.420892547776,
++            "qualityControl": "V"
++        },
++        "windChill": {
++            "unitCode": "wmoUnit:degC",
++            "value": null,
++            "qualityControl": "V"
++        },
++        "heatIndex": {
++            "unitCode": "wmoUnit:degC",
++            "value": null,
++            "qualityControl": "V"
++        },
++        "cloudLayers": []
++    }
++}
+\ No newline at end of file
+diff --git a/tests/data/stations-2026-11-14/nws-KNTU-latest.json b/tests/data/stations-2026-11-14/nws-KNTU-latest.json
+new file mode 100644
+index 0000000..97c966c
+--- /dev/null
++++ b/tests/data/stations-2026-11-14/nws-KNTU-latest.json
+@@ -0,0 +1,149 @@
++{
++    "@context": [
++        "https://geojson.org/geojson-ld/geojson-context.jsonld",
++        {
++            "@version": "1.1",
++            "wx": "https://api.weather.gov/ontology#",
++            "s": "https://schema.org/",
++            "geo": "http://www.opengis.net/ont/geosparql#",
++            "unit": "http://codes.wmo.int/common/unit/",
++            "@vocab": "https://api.weather.gov/ontology#",
++            "geometry": {
++                "@id": "s:GeoCoordinates",
++                "@type": "geo:wktLiteral"
++            },
++            "city": "s:addressLocality",
++            "state": "s:addressRegion",
++            "distance": {
++                "@id": "s:Distance",
++                "@type": "s:QuantitativeValue"
++            },
++            "bearing": {
++                "@type": "s:QuantitativeValue"
++            },
++            "value": {
++                "@id": "s:value"
++            },
++            "unitCode": {
++                "@id": "s:unitCode",
++                "@type": "@id"
++            },
++            "forecastOffice": {
++                "@type": "@id"
++            },
++            "forecastGridData": {
++                "@type": "@id"
++            },
++            "publicZone": {
++                "@type": "@id"
++            },
++            "county": {
++                "@type": "@id"
++            }
++        }
++    ],
++    "id": "https://api.weather.gov/stations/KNTU/observations/2026-11-14T16:56:00+00:00",
++    "type": "Feature",
++    "geometry": {
++        "type": "Point",
++        "coordinates": [
++            -76.03,
++            36.82
++        ]
++    },
++    "properties": {
++        "@id": "https://api.weather.gov/stations/KNTU/observations/2026-11-14T16:56:00+00:00",
++        "@type": "wx:ObservationStation",
++        "elevation": {
++            "unitCode": "wmoUnit:m",
++            "value": 7
++        },
++        "station": "https://api.weather.gov/stations/KNTU",
++        "stationId": "KNTU",
++        "stationName": "Virginia Beach, Oceana, Naval Air Station",
++        "timestamp": "2026-11-14T16:56:00+00:00",
++        "rawMessage": "KNTU 141656Z 33014G25KT 10SM OVC060 09/M03 A2993 RMK AO2 PK WND 33032/1633 SLP138 T00941028",
++        "textDescription": "",
++        "icon": null,
++        "presentWeather": [],
++        "temperature": {
++            "unitCode": "wmoUnit:degC",
++            "value": 9.4,
++            "qualityControl": "V"
++        },
++        "dewpoint": {
++            "unitCode": "wmoUnit:degC",
++            "value": -2.8,
++            "qualityControl": "V"
++        },
++        "windDirection": {
++            "unitCode": "wmoUnit:degree_(angle)",
++            "value": 330,
++            "qualityControl": "V"
++        },
++        "windSpeed": {
++            "unitCode": "wmoUnit:km_h-1",
++            "value": 25.92,
++            "qualityControl": "V"
++        },
++        "windGust": {
++            "unitCode": "wmoUnit:km_h-1",
++            "value": null,
++            "qualityControl": "Z"
++        },
++        "barometricPressure": {
++            "unitCode": "wmoUnit:Pa",
++            "value": 101360,
++            "qualityControl": "V"
++        },
++        "seaLevelPressure": {
++            "unitCode": "wmoUnit:Pa",
++            "value": 101380,
++            "qualityControl": "V"
++        },
++        "visibility": {
++            "unitCode": "wmoUnit:m",
++            "value": 16090,
++            "qualityControl": "C"
++        },
++        "maxTemperatureLast24Hours": {
++            "unitCode": "wmoUnit:degC",
++            "value": null
++        },
++        "minTemperatureLast24Hours": {
++            "unitCode": "wmoUnit:degC",
++            "value": null
++        },
++        "precipitationLastHour": {
++            "unitCode": "wmoUnit:mm",
++            "value": null,
++            "qualityControl": "Z"
++        },
++        "precipitationLast3Hours": {
++            "unitCode": "wmoUnit:mm",
++            "value": null,
++            "qualityControl": "Z"
++        },
++        "precipitationLast6Hours": {
++            "unitCode": "wmoUnit:mm",
++            "value": null,
++            "qualityControl": "Z"
++        },
++        "relativeHumidity": {
++            "unitCode": "wmoUnit:percent",
++            "value": 42.243734228587,
++            "qualityControl": "V"
++        },
++        "windChill": {
++            "unitCode": "wmoUnit:degC",
++            "value": 6.110495269336111,
++            "qualityControl": "V"
++        },
++        "heatIndex": {
++            "unitCode": "wmoUnit:degC",
++            "value": null,
++            "qualityControl": "V"
++        },
++        "cloudLayers": []
++    }
++}
+\ No newline at end of file
+diff --git a/tests/data/stations-2026-11-14/nws-KORF-latest.json b/tests/data/stations-2026-11-14/nws-KORF-latest.json
+new file mode 100644
+index 0000000..6dda0e3
+--- /dev/null
++++ b/tests/data/stations-2026-11-14/nws-KORF-latest.json
+@@ -0,0 +1,154 @@
++{
++    "@context": [
++        "https://geojson.org/geojson-ld/geojson-context.jsonld",
++        {
++            "@version": "1.1",
++            "wx": "https://api.weather.gov/ontology#",
++            "s": "https://schema.org/",
++            "geo": "http://www.opengis.net/ont/geosparql#",
++            "unit": "http://codes.wmo.int/common/unit/",
++            "@vocab": "https://api.weather.gov/ontology#",
++            "geometry": {
++                "@id": "s:GeoCoordinates",
++                "@type": "geo:wktLiteral"
++            },
++            "city": "s:addressLocality",
++            "state": "s:addressRegion",
++            "distance": {
++                "@id": "s:Distance",
++                "@type": "s:QuantitativeValue"
++            },
++            "bearing": {
++                "@type": "s:QuantitativeValue"
++            },
++            "value": {
++                "@id": "s:value"
++            },
++            "unitCode": {
++                "@id": "s:unitCode",
++                "@type": "@id"
++            },
++            "forecastOffice": {
++                "@type": "@id"
++            },
++            "forecastGridData": {
++                "@type": "@id"
++            },
++            "publicZone": {
++                "@type": "@id"
++            },
++            "county": {
++                "@type": "@id"
++            }
++        }
++    ],
++    "id": "https://api.weather.gov/stations/KORF/observations/2026-11-14T17:20:00+00:00",
++    "type": "Feature",
++    "geometry": {
++        "type": "Point",
++        "coordinates": [
++            -76.2,
++            36.9
++        ]
++    },
++    "properties": {
++        "@id": "https://api.weather.gov/stations/KORF/observations/2026-11-14T17:20:00+00:00",
++        "@type": "wx:ObservationStation",
++        "elevation": {
++            "unitCode": "wmoUnit:m",
++            "value": 9
++        },
++        "station": "https://api.weather.gov/stations/KORF",
++        "stationId": "KORF",
++        "stationName": "Norfolk, Norfolk International Airport",
++        "timestamp": "2026-11-14T17:20:00+00:00",
++        "rawMessage": "",
++        "textDescription": "Cloudy",
++        "icon": "https://api.weather.gov/icons/land/day/ovc?size=medium",
++        "presentWeather": [],
++        "temperature": {
++            "unitCode": "wmoUnit:degC",
++            "value": 10,
++            "qualityControl": "V"
++        },
++        "dewpoint": {
++            "unitCode": "wmoUnit:degC",
++            "value": -2,
++            "qualityControl": "V"
++        },
++        "windDirection": {
++            "unitCode": "wmoUnit:degree_(angle)",
++            "value": null,
++            "qualityControl": "Z"
++        },
++        "windSpeed": {
++            "unitCode": "wmoUnit:km_h-1",
++            "value": null,
++            "qualityControl": "Z"
++        },
++        "windGust": {
++            "unitCode": "wmoUnit:km_h-1",
++            "value": null,
++            "qualityControl": "Z"
++        },
++        "barometricPressure": {
++            "unitCode": "wmoUnit:Pa",
++            "value": 101388.48,
++            "qualityControl": "V"
++        },
++        "seaLevelPressure": {
++            "unitCode": "wmoUnit:Pa",
++            "value": null,
++            "qualityControl": "Z"
++        },
++        "visibility": {
++            "unitCode": "wmoUnit:m",
++            "value": 16093.44,
++            "qualityControl": "C"
++        },
++        "maxTemperatureLast24Hours": {
++            "unitCode": "wmoUnit:degC",
++            "value": null
++        },
++        "minTemperatureLast24Hours": {
++            "unitCode": "wmoUnit:degC",
++            "value": null
++        },
++        "precipitationLast3Hours": {
++            "unitCode": "wmoUnit:mm",
++            "value": null,
++            "qualityControl": "Z"
++        },
++        "relativeHumidity": {
++            "unitCode": "wmoUnit:percent",
++            "value": 43.051570256137,
++            "qualityControl": "V"
++        },
++        "windChill": {
++            "unitCode": "wmoUnit:degC",
++            "value": null,
++            "qualityControl": "V"
++        },
++        "heatIndex": {
++            "unitCode": "wmoUnit:degC",
++            "value": null,
++            "qualityControl": "V"
++        },
++        "cloudLayers": [
++            {
++                "base": {
++                    "unitCode": "wmoUnit:m",
++                    "value": 1493.52
++                },
++                "amount": "FEW"
++            },
++            {
++                "base": {
++                    "unitCode": "wmoUnit:m",
++                    "value": 1828.8
++                },
++                "amount": "OVC"
++            }
++        ]
++    }
++}
+\ No newline at end of file
+diff --git a/tests/data/stations-2026-11-14/recorded-at.txt b/tests/data/stations-2026-11-14/recorded-at.txt
+new file mode 100644
+index 0000000..22f343d
+--- /dev/null
++++ b/tests/data/stations-2026-11-14/recorded-at.txt
+@@ -0,0 +1 @@
++2026-11-14T18:04:55Z
+diff --git a/tests/data/surf-2026-11-14/44099.spec b/tests/data/surf-2026-11-14/44099.spec
+new file mode 100644
+index 0000000..2991cd6
+--- /dev/null
++++ b/tests/data/surf-2026-11-14/44099.spec
+@@ -0,0 +1,37 @@
++#YY  MM DD hh mm WVHT  SwH  SwP  WWH  WWP SwD WWD  STEEPNESS  APD MWD
++#yr  mo dy hr mn    m    m  sec    m  sec  -  degT     -      sec degT
++2026 11 14 17 26  1.7  0.1 10.5  1.7  4.8  NE  NW VERY_STEEP  4.6 318
++2026 11 14 16 56  1.7  0.1 10.5  1.7  5.0 NNE  NW VERY_STEEP  4.6 315
++2026 11 14 16 26  1.8  0.1 10.5  1.8  5.0   E  NW VERY_STEEP  4.6 314
++2026 11 14 15 56  1.8  0.1 10.5  1.8  5.3 ENE  NW VERY_STEEP  4.6 325
++2026 11 14 15 26  1.9  0.1 10.5  1.9  4.8  NE  NW VERY_STEEP  4.8 312
++2026 11 14 14 56  1.8  0.1 10.5  1.8  4.8  NE  NW VERY_STEEP  4.6 312
++2026 11 14 14 26  1.8  0.1 10.5  1.8  4.8  NE  NW VERY_STEEP  4.7 322
++2026 11 14 13 56  1.7  0.1 10.5  1.7  4.5  NE NNW VERY_STEEP  4.6 329
++2026 11 14 13 26  1.7  0.1 10.5  1.7  4.2  NE  NW VERY_STEEP  4.5 321
++2026 11 14 12 56  1.6  0.2 10.5  1.6  4.3  NE  NW VERY_STEEP  4.5 311
++2026 11 14 12 26  1.6  0.2 10.5  1.6  4.2  NE NNW VERY_STEEP  4.6 343
++2026 11 14 11 56  1.7  0.2 10.5  1.7  4.2 ENE NNW VERY_STEEP  4.8 338
++2026 11 14 11 26  1.7  0.2 10.5  1.7  4.5 ENE   N VERY_STEEP  4.7 355
++2026 11 14 10 56  1.7  0.2 10.5  1.7  4.3  NE NNW VERY_STEEP  4.7 329
++2026 11 14 10 26  1.7  0.2 10.5  1.7  4.2 ENE  NW VERY_STEEP  4.5 321
++2026 11 14 09 56  1.6  0.2 10.5  1.6  9.1 ENE  NE    AVERAGE  4.5  54
++2026 11 14 09 26  1.6  0.2 10.5  1.6  9.9  NE ENE    AVERAGE  4.6  65
++2026 11 14 08 56  1.5  0.2 10.5  1.5  8.3 ENE ENE    AVERAGE  4.9  61
++2026 11 14 08 26  1.4  0.2 10.5  1.4  9.1 ENE ENE    AVERAGE  4.7  58
++2026 11 14 07 56  1.5  0.3 10.5  1.5  9.9 ENE ENE    AVERAGE  4.9  58
++2026 11 14 07 26  1.4  0.2 10.5  1.4  9.1 ENE ENE    AVERAGE  4.7  59
++2026 11 14 06 56  1.4  0.3 10.5  1.4  5.6 ENE  NE VERY_STEEP  4.7  38
++2026 11 14 06 26  1.4  0.3 11.1  1.4  4.8  NE NNE VERY_STEEP  4.6  31
++2026 11 14 05 56  1.4  0.3 10.5  1.4  5.3 ENE  NE VERY_STEEP  4.7  37
++2026 11 14 05 26  1.4  0.2 10.5  1.4  9.1 ENE ENE    AVERAGE  4.6  58
++2026 11 14 04 56  1.4  0.2 10.5  1.4  8.3  NE  NE    AVERAGE  4.6  52
++2026 11 14 04 26  1.4  0.2 10.5  1.4  8.3   E  NE    AVERAGE  4.7  52
++2026 11 14 03 56  1.4  0.2 10.5  1.4  9.1 ENE  NE    AVERAGE  4.6  52
++2026 11 14 03 26  1.3  0.2 10.5  1.3  4.8 ENE  NE VERY_STEEP  4.5  34
++2026 11 14 02 56  1.3  0.1 10.5  1.2  9.1  NE ENE    AVERAGE  4.6  57
++2026 11 14 02 26  1.3  0.2 10.5  1.3  8.3 ENE ENE    AVERAGE  4.5  58
++2026 11 14 01 56  1.2  0.2 10.5  1.2  8.3 ENE ENE    AVERAGE  4.4  59
++2026 11 14 01 26  1.2  0.1 10.5  1.2  8.3 ENE  NE    AVERAGE  4.4  51
++2026 11 14 00 56  1.2  0.1 10.5  1.2  8.3 ENE ENE    AVERAGE  4.3  58
++2026 11 14 00 26  1.2  0.1 10.5  1.2  8.3 ENE  NE    AVERAGE  4.2  55
+diff --git a/tests/data/surf-2026-11-14/44099.txt b/tests/data/surf-2026-11-14/44099.txt
+new file mode 100644
+index 0000000..0ed1aa9
+--- /dev/null
++++ b/tests/data/surf-2026-11-14/44099.txt
+@@ -0,0 +1,41 @@
++#YY  MM DD hh mm WDIR WSPD GST  WVHT   DPD   APD MWD   PRES  ATMP  WTMP  DEWP  VIS PTDY  TIDE
++#yr  mo dy hr mn degT m/s  m/s     m   sec   sec degT   hPa  degC  degC  degC  nmi  hPa    ft
++2026 11 14 17 26  MM   MM   MM   1.7     5   4.6 318     MM    MM  16.7    MM   MM   MM    MM
++2026 11 14 16 56  MM   MM   MM   1.7     5   4.6 315     MM    MM  16.7    MM   MM   MM    MM
++2026 11 14 16 26  MM   MM   MM   1.8     5   4.6 314     MM    MM  16.7    MM   MM   MM    MM
++2026 11 14 15 56  MM   MM   MM   1.8     5   4.6 325     MM    MM  16.7    MM   MM   MM    MM
++2026 11 14 15 26  MM   MM   MM   1.9     5   4.8 312     MM    MM  16.7    MM   MM   MM    MM
++2026 11 14 14 56  MM   MM   MM   1.8     5   4.6 312     MM    MM  16.7    MM   MM   MM    MM
++2026 11 14 14 26  MM   MM   MM   1.8     5   4.7 322     MM    MM  16.7    MM   MM   MM    MM
++2026 11 14 13 56  MM   MM   MM   1.7     5   4.6 329     MM    MM  16.7    MM   MM   MM    MM
++2026 11 14 13 26  MM   MM   MM   1.7     4   4.5 321     MM    MM  16.7    MM   MM   MM    MM
++2026 11 14 12 56  MM   MM   MM   1.6     4   4.5 311     MM    MM  16.7    MM   MM   MM    MM
++2026 11 14 12 26  MM   MM   MM   1.6     4   4.6 343     MM    MM  16.7    MM   MM   MM    MM
++2026 11 14 11 56  MM   MM   MM   1.7     4   4.8 338     MM    MM  16.7    MM   MM   MM    MM
++2026 11 14 11 26  MM   MM   MM   1.7     5   4.7 355     MM    MM  16.8    MM   MM   MM    MM
++2026 11 14 10 56  MM   MM   MM   1.7     4   4.7 329     MM    MM  16.7    MM   MM   MM    MM
++2026 11 14 10 26  MM   MM   MM   1.7     4   4.5 321     MM    MM  16.8    MM   MM   MM    MM
++2026 11 14 09 56  MM   MM   MM   1.7     9   4.5  54     MM    MM  16.8    MM   MM   MM    MM
++2026 11 14 09 26  MM   MM   MM   1.6    10   4.6  65     MM    MM  16.7    MM   MM   MM    MM
++2026 11 14 08 56  MM   MM   MM   1.5     8   4.9  61     MM    MM  16.7    MM   MM   MM    MM
++2026 11 14 08 26  MM   MM   MM   1.5     9   4.7  58     MM    MM  16.8    MM   MM   MM    MM
++2026 11 14 07 56  MM   MM   MM   1.5    10   4.9  58     MM    MM  16.8    MM   MM   MM    MM
++2026 11 14 07 26  MM   MM   MM   1.4     9   4.7  59     MM    MM  16.8    MM   MM   MM    MM
++2026 11 14 06 56  MM   MM   MM   1.4     6   4.7  38     MM    MM  16.9    MM   MM   MM    MM
++2026 11 14 06 26  MM   MM   MM   1.5     5   4.6  31     MM    MM  16.9    MM   MM   MM    MM
++2026 11 14 05 56  MM   MM   MM   1.4     5   4.7  37     MM    MM  16.9    MM   MM   MM    MM
++2026 11 14 05 26  MM   MM   MM   1.4     9   4.6  58     MM    MM  17.0    MM   MM   MM    MM
++2026 11 14 04 56  MM   MM   MM   1.4     8   4.6  52     MM    MM  17.0    MM   MM   MM    MM
++2026 11 14 04 26  MM   MM   MM   1.4     8   4.7  52     MM    MM  16.9    MM   MM   MM    MM
++2026 11 14 03 56  MM   MM   MM   1.4     9   4.6  52     MM    MM  16.9    MM   MM   MM    MM
++2026 11 14 03 26  MM   MM   MM   1.3     5   4.5  34     MM    MM  17.0    MM   MM   MM    MM
++2026 11 14 02 56  MM   MM   MM   1.3     9   4.6  57     MM    MM  17.0    MM   MM   MM    MM
++2026 11 14 02 26  MM   MM   MM   1.3     8   4.5  58     MM    MM  16.9    MM   MM   MM    MM
++2026 11 14 01 56  MM   MM   MM   1.3     8   4.4  59     MM    MM  16.9    MM   MM   MM    MM
++2026 11 14 01 26  MM   MM   MM   1.2     8   4.4  51     MM    MM  16.8    MM   MM   MM    MM
++2026 11 14 00 56  MM   MM   MM   1.2     8   4.3  58     MM    MM  16.7    MM   MM   MM    MM
++2026 11 14 00 26  MM   MM   MM   1.2     8   4.2  55     MM    MM  16.7    MM   MM   MM    MM
++2026 11 11 14 56  MM   MM   MM   0.5    11   4.3 121     MM    MM  16.8    MM   MM   MM    MM
++2026 11 11 14 26  MM   MM   MM   0.5    11   4.3  94     MM    MM  16.7    MM   MM   MM    MM
++2026 10 11 14 56  MM   MM   MM   2.1     8   6.0 121     MM    MM  21.1    MM   MM   MM    MM
++2026 10 11 14 26  MM   MM   MM   2.2     9   6.0 124     MM    MM  21.1    MM   MM   MM    MM
+\ No newline at end of file
+diff --git a/tests/data/surf-2026-11-14/marine.json b/tests/data/surf-2026-11-14/marine.json
+new file mode 100644
+index 0000000..96d62bb
+--- /dev/null
++++ b/tests/data/surf-2026-11-14/marine.json
+@@ -0,0 +1 @@
++{"latitude":36.708336,"longitude":-75.87499,"generationtime_ms":0.2714395523071289,"utc_offset_seconds":0,"timezone":"GMT","timezone_abbreviation":"GMT","elevation":0.0,"hourly_units":{"time":"iso8601","wave_height":"m","wave_direction":"°","wave_period":"s","swell_wave_height":"m","swell_wave_direction":"°","swell_wave_period":"s","swell_wave_peak_period":"undefined","secondary_swell_wave_height":"m","secondary_swell_wave_period":"s","secondary_swell_wave_direction":"°","tertiary_swell_wave_height":"undefined","tertiary_swell_wave_period":"undefined","tertiary_swell_wave_direction":"undefined","wind_wave_height":"m","wind_wave_period":"s","wind_wave_direction":"°","sea_surface_temperature":"°C"},"hourly":{"time":["2026-11-14T00:00","2026-11-14T01:00","2026-11-14T02:00","2026-11-14T03:00","2026-11-14T04:00","2026-11-14T05:00","2026-11-14T06:00","2026-11-14T07:00","2026-11-14T08:00","2026-11-14T09:00","2026-11-14T10:00","2026-11-14T11:00","2026-11-14T12:00","2026-11-14T13:00","2026-11-14T14:00","2026-11-14T15:00","2026-11-14T16:00","2026-11-14T17:00","2026-11-14T18:00","2026-11-14T19:00","2026-11-14T20:00","2026-11-14T21:00","2026-11-14T22:00","2026-11-14T23:00","2026-11-15T00:00","2026-11-15T01:00","2026-11-15T02:00","2026-11-15T03:00","2026-11-15T04:00","2026-11-15T05:00","2026-11-15T06:00","2026-11-15T07:00","2026-11-15T08:00","2026-11-15T09:00","2026-11-15T10:00","2026-11-15T11:00","2026-11-15T12:00","2026-11-15T13:00","2026-11-15T14:00","2026-11-15T15:00","2026-11-15T16:00","2026-11-15T17:00","2026-11-15T18:00","2026-11-15T19:00","2026-11-15T20:00","2026-11-15T21:00","2026-11-15T22:00","2026-11-15T23:00"],"wave_height":[0.66,0.70,0.72,0.76,0.80,0.82,0.86,0.88,0.88,0.90,0.90,0.88,0.88,0.86,0.86,0.84,0.84,0.84,0.84,0.82,0.80,0.78,0.72,0.64,0.58,0.56,0.54,0.52,0.52,0.52,0.52,0.52,0.52,0.52,0.50,0.50,0.48,0.50,0.50,0.52,0.52,0.52,0.52,0.52,0.54,0.54,0.54,0.52],"wave_direction":[9,11,13,15,16,18,19,17,16,14,13,12,11,10,9,8,2,356,350,348,345,343,350,358,5,7,8,10,5,1,356,353,351,348,346,344,342,341,341,340,341,343,344,344,344,344,345,347],"wave_period":[5.55,5.50,5.40,5.25,5.15,5.10,5.05,5.05,5.05,5.05,5.10,5.15,5.20,5.20,5.20,5.15,5.00,4.80,4.65,4.55,4.55,4.60,4.85,5.20,5.50,5.65,5.75,5.75,5.55,5.25,5.00,4.90,4.80,4.75,4.70,4.65,4.55,4.45,4.30,4.15,4.05,3.95,3.90,3.85,3.80,3.80,3.90,4.00],"swell_wave_height":[0.36,0.38,0.40,0.42,0.42,0.40,0.40,0.44,0.48,0.52,0.52,0.52,0.52,0.54,0.56,0.58,0.52,0.48,0.42,0.42,0.42,0.42,0.40,0.40,0.38,0.38,0.36,0.36,0.34,0.32,0.30,0.28,0.28,0.26,0.24,0.24,0.22,0.22,0.20,0.20,0.20,0.18,0.18,0.16,0.16,0.14,0.16,0.20],"swell_wave_direction":[47,47,46,46,47,49,50,47,45,42,41,41,40,41,41,42,45,48,51,50,48,47,48,49,50,52,53,55,56,56,57,58,59,60,61,61,62,62,63,63,64,64,65,56,48,39,28,16],"swell_wave_period":[7.75,7.70,7.50,7.35,7.30,7.25,7.05,6.55,5.95,5.45,5.20,5.05,5.00,5.05,5.15,5.35,5.70,6.10,6.35,6.35,6.25,6.20,6.25,6.30,6.40,6.50,6.55,6.60,6.60,6.55,6.50,6.50,6.45,6.45,6.45,6.40,6.40,6.40,6.40,6.40,6.50,6.60,6.50,6.10,5.50,4.95,4.55,4.20],"swell_wave_peak_period":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"secondary_swell_wave_height":[0.20,0.18,0.16,0.14,0.20,0.24,0.30,0.30,0.32,0.32,0.34,0.36,0.38,0.30,0.24,0.16,0.20,0.22,0.26,0.22,0.18,0.14,0.20,0.24,0.30,0.26,0.24,0.20,0.18,0.18,0.16,0.16,0.14,0.14,0.12,0.12,0.10,0.10,0.12,0.12,0.12,0.12,0.12,0.12,0.10,0.10,0.12,0.12],"secondary_swell_wave_period":[3.80,4.00,4.40,4.70,4.90,5.10,5.30,5.60,5.90,6.05,5.90,5.65,5.65,6.40,7.45,7.85,6.80,5.10,4.10,4.80,6.20,6.90,6.10,4.55,3.40,3.05,3.05,3.25,3.70,4.35,4.80,4.85,4.75,4.65,4.75,4.85,4.90,4.80,4.55,4.45,4.50,4.65,4.70,4.60,4.45,4.35,4.45,4.65],"secondary_swell_wave_direction":[10,33,57,80,65,50,35,38,42,45,40,34,29,33,36,40,31,21,12,24,35,47,23,359,335,334,334,333,343,353,3,4,4,5,10,16,21,13,5,357,5,12,20,18,16,14,25,35],"tertiary_swell_wave_height":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"tertiary_swell_wave_period":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"tertiary_swell_wave_direction":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"wind_wave_height":[0.46,0.50,0.54,0.58,0.60,0.64,0.66,0.66,0.64,0.64,0.62,0.60,0.58,0.58,0.56,0.56,0.60,0.62,0.66,0.66,0.64,0.64,0.50,0.38,0.24,0.24,0.26,0.26,0.28,0.32,0.34,0.34,0.36,0.36,0.36,0.36,0.36,0.38,0.40,0.42,0.44,0.44,0.46,0.46,0.48,0.48,0.46,0.42],"wind_wave_period":[2.65,2.70,2.75,2.80,2.85,2.95,3.00,3.00,2.95,2.90,2.90,2.85,2.85,2.85,2.80,2.80,2.85,2.85,2.90,2.95,2.95,2.90,2.65,2.35,2.10,2.00,2.00,2.05,2.10,2.15,2.20,2.25,2.25,2.30,2.30,2.35,2.35,2.40,2.45,2.50,2.55,2.60,2.65,2.65,2.65,2.65,2.60,2.50],"wind_wave_direction":[339,344,349,354,356,357,359,354,348,343,339,335,331,328,326,323,321,320,318,317,315,314,307,300,293,295,298,300,300,300,300,300,299,299,300,302,303,308,314,319,323,326,330,330,330,330,329,329],"sea_surface_temperature":[16.6,16.5,16.5,16.5,16.5,16.4,16.4,16.3,16.3,16.2,16.2,16.1,16.1,16.1,16.1,16.1,16.1,16.1,16.1,16.1,16.0,16.0,16.0,15.9,15.9,15.8,15.8,15.8,15.7,15.7,15.6,15.6,15.5,15.4,15.4,15.3,15.3,15.3,15.3,15.3,15.3,15.3,15.3,15.3,15.3,15.3,15.3,15.2]}}
+\ No newline at end of file
+diff --git a/tests/data/surf-2026-11-14/wind.json b/tests/data/surf-2026-11-14/wind.json
+new file mode 100644
+index 0000000..4057d7e
+--- /dev/null
++++ b/tests/data/surf-2026-11-14/wind.json
+@@ -0,0 +1 @@
++{"latitude":36.725792,"longitude":-75.94617,"generationtime_ms":0.37479400634765625,"utc_offset_seconds":0,"timezone":"GMT","timezone_abbreviation":"GMT","elevation":0.0,"hourly_units":{"time":"iso8601","wind_speed_10m":"m/s","wind_direction_10m":"°","wind_gusts_10m":"m/s","wind_speed_120m":"m/s","temperature_2m":"°C","wind_speed_500hPa":"m/s","wind_direction_500hPa":"°","weather_code":"wmo code","precipitation":"mm","cloud_cover":"%","cloud_cover_low":"%","cloud_cover_mid":"%","cloud_cover_high":"%","precipitation_probability":"%"},"hourly":{"time":["2026-11-14T00:00","2026-11-14T01:00","2026-11-14T02:00","2026-11-14T03:00","2026-11-14T04:00","2026-11-14T05:00","2026-11-14T06:00","2026-11-14T07:00","2026-11-14T08:00","2026-11-14T09:00","2026-11-14T10:00","2026-11-14T11:00","2026-11-14T12:00","2026-11-14T13:00","2026-11-14T14:00","2026-11-14T15:00","2026-11-14T16:00","2026-11-14T17:00","2026-11-14T18:00","2026-11-14T19:00","2026-11-14T20:00","2026-11-14T21:00","2026-11-14T22:00","2026-11-14T23:00","2026-11-15T00:00","2026-11-15T01:00","2026-11-15T02:00","2026-11-15T03:00","2026-11-15T04:00","2026-11-15T05:00","2026-11-15T06:00","2026-11-15T07:00","2026-11-15T08:00","2026-11-15T09:00","2026-11-15T10:00","2026-11-15T11:00","2026-11-15T12:00","2026-11-15T13:00","2026-11-15T14:00","2026-11-15T15:00","2026-11-15T16:00","2026-11-15T17:00","2026-11-15T18:00","2026-11-15T19:00","2026-11-15T20:00","2026-11-15T21:00","2026-11-15T22:00","2026-11-15T23:00"],"wind_speed_10m":[7.40,6.83,8.27,8.24,8.59,8.59,7.59,6.41,5.58,6.41,5.76,6.03,6.60,5.01,7.51,7.66,7.59,8.64,7.30,6.91,7.24,6.02,4.34,3.81,3.11,3.61,3.99,3.99,3.93,4.15,4.62,4.20,3.61,3.57,3.98,4.48,4.57,4.70,4.72,5.86,5.69,5.19,5.56,5.58,5.16,4.36,4.08,4.70],"wind_direction_10m":[354,356,6,3,1,359,355,342,341,339,335,333,341,309,325,319,324,326,320,318,316,319,312,307,278,288,305,305,298,299,305,309,288,301,309,307,307,307,320,337,339,334,336,337,329,320,319,335],"wind_gusts_10m":[10.10,9.60,10.70,10.70,11.50,11.70,10.50,10.00,9.90,10.80,10.80,11.10,10.90,9.90,11.10,12.30,13.10,12.60,11.30,10.50,10.90,10.30,9.00,8.80,8.80,9.50,9.40,9.90,9.50,10.20,10.10,9.50,8.70,9.50,9.10,9.60,9.60,9.10,8.10,7.80,7.20,6.70,7.20,7.40,7.20,8.00,7.50,7.80],"wind_speed_120m":[9.75,9.82,9.55,9.04,9.75,10.63,11.16,10.74,10.18,10.12,10.28,10.11,9.85,9.92,10.74,11.02,10.61,10.35,10.84,11.14,10.26,8.78,7.93,7.83,7.58,7.74,8.70,8.59,8.76,8.23,7.70,7.51,7.45,7.74,7.45,7.87,8.40,8.75,8.72,7.82,8.10,8.14,7.59,7.67,8.72,8.27,8.17,8.42],"temperature_2m":[9.7,9.8,9.1,8.8,9.3,8.3,8.4,8.3,7.0,6.6,6.4,6.1,6.4,6.9,8.4,9.3,9.9,9.5,10.1,10.1,10.4,10.1,8.7,7.9,7.2,6.7,6.7,6.5,6.0,5.6,5.5,5.3,4.1,3.8,4.1,4.2,4.1,5.9,8.6,9.7,10.3,10.9,11.2,11.3,11.0,10.9,10.3,10.1],"wind_speed_500hPa":[21.92,21.73,21.14,21.27,20.27,18.87,15.37,16.03,16.28,15.71,15.72,18.01,18.69,19.56,21.32,22.82,19.68,16.03,15.22,15.58,16.61,17.22,16.35,15.81,16.47,17.32,17.52,19.24,20.14,21.04,22.36,23.00,24.34,25.39,26.08,25.77,24.81,24.11,23.15,21.79,20.04,19.03,18.71,18.05,17.00,17.35,18.67,19.68],"wind_direction_500hPa":[238,235,231,229,230,229,234,240,248,266,279,281,280,275,274,272,281,304,312,325,322,326,334,331,319,313,305,297,290,287,286,284,283,280,279,278,277,278,277,277,280,280,279,279,282,286,284,285],"weather_code":[0,0,0,1,3,0,1,0,0,0,0,0,0,1,0,0,1,3,3,3,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,3,3,3,3,3],"precipitation":[0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00],"cloud_cover":[0,0,12,25,95,2,25,5,1,0,0,0,2,23,0,3,24,94,100,100,23,14,0,2,3,3,0,1,0,0,0,0,1,0,0,0,0,0,4,14,26,30,25,100,100,100,100,100],"cloud_cover_low":[0,0,12,25,95,2,25,3,1,0,0,0,2,23,0,3,24,94,100,100,23,14,0,2,3,3,0,1,0,0,0,0,1,0,0,0,0,0,4,14,26,30,25,100,100,100,100,100],"cloud_cover_mid":[0,0,0,0,0,0,7,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"cloud_cover_high":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"precipitation_probability":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1]}}
+\ No newline at end of file
+diff --git a/tests/stationLive.test.ts b/tests/stationLive.test.ts
+new file mode 100644
+index 0000000..0ccf4ff
+--- /dev/null
++++ b/tests/stationLive.test.ts
+@@ -0,0 +1,108 @@
++import { readFileSync } from 'node:fs'
++import { describe, expect, it } from 'vitest'
++import { metarTime, parseMetarSky } from '../src/core/metar.ts'
++import { skyConsensus, skyStations } from '../src/core/skyConsensus.ts'
++import { skyCondition, metarVisMiles } from '../src/core/skyWord.ts'
++import { stationSky } from '../src/lib/skyFireData.ts'
++import { consensusOf, skyReadings } from '../src/lib/useStationObs.ts'
++import { ASOS_STATIONS } from '../src/data/asosStations.ts'
++import { COOPS_MET } from '../src/data/coopsMet.ts'
++
++/*
++ * THE STATION PATH AGAINST RECORDED LIVE ANSWERS (Batch LIVE, Section 0.1).
++ * 14 Nov 12:21 PM the Sky page said "no station report in the last 75
++ * minutes" at noon. tests/data/stations-2026-11-14/ holds what weather.gov
++ * and aviationweather.gov answered at 18:04Z that day, real timestamps and
++ * all: weather.gov's KNTU latest was the 16:56Z report (an hour behind the
++ * 17:56Z METAR), its KORF and KNFE latest carried no METAR text. The phone's
++ * own path (stationSky, nearWind's airport, the consensus) is run against
++ * them at the minute they were recorded.
++ */
++const DIR = 'tests/data/stations-2026-11-14'
++const NOW = new Date(readFileSync(`${DIR}/recorded-at.txt`, 'utf8').trim())
++const AVWX = readFileSync(`${DIR}/avwx-raw.txt`, 'utf8').split('\n').map((l) => l.trim()).filter((l) => l !== '')
++const VB = { lat: 36.8435575, lon: -75.9713104 }
++
++/** weather.gov's recorded latest, and /api/metar as it answers (aviationweather.gov's newest line for the id). */
++const recorded: typeof fetch = async (input, init) => {
++  const url = String(input)
++  const nws = /api\.weather\.gov\/stations\/([A-Z0-9]{4})\/observations\/latest/.exec(url)
++  if (nws !== null) {
++    try {
++      return new Response(readFileSync(`${DIR}/nws-${nws[1]}-latest.json`, 'utf8'), { status: 200 })
++    } catch {
++      return new Response('{}', { status: 404 })
++    }
++  }
++  if (url === '/api/metar') {
++    const id = (JSON.parse(String(init?.body)) as { station: string }).station
++    const line = AVWX.find((l) => l.startsWith(`METAR ${id} `) || l.startsWith(`${id} `))
++    return line === undefined ? new Response('{}', { status: 404 }) : Response.json({ status: 'ok', metar: line })
++  }
++  throw new Error(`not recorded: ${url}`)
++}
++
++describe('a station report is timed by the report itself', () => {
++  it('metarTime reads the day-hour-minute group', () => {
++    expect(metarTime('METAR KNTU 141756Z 32012KT', NOW)?.toISOString()).toBe('2026-11-14T17:56:00.000Z')
++    expect(metarTime('no time here', NOW)).toBeNull()
++  })
++  it('stationSky takes the newer of weather.gov and aviationweather.gov: KNTU 17:56Z, not weather.gov\'s 16:56Z', async () => {
++    const s = await stationSky('KNTU', recorded, NOW)
++    expect(s?.at).toBe('2026-11-14T17:56:00.000Z')
++  })
++  it('weather.gov with no METAR text (KORF): the fallback\'s report, with its own time, never a blank time', async () => {
++    const s = await stationSky('KORF', recorded, NOW)
++    expect(s).not.toBeNull()
++    expect(s?.at).toBe('2026-11-14T17:51:00.000Z')
++  })
++  it('at the minute recorded, VB has a fresh sky report (the Sky page\'s "no station report" cannot happen with these answers)', async () => {
++    const got = consensusOf(await skyReadings(VB, [], NOW, recorded), NOW)
++    expect(got).not.toBeNull()
++    expect(NOW.getTime() - got!.at.getTime()).toBeLessThan(15 * 60_000)
++  })
++})
++
++describe('the sky word by consensus', () => {
++  it('VB reads the nearest coastal airport (KNGU, on the water at Sewells Point) and the nearest airport (KNTU)', () => {
++    expect(skyStations(VB, ASOS_STATIONS, COOPS_MET).map((s) => `${s.id}:${s.role}`)).toEqual(['KNTU:airport', 'KNGU:coastal'])
++  })
++  /* The reports each station had out at 12:19 PM EST (17:19Z), from IEM's archive of the day. */
++  const iem = readFileSync(`${DIR}/iem-metars.csv`, 'utf8').trim().split('\n').slice(1).map((l) => {
++    const [st, valid, metar] = l.split(',')
++    return { id: `K${st}`, at: new Date(`${valid.replace(' ', 'T')}:00Z`), metar }
++  })
++  const latestAt = (id: string, t: Date) => iem.filter((r) => r.id === id && r.at <= t).sort((a, b) => b.at.getTime() - a.at.getTime())[0]
++  const report = (id: string, t: Date) => {
++    const r = latestAt(id, t)
++    return { id, sky: parseMetarSky(r.metar)!, visMi: metarVisMiles(r.metar), at: r.at }
++  }
++  it('14 Nov 12:19 PM: KNTU OVC060 and KNGU BKN060 disagree, the lesser cover: Mostly cloudy, not Overcast', () => {
++    const t = new Date('2026-11-14T17:19:00Z')
++    const c = skyConsensus([report('KNTU', t), report('KNGU', t)], t)
++    expect(c?.rule).toBe('lesser')
++    expect(c?.word).toBe('Mostly cloudy')
++    const truth = JSON.parse(readFileSync('fixtures/truth/2026-11-14-vb.json', 'utf8')) as { noon: { skyTruth: string } }
++    expect(skyCondition({ code: 3, layers: { low: 60, mid: 40, high: 0 }, day: true, station: { sky: c!.sky, visMi: c!.visMi } })?.word).toBe(truth.noon.skyTruth)
++  })
++  it('both fresh and agreeing: their word (18:04Z, KNTU OVC055 and KNGU OVC050)', async () => {
++    const c = consensusOf(await skyReadings(VB, [], NOW, recorded), NOW)
++    expect(c?.rule).toBe('agree')
++    expect(c?.word).toBe('Overcast')
++  })
++  it('a stale report is no vote: one fresh station is the word', () => {
++    const t = new Date('2026-11-14T17:19:00Z')
++    const old = { ...report('KNGU', t), at: new Date(t.getTime() - 2 * 3_600_000) }
++    expect(skyConsensus([report('KNTU', t), old], t)?.rule).toBe('one')
++    expect(skyConsensus([old], t)).toBeNull()
++  })
++  it('Wrightsville Beach: KILM alone, through the same function', () => {
++    const w = skyStations({ lat: 34.21, lon: -77.796 }, ASOS_STATIONS, COOPS_MET)
++    expect(w.map((s) => s.id)).toContain('KILM')
++    const t = new Date('2026-11-14T17:19:00Z')
++    const c = skyConsensus([report('KILM', t)], t)
++    expect(c?.word).toBe('Clear')
++    /* KILM's CLR reaches 12,000 ft: "Clear" only with the sky above empty too (src/core/skyWord.ts). */
++    expect(skyCondition({ code: 1, layers: { low: 0, mid: 0, high: 40 }, day: true, station: { sky: c!.sky, visMi: c!.visMi } })?.word).not.toBe('Clear')
++  })
++})
+diff --git a/tests/stationNow.test.ts b/tests/stationNow.test.ts
+index 0590be4..2cdd672 100644
+--- a/tests/stationNow.test.ts
++++ b/tests/stationNow.test.ts
+@@ -44,6 +44,7 @@ describe('near now', () => {
+     const b = await stationNow(pier, now + 5 * 60_000, fake)
+     expect(a?.sky.station).toBe('KORF')
+     expect(b?.sky.station).toBe('KORF')
+-    expect(asks).toBe(3)
++    /* The points, the station list, then the station's latest from both weather.gov and /api/metar (Batch LIVE, Section 0.1: the newer report wins); the second read is kept. */
++    expect(asks).toBe(4)
+   })
+ })
+diff --git a/tests/surfLive.test.ts b/tests/surfLive.test.ts
+new file mode 100644
+index 0000000..6345b66
+--- /dev/null
++++ b/tests/surfLive.test.ts
+@@ -0,0 +1,106 @@
++import { readFileSync } from 'node:fs'
++import { describe, expect, it } from 'vitest'
++import { BLOWN_KT, CHOPPY_KT, surfTag, windQuality, type SurfTag } from '../src/core/surf.ts'
++import { LEAN_MAX_FT, surfLean } from '../src/core/surfNowcast.ts'
++import { buoyFaceFt, spotStats } from '../src/core/spotSkill.ts'
++import { beachFactorAt } from '../src/core/beachFactor.ts'
++import { MARINE_NAMES, BRIEF_WIND_NAMES, parseHourly } from '../src/lib/tideSheetData.ts'
++import { surfNowFrom } from '../src/lib/useSurfNow.ts'
++import type { BuoyReading } from '../src/lib/buoy.ts'
++
++/*
++ * ONE SURF SERIES AND THE WIND'S WORD (Batch LIVE, Sections 0.3 and 0.4;
++ * fixtures/truth/2026-11-14-vb.json). 14 Nov 5:38 AM at Sandbridge the home
++ * said "4-6 ft Firing" over its own chart at 1.7 ft, in N 20 kt
++ * cross-onshore: small and messy. At 12:19 PM "0-1 ft Flat" over a dot at
++ * 2.3. Both headlines were the buoy's lean (44099's wind sea read as surf,
++ * its direction swinging NE to NW); the chart was the briefing's unleaned
++ * faces (measurements/2026-11-14-surf-replay.md). The recorded inputs:
++ * tests/data/surf-2026-11-14/.
++ */
++const KT = 1.943844
++const FACING = 73
++const wind = (kt: number, fromDeg: number) => ({ mps: kt / KT, fromDeg, facing: FACING })
++
++describe('the wind word over the size, one test per band', () => {
++  /* At a beach facing 73°: from 73° onshore, from 10° cross-onshore (63° apart), from 160° cross-shore, from 200° cross-offshore, from 253° offshore. */
++  const cases: [string, number, number, SurfTag][] = [
++    ['onshore 10 kt: the size stands', 10, 73, 'Firing'],
++    [`onshore at ${CHOPPY_KT} kt exactly: the size stands`, CHOPPY_KT, 73, 'Firing'],
++    ['onshore 15 kt: Choppy', 15, 73, 'Choppy'],
++    [`onshore ${BLOWN_KT} kt: Choppy`, BLOWN_KT, 73, 'Choppy'],
++    ['onshore 22 kt: Blown out', 22, 73, 'Blown out'],
++    ['cross-onshore 14 kt: Choppy', 14, 10, 'Choppy'],
++    ['cross-onshore 20 kt (14 Nov 5:38, N 20): Blown out', 20, 0, 'Blown out'],
++    ['cross-shore 20 kt: the size stands', 20, 163, 'Firing'],
++    ['cross-offshore 20 kt: the size stands', 20, 200, 'Firing'],
++    ['offshore 25 kt: the size stands', 25, 253, 'Firing'],
++  ]
++  for (const [name, kt, from, want] of cases) it(name, () => expect(windQuality('Firing', wind(kt, from))).toBe(want))
++  it('Fun and Rideable the same; Small and Flat are never relabelled', () => {
++    expect(windQuality('Fun', wind(15, 73))).toBe('Choppy')
++    expect(windQuality('Rideable', wind(20, 73))).toBe('Blown out')
++    expect(windQuality('Small', wind(25, 73))).toBe('Small')
++    expect(windQuality('Flat', wind(25, 73))).toBe('Flat')
++  })
++  it('no wind known: the size stands', () => {
++    expect(windQuality('Firing', null)).toBe('Firing')
++    expect(windQuality('Firing', { mps: null, fromDeg: 0, facing: FACING })).toBe('Firing')
++  })
++  it('surfTag never says Fun or Firing in onshore wind over 12 kt, at any size', () => {
++    for (let ft = 0; ft <= 10; ft += 0.5) for (const kt of [12.5, 15, 18, 19, 30]) for (const from of [73, 10, 130]) expect(['Fun', 'Firing']).not.toContain(surfTag(ft, 'Clean', wind(kt, from)))
++  })
++})
++
++describe('the buoy lean, bounded and read by its split', () => {
++  it('one reading moves the centre by at most 1 ft or half of it', () => {
++    expect(surfLean(4.65, 1.78, 0)?.missFt).toBe(LEAN_MAX_FT)
++    expect(surfLean(0, 1.55, 0)?.missFt).toBe(-LEAN_MAX_FT)
++    expect(surfLean(9, 4, 0)?.missFt).toBe(2)
++    expect(surfLean(2.3, 2, 0)?.missFt).toBeCloseTo(0.3, 6)
++  })
++  it('a wind sea blowing off the beach carries nothing to it (16:26Z, WWH 1.8 m from NW)', () => {
++    const split = { swellM: 0.1, swellS: 10.5, swellFrom: 'E', windWaveM: 1.8, windWaveS: 5, windWaveFrom: 'NW' }
++    expect(buoyFaceFt({ waveM: 1.8, periodS: 5, fromDeg: 314, split }, FACING)).toBeLessThan(1)
++  })
++})
++
++describe('14 Nov replayed: one series, never 4-6 over a chart at 1.7', () => {
++  const DIR = 'tests/data/surf-2026-11-14'
++  const marine = parseHourly(JSON.parse(readFileSync(`${DIR}/marine.json`, 'utf8')), MARINE_NAMES)!
++  const windH = parseHourly(JSON.parse(readFileSync(`${DIR}/wind.json`, 'utf8')), BRIEF_WIND_NAMES)!
++  const num = (x: string | undefined) => (x === undefined || x === 'MM' ? null : Number(x))
++  const spec = readFileSync(`${DIR}/44099.spec`, 'utf8').split('\n').filter((l) => !l.startsWith('#') && l.trim() !== '').map((l) => l.trim().split(/\s+/))
++  const rows = readFileSync(`${DIR}/44099.txt`, 'utf8').split('\n').filter((l) => !l.startsWith('#') && l.trim() !== '').map((l) => l.trim().split(/\s+/))
++  const stamp = (f: string[]) => new Date(`${f[0]}-${f[1]}-${f[2]}T${f[3]}:${f[4]}:00Z`)
++  /* The reading the phone had: the latest 30 minutes before (NDBC posts that late). */
++  const buoyAt = (t: Date): BuoyReading => {
++    const f = rows.filter((r) => stamp(r).getTime() <= t.getTime() - 30 * 60_000 && r[8] !== 'MM').sort((a, b) => stamp(b).getTime() - stamp(a).getTime())[0]
++    const s = spec.find((g) => stamp(g).getTime() === stamp(f).getTime())!
++    return { status: 'ok', buoy: { id: '44099', name: 'Cape Henry', at: { lat: 36.915, lon: -75.72 }, km: 29 }, at: stamp(f), waveM: Number(f[8]), periodS: num(f[9]), fromDeg: num(f[11]), split: { swellM: num(s[6]), swellS: num(s[7]), windWaveM: num(s[8]), windWaveS: num(s[9]), swellFrom: s[10], windWaveFrom: s[11] } }
++  }
++  const read = (iso: string, windNow: { mps: number; fromDeg: number } | null) => {
++    const now = new Date(iso)
++    const sea = { status: 'ready' as const, marine, wind: windH, facing: FACING, facingState: 'ok' as const, buoy: buoyAt(now), factor: beachFactorAt({ lat: 36.72, lon: -75.93 }) }
++    return surfNowFrom(sea, spotStats([], 0), now, 'America/New_York', windNow === null ? null : { ...windNow, facing: FACING })
++  }
++  it('5:38 AM: not 4-6, not Firing; with the Wind card\'s N 20 kt, Blown out', () => {
++    const r = read('2026-11-14T10:38:00Z', { mps: 20 / KT, fromDeg: 0 })
++    const call = r.week[0].call!
++    expect(call.words).not.toBe('4–6 ft')
++    expect(call.highFt).toBeLessThanOrEqual(3)
++    expect(call.size).toBe('Blown out')
++  })
++  it('the chart\'s now is the headline\'s hour: the same centre, both moments', () => {
++    for (const iso of ['2026-11-14T10:38:00Z', '2026-11-14T17:19:00Z']) {
++      const r = read(iso, null)
++      expect(r.hours[0].centerFt).toBeCloseTo(r.week[0].hour!.centerFt, 9)
++      expect(r.hours[0].at.getTime()).toBe(r.week[0].hour!.at.getTime())
++    }
++  })
++  it('12:19 PM: the lean no longer takes the forecast to nothing (centre kept within 1 ft of it)', () => {
++    const r = read('2026-11-14T17:19:00Z', null)
++    expect(r.week[0].hour!.centerFt).toBeGreaterThan(0.5)
++    expect(Math.abs(r.week[0].hour!.leanFt)).toBeLessThanOrEqual(1 + 1e-9)
++  })
++})
+diff --git a/tests/surfNowcast.test.ts b/tests/surfNowcast.test.ts
+index 6642035..b3a1a4c 100644
+--- a/tests/surfNowcast.test.ts
++++ b/tests/surfNowcast.test.ts
+@@ -1,7 +1,7 @@
+ import { describe, expect, it } from 'vitest'
+ import { beachFactorAt } from '../src/core/beachFactor.ts'
+ import { buoyFaceFt } from '../src/core/spotSkill.ts'
+-import { leanRange, SURF_FADE_MS, surfLeanWeight } from '../src/core/surfNowcast.ts'
++import { LEAN_MAX_FT, leanRange, SURF_FADE_MS, surfLeanWeight } from '../src/core/surfNowcast.ts'
+ import { SURF_SPOTS } from '../src/data/surfSpots.ts'
+ import type { BuoyReading } from '../src/lib/buoy.ts'
+ import { nearestBuoys } from '../src/lib/buoy.ts'
+@@ -51,7 +51,8 @@ describe('the surf nowcast: the next 6 h lean to the buoy, then the model', () =
+     const face = buoyFaceFt({ waveM: 3.0 / 3.28084, periodS: 12, fromDeg: 90 }, MIRLO.facing, beachFactorAt(MIRLO.at)) as number
+     expect(face).toBeGreaterThanOrEqual(3)
+     const lean = buoyLean(marine, wind, buoy(at), MIRLO.facing, NO_STATS, beachFactorAt(MIRLO.at), NOW)
+-    expect(lean?.missFt).toBeGreaterThan(1)
++    /* Batch LIVE, Section 0.3: one reading moves the centre by at most 1 ft or half of it. */
++    expect(lean?.missFt).toBeCloseTo(Math.max(LEAN_MAX_FT, (without?.centerFt as number) / 2), 6)
+     const withBuoy = surfNowFrom(sea(buoy(at)), NO_STATS, new Date(NOW), TZ).now
+     /* Read at half past: 50 minutes after the reading, the lean is still 1 - 50/360. */
+     expect(withBuoy?.centerFt).toBeCloseTo((without?.centerFt as number) + (1 - 50 / 360) * (lean?.missFt as number), 6)
+diff --git a/tests/windSideNext.test.ts b/tests/windSideNext.test.ts
+new file mode 100644
+index 0000000..31bf32c
+--- /dev/null
++++ b/tests/windSideNext.test.ts
+@@ -0,0 +1,26 @@
++import { describe, expect, it } from 'vitest'
++import { nextSideChange, sideSpanWords } from '../src/core/homeDay.ts'
++
++/*
++ * THE WIND CARD SAYS ONLY WHAT IS STILL TO COME (Batch LIVE, Section 0.5;
++ * fixtures/truth/2026-11-14-vb.json: at 5:38 AM it said "→ cross-off 5a").
++ * The forecast's hours sit at half past; the 5 AM hour starts at 5:00.
++ */
++const at = (h: number, m = 30) => new Date(Date.UTC(2026, 10, 14, h + 5, m))
++const hours = [
++  { at: at(5), side: 'Cross-offshore' as const },
++  { at: at(6), side: 'Cross-offshore' as const },
++  { at: at(9), side: 'Offshore' as const },
++]
++
++describe('the next side change', () => {
++  it('at 5:38 the 5 AM hour has begun: its change is not said; the next one is', () => {
++    const c = nextSideChange(hours, 'Cross-onshore', at(5, 38))
++    expect(c?.at.getTime()).toBe(at(6, 0).getTime())
++    expect(sideSpanWords('Cross-onshore', c, 'America/New_York')).toMatch(/6a$/)
++  })
++  it('a change that has passed is never the line', () => {
++    expect(nextSideChange(hours, 'Cross-offshore', at(9, 10))).toBeNull()
++    expect(sideSpanWords('Cross-offshore', null, 'America/New_York')).toMatch(/all day$/)
++  })
++})
