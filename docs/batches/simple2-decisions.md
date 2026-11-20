@@ -131,3 +131,19 @@ Integration calls (by the integration pass):
   Surfline paid, different pages): each row now names whose cam it is.
 - The moonrise card on home opens the Sky page on Night; covered by a unit
   test only, not yet by a browser audit.
+
+## Close (05:48, 20 Nov)
+
+Committed, each through the full gate, none pushed: ae3b692 (S0), abe9015
+(clock fix for two audits), 33ba638 (S1), fd8f351 (moon), e67c14b (S6),
+cf9072d (S7), a9abd70 (S2–S5). No piece was reverted; the only re-runs were
+known flakes (service worker, gesture, viewfinder), each passing alone.
+S8 not started (see top). Contact sheets are in docs/batches/simple2-sheets/,
+kept local and out of git (325 MB, in .git/info/exclude).
+
+Left for the next batch: a browser audit for the home's moonrise card
+opening Sky on Night; the overflow audit's "Surf, Advanced" label on a page
+with no Advanced tab; Fish's own window; no cam embeds until an owner says
+yes; the "Tmrw AM" label against the words rule; menu duplicates; skyEvents
+still on its 6-hour grid; refuges not yet in aerialHero or suggest; checks on
+a real iPhone; can I fly (4 taps) and plan a shoot (5) over the 3-tap aim.
