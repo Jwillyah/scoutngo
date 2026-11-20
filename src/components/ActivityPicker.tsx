@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ACTIVITIES, type Activity } from '../core/homeDay.ts'
 import { ACTIVITY_LINES, ACTIVITY_WORDS } from '../lib/activities.ts'
 import { ActivityIcon } from './ActivityIcon.tsx'
+import { PERSONAS, PERSONA_LINES, PERSONA_WORDS, type Persona } from '../lib/persona.ts'
 
 /*
  * "WHAT DO YOU DO OUTSIDE?" (Batch M, Section 2; board "HOME 8 Nov ·
@@ -76,6 +77,51 @@ export function ActivityPicker({ variant, value, onDone, onLater }: ActivityPick
             </button>
           )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+/*
+ * "WHAT DO YOU DO OUTSIDE?", ONE TAP (Batch SIMPLE-2, Section 2). Five
+ * choices; a tap picks and goes on to the home, no Continue. "Not now" skips
+ * (the home shows the Surf order, and the question comes back with the next
+ * spot picked). The pick is the persona (src/lib/persona.ts), kept on this
+ * phone only, and changed from the home's pill or Settings. The multi-pick
+ * sheet above is Batch M's, behind ACTIVITY_MULTI (src/config/flags.ts).
+ */
+export function PersonaPicker({ value, onPick, onLater }: { value: Persona | null; onPick: (p: Persona) => void; onLater?: () => void }) {
+  return (
+    <div className="actpick actpick--sheet actpick--persona" role="dialog" aria-label="What do you do outside?">
+      <div className="actpick__panel">
+        <p className="actpick__brand">ScoutNGo</p>
+        <h2 className="actpick__title">What do you do outside?</h2>
+        <p className="actpick__sub">One tap. Your home leads with it. Change it anytime in Settings.</p>
+        <ul className="actpick__list" role="group" aria-label="What do you do outside?">
+          {PERSONAS.map((p) => (
+            <li key={p}>
+              <button type="button" className={`actpick__opt${value === p ? ' actpick__opt--on' : ''}`} aria-pressed={value === p} data-persona={p} onClick={() => onPick(p)}>
+                <span className={`actpick__tile actpick__tile--${p}`}>
+                  <ActivityIcon activity={p} className="actpick__icon" />
+                </span>
+                <span className="actpick__text">
+                  <span className="actpick__word">{PERSONA_WORDS[p]}</span>
+                  <span className="actpick__line">{PERSONA_LINES[p]}</span>
+                </span>
+                <span className="actpick__tick" aria-hidden="true">
+                  ›
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+        {onLater === undefined ? null : (
+          <div className="actpick__end">
+            <button type="button" className="actpick__later" onClick={onLater}>
+              Not now
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

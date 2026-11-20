@@ -33,6 +33,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { chromium, webkit, devices } from './gate/playwright.mjs'
 import { ensureApp, findChrome, goToStage, guardAudit, startWatchdog, APP_ORIGIN, openMenu } from './preflight.mjs'
+import { goHome } from './preflight.mjs'
 
 /* Batch Polish, Section 2: the menu is the home's (and setup's and field's); on the map its Back goes home first (scripts/preflight.mjs openMenu). */
 const menuOn = (pg) => openMenu((x) => pg.evaluate(x), (ms) => pg.waitForTimeout(ms))
@@ -72,7 +73,7 @@ const READ = (tokens) => `JSON.stringify((() => {
   const lum = (c) => (0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b) / 255
   const vis = (e, b, st) => b.width > 0 && b.height > 0 && st.visibility !== 'hidden' && st.display !== 'none' && b.bottom > 0 && b.top < innerHeight && b.right > 0 && b.left < innerWidth && Number(st.opacity) > 0.05
   const out = { mono: new Set(), square: new Set(), black: new Set(), flat: new Set(), lookd: new Set(), colour: {} }
-  const CARDS = '.hcard, .dcard, .wtile, .wweek, .mcard, .spage__checks, .cal2__card'
+  const CARDS = '.hcard, .dcard, .wtile, .wweek, .mcard, .spage__checks, .cal2__card, .tipage__card, .htile, .hwtile, .hmoment, .mlist'
   const off = (where, c) => { if (c === null || c.a < 0.05) return; const h = hex(c); if (TOKENS.has(h)) return; if ((c.r === c.g && c.g === c.b) && (c.r === 255 || c.r === 0)) return; (out.colour[h] ??= new Set()).add(where) }
   /* The screen on top: the last open page, sheet or dialog that covers half the screen; else everything. */
   const tops = [...document.querySelectorAll('[role="dialog"]')].filter((d) => { const b = d.getBoundingClientRect(); return b.height > innerHeight * 0.5 && getComputedStyle(d).display !== 'none' })
@@ -259,19 +260,22 @@ try {
   await menuOn(page)
   await wait(3000)
   await look('menu')
-  for (const [what, screen] of [['.mcard--sky', 'sky page'], ['.mcard--drone', 'drone page']]) {
-    if (await tap(`nav[aria-label="Stage"] ${what}`, screen)) {
+  /* Batch SIMPLE-2, Sections 2 and 3: the pages are the home's tiles (the menu has no cards). */
+  for (const [what, screen] of [['sky', 'sky page'], ['drone', 'drone page']]) {
+    await goHome(ev, wait)
+    if (await tap(`.home [data-tile="${what}"]`, screen)) {
       await look(screen)
-      /* Batch Pages: the month too (the calendar was flat navy), from the Sky page's Calendar button (Section 3). */
-      if (what === '.mcard--sky' && (await tap('.spage__buttons button:has-text("Calendar")', 'calendar'))) {
-        await look('calendar')
-        await tap('.cal__close', 'close the calendar')
+      /* Batch SIMPLE-2, Section 4: every tab of the tap-in Sky page (the month is Menu › Calendar now, no button here). */
+      if (what === 'sky') {
+        for (const [i, pill] of ['evening', 'morning', 'night'].entries()) {
+          if (await tap(`.tipage.spage .tipage__tabs [role="tab"] >> nth=${i + 1}`, `sky ${pill}`)) await look(`sky page ${pill}`)
+        }
       }
-      /* Batch QA, Section 1: Color detail, which no screen here reached (its best-view line was cut). */
-      if (what === '.mcard--sky') {
+      /* Batch QA, Section 1: Color detail (the Sky page's More details ›), which no screen here reached (its best-view line was cut). */
+      if (what === 'sky') {
         await closeAll()
-        await menuOn(page)
-        if ((await tap(`nav[aria-label="Stage"] ${what}`, screen)) && (await tap('.spage button:has-text("Color detail")', 'color detail'))) {
+        await goHome(ev, wait)
+        if ((await tap(`.home [data-tile="${what}"]`, screen)) && (await tap('.tipage.spage .tipage__more', 'color detail'))) {
           await wait(3000)
           await look('color detail')
         }
@@ -301,19 +305,27 @@ try {
   await page.getByRole('button', { name: /^open$/i }).click({ timeout: 4000 }).catch(() => {})
   await goToStage(ev, wait, 'plan')
   await wait(2000)
-  await menuOn(page)
-  if (await tap('nav[aria-label="Stage"] .mcard--today', 'home')) {
+  if ((await goHome(ev, wait)) === 'home') {
     await wait(2500)
     await look('home')
-    /* Batch Pages, Section 2: the Weather page, from the home's "Weather ›". */
-    if (await tap('.home__page[aria-label="Today"] .hwx__temp', 'weather page')) {
+    /* Batch Pages, Section 2: the Weather page, from the home's Weather tile. */
+    if (await tap('.home [data-tile="weather"]', 'weather page')) {
       await wait(2500)
       await look('weather page')
       await tap('.wpage .ppage__back', 'back to the home')
     }
-    if (await tap('.home__page[aria-label="Today"] .hcard--surf', 'surf page')) {
+    if (await tap('.home [data-tile="surf"]', 'surf page')) {
       await wait(2500)
       await look('surf page')
+      for (const tab of ['Cams', 'Buoys']) {
+        if (await tap(`.tipage--surf button[role="tab"]:has-text("${tab}")`, `surf ${tab}`)) {
+          await wait(2000)
+          await look(`surf ${tab.toLowerCase()} tab`)
+        }
+      }
+      await tap('.tipage--surf button[role="tab"]:has-text("Now")', 'surf now')
+      await tap('.tipage--surf .tipage__more', 'surf more details')
+      await wait(1500)
       for (const tab of ['Tide', 'Wind', 'Buoys']) {
         if (await tap(`.dpage__tab:has-text("${tab}")`, `${tab} page`)) {
           await wait(2500)
@@ -325,9 +337,9 @@ try {
   /* Last in WebKit: the drone view is kept across a reload, so nothing is looked at after it. Back from the detail page and the home to the map first (both are kept too). */
   await tap('.dpage__back', 'back')
   await tap('.home .hbtn--round[aria-label="Open the map"]', 'the map')
-  await menuOn(page)
+  await goHome(ev, wait)
   /* The drone view's HUD: the Drone page › Plan the flight (Batch Flow, Section 5; renamed in Batch DRONE, Section 2.5). */
-  if (await tap('nav[aria-label="Stage"] .mcard--drone', 'drone page')) {
+  if (await tap('.home [data-tile="drone"]', 'drone page')) {
     /* Batch SIMPLE-1, Section 1: on the Preflight tab, under its two buttons, while Labs is on. */
     await tap('button[role="tab"]:has-text("Preflight")', 'the Preflight tab')
     if (await tap('.drp__labsrow button:has-text("Plan the flight")', 'drone view')) {
@@ -364,10 +376,10 @@ try {
     await cp.waitForTimeout(1500)
     const page0 = page
     page = cp
-    /* Batch Flow, Section 8: the menu has no Viewfinder row; the Viewfinder is the Sky page's button. A route that does not open is a problem, never a pass. */
-    const opened = (await tap('nav[aria-label="Stage"] .mcard--sky', 'the Sky page from the menu')) && (await tap('.spage .spage__btn:has-text("Viewfinder")', 'viewfinder'))
+    /* Batch SIMPLE-2, Section 3: the Viewfinder is a row of the ☰ menu. A route that does not open is a problem, never a pass. */
+    const opened = await tap('nav[aria-label="Stage"] .mrow:has-text("Viewfinder")', 'viewfinder')
     if (!opened) {
-      console.log('      PROBLEM: the Viewfinder could not be reached (menu › Sky › Viewfinder), so its style was not looked at')
+      console.log('      PROBLEM: the Viewfinder could not be reached (☰ › Viewfinder), so its style was not looked at')
       problems += 1
     }
     if (opened) {

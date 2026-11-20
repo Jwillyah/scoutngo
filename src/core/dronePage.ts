@@ -90,31 +90,33 @@ export const NIGHT_STARS: readonly [number, number, number][] = [
 
 /* ------------------------------------------- the tabs (Batch SIMPLE-1, Section 1) */
 
-/** The Drone page's tabs: Wind · Airspace · Preflight (and Plan, behind src/config/flags.ts DRONE_PLAN_TAB). */
+/** The Drone page's tabs: Preflight · Wind · Airspace (and Plan, behind src/config/flags.ts DRONE_PLAN_TAB). */
 export type DroneTab = 'wind' | 'airspace' | 'preflight' | 'plan'
 /** What a caller may still ask for: the old ids are mapped, so none of them breaks. */
 export type DroneTabAsked = DroneTab | 'now' | 'height'
 
-/** The tab a request lands on: now and height are Wind; plan is Plan only while its flag is on, else Preflight. */
+/** The tab a request lands on: Preflight unless a caller asks for another (Batch SIMPLE-2, Section 4: the page opens on its "should I go?" tab); now and height are Wind; plan is Plan only while its flag is on, else Preflight. */
 export function droneTabFor(asked: DroneTabAsked | undefined, planOn: boolean): DroneTab {
   switch (asked) {
     case 'airspace':
       return 'airspace'
-    case 'preflight':
-      return 'preflight'
+    case 'wind':
+    case 'now':
+    case 'height':
+      return 'wind'
     case 'plan':
       return planOn ? 'plan' : 'preflight'
     default:
-      return 'wind'
+      return 'preflight'
   }
 }
 
 /** The tabs in order, with their words. */
 export function droneTabs(planOn: boolean): readonly { id: DroneTab; label: string }[] {
   return [
+    { id: 'preflight', label: 'Preflight' },
     { id: 'wind', label: 'Wind' },
     { id: 'airspace', label: 'Airspace' },
-    { id: 'preflight', label: 'Preflight' },
     ...(planOn ? [{ id: 'plan' as const, label: 'Plan' }] : []),
   ]
 }

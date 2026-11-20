@@ -64,11 +64,20 @@ export function LayerMarker({ map, at, lines, children, layer, atSpot }: Props) 
        * buttons: on the right of the marker at 390 x 664 the card covered the
        * compass.
        */
-      const avoid: Rect[] = [...document.querySelectorAll('[data-layer-source], .rail2__btn')]
+      const avoid: Rect[] = [...document.querySelectorAll('[data-layer-source], .rail2__btn, .lmark-hint__words, .lmark-back')]
         .map((e) => e.getBoundingClientRect())
         .filter((q) => q.width > 0 && q.height > 0)
         .map((q) => ({ x: q.left - box.left, y: q.top - box.top, w: q.width, h: q.height }))
-      const fit = { avoid, px: p.x, py: p.y, w: c.offsetWidth, h: c.offsetHeight, boxW: box.width, boxH: box.height, gap: GAP, edge: EDGE }
+      /*
+       * Batch SIMPLE-2, Section 5.5: never off the glass. The card keeps below
+       * the bar at the top (whose box starts under the status bar's safe area
+       * in standalone) and above the sheet that holds the timeline, measured
+       * here, so a marker under either still has its card on show beside it.
+       */
+      const shown = (sel: string) => [...document.querySelectorAll(sel)].map((e) => e.getBoundingClientRect()).filter((q) => q.width > 0 && q.height > 0)
+      const top = Math.max(0, ...shown('.topbar').map((q) => q.bottom - box.top))
+      const sheetTop = Math.min(box.height, ...shown('.sheet').map((q) => q.top - box.top))
+      const fit = { avoid, px: p.x, py: p.y, w: c.offsetWidth, h: c.offsetHeight, boxW: box.width, boxH: box.height, gap: GAP, edge: EDGE, top, bottom: Math.max(0, box.height - sheetTop) }
       let at = readoutBeside(fit)
       if (at.maxWidth !== null) {
         c.style.maxWidth = `${Math.floor(at.maxWidth)}px`

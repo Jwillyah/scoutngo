@@ -196,10 +196,23 @@
 .ltl__when {
   flex: 0 1 auto;
   min-width: 0;
+  min-height: 44px;
   margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
   overflow: hidden;
   white-space: nowrap;
-  text-overflow: ellipsis;
+  line-height: 1.15;
+}
+.ltl__when--go {
+  border: 0;
+  background: transparent;
+  color: var(--white);
+  font: inherit;
+  text-align: left;
 }
 .ltl__time {
   font-size: 17px;
@@ -212,38 +225,64 @@
   font-weight: 700;
 }
 .ltl__now--go {
-  min-width: 44px;
-  min-height: 44px;
-  padding: 0 6px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  font: inherit;
-  font-size: var(--text-sm);
-  font-weight: 700;
-  color: var(--d-surf);
   text-decoration: underline;
 }
 .ltl__chips {
   display: flex;
   flex: none;
-  gap: 4px;
+  align-items: center;
+  gap: 2px;
   margin-left: auto;
 }
 .ltl__menuwrap {
   position: relative;
 }
-.ltl__chip {
-  min-height: 44px;
-  padding: 0 12px;
+/* Batch SIMPLE-2, Section 5 (board Wind_Map): Wind · Radar · Clouds, one pill, the layer on in white. */
+.ltl__seg {
+  display: flex;
   border: 1px solid var(--glass-edge);
   border-radius: 999px;
   background: rgb(255 255 255 / 0.08);
+}
+.ltl__chip {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
   color: var(--white);
   font: inherit;
   font-size: var(--text-sm);
   font-weight: 700;
   white-space: nowrap;
+}
+.ltl__chip--on {
+  background: var(--white);
+  color: var(--sky-ink);
+}
+/* ⋯: drawn 30 px, a finger's 44 px of touch (the hit reaches into the gap and the sheet's gutter). */
+.ltl__more {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--white);
+}
+.ltl__more::after {
+  content: '';
+  position: absolute;
+  inset: 0 -7px;
+}
+.ltl__more svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
 }
 .ltl__menu {
   position: absolute;
@@ -481,9 +520,9 @@
 /* A 360-390 px phone: the time a size down so the row keeps one line. */
 @media (max-width: 400px) {
   .ltl__time {
-    font-size: 15px;
+    font-size: 14px;
   }
   .ltl__chip {
-    padding: 0 8px;
+    padding: 0 5px;
   }
 }

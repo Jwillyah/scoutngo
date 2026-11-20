@@ -81,6 +81,8 @@ export interface Chip {
   spoken?: string
   /** A short second word under the value, small: "models split". */
   note?: string
+  /** The fact in the words every screen shares (data-shared), for a value shortened to fit: "high 12:56 pm" under "High 12:56p". */
+  shared?: string
   /** The wind's dot (offshore, cross, onshore at this beach) or the tide's arrow. */
   mark?: 'offshore' | 'cross' | 'onshore' | 'rising' | 'falling'
 }
@@ -165,7 +167,7 @@ export function ChipRow({ chips, active, onOpen, measureRef, status = null, stat
           onClick={() => onOpen(chip.kind)}
         >
           {/* Batch Polish 2, Section 1: one line, the words say what the number is ("Sunrise 6:37a", "High cloud"). */}
-          <span className={`chip2__value${chip.value === null ? '' : ' num'}`} {...(chip.kind === 'tide' && chip.value !== null && /^(High|Low) /.test(chip.value) ? { 'data-shared': 'tide', 'data-value': chip.value.toLowerCase() } : {})}>
+          <span className={`chip2__value${chip.value === null ? '' : ' num'}`} {...(chip.kind === 'tide' && chip.value !== null && chip.shared !== undefined ? { 'data-shared': 'tide', 'data-value': chip.shared } : {})}>
             {chip.value ?? NO_DATA}
             {chip.mark === undefined || chip.value === null ? null : <span className={`chip2__mark chip2__mark--${chip.mark}`} aria-hidden="true">{chip.mark === 'rising' ? '↑' : chip.mark === 'falling' ? '↓' : ''}</span>}
           </span>

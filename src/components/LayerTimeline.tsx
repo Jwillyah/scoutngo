@@ -107,12 +107,71 @@ const PLOT_PX = 40
 
 const flagShift = (f: number) => `translateX(-${(Math.max(0, Math.min(1, f)) * 100).toFixed(1)}%)`
 
-const LAYER_WORD: Record<TimelinePick, string> = { wind: 'Wind', clouds: 'Clouds', tide: 'Tide', radar: 'Rain', off: 'Off' }
-const PICKS: readonly TimelinePick[] = ['wind', 'clouds', 'tide', 'radar', 'off']
+const LAYER_WORD: Record<TimelinePick, string> = { wind: 'Wind', clouds: 'Clouds', tide: 'Tide', radar: 'Radar', off: 'Off' }
+/** The bar's chips (board Wind_Map): the three layers it is mostly read for; the tide and Layers off are under ⋯. */
+const BAR_CHIPS = ['wind', 'radar', 'clouds'] as const
+
+/*
+ * THE BAR'S LAYER CHIPS (Batch SIMPLE-2, Section 5; board Wind_Map): Wind ·
+ * Radar · Clouds as one segmented pill, the one on in white, and ⋯ for the
+ * rest: the wind's height and model (with the wind on), the tide, and Layers
+ * off. The same chips sit over the radar's legend when the radar is on, so
+ * the bar is one bar whichever layer it shows (ux-rules 15).
+ */
+export function LayerChips({ layer, onPick, wind }: { layer: TimelinePick; onPick: (p: TimelinePick) => void; wind?: Pick<WindProps, 'levelFt' | 'onLevel' | 'model' | 'onModel'> }) {
+  const [menu, setMenu] = useState(false)
+  const modelLabel = MODEL_CHIPS.find((m) => m.id === wind?.model)?.label ?? 'Blend'
+  return (
+    <div className="ltl__chips" data-layer-chips={layer}>
+      <div className="ltl__seg" role="radiogroup" aria-label="Layer">
+        {BAR_CHIPS.map((p) => (
+          <button key={p} type="button" role="radio" aria-checked={p === layer} className={`ltl__chip${p === layer ? ' ltl__chip--on' : ''}`} data-layer-pick={p} onClick={() => (setMenu(false), p === layer ? undefined : onPick(p))}>
+            {LAYER_WORD[p]}
+          </button>
+        ))}
+      </div>
+      <div className="ltl__menuwrap">
+        <button type="button" className="ltl__more" data-layer-more data-level-chip={wind === undefined ? undefined : ''} aria-haspopup="menu" aria-expanded={menu} aria-label={wind === undefined ? 'More layers' : `More: height ${wind.levelFt === 0 ? 'surface' : '400 ft'}, model ${modelLabel}, other layers`} onClick={() => setMenu(!menu)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="5" cy="12" r="2" />
+            <circle cx="12" cy="12" r="2" />
+            <circle cx="19" cy="12" r="2" />
+          </svg>
+        </button>
+        {menu ? (
+          <div className="ltl__menu" role="menu" aria-label="More layers">
+            {wind === undefined ? null : (
+              <>
+                <p className="ltl__menuhead">Height</p>
+                {([0, 400] as const).map((ft) => (
+                  <button key={ft} type="button" role="menuitemradio" aria-checked={wind.levelFt === ft} data-level-pick={ft} className={`ltl__item${wind.levelFt === ft ? ' ltl__item--on' : ''}`} onClick={() => (setMenu(false), wind.onLevel(ft))}>
+                    {ft === 0 ? 'Surface' : '400 ft'}
+                  </button>
+                ))}
+                <p className="ltl__menuhead">Model</p>
+                {(['blend', 'hrrr', 'ecmwf'] as const).map((id) => (
+                  <button key={id} type="button" role="menuitemradio" aria-checked={wind.model === id} data-model-pick={id} className={`ltl__item${wind.model === id ? ' ltl__item--on' : ''}`} onClick={() => (setMenu(false), wind.onModel(id))}>
+                    {MODEL_CHIPS.find((m) => m.id === id)?.label ?? id}
+                  </button>
+                ))}
+                <p className="ltl__menuhead">Layers</p>
+              </>
+            )}
+            <button type="button" role="menuitemradio" aria-checked={layer === 'tide'} className={`ltl__item${layer === 'tide' ? ' ltl__item--on' : ''}`} data-layer-pick="tide" onClick={() => (setMenu(false), onPick('tide'))}>
+              Tide
+            </button>
+            <button type="button" role="menuitem" className="ltl__item" data-layer-pick="off" data-wind-off="" onClick={() => (setMenu(false), onPick('off'))}>
+              Layers off
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  )
+}
 
 export function LayerTimeline({ layer, span, at, now, timeZone, lat, lon, onAt, onNow, onHold, onPick, wind, tide, percent }: Props) {
   const [play, setPlay] = useState(false)
-  const [menu, setMenu] = useState<'layer' | 'level' | null>(null)
   const track = useRef<HTMLDivElement>(null)
   const thumb = useRef<HTMLDivElement>(null)
   const flag = useRef<HTMLSpanElement>(null)
@@ -182,6 +241,7 @@ export function LayerTimeline({ layer, span, at, now, timeZone, lat, lon, onAt, 
 
   const isNow = Math.abs(at.getTime() - now.getTime()) < HOUR_MS / 2
   const modelLabel = MODEL_CHIPS.find((m) => m.id === wind?.model)?.label ?? 'Blend'
+  /* Batch SIMPLE-2, Section 5 (board Wind_Map): the row is play · the time · now · Wind Radar Clouds · ⋯. */
 
   return (
     <div className={`ltl ltl--${layer}`} data-layer-timeline={layer} data-wind-timebar={layer === 'wind' ? '' : undefined} data-model={wind === undefined ? undefined : modelLabel}>
@@ -189,65 +249,23 @@ export function LayerTimeline({ layer, span, at, now, timeZone, lat, lon, onAt, 
         <button type="button" className="ltl__play" aria-label={play ? 'Pause' : `Play the ${LAYER_WORD[layer].toLowerCase()}`} aria-pressed={play} onClick={() => setPlay(!play)}>
           <svg viewBox="0 0 24 24" aria-hidden="true">{play ? <path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" /> : <path d="M8 5v14l11-7z" />}</svg>
         </button>
-        <p className="ltl__when">
-          <span className="ltl__time" data-wind-when={layer === 'wind' ? '' : undefined}>
-            {formatDayHour(at, timeZone)}
-          </span>
-        </p>
+        {/* Batch SIMPLE-2, Section 5: the time with "now" under it, so the row keeps one line beside the three chips; away from now the pair is the way back to it. */}
         {isNow ? (
-          <span className="ltl__now">now</span>
+          <div className="ltl__when">
+            <span className="ltl__time" data-wind-when={layer === 'wind' ? '' : undefined}>
+              {formatDayHour(at, timeZone)}
+            </span>
+            <span className="ltl__now">now</span>
+          </div>
         ) : (
-          <button type="button" className="ltl__now ltl__now--go" onClick={() => (setPlay(false), onNow === undefined ? onAt(new Date()) : onNow())} aria-label="Back to now">
-            now
+          <button type="button" className="ltl__when ltl__when--go" onClick={() => (setPlay(false), onNow === undefined ? onAt(new Date()) : onNow())} aria-label="Back to now">
+            <span className="ltl__time" data-wind-when={layer === 'wind' ? '' : undefined}>
+              {formatDayHour(at, timeZone)}
+            </span>
+            <span className="ltl__now ltl__now--go">now ↺</span>
           </button>
         )}
-        <div className="ltl__chips">
-          <div className="ltl__menuwrap">
-            <button type="button" className="ltl__chip" data-layer-chip aria-haspopup="menu" aria-expanded={menu === 'layer'} aria-label={`Layer: ${LAYER_WORD[layer]}`} onClick={() => setMenu(menu === 'layer' ? null : 'layer')}>
-              {LAYER_WORD[layer]} ▾
-            </button>
-            {menu === 'layer' ? (
-              <div className="ltl__menu" role="menu" aria-label="Layer">
-                {PICKS.map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={p === layer}
-                    className={`ltl__item${p === layer ? ' ltl__item--on' : ''}`}
-                    data-layer-pick={p}
-                    data-wind-off={p === 'off' ? '' : undefined}
-                    onClick={() => (setMenu(null), setPlay(false), onPick(p))}
-                  >
-                    {p === 'off' ? 'Layers off' : LAYER_WORD[p]}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </div>
-          {wind === undefined ? null : (
-            <div className="ltl__menuwrap">
-              <button type="button" className="ltl__chip" data-level-chip aria-haspopup="menu" aria-expanded={menu === 'level'} aria-label={`Height ${wind.levelFt === 0 ? 'surface' : '400 ft'}, model ${modelLabel}`} onClick={() => setMenu(menu === 'level' ? null : 'level')}>
-                {wind.levelFt === 0 ? 'Surface' : '400 ft'} ▾
-              </button>
-              {menu === 'level' ? (
-                <div className="ltl__menu" role="menu" aria-label="Height and model">
-                  {([0, 400] as const).map((ft) => (
-                    <button key={ft} type="button" role="menuitemradio" aria-checked={wind.levelFt === ft} className={`ltl__item${wind.levelFt === ft ? ' ltl__item--on' : ''}`} onClick={() => (setMenu(null), wind.onLevel(ft))}>
-                      {ft === 0 ? 'Surface' : '400 ft'}
-                    </button>
-                  ))}
-                  <p className="ltl__menuhead">Model</p>
-                  {(['blend', 'hrrr', 'ecmwf'] as const).map((id) => (
-                    <button key={id} type="button" role="menuitemradio" aria-checked={wind.model === id} data-model-pick={id} className={`ltl__item${wind.model === id ? ' ltl__item--on' : ''}`} onClick={() => (setMenu(null), wind.onModel(id))}>
-                      {MODEL_CHIPS.find((m) => m.id === id)?.label ?? id}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          )}
-        </div>
+        <LayerChips layer={layer} onPick={(p) => (setPlay(false), onPick(p))} wind={wind} />
       </div>
 
       <div

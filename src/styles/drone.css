@@ -1,7 +1,7 @@
 /* THE DRONE PAGE (Batch Flow, Section 5; Batch DRONE, Section 2: boards Drone_P1 to P4, Drone_Layers). Colours from tokens.css only. */
 
 /* The shell's body holds the pill, the swiped pages and the foot; each page scrolls on its own. */
-.drpage .dpage__body {
+.drpage:not(.tipage) .dpage__body {
   overflow: hidden;
   padding-bottom: 0;
 }
@@ -860,4 +860,28 @@
 .drp__wxchip--on {
   background: var(--white);
   color: var(--sky-ink);
+}
+
+/* ------------------------------------------- inside the tap-in skeleton (Batch SIMPLE-2, Section 4) */
+.tipage__swipe > .drp__page {
+  flex: none;
+  overflow: visible;
+  padding: 0;
+  scroll-snap-align: none;
+}
+.tipage__swipe > .drp__airbox {
+  /* The map takes what the tabs leave, edge to edge. */
+  flex: 1 0 auto;
+  min-height: 360px;
+  position: relative;
+  margin-inline: -16px;
+  overflow: hidden;
+}
+.drp__airbox > .drp__air {
+  position: absolute;
+  inset: 0;
+  height: auto;
+}
+.drpage .drp__labsrow {
+  flex: none;
 }

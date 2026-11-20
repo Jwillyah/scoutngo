@@ -9,10 +9,10 @@
  */
 import { useCallback, useSyncExternalStore } from 'react'
 import { ACTIVITIES, type Activity } from '../core/homeDay.ts'
+import { readPersona, subscribePersona, writePersona } from './persona.ts'
 
 export const ACTIVITIES_KEY = 'scoutngo.activities.v1'
 
-const listeners = new Set<() => void>()
 let cache: { raw: string | null; value: Activity[] | null } = { raw: undefined as unknown as null, value: null }
 
 /** What was stored, as a list of known activities in the order picked; null when never asked or unreadable. */
@@ -28,36 +28,27 @@ export function reviveActivities(raw: string | null): Activity[] | null {
   }
 }
 
+/*
+ * Batch SIMPLE-2, Section 2: ONE SOURCE. What was picked is the persona
+ * (src/lib/persona.ts), one activity; Batch M's list is read there once, as
+ * a migration, and never written again. Every screen that asked "what was
+ * picked?" (the Surf page's light, the map's photo tools) reads the persona.
+ */
 export function readActivities(): Activity[] | null {
-  let raw: string | null = null
-  try {
-    raw = localStorage.getItem(ACTIVITIES_KEY)
-  } catch {
-    raw = null
-  }
-  if (raw !== cache.raw) cache = { raw, value: reviveActivities(raw) }
+  const p = readPersona()
+  if (p === null) return null
+  if (cache.value === null || cache.value.length !== 1 || cache.value[0] !== p) cache = { raw: p, value: [p] }
   return cache.value
 }
 
+/** The first of the list becomes the persona (Settings and the picker write the persona itself). */
 export function writeActivities(list: readonly Activity[]): void {
-  try {
-    localStorage.setItem(ACTIVITIES_KEY, JSON.stringify(list))
-  } catch {
-    /* Private browsing: this session still orders by it. */
-    cache = { raw: JSON.stringify(list), value: [...list] }
-  }
-  for (const f of [...listeners]) f()
+  const first = list[0]
+  if (first !== undefined) writePersona(first)
 }
 
 export function useActivities(): [Activity[] | null, (next: readonly Activity[]) => void] {
-  const value = useSyncExternalStore(
-    (f) => {
-      listeners.add(f)
-      return () => listeners.delete(f)
-    },
-    readActivities,
-    () => null,
-  )
+  const value = useSyncExternalStore(subscribePersona, readActivities, () => null)
   return [value, useCallback((next: readonly Activity[]) => writeActivities(next), [])]
 }
 

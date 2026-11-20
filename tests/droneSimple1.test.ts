@@ -22,12 +22,13 @@ describe('the flags', () => {
 })
 
 describe('the tabs', () => {
-  it('are Wind, Airspace, Preflight; Plan only with its flag', () => {
-    expect(droneTabs(false).map((t) => t.label)).toEqual(['Wind', 'Airspace', 'Preflight'])
-    expect(droneTabs(true).map((t) => t.label)).toEqual(['Wind', 'Airspace', 'Preflight', 'Plan'])
+  it('are Preflight, Wind, Airspace (Batch SIMPLE-2); Plan only with its flag', () => {
+    expect(droneTabs(false).map((t) => t.label)).toEqual(['Preflight', 'Wind', 'Airspace'])
+    expect(droneTabs(true).map((t) => t.label)).toEqual(['Preflight', 'Wind', 'Airspace', 'Plan'])
   })
-  it('maps the old ids: now and height to Wind, airspace to Airspace, plan to Preflight unless its flag is on', () => {
-    expect(droneTabFor(undefined, false)).toBe('wind')
+  it('opens on Preflight, and maps the old ids: now and height to Wind, airspace to Airspace, plan to Preflight unless its flag is on', () => {
+    expect(droneTabFor(undefined, false)).toBe('preflight')
+    expect(droneTabFor('wind', false)).toBe('wind')
     expect(droneTabFor('now', false)).toBe('wind')
     expect(droneTabFor('height', true)).toBe('wind')
     expect(droneTabFor('airspace', false)).toBe('airspace')

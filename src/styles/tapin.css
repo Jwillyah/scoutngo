@@ -122,6 +122,10 @@
 }
 .tipage__btn {
   flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
   min-height: 48px;
   padding: 0 12px;
   border: 1px solid var(--d-edge);
@@ -240,4 +244,40 @@
 .wbar7__now {
   stroke: var(--caution);
   stroke-width: 2;
+}
+
+/* ------------------------------------------------ the Weather page's chart (Batch SIMPLE-2, Section 4) */
+.wchart__title {
+  margin: 4px 4px 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+}
+.wchart__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.wchart__line {
+  fill: none;
+  stroke: var(--d-drone);
+  stroke-width: 3;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.wchart__dot {
+  fill: var(--d-drone);
+}
+.wchart__bar {
+  fill: var(--d-tide);
+  fill-opacity: 0.85;
+}
+.wchart__tick {
+  fill: var(--glass-ink-2);
+  font-size: var(--text-md);
+}
+
+/* The Weather hero reads "59° partly cloudy" on one line at 390 wide (board Page_Weather). */
+.wpage .tipage__value {
+  font-size: 44px;
 }

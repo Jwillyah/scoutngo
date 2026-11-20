@@ -23,6 +23,10 @@ import { SkyIconSvg } from './SkyIconSvg.tsx'
 import { LiveSkyDraw } from './LiveSky.tsx'
 import { useLiveSky } from '../lib/useLiveSky.ts'
 import { DaysPage, ModelsPage } from './WeatherPages.tsx'
+import { TapInPage, type TapInRow } from './TapInPage.tsx'
+import { WeatherChart } from './WeatherChart.tsx'
+import { CHART_HOURS, type ChartHour } from '../core/weatherChart.ts'
+import { WEATHER_PAGE_OLD_FIRST } from '../config/flags.ts'
 
 /*
  * THE WEATHER PAGE (Batch Pages, Section 2; board WeatherPage). Its own page:
@@ -63,6 +67,8 @@ export function WeatherPage({ venue, placeName, timeZone, units, now, onBack, on
   const [extra, setExtra] = useState<Hourly | null>(null)
   const [sky, setSky] = useState<MetarSky | null>(null)
   const [view, setView] = useState<'main' | 'days' | 'models'>('main')
+  /* Batch SIMPLE-2, Section 4: the skeleton page first; "More details ›" opens the old page, unchanged (src/config/flags.ts WEATHER_PAGE_OLD_FIRST). */
+  const [more, setMore] = useState(WEATHER_PAGE_OLD_FIRST)
   useEffect(() => {
     let live = true
     void fetchBriefWind(venue).then((w) => live && setWx(w), () => undefined)
@@ -155,7 +161,7 @@ export function WeatherPage({ venue, placeName, timeZone, units, now, onBack, on
     </>
   )
 
-  return (
+  const oldPage = (
     <PageShell
       kind="wpage"
       title="Weather"
@@ -164,7 +170,7 @@ export function WeatherPage({ venue, placeName, timeZone, units, now, onBack, on
       backdrop={live === null ? null : <LiveSkyDraw sky={live} />}
       onBack={onBack}
       onMap={onMap}
-      inner={{ open: view !== 'main', close: () => setView('main') }}
+      inner={{ open: view !== 'main' || (more && !WEATHER_PAGE_OLD_FIRST), close: () => (view !== 'main' ? setView('main') : setMore(false)) }}
       how={how}
       foot={
         modelsLine === null ? <span /> : (
@@ -258,5 +264,52 @@ export function WeatherPage({ venue, placeName, timeZone, units, now, onBack, on
         </>
       )}
     </PageShell>
+  )
+  if (more) return oldPage
+
+  /* ------------------------------------------------------ the tap-in page (board Page_Weather) */
+  const start = Math.floor(now.getTime() / 3_600_000) * 3_600_000
+  const chartHours: ChartHour[] = Array.from({ length: CHART_HOURS + 1 }, (_, i) => {
+    const t = new Date(start + i * 3_600_000)
+    const h = state?.hours.find((x) => Math.abs(x.at.getTime() - t.getTime()) <= 1_800_000) ?? null
+    return { at: t, tempC: at(wx, 'temperature_2m', i === 0 ? now : t), rain: h === null ? null : h.rain.chance }
+  })
+  const word = (k: string) => tiles.find((t) => t.k === k)
+  const rows: TapInRow[] = (['rain', 'cloud', 'humidity', 'uv'] as const).flatMap((k) => {
+    const t = word(k)
+    return t === undefined ? [] : [{ label: k === 'cloud' ? 'Clouds' : t.label, value: t.big, detail: t.line }]
+  })
+  const dayHi = dayTemps.length === 0 ? null : Math.max(...dayTemps)
+  const dayLo = dayTemps.length === 0 ? null : Math.min(...dayTemps)
+  return (
+    <TapInPage
+      title="Weather"
+      spot={placeName}
+      ground={ground}
+      kind="wpage"
+      onBack={onBack}
+      how={how}
+      safety="Forecasts can be wrong · look first"
+      hero={{
+        eyebrow: 'Now',
+        value: temp === null ? (wx === null ? '…' : '—') : `${deg(temp)}${cond === null ? '' : ` ${cond.word}`}`,
+        sub: `High ${deg(dayHi)} · low ${deg(dayLo)} · feels ${deg(feels)}`,
+        shared: { key: 'temp', value: temp === null ? '' : deg(temp) },
+      }}
+      chart={<WeatherChart hours={chartHours} timeZone={timeZone} />}
+      rows={rows}
+      onMore={() => setMore(true)}
+    >
+      {alerts.slice(0, 1).map((a) => (
+        <details key={a.event + a.headline} className="wpage__alert">
+          <summary>
+            {a.event}
+            {a.ends === null ? '' : ` · until ${clock(a.ends)}`} ›
+          </summary>
+          <p>{a.headline}</p>
+          <p>{a.sender}, as issued.</p>
+        </details>
+      ))}
+    </TapInPage>
   )
 }

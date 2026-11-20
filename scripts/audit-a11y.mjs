@@ -20,6 +20,7 @@ import { join } from 'node:path'
 import { webkit, devices } from './gate/playwright.mjs'
 import { decodePng } from '../src/lib/png.ts'
 import { ensureApp, goToStage, guardAudit, startWatchdog, APP_ORIGIN, openMenu } from './preflight.mjs'
+import { goHome, homeTile } from './preflight.mjs'
 
 /* Batch Polish, Section 2: the menu is the home's (and setup's and field's); on the map its Back goes home first (scripts/preflight.mjs openMenu). */
 const menuOn = (pg) => openMenu((x) => pg.evaluate(x), (ms) => pg.waitForTimeout(ms))
@@ -112,20 +113,19 @@ try {
     await names('map')
     await menuOn(page)
     await names('menu')
-    await tap('.mcard--today', 4000)
+    /* Batch SIMPLE-2, Section 2: every page from its home tile; the Wind tile is the map on the wind layer. */
+    await goHome(ev, wait)
     await names('home')
-    for (const card of ['surf', 'wind', 'tide']) {
-      await tap(`.home__page[aria-label="Today"] .hcard--${card}`, 4000)
-      await names(`${card} page`)
-      await tap('.dpage__back:visible', 1500)
-    }
-    for (const [card, screen] of [['sky', 'sky page'], ['drone', 'drone page']]) {
-      await tap(`.home__page[aria-label="Today"] .hcard--${card}`, 4000)
+    for (const [tile, screen] of [['surf', 'surf page'], ['tide', 'tide page'], ['sky', 'sky page'], ['drone', 'drone page'], ['fish', 'fish page'], ['weather', 'weather page']]) {
+      await homeTile(ev, wait, tile)
+      await wait(1200)
       await names(screen)
-      await tap('.ppage__back:visible', 1500)
+      await tap('.ppage__back:visible, .dpage__back:visible', 1500)
+      await wait(600)
     }
-    await tap('.home .hwx__temp', 4000)
-    await names('weather page')
+    await homeTile(ev, wait, 'wind')
+    await wait(1500)
+    await names('wind map')
     await ctx.close()
     watchdog.note('names')
   }
@@ -150,9 +150,7 @@ try {
     await page.getByRole('button', { name: /^open$/i }).click({ timeout: 4000 }).catch(() => {})
     await wait(3500)
     await goToStage(ev, wait, 'plan')
-    await menuOn(page)
-    await wait(800)
-    await page.locator('.mcard--today').first().click({ noWaitAfter: true }).catch(() => {})
+    await goHome(ev, wait)
     await wait(5000)
     for (const sky of ['day', 'cloud', 'rain', 'fog', 'golden', 'night', 'storm']) {
       await ev(`(() => { const h = document.querySelector('.home'); if (h) h.className = h.className.replace(/home--[a-z]+/g, '') + ' home--${sky}'; return 1 })()`)
@@ -226,12 +224,10 @@ try {
     await page.getByRole('button', { name: /^open$/i }).click({ timeout: 4000 }).catch(() => {})
     await wait(3500)
     await goToStage(ev, wait, 'plan')
-    await menuOn(page)
-    await wait(800)
-    await page.locator('.mcard--today').first().click({ noWaitAfter: true }).catch(() => {})
+    await goHome(ev, wait)
     await wait(5000)
     const wide = async (screen) => {
-      const out = JSON.parse(await ev(`JSON.stringify([...document.querySelectorAll('body *')].filter((e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0 && b.left < innerWidth && b.right > innerWidth + 1 && getComputedStyle(e).position !== 'fixed' && !e.matches('.home__track, .home__page, .hday') && !e.closest('[data-sideways], .tbar, .hstrip, .dwind__strip, .wweek, table') }).map((e) => String(e.className?.baseVal ?? e.className).split(' ')[0] || e.tagName).slice(0, 5))`))
+      const out = JSON.parse(await ev(`JSON.stringify([...document.querySelectorAll('body *')].filter((e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0 && b.left < innerWidth && b.right > innerWidth + 1 && getComputedStyle(e).position !== 'fixed' && !e.matches('.home__track, .home__page, .hday, .homep__body') && !e.closest('[data-sideways], .tbar, .hstrip, .dwind__strip, .wweek, table') }).map((e) => String(e.className?.baseVal ?? e.className).split(' ')[0] || e.tagName).slice(0, 5))`))
       console.log(`  ${screen} at 150%: ${out.length} past the edge`)
       for (const o of [...new Set(out)]) fail(`${screen} at the largest text: ${o} runs past the screen`)
     }
@@ -240,7 +236,7 @@ try {
     const running = await ev(`document.getAnimations().filter((a) => a.playState === 'running' && (a.effect?.getTiming().iterations === Infinity)).map((a) => (a.effect?.target?.className?.baseVal ?? a.effect?.target?.className ?? '?') + ' ' + (a.animationName ?? a.id ?? '')).slice(0, 8)`)
     console.log(`  reduce motion: ${running.length} animations running for ever`)
     for (const r of running) fail(`reduce motion is on and an animation keeps running: ${r}`)
-    await page.locator('.home__page[aria-label="Today"] .hcard--surf').first().click({ noWaitAfter: true }).catch(() => {})
+    await homeTile(ev, wait, 'surf')
     await wait(4000)
     await wide('surf page')
     await ctx.close()

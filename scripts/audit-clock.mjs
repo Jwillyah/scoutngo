@@ -149,11 +149,16 @@ async function screenHalf() {
     await ev(`[...document.querySelectorAll('.sidemenu__item')].find((x) => x.textContent.includes('Sky'))?.click()`)
     await wait(1500)
     /* Batch Pages, Section 3: Menu › Sky is the Sky page (Sunset, then Sunrise), and its "Color detail ›" the Sky color page; the Weather page from the home's "Weather ›" is read by the pages audit. */
-    await read('sky page: sunset')
-    await ev(`[...document.querySelectorAll('.spage__seg button')][1]?.click()`)
-    await wait(900)
-    await read('sky page: sunrise')
-    await ev(`[...document.querySelectorAll('.spage .ppage__foot button')].find((b) => b.textContent.includes('Color detail'))?.click()`)
+    /* Batch SIMPLE-2, Section 4: the tap-in Sky page, each tab; its "More details ›" is the Sky color page. */
+    const tabs = `[...document.querySelectorAll('.tipage.spage .tipage__tabs [role="tab"]')]`
+    for (const [i, name] of ['now', 'sunset', 'sunrise', 'night'].entries()) {
+      await ev(`${tabs}[${i}]?.click()`)
+      await wait(900)
+      await read(`sky page: ${name}`)
+    }
+    await ev(`${tabs}[1]?.click()`)
+    await wait(600)
+    await ev(`document.querySelector('.tipage.spage .tipage__more')?.click()`)
     await wait(1500)
     await read('sky: color detail')
     watchdog.note(`clock ${clock}`)

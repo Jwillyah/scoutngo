@@ -75,7 +75,8 @@ describe('calibration', () => {
   })
 
   it('both down is grey text, not a button', () => {
-    expect(VF).toMatch(/target === null \? \(\s*<span className="vf__act vf__act--off">/)
+    /* Batch SIMPLE-2: and with no compass to calibrate against (the compass-only view). */
+    expect(VF).toMatch(/target === null \|\| orientation === null \? \(\s*<span className="vf__act vf__act--off">/)
   })
 })
 

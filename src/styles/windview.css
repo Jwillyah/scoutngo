@@ -1,0 +1,96 @@
+/*
+ * WIND = THE MAP (Batch SIMPLE-2, Section 5; boards docs/mockups/simple2/
+ * Wind_Map.png, Wind_Charts.png): the Map | Charts pair in the map's top bar
+ * and the Charts page's two cards. Colours are tokens only
+ * (src/styles/tokens.css); the bars and the grid share the wind bands.
+ */
+
+/* ------------------------------------------------ Map | Charts, on the map */
+.windtop {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+.windtop .ui-seg {
+  flex: 0 1 auto;
+  width: min(100%, 220px);
+  border: 1px solid var(--glass-edge);
+  background: var(--map-glass);
+}
+.windtop .ui-seg__opt {
+  min-height: 44px;
+  padding: 0 14px;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------ Charts: the two cards */
+.wcharts__grid {
+  padding: 12px 16px;
+}
+.wcharts__bars {
+  padding: 12px 16px 8px;
+}
+.wcharts__k {
+  margin: 0 0 8px;
+  color: var(--white);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+}
+.wcharts__k--caps {
+  color: var(--glass-ink-2);
+  font-size: var(--text-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.wcharts__none {
+  margin: 0;
+  color: var(--glass-ink-2);
+  font-size: var(--text-md);
+}
+.wcharts__table {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.wcharts__row {
+  display: grid;
+  gap: 3px;
+  align-items: center;
+}
+.wcharts__rowk {
+  color: var(--glass-ink-2);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+.wcharts__cell {
+  height: 18px;
+  border-radius: 4px;
+  opacity: 0.85;
+}
+.wcharts__cell--none {
+  background: transparent;
+  border: 1px dashed var(--glass-edge);
+}
+.wcharts__cell--b0 {
+  background: var(--wind-0);
+}
+.wcharts__cell--b1 {
+  background: var(--wind-7);
+}
+.wcharts__cell--b2 {
+  background: var(--wind-12);
+}
+.wcharts__cell--b3 {
+  background: var(--wind-17);
+}
+.wcharts__cell--b4 {
+  background: var(--wind-25);
+}
+.wcharts__hour {
+  overflow: visible;
+  color: var(--glass-ink-2);
+  font-size: var(--text-sm);
+  text-align: left;
+  white-space: nowrap;
+}

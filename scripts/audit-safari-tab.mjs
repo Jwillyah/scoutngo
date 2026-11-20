@@ -19,6 +19,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { webkit, devices } from './gate/playwright.mjs'
 import { ensureApp, goToStage, guardAudit, startWatchdog, APP_ORIGIN, openMenu, setSheet } from './preflight.mjs'
+import { homeTile } from './preflight.mjs'
 
 /* Batch Polish, Section 2: the menu is the home's (and setup's and field's); on the map its Back goes home first (scripts/preflight.mjs openMenu). */
 const menuOn = (pg) => openMenu((x) => pg.evaluate(x), (ms) => pg.waitForTimeout(ms))
@@ -197,9 +198,18 @@ try {
     await wait(800)
   }
   await setSheet(ev, wait, 'peek')
+  /* Batch SIMPLE-2, Section 5: the Wind chip opens the map's wind; its Charts is the page, and More details the old Wind page. */
   await page.locator('.chip2[data-chip="wind"]').first().tap()
   await wait(1500)
+  await page.locator('[data-wind-tab="charts"]').first().tap().catch(() => fail('the Wind chip opened no Map | Charts'))
+  await wait(1500)
+  await check('Wind charts', '.wcharts', 'tab-wind-charts')
+  await page.locator('.wcharts .tipage__more').first().tap().catch(() => fail('Wind › Charts has no More details'))
+  await wait(1500)
   await check('Wind page', '.windp, .dpage--wind', 'tab-wind-page')
+  /* Back from the old page is Charts; Back from Charts is the home. */
+  await page.keyboard.press('Escape')
+  await wait(500)
   await page.keyboard.press('Escape')
   await goToStage(ev, wait, 'plan')
   await wait(800)
@@ -207,9 +217,9 @@ try {
   await menuOn(page)
   await wait(500)
   await check('Menu', '.sidemenu__panel', 'tab-menu')
-  await page.locator('.sidemenu__panel .sidemenu__item', { hasText: /^Sky/ }).first().tap()
+  /* Batch SIMPLE-2, Sections 2 and 3: the Sky page is the home's Sky tile (the menu has no cards); every button on it within reach in a short tab. */
+  await homeTile(ev, wait, 'sky')
   await wait(1200)
-  /* Batch Pages, Section 3: the menu's Sky card is the Sky page; every button on it within reach in a short tab. */
   await check('Sky page', '.spage', 'tab-sky')
   watchdog.note('done')
   await ctx.close()

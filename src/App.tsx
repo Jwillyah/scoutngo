@@ -108,9 +108,12 @@ import { ScreenBoundary, ScreenFailCard } from './components/ScreenBoundary.tsx'
 import { buildScoutFile, saveScoutFile, scoutFilename, type ReadFile } from './lib/scoutFile.ts'
 import { readShareHash, SHARE_PREFIX } from './lib/planShare.ts'
 import type { MenuRows, MenuTarget } from './components/Menu.tsx'
-import { Home, type HomeTarget } from './components/Home.tsx'
+import type { HomeTarget } from './components/Home.tsx'
+import { TileHome, type TileTarget } from './components/TileHome.tsx'
+import { spotKey } from './core/spotSkill.ts'
+import { readPersona, usePersona } from './lib/persona.ts'
 import { OPEN_RADAR_EVENT, OPEN_SKY_EVENT, OPEN_WEATHER_EVENT } from './lib/pageEvents.ts'
-import { homeOrder, readActivities, showsDrone, showsPhotoTools, useActivities } from './lib/activities.ts'
+import { homeOrder, showsDrone, showsPhotoTools, useActivities } from './lib/activities.ts'
 import { homeCardsShown } from './core/homeCards.ts'
 import { viewfinderPreset } from './core/viewfinderPreset.ts'
 import { shouldOpenBriefing } from './lib/briefingOpen.ts'
@@ -120,7 +123,7 @@ import { planForNow } from './lib/planForNow.ts'
 import { useNow } from './lib/useNow.ts'
 import { pathToMenuItem, type MenuItem } from './lib/menu.ts'
 import { askPlanner, FIELD, MAP, plannerOnMap, setupFor, shownMode, spent, startView, type PlannerDoor, type View } from './lib/planner.ts'
-import { PLANNER_EXTRA_DOORS } from './config/flags.ts'
+import { ACTIVITY_MULTI, HOME_OLD, PLANNER_EXTRA_DOORS } from './config/flags.ts'
 import { placeOf, shownGroups, usePlaceGroups } from './lib/placeGroups.ts'
 import {
   blockedReason,
@@ -180,6 +183,11 @@ const PRELOAD_AFTER_MS = 3000
 const Landing = lazyPage(() => import('./components/Landing.tsx').then((m) => ({ default: m.Landing })))
 const NearYou = lazyPage(() => import('./components/NearYou.tsx').then((m) => ({ default: m.NearYou })))
 const ActivityPicker = lazyPage(() => import('./components/ActivityPicker.tsx').then((m) => ({ default: m.ActivityPicker })))
+const PersonaPicker = lazyPage(() => import('./components/ActivityPicker.tsx').then((m) => ({ default: m.PersonaPicker })))
+/* Batch SIMPLE-2, Section 2: the Batch M home, behind HOME_OLD (src/config/flags.ts); loaded only when that flag is on. */
+const Home = lazyPage(() => import('./components/Home.tsx').then((m) => ({ default: m.Home })))
+const FishPage = lazyPage(() => import('./components/FishPage.tsx').then((m) => ({ default: m.FishPage })))
+const FieldReportCard = lazyPage(() => import('./components/FieldReportCard.tsx').then((m) => ({ default: m.FieldReportCard })))
 const loadMenu = () => import('./components/Menu.tsx').then((m) => ({ default: m.Menu }))
 const Menu = lazyPage(loadMenu)
 const SpotPicker = lazyPage(() => import('./components/SpotPicker.tsx').then((m) => ({ default: m.SpotPicker })))
@@ -1482,8 +1490,13 @@ function App() {
    */
   const [menuOpen, setMenuOpen] = useState(false)
   const [activities, setActivities] = useActivities()
+  /* Batch SIMPLE-2, Section 2: what you do outside, one answer (src/lib/persona.ts); the tile home's order and its moment. */
+  const [persona, setPersona] = usePersona()
   /* Batch M, Section 2: "What do you do outside?", once, after the first spot is picked. */
   const [askWhat, setAskWhat] = useState(false)
+  /* Batch SIMPLE-2, Sections 2 and 3: the Fish page (the Fish and Water tiles) and Menu › Field report. */
+  const [fishOpen, setFishOpen] = useState(false)
+  const [reportOpen, setReportOpen] = useState(false)
   /* The Today briefing: on a plain launch (src/lib/briefingOpen.ts), and from Menu › Today. */
   /* Batch CORE, Section 2.1: 3D or Fly open when iOS reloaded the tab (15 Nov): back on the map, saying so, never the home. */
   const [died, setDied] = useState(() => diedIn())
@@ -1497,12 +1510,18 @@ function App() {
   }, [])
   /* The Sky page (Batch Pages, Section 3): from the home's Sky card, the menu's, and the map's sky chips. */
   const [skyOpen, setSkyOpen] = useState(false)
+  /* Batch SIMPLE-2: the tab the Sky page opens on when a door asked for one (the home's moonrise moment: Night); undefined is the page's own rule. */
+  const [skyTab, setSkyTab] = useState<'night' | undefined>(undefined)
+  /* Asked for once: closed by any way out, the next open is the page's own rule again. */
+  if (!skyOpen && skyTab !== undefined) setSkyTab(undefined)
   /* Batch BEST SKY: "Where's the color?". */
   const [bestSkyOpen, setBestSkyOpen] = useState(false)
   /* Batch DRONE, Section 4: Sun · Moon · Night, its own page (from the Sky page and the home's Moon card); 'auto' opens on the tab the hour wants. */
   const [smnOpen, setSmnOpen] = useState<'sun' | 'moon' | 'night' | 'auto' | null>(null)
   /* Batch Flow, Section 5: the Drone page, first from the home's Drone card and the menu's. */
   const [droneOpen, setDroneOpen] = useState(false)
+  /* Batch SIMPLE-2, Section 2: the home's Drone tile opens it on Preflight ("can I fly here?"). */
+  const [droneTab, setDroneTab] = useState<'preflight' | undefined>(undefined)
   useEffect(() => {
     const open = () => setSkyOpen(true)
     window.addEventListener(OPEN_SKY_EVENT, open)
@@ -1529,10 +1548,35 @@ function App() {
   const [spotPickOpen, setSpotPickOpen] = useState(false)
   /* The first run asks only on a bare launch: a shared plan's link, or ?calibration=1, brings its own place. */
   const [bareLaunch] = useState(() => typeof window === 'undefined' || (window.location.search.length <= 1 && window.location.hash.length <= 1))
+  /*
+   * Batch SIMPLE-2, Section 2 (the tap count): the spot search opens with
+   * its box focused, so typing is the next thing, not a tap on the box
+   * (docs/batches/simple-audit.md section 2 counted that tap on every find).
+   * The picker is its own download: looked for over the next frames. On an
+   * iPhone a focus made outside a tap may not raise the keyboard (a check
+   * for the phone); the box is focused either way.
+   */
+  const spotPickerUp = (landingSeen && centre === null && bareLaunch) || spotPickOpen
+  useEffect(() => {
+    if (!spotPickerUp) return
+    let tries = 0
+    let frame = 0
+    const focus = () => {
+      const box = document.querySelector<HTMLInputElement>('.spick__search')
+      if (box !== null) {
+        if (document.activeElement !== box) box.focus()
+        return
+      }
+      tries += 1
+      if (tries < 90) frame = requestAnimationFrame(focus)
+    }
+    frame = requestAnimationFrame(focus)
+    return () => cancelAnimationFrame(frame)
+  }, [spotPickerUp])
   /* Its clock, a minute at a time while it is open: the Now line and the calls move with it. */
   const [briefNow, setBriefNow] = useState(() => new Date())
   useEffect(() => {
-    if (!briefOpen && !weatherOpen && !skyOpen && !droneOpen) return
+    if (!briefOpen && !weatherOpen && !skyOpen && !droneOpen && !fishOpen) return
     setBriefNow(new Date())
     const t = setInterval(() => setBriefNow(new Date()), 60_000)
     /*
@@ -1552,7 +1596,7 @@ function App() {
       window.removeEventListener('focus', wake)
       window.removeEventListener('pageshow', wake)
     }
-  }, [briefOpen, weatherOpen, skyOpen, droneOpen])
+  }, [briefOpen, weatherOpen, skyOpen, droneOpen, fishOpen])
   const [drawerRequest, setDrawerRequest] = useState<{ drawer: 'kit' | 'saved'; tick: number }>({
     drawer: 'kit',
     tick: 0,
@@ -1676,6 +1720,19 @@ function App() {
       setSkyOpen(true)
       return
     }
+    /* Batch SIMPLE-2, Section 3: Best sky, the Viewfinder and Field report open over whatever is there too; Back is where you were. */
+    if (target === 'bestsky') {
+      setBestSkyOpen(true)
+      return
+    }
+    if (target === 'viewfinder') {
+      setViewfinderOpen(true)
+      return
+    }
+    if (target === 'report') {
+      setReportOpen(true)
+      return
+    }
     /* The menu opened over the home: what it opens is under the home, so the home steps aside. */
     if (target !== 'today') setBriefOpen(false)
     switch (target) {
@@ -1684,6 +1741,7 @@ function App() {
         return
       case 'drone':
         /* Batch Flow, Section 5: the Drone page first, not the Preflight card. */
+        setDroneTab(undefined)
         setDroneOpen(true)
         return
       /* Batch Flow, Section 8: the menu's cards open the home's pages. */
@@ -1739,7 +1797,51 @@ function App() {
         setSmnOpen('moon')
         return
     }
-  }  /* Batch CORE, Section 6.1: asked for from the landing, Best Sky opens the first time the home has a spot. */
+  }
+  /*
+   * THE TILE HOME'S DOORS (Batch SIMPLE-2, Sections 2 and 4): each tile one
+   * page. Weather, Sky, Fish, Drone open over the home (Back is the home);
+   * Surf and Tide are the map's pages, opened from the home (Back is the
+   * home, pageFromHome); Wind is the map itself, on the wind layer, now.
+   */
+  const tileOpen = (t: TileTarget) => {
+    switch (t) {
+      case 'weather':
+        setWeatherOpen(true)
+        return
+      case 'sky':
+        setSkyTab(undefined)
+        setSkyOpen(true)
+        return
+      case 'sky-night':
+        /* The moonrise moment: the Sky page on Night, where the moon's nights are. */
+        setSkyTab('night')
+        setSkyOpen(true)
+        return
+      case 'fish':
+      case 'water':
+        setFishOpen(true)
+        return
+      case 'drone':
+        setDroneTab('preflight')
+        setDroneOpen(true)
+        return
+      case 'surf':
+      case 'tide':
+        setBriefOpen(false)
+        homeOpen(t === 'tide' ? 'tides' : 'surf')
+        return
+      case 'wind':
+        /* The map, the wind layer on, at now (the home closing puts the bar at now) with the spot's marker where the map opens: on it. */
+        setBriefOpen(false)
+        setSkyLayer('wind')
+        setMapPanel('sky')
+        /* Section 5's wind view (PlanMode's card request 'wind': Map | Charts); Back is the home. */
+        homeOpen('wind')
+        return
+    }
+  }
+  /* Batch CORE, Section 6.1: asked for from the landing, Best Sky opens the first time the home has a spot. */
   useEffect(() => {
     if (!briefOpen || centre === null) return
     let asked: string | null = null
@@ -2026,7 +2128,7 @@ function App() {
     setGeneration({ status: 'idle' })
     setSpotPickOpen(false)
     setBriefOpen(true)
-    if (readActivities() === null) setAskWhat(true)
+    if (readPersona() === null) setAskWhat(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -2831,8 +2933,30 @@ function App() {
         />
         </Suspense>
       ) : null}
-      {briefOpen && centre !== null && !spotPickOpen ? (
-        /* THE HOME (Batch M, Section 3): the front door, weather first, ordered by what you do. */
+      {briefOpen && centre !== null && !spotPickOpen && !HOME_OLD ? (
+        /* THE HOME (Batch SIMPLE-2, Section 2): the spot, one moment when it is worth it, the weather, six tiles in the persona's order, Map and ☰. */
+        <TileHome
+          venue={centre}
+          placeName={venueShort}
+          timeZone={venueWindow?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}
+          units={settings.units}
+          drone={briefDrone}
+          now={briefNow}
+          persona={persona}
+          onClose={() => setBriefOpen(false)}
+          onOpenMap={() => {
+            setBriefOpen(false)
+            setMode('plan')
+          }}
+          onMenu={() => setMenuOpen(true)}
+          onSwitchSpot={() => setSpotPickOpen(true)}
+          onPersona={() => setAskWhat(true)}
+          onOpen={tileOpen}
+        />
+      ) : null}
+      {briefOpen && centre !== null && !spotPickOpen && HOME_OLD ? (
+        /* THE HOME (Batch M, Section 3), behind HOME_OLD: the front door, weather first, ordered by what you do. */
+        <Suspense fallback={null}>
         <Home
           venue={centre}
           placeName={venueShort}
@@ -2858,6 +2982,7 @@ function App() {
             homeOpen(t)
           }}
         />
+        </Suspense>
       ) : null}
       {droneOpen && centre !== null ? (
         <Suspense fallback={null}>
@@ -2869,6 +2994,7 @@ function App() {
           units={settings.units}
           now={briefNow}
           drone={briefDrone}
+          tab={droneTab}
           onBack={() => setDroneOpen(false)}
           onMap={() => {
             setDroneOpen(false)
@@ -2907,13 +3033,26 @@ function App() {
           placeName={venueShort}
           timeZone={venueWindow?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}
           now={briefNow}
-          onBack={() => setSkyOpen(false)}
+          {...(skyTab === undefined ? {} : { initialTab: skyTab })}
+          miles={settings.units.distance === 'ft'}
+          onBack={() => {
+            setSkyOpen(false)
+            setSkyTab(undefined)
+          }}
           onMap={() => {
             setSkyOpen(false)
             setBriefOpen(false)
             setMode('plan')
           }}
-          onViewfinder={showsPhotoTools(activities) ? () => setViewfinderOpen(true) : undefined}
+          /* Batch SIMPLE-2, Section 0: Night's moment cards' "Plan ›" is a planner door (src/lib/planner.ts), from a tap. */
+          onPlan={() => {
+            setSkyOpen(false)
+            setSkyTab(undefined)
+            setBriefOpen(false)
+            openPlanner('sky-night')
+          }}
+          /* Batch SIMPLE-2, Section 3: the Viewfinder is a menu row for everyone now, so the Sky page's button is too (board Sky_Tonight). */
+          onViewfinder={() => setViewfinderOpen(true)}
           onCalendar={() => {
             setSkyOpen(false)
             setBriefOpen(false)
@@ -3008,7 +3147,20 @@ function App() {
         </Suspense>
       ) : null}
 
-      {askWhat ? (
+      {fishOpen && centre !== null ? (
+        /* Batch SIMPLE-2, Section 4: the Fish page (Today · Week), from the home's Fish and Water tiles. */
+        <Suspense fallback={null}>
+          <FishPage venue={centre} placeName={spotNameAt(spots, centre) ?? venueShort} timeZone={venueWindow?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone} units={settings.units} now={briefNow} onBack={() => setFishOpen(false)} />
+        </Suspense>
+      ) : null}
+      {reportOpen && centre !== null ? (
+        /* Batch SIMPLE-2, Section 3: Menu › Field report, the Surf page's own report page (kept on this phone). */
+        <Suspense fallback={null}>
+          <FieldReportCard spot={spotKey(centre)} at={centre} name={spotNameAt(spots, centre) ?? venueShort} timeZone={venueWindow?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone} buoyFt={null} now={() => Date.now()} startOpen onClose={() => setReportOpen(false)} />
+        </Suspense>
+      ) : null}
+
+      {askWhat && ACTIVITY_MULTI ? (
         <Suspense fallback={null}>
         <ActivityPicker
           variant="sheet"
@@ -3019,6 +3171,19 @@ function App() {
           }}
           onLater={() => setAskWhat(false)}
         />
+        </Suspense>
+      ) : null}
+      {askWhat && !ACTIVITY_MULTI ? (
+        /* Batch SIMPLE-2, Section 2: one tap picks and goes on; Not now skips. */
+        <Suspense fallback={null}>
+          <PersonaPicker
+            value={persona}
+            onPick={(p) => {
+              setPersona(p)
+              setAskWhat(false)
+            }}
+            onLater={() => setAskWhat(false)}
+          />
         </Suspense>
       ) : null}
 

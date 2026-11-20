@@ -53,6 +53,7 @@
  */
 import { readFileSync } from 'node:fs'
 import { goToStage, guardAudit, openPlanner, startWatchdog, APP_ORIGIN, openMenu as openMenuAnywhere } from './preflight.mjs'
+import { homeTile } from './preflight.mjs'
 
 guardAudit('surface')
 
@@ -569,8 +570,9 @@ console.log('\n### every stage reaches every other stage, by pressing the nav')
  * by where the shell lands.
  */
 /* Batch Flow, Section 8 (board D_Menu): no Plan row (the map is the home's Map button, goToStage follows it); Plan a shoot is the Shoot setup's door (Shoot picked, or nothing yet); the Viewfinder is the Sky page's. */
-const IN_MENU = ['Plan a shoot', 'Calendar', 'Kit', 'Saved', 'Settings']
-const NOT_IN_MENU = ['Shoot setup', 'Field', 'Plan', 'Viewfinder']
+/* Batch SIMPLE-2, Section 3 (board Home_Menu): the eight rows; the home's tiles are not repeated here, and Kit is Settings' Camera + lenses. */
+const IN_MENU = ['Plan a shoot', 'Best sky near me', 'Viewfinder', 'Calendar', 'Saved spots', 'Field report', 'Settings', 'About']
+const NOT_IN_MENU = ['Shoot setup', 'Field', 'Plan', 'Kit', 'Weather', 'Sky', 'Surf', 'Drone']
 const STAGE_IDS = ['setup', 'plan', 'field']
 
 /* Batch Polish, Section 2: the map's menu is the home's; from the map, its Back goes home first (scripts/preflight.mjs openMenu). */
@@ -1261,14 +1263,13 @@ const click = async (sel, i) => {
     return
   }
   if (sel === 'dronepage') {
-    await openMenuAnywhere(ev, wait)
-    await wait(400)
-    await ev(`[...document.querySelectorAll('nav[aria-label="Stage"] button')].find((b) => (b.querySelector('.sidemenu__label')?.textContent ?? '').trim() === 'Drone')?.click()`)
+    /* Batch SIMPLE-2, Section 2: the Drone page is the home's Drone tile. */
+    await homeTile(ev, wait, 'drone')
     for (let k = 0; k < 10 && !(await ev(`!!document.querySelector('.drpage')`)); k += 1) await wait(200)
     /* Batch SIMPLE-1, Section 1: the button is on the Preflight tab, under its two. */
     await ev(`[...document.querySelectorAll('.drpage button[role="tab"]')].find((b) => b.textContent.trim() === 'Preflight')?.click()`)
     await wait(400)
-    await ev(`[...document.querySelectorAll('.drpage .drp__labsrow button, .drpage .drp__buttons button')].find((b) => b.textContent.trim() === ${JSON.stringify(i)})?.click()`)
+    await ev(`[...document.querySelectorAll('.drpage .drp__labsrow button, .drpage .tipage__actions button')].find((b) => b.textContent.trim() === ${JSON.stringify(i)})?.click()`)
     /* The Preflight card arrives after the page closes, sometimes past 700 ms (Batch QA, Section 0: a run read the shoot card still there): wait for it, up to 4 s. */
     for (let k = 0; k < 20 && !(await ev(`!!document.querySelector('.pf, .sheet [data-card="preflight"]')`)); k += 1) await wait(200)
     await wait(300)
@@ -1281,6 +1282,12 @@ const click = async (sel, i) => {
       }
       await wait(300)
     }
+    return
+  }
+  /* Batch SIMPLE-2, Sections 2 and 3: the Sky page is the home's Sky tile (the menu has no cards). */
+  if (sel === 'menu' && i === 'Sky') {
+    await homeTile(ev, wait, 'sky')
+    await wait(600)
     return
   }
   if (sel === 'menu') {
@@ -1413,9 +1420,37 @@ if (await homeCard()) {
   await setDetent('half')
   const inner = await ev(OPENERS)
   for (const first of inner ?? []) {
+    /*
+     * Batch SIMPLE-2, Sections 2 and 3: the shoot card's rows (Cloud along each view, Wind at your flight height,
+     * Call sheet) are the planner's. The Sky and Drone doors now go through the home's tiles, and the map the home
+     * hands back is the plain map, not the planner (Section 0), so before a planner row the planner is asked for
+     * again, the way a person gets back to it (Menu › Plan a shoot), and the run says when it had to.
+     */
+    if (first.sel === '.more2__row' && !(await ev(`!!document.querySelector('.mode-plan .shootc')`))) {
+      console.log(`  the planner was gone before "${first.name}" (the walk went through the home): asked for again`)
+      await openPlanner(ev, wait)
+    }
     if (!(await homeCard())) break
     await setDetent('half')
     await click(first.sel, first.i)
+    /*
+     * The planner's rows are first hops from the shoot card, and only this walk has the planner up (the one-hop walk
+     * above runs on the plain map): the card a row opens is measured here, at both detents, like any other.
+     */
+    if (first.sel === '.more2__row') {
+      const opened = await cardNow()
+      if (opened !== null && opened !== 'shoot' && !walked.has(opened)) {
+        const heights = {}
+        for (const detent of ['half', 'full']) {
+          if (await setDetent(detent)) {
+            const m = await ev(CARD_HEIGHT)
+            if (m.error === undefined) heights[detent] = m
+          }
+        }
+        walked.set(opened, heights)
+        await setDetent('half')
+      }
+    }
     const doors = await ev(`(() => [...document.querySelectorAll('.more2__row')].map((b, i) => ({ sel: '.more2__row', i, name: (b.textContent ?? '').trim() })))()`)
     console.log(`  inside ${first.name || first.sel}: ${(doors ?? []).length} doors (card ${await cardNow()}${await ev(`document.querySelector('.dpage:not(.ppage)') ? ', a page open: ' + document.querySelector('.dpage:not(.ppage)').getAttribute('aria-label') : ''`)}${await ev(`document.querySelector('.mpage') ? ', the sky page' : ''`)})`)
     for (const door of doors ?? []) {

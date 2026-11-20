@@ -28,7 +28,9 @@ describe('the safety lines', () => {
   it('the drone page has ONE footer: "How we got this ›" left, the air line right, no second disclaimer (Batch FIX, Section 6.6)', () => {
     const page = readFileSync('src/components/DronePage.tsx', 'utf8')
     expect(page).toContain("footNote={tab === 'airspace' ? null : AIR_FOOT}")
-    expect(page).not.toMatch(/safety=\{|AIR_SAFETY|dsafety/)
+    /* Batch SIMPLE-2, Section 4: the skeleton's `safety` prop is the same one footer line (PageShell's footNote), and still none on Airspace. */
+    expect(page).toContain("safety={tab === 'airspace' ? null : AIR_FOOT}")
+    expect(page).not.toMatch(/AIR_SAFETY|dsafety/)
     const shell = readFileSync('src/components/PageShell.tsx', 'utf8')
     const foot = shell.slice(shell.indexOf('const footer ='), shell.indexOf('return createPortal('))
     expect(foot.indexOf('How we got this ›')).toBeGreaterThan(-1)

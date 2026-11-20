@@ -24,10 +24,9 @@ import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { webkit, devices } from './gate/playwright.mjs'
-import { ensureApp, goToStage, guardAudit, startWatchdog, APP_ORIGIN, openMenu } from './preflight.mjs'
+import { ensureApp, goToStage, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mjs'
+import { homeTile } from './preflight.mjs'
 
-/* Batch Polish, Section 2: the menu is the home's (and setup's and field's); on the map its Back goes home first (scripts/preflight.mjs openMenu). */
-const menuOn = (pg) => openMenu((x) => pg.evaluate(x), (ms) => pg.waitForTimeout(ms))
 import { shareLink } from '../src/lib/planShare.ts'
 import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
 import { placeKey } from '../src/core/venueName.ts'
@@ -95,9 +94,8 @@ try {
     await goToStage(ev, wait, 'plan')
     await wait(3000)
     /* Batch K addendum: Preflight moved from the layers sheet to the menu's Drone card; Batch Flow: the Drone page first. */
-    await menuOn(page)
-    await wait(900)
-    await page.locator('.mcard--drone').first().tap()
+    /* Batch SIMPLE-2, Section 2: the Drone page is the home's Drone tile (the menu has no cards). */
+    await homeTile(ev, wait, 'drone')
     await wait(1500)
     /* Batch Flow, Section 5: the menu's Drone card is the Drone page; its "Plan the flight" (was "Fly it yourself") opens the 3D view (the drone card under it). */
     /* Batch DRONE, Section 2.5: on the Drone page the button reads "Plan the flight"; Preflight's card keeps "Fly it yourself". */
@@ -111,7 +109,7 @@ try {
     let pressed = false
     for (let i = 0; i < 40 && !pressed; i += 1) {
       await wait(250)
-      pressed = await ev(`(() => { const b = [...document.querySelectorAll('.drp__labsrow button, .drp__buttons button, .pf button')].find(b => b.textContent === 'Plan the flight' || b.textContent === 'Fly it yourself'); if (!b) return false; b.click(); return true })()`)
+      pressed = await ev(`(() => { const b = [...document.querySelectorAll('.drp__labsrow button, .tipage__actions button, .pf button')].find(b => b.textContent === 'Plan the flight' || b.textContent === 'Fly it yourself'); if (!b) return false; b.click(); return true })()`)
     }
     console.log(`  the Drone page: Preflight tab ${tabbed ? 'tapped' : 'NOT FOUND'}, Plan the flight ${pressed ? 'tapped' : 'NOT FOUND'}`)
     let up = false

@@ -25,7 +25,7 @@ import { buoyFaceFt } from '../core/spotSkill.ts'
 import type { BuoyReading } from '../lib/buoy.ts'
 import type { DetailId } from '../lib/detailTabs.ts'
 import { readSkillBook } from '../lib/spotSkillStore.ts'
-import { seaNow, surfNowFrom, surfObs, useSurfNow, type SurfDay } from '../lib/useSurfNow.ts'
+import { seaNow, surfNowFrom, surfObs, useSurfNow } from '../lib/useSurfNow.ts'
 import { useStationObs } from '../lib/useStationObs.ts'
 import type { StationObs } from '../core/nowcast.ts'
 import { spotKey } from '../core/spotSkill.ts'
@@ -38,7 +38,11 @@ import type { SurfSea } from '../lib/useSurfSea.ts'
 import { DCard, DetailShell } from './DetailShell.tsx'
 import { FieldReportCard } from './FieldReportCard.tsx'
 import { WaterLine } from './WaterLine.tsx'
+import { WeekBars } from './SurfWeekBars.tsx'
 import type { ReactNode } from 'react'
+import { SURF_PAGE_OLD_FIRST } from '../config/flags.ts'
+import { useTide } from '../lib/useTide.ts'
+import { SurfTapIn } from './SurfTapIn.tsx'
 
 /*
  * SURF, HONEST (Batch N, Section 1; boards "DETAIL v2 · Surf").
@@ -79,6 +83,8 @@ const LIGHT_WORDS: Record<FaceLight, string> = {
 }
 
 export function SurfPageV2({ venue, placeName, timeZone, units, ground, onBack, onSwitch, onMap }: SurfPageV2Props) {
+  /* Batch SIMPLE-2, Section 4: the tap-in skeleton first; "More details ›" opens the old page below, unchanged (src/config/flags.ts SURF_PAGE_OLD_FIRST). */
+  const [more, setMore] = useState(SURF_PAGE_OLD_FIRST)
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 60_000)
@@ -105,9 +111,12 @@ export function SurfPageV2({ venue, placeName, timeZone, units, ground, onBack, 
   /* Batch Flow, Section 3: the spot's own beach's cam, and how far it is from the spot itself (it read "0.0 mi" measured from the beach). */
   const camNear = sea.facing === null ? null : (camsNear(spot, 'surf', COAST_CAMS, null, sea.facing)[0] ?? null)
   const cam = camNear === null ? null : { ...camNear, km: distanceMeters(venue, camNear.cam.at) / 1000 }
+  const tide = useTide(venue, now)
+  const how = <SurfHow sea={sea} stats={skill.stats} away={awayWords} placeName={placeName} spot={spot} today={venueToday(now, timeZone)} />
 
+  if (!more) return <SurfTapIn now={now} timeZone={timeZone} venue={venue} spot={spot} placeName={awayWords?.name ?? placeName} sea={sea} stats={skill.stats} units={units} ground={ground} station={station} tide={tide} how={how} onBack={onBack} onMore={() => setMore(true)} />
   return (
-    <DetailShell id="surf" ground={ground} onBack={onBack} onSwitch={onSwitch} onMap={onMap} how={<SurfHow sea={sea} stats={skill.stats} away={awayWords} placeName={placeName} spot={spot} today={venueToday(now, timeZone)} />}>
+    <DetailShell id="surf" ground={ground} onBack={SURF_PAGE_OLD_FIRST ? onBack : () => setMore(false)} onSwitch={onSwitch} onMap={onMap} how={how}>
       <SurfBody now={now} timeZone={timeZone} spot={spot} spotName={awayWords?.name ?? placeName} away={awayWords} sea={sea} stats={skill.stats} kept={kept} shoot={shootPicked(picked)} cam={cam} miles={units.distance === 'ft'} station={station} water={<WaterLine at={spot} unit={units.temperature} miles={units.distance === 'ft'} className="dhead__line" source />} />
     </DetailShell>
   )
@@ -396,37 +405,6 @@ function BuoyCard({ buoy, facing, factor, marine, wind, stats, clock }: { buoy: 
         </p>
       </div>
     </DCard>
-  )
-}
-
-/* ------------------------------------------------------------ the week */
-
-function WeekBars({ week }: { week: SurfDay[] }) {
-  const top = chartTopFt(week.map((d) => d.call?.highFt ?? 0))
-  return (
-    <div className="dsurf__week" role="img" aria-label="Seven days, each day's biggest hour and its likely range; grey Flat, teal Fun, amber Firing">
-      {week.map((d, i) => (
-        <div key={d.date} className={`dsurf__day${i >= 3 ? ' dsurf__day--later' : ''}`}>
-          <span className="dsurf__dname">
-            {new Intl.DateTimeFormat('en-US', {
-              weekday: 'short',
-              timeZone: 'UTC',
-            }).format(new Date(`${d.date}T12:00:00Z`))}
-          </span>
-          <div className="dsurf__barbox">
-            {d.call === null || d.hour === null ? null : (
-              <span
-                className={`dsurf__bar dsurf__bar--${d.call.size.toLowerCase()}`}
-                style={{
-                  height: `${Math.max(12, (d.hour.centerFt / top) * 100)}%`,
-                }}
-              />
-            )}
-          </div>
-          <span className="dsurf__drange" data-day={d.date}>{d.call === null ? '—' : d.call.words.replace(/ ft$/, '')}</span>
-        </div>
-      ))}
-    </div>
   )
 }
 

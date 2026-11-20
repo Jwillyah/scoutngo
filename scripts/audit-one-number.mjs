@@ -27,10 +27,7 @@ import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { webkit, devices } from './gate/playwright.mjs'
-import { ensureApp, goToStage, guardAudit, startWatchdog, APP_ORIGIN, openMenu } from './preflight.mjs'
-
-/* Batch Polish, Section 2: the menu is the home's (and setup's and field's); on the map its Back goes home first (scripts/preflight.mjs openMenu). */
-const menuOn = (pg) => openMenu((x) => pg.evaluate(x), (ms) => pg.waitForTimeout(ms))
+import { ensureApp, goHome, goToStage, guardAudit, homeTile, startWatchdog, APP_ORIGIN } from './preflight.mjs'
 import { shareLink } from '../src/lib/planShare.ts'
 import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
 import { placeKey } from '../src/core/venueName.ts'
@@ -84,7 +81,6 @@ const READ = (root) => `JSON.stringify((() => {
 /* What each screen must say, by spot: a screen that lost its value fails rather than drops out. */
 const expectFor = (spot) => ({
   home: spot.coast ? ['surf', 'wind', 'skycall', 'temp', ...(spot.noTide ? [] : ['tide'])] : ['wind', 'skycall', 'temp'],
-  menu: spot.coast ? ['surf', 'skycall'] : ['skycall'],
   surf: spot.coast ? ['surf'] : [],
   wind: ['wind'],
   tide: spot.coast && !spot.noTide ? ['tide'] : [],
@@ -138,20 +134,32 @@ try {
         for (let i = 0; i < 40 && !(await ev(`(document.querySelector('.pill-venue__name')?.textContent ?? '').includes(${JSON.stringify(spot.name)})`)); i += 1) await wait(250)
         await wait(1500)
         take('map', await read('map', '.chips2'))
-        await menuOn(page)
-        take('menu', await read('menu', 'nav[aria-label="Stage"]'))
-        await tap('.mcard--today')
+        /* Batch SIMPLE-2, Sections 2 and 3: the menu has no cards; every page is opened from its home tile. */
+        if ((await goHome(ev, wait)) !== 'home') fail(`${spot.name} ${time.key}: no way back to the home from the map`)
         await wait(1500)
-        take('home', await read('home', '.home__page[aria-label="Today"]'))
+        take('home', await read('home', '.home .homep__body'))
         await page.screenshot({ path: join(OUT, `home-${spot.key}-${time.key}.png`) })
         if (spot.coast) {
-          if (await tap('.home__page[aria-label="Today"] .hcard--surf')) take('surf', await read('surf', '.dpage--surf'))
+          if (await tap('.home [data-tile="surf"]')) {
+            take('surf', await read('surf', '.dpage--surf'))
+            /* The Surf page is the tap-in skeleton now; its Tide and Wind tabs are on the page "More details ›" opens (Batch SIMPLE-2, Section 4). */
+            await tap('.tipage--surf .tipage__more')
+            await wait(1200)
+          }
           if (await tap('.dpage__tab:has-text("Tide")')) take('tide', await read('tide', '.dpage--tide'))
           if (await tap('.dpage__tab:has-text("Wind")')) take('wind', await read('wind', '.dpage--wind'))
           await tap('.dpage__back')
           await wait(800)
-        } else if (await tap('.home__page[aria-label="Today"] .hcard--wind')) {
-          take('wind', await read('wind', '.dpage--wind'))
+        } else if ((await homeTile(ev, wait, 'wind')) === 'ok') {
+          /* The Wind tile is the map on the wind layer (Section 5 refines it); the Wind page is the map's wind chip. */
+          await wait(1500)
+          /* Batch SIMPLE-2, Section 5: the Wind tile is the map on the wind layer; its Charts (Map | Charts) carry the wind's numbers. */
+          const layer = await ev(`document.querySelector('[data-weather-layer]')?.getAttribute('data-weather-layer') ?? null`)
+          if (layer !== 'wind') fail(`${spot.name} ${time.key}: the Wind tile opened the map on ${JSON.stringify(layer)}, not the wind layer`)
+          await page.getByRole('button', { name: /^Charts$/ }).first().click({ timeout: 3000, noWaitAfter: true }).catch(() => {})
+          await page.getByRole('tab', { name: /^Charts$/ }).first().click({ timeout: 1500, noWaitAfter: true }).catch(() => {})
+          await wait(1500)
+          take('wind', await read('wind', (await ev(`!!document.querySelector('.dpage--wind')`)) ? '.dpage--wind' : 'body'))
           await tap('.dpage__back')
           await wait(800)
         }
@@ -160,17 +168,29 @@ try {
         await page.goto(url)
         await wait(3000)
         await goToStage(ev, wait, 'plan')
-        await menuOn(page)
-        await wait(600)
-        await tap('nav[aria-label="Stage"] .mcard--weather')
+        await homeTile(ev, wait, 'weather')
         take('weather', await read('weather', '.wpage'))
         await tap('.wpage .ppage__back')
         await wait(800)
-        await menuOn(page)
-        await wait(600)
-        await tap('nav[aria-label="Stage"] .mcard--sky')
-        take('sky', await read('sky', '.spage'))
-        await page.getByRole('button', { name: /Color detail/ }).first().click({ timeout: 4000, noWaitAfter: true }).catch(() => fail(`${spot.name} ${time.key}: no Color detail on the Sky page`))
+        await goHome(ev, wait)
+        await homeTile(ev, wait, 'sky')
+        /*
+         * Batch SIMPLE-2, Section 4: the call is on the Sky page's Tonight and Tmrw AM tabs; the soonest event's
+         * carries data-shared="skycall" (the other, "skycall-picked"). Both tabs are read and put together.
+         */
+        const sky = {}
+        for (const pill of ['Tonight', 'Tmrw PM', 'This AM', 'Tmrw AM']) {
+          if (!(await tap(`.tipage.spage .tipage__tabs [role="tab"]:text-is("${pill}")`))) continue
+          let got = {}
+          for (let i = 0; i < 20; i += 1) {
+            await wait(500)
+            got = JSON.parse(await ev(READ('.tipage.spage'))) ?? {}
+            if ((got.skycall ?? got['skycall-picked'] ?? []).length > 0) break
+          }
+          for (const [k, v] of Object.entries(got)) (sky[k] ??= []).push(...v)
+        }
+        take('sky', sky)
+        await page.locator('.tipage.spage .tipage__more').first().click({ timeout: 4000, noWaitAfter: true }).catch(() => fail(`${spot.name} ${time.key}: no More details on the Sky page`))
         take('detail', await read('detail', '.fire'))
       } catch (error) {
         fail(`${spot.name} ${time.key}: ABORTED: ${error instanceof Error ? error.message : String(error)}`)
@@ -195,14 +215,12 @@ try {
           await wait(20_000)
           await goToStage(ev, wait, 'plan')
           for (let i = 0; i < 40 && !(await ev(`(document.querySelector('.pill-venue__name')?.textContent ?? '').includes(${JSON.stringify(spot.name)})`)); i += 1) await wait(250)
-          await menuOn(page)
+          await goHome(ev, wait)
           await wait(3000)
-          again.menu = JSON.parse(await ev(READ('nav[aria-label="Stage"]')))?.[k] ?? []
-          await tap('.mcard--today')
-          await wait(3000)
-          again.home = JSON.parse(await ev(READ('.home__page[aria-label="Today"]')))?.[k] ?? []
-          const still = [...new Set([...again.menu, ...again.home])]
-          if (still.length > 1) fail(`${spot.name} ${time.key}: ${k} differs, and still 20 s on: ${by.map((b) => `${b.screen} "${b.x}"`).join(', ')}; again menu ${JSON.stringify(again.menu)}, home ${JSON.stringify(again.home)}`)
+          again.home = JSON.parse(await ev(READ('.home .homep__body')))?.[k] ?? []
+          const others = by.filter((b) => b.screen !== 'home').map((b) => b.x)
+          const still = [...new Set([...again.home, ...others])]
+          if (still.length > 1) fail(`${spot.name} ${time.key}: ${k} differs, and still 20 s on: ${by.map((b) => `${b.screen} "${b.x}"`).join(', ')}; again home ${JSON.stringify(again.home)}`)
           else console.log(`  NOTE ${spot.name} ${time.key}: ${k} differed on the first read (${by.map((b) => `${b.screen} "${b.x}"`).join(', ')}) and agreed 20 s on: ${JSON.stringify(again)}`)
         }
       }
@@ -236,7 +254,7 @@ if (runs < SPOTS.length * TIMES.length) fail(`only ${runs} of ${SPOTS.length * T
       try {
         localStorage.setItem('scoutngo.landing.v1', 'true')
         /* Answered already: on a fresh phone a pick asks "What do you do outside?" over the home, as it should. */
-        localStorage.setItem('scoutngo.activities.v1', JSON.stringify(['surf', 'shoot', 'fish', 'weather']))
+        localStorage.setItem('scoutngo.persona.v1', 'surf')
       } catch {
         /* about:blank */
       }
@@ -266,15 +284,12 @@ if (runs < SPOTS.length * TIMES.length) fail(`only ${runs} of ${SPOTS.length * T
     await tap('.home .hbtn--round[aria-label="Open the map"]')
     await wait(1500)
     labels.map = await ev(`document.querySelector('.pill-venue__name')?.textContent ?? null`)
-    await menuOn(page)
-    await wait(800)
-    labels.menu = await ev(`document.querySelector('.menu__spot .menu__title')?.textContent ?? null`)
-    await tap('.mcard--today')
+    await goHome(ev, wait)
     await wait(2500)
     labels.home = await ev(`document.querySelector('.home__spotname')?.textContent ?? null`)
-    await tap('.home__page[aria-label="Today"] .hcard--surf')
+    await tap('.home [data-tile="surf"]')
     await wait(2500)
-    labels.surf = await ev(`document.querySelector('.dpage--surf .dsurf__place')?.textContent ?? null`)
+    labels.surf = await ev(`document.querySelector('.dpage--surf .ppage__sub')?.textContent ?? null`)
     console.log(`  ${JSON.stringify(labels)}`)
     for (const [screen, text] of Object.entries(labels)) {
       if (text === null) fail(`after five spots: no place label on the ${screen}`)

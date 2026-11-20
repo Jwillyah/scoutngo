@@ -43,10 +43,14 @@ describe('Settings, a page of its own (30 Oct)', () => {
     expect(html).toMatch(/class="set2__version"/)
   })
 
-  it('what I do: the five activities, each a coloured tile and a real switch, no emoji', () => {
+  /* Batch SIMPLE-2, Section 2: one persona; a row is a tap that makes it first (src/lib/persona.ts), not five switches. */
+  it('what I do: the five, each a coloured tile and a tap that makes it first, no emoji', () => {
     const html = page()
     for (const a of ['surf', 'shoot', 'drone', 'fish', 'weather']) expect(html).toContain(`set2__tile--${a}`)
-    expect(html.match(/role="switch"/g)?.length).toBeGreaterThanOrEqual(7)
+    const what = html.slice(html.indexOf('>What I do<'), html.indexOf('>My spot<'))
+    expect(what.match(/<button[^>]*set2__row--tap/g)?.length).toBe(5)
+    expect(what).not.toContain('role="switch"')
+    expect(html.match(/role="switch"/g)?.length).toBeGreaterThanOrEqual(2)
     expect(html).not.toMatch(/\p{Extended_Pictographic}/u)
   })
 

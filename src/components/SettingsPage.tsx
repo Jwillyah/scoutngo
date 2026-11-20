@@ -5,6 +5,8 @@ import { NUMERALS_NOTE } from '../core/numerals.ts'
 import type { Drone } from '../core/kit.ts'
 import { ACTIVITIES, type Activity } from '../core/homeDay.ts'
 import { ACTIVITY_LINES, ACTIVITY_WORDS, useActivities } from '../lib/activities.ts'
+import { PERSONAS, PERSONA_LINES, PERSONA_WORDS, usePersona } from '../lib/persona.ts'
+import { ACTIVITY_MULTI } from '../config/flags.ts'
 import { versionLine, type BuildCheck } from '../lib/build.ts'
 import { readHome, writeHome, type Home } from '../lib/home.ts'
 import { locateOnce, locateWords, useLocateAttempts } from '../lib/locateOnce.ts'
@@ -165,6 +167,34 @@ function WhatIDo() {
   )
 }
 
+/*
+ * Batch SIMPLE-2, Section 2: WHAT I DO, ONE ANSWER. The five, as rows; a
+ * tap makes that one the persona (src/lib/persona.ts): the home's tile
+ * order and its moment. Batch M's toggles (WhatIDo above) are behind
+ * ACTIVITY_MULTI.
+ */
+function MyPersona() {
+  const [persona, setPersona] = usePersona()
+  return (
+    <>
+      {PERSONAS.map((p) => (
+        <Row
+          key={p}
+          label={PERSONA_WORDS[p]}
+          sub={PERSONA_LINES[p]}
+          lead={
+            <span className={`set2__tile set2__tile--${p}`}>
+              <ActivityIcon activity={p} className="set2__icon" />
+            </span>
+          }
+          value={persona === p ? <span data-persona-on={p}>✓ first</span> : ''}
+          onClick={persona === p ? undefined : () => setPersona(p)}
+        />
+      ))}
+    </>
+  )
+}
+
 export function SettingsPage(props: Props) {
   const { units, onUnits, venue, drone } = props
   const [more, setMore] = useState(false)
@@ -209,7 +239,7 @@ export function SettingsPage(props: Props) {
   return (
     <Page title="Settings" className="setpage set2" back onClose={props.onClose}>
       <Group title="What I do">
-        <WhatIDo />
+        {ACTIVITY_MULTI ? <WhatIDo /> : <MyPersona />}
       </Group>
 
       <Group title="My spot">

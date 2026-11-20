@@ -126,6 +126,15 @@ export interface ReadoutIn {
    * the card beside a marker near the top covered it.
    */
   avoid?: readonly Rect[]
+  /**
+   * Batch SIMPLE-2, Section 5.5: the bands at the top and the foot of the
+   * map's box the card is held out of, px: the status bar's safe area and the
+   * bar over the map at the top, the sheet with the timeline at the foot. The
+   * card stays between them, beside the marker, whatever the marker's height
+   * (0 when not given: the map's own edges).
+   */
+  top?: number
+  bottom?: number
 }
 
 /** A box in the map's box, px. */
@@ -155,8 +164,10 @@ export function readoutBeside(r: ReadoutIn): ReadoutAt {
   const room = Math.max(0, side === 'right' ? roomRight : roomLeft)
   const width = Math.min(r.w, room)
   const x = side === 'right' ? r.px + r.gap : r.px - r.gap - width
-  const y0 = Math.max(r.edge, Math.min(r.boxH - r.h - r.edge, r.py - r.h / 2))
-  const y = clearOf(r.avoid ?? [], x, width, y0, r.h, r.edge, r.boxH)
+  const lo = (r.top ?? 0) + r.edge
+  const hi = Math.max(lo, r.boxH - (r.bottom ?? 0) - r.h - r.edge)
+  const y0 = Math.max(lo, Math.min(hi, r.py - r.h / 2))
+  const y = clearOf(r.avoid ?? [], x, width, y0, r.h, lo, hi)
   return { x, y, side, maxWidth: r.w <= room ? null : room }
 }
 
@@ -166,11 +177,9 @@ export function readoutBeside(r: ReadoutIn): ReadoutAt {
  * touches none of them. The card moves along its own side only, so it never
  * reaches the marker. Where nowhere is clear, it stays put.
  */
-function clearOf(avoid: readonly Rect[], x: number, w: number, y0: number, h: number, edge: number, boxH: number): number {
+function clearOf(avoid: readonly Rect[], x: number, w: number, y0: number, h: number, lo: number, hi: number): number {
   const hits = (y: number) => avoid.some((o) => x < o.x + o.w && x + w > o.x && y < o.y + o.h + AVOID_PAD && y + h > o.y - AVOID_PAD)
   if (!hits(y0)) return y0
-  const lo = edge
-  const hi = boxH - h - edge
   const tries = avoid.flatMap((o) => [o.y + o.h + AVOID_PAD, o.y - AVOID_PAD - h]).filter((y) => y >= lo && y <= hi && !hits(y))
   if (tries.length === 0) return y0
   return tries.reduce((a, b) => (Math.abs(b - y0) < Math.abs(a - y0) ? b : a))

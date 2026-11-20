@@ -32,6 +32,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { chromium, webkit, devices } from './gate/playwright.mjs'
 import { ensureApp, findChrome, goToStage, guardAudit, startWatchdog, APP_ORIGIN, openMenu } from './preflight.mjs'
+import { goHome } from './preflight.mjs'
 import { shareLink } from '../src/lib/planShare.ts'
 import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
 import { placeKey } from '../src/core/venueName.ts'
@@ -118,9 +119,8 @@ try {
     await page.getByRole('button', { name: /^open$/i }).click({ timeout: 4000 }).catch(() => {})
     await goToStage(ev, wait, 'plan')
     await wait(2500)
-    await openMenu(ev, wait)
-    await wait(700)
-    await page.locator('.mcard--today').first().click()
+    /* Batch SIMPLE-2, Section 2: the map's Back to the home (the menu has no Today card). */
+    await goHome(ev, wait)
     await wait(7000)
     if (!(await ev(`!!document.querySelector('.home')`))) {
       fail(`${label}: no home`)
@@ -135,13 +135,14 @@ try {
      * Sky page, and only then does the home's row read the kept answer.
      */
     const coldAsked = asked.length
-    const coldRow = await ev(`document.querySelector('.home__page[aria-label="Today"] [data-better]')?.textContent ?? null`)
-    console.log(`  cold home: grid questions ${coldAsked}, row ${JSON.stringify(coldRow)}`)
+    console.log(`  cold home: grid questions ${coldAsked}`)
     if (coldAsked !== 0) fail(`${label}: the home asked the grid ${coldAsked} times before Best Sky was opened`)
-    if (coldRow !== null) fail(`${label}: the cold home shows a Best Sky row with nothing kept: ${JSON.stringify(coldRow)}`)
-    if (!(await tap('.home__page[aria-label="Today"] .hcard--sky, .home__page[aria-label="Today"] [data-colornow]'))) fail(`${label}: the home's Sky card did not open`)
+    if (!(await tap('.home [data-tile="sky"]'))) fail(`${label}: the home's Sky tile did not open`)
     await wait(2500)
-    if (!(await tap('.spage__bestsky'))) fail(`${label}: the Sky page's "Where's the color?" did not open`)
+    /* Batch SIMPLE-2, Section 4: "Best spot near me ›" is on the Sky page's Tonight (and Tmrw AM) tab. */
+    await tap('.tipage.spage .tipage__tabs [role="tab"] >> nth=1')
+    await wait(800)
+    if (!(await tap('.tipage.spage .tipage__btn:has-text("Best spot near me")'))) fail(`${label}: the Sky page's "Best spot near me" did not open`)
     // </open>
     await wait(5000)
     if (!(await ev(`!!document.querySelector('.bsky')`))) {
@@ -252,17 +253,19 @@ try {
     await page.locator('.bsky .ppage__back').click()
     await wait(800)
     if (await ev(`!!document.querySelector('.bsky')`)) fail(`${label}: Back left the page open`)
-    /* Section 4's home row, now from the page's kept answer (src/lib/bestSkyKept.ts): it reads, it opens the page, and the page asks nothing again inside the 30 minutes. */
+    /*
+     * Batch SIMPLE-2, Section 3: the page's other door is ☰ › Best sky near me (the old home's "Better color" row went with
+     * that home, HOME_OLD). Opened again from there inside the 30 minutes, it asks nothing: the kept answer (src/lib/bestSkyKept.ts).
+     */
     await page.locator('.ppage__back').first().click({ timeout: 4000 }).catch(() => {})
     await wait(1500)
-    const row = await ev(`document.querySelector('.home__page[aria-label="Today"] [data-better]')?.textContent ?? null`)
-    console.log(`  home row, kept: ${JSON.stringify(row)}`)
-    if (!/^Better color \d+ mi [NESW]+ · Lynnhaven Inlet · \d+:\d\d [AP]M ›$/.test(row ?? '')) fail(`${label}: after the page, the home's row reads ${JSON.stringify(row)}`)
+    await goHome(ev, wait)
     const keptBefore = asked.length
-    if (!(await tap('.home__page[aria-label="Today"] [data-better]'))) fail(`${label}: the home's row does not open the page`)
+    await openMenu(ev, wait)
+    if (!(await tap('nav[aria-label="Stage"] .mrow:has-text("Best sky near me")'))) fail(`${label}: no Best sky near me row in the menu`)
     await wait(3000)
-    if (!(await ev(`!!document.querySelector('.bsky')`))) fail(`${label}: the home's row did not open "Where's the color?"`)
-    console.log(`  reopened from the row: grid questions ${asked.length - keptBefore}`)
+    if (!(await ev(`!!document.querySelector('.bsky')`))) fail(`${label}: ☰ › Best sky near me did not open "Where's the color?"`)
+    console.log(`  reopened from the menu: grid questions ${asked.length - keptBefore}`)
     if (asked.length !== keptBefore) fail(`${label}: reopened inside 30 minutes, the page asked the grid ${asked.length - keptBefore} times, not kept`)
     await ctx.close()
     watchdog.note(label)

@@ -38,6 +38,8 @@ import { moonPhaseName } from '../lib/moonGlyph.ts'
 import { useBriefing } from '../lib/useBriefing.ts'
 import { MoonGlyph } from './MoonGlyph.tsx'
 import { PageShell } from './PageShell.tsx'
+import { SkyPage } from './SkyPage.tsx'
+import { SKY_SUN_MOON_NIGHT_PAGE } from '../config/flags.ts'
 
 /*
  * SUN · MOON · NIGHT (Batch DRONE, Section 4; boards SkySun, SkyMoon, SkyB2n),
@@ -337,7 +339,19 @@ export function NightView({ venue, timeZone, now }: { venue: LatLon; timeZone: s
   )
 }
 
-export function SunMoonNightPage({ venue, placeName, timeZone, now, initial, onBack, onMap, onPlanMoonrise }: Props) {
+/*
+ * FOLDED INTO THE SKY PAGE (Batch SIMPLE-2, Section 4): with
+ * SKY_SUN_MOON_NIGHT_PAGE off (src/config/flags.ts) a call that opens this
+ * page opens Sky › Night instead (the home's Moon tile); the old page is
+ * below, whole, and comes back with the flag.
+ */
+export function SunMoonNightPage(props: Props) {
+  if (SKY_SUN_MOON_NIGHT_PAGE) return <SunMoonNightPageOld {...props} />
+  const { venue, placeName, timeZone, now, onBack, onMap } = props
+  return <SkyPage venue={venue} placeName={placeName} timeZone={timeZone} now={now} onBack={onBack} onMap={onMap} onCalendar={() => undefined} initialTab="night" />
+}
+
+export function SunMoonNightPageOld({ venue, placeName, timeZone, now, initial, onBack, onMap, onPlanMoonrise }: Props) {
   const brief = useBriefing(venue, timeZone, now, true)
   const opened = useMemo(() => initial ?? opensOn(sunHero(now, venue.lat, venue.lon).phase), [initial, now, venue])
   const [picked, setPicked] = useState<SmnTab | null>(null)

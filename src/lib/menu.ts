@@ -53,3 +53,32 @@ export function pathToMenuItem(pathname: string): MenuItem | null {
   const key = pathname.replace(/\/+$/, '').toLowerCase()
   return OLD_PATHS[key] ?? null
 }
+
+/*
+ * THE ☰ MENU (Batch SIMPLE-2, Section 3; board Home_Menu): everything the
+ * home and the map do not answer, eight rows, in this order. The home
+ * answers, the map looks around, everything else lives here. The Weather,
+ * Surf, Wind, Tide, Sky and Drone cards the menu used to carry are the
+ * home's tiles now (each page one way in, docs/batches/simple-audit.md
+ * section 3), behind MENU_CARDS in src/config/flags.ts.
+ */
+export type MenuRowId = 'setup' | 'bestsky' | 'viewfinder' | 'calendar' | 'saved' | 'report' | 'settings' | 'about'
+
+export interface MenuRowDef {
+  id: MenuRowId
+  label: string
+  sub: string
+  /** The dot's colour role (src/styles/menu-list.css). */
+  tone: 'sun' | 'set' | 'sky' | 'water' | 'plain'
+}
+
+export const MENU_LIST: readonly MenuRowDef[] = [
+  { id: 'setup', label: 'Plan a shoot', sub: 'positions, lenses, light · drone moves', tone: 'sun' },
+  { id: 'bestsky', label: 'Best sky near me', sub: 'where the color is tonight', tone: 'set' },
+  { id: 'viewfinder', label: 'Viewfinder', sub: 'the sun and moon through your camera', tone: 'sun' },
+  { id: 'calendar', label: 'Calendar', sub: 'good days ahead', tone: 'sky' },
+  { id: 'saved', label: 'Saved spots', sub: 'your places, on this phone', tone: 'water' },
+  { id: 'report', label: 'Field report', sub: 'tell the app what it was really like', tone: 'water' },
+  { id: 'settings', label: 'Settings', sub: 'units, gear, Labs', tone: 'plain' },
+  { id: 'about', label: 'About', sub: 'how it works · hit rate · privacy', tone: 'plain' },
+]

@@ -65,7 +65,8 @@ describe('the station over the models (1.2): 12 Nov 9:40 AM', () => {
   it('the Sky page shows it under the call, and Now is its first tab', () => {
     const page = readFileSync('src/components/SkyPage.tsx', 'utf8')
     expect(page).toMatch(/data-doubt>\{doubt\.line\}/)
-    expect(page).toMatch(/\['now', \.\.\./)
+    /* Batch SIMPLE-2, Section 4: Now · Tonight · Tmrw AM · Night, Now first. */
+    expect(page).toMatch(/\{ id: 'now', label: 'Now' \},\s*\{ id: 'tonight'/)
   })
 })
 

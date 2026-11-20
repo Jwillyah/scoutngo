@@ -23,10 +23,11 @@ import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { webkit, devices } from './gate/playwright.mjs'
-import { ensureApp, goToStage, guardAudit, startWatchdog, APP_ORIGIN, setSheet } from './preflight.mjs'
+import { ensureApp, goToStage, guardAudit, homeTile, startWatchdog, APP_ORIGIN } from './preflight.mjs'
 import { shareLink } from '../src/lib/planShare.ts'
 import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
 import { OPEN_METEO, fakeAnswer } from './openMeteoFake.mjs'
+import { surfAndFish } from './audit-tapin-surf.mjs'
 
 guardAudit('tap in')
 const watchdog = startWatchdog('tap in', 420_000)
@@ -105,6 +106,7 @@ try {
       ([top, bottom]) => {
         try {
           localStorage.setItem('scoutngo.landing.v1', 'true')
+          localStorage.setItem('scoutngo.activities.v1', JSON.stringify(['surf', 'fish', 'shoot']))
         } catch {
           /* about:blank */
         }
@@ -131,8 +133,9 @@ try {
     await page.getByText(/^(Open the map|Open ScoutNGo)$/).click({ timeout: 3000 }).catch(() => {})
     await goToStage(ev, wait, 'plan')
     await wait(2000)
-    await setSheet(ev, wait, 'peek')
-    await page.locator('.chip2[data-chip="tide"]').first().tap()
+    /* Batch SIMPLE-2, Section 2: the Tide page is the home's Tide tile (the map's chip was a second way in). */
+    const toTide = await homeTile(ev, wait, 'tide')
+    if (toTide !== 'ok') fail(`${look.key}: could not tap the home's Tide tile: ${toTide}`)
     let l = null
     for (let i = 0; i < 40; i += 1) {
       await wait(500)
@@ -192,6 +195,8 @@ try {
         if (!/ at \d{1,2}:\d{2} [AP]M$/.test(during.head ?? '')) fail(`the line under the value did not follow the finger: ${JSON.stringify(during.head)}`)
       }
     }
+    /* The Surf and Fish pages (Section 4), from the home, in this same context. */
+    await surfAndFish({ page, ev, wait, look, fail, OUT, count: () => (looked += 1) })
     await ctx.close()
     watchdog.note(look.key)
   }
@@ -203,6 +208,6 @@ if (looked === 0) {
   console.log('=== TAP IN AUDIT ABORTED: nothing was looked at ===')
   process.exit(2)
 }
-console.log(`  looked at ${looked} of ${LOOKS.length} screens; screenshots: ${OUT}`)
+console.log(`  looked at ${looked} pages in ${LOOKS.length} sizes (Tide, Surf, and Fish where the home routes it); screenshots: ${OUT}`)
 console.log(`\n=== TAP IN PROBLEMS: ${problems} ===`)
 process.exit(problems === 0 ? 0 : 1)

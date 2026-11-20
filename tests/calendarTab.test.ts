@@ -12,8 +12,10 @@ describe('the calendar and the showers', () => {
   const card = readFileSync('src/components/SkyCard.tsx', 'utf8')
   const page = readFileSync('src/components/SkyPage.tsx', 'utf8')
   const app = readFileSync('src/App.tsx', 'utf8')
-  it('the Sky page has a Calendar button, and App opens the month from it', () => {
-    expect(page).toMatch(/onClick=\{onCalendar\}[\s\S]{0,40}Calendar ›/)
+  /* Batch SIMPLE-2, Section 4 (mockups Sky_*): the Sky page draws no Calendar button any more (the month is Menu › Calendar); it keeps the prop so App's call keeps working. */
+  it('the Sky page keeps onCalendar for App, draws no Calendar button, and App opens the month from it', () => {
+    expect(page).toMatch(/onCalendar: \(\) => void/)
+    expect(page).not.toMatch(/Calendar ›/)
     expect(app).toMatch(/onCalendar=\{\(\) => \{[\s\S]{0,400}kind: 'calendar'/)
     expect(readFileSync('src/components/PlanMode.tsx', 'utf8')).toMatch(/cardRequest\.kind === 'calendar'\) \{[\s\S]{0,200}setCalendarOpen\(true\)/)
   })

@@ -303,3 +303,271 @@
   margin-top: auto;
   padding: 16px 0 calc(var(--safe-bottom) + 12px);
 }
+
+/* ------------------------------------------------------------------------
+ * THE SKY PAGE ON THE TAP-IN SKELETON (Batch SIMPLE-2, Section 4; mockups
+ * Sky_Now, Sky_Tonight, Sky_Night). The shell, the hero, the rows card and
+ * the buttons are tapin.css's; these are the page's own pictures.
+ * --------------------------------------------------------------------- */
+.spage .tipage__tabs .ui-seg__opt {
+  white-space: nowrap;
+  padding-inline: 6px;
+}
+.spage__callwhy {
+  flex: none;
+  padding: 0 8px;
+}
+
+/* Now: the cams. Every one a link out (embed false), so a card with words, no picture. */
+.snow {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.snow__none {
+  margin: 0;
+  padding: 12px 16px;
+  font-size: var(--text-sm);
+  color: var(--glass-ink-2);
+}
+.snow__big {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 112px;
+  padding: 12px 14px;
+  box-sizing: border-box;
+  color: var(--white);
+  text-decoration: none;
+  /* The glass card's colour (style audit, look D) with the sky's gradient over it. */
+  background-color: var(--d-card);
+  background-image: linear-gradient(180deg, color-mix(in srgb, var(--d-glow-violet) 55%, transparent), color-mix(in srgb, var(--d-glow) 55%, transparent));
+}
+.snow__chip {
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--d-card-solid);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  overflow-wrap: anywhere;
+}
+.snow__why {
+  font-size: var(--text-sm);
+  color: var(--white);
+}
+.snow__meta {
+  margin-top: auto;
+  font-size: var(--text-sm);
+  color: var(--white);
+}
+.snow__meta b {
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+.snow__strip {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.snow__small {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 52px;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border-radius: 16px;
+  border: 1px solid var(--d-edge);
+  background: var(--d-card);
+  color: var(--white);
+  text-decoration: none;
+  font-size: var(--text-sm);
+}
+.snow__small b {
+  font-weight: var(--weight-medium);
+  overflow-wrap: anywhere;
+}
+.snow__small span {
+  color: var(--glass-ink-2);
+}
+.snow__showall {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--white);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-decoration: underline;
+}
+.snow__road {
+  margin: 0;
+  padding: 0 4px;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+.snow__road a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--white);
+  overflow-wrap: anywhere;
+}
+
+/* Tonight, Tmrw AM: the drawn sky (src/core/skyPicture.ts). */
+.skypic {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.skypic__top {
+  stop-color: var(--d-glow-violet);
+}
+.skypic__low {
+  stop-color: var(--d-glow);
+}
+.skypic__deck {
+  fill: none;
+  stroke: var(--d-cloud-top);
+  stroke-width: 14;
+  stroke-linecap: round;
+  opacity: 0.85;
+}
+.skypic__deck--lit {
+  stroke: var(--afterglow);
+}
+.skypic__deckt,
+.skypic__gapt {
+  font-size: 14px;
+  fill: var(--white);
+}
+.skypic__gapt {
+  fill: var(--sun);
+  font-weight: var(--weight-medium);
+}
+.skypic__gap {
+  fill: var(--sun);
+  fill-opacity: 0.22;
+}
+.skypic__horizon {
+  stroke: var(--white);
+  stroke-width: 1.5;
+}
+.skypic__sun {
+  fill: var(--sun);
+}
+.skypic__tick {
+  font-size: 14px;
+  fill: var(--glass-ink-2);
+}
+.skypic__none {
+  margin: 8px 0;
+  font-size: var(--text-sm);
+  color: var(--glass-ink-2);
+}
+
+/* Night: the moon beside the hero, the 14 nights, the moments. */
+.spage--night .tipage__swipe {
+  position: relative;
+}
+.spage--night .tipage__hero {
+  padding-right: 112px;
+}
+.snight__moon {
+  position: absolute;
+  top: 60px;
+  right: 4px;
+  width: 100px;
+  height: 100px;
+  pointer-events: none;
+}
+.snight__strip {
+  padding: 10px 12px 8px;
+}
+.snight__label,
+.snight__meyebrow {
+  margin: 0;
+  font-size: var(--text-label);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--glass-ink-2);
+}
+.snight__days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  row-gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.snight__day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: var(--text-xs);
+}
+.snight__num {
+  color: var(--white);
+}
+.snight__mark {
+  min-height: 1.2em;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-heavy);
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+.snight__day--full .snight__num,
+.snight__day--new .snight__num {
+  color: var(--accent);
+  font-weight: var(--weight-medium);
+}
+.snight__moments {
+  border-color: var(--accent);
+}
+.snight__moment {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+}
+.snight__moment + .snight__moment {
+  border-top: 1px solid var(--d-edge);
+}
+.snight__mtext {
+  flex: 1;
+  min-width: 0;
+}
+.snight__meyebrow {
+  color: var(--accent);
+}
+.snight__mtitle {
+  margin: 2px 0 0;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+}
+.snight__mline {
+  margin: 2px 0 0;
+  font-size: var(--text-sm);
+  color: var(--glass-ink-2);
+}
+.snight__plan {
+  flex: none;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--sky-ink);
+  font: inherit;
+  font-weight: var(--weight-medium);
+}

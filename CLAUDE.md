@@ -47,6 +47,7 @@ tsc -b → oxlint --deny-warnings → viewport units → colour roles → clock
          buildings, sky fire, terrain decode, special light, line up, privacy,
          wind, map layers, weather, locate, safari tab, venue pack, surface,
          overflow, one number, style, map labels, home fit,
+         tap in, sky page, taps, planner,
          projection (alone), offline, api urls, 3d network, airspace,
          call sheet, clock screen, service worker, clean map,
          planner

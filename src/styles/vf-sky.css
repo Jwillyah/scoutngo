@@ -1,0 +1,122 @@
+/*
+ * THE VIEWFINDER'S GUIDES (Batch SIMPLE-2, Section 4; mockup Sky_Viewfinder):
+ * the compass strip under the top buttons, the sun's dots with their times,
+ * the ring on the event, the chips Sun · Moon · Milky Way, the event's line,
+ * and the compass-only ground when there is no picture. The rest of the
+ * viewfinder is app.css's (.vf).
+ */
+.vf__nocam {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, var(--d-day-top), var(--d-glow) 62%, var(--black) 62%);
+}
+.vf__compass {
+  position: absolute;
+  top: calc(var(--safe-top) + var(--space-1) + var(--control-height) + var(--space-2));
+  left: var(--space-2);
+  right: var(--space-2);
+  height: 40px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--black) 60%, transparent);
+  overflow: hidden;
+  pointer-events: none;
+}
+.vf__ctick,
+.vf__cnow {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  font-size: var(--text-sm);
+}
+.vf__ctick {
+  color: var(--glass-ink-2);
+}
+.vf__ctick--pt {
+  color: var(--white);
+  font-weight: var(--weight-medium);
+}
+.vf__cnow {
+  left: 50%;
+  color: var(--sun);
+  font-weight: var(--weight-medium);
+}
+/* The sky check's words go under the strip. */
+.vf__checked {
+  top: calc(var(--safe-top) + var(--space-1) + var(--control-height) + var(--space-2) + 48px);
+}
+.vf__dotat {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.vf__dot {
+  position: absolute;
+  left: -7px;
+  top: -7px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--sun);
+}
+.vf__hour--dot {
+  left: 8px;
+  top: -6px;
+  transform: translate(0, -100%);
+}
+.vf__ring {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  transform: translate(-50%, -50%);
+  border: 3px solid var(--sun);
+  border-radius: 50%;
+  pointer-events: none;
+}
+.vf__corepath {
+  fill: none;
+  stroke: var(--white);
+  stroke-width: 2;
+  stroke-dasharray: 2 5;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+.vf__head {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  line-height: 1.25;
+}
+.vf__chips {
+  display: flex;
+  gap: var(--space-2);
+}
+.vf__pick {
+  flex: 0 0 auto;
+  min-height: var(--control-height);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--white) 16%, transparent);
+  color: var(--white);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+.vf__pick[aria-pressed='true'] {
+  background: var(--white);
+  color: var(--black);
+}
+.vf__actions {
+  grid-template-columns: repeat(2, 1fr);
+}
+/* The chips sit under the compass strip (top), the controls at the foot keep to a quarter of the screen. */
+.vf__chips--top {
+  position: absolute;
+  top: calc(var(--safe-top) + var(--space-1) + var(--control-height) + var(--space-2) + 48px);
+  left: var(--space-2);
+}
+.vf__checked {
+  top: calc(var(--safe-top) + var(--space-1) + var(--control-height) + var(--space-2) + 100px);
+}

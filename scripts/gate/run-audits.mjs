@@ -55,10 +55,14 @@ export const AUDITS = [
   { name: 'pages', script: 'audit-pages.mjs', summary: /PAGES PROBLEMS/ },
   /* Batch SIMPLE-2, Section 1: the tap-in page skeleton, on the Tide page, at every size and standalone. */
   { name: 'tap in', script: 'audit-tapin.mjs', summary: /TAP IN PROBLEMS/ },
+  /* Batch SIMPLE-2, Section 4: the Sky page on the skeleton, Now · Tonight · Tmrw AM · Night and the Viewfinder, at every size and standalone. */
+  { name: 'sky page', script: 'audit-sky.mjs', summary: /SKY PAGE PROBLEMS/ },
   { name: 'best sky', script: 'audit-bestsky.mjs', summary: /BEST SKY PROBLEMS/ },
   /* Batch Polish, Section 3: the home never scrolls, in five looks and three numbers of activities. */
   { name: 'home fit', script: 'audit-home-fit.mjs', summary: /HOME FIT PROBLEMS/ },
   { name: 'menu', script: 'audit-menu.mjs', summary: /MENU PROBLEMS/ },
+  /* Batch SIMPLE-2, Section 2: taps from a fresh install for seven tasks (surf now, tonight's color, can I fly, the tide, plan a shoot, a spot by name, by address), each held to its budget. */
+  { name: 'taps', script: 'audit-taps.mjs', summary: /TAPS PROBLEMS/, pattern: /PROBLEM|ABORTED|\| / },
   { name: 'clean map', script: 'audit-clean-map.mjs', summary: /CLEAN MAP PROBLEMS/, pattern: /PROBLEM|ABORTED/ },
   /* Batch SIMPLE-2, Section 0: the map opened eighteen ways, never the planner; Menu › Plan a shoot always it. */
   { name: 'planner', script: 'audit-planner.mjs', summary: /PLANNER PROBLEMS/, pattern: /PROBLEM|ABORTED/ },

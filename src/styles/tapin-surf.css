@@ -1,0 +1,149 @@
+/*
+ * THE SURF AND FISH TAP-IN PAGES' OWN PARTS (Batch SIMPLE-2, Section 4): the
+ * hourly bars with the clean stretch lit, the cam list, the fish week. The
+ * skeleton and the tide curve are tapin.css's. Tokens only.
+ */
+.sbars {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.sbars__bar {
+  fill: var(--d-surf);
+  fill-opacity: 0.45;
+}
+.sbars__bar--clean {
+  fill-opacity: 1;
+}
+.sbars__band {
+  fill: var(--d-surf);
+  fill-opacity: 0.2;
+}
+.sbars__bandt {
+  fill: var(--d-surf);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+}
+.sbars__now {
+  stroke: var(--white);
+  stroke-width: 2;
+}
+.sbars__tick {
+  fill: var(--glass-ink-2);
+  font-size: var(--text-md);
+}
+.sbars__tidelabel {
+  margin: 2px 0 0;
+  font-size: var(--text-sm);
+  color: var(--glass-ink-2);
+}
+.scams__big {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--d-card);
+  color: var(--white);
+  text-decoration: none;
+}
+.scams__frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.scams__tag {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  max-width: calc(100% - 16px);
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--d-card);
+  font-size: var(--text-sm);
+}
+.scams__open {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  text-align: center;
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+}
+.scams__note {
+  margin: 0;
+  padding: 0 8px;
+  font-size: var(--text-md);
+  color: var(--white);
+}
+.scams__head {
+  margin: 0;
+  padding: 0 8px;
+  font-size: var(--text-label);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--glass-ink-2);
+}
+.scams__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.scams__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 16px;
+  border: 0;
+  border-top: 1px solid var(--d-edge);
+  background: none;
+  color: var(--white);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.scams__item:first-child {
+  border-top: 0;
+}
+.scams__name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.scams__name b {
+  font-size: var(--text-md);
+}
+.scams__name span {
+  font-size: var(--text-sm);
+  color: var(--glass-ink-2);
+}
+.fishweek {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.fishweek__day {
+  display: grid;
+  grid-template-columns: 4.5em 1fr 1fr;
+  gap: 2px 8px;
+  padding: 8px 0;
+  border-top: 1px solid var(--d-edge);
+  font-size: var(--text-sm);
+}
+.fishweek__day:first-child {
+  border-top: 0;
+}
+.fishweek__tides {
+  grid-column: 2 / 4;
+  color: var(--glass-ink-2);
+}

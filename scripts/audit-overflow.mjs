@@ -31,6 +31,7 @@
  */
 import { connect } from './cdp.mjs'
 import { goToStage, guardAudit, setSheet, startWatchdog, APP_ORIGIN, openMenu } from './preflight.mjs'
+import { goHome, homeTile } from './preflight.mjs'
 import { shareLink } from '../src/lib/planShare.ts'
 import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
 import { placeKey } from '../src/core/venueName.ts'
@@ -211,11 +212,38 @@ try {
    */
   const pageFit = `JSON.stringify((() => {
     /* Batch N: the detail pages v2 (.dpage) as well as the pages of their own (.page). */
-    const page = document.querySelector('.page') ?? document.querySelector('.dpage')
+    /* The top one: More details opens its page over the tap-in page. */
+    const page = document.querySelector('.page') ?? [...document.querySelectorAll('.dpage')].pop() ?? null
     if (!page) return { missing: true }
-    const scrolls = [...page.querySelectorAll('*')].filter((e) => { const s = getComputedStyle(e); return /(auto|scroll)/.test(s.overflowY) && e.scrollHeight > e.clientHeight + 1 }).map((e) => e.className + ' ' + e.scrollHeight + '/' + e.clientHeight)
+    /*
+     * A TAP-IN PAGE MAY SCROLL ITS ONE BODY (Batch SIMPLE-2, Section 1: "fits 390x664 without covering anything;
+     * scrolls if it needs to"). So for .tipage the body is let scroll, and what is asserted instead is that a
+     * finger can (overflow-y auto or scroll), that it is the only box that scrolls, and that at the bottom of
+     * that scroll the last row (More details) is on screen, above the pinned foot and on top: nothing covered,
+     * everything reachable. Every other page still fits with nothing scrolling.
+     */
+    const tap = page.matches('.tipage') ? page.querySelector('.dpage__body') : null
+    const scrolls = [...page.querySelectorAll('*')].filter((e) => e !== tap && (() => { const s = getComputedStyle(e); return /(auto|scroll)/.test(s.overflowY) && e.scrollHeight > e.clientHeight + 1 })()).map((e) => e.className + ' ' + e.scrollHeight + '/' + e.clientHeight)
+    let reach = null
+    if (tap !== null) {
+      const fingers = /(auto|scroll)/.test(getComputedStyle(tap).overflowY)
+      const long = tap.scrollHeight > tap.clientHeight + 1
+      tap.scrollTop = tap.scrollHeight
+      const last = page.querySelector('.tipage__more') ?? [...tap.querySelectorAll('.tipage__row')].pop() ?? null
+      const foot = page.querySelector('.dpage__foot')
+      let lastOn = false
+      let lastBottom = null
+      if (last !== null) {
+        const r = last.getBoundingClientRect()
+        const at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+        lastOn = at !== null && last.contains(at)
+        lastBottom = Math.round(r.bottom)
+      }
+      reach = { long, fingers, last: last === null ? null : last.className, lastOn, lastBottom, footTop: foot === null ? null : Math.round(foot.getBoundingClientRect().top) }
+    }
     const clipped = [...page.querySelectorAll('*')].filter((e) => { if (e.closest('svg, details:not([open])')) return false; const r = e.getBoundingClientRect(); return r.height > 0 && r.bottom > innerHeight + 1 }).map((e) => e.className)
-    return { title: page.querySelector('.page__title, .dpage__tab--on')?.textContent, scroll: page.scrollHeight > page.clientHeight + 1, scrolls, clipped }
+    if (tap !== null) tap.scrollTop = 0
+    return { title: page.querySelector('.page__title, .dpage__tab--on, .dpage__title')?.textContent, scroll: page.scrollHeight > page.clientHeight + 1, scrolls, clipped, reach }
   })())`
   const checkPage = async (label) => {
     await wait(1500)
@@ -225,37 +253,64 @@ try {
       return
     }
     await check(label, '.page, .dpage')
-    console.log(`  ${label}: ${t.scroll ? 'SCROLLS' : 'no scroll'}, scrolling boxes ${t.scrolls.length}, parts below the screen ${t.clipped.length}`)
+    console.log(`  ${label}: ${t.scroll ? 'SCROLLS' : 'no scroll'}, scrolling boxes ${t.scrolls.length}, parts below the screen ${t.clipped.length}${t.reach === null ? '' : `, tap-in body ${t.reach.long ? 'scrolls' : 'fits'}, last row ${t.reach.last ?? 'none'} at ${t.reach.lastBottom} (foot at ${t.reach.footTop}) ${t.reach.lastOn ? 'on top' : 'NOT on top'}`}`)
     if (t.scroll) fail(`${label} scrolls`)
+    if (t.reach !== null) {
+      if (t.reach.last === null) fail(`${label}: a tap-in page with no rows, so nothing was looked at`)
+      else {
+        if (t.reach.long && !t.reach.fingers) fail(`${label}: the tap-in body runs past the screen in a box a finger cannot scroll`)
+        if (!t.reach.lastOn) fail(`${label}: scrolled to the bottom, the last row (${t.reach.last}) is covered`)
+        if (t.reach.footTop !== null && t.reach.lastBottom > t.reach.footTop + 1) fail(`${label}: scrolled to the bottom, the last row ends at ${t.reach.lastBottom} px, under the foot at ${t.reach.footTop} px`)
+      }
+    }
     for (const x of t.scrolls) fail(`${label}: ${x} scrolls`)
     if (t.clipped.length > 0) fail(`${label}: ${t.clipped.length} parts run below the screen (${t.clipped.slice(0, 3).join(', ')})`)
   }
   const tab = (name) => ev(`[...document.querySelectorAll('.page__tabs button')].find((b) => b.textContent === '${name}')?.click()`)
   await ev(`document.querySelector('.chip2[data-chip="tide"]')?.click()`)
   await checkPage('Tides, from its chip')
-  await tab('Advanced')
-  await checkPage('Tides, Advanced')
-  await tab('Simple')
-  await ev(`document.querySelector('.tides__why')?.click()`)
-  await checkPage('Tides, an explainer open')
-  await ev(`document.querySelector('.tides__explainer .card2__x')?.click()`)
+  if (await ev(`!!document.querySelector('.tipage--tide')`)) {
+    /* Batch SIMPLE-2, Section 1: the Tide page is the tap-in page; the old body, its Simple and Advanced, is what "More details ›" opens. */
+    if (await ev(`(() => { const m = document.querySelector('.tipage--tide .tipage__more'); if (!m) return false; m.click(); return true })()`)) {
+      await checkPage('Tides, More details')
+      await ev(`[...document.querySelectorAll('.dpage__back')].pop()?.click()`)
+      await wait(600)
+    } else fail('Tides: the tap-in page has no More details, so the detail page was not checked')
+  } else {
+    await tab('Advanced')
+    await checkPage('Tides, Advanced')
+    await tab('Simple')
+    await ev(`document.querySelector('.tides__why')?.click()`)
+    await checkPage('Tides, an explainer open')
+    await ev(`document.querySelector('.tides__explainer .card2__x')?.click()`)
+  }
   await ev(`document.querySelector('.page__close, .page__back, .dpage__back')?.click()`)
   await wait(500)
   /*
    * Batch H: the menu is four cards and four rows; Exposure is Kit's "Try
    * your settings on a photo". Batch Flow, Section 8: Surf is its own card.
    */
+  /* Batch SIMPLE-2, Sections 2 and 3: Surf is the home's Surf tile; Kit is Settings › Camera + lenses (the menu has no cards and no Kit row). */
   for (const item of ['Surf', 'Exposure']) {
-    await openMenu(ev, wait)
-    await wait(600)
-    const door = item === 'Surf' ? 'Surf' : 'Kit'
-    const found = await ev(`(() => { const b = [...document.querySelectorAll('.sidemenu__item')].find((x) => x.querySelector('.sidemenu__label')?.textContent === '${door}'); if (!b) return false; b.click(); return true })()`)
-    if (found && item === 'Exposure') {
-      await wait(900)
-      await ev(`[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Try your settings on a photo')?.click()`)
+    let found = false
+    let door = 'the home\'s Surf tile'
+    if (item === 'Surf') found = (await homeTile(ev, wait, 'surf')) === 'ok'
+    else {
+      door = 'Settings › Camera + lenses'
+      await openMenu(ev, wait)
+      await wait(600)
+      found = await ev(`(() => { const b = [...document.querySelectorAll('.sidemenu__item')].find((x) => x.querySelector('.sidemenu__label')?.textContent === 'Settings'); if (!b) return false; b.click(); return true })()`)
+      if (found) {
+        await wait(900)
+        found = await ev(`(() => { const r = [...document.querySelectorAll('.set2__row')].find((b) => b.querySelector('.set2__label')?.textContent === 'Camera + lenses'); if (!r) return false; r.click(); return true })()`)
+      }
+      if (found) {
+        await wait(900)
+        await ev(`[...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Try your settings on a photo')?.click()`)
+      }
     }
     if (!found) {
-      fail(`no ${door} in the menu`)
+      fail(`no way to ${item}: ${door}`)
       await ev(`document.querySelector('.sidemenu__scrim')?.click()`)
       continue
     }
@@ -353,13 +408,10 @@ try {
   }
 
   /* THE CALENDAR: a page of its own, the whole month on one screen with nothing below it (29 Oct). */
-  /* Batch K addendum: the dock is gone; the calendar is Sky › Calendar. */
+  /* Batch SIMPLE-2, Sections 3 and 4: the month is Menu › Calendar (the tap-in Sky page has no Calendar button). */
   await openMenu(ev, wait)
   await wait(900)
-  await ev(`document.querySelector('.mcard--sky')?.click()`)
-  await wait(1500)
-  /* Batch Pages, Section 3: Menu › Sky is the Sky page; its Calendar button opens the month. */
-  await ev(`[...document.querySelectorAll('.spage__buttons button')].find((b) => b.textContent.includes('Calendar'))?.click()`)
+  await ev(`[...document.querySelectorAll('nav[aria-label="Stage"] .sidemenu__item, nav[aria-label="Stage"] button')].find((b) => /^Calendar/.test((b.querySelector('.sidemenu__label') ?? b).textContent.trim()))?.click()`)
   await wait(2500)
   await check('Calendar', '.cal .cal2__grid')
   {
@@ -377,31 +429,25 @@ try {
   }
 
   /*
-   * SUN · MOON · NIGHT (Batch DRONE, Section 4; Batch FIX, Section 5.2): the
-   * three are swipe pages. Nothing runs past the edge; the row is paged (the
-   * check's own rule); a swipe to the last page names Night on the pill.
+   * SKY › NIGHT (Batch SIMPLE-2, Section 4): the old Sun · Moon · Night page folds into the Sky page's Tonight and
+   * Night tabs (src/config/flags.ts SKY_SUN_MOON_NIGHT_PAGE, off). Every tab of the Sky page, nothing past the edge.
    */
-  await openMenu(ev, wait)
-  await wait(900)
-  await ev(`document.querySelector('.mcard--sky')?.click()`)
+  /* Batch SIMPLE-2, Section 2: the home's Sky tile. */
+  await goHome(ev, wait)
+  await homeTile(ev, wait, 'sky')
   await wait(1500)
-  await ev(`[...document.querySelectorAll('button')].find((b) => /^Sun, moon, night/.test(b.textContent.trim()))?.click()`)
-  await wait(2500)
-  await check('Sun · Moon · Night', '.smn .smn__track')
-  {
-    const swiped = JSON.parse(await ev(`(async () => { const t = document.querySelector('.smn__track'); if (!t) return 'null'; t.scrollTo({ left: t.clientWidth * 2, behavior: 'auto' }); await new Promise((r) => setTimeout(r, 600)); return JSON.stringify({ pages: t.querySelectorAll('[data-smn-page]').length, on: document.querySelector('.smn__seg [aria-selected="true"]')?.textContent ?? null, left: Math.round(t.scrollLeft), w: t.clientWidth }) })()`))
-    if (swiped === null) fail('Sun · Moon · Night: no swipe row')
-    else {
-      console.log(`  Sun · Moon · Night: ${swiped.pages} pages; swiped to ${swiped.left} of ${swiped.w * 2} px, the pill says ${swiped.on}`)
-      if (swiped.pages !== 3) fail(`Sun · Moon · Night: ${swiped.pages} swipe pages, not 3`)
-      if (swiped.on !== 'Night') fail(`Sun · Moon · Night: swiped to the last page, the pill says ${swiped.on}`)
+  /* By position: the two event pills say the event's day ("Tonight" / "Tmrw PM", "This AM" / "Tmrw AM", src/core/skyTabs.ts eventTabLabel). */
+  for (const [i, pill] of ['Now', 'the evening', 'the morning', 'Night'].entries()) {
+    const on = await ev(`(() => { const b = [...document.querySelectorAll('.tipage.spage .tipage__tabs [role="tab"]')][${i}]; b?.click(); return !!b })()`)
+    if (!on) {
+      fail(`the Sky page has no ${pill} tab`)
+      continue
     }
-    await ev(`document.querySelector('.smn .ppage__back')?.click()`)
-    await wait(800)
-    /* And the Sky page under it, so the menu below opens from the map as before. */
-    await ev(`document.querySelector('.spage .ppage__back')?.click()`)
-    await wait(800)
+    await wait(1200)
+    await check(`Sky › ${pill}`, '.tipage.spage .tipage__hero')
   }
+  await ev(`document.querySelector('.tipage.spage .ppage__back')?.click()`)
+  await wait(800)
 
   await openMenu(ev, wait)
   await check('the menu', 'nav[aria-label="Stage"]')

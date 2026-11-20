@@ -18,6 +18,16 @@ const BANNED: [RegExp, string][] = [
   [/\bkts\b/, 'kt'],
   [/\bPre-flight\b/, 'Preflight'],
 ]
+/*
+ * THE ONE EXCEPTION, by name (Batch SIMPLE-2, Section 4; mockups Sky_Now, Sky_Tonight, Sky_Night): the Sky page's
+ * pill is "Tmrw AM" (and "Tmrw PM" after dark), the batch's own word; four pills share 358 px and "Tomorrow AM"
+ * does not fit one. Only these strings, only in this file; "Tmrw" anywhere else still fails.
+ */
+const ALLOWED: [string, string][] = [
+  ['src/core/skyTabs.ts', "'Tmrw AM'"],
+  ['src/core/skyTabs.ts', '`Tmrw ${half}`'],
+]
+const allowed = (f: string, s: string) => ALLOWED.some(([file, str]) => f === file && s === str)
 const files = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? files(join(dir, e.name)) : /\.(ts|tsx)$/.test(e.name) && !/\.test\./.test(e.name) ? [join(dir, e.name)] : []))
 /* Strings only: '…', "…", `…` and JSX text between > and <, with comments taken out first. */
 const strings = (src: string): string[] => {
@@ -29,7 +39,7 @@ describe('the word list', () => {
   for (const dir of ['src/components', 'src/core', 'src/lib']) {
     it(`${dir}: no banned variant in what the app shows`, () => {
       const hits: string[] = []
-      for (const f of files(dir)) for (const s of strings(readFileSync(f, 'utf8'))) for (const [re, say] of BANNED) if (re.test(s)) hits.push(`${f}: ${s.slice(0, 70)} (say "${say}")`)
+      for (const f of files(dir)) for (const s of strings(readFileSync(f, 'utf8'))) for (const [re, say] of BANNED) if (re.test(s) && !allowed(f, s)) hits.push(`${f}: ${s.slice(0, 70)} (say "${say}")`)
       expect(hits).toEqual([])
     })
   }

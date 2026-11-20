@@ -52,10 +52,18 @@ export function skyCell(layers: { low: number | null; mid: number | null; high: 
   return 'Clear'
 }
 
-/** The next turn of the tide, and which way the water is going until then: falling to a low, rising to a high. */
-export function tideCell(next: { kind: 'high' | 'low'; at: Date } | null, timeZone: string | null, hours?: ClockHours): { text: string; going: 'rising' | 'falling' } | null {
+/**
+ * The next turn of the tide, and which way the water is going until then: falling to a low, rising to a high.
+ * `shared` is the same turn in the words every other screen uses ("high 12:56 pm"): the strip's text is
+ * shortened to fit, the fact is not (Batch SIMPLE-2: the chip said "high 12:56p", home and Tide "high 12:56 pm").
+ */
+export function tideCell(next: { kind: 'high' | 'low'; at: Date } | null, timeZone: string | null, hours?: ClockHours): { text: string; going: 'rising' | 'falling'; shared: string } | null {
   if (next === null || timeZone === null) return null
-  return { text: `${next.kind === 'high' ? 'High' : 'Low'} ${formatShortClock(next.at, timeZone, hours)}`, going: next.kind === 'high' ? 'rising' : 'falling' }
+  return {
+    text: `${next.kind === 'high' ? 'High' : 'Low'} ${formatShortClock(next.at, timeZone, hours)}`,
+    going: next.kind === 'high' ? 'rising' : 'falling',
+    shared: `${next.kind} ${formatClock(next.at, timeZone, hours)}`.toLowerCase(),
+  }
 }
 
 /**

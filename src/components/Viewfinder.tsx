@@ -1,6 +1,8 @@
+import '../styles/vf-sky.css'
 import { readBand } from '../lib/skyCheckRead.ts'
 import { skyCheckWords } from '../core/skyCheck.ts'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { PresetEvent, ViewfinderPreset } from '../core/viewfinderPreset.ts'
 import { getMoonPosition, getPosition } from 'suncalc'
 import {
@@ -22,6 +24,8 @@ import { formatClock, formatHour } from '../core/timezone.ts'
 import type { KitSelection } from '../lib/kitSelection.ts'
 import { locateOnce, locateWords } from '../lib/locateOnce.ts'
 import { formatRange, type Units } from '../lib/units.ts'
+import { corePosition } from '../core/milkyWay.ts'
+import { facingView, headingOf, headingWords, stripTicks, sunDotTimes } from '../core/viewfinderGuide.ts'
 import { readPhoneFov, ultraWideOf, writePhoneFov } from '../lib/phoneCamera.ts'
 
 /*
@@ -51,6 +55,13 @@ import { readPhoneFov, ultraWideOf, writePhoneFov } from '../lib/phoneCamera.ts'
  *
  * Both permissions are asked from the tap that opens it, never on load, and a
  * refusal is one sentence.
+ *
+ * BATCH SIMPLE-2, SECTION 4 (mockup Sky_Viewfinder): a compass strip at the
+ * top, the sun's dots with their times up to the event, the chips Sun · Moon ·
+ * Milky Way, and one line saying where the event happens. A refused camera or
+ * motion is the compass-only view: no picture, the same drawing, facing the
+ * event's bearing when the phone cannot say where it points
+ * (src/core/viewfinderGuide.ts).
  */
 interface ViewfinderProps {
   venue: LatLon
@@ -87,7 +98,8 @@ export function ViewfinderNeedsPlace({ onSetup, onClose }: { onSetup: () => void
 
 type Phase =
   | { kind: 'ask' }
-  | { kind: 'refused'; why: string }
+  /* The camera or the motion was not allowed: the drawing with no picture. */
+  | { kind: 'compass'; why: string }
   | { kind: 'live' }
 
 interface OrientationEventLike {
@@ -138,7 +150,15 @@ const Glyph = ({ d }: { d: keyof typeof ICON }) => (
 
 const PRESET_WORD: Record<PresetEvent, string> = { sunrise: 'Sunrise', sunset: 'Sunset', moonrise: 'Moonrise' }
 
-export function Viewfinder({ venue, pins, profile, bag, timeZone, units, preset = null, onClose }: ViewfinderProps) {
+/*
+ * OVER EVERY PAGE (Batch SIMPLE-2, Section 4): opened from Sky › Tonight's "Viewfinder ›", it must sit over the
+ * tap-in page, which is itself a portal on <body>; so the viewfinder is one too, after it.
+ */
+export function Viewfinder(props: ViewfinderProps) {
+  return createPortal(<ViewfinderScreen {...props} />, document.body)
+}
+
+function ViewfinderScreen({ venue, pins, profile, bag, timeZone, units, preset = null, onClose }: ViewfinderProps) {
   const [phase, setPhase] = useState<Phase>({ kind: 'ask' })
   const video = useRef<HTMLVideoElement>(null)
   const [stream, setStream] = useState<MediaStream | null>(null)
@@ -148,6 +168,8 @@ export function Viewfinder({ venue, pins, profile, bag, timeZone, units, preset 
   const [offset, setOffset] = useState(0)
   const [calibrating, setCalibrating] = useState(false)
   const [moon, setMoon] = useState(preset?.event === 'moonrise')
+  const [sunOn, setSunOn] = useState(true)
+  const [milky, setMilky] = useState(false)
   const [info, setInfo] = useState(false)
   /* Batch J, Section 7: the sky check's words, after a tap; the picture itself is never kept (src/lib/skyCheckRead.ts). */
   const [checked, setChecked] = useState<string | null>(null)
@@ -221,7 +243,7 @@ export function Viewfinder({ venue, pins, profile, bag, timeZone, units, preset 
   }, [phase.kind, stream])
 
   useEffect(() => {
-    if (phase.kind !== 'live') return
+    if (phase.kind === 'ask') return
     const tick = window.setInterval(() => setNow(new Date()), 30_000)
     const onOrientation = (event: Event) => {
       const e = event as unknown as OrientationEventLike
@@ -257,7 +279,7 @@ export function Viewfinder({ venue, pins, profile, bag, timeZone, units, preset 
         .catch(() => undefined)
       return true
     } catch {
-      setPhase({ kind: 'refused', why: CAMERA_REFUSED })
+      setPhase({ kind: 'compass', why: CAMERA_REFUSED })
       return false
     }
   }
@@ -267,11 +289,11 @@ export function Viewfinder({ venue, pins, profile, bag, timeZone, units, preset 
     if (typeof ask === 'function') {
       try {
         if ((await ask()) !== 'granted') {
-          setPhase({ kind: 'refused', why: MOTION_REFUSED })
+          setPhase({ kind: 'compass', why: MOTION_REFUSED })
           return
         }
       } catch {
-        setPhase({ kind: 'refused', why: MOTION_REFUSED })
+        setPhase({ kind: 'compass', why: MOTION_REFUSED })
         return
       }
     }
@@ -311,17 +333,24 @@ export function Viewfinder({ venue, pins, profile, bag, timeZone, units, preset 
     day.setHours(0, 0, 0, 0)
     const sun: { t: Date; az: number; alt: number }[] = []
     const moonPath: { t: Date; az: number; alt: number }[] = []
+    /* The Milky Way's core while the sun is 12° or more down: the part of its path worth looking for. */
+    const core: { t: Date; az: number; alt: number }[] = []
     for (let m = 0; m <= 24 * 60; m += PATH_STEP_MINUTES) {
       const t = new Date(day.getTime() + m * 60_000)
       const s = getPosition(t, from.lat, from.lon)
       sun.push({ t, az: normalizeBearing(s.azimuth), alt: s.altitude })
       const mo = getMoonPosition(t, from.lat, from.lon)
       moonPath.push({ t, az: normalizeBearing(mo.azimuth), alt: mo.altitude })
+      const c = corePosition(t, from.lat, from.lon)
+      core.push({ t, az: normalizeBearing(c.azimuth), alt: s.altitude <= -12 ? c.altitude : -90 })
     }
-    return { sun, moon: moonPath }
+    return { sun, moon: moonPath, core }
   }, [now, from.lat, from.lon])
 
-  const at = (az: number, alt: number) => (orientation === null ? null : project(az, alt, orientation, fov, -offset))
+  /* The compass-only view, with no motion to read: upright, facing the event (or the sun now). */
+  const facing = preset === null ? null : preset.event === 'moonrise' ? getMoonPosition(preset.at, from.lat, from.lon).azimuth : getPosition(preset.at, from.lat, from.lon).azimuth
+  const view = orientation ?? (phase.kind === 'compass' ? facingView(facing ?? getPosition(now, from.lat, from.lon).azimuth) : null)
+  const at = (az: number, alt: number) => (view === null ? null : project(az, alt, view, fov, -offset))
   const polyline = (points: { az: number; alt: number }[]) => {
     const segments: string[] = []
     let current: string[] = []
@@ -348,7 +377,7 @@ export function Viewfinder({ venue, pins, profile, bag, timeZone, units, preset 
     setCalibrating(false)
   }
 
-  if (phase.kind !== 'live') {
+  if (phase.kind === 'ask') {
     return (
       <div className="vf vf--ask" role="dialog" aria-label="Viewfinder">
         <p className="vf__title">Viewfinder</p>
@@ -356,10 +385,9 @@ export function Viewfinder({ venue, pins, profile, bag, timeZone, units, preset 
           The camera, with the sun's path, the horizon, your positions and your camera's frame drawn over it. The picture stays in
           this screen: it is not saved, recorded or sent.
         </p>
-        {phase.kind === 'refused' ? <p className="vf__refused">{phase.why}</p> : null}
         <div className="btn-row">
           <button type="button" className="btn btn--primary" onClick={() => void open()}>
-            {phase.kind === 'refused' ? 'Retry' : 'Open the camera'}
+            Open the camera
           </button>
           <button type="button" className="btn" onClick={close}>
             Close
@@ -371,7 +399,15 @@ export function Viewfinder({ venue, pins, profile, bag, timeZone, units, preset 
 
   const sunScreen = sunNow.altitude > -1 ? at(normalizeBearing(sunNow.azimuth), sunNow.altitude) : null
   const moonScreen = (moon || (calibrating && target === 'moon')) && moonNow.altitude > -1 ? at(normalizeBearing(moonNow.azimuth), moonNow.altitude) : null
-  const hourly = paths.sun.filter((p, i) => i % 6 === 0 && p.alt > 0)
+  const sunEvent = preset !== null && preset.event !== 'moonrise' ? preset : null
+  /* The sun's dots: up to the sunset (from the sunrise) every 20 minutes, with their times; else on the hour. */
+  const dots = sunEvent !== null
+    ? sunDotTimes(sunEvent.event as 'sunrise' | 'sunset', sunEvent.at).map((t) => {
+        const p = getPosition(t, from.lat, from.lon)
+        return { t, az: normalizeBearing(p.azimuth), alt: Math.max(p.altitude, -0.8), label: t.getTime() === sunEvent.at.getTime() ? null : formatClock(t, timeZone) }
+      })
+    : paths.sun.filter((p, i) => i % 6 === 0 && p.alt > 0).map((p) => ({ ...p, label: formatHour(p.t, timeZone) }))
+  const heading = headingOf(view, fov, offset)
   /* The next event, marked where it happens: the sun or the moon at its time, on the horizon. */
   const eventPos = preset === null ? null : preset.event === 'moonrise' ? getMoonPosition(preset.at, from.lat, from.lon) : getPosition(preset.at, from.lat, from.lon)
   const eventScreen = eventPos === null ? null : at(normalizeBearing(eventPos.azimuth), Math.max(0, eventPos.altitude))
@@ -381,8 +417,14 @@ export function Viewfinder({ venue, pins, profile, bag, timeZone, units, preset 
   const box = frame === null ? null : frameBox({ h: frame.hFOV, v: frame.vFOV }, fov)
   const wider = frame !== null && lensWiderThanPhone(frame.hFOV, phoneFov)
 
+  const onScreen = eventScreen !== null && eventScreen.x >= 0 && eventScreen.x <= 1 && eventScreen.y >= 0 && eventScreen.y <= 1
+  const eventLine =
+    preset === null || eventPos === null
+      ? null
+      : `${preset.event === 'moonrise' ? 'Moon rises' : preset.event === 'sunset' ? 'Sun sets' : 'Sun rises'} ${onScreen ? 'right there ' : ''}at ${formatClock(preset.at, timeZone)}${onScreen ? '' : `, ${headingWords(normalizeBearing(eventPos.azimuth))}`}`
+
   const note =
-    noPicture ? null
+    noPicture || phase.kind === 'compass' ? null
     : orientation === null ? 'Waiting for the compass. Move the phone in a figure of eight if this stays.'
     : calibrating ? `Tap the ${target ?? 'sun'} where you see it.`
     : locateNote !== null ? locateNote
@@ -390,32 +432,41 @@ export function Viewfinder({ venue, pins, profile, bag, timeZone, units, preset 
 
   return (
     <div className="vf" role="dialog" aria-label="Viewfinder">
-      <video ref={video} className="vf__video" playsInline muted autoPlay aria-hidden="true" />
+      {phase.kind === 'live' ? <video ref={video} className="vf__video" playsInline muted autoPlay aria-hidden="true" /> : <div className="vf__nocam" aria-hidden="true" />}
       <div className="vf__overlay" ref={overlay} onPointerUp={onTap}>
         <svg className="vf__svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
           {horizon.map((d) => (
             <polyline key={`h${d.slice(0, 12)}`} className="vf__horizon" points={d} />
           ))}
-          {polyline(paths.sun).map((d) => (
-            <polyline key={`s${d.slice(0, 12)}`} className="vf__sunpath" points={d} />
-          ))}
+          {sunOn
+            ? polyline(paths.sun).map((d) => (
+                <polyline key={`s${d.slice(0, 12)}`} className="vf__sunpath" points={d} />
+              ))
+            : null}
           {moon
             ? polyline(paths.moon).map((d) => <polyline key={`m${d.slice(0, 12)}`} className="vf__moonpath" points={d} />)
             : null}
+          {milky ? polyline(paths.core).map((d) => <polyline key={`c${d.slice(0, 12)}`} className="vf__corepath" points={d} />) : null}
         </svg>
-        {hourly.map((p) => {
-          const s = at(p.az, p.alt)
-          if (s === null || s.x < 0 || s.x > 1 || s.y < 0 || s.y > 1) return null
-          return (
-            <span key={p.t.getTime()} className="vf__hour num" style={{ left: `${s.x * 100}%`, top: `${s.y * 100}%` }}>
-              {formatHour(p.t, timeZone)}
-            </span>
-          )
-        })}
+        {!sunOn
+          ? null
+          : dots.map((p) => {
+              const s = at(p.az, p.alt)
+              if (s === null || s.x < 0 || s.x > 1 || s.y < 0 || s.y > 1) return null
+              return (
+                <span key={p.t.getTime()} className="vf__dotat" style={{ left: `${s.x * 100}%`, top: `${s.y * 100}%` }} data-sun-dot>
+                  <i className="vf__dot" />
+                  {p.label === null ? null : <span className="vf__hour vf__hour--dot num">{p.label}</span>}
+                </span>
+              )
+            })}
         {eventScreen === null || preset === null || eventScreen.x < 0 || eventScreen.x > 1 ? null : (
-          <span className="vf__event num" style={{ left: `${eventScreen.x * 100}%`, top: `${eventScreen.y * 100}%` }}>
-            {PRESET_WORD[preset.event]} {formatClock(preset.at, timeZone)}
-          </span>
+          <>
+            <span className="vf__ring" style={{ left: `${eventScreen.x * 100}%`, top: `${eventScreen.y * 100}%` }} />
+            <span className="vf__event num" style={{ left: `${eventScreen.x * 100}%`, top: `${eventScreen.y * 100}%` }}>
+              {PRESET_WORD[preset.event]} {formatClock(preset.at, timeZone)}
+            </span>
+          </>
         )}
         {sunScreen === null ? null : <span className="vf__sun" style={{ left: `${sunScreen.x * 100}%`, top: `${sunScreen.y * 100}%` }} />}
         {moonScreen === null ? null : <span className="vf__moon" style={{ left: `${moonScreen.x * 100}%`, top: `${moonScreen.y * 100}%` }} />}
@@ -442,7 +493,30 @@ export function Viewfinder({ venue, pins, profile, bag, timeZone, units, preset 
 
       {/* Batch J, Section 7: the sky check, up here so the controls below keep their height. Point at the horizon under the sun's line. */}
       {checked === null ? null : <p className="vf__checked" role="status">{checked}</p>}
+      {heading === null ? null : (
+        <div className="vf__compass" aria-label={`Pointing ${headingWords(heading)}`} role="img">
+          {stripTicks(heading).map((t) => (
+            <span key={t.label} className={`vf__ctick${t.point ? ' vf__ctick--pt' : ''}`} style={{ left: `${t.x * 100}%` }}>
+              {t.label}
+            </span>
+          ))}
+          <span className="vf__cnow num">▼ {headingWords(heading)}</span>
+        </div>
+      )}
+      {/* The chips under the compass strip, so the controls below keep to a quarter of the screen. */}
+        <div className="vf__chips vf__chips--top" role="group" aria-label="What to draw">
+          <button type="button" className="vf__pick" aria-pressed={sunOn} onClick={() => setSunOn(!sunOn)}>
+            Sun
+          </button>
+          <button type="button" className="vf__pick" aria-pressed={moon} onClick={() => setMoon(!moon)}>
+            Moon
+          </button>
+          <button type="button" className="vf__pick" aria-pressed={milky} onClick={() => setMilky(!milky)}>
+            Milky Way
+          </button>
+        </div>
       <div className="vf__top">
+        {phase.kind !== 'live' ? null : (
         <button
           type="button"
           className="vf__chip vf__checkbtn"
@@ -456,6 +530,7 @@ export function Viewfinder({ venue, pins, profile, bag, timeZone, units, preset 
         >
           Check the gap
         </button>
+        )}
         <button type="button" className="vf__icon" onClick={() => setInfo(!info)} aria-pressed={info} aria-label="What the viewfinder assumes">
           <Glyph d="info" />
         </button>
@@ -498,6 +573,15 @@ export function Viewfinder({ venue, pins, profile, bag, timeZone, units, preset 
       ) : null}
 
       <div className="vf__bar">
+        {phase.kind === 'compass' ? (
+          <p className="vf__note vf__note--act" data-compass-only>
+            <span>{phase.why} The compass view, with no picture.</span>
+            <button type="button" className="vf__chip" onClick={() => void open()}>
+              Retry
+            </button>
+          </p>
+        ) : null}
+        {eventLine === null ? null : <p className="vf__head">{eventLine}</p>}
         {noPicture ? (
           <p className="vf__note vf__note--act">
             <span>{NO_PICTURE}</span>
@@ -570,18 +654,14 @@ export function Viewfinder({ venue, pins, profile, bag, timeZone, units, preset 
           </div>
         )}
         <div className="vf__actions">
-          <button type="button" className="vf__act" onClick={() => setMoon(!moon)} aria-pressed={moon}>
-            <Glyph d="moon" />
-            <span>Moon path</span>
-          </button>
           <button type="button" className="vf__act" onClick={locate}>
             <Glyph d="pins" />
             <span>{me === null ? 'Pins from me' : 'Pins from here'}</span>
           </button>
-          {target === null ? (
+          {target === null || orientation === null ? (
             <span className="vf__act vf__act--off">
               <Glyph d="calibrate" />
-              <span>Sun and moon down</span>
+              <span>{target === null ? 'Sun and moon down' : 'No compass to calibrate'}</span>
             </span>
           ) : (
             <button type="button" className="vf__act" onClick={() => setCalibrating(true)} aria-pressed={calibrating}>

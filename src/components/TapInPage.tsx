@@ -58,11 +58,15 @@ export interface TapInPageProps {
   /** What "How we got this ›" opens. */
   how: ReactNode
   /** The page's safety line, right of "How we got this ›". */
-  safety: string
+  /** null: no footer line (Drone's Airspace tab, whose sheet carries its own disclaimer). */
+  safety: string | null
   tabs?: readonly TapInTab[]
   initialTab?: string
   onTab?: (id: string) => void
-  hero: { eyebrow: string; value: string; sub?: string; shared?: { key: string; value: string }; /** Extra data-* attributes for the sub line (an audit reads them). */ subData?: Record<string, string> }
+  /** Controlled: the open tab, when the caller must move it itself (Drone: a tap on the Airspace row). */
+  tab?: string
+  /** Leave out for a tab that is its own picture (Drone's Wind and Airspace tabs keep their content). */
+  hero?: { eyebrow: string; value: string; sub?: string; shared?: { key: string; value: string }; /** Extra data-* attributes for the sub line (an audit reads them). */ subData?: Record<string, string> }
   /** The chart card's content; leave out for a page with no picture. */
   chart?: ReactNode
   rows?: readonly TapInRow[]
@@ -70,15 +74,19 @@ export interface TapInPageProps {
   maxRows?: number
   /** "More details ›": opens the page's existing detail screen. */
   onMore?: () => void
-  actions?: readonly { label: string; onClick: () => void; primary?: boolean }[]
+  /** `href`: an outside link (Drone's "Get LAANC ›"), opened in a new tab; `onClick` is then not used. */
+  actions?: readonly { label: string; onClick: () => void; primary?: boolean; href?: string }[]
+  /** Under the actions (Drone: the Labs-only "Plan the flight" row). */
+  after?: ReactNode
   /** Content under the hero for a tabbed page: a function of the open tab; plain children for a page without tabs. */
   children?: ReactNode | ((tab: string) => ReactNode)
 }
 
 const warned = new Set<string>()
 
-export function TapInPage({ title, spot, when = 'now', ground, kind, onBack, how, safety, tabs, initialTab, onTab, hero, chart, rows = [], maxRows = MAX_ROWS, onMore, actions = [], children }: TapInPageProps) {
-  const [tab, setTab] = useState<string>(openTab(tabs, initialTab))
+export function TapInPage({ title, spot, when = 'now', ground, kind, onBack, how, safety, tabs, initialTab, onTab, tab: controlled, hero, chart, rows = [], maxRows = MAX_ROWS, onMore, actions = [], after, children }: TapInPageProps) {
+  const [own, setTab] = useState<string>(openTab(tabs, initialTab))
+  const tab = controlled ?? own
   const go = (id: string) => {
     setTab(id)
     onTab?.(id)
@@ -122,17 +130,19 @@ export function TapInPage({ title, spot, when = 'now', ground, kind, onBack, how
             ))}
           </div>
         )}
-        <div className="tipage__hero" role={tabs === undefined ? undefined : 'tabpanel'}>
-          <p className="tipage__eyebrow">{hero.eyebrow}</p>
-          <p className="tipage__value" {...(hero.shared === undefined ? {} : { 'data-shared': hero.shared.key, 'data-value': hero.shared.value })}>
-            {hero.value}
-          </p>
-          {hero.sub === undefined ? null : (
-            <p className="tipage__sub" {...hero.subData}>
-              {hero.sub}
+        {hero === undefined ? null : (
+          <div className="tipage__hero" role={tabs === undefined ? undefined : 'tabpanel'}>
+            <p className="tipage__eyebrow">{hero.eyebrow}</p>
+            <p className="tipage__value" {...(hero.shared === undefined ? {} : { 'data-shared': hero.shared.key, 'data-value': hero.shared.value })}>
+              {hero.value}
             </p>
-          )}
-        </div>
+            {hero.sub === undefined ? null : (
+              <p className="tipage__sub" {...hero.subData}>
+                {hero.sub}
+              </p>
+            )}
+          </div>
+        )}
         {typeof children === 'function' ? children(tab) : children}
         {chart === undefined ? null : <section className="tipage__card tipage__chart">{chart}</section>}
         {shown.length === 0 && onMore === undefined ? null : (
@@ -169,13 +179,21 @@ export function TapInPage({ title, spot, when = 'now', ground, kind, onBack, how
         )}
         {actions.length === 0 ? null : (
           <div className="tipage__actions">
-            {actions.map((a) => (
-              <button key={a.label} type="button" className={`tipage__btn${a.primary === true ? ' tipage__btn--primary' : ''}`} onClick={a.onClick}>
-                {a.label} ›
-              </button>
-            ))}
+            {actions.map((a) => {
+              const cls = `tipage__btn${a.primary === true ? ' tipage__btn--primary' : ''}`
+              return a.href === undefined ? (
+                <button key={a.label} type="button" className={cls} onClick={a.onClick}>
+                  {a.label} ›
+                </button>
+              ) : (
+                <a key={a.label} className={cls} href={a.href} target="_blank" rel="noopener noreferrer">
+                  {a.label} ›
+                </a>
+              )
+            })}
           </div>
         )}
+        {after}
       </div>
     </PageShell>
   )

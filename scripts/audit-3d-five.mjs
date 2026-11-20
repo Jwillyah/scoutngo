@@ -25,7 +25,8 @@ import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { webkit, devices } from './gate/playwright.mjs'
-import { APP_ORIGIN, goToStage, guardAudit, openMenu, startWatchdog } from './preflight.mjs'
+import { APP_ORIGIN, goToStage, guardAudit, startWatchdog } from './preflight.mjs'
+import { homeTile } from './preflight.mjs'
 import { shareLink } from '../src/lib/planShare.ts'
 import { placeKey } from '../src/core/venueName.ts'
 import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
@@ -87,7 +88,7 @@ try {
     }
     return s
   }
-  const flyButton = `[...document.querySelectorAll('.drp__buttons button, .pf button, button')].find(b => /^(Plan the flight|Fly it yourself)$/.test(b.textContent.trim()))`
+  const flyButton = `[...document.querySelectorAll('.tipage__actions button, .pf button, button')].find(b => /^(Plan the flight|Fly it yourself)$/.test(b.textContent.trim()))`
   let last = null
   for (let n = 1; n <= ROUNDS; n += 1) {
     /* 3D from the 2D map. */
@@ -113,8 +114,8 @@ try {
     /* Then Fly, from the 2D map: the Drone page's "Plan the flight" the first time, the drone card's "Fly it yourself" after. */
     let can = await ev(`!!${flyButton}`)
     if (!can) {
-      await openMenu(ev, wait)
-      await page.locator('.mcard--drone').first().tap({ timeout: 4000 }).catch(() => {})
+      /* Batch SIMPLE-2, Section 2: the Drone page is the home's Drone tile (the menu has no cards). */
+      await homeTile(ev, wait, 'drone')
       await wait(1500)
       /* Batch SIMPLE-1, Section 1: on the Preflight tab, while Labs is on. */
       await ev(`[...document.querySelectorAll('button[role="tab"]')].find(b => b.textContent.trim() === 'Preflight')?.click()`)

@@ -5,14 +5,17 @@
  *
  * A friend took twenty minutes to find their way round the app; part of it was
  * sheets that came up by themselves: the planner on a link, the drone's
- * Preflight back with the map after the home. Five ways onto the map, each
+ * Preflight back with the map after the home. Six ways onto the map, each
  * must land on the map, the marker and the time bar, and nothing else:
  *
  *   home       the home's Map button
  *   menu       Menu › Plan a shoot (the planner, asked for), then its way out
  *   drone      the Drone page's Preflight › Plan a shoot (the planner, asked
- *              for), then its way out; and the Drone page's own Map button
+ *              for), then its way out; and the Drone page's Airspace tab,
+ *              Back, then the home's Map
  *   search     the place pill, a spot picked, then Map
+ *   wind       the home's Wind tile (the map's wind), its Back, then the
+ *              home's Map: the plain map, no layer left on (SIMPLE-2, S5)
  *   link       a link with a query (no home over it), and a reload
  *
  * Clean: the map's shell, no setup, the sheet's own card (the time bar) at
@@ -49,6 +52,8 @@ const STATE = `JSON.stringify((() => {
     page: [...document.querySelectorAll('.page[aria-label]')].map((p) => p.getAttribute('aria-label')),
     dialogs: [...document.querySelectorAll('[role="dialog"][aria-label]')].map((d) => d.getAttribute('aria-label')),
     threeD: !!document.querySelector('.clay3d, [data-clay3d]'),
+    layer: document.querySelector('.mode-plan')?.getAttribute('data-weather-layer') ?? null,
+    windView: document.querySelector('[data-wind-view]')?.getAttribute('data-wind-view') ?? null,
   }
 })())`
 
@@ -87,7 +92,7 @@ try {
     for (let i = 0; i < 20 && !(await ev(`!!document.querySelector('.home')`)); i += 1) await wait(500)
     await wait(800)
   }
-  const clean = async (way) => {
+  const clean = async (way, { layersOff = false } = {}) => {
     await wait(1800)
     const s = JSON.parse(await ev(STATE))
     looked += 1
@@ -100,6 +105,7 @@ try {
     if (s.page.length > 0) fail(`${way}: a page is over the map (${s.page.join(', ')})`)
     if (s.dialogs.length > 0) fail(`${way}: a dialog is up (${s.dialogs.join(', ')})`)
     if (s.threeD) fail(`${way}: the 3D view is up`)
+    if (layersOff && (s.layer !== 'off' || s.windView !== null)) fail(`${way}: a weather layer is still on (${s.layer}${s.windView === null ? '' : `, the wind view on ${s.windView}`})`)
   }
 
   console.log('\n### home')
@@ -127,11 +133,23 @@ try {
       if (await tap(page.getByRole('button', { name: /^same as last time$/i }), "the planner's Same as last time")) await clean('drone, Plan a shoot, out')
     }
   }
+  /*
+   * Batch SIMPLE-2, Section 4: the tap-in Drone page has no Map button of its
+   * own; its way to the map is Back, then the home's Map. Through the
+   * Airspace tab first, so a map the page drew cannot leave a layer, a card or
+   * a raised sheet on the plain map.
+   */
   await front()
   if (await tap(page.locator('.home button', { hasText: /^Drone/ }), "the home's Drone card")) {
     await wait(1500)
-    const onDrone = page.locator('.page[aria-label="Drone"] button[aria-label="Open the map"], [aria-label="Drone"] button[aria-label="Open the map"]')
-    if (await tap(onDrone, "the Drone page's Map button")) await clean("drone page's Map")
+    if (await ev(`!!document.querySelector('[aria-label="Drone"] button[aria-label="Open the map"]')`)) fail('drone: the tap-in Drone page still has a Map button of its own')
+    await tap(page.locator('.tipage__tabs [role="tab"]', { hasText: /^Airspace$/ }), "the Drone page's Airspace tab")
+    await wait(1500)
+    if (await tap(page.locator('.ppage__back'), "the Drone page's Back")) {
+      for (let i = 0; i < 20 && !(await ev(`!!document.querySelector('.home')`)); i += 1) await wait(250)
+      if (!(await ev(`!!document.querySelector('.home')`))) fail("drone: the Drone page's Back did not land on the home")
+      else if (await openMap()) await clean('drone, Airspace, Back, then Map', { layersOff: true })
+    }
   }
 
   console.log('\n### search')
@@ -143,6 +161,25 @@ try {
       await wait(1500)
       if (await ev(`!!document.querySelector('.home')`)) await openMap()
       await clean('search pick')
+    }
+  }
+
+  /*
+   * Batch SIMPLE-2, Section 5: the Wind tile is the map on its wind layer;
+   * Back is the home, and the map the home's Map button opens next is the
+   * plain map again (no layer, no Map | Charts).
+   */
+  console.log('\n### wind, then the map')
+  await front()
+  if (await tap(page.locator('.home [data-tile="wind"]'), "the home's Wind tile")) {
+    await wait(2500)
+    const w = JSON.parse(await ev(STATE))
+    console.log(`  wind tile: ${JSON.stringify(w)}`)
+    if (w.layer !== 'wind' || w.windView !== 'map') fail(`wind: the Wind tile did not open the map's wind (${w.layer}, ${w.windView})`)
+    if (w.setup) fail('wind: the planner opened with the wind')
+    if (await tap(page.locator('.topbar__back'), "the wind view's Back")) {
+      for (let i = 0; i < 20 && !(await ev(`!!document.querySelector('.home')`)); i += 1) await wait(250)
+      if (await openMap()) await clean('wind, Back, then Map', { layersOff: true })
     }
   }
 
@@ -159,8 +196,8 @@ try {
   await browser.close()
 }
 watchdog.stop()
-if (looked < 7) {
-  console.log(`=== CLEAN MAP AUDIT ABORTED: ${looked} of 7 ways looked at ===`)
+if (looked < 8) {
+  console.log(`=== CLEAN MAP AUDIT ABORTED: ${looked} of 8 ways looked at ===`)
   process.exit(2)
 }
 console.log(`  screenshots: ${OUT}`)

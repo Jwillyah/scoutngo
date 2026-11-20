@@ -1,23 +1,23 @@
 /*
- * THE MENU, IN WEBKIT, AS A TAB AND STANDALONE (Batch H, Section 3).
+ * THE ☰ MENU, IN WEBKIT, AS A TAB AND STANDALONE (Batch SIMPLE-2, Section 3;
+ * board Home_Menu).
  *
  * Usage:  node scripts/audit-menu.mjs [screenshot-dir]
  *
  * The Virginia Beach pier at 6:11 AM EST on 2 Nov, a drone in the kit, every
  * weather host answered by the gate's fixtures.
  *
- *   fits       390 x 844, nothing scrolled, nothing below or off the side
- *   header     the spot once, then temperature · condition · wind (Batch
- *              Flow, Section 8; board D_Menu); a tap is the home
- *   cards      Weather, then the home's cards in its order, Sky always
- *              (nothing picked, a drone in the kit: Weather, Surf, Wind,
- *              Tide, Sky, Drone), each a value; rows Plan a shoot (only with
- *              Shoot picked), Calendar, Kit, Saved, Settings
- *   surf only  a fourth pass with Surf alone picked (the drone still in
- *              the kit): the home's three, Surf, Drone, Wind, after Weather
- *              and Sky, and no Plan a shoot
- *   doors      the header opens the home; Sky opens the Sky page
- *   colour     never the hazard red
+ *   fits     390 x 844 tab and home screen, 390 x 664: nothing scrolled,
+ *            nothing below or off the side
+ *   rows     "Menu", then exactly Plan a shoot · Best sky near me ·
+ *            Viewfinder · Calendar · Saved spots · Field report · Settings ·
+ *            About, each 44 px or more with its line; the foot line; no
+ *            card (each page the home's tiles open has one way in), and the
+ *            same eight whatever is picked (a Surf persona too)
+ *   doors    every row opens its place: Plan a shoot the planner, Best sky
+ *            its page, the Viewfinder, the Calendar, Saved spots the Saved
+ *            drawer, Field report its page, Settings, About
+ *   colour   never the hazard red
  */
 import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -50,13 +50,13 @@ const fail = (why) => {
 
 const browser = await webkit.launch()
 try {
-  for (const [label, insets, height, picked] of [['browser', { top: 0, bottom: 0 }, 844, null], ['standalone', { top: 47, bottom: 34 }, 844, null], ['short tab', { top: 0, bottom: 0 }, 664, null], ['surf only', { top: 0, bottom: 0 }, 844, ['surf']]]) {
+  for (const [label, insets, height, picked] of [['browser', { top: 0, bottom: 0 }, 844, null], ['standalone', { top: 47, bottom: 34 }, 844, null], ['short tab', { top: 0, bottom: 0 }, 664, null], ['surf only', { top: 0, bottom: 0 }, 844, 'surf']]) {
     console.log(`\n### ${label}`)
     const ctx = await browser.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height } })
     await ctx.addInitScript(([top, bottom, picked]) => {
       try {
         localStorage.setItem('scoutngo.landing.v1', 'true')
-        if (picked !== null) localStorage.setItem('scoutngo.activities.v1', JSON.stringify(picked))
+        if (picked !== null) localStorage.setItem('scoutngo.persona.v1', picked)
       } catch {
         /* about:blank */
       }
@@ -84,21 +84,8 @@ try {
       const nav = document.querySelector('nav[aria-label="Stage"]')
       if (!nav) return { missing: true }
       const out = [...nav.querySelectorAll('*')].filter((e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0 && (b.bottom > innerHeight + 1 || b.right > innerWidth + 1 || b.left < -1) }).map((e) => (e.getAttribute('class') ?? e.tagName) + ' ' + Math.round(e.getBoundingClientRect().bottom)).slice(0, 4)
-      /* Batch LIVE, Section 4.1 (Menu A): each card's art, at most 60% opacity and never under the value. */
-      const overlap = (a, b) => a !== null && b !== null && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
-      const cards = [...nav.querySelectorAll('.mcard:not(.menu__spot)')].map((c) => {
-        const art = c.querySelector('.mart')
-        const v = c.querySelector('.mcard__value')
-        const ar = art === null ? null : art.getBoundingClientRect()
-        const vr = v === null ? null : v.getBoundingClientRect()
-        /* The value's own text, not its box's full width. */
-        const range = v === null ? null : document.createRange()
-        if (range !== null && v !== null) range.selectNodeContents(v)
-        const tr = range === null ? null : range.getBoundingClientRect()
-        return { name: c.querySelector('.sidemenu__label')?.textContent, h: Math.round(c.getBoundingClientRect().height), value: v?.textContent, bg: getComputedStyle(c).backgroundImage, art: art !== null, artOpacity: art === null ? null : Number(getComputedStyle(art).opacity), artUnderValue: ar !== null && ar.height > 0 && overlap(ar, tr ?? vr) }
-      })
-      const rows = [...nav.querySelectorAll('.mrow')].map((r) => ({ name: r.querySelector('.sidemenu__label')?.textContent, value: r.querySelector('.mrow__value')?.textContent, h: Math.round(r.getBoundingClientRect().height) }))
-      return { out, scrolls: nav.scrollHeight > nav.clientHeight + 1, cards, rows, where: document.querySelector('.menu__where')?.textContent, spot: document.querySelector('.menu__spot .menu__title')?.textContent ?? '', chip: nav.querySelector('.mcard__beach')?.textContent ?? null, text: nav.innerText }
+      const rows = [...nav.querySelectorAll('.mrow')].map((r) => ({ name: r.querySelector('.sidemenu__label')?.textContent, sub: r.querySelector('.mlist__sub')?.textContent ?? '', h: Math.round(r.getBoundingClientRect().height), bg: getComputedStyle(r).backgroundColor }))
+      return { out, scrolls: nav.scrollHeight > nav.clientHeight + 1, title: nav.querySelector('.mlist__title')?.textContent ?? null, foot: nav.querySelector('.mlist__foot')?.textContent ?? null, cards: nav.querySelectorAll('.mcard').length, rows, text: nav.innerText }
     })())`))
     if (m.missing) {
       fail(`${label}: the menu opened no Stage nav`)
@@ -106,63 +93,53 @@ try {
       continue
     }
     looked += 1
-    console.log(`  ${JSON.stringify({ where: m.where, cards: m.cards.map((c) => `${c.name} ${c.value} ${c.h}px`), rows: m.rows.map((r) => `${r.name}: ${r.value}`) })}`)
+    console.log(`  ${JSON.stringify({ title: m.title, rows: m.rows.map((r) => `${r.name} (${r.h}px): ${r.sub}`), foot: m.foot })}`)
     if (m.scrolls) fail(`${label}: the menu scrolls`)
     for (const o of m.out) fail(`${label}: ${o} runs off the screen`)
-    const names = m.cards.map((c) => c.name)
-    /* Batch Flow, Section 8: Weather, then the home's order (nothing picked, a drone in the kit: Surf, Wind, Tide, Sky, Moon, Drone; no Moon here); Sky always. */
-    /* Surf picked, the Air 3S in the kit: the home shows Surf, Wind, Tide (a kit drone is not Drone picked: Batch QA, Section 0B), so the menu does, with Weather and Sky, and the Drone card last (drone tools on: the kit's drone). */
-    const wantCards = picked === null ? ['Weather', 'Surf', 'Wind', 'Tide', 'Sky', 'Drone'] : ['Weather', 'Sky', 'Surf', 'Wind', 'Tide', 'Drone']
-    if (JSON.stringify(names) !== JSON.stringify(wantCards)) fail(`${label}: the cards are ${JSON.stringify(names)}, not ${JSON.stringify(wantCards)}`)
-    /* The header: the spot, then temperature · condition · wind. */
-    console.log(`  header: ${JSON.stringify(m.spot)} / ${JSON.stringify(m.where)}`)
-    if (!m.spot) fail(`${label}: the header has no spot`)
-    /* Batch Polish, Section 4: the header is the spot; the weather is the Weather card's, not said twice. */
-    if (m.where !== undefined && m.where !== null) fail(`${label}: the header repeats the weather (${JSON.stringify(m.where)})`)
-    /* The spot once (9 Nov: "Virginia Beach" in the header and on the Water card's chip): the beach chip only when it is another place. */
-    const spot = (m.spot ?? '').trim()
-    if (m.chip !== null && spot !== '' && m.chip.trim() === spot) fail(`${label}: the Water card's chip repeats the spot (${JSON.stringify(m.chip)})`)
-    const times = spot === '' ? 0 : m.text.split(spot).length - 1
-    console.log(`  the spot ${JSON.stringify(spot)} said ${times} times; chip ${JSON.stringify(m.chip)}`)
-    if (times > 1) fail(`${label}: the menu says ${JSON.stringify(spot)} ${times} times`)
-    for (const c of m.cards) {
-      if (c.h < 44) fail(`${label}: the ${c.name} card is ${c.h} px, under a 44 px target`)
-      if (!c.value) fail(`${label}: the ${c.name} card has no value`)
-      if (!c.art) fail(`${label}: the ${c.name} card has no art (Menu A)`)
-      if (c.artOpacity !== null && c.artOpacity > 0.6) fail(`${label}: the ${c.name} card's art is at ${c.artOpacity} opacity, over 60%`)
-      if (c.artUnderValue) fail(`${label}: the ${c.name} card's art is under its value`)
-      if (/255,\s*59,\s*48/.test(c.bg)) fail(`${label}: the ${c.name} card is the hazard red`)
+    if (m.title !== 'Menu') fail(`${label}: the menu's title is ${JSON.stringify(m.title)}`)
+    const want = ['Plan a shoot', 'Best sky near me', 'Viewfinder', 'Calendar', 'Saved spots', 'Field report', 'Settings', 'About']
+    if (JSON.stringify(m.rows.map((r) => r.name)) !== JSON.stringify(want)) fail(`${label}: the rows are ${JSON.stringify(m.rows.map((r) => r.name))}, not ${JSON.stringify(want)}`)
+    for (const r of m.rows) {
+      if (r.h < 44) fail(`${label}: the ${r.name} row is ${r.h} px, under a 44 px target`)
+      if (r.sub.trim() === '') fail(`${label}: the ${r.name} row has no line under it`)
+      if (/255,\s*59,\s*48/.test(r.bg)) fail(`${label}: the ${r.name} row is the hazard red`)
     }
-    /* Batch TRUTH, Section 4: Cams moved here from the home's Next row. */
-    const wantRows = picked === null ? ['Plan a shoot', 'Calendar', 'Cams', 'Kit', 'Saved', 'Settings'] : ['Calendar', 'Cams', 'Kit', 'Saved', 'Settings']
-    if (JSON.stringify(m.rows.map((r) => r.name)) !== JSON.stringify(wantRows)) fail(`${label}: the rows are ${JSON.stringify(m.rows.map((r) => r.name))}`)
-    for (const r of m.rows) if (r.h < 44) fail(`${label}: the ${r.name} row is ${r.h} px, under a 44 px target`)
+    if (m.cards !== 0) fail(`${label}: ${m.cards} cards in the menu; the home's tiles are the one way to their pages`)
+    if (!/Home answers/.test(m.foot ?? '')) fail(`${label}: no foot line`)
     await page.screenshot({ path: join(OUT, `menu-${label}.png`) })
 
-    await page.locator('.menu__spot').click()
-    await wait(1500)
-    if (!(await ev(`!!document.querySelector('.home')`))) fail(`${label}: the header opened no home`)
-    /* Batch M: the home has no ×; its round Map button goes to the map. */
-    await ev(`document.querySelector('.home .hbtn--round[aria-label="Open the map"]')?.click()`)
-    await wait(500)
-    await menuOn(page)
-    await wait(800)
-    await page.locator('.mcard--sky').click()
-    await wait(1500)
-    /* Batch Pages, Section 3: the Sky card opens the Sky page, as the home's Sky card does. */
-    const sky = await ev(`document.querySelector('.spage .ppage__title')?.textContent ?? null`)
-    console.log(`  Sky card opened: ${sky}`)
-    if (sky !== 'Sky') fail(`${label}: the Sky card opened no Sky page (${JSON.stringify(sky)})`)
-    /* Batch QA, Section 0: the Weather card opens the Weather page. */
-    await ev(`document.querySelector('.spage .ppage__back')?.click()`)
-    await wait(800)
-    await menuOn(page)
-    await wait(800)
-    await page.locator('.mcard--weather').click()
-    await wait(1500)
-    const wx = await ev(`!!document.querySelector('.wpage')`)
-    console.log(`  Weather card opened: ${wx ? 'the Weather page' : 'nothing'}`)
-    if (!wx) fail(`${label}: the Weather card opened no Weather page`)
+    /* Every door, in the tab look: open the menu from the home, tap the row, see its place. */
+    if (label === 'browser') {
+      const DOORS = [
+        ['Best sky near me', `!!document.querySelector('.bsky__dots, [class*="bsky"]')`],
+        ['Viewfinder', `!!document.querySelector('.vf[aria-label="Viewfinder"]')`],
+        ['Calendar', `!!document.querySelector('.cal2[aria-label="Calendar"]')`],
+        ['Saved spots', `[...document.querySelectorAll('.drawer__title')].some((e) => e.textContent === 'Saved')`],
+        ['Field report', `!!document.querySelector('.reportpage')`],
+        ['Settings', `!!document.querySelector('.set2')`],
+        ['About', `!!document.querySelector('.astory')`],
+        ['Plan a shoot', `document.querySelector('.shell')?.className.includes('shell--setup') ?? false`],
+      ]
+      for (const [row, opened] of DOORS) {
+        await page.goto('about:blank')
+        await page.goto(url)
+        await wait(3000)
+        await goToStage(ev, wait, 'plan')
+        await wait(800)
+        await menuOn(page)
+        await wait(600)
+        const tapped = await ev(`(() => { const r = [...document.querySelectorAll('nav[aria-label="Stage"] .mrow')].find((b) => b.querySelector('.sidemenu__label')?.textContent === ${JSON.stringify(row)}); if (!r) return false; r.click(); return true })()`)
+        let ok = false
+        for (let i = 0; tapped && i < 20 && !ok; i += 1) {
+          await wait(250)
+          ok = await ev(opened)
+        }
+        console.log(`  ${row}: ${tapped ? (ok ? 'opened' : 'OPENED NOTHING') : 'NO ROW'}`)
+        if (!tapped) fail(`${label}: no ${row} row to tap`)
+        else if (!ok) fail(`${label}: ${row} opened nothing`)
+        if (ok) await page.screenshot({ path: join(OUT, `menu-door-${row.replace(/\s+/g, '-').toLowerCase()}.png`) })
+      }
+    }
     await ctx.close()
     watchdog.note(label)
   }

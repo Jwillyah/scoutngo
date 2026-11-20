@@ -35,8 +35,16 @@ describe('the timeline bar, wind', () => {
     expect(html).toContain('aria-label="Play the wind"')
     expect(html).toMatch(/class="ltl__time"[^>]*>Mon 11:05 AM</)
     expect(html).toContain('<span class="ltl__now">now</span>')
-    expect(html).toContain('aria-label="Layer: Wind"')
-    expect(html).toContain('>Surface ▾<')
+  })
+  /* Batch SIMPLE-2, Section 5 (board Wind_Map): Wind · Radar · Clouds as one pill, the one on in white; ⋯ for the height, the model, the tide and Layers off. */
+  it('the chips: Wind · Radar · Clouds in that order, Wind on, and ⋯ with the height', () => {
+    const chips = [...html.matchAll(/data-layer-pick="(\w+)"[^>]*>(\w+)</g)].map((m) => `${m[1]}:${m[2]}`)
+    expect(chips).toEqual(['wind:Wind', 'radar:Radar', 'clouds:Clouds'])
+    expect(html).toMatch(/aria-checked="true" class="ltl__chip ltl__chip--on" data-layer-pick="wind"/)
+    expect(html.match(/ltl__chip--on/g)?.length).toBe(1)
+    expect(html).toMatch(/data-layer-more[^>]*data-level-chip[^>]*aria-label="More: height surface, model Blend, other layers"/)
+    /* The menu is closed until ⋯ is tapped: no tide or off in the row. */
+    expect(html).not.toContain('data-wind-off')
   })
   it('a day strip Mon to Fri, a slider, the yellow flag on the thumb', () => {
     const days = [...html.matchAll(/class="ltl__day"[^>]*>(\w+)</g)].map((m) => m[1])
@@ -84,7 +92,9 @@ describe('the timeline bar, tide', () => {
     expect(html).toContain('class="ltl__waterline"')
     expect(html.match(/class="ltl__night"/g)?.length).toBe(6)
     expect(html).toContain('High 3.0 ft 8:12a · Low 0.5 ft 2:24p · shaded = night')
-    expect(html).toContain('aria-label="Layer: Tide"')
+    /* The tide is under ⋯: none of the three chips is on, and ⋯ has no height (the tide has none). */
+    expect(html).not.toContain('ltl__chip--on')
+    expect(html).toContain('aria-label="More layers"')
     expect(html).not.toContain('Surface')
   })
   it('says why when there is no curve', () => {

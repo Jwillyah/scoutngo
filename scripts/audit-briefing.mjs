@@ -1,42 +1,34 @@
 /*
- * THE HOME (Batch M, Section 3; it replaced the Today briefing), ON AN
- * IPHONE AND AN ANDROID PHONE, AS A BROWSER TAB AND FROM THE HOME SCREEN.
+ * THE HOME (Batch SIMPLE-2, Section 2: the tile home, boards Home_P_*), ON
+ * AN IPHONE AND AN ANDROID PHONE, AS A BROWSER TAB AND FROM THE HOME SCREEN.
  *
  * Usage:  node scripts/audit-briefing.mjs [screenshot-dir]
  *
  * The Virginia Beach pier at 6:11 AM EST on 2 Nov, a drone in the kit, every
- * weather host answered by the gate's fixtures (a calm day). Opened from the
- * menu's Today card.
+ * weather host answered by the gate's fixtures. A shared plan's link lands
+ * on the map, never the home; the map's "Back to the home" opens it.
  *
- *   each page   Today, Tomorrow, Week: fits 390 x 844 (WebKit, tab and
- *               home screen) and 412 x 915 (Chromium, tab and installed)
- *               with nothing scrolled, nothing below the screen, nothing off
- *               its side
- *   Today       the weather first: a temperature, the sky in a word, H and
- *               L, wind, a rain line; six hourly steps; the best windows
- *               (rows, or the honest "Nothing standout" line); four cards
- *               in a grid (boards Home8S / Home8J);
- *               one primary button, a round Map and a round Menu
- *   Tomorrow    the same, and no large empty gap under its cards (8 Nov:
- *               the old Today had one under the conditions card)
- *   Week        a headline, seven days, days 4-7 marked as guesses
- *   words       never "safe", never "clear to", never a red ground
- *   Menu        the round Menu opens the menu over the home
- *   short tab   390 x 664 (a Safari tab): fits too (Batch N C5)
- *   first run   a bare launch with no spot: "Where do you go?", spots
- *               near the location once, one tap to the home (Batch I);
- *               then "What do you do outside?" (Batch M): Fish or boat
- *               puts Wind and Tide first and takes the Viewfinder off the
- *               menu
+ *   fits      390 x 844 (WebKit, tab and home screen), 412 x 915 (Chromium,
+ *             tab and installed), 390 x 664 (a short Safari tab): nothing
+ *             scrolled, nothing below the screen or off its side
+ *   weather   a temperature, the sky in a word with H and L, six hours
+ *   tiles     six, in the Surf order with nothing picked, each a label, a
+ *             value (or a dash), one line and ›; their pictures live: the
+ *             wind's arrows point the way the Wind tile's words say, the
+ *             tide is a curve when there is a turn, the sky's art is warm
+ *             only for a Likely or Possible call
+ *   dock      Map and Menu, nothing else; Menu opens the menu
+ *   words     never "safe", never "clear to", never a red ground
+ *   first run a bare launch: "Where do you go?" with its box focused, spots
+ *             near the location once, one tap to the home; then "What do you
+ *             do outside?": ONE tap on Fish picks it, keeps it on the phone
+ *             and draws the Fish order with Water, "Fish first"
  */
 import { mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { chromium, webkit, devices } from './gate/playwright.mjs'
-import { ensureApp, findChrome, goToStage, guardAudit, startWatchdog, APP_ORIGIN, openMenu } from './preflight.mjs'
-
-/* Batch Polish, Section 2: the menu is the home's (and setup's and field's); on the map its Back goes home first (scripts/preflight.mjs openMenu). */
-const menuOn = (pg) => openMenu((x) => pg.evaluate(x), (ms) => pg.waitForTimeout(ms))
+import { ensureApp, findChrome, goHome, goToStage, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mjs'
 import { shareLink } from '../src/lib/planShare.ts'
 import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
 import { placeKey } from '../src/core/venueName.ts'
@@ -58,21 +50,22 @@ const fail = (why) => {
   problems += 1
 }
 
-/** One page of the home: what runs off the screen or its side, whether it scrolls, its text, and the gap under its last element. */
-const FIT = (i) => `JSON.stringify((() => {
-  const pg = document.querySelectorAll('.home__page')[${i}]
-  if (!pg) return { missing: true }
-  const r = pg.getBoundingClientRect()
-  const out = [...pg.querySelectorAll('*')].filter((e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0 && (b.bottom > innerHeight + 1 || b.right > r.right + 1 || b.left < r.left - 1) }).map((e) => (e.getAttribute('class') ?? e.tagName) + ' ' + Math.round(e.getBoundingClientRect().bottom)).slice(0, 4)
-  const side = [...pg.querySelectorAll('*')].filter((e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0 && (b.right > r.right + 1 || b.left < r.left - 1) }).map((e) => e.getAttribute('class') ?? e.tagName).slice(0, 4)
-  const foot = document.querySelector('.home__foot')?.getBoundingClientRect().top ?? innerHeight
-  const kids = [...(pg.firstElementChild?.children ?? [])].filter((e) => e.getBoundingClientRect().height > 0)
-  const last = kids.length === 0 ? r.top : Math.max(...kids.map((e) => e.getBoundingClientRect().bottom))
-  return { out, side, scrolls: pg.scrollHeight > pg.clientHeight + 1, text: pg.innerText, gap: Math.round(foot - last), content: Math.round(pg.scrollHeight), box: Math.round(pg.clientHeight) }
+/** The home as drawn: what runs off the screen or its side, whether anything scrolls, its text, and each part's words. */
+const READ = `JSON.stringify((() => {
+  const home = document.querySelector('.home.homep')
+  if (!home) return { missing: true }
+  const r = home.getBoundingClientRect()
+  const cls = (e) => String(e.getAttribute('class') ?? e.tagName).split(' ')[0]
+  const vis = (e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0 }
+  const out = [...home.querySelectorAll('*')].filter((e) => vis(e) && !e.closest('.lsky') && e.getBoundingClientRect().bottom > innerHeight + 1).map((e) => cls(e) + ' ' + Math.round(e.getBoundingClientRect().bottom)).slice(0, 4)
+  const side = [...home.querySelectorAll('*')].filter((e) => vis(e) && !e.closest('.lsky') && (e.getBoundingClientRect().right > r.right + 1 || e.getBoundingClientRect().left < r.left - 1)).map(cls).slice(0, 4)
+  const scrolls = [home, ...home.querySelectorAll('*')].some((e) => /(auto|scroll)/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 1)
+  const tiles = [...home.querySelectorAll('.htile')].map((t) => ({ kind: t.dataset.tile, label: t.querySelector('.htile__label')?.textContent ?? '', value: t.querySelector('.htile__value')?.textContent ?? '', line: t.querySelector('.htile__line')?.textContent ?? null, chev: !!t.querySelector('.htile__chev'), arrows: [...t.querySelectorAll('[data-arrow-deg]')].map((g) => Number(g.dataset.arrowDeg)), curve: t.querySelector('[data-tide-curve]')?.dataset.tideCurve ?? null, sky: t.querySelector('[data-sky-art]')?.dataset.skyArt ?? null }))
+  const w = home.querySelector('.hwtile')
+  return { out, side, scrolls, text: home.innerText, tiles, temp: w?.querySelector('.hwtile__temp')?.textContent ?? '', cond: w?.querySelector('.hwtile__line')?.textContent ?? '', hours: w?.querySelectorAll('.hwtile__h').length ?? 0, dock: [...home.querySelectorAll('.homep__dock button')].map((b) => b.getAttribute('aria-label')), moment: home.querySelector('.hmoment')?.innerText ?? null }
 })())`
 
-/** The most space between two of the home's blocks (board HomeV9: about 16 px). */
-const MAX_GAP = 24
+const POINTS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW']
 
 const LOOKS = [
   ['iPhone tab', 'webkit', { width: 390, height: 844 }, { top: 0, bottom: 0 }, true],
@@ -113,71 +106,60 @@ try {
     await goToStage(ev, wait, 'plan')
     await wait(2500)
     if (await ev(`!!document.querySelector('.home')`)) fail(`${label}: the home opened by itself on a shared plan's link`)
-    await menuOn(page)
-    await wait(700)
-    await page.locator('.mcard--today').first().click()
+    const went = await goHome(ev, wait)
     await wait(6000)
-    if (!(await ev(`!!document.querySelector('.home')`))) {
-      fail(`${label}: Menu › Today opened no home`)
+    if (went !== 'home' || !(await ev(`!!document.querySelector('.home.homep')`))) {
+      fail(`${label}: the map's Back to the home opened no home (${went})`)
       await ctx.close()
       continue
     }
     looked += 1
-    for (const [i, name] of ['Today', 'Tomorrow', 'Week'].entries()) {
-      await page.getByRole('tab', { name, exact: true }).click()
-      await wait(1200)
-      const t = JSON.parse(await ev(FIT(i)))
-      if (t.missing) {
-        fail(`${label}: no ${name} page`)
-        continue
-      }
-      console.log(`  ${name}: ${t.content}/${t.box} px, gap under it ${t.gap} px, ${t.out.length === 0 && !t.scrolls ? 'fits' : `DOES NOT FIT ${JSON.stringify(t.out)}${t.scrolls ? ' (scrolls)' : ''}`}`)
-      if (mustFit && t.scrolls) fail(`${label}, ${name}: the page scrolls (${t.content} of ${t.box} px)`)
-      if (mustFit) for (const o of t.out) fail(`${label}, ${name}: ${o} runs off the screen`)
-      for (const o of t.side) fail(`${label}, ${name}: ${o} runs off the side`)
-      if (/\bsafe\b|clear to fly|all clear/i.test(t.text)) fail(`${label}, ${name}: says safe or clear: ${JSON.stringify(t.text.slice(0, 120))}`)
-      if (mustFit && name === 'Tomorrow' && t.gap > 200) fail(`${label}: a ${t.gap} px empty gap under Tomorrow's cards`)
-      await page.screenshot({ path: join(OUT, `home-${name.toLowerCase()}-${label.replace(/\s/g, '-').toLowerCase()}.png`) })
-      if (i <= 1) {
-        const d = JSON.parse(await ev(`JSON.stringify((() => { const pg = document.querySelectorAll('.home__page')[${i}]; return { temp: pg.querySelector('.hwx__temp')?.textContent ?? '', cond: pg.querySelector('.hwx__cond')?.textContent ?? '', lines: [...pg.querySelectorAll('.hwx__line')].map((e) => e.textContent), steps: pg.querySelectorAll('.hstrip__step').length, best: pg.querySelector('.hbest')?.innerText ?? null, cards: [...pg.querySelectorAll('.hcard__title')].map((e) => e.textContent.split(' · ')[0]), next: pg.querySelector('.hnext')?.textContent ?? null, gaps: (() => { const els = ['.hwx', '.hcards', '.hhours', '.hnext'].map((q) => pg.querySelector(q)).filter((e) => e !== null); return els.slice(1).map((e, k) => ({ between: 'between ' + els[k].className.split(' ')[0] + ' and ' + e.className.split(' ')[0], px: Math.round(e.getBoundingClientRect().top - els[k].getBoundingClientRect().bottom) })) })() } })())`))
-        console.log(`  ${name}: ${JSON.stringify(d).slice(0, 300)}`)
-        if (!/^-?\d+°$/.test(d.temp)) fail(`${label}, ${name}: the big temperature reads ${JSON.stringify(d.temp)}`)
-        if (d.cond.trim() === '' || d.cond.trim() === '—') fail(`${label}, ${name}: no sky word`)
-        /* Batch Flow, Section 3 (boards D_Home6, D_Home2): "Clear · H 69° L 45°" under the big temperature; no hourly strip, no best windows card (the Weather page has the hours); "Next:" under the cards. */
-        if (!/ · H -?\d+° L -?\d+°/.test(d.cond)) fail(`${label}, ${name}: no condition with high and low under the temperature (${JSON.stringify(d.cond)})`)
-        if (d.steps !== 0) fail(`${label}, ${name}: an hourly strip on the home (${d.steps} steps); it is the Weather page's`)
-        if (d.next === null || d.next.trim() === '') fail(`${label}, ${name}: no "Next:" line under the cards`)
-        /* Batch Pages, Section 1 (board HomeV9): all the cards, Surf · Wind · Tide · Sky · Moon with nothing picked (the Drone too with a drone in the kit). */
-        if (d.cards.length < 5) fail(`${label}, ${name}: ${d.cards.length} cards, not 5 or 6`)
-        if (d.cards.slice(0, 2).join('|') !== 'Surf|Wind') fail(`${label}, ${name}: the cards lead with ${JSON.stringify(d.cards.slice(0, 2))}`)
-        if (!d.cards.includes('Sky')) fail(`${label}, ${name}: no Sky card (${JSON.stringify(d.cards)})`)
-        /* No big empty gaps between the blocks (9 Nov 3:52 PM: under the temperature, under the hourly, under Best windows): spare height goes to the cards. */
-        for (const g of d.gaps) if (g.px > MAX_GAP) fail(`${label}, ${name}: a ${g.px} px gap ${g.between}`)
-      } else {
-        const w = JSON.parse(await ev(`JSON.stringify({ head: document.querySelector('.hweek__head')?.textContent ?? null, days: document.querySelectorAll('.hweek__row').length, guesses: document.querySelectorAll('.hweek__row--guess').length })`))
-        console.log(`  week: ${JSON.stringify(w)}`)
-        if (w.head === null || w.head === '') fail(`${label}: no week headline`)
-        if (w.days !== 7) fail(`${label}: ${w.days} days in the week`)
-        if (w.guesses !== 4) fail(`${label}: ${w.guesses} days marked as guesses, not days 4-7`)
+    const h = JSON.parse(await ev(READ))
+    console.log(`  home: ${h.tiles.map((t) => `${t.kind} "${t.value}"`).join(' · ')}${h.moment === null ? '' : ` · moment ${JSON.stringify(h.moment)}`}, ${h.out.length === 0 && !h.scrolls ? 'fits' : `DOES NOT FIT ${JSON.stringify(h.out)}${h.scrolls ? ' (scrolls)' : ''}`}`)
+    if (mustFit && h.scrolls) fail(`${label}: the home scrolls`)
+    if (mustFit) for (const o of h.out) fail(`${label}: ${o} runs off the screen`)
+    for (const o of h.side) fail(`${label}: ${o} runs off the side`)
+    if (/\bsafe\b|clear to fly|all clear/i.test(h.text)) fail(`${label}: says safe or clear: ${JSON.stringify(h.text.slice(0, 120))}`)
+    if (!/^-?\d+°$/.test(h.temp)) fail(`${label}: the big temperature reads ${JSON.stringify(h.temp)}`)
+    if (!/^\S.* · H-?\d+° L-?\d+°$/.test(h.cond.trim()) || /^— /.test(h.cond)) fail(`${label}: no sky word with high and low under the temperature (${JSON.stringify(h.cond)})`)
+    if (h.hours !== 6) fail(`${label}: ${h.hours} hours on the Weather tile, not 6`)
+    /* Nothing picked: the Surf order (src/core/homeTiles.ts tileOrder). */
+    if (h.tiles.map((t) => t.kind).join(' ') !== 'surf tide wind sky fish drone') fail(`${label}: the tiles are ${JSON.stringify(h.tiles.map((t) => t.kind))}`)
+    for (const t of h.tiles) {
+      if (t.label.trim() === '' || t.value.trim() === '' || !t.chev) fail(`${label}: the ${t.kind} tile has no label, value or › (${JSON.stringify(t)})`)
+    }
+    /* The live pictures, against the tile's own words. */
+    const wind = h.tiles.find((t) => t.kind === 'wind')
+    const from = /\b(N|NNE|NE|ENE|E|ESE|SE|SSE|S|SSW|SW|WSW|W|WNW|NW|NNW)$/.exec(wind?.value ?? '')?.[1] ?? null
+    if (from !== null) {
+      if ((wind?.arrows.length ?? 0) === 0) fail(`${label}: the Wind tile says ${wind?.value} and draws no arrow`)
+      else {
+        const goes = (POINTS.indexOf(from) * 22.5 + 180) % 360
+        const off = Math.abs((((wind.arrows[0] - goes) % 360) + 540) % 360 - 180)
+        console.log(`  wind "${wind.value}": first arrow ${wind.arrows[0]}°, the words say it goes ${goes}°`)
+        if (off > 12) fail(`${label}: the Wind tile's first arrow points ${wind.arrows[0]}°, its words (${wind.value}) say ${goes}°`)
       }
     }
-    const buttons = JSON.parse(await ev(`JSON.stringify({ main: document.querySelector('.home .hbtn--main')?.textContent?.trim() ?? null, round: [...document.querySelectorAll('.home .hbtn--round')].map((b) => b.getAttribute('aria-label')) })`))
-    console.log(`  buttons: ${JSON.stringify(buttons)}`)
-    if (!/^(Radar|Viewfinder|Preflight)$/.test(buttons.main ?? '')) fail(`${label}: the primary button reads ${JSON.stringify(buttons.main)}`)
-    if (buttons.round.join('|') !== 'Menu|Open the map') fail(`${label}: the round buttons are ${JSON.stringify(buttons.round)}`)
+    const tide = h.tiles.find((t) => t.kind === 'tide')
+    if (tide !== undefined && /^(High|Low) /.test(tide.value) && tide.curve !== 'strip') fail(`${label}: the Tide tile says ${tide.value} and draws no curve`)
+    const sky = h.tiles.find((t) => t.kind === 'sky')
+    if (sky !== undefined && sky.sky !== null && (sky.sky === 'lit') !== /^(Likely|Possible)$/.test(sky.value.trim())) fail(`${label}: the Sky tile says ${sky.value} and its art is ${sky.sky}`)
+    if (JSON.stringify(h.dock) !== JSON.stringify(['Open the map', 'Menu'])) fail(`${label}: the dock is ${JSON.stringify(h.dock)}, not Map and Menu alone`)
+    await page.screenshot({ path: join(OUT, `home-${label.replace(/\s/g, '-').toLowerCase()}.png`) })
     const ground = await ev(`getComputedStyle(document.querySelector('.home')).backgroundImage`)
     if (/255,\s*59,\s*48|#ff3b30/i.test(ground)) fail(`${label}: the ground is the hazard red`)
-    await page.locator('.home .hbtn--round[aria-label="Menu"]').click()
+    await page.locator('.home .homep__dock button[aria-label="Menu"]').click()
     await wait(700)
     const menu = await ev(`(() => { const m = document.querySelector('.menu'); return m !== null && getComputedStyle(m).visibility !== 'hidden' && m.getBoundingClientRect().width > 0 })()`)
-    if (!menu) fail(`${label}: the round Menu opened no menu`)
+    if (!menu) fail(`${label}: Menu opened no menu`)
     await page.keyboard.press('Escape')
     await wait(500)
 
     /*
-     * FIRST RUN, NO SETUP (Batch I, Section 1): a bare launch with no spot
-     * asks where; the location once offers known spots near it; one tap
-     * opens the home for that spot. No map, no pin.
+     * FIRST RUN, NO SETUP (Batch I, Section 1; Batch SIMPLE-2, Section 2): a
+     * bare launch with no spot asks where, its box focused; the location once
+     * offers known spots near it; one tap opens the home for that spot, and
+     * "What do you do outside?" over it, one tap.
      */
     if (label === 'short tab') {
       await ctx.grantPermissions(['geolocation'])
@@ -186,8 +168,10 @@ try {
       await page.goto(`${APP_ORIGIN}/`)
       await wait(3500)
       const asked = await ev(`document.querySelector('.spick__title')?.textContent ?? null`)
-      console.log(`  first run: ${asked}`)
+      const focused = await ev(`document.activeElement?.classList.contains('spick__search') ?? false`)
+      console.log(`  first run: ${asked}, the search box ${focused ? 'focused' : 'NOT focused'}`)
       if (asked !== 'Where do you go?') fail(`a bare first launch did not ask where you go (${JSON.stringify(asked)})`)
+      if (!focused) fail('the first run\'s search box is not focused: typing would need a tap on it first')
       await page.getByRole('button', { name: 'Use my location once' }).click().catch(() => {})
       await wait(2500)
       const rows = await ev(`[...document.querySelectorAll('.spick__row .spick__name')].map((e) => e.textContent)`)
@@ -195,35 +179,25 @@ try {
       if (!Array.isArray(rows) || rows.length === 0) fail('no known spots offered near the location')
       await page.locator('.spick__row').first().click().catch(() => {})
       await wait(5000)
-      const opened = await ev(`document.querySelector('.home__spotname')?.textContent ?? null`)
+      const opened = await ev(`document.querySelector('.home .homep__spotname')?.textContent ?? null`)
       console.log(`  then the home: ${opened}`)
       if (opened === null) fail('picking a spot did not open the home')
-      /*
-       * WHAT DO YOU DO OUTSIDE? (Batch M, Section 2): asked once after the
-       * spot. Fish or boat alone: the wind and the tide lead the cards, the
-       * primary button is Radar, and the menu has no Viewfinder row; no card's
-       * data is gone (all five still there, the drone with none in the kit).
-       */
-      const question = await ev(`document.querySelector('.actpick__title')?.textContent ?? null`)
-      console.log(`  then: ${question}`)
+      const question = await ev(`document.querySelector('.actpick--persona .actpick__title')?.textContent ?? null`)
+      const choices = await ev(`[...document.querySelectorAll('.actpick--persona [data-persona]')].map((b) => b.dataset.persona).join(' ')`)
+      console.log(`  then: ${question} (${choices})`)
       if (question !== 'What do you do outside?') fail(`no "What do you do outside?" after the first spot (${JSON.stringify(question)})`)
-      await page.getByRole('button', { name: /Fish or boat/ }).click().catch(() => fail('no Fish or boat choice'))
-      await page.getByRole('button', { name: 'Continue', exact: true }).click().catch(() => fail('no Continue'))
-      await wait(1200)
-      const kept = await ev(`localStorage.getItem('scoutngo.activities.v1')`)
-      const after = JSON.parse(await ev(`JSON.stringify({ cards: [...document.querySelectorAll('.home__page')[0]?.querySelectorAll('.hcard__title') ?? []].map((e) => e.textContent.split(' · ')[0]), main: document.querySelector('.home .hbtn--main')?.textContent?.trim() ?? null, open: !!document.querySelector('.actpick--sheet') })`))
-      console.log(`  picked Fish or boat: kept ${kept}, ${JSON.stringify(after)}`)
-      if (kept !== '["fish"]') fail(`the pick was kept as ${JSON.stringify(kept)}`)
-      if (after.open) fail('the picker stayed open after Done')
-      /* Batch Flow, Section 3: one activity picked, its own cards only, big (board D_Home2). */
-      /* The kit's drone is the home's too (homeOrder): Wind first, Tide with it, three at most. */
-      if (after.cards[0] !== 'Wind' || !after.cards.includes('Tide') || after.cards.length > 3) fail(`Fish or boat: the cards are ${JSON.stringify(after.cards)}, not Wind first and Tide, big`)
-      if (after.main !== 'Radar') fail(`Fish or boat: the primary button is ${JSON.stringify(after.main)}`)
-      await page.locator('.home .hbtn--round[aria-label="Menu"]').click()
-      await wait(800)
-      const vf = await ev(`[...document.querySelectorAll('.menu .menu__rows')].some((r) => /Viewfinder/.test(r.textContent))`)
-      if (vf) fail('Fish or boat: the menu still offers the Viewfinder (a photo tool)')
-      await page.keyboard.press('Escape')
+      if (choices !== 'surf shoot fish drone weather') fail(`the choices are "${choices}", not Surf · Shoot · Fish · Drone · Just weather`)
+      /* ONE tap: no Continue. */
+      await page.locator('.actpick--persona [data-persona="fish"]').click().catch(() => fail('no Fish choice'))
+      await wait(1500)
+      const kept = await ev(`localStorage.getItem('scoutngo.persona.v1')`)
+      const after = JSON.parse(await ev(`JSON.stringify({ tiles: [...document.querySelectorAll('.home .htile')].map((t) => t.dataset.tile).join(' '), pill: document.querySelector('.home .homep__pill')?.textContent ?? null, open: !!document.querySelector('.actpick--sheet') })`))
+      console.log(`  one tap on Fish: kept ${kept}, ${JSON.stringify(after)}`)
+      if (kept !== 'fish') fail(`the pick was kept as ${JSON.stringify(kept)}`)
+      if (after.open) fail('the picker stayed open after one tap')
+      if (after.tiles !== 'fish tide wind water sky surf') fail(`Fish: the tiles are "${after.tiles}", not Fish · Tide · Wind · Water · Sky · Surf`)
+      if (after.pill !== 'Fish first') fail(`Fish: the pill reads ${JSON.stringify(after.pill)}`)
+      await page.screenshot({ path: join(OUT, `home-fish-first-run.png`) })
     }
     await ctx.close()
     watchdog.note(label)

@@ -760,3 +760,39 @@ export async function openMenu(ev, wait) {
   if (r === 'menu') await wait(400)
   return r === 'menu' ? 'menu' : `went Back, and then: ${r}`
 }
+
+/*
+ * THE HOME AND ITS TILES (Batch SIMPLE-2, Sections 2 and 3). The menu no
+ * longer carries Today, Weather, Sky or Drone cards: a person goes back to
+ * the home (the map's "Back to the home", or the home already up) and taps
+ * the tile. Each returns what it did, so a caller can fail with it.
+ */
+export async function goHome(ev, wait) {
+  /* An open menu is closed first: it covers whatever is under it, the home too. */
+  if (await ev(`(() => { const x = document.querySelector('.menu .menu__x'); if (x) x.click(); return !!x })()`)) await wait(300)
+  if (await ev(`!!document.querySelector('.home')`)) return 'home'
+  const r = await ev(`(() => {
+    const vis = (e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0 && !e.closest('[inert]') }
+    const back = [...document.querySelectorAll('.topbar__back')].find(vis)
+    if (back) { back.click(); return 'back' }
+    return 'no Back to the home on screen'
+  })()`)
+  if (r !== 'back') return r
+  for (let i = 0; i < 30; i += 1) {
+    await wait(200)
+    if (await ev(`!!document.querySelector('.home [data-tile]')`)) return 'home'
+  }
+  return 'tapped Back to the home and no home came'
+}
+
+/** The home's tile (src/components/TileHome.tsx data-tile: weather, surf, tide, wind, sky, fish, drone, water), tapped from the home. */
+export async function homeTile(ev, wait, kind) {
+  const at = await goHome(ev, wait)
+  if (at !== 'home') return at
+  for (let i = 0; i < 20; i += 1) {
+    const r = await ev(`(() => { const t = document.querySelector('.home [data-tile="${kind}"]'); if (!t) return 'none'; t.click(); return 'ok' })()`)
+    if (r === 'ok') return 'ok'
+    await wait(250)
+  }
+  return `no ${kind} tile on the home`
+}

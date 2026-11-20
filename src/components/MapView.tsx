@@ -942,6 +942,12 @@ interface MapViewProps {
   sunOverlay: SunOverlay | null
   showSun: boolean
   showArc: boolean
+  /**
+   * Batch SIMPLE-2, Section 5.4: false while a weather layer is on
+   * (src/core/mapLines.ts sunMoonLinesShown): every sun and moon line from the
+   * pin goes, the dashed axis included, and its pills and labels with it.
+   */
+  sunLines?: boolean
   selectedId: string | null
   onSelect: (id: string | null) => void
   onPitchChange: (pitch: number) => void
@@ -1382,8 +1388,9 @@ export function MapView({
   onSelectMark,
   sunAzimuth,
   sunOverlay,
-  showSun,
-  showArc,
+  showSun: showSunIn,
+  showArc: showArcIn,
+  sunLines = true,
   selectedId,
   onSelect,
   onPitchChange,
@@ -1425,6 +1432,9 @@ export function MapView({
   onPilotMove,
   onAimAt,
 }: MapViewProps) {
+  /* Batch SIMPLE-2, Section 5.4: no sun or moon line, no pill, no label for one, while a weather layer is on. */
+  const showSun = showSunIn && sunLines
+  const showArc = showArcIn && sunLines
   /*
    * The ray plates are built imperatively into marker elements, so the switch
    * has to arrive as a value and sit in the effect's dependencies rather than
@@ -3653,7 +3663,7 @@ export function MapView({
    * what skips the rest.
    */
   /* Batch NOW, Section 4: the line through the pin is the sun's by day; the caller may give the moon's at night, or none. */
-  const lineAzimuth = axisAzimuth === undefined ? sunAzimuth : axisAzimuth
+  const lineAzimuth = !sunLines ? null : axisAzimuth === undefined ? sunAzimuth : axisAzimuth
   const bearingInputs = useRef({ venue, sunAzimuth: lineAzimuth, sunOverlay, showSun, showArc })
   bearingInputs.current = { venue, sunAzimuth: lineAzimuth, sunOverlay, showSun, showArc }
   /*

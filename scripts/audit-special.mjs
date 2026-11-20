@@ -137,6 +137,17 @@ try {
     let list = null
     for (let i = 0; i < 20; i += 1) {
       await wait(500)
+      /*
+       * Batch SIMPLE-2, Section 4: on the tap-in Sky page the week's list is one tap in from Now's Rare light row
+       * ("next: Fog Today 7:40 AM ›"); at 7:30 AM the page opens on the morning's tab, so Now first, then the row.
+       */
+      await ev(`(() => {
+        if (document.querySelector('.spage__rare')) return
+        const now = [...document.querySelectorAll('.tipage.spage .tipage__tabs [role="tab"]')].find((b) => b.textContent === 'Now')
+        if (now && now.getAttribute('aria-selected') !== 'true') { now.click(); return }
+        const row = [...document.querySelectorAll('.tipage.spage button.tipage__row')].find((b) => b.querySelector('.tipage__label')?.textContent === 'Rare light')
+        row?.click()
+      })()`)
       list = await ev(`(() => {
         const s = document.querySelector('.spage__rare')
         if (!s || s.querySelectorAll('.spage__row').length === 0) return null

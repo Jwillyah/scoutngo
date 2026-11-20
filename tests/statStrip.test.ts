@@ -48,8 +48,8 @@ describe('the sky cell: which layer matters, in a word', () => {
 describe('the tide cell: the next turn and which way the water is going', () => {
   it('falling to a low, rising to a high', () => {
     const at = new Date('2026-11-11T06:54:00Z')
-    expect(tideCell({ kind: 'low', at }, TZ, 12)).toEqual({ text: 'Low 1:54a', going: 'falling' })
-    expect(tideCell({ kind: 'high', at }, TZ, 12)).toEqual({ text: 'High 1:54a', going: 'rising' })
+    expect(tideCell({ kind: 'low', at }, TZ, 12)).toEqual({ text: 'Low 1:54a', going: 'falling', shared: 'low 1:54 am' })
+    expect(tideCell({ kind: 'high', at }, TZ, 12)).toEqual({ text: 'High 1:54a', going: 'rising', shared: 'high 1:54 am' })
     expect(tideCell(null, TZ)).toBeNull()
   })
 })

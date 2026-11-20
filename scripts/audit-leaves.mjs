@@ -27,6 +27,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { webkit, devices } from './gate/playwright.mjs'
 import { ensureApp, goToStage, guardAudit, startWatchdog, APP_ORIGIN, openMenu } from './preflight.mjs'
+import { goHome } from './preflight.mjs'
 
 /* Batch Polish, Section 2: the menu is the home's (and setup's and field's); on the map its Back goes home first (scripts/preflight.mjs openMenu). */
 const menuOn = (pg) => openMenu((x) => pg.evaluate(x), (ms) => pg.waitForTimeout(ms))
@@ -77,14 +78,21 @@ try {
   await goToStage(ev, wait, 'plan')
   await wait(2500)
   watchdog.note('the map')
+  /* Batch SIMPLE-2, Section 2: each page from its home tile (the menu has no cards). */
   await menuOn(page)
-  await tap('.mcard--today', 4000)
-  for (const card of ['surf', 'wind', 'tide']) {
-    await tap(`.home__page[aria-label="Today"] .hcard--${card}`, 4000)
-    if (card === 'surf') await tap('.dpage__tab:has-text("Buoys")', 4000)
-    await tap('.dpage__back:visible', 1500)
+  await goHome(ev, wait)
+  for (const tile of ['surf', 'tide', 'fish', 'drone']) {
+    await tap(`.home [data-tile="${tile}"]`, 4000)
+    if (tile === 'surf') await tap('.tipage--surf button[role="tab"]:has-text("Buoys")', 4000)
+    await tap('.ppage__back:visible, .dpage__back:visible', 1500)
+    await goHome(ev, wait)
   }
-  await tap('.home__page[aria-label="Today"] .hcard--sky', 4000)
+  /* The Wind page: the map's wind chip, from the Wind tile's map. */
+  await tap('.home [data-tile="wind"]', 3000)
+  await tap('.chip2[data-chip="wind"]', 4000)
+  await tap('.dpage__back:visible, .ppage__back:visible', 1500)
+  await goHome(ev, wait)
+  await tap('.home [data-tile="sky"]', 4000)
   await tap('button:has-text("Color detail")', 5000)
   watchdog.note('sky')
   await page.goto(url)
@@ -92,8 +100,8 @@ try {
     await page.getByRole('button', { name: /^open$/i }).click({ timeout: 4000 }).catch(() => {})
   await wait(3000)
   await goToStage(ev, wait, 'plan')
-  await menuOn(page)
-  await tap('nav[aria-label="Stage"] .mcard--weather', 4000)
+  await goHome(ev, wait)
+  await tap('.home [data-tile="weather"]', 4000)
   await page.goto(url)
     /* The shared plan's own question first: other screens wait under it. */
     await page.getByRole('button', { name: /^open$/i }).click({ timeout: 4000 }).catch(() => {})

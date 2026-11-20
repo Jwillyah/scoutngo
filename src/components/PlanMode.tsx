@@ -5,7 +5,7 @@ import { ScreenBoundary, ScreenFailCard } from './ScreenBoundary.tsx'
 import { markScreenOpen, recordError } from '../lib/errorLog.ts'
 import { NetDebug } from './NetDebug.tsx'
 import { WindHours } from './WindTimeBar.tsx'
-import { LayerTimeline, type TimelineLayer, type TimelinePick } from './LayerTimeline.tsx'
+import { LayerChips, LayerTimeline, type TimelineLayer, type TimelinePick } from './LayerTimeline.tsx'
 import { barSpan, onBar, rainSpan, type WindHour, type WindStrip } from '../core/layerTimeline.ts'
 import { percentLine, tideLines } from '../core/markerReadout.ts'
 import { tideStateAt } from '../core/tide.ts'
@@ -100,6 +100,10 @@ import { showsPhotoTools, useActivities } from '../lib/activities.ts'
 import { SurfPageV2 } from './SurfPageV2.tsx'
 import { TidePageV2 } from './TidePageV2.tsx'
 import { WindPageV2 } from './WindPageV2.tsx'
+import { sunMoonLinesShown } from '../core/mapLines.ts'
+import { WindCharts } from './WindCharts.tsx'
+import { WIND_TABS } from '../core/windCharts.ts'
+import { WIND_PAGE_OLD_FIRST } from '../config/flags.ts'
 import { BuoysPageV2 } from './BuoysPageV2.tsx'
 import { groundOf } from '../core/homeDay.ts'
 import type { DetailId } from '../lib/detailTabs.ts'
@@ -211,6 +215,8 @@ const PLAN_PEEK_PX = 187
  */
 const LAYER_PEEK_PX = 207
 const WIND_PEEK_PX = LAYER_PEEK_PX + 16
+/* Batch SIMPLE-2, Section 5: the radar's legend with the bar's chip row over it (44, its padding and the gap; measured standalone). */
+const RADAR_PEEK_PX = PLAN_PEEK_PX + 60
 
 /** What the one sheet is currently showing. Chosen by an explicit control. */
 /*
@@ -521,7 +527,8 @@ const MapView = lazyPage(() => import('./MapView.tsx').then((m) => ({ default: m
 const Clay3D = lazyPage(() => import('./Clay3D.tsx').then((m) => ({ default: m.Clay3D })), { preload: false })
 
 /* The card requests that open a full page (or the calendar) over the map. */
-const PAGE_REQUESTS: ReadonlySet<string> = new Set(['exposure', 'tides', 'surf', 'buoys', 'wind', 'terrain', 'settings', 'about', 'calendar'])
+/* Batch SIMPLE-2, Section 5: Wind is the map (its layer, at now, the marker on the spot), not a page, unless the old page is flagged first. */
+const PAGE_REQUESTS: ReadonlySet<string> = new Set(['exposure', 'tides', 'surf', 'buoys', ...(WIND_PAGE_OLD_FIRST ? ['wind'] : []), 'terrain', 'settings', 'about', 'calendar'])
 
 /* Set once the moon's one-time hint has been shown. */
 const MOON_HINT_KEY = 'scoutngo.moonHint.v1'
@@ -1532,6 +1539,31 @@ export function PlanMode({
       }
     }
   }
+  /*
+   * WIND = THE MAP (Batch SIMPLE-2, Section 5; boards Wind_Map, Wind_Charts).
+   * The Wind tile (the card request), the Wind chip and the wind card's
+   * models open the map on the wind layer at now with the marker on the spot,
+   * and put Map | Charts in the top bar; Charts is a page over the map
+   * (src/components/WindCharts.tsx). The view holds while a weather layer of
+   * the bar is on (Wind · Radar · Clouds, its chips); Back leaves it for the
+   * home with the layers off. Nothing here opens Plan a shoot.
+   */
+  /* Mounted uncovered with the wind on (the home's Wind tile hands over the map that way when the map was not yet mounted): the wind view. */
+  const [windView, setWindView] = useState<'map' | 'charts' | null>(() => (!covered && showSky && skyLayer === 'wind' ? 'map' : null))
+  const windViewNow = useRef(windView)
+  windViewNow.current = windView
+  const openWindNow = useRef<(v: 'map' | 'charts') => void>(() => undefined)
+  openWindNow.current = (v) => {
+    setPage(null)
+    setCard(HOME)
+    setSheet('peek')
+    setThreeD(false)
+    setMarkerAt(null)
+    pickWeather('wind')
+    scrubTo(new Date())
+    setWindView(v)
+  }
+  const openWind = useCallback((v: 'map' | 'charts') => openWindNow.current(v), [])
   const stormLayersOn = lightningOn || warningsOn || tracksOn
   const layerNow = useNowcast(venue, stormLayersOn || weatherLayer === 'radar')
   const layerCalls = useMemo(() => (layerNow?.radar == null || venue === null ? [] : cellCalls(venue, layerNow.radar.tracks, layerNow.radar.scanAt)), [layerNow, venue])
@@ -1667,7 +1699,11 @@ export function PlanMode({
     const timer = setTimeout(() => {
       /* Exposure, Tides and Surf are pages of their own (29 Oct); Preflight is its card. */
       /* Settings is a page of its own since 30 Oct (SettingsPage.tsx). */
-      if (cardRequest.kind === 'exposure' || cardRequest.kind === 'tides' || cardRequest.kind === 'surf' || cardRequest.kind === 'buoys' || cardRequest.kind === 'wind' || cardRequest.kind === 'terrain' || cardRequest.kind === 'settings' || cardRequest.kind === 'about') {
+      if (cardRequest.kind === 'wind' && !WIND_PAGE_OLD_FIRST) {
+        /* Batch SIMPLE-2, Section 5: Wind = the map, on its wind layer at now, the marker on the spot. */
+        openWind('map')
+        return
+      } else if (cardRequest.kind === 'exposure' || cardRequest.kind === 'tides' || cardRequest.kind === 'surf' || cardRequest.kind === 'buoys' || cardRequest.kind === 'wind' || cardRequest.kind === 'terrain' || cardRequest.kind === 'settings' || cardRequest.kind === 'about') {
         setPage(cardRequest.kind)
         return
       } else if (cardRequest.kind === 'calendar') {
@@ -1705,6 +1741,12 @@ export function PlanMode({
   const wasCovered = useRef(covered)
   useEffect(() => {
     const uncovered = wasCovered.current && !covered
+    /* Batch SIMPLE-2, Section 5: the home over the wind view ends it, the layer with it: the map the dock opens next is the plain map. */
+    if (!wasCovered.current && covered && windViewNow.current !== null) {
+      /* oxlint-disable-next-line react/set-state-in-effect -- one reset when the home covers the map */
+      setWindView(null)
+      allLayersOff()
+    }
     wasCovered.current = covered
     if (!uncovered) return
     /* oxlint-disable react/set-state-in-effect -- one reset on the home's way out, not a render loop */
@@ -1716,8 +1758,18 @@ export function PlanMode({
     setFlySession(null)
     setStand(null)
     setThreeD(false)
+    /*
+     * Batch SIMPLE-2, Section 5: the home's Wind tile hands the map over with
+     * the wind layer on (App: the layer, then the home steps aside); the map
+     * comes up as the wind view, Map | Charts at its top, the marker on the
+     * spot. A wind card request (openWind) lands the same.
+     */
+    if (weatherLayer === 'wind') {
+      setMarkerAt(null)
+      setWindView('map')
+    }
     /* oxlint-enable react/set-state-in-effect */
-  }, [covered])
+  }, [covered]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /*
    * THE RELIEF ROUND THE VENUE, for the Terrain tile and its 2D contours
@@ -1754,7 +1806,10 @@ export function PlanMode({
   const openChip = useCallback(
     (kind: Chip['kind']) => {
       if (kind === 'tide') setPage('tides')
-      else if (kind === 'wind') setPage('wind')
+      else if (kind === 'wind') {
+        if (WIND_PAGE_OLD_FIRST) setPage('wind')
+        else openWind('map')
+      }
       /* Batch Pages, Section 3: the Cloud chip opens the Sky page (src/components/SkyPage.tsx); Golden the sheet's sun, moon and night (no tabs any more). */
       else if (kind === 'cloud') window.dispatchEvent(new CustomEvent(OPEN_SKY_EVENT))
       else if (kind === 'golden') {
@@ -1766,7 +1821,7 @@ export function PlanMode({
         }
       } else openCard(kind)
     },
-    [openCard, card.kind, skyTab, raiseToHalf],
+    [openCard, card.kind, skyTab, raiseToHalf, openWind],
   )
   const clock = useCallback(
     (at: Date | null) =>
@@ -1860,7 +1915,7 @@ export function PlanMode({
         /* The next turn after the time on the bar, high or low, and which way the water is going until then. */
         label: 'TIDE',
         value: turn?.text ?? null,
-        ...(turn === null ? {} : { mark: turn.going }),
+        ...(turn === null ? {} : { mark: turn.going, shared: turn.shared }),
         spoken: turn === null ? 'Tide: not known' : `Tide ${turn.going}, ${nextTurn?.kind} at ${clock(nextTurn?.at ?? null) ?? ''}`,
       }]),
     ]
@@ -1892,6 +1947,16 @@ export function PlanMode({
   const marker = markerAt ?? venue
   const timelineLayer: TimelineLayer | null = threeD ? null : weatherLayer === 'wind' || weatherLayer === 'clouds' || weatherLayer === 'tide' ? weatherLayer : null
   const timelineUp = timelineLayer !== null && (card.kind === HOME.kind || card.kind === 'wxlayer') && venueWindow !== null && scrubbedAt !== null
+  /* Batch SIMPLE-2, Section 5: the wind view lasts while one of its bar's layers is on in 2D; Layers off (or the tide) ends it. */
+  const radarBarUp = weatherLayer === 'radar' && !threeD && (card.kind === HOME.kind || card.kind === 'wxlayer')
+  const windViewOn = windView !== null && !threeD && (weatherLayer === 'wind' || weatherLayer === 'radar' || weatherLayer === 'clouds')
+  const leaveWind = () => {
+    setWindView(null)
+    setPage(null)
+    allLayersOff()
+    setMarkerAt(null)
+    onHome?.()
+  }
   /* The time a drag began, while it lasts: the map holds its frames for it (no refetch while scrubbing). */
   const [scrubHeld, setScrubHeld] = useState<Date | null>(null)
   const tz = venueWindow?.timeZone ?? 'UTC'
@@ -2362,7 +2427,7 @@ export function PlanMode({
             atLabel={clock(scrubbedAt)}
             units={units}
             onClose={home}
-            onModels={() => setPage('wind')}
+            onModels={() => (WIND_PAGE_OLD_FIRST ? setPage('wind') : openWind('charts'))}
           />
         )
       case 'cloud':
@@ -2874,9 +2939,10 @@ export function PlanMode({
             shadowPaint={shadowPaint}
             linkPins={camPins}
             rayClock={venueWindow === null ? undefined : (at: Date) => formatClock(at, venueWindow.timeZone)}
-            /* Batch Map, Section 1: the sun and moon lines step aside while a weather layer is on, and come back when it is off. */
-            showSun={showSun && weatherLayer === 'off'}
-            showArc={showArc && weatherLayer === 'off'}
+            /* Batch Map, Section 1; SIMPLE-2, Section 5.4: every sun and moon line steps aside while a weather layer is on (the dashed axis too), and comes back when it is off. */
+            showSun={showSun}
+            showArc={showArc}
+            sunLines={sunMoonLinesShown(weatherLayer)}
             windModel={windModel}
             windAt={scrubbedAt}
             windUnit={units.wind}
@@ -2938,6 +3004,8 @@ export function PlanMode({
           ground: groundOf(getPosition(new Date(), venue.lat, venue.lon).altitude, null, false),
           onBack: () => {
             setPage(null)
+            /* Batch SIMPLE-2, Section 5: the Wind page opened from Charts' "More details ›" goes back to Charts. */
+            if (page === 'wind' && windViewOn) return
             onPageBack?.()
           },
           onSwitch: (id: DetailId) => setPage(id === 'tide' ? 'tides' : id),
@@ -2948,6 +3016,11 @@ export function PlanMode({
           },
           /* Batch Flow, Section 6: the Wind page's Map: the map's moving wind, at the spot. */
           onWindMap: () => {
+            if (windViewOn) {
+              setPage(null)
+              setWindView('map')
+              return
+            }
             setMapFrom(page)
             setPage(null)
             setRadarAt(null)
@@ -2958,6 +3031,21 @@ export function PlanMode({
         }
         return page === 'surf' ? <SurfPageV2 {...props} /> : page === 'tides' ? <TidePageV2 {...props} /> : page === 'wind' ? <WindPageV2 {...props} /> : <BuoysPageV2 {...props} />
       })() : null}
+      {/* Batch SIMPLE-2, Section 5 (board Wind_Charts): Wind › Charts over the map; Map (or a swipe right) is the map again. */}
+      {windViewOn && windView === 'charts' && page === null && venue !== null && venueWindow !== null ? (
+        <WindCharts
+          venue={{ lat: venue.lat, lon: venue.lon }}
+          placeName={venueNameLine}
+          timeZone={venueWindow.timeZone}
+          units={units}
+          ground={groundOf(getPosition(new Date(), venue.lat, venue.lon).altitude, null, false)}
+          onBack={leaveWind}
+          onMap={() => setWindView('map')}
+          onMore={() => setPage('wind')}
+          /* The map layer's own hours when its marker is on the spot, so Map and Charts draw the same bars. */
+          strip={markerAt === null && weatherLayer === 'wind' ? windStrip : null}
+        />
+      ) : null}
       {page === 'settings' ? (
         <SettingsPage
           feedPlace={venue}
@@ -3219,6 +3307,18 @@ export function PlanMode({
         onMenu={onMenu}
         menuOpen={menuOpen}
         pill={
+          windViewOn ? (
+            /* Batch SIMPLE-2, Section 5 (board Wind_Map): Map | Charts in the pill's place, the app's one segmented pill. */
+            <div className="windtop" data-wind-view={windView ?? undefined}>
+              <div className="ui-seg" role="tablist" aria-label="Wind views">
+                {WIND_TABS.map((t) => (
+                  <button key={t.id} type="button" role="tab" aria-selected={windView === t.id} className={`ui-seg__opt${windView === t.id ? ' ui-seg__opt--on' : ''}`} data-wind-tab={t.id} onClick={() => setWindView(t.id)}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) :
           /*
            * THE PILL NAMES THE PLACE AND THE DAY, and a tap goes to search it,
            * which is what a search pill is for. The venue bar this replaced
@@ -3237,7 +3337,9 @@ export function PlanMode({
         addHidden={planShoot === false || onHome !== undefined}
         menuHidden={onHome !== undefined}
         onBack={
-          onHome === undefined
+          windViewOn
+            ? leaveWind
+            : onHome === undefined
             ? undefined
             : () => {
                 const to = mapBack(mapFrom)
@@ -3317,7 +3419,7 @@ export function PlanMode({
 
       <BottomSheet
         /* Room for the time bar: its date line and its strip, measured, not the old one-line scrubber. */
-        peekPx={timelineUp ? (timelineLayer === 'wind' ? WIND_PEEK_PX : LAYER_PEEK_PX) : PLAN_PEEK_PX}
+        peekPx={timelineUp ? (timelineLayer === 'wind' ? WIND_PEEK_PX : LAYER_PEEK_PX) : radarBarUp ? RADAR_PEEK_PX : PLAN_PEEK_PX}
         detent={sheet}
         onDetentChange={setSheet}
         onHeightChange={setSheetHeight}
@@ -3363,8 +3465,16 @@ export function PlanMode({
             {/* In 3D the time bar always shows: the light, the shadows and the sky all run on it. Batch I: not over Sky fire, Special or Calendar, which read their own events. */}
             {/* Radar on (8 Nov): its legend and timeline take the time bar's place here, up at every height of the sheet. */}
             {/* Only on the map's own view (the home card, the radar card): a card that reads a moment keeps its time strip (Batch N; the surface audit). */}
-            {weatherLayer === 'radar' && !threeD && (card.kind === HOME.kind || card.kind === 'wxlayer') ? (
-              <RadarLegend scanAt={radarAt === null ? null : (layerNow?.radar?.scanAt ?? radarAt)} calls={layerCalls} strikes={layerNow?.strikes ?? []} timeZone={venueWindow?.timeZone ?? 'UTC'} rain={rainStrip} />
+            {radarBarUp ? (
+              <>
+                {/* Batch SIMPLE-2, Section 5: the bar's own chips over the radar's legend, so Wind · Radar · Clouds is one bar whichever is on. */}
+                <div className="ltl ltl--radar" data-layer-timeline="radar">
+                  <div className="ltl__row">
+                    <LayerChips layer="radar" onPick={onTimelinePick} />
+                  </div>
+                </div>
+                <RadarLegend scanAt={radarAt === null ? null : (layerNow?.radar?.scanAt ?? radarAt)} calls={layerCalls} strikes={layerNow?.strikes ?? []} timeZone={venueWindow?.timeZone ?? 'UTC'} rain={rainStrip} />
+              </>
             ) : timelineUp && timelineLayer !== null && venueWindow !== null && scrubbedAt !== null ? (
               /* Batch DRONE, Section 3: the one timeline bar for wind, clouds and tide, docked in the time sheet's place. */
               <LayerTimeline

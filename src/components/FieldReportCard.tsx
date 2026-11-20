@@ -38,9 +38,11 @@ export interface FieldReportCardProps {
   now: () => number
   /** For tests: what the phone holds. */
   initial?: FieldReport[]
+  /** Batch SIMPLE-2, Section 3: opened on its own (Menu › Field report), Back closes it rather than showing the Surf page's row. */
+  onClose?: () => void
 }
 
-export function FieldReportCard({ spot, name, at: spotAt, timeZone, buoyFt, now, initial, startOpen = false }: FieldReportCardProps) {
+export function FieldReportCard({ spot, name, at: spotAt, timeZone, buoyFt, now, initial, startOpen = false, onClose }: FieldReportCardProps) {
   const [reports, setReports] = useState<FieldReport[]>(() => initial ?? readReports())
   const [size, setSize] = useState<ReportSize | null>(null)
   const [rating, setRating] = useState<ReportRating | null>(null)
@@ -109,7 +111,7 @@ export function FieldReportCard({ spot, name, at: spotAt, timeZone, buoyFt, now,
     <>
       {row}
       <PageGroup.Provider value={null}>
-        <Page title="What did you see?" className="reportpage" back onClose={() => setOpen(false)}>
+        <Page title="What did you see?" className="reportpage" back onClose={() => (onClose === undefined ? setOpen(false) : onClose())}>
     <DCard label={chosen.name} className="drep">
       {near.length < 2 ? null : (
         <div className="drep__row drep__spots" role="radiogroup" aria-label="Which spot">

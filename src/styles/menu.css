@@ -52,3 +52,88 @@
   border: 1px solid var(--glass-edge);
   background: var(--glass);
 }
+
+/*
+ * THE ☰ MENU, EIGHT ROWS (Batch SIMPLE-2, Section 3; board Home_Menu). The
+ * night sky's gradient; one glass card of rows, each a coloured dot, its
+ * name and one line; the line at the foot.
+ */
+.menu--list .menu__panel {
+  gap: 16px;
+}
+.mlist__title {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 800;
+}
+.menu--list .menu__x {
+  width: 56px;
+  height: 56px;
+}
+.mlist {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--glass-edge);
+  border-radius: 24px;
+  background: var(--glass);
+  overflow: hidden;
+}
+.menu .mlist__row {
+  gap: 14px;
+  min-height: 56px;
+  padding: 8px 16px;
+  border-radius: 0;
+  background: transparent;
+}
+.menu .mlist__row:last-child {
+  border-bottom: 0;
+}
+.mlist__dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--white);
+}
+.mlist__dot--sun {
+  background: var(--sun);
+}
+.mlist__dot--set {
+  background: var(--sun-rise);
+}
+.mlist__dot--sky {
+  background: var(--tide);
+}
+.mlist__dot--water {
+  background: var(--d-surf);
+}
+.mlist__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+.mlist__label {
+  font-size: var(--text-lg);
+  font-weight: 800;
+}
+.mlist__sub {
+  color: var(--grey-1);
+  font-size: var(--text-md);
+}
+.mlist__foot {
+  margin: auto 0 0;
+  color: var(--grey-1);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+/* A short Safari tab (390 × 664): the eight rows still fit. */
+@media (max-height: 700px) {
+  .menu .mlist__row {
+    min-height: 48px;
+    padding-block: 4px;
+  }
+  .mlist__title {
+    font-size: 1.5rem;
+  }
+}

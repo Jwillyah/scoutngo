@@ -82,7 +82,7 @@ async function context({ lastSetup = true, spots = null } = {}) {
         sessionStorage.setItem('audit.planner', '1')
         localStorage.setItem('scoutngo.landing.v1', 'true')
         localStorage.setItem('scoutngo.nearMe.v1', 'off')
-        localStorage.setItem('scoutngo.activities.v1', JSON.stringify(['shoot', 'drone', 'surf']))
+        localStorage.setItem('scoutngo.persona.v1', 'shoot')
         if (lastSetup) localStorage.setItem('scoutngo.lastSetup.v1', JSON.stringify({ at, name: { key: 'x', name: 'Virginia Beach Fishing Pier' }, shootKind: 'sunset', platform: 'both', reachMeters: 2000 }))
         else localStorage.removeItem('scoutngo.lastSetup.v1')
         if (spots !== null) localStorage.setItem('scoutngo.spots.v1', spots)
@@ -172,21 +172,52 @@ try {
     await page.keyboard.press('Escape')
     await onMap('home, Escape')
 
-    await front()
-    if (await menu()) {
-      await wait(500)
-      if (await tap(page.locator('.mcard', { hasText: 'Weather' }), 'Menu › Weather')) {
+    /* Batch SIMPLE-2, Sections 2 and 3: the pages are the home's tiles (the menu has no cards); Back is the home, and off the home is the map. */
+    for (const tile of ['weather', 'drone', 'sky', 'fish']) {
+      await front()
+      if (await tap(page.locator(`.home [data-tile="${tile}"]`), `the home's ${tile} tile`)) {
         await wait(1200)
-        if (await back()) await onMap('home › ☰ › Weather › Back')
+        if (await back()) {
+          await wait(600)
+          if (await ev(`!!document.querySelector('.home')`)) await page.keyboard.press('Escape')
+          await onMap(`home › ${tile} › Back, then off the home`)
+        }
       }
     }
-    await front()
-    if (await menu()) {
-      await wait(500)
-      if (await tap(page.locator('.mcard', { hasText: 'Drone' }), 'Menu › Drone')) {
-        await wait(1200)
-        if (await back()) await onMap('home › ☰ › Drone › Back')
+    for (const tile of ['surf', 'tide']) {
+      await front()
+      if (await tap(page.locator(`.home [data-tile="${tile}"]`), `the home's ${tile} tile`)) {
+        await wait(1500)
+        if (await back()) {
+          await wait(600)
+          if (await ev(`!!document.querySelector('.home')`)) await page.keyboard.press('Escape')
+          await onMap(`home › ${tile} › Back, then off the home`)
+        }
       }
+    }
+    /* The Wind tile is the map itself, on the wind layer: never the planner. */
+    await front()
+    if (await tap(page.locator('.home [data-tile="wind"]'), "the home's Wind tile")) {
+      await wait(1500)
+      await onMap("home › Wind tile (the map's wind layer)")
+      /* Batch SIMPLE-2, Section 5: Map | Charts at its top only switches the view: Charts, then Map, and never the planner. */
+      if (await tap(page.locator('[data-wind-tab="charts"]'), 'Wind › Charts')) {
+        await wait(1500)
+        const c = await state()
+        const charts = await ev(`!!document.querySelector('.wcharts')`)
+        console.log(`  Wind › Charts: ${charts ? 'the Charts page' : 'no Charts page'} ${JSON.stringify(c)}`)
+        if (!charts) fail('Wind › Charts opened no Charts page')
+        if (c.setup || c.shootCard || c.suggest) fail(`Wind › Charts: the planner is on screen (${c.card} at ${c.detent})`)
+        if (await tap(page.locator('.wcharts [role="tab"]', { hasText: 'Map' }), 'Wind › Charts › Map')) {
+          await wait(1200)
+          await onMap('Wind › Charts › Map')
+        }
+      }
+    }
+    /* Out of the wind view (its Back is the home), then the home's Map: the plain map, with its place pill, for the next way. */
+    if (await tap(page.locator('.topbar__back'), "the wind view's Back")) {
+      await wait(1200)
+      if (await tap(page.getByRole('button', { name: /^open the map$/i }), "the home's Map button")) await onMap("wind's Back, then the home's Map")
     }
 
     /* A search pick, from the map's place pill. */
@@ -215,7 +246,7 @@ try {
 
     /* The Viewfinder, closed, then off the home. */
     await front()
-    if (await tap(page.getByRole('button', { name: /viewfinder/i }), "the home's Viewfinder")) {
+    if ((await menu()) && (await tap(page.locator('nav[aria-label="Stage"] .mrow', { hasText: 'Viewfinder' }), 'Menu › Viewfinder'))) {
       await wait(1500)
       await tap(page.locator('button[aria-label="Close the viewfinder"], .vf button:has-text("Not now"), .vf button:has-text("Close")'), 'close the Viewfinder')
       await wait(800)
@@ -289,7 +320,7 @@ try {
   {
     const spots = JSON.stringify([{ id: 's1', name: 'Croatan', venue: { name: null, latitude: '36.8170', longitude: '-75.9730', date: '2026-11-19', startTime: '16:00', endTime: '17:30', eventDescription: '', desiredOutcome: '', laanc: false, laancCeilingFeet: '', subjectAcrossMeters: '' }, positions: [], marks: [] }])
     const a = await context({ lastSetup: false, spots })
-    const { page, tap, wait, ev, menu, back, onMap } = a
+    const { page, tap, wait, ev, back, onMap } = a
     await page.goto(`${APP_ORIGIN}/`)
     await wait(2500)
     if (await ev(`!!document.querySelector('.spick__search')`)) {
@@ -303,11 +334,12 @@ try {
         const toHome = page.locator('.topbar__back:visible')
         if ((await toHome.count()) > 0) await toHome.first().click()
         await wait(1200)
-        if (await menu()) {
-          await wait(500)
-          if (await tap(page.locator('.mcard', { hasText: 'Weather' }), 'Menu › Weather')) {
-            await wait(1200)
-            if (await back()) await onMap('first run › home › ☰ › Weather › Back')
+        if (await tap(page.locator('.home [data-tile="weather"]'), "the home's Weather tile")) {
+          await wait(1200)
+          if (await back()) {
+            await wait(600)
+            if (await ev(`!!document.querySelector('.home')`)) await page.keyboard.press('Escape')
+            await onMap('first run › home › Weather › Back, then off the home')
           }
         }
       }

@@ -1,6 +1,6 @@
 import '../styles/drone.css'
 import { AIR_FOOT } from '../core/safetyWords.ts'
-import { DRONE_PLAN_TAB, DRONE_WIND_ROWS } from '../config/flags.ts'
+import { DRONE_PAGE_OLD_LAYOUT, DRONE_PLAN_TAB, DRONE_WIND_ROWS } from '../config/flags.ts'
 import { useLabs3D } from '../lib/labs3d.ts'
 import { useEffect, useRef, useState } from 'react'
 import { getPosition, getTimes } from 'suncalc'
@@ -45,6 +45,8 @@ import { DronePlanView } from './DronePlan.tsx'
 import { DronePreflightView } from './DronePreflight.tsx'
 import { useWaterTemp } from '../lib/waterTemp.ts'
 import { PageShell } from './PageShell.tsx'
+import { TapInPage } from './TapInPage.tsx'
+import { preflightHeadline, preflightTapRows } from '../lib/dronePreflightRows.ts'
 
 /*
  * THE DRONE PAGE (Batch Flow, Section 5; Batch DRONE, Section 2: boards Drone_P1
@@ -362,10 +364,13 @@ export function DronePage({ venue: spot, placeName, timeZone, units, now, drone,
   const [airSeen, setAirSeen] = useState(startAt === 'airspace')
   const track = useRef<HTMLDivElement>(null)
   const index = (t: DroneTab) => DRONE_TABS.findIndex((x) => x.id === t)
-  const go = (t: DroneTab) => {
+  const pick = (t: DroneTab) => {
     setTab(t)
     if (t === 'airspace') setAirSeen(true)
     if (t === 'preflight') setPfSeen(true)
+  }
+  const go = (t: DroneTab) => {
+    pick(t)
     const el = track.current
     const still = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
     if (el !== null) el.scrollTo({ left: index(t) * el.clientWidth, behavior: still ? 'auto' : 'smooth' })
@@ -386,6 +391,75 @@ export function DronePage({ venue: spot, placeName, timeZone, units, now, drone,
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const ground = groundOf(alt(now), at('weather_code', now), false)
+  const howNode = (
+        <>
+          <p>The wind at 400 ft is the forecast's at 120 m; the ground's at 10 m; 100 to 300 ft between them, on a log of the height. Its direction is the 10 m wind's. Gusts are forecast at 10 m only: the gust's excess over the steady wind there is added to the wind at 400 ft.</p>
+          <p>Colour: teal under {Math.round(DRONE_LIGHT_RATIO * 100)}% of your drone's limit (the home's "Light wind"), amber up to it, orange at or past it. The calm window is the first run of daylight hours under that line, the same one the home's drone line says. Today's bars run from civil dawn to civil dusk (the sun 6° down).</p>
+          <p>Battery: your pack's rated minutes, less {Math.round((0.4 / 30) * 1000) / 10}% for every °C under 20 °C, at most 40%: a rule of thumb for cold lithium cells, not a measurement of your battery.</p>
+          <p>Sky: the nearest station's lowest cloud when its report is under 75 minutes old; otherwise the forecast's total cloud, and visibility. GPS: NOAA's planetary K index and the time NOAA gave it; 5 and over is a geomagnetic storm, which degrades GPS. When NOAA does not answer, the last value this phone received, with its time; no row when it never has.</p>
+          <p>Airspace: the class airspace, the FAA facility map grid, restricted and prohibited areas, national parks and national wildlife refuges are in the app. TFRs, national security UAS restrictions, FRIAs, heliports and warning, alert and military operations areas are fetched from the FAA whole, for the country, with no place in the request, and kept on this phone with their date. TFRs are counted within {TFR_RADIUS_MI} mi of the point, with the time tfr.faa.gov answered; when it does not answer, the app says it could not check, never zero. Other NOTAMs are not checked. Heliport dots show within 5 mi of the point, or zoomed in to 11. State, county and city park rules are not in any FAA data, so they are not shown. This is not an authorization, and the app never issues LAANC.</p>
+          <p>Preflight: one row per fact, green when it was read and sits under its line, amber when it is over, needs something of you, or was not read. Green never means go; the app does not say an area is clear.</p>
+          {DRONE_PLAN_TAB ? <p>Turn back by: out and straight back at the cruise on the card, in the wind at 400 ft, landing with the reserve on the card; climb, hover and descent are not counted. Sun at 400 ft: the horizon dips by √(2h/R) from up there, so the sun sets when it is that much lower. Sun in the lens: the bearings within 20° of the sun while it is under 25°. Lens fog: "Possible" when the air is within 5 °F of its dew point, or 15 °F or more colder than a warm car (taken as 70 °F: the car is not measured); "Low" otherwise. Last flight: a flight log CSV (an Airdata or PhantomHelp export; DJI’s own .txt logs are encrypted), read on this phone and never sent. Birds: no free forecast the app can check, so no row.</p> : null}
+        </>
+  )
+  const sub = `${pointName}${drone === null ? '' : ` · ${drone.name}`}`
+  const windPage = (
+    <section className="drp__page drp__page--wind" aria-label="Wind" data-drone-page="wind">
+      <DroneNowView data={nowData} rows={DRONE_WIND_ROWS ? rows : []} />
+      <DroneHeightView data={heightData} />
+    </section>
+  )
+  const airspacePage = (
+    <section className="drp__page drp__page--airspace drp__airbox" aria-label="Airspace" data-drone-page="airspace" data-no-swipe>
+      <DroneAirspace spot={spot} marker={venue} here={here} read={read} onMarker={(at, name) => setPoint({ at, name: name === null ? null : shortPlace(name) })} timeZone={timeZone} now={now} online={online} todayIso={isoDay(now, timeZone)} windWords={mps400 === null ? null : `Wind ${speed(mps400)}${dir === null ? '' : ` from ${dir}`} at 400 ft`} gustWords={gust400 === null ? null : `Gusts ${speed(gust400)} at 400 ft`} sunsetWords={nextSunset === null ? null : clock(nextSunset)} onSaveSpot={onSaveSpot} />
+    </section>
+  )
+
+  if (!DRONE_PAGE_OLD_LAYOUT) {
+    /*
+     * Batch SIMPLE-2, Section 4 (board Drone_Preflight): the tap-in skeleton.
+     * Tabs Preflight · Wind · Airspace, opening on Preflight. Wind and
+     * Airspace keep their SIMPLE-1 content, so they have no hero of their own
+     * here; the Airspace sheet carries its own disclaimer, so no footer line.
+     */
+    const isPf = tab === 'preflight'
+    const head = preflightHeadline(preflight)
+    return (
+      <TapInPage
+        title="Drone"
+        spot={sub}
+        ground={ground}
+        kind="drpage"
+        onBack={onBack}
+        how={howNode}
+        safety={tab === 'airspace' ? null : AIR_FOOT}
+        tabs={DRONE_TABS}
+        initialTab={startAt}
+        tab={tab}
+        onTab={(t) => pick(t as DroneTab)}
+        maxRows={8}
+        {...(isPf ? { hero: head, rows: preflightTapRows(preflight, (t) => pick(t)) } : {})}
+        actions={isPf ? [{ label: 'Get LAANC', onClick: () => undefined, href: LAANC_URL, primary: true }, { label: 'Plan a shoot', onClick: onPlanShoot }] : []}
+        after={
+          isPf && labs3D ? (
+            /* Batch SIMPLE-1, Section 1 (docs/batches/simple-decisions.md): Fly's door, only while Settings › Labs is on. */
+            <div className="drp__labsrow">
+              <button type="button" className="btn btn--small drp__fly" onClick={onFly} aria-describedby="drp-labs">
+                Plan the flight
+              </button>
+              <span className="drp__labs" id="drp-labs">in 3D · Labs, off in Settings</span>
+            </div>
+          ) : null
+        }
+      >
+        {tab === 'wind' ? windPage : tab === 'airspace' ? airspacePage : DRONE_PLAN_TAB && tab === 'plan' ? (
+          <section className="drp__page drp__page--plan" aria-label="Plan" data-drone-page="plan">
+            <DronePlanView data={planData} />
+          </section>
+        ) : null}
+      </TapInPage>
+    )
+  }
 
   return (
     <PageShell
@@ -397,17 +471,7 @@ export function DronePage({ venue: spot, placeName, timeZone, units, now, drone,
       ground={ground}
       onBack={onBack}
       onMap={onMap}
-      how={
-        <>
-          <p>The wind at 400 ft is the forecast's at 120 m; the ground's at 10 m; 100 to 300 ft between them, on a log of the height. Its direction is the 10 m wind's. Gusts are forecast at 10 m only: the gust's excess over the steady wind there is added to the wind at 400 ft.</p>
-          <p>Colour: teal under {Math.round(DRONE_LIGHT_RATIO * 100)}% of your drone's limit (the home's "Light wind"), amber up to it, orange at or past it. The calm window is the first run of daylight hours under that line, the same one the home's drone line says. Today's bars run from civil dawn to civil dusk (the sun 6° down).</p>
-          <p>Battery: your pack's rated minutes, less {Math.round((0.4 / 30) * 1000) / 10}% for every °C under 20 °C, at most 40%: a rule of thumb for cold lithium cells, not a measurement of your battery.</p>
-          <p>Sky: the nearest station's lowest cloud when its report is under 75 minutes old; otherwise the forecast's total cloud, and visibility. GPS: NOAA's planetary K index and the time NOAA gave it; 5 and over is a geomagnetic storm, which degrades GPS. When NOAA does not answer, the last value this phone received, with its time; no row when it never has.</p>
-          <p>Airspace: the class airspace, the FAA facility map grid, restricted and prohibited areas, national parks and national wildlife refuges are in the app. TFRs, national security UAS restrictions, FRIAs, heliports and warning, alert and military operations areas are fetched from the FAA whole, for the country, with no place in the request, and kept on this phone with their date. TFRs are counted within {TFR_RADIUS_MI} mi of the point, with the time tfr.faa.gov answered; when it does not answer, the app says it could not check, never zero. Other NOTAMs are not checked. Heliport dots show within 5 mi of the point, or zoomed in to 11. State, county and city park rules are not in any FAA data, so they are not shown. This is not an authorization, and the app never issues LAANC.</p>
-          <p>Preflight: one row per fact, green when it was read and sits under its line, amber when it is over, needs something of you, or was not read. Green never means go; the app does not say an area is clear.</p>
-          {DRONE_PLAN_TAB ? <p>Turn back by: out and straight back at the cruise on the card, in the wind at 400 ft, landing with the reserve on the card; climb, hover and descent are not counted. Sun at 400 ft: the horizon dips by √(2h/R) from up there, so the sun sets when it is that much lower. Sun in the lens: the bearings within 20° of the sun while it is under 25°. Lens fog: "Possible" when the air is within 5 °F of its dew point, or 15 °F or more colder than a warm car (taken as 70 °F: the car is not measured); "Low" otherwise. Last flight: a flight log CSV (an Airdata or PhantomHelp export; DJI’s own .txt logs are encrypted), read on this phone and never sent. Birds: no free forecast the app can check, so no row.</p> : null}
-        </>
-      }
+      how={howNode}
     >
       <div className="ui-seg drp__seg" role="tablist" aria-label={DRONE_PLAN_TAB ? 'Wind, airspace, preflight or plan' : 'Wind, airspace or preflight'}>
         {DRONE_TABS.map((t) => (

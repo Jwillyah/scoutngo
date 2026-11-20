@@ -16,6 +16,8 @@ import { formatTemperature, windIn, windUnitLabel, type Units } from '../lib/uni
 import { gustWords, windAt, windWords } from '../lib/windNow.ts'
 import { MenuArt, type ArtInput } from './MenuArt.tsx'
 import '../styles/menu-a.css'
+import { MENU_CARDS } from '../config/flags.ts'
+import { MENU_LIST, type MenuRowId } from '../lib/menu.ts'
 
 /*
  * THE MENU (Batch H, Section 3; it replaced the side menu entirely).
@@ -42,7 +44,7 @@ import '../styles/menu-a.css'
 export const LOOK_AFTER_MS = 800
 
 /* What the menu sends (Batch QA, Section 7: 'water', 'viewfinder' and 'plan' were never sent and went). */
-export type MenuTarget = 'today' | 'sky' | 'drone' | 'kit' | 'saved' | 'settings' | 'weather' | 'surf' | 'wind' | 'tides' | 'setup' | 'calendar'
+export type MenuTarget = 'today' | 'sky' | 'drone' | 'kit' | 'saved' | 'settings' | 'weather' | 'surf' | 'wind' | 'tides' | 'setup' | 'calendar' | MenuRowId
 
 export interface MenuRows {
   plan: string
@@ -89,7 +91,48 @@ export function Menu(props: MenuProps) {
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
   if (!open) return null
-  return <MenuSheet {...props} first={first} />
+  /* Batch SIMPLE-2, Section 3: the eight rows (board Home_Menu); the live cards are a flag, off, and ask nothing while off. */
+  return MENU_CARDS ? <MenuSheet {...props} first={first} /> : <MenuList {...props} first={first} />
+}
+
+/*
+ * THE ☰ MENU (Batch SIMPLE-2, Section 3; board Home_Menu): "Menu" and ×,
+ * then eight rows, each a dot, its name, one line and ›, and a line at the
+ * foot. Everything the home and the map do not answer; nothing here repeats
+ * a home tile (src/lib/menu.ts MENU_LIST). It asks no forecast.
+ */
+function MenuList({ rows, onPick, onClose, first }: MenuProps & { first: React.RefObject<HTMLButtonElement | null> }) {
+  const pick = (t: MenuTarget) => {
+    onPick(t)
+    onClose()
+  }
+  return (
+    <div className="menu menu--d menu--list" role="presentation">
+      <nav className="menu__panel sidemenu__panel home--night" aria-label="Stage">
+        <div className="menu__head">
+          <h2 className="mlist__title">Menu</h2>
+          <button type="button" className="menu__x sidemenu__scrim" aria-label="Close the menu" onClick={onClose}>
+            ×
+          </button>
+        </div>
+        <div className="mlist menu__rows">
+          {MENU_LIST.map((r, i) => (
+            <button key={r.id} ref={i === 0 ? first : undefined} type="button" className="mrow mlist__row sidemenu__item" data-menu={r.id} onClick={() => pick(r.id)}>
+              <span className={`mlist__dot mlist__dot--${r.tone}`} aria-hidden="true" />
+              <span className="mlist__text">
+                <span className="mrow__label mlist__label sidemenu__label">{r.label}</span>
+                <span className="mlist__sub">{r.id === 'saved' && rows.saved !== '' && !rows.saved.startsWith('0 ') ? `${r.sub} · ${rows.saved}` : r.sub}</span>
+              </span>
+              <span className="mrow__chev" aria-hidden="true">
+                ›
+              </span>
+            </button>
+          ))}
+        </div>
+        <p className="mlist__foot">Home answers · Map looks around · everything else lives here</p>
+      </nav>
+    </div>
+  )
 }
 
 function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools = true, droneTools = true, order = [], now, onPick, onClose, first }: MenuProps & { first: React.RefObject<HTMLButtonElement | null> }) {

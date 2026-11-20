@@ -328,12 +328,43 @@ try {
     }
     await ev(`window.__probe?.map?.jumpTo({ zoom: 16.5 })`)
     await wait(800)
-    /* Wind mode hides the rail and the layer chip; the bar's layer menu turns it off and gives them back (Batch DRONE, Section 3). */
-    await page.locator('[data-wind-timebar] [data-layer-chip]').first().click({ timeout: 4000 }).catch(() => undefined)
+    /*
+     * Batch SIMPLE-2, Section 5 (board Wind_Map): the bar's chips are Wind ·
+     * Radar · Clouds, Wind on, and ⋯ holds the height, the model, the tide and
+     * Layers off.
+     */
+    const chips = JSON.parse(await ev(`JSON.stringify([...document.querySelectorAll('[data-wind-timebar] .ltl__seg [data-layer-pick]')].map((b) => ({ p: b.dataset.layerPick, t: b.textContent.trim(), on: b.getAttribute('aria-checked') === 'true', w: Math.round(b.getBoundingClientRect().width), h: Math.round(b.getBoundingClientRect().height) })))`))
+    console.log(`  the bar's chips: ${chips.map((c) => `${c.t}${c.on ? ' (on)' : ''} ${c.w}x${c.h}`).join(' · ')}`)
+    if (chips.map((c) => c.t).join(' · ') !== 'Wind · Radar · Clouds') fail(`${label}: the bar's chips read ${JSON.stringify(chips.map((c) => c.t))}, not Wind · Radar · Clouds`)
+    else if (!chips[0].on || chips.slice(1).some((c) => c.on)) fail(`${label}: with the wind on, the chips on are ${JSON.stringify(chips.filter((c) => c.on).map((c) => c.t))}`)
+    if (chips.some((c) => c.w < 44 || c.h < 44)) fail(`${label}: a chip is under a finger's 44 px: ${JSON.stringify(chips)}`)
+    /* The row is one line: play, the time over now, the chips and ⋯ inside the screen, none over another. */
+    const row = JSON.parse(await ev(`JSON.stringify([...(document.querySelector('[data-wind-timebar] .ltl__row')?.querySelectorAll('.ltl__play, .ltl__when, .ltl__chip, .ltl__more') ?? [])].map((e) => { const q = e.getBoundingClientRect(); return { c: String(e.className.baseVal ?? e.className).split(' ')[0], l: q.left, t: q.top, r: q.right, b: q.bottom } }))`))
+    const hit = row.flatMap((a, i) => row.slice(i + 1).filter((b) => a.l < b.r - 0.5 && b.l < a.r - 0.5 && a.t < b.b - 0.5 && b.t < a.b - 0.5).map((b) => `${a.c} over ${b.c}`))
+    if (row.length < 6) fail(`${label}: the bar's row has ${row.length} of play, the time and now, three chips and ⋯`)
+    if (hit.length > 0) fail(`${label}: in the bar's row ${hit.join(', ')}`)
+    if (row.some((e) => e.l < 0 || e.r > viewport.width)) fail(`${label}: the bar's row runs off the screen: ${JSON.stringify(row.map((e) => [e.c, Math.round(e.l), Math.round(e.r)]))}`)
+    if (new Set(row.map((e) => Math.round((e.t + e.b) / 2 / 4))).size > 2) fail(`${label}: the bar's row is not one line: ${JSON.stringify(row.map((e) => [e.c, Math.round(e.t)]))}`)
+    /* Wind mode hides the rail and the layer chip; ⋯ › Layers off turns it off and gives them back (Batch DRONE, Section 3). */
+    await page.locator('[data-wind-timebar] [data-layer-more]').first().click({ timeout: 4000 }).catch(() => fail(`${label}: no ⋯ on the wind bar`))
     await wait(300)
     await page.locator('[data-wind-off]').first().click({ timeout: 4000 }).catch(() => fail(`${label}: no way to turn the wind off from its bar`))
     await wait(800)
     watchdog.note(`${label} wind`)
+
+    /*
+     * Batch SIMPLE-2, Section 5.4 (Trey and Jwilly): no dashed sun or moon
+     * line over the radar or the clouds. Read from the map's own sources: the
+     * axis through the pin and the rays. First the precondition, with every
+     * layer off: the lines are there to lose (failure-modes.md, B).
+     */
+    const LINES = `JSON.stringify((() => { const m = window.__probe?.map; if (!m || !m.getSource) return null; const n = (id) => { const src = m.getSource(id); const d = src?.serialize?.().data; return d && Array.isArray(d.features) ? d.features.length : -1 }; return { axis: n('sun-axis'), rays: n('sun-rays'), pills: document.querySelectorAll('.raypills > *').length } })())`
+    const linesNow = async () => JSON.parse(await ev(LINES))
+    /* By day the sun's dashed axis runs through the pin whatever the Sun switch says (the line that stayed over the radar). */
+    const off = await linesNow()
+    console.log(`  sun and moon lines, layers off: ${JSON.stringify(off)}`)
+    if (off === null) fail(`${label}: could not read the map's sun and moon sources (no probe)`)
+    else if (off.axis + off.rays <= 0) fail(`${label}: could not look: no sun or moon line on the map with every layer off, so their going under radar proves nothing (${JSON.stringify(off)})`)
 
     /* RADAR: the legend in the time sheet's place, on screen, and staying. */
     await openFeatures()
@@ -359,6 +390,15 @@ try {
     }
     await checkRadar('on')
     looked.radar += 1
+    {
+      const l = await linesNow()
+      console.log(`  sun and moon lines, radar on: ${JSON.stringify(l)}`)
+      if (l === null || l.axis !== 0 || l.rays !== 0 || l.pills !== 0) fail(`${label}: with radar on the sun and moon lines are on the map: ${JSON.stringify(l)}`)
+      /* The bar's chips over the radar legend, Radar on (one bar, ux-rules 15). */
+      const rc = JSON.parse(await ev(`JSON.stringify([...document.querySelectorAll('.sheet__peek [data-layer-chips="radar"] .ltl__seg [data-layer-pick]')].map((b) => (b.getAttribute('aria-checked') === 'true' ? '*' : '') + b.textContent.trim()))`))
+      console.log(`  radar's chips: ${rc.join(' · ')}`)
+      if (rc.join(' · ') !== 'Wind · *Radar · Clouds') fail(`${label}: over the radar legend the chips read ${JSON.stringify(rc)}, not Wind · Radar (on) · Clouds`)
+    }
     await shot('radar')
     await wait(5000)
     await checkRadar('after 5 s')
@@ -368,6 +408,26 @@ try {
     await checkRadar('with the sheet raised')
     await shot('radar-raised')
     watchdog.note(`${label} radar`)
+    /* Clouds from the bar's own chip: no sun or moon line either; then Layers off brings them back. */
+    await page.locator('.sheet__handle').click()
+    await wait(600)
+    await page.locator('.sheet__peek [data-layer-chips] [data-layer-pick="clouds"]').first().click({ timeout: 4000 }).catch(() => fail(`${label}: no Clouds chip on the radar's bar`))
+    await wait(1500)
+    {
+      const l = await linesNow()
+      const on = await ev(`document.querySelector('.mode-plan')?.getAttribute('data-weather-layer')`)
+      console.log(`  sun and moon lines, clouds on (${on}): ${JSON.stringify(l)}`)
+      if (on !== 'clouds') fail(`${label}: the Clouds chip left the layer at ${on}`)
+      if (l === null || l.axis !== 0 || l.rays !== 0 || l.pills !== 0) fail(`${label}: with the clouds on the sun and moon lines are on the map: ${JSON.stringify(l)}`)
+      await shot('clouds')
+      await page.locator('.sheet__peek [data-layer-more]').first().click({ timeout: 4000 }).catch(() => undefined)
+      await wait(300)
+      await page.locator('[data-wind-off]').first().click({ timeout: 4000 }).catch(() => fail(`${label}: no Layers off under the clouds bar's ⋯`))
+      await wait(1200)
+      const back = await linesNow()
+      console.log(`  sun and moon lines, layers off again: ${JSON.stringify(back)}`)
+      if (back === null || back.axis + back.rays <= 0) fail(`${label}: the sun and moon lines did not come back with the layers off: ${JSON.stringify(back)}`)
+    }
     await ctx.close()
   }
 } finally {
