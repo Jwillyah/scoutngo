@@ -1,16 +1,16 @@
 {
   "schema": "scoutngo.model-skill/1",
   "region": "midatl",
-  "date": "2026-11-19",
-  "generated": "2026-11-19T16:42:47.783Z",
-  "file": "2026-11-19.json.gz",
-  "bytes": 523080,
-  "rawBytes": 2668401,
-  "sha256": "f59a8ab3fbb9e42dee63cf8c09c1e7ec3333524676e0e05d369cb32a2a587b73",
+  "date": "2026-11-20",
+  "generated": "2026-11-20T16:18:29.577Z",
+  "file": "2026-11-20.json.gz",
+  "bytes": 523652,
+  "rawBytes": 2668212,
+  "sha256": "d880d24c69ac77720f1c1b7842dfcb55edbc2d26761596a904984b36f2dd20e3",
   "stations": 48,
-  "rows": 119616,
+  "rows": 119667,
   "history": [
-    "2026-11-19.json.gz",
-    "2026-11-18.json.gz"
+    "2026-11-20.json.gz",
+    "2026-11-19.json.gz"
   ]
 }
