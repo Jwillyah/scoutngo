@@ -66,9 +66,9 @@ describe('the tab the Sky page opens on', () => {
 describe('the event tabs say the day the event is on', () => {
   const sunset = at('2026-11-19T21:52:00Z')
   const sunrise = at('2026-11-20T11:48:00Z')
-  it('Tonight and Tmrw AM in the afternoon', () => {
+  it('Tonight and Sunrise in the afternoon', () => {
     expect(eventTabLabel('sunset', sunset, at('2026-11-19T19:00:00Z'), TZ)).toBe('Tonight')
-    expect(eventTabLabel('sunrise', sunrise, at('2026-11-19T19:00:00Z'), TZ)).toBe('Tmrw AM')
+    expect(eventTabLabel('sunrise', sunrise, at('2026-11-19T19:00:00Z'), TZ)).toBe('Sunrise')
   })
   it('This AM before sunrise, Tmrw PM for the next sunset after dark', () => {
     expect(eventTabLabel('sunrise', sunrise, at('2026-11-20T10:00:00Z'), TZ)).toBe('This AM')
@@ -76,6 +76,6 @@ describe('the event tabs say the day the event is on', () => {
   })
   it('no event: the board’s words', () => {
     expect(eventTabLabel('sunset', null, sunset, TZ)).toBe('Tonight')
-    expect(eventTabLabel('sunrise', null, sunset, TZ)).toBe('Tmrw AM')
+    expect(eventTabLabel('sunrise', null, sunset, TZ)).toBe('Sunrise')
   })
 })

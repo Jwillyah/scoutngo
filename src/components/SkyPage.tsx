@@ -41,7 +41,7 @@ import { TapInPage, type TapInRow } from './TapInPage.tsx'
  *             speed, the models' clearing time only when they clear it) ·
  *             Rare light (now, and the week's list one tap in) · Next
  *   Tonight   the one sky call (src/core/skyCall.ts, with the station's doubt,
- *   Tmrw AM   src/core/skyNow.ts) and a drawing of the sky from the computed
+ *   Sunrise   src/core/skyNow.ts) and a drawing of the sky from the computed
  *             state (src/core/skyPicture.ts: the deck's height, the gap, the
  *             sun), then Golden · Color · Blue hour · Moon, and "Best spot
  *             near me ›" · "Viewfinder ›"
@@ -324,7 +324,7 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onViewfinder,
     }
   }
 
-  /* --------------------------------------------------- Tonight, Tmrw AM */
+  /* --------------------------------------------------- Tonight, Sunrise */
   function eventView(kind: Kind) {
     const c = calls[kind]
     const { event, read, doubt, verdict, sun, lead } = c

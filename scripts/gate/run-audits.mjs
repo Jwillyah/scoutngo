@@ -55,7 +55,7 @@ export const AUDITS = [
   { name: 'pages', script: 'audit-pages.mjs', summary: /PAGES PROBLEMS/ },
   /* Batch SIMPLE-2, Section 1: the tap-in page skeleton, on the Tide page, at every size and standalone. */
   { name: 'tap in', script: 'audit-tapin.mjs', summary: /TAP IN PROBLEMS/ },
-  /* Batch SIMPLE-2, Section 4: the Sky page on the skeleton, Now · Tonight · Tmrw AM · Night and the Viewfinder, at every size and standalone. */
+  /* Batch SIMPLE-2, Section 4: the Sky page on the skeleton, Now · Tonight · Sunrise · Night and the Viewfinder, at every size and standalone. */
   { name: 'sky page', script: 'audit-sky.mjs', summary: /SKY PAGE PROBLEMS/ },
   { name: 'best sky', script: 'audit-bestsky.mjs', summary: /BEST SKY PROBLEMS/ },
   /* Batch Polish, Section 3: the home never scrolls, in five looks and three numbers of activities. */

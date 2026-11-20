@@ -147,3 +147,11 @@ with no Advanced tab; Fish's own window; no cam embeds until an owner says
 yes; the "Tmrw AM" label against the words rule; menu duplicates; skyEvents
 still on its 6-hour grid; refuges not yet in aerialHero or suggest; checks on
 a real iPhone; can I fly (4 taps) and plan a shoot (5) over the 3-tap aim.
+
+## Sky morning pill reads Sunrise (20 Nov, after the run)
+
+Decided by the user: the Sky page's "Tmrw AM" pill becomes "Sunrise".
+Only the strings that read "Tmrw AM" changed (tomorrow's sunrise, and no
+sunrise event). "This AM" before dawn, the weekday form for a later
+sunrise, and the evening's "Tmrw PM" are unchanged; the words test now
+allows only "Tmrw PM". The internal tab id stays tmrw-am.

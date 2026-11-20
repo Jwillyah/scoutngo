@@ -185,7 +185,7 @@ try {
       looked += 1
       console.log(`  Sky: ${k.content}/${k.box} px, ${k.out.length === 0 && !k.scrolls ? 'fits' : `scrolls or runs off ${JSON.stringify(k.out)}`}`)
       /*
-       * Batch SIMPLE-2, Section 4: the Sky page is the tap-in skeleton, Now · Tonight · Tmrw AM · Night; at 10:30 AM it
+       * Batch SIMPLE-2, Section 4: the Sky page is the tap-in skeleton, Now · Tonight · Sunrise · Night; at 10:30 AM it
        * opens on Now (src/core/skyTabs.ts): the sky in a word, the cams, then Clouds · Moving · Rare light · Next. Every
        * tab, every size and the Viewfinder are scripts/audit-sky.mjs's; here, the page the home's Sky card opens.
        */
@@ -193,7 +193,7 @@ try {
       const READ = `JSON.stringify({ seg: ${TABS}.map((b) => ({ t: b.textContent, on: b.getAttribute('aria-selected') === 'true' })), value: document.querySelector('.tipage.spage .tipage__value')?.textContent ?? null, sub: document.querySelector('.tipage.spage .tipage__sub')?.textContent ?? null, rows: [...document.querySelectorAll('.tipage.spage .tipage__row')].map((r) => (r.querySelector('.tipage__label') ?? r.querySelector('.tipage__morelabel'))?.textContent + ' ' + (r.querySelector('.tipage__val')?.textContent ?? '').trim()), picture: !!document.querySelector('.tipage.spage svg[data-sky-picture], .tipage.spage .skypic__none'), why: document.querySelector('.tipage.spage .spage__why')?.textContent ?? null, buttons: [...document.querySelectorAll('.tipage.spage .tipage__btn')].map((b) => b.textContent) })`
       const nowTab = JSON.parse(await ev(READ))
       console.log(`  Now: ${JSON.stringify(nowTab)}`)
-      if (nowTab.seg.map((x) => x.t).join('|') !== 'Now|Tonight|Tmrw AM|Night') fail(`${label}: the Sky page's tabs read ${JSON.stringify(nowTab.seg)}`)
+      if (nowTab.seg.map((x) => x.t).join('|') !== 'Now|Tonight|Sunrise|Night') fail(`${label}: the Sky page's tabs read ${JSON.stringify(nowTab.seg)}`)
       if (nowTab.seg[0]?.on !== true) fail(`${label}: the Sky page did not open on Now at 10:30 AM (${JSON.stringify(nowTab.seg)})`)
       if (!/^(Textured clouds now|Light rays now|Iridescence now|A halo now|Color now|Nothing special now)/.test(nowTab.sub ?? '')) fail(`${label}: Now's line reads ${JSON.stringify(nowTab.sub)}`)
       if (!/^Clouds /.test(nowTab.rows[0] ?? '') || /^Clouds\s*$/.test(nowTab.rows[0] ?? '')) fail(`${label}: Now does not say the clouds (${JSON.stringify(nowTab.rows[0])})`)

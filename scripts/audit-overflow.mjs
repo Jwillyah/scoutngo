@@ -436,7 +436,7 @@ try {
   await goHome(ev, wait)
   await homeTile(ev, wait, 'sky')
   await wait(1500)
-  /* By position: the two event pills say the event's day ("Tonight" / "Tmrw PM", "This AM" / "Tmrw AM", src/core/skyTabs.ts eventTabLabel). */
+  /* By position: the two event pills say the event's day ("Tonight" / "Tmrw PM", "This AM" / "Sunrise", src/core/skyTabs.ts eventTabLabel). */
   for (const [i, pill] of ['Now', 'the evening', 'the morning', 'Night'].entries()) {
     const on = await ev(`(() => { const b = [...document.querySelectorAll('.tipage.spage .tipage__tabs [role="tab"]')][${i}]; b?.click(); return !!b })()`)
     if (!on) {

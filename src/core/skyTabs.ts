@@ -1,6 +1,6 @@
 /*
  * WHICH SKY TAB THE PAGE OPENS ON (Batch SIMPLE-2, Section 4: "Now · Tonight ·
- * Tmrw AM · Night; opens on Tonight before sunset/sunrise, Now otherwise,
+ * Tmrw AM · Night" — the morning's pill now reads Sunrise; opens on Tonight before sunset/sunrise, Now otherwise,
  * Night after dark"). Arithmetic on the venue's own day; the page only reads
  * the answer.
  *
@@ -62,16 +62,16 @@ export function skyOpenTab(now: Date, day: SkyDayTimes): SkyTabId {
 
 /**
  * The pill's word for an event's tab: "Tonight" / "This AM" when the event is
- * on today's date, "Tmrw PM" / "Tmrw AM" when tomorrow's, else the weekday
+ * on today's date, "Tmrw PM" / "Sunrise" when tomorrow's, else the weekday
  * ("Fri PM"). Never a word for a day the event is not on.
  */
 export function eventTabLabel(kind: 'sunset' | 'sunrise', event: Date | null, now: Date, timeZone: string): string {
-  if (event === null) return kind === 'sunset' ? 'Tonight' : 'Tmrw AM'
+  if (event === null) return kind === 'sunset' ? 'Tonight' : 'Sunrise'
   const d = localDate(event, timeZone)
   const today = localDate(now, timeZone)
   const tomorrow = localDate(new Date(now.getTime() + 24 * 60 * MIN), timeZone)
   const half = kind === 'sunset' ? 'PM' : 'AM'
   if (d === today) return kind === 'sunset' ? 'Tonight' : 'This AM'
-  if (d === tomorrow) return `Tmrw ${half}`
+  if (d === tomorrow) return kind === 'sunset' ? 'Tmrw PM' : 'Sunrise'
   return `${new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'short' }).format(event)} ${half}`
 }

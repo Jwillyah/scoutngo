@@ -1,6 +1,6 @@
 /*
  * THE SKY PICTURE (Batch SIMPLE-2, Section 4; mockup Sky_Tonight): the
- * Tonight and Tmrw AM tabs' drawing, from the computed state only. No photo,
+ * Tonight and Sunrise tabs' drawing, from the computed state only. No photo,
  * no generated image: a horizon, the compass points along it, the sun where
  * it sets or rises, the deck at its height, and the gap under it toward the
  * sun when the call found one. This file is the arithmetic (state to

@@ -422,7 +422,7 @@
   overflow-wrap: anywhere;
 }
 
-/* Tonight, Tmrw AM: the drawn sky (src/core/skyPicture.ts). */
+/* Tonight, Sunrise: the drawn sky (src/core/skyPicture.ts). */
 .skypic {
   display: block;
   width: 100%;

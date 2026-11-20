@@ -11,7 +11,7 @@
  * before; the models are the gate's fake Open-Meteo.
  *
  *   opens     on Now at 10:30 AM (src/core/skyTabs.ts skyOpenTab)
- *   tabs      Now · Tonight · Tmrw AM · Night, in that order, each a tap
+ *   tabs      Now · Tonight · Sunrise · Night, in that order, each a tap
  *   Now       the cams: a big card and links, every one a link out to its
  *             owner (target _blank, noopener), no <img>, <video> or <iframe>
  *             of a cam anywhere (nothing fetched or kept by us); rows Clouds
@@ -20,7 +20,7 @@
  *   Tonight   the call (Color likely / possible / unlikely, or No call yet),
  *             the drawn sky (an SVG, never an image), rows Golden · Color ·
  *             Blue hour · Moon, "Best spot near me ›" and "Viewfinder ›"
- *   Tmrw AM   the same, the rows in the morning's order
+ *   Sunrise   the same, the rows in the morning's order
  *   Night     "N% lit", the moon drawn, 14 nights with FULL on the 24th,
  *             rows Next full · Next new · Darkest nights · Milky Way · Next
  *             shower
@@ -70,7 +70,7 @@ const LOOKS = [
 const TABS = [
   { id: 'now', pill: /^Now$/, rows: ['Clouds', 'Moving', 'Rare light', 'Next', 'More details'] },
   { id: 'tonight', pill: /^Tonight$/, rows: ['Golden', 'Color', 'Blue hour', 'Moon', 'More details'] },
-  { id: 'tmrw-am', pill: /^Tmrw AM$/, rows: ['Blue hour', 'Color', 'Golden', 'Moon', 'More details'] },
+  { id: 'tmrw-am', pill: /^Sunrise$/, rows: ['Blue hour', 'Color', 'Golden', 'Moon', 'More details'] },
   { id: 'night', pill: /^Night$/, rows: ['Next full', 'Next new', 'Darkest nights', 'Milky Way', 'Next shower'] },
 ]
 
@@ -219,7 +219,7 @@ try {
     /* The rule: 10:30 AM, between sunrise + 30 min and sunset - 90 min, is Now. */
     const day = getTimes(new Date('2026-11-19T17:00:00Z'), SPOT.lat, SPOT.lon)
     console.log(`  sunrise ${day.sunrise.toISOString()} sunset ${day.sunset.toISOString()}; opened on ${JSON.stringify(l.tabs.find((t) => t.on)?.t)}`)
-    if (l.tabs.map((t) => t.t).join('|') !== 'Now|Tonight|Tmrw AM|Night') fail(`${look.key}: the tabs read ${JSON.stringify(l.tabs.map((t) => t.t))}`)
+    if (l.tabs.map((t) => t.t).join('|') !== 'Now|Tonight|Sunrise|Night') fail(`${look.key}: the tabs read ${JSON.stringify(l.tabs.map((t) => t.t))}`)
     if (l.tabs[0]?.on !== true) fail(`${look.key}: at 10:30 AM the Sky page opened on ${JSON.stringify(l.tabs.find((t) => t.on)?.t)}, not Now`)
 
     for (const tab of TABS) {

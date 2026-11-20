@@ -20,12 +20,12 @@ const BANNED: [RegExp, string][] = [
 ]
 /*
  * THE ONE EXCEPTION, by name (Batch SIMPLE-2, Section 4; mockups Sky_Now, Sky_Tonight, Sky_Night): the Sky page's
- * pill is "Tmrw AM" (and "Tmrw PM" after dark), the batch's own word; four pills share 358 px and "Tomorrow AM"
- * does not fit one. Only these strings, only in this file; "Tmrw" anywhere else still fails.
+ * pill is "Tmrw PM" after dark, the batch's own word; four pills share 358 px and "Tomorrow PM" does not fit
+ * one. The morning's pill reads "Sunrise" (20 Nov). Only this string, only in this file; "Tmrw" anywhere else
+ * still fails.
  */
 const ALLOWED: [string, string][] = [
-  ['src/core/skyTabs.ts', "'Tmrw AM'"],
-  ['src/core/skyTabs.ts', '`Tmrw ${half}`'],
+  ['src/core/skyTabs.ts', "'Tmrw PM'"],
 ]
 const allowed = (f: string, s: string) => ALLOWED.some(([file, str]) => f === file && s === str)
 const files = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? files(join(dir, e.name)) : /\.(ts|tsx)$/.test(e.name) && !/\.test\./.test(e.name) ? [join(dir, e.name)] : []))
