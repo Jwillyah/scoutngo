@@ -99,6 +99,12 @@ samp {
   background: var(--glass-strong);
   cursor: pointer;
 }
+/* Batch SIMPLE-2, Section 0: 44 px of touch around a 32 px switch (the map's raised sheet shows Features, switches and all). */
+.ui-toggle::after {
+  content: '';
+  position: absolute;
+  inset: -6px -4px;
+}
 .ui-toggle__knob {
   position: absolute;
   top: 3px;

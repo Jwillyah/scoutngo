@@ -474,10 +474,25 @@ export async function goToStage(ev, wait, stage) {
     const now = await ev(`document.querySelector('.shell')?.className.match(/shell--([a-z]+)/)?.[1] ?? null`)
     if (now === 'setup') return now
     if (now !== 'plan') await goToStage(ev, wait, 'plan')
-    /* Batch Polish, Section 2: the map's + moved into the Map sheet's tools; setup by its address, as /plan and /field are. */
-    await ev(`(() => { history.pushState(null, '', '/setup' + location.search + location.hash); dispatchEvent(new PopStateEvent('popstate')); return 1 })()`)
-    await wait(600)
-    return arrivedAt(ev, want, 'went to /setup')
+    /*
+     * Batch SIMPLE-2, Section 0: the planner opens on a tap only, and /setup
+     * lands on the map (src/lib/planner.ts). The way a person goes: ☰ › Plan a
+     * shoot (on the map, its Back to the home first, then the home's Menu).
+     */
+    const opened = await openMenu(ev, wait)
+    if (opened !== 'menu') throw new PreflightError(`could not open the menu for Plan a shoot: ${opened}`)
+    const tapped = await ev(`(() => {
+      const row = [...document.querySelectorAll('.mrow')].find((b) => (b.textContent ?? '').includes('Plan a shoot'))
+      if (!row) return 'no Plan a shoot row in the menu (it shows when Shoot is picked, or nothing yet: src/components/Menu.tsx)'
+      row.click()
+      return 'ok'
+    })()`)
+    if (tapped !== 'ok') throw new PreflightError(tapped)
+    for (let i = 0; i < 25; i += 1) {
+      await wait(200)
+      if ((await ev(`document.querySelector('.shell')?.className.match(/shell--([a-z]+)/)?.[1] ?? null`)) === 'setup') break
+    }
+    return arrivedAt(ev, want, 'tapped Menu › Plan a shoot')
   }
 
   /*
@@ -656,7 +671,42 @@ export async function setSheet(ev, wait, want, nudge = null) {
  * on a plan with no suggested positions. The button is `.shootc__gen` on the
  * shoot card; the sheet has to be up for it to be in the DOM.
  */
+/*
+ * THE PLANNER ON THE MAP (Batch SIMPLE-2, Section 0). The shoot card (Suggest,
+ * the + and the positions) is the sheet's home card only after a tap asked
+ * for the planner and its setup was done; on a map nobody asked to plan on the
+ * sheet is the map's own. So an audit that wants the shoot card asks the way
+ * a person does: ☰ › Plan a shoot, then "Same as last time" (or the wizard's
+ * own steps), and lands on the map with the sheet at half on the shoot card.
+ */
+export async function openPlanner(ev, wait) {
+  const there = await ev(`!!document.querySelector('.mode-plan .shootc')`)
+  if (!there) await goToStage(ev, wait, 'setup')
+  for (let i = 0; i < 6 && !there; i += 1) {
+    const step = await ev(`(() => {
+      const vis = (e) => e && e.getBoundingClientRect().height > 0
+      const shell = document.querySelector('.shell')?.className.match(/shell--([a-z]+)/)?.[1] ?? null
+      if (shell === 'plan') return 'plan'
+      const same = [...document.querySelectorAll('button')].find((b) => vis(b) && /^Same as last time$/.test((b.textContent ?? '').trim()))
+      if (same) { same.click(); return 'same' }
+      const next = [...document.querySelectorAll('.wiz__next')].find(vis)
+      if (next) { next.click(); return 'next' }
+      return 'stuck'
+    })()`)
+    if (step === 'plan') break
+    if (step === 'stuck') throw new PreflightError('in the planner and found neither "Same as last time" nor the wizard\'s next button (src/components/SetupMode.tsx)')
+    await wait(700)
+  }
+  await setSheet(ev, wait, 'half')
+  for (let i = 0; i < 25; i += 1) {
+    if (await ev(`!!document.querySelector('.mode-plan .shootc')`)) return there ? 'there' : 'asked'
+    await wait(200)
+  }
+  throw new PreflightError('asked for the planner and the map\'s sheet shows no shoot card (src/components/PlanMode.tsx, planner)')
+}
+
 export async function pressSuggest(ev, wait) {
+  await openPlanner(ev, wait)
   await setSheet(ev, wait, 'half')
   const pressed = await ev(`(() => {
     const b = document.querySelector('.shootc__gen')

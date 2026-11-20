@@ -23,8 +23,12 @@ import { fetchOpenGround } from '../lib/openGroundQuery.ts'
 
 interface NowScreenProps {
   onClose: () => void
-  /** Drops into Setup with this coordinate as the pin and today already set. */
-  onPlanHere: (at: LatLon) => void
+  /**
+   * Drops into Setup with this coordinate as the pin and today already set.
+   * Absent while the planner's extra doors are shut (src/config/flags.ts
+   * PLANNER_EXTRA_DOORS): no button, rather than one that does nothing.
+   */
+  onPlanHere?: (at: LatLon) => void
 }
 
 /** Everything the screen needs, or the reason it has none of it. */
@@ -265,9 +269,11 @@ export function NowScreen({ onClose, onPlanHere }: NowScreenProps) {
 
           <div className="now__acts">
             {/* The door into the app. Carries the coordinate and today's date. */}
-            <button type="button" className="now__go" onClick={() => onPlanHere(at)}>
-              Plan this spot
-            </button>
+            {onPlanHere === undefined ? null : (
+              <button type="button" className="now__go" onClick={() => onPlanHere(at)}>
+                Plan this spot
+              </button>
+            )}
 
             {/*
               * TOMORROW, AS A FILE. Labelled as a reminder rather than a

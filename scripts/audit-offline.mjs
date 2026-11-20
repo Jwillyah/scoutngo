@@ -37,7 +37,7 @@
  */
 import { mkdirSync } from 'node:fs'
 import { connect } from './cdp.mjs'
-import { goToStage, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mjs'
+import { goToStage, guardAudit, openPlanner, setSheet, startWatchdog, APP_ORIGIN } from './preflight.mjs'
 
 guardAudit('offline')
 const watchdog = startWatchdog('offline', 600_000)
@@ -139,6 +139,13 @@ for (const run of MODES) {
   }
 
   await goToStage(ev, wait, 'plan')
+  /*
+   * Batch SIMPLE-2, Section 0: the position below goes on the shoot card,
+   * which is the planner's: asked for first, as a person does, then the
+   * sheet back down (scripts/preflight.mjs openPlanner).
+   */
+  await openPlanner(ev, wait)
+  await setSheet(ev, wait, 'peek')
 
   /*
    * THE MAP IS WHAT IS ON THE GLASS. A positive property of the thing being

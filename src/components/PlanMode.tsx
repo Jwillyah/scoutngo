@@ -423,6 +423,12 @@ interface PlanModeProps {
   onShootSetup?: () => void
   /** Batch Flow, Section 2: Shoot is picked (or nothing yet): the + is there as "Plan a shoot". */
   planShoot?: boolean
+  /**
+   * Batch SIMPLE-2, Section 0: a tap asked for the planner and its setup was
+   * done (src/lib/planner.ts plannerOnMap). Only then is the sheet's home card
+   * the shoot card (Suggest, the positions); otherwise it is the map's own.
+   */
+  planner?: boolean
   /** Batch Flow, Section 2: the map's own back, to the home. */
   onHome?: () => void
   /** A detail page's back: the map, or the home when the home opened it (App decides; Batch QA, Section 1). */
@@ -639,6 +645,7 @@ export function PlanMode({
   onSearch,
   onShootSetup,
   planShoot,
+  planner = false,
   onHome,
   onPageBack,
   onOpenNow,
@@ -1990,6 +1997,30 @@ export function PlanMode({
    * with a + at the end. Not a list of rows -- a shoot is a handful of places
    * you are going to stand, and a row of pictures is how that reads.
    */
+  /*
+   * SAVE FOR OFFLINE, AND THE SAVED AREAS: the map's, not the planner's. On
+   * the shoot card as before, and on the map's own sheet (Batch SIMPLE-2,
+   * Section 0), so nobody has to plan a shoot to keep a place for no signal.
+   */
+  const offlineCards = (
+    <>
+      <VenuePackCard
+        centre={venue}
+        name={venueNameLine}
+        shootAt={venueWindow?.start ?? null}
+        timeZone={venueWindow?.timeZone ?? null}
+        online={online}
+      />
+      <OfflineAreas
+        packed={packTick >= 0 && packFor(venue) !== null}
+        venueCache={venueCache}
+        getView={getView}
+        venueName={venueNameLine}
+        online={online}
+      />
+    </>
+  )
+
   const shootCard = (
     <div className="shootc">
       <div className="shootc__head">
@@ -2183,20 +2214,7 @@ export function PlanMode({
             * hand, size first. See OfflineAreas.tsx.
             */}
           {/* SAVE FOR OFFLINE: the whole venue, size first, Wi-Fi first (src/lib/venuePack.ts). */}
-          <VenuePackCard
-            centre={venue}
-            name={venueNameLine}
-            shootAt={venueWindow?.start ?? null}
-            timeZone={venueWindow?.timeZone ?? null}
-            online={online}
-          />
-          <OfflineAreas
-            packed={packTick >= 0 && packFor(venue) !== null}
-            venueCache={venueCache}
-            getView={getView}
-            venueName={venueNameLine}
-            online={online}
-          />
+          {offlineCards}
         </>
       )}
       {/* The cloud along each position's sightline and the wind at the drone's height: a Plan thing, so their doors are here (Batch E). */}
@@ -2318,7 +2336,21 @@ export function PlanMode({
     switch (card.kind) {
       case 'shoot':
         /* Batch NOW, Section 4.2: in wind mode the sheet is the wind's time bar alone; the planner ("0 positions · Suggest · BOTH GROUND AIR") never shows under it. */
-        return windMode ? null : shootCard
+        if (windMode) return null
+        /*
+         * Batch SIMPLE-2, Section 0: THE PLANNER IS NOT THE MAP'S SHEET. Raised
+         * by its handle, or left up when a card closed, the sheet showed the
+         * shoot card, and that read as Plan a shoot opening on the map. It is
+         * the shoot card only on the planner's ask, a position tapped, or one
+         * being placed; otherwise the map's own sheet, its layers and tools.
+         */
+        if (planner || selected !== null || placing) return shootCard
+        return (
+          <Card title="Map" onClose={closeFeatures}>
+            {featuresCard}
+            {offlineCards}
+          </Card>
+        )
       case 'wind':
         return (
           <WindCard

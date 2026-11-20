@@ -19,7 +19,9 @@ describe('the mode the app starts in', () => {
     expect(startMode(false)).toBe('setup')
   })
   it('is what App starts in, not a fixed setup', () => {
-    expect(app).toMatch(/useState<Mode>\(\(\) => startMode\(/)
+    /* Batch SIMPLE-2, Section 0: the view starts as the map; the mode shown is derived (src/lib/planner.ts shownMode, which agrees with startMode). */
+    expect(app).toMatch(/useState<View>\(\(\) => startView\(venueLatLon\(venue\) !== null\)\)/)
+    expect(app).toMatch(/const mode: Mode = shownMode\(view, venueLatLon\(venue\) !== null\)/)
     expect(app).not.toMatch(/useState<Mode>\('setup'\)/)
   })
 })

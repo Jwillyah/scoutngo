@@ -21,3 +21,13 @@ export const DRONE_PLAN_TAB = false
  * tab is the wind.
  */
 export const DRONE_WIND_ROWS = false
+
+/**
+ * Batch SIMPLE-2, Section 0: the planner's other doors, the ones SIMPLE-1
+ * kept beyond Menu › Plan a shoot and the explicit "Plan a shoot ›" / "Plan ›"
+ * buttons: the map's Features › Plan a shoot tool, Now › Plan here, the
+ * Viewfinder's "Set up a place". OFF: the map
+ * is a map, and the planner opens from the Menu and the Plan buttons only
+ * (src/lib/planner.ts). On, each of those taps opens it again.
+ */
+export const PLANNER_EXTRA_DOORS = false

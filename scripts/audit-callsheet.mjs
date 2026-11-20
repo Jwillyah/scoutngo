@@ -18,7 +18,7 @@
  * the card rendered a sheet.
  */
 import { connect } from './cdp.mjs'
-import { goToStage, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mjs'
+import { goToStage, guardAudit, openPlanner, startWatchdog, APP_ORIGIN } from './preflight.mjs'
 
 guardAudit('call sheet')
 const watchdog = startWatchdog('call sheet', 240_000)
@@ -72,6 +72,8 @@ const venue = await ev(`(() => { const c = window.__probe.map.getCenter(); retur
 watchdog.note('plan')
 
 /* Batch H: the call sheet's door is a row on Plan's shoot card, not the menu. */
+/* Batch SIMPLE-2, Section 0: the shoot card is the planner's, asked for as a person does (scripts/preflight.mjs openPlanner). */
+await openPlanner(ev, wait)
 const opened = await ev(`(() => { const b = [...document.querySelectorAll('.more2__row')].find((x) => x.textContent.includes('Call sheet')); b?.click(); return !!b })()`)
 if (!opened) {
   console.log('=== CALL SHEET AUDIT ABORTED: no Call sheet row on the Plan sheet ===')

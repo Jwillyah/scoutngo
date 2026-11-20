@@ -19,7 +19,7 @@
 import { connect } from './cdp.mjs'
 import { shareLink } from '../src/lib/planShare.ts'
 import { EMPTY_VENUE } from '../src/lib/venue.ts'
-import { goToStage, guardAudit, startWatchdog, APP_ORIGIN } from './preflight.mjs'
+import { goToStage, guardAudit, openPlanner, startWatchdog, APP_ORIGIN } from './preflight.mjs'
 
 guardAudit('api url')
 const watchdog = startWatchdog('api url', 300_000)
@@ -69,6 +69,8 @@ watchdog.note('searched')
 
 /* A position, whose card asks for its ground view. */
 await goToStage(ev, wait, 'plan')
+/* Batch SIMPLE-2, Section 0: the shoot card is the planner's, so ask for it as a person does (scripts/preflight.mjs openPlanner). */
+await openPlanner(ev, wait)
 await ev(`document.querySelector('.shootc__add')?.click()`)
 await wait(500)
 await ev(`(() => {

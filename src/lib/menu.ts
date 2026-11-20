@@ -34,12 +34,17 @@ export type MenuItem =
  */
 export const OLD_PATHS: Readonly<Record<string, MenuItem>> = {
   '/plan': 'plan',
-  '/setup': 'setup',
+  /*
+   * Batch SIMPLE-2, Section 0: an address never opens the planner. /setup,
+   * /kit and /saved land on the map; the planner is a tap
+   * (src/lib/planner.ts), and a URL cannot carry one.
+   */
+  '/setup': 'plan',
   '/field': 'field',
   '/now': 'now',
   '/sky': 'sky',
-  '/kit': 'kit',
-  '/saved': 'saved',
+  '/kit': 'plan',
+  '/saved': 'plan',
   '/settings': 'settings',
   '/about': 'about',
 }

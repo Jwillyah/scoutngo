@@ -52,7 +52,7 @@
  *      opening the sheet, which is one action with no nesting.
  */
 import { readFileSync } from 'node:fs'
-import { goToStage, guardAudit, startWatchdog, APP_ORIGIN, openMenu as openMenuAnywhere } from './preflight.mjs'
+import { goToStage, guardAudit, openPlanner, startWatchdog, APP_ORIGIN, openMenu as openMenuAnywhere } from './preflight.mjs'
 
 guardAudit('surface')
 
@@ -862,6 +862,8 @@ for (const detent of ['half', 'full']) {
  * check FAILS rather than skipping.
  */
 console.log('\n### tapping a position never lowers the sheet')
+/* Batch SIMPLE-2, Section 0: the shoot card is the planner's, so ask for it as a person does (scripts/preflight.mjs openPlanner). */
+await openPlanner(ev, wait)
 await setDetent('half')
 /*
  * ARM THE MAP, AND FAIL IF THE CONTROL IS NOT THERE. This was
@@ -1388,6 +1390,12 @@ while (queue.length > 0) {
   }
 }
 
+/*
+ * Batch SIMPLE-2, Section 0: the shoot card, and the doors inside it (Cloud
+ * along each view, Wind at your flight height, Call sheet), are the planner's:
+ * asked for first, as a person does (scripts/preflight.mjs openPlanner).
+ */
+await openPlanner(ev, wait)
 /* The shoot card itself, which is where the walk starts and has no door. */
 if (await homeCard()) {
   const heights = {}

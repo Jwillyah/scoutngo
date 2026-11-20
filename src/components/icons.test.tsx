@@ -65,7 +65,8 @@ describe('the menu (Batch H, Section 3: it replaced the side menu)', () => {
 
   it('old paths land on their place, and nothing else is claimed', () => {
     expect(pathToMenuItem('/field')).toBe('field')
-    expect(pathToMenuItem('/setup/')).toBe('setup')
+    /* Batch SIMPLE-2, Section 0: an address never opens the planner (src/lib/planner.ts). */
+    expect(pathToMenuItem('/setup/')).toBe('plan')
     expect(pathToMenuItem('/Now')).toBe('now')
     expect(pathToMenuItem('/')).toBeNull()
     expect(pathToMenuItem('/how')).toBeNull()

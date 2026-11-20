@@ -119,11 +119,12 @@ import { retrying } from './lib/retrying.ts'
 import { planForNow } from './lib/planForNow.ts'
 import { useNow } from './lib/useNow.ts'
 import { pathToMenuItem, type MenuItem } from './lib/menu.ts'
+import { askPlanner, FIELD, MAP, plannerOnMap, setupFor, shownMode, spent, startView, type PlannerDoor, type View } from './lib/planner.ts'
+import { PLANNER_EXTRA_DOORS } from './config/flags.ts'
 import { placeOf, shownGroups, usePlaceGroups } from './lib/placeGroups.ts'
 import {
   blockedReason,
   setupGap,
-  startMode,
   type Mode,
   type ModeAvailability,
   type SetupTarget,
@@ -470,7 +471,32 @@ function App() {
    * button that names it. With no place yet there is no map to show, and
    * setup is where the pin goes (src/lib/mode.ts startMode).
    */
-  const [mode, setMode] = useState<Mode>(() => startMode(venueLatLon(venue) !== null))
+  /*
+   * Batch SIMPLE-2, Section 0: the view, not a bare mode word. Setup is a
+   * PlannerAsk that only a tap makes (src/lib/planner.ts), so a first run's
+   * leftover, a URL or anything stored cannot put the planner on screen. The
+   * mode on screen is derived: the first run's setup only while there is no
+   * place (where the pin goes, as startMode said), otherwise setup only for a
+   * real ask.
+   */
+  const [view, setView] = useState<View>(() => startView(venueLatLon(venue) !== null))
+  const mode: Mode = shownMode(view, venueLatLon(venue) !== null)
+  /** The map or Field. Setup is never set by name: openPlanner, from a tap. */
+  const setMode = useCallback((next: 'plan' | 'field') => setView(next === 'field' ? FIELD : MAP), [])
+  /*
+   * The first run's setup lasts only while there is no place. A pin set in it
+   * (dropped or confirmed) is a tap on the planner, so
+   * the wizard carries on to its When and Window steps instead of giving way
+   * to the map the moment the place exists.
+   */
+  const keepFirstRun = useCallback(() => {
+    setView((v) => (v.mode === 'setup' && v.ask === null ? setupFor(askPlanner('first-pin'), v) : v))
+  }, [])
+  /** A tap asked for the planner, at this door. A shut door (PLANNER_EXTRA_DOORS) does nothing. */
+  const openPlanner = useCallback((door: PlannerDoor) => {
+    const ask = askPlanner(door)
+    setView((v) => setupFor(ask, v))
+  }, [])
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   /*
@@ -1546,6 +1572,16 @@ function App() {
     if (mode !== 'setup') setDrawerRequest((r) => (r.tick === 0 ? r : { ...r, tick: 0 }))
     /* oxlint-enable react/set-state-in-effect */
   }, [mode])
+  /*
+   * Batch SIMPLE-2, Section 0: THE HOME OVER THE PLANNER SPENDS ITS ASK. The
+   * home is the front door; whatever takes it away next (its Map button,
+   * Escape, a page's Back) lands on the map, never back in the planner.
+   */
+  useEffect(() => {
+    /* oxlint-disable react/set-state-in-effect -- spends the planner's ask when the home covers it */
+    if (briefOpen) setView(spent)
+    /* oxlint-enable react/set-state-in-effect */
+  }, [briefOpen])
   /* The viewfinder: the camera with the plan over it. Opened from the menu, asks for its permissions on a tap. */
   const [viewfinderOpen, setViewfinderOpen] = useState(false)
   /* The Viewfinder opens ready: the next event and the lens for it (src/core/viewfinderPreset.ts). */
@@ -1587,9 +1623,11 @@ function App() {
         setBriefOpen(true)
         return
       case 'plan':
-      case 'setup':
       case 'field':
         setMode(item)
+        return
+      case 'setup':
+        openPlanner('menu')
         return
       case 'now':
         setNowOpen(true)
@@ -1622,7 +1660,7 @@ function App() {
         return
       case 'kit':
       case 'saved':
-        setMode('setup')
+        openPlanner(item === 'kit' ? 'menu-kit' : 'menu-saved')
         setDrawerRequest((r) => ({ drawer: item, tick: r.tick + 1 }))
         return
     }
@@ -1834,9 +1872,9 @@ function App() {
       ].join('-')
       setVenue((current) => ({ ...withCoordinates(current, at), date: iso }))
       setDefaults((d) => ({ ...d, date: true }))
-      setMode('setup')
+      openPlanner('now-plan-here')
     },
-    [],
+    [openPlanner],
   )
 
   const onVenueChange = dropVenuePin
@@ -2273,7 +2311,8 @@ function App() {
 
   /** Takes the shooter to the thing a block named, and points at it. */
   const onFixBlock = useCallback((field: SetupTarget | null) => {
-    setMode('setup')
+    /* Inside the planner already (the shoot card shows only on an ask): back to setup on the same ask. */
+    setView((v) => setupFor(v.mode === 'plan' ? v.ask : null, v))
     if (field !== null) setPointAt((current) => ({ field, tick: current.tick + 1 }))
     setGeneration({ status: 'idle' })
   }, [])
@@ -2305,7 +2344,7 @@ function App() {
    * statement about the work and not a lock on the navigation. `canEnter`
    * existed only to make this line refuse, and is deleted with it.
    */
-  const goTo = (next: Mode) => setMode(next)
+  const goTo = (next: 'plan' | 'field') => setMode(next)
 
   /*
    * THE PEEK LINE SAYS SOMETHING OR IT IS NOT THERE.
@@ -2367,7 +2406,7 @@ function App() {
         </Suspense>
       )}
       {!nowOpen ? null : (
-        <Suspense fallback={null}><NowScreen onClose={() => setNowOpen(false)} onPlanHere={planFromNow} /></Suspense>
+        <Suspense fallback={null}><NowScreen onClose={() => setNowOpen(false)} onPlanHere={PLANNER_EXTRA_DOORS ? planFromNow : undefined} /></Suspense>
       )}
 
       {privacyOpen ? <Suspense fallback={null}><PrivacyPage onClose={closePrivacy} /></Suspense> : null}
@@ -2412,20 +2451,27 @@ function App() {
             venueNameState={venueNameState}
             onUseMyLocation={onUseMyLocation}
             at={centre}
-            onPinChange={onVenueChange}
+            onPinChange={(at) => {
+              keepFirstRun()
+              onVenueChange(at)
+            }}
             onSearchPick={onPick}
             reachMeters={reachMeters}
             onReachChange={onReach}
             mapHandle={setupMap}
             pendingPin={pendingPin}
             onPendingMove={onPendingMove}
-            onConfirmPin={confirmPin}
+            onConfirmPin={() => {
+              keepFirstRun()
+              confirmPin()
+            }}
             onCancelPin={cancelPin}
             searchBias={centre}
             showPinHint={!pinHintDone}
             onPinDrag={() => setPinHintDone(true)}
             units={settings.units ?? DEFAULT_UNITS}
-            onDone={() => setMode('plan')}
+            /* The ask goes on to the map: the shoot card (Suggest, the positions) is the planner's second half. */
+            onDone={() => setView((v) => ({ mode: 'plan', ask: v.mode === 'setup' ? v.ask : null }))}
             pointAt={pointAt}
             doneBlocked={gap !== null ? gap.copy : null}
             returning={lastSetup !== null}
@@ -2441,8 +2487,8 @@ function App() {
               setViewfinderOpen(true)
             }}
             onAddPosition={() => {
-              /* There are no positions in setup: the + goes to the plan, armed. */
-              setMode('plan')
+              /* There are no positions in setup: the + goes to the plan, armed, still the planner. */
+              setView((v) => ({ mode: 'plan', ask: v.mode === 'setup' ? v.ask : null }))
               setPlacing(true)
             }}
           />
@@ -2679,8 +2725,10 @@ function App() {
           bag={kit}
           /* Batch MAP2, Section 3: the place pill finds a spot (search v2); the + is Shoot setup. */
           onSearch={() => setSpotPickOpen(true)}
-          onShootSetup={() => setMode('setup')}
-          planShoot={showsPhotoTools(activities)}
+          onShootSetup={() => openPlanner('features-tool')}
+          /* Batch SIMPLE-2, Section 0: Features › Plan a shoot is one of the extra doors, shut (src/config/flags.ts). */
+          planShoot={PLANNER_EXTRA_DOORS && showsPhotoTools(activities)}
+          planner={plannerOnMap(view)}
           onHome={() => setBriefOpen(true)}
           onPageBack={() => {
             if (!pageFromHome) return
@@ -2746,7 +2794,8 @@ function App() {
         <ViewfinderNeedsPlace
           onSetup={() => {
             setViewfinderOpen(false)
-            setMode('setup')
+            /* With no place the setup shows anyway (shownMode), door or no door. */
+            openPlanner('viewfinder-set-up')
           }}
           onClose={() => setViewfinderOpen(false)}
         />
@@ -2841,7 +2890,7 @@ function App() {
           onPlanShoot={() => {
             setDroneOpen(false)
             setBriefOpen(false)
-            onMenuPick('setup')
+            openPlanner('drone-preflight')
           }}
           onSaveSpot={(at, name) => {
             /* Batch DRONE, Section 2.3: the Airspace tab's marker, saved on this phone as a spot of its own (no positions). */

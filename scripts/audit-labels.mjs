@@ -25,7 +25,7 @@
  * the whole point of it.
  */
 
-import { goToStage, guardAudit, setSheet, startWatchdog, APP_ORIGIN } from './preflight.mjs'
+import { goToStage, guardAudit, openPlanner, setSheet, startWatchdog, APP_ORIGIN } from './preflight.mjs'
 import { FLOATING_CHROME_SELECTORS, floatingChromeNodes } from '../src/lib/floatingChrome.ts'
 
 /*
@@ -201,6 +201,9 @@ await send('Page.navigate', { url: `${APP_ORIGIN}/?calibration=1&probe=1` })
 await wait(8000)
 
 await goToStage(ev, wait, 'plan')
+/* Batch SIMPLE-2, Section 0: the positions are the planner's, asked for first, before the view is set (scripts/preflight.mjs openPlanner). */
+await openPlanner(ev, wait)
+await setSheet(ev, wait, 'peek')
 await wait(4000)
 /* The arc adds sunrise and sunset readouts, which is the crowded case. */
 await ev(`[...document.querySelectorAll('button')].find(b=>/Sun arc/i.test(b.textContent))?.click()`)
@@ -244,7 +247,8 @@ await wait(500)
  * have passed here. That is the fifth time this week, and it stayed caught
  * because both checks fail on an empty list instead of iterating over it.
  */
-await ev(`[...document.querySelectorAll('.sheet__handle')][0]?.click()`)
+/* Batch SIMPLE-2, Section 0: the shoot card is the planner's, so ask for it as a person does (scripts/preflight.mjs openPlanner). */
+await openPlanner(ev, wait)
 await wait(600)
 const armable = await ev(`document.querySelector('.shootc__add') !== null`)
 console.log(`  add control reachable at half: ${armable}`)

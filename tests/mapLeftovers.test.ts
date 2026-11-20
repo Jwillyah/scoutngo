@@ -10,7 +10,9 @@ describe('Batch MAP leftovers', () => {
     expect(src('src/components/PlanMode.tsx')).toMatch(/className="pill-venue" onClick=\{onSearch\} aria-label="Find a spot"/)
     const app = src('src/App.tsx')
     expect(app).toMatch(/onSearch=\{\(\) => setSpotPickOpen\(true\)\}/)
-    expect(app).toMatch(/onShootSetup=\{\(\) => setMode\('setup'\)\}/)
+    /* Batch SIMPLE-2, Section 0: a tap at the Features door, shut behind PLANNER_EXTRA_DOORS (src/lib/planner.ts). */
+    expect(app).toMatch(/onShootSetup=\{\(\) => openPlanner\('features-tool'\)\}/)
+    expect(app).toMatch(/planShoot=\{PLANNER_EXTRA_DOORS && showsPhotoTools\(activities\)\}/)
     expect(src('src/components/PlanMode.tsx')).toMatch(/addLabel=\{onShootSetup === undefined \? undefined : 'Plan a shoot'\}/)
     /* Batch Polish, Section 2: on the map (with its Back to the home) the top bar is back · spot · locate; "Plan a shoot" is in the Map sheet's tools. */
     expect(src('src/components/PlanMode.tsx')).toMatch(/addHidden=\{planShoot === false \|\| onHome !== undefined\}/)
