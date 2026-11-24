@@ -5,7 +5,7 @@ import { compassPoint } from '../core/field.ts'
 import type { LatLon } from '../core/geo.ts'
 import { colorWords } from '../core/homeDay.ts'
 import { localDate } from '../core/moonTimes.ts'
-import { skyCallNow } from '../core/skyCall.ts'
+import { useSkyCalls } from '../lib/useSkyCalls.ts'
 import { eventDayWord } from '../core/skyPage.ts'
 import {
   bigMoonriseLine,
@@ -380,7 +380,9 @@ export function SunMoonNightPageOld({ venue, placeName, timeZone, now, initial, 
     el.addEventListener('scroll', onScroll, { passive: true })
     return () => el.removeEventListener('scroll', onScroll)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
-  const callWord = (k: 'sunset' | 'sunrise') => colorWords(skyCallNow(brief.days, now, venue, k)?.call ?? null)
+  /* Batch SIMPLE-3, Section 0.2: the one sky call object (src/lib/useSkyCalls.ts), as the home and Sky Tonight read it. */
+  const calls = useSkyCalls(brief, venue, now, timeZone)
+  const callWord = (k: 'sunset' | 'sunrise') => colorWords(calls[k]?.call ?? null)
   const how = (
     <>
       <p>The light: the sun&rsquo;s height, golden from +6°, blue hour from −4°, dark from −6°, as on the Sky page. Sunrise and sunset are the sun&rsquo;s centre at −0.833°.</p>

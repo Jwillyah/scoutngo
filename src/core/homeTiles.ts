@@ -19,6 +19,7 @@ import { compassPoint } from './field.ts'
 import { formatClock } from './timezone.ts'
 import { spanWords } from './homeDay.ts'
 import type { BigMoonriseMoment, MoonMoment } from './moonNights.ts'
+import { EVENT_LINGER_MS } from './skyCall.ts'
 
 export type Persona = Activity
 export type TileKind = 'surf' | 'tide' | 'wind' | 'sky' | 'fish' | 'drone' | 'water'
@@ -55,6 +56,10 @@ export interface Moment {
   /** The one line under it. */
   line: string
   target: MomentTarget
+  /** Shown whatever the persona's rank (a Supermoon, src/core/moonMoment.ts). */
+  always?: boolean
+  /** Batch SIMPLE-3, Section 0.6: when its window ends; from then the card is gone (pickMoment with a clock). Absent: it stands until the builder drops it. */
+  until?: Date
 }
 
 /** How far ahead each moment counts (Batch SIMPLE-2, Section 2.3). */
@@ -77,9 +82,12 @@ export const MOMENT_RANK: Record<Persona, readonly MomentKind[]> = {
 }
 
 /** The one moment for the top, or null: nothing worth it, and the top stays empty. */
-export function pickMoment(found: readonly (Moment | null)[], persona: Persona | null): Moment | null {
+export function pickMoment(found: readonly (Moment | null)[], persona: Persona | null, now: Date | null = null): Moment | null {
   const rank = MOMENT_RANK[persona ?? 'surf']
-  const have = found.filter((m): m is Moment => m !== null)
+  /* Batch SIMPLE-3, Section 0.6: a card whose window has ended is gone, whatever kept it. */
+  const have = found.filter((m): m is Moment => m !== null && (now === null || m.until === undefined || m.until.getTime() > now.getTime()))
+  const always = have.filter((m) => m.always === true).sort((a, b) => a.at.getTime() - b.at.getTime())[0]
+  if (always !== undefined) return always
   for (const k of rank) {
     const m = have.filter((x) => x.kind === k).sort((a, b) => a.at.getTime() - b.at.getTime())[0]
     if (m !== undefined) return m
@@ -88,9 +96,10 @@ export function pickMoment(found: readonly (Moment | null)[], persona: Persona |
 }
 
 const clock = (d: Date, timeZone: string) => formatClock(d, timeZone).replace(/:00 /, ' ')
-/** "1 h 10 m", "25 m". */
+/** "1 h 10 m", "25 m"; under a minute "now" (Batch SIMPLE-3, Section 0.6: never "0 m"). */
 export function leadWords(ms: number): string {
   const m = Math.max(0, Math.round(ms / 60_000))
+  if (m < 1) return 'now'
   if (m < 60) return `${m} m`
   return m % 60 === 0 ? `${Math.floor(m / 60)} h` : `${Math.floor(m / 60)} h ${m % 60} m`
 }
@@ -99,12 +108,16 @@ export function leadWords(ms: number): string {
  * SKY: a Likely call (the one sky call's Go) for an event within 3 h, or
  * its colour on now. From src/core/skyCall.ts, never a second opinion.
  */
-export function skyMoment(c: { kind: 'sunrise' | 'sunset'; event: Date; call: 'Go' | 'Maybe' | 'Skip' | null; from: Date | null; lookDeg: number } | null, now: Date, timeZone: string): Moment | null {
+export function skyMoment(c: { kind: 'sunrise' | 'sunset'; event: Date; call: 'Go' | 'Maybe' | 'Skip' | null; from: Date | null; to?: Date | null; lookDeg: number } | null, now: Date, timeZone: string): Moment | null {
   if (c === null || c.call !== 'Go') return null
   const start = c.from ?? c.event
   const lead = c.event.getTime() - now.getTime()
   if (lead > MOMENT_AHEAD_MS.sky) return null
-  const on = now.getTime() >= start.getTime()
+  /* Batch SIMPLE-3, Section 0.6: the card ends with the colour (src/core/skyCall.ts colourOver: its window's end, or 20 min after the event). */
+  const until = new Date(Math.max(c.event.getTime() + EVENT_LINGER_MS, c.to?.getTime() ?? 0))
+  if (now.getTime() >= until.getTime()) return null
+  /* Inside the window, past the event, or under a minute to it: on now, never "Coming up · 0 m". */
+  const on = now.getTime() >= start.getTime() || lead < 60_000
   const name = c.kind === 'sunset' ? 'Sunset' : 'Sunrise'
   return {
     kind: 'sky',
@@ -112,6 +125,29 @@ export function skyMoment(c: { kind: 'sunrise' | 'sunset'; event: Date; call: 'G
     eyebrow: on ? 'Color on now' : `Coming up · ${leadWords(lead)}`,
     line: `${name} color likely ${clock(c.event, timeZone)} · look ${compassPoint(c.lookDeg)}`,
     target: 'sky',
+    until,
+  }
+}
+
+/**
+ * CLEAN (Batch SIMPLE-3, Section 0.3): the one surf window (src/lib/surfTapIn.ts
+ * surfWindow: the next clean daylight stretch with surf, from the one series)
+ * when it starts within 12 h, said in the Surf page's own word and its own
+ * times, with the call's size for its first hour. Replaces the glassy rule
+ * over the briefing's wind on the home (23 Nov 11:07 AM: "1–3 ft until 5 PM"
+ * on the card, "clean 10a–11p" on the chart, "11a–11p" on the Best row).
+ */
+export function cleanMoment(w: { from: Date; to: Date; words: string; size: string | null } | null, now: Date, timeZone: string): Moment | null {
+  if (w === null || w.to.getTime() <= now.getTime()) return null
+  if (w.from.getTime() - now.getTime() > MOMENT_AHEAD_MS.glassy) return null
+  const on = w.from.getTime() <= now.getTime()
+  return {
+    kind: 'glassy',
+    at: on ? now : w.from,
+    eyebrow: on ? `Clean now · until ${clock(w.to, timeZone)}` : `Clean · ${w.words}`,
+    line: w.size ?? 'clean water',
+    target: 'surf',
+    until: w.to,
   }
 }
 
@@ -161,6 +197,7 @@ export function fishMoment(run: { from: Date; to: Date } | null, turn: { kind: '
     eyebrow: `Calm water · from ${clock(run.from, timeZone)}`,
     line: `${spanWords(run.from, run.to, timeZone)}${turn === null ? '' : ` · ${turn.kind} tide ${clock(turn.at, timeZone)}`}`,
     target: 'fish',
+    until: run.to,
   }
 }
 
@@ -178,6 +215,7 @@ export function swellMoment(fun: Date | 'now' | null, words: string | null, now:
     eyebrow: `Surf picks up · ${clock(fun, timeZone)}`,
     line: words === null ? 'Fun or better from then' : `${words} from then`,
     target: 'surf',
+    until: fun,
   }
 }
 
@@ -191,5 +229,7 @@ export function moonriseMoment(moments: readonly MoonMoment[], today: string, ti
     eyebrow: `Big moonrise · ${clock(m.moonrise.at, timeZone)}`,
     line: `${Math.round(m.lit * 100)}% lit · rises ${m.moonrise.compass}`,
     target: 'sky-night',
+    /* Batch SIMPLE-3, Section 0.6: over with the rising, as the colour is 20 min after its event. */
+    until: new Date(m.moonrise.at.getTime() + EVENT_LINGER_MS),
   }
 }

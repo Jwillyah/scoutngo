@@ -297,8 +297,14 @@
   height: 100%;
   max-height: 44px;
 }
-/* Too short for a picture: the words stay, the picture goes (390 × 664, the largest text). */
-@container (max-height: 9rem) {
+/*
+ * Too short for any picture: the words stay, the picture goes. Batch SIMPLE-3,
+ * Section 0.1: at 9rem the moment card alone took every picture away (390 x
+ * 844 home screen, 144 px tiles: the 23 Nov "no pictures" state). The query
+ * reads the tile's content box (padding off): at 5.5rem its words leave a
+ * picture of about 18 px, so only a shorter tile drops it.
+ */
+@container (max-height: 5.5rem) {
   .htile__pic {
     display: none;
   }
@@ -448,4 +454,57 @@
 .homep .homep__spot {
   margin: 0;
   align-self: center;
+}
+
+/*
+ * A VALUE ON ITS WAY (Batch SIMPLE-3, Section 0.5): a light bar where the
+ * word will be, never "…", "■■■" or a dash; shown only until the part's
+ * inputs answer (src/lib/homeSnapshot.ts), and only when nothing for the
+ * spot was kept. The pulse stops under reduce-motion.
+ */
+.hskel {
+  display: inline-block;
+  width: 3.4em;
+  max-width: 100%;
+  height: 0.72em;
+  border-radius: 6px;
+  background: var(--d-edge);
+  vertical-align: middle;
+  animation: hskel-pulse 1.2s ease-in-out infinite alternate;
+}
+.hskel--wide {
+  width: 6.5em;
+  height: 0.6em;
+}
+@keyframes hskel-pulse {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hskel {
+    animation: none;
+  }
+}
+
+/*
+ * Batch SIMPLE-3, Section 0.1: a short picture keeps its drawing, not half of
+ * it. The arrows' hour words go first when the picture is under 36 px (a
+ * wrapped line above it at 390 x 664 left only the words' tops on screen),
+ * then the arrows shrink with the box.
+ */
+.htile__pic {
+  container-type: size;
+}
+@container (max-height: 36px) {
+  .hpic__arrowat {
+    display: none;
+  }
+  .hpic__arrowsvg {
+    width: min(22px, 100cqh);
+    height: min(22px, 100cqh);
+  }
 }

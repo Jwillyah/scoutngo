@@ -12,7 +12,7 @@
  * Coordinates are rounded to 2 decimals by the fetchers; the buoy is picked
  * on the phone. Nothing about the user leaves it.
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { factorHere, jettyHere } from './beachFactorHere.ts'
 import type { Shelter } from '../core/jettyFactor.ts'
 import { readReports, REPORTS_CHANGED } from './fieldReportStore.ts'
@@ -42,7 +42,12 @@ export interface SurfSea {
   shelter?: Shelter | null
   /** Batch 3D, Section 3.2: the other wave models, for the bigger-swell watch only (src/lib/waveModels.ts); absent where the screen did not ask. */
   models?: ModelSea[]
+  /** Batch SIMPLE-3, Section 0: the nearest buoy has been asked once (answered or not). */
+  buoyAsked?: boolean
 }
+
+/** Batch SIMPLE-3, Section 0: the forecasts, the facing and the buoy have each answered (or said why not): the surf can be called without a second, different answer coming. */
+export const seaSettled = (s: SurfSea): boolean => s.status === 'ready' && s.facingState !== 'loading' && s.buoyAsked === true
 
 const EMPTY: SurfSea = {
   status: 'loading',
@@ -53,33 +58,61 @@ const EMPTY: SurfSea = {
   buoy: null,
 }
 
+/*
+ * ONE SEA PER SPOT (Batch SIMPLE-3, Section 0). Each screen's useSurfSea kept
+ * its own copy and asked on its own, so the home mounted again (Back from a
+ * page, the spot search closed) started from nothing: the size was read with
+ * no facing and no buoy for a second ("4–6 ft Fun"), then again with them
+ * ("3–4 ft Rideable"). What has answered for a spot lives here, once; a
+ * screen opened later reads it at once, and `settled` says when the
+ * forecasts, the facing and the buoy have all answered (or said why not).
+ */
+const seas = new Map<string, SurfSea>()
+const seaAsked = new Map<string, number>()
+const seaListeners = new Set<() => void>()
+let seaVersion = 0
+function putSea(key: string, patch: Partial<SurfSea>): void {
+  seas.set(key, { ...(seas.get(key) ?? EMPTY), ...patch })
+  seaVersion += 1
+  for (const l of [...seaListeners]) l()
+}
+const subscribeSea = (l: () => void) => {
+  seaListeners.add(l)
+  return () => seaListeners.delete(l)
+}
+const seaNowVersion = () => seaVersion
+/** For tests. */
+export function clearSurfSeas(): void {
+  seas.clear()
+  seaAsked.clear()
+  seaVersion += 1
+}
+export function putSurfSea(spot: LatLon, patch: Partial<SurfSea>): void {
+  putSea(`${spot.lat.toFixed(3)},${spot.lon.toFixed(3)}`, patch)
+}
+
 export function useSurfSea(spot: LatLon | null): SurfSea {
   const lat = spot?.lat ?? null
   const lon = spot?.lon ?? null
   const key = lat === null || lon === null ? null : `${lat.toFixed(3)},${lon.toFixed(3)}`
   const epoch = useWeatherEpoch()
-  const [sea, setSea] = useState<{ key: string; v: SurfSea } | null>(null)
+  const version = useSyncExternalStore(subscribeSea, seaNowVersion, seaNowVersion)
 
   useEffect(() => {
-    if (key === null || lat === null || lon === null) return
+    if (key === null || lat === null || lon === null || seaAsked.get(key) === epoch) return
+    seaAsked.set(key, epoch)
     const at = { lat, lon }
-    let live = true
-    const put = (patch: Partial<SurfSea>) => {
-      if (live)
-        setSea((prev) => ({
-          key,
-          v: { ...(prev?.key === key ? prev.v : EMPTY), ...patch },
-        }))
-    }
+    const put = (patch: Partial<SurfSea>) => putSea(key, patch)
     /*
      * Batch Map A3/A4: asked again (5 s, 20 s, 60 s, and when the network
      * comes back: src/lib/retrying.ts) until the sea, the wind and the buoy
      * have all answered. What arrived stays on screen; a later try never
-     * puts an empty answer over a good one.
+     * puts an empty answer over a good one. The asking is the spot's, not
+     * the screen's: a screen closing does not stop it.
      */
-    let facing: number | null | undefined
+    let facing: number | null | undefined = seas.get(key)?.facingState === 'ok' || seas.get(key)?.facingState === 'inland' ? (seas.get(key)?.facing ?? null) : undefined
     let gotBuoy = false
-    const stop = retrying(async () => {
+    retrying(async () => {
       const [m, w] = await Promise.all([fetchMarine(at).catch(() => null), fetchBriefWind(at).catch(() => null)])
       put({ status: 'ready', ...(m === null ? {} : { marine: m.value }), ...(w === null ? {} : { wind: w }) })
       if (facing === undefined) {
@@ -95,12 +128,9 @@ export function useSurfSea(spot: LatLon | null): SurfSea {
       const buoyLost = buoy === null || (buoy.status === 'none' && buoy.reason === "The buoy didn't load.")
       if (!buoyLost) gotBuoy = true
       if (!buoyLost || !gotBuoy) put({ buoy, buoys: all ?? [] })
+      put({ buoyAsked: true })
       return m !== null && w !== null && facing !== undefined && !buoyLost
     })
-    return () => {
-      live = false
-      stop()
-    }
   }, [key, lat, lon, epoch])
 
   /* The spot's factor: your reports here, else the region's; read again when a report is saved. */
@@ -112,6 +142,6 @@ export function useSurfSea(spot: LatLon | null): SurfSea {
   }, [])
   const factor = useMemo(() => (lat === null || lon === null ? undefined : factorHere({ lat, lon }, reports)), [lat, lon, reports])
   const shelter = useMemo(() => (lat === null || lon === null ? null : (jettyHere({ lat, lon })?.shelter ?? null)), [lat, lon])
-  const v = sea !== null && sea.key === key ? sea.v : EMPTY
-  return useMemo(() => (factor === undefined ? v : { ...v, factor, shelter }), [v, factor, shelter])
+  const v = key === null ? EMPTY : (seas.get(key) ?? EMPTY)
+  return useMemo(() => (factor === undefined ? v : { ...v, factor, shelter }), [v, factor, shelter, version]) // eslint-disable-line react-hooks/exhaustive-deps
 }

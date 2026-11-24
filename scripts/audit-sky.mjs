@@ -230,7 +230,7 @@ try {
       for (let i = 0; i < 30; i += 1) {
         await wait(400)
         t = await ev(LOOK)
-        const ready = t !== null && t.tabs.find((x) => x.on)?.t !== undefined && tab.pill.test(t.tabs.find((x) => x.on).t) && t.value !== '…' && (tab.id !== 'now' || t.camText === null || !/Finding the cams/.test(t.camText))
+        const ready = t !== null && t.tabs.find((x) => x.on)?.t !== undefined && tab.pill.test(t.tabs.find((x) => x.on).t) && t.value !== '…' && (tab.id !== 'now' || ((t.camText === null || !/Finding the cams/.test(t.camText)) && !/asking the station/.test(t.values?.[0] ?? '')))
         if (ready) break
       }
       if (t === null || !tab.pill.test(t.tabs.find((x) => x.on)?.t ?? '')) {

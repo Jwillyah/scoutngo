@@ -1,5 +1,7 @@
 import '../styles/sky.css'
-import { colourNowWords, skyCallNow } from '../core/skyCall.ts'
+import { colourNowWords } from '../core/skyCall.ts'
+import { useSkyCalls } from '../lib/useSkyCalls.ts'
+import { stationNowAnswered } from '../lib/useStationNow.ts'
 import { useEffect, useMemo, useState } from 'react'
 import { getPosition } from 'suncalc'
 import type { CamEntry } from '../core/camPick.ts'
@@ -25,7 +27,7 @@ import { useLiveSky } from '../lib/useLiveSky.ts'
 import { useBriefing } from '../lib/useBriefing.ts'
 import { useStationNow } from '../lib/useStationNow.ts'
 import { stationWord } from '../core/skyWord.ts'
-import { MODELS_CLEAR, nowHeadline, skyNow, stationDoubt, STATION_FRESH_MS, withDoubt } from '../core/skyNow.ts'
+import { nowHeadline, skyNow, STATION_FRESH_MS } from '../core/skyNow.ts'
 import { SkyPicture } from './SkyPicture.tsx'
 import { SkyNightMoments, SkyNightMoon, SkyNightStrip } from './SkyNightTab.tsx'
 import { TapInPage, type TapInRow } from './TapInPage.tsx'
@@ -97,11 +99,13 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onViewfinder,
   const brief = useBriefing(venue, timeZone, now, true)
   /* Batch Polish 2, Section 1: the nearest station's sky is this page's (a station reports now). */
   const station = useStationNow(venue, now, typeof navigator === 'undefined' ? false : navigator.onLine)
+  const stationAsked = stationNowAnswered(venue, now, typeof navigator === 'undefined' ? false : navigator.onLine)
   const clock = (d: Date | null) => (d === null ? '—' : formatClock(d, timeZone))
   /* The clock is App's, put right whenever the app comes back to the front. */
   const realNow = now
   /* Batch CORE, Section 1.1 and 1.3: the one sky call (src/core/skyCall.ts); an event holds the page through its colour. */
-  const soonest: Kind = skyCallNow(brief.days, realNow, venue)?.kind ?? 'sunset'
+  const one = useSkyCalls(brief, venue, realNow, timeZone)
+  const soonest: Kind = one.now?.kind ?? 'sunset'
   const stationAt = station === null || station.at === '' ? null : new Date(station.at)
   const fresh = station !== null && stationAt !== null && realNow.getTime() - stationAt.getTime() <= STATION_FRESH_MS ? { sky: station.sky, at: stationAt, via: station.via } : null
   const wxWhen = (n: string, t: Date) => (brief.wx === null ? null : hourlyAt(brief.wx, n, t))
@@ -111,28 +115,13 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onViewfinder,
   const motion = aloft === null || aloftFrom === null ? null : { fromDeg: aloftFrom, mps: aloft }
   const deckOverhead = fresh !== null && fresh.sky.groups.some((g) => (g.amount === 'BKN' || g.amount === 'OVC') && g.baseFt < 20_000)
 
-  /* ONE CALL PER EVENT: the sky call, the station's doubt on it, and what the picture and the rows read. */
+  /* ONE CALL PER EVENT (Batch SIMPLE-3, Section 0.2): the one sky call object, the station's doubt already on it, the home's too (src/lib/useSkyCalls.ts). */
   const callFor = (kind: Kind) => {
-    const c = skyCallNow(brief.days, realNow, venue, kind)
-    const day = c === null ? null : (brief.days[c.dayIndex] ?? null)
-    const event = day?.events[kind] ?? null
-    const verdict = day?.verdicts[kind] ?? null
-    /* The hour the models clear the deck here, before the event. */
-    let clearsAt: Date | null = null
-    if (event !== null) {
-      for (let t = realNow.getTime(); t <= event.getTime(); t += 15 * 60_000) {
-        const low = wxWhen('cloud_cover_low', new Date(t))
-        const mid = wxWhen('cloud_cover_mid', new Date(t))
-        if (low !== null && mid !== null && Math.max(low, mid) < MODELS_CLEAR) {
-          clearsAt = new Date(t)
-          break
-        }
-      }
-    }
-    const doubt = stationDoubt(verdict, fresh === null ? null : { sky: fresh.sky, at: fresh.at }, event, realNow, (d) => formatClock(d, timeZone), motion, clearsAt)
-    const read = withDoubt(day?.reads[kind] ?? null, doubt)
+    const c = one[kind]
+    const event = c?.event ?? null
+    const verdict = c?.verdict ?? null
     const sun = event === null ? null : getPosition(event, venue.lat, venue.lon)
-    return { kind, event, verdict, read, doubt, clearsAt, sun, lead: verdict === null ? null : leadLayer(verdict) }
+    return { kind, event, verdict, read: c?.read ?? null, doubt: c?.doubt ?? null, clearsAt: c?.clearsAt ?? null, sun, lead: verdict === null ? null : leadLayer(verdict) }
   }
   const calls = { sunset: callFor('sunset'), sunrise: callFor('sunrise') }
 
@@ -250,7 +239,7 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onViewfinder,
     const model = brief.wx === null ? null : { low: wxAt('cloud_cover_low'), mid: wxAt('cloud_cover_mid'), high: wxAt('cloud_cover_high') }
     const read = skyNow(fresh?.sky ?? null, model, sunNow.altitude, compassPoint(sunNow.azimuth))
     const named = nowHeadline(read.worth)
-    const colourNow = colourNowWords(skyCallNow(brief.days, realNow, venue), realNow, deckOverhead)
+    const colourNow = colourNowWords(one.now, realNow, deckOverhead)
     const word = fresh !== null ? stationWord(fresh.sky) : skyCell(model)
     const deck = fresh === null ? null : deckOf(fresh.sky.groups)
     const moving = motion === null ? null : compassPoint(motion.fromDeg + 180)
@@ -260,7 +249,8 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onViewfinder,
     const firstWeek = rows === 'loading' || rows === null ? null : (rows[0] ?? null)
     const out: TapInRow[] = [
       fresh === null
-        ? { label: 'Clouds', value: word ?? '—', detail: word === null ? 'no station report, no forecast for this hour' : 'forecast · no station report in 75 min' }
+        ? /* Batch SIMPLE-3, Section 0.5: "no station report" only once the station has answered; while it is asked, that is what it says. */
+          { label: 'Clouds', value: word ?? '—', detail: !stationAsked ? 'forecast · asking the station' : word === null ? 'no station report, no forecast for this hour' : 'forecast · no station report in 75 min' }
         : { label: 'Clouds', value: deck === null ? (fresh.sky.clear ? 'None under 12,000 ft' : (stationWord(fresh.sky) ?? '—')) : `${AMOUNT_WORD[deck.amount]} ${ft(deck.baseFt)}`, detail: `${fresh.sky.station} · ${ageMin} min` },
       motion === null || moving === null
         ? { label: 'Moving', value: '—', detail: 'the forecast did not say' }

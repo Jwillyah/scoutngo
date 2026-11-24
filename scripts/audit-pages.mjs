@@ -23,6 +23,11 @@
  *             icon-only week grid; Viewfinder and Calendar ›; the map's
  *             Cloud chip opens it too, and the map has no Sky sheet tabs
  *
+ *   Back      Batch SIMPLE-3, Section 0.4: the spot search's × and Escape, from
+ *             the home and from the map, and Back from Surf, Tide, Wind,
+ *             Sky and Weather opened from the home: each lands where it
+ *             came from, never on the spot search
+ *
  * Nothing on a page says safe or clear (rule 28; ux-rules 12), except the
  * station's own "below 12,000 ft" cloud report, which is about cloud.
  */
@@ -38,7 +43,7 @@ import { CALIBRATION_VENUE } from '../src/lib/venue.ts'
 import { placeKey } from '../src/core/venueName.ts'
 
 guardAudit('pages')
-const watchdog = startWatchdog('pages', 420_000)
+const watchdog = startWatchdog('pages', 600_000)
 const OUT = process.argv[2] ?? join(process.env.SCOUTNGO_OUT ?? tmpdir(), 'pages')
 mkdirSync(OUT, { recursive: true })
 
@@ -272,6 +277,63 @@ try {
       await page.locator('.drpage .ppage__back').click()
       await wait(800)
     }
+    /*
+     * ---------------------------------------------------------- every Back, never the spot search (Batch SIMPLE-3, Section 0.4)
+     * The search is a modal of the screen it was opened over (src/lib/spotPick.ts): its ×, Escape and every
+     * page's Back return to that screen, and no Back finds the search again. Counted, so a run that could
+     * open nothing fails (docs/failure-modes.md B).
+     */
+    const on = () => ev(`JSON.stringify({ picker: !!document.querySelector('.spick'), home: !!document.querySelector('.home.homep [data-tile]'), map: [...document.querySelectorAll('.pill-venue')].some((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 }) })`).then(JSON.parse)
+    let backs = 0
+    const expectOn = async (step, want) => {
+      await wait(900)
+      const o = await on()
+      backs += 1
+      if (o.picker) fail(`${label}: ${step}: the spot search is on screen`)
+      if (want === 'home' && !o.home) fail(`${label}: ${step}: not the home (${JSON.stringify(o)})`)
+      if (want === 'map' && (!o.map || o.home)) fail(`${label}: ${step}: not the map (${JSON.stringify(o)})`)
+    }
+    if ((await goHome(ev, wait)) !== 'home') fail(`${label}: no home for the Back paths`)
+    for (const how of ['×', 'Escape']) {
+      const opened = await page.locator('.homep__spot').click({ timeout: 4000 }).then(() => true, () => false)
+      await wait(900)
+      if (!opened || !(await on()).picker) {
+        fail(`${label}: the home's spot ⌄ opened no spot search`)
+        continue
+      }
+      if (how === '×') await page.locator('.spick__x').click({ timeout: 4000 }).catch(() => fail(`${label}: the spot search has no ×`))
+      else await page.keyboard.press('Escape')
+      await expectOn(`home › spot search › ${how}`, 'home')
+    }
+    for (const tile of ['surf', 'tide', 'wind', 'sky', 'weather']) {
+      const t = await page.locator(`.home [data-tile="${tile}"]`).first().click({ timeout: 4000 }).then(() => true, () => false)
+      if (!t) {
+        fail(`${label}: no ${tile} tile for the Back paths`)
+        continue
+      }
+      await wait(2500)
+      /* The page's own Back (a page's arrow, or the map's for Wind): the top one on screen. */
+      const tapped = await ev(`(() => { const vis = (e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && !e.closest('[inert]') }; const b = [...document.querySelectorAll('.ppage__back, .dpage__back:not(.ppage__map), .topbar__back')].filter(vis).pop(); if (!b) return false; b.click(); return true })()`)
+      if (!tapped) fail(`${label}: home › ${tile}: no Back on screen`)
+      await expectOn(`home › ${tile} › Back`, 'home')
+    }
+    await page.locator('.home .hbtn--round[aria-label="Open the map"]').click().catch(() => fail(`${label}: no map button on the home`))
+    await wait(2500)
+    for (const how of ['×', 'Escape']) {
+      const p2 = await page.locator('.pill-venue').first().click({ timeout: 4000 }).then(() => true, () => false)
+      await wait(900)
+      if (!p2 || !(await on()).picker) {
+        fail(`${label}: the map's place pill opened no spot search`)
+        continue
+      }
+      if (how === '×') await page.locator('.spick__x').click({ timeout: 4000 }).catch(() => {})
+      else await page.keyboard.press('Escape')
+      await expectOn(`map › spot search › ${how}`, 'map')
+    }
+    if ((await goHome(ev, wait)) !== 'home') fail(`${label}: the map's Back did not bring the home`)
+    await expectOn('map › Back', 'home')
+    if (backs < 10) fail(`${label}: only ${backs} Back paths were walked`)
+    console.log(`  Back paths: ${backs} walked, the spot search on none`)
     /* The map: its Cloud chip opens the Sky page; no Sky sheet with tabs. */
     await page.locator('.home .hbtn--round[aria-label="Open the map"]').click().catch(() => fail(`${label}: no map button on the home`))
     await wait(2500)

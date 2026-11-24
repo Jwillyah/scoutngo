@@ -110,6 +110,7 @@ import { readShareHash, SHARE_PREFIX } from './lib/planShare.ts'
 import type { MenuRows, MenuTarget } from './components/Menu.tsx'
 import type { HomeTarget } from './components/Home.tsx'
 import { TileHome, type TileTarget } from './components/TileHome.tsx'
+import { followSurface, openSpotPick, spotPickShown, spotSurface, type SpotPick } from './lib/spotPick.ts'
 import { spotKey } from './core/spotSkill.ts'
 import { readPersona, usePersona } from './lib/persona.ts'
 import { OPEN_RADAR_EVENT, OPEN_SKY_EVENT, OPEN_WEATHER_EVENT } from './lib/pageEvents.ts'
@@ -1548,7 +1549,22 @@ function App() {
   const [mapShown, setMapShown] = useState(false)
   const venueCache = useVenueCache(mapShown ? centre : null, reachMeters, venueNameLine)
   /* The spot switcher over Today (Batch I, Section 1). */
-  const [spotPickOpen, setSpotPickOpen] = useState(false)
+  /* Batch SIMPLE-3, Section 0.4: the spot search belongs to the screen it was opened over and is shown only while that screen is (src/lib/spotPick.ts); it never enters history. */
+  const [spotPick, setSpotPick] = useState<SpotPick | null>(null)
+  const surface = spotSurface({ briefOpen, skyOpen, weatherOpen, droneOpen, fishOpen, bestSkyOpen, menuOpen, reportOpen, nowOpen, dayOpen, smn: smnOpen !== null })
+  const spotPickOpen = spotPickShown(spotPick, surface)
+  const setSpotPickOpen = (open: boolean) => setSpotPick(open ? openSpotPick(surface) : null)
+  /* Left any other way than its × or a pick: gone, so no Back finds it again. */
+  useEffect(() => {
+    if (followSurface(spotPick, surface) !== spotPick) setSpotPick(null) // oxlint-disable-line react/set-state-in-effect -- the search's own state follows the screen it was opened over
+  }, [spotPick, surface])
+  /* A Back that reaches the app (a popstate) while it is up closes it: the screen under it is where Back goes. */
+  useEffect(() => {
+    if (!spotPickOpen) return
+    const onPop = () => setSpotPick(null)
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [spotPickOpen])
   /* The first run asks only on a bare launch: a shared plan's link, or ?calibration=1, brings its own place. */
   const [bareLaunch] = useState(() => typeof window === 'undefined' || (window.location.search.length <= 1 && window.location.hash.length <= 1))
   /*

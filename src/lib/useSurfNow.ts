@@ -29,9 +29,10 @@ import { keepWatch, takeDailyModelsAsk } from './swellWatchStore.ts'
 import { useFirstLoadSettled } from './firstLoad.ts'
 import { onSkillBook, readSkillBook, skillBookVersion } from './spotSkillStore.ts'
 import { awayFrom, beachName, sameBeach, useSurfBeach, type Beach } from './surfBeach.ts'
-import { useSurfSea, type SurfSea } from './useSurfSea.ts'
+import { seaSettled, useSurfSea, type SurfSea } from './useSurfSea.ts'
 import { fetchWaveModels, type ModelSea } from './waveModels.ts'
-import { useStationObs } from './useStationObs.ts'
+import { stationObsAnswered, useStationObs } from './useStationObs.ts'
+import { useCoastCams } from './coastCamsLazy.ts'
 import { leanHourly } from './windNow.ts'
 import { keepWeek } from './weekBiasStore.ts'
 
@@ -56,6 +57,14 @@ export interface SurfNow {
   series: RangeHour[]
   /** Batch FIX, Section 3.4: the bigger-swell watch for the week page; null when nothing we hold reaches it. */
   watch: SwellWatch | null
+  /**
+   * Batch SIMPLE-3, Section 0: every input the call reads has answered: the
+   * beach is chosen (the cams' list is in, src/lib/surfBeach.ts), its sea,
+   * facing and buoy (src/lib/useSurfSea.ts seaSettled), and the station the
+   * wind leans to. Before that the size can still move (23 Nov: "1–2 ft",
+   * then "2–3 ft" in the same minute).
+   */
+  settled: boolean
 }
 
 export interface SurfDay {
@@ -244,6 +253,8 @@ export function useSurfNow(venue: LatLon | null, now: Date, timeZone: string, mi
   const seaRaw = useMemo(() => (waveModels === null ? seaOwn : { ...seaOwn, models: waveModels }), [seaOwn, waveModels])
   /* Batch FIX, Section 1: the wind the call reads leans to the one station now, the home's and the Wind page's (src/lib/useStationObs.ts). */
   const near = useStationObs(venue)
+  const camsIn = useCoastCams() !== null
+  const answered = camsIn && seaSettled(seaOwn) && stationObsAnswered(venue)
   const sea = useMemo(() => {
     const wind = leanHourly(seaRaw.wind, near, now)
     return wind === seaRaw.wind ? seaRaw : { ...seaRaw, wind }
@@ -283,5 +294,6 @@ export function useSurfNow(venue: LatLon | null, now: Date, timeZone: string, mi
     week: read.week,
     series: read.series,
     watch: read.watch,
+    settled: answered,
   }
 }

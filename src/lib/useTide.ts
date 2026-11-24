@@ -1,5 +1,5 @@
 import { retrying } from './retrying.ts'
-import { useEffect, useState } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
 import type { LatLon } from '../core/geo.ts'
 import {
   nearestStations,
@@ -58,13 +58,109 @@ export const chosenFor = (at: LatLon): string | null => chosen.get(spotKey(at)) 
 /** How many stations to try before giving up. See the loop below. */
 export const STATION_ATTEMPTS = 3
 
-export function useTide(venue: LatLon | null, shootAt: Date | null): TideInfo {
-  const [info, setInfo] = useState<TideInfo>({ status: 'idle' })
+/*
+ * ONE TIDE PER SPOT AND DAY (Batch SIMPLE-3, Section 0). Every screen's
+ * useTide asked again from 'loading' on each mount, so the home mounted again
+ * (Back from a page, the spot search closed) said "Tide —" for a few seconds
+ * while the Surf page beside it had the table. The answer is kept here, once
+ * per spot and day, for every screen; the asking belongs to the spot, not to
+ * the screen that happened to ask first.
+ */
+const tides = new Map<string, TideInfo>()
+const tideListeners = new Set<() => void>()
+let tideVersion = 0
+function putTide(key: string, info: TideInfo): void {
+  tides.set(key, info)
+  if (tides.size > 24) tides.delete(tides.keys().next().value as string)
+  tideVersion += 1
+  for (const l of [...tideListeners]) l()
+}
+const subscribeTide = (l: () => void) => {
+  tideListeners.add(l)
+  return () => tideListeners.delete(l)
+}
+const tideNow = () => tideVersion
+/** For tests. */
+export function clearTides(): void {
+  tides.clear()
+  tideVersion += 1
+}
 
+function askTide(key: string, lat: number, lon: number, shootAt: Date): void {
+  if (tides.has(key)) return
+  const setInfo = (info: TideInfo) => putTide(key, info)
+  setInfo({ status: 'loading' })
+  /* Asked again after a failure (src/lib/retrying.ts): true is finished, false is try again. */
+  retrying(async () => {
+    const stations = await fetchStations()
+    if (stations.status !== 'ok') {
+      setInfo({ status: 'unavailable', reason: stations.reason })
+      return false
+    }
+
+    /*
+     * Batch MAP2, Section 2: the open coast first among the nearest (a spot on the beach, not up a creek).
+     * Batch Beach, Section 1: from the ocean beach, when the spot is on a barrier island's sound side (above).
+     */
+    const beach = await beachFor({ lat, lon })
+    const from = beach ?? { lat, lon }
+    const spot = spotKey({ lat, lon })
+    const ordered = openCoastFirst(nearestStations(from, stations.stations, STATION_ATTEMPTS + 3)).slice(0, STATION_ATTEMPTS)
+    const was = chosen.get(spot)
+    const candidates = was === undefined ? ordered : [...ordered.filter((c) => c.station.id === was), ...ordered.filter((c) => c.station.id !== was)]
+    const nearest = candidates[0]
+    if (nearest === undefined) {
+      setInfo({ status: 'unavailable', reason: 'NOAA listed no tide stations.' })
+      return true
+    }
+    if (nearest.proximity === 'none') {
+      setInfo({
+        status: 'no-station',
+        nearestKm: nearest.distanceKm,
+        nearestName: nearest.station.name,
+      })
+      return true
+    }
+
+    /*
+     * Nearest AND active. The closest station may publish nothing against the
+     * MLLW datum, which is not a reason to tell a waterfront venue it has no
+     * tide, so the next few are tried in order. Bounded, because this is a
+     * shared public service and a venue with three dead stations around it is
+     * genuinely a venue without usable predictions.
+     */
+    let lastReason = 'No nearby station published predictions for this date.'
+    let unreachable = false
+    for (const candidate of candidates) {
+      if (candidate.proximity === 'none') break
+      const predictions = await fetchPredictions(candidate.station.id, shootAt)
+        if (predictions.status === 'ok') {
+        chosen.set(spot, candidate.station.id)
+        setInfo({
+          status: 'ok',
+          station: candidate.station,
+          distanceKm: candidate.distanceKm,
+          distant: candidate.proximity === 'distant',
+          predictions: predictions.predictions,
+        })
+        return true
+      }
+      lastReason = predictions.reason
+      if (predictions.status === 'unavailable' && predictions.unreachable === true) unreachable = true
+    }
+    setInfo({ status: 'unavailable', reason: lastReason })
+    /* A station that publishes nothing will publish nothing on a second ask; a dropped request might answer. */
+    return !unreachable
+  })
+}
+
+export function useTide(venue: LatLon | null, shootAt: Date | null): TideInfo {
   /* Primitives, so a new object identity each render does not refetch. */
   const lat = venue?.lat ?? null
   const lon = venue?.lon ?? null
   const dayKey = shootAt === null ? null : shootAt.toISOString().slice(0, 10)
+  const key = lat === null || lon === null || dayKey === null ? null : `${spotKey({ lat, lon })},${dayKey}`
+  useSyncExternalStore(subscribeTide, tideNow, tideNow)
 
   /*
    * Batch Beach, Section 1: a pin on a barrier island's sound side takes its
@@ -74,95 +170,19 @@ export function useTide(venue: LatLon | null, shootAt: Date | null): TideInfo {
    * is the one every screen uses (chosenFor). On 15 Nov the map said "Low
    * 5:52p" (Rudee Heights, 8639214) and the home "Low 9:15 PM" (Buchanan
    * Creek entrance, 8638854) for one spot: two stations, each right for itself.
+   *
+   * shootAt is intentionally not a dependency: only the DAY changes which
+   * predictions are needed, and depending on the instant would refetch on
+   * every drag of the time scrubber.
    */
   useEffect(() => {
-    if (lat === null || lon === null || dayKey === null || shootAt === null) {
-      setInfo({ status: 'idle' })
-      return
-    }
-
-    let live = true
-    setInfo({ status: 'loading' })
-
-    /* Asked again after a failure (src/lib/retrying.ts): true is finished, false is try again. */
-    const stop = retrying(async () => {
-      const stations = await fetchStations()
-      if (!live) return true
-      if (stations.status !== 'ok') {
-        setInfo({ status: 'unavailable', reason: stations.reason })
-        return false
-      }
-
-      /*
-       * Batch MAP2, Section 2: the open coast first among the nearest (a spot on the beach, not up a creek).
-       * Batch Beach, Section 1: from the ocean beach, when the spot is on a barrier island's sound side (above).
-       */
-      const beach = await beachFor({ lat, lon })
-      if (!live) return true
-      const from = beach ?? { lat, lon }
-      const spot = spotKey({ lat, lon })
-      const ordered = openCoastFirst(nearestStations(from, stations.stations, STATION_ATTEMPTS + 3)).slice(0, STATION_ATTEMPTS)
-      const was = chosen.get(spot)
-      const candidates = was === undefined ? ordered : [...ordered.filter((c) => c.station.id === was), ...ordered.filter((c) => c.station.id !== was)]
-      const nearest = candidates[0]
-      if (nearest === undefined) {
-        setInfo({ status: 'unavailable', reason: 'NOAA listed no tide stations.' })
-        return true
-      }
-      if (nearest.proximity === 'none') {
-        setInfo({
-          status: 'no-station',
-          nearestKm: nearest.distanceKm,
-          nearestName: nearest.station.name,
-        })
-        return true
-      }
-
-      /*
-       * Nearest AND active. The closest station may publish nothing against the
-       * MLLW datum, which is not a reason to tell a waterfront venue it has no
-       * tide, so the next few are tried in order. Bounded, because this is a
-       * shared public service and a venue with three dead stations around it is
-       * genuinely a venue without usable predictions.
-       */
-      let lastReason = 'No nearby station published predictions for this date.'
-      let unreachable = false
-      for (const candidate of candidates) {
-        if (candidate.proximity === 'none') break
-        const predictions = await fetchPredictions(candidate.station.id, shootAt)
-        if (!live) return true
-        if (predictions.status === 'ok') {
-          chosen.set(spot, candidate.station.id)
-          setInfo({
-            status: 'ok',
-            station: candidate.station,
-            distanceKm: candidate.distanceKm,
-            distant: candidate.proximity === 'distant',
-            predictions: predictions.predictions,
-          })
-          return true
-        }
-        lastReason = predictions.reason
-        if (predictions.status === 'unavailable' && predictions.unreachable === true) unreachable = true
-      }
-      setInfo({ status: 'unavailable', reason: lastReason })
-      /* A station that publishes nothing will publish nothing on a second ask; a dropped request might answer. */
-      return !unreachable
-    })
-
-    return () => {
-      live = false
-      stop()
-    }
-    /*
-     * shootAt is intentionally not a dependency: only the DAY changes which
-     * predictions are needed, and depending on the instant would refetch on
-     * every drag of the time scrubber.
-     */
+    if (key === null || lat === null || lon === null || shootAt === null) return
+    askTide(key, lat, lon, shootAt)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lat, lon, dayKey])
+  }, [key])
 
-  return info
+  if (key === null) return { status: 'idle' }
+  return tides.get(key) ?? { status: 'loading' }
 }
 
 /** How far a station may be and still be shown at all. Re-exported for the UI. */

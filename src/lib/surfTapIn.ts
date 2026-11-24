@@ -1,3 +1,5 @@
+import { getPosition } from 'suncalc'
+import type { LatLon } from '../core/geo.ts'
 import { localDate } from '../core/moonTimes.ts'
 import { nowcastAt, obsFresh, type StationObs } from '../core/nowcast.ts'
 import { SHAPE_WORD, type SurfCall } from '../core/surfCall.ts'
@@ -67,6 +69,40 @@ export function bestStretch(series: readonly RangeHour[], now: Date): BestStretc
     if (best === null || peak > best.peakFt) best = { from: new Date(r.from), to: new Date(r.to), peakFt: peak }
   }
   return best
+}
+
+/*
+ * THE ONE SURF WINDOW (Batch SIMPLE-3, Section 0.3). On 23 Nov at 11:07 AM
+ * the home's card said "1–3 ft until 5 PM", the Surf tile "2–3 ft", the Surf
+ * chart "clean 10a–11p" and its Best row "11a–11p": four rules over three
+ * series. Now there is one: the clean stretches (src/core/surf.ts surfShape's
+ * clean, the call's own) with surf in them (BEST_MIN_FT), in daylight, from
+ * the one series (src/lib/useSurfNow.ts), each [from, to) on the hour. The
+ * window is the first of them not yet over. The home's moment, the Surf
+ * page's lit stretches and its Best row all say these, in these words.
+ */
+export function surfRuns(series: readonly RangeHour[], daylight: (t: Date) => boolean): { from: Date; to: Date; peakFt: number }[] {
+  const hours = [...series].sort((a, b) => a.at.getTime() - b.at.getTime())
+  const ok = (h: RangeHour) => h.clean && h.centerFt >= BEST_MIN_FT && daylight(h.at)
+  return cleanRuns(hours.map((h) => ({ at: h.at.getTime() - HOUR / 2, clean: ok(h) }))).map((r) => ({
+    from: new Date(r.from),
+    to: new Date(r.to),
+    peakFt: Math.max(...hours.filter((h) => h.at.getTime() >= r.from && h.at.getTime() < r.to).map((h) => h.centerFt)),
+  }))
+}
+
+/** Daylight at a spot: the sun's centre above -0.8° (the home's own test). */
+export const daylightAt = (at: LatLon) => (t: Date): boolean => getPosition(t, at.lat, at.lon).altitude > -0.8
+
+/** The one window: the first surf run not yet over; null when none is left in the series. */
+export function surfWindow(series: readonly RangeHour[], now: Date, daylight: (t: Date) => boolean): BestStretch | null {
+  return surfRuns(series, daylight).find((r) => r.to.getTime() > now.getTime()) ?? null
+}
+
+/** The window's first hour still to come (now's, when it is on): the size the home's card says, the tile's when it is on now. */
+export function windowHour(series: readonly RangeHour[], w: BestStretch, now: Date): RangeHour | null {
+  const from = Math.max(w.from.getTime(), Math.floor(now.getTime() / HOUR) * HOUR)
+  return series.find((h) => h.at.getTime() >= from && h.at.getTime() < w.to.getTime()) ?? null
 }
 
 const shortDay = (at: Date, timeZone: string) => new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone }).format(at)

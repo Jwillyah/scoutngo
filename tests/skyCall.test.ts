@@ -77,7 +77,10 @@ describe('1.1 and 1.3 one sky call, held until the colour is over', () => {
   })
   it('every surface reads it: the home card, the Sky page\'s tabs and Next, the Go alert', () => {
     expect(readFileSync('src/components/Home.tsx', 'utf8')).toMatch(/skyCallNow\(brief\.days\.slice\(0, 2\), now, venue\)/)
-    expect(readFileSync('src/components/SkyPage.tsx', 'utf8')).toMatch(/const soonest: Kind = skyCallNow\(brief\.days, realNow, venue\)/)
+    /* Batch SIMPLE-3, Section 0.2: through the one sky call object (src/lib/useSkyCalls.ts), whose `now` is skyCallNow's (tests/oneSkyCall.test.ts). */
+    expect(readFileSync('src/components/SkyPage.tsx', 'utf8')).toMatch(/const one = useSkyCalls\(brief, venue, realNow, timeZone\)/)
+    expect(readFileSync('src/components/SkyPage.tsx', 'utf8')).toMatch(/const soonest: Kind = one\.now\?\.kind/)
+    expect(readFileSync('src/components/TileHome.tsx', 'utf8')).toMatch(/const calls = useSkyCalls\(brief, venue, now, timeZone\)/)
     expect(readFileSync('src/components/SkyPage.tsx', 'utf8')).not.toMatch(/nextEvent\(/)
   })
   it('the pill and the call agree on the event and the word at 4:59 PM', () => {

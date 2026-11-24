@@ -9,6 +9,8 @@ import { LAYER_WORD, type Layer } from '../core/skyColour.ts'
 import { LOG_FOR_H } from '../core/skyFire.ts'
 import { layerWords } from '../core/layerTruth.ts'
 import { useSkyObs } from '../lib/useSkyObs.ts'
+import { useBriefing } from '../lib/useBriefing.ts'
+import { useSkyCalls } from '../lib/useSkyCalls.ts'
 import { eventCall } from '../core/briefing.ts'
 import { colorWords } from '../core/homeDay.ts'
 import { colorHeadline } from '../core/skyPage.ts'
@@ -113,7 +115,18 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
   const seen = obs === null || event === null || verdict === null ? null : eventCall(verdict, kind, event, realNow, null, { venue, truth: obs.truth, gap: obs.gap })
   const byStations = seen !== null && seen.call === 'Go' && seen.peak != null
   /* Batch QA, Section 0: the call, as the home, the menu and the Sky page say it (src/core/briefing.ts eventCall, the words colorWords'), never the models' own word beside it. */
-  const call = seen?.call ?? (verdict === null || event === null ? null : eventCall(verdict, kind, event, realNow).call)
+  /*
+   * Batch SIMPLE-3, Section 0.2: for the event the home and Sky Tonight are
+   * about, the word is the one sky call's (src/lib/useSkyCalls.ts), never this
+   * page's own second read of it (23 Nov 4:57 PM: Tonight "Color possible",
+   * this page "Color likely"). A later event, scrubbed to on the bar, is this
+   * page's own read, as before.
+   */
+  const brief = useBriefing(venue, timeZone, realNow, true)
+  const one = useSkyCalls(brief, venue, realNow, timeZone)[kind]
+  const same = one !== null && event !== null && one.event.getTime() === event.getTime()
+  /* When the one call has no word for that event yet (no forecast for its day, as on a logged past day), this page's own read stands. */
+  const call = same && one.call !== null ? one.call : (seen?.call ?? (verdict === null || event === null ? null : eventCall(verdict, kind, event, realNow).call))
   const said = colorWords(call)
   /* Batch J, Section 5: the best view tonight, a tap draws the wedge and the spots on the map. */
   const view = useBestView(event === null ? null : venue, event)

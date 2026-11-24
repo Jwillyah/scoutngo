@@ -1,0 +1,23 @@
+{
+  "about": "Batch SIMPLE-3, Section 0.1: the two states the home flickered between on 23 Nov 2026 at 5:10 PM at Atlantic Park Surf (field report), as the tile home's parts (src/components/TileHome.tsx). A: the parts drawn before their inputs had all answered (no satellite read, no facing or buoy, no tide table). B: every input in. Values are the field report's words; times America/New_York.",
+  "now": "2026-11-23T22:10:00Z",
+  "spot": "36.851,-75.980",
+  "A": {
+    "sky": { "kind": "sunset", "event": 1795470600000, "call": "Maybe", "from": null, "to": null, "lookDeg": 245, "dayIndex": 0 },
+    "surf": { "value": { "text": "1–2 ft", "shared": { "key": "surf" } }, "tag": "Poor", "line": [{ "text": "ankle to knee" }], "bars": [{ "v": 1.4, "on": false }, { "v": 1.5, "on": false }, { "v": 1.5, "on": false }], "window": null, "fun": null, "coast": true },
+    "tide": { "turns": [] },
+    "wind": { "value": { "text": "4 kt WSW", "shared": { "key": "wind" } }, "tag": null, "line": [{ "text": "gusts 7 kt" }], "steps": [{ "fromDeg": 250, "calm": false, "at": 1795473000000 }] },
+    "fish": { "run": null, "noWind": false },
+    "drone": { "value": { "text": "Light wind" }, "tag": null, "line": [{ "text": "6 kt at 400 ft" }], "bars": [{ "v": 6, "on": false }], "limit": 23 },
+    "weather": { "tempC": 11, "cond": "Partly cloudy", "hiC": 14, "loC": 8, "hours": [] }
+  },
+  "B": {
+    "sky": { "kind": "sunset", "event": 1795470600000, "call": "Go", "from": 1795470000000, "to": 1795472400000, "lookDeg": 245, "dayIndex": 0 },
+    "surf": { "value": { "text": "2–3 ft", "shared": { "key": "surf" } }, "tag": "Poor-Fair", "line": [{ "text": "knee to thigh · 10 s" }], "bars": [{ "v": 2.4, "on": true }, { "v": 2.5, "on": true }, { "v": 2.5, "on": true }], "window": null, "fun": null, "coast": true },
+    "tide": { "turns": [{ "at": 1795485480000, "feet": 3.1, "kind": "high" }, { "at": 1795507800000, "feet": 0.2, "kind": "low" }] },
+    "wind": { "value": { "text": "4 kt WSW", "shared": { "key": "wind" } }, "tag": null, "line": [{ "text": "gusts 7 kt · offshore" }], "steps": [{ "fromDeg": 250, "calm": false, "at": 1795473000000 }] },
+    "fish": { "run": null, "noWind": false },
+    "drone": { "value": { "text": "Light wind" }, "tag": null, "line": [{ "text": "6 kt at 400 ft" }], "bars": [{ "v": 6, "on": false }], "limit": 23 },
+    "weather": { "tempC": 11, "cond": "Partly cloudy", "hiC": 14, "loC": 8, "hours": [] }
+  }
+}

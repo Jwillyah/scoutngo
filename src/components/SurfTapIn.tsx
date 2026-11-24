@@ -8,7 +8,7 @@ import { nextTurns } from '../core/tideWindow.ts'
 import { formatShortClock, formatShortHour } from '../core/timezone.ts'
 import { waterHead, wetsuitWords } from '../core/waterTemp.ts'
 import { bigCam, camLine } from '../lib/surfCam.ts'
-import { barRuns, bestStretch, stretchWords, surfBars, surfHero, windFromNow, BARS_HOURS } from '../lib/surfTapIn.ts'
+import { barRuns, daylightAt, stretchWords, surfBars, surfHero, surfRuns, surfWindow, windFromNow, BARS_HOURS } from '../lib/surfTapIn.ts'
 import { metresToFeet, compass } from '../lib/tideWords.ts'
 import { formatTemperature, type Units } from '../lib/units.ts'
 import { seaNow, sideWord, surfNowFrom } from '../lib/useSurfNow.ts'
@@ -72,13 +72,14 @@ const LABEL_ROOM = 22
 const AXIS_ROOM = 16
 const CHAR_PX = 6.6
 
-export function SurfBars({ bars, from, to, now, timeZone }: { bars: ReturnType<typeof surfBars>['bars']; from: Date; to: Date; now: Date; timeZone: string }) {
+export function SurfBars({ bars, from, to, now, timeZone, runs: lit = null }: { bars: ReturnType<typeof surfBars>['bars']; from: Date; to: Date; now: Date; timeZone: string; runs?: readonly { from: Date; to: Date }[] | null }) {
   const span = to.getTime() - from.getTime()
   const x = (t: number) => ((t - from.getTime()) / span) * W
   const slot = W / BARS_HOURS
   const top = chartTopFt(bars.map((b) => b.ft))
   const plot = H - LABEL_ROOM - AXIS_ROOM
-  const runs = barRuns(bars)
+  /* Batch SIMPLE-3, Section 0.3: the stretches lit are the one surf window's runs (src/lib/surfTapIn.ts surfRuns), when the page passes them. */
+  const runs = (lit ?? barRuns(bars)).filter((r) => r.to.getTime() > from.getTime() && r.from.getTime() < to.getTime())
   const ticks = [1, 7, 13, 19].map((k) => new Date(from.getTime() + k * 3_600_000))
   const nowX = x(now.getTime())
   return (
@@ -141,7 +142,10 @@ export function SurfTapIn({ now, timeZone, venue, spot, placeName, sea, stats, u
   const sea0 = seaNow(sea, now, head?.periodS ?? null)
   const swell = swellOf(sea0.parts) ?? sea0.parts[0] ?? null
   const { from, to, bars } = surfBars(read.series, now)
-  const best = bestStretch(read.series, now)
+  /* Batch SIMPLE-3, Section 0.3: the one surf window, the home's card's too (src/lib/surfTapIn.ts surfWindow). */
+  const daylight = daylightAt(spot)
+  const runs = surfRuns(read.series, daylight)
+  const best = surfWindow(read.series, now, daylight)
   const turn = tide.status === 'ok' ? nextTurns(tide.predictions.extremes, now).next : null
 
   const noForecast = sea.marine === null
@@ -207,7 +211,7 @@ export function SurfTapIn({ now, timeZone, venue, spot, placeName, sea, stats, u
       chart={
         tab === 'now' && !noForecast ? (
           <>
-            {bars.length === 0 ? <p className="tcurve__none">The forecast did not say for the next hours.</p> : <SurfBars bars={bars} from={from} to={to} now={now} timeZone={timeZone} />}
+            {bars.length === 0 ? <p className="tcurve__none">The forecast did not say for the next hours.</p> : <SurfBars bars={bars} from={from} to={to} now={now} timeZone={timeZone} runs={runs} />}
             {tide.status === 'ok' ? (
               <>
                 <p className="sbars__tidelabel">tide</p>

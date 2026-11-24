@@ -55,5 +55,20 @@ export function useStationNow(venue: LatLon | null, at: Date | null, online: boo
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [askKey])
-  return answer !== null && answer.key === askKey ? answer.sky : null
+  /*
+   * Batch SIMPLE-3, Section 0: the minute's question is new each minute; until
+   * it answers, the last report for this same place stands (it carries its
+   * own time), rather than nothing for a moment each minute. The Sky page's
+   * doubt on the call flickered with it.
+   */
+  if (answer === null || askKey === null) return null
+  if (answer.key === askKey) return answer.sky
+  return answer.key.split('@')[0] === key ? answer.sky : null
+}
+
+/** Batch SIMPLE-3, Section 0: whether the station's report near now has answered (a report or none) for this place, or cannot be asked (offline, or `at` not near now): the sky call's doubt will not change under it. */
+export function stationNowAnswered(venue: LatLon | null, at: Date, online: boolean, now: number = Date.now()): boolean {
+  if (venue === null || !online || !nearNow(at, now)) return true
+  const hit = cache.get(`${venue.lat.toFixed(2)},${venue.lon.toFixed(2)}`)
+  return hit !== undefined && hit.pending === undefined
 }

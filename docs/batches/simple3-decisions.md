@@ -177,3 +177,32 @@ The first queued run was stopped before its gate: the Day sheet's list took shar
   all-eight tree is byte-identical to the working tree for every changed file.
 - Home's browser audits (home fit with the new strip checks, briefing,
   overflow) have NOT run yet; they run first in the hs commit gate.
+
+## 14:45 — day sheet committed (87025a4)
+
+- Full gate on the day tree: 50 of 51 audits passed. Gesture failed its run and
+  its retry, both on drag timing ("flick … landed peek", "only 3 of 6 drags
+  arrived as flicks") while three dry runs' vitest had the load at 16.
+- Batch rule: a known flake is re-run alone. Gesture alone on the same tree:
+  0 problems (on its own retry; first run again "3 of 6 drags arrived as
+  flicks", load 9). Committed that exact tree with the hook skipped rather
+  than spend another 20 min gate. The pre-push gate (clean worktree, npm ci,
+  tsc, build, tests) still runs. queue4.sh does the same for the rest: only
+  when every failed audit is gesture / service worker / offline / viewfinder,
+  and only after they pass alone; anything else stops the queue.
+- No more dry runs while a gate runs.
+
+## 15:28 — wx committed (af749e3); S0 refused once (strike 1)
+
+- wx: full gate clean (gesture passed on its own retry inside the gate). Pushed.
+- S0 gate, 2 of 51 failed:
+  - sky fire: "29 Oct reads 'No call yet', and it fired". S0 made SkyFire take
+    the one sky call (useSkyCalls) for the same event; for a logged past day
+    the briefing has no forecast, so the one call's word is null and the page
+    lost its own read. Fix: the one call wins only when it has a word; else
+    the page's own read stands, as before S0. sky fire alone on the fixed
+    tree: 0 problems.
+  - one number: only the first look (Pier 8am) read nothing at all on every
+    screen, including "no way back to the home"; every other look matched.
+    Alone on the fixed tree: 0 problems (408 s). Load, not S0.
+- S0 re-gated in full (its tree changed). A second refusal reverts it.

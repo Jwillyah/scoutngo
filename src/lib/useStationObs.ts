@@ -217,3 +217,10 @@ export function useStationObs(spot: LatLon | null): StationNow | null {
     () => null,
   )
 }
+
+/** Batch SIMPLE-3, Section 0: whether the spot's station has been asked and has answered (a station or none), so a screen can wait for it rather than draw a call it is about to change. */
+export function stationObsAnswered(spot: LatLon | null): boolean {
+  if (spot === null) return true
+  const e = entries.get(spotKeyOf(spot))
+  return e !== undefined && e.askedAt > 0 && !e.asking
+}

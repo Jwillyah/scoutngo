@@ -53,6 +53,15 @@ export function SpotPicker({ title, saved, around, initialQuery = '', onPick, on
     }
   }, [])
   const searchBox = useRef<HTMLInputElement | null>(null)
+  /* Batch SIMPLE-3, Section 0.4: a modal: Escape closes it, back to the screen it was opened over (src/lib/spotPick.ts); the first run's has no way out but a pick. */
+  useEffect(() => {
+    if (onClose === undefined) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
   /* The geocoders' answer, kept with the words it answers: an answer to older words is not shown (E7). */
   const [online, setOnline] = useState<{ text: string; result: GeoAnswer | 'searching' } | null>(null)
   const [centre, setCentre] = useState<{ at: LatLon; label: string } | null>(around === null ? null : { at: around, label: 'here' })
