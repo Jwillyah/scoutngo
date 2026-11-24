@@ -64,6 +64,8 @@ export const AUDITS = [
   /* Batch SIMPLE-2, Section 2: taps from a fresh install for seven tasks (surf now, tonight's color, can I fly, the tide, plan a shoot, a spot by name, by address), each held to its budget. */
   { name: 'taps', script: 'audit-taps.mjs', summary: /TAPS PROBLEMS/, pattern: /PROBLEM|ABORTED|\| / },
   { name: 'clean map', script: 'audit-clean-map.mjs', summary: /CLEAN MAP PROBLEMS/, pattern: /PROBLEM|ABORTED/ },
+  /* Batch SIMPLE-3, Section 6.2: the map's Near-you banner covers no control, at every size and standalone. */
+  { name: 'near banner', script: 'audit-near-banner.mjs', summary: /NEAR BANNER PROBLEMS/, pattern: /PROBLEM|ABORTED/ },
   /* Batch SIMPLE-2, Section 0: the map opened eighteen ways, never the planner; Menu › Plan a shoot always it. */
   { name: 'planner', script: 'audit-planner.mjs', summary: /PLANNER PROBLEMS/, pattern: /PROBLEM|ABORTED/ },
   /* Batch SIMPLE-3, Section 4: Menu › Plan a shoot opens the Day sheet in one tap; its rows, strip and buttons fit at every size. */

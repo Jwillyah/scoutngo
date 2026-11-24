@@ -44,8 +44,8 @@ export interface RangeHour {
   windKt: number | null
   /** Whether that wind chops the water (src/core/surfCall.ts surfChop): then never clean, never Rideable. */
   chop: boolean
-  /** "Poor · choppy" / "Fair · textured" when it does; null otherwise. */
-  quality: SurfQuality | null
+  /** The pill: Poor, Poor-Fair, Fair, Good, or the chop words when the wind chops the water. */
+  quality: SurfQuality
   /** Whether the wind sea dominates the swell at the beach this hour (src/core/surfTransform.ts windSeaDominates); null when the sea's parts could not be worked out. */
   windSeaDominant: boolean | null
 }
@@ -125,7 +125,7 @@ export function rangeHourAt(marine: Hourly, wind: Hourly | null, at: Date, facin
     tag: surfTag(range.centerFt, shape),
     windKt,
     chop,
-    quality: surfQuality(range.centerFt, chop),
+    quality: surfQuality(range.centerFt, chop, shape, s.periodS),
     windSeaDominant,
   }
 }

@@ -79,7 +79,7 @@ export interface SurfDay {
 export const sideWord = (h: RangeHour): string | null => (h.side === null ? null : sideWords(h.side))
 
 /** surfCall(spot, time): one hour of one spot, called (Batch TRUTH, Section 1). */
-export const callOf = (h: RangeHour | null, dayIndex: number): SurfCall | null => (h === null ? null : surfCall({ centerFt: h.centerFt, shape: h.shape, side: sideWord(h), chop: h.chop }, dayIndex))
+export const callOf = (h: RangeHour | null, dayIndex: number): SurfCall | null => (h === null ? null : surfCall({ centerFt: h.centerFt, shape: h.shape, side: sideWord(h), chop: h.chop, periodS: h.periodS, windKt: h.windKt }, dayIndex))
 
 /**
  * THE SEA NOW, ONE SOURCE (Batch QA, Section 0B; field 10 Nov: one Surf page

@@ -25,7 +25,14 @@
  * be set against what the beach had.
  */
 export const WATCH_FT = 4
-export const WATCH_CALL_MAX_FT = 2
+/*
+ * Batch SIMPLE-3, Section 5.3 (Surfline showed Wed 4-6, Thu 6-8 ft at
+ * Sandbridge): the chip stands for "a model says bigger than we do", so it
+ * shows while our call's top is under WATCH_FT, 3 ft or under. It was 2; a
+ * day we called 2-3 with a model at 5 ft said nothing. A call that already
+ * says 3-4 or more has nothing to add.
+ */
+export const WATCH_CALL_MAX_FT = 3
 
 /*
  * THE WAVE MODELS (Batch 3D, Section 3.2), by Open-Meteo Marine's own ids

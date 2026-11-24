@@ -102,6 +102,8 @@ export interface Radar {
   flowToDeg: number | null
   /** Tiles read in the newest scan's grid, for "could not look". */
   scans: number
+  /** Batch SIMPLE-3, Section 1b: the newest scan's grid itself, for the rain nowcast's samples at the spot and upstream (src/core/rainNow.ts radarSample). */
+  grid?: Grid
 }
 
 /** The newest scans round the venue; `asOf` replays a past scan time (5-minute steps) for the storm-day replay. */
@@ -118,7 +120,7 @@ export async function fetchRadar(venue: LatLon, fetchImpl: typeof fetch = fetch,
   const scans = grids.filter((s): s is Scan => s !== null)
   if (newest === null || scans.length === 0 || scans[scans.length - 1].at.getTime() !== valid.getTime()) return null
   const tracks = trackCells(scans)
-  return { scanAt: valid, tracks, scans: scans.length, nearRain: nearestEcho(newest, venue), flowToDeg: flowToward(tracks) }
+  return { scanAt: valid, tracks, scans: scans.length, nearRain: nearestEcho(newest, venue), flowToDeg: flowToward(tracks), grid: newest }
 }
 
 /* ------------------------------------------------------------- the HRRR */

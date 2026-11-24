@@ -14,6 +14,7 @@ import { nearestStation, stationReport } from '../lib/stationNear.ts'
 import { fetchBriefWind, fetchWeatherExtras, hourlyAt, type Hourly } from '../lib/tideSheetData.ts'
 import { formatTemperature, type Units } from '../lib/units.ts'
 import { useStationObs } from '../lib/useStationObs.ts'
+import { useFogRain } from '../lib/useFogRain.ts'
 import { gustWords, windAt, windWords } from '../lib/windNow.ts'
 import { PageShell } from './PageShell.tsx'
 import { MarineLine } from './MarineLine.tsx'
@@ -23,7 +24,7 @@ import { SkyIconSvg } from './SkyIconSvg.tsx'
 import { LiveSkyDraw } from './LiveSky.tsx'
 import { useLiveSky } from '../lib/useLiveSky.ts'
 import { DaysPage, ModelsPage } from './WeatherPages.tsx'
-import { TapInPage, type TapInRow } from './TapInPage.tsx'
+import { TapInPage, type TapInPageProps, type TapInRow } from './TapInPage.tsx'
 import { WeatherChart } from './WeatherChart.tsx'
 import { CHART_HOURS, type ChartHour } from '../core/weatherChart.ts'
 import { WEATHER_PAGE_OLD_FIRST } from '../config/flags.ts'
@@ -57,9 +58,11 @@ interface WeatherPageProps {
   onMap?: () => void
   /** The radar on the map. */
   onRadar: (scanAt: Date | null) => void
+  /** Batch SIMPLE-3, Section 2.5: the hour to open on (a tap on an hour of the home's strip), ms; null or absent, now. */
+  at?: number | null
 }
 
-export function WeatherPage({ venue, placeName, timeZone, units, now, onBack, onMap, onRadar }: WeatherPageProps) {
+export function WeatherPage({ venue, placeName, timeZone, units, now, onBack, onMap, onRadar, at: openAt = null }: WeatherPageProps) {
   const { state, reason } = useBlend(venue, timeZone, true)
   const nowcast = useNowcast(venue, true)
   const obs = useStationObs(venue)
@@ -69,6 +72,10 @@ export function WeatherPage({ venue, placeName, timeZone, units, now, onBack, on
   const [view, setView] = useState<'main' | 'days' | 'models'>('main')
   /* Batch SIMPLE-2, Section 4: the skeleton page first; "More details ›" opens the old page, unchanged (src/config/flags.ts WEATHER_PAGE_OLD_FIRST). */
   const [more, setMore] = useState(WEATHER_PAGE_OLD_FIRST)
+  /* The hour on show: the one the home's strip opened (a later hour), else now; "Back to now" brings it back. The page mounts afresh each time it opens. */
+  const [hourAt, setHourAt] = useState<number | null>(openAt !== null && openAt >= Math.floor(now.getTime() / 3_600_000) * 3_600_000 + 3_600_000 ? openAt : null)
+  /* Batch SIMPLE-3, Sections 1 and 1b: the fog and the rain here, the home's own (src/lib/useFogRain.ts), with this page's radar scan. */
+  const fr = useFogRain(venue, now, timeZone, { radar: nowcast?.radar ?? null })
   useEffect(() => {
     let live = true
     void fetchBriefWind(venue).then((w) => live && setWx(w), () => undefined)
@@ -84,6 +91,12 @@ export function WeatherPage({ venue, placeName, timeZone, units, now, onBack, on
 
   const deg = (c: number | null) => formatTemperature(c, units.temperature).replace(/°[FC]$/, '°')
   const clock = (d: Date) => formatClock(d, timeZone)
+  /* "2 PM", or "Wed 2 PM" on another day than today. */
+  const whenWords = (ms: number) => {
+    const d = new Date(ms)
+    const hour = formatClock(d, timeZone).replace(/:00 /, ' ')
+    return localDate(d, timeZone) === localDate(now, timeZone) ? hour : `${new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'short' }).format(d)} ${hour}`
+  }
   const hourWord = (d: Date) => formatClock(d, timeZone).replace(/:00 /, ' ')
   const at = (s: Hourly | null, name: string, t: Date) => (s === null ? null : hourlyAt(s, name, t))
   const sunUp = (t: Date) => getPosition(t, venue.lat, venue.lon).altitude > -0.8
@@ -268,11 +281,11 @@ export function WeatherPage({ venue, placeName, timeZone, units, now, onBack, on
   if (more) return oldPage
 
   /* ------------------------------------------------------ the tap-in page (board Page_Weather) */
-  const start = Math.floor(now.getTime() / 3_600_000) * 3_600_000
+  const start = hourAt ?? Math.floor(now.getTime() / 3_600_000) * 3_600_000
   const chartHours: ChartHour[] = Array.from({ length: CHART_HOURS + 1 }, (_, i) => {
     const t = new Date(start + i * 3_600_000)
     const h = state?.hours.find((x) => Math.abs(x.at.getTime() - t.getTime()) <= 1_800_000) ?? null
-    return { at: t, tempC: at(wx, 'temperature_2m', i === 0 ? now : t), rain: h === null ? null : h.rain.chance }
+    return { at: t, tempC: at(wx, 'temperature_2m', i === 0 && hourAt === null ? now : t), rain: h === null ? null : h.rain.chance }
   })
   const word = (k: string) => tiles.find((t) => t.k === k)
   const rows: TapInRow[] = (['rain', 'cloud', 'humidity', 'uv'] as const).flatMap((k) => {
@@ -281,6 +294,32 @@ export function WeatherPage({ venue, placeName, timeZone, units, now, onBack, on
   })
   const dayHi = dayTemps.length === 0 ? null : Math.max(...dayTemps)
   const dayLo = dayTemps.length === 0 ? null : Math.min(...dayTemps)
+  /* Plain words first (docs/ux-rules.md 19): the rain, else the fog, ahead of the numbers. */
+  const nowWords = fr.rainLine ?? fr.fog?.line ?? null
+  const hero = ((): NonNullable<TapInPageProps['hero']> => {
+    if (hourAt === null) {
+      return {
+        eyebrow: 'Now',
+        value: temp === null ? (wx === null ? '…' : '—') : `${deg(temp)}${cond === null ? '' : ` ${cond.word}`}`,
+        sub: `${nowWords === null ? '' : `${nowWords} · `}High ${deg(dayHi)} · low ${deg(dayLo)} · feels ${deg(feels)}`,
+        shared: { key: 'temp', value: temp === null ? '' : deg(temp) },
+        subData: nowWords === null ? undefined : { 'data-fog-rain': nowWords },
+      }
+    }
+    const t = new Date(hourAt + 1_800_000)
+    const tc = at(wx, 'temperature_2m', t)
+    const c = skyAt(t, null)
+    const h = state?.hours.find((x) => Math.abs(x.at.getTime() - t.getTime()) <= 1_800_000) ?? null
+    const fog = fr.fogAt(t)
+    const w = windWords(windAt(wx, t, obs, now), units.wind)
+    return {
+      eyebrow: whenWords(hourAt),
+      value: tc === null ? '—' : `${deg(tc)}${c === null ? '' : ` ${c.word}`}`,
+      sub: [fog?.level === 'high' ? 'Fog likely' : null, h === null || h.rain.chance === null ? null : `rain ${Math.round(h.rain.chance * 100)}%`, w === null ? null : `wind ${w}`].filter((x) => x !== null).join(' · ') || 'the forecast did not say more',
+      shared: undefined,
+      subData: { 'data-weather-at': String(hourAt) },
+    }
+  })()
   return (
     <TapInPage
       title="Weather"
@@ -290,12 +329,9 @@ export function WeatherPage({ venue, placeName, timeZone, units, now, onBack, on
       onBack={onBack}
       how={how}
       safety="Forecasts can be wrong · look first"
-      hero={{
-        eyebrow: 'Now',
-        value: temp === null ? (wx === null ? '…' : '—') : `${deg(temp)}${cond === null ? '' : ` ${cond.word}`}`,
-        sub: `High ${deg(dayHi)} · low ${deg(dayLo)} · feels ${deg(feels)}`,
-        shared: { key: 'temp', value: temp === null ? '' : deg(temp) },
-      }}
+      when={hourAt === null ? 'now' : whenWords(hourAt)}
+      hero={hero}
+      actions={hourAt === null ? [] : [{ label: 'Back to now', onClick: () => setHourAt(null) }]}
       chart={<WeatherChart hours={chartHours} timeZone={timeZone} />}
       rows={rows}
       onMore={() => setMore(true)}

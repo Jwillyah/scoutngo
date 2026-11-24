@@ -41,11 +41,12 @@ export function tileOrder(p: Persona | null): TileKind[] {
 
 /* ------------------------------------------------------------ moments */
 
-export type MomentKind = 'sky' | 'glassy' | 'fish' | 'swell' | 'moonrise'
+export type MomentKind = 'sky' | 'glassy' | 'fish' | 'swell' | 'moonrise' | 'rain' | 'fog'
 
 /** Which page the gold card opens. */
 /** 'sky-night': the Sky page opened on its Night tab (the moonrise moment, Batch SIMPLE-2). */
-export type MomentTarget = 'sky' | 'sky-night' | 'surf' | 'fish'
+/** 'weather': the Weather page (rain and fog, Batch SIMPLE-3, Sections 1 and 1b). */
+export type MomentTarget = 'sky' | 'sky-night' | 'surf' | 'fish' | 'weather'
 
 export interface Moment {
   kind: MomentKind
@@ -70,15 +71,24 @@ export const MOMENT_AHEAD_MS: Record<MomentKind, number> = {
   swell: 24 * 3_600_000,
   /* "today": the builder checks the local date. */
   moonrise: 24 * 3_600_000,
+  /* Batch SIMPLE-3, Section 1b: "Rain in 20 min", within the hour. */
+  rain: 3_600_000,
+  /* Batch SIMPLE-3, Section 1.2: fog now, or a likely window starting within 3 h. */
+  fog: 3 * 3_600_000,
 }
 
 /** Which moment wins, per persona; the first that exists is the card. */
+/*
+ * Batch SIMPLE-3: rain coming ("Rain in 20 min") ranks for Surf, Shoot and
+ * Drone only (Section 1b.2) and straight after the persona's own first
+ * moment; fog for everyone, after rain. A Supermoon outranks all (`always`).
+ */
 export const MOMENT_RANK: Record<Persona, readonly MomentKind[]> = {
-  surf: ['glassy', 'swell', 'sky', 'fish', 'moonrise'],
-  shoot: ['sky', 'moonrise', 'glassy', 'swell', 'fish'],
-  weather: ['sky', 'moonrise', 'glassy', 'swell', 'fish'],
-  fish: ['fish', 'glassy', 'moonrise', 'sky', 'swell'],
-  drone: ['sky', 'glassy', 'moonrise', 'swell', 'fish'],
+  surf: ['glassy', 'rain', 'fog', 'swell', 'sky', 'fish', 'moonrise'],
+  shoot: ['sky', 'rain', 'fog', 'moonrise', 'glassy', 'swell', 'fish'],
+  weather: ['sky', 'fog', 'moonrise', 'glassy', 'swell', 'fish'],
+  fish: ['fish', 'fog', 'glassy', 'moonrise', 'sky', 'swell'],
+  drone: ['sky', 'rain', 'fog', 'glassy', 'moonrise', 'swell', 'fish'],
 }
 
 /** The one moment for the top, or null: nothing worth it, and the top stays empty. */
@@ -232,4 +242,41 @@ export function moonriseMoment(moments: readonly MoonMoment[], today: string, ti
     /* Batch SIMPLE-3, Section 0.6: over with the rising, as the colour is 20 min after its event. */
     until: new Date(m.moonrise.at.getTime() + EVENT_LINGER_MS),
   }
+}
+
+/**
+ * RAIN (Batch SIMPLE-3, Section 1b.2): rain due to start within the hour, by
+ * the rain nowcast (src/core/rainNow.ts, src/lib/useFogRain.ts). "Rain in 20
+ * min" / "Light · from 2:15 PM". Raining now is the weather tile's strip, not
+ * a card. Gone once it has started.
+ */
+export function rainMoment(r: { state: string; startsAt: Date | null; intensity: string | null } | null, now: Date, timeZone: string): Moment | null {
+  if (r === null || r.state !== 'starting' || r.startsAt === null) return null
+  const lead = r.startsAt.getTime() - now.getTime()
+  if (lead <= 0 || lead > MOMENT_AHEAD_MS.rain) return null
+  const how = r.intensity === null ? 'Rain' : r.intensity.charAt(0).toUpperCase() + r.intensity.slice(1)
+  return {
+    kind: 'rain',
+    at: r.startsAt,
+    eyebrow: `Rain in ${leadWords(lead)}`,
+    line: `${how} · from ${clock(r.startsAt, timeZone)}`,
+    target: 'weather',
+    until: r.startsAt,
+  }
+}
+
+/**
+ * FOG (Batch SIMPLE-3, Section 1.2): high fog now, or a likely window
+ * starting within 3 h (src/core/fogRisk.ts fogLine), said in the fog's own
+ * phrase. Moderate fog stays a line on the weather tile, not a card.
+ */
+export function fogMoment(f: { line: string | null; now: { level: string | null }; windows: readonly { from: Date; to: Date; level: string }[] } | null, now: Date): Moment | null {
+  if (f === null || f.line === null) return null
+  if (f.now.level === 'high') {
+    const w = f.windows.find((x) => x.from.getTime() <= now.getTime() + 3_600_000)
+    return { kind: 'fog', at: now, eyebrow: 'Fog now', line: f.line, target: 'weather', until: w?.to ?? new Date(now.getTime() + 3_600_000) }
+  }
+  const next = f.windows.find((x) => x.level === 'high' && x.from.getTime() > now.getTime() && x.from.getTime() - now.getTime() <= MOMENT_AHEAD_MS.fog)
+  if (next === undefined) return null
+  return { kind: 'fog', at: next.from, eyebrow: `Fog in ${leadWords(next.from.getTime() - now.getTime())}`, line: f.line, target: 'weather', until: next.to }
 }

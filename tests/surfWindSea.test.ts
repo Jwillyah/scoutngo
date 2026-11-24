@@ -112,13 +112,13 @@ describe('16 Nov 10:50 AM, replayed with the forecast and with Cape Henry', () =
     expect(first.week[0].call?.quality).toBe('Poor · choppy')
     const croatan = at(spotPlace('vb-croatan'))
     expect(croatan.now?.clean).toBe(false)
-    expect(croatan.week[0].call?.quality).toBe(null)
+    expect(croatan.week[0].call?.choppy).toBe(false)
   })
 
   it('VB itself: the station carried to 10 m reads under 10 kt, so "Poor · choppy" does not fire there (measurements/2026-11-17-surf-fix.md)', () => {
     const st = capeHenryAt(t, VB.facing)
     const r = surfNowFrom(seaAt(d, VB, t), stats, t, TZ, st?.obs ?? null)
     expect(r.now?.windKt ?? 0).toBeLessThan(CHOP_WIND_KT)
-    expect(r.week[0].call?.quality).toBe(null)
+    expect(r.week[0].call?.choppy).toBe(false)
   })
 })

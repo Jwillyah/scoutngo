@@ -64,14 +64,18 @@ describe('dayWord', () => {
 })
 
 describe('the hero', () => {
-  const call: SurfCall = { lowFt: 1, highFt: 2, words: '1–2 ft', size: 'Flat', wind: 'messy, cross-shore', confidence: 'firm', quality: 'Poor · choppy' }
+  const call: SurfCall = { lowFt: 1, highFt: 2, words: '1–2 ft', size: 'Flat', wind: 'messy, cross-shore', confidence: 'firm', quality: 'Poor · choppy', choppy: true }
   it('reads "NOW · POOR", the range, and the texture with the wind', () => {
     const h = surfHero(call, hour(0, { chop: true, windKt: 8 }), 'cross-shore', 22.5, DEFAULT_UNITS)
     expect(h).toEqual({ eyebrow: 'NOW · POOR', value: '1–2 ft', sub: 'Choppy · NNE 8 kt cross-shore', shared: '1–2 ft' })
   })
-  it('uses the size tag when the wind does not chop it', () => {
-    expect(surfHero({ ...call, quality: null, size: 'Fun' }, hour(0, { shape: 'Clean', windKt: 3 }), 'offshore', 270, DEFAULT_UNITS).eyebrow).toBe('NOW · FUN')
-    expect(surfSub(hour(0, { shape: 'Clean', windKt: 3 }), 'offshore', 270, DEFAULT_UNITS)).toBe('Clean · W 3 kt offshore')
+  it('uses the quality word when the wind does not chop it, never the size tag', () => {
+    expect(surfHero({ ...call, quality: 'Fair', choppy: false, size: 'Fun' }, hour(0, { shape: 'Clean', windKt: 6 }), 'offshore', 270, DEFAULT_UNITS).eyebrow).toBe('NOW · FAIR')
+    expect(surfSub(hour(0, { shape: 'Clean', windKt: 6 }), 'offshore', 270, DEFAULT_UNITS)).toBe('Clean · W 6 kt offshore')
+  })
+  it('under 5 kt: "Calm · glassy" and no side of the beach (Batch SIMPLE-3, Section 5.2)', () => {
+    expect(surfSub(hour(0, { shape: 'Clean', windKt: 3 }), 'offshore', 270, DEFAULT_UNITS)).toBe('Calm · glassy')
+    expect(surfSub(hour(0, { shape: 'Clean', windKt: 4.9 }), 'cross-shore', 45, DEFAULT_UNITS)).not.toMatch(/shore/)
   })
   it('says what it does not know: a dash and words, never a zero', () => {
     expect(surfHero(null, null, null, null, DEFAULT_UNITS)).toEqual({ eyebrow: 'NOW', value: '—', sub: 'The forecast did not say for this hour', shared: null })

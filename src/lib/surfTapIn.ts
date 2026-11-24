@@ -2,7 +2,7 @@ import { getPosition } from 'suncalc'
 import type { LatLon } from '../core/geo.ts'
 import { localDate } from '../core/moonTimes.ts'
 import { nowcastAt, obsFresh, type StationObs } from '../core/nowcast.ts'
-import { SHAPE_WORD, type SurfCall } from '../core/surfCall.ts'
+import { CALM_GLASSY_WORDS, isCalmGlassy, SHAPE_WORD, type SurfCall } from '../core/surfCall.ts'
 import { cleanRuns } from '../core/surfRange.ts'
 import { formatShortHour } from '../core/timezone.ts'
 import { hourlyAt } from './tideSheetData.ts'
@@ -148,6 +148,8 @@ const KT_TO_MPS = 0.514444
 /** "Choppy · NNE 8 kt cross-shore": the texture, then where the wind is from, how hard, and its side of the beach. */
 export function surfSub(hour: RangeHour | null, side: string | null, windFromDeg: number | null, units: Units): string {
   if (hour === null) return 'The forecast did not say for this hour'
+  /* Batch SIMPLE-3, Section 5.2: under 5 kt the water is glassy and the side of the beach means nothing. */
+  if (!hour.chop && isCalmGlassy(hour.windKt)) return CALM_GLASSY_WORDS
   const texture = hour.chop ? 'Choppy' : hour.shape === null ? null : SHAPE_WORD[hour.shape].replace(/^./, (c) => c.toUpperCase())
   const wind = hour.windKt === null ? 'wind not forecast' : [windFromDeg === null ? null : compass(windFromDeg), formatWind(hour.windKt * KT_TO_MPS, units.wind), side].filter((x) => x !== null).join(' ')
   return [texture, wind].filter((x) => x !== null).join(' · ')

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import { goAlertDue, goAlertKey } from '../core/goAlert.ts'
+import { goAlertDue, goAlertKey, moonAlertDue, rainAlertDue } from '../core/goAlert.ts'
+import type { MoonHomeMoment } from '../core/moonMoment.ts'
+import type { RainNow } from '../core/rainNow.ts'
 import type { SkyCall } from '../core/skyCall.ts'
 
 /*
@@ -76,4 +78,32 @@ export function useGoAlert(call: SkyCall | null, now: Date, timeZone: string): v
     }
     void notify(due, key)
   }, [due, key])
+}
+
+/**
+ * Rain and the Supermoon, said once each while the app is open, when the
+ * same setting is on (Batch SIMPLE-3, Sections 1b.3 and 2b.2). `rain` is
+ * rainNow's result for the spot, `moon` the home's moon moment; both worked out
+ * on the phone, neither sent anywhere (docs/go-alert.md).
+ */
+export function useRainMoonAlerts(rain: RainNow | null, moon: MoonHomeMoment | null, now: Date, timeZone: string): void {
+  const on = readGoAlert()
+  const sent = on ? readSent() : []
+  const rainDue = on ? rainAlertDue(rain, now, sent, timeZone) : null
+  const moonDue = on ? moonAlertDue(moon, now, sent) : null
+  useSaid(rainDue?.key ?? null, rainDue?.text ?? null)
+  useSaid(moonDue?.key ?? null, moonDue?.text ?? null)
+}
+
+/** Keeps the key as said, then says the words, once per key. */
+function useSaid(key: string | null, text: string | null): void {
+  useEffect(() => {
+    if (key === null || text === null) return
+    try {
+      localStorage.setItem(SENT, JSON.stringify([...readSent(), key].slice(-20)))
+    } catch {
+      /* Said again next time, rather than never. */
+    }
+    void notify(text, key)
+  }, [key, text])
 }

@@ -54,6 +54,21 @@ export interface StationNow extends StationObs {
   norm: Normalized
   /** The nearest fresh coastal station's, at a beach, for the page's "models · station" line. */
   coast: { label: string; rawKt: number; normKt: number } | null
+  /**
+   * Batch SIMPLE-3, Sections 1 and 1b: every airport's raw METAR this load
+   * brought back, each with its distance, for the fog and rain nowcasts
+   * (src/lib/useFogRain.ts: present weather, air and dew point, visibility).
+   * The rules there judge freshness and distance themselves.
+   */
+  reports?: readonly StationReport[]
+}
+
+/** One airport report as it came back: its id, km from the spot, when it was made, and the METAR itself. */
+export interface StationReport {
+  id: string
+  km: number
+  at: Date
+  raw: string
 }
 
 /** One load's answers: the stations asked, each one's reading (null: no answer). */
@@ -100,6 +115,7 @@ export function stationNowFrom(load: StationLoad, facing: number | null, now: Da
       visMi: air?.visMi ?? null,
       skyAt: air?.at ?? null,
       skyId: air?.station.id ?? null,
+      reports: load.readings.flatMap((r) => (r === null || r.raw === undefined || r.station.kind !== 'airport' ? [] : [{ id: r.station.id, km: r.station.km, at: r.at, raw: r.raw }])),
     },
   }
 }

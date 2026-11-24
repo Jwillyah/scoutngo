@@ -13,8 +13,8 @@ import type { Special } from '../src/core/specialLight.ts'
 const SANDBRIDGE = { lat: 36.72, lon: -75.93 }
 const WRIGHTSVILLE_VIEW = { south: 34.15, west: -77.86, north: 34.27, east: -77.73 }
 const SANDBRIDGE_VIEW = { south: 36.68, west: -75.98, north: 36.76, east: -75.88 }
-const LOOK = Date.parse('2026-11-17T17:27:00Z') /* 12:27 PM EST */
-const SUNRISE_18 = new Date('2026-11-18T11:44:00Z') /* the next sunrise, within the 24 h the card looks */
+const LOOK = Date.parse('2026-11-18T03:00:00Z') /* 10:00 PM EST the evening before: the sunrise is 8.7 h off, inside the 12 h the card looks */
+const SUNRISE_18 = new Date('2026-11-18T11:44:00Z') /* the next sunrise, within the 12 h the card looks */
 const clock = (d: Date) => new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }).format(d)
 const place: NearPlace = { name: 'Sandbridge', at: SANDBRIDGE, m: 0 }
 const fire: { s: Special; place: NearPlace } = { s: { kind: 'fire', event: 'sunrise', from: SUNRISE_18, to: SUNRISE_18, agree: 3, of: 5, word: 'possible', why: '' }, place }

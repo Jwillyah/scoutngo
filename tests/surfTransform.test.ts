@@ -128,7 +128,8 @@ describe('the quality words', () => {
     expect(surfChop(20, 'offshore')).toBe(false)
     expect(surfQuality(1.5, true)).toBe('Poor · choppy')
     expect(surfQuality(3, true)).toBe('Fair · textured')
-    expect(surfQuality(3, false)).toBeNull()
+    /* Without chop the pill is the scale word (Batch SIMPLE-3, Section 5.1): 3 ft clean is Fair. */
+    expect(surfQuality(3, false)).toBe('Fair')
     /* 16 Nov as the cams had it: 1-2 ft in N 12 kt cross-shore. */
     const c = surfCall({ centerFt: 1.5, shape: 'Bumpy', side: 'cross-shore', chop: surfChop(12, 'cross-shore') }, 0)!
     expect(c.quality).toBe('Poor · choppy')

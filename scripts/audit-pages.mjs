@@ -115,7 +115,7 @@ try {
     const homeTemp = await ev(`document.querySelector('.home .hwtile__temp')?.textContent ?? null`)
 
     /* ---------------------------------------------------------- Weather */
-    const opened = await page.locator('.home [data-tile="weather"]').first().click({ timeout: 4000 }).then(() => true, () => false)
+    const opened = await page.locator('.home [data-tile="weather"] .hwtile__temp').first().click({ timeout: 4000 }).then(() => true, () => false)
     if (!opened) fail(`${label}: no "Weather ›" on the home`)
     await wait(5000)
     const w = JSON.parse(await ev(FIT('.wpage')))

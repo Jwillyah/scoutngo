@@ -11,7 +11,7 @@
  *   fits      390 x 844 (WebKit, tab and home screen), 412 x 915 (Chromium,
  *             tab and installed), 390 x 664 (a short Safari tab): nothing
  *             scrolled, nothing below the screen or off its side
- *   weather   a temperature, the sky in a word with H and L, six hours
+ *   weather   a temperature, the sky in a word with H and L, the strip's 48 hours
  *   tiles     six, in the Surf order with nothing picked, each a label, a
  *             value (or a dash), one line and ›; their pictures live: the
  *             wind's arrows point the way the Wind tile's words say, the
@@ -58,11 +58,12 @@ const READ = `JSON.stringify((() => {
   const cls = (e) => String(e.getAttribute('class') ?? e.tagName).split(' ')[0]
   const vis = (e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0 }
   const out = [...home.querySelectorAll('*')].filter((e) => vis(e) && !e.closest('.lsky') && e.getBoundingClientRect().bottom > innerHeight + 1).map((e) => cls(e) + ' ' + Math.round(e.getBoundingClientRect().bottom)).slice(0, 4)
-  const side = [...home.querySelectorAll('*')].filter((e) => vis(e) && !e.closest('.lsky') && (e.getBoundingClientRect().right > r.right + 1 || e.getBoundingClientRect().left < r.left - 1)).map(cls).slice(0, 4)
+  /* Batch SIMPLE-3, Section 2.5: an hour scrolled out of the weather strip is clipped by the strip, not off the side. */
+  const side = [...home.querySelectorAll('*')].filter((e) => vis(e) && !e.closest('.lsky') && !e.closest('.hwtile__hours') && (e.getBoundingClientRect().right > r.right + 1 || e.getBoundingClientRect().left < r.left - 1)).map(cls).slice(0, 4)
   const scrolls = [home, ...home.querySelectorAll('*')].some((e) => /(auto|scroll)/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + 1)
   const tiles = [...home.querySelectorAll('.htile')].map((t) => ({ kind: t.dataset.tile, label: t.querySelector('.htile__label')?.textContent ?? '', value: t.querySelector('.htile__value')?.textContent ?? '', line: t.querySelector('.htile__line')?.textContent ?? null, chev: !!t.querySelector('.htile__chev'), arrows: [...t.querySelectorAll('[data-arrow-deg]')].map((g) => Number(g.dataset.arrowDeg)), curve: t.querySelector('[data-tide-curve]')?.dataset.tideCurve ?? null, sky: t.querySelector('[data-sky-art]')?.dataset.skyArt ?? null }))
   const w = home.querySelector('.hwtile')
-  return { out, side, scrolls, text: home.innerText, tiles, temp: w?.querySelector('.hwtile__temp')?.textContent ?? '', cond: w?.querySelector('.hwtile__line')?.textContent ?? '', hours: w?.querySelectorAll('.hwtile__h').length ?? 0, dock: [...home.querySelectorAll('.homep__dock button')].map((b) => b.getAttribute('aria-label')), moment: home.querySelector('.hmoment')?.innerText ?? null }
+  return { out, side, scrolls, text: home.innerText, tiles, temp: w?.querySelector('.hwtile__temp')?.textContent ?? '', cond: w?.querySelector('.hwtile__line')?.textContent ?? '', hours: w?.querySelectorAll('.hwtile__h[data-slot="hour"]').length ?? 0, dock: [...home.querySelectorAll('.homep__dock button')].map((b) => b.getAttribute('aria-label')), moment: home.querySelector('.hmoment')?.innerText ?? null }
 })())`
 
 const POINTS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW']
@@ -122,7 +123,7 @@ try {
     if (/\bsafe\b|clear to fly|all clear/i.test(h.text)) fail(`${label}: says safe or clear: ${JSON.stringify(h.text.slice(0, 120))}`)
     if (!/^-?\d+°$/.test(h.temp)) fail(`${label}: the big temperature reads ${JSON.stringify(h.temp)}`)
     if (!/^\S.* · H-?\d+° L-?\d+°$/.test(h.cond.trim()) || /^— /.test(h.cond)) fail(`${label}: no sky word with high and low under the temperature (${JSON.stringify(h.cond)})`)
-    if (h.hours !== 6) fail(`${label}: ${h.hours} hours on the Weather tile, not 6`)
+    if (h.hours !== 48) fail(`${label}: ${h.hours} hours on the Weather tile's strip, not 48 (Batch SIMPLE-3, Section 2.5)`)
     /* Nothing picked: the Surf order (src/core/homeTiles.ts tileOrder). */
     if (h.tiles.map((t) => t.kind).join(' ') !== 'surf tide wind sky fish drone') fail(`${label}: the tiles are ${JSON.stringify(h.tiles.map((t) => t.kind))}`)
     for (const t of h.tiles) {

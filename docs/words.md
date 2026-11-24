@@ -9,7 +9,9 @@ fails on any banned variant in a string the app shows.
 | Color likely · Color possible · Color unlikely | Fire likely, "Big color", Go/Maybe/Skip as a headline | The call's words (`colorWords`). The models' agreement is said as a count, "5 of 5", never with a word of its own. |
 | offshore · onshore · cross-shore | Cross, crossshore | `sideWords`; a pill may capitalise the first letter. |
 | Calm · Light and variable | a direction under 3 kt | `calmDirection`. |
-| Flat · Small · Rideable · Fun · Firing | Solid, Big, Good, Epic | The surf tag scale (`surfTag`). Size words (knee, waist…) are a different thing and stay. |
+| Poor · Poor-Fair · Fair · Good | Small, Fun, Firing as the pill | The surf pill is quality (`surfQuality`, src/core/surfCall.ts); the number beside it is the size. "Poor · choppy" and "Fair · textured" when the wind chops the water. |
+| Calm · glassy | a side of the beach under 5 kt | `CALM_GLASSY_WORDS`: no onshore/offshore word when the wind is under 5 kt. |
+| Flat · Small · Rideable · Fun · Firing | Solid, Big, Epic | The surf size tag (`surfTag`), kept for "worth going" (`surfOn`) and the filters, not the pill. Size words (knee, waist…) are a different thing and stay. |
 | Today · Tomorrow · Week | Tmrw, Tom., 7-day | |
 | Sunrise · Sunset | Sun up, Sun down | |
 | golden hour · blue hour | Golden Hour (mid-sentence) | Lower case in a sentence. |

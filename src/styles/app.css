@@ -14465,23 +14465,26 @@
   position: fixed;
   z-index: 40;
   left: var(--space-2);
-  right: var(--space-2);
+  /* Batch SIMPLE-3, Section 6.2: stops short of the map's right-hand rail (Features, compass, 3D: 56 px and its gutter), which it covered. */
+  right: calc(var(--space-2) + 64px);
   top: calc(var(--safe-top) + 150px);
   max-width: var(--page-max);
-  margin: 0 auto;
-  /* Batch TRUTH, Section 5: one line, its two actions at the end. */
+  margin: 0;
+  /* The words, then the two actions under them at the end. */
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--space-1);
-  padding: 4px 4px 4px var(--space-3);
-  border-radius: 999px;
+  padding: var(--space-2) 4px 4px var(--space-3);
+  border-radius: 22px;
   background: var(--panel-sheen);
   border: var(--line-hair) solid var(--color-edge-top);
   color: var(--color-text);
 }
 
 .nearyou__line {
-  flex: 1 1 auto;
+  flex: 1 1 100%;
   min-width: 0;
   margin: 0;
   font-size: var(--text-sm);
@@ -18727,6 +18730,9 @@ a.about__row * {
   background: rgb(255 255 255 / 0.18);
   color: rgb(255 255 255 / 0.85);
   white-space: nowrap;
+}
+.dsurf__watch {
+  margin-top: 8px;
 }
 .dsurf__tag--fun {
   background: rgb(94 224 208 / 0.22);

@@ -109,8 +109,8 @@ describe('17 Nov 7:05 AM at VB, the week the phone had, with the models beside i
     expect(r.watch).toBe(null)
   })
 
-  it("doesn't fire on a day called over 2 ft, whatever a model says", () => {
-    expect(swellWatch([{ date: '2026-11-23', callHighFt: 3, readings: [{ model: 'ECMWF WAM', read: 'the whole sea as one', faceFt: 6 }] }], weekday)).toBe(null)
+  it("doesn't fire on a day called over 3 ft, whatever a model says", () => {
+    expect(swellWatch([{ date: '2026-11-23', callHighFt: 4, readings: [{ model: 'ECMWF WAM', read: 'the whole sea as one', faceFt: 6 }] }], weekday)).toBe(null)
   })
 
   it('a model with swell parts is read part by part too', () => {

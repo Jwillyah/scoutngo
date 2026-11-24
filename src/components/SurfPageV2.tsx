@@ -5,7 +5,10 @@ import { venueToday } from '../core/eventDay.ts'
 import { PROVISIONAL_BELOW, regionEvidence, regionOf } from '../core/beachFactor.ts'
 import { BEACH_CAP } from '../core/surf.ts'
 import { LEAN_CAP_FT, SURF_FADE_MS } from '../core/surfNowcast.ts'
-import { CHOP_WIND_KT } from '../core/surfCall.ts'
+import { CHOP_WIND_KT, type SurfQuality } from '../core/surfCall.ts'
+
+/** The pill's colour by quality: Fair the board's teal, Good its amber, the rest plain. */
+const qualityClass = (q: SurfQuality): string => (q === 'Good' ? 'firing' : q === 'Fair' ? 'fun' : 'small')
 import { PART_GONE_DEG, PERIOD_LONG_S, PERIOD_SHORT_S, PERIOD_SHORT_SHARE } from '../core/surfTransform.ts'
 import { WEEK_BIAS_MIN_DAYS, weekBias, weekBiasLine } from '../core/weekBias.ts'
 import { readWeekLog } from '../lib/weekBiasStore.ts'
@@ -205,7 +208,7 @@ export function SurfBody({ now, timeZone, spot, spotName, away, sea, stats, kept
         <div className="dsurf__bigrow">
           <p className="dhead__big" data-shared="surf">{headCall?.words ?? '—'}</p>
           {/* Batch DRONE, Section 1.4: in a chopping wind the quality words stand in for the tag: never "Rideable" in chop. */}
-          {headCall === null ? null : <span className={`dsurf__tag dsurf__tag--${headCall.quality === null ? headCall.size.toLowerCase() : 'small'}`}>{headCall.quality ?? headCall.size}</span>}
+          {headCall === null ? null : <span className={`dsurf__tag dsurf__tag--${qualityClass(headCall.quality)}`}>{headCall.quality}</span>}
         </div>
         <p className="dhead__line">
           {headCall === null
@@ -271,6 +274,12 @@ export function SurfBody({ now, timeZone, spot, spotName, away, sea, stats, kept
 
       <DCard label="This week">
         <WeekBars week={week} />
+        {/* Batch SIMPLE-3, Section 5.3: any wave model at 4 ft or more on a day we call under that (src/core/swellWatch.ts); a watch, never a size. */}
+        {read.watch === null ? null : (
+          <p className="hweek__watch dsurf__watch" data-swell-watch={read.watch.date}>
+            {read.watch.words}
+          </p>
+        )}
       </DCard>
 
       {/* Batch Beach, Section 3: one tap after a session or a look; kept on this phone, calibrating this spot. */}

@@ -48,6 +48,8 @@ export interface NearReading {
   /** An airport's sky and visibility (the one sky word); null for a coastal station. */
   sky: MetarSky | null
   visMi: number | null
+  /** An airport's raw METAR, for the fog and rain nowcasts' present weather, air and dew point (Batch SIMPLE-3, Sections 1 and 1b, src/core/fogRisk.ts stationFog); absent for a coastal station. */
+  raw?: string
 }
 
 type Asos = readonly [string, string, number, number]
@@ -105,7 +107,7 @@ export function parseMetarReading(raw: string, station: NearStation, now: Date):
   let at = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), Number(m[1]), Number(m[2]), Number(m[3])))
   /* A report from the end of last month read early in this one. */
   if (at.getTime() > now.getTime() + 86_400_000) at = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, Number(m[1]), Number(m[2]), Number(m[3])))
-  return { station, at, kt: w.kt, gustKt: w.gustKt, fromDeg: w.fromDeg, sky: parseMetarSky(raw), visMi: metarVisMiles(raw) }
+  return { station, at, kt: w.kt, gustKt: w.gustKt, fromDeg: w.fromDeg, sky: parseMetarSky(raw), visMi: metarVisMiles(raw), raw }
 }
 
 async function airport(st: NearStation, now: Date, fetchImpl: typeof fetch): Promise<NearReading | null> {

@@ -119,7 +119,7 @@ describe('Surf page v2 (Batch N, Section 1)', () => {
     const big = /<p class="dhead__big" data-shared="surf">([^<]*)<\/p>/.exec(html)?.[1]
     expect(big).toBe(want)
     expect(big).toMatch(/^\d+–\d+ ft$/)
-    expect(text(html)).toMatch(/Virginia Beach · now .*clean, offshore · 8 s/)
+    expect(text(html)).toMatch(/Virginia Beach · now .*Calm · glassy · 8 s/)
   })
 
   it('draws the band, the line, the clean stretch, now, and the buoy readings as dots', () => {
@@ -256,8 +256,8 @@ describe('one surf series (Batch FIX, Section 3.3)', () => {
     expect(html).toContain(`>${call?.quality}<`)
     expect(read.now?.clean).toBe(false)
   })
-  it('without it, the forecast’s light offshore wind: no quality words', () => {
-    expect(surfNowFrom(sea, NONE, NOW, 'America/New_York').week[0].call?.quality).toBe(null)
+  it('without it, the forecast’s light offshore wind: no chop words', () => {
+    expect(surfNowFrom(sea, NONE, NOW, 'America/New_York').week[0].call?.choppy).toBe(false)
     expect(render()).not.toContain('Poor · choppy')
   })
 })

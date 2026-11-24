@@ -227,7 +227,7 @@ try {
     await goHome(ev, wait)
     await wait(5000)
     const wide = async (screen) => {
-      const out = JSON.parse(await ev(`JSON.stringify([...document.querySelectorAll('body *')].filter((e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0 && b.left < innerWidth && b.right > innerWidth + 1 && getComputedStyle(e).position !== 'fixed' && !e.matches('.home__track, .home__page, .hday, .homep__body') && !e.closest('[data-sideways], .tbar, .hstrip, .dwind__strip, .wweek, table') }).map((e) => String(e.className?.baseVal ?? e.className).split(' ')[0] || e.tagName).slice(0, 5))`))
+      const out = JSON.parse(await ev(`JSON.stringify([...document.querySelectorAll('body *')].filter((e) => { const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0 && b.left < innerWidth && b.right > innerWidth + 1 && getComputedStyle(e).position !== 'fixed' && !e.matches('.home__track, .home__page, .hday, .homep__body') && !e.closest('[data-sideways], [data-hour-strip], .tbar, .hstrip, .dwind__strip, .wweek, table') }).map((e) => String(e.className?.baseVal ?? e.className).split(' ')[0] || e.tagName).slice(0, 5))`))
       console.log(`  ${screen} at 150%: ${out.length} past the edge`)
       for (const o of [...new Set(out)]) fail(`${screen} at the largest text: ${o} runs past the screen`)
     }

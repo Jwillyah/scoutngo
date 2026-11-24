@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { localDate } from '../core/moonTimes.ts'
 import { distanceMeters, type LatLon } from '../core/geo.ts'
 import { aboutHere } from '../core/awayWords.ts'
 import { nextEvents } from '../core/skyFire.ts'
@@ -28,7 +29,14 @@ const NEAR_M = NEAR_MI * 1609.344
 export const NEAR_PLACES = 2
 export const NEAR_ITEMS = 3
 export const RETURN_AFTER_MS = 6 * 3_600_000
-const DAY_MS = 86_400_000
+/*
+ * HOW FAR AHEAD THE BANNER LOOKS (Batch SIMPLE-3, Section 6.2). 21 Nov 5:08 PM
+ * the map said "God rays likely 7:00-9:00 AM · Sandbridge" for the next
+ * morning, 14 hours off, with no day on it. A banner over the map is for what
+ * is about to happen: windows that start within BANNER_AHEAD_MS (12 hours),
+ * and one that starts on another day says so ("tomorrow").
+ */
+export const BANNER_AHEAD_MS = 12 * 3_600_000
 
 export interface NearPlace {
   name: string
@@ -134,22 +142,24 @@ export function nearEnd(s: Pick<Special, 'kind' | 'event' | 'from' | 'to'>): Dat
   return s.kind === 'fire' && s.event !== undefined && s.from.getTime() === s.to.getTime() ? afterglowWindow(s.event, s.to).to : s.to
 }
 
-/** The windows that touch the next 24 hours, soonest first, at most NEAR_ITEMS. */
-export function pickNear(found: readonly { s: Special; place: NearPlace }[], now: number, clock: (d: Date) => string, place: Place): NearItem[] {
+/** The windows that start within the next BANNER_AHEAD_MS and are not over, soonest first, at most NEAR_ITEMS. */
+export function pickNear(found: readonly { s: Special; place: NearPlace }[], now: number, clock: (d: Date) => string, place: Place, timeZone: string | null = null): NearItem[] {
   return found
-    .filter(({ s }) => nearEnd(s).getTime() > now && s.from.getTime() < now + DAY_MS)
+    .filter(({ s }) => nearEnd(s).getTime() > now && s.from.getTime() < now + BANNER_AHEAD_MS)
     .sort((a, b) => a.s.from.getTime() - b.s.from.getTime())
     .slice(0, NEAR_ITEMS)
     .map(({ s, place: p }) => {
       const from = new Date(Math.max(s.from.getTime(), now))
-      const when = s.kind === 'fire' ? clock(new Date((s.from.getTime() + s.to.getTime()) / 2)) : `${clock(from)}–${clock(s.to)}`
+      const when0 = s.kind === 'fire' ? clock(new Date((s.from.getTime() + s.to.getTime()) / 2)) : `${clock(from)}–${clock(s.to)}`
+      /* Another calendar day than now's, in the venue's zone, is said: "tomorrow 7:00 AM–9:00 AM". */
+      const when = timeZone !== null && localDate(from, timeZone) !== localDate(new Date(now), timeZone) ? `tomorrow ${when0}` : when0
       const until = nearEnd(s)
       return { line: `${s.kind === 'fire' ? specialNameOf(s) : specialName(s.kind, place)} ${s.word} ${when} · ${p.name}`, place: p, at: from, until }
     })
 }
 
 /** Asks the shared store for each place's week, and Sky fire's next event at the nearest. */
-export async function nearMeItems(places: readonly NearPlace[], now: number, clock: (d: Date) => string, place: Place): Promise<NearItem[]> {
+export async function nearMeItems(places: readonly NearPlace[], now: number, clock: (d: Date) => string, place: Place, timeZone: string | null = null): Promise<NearItem[]> {
   const found: { s: Special; place: NearPlace }[] = []
   for (const p of places) {
     const week = await fetchSpecialWeek(p.at)
@@ -160,14 +170,14 @@ export async function nearMeItems(places: readonly NearPlace[], now: number, clo
     const events = nextEvents(new Date(now), nearest.at)
     for (const kind of ['sunrise', 'sunset'] as const) {
       const event = events[kind]
-      if (event === null || event.getTime() < now || event.getTime() > now + DAY_MS) continue
+      if (event === null || event.getTime() < now || event.getTime() > now + BANNER_AHEAD_MS) continue
       const data = await fetchFirePaths(nearest.at, getSunPosition(event, nearest.at.lat, nearest.at.lon).azimuth, event.toISOString().slice(0, 10))
       const paths = data === null ? [] : pathsAt(data, nearestHour(event))
       const v = paths.length === 0 ? null : fireVerdict(paths, { event, kind, venue: nearest.at })
       if (v !== null && v.word !== 'unlikely') found.push({ s: { kind: 'fire', event: kind, from: event, to: event, agree: v.agree, of: v.of, word: v.word, why: '' }, place: nearest })
     }
   }
-  return pickNear(found, now, clock, place)
+  return pickNear(found, now, clock, place, timeZone)
 }
 
 /* ------------------------------------------------------- one banner at most */

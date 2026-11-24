@@ -221,3 +221,48 @@ The first queued run was stopped before its gate: the Day sheet's list took shar
   piece ("the day card does not say elevation never came: ''", an empty
   card, read before it drew). Known flake: alone on the same tree, 0
   problems. Committed that tree (queue4.sh), pushed.
+
+## 16:25 — home+small refused once (strike 1); fixed
+
+Gate on hs: 4 of 52 failed, all from the new strip or its pictures:
+- home fit ABORTED: `mouse.wheel` is not supported in mobile WebKit. The
+  strip is now scrolled by script (`scrollBy`); the check still fails when
+  the strip has nothing to scroll. A real finger drag can't be sent there;
+  touch-action pan-x and overflow-y hidden are still asserted per look.
+- pages: "the Weather page says null" / sub "rain 0% · wind 6 kt NNE". The
+  audit clicked the tile's centre, which is now an hour of the strip, so
+  Weather opened at that hour (as S2.5 asks). "A tap on the tile" now taps the
+  tile's own temperature, which opens Now.
+- a11y: the hour strip's slots counted as "runs past the screen" at the
+  largest text: the marked strip ([data-hour-strip]) is excluded, as tbar
+  and hstrip are; the overflow audit holds it to its marks. Picture words
+  under 4.5:1 on light skies (sunset tick 3.3:1, "limit 23" 4.2:1): they get
+  a dark backing.
+- day sheet: "Golden · fog" clipped. Home wires the fog mark into the Day
+  sheet; the day piece's cell did not wrap. Dayblue's cell wraps, with fog its
+  own span; hs is now gated on top of dayblue.
+Order now: dayblue (in its gate) → hs (second try; a second refusal drops
+it, and sky with it) → sky → wind bar.
+
+## 17:00 — dayblue committed (a81b2fb); home+small refused twice → not committed
+
+- dayblue: full gate clean, pushed.
+- hs second gate: 2 of 52 failed. offline (the same empty day-card read,
+  known flake) and style: "colour #080e1c: hpic__tick fill, hpic__limitt
+  fill", the dark backing I gave the picture words at 16:25 was off the
+  palette. Every strip/home audit that failed at 16:21 now passed (home fit,
+  pages, a11y, day sheet).
+- Two strikes: home+small is NOT committed. Sky depends on home's
+  useFogRain, so it is not committed either. Both stay in the working tree,
+  frozen as $S/ov/hs and $S/ov/skyc with their lists. Not deleted.
+- The backing now uses the palette's navy (#14183c at 0.72); colour audit 0.
+  Not browser-checked: style and a11y need a gate, and there is no time for
+  one before 17:33.
+
+## 18:28 — resumed by Jwilly
+
+- The wind bar's 16:58 gate ran across the laptop's sleep: 85 min, 42 of 51
+  failed, the network guard included (exit 2). That was the browsers dying,
+  not the wind bar; its next gate is a fresh one.
+- On "resume": home+small gets a third gate (the code is done; Jwilly asked
+  to carry on), then sky, then the wind bar, each with the full hook.

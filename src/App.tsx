@@ -110,6 +110,7 @@ import { readShareHash, SHARE_PREFIX } from './lib/planShare.ts'
 import type { MenuRows, MenuTarget } from './components/Menu.tsx'
 import type { HomeTarget } from './components/Home.tsx'
 import { TileHome, type TileTarget } from './components/TileHome.tsx'
+import { useFogRain } from './lib/useFogRain.ts'
 import { followSurface, openSpotPick, spotPickShown, spotSurface, type SpotPick } from './lib/spotPick.ts'
 import { spotKey } from './core/spotSkill.ts'
 import { readPersona, usePersona } from './lib/persona.ts'
@@ -1505,10 +1506,15 @@ function App() {
   const [briefOpen, setBriefOpen] = useState(() => died === null && shouldOpenBriefing(typeof window === 'undefined' ? null : window, landingSeen))
   /* The Weather page (Batch Pages, Section 2): over the home or the map, from the home's "Weather ›" or the map's Sky sheet. */
   const [weatherOpen, setWeatherOpen] = useState(false)
+  /* Batch SIMPLE-3, Section 2.5: the hour the Weather page opens on (a tap on an hour of the home's strip); null is now. */
+  const [weatherAt, setWeatherAt] = useState<number | null>(null)
   /* Batch SIMPLE-3, Section 4: Menu › Plan a shoot opens the Day sheet; its "Add positions ›" is the planner. */
   const [dayOpen, setDayOpen] = useState(false)
   useEffect(() => {
-    const open = () => setWeatherOpen(true)
+    const open = () => {
+      setWeatherAt(null)
+      setWeatherOpen(true)
+    }
     window.addEventListener(OPEN_WEATHER_EVENT, open)
     return () => window.removeEventListener(OPEN_WEATHER_EVENT, open)
   }, [])
@@ -1594,6 +1600,9 @@ function App() {
   }, [spotPickerUp])
   /* Its clock, a minute at a time while it is open: the Now line and the calls move with it. */
   const [briefNow, setBriefNow] = useState(() => new Date())
+  /* Batch SIMPLE-3, Section 1: the Day sheet's fog mark, from the one fog hook (src/lib/useFogRain.ts), for the spot it opens on. */
+  const dayFog = useFogRain(dayOpen ? centre : null, briefNow, venueWindow?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone)
+  const dayFogAt = useCallback((spot: { lat: number; lon: number }, hourStart: Date) => (centre !== null && Math.abs(spot.lat - centre.lat) < 1e-6 && Math.abs(spot.lon - centre.lon) < 1e-6 ? dayFog.fogHigh(hourStart) : null), [dayFog, centre])
   useEffect(() => {
     if (!briefOpen && !weatherOpen && !skyOpen && !droneOpen && !fishOpen) return
     setBriefNow(new Date())
@@ -1766,6 +1775,7 @@ function App() {
         return
       /* Batch Flow, Section 8: the menu's cards open the home's pages. */
       case 'weather':
+        setWeatherAt(null)
         setWeatherOpen(true)
         return
       case 'surf':
@@ -1799,6 +1809,7 @@ function App() {
         setSkyOpen(true)
         return
       case 'weather':
+        setWeatherAt(null)
         setWeatherOpen(true)
         return
       case 'drone':
@@ -1824,9 +1835,10 @@ function App() {
    * Surf and Tide are the map's pages, opened from the home (Back is the
    * home, pageFromHome); Wind is the map itself, on the wind layer, now.
    */
-  const tileOpen = (t: TileTarget) => {
+  const tileOpen = (t: TileTarget, at?: number) => {
     switch (t) {
       case 'weather':
+        setWeatherAt(at ?? null)
         setWeatherOpen(true)
         return
       case 'sky':
@@ -2086,7 +2098,7 @@ function App() {
       const { spots: list, place: here } = nearInputs.current
       const places = placesNear(origin, list.map((sp) => ({ name: sp.name, at: { lat: Number(sp.venue.latitude), lon: Number(sp.venue.longitude) } })).filter((sp) => Number.isFinite(sp.at.lat) && Number.isFinite(sp.at.lon)))
       const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
-      const items = await nearMeItems(places, Date.now(), (d) => formatClock(d, zone), here)
+      const items = await nearMeItems(places, Date.now(), (d) => formatClock(d, zone), here, zone)
       if (live && items.length > 0) setNearItems(items)
     }
     void look()
@@ -3150,6 +3162,7 @@ function App() {
             spots={spots.map((sp) => ({ id: sp.id, name: sp.name, lat: Number(sp.venue.latitude), lon: Number(sp.venue.longitude) })).filter((sp) => Number.isFinite(sp.lat) && Number.isFinite(sp.lon))}
             units={settings.units}
             onBack={() => setDayOpen(false)}
+            fogAt={dayFogAt}
             onAddPositions={() => {
               setDayOpen(false)
               openPlanner('menu')
@@ -3165,7 +3178,11 @@ function App() {
           timeZone={venueWindow?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone}
           units={settings.units}
           now={briefNow}
-          onBack={() => setWeatherOpen(false)}
+          at={weatherAt}
+          onBack={() => {
+            setWeatherOpen(false)
+            setWeatherAt(null)
+          }}
           onMap={() => {
             setWeatherOpen(false)
             setBriefOpen(false)

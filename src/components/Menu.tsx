@@ -13,7 +13,7 @@ import { useBriefing } from '../lib/useBriefing.ts'
 import { useStationObs } from '../lib/useStationObs.ts'
 import { useSurfNow } from '../lib/useSurfNow.ts'
 import { formatTemperature, windIn, windUnitLabel, type Units } from '../lib/units.ts'
-import { gustWords, windAt, windWords } from '../lib/windNow.ts'
+import { droneWindAt, gustWords, windAt, windWords } from '../lib/windNow.ts'
 import { MenuArt, type ArtInput } from './MenuArt.tsx'
 import '../styles/menu-a.css'
 import { MENU_CARDS } from '../config/flags.ts'
@@ -227,9 +227,10 @@ function MenuSheet({ venue, placeShort, timeZone, units, drone, rows, photoTools
       const next = brief.turns.find((x) => x.at.getTime() > now.getTime()) ?? null
       return { title: 'Tide', big: next === null ? '—' : next.kind === 'high' ? 'Rising' : 'Falling', line: next === null ? '' : `${next.kind} ${clock(next.at)}`, target: 'tides' }
     }
-    const w = day === null ? null : day.wind.reduce<(typeof day.wind)[number] | null>((a, b) => (a === null || Math.abs(b.at.getTime() - now.getTime()) < Math.abs(a.at.getTime() - now.getTime()) ? b : a), null)
-    const tag = drone === null || w === null ? null : droneTag(w.highMps, drone.maxWindMps)
-    return { title: 'Drone', big: w?.highMps == null ? '—' : `${Math.round(windIn(w.highMps, units.wind) ?? 0)} ${windUnitLabel(units.wind)}`, line: tag === null ? 'at 400 ft' : `${tag.toLowerCase()} at 400 ft`, target: 'drone' }
+    /* Batch SIMPLE-3, Section 1c: the one wind at 400 ft (src/lib/windNow.ts droneWindAt), the home's Drone tile's and the Drone page's: the same series, half hour and station as the Wind card's. */
+    const high = droneWindAt(wx, now, obs, now)?.mps ?? null
+    const tag = drone === null || high === null ? null : droneTag(high, drone.maxWindMps)
+    return { title: 'Drone', big: high === null ? '—' : `${Math.round(windIn(high, units.wind) ?? 0)} ${windUnitLabel(units.wind)}`, line: tag === null ? 'at 400 ft' : `${tag.toLowerCase()} at 400 ft`, target: 'drone' }
   }
 
   return (

@@ -18,7 +18,7 @@ describe('the watch', () => {
     const w = swellWatch(
       [
         { date: '2026-11-17', callHighFt: 1, readings: [R('A', 1)] },
-        { date: '2026-11-22', callHighFt: 3, readings: [R('A', 5)] },
+        { date: '2026-11-22', callHighFt: 4, readings: [R('A', 5)] },
         { date: '2026-11-23', callHighFt: 2, readings: [R('A', 2), R('B', 4.2)] },
       ],
       weekday,
@@ -32,9 +32,10 @@ describe('the watch', () => {
     expect(w?.words).toBe('Possible bigger swell Mon · readings disagree · low confidence')
   })
 
-  it('nothing under 4 ft, a call over 2, no call, or past the week: no chip', () => {
+  it('nothing under 4 ft, a call over 3, no call, or past the week: no chip', () => {
     expect(swellWatch([{ date: '2026-11-23', callHighFt: 2, readings: [R('A', 3.99)] }], weekday)).toBe(null)
-    expect(swellWatch([{ date: '2026-11-23', callHighFt: 3, readings: [R('A', 6)] }], weekday)).toBe(null)
+    expect(swellWatch([{ date: '2026-11-23', callHighFt: 4, readings: [R('A', 6)] }], weekday)).toBe(null)
+    expect(swellWatch([{ date: '2026-11-25', callHighFt: 3, readings: [R('A', 5)] }], weekday)?.date).toBe('2026-11-25')
     expect(swellWatch([{ date: '2026-11-23', callHighFt: null, readings: [R('A', 6)] }], weekday)).toBe(null)
     const eight = Array.from({ length: 8 }, (_, i) => ({ date: `2026-11-${17 + i}`, callHighFt: 1, readings: i === 7 ? [R('A', 6)] : [] }))
     expect(swellWatch(eight, weekday)).toBe(null)

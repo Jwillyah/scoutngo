@@ -37,6 +37,10 @@ export interface SurfHourIn {
   side: string | null
   /** Whether the wind chops the water this hour (surfChop); absent: not known, no quality words. */
   chop?: boolean
+  /** The swell's period, seconds; absent: not known, and it moves nothing. */
+  periodS?: number | null
+  /** The wind at the beach, knots; absent or null: not known, and no "calm". */
+  windKt?: number | null
 }
 
 /*
@@ -49,7 +53,7 @@ export interface SurfHourIn {
  * onshore (src/core/surf.ts MESSY_ONSHORE_MPS).
  */
 export const CHOP_WIND_KT = 10
-export type SurfQuality = 'Poor · choppy' | 'Fair · textured'
+export type SurfQuality = 'Poor' | 'Poor-Fair' | 'Fair' | 'Good' | 'Poor · choppy' | 'Fair · textured'
 const CHOP_SIDES: ReadonlySet<WindSide> = new Set<WindSide>(['onshore', 'cross-onshore', 'cross-shore'])
 
 /** Whether a wind chops the water at this beach: CHOP_WIND_KT or more, from cross-shore round to onshore. */
@@ -81,12 +85,41 @@ export function seaChop(windKt: number | null, fromDeg: number | null, facing: n
   return windKt >= CHOP_WIND_KT && !nearOffshore(fromDeg, facing)
 }
 
-/** The quality words for a choppy hour; null when the wind does not chop it (the size tag stands). */
-export function surfQuality(centerFt: number, chop: boolean): SurfQuality | null {
-  if (!chop) return null
-  const size = surfTag(centerFt, 'Clean')
-  return size === 'Flat' || size === 'Small' ? 'Poor · choppy' : 'Fair · textured'
+/*
+ * SIZE AND QUALITY ARE TWO THINGS (Batch SIMPLE-3, Section 5.1; 23 Nov: 2-3 ft
+ * clean, 10 s, light offshore read "Small" on the pill, Surfline said "Fair",
+ * Jwilly: "def a go all day"). The number beside the pill is the size; the
+ * pill is how good the water is for riding it: Poor, Poor-Fair, Fair, Good.
+ *
+ *   by size   under 1 ft Poor, 1 to 2 Poor-Fair, 2 to 4 Fair, 4 and up Good
+ *             (the face's centre, the same one the number comes from)
+ *   the wind  on the water: Bumpy drops a step, Messy two, no wind forecast one
+ *             (the same drops as the size tag, src/core/surf.ts surfTag)
+ *   the period under 6 s drops a step (wind chop's own period); not known: no change
+ *   chop      the wind chops the water (surfChop, seaChop): "Poor · choppy"
+ *             at Small and under, "Fair · textured" for a size worth riding
+ *
+ * The size tag (Flat, Small, Fun, Firing) stays for the filters that ask
+ * "is it worth going" (surfOn); it is no longer what the pill says.
+ */
+export const QUALITY_SCALE = ['Poor', 'Poor-Fair', 'Fair', 'Good'] as const
+export const QUALITY_SHORT_PERIOD_S = 6
+const QUALITY_SIZE_FT = [1, 2, 4] as const
+
+export function surfQuality(centerFt: number, chop: boolean, shape: SurfShape | null = 'Clean', periodS: number | null = null): SurfQuality {
+  if (chop) {
+    const size = surfTag(centerFt, 'Clean')
+    return size === 'Flat' || size === 'Small' ? 'Poor · choppy' : 'Fair · textured'
+  }
+  const bySize = QUALITY_SIZE_FT.filter((ft) => centerFt >= ft).length
+  const drop = (shape === 'Clean' ? 0 : shape === 'Messy' ? 2 : 1) + (periodS !== null && periodS > 0 && periodS < QUALITY_SHORT_PERIOD_S ? 1 : 0)
+  return QUALITY_SCALE[Math.max(0, bySize - drop)]
 }
+
+/** Under this wind the water is glassy and the side of the beach it blows from means nothing: 5 kt (src/core/coastFacing.ts GLASSY_MPS). */
+export const CALM_GLASSY_KT = 5
+export const CALM_GLASSY_WORDS = 'Calm · glassy'
+export const isCalmGlassy = (windKt: number | null | undefined): boolean => windKt !== null && windKt !== undefined && windKt < CALM_GLASSY_KT
 
 export interface SurfCall {
   lowFt: number
@@ -97,8 +130,10 @@ export interface SurfCall {
   /** "clean, offshore"; "wind not forecast" when no wind came. */
   wind: string
   confidence: 'firm' | 'guess'
-  /** "Poor · choppy" / "Fair · textured" when the wind chops the water; shown in place of the size tag. */
-  quality: SurfQuality | null
+  /** The pill: Poor, Poor-Fair, Fair, Good (or the chop words); the size is `words`. */
+  quality: SurfQuality
+  /** Whether the wind chops the water this hour. */
+  choppy: boolean
 }
 
 export const SHAPE_WORD: Record<SurfShape, string> = { Clean: 'clean', Bumpy: 'bumpy', Messy: 'messy' }
@@ -106,13 +141,15 @@ export const SHAPE_WORD: Record<SurfShape, string> = { Clean: 'clean', Bumpy: 'b
 export function surfCall(h: SurfHourIn | null, dayIndex: number): SurfCall | null {
   if (h === null || !Number.isFinite(h.centerFt)) return null
   const [lowFt, highFt] = surfBand(h.centerFt)
+  const calm = h.chop !== true && isCalmGlassy(h.windKt)
   return {
     lowFt,
     highFt,
     words: `${lowFt}–${highFt} ft`,
     size: surfTag(h.centerFt, h.shape),
-    wind: [h.shape === null ? 'wind not forecast' : SHAPE_WORD[h.shape], h.side].filter((x) => x !== null).join(', '),
+    wind: calm ? CALM_GLASSY_WORDS : [h.shape === null ? 'wind not forecast' : SHAPE_WORD[h.shape], h.side].filter((x) => x !== null).join(', '),
     confidence: dayIndex < SURF_SURE_DAYS ? 'firm' : 'guess',
-    quality: surfQuality(h.centerFt, h.chop === true),
+    quality: surfQuality(h.centerFt, h.chop === true, h.shape, h.periodS ?? null),
+    choppy: h.chop === true,
   }
 }

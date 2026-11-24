@@ -19,7 +19,11 @@
  *   page       the document is no wider than the screen
  *   sideways   no element scrolls sideways (overflow-x auto or scroll with
  *              more content than room): a row of chips that scrolls is a row
- *              whose end nobody sees
+ *              whose end nobody sees. Two kinds are by design: swipe pages
+ *              (data-sideways, a page at a time) and the home's hour strip
+ *              (Batch SIMPLE-3, Section 2.5: data-hour-strip, snapping per
+ *              hour, sideways drag only, with a "›" beside it marked
+ *              data-more-hint that says there is more)
  *   past edge  no visible element reaches past the screen's left or right
  *              edge, unless something on screen clips it (the map's canvas,
  *              a name cut short with an ellipsis)
@@ -69,7 +73,7 @@ const LOOK = `(() => {
   const clipped = (e) => {
     for (let p = e.parentElement; p; p = p.parentElement) {
       const s = getComputedStyle(p)
-      if (/hidden|clip/.test(s.overflowX) || /hidden|clip/.test(s.overflow)) {
+      if (/hidden|clip|auto|scroll/.test(s.overflowX) || /hidden|clip/.test(s.overflow)) {
         const r = p.getBoundingClientRect()
         if (r.right <= vw + 1 && r.left >= -1) return true
       }
@@ -82,7 +86,8 @@ const LOOK = `(() => {
     const s = getComputedStyle(e)
     /* Swipe pages by design (Sky › Now, the colour clock): marked data-sideways, snapping a page at a time, with dots that name the pages. A row that merely scrolls is still a failure. */
     const paged = e.hasAttribute('data-sideways') && /x/.test(s.scrollSnapType) && e.scrollWidth % Math.max(1, e.clientWidth) <= 2
-    if (/auto|scroll/.test(s.overflowX) && e.scrollWidth > e.clientWidth + 1 && shown(e) && !paged) out.sideways.push({ el: name(e), scroll: e.scrollWidth, room: e.clientWidth })
+    const strip = e.hasAttribute('data-hour-strip') && /x/.test(s.scrollSnapType) && s.touchAction === 'pan-x' && e.parentElement?.querySelector('[data-more-hint]') != null
+    if (/auto|scroll/.test(s.overflowX) && e.scrollWidth > e.clientWidth + 1 && shown(e) && !paged && !strip) out.sideways.push({ el: name(e), scroll: e.scrollWidth, room: e.clientWidth })
     if ((r.right > vw + 1 || r.left < -1) && shown(e) && !clipped(e)) out.past.push({ el: name(e), left: Math.round(r.left), right: Math.round(r.right), text: (e.textContent || '').trim().slice(0, 30) })
   }
   /* Report the outermost offender only: its children run past with it. */
