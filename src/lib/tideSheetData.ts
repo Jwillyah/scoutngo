@@ -155,10 +155,18 @@ export async function fetchWindMonth(at: LatLon) {
  */
 /* And for the satellite nowcast: the air at 2 m (its ground reference) and the wind at 500 hPa (to advect the cloud). */
 /* Batch M: and the home's weather block (the sky's WMO code, the rain), in the same one question: 10 variables, one call. */
-export const BRIEF_WIND_NAMES = ['wind_speed_10m', 'wind_direction_10m', 'wind_gusts_10m', 'wind_speed_120m', 'temperature_2m', 'wind_speed_500hPa', 'wind_direction_500hPa', 'weather_code', 'precipitation', 'cloud_cover', 'cloud_cover_low', 'cloud_cover_mid', 'cloud_cover_high', 'precipitation_probability'] as const
-/** The brief's one request, built in one place: the Day sheet (Batch SIMPLE-3, Section 4) reads the same answer (the weather store keys on it: no second request). */
+/*
+ * Batch SIMPLE-3, Sections 1 and 1b: and the fog and rain nowcasts' own
+ * numbers in the same question: the dew point and the visibility by the
+ * hour (src/core/fogRisk.ts), and the precipitation every 15 minutes
+ * (minutely_15, src/core/rainNow.ts). Still one request.
+ */
+export const BRIEF_WIND_NAMES = ['wind_speed_10m', 'wind_direction_10m', 'wind_gusts_10m', 'wind_speed_120m', 'temperature_2m', 'wind_speed_500hPa', 'wind_direction_500hPa', 'weather_code', 'precipitation', 'cloud_cover', 'cloud_cover_low', 'cloud_cover_mid', 'cloud_cover_high', 'precipitation_probability', 'dew_point_2m', 'visibility'] as const
+export const BRIEF_QUARTER_NAMES = ['precipitation'] as const
+
+/** The brief's one request. fetchBriefWind and fetchBriefQuarters read the same answer (the weather store keys on it: no second request). */
 export function briefWindUrl(at: LatLon): string {
-  const params = new URLSearchParams({ latitude: at.lat.toFixed(2), longitude: at.lon.toFixed(2), hourly: BRIEF_WIND_NAMES.join(','), wind_speed_unit: 'ms', forecast_days: '7', timezone: 'GMT' })
+  const params = new URLSearchParams({ latitude: at.lat.toFixed(2), longitude: at.lon.toFixed(2), hourly: BRIEF_WIND_NAMES.join(','), minutely_15: BRIEF_QUARTER_NAMES.join(','), wind_speed_unit: 'ms', forecast_days: '7', timezone: 'GMT' })
   return `${WIND_URL}?${params}`
 }
 
@@ -166,6 +174,24 @@ export async function fetchBriefWind(at: LatLon): Promise<Hourly | null> {
   /* A kept answer, stale or not, is shown while a new one is fetched behind it (Batch M: never a blank home while refreshing). */
   const got = await weatherJson(briefWindUrl(at), { maxAgeMs: SLOW_MAX_AGE_MS, timeoutMs: TIMEOUT_MS })
   return got.ok ? parseHourly(got.payload, BRIEF_WIND_NAMES) : null
+}
+
+/** Open-Meteo's minutely_15 block: each time the END of its 15 minutes (the value is the sum of the 15 minutes before it). Null without one. */
+export function parseQuarters(payload: unknown): { at: Date; mm: number | null }[] | null {
+  const q = (payload as { minutely_15?: Record<string, unknown> })?.minutely_15
+  const time = q?.time
+  const mm = q?.precipitation
+  if (!Array.isArray(time) || time.length === 0) return null
+  return (time as string[]).map((t, i) => {
+    const v = Array.isArray(mm) ? mm[i] : null
+    return { at: new Date(gmt(t)), mm: typeof v === 'number' && Number.isFinite(v) ? v : null }
+  })
+}
+
+/** The brief's precipitation every 15 minutes, for the rain nowcast: the same answer as fetchBriefWind's. */
+export async function fetchBriefQuarters(at: LatLon): Promise<{ at: Date; mm: number | null }[] | null> {
+  const got = await weatherJson(briefWindUrl(at), { maxAgeMs: SLOW_MAX_AGE_MS, timeoutMs: TIMEOUT_MS })
+  return got.ok ? parseQuarters(got.payload) : null
 }
 
 /*

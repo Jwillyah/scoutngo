@@ -29,14 +29,16 @@ export function requestShape(href) {
   const u = new URL(unwrapForecast(href))
   const points = (u.searchParams.get('latitude') ?? '').split(',').filter(Boolean).length || 1
   const vars = (u.searchParams.get('hourly') ?? '').split(',').filter(Boolean)
+  /* Batch SIMPLE-3, Section 1b: the brief asks minutely_15 precipitation too; it is billed as variables like the hourly ones. */
+  const quarters = (u.searchParams.get('minutely_15') ?? '').split(',').filter(Boolean)
   const models = (u.searchParams.get('models') ?? '').split(',').filter(Boolean)
   const start = u.searchParams.get('start_date')
   const end = u.searchParams.get('end_date')
   /* past_days: the series starts that many days back and runs that much longer, as Open-Meteo's does (Batch Pages, Section 2). */
   const past = Number(u.searchParams.get('past_days') ?? 0)
   const days = start && end ? Math.round((Date.parse(end) - Date.parse(start)) / 86_400_000) + 1 : Number(u.searchParams.get('forecast_days') ?? 7) + past
-  const weight = points * Math.max(1, (vars.length * Math.max(1, models.length)) / 10) * Math.max(1, days / 14)
-  return { host: u.host, points, vars, models, days, start, past, weight }
+  const weight = points * Math.max(1, ((vars.length + quarters.length) * Math.max(1, models.length)) / 10) * Math.max(1, days / 14)
+  return { host: u.host, points, vars, quarters, models, days, start, past, weight }
 }
 
 const value = (v) =>
@@ -66,5 +68,10 @@ export function fakeAnswer(href, now = new Date()) {
   const names = s.models.length <= 1 ? s.vars : s.vars.flatMap((v) => s.models.map((m) => `${v}_${m}`))
   const day0 = Date.parse(`${first}T00:00:00Z`)
   const one = { hourly: Object.fromEntries([['time', time], ...names.map((n) => [n, time.map((t) => byDay(n, Math.floor((Date.parse(`${t}:00Z`) - day0) / 86_400_000), value(n)))])]) }
+  /* minutely_15: every 15 minutes for the same days, dry (0 mm): no rain is made up here. */
+  if (s.quarters.length > 0) {
+    const qt = Array.from({ length: s.days * 96 }, (_, i) => new Date(t0 + i * 900_000).toISOString().slice(0, 16))
+    one.minutely_15 = Object.fromEntries([['time', qt], ...s.quarters.map((n) => [n, qt.map(() => value(n))])])
+  }
   return s.points === 1 ? one : Array.from({ length: s.points }, () => one)
 }

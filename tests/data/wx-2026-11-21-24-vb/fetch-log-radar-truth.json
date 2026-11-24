@@ -1,0 +1,31 @@
+{
+ "fetched": "2026-11-24T14:42:28.863Z",
+ "userAgent": "ScoutNGo (+https://github.com/Jwillyah/scoutngo)",
+ "requests": [
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240420/7/36/49.png",
+   "status": 200,
+   "bytes": 14150
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240430/7/36/49.png",
+   "status": 200,
+   "bytes": 14983
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240440/7/36/49.png",
+   "status": 200,
+   "bytes": 15474
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240450/7/36/49.png",
+   "status": 200,
+   "bytes": 16315
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240500/7/36/49.png",
+   "status": 200,
+   "bytes": 16970
+  }
+ ]
+}

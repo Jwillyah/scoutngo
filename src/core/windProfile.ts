@@ -190,3 +190,24 @@ export function compareToRating(
   if (gustMps === null || ratedMps === null) return null
   return { gustMps, ratedMps, over: gustMps > ratedMps }
 }
+
+/*
+ * 400 FT IS NEVER CALMER THAN THE GROUND, UNLESS A SOUNDING SAYS SO
+ * (Batch SIMPLE-3, Section 1c). 23 Nov at 11:14 PM the home said "18 kt NNE
+ * · gusts 22" (the station-leaned wind at 10 m, after a front reached Cape
+ * Henry at 10:42 PM) while the Drone tile said "8 kt at 400 ft": the
+ * model's 120 m, of the last daytime hour the briefing keeps (8:30 PM),
+ * with no station in it. Friction slows the wind near the ground, so over
+ * open ground and water the wind at 120 m is not under the wind at 10 m.
+ * The floor: ALOFT_MIN_RATIO of the surface wind, unless a measured profile
+ * (a sounding, a drone's own log) says the air aloft is calmer.
+ */
+export const ALOFT_MIN_RATIO = 0.9
+
+/** The wind at 400 ft, m/s: the model's, held at or above ALOFT_MIN_RATIO of the surface wind; a measured value as it is. Null without one. */
+export function saneAloft(surfaceMps: number | null, aloftMps: number | null, measuredMps: number | null = null): { mps: number; floored: boolean; measured: boolean } | null {
+  if (measuredMps !== null && Number.isFinite(measuredMps) && measuredMps >= 0) return { mps: measuredMps, floored: false, measured: true }
+  if (aloftMps === null || !Number.isFinite(aloftMps)) return null
+  const floor = surfaceMps === null || !Number.isFinite(surfaceMps) ? 0 : ALOFT_MIN_RATIO * surfaceMps
+  return aloftMps >= floor ? { mps: aloftMps, floored: false, measured: false } : { mps: floor, floored: true, measured: false }
+}

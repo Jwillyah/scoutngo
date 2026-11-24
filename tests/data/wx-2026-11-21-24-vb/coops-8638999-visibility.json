@@ -1,0 +1,1 @@
+{"source":"https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=visibility&application=scoutngo&begin_date=20261121+00%3A00&end_date=20261124+12%3A00&station=8638999&time_zone=gmt&units=english&format=json","payload":{"error":{"message":"No data was found. This product may not be offered at this station at the requested time."}}}

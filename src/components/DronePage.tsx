@@ -36,7 +36,7 @@ import { useBriefing, type BriefingDrone } from '../lib/useBriefing.ts'
 import { useStationNow } from '../lib/useStationNow.ts'
 import { formatTemperature, windIn, windUnitLabel, type Units } from '../lib/units.ts'
 import { facilityCellAt } from '../lib/uasfm.ts'
-import { calmDirection, windAt } from '../lib/windNow.ts'
+import { calmDirection, droneWindAt, windAt } from '../lib/windNow.ts'
 import { useStationObs } from '../lib/useStationObs.ts'
 import { DroneAirspace } from './DroneAirspace.tsx'
 import { DroneHeightView } from './DroneHeight.tsx'
@@ -135,7 +135,8 @@ export function DronePage({ venue: spot, placeName, timeZone, units, now, drone,
   const wind10 = windAt(wx, now, near)
   const mps10 = wind10?.mps ?? null
   const gust10 = wind10?.gustMps ?? null
-  const mps400 = at('wind_speed_120m', now)
+  /* Batch SIMPLE-3, Section 1c: the home's 400 ft and this one are the same (droneWindAt): the brief's half hour, never under 0.9 of the ground's leaned wind. */
+  const mps400 = droneWindAt(wx, now, near, now)?.mps ?? null
   const fromDeg = calmDirection(mps10, wind10?.fromDeg ?? null)
   const gust400 = gustAloft(mps10, gust10, mps400)
   const limit = drone?.maxWindMps ?? null

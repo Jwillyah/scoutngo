@@ -12,6 +12,7 @@ import { CALM_KT, CALM_MPS, calmDirection, halfHour, isCalm } from '../core/mark
 import { nowcastAt, nowcastWeight, obsFresh, type StationObs } from '../core/nowcast.ts'
 import { hourlyAt } from './tideSheetData.ts'
 import { saneAzimuth, saneGust, saneWind } from '../core/sanity.ts'
+import { saneAloft } from '../core/windProfile.ts'
 import { compass } from './tideWords.ts'
 import { windIn, windUnitLabel, type WindUnit } from './units.ts'
 
@@ -43,6 +44,34 @@ export function windAt(wx: Hourly | null, t: Date, obs: StationObs | null = null
   const lean = obsFresh(obs, now) ? obs : null
   const w = nowcastAt((tt) => modelWindAt(wx, tt), lean, halfHour(t)) as WindNow | null
   return w === null ? null : { ...w, fromDeg: calmDirection(w.mps, w.fromDeg) }
+}
+
+/*
+ * THE ONE WIND AT 400 FT (Batch SIMPLE-3, Section 1c). The home's Drone tile
+ * read the briefing's day hours, 5:30 AM to 8:30 PM, so at 11:14 PM it said
+ * 8:30 PM's 120 m; the Drone page read the 120 m at the hour; neither knew
+ * the station the 10 m wind leans on. Now both read this: the same series
+ * as windAt (the brief's), the same half hour, and the surface wind windAt
+ * gives (station-leaned), with 400 ft never under ALOFT_MIN_RATIO of it
+ * unless `measuredMps` (a measured profile) says otherwise
+ * (src/core/windProfile.ts saneAloft). `surface` is that same windAt, for
+ * the screen that shows both.
+ */
+export interface AloftNow {
+  mps: number
+  /** Held up to 0.9 of the surface wind: the model's 120 m was under it. */
+  floored: boolean
+  measured: boolean
+  /** The model's own 120 m at that half hour, m/s. */
+  modelMps: number | null
+  /** windAt at the same time, the wind the home shows. */
+  surface: WindNow | null
+}
+export function droneWindAt(wx: Hourly | null, t: Date, obs: StationObs | null = null, now: Date = new Date(), measuredMps: number | null = null): AloftNow | null {
+  const surface = windAt(wx, t, obs, now)
+  const modelMps = wx === null ? null : saneWind(hourlyAt(wx, 'wind_speed_120m', halfHour(t)))
+  const got = saneAloft(surface?.mps ?? null, modelMps, measuredMps)
+  return got === null ? null : { ...got, modelMps, surface }
 }
 
 /** "9 kt WNW": the speed in the user's unit, and where it is from. */

@@ -136,3 +136,44 @@ Calls:
 - **Cam card:** "Live on <operator>'s site · link out ↗"; no stills (every cam is embed:false and a cam entry has no still field). Distances under 1 km say "here" (was "0 ft").
 - **Moon:** two new tokens, `--moon-face #e8e1cf` and `--moon-mare #b5ad9c` (the existing `--moon` is violet); 7 soft maria from 48 px up, clipped to the phase.
 - **Left:** units in the `camsNear`/`bestView` callers (CamsSheet, SurfPageV2, bestViewData) still ride the core's miles default; SkyNowView.tsx is dead code; measure-fog-fixtures.mjs's "before" column would print null if re-run (the file is unchanged). Needs a real iPhone: the photo picker, EXIF on an iPhone export, the moon's colour in sun.
+
+## Day sheet brought to the one blue-hour convention (follow-up commit)
+
+- The sheet reads `sunBoundaries` (built from the same `lightMarks` as the Sky bar): golden, a new colour band (`--afterglow`), blue −4° → −6° (`--sun-shadow`); one `phaseAt` drives both the strip and the row words. The batch's S4.7 "blue 4:47–5:08 / 6:31–6:51" is the afterglow in this convention; blue −6° is within 0.5 min of the second ephemeris (measurements/2026-11-24-day-sheet-fixture.md).
+- When several edges share an hour, the row names the last one (the band the hour ends in); a joined list does not fit at 390 px. The Light cell wraps rather than cut a time.
+
+## Packaging note (12:05)
+
+The first queued run was stopped before its gate: the Day sheet's list took shared audit scripts straight from the working tree, where another piece had since added an audit whose script was not in the commit. Every piece's list is now frozen: its own files from the tree its dry run passed, shared files as HEAD plus its own hunks. Nothing reached git.
+
+## 14:27 — two hours lost to a stale lock; queue reordered
+
+- The killed first queue run (12:03) left the browser lock owned by "commit".
+  The rebuilt queue's day commit waited on it from 12:04 to 14:16, when the
+  home agent spotted and dropped it. Nothing ran on the browser lock in between.
+- With ~3 h left, the remaining pieces go in section priority, not build order:
+  day (in flight) → wx (S1) → s0 (S0; needs wx's saneAloft) → sky-core (S3) →
+  dayblue (S4) → wind bar (S5b). Home (S2), sky (S3.1–3.3) and small (S5–S7)
+  follow if time allows; whatever misses 17:33 is listed as undone.
+
+## 14:35 — home, small and sky packaged; final order
+
+- Home's report: TileHome imports `useRainMoonAlerts` (small's src/lib/goAlert.ts)
+  and `moonHomeMoment` (sky-core's moonMoment.ts); the Sky piece imports
+  home's `useFogRain`. So the order is forced: sky-core → home → sky.
+- Home and small go as ONE commit ("hs"), against the one-commit-per-piece
+  rule: a gate is ~22 min, nine gates do not fit before 17:33, and the two
+  share App.tsx, TileHome's imports and the surf files. Sky-core stays its
+  own commit.
+- Queue: day → wx → s0 → sky-core → home+small → sky → dayblue → wind bar.
+  Day sheet blue and the wind bar are last because they're S4/S5b and touch
+  nothing the others need.
+- Frozen sets: App.tsx for hs = S0's + home hunks + small's nearMeItems zone;
+  audit-overflow.mjs for hs = HEAD + the hour-strip hunks only (the pill
+  hunk is sky's); flags.ts for sky = day's + SKY_PICTURE_FLAT; wind bar's
+  flags.ts = all three.
+- Dry runs (tsc, lint, unit/colour/clock/measurement audits, vitest) on the
+  stacked sets: home+small 4919 passed, sky 4938, all eight 4954, and the
+  all-eight tree is byte-identical to the working tree for every changed file.
+- Home's browser audits (home fit with the new strip checks, briefing,
+  overflow) have NOT run yet; they run first in the hs commit gate.

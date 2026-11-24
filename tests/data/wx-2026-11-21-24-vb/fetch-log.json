@@ -1,0 +1,176 @@
+{
+ "fetched": "2026-11-24T14:38:21.407Z",
+ "userAgent": "ScoutNGo (+https://github.com/Jwillyah/scoutngo)",
+ "requests": [
+  {
+   "url": "https://historical-forecast-api.open-meteo.com/v1/forecast?latitude=36.851&longitude=-75.98&hourly=temperature_2m%2Cdew_point_2m%2Cvisibility%2Cwind_speed_10m%2Cwind_direction_10m%2Cwind_gusts_10m%2Cwind_speed_120m%2Cwind_direction_120m%2Cwind_speed_500hPa%2Cwind_direction_500hPa%2Cweather_code%2Cprecipitation%2Ccloud_cover%2Ccloud_cover_low%2Ccloud_cover_mid%2Ccloud_cover_high%2Cprecipitation_probability&minutely_15=precipitation&wind_speed_unit=ms&start_date=2026-11-21&end_date=2026-11-24&timezone=GMT",
+   "status": 200,
+   "bytes": 18891
+  },
+  {
+   "url": "https://historical-forecast-api.open-meteo.com/v1/forecast?latitude=36.7&longitude=-76.3&hourly=temperature_2m%2Cdew_point_2m%2Cvisibility%2Cwind_speed_10m%2Cwind_direction_10m%2Cwind_gusts_10m%2Cwind_speed_120m%2Cwind_direction_120m%2Cwind_speed_500hPa%2Cwind_direction_500hPa%2Cweather_code%2Cprecipitation%2Ccloud_cover%2Ccloud_cover_low%2Ccloud_cover_mid%2Ccloud_cover_high%2Cprecipitation_probability&minutely_15=precipitation&wind_speed_unit=ms&start_date=2026-11-21&end_date=2026-11-24&timezone=GMT",
+   "status": 200,
+   "bytes": 18915
+  },
+  {
+   "url": "https://marine-api.open-meteo.com/v1/marine?latitude=36.851&longitude=-75.98&hourly=sea_surface_temperature&start_date=2026-11-21&end_date=2026-11-24&timezone=GMT",
+   "status": 200,
+   "bytes": 2587
+  },
+  {
+   "url": "https://www.ndbc.noaa.gov/data/realtime2/44099.txt",
+   "status": 200,
+   "bytes": 204732
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py?station=NTU&station=ORF&station=NFE&station=CPK&station=PVG&data=tmpf&data=dwpf&data=sknt&data=drct&data=gust&data=vsby&data=wxcodes&data=metar&sts=2026-11-21T00%3A00Z&ets=2026-11-24T12%3A00Z&tz=Etc%2FUTC&format=onlycomma&latlon=yes&missing=null&trace=0.0001&report_type=3&report_type=4",
+   "status": 200,
+   "bytes": 146985
+  },
+  {
+   "url": "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=wind&application=scoutngo&begin_date=20261121+00%3A00&end_date=20261124+12%3A00&station=8638999&time_zone=gmt&units=english&format=json",
+   "status": 200,
+   "bytes": 71053
+  },
+  {
+   "url": "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=visibility&application=scoutngo&begin_date=20261121+00%3A00&end_date=20261124+12%3A00&station=8638999&time_zone=gmt&units=english&format=json",
+   "status": 200,
+   "bytes": 115
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240350/7/35/48.png",
+   "status": 200,
+   "bytes": 46199
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240350/7/36/48.png",
+   "status": 200,
+   "bytes": 17809
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240350/7/37/48.png",
+   "status": 200,
+   "bytes": 9216
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240350/7/35/49.png",
+   "status": 200,
+   "bytes": 26087
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240350/7/36/49.png",
+   "status": 200,
+   "bytes": 14542
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240350/7/37/49.png",
+   "status": 200,
+   "bytes": 6790
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240350/7/35/50.png",
+   "status": 200,
+   "bytes": 2077
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240350/7/36/50.png",
+   "status": 200,
+   "bytes": 9602
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240350/7/37/50.png",
+   "status": 200,
+   "bytes": 4864
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240400/7/35/48.png",
+   "status": 200,
+   "bytes": 46850
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240400/7/36/48.png",
+   "status": 200,
+   "bytes": 19991
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240400/7/37/48.png",
+   "status": 200,
+   "bytes": 10835
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240400/7/35/49.png",
+   "status": 200,
+   "bytes": 31334
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240400/7/36/49.png",
+   "status": 200,
+   "bytes": 14462
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240400/7/37/49.png",
+   "status": 200,
+   "bytes": 7121
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240400/7/35/50.png",
+   "status": 200,
+   "bytes": 2346
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240400/7/36/50.png",
+   "status": 200,
+   "bytes": 9707
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240400/7/37/50.png",
+   "status": 200,
+   "bytes": 4494
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240410/7/35/48.png",
+   "status": 200,
+   "bytes": 46314
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240410/7/36/48.png",
+   "status": 200,
+   "bytes": 18871
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240410/7/37/48.png",
+   "status": 200,
+   "bytes": 11463
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240410/7/35/49.png",
+   "status": 200,
+   "bytes": 31129
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240410/7/36/49.png",
+   "status": 200,
+   "bytes": 14335
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240410/7/37/49.png",
+   "status": 200,
+   "bytes": 8105
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240410/7/35/50.png",
+   "status": 200,
+   "bytes": 2315
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240410/7/36/50.png",
+   "status": 200,
+   "bytes": 9427
+  },
+  {
+   "url": "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/ridge::USCOMP-N0Q-202611240410/7/37/50.png",
+   "status": 200,
+   "bytes": 5227
+  }
+ ]
+}
