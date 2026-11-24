@@ -45,6 +45,15 @@ function nextDate(date: string): string {
   return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10)
 }
 
+/*
+ * TO THE NEAREST MINUTE (Batch SIMPLE-3, 2b). The clock prints hours and
+ * minutes and drops the seconds, so a rise at 4:37:58 PM read "4:37 PM" where
+ * USNO and every almanac say 4:38. Rounded once, here, every screen that
+ * prints a moonrise (the home's moment, the Night tab, the Fish tile) says the
+ * same minute, and it is the nearest one.
+ */
+const toMinute = (d: Date | null): Date | null => (d === null ? null : new Date(Math.round(d.getTime() / 60_000) * 60_000))
+
 /**
  * Moonrise and moonset on the venue's civil day containing `at`. The zone is
  * the venue's own, from its coordinate, unless one is given.
@@ -69,5 +78,5 @@ export function moonTimesOnLocalDay(
   }
   const inside = (list: Date[]) =>
     list.filter((d) => d.getTime() >= start.getTime() && d.getTime() < end.getTime()).sort((a, b) => a.getTime() - b.getTime())[0] ?? null
-  return { rise: inside(rises), set: inside(sets), date, timeZone }
+  return { rise: toMinute(inside(rises)), set: toMinute(inside(sets)), date, timeZone }
 }

@@ -43,7 +43,7 @@ describe('best view', () => {
     expect(shore!.km).toBeLessThan(8)
     expect(['W', 'WSW', 'WNW', 'SW', 'NW']).toContain(shore!.toward)
     const v = bestView(VENUE, 252, [SPOTS[0]], sea)
-    expect(v.line).toMatch(/^Best view tonight: open WSW horizon · a shore \d+ km W\w*, drone up high\. Oceanfront faces away: afterglow only\.$/)
+    expect(v.line).toMatch(/^Best view tonight: open WSW horizon · a shore \d+ mi W\w*, drone up high\. Oceanfront faces away: afterglow only\.$/)
   })
 
   it('draws the wedge and the ranked spots for the map', () => {

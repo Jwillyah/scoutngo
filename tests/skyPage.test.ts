@@ -122,11 +122,13 @@ describe('never an event that has passed (Batch Flow, Section 4; field 9 Nov 8:3
 describe('the light as one bar, and the side view', () => {
   const VB = { lat: 36.84, lon: -75.97 }
   const alt = (t: Date) => getPosition(t, VB.lat, VB.lon).altitude
-  it("sunset: golden, color, blue, dark in order, the colour window the call's own; now on it or null", () => {
+  it('sunset: golden, color, blue, dark in order, color from the sunset to −4° whatever the call says; now on it or null', () => {
     const set = new Date('2026-11-09T21:57:00Z')
-    const segs = lightTimeline('sunset', set, lightMarks('sunset', set, alt), new Date(set.getTime() - 60_000), new Date(set.getTime() + 17 * 60_000))
+    const marks = lightMarks('sunset', set, alt)
+    const segs = lightTimeline('sunset', set, marks, new Date(set.getTime() - 60_000), new Date(set.getTime() + 17 * 60_000))
     expect(segs.map((g) => g.key)).toEqual(['golden', 'color', 'blue', 'dark'])
-    expect(segs[1].to.getTime() - segs[1].from.getTime()).toBe(18 * 60_000)
+    expect(segs[1].from).toEqual(set)
+    expect(segs[1].to).toEqual(marks.find((m) => m.label === 'Blue')?.at)
     expect(nowShare(segs, new Date(set.getTime()))).toBeGreaterThan(0)
     expect(nowShare(segs, new Date(set.getTime() - 5 * 3_600_000))).toBeNull()
   })

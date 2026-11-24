@@ -241,36 +241,59 @@ export interface LightSegment {
 
 /**
  * Golden · color · blue · dark, in the order they come (sunset), or dark ·
- * blue · color · golden (sunrise): golden from the sun at +6°, the colour
- * window from the call when it has one (else the 20 minutes round the
- * event), blue from −4°, dark from −6°. A segment with no time is left out.
+ * blue · color · golden (sunrise), each from the sun's height and nothing
+ * else (src/core/sunBand.ts's bands): golden from +6° to the sunset (the
+ * sunrise to +6°), color, the afterglow, from the sunset down to −4° (from
+ * −4° up to the sunrise), blue from −4° to −6°, dark from −6°.
+ *
+ * WHY NOT THE CALL'S WINDOW (Batch SIMPLE-3, Section 3.4). Until 24 Nov the
+ * color segment was the call's own window and golden ran up to its start. On
+ * 23 Nov at Atlantic Park the call said 5:07–5:17 PM, so golden read
+ * 4:12–5:07 PM, past the 4:50 PM sunset, and color 5:07–5:17 sat on top of
+ * blue 5:10–5:21. The call's window is when the clouds may be lit, which is a
+ * different fact from the sky's phases: the page says it as the call's peak,
+ * not as a second set of phase times. The call's window is used only where a
+ * height is never reached (the sun not getting down to −4° within three hours
+ * of the event, a summer night far north).
+ *
+ * Ordered and disjoint by construction: each segment starts no earlier than
+ * the one before it ends, and a segment left with no time is dropped.
  */
 export function lightTimeline(kind: 'sunrise' | 'sunset', event: Date, marks: readonly LightMark[], colorFrom: Date | null, colorTo: Date | null): LightSegment[] {
   const at = (label: string) => marks.find((m) => m.label === label)?.at ?? null
-  const cf = colorFrom ?? new Date(event.getTime() - 10 * 60_000)
-  const ct = colorTo ?? new Date(event.getTime() + 10 * 60_000)
+  const plus = (d: Date, min: number) => new Date(d.getTime() + min * 60_000)
+  let segs: (LightSegment | null)[]
   if (kind === 'sunset') {
     const golden = at('Golden')
     const blue = at('Blue')
     const dark = at('Dark')
-    const segs: (LightSegment | null)[] = [
-      golden === null ? null : { key: 'golden', label: 'golden', from: golden, to: cf },
-      { key: 'color', label: 'color', from: cf, to: ct },
-      blue === null ? null : { key: 'blue', label: 'blue', from: blue, to: dark ?? new Date(blue.getTime() + 15 * 60_000) },
-      dark === null ? null : { key: 'dark', label: 'dark', from: dark, to: new Date(dark.getTime() + 30 * 60_000) },
+    const colorEnd = blue ?? (colorTo !== null && colorTo.getTime() > event.getTime() ? colorTo : plus(event, 10))
+    segs = [
+      golden === null ? null : { key: 'golden', label: 'golden', from: golden, to: event },
+      { key: 'color', label: 'color', from: event, to: colorEnd },
+      blue === null ? null : { key: 'blue', label: 'blue', from: blue, to: dark ?? plus(blue, 15) },
+      dark === null ? null : { key: 'dark', label: 'dark', from: dark, to: plus(dark, 30) },
     ]
-    return segs.filter((x): x is LightSegment => x !== null && x.to.getTime() > x.from.getTime())
+  } else {
+    const blue = at('Blue')
+    const glow = at('Glow')
+    const day = at('Day')
+    const colorStart = glow ?? (colorFrom !== null && colorFrom.getTime() < event.getTime() ? colorFrom : plus(event, -10))
+    segs = [
+      blue === null ? null : { key: 'dark', label: 'dark', from: plus(blue, -30), to: blue },
+      blue === null ? null : { key: 'blue', label: 'blue', from: blue, to: colorStart },
+      { key: 'color', label: 'color', from: colorStart, to: event },
+      day === null ? null : { key: 'golden', label: 'golden', from: event, to: day },
+    ]
   }
-  const blue = at('Blue')
-  const glow = at('Glow')
-  const day = at('Day')
-  const segs: (LightSegment | null)[] = [
-    blue === null ? null : { key: 'dark', label: 'dark', from: new Date(blue.getTime() - 30 * 60_000), to: blue },
-    blue === null ? null : { key: 'blue', label: 'blue', from: blue, to: glow ?? cf },
-    { key: 'color', label: 'color', from: cf, to: ct },
-    day === null ? null : { key: 'golden', label: 'golden', from: ct, to: day },
-  ]
-  return segs.filter((x): x is LightSegment => x !== null && x.to.getTime() > x.from.getTime())
+  const out: LightSegment[] = []
+  for (const s of segs) {
+    if (s === null) continue
+    const prev = out[out.length - 1]
+    const from = prev === undefined || s.from.getTime() >= prev.to.getTime() ? s.from : prev.to
+    if (s.to.getTime() > from.getTime()) out.push({ ...s, from })
+  }
+  return out
 }
 
 /** Where now sits along the bar, 0 to 1, or null when it is outside it. */

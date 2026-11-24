@@ -18,6 +18,7 @@
  * offered.
  */
 import { getPosition } from 'suncalc'
+import { distanceToward } from './cloudLayerName.ts'
 import { compassPoint } from './field.ts'
 import { angleApart } from './coastFacing.ts'
 import { bearingBetween, distanceMeters, type LatLon } from './geo.ts'
@@ -48,7 +49,7 @@ export interface FacingCam {
 export interface SkyCam {
   cam: FacingCam
   km: number
-  /** Where the cam is from you: "4 km N". */
+  /** Where the cam is from you: "3 mi N" (or "4 km N" with miles off; src/core/cloudLayerName.ts distanceToward). */
   where: string
 }
 
@@ -59,7 +60,7 @@ export const camDistanceKnown = (cam: FacingCam): boolean => cam.atIs === 'cam'
 export const lensFacing = (cam: FacingCam): number | null => (cam.facingIs === 'lanes' ? null : cam.facing)
 
 /** The nearest cams within CAM_MAX_KM whose recorded facing is within CAM_FACING_DEG of any of `lines`. */
-function camsAlong(venue: LatLon, lines: readonly number[], cams: readonly FacingCam[], n: number): SkyCam[] {
+function camsAlong(venue: LatLon, lines: readonly number[], cams: readonly FacingCam[], n: number, miles: boolean): SkyCam[] {
   const seen = new Set<string>()
   return cams
     .filter((c) => {
@@ -78,12 +79,12 @@ function camsAlong(venue: LatLon, lines: readonly number[], cams: readonly Facin
       return true
     })
     .slice(0, n)
-    .map((x) => ({ ...x, where: x.km < 1 ? 'here' : `${Math.round(x.km)} km ${compassPoint(bearingBetween(venue, x.cam.at))}` }))
+    .map((x) => ({ ...x, where: distanceToward(x.km, bearingBetween(venue, x.cam.at), miles) }))
 }
 
 /** "Look toward the sun": cams facing within CAM_FACING_DEG of the sun's azimuth, within CAM_MAX_KM. Empty means no row. */
-export function camsTowardSun(venue: LatLon, sunAzDeg: number, cams: readonly FacingCam[], n = SKY_CAMS_SHOWN): SkyCam[] {
-  return camsAlong(venue, [sunAzDeg], cams, n)
+export function camsTowardSun(venue: LatLon, sunAzDeg: number, cams: readonly FacingCam[], n = SKY_CAMS_SHOWN, miles = true): SkyCam[] {
+  return camsAlong(venue, [sunAzDeg], cams, n, miles)
 }
 
 /**
@@ -92,9 +93,9 @@ export function camsTowardSun(venue: LatLon, sunAzDeg: number, cams: readonly Fa
  * azimuth or of the beach's seaward facing (src/core/coastFacing.ts; null when
  * the venue has none). Unknown facing is excluded. Empty means no row.
  */
-export function camsFacingWaterOrSun(venue: LatLon, sunAzDeg: number | null, seaFacingDeg: number | null, cams: readonly FacingCam[], n = SKY_CAMS_SHOWN): SkyCam[] {
+export function camsFacingWaterOrSun(venue: LatLon, sunAzDeg: number | null, seaFacingDeg: number | null, cams: readonly FacingCam[], n = SKY_CAMS_SHOWN, miles = true): SkyCam[] {
   const lines = [sunAzDeg, seaFacingDeg].filter((d): d is number => d !== null)
-  return lines.length === 0 ? [] : camsAlong(venue, lines, cams, n)
+  return lines.length === 0 ? [] : camsAlong(venue, lines, cams, n, miles)
 }
 
 /** "Look WSW now". */
@@ -115,15 +116,15 @@ export function camsForEvent(venue: LatLon, event: Date, cams: readonly FacingCa
  *   roads    the road cams (VDOT), whose facing is the lanes', under Roads and All only
  */
 export type CamChip = 'all' | 'surf' | 'sunset' | 'roads'
-export function camsNear(venue: LatLon, chip: CamChip, cams: readonly FacingCam[], sunsetAzDeg: number | null, seaFacingDeg: number | null): SkyCam[] {
+export function camsNear(venue: LatLon, chip: CamChip, cams: readonly FacingCam[], sunsetAzDeg: number | null, seaFacingDeg: number | null, miles = true): SkyCam[] {
   const MANY = 40
-  if (chip === 'surf') return seaFacingDeg === null ? [] : camsAlong(venue, [seaFacingDeg], cams.filter((c) => c.facingIs !== 'lanes'), MANY)
-  if (chip === 'sunset') return sunsetAzDeg === null ? [] : camsAlong(venue, [sunsetAzDeg], cams, MANY)
+  if (chip === 'surf') return seaFacingDeg === null ? [] : camsAlong(venue, [seaFacingDeg], cams.filter((c) => c.facingIs !== 'lanes'), MANY, miles)
+  if (chip === 'sunset') return sunsetAzDeg === null ? [] : camsAlong(venue, [sunsetAzDeg], cams, MANY, miles)
   const pool = chip === 'roads' ? cams.filter((c) => c.facingIs === 'lanes') : cams
   return pool
     .map((cam) => ({ cam, km: distanceMeters(venue, cam.at) / 1000 }))
     .filter((x) => x.km <= CAM_MAX_KM)
     .sort((a, b) => a.km - b.km)
     .slice(0, MANY)
-    .map((x) => ({ ...x, where: x.km < 1 ? 'here' : `${Math.round(x.km)} km ${compassPoint(bearingBetween(venue, x.cam.at))}` }))
+    .map((x) => ({ ...x, where: distanceToward(x.km, bearingBetween(venue, x.cam.at), miles) }))
 }

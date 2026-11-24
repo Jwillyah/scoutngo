@@ -20,6 +20,7 @@
 import { angleApart } from './coastFacing.ts'
 import { destinationPoint, distanceMeters, bearingBetween, type LatLon } from './geo.ts'
 import { compassPoint } from './field.ts'
+import { distanceWords } from './cloudLayerName.ts'
 
 export const WEDGE_HALF_DEG = 30
 export const WEDGE_STEP_DEG = 10
@@ -112,7 +113,8 @@ export interface BestView {
 
 const short = (name: string) => name.split(/[,(]/)[0].trim()
 
-export function bestView(venue: LatLon, sunAzimuthDeg: number, spots: readonly ViewSpot[], sea: (p: LatLon) => boolean): BestView {
+/** `miles`: the shore's distance in mi (the app's default units) or km. */
+export function bestView(venue: LatLon, sunAzimuthDeg: number, spots: readonly ViewSpot[], sea: (p: LatLon) => boolean, miles = true): BestView {
   const toward = compassPoint(sunAzimuthDeg)
   const ranked = rankSpots(venue, sunAzimuthDeg, spots, sea)
   const shore = nearestShore(venue, sunAzimuthDeg, sea)
@@ -126,7 +128,7 @@ export function bestView(venue: LatLon, sunAzimuthDeg: number, spots: readonly V
       : part.length > 0
         ? `Best view tonight: ${toward} horizon partly over water · ${part.join(', ')}, drone up high`
         : shore !== null
-          ? `Best view tonight: open ${toward} horizon · a shore ${Math.round(shore.km)} km ${shore.toward}, drone up high`
+          ? `Best view tonight: open ${toward} horizon · a shore ${distanceWords(shore.km, miles)} ${shore.toward}, drone up high`
           : `Best view tonight: toward the ${toward} · no water horizon near; drone up high`
   const line = `${head}.${away.length === 0 ? '' : ` ${away[0]} faces away: afterglow only.`}`
   return { toward, centreDeg: sunAzimuthDeg, ranked, shore, line }
