@@ -1,0 +1,228 @@
+/*
+ * THE DAY SHEET (Batch SIMPLE-3, Section 4; board Day_Sheet.png). Shell is
+ * PageShell's (.dpage, .ppage); colours are tokens only.
+ */
+.dsheet {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.dsheet__pick {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.dsheet__field {
+  flex: 1 1 140px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dsheet__fl {
+  font-size: var(--text-label);
+  color: var(--glass-ink-2);
+}
+.dsheet__ctl {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--d-edge);
+  border-radius: 14px;
+  background: var(--d-card);
+  color: var(--white);
+  font: inherit;
+  font-size: var(--text-base);
+}
+.dsheet__age {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--glass-ink-2);
+}
+.dsheet__none {
+  margin: 8px 0;
+  color: var(--white);
+}
+.dsheet__card {
+  background: var(--d-card);
+  border: 1px solid var(--d-edge);
+  border-radius: 24px;
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  overflow: hidden;
+}
+.dsheet__chart {
+  padding: 8px 12px 10px;
+}
+.dsheet__strip {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.dsheet__curve {
+  fill: none;
+  stroke: var(--sun);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.dsheet__now {
+  stroke: var(--white);
+  stroke-width: 2;
+}
+.dsheet__nowword {
+  fill: var(--white);
+  font-size: 11px;
+  font-weight: 600;
+}
+.dsheet__tick {
+  fill: var(--glass-ink-2);
+  font-size: 11px;
+}
+.dsheet__band--golden {
+  fill: var(--sun-rise);
+  background: var(--sun-rise);
+}
+.dsheet__band--side {
+  fill: var(--sun);
+  background: var(--sun);
+}
+.dsheet__band--top {
+  fill: var(--grey-1);
+  background: var(--grey-1);
+}
+.dsheet__band--blue {
+  fill: var(--sun-shadow);
+  background: var(--sun-shadow);
+}
+.dsheet__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+  color: var(--glass-ink-2);
+}
+.dsheet__swatch,
+.dsheet__dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: none;
+}
+.dsheet__table {
+  display: flex;
+  flex-direction: column;
+}
+.dsheet__row {
+  display: grid;
+  grid-template-columns: 34px 56px minmax(0, 1fr) 46px 54px 40px;
+  align-items: center;
+  column-gap: 6px;
+  min-height: 34px;
+  padding: 4px 12px;
+  border-top: 1px solid var(--d-edge);
+  font-size: var(--text-md);
+}
+.dsheet__row:first-child {
+  border-top: 0;
+}
+.dsheet__row--head {
+  min-height: 32px;
+  font-size: var(--text-label);
+  color: var(--glass-ink-2);
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+.dsheet__row--now {
+  background: var(--d-edge);
+}
+.dsheet__t {
+  font-weight: var(--weight-medium);
+}
+.dsheet__sun {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+.dsheet__arrow {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: var(--sun);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.dsheet__light {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  line-height: 1.2;
+}
+.dsheet__faint {
+  color: var(--glass-ink-2);
+}
+.dsheet__warn {
+  margin: 0;
+  padding: 0 4px;
+  font-size: var(--text-md);
+  line-height: 1.35;
+  color: var(--white);
+}
+.dsheet__actions {
+  display: flex;
+  gap: 12px;
+  padding-bottom: 8px;
+}
+.dsheet__btn {
+  flex: 1;
+  min-height: 48px;
+  padding: 0 12px;
+  border: 1px solid var(--d-edge);
+  border-radius: 999px;
+  background: var(--d-card);
+  color: var(--white);
+  font: inherit;
+  font-weight: var(--weight-medium);
+}
+.dsheet__btn--primary {
+  background: var(--white);
+  color: var(--sky-ink);
+}
+.dsheet__btn:disabled {
+  background: transparent;
+  color: var(--glass-ink-2);
+}
+.dsheet__show {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: calc(var(--safe-top) + 16px) 16px calc(var(--safe-bottom) + 16px);
+  background: var(--black);
+  overflow: auto;
+}
+.dsheet__showhint {
+  margin: 0;
+  color: var(--white);
+}
+.dsheet__img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 12px;
+  -webkit-touch-callout: default;
+  user-select: auto;
+}

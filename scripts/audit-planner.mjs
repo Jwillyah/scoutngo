@@ -286,6 +286,11 @@ try {
       await wait(500)
       if (await tap(page.locator('.mrow', { hasText: 'Plan a shoot' }), 'Menu › Plan a shoot')) {
         await wait(1500)
+        /* Batch SIMPLE-3, Section 4: Plan a shoot is the Day sheet; the planner is its "Add positions ›", asked for by that tap. */
+        if (await page.evaluate(() => !!document.querySelector('.dsheet'))) {
+          await tap(page.locator('.dsheet [data-add-positions]'), 'Add positions ›')
+          await wait(1500)
+        }
         const s = await state()
         looked += 1
         await a.shot('asked, Menu › Plan a shoot')

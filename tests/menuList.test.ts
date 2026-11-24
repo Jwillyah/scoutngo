@@ -18,6 +18,8 @@ describe('the ☰ menu', () => {
   })
   it('Plan a shoot is the planner’s menu door (src/lib/planner.ts), and nothing else in the menu opens it', () => {
     const app = readFileSync('src/App.tsx', 'utf8')
-    expect(app).toMatch(/case 'setup':\s*\n\s*openPlanner\('menu'\)/)
+    /* Batch SIMPLE-3, Section 4: the door is the Day sheet first (DAY_SHEET_FIRST); the planner is its "Add positions ›" and the flag's off side. */
+    expect(app).toMatch(/case 'setup':\s*\n\s*if \(DAY_SHEET_FIRST && centre !== null\) setDayOpen\(true\)\s*\n\s*else openPlanner\('menu'\)/)
+    expect(app).toMatch(/onAddPositions=\{\(\) => \{\s*\n\s*setDayOpen\(false\)\s*\n\s*openPlanner\('menu'\)/)
   })
 })

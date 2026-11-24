@@ -110,3 +110,10 @@ export const SKY_SUN_MOON_NIGHT_PAGE = false
  * page first, as before.
  */
 export const WIND_PAGE_OLD_FIRST = false
+
+/**
+ * Batch SIMPLE-3, Section 4 (board Day_Sheet): ☰ › Plan a shoot opens the Day
+ * sheet (src/components/DaySheetPage.tsx), and its "Add positions ›" is the
+ * planner, unchanged. OFF: Plan a shoot opens the planner directly, as before.
+ */
+export const DAY_SHEET_FIRST = true

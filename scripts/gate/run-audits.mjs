@@ -66,6 +66,8 @@ export const AUDITS = [
   { name: 'clean map', script: 'audit-clean-map.mjs', summary: /CLEAN MAP PROBLEMS/, pattern: /PROBLEM|ABORTED/ },
   /* Batch SIMPLE-2, Section 0: the map opened eighteen ways, never the planner; Menu › Plan a shoot always it. */
   { name: 'planner', script: 'audit-planner.mjs', summary: /PLANNER PROBLEMS/, pattern: /PROBLEM|ABORTED/ },
+  /* Batch SIMPLE-3, Section 4: Menu › Plan a shoot opens the Day sheet in one tap; its rows, strip and buttons fit at every size. */
+  { name: 'day sheet', script: 'audit-day-sheet.mjs', summary: /DAY SHEET PROBLEMS/, pattern: /PROBLEM|ABORTED/ },
   { name: 'one number', script: 'audit-one-number.mjs', summary: /ONE NUMBER PROBLEMS/ },
   { name: 'style', script: 'audit-style.mjs', summary: /STYLE PROBLEMS/ },
   { name: 'map labels', script: 'audit-map-labels.mjs', summary: /MAP LABELS PROBLEMS/ },

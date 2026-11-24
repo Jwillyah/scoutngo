@@ -82,8 +82,9 @@ const TASKS = [
     name: 'plan a shoot',
     steps: [...FIRST_RUN('Virginia Beach', 'Virginia Beach Pier'), persona('shoot', 'Shoot'), { tap: '.home .homep__dock button[aria-label="Menu"]', what: '☰' }, { tap: 'nav[aria-label="Stage"] .mrow:has-text("Plan a shoot")', what: 'Plan a shoot' }],
     /* Not the first run's own setup under the spot search: the planner, with nothing over it. */
-    answer: `(document.querySelector('.shell')?.className.includes('shell--setup') ?? false) && !document.querySelector('.spick, .actpick--sheet, .home, .menu') ? 'the planner, on its first step' : null`,
-    page: `(document.querySelector('.shell')?.className.includes('shell--setup') ?? false) && !document.querySelector('.spick, .actpick--sheet, .home, .menu') ? 'setup' : null`,
+    /* Batch SIMPLE-3, Section 4: Plan a shoot is the Day sheet (hour rows), with the planner one tap on at "Add positions ›". */
+    answer: `document.querySelector('.dsheet [data-hour]') && !document.querySelector('.spick, .actpick--sheet, .home, .menu') ? 'the Day sheet, first light to last light' : null`,
+    page: `document.querySelector('.dsheet [data-hour]') && !document.querySelector('.spick, .actpick--sheet, .home, .menu') ? 'day sheet' : null`,
     budget: [5, 5],
   },
   {

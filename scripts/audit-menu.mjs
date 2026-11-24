@@ -118,7 +118,8 @@ try {
         ['Field report', `!!document.querySelector('.reportpage')`],
         ['Settings', `!!document.querySelector('.set2')`],
         ['About', `!!document.querySelector('.astory')`],
-        ['Plan a shoot', `document.querySelector('.shell')?.className.includes('shell--setup') ?? false`],
+        /* Batch SIMPLE-3, Section 4: the Day sheet; the planner is its "Add positions ›". */
+        ['Plan a shoot', `!!document.querySelector('.dsheet')`],
       ]
       for (const [row, opened] of DOORS) {
         await page.goto('about:blank')

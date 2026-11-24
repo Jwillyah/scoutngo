@@ -490,6 +490,8 @@ export async function goToStage(ev, wait, stage) {
     if (tapped !== 'ok') throw new PreflightError(tapped)
     for (let i = 0; i < 25; i += 1) {
       await wait(200)
+      /* Batch SIMPLE-3, Section 4: Plan a shoot opens the Day sheet; the planner is its "Add positions ›". */
+      await ev(`document.querySelector('.dsheet [data-add-positions]')?.click()`)
       if ((await ev(`document.querySelector('.shell')?.className.match(/shell--([a-z]+)/)?.[1] ?? null`)) === 'setup') break
     }
     return arrivedAt(ev, want, 'tapped Menu › Plan a shoot')
@@ -682,6 +684,7 @@ export async function setSheet(ev, wait, want, nudge = null) {
 export async function openPlanner(ev, wait) {
   const there = await ev(`!!document.querySelector('.mode-plan .shootc')`)
   if (!there) await goToStage(ev, wait, 'setup')
+  let stuck = 0
   for (let i = 0; i < 6 && !there; i += 1) {
     const step = await ev(`(() => {
       const vis = (e) => e && e.getBoundingClientRect().height > 0
@@ -694,7 +697,14 @@ export async function openPlanner(ev, wait) {
       return 'stuck'
     })()`)
     if (step === 'plan') break
-    if (step === 'stuck') throw new PreflightError('in the planner and found neither "Same as last time" nor the wizard\'s next button (src/components/SetupMode.tsx)')
+    if (step === 'stuck') {
+      /* Batch SIMPLE-3, Section 4: the planner now arrives from the Day sheet's tap, and its chunk may still be loading: look again before giving up. */
+      stuck += 1
+      if (stuck > 12) throw new PreflightError('in the planner and found neither "Same as last time" nor the wizard\'s next button (src/components/SetupMode.tsx)')
+      i -= 1
+      await wait(500)
+      continue
+    }
     await wait(700)
   }
   await setSheet(ev, wait, 'half')

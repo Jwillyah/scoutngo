@@ -123,7 +123,7 @@ import { planForNow } from './lib/planForNow.ts'
 import { useNow } from './lib/useNow.ts'
 import { pathToMenuItem, type MenuItem } from './lib/menu.ts'
 import { askPlanner, FIELD, MAP, plannerOnMap, setupFor, shownMode, spent, startView, type PlannerDoor, type View } from './lib/planner.ts'
-import { ACTIVITY_MULTI, HOME_OLD, PLANNER_EXTRA_DOORS } from './config/flags.ts'
+import { ACTIVITY_MULTI, DAY_SHEET_FIRST, HOME_OLD, PLANNER_EXTRA_DOORS } from './config/flags.ts'
 import { placeOf, shownGroups, usePlaceGroups } from './lib/placeGroups.ts'
 import {
   blockedReason,
@@ -199,6 +199,7 @@ const PrivacyPage = lazyPage(() => import('./components/PrivacyPage.tsx').then((
 const CreditsPage = lazyPage(() => import('./components/CreditsPage.tsx').then((m) => ({ default: m.CreditsPage })))
 const Viewfinder = lazyPage(() => import('./components/Viewfinder.tsx').then((m) => ({ default: m.Viewfinder })))
 const ViewfinderNeedsPlace = lazyPage(() => import('./components/Viewfinder.tsx').then((m) => ({ default: m.ViewfinderNeedsPlace })))
+const DaySheetPage = lazyPage(() => import('./components/DaySheetPage.tsx').then((m) => ({ default: m.DaySheetPage })))
 const WeatherPage = lazyPage(() => import('./components/WeatherPage.tsx').then((m) => ({ default: m.WeatherPage })))
 const SkyPage = lazyPage(() => import('./components/SkyPage.tsx').then((m) => ({ default: m.SkyPage })))
 const SunMoonNightPage = lazyPage(() => import('./components/SunMoonNightPage.tsx').then((m) => ({ default: m.SunMoonNightPage })))
@@ -1503,6 +1504,8 @@ function App() {
   const [briefOpen, setBriefOpen] = useState(() => died === null && shouldOpenBriefing(typeof window === 'undefined' ? null : window, landingSeen))
   /* The Weather page (Batch Pages, Section 2): over the home or the map, from the home's "Weather ›" or the map's Sky sheet. */
   const [weatherOpen, setWeatherOpen] = useState(false)
+  /* Batch SIMPLE-3, Section 4: Menu › Plan a shoot opens the Day sheet; its "Add positions ›" is the planner. */
+  const [dayOpen, setDayOpen] = useState(false)
   useEffect(() => {
     const open = () => setWeatherOpen(true)
     window.addEventListener(OPEN_WEATHER_EVENT, open)
@@ -1671,7 +1674,8 @@ function App() {
         setMode(item)
         return
       case 'setup':
-        openPlanner('menu')
+        if (DAY_SHEET_FIRST && centre !== null) setDayOpen(true)
+        else openPlanner('menu')
         return
       case 'now':
         setNowOpen(true)
@@ -3119,6 +3123,20 @@ function App() {
               jumpTo.current = when.getTime()
               setVenue((current) => ({ ...withCoordinates(current, at), date: when.toLocaleDateString('en-CA') }))
               setMode('plan')
+            }}
+          />
+        </Suspense>
+      ) : null}
+      {dayOpen && centre !== null ? (
+        <Suspense fallback={null}>
+          <DaySheetPage
+            here={{ id: 'here', name: venueShort, lat: centre.lat, lon: centre.lon }}
+            spots={spots.map((sp) => ({ id: sp.id, name: sp.name, lat: Number(sp.venue.latitude), lon: Number(sp.venue.longitude) })).filter((sp) => Number.isFinite(sp.lat) && Number.isFinite(sp.lon))}
+            units={settings.units}
+            onBack={() => setDayOpen(false)}
+            onAddPositions={() => {
+              setDayOpen(false)
+              openPlanner('menu')
             }}
           />
         </Suspense>

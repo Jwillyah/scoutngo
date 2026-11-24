@@ -116,6 +116,11 @@ try {
   await openMenu(ev, wait)
   if (await tap(page.locator('.mrow', { hasText: 'Plan a shoot' }), 'Menu › Plan a shoot')) {
     await wait(1500)
+    /* Batch SIMPLE-3, Section 4: Plan a shoot is the Day sheet; the planner is its "Add positions ›". */
+    if (await ev(`!!document.querySelector('.dsheet')`)) {
+      await tap(page.locator('.dsheet [data-add-positions]'), 'Add positions ›')
+      await wait(1500)
+    }
     if (!(await ev(`!!document.querySelector('.mode-setup')`))) fail('menu: Plan a shoot did not open the planner')
     if (await tap(page.getByRole('button', { name: /^same as last time$/i }), "the planner's Same as last time")) await clean('menu')
   }
