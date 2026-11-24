@@ -94,6 +94,10 @@
   fill: var(--grey-1);
   background: var(--grey-1);
 }
+.dsheet__band--color {
+  fill: var(--afterglow);
+  background: var(--afterglow);
+}
 .dsheet__band--blue {
   fill: var(--sun-shadow);
   background: var(--sun-shadow);
@@ -164,10 +168,17 @@
 }
 .dsheet__light {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 6px;
+  min-width: 0;
+  line-height: 1.2;
+}
+.dsheet__lw {
+  display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
-  line-height: 1.2;
 }
 .dsheet__faint {
   color: var(--glass-ink-2);

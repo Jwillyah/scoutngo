@@ -206,3 +206,18 @@ The first queued run was stopped before its gate: the Day sheet's list took shar
     screen, including "no way back to the home"; every other look matched.
     Alone on the fixed tree: 0 problems (408 s). Load, not S0.
 - S0 re-gated in full (its tree changed). A second refusal reverts it.
+
+## 15:46 — S0 committed (38491e2)
+
+- The re-gate first stopped at unit tests: tests/oneSkyCall.test.ts pins
+  SkyFire's call line by source, and the fallback changed it. The pin now
+  holds the new line (one call wins only with a word). Not counted as a
+  strike: the browser failures were fixed; this was the fix's own test.
+- Full gate then clean, 51 of 51.
+
+## 16:04 — sky-core committed (9d7ec72)
+
+- Gate: 50 of 51; offline failed with the same empty read seen on the day
+  piece ("the day card does not say elevation never came: ''", an empty
+  card, read before it drew). Known flake: alone on the same tree, 0
+  problems. Committed that tree (queue4.sh), pushed.

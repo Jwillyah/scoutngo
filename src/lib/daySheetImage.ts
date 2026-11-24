@@ -22,7 +22,7 @@ export const PICTURE_WIDTH = 1080
 const PAD = 56
 const ROW = 76
 const COLS = [0, 150, 380, 690, 810, 960]
-const BAND_TOKEN: Record<string, string> = { golden: '--sun-rise', side: '--sun', top: '--grey-1', blue: '--sun-shadow' }
+const BAND_TOKEN: Record<string, string> = { golden: '--sun-rise', side: '--sun', top: '--grey-1', color: '--afterglow', blue: '--sun-shadow' }
 
 const token = (name: string, fallback: string): string => {
   try {

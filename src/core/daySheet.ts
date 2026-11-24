@@ -5,16 +5,18 @@
  * draws.
  *
  * ONE SOURCE FOR THE LIGHT. The edges of the light are src/core/sunMoonNight.ts
- * sunBoundaries (the Sky page's marks: golden +6°, blue to -4°, suncalc's
- * sunrise and sunset). This file adds no second set of windows. If those marks
- * change (the sky-core work on S3.4), the sheet follows them. Held against a
- * second ephemeris in src/core/daySheet.test.ts.
+ * sunBoundaries, which reads src/core/skyPage.ts lightMarks, the marks the Sky
+ * page's light bar (lightTimeline) is cut from: golden +6° to sunset, colour
+ * (the afterglow) sunset to -4°, blue -4° to -6°, the morning the same the
+ * other way. This file adds no second set of windows. Held against a second
+ * ephemeris in src/core/daySheet.test.ts.
  *
  * THE BANDS, in this file's own words and nowhere else:
  *   Golden     the sun on the horizon to 6° up (sunrise to +6°, +6° to sunset)
  *   Warm side  6° to 15°     Side  15° to 30°     Top  30° and up
  *   soft       cloud cover 60% or more; Flat when it is 90% or more (daytime)
- *   Blue       sunrise back to the -4° mark, and sunset on to it
+ *   Color      sunset on to the -4° mark, and the -4° mark on to sunrise
+ *   Blue       -4° to -6°, either side of the night
  * Heights are suncalc's, as the Sky page measures them. The mockup's own
  * numbers are examples; these thresholds are this file's.
  *
@@ -48,7 +50,7 @@ export type DayWxName = 'cloud_cover' | 'wind_speed_10m' | 'wind_direction_10m' 
 /** The forecast at an instant; null where it did not say. */
 export type DayWx = (name: DayWxName, at: Date) => number | null
 
-export type BandKind = 'golden' | 'side' | 'top' | 'blue'
+export type BandKind = 'golden' | 'side' | 'top' | 'color' | 'blue'
 
 export interface DayInput {
   /** The venue's day, "YYYY-MM-DD". */
@@ -65,15 +67,19 @@ export interface DayInput {
 }
 
 export interface LightEdges {
-  /** Morning: the -4° mark, blue begins. */
+  /** Morning: the -6° mark, blue begins. */
   blueFrom: Date | null
+  /** Morning: the -4° mark, colour begins (the glow). */
+  colorFrom: Date | null
   sunrise: Date | null
   /** Morning golden ends at +6°. */
   goldenEnds: Date | null
   /** Evening golden begins at +6°. */
   goldenStarts: Date | null
   sunset: Date | null
-  /** Evening blue ends at the -4° mark. */
+  /** Evening: the -4° mark, colour ends and blue begins. */
+  colorTo: Date | null
+  /** Evening: the -6° mark, blue ends. */
   blueTo: Date | null
   noon: { at: Date; altitude: number } | null
 }
@@ -88,7 +94,7 @@ export interface DayHour {
   azimuth: number
   /** Which way the light travels: azimuth + 180. */
   travel: number
-  /** "Golden", "Warm side", "Side · soft", "Blue 6:31", "Blue to 5:08"; the page prefixes nothing. */
+  /** "Golden", "Warm side", "Side · soft", "Color 4:50 PM", "Blue 5:10 PM"; the page prefixes nothing. */
   word: string
   band: BandKind | null
   cloud: number | null
@@ -125,18 +131,20 @@ const usable = (d: Date | null | undefined): d is Date => d instanceof Date && !
 export function lightEdges(date: string, lat: number, lon: number, timeZone: string): LightEdges {
   const from = zonedTimeToUtc(date, '00:00', timeZone)
   const next = from === null ? null : new Date(from.getTime() + 25 * HOUR)
-  if (from === null || next === null) return { blueFrom: null, sunrise: null, goldenEnds: null, goldenStarts: null, sunset: null, blueTo: null, noon: null }
+  if (from === null || next === null) return { blueFrom: null, colorFrom: null, sunrise: null, goldenEnds: null, goldenStarts: null, sunset: null, colorTo: null, blueTo: null, noon: null }
   const end = zonedTimeToUtc(shiftDate(date, 1), '00:00', timeZone) ?? next
   const marks = sunBoundaries(from, new Date(end.getTime() - 1), lat, lon)
   const at = (kind: string) => marks.find((m) => m.kind === kind)?.at ?? null
   const noonAt = getTimes(new Date(from.getTime() + 12 * HOUR), lat, lon).solarNoon
   return {
-    blueFrom: at('glow'),
+    blueFrom: at('dawn'),
+    colorFrom: at('glow'),
     sunrise: at('sunrise'),
     goldenEnds: at('day'),
     goldenStarts: at('golden'),
     sunset: at('sunset'),
-    blueTo: at('blue'),
+    colorTo: at('blue'),
+    blueTo: at('dark'),
     noon: usable(noonAt) ? { at: noonAt, altitude: getSunPosition(noonAt, lat, lon).altitude } : null,
   }
 }
@@ -183,15 +191,31 @@ export function daySheet(input: DayInput): DaySheet {
   }
   const spanFrom = first
   const spanTo = last
-  const inBlue = (t: number) =>
-    (edges.blueFrom !== null && edges.sunrise !== null && t >= edges.blueFrom.getTime() && t < edges.sunrise.getTime()) ||
-    (edges.sunset !== null && edges.blueTo !== null && t >= edges.sunset.getTime() && t < edges.blueTo.getTime())
+  const ms = (d: Date | null) => (usable(d) ? d.getTime() : null)
+  const within = (t: number, a: Date | null, b: Date | null) => {
+    const x = ms(a)
+    const y = ms(b)
+    return x !== null && y !== null && t >= x && t < y
+  }
+  /* The band at an instant, from the same edges the Sky page cuts its bar at. Below the horizon and outside them: blue. */
+  const phaseAt = (t: number, a: number): BandKind => {
+    if (within(t, edges.blueFrom, edges.colorFrom) || within(t, edges.colorTo, edges.blueTo)) return 'blue'
+    if (within(t, edges.colorFrom, edges.sunrise) || within(t, edges.sunset, edges.colorTo)) return 'color'
+    if (within(t, edges.sunrise, edges.goldenEnds) || within(t, edges.goldenStarts, edges.sunset)) return 'golden'
+    return bandOf(a) ?? 'blue'
+  }
 
-  /* The edges that begin a window, for the row they fall in: "Blue 6:31", "Golden 4:12". */
-  const starts: { at: Date; name: string }[] = []
-  if (usable(edges.blueFrom)) starts.push({ at: edges.blueFrom, name: 'Blue' })
-  if (usable(edges.goldenStarts)) starts.push({ at: edges.goldenStarts, name: 'Golden' })
-  if (usable(edges.sunrise) && !usable(edges.blueFrom)) starts.push({ at: edges.sunrise, name: 'Golden' })
+  /* The edges that begin a window, for the row they fall in: "Blue 6:09 AM", "Color 4:50 PM". */
+  const starts: { at: Date; name: string; band: BandKind }[] = []
+  const edge1 = (at: Date | null, name: string, band: BandKind) => {
+    if (usable(at)) starts.push({ at, name, band })
+  }
+  edge1(edges.blueFrom, 'Blue', 'blue')
+  edge1(edges.colorFrom, 'Color', 'color')
+  edge1(edges.sunrise, 'Golden', 'golden')
+  edge1(edges.goldenStarts, 'Golden', 'golden')
+  edge1(edges.sunset, 'Color', 'color')
+  edge1(edges.colorTo, 'Blue', 'blue')
   starts.sort((a, b) => a.at.getTime() - b.at.getTime())
 
   const rows: DayHour[] = []
@@ -207,21 +231,16 @@ export function daySheet(input: DayInput): DaySheet {
     const cloud = wxAt('cloud_cover', mid)
     const speed = wxAt('wind_speed_10m', mid)
     const dir = wxAt('wind_direction_10m', mid)
-    const edge = starts.find((s) => s.at.getTime() > h && s.at.getTime() <= h + HOUR)
+    /* Several edges can fall in one hour; the row names the last, the band the hour ends in. The strip carries the rest. */
+    const edge = starts.filter((e) => e.at.getTime() > h && e.at.getTime() <= h + HOUR).pop()
     let word: string
     let band: BandKind | null
     if (edge !== undefined) {
       word = `${edge.name} ${formatClock(edge.at, timeZone)}`
-      band = edge.name === 'Blue' ? 'blue' : 'golden'
-    } else if (altitude < 0 && inBlue(h)) {
-      word = usable(edges.blueTo) && edges.sunset !== null && h >= edges.sunset.getTime() - HOUR ? `Blue to ${formatClock(edges.blueTo, timeZone)}` : 'Blue'
-      band = 'blue'
-    } else if (altitude < 0) {
-      word = 'Blue'
-      band = 'blue'
+      band = edge.band
     } else {
-      word = lightWord(altitude, cloud)
-      band = bandOf(altitude)
+      band = phaseAt(h, altitude)
+      word = band === 'blue' ? 'Blue' : band === 'color' ? 'Color' : band === 'golden' ? 'Golden' : lightWord(altitude, cloud)
     }
     rows.push({
       start,
@@ -244,7 +263,7 @@ export function daySheet(input: DayInput): DaySheet {
   const bands: BandSpan[] = []
   for (let t = spanFrom.getTime(); t < spanTo.getTime(); t += 5 * MIN) {
     const a = alt(new Date(t))
-    const band: BandKind = inBlue(t) ? 'blue' : (bandOf(a) ?? 'blue')
+    const band: BandKind = phaseAt(t, a)
     const prev = bands[bands.length - 1]
     if (prev !== undefined && prev.band === band) prev.to = Math.min(t + 5 * MIN, spanTo.getTime())
     else bands.push({ band, from: t, to: Math.min(t + 5 * MIN, spanTo.getTime()) })

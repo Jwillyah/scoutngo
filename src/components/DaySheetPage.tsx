@@ -42,7 +42,7 @@ interface Props {
   clock?: () => Date
 }
 
-const BAND_WORD: Record<BandKind, string> = { golden: 'golden', side: 'side', top: 'top', blue: 'blue' }
+const BAND_WORD: Record<BandKind, string> = { golden: 'golden', side: 'side', top: 'top', color: 'color', blue: 'blue' }
 
 function Arrow({ travel }: { travel: number }) {
   return (
@@ -220,7 +220,7 @@ export function DaySheetPage({ here, spots = [], units, onBack, onAddPositions, 
             <section className="dsheet__card dsheet__chart">
               <Strip sheet={sheet} tz={tz} />
               <ul className="dsheet__legend" aria-label="Light bands">
-                {(['golden', 'side', 'top', 'blue'] as const).map((b) => (
+                {(['golden', 'side', 'top', 'color', 'blue'] as const).map((b) => (
                   <li key={b}>
                     <span className={`dsheet__swatch dsheet__band--${b}`} aria-hidden="true" /> {BAND_WORD[b]}
                   </li>
@@ -244,8 +244,10 @@ export function DaySheetPage({ here, spots = [], units, onBack, onAddPositions, 
                     {sunCell(r)}
                   </span>
                   <span className="dsheet__light">
-                    {r.band === null ? null : <i className={`dsheet__dot dsheet__band--${r.band}`} aria-hidden="true" />}
-                    <span data-light>{r.word}</span>
+                    <span className="dsheet__lw">
+                      {r.band === null ? null : <i className={`dsheet__dot dsheet__band--${r.band}`} aria-hidden="true" />}
+                      <span data-light>{r.word}</span>
+                    </span>
                     {r.fog ? <span className="dsheet__fog" data-fog> · fog</span> : null}
                   </span>
                   <span className="num">{pct(r.cloud)}</span>
@@ -287,9 +289,9 @@ export function DaySheetPage({ here, spots = [], units, onBack, onAddPositions, 
 function HowWeGotThis() {
   return (
     <>
-      <p>The sun's height and direction, and the golden and blue times, are worked out on this phone from the date and the spot (the same marks as the Sky page).</p>
+      <p>The sun's height and direction, and the golden, color and blue times, are worked out on this phone from the date and the spot (the same marks as the Sky page).</p>
       <p>Cloud, wind and rain chance are the hourly forecast. Fog is shown where the fog risk for that hour is high. Where the forecast did not say, there is a dash.</p>
-      <p>Golden is the sun from the horizon to 6° up. Warm side is 6° to 15°, Side 15° to 30°, Top 30° and up. Soft is cloud cover of 60% or more; Flat, 90% or more. The arrow is the way the light travels.</p>
+      <p>Golden is the sun from 6° up to the horizon (sunset), Color from sunset to 4° down, Blue from 4° to 6° down, the morning the other way. Warm side is 6° to 15°, Side 15° to 30°, Top 30° and up. Soft is cloud cover of 60% or more; Flat, 90% or more. The arrow is the way the light travels.</p>
       <p>The picture is drawn on this phone. It goes nowhere unless you share it.</p>
     </>
   )

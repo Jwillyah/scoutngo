@@ -183,7 +183,7 @@ try {
     if (l.plannerOnScreen) fail(`${look.key}: the planner opened instead of the Day sheet`)
     if (l.hours.join(' ') !== WANT_HOURS.join(' ')) fail(`${look.key}: rows ${l.hours.join(' ')}, wanted first light to last light ${WANT_HOURS.join(' ')}`)
     for (let i = 0; i < l.light.length; i += 1) {
-      if (!/^(Blue|Golden|Warm side|Side|Top|Flat)/.test(l.light[i])) fail(`${look.key}: the ${l.hours[i]} row's light word is ${JSON.stringify(l.light[i])}`)
+      if (!/^(Blue|Color|Golden|Warm side|Side|Top|Flat)/.test(l.light[i])) fail(`${look.key}: the ${l.hours[i]} row's light word is ${JSON.stringify(l.light[i])}`)
       if (!/^[−]?\d+°$/.test(l.sunCells[i].trim())) fail(`${look.key}: the ${l.hours[i]} row's sun height is ${JSON.stringify(l.sunCells[i])}`)
       for (const c of l.cells[i]) if (!/^(—|\d+%|\d+( [NESW]{1,3})?)$/.test(c)) fail(`${look.key}: the ${l.hours[i]} row has a cell reading ${JSON.stringify(c)} (a number or a dash)`)
     }

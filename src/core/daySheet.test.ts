@@ -13,9 +13,16 @@ import { formatClock, zonedTimeToUtc } from './timezone.ts'
  * src/core/ephemeris2.ts (Meeus, no suncalc code) to 2 minutes, and against
  * the batch's numbers.
  *
- * THE BATCH'S SUNRISE, SUNSET AND BLUE TIMES DISAGREE WITH BOTH EPHEMERIDES.
- * Ours and the second ephemeris agree to 0.4 min everywhere; the batch's
- * 6:51, 4:47 and the blue ends sit 2 to 4 min off both (sunrise 6:48, sunset
+ * THE BATCH'S "BLUE" IS THE APP'S COLOUR. The batch's blue 6:31-6:51 and
+ * 4:47-5:08 is the stretch between -4° and the sunrise or sunset: in the app's
+ * convention (src/core/skyPage.ts lightMarks, the Sky page's light bar) that is
+ * Color (the afterglow), and blue is -4° to -6°. The sheet follows the app, so
+ * the batch's blue is compared against colorFrom and colorTo, and the app's
+ * blue edges (-6°) are held against the second ephemeris alone.
+ *
+ * THE BATCH'S SUNRISE, SUNSET AND COLOUR TIMES DISAGREE WITH BOTH EPHEMERIDES.
+ * Ours and the second ephemeris agree to 0.5 min everywhere; the batch's
+ * 6:51, 4:47 and the colour ends sit 2 to 4 min off both (sunrise 6:48, sunset
  * 4:50). Only golden and noon match the batch. The code is not bent: the
  * known gaps are pinned below (4.5 min at most) so a change in either
  * direction shows. Table: measurements/2026-11-24-day-sheet-fixture.md,
@@ -38,16 +45,16 @@ describe('S4.7 fixture: the edges of the light', () => {
     sunset: at('16:47'),
     goldenEnds: at('07:26'),
     goldenStarts: at('16:12'),
-    blueFrom: at('06:31'),
-    blueTo: at('17:08'),
+    colorFrom: at('06:31'),
+    colorTo: at('17:08'),
   }
   const second = {
     sunrise: sunRiseSet2(dayFrom, dayTo, LAT, LON).find((x) => x.rising)!.at,
     sunset: sunRiseSet2(dayFrom, dayTo, LAT, LON).find((x) => !x.rising)!.at,
     goldenEnds: sunApparentCrossings2(dayFrom, dayTo, LAT, LON, 6).find((x) => !x.rising ? false : true)!.at,
     goldenStarts: sunApparentCrossings2(dayFrom, dayTo, LAT, LON, 6).find((x) => !x.rising)!.at,
-    blueFrom: sunApparentCrossings2(dayFrom, dayTo, LAT, LON, -4).find((x) => x.rising)!.at,
-    blueTo: sunApparentCrossings2(dayFrom, dayTo, LAT, LON, -4).find((x) => !x.rising)!.at,
+    colorFrom: sunApparentCrossings2(dayFrom, dayTo, LAT, LON, -4).find((x) => x.rising)!.at,
+    colorTo: sunApparentCrossings2(dayFrom, dayTo, LAT, LON, -4).find((x) => !x.rising)!.at,
   }
   const matchesBatch = ['goldenEnds', 'goldenStarts']
   for (const k of Object.keys(batch) as (keyof typeof batch)[]) {
@@ -58,6 +65,13 @@ describe('S4.7 fixture: the edges of the light', () => {
       expect(gap).toBeLessThanOrEqual(matchesBatch.includes(k) ? TOL : 4.5 * 60_000)
     })
   }
+  it('blue is -4° to -6°: both ends within 2 min of the second ephemeris', () => {
+    const dark = sunApparentCrossings2(dayFrom, dayTo, LAT, LON, -6)
+    expect(Math.abs(e.blueFrom!.getTime() - dark.find((x) => x.rising)!.at.getTime())).toBeLessThanOrEqual(TOL)
+    expect(Math.abs(e.blueTo!.getTime() - dark.find((x) => !x.rising)!.at.getTime())).toBeLessThanOrEqual(TOL)
+    expect(e.blueFrom!.getTime()).toBeLessThan(e.colorFrom!.getTime())
+    expect(e.colorTo!.getTime()).toBeLessThan(e.blueTo!.getTime())
+  })
   it('noon: 33° at 11:49, and the second ephemeris agrees on the height', () => {
     expect(e.noon).not.toBeNull()
     expect(Math.abs(e.noon!.at.getTime() - at('11:49').getTime())).toBeLessThanOrEqual(TOL)
@@ -81,10 +95,11 @@ describe('the hour rows', () => {
     expect(sheet.rows.map((r) => r.label)).toEqual(['6a', '7a', '8a', '9a', '10a', '11a', '12p', '1p', '2p', '3p', '4p', '5p'])
   })
   it('names the windows where they start, and the current hour is 9a', () => {
-    expect(sheet.rows[0].word).toBe('Blue 6:29 AM')
+    /* An hour holding several edges names the last: the band the hour ends in. */
+    expect(sheet.rows[0].word).toBe('Golden 6:48 AM')
     expect(sheet.rows[1].word).toBe('Golden')
-    expect(sheet.rows[10].word).toBe('Golden 4:13 PM')
-    expect(sheet.rows[11].word).toBe('Blue to 5:11 PM')
+    expect(sheet.rows[10].word).toBe('Color 4:50 PM')
+    expect(sheet.rows[11].word).toBe('Blue 5:11 PM')
     expect(sheet.rows.filter((r) => r.current).map((r) => r.label)).toEqual(['9a'])
   })
   it('the arrow is the way the light travels: the sun bearing plus 180', () => {
@@ -116,6 +131,7 @@ describe('the hour rows', () => {
   it('the strip has bands that tile the span, a curve and a now line', () => {
     expect(sheet.bands[0].band).toBe('blue')
     expect(sheet.bands[sheet.bands.length - 1].band).toBe('blue')
+    expect(sheet.bands.map((b) => b.band).filter((b, i, a) => a[i - 1] !== b)).toEqual(['blue', 'color', 'golden', 'side', 'top', 'side', 'golden', 'color', 'blue'])
     expect(sheet.bands.some((b) => b.band === 'golden')).toBe(true)
     expect(sheet.bands.some((b) => b.band === 'top')).toBe(true)
     for (let i = 1; i < sheet.bands.length; i += 1) expect(sheet.bands[i].from).toBe(sheet.bands[i - 1].to)
