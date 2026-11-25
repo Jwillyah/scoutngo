@@ -1,5 +1,6 @@
 import type { MoonMoment, MoonNightTab } from '../core/moonNights.ts'
 import { MoonDrawing } from './MoonDrawing.tsx'
+import { AT_SUN_MINUTES } from '../core/moonMoment.ts'
 
 /*
  * SKY › NIGHT'S PICTURES (Batch SIMPLE-2, Section 4; mockup Sky_Night):
@@ -50,11 +51,12 @@ function momentWords(m: MoonMoment, clock: (d: Date) => string): MomentWords {
   const lit = `${Math.round(m.lit * 100)}% lit`
   if (m.kind === 'big-moonrise') {
     const lead = m.minutesBeforeSunset
-    const rel = lead === 0 ? 'at sunset' : lead > 0 ? `${lead} min before sunset` : `${-lead} min after sunset`
+    /* "at sunset" within AT_SUN_MINUTES, the home's moon card's rule (src/core/moonMoment.ts), so the two never disagree. */
+    const rel = Math.abs(lead) <= AT_SUN_MINUTES ? 'at sunset' : lead > 0 ? `${lead} min before sunset` : `${-lead} min after sunset`
     return { eyebrow: `Big moonrise · ${when}`, title: `Moonrise ${clock(m.moonrise.at)} ${m.moonrise.compass}`, line: `${rel} · ${lit}`, at: m.moonrise.at }
   }
   const after = m.minutesAfterSunrise
-  const rel = after === 0 ? 'at sunrise' : after > 0 ? `${after} min after sunrise` : `${-after} min before sunrise`
+  const rel = Math.abs(after) <= AT_SUN_MINUTES ? 'at sunrise' : after > 0 ? `${after} min after sunrise` : `${-after} min before sunrise`
   return { eyebrow: `Moonset at sunrise · ${when}`, title: `Moonset ${clock(m.moonset.at)} ${m.moonset.compass}`, line: `${rel} (${clock(m.sunrise)}) · ${lit}`, at: m.moonset.at }
 }
 

@@ -20,6 +20,7 @@ import type { FireVerdict } from './fireOutlook.ts'
 import { colorWords } from './homeDay.ts'
 import type { MetarSky } from './metar.ts'
 import { MODELS_CLEAR, stationDoubt, withDoubt, type StationDoubt } from './skyNow.ts'
+import { fogSkyCallAt, type FogHour } from './fogRisk.ts'
 
 /** The colour goes on this long after a sunset (or a sunrise): the pill's own 20 min (src/core/colorNow.ts). */
 export const EVENT_LINGER_MS = 20 * 60_000
@@ -117,6 +118,13 @@ export interface SkyCallFull extends SkyCall {
   doubt: StationDoubt | null
   /** When the models clear the low and mid deck here before the event; null when they do not. */
   clearsAt: Date | null
+  /**
+   * The fog at the event (Batch SIMPLE-3, Section 1.3, src/core/fogRisk.ts
+   * fogSkyCall), when the spot's fog inputs were given: already applied to
+   * `call` and `read`, so every reader says the same dropped call. `line` is
+   * "Color above the fog inland" when the call was dropped for it.
+   */
+  fog: { hour: FogHour; dropped: boolean; line: string | null } | null
 }
 
 export interface SkyCalls {
@@ -144,9 +152,11 @@ export function skyCalls(
   cover: (layer: 'low' | 'mid', t: Date) => number | null,
   motion: { fromDeg: number; mps: number } | null,
   clock: (d: Date) => string,
+  /** The fog at an instant at this spot (src/lib/useFogRain.ts fogAt); null or left out: no fog read, the call as the sky makes it. */
+  fogAt: ((t: Date) => FogHour | null) | null = null,
 ): SkyCalls {
   const doubted: SkyDayFull[] = days.map((d) => ({ ...d, reads: { ...d.reads } }))
-  const extra = new Map<number, { verdict: FireVerdict | null; doubt: StationDoubt | null; clearsAt: Date | null }>()
+  const extra = new Map<number, { verdict: FireVerdict | null; doubt: StationDoubt | null; clearsAt: Date | null; fog: SkyCallFull['fog'] }>()
   for (const kind of ['sunrise', 'sunset'] as const) {
     const c = skyCallNow(days, now, venue, kind)
     if (c === null) continue
@@ -155,8 +165,17 @@ export function skyCalls(
     const clearsAt = modelsClearBy(cover, now, c.event)
     const doubt = stationDoubt(verdict, station, c.event, now, clock, motion, clearsAt)
     doubted[c.dayIndex].reads[kind] = withDoubt(d.reads[kind], doubt)
-    extra.set(c.event.getTime(), { verdict, doubt, clearsAt })
+    /* Then the fog at the event: the station's doubt first, the fog's step on what is left (Batch SIMPLE-3, Section 1.3). */
+    let fog: SkyCallFull['fog'] = null
+    const doubtedCall = fogAt === null ? null : skyCallNow(doubted, now, venue, kind)
+    const fogHere = doubtedCall === null || fogAt === null ? null : fogAt(doubtedCall.event)
+    if (doubtedCall !== null && fogHere !== null && doubtedCall.event.getTime() === c.event.getTime()) {
+      const f = fogSkyCallAt(doubtedCall, fogHere)
+      doubted[c.dayIndex].reads[kind] = f.call.read
+      fog = { hour: f.fog, dropped: f.dropped, line: f.line }
+    }
+    extra.set(c.event.getTime(), { verdict, doubt, clearsAt, fog })
   }
-  const full = (c: SkyCall | null): SkyCallFull | null => (c === null ? null : { ...c, ...(extra.get(c.event.getTime()) ?? { verdict: doubted[c.dayIndex].verdicts[c.kind], doubt: null, clearsAt: null }) })
+  const full = (c: SkyCall | null): SkyCallFull | null => (c === null ? null : { ...c, ...(extra.get(c.event.getTime()) ?? { verdict: doubted[c.dayIndex].verdicts[c.kind], doubt: null, clearsAt: null, fog: null }) })
   return { now: full(skyCallNow(doubted, now, venue)), sunrise: full(skyCallNow(doubted, now, venue, 'sunrise')), sunset: full(skyCallNow(doubted, now, venue, 'sunset')) }
 }

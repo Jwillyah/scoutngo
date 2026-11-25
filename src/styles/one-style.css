@@ -382,9 +382,17 @@ input[type='radio'] {
   }
 }
 @media (orientation: landscape) and (max-height: 540px) {
+  /*
+   * Under the chips as they are, not as one row of 46 px: a status line under
+   * them (a rare light on now, offline) made the row 90 px and the panel rode
+   * over it (24 Nov, audit-landscape). --chips-bottom is PlanMode's measure.
+   */
+  .mode-plan {
+    --land-sheet-top: max(calc(var(--safe-top) + var(--space-1) + 52px + var(--space-1) + 46px + var(--space-2)), calc(var(--chips-bottom, 0px) + var(--space-2)));
+  }
   .mode-plan .sheet {
-    top: calc(var(--safe-top) + var(--space-1) + 52px + var(--space-1) + 46px + var(--space-2));
-    max-height: calc(100% - var(--safe-top) - 52px - 46px - var(--space-1) * 2 - var(--space-2) - var(--dock-height, 0px) - var(--space-1));
+    top: var(--land-sheet-top);
+    max-height: calc(100% - var(--land-sheet-top) - var(--dock-height, 0px) - var(--space-1));
   }
 }
 

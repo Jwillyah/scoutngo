@@ -164,6 +164,8 @@
   --time-flag: #ffd47a;
   --sun-shadow: #9aa7ff; /* current shadow bearing */
   --moon: #c4b5fd; /* the moon and the night: its lines, its phase, the calendar's night marks. Not the shadow's periwinkle */
+  --moon-face: #e8e1cf; /* the moon's own face as drawn (Batch SIMPLE-3, Section 2b.3): warm cream, not the night's violet */
+  --moon-mare: #b5ad9c; /* its seas, the soft maria: a warm grey */
   --sun-rise: #ffa04a; /* sunrise bearing */
   --sun-set: #ff5fa8; /* sunset bearing. NOT the magenta hazard token. */
   /*

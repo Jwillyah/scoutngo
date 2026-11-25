@@ -62,22 +62,29 @@ describe('the rainbow', () => {
  * A REAL FOG MORNING: 9 Mar 2026 at Norfolk International (KORF), fog
  * reported 05:51-07:51, with the sea at buoy 44099 at 6.7 °C under air of
  * 60-62 °F (tests/data/fog-2026-03-09-korf.json, from the IEM ASOS archive and
- * NDBC). The rule must fire on the fog hours and not on the morning before.
+ * NDBC). Batch SIMPLE-3, Section 1: the special-light fog rule is now
+ * src/core/fogRisk.ts's on one forecast hour (one fog rule, not two). KORF is
+ * an airport: no facing, so the radiation rule (spread 2 °F or less, wind
+ * 4 kt or less, a clear-ish sky at night or early) is the one that can fire.
+ * The fixture has no cloud: the night's sky is given clear, as the fog's own
+ * night was (the station reported no deck before the fog).
  */
-describe('the fog rule, replayed on 9 Mar 2026 at KORF', () => {
+describe('the fog rule, fogRisk on one hour, replayed on 9 Mar 2026 at KORF', () => {
   const data = JSON.parse(readFileSync('tests/data/fog-2026-03-09-korf.json', 'utf8')) as {
     korf: { local: string; tempF: number; dewF: number; windKt: number | null; visMi: number; wx: string | null }[]
     buoy44099: { utc: string; waterC: number }[]
   }
-  const sea = (day: string) => data.buoy44099.find((b) => b.utc.startsWith(day))?.waterC ?? null
-  const rule = (o: (typeof data.korf)[number]) => fogRule({ tempF: o.tempF, dewF: o.dewF, windKt: o.windKt, seaC: sea(o.local.slice(0, 10)) })
+  /* Local is EDT (UTC−4) from 8 Mar 2026. */
+  const utc = (local: string) => new Date(`${local.replace(' ', 'T')}:00-04:00`)
+  const rule = (o: (typeof data.korf)[number]) => fogRule({ tempF: o.tempF, dewF: o.dewF, windKt: o.windKt, seaC: null, at: utc(o.local), lat: 36.895, lon: -76.201, lowPct: 0, midPct: 0 })
 
-  it('fires on the hours fog was reported, before the wind rose to 6 kt', () => {
+  it('fires as the fog formed, in the calm; once the wind is over 4 kt the rule is quiet and only a station sees it', () => {
     const fog = data.korf.filter((o) => o.wx === 'FG')
     expect(fog.map((o) => o.local)).toEqual(['2026-03-09 05:51', '2026-03-09 06:51', '2026-03-09 07:51'])
+    /* 05:51: 60/60 °F, 3 kt. */
     expect(rule(fog[0])).toBe(true)
-    expect(rule(fog[1])).toBe(true)
-    /* 07:51 had the wind at 6 kt: at the rule's edge, and said honestly as not firing. */
+    /* 06:51 and 07:51: 5 and 6 kt, over fogRisk's 4 kt: the rule says no; fogRisk's station confirmation (FG) is what says fog then. */
+    expect(rule(fog[1])).toBe(false)
     expect(rule(fog[2])).toBe(false)
   })
 
@@ -87,15 +94,21 @@ describe('the fog rule, replayed on 9 Mar 2026 at KORF', () => {
     expect(before.every((o) => rule(o) === false)).toBe(true)
   })
 
-  it('is a rule, not a forecast: it also fired on 10 Mar, when no fog came', () => {
-    /* Recorded so the list's "possible" is read as possible: 55/55 °F, 5 kt, sea 6.7 °C, visibility 8-10 miles. */
-    const next = data.korf.find((o) => o.local === '2026-03-10 05:51')
+  it('is a rule, not a forecast: it also fired on 10 Mar at 04:51, when only mist came', () => {
+    const next = data.korf.find((o) => o.local === '2026-03-10 04:51')
     expect(next !== undefined && rule(next)).toBe(true)
-    expect(next?.wx).toBeNull()
+    expect(next?.wx).toBe('BR')
   })
 
-  it('cannot say without a number, and says so', () => {
+  it('cannot say without a number, the hour or the place, and says so', () => {
     expect(fogRule({ tempF: null, dewF: 50, windKt: 2, seaC: null })).toBeNull()
+    expect(fogRule({ tempF: 50, dewF: 50, windKt: 2, seaC: null })).toBeNull()
+    /* No cloud figure: the clear-ish sky could not be read. */
+    expect(fogRule({ tempF: 50, dewF: 50, windKt: 2, seaC: null, at: utc('2026-03-09 05:51'), lat: 36.895, lon: -76.201 })).toBeNull()
+  })
+
+  it('at a beach with no wind direction, the sea rule cannot be read: never a "no"', () => {
+    expect(fogRule({ tempF: 65, dewF: 61, windKt: 14, seaC: 6.7, at: utc('2026-03-08 05:51'), lat: 36.895, lon: -76.201, lowPct: 0, midPct: 0 })).toBeNull()
   })
 })
 

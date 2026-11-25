@@ -37,6 +37,13 @@ describe('Sky › Night', () => {
     expect((html.match(/snight__plan/g) ?? []).length).toBe(2)
   })
 
+  /* Batch SIMPLE-3 (the home moon card's rule, src/core/moonMoment.ts AT_SUN_MINUTES): 24 Nov the moon rises 4:38 PM, 12 min before the 4:50 sunset: "at sunset", as the home says, never "12 min before sunset". */
+  it('the big moonrise within 15 minutes of sunset reads "at sunset", the home card\'s words', () => {
+    const t = text(renderToStaticMarkup(<SkyNightMoments night={night} clock={clock} />))
+    expect(t).toMatch(/Moonrise 4:3\d PM ENE at sunset · 100% lit/)
+    expect(t).not.toMatch(/min before sunset/)
+  })
+
   it('no Plan button with nowhere to plan it', () => {
     expect(renderToStaticMarkup(<SkyNightMoments night={night} clock={clock} />)).not.toContain('snight__plan')
   })

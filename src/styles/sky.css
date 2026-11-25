@@ -367,6 +367,23 @@
   font-weight: var(--weight-medium);
   white-space: nowrap;
 }
+.snow__out {
+  align-self: stretch;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--d-card-solid);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+.snow__out b {
+  font-weight: var(--weight-medium);
+}
+.spage__fogline {
+  margin: 0 0 6px;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--white);
+}
 .snow__strip {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -474,6 +491,101 @@
   color: var(--glass-ink-2);
 }
 
+/*
+ * THE SKY SCENE (Batch SIMPLE-3, Section 3.2; src/components/SkyScene.tsx):
+ * the sky's tone is the call's, the clouds the deck colours, their lit
+ * undersides the afterglow, fog the fog ground, water and land the night's.
+ */
+.scene {
+  margin: 0;
+}
+.scene__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 14px;
+}
+.scene__top--warm,
+.scene__top--soft {
+  stop-color: var(--d-night-top);
+}
+.scene__top--grey {
+  stop-color: var(--d-rain-top);
+}
+.scene__mid--warm {
+  stop-color: var(--d-glow-violet);
+}
+.scene__mid--soft {
+  stop-color: var(--afterglow-dim);
+}
+.scene__mid--grey {
+  stop-color: var(--d-cloud-top);
+}
+.scene__low--warm {
+  stop-color: var(--d-glow);
+}
+.scene__low--soft {
+  stop-color: var(--d-glow-violet);
+}
+.scene__low--grey {
+  stop-color: var(--d-cloud-low);
+}
+.scene__glow {
+  stop-color: var(--sun-rise);
+  stop-opacity: 0.45;
+}
+.scene__glow--out {
+  stop-opacity: 0;
+}
+.scene__gap {
+  fill: var(--sun);
+  fill-opacity: 0.16;
+}
+.scene__cloud {
+  fill: var(--d-cloud-low);
+  opacity: 0.85;
+}
+.scene__cloud--high {
+  fill: var(--grey-1);
+  opacity: 0.55;
+}
+.scene__under {
+  fill: var(--afterglow);
+  opacity: 0.75;
+}
+.scene__sun {
+  fill: var(--sun);
+}
+.scene__fog {
+  fill: var(--d-fog-low);
+  opacity: 0.65;
+}
+.scene__water {
+  fill: var(--d-astro);
+}
+.scene__land {
+  fill: var(--d-night-low);
+}
+.scene__glint {
+  fill: var(--sun);
+  opacity: 0.35;
+}
+.scene__label {
+  font-size: 12px;
+  font-weight: var(--weight-medium);
+  fill: var(--white);
+}
+.scene__tick {
+  font-size: 12px;
+  fill: var(--glass-ink-2);
+}
+.scene__why {
+  margin: 10px 2px 2px;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--white);
+}
+
 /* Night: the moon beside the hero, the 14 nights, the moments. */
 .spage--night .tipage__swipe {
   position: relative;
@@ -570,4 +682,43 @@
   color: var(--sky-ink);
   font: inherit;
   font-weight: var(--weight-medium);
+}
+
+/* Sky color's log (Batch SIMPLE-3, Sections 3.5-3.6): five steps that wrap, and the photo as a thumbnail with its time. */
+.fire__rate {
+  flex-wrap: wrap;
+}
+.fire__shot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 4px 8px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 12px;
+  background: var(--glass);
+  color: var(--white);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+}
+.fire__shot .fire__thumb {
+  width: 44px;
+  height: 44px;
+}
+
+/* The moon drawn moon-coloured (Batch SIMPLE-3, Section 2b.3; src/components/MoonDrawing.tsx): cream face, soft warm-grey seas, the dark limb faint. */
+.calm.mdraw .mdraw__dark {
+  fill: var(--moon-mare);
+  fill-opacity: 0.18;
+}
+.calm.mdraw .mdraw__lit {
+  fill: var(--moon-face);
+}
+.calm.mdraw .mdraw__mare {
+  fill: var(--moon-mare);
+  opacity: 0.55;
+}
+.calm.mdraw.calm--strong {
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--moon-face) 45%, transparent));
 }

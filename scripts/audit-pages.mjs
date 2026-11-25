@@ -190,7 +190,7 @@ try {
       looked += 1
       console.log(`  Sky: ${k.content}/${k.box} px, ${k.out.length === 0 && !k.scrolls ? 'fits' : `scrolls or runs off ${JSON.stringify(k.out)}`}`)
       /*
-       * Batch SIMPLE-2, Section 4: the Sky page is the tap-in skeleton, Now · Tonight · Sunrise · Night; at 10:30 AM it
+       * Batch SIMPLE-2, Section 4: the Sky page is the tap-in skeleton, Now · Sunrise · Sunset · Night (fixed, SIMPLE-3 S3.1); at 10:30 AM it
        * opens on Now (src/core/skyTabs.ts): the sky in a word, the cams, then Clouds · Moving · Rare light · Next. Every
        * tab, every size and the Viewfinder are scripts/audit-sky.mjs's; here, the page the home's Sky card opens.
        */
@@ -198,20 +198,21 @@ try {
       const READ = `JSON.stringify({ seg: ${TABS}.map((b) => ({ t: b.textContent, on: b.getAttribute('aria-selected') === 'true' })), value: document.querySelector('.tipage.spage .tipage__value')?.textContent ?? null, sub: document.querySelector('.tipage.spage .tipage__sub')?.textContent ?? null, rows: [...document.querySelectorAll('.tipage.spage .tipage__row')].map((r) => (r.querySelector('.tipage__label') ?? r.querySelector('.tipage__morelabel'))?.textContent + ' ' + (r.querySelector('.tipage__val')?.textContent ?? '').trim()), picture: !!document.querySelector('.tipage.spage svg[data-sky-picture], .tipage.spage .skypic__none'), why: document.querySelector('.tipage.spage .spage__why')?.textContent ?? null, buttons: [...document.querySelectorAll('.tipage.spage .tipage__btn')].map((b) => b.textContent) })`
       const nowTab = JSON.parse(await ev(READ))
       console.log(`  Now: ${JSON.stringify(nowTab)}`)
-      if (nowTab.seg.map((x) => x.t).join('|') !== 'Now|Tonight|Sunrise|Night') fail(`${label}: the Sky page's tabs read ${JSON.stringify(nowTab.seg)}`)
+      if (nowTab.seg.map((x) => x.t).join('|') !== 'Now|Sunrise|Sunset|Night') fail(`${label}: the Sky page's tabs read ${JSON.stringify(nowTab.seg)}`)
       if (nowTab.seg[0]?.on !== true) fail(`${label}: the Sky page did not open on Now at 10:30 AM (${JSON.stringify(nowTab.seg)})`)
-      if (!/^(Textured clouds now|Light rays now|Iridescence now|A halo now|Color now|Nothing special now)/.test(nowTab.sub ?? '')) fail(`${label}: Now's line reads ${JSON.stringify(nowTab.sub)}`)
+      if (!/^(Fog [^·]+ · )?(Textured clouds now|Light rays now|Iridescence now|A halo now|Color now|Nothing special now)/.test(nowTab.sub ?? '')) fail(`${label}: Now's line reads ${JSON.stringify(nowTab.sub)}`)
       if (!/^Clouds /.test(nowTab.rows[0] ?? '') || /^Clouds\s*$/.test(nowTab.rows[0] ?? '')) fail(`${label}: Now does not say the clouds (${JSON.stringify(nowTab.rows[0])})`)
       if (!nowTab.rows.some((r) => /^Next (Sunset|Sunrise) \d+:\d\d [AP]M ?(Color (likely|possible|unlikely)|No call yet)/.test(r))) fail(`${label}: Now's Next row reads ${JSON.stringify(nowTab.rows)}`)
-      await ev(`${TABS}[1]?.click()`)
+      /* Batch SIMPLE-3, Section 3.1: the fixed pills, Sunset third. */
+      await ev(`${TABS}[2]?.click()`)
       await wait(800)
       const d = JSON.parse(await ev(READ))
       console.log(`  ${JSON.stringify(d).slice(0, 500)}`)
-      if (d.seg[1]?.on !== true) fail(`${label}: Tonight did not open (${JSON.stringify(d.seg)})`)
+      if (d.seg[2]?.on !== true) fail(`${label}: Sunset did not open (${JSON.stringify(d.seg)})`)
       if (!/^(Color (likely|possible|unlikely)|No call yet)$/.test(d.value ?? '')) fail(`${label}: the call reads ${JSON.stringify(d.value)}`)
       if (!d.why || d.why === '…') fail(`${label}: no reason under the call`)
       if (!d.picture) fail(`${label}: no drawn sky toward the sun`)
-      if (!/^Golden \d+:\d\d [AP]M–\d+:\d\d [AP]M/.test(d.rows[0] ?? '') || !/^Color \d+:\d\d [AP]M–/.test(d.rows[1] ?? '') || !/^Blue hour \d+:\d\d [AP]M–/.test(d.rows[2] ?? '') || !/^Moon \d+% · (up|down)/.test(d.rows[3] ?? '')) fail(`${label}: Tonight's rows read ${JSON.stringify(d.rows)}`)
+      if (!/^Golden \d+:\d\d [AP]M–\d+:\d\d [AP]M/.test(d.rows[0] ?? '') || !/^Color \d+:\d\d [AP]M–/.test(d.rows[1] ?? '') || !/^Blue hour \d+:\d\d [AP]M–/.test(d.rows[2] ?? '') || !/^(Moon \d+% · (up|down)|Fog (Likely|Possible))/.test(d.rows[3] ?? '')) fail(`${label}: Sunset's rows read ${JSON.stringify(d.rows)}`)
       if (!d.buttons.some((b) => /Best spot near me/.test(b))) fail(`${label}: no "Best spot near me ›"`)
       if (/\bsafe\b|all clear|clear to/i.test(k.text)) fail(`${label}: the Sky page says safe or clear`)
       await page.screenshot({ path: join(OUT, `sky-${label.replace(/\s/g, '-').toLowerCase()}.png`) })

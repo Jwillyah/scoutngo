@@ -188,3 +188,11 @@
 .bsky__page--spot {
   padding-bottom: calc(var(--safe-bottom) + 28px);
 }
+
+/* Batch SIMPLE-3, Section 1.3: the fog line when the beach's call was dropped for sea fog. */
+.bsky__fog {
+  margin: 0 0 8px;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--white);
+}

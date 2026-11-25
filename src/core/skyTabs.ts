@@ -1,16 +1,18 @@
 /*
- * WHICH SKY TAB THE PAGE OPENS ON (Batch SIMPLE-2, Section 4: "Now · Tonight ·
- * Tmrw AM · Night" — the morning's pill now reads Sunrise; opens on Tonight before sunset/sunrise, Now otherwise,
- * Night after dark"). Arithmetic on the venue's own day; the page only reads
- * the answer.
+ * WHICH SKY TAB THE PAGE OPENS ON (Batch SIMPLE-2, Section 4), on the fixed
+ * tabs of Batch SIMPLE-3, Section 3.1: Now · Sunrise · Sunset · Night. The
+ * pills never change their words; the day the event is on goes in the hero's
+ * eyebrow ("TONIGHT · SUNSET 4:49 PM", "TOMORROW AM · SUNRISE 6:51 AM",
+ * eventDayWord). Arithmetic on the venue's own day; the page only reads the
+ * answer.
  *
  * THE RULE, on the venue's local day (sunrise, sunset and civil dusk from
  * suncalc at local noon, as src/core/moonNights.ts does):
  *
  *   before sunrise - MORNING_LEAD_MIN       night     the night still running
- *   until sunrise + NOW_AFTER_SUNRISE_MIN   tmrw-am   the morning's light and its call
+ *   until sunrise + NOW_AFTER_SUNRISE_MIN   sunrise   the morning's light and its call
  *   until sunset - NOW_BEFORE_SUNSET_MIN    now       the day's middle (src/core/skyNow.ts opensOnNow)
- *   until civil dusk (sun at -6°)           tonight   the evening's light and its call
+ *   until civil dusk (sun at -6°)           sunset    the evening's light and its call
  *   after civil dusk                        night     the moon and the dark
  *
  * The morning's lead is the evening's (90 minutes) so the two calls get the
@@ -22,10 +24,13 @@ import { localDate } from './moonTimes.ts'
 import { NOW_AFTER_SUNRISE_MIN, NOW_BEFORE_SUNSET_MIN, opensOnNow } from './skyNow.ts'
 import { zonedTimeToUtc } from './timezone.ts'
 
-export type SkyTabId = 'now' | 'tonight' | 'tmrw-am' | 'night'
+export type SkyTabId = 'now' | 'sunrise' | 'sunset' | 'night'
 
 /** The tabs, in the order the pills show them (fixed: a swipe always goes the same way). */
-export const SKY_TAB_IDS: readonly SkyTabId[] = ['now', 'tonight', 'tmrw-am', 'night']
+export const SKY_TAB_IDS: readonly SkyTabId[] = ['now', 'sunrise', 'sunset', 'night']
+
+/** The pills' words: fixed, whatever the day (Batch SIMPLE-3, Section 3.1; no more "This AM" / "Tmrw PM" / "Tonight" swapping). */
+export const SKY_TAB_LABEL: Record<SkyTabId, string> = { now: 'Now', sunrise: 'Sunrise', sunset: 'Sunset', night: 'Night' }
 
 /** The morning's tab opens this long before sunrise: the evening's lead, mirrored. */
 export const MORNING_LEAD_MIN = NOW_BEFORE_SUNSET_MIN
@@ -54,24 +59,24 @@ export function skyOpenTab(now: Date, day: SkyDayTimes): SkyTabId {
   if (sunrise === null || sunset === null) return 'now'
   const t = now.getTime()
   if (t < sunrise.getTime() - MORNING_LEAD_MIN * MIN) return 'night'
-  if (t < sunrise.getTime() + NOW_AFTER_SUNRISE_MIN * MIN) return 'tmrw-am'
+  if (t < sunrise.getTime() + NOW_AFTER_SUNRISE_MIN * MIN) return 'sunrise'
   if (opensOnNow(now, sunrise, sunset)) return 'now'
-  if (dusk === null || t < dusk.getTime()) return 'tonight'
+  if (dusk === null || t < dusk.getTime()) return 'sunset'
   return 'night'
 }
 
 /**
- * The pill's word for an event's tab: "Tonight" / "This AM" when the event is
- * on today's date, "Tmrw PM" / "Sunrise" when tomorrow's, else the weekday
- * ("Fri PM"). Never a word for a day the event is not on.
+ * The day an event is on, for the eyebrow (Batch SIMPLE-3, Section 3.1):
+ * "Tonight" / "This morning" when it is on today's date, "Tomorrow PM" /
+ * "Tomorrow AM" when tomorrow's, else the date ("Sat 21 Nov"). Never a word
+ * for a day the event is not on. With no event, the kind's own word.
  */
-export function eventTabLabel(kind: 'sunset' | 'sunrise', event: Date | null, now: Date, timeZone: string): string {
-  if (event === null) return kind === 'sunset' ? 'Tonight' : 'Sunrise'
+export function eventDayWord(kind: 'sunset' | 'sunrise', event: Date | null, now: Date, timeZone: string): string {
+  if (event === null) return kind === 'sunset' ? 'Sunset' : 'Sunrise'
   const d = localDate(event, timeZone)
   const today = localDate(now, timeZone)
   const tomorrow = localDate(new Date(now.getTime() + 24 * 60 * MIN), timeZone)
-  const half = kind === 'sunset' ? 'PM' : 'AM'
-  if (d === today) return kind === 'sunset' ? 'Tonight' : 'This AM'
-  if (d === tomorrow) return kind === 'sunset' ? 'Tmrw PM' : 'Sunrise'
-  return `${new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'short' }).format(event)} ${half}`
+  if (d === today) return kind === 'sunset' ? 'Tonight' : 'This morning'
+  if (d === tomorrow) return kind === 'sunset' ? 'Tomorrow PM' : 'Tomorrow AM'
+  return new Intl.DateTimeFormat('en-GB', { timeZone, weekday: 'short', day: 'numeric', month: 'short' }).format(event).replace(',', '')
 }

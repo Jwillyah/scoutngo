@@ -1,6 +1,7 @@
 import '../styles/sky.css'
 import { colourNowWords } from '../core/skyCall.ts'
 import { useSkyCalls } from '../lib/useSkyCalls.ts'
+import { useFogRain } from '../lib/useFogRain.ts'
 import { stationNowAnswered } from '../lib/useStationNow.ts'
 import { useEffect, useMemo, useState } from 'react'
 import { getPosition } from 'suncalc'
@@ -13,22 +14,26 @@ import type { CloudGroup } from '../core/metar.ts'
 import { moonNightTab, tonightMoon } from '../core/moonNights.ts'
 import { colorHeadline, lightMarks, lightTimeline, plainReason, rareRows, RARE_WAIT_MS, type RareRow } from '../core/skyPage.ts'
 import { skyPicture } from '../core/skyPicture.ts'
-import { eventTabLabel, skyDayTimes, skyOpenTab, type SkyTabId } from '../core/skyTabs.ts'
+import { skyScene, type SceneLayerIn } from '../core/skyScene.ts'
+import { cloudLayerOfFt, distanceWords } from '../core/cloudLayerName.ts'
+import { DECK_HEIGHT_M } from '../core/skyFire.ts'
+import { eventDayWord, SKY_TAB_LABEL, skyDayTimes, skyOpenTab, type SkyTabId } from '../core/skyTabs.ts'
 import type { Special } from '../core/specialLight.ts'
 import { skyCell } from '../core/statStrip.ts'
 import { dayRangeWords } from '../core/sunMoonNight.ts'
 import { formatClock } from '../core/timezone.ts'
-import { SKY_SUN_MOON_NIGHT_PAGE } from '../config/flags.ts'
+import { SKY_PICTURE_FLAT, SKY_SUN_MOON_NIGHT_PAGE } from '../config/flags.ts'
 import { skyNowCams, camKind, type SkyNowCams } from '../lib/skyNowCams.ts'
 import { fetchGlassWeek, fetchSpecialWeek, specialsFrom } from '../lib/specialLightData.ts'
 import { hourlyAt } from '../lib/tideSheetData.ts'
-import { formatRange } from '../lib/units.ts'
+import { CAM_MAX_KM } from '../core/skyCams.ts'
 import { useLiveSky } from '../lib/useLiveSky.ts'
 import { useBriefing } from '../lib/useBriefing.ts'
 import { useStationNow } from '../lib/useStationNow.ts'
 import { stationWord } from '../core/skyWord.ts'
 import { nowHeadline, skyNow, STATION_FRESH_MS } from '../core/skyNow.ts'
 import { SkyPicture } from './SkyPicture.tsx'
+import { SkyScene } from './SkyScene.tsx'
 import { SkyNightMoments, SkyNightMoon, SkyNightStrip } from './SkyNightTab.tsx'
 import { TapInPage, type TapInRow } from './TapInPage.tsx'
 
@@ -80,8 +85,6 @@ interface SkyPageProps {
 }
 
 type Kind = 'sunset' | 'sunrise'
-const KIND_OF_TAB = { tonight: 'sunset', 'tmrw-am': 'sunrise' } as const
-const TAB_OF_KIND = { sunset: 'tonight', sunrise: 'tmrw-am' } as const
 
 const AMOUNT_WORD: Record<CloudGroup['amount'], string> = { FEW: 'Few', SCT: 'Scattered', BKN: 'Broken', OVC: 'Overcast', VV: 'Sky hidden' }
 const AMOUNT_RANK: Record<CloudGroup['amount'], number> = { FEW: 1, SCT: 2, BKN: 3, OVC: 4, VV: 4 }
@@ -105,6 +108,8 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onViewfinder,
   const realNow = now
   /* Batch CORE, Section 1.1 and 1.3: the one sky call (src/core/skyCall.ts); an event holds the page through its colour. */
   const one = useSkyCalls(brief, venue, realNow, timeZone)
+  /* Batch SIMPLE-3, Section 1.2: the spot's one fog line (src/lib/useFogRain.ts, the same the home and the call read). */
+  const fogLineNow = useFogRain(venue, realNow, timeZone, { facing: brief.facing }).fog?.line ?? null
   const soonest: Kind = one.now?.kind ?? 'sunset'
   const stationAt = station === null || station.at === '' ? null : new Date(station.at)
   const fresh = station !== null && stationAt !== null && realNow.getTime() - stationAt.getTime() <= STATION_FRESH_MS ? { sky: station.sky, at: stationAt, via: station.via } : null
@@ -121,7 +126,7 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onViewfinder,
     const event = c?.event ?? null
     const verdict = c?.verdict ?? null
     const sun = event === null ? null : getPosition(event, venue.lat, venue.lon)
-    return { kind, event, verdict, read: c?.read ?? null, doubt: c?.doubt ?? null, clearsAt: c?.clearsAt ?? null, sun, lead: verdict === null ? null : leadLayer(verdict) }
+    return { kind, event, verdict, read: c?.read ?? null, doubt: c?.doubt ?? null, clearsAt: c?.clearsAt ?? null, fog: c?.fog ?? null, sun, lead: verdict === null ? null : leadLayer(verdict) }
   }
   const calls = { sunset: callFor('sunset'), sunrise: callFor('sunrise') }
 
@@ -193,23 +198,19 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onViewfinder,
       <p>Now: the nearest airport station&rsquo;s cloud report and its age; the deck&rsquo;s way and speed are the models&rsquo; wind at 500 hPa, and &ldquo;clears&rdquo; is said only when the models clear it here before the event. The big cam faces the sun within 90 minutes of sunrise or sunset, else it is the nearest; every cam opens on its owner&rsquo;s site, and nothing of it passes through ours.</p>
       <p>The call: the same read as the home&rsquo;s Sky card, from six weather models along the line toward the sun, and from the stations in the hours before. The picture draws the deck at its height, the gap toward the sun when the models read one, and the sun where it sets or rises.</p>
       <p>The light: the sun&rsquo;s height, golden from +6°, blue from −4°, dark from −6° (civil dusk); the colour window is the call&rsquo;s own, else the 20 minutes round the event.</p>
-      <p>Rare light: five models&rsquo; hours, by written rules. Fog: dew point within 2°F of the air and wind under 6 kt. Rainbow: showers within 25 km opposite the sun, the sun under 42°. Light rays: low cloud 30–80% with the sun under 15°. Mirror water: a low tide within 90 minutes of sunrise and a light wind. A rule, not a promise.</p>
+      <p>Rare light: five models&rsquo; hours, by written rules. Fog: the one fog rule (sea fog at a beach: the dew point at the water&rsquo;s temperature less 1°F, the wind onshore at 12 kt or under; radiation fog: the air within 2°F of its dew point, wind 4 kt or under, a clear-ish sky at night or early), confirmed by any visibility of 2 mi or under within 15 mi. At a beach, a high fog risk at the event drops the call a step and says the color is above the fog inland. Rainbow: showers within {miles ? '16 mi' : '25 km'} opposite the sun, the sun under 42°. Light rays: low cloud 30–80% with the sun under 15°. Mirror water: a low tide within 90 minutes of sunrise and a light wind. A rule, not a promise.</p>
       <p>Night: the moon&rsquo;s rise, set and bearing on this place&rsquo;s own day, held to the US Naval Observatory&rsquo;s answers within 5 minutes; full and new moon to the minute (Meeus). Big moonrise: within a day of full, rising within 45 minutes of sunset. Moonset at sunrise: 95% lit or more, setting within 30 minutes of sunrise. Darkest nights: the new moon ±3 days. The Milky Way: the core 5° up with the sun 18° down and the moon down or under half lit.</p>
     </>
   )
 
   /* ------------------------------------------------------------ the tabs */
-  const tabs = [
-    { id: 'now', label: 'Now' },
-    { id: 'tonight', label: eventTabLabel('sunset', calls.sunset.event, realNow, timeZone) },
-    { id: 'tmrw-am', label: eventTabLabel('sunrise', calls.sunrise.event, realNow, timeZone) },
-    { id: 'night', label: 'Night' },
-  ] as const
+  /* Batch SIMPLE-3, Section 3.1: fixed pills; the day the event is on is the eyebrow's (eventDayWord). */
+  const tabs = (['now', 'sunrise', 'sunset', 'night'] as const).map((id) => ({ id, label: SKY_TAB_LABEL[id] }))
 
   const page = (() => {
     if (tab === 'now') return weekOpen ? weekView() : nowView()
     if (tab === 'night') return nightView()
-    return eventView(KIND_OF_TAB[tab])
+    return eventView(tab)
   })()
 
   /* Back closes the week's list first, then the page. */
@@ -263,13 +264,13 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onViewfinder,
       },
       next.event === null
         ? { label: 'Next', value: '—', detail: 'no sunrise or sunset ahead' }
-        : { label: 'Next', value: `${soonest === 'sunset' ? 'Sunset' : 'Sunrise'} ${clock(next.event)}`, detail: colorHeadline(next.read?.call ?? null), onClick: () => goTab(TAB_OF_KIND[soonest]) },
+        : { label: 'Next', value: `${soonest === 'sunset' ? 'Sunset' : 'Sunrise'} ${clock(next.event)}`, detail: colorHeadline(next.read?.call ?? null), onClick: () => goTab(soonest) },
     ]
     return {
       hero: {
         eyebrow: 'Looking like · now',
         value: word ?? '—',
-        sub: `${colourNow !== null ? `Color now · ${colourNow}` : (named?.head ?? 'Nothing special now')}${moving === null || deck === null ? '' : ` · deck moving ${moving}`}`,
+        sub: `${fogLineNow === null ? '' : `${fogLineNow} · `}${colourNow !== null ? `Color now · ${colourNow}` : (named?.head ?? 'Nothing special now')}${moving === null || deck === null ? '' : ` · deck moving ${moving}`}`,
         subData: { 'data-now-head': '' },
       },
       children: <NowCams cams={cams} miles={miles} showRoad={showRoad} onShowRoad={() => setShowRoad((s) => !s)} />,
@@ -317,7 +318,7 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onViewfinder,
   /* --------------------------------------------------- Tonight, Sunrise */
   function eventView(kind: Kind) {
     const c = calls[kind]
-    const { event, read, doubt, verdict, sun, lead } = c
+    const { event, read, doubt, verdict, sun, lead, fog } = c
     const az = sun === null ? null : sun.azimuth
     const look = read?.lookDeg ?? az
     const pink = az !== null && verdict?.afterglow != null && (verdict.afterglow.sky.fires || verdict.afterglow.sky.belt) ? compassPoint(az + 180) : null
@@ -326,7 +327,25 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onViewfinder,
     /* The deck the call speaks for: the station's when its report is fresh and the event within 3 hours, else the models' lead layer when it is cloud to light. */
     const near = fresh !== null && event !== null && event.getTime() - realNow.getTime() <= 3 * 3_600_000 ? deckOf(fresh.sky.groups) : null
     const deck = near !== null && near.amount !== 'FEW' ? { baseFt: near.baseFt, lit: lead?.fires === true, by: fresh?.sky.station ?? null } : lead !== null && lead.canvas ? { baseFt: lead.heightM * 3.28084, lit: lead.fires, by: null } : null
-    const pic = skyPicture({ sunAzDeg: az, sunAltDeg: sun?.altitude ?? null, deck, gap: read?.confirmed === true ? 'open' : (lead?.gap ?? null) })
+    const gap = read?.confirmed === true ? 'open' : (lead?.gap ?? null)
+    /*
+     * THE SCENE'S LAYERS (Batch SIMPLE-3, Section 3.2): every layer of the
+     * call's mean sky at its height, lit where the call fires it; a fresh
+     * station deck takes the place of the models' layer its height is in.
+     */
+    const stationDeck = near !== null && near.amount !== 'FEW' ? near : null
+    const stationLayer = stationDeck === null ? null : cloudLayerOfFt(stationDeck.baseFt)
+    const sceneLayers: SceneLayerIn[] = [
+      ...(verdict?.sky.layers ?? [])
+        .filter((l) => l.layer !== stationLayer)
+        .map((l) => ({ layer: l.layer, baseFt: l.heightM * 3.28084, cover: l.cover, lit: l.fires, measured: l.heightM !== DECK_HEIGHT_M[l.layer], by: null })),
+      ...(stationDeck === null || stationLayer === null
+        ? []
+        : [{ layer: stationLayer, baseFt: stationDeck.baseFt, cover: null, lit: verdict?.sky.layers.find((l) => l.layer === stationLayer)?.fires === true, measured: true, by: fresh?.sky.station ?? null }]),
+    ]
+    const fogAtEvent = fog === null ? null : { level: fog.hour.level, kind: fog.hour.kind }
+    const scene = skyScene({ kind, sunAzDeg: az, sunAltDeg: sun?.altitude ?? null, call: read?.call ?? null, layers: sceneLayers, gap, fog: fogAtEvent, facingDeg: brief.facing ?? null, miles })
+    const pic = SKY_PICTURE_FLAT ? skyPicture({ sunAzDeg: az, sunAltDeg: sun?.altitude ?? null, deck, gap }) : null
     const marks = event === null ? [] : lightMarks(kind, event, (t) => getPosition(t, venue.lat, venue.lon).altitude)
     const segs = event === null ? [] : lightTimeline(kind, event, marks, read?.colorFrom ?? null, read?.colorTo ?? null)
     const seg = (k: 'golden' | 'color' | 'blue') => segs.find((s) => s.key === k) ?? null
@@ -343,29 +362,44 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onViewfinder,
             value: `${Math.round(moon.lit * 100)}% · ${moon.up ? 'up' : 'down'}`,
             detail: moon.up ? (moon.set === null ? undefined : `sets ${clock(moon.set.at)} ${moon.set.compass}`) : moon.rise === null ? undefined : `rises ${clock(moon.rise.at)} ${moon.rise.compass}`,
           }
+    /* Batch SIMPLE-3, Section 1.2: the fog at the event, when there is any to say, takes the Moon row's place (mockup Sky_Sunrise2). */
+    const fogHigh = fog !== null && (fog.hour.level === 'high' || fog.hour.level === 'moderate')
+    const fogRow: TapInRow | null = !fogHigh || fog === null ? null : { label: 'Fog', value: `${fog.hour.level === 'high' ? 'Likely' : 'Possible'}${fog.hour.coastal && fog.hour.kind === 'sea' ? ', on the water' : ''}`, /* A visibility only when it confirms the fog (2 mi or under): an inland airport's 10 mi says nothing of a bank on the beach (src/core/fogRisk.ts). */ detail: fog.hour.visMi === null || fog.hour.visMi > 2 ? undefined : `vis ${fog.hour.visMi >= 1 ? Math.round(fog.hour.visMi * 10) / 10 : 'under 1'} mi` }
     const golden: TapInRow = { label: 'Golden', value: span('golden'), detail: 'soft light' }
-    const colour: TapInRow = { label: 'Color', value: span('color'), detail: peak !== null ? `peak ${clock(peak)}` : read?.colorFrom != null ? "the call's window" : `around ${kind}` }
+    /* The colour span is the afterglow, sunset to −4° (src/core/sunBand.ts): its peak when the call has one, else which side of the event it is. */
+    const colour: TapInRow = { label: 'Color', value: span('color'), detail: peak !== null ? `peak ${clock(peak)}` : kind === 'sunset' ? 'after sunset' : 'before sunrise' }
     const blue: TapInRow = { label: 'Blue hour', value: span('blue') }
     const shared = { key: kind === soonest ? 'skycall' : 'skycall-picked', value: colorWords(read?.call ?? null) ?? '' }
     const actions = [
       ...(onBestSky === undefined ? [] : [{ label: 'Best spot near me', onClick: onBestSky, primary: true }]),
       ...(onViewfinder === undefined ? [] : [{ label: 'Viewfinder', onClick: onViewfinder }]),
     ]
+    const fogWords = fog === null || !fogHigh ? null : fog.line !== null ? 'fog on the beach' : fog.hour.coastal && fog.hour.kind === 'sea' ? 'fog low on the water' : 'fog'
+    const sub =
+      event === null
+        ? 'No sunrise or sunset ahead in the forecast'
+        : [peak !== null ? `Peak ${clock(peak)}` : `${word} ${clock(event)}`, look === null ? null : `look ${compassPoint(look)}`, pink === null ? null : `pink ${pink} ${kind === 'sunset' ? 'after' : 'before'}`, fogWords].filter((x) => x !== null).join(' · ')
+    const label = scene === null ? 'No sun position for this event' : `The sky toward the ${kind}: ${scene.layers.map((l) => `${l.label}${l.lit ? ', lit' : ''}`).join('; ') || 'no cloud to light'}${scene.fog === null ? '' : '; fog on the horizon'}, the sun ${scene.sun.label}`
     return {
       hero: {
-        eyebrow: `${eventTabLabel(kind, event, realNow, timeZone)} · ${event === null ? word : `${word} ${clock(event)}`}`,
+        eyebrow: event === null ? word : `${eventDayWord(kind, event, realNow, timeZone)} · ${word} ${clock(event)}`,
         value: brief.status === 'loading' && read === null ? '…' : colorHeadline(read?.call ?? null),
-        sub: event === null ? 'No sunrise or sunset ahead in the forecast' : `${peak !== null ? `Peak ${clock(peak)}` : `${word} ${clock(event)}`}${look === null ? '' : ` · look ${compassPoint(look)}`}${pink === null ? '' : ` · pink ${pink} ${kind === 'sunset' ? 'after' : 'before'}`}`,
+        sub,
         shared,
       },
       children: (
         <div className="spage__callwhy">
-          <p className="spage__why">{plainReason(read?.why ?? null) ?? (brief.status === 'loading' ? 'Reading the forecast…' : 'The forecast did not say.')}</p>
+          {fog?.line == null ? null : (
+            <p className="spage__fogline" data-fog-line>
+              {fog.line}
+            </p>
+          )}
           {doubt === null ? null : <p className="spage__doubt" data-doubt>{doubt.line}</p>}
+          {SKY_PICTURE_FLAT ? <p className="spage__why">{plainReason(read?.why ?? null) ?? (brief.status === 'loading' ? 'Reading the forecast…' : 'The forecast did not say.')}</p> : null}
         </div>
       ),
-      chart: <SkyPicture pic={pic} label={`The sky toward the ${kind}: ${pic?.deck?.label ?? 'no deck to light'}${pic?.gap === null || pic === null ? '' : `, ${pic.gap.label}`}, the sun ${pic?.sun.label ?? '—'}`} />,
-      rows: kind === 'sunset' ? [golden, colour, blue, moonRow] : [blue, colour, golden, moonRow],
+      chart: SKY_PICTURE_FLAT ? <SkyPicture pic={pic} label={`The sky toward the ${kind}: ${pic?.deck?.label ?? 'no deck to light'}`} /> : <SkyScene scene={scene} label={label} />,
+      rows: kind === 'sunset' ? [golden, colour, blue, fogRow ?? moonRow] : [blue, colour, golden, fogRow ?? moonRow],
       ...(onDetail === undefined ? {} : { onMore: () => onDetail('fire') }),
       actions,
       safety: 'Forecasts can be wrong · look first',
@@ -414,23 +448,31 @@ export function SkyPage({ venue, placeName, timeZone, now, onBack, onViewfinder,
 const WHY_WORD = { sun: 'faces the sun', deck: 'faces the deck', nearest: 'nearest' } as const
 
 function NowCams({ cams, miles, showRoad, onShowRoad }: { cams: SkyNowCams | null; miles: boolean; showRoad: boolean; onShowRoad: () => void }) {
-  const dist = (km: number) => formatRange(km * 1000, miles ? 'ft' : 'm')
+  /* Batch SIMPLE-3, Sections 3.3 and 3.7: whole miles (or km), "here" under a kilometre, never "0 ft" (src/core/cloudLayerName.ts). */
+  const dist = (km: number) => (km < 1 ? 'here' : distanceWords(km, miles))
   if (cams === null) return <p className="snow__none">Finding the cams near you…</p>
   const big = cams.big
   return (
     <section className="snow" aria-label="Sky cams">
       {big === null ? (
-        <p className="tipage__card snow__none">No sky cam within 15 km.</p>
+        <p className="tipage__card snow__none">No sky cam within {distanceWords(CAM_MAX_KM, miles)}.</p>
       ) : (
-        /* A link out: the owner's page opens in the browser. Nothing of the cam is fetched, shown or kept here (embed false). */
-        <a className="tipage__card snow__big" href={big.cam.url} target="_blank" rel="noopener noreferrer" data-embed={String(big.cam.embed)} data-cam={big.cam.id}>
+        /*
+         * Batch SIMPLE-3, Section 3.7: a still only where the owner allows it in the app (cams.json embed); today none
+         * does (docs/batches/simple2-decisions.md), so every big card is a link out, said plainly: the owner's page
+         * opens in the browser. Nothing of the cam is fetched, shown or kept here.
+         */
+        <a className="tipage__card snow__big snow__big--out" href={big.cam.url} target="_blank" rel="noopener noreferrer" data-embed={String(big.cam.embed)} data-cam={big.cam.id}>
           <span className="snow__chip">
             {big.cam.name}
             {big.cam.facing === null ? '' : ` · faces ${compassPoint(big.cam.facing)}`}
           </span>
           <span className="snow__why">{cams.bigWhy === null ? '' : WHY_WORD[cams.bigWhy]}</span>
           <span className="snow__meta">
-            {camKind(big.cam)} · {big.cam.operator} · {dist(big.km)} <b>link out ↗</b>
+            {camKind(big.cam)} · {big.cam.operator} · {dist(big.km)}
+          </span>
+          <span className="snow__out">
+            <b>Live on {big.cam.operator}&rsquo;s site · link out ↗</b>
           </span>
         </a>
       )}

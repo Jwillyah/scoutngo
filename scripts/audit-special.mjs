@@ -79,6 +79,16 @@ async function routes(ctx) {
       asked.week += 1
       return route.fulfill({ json: week(u) })
     }
+    /*
+     * The week's mid and high cloud (src/lib/specialLightData.ts thinUrl): none. Batch SIMPLE-3, Section 1: the fog
+     * rule is src/core/fogRisk.ts's now, whose radiation fog needs a clear-ish sky (low AND mid cloud under 50%), so
+     * without this answer the fog could not be said at all.
+     */
+    if ((u.searchParams.get('hourly') ?? '') === 'cloud_cover_mid,cloud_cover_high') {
+      const hs = hoursOf(7)
+      const models = (u.searchParams.get('models') ?? '').split(',')
+      return route.fulfill({ json: { latitude: PIER.lat, longitude: PIER.lon, hourly: { time: hs.map((t) => t.toISOString().slice(0, 16)), ...Object.fromEntries(models.flatMap((m) => [[`cloud_cover_mid_${m}`, hs.map(() => 0)], [`cloud_cover_high_${m}`, hs.map(() => 0)]])) } } })
+    }
     return route.fulfill({ status: 503, body: 'not in this audit' })
   })
   await ctx.route(/marine-api\.open-meteo\.com/, async (route) => {

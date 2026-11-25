@@ -11,7 +11,7 @@
  * before; the models are the gate's fake Open-Meteo.
  *
  *   opens     on Now at 10:30 AM (src/core/skyTabs.ts skyOpenTab)
- *   tabs      Now · Tonight · Sunrise · Night, in that order, each a tap
+ *   tabs      Now · Sunrise · Sunset · Night (fixed, Batch SIMPLE-3 S3.1; the day in the eyebrow), each a tap
  *   Now       the cams: a big card and links, every one a link out to its
  *             owner (target _blank, noopener), no <img>, <video> or <iframe>
  *             of a cam anywhere (nothing fetched or kept by us); rows Clouds
@@ -69,8 +69,9 @@ const LOOKS = [
 ]
 const TABS = [
   { id: 'now', pill: /^Now$/, rows: ['Clouds', 'Moving', 'Rare light', 'Next', 'More details'] },
-  { id: 'tonight', pill: /^Tonight$/, rows: ['Golden', 'Color', 'Blue hour', 'Moon', 'More details'] },
-  { id: 'tmrw-am', pill: /^Sunrise$/, rows: ['Blue hour', 'Color', 'Golden', 'Moon', 'More details'] },
+  /* Batch SIMPLE-3, Section 3.1: fixed pills; the day is in the eyebrow. The last row is the Moon, or the Fog when there is fog at the event (S1.2). */
+  { id: 'sunrise', pill: /^Sunrise$/, rows: ['Blue hour', 'Color', 'Golden', 'Moon|Fog', 'More details'] },
+  { id: 'sunset', pill: /^Sunset$/, rows: ['Golden', 'Color', 'Blue hour', 'Moon|Fog', 'More details'] },
   { id: 'night', pill: /^Night$/, rows: ['Next full', 'Next new', 'Darkest nights', 'Milky Way', 'Next shower'] },
 ]
 
@@ -113,6 +114,7 @@ const LOOK = `(() => {
     values: rows.map((r) => r.querySelector('.tipage__val')?.textContent?.trim() ?? null),
     actions: [...root.querySelectorAll('.tipage__btn')].map((b) => b.textContent),
     picture: !!root.querySelector('svg[data-sky-picture], .skypic__none'),
+    scene: root.querySelector('[data-sky-scene]') === null ? null : { layers: root.querySelectorAll('[data-sky-scene] [data-layer]').length, ground: root.querySelectorAll('[data-sky-scene] [data-ground]').length, sentence: root.querySelector('[data-scene-sentence]')?.textContent ?? '' },
     camLinks: links.length,
     camLinksOut: links.every((a) => a.target === '_blank' && /noopener/.test(a.rel) && /^https:/.test(a.href)),
     camMedia: root.querySelectorAll('.snow img, .snow video, .snow iframe, .snow picture').length,
@@ -219,7 +221,7 @@ try {
     /* The rule: 10:30 AM, between sunrise + 30 min and sunset - 90 min, is Now. */
     const day = getTimes(new Date('2026-11-19T17:00:00Z'), SPOT.lat, SPOT.lon)
     console.log(`  sunrise ${day.sunrise.toISOString()} sunset ${day.sunset.toISOString()}; opened on ${JSON.stringify(l.tabs.find((t) => t.on)?.t)}`)
-    if (l.tabs.map((t) => t.t).join('|') !== 'Now|Tonight|Sunrise|Night') fail(`${look.key}: the tabs read ${JSON.stringify(l.tabs.map((t) => t.t))}`)
+    if (l.tabs.map((t) => t.t).join('|') !== 'Now|Sunrise|Sunset|Night') fail(`${look.key}: the tabs read ${JSON.stringify(l.tabs.map((t) => t.t))}`)
     if (l.tabs[0]?.on !== true) fail(`${look.key}: at 10:30 AM the Sky page opened on ${JSON.stringify(l.tabs.find((t) => t.on)?.t)}, not Now`)
 
     for (const tab of TABS) {
@@ -243,7 +245,7 @@ try {
       await page.screenshot({ path: join(OUT, `sky-${tab.id}-${look.key}.png`) })
       if (t.title !== 'Sky') fail(`${k}: the title reads ${JSON.stringify(t.title)}`)
       if (!/^Chic.s Beach · now$/.test(t.sub ?? '')) fail(`${k}: the line under the title reads ${JSON.stringify(t.sub)}`)
-      if (JSON.stringify(t.labels) !== JSON.stringify(tab.rows)) fail(`${k}: the rows are ${JSON.stringify(t.labels)}, not ${JSON.stringify(tab.rows)}`)
+      if (t.labels.length !== tab.rows.length || tab.rows.some((r, i) => !r.split('|').includes(t.labels[i]))) fail(`${k}: the rows are ${JSON.stringify(t.labels)}, not ${JSON.stringify(tab.rows)}`)
       if (t.how !== 'How we got this ›') fail(`${k}: the foot's left reads ${JSON.stringify(t.how)}`)
       if (t.safety === null || t.safety.trim() === '') fail(`${k}: no safety line at the foot`)
       if (/\bsafe\b|\ball clear\b|\bclear to\b|\bclear of\b/i.test(t.text)) fail(`${k}: the page says safe or clear`)
@@ -274,11 +276,21 @@ try {
           }
         }
       }
-      if (tab.id === 'tonight' || tab.id === 'tmrw-am') {
+      if (tab.id === 'sunset' || tab.id === 'sunrise') {
         if (!/^(Color (likely|possible|unlikely)|No call yet)$/.test(t.value ?? '')) fail(`${k}: the call reads ${JSON.stringify(t.value)}`)
         if (!t.picture) fail(`${k}: no drawn sky and no words saying why`)
+        /* The eyebrow says the event's day, the pill never does (S3.1). */
+        if (!/^(Tonight|This morning|Tomorrow AM|Tomorrow PM|[A-Z][a-z]{2} \d{1,2} [A-Z][a-z]{2}) · (Sunset|Sunrise) \d{1,2}:\d\d [AP]M$/.test(t.eyebrow ?? '')) fail(`${k}: the eyebrow reads ${JSON.stringify(t.eyebrow)}, not the day and the event`)
+        /* The scene (S3.2): drawn, with its ground along the horizon and one sentence; no "high cirrus" or km under a feet user. */
+        if (t.scene === null) fail(`${k}: no sky scene ([data-sky-scene])`)
+        else {
+          if (t.scene.ground === 0) fail(`${k}: the scene has no water or land along the horizon`)
+          if (!/\.$/.test(t.scene.sentence.trim())) fail(`${k}: the scene's sentence reads ${JSON.stringify(t.scene.sentence)}`)
+        }
+        if (/high cirrus|\d km\b/.test(t.text)) fail(`${k}: a layer named by the models' band or in km: ${JSON.stringify(/.{0,30}(high cirrus|\d km\b).{0,30}/.exec(t.text)?.[0])}`)
         if (!/^(Golden|Blue hour)/.test(t.values[0] ?? '') && !/\d:\d\d [AP]M–\d/.test(t.values[0] ?? '')) fail(`${k}: the first light row reads ${JSON.stringify(t.values[0])}`)
-        if (!/^\d+% · (up|down)/.test(t.values[3] ?? '')) fail(`${k}: the Moon row reads ${JSON.stringify(t.values[3])}`)
+        if (t.labels[3] === 'Moon' && !/^\d+% · (up|down)/.test(t.values[3] ?? '')) fail(`${k}: the Moon row reads ${JSON.stringify(t.values[3])}`)
+        if (t.labels[3] === 'Fog' && !/^(Likely|Possible)/.test(t.values[3] ?? '')) fail(`${k}: the Fog row reads ${JSON.stringify(t.values[3])}`)
         if (JSON.stringify(t.actions) !== JSON.stringify(['Best spot near me ›', 'Viewfinder ›'])) fail(`${k}: the buttons are ${JSON.stringify(t.actions)}`)
       }
       if (tab.id === 'night') {
@@ -292,11 +304,11 @@ try {
       }
     }
 
-    /* The Viewfinder, from Tonight: the camera with the guides, then refused: the compass-only view. */
-    await page.locator('.tipage.spage .tipage__tabs [role="tab"]', { hasText: /^Tonight$/ }).first().tap().catch(() => {})
+    /* The Viewfinder, from Sunset: the camera with the guides, then refused: the compass-only view. */
+    await page.locator('.tipage.spage .tipage__tabs [role="tab"]', { hasText: /^Sunset$/ }).first().tap().catch(() => {})
     await wait(600)
     const vfOpened = await page.locator('.tipage.spage .tipage__btn', { hasText: 'Viewfinder' }).first().tap({ timeout: 4000 }).then(() => true, () => false)
-    if (!vfOpened) fail(`${look.key}: no Viewfinder button on Tonight`)
+    if (!vfOpened) fail(`${look.key}: no Viewfinder button on Sunset`)
     else {
       await wait(800)
       await page.getByRole('button', { name: /Open the camera/ }).tap({ timeout: 4000 }).catch(() => fail(`${look.key}: the Viewfinder did not offer to open the camera`))

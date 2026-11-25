@@ -3,6 +3,9 @@ import type { RadiusMi } from '../core/bestSky.ts'
 import type { LatLon } from '../core/geo.ts'
 import { formatClock } from '../core/timezone.ts'
 import { DEFAULT_RADIUS, useBestSky } from '../lib/useBestSky.ts'
+import { useBriefing } from '../lib/useBriefing.ts'
+import { useSkyCalls } from '../lib/useSkyCalls.ts'
+import { inlandFirst } from '../core/fogInland.ts'
 import { BestSkyList } from './BestSkyList.tsx'
 import { BestSkyMap } from './BestSkyMap.tsx'
 import { BestSkySpot } from './BestSkySpot.tsx'
@@ -36,8 +39,17 @@ export function BestSkyPage({ venue, placeName, timeZone, now, miles, saved = []
   const [page, setPage] = useState(0)
   const [picked, setPicked] = useState<string | null>(null)
   const track = useRef<HTMLDivElement>(null)
-  const sky = useBestSky(venue, radius, now, saved)
-  const ev = sky.event
+  const found = useBestSky(venue, radius, now, saved)
+  const ev = found.event
+  /*
+   * Batch SIMPLE-3, Section 1.3: the one sky call (src/lib/useSkyCalls.ts) for
+   * this event. When it was dropped for fog on the beach, its line shows here
+   * and the inland spots go first (src/core/fogInland.ts).
+   */
+  const one = useSkyCalls(useBriefing(venue, timeZone, now, true), venue, now, timeZone)
+  const evCall = ev === null ? null : one[ev.kind]
+  const fogLine = evCall !== null && ev !== null && Math.abs(evCall.event.getTime() - ev.at.getTime()) < 30 * 60_000 ? (evCall.fog?.line ?? null) : null
+  const sky = { ...found, ranked: inlandFirst(found.ranked, fogLine !== null) }
   /* Sideways only, and each page from its top: the three share one vertical scroller, so a page would otherwise open at the last one's depth. */
   const toTop = () => track.current?.closest('.ppage__body')?.scrollTo({ top: 0 })
   const go = (i: number) => {
@@ -59,6 +71,11 @@ export function BestSkyPage({ venue, placeName, timeZone, now, miles, saved = []
 
   return (
     <PageShell kind="bsky" title={title} sub={sub} ground="night" onBack={onBack} how={<BestSkyHow asked={sky.asked} satAt={sky.satAt} timeZone={timeZone} />}>
+      {fogLine === null ? null : (
+        <p className="bsky__fog" data-fog-line>
+          {fogLine}: the spots away from the water first.
+        </p>
+      )}
       <div className="bsky__dots" role="tablist" aria-label="Pages">
         {PAGES.map((p, i) => (
           <button key={p} type="button" role="tab" aria-label={p} aria-selected={page === i} className={`home__dot${page === i ? ' home__dot--on' : ''}`} onClick={() => go(i)} />

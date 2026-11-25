@@ -441,8 +441,8 @@ try {
   await goHome(ev, wait)
   await homeTile(ev, wait, 'sky')
   await wait(1500)
-  /* By position: the two event pills say the event's day ("Tonight" / "Tmrw PM", "This AM" / "Sunrise", src/core/skyTabs.ts eventTabLabel). */
-  for (const [i, pill] of ['Now', 'the evening', 'the morning', 'Night'].entries()) {
+  /* By position: the fixed pills Now · Sunrise · Sunset · Night (Batch SIMPLE-3, Section 3.1; src/core/skyTabs.ts SKY_TAB_LABEL). */
+  for (const [i, pill] of ['Now', 'Sunrise', 'Sunset', 'Night'].entries()) {
     const on = await ev(`(() => { const b = [...document.querySelectorAll('.tipage.spage .tipage__tabs [role="tab"]')][${i}]; b?.click(); return !!b })()`)
     if (!on) {
       fail(`the Sky page has no ${pill} tab`)

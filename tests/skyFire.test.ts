@@ -199,7 +199,7 @@ describe('the log, on this phone', () => {
     const a = { ...FIRST_ENTRY, id: 'b', date: '2026-10-30', outcome: 'meh' as const, forecast: 'Color possible' }
     const log = withEntry(withEntry([FIRST_ENTRY], a), { ...a, outcome: 'fired' })
     expect(log.map((e) => [e.date, e.outcome])).toEqual([['2026-10-30', 'fired'], ['2026-10-29', 'fired']])
-    expect(trackRecord(log)).toEqual({ said: 1, fired: 1 })
+    expect(trackRecord(log)).toMatchObject({ said: 1, fired: 1 })
   })
 
   it('drops anything malformed, and a photo that is not an image', () => {

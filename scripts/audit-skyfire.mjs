@@ -292,11 +292,18 @@ try {
       } else {
         if (!fire?.log) fail(`${label}: after sunrise there is no "How was it?"`)
         else {
-          await page.getByRole('button', { name: 'It fired' }).tap()
+          /* Batch SIMPLE-3, Section 3.5: five steps, Nothing · A little · Some · Good · Fired; one tap, changeable. */
+          const steps = await ev(`[...document.querySelectorAll('.fire__log [data-rating]')].map((b) => b.textContent.trim())`)
+          if (steps.join('|') !== 'Nothing|A little|Some|Good|Fired') fail(`${label}: the rating reads ${JSON.stringify(steps)}, not Nothing · A little · Some · Good · Fired`)
+          await page.locator('.fire__log [data-rating="some"]').tap()
+          await wait(200)
+          await page.locator('.fire__log [data-rating="fired"]').tap()
           await wait(300)
-          const kept = await ev(`JSON.parse(localStorage.getItem('scoutngo.fireLog.v1') ?? '[]').map((e) => e.date + ' ' + e.event + ' ' + e.outcome)`)
+          const kept = await ev(`JSON.parse(localStorage.getItem('scoutngo.fireLog.v1') ?? '[]').map((e) => e.date + ' ' + e.event + ' ' + e.outcome + ' ' + (e.rating ?? ''))`)
           console.log(`  log: ${JSON.stringify(kept)}`)
-          if (!kept.includes('2026-10-29 sunrise fired')) fail(`${label}: "It fired" was not kept`)
+          if (!kept.includes('2026-10-29 sunrise fired fired')) fail(`${label}: "Fired" was not kept`)
+          if (kept.filter((k) => k.startsWith('2026-10-29 sunrise') && !k.endsWith(' ')).length !== 1) fail(`${label}: changing the rating made a second entry`)
+          if (!(await ev(`!!document.querySelector('.fire__log [data-add-photo]') && !document.querySelector('.fire__log input[type=file]:not([hidden])')`))) fail(`${label}: no "Add photo" button, or the raw file input shows`)
           await ev(`document.querySelector('.fire__log')?.scrollIntoView({ block: 'center' })`)
           await wait(300)
           await page.screenshot({ path: join(OUT, `fire-log-${label}.png`) })

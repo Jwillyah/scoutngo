@@ -386,7 +386,11 @@ export interface FogSkyCall {
  * it, so the call and its read never disagree.
  */
 export function fogSkyCall(call: SkyCall, spot: FogSpot): FogSkyCall {
-  const fog = fogAt(spot, call.event)
+  return fogSkyCallAt(call, fogAt(spot, call.event))
+}
+
+/** fogSkyCall on the fog already read at the call's event (a screen's src/lib/useFogRain.ts fogAt): the same rule, one place. */
+export function fogSkyCallAt(call: SkyCall, fog: FogHour): FogSkyCall {
   const drops = fog.coastal && fog.level === 'high' && fog.kind !== 'radiation' && (call.call === 'Go' || call.call === 'Maybe')
   if (!drops || call.call === null) return { call, dropped: false, fog, line: null }
   const next = DOWN[call.call]

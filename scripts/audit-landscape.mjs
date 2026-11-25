@@ -69,7 +69,7 @@ await wait(1500)
 
 const MEASURE = `(() => {
   const r = (q) => { const e = document.querySelector(q); if (!e) return null; const b = e.getBoundingClientRect(); if (b.width < 2 || b.height < 2) return null; return { left: b.left, top: b.top, right: b.right, bottom: b.bottom, width: b.width, height: b.height } }
-  const chips = [...document.querySelectorAll('.chips2 > *')].map((c) => Math.round(c.getBoundingClientRect().top))
+  const chips = [...document.querySelectorAll('.chips2 .chip2')].map((c) => Math.round(c.getBoundingClientRect().top))
   return { vw: innerWidth, vh: innerHeight, detent: document.querySelector('.sheet')?.dataset.detent ?? null, parts: { bar: r('.topbar'), chips: r('.chips2'), sheet: r('.sheet'), dock: r('.tooldock'), rail: r('.rail2'), key: r('.shadowkey') }, chipRows: new Set(chips).size }
 })()`
 

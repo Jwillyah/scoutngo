@@ -274,11 +274,11 @@ export function SettingsPage(props: Props) {
 
       <Group title="Alerts">
         {/* Batch Beach, Section 6: one line for what it does and what it sends; the detail under How it works. */}
-        <Row label="Sky calls in my calendar" sub="Puts sunrise/sunset calls in your calendar · sends your spot rounded to ~1 km" end={<Toggle on={feed} label="Sky calls in my calendar" onChange={setFeed} />} />
+        <Row label="Sky calls in my calendar" sub={`Puts sunrise/sunset calls in your calendar · sends your spot rounded to ${units.distance === 'ft' ? '~0.7 mi' : '~1 km'}`} end={<Toggle on={feed} label="Sky calls in my calendar" onChange={setFeed} />} />
         <Row label="How it works" onClick={() => setFeedHow((v) => !v)} />
         {feedHow ? (
           <p className="set2__note" data-feed-how>
-            Off unless you switch it on. Your calendar app sends this spot, rounded to about a kilometre, to this app’s server each time it refreshes, about hourly. The server asks the forecast, and in the three hours before a sunrise or sunset the weather stations by their ids, so a call that changes from Maybe to Go or Skip changes in your calendar too; it logs nothing. Vercel’s own request logs keep the request line for an hour. Turn it off here and remove the calendar in your calendar app to stop it.
+            Off unless you switch it on. Your calendar app sends this spot, rounded to {units.distance === 'ft' ? 'about 0.7 mi' : 'about a kilometre'} (0.01° of latitude and longitude), to this app’s server each time it refreshes, about hourly. The server asks the forecast, and in the three hours before a sunrise or sunset the weather stations by their ids, so a call that changes from Maybe to Go or Skip changes in your calendar too; it logs nothing. Vercel’s own request logs keep the request line for an hour. Turn it off here and remove the calendar in your calendar app to stop it.
           </p>
         ) : null}
         {!feed || feedHref === null ? null : (

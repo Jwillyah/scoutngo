@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import '../styles/sky.css'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { getPosition } from 'suncalc'
 import type { LatLon } from '../core/geo.ts'
 import { disagreement, layersWords, skyWords } from '../core/metar.ts'
@@ -18,7 +19,8 @@ import { litUntilDeg } from '../core/underLight.ts'
 import { showGuide, useBestView } from '../lib/useBestView.ts'
 import { bestViewOnMap } from '../core/bestView.ts'
 import { formatClock } from '../core/timezone.ts'
-import { FIRST_ENTRY, OUTCOME_LABEL, readFireLog, trackRecord, withEntry, writeFireLog, type FireEntry, type FireOutcome } from '../lib/fireLog.ts'
+import { FIRST_ENTRY, OUTCOME_LABEL, OUTCOME_OF_RATING, photoTakenAt, RATING_LABEL, RATINGS, readFireLog, trackRecord, withEntry, writeFireLog, type FireEntry, type SkyRating } from '../lib/fireLog.ts'
+import { readPhotoFacts } from '../core/exif.ts'
 import { TruthLoop } from './TruthLoop.tsx'
 import { useOnline } from '../lib/useOnline.ts'
 import { useStationNow } from '../lib/useStationNow.ts'
@@ -140,34 +142,49 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
   const [log, setLog] = useState<FireEntry[]>(() => readFireLog())
   const [kept, setKept] = useState<string | null>(null)
   const toLog = eventToLog(realNow, venue, timeZone)
-  const logIt = (outcome: FireOutcome, photo: string | null) => {
+  /*
+   * Batch SIMPLE-3, Sections 3.5-3.6: five steps in the call's words, one tap,
+   * changeable (a second tap replaces the entry, the photo kept); "Add photo"
+   * shrinks the picture to a thumbnail on the phone and reads only its Exif
+   * time. Nothing of it leaves the phone (src/lib/fireLog.ts, localStorage).
+   */
+  const entryId = (day: string) => (toLog === null ? '' : `${day}-${toLog.kind}-${placeName}`)
+  const logIt = (rating: SkyRating, photo?: { data: string; at: number | null }) => {
     if (toLog === null) return
     const day = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(toLog.at)
+    const had = log.find((e) => e.id === entryId(day)) ?? null
     const entry: FireEntry = {
-      id: `${day}-${toLog.kind}-${placeName}`,
+      id: entryId(day),
       date: day,
       event: toLog.kind,
       place: placeName,
-      outcome,
-      /* What the page said for that event, when it is the one on it. */
-      forecast: event !== null && Math.abs(event.getTime() - toLog.at.getTime()) < 60_000 ? (verdict?.line ?? null) : null,
-      photo,
+      outcome: OUTCOME_OF_RATING[rating],
+      rating,
+      /* What the page said for that event, when it is the one on it. Stored as the call is named, "Color likely" (src/lib/fireLog.ts reads it back). */
+      forecast: event !== null && Math.abs(event.getTime() - toLog.at.getTime()) < 60_000 ? (said === null ? (verdict?.line ?? null) : said.charAt(0).toUpperCase() + said.slice(1)) : (had?.forecast ?? null),
+      photo: photo?.data ?? had?.photo ?? null,
+      photoAt: photo === undefined ? (had?.photoAt ?? null) : photo.at,
     }
     const next = withEntry(log, entry)
     setLog(next)
-    setKept(writeFireLog(next) ? `Logged: ${dayMonth(toLog.at, timeZone)} ${toLog.kind} · ${OUTCOME_LABEL[outcome]}` : 'Not kept: this phone\'s storage is full.')
+    setKept(writeFireLog(next) ? `Logged: ${dayMonth(toLog.at, timeZone)} ${toLog.kind} · ${RATING_LABEL[rating]}` : 'Not kept: this phone\'s storage is full.')
   }
-  const [outcome, setOutcome] = useState<FireOutcome | null>(null)
+  const [rating, setRating] = useState<SkyRating | null>(null)
+  const [shot, setShot] = useState<{ data: string; at: number | null } | null>(null)
+  const photoInput = useRef<HTMLInputElement | null>(null)
   const addPhoto = async (file: File | undefined) => {
-    if (file === undefined || outcome === null) return
+    if (file === undefined || rating === null) return
     try {
+      const at = photoTakenAt(readPhotoFacts(await file.arrayBuffer()), timeZone)
       const bitmap = await createImageBitmap(file)
       const scale = Math.min(1, 320 / Math.max(bitmap.width, bitmap.height))
       const c = document.createElement('canvas')
       c.width = Math.round(bitmap.width * scale)
       c.height = Math.round(bitmap.height * scale)
       c.getContext('2d')?.drawImage(bitmap, 0, 0, c.width, c.height)
-      logIt(outcome, c.toDataURL('image/jpeg', 0.7))
+      const got = { data: c.toDataURL('image/jpeg', 0.7), at }
+      setShot(got)
+      logIt(rating, got)
     } catch {
       setKept('That photo could not be read; the entry is kept without it.')
     }
@@ -190,19 +207,28 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
         <p className="fire__head">
           How was the {toLog.kind}, {dayMonth(toLog.at, timeZone)}?
         </p>
-        <div className="btn-row">
-          {(['fired', 'meh', 'nothing'] as const).map((o) => (
-            <button key={o} type="button" className={`btn btn--small${outcome === o ? ' btn--on' : ''}`} aria-pressed={outcome === o} onClick={() => { setOutcome(o); logIt(o, null) }}>
-              {OUTCOME_LABEL[o]}
+        <div className="btn-row fire__rate" role="group" aria-label="How much color">
+          {RATINGS.map((r) => (
+            <button key={r} type="button" className={`btn btn--small${rating === r ? ' btn--on' : ''}`} aria-pressed={rating === r} data-rating={r} onClick={() => { setRating(r); logIt(r) }}>
+              {RATING_LABEL[r]}
             </button>
           ))}
         </div>
         {kept === null ? null : <p className="fire__note fire__kept" role="status">{kept}</p>}
-        {outcome === null ? null : (
-          <label className="fire__photo">
-            Add a photo (stays on this phone)
-            <input type="file" accept="image/*" onChange={(e) => void addPhoto(e.target.files?.[0])} />
-          </label>
+        {rating === null ? null : (
+          <div className="fire__photo">
+            <input ref={photoInput} className="fire__photoinput" type="file" accept="image/*" hidden onChange={(e) => void addPhoto(e.target.files?.[0])} />
+            {shot === null ? (
+              <button type="button" className="btn btn--small" data-add-photo onClick={() => photoInput.current?.click()}>
+                Add photo
+              </button>
+            ) : (
+              <button type="button" className="fire__shot" data-add-photo onClick={() => photoInput.current?.click()} aria-label="Change the photo">
+                <img src={shot.data} alt="" className="fire__thumb" />
+                <span className="num">{shot.at === null ? 'no time in the photo' : formatClock(new Date(shot.at), timeZone)} · saved on this phone ✓</span>
+              </button>
+            )}
+          </div>
         )}
       </div>
     )
@@ -232,12 +258,14 @@ export function SkyFire({ venue, timeZone, placeName, at, now = () => new Date()
       <p className="fire__note">
         {log.length} {log.length === 1 ? 'entry' : 'entries'}, kept on this phone only.
         {record.said === 0 ? '' : ` It fired ${record.fired} of ${record.said} times the forecast said possible or likely.`}
+        {record.rated === 0 ? '' : ` Your rating sat on the call's step ${record.hits} of ${record.rated} times.`}
       </p>
       <ul className="fire__entries">
         {log.slice(0, 3).map((e) => (
           <li key={e.id}>
             {e.photo === null ? null : <img src={e.photo} alt="" className="fire__thumb" />}
-            {e.date} {e.event} · {e.place}: {OUTCOME_LABEL[e.outcome]}
+            {e.date} {e.event} · {e.place}: {e.rating == null ? OUTCOME_LABEL[e.outcome] : RATING_LABEL[e.rating]}
+            {e.photo === null || e.photoAt == null ? '' : ` · photo ${formatClock(new Date(e.photoAt), timeZone)}`}
             {e.id === FIRST_ENTRY.id ? ' (entry #1)' : ''}
           </li>
         ))}

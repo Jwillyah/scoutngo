@@ -8,6 +8,7 @@ import { keptOsmSpots } from '../lib/bestSkyOsm.ts'
 import { locateOnce, locateWords } from '../lib/locateOnce.ts'
 import { geocodeAsk, PICKER_KNOWN as KNOWN, PICKER_SPOTS as OWN, type GeoAnswer } from '../lib/spotSearchData.ts'
 import { Chip } from './ui.tsx'
+import { distanceWords } from '../core/cloudLayerName.ts'
 
 /*
  * WHERE DO YOU SHOOT? (Batch I, Section 1; board "BATCH I · first run").
@@ -25,7 +26,8 @@ const CHIPS: readonly { id: 'all' | Group; label: string }[] = [
   { id: 'beach', label: 'Beaches' },
   { id: 'town', label: 'Towns' },
 ]
-const miles = (km: number | null) => (km === null ? '' : km < 1.6 ? 'here' : `${Math.round(km / 1.609344)} mi`)
+/* Batch SIMPLE-3, Section 3.3: in miles (the app's default), through src/core/cloudLayerName.ts; "here" within a mile. */
+const miles = (km: number | null) => (km === null ? '' : km < 1.6 ? 'here' : distanceWords(km, true))
 
 interface SpotPickerProps {
   title: string
@@ -196,7 +198,7 @@ export function SpotPicker({ title, saved, around, initialQuery = '', onPick, on
                 <button type="button" className="spick__row" onClick={() => onPick(s.spot.at, s.spot.name)}>
                   <span className="spick__name">{s.spot.name}</span>
                   <span className="spick__sub">
-                    {s.kind} · {s.km < 1 ? 'here' : `${Math.round(s.km * 0.621)} mi`}
+                    {s.kind} · {miles(s.km)}
                     {s.facingWord === null ? '' : ` · ${s.facingWord}`}
                   </span>
                 </button>
@@ -228,7 +230,7 @@ export function SpotPicker({ title, saved, around, initialQuery = '', onPick, on
           </ul>
         </>
       )}
-      <p className="spick__foot">Kept on this phone only. Forecasts are asked for the spot rounded to about a kilometre.</p>
+      <p className="spick__foot">Kept on this phone only. Forecasts are asked for the spot rounded to about 0.7 mi.</p>
     </div>
   )
 }

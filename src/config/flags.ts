@@ -117,3 +117,11 @@ export const WIND_PAGE_OLD_FIRST = false
  * planner, unchanged. OFF: Plan a shoot opens the planner directly, as before.
  */
 export const DAY_SHEET_FIRST = true
+
+/*
+ * Batch SIMPLE-3, Section 3.2 (mockups Sky_Sunrise2, Sky_Sunset2): the Sky
+ * page's Sunrise and Sunset tabs draw the sky scene (src/components/
+ * SkyScene.tsx: every layer at its height, lit undersides, fog, water or
+ * land). ON: SIMPLE-2's flat picture (src/components/SkyPicture.tsx) instead.
+ */
+export const SKY_PICTURE_FLAT = false

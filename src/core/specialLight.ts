@@ -36,6 +36,9 @@
  * not hidden by low cloud at the venue (src/lib/specialLightData.ts).
  */
 import { normalizeBearing } from './sun.ts'
+import { fogAt, type FogSpot } from './fogRisk.ts'
+
+const KT_MPS = 0.514444
 
 export const FOG_SPREAD_F = 2
 export const FOG_WIND_KT = 6
@@ -72,17 +75,47 @@ export interface FogInput {
   windKt: number | null
   /** The sea's surface temperature, °C, or null inland. */
   seaC: number | null
+  /** The hour and the place: night or early morning is part of the radiation rule. */
+  at?: Date
+  lat?: number
+  lon?: number
+  /** The wind's direction (from), when the forecast gave one: the sea rule needs it. */
+  fromDeg?: number | null
+  /** The beach's facing; null inland or not known. */
+  facingDeg?: number | null
+  /** Low and mid cloud, per cent: the radiation rule's clear-ish sky. */
+  lowPct?: number | null
+  midPct?: number | null
 }
 
 export const fToC = (f: number): number => ((f - 32) * 5) / 9
 
+/*
+ * ONE FOG RULE (Batch SIMPLE-3, Section 1; failure mode A). This was a second
+ * fog rule of its own (dew point within 2 °F, wind under 6 kt, the sea colder
+ * than the air) beside src/core/fogRisk.ts, and the two disagreed. It is now
+ * fogRisk's rules on one model's hour, with no station: high is yes, low is
+ * no, and where a number the rules need is missing (the hour, the place, the
+ * cloud, the wind's direction at a beach), "could not say". FOG_SPREAD_F and
+ * FOG_WIND_KT stay only for the words of the older why lines.
+ */
 /** Null when a number the rule needs is missing: not "no fog", "could not say". */
 export function fogRule(h: FogInput): boolean | null {
-  if (h.tempF === null || h.dewF === null || h.windKt === null) return null
-  const close = h.tempF - h.dewF <= FOG_SPREAD_F
-  const calm = h.windKt < FOG_WIND_KT
-  const sea = h.seaC === null ? true : h.seaC < fToC(h.tempF)
-  return close && calm && sea
+  if (h.tempF === null || h.dewF === null || h.windKt === null || h.at === undefined || h.lat === undefined || h.lon === undefined) return null
+  const coastal = h.seaC !== null && h.facingDeg != null
+  const spot: FogSpot = {
+    lat: h.lat,
+    lon: h.lon,
+    facingDeg: coastal ? (h.facingDeg as number) : null,
+    waterC: coastal ? h.seaC : null,
+    hours: [{ at: h.at, tempC: fToC(h.tempF), dewC: fToC(h.dewF), windMps: h.windKt * KT_MPS, windFromDeg: h.fromDeg ?? null, visibilityM: null, lowCloudPct: h.lowPct ?? null, midCloudPct: h.midPct ?? null }],
+    stations: [],
+  }
+  /* A sea without a facing: the sea rule could not be read, so only a radiation fog can say yes. */
+  const f = fogAt(spot, h.at)
+  if (f.level === 'high') return true
+  if (h.seaC !== null && !coastal) return null
+  return f.level === null ? null : false
 }
 
 /* -------------------------------------------------------------- rainbow */

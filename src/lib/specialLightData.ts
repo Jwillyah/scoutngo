@@ -145,7 +145,8 @@ export function specialsFrom(week: SpecialWeek, venue: LatLon, seaCAt: (t: Date)
       .filter((x): x is number => x !== null)
     return all.length === 0 ? null : Math.max(...all)
   }
-  const fog = models.map((m) => week.hours.map((t, h) => fogRule({ tempF: at(m, 0, 'temperature_2m', h), dewF: at(m, 0, 'dew_point_2m', h), windKt: at(m, 0, 'wind_speed_10m', h), seaC: seaCAt(t) })))
+  /* Batch SIMPLE-3, Section 1: fogRisk's rules on each model's hour (src/core/specialLight.ts fogRule). The week asks no wind direction, so at a beach only a radiation fog can say yes; sea fog is the spot's one fog line's (src/lib/useFogRain.ts). */
+  const fog = models.map((m) => week.hours.map((t, h) => fogRule({ tempF: at(m, 0, 'temperature_2m', h), dewF: at(m, 0, 'dew_point_2m', h), windKt: at(m, 0, 'wind_speed_10m', h), seaC: seaCAt(t), at: t, lat: venue.lat, lon: venue.lon, lowPct: at(m, 0, 'cloud_cover_low', h), midPct: week.thin?.[m]?.mid[h] ?? null })))
   const rain = models.map((m) => week.hours.map((_, h) => rainbowRule(sun[h], showersNear(m, h))))
   const rays = models.map((m) => week.hours.map((_, h) => godRaysRule(sun[h], at(m, 0, 'cloud_cover_low', h))))
   const thin = week.thin

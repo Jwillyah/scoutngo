@@ -45,11 +45,25 @@ describe('the one moon drawing', () => {
     expect(xs(litPath(1, true)).length).toBeGreaterThan(0)
     expect(litPath(1, true)).toMatch(/A 49 49 0 0 1 50 1 Z$|A 49 49 0 0 0 50 1 Z$/)
   })
-  it('renders through the one glyph (the app’s .calm moon) at the size asked', () => {
+  it('renders as the app’s .calm moon, on the one lit path, at the size asked', () => {
     const h = renderToStaticMarkup(<MoonDrawing lit={0.72} waxing size={100} />)
-    expect(h).toContain('class="calm"')
+    expect(h).toContain('class="calm mdraw"')
     expect(h).toContain('width="100"')
     expect(h).toContain('calm__lit')
     expect(renderToStaticMarkup(<MoonDrawing lit={0} waxing size={40} />)).not.toContain('calm__lit')
   })
+  /* Batch SIMPLE-3, Section 2b.3: moon-coloured, with a few soft seas, cut by the phase. */
+  it('is moon-coloured with soft seas at a big size, clipped to the lit part; a strip moon has none', () => {
+    const big = renderToStaticMarkup(<MoonDrawing lit={0.72} waxing size={96} strong />)
+    expect(big).toContain('mdraw__lit')
+    expect(big).toContain('data-maria="7"')
+    expect((big.match(/mdraw__mare/g) ?? []).length).toBe(7)
+    expect(big).toMatch(/<clipPath id="mlit[^"]+"><path d="M 48 1 A 47 47 0 0 1 48 95/)
+    const small = renderToStaticMarkup(<MoonDrawing lit={0.72} waxing size={22} />)
+    expect(small).toContain('mdraw__lit')
+    expect(small).not.toContain('mdraw__mare')
+    /* New moon: no lit part, so no seas either. */
+    expect(renderToStaticMarkup(<MoonDrawing lit={0} waxing size={96} />)).not.toContain('mdraw__mare')
+  })
 })
+

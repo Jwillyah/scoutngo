@@ -175,11 +175,11 @@ try {
         await goHome(ev, wait)
         await homeTile(ev, wait, 'sky')
         /*
-         * Batch SIMPLE-2, Section 4: the call is on the Sky page's Tonight and Sunrise tabs; the soonest event's
-         * carries data-shared="skycall" (the other, "skycall-picked"). Both tabs are read and put together.
+         * Batch SIMPLE-2, Section 4: the call is on the Sky page's Sunrise and Sunset tabs (fixed pills, Batch SIMPLE-3,
+         * Section 3.1); the soonest event's carries data-shared="skycall" (the other, "skycall-picked"). Both are read.
          */
         const sky = {}
-        for (const pill of ['Tonight', 'Tmrw PM', 'This AM', 'Sunrise']) {
+        for (const pill of ['Sunset', 'Sunrise']) {
           if (!(await tap(`.tipage.spage .tipage__tabs [role="tab"]:text-is("${pill}")`))) continue
           let got = {}
           for (let i = 0; i < 20; i += 1) {

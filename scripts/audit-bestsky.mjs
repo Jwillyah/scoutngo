@@ -139,7 +139,7 @@ try {
     if (coldAsked !== 0) fail(`${label}: the home asked the grid ${coldAsked} times before Best Sky was opened`)
     if (!(await tap('.home [data-tile="sky"]'))) fail(`${label}: the home's Sky tile did not open`)
     await wait(2500)
-    /* Batch SIMPLE-2, Section 4: "Best spot near me ›" is on the Sky page's Tonight (and Sunrise) tab. */
+    /* Batch SIMPLE-2, Section 4: "Best spot near me ›" is on the Sky page's Sunrise and Sunset tabs (Sunrise is second, SIMPLE-3 S3.1). */
     await tap('.tipage.spage .tipage__tabs [role="tab"] >> nth=1')
     await wait(800)
     if (!(await tap('.tipage.spage .tipage__btn:has-text("Best spot near me")'))) fail(`${label}: the Sky page's "Best spot near me" did not open`)

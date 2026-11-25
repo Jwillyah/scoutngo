@@ -17,6 +17,7 @@ import {
   type Strip,
 } from '../core/skyColour.ts'
 import { formatClock } from '../core/timezone.ts'
+import { cloudHeightWords, cloudLayerLabel } from '../core/cloudLayerName.ts'
 import type { Cover } from '../core/clouds.ts'
 import { fourSkies, weekOfSkies, type ModelSky } from '../core/skyPages.ts'
 import { skyWords } from '../core/metar.ts'
@@ -55,6 +56,8 @@ interface Props {
   timeZone: string
   at: Date
   now?: () => Date
+  /** Heights in ft and distances in mi (the app's default); m and km when false. */
+  miles?: boolean
   /**
    * Inside Sky fire (Batch E, 1 Nov): the event Sky fire's own switch picked,
    * and no second switch or verdict here; the page had both twice.
@@ -104,17 +107,20 @@ function SkyPicture({ sunAzimuthDeg, sunAltitudeDeg, cover, width, height, label
 
 const pct = (x: number | null) => (x === null ? '—' : `${Math.round(x)}%`)
 
-function StripRow({ s, clock, name }: { s: Strip; clock: (d: Date) => string; name?: (l: Layer) => string }) {
-  const word = name?.(s.layer) ?? LAYER_WORD[s.layer]
+function StripRow({ s, clock, name, miles }: { s: Strip; clock: (d: Date) => string; name?: (l: Layer) => string; miles: boolean }) {
+  const given = name?.(s.layer) ?? LAYER_WORD[s.layer]
   /* A measured deck's words carry its height (Batch J); the models' typical height is said only for theirs. */
-  const measured = word !== LAYER_WORD[s.layer]
+  const measured = given !== LAYER_WORD[s.layer]
+  /* Batch SIMPLE-3, Section 3.3: the models' layer named from its height and said in the shooter's units, never "high cirrus 8 km" (src/core/cloudLayerName.ts). */
+  const typical = cloudLayerLabel({ layer: s.layer, typicalHeightM: s.heightM, truth: null, miles })
+  const word = measured ? given : typical.name
   const n = s.minutes.length
   const zero = -CLOCK_FROM_MIN
   return (
     <div className="prev__row">
       <span className="prev__layer">
         {word}
-        {measured ? null : <span className="prev__h num"> {Math.round(s.heightM / 100) / 10} km</span>}
+        {measured ? null : <span className="prev__h num"> {typical.height}</span>}
       </span>
       <svg className="prev__strip" viewBox={`0 0 ${n} 10`} preserveAspectRatio="none" role="img" aria-label={`${word}: the colour of its light from ${clock(s.minutes[0].at)} to ${clock(s.minutes[n - 1].at)}`}>
         {s.minutes.map((m, i) => (
@@ -126,7 +132,7 @@ function StripRow({ s, clock, name }: { s: Strip; clock: (d: Date) => string; na
   )
 }
 
-export function SkyPreview({ venue, timeZone, at, now = () => new Date(), kind: given, onJump, show }: Props) {
+export function SkyPreview({ venue, timeZone, at, now = () => new Date(), kind: given, onJump, show, miles = true }: Props) {
   const wanted = show === 'strip' ? [0] : show === 'compare' ? [1, 2] : [0, 1, 2]
   const events = useMemo(() => nextEvents(at, venue), [at, venue])
   const firstKind: Kind = events.sunrise !== null && (events.sunset === null || events.sunrise < events.sunset) ? 'sunrise' : 'sunset'
@@ -253,7 +259,7 @@ export function SkyPreview({ venue, timeZone, at, now = () => new Date(), kind: 
                   {show === 'strip' ? null : <p className="prev__words">{strips.some((s) => stripTimes(s).glowFrom !== null) ? clockWords(strips, kind, clock) : `Nothing lit that you could see: ${WHY_WORDS[verdict.why ?? 'none']}.`}</p>}
                   <div className="prev__strips">
                     {strips.map((s) => (
-                      <StripRow key={s.layer} s={s} clock={clock} name={name} />
+                      <StripRow key={s.layer} s={s} clock={clock} name={name} miles={miles} />
                     ))}
                     <div className="prev__ticks num" aria-hidden="true">
                       <span>{clock(new Date(event.getTime() + CLOCK_FROM_MIN * 60_000))}</span>
@@ -264,7 +270,7 @@ export function SkyPreview({ venue, timeZone, at, now = () => new Date(), kind: 
                   {show === 'strip' ? null : <details className="prev__how">
                     <summary aria-label="How this is worked out">i</summary>
                     <p>
-                      The colour of sunlight reaching each cloud’s base, each minute: the sun’s height with refraction, the cloud’s own horizon (it sees the sun sqrt(2h/R) below yours), the air along the light’s path, and how much blue that air and the haze take out. Haze: aerosol optical depth {aod === null ? '0.1, assumed (the air-quality forecast did not answer)' : `${aod.toFixed(2)} from Open-Meteo`}. Heights: {strips.map((s) => `${LAYER_WORD[s.layer]} ${Math.round(s.heightM)} m${s.layer === 'low' && lowBaseM !== null ? ` (${verdict.station?.station ?? 'station'})` : ' (typical)'}`).join(', ')}. The lit cloud is the sunward edge of the deck over you, still above your horizon: {strips.map((s) => `${LAYER_WORD[s.layer]} ${s.reachKm} km`).join(', ')}. The light’s own path is walked toward the sun, and cloud on it counts only where the ray is inside that cloud’s layer; a faded minute is one the cloud on the way blocks. The models’ mean cover is drawn, the same arithmetic as the verdict. Not counted: ozone, the cloud’s own thickness, light from the rest of the sky.
+                      The colour of sunlight reaching each cloud’s base, each minute: the sun’s height with refraction, the cloud’s own horizon (it sees the sun sqrt(2h/R) below yours), the air along the light’s path, and how much blue that air and the haze take out. Haze: aerosol optical depth {aod === null ? '0.1, assumed (the air-quality forecast did not answer)' : `${aod.toFixed(2)} from Open-Meteo`}. Heights: {strips.map((s) => `${cloudLayerLabel({ layer: s.layer, typicalHeightM: s.heightM, truth: null, miles }).name} ${cloudHeightWords(s.heightM, miles)}${s.layer === 'low' && lowBaseM !== null ? ` (${verdict.station?.station ?? 'station'})` : ' (typical)'}`).join(', ')}. The lit cloud is the sunward edge of the deck over you, still above your horizon: {strips.map((s) => `${cloudLayerLabel({ layer: s.layer, typicalHeightM: s.heightM, truth: null, miles }).name} ${s.reachKm === null ? '—' : miles ? `${Math.round(s.reachKm / 1.609344)} mi` : `${s.reachKm} km`}`).join(', ')}. The light’s own path is walked toward the sun, and cloud on it counts only where the ray is inside that cloud’s layer; a faded minute is one the cloud on the way blocks. The models’ mean cover is drawn, the same arithmetic as the verdict. Not counted: ozone, the cloud’s own thickness, light from the rest of the sky.
                     </p>
                   </details>}
                 </>
