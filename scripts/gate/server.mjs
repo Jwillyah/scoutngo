@@ -77,7 +77,23 @@ async function readBody(req) {
   return Buffer.concat(chunks)
 }
 
-const app = createServer(async (req, res) => {
+/*
+ * One client dropping a request must not take the gate down. A page that
+ * aborts a fetch while its body is still being read (ECONNRESET, "aborted")
+ * threw out of this async handler, the rejection went unhandled, and Node
+ * exited: on 24 Nov the sky piece's gates lost :5180 four minutes in, twice,
+ * and 46 audits failed to load a page. The error is now caught and written
+ * here, so the gate log still shows it.
+ */
+const app = createServer((req, res) => {
+  handle(req, res).catch((err) => {
+    console.error(`gate app: ${req.method} ${req.url?.slice(0, 120)}: ${err?.code ?? ''} ${err?.message ?? err}`)
+    if (!res.headersSent) res.writeHead(500)
+    res.end()
+  })
+})
+
+async function handle(req, res) {
   const url = new URL(req.url, `http://127.0.0.1:${GATE_APP_PORT}`)
   if (url.pathname === '/__gate/ledger') {
     res.writeHead(200, { 'content-type': 'application/json' })
@@ -133,11 +149,18 @@ const app = createServer(async (req, res) => {
     ...(gzip ? { 'content-encoding': 'gzip', vary: 'accept-encoding' } : {}),
   })
   res.end(gzip ? gzipSync(readFileSync(file)) : readFileSync(file))
-})
+}
 
 /* ------------------------------------------------------------------ the proxy */
 const certDir = mkdtempSync(join(tmpdir(), 'scoutngo-gate-cert-'))
 execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '2', '-subj', '/CN=scoutngo-gate-fixtures', '-keyout', join(certDir, 'key.pem'), '-out', join(certDir, 'cert.pem')], { stdio: 'ignore' })
+
+/* The proxy's side of the same rule: a dropped request is written down, never an exit. */
+function dropped(req, res, err) {
+  console.error(`gate proxy: ${req.method} ${req.url?.slice(0, 120)}: ${err?.code ?? ''} ${err?.message ?? err}`)
+  if (!res.headersSent) res.writeHead(500)
+  res.end()
+}
 
 async function fulfil(req, res, href, via) {
   if (req.method === 'OPTIONS') {
@@ -153,13 +176,13 @@ async function fulfil(req, res, href, via) {
 
 /* The HTTPS side: one TLS server, never listening, fed the sockets CONNECT hands over. */
 const tls = createTls({ key: readFileSync(join(certDir, 'key.pem')), cert: readFileSync(join(certDir, 'cert.pem')) }, (req, res) => {
-  fulfil(req, res, `https://${req.headers.host}${req.url}`, 'https')
+  fulfil(req, res, `https://${req.headers.host}${req.url}`, 'https').catch((err) => dropped(req, res, err))
 })
 
 const proxy = createServer((req, res) => {
   /* Plain HTTP through a proxy carries the absolute URL. */
   const href = /^https?:\/\//.test(req.url) ? req.url : `http://${req.headers.host}${req.url}`
-  fulfil(req, res, href, 'http')
+  fulfil(req, res, href, 'http').catch((err) => dropped(req, res, err))
 })
 proxy.on('connect', (req, socket, head) => {
   socket.write('HTTP/1.1 200 Connection Established\r\n\r\n')

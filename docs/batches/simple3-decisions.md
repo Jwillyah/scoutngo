@@ -266,3 +266,62 @@ it, and sky with it) → sky → wind bar.
   not the wind bar; its next gate is a fresh one.
 - On "resume": home+small gets a third gate (the code is done; Jwilly asked
   to carry on), then sky, then the wind bar, each with the full hook.
+
+## 19:30 — home+small committed (a548072); sky refused once (strike 1)
+
+- hs third gate: 51 of 52; offline the same empty day-card read, alone 0.
+  Committed and pushed. That offline read has now failed in four full
+  gates and passed alone every time: worth a look (the day card may be read
+  before it draws under load), listed as undone.
+- sky gate, 2 failed:
+  - sky fire: the logged photo row read "it said color likely". Sky's
+    SkyFire logged colorWords (lower case, for home lines) as the forecast.
+    It now stores the call's name, "Color likely", as before.
+  - landscape: "chips take 2 rows" and "chips over sheet by 338x36". The
+    new fog rule turns the fixture's fog on, so a rare-light status line
+    ("Fog likely now · 5 of 5 models") sits under the chips, and the
+    landscape panel's top assumed a 46 px chip row: the panel rode over the
+    line. Any status line (offline too) did this; the fixture never had
+    one. The panel now sits under PlanMode's measured --chips-bottom
+    (one-style.css), and the audit counts chip cells (.chip2), not the
+    row's children (a status line is not a chip; failure mode C).
+  - Both pass alone on the fixed tree.
+- gesture: on the sky tree it failed 3 runs of 4 ("only 3 of 6 drags arrived
+  as flicks"), HEAD passed alone 1 of 1. 840 fog-rule calls take 6 ms, so the
+  new fog rule is not the cost. Measuring more before the second gate.
+- Gesture on the sky tree, all runs: 2 passes in 7. Earlier trees (day, wx,
+  hs and day alone) were about 4 in 9. Every failure is the audit refusing
+  to measure ("only 3 of 6 drags arrived as flicks"), never a wrong landing
+  on the sky tree. Treated as the known flake; sky's second gate goes.
+- 19:56: sky's second gate lost its app server at about minute 4
+  (ERR_CONNECTION_REFUSED on :5180; "no app on :5180, starting one", three
+  times), so 46 of 52 audits failed to load a page. The audits before that
+  (home fit strip checks) were running normally. Infrastructure, not sky's
+  code; not counted as a strike. Re-run.
+
+## 22:05 — the sky gates' lost server was the gate's own bug
+
+- With the gate server's log kept: `Error: aborted ... code: 'ECONNRESET'`,
+  uncaught from a promise in scripts/gate/server.mjs. A page dropped a
+  request while the server read its body; the async handler had no catch,
+  so Node exited. The sky build drops such a request; earlier builds didn't
+  happen to. Not sky's defect: the server must outlive any one client.
+- Fix: both handlers catch, answer 500 when nothing was sent, and log the
+  drop. tests/gateServerAbort.test.ts fails on the old server (exit 1) and
+  passes on the new. Committed alone, before sky.
+- Still to look at: home fit counted 0 moment cards in 35 looks from the
+  home+small commit on (25 before). Checking whether that is S2b / S7.1's
+  intended change (no fish moment, the moon's moment narrowed) or a loss.
+- Moment cards: at the home-fit clocks (2 Nov 15:30Z and 20:00Z) the moon
+  gives none under either rule (old moonriseMoment and new moonHomeMoment
+  both null, checked by running them). The 25 cards before were the fish
+  moment, which every persona ranked and S7.1 removed on purpose (its
+  "calm run 7 AM–9 PM" was not a computed window). So 0 is intended, but
+  home fit no longer measures a moment card's fit at all (failure mode B):
+  it needs a clock with a moment on, e.g. the fixture week's sky colour or
+  a rain start. Listed as undone.
+- 22:28: the gate-server commit's gate failed "sky page" (no More details on
+  Tonight) and "style" (aborted at 600 s before its first step). Alone on the
+  same tree both pass (81 s, 107 s), and the fixed server logged no dropped
+  request. Premiere Pro had been opened 26 min before. Not known flakes, so a
+  full re-gate rather than a flake commit; counted as strike 1 for it.
